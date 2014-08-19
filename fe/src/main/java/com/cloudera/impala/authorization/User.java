@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.authorization;
 
+import com.google.common.base.Preconditions;
+
 /*
  * Class that represents a User of an Impala session.
  */
@@ -21,6 +23,7 @@ public class User {
   private final String name_;
 
   public User(String name) {
+    Preconditions.checkNotNull(name);
     this.name_ = name;
   }
 

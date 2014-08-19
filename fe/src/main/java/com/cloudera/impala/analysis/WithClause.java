@@ -76,7 +76,8 @@ public class WithClause implements ParseNode {
     // 'analyzer' (see IMPALA-1106).
     Analyzer withClauseAnalyzer = null;
     if (analyzer.isRootAnalyzer()) {
-      withClauseAnalyzer = new Analyzer(analyzer.getCatalog(), analyzer.getQueryCtx());
+      withClauseAnalyzer = new Analyzer(analyzer.getCatalog(), analyzer.getQueryCtx(),
+          analyzer.getAuthzConfig());
     } else {
       withClauseAnalyzer = new Analyzer(analyzer);
     }

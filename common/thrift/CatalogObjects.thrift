@@ -358,9 +358,9 @@ enum TPrivilegeLevel {
 // corresponding to a table must also specify all the parent objects (database name
 // and server name).
 struct TPrivilege {
-  // The Sentry defined name of this privilege. Will be in the form of:
-  // [ServerName]->[DbName]->[TableName]->[Action Granted] and may contain wildcard/"*"
-  // characters. The combination of role_id + privilege_name is guaranteed to be unique.
+  // A human readable name for this privilege. The combination of role_id +
+  // privilege_name is guaranteed to be unique. Stored in a form that can be passed
+  // to Sentry: [ServerName]->[DbName]->[TableName]->[Action Granted].
   1: required string privilege_name
 
   // The level of access this privilege provides.

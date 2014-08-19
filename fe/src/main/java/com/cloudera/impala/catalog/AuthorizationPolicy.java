@@ -14,9 +14,6 @@
 
 package com.cloudera.impala.catalog;
 
-import static org.apache.sentry.provider.common.ProviderConstants.AUTHORIZABLE_JOINER;
-import static org.apache.sentry.provider.common.ProviderConstants.KV_JOINER;
-
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,14 +22,15 @@ import org.apache.log4j.Logger;
 import org.apache.sentry.core.common.ActiveRoleSet;
 import org.apache.sentry.provider.cache.PrivilegeCache;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 /**
  * A thread safe authorization policy cache, consisting of roles, groups that are
- * members of that role, and the privileges associated with the role.
+ * members of that role, and the privileges associated with the role. The source data
+ * this cache is backing is read from the Sentry Policy Service. Writing to the cache
+ * will replace any matching items, but will not write back to the Sentry Policy Service.
  * A role can have 0 or more privileges and roles are stored in a map of role name
  * to role object. For example:
  * RoleName -> Role -> [RolePriv1, ..., RolePrivN]
@@ -58,11 +56,13 @@ public class AuthorizationPolicy implements PrivilegeCache {
   // Map of group name (case sensitive) to set of role names (case insensitive) that
   // have been granted to this group. Kept in sync with roleCache_. Provides efficient
   // lookups of Role by group name.
-  Map<String, Set<String>> grantGroups_ = Maps.newHashMap();
+  Map<String, Set<String>> groupsToRoles_ = Maps.newHashMap();
 
   /**
    * Adds a new role to the policy. If a role with the same name already
-   * exists it will be overwritten by the new role.
+   * exists and the role ID's are different, it will be overwritten by the new role.
+   * If a role exists and the role IDs are the same, the privileges from the old
+   * role will be copied to the new role.
    */
   public synchronized void addRole(Role role) {
     Role existingRole = roleCache_.get(role.getName());
@@ -72,22 +72,29 @@ public class AuthorizationPolicy implements PrivilegeCache {
         existingRole.getCatalogVersion() >= role.getCatalogVersion()) return;
 
     // If there was an existing role that was replaced we first need to remove it.
-    // TODO: only remove things that have changed?
-    if (existingRole != null) removeRole(role.getName());
+    if (existingRole != null) {
+      // Remove the role. This will also clean up the grantGroup mappings.
+      removeRole(existingRole.getName());
+      if (existingRole.getId() == role.getId()) {
+        // Copy the privileges from the existing role.
+        for (RolePrivilege p: existingRole.getPrivileges()) {
+          role.addPrivilege(p);
+        }
+      }
+    }
     roleCache_.add(role);
 
     // Add new grants
     for (String groupName: role.getGrantGroups()) {
-      Set<String> grantedRoles = grantGroups_.get(groupName);
+      Set<String> grantedRoles = groupsToRoles_.get(groupName);
       if (grantedRoles == null) {
         grantedRoles = Sets.newHashSet();
-        grantGroups_.put(groupName, grantedRoles);
+        groupsToRoles_.put(groupName, grantedRoles);
       }
       grantedRoles.add(role.getName().toLowerCase());
     }
 
     // Add this role to the role ID mapping
-    LOG.trace("Adding role: " + role.getName() + " ID: " + role.getId());
     roleIds_.put(role.getId(), role.getName());
   }
 
@@ -111,14 +118,32 @@ public class AuthorizationPolicy implements PrivilegeCache {
   }
 
   /**
-   * Returns all roles in the policy.
+   * Removes a privilege from the policy mapping to the role specified by the
+   * role ID in the privilege.
+   * Throws a CatalogException if no role with a corresponding ID exists in the catalog.
+   * Returns null if no matching privilege is found in this role.
+   */
+  public synchronized RolePrivilege removePrivilege(RolePrivilege privilege)
+      throws CatalogException {
+    Role role = getRole(privilege.getRoleId());
+    if (role == null) {
+      throw new CatalogException(String.format("Error removing privilege: %s. Role ID " +
+          "'%d' does not exist.", privilege.getName(), privilege.getRoleId()));
+    }
+    LOG.trace("Removing privilege: '" + privilege.getName() + "' from Role ID: " +
+        privilege.getRoleId() + " Role Name: " + role.getName());
+    return role.removePrivilege(privilege.getName());
+  }
+
+  /**
+   * Returns all roles in the policy. Returns an empty list if no roles exist.
    */
   public synchronized List<Role> getAllRoles() {
     return roleCache_.getValues();
   }
 
   /**
-   * Returns all role names in the policy.
+   * Returns all role names in the policy. Returns an empty set if no roles exist.
    */
   public synchronized Set<String> getAllRoleNames() {
     return Sets.newHashSet(roleCache_.keySet());
@@ -156,7 +181,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
    */
   public synchronized List<Role> getGrantedRoles(String groupName) {
     List<Role> grantedRoles = Lists.newArrayList();
-    Set<String> roleNames = grantGroups_.get(groupName);
+    Set<String> roleNames = groupsToRoles_.get(groupName);
     if (roleNames != null) {
       for (String roleName: roleNames) {
         // TODO: verify they actually exist.
@@ -177,12 +202,48 @@ public class AuthorizationPolicy implements PrivilegeCache {
     // Cleanup grant groups
     for (String grantGroup: removedRole.getGrantGroups()) {
       // Remove this role from all of its grant groups.
-      Set<String> roles = grantGroups_.get(grantGroup);
+      Set<String> roles = groupsToRoles_.get(grantGroup);
       if (roles != null) roles.remove(roleName.toLowerCase());
     }
     // Cleanup role id.
     roleIds_.remove(removedRole.getId());
     return removedRole;
+  }
+
+  /**
+   * Adds a new grant group to the specified role. Returns the updated
+   * Role, if a matching role was found. If the role does not exist a
+   * CatalogException is thrown.
+   */
+  public synchronized Role addGrantGroup(String roleName, String groupName)
+      throws CatalogException {
+    Role role = roleCache_.get(roleName);
+    if (role == null) throw new CatalogException("Role does not exist: " + roleName);
+    role.addGrantGroup(groupName);
+    Set<String> grantedRoles = groupsToRoles_.get(groupName);
+    if (grantedRoles == null) {
+      grantedRoles = Sets.newHashSet();
+      groupsToRoles_.put(groupName, grantedRoles);
+    }
+    grantedRoles.add(roleName.toLowerCase());
+    return role;
+  }
+
+  /**
+   * Removes a grant group from the specified role. Returns the updated
+   * Role, if a matching role was found. If the role does not exist a
+   * CatalogException is thrown.
+   */
+  public synchronized Role removeGrantGroup(String roleName, String groupName)
+      throws CatalogException {
+    Role role = roleCache_.get(roleName);
+    if (role == null) throw new CatalogException("Role does not exist: " + roleName);
+    role.removeGrantGroup(groupName);
+    Set<String> grantedRoles = groupsToRoles_.get(groupName);
+    if (grantedRoles != null) {
+      grantedRoles.remove(roleName.toLowerCase());
+    }
+    return role;
   }
 
   /**
@@ -203,7 +264,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
         for (RolePrivilege privilege: role.getPrivileges()) {
           String authorizeable = privilege.getName();
           if (authorizeable == null) {
-            LOG.error("Ignoring invalid privilege: " + privilege.getName());
+            LOG.trace("Ignoring invalid privilege: " + privilege.getName());
             continue;
           }
           privileges.add(authorizeable);

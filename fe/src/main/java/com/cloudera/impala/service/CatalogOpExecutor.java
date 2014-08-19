@@ -48,6 +48,7 @@ import org.apache.thrift.TException;
 
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.TableName;
+import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.CatalogServiceCatalog;
@@ -62,6 +63,8 @@ import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.HiveStorageDescriptorFactory;
 import com.cloudera.impala.catalog.IncompleteTable;
 import com.cloudera.impala.catalog.MetaStoreClientPool.MetaStoreClient;
+import com.cloudera.impala.catalog.Role;
+import com.cloudera.impala.catalog.RolePrivilege;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
@@ -94,6 +97,7 @@ import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TCreateDataSourceParams;
 import com.cloudera.impala.thrift.TCreateDbParams;
+import com.cloudera.impala.thrift.TCreateDropRoleParams;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TCreateOrAlterViewParams;
 import com.cloudera.impala.thrift.TCreateTableLikeParams;
@@ -106,9 +110,12 @@ import com.cloudera.impala.thrift.TDropDbParams;
 import com.cloudera.impala.thrift.TDropFunctionParams;
 import com.cloudera.impala.thrift.TDropStatsParams;
 import com.cloudera.impala.thrift.TDropTableOrViewParams;
+import com.cloudera.impala.thrift.TGrantRevokePrivParams;
+import com.cloudera.impala.thrift.TGrantRevokeRoleParams;
 import com.cloudera.impala.thrift.THdfsCachingOp;
 import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
+import com.cloudera.impala.thrift.TPrivilege;
 import com.cloudera.impala.thrift.TResetMetadataRequest;
 import com.cloudera.impala.thrift.TResetMetadataResponse;
 import com.cloudera.impala.thrift.TResultRow;
@@ -167,6 +174,11 @@ public class CatalogOpExecutor {
     TDdlExecResponse response = new TDdlExecResponse();
     response.setResult(new TCatalogUpdateResult());
     response.getResult().setCatalog_service_id(JniCatalog.getServiceId());
+    User requestingUser = null;
+    if (ddlRequest.isSetHeader()) {
+      requestingUser = new User(ddlRequest.getHeader().getRequesting_user());
+    }
+
     switch (ddlRequest.ddl_type) {
       case ALTER_TABLE:
         alterTable(ddlRequest.getAlter_table_params(), response);
@@ -214,6 +226,21 @@ public class CatalogOpExecutor {
         break;
       case DROP_DATA_SOURCE:
         dropDataSource(ddlRequest.getDrop_data_source_params(), response);
+        break;
+      case CREATE_ROLE:
+      case DROP_ROLE:
+        createDropRole(requestingUser, ddlRequest.getCreate_drop_role_params(),
+            response);
+        break;
+      case GRANT_ROLE:
+      case REVOKE_ROLE:
+        grantRevokeRoleGroup(requestingUser, ddlRequest.getGrant_revoke_role_params(),
+            response);
+        break;
+      case GRANT_PRIVILEGE:
+      case REVOKE_PRIVILEGE:
+        grantRevokeRolePrivilege(requestingUser,
+            ddlRequest.getGrant_revoke_priv_params(), response);
         break;
       default: throw new IllegalStateException("Unexpected DDL exec request type: " +
           ddlRequest.ddl_type);
@@ -1730,6 +1757,127 @@ public class CatalogOpExecutor {
           String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_partition"), e);
     } finally {
       msClient.release();
+    }
+  }
+
+  /**
+   * Creates or drops a Sentry role on behalf of the requestingUser.
+   */
+  private void createDropRole(User requestingUser,
+      TCreateDropRoleParams createDropRoleParams, TDdlExecResponse resp)
+      throws ImpalaException {
+    Preconditions.checkNotNull(requestingUser);
+    verifySentryServiceEnabled();
+
+    Role role;
+    if (createDropRoleParams.isIs_drop()) {
+      role = catalog_.getSentryProxy().dropRole(requestingUser,
+          createDropRoleParams.getRole_name());
+      if (role == null) {
+        role = new Role(createDropRoleParams.getRole_name(), Sets.<String>newHashSet());
+        role.setCatalogVersion(catalog_.getCatalogVersion());
+      }
+    } else {
+      role = catalog_.getSentryProxy().createRole(requestingUser,
+          createDropRoleParams.getRole_name());
+    }
+    Preconditions.checkNotNull(role);
+
+    TCatalogObject catalogObject = new TCatalogObject();
+    catalogObject.setType(role.getCatalogObjectType());
+    catalogObject.setRole(role.toThrift());
+    catalogObject.setCatalog_version(role.getCatalogVersion());
+    if (createDropRoleParams.isIs_drop()) {
+      resp.result.setRemoved_catalog_object(catalogObject);
+    } else {
+      resp.result.setUpdated_catalog_object(catalogObject);
+    }
+    resp.result.setVersion(role.getCatalogVersion());
+  }
+
+  /**
+   * Grants or revokes a Sentry role to/from the given group on behalf of the
+   * requestingUser.
+   */
+  private void grantRevokeRoleGroup(User requestingUser,
+      TGrantRevokeRoleParams grantRevokeRoleParams, TDdlExecResponse resp)
+      throws ImpalaException {
+    Preconditions.checkNotNull(requestingUser);
+    verifySentryServiceEnabled();
+
+    String roleName = grantRevokeRoleParams.getRole_names().get(0);
+    String groupName = grantRevokeRoleParams.getGroup_names().get(0);
+    Role role = null;
+    if (grantRevokeRoleParams.isIs_grant()) {
+      role = catalog_.getSentryProxy().grantRoleGroup(requestingUser, roleName,
+          groupName);
+    } else {
+      role = catalog_.getSentryProxy().revokeRoleGroup(requestingUser, roleName,
+          groupName);
+    }
+    Preconditions.checkNotNull(role);
+    TCatalogObject catalogObject = new TCatalogObject();
+    catalogObject.setType(role.getCatalogObjectType());
+    catalogObject.setRole(role.toThrift());
+    catalogObject.setCatalog_version(role.getCatalogVersion());
+    resp.result.setUpdated_catalog_object(catalogObject);
+    resp.result.setVersion(role.getCatalogVersion());
+  }
+
+  /**
+   * Grants or revokes one or more privileges to/from a Sentry role on behalf of the
+   * requestingUser.
+   */
+  private void grantRevokeRolePrivilege(User requestingUser,
+      TGrantRevokePrivParams grantRevokePrivParams, TDdlExecResponse resp)
+      throws ImpalaException {
+    Preconditions.checkNotNull(requestingUser);
+    verifySentryServiceEnabled();
+
+    String roleName = grantRevokePrivParams.getRole_name();
+    List<TCatalogObject> updatedPrivs = Lists.newArrayList();
+    for (TPrivilege privilege: grantRevokePrivParams.getPrivileges()) {
+      RolePrivilege rolePriv;
+      if (grantRevokePrivParams.isIs_grant()) {
+          rolePriv = catalog_.getSentryProxy().grantRolePrivilege(requestingUser,
+              roleName, privilege);
+      } else {
+        rolePriv = catalog_.getSentryProxy().revokeRolePrivilege(requestingUser,
+            roleName, privilege);
+      }
+      Preconditions.checkNotNull(rolePriv);
+      TCatalogObject catalogObject = new TCatalogObject();
+      catalogObject.setType(rolePriv.getCatalogObjectType());
+      catalogObject.setPrivilege(rolePriv.toThrift());
+      catalogObject.setCatalog_version(rolePriv.getCatalogVersion());
+      updatedPrivs.add(catalogObject);
+    }
+
+    // TODO: Currently we only support sending back 1 catalog object in a "direct DDL"
+    // response. If multiple privileges have been updated, just send back the
+    // catalog version so subscribers can wait for the statestore heartbeat that contains
+    // all updates.
+    if (updatedPrivs.size() == 1) {
+      if (grantRevokePrivParams.isIs_grant()) {
+        resp.result.setUpdated_catalog_object(updatedPrivs.get(0));
+      } else {
+        resp.result.setRemoved_catalog_object(updatedPrivs.get(0));
+      }
+      resp.result.setVersion(
+          resp.result.getUpdated_catalog_object().getCatalog_version());
+    } else if (updatedPrivs.size() > 1) {
+      resp.result.setVersion(
+          updatedPrivs.get(updatedPrivs.size() - 1).getCatalog_version());
+    }
+  }
+
+  /**
+   * Throws a CatalogException if the Sentry Service is not enabled.
+   */
+  private void verifySentryServiceEnabled() throws CatalogException {
+    if (catalog_.getSentryProxy() == null) {
+      throw new CatalogException("Sentry Service is not enabled on the " +
+          "CatalogServer.");
     }
   }
 

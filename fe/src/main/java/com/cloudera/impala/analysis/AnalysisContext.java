@@ -20,6 +20,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAccessEvent;
@@ -33,13 +34,16 @@ public class AnalysisContext {
   private final static Logger LOG = LoggerFactory.getLogger(AnalysisContext.class);
   private final ImpaladCatalog catalog_;
   private final TQueryCtx queryCtx_;
+  private final AuthorizationConfig authzConfig_;
 
   // Set in analyze()
   private AnalysisResult analysisResult_;
 
-  public AnalysisContext(ImpaladCatalog catalog, TQueryCtx queryCtx) {
+  public AnalysisContext(ImpaladCatalog catalog, TQueryCtx queryCtx,
+      AuthorizationConfig authzConfig) {
     catalog_ = catalog;
     queryCtx_ = queryCtx;
+    authzConfig_ = authzConfig;
   }
 
   static public class AnalysisResult {
@@ -85,17 +89,37 @@ public class AnalysisContext {
     public boolean isDescribeStmt() { return stmt_ instanceof DescribeStmt; }
     public boolean isResetMetadataStmt() { return stmt_ instanceof ResetMetadataStmt; }
     public boolean isExplainStmt() { return stmt_.isExplain(); }
+    public boolean isShowRolesStmt() { return stmt_ instanceof ShowRolesStmt; }
+    public boolean isCreateDropRoleStmt() { return stmt_ instanceof CreateDropRoleStmt; }
+    public boolean isGrantRevokeRoleStmt() {
+      return stmt_ instanceof GrantRevokeRoleStmt;
+    }
+    public boolean isGrantRevokePrivStmt() {
+      return stmt_ instanceof GrantRevokePrivStmt;
+    }
 
     public boolean isCatalogOp() {
-      return isUseStmt() || isShowTablesStmt() || isShowDbsStmt() ||
-          isShowDataSrcsStmt() || isShowStatsStmt() || isShowCreateTableStmt() ||
-          isDescribeStmt() || isCreateTableLikeStmt() || isCreateTableStmt() ||
+      return isUseStmt() || isViewMetadataStmt() || isDdlStmt();
+    }
+
+    private boolean isDdlStmt() {
+      return isCreateTableLikeStmt() || isCreateTableStmt() ||
           isCreateViewStmt() || isCreateDbStmt() || isDropDbStmt() ||
           isDropTableOrViewStmt() || isResetMetadataStmt() || isAlterTableStmt() ||
           isAlterViewStmt() || isComputeStatsStmt() || isCreateUdfStmt() ||
-          isCreateUdaStmt() || isShowFunctionsStmt() || isDropFunctionStmt() ||
-          isCreateTableAsSelectStmt() || isCreateDataSrcStmt() || isDropDataSrcStmt() ||
-          isDropStatsStmt();
+          isCreateUdaStmt() || isDropFunctionStmt() || isCreateTableAsSelectStmt() ||
+          isCreateDataSrcStmt() || isDropDataSrcStmt() || isDropStatsStmt() ||
+          isCreateDropRoleStmt() || isGrantRevokeStmt();
+    }
+
+    private boolean isViewMetadataStmt() {
+      return isShowTablesStmt() || isShowDbsStmt() || isShowFunctionsStmt() ||
+          isShowRolesStmt() || isShowCreateTableStmt() || isShowDataSrcsStmt() ||
+          isShowStatsStmt() || isDescribeStmt();
+    }
+
+    private boolean isGrantRevokeStmt() {
+      return isGrantRevokeRoleStmt() || isGrantRevokePrivStmt();
     }
 
     public boolean isDmlStmt() {
@@ -254,9 +278,8 @@ public class AnalysisContext {
    *           missing tables are detected as a result of running analysis.
    */
   public void analyze(String stmt) throws AnalysisException {
-    Analyzer analyzer = new Analyzer(catalog_, queryCtx_);
+    Analyzer analyzer = new Analyzer(catalog_, queryCtx_, authzConfig_);
     analyze(stmt, analyzer);
-
   }
 
   /**
@@ -269,7 +292,7 @@ public class AnalysisContext {
       analysisResult_ = new AnalysisResult();
       analysisResult_.analyzer_ = analyzer;
       if (analysisResult_.analyzer_ == null) {
-        analysisResult_.analyzer_ = new Analyzer(catalog_, queryCtx_);
+        analysisResult_.analyzer_ = new Analyzer(catalog_, queryCtx_, authzConfig_);
       }
       analysisResult_.stmt_ = (StatementBase) parser.parse().value;
       if (analysisResult_.stmt_ == null) return;
@@ -290,7 +313,7 @@ public class AnalysisContext {
         // Re-analyze the rewritten statement.
         Preconditions.checkNotNull(rewrittenStmt);
         analysisResult_ = new AnalysisResult();
-        analysisResult_.analyzer_ = new Analyzer(catalog_, queryCtx_);
+        analysisResult_.analyzer_ = new Analyzer(catalog_, queryCtx_, authzConfig_);
         analysisResult_.stmt_ = rewrittenStmt;
         analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
         LOG.trace("rewrittenStmt: " + rewrittenStmt.toSql());

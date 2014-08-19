@@ -28,14 +28,13 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.BoolLiteral;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.NullLiteral;
-import com.cloudera.impala.analysis.FunctionCallExpr;
 import com.cloudera.impala.analysis.TableName;
-import com.cloudera.impala.catalog.AggregateFunction;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TCacheJarParams;
 import com.cloudera.impala.thrift.TCacheJarResult;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
+import com.cloudera.impala.thrift.TCatalogServiceRequestHeader;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TExprBatch;
 import com.cloudera.impala.thrift.TPrioritizeLoadRequest;
@@ -48,7 +47,6 @@ import com.cloudera.impala.thrift.TSymbolLookupResult;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.util.NativeLibUtil;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * This class provides the Impala executor functionality to the FE.
@@ -241,6 +239,7 @@ public class FeSupport {
     }
 
     TPrioritizeLoadRequest request = new TPrioritizeLoadRequest ();
+    request.setHeader(new TCatalogServiceRequestHeader());
     request.setObject_descs(objectDescs);
 
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());

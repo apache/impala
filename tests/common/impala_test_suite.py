@@ -19,6 +19,8 @@ import logging
 import os
 import pprint
 import pytest
+import grp
+from getpass import getuser
 from functools import wraps
 from random import choice
 from tests.common.impala_service import ImpaladService
@@ -151,6 +153,9 @@ class ImpalaTestSuite(BaseTestSuite):
     table_format_info = vector.get_value('table_format')
     exec_options = vector.get_value('exec_option')
 
+    # Resolve the current user's group name.
+    group_name = grp.getgrnam(getuser()).gr_name
+
     target_impalad_clients = list()
     if multiple_impalad:
       target_impalad_clients =\
@@ -176,7 +181,8 @@ class ImpalaTestSuite(BaseTestSuite):
         self.execute_test_case_setup(test_section['SETUP'], table_format_info)
 
       # TODO: support running query tests against different scale factors
-      query = QueryTestSectionReader.build_query(test_section['QUERY'])
+      query = QueryTestSectionReader.build_query(test_section['QUERY'].replace(
+          '$GROUP_NAME', group_name))
 
       if 'QUERY_NAME' in test_section:
         LOG.info('Query Name: \n%s\n' % test_section['QUERY_NAME'])

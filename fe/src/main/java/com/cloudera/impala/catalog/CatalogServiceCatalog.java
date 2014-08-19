@@ -51,7 +51,7 @@ import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.cloudera.impala.util.PatternMatcher;
-import com.cloudera.impala.util.SentryPolicyUpdater;
+import com.cloudera.impala.util.SentryProxy;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -113,9 +113,9 @@ public class CatalogServiceCatalog extends Catalog {
   private final ScheduledExecutorService cachePoolReader_ =
       Executors.newScheduledThreadPool(1);
 
-  // If the Sentry Service is configured, this object will periodically refresh the
-  // policy metadata.
-  private final SentryPolicyUpdater policyUpdater_;
+  // Proxy to access the Sentry Service and also periodically refreshes the
+  // policy metadata. Null if Sentry Service is not enabled.
+  private final SentryProxy sentryProxy_;
 
   /**
    * Initialize the CatalogServiceCatalog. If loadInBackground is true, table metadata
@@ -127,12 +127,11 @@ public class CatalogServiceCatalog extends Catalog {
     catalogServiceId_ = catalogServiceId;
     tableLoadingMgr_ = new TableLoadingMgr(this, numLoadingThreads);
     loadInBackground_ = loadInBackground;
-
     cachePoolReader_.scheduleAtFixedRate(new CachePoolReader(), 0, 1, TimeUnit.MINUTES);
     if (sentryConfig != null) {
-      policyUpdater_ = new SentryPolicyUpdater(sentryConfig, this);
+      sentryProxy_ = new SentryProxy(sentryConfig, this);
     } else {
-      policyUpdater_ = null;
+      sentryProxy_ = null;
     }
   }
 
@@ -343,11 +342,11 @@ public class CatalogServiceCatalog extends Catalog {
    */
   public void reset() throws CatalogException {
     // First update the policy metadata.
-    if (policyUpdater_ != null) {
+    if (sentryProxy_ != null) {
       // Sentry Service is enabled.
       try {
         // Update the authorization policy, waiting for the result to complete.
-        policyUpdater_.refresh();
+        sentryProxy_.refresh();
       } catch (Exception e) {
         throw new CatalogException("Error updating authorization policy: ", e);
       }
@@ -845,6 +844,40 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * Adds a grant group to the given role name and returns the modified Role with
+   * an updated catalog version. If the role does not exist a CatalogException is thrown.
+   */
+  public Role addRoleGrantGroup(String roleName, String groupName)
+      throws CatalogException {
+    catalogLock_.writeLock().lock();
+    try {
+      Role role = authPolicy_.addGrantGroup(roleName, groupName);
+      Preconditions.checkNotNull(role);
+      role.setCatalogVersion(incrementAndGetCatalogVersion());
+      return role;
+    } finally {
+      catalogLock_.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Removes a grant group from the given role name and returns the modified Role with
+   * an updated catalog version. If the role does not exist a CatalogException is thrown.
+   */
+  public Role removeRoleGrantGroup(String roleName, String groupName)
+      throws CatalogException {
+    catalogLock_.writeLock().lock();
+    try {
+      Role role = authPolicy_.removeGrantGroup(roleName, groupName);
+      Preconditions.checkNotNull(role);
+      role.setCatalogVersion(incrementAndGetCatalogVersion());
+      return role;
+    } finally {
+      catalogLock_.writeLock().unlock();
+    }
+  }
+
+  /**
    * Adds a privilege to the given role name. Returns the new RolePrivilege and
    * increments the catalog version. If the parent role does not exist a CatalogException
    * is thrown.
@@ -913,5 +946,6 @@ public class CatalogServiceCatalog extends Catalog {
    * Gets the next table ID and increments the table ID counter.
    */
   public TableId getNextTableId() { return new TableId(nextTableId_.getAndIncrement()); }
+  public SentryProxy getSentryProxy() { return sentryProxy_; }
   public AuthorizationPolicy getAuthPolicy() { return authPolicy_; }
 }

@@ -39,6 +39,12 @@ enum TDdlType {
   CREATE_DATA_SOURCE,
   DROP_DATA_SOURCE,
   DROP_STATS,
+  CREATE_ROLE,
+  DROP_ROLE,
+  GRANT_ROLE,
+  REVOKE_ROLE,
+  GRANT_PRIVILEGE,
+  REVOKE_PRIVILEGE,
 }
 
 // Types of ALTER TABLE commands supported.
@@ -394,6 +400,39 @@ struct TComputeStatsParams {
   // Query for gathering per-column NDVs and number of NULLs.
   // Not set if there are no columns we can compute stats for.
   3: optional string col_stats_query
+}
+
+// Parameters for CREATE/DROP ROLE
+struct TCreateDropRoleParams {
+  // True if this is a DROP ROLE statement, false if this is a CREATE ROLE statement.
+  1: required bool is_drop
+
+  // The role name to create or drop.
+  2: required string role_name
+}
+
+// Parameters for GRANT/REVOKE ROLE.
+struct TGrantRevokeRoleParams {
+  // The role names this change applies to.
+  1: required list<string> role_names
+
+  // The group names that are being granted/revoked.
+  2: required list<string> group_names
+
+  // True if this is a GRANT statement false if this is a REVOKE statement.
+  3: required bool is_grant
+}
+
+// Parameters for GRANT/REVOKE privilege TO/FROM role.
+struct TGrantRevokePrivParams {
+  // List of privileges being granted or revoked.
+  1: required list<CatalogObjects.TPrivilege> privileges
+
+  // The role name this change should apply to.
+  2: required string role_name
+
+  // True if this is a GRANT statement false if this is a REVOKE statement.
+  3: required bool is_grant
 }
 
 // Parameters of DROP DATABASE commands

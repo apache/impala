@@ -184,6 +184,17 @@ struct TShowTablesParams {
   2: optional string show_pattern
 }
 
+// Parameters for SHOW ROLES commands
+struct TShowRolesParams {
+  // Filter roles to the specified grant group. If not set, show all roles.
+  1: optional string grant_group
+}
+
+// Result of a SHOW ROLES command
+struct TShowRolesResult {
+  1: required list<string> role_names
+}
+
 // Arguments to getFunctions(), which returns a list of non-qualified function
 // signatures that match an optional pattern. Parameters for SHOW FUNCTIONS.
 struct TGetFunctionsParams {
@@ -327,7 +338,8 @@ enum TCatalogOpType {
   RESET_METADATA,
   DDL,
   SHOW_CREATE_TABLE,
-  SHOW_DATA_SRCS
+  SHOW_DATA_SRCS,
+  SHOW_ROLES,
 }
 
 // TODO: Combine SHOW requests with a single struct that contains a field
@@ -352,6 +364,9 @@ struct TCatalogOpRequest {
 
   // Parameters for SHOW DATA SOURCES
   11: optional TShowDataSrcsParams show_data_srcs_params
+
+  // Parameters for SHOW ROLES
+  12: optional TShowRolesParams show_roles_params
 
   // Parameters for DDL requests executed using the CatalogServer
   // such as CREATE, ALTER, and DROP. See CatalogService.TDdlExecRequest

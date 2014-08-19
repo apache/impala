@@ -99,6 +99,9 @@ class Frontend {
   // information on the error will be returned.
   Status GetCatalogObject(const TCatalogObject& request, TCatalogObject* response);
 
+  // Call FE to get the roles.
+  Status ShowRoles(const TShowRolesParams& params, TShowRolesResult* result);
+
   // Returns (in the output parameter) the result of a DESCRIBE table command. This
   // command retrieves table metadata, such as the column definitions. The metadata
   // that is returned is controlled by setting the 'output_style' field. If this
@@ -162,6 +165,7 @@ class Frontend {
   jmethodID get_stats_id_; // JniFrontend.getTableStats
   jmethodID get_functions_id_; // JniFrontend.getFunctions
   jmethodID get_catalog_object_id_; // JniFrontend.getCatalogObject
+  jmethodID show_roles_id_; // JniFrontend.getRoles
   jmethodID exec_hs2_metadata_op_id_; // JniFrontend.execHiveServer2MetadataOp
   jmethodID load_table_data_id_; // JniFrontend.loadTableData
   jmethodID set_catalog_initialized_id_; // JniFrontend.setCatalogInitialized

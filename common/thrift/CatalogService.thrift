@@ -27,6 +27,15 @@ enum CatalogServiceVersion {
   V1
 }
 
+// Common header included in all CatalogService requests.
+// TODO: The CatalogServiceVersion/protocol version should be part of the header.
+// This would require changes in BDR and break their compatibility story. We should
+// coordinate a joint change somewhere down the line.
+struct TCatalogServiceRequestHeader {
+  // The effective user who submitted this request.
+  1: optional string requesting_user
+}
+
 // Returns details on the result of an operation that updates the catalog. Information
 // returned includes the Status of the operations, the catalog version that will contain
 // the update, and the catalog service ID.
@@ -50,6 +59,9 @@ struct TCatalogUpdateResult {
 // Request for executing a DDL operation (CREATE, ALTER, DROP).
 struct TDdlExecRequest {
   1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
+
+  // Common header included in all CatalogService requests.
+  17: optional TCatalogServiceRequestHeader header
 
   2: required JniCatalog.TDdlType ddl_type
 
@@ -94,6 +106,15 @@ struct TDdlExecRequest {
 
   // Parameters for DROP STATS
   16: optional JniCatalog.TDropStatsParams drop_stats_params
+
+  // Parameters for CREATE/DROP ROLE
+  18: optional JniCatalog.TCreateDropRoleParams create_drop_role_params
+
+  // Parameters for GRANT/REVOKE ROLE
+  19: optional JniCatalog.TGrantRevokeRoleParams grant_revoke_role_params
+
+  // Parameters for GRANT/REVOKE privilege
+  20: optional JniCatalog.TGrantRevokePrivParams grant_revoke_priv_params
 }
 
 // Response from executing a TDdlExecRequest
@@ -120,15 +141,18 @@ struct TDdlExecResponse {
 struct TUpdateCatalogRequest {
   1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
 
+  // Common header included in all CatalogService requests.
+  2: optional TCatalogServiceRequestHeader header
+
   // Unqualified name of the table to change
-  2: required string target_table;
+  3: required string target_table;
 
   // Database that the table belongs to
-  3: required string db_name;
+  4: required string db_name;
 
   // List of partitions that are new and need to be created. May
   // include the root partition (represented by the empty string).
-  4: required set<string> created_partitions;
+  5: required set<string> created_partitions;
 }
 
 // Response from a TUpdateCatalogRequest
@@ -139,6 +163,9 @@ struct TUpdateCatalogResponse {
 // Parameters of REFRESH/INVALIDATE METADATA commands
 struct TResetMetadataRequest {
   1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
+
+  // Common header included in all CatalogService requests.
+  4: optional TCatalogServiceRequestHeader header
 
   // If true, refresh. Otherwise, invalidate metadata
   2: required bool is_refresh
@@ -156,6 +183,9 @@ struct TResetMetadataResponse {
 // Request to GetFunctions()
 struct TGetFunctionsRequest {
   1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
+
+  // Common header included in all CatalogService requests.
+  3: optional TCatalogServiceRequestHeader header
 
   // The parent database name.
   2: optional string db_name;
@@ -176,6 +206,9 @@ struct TGetFunctionsResponse {
 struct TGetCatalogObjectRequest {
   1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
 
+  // Common header included in all CatalogService requests.
+  3: optional TCatalogServiceRequestHeader header
+
   // A catalog object descriptor: a TCatalogObject with the object name and type fields
   // set.
   2: required CatalogObjects.TCatalogObject object_desc
@@ -192,9 +225,12 @@ struct TGetCatalogObjectResponse {
 struct TPrioritizeLoadRequest {
   1: required CatalogServiceVersion protocol_version = CatalogServiceVersion.V1
 
+  // Common header included in all CatalogService requests.
+  2: optional TCatalogServiceRequestHeader header
+
   // A list of catalog objects descriptors for which to prioritize loading. A catalog
   // object descriptor is a TCatalogObject with only the object name and type fields set.
-  2: required list<CatalogObjects.TCatalogObject> object_descs
+  3: required list<CatalogObjects.TCatalogObject> object_descs
 }
 
 struct TPrioritizeLoadResponse {

@@ -303,7 +303,7 @@ public class AuditingTest extends AnalyzerTest {
         "server1", "/does/not/exist", "");
     ImpaladCatalog catalog = new ImpaladTestCatalog(config);
     Frontend fe = new Frontend(config, catalog);
-    Analyzer analyzer = new Analyzer(catalog, TestUtils.createQueryContext());
+    Analyzer analyzer = new Analyzer(catalog, TestUtils.createQueryContext(), config);
 
     // We should get an audit event even when an authorization failure occurs.
     try {

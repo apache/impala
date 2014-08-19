@@ -104,6 +104,13 @@ public class CatalogDeltaLog {
       case FUNCTION:
         return first.getFn().getSignature().equals(second.getFn().getSignature()) &&
             first.getFn().getName().equals(second.getFn().getName());
+      case ROLE:
+        return first.getRole().getRole_name().equalsIgnoreCase(
+            second.getRole().getRole_name());
+      case PRIVILEGE:
+        return first.getPrivilege().getPrivilege_name().equalsIgnoreCase(
+            second.getPrivilege().getPrivilege_name()) &&
+            first.getPrivilege().getRole_id() == second.getPrivilege().getRole_id();
       default: return false;
     }
   }

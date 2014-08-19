@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.authorization.AuthorizationChecker;
+import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.AuthorizeableDb;
 import com.cloudera.impala.authorization.AuthorizeableTable;
 import com.cloudera.impala.authorization.Privilege;
@@ -148,8 +149,11 @@ public class Analyzer {
 
   // state shared between all objects of an Analyzer tree
   private static class GlobalState {
+    // TODO: Consider adding an "exec-env"-like global singleton that contains the
+    // catalog and authzConfig.
     public final ImpaladCatalog catalog;
     public final TQueryCtx queryCtx;
+    public final AuthorizationConfig authzConfig;
     public final DescriptorTable descTbl = new DescriptorTable();
     public final IdGenerator<ExprId> conjunctIdGenerator = ExprId.createGenerator();
 
@@ -240,9 +244,11 @@ public class Analyzer {
     // Decreases the size of the scan range locations.
     private final ListMap<TNetworkAddress> hostIndex = new ListMap<TNetworkAddress>();
 
-    public GlobalState(ImpaladCatalog catalog, TQueryCtx queryCtx) {
+    public GlobalState(ImpaladCatalog catalog, TQueryCtx queryCtx,
+        AuthorizationConfig authzConfig) {
       this.catalog = catalog;
       this.queryCtx = queryCtx;
+      this.authzConfig = authzConfig;
     }
   };
 
@@ -284,9 +290,10 @@ public class Analyzer {
   // conjunct evaluating to false.
   private boolean hasEmptySpjResultSet_ = false;
 
-  public Analyzer(ImpaladCatalog catalog, TQueryCtx queryCtx) {
-    this.ancestors_ = Lists.newArrayList();
-    this.globalState_ = new GlobalState(catalog, queryCtx);
+  public Analyzer(ImpaladCatalog catalog, TQueryCtx queryCtx,
+      AuthorizationConfig authzConfig) {
+    ancestors_ = Lists.newArrayList();
+    globalState_ = new GlobalState(catalog, queryCtx, authzConfig);
     user_ = new User(TSessionStateUtil.getEffectiveUser(queryCtx.session));
   }
 
@@ -1635,6 +1642,7 @@ public class Analyzer {
   public String getDefaultDb() { return globalState_.queryCtx.session.database; }
   public User getUser() { return user_; }
   public TQueryCtx getQueryCtx() { return globalState_.queryCtx; }
+  public AuthorizationConfig getAuthzConfig() { return globalState_.authzConfig; }
   public ListMap<TNetworkAddress> getHostIndex() { return globalState_.hostIndex; }
 
   public ImmutableList<PrivilegeRequest> getPrivilegeReqs() {

@@ -2183,8 +2183,9 @@ public class ParserTest {
         "c, b, c from t\n" +
         "^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: ALTER, COMPUTE, CREATE, DESCRIBE, DROP, EXPLAIN, INSERT, " +
-        "INVALIDATE, LOAD, REFRESH, SELECT, SET, SHOW, USE, VALUES, WITH\n");
+        "Expected: ALTER, COMPUTE, CREATE, DESCRIBE, DROP, EXPLAIN, GRANT, " +
+        "INSERT, INVALIDATE, LOAD, REFRESH, REVOKE, SELECT, SET, SHOW, USE, " +
+        "VALUES, WITH\n");
 
     // missing select list
     ParserError("select from t",
@@ -2456,5 +2457,83 @@ public class ParserTest {
     ParserError("SET foo=");
     ParserError("SET foo=1+2");
     ParserError("SET foo = '10");
+  }
+
+  @Test
+  public void TestCreateDropRole() {
+    ParsesOk("CREATE ROLE foo");
+    ParsesOk("DROP ROLE foo");
+    ParsesOk("DROP ROLE foo");
+    ParsesOk("CREATE ROLE `role`");
+    ParsesOk("DROP ROLE  `role`");
+    ParserError("CREATE ROLE");
+    ParserError("DROP ROLE");
+    ParserError("CREATE ROLE 'foo'");
+    ParserError("DROP ROLE 'foo'");
+  }
+
+  @Test
+  public void TestGrantRevokeRole() {
+    ParsesOk("GRANT ROLE foo TO GROUP bar");
+    ParsesOk("REVOKE ROLE foo FROM GROUP bar");
+    ParsesOk("GRANT ROLE `foo` TO GROUP `bar`");
+
+    ParserError("GRANT ROLE foo TO GROUP");
+    ParserError("GRANT ROLE foo FROM GROUP bar");
+
+    ParserError("REVOKE ROLE foo FROM GROUP");
+    ParserError("REVOKE ROLE foo TO GROUP bar");
+  }
+
+  @Test
+  public void TestGrantRevokePrivilege() {
+    Object[][] grantRevFormatStrs = {{"GRANT", "TO"}, {"REVOKE", "FROM"}};
+    for (Object[] formatStr: grantRevFormatStrs) {
+      ParsesOk(String.format("%s ALL ON TABLE foo %s myRole", formatStr));
+      ParsesOk(String.format("%s ALL ON DATABASE foo %s myRole", formatStr));
+      ParsesOk(String.format("%s ALL ON URI 'foo' %s  myRole", formatStr));
+
+      ParsesOk(String.format("%s INSERT ON TABLE foo %s myRole", formatStr));
+      ParsesOk(String.format("%s INSERT ON DATABASE foo %s myRole", formatStr));
+      ParsesOk(String.format("%s INSERT ON URI 'foo' %s  myRole", formatStr));
+
+      ParsesOk(String.format("%s SELECT ON TABLE foo %s myRole", formatStr));
+      ParsesOk(String.format("%s SELECT ON DATABASE foo %s myRole", formatStr));
+      ParsesOk(String.format("%s SELECT ON URI 'foo' %s  myRole", formatStr));
+
+      // Server scope does not accept a name.
+      ParsesOk(String.format("%s ALL ON SERVER %s myRole", formatStr));
+      ParsesOk(String.format("%s INSERT ON SERVER %s myRole", formatStr));
+      ParsesOk(String.format("%s SELECT ON SERVER %s myRole", formatStr));
+
+      // URIs are string literals
+      ParserError(String.format("%s ALL ON URI foo %s myRole", formatStr));
+      ParserError(String.format("%s ALL ON DATABASE 'foo' %s myRole", formatStr));
+      ParserError(String.format("%s ALL ON TABLE 'foo' %s myRole", formatStr));
+
+      // No object name (only works for SERVER scope)
+      ParserError(String.format("GRANT ALL ON TABLE FROM myrole", formatStr));
+      ParserError(String.format("GRANT ALL ON DATABASE FROM myrole", formatStr));
+      ParserError(String.format("GRANT ALL ON URI FROM myrole", formatStr));
+
+      // No role specified
+      ParserError(String.format("%s ALL ON TABLE foo %s", formatStr));
+      // Invalid privilege
+      ParserError(String.format("%s FAKE ON TABLE foo %s myRole", formatStr));
+    }
+
+    ParserError("ALL ON TABLE foo TO myrole");
+    ParserError("ALL ON TABLE foo FROM myrole");
+
+    ParserError("GRANT ALL ON TABLE foo FROM myrole");
+    ParserError("REVOKE ALL ON TABLE foo TO myrole");
+  }
+
+  @Test
+  public void TestShowRoles() {
+    ParsesOk("SHOW ROLES");
+    ParsesOk("SHOW ROLE GRANT GROUP myGroup");
+    ParserError("SHOW ROLES blah");
+    ParserError("SHOW ROLE GRANT GROUP");
   }
 }

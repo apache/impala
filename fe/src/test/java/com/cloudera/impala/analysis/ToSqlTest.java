@@ -19,6 +19,7 @@ import static org.junit.Assert.fail;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.testutil.TestUtils;
 import com.google.common.base.Preconditions;
@@ -45,7 +46,8 @@ public class ToSqlTest extends AnalyzerTest {
   private static AnalysisContext.AnalysisResult analyze(String query, String defaultDb) {
     try {
       AnalysisContext analysisCtx = new AnalysisContext(catalog_,
-          TestUtils.createQueryContext(defaultDb, System.getProperty("user.name")));
+          TestUtils.createQueryContext(defaultDb, System.getProperty("user.name")),
+          AuthorizationConfig.createAuthDisabledConfig());
       analysisCtx.analyze(query);
       AnalysisContext.AnalysisResult analysisResult = analysisCtx.getAnalysisResult();
       Preconditions.checkNotNull(analysisResult.getStmt());

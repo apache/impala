@@ -21,6 +21,7 @@ import org.apache.commons.cli.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.authorization.SentryConfig;
 import com.cloudera.impala.util.SentryPolicyService;
 
@@ -66,9 +67,9 @@ public class SentryServicePinger {
 
     sentryConfig.loadConfig();
     while (numPings > 0) {
-      SentryPolicyService policyService = new SentryPolicyService(sentryConfig, null);
+      SentryPolicyService policyService = new SentryPolicyService(sentryConfig);
       try {
-        policyService.listAllRoles();
+        policyService.listAllRoles(new User(System.getProperty("user.name")));
         LOG.info("Sentry Service ping succeeded.");
         System.exit(0);
       } catch (Exception e) {

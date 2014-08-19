@@ -1,0 +1,174 @@
+====
+---- QUERY
+create role grant_revoke_test_ALL_SERVER
+---- RESULTS
+====
+---- QUERY
+create role grant_revoke_test_ALL_TEST_DB
+---- RESULTS
+====
+---- QUERY
+create role grant_revoke_test_SELECT_INSERT_TEST_TBL
+---- RESULTS
+====
+---- QUERY
+create role grant_revoke_test_ALL_URI
+---- RESULTS
+====
+---- QUERY
+show roles
+---- RESULTS: VERIFY_IS_SUBSET
+'grant_revoke_test_ALL_SERVER'
+'grant_revoke_test_ALL_TEST_DB'
+'grant_revoke_test_SELECT_INSERT_TEST_TBL'
+'grant_revoke_test_ALL_URI'
+---- TYPES
+STRING
+====
+---- QUERY
+create database grant_rev_db
+---- CATCH
+does not have privileges to execute 'CREATE' on: grant_rev_db
+====
+---- QUERY
+grant all on server to grant_revoke_test_ALL_SERVER
+====
+---- QUERY
+# Group name will be replaced with the actual user's group in the test
+# framework.
+grant role grant_revoke_test_ALL_SERVER to group $GROUP_NAME
+====
+---- QUERY
+drop database if exists grant_rev_db
+====
+---- QUERY
+create database grant_rev_db
+====
+---- QUERY
+show tables in grant_rev_db
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+create table grant_rev_db.test_tbl1(i int)
+====
+---- QUERY
+show tables in grant_rev_db
+---- RESULTS
+'test_tbl1'
+---- TYPES
+STRING
+====
+---- QUERY
+revoke role grant_revoke_test_ALL_SERVER from group $GROUP_NAME
+====
+---- QUERY
+create database grant_rev_db
+---- CATCH
+does not have privileges to execute 'CREATE' on: grant_rev_db
+====
+---- QUERY
+show tables in grant_rev_db
+---- CATCH
+does not have privileges to access: grant_rev_db.*
+====
+---- QUERY
+grant role grant_revoke_test_ALL_TEST_DB to group $GROUP_NAME
+====
+---- QUERY
+# Should now have all privileges on the test db
+grant all on database grant_rev_db to grant_revoke_test_ALL_TEST_DB
+====
+---- QUERY
+show tables in grant_rev_db
+---- RESULTS
+'test_tbl1'
+---- TYPES
+STRING
+====
+---- QUERY
+# Even though the user has all privileges on the database, they do not have privileges
+# on any URIs. Note: The host:port of HDFS may not always be the same so only verify
+# up to hdfs://. The FE tests have additional error message verification.
+create table grant_rev_db.test_tbl2(i int) location '/test-warehouse/grant_rev_test_tbl2';
+---- CATCH
+does not have privileges to access: hdfs://
+====
+---- QUERY
+grant role grant_revoke_test_ALL_URI to group $GROUP_NAME
+====
+---- QUERY
+grant all on uri '/test-warehouse/grant_rev_test_tbl2' to grant_revoke_test_ALL_URI
+====
+---- QUERY
+# Should now have privileges to create the table.
+create table grant_rev_db.test_tbl2(i int) location '/test-warehouse/grant_rev_test_tbl2';
+====
+---- QUERY
+show tables in grant_rev_db
+---- RESULTS
+'test_tbl1'
+'test_tbl2'
+---- TYPES
+STRING
+====
+---- QUERY
+# To create a database server-level privileges are required.
+create database grant_rev_db
+---- CATCH
+does not have privileges to execute 'CREATE' on: grant_rev_db
+====
+---- QUERY
+# Dropping the role should remove the privileges
+drop role grant_revoke_test_ALL_TEST_DB
+====
+---- QUERY
+show tables in grant_rev_db
+---- CATCH
+does not have privileges to access: grant_rev_db.*
+====
+---- QUERY
+grant role grant_revoke_test_SELECT_INSERT_TEST_TBL to group $GROUP_NAME
+====
+---- QUERY
+GRANT SELECT ON TABLE grant_rev_db.test_tbl1 TO grant_revoke_test_SELECT_INSERT_TEST_TBL
+====
+---- QUERY
+select * from grant_rev_db.test_tbl1
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+select * from grant_rev_db.test_tbl2
+---- CATCH
+does not have privileges to execute 'SELECT' on: grant_rev_db.test_tbl2
+====
+---- QUERY
+insert overwrite grant_rev_db.test_tbl1 select 1
+---- CATCH
+does not have privileges to execute 'INSERT' on: grant_rev_db.test_tbl1
+====
+---- QUERY
+GRANT INSERT ON TABLE grant_rev_db.test_tbl1 TO grant_revoke_test_SELECT_INSERT_TEST_TBL
+====
+---- QUERY
+insert overwrite grant_rev_db.test_tbl1 select 1
+---- RESULTS
+: 1
+====
+---- QUERY
+select * from grant_rev_db.test_tbl1
+---- RESULTS
+1
+---- TYPES
+INT
+====
+---- QUERY
+# Cleanup test roles
+drop role grant_revoke_test_ALL_SERVER;
+drop role grant_revoke_test_SELECT_INSERT_TEST_TBL;
+drop role grant_revoke_test_ALL_URI;
+---- RESULTS
+====

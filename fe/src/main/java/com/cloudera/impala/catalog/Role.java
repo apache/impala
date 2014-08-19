@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TRole;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -84,6 +85,23 @@ public class Role implements CatalogObject {
    */
   public RolePrivilege removePrivilege(String privilegeName) {
     return rolePrivileges_.remove(privilegeName);
+  }
+
+  /**
+   * Adds a new grant group to this role.
+   */
+  public synchronized void addGrantGroup(String groupName) {
+    if (role_.getGrant_groups().contains(groupName)) return;
+    role_.addToGrant_groups(groupName);
+  }
+
+  /**
+   * Removes a grant group from this role.
+   */
+  public synchronized void removeGrantGroup(String groupName) {
+    role_.getGrant_groups().remove(groupName);
+    // Should never have duplicates in the list of groups.
+    Preconditions.checkState(!role_.getGrant_groups().contains(groupName));
   }
 
   /**

@@ -42,16 +42,20 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.CreateDataSrcStmt;
+import com.cloudera.impala.analysis.CreateDropRoleStmt;
 import com.cloudera.impala.analysis.CreateUdaStmt;
 import com.cloudera.impala.analysis.CreateUdfStmt;
 import com.cloudera.impala.analysis.DropDataSrcStmt;
 import com.cloudera.impala.analysis.DropFunctionStmt;
 import com.cloudera.impala.analysis.DropStatsStmt;
 import com.cloudera.impala.analysis.DropTableOrViewStmt;
+import com.cloudera.impala.analysis.GrantRevokePrivStmt;
+import com.cloudera.impala.analysis.GrantRevokeRoleStmt;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.ResetMetadataStmt;
 import com.cloudera.impala.analysis.ShowFunctionsStmt;
+import com.cloudera.impala.analysis.ShowRolesStmt;
 import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.authorization.AuthorizationChecker;
 import com.cloudera.impala.authorization.AuthorizationConfig;
@@ -85,8 +89,10 @@ import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.planner.ScanNode;
 import com.cloudera.impala.thrift.TCatalogOpRequest;
 import com.cloudera.impala.thrift.TCatalogOpType;
+import com.cloudera.impala.thrift.TCatalogServiceRequestHeader;
 import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TColumnValue;
+import com.cloudera.impala.thrift.TCreateDropRoleParams;
 import com.cloudera.impala.thrift.TDdlExecRequest;
 import com.cloudera.impala.thrift.TDdlType;
 import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
@@ -96,6 +102,8 @@ import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExplainResult;
 import com.cloudera.impala.thrift.TFinalizeParams;
 import com.cloudera.impala.thrift.TFunctionCategory;
+import com.cloudera.impala.thrift.TGrantRevokePrivParams;
+import com.cloudera.impala.thrift.TGrantRevokeRoleParams;
 import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
@@ -395,12 +403,51 @@ public class Frontend {
       TResetMetadataRequest req = resetMetadataStmt.toThrift();
       ddl.setReset_metadata_params(req);
       metadata.setColumns(Collections.<TColumn>emptyList());
+    } else if (analysis.isShowRolesStmt()) {
+      ddl.op_type = TCatalogOpType.SHOW_ROLES;
+      ShowRolesStmt showRolesStmt = (ShowRolesStmt) analysis.getStmt();
+      ddl.setShow_roles_params(showRolesStmt.toThrift());
+      metadata.setColumns(Arrays.asList(
+          new TColumn("role_name", Type.STRING.toThrift())));
+    } else if (analysis.isCreateDropRoleStmt()) {
+      CreateDropRoleStmt createDropRoleStmt = (CreateDropRoleStmt) analysis.getStmt();
+      TCreateDropRoleParams params = createDropRoleStmt.toThrift();
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(params.isIs_drop() ? TDdlType.DROP_ROLE : TDdlType.CREATE_ROLE);
+      req.setCreate_drop_role_params(params);
+      ddl.op_type = TCatalogOpType.DDL;
+      ddl.setDdl_params(req);
+      metadata.setColumns(Collections.<TColumn>emptyList());
+    } else if (analysis.isGrantRevokeRoleStmt()) {
+      GrantRevokeRoleStmt grantRoleStmt = (GrantRevokeRoleStmt) analysis.getStmt();
+      TGrantRevokeRoleParams params = grantRoleStmt.toThrift();
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(params.isIs_grant() ? TDdlType.GRANT_ROLE : TDdlType.REVOKE_ROLE);
+      req.setGrant_revoke_role_params(params);
+      ddl.op_type = TCatalogOpType.DDL;
+      ddl.setDdl_params(req);
+      metadata.setColumns(Collections.<TColumn>emptyList());
+    } else if (analysis.isGrantRevokePrivStmt()) {
+      GrantRevokePrivStmt grantRevokePrivStmt = (GrantRevokePrivStmt) analysis.getStmt();
+      TGrantRevokePrivParams params = grantRevokePrivStmt.toThrift();
+      TDdlExecRequest req = new TDdlExecRequest();
+      req.setDdl_type(params.isIs_grant() ?
+          TDdlType.GRANT_PRIVILEGE : TDdlType.REVOKE_PRIVILEGE);
+      req.setGrant_revoke_priv_params(params);
+      ddl.op_type = TCatalogOpType.DDL;
+      ddl.setDdl_params(req);
+      metadata.setColumns(Collections.<TColumn>emptyList());
     } else {
       throw new IllegalStateException("Unexpected CatalogOp statement type.");
     }
 
     result.setResult_set_metadata(metadata);
     result.setCatalog_op_request(ddl);
+    if (ddl.getOp_type() == TCatalogOpType.DDL) {
+      TCatalogServiceRequestHeader header = new TCatalogServiceRequestHeader();
+      header.setRequesting_user(analysis.getAnalyzer().getUser().getName());
+      ddl.getDdl_params().setHeader(header);
+    }
   }
 
   /**
@@ -685,7 +732,8 @@ public class Frontend {
    */
   private AnalysisContext.AnalysisResult analyzeStmt(TQueryCtx queryCtx)
       throws AnalysisException, InternalException, AuthorizationException {
-    AnalysisContext analysisCtx = new AnalysisContext(impaladCatalog_, queryCtx);
+    AnalysisContext analysisCtx = new AnalysisContext(impaladCatalog_, queryCtx,
+        authzConfig_);
     LOG.debug("analyze query " + queryCtx.request.stmt);
 
     // Run analysis in a loop until it any of the following events occur:

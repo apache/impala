@@ -28,6 +28,7 @@ import com.cloudera.impala.analysis.UnionStmt.Qualifier;
 import com.cloudera.impala.thrift.TFunctionCategory;
 import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
 import com.cloudera.impala.thrift.THdfsFileFormat;
+import com.cloudera.impala.thrift.TPrivilegeLevel;
 import com.cloudera.impala.thrift.TTablePropertyType;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -236,21 +237,21 @@ terminal
   KW_DESCRIBE, KW_DISTINCT, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED,
   KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN,
   KW_FIRST, KW_FLOAT, KW_FOLLOWING, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL,
-  KW_FUNCTION, KW_FUNCTIONS, KW_GROUP, KW_HAVING, KW_IF, KW_IN, KW_INIT_FN, KW_INNER,
-  KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL, KW_INTO, KW_INVALIDATE,
-  KW_IS, KW_JOIN, KW_LAST, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD, KW_LOCATION,
-  KW_MAP, KW_MERGE_FN, KW_METADATA, KW_NOT, KW_NULL, KW_NULLS, KW_OFFSET,
+  KW_FUNCTION, KW_FUNCTIONS, KW_GRANT, KW_GROUP, KW_HAVING, KW_IF, KW_IN, KW_INIT_FN,
+  KW_INNER, KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL, KW_INTO,
+  KW_INVALIDATE, KW_IS, KW_JOIN, KW_LAST, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD,
+  KW_LOCATION, KW_MAP, KW_MERGE_FN, KW_METADATA, KW_NOT, KW_NULL, KW_NULLS, KW_OFFSET,
   KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVER, KW_OVERWRITE, KW_PARQUET, KW_PARQUETFILE,
   KW_PARTITION, KW_PARTITIONED, KW_PARTITIONS, KW_PRECEDING,
-  KW_PREPARE_FN, KW_PRODUCED, KW_RANGE, KW_RCFILE,
-  KW_REFRESH, KW_REGEXP, KW_RENAME, KW_REPLACE, KW_RETURNS, KW_RIGHT, KW_RLIKE, KW_ROW,
+  KW_PREPARE_FN, KW_PRODUCED, KW_RANGE, KW_RCFILE, KW_REFRESH, KW_REGEXP, KW_RENAME,
+  KW_REPLACE, KW_RETURNS, KW_REVOKE, KW_RIGHT, KW_RLIKE, KW_ROLE, KW_ROLES, KW_ROW,
   KW_ROWS, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES,
-  KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED, KW_STRAIGHT_JOIN, KW_STRING,
-  KW_STRUCT, KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TBLPROPERTIES, KW_TERMINATED,
+  KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED, KW_STRAIGHT_JOIN,
+  KW_STRING, KW_STRUCT, KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TBLPROPERTIES, KW_TERMINATED,
   KW_TEXTFILE, KW_THEN,
   KW_TIMESTAMP, KW_TINYINT, KW_STATS, KW_TO, KW_TRUE, KW_UNBOUNDED, KW_UNCACHED,
-  KW_UNION, KW_UPDATE_FN,
-  KW_USE, KW_USING, KW_VALUES, KW_VARCHAR, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
+  KW_UNION, KW_UPDATE_FN, KW_USE, KW_USING,
+  KW_VALUES, KW_VARCHAR, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
 
 terminal COLON, COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET,
   DIVIDE, MOD, ADD, SUBTRACT;
@@ -400,10 +401,22 @@ nonterminal String opt_kw_column;
 nonterminal String opt_kw_table;
 nonterminal Boolean overwrite_val;
 
-// Used to parse 'SOURCE' and 'SOURCES' as identifiers rather than keywords. Throws a
-// parse exception if the identifier is not SOURCE/SOURCES.
+// For GRANT/REVOKE/AUTH DDL statements
+nonterminal ShowRolesStmt show_roles_stmt;
+nonterminal CreateDropRoleStmt create_drop_role_stmt;
+nonterminal GrantRevokeRoleStmt grant_role_stmt;
+nonterminal GrantRevokeRoleStmt revoke_role_stmt;
+nonterminal GrantRevokePrivStmt grant_privilege_stmt;
+nonterminal GrantRevokePrivStmt revoke_privilege_stmt;
+nonterminal TPrivilegeLevel privilege;
+
+// To avoid creating common keywords such as 'SERVER' or 'SOURCES' we treat them as
+// identifiers rather than keywords. Throws a parse exception if the identifier does not
+// match the expected string.
 nonterminal Boolean source_ident;
 nonterminal Boolean sources_ident;
+nonterminal Boolean server_ident;
+nonterminal Boolean uri_ident;
 
 // For Create/Drop/Show function ddl
 nonterminal FunctionArgs function_def_args;
@@ -517,6 +530,18 @@ stmt ::=
   {: RESULT = reset_metadata; :}
   | set_stmt:set
   {: RESULT = set; :}
+  | show_roles_stmt:show_roles
+  {: RESULT = show_roles; :}
+  | create_drop_role_stmt:create_drop_role
+  {: RESULT = create_drop_role; :}
+  | grant_role_stmt:grant_role
+  {: RESULT = grant_role; :}
+  | revoke_role_stmt:revoke_role
+  {: RESULT = revoke_role; :}
+  | grant_privilege_stmt:grant_privilege
+  {: RESULT = grant_privilege; :}
+  | revoke_privilege_stmt:revoke_privilege
+  {: RESULT = revoke_privilege; :}
   ;
 
 load_stmt ::=
@@ -596,6 +621,65 @@ opt_ident_list ::=
 opt_kw_table ::=
   KW_TABLE
   | /* empty */
+  ;
+
+show_roles_stmt ::=
+  KW_SHOW KW_ROLES
+  {: RESULT = new ShowRolesStmt(null); :}
+  | KW_SHOW KW_ROLE KW_GRANT KW_GROUP IDENT:group
+  {: RESULT = new ShowRolesStmt(group); :}
+  ;
+
+create_drop_role_stmt ::=
+  KW_CREATE KW_ROLE IDENT:role
+  {: RESULT = new CreateDropRoleStmt(role, false); :}
+  | KW_DROP KW_ROLE IDENT:role
+  {: RESULT = new CreateDropRoleStmt(role, true); :}
+  ;
+
+grant_role_stmt ::=
+  KW_GRANT KW_ROLE IDENT:role KW_TO KW_GROUP IDENT:group
+  {: RESULT = new GrantRevokeRoleStmt(role, group, true); :}
+  ;
+
+revoke_role_stmt ::=
+  KW_REVOKE KW_ROLE IDENT:role KW_FROM KW_GROUP IDENT:group
+  {: RESULT = new GrantRevokeRoleStmt(role, group, false); :}
+  ;
+
+grant_privilege_stmt ::=
+  KW_GRANT privilege:priv KW_ON server_ident:server_kw KW_TO IDENT:role
+  {: RESULT = GrantRevokePrivStmt.createServerScopedStmt(priv, role, true); :}
+  | KW_GRANT privilege:priv KW_ON KW_DATABASE IDENT:db_name KW_TO IDENT:role
+  {: RESULT = GrantRevokePrivStmt.createDbScopedStmt(priv, role, true, db_name); :}
+  | KW_GRANT privilege:priv KW_ON KW_TABLE table_name:tbl_name KW_TO IDENT:role
+  {: RESULT = GrantRevokePrivStmt.createTableScopedStmt(priv, role, true, tbl_name); :}
+  | KW_GRANT privilege:priv KW_ON uri_ident:uri_kw STRING_LITERAL:uri KW_TO IDENT:role
+  {:
+    RESULT = GrantRevokePrivStmt.createUriScopedStmt(priv, role, true, new HdfsUri(uri));
+  :}
+  ;
+
+revoke_privilege_stmt ::=
+  KW_REVOKE privilege:priv KW_ON server_ident:server_kw KW_FROM IDENT:role
+  {: RESULT = GrantRevokePrivStmt.createServerScopedStmt(priv, role, false); :}
+  | KW_REVOKE privilege:priv KW_ON KW_DATABASE IDENT:db_name KW_FROM IDENT:role
+  {: RESULT = GrantRevokePrivStmt.createDbScopedStmt(priv, role, false, db_name); :}
+  | KW_REVOKE privilege:priv KW_ON KW_TABLE table_name:tbl_name KW_FROM IDENT:role
+  {: RESULT = GrantRevokePrivStmt.createTableScopedStmt(priv, role, false, tbl_name); :}
+  | KW_REVOKE privilege:priv KW_ON uri_ident:uri_kw STRING_LITERAL:uri KW_FROM IDENT:role
+  {:
+    RESULT = GrantRevokePrivStmt.createUriScopedStmt(priv, role, false, new HdfsUri(uri));
+  :}
+  ;
+
+privilege ::=
+  KW_SELECT
+  {: RESULT = TPrivilegeLevel.SELECT; :}
+  | KW_INSERT
+  {: RESULT = TPrivilegeLevel.INSERT; :}
+  | KW_ALL
+  {: RESULT = TPrivilegeLevel.ALL; :}
   ;
 
 alter_tbl_stmt ::=
@@ -991,6 +1075,26 @@ sources_ident ::=
   {:
     if (!ident.toUpperCase().equals("SOURCES")) {
       parser.parseError("identifier", SqlParserSymbols.IDENT, "SOURCES");
+    }
+    RESULT = true;
+  :}
+  ;
+
+uri_ident ::=
+  IDENT:ident
+  {:
+    if (!ident.toUpperCase().equals("URI")) {
+      parser.parseError("identifier", SqlParserSymbols.IDENT, "URI");
+    }
+    RESULT = true;
+  :}
+  ;
+
+server_ident ::=
+  IDENT:ident
+  {:
+    if (!ident.toUpperCase().equals("SERVER")) {
+      parser.parseError("identifier", SqlParserSymbols.IDENT, "SERVER");
     }
     RESULT = true;
   :}

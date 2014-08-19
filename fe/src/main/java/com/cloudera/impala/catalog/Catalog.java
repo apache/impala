@@ -475,15 +475,17 @@ public abstract class Catalog {
               objectDesc.getPrivilege().getRole_id());
         }
         for (RolePrivilege p: tmpRole.getPrivileges()) {
-          if (p.getName().equals(objectDesc.getPrivilege().getPrivilege_name())) {
+          if (p.getName().equalsIgnoreCase(
+              objectDesc.getPrivilege().getPrivilege_name())) {
             result.setType(p.getCatalogObjectType());
             result.setCatalog_version(p.getCatalogVersion());
             result.setPrivilege(p.toThrift());
-            break;
+            return result;
           }
         }
-        throw new CatalogException("Privilege not found: " +
-            objectDesc.getPrivilege().getPrivilege_name());
+        throw new CatalogException(String.format("Role '%s' does not contain " +
+            "privilege: '%s'", tmpRole.getName(),
+            objectDesc.getPrivilege().getPrivilege_name()));
       default: throw new IllegalStateException(
           "Unexpected TCatalogObject type: " + objectDesc.getType());
     }

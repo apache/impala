@@ -40,10 +40,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.AuthorizeableDb;
-import com.cloudera.impala.authorization.AuthorizeableServer;
 import com.cloudera.impala.authorization.AuthorizeableTable;
-import com.cloudera.impala.authorization.AuthorizeableUri;
-import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Catalog;
@@ -59,6 +56,9 @@ import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TMetadataOpcode;
 import com.cloudera.impala.thrift.TNetworkAddress;
+import com.cloudera.impala.thrift.TPrivilege;
+import com.cloudera.impala.thrift.TPrivilegeLevel;
+import com.cloudera.impala.thrift.TPrivilegeScope;
 import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TSessionState;
@@ -100,7 +100,7 @@ public class AuthorizationTest {
   // service.
   @Parameters
   public static Collection testVectors() {
-    return Arrays.asList(new Object[][] {{AUTHZ_POLICY_FILE}, {null}});
+    return Arrays.asList(new Object[][] {{null}, {AUTHZ_POLICY_FILE}});
   }
 
   public AuthorizationTest(String policyFile) throws Exception {
@@ -113,120 +113,157 @@ public class AuthorizationTest {
     }
     catalog_ = new ImpaladTestCatalog(authzConfig_);
     queryCtx_ = TestUtils.createQueryContext(Catalog.DEFAULT_DB, USER.getName());
-    analysisContext_ = new AnalysisContext(catalog_, queryCtx_);
+    analysisContext_ = new AnalysisContext(catalog_, queryCtx_, authzConfig_);
     fe_ = new Frontend(authzConfig_, catalog_);
   }
 
   private void setup() throws Exception {
-    SentryPolicyService sentryService =
-        new SentryPolicyService(authzConfig_.getSentryConfig(), "server1");
+    SentryPolicyService sentryService = new SentryPolicyService(
+        authzConfig_.getSentryConfig());
     // Server admin. Don't grant to any groups, that is done within
     // the test cases.
     String roleName = "admin";
-    sentryService.createRole(roleName, true);
-    sentryService.grantRolePrivilege(roleName, new AuthorizeableServer("server1"),
-        Privilege.ALL);
-    sentryService.revokeRoleFromGroup("admin", USER.getName());
+    sentryService.createRole(USER, roleName, true);
+
+    TPrivilege privilege = new TPrivilege("", TPrivilegeLevel.ALL,
+        TPrivilegeScope.SERVER);
+    privilege.setServer_name("server1");
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
+    sentryService.revokeRoleFromGroup(USER, "admin", USER.getName());
 
     // insert functional alltypes
     roleName = "insert_functional_alltypes";
     roleName = roleName.toLowerCase();
-    sentryService.createRole(roleName, true);
-    sentryService.grantRoleToGroup(roleName, USER.getName());
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
 
-    AuthorizeableTable table = new AuthorizeableTable("functional", "alltypes");
-    sentryService.grantRolePrivilege(roleName, table, Privilege.INSERT);
+    privilege = new TPrivilege("", TPrivilegeLevel.INSERT, TPrivilegeScope.TABLE);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional");
+    privilege.setTable_name("alltypes");
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // insert_parquet
     roleName = "insert_parquet";
-    sentryService.createRole(roleName, true);
-    sentryService.grantRoleToGroup(roleName, USER.getName());
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
 
-    table = new AuthorizeableTable("functional_parquet",
-        AuthorizeableTable.ANY_TABLE_NAME);
-    sentryService.grantRolePrivilege(roleName, table, Privilege.INSERT);
+    privilege = new TPrivilege("", TPrivilegeLevel.INSERT, TPrivilegeScope.TABLE);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional_parquet");
+    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
 
-    // all newdb
+    // all newdb w/ all on URI
     roleName = "all_newdb";
-    sentryService.createRole(roleName, true);
-    sentryService.grantRoleToGroup(roleName, USER.getName());
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
 
-    AuthorizeableDb db = new AuthorizeableDb("newdb");
-    sentryService.grantRolePrivilege(roleName, db, Privilege.ALL);
-    AuthorizeableUri uri = new AuthorizeableUri(
-        "hdfs://localhost:20500/test-warehouse/new_table");
-    sentryService.grantRolePrivilege(roleName, uri, Privilege.ALL);
+    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.DATABASE);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("newdb");
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
+
+    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.URI);
+    privilege.setServer_name("server1");
+    privilege.setUri("hdfs://localhost:20500/test-warehouse/new_table");
+    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // all tpch
     roleName = "all_tpch";
-    sentryService.createRole(roleName, true);
-    sentryService.grantRoleToGroup(roleName, USER.getName());
-    uri = new AuthorizeableUri(
-        "hdfs://localhost:20500/test-warehouse/tpch.lineitem");
-    sentryService.grantRolePrivilege(roleName, uri, Privilege.ALL);
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.URI);
+    privilege.setServer_name("server1");
+    privilege.setUri("hdfs://localhost:20500/test-warehouse/tpch.lineitem");
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
 
-    db = new AuthorizeableDb("tpch");
-    sentryService.grantRolePrivilege(roleName, db, Privilege.ALL);
+    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.DATABASE);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("tpch");
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // select tpcds
     roleName = "select_tpcds";
-    sentryService.createRole(roleName, true);
-    sentryService.grantRoleToGroup(roleName, USER.getName());
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
 
-    table = new AuthorizeableTable("tpcds", AuthorizeableTable.ANY_TABLE_NAME);
-    sentryService.grantRolePrivilege(roleName, table, Privilege.SELECT);
+    privilege = new TPrivilege("", TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("tpcds");
+    privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // select_functional_alltypesagg
     roleName = "select_functional_alltypesagg";
-    sentryService.createRole(roleName, true);
-    sentryService.grantRoleToGroup(roleName, USER.getName());
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
 
-    table = new AuthorizeableTable("functional", "alltypesagg");
-    sentryService.grantRolePrivilege(roleName, table, Privilege.SELECT);
+    privilege = new TPrivilege("", TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional");
+    privilege.setTable_name("alltypesagg");
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // select_functional_complex_view
     roleName = "select_functional_complex_view";
-    sentryService.createRole(roleName, true);
-    sentryService.grantRoleToGroup(roleName, USER.getName());
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
 
-    table = new AuthorizeableTable("functional", "complex_view");
-    sentryService.grantRolePrivilege(roleName, table, Privilege.SELECT);
+    privilege = new TPrivilege("", TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional");
+    privilege.setTable_name("complex_view");
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // select_functional_view_view
     roleName = "select_functional_view_view";
-    sentryService.createRole(roleName, true);
-    sentryService.grantRoleToGroup(roleName, USER.getName());
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
 
-    table = new AuthorizeableTable("functional", "view_view");
-    sentryService.grantRolePrivilege(roleName, table, Privilege.SELECT);
+    privilege = new TPrivilege("", TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional");
+    privilege.setTable_name("view_view");
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     // all_functional_seq_snap
     roleName = "all_functional_seq_snap";
     // Verify we are able to drop a role.
-    sentryService.dropRole(roleName, true);
-    sentryService.createRole(roleName, true);
-    sentryService.grantRoleToGroup(roleName, USER.getName());
-    db = new AuthorizeableDb("functional_seq_snap");
-    sentryService.grantRolePrivilege(roleName, db, Privilege.ALL);
+    sentryService.dropRole(USER, roleName, true);
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+
+    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.DATABASE);
+    privilege.setServer_name("server1");
+    privilege.setDb_name("functional_seq_snap");
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
   }
 
   @Test
   public void TestSentryService() throws ImpalaException {
     SentryPolicyService sentryService =
-        new SentryPolicyService(authzConfig_.getSentryConfig(), "server1");
+        new SentryPolicyService(authzConfig_.getSentryConfig());
     String roleName = "testRoleName";
     roleName = roleName.toLowerCase();
 
-    sentryService.createRole(roleName, true);
+    sentryService.createRole(USER, roleName, true);
     String dbName = UUID.randomUUID().toString();
     AuthorizeableDb db = new AuthorizeableDb(dbName);
-    sentryService.grantRolePrivilege(roleName, db, Privilege.ALL);
-    sentryService.grantRoleToGroup(roleName, System.getProperty("user.name"));
+    TPrivilege privilege =
+        new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.DATABASE);
+    privilege.setServer_name("server1");
+    privilege.setDb_name(dbName);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+    sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     for (int i = 0; i < 2; ++i) {
-      AuthorizeableTable table = new AuthorizeableTable(dbName,
-          "test_tbl_" + String.valueOf(i));
-      sentryService.grantRolePrivilege(roleName, table, Privilege.SELECT);
+      privilege = new TPrivilege("", TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE);
+      privilege.setServer_name("server1");
+      privilege.setDb_name(dbName);
+      privilege.setTable_name("test_tbl_" + String.valueOf(i));
+      sentryService.grantRolePrivilege(USER, roleName, privilege);
     }
   }
 
@@ -515,11 +552,11 @@ public class AuthorizationTest {
     SentryPolicyService sentryService = createSentryService();
 
     try {
-      sentryService.grantRoleToGroup("admin", USER.getName());
+      sentryService.grantRoleToGroup(USER, "admin", USER.getName());
       ((ImpaladTestCatalog) catalog_).reset();
       AuthzOk("invalidate metadata");
     } finally {
-      sentryService.revokeRoleFromGroup("admin", USER.getName());
+      sentryService.revokeRoleFromGroup(USER, "admin", USER.getName());
       ((ImpaladTestCatalog) catalog_).reset();
     }
   }
@@ -665,9 +702,9 @@ public class AuthorizationTest {
     if (authzConfig_.isFileBasedPolicy()) return;
 
     SentryPolicyService sentryService =
-        new SentryPolicyService(authzConfig_.getSentryConfig(), "server1");
+        new SentryPolicyService(authzConfig_.getSentryConfig());
     try {
-      sentryService.grantRoleToGroup("admin", USER.getName());
+      sentryService.grantRoleToGroup(USER, "admin", USER.getName());
       ((ImpaladTestCatalog) catalog_).reset();
 
       // User has permissions to create database.
@@ -680,7 +717,7 @@ public class AuthorizationTest {
       AuthzOk("create database newdb location " +
           "'hdfs://localhost:20500/test-warehouse/new_table'");
     } finally {
-      sentryService.revokeRoleFromGroup("admin", USER.getName());
+      sentryService.revokeRoleFromGroup(USER, "admin", USER.getName());
       ((ImpaladTestCatalog) catalog_).reset();
     }
   }
@@ -1199,9 +1236,9 @@ public class AuthorizationTest {
         new User(USER.getName() + "/abc.host.com@REAL.COM"),
         new User(USER.getName() + "@REAL.COM"));
     for (User user: users) {
-      ImpaladCatalog catalog = new ImpaladTestCatalog();
       AnalysisContext context = new AnalysisContext(catalog_,
-          TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()));
+          TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()),
+          authzConfig_);
 
       // Can select from table that user has privileges on.
       AuthzOk(context, "select * from functional.alltypesagg");
@@ -1222,7 +1259,8 @@ public class AuthorizationTest {
     // First try with the less privileged user.
     User currentUser = USER;
     AnalysisContext context = new AnalysisContext(catalog_,
-        TestUtils.createQueryContext(Catalog.DEFAULT_DB, currentUser.getName()));
+        TestUtils.createQueryContext(Catalog.DEFAULT_DB, currentUser.getName()),
+        authzConfig_);
     AuthzError(context, "show functions",
         "User '%s' does not have privileges to access: default", currentUser);
     AuthzOk(context, "show functions in tpch");
@@ -1251,9 +1289,9 @@ public class AuthorizationTest {
 
     // Admin should be able to do everything
     SentryPolicyService sentryService =
-        new SentryPolicyService(authzConfig_.getSentryConfig(), "server1");
+        new SentryPolicyService(authzConfig_.getSentryConfig());
     try {
-      sentryService.grantRoleToGroup("admin", USER.getName());
+      sentryService.grantRoleToGroup(USER, "admin", USER.getName());
       ((ImpaladTestCatalog) catalog_).reset();
 
       AuthzOk("show functions");
@@ -1280,7 +1318,7 @@ public class AuthorizationTest {
 
       AuthzOk("drop function tpch.f()");
     } finally {
-      sentryService.revokeRoleFromGroup("admin", USER.getName());
+      sentryService.revokeRoleFromGroup(USER, "admin", USER.getName());
       ((ImpaladTestCatalog) catalog_).reset();
 
       AuthzError(context, "create function tpch.f() returns int location " +
@@ -1436,7 +1474,7 @@ public class AuthorizationTest {
     // Create an analysis context + FE with the test user (as defined in the policy file)
     User user = new User("test_user");
     AnalysisContext context = new AnalysisContext(catalog,
-        TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()));
+        TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()), authzConfig);
     Frontend fe = new Frontend(authzConfig, catalog);
 
     // Can select from table that user has privileges on.
@@ -1449,7 +1487,7 @@ public class AuthorizationTest {
     // Verify with the admin user
     user = new User("admin_user");
     context = new AnalysisContext(catalog,
-        TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()));
+        TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()), authzConfig);
     fe = new Frontend(authzConfig, catalog);
 
     // Admin user should have privileges to do anything
@@ -1462,7 +1500,7 @@ public class AuthorizationTest {
       throws AnalysisException {
     Frontend fe = new Frontend(authzConfig, catalog_);
     AnalysisContext ac = new AnalysisContext(new ImpaladTestCatalog(),
-        TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()));
+        TestUtils.createQueryContext(Catalog.DEFAULT_DB, user.getName()), authzConfig);
     AuthzError(fe, ac, "select * from functional.alltypesagg",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
         "functional.alltypesagg", user);
@@ -1533,6 +1571,6 @@ public class AuthorizationTest {
   }
 
   private SentryPolicyService createSentryService() {
-    return new SentryPolicyService(authzConfig_.getSentryConfig(), "server1");
+    return new SentryPolicyService(authzConfig_.getSentryConfig());
   }
 }

@@ -68,6 +68,7 @@ Frontend::Frontend() {
     {"getStats", "([B)[B", &get_stats_id_},
     {"getFunctions", "([B)[B", &get_functions_id_},
     {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
+    {"getRoles", "([B)[B", &show_roles_id_},
     {"execHiveServer2MetadataOp", "([B)[B", &exec_hs2_metadata_op_id_},
     {"setCatalogInitialized", "()V", &set_catalog_initialized_id_},
     {"loadTableData", "([B)[B", &load_table_data_id_}};
@@ -150,6 +151,10 @@ Status Frontend::GetFunctions(TFunctionCategory::type fn_category, const string&
   if (pattern != NULL) params.__set_pattern(*pattern);
   if (session != NULL) params.__set_session(*session);
   return JniUtil::CallJniMethod(fe_, get_functions_id_, params, functions);
+}
+
+Status Frontend::ShowRoles(const TShowRolesParams& params, TShowRolesResult* result) {
+  return JniUtil::CallJniMethod(fe_, show_roles_id_, params, result);
 }
 
 Status Frontend::GetCatalogObject(const TCatalogObject& req,

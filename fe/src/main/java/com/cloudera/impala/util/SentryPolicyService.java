@@ -25,12 +25,6 @@ import org.apache.sentry.provider.db.service.thrift.TSentryRole;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.authorization.Authorizeable;
-import com.cloudera.impala.authorization.AuthorizeableDb;
-import com.cloudera.impala.authorization.AuthorizeableServer;
-import com.cloudera.impala.authorization.AuthorizeableTable;
-import com.cloudera.impala.authorization.AuthorizeableUri;
-import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.SentryConfig;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.RolePrivilege;
@@ -38,7 +32,6 @@ import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TPrivilege;
 import com.cloudera.impala.thrift.TPrivilegeLevel;
 import com.cloudera.impala.thrift.TPrivilegeScope;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
@@ -46,10 +39,7 @@ import com.google.common.collect.Lists;
  */
 public class SentryPolicyService {
   private final static Logger LOG = LoggerFactory.getLogger(SentryPolicyService.class);
-
   private final SentryConfig config_;
-  private final String serverName_;
-  private final User user_ = new User(System.getProperty("user.name"));
 
   /**
    * Wrapper around a SentryPolicyServiceClient.
@@ -94,26 +84,28 @@ public class SentryPolicyService {
     }
   }
 
-  public SentryPolicyService(SentryConfig config, String serverName) {
+  public SentryPolicyService(SentryConfig config) {
     config_ = config;
-    serverName_ = serverName;
   }
 
   /**
-   * Drops a role. Currently only used by authorization tests.
+   * Drops a role.
    *
+   * @param requestingUser - The requesting user.
    * @param roleName - The role to drop.
    * @param ifExists - If true, no error is thrown if the role does not exist.
    * @throws InternalException - On any error dropping the role.
    */
-  public void dropRole(String roleName, boolean ifExists) throws InternalException {
-    LOG.trace("Dropping role: " + roleName);
+  public void dropRole(User requestingUser, String roleName, boolean ifExists)
+      throws InternalException {
+    LOG.trace(String.format("Dropping role: %s on behalf of: %s", roleName,
+        requestingUser.getName()));
     SentryServiceClient client = new SentryServiceClient();
     try {
       if (ifExists) {
-        client.get().dropRoleIfExists(user_.getName(), roleName);
+        client.get().dropRoleIfExists(requestingUser.getShortName(), roleName);
       } else {
-        client.get().dropRole(user_.getName(), roleName);
+        client.get().dropRole(requestingUser.getShortName(), roleName);
       }
     } catch (SentryUserException e) {
       throw new InternalException("Error dropping role: ", e);
@@ -123,18 +115,20 @@ public class SentryPolicyService {
   }
 
   /**
-   * Creates a new role. Currently only used by authorization tests.
+   * Creates a new role.
    *
+   * @param requestingUser - The requesting user.
    * @param roleName - The role to create.
    * @param ifNotExists - If true, no error is thrown if the role already exists.
    * @throws InternalException - On any error creating the role.
    */
-  public void createRole(String roleName, boolean ifNotExists)
+  public void createRole(User requestingUser, String roleName, boolean ifNotExists)
       throws InternalException {
-    LOG.trace("Creating role: " + roleName);
+    LOG.trace(String.format("Creating role: %s on behalf of: %s", roleName,
+        requestingUser.getName()));
     SentryServiceClient client = new SentryServiceClient();
     try {
-      client.get().createRole(user_.getName(), roleName);
+      client.get().createRole(requestingUser.getShortName(), roleName);
     } catch (SentryAlreadyExistsException e) {
       if (ifNotExists) return;
       throw new InternalException("Error creating role: ", e);
@@ -146,19 +140,20 @@ public class SentryPolicyService {
   }
 
   /**
-   * Grants a role to a group. Currently only used by authorization tests.
+   * Grants a role to a group.
    *
+   * @param requestingUser - The requesting user.
    * @param roleName - The role to grant to a group. Role must already exist.
    * @param groupName - The group to grant the role to.
    * @throws InternalException - On any error.
    */
-  public void grantRoleToGroup(String roleName, String groupName)
+  public void grantRoleToGroup(User requestingUser, String roleName, String groupName)
       throws InternalException {
-    LOG.trace(String.format("Granting role '%s' to group '%s'", roleName, groupName));
-
+    LOG.trace(String.format("Granting role '%s' to group '%s' on behalf of: %s",
+        roleName, groupName, requestingUser.getName()));
     SentryServiceClient client = new SentryServiceClient();
     try {
-      client.get().grantRoleToGroup(user_.getName(), groupName, roleName);
+      client.get().grantRoleToGroup(requestingUser.getShortName(), groupName, roleName);
     } catch (SentryUserException e) {
       throw new InternalException("Error granting role to group: ", e);
     } finally {
@@ -166,77 +161,23 @@ public class SentryPolicyService {
     }
   }
 
-  /**
-   * Grants privileges to an existing role. Currently only used by authorization tests.
-   *
-   * @param roleName - The role to grant privileges to (case insensitive).
-   * @param authorizeable - The object to secure (Table, Database, Uri, etc...)
-   * @param privilege - The privilege to grant to the object.
-   * @throws InternalException - On any error
-   */
-  public void grantRolePrivilege(String roleName, Authorizeable authorizeable,
-      Privilege privilege) throws InternalException {
-    LOG.trace(String.format("Granting role '%s' privilege '%s' on '%s'", roleName,
-        privilege.toString(), authorizeable.getName()));
-
-    SentryServiceClient client = new SentryServiceClient();
-    try {
-      if (authorizeable instanceof AuthorizeableServer) {
-        try {
-          client.get().grantServerPrivilege(user_.getName(), roleName,
-              authorizeable.getName());
-        } catch (SentryUserException e) {
-          throw new InternalException("Error granting privilege: ", e);
-        }
-      } else if (authorizeable instanceof AuthorizeableDb) {
-        AuthorizeableDb db = (AuthorizeableDb) authorizeable;
-        try {
-          client.get().grantDatabasePrivilege(user_.getName(), roleName,
-              serverName_, db.getName(), privilege.toString());
-        } catch (SentryUserException e) {
-          throw new InternalException("Error granting privilege: ", e);
-        }
-      } else if (authorizeable instanceof AuthorizeableUri) {
-        AuthorizeableUri uri = (AuthorizeableUri) authorizeable;
-        try {
-          client.get().grantURIPrivilege(user_.getName(),
-              roleName, serverName_, uri.getName());
-        } catch (SentryUserException e) {
-          throw new InternalException("Error granting privilege: ", e);
-        }
-      } else if (authorizeable instanceof AuthorizeableTable) {
-        AuthorizeableTable tbl = (AuthorizeableTable) authorizeable;
-        String tblName = tbl.getTblName();
-        String dbName = tbl.getDbName();
-        try {
-          client.get().grantTablePrivilege(user_.getName(), roleName, serverName_,
-              dbName, tblName, privilege.toString());
-        } catch (SentryUserException e) {
-          throw new InternalException("Error granting privilege: ", e);
-        }
-      } else {
-        Preconditions.checkState(false, "Unexpected Authorizeable type: %s",
-            authorizeable.getClass().getName());
-      }
-    } finally {
-      client.close();
-    }
-  }
 
   /**
-   * Removes a roles from a group. Currently only used by authorization tests.
+   * Removes a role from a group.
    *
+   * @param requestingUser - The requesting user.
    * @param roleName - The role name to remove.
    * @param groupName - The group to remove the role from.
    * @throws InternalException - On any error.
    */
-  public void revokeRoleFromGroup(String roleName, String groupName)
+  public void revokeRoleFromGroup(User requestingUser, String roleName, String groupName)
       throws InternalException {
-    LOG.trace(String.format("Revoking role '%s' from group '%s'", roleName, groupName));
-
+    LOG.trace(String.format("Revoking role '%s' from group '%s' on behalf of: %s",
+        roleName, groupName, requestingUser.getName()));
     SentryServiceClient client = new SentryServiceClient();
     try {
-      client.get().revokeRoleFromGroup(user_.getName(), groupName, roleName);
+      client.get().revokeRoleFromGroup(requestingUser.getShortName(),
+          groupName, roleName);
     } catch (SentryUserException e) {
       throw new InternalException("Error revoking role from group: ", e);
     } finally {
@@ -245,12 +186,100 @@ public class SentryPolicyService {
   }
 
   /**
-   * Lists all roles.
+   * Grants privileges to an existing role.
+   *
+   * @param requestingUser - The requesting user.
+   * @param roleName - The role to grant privileges to (case insensitive).
+   * @param privilege - The privilege to grant.
+   * @throws InternalException - On any error
    */
-  public List<TSentryRole> listAllRoles() throws InternalException {
+  public void grantRolePrivilege(User requestingUser, String roleName,
+      TPrivilege privilege) throws InternalException {
+    LOG.trace(String.format("Granting role '%s' privilege '%s' on '%s' on behalf of: %s",
+        roleName, privilege.toString(), privilege.getScope().toString(),
+        requestingUser.getName()));
     SentryServiceClient client = new SentryServiceClient();
     try {
-      return Lists.newArrayList(client.get().listRoles(user_.getName()));
+      switch (privilege.getScope()) {
+        case SERVER:
+          client.get().grantServerPrivilege(requestingUser.getShortName(), roleName,
+              privilege.getServer_name());
+          break;
+        case DATABASE:
+          client.get().grantDatabasePrivilege(requestingUser.getShortName(), roleName,
+              privilege.getServer_name(), privilege.getDb_name(),
+              privilege.getPrivilege_level().toString());
+          break;
+        case TABLE:
+          String tblName = privilege.getTable_name();
+          String dbName = privilege.getDb_name();
+          client.get().grantTablePrivilege(requestingUser.getShortName(), roleName,
+              privilege.getServer_name(),
+              dbName, tblName, privilege.getPrivilege_level().toString());
+          break;
+        case URI:
+          client.get().grantURIPrivilege(requestingUser.getShortName(),
+              roleName, privilege.getServer_name(), privilege.getUri());
+          break;
+      }
+    } catch (SentryUserException e) {
+      throw new InternalException("Error granting privilege: ", e);
+    } finally {
+      client.close();
+    }
+  }
+
+  /**
+   * Revokes privileges from an existing role.
+   *
+   * @param requestingUser - The requesting user.
+   * @param roleName - The role to grant privileges to (case insensitive).
+   * @param privilege - The privilege to grant to the object.
+   * @throws InternalException - On any error
+   */
+  public void revokeRolePrivilege(User requestingUser, String roleName,
+      TPrivilege privilege) throws InternalException {
+    LOG.trace(String.format("Revoking role '%s' privilege '%s' on '%s' on behalf of: %s",
+        roleName, privilege.toString(), privilege.getScope().toString(),
+        requestingUser.getName()));
+    SentryServiceClient client = new SentryServiceClient();
+    try {
+      switch (privilege.getScope()) {
+        case SERVER:
+          client.get().revokeServerPrivilege(requestingUser.getShortName(), roleName,
+              privilege.getServer_name());
+          break;
+        case DATABASE:
+          client.get().revokeDatabasePrivilege(requestingUser.getShortName(), roleName,
+              privilege.getServer_name(), privilege.getDb_name(),
+              privilege.getPrivilege_level().toString());
+          break;
+        case TABLE:
+          String tblName = privilege.getTable_name();
+          String dbName = privilege.getDb_name();
+          client.get().revokeTablePrivilege(requestingUser.getShortName(), roleName,
+              privilege.getServer_name(), dbName, tblName,
+              privilege.getPrivilege_level().toString());
+          break;
+        case URI:
+          client.get().revokeURIPrivilege(requestingUser.getShortName(),
+              roleName, privilege.getServer_name(), privilege.getUri());
+          break;
+      }
+    } catch (SentryUserException e) {
+      throw new InternalException("Error revoking privilege: ", e);
+    } finally {
+      client.close();
+    }
+  }
+
+  /**
+   * Lists all roles.
+   */
+  public List<TSentryRole> listAllRoles(User requestingUser) throws InternalException {
+    SentryServiceClient client = new SentryServiceClient();
+    try {
+      return Lists.newArrayList(client.get().listRoles(requestingUser.getShortName()));
     } catch (SentryUserException e) {
       throw new InternalException("Error listing roles: ", e);
     } finally {
@@ -261,12 +290,12 @@ public class SentryPolicyService {
   /**
    * Lists all privileges granted to a role.
    */
-  public List<TSentryPrivilege> listRolePrivileges(String roleName)
+  public List<TSentryPrivilege> listRolePrivileges(User requestingUser, String roleName)
       throws InternalException {
     SentryServiceClient client = new SentryServiceClient();
     try {
-      return Lists.newArrayList(client.get().listAllPrivilegesByRoleName(user_.getName(),
-          roleName));
+      return Lists.newArrayList(client.get().listAllPrivilegesByRoleName(
+          requestingUser.getShortName(), roleName));
     } catch (SentryUserException e) {
       throw new InternalException("Error listing privileges by role name: ", e);
     } finally {

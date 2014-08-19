@@ -150,6 +150,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       TCatalogOpRequest reset_req;
       reset_req.__set_op_type(TCatalogOpType::RESET_METADATA);
       reset_req.__set_reset_metadata_params(TResetMetadataRequest());
+      reset_req.reset_metadata_params.__set_header(TCatalogServiceRequestHeader());
       reset_req.reset_metadata_params.__set_is_refresh(true);
       reset_req.reset_metadata_params.__set_table_name(
           exec_request_.load_data_request.table_name);
@@ -252,6 +253,13 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
       RETURN_IF_ERROR(frontend_->GetFunctions(
           params->category, params->db, fn_pattern, &query_ctx_.session, &functions));
       SetResultSet(functions.fn_ret_types, functions.fn_signatures);
+      return Status::OK;
+    }
+    case TCatalogOpType::SHOW_ROLES: {
+      const TShowRolesParams& params = catalog_op.show_roles_params;
+      TShowRolesResult result;
+      RETURN_IF_ERROR(frontend_->ShowRoles(params, &result));
+      SetResultSet(result.role_names);
       return Status::OK;
     }
     case TCatalogOpType::DESCRIBE: {
@@ -710,6 +718,8 @@ Status ImpalaServer::QueryExecState::UpdateCatalog() {
   if (query_exec_request.__isset.finalize_params) {
     const TFinalizeParams& finalize_params = query_exec_request.finalize_params;
     TUpdateCatalogRequest catalog_update;
+    catalog_update.__set_header(TCatalogServiceRequestHeader());
+    catalog_update.header.__set_requesting_user(effective_user());
     if (!coord()->PrepareCatalogUpdate(&catalog_update)) {
       VLOG_QUERY << "No partitions altered, not updating metastore (query id: "
                  << query_id() << ")";

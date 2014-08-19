@@ -48,6 +48,15 @@ public class HdfsUri {
 
   public void analyze(Analyzer analyzer, Privilege privilege)
       throws AnalysisException {
+    analyze(analyzer, privilege, true);
+  }
+
+  /**
+   * Analyzes the URI, optionally registering a privilege request. Used by GRANT/REVOKE
+   * privilege statements.
+   */
+  public void analyze(Analyzer analyzer, Privilege privilege, boolean registerPrivReq)
+      throws AnalysisException {
     if (location_.isEmpty()) {
       throw new AnalysisException("URI path cannot be empty.");
     }
@@ -68,8 +77,10 @@ public class HdfsUri {
 
     // Fully-qualify the path
     uriPath_ = FileSystemUtil.createFullyQualifiedPath(uriPath_);
-    analyzer.registerPrivReq(new PrivilegeRequest(
-        new AuthorizeableUri(uriPath_.toString()), privilege));
+    if (registerPrivReq) {
+      analyzer.registerPrivReq(new PrivilegeRequest(
+          new AuthorizeableUri(uriPath_.toString()), privilege));
+    }
   }
 
   @Override

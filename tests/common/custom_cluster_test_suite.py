@@ -51,7 +51,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
 
   def setup_class(cls):
     # No-op, but needed to override base class setup which is not wanted in this
-    # case.
+    # case (it is done on a per-method basis).
     pass
 
   def teardown_class(cls):
@@ -83,6 +83,10 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     statestored.service.wait_for_live_subscribers(NUM_SUBSCRIBERS, timeout=60)
     for impalad in self.cluster.impalads:
       impalad.service.wait_for_num_known_live_backends(CLUSTER_SIZE, timeout=60)
+    super(CustomClusterTestSuite, self).setup_class()
+
+  def teardown_method(self, method):
+    super(CustomClusterTestSuite, self).teardown_class()
 
   @classmethod
   def __stop_impala_cluster(cls):
