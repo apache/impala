@@ -65,6 +65,28 @@ class TestQueryExpiration(CustomClusterTestSuite):
         == num_expired + 3
 
   @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args("--idle_query_timeout=0")
+  def test_query_expiration_no_default(self, vector):
+    """Confirm that single queries expire if no default is set, but a per-query
+    expiration is set"""
+    impalad = self.cluster.get_any_impalad()
+    client = impalad.service.create_beeswax_client()
+    num_expired = impalad.service.get_metric_value('impala-server.num-queries-expired')
+    client.execute("SET QUERY_TIMEOUT_S=1")
+    handle = client.execute_async("SELECT SLEEP(1000000)")
+
+    # Set a huge timeout, server should not expire the query while this test is running
+    client.execute("SET QUERY_TIMEOUT_S=1000")
+    handle3 = client.execute_async("SELECT SLEEP(2000000)")
+
+    before = time()
+    sleep(4)
+
+    # Query with timeout of 1 should have expired, other query should still be running.
+    assert num_expired + 1 == impalad.service.get_metric_value(
+      'impala-server.num-queries-expired')
+
+  @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--idle_query_timeout=1")
   def test_concurrent_query_expiration(self, vector):
     """Confirm that multiple concurrent queries are correctly expired if not fetched"""
