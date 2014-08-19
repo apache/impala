@@ -15,6 +15,12 @@ limitations under the License.
 -->
 {{> www/common-header.tmpl }}
 
+<!-- Enable the 'highlight' library, which does syntax highlighting of query
+     statements -->
+<link rel="stylesheet" href="www/highlight/styles/default.css">
+<script src="www/highlight/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
 <h3>Query <tt>{{query_id}}</tt></h3>
 <h4><em>Status:</em> {{status}}</h4>
 
