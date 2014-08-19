@@ -132,7 +132,7 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
 };
 
 CatalogServer::CatalogServer(Metrics* metrics)
-  : thrift_iface_(new CatalogServiceThriftIf(this)), thrift_serializer_(false),
+  : thrift_iface_(new CatalogServiceThriftIf(this)), thrift_serializer_(true),
     metrics_(metrics), topic_updates_ready_(false), last_sent_catalog_version_(0L),
     catalog_objects_min_version_(0L), catalog_objects_max_version_(0L) {
   topic_processing_time_metric_ = metrics_->RegisterMetric(

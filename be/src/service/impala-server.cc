@@ -1395,7 +1395,7 @@ void ImpalaServer::CatalogUpdateCallback(
       uint32_t len = item.value.size();
       TCatalogObject catalog_object;
       Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
-          item.value.data()), &len, false, &catalog_object);
+          item.value.data()), &len, true, &catalog_object);
       if (!status.ok()) {
         LOG(ERROR) << "Error deserializing item: " << status.GetErrorMsg();
         continue;
