@@ -20,5 +20,5 @@ bin=`cd "$bin"; pwd`
 
 # Generate list of files for Cscope to index
 cd $IMPALA_HOME
-find . -regex '.*\.\(cc\|c\|hh\|h\|java\)$' > cscope.files
+find . -regex '.*\.\(cc\|c\|hh\|h\|java\|thrift\|flex\|y\)$' > cscope.files
 
