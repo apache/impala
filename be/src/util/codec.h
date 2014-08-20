@@ -116,13 +116,13 @@ class Codec {
   //   input_length: length of the data to process
   //   input: data to process
   virtual Status ProcessBlock(bool output_preallocated,
-                              int64_t input_length, uint8_t* input,
+                              int64_t input_length, const uint8_t* input,
                               int64_t* output_length, uint8_t** output) = 0;
 
   // Wrapper to the actual ProcessBlock() function. This wrapper uses lengths as ints and
   // not int64_ts. We need to keep this interface because the Parquet thrift uses ints.
   // See IMPALA-1116.
-  Status ProcessBlock32(bool output_preallocated, int input_length, uint8_t* input,
+  Status ProcessBlock32(bool output_preallocated, int input_length, const uint8_t* input,
                         int* output_length, uint8_t** output);
 
   // Returns the maximum result length from applying the codec to input.

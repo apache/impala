@@ -226,8 +226,8 @@ void Codec::Close() {
   }
 }
 
-Status Codec::ProcessBlock32(bool output_preallocated, int input_length, uint8_t* input,
-                             int* output_length, uint8_t** output) {
+Status Codec::ProcessBlock32(bool output_preallocated, int input_length,
+    const uint8_t* input, int* output_length, uint8_t** output) {
   int64_t input_len64 = input_length;
   int64_t output_len64 = *output_length;
   RETURN_IF_ERROR(ProcessBlock(output_preallocated, input_len64, input, &output_len64,
