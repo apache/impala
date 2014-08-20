@@ -319,8 +319,7 @@ inline bool PartitionedHashJoinNode::AppendRow(BufferedTupleStream* stream,
 
 Status PartitionedHashJoinNode::InitGetNext(TupleRow* first_probe_row) {
   // TODO: Move this reset to blocking-join. Not yet though because of hash-join.
-  probe_batch_pos_ = 0;
-  matched_probe_ = true;
+  ResetForProbe();
   return Status::OK;
 }
 
@@ -331,12 +330,12 @@ Status PartitionedHashJoinNode::NextProbeRowBatch(
     // Loop until we find a non-empty row batch.
     if (UNLIKELY(probe_batch_pos_ == probe_batch_->num_rows())) {
       probe_batch_->TransferResourceOwnership(out_batch);
-      probe_batch_pos_ = 0;
-      matched_probe_ = true;
+      ResetForProbe();
       if (probe_side_eos_) break;
       RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_side_eos_));
       continue;
     }
+    ResetForProbe();
     return Status::OK;
   }
   current_probe_row_ = NULL;
@@ -354,8 +353,7 @@ Status PartitionedHashJoinNode::NextSpilledProbeRowBatch(
     bool eos = false;
     RETURN_IF_ERROR(input_partition_->probe_rows()->GetNext(probe_batch_.get(), &eos));
     DCHECK_GT(probe_batch_->num_rows(), 0);
-    probe_batch_pos_ = 0;
-    matched_probe_ = true;
+    ResetForProbe();
   } else {
     // Done with this partition.
     if (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN) {

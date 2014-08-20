@@ -1,0 +1,60 @@
+====
+---- QUERY
+# Testing anti join
+select j.* from JoinTbl j left anti join DimTbl d on j.test_id = d.id
+---- RESULTS
+1106,'Name6',94612,5000
+1106,'Name16',94612,5000
+1106,'Name6',94616,5000
+1106,'Name16',94616,5000
+1106,'Name6',94612,15000
+1106,'Name16',94612,15000
+1106,'Name6',94616,15000
+1106,'Name16',94616,15000
+---- TYPES
+bigint, string, int, int
+====
+---- QUERY
+# Testing anti join on string column
+select j.* from JoinTbl j left anti join DimTbl d on j.test_name = d.name
+---- RESULTS
+1006,'Name16',94612,5000
+1106,'Name16',94612,5000
+1006,'Name16',94616,5000
+1106,'Name16',94616,5000
+1006,'Name16',94612,15000
+1106,'Name16',94612,15000
+1006,'Name16',94616,15000
+1106,'Name16',94616,15000
+---- TYPES
+bigint, string, int, int
+====
+---- QUERY
+# Testing multi-way joins that include an anti join
+select count(*) from JoinTbl j left anti join DimTbl d on j.test_id = d.id
+left outer join JoinTbl k on j.test_id = k.test_id
+---- RESULTS
+64
+---- TYPES
+bigint
+====
+---- QUERY
+# Testing multi-way joins that include only anti joins
+select count(*) from JoinTbl j left anti join DimTbl d on j.test_id = d.id
+left anti join JoinTbl k on j.test_id = k.test_id
+---- RESULTS
+0
+---- TYPES
+bigint
+====
+---- QUERY
+# Regression test for IMPALA-1160. Proper handling of anti joins with NULLs
+select a.* FROM functional.imp1160a a left anti join functional.imp1160b b on a.b = b.b
+---- RESULTS
+2,4,30
+1,3,10
+2,NULL,20
+NULL,NULL,30
+---- TYPES
+INT, INT, INT
+====

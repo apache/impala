@@ -178,6 +178,13 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // initialize hash_partitions_.
   Status PrepareNextPartition(RuntimeState*);
 
+  // TODO: Move to .inline.h, when we have one
+  void ResetForProbe() {
+    probe_batch_pos_ = 0;
+    matched_probe_ = true;
+    hash_tbl_iterator_.reset();
+  }
+
   // Returns the current state of the partition as a string.
   std::string PrintState() const;
 

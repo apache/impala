@@ -280,6 +280,11 @@ class HashTable {
       return node_->matched;
     }
 
+    void reset() {
+      bucket_idx_ = -1;
+      node_ = NULL;
+    }
+
     // Returns true if this iterator is at the end, i.e. GetRow() cannot be called.
     bool AtEnd() const { return node_ == NULL; }
     bool operator!=(const Iterator& rhs) { return !(*this == rhs); }
