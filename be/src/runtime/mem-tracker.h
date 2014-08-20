@@ -140,7 +140,6 @@ class MemTracker {
   // the limit recorded in one of its ancestors already happened.
   void ConsumeLocal(int64_t bytes) {
     DCHECK(consumption_metric_ == NULL) << "Should not be called on root.";
-    DCHECK(limit_ == -1) << "This probably doesn't make sense for trackers with limits";
     if (UNLIKELY(enable_logging_)) LogUpdate(bytes > 0, bytes);
     all_trackers_[0]->consumption_->Update(bytes);
   }

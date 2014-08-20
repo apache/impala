@@ -87,6 +87,7 @@ Status PartitionedHashJoinNode::Init(const TPlanNode& tnode) {
 Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
+
   // Note: For easier testing of the spilling paths, use just 80% of what is left.
   // That is, multiple SpareCapacity() * 0.8f.
   int64_t max_join_mem = mem_tracker()->SpareCapacity();
@@ -238,6 +239,7 @@ Status PartitionedHashJoinNode::SpillPartitions() {
         "have enough memory to maintain a buffer per partition.");
     return status;
   }
+  LOG(ERROR) << "Spilling partition: " << partition_idx << endl << DebugString();
   return hash_partitions_[partition_idx]->build_rows()->UnpinAllBlocks();
 }
 
@@ -260,8 +262,11 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state) {
     hash_partitions_.push_back(pool_->Add(new Partition(state, this, level + 1)));
     RETURN_IF_ERROR(hash_partitions_[i]->build_rows()->Init());
   }
-  LOG(ERROR) << "Initial partitions\n" << DebugString();
 
+  if (input_partition_ != NULL) {
+    DCHECK(input_partition_->build_rows() != NULL);
+    RETURN_IF_ERROR(input_partition_->build_rows()->PrepareForRead());
+  }
   RowBatch build_batch(child(1)->row_desc(), state->batch_size(), mem_tracker());
   bool eos = false;
   while (!eos) {
@@ -343,14 +348,14 @@ Status PartitionedHashJoinNode::NextSpilledProbeRowBatch(
     RuntimeState* state, RowBatch* out_batch) {
   DCHECK(input_partition_ != NULL);
   BufferedTupleStream* probe_rows = input_partition_->probe_rows();
+  probe_batch_->Reset();
   if (LIKELY(probe_rows->rows_returned() < probe_rows->num_rows())) {
-    // Common case, continue from the current probe stream.
-    probe_batch_->TransferResourceOwnership(out_batch);
-    probe_batch_pos_ = 0;
-    matched_probe_ = true;
+    // Continue from the current probe stream.
     bool eos = false;
     RETURN_IF_ERROR(input_partition_->probe_rows()->GetNext(probe_batch_.get(), &eos));
     DCHECK_GT(probe_batch_->num_rows(), 0);
+    probe_batch_pos_ = 0;
+    matched_probe_ = true;
   } else {
     // Done with this partition.
     if (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN) {
@@ -374,6 +379,7 @@ Status PartitionedHashJoinNode::NextSpilledProbeRowBatch(
 Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
   DCHECK(input_partition_ == NULL);
   if (spilled_partitions_.empty()) return Status::OK;
+  LOG(ERROR) << "PrepareNextPartition\n" << DebugString();
 
   int64_t mem_limit = join_node_mem_tracker()->SpareCapacity();
   mem_limit -= state->block_mgr()->block_size();
@@ -475,9 +481,10 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
     current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
     matched_probe_ = false;
     Partition* partition = NULL;
-    if (input_partition_ != NULL) {
-      // We are probing a row from a spilled partition, no need to hash to find
-      // the partition.
+    if (input_partition_ != NULL && input_partition_->hash_tbl() != NULL) {
+      // In this case we are working on a spilled partition (input_partition_ != NULL).
+      // If the input partition has a hash table built, it means we are *not*
+      // repartitioning and simply probing into input_partition_'s hash table.
       partition = input_partition_;
     } else {
       // We don't know which partition this probe row should go to.
@@ -688,6 +695,7 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
     if (hash_partitions_[i]->is_closed()) continue;
     if (hash_partitions_[i]->hash_tbl() != NULL) continue;
     RETURN_IF_ERROR(hash_partitions_[i]->probe_rows()->Init());
+    RETURN_IF_ERROR(hash_partitions_[i]->probe_rows()->UnpinAllBlocks());
   }
   return Status::OK;
 }
@@ -772,6 +780,17 @@ string PartitionedHashJoinNode::DebugString() const {
     }
     ss << "   (Spilled) Probe Rows: "
        << hash_partitions_[i]->probe_rows()->num_rows() << endl;
+  }
+  if (!spilled_partitions_.empty()) {
+    ss << "SpilledPartitions" << endl;
+    for (list<Partition*>::const_iterator it = spilled_partitions_.begin();
+        it != spilled_partitions_.end(); ++it) {
+      ss << "  Partition=" << *it << endl
+        << "   Spilled Build Rows: "
+        << (*it)->build_rows()->num_rows() << endl
+        << "   Spilled Probe Rows: "
+        << (*it)->probe_rows()->num_rows() << endl;
+    }
   }
   return ss.str();
 }
