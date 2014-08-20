@@ -133,6 +133,7 @@ Status BufferedTupleStream::NewBlockForWrite(bool* got_block) {
   write_block_ = new_block;
   DCHECK(write_block_->is_pinned());
   ++num_pinned_;
+  DCHECK_EQ(num_pinned_, NumPinned(blocks_));
   return Status::OK;
 }
 
@@ -205,12 +206,12 @@ Status BufferedTupleStream::PinAllBlocks(bool* pinned) {
       it != blocks_.end(); ++it) {
     if ((*it)->is_pinned()) continue;
     RETURN_IF_ERROR((*it)->Pin(pinned));
-    ++num_pinned_;
-    DCHECK_EQ(num_pinned_, NumPinned(blocks_));
     if (!*pinned) {
       UnpinAllBlocks();
       return Status::OK;
     }
+    ++num_pinned_;
+    DCHECK_EQ(num_pinned_, NumPinned(blocks_));
   }
   *pinned = true;
   pinned_ = true;

@@ -681,8 +681,10 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
       if (!built) {
         // Estimate was wrong, cleanup hash table.
         RETURN_IF_ERROR(hash_partitions_[i]->build_rows()->UnpinAllBlocks());
-        hash_partitions_[i]->hash_tbl_->Close();
-        hash_partitions_[i]->hash_tbl_.reset();
+        if (hash_partitions_[i]->hash_tbl_.get() != NULL) {
+          hash_partitions_[i]->hash_tbl_->Close();
+          hash_partitions_[i]->hash_tbl_.reset();
+        }
         continue;
       }
       max_mem_build_tables -= hash_partitions_[i]->InMemSize();
