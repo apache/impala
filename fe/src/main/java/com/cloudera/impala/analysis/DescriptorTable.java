@@ -24,6 +24,7 @@ import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.thrift.TDescriptorTable;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 /**
@@ -32,19 +33,16 @@ import com.google.common.collect.Sets;
  * them unique ids.
  */
 public class DescriptorTable {
-  private final HashMap<TupleId, TupleDescriptor> tupleDescs_;
-  private final HashMap<SlotId, SlotDescriptor> slotDescs_;
+  private final HashMap<TupleId, TupleDescriptor> tupleDescs_ = Maps.newHashMap();
+  private final HashMap<SlotId, SlotDescriptor> slotDescs_ = Maps.newHashMap();
   private final IdGenerator<TupleId> tupleIdGenerator_ = TupleId.createGenerator();
   private final IdGenerator<SlotId> slotIdGenerator_ = SlotId.createGenerator();
   // List of referenced tables with no associated TupleDescriptor to ship to the BE.
   // For example, the output table of an insert query.
-  private final List<Table> referencedTables_;
-
-  public DescriptorTable() {
-    tupleDescs_ = new HashMap<TupleId, TupleDescriptor>();
-    slotDescs_ = new HashMap<SlotId, SlotDescriptor>();
-    referencedTables_ = new ArrayList<Table>();
-  }
+  private final List<Table> referencedTables_ = Lists.newArrayList();
+  // For each table, the set of partitions that are referenced by at least one scan range.
+  private final HashMap<Table, HashSet<Long>> referencedPartitionsPerTable_ =
+      Maps.newHashMap();
 
   public TupleDescriptor createTupleDescriptor() {
     TupleDescriptor d = new TupleDescriptor(tupleIdGenerator_.getNextId());
@@ -68,6 +66,27 @@ public class DescriptorTable {
 
   public void addReferencedTable(Table table) {
     referencedTables_.add(table);
+  }
+
+  /**
+   * Find the set of referenced partitions for the given table.  Allocates a set if
+   * none has been allocated for the table yet.
+   */
+  private HashSet<Long> getReferencedPartitions(Table table) {
+    HashSet<Long> refPartitions = referencedPartitionsPerTable_.get(table);
+    if (refPartitions == null) {
+      refPartitions = new HashSet<Long>();
+      referencedPartitionsPerTable_.put(table, refPartitions);
+    }
+    return refPartitions;
+  }
+
+  /**
+   * Add the partition with ID partitionId to the set of referenced partitions for the
+   * given table.
+   */
+  public void addReferencedPartition(Table table, long partitionId) {
+    getReferencedPartitions(table).add(partitionId);
   }
 
   /**
@@ -102,6 +121,7 @@ public class DescriptorTable {
   public TDescriptorTable toThrift() {
     TDescriptorTable result = new TDescriptorTable();
     HashSet<Table> referencedTbls = Sets.newHashSet();
+    HashSet<Table> allPartitionsTbls = Sets.newHashSet();
     for (TupleDescriptor tupleD: tupleDescs_.values()) {
       // inline view of a non-constant select has a non-materialized tuple descriptor
       // in the descriptor table just for type checking, which we need to skip
@@ -120,9 +140,15 @@ public class DescriptorTable {
     }
     for (Table table: referencedTables_) {
       referencedTbls.add(table);
+      // We don't know which partitions are needed for INSERT, so include them all.
+      allPartitionsTbls.add(table);
     }
     for (Table tbl: referencedTbls) {
-      result.addToTableDescriptors(tbl.toThriftDescriptor());
+      HashSet<Long> referencedPartitions = null; // null means include all partitions.
+      if (!allPartitionsTbls.contains(tbl)) {
+        referencedPartitions = getReferencedPartitions(tbl);
+      }
+      result.addToTableDescriptors(tbl.toThriftDescriptor(referencedPartitions));
     }
     return result;
   }

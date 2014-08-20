@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.catalog;
 
+import java.util.Set;
+
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 
 import com.cloudera.impala.thrift.TCatalogObjectType;
@@ -66,8 +68,8 @@ public class InlineView extends Table {
    * This should never be called.
    */
   @Override
-  public TTableDescriptor toThriftDescriptor() {
-    // An inline view never generate Thrift representation.
+  public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {
+    // An inline view never generates Thrift representation.
     throw new UnsupportedOperationException(
         "Inline View should not generate Thrift representation");
   }

@@ -1168,12 +1168,12 @@ public class HdfsTable extends Table {
   }
 
   @Override
-  public TTableDescriptor toThriftDescriptor() {
+  public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {
     // Create thrift descriptors to send to the BE.  The BE does not
     // need any information below the THdfsPartition level.
     TTableDescriptor tableDesc = new TTableDescriptor(id_.asInt(), TTableType.HDFS_TABLE,
         getColumns().size(), numClusteringCols_, name_, db_.getName());
-    tableDesc.setHdfsTable(getTHdfsTable(false));
+    tableDesc.setHdfsTable(getTHdfsTable(false, referencedPartitions));
     tableDesc.setColNames(getColumnNames());
     return tableDesc;
   }
@@ -1183,14 +1183,26 @@ public class HdfsTable extends Table {
     // Send all metadata between the catalog service and the FE.
     TTable table = super.toThrift();
     table.setTable_type(TTableType.HDFS_TABLE);
-    table.setHdfs_table(getTHdfsTable(true));
+    table.setHdfs_table(getTHdfsTable(true, null));
     return table;
   }
 
-  private THdfsTable getTHdfsTable(boolean includeFileDesc) {
+  /**
+   * Create a THdfsTable corresponding to this HdfsTable. If includeFileDesc is true,
+   * then then all partitions and THdfsFileDescs of each partition should be included.
+   * Otherwise, don't include any THdfsFileDescs, and include only those partitions in
+   * the refPartitions set (the backend doesn't need metadata for unreferenced
+   * partitions).
+   */
+  private THdfsTable getTHdfsTable(boolean includeFileDesc, Set<Long> refPartitions) {
+    // includeFileDesc implies all partitions should be included (refPartitions == null).
+    Preconditions.checkState(!includeFileDesc || refPartitions == null);
     Map<Long, THdfsPartition> idToPartition = Maps.newHashMap();
     for (HdfsPartition partition: partitions_) {
-      idToPartition.put(partition.getId(), partition.toThrift(includeFileDesc));
+      long id = partition.getId();
+      if (refPartitions == null || refPartitions.contains(id)) {
+        idToPartition.put(id, partition.toThrift(includeFileDesc));
+      }
     }
     THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, getColumnNames(),
         nullPartitionKeyValue_, nullColumnValue_, idToPartition);

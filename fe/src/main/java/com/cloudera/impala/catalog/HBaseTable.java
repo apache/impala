@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -510,7 +511,7 @@ public class HBaseTable extends Table {
   public ArrayList<Column> getColumnsInHiveOrder() { return getColumns(); }
 
   @Override
-  public TTableDescriptor toThriftDescriptor() {
+  public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {
     TTableDescriptor tableDescriptor =
         new TTableDescriptor(id_.asInt(), TTableType.HBASE_TABLE, getColumns().size(),
             numClusteringCols_, hbaseTableName_, db_.getName());

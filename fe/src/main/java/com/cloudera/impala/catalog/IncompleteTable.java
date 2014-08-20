@@ -15,6 +15,7 @@
 package com.cloudera.impala.catalog;
 
 import java.util.List;
+import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 
@@ -64,7 +65,7 @@ public class IncompleteTable extends Table {
   public int getNumNodes() { throw new IllegalStateException(cause_); }
 
   @Override
-  public TTableDescriptor toThriftDescriptor() {
+  public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {
     throw new IllegalStateException(cause_);
   }
 

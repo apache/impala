@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
@@ -98,7 +99,7 @@ public abstract class Table implements CatalogObject {
 
   //number of nodes that contain data for this table; -1: unknown
   public abstract int getNumNodes();
-  public abstract TTableDescriptor toThriftDescriptor();
+  public abstract TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions);
   public abstract TCatalogObjectType getCatalogObjectType();
 
   /**

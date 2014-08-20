@@ -16,6 +16,7 @@ package com.cloudera.impala.catalog;
 
 import java.io.StringReader;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -155,7 +156,7 @@ public class View extends Table {
   public boolean isLocalView() { return isLocalView_; }
 
   @Override
-  public TTableDescriptor toThriftDescriptor() {
+  public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {
     throw new IllegalStateException("Cannot call toThriftDescriptor() on a view.");
   }
 

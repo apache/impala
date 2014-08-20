@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.fs.Path;
 import org.junit.AfterClass;
@@ -55,6 +56,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 public class PlannerTest {
   private final static Logger LOG = LoggerFactory.getLogger(PlannerTest.class);
@@ -132,6 +134,59 @@ public class PlannerTest {
     Preconditions.checkNotNull(partition);
     Preconditions.checkState(partition.id == split.partition_id);
     return partition;
+  }
+
+  /**
+   * Verify that all THdfsPartitions included in the descriptor table are referenced by
+   * at least one scan range or part of an inserted table.  PrintScanRangeLocations
+   * will implicitly verify the converse (it'll fail if a scan range references a
+   * table/partition descriptor that is not present).
+   */
+  private void testHdfsPartitionsReferenced(TQueryExecRequest execRequest,
+      String query, StringBuilder errorLog) {
+    long insertTableId = -1;
+    // Collect all partitions that are referenced by a scan range.
+    Set<THdfsPartition> scanRangePartitions = Sets.newHashSet();
+    if (execRequest.per_node_scan_ranges != null) {
+      for (Map.Entry<Integer, List<TScanRangeLocations>> entry:
+           execRequest.per_node_scan_ranges.entrySet()) {
+        if (entry.getValue() == null) {
+          continue;
+        }
+        for (TScanRangeLocations locations: entry.getValue()) {
+          if (locations.scan_range.isSetHdfs_file_split()) {
+            THdfsFileSplit split = locations.scan_range.getHdfs_file_split();
+            THdfsPartition partition = findPartition(entry.getKey(), split);
+            scanRangePartitions.add(partition);
+          }
+        }
+      }
+    }
+    if (execRequest.isSetFinalize_params()) {
+      insertTableId = execRequest.getFinalize_params().getTable_id();
+    }
+    boolean first = true;
+    // Iterate through all partitions of the descriptor table and verify all partitions
+    // are referenced.
+    if (execRequest.isSetDesc_tbl() && execRequest.desc_tbl.isSetTableDescriptors()) {
+      for (TTableDescriptor tableDesc: execRequest.desc_tbl.tableDescriptors) {
+        // All partitions of insertTableId are okay.
+        if (tableDesc.getId() == insertTableId) continue;
+        if (!tableDesc.isSetHdfsTable()) continue;
+        THdfsTable hdfsTable = tableDesc.getHdfsTable();
+        for (Map.Entry<Long, THdfsPartition> e :
+             hdfsTable.getPartitions().entrySet()) {
+          THdfsPartition partition = e.getValue();
+          if (!scanRangePartitions.contains(partition)) {
+            if (first) errorLog.append("query:\n" + query + "\n");
+            errorLog.append(
+                " unreferenced partition: HdfsTable: " + tableDesc.getId() +
+                " HdfsPartition: " + partition.getId() + "\n");
+            first = false;
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -282,6 +337,7 @@ public class PlannerTest {
         }
         // Query exec request may not be set for DDL, e.g., CTAS.
         if (execRequest.isSetQuery_exec_request()) {
+          testHdfsPartitionsReferenced(execRequest.query_exec_request, query, errorLog);
           locationsStr =
               PrintScanRangeLocations(execRequest.query_exec_request).toString();
         }

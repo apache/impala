@@ -31,6 +31,7 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.BinaryPredicate.Operator;
 import com.cloudera.impala.analysis.CompoundPredicate;
+import com.cloudera.impala.analysis.DescriptorTable;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InPredicate;
 import com.cloudera.impala.analysis.IsNullPredicate;
@@ -461,11 +462,11 @@ public class HdfsScanNode extends ScanNode {
    * conjuncts used for filtering from conjuncts_.
    */
   private void prunePartitions(Analyzer analyzer) throws InternalException {
+    DescriptorTable descTbl = analyzer.getDescTbl();
     // loop through all partitions and prune based on applicable conjuncts;
     // start with creating a collection of partition filters for the applicable conjuncts
     List<SlotId> partitionSlots = Lists.newArrayList();
-    for (SlotDescriptor slotDesc:
-        analyzer.getDescTbl().getTupleDesc(tupleIds_.get(0)).getSlots()) {
+    for (SlotDescriptor slotDesc: descTbl.getTupleDesc(tupleIds_.get(0)).getSlots()) {
       Preconditions.checkState(slotDesc.getColumn() != null);
       if (slotDesc.getColumn().getPosition() < tbl_.getNumClusteringCols()) {
         partitionSlots.add(slotDesc.getId());
@@ -522,7 +523,10 @@ public class HdfsScanNode extends ScanNode {
     for (Long id: matchingPartitionIds) {
       HdfsPartition partition = partitionMap.get(id);
       Preconditions.checkNotNull(partition);
-      if (partition.hasFileDescriptors()) partitions_.add(partition);
+      if (partition.hasFileDescriptors()) {
+        partitions_.add(partition);
+        descTbl.addReferencedPartition(tbl_, partition.getId());
+      }
     }
   }
 
