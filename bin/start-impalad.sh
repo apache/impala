@@ -85,7 +85,10 @@ if ${CLUSTER_DIR}/admin is_kerberized; then
   IMPALAD_ARGS="${IMPALAD_ARGS} -principal=${MINIKDC_PRINC_IMPALA}"
   IMPALAD_ARGS="${IMPALAD_ARGS} -be_principal=${MINIKDC_PRINC_IMPALA_BE}"
   IMPALAD_ARGS="${IMPALAD_ARGS} -keytab_file=${KRB5_KTNAME}"
-  export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS} ${JAVA_KERBEROS_MAGIC}"
+  IMPALAD_ARGS="${IMPALAD_ARGS} -krb5_conf=${KRB5_CONFIG}"
+  if [ "${MINIKDC_DEBUG}" = "true" ]; then
+      IMPALAD_ARGS="${IMPALAD_ARGS} -krb5_debug_file=/tmp/impalad.krb5_debug"
+  fi
 fi
 
 . ${IMPALA_HOME}/bin/set-classpath.sh

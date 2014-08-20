@@ -46,6 +46,10 @@ if ${CLUSTER_DIR}/admin is_kerberized; then
   . ${MINIKDC_ENV}
   STATESTORED_ARGS="${STATESTORED_ARGS} -principal=${MINIKDC_PRINC_IMPALA_BE}"
   STATESTORED_ARGS="${STATESTORED_ARGS} -keytab_file=${KRB5_KTNAME}"
+  STATESTORED_ARGS="${STATESTORED_ARGS} -krb5_conf=${KRB5_CONFIG}"
+  if [ "${MINIKDC_DEBUG}" = "true" ]; then
+      STATESTORED_ARGS="${STATESTORED_ARGS} -krb5_debug_file=/tmp/statestored.krb5_debug"
+  fi
 fi
 
 exec ${BINARY_BASE_DIR}/${BUILD_TYPE}/statestore/statestored ${STATESTORED_ARGS}
