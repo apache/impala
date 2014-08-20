@@ -34,6 +34,9 @@ DEFINE_string(principal, "", "Kerberos principal. If set, both client and backen
 DEFINE_string(be_principal, "", "Kerberos principal for backend network connections only,"
     "overriding --principal if set.");
 DEFINE_string(keytab_file, "", "Absolute path to Kerberos keytab file");
+DEFINE_string(krb5_conf, "", "Absolute path to Kerberos krb5.conf if in a non-standard "
+    "location. Does not normally need to be set.");
+DEFINE_string(krb5_debug_file, "", "Turn on Kerberos debugging and output to this file");
 
 DEFINE_string(mem_limit, "80%", "Process memory limit specified as number of bytes "
               "('<int>[bB]?'), megabytes ('<float>[mM]'), gigabytes ('<float>[gG]'), "

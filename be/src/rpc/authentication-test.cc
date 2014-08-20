@@ -37,7 +37,7 @@ TEST(Auth, PrincipalSubstitution) {
   string hostname;
   ASSERT_TRUE(GetHostname(&hostname).ok());
   SaslAuthProvider sa(false);  // false means it's external
-  ASSERT_TRUE(sa.InitKerberos("service_name/_HOST@some.realm", "").ok());
+  ASSERT_TRUE(sa.InitKerberos("service_name/_HOST@some.realm", "/etc/hosts").ok());
   ASSERT_TRUE(sa.Start().ok());
   ASSERT_EQ(string::npos, sa.principal().find("_HOST"));
   ASSERT_NE(string::npos, sa.principal().find(hostname));

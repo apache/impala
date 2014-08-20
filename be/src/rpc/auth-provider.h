@@ -119,7 +119,7 @@ class SaslAuthProvider : public AuthProvider {
   std::string principal_;
 
   // The full path to the keytab where the above principal can be found.
-  std::string keytab_path_;
+  std::string keytab_file_;
 
   // The service name, deduced from the principal. Used by servers to indicate
   // what service a principal must have a ticket for in order to be granted
@@ -144,6 +144,12 @@ class SaslAuthProvider : public AuthProvider {
   // obtain a ticket has completed, first_kinit is Set() with the status of the operation.
   // Additionally, if the first attempt fails, this method will return.
   void RunKinit(Promise<Status>* first_kinit);
+
+  // We use this to ensure that we only set up environment variables one time.
+  static bool env_setup_complete_;
+
+  // One-time kerberos-specific environment variable setup.  Called by InitKerberos().
+  Status InitKerberosEnv();
 };
 
 // This provider implements no authentication, so any connection is immediately

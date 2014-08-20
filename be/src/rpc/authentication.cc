@@ -21,6 +21,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_int.hpp>
+#include <boost/filesystem.hpp>
 #include <gutil/strings/substitute.h>
 #include <string>
 #include <vector>
@@ -47,10 +48,13 @@ using namespace std;
 using namespace strings;
 using namespace boost;
 using namespace boost::random;
+using namespace boost::filesystem;   // for is_regular()
 
 DECLARE_string(keytab_file);
 DECLARE_string(principal);
 DECLARE_string(be_principal);
+DECLARE_string(krb5_conf);
+DECLARE_string(krb5_debug_file);
 
 DEFINE_int32(kerberos_reinit_interval, 60,
     "Interval, in minutes, between kerberos ticket renewals. Each renewal will request "
@@ -110,6 +114,11 @@ static const string PLAIN_MECHANISM = "PLAIN";
 static const string LDAP_URI_PREFIX = "ldap://";
 static const string LDAPS_URI_PREFIX = "ldaps://";
 
+// We implement an "auxprop" plugin for the Sasl layer in order to have a hook in which
+// to log messages about the start of authentication. This is that plugin's name.
+static const string IMPALA_AUXPROP_PLUGIN = "impala-auxprop";
+
+bool SaslAuthProvider::env_setup_complete_ = false;
 AuthManager* AuthManager::auth_manager_ = new AuthManager();
 
 // This Sasl callback is called when the underlying cyrus-sasl layer has
@@ -130,20 +139,21 @@ static int SaslLogCallback(void* context, int level, const char* message) {
   case SASL_LOG_NONE:  // "Don't log anything"
   case SASL_LOG_PASS:  // "Traces... including passwords" - don't log!
     break;
-  case SASL_LOG_ERR:
-  case SASL_LOG_FAIL:
+  case SASL_LOG_ERR:   // "Unusual errors"
+  case SASL_LOG_FAIL:  // "Authentication failures"
     LOG(ERROR) << "SASL message (" << authctx << "): " << message;
     break;
-  case SASL_LOG_WARN:
+  case SASL_LOG_WARN:  // "Non-fatal warnings"
     LOG(WARNING) << "SASL message (" << authctx << "): " << message;
     break;
-  case SASL_LOG_NOTE:
+  case SASL_LOG_NOTE:  // "More verbose than WARN"
     LOG(INFO) << "SASL message (" << authctx << "): " << message;
     break;
-  case SASL_LOG_DEBUG:
+  case SASL_LOG_DEBUG: // "More verbose than NOTE"
     VLOG(1) << "SASL message (" << authctx << "): " << message;
     break;
-  case SASL_LOG_TRACE:
+  case SASL_LOG_TRACE: // "Traces of internal protocols"
+  default:
     VLOG(3) << "SASL message (" << authctx << "): " << message;
     break;
   }
@@ -179,7 +189,7 @@ int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
   LDAP* ld;
   int rc = ldap_initialize(&ld, FLAGS_ldap_uri.c_str());
   if (rc != LDAP_SUCCESS) {
-    LOG(WARNING) << "Could not initialise connection with LDAP server ("
+    LOG(WARNING) << "Could not initialize connection with LDAP server ("
                  << FLAGS_ldap_uri << "). Error: " << ldap_err2string(rc);
     return SASL_FAIL;
   }
@@ -196,13 +206,16 @@ int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
       ldap_unbind_ext(ld, NULL, NULL);
       return SASL_FAIL;
     }
-    LOG(INFO) << "Started TLS connection with LDAP server: " << FLAGS_ldap_uri;
+    VLOG(2) << "Started TLS connection with LDAP server: " << FLAGS_ldap_uri;
   }
 
   // Map the user string into an acceptable LDAP "DN" (distinguished name)
   string user_str = user;
   if (!FLAGS_ldap_domain.empty()) {
-    user_str = Substitute("$0@$1", user_str, FLAGS_ldap_domain);
+    // Append @domain if there isn't already an @ in the user string.
+    if (user_str.find("@") == string::npos) {
+      user_str = Substitute("$0@$1", user_str, FLAGS_ldap_domain);
+    }
   } else if (!FLAGS_ldap_baseDN.empty()) {
     user_str = Substitute("uid=$0,$1", user_str, FLAGS_ldap_baseDN);
   } else if (!FLAGS_ldap_bind_pattern.empty()) {
@@ -222,7 +235,8 @@ int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
   // Free ld
   ldap_unbind_ext(ld, NULL, NULL);
   if (rc != LDAP_SUCCESS) {
-    LOG(WARNING) << "LDAP bind failed: " << ldap_err2string(rc);
+    LOG(WARNING) << "LDAP authentication failure for " << user_str
+                 << " : " << ldap_err2string(rc);
     return SASL_FAIL;
   }
 
@@ -260,15 +274,55 @@ static int SaslGetOption(void* context, const char* plugin_name, const char* opt
       *result = buf;
       if (len != NULL) *len = strlen(buf);
       return SASL_OK;
+    } else if (strcmp("auxprop_plugin", option) == 0) {
+      *result = IMPALA_AUXPROP_PLUGIN.c_str();
+      if (len != NULL) *len = strlen(*result);
+      return SASL_OK;
     }
 
-    VLOG_RPC << "Sasl general option " << option << " requested";
+    VLOG(3) << "Sasl general option " << option << " requested";
     return SASL_FAIL;
   }
 
-  VLOG_RPC << "Sasl option " << plugin_name << " : "
-           << option << " requested";
+  VLOG(3) << "Sasl option " << plugin_name << " : "
+          << option << " requested";
   return SASL_FAIL;
+}
+
+// The "auxprop" plugin interface was intended to be a database service for the "glue"
+// layer between the mechanisms and applications.  We, however, hijack this interface
+// simply in order to provide an audit message prior to that start of authentication.
+static void ImpalaAuxpropLookup(void* glob_context, sasl_server_params_t* sparams,
+    unsigned int flags, const char* user, unsigned ulen) {
+  // This callback is called twice, once with this flag clear, and once with
+  // this flag set.  We only want to log this message once, so only log it when
+  // the flag is clear.
+  if ((flags & SASL_AUXPROP_AUTHZID) == 0) {
+    string ustr(user, ulen);
+    VLOG(2) << "Attempting to authenticate user \"" << ustr << "\"";
+  }
+}
+
+// Singleton structure used to register our auxprop plugin with Sasl
+static sasl_auxprop_plug_t impala_auxprop_plugin = {
+  0, // feature flag
+  0, // 'spare'
+  NULL, // global plugin state
+  NULL, // Free global state callback
+  &ImpalaAuxpropLookup, // Auxprop lookup method
+  const_cast<char*>(IMPALA_AUXPROP_PLUGIN.c_str()), // Name of plugin
+  NULL // Store property callback
+};
+
+// This is a Sasl callback that's called in order to register our "auxprop"
+// plugin.  We give it the structure above, which installs ImpalaAuxpropLookup
+// as the lookup method.
+int ImpalaAuxpropInit(const sasl_utils_t* utils, int max_version, int* out_version,
+    sasl_auxprop_plug_t** plug, const char* plugname) {
+  VLOG(2) << "Initializing Impala SASL plugin: " << plugname;
+  *plug = &impala_auxprop_plugin;
+  *out_version = max_version;
+  return SASL_OK;
 }
 
 // This Sasl callback will tell us what files Sasl is trying to access.  It's
@@ -298,8 +352,9 @@ static int SaslVerifyFile(void* context, const char* file,
   return SASL_OK;
 }
 
-// This callback could be used to authorize, or restrict access to certain
-// users.  Currently it's just used for diagnostics to see who is logging in.
+// This callback could be used to authorize or restrict access to certain
+// users.  Currently it is used to log a message that we successfully
+// authenticated with a user on an internal connection.
 //
 // conn: Sasl connection - Ignored
 // context: Ignored, always NULL
@@ -311,16 +366,39 @@ static int SaslVerifyFile(void* context, const char* file,
 // urlen: Length of above
 // propctx: Auxiliary properties - Ignored
 // Return: SASL_OK
-static int SaslAuthorize(sasl_conn_t* conn, void* context, const char* requested_user,
-    unsigned rlen, const char* auth_identity, unsigned alen, const char* def_realm,
-    unsigned urlen, struct propctx* propctx) {
+static int SaslAuthorizeInternal(sasl_conn_t* conn, void* context,
+    const char* requested_user, unsigned rlen,
+    const char* auth_identity, unsigned alen,
+    const char* def_realm, unsigned urlen,
+    struct propctx* propctx) {
+  // We say "principal" here becase this is for internal communication, and hence
+  // ought always be --principal or --be_principal
+  VLOG(1) << "Successfully authenticated principal \"" << string(requested_user, rlen)
+          << "\" on an internal connection";
+  return SASL_OK;
+}
 
-  string user(requested_user, rlen);
-  string auth(auth_identity, alen);
-  string realm(def_realm, urlen);
-
-  VLOG_CONNECTION << "SASL authorize. User: " << user << " for: " << auth << " from "
-                  << realm;
+// This callback could be used to authorize or restrict access to certain
+// users.  Currently it is used to log a message that we successfully
+// authenticated with a user on an external connection.
+//
+// conn: Sasl connection - Ignored
+// context: Ignored, always NULL
+// requested_user: The identity/username to authorize
+// rlen: Length of above
+// auth_identity: "The identity associated with the secret"
+// alen: Length of above
+// def_realm: Default user realm
+// urlen: Length of above
+// propctx: Auxiliary properties - Ignored
+// Return: SASL_OK
+static int SaslAuthorizeExternal(sasl_conn_t* conn, void* context,
+    const char* requested_user, unsigned rlen,
+    const char* auth_identity, unsigned alen,
+    const char* def_realm, unsigned urlen,
+    struct propctx* propctx) {
+  LOG(INFO) << "Successfully authenticated client user \""
+            << string(requested_user, rlen) << "\"";
   return SASL_OK;
 }
 
@@ -363,12 +441,12 @@ void SaslAuthProvider::RunKinit(Promise<Status>* first_kinit) {
   // Calling kinit -R ensures the ticket makes it to the cache, and should be a separate
   // call to kinit.
   const string kinit_cmd = Substitute("kinit -r $0m -k -t $1 $2 2>&1",
-      ticket_lifetime_mins, keytab_path_, principal_);
+      ticket_lifetime_mins, keytab_file_, principal_);
 
   bool first_time = true;
   int failures_since_renewal = 0;
   while (true) {
-    LOG(INFO) << "Registering " << principal_ << ", key_tab file " << keytab_path_;
+    LOG(INFO) << "Registering " << principal_ << ", keytab file " << keytab_file_;
     string kinit_output;
     bool success = RunShellProcess(kinit_cmd, &kinit_output);
 
@@ -443,13 +521,17 @@ Status InitAuth(const string& appname) {
 
     if (!FLAGS_principal.empty()) {
       // Callbacks for when we're a Kerberos Sasl internal connection.  Just do logging.
-      KERB_INT_CALLBACKS.resize(2);
+      KERB_INT_CALLBACKS.resize(3);
 
       KERB_INT_CALLBACKS[0].id = SASL_CB_LOG;
       KERB_INT_CALLBACKS[0].proc = (int (*)())&SaslLogCallback;
       KERB_INT_CALLBACKS[0].context = ((void *)"Kerberos (internal)");
 
-      KERB_INT_CALLBACKS[1].id = SASL_CB_LIST_END;
+      KERB_INT_CALLBACKS[1].id = SASL_CB_PROXY_POLICY;
+      KERB_INT_CALLBACKS[1].proc = (int (*)())&SaslAuthorizeInternal;
+      KERB_INT_CALLBACKS[1].context = NULL;
+
+      KERB_INT_CALLBACKS[2].id = SASL_CB_LIST_END;
 
       // Our externally facing Sasl callbacks for Kerberos communication
       KERB_EXT_CALLBACKS.resize(3);
@@ -459,7 +541,7 @@ Status InitAuth(const string& appname) {
       KERB_EXT_CALLBACKS[0].context = ((void *)"Kerberos (external)");
 
       KERB_EXT_CALLBACKS[1].id = SASL_CB_PROXY_POLICY;
-      KERB_EXT_CALLBACKS[1].proc = (int (*)())&SaslAuthorize;
+      KERB_EXT_CALLBACKS[1].proc = (int (*)())&SaslAuthorizeExternal;
       KERB_EXT_CALLBACKS[1].context = NULL;
 
       KERB_EXT_CALLBACKS[2].id = SASL_CB_LIST_END;
@@ -474,7 +556,7 @@ Status InitAuth(const string& appname) {
       LDAP_EXT_CALLBACKS[0].context = ((void *)"LDAP");
 
       LDAP_EXT_CALLBACKS[1].id = SASL_CB_PROXY_POLICY;
-      LDAP_EXT_CALLBACKS[1].proc = (int (*)())&SaslAuthorize;
+      LDAP_EXT_CALLBACKS[1].proc = (int (*)())&SaslAuthorizeExternal;
       LDAP_EXT_CALLBACKS[1].context = NULL;
 
       // This last callback is where we take the password and turn around and
@@ -495,6 +577,13 @@ Status InitAuth(const string& appname) {
       err_msg << "Could not initialize Sasl library: " << e.what();
       return Status(err_msg.str());
     }
+
+    // Add our auxprop plugin, which gives us a hook before authentication
+    int rc = sasl_auxprop_add_plugin(IMPALA_AUXPROP_PLUGIN.c_str(), &ImpalaAuxpropInit);
+    if (rc != SASL_OK) {
+      return Status(Substitute("Error adding Sasl auxprop plugin: $0",
+              sasl_errstring(rc, NULL, NULL)));
+    }
   }
 
   RETURN_IF_ERROR(AuthManager::GetInstance()->Init());
@@ -502,9 +591,9 @@ Status InitAuth(const string& appname) {
 }
 
 Status SaslAuthProvider::InitKerberos(const string& principal,
-    const string& keytab_path) {
+    const string& keytab_file) {
   principal_ = principal;
-  keytab_path_ = keytab_path;
+  keytab_file_ = keytab_file;
   // The logic here is that needs_kinit_ is false unless we are the internal
   // auth provider and we support kerberos.
   needs_kinit_ = is_internal_;
@@ -529,17 +618,115 @@ Status SaslAuthProvider::InitKerberos(const string& principal,
   hostname_ = names[1];
   realm_ = names[2];
 
+  RETURN_IF_ERROR(InitKerberosEnv());
+
+  LOG(INFO) << "Using " << (is_internal_ ? "internal" : "external")
+            << " kerberos principal \"" << service_name_ << "/"
+            << hostname_ << "@" << realm_ << "\"";
+
+  return Status::OK;
+}
+
+// For the environment variable attr, append "-Dthing=thingval" if "thing" is not already
+// in the current attr's value.
+static Status EnvAppend(const string& attr, const string& thing, const string& thingval) {
+  // Carefully append to attr. There are three distinct cases:
+  // 1. Attr doesn't exist: set it
+  // 2. Attr exists, and doesn't contain thing: append to it
+  // 3. Attr exists, and already contains thing: do nothing
+  string current_val;
+  char* current_val_c = getenv(attr.c_str());
+  if (current_val_c != NULL) {
+    current_val = current_val_c;
+  }
+
+  if (!current_val.empty() && (current_val.find(thing) != string::npos)) {
+    // Case 3 above
+    return Status::OK;
+  }
+
+  stringstream val_out;
+  if (!current_val.empty()) {
+    // Case 2 above
+    val_out << current_val << " ";
+  }
+  val_out << "-D" << thing << "=" << thingval;
+
+  if (setenv(attr.c_str(), val_out.str().c_str(), 1) < 0) {
+    return Status(Substitute("Bad $0=$1 value: Could not set environment variable $2: $3",
+        thing, thingval, attr, GetStrErrMsg()));
+  }
+
+  return Status::OK;
+}
+
+Status SaslAuthProvider::InitKerberosEnv() {
+  DCHECK(!principal_.empty());
+
+  // Called only during setup; no locking required.
+  if (env_setup_complete_) return Status::OK;
+
+  if (!is_regular(keytab_file_)) {
+    return Status(Substitute("Bad --keytab_file value: The file $0 is not a "
+        "regular file", keytab_file_));
+  }
+
   // Set the keytab name in the environment so that Sasl Kerberos and kinit can
   // find and use it.
-  if (setenv("KRB5_KTNAME", keytab_path_.c_str(), 1)) {
+  if (setenv("KRB5_KTNAME", keytab_file_.c_str(), 1)) {
     return Status(Substitute("Kerberos could not set KRB5_KTNAME: $0",
         GetStrErrMsg()));
   }
 
-  LOG(INFO) << "Set " << (is_internal_ ? "internal" : "external")
-            << " kerberos principal = " << service_name_ << "/"
-            << hostname_ << "@" << realm_;
+  // We want to set a custom location for the impala credential cache.
+  // Usually, it's /tmp/krb5cc_xxx where xxx is the UID of the process.  This
+  // is normally fine, but if you're not running impala daemons as user
+  // 'impala', the kinit we perform is going to blow away credentials for the
+  // current user.  Not setting this isn't technically fatal, so ignore errors.
+  (void) setenv("KRB5CCNAME", "/tmp/krb5cc_impala_internal", 1);
 
+  // If an alternate krb5_conf location is supplied, set both KRB5_CONFIG and
+  // JAVA_TOOL_OPTIONS in the environment.
+  if (!FLAGS_krb5_conf.empty()) {
+    // Ensure it points to a regular file
+    if (!is_regular(FLAGS_krb5_conf)) {
+      return Status(Substitute("Bad --krb5_conf value: The file $0 is not a "
+          "regular file", FLAGS_krb5_conf));
+    }
+
+    // Overwrite KRB5_CONFIG
+    if (setenv("KRB5_CONFIG", FLAGS_krb5_conf.c_str(), 1) < 0) {
+      return Status(Substitute("Bad --krb5_conf value: Could not set "
+          "KRB5_CONFIG: $0", GetStrErrMsg()));
+    }
+
+    RETURN_IF_ERROR(EnvAppend("JAVA_TOOL_OPTIONS", "java.security.krb5.conf",
+        FLAGS_krb5_conf));
+
+    LOG(INFO) << "Using custom Kerberos configuration file at "
+              << FLAGS_krb5_conf;
+  }
+
+  // Set kerberos debugging, if applicable.  Errors are non-fatal.
+  if (!FLAGS_krb5_debug_file.empty()) {
+    bool krb5_debug_fail = false;
+    if (setenv("KRB5_TRACE", FLAGS_krb5_debug_file.c_str(), 1) < 0) {
+      LOG(WARNING) << "Failed to set KRB5_TRACE; --krb5_debuf_file not enabled for "
+          "back-end code";
+      krb5_debug_fail = true;
+    }
+    if (!EnvAppend("JAVA_TOOL_OPTIONS", "sun.security.krb5.debug", "true").ok()) {
+      LOG(WARNING) << "Failed to set JAVA_TOOL_OPTIONS; --krb5_debuf_file not enabled "
+          "for front-end code";
+      krb5_debug_fail = true;
+    }
+    if (!krb5_debug_fail) {
+      LOG(INFO) << "Kerberos debugging is enabled; kerberos messages written to "
+                << FLAGS_krb5_debug_file;
+    }
+  }
+
+  env_setup_complete_ = true;
   return Status::OK;
 }
 
@@ -645,9 +832,13 @@ Status SaslAuthProvider::WrapClientTransport(const string& hostname,
     LOG(ERROR) << "Failed to create a GSSAPI/SASL client: " << e.what();
     return Status(e.what());
   }
-
   wrapped_transport->reset(new TSaslClientTransport(sasl_client, raw_transport));
-  VLOG_RPC << "Created wrapped client transport";
+
+  // This function is called immediately prior to sasl_client_start(), and so
+  // can be used to log an "I'm beginning authentication for this principal"
+  // message.  Unfortunately, there are no hooks for us at this level to say
+  // that we successfully authenticated as a client.
+  VLOG_RPC << "Initiating client connection using principal " << principal_;
 
   return Status::OK;
 }
