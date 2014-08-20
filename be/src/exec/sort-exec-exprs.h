@@ -28,8 +28,14 @@ namespace impala {
 // materialize the sort tuples.
 class SortExecExprs {
  public:
-  // Initialize the expressions from a thrift node using the specified pool.
+  // Initialize the expressions from a TSortInfo using the specified pool.
   Status Init(const TSortInfo& sort_info, ObjectPool* pool);
+
+  // Initialize the ordering and (optionally) materialization expressions from the thrift
+  // TExprs into the specified pool. sort_tuple_slot_exprs is NULL if the tuple is not
+  // materialized.
+  Status Init(const std::vector<TExpr>& ordering_exprs,
+    const std::vector<TExpr>* sort_tuple_slot_exprs, ObjectPool* pool);
 
   // Prepare all expressions used for sorting and tuple materialization.
   Status Prepare(RuntimeState* state, const RowDescriptor& child_row_desc,

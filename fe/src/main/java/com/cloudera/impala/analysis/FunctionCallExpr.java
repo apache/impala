@@ -156,7 +156,7 @@ public class FunctionCallExpr extends Expr {
 
   @Override
   protected void toThrift(TExprNode msg) {
-    if (Expr.isAggregatePredicate().apply(this)) {
+    if (Expr.isAggregatePredicate().apply(this) || isAnalyticFnCall_) {
       msg.node_type = TExprNodeType.AGGREGATE_EXPR;
     } else {
       msg.node_type = TExprNodeType.FUNCTION_CALL;

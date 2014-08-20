@@ -19,12 +19,19 @@ using namespace std;
 namespace impala {
 
 Status SortExecExprs::Init(const TSortInfo& sort_info, ObjectPool* pool) {
-  RETURN_IF_ERROR(Expr::CreateExprTrees(
-      pool, sort_info.ordering_exprs, &lhs_ordering_expr_ctxs_));
+  return Init(sort_info.ordering_exprs,
+      sort_info.__isset.sort_tuple_slot_exprs ? &sort_info.sort_tuple_slot_exprs : NULL,
+      pool);
+}
 
-  if (sort_info.__isset.sort_tuple_slot_exprs) {
+Status SortExecExprs::Init(const vector<TExpr>& ordering_exprs,
+    const vector<TExpr>* sort_tuple_slot_exprs, ObjectPool* pool) {
+  RETURN_IF_ERROR(
+      Expr::CreateExprTrees(pool, ordering_exprs, &lhs_ordering_expr_ctxs_));
+
+  if (sort_tuple_slot_exprs != NULL) {
     materialize_tuple_ = true;
-    RETURN_IF_ERROR(Expr::CreateExprTrees(pool, sort_info.sort_tuple_slot_exprs,
+    RETURN_IF_ERROR(Expr::CreateExprTrees(pool, *sort_tuple_slot_exprs,
         &sort_tuple_slot_expr_ctxs_));
   } else {
     materialize_tuple_ = false;

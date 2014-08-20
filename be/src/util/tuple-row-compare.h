@@ -37,22 +37,32 @@ class TupleRowComparator {
       const std::vector<bool>& is_asc,
       const std::vector<bool>& nulls_first)
       : key_expr_ctxs_lhs_(key_expr_ctxs_lhs),
-        key_expr_ctxs_rhs_(key_expr_ctxs_rhs) {
+        key_expr_ctxs_rhs_(key_expr_ctxs_rhs),
+        is_asc_(is_asc) {
     DCHECK_EQ(key_expr_ctxs_lhs.size(), key_expr_ctxs_rhs.size());
     DCHECK_EQ(key_expr_ctxs_lhs.size(), is_asc.size());
     DCHECK_EQ(key_expr_ctxs_lhs.size(), nulls_first.size());
-    is_asc_.reserve(key_expr_ctxs_lhs.size());
     nulls_first_.reserve(key_expr_ctxs_lhs.size());
     for (int i = 0; i < key_expr_ctxs_lhs.size(); ++i) {
-      is_asc_.push_back(is_asc[i] ? 1 : 0);
-      nulls_first_.push_back(nulls_first[i] ? 1 : 0);
+      nulls_first_.push_back(nulls_first[i] ? -1 : 1);
     }
   }
 
-  // Returns true if lhs is strictly less than rhs.
-  // All exprs (key_expr_ctxs_lhs_ and key_expr_ctxs_rhs_) must have been prepared and
-  // opened before calling this.
-  bool operator() (TupleRow* lhs, TupleRow* rhs) const {
+  TupleRowComparator(
+      const std::vector<ExprContext*>& key_expr_ctxs_lhs,
+      const std::vector<ExprContext*>& key_expr_ctxs_rhs,
+      bool is_asc, bool nulls_first)
+      : key_expr_ctxs_lhs_(key_expr_ctxs_lhs),
+        key_expr_ctxs_rhs_(key_expr_ctxs_rhs),
+        is_asc_(key_expr_ctxs_lhs.size(), is_asc),
+        nulls_first_(key_expr_ctxs_lhs.size(), nulls_first ? -1 : 1) {
+    DCHECK_EQ(key_expr_ctxs_lhs.size(), key_expr_ctxs_rhs.size());
+  }
+
+  // Returns a negative value if lhs is less than rhs, a positive value if lhs is greater
+  // than rhs, or 0 if they are equal. All exprs (key_exprs_lhs_ and key_exprs_rhs_)
+  // must have been prepared and opened before calling this.
+  int Compare(TupleRow* lhs, TupleRow* rhs) const {
     for (int i = 0; i < key_expr_ctxs_lhs_.size(); ++i) {
       void* lhs_value = key_expr_ctxs_lhs_[i]->GetValue(lhs);
       void* rhs_value = key_expr_ctxs_rhs_[i]->GetValue(rhs);
@@ -60,16 +70,24 @@ class TupleRowComparator {
       // The sort order of NULLs is independent of asc/desc.
       if (lhs_value == NULL && rhs_value == NULL) continue;
       if (lhs_value == NULL && rhs_value != NULL) return nulls_first_[i];
-      if (lhs_value != NULL && rhs_value == NULL) return !nulls_first_[i];
+      if (lhs_value != NULL && rhs_value == NULL) return -nulls_first_[i];
 
       int result = RawValue::Compare(lhs_value, rhs_value, 
                                      key_expr_ctxs_lhs_[i]->root()->type());
       if (!is_asc_[i]) result = -result;
-      if (result > 0) return false;
-      if (result < 0) return true;
+      if (result != 0) return result;
       // Otherwise, try the next Expr
     }
-    return false;  // fully equivalent key -> x is not strictly before y
+    return 0; // fully equivalent key
+  }
+
+  // Returns true if lhs is strictly less than rhs.
+  // All exprs (key_exprs_lhs_ and key_exprs_rhs_) must have been prepared and opened
+  // before calling this.
+  bool operator() (TupleRow* lhs, TupleRow* rhs) const {
+    int result = Compare(lhs, rhs);
+    if (result < 0) return true;
+    return false;
   }
 
   bool operator() (Tuple* lhs, Tuple* rhs) const {
@@ -81,8 +99,8 @@ class TupleRowComparator {
  private:
   std::vector<ExprContext*> key_expr_ctxs_lhs_;
   std::vector<ExprContext*> key_expr_ctxs_rhs_;
-  std::vector<uint8_t> is_asc_;
-  std::vector<uint8_t> nulls_first_;
+  std::vector<bool> is_asc_;
+  std::vector<int8_t> nulls_first_;
 };
 
 // Compares the equality of two Tuples, going slot by slot.

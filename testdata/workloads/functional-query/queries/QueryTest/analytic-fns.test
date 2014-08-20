@@ -1,0 +1,97 @@
+====
+---- QUERY
+# TODO add avg, sum, min, max when multiple analytic fns are supported
+select year, month,
+count(int_col) over (partition by year, month)
+from alltypessmall
+where id % 4 = 0 and month != 1
+---- RESULTS
+2009,2,6
+2009,2,6
+2009,2,6
+2009,2,6
+2009,2,6
+2009,2,6
+2009,3,6
+2009,3,6
+2009,3,6
+2009,3,6
+2009,3,6
+2009,3,6
+2009,4,6
+2009,4,6
+2009,4,6
+2009,4,6
+2009,4,6
+2009,4,6
+---- TYPES
+INT, INT, BIGINT
+====
+---- QUERY
+select int_col,
+count(int_col) over ()
+from alltypessmall
+where id % 4 = 0 and month = 1
+order by int_col
+---- RESULTS
+0,7
+0,7
+2,7
+4,7
+4,7
+6,7
+8,7
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+select tinyint_col,
+count(int_col) over (order by tinyint_col)
+from alltypessmall
+where month = 1 and tinyint_col < 5
+---- RESULTS
+0,3
+0,3
+0,3
+1,6
+1,6
+1,6
+2,9
+2,9
+2,9
+3,12
+3,12
+3,12
+4,15
+4,15
+4,15
+---- TYPES
+TINYINT, BIGINT
+====
+---- QUERY
+select year, month, tinyint_col,
+count(int_col) over (partition by year, month order by tinyint_col)
+from alltypessmall
+where month >= 3 and tinyint_col < 3
+---- RESULTS
+2009,3,0,3
+2009,3,0,3
+2009,3,0,3
+2009,3,1,6
+2009,3,1,6
+2009,3,1,6
+2009,3,2,9
+2009,3,2,9
+2009,3,2,9
+2009,4,0,3
+2009,4,0,3
+2009,4,0,3
+2009,4,1,6
+2009,4,1,6
+2009,4,1,6
+2009,4,2,9
+2009,4,2,9
+2009,4,2,9
+---- TYPES
+INT, INT, TINYINT, BIGINT
+====

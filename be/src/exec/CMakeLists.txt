@@ -24,6 +24,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec")
 add_library(Exec
   aggregation-node.cc
   aggregation-node-ir.cc
+  analytic-eval-node.cc
   base-sequence-scanner.cc
   blocking-join-node.cc
   catalog-op-executor.cc

@@ -125,6 +125,7 @@ public class AnalyticEvalNode extends PlanNode {
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.ANALYTIC_EVAL_NODE;
     msg.analytic_node = new TAnalyticNode();
+    msg.analytic_node.setTuple_id(analyticTupleDesc_.getId().asInt());
     msg.analytic_node.setPartition_exprs(Expr.treesToThrift(partitionExprs_));
     msg.analytic_node.setOrder_by_exprs(Expr.treesToThrift(orderingExprs_));
     msg.analytic_node.setAnalytic_functions(Expr.treesToThrift(analyticFnCalls_));

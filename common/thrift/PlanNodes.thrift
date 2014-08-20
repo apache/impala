@@ -267,6 +267,9 @@ struct TAnalyticNode {
 
   // Window specification
   4: optional TAnalyticWindow window
+
+  // Analytic function results are materialized into this tuple.
+  5: required Types.TTupleId tuple_id
 }
 
 struct TUnionNode {

@@ -46,6 +46,10 @@ class TestQueries(ImpalaTestSuite):
   def test_hdfs_scan_node(self, vector):
     self.run_test_case('QueryTest/hdfs-scan-node', vector)
 
+  def test_analytic_fns(self, vector):
+    vector.get_value('exec_option')['num_nodes'] = 1
+    self.run_test_case('QueryTest/analytic-fns', vector)
+
   def test_file_partitions(self, vector):
     self.run_test_case('QueryTest/hdfs-partitions', vector)
 

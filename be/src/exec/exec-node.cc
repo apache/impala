@@ -25,6 +25,7 @@
 #include "common/status.h"
 #include "exprs/expr.h"
 #include "exec/aggregation-node.h"
+#include "exec/analytic-eval-node.h"
 #include "exec/cross-join-node.h"
 #include "exec/data-source-scan-node.h"
 #include "exec/empty-set-node.h"
@@ -291,6 +292,9 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       break;
     case TPlanNodeType::UNION_NODE:
       *node = pool->Add(new UnionNode(pool, tnode, descs));
+      break;
+    case TPlanNodeType::ANALYTIC_EVAL_NODE:
+      *node = pool->Add(new AnalyticEvalNode(pool, tnode, descs));
       break;
     default:
       map<int, const char*>::const_iterator i =
