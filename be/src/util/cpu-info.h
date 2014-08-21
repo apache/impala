@@ -29,7 +29,7 @@ namespace impala {
 // /sys/devices)
 class CpuInfo {
  public:
-  static const int64_t SSE3    = (1 << 1);
+  static const int64_t SSSE3   = (1 << 1);
   static const int64_t SSE4_1  = (1 << 2);
   static const int64_t SSE4_2  = (1 << 3);
   static const int64_t POPCNT  = (1 << 4);

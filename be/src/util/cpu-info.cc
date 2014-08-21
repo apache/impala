@@ -46,7 +46,7 @@ static struct {
   int64_t flag;
 } flag_mappings[] =
 {
-  { "ssse3",  CpuInfo::SSE3 },
+  { "ssse3",  CpuInfo::SSSE3 },
   { "sse4_1", CpuInfo::SSE4_1 },
   { "sse4_2", CpuInfo::SSE4_2 },
   { "popcnt", CpuInfo::POPCNT },

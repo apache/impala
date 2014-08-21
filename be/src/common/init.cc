@@ -113,9 +113,9 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
 
   TestInfo::Init(test_mode);
 
-  if (!CpuInfo::IsSupported(CpuInfo::SSE3)) {
-    LOG(ERROR) << "CPU does not support the SSE3 instruction set, which is required."
-               << " This could lead to instability.";
+  if (!CpuInfo::IsSupported(CpuInfo::SSSE3)) {
+    LOG(ERROR) << "CPU does not support the Supplemental SSE3 instruction set, which is "
+               << "required. This could lead to instability.";
   }
 
   // Set the default hostname. The user can override this with the hostname flag.
