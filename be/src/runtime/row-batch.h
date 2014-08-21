@@ -28,6 +28,7 @@
 
 namespace impala {
 
+class BufferedTupleStream;
 class MemTracker;
 class TRowBatch;
 class Tuple;
@@ -139,8 +140,12 @@ class RowBatch {
   // Resets the row batch, returning all resources it has accumulated.
   void Reset();
 
-  // Add buffer to this row batch.
+  // Add io buffer to this row batch.
   void AddIoBuffer(DiskIoMgr::BufferDescriptor* buffer);
+
+  // Add tuple stream to this row batch. The row batch must call Close() on the stream
+  // when freeing resources.
+  void AddTupleStream(BufferedTupleStream* stream);
 
   // Transfer ownership of resources to dest.  This includes tuple data in mem
   // pool and io buffers.
@@ -230,6 +235,9 @@ class RowBatch {
   // between row batches. Any IO buffer will be owned by at most one row batch
   // (i.e. they are not ref counted) so most row batches don't own any.
   std::vector<DiskIoMgr::BufferDescriptor*> io_buffers_;
+
+  // Tuple streams currently owned by this row batch.
+  std::vector<BufferedTupleStream*> tuple_streams_;
 
   // String to write compressed tuple data to in Serialize().
   // This is a string so we can swap() with the string in the TRowBatch we're serializing

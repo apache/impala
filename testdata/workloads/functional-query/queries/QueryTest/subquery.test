@@ -43,6 +43,8 @@ where id not in (select id from functional.alltypestiny where bool_col = false)
 and id < 5
 ---- RESULTS
 0,2009,1
+2,2009,1
+4,2009,1
 ---- TYPES
 INT, INT, INT
 ====
@@ -94,6 +96,11 @@ where not exists (select 1 from functional.alltypestiny s where t.id = s.id)
 and month = 1 and int_col < 5
 order by id
 ---- RESULTS
+10,0
+11,1
+12,2
+13,3
+14,4
 20,0
 21,1
 22,2

@@ -155,12 +155,12 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   // Call at the end of consuming the probe rows. Walks hash_partitions_ and
   //  - If this partition had a hash table, close it. This partition is fully processed
-  //    on both the build and probe sides.
+  //    on both the build and probe sides. The streams are transferred to batch.
   //    In the case of right-outer and full-outer joins, instead of closing this partition
   //    we put it on a list of partitions that we need to flush their unmatched rows.
   //  - If this partition did not have a hash table, meaning both sides were spilled,
   //    move the partition to spilled_partitions_.
-  Status CleanUpHashPartitions();
+  Status CleanUpHashPartitions(RowBatch* batch);
 
   // Get the next row batch from the probe (left) side (child(0)). If we are done
   // consuming the input, sets probe_batch_pos_ to -1, otherwise, sets it to 0.
@@ -239,15 +239,17 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     Partition(RuntimeState* state, PartitionedHashJoinNode* parent, int level);
     ~Partition();
 
-    BufferedTupleStream* build_rows() { return build_rows_.get(); }
-    BufferedTupleStream* probe_rows() { return probe_rows_.get(); }
+    BufferedTupleStream* build_rows() { return build_rows_; }
+    BufferedTupleStream* probe_rows() { return probe_rows_; }
     HashTable* hash_tbl() { return hash_tbl_.get(); }
 
     bool is_closed() const { return is_closed_; }
 
     // Must be called once per partition to release any resources. This should be called
-    // as soon as possible to release memory as quickly as possible.
-    void Close();
+    // as soon as possible to release memory.
+    // If batch is non-null, the build and probe streams are attached to the batch,
+    // transferring ownership to them.
+    void Close(RowBatch* batch);
 
     // Returns the estimated size of the in memory size for the build side of this
     // partition. This includes the entire build side and the hash table.
@@ -279,9 +281,13 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     // The hash table for this partition.
     boost::scoped_ptr<HashTable> hash_tbl_;
 
-    // Stream of build/probe tuples in this partition.
-    boost::scoped_ptr<BufferedTupleStream> build_rows_;
-    boost::scoped_ptr<BufferedTupleStream> probe_rows_;
+    // Stream of build/probe tuples in this partition. Allocated from the runtime state's
+    // object pool. Initially owned by this object (meaning it has to call Close() on it)
+    // but transferred to the parent exec node (via the row batch) when the partition
+    // is complete.
+    // If NULL, ownership has been transfered.
+    BufferedTupleStream* build_rows_;
+    BufferedTupleStream* probe_rows_;
   };
 
   // llvm function and signature for codegening build batch.

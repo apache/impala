@@ -139,7 +139,7 @@ Status BufferedTupleStream::NewBlockForWrite(bool* got_block) {
 
 Status BufferedTupleStream::NextBlockForRead() {
   DCHECK(read_block_ != blocks_.end());
-  if (delete_on_read_) {
+  if (delete_on_read_ && !pinned_) {
     DCHECK(read_block_ == blocks_.begin());
     (*read_block_)->Delete();
     --num_pinned_;

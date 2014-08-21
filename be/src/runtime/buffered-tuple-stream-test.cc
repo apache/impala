@@ -333,15 +333,17 @@ TEST_F(BufferedTupleStreamTest, UnpinPin) {
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(pinned);
 
-  status = stream.PrepareForRead();
-  ASSERT_TRUE(status.ok());
-
   vector<int32_t> results;
-  ReadValues(&stream, int_desc_, &results);
 
-  // Verify result
-  EXPECT_EQ(results.size(), offset);
-  VerifyResults(results);
+  // Read and verify result a few times. We should be able to reread the stream.
+  for (int i = 0; i < 3; ++i) {
+    status = stream.PrepareForRead();
+    ASSERT_TRUE(status.ok());
+    results.clear();
+    ReadValues(&stream, int_desc_, &results);
+    EXPECT_EQ(results.size(), offset);
+    VerifyResults(results);
+  }
 
   stream.Close();
 }

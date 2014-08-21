@@ -17,9 +17,10 @@
 #include <stdint.h>  // for intptr_t
 #include <boost/scoped_ptr.hpp>
 
+#include "runtime/buffered-tuple-stream.h"
+#include "runtime/mem-tracker.h"
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
-#include "runtime/mem-tracker.h"
 #include "util/compress.h"
 #include "util/decompress.h"
 #include "gen-cpp/Results_types.h"
@@ -136,6 +137,9 @@ RowBatch::~RowBatch() {
   for (int i = 0; i < io_buffers_.size(); ++i) {
     io_buffers_[i]->Return();
   }
+  for (int i = 0; i < tuple_streams_.size(); ++i) {
+    tuple_streams_[i]->Close();
+  }
 }
 
 int RowBatch::Serialize(TRowBatch* output_batch) {
@@ -209,6 +213,12 @@ void RowBatch::AddIoBuffer(DiskIoMgr::BufferDescriptor* buffer) {
   buffer->SetMemTracker(mem_tracker_);
 }
 
+void RowBatch::AddTupleStream(BufferedTupleStream* stream) {
+  DCHECK(stream != NULL);
+  tuple_streams_.push_back(stream);
+  auxiliary_mem_usage_ += stream->byte_size();
+}
+
 void RowBatch::Reset() {
   DCHECK(tuple_data_pool_.get() != NULL);
   num_rows_ = 0;
@@ -219,6 +229,10 @@ void RowBatch::Reset() {
     io_buffers_[i]->Return();
   }
   io_buffers_.clear();
+  for (int i = 0; i < tuple_streams_.size(); ++i) {
+    tuple_streams_[i]->Close();
+  }
+  tuple_streams_.clear();
   auxiliary_mem_usage_ = 0;
   tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_->Allocate(tuple_ptrs_size_));
 }
@@ -233,6 +247,11 @@ void RowBatch::TransferResourceOwnership(RowBatch* dest) {
     buffer->SetMemTracker(dest->mem_tracker_);
   }
   io_buffers_.clear();
+  for (int i = 0; i < tuple_streams_.size(); ++i) {
+    dest->tuple_streams_.push_back(tuple_streams_[i]);
+    dest->auxiliary_mem_usage_ += tuple_streams_[i]->byte_size();
+  }
+  tuple_streams_.clear();
   auxiliary_mem_usage_ = 0;
   tuple_ptrs_ = NULL;
   Reset();
@@ -264,6 +283,8 @@ void RowBatch::AcquireState(RowBatch* src) {
   }
   src->io_buffers_.clear();
   src->auxiliary_mem_usage_ = 0;
+
+  DCHECK(src->tuple_streams_.empty());
 
   has_in_flight_row_ = src->has_in_flight_row_;
   num_rows_ = src->num_rows_;
