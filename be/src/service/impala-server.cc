@@ -146,6 +146,7 @@ DEFINE_int32(idle_query_timeout, 0, "The time, in seconds, that a query may be i
 DEFINE_string(local_nodemanager_url, "", "The URL of the local Yarn Node Manager's HTTP "
     "interface, used to detect if the Node Manager fails");
 DECLARE_bool(enable_rm);
+DECLARE_bool(compact_catalog_topic);
 
 namespace impala {
 
@@ -1398,7 +1399,7 @@ void ImpalaServer::CatalogUpdateCallback(
       uint32_t len = item.value.size();
       TCatalogObject catalog_object;
       Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
-          item.value.data()), &len, true, &catalog_object);
+          item.value.data()), &len, FLAGS_compact_catalog_topic, &catalog_object);
       if (!status.ok()) {
         LOG(ERROR) << "Error deserializing item: " << status.GetErrorMsg();
         continue;

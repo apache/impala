@@ -53,3 +53,8 @@ DEFINE_bool(abort_on_config_error, true, "Abort Impala startup if there are impr
 
 DEFINE_bool(disable_mem_pools, false, "Set to true to disable memory pooling. "
     "This can be used to help diagnose memory corruption issues.");
+
+DEFINE_bool(compact_catalog_topic, false, "If true, catalog updates sent via the "
+    "statestore are compacted before transmission. This saves network bandwidth at the"
+    " cost of a small quantity of CPU time. Enable this option in cluster with large"
+    " catalogs. It must be enabled on both the catalog service, and all Impala demons.");
