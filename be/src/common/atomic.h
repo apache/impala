@@ -116,26 +116,31 @@ class AtomicInt {
     while (true) {
       T old_value = value_;
       T new_value = std::max(old_value, value);
-      if (LIKELY(Swap(old_value, new_value))) break;
+      if (LIKELY(CompareAndSwap(old_value, new_value))) break;
     }
   }
   void UpdateMin(T value) {
     while (true) {
       T old_value = value_;
       T new_value = std::min(old_value, value);
-      if (LIKELY(Swap(old_value, new_value))) break;
+      if (LIKELY(CompareAndSwap(old_value, new_value))) break;
     }
   }
 
-  // Returns true if the atomic compare-and-swap was successful
-  bool Swap(T old_val, T new_val) {
+  // Returns true if the atomic compare-and-swap was successful.
+  bool CompareAndSwap(T old_val, T new_val) {
     return __sync_bool_compare_and_swap(&value_, old_val, new_val);
   }
 
   // Returns the content of value_ before the operation.
   // If returnValue == old_val, then the atomic compare-and-swap was successful.
-  T SwapVal(T old_val, T new_val) {
+  T CompareAndSwapVal(T old_val, T new_val) {
     return __sync_val_compare_and_swap(&value_, old_val, new_val);
+  }
+
+  // Atomically updates value_ with new_val. Returns the old value_.
+  T Swap(const T& new_val) {
+    return __sync_lock_test_and_set(&value_, new_val);
   }
 
  private:

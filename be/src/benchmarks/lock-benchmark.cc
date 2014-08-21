@@ -126,23 +126,23 @@ void BoostProduceThread(int64_t n, int64_t* value) {
 }
 
 void LaunchThreads(void* d, Fn consume_fn, Fn produce_fn, int64_t scale) {
-    TestData* data = reinterpret_cast<TestData*>(d);
-    data->value = 0;
-    int64_t num_per_consumer = data->num_consumes / data->num_consumer_threads;
-    int64_t num_per_producer = data->num_produces / data->num_producer_threads;
-    num_per_producer *= scale;
-    num_per_consumer *= scale;
-    thread_group consumers, producers;
-    for (int i = 0; i < data->num_consumer_threads; ++i) {
-      consumers.add_thread(
-          new thread(consume_fn, num_per_consumer, &data->value));
-    }
-    for (int i = 0; i < data->num_producer_threads; ++i) {
-      consumers.add_thread(
-          new thread(produce_fn, num_per_producer, &data->value));
-    }
-    consumers.join_all();\
-    producers.join_all();
+  TestData* data = reinterpret_cast<TestData*>(d);
+  data->value = 0;
+  int64_t num_per_consumer = data->num_consumes / data->num_consumer_threads;
+  int64_t num_per_producer = data->num_produces / data->num_producer_threads;
+  num_per_producer *= scale;
+  num_per_consumer *= scale;
+  thread_group consumers, producers;
+  for (int i = 0; i < data->num_consumer_threads; ++i) {
+    consumers.add_thread(
+        new thread(consume_fn, num_per_consumer, &data->value));
+  }
+  for (int i = 0; i < data->num_producer_threads; ++i) {
+    consumers.add_thread(
+        new thread(produce_fn, num_per_producer, &data->value));
+  }
+  consumers.join_all();
+  producers.join_all();
 }
 
 void TestUnlocked(int batch_size, void* d) {

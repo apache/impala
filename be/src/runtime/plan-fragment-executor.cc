@@ -485,7 +485,7 @@ Status PlanFragmentExecutor::GetNextInternal(RowBatch** batch) {
 void PlanFragmentExecutor::FragmentComplete() {
   // Check the atomic flag. If it is set, then a fragment complete report has already
   // been sent.
-  bool send_report = completed_report_sent_.Swap(0,1);
+  bool send_report = completed_report_sent_.CompareAndSwap(0,1);
 
   fragment_sw_.Stop();
   int64_t cpu_and_wait_time = fragment_sw_.ElapsedTime();
@@ -507,7 +507,7 @@ void PlanFragmentExecutor::FragmentComplete() {
 void PlanFragmentExecutor::UpdateStatus(const Status& status) {
   if (status.ok()) return;
 
-  bool send_report = completed_report_sent_.Swap(0,1);
+  bool send_report = completed_report_sent_.CompareAndSwap(0,1);
 
   {
     lock_guard<mutex> l(status_lock_);

@@ -138,7 +138,7 @@ class RuntimeProfile {
         int64_t old_val = current_value_;
         int64_t new_val = old_val + delta;
         if (new_val > max) return false;
-        if (LIKELY(current_value_.Swap(old_val, new_val))) {
+        if (LIKELY(current_value_.CompareAndSwap(old_val, new_val))) {
           value_.UpdateMax(new_val);
           return true;
         }
