@@ -78,6 +78,9 @@ parser.add_option("--cluster_name", dest="cluster_name", default='UNKNOWN',
                  help="Name of the cluster the results are from (ex. Bolt)")
 parser.add_option("--verbose", "-v", dest="verbose", action="store_true",
                  default= False, help='Outputs to console with with increased verbosity')
+parser.add_option("--output_all_summary_nodes", dest="output_all_summary_nodes",
+                 action="store_true", default= False,
+                 help='Print all execution summary nodes')
 parser.add_option("--build_version", dest="build_version", default='UNKNOWN',
                  help="Build/version info about the Impalad instance results are from.")
 parser.add_option("--lab_run_info", dest="lab_run_info", default='UNKNOWN',
@@ -161,12 +164,12 @@ def get_dict_from_json(filename):
       level = list()
       # In the outer layer, we group by workload name and scale factor
       level.append([('query', 'workload_name'), ('query', 'scale_factor')])
-      # In the middle layer, we group by query name
-      level.append([('query', 'name')])
-      # In the inner layer, we group by file format and compression type
+      # In the middle layer, we group by file format and compression type
       level.append([('query', 'test_vector', 'file_format'),
       ('query', 'test_vector', 'compression_codec'),
       ('query', 'test_vector', 'compression_type')])
+      # In the bottom layer, we group by query name
+      level.append([('query', 'name')])
 
       key = []
 
@@ -202,6 +205,8 @@ def get_dict_from_json(filename):
     for workload_name, workload in data.items():
       for query_result in workload:
         add_result(query_result)
+    # Calculate average runtime and stddev for each query type
+    calculate_time_stats(grouped)
     return grouped
 
 def calculate_time_stats(grouped):
@@ -209,10 +214,10 @@ def calculate_time_stats(grouped):
      and Standard Deviation for each query type.
   """
 
-  for workload_scale in grouped:
-    for query_name in grouped[workload_scale]:
-      for file_format in grouped[workload_scale][query_name]:
-        result_list = grouped[workload_scale][query_name][file_format][RESULT_LIST]
+  for workload_scale, workload in grouped.items():
+    for file_format, queries in workload.items():
+      for query_name, results in queries.items():
+        result_list = results[RESULT_LIST]
         avg = calculate_avg(
             [query_results[TIME_TAKEN] for query_results in result_list])
         dev = calculate_stddev(
@@ -220,49 +225,15 @@ def calculate_time_stats(grouped):
         num_clients = max(
             int(query_results[CLIENT_NAME]) for query_results in result_list)
         iterations = len(result_list)
+        results[AVG] = avg
+        results[STDDEV] = dev
+        results[NUM_CLIENTS] = num_clients
+        results[ITERATIONS] = iterations
 
-        grouped[workload_scale][query_name][file_format][AVG] = avg
-        grouped[workload_scale][query_name][file_format][STDDEV] = dev
-        grouped[workload_scale][query_name][file_format][NUM_CLIENTS] = num_clients
-        grouped[workload_scale][query_name][file_format][ITERATIONS] = iterations
-
-def calculate_workload_file_format_runtimes(grouped):
-  """Calculate average time for each workload and scale factor, for each file format and
-  compression.
-
-  This returns a new dictionary with avarage times.
-
-  Here's an example of how this dictionary is structured:
-  dictionary->
-  (('workload', 'tpch'), ('scale', '300gb'))->
-  (('file_format','parquet'), ('compression_codec','zip'), ('compression_type','block'))->
-  'avg'
-
-  We also have access to the list of QueryResult associated with each file_format
-
-  The difference between this dictionary and grouped_queries is that query name is missing
-  after workload.
-  """
-  new_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-
-  # First populate the dictionary with query results
-  for workload_scale, workload in grouped.items():
-    for query_name, file_formats in workload.items():
-      for file_format, results in file_formats.items():
-        new_dict[workload_scale][file_format][RESULT_LIST].extend(results[RESULT_LIST])
-
-  # Do the average calculation. Standard deviation could also be calculated here
-  for workload_scale in new_dict:
-    for file_format in new_dict[workload_scale]:
-      avg = calculate_avg([query_results[TIME_TAKEN]
-        for query_results in new_dict[workload_scale][file_format][RESULT_LIST]])
-      new_dict[workload_scale][file_format][AVG] = avg
-  return new_dict
-
-def build_perf_change_str(result, ref_result, regression):
+def build_perf_change_str(result, ref_result, is_regression):
   """Build a performance change string"""
 
-  perf_change_type = "regression" if regression else "improvement"
+  perf_change_type = "regression" if is_regression else "improvement"
   query = result[RESULT_LIST][0][QUERY]
 
   query_name = query[NAME]
@@ -270,7 +241,7 @@ def build_perf_change_str(result, ref_result, regression):
   compression_codec = query[TEST_VECTOR][COMPRESSION_CODEC]
   compression_type = query[TEST_VECTOR][COMPRESSION_TYPE]
 
-  template = ("\nSignificant perf {perf_change_type} detected: "
+  template = ("Significant perf {perf_change_type}: "
              "{query_name} [{file_format}/{compression_codec}/{compression_type}] "
              "({ref_avg:.3f}s -> {avg:.3f}s)")
   return template.format(
@@ -521,8 +492,8 @@ class ExecSummaryComparison(object):
         ref_row = self.ref_combined_summary.rows[i]
 
         comparison_row = {}
-        for key in [PREFIX, OPERATOR, NUM_HOSTS, AVG_TIME, STDDEV_TIME, MAX_TIME, PEAK_MEM,
-            NUM_ROWS, EST_NUM_ROWS, EST_PEAK_MEM, DETAIL]:
+        for key in [PREFIX, OPERATOR, NUM_HOSTS, AVG_TIME, STDDEV_TIME,
+            MAX_TIME, PEAK_MEM, NUM_ROWS, EST_NUM_ROWS, EST_PEAK_MEM, DETAIL]:
           comparison_row[key] = row[key]
 
         comparison_row[AVG_TIME_CHANGE] = self.__calculate_change(
@@ -565,19 +536,24 @@ class ExecSummaryComparison(object):
           "Est #Rows"])
     table.align = 'l'
 
-    for row in self.rows:
-      table_row = [ row[PREFIX] + row[OPERATOR],
-          prettyprint_values(row[NUM_HOSTS]),
-          prettyprint_time(row[AVG_TIME]),
-          prettyprint_time(row[STDDEV_TIME]),
-          prettyprint_percent(row[AVG_TIME_CHANGE]),
-          prettyprint_percent(row[AVG_TIME_CHANGE_TOTAL]),
-          prettyprint_time(row[MAX_TIME]),
-          prettyprint_percent(row[MAX_TIME_CHANGE]),
-          prettyprint_values(row[NUM_ROWS]),
-          prettyprint_values(row[EST_NUM_ROWS]) ]
+    def is_significant(row):
+      """Check if the performance change in this row was significant"""
+      return options.output_all_summary_nodes or abs(row[AVG_TIME_CHANGE_TOTAL]) > 0.01
 
-      table.add_row(table_row)
+    for row in self.rows:
+      if is_significant(row):
+        table_row = [row[OPERATOR],
+            prettyprint_values(row[NUM_HOSTS]),
+            prettyprint_time(row[AVG_TIME]),
+            prettyprint_time(row[STDDEV_TIME]),
+            prettyprint_percent(row[AVG_TIME_CHANGE]),
+            prettyprint_percent(row[AVG_TIME_CHANGE_TOTAL]),
+            prettyprint_time(row[MAX_TIME]),
+            prettyprint_percent(row[MAX_TIME_CHANGE]),
+            prettyprint_values(row[NUM_ROWS]),
+            prettyprint_values(row[EST_NUM_ROWS]) ]
+
+        table.add_row(table_row)
 
     return str(table)
 
@@ -653,6 +629,21 @@ def build_exec_summary_str(results, ref_results):
 
   return str(comparison) + '\n'
 
+def build_perf_change_row(result, ref_result, is_regression):
+  """Build a performance change table row"""
+
+  query = result[RESULT_LIST][0][QUERY]
+
+  query_name = query[NAME]
+  file_format = query[TEST_VECTOR][FILE_FORMAT]
+  compression_codec = query[TEST_VECTOR][COMPRESSION_CODEC]
+  compression_type = query[TEST_VECTOR][COMPRESSION_TYPE]
+  format_str = '{0}/{1}/{2}'.format(file_format, compression_codec, compression_type)
+  ref_avg = ref_result[AVG]
+  avg = result[AVG]
+
+  return [query_name, format_str, ref_avg, avg]
+
 def compare_time_stats(grouped, ref_grouped):
   """Given two nested dictionaries generated by get_dict_from_json, after running
   calculate_time_stats on both, compare the performance of the given run to a reference
@@ -661,8 +652,9 @@ def compare_time_stats(grouped, ref_grouped):
   A string will be returned with instances where there is a significant performance
   difference
   """
-  out_str = str()
-  all_exec_summaries = str()
+  regression_table_data = list()
+  improvement_table_data = list()
+  full_comparison_str = str()
   for workload_scale_key, workload in grouped.items():
     for query_name, file_formats in workload.items():
       for file_format, results in file_formats.items():
@@ -671,15 +663,23 @@ def compare_time_stats(grouped, ref_grouped):
             results, ref_results)
 
         if change_significant:
-          out_str += build_perf_change_str(results, ref_results, is_regression) + '\n'
-          out_str += build_exec_summary_str(results, ref_results)
+          full_comparison_str += build_perf_change_str(
+              results, ref_results, is_regression) + '\n'
+          full_comparison_str += build_exec_summary_str(results, ref_results) + '\n'
+
+          change_row = build_perf_change_row(results, ref_results, is_regression)
+
+          if is_regression:
+            regression_table_data.append(change_row)
+          else:
+            improvement_table_data.append(change_row)
 
         try:
           save_runtime_diffs(results, ref_results, change_significant, is_regression)
         except Exception as e:
           print 'Could not generate an html diff: %s' % e
 
-  return out_str
+  return full_comparison_str, regression_table_data, improvement_table_data
 
 def is_result_group_comparable(grouped, ref_grouped):
   """Given two nested dictionaries generated by get_dict_from_json, return true if they
@@ -726,46 +726,49 @@ def build_summary_header():
     summary += 'Lab Run Info: {0}\n'.format(options.lab_run_info)
   return summary
 
-def get_summary_str(workload_ff):
-  """This prints a table containing the average run time per file format"""
+def get_summary_str(grouped):
   summary_str = str()
-  summary_str += build_summary_header() + '\n'
 
-  for workload_scale in workload_ff:
+  for workload_scale, workload in grouped.items():
     summary_str += "{0} / {1} \n".format(workload_scale[0][1], workload_scale[1][1])
     table = prettytable.PrettyTable(["File Format", "Compression", "Avg (s)"])
     table.align = 'l'
     table.float_format = '.2'
-    for file_format in workload_ff[workload_scale]:
+    for file_format, queries in workload.items():
+      # Calculate The average time for each file format and compression
       ff = file_format[0][1]
       compression = file_format[1][1] + " / " + file_format[2][1]
-      avg = workload_ff[workload_scale][file_format][AVG]
+      avg = calculate_avg([query_results[TIME_TAKEN] for results in queries.values() for
+        query_results in results[RESULT_LIST]])
       table.add_row([ff, compression, avg])
     summary_str += str(table) + '\n'
   return summary_str
 
 def get_stats_str(grouped):
   stats_str = str()
-  for workload_scale_key, workload in grouped.items():
-    stats_str += "Workload / Scale Factor: {0} / {1}".format(workload_scale_key[0][1],
-        workload_scale_key[1][1])
-    for query_name, file_formats in workload.items():
-      stats_str += "\n\nQuery: {0} \n".format(query_name[0][1])
-      table = prettytable.PrettyTable(
-          ["File Format", "Compression", "Avg(s)", "StdDev(s)", "Num Clients", "Iters"])
-      table.align = 'l'
-      table.float_format = '.2'
-      for file_format, results in file_formats.items():
-        table_row = []
-        # File Format
-        table_row.append(file_format[0][1])
-        # Compression
-        table_row.append(file_format[1][1] + " / " + file_format[2][1])
-        table_row.append(results[AVG])
-        table_row.append(results[STDDEV])
-        table_row.append(results[NUM_CLIENTS])
-        table_row.append(results[ITERATIONS])
-        table.add_row(table_row)
+  for workload_scale, workload in grouped.items():
+    stats_str += "Workload / Scale Factor: {0} / {1}\n".format(
+        workload_scale[0][1], workload_scale[1][1])
+    table = prettytable.PrettyTable(["Query", "File Format", "Compression", "Avg(s)",
+      "StdDev(s)", "Rel StdDev", "Num Clients", "Iters"])
+    table.align = 'l'
+    table.float_format = '.2'
+    for file_format, queries in workload.items():
+      for query_name, results in queries.items():
+        relative_stddev = results[STDDEV] / results[AVG] if results[AVG] > 0 else 0.0
+        relative_stddev_str = '{0:.2%}'.format(relative_stddev)
+        if relative_stddev > 0.1:
+          relative_stddev_str = '* ' + relative_stddev_str + ' *'
+        else:
+          relative_stddev_str = '  ' + relative_stddev_str
+        table.add_row([query_name[0][1],
+            file_format[0][1],
+            file_format[1][1] + ' / ' + file_format[2][1],
+            results[AVG],
+            results[STDDEV],
+            relative_stddev_str,
+            results[NUM_CLIENTS],
+            results[ITERATIONS]])
       stats_str += str(table) + '\n'
   return stats_str
 
@@ -774,7 +777,6 @@ def all_query_results(grouped):
     for query_name, file_formats in workload.items():
       for file_format, results in file_formats.items():
         yield(results)
-
 
 def write_results_to_datastore(grouped):
   """ Saves results to a database """
@@ -832,6 +834,19 @@ def write_results_to_datastore(grouped):
         runtime_profile = runtime_profile,
         is_official = options.is_official)
 
+def build_perf_summary_table(table_data):
+  table = prettytable.PrettyTable(
+      ['Query',
+        'Format',
+        'Original Time (s)',
+        'Current Time (s)'])
+  table.align = 'l'
+  table.float_format = '.2'
+  for row in table_data:
+    table.add_row(row)
+
+  return str(table)
+
 if __name__ == "__main__":
   """Workflow:
   1. Build a nested dictionary for the current result JSON and reference result JSON.
@@ -852,22 +867,34 @@ if __name__ == "__main__":
     print 'Could not read reference result file: %s' % e
     ref_grouped = None
 
-  # Calculate average runtime and stddev for each query type
-  calculate_time_stats(grouped)
-  if ref_grouped is not None:
-    calculate_time_stats(ref_grouped)
-
   if options.save_to_db: write_results_to_datastore(grouped)
 
-  summary_str = get_summary_str(calculate_workload_file_format_runtimes(grouped))
+  summary_str = get_summary_str(grouped)
   stats_str = get_stats_str(grouped)
-  if is_result_group_comparable(grouped, ref_grouped):
-    comparison_str = compare_time_stats(grouped, ref_grouped)
-  else:
-    comparison_str = ("Comparison could not be generated because reference results do "
-                     "not contain all queries\nthat in results (or reference results are "
-                     "missing)")
 
+  comparison_str = ("Comparison could not be generated because reference results do "
+                   "not contain all queries\nin results (or reference results are "
+                   "missing)")
+  regression_table_data = []
+  improvement_table_data = []
+  if is_result_group_comparable(grouped, ref_grouped):
+    comparison_str, regression_table_data, improvement_table_data = compare_time_stats(
+        grouped, ref_grouped)
+
+  regression_table_str = str()
+  improvement_table_str = str()
+
+  if len(regression_table_data) > 0:
+    regression_table_str += 'Performance Regressions:\n'
+    regression_table_str += build_perf_summary_table(regression_table_data) + '\n'
+
+  if len(improvement_table_data) > 0:
+    improvement_table_str += 'Performance Improvements:\n'
+    improvement_table_str += build_perf_summary_table(improvement_table_data) + '\n'
+
+  print build_summary_header()
   print summary_str
   print stats_str
+  print regression_table_str
+  print improvement_table_str
   print comparison_str
