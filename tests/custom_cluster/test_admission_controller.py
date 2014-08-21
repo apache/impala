@@ -265,7 +265,7 @@ class TestAdmissionControllerStress(TestAdmissionController):
     curr = dict()
     for impalad in self.impalads:
       init[impalad] = impalad.service.get_metric_value(\
-          'statestore-subscriber.heartbeat-interval-time')['count']
+          'statestore-subscriber.topic-update-interval-time')['count']
       curr[impalad] = init[impalad]
 
     while True:
@@ -274,7 +274,7 @@ class TestAdmissionControllerStress(TestAdmissionController):
       if all([curr[i] - init[i] >= heartbeats for i in self.impalads]): break
       for impalad in self.impalads:
         curr[impalad] = impalad.service.get_metric_value(\
-            'statestore-subscriber.heartbeat-interval-time')['count']
+            'statestore-subscriber.topic-update-interval-time')['count']
       assert (time() - start_time < timeout),\
           "Timed out waiting %s seconds for heartbeats" % (timeout,)
       sleep(0.5)
@@ -540,4 +540,3 @@ class TestAdmissionControllerStress(TestAdmissionController):
     query_mem_limit = (MEM_TEST_LIMIT / MAX_NUM_CONCURRENT_QUERIES / num_impalads) - 1
     self.run_admission_test(vector,
         {'request_pool': self.pool_name, 'mem_limit': query_mem_limit})
-

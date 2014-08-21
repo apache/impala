@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "statestore/statestore.h"
+
 #include <boost/foreach.hpp>
+#include <boost/thread.hpp>
+#include <thrift/Thrift.h>
+#include <gutil/strings/substitute.h>
 
 #include "common/status.h"
-#include "statestore/statestore.h"
 #include "gen-cpp/StatestoreService_types.h"
 #include "statestore/failure-detector.h"
 #include "rpc/thrift-util.h"
@@ -24,29 +28,28 @@
 #include "util/uid-util.h"
 #include "util/webserver.h"
 
-#include <boost/thread.hpp>
-#include <thrift/Thrift.h>
-
 using namespace impala;
 using namespace std;
 using namespace boost;
 using namespace apache::thrift;
 using namespace rapidjson;
+using namespace strings;
 
 DEFINE_int32(statestore_max_missed_heartbeats, 10, "Maximum number of consecutive "
-    "heartbeats an impalad can miss before being declared failed by the "
+    "keep-alive messages an impalad can miss before being declared failed by the "
     "statestore.");
-DEFINE_int32(statestore_suspect_heartbeats, 5, "(Advanced) Number of consecutive "
-    "heartbeats an impalad can miss before being suspected of failure by the"
-    " statestore");
+
+DEFINE_int32(statestore_num_update_threads, 10, "(Advanced) Number of threads used to "
+    " send topic updates in parallel to all registered subscribers.");
+DEFINE_int32(statestore_update_frequency_ms, 2000, "(Advanced) Frequency (in ms) with"
+    " which the statestore sends topic updates to subscribers.");
+
 DEFINE_int32(statestore_num_heartbeat_threads, 10, "(Advanced) Number of threads used to "
-    " send heartbeats in parallel to all registered subscribers.");
-DEFINE_int32(statestore_heartbeat_frequency_ms, 500, "(Advanced) Frequency (in ms) with"
-    " which the statestore sends heartbeats to subscribers.");
+    " send keep-alive heartbeats in parallel to all registered subscribers.");
+DEFINE_int32(statestore_heartbeat_frequency_ms, 1000, "(Advanced) Frequency (in ms) with"
+    " which the statestore sends keep-alive heartbeats to subscribers.");
 
 DEFINE_int32(state_store_port, 24000, "port where StatestoreService is running");
-
-DECLARE_int32(statestore_subscriber_timeout_seconds);
 
 // Metric keys
 // TODO: Replace 'backend' with 'subscriber' when we can coordinate a change with CM
@@ -55,7 +58,8 @@ const string STATESTORE_LIVE_SUBSCRIBERS_LIST = "statestore.live-backends.list";
 const string STATESTORE_TOTAL_KEY_SIZE_BYTES = "statestore.total-key-size-bytes";
 const string STATESTORE_TOTAL_VALUE_SIZE_BYTES = "statestore.total-value-size-bytes";
 const string STATESTORE_TOTAL_TOPIC_SIZE_BYTES = "statestore.total-topic-size-bytes";
-const string STATESTORE_HEARTBEAT_DURATION = "statestore.heartbeat-durations";
+const string STATESTORE_UPDATE_DURATION = "statestore.topic-update-durations";
+const string STATESTORE_KEEPALIVE_DURATION = "statestore.keep-alive-durations";
 
 const Statestore::TopicEntry::Value Statestore::TopicEntry::NULL_VALUE = "";
 
@@ -66,12 +70,12 @@ const Statestore::TopicEntry::Value Statestore::TopicEntry::NULL_VALUE = "";
 // an item with the initial version.
 const Statestore::TopicEntry::Version Statestore::Subscriber::TOPIC_INITIAL_VERSION = 0L;
 
-// Used to control the maximum size of the heartbeat input queue, in which there is at
-// most one entry per subscriber.
+// Used to control the maximum size of the pending topic-update queue, in which there is
+// at most one entry per subscriber.
 const int32_t STATESTORE_MAX_SUBSCRIBERS = 10000;
 
-// Heartbeats that miss their deadline by this much are logged.
-const uint32_t HEARTBEAT_WARN_THRESHOLD_MS = 2000;
+// Updates or keep-alives that miss their deadline by this much are logged.
+const uint32_t DEADLINE_MISS_THRESHOLD_MS = 2000;
 
 typedef ClientConnection<StatestoreSubscriberClient> StatestoreSubscriberConnection;
 
@@ -187,16 +191,20 @@ void Statestore::Subscriber::SetLastTopicVersionProcessed(const TopicId& topic_i
 
 Statestore::Statestore(Metrics* metrics)
   : exit_flag_(false),
-    subscriber_heartbeat_threadpool_("statestore",
-        "subscriber-heartbeat-worker",
+    subscriber_topic_update_threadpool_("statestore-update",
+        "subscriber-update-worker",
+        FLAGS_statestore_num_update_threads,
+        STATESTORE_MAX_SUBSCRIBERS,
+        bind<void>(mem_fn(&Statestore::DoSubscriberUpdate), this, false, _1, _2)),
+    subscriber_keepalive_threadpool_("statestore-keepalive",
+        "subscriber-keepalive-worker",
         FLAGS_statestore_num_heartbeat_threads,
         STATESTORE_MAX_SUBSCRIBERS,
-        bind<void>(mem_fn(&Statestore::UpdateSubscriber), this, _1, _2)),
+        bind<void>(mem_fn(&Statestore::DoSubscriberUpdate), this, true, _1, _2)),
     client_cache_(new ClientCache<StatestoreSubscriberClient>()),
     thrift_iface_(new StatestoreThriftIf(this)),
-    failure_detector_(
-        new MissedHeartbeatFailureDetector(FLAGS_statestore_max_missed_heartbeats,
-                                           FLAGS_statestore_suspect_heartbeats)) {
+    failure_detector_(new MissedHeartbeatFailureDetector(
+        FLAGS_statestore_max_missed_heartbeats, FLAGS_statestore_max_missed_heartbeats / 2)) {
 
   DCHECK(metrics != NULL);
   num_subscribers_metric_ =
@@ -211,8 +219,10 @@ Statestore::Statestore(Metrics* metrics)
   topic_size_metric_ =
       metrics->CreateAndRegisterPrimitiveMetric(STATESTORE_TOTAL_TOPIC_SIZE_BYTES, 0L);
 
-  heartbeat_duration_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>(STATESTORE_HEARTBEAT_DURATION));
+  topic_update_duration_metric_ = metrics->RegisterMetric(
+      new StatsMetric<double>(STATESTORE_UPDATE_DURATION));
+  keepalive_duration_metric_ = metrics->RegisterMetric(
+      new StatsMetric<double>(STATESTORE_KEEPALIVE_DURATION));
 
   client_cache_->InitMetrics(metrics, "subscriber");
 }
@@ -299,13 +309,30 @@ void Statestore::SubscribersHandler(const Webserver::ArgumentMap& args,
   document->AddMember("subscribers", subscribers, document->GetAllocator());
 }
 
+Status Statestore::OfferUpdate(const ScheduledSubscriberUpdate& update,
+    ThreadPool<ScheduledSubscriberUpdate>* threadpool) {
+  if (threadpool->GetQueueSize() >= STATESTORE_MAX_SUBSCRIBERS
+      || !threadpool->Offer(update)) {
+    stringstream ss;
+    ss << "Maximum subscriber limit reached: " << STATESTORE_MAX_SUBSCRIBERS;
+    lock_guard<mutex> l(subscribers_lock_);
+    SubscriberMap::iterator subscriber_it = subscribers_.find(update.second);
+    DCHECK(subscriber_it != subscribers_.end());
+    subscribers_.erase(subscriber_it);
+    LOG(ERROR) << ss.str();
+    return Status(ss.str());
+  }
+
+  return Status::OK;
+}
+
 Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
     const TNetworkAddress& location,
     const vector<TTopicRegistration>& topic_registrations, TUniqueId* registration_id) {
   if (subscriber_id.empty()) return Status("Subscriber ID cannot be empty string");
 
-  // Create any new topics first, so that when the subscriber is first sent a heartbeat by
-  // the worker threads its topics are guaranteed to exist.
+  // Create any new topics first, so that when the subscriber is first sent a topic update
+  // by the worker threads its topics are guaranteed to exist.
   {
     lock_guard<mutex> l(topic_lock_);
     BOOST_FOREACH(const TTopicRegistration& topic, topic_registrations) {
@@ -337,26 +364,18 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
   }
 
   // Add the subscriber to the update queue, with an immediate schedule.
-  if (subscriber_heartbeat_threadpool_.GetQueueSize() >= STATESTORE_MAX_SUBSCRIBERS
-      || !subscriber_heartbeat_threadpool_.Offer(make_pair(0L, subscriber_id))) {
-    stringstream ss;
-    ss << "Maximum subscriber limit reached: " << STATESTORE_MAX_SUBSCRIBERS;
-    lock_guard<mutex> l(subscribers_lock_);
-    SubscriberMap::iterator subscriber_it = subscribers_.find(subscriber_id);
-    DCHECK(subscriber_it != subscribers_.end());
-    subscribers_.erase(subscriber_it);
-    LOG(ERROR) << ss.str();
-    return Status(ss.str());
-  }
+  ScheduledSubscriberUpdate update = make_pair(0L, subscriber_id);
+  RETURN_IF_ERROR(OfferUpdate(update, &subscriber_topic_update_threadpool_));
+  RETURN_IF_ERROR(OfferUpdate(update, &subscriber_keepalive_threadpool_));
 
   LOG(INFO) << "Subscriber '" << subscriber_id << "' registered (registration id: "
             << PrintId(*registration_id) << ")";
   return Status::OK;
 }
 
-Status Statestore::ProcessOneSubscriber(Subscriber* subscriber, bool* heartbeat_skipped) {
-  // Time any successful heartbeats (i.e. those for which UpdateState() completed, even
-  // though it may have returned an error.)
+Status Statestore::SendTopicUpdate(Subscriber* subscriber, bool* update_skipped) {
+  // Time any successful RPCs (i.e. those for which UpdateState() completed, even though
+  // it may have returned an error.)
   MonotonicStopWatch sw;
   sw.Start();
 
@@ -391,16 +410,16 @@ Status Statestore::ProcessOneSubscriber(Subscriber* subscriber, bool* heartbeat_
 
   status = Status(response.status);
   if (!status.ok()) {
-    heartbeat_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
+    topic_update_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
     return status;
   }
 
-  *heartbeat_skipped = (response.__isset.skipped && response.skipped);
-  if (*heartbeat_skipped) {
-    // The subscriber skipped processing this heartbeat. We don't consider this a failure
+  *update_skipped = (response.__isset.skipped && response.skipped);
+  if (*update_skipped) {
+    // The subscriber skipped processing this update. We don't consider this a failure
     // - subscribers can decide what they do with any update - so, return OK and set
-    // heartbeat_skipped so the caller can compensate.
-    heartbeat_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
+    // update_skipped so the caller can compensate.
+    topic_update_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
     return Status::OK;
   }
 
@@ -446,7 +465,7 @@ Status Statestore::ProcessOneSubscriber(Subscriber* subscriber, bool* heartbeat_
       }
     }
   }
-  heartbeat_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
+  topic_update_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
   return Status::OK;
 }
 
@@ -459,6 +478,10 @@ void Statestore::GatherTopicUpdates(const Subscriber& subscriber,
       TopicMap::const_iterator topic_it = topics_.find(subscribed_topic.first);
       DCHECK(topic_it != topics_.end());
 
+      TopicEntry::Version last_processed_version =
+          subscriber.LastTopicVersionProcessed(topic_it->first);
+      const Topic& topic = topic_it->second;
+
       TTopicDelta& topic_delta =
           update_state_request->topic_deltas[subscribed_topic.first];
       topic_delta.topic_name = subscribed_topic.first;
@@ -466,12 +489,9 @@ void Statestore::GatherTopicUpdates(const Subscriber& subscriber,
       // If the subscriber version is > 0, send this update as a delta. Otherwise, this is
       // a new subscriber so send them a non-delta update that includes all items in the
       // topic.
-      TopicEntry::Version last_processed_version =
-          subscriber.LastTopicVersionProcessed(topic_it->first);
       topic_delta.is_delta = last_processed_version > Subscriber::TOPIC_INITIAL_VERSION;
       topic_delta.__set_from_version(last_processed_version);
 
-      const Topic& topic = topic_it->second;
       if (!topic_delta.is_delta &&
           topic.last_version() > Subscriber::TOPIC_INITIAL_VERSION) {
         int64_t topic_size =
@@ -549,12 +569,41 @@ bool Statestore::ShouldExit() {
 void Statestore::SetExitFlag() {
   lock_guard<mutex> l(exit_flag_lock_);
   exit_flag_ = true;
-  subscriber_heartbeat_threadpool_.Shutdown();
+  subscriber_topic_update_threadpool_.Shutdown();
 }
 
-void Statestore::UpdateSubscriber(int thread_id,
+Status Statestore::SendKeepAlive(Subscriber* subscriber) {
+  MonotonicStopWatch sw;
+  sw.Start();
+
+  Status status;
+  StatestoreSubscriberConnection client(client_cache_.get(),
+      subscriber->network_address(), &status);
+  RETURN_IF_ERROR(status);
+
+  TKeepAliveRequest request;
+  TKeepAliveResponse response;
+  request.__set_registration_id(subscriber->registration_id());
+  try {
+    client->KeepAlive(response, request);
+  } catch (const TException& e) {
+    // Client may have been closed due to a failure
+    RETURN_IF_ERROR(client.Reopen());
+    try {
+      client->KeepAlive(response, request);
+    } catch (const TException& e) {
+      return Status(e.what());
+    }
+  }
+
+  keepalive_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
+  return Status::OK;
+}
+
+void Statestore::DoSubscriberUpdate(bool is_keepalive, int thread_id,
     const ScheduledSubscriberUpdate& update) {
   int64_t update_deadline = update.first;
+  const string hb_type = is_keepalive ? "keep-alive" : "topic update";
   if (update_deadline != 0L) {
     // Wait until deadline.
     int64_t diff_ms = update_deadline - ms_since_epoch();
@@ -563,19 +612,26 @@ void Statestore::UpdateSubscriber(int thread_id,
       diff_ms = update_deadline - ms_since_epoch();
     }
     diff_ms = abs(diff_ms);
-    VLOG(3) << "Sending update to: " << update.second << " (deadline accuracy: "
-            << diff_ms << "ms)";
+    VLOG(3) << "Sending " << hb_type << " message to: " << update.second
+            << " (deadline accuracy: " << diff_ms << "ms)";
 
-    if (diff_ms > HEARTBEAT_WARN_THRESHOLD_MS) {
+    if (diff_ms > DEADLINE_MISS_THRESHOLD_MS) {
       // TODO: This should be a healthcheck in a monitored metric in CM, which would
       // require a 'rate' metric type.
-      LOG(WARNING) << "Missed subscriber (" << update.second << ") deadline by "
-                   << diff_ms << "ms";
+      const string& msg = Substitute("Missed subscriber ($0) $1 deadline by $2ms, "
+          "consider decreasing --$3", update.second, hb_type, diff_ms,
+          is_keepalive ? "statestore_heartbeat_frequency_ms" :
+          "statestore_update_frequency_ms");
+      if (is_keepalive) {
+        LOG(WARNING) << msg;
+      } else {
+        VLOG_QUERY << msg;
+      }
     }
   } else {
     // The first update is scheduled immediately and has a deadline of 0. There's no need
     // to wait.
-    VLOG(3) << "Initial update to: " << update.second;
+    VLOG(3) << "Initial " << hb_type << " message for: " << update.second;
   }
   shared_ptr<Subscriber> subscriber;
   {
@@ -584,39 +640,53 @@ void Statestore::UpdateSubscriber(int thread_id,
     if (it == subscribers_.end()) return;
     subscriber = it->second;
   }
-  // Give up the lock here so that others can get to the queue
-  bool heartbeat_skipped;
-  Status status = ProcessOneSubscriber(subscriber.get(), &heartbeat_skipped);
+  // Send the right message type, and compute the next deadline
+  int64_t deadline_ms = 0;
+  Status status;
+  if (is_keepalive) {
+    status = SendKeepAlive(subscriber.get());
+    deadline_ms = ms_since_epoch() + FLAGS_statestore_heartbeat_frequency_ms;
+  } else {
+    bool update_skipped;
+    status = SendTopicUpdate(subscriber.get(), &update_skipped);
+    // If the subscriber responded that it skipped the last update sent, we assume that
+    // it was busy doing something else, and back off slightly before sending another.
+    int64_t update_interval = update_skipped ?
+        (2 * FLAGS_statestore_update_frequency_ms) :
+        FLAGS_statestore_update_frequency_ms;
+    deadline_ms = ms_since_epoch() + update_interval;
+  }
+
   {
     lock_guard<mutex> l(subscribers_lock_);
     // Check again if this registration has been removed while we were processing the
-    // heartbeat.
+    // message.
     SubscriberMap::iterator it = subscribers_.find(update.second);
     if (it == subscribers_.end()) return;
-
     if (!status.ok()) {
-      LOG(INFO) << "Unable to update subscriber at " << subscriber->network_address()
-                << ", received error " << status.GetErrorMsg();
+      LOG(INFO) << "Unable to send " << hb_type << " message to subscriber "
+                << update.second << ", received error " << status.GetErrorMsg();
     }
 
-    if (failure_detector_->UpdateHeartbeat(PrintId(
-        subscriber->registration_id()), status.ok()) == FailureDetector::FAILED) {
-      // TODO: Consider if a metric to track the number of failures would be useful.
-      LOG(INFO) << "Subscriber '" << subscriber->id() << "' has failed, disconnected "
-                << "or re-registered (last known registration ID: "
-                << PrintId(subscriber->registration_id()) << ")";
-      UnregisterSubscriber(subscriber.get());
+    const string& registration_id = PrintId(subscriber->registration_id());
+    FailureDetector::PeerState state = is_keepalive ?
+        failure_detector_->UpdateHeartbeat(registration_id, status.ok()) :
+        failure_detector_->GetPeerState(registration_id);
+
+    if (state == FailureDetector::FAILED) {
+      if (is_keepalive) {
+        // TODO: Consider if a metric to track the number of failures would be useful.
+        LOG(INFO) << "Subscriber '" << subscriber->id() << "' has failed, disconnected "
+                  << "or re-registered (last known registration ID: " << update.second
+                  << ")";
+        UnregisterSubscriber(subscriber.get());
+      }
     } else {
-      // Schedule the next heartbeat. If the subscriber responded that it skipped the last
-      // heartbeat sent, we assume that it was busy doing something else, and back off
-      // slightly before sending another.
-      int64_t heartbeat_interval =
-          heartbeat_skipped ? (2 * FLAGS_statestore_heartbeat_frequency_ms) :
-              FLAGS_statestore_heartbeat_frequency_ms;
-      int64_t deadline_ms = ms_since_epoch() + heartbeat_interval;
+      // Schedule the next message.
       VLOG(3) << "Next deadline for: " << subscriber->id() << " is in "
               << FLAGS_statestore_heartbeat_frequency_ms << "ms";
-      subscriber_heartbeat_threadpool_.Offer(make_pair(deadline_ms, subscriber->id()));
+      OfferUpdate(make_pair(deadline_ms, subscriber->id()), is_keepalive ?
+          &subscriber_keepalive_threadpool_ : &subscriber_topic_update_threadpool_);
     }
   }
 }
@@ -650,6 +720,6 @@ void Statestore::UnregisterSubscriber(Subscriber* subscriber) {
 }
 
 Status Statestore::MainLoop() {
-  subscriber_heartbeat_threadpool_.Join();
+  subscriber_topic_update_threadpool_.Join();
   return Status::OK;
 }

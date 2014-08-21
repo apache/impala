@@ -168,8 +168,16 @@ struct TUpdateStateResponse {
   3: optional bool skipped;
 }
 
+struct TKeepAliveRequest {
+  1: optional Types.TUniqueId registration_id;
+}
+
+struct TKeepAliveResponse {
+
+}
+
 service StatestoreSubscriber {
-  // Called when the statestore sends a heartbeat. The request contains a map of
+  // Called when the statestore sends a topic update. The request contains a map of
   // topic names to TTopicDelta updates, sent from the statestore to the subscriber. Each
   // of these delta updates will contain a list of additions to the topic and a list of
   // deletions from the topic.
@@ -180,4 +188,7 @@ service StatestoreSubscriber {
   // update based off a specific version from the statestore. The next statestore
   // delta update will be based off of the version the subscriber requested.
   TUpdateStateResponse UpdateState(1: TUpdateStateRequest params);
+
+  // Called when the statestore sends a keep-alive heartbeat.
+  TKeepAliveResponse KeepAlive(1: TKeepAliveRequest params);
 }

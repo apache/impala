@@ -42,9 +42,11 @@ class ThriftServer;
 typedef ClientCache<StatestoreServiceClient> StatestoreClientCache;
 
 // A StatestoreSubscriber communicates with a statestore periodically through the exchange
-// of heartbeat messages. These messages contain updates from the statestore to a list of
-// 'topics' that the subscriber is interested in; in response the subscriber sends a list
-// of changes that it wishes to make to a topic.
+// of topic update messages. These messages contain updates from the statestore to a list
+// of 'topics' that the subscriber is interested in; in response the subscriber sends a
+// list of changes that it wishes to make to a topic. The statestore also sends more
+// frequent 'keep alive' messages that confirm the connection between statestore and
+// subscriber is still active.
 //
 // Clients of the subscriber register topics of interest, and a function to call once an
 // update has been received. Each callback may optionally add one or more updates to a
@@ -134,7 +136,7 @@ class StatestoreSubscriber {
   // Container for the heartbeat server.
   boost::shared_ptr<ThriftServer> heartbeat_server_;
 
-  // Failure detector that monitors heartbeats from the statestore.
+  // Failure detector that tracks keep-alive messages from the statestore.
   boost::scoped_ptr<impala::TimeoutFailureDetector> failure_detector_;
 
   // Thread in which RecoveryModeChecker runs.
@@ -203,15 +205,21 @@ class StatestoreSubscriber {
   // When the last recovery happened.
   Metrics::StringMetric* last_recovery_time_metric_;
 
-  // Accumulated statistics on the frequency of heartbeats
-  StatsMetric<double>* heartbeat_interval_metric_;
+  // Accumulated statistics on the frequency of topic-update messages
+  StatsMetric<double>* topic_update_interval_metric_;
 
-  // Tracks the time between heartbeats
-  MonotonicStopWatch heartbeat_interval_timer_;
+  // Tracks the time between topic-update mesages
+  MonotonicStopWatch topic_update_interval_timer_;
 
-  // Accumulated statistics on the time taken to process each heartbeat from the
-  // statestore (that is, to call all callbacks)
-  StatsMetric<double>* heartbeat_duration_metric_;
+  // Accumulated statistics on the time taken to process each topic-update message from
+  // the statestore (that is, to call all callbacks)
+  StatsMetric<double>* topic_update_duration_metric_;
+
+  // Tracks the time between keepalive mesages
+  MonotonicStopWatch keepalive_interval_timer_;
+
+  // Accumulated statistics on the frequency of keepalive messages
+  StatsMetric<double>* keepalive_interval_metric_;
 
   // Current registration ID, in string form.
   Metrics::StringMetric* registration_id_metric_;
@@ -219,45 +227,51 @@ class StatestoreSubscriber {
   // Subscriber thrift implementation, needs to access UpdateState
   friend class StatestoreSubscriberThriftIf;
 
-  // Called when the statestore sends a heartbeat. Each registered callback is called
+  // Called when the statestore sends a topic update. Each registered callback is called
   // in turn with the given map of incoming_topic_deltas from the statestore. Each
-  // TTopicDelta sent from the statestore to the subscriber will contain the topic name,
-  // a list of additions to the topic, a list of deletions from the topic, and the
-  // version range the update covers. A from_version of 0 indicates a non-delta update.
-  // In response, any updates to the topic by the subscriber are aggregated in
-  // subscriber_topic_updates and returned to the statestore. Each update is a
-  // TTopicDelta that contains a list of additions to the topic and a list of deletions
-  // from the topic. Additionally, if a subscriber has received an unexpected delta
-  // update version range, they can request a new delta update by setting the
-  // "from_version" field of the TTopicDelta response. The next statestore update will
-  // be based off the version the subscriber responds with.
-  // If the subscriber is in recovery mode, this method returns immediately.
+  // TTopicDelta sent from the statestore to the subscriber will contain the topic name, a
+  // list of additions to the topic, a list of deletions from the topic, and the version
+  // range the update covers. A from_version of 0 indicates a non-delta update.  In
+  // response, any updates to the topic by the subscriber are aggregated in
+  // subscriber_topic_updates and returned to the statestore. Each update is a TTopicDelta
+  // that contains a list of additions to the topic and a list of deletions from the
+  // topic. Additionally, if a subscriber has received an unexpected delta update version
+  // range, they can request a new delta update by setting the "from_version" field of the
+  // TTopicDelta response. The next statestore update will be based off the version the
+  // subscriber responds with.  If the subscriber is in recovery mode, this method returns
+  // immediately.
   //
   // Returns an error if some error was encountered (e.g. the supplied registration ID was
   // unexpected), and OK otherwise. The output parameter 'skipped' is set to true if the
-  // subscriber chose not to process this heartbeat (if, for example, a concurrent
-  // heartbeat was being processed, or if the subscriber currently believes it is
+  // subscriber chose not to process this topic-update (if, for example, a concurrent
+  // update was being processed, or if the subscriber currently believes it is
   // recovering). Doing so indicates that no topics were updated during this call.
   Status UpdateState(const TopicDeltaMap& incoming_topic_deltas,
       const TUniqueId& registration_id,
       std::vector<TTopicDelta>* subscriber_topic_updates, bool* skipped);
 
-  // Run in a separate thread. In a loop, check failure_detector_ to see if the
-  // statestore is still sending heartbeats. If not, enter 'recovery mode'
-  // where a reconnection is repeatedly attempted. Once reconnected, all
-  // existing subscriptions and services are reregistered and normal operation
-  // resumes.
+  // Called when the statestore sends a keep-alive message. Updates the failure detector.
+  void KeepAlive(const TUniqueId& registration_id);
+
+  // Run in a separate thread. In a loop, check failure_detector_ to see if the statestore
+  // is still sending keep-alive messages. If not, enter 'recovery mode' where a
+  // reconnection is repeatedly attempted. Once reconnected, all existing subscriptions
+  // and services are reregistered and normal operation resumes.
   //
-  // During recovery mode, any public methods that are started will block on
-  // lock_, which is only released when recovery finishes. In practice, all
-  // registrations are made early in the life of an impalad before the
-  // statestore could be detected as failed.
+  // During recovery mode, any public methods that are started will block on lock_, which
+  // is only released when recovery finishes. In practice, all registrations are made
+  // early in the life of an impalad before the statestore could be detected as failed.
   void RecoveryModeChecker();
 
   // Creates a client of the remote statestore and sends a list of
   // topics to register for. Returns OK unless there is some problem
   // connecting, or the statestore reports an error.
   Status Register();
+
+  // Returns OK if registration_id == registration_id_, or if registration_id_ is not yet
+  // set, an error otherwise. Used to confirm that RPCs from the statestore are intended
+  // for the current registration epoch.
+  Status CheckRegistrationId(const TUniqueId& registration_id);
 };
 
 }

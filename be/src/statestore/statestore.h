@@ -47,14 +47,15 @@ class Status;
 //
 // Topics are subscribed to by subscribers, which are remote clients of the statestore
 // which express an interest in some set of Topics. The statestore sends topic updates to
-// subscribers via periodic heartbeat messages, which are also used to detect the liveness
-// of a subscriber.
+// subscribers via periodic 'update' messages, and also sends periodic 'keep-alive'
+// messages, which are used to detect the liveness of a subscriber.
 //
-// Subscribers, in return, send topic updates to the statestore to merge with the current
-// topic. These updates are then sent to all other subscribers in the next heartbeat. The
-// next heartbeat is scheduled for FLAGS_statestore_heartbeat_frequency_ms in the future,
-// unless the subscriber indicated that it skipped processing a heartbeat, in which case
-// the statestore will back off slightly before re-sending the same heartbeat.
+// In response to 'update' messages, subscribers, send topic updates to the statestore to
+// merge with the current topic. These updates are then sent to all other subscribers in
+// their next update message. The next message is scheduled for
+// FLAGS_statestore_update_frequency_ms in the future, unless the subscriber indicated
+// that it skipped processing an update, in which case the statestore will back off
+// slightly before re-sending the same update.
 //
 // Topic entries usually have human-readable keys, and values which are some serialised
 // representation of a data structure, e.g. a Thrift struct. The contents of a value's
@@ -64,9 +65,9 @@ class Status;
 // A subscriber may have marked some updates that it made as 'transient', which implies
 // that those entries should be deleted once the subscriber is no longer connected (this
 // is judged by the statestore's failure-detector, which will mark a subscriber as failed
-// when it has not responded to a number of successive heartbeats). Transience is tracked
-// per-topic-per-subscriber, so two different subscribers may treat the same topic
-// differently wrt to the transience of their updates.
+// when it has not responded to a number of successive keep-alive messages). Transience
+// is tracked per-topic-per-subscriber, so two different subscribers may treat the same
+// topic differently wrt to the transience of their updates.
 //
 // The statestore tracks the history of updates to each topic, with each topic update
 // getting a sequentially increasing version number that is unique across the topic.
@@ -90,13 +91,13 @@ class Statestore {
   // The only constructor; initialises member variables only.
   Statestore(Metrics* metrics);
 
-  // Registers a new subscriber with the given unique subscriber ID, running a heartbeat
+  // Registers a new subscriber with the given unique subscriber ID, running a subscriber
   // service at the given location, with the provided list of topic subscriptions.
   // The registration_id output parameter is the unique ID for this registration, used to
   // distinguish old registrations from new ones for the same subscriber.
   //
   // If a registration already exists for this subscriber, the old registration is removed
-  // and a new one is created. Subscribers may receive a heartbeat intended for the old
+  // and a new one is created. Subscribers may receive an update intended for the old
   // registration, since one may be in flight when a new RegisterSubscriber() is received.
   Status RegisterSubscriber(const SubscriberId& subscriber_id,
       const TNetworkAddress& location,
@@ -323,7 +324,7 @@ class Statestore {
     // with the same subscriber_id_.
     const TUniqueId registration_id_;
 
-    // The location of the heartbeat service that this subscriber runs.
+    // The location of the subscriber service that this subscriber runs.
     const TNetworkAddress network_address_;
 
     // Map of topic subscriptions to current TopicState. The the state describes whether
@@ -356,31 +357,42 @@ class Statestore {
   // Used to generated unique IDs for each new registration.
   boost::uuids::random_generator subscriber_uuid_generator_;
 
-  // Work item passed to subscriber heartbeat threads. First entry is the *earliest* time
-  // (in microseconds since epoch) that the next heartbeat should be sent, the second
-  // entry is the subscriber to send it to.
+  // Work item passed to both kinds of subscriber update threads. First entry is the
+  // *earliest* time (in microseconds since epoch) that the next message should be sent,
+  // the second entry is the subscriber to send it to.
   typedef std::pair<int64_t, SubscriberId> ScheduledSubscriberUpdate;
 
-  // Pool of threads that send heartbeats to subscribers one-by-one. Each subscriber has a
-  // time that the next heartbeat is scheduled, and each heartbeat thread will sleep until
-  // that time has passed to rate limit heartbeats. Subscribers are placed back into the
-  // queue once they have been processed, which guarantees that a) each subscriber is in
-  // the queue at most once and b) therefore there may be at most subscribers_.size() - 1
-  // subscribers ahead of any subscriber in the queue. Heartbeats may be delayed for any
-  // number of reasons, including scheduler interference, lock unfairness when submitting
-  // to the thread pool and head-of-line blocking when threads are occupied sending
-  // heartbeats to slow subscribers (subscribers are not guaranteed to be in the queue in
-  // next-heartbeat order). This does not affect correctness until the failure timeout in
-  // the subscriber is exceeded.
+  // The statestore has two pools of threads that send messages to subscribers
+  // one-by-one. One pool deals with 'keep-alive' messages that update failure detection
+  // state, and the other pool sends 'topic update' messages which contain the
+  // actual topic data that a subscriber does not yet have.
   //
-  // To mitigate this risk, 'sufficiently' many threads should be allocated to this thread
-  // pool via --statestore_num_heartbeat_threads. The failure timeout for each subscriber
-  // process may also be increased.
+  // Each message is scheduled for some time in the future and each worker thread
+  // will sleep until that time has passed to rate-limit messages. Subscribers are
+  // placed back into the queue once they have been processed. A subscriber may have many
+  // entries in a queue, but no more than one for each registration associated with that
+  // subscriber. Since at most one registration is considered 'live' per subscriber, this
+  // guarantees that subscribers_.size() - 1 'live' subscribers ahead of any subscriber in
+  // the queue.
+  //
+  // Messages may be delayed for any number of reasons, including scheduler
+  // interference, lock unfairness when submitting to the thread pool and head-of-line
+  // blocking when threads are occupied sending messages to slow subscribers
+  // (subscribers are not guaranteed to be in the queue in next-update order).
+  //
+  // Delays for keep-alive messages can result in the subscriber that is kept waiting
+  // assuming that the statestore has failed. Correct configuration of keep-alive message
+  // frequency and subscriber timeout is therefore very important, and depends upon the
+  // cluster size. See --statestore_heartbeat_frequency_ms and
+  // --statestore_subscriber_timeout_seconds. We expect that the provided defaults will
+  // work up to clusters of several hundred nodes.
   //
   // Subscribers are therefore not processed in lock-step, and one subscriber may have
-  // seen many more heartbeats than another during the same interval (if the second
+  // seen many more messages than another during the same interval (if the second
   // subscriber runs slow for any reason).
-  ThreadPool<ScheduledSubscriberUpdate> subscriber_heartbeat_threadpool_;
+  ThreadPool<ScheduledSubscriberUpdate> subscriber_topic_update_threadpool_;
+
+  ThreadPool<ScheduledSubscriberUpdate> subscriber_keepalive_threadpool_;
 
   // Cache of subscriber clients. Only one client per subscriber should be used, but the
   // cache helps with the client lifecycle on failure.
@@ -390,8 +402,8 @@ class Statestore {
   boost::shared_ptr<StatestoreServiceIf> thrift_iface_;
 
   // Failure detector for subscribers. If a subscriber misses a configurable number of
-  // consecutive heartbeats, it is considered failed and a) its transient topic entries
-  // are removed and b) its entry in the subscriber map is erased.
+  // consecutive keep-alive messages, it is considered failed and a) its transient topic
+  // entries are removed and b) its entry in the subscriber map is erased.
   boost::scoped_ptr<MissedHeartbeatFailureDetector> failure_detector_;
 
   // Metric that track the registered, non-failed subscribers.
@@ -403,32 +415,41 @@ class Statestore {
   Metrics::IntMetric* value_size_metric_;
   Metrics::IntMetric* topic_size_metric_;
 
-  // Tracks the distribution of heartbeat durations - precisely the time spent in calling
-  // the UpdateState() RPC which allows us to measure the network transmission cost as
-  // well as the subscriber-side processing time.
-  StatsMetric<double>* heartbeat_duration_metric_;
+  // Tracks the distribution of topic-update durations - precisely the time spent in
+  // calling the UpdateState() RPC which allows us to measure the network transmission
+  // cost as well as the subscriber-side processing time.
+  StatsMetric<double>* topic_update_duration_metric_;
 
-  // Called by the subscriber heartbeat thread pool to send one heartbeat to a subscriber
-  // by calling ProcessOneSubscriber(). Once complete, the subscriber is re-added to the
-  // heartbeat queue with a new scheduled time for its next heartbeat which depends on
-  // whether the heartbeat was skipped or not.
-  //
-  // The failure state of the subscriber is updated with the status returned from
-  // ProcessOneSubscriber(), and if the subscriber is judged to have failed it is removed
-  // from the list of active subscribers, and no further heartbeats are scheduled for it.
-  void UpdateSubscriber(int thread_id, const ScheduledSubscriberUpdate& update);
+  // Same as above, but for SendKeepAlive() RPCs.
+  StatsMetric<double>* keepalive_duration_metric_;
+
+  // Utility method to add an update to the given thread pool, and to fail if the thread
+  // pool is already at capacity.
+  Status OfferUpdate(const ScheduledSubscriberUpdate& update,
+      ThreadPool<ScheduledSubscriberUpdate>* thread_pool);
+
+  // Sends either a keep-alive or topic update message to the subscriber in 'update' at
+  // the closest possible time to the first member of 'update'.  If is_keepalive is true,
+  // sends a keep-alive update, otherwise the set of pending topic updates is sent. Once
+  // complete, the next update is scheduled and added to the appropriate queue.
+  void DoSubscriberUpdate(bool is_keepalive, int thread_id,
+      const ScheduledSubscriberUpdate& update);
 
   // Does the work of updating a single subscriber, by calling UpdateState() on the client
   // to send a list of topic deltas to the subscriber. If that call fails (either because
   // the RPC could not be completed, or the subscriber indicated an error), this method
   // returns a non-OK status immediately without further processing.
   //
-  // The subscriber may indicated that it skipped processing the heartbeat, either because
+  // The subscriber may indicated that it skipped processing the message, either because
   // it was not ready to do so or because it was busy. In that case, the UpdateState() RPC
-  // will return OK (since there was no error) and the output parameter heartbeat_skipped
+  // will return OK (since there was no error) and the output parameter update_skipped
   // is set to true. Otherwise, any updates returned by the subscriber are applied to
   // their target topics.
-  Status ProcessOneSubscriber(Subscriber* subscriber, bool* heartbeat_skipped);
+  Status SendTopicUpdate(Subscriber* subscriber, bool* update_skipped);
+
+  // Sends a keep-alive message to subscriber. Returns false if there was some error
+  // performing the RPC.
+  Status SendKeepAlive(Subscriber* subscriber);
 
   // Unregister a subscriber, removing all of its transient entries and evicting it from
   // the subscriber map. Callers must hold subscribers_lock_ prior to calling this method.
