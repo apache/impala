@@ -377,9 +377,6 @@ class ImpalaShell(cmd.Cmd):
       return False
 
   def do_summary(self, args):
-#     if not self.imp_client.connected:
-#       print_to_stderr("Must be connected to an Impala demon to retrieve query summaries")
-#       return True
     summary = None
     try:
       summary = self.imp_client.get_summary(self.last_query_handle)
@@ -412,9 +409,6 @@ class ImpalaShell(cmd.Cmd):
 
     """
     # TODO: Expand set to allow for setting more than just query options.
-#     if not self.imp_client.connected:
-#       print ("Connect to an impalad to view and set query options.")
-#       return True
     if len(args) == 0:
       print "Query options (defaults shown in []):"
       self._print_options(self.imp_client.default_query_options, self.set_query_options);
@@ -539,10 +533,13 @@ class ImpalaShell(cmd.Cmd):
         print_to_stderr(("Unable to import the python 'ssl' module. It is"
                          " required for an SSL-secured connection."))
         sys.exit(1)
-    except socket.error as (code, _):
+    except socket.error as (code, e):
       # if the socket was interrupted, reconnect the connection with the client
       if code == errno.EINTR:
         self._reconnect_cancellation
+      else:
+        print_to_stderr("Socket error %s: %s" % (code, e))
+        self.prompt = self.DISCONNECTED_PROMPT
     except Exception, e:
       print_to_stderr("Error connecting: %s, %s" % (type(e).__name__, e))
       # If a connection to another impalad failed while already connected
@@ -708,11 +705,15 @@ class ImpalaShell(cmd.Cmd):
       print_to_stderr(e)
       self.imp_client.connected = False
       self.prompt = ImpalaShell.DISCONNECTED_PROMPT
-    except socket.error as (code, _):
+    except socket.error as (code, e):
       # if the socket was interrupted, reconnect the connection with the client
-      print(ImpalaShell.CANCELLATION_MESSAGE)
       if code == errno.EINTR:
+        print ImpalaShell.CANCELLATION_MESSAGE
         self._reconnect_cancellation()
+      else:
+        print_to_stderr("Socket error %s: %s" % (code, e))
+        self.prompt = self.DISCONNECTED_PROMPT
+        self.imp_client.connected = False
     except Exception, u:
       # if the exception is unknown, there was possibly an issue with the connection
       # set the shell as disconnected
@@ -995,11 +996,15 @@ if __name__ == "__main__":
       intro = '\n'
     # a last measure agaisnt any exceptions thrown by an rpc
     # not caught in the shell
-    except socket.error as (code, _):
+    except socket.error as (code, e):
       # if the socket was interrupted, reconnect the connection with the client
-      print(shell.CANCELLATION_MESSAGE)
       if code == errno.EINTR:
+        print shell.CANCELLATION_MESSAGE
         shell._reconnect_cancellation()
+      else:
+        print_to_stderr("Socket error %s: %s" % (code, e))
+        shell.imp_client.connected = False
+        shell.prompt = shell.DISCONNECTED_PROMPT
     except DisconnectedException, e:
       print_to_stderr(e)
       shell.imp_client.connected = False
