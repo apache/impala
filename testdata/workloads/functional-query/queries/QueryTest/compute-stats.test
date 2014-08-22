@@ -704,3 +704,62 @@ COMPUTE STATS `parquet`.`parquet`
 ---- TYPES
 STRING
 ====
+---- QUERY
+# IMPALA-883: Compute table stats for an empty partition.
+create table compute_stats_db.empty_partitioned (i int) partitioned by (j int);
+alter table compute_stats_db.empty_partitioned add partition (j=1);
+====
+---- QUERY
+compute stats compute_stats_db.empty_partitioned
+---- RESULTS
+'Updated 1 partition(s) and 1 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.empty_partitioned
+---- RESULTS
+1,0,0,'0B','NOT CACHED','TEXT'
+Total,0,0,'0B','0B',''
+---- TYPES
+INT, BIGINT, BIGINT, STRING, STRING, STRING
+====
+---- QUERY
+# Insert non empty partition to the table with empty partition.
+insert into table compute_stats_db.empty_partitioned partition (j=2) select 1;
+====
+---- QUERY
+# Verify incremental partition stats work with empty and non-empty partition.
+compute stats compute_stats_db.empty_partitioned
+---- RESULTS
+'Updated 2 partition(s) and 1 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.empty_partitioned
+---- RESULTS
+1,0,0,'0B','NOT CACHED','TEXT'
+2,1,1,'2B','NOT CACHED','TEXT'
+Total,1,1,'2B','0B',''
+---- TYPES
+INT, BIGINT, BIGINT, STRING, STRING, STRING
+====
+---- QUERY
+# Verify partition stats work with empty and non-empty partition.
+drop stats compute_stats_db.empty_partitioned;
+compute stats compute_stats_db.empty_partitioned;
+---- RESULTS
+'Updated 2 partition(s) and 1 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.empty_partitioned
+---- RESULTS
+1,0,0,'0B','NOT CACHED','TEXT'
+2,1,1,'2B','NOT CACHED','TEXT'
+Total,1,1,'2B','0B',''
+---- TYPES
+INT, BIGINT, BIGINT, STRING, STRING, STRING
+====

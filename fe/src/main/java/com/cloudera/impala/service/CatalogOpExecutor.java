@@ -467,7 +467,8 @@ public class CatalogOpExecutor {
    * given Hive table based on the given update stats parameters. The partitions whose
    * row counts have not changed are skipped. The modified partitions are returned
    * in the modifiedParts parameter.
-   * Missing or new partitions as a result of concurrent table alterations are ignored.
+   * Row counts for missing or new partitions as a result of concurrent table
+   * alterations are set to 0.
    * Returns the number of partitions that were targeted for update (includes partitions
    * whose row counts have not changed).
    */
@@ -482,11 +483,12 @@ public class CatalogOpExecutor {
     int numTargetedPartitions = 0;
     for (org.apache.hadoop.hive.metastore.api.Partition msPartition: msPartitions) {
       TTableStats partitionStats = params.partition_stats.get(msPartition.getValues());
-      if (partitionStats == null) continue;
+      // A partition won't have an entry in partition_stats if either the partition has
+      // no rows or it was added by a concurrent table alteration.
+      long numRows = partitionStats == null ? 0 : partitionStats.num_rows;
       LOG.trace(String.format("Updating stats for partition %s: numRows=%s",
-          Joiner.on(",").join(msPartition.getValues()), partitionStats.num_rows));
-
-      String newRowCount = String.valueOf(partitionStats.num_rows);
+          Joiner.on(",").join(msPartition.getValues()), numRows));
+      String newRowCount = String.valueOf(numRows);
       String existingRowCount =
           msPartition.getParameters().get(StatsSetupConst.ROW_COUNT);
       if (existingRowCount == null || !existingRowCount.equals(newRowCount)) {
