@@ -412,8 +412,8 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
   int num_other_conjuncts = other_join_conjunct_ctxs_.size();
   ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
   int num_conjuncts = conjunct_ctxs_.size();
-
   int num_rows_added = 0;
+
   while (probe_batch_pos_ >= 0) {
     while (!hash_tbl_iterator_.AtEnd()) {
       DCHECK(current_probe_row_ != NULL);
@@ -518,6 +518,13 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
     bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
+
+  if (ReachedLimit()) {
+    *eos = true;
+    return Status::OK;
+  } else {
+    *eos = false;
+  }
 
   while (true) {
     DCHECK_NE(state_, PARTITIONING_BUILD) << "Should not be in GetNext()";

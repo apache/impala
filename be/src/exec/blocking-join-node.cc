@@ -36,6 +36,8 @@ BlockingJoinNode::BlockingJoinNode(const string& node_name, const TJoinOp::type 
   : ExecNode(pool, tnode, descs),
     node_name_(node_name),
     join_op_(join_op),
+    eos_(false),
+    probe_side_eos_(false),
     can_add_probe_filters_(false) {
 }
 
@@ -113,8 +115,6 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(state->CheckQueryState());
-
-  eos_ = false;
 
   // Kick-off the construction of the build-side table in a separate
   // thread, so that the left child can do any initialisation in parallel.
