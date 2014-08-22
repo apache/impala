@@ -167,8 +167,7 @@ public class Planner {
     } else {
       List<Expr> resultExprs = null;
       if (queryStmt instanceof SelectStmt
-          && ((SelectStmt) queryStmt).getAnalyticInfo() != null
-          && fragments.size() == 1) {
+          && ((SelectStmt) queryStmt).getAnalyticInfo() != null) {
         // TODO: fix this hack: always apply the smap of the root of fragment 0
         resultExprs =
             Expr.substituteList(
@@ -932,8 +931,10 @@ public class Planner {
       }
     } else {
       // we need the input partitioned on the Partition By exprs
+      List<Expr> partitionExprs = Expr.substituteList(analyticParent.getPartitionExprs(),
+          childFragment.getPlanRoot().getBaseTblSmap(), analyzer);
       DataPartition parentPartition = new DataPartition(TPartitionType.HASH_PARTITIONED,
-          analyticParent.getPartitionExprs());
+          partitionExprs);
       // TODO: should this use Analyzer.isEquivSlots() instead?
       if (childFragment.getDataPartition().equals(parentPartition)) {
         analyticFragment = childFragment;

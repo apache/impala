@@ -69,6 +69,67 @@ where month = 1 and tinyint_col < 5
 TINYINT, BIGINT
 ====
 ---- QUERY
+# Test ordering expressions having NULL values
+select tinyint_col, smallint_col, int_col,
+sum(smallint_col) over (order by tinyint_col nulls first)
+from alltypesagg
+where year = 2010 and month = 1 and day = 4 and id <= 3030 and bool_col = true
+order by tinyint_col, id, smallint_col, int_col
+---- RESULTS
+2,2,2,96
+2,12,12,96
+2,22,22,96
+4,4,4,138
+4,14,14,138
+4,24,24,138
+6,6,6,186
+6,16,16,186
+6,26,26,186
+8,8,8,240
+8,18,18,240
+8,28,28,240
+NULL,NULL,NULL,60
+NULL,10,10,60
+NULL,20,20,60
+NULL,30,30,60
+---- TYPES
+TINYINT, SMALLINT, INT, BIGINT
+====
+---- QUERY
+# Test partitions having NULL values
+select tinyint_col, smallint_col,
+sum(int_col) over (partition by tinyint_col order by smallint_col)
+from alltypesagg
+where year = 2010 and month = 1 and day = 4 and id <= 3200
+    and (smallint_col < 50 or smallint_col is NULL)
+    and (tinyint_col = 1 or tinyint_col is NULL)
+order by tinyint_col, smallint_col
+---- RESULTS
+1,1,102
+1,1,102
+1,11,224
+1,11,224
+1,21,366
+1,21,366
+1,31,528
+1,31,528
+1,41,710
+1,41,710
+NULL,10,120
+NULL,10,120
+NULL,20,260
+NULL,20,260
+NULL,30,420
+NULL,30,420
+NULL,40,600
+NULL,40,600
+NULL,NULL,900
+NULL,NULL,900
+NULL,NULL,900
+---- TYPES
+TINYINT, SMALLINT, BIGINT
+====
+---- QUERY
 select year, month, tinyint_col,
 count(int_col) over (partition by year, month order by tinyint_col)
 from alltypessmall

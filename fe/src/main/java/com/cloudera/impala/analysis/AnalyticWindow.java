@@ -181,8 +181,8 @@ public class AnalyticWindow {
     if (leftBoundary_.getType() != BoundaryType.UNBOUNDED_PRECEDING) {
       result.setWindow_start(leftBoundary_.toThrift());
     }
-    if (leftBoundary_.getType() != BoundaryType.UNBOUNDED_FOLLOWING) {
-      result.setWindow_start(rightBoundary_.toThrift());
+    if (rightBoundary_.getType() != BoundaryType.CURRENT_ROW) {
+      result.setWindow_end(rightBoundary_.toThrift());
     }
     return result;
   }
@@ -298,23 +298,29 @@ public class AnalyticWindow {
     if (rightBoundary_.getType().isOffset()) checkOffsetExpr(analyzer, rightBoundary_);
 
     if (leftBoundary_.getType() == BoundaryType.FOLLOWING) {
-      if (rightBoundary_.getType() != BoundaryType.FOLLOWING) {
+      if (rightBoundary_.getType() != BoundaryType.FOLLOWING
+          && rightBoundary_.getType() != BoundaryType.UNBOUNDED_FOLLOWING) {
         throw new AnalysisException(
             "A lower window bound of " + BoundaryType.FOLLOWING.toString()
               + " requires that the upper bound also be "
               + BoundaryType.FOLLOWING.toString());
       }
-      checkOffsetBoundaries(analyzer, leftBoundary_, rightBoundary_);
+      if (rightBoundary_.getType() != BoundaryType.UNBOUNDED_FOLLOWING) {
+        checkOffsetBoundaries(analyzer, leftBoundary_, rightBoundary_);
+      }
     }
 
     if (rightBoundary_.getType() == BoundaryType.PRECEDING) {
-      if (leftBoundary_.getType() != BoundaryType.PRECEDING) {
+      if (leftBoundary_.getType() != BoundaryType.PRECEDING
+          && leftBoundary_.getType() != BoundaryType.UNBOUNDED_PRECEDING) {
         throw new AnalysisException(
             "An upper window bound of " + BoundaryType.PRECEDING.toString()
               + " requires that the lower bound also be "
               + BoundaryType.PRECEDING.toString());
       }
-      checkOffsetBoundaries(analyzer, rightBoundary_, leftBoundary_);
+      if (leftBoundary_.getType() != BoundaryType.UNBOUNDED_PRECEDING) {
+        checkOffsetBoundaries(analyzer, rightBoundary_, leftBoundary_);
+      }
     }
   }
 }

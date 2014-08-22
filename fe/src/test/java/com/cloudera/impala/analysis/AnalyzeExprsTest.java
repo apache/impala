@@ -552,6 +552,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         + "rows between unbounded preceding and current row) from functional.alltypes");
     AnalyzesOk("select min(int_col) over (partition by id order by tinyint_col "
         + "rows between 2 preceding and unbounded following) from functional.alltypes");
+    AnalyzesOk("select min(int_col) over (partition by id order by tinyint_col "
+        + "rows between unbounded preceding and 2 preceding) from functional.alltypes");
+    AnalyzesOk("select min(int_col) over (partition by id order by tinyint_col "
+        + "rows between 2 following and unbounded following) from functional.alltypes");
     AnalyzesOk("select max(int_col) over (partition by id order by tinyint_col "
         + "range between 2 preceding and 6 following) from functional.alltypes");
         // TODO: substitute constants in-line so that 2*3 becomes implicitly castable

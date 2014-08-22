@@ -58,7 +58,7 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   DCHECK(child(0)->row_desc().IsPrefixOf(row_desc()));
   output_tuple_pool_.reset(new MemPool(mem_tracker()));
-  prev_input_row_pool_.reset(new MemPool(mem_tracker()));
+  mem_pool_.reset(new MemPool(mem_tracker()));
   evaluation_timer_ = ADD_TIMER(runtime_profile(), "EvaluationTime");
   input_batch_.reset(new RowBatch(child(0)->row_desc(), state->batch_size(),
       mem_tracker()));
@@ -76,9 +76,8 @@ inline Tuple* AnalyticEvalNode::CreateOutputTuple() {
   Tuple* result = Tuple::Create(output_tuple_desc_->byte_size(),
       output_tuple_pool_.get());
   ++num_owned_output_tuples_;
-  if (current_tuple_ != NULL) {
-    memcpy(result, current_tuple_, output_tuple_desc_->byte_size());
-  }
+  DCHECK(current_tuple_ != NULL);
+  memcpy(result, current_tuple_, output_tuple_desc_->byte_size());
   return result;
 }
 
@@ -108,8 +107,11 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   ordering_comparator_.reset(new TupleRowComparator(
       ordering_exprs_.lhs_ordering_expr_ctxs(),
       ordering_exprs_.rhs_ordering_expr_ctxs(), false, false));
-  current_tuple_ = CreateOutputTuple();
-  BOOST_FOREACH(AggFnEvaluator* evaluator, evaluators_) evaluator->Init(current_tuple_);
+
+  // Only allocated once, output tuples are allocated from output_tuple_pool_ and copy
+  // the intermediate state from current_tuple_.
+  current_tuple_ = Tuple::Create(output_tuple_desc_->byte_size(), mem_pool_.get());
+  for (int i = 0; i < evaluators_.size(); ++i) evaluators_[i]->Init(current_tuple_);
 
   // Initialize and process the first input batch so that some initial state can be
   // set here to avoid special casing in GetNext().
@@ -199,11 +201,10 @@ Status AnalyticEvalNode::ProcessInputBatch(RuntimeState* state, RowBatch* row_ba
     prev_input_row_ = row;
   }
 
-  // TODO: Consider removing pool and maintaining the last two input batches
-  // or at least clear the pool after enough prev rows have accumulated
+  // TODO: Avoid copying and instead maintain the last two input batches
   DCHECK(prev_input_row_ != NULL);
   prev_input_row_ = prev_input_row_->DeepCopy(child(0)->row_desc().tuple_descriptors(),
-      prev_input_row_pool_.get());
+      mem_pool_.get());
   if (input_eos_) FinalizeOutputTuple(false);
   return Status::OK;
 }
@@ -328,7 +329,7 @@ void AnalyticEvalNode::Close(RuntimeState* state) {
   ordering_exprs_.Close(state);
   if (input_batch_.get() != NULL) input_batch_.reset();
   if (output_tuple_pool_.get() != NULL) output_tuple_pool_->FreeAll();
-  if (prev_input_row_pool_.get() != NULL) prev_input_row_pool_->FreeAll();
+  if (mem_pool_.get() != NULL) mem_pool_->FreeAll();
   ExecNode::Close(state);
 }
 

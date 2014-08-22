@@ -138,14 +138,11 @@ class AnalyticEvalNode : public ExecNode {
   int num_owned_output_tuples_;
 
   // Previous input row used to compare partition boundaries and to determine when the
-  // order-by expressions change. The last row in an input RowBatch needs to be deep
-  // copied into prev_input_row_pool_.
+  // order-by expressions change.
+  // TODO: Maintain the previous two row batches rather than deep copying into mem_pool_
+  // (which we do because the last row in a batch references memory belonging to the
+  // previous batch).
   TupleRow* prev_input_row_;
-
-  // Pool used to allocate a copy of prev_input_row_ between input row batches. This is
-  // a separate MemPool from output_tuple_pool_ so that the pool can be cleared
-  // independently of output_tuple_pool_.
-  boost::scoped_ptr<MemPool> prev_input_row_pool_;
 
   BufferedBlockMgr::Client* client_;
 
@@ -161,6 +158,9 @@ class AnalyticEvalNode : public ExecNode {
 
   // RowBatch used to read rows from input_stream_.
   boost::scoped_ptr<RowBatch> input_batch_;
+
+  // Pool used for allocations that live until Close().
+  boost::scoped_ptr<MemPool> mem_pool_;
 
   // Current index in input_batch_.
   int input_row_idx_;

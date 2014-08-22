@@ -49,7 +49,10 @@ public class AnalyticEvalNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(AnalyticEvalNode.class);
 
   private List<Expr> analyticFnCalls_;
-  private List<Expr> partitionExprs_;
+  // Partitioning exprs from the AnalyticInfo
+  private final List<Expr> partitionExprs_;
+  // TODO: Remove when the BE uses partitionByLessThan rather than the exprs
+  private List<Expr> substitutedPartitionExprs_;
   private List<Expr> orderingExprs_;
   private final AnalyticWindow analyticWindow_;
   private final TupleDescriptor analyticTupleDesc_;
@@ -127,12 +130,13 @@ public class AnalyticEvalNode extends PlanNode {
     // point fn calls, partition and ordering exprs at our input
     ExprSubstitutionMap childSmap = getCombinedChildSmap();
     analyticFnCalls_ = Expr.substituteList(analyticFnCalls_, childSmap, analyzer);
-    partitionExprs_ = Expr.substituteList(partitionExprs_, childSmap, analyzer);
+    substitutedPartitionExprs_ = Expr.substituteList(partitionExprs_, childSmap,
+        analyzer);
     orderingExprs_ = Expr.substituteList(orderingExprs_, childSmap, analyzer);
 
     // create partition-by/order-by predicates post-substitution
-    if (!partitionExprs_.isEmpty()) {
-      partitionByLessThan_ = createLessThan(analyzer, partitionExprs_);
+    if (!substitutedPartitionExprs_.isEmpty()) {
+      partitionByLessThan_ = createLessThan(analyzer, substitutedPartitionExprs_);
     }
     if (!orderingExprs_.isEmpty()) {
       orderByLessThan_ = createLessThan(analyzer, orderingExprs_);
@@ -159,6 +163,7 @@ public class AnalyticEvalNode extends PlanNode {
     return Objects.toStringHelper(this)
         .add("analyticFnCalls", Expr.debugString(analyticFnCalls_))
         .add("partitionExprs", Expr.debugString(partitionExprs_))
+        .add("subtitutedPartitionExprs", Expr.debugString(substitutedPartitionExprs_))
         .add("orderingExprs", Expr.debugString(orderingExprs_))
         .add("window", analyticWindow_)
         .add("analyticTid", analyticTupleDesc_.getId())
@@ -210,7 +215,7 @@ public class AnalyticEvalNode extends PlanNode {
     msg.node_type = TPlanNodeType.ANALYTIC_EVAL_NODE;
     msg.analytic_node = new TAnalyticNode();
     msg.analytic_node.setTuple_id(analyticTupleDesc_.getId().asInt());
-    msg.analytic_node.setPartition_exprs(Expr.treesToThrift(partitionExprs_));
+    msg.analytic_node.setPartition_exprs(Expr.treesToThrift(substitutedPartitionExprs_));
     msg.analytic_node.setOrder_by_exprs(Expr.treesToThrift(orderingExprs_));
     msg.analytic_node.setAnalytic_functions(Expr.treesToThrift(analyticFnCalls_));
     if (analyticWindow_ != null) {
