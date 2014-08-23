@@ -21,9 +21,15 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.AnalyticWindow;
 import com.cloudera.impala.analysis.Analyzer;
+import com.cloudera.impala.analysis.BinaryPredicate;
+import com.cloudera.impala.analysis.CompoundPredicate;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.ExprSubstitutionMap;
+import com.cloudera.impala.analysis.SlotDescriptor;
+import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
+import com.cloudera.impala.analysis.TupleId;
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TAnalyticNode;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -49,12 +55,27 @@ public class AnalyticEvalNode extends PlanNode {
   private final TupleDescriptor analyticTupleDesc_;
   private final ExprSubstitutionMap analyticSmap_;
 
+  // id of buffered copy of input tuple; null if no partition and ordering exprs
+  private TupleDescriptor bufferedTupleDesc_;
+  // map from input to buffered tuple; empty if no bufferedTupleDesc_
+  private ExprSubstitutionMap bufferedTupleSmap_ = new ExprSubstitutionMap();
+
+  // predicates constructed from partitionExprs_/orderingExprs_ to
+  // compare input to buffered tuples; created in init()
+  private Expr partitionByLessThan_;
+  private Expr orderByLessThan_;
+
   public AnalyticEvalNode(
       PlanNodeId id, PlanNode input, List<Expr> analyticFnCalls,
       List<Expr> partitionExprs, List<Expr> orderingExprs,
       AnalyticWindow analyticWindow, TupleDescriptor analyticTupleDesc,
       ExprSubstitutionMap analyticSmap) {
     super(id, input.getTupleIds(), "ANALYTIC");
+    // we assume to get our input from a SortNode if there are partition
+    // or ordering exprs
+    Preconditions.checkState(
+        (partitionExprs.isEmpty() && orderingExprs.isEmpty())
+          || input.getTupleIds().size() == 1);
     // we're materializing the input row augmented with the analytic tuple
     tupleIds_.add(analyticTupleDesc.getId());
     analyticFnCalls_ = analyticFnCalls;
@@ -67,19 +88,6 @@ public class AnalyticEvalNode extends PlanNode {
     nullableTupleIds_.addAll(input.getNullableTupleIds());
   }
 
-  /**
-   * Copy c'tor used in clone().
-  private AnalyticEvalNode(PlanNodeId id, AnalyticEvalNode src) {
-    super(id, src, "ANALYTIC");
-    analyticFnCalls_ = Expr.cloneList(src.analyticFnCalls_);
-    partitionExprs_ = Expr.cloneList(src.partitionExprs_);
-    orderingExprs_ = Expr.cloneList(src.orderingExprs_);
-    analyticWindow_ = src.analyticWindow_;
-    analyticTupleDesc_ = src.analyticTupleDesc_;
-    analyticSmap_ = src.analyticSmap_;
-  }
-   */
-
   @Override
   public boolean isBlockingNode() { return true; }
 
@@ -87,8 +95,28 @@ public class AnalyticEvalNode extends PlanNode {
   public void init(Analyzer analyzer) throws InternalException {
     // TODO: deal with conjuncts
     computeMemLayout(analyzer);
+
+    if (!partitionExprs_.isEmpty() || !orderingExprs_.isEmpty()) {
+      // register copy of input now, before serializing descriptor table
+      bufferedTupleDesc_ = analyzer.getDescTbl().copyTupleDescriptor(tupleIds_.get(0));
+      Preconditions.checkState(
+          analyzer.getDescTbl().getTupleDesc(tupleIds_.get(0)).getByteSize() ==
+            bufferedTupleDesc_.getByteSize());
+    }
     // do this at the end so it can take all conjuncts into account
     computeStats(analyzer);
+
+    if (bufferedTupleDesc_ != null) {
+      // populate bufferedTupleMap
+      List<SlotDescriptor> inputSlots =
+          analyzer.getDescTbl().getTupleDesc(tupleIds_.get(0)).getSlots();
+      List<SlotDescriptor> bufferedSlots = bufferedTupleDesc_.getSlots();
+      Preconditions.checkState(inputSlots.size() == bufferedSlots.size());
+      for (int i = 0; i < inputSlots.size(); ++i) {
+        bufferedTupleSmap_.put(
+            new SlotRef(inputSlots.get(i)), new SlotRef(bufferedSlots.get(i)));
+      }
+    }
 
     // we add the analyticInfo's smap to the combined smap of our child
     baseTblSmap_ = analyticSmap_;
@@ -100,6 +128,21 @@ public class AnalyticEvalNode extends PlanNode {
     partitionExprs_ = Expr.substituteList(partitionExprs_, childSmap, analyzer);
     orderingExprs_ = Expr.substituteList(orderingExprs_, childSmap, analyzer);
 
+    // create partition-by/order-by predicates post-substitution
+    if (!partitionExprs_.isEmpty()) {
+      partitionByLessThan_ = createLessThan(analyzer, partitionExprs_);
+    }
+    if (!orderingExprs_.isEmpty()) {
+      orderByLessThan_ = createLessThan(analyzer, orderingExprs_);
+    }
+
+    // TODO: remove (eventually)
+    if (partitionByLessThan_ != null) {
+      LOG.info("partitionByLt: " + partitionByLessThan_.debugString());
+    }
+    if (orderByLessThan_ != null) {
+      LOG.info("orderByLt: " + orderByLessThan_.debugString());
+    }
     LOG.info("evalnode: " + debugString());
   }
 
@@ -117,8 +160,47 @@ public class AnalyticEvalNode extends PlanNode {
         .add("orderingExprs", Expr.debugString(orderingExprs_))
         .add("window", analyticWindow_)
         .add("analyticTid", analyticTupleDesc_.getId())
+        .add("bufferedTid",
+          bufferedTupleDesc_ != null ? bufferedTupleDesc_.getId() : "null")
+        .add("partitionByLt",
+          partitionByLessThan_ != null ? partitionByLessThan_.debugString() : "null")
+        .add("orderByLt",
+          orderByLessThan_ != null ? orderByLessThan_.debugString() : "null")
         .addValue(super.debugString())
         .toString();
+  }
+
+  /**
+   * Create '<' predicate between exprs of input tuple and buffered tuple
+   * ('exprs' refers to input tuple).
+   * Example:
+   * (tid0_slot0 < tid1_slot0)
+   *   || (tid0_slot0 == tid1_slot0 && tid0_slot1 < tid1_slot1)
+   *   || ...
+   */
+  private Expr createLessThan(Analyzer analyzer, List<Expr> exprs) {
+    Preconditions.checkState(!exprs.isEmpty());
+    TupleId inputTid = tupleIds_.get(0);
+    Preconditions.checkState(exprs.get(0).isBound(inputTid));
+    Expr result = new BinaryPredicate(BinaryPredicate.Operator.LT,
+        exprs.get(0).clone(), exprs.get(0).substitute(bufferedTupleSmap_, analyzer));
+    for (int i = 1; i < exprs.size(); ++i) {
+      Expr eqClause = new BinaryPredicate(BinaryPredicate.Operator.EQ,
+          exprs.get(i - 1).clone(),
+          exprs.get(i - 1).substitute(bufferedTupleSmap_, analyzer));
+      Preconditions.checkState(exprs.get(i).isBound(inputTid));
+      Expr ltClause = new BinaryPredicate(BinaryPredicate.Operator.LT,
+          exprs.get(i).clone(), exprs.get(i).substitute(bufferedTupleSmap_, analyzer));
+      result = new CompoundPredicate(CompoundPredicate.Operator.OR,
+          result,
+          new CompoundPredicate(CompoundPredicate.Operator.AND, eqClause, ltClause));
+    }
+    try {
+      result.analyze(analyzer);
+    } catch (AnalysisException e) {
+      throw new IllegalStateException(e.getMessage());
+    }
+    return result;
   }
 
   @Override
@@ -131,6 +213,15 @@ public class AnalyticEvalNode extends PlanNode {
     msg.analytic_node.setAnalytic_functions(Expr.treesToThrift(analyticFnCalls_));
     if (analyticWindow_ != null) {
       msg.analytic_node.setWindow(analyticWindow_.toThrift());
+    }
+    if (bufferedTupleDesc_ != null) {
+      msg.analytic_node.setBuffered_tuple_id(bufferedTupleDesc_.getId().asInt());
+    }
+    if (partitionByLessThan_ != null) {
+      msg.analytic_node.setPartition_by_lt(partitionByLessThan_.treeToThrift());
+    }
+    if (orderByLessThan_ != null) {
+      msg.analytic_node.setOrder_by_lt(orderByLessThan_.treeToThrift());
     }
   }
 

@@ -1,13 +1,14 @@
-select bigint_col, count(double_col) over(partition by tinyint_col order by int_col)
+select bigint_col, count(double_col)
+  over(partition by tinyint_col + 1, double_col / 2 order by 4 - int_col, 4 * smallint_col)
 from functional.alltypesagg
 ---- PLAN
 02:ANALYTIC
 |  functions: count(double_col)
-|  partition by: tinyint_col
-|  order by: int_col
+|  partition by: tinyint_col + 1, double_col / 2
+|  order by: 4 - int_col, 4 * smallint_col
 |
 01:SORT
-|  order by: tinyint_col ASC NULLS FIRST, int_col ASC
+|  order by: tinyint_col + 1 ASC NULLS FIRST, double_col / 2 ASC NULLS FIRST, 4 - int_col ASC, 4 * smallint_col ASC
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB

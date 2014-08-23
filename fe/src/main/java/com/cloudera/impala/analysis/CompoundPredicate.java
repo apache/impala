@@ -23,6 +23,7 @@ import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -86,6 +87,14 @@ public class CompoundPredicate extends Predicate {
   public boolean equals(Object obj) {
     if (!super.equals(obj)) return false;
     return ((CompoundPredicate) obj).op_ == op_;
+  }
+
+  @Override
+  public String debugString() {
+    return Objects.toStringHelper(this)
+        .add("op", op_)
+        .addValue(super.debugString())
+        .toString();
   }
 
   @Override

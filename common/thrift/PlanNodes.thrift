@@ -270,6 +270,17 @@ struct TAnalyticNode {
 
   // Analytic function results are materialized into this tuple.
   5: required Types.TTupleId tuple_id
+
+  // id of the buffered tuple (identical to the input tuple, which is assumed
+  // to come from a single SortNode); not set if both partition_exprs and
+  // order_by_exprs are empty
+  6: optional Types.TTupleId buffered_tuple_id
+
+  // child.row_tuples[0] '<' buffered_tuple_id for partition_exprs
+  7: optional Exprs.TExpr partition_by_lt
+
+  // child.row_tuples[0] '<' buffered_tuple_id for order_by_exprs
+  8: optional Exprs.TExpr order_by_lt
 }
 
 struct TUnionNode {

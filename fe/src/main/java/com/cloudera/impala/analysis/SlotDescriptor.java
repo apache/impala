@@ -44,9 +44,25 @@ public class SlotDescriptor {
   private ColumnStats stats_;  // only set if 'column' isn't set
 
   SlotDescriptor(SlotId id, TupleDescriptor parent) {
-    this.id_ = id;
-    this.parent_ = parent;
-    this.byteOffset_ = -1;  // invalid
+    id_ = id;
+    parent_ = parent;
+    byteOffset_ = -1;  // invalid
+  }
+
+  SlotDescriptor(SlotId id, TupleDescriptor parent, SlotDescriptor src) {
+    id_ = id;
+    parent_ = parent;
+    type_ = src.type_;
+    column_ = src.column_;
+    label_ = src.label_;
+    isMaterialized_ = src.isMaterialized_;
+    isNullable_ = src.isNullable_;
+    byteSize_ = src.byteSize_;
+    byteOffset_ = src.byteOffset_;
+    nullIndicatorByte_ = src.nullIndicatorByte_;
+    nullIndicatorBit_ = src.nullIndicatorBit_;
+    slotIdx_ = src.slotIdx_;
+    stats_ = src.stats_;
   }
 
   public int getNullIndicatorByte() { return nullIndicatorByte_; }

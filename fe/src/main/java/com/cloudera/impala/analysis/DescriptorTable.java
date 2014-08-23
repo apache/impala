@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -50,9 +49,35 @@ public class DescriptorTable {
     return d;
   }
 
+  /**
+   * Create copy of src with new id. The returned descriptor has its mem layout
+   * computed.
+   */
+  public TupleDescriptor copyTupleDescriptor(TupleId srcId) {
+    TupleDescriptor d = new TupleDescriptor(tupleIdGenerator_.getNextId());
+    tupleDescs_.put(d.getId(), d);
+    // create copies of slots
+    TupleDescriptor src = tupleDescs_.get(srcId);
+    for (SlotDescriptor slot: src.getSlots()) {
+      copySlotDescriptor(d, slot);
+    }
+    d.computeMemLayout();
+    return d;
+  }
+
   public SlotDescriptor addSlotDescriptor(TupleDescriptor d) {
     SlotDescriptor result = new SlotDescriptor(slotIdGenerator_.getNextId(), d);
     d.addSlot(result);
+    slotDescs_.put(result.getId(), result);
+    return result;
+  }
+
+  /**
+   * Append copy of src to dest.
+   */
+  public SlotDescriptor copySlotDescriptor(TupleDescriptor dest, SlotDescriptor src) {
+    SlotDescriptor result = new SlotDescriptor(slotIdGenerator_.getNextId(), dest, src);
+    dest.addSlot(result);
     slotDescs_.put(result.getId(), result);
     return result;
   }
