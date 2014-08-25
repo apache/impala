@@ -173,6 +173,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select * from functional.alltypes where double_col > NULL");
     AnalyzesOk("select * from functional.alltypes where string_col = NULL");
     AnalyzesOk("select * from functional.alltypes where timestamp_col = NULL");
+
+    AnalyzesOk("select cast('hi' as CHAR(2)) = cast('hi' as CHAR(3))");
+    AnalyzesOk("select cast('hi' as CHAR(2)) = 'hi'");
+
     // invalid casts
     AnalysisError("select * from functional.alltypes where bool_col = '15'",
         "operands of type BOOLEAN and STRING are not comparable: bool_col = '15'");
@@ -213,7 +217,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     for (Type type: Type.getSupportedTypes()) {
       if (type.isNull() || type.isDecimal() || type.isBoolean() || type.isDateType()
-          || type.getPrimitiveType() == PrimitiveType.VARCHAR) {
+          || type.getPrimitiveType() == PrimitiveType.VARCHAR
+          || type.getPrimitiveType() == PrimitiveType.CHAR) {
         continue;
       }
       AnalyzesOk("select cast(1.1 as " + type + ")");
@@ -231,6 +236,17 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     AnalysisError("select cast(1 as decimal(0, 1))",
         "Decimal precision must be greater than 0.");
+  }
+
+  /**
+   * Asserts that an expression can be cast as the specified type
+   */
+  private void testExprCast(String literal, Type expectedType) {
+    SelectStmt selectStmt = (SelectStmt) AnalyzesOk("select cast(" + literal +
+        " as " + expectedType.toSql() + ")");
+    Type actualType = selectStmt.resultExprs_.get(0).getType();
+    Assert.assertTrue("Expected Type: " + expectedType + " Actual type: " + actualType,
+        expectedType.equals(actualType));
   }
 
   @Test
@@ -306,6 +322,33 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select cast('helloworld' as VARCHAR(3))");
     AnalyzesOk("select cast(cast('helloworld' as VARCHAR(3)) as string)");
     AnalyzesOk("select cast(cast('3.0' as VARCHAR(5)) as float)");
+    AnalyzesOk("select NULL = cast('123' as CHAR(3))");
+    AnalysisError("select now() = cast('hi' as CHAR(3))",
+        "operands of type TIMESTAMP and CHAR(3) are not comparable: " +
+        "now() = CAST('hi' AS CHAR(3))");
+    testExprCast("cast('Hello' as VARCHAR(5))", ScalarType.createVarcharType(7));
+    testExprCast("cast('Hello' as VARCHAR(5))", ScalarType.createVarcharType(3));
+
+    testExprCast("'Hello'", ScalarType.createCharType(5));
+    testExprCast("cast('Hello' as CHAR(5))", ScalarType.STRING);
+    testExprCast("cast('Hello' as CHAR(5))", ScalarType.createVarcharType(7));
+    testExprCast("cast('Hello' as VARCHAR(5))", ScalarType.createCharType(7));
+    testExprCast("cast('Hello' as CHAR(7))", ScalarType.createVarcharType(5));
+    testExprCast("cast('Hello' as VARCHAR(7))", ScalarType.createCharType(5));
+    testExprCast("cast('Hello' as CHAR(5))", ScalarType.createVarcharType(5));
+    testExprCast("cast('Hello' as VARCHAR(5))", ScalarType.createCharType(5));
+
+    /* TODO re-enable when we have determined behavior for casting to VARCHAR
+    testExprCast("cast('abcde' as char(10)) IN " +
+        "(cast('abcde' as CHAR(20)), cast('abcde' as VARCHAR(10)), 'abcde')",
+        ScalarType.createCharType(10));
+    testExprCast("'abcde' IN " +
+        "(cast('abcde' as CHAR(20)), cast('abcde' as VARCHAR(10)), 'abcde')",
+        ScalarType.STRING);
+    testExprCast("cast('abcde' as varchar(10)) IN " +
+        "(cast('abcde' as CHAR(20)), cast('abcde' as VARCHAR(10)), 'abcde')",
+        ScalarType.createVarcharType(10));
+    */
   }
 
   /**
@@ -314,13 +357,14 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   @Test
   public void TestNullCasts() throws AnalysisException {
     for (Type type: Type.getSupportedTypes()) {
-      // TODO: Implement CHAR
-      if (type.getPrimitiveType() == PrimitiveType.CHAR) continue;
        // Cannot cast to NULL_TYPE
       if (type.isNull()) continue;
       if (type.isDecimal()) type = Type.DEFAULT_DECIMAL;
       if (type.getPrimitiveType() == PrimitiveType.VARCHAR) {
         type = ScalarType.createVarcharType(1);
+      }
+      if (type.getPrimitiveType() == PrimitiveType.CHAR) {
+        type = ScalarType.createCharType(1);
       }
       checkExprType("select cast(null as " + type + ")", type);
     }

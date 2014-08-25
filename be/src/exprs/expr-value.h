@@ -31,6 +31,7 @@ struct ExprValue {
   float float_val;
   double double_val;
   std::string string_data;
+  char* char_val;
   StringValue string_val;
   TimestampValue timestamp_val;
   Decimal4Value decimal4_val;

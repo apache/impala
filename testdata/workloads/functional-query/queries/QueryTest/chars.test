@@ -1,9 +1,62 @@
 ====
 ---- QUERY
-drop table if exists test_varchar_tmp
+# TODO: string literals should start as CHAR(N) and analysis should promote as necessary
+# TODO: Test min/max aggregates on CHAR(N)
+# TODO: Test hash joins on varchar to char
+insert into test_char_tmp select cast("hello" as char(5))
 ====
 ---- QUERY
-create table if not exists test_varchar_tmp (vc varchar(5))
+select * from test_char_tmp
+---- TYPES
+char
+---- RESULTS
+'hello'
+====
+---- QUERY
+insert into test_char_tmp select cast("hel" as char(5))
+====
+---- QUERY
+insert into test_char_tmp select cast(cast("hello000" as VARCHAR(8)) as char(5))
+====
+---- QUERY
+select * from test_char_tmp where c = cast('hel' as char(5))
+---- TYPES
+char
+---- RESULTS
+'hel  '
+====
+---- QUERY
+insert into test_char_tmp values (NULL)
+====
+---- QUERY
+select * from test_char_tmp as A CROSS JOIN test_char_tmp as B
+where B.c = cast('hel' as CHAR(5))
+ORDER BY A.c
+---- TYPES
+char, char
+---- RESULTS
+'hel  ','hel  '
+'hello','hel  '
+'hello','hel  '
+'NULL','hel  '
+====
+---- QUERY
+select * from test_char_tmp as A, test_char_tmp as B 
+where A.c = B.c AND A.c != 'hello'
+---- TYPES
+char, char
+---- RESULTS
+'hel  ','hel  '
+====
+---- QUERY
+select lower(c) from test_char_tmp ORDER BY c
+---- TYPES
+string
+---- RESULTS
+'hel  '
+'hello'
+'hello'
+'NULL'
 ====
 ---- QUERY
 insert into test_varchar_tmp values (cast("hello" as varchar(5)))
@@ -30,7 +83,4 @@ string
 ---- RESULTS
 'hello'
 'hel'
-====
----- QUERY
-drop table if exists test_varchar_tmp
 ====

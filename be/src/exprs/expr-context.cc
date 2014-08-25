@@ -228,13 +228,18 @@ void* ExprContext::GetValue(Expr* e, TupleRow* row) {
       return &result_.double_val;
     }
     case TYPE_STRING:
-    case TYPE_VARCHAR:
-    case TYPE_CHAR: {
+    case TYPE_VARCHAR: {
       impala_udf::StringVal v = e->GetStringVal(this, row);
       if (v.is_null) return NULL;
       result_.string_val.ptr = reinterpret_cast<char*>(v.ptr);
       result_.string_val.len = v.len;
       return &result_.string_val;
+    }
+    case TYPE_CHAR: {
+      impala_udf::StringVal v = e->GetStringVal(this, row);
+      if (v.is_null) return NULL;
+      result_.char_val = reinterpret_cast<char*>(v.ptr);
+      return result_.char_val;
     }
     case TYPE_TIMESTAMP: {
       impala_udf::TimestampVal v = e->GetTimestampVal(this, row);

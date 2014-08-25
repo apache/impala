@@ -96,6 +96,8 @@ class CastFunctions {
   static StringVal CastToStringVal(FunctionContext* context, const TimestampVal& val);
   static StringVal CastToStringVal(FunctionContext* context, const StringVal& val);
 
+  static StringVal CastToChar(FunctionContext* context, const StringVal& val);
+
   static TimestampVal CastToTimestampVal(FunctionContext* context, const BooleanVal& val);
   static TimestampVal CastToTimestampVal(FunctionContext* context, const TinyIntVal& val);
   static TimestampVal CastToTimestampVal(FunctionContext* context, const SmallIntVal& val);

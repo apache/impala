@@ -28,6 +28,7 @@
 #include "runtime/timestamp-value.h"
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.inline.h"
+#include "exprs/string-functions.h"
 
 namespace impala {
 
@@ -51,8 +52,6 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
   // Parse the raw-text data. Translate the text string to internal format.
   switch (slot_desc->type().type) {
     case TYPE_VARCHAR:
-      len = std::min(len, slot_desc->type().len);
-      // fall through into TYPE_STRING
     case TYPE_STRING: {
       StringValue* str_slot = reinterpret_cast<StringValue*>(slot);
       str_slot->ptr = const_cast<char*>(data);
@@ -61,12 +60,28 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
         DCHECK(pool != NULL);
         char* slot_data = reinterpret_cast<char*>(pool->Allocate(len));
         if (need_escape) {
-          UnescapeString(data, slot_data, &str_slot->len);
+          int64_t maxlen = slot_desc->type().type == TYPE_VARCHAR ?
+              slot_desc->type().len : -1;
+          UnescapeString(data, slot_data, &str_slot->len, maxlen);
         } else {
+          if (slot_desc->type().type == TYPE_VARCHAR) {
+            str_slot->len = std::min(str_slot->len, slot_desc->type().len);
+          }
           memcpy(slot_data, data, str_slot->len);
         }
         str_slot->ptr = slot_data;
       }
+      break;
+    }
+    case TYPE_CHAR: {
+      char* char_slot = reinterpret_cast<char*>(slot);
+      if (need_escape) {
+        UnescapeString(data, char_slot, &len, slot_desc->type().len);
+      } else {
+        len = std::min(slot_desc->type().len, len);
+        memcpy(char_slot, data, len);
+      }
+      StringValue::PadWithSpaces(char_slot, slot_desc->type().len, len);
       break;
     }
     case TYPE_BOOLEAN:

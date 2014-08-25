@@ -118,6 +118,9 @@ public class ScalarFunction extends Function {
         case VARCHAR:
           beFn += "_StringVal";
           break;
+        case CHAR:
+          beFn += "_Char";
+          break;
         case TIMESTAMP:
           beFn += "_TimestampVal";
           break;

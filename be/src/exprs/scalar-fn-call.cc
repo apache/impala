@@ -272,12 +272,13 @@ Status ScalarFnCall::GetCodegendComputeFn(RuntimeState* state, llvm::Function** 
 
   // Call children to populate remaining arguments
   for (int i = 0; i < GetNumChildren(); ++i) {
-    llvm::Function* child_fn;
+    llvm::Function* child_fn = NULL;
     vector<llvm::Value*> child_fn_args;
     if (state->codegen_enabled()) {
-      // Set 'child_fn' to the codegen'd function
-      RETURN_IF_ERROR(children_[i]->GetCodegendComputeFn(state, &child_fn));
-    } else {
+      // Set 'child_fn' to the codegen'd function, sets child_fn = NULL if codegen fails
+      children_[i]->GetCodegendComputeFn(state, &child_fn);
+    }
+    if (child_fn == NULL) {
       // Set 'child_fn' to the interpreted function
       child_fn = GetStaticGetValWrapper(children_[i]->type(), codegen);
       // First argument to interpreted function is children_[i]

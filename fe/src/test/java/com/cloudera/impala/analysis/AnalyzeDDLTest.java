@@ -861,6 +861,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create table new_table(s1 varchar(32673))",
         "Varchar size must be <= 32672. Size was set to: 32673.");
     AnalyzesOk("create table new_table (i int) PARTITIONED BY (s varchar(3))");
+    AnalyzesOk("create table functional.new_table (c char(1024))");
+    AnalyzesOk("create table new_table (i int) PARTITIONED BY (c char(3))");
 
     // Supported file formats. Exclude Avro since it is tested separately.
     String [] fileFormats =

@@ -29,5 +29,4 @@ ostream& operator<<(ostream& os, const StringValue& string_value) {
   return os << string_value.DebugString();
 }
 
-
 }

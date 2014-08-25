@@ -42,11 +42,15 @@ void TextConverter::UnescapeString(StringValue* value, MemPool* pool) {
   value->ptr = new_data;
 }
 
-void TextConverter::UnescapeString(const char* src, char* dest, int* len) {
+void TextConverter::UnescapeString(const char* src, char* dest, int* len,
+    int64_t maxlen) {
+  const char* src_end = src + *len;
+  char* dest_end = dest + *len;
+  if (maxlen > 0) dest_end = dest + maxlen;
   char* dest_ptr = dest;
-  const char* end = src + *len;
   bool escape_next_char = false;
-  while (src < end) {
+
+  while ((src < src_end) && (dest_ptr < dest_end)) {
     if (*src == escape_char_) {
       escape_next_char = !escape_next_char;
     } else {
@@ -95,6 +99,10 @@ void TextConverter::UnescapeString(const char* src, char* dest, int* len) {
 Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc,
     const char* null_col_val, int len, bool check_null) {
+  if (slot_desc->type().type == TYPE_CHAR) {
+    LOG(INFO) << "Char isn't supported for CodegenWriteSlot";
+    return NULL;
+  }
   SCOPED_TIMER(codegen->codegen_timer());
 
   // Codegen is_null_string
@@ -131,7 +139,7 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
   codegen->CreateIfElseBlocks(fn, "set_null", "parse_slot",
       &set_null_block, &parse_slot_block);
 
-  if (slot_desc->type().type != TYPE_STRING && slot_desc->type().type != TYPE_VARCHAR) {
+  if (!slot_desc->type().IsVarLen()) {
     check_zero_block = BasicBlock::Create(codegen->context(), "check_zero", fn);
   }
 
@@ -152,11 +160,9 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     is_null = codegen->false_value();
   }
   builder.CreateCondBr(is_null, set_null_block,
-      (slot_desc->type().type == TYPE_STRING ||
-       slot_desc->type().type == TYPE_VARCHAR) ? parse_slot_block : check_zero_block);
+      (slot_desc->type().IsVarLen()) ? parse_slot_block : check_zero_block);
 
-  if (slot_desc->type().type != TYPE_STRING &&
-      slot_desc->type().type != TYPE_VARCHAR) {
+  if (!slot_desc->type().IsVarLen()) {
     builder.SetInsertPoint(check_zero_block);
     // If len <= 0 and it is not a string col, set slot to NULL
     // The len can be less than 0 if the field contained an escape character which
@@ -170,11 +176,13 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
   builder.SetInsertPoint(parse_slot_block);
   Value* slot = builder.CreateStructGEP(args[0], slot_desc->field_idx(), "slot");
 
-  if (slot_desc->type().type == TYPE_STRING || slot_desc->type().type == TYPE_VARCHAR) {
+  if (slot_desc->type().IsVarLen()) {
     Value* ptr = builder.CreateStructGEP(slot, 0, "string_ptr");
     Value* len = builder.CreateStructGEP(slot, 1, "string_len");
 
     builder.CreateStore(args[1], ptr);
+    // TODO codegen memory allocation for CHAR
+    DCHECK(slot_desc->type().type != TYPE_CHAR);
     if (slot_desc->type().type == TYPE_VARCHAR) {
       // determine if we need to truncate the string
       Value* maxlen = codegen->GetIntConstant(TYPE_INT, slot_desc->type().len);

@@ -223,7 +223,7 @@ TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
 
 void TupleDescriptor::AddSlot(SlotDescriptor* slot) {
   slots_.push_back(slot);
-  if (slot->type().IsStringType() && slot->is_materialized()) {
+  if (slot->type().IsVarLen() && slot->is_materialized()) {
     string_slots_.push_back(slot);
   }
   if (slot->is_materialized()) ++num_materialized_slots_;

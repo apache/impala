@@ -15,10 +15,12 @@
 package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.cloudera.impala.catalog.ColumnStats;
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.thrift.TTupleDescriptor;
 import com.google.common.base.Joiner;
@@ -125,11 +127,8 @@ public class TupleDescriptor {
     hasMemLayout_ = true;
 
     // sort slots by size
-    List<List<SlotDescriptor>> slotsBySize =
-        Lists.newArrayListWithCapacity(PrimitiveType.getMaxSlotSize());
-    for (int i = 0; i <= PrimitiveType.getMaxSlotSize(); ++i) {
-      slotsBySize.add(new ArrayList<SlotDescriptor>());
-    }
+    Map<Integer, List<SlotDescriptor>> slotsBySize =
+        new HashMap<Integer, List<SlotDescriptor>>();
 
     // populate slotsBySize; also compute avgSerializedSize
     int numNullableSlots = 0;
@@ -142,11 +141,15 @@ public class TupleDescriptor {
         // TODO: for computed slots, try to come up with stats estimates
         avgSerializedSize_ += d.getType().getSlotSize();
       }
+      if (!slotsBySize.containsKey(d.getType().getSlotSize())) {
+        slotsBySize.put(d.getType().getSlotSize(), new ArrayList<SlotDescriptor>());
+      }
       slotsBySize.get(d.getType().getSlotSize()).add(d);
       if (d.getIsNullable()) ++numNullableSlots;
     }
-    // we shouldn't have anything of size 0
-    Preconditions.checkState(slotsBySize.get(0).isEmpty());
+    // we shouldn't have anything of size <= 0
+    Preconditions.checkState(!slotsBySize.containsKey(0));
+    Preconditions.checkState(!slotsBySize.containsKey(-1));
 
     // assign offsets to slots in order of ascending size
     numNullBytes_ = (numNullableSlots + 7) / 8;
@@ -156,7 +159,9 @@ public class TupleDescriptor {
     // slotIdx is the index into the resulting tuple struct.  The first (smallest) field
     // is 0, next is 1, etc.
     int slotIdx = 0;
-    for (int slotSize = 1; slotSize <= PrimitiveType.getMaxSlotSize(); ++slotSize) {
+    List<Integer> sortedSizes = new ArrayList<Integer>(slotsBySize.keySet());
+    Collections.sort(sortedSizes);
+    for (int slotSize: sortedSizes) {
       if (slotsBySize.get(slotSize).isEmpty()) continue;
       if (slotSize > 1) {
         // insert padding

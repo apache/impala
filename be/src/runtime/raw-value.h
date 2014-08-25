@@ -136,9 +136,14 @@ inline bool RawValue::Eq(const void* v1, const void* v2, const ColumnType& type)
     case TYPE_TIMESTAMP:
       return *reinterpret_cast<const TimestampValue*>(v1) ==
           *reinterpret_cast<const TimestampValue*>(v2);
-    case TYPE_CHAR:
-      return StringCompare(reinterpret_cast<const char*>(v1), type.len,
-          reinterpret_cast<const char*>(v2), type.len, type.len) == 0;
+    case TYPE_CHAR: {
+      int64_t l1 = StringValue::UnpaddedCharLength(reinterpret_cast<const char*>(v1),
+                                                   type.len);
+      int64_t l2 = StringValue::UnpaddedCharLength(reinterpret_cast<const char*>(v2),
+                                                   type.len);
+      return StringCompare(reinterpret_cast<const char*>(v1), l1,
+          reinterpret_cast<const char*>(v2), l2, std::min(l1, l2)) == 0;
+    }
     case TYPE_DECIMAL:
       switch (type.GetByteSize()) {
         case 4:

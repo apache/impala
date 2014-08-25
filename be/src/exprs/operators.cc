@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "exprs/operators.h"
+#include "exprs/anyval-util.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
 
@@ -52,6 +53,19 @@
     return BooleanVal(iv1 OP iv2);\
   }
 
+#define BINARY_PREDICATE_CHAR(NAME, OP) \
+  BooleanVal Operators::NAME##_Char_Char(\
+      FunctionContext* c, const StringVal& v1, const StringVal& v2) {\
+    if (v1.is_null || v2.is_null) return BooleanVal::null();\
+    const ColumnType& v1_type = AnyValUtil::TypeDescToColumnType(*c->GetArgType(0));\
+    const ColumnType& v2_type = AnyValUtil::TypeDescToColumnType(*c->GetArgType(1));\
+    StringValue iv1 = StringValue::FromStringVal(v1);\
+    StringValue iv2 = StringValue::FromStringVal(v2);\
+    iv1.len = StringValue::UnpaddedCharLength(iv1.ptr, v1_type.len);\
+    iv2.len = StringValue::UnpaddedCharLength(iv2.ptr, v2_type.len);\
+    return BooleanVal(iv1 OP iv2);\
+  }
+
 #define BINARY_OP_NUMERIC_TYPES(NAME, OP) \
   BINARY_OP_FN(NAME, TinyIntVal, OP); \
   BINARY_OP_FN(NAME, SmallIntVal, OP);\
@@ -81,7 +95,8 @@
   BINARY_PREDICATE_NUMERIC_FN(NAME, FloatVal, OP);\
   BINARY_PREDICATE_NUMERIC_FN(NAME, DoubleVal, OP);\
   BINARY_PREDICATE_NONNUMERIC_FN(NAME, StringVal, StringValue, OP);\
-  BINARY_PREDICATE_NONNUMERIC_FN(NAME, TimestampVal, TimestampValue, OP);
+  BINARY_PREDICATE_NONNUMERIC_FN(NAME, TimestampVal, TimestampValue, OP);\
+  BINARY_PREDICATE_CHAR(NAME, OP);
 
 namespace impala {
 

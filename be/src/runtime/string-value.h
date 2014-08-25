@@ -100,6 +100,13 @@ struct StringValue {
     return StringValue(reinterpret_cast<char*>(sv.ptr), sv.len);
   }
 
+  // Pads the end of the char pointer with spaces. num_chars is the number of used
+  // characters, cptr_len is the length of cptr
+  inline static void PadWithSpaces(char* cptr, int64_t cptr_len, int64_t num_chars);
+
+  // Returns number of characters in a char array (ignores trailing spaces)
+  inline static int64_t UnpaddedCharLength(const char* cptr, int64_t len);
+
   // For C++/IR interop, we need to be able to look up types by name.
   static const char* LLVM_CLASS_NAME;
 };

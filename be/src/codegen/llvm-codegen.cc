@@ -315,6 +315,7 @@ Type* LlvmCodeGen::GetType(const ColumnType& type) {
       return Type::getDoubleTy(context());
     case TYPE_STRING:
     case TYPE_VARCHAR:
+    case TYPE_CHAR:
       return string_val_type_;
     case TYPE_TIMESTAMP:
       return timestamp_val_type_;

@@ -18,7 +18,9 @@ import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.Function.CompareMode;
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarFunction;
+import com.cloudera.impala.catalog.ScalarType;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExpr;
@@ -91,6 +93,24 @@ public class CastExpr extends Expr {
         if (fromType.isStringType() && toType.isBoolean()) continue;
         // Disable casting from boolean/timestamp to decimal
         if ((fromType.isBoolean() || fromType.isDateType()) && toType.isDecimal()) {
+          continue;
+        }
+        if (fromType.getPrimitiveType() == PrimitiveType.STRING
+            && toType.getPrimitiveType() == PrimitiveType.CHAR) {
+          // Allow casting from String to Char(N)
+          String beSymbol = "impala::CastFunctions::CastToChar";
+          db.addBuiltin(ScalarFunction.createBuiltin(getFnName(ScalarType.CHAR),
+              Lists.newArrayList((Type) ScalarType.STRING), false, ScalarType.CHAR,
+              beSymbol, null, null, true));
+          continue;
+        }
+        if (fromType.getPrimitiveType() == PrimitiveType.VARCHAR
+            && toType.getPrimitiveType() == PrimitiveType.VARCHAR) {
+          // Allow casting from VARCHAR(N) to VARCHAR(M)
+          String beSymbol = "impala::CastFunctions::CastToStringVal";
+          db.addBuiltin(ScalarFunction.createBuiltin(getFnName(ScalarType.VARCHAR),
+              Lists.newArrayList((Type) ScalarType.VARCHAR), false, ScalarType.VARCHAR,
+              beSymbol, null, null, true));
           continue;
         }
         // Disable no-op casts

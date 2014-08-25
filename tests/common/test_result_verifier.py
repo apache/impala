@@ -383,7 +383,7 @@ def parse_result_rows(exec_result):
     assert len(cols) == len(col_types)
     new_cols = list()
     for i in xrange(len(cols)):
-      if col_types[i] == 'STRING':
+      if col_types[i] == 'STRING' or col_types[i] == 'CHAR':
         new_cols.append("'%s'" % cols[i])
       else:
         new_cols.append(cols[i])

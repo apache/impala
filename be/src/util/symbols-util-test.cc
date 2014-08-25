@@ -240,44 +240,45 @@ TEST(SymbolsUtil, Mangling) {
   TestMangling("AllTypes", false, args, NULL,
       "_Z8AllTypesPN10impala_udf15FunctionContextERKNS_9StringValERKNS_10"
           "BooleanValERKNS_10TinyIntValERKNS_11SmallIntValERKNS_6IntValERKNS_9BigIntVal"
-          "ERKNS_8FloatValERKNS_9DoubleValERKNS_12TimestampValERKPh",
+          "ERKNS_8FloatValERKNS_9DoubleValERKNS_12TimestampValERKNS_9StringValE",
       "AllTypes(impala_udf::FunctionContext*, impala_udf::StringVal const&, "
           "impala_udf::BooleanVal const&, impala_udf::TinyIntVal const&, "
           "impala_udf::SmallIntVal const&, impala_udf::IntVal const&, "
           "impala_udf::BigIntVal const&, impala_udf::FloatVal const&, "
           "impala_udf::DoubleVal const&, impala_udf::TimestampVal const&, "
-          "unsigned char* const&)");
+          "impala_udf::StringVal const&)");
   TestMangling("AllTypes", false, args, &int_ret_type,
       "_Z8AllTypesPN10impala_udf15FunctionContextERKNS_9StringValERKNS_10BooleanValE"
           "RKNS_10TinyIntValERKNS_11SmallIntValERKNS_6IntValERKNS_9BigIntValE"
-          "RKNS_8FloatValERKNS_9DoubleValERKNS_12TimestampValERKPhPSE_",
+          "RKNS_8FloatValERKNS_9DoubleValERKNS_12TimestampValERKNS_9StringValEPSE_",
       "AllTypes(impala_udf::FunctionContext*, impala_udf::StringVal const&, "
           "impala_udf::BooleanVal const&, impala_udf::TinyIntVal const&, "
           "impala_udf::SmallIntVal const&, impala_udf::IntVal const&, "
           "impala_udf::BigIntVal const&, impala_udf::FloatVal const&, "
           "impala_udf::DoubleVal const&, impala_udf::TimestampVal const&, "
-          "unsigned char* const&, impala_udf::IntVal*)");
+          "impala_udf::StringVal const&, impala_udf::IntVal*)");
   TestMangling("AllTypes", false, args, &double_ret_type,
       "_Z8AllTypesPN10impala_udf15FunctionContextERKNS_9StringValERKNS_10BooleanValE"
           "RKNS_10TinyIntValERKNS_11SmallIntValERKNS_6IntValERKNS_9BigIntValE"
-          "RKNS_8FloatValERKNS_9DoubleValERKNS_12TimestampValERKPhPSN_",
+          "RKNS_8FloatValERKNS_9DoubleValERKNS_12TimestampValERKNS_9StringValEPSN_",
       "AllTypes(impala_udf::FunctionContext*, impala_udf::StringVal const&, "
           "impala_udf::BooleanVal const&, impala_udf::TinyIntVal const&, "
           "impala_udf::SmallIntVal const&, impala_udf::IntVal const&, "
           "impala_udf::BigIntVal const&, impala_udf::FloatVal const&, "
           "impala_udf::DoubleVal const&, impala_udf::TimestampVal const&, "
-          "unsigned char* const&, impala_udf::DoubleVal*)");
+          "impala_udf::StringVal const&, impala_udf::DoubleVal*)");
 
   // CHAR(N) type. This has restricted use. It can only be an intermediate type.
   args.clear();
   ColumnType char_ret_type = ColumnType::CreateCharType(10);
   TestMangling("TEST", false, args, &char_ret_type,
-      "_Z4TESTPN10impala_udf15FunctionContextEPPh",
-      "TEST(impala_udf::FunctionContext*, unsigned char**)");
+      "_Z4TESTPN10impala_udf15FunctionContextEPNS_9StringValE",
+      "TEST(impala_udf::FunctionContext*, impala_udf::StringVal*)");
   args.push_back(ColumnType::CreateCharType(10));
   TestMangling("TEST", false, args, &char_ret_type,
-      "_Z4TESTPN10impala_udf15FunctionContextERKPhPS2_",
-      "TEST(impala_udf::FunctionContext*, unsigned char* const&, unsigned char**)");
+      "_Z4TESTPN10impala_udf15FunctionContextERKNS_9StringValEPS2_",
+      "TEST(impala_udf::FunctionContext*, impala_udf::StringVal const&, "
+      "impala_udf::StringVal*)");
 }
 
 TEST(SymbolsUtil, ManglingPrepareOrClose) {

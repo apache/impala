@@ -387,6 +387,7 @@ public class Function implements CatalogObject {
       return "DoubleVal";
     case STRING:
     case VARCHAR:
+    case CHAR:
       return "StringVal";
     case TIMESTAMP:
       return "TimestampVal";

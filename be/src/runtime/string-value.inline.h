@@ -101,7 +101,21 @@ inline StringValue StringValue::Trim() const {
   return StringValue(ptr + begin, end - begin + 1);
 }
 
+inline void StringValue::PadWithSpaces(char* cptr, int64_t cptr_len, int64_t num_chars) {
+  DCHECK(cptr != NULL);
+  DCHECK_GE(cptr_len, 1);
+  DCHECK_GE(cptr_len, num_chars);
+  memset(&cptr[num_chars], ' ', cptr_len - num_chars);
 }
 
+inline int64_t StringValue::UnpaddedCharLength(const char* cptr, int64_t len) {
+  DCHECK(cptr != NULL);
+  DCHECK_GE(len, 0);
+  int64_t last = len - 1;
+  while (last >= 0 && cptr[last] == ' ') --last;
+  return last + 1;
+}
+
+}
 #endif
 

@@ -58,7 +58,7 @@ class StringFunctions {
 
   static void RegexpPrepare(FunctionContext*, FunctionContext::FunctionStateScope);
   static void RegexpClose(FunctionContext*, FunctionContext::FunctionStateScope);
-  static StringVal RegexpExtract(FunctionContext*, const StringVal& str, 
+  static StringVal RegexpExtract(FunctionContext*, const StringVal& str,
                                  const StringVal& pattern, const BigIntVal& index);
   static StringVal RegexpReplace(FunctionContext*, const StringVal& str,
                                  const StringVal& pattern, const StringVal& replace);
@@ -77,5 +77,4 @@ class StringFunctions {
 };
 
 }
-
 #endif

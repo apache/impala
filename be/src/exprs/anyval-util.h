@@ -151,6 +151,7 @@ class AnyValUtil {
       case TYPE_DOUBLE: return sizeof(DoubleVal);
       case TYPE_STRING:
       case TYPE_VARCHAR:
+      case TYPE_CHAR:
         return sizeof(StringVal);
       case TYPE_TIMESTAMP: return sizeof(TimestampVal);
       case TYPE_DECIMAL: return sizeof(DecimalVal);
@@ -226,6 +227,12 @@ class AnyValUtil {
           DCHECK_LE(sv->len, type.len);
         }
         return;
+      case TYPE_CHAR: {
+        StringVal* sv = reinterpret_cast<StringVal*>(dst);
+        sv->ptr = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(slot));
+        sv->len = type.len;
+        return;
+      }
       case TYPE_TIMESTAMP:
         reinterpret_cast<const TimestampValue*>(slot)->ToTimestampVal(
             reinterpret_cast<TimestampVal*>(dst));

@@ -123,6 +123,7 @@ class Operators {
       FunctionContext*, const DoubleVal&, const DoubleVal&);
   static BooleanVal Eq_StringVal_StringVal(
       FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal Eq_Char_Char(FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Eq_TimestampVal_TimestampVal(
       FunctionContext*, const TimestampVal&, const TimestampVal&);
 
@@ -141,6 +142,7 @@ class Operators {
       FunctionContext*, const DoubleVal&, const DoubleVal&);
   static BooleanVal Ne_StringVal_StringVal(
       FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal Ne_Char_Char(FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Ne_TimestampVal_TimestampVal(
       FunctionContext*, const TimestampVal&, const TimestampVal&);
 
@@ -159,6 +161,7 @@ class Operators {
       FunctionContext*, const DoubleVal&, const DoubleVal&);
   static BooleanVal Gt_StringVal_StringVal(
       FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal Gt_Char_Char(FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Gt_TimestampVal_TimestampVal(
       FunctionContext*, const TimestampVal&, const TimestampVal&);
 
@@ -177,6 +180,7 @@ class Operators {
       FunctionContext*, const DoubleVal&, const DoubleVal&);
   static BooleanVal Lt_StringVal_StringVal(
       FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal Lt_Char_Char(FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Lt_TimestampVal_TimestampVal(
       FunctionContext*, const TimestampVal&, const TimestampVal&);
 
@@ -195,6 +199,7 @@ class Operators {
       FunctionContext*, const DoubleVal&, const DoubleVal&);
   static BooleanVal Ge_StringVal_StringVal(
       FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal Ge_Char_Char( FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Ge_TimestampVal_TimestampVal(
       FunctionContext*, const TimestampVal&, const TimestampVal&);
 
@@ -213,6 +218,7 @@ class Operators {
       FunctionContext*, const DoubleVal&, const DoubleVal&);
   static BooleanVal Le_StringVal_StringVal(
       FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal Le_Char_Char(FunctionContext*, const StringVal&, const StringVal&);
   static BooleanVal Le_TimestampVal_TimestampVal(
       FunctionContext*, const TimestampVal&, const TimestampVal&);
 };

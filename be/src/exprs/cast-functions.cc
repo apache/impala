@@ -19,6 +19,7 @@
 #include "exprs/decimal-functions.h"
 #include "runtime/timestamp-value.h"
 #include "util/string-parser.h"
+#include "string-functions.h"
 
 using namespace boost;
 using namespace impala;
@@ -154,6 +155,26 @@ StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const StringVal& 
   sv.ptr = val.ptr;
   sv.len = val.len;
   AnyValUtil::TruncateIfNecessary(type, &sv);
+  return sv;
+}
+
+StringVal CastFunctions::CastToChar(FunctionContext* ctx, const StringVal& val) {
+  if (val.is_null) return StringVal::null();
+
+  ColumnType type = AnyValUtil::TypeDescToColumnType(ctx->GetReturnType());
+  DCHECK(type.type == TYPE_CHAR);
+  DCHECK_GE(type.len, 1);
+  char* cptr;
+  if (type.len > val.len) {
+    cptr = reinterpret_cast<char*>(ctx->impl()->AllocateLocal(type.len));
+    memcpy(cptr, val.ptr, min(type.len, val.len));
+    StringValue::PadWithSpaces(cptr, type.len, val.len);
+  } else {
+    cptr = reinterpret_cast<char*>(val.ptr);
+  }
+  StringVal sv;
+  sv.ptr = reinterpret_cast<uint8_t*>(cptr);
+  sv.len = type.len;
   return sv;
 }
 

@@ -105,10 +105,6 @@ static void AppendSeqId(int seq_id, stringstream* out) {
 }
 
 static void AppendAnyValType(int namespace_id, const ColumnType& type, stringstream* s) {
-  if (type.type == TYPE_CHAR) {
-    (*s) << "Ph"; // TYPE_CHAR just maps to uint8_t* and is a builtin type.
-    return;
-  }
   (*s) << "N";
   // All the AnyVal types are in the impala_udf namespace, that token
   // already came with impala_udf::FunctionContext
@@ -138,6 +134,7 @@ static void AppendAnyValType(int namespace_id, const ColumnType& type, stringstr
       break;
     case TYPE_STRING:
     case TYPE_VARCHAR:
+    case TYPE_CHAR:
       AppendMangledToken("StringVal", s);
       break;
     case TYPE_TIMESTAMP:
@@ -211,11 +208,7 @@ string SymbolsUtil::MangleUserFunction(const string& fn_name,
 
     ss << "K"; // This indicates it is const
     seq_id += 2; // For impala_udf::*Val, which is two tokens.
-    if (arg_types[i].type == TYPE_CHAR) {
-      ss << "Ph";
-    } else {
-      AppendAnyValType(impala_udf_seq_id, arg_types[i], &ss);
-    }
+    AppendAnyValType(impala_udf_seq_id, arg_types[i], &ss);
     argument_map[arg_types[i].type] = seq_id;
   }
 

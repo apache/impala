@@ -40,8 +40,15 @@ TEST(StringValueTest, TestCompare) {
   // Include a few long strings so we test the SSE path
   string str8_str("yyyyyyyyyyyyyyyy\0yyyyyyyyyyyyyyyyyy", 35);
   string str9_str("yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy", 34);
+  string char0_str("hi", 2);
+  string char1_str("hi  ", 4);
+  string char2_str(" hi  ", 5);
+  string char3_str("12345", 5);
+  string char4_str(" ", 1);
+  string char5_str("", 0);
 
   const int NUM_STRINGS = 10;
+  const int NUM_CHARS = 6;
 
   // Must be in lexical order
   StringValue svs[NUM_STRINGS];
@@ -88,6 +95,25 @@ TEST(StringValueTest, TestCompare) {
       }
     }
   }
+
+  StringValue chars[NUM_CHARS];
+  chars[0] = FromStdString(char0_str);
+  chars[1] = FromStdString(char1_str);
+  chars[2] = FromStdString(char2_str);
+  chars[3] = FromStdString(char3_str);
+  chars[4] = FromStdString(char4_str);
+  chars[5] = FromStdString(char5_str);
+
+  EXPECT_EQ(StringValue::UnpaddedCharLength(chars[0].ptr, 2), 2);
+  EXPECT_EQ(StringValue::UnpaddedCharLength(chars[1].ptr, 4), 2);
+  EXPECT_EQ(StringValue::UnpaddedCharLength(chars[2].ptr, 5), 3);
+  EXPECT_EQ(StringValue::UnpaddedCharLength(chars[3].ptr, 5), 5);
+  EXPECT_EQ(StringValue::UnpaddedCharLength(chars[4].ptr, 1), 0);
+  EXPECT_EQ(StringValue::UnpaddedCharLength(chars[5].ptr, 0), 0);
+
+  StringValue::PadWithSpaces(chars[3].ptr, 5, 4);
+  EXPECT_EQ(chars[3].ptr[4], ' ');
+  EXPECT_EQ(chars[3].ptr[3], '4');
 }
 
 }

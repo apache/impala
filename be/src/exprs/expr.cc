@@ -514,6 +514,7 @@ AnyVal* Expr::GetConstVal(ExprContext* context) {
       break;
     }
     case TYPE_STRING:
+    case TYPE_CHAR:
     case TYPE_VARCHAR: {
       constant_val_.reset(new StringVal(GetStringVal(context, NULL)));
       break;

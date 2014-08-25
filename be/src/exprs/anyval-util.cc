@@ -38,6 +38,7 @@ AnyVal* CreateAnyVal(const ColumnType& type) {
     case TYPE_DOUBLE: return new DoubleVal;
     case TYPE_STRING:
     case TYPE_VARCHAR:
+    case TYPE_CHAR:
       return new StringVal;
     case TYPE_TIMESTAMP: return new TimestampVal;
     case TYPE_DECIMAL: return new DecimalVal;
@@ -83,6 +84,7 @@ FunctionContext::TypeDesc AnyValUtil::ColumnTypeToTypeDesc(const ColumnType& typ
       break;
     case TYPE_CHAR:
       out.type = FunctionContext::TYPE_FIXED_BUFFER;
+      out.len = type.len;
       break;
     case TYPE_DECIMAL:
       out.type = FunctionContext::TYPE_DECIMAL;

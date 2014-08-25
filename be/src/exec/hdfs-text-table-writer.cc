@@ -124,8 +124,12 @@ Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
       for (int j = 0; j < num_non_partition_cols; ++j) {
         void* value = output_expr_ctxs_[j]->GetValue(current_row);
         if (value != NULL) {
-          if (output_expr_ctxs_[j]->root()->type().IsStringType()) {
+          const ColumnType& type = output_expr_ctxs_[j]->root()->type();
+          if (type.IsVarLen()) {
             PrintEscaped(reinterpret_cast<const StringValue*>(value));
+          } else if (type.type == TYPE_CHAR) {
+            StringValue sv(reinterpret_cast<char*>(value), type.len);
+            PrintEscaped(&sv);
           } else {
             output_expr_ctxs_[j]->PrintValue(value, &rowbatch_stringstream_);
           }

@@ -152,6 +152,10 @@ string SlotRef::DebugString() const {
 // TODO: We could generate a typed struct (and not a char*) for Tuple for llvm.  We know
 // the types from the TupleDesc.  It will likey make this code simpler to reason about.
 Status SlotRef::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
+  if (type_.type == TYPE_CHAR) {
+    *fn = NULL;
+    return Status("Codegen for Char not supported.");
+  }
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
     return Status::OK;
@@ -278,7 +282,7 @@ Status SlotRef::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
   // *Val. The optimizer does a better job when there is a phi node for each value, rather
   // than having get_slot_block generate an AnyVal and having a single phi node over that.
   // TODO: revisit this code, can possibly be simplified
-  if (type() == TYPE_STRING || type() == TYPE_VARCHAR) {
+  if (type().IsVarLen()) {
     DCHECK(ptr != NULL);
     DCHECK(len != NULL);
     PHINode* ptr_phi = builder.CreatePHI(ptr->getType(), 2, "ptr_phi");
@@ -415,9 +419,14 @@ StringVal SlotRef::GetStringVal(ExprContext* context, TupleRow* row) {
   DCHECK(type_.IsStringType());
   Tuple* t = row->GetTuple(tuple_idx_);
   if (t == NULL || t->IsNull(null_indicator_offset_)) return StringVal::null();
-  StringValue* sv = reinterpret_cast<StringValue*>(t->GetSlot(slot_offset_));
   StringVal result;
-  sv->ToStringVal(&result);
+  if (type_.type == TYPE_CHAR) {
+    result.ptr = reinterpret_cast<uint8_t*>(t->GetSlot(slot_offset_));
+    result.len = type_.len;
+  } else {
+    StringValue* sv = reinterpret_cast<StringValue*>(t->GetSlot(slot_offset_));
+    sv->ToStringVal(&result);
+  }
   return result;
 }
 

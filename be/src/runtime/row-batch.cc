@@ -307,7 +307,7 @@ int RowBatch::TotalByteSize() {
       result += (*desc)->byte_size();
       vector<SlotDescriptor*>::const_iterator slot = (*desc)->string_slots().begin();
       for (; slot != (*desc)->string_slots().end(); ++slot) {
-        DCHECK((*slot)->type() == TYPE_STRING || (*slot)->type() == TYPE_VARCHAR);
+        DCHECK((*slot)->type().IsVarLen());
         if (tuple->IsNull((*slot)->null_indicator_offset())) continue;
         StringValue* string_val = tuple->GetStringSlot((*slot)->tuple_offset());
         result += string_val->len;

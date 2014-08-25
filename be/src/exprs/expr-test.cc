@@ -187,6 +187,7 @@ class ExprTest : public testing::Test {
     if (value.compare("NULL") == 0) return NULL;
     switch (type.type) {
       case TYPE_STRING:
+      case TYPE_CHAR:
         // Float and double get conversion errors so leave them as strings.
         // We convert the expected result to string.
       case TYPE_FLOAT:
@@ -241,6 +242,14 @@ class ExprTest : public testing::Test {
   void TestStringValue(const string& expr, const string& expected_result) {
     StringValue* result;
     GetValue(expr, TYPE_STRING, reinterpret_cast<void**>(&result));
+    string tmp(result->ptr, result->len);
+    EXPECT_EQ(tmp, expected_result) << expr;
+  }
+
+  void TestCharValue(const string& expr, const string& expected_result,
+                     const ColumnType& type) {
+    StringValue* result;
+    GetValue(expr, type, reinterpret_cast<void**>(&result));
     string tmp(result->ptr, result->len);
     EXPECT_EQ(tmp, expected_result) << expr;
   }
@@ -774,8 +783,6 @@ TEST_F(ExprTest, LiteralConstruction) {
   TestSingleLiteralConstruction(TYPE_DOUBLE, d_val_3, "5.9e-3");
   TestSingleLiteralConstruction(TYPE_DOUBLE, d_val_3, "+5.9e-3");
   TestSingleLiteralConstruction(TYPE_STRING, str_val, "Hello");
-  TestSingleLiteralConstruction(ColumnType::CreateCharType(5), string("HelloWorld"), "Hello");
-  TestSingleLiteralConstruction(ColumnType::CreateCharType(1), string("H"), "H");
 
   // Min/Max Boundary value test for tiny/small/int/long
   c_val = 127;
@@ -1567,6 +1574,23 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("lower(cast('HELLO' as VARCHAR(3)))", "hel");
   TestStringValue("lower(cast(123456 as VARCHAR(3)))", "123");
   TestIsNull("cast(NULL as VARCHAR(3))", TYPE_STRING);
+
+  if (disable_codegen_) {
+    // TODO remove if guard once CHAR codegen is committed
+    TestCharValue("cast('HELLO' as CHAR(3))", "HEL",
+                  ColumnType::CreateCharType(3));
+    TestCharValue("cast('HELLO' as CHAR(7))", "HELLO  ",
+                  ColumnType::CreateCharType(7));
+    TestCharValue("cast('HELLO' as CHAR(70))",
+        "HELLO                                                                 ",
+        ColumnType::CreateCharType(70));
+    TestValue("cast('HELLO' as CHAR(7)) = 'HELLO  '", TYPE_BOOLEAN, true);
+    TestValue("cast('HELLO' as CHAR(7)) = cast('HELLO' as CHAR(5))", TYPE_BOOLEAN, true);
+    TestStringValue("lower(cast('HELLO' as CHAR(3)))", "hel");
+    TestStringValue("lower(cast(123456 as CHAR(3)))", "123");
+    TestStringValue("cast(cast(123456 as CHAR(3)) as VARCHAR(3))", "123");
+    TestIsNull("cast(NULL as CHAR(3))", ColumnType::CreateCharType(3));
+  }
 }
 
 TEST_F(ExprTest, StringRegexpFunctions) {
