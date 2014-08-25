@@ -575,8 +575,9 @@ public class Analyzer {
   }
 
   /**
-   * Resolves column name in context of any of the registered tuple descriptors.
-   * Returns the matching tuple descriptor or null if none could be found.
+   * Resolves column name in context of any of the registered tuple descriptors,
+   * preferring matches to visible tuples over invisible tuples. Returns the matching
+   * tuple descriptor or null if none could be found.
    * Throws if multiple bindings to different tables exist. If 'resolveInAncestors'
    * is true, the resolution process will continue along the chain of ancestors
    * until we either resolve the column name, throw an AnalysisException, or reach
@@ -591,18 +592,23 @@ public class Analyzer {
     for (Map.Entry<String, TupleDescriptor> entry: aliasMap_.entrySet()) {
       TupleDescriptor tupleDesc = entry.getValue();
       Column col = tupleDesc.getTable().getColumn(colName);
-      if (col != null) {
-        // The same tuple descriptor may have been registered for multiple
-        // implicit aliases, so only throw an error if the tuple descriptors
-        // are different. Prefer visible tuples over invisible ones, and don't
-        // simply ignore invisible tuples for better error reporting.
-        if (result != null && result != tupleDesc &&
-            !(!isVisible(result.getId()) && isVisible(tupleDesc.getId()))) {
+      // Continue if this tuple doesn't have a column with colName.
+      if (col == null) continue;
+      // The same tuple descriptor may have been registered for multiple
+      // implicit aliases.
+      if (result == tupleDesc) continue;
+      if (result != null && isVisible(result.getId())) {
+        // Can only have ambiguity between visible tuples.
+        if (isVisible(tupleDesc.getId())) {
           throw new AnalysisException(
               "unqualified column reference '" + colName + "' is ambiguous");
         }
-        result = tupleDesc;
+        // At this point result.getId() is visible but tupleDesc.getId() is invisible.
+        // Prefer visible tuples over invisible ones, and don't simply ignore invisible
+        // tuples for consistent error reporting.
+        continue;
       }
+      result = tupleDesc;
     }
 
     if (result != null) return result;
