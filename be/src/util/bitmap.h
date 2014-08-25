@@ -29,7 +29,7 @@ namespace impala {
 class Bitmap {
  public:
   Bitmap(int64_t num_bits) {
-    buffer_.resize(BitUtil::RoundUp(num_bits, 64) / 64);
+    buffer_.resize(BitUtil::RoundUpNumi64(num_bits));
     size_ = num_bits;
   }
 

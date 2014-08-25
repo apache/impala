@@ -50,7 +50,7 @@ inline uint8_t* BitWriter_8byte::GetNextBytePtr(int num_bytes) {
     ++offset_;
     bit_offset_ = 0;
   } else {
-    bit_offset_ = BitUtil::RoundUp(bit_offset_, 8);
+    bit_offset_ = BitUtil::RoundUpNumBytes(bit_offset_) * 8;
   }
 
   DCHECK_EQ(bit_offset_ % 8, 0);
@@ -133,7 +133,7 @@ inline void BitReader_8byte::Align() {
     bit_offset_ = 0;
     DCHECK_LE(offset_, max_bytes_);
   } else {
-    bit_offset_ = BitUtil::RoundUp(bit_offset_, 8);
+    bit_offset_ = BitUtil::RoundUpNumBytes(bit_offset_) * 8;
   }
 }
 

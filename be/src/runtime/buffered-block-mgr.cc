@@ -176,6 +176,34 @@ string BufferedBlockMgr::Block::DebugString() const {
   return ss.str();
 }
 
+BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, int64_t block_size)
+  : max_block_size_(block_size),
+    // Keep two writes in flight per scratch disk so the disks can stay busy.
+    block_write_threshold_(TmpFileMgr::num_tmp_devices() * 2),
+    disable_spill_(state->query_ctx().disable_spilling),
+    query_id_(state->query_id()),
+    unfullfilled_reserved_buffers_(0),
+    total_pinned_buffers_(0),
+    num_outstanding_writes_(0),
+    io_mgr_(state->io_mgr()),
+    is_cancelled_(0),
+    encryption_(FLAGS_disk_spill_encryption),
+    check_integrity_(FLAGS_disk_spill_encryption) {
+  state->io_mgr()->RegisterContext(NULL, &io_request_context_);
+  if (encryption_) {
+    static bool openssl_loaded = false;
+    if (!openssl_loaded) {
+      // These are idempotent, so no threading worries.
+      OpenSSL_add_all_algorithms();
+      ERR_load_crypto_strings();
+      openssl_loaded = true;
+    }
+    // Seed the random number generator
+    // TODO: try non-blocking read from /dev/random and add that, too.
+    RAND_load_file("/dev/urandom", 4096);
+  }
+}
+
 Status BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
     RuntimeProfile* profile, int64_t mem_limit, int64_t block_size,
     shared_ptr<BufferedBlockMgr>* block_mgr) {
@@ -321,11 +349,7 @@ void BufferedBlockMgr::ReleaseMemory(Client* client, int64_t size) {
 }
 
 void BufferedBlockMgr::Cancel() {
-  {
-    lock_guard<mutex> lock(lock_);
-    if (is_cancelled_) return;
-    is_cancelled_ = true;
-  }
+  if (is_cancelled_.Swap(1) == 1) return;
   // Cancel to the underlying io mgr to unblock any waiting threads.
   io_mgr_->CancelContext(io_request_context_);
 }
@@ -333,10 +357,10 @@ void BufferedBlockMgr::Cancel() {
 Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block** block,
     int64_t len) {
   *block = NULL;
+  if (is_cancelled_.Read() == 1) return Status::CANCELLED;
   Block* new_block = NULL;
   {
     lock_guard<mutex> lock(lock_);
-    if (is_cancelled_) return Status::CANCELLED;
     new_block = GetUnusedBlock(client);
   }
   DCHECK_NOTNULL(new_block);
@@ -399,10 +423,10 @@ Status BufferedBlockMgr::TransferBuffer(Block* dst, Block* src, bool unpin) {
     src->client_local_ = true;
     RETURN_IF_ERROR(WriteUnpinnedBlock(src));
     // Wait for the write to complete.
-    while (src->in_write_ && !is_cancelled_) {
+    while (src->in_write_ && is_cancelled_.Read() == 0) {
       src->write_complete_cv_.wait(lock);
     }
-    if (is_cancelled_) return Status::CANCELLED;
+    if (is_cancelled_.Read() == 1) return Status::CANCELLED;
     DCHECK(!src->in_write_);
   }
 
@@ -449,34 +473,6 @@ BufferedBlockMgr::~BufferedBlockMgr() {
   mem_tracker_.reset();
 }
 
-BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, int64_t block_size)
-  : max_block_size_(block_size),
-    // Keep two writes in flight per scratch disk so the disks can stay busy.
-    block_write_threshold_(TmpFileMgr::num_tmp_devices() * 2),
-    disable_spill_(state->query_ctx().disable_spilling),
-    query_id_(state->query_id()),
-    unfullfilled_reserved_buffers_(0),
-    total_pinned_buffers_(0),
-    num_outstanding_writes_(0),
-    io_mgr_(state->io_mgr()),
-    is_cancelled_(false),
-    encryption_(FLAGS_disk_spill_encryption),
-    check_integrity_(FLAGS_disk_spill_encryption) {
-  state->io_mgr()->RegisterContext(NULL, &io_request_context_);
-  if (encryption_) {
-    static bool openssl_loaded = false;
-    if (!openssl_loaded) {
-      // These are idempotent, so no threading worries.
-      OpenSSL_add_all_algorithms();
-      ERR_load_crypto_strings();
-      openssl_loaded = true;
-    }
-    // Seed the random number generator
-    // TODO: try non-blocking read from /dev/random and add that, too.
-    RAND_load_file("/dev/urandom", 4096);
-  }
-}
-
 int64_t BufferedBlockMgr::bytes_allocated() const {
   return mem_tracker_->consumption();
 }
@@ -502,10 +498,7 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
     bool unpin) {
   DCHECK(!block->is_deleted_);
   *pinned = false;
-  {
-    lock_guard<mutex> lock(lock_);
-    if (is_cancelled_) return Status::CANCELLED;
-  }
+  if (is_cancelled_.Read() == 1) return Status::CANCELLED;
 
   if (block->is_pinned_) {
     *pinned = true;
@@ -575,9 +568,10 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
 }
 
 Status BufferedBlockMgr::UnpinBlock(Block* block) {
+  if (is_cancelled_.Read() == 1) return Status::CANCELLED;
   DCHECK(!block->is_deleted_) << "Unpin for deleted block.";
+
   lock_guard<mutex> unpinned_lock(lock_);
-  if (is_cancelled_) return Status::CANCELLED;
   if (!block->is_pinned_) return Status::OK;
   DCHECK(Validate()) << endl << DebugInternal();
   DCHECK_EQ(block->buffer_desc_->len, max_block_size_) << "Can only unpin io blocks.";
@@ -680,11 +674,11 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
     // hang around needlessly.
     EncryptDone(block);
   }
-  if (is_cancelled_) return;
+  if (is_cancelled_.Read() == 1) return;
   // Check for an error. Set cancelled and wake up waiting threads if an error occurred.
   if (!write_status.ok()) {
     block->client_->state_->LogError(write_status);
-    is_cancelled_ = true;
+    is_cancelled_.Swap(1);
     if (block->client_local_) {
       block->write_complete_cv_.notify_one();
     } else {
@@ -725,11 +719,12 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
 
 Status BufferedBlockMgr::DeleteBlock(Block* block) {
   DCHECK(!block->is_deleted_);
-  lock_guard<mutex> lock(lock_);
-  if (is_cancelled_) return Status::CANCELLED;
-  DCHECK(block->Validate()) << endl << DebugInternal();
+  if (is_cancelled_.Read() == 1) return Status::CANCELLED;
 
+  lock_guard<mutex> lock(lock_);
+  DCHECK(block->Validate()) << endl << DebugInternal();
   block->is_deleted_ = true;
+
   if (block->is_pinned_) {
     block->is_pinned_ = false;
     block->client_->UnpinBuffer(block->buffer_desc_);
@@ -773,6 +768,7 @@ void BufferedBlockMgr::ReturnUnusedBlock(Block* block) {
 }
 
 Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
+  DCHECK_NOTNULL(block);
   Client* client = block->client_;
   DCHECK_NOTNULL(client);
   DCHECK(!block->is_pinned_);
@@ -904,7 +900,7 @@ Status BufferedBlockMgr::FindBuffer(unique_lock<mutex>& lock,
     // Try to evict unpinned blocks before waiting.
     RETURN_IF_ERROR(WriteUnpinnedBlocks());
     buffer_available_cv_.wait(lock);
-    if (is_cancelled_) return Status::CANCELLED;
+    if (is_cancelled_.Read() == 1) return Status::CANCELLED;
   }
   *buffer_desc = free_io_buffers_.Dequeue();
   return Status::OK;
@@ -928,7 +924,7 @@ BufferedBlockMgr::Block* BufferedBlockMgr::GetUnusedBlock(Client* client) {
   return new_block;
 }
 
-bool BufferedBlockMgr::Validate() const {
+bool BufferedBlockMgr::Validate() {
   int num_free_io_buffers = 0;
 
   if (total_pinned_buffers_ < 0) {
@@ -1004,7 +1000,7 @@ bool BufferedBlockMgr::Validate() const {
 
   // Check if we're writing blocks when the number of free buffers falls below
   // threshold. We don't write blocks after cancellation.
-  if (!is_cancelled_ && !unpinned_blocks_.empty() && !disable_spill_ &&
+  if ((is_cancelled_.Read() == 0) && !unpinned_blocks_.empty() && !disable_spill_ &&
       (free_io_buffers_.size() + num_outstanding_writes_ < block_write_threshold_)) {
     LOG(ERROR) << "Missed writing unpinned blocks";
     return false;

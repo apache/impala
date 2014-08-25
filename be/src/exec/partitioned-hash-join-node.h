@@ -255,7 +255,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // Updates state_ to 's', logging the transition.
   void UpdateState(State s);
 
-  std::string DebugString() const;
+  std::string NodeDebugString() const;
 
   // our equi-join predicates "<lhs> = <rhs>" are separated into
   // build_expr_ctxs_ (over child(1)) and probe_expr_ctxs_ (over child(0))

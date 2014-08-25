@@ -40,8 +40,6 @@ class TestJoinQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/outer-joins', new_vector)
 
 class TestSemiJoinQueries(ImpalaTestSuite):
-  IMP1160_TABLES = ['functional.imp1160a', 'functional.imp1160b']
-
   @classmethod
   def get_workload(cls):
     return 'functional-query'
@@ -51,7 +49,6 @@ class TestSemiJoinQueries(ImpalaTestSuite):
     super(TestSemiJoinQueries, cls).add_test_dimensions()
     cls.TestMatrix.add_dimension(
         TestDimension('batch_size', *TestJoinQueries.BATCH_SIZES))
-    # TODO: Look into splitting up join tests to accomodate hbase.
     # Joins with hbase tables produce drastically different results.
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format in ['parquet'])
@@ -60,37 +57,46 @@ class TestSemiJoinQueries(ImpalaTestSuite):
       # Cut down on execution time when not running in exhaustive mode.
       cls.TestMatrix.add_constraint(lambda v: v.get_value('batch_size') != 1)
 
-  def setup_method(self, method):
-    self.__cleanup_semi_join_tables()
-    self.__load_semi_join_tables()
+  @classmethod
+  def setup_class(cls):
+    super(TestSemiJoinQueries, cls).setup_class()
+    cls.__cleanup_semi_join_tables()
+    cls.__load_semi_join_tables()
 
-  def teardown_method(self, method):
-    self.__cleanup_semi_join_tables()
+  @classmethod
+  def teardown_class(cls):
+    cls.__cleanup_semi_join_tables()
+    super(TestSemiJoinQueries, cls).teardown_class()
 
-  def __load_semi_join_tables(self):
-    # Cleanup, create and load fresh test tables for semi-join test
-    for t in self.IMP1160_TABLES:
-      self.client.execute('create table if not exists %s(a int, b int, c int)' % t)
+  @classmethod
+  def __load_semi_join_tables(cls):
+    SEMIJOIN_TABLES = ['functional.SemiJoinTblA', 'functional.SemiJoinTblB']
+    # Cleanup, create and load fresh test tables for semi/anti-join tests
+    cls.client.execute('create table if not exists '\
+                          'functional.SemiJoinTblA(a int, b int, c int)')
+    cls.client.execute('create table if not exists '\
+                          'functional.SemiJoinTblB(a int, b int, c int)')
     # loads some values with NULLs in the first table
-    self.client.execute('insert into %s values(1,1,1)' % self.IMP1160_TABLES[0]);
-    self.client.execute('insert into %s values(1,1,10)' % self.IMP1160_TABLES[0]);
-    self.client.execute('insert into %s values(1,2,10)' % self.IMP1160_TABLES[0]);
-    self.client.execute('insert into %s values(1,3,10)' % self.IMP1160_TABLES[0]);
-    self.client.execute('insert into %s values(NULL,NULL,30)'  % self.IMP1160_TABLES[0]);
-    self.client.execute('insert into %s values(2,4,30)' % self.IMP1160_TABLES[0]);
-    self.client.execute('insert into %s values(2,NULL,20)' % self.IMP1160_TABLES[0]);
+    cls.client.execute('insert into %s values(1,1,1)' % SEMIJOIN_TABLES[0]);
+    cls.client.execute('insert into %s values(1,1,10)' % SEMIJOIN_TABLES[0]);
+    cls.client.execute('insert into %s values(1,2,10)' % SEMIJOIN_TABLES[0]);
+    cls.client.execute('insert into %s values(1,3,10)' % SEMIJOIN_TABLES[0]);
+    cls.client.execute('insert into %s values(NULL,NULL,30)'  % SEMIJOIN_TABLES[0]);
+    cls.client.execute('insert into %s values(2,4,30)' % SEMIJOIN_TABLES[0]);
+    cls.client.execute('insert into %s values(2,NULL,20)' % SEMIJOIN_TABLES[0]);
     # loads some values with NULLs in the second table
-    self.client.execute('insert into %s values(1,1,1)' % self.IMP1160_TABLES[1]);
-    self.client.execute('insert into %s values(1,1,10)' % self.IMP1160_TABLES[1]);
-    self.client.execute('insert into %s values(1,2,5)' % self.IMP1160_TABLES[1]);
-    self.client.execute('insert into %s values(1,NULL,10)' % self.IMP1160_TABLES[1]);
-    self.client.execute('insert into %s values(2,10,NULL)' % self.IMP1160_TABLES[1]);
-    self.client.execute('insert into %s values(3,NULL,NULL)' % self.IMP1160_TABLES[1]);
-    self.client.execute('insert into %s values(3,NULL,50)' % self.IMP1160_TABLES[1]);
+    cls.client.execute('insert into %s values(1,1,1)' % SEMIJOIN_TABLES[1]);
+    cls.client.execute('insert into %s values(1,1,10)' % SEMIJOIN_TABLES[1]);
+    cls.client.execute('insert into %s values(1,2,5)' % SEMIJOIN_TABLES[1]);
+    cls.client.execute('insert into %s values(1,NULL,10)' % SEMIJOIN_TABLES[1]);
+    cls.client.execute('insert into %s values(2,10,NULL)' % SEMIJOIN_TABLES[1]);
+    cls.client.execute('insert into %s values(3,NULL,NULL)' % SEMIJOIN_TABLES[1]);
+    cls.client.execute('insert into %s values(3,NULL,50)' % SEMIJOIN_TABLES[1]);
 
-  def __cleanup_semi_join_tables(self):
-    for t in self.IMP1160_TABLES:
-      self.client.execute('drop table if exists %s' % t)
+  @classmethod
+  def __cleanup_semi_join_tables(cls):
+    cls.client.execute('drop table if exists functional.SemiJoinTblA')
+    cls.client.execute('drop table if exists functional.SemiJoinTblB')
 
   @pytest.mark.execute_serially
   def test_semi_joins(self, vector):

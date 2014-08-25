@@ -42,6 +42,20 @@ class TupleRow;
 // Blocks are optionally deleted as they are read, set with the delete_on_read c'tor
 // parameter.
 //
+// Block layout:
+// At the header of each block, starting at position 0, there is a bitstring with null
+// indicators for all the tuples in each row in the block. Then there are the tuple rows.
+// We further optimize the codepaths when we know that no tuple is nullable, indicated
+// by 'nullable_tuple_'.
+//
+// Tuple row layout:
+// Tuples are stored back to back. Each tuple starts with the fixed length portion,
+// directly followed by the var len portion. (Fixed len and var len are interleaved).
+// If any tuple in the row is nullable, then there is a bitstring of null tuple indicators
+// at the header of the block. The order of bits in the null indicators bitstring
+// corresponds to the order of tuples in the block. The NULL tuples are not stored in the
+// body of the block, only as set bits in the null indicators bitsting.
+//
 // The behavior of reads and writes is as follows:
 // Read:
 //   1. Delete on read (delete_on_read_): Blocks are deleted as we go through the stream.
@@ -58,10 +72,6 @@ class TupleRow;
 //   2. Pinned: Blocks are left pinned. If we run out of blocks, the write will fail and
 //   the caller needs to free memory from the underlying block mgr.
 //
-// Tuple row layout: Tuples are stored back to back. Each tuple starts with the fixed
-// length portion, directly followed by the var len portion. (Fixed len and var len
-// are interleaved).
-//
 // TODO: we need to be able to do read ahead in the BufferedBlockMgr. It currently
 // only has PinAllBlocks() which is blocking. We need a non-blocking version of this or
 // some way to indicate a block will need to be pinned soon.
@@ -71,23 +81,63 @@ class TupleRow;
 // TODO: improvements:
 //   - Think about how to layout for the var len data more, possibly filling in them
 //     from the end of the same block. Don't interleave fixed and var len data.
+//   - It would be good to allocate the null indicators at the end of each block and grow
+//     this array as new rows are inserted in the block. If we do so, then there will be
+//     fewer gaps in case of many rows with NULL tuples.
 //   - We will want to multithread this. Add a AddBlock() call so the synchronization
 //     happens at the block level. This is a natural extension.
 //   - Instead of allocating all blocks from the block_mgr, allocate some blocks that
 //     are much smaller (e.g. 16K and doubling up to the block size). This way, very
 //     small streams (a common case) will use very little memory. This small blocks
 //     are always in memory since spilling them frees up negligible memory.
-//   - Return row batches in GetNext() instead of filling one in.
+//   - Return row batches in GetNext() instead of filling one in
+//   - Should we 32-bit align the start of the tuple rows? Now it is byte-aligned.
 class BufferedTupleStream {
  public:
   // Ordinal index into the stream to retrieve a row in O(1) time. This index can
   // only be used if the stream is pinned.
+  // To read a row from a stream we need three pieces of information that we squeeze in
+  // 64 bits:
+  //  - The index of the block. The block id is stored in 16 bits. We can have up to
+  //    64K blocks per tuple stream. With 8MB blocks that is 512GB per stream.
+  //  - The offset of the start of the row (data) within the block. Since blocks are 8MB
+  //    we use 24 bits for the offsets. (In theory we could use 23 bits.)
+  //  - The idx of the row in the block. We need this for retrieving the null indicators.
+  //    We use 24 bits for this index as well.
   struct RowIdx {
-    // Index into blocks_.
-    uint32_t block_idx;
+    static const uint64_t BLOCK_MASK  = 0xFFFF;
+    static const uint64_t BLOCK_SHIFT = 0;
+    static const uint64_t OFFSET_MASK  = 0xFFFFFF0000;
+    static const uint64_t OFFSET_SHIFT = 16;
+    static const uint64_t IDX_MASK  = 0xFFFFFF0000000000;
+    static const uint64_t IDX_SHIFT = 40;
 
-    // Byte offset within the block.
-    uint32_t offset;
+    uint64_t block() const {
+      return (data & BLOCK_MASK);
+    };
+
+    uint64_t offset() const {
+      return (data & OFFSET_MASK) >> OFFSET_SHIFT;
+    };
+
+    uint64_t idx() const {
+      return (data & IDX_MASK) >> IDX_SHIFT;
+    }
+
+    uint64_t set(uint64_t block, uint64_t offset, uint64_t idx) {
+      DCHECK_LE(block, BLOCK_MASK)
+          << "Cannot have more than 2^16 = 64K blocks in a tuple stream.";
+      DCHECK_LE(offset, OFFSET_MASK >> OFFSET_SHIFT)
+          << "Cannot have blocks larger than 2^24 = 16MB";
+      DCHECK_LE(idx, IDX_MASK >> IDX_SHIFT)
+          << "Cannot have more than 2^24 = 16M rows in a block.";
+      data = block | (offset << OFFSET_SHIFT) | (idx << IDX_SHIFT);
+      return data;
+    }
+
+    std::string DebugString() const;
+
+    uint64_t data;
   };
 
   // row_desc: description of rows stored in the stream. This is the desc for rows
@@ -117,8 +167,8 @@ class BufferedTupleStream {
   // not enough memory. The returned memory is guaranteed to fit on one block.
   uint8_t* AllocateRow(int size);
 
-  // Populates 'row' with the row at idx. The stream must be pinned. The row must have
-  // been allocated with the stream's row_desc.
+  // Populates 'row' with the row at 'idx'. The stream must be pinned. The row must have
+  // been allocated with the stream's row desc.
   void GetTupleRow(const RowIdx& idx, TupleRow* row) const;
 
   // Prepares the stream for reading. If read_write_, this does not need to be called in
@@ -141,8 +191,12 @@ class BufferedTupleStream {
 
   // Get the next batch of output rows. Memory is still owned by the BufferedTupleStream
   // and must be copied out by the caller.
-  // If indices is non-NULL, that is also populated for each returned row with the index
-  // for that row.
+  // If 'indices' is non-NULL, that is also populated for each returned row with the
+  // index for that row.
+  template <bool HasNullableTuple>
+  Status GetNextInternal(RowBatch* batch, bool* eos, std::vector<RowIdx>* indices);
+
+  // Wrapper of the templated GetNextInternal function.
   Status GetNext(RowBatch* batch, bool* eos, std::vector<RowIdx>* indices = NULL);
 
   // Returns all the rows in the stream in batch. This pins the entire stream
@@ -194,8 +248,21 @@ class BufferedTupleStream {
   // Description of rows stored in the stream.
   const RowDescriptor& desc_;
 
+  // Whether any tuple in the rows is nullable.
+  const bool nullable_tuple_;
+
   // Sum of the fixed length portion of all the tuples in desc_.
   int fixed_tuple_row_size_;
+
+  // Sum of the non-nullable fixed-length portion of all the tuples in desc. This
+  // constitutes the minimum possible space occupied by a single row.
+  int min_tuple_row_size_;
+
+  // Max size (in bytes) of null indicators bitstring in each block. If 0, it means that
+  // there is no need to store null indicators for this RowDesc. We calculate this value
+  // based on the block size and the fixed_tuple_row_size_. When not 0, this value is
+  // also an upper bound for the number of (rows * tuples_per_row) in a block.
+  uint32_t null_indicators_per_block_;
 
   // Vector of all the strings slots grouped by tuple_idx.
   std::vector<std::pair<int, std::vector<SlotDescriptor*> > > string_slots_;
@@ -218,6 +285,12 @@ class BufferedTupleStream {
 
   // Current ptr offset in read_block_'s buffer.
   uint8_t* read_ptr_;
+
+  // Current idx of the tuple read from the read_block_ buffer.
+  uint32_t read_tuple_idx_;
+
+  // Current idx of the tuple written at the write_block_ buffer.
+  uint32_t write_tuple_idx_;
 
   // Bytes read in read_block_.
   int64_t read_bytes_;
@@ -252,20 +325,24 @@ class BufferedTupleStream {
   RuntimeProfile::Counter* unpin_timer_;
   RuntimeProfile::Counter* get_new_block_timer_;
 
-  // Copies row into 'write_block_'. Returns false if there is not enough space
-  // in 'write_block_'.
-  // *dst is the ptr to the memory (in the underlying block) that this row
+  // Copies 'row' into write_block_. Returns false if there is not enough space in
+  // 'write_block_'.
+  // *dst is the ptr to the memory (in the underlying write block) where this row
   // was copied to.
+  template <bool HasNullableTuple>
+  bool DeepCopyInternal(TupleRow* row, uint8_t** dst);
+
+  // Wrapper of the templated DeepCopyInternal() function.
   bool DeepCopy(TupleRow* row, uint8_t** dst);
 
-  // Gets a new block from the block_mgr_, updating write_block_ and
+  // Gets a new block from the block_mgr_, updating write_block_ and write_tuple_idx_, and
   // setting *got_block. If there are no blocks available, write_block_ is set to NULL
   // and *got_block is set to false.
   // min_size is the minimum number of bytes required for this block.
   Status NewBlockForWrite(int min_size, bool* got_block);
 
   // Reads the next block from the block_mgr_. This blocks if necessary.
-  // Updates read_block_, read_ptr_ and read_bytes_left_.
+  // Updates read_block_, read_ptr_, read_tuple_idx_ and read_bytes_left_.
   Status NextBlockForRead();
 
   // Returns the byte size of this row when encoded in a block.

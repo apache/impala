@@ -349,7 +349,8 @@ string HashTable::DebugString(bool skip_empty, bool show_match,
       if (stores_tuples_) {
         ss << node << "(" << node->tuple << ")";
       } else {
-        ss << node << "(" << node->idx.block_idx << ", " << node->idx.offset << ")";
+        ss << node << "(" << node->idx.block() << ", " << node->idx.idx()
+           << ", " << node->idx.offset() << ")";
       }
       if (desc != NULL) {
         ss << " " << PrintRow(GetRow(node, reinterpret_cast<TupleRow*>(row)), *desc);

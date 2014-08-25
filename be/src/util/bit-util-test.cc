@@ -94,6 +94,41 @@ TEST(BitUtil, Log2) {
   EXPECT_EQ(BitUtil::Log2(ULLONG_MAX), 64);
 }
 
+TEST(BitUtil, RoundUpToPowerOf2) {
+  EXPECT_EQ(BitUtil::RoundUpToPowerOf2(7, 8), 8);
+  EXPECT_EQ(BitUtil::RoundUpToPowerOf2(8, 8), 8);
+  EXPECT_EQ(BitUtil::RoundUpToPowerOf2(9, 8), 16);
+}
+
+TEST(BitUtil, RoundDownToPowerOf2) {
+  EXPECT_EQ(BitUtil::RoundDownToPowerOf2(7, 8), 0);
+  EXPECT_EQ(BitUtil::RoundDownToPowerOf2(8, 8), 8);
+  EXPECT_EQ(BitUtil::RoundDownToPowerOf2(9, 8), 8);
+}
+
+TEST(BitUtil, RoundUpDown) {
+  EXPECT_EQ(BitUtil::RoundUpNumBytes(7), 1);
+  EXPECT_EQ(BitUtil::RoundUpNumBytes(8), 1);
+  EXPECT_EQ(BitUtil::RoundUpNumBytes(9), 2);
+  EXPECT_EQ(BitUtil::RoundDownNumBytes(7), 0);
+  EXPECT_EQ(BitUtil::RoundDownNumBytes(8), 1);
+  EXPECT_EQ(BitUtil::RoundDownNumBytes(9), 1);
+
+  EXPECT_EQ(BitUtil::RoundUpNumi32(31), 1);
+  EXPECT_EQ(BitUtil::RoundUpNumi32(32), 1);
+  EXPECT_EQ(BitUtil::RoundUpNumi32(33), 2);
+  EXPECT_EQ(BitUtil::RoundDownNumi32(31), 0);
+  EXPECT_EQ(BitUtil::RoundDownNumi32(32), 1);
+  EXPECT_EQ(BitUtil::RoundDownNumi32(33), 1);
+
+  EXPECT_EQ(BitUtil::RoundUpNumi64(63), 1);
+  EXPECT_EQ(BitUtil::RoundUpNumi64(64), 1);
+  EXPECT_EQ(BitUtil::RoundUpNumi64(65), 2);
+  EXPECT_EQ(BitUtil::RoundDownNumi64(63), 0);
+  EXPECT_EQ(BitUtil::RoundDownNumi64(64), 1);
+  EXPECT_EQ(BitUtil::RoundDownNumi64(65), 1);
+}
+
 }
 
 int main(int argc, char **argv) {

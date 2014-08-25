@@ -662,3 +662,43 @@ order by id, int_col
 ---- TYPES
 INT, INT
 ====
+---- QUERY
+# Testing a crash in the buffered tuple stream related to IMPALA-1306.
+SELECT COUNT(t1.id) AS int_col_1
+FROM alltypes t1
+WHERE t1.month IN
+    (SELECT tt1.tinyint_col AS tinyint_col_1
+     FROM alltypes tt1
+     WHERE t1.month = tt1.tinyint_col)
+  AND EXISTS
+    (SELECT MIN(tt1.tinyint_col) AS tinyint_col_1
+     FROM alltypestiny tt1)
+  AND
+    (SELECT t1.year AS int_col_1
+     FROM alltypes t1
+     ORDER BY t1.year ASC LIMIT 1) = t1.id
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Testing a crash in the buffered tuple stream related to IMPALA-1306.
+SELECT COUNT(t1.id) AS int_col_1
+FROM alltypestiny t1
+WHERE t1.month IN
+    (SELECT tt1.tinyint_col AS tinyint_col_1
+     FROM alltypes tt1
+     WHERE t1.month = tt1.tinyint_col)
+  AND EXISTS
+    (SELECT MIN(tt1.tinyint_col) AS tinyint_col_1
+     FROM alltypestiny tt1)
+  AND
+    (SELECT t1.year AS int_col_1
+     FROM alltypes t1
+     ORDER BY t1.year ASC LIMIT 1) = t1.id
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====

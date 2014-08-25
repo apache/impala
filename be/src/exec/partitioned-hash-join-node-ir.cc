@@ -39,13 +39,13 @@ template<int const JoinOp>
 int PartitionedHashJoinNode::ProcessProbeBatch(
     RowBatch* out_batch, HashTableCtx* ht_ctx) {
   ExprContext* const* join_conjunct_ctxs = &other_join_conjunct_ctxs_[0];
-  int num_join_conjuncts = other_join_conjunct_ctxs_.size();
+  const int num_join_conjuncts = other_join_conjunct_ctxs_.size();
   ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
-  int num_conjuncts = conjunct_ctxs_.size();
+  const int num_conjuncts = conjunct_ctxs_.size();
 
   DCHECK(!out_batch->AtCapacity());
   TupleRow* out_row = out_batch->GetRow(out_batch->AddRow());
-  int max_rows = out_batch->capacity() - out_batch->num_rows();
+  const int max_rows = out_batch->capacity() - out_batch->num_rows();
   int num_rows_added = 0;
 
   while (probe_batch_pos_ >= 0) {
@@ -96,7 +96,7 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
         }
       }
 
-      if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN && !matched_probe_) {
+      if (JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN && !matched_probe_) {
         // Null aware behavior. The probe row did not match in the hash table so we
         // should interpret the hash table probe as "unknown" if there are nulls on the
         // build size. For those rows, we need to process the remaining join
@@ -139,7 +139,7 @@ next_row:
     matched_probe_ = false;
     uint32_t hash;
     if (!ht_ctx->EvalAndHashProbe(current_probe_row_, &hash)) {
-      if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
+      if (JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
         // For NAAJ, we need to treat NULLs on the probe carefully. The logic is:
         // 1. No build rows -> Return this row.
         // 2. Has build rows & no other join predicates, skip row.
@@ -220,9 +220,9 @@ Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch) {
       }
       continue;
     }
-    Partition* partition = hash_partitions_[hash >> (32 - NUM_PARTITIONING_BITS)];
-    // TODO: Should we maintain a histogram with the size of each partition?
-    bool result = AppendRow(partition->build_rows(), build_row);
+    const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
+    Partition* partition = hash_partitions_[partition_idx];
+    const bool result = AppendRow(partition->build_rows(), build_row);
     if (UNLIKELY(!result)) return status_;
   }
   return Status::OK;

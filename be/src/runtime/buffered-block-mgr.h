@@ -19,6 +19,7 @@
 
 #include "runtime/disk-io-mgr.h"
 #include "runtime/tmp-file-mgr.h"
+#include "common/atomic.h"
 
 #include <openssl/aes.h>
 #include <openssl/sha.h>
@@ -100,7 +101,7 @@ class BufferedBlockMgr {
   struct Client;
 
   // A fixed-size block of data that may be be persisted to disk. The state of the block
-  // is maintained by the block manager and is described by 3 bools
+  // is maintained by the block manager and is described by 3 bools:
   // is_pinned_ = True if the block is pinned. The block has a non-null buffer_desc_,
   //   buffer_desc_ cannot be in the free buffer list and the block cannot be in
   //   unused_blocks_ or unpinned_blocks_. Newly allocated blocks are pinned.
@@ -169,7 +170,10 @@ class BufferedBlockMgr {
 
     // Pointer to start of the block data in memory. Only guaranteed to be valid if the
     // block is pinned.
-    uint8_t* buffer() const { return buffer_desc_->buffer; }
+    uint8_t* buffer() const {
+      DCHECK_NOTNULL(buffer_desc_);
+      return buffer_desc_->buffer;
+    }
 
     // Return the number of bytes allocated in this block.
     int64_t valid_data_len() const { return valid_data_len_; }
@@ -431,7 +435,7 @@ class BufferedBlockMgr {
   Block* GetUnusedBlock(Client* client);
 
   // Used to debug the state of the block manager. Lock must already be taken.
-  bool Validate() const;
+  bool Validate();
   std::string DebugInternal() const;
 
   // Size of the largest/default block in bytes.
@@ -504,14 +508,13 @@ class BufferedBlockMgr {
 
   // If true, the block manager is cancelled and all API calls return
   // Status::CANCELLED. Set to true on Close() or if there was an error writing a block.
-  bool is_cancelled_;
+  AtomicInt<uint32_t> is_cancelled_;
 
   // Counters and timers to track behavior.
   boost::scoped_ptr<RuntimeProfile> profile_;
 
   // These have a fixed value for the lifetime of the manager and show memory usage.
   RuntimeProfile::Counter* mem_limit_counter_;
-  RuntimeProfile::Counter* mem_used_counter_;
   RuntimeProfile::Counter* block_size_counter_;
 
   // Total number of blocks created.

@@ -284,36 +284,12 @@ class HashTable {
   // The 'row' is not copied by the hash table and the caller must guarantee it
   // stays in memory.
   // 'idx' is the index into tuple_stream_ for this row. If the row contains more
-  // than one tuple, the idx is stored instead of the row.
+  // than one tuples, the 'idx' is stored instead of the 'row'.
   // Returns false if there was not enough memory to insert the row.
   bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx,
-      const BufferedTupleStream::RowIdx& idx, TupleRow* row, uint32_t hash) {
-    DCHECK_NOTNULL(tuple_stream_);
-#ifndef NDEBUG
-    Tuple* debug_row[num_build_tuples_];
-    tuple_stream_->GetTupleRow(idx, reinterpret_cast<TupleRow*>(debug_row));
-    DCHECK(memcmp(debug_row, row, sizeof(debug_row)) == 0);
-#endif
+      const BufferedTupleStream::RowIdx& idx, TupleRow* row, uint32_t hash);
 
-    Node* node = InsertImpl(ht_ctx, hash);
-    if (node == NULL) return false;
-    if (stores_tuples_) {
-      DCHECK_EQ(num_build_tuples_, 1);
-      // Optimization: if this row is just a single tuple, just store the tuple*.
-      node->tuple = row->GetTuple(0);
-    } else {
-      node->idx = idx;
-    }
-    return true;
-  }
-
-  bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx, Tuple* tuple, uint32_t hash) {
-    DCHECK(stores_tuples_);
-    Node* node = InsertImpl(ht_ctx, hash);
-    if (node == NULL) return false;
-    node->tuple = tuple;
-    return true;
-  }
+  bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx, Tuple* tuple, uint32_t hash);
 
   // Returns the start iterator for all rows that match the last row evaluated in
   // 'ht_cxt'. EvalAndHashBuild/EvalAndHashProbe must have been called before calling

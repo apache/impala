@@ -1,5 +1,33 @@
 ====
 ---- QUERY
+# Verification that the setup of SEMIJOIN tables was correct. (SemiJoinTblA)
+SELECT * FROM functional.SemiJoinTblA
+---- RESULTS
+1,1,1
+1,1,10
+1,2,10
+1,3,10
+NULL,NULL,30
+2,4,30
+2,NULL,20
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Verification that the setup of SEMIJOIN tables was correct. (SemiJoinTblB)
+SELECT * FROM functional.SemiJoinTblB
+---- RESULTS
+1,1,1
+1,1,10
+1,2,5
+1,NULL,10
+2,10,NULL
+3,NULL,NULL
+3,NULL,50
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
 # Testing left anti join
 select j.* from JoinTbl j left anti join DimTbl d on j.test_id = d.id
 ---- RESULTS
@@ -36,7 +64,7 @@ left outer join JoinTbl k on j.test_id = k.test_id
 ---- RESULTS
 64
 ---- TYPES
-bigint
+BIGINT
 ====
 ---- QUERY
 # Testing multi-way joins that include only left anti joins
@@ -45,11 +73,12 @@ left anti join JoinTbl k on j.test_id = k.test_id
 ---- RESULTS
 0
 ---- TYPES
-bigint
+BIGINT
 ====
 ---- QUERY
 # Regression test for IMPALA-1160. Proper handling of left anti joins with NULLs
-select a.* FROM functional.imp1160a a left anti join functional.imp1160b b on a.b = b.b
+SELECT a.* FROM functional.SemiJoinTblA a
+LEFT ANTI JOIN functional.SemiJoinTblB b ON a.b = b.b
 ---- RESULTS
 2,4,30
 1,3,10
@@ -59,7 +88,21 @@ NULL,NULL,30
 INT, INT, INT
 ====
 ---- QUERY
-# Regression tests for IMPALA-1177: Incorrect results in query left anti join on tinyint
+# Regression test for IMPALA-1175: Anti join query crashes Impala.
+SELECT * FROM functional.SemiJoinTblA A LEFT ANTI JOIN
+(SELECT count(*) `$c$2`, B.b `$c$1` FROM functional.SemiJoinTblB B GROUP BY B.b) `$a$1`
+ON A.a != `$a$1`.`$c$2` AND `$a$1`.`$c$1` = A.b
+---- RESULTS
+1,2,10
+1,3,10
+NULL,NULL,30
+2,4,30
+2,NULL,20
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Regression tests for IMPALA-1177: Incorrect results in query with ANTI JOIN on tinyint
 # column with nulls.
 SELECT COUNT(*) FROM functional.alltypesagg t1 LEFT ANTI JOIN functional.alltypes t2
 ON t2.tinyint_col = t1.tinyint_col
@@ -81,8 +124,19 @@ SELECT COUNT(*) FROM functional.alltypesagg t1 LEFT ANTI JOIN functional.alltype
 ON t2.tinyint_col = t1.tinyint_col and t2.month = 1;
 ---- RESULTS
 2000
+====
+---- QUERY
+# Regression test for IMPALA-1204: ANTI JOIN crash running complicated query with right
+# joins.
+SELECT 1 FROM functional.alltypestiny t1 INNER JOIN functional.alltypestiny t2
+ON t2.bigint_col = t1.tinyint_col AND t2.tinyint_col = t1.id
+LEFT ANTI JOIN
+(SELECT 1 `$c$2`, tt6.id `$c$1`
+ FROM functional.alltypes tt5 RIGHT OUTER JOIN functional.alltypestiny tt6
+ ON tt6.month = tt5.bigint_col) `$a$1` ON t2.int_col = `$a$1`.`$c$1`
+---- RESULTS
 ---- TYPES
-BIGINT
+TINYINT
 ====
 ---- QUERY
 # left semi-join on bigint
@@ -125,9 +179,24 @@ from DimTbl d left semi join JoinTbl j on (j.test_zip = d.zip)
 bigint, string, int
 ====
 ---- QUERY
+# Regression test for IMPALA-1249. Left anti join on empty build side.
+SELECT a.* FROM functional.SemiJoinTblA a LEFT ANTI JOIN
+(SELECT b.* FROM functional.SemiJoinTblB b WHERE b.a > 10) v ON a.b = v.b
+---- RESULTS
+1,1,1
+1,1,10
+1,2,10
+1,3,10
+NULL,NULL,30
+2,4,30
+2,NULL,20
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
 # Testing right semi joins
-select b.* FROM functional.imp1160a a
-right semi join functional.imp1160b b on a.b = b.b
+select b.* FROM functional.SemiJoinTblA a
+right semi join functional.SemiJoinTblB b on a.b = b.b
 ---- RESULTS
 1,1,10
 1,1,1
@@ -137,8 +206,8 @@ INT, INT, INT
 ====
 ---- QUERY
 # Testing right anti joins
-select b.* FROM functional.imp1160a a
-right anti join functional.imp1160b b on a.b = b.b
+select b.* FROM functional.SemiJoinTblA a
+right anti join functional.SemiJoinTblB b on a.b = b.b
 ---- RESULTS
 2,10,NULL
 1,NULL,10
@@ -149,15 +218,30 @@ INT, INT, INT
 ====
 ---- QUERY
 # Anti joins have a uni-directional value transfer (IMPALA-1249).
-select a.* FROM functional.imp1160a a
+select a.* FROM functional.SemiJoinTblA a
 left anti join
-  (select * from functional.imp1160b where b <= 3) b
+  (select * from functional.SemiJoinTblB where b <= 3) b
 on a.b = b.b
 ---- RESULTS
 1,3,10
 2,4,30
 2,NULL,20
 NULL,NULL,30
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing right anti join with empty probe side.
+SELECT b.* FROM (SELECT a.* from functional.SemiJoinTblA a where a.a > 10) v
+RIGHT ANTI JOIN functional.SemiJoinTblB b on v.b = b.b
+---- RESULTS
+1,1,1
+1,1,10
+1,2,5
+1,NULL,10
+2,10,NULL
+3,NULL,NULL
+3,NULL,50
 ---- TYPES
 INT, INT, INT
 ====

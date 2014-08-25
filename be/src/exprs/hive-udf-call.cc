@@ -152,7 +152,7 @@ Status HiveUdfCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc,
     input_buffer_size_ += GetChild(i)->type().GetSlotSize();
     // Align all values up to 8 bytes. We don't care about footprint since we allocate
     // one buffer for all rows and we never copy the entire buffer.
-    input_buffer_size_ = BitUtil::RoundUp(input_buffer_size_, 8);
+    input_buffer_size_ = BitUtil::RoundUpNumBytes(input_buffer_size_) * 8;
   }
 
   // Register FunctionContext in ExprContext

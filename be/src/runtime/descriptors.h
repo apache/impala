@@ -390,6 +390,9 @@ class RowDescriptor {
   // Return true if the Tuple of the given Tuple index is nullable.
   bool TupleIsNullable(int tuple_idx) const;
 
+  // Return true if any Tuple of the row is nullable.
+  bool IsAnyTupleNullable() const;
+
   // Return descriptors for all tuples in this row, in order of appearance.
   const std::vector<TupleDescriptor*>& tuple_descriptors() const {
     return tuple_desc_map_;

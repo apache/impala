@@ -414,7 +414,7 @@ Status PartitionedHashJoinNode::SpillPartition() {
         "have enough memory to maintain a buffer per partition.");
     return status;
   }
-  VLOG(2) << "Spilling partition: " << partition_idx << endl << DebugString();
+  VLOG(2) << "Spilling partition: " << partition_idx << endl << NodeDebugString();
   RETURN_IF_ERROR(hash_partitions_[partition_idx]->Spill(false));
   DCHECK(hash_partitions_[partition_idx]->probe_rows()->has_write_block());
   hash_tbls_[partition_idx] = NULL;
@@ -449,8 +449,7 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
   DCHECK(hash_partitions_.empty());
   if (input_partition_ != NULL) {
     DCHECK(input_partition_->build_rows() != NULL);
-    DCHECK_EQ(input_partition_->build_rows()->blocks_pinned(), 0) << DebugString();
-    DCHECK_EQ(input_partition_->build_rows()->blocks_pinned(), 0) << DebugString();
+    DCHECK_EQ(input_partition_->build_rows()->blocks_pinned(), 0) << NodeDebugString();
     RETURN_IF_ERROR(input_partition_->build_rows()->PrepareForRead());
   }
 
@@ -600,7 +599,7 @@ Status PartitionedHashJoinNode::NextSpilledProbeRowBatch(
 Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
   DCHECK(input_partition_ == NULL);
   if (spilled_partitions_.empty()) return Status::OK;
-  VLOG(2) << "PrepareNextPartition\n" << DebugString();
+  VLOG(2) << "PrepareNextPartition\n" << NodeDebugString();
 
   input_partition_ = spilled_partitions_.front();
   spilled_partitions_.pop_front();
@@ -1077,7 +1076,7 @@ Status PartitionedHashJoinNode::CleanUpHashPartitions(RowBatch* batch) {
   DCHECK_EQ(probe_batch_pos_, -1);
   // At this point all the rows have been read from the probe side for all partitions in
   // hash_partitions_.
-  VLOG(2) << "Probe Side Consumed\n" << DebugString();
+  VLOG(2) << "Probe Side Consumed\n" << NodeDebugString();
 
   // Walk the partitions that had hash tables built for the probe phase and close them.
   // In the case of right outer and full outer joins, instead of closing those partitions,
@@ -1088,7 +1087,7 @@ Status PartitionedHashJoinNode::CleanUpHashPartitions(RowBatch* batch) {
     Partition* partition = hash_partitions_[i];
     if (partition->is_closed()) continue;
     if (partition->is_spilled()) {
-      DCHECK(partition->hash_tbl() == NULL) << DebugString();
+      DCHECK(partition->hash_tbl() == NULL) << NodeDebugString();
       // Unpin the build and probe stream to free up more memory. We need to free all
       // memory so we can recurse the algorithm and create new hash partitions from
       // spilled partitions.
@@ -1141,7 +1140,7 @@ void PartitionedHashJoinNode::AddToDebugString(int indent, stringstream* out) co
 
 void PartitionedHashJoinNode::UpdateState(State s) {
   state_ = s;
-  VLOG(2) << "Transitioned State:" << endl << DebugString();
+  VLOG(2) << "Transitioned State:" << endl << NodeDebugString();
 }
 
 string PartitionedHashJoinNode::PrintState() const {
@@ -1155,7 +1154,7 @@ string PartitionedHashJoinNode::PrintState() const {
   return "";
 }
 
-string PartitionedHashJoinNode::DebugString() const {
+string PartitionedHashJoinNode::NodeDebugString() const {
   stringstream ss;
   ss << "PartitionedHashJoinNode (id=" << id() << " op=" << join_op_
      << " state=" << PrintState()

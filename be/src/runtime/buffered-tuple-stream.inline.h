@@ -22,53 +22,6 @@
 
 namespace impala {
 
-// TODO: this really needs codegen
-inline bool BufferedTupleStream::DeepCopy(TupleRow* row, uint8_t** dst) {
-  if (UNLIKELY(write_block_ == NULL)) return false;
-  DCHECK(write_block_->is_pinned());
-
-  // Total bytes allocated in write_block_ for this row. Saved so we can roll
-  // back if this row doesn't fit.
-  int bytes_allocated = 0;
-
-  // Copy the fixed len tuples.
-  if (UNLIKELY(write_block_->BytesRemaining() < fixed_tuple_row_size_)) return false;
-  uint8_t* tuple_buf = write_block_->Allocate<uint8_t>(fixed_tuple_row_size_);
-  if (dst != NULL) *dst = tuple_buf;
-  bytes_allocated += fixed_tuple_row_size_;
-  for (int i = 0; i < desc_.tuple_descriptors().size(); ++i) {
-    int tuple_size = desc_.tuple_descriptors()[i]->byte_size();
-    Tuple* t = row->GetTuple(i);
-    memcpy(tuple_buf, t, tuple_size);
-    tuple_buf += tuple_size;
-  }
-
-  // Copy string slots. Note: we do not need to convert the string ptrs to offsets
-  // on the write path, only on the read. The tuple data is immediately followed
-  // by the string data so only the len information is necessary.
-  for (int i = 0; i < string_slots_.size(); ++i) {
-    Tuple* tuple = row->GetTuple(string_slots_[i].first);
-    if (tuple == NULL) continue;
-    for (int j = 0; j < string_slots_[i].second.size(); ++j) {
-      const SlotDescriptor* slot_desc = string_slots_[i].second[j];
-      if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
-      StringValue* sv = tuple->GetStringSlot(slot_desc->tuple_offset());
-      if (LIKELY(sv->len > 0)) {
-        if (UNLIKELY(write_block_->BytesRemaining() < sv->len)) {
-          write_block_->ReturnAllocation(bytes_allocated);
-          return false;
-        }
-        uint8_t* buf = write_block_->Allocate<uint8_t>(sv->len);
-        bytes_allocated += sv->len;
-        memcpy(buf, sv->ptr, sv->len);
-      }
-    }
-  }
-
-  ++num_rows_;
-  return true;
-}
-
 inline bool BufferedTupleStream::AddRow(TupleRow* row, uint8_t** dst) {
   if (LIKELY(DeepCopy(row, dst))) return true;
   bool got_block = false;
@@ -78,7 +31,7 @@ inline bool BufferedTupleStream::AddRow(TupleRow* row, uint8_t** dst) {
 }
 
 inline uint8_t* BufferedTupleStream::AllocateRow(int size) {
-  DCHECK_GE(size, fixed_tuple_row_size_);
+  DCHECK_GE(size, min_tuple_row_size_);
   if (UNLIKELY(write_block_ == NULL || write_block_->BytesRemaining() < size)) {
     bool got_block = false;
     status_ = NewBlockForWrite(size, &got_block);
@@ -95,12 +48,27 @@ inline void BufferedTupleStream::GetTupleRow(const RowIdx& idx, TupleRow* row) c
   DCHECK(is_pinned());
   DCHECK(!delete_on_read_);
   DCHECK_EQ(blocks_.size(), block_start_idx_.size());
-  DCHECK_LT(idx.block_idx, blocks_.size());
+  DCHECK_LT(idx.block(), blocks_.size());
 
-  uint8_t* data = block_start_idx_[idx.block_idx] + idx.offset;
-  for (int i = 0; i < desc_.tuple_descriptors().size(); ++i) {
-    row->SetTuple(i, reinterpret_cast<Tuple*>(data));
-    data += desc_.tuple_descriptors()[i]->byte_size();
+  uint8_t* data = block_start_idx_[idx.block()] + idx.offset();
+  if (nullable_tuple_) {
+    // Stitch together the tuples from the block and the NULL ones.
+    const int tuples_per_row = desc_.tuple_descriptors().size();
+    uint32_t tuple_idx = idx.idx();
+    for (int i = 0; i < tuples_per_row; ++i) {
+      const uint8_t* null_word = block_start_idx_[idx.block()] + (tuple_idx >> 3);
+      const uint32_t null_pos = tuple_idx & 7;
+      const bool is_not_null = ((*null_word & (1 << (7 - null_pos))) == 0);
+      row->SetTuple(i, reinterpret_cast<Tuple*>(
+          reinterpret_cast<uint64_t>(data) * is_not_null));
+      data += desc_.tuple_descriptors()[i]->byte_size() * is_not_null;
+      ++tuple_idx;
+    }
+  } else {
+    for (int i = 0; i < desc_.tuple_descriptors().size(); ++i) {
+      row->SetTuple(i, reinterpret_cast<Tuple*>(data));
+      data += desc_.tuple_descriptors()[i]->byte_size();
+    }
   }
 }
 

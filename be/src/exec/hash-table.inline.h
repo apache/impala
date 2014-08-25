@@ -85,6 +85,28 @@ inline HashTable::Bucket* HashTable::NextBucket(int64_t* bucket_idx) {
   return NULL;
 }
 
+inline bool HashTable::Insert(HashTableCtx* ht_ctx,
+    const BufferedTupleStream::RowIdx& idx, TupleRow* row, uint32_t hash) {
+  Node* node = InsertImpl(ht_ctx, hash);
+  if (node == NULL) return false;
+  if (stores_tuples_) {
+    DCHECK_EQ(num_build_tuples_, 1);
+    // Optimization: if this row is just a single tuple, just store the tuple*.
+    node->tuple = row->GetTuple(0);
+  } else {
+    node->idx = idx;
+  }
+  return true;
+}
+
+inline bool HashTable::Insert(HashTableCtx* ht_ctx, Tuple* tuple, uint32_t hash) {
+  DCHECK(stores_tuples_);
+  Node* node = InsertImpl(ht_ctx, hash);
+  if (node == NULL) return false;
+  node->tuple = tuple;
+  return true;
+}
+
 inline HashTable::Node* HashTable::InsertImpl(HashTableCtx* ht_ctx, uint32_t hash) {
   DCHECK_NOTNULL(ht_ctx);
   DCHECK_NE(num_buckets_, 0);

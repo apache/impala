@@ -304,6 +304,13 @@ bool RowDescriptor::TupleIsNullable(int tuple_idx) const {
   return tuple_idx_nullable_map_[tuple_idx];
 }
 
+bool RowDescriptor::IsAnyTupleNullable() const {
+  for (int i = 0; i < tuple_idx_nullable_map_.size(); ++i) {
+    if (tuple_idx_nullable_map_[i]) return true;
+  }
+  return false;
+}
+
 void RowDescriptor::ToThrift(vector<TTupleId>* row_tuple_ids) {
   row_tuple_ids->clear();
   for (int i = 0; i < tuple_desc_map_.size(); ++i) {

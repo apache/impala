@@ -56,6 +56,50 @@ class BitUtil {
     return v;
   }
 
+  // Returns 'value' rounded up to the nearest multiple of 'factor' when factor is
+  // a power of two
+  static inline int RoundUpToPowerOf2(int value, int factor) {
+    DCHECK((factor > 0) && ((factor & (factor - 1)) == 0));
+    return (value + (factor - 1)) & ~(factor - 1);
+  }
+
+  static inline int RoundDownToPowerOf2(int value, int factor) {
+    DCHECK((factor > 0) && ((factor & (factor - 1)) == 0));
+    return value & ~(factor - 1);
+  }
+
+  // Specialized round up and down functions for frequently used factors,
+  // like 8 (bits->bytes), 32 (bits->i32), and 64 (bits->i64).
+  // Returns the rounded up number of bytes that fit the number of bits.
+  static inline uint32_t RoundUpNumBytes(uint32_t bits) {
+    return (bits + 7) >> 3;
+  }
+
+  // Returns the rounded down number of bytes that fit the number of bits.
+  static inline uint32_t RoundDownNumBytes(uint32_t bits) {
+    return bits >> 3;
+  }
+
+  // Returns the rounded up to 32 multiple. Used for conversions of bits to i32.
+  static inline uint32_t RoundUpNumi32(uint32_t bits) {
+    return (bits + 31) >> 5;
+  }
+
+  // Returns the rounded up 32 multiple.
+  static inline uint32_t RoundDownNumi32(uint32_t bits) {
+    return bits >> 5;
+  }
+
+  // Returns the rounded up to 64 multiple. Used for conversions of bits to i64.
+  static inline uint32_t RoundUpNumi64(uint32_t bits) {
+    return (bits + 63) >> 6;
+  }
+
+  // Returns the rounded down to 64 multiple.
+  static inline uint32_t RoundDownNumi64(uint32_t bits) {
+    return bits >> 6;
+  }
+
   // Non hw accelerated pop count.
   // TODO: we don't use this in any perf sensitive code paths currently.  There
   // might be a much faster way to implement this.
