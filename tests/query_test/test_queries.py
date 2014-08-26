@@ -76,6 +76,9 @@ class TestQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/top-n', vector)
 
   def test_subquery(self, vector):
+    if vector.get_value('table_format').file_format == 'hbase':
+      pytest.xfail("jointbl does not have columns with unique values, "
+                   "hbase collapses them")
     self.run_test_case('QueryTest/subquery', vector)
 
   def test_subquery_limit(self, vector):
