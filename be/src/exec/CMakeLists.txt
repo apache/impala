@@ -38,6 +38,7 @@ add_library(Exec
   external-data-source-executor.cc
   hash-join-node.cc
   hash-join-node-ir.cc
+  old-hash-table.cc
   hash-table.cc
   hbase-table-sink.cc
   hbase-table-writer.cc
@@ -73,6 +74,7 @@ add_library(Exec
 )
 
 ADD_BE_TEST(zigzag-test)
+ADD_BE_TEST(old-hash-table-test)
 ADD_BE_TEST(hash-table-test)
 ADD_BE_TEST(delimited-text-parser-test)
 ADD_BE_TEST(read-write-util-test)

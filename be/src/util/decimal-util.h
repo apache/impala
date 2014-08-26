@@ -63,16 +63,20 @@ class DecimalUtil {
       uint8_t* buffer, int fixed_len_size, const T& v) {
     DCHECK_GT(fixed_len_size, 0);
     DCHECK_LE(fixed_len_size, sizeof(T));
-    const int8_t* skipped_bytes_start = NULL;
+
 #if __BYTE_ORDER == __LITTLE_ENDIAN
     BitUtil::ByteSwap(buffer, &v, fixed_len_size);
-    skipped_bytes_start = reinterpret_cast<const int8_t*>(&v) + fixed_len_size;
 #else
     memcpy(buffer, &v + sizeof(T) - fixed_len_size, fixed_len_size);
-    skipped_bytes_start = reinterpret_cast<const int8_t*>(&v);
 #endif
 
 #ifndef NDEBUG
+#if __BYTE_ORDER == __LITTLE_ENDIAN
+    const int8_t* skipped_bytes_start = reinterpret_cast<const int8_t*>(&v) +
+        fixed_len_size;
+#else
+    const int8_t* skipped_bytes_start = reinterpret_cast<const int8_t*>(&v);
+#endif
     // On debug, verify that the skipped bytes are what we expect.
     for (int i = 0; i < sizeof(T) - fixed_len_size; ++i) {
       DCHECK_EQ(skipped_bytes_start[i], v.value() < 0 ? -1 : 0);

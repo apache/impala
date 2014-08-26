@@ -154,9 +154,10 @@ class PartitionedAggregationNode : public ExecNode {
   // the partitioning structures, or during Close() when creating new output tuples.
   boost::scoped_ptr<MemPool> mem_pool_;
 
-  // TODO: we use this hash table to hash rows. Remove when the hashing interface is
-  // cleaned up.
-  boost::scoped_ptr<HashTable> hash_tbl_;
+  // Used for hash-related functionality, such as evaluating rows and calculating hashes.
+  // TODO: If we want to multi-thread then this context should be thread-local and not
+  // associated with the node.
+  boost::scoped_ptr<HashTableCtx> ht_ctx_;
 
   // The current partition and iterator to the next row in its hash table that we need
   // to return in GetNext()

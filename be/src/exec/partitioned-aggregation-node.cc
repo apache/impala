@@ -153,8 +153,8 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
     contains_var_len_agg_exprs_ |= (intermediate_slot_desc->type().type == TYPE_STRING);
   }
 
-  hash_tbl_.reset(new HashTable(state_, build_expr_ctxs_, probe_expr_ctxs_,
-      1, true, true, id(), mem_tracker(), true));
+  ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_,
+      true, true, state->fragment_hash_seed()));
 
   if (probe_expr_ctxs_.empty()) {
     // create single output tuple now; we need to output something
@@ -288,7 +288,7 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
     Tuple* intermediate_tuple = output_iterator_.GetTuple();
     Tuple* output_tuple = FinalizeTuple(
         output_partition_->agg_fn_ctxs, intermediate_tuple, row_batch->tuple_data_pool());
-    output_iterator_.Next<false>();
+    output_iterator_.Next<false>(ht_ctx_.get());
     row->SetTuple(0, output_tuple);
     if (ExecNode::EvalConjuncts(ctxs, num_ctxs, row)) {
       row_batch->CommitLastRow();
@@ -319,7 +319,7 @@ void PartitionedAggregationNode::Close(RuntimeState* state) {
         // Avoid consuming excessive memory.
         mem_pool_->FreeAll();
       }
-      output_iterator_.Next<false>();
+      output_iterator_.Next<false>(ht_ctx_.get());
     }
     output_partition_->aggregated_row_stream->Close();
     output_partition_->aggregated_row_stream.reset();
@@ -347,7 +347,7 @@ void PartitionedAggregationNode::Close(RuntimeState* state) {
   }
   if (agg_fn_pool_.get() != NULL) agg_fn_pool_->FreeAll();
   if (mem_pool_.get() != NULL) mem_pool_->FreeAll();
-  if (hash_tbl_.get() != NULL) hash_tbl_->Close();
+  if (ht_ctx_.get() != NULL) ht_ctx_->Close();
   Expr::Close(probe_expr_ctxs_, state);
   Expr::Close(build_expr_ctxs_, state);
   ExecNode::Close(state);
@@ -360,9 +360,7 @@ Status PartitionedAggregationNode::Partition::Init() {
   }
 
   // TODO: how many buckets?
-  hash_tbl.reset(new HashTable(parent->state_, parent->build_expr_ctxs_,
-      parent->probe_expr_ctxs_, 1, true, true, parent->id(),
-      parent->mem_tracker(), true));
+  hash_tbl.reset(new HashTable(parent->state_, 1, parent->mem_tracker(), true));
   aggregated_row_stream.reset(new BufferedTupleStream(parent->state_, parent->row_desc(),
       parent->state_->block_mgr(), parent->block_mgr_client_));
   RETURN_IF_ERROR(aggregated_row_stream->Init());
@@ -425,8 +423,8 @@ Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
       // it hashes.
       for (int i = 0; i < probe_expr_ctxs_.size(); ++i) {
         if (probe_expr_ctxs_[i]->root()->type().type != TYPE_STRING) continue;
-        if (hash_tbl_->last_expr_value_null(i)) continue;
-        StringValue* sv = reinterpret_cast<StringValue*>(hash_tbl_->last_expr_value(i));
+        if (ht_ctx_->last_expr_value_null(i)) continue;
+        StringValue* sv = reinterpret_cast<StringValue*>(ht_ctx_->last_expr_value(i));
         size += sv->len;
       }
     }
@@ -442,10 +440,10 @@ Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
   vector<SlotDescriptor*>::const_iterator slot_desc =
       intermediate_tuple_desc_->slots().begin();
   for (int i = 0; i < probe_expr_ctxs_.size(); ++i, ++slot_desc) {
-    if (hash_tbl_->last_expr_value_null(i)) {
+    if (ht_ctx_->last_expr_value_null(i)) {
       intermediate_tuple->SetNull((*slot_desc)->null_indicator_offset());
     } else {
-      void* src = hash_tbl_->last_expr_value(i);
+      void* src = ht_ctx_->last_expr_value(i);
       void* dst = intermediate_tuple->GetSlot((*slot_desc)->tuple_offset());
       if (stream == NULL) {
         RawValue::Write(src, dst, (*slot_desc)->type(), pool);
@@ -533,11 +531,11 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, int level) {
 
   for (int i = 0; i < batch->num_rows(); ++i) {
     TupleRow* row = batch->GetRow(i);
-    uint32_t hash;
+    uint32_t hash = 0;
     if (aggregated_rows) {
-      hash_tbl_->EvalAndHashBuild(row, &hash);
+      ht_ctx_->EvalAndHashBuild(row, &hash);
     } else {
-      hash_tbl_->EvalAndHashProbe(row, &hash);
+      ht_ctx_->EvalAndHashProbe(row, &hash);
     }
 
     Partition* dst_partition = hash_partitions_[hash & (PARTITION_FAN_OUT - 1)];
@@ -549,7 +547,7 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, int level) {
     if (!dst_partition->is_spilled()) {
       HashTable* ht = dst_partition->hash_tbl.get();
       DCHECK(ht != NULL);
-      HashTable::Iterator it = ht->Find(row);
+      HashTable::Iterator it = ht->Find(ht_ctx_.get(), row);
       if (!it.AtEnd()) {
         // Row is already in hash table. Do the aggregation and we're done.
         UpdateTuple(dst_partition->agg_fn_ctxs, it.GetTuple(), row, aggregated_rows);
@@ -562,11 +560,11 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, int level) {
       if (aggregated_rows) {
         intermediate_tuple = row->GetTuple(0);
         DCHECK(intermediate_tuple != NULL);
-        if (ht->Insert(intermediate_tuple)) continue;
+        if (ht->Insert(ht_ctx_.get(), intermediate_tuple)) continue;
       } else {
         intermediate_tuple = ConstructIntermediateTuple(
             dst_partition->agg_fn_ctxs, NULL, dst_partition->aggregated_row_stream.get());
-        if (intermediate_tuple != NULL && ht->Insert(intermediate_tuple)) {
+        if (intermediate_tuple != NULL && ht->Insert(ht_ctx_.get(), intermediate_tuple)) {
           UpdateTuple(dst_partition->agg_fn_ctxs, intermediate_tuple, row);
           continue;
         }
@@ -578,7 +576,7 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, int level) {
       RETURN_IF_ERROR(SpillPartition());
       if (!dst_partition->is_spilled()) {
         // We spilled a different partition, try to insert this tuple.
-        if (ht->Insert(intermediate_tuple)) continue;
+        if (ht->Insert(ht_ctx_.get(), intermediate_tuple)) continue;
         DCHECK(false) << "How can we get here. We spilled a different partition but "
           " still did not have enough memory.";
       }

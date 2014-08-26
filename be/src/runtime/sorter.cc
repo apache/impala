@@ -472,7 +472,7 @@ Status Sorter::Run::UnpinAllBlocks() {
   int64_t var_data_offset = 0;
   int total_var_len;
   var_values.reserve(sort_tuple_desc_->string_slots().size());
-  BufferedBlockMgr::Block* cur_sorted_var_len_block;
+  BufferedBlockMgr::Block* cur_sorted_var_len_block = NULL;
   if (has_var_len_slots_ && var_len_blocks_.size() > 0) {
     DCHECK_NOTNULL(var_len_copy_block_);
     sorted_var_len_blocks.push_back(var_len_copy_block_);

@@ -172,37 +172,37 @@ bool ParseString(const string& str, T* val) {
 Literal* Literal::CreateLiteral(const ColumnType& type, const string& str) {
   switch (type.type) {
     case TYPE_BOOLEAN: {
-      bool v;
+      bool v = false;
       DCHECK(ParseString<bool>(str, &v)) << str;
       return new Literal(type, v);
     }
     case TYPE_TINYINT: {
-      int8_t v;
+      int8_t v = 0;
       DCHECK(ParseString<int8_t>(str, &v)) << str;
       return new Literal(type, v);
     }
     case TYPE_SMALLINT: {
-      int16_t v;
+      int16_t v = 0;
       DCHECK(ParseString<int16_t>(str, &v)) << str;
       return new Literal(type, v);
     }
     case TYPE_INT: {
-      int32_t v;
+      int32_t v = 0;
       DCHECK(ParseString<int32_t>(str, &v)) << str;
       return new Literal(type, v);
     }
     case TYPE_BIGINT: {
-      int64_t v;
+      int64_t v = 0;
       DCHECK(ParseString<int64_t>(str, &v)) << str;
       return new Literal(type, v);
     }
     case TYPE_FLOAT: {
-      float v;
+      float v = 0;
       DCHECK(ParseString<float>(str, &v)) << str;
       return new Literal(type, v);
     }
     case TYPE_DOUBLE: {
-      double v;
+      double v = 0;
       DCHECK(ParseString<double>(str, &v)) << str;
       return new Literal(type, v);
     }
@@ -210,12 +210,13 @@ Literal* Literal::CreateLiteral(const ColumnType& type, const string& str) {
     case TYPE_CHAR:
       return new Literal(type, str);
     case TYPE_TIMESTAMP: {
-      double v;
+      double v = 0;
       DCHECK(ParseString<double>(str, &v));
       return new Literal(type, v);
     }
     default:
       DCHECK(false) << "Invalid type: " << type.DebugString();
+      return NULL;
   }
 }
 

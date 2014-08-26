@@ -20,7 +20,7 @@
 #include <gtest/gtest.h>
 
 #include "common/compiler-util.h"
-#include "exec/hash-table.inline.h"
+#include "exec/old-hash-table.inline.h"
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
 #include "exprs/slot-ref.h"
@@ -35,9 +35,9 @@ using namespace std;
 
 namespace impala {
 
-class HashTableTest : public testing::Test {
+class OldHashTableTest : public testing::Test {
  public:
-  HashTableTest() : mem_pool_(&tracker_) {}
+  OldHashTableTest() : mem_pool_(&tracker_) {}
 
  protected:
   ObjectPool pool_;
@@ -82,9 +82,9 @@ class HashTableTest : public testing::Test {
     return row;
   }
 
-  // Wrapper to call private methods on HashTable
+  // Wrapper to call private methods on OldHashTable
   // TODO: understand google testing, there must be a more natural way to do this
-  void ResizeTable(HashTable* table, int64_t new_size) {
+  void ResizeTable(OldHashTable* table, int64_t new_size) {
     table->ResizeBuckets(new_size);
   }
 
@@ -92,9 +92,9 @@ class HashTableTest : public testing::Test {
   // all_unique, then each key(int value) should only appear once.  Results are
   // stored in results, indexed by the key.  Results must have been preallocated to
   // be at least max size.
-  void FullScan(HashTable* table, HashTableCtx* ht_ctx, int min, int max,
-      bool all_unique, TupleRow** results, TupleRow** expected) {
-    HashTable::Iterator iter = table->Begin();
+  void FullScan(OldHashTable* table, int min, int max, bool all_unique,
+      TupleRow** results, TupleRow** expected) {
+    OldHashTable::Iterator iter = table->Begin();
     while (iter != table->End()) {
       TupleRow* row = iter.GetRow();
       int32_t val = *reinterpret_cast<int32_t*>(build_expr_ctxs_[0]->GetValue(row));
@@ -103,7 +103,7 @@ class HashTableTest : public testing::Test {
       if (all_unique) EXPECT_TRUE(results[val] == NULL);
       EXPECT_EQ(row->GetTuple(0), expected[val]->GetTuple(0));
       results[val] = row;
-      iter.Next<false>(ht_ctx);
+      iter.Next<false>();
     }
   }
 
@@ -123,13 +123,12 @@ class HashTableTest : public testing::Test {
     vector<TupleRow*> expected_build_rows;
   };
 
-  void ProbeTest(HashTable* table, HashTableCtx* ht_ctx,
-      ProbeTestData* data, int num_data, bool scan) {
+  void ProbeTest(OldHashTable* table, ProbeTestData* data, int num_data, bool scan) {
     for (int i = 0; i < num_data; ++i) {
       TupleRow* row = data[i].probe_row;
 
-      HashTable::Iterator iter;
-      iter = table->Find(ht_ctx, row);
+      OldHashTable::Iterator iter;
+      iter = table->Find(row);
 
       if (data[i].expected_build_rows.size() == 0) {
         EXPECT_TRUE(iter == table->End());
@@ -139,7 +138,7 @@ class HashTableTest : public testing::Test {
           while (iter != table->End()) {
             EXPECT_TRUE(matched.find(iter.GetRow()) == matched.end());
             matched[iter.GetRow()] = true;
-            iter.Next<true>(ht_ctx);
+            iter.Next<true>();
           }
           EXPECT_EQ(matched.size(), data[i].expected_build_rows.size());
           for (int j = 0; i < data[j].expected_build_rows.size(); ++j) {
@@ -156,7 +155,7 @@ class HashTableTest : public testing::Test {
   }
 };
 
-TEST_F(HashTableTest, SetupTest) {
+TEST_F(OldHashTableTest, SetupTest) {
   TupleRow* build_row1 = CreateTupleRow(1);
   TupleRow* build_row2 = CreateTupleRow(2);
   TupleRow* probe_row3 = CreateTupleRow(3);
@@ -182,7 +181,7 @@ TEST_F(HashTableTest, SetupTest) {
 // are all there using a full table scan.  It also validates that Find() is correct
 // testing for probe rows that are both there and not.
 // The hash table is rehashed a few times and the scans/finds are tested again.
-TEST_F(HashTableTest, BasicTest) {
+TEST_F(OldHashTableTest, BasicTest) {
   TupleRow* build_rows[5];
   TupleRow* scan_rows[5] = {0};
   for (int i = 0; i < 5; ++i) {
@@ -199,52 +198,50 @@ TEST_F(HashTableTest, BasicTest) {
 
   // Create the hash table and insert the build rows
   MemTracker tracker;
-  HashTable hash_table(NULL, 1, &tracker, false);
-  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 0);
-
+  OldHashTable hash_table(NULL, build_expr_ctxs_, probe_expr_ctxs_,
+                       1, false, false, 0, &tracker);
   for (int i = 0; i < 5; ++i) {
-    hash_table.Insert(&ht_ctx, build_rows[i]);
+    hash_table.Insert(build_rows[i]);
   }
   EXPECT_EQ(hash_table.size(), 5);
 
   // Do a full table scan and validate returned pointers
-  FullScan(&hash_table, &ht_ctx, 0, 5, true, scan_rows, build_rows);
-  ProbeTest(&hash_table, &ht_ctx, probe_rows, 10, false);
+  FullScan(&hash_table, 0, 5, true, scan_rows, build_rows);
+  ProbeTest(&hash_table, probe_rows, 10, false);
 
   // Resize and scan again
   ResizeTable(&hash_table, 64);
   EXPECT_EQ(hash_table.num_buckets(), 64);
   EXPECT_EQ(hash_table.size(), 5);
   memset(scan_rows, 0, sizeof(scan_rows));
-  FullScan(&hash_table, &ht_ctx, 0, 5, true, scan_rows, build_rows);
-  ProbeTest(&hash_table, &ht_ctx, probe_rows, 10, false);
+  FullScan(&hash_table, 0, 5, true, scan_rows, build_rows);
+  ProbeTest(&hash_table, probe_rows, 10, false);
 
   // Resize to two and cause some collisions
   ResizeTable(&hash_table, 2);
   EXPECT_EQ(hash_table.num_buckets(), 2);
   EXPECT_EQ(hash_table.size(), 5);
   memset(scan_rows, 0, sizeof(scan_rows));
-  FullScan(&hash_table, &ht_ctx, 0, 5, true, scan_rows, build_rows);
-  ProbeTest(&hash_table, &ht_ctx, probe_rows, 10, false);
+  FullScan(&hash_table, 0, 5, true, scan_rows, build_rows);
+  ProbeTest(&hash_table, probe_rows, 10, false);
 
   // Resize to one and turn it into a linked list
   ResizeTable(&hash_table, 1);
   EXPECT_EQ(hash_table.num_buckets(), 1);
   EXPECT_EQ(hash_table.size(), 5);
   memset(scan_rows, 0, sizeof(scan_rows));
-  FullScan(&hash_table, &ht_ctx, 0, 5, true, scan_rows, build_rows);
-  ProbeTest(&hash_table, &ht_ctx, probe_rows, 10, false);
+  FullScan(&hash_table, 0, 5, true, scan_rows, build_rows);
+  ProbeTest(&hash_table, probe_rows, 10, false);
 
   hash_table.Close();
   mem_pool_.FreeAll();
 }
 
 // This tests makes sure we can scan ranges of buckets
-TEST_F(HashTableTest, ScanTest) {
+TEST_F(OldHashTableTest, ScanTest) {
   MemTracker tracker;
-  HashTable hash_table(NULL, 1, &tracker, false);
-  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 0);
-
+  OldHashTable hash_table(NULL, build_expr_ctxs_, probe_expr_ctxs_,
+                       1, false, false, 0, &tracker);
   // Add 1 row with val 1, 2 with val 2, etc
   vector<TupleRow*> build_rows;
   ProbeTestData probe_rows[15];
@@ -253,7 +250,7 @@ TEST_F(HashTableTest, ScanTest) {
     probe_rows[val].probe_row = CreateTupleRow(val);
     for (int i = 0; i < val; ++i) {
       TupleRow* row = CreateTupleRow(val);
-      hash_table.Insert(&ht_ctx, row);
+      hash_table.Insert(row);
       build_rows.push_back(row);
       probe_rows[val].expected_build_rows.push_back(row);
     }
@@ -265,34 +262,32 @@ TEST_F(HashTableTest, ScanTest) {
   }
 
   // Test that all the builds were found
-  ProbeTest(&hash_table, &ht_ctx, probe_rows, 15, true);
+  ProbeTest(&hash_table, probe_rows, 15, true);
 
   // Resize and try again
   ResizeTable(&hash_table, 128);
   EXPECT_EQ(hash_table.num_buckets(), 128);
-  ProbeTest(&hash_table, &ht_ctx, probe_rows, 15, true);
+  ProbeTest(&hash_table, probe_rows, 15, true);
 
   ResizeTable(&hash_table, 16);
   EXPECT_EQ(hash_table.num_buckets(), 16);
-  ProbeTest(&hash_table, &ht_ctx, probe_rows, 15, true);
+  ProbeTest(&hash_table, probe_rows, 15, true);
 
   ResizeTable(&hash_table, 2);
   EXPECT_EQ(hash_table.num_buckets(), 2);
-  ProbeTest(&hash_table, &ht_ctx, probe_rows, 15, true);
+  ProbeTest(&hash_table, probe_rows, 15, true);
 
   hash_table.Close();
   mem_pool_.FreeAll();
 }
 
 // This test continues adding to the hash table to trigger the resize code paths
-TEST_F(HashTableTest, GrowTableTest) {
+TEST_F(OldHashTableTest, GrowTableTest) {
   int num_to_add = 4;
   int expected_size = 0;
   MemTracker tracker(100 * 1024 * 1024);
-  HashTable hash_table(NULL, 1, &tracker, false);
-  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false,
-      num_to_add);
-
+  OldHashTable hash_table(NULL, build_expr_ctxs_, probe_expr_ctxs_,
+                       1, false, false, 0, &tracker, false, num_to_add);
   EXPECT_FALSE(hash_table.mem_limit_exceeded());
   EXPECT_TRUE(!tracker.LimitExceeded());
 
@@ -300,7 +295,7 @@ TEST_F(HashTableTest, GrowTableTest) {
   int build_row_val = 0;
   for (int i = 0; i < 20; ++i) {
     for (int j = 0; j < num_to_add; ++build_row_val, ++j) {
-      hash_table.Insert(&ht_ctx, CreateTupleRow(build_row_val));
+      hash_table.Insert(CreateTupleRow(build_row_val));
     }
     expected_size += num_to_add;
     num_to_add *= 2;
@@ -311,7 +306,7 @@ TEST_F(HashTableTest, GrowTableTest) {
   // Validate that we can find the entries before we went over the limit
   for (int i = 0; i < expected_size * 5; i += 100000) {
     TupleRow* probe_row = CreateTupleRow(i);
-    HashTable::Iterator iter = hash_table.Find(&ht_ctx, probe_row);
+    OldHashTable::Iterator iter = hash_table.Find(probe_row);
     if (i < hash_table.size()) {
       EXPECT_TRUE(iter != hash_table.End());
       ValidateMatch(probe_row, iter.GetRow());

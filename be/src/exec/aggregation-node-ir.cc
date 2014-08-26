@@ -14,7 +14,7 @@
 
 #include "exec/aggregation-node.h"
 
-#include "exec/hash-table.inline.h"
+#include "exec/old-hash-table.inline.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple.h"
@@ -35,7 +35,7 @@ void AggregationNode::ProcessRowBatchWithGrouping(RowBatch* batch) {
   for (int i = 0; i < batch->num_rows(); ++i) {
     TupleRow* row = batch->GetRow(i);
     Tuple* agg_tuple = NULL;
-    HashTable::Iterator it = hash_tbl_->Find(row);
+    OldHashTable::Iterator it = hash_tbl_->Find(row);
     if (it.AtEnd()) {
       agg_tuple = ConstructIntermediateTuple();
       hash_tbl_->Insert(agg_tuple);

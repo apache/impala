@@ -21,7 +21,7 @@
 #include <string>
 
 #include "exec/exec-node.h"
-#include "exec/hash-table.h"
+#include "exec/old-hash-table.h"
 #include "exec/blocking-join-node.h"
 #include "util/promise.h"
 
@@ -63,8 +63,8 @@ class HashJoinNode : public BlockingJoinNode {
   virtual Status ConstructBuildSide(RuntimeState* state);
 
  private:
-  boost::scoped_ptr<HashTable> hash_tbl_;
-  HashTable::Iterator hash_tbl_iterator_;
+  boost::scoped_ptr<OldHashTable> hash_tbl_;
+  OldHashTable::Iterator hash_tbl_iterator_;
 
   // our equi-join predicates "<lhs> = <rhs>" are separated into
   // build_exprs_ (over child(1)) and probe_exprs_ (over child(0))

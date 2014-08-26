@@ -20,7 +20,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "exec/exec-node.h"
-#include "exec/hash-table.h"
+#include "exec/old-hash-table.h"
 #include "runtime/descriptors.h"  // for TupleId
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.h"
@@ -63,8 +63,8 @@ class AggregationNode : public ExecNode {
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
-  boost::scoped_ptr<HashTable> hash_tbl_;
-  HashTable::Iterator output_iterator_;
+  boost::scoped_ptr<OldHashTable> hash_tbl_;
+  OldHashTable::Iterator output_iterator_;
 
   std::vector<AggFnEvaluator*> aggregate_evaluators_;
 

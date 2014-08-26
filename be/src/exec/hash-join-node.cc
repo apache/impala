@@ -17,7 +17,7 @@
 #include <sstream>
 
 #include "codegen/llvm-codegen.h"
-#include "exec/hash-table.inline.h"
+#include "exec/old-hash-table.inline.h"
 #include "exprs/expr.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -97,7 +97,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   // TODO: default buckets
   bool stores_nulls =
       join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN;
-  hash_tbl_.reset(new HashTable(state, build_expr_ctxs_, probe_expr_ctxs_,
+  hash_tbl_.reset(new OldHashTable(state, build_expr_ctxs_, probe_expr_ctxs_,
       child(1)->row_desc().tuple_descriptors().size(), stores_nulls,
       false, state->fragment_hash_seed(), mem_tracker()));
 
@@ -373,13 +373,12 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
     if (process_probe_batch_fn_ == NULL) {
       num_rows_returned_ +=
           ProcessProbeBatch(out_batch, probe_batch_.get(), max_added_rows);
-      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
     } else {
       // Use codegen'd function
       num_rows_returned_ +=
           process_probe_batch_fn_(this, out_batch, probe_batch_.get(), max_added_rows);
-      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
     }
+    COUNTER_SET(rows_returned_counter_, num_rows_returned_);
 
     if (ReachedLimit() || out_batch->AtCapacity()) {
       *eos = ReachedLimit();

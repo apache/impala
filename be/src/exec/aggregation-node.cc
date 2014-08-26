@@ -23,7 +23,7 @@
 
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
-#include "exec/hash-table.inline.h"
+#include "exec/old-hash-table.inline.h"
 #include "exprs/agg-fn-evaluator.h"
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
@@ -140,8 +140,8 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   }
 
   // TODO: how many buckets?
-  hash_tbl_.reset(new HashTable(state, build_expr_ctxs_, probe_expr_ctxs_, 1,
-                                true, true, id(), mem_tracker(), true));
+  hash_tbl_.reset(new OldHashTable(state, build_expr_ctxs_, probe_expr_ctxs_, 1,
+                                   true, true, id(), mem_tracker(), true));
 
   if (probe_expr_ctxs_.empty()) {
     // create single intermediate tuple now; we need to output something

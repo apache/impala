@@ -78,11 +78,15 @@ class DiskIoMgrTest : public testing::Test {
     fclose(file);
   }
 
-  void CreateTempFile(const char* filename, int file_size) {
+  int CreateTempFile(const char* filename, int file_size) {
     FILE* file = fopen(filename, "w");
     EXPECT_TRUE(file != NULL);
-    fclose(file);
-    truncate(filename, file_size);
+    int success = fclose(file);
+    if (success != 0) {
+      LOG(ERROR) << "Error closing file " << filename;
+      return success;
+    }
+    return truncate(filename, file_size);
   }
 
   // Validates that buffer[i] is \0 or expected[i]
@@ -169,7 +173,13 @@ TEST_F(DiskIoMgrTest, SingleWriter) {
   int num_ranges = 100;
   int64_t file_size = 1024 * 1024;
   int64_t cur_offset = 0;
-  CreateTempFile(tmp_file.c_str(), file_size);
+  int success = CreateTempFile(tmp_file.c_str(), file_size);
+  if (success != 0) {
+    LOG(ERROR) << "Error creating temp file " << tmp_file.c_str() << " of size " <<
+        file_size;
+    EXPECT_TRUE(false);
+  }
+
   scoped_ptr<DiskIoMgr> read_io_mgr(new DiskIoMgr(1, 1, 1, 10));
   MemTracker reader_mem_tracker(LARGE_MEM_LIMIT);
   Status status = read_io_mgr->Init(&reader_mem_tracker);
@@ -241,7 +251,12 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
 
   // Write to a bad location in a file that exists.
   tmp_file = "/tmp/disk_io_mgr_test.txt";
-  CreateTempFile(tmp_file.c_str(), 100);
+  int success = CreateTempFile(tmp_file.c_str(), 100);
+  if (success != 0) {
+    LOG(ERROR) << "Error creating temp file " << tmp_file.c_str() << " of size 100";
+    EXPECT_TRUE(false);
+  }
+
   new_range = pool_->Add(new DiskIoMgr::WriteRange*);
   callback = bind(mem_fn(&DiskIoMgrTest::WriteValidateCallback), this, 2,
       new_range, (DiskIoMgr*)NULL, (DiskIoMgr::RequestContext*)NULL,
@@ -271,7 +286,13 @@ TEST_F(DiskIoMgrTest, SingleWriterCancel) {
   int num_ranges_before_cancel = 25;
   int64_t file_size = 1024 * 1024;
   int64_t cur_offset = 0;
-  CreateTempFile(tmp_file.c_str(), file_size);
+  int success = CreateTempFile(tmp_file.c_str(), file_size);
+  if (success != 0) {
+    LOG(ERROR) << "Error creating temp file " << tmp_file.c_str() << " of size " <<
+        file_size;
+    EXPECT_TRUE(false);
+  }
+
   scoped_ptr<DiskIoMgr> read_io_mgr(new DiskIoMgr(1, 1, 1, 10));
   MemTracker reader_mem_tracker(LARGE_MEM_LIMIT);
   Status status = read_io_mgr->Init(&reader_mem_tracker);
@@ -725,7 +746,12 @@ TEST_F(DiskIoMgrTest, MultipleReaderWriter) {
   const int num_reads_queued = 5;
 
   string file_name = "/tmp/disk_io_mgr_test.txt";
-  CreateTempFile(file_name.c_str(), file_size);
+  int success = CreateTempFile(file_name.c_str(), file_size);
+  if (success != 0) {
+    LOG(ERROR) << "Error creating temp file " << file_name.c_str() << " of size " <<
+        file_size;
+    ASSERT_TRUE(false);
+  }
 
   int64_t iters = 0;
   vector<DiskIoMgr::RequestContext*> contexts(num_contexts);

@@ -14,7 +14,7 @@
 
 #include "codegen/impala-ir.h"
 #include "exec/hash-join-node.h"
-#include "exec/hash-table.inline.h"
+#include "exec/old-hash-table.inline.h"
 #include "runtime/row-batch.h"
 
 using namespace std;

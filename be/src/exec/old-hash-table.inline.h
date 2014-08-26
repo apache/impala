@@ -13,37 +13,21 @@
 // limitations under the License.
 
 
-#ifndef IMPALA_EXEC_HASH_TABLE_INLINE_H
-#define IMPALA_EXEC_HASH_TABLE_INLINE_H
+#ifndef IMPALA_EXEC_OLD_HASH_TABLE_INLINE_H
+#define IMPALA_EXEC_OLD_HASH_TABLE_INLINE_H
 
-#include "exec/hash-table.h"
+#include "exec/old-hash-table.h"
 
 namespace impala {
 
-inline bool HashTableCtx::EvalAndHashBuild(TupleRow* row, uint32_t* hash) {
-  bool has_null = EvalBuildRow(row);
-  if (!stores_nulls_ && has_null) return false;
-  *hash = HashCurrentRow();
-  return true;
-}
-
-inline bool HashTableCtx::EvalAndHashProbe(TupleRow* row, uint32_t* hash) {
-  bool has_null = EvalProbeRow(row);
-  if ((!stores_nulls_ || !finds_nulls_) && has_null) return false;
-  *hash = HashCurrentRow();
-  return true;
-}
-
-inline HashTable::Iterator HashTable::Find(HashTableCtx* ht_ctx,
-    TupleRow* probe_row) {
+inline OldHashTable::Iterator OldHashTable::Find(TupleRow* probe_row) {
   uint32_t hash;
-  DCHECK_NOTNULL(ht_ctx);
-  if (!ht_ctx->EvalAndHashProbe(probe_row, &hash)) return End();
+  if (!EvalAndHashProbe(probe_row, &hash)) return End();
   int64_t bucket_idx = hash & (num_buckets_ - 1);
   Bucket* bucket = &buckets_[bucket_idx];
   Node* node = bucket->node;
   while (node != NULL) {
-    if (node->hash == hash && ht_ctx->Equals(GetRow(node))) {
+    if (node->hash == hash && Equals(GetRow(node))) {
       return Iterator(this, bucket_idx, node, hash);
     }
     node = node->next;
@@ -51,14 +35,14 @@ inline HashTable::Iterator HashTable::Find(HashTableCtx* ht_ctx,
   return End();
 }
 
-inline HashTable::Iterator HashTable::Begin() {
+inline OldHashTable::Iterator OldHashTable::Begin() {
   int64_t bucket_idx = -1;
   Bucket* bucket = NextBucket(&bucket_idx);
   if (bucket != NULL) return Iterator(this, bucket_idx, bucket->node, 0);
   return End();
 }
 
-inline HashTable::Iterator HashTable::FirstUnmatched() {
+inline OldHashTable::Iterator OldHashTable::FirstUnmatched() {
   int64_t bucket_idx = -1;
   Bucket* bucket = NextBucket(&bucket_idx);
   while (bucket != NULL) {
@@ -76,7 +60,7 @@ inline HashTable::Iterator HashTable::FirstUnmatched() {
   return End();
 }
 
-inline HashTable::Bucket* HashTable::NextBucket(int64_t* bucket_idx) {
+inline OldHashTable::Bucket* OldHashTable::NextBucket(int64_t* bucket_idx) {
   ++*bucket_idx;
   for (; *bucket_idx < num_buckets_; ++*bucket_idx) {
     if (buckets_[*bucket_idx].node != NULL) return &buckets_[*bucket_idx];
@@ -85,8 +69,8 @@ inline HashTable::Bucket* HashTable::NextBucket(int64_t* bucket_idx) {
   return NULL;
 }
 
-inline bool HashTable::InsertImpl(HashTableCtx* ht_ctx, void* data) {
-  uint32_t hash = ht_ctx->HashCurrentRow();
+inline bool OldHashTable::InsertImpl(void* data) {
+  uint32_t hash = HashCurrentRow();
   int64_t bucket_idx = hash & (num_buckets_ - 1);
   if (node_remaining_current_page_ == 0) {
     GrowNodeArray();
@@ -95,7 +79,6 @@ inline bool HashTable::InsertImpl(HashTableCtx* ht_ctx, void* data) {
   next_node_->hash = hash;
   next_node_->data = data;
   next_node_->matched = false;
-  DCHECK_GT(num_buckets_, bucket_idx);
   AddToBucket(&buckets_[bucket_idx], next_node_);
   DCHECK_GT(node_remaining_current_page_, 0);
   --node_remaining_current_page_;
@@ -104,13 +87,27 @@ inline bool HashTable::InsertImpl(HashTableCtx* ht_ctx, void* data) {
   return true;
 }
 
-inline void HashTable::AddToBucket(Bucket* bucket, Node* node) {
+inline void OldHashTable::AddToBucket(Bucket* bucket, Node* node) {
   num_filled_buckets_ += (bucket->node == NULL);
   node->next = bucket->node;
   bucket->node = node;
 }
 
-inline void HashTable::MoveNode(Bucket* from_bucket, Bucket* to_bucket,
+inline bool OldHashTable::EvalAndHashBuild(TupleRow* row, uint32_t* hash) {
+  bool has_null = EvalBuildRow(row);
+  if (!stores_nulls_ && has_null) return false;
+  *hash = HashCurrentRow();
+  return true;
+}
+
+inline bool OldHashTable::EvalAndHashProbe(TupleRow* row, uint32_t* hash) {
+  bool has_null = EvalProbeRow(row);
+  if ((!stores_nulls_ || !finds_nulls_) && has_null) return false;
+  *hash = HashCurrentRow();
+  return true;
+}
+
+inline void OldHashTable::MoveNode(Bucket* from_bucket, Bucket* to_bucket,
     Node* node, Node* previous_node) {
   if (previous_node != NULL) {
     previous_node->next = node->next;
@@ -123,9 +120,8 @@ inline void HashTable::MoveNode(Bucket* from_bucket, Bucket* to_bucket,
 }
 
 template<bool check_match>
-inline void HashTable::Iterator::Next(HashTableCtx* ht_ctx) {
+inline void OldHashTable::Iterator::Next() {
   if (bucket_idx_ == -1) return;
-  DCHECK_NOTNULL(ht_ctx);
 
   // TODO: this should prefetch the next tuplerow
   // Iterator is not from a full table scan, evaluate equality now.  Only the current
@@ -135,7 +131,7 @@ inline void HashTable::Iterator::Next(HashTableCtx* ht_ctx) {
     // TODO: this should prefetch the next node
     Node* node = node_->next;
     while (node != NULL) {
-      if (node->hash == scan_hash_ && ht_ctx->Equals(table_->GetRow(node))) {
+      if (node->hash == scan_hash_ && table_->Equals(table_->GetRow(node))) {
         node_ = node;
         return;
       }
@@ -160,7 +156,7 @@ inline void HashTable::Iterator::Next(HashTableCtx* ht_ctx) {
   }
 }
 
-inline bool HashTable::Iterator::NextUnmatched() {
+inline bool OldHashTable::Iterator::NextUnmatched() {
   if (bucket_idx_ == -1) return false;
   while (true) {
     while (node_->next != NULL && node_->next->matched) {

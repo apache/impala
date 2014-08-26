@@ -147,7 +147,8 @@ class DecimalValue {
   DecimalValue<RESULT_T> Add(const ColumnType& this_type, const DecimalValue& other,
       const ColumnType& other_type, int result_scale, bool* overflow) const {
     DCHECK_EQ(result_scale, std::max(this_type.scale, other_type.scale));
-    RESULT_T x, y;
+    RESULT_T x;
+    RESULT_T y;
     *overflow |= AdjustToSameScale(*this, this_type, other, other_type, &x, &y);
     if (sizeof(RESULT_T) == 16) {
       // Check overflow.
