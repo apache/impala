@@ -78,6 +78,14 @@ public class DataPartition {
     return result;
   }
 
+  public boolean equals(Object obj) {
+    if (obj == null) return false;
+    if (obj.getClass() != this.getClass()) return false;
+    DataPartition other = (DataPartition) obj;
+    if (type_ != other.type_) return false;
+    return Expr.equalLists(partitionExprs_, other.partitionExprs_);
+  }
+
   public String debugString() {
     return Objects.toStringHelper(this)
         .add("type_", type_)

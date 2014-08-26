@@ -58,7 +58,7 @@ public class AnalyticEvalNode extends PlanNode {
   // id of buffered copy of input tuple; null if no partition and ordering exprs
   private TupleDescriptor bufferedTupleDesc_;
   // map from input to buffered tuple; empty if no bufferedTupleDesc_
-  private ExprSubstitutionMap bufferedTupleSmap_ = new ExprSubstitutionMap();
+  private final ExprSubstitutionMap bufferedTupleSmap_ = new ExprSubstitutionMap();
 
   // predicates constructed from partitionExprs_/orderingExprs_ to
   // compare input to buffered tuples; created in init()
@@ -90,6 +90,8 @@ public class AnalyticEvalNode extends PlanNode {
 
   @Override
   public boolean isBlockingNode() { return true; }
+  public List<Expr> getPartitionExprs() { return partitionExprs_; }
+  public List<Expr> getOrderingExprs() { return orderingExprs_; }
 
   @Override
   public void init(Analyzer analyzer) throws InternalException {

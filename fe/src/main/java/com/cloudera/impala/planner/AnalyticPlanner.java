@@ -70,6 +70,7 @@ public class AnalyticPlanner {
     // sort on partition + ordering exprs
     List<Expr> partitionExprs = e.getPartitionExprs();
     List<Expr> orderByExprs = e.getOrderByExprs();
+    SortNode sortNode = null;
     if (!partitionExprs.isEmpty() || !orderByExprs.isEmpty()) {
       // first sort on partitionExprs (direction doesn't matter)
       List<Expr> sortExprs = Lists.newArrayList(partitionExprs);
@@ -87,7 +88,8 @@ public class AnalyticPlanner {
       }
 
       SortInfo sortInfo = createSortInfo(root, sortExprs, isAsc, nullsFirst);
-      root = new SortNode(idGenerator_.getNextId(), root, sortInfo, false, 0);
+      sortNode = new SortNode(idGenerator_.getNextId(), root, sortInfo, false, 0);
+      root = sortNode;
       root.init(analyzer_);
     }
 
@@ -95,6 +97,7 @@ public class AnalyticPlanner {
         Lists.newArrayList((Expr) e.getFnCall()), partitionExprs, orderByExprs,
         e.getWindow(), analyticInfo.getTupleDesc(), analyticInfo.getSmap());
     root.init(analyzer_);
+    if (sortNode != null) sortNode.setAnalyticParent((AnalyticEvalNode) root);
     return root;
   }
 

@@ -47,8 +47,11 @@ import com.google.common.collect.Lists;
 public class SortNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(SortNode.class);
 
-  // The sort information produced in analysis.
   private final SortInfo info_;
+
+  // if set, this SortNode's output is fed into analyticParent_
+  private AnalyticEvalNode analyticParent_;
+
   // info_.sortTupleSlotExprs_ substituted with the baseTblSmap_ for materialized slots
   // in init().
   List<Expr> baseTblMaterializedTupleExprs_;
@@ -69,10 +72,11 @@ public class SortNode extends PlanNode {
   public long getOffset() { return offset_; }
   public void setOffset(long offset) { offset_ = offset; }
   public boolean hasOffset() { return offset_ > 0; }
-
   public boolean useTopN() { return useTopN_; }
-
   public SortInfo getSortInfo() { return info_; }
+  public boolean isAnalyticSort() { return analyticParent_ != null; }
+  public void setAnalyticParent(AnalyticEvalNode parent) { analyticParent_ = parent; }
+  public AnalyticEvalNode getAnalyticParent() { return analyticParent_; }
 
   @Override
   public void setCompactData(boolean on) { compactData_ = on; }

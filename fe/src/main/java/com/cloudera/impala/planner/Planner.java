@@ -282,9 +282,15 @@ public class Planner {
       result = createAggregationFragment(
           (AggregationNode) root, childFragments.get(0), fragments, analyzer);
     } else if (root instanceof SortNode) {
-      result =
-          createOrderByFragment((SortNode) root, childFragments.get(0), fragments,
-              analyzer);
+      if (((SortNode) root).isAnalyticSort()) {
+        result = createAnalyticFragment(
+            (SortNode) root, childFragments.get(0), fragments, analyzer);
+      } else {
+        result = createOrderByFragment(
+            (SortNode) root, childFragments.get(0), fragments, analyzer);
+      }
+    } else if (root instanceof AnalyticEvalNode) {
+      result = createAnalyticFragment(root, childFragments.get(0), fragments, analyzer);
     } else if (root instanceof EmptySetNode) {
       result = new PlanFragment(
           fragmentIdGenerator_.getNextId(), root, DataPartition.UNPARTITIONED);
@@ -873,6 +879,70 @@ public class Planner {
       mergeFragment.addPlanRoot(mergeAggNode);
     }
     return mergeFragment;
+  }
+
+  /**
+   * Returns a fragment that produces the output of either an AnalyticEvalNode
+   * or of the SortNode that provides the input to an AnalyticEvalNode.
+   * ('node' can be either an AnalyticEvalNode or a SortNode).
+   * The returned fragment is either partitioned on the Partition By exprs or
+   * unpartitioned in the absence of such exprs.
+   */
+  private PlanFragment createAnalyticFragment(PlanNode node,
+      PlanFragment childFragment, ArrayList<PlanFragment> fragments, Analyzer analyzer)
+      throws InternalException {
+    Preconditions.checkState(
+        node instanceof SortNode || node instanceof AnalyticEvalNode);
+    if (node instanceof AnalyticEvalNode) {
+      AnalyticEvalNode analyticNode = (AnalyticEvalNode) node;
+      if (analyticNode.getPartitionExprs().isEmpty()
+          && analyticNode.getOrderingExprs().isEmpty()) {
+        // no Partition-By/Order-By exprs: compute analytic exprs in single
+        // unpartitioned fragment
+        PlanFragment fragment = childFragment;
+        if (childFragment.isPartitioned()) {
+          fragment = createParentFragment(
+              analyzer, childFragment, DataPartition.UNPARTITIONED);
+        }
+        fragment.addPlanRoot(analyticNode);
+        return fragment;
+      } else {
+        // the input to the AnalyticEvalNode comes from a SortNode that's
+        // already sitting in a plan fragment with the appropriate partitioning
+        Preconditions.checkState(childFragment.getPlanRoot() instanceof SortNode);
+        Preconditions.checkState(
+            ((SortNode) childFragment.getPlanRoot()).getAnalyticParent() == node);
+        childFragment.addPlanRoot(analyticNode);
+        return childFragment;
+      }
+    }
+
+    SortNode sortNode = (SortNode) node;
+    Preconditions.checkState(sortNode.isAnalyticSort());
+    AnalyticEvalNode analyticParent = sortNode.getAnalyticParent();
+    PlanFragment analyticFragment = null;
+    if (analyticParent.getPartitionExprs().isEmpty()) {
+      // no Partition By clause: analytic exprs are computed in an unpartitioned
+      // fragment
+      if (!childFragment.getDataPartition().isPartitioned()) {
+        analyticFragment = childFragment;
+      } else {
+        analyticFragment = createParentFragment(
+            analyzer, childFragment, DataPartition.UNPARTITIONED);
+      }
+    } else {
+      // we need the input partitioned on the Partition By exprs
+      DataPartition parentPartition = new DataPartition(TPartitionType.HASH_PARTITIONED,
+          analyticParent.getPartitionExprs());
+      // TODO: should this use Analyzer.isEquivSlots() instead?
+      if (childFragment.getDataPartition().equals(parentPartition)) {
+        analyticFragment = childFragment;
+      } else {
+        analyticFragment = createParentFragment(analyzer, childFragment, parentPartition);
+      }
+    }
+    analyticFragment.addPlanRoot(sortNode);
+    return analyticFragment;
   }
 
   /**

@@ -12,11 +12,34 @@ from functional.alltypesagg
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
+---- DISTRIBUTEDPLAN
+04:EXCHANGE [UNPARTITIONED]
+|
+02:ANALYTIC
+|  functions: count(double_col)
+|  partition by: tinyint_col + 1, double_col / 2
+|  order by: 4 - int_col, 4 * smallint_col
+|
+01:SORT
+|  order by: tinyint_col + 1 ASC NULLS FIRST, double_col / 2 ASC NULLS FIRST, 4 - int_col ASC, 4 * smallint_col ASC
+|
+03:EXCHANGE [HASH(tinyint_col + 1,double_col / 2)]
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 size=814.73KB
 ====
 select count(*) over() from functional.alltypesagg
 ---- PLAN
 01:ANALYTIC
 |  functions: count(*)
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 size=814.73KB
+---- DISTRIBUTEDPLAN
+01:ANALYTIC
+|  functions: count(*)
+|
+02:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
@@ -33,6 +56,20 @@ from functional.alltypesagg
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
+---- DISTRIBUTEDPLAN
+04:EXCHANGE [UNPARTITIONED]
+|
+02:ANALYTIC
+|  functions: sum(bigint_col)
+|  partition by: tinyint_col
+|
+01:SORT
+|  order by: tinyint_col ASC NULLS FIRST
+|
+03:EXCHANGE [HASH(tinyint_col)]
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 size=814.73KB
 ====
 select int_col, rank() over(order by int_col) from functional.alltypesagg
 ---- PLAN
@@ -45,4 +82,31 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
+---- DISTRIBUTEDPLAN
+02:ANALYTIC
+|  functions: rank()
+|  order by: int_col
+|
+01:SORT
+|  order by: int_col ASC
+|
+03:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 size=814.73KB
 ====
+# TODO: get these to work, the smaps don't quite work for view substitution
+#select int_col, rank() over(order by int_col)
+#from (select int_col from functional.alltypesagg order by int_col limit 10) t
+#---- PLAN
+#bla
+#---- DISTRIBUTEDPLAN
+#bla
+#====
+#select sum(int_col) over(partition by int_col)
+#from (select distinct int_col from functional.alltypesagg) t
+#---- PLAN
+#bla
+#---- DISTRIBUTEDPLAN
+#bla
+#====
