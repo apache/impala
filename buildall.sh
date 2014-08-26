@@ -102,7 +102,8 @@ do
       ;;
     -help|*)
       echo "buildall.sh - Builds Impala and runs all tests."
-      echo "[-noclean] : Omits cleaning all packages before building"
+      echo "[-noclean] : Omits cleaning all packages before building. Will not kill"\
+           "running Hadoop services unless any -format* is True"
       echo "[-format] : Format the minicluster and metastore db [Default: False]"
       echo "[-format_cluster] : Format the minicluster [Default: False]"
       echo "[-format_metastore] : Format the metastore db [Default: False]"
@@ -128,7 +129,7 @@ Examples of common tasks:
   # Build and skip tests
   ./buildall.sh -skiptests
 
-  # Incrementally rebuild and skip tests
+  # Incrementally rebuild and skip tests. Keeps existing Hadoop services running.
   ./buildall.sh -skiptests -noclean
 
   # Build, load a snapshot file, run tests
@@ -168,6 +169,18 @@ else
   echo "No hadoop-lzo found"
 fi
 
+# Stop any running Impala services.
+${IMPALA_HOME}/bin/start-impala-cluster.py --kill --force
+
+if [ $CLEAN_ACTION -eq 1 ] || [ $FORMAT_METASTORE -eq 1 ] || [ $FORMAT_CLUSTER -eq 1 ]
+then
+  # Kill any processes that may be accessing postgres metastore. To be safe, this is done
+  # before we make any changes to the config files.
+  set +e
+  ${IMPALA_HOME}/testdata/bin/kill-all.sh
+  set -e
+fi
+
 # option to clean everything first
 if [ $CLEAN_ACTION -eq 1 ]
 then
@@ -198,13 +211,6 @@ then
   rm -f $IMPALA_HOME/llvm-ir/impala*.ll
   rm -f $IMPALA_HOME/be/generated-sources/impala-ir/*
 fi
-
-# Kill any processes that may be accessing postgres metastore
-# TODO: figure out how to make postgres ignore other users
-# Disable error on exit for kill-all.sh
-set +e
-${IMPALA_HOME}/testdata/bin/kill-all.sh
-set -e
 
 # Generate the Hadoop configs needed by Impala
 if [ $FORMAT_METASTORE -eq 1 ]; then
