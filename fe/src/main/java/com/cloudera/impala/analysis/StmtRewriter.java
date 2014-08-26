@@ -14,25 +14,20 @@
 
 package com.cloudera.impala.analysis;
 
-import com.cloudera.impala.analysis.AnalysisContext.AnalysisResult;
-import com.cloudera.impala.analysis.BinaryPredicate.Operator;
-import com.cloudera.impala.analysis.BinaryPredicate;
-import com.cloudera.impala.analysis.CompoundPredicate;
-import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.TreeNode;
-
-import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.cloudera.impala.analysis.AnalysisContext.AnalysisResult;
+import com.cloudera.impala.catalog.Type;
+import com.cloudera.impala.common.AnalysisException;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 /**
  * Class representing a statement rewriter. A statement rewriter performs subquery
@@ -278,7 +273,6 @@ public class StmtRewriter {
     Preconditions.checkNotNull(expr);
     Preconditions.checkNotNull(analyzer);
     boolean updateSelectList = false;
-    List<TupleId> stmtTupleIds = stmt.getTableRefIds();
 
     SelectStmt subqueryStmt = (SelectStmt)expr.getSubquery().getStatement();
     // Generate an alias for the new inline view.
@@ -499,8 +493,8 @@ public class StmtRewriter {
     }
     Preconditions.checkState(!newItems.isEmpty());
     boolean isDistinct = stmt.selectList_.isDistinct();
-    boolean isStraightJoin = stmt.selectList_.isStraightJoin();
-    stmt.selectList_ = new SelectList(newItems, isDistinct, isStraightJoin);
+    stmt.selectList_ =
+        new SelectList(newItems, isDistinct, stmt.selectList_.getPlanHints());
   }
 
   /**
@@ -530,8 +524,8 @@ public class StmtRewriter {
       }
     }
     boolean isDistinct = stmt.selectList_.isDistinct();
-    boolean isStraightJoin = stmt.selectList_.isStraightJoin();
-    stmt.selectList_ = new SelectList(newItems, isDistinct, isStraightJoin);
+    stmt.selectList_ = new SelectList(
+        newItems, isDistinct, stmt.selectList_.getPlanHints());
   }
 
   /**
@@ -626,7 +620,7 @@ public class StmtRewriter {
     if (updateGroupBy) groupByExprs = Lists.newArrayList();
     ArrayList<Expr> slotRefs = Lists.newArrayList();
     expr.collectAll(Predicates.instanceOf(SlotRef.class), slotRefs);
-    ArrayList<SelectListItem> items = stmt.selectList_.getItems();
+    List<SelectListItem> items = stmt.selectList_.getItems();
     for (Expr slotRef: slotRefs) {
       // If the slotRef belongs to the subquery, add it to the select list and
       // register it for substitution. We use a temporary substitution map
@@ -642,10 +636,10 @@ public class StmtRewriter {
     }
 
     // Update the subquery's select list.
-    boolean isStraightJoin = stmt.selectList_.isStraightJoin();
     boolean isDistinct = stmt.selectList_.isDistinct();
     Preconditions.checkState(!isDistinct);
-    stmt.selectList_ = new SelectList(items, isDistinct, isStraightJoin);
+    stmt.selectList_ = new SelectList(
+        items, isDistinct, stmt.selectList_.getPlanHints());
     // Update subquery's GROUP BY clause
     if (groupByExprs != null && !groupByExprs.isEmpty()) {
       if (stmt.hasGroupByClause()) {

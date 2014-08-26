@@ -260,6 +260,7 @@ terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
 terminal String IDENT;
 terminal String EMPTY_IDENT;
 terminal String NUMERIC_OVERFLOW;
+terminal String COMMENTED_PLAN_HINTS;
 terminal BigDecimal INTEGER_LITERAL;
 terminal BigDecimal DECIMAL_LITERAL;
 terminal String STRING_LITERAL;
@@ -298,7 +299,6 @@ nonterminal SelectList select_clause;
 nonterminal SelectList select_list;
 nonterminal SelectListItem select_list_item;
 nonterminal SelectListItem star_expr;
-nonterminal Boolean opt_straight_join;
 nonterminal Expr expr, non_pred_expr, arithmetic_expr, timestamp_arithmetic_expr;
 nonterminal ArrayList<Expr> expr_list;
 nonterminal String alias_clause;
@@ -1611,20 +1611,20 @@ select_stmt ::=
   ;
 
 select_clause ::=
-  KW_SELECT opt_straight_join:s select_list:l
+  KW_SELECT opt_plan_hints:hints select_list:l
   {:
-    l.setIsStraightJoin(s);
+    l.setPlanHints(hints);
     RESULT = l;
   :}
-  | KW_SELECT KW_ALL opt_straight_join:s select_list:l
+  | KW_SELECT KW_ALL opt_plan_hints:hints select_list:l
   {:
-    l.setIsStraightJoin(s);
+    l.setPlanHints(hints);
     RESULT = l;
   :}
-  | KW_SELECT KW_DISTINCT opt_straight_join:s select_list:l
+  | KW_SELECT KW_DISTINCT opt_plan_hints:hints select_list:l
   {:
     l.setIsDistinct(true);
-    l.setIsStraightJoin(s);
+    l.setPlanHints(hints);
     RESULT = l;
   :}
   ;
@@ -1636,13 +1636,6 @@ set_stmt ::=
   {: RESULT = new SetStmt(key, ident); :}
   | KW_SET
   {: RESULT = new SetStmt(null, null); :}
-  ;
-
-opt_straight_join ::=
-  KW_STRAIGHT_JOIN
-  {: RESULT = true; :}
-  | /* empty */
-  {: RESULT = false; :}
   ;
 
 select_list ::=
@@ -1796,9 +1789,27 @@ opt_outer ::=
   ;
 
 opt_plan_hints ::=
-  LBRACKET ident_list:l RBRACKET
+  COMMENTED_PLAN_HINTS:l
+  {:
+    ArrayList<String> hints = new ArrayList<String>();
+    String[] tokens = l.split(",");
+    for (String token: tokens) {
+      String trimmedToken = token.trim();
+      if (trimmedToken.length() > 0) hints.add(trimmedToken);
+    }
+    RESULT = hints;
+  :}
+  /* legacy straight_join hint style */
+  | KW_STRAIGHT_JOIN
+  {:
+    ArrayList<String> hints = new ArrayList<String>();
+    hints.add("straight_join");
+    RESULT = hints;
+  :}
+  /* legacy plan-hint style */
+  | LBRACKET ident_list:l RBRACKET
   {: RESULT = l; :}
-  |
+  | /* empty */
   {: RESULT = null; :}
   ;
 
@@ -2366,4 +2377,3 @@ struct_field_def_list ::=
     RESULT = list;
   :}
   ;
-

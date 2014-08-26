@@ -14,52 +14,73 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import com.google.common.collect.Lists;
 
 /**
- * Select list items plus distinct clause.
- *
+ * Select list items plus optional distinct clause and optional plan hints.
  */
 public class SelectList {
-  private final ArrayList<SelectListItem> items_ = Lists.newArrayList();
+  private List<String> planHints_;
+  private final List<SelectListItem> items_;
   private boolean isDistinct_;
+
+  // Set in analyzePlanHints() based on planHints_.
   private boolean isStraightJoin_;
 
-  public SelectList() {
-    this.isDistinct_ = false;
-    this.isStraightJoin_ = false;
-  }
-
   public SelectList(List<SelectListItem> items) {
+    items_ = items;
     isDistinct_ = false;
     isStraightJoin_ = false;
-    this.items_.addAll(items);
+  }
+
+  public SelectList() {
+    items_ = Lists.newArrayList();
+    isDistinct_ = false;
+    isStraightJoin_ = false;
   }
 
   public SelectList(List<SelectListItem> items, boolean isDistinct,
-      boolean isStraightJoin) {
+      List<String> planHints) {
     isDistinct_ = isDistinct;
-    isStraightJoin_ = isStraightJoin;
-    items_.addAll(items);
+    isStraightJoin_ = false;
+    items_ = items;
+    planHints_ = planHints;
   }
 
-  public ArrayList<SelectListItem> getItems() { return items_; }
+  /**
+   * C'tor for cloning.
+   */
+  public SelectList(SelectList other) {
+    planHints_ =
+        (other.planHints_ != null) ? Lists.newArrayList(other.planHints_) : null;
+    items_ = Lists.newArrayList();
+    for (SelectListItem item: other.items_) {
+      items_.add(item.clone());
+    }
+    isDistinct_ = other.isDistinct_;
+    isStraightJoin_ = other.isStraightJoin_;
+  }
+
+  public List<SelectListItem> getItems() { return items_; }
+  public void setPlanHints(List<String> planHints) { planHints_ = planHints; }
+  public List<String> getPlanHints() { return planHints_; }
   public boolean isDistinct() { return isDistinct_; }
   public void setIsDistinct(boolean value) { isDistinct_ = value; }
   public boolean isStraightJoin() { return isStraightJoin_; }
-  public void setIsStraightJoin(boolean value) { isStraightJoin_ = value; }
+  public boolean hasPlanHints() { return planHints_ != null; }
+
+  public void analyzePlanHints(Analyzer analyzer) {
+    if (planHints_ == null) return;
+    for (String hint: planHints_) {
+      if (!hint.equalsIgnoreCase("straight_join")) {
+        analyzer.addWarning("PLAN hint not recognized: " + hint);
+      }
+      isStraightJoin_ = true;
+    }
+  }
 
   @Override
-  public SelectList clone() {
-    SelectList clone = new SelectList();
-    for (SelectListItem item: items_) {
-      clone.items_.add(item.clone());
-    }
-    clone.setIsDistinct(isDistinct_);
-    clone.setIsStraightJoin(isStraightJoin_);
-    return clone;
-  }
+  public SelectList clone() { return new SelectList(this); }
 }

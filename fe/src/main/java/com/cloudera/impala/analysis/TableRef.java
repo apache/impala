@@ -214,22 +214,22 @@ public class TableRef implements ParseNode {
     }
   }
 
-  /**
-   * Parse hints.
-   */
-  private void analyzeJoinHints() throws AnalysisException {
+  private void analyzeJoinHints(Analyzer analyzer) throws AnalysisException {
     if (joinHints_ == null) return;
     for (String hint: joinHints_) {
-      if (hint.toUpperCase().equals("BROADCAST")) {
-        if (joinOp_ == JoinOperator.RIGHT_OUTER_JOIN ||
-            joinOp_ == JoinOperator.FULL_OUTER_JOIN) {
-          throw new AnalysisException(joinOp_.toString() + " does not support BROADCAST.");
+      if (hint.equalsIgnoreCase("BROADCAST")) {
+        if (joinOp_ == JoinOperator.RIGHT_OUTER_JOIN
+            || joinOp_ == JoinOperator.FULL_OUTER_JOIN
+            || joinOp_ == JoinOperator.RIGHT_SEMI_JOIN
+            || joinOp_ == JoinOperator.RIGHT_ANTI_JOIN) {
+          throw new AnalysisException(
+              joinOp_.toString() + " does not support BROADCAST.");
         }
         if (isPartitionedJoin_) {
           throw new AnalysisException("Conflicting JOIN hint: " + hint);
         }
         isBroadcastJoin_ = true;
-      } else if (hint.toUpperCase().equals("SHUFFLE")) {
+      } else if (hint.equalsIgnoreCase("SHUFFLE")) {
         if (joinOp_ == JoinOperator.CROSS_JOIN) {
           throw new AnalysisException("CROSS JOIN does not support SHUFFLE.");
         }
@@ -238,7 +238,7 @@ public class TableRef implements ParseNode {
         }
         isPartitionedJoin_ = true;
       } else {
-        throw new AnalysisException("JOIN hint not recognized: " + hint);
+        analyzer.addWarning("JOIN hint not recognized: " + hint);
       }
     }
   }
@@ -250,7 +250,7 @@ public class TableRef implements ParseNode {
    */
   public void analyzeJoin(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(desc_ != null);
-    analyzeJoinHints();
+    analyzeJoinHints(analyzer);
     if (joinOp_ == JoinOperator.CROSS_JOIN) {
       // A CROSS JOIN is always a broadcast join, regardless of the join hints
       isBroadcastJoin_ = true;
@@ -368,6 +368,7 @@ public class TableRef implements ParseNode {
     }
 
     StringBuilder output = new StringBuilder(" " + joinOp_.toString() + " ");
+    if(joinHints_ != null) output.append(ToSqlUtils.getPlanHintsSql(joinHints_) + " ");
     output.append(tableRefToSql());
     if (usingColNames_ != null) {
       output.append(" USING (").append(Joiner.on(", ").join(usingColNames_)).append(")");

@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -21,11 +22,13 @@ import static org.junit.Assert.fail;
 import java.io.StringReader;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.Test;
 
 import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import com.cloudera.impala.common.AnalysisException;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class ParserTest {
@@ -182,18 +185,193 @@ public class ParserTest {
     ParserError("select * from tbl where f(tbl.*) = 5");
   }
 
+  /**
+   * Parses stmt and checks that the all table refs in stmt have the expected join hints.
+   * The expectedHints contains the hints of all table refs from left to right (starting
+   * with the second tableRef because the first one cannot have hints).
+   */
+  private void TestJoinHints(String stmt, String... expectedHints) {
+    SelectStmt selectStmt = (SelectStmt) ParsesOk(stmt);
+    Preconditions.checkState(selectStmt.getTableRefs().size() > 1);
+    List<String> actualHints = Lists.newArrayList();
+    assertEquals(null, selectStmt.getTableRefs().get(0).getJoinHints());
+    for (int i = 1; i < selectStmt.getTableRefs().size(); ++i) {
+      List<String> hints = selectStmt.getTableRefs().get(i).getJoinHints();
+      if (hints != null) actualHints.addAll(hints);
+    }
+    if (actualHints.isEmpty()) actualHints = Lists.<String>newArrayList((String) null);
+    assertEquals(Lists.newArrayList(expectedHints), actualHints);
+  }
+
+  /**
+   * Parses stmt and checks that the select-list plan hints in stmt are the
+   * expected hints.
+   */
+  private void TestSelectListHints(String stmt, String... expectedHints) {
+    SelectStmt selectStmt = (SelectStmt) ParsesOk(stmt);
+    List<String> actualHints = selectStmt.getSelectList().getPlanHints();
+    if (actualHints == null) actualHints = Lists.<String>newArrayList((String) null);
+    assertEquals(Lists.newArrayList(expectedHints), actualHints);
+  }
+
+  /**
+   * Parses stmt and checks that the insert hints stmt are the expected hints.
+   */
+  private void TestInsertHints(String stmt, String... expectedHints) {
+    InsertStmt insertStmt = (InsertStmt) ParsesOk(stmt);
+    List<String> actualHints = insertStmt.getPlanHints();
+    if (actualHints == null) actualHints = Lists.<String>newArrayList((String) null);
+    assertEquals(Lists.newArrayList(expectedHints), actualHints);
+  }
+
   @Test
-  public void TestJoinHints() {
-    ParsesOk("select * from functional.alltypes a join [broadcast] " +
+  public void TestPlanHints() {
+    // All plan-hint styles embed a comma-separated list of hints.
+    String[][] hintStyles = new String[][] {
+        new String[] { "/* +", "*/" }, // traditional commented hint
+        new String[] { "-- +", "\n" }, // eol commented hint
+        new String[] { "\n-- +", "\n" }, // eol commented hint
+        new String[] { "[", "]" } // legacy style
+    };
+    String[][] commentStyles = new String[][] {
+        new String[] { "/*", "*/" }, // traditional comment
+        new String[] { "--", "\n" } // eol comment
+    };
+    for (String[] hintStyle: hintStyles) {
+      String prefix = hintStyle[0];
+      String suffix = hintStyle[1];
+      // Test join hints.
+      TestJoinHints(String.format(
+          "select * from functional.alltypes a join %sbroadcast%s " +
+              "functional.alltypes b", prefix, suffix), "broadcast");
+      TestJoinHints(String.format(
+          "select * from functional.alltypes a join %sbroadcast%s " +
+              "functional.alltypes b using(id)", prefix, suffix), "broadcast");
+      TestJoinHints(String.format(
+          "select * from functional.alltypes a join %sbroadcast%s " +
+              "functional.alltypes b on(a.id = b.id)", prefix, suffix), "broadcast");
+      TestJoinHints(String.format(
+          "select * from functional.alltypes a cross join %sbroadcast%s " +
+              "functional.alltypes b", prefix, suffix), "broadcast");
+      // Multiple comma-separated hints.
+      TestJoinHints(String.format(
+          "select * from functional.alltypes a join " +
+              "%sbroadcast,shuffle,foo,bar%s " +
+              "functional.alltypes b using(id)", prefix, suffix),
+              "broadcast", "shuffle", "foo", "bar");
+      // Test hints in a multi-way join.
+      TestJoinHints(String.format(
+          "select * from functional.alltypes a " +
+              "join %sbroadcast%s functional.alltypes b using(id) " +
+              "join %sshuffle%s functional.alltypes c using(int_col) " +
+              "join %sbroadcast%s functional.alltypes d using(int_col) " +
+              "join %sshuffle%s functional.alltypes e using(string_col)",
+              prefix, suffix, prefix, suffix, prefix, suffix, prefix, suffix),
+              "broadcast", "shuffle", "broadcast", "shuffle");
+      // Test hints in a multi-way join (flipped prefix/suffix -> bad hint start/ends).
+      ParserError(String.format(
+          "select * from functional.alltypes a " +
+              "join %sbroadcast%s functional.alltypes b using(id) " +
+              "join %sshuffle%s functional.alltypes c using(int_col) " +
+              "join %sbroadcast%s functional.alltypes d using(int_col) " +
+              "join %sshuffle%s functional.alltypes e using(string_col)",
+              prefix, suffix, suffix, prefix, prefix, suffix, suffix, prefix));
+      // Test hints in a multi-way join (missing prefixes/suffixes).
+      ParserError(String.format(
+          "select * from functional.alltypes a " +
+              "join %sbroadcast%s functional.alltypes b using(id) " +
+              "join %sshuffle%s functional.alltypes c using(int_col) " +
+              "join %sbroadcast%s functional.alltypes d using(int_col) " +
+              "join %sshuffle%s functional.alltypes e using(string_col)",
+              suffix, suffix, suffix, suffix, prefix, "", "", ""));
+
+      // Test insert hints.
+      TestInsertHints(String.format(
+          "insert into t %snoshuffle%s select * from t", prefix, suffix),
+          "noshuffle");
+      TestInsertHints(String.format(
+          "insert overwrite t %snoshuffle%s select * from t", prefix, suffix),
+          "noshuffle");
+      TestInsertHints(String.format(
+          "insert into t partition(x, y) %snoshuffle%s select * from t",
+          prefix, suffix), "noshuffle");
+      TestInsertHints(String.format(
+          "insert into t(a, b) partition(x, y) %sshuffle%s select * from t",
+          prefix, suffix), "shuffle");
+      TestInsertHints(String.format(
+          "insert overwrite t(a, b) partition(x, y) %sfoo,bar,baz%s select * from t",
+          prefix, suffix), "foo", "bar", "baz");
+
+      // Test select-list hints (e.g., straight_join). The legacy-style hint has no
+      // prefix and suffix.
+      if (prefix.contains("[")) {
+        prefix = "";
+        suffix = "";
+      }
+      TestSelectListHints(String.format(
+          "select %sstraight_join%s * from functional.alltypes a", prefix, suffix),
+          "straight_join");
+      // Only the new hint-style is recognized
+      if (!prefix.equals("")) {
+        TestSelectListHints(String.format(
+            "select %sfoo,bar,baz%s * from functional.alltypes a", prefix, suffix),
+            "foo", "bar", "baz");
+      }
+      if (prefix.isEmpty()) continue;
+
+      // Test mixing commented hints and comments.
+      for (String[] commentStyle: commentStyles) {
+        String commentPrefix = commentStyle[0];
+        String commentSuffix = commentStyle[1];
+        String queryTemplate =
+            "$1comment$2 select $1comment$2 $3straight_join$4 $1comment$2 * " +
+            "from $1comment$2 functional.alltypes a join $1comment$2 $3shuffle$4 " +
+            "$1comment$2 functional.alltypes b $1comment$2 on $1comment$2 " +
+            "(a.id = b.id)";
+        String query = queryTemplate.replaceAll("\\$1", commentPrefix)
+            .replaceAll("\\$2", commentSuffix).replaceAll("\\$3", prefix)
+            .replaceAll("\\$4", suffix);
+        TestSelectListHints(query, "straight_join");
+        TestJoinHints(query, "shuffle");
+      }
+    }
+    // No "+" at the beginning so the comment is not recognized as a hint.
+    TestJoinHints("select * from functional.alltypes a join /* comment */" +
+        "functional.alltypes b using (int_col)", (String) null);
+    TestSelectListHints("select /* comment */ * from functional.alltypes",
+        (String) null);
+    TestInsertHints("insert into t(a, b) partition(x, y) /* comment */ select 1",
+        (String) null);
+    TestSelectListHints("select /* -- +straight_join */ * from functional.alltypes",
+        (String) null);
+    TestSelectListHints("select /* abcdef +straight_join */ * from functional.alltypes",
+        (String) null);
+    TestSelectListHints("select \n-- abcdef +straight_join\n * from functional.alltypes",
+        (String) null);
+    TestSelectListHints("select \n-- /*+straight_join\n * from functional.alltypes",
+        (String) null);
+
+    // Commented hints cannot span lines (recognized as comments instead).
+    TestSelectListHints("select /*\n +straight_join */ * from functional.alltypes",
+        (String) null);
+    TestSelectListHints("select /* +straight_join \n*/ * from functional.alltypes",
+        (String) null);
+    TestSelectListHints("select /* +straight_\njoin */ * from functional.alltypes",
+        (String) null);
+    ParserError("select -- +straight_join * from functional.alltypes");
+    ParserError("select \n-- +straight_join * from functional.alltypes");
+
+    // Missing "/*" or "/*"
+    ParserError("select * from functional.alltypes a join + */" +
         "functional.alltypes b using (int_col)");
-    ParsesOk("select * from functional.alltypes a join [bla,bla] " +
+    ParserError("select * from functional.alltypes a join /* + " +
         "functional.alltypes b using (int_col)");
-    ParsesOk("select * from functional.alltypes a cross join [bla,bla] " +
-        "functional.alltypes b"); // Parses but fails during analysis
-    ParserError("select * from functional.alltypes a join [bla bla] " +
-        "functional.alltypes b using (int_col)");
-    ParserError("select * from functional.alltypes a join [1 + 2] " +
-        "functional.alltypes b using (int_col)");
+
+    // Test empty hint tokens.
+    TestSelectListHints("select /* +straight_join, ,, */ * from functional.alltypes",
+        "straight_join");
+    // Traditional commented hints are not parsed inside a comment.
+    ParserError("select /* /* +straight_join */ */ * from functional.alltypes");
   }
 
   @Test
@@ -1124,77 +1302,75 @@ public class ParserTest {
   private void testInsert() {
     for (String qualifier: new String[] {"overwrite", "into"}) {
       for (String optTbl: new String[] {"", "table"}) {
-        for (String optHints: new String[] {"[shuffle]", "[badhint,noshuffle]", ""}) {
-          // Entire unpartitioned table.
-          ParsesOk(String.format("insert %s %s t %s select a from src where b > 5",
-              qualifier, optTbl, optHints));
-          // Static partition with one partitioning key.
-          ParsesOk(String.format(
-              "insert %s %s t partition (pk1=10) %s select a from src where b > 5",
-              qualifier, optTbl, optHints));
-          // Dynamic partition with one partitioning key.
-          ParsesOk(String.format(
-              "insert %s %s t partition (pk1) %s select a from src where b > 5",
-              qualifier, optTbl, optHints));
-          // Static partition with two partitioning keys.
-          ParsesOk(String.format("insert %s %s t partition (pk1=10, pk2=20) %s " +
-              "select a from src where b > 5",
-              qualifier, optTbl, optHints));
-          // Fully dynamic partition with two partitioning keys.
-          ParsesOk(String.format(
-              "insert %s %s t partition (pk1, pk2) %s select a from src where b > 5",
-              qualifier, optTbl, optHints));
-          // Partially dynamic partition with two partitioning keys.
-          ParsesOk(String.format(
-              "insert %s %s t partition (pk1=10, pk2) %s select a from src where b > 5",
-              qualifier, optTbl, optHints));
-          // Partially dynamic partition with two partitioning keys.
-          ParsesOk(String.format(
-              "insert %s %s t partition (pk1, pk2=20) %s select a from src where b > 5",
-              qualifier, optTbl, optHints));
-          // Static partition with two NULL partitioning keys.
-          ParsesOk(String.format("insert %s %s t partition (pk1=NULL, pk2=NULL) %s " +
-              "select a from src where b > 5",
-              qualifier, optTbl, optHints));
-          // Static partition with boolean partitioning keys.
-          ParsesOk(String.format("insert %s %s t partition (pk1=false, pk2=true) %s " +
-              "select a from src where b > 5",
-              qualifier, optTbl, optHints));
-          // Static partition with arbitrary exprs as partitioning keys.
-          ParsesOk(String.format("insert %s %s t partition (pk1=abc, pk2=(5*8+10)) %s " +
-              "select a from src where b > 5",
-              qualifier, optTbl, optHints));
-          ParsesOk(String.format(
-              "insert %s %s t partition (pk1=f(a), pk2=!true and false) %s " +
-              "select a from src where b > 5",
-              qualifier, optTbl, optHints));
-          // Permutation
-          ParsesOk(String.format("insert %s %s t(a,b,c) %s values(1,2,3)",
-              qualifier, optTbl, optHints));
-          // Permutation with mismatched select list (should parse fine)
-          ParsesOk(String.format("insert %s %s t(a,b,c) %s values(1,2,3,4,5,6)",
-              qualifier, optTbl, optHints));
-          // Permutation and partition
-          ParsesOk(String.format("insert %s %s t(a,b,c) partition(d) %s values(1,2,3,4)",
-              qualifier, optTbl, optHints));
-          // Empty permutation list
-          ParsesOk(String.format("insert %s %s t() %s select 1 from a",
-              qualifier, optTbl, optHints));
-          // Permutation with optional query statement
-          ParsesOk(String.format("insert %s %s t() partition(d) %s",
-              qualifier, optTbl, optHints));
-          ParsesOk(String.format("insert %s %s t() %s",
-              qualifier, optTbl, optHints));
-          // No comma in permutation list
-          ParserError(String.format("insert %s %s t(a b c) %s select 1 from a",
-              qualifier, optTbl, optHints));
-          // Can't use strings as identifiers in permutation list
-          ParserError(String.format("insert %s %s t('a') %s select 1 from a",
-              qualifier, optTbl, optHints));
-          // Expressions not allowed in permutation list
-          ParserError(String.format("insert %s %s t(a=1, b) %s select 1 from a",
-              qualifier, optTbl, optHints));
-        }
+        // Entire unpartitioned table.
+        ParsesOk(String.format("insert %s %s t select a from src where b > 5",
+            qualifier, optTbl));
+        // Static partition with one partitioning key.
+        ParsesOk(String.format(
+            "insert %s %s t partition (pk1=10) select a from src where b > 5",
+            qualifier, optTbl));
+        // Dynamic partition with one partitioning key.
+        ParsesOk(String.format(
+            "insert %s %s t partition (pk1) select a from src where b > 5",
+            qualifier, optTbl));
+        // Static partition with two partitioning keys.
+        ParsesOk(String.format("insert %s %s t partition (pk1=10, pk2=20) " +
+            "select a from src where b > 5",
+            qualifier, optTbl));
+        // Fully dynamic partition with two partitioning keys.
+        ParsesOk(String.format(
+            "insert %s %s t partition (pk1, pk2) select a from src where b > 5",
+            qualifier, optTbl));
+        // Partially dynamic partition with two partitioning keys.
+        ParsesOk(String.format(
+            "insert %s %s t partition (pk1=10, pk2) select a from src where b > 5",
+            qualifier, optTbl));
+        // Partially dynamic partition with two partitioning keys.
+        ParsesOk(String.format(
+            "insert %s %s t partition (pk1, pk2=20) select a from src where b > 5",
+            qualifier, optTbl));
+        // Static partition with two NULL partitioning keys.
+        ParsesOk(String.format("insert %s %s t partition (pk1=NULL, pk2=NULL) " +
+            "select a from src where b > 5",
+            qualifier, optTbl));
+        // Static partition with boolean partitioning keys.
+        ParsesOk(String.format("insert %s %s t partition (pk1=false, pk2=true) " +
+            "select a from src where b > 5",
+            qualifier, optTbl));
+        // Static partition with arbitrary exprs as partitioning keys.
+        ParsesOk(String.format("insert %s %s t partition (pk1=abc, pk2=(5*8+10)) " +
+            "select a from src where b > 5",
+            qualifier, optTbl));
+        ParsesOk(String.format(
+            "insert %s %s t partition (pk1=f(a), pk2=!true and false) " +
+                "select a from src where b > 5",
+                qualifier, optTbl));
+        // Permutation
+        ParsesOk(String.format("insert %s %s t(a,b,c) values(1,2,3)",
+            qualifier, optTbl));
+        // Permutation with mismatched select list (should parse fine)
+        ParsesOk(String.format("insert %s %s t(a,b,c) values(1,2,3,4,5,6)",
+            qualifier, optTbl));
+        // Permutation and partition
+        ParsesOk(String.format("insert %s %s t(a,b,c) partition(d) values(1,2,3,4)",
+            qualifier, optTbl));
+        // Empty permutation list
+        ParsesOk(String.format("insert %s %s t() select 1 from a",
+            qualifier, optTbl));
+        // Permutation with optional query statement
+        ParsesOk(String.format("insert %s %s t() partition(d) ",
+            qualifier, optTbl));
+        ParsesOk(String.format("insert %s %s t() ",
+            qualifier, optTbl));
+        // No comma in permutation list
+        ParserError(String.format("insert %s %s t(a b c) select 1 from a",
+            qualifier, optTbl));
+        // Can't use strings as identifiers in permutation list
+        ParserError(String.format("insert %s %s t('a') select 1 from a",
+            qualifier, optTbl));
+        // Expressions not allowed in permutation list
+        ParserError(String.format("insert %s %s t(a=1, b) select 1 from a",
+            qualifier, optTbl));
       }
     }
   }

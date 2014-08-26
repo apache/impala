@@ -632,29 +632,138 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
   @Test
   public void TestJoinHints() throws AnalysisException {
-    AnalyzesOk("select * from functional.alltypes a join [broadcast] " +
-        "functional.alltypes b using (int_col)");
-    AnalyzesOk("select * from functional.alltypes a join [shuffle] " +
-        "functional.alltypes b using (int_col)");
-    AnalyzesOk("select * from functional.alltypes a cross join [broadcast] " +
-        "functional.alltypes b");
-    AnalysisError(
-        "select * from functional.alltypes a join [broadcast,shuffle] " +
-         "functional.alltypes b using (int_col)",
-        "Conflicting JOIN hint: shuffle");
-    AnalysisError(
-        "select * from functional.alltypes a join [bla] " +
-         "functional.alltypes b using (int_col)",
-        "JOIN hint not recognized: bla");
-    AnalysisError("select * from functional.alltypes a cross join [shuffle] " +
-        "functional.alltypes b",
-        "CROSS JOIN does not support SHUFFLE.");
-    AnalysisError("select * from functional.alltypes a right outer join [broadcast] " +
-        "functional.alltypes b using (int_col)",
-        "RIGHT OUTER JOIN does not support BROADCAST.");
-    AnalysisError("select * from functional.alltypes a full outer join [broadcast] " +
-        "functional.alltypes b using (int_col)",
-        "FULL OUTER JOIN does not support BROADCAST.");
+    String[][] hintStyles = new String[][] {
+        new String[] { "/* +", "*/" }, // traditional commented hint
+        new String[] { "\n-- +", "\n" }, // eol commented hint
+        new String[] { "[", "]" } // legacy style
+    };
+    for (String[] hintStyle: hintStyles) {
+      String prefix = hintStyle[0];
+      String suffix = hintStyle[1];
+      AnalyzesOk(
+          String.format("select * from functional.alltypes a join %sbroadcast%s " +
+          "functional.alltypes b using (int_col)", prefix, suffix));
+      AnalyzesOk(
+          String.format("select * from functional.alltypes a join %sshuffle%s " +
+          "functional.alltypes b using (int_col)", prefix, suffix));
+      AnalyzesOk(
+          String.format("select * from functional.alltypes a cross join %sbroadcast%s " +
+          "functional.alltypes b", prefix, suffix));
+      // Only warn on unrecognized hints for view-compatibility with Hive.
+      AnalyzesOk(
+          String.format("select * from functional.alltypes a join %sbadhint%s " +
+              "functional.alltypes b using (int_col)", prefix, suffix),
+          "JOIN hint not recognized: badhint");
+      // Hints must be comma separated. Legacy-style hint does not parse because
+      // of space-separated identifiers.
+      if (!prefix.contains("[")) {
+        AnalyzesOk(String.format(
+            "select * from functional.alltypes a join %sbroadcast broadcast%s " +
+                "functional.alltypes b using (int_col)", prefix, suffix),
+            "JOIN hint not recognized: broadcast broadcast");
+      }
+      AnalysisError(
+          String.format("select * from functional.alltypes a cross join %sshuffle%s " +
+          "functional.alltypes b", prefix, suffix),
+          "CROSS JOIN does not support SHUFFLE.");
+      AnalysisError(String.format(
+          "select * from functional.alltypes a right outer join %sbroadcast%s " +
+              "functional.alltypes b using (int_col)", prefix, suffix),
+          "RIGHT OUTER JOIN does not support BROADCAST.");
+      AnalysisError(String.format(
+          "select * from functional.alltypes a full outer join %sbroadcast%s " +
+          "functional.alltypes b using (int_col)", prefix, suffix),
+          "FULL OUTER JOIN does not support BROADCAST.");
+      AnalysisError(String.format(
+          "select * from functional.alltypes a right semi join %sbroadcast%s " +
+          "functional.alltypes b using (int_col)", prefix, suffix),
+          "RIGHT SEMI JOIN does not support BROADCAST.");
+      AnalysisError(String.format(
+          "select * from functional.alltypes a right anti join %sbroadcast%s " +
+          "functional.alltypes b using (int_col)", prefix, suffix),
+          "RIGHT ANTI JOIN does not support BROADCAST.");
+      // Conflicting join hints.
+      AnalysisError(String.format(
+          "select * from functional.alltypes a join %sbroadcast,shuffle%s " +
+              "functional.alltypes b using (int_col)", prefix, suffix),
+          "Conflicting JOIN hint: shuffle");
+    }
+  }
+
+  @Test
+  public void TestSelectListHints() throws AnalysisException {
+    String[][] hintStyles = new String[][] {
+        new String[] { "/* +", "*/" }, // traditional commented hint
+        new String[] { "\n-- +", "\n" }, // eol commented hint
+        new String[] { "", "" } // legacy style
+    };
+    for (String[] hintStyle: hintStyles) {
+      String prefix = hintStyle[0];
+      String suffix = hintStyle[1];
+      AnalyzesOk(String.format(
+          "select %sstraight_join%s * from functional.alltypes", prefix, suffix));
+      AnalyzesOk(String.format(
+          "select %sStrAigHt_jOiN%s * from functional.alltypes", prefix, suffix));
+      if (!prefix.equals("")) {
+        // Only warn on unrecognized hints for view-compatibility with Hive.
+        // Legacy hint style does not parse.
+        AnalyzesOk(String.format(
+            "select %sbadhint%s * from functional.alltypes", prefix, suffix),
+            "PLAN hint not recognized: badhint");
+        // Multiple hints. Legacy hint style does not parse.
+        AnalyzesOk(String.format(
+            "select %sstraight_join,straight_join%s * from functional.alltypes",
+            prefix, suffix));
+      }
+    }
+  }
+
+  @Test
+  public void TestInsertHints() throws AnalysisException {
+    String[][] hintStyles = new String[][] {
+        new String[] { "/* +", "*/" }, // traditional commented hint
+        new String[] { "\n-- +", "\n" }, // eol commented hint
+        new String[] { "[", "]" } // legacy style
+    };
+    for (String[] hintStyle: hintStyles) {
+      String prefix = hintStyle[0];
+      String suffix = hintStyle[1];
+      // Test plan hints for partitioned Hdfs tables.
+      AnalyzesOk(String.format("insert into functional.alltypessmall " +
+          "partition (year, month) %sshuffle%s select * from functional.alltypes",
+          prefix, suffix));
+      AnalyzesOk(String.format("insert into table functional.alltypessmall " +
+          "partition (year, month) %snoshuffle%s select * from functional.alltypes",
+          prefix, suffix));
+      // Only warn on unrecognized hints.
+      AnalyzesOk(String.format("insert into functional.alltypessmall " +
+          "partition (year, month) %sbadhint%s select * from functional.alltypes",
+          prefix, suffix),
+          "INSERT hint not recognized: badhint");
+      // Plan hints require a partition clause.
+      AnalysisError(String.format(
+          "insert into table functional.alltypesnopart %sshuffle%s " +
+          "select * from functional.alltypesnopart", prefix, suffix),
+          "INSERT hints are only supported for inserting into partitioned Hdfs tables.");
+      // Plan hints do not make sense for inserting into HBase tables.
+      AnalysisError(String.format(
+          "insert into table functional_hbase.alltypes %sshuffle%s " +
+          "select * from functional_hbase.alltypes", prefix, suffix),
+          "INSERT hints are only supported for inserting into partitioned Hdfs tables.");
+      // Conflicting plan hints.
+      AnalysisError("insert into table functional.alltypessmall " +
+          "partition (year, month) /* +shuffle,noshuffle */ " +
+          "select * from functional.alltypes",
+          "Conflicting INSERT hint: noshuffle");
+    }
+
+    // Multiple non-conflicting hints and case insensitivity of hints.
+    AnalyzesOk("insert into table functional.alltypessmall " +
+        "partition (year, month) /* +shuffle, ShUfFlE */ " +
+        "select * from functional.alltypes");
+    AnalyzesOk("insert into table functional.alltypessmall " +
+        "partition (year, month) [shuffle, ShUfFlE] " +
+        "select * from functional.alltypes");
   }
 
   @Test
@@ -1694,8 +1803,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Multiple non-conflicting hints and case insensitivity of hints.
     AnalyzesOk("insert into table functional.alltypessmall " +
         "partition (year, month) [shuffle, ShUfFlE] select * from functional.alltypes");
-    // Unknown plan hint,
-    AnalysisError("insert into functional.alltypessmall " +
+    // Unknown plan hint. Expect a warning but no error.
+    AnalyzesOk("insert into functional.alltypessmall " +
         "partition (year, month) [badhint] select * from functional.alltypes",
         "INSERT hint not recognized: badhint");
     // Conflicting plan hints.

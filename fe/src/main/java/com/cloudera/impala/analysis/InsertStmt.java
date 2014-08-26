@@ -144,6 +144,7 @@ public class InsertStmt extends StatementBase {
     table_ = other.table_;
   }
 
+  @Override
   public InsertStmt clone() { return new InsertStmt(this); }
 
   @Override
@@ -287,7 +288,7 @@ public class InsertStmt extends StatementBase {
     prepareExpressions(selectExprTargetColumns, selectListExprs, table_, analyzer);
     // Analyze plan hints at the end to prefer reporting other error messages first
     // (e.g., the PARTITION clause is not applicable to unpartitioned and HBase tables).
-    analyzePlanHints();
+    analyzePlanHints(analyzer);
   }
 
   /**
@@ -578,7 +579,7 @@ public class InsertStmt extends StatementBase {
     return expr.castTo(compatibleType);
   }
 
-  private void analyzePlanHints() throws AnalysisException {
+  private void analyzePlanHints(Analyzer analyzer) throws AnalysisException {
     if (planHints_ == null) return;
     if (!planHints_.isEmpty() &&
         (partitionKeyValues_ == null || table_ instanceof HBaseTable)) {
@@ -597,15 +598,12 @@ public class InsertStmt extends StatementBase {
         }
         isRepartition_ = Boolean.FALSE;
       } else {
-        throw new AnalysisException("INSERT hint not recognized: " + hint);
+        analyzer.addWarning("INSERT hint not recognized: " + hint);
       }
-    }
-    if (table_ instanceof HBaseTable && isRepartition_) {
-      throw new AnalysisException("INSERT hints are only supported for inserting into " +
-          "partitioned Hdfs tables.");
     }
   }
 
+  public List<String> getPlanHints() { return planHints_; }
   public TableName getTargetTableName() { return targetTableName_; }
   public Table getTargetTable() { return table_; }
   public void setTargetTable(Table table) { this.table_ = table; }
@@ -653,7 +651,7 @@ public class InsertStmt extends StatementBase {
       strBuilder.append(" PARTITION (" + Joiner.on(", ").join(values) + ")");
     }
     if (planHints_ != null) {
-      strBuilder.append(" [" + Joiner.on(", ").join(planHints_) + "]");
+      strBuilder.append(" " + ToSqlUtils.getPlanHintsSql(planHints_));
     }
     if (!needsGeneratedQueryStatement_) {
       strBuilder.append(" " + queryStmt_.toSql());

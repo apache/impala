@@ -240,4 +240,18 @@ public class ToSqlUtils {
     }
     return "(" + Joiner.on(", ").join(properties) + ")";
   }
+
+  /**
+   * Returns a SQL representation of the given list of hints. Uses the end-of-line
+   * commented plan hint style such that hinted views created by Impala are readable by
+   * Hive (parsed as a comment by Hive).
+   */
+  public static String getPlanHintsSql(List<String> hints) {
+    if (hints == null || hints.isEmpty()) return "";
+    StringBuilder sb = new StringBuilder();
+    sb.append("\n-- +");
+    sb.append(Joiner.on(",").join(hints));
+    sb.append("\n");
+    return sb.toString();
+  }
 }

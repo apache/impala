@@ -251,3 +251,41 @@ select * from ddl_test_db.decimal_view
 ---- TYPES
 decimal,decimal,decimal,decimal,decimal,decimal
 ====
+---- QUERY
+# Test that plan hints are stored in the view as end-of-line commented hints
+# for view-compatibility with Hive.
+create view ddl_test_db.hints_test as
+select /* +straight_join */ a.* from functional.alltypestiny a
+inner join /* +broadcast */ functional.alltypes b on a.id = b.id
+inner join /* +shuffle */ functional.alltypessmall c on b.id = c.id
+---- RESULTS
+====
+---- QUERY
+describe formatted ddl_test_db.hints_test
+---- TYPES
+string,string,string
+---- RESULTS: VERIFY_IS_SUBSET
+'# View Information','NULL','NULL'
+'View Original Text: ','SELECT ','NULL'
+'-- +straight_join','NULL','NULL'
+' a.* FROM functional.alltypestiny a INNER JOIN ','NULL','NULL'
+'-- +broadcast','NULL','NULL'
+' functional.alltypes b ON a.id = b.id INNER JOIN ','NULL','NULL'
+'-- +shuffle','NULL','NULL'
+' functional.alltypessmall c ON b.id = c.id','NULL','NULL'
+'View Expanded Text: ','SELECT ','NULL'
+'-- +straight_join','NULL','NULL'
+' a.* FROM functional.alltypestiny a INNER JOIN ','NULL','NULL'
+'-- +broadcast','NULL','NULL'
+' functional.alltypes b ON a.id = b.id INNER JOIN ','NULL','NULL'
+'-- +shuffle','NULL','NULL'
+' functional.alltypessmall c ON b.id = c.id','NULL','NULL'
+====
+---- QUERY
+# Test querying the hinted view.
+select count(*) from ddl_test_db.hints_test
+---- RESULTS
+8
+---- TYPES
+bigint
+====

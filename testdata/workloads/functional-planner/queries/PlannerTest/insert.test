@@ -441,6 +441,27 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ====
+# same as above but with traditional commented hint
+insert into table functional.alltypes partition(year, month) /* +noshuffle */
+select * from functional.alltypes
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
+|  partitions=24
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
+# same as above but with enf-of-line commented hint
+insert into table functional.alltypes partition(year, month)
+-- +noshuffle
+select * from functional.alltypes
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
+|  partitions=24
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
 # test that the planner does not repartition before the table sink
 # alltypes has column stats and since year only has 2 distinct values the planner
 # should choose not to repartition before the table sink

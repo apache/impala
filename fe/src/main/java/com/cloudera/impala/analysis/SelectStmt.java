@@ -162,6 +162,9 @@ public class SelectStmt extends QueryStmt {
       throw new AnalysisException("Found missing tables. Aborting analysis.");
     }
 
+    // analyze plan hints from select list
+    selectList_.analyzePlanHints(analyzer);
+
     // populate resultExprs_, aliasSmap_, and colLabels_
     for (int i = 0; i < selectList_.getItems().size(); ++i) {
       SelectListItem item = selectList_.getItems().get(i);
@@ -730,6 +733,9 @@ public class SelectStmt extends QueryStmt {
     strBuilder.append("SELECT ");
     if (selectList_.isDistinct()) {
       strBuilder.append("DISTINCT ");
+    }
+    if (selectList_.hasPlanHints()) {
+      strBuilder.append(ToSqlUtils.getPlanHintsSql(selectList_.getPlanHints()) + " ");
     }
     for (int i = 0; i < selectList_.getItems().size(); ++i) {
       strBuilder.append(selectList_.getItems().get(i).toSql());

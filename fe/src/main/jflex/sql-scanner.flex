@@ -260,6 +260,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
 
   public static boolean isKeyword(Integer tokenId) {
     String token = tokenIdMap.get(tokenId);
+    if (token == null) return false;
     return keywordMap.containsKey(token.toLowerCase());
   }
 
@@ -292,6 +293,11 @@ IdentifierOrKw = [:digit:]*[:jletter:][:jletterdigit:]* | "&&" | "||"
 QuotedIdentifier = \`(\\.|[^\\\`])*\`
 SingleQuoteStringLiteral = \'(\\.|[^\\\'])*\'
 DoubleQuoteStringLiteral = \"(\\.|[^\\\"])*\"
+
+// Both types of plan hints must appear within a single line.
+TraditionalCommentedPlanHints = "/*" [ ]* "+" [^\r\n*]* "*/"
+// Must end with a line terminator.
+EndOfLineCommentedPlanHints = "--" [ ]* "+" {NonTerminator}* {LineTerminator}
 
 Comment = {TraditionalComment} | {EndOfLineComment}
 TraditionalComment = "/*" [^*] ~"*/" | "/*" "*"+ "/"
@@ -373,6 +379,20 @@ EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
 
 {DoubleQuoteStringLiteral} {
   return newToken(SqlParserSymbols.STRING_LITERAL, yytext().substring(1, yytext().length()-1));
+}
+
+{TraditionalCommentedPlanHints} {
+  String text = yytext();
+  // Remove everything before the first '+' as well as the trailing "*/"
+  String hintStr = text.substring(text.indexOf('+') + 1, text.length() - 2);
+  return newToken(SqlParserSymbols.COMMENTED_PLAN_HINTS, hintStr.trim());
+}
+
+{EndOfLineCommentedPlanHints} {
+  String text = yytext();
+  // Remove everything before the first '+'
+  String hintStr = text.substring(text.indexOf('+') + 1);
+  return newToken(SqlParserSymbols.COMMENTED_PLAN_HINTS, hintStr.trim());
 }
 
 {Comment} { /* ignore */ }

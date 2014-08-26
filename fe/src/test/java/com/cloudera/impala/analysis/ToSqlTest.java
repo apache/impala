@@ -247,6 +247,55 @@ public class ToSqlTest extends AnalyzerTest {
         joinTypes_, joinConditions_);
   }
 
+  /**
+   * Tests that the toSql() of plan hints use the end-of-line commented hint style
+   * (for view compatibility with Hive) regardless of what style was used in the
+   * original query.
+   */
+  @Test
+  public void planHintsTest() {
+    String[][] hintStyles = new String[][] {
+        new String[] { "/* +", "*/" }, // traditional commented hint
+        new String[] { "\n-- +", "\n" }, // eol commented hint
+        new String[] { "[", "]" } // legacy style
+    };
+    for (String[] hintStyle: hintStyles) {
+      String prefix = hintStyle[0];
+      String suffix = hintStyle[1];
+
+      // Join hint.
+      testToSql(String.format(
+          "select * from functional.alltypes a join %sbroadcast%s " +
+          "functional.alltypes b on a.id = b.id", prefix, suffix),
+          "SELECT * FROM functional.alltypes a INNER JOIN \n-- +broadcast\n " +
+          "functional.alltypes b ON a.id = b.id");
+
+      // Insert hint.
+      testToSql(String.format(
+          "insert into functional.alltypes(int_col, bool_col) " +
+          "partition(year, month) %snoshuffle%s " +
+          "select int_col, bool_col, year, month from functional.alltypes",
+          prefix, suffix),
+          "INSERT INTO TABLE functional.alltypes(int_col, bool_col) " +
+              "PARTITION (year, month) \n-- +noshuffle\n " +
+          "SELECT int_col, bool_col, year, month FROM functional.alltypes");
+
+      // Select-list hint. The legacy-style hint has no prefix and suffix.
+      if (prefix.contains("[")) {
+        prefix = "";
+        suffix = "";
+      }
+      // Comment-style select-list plan hint.
+      testToSql(String.format(
+          "select %sstraight_join%s * from functional.alltypes", prefix, suffix),
+          "SELECT \n-- +straight_join\n * FROM functional.alltypes");
+      testToSql(
+          String.format("select distinct %sstraight_join%s * from functional.alltypes",
+          prefix, suffix),
+          "SELECT DISTINCT \n-- +straight_join\n * FROM functional.alltypes");
+    }
+  }
+
   // Test the toSql() output of aggregate and group by expressions.
   @Test
   public void aggregationTest() {
