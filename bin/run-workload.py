@@ -227,6 +227,7 @@ if __name__ == "__main__":
 
   # Run all the workloads serially
   result_map = dict()
+  exit_code = 0
   for workload_runner in workload_runners:
     try:
       if plugin_runner: plugin_runner.run_plugins_pre(scope="Workload")
@@ -235,6 +236,9 @@ if __name__ == "__main__":
     finally:
       key = "%s_%s" % (workload_runner.workload.name, workload_runner.scale_factor)
       result_map[key] = workload_runner.results
+
+      if not all(result.success for result in workload_runner.results): exit_code = 1
+
       # Print the results
       print "\nWorkload: {0}, Scale Factor: {1}\n".format(
           workload_runner.workload.name.upper(), workload_runner.scale_factor)
@@ -243,3 +247,5 @@ if __name__ == "__main__":
   # Store the results
   with open(options.results_json_file, 'w') as f:
     json.dump(result_map, f, cls=CustomJSONEncoder)
+
+  exit(exit_code)
