@@ -30,7 +30,6 @@ struct ExprValue {
   int64_t bigint_val;
   float float_val;
   double double_val;
-  char* char_val;
   StringValue string_val;
   TimestampValue timestamp_val;
   Decimal4Value decimal4_val;
@@ -165,6 +164,8 @@ struct ExprValue {
         return NULL;
     }
   }
+
+  std::string& GetStringData() { return string_data; }
 
  private:
   std::string string_data; // Stores the data for string_val if necessary.

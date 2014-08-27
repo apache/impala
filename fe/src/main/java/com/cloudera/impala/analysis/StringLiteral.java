@@ -38,6 +38,11 @@ public class StringLiteral extends LiteralExpr {
     type_ = Type.STRING;
   }
 
+  public StringLiteral(String value, Type type) {
+    this.value_ = value;
+    type_ = type;
+  }
+
   /**
    * Copy c'tor used in clone().
    */
@@ -86,9 +91,11 @@ public class StringLiteral extends LiteralExpr {
   @Override
   protected Expr uncheckedCastTo(Type targetType) throws AnalysisException {
     Preconditions.checkState(targetType.isNumericType() || targetType.isDateType()
-        || targetType.equals(this.type_));
+        || targetType.equals(this.type_) || targetType.isStringType());
     if (targetType.equals(this.type_)) {
       return this;
+    } else if (targetType.isStringType()) {
+      return new StringLiteral(value_, targetType);
     } else if (targetType.isNumericType()) {
       return convertToNumber();
     } else if (targetType.isDateType()) {

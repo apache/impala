@@ -173,3 +173,42 @@ char
 '6a   '
 '6a   '
 ====
+---- QUERY
+drop table if exists char_parts
+====
+---- QUERY
+create table if not exists char_parts (vc varchar(32)) partitioned by
+(csp char(5), clp char(140), vcp varchar(32))
+====
+---- QUERY
+insert into char_parts (csp, clp, vcp, vc) select cs, cl, vc, vc from chars_tiny
+====
+---- QUERY
+select csp, clp, vcp from char_parts where csp != cast('dne' as char(5)) order by csp
+---- TYPES
+char, char, string
+---- RESULTS
+'1aaaa','1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','1cccc'
+'2aaaa','2bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','2cccccc'
+'3aaa ','3bbbbb                                                                                                                                      ','3ccc'
+'4aa  ','4bbbb                                                                                                                                       ','4cc'
+'5a   ','5bbb                                                                                                                                        ','5c'
+'6a   ','6b                                                                                                                                          ','6c'
+'6a   ','6b                                                                                                                                          ','6c'
+'a    ','b                                                                                                                                           ','c'
+====
+---- QUERY
+insert into char_parts partition (csp=cast('foo' as char(5)), 
+clp=cast('01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789xxxxxxx' as char(140)),
+vcp=cast('myvar' as varchar(32))) select cast('val' as varchar(32));
+====
+---- QUERY
+select csp, clp, vcp from char_parts where csp = cast('foo' as char(3))
+---- TYPES
+char, char, string
+---- RESULTS
+'foo  ','01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789','myvar'
+====
+---- QUERY
+drop table if exists char_parts
+====

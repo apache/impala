@@ -68,6 +68,8 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
         e = new NumericLiteral(value, type);
         break;
       case STRING:
+      case VARCHAR:
+      case CHAR:
         e = new StringLiteral(value);
         break;
       case DATE:
@@ -204,6 +206,8 @@ public abstract class LiteralExpr extends Expr implements Comparable<LiteralExpr
         }
         break;
       case STRING:
+      case VARCHAR:
+      case CHAR:
         if (val.isSetString_val()) result = new StringLiteral(val.string_val);
         break;
       case DATE:

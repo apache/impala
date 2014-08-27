@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import java.util.HashMap;
 
 import com.cloudera.impala.catalog.AggregateFunction;
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
@@ -104,6 +105,21 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
     if (fn_.getNumArgs() > 8) {
       throw new AnalysisException(
           "UDAs with more than 8 arguments are not yet supported.");
+    }
+
+    if (uda_.getReturnType().getPrimitiveType() == PrimitiveType.CHAR) {
+      throw new AnalysisException("UDAs with CHAR return type are not yet supported.");
+    }
+    if (uda_.getReturnType().getPrimitiveType() == PrimitiveType.VARCHAR) {
+      throw new AnalysisException("UDAs with VARCHAR return type are not yet supported.");
+    }
+    for (int i = 0; i < uda_.getNumArgs(); ++i) {
+      if (uda_.getArgs()[i].getPrimitiveType() == PrimitiveType.CHAR) {
+        throw new AnalysisException("UDAs with CHAR arguments are not yet supported.");
+      }
+      if (uda_.getArgs()[i].getPrimitiveType() == PrimitiveType.VARCHAR) {
+        throw new AnalysisException("UDAs with VARCHAR arguments are not yet supported.");
+      }
     }
 
     if (intermediateType_ == null) {

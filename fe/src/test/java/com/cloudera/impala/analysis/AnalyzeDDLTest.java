@@ -1308,6 +1308,22 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Hive UDFs that use DECIMAL are not yet supported.");
     AnalysisError("create function foo(Decimal) RETURNS int LOCATION '/a.jar'",
         "Hive UDFs that use DECIMAL are not yet supported.");
+    AnalysisError("create function foo(char(5)) RETURNS int LOCATION '/a.jar'",
+        "UDFs that use CHAR are not yet supported.");
+    AnalysisError("create function foo(varchar(5)) RETURNS int LOCATION '/a.jar'",
+        "UDFs that use VARCHAR are not yet supported.");
+    AnalysisError("create function foo() RETURNS CHAR(5) LOCATION '/a.jar'",
+        "UDFs that use CHAR are not yet supported.");
+    AnalysisError("create function foo() RETURNS VARCHAR(5) LOCATION '/a.jar'",
+        "UDFs that use VARCHAR are not yet supported.");
+    AnalysisError("create function foo() RETURNS CHAR(5)" + udfSuffix,
+        "UDFs that use CHAR are not yet supported.");
+    AnalysisError("create function foo() RETURNS VARCHAR(5)" + udfSuffix,
+        "UDFs that use VARCHAR are not yet supported.");
+    AnalysisError("create function foo(CHAR(5)) RETURNS int" + udfSuffix,
+        "UDFs that use CHAR are not yet supported.");
+    AnalysisError("create function foo(VARCHAR(5)) RETURNS int" + udfSuffix,
+        "UDFs that use VARCHAR are not yet supported.");
 
     AnalyzesOk("create function foo() RETURNS decimal" + udfSuffix);
     AnalyzesOk("create function foo() RETURNS decimal(38,10)" + udfSuffix);
@@ -1519,6 +1535,20 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         + "foo(int, int, int, int, int, int, int , int, int) "
         + "RETURNS int" + loc,
       "UDAs with more than 8 arguments are not yet supported.");
+
+    // Check that CHAR and VARCHAR are not valid UDA argument or return types
+    String symbols =
+        " UPDATE_FN='_Z9AggUpdatePN10impala_udf15FunctionContextERKNS_6IntValEPS2_' " +
+        "INIT_FN='_Z7AggInitPN10impala_udf15FunctionContextEPNS_6IntValE' " +
+        "MERGE_FN='_Z8AggMergePN10impala_udf15FunctionContextERKNS_6IntValEPS2_'";
+    AnalysisError("create aggregate function foo(CHAR(5)) RETURNS int" + loc + symbols,
+        "UDAs with CHAR arguments are not yet supported.");
+    AnalysisError("create aggregate function foo(VARCHAR(5)) RETURNS int" + loc + symbols,
+        "UDAs with VARCHAR arguments are not yet supported.");
+    AnalysisError("create aggregate function foo(int) RETURNS CHAR(5)" + loc + symbols,
+        "UDAs with CHAR return type are not yet supported.");
+    AnalysisError("create aggregate function foo(int) RETURNS VARCHAR(5)" + loc + symbols,
+        "UDAs with VARCHAR return type are not yet supported.");
 
     // Specify the complete symbol. If the user does this, we can't guess the
     // other function names.

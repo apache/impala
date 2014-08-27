@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import java.util.HashMap;
 
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
@@ -76,6 +77,21 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
           throw new AnalysisException(
               "Hive UDFs that use DECIMAL are not yet supported.");
         }
+      }
+    }
+
+    if (udf_.getReturnType().getPrimitiveType() == PrimitiveType.CHAR) {
+      throw new AnalysisException("UDFs that use CHAR are not yet supported.");
+    }
+    if (udf_.getReturnType().getPrimitiveType() == PrimitiveType.VARCHAR) {
+      throw new AnalysisException("UDFs that use VARCHAR are not yet supported.");
+    }
+    for (int i = 0; i < udf_.getNumArgs(); ++i) {
+      if (udf_.getArgs()[i].getPrimitiveType() == PrimitiveType.CHAR) {
+        throw new AnalysisException("UDFs that use CHAR are not yet supported.");
+      }
+      if (udf_.getArgs()[i].getPrimitiveType() == PrimitiveType.VARCHAR) {
+        throw new AnalysisException("UDFs that use VARCHAR are not yet supported.");
       }
     }
 

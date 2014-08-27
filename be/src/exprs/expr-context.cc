@@ -169,6 +169,11 @@ void ExprContext::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) 
       col_val->string_val.swap(tmp);
       col_val->__isset.string_val = true;
       break;
+    case TYPE_CHAR:
+      tmp.assign(StringValue::CharSlotToPtr(value, root_->type_), root_->type_.len);
+      col_val->string_val.swap(tmp);
+      col_val->__isset.string_val = true;
+      break;
     case TYPE_TIMESTAMP:
       RawValue::PrintValue(
           value, root_->type_, root_->output_scale_, &col_val->string_val);
@@ -238,13 +243,12 @@ void* ExprContext::GetValue(Expr* e, TupleRow* row) {
     case TYPE_CHAR: {
       impala_udf::StringVal v = e->GetStringVal(this, row);
       if (v.is_null) return NULL;
+      result_.string_val.ptr = reinterpret_cast<char*>(v.ptr);
+      result_.string_val.len = v.len;
       if (e->type_.IsVarLen()) {
-        result_.string_val.ptr = reinterpret_cast<char*>(v.ptr);
-        result_.string_val.len = v.len;
         return &result_.string_val;
       } else {
-        result_.char_val = reinterpret_cast<char*>(v.ptr);
-        return result_.char_val;
+        return result_.string_val.ptr;
       }
     }
     case TYPE_TIMESTAMP: {
