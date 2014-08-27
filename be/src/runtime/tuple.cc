@@ -97,7 +97,7 @@ void Tuple::MaterializeExprs(
     if (src != NULL) {
       void* dst = GetSlot(slot_desc->tuple_offset());
       RawValue::Write(src, dst, slot_desc->type(), pool);
-      if (collect_string_vals && slot_desc->type() == TYPE_STRING) {
+      if (collect_string_vals && slot_desc->type().IsVarLen()) {
         StringValue* string_val = reinterpret_cast<StringValue*>(dst);
         non_null_var_len_values->push_back(string_val);
         *total_var_len += string_val->len;

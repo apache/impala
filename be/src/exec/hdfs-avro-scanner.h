@@ -237,6 +237,9 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   void ReadAvroVarchar(
       PrimitiveType type, int max_len, uint8_t** data, bool write_slot, void* slot,
       MemPool* pool);
+  void ReadAvroChar(
+      PrimitiveType type, int max_len, uint8_t** data, bool write_slot, void* slot,
+      MemPool* pool);
   void ReadAvroString( PrimitiveType type, uint8_t** data, bool write_slot, void* slot,
       MemPool* pool);
 

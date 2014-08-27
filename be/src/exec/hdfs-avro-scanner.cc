@@ -454,7 +454,7 @@ HdfsAvroScanner::SchemaElement HdfsAvroScanner::ConvertSchema(
       return Status::OK;
     case AVRO_STRING:
     case AVRO_BYTES:
-      if (slot_desc->type().type == TYPE_STRING) return Status::OK;
+      if (slot_desc->type().IsStringType()) return Status::OK;
       break;
     case AVRO_INT32:
       if (slot_desc->type().type == TYPE_INT) return Status::OK;
@@ -621,7 +621,13 @@ void HdfsAvroScanner::MaterializeTuple(MemPool* pool, uint8_t** data, Tuple* tup
         break;
       case AVRO_STRING:
       case AVRO_BYTES:
-        ReadAvroString(slot_type, data, write_slot, slot, pool);
+        if (slot_desc != NULL && slot_desc->type().type == TYPE_VARCHAR) {
+          ReadAvroVarchar(slot_type, slot_desc->type().len, data, write_slot, slot, pool);
+        } else if (slot_desc != NULL && slot_desc->type().type == TYPE_CHAR) {
+          ReadAvroChar(slot_type, slot_desc->type().len, data, write_slot, slot, pool);
+        } else {
+          ReadAvroString(slot_type, data, write_slot, slot, pool);
+        }
         break;
       case AVRO_DECIMAL: {
         int slot_byte_size = 0;
@@ -705,6 +711,18 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node,
   }
   int num_fields = avro_schema_record_size(table_schema.get());
   DCHECK_GT(num_fields, 0);
+  // Disable Codegen for TYPE_CHAR
+  for (int field_idx = 0; field_idx < num_fields; ++field_idx) {
+    int col_idx = field_idx + node->num_partition_keys();
+    int slot_idx = node->GetMaterializedSlotIdx(col_idx);
+    if (slot_idx != HdfsScanNode::SKIP_COLUMN) {
+      SlotDescriptor* slot_desc = node->materialized_slots()[slot_idx];
+      if (slot_desc->type().type == TYPE_CHAR) {
+        LOG(INFO) << "Avro codegen skipped because CHAR is not supported.";
+        return NULL;
+      }
+    }
+  }
 
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
@@ -784,6 +802,11 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node,
       builder.CreateBr(read_field_block);
     }
 
+    SlotDescriptor* slot_desc = NULL;
+    if (slot_idx != HdfsScanNode::SKIP_COLUMN) {
+      slot_desc = node->materialized_slots()[slot_idx];
+    }
+
     // Write read_field_block IR starting at the beginning of the block
     builder.SetInsertPoint(read_field_block, read_field_block->begin());
     Function* read_field_fn;
@@ -805,7 +828,12 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node,
         break;
       case AVRO_STRING:
       case AVRO_BYTES:
-        read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_STRING);
+        if ((slot_idx != HdfsScanNode::SKIP_COLUMN) &&
+            (slot_desc->type().type == TYPE_VARCHAR)) {
+          read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_VARCHAR);
+        } else {
+          read_field_fn = codegen->GetFunction(IRFunction::READ_AVRO_STRING);
+        }
         break;
       default:
         // Unsupported type, can't codegen
@@ -822,7 +850,6 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node,
     if (slot_idx != HdfsScanNode::SKIP_COLUMN) {
       // Field corresponds to a materialized column, fill in relevant arguments
       write_slot_val = builder.getTrue();
-      SlotDescriptor* slot_desc = node->materialized_slots()[slot_idx];
       if (slot_desc->type().type == TYPE_DECIMAL) {
         // ReadAvroDecimal() takes slot byte size instead of slot type
         slot_type_val = builder.getInt32(slot_desc->type().GetByteSize());
@@ -834,9 +861,21 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node,
       opaque_slot_val =
           builder.CreateBitCast(slot_val, codegen->ptr_type(), "opaque_slot");
     }
-    Value* read_field_args[] =
-        {this_val, slot_type_val, data_val, write_slot_val, opaque_slot_val, pool_val};
-    builder.CreateCall(read_field_fn, read_field_args);
+
+    // NOTE: ReadAvroVarchar/Char has different signature than rest of read functions
+    if ((slot_idx != HdfsScanNode::SKIP_COLUMN) &&
+        (slot_desc->type().type == TYPE_VARCHAR ||
+         slot_desc->type().type == TYPE_CHAR)) {
+      // Need to pass an extra argument (the length) to the codegen function
+      Value* fixed_len = builder.getInt32(slot_desc->type().len);
+      Value* read_field_args[] = {this_val, slot_type_val, fixed_len, data_val,
+        write_slot_val, opaque_slot_val, pool_val};
+      builder.CreateCall(read_field_fn, read_field_args);
+    } else {
+      Value* read_field_args[] =
+          {this_val, slot_type_val, data_val, write_slot_val, opaque_slot_val, pool_val};
+      builder.CreateCall(read_field_fn, read_field_args);
+    }
   }
   builder.SetInsertPoint(&fn->back());
   builder.CreateRetVoid();

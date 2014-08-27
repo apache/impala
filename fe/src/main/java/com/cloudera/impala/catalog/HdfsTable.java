@@ -143,7 +143,7 @@ public class HdfsTable extends Table {
   // address as the host name. Each FileBlock specifies a list of
   // indices within this hostIndex_ to specify which nodes contain
   // replicas of the block.
-  private ListMap<TNetworkAddress> hostIndex_ = new ListMap<TNetworkAddress>();
+  private final ListMap<TNetworkAddress> hostIndex_ = new ListMap<TNetworkAddress>();
 
   // Map of parent directory (partition location) to list of files (FileDescriptors)
   // under that directory. Used to look up/index all files in the table.
@@ -968,12 +968,25 @@ public class HdfsTable extends Table {
           tblFields.addAll(msTbl.getSd().getCols());
         } else {
           // Load the fields from the Avro schema.
-          for (Column parsedCol: AvroSchemaParser.parse(avroSchema_)) {
+          // Since Avro does not include meta-data for CHAR or VARCHAR, an Avro type of
+          // "string" is used for CHAR, VARCHAR and STRING. Default back to the storage
+          // descriptor to determine the the type for "string"
+          List<FieldSchema> sdTypes = msTbl.getSd().getCols();
+          int i = 0;
+          List<Column> avroTypeList = AvroSchemaParser.parse(avroSchema_);
+          boolean canFallBack = sdTypes.size() == avroTypeList.size();
+          for (Column parsedCol: avroTypeList) {
             FieldSchema fs = new FieldSchema();
             fs.setName(parsedCol.getName());
-            fs.setType(parsedCol.getType().toString());
+            String avroType = parsedCol.getType().toString();
+            if (avroType.toLowerCase().equals("string") && canFallBack) {
+              fs.setType(sdTypes.get(i).getType());
+            } else {
+              fs.setType(avroType);
+            }
             fs.setComment("from deserializer");
             tblFields.add(fs);
+            i++;
           }
         }
       } else {

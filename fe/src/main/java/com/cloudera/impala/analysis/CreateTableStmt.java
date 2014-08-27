@@ -304,10 +304,14 @@ public class CreateTableStmt extends StatementBase {
         Column avroCol = avroColumns.get(i);
         avroCol.getType().analyze();
         String warnDetail = null;
-        if (!colDesc.getType().equals(avroCol.getType())) {
-          warnDetail = "type";
-        } else if (!colDesc.getColName().equalsIgnoreCase(avroCol.getName())) {
+        if (!colDesc.getColName().equalsIgnoreCase(avroCol.getName())) {
           warnDetail = "name";
+        }
+        if (colDesc.getType().isStringType() &&
+            avroCol.getType().isStringType()) {
+          // This is OK -- avro types for CHAR, VARCHAR, and STRING are "string"
+        } else if (!colDesc.getType().equals(avroCol.getType())) {
+          warnDetail = "type";
         }
         if (warnDetail != null) {
           warnStr = String.format(
@@ -333,7 +337,6 @@ public class CreateTableStmt extends StatementBase {
       }
       return avroSchemaColDefs;
     }
-
     // The existing col defs are consistent with the Avro schema.
     return columnDefs_;
   }

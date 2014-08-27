@@ -56,6 +56,12 @@ ${IMPALA_HOME}/testdata/bin/check-schema-diff.sh
 if [[ $? -eq 1 ]]; then
   LOAD_DATA_ARGS="--force"
 fi
+
+# For kerberized clusters, use kerberos
+if ${CLUSTER_DIR}/admin is_kerberized; then
+  LOAD_DATA_ARGS="${LOAD_DATA_ARGS} --use_kerberos --principal=${MINIKDC_PRINC_HIVE}"
+fi
+
 set -e
 
 # Load schemas
@@ -78,10 +84,16 @@ hadoop fs -put ${IMPALA_HOME}/testdata/data/schemas/malformed_decimal_tiny.parqu
 hadoop fs -put ${IMPALA_HOME}/testdata/data/schemas/decimal.parquet \
   /test-warehouse/schemas/
 
-# For kerberized clusters, use kerberos
-if ${CLUSTER_DIR}/admin is_kerberized; then
-  LOAD_DATA_ARGS="${LOAD_DATA_ARGS} --use_kerberos --principal=${MINIKDC_PRINC_HIVE}"
-fi
+# CHAR and VARCHAR tables written by Hive
+hadoop fs -mkdir /test-warehouse/chars_formats_avro_snap/
+hadoop fs -put ${IMPALA_HOME}/testdata/data/chars-formats.avro \
+  /test-warehouse/chars_formats_avro_snap
+hadoop fs -mkdir /test-warehouse/chars_formats_parquet/
+hadoop fs -put ${IMPALA_HOME}/testdata/data/chars-formats.parquet \
+  /test-warehouse/chars_formats_parquet
+hadoop fs -mkdir /test-warehouse/chars_formats_text/
+hadoop fs -put ${IMPALA_HOME}/testdata/data/chars-formats.txt \
+  /test-warehouse/chars_formats_text
 
 # Load the data set
 pushd ${IMPALA_HOME}/bin

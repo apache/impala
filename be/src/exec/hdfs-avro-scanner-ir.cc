@@ -133,6 +133,27 @@ void HdfsAvroScanner::ReadAvroVarchar(PrimitiveType type, int max_len, uint8_t**
   *data += len;
 }
 
+void HdfsAvroScanner::ReadAvroChar(PrimitiveType type, int max_len, uint8_t** data,
+                                   bool write_slot, void* slot, MemPool* pool) {
+  int64_t len = ReadWriteUtil::ReadZLong(data);
+  if (write_slot) {
+    DCHECK(type == TYPE_CHAR);
+    ColumnType ctype = ColumnType::CreateCharType(max_len);
+    int str_len = std::min(static_cast<int>(len), max_len);
+    if (ctype.IsVarLen()) {
+      StringValue* sv = reinterpret_cast<StringValue*>(slot);
+      sv->ptr = reinterpret_cast<char*>(pool->Allocate(max_len));
+      sv->len = max_len;
+      memcpy(sv->ptr, *data, str_len);
+      StringValue::PadWithSpaces(sv->ptr, max_len, str_len);
+    } else {
+      memcpy(slot, *data, str_len);
+      StringValue::PadWithSpaces(reinterpret_cast<char*>(slot), max_len, str_len);
+    }
+  }
+  *data += len;
+}
+
 void HdfsAvroScanner::ReadAvroString(PrimitiveType type, uint8_t** data,
                                      bool write_slot, void* slot, MemPool* pool) {
   int64_t len = ReadWriteUtil::ReadZLong(data);
