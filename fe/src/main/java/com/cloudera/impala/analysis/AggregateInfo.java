@@ -608,7 +608,6 @@ public class AggregateInfo {
     for (int i = 0; i < exprs.size(); ++i) {
       Expr expr = exprs.get(i);
       SlotDescriptor slotDesc = analyzer.addSlotDescriptor(result);
-      slotDesc.setLabel(expr.toSql());
       slotDesc.setStats(ColumnStats.fromExpr(expr));
       Preconditions.checkState(expr.getType().isValid());
       slotDesc.setType(expr.getType());
@@ -620,9 +619,17 @@ public class AggregateInfo {
         if (!expr.isConstant()) {
           analyzer.createAuxEquivPredicate(new SlotRef(slotDesc), expr.clone());
         }
+        // Use the grouping expr as label.
+        slotDesc.setLabel(expr.toSql());
       } else {
         Preconditions.checkArgument(expr instanceof FunctionCallExpr);
         FunctionCallExpr aggExpr = (FunctionCallExpr)expr;
+        if (aggExpr.isMergeAggFn()) {
+          slotDesc.setLabel(aggExpr.getChild(0).toSql());
+        } else {
+          slotDesc.setLabel(aggExpr.toSql());
+        }
+
         // count(*) is non-nullable.
         if (aggExpr.getFnName().getFunction().equals("count")) {
           // TODO: Consider making nullability a property of types.

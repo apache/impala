@@ -26,8 +26,8 @@ group by 1
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
-03:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(*))
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
 |  group by: zip
 |
 02:EXCHANGE [HASH(zip)]

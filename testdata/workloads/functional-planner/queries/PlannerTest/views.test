@@ -37,8 +37,8 @@ select * from functional.complex_view
 04:TOP-N [LIMIT=100]
 |  order by: b.string_col ASC
 |
-07:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(a.bigint_col))
+07:AGGREGATE [FINALIZE]
+|  output: count:merge(a.bigint_col)
 |  group by: b.string_col
 |  having: count(a.bigint_col) > 1
 |
@@ -168,8 +168,8 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |  06:TOP-N [LIMIT=100]
 |  |  order by: b.string_col ASC
 |  |
-|  11:AGGREGATE [MERGE FINALIZE]
-|  |  output: sum(count(a.bigint_col))
+|  11:AGGREGATE [FINALIZE]
+|  |  output: count:merge(a.bigint_col)
 |  |  group by: b.string_col
 |  |  having: count(a.bigint_col) > 1
 |  |

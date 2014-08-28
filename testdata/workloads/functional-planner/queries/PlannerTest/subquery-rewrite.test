@@ -207,7 +207,7 @@ where a.int_col in
    from functional.alltypes t, functional.alltypessmall s, functional.alltypestiny n
    where t.id = s.id and s.bigint_col = n.bigint_col and n.bool_col = false)
 ---- PLAN
-08:AGGREGATE [MERGE FINALIZE]
+08:AGGREGATE [FINALIZE]
 |  output: count(id)
 |
 07:AGGREGATE

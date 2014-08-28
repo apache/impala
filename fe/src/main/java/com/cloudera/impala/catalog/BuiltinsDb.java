@@ -374,13 +374,11 @@ public class BuiltinsDb extends Db {
 
     Db db = this;
     // Count (*)
-    // TODO: the merge function should be Sum but the way we rewrite distincts
-    // makes that not work.
     db.addBuiltin(AggregateFunction.createBuiltin(db, "count",
         new ArrayList<Type>(), Type.BIGINT, Type.BIGINT,
         prefix + "8InitZeroIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextEPT_",
         prefix + "15CountStarUpdateEPN10impala_udf15FunctionContextEPNS1_9BigIntValE",
-        prefix + "15CountStarUpdateEPN10impala_udf15FunctionContextEPNS1_9BigIntValE",
+        prefix + "10CountMergeEPN10impala_udf15FunctionContextERKNS1_9BigIntValEPS4_",
         null, null, false));
 
     for (Type t: Type.getSupportedTypes()) {
@@ -390,7 +388,7 @@ public class BuiltinsDb extends Db {
           Lists.newArrayList(t), Type.BIGINT, Type.BIGINT,
           prefix + "8InitZeroIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextEPT_",
           prefix + "11CountUpdateEPN10impala_udf15FunctionContextERKNS1_6AnyValEPNS1_9BigIntValE",
-          prefix + "11CountUpdateEPN10impala_udf15FunctionContextERKNS1_6AnyValEPNS1_9BigIntValE",
+          prefix + "10CountMergeEPN10impala_udf15FunctionContextERKNS1_9BigIntValEPS4_",
           null, null, false));
       // Min
       String minMaxInit = t.isStringType() ? initNullString : initNull;

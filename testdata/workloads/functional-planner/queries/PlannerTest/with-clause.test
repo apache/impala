@@ -165,8 +165,8 @@ limit 3
 02:TOP-N [LIMIT=5]
 |  order by: int_col ASC, tinyint_col ASC
 |
-07:AGGREGATE [MERGE FINALIZE]
-|  output: max(max(id))
+07:AGGREGATE [FINALIZE]
+|  output: max:merge(id)
 |  group by: int_col, tinyint_col
 |
 06:EXCHANGE [HASH(int_col,tinyint_col)]

@@ -55,8 +55,8 @@ limit 10
 06:TOP-N [LIMIT=10]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC, o_orderdate ASC
 |
-10:AGGREGATE [MERGE FINALIZE]
-|  output: sum(sum(l_extendedprice * (1 - l_discount)))
+10:AGGREGATE [FINALIZE]
+|  output: sum:merge(l_extendedprice * (1 - l_discount))
 |  group by: l_orderkey, o_orderdate, o_shippriority
 |
 09:EXCHANGE [HASH(l_orderkey,o_orderdate,o_shippriority)]
@@ -144,8 +144,8 @@ limit 10
 06:TOP-N [LIMIT=10]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC, o_orderdate ASC
 |
-12:AGGREGATE [MERGE FINALIZE]
-|  output: sum(sum(l_extendedprice * (1 - l_discount)))
+12:AGGREGATE [FINALIZE]
+|  output: sum:merge(l_extendedprice * (1 - l_discount))
 |  group by: l_orderkey, o_orderdate, o_shippriority
 |
 11:EXCHANGE [HASH(l_orderkey,o_orderdate,o_shippriority)]
@@ -256,8 +256,8 @@ limit 100
 12:TOP-N [LIMIT=100]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC
 |
-19:AGGREGATE [MERGE FINALIZE]
-|  output: sum(sum(l_extendedprice * (1 - l_discount)))
+19:AGGREGATE [FINALIZE]
+|  output: sum:merge(l_extendedprice * (1 - l_discount))
 |  group by: n_name
 |
 18:EXCHANGE [HASH(n_name)]
@@ -448,8 +448,8 @@ limit 10
 04:TOP-N [LIMIT=10]
 |  order by: o_orderpriority ASC
 |
-08:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(*))
+08:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
 |  group by: o_orderpriority
 |
 07:EXCHANGE [HASH(o_orderpriority)]
@@ -504,8 +504,8 @@ order by o_orderpriority limit 10
 04:TOP-N [LIMIT=10]
 |  order by: o_orderpriority ASC
 |
-08:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(*))
+08:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
 |  group by: o_orderpriority
 |
 07:EXCHANGE [HASH(o_orderpriority)]
@@ -558,8 +558,8 @@ order by o_orderpriority limit 10
 04:TOP-N [LIMIT=10]
 |  order by: o_orderpriority ASC
 |
-08:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(*))
+08:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
 |  group by: o_orderpriority
 |
 07:EXCHANGE [HASH(o_orderpriority)]
@@ -608,8 +608,8 @@ where n_name = 'x'
 00:SCAN HDFS [tpch.customer]
    partitions=1/1 size=23.08MB
 ---- DISTRIBUTEDPLAN
-10:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(*))
+10:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
 |
 09:EXCHANGE [UNPARTITIONED]
 |
@@ -664,8 +664,8 @@ where n_name = 'x'
 00:SCAN HDFS [tpch.customer]
    partitions=1/1 size=23.08MB
 ---- DISTRIBUTEDPLAN
-09:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(*))
+09:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
 |
 08:EXCHANGE [UNPARTITIONED]
 |

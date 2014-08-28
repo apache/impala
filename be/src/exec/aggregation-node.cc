@@ -549,8 +549,12 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(
   Value* dst_value = builder.CreateLoad(dst_ptr, "dst_val");
   switch (evaluator->agg_op()) {
     case AggFnEvaluator::COUNT:
-      result = builder.CreateAdd(dst_value,
-          codegen->GetIntConstant(TYPE_BIGINT, 1), "count_inc");
+      if (evaluator->is_merge()) {
+        result = builder.CreateAdd(dst_value, src.GetVal(), "count_sum");
+      } else {
+        result = builder.CreateAdd(dst_value,
+            codegen->GetIntConstant(TYPE_BIGINT, 1), "count_inc");
+      }
       break;
     case AggFnEvaluator::MIN: {
       Function* min_fn = codegen->CodegenMinMax(slot_desc->type(), true);

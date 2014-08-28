@@ -7,8 +7,8 @@ select distinctpc(l_orderkey) from tpch.lineitem
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 size=718.94MB
 ---- DISTRIBUTEDPLAN
-03:AGGREGATE [MERGE FINALIZE]
-|  output: distinctpc(distinctpc(l_orderkey))
+03:AGGREGATE [FINALIZE]
+|  output: distinctpc:merge(l_orderkey)
 |
 02:EXCHANGE [UNPARTITIONED]
 |
@@ -21,8 +21,8 @@ select distinctpc(l_orderkey) from tpch.lineitem
 # Distinct estimate with distinct
 select count(distinct l_orderkey), distinctpc(l_orderkey) from tpch.lineitem
 ---- PLAN
-02:AGGREGATE [MERGE FINALIZE]
-|  output: count(l_orderkey), distinctpc(distinctpc(l_orderkey))
+02:AGGREGATE [FINALIZE]
+|  output: count(l_orderkey), distinctpc:merge(l_orderkey)
 |
 01:AGGREGATE
 |  output: distinctpc(l_orderkey)
@@ -31,16 +31,16 @@ select count(distinct l_orderkey), distinctpc(l_orderkey) from tpch.lineitem
 00:SCAN HDFS [tpch.lineitem]
    partitions=1/1 size=718.94MB
 ---- DISTRIBUTEDPLAN
-06:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(l_orderkey)), distinctpc(distinctpc(distinctpc(l_orderkey)))
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(l_orderkey), distinctpc:merge(l_orderkey)
 |
 05:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [MERGE]
-|  output: count(l_orderkey), distinctpc(distinctpc(l_orderkey))
+02:AGGREGATE
+|  output: count(l_orderkey), distinctpc:merge(l_orderkey)
 |
-04:AGGREGATE [MERGE]
-|  output: distinctpc(distinctpc(l_orderkey))
+04:AGGREGATE
+|  output: distinctpc:merge(l_orderkey)
 |  group by: l_orderkey
 |
 03:EXCHANGE [HASH(l_orderkey)]

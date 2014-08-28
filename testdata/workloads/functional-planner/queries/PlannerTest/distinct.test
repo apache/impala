@@ -10,7 +10,7 @@ from functional.testtbl
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
-03:AGGREGATE [MERGE FINALIZE]
+03:AGGREGATE [FINALIZE]
 |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
 |
 02:EXCHANGE [HASH(functional.testtbl.id,functional.testtbl.name,functional.testtbl.zip)]
@@ -33,7 +33,7 @@ from functional.testtbl
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
-03:AGGREGATE [MERGE FINALIZE]
+03:AGGREGATE [FINALIZE]
 |  group by: id, zip
 |
 02:EXCHANGE [HASH(id,zip)]
@@ -48,7 +48,7 @@ from functional.testtbl
 select count(distinct id, zip)
 from functional.testtbl
 ---- PLAN
-02:AGGREGATE [MERGE FINALIZE]
+02:AGGREGATE [FINALIZE]
 |  output: count(if(id IS NULL, NULL, zip))
 |
 01:AGGREGATE
@@ -57,15 +57,15 @@ from functional.testtbl
 00:SCAN HDFS [functional.testtbl]
    partitions=1/1 size=0B
 ---- DISTRIBUTEDPLAN
-06:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(if(id IS NULL, NULL, zip)))
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(if(id IS NULL, NULL, zip))
 |
 05:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [MERGE]
+02:AGGREGATE
 |  output: count(if(id IS NULL, NULL, zip))
 |
-04:AGGREGATE [MERGE]
+04:AGGREGATE
 |  group by: id, zip
 |
 03:EXCHANGE [HASH(id,zip)]
@@ -81,7 +81,7 @@ select tinyint_col, count(distinct int_col, bigint_col)
 from functional.alltypesagg
 group by 1
 ---- PLAN
-02:AGGREGATE [MERGE FINALIZE]
+02:AGGREGATE [FINALIZE]
 |  output: count(if(int_col IS NULL, NULL, bigint_col))
 |  group by: tinyint_col
 |
@@ -93,11 +93,11 @@ group by 1
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [MERGE FINALIZE]
+02:AGGREGATE [FINALIZE]
 |  output: count(if(int_col IS NULL, NULL, bigint_col))
 |  group by: tinyint_col
 |
-04:AGGREGATE [MERGE]
+04:AGGREGATE
 |  group by: tinyint_col, int_col, bigint_col
 |
 03:EXCHANGE [HASH(tinyint_col)]
@@ -113,7 +113,7 @@ select tinyint_col, count(distinct int_col), sum(distinct int_col)
 from functional.alltypesagg
 group by 1
 ---- PLAN
-02:AGGREGATE [MERGE FINALIZE]
+02:AGGREGATE [FINALIZE]
 |  output: count(int_col), sum(int_col)
 |  group by: tinyint_col
 |
@@ -125,11 +125,11 @@ group by 1
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [MERGE FINALIZE]
+02:AGGREGATE [FINALIZE]
 |  output: count(int_col), sum(int_col)
 |  group by: tinyint_col
 |
-04:AGGREGATE [MERGE]
+04:AGGREGATE
 |  group by: tinyint_col, int_col
 |
 03:EXCHANGE [HASH(tinyint_col)]
@@ -144,7 +144,7 @@ group by 1
 select sum(distinct int_col)
 from functional.alltypesagg
 ---- PLAN
-02:AGGREGATE [MERGE FINALIZE]
+02:AGGREGATE [FINALIZE]
 |  output: sum(int_col)
 |
 01:AGGREGATE
@@ -153,15 +153,15 @@ from functional.alltypesagg
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
-06:AGGREGATE [MERGE FINALIZE]
-|  output: sum(sum(int_col))
+06:AGGREGATE [FINALIZE]
+|  output: sum:merge(int_col)
 |
 05:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [MERGE]
+02:AGGREGATE
 |  output: sum(int_col)
 |
-04:AGGREGATE [MERGE]
+04:AGGREGATE
 |  group by: int_col
 |
 03:EXCHANGE [HASH(int_col)]
@@ -178,8 +178,8 @@ select tinyint_col, count(distinct int_col),
 min(distinct smallint_col), max(distinct string_col)
 from functional.alltypesagg group by 1
 ---- PLAN
-02:AGGREGATE [MERGE FINALIZE]
-|  output: count(int_col), min(min(smallint_col)), max(max(string_col))
+02:AGGREGATE [FINALIZE]
+|  output: count(int_col), min:merge(smallint_col), max:merge(string_col)
 |  group by: tinyint_col
 |
 01:AGGREGATE
@@ -191,12 +191,12 @@ from functional.alltypesagg group by 1
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [MERGE FINALIZE]
-|  output: count(int_col), min(min(smallint_col)), max(max(string_col))
+02:AGGREGATE [FINALIZE]
+|  output: count(int_col), min:merge(smallint_col), max:merge(string_col)
 |  group by: tinyint_col
 |
-04:AGGREGATE [MERGE]
-|  output: min(min(smallint_col)), max(max(string_col))
+04:AGGREGATE
+|  output: min:merge(smallint_col), max:merge(string_col)
 |  group by: tinyint_col, int_col
 |
 03:EXCHANGE [HASH(tinyint_col)]
@@ -213,8 +213,8 @@ select tinyint_col, count(distinct int_col), count(*), sum(distinct int_col),
 sum(int_col), min(smallint_col), max(bigint_col)
 from functional.alltypesagg group by 1
 ---- PLAN
-02:AGGREGATE [MERGE FINALIZE]
-|  output: count(int_col), sum(int_col), sum(count(*)), sum(sum(int_col)), min(min(smallint_col)), max(max(bigint_col))
+02:AGGREGATE [FINALIZE]
+|  output: count(int_col), sum(int_col), count:merge(*), sum:merge(int_col), min:merge(smallint_col), max:merge(bigint_col)
 |  group by: tinyint_col
 |
 01:AGGREGATE
@@ -226,12 +226,12 @@ from functional.alltypesagg group by 1
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [MERGE FINALIZE]
-|  output: count(int_col), sum(int_col), sum(count(*)), sum(sum(int_col)), min(min(smallint_col)), max(max(bigint_col))
+02:AGGREGATE [FINALIZE]
+|  output: count(int_col), sum(int_col), count:merge(*), sum:merge(int_col), min:merge(smallint_col), max:merge(bigint_col)
 |  group by: tinyint_col
 |
-04:AGGREGATE [MERGE]
-|  output: sum(count(*)), sum(sum(int_col)), min(min(smallint_col)), max(max(bigint_col))
+04:AGGREGATE
+|  output: count:merge(*), sum:merge(int_col), min:merge(smallint_col), max:merge(bigint_col)
 |  group by: tinyint_col, int_col
 |
 03:EXCHANGE [HASH(tinyint_col)]
@@ -253,7 +253,7 @@ select t1.c, t2.c from
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: count(int_col) = count(bigint_col)
 |
-|--05:AGGREGATE [MERGE FINALIZE]
+|--05:AGGREGATE [FINALIZE]
 |  |  output: count(bigint_col)
 |  |
 |  04:AGGREGATE
@@ -262,7 +262,7 @@ select t1.c, t2.c from
 |  03:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 size=460B
 |
-02:AGGREGATE [MERGE FINALIZE]
+02:AGGREGATE [FINALIZE]
 |  output: count(int_col)
 |
 01:AGGREGATE
@@ -276,15 +276,15 @@ select t1.c, t2.c from
 |
 |--15:EXCHANGE [UNPARTITIONED]
 |  |
-|  14:AGGREGATE [MERGE FINALIZE]
-|  |  output: sum(count(bigint_col))
+|  14:AGGREGATE [FINALIZE]
+|  |  output: count:merge(bigint_col)
 |  |
 |  13:EXCHANGE [UNPARTITIONED]
 |  |
-|  05:AGGREGATE [MERGE]
+|  05:AGGREGATE
 |  |  output: count(bigint_col)
 |  |
-|  12:AGGREGATE [MERGE]
+|  12:AGGREGATE
 |  |  group by: bigint_col
 |  |
 |  11:EXCHANGE [HASH(bigint_col)]
@@ -295,15 +295,15 @@ select t1.c, t2.c from
 |  03:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 size=460B
 |
-10:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(int_col))
+10:AGGREGATE [FINALIZE]
+|  output: count:merge(int_col)
 |
 09:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [MERGE]
+02:AGGREGATE
 |  output: count(int_col)
 |
-08:AGGREGATE [MERGE]
+08:AGGREGATE
 |  group by: int_col
 |
 07:EXCHANGE [HASH(int_col)]
@@ -323,9 +323,9 @@ select t1.c, t2.c from
 select count(distinct tinyint_col) from functional.alltypes
 having count(bigint_col) > 0
 ---- PLAN
-02:AGGREGATE [MERGE FINALIZE]
-|  output: count(tinyint_col), sum(count(bigint_col))
-|  having: zeroifnull(sum(count(bigint_col))) > 0
+02:AGGREGATE [FINALIZE]
+|  output: count(tinyint_col), count:merge(bigint_col)
+|  having: zeroifnull(count(bigint_col)) > 0
 |
 01:AGGREGATE
 |  output: count(bigint_col)
@@ -334,17 +334,17 @@ having count(bigint_col) > 0
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-06:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(tinyint_col)), sum(sum(count(bigint_col)))
-|  having: zeroifnull(sum(count(bigint_col))) > 0
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(tinyint_col), count:merge(bigint_col)
+|  having: zeroifnull(count(bigint_col)) > 0
 |
 05:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [MERGE]
-|  output: count(tinyint_col), sum(count(bigint_col))
+02:AGGREGATE
+|  output: count(tinyint_col), count:merge(bigint_col)
 |
-04:AGGREGATE [MERGE]
-|  output: sum(count(bigint_col))
+04:AGGREGATE
+|  output: count:merge(bigint_col)
 |  group by: tinyint_col
 |
 03:EXCHANGE [HASH(tinyint_col)]
@@ -362,7 +362,7 @@ select 1 from
   (select count(distinct 1) x from functional.alltypes) t
 where t.x is not null
 ---- PLAN
-02:AGGREGATE [MERGE FINALIZE]
+02:AGGREGATE [FINALIZE]
 |  output: count(1)
 |  having: count(1) IS NOT NULL
 |
@@ -372,16 +372,16 @@ where t.x is not null
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-06:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(1))
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(1)
 |  having: count(1) IS NOT NULL
 |
 05:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [MERGE]
+02:AGGREGATE
 |  output: count(1)
 |
-04:AGGREGATE [MERGE]
+04:AGGREGATE
 |  group by: 1
 |
 03:EXCHANGE [HASH(1)]
@@ -398,9 +398,9 @@ select 1 from
   (select count(distinct 1) x, count(1) y from functional.alltypes) t
 where t.x + t.y > 10 and t.x > 0 and t.y > 1
 ---- PLAN
-02:AGGREGATE [MERGE FINALIZE]
-|  output: count(1), sum(count(1))
-|  having: count(1) > 0, count(1) + zeroifnull(sum(count(1))) > 10, zeroifnull(sum(count(1))) > 1
+02:AGGREGATE [FINALIZE]
+|  output: count(1), count:merge(1)
+|  having: count(1) > 0, count(1) + zeroifnull(count(1)) > 10, zeroifnull(count(1)) > 1
 |
 01:AGGREGATE
 |  output: count(1)
@@ -409,17 +409,17 @@ where t.x + t.y > 10 and t.x > 0 and t.y > 1
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-06:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(1)), sum(sum(count(1)))
-|  having: count(1) > 0, count(1) + zeroifnull(sum(count(1))) > 10, zeroifnull(sum(count(1))) > 1
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(1), count:merge(1)
+|  having: count(1) > 0, count(1) + zeroifnull(count(1)) > 10, zeroifnull(count(1)) > 1
 |
 05:EXCHANGE [UNPARTITIONED]
 |
-02:AGGREGATE [MERGE]
-|  output: count(1), sum(count(1))
+02:AGGREGATE
+|  output: count(1), count:merge(1)
 |
-04:AGGREGATE [MERGE]
-|  output: sum(count(1))
+04:AGGREGATE
+|  output: count:merge(1)
 |  group by: 1
 |
 03:EXCHANGE [HASH(1)]

@@ -106,8 +106,8 @@ where a.id < 5 limit 5
 |  03:TOP-N [LIMIT=5]
 |  |  order by: count(*) ASC
 |  |
-|  06:AGGREGATE [MERGE FINALIZE]
-|  |  output: sum(count(*))
+|  06:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
 |  |  group by: id
 |  |
 |  05:EXCHANGE [HASH(id)]

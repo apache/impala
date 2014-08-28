@@ -91,6 +91,13 @@ void AggregateFunctions::CountStarUpdate(FunctionContext*, BigIntVal* dst) {
   ++dst->val;
 }
 
+void AggregateFunctions::CountMerge(FunctionContext*, const BigIntVal& src,
+    BigIntVal* dst) {
+  DCHECK(!dst->is_null);
+  DCHECK(!src.is_null);
+  dst->val += src.val;
+}
+
 struct AvgState {
   double sum;
   int64_t count;

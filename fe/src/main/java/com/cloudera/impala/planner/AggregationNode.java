@@ -209,26 +209,8 @@ public class AggregationNode extends PlanNode {
 
   @Override
   protected String getDisplayLabelDetail() {
-    switch(aggInfo_.getAggPhase()) {
-      case FIRST: {
-        if (needsFinalize_) return "FINALIZE";
-        return null;
-      }
-      case FIRST_MERGE: {
-        if (getChild(0) instanceof ExchangeNode &&
-            getChild(0).getChild(0) instanceof AggregationNode) {
-          AggregationNode child = (AggregationNode) getChild(0).getChild(0);
-          if (child.getAggInfo().isDistinctAgg()) return "MERGE";
-        }
-        return "MERGE FINALIZE";
-      }
-      case SECOND: {
-        if (needsFinalize_) return "MERGE FINALIZE";
-        return "MERGE";
-      }
-      case SECOND_MERGE: return "MERGE FINALIZE";
-      default: return null;
-    }
+    if (needsFinalize_) return "FINALIZE";
+    return null;
   }
 
   @Override

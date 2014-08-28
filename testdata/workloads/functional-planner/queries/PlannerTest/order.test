@@ -60,8 +60,8 @@ order by 2 desc
 02:SORT
 |  order by: count(*) DESC
 |
-04:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(*))
+04:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
 |  group by: zip
 |
 03:EXCHANGE [HASH(zip)]
@@ -96,8 +96,8 @@ order by 2
 02:SORT
 |  order by: sum(float_col) ASC
 |
-04:AGGREGATE [MERGE FINALIZE]
-|  output: sum(sum(float_col))
+04:AGGREGATE [FINALIZE]
+|  output: sum:merge(float_col)
 |  group by: int_col
 |
 03:EXCHANGE [HASH(int_col)]
@@ -129,8 +129,8 @@ order by 2,3 desc
 02:SORT
 |  order by: sum(float_col) ASC, min(float_col) DESC
 |
-04:AGGREGATE [MERGE FINALIZE]
-|  output: sum(sum(float_col)), min(min(float_col))
+04:AGGREGATE [FINALIZE]
+|  output: sum:merge(float_col), min:merge(float_col)
 |  group by: int_col
 |
 03:EXCHANGE [HASH(int_col)]
@@ -238,7 +238,7 @@ order by int_col desc offset 5
 04:SORT
 |  order by: int_col DESC
 |
-06:AGGREGATE [MERGE FINALIZE]
+06:AGGREGATE [FINALIZE]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 05:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
@@ -376,8 +376,8 @@ order by avg(tinyint_col)
 02:SORT
 |  order by: avg(tinyint_col) ASC
 |
-04:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(*)), avg(avg(tinyint_col))
+04:AGGREGATE [FINALIZE]
+|  output: count:merge(*), avg:merge(tinyint_col)
 |  group by: int_col
 |
 03:EXCHANGE [HASH(int_col)]
@@ -497,7 +497,7 @@ order by 1
 06:SORT
 |  order by: id ASC
 |
-08:AGGREGATE [MERGE FINALIZE]
+08:AGGREGATE [FINALIZE]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 07:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
@@ -564,7 +564,7 @@ order by 1,2
 |--05:SCAN HDFS [functional.alltypestiny]
 |     partitions=1/4 size=115B
 |
-09:AGGREGATE [MERGE FINALIZE]
+09:AGGREGATE [FINALIZE]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 08:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
@@ -679,7 +679,7 @@ order by 12, 13, 1
 |  13:SCAN HDFS [functional.alltypestiny]
 |     partitions=1/4 size=115B
 |
-21:AGGREGATE [MERGE FINALIZE]
+21:AGGREGATE [FINALIZE]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 20:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
@@ -933,7 +933,7 @@ order by int_col offset 5
 07:SORT
 |  order by: int_col ASC
 |
-13:AGGREGATE [MERGE FINALIZE]
+13:AGGREGATE [FINALIZE]
 |  group by: int_col
 |
 12:EXCHANGE [HASH(int_col)]
@@ -1055,7 +1055,7 @@ order by x
 |  05:TOP-N [LIMIT=100]
 |  |  order by: int_col ASC
 |  |
-|  14:AGGREGATE [MERGE FINALIZE]
+|  14:AGGREGATE [FINALIZE]
 |  |  group by: float_col, bigint_col, int_col, tinyint_col, smallint_col, id
 |  |
 |  13:EXCHANGE [HASH(float_col,bigint_col,int_col,tinyint_col,smallint_col,id)]

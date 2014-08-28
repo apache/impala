@@ -43,8 +43,8 @@ where month = 1
 |  02:TOP-N [LIMIT=5]
 |  |  order by: count(*) DESC
 |  |
-|  06:AGGREGATE [MERGE FINALIZE]
-|  |  output: sum(count(*))
+|  06:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
 |  |  group by: int_col
 |  |  having: count(*) > 1
 |  |
@@ -366,8 +366,8 @@ NODE 0:
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
-03:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(*)), min(min(tinyint_col)), max(max(tinyint_col)), sum(sum(tinyint_col)), avg(avg(tinyint_col))
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*), min:merge(tinyint_col), max:merge(tinyint_col), sum:merge(tinyint_col), avg:merge(tinyint_col)
 |  group by: tinyint_col
 |
 02:EXCHANGE [HASH(tinyint_col)]
@@ -396,8 +396,8 @@ group by 1
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
-03:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(*)), min(min(tinyint_col)), max(max(tinyint_col)), sum(sum(tinyint_col)), avg(avg(tinyint_col))
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*), min:merge(tinyint_col), max:merge(tinyint_col), sum:merge(tinyint_col), avg:merge(tinyint_col)
 |  group by: tinyint_col
 |
 02:EXCHANGE [HASH(tinyint_col)]
@@ -436,8 +436,8 @@ from
 02:TOP-N [LIMIT=5]
 |  order by: c2 ASC, c3 DESC
 |
-04:AGGREGATE [MERGE FINALIZE]
-|  output: sum(sum(float_col)), min(min(float_col))
+04:AGGREGATE [FINALIZE]
+|  output: sum:merge(float_col), min:merge(float_col)
 |  group by: int_col
 |
 03:EXCHANGE [HASH(int_col)]
@@ -485,7 +485,7 @@ from (select distinct * from functional.testtbl) x
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
 |
-06:AGGREGATE [MERGE FINALIZE]
+06:AGGREGATE [FINALIZE]
 |  group by: x.id, x.name, x.zip
 |
 05:EXCHANGE [HASH(x.id,x.name,x.zip)]
@@ -493,7 +493,7 @@ from (select distinct * from functional.testtbl) x
 02:AGGREGATE
 |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
 |
-04:AGGREGATE [MERGE FINALIZE]
+04:AGGREGATE [FINALIZE]
 |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
 |
 03:EXCHANGE [HASH(functional.testtbl.id,functional.testtbl.name,functional.testtbl.zip)]
@@ -519,7 +519,7 @@ from (select distinct * from functional.testtbl) x
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
 |
-06:AGGREGATE [MERGE FINALIZE]
+06:AGGREGATE [FINALIZE]
 |  group by: id, zip
 |
 05:EXCHANGE [HASH(id,zip)]
@@ -527,7 +527,7 @@ from (select distinct * from functional.testtbl) x
 02:AGGREGATE
 |  group by: functional.testtbl.id, functional.testtbl.zip
 |
-04:AGGREGATE [MERGE FINALIZE]
+04:AGGREGATE [FINALIZE]
 |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
 |
 03:EXCHANGE [HASH(functional.testtbl.id,functional.testtbl.name,functional.testtbl.zip)]
@@ -561,8 +561,8 @@ and   c2 > 10
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
-03:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(*)), avg(avg(int_col))
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*), avg:merge(int_col)
 |  group by: int_col % 7
 |  having: avg(int_col) > 500 OR count(*) = 10, count(*) > 10, int_col % 7 IS NOT NULL
 |
@@ -655,8 +655,8 @@ group by x.smallint_col
 ---- DISTRIBUTEDPLAN
 11:EXCHANGE [UNPARTITIONED]
 |
-10:AGGREGATE [MERGE FINALIZE]
-|  output: sum(count(x.id))
+10:AGGREGATE [FINALIZE]
+|  output: count:merge(x.id)
 |  group by: x.smallint_col
 |
 09:EXCHANGE [HASH(x.smallint_col)]
@@ -792,8 +792,8 @@ group by x.smallint_col
 ---- DISTRIBUTEDPLAN
 13:EXCHANGE [UNPARTITIONED]
 |
-12:AGGREGATE [MERGE FINALIZE]
-|  output: sum(sum(x.cnt))
+12:AGGREGATE [FINALIZE]
+|  output: sum:merge(x.cnt)
 |  group by: x.smallint_col
 |
 11:EXCHANGE [HASH(x.smallint_col)]
@@ -807,8 +807,8 @@ group by x.smallint_col
 |
 |--10:EXCHANGE [BROADCAST]
 |  |
-|  09:AGGREGATE [MERGE FINALIZE]
-|  |  output: sum(count(a.id))
+|  09:AGGREGATE [FINALIZE]
+|  |  output: count:merge(a.id)
 |  |  group by: b.smallint_col
 |  |
 |  08:EXCHANGE [HASH(b.smallint_col)]

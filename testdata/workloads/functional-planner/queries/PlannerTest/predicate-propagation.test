@@ -451,8 +451,8 @@ NODE 1:
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
-|  05:AGGREGATE [MERGE FINALIZE]
-|  |  output: sum(count(*))
+|  05:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
 |  |  group by: year, month, id, int_col
 |  |  having: count(*) + 1 = 17
 |  |
@@ -510,8 +510,8 @@ where a.id = b.id and
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
-|  05:AGGREGATE [MERGE FINALIZE]
-|  |  output: sum(count(*))
+|  05:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
 |  |  group by: year, month, id, int_col
 |  |  having: count(*) + 1 = 17
 |  |
@@ -585,8 +585,8 @@ NODE 1:
 |  07:EXCHANGE [UNPARTITIONED]
 |  |  limit: 5
 |  |
-|  06:AGGREGATE [MERGE FINALIZE]
-|  |  output: sum(count(*))
+|  06:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
 |  |  group by: year, month, id, int_col
 |  |  limit: 5
 |  |
@@ -654,8 +654,8 @@ where a.year = 2009 and
 |  07:EXCHANGE [UNPARTITIONED]
 |  |  limit: 5
 |  |
-|  06:AGGREGATE [MERGE FINALIZE]
-|  |  output: sum(count(*))
+|  06:AGGREGATE [FINALIZE]
+|  |  output: count:merge(*)
 |  |  group by: year, month, id, int_col
 |  |  limit: 5
 |  |

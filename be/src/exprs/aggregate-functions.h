@@ -45,6 +45,7 @@ class AggregateFunctions {
   // Implementation of Count and Count(*)
   static void CountUpdate(FunctionContext*, const AnyVal& src, BigIntVal* dst);
   static void CountStarUpdate(FunctionContext*, BigIntVal* dst);
+  static void CountMerge(FunctionContext*, const BigIntVal& src, BigIntVal* dst);
 
   // Implementation of Avg.
   // TODO: Change this to use a fixed-sized BufferVal as intermediate type.

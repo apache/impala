@@ -39,9 +39,12 @@ public class FunctionCallExpr extends Expr {
   private boolean isAnalyticFnCall_ = false;
 
   // Indicates whether this is a merge aggregation function that should use the merge
-  // instead of the update symbol. This flag also affects resetAnalysisState() which is
-  // used during expr substitution.
+  // instead of the update symbol. This flag also affects the behavior of
+  // resetAnalysisState() which is used during expr substitution.
   private final boolean isMergeAggFn_;
+
+  // Printed in toSqlImpl(), if set. Used for merge agg fns.
+  private String label_;
 
   public FunctionCallExpr(String functionName, List<Expr> params) {
     this(new FunctionName(functionName), new FunctionParams(false, params));
@@ -72,20 +75,18 @@ public class FunctionCallExpr extends Expr {
       FunctionCallExpr agg, List<Expr> params) {
     Preconditions.checkState(agg.isAnalyzed_);
     Preconditions.checkState(agg.isAggregateFunction());
-    FunctionCallExpr result = null;
-    if (agg.fnName_.getFunction().equals("count")) {
-      // Use SUM to merge counts.
-      // TODO: Should we implement a count merge fn instead? Or should we update
-      // the toSqlImpl() to reflect which symbol is being used such that the explain
-      // plan makes sense, e.g., count_update, count_merge, etc. Might also help uda
-      // developers understand how their function implementations are applied in a plan.
-      result = new FunctionCallExpr("sum", params);
+    FunctionCallExpr result = new FunctionCallExpr(
+        agg.fnName_, new FunctionParams(false, params), true);
+    // Inherit the function object from 'agg'.
+    result.fn_ = agg.fn_;
+    result.type_ = agg.type_;
+    // Set an explicit label based on the input agg.
+    if (agg.isMergeAggFn_) {
+      result.label_ = agg.label_;
     } else {
-      result = new FunctionCallExpr(
-          agg.fnName_, new FunctionParams(false, params), true);
-      // Inherit the function object from 'agg'.
-      result.fn_ = agg.fn_;
-      result.type_ = agg.type_;
+      // fn(input) becomes fn:merge(input).
+      result.label_ = agg.toSql().replaceFirst(agg.fnName_.toString(),
+          agg.fnName_.toString() + ":merge");
     }
     Preconditions.checkState(!result.type_.isWildcardDecimal());
     return result;
@@ -101,6 +102,7 @@ public class FunctionCallExpr extends Expr {
     isMergeAggFn_ = other.isMergeAggFn_;
     // No need to deep clone the params, its exprs are already in children_.
     params_ = other.params_;
+    label_ = other.label_;
   }
 
   public boolean isMergeAggFn() { return isMergeAggFn_; }
@@ -126,6 +128,9 @@ public class FunctionCallExpr extends Expr {
 
   @Override
   public String toSqlImpl() {
+    if (label_ != null) return label_;
+    // Merge agg fns should have an explicit label.
+    Preconditions.checkState(!isMergeAggFn_);
     StringBuilder sb = new StringBuilder();
     sb.append(fnName_).append("(");
     if (params_.isStar()) sb.append("*");
