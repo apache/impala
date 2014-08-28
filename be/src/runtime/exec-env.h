@@ -96,6 +96,8 @@ class ExecEnv {
   Scheduler* scheduler() { return scheduler_.get(); }
   StatestoreSubscriber* subscriber() { return statestore_subscriber_.get(); }
 
+  const TNetworkAddress& backend_address() const { return backend_address_; }
+
   // Starts any dependent services in their correct order
   virtual Status StartServices();
 
@@ -140,6 +142,9 @@ class ExecEnv {
   static ExecEnv* exec_env_;
   TimezoneDatabase tz_database_;
   bool is_fe_tests_;
+
+  // Address of the Impala backend server instance
+  TNetworkAddress backend_address_;
 
   // True if the cluster has set 'yarn.scheduler.include-port-in-node-name' to true,
   // indicating that this cluster is pseudo-distributed. Should not be true in real

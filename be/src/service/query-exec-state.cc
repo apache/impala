@@ -94,6 +94,8 @@ ImpalaServer::QueryExecState::QueryExecState(
       lexical_cast<string>(session_->network_address));
   summary_profile_.AddInfoString("Default Db", default_db());
   summary_profile_.AddInfoString("Sql Statement", query_ctx_.request.stmt);
+  summary_profile_.AddInfoString("Coordinator",
+      TNetworkAddressToString(exec_env->backend_address()));
 }
 
 ImpalaServer::QueryExecState::~QueryExecState() {

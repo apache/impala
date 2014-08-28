@@ -32,6 +32,7 @@
 #include <boost/unordered_set.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string.hpp>
+#include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
 #include "exprs/expr.h"
@@ -66,6 +67,7 @@ using namespace boost;
 using namespace boost::accumulators;
 using namespace boost::filesystem;
 using namespace apache::thrift;
+using namespace strings;
 
 DECLARE_int32(be_port);
 DECLARE_string(hostname);
@@ -879,10 +881,6 @@ void Coordinator::InitExecProfile(const TQueryExecRequest& request) {
     int fragment_first_node_idx = exec_summary_.nodes.size();
 
     for (int j = 0; j < plan.nodes.size(); ++j) {
-      stringstream node_label;
-      node_label << plan.nodes[j].node_id << ":"
-                 << PrintPlanNodeType(plan.nodes[j].node_type);
-
       TPlanNodeExecSummary node;
       node.node_id = plan.nodes[j].node_id;
       node.fragment_id = i;
@@ -914,9 +912,8 @@ void Coordinator::InitExecProfile(const TQueryExecRequest& request) {
     // register coordinator's fragment profile now, before those of the backends,
     // so it shows up at the top
     query_profile_->AddChild(executor_->profile());
-    stringstream ss;
-    ss << "Coordinator Fragment " << request.fragments[0].display_name;
-    executor_->profile()->set_name(ss.str());
+    executor_->profile()->set_name(Substitute("Coordinator Fragment $0",
+        request.fragments[0].display_name));
     CollectScanNodeCounters(executor_->profile(), &coordinator_counters_);
   }
 
@@ -934,10 +931,9 @@ void Coordinator::InitExecProfile(const TQueryExecRequest& request) {
       fragment_profiles_[i].averaged_profile = executor_->profile();
       continue;
     }
-    stringstream ss;
-    ss << "Averaged Fragment " << request.fragments[i].display_name;
     fragment_profiles_[i].averaged_profile =
-        obj_pool()->Add(new RuntimeProfile(obj_pool(), ss.str(), true));
+        obj_pool()->Add(new RuntimeProfile(obj_pool(),
+            Substitute("Averaged Fragment $0", request.fragments[i].display_name), true));
     // Insert the avg profiles in ascending fragment number order. If
     // there is a coordinator fragment, it's been placed in
     // fragment_profiles_[0].averaged_profile, ensuring that this code
@@ -948,10 +944,9 @@ void Coordinator::InitExecProfile(const TQueryExecRequest& request) {
     query_profile_->AddChild(fragment_profiles_[i].averaged_profile, true,
         (i > 0) ? fragment_profiles_[i-1].averaged_profile : NULL);
 
-    ss.str("");
-    ss << "Fragment " << request.fragments[i].display_name;
     fragment_profiles_[i].root_profile =
-        obj_pool()->Add(new RuntimeProfile(obj_pool(), ss.str()));
+        obj_pool()->Add(new RuntimeProfile(obj_pool(),
+            Substitute("Fragment $0", request.fragments[i].display_name)));
     // Note: we don't start the wall timer here for the fragment
     // profile; it's uninteresting and misleading.
     query_profile_->AddChild(fragment_profiles_[i].root_profile);
