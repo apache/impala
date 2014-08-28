@@ -28,14 +28,13 @@ namespace impala {
 class MemPool;
 class RuntimeState;
 
-// Create a compression object.  This is the base class for all compression
-// algorithms. A compression algorithm is either a compressor or a decompressor.
-// To add a new algorithm, generally, both a compressor and a decompressor
-// will be added.  Each of these objects inherits from this class. The objects
-// are instantiated in the Create static methods defined here.  The type of
-// compression is defined in the Thrift interface THdfsCompression.
-// TODO: make this pure virtual (no members) so that external codecs (e.g. Lzo)
-// can implement this without binary dependency issues.
+// Create a compression object.  This is the base class for all compression algorithms. A
+// compression algorithm is either a compressor or a decompressor.  To add a new
+// algorithm, generally, both a compressor and a decompressor will be added.  Each of
+// these objects inherits from this class. The objects are instantiated in the Create
+// static methods defined here.  The type of compression is defined in the Thrift
+// interface THdfsCompression.  TODO: make this pure virtual (no members) so that external
+// codecs (e.g. Lzo) can implement this without binary dependency issues.
 class Codec {
  public:
   // These are the codec string representations used in Hadoop.
@@ -55,22 +54,15 @@ class Codec {
   //  reuse: if true the allocated buffer can be reused.
   //  format: the type of decompressor to create.
   // Output:
-  //  decompressor: pointer to the decompressor class to use.
+  //  decompressor: scoped pointer to the decompressor class to use.
   // If mem_pool is NULL, then the resulting codec will never allocate memory and
   // the caller must be responsible for it.
   static Status CreateDecompressor(MemPool* mem_pool, bool reuse,
-                                   THdfsCompression::type format,
-                                   Codec** decompressor);
+    THdfsCompression::type format, boost::scoped_ptr<Codec>* decompressor);
 
-  // Alternate creator: returns a scoped pointer.
+  // Alternate factory method: takes a codec string and populates a scoped pointer.
   static Status CreateDecompressor(MemPool* mem_pool, bool reuse,
-                                   THdfsCompression::type format,
-                                   boost::scoped_ptr<Codec>* decompressor);
-
-  // Alternate creator: takes a codec string and returns a scoped pointer.
-  static Status CreateDecompressor(MemPool* mem_pool, bool reuse,
-                                   const std::string& codec,
-                                   boost::scoped_ptr<Codec>* decompressor);
+      const std::string& codec, boost::scoped_ptr<Codec>* decompressor);
 
   // Create a compressor.
   // Input:
@@ -78,22 +70,13 @@ class Codec {
   //  reuse: if true the allocated buffer can be reused.
   //  format: The type of compressor to create.
   // Output:
-  //  compressor: pointer to the compressor class to use.
+  //  compressor: scoped pointer to the compressor class to use.
   static Status CreateCompressor(MemPool* mem_pool, bool reuse,
-                                 THdfsCompression::type format,
-                                 Codec** compressor);
+      THdfsCompression::type format, boost::scoped_ptr<Codec>* compressor);
 
-  // Alternate creator: returns a scoped pointer.
+  // Alternate factory method: takes a codec string and populates a scoped pointer.
   static Status CreateCompressor(MemPool* mem_pool, bool reuse,
-                                 THdfsCompression::type format,
-                                 boost::scoped_ptr<Codec>* compressor);
-
-  // Alternate creator: takes a codec string and returns a scoped pointer.
-  // Input, as above except:
-  //  codec: the string representing the codec of the current file.
-  static Status CreateCompressor(MemPool* mem_pool, bool reuse,
-                                 const std::string& codec,
-                                 boost::scoped_ptr<Codec>* compressor);
+      const std::string& codec, boost::scoped_ptr<Codec>* compressor);
 
   // Return the name of a compression algorithm.
   static std::string GetCodecName(THdfsCompression::type);
@@ -109,21 +92,20 @@ class Codec {
   // transformed output). If output_preallocated is false, *output will be allocated from
   // the codec's mempool. In this case, a mempool must have been passed into the c'tor.
   //
-  // In either case, *output_length will be set to the actual length of the
-  // transformed output.
+  // In either case, *output_length will be set to the actual length of the transformed
+  // output.
   //
   // Inputs:
   //   input_length: length of the data to process
   //   input: data to process
-  virtual Status ProcessBlock(bool output_preallocated,
-                              int64_t input_length, const uint8_t* input,
-                              int64_t* output_length, uint8_t** output) = 0;
+  virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
+      const uint8_t* input, int64_t* output_length, uint8_t** output) = 0;
 
   // Wrapper to the actual ProcessBlock() function. This wrapper uses lengths as ints and
   // not int64_ts. We need to keep this interface because the Parquet thrift uses ints.
   // See IMPALA-1116.
   Status ProcessBlock32(bool output_preallocated, int input_length, const uint8_t* input,
-                        int* output_length, uint8_t** output);
+      int* output_length, uint8_t** output);
 
   // Returns the maximum result length from applying the codec to input.
   // Note this is not the exact result length, simply a bound to allow preallocating
@@ -138,9 +120,8 @@ class Codec {
   bool reuse_output_buffer() const { return reuse_buffer_; }
 
   // Largest block we will compress/decompress: 2GB.
-  // We are dealing with compressed blocks that are never this big but we
-  // want to guard against a corrupt file that has the block length as some
-  // large number.
+  // We are dealing with compressed blocks that are never this big but we want to guard
+  // against a corrupt file that has the block length as some large number.
   static const int MAX_BLOCK_SIZE = (2L * 1024 * 1024 * 1024) - 1;
 
  protected:
@@ -151,14 +132,14 @@ class Codec {
   //   reuse_buffer: if false always allocate a new buffer rather than reuse.
   Codec(MemPool* mem_pool, bool reuse_buffer);
 
-  // Initialize the operation. This should only be called once.
+  // Initialize the codec. This should only be called once.
   virtual Status Init() = 0;
 
   // Pool to allocate the buffer to hold transformed data.
   MemPool* memory_pool_;
 
-  // Temporary memory pool: in case we get the output size too small we can
-  // use this to free unused buffers.
+  // Temporary memory pool: in case we get the output size too small we can use this to
+  // free unused buffers.
   boost::scoped_ptr<MemPool> temp_memory_pool_;
 
   // Can we reuse the output buffer or do we need to allocate on each call?
