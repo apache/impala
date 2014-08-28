@@ -126,17 +126,14 @@ HIVE=SUCCESS
 ====
 ---- CREATE_VIEW
 # Test that Impala adds quotes to table aliases if necessary
-# and that Impala omits "AS" for table aliases to make
-# the view parseable by Hive. Hive cannot parse "AS" before table aliases,
-# so Hive's view creation should fail but it should be able to parse
-# Impala's view.
+# As of Hive .13, Hive's view creation should also work with this query
 create view test as
 select int_col, string_col, float_col from
 (select int_col, string_col, float_col
 from functional.alltypessmall) as t
 ---- CREATE_VIEW_RESULTS
 IMPALA=SUCCESS
-HIVE=FAILURE
+HIVE=SUCCESS
 ---- QUERY_IMPALA_VIEW_RESULTS
 IMPALA=SUCCESS
 HIVE=SUCCESS
@@ -159,8 +156,7 @@ HIVE=SUCCESS
 ====
 ---- CREATE_VIEW
 # Test a complex query with subqueries, joins, aggregates, group by,
-# order by and limit. The view is not parsable by Hive because Hive
-# requires explicit aliases for columns referenced in the oder by clause.
+# order by and limit. As of Hive .13 this should also work in Hive
 create view test (a, b, c) as
 select count(t1.int_col), avg(t2.float_col), t1.string_col from
 (select id, int_col, string_col from functional.alltypesagg where id < 10) t1
@@ -172,10 +168,10 @@ group by t1.string_col having count(t2.float_col) > 2
 order by t1.string_col limit 100
 ---- CREATE_VIEW_RESULTS
 IMPALA=SUCCESS
-HIVE=FAILURE
+HIVE=SUCCESS
 ---- QUERY_IMPALA_VIEW_RESULTS
 IMPALA=SUCCESS
-HIVE=FAILURE
+HIVE=SUCCESS
 ====
 ---- CREATE_VIEW
 # Test a complex query with an explicit alias for the order-by columns.
