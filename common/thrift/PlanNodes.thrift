@@ -235,13 +235,19 @@ enum TAnalyticWindowBoundaryType {
 struct TAnalyticWindowBoundary {
   1: required TAnalyticWindowBoundaryType type
 
-  // Expr to supply offset value when type is PRECEDING or FOLLOWING.
+  // Expr to supply offset for range window values when type is PRECEDING or FOLLOWING.
   // This should be a numeric literal.
-  2: optional Exprs.TExpr offset_expr
+  // TODO: This should be a predicate expr like TAnalyticNode.order_by_lt
+  2: optional Exprs.TExpr range_offset_expr
+
+  // Index offset from the current row. Is positive if type is FOLLOWING, negative if
+  // type is PRECEDING, and 0 if type is CURRENT ROW.
+  3: optional i64 rows_offset_idx
 }
 
 struct TAnalyticWindow {
-  1: required TAnalyticWindowType window_type
+  // Specifies the window type for the start and end bounds.
+  1: required TAnalyticWindowType type
 
   // Absence indicates window start is UNBOUNDED PRECEDING.
   2: optional TAnalyticWindowBoundary window_start

@@ -130,6 +130,7 @@ NULL,NULL,900
 TINYINT, SMALLINT, BIGINT
 ====
 ---- QUERY
+# Test multiple partition exprs
 select year, month, tinyint_col,
 count(int_col) over (partition by year, month order by tinyint_col)
 from alltypessmall
@@ -155,4 +156,162 @@ where month >= 3 and tinyint_col < 3
 2009,4,2,9
 ---- TYPES
 INT, INT, TINYINT, BIGINT
+====
+---- QUERY
+# Test multiple partition exprs and multiple order by exprs
+select year, month, bool_col, tinyint_col,
+count(id) over (partition by year, month order by bool_col, tinyint_col)
+from alltypes
+where tinyint_col < 2 and month < 3 and (id % 100 < 10)
+order by year, month, bool_col, tinyint_col
+---- RESULTS
+2009,1,false,1,4
+2009,1,false,1,4
+2009,1,false,1,4
+2009,1,false,1,4
+2009,1,true,0,8
+2009,1,true,0,8
+2009,1,true,0,8
+2009,1,true,0,8
+2009,2,false,1,2
+2009,2,false,1,2
+2009,2,true,0,4
+2009,2,true,0,4
+2010,1,false,1,3
+2010,1,false,1,3
+2010,1,false,1,3
+2010,1,true,0,6
+2010,1,true,0,6
+2010,1,true,0,6
+2010,2,false,1,3
+2010,2,false,1,3
+2010,2,false,1,3
+2010,2,true,0,6
+2010,2,true,0,6
+2010,2,true,0,6
+---- TYPES
+INT, INT, BOOLEAN, TINYINT, BIGINT
+====
+---- QUERY
+# Simple ROWS window
+select (month % 2), int_col,
+sum(int_col) over (partition by (month % 2)
+                   order by int_col rows between unbounded preceding and current row)
+from alltypestiny
+---- RESULTS
+0,0,0
+0,0,0
+0,1,1
+0,1,2
+1,0,0
+1,0,0
+1,1,1
+1,1,2
+---- TYPES
+INT, INT, BIGINT
+====
+---- QUERY
+# sum() over ROWS with end bound FOLLOWING
+select bool_col, tinyint_col,
+sum(tinyint_col) over (partition by bool_col order by tinyint_col
+                       rows between unbounded preceding and 1 following)
+from alltypesagg where id <= 10 and day = 1
+---- RESULTS
+false,1,4
+false,3,9
+false,5,16
+false,7,25
+false,9,25
+true,2,6
+true,4,12
+true,6,20
+true,8,20
+true,NULL,20
+true,NULL,20
+---- TYPES
+BOOLEAN, TINYINT, BIGINT
+====
+---- QUERY
+# count() over ROWS with end bound FOLLOWING
+select bool_col, tinyint_col,
+count(tinyint_col) over (partition by bool_col order by tinyint_col
+                         rows between unbounded preceding and 1 following)
+from alltypesagg where id <= 10 and day = 1
+---- RESULTS
+false,1,2
+false,3,3
+false,5,4
+false,7,5
+false,9,5
+true,2,2
+true,4,3
+true,6,4
+true,8,4
+true,NULL,4
+true,NULL,4
+---- TYPES
+BOOLEAN, TINYINT, BIGINT
+====
+---- QUERY
+# ROWS with end bound PRECEDING
+select bool_col, tinyint_col,
+sum(tinyint_col) over (partition by bool_col order by tinyint_col
+                       rows between unbounded preceding and 3 preceding)
+from alltypesagg where id <= 10 and day = 1
+---- RESULTS
+false,1,NULL
+false,3,NULL
+false,5,NULL
+false,7,1
+false,9,4
+true,2,NULL
+true,4,NULL
+true,6,NULL
+true,8,2
+true,NULL,6
+true,NULL,12
+---- TYPES
+BOOLEAN, TINYINT, BIGINT
+====
+---- QUERY
+# ROWS with end bound FOLLOWING beyond the end of the results
+select bool_col, tinyint_col,
+sum(tinyint_col) over (partition by bool_col order by tinyint_col
+                       rows between unbounded preceding and 20 following)
+from alltypesagg where id <= 10 and day = 1
+---- RESULTS
+false,1,25
+false,3,25
+false,5,25
+false,7,25
+false,9,25
+true,2,20
+true,4,20
+true,6,20
+true,8,20
+true,NULL,20
+true,NULL,20
+---- TYPES
+BOOLEAN, TINYINT, BIGINT
+====
+---- QUERY
+# ROWS with end bound PRECEDING before the start of all results
+select bool_col, tinyint_col,
+sum(tinyint_col) over (partition by bool_col order by tinyint_col
+                       rows between unbounded preceding and 20 preceding)
+from alltypesagg where id <= 10 and day = 1
+---- RESULTS
+false,1,NULL
+false,3,NULL
+false,5,NULL
+false,7,NULL
+false,9,NULL
+true,2,NULL
+true,4,NULL
+true,6,NULL
+true,8,NULL
+true,NULL,NULL
+true,NULL,NULL
+---- TYPES
+BOOLEAN, TINYINT, BIGINT
 ====

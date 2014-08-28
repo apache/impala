@@ -223,7 +223,11 @@ public class AnalyticEvalNode extends PlanNode {
     msg.analytic_node.setPartition_exprs(Expr.treesToThrift(substitutedPartitionExprs_));
     msg.analytic_node.setOrder_by_exprs(Expr.treesToThrift(orderingExprs_));
     msg.analytic_node.setAnalytic_functions(Expr.treesToThrift(analyticFnCalls_));
-    if (analyticWindow_ != null) {
+    if (analyticWindow_ == null) {
+      if (!orderingExprs_.isEmpty()) {
+        msg.analytic_node.setWindow(AnalyticWindow.DEFAULT_WINDOW.toThrift());
+      }
+    } else {
       msg.analytic_node.setWindow(analyticWindow_.toThrift());
     }
     if (bufferedTupleDesc_ != null) {

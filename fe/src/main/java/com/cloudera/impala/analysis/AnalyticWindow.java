@@ -30,6 +30,10 @@ import com.google.common.base.Preconditions;
  * Windowing clause of an analytic expr
  */
 public class AnalyticWindow {
+  public static final AnalyticWindow DEFAULT_WINDOW = new AnalyticWindow(Type.RANGE,
+      new Boundary(BoundaryType.UNBOUNDED_PRECEDING, null),
+      new Boundary(BoundaryType.CURRENT_ROW, null));
+
   enum Type {
     ROWS("ROWS"),
     RANGE("RANGE");
@@ -95,15 +99,24 @@ public class AnalyticWindow {
     private final BoundaryType type_;
     private final Expr expr_;  // only set for PRECEDING/FOLLOWING
 
+    // set during analysis if the boundary is for a ROWS window
+    private Long rowsOffset_;
+
     public BoundaryType getType() { return type_; }
     public Expr getExpr() { return expr_; }
 
     public Boundary(BoundaryType type, Expr e) {
+      this(type, e, null);
+    }
+
+    // c'tor used by clone()
+    private Boundary(BoundaryType type, Expr e, Long rowsOffset) {
       Preconditions.checkState(
         (type.isOffset() && e != null)
         || (!type.isOffset() && e == null));
       type_ = type;
       expr_ = e;
+      rowsOffset_ = rowsOffset;
     }
 
     public String toSql() {
@@ -116,7 +129,15 @@ public class AnalyticWindow {
     public TAnalyticWindowBoundary toThrift() {
       TAnalyticWindowBoundary result = new TAnalyticWindowBoundary(type_.toThrift());
       if (type_.isOffset()) {
-        result.setOffset_expr(expr_.treeToThrift());
+        if (rowsOffset_ == null) {
+          result.setRange_offset_expr(expr_.treeToThrift());
+        } else {
+          long relativeOffset = rowsOffset_;
+          if (type_ == BoundaryType.PRECEDING) relativeOffset *= -1;
+          result.setRows_offset_idx(relativeOffset);
+        }
+      } else if (type_ == BoundaryType.CURRENT_ROW) {
+        result.setRows_offset_idx(0);
       }
       return result;
     }
@@ -133,7 +154,7 @@ public class AnalyticWindow {
 
     @Override
     public Boundary clone() {
-      return new Boundary(type_, expr_ != null ? expr_.clone() : null);
+      return new Boundary(type_, expr_ != null ? expr_.clone() : null, rowsOffset_);
     }
 
     public void analyze(Analyzer analyzer) throws AnalysisException {
@@ -181,7 +202,7 @@ public class AnalyticWindow {
     if (leftBoundary_.getType() != BoundaryType.UNBOUNDED_PRECEDING) {
       result.setWindow_start(leftBoundary_.toThrift());
     }
-    if (rightBoundary_.getType() != BoundaryType.CURRENT_ROW) {
+    if (rightBoundary_.getType() != BoundaryType.UNBOUNDED_FOLLOWING) {
       result.setWindow_end(rightBoundary_.toThrift());
     }
     return result;
@@ -216,10 +237,12 @@ public class AnalyticWindow {
     Expr e = boundary.getExpr();
     Preconditions.checkNotNull(e);
     boolean isPos = true;
+    Double val = null;
     if (e.isConstant() && e.getType().isNumericType()) {
       try {
-        TColumnValue val = FeSupport.EvalConstExpr(e, analyzer.getQueryCtx());
-        if (TColumnValueUtil.getNumericVal(val) <= 0) isPos = false;
+        val = TColumnValueUtil.getNumericVal(
+            FeSupport.EvalConstExpr(e, analyzer.getQueryCtx()));
+        if (val <= 0) isPos = false;
       } catch (InternalException exc) {
         throw new AnalysisException(
             "Couldn't evaluate PRECEDING/FOLLOWING expression: " + exc.getMessage());
@@ -232,6 +255,8 @@ public class AnalyticWindow {
             "For ROWS window, the value of a PRECEDING/FOLLOWING offset must be a "
               + "constant positive integer: " + boundary.toSql());
       }
+      Preconditions.checkNotNull(val);
+      boundary.rowsOffset_ = val.longValue();
     } else {
       if (!e.isConstant() || !e.getType().isNumericType() || !isPos) {
         throw new AnalysisException(
