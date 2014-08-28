@@ -258,7 +258,7 @@ class TestImpalaShell(object):
     assert "03:AGGREGATE" in result_set.stdout
 
     args = "-q 'summary;'"
-    result_set = run_impala_shell_cmd(args)
+    result_set = run_impala_shell_cmd(args, expect_success=False)
     assert "Could not retrieve summary for query" in result_set.stderr
 
     args = "-q 'show tables; summary;'"

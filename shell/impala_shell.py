@@ -387,10 +387,10 @@ class ImpalaShell(cmd.Cmd):
       pass
     if summary is None:
       print_to_stderr("Could not retrieve summary for query.")
-      return True
+      return CmdStatus.ERROR
     if summary.nodes is None:
       print_to_stderr("Summary not available")
-      return True
+      return CmdStatus.SUCCESS
     output = []
     table = self.construct_table_header(["Operator", "#Hosts", "Avg Time", "Max Time",
                                            "#Rows", "Est. #Rows", "Peak Mem",
