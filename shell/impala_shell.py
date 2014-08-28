@@ -676,7 +676,7 @@ class ImpalaShell(cmd.Cmd):
       end_time = time.time()
 
       if warning_log:
-        print_to_stderr(warning_log)
+        self._print_if_verbose(warning_log)
       # print insert when is_insert is true (which is 1)
       # print fetch when is_insert is false (which is 0)
       verb = ["Fetch", "Insert"][is_insert]

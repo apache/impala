@@ -164,13 +164,20 @@ class TestImpalaShell(object):
   @pytest.mark.execute_serially
   def test_completed_query_errors(self):
     args = ('-q "set abort_on_error=false;'
-        ' select count(*) from functional_seq_snap.bad_seq_snap" --quiet')
+        ' select count(*) from functional_seq_snap.bad_seq_snap"')
     result = run_impala_shell_cmd(args)
     assert 'WARNINGS:' in result.stderr
     assert 'Bad synchronization marker' in result.stderr
     assert 'Expected: ' in result.stderr
     assert 'Actual: ' in result.stderr
     assert 'Problem parsing file' in result.stderr
+
+    # Regression test for CDH-21036
+    # do not print warning log in quiet mode
+    args = ('-q "set abort_on_error=false;'
+        ' select count(*) from functional_seq_snap.bad_seq_snap" --quiet')
+    result = run_impala_shell_cmd(args)
+    assert 'WARNINGS:' not in result.stderr
 
   @pytest.mark.execute_serially
   def test_output_format(self):
