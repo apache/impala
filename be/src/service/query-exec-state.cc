@@ -81,6 +81,10 @@ ImpalaServer::QueryExecState::QueryExecState(
   profile_.set_name("Query (id=" + PrintId(query_id()) + ")");
   summary_profile_.AddInfoString("Session ID", PrintId(session_id()));
   summary_profile_.AddInfoString("Session Type", PrintTSessionType(session_type()));
+  if (session_type() == TSessionType::HIVESERVER2) {
+    summary_profile_.AddInfoString("HiveServer2 Protocol Version",
+        Substitute("V$0", 1 + session->hs2_version));
+  }
   summary_profile_.AddInfoString("Start Time", start_time().DebugString());
   summary_profile_.AddInfoString("End Time", "");
   summary_profile_.AddInfoString("Query Type", "N/A");
@@ -660,7 +664,7 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
       return Status::OK;
     }
     int64_t delta_bytes =
-        fetched_rows->BytesSize(num_rows_fetched_from_cache, fetched_rows->size());
+        fetched_rows->ByteSize(num_rows_fetched_from_cache, fetched_rows->size());
     MemTracker* query_mem_tracker = coord_->query_mem_tracker();
     // Count the cached rows towards the mem limit.
     if (!query_mem_tracker->TryConsume(delta_bytes)) {
@@ -924,7 +928,7 @@ void ImpalaServer::QueryExecState::ClearResultCache() {
   if (result_cache_ == NULL) return;
   // Update result set cache metrics and mem limit accounting.
   ImpaladMetrics::RESULTSET_CACHE_TOTAL_NUM_ROWS->Increment(-result_cache_->size());
-  int64_t total_bytes = result_cache_->BytesSize();
+  int64_t total_bytes = result_cache_->ByteSize();
   ImpaladMetrics::RESULTSET_CACHE_TOTAL_BYTES->Increment(-total_bytes);
   if (coord_ != NULL) {
     DCHECK_NOTNULL(coord_->query_mem_tracker());

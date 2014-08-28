@@ -20,7 +20,7 @@
 
 #include "common/status.h"
 #include "impala-server.h"
-#include "gen-cpp/cli_service_types.h"
+#include "gen-cpp/TCLIService_types.h"
 
 namespace impala {
 

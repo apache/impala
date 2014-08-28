@@ -17,7 +17,7 @@
 
 import pytest
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session, operation_id_to_query_id
-from cli_service import TCLIService
+from TCLIService import TCLIService
 from ImpalaService import ImpalaHiveServer2Service
 from ExecStats.ttypes import TExecState
 
@@ -26,6 +26,18 @@ class TestHS2(HS2TestSuite):
     """Check that a session can be opened"""
     open_session_req = TCLIService.TOpenSessionReq()
     TestHS2.check_response(self.hs2_client.OpenSession(open_session_req))
+
+  def test_open_session_unsupported_protocol(self):
+    """Test that we get the right protocol version back if we ask for one larger than the
+    server supports. This test will fail as we support newer version of HS2, and should be
+    updated."""
+    open_session_req = TCLIService.TOpenSessionReq()
+    open_session_req.protocol_version = \
+        TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V7
+    open_session_resp = self.hs2_client.OpenSession(open_session_req)
+    TestHS2.check_response(open_session_resp)
+    assert open_session_resp.serverProtocolVersion == \
+        TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6
 
   def test_close_session(self):
     """Test that an open session can be closed"""
@@ -51,30 +63,7 @@ class TestHS2(HS2TestSuite):
     TestHS2.check_response(self.hs2_client.CloseSession(close_session_req),
                            TCLIService.TStatusCode.ERROR_STATUS)
 
-  @needs_session
-  def test_execute_select(self):
-    """Test that a simple select statement works"""
-    execute_statement_req = TCLIService.TExecuteStatementReq()
-    execute_statement_req.sessionHandle = self.session_handle
-    execute_statement_req.statement = "SELECT COUNT(*) FROM functional.alltypes"
-    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
-    TestHS2.check_response(execute_statement_resp)
-
-    fetch_results_req = TCLIService.TFetchResultsReq()
-    fetch_results_req.operationHandle = execute_statement_resp.operationHandle
-    fetch_results_req.maxRows = 100
-    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
-    TestHS2.check_response(fetch_results_resp)
-
-    assert len(fetch_results_resp.results.rows) == 1
-    assert fetch_results_resp.results.startRowOffset == 0
-
-    try:
-      assert not fetch_results_resp.hasMoreRows
-    except AssertionError:
-      pytest.xfail("IMPALA-558")
-
-  @needs_session
+  @needs_session()
   def test_get_operation_status(self):
     """Tests that GetOperationStatus returns a valid result for a running query"""
     execute_statement_req = TCLIService.TExecuteStatementReq()
@@ -95,7 +84,7 @@ class TestHS2(HS2TestSuite):
          TCLIService.TOperationState.RUNNING_STATE,
          TCLIService.TOperationState.FINISHED_STATE]
 
-  @needs_session
+  @needs_session()
   def test_malformed_get_operation_status(self):
     """Tests that a short guid / secret returns an error (regression would be to crash
     impalad)"""
@@ -159,7 +148,7 @@ class TestHS2(HS2TestSuite):
     self.impalad_test_service.wait_for_metric_value(
       "impala-server.num-open-hiveserver2-sessions", num_sessions)
 
-  @needs_session
+  @needs_session()
   def test_get_schemas(self):
     get_schemas_req = TCLIService.TGetSchemasReq()
     get_schemas_req.sessionHandle = self.session_handle
@@ -197,7 +186,7 @@ class TestHS2(HS2TestSuite):
     TestHS2.check_response(get_log_resp)
     return get_log_resp.log
 
-  @needs_session
+  @needs_session()
   def test_get_log(self):
     # Test query that generates BE warnings
     log = self.get_log("select * from functional.alltypeserror")
@@ -207,7 +196,7 @@ class TestHS2(HS2TestSuite):
     log = self.get_log("select cast(1000 as decimal(2, 1))")
     assert "Expression overflowed, returning NULL" in log
 
-  @needs_session
+  @needs_session()
   def test_get_exec_summary(self):
     execute_statement_req = TCLIService.TExecuteStatementReq()
     execute_statement_req.sessionHandle = self.session_handle
@@ -231,7 +220,7 @@ class TestHS2(HS2TestSuite):
     TestHS2.check_response(exec_summary_resp)
     assert len(exec_summary_resp.summary.nodes) > 0
 
-  @needs_session
+  @needs_session()
   def test_get_profile(self):
     execute_statement_req = TCLIService.TExecuteStatementReq()
     execute_statement_req.sessionHandle = self.session_handle

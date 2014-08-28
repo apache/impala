@@ -17,7 +17,7 @@
 #define IMPALA_EXEC_CATALOG_OP_EXECUTOR_H
 
 #include <boost/scoped_ptr.hpp>
-#include "gen-cpp/cli_service_types.h"
+#include "gen-cpp/TCLIService_types.h"
 #include "gen-cpp/Frontend_types.h"
 
 namespace impala {

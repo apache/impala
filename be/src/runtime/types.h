@@ -20,7 +20,7 @@
 
 #include "common/logging.h"
 #include "gen-cpp/Types_types.h"  // for TPrimitiveType
-#include "gen-cpp/cli_service_types.h"  // for HiveServer2 Type
+#include "gen-cpp/TCLIService_types.h"  // for HiveServer2 Type
 
 namespace impala {
 

@@ -22,7 +22,7 @@
 #include "common/logging.h"
 #include "common/compiler-util.h"
 #include "gen-cpp/Status_types.h"  // for TStatus
-#include "gen-cpp/cli_service_types.h" // for HS2 TStatus
+#include "gen-cpp/TCLIService_types.h" // for HS2 TStatus
 
 namespace impala {
 

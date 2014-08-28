@@ -24,7 +24,7 @@ from optparse import OptionParser
 from tests.util.thrift_util import create_transport
 
 # Imports required for HiveServer2 Client
-from cli_service import TCLIService
+from cli_service import LegacyTCLIService
 from thrift.transport import TTransport, TSocket
 from thrift.protocol import TBinaryProtocol
 
@@ -48,7 +48,7 @@ else:
   hs2_transport = create_transport(hs2_host, hs2_port, "hive", options.transport)
 
 protocol = TBinaryProtocol.TBinaryProtocol(hs2_transport)
-hs2_client = TCLIService.Client(protocol)
+hs2_client = LegacyTCLIService.Client(protocol)
 
 # Try to connect to the HiveServer2 service and create a session
 now = time.time()
@@ -56,11 +56,11 @@ TIMEOUT_SECONDS = 30.0
 while time.time() - now < TIMEOUT_SECONDS:
   try:
     hs2_transport.open()
-    open_session_req = TCLIService.TOpenSessionReq()
+    open_session_req = LegacyTCLIService.TOpenSessionReq()
     open_session_req.username = getpass.getuser()
     resp = hs2_client.OpenSession(open_session_req)
-    if resp.status.statusCode == TCLIService.TStatusCode.SUCCESS_STATUS:
-      close_session_req = TCLIService.TCloseSessionReq()
+    if resp.status.statusCode == LegacyTCLIService.TStatusCode.SUCCESS_STATUS:
+      close_session_req = LegacyTCLIService.TCloseSessionReq()
       close_session_req.sessionHandle = resp.sessionHandle
       hs2_client.CloseSession(close_session_req)
       print "HiveServer2 service is up at %s." % options.hs2_hostport
@@ -73,6 +73,7 @@ while time.time() - now < TIMEOUT_SECONDS:
       print "GSS failure when attempting connection:"
       raise
     print "Waiting for HiveServer2 at %s..." % options.hs2_hostport
+    print e
   finally:
     hs2_transport.close()
     time.sleep(0.5)

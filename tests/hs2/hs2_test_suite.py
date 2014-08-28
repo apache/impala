@@ -16,32 +16,38 @@
 # Superclass of all HS2 tests containing commonly used functions.
 
 from getpass import getuser
-from cli_service import TCLIService
+from TCLIService import TCLIService
 from ImpalaService import ImpalaHiveServer2Service
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
 from thrift.protocol import TBinaryProtocol
 from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
 
-def needs_session(fn):
-  """Decorator that establishes a session and sets self.session_handle. When the test is
-  finished, the session is closed.
-  """
-  def add_session(self):
-    open_session_req = TCLIService.TOpenSessionReq()
-    open_session_req.username = getuser()
-    open_session_req.configuration = dict()
-    resp = self.hs2_client.OpenSession(open_session_req)
-    HS2TestSuite.check_response(resp)
-    self.session_handle = resp.sessionHandle
-    try:
-      fn(self)
-    finally:
-      close_session_req = TCLIService.TCloseSessionReq()
-      close_session_req.sessionHandle = resp.sessionHandle
-      HS2TestSuite.check_response(self.hs2_client.CloseSession(close_session_req))
-      self.session_handle = None
-  return add_session
+def needs_session(protocol_version=
+                  TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6):
+  def session_decorator(fn):
+    """Decorator that establishes a session and sets self.session_handle. When the test is
+    finished, the session is closed.
+    """
+    def add_session(self):
+      open_session_req = TCLIService.TOpenSessionReq()
+      open_session_req.username = getuser()
+      open_session_req.configuration = dict()
+      open_session_req.client_protocol = protocol_version
+      resp = self.hs2_client.OpenSession(open_session_req)
+      HS2TestSuite.check_response(resp)
+      self.session_handle = resp.sessionHandle
+      assert protocol_version <= resp.serverProtocolVersion
+      try:
+        fn(self)
+      finally:
+        close_session_req = TCLIService.TCloseSessionReq()
+        close_session_req.sessionHandle = resp.sessionHandle
+        HS2TestSuite.check_response(self.hs2_client.CloseSession(close_session_req))
+        self.session_handle = None
+    return add_session
+
+  return session_decorator
 
 def operation_id_to_query_id(operation_id):
   lo, hi = operation_id.guid[:8],  operation_id.guid[8:]
@@ -51,6 +57,9 @@ def operation_id_to_query_id(operation_id):
 
 class HS2TestSuite(ImpalaTestSuite):
   TEST_DB = 'hs2_db'
+
+  HS2_V6_COLUMN_TYPES = ['boolVal', 'stringVal', 'byteVal', 'i16Val', 'i32Val', 'i64Val',
+                         'doubleVal', 'binaryVal']
 
   def setup(self):
     self.cleanup_db(self.TEST_DB)

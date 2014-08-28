@@ -127,11 +127,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Pings the Impala service and gets the server version string.
   virtual void PingImpalaService(TPingImpalaServiceResp& return_val);
 
-  // TODO: Need to implement HiveServer2 version of GetRuntimeProfile
   virtual void GetRuntimeProfile(std::string& profile_output,
       const beeswax::QueryHandle& query_id);
 
-  // TODO: Need to implement HiveServer2 version of GetExecSummary
   virtual void GetExecSummary(impala::TExecSummary& result,
       const beeswax::QueryHandle& query_id);
 
@@ -198,8 +196,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       const TGetExecSummaryReq& request);
   virtual void GetRuntimeProfile(TGetRuntimeProfileResp& return_val,
       const TGetRuntimeProfileReq& request);
-
-  // These function are not implemented.
   virtual void GetDelegationToken(
       apache::hive::service::cli::thrift::TGetDelegationTokenResp& return_val,
       const apache::hive::service::cli::thrift::TGetDelegationTokenReq& req);
@@ -299,17 +295,19 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     virtual int AddRows(const QueryResultSet* other, int start_idx, int num_rows) = 0;
 
     // Returns the approximate size of this result set in bytes.
-    int64_t BytesSize() { return BytesSize(0, size()); }
+    int64_t ByteSize() { return ByteSize(0, size()); }
 
     // Returns the approximate size of the given range of rows in bytes.
-    virtual int64_t BytesSize(int start_idx, int num_rows) = 0;
+    virtual int64_t ByteSize(int start_idx, int num_rows) = 0;
 
     // Returns the size of this result set in number of rows.
     virtual size_t size() = 0;
   };
 
-  class AsciiQueryResultSet; // extends QueryResultSet
-  class TRowQueryResultSet; // extends QueryResultSet
+  // Result set implementations for Beeswax and HS2
+  class AsciiQueryResultSet;
+  class HS2RowOrientedResultSet;
+  class HS2ColumnarResultSet;
 
   struct SessionState;
 
@@ -324,6 +322,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Ascii output precision for double/float
   static const int ASCII_PRECISION;
+
+  QueryResultSet* CreateHS2ResultSet(
+      apache::hive::service::cli::thrift::TProtocolVersion::type version,
+      const TResultSetMetadata& metadata,
+      apache::hive::service::cli::thrift::TRowSet* rowset = NULL);
 
   // Initiate execution of plan fragment in newly created thread.
   // Creates new FragmentExecState and registers it in fragment_exec_state_map_.
@@ -672,20 +675,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   Status TExecuteStatementReqToTQueryContext(
       const apache::hive::service::cli::thrift::TExecuteStatementReq execute_request,
       TQueryCtx* query_ctx);
-  static void TColumnValueToHiveServer2TColumnValue(const TColumnValue& value,
-      const TColumnType& type,
-      apache::hive::service::cli::thrift::TColumnValue* hs2_col_val);
   static void TQueryOptionsToMap(const TQueryOptions& query_option,
       std::map<std::string, std::string>* configuration);
-
-  // Convert an expr value to HiveServer2 TColumnValue
-  static void ExprValueToHiveServer2TColumnValue(const void* value,
-      const TColumnType& type,
-      apache::hive::service::cli::thrift::TColumnValue* hs2_col_val);
-
-  // Helper function to translate between Beeswax and HiveServer2 type
-  static apache::hive::service::cli::thrift::TOperationState::type
-      QueryStateToTOperationState(const beeswax::QueryState::type& query_state);
 
   // Helper method to process cancellations that result from failed backends, called from
   // the cancellation thread pool. The cancellation_work contains the query id to cancel
@@ -787,7 +778,13 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // is one ref count in the SessionStateMap for as long as the session is active.
   // All queries running from this session also have a reference.
   struct SessionState {
-    SessionState() : closed(false), expired(false), ref_count(0) { }
+    // The default hs2_version must be V1 so that child queries (which use HS2, but may
+    // run as children of Beeswax sessions) get results back in the expected format -
+    // child queries inherit the HS2 version from their parents, and a Beeswax session
+    // will never update the HS2 version from the default.
+    SessionState() : closed(false), expired(false), hs2_version(
+        apache::hive::service::cli::thrift::
+        TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V1), ref_count(0) { }
 
     TSessionType::type session_type;
 
@@ -821,6 +818,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
     // The default query options of this session
     TQueryOptions default_query_options;
+
+    // For HS2 only, the protocol version this session is expecting
+    apache::hive::service::cli::thrift::TProtocolVersion::type hs2_version;
 
     // Inflight queries belonging to this session
     boost::unordered_set<TUniqueId> inflight_queries;

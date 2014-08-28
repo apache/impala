@@ -143,7 +143,7 @@ class ImpalaServer::AsciiQueryResultSet : public ImpalaServer::QueryResultSet {
     return rows_added;
   }
 
-  virtual int64_t BytesSize(int start_idx, int num_rows) {
+  virtual int64_t ByteSize(int start_idx, int num_rows) {
     int64_t bytes = 0;
     const int end = min(static_cast<size_t>(num_rows), result_set_->size() - start_idx);
     for (int i = start_idx; i < start_idx + end; ++i) {

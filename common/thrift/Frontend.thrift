@@ -23,7 +23,7 @@ include "Descriptors.thrift"
 include "Data.thrift"
 include "Results.thrift"
 include "Exprs.thrift"
-include "cli_service.thrift"
+include "TCLIService.thrift"
 include "Status.thrift"
 include "CatalogObjects.thrift"
 include "CatalogService.thrift"
@@ -408,15 +408,15 @@ struct TMetadataOpRequest {
   // opcode
   1: required TMetadataOpcode opcode
 
-  // input parameter
-  2: optional cli_service.TGetInfoReq get_info_req
-  3: optional cli_service.TGetTypeInfoReq get_type_info_req
-  4: optional cli_service.TGetCatalogsReq get_catalogs_req
-  5: optional cli_service.TGetSchemasReq get_schemas_req
-  6: optional cli_service.TGetTablesReq get_tables_req
-  7: optional cli_service.TGetTableTypesReq get_table_types_req
-  8: optional cli_service.TGetColumnsReq get_columns_req
-  9: optional cli_service.TGetFunctionsReq get_functions_req
+  // input parameters
+  2: optional TCLIService.TGetInfoReq get_info_req
+  3: optional TCLIService.TGetTypeInfoReq get_type_info_req
+  4: optional TCLIService.TGetCatalogsReq get_catalogs_req
+  5: optional TCLIService.TGetSchemasReq get_schemas_req
+  6: optional TCLIService.TGetTablesReq get_tables_req
+  7: optional TCLIService.TGetTableTypesReq get_table_types_req
+  8: optional TCLIService.TGetColumnsReq get_columns_req
+  9: optional TCLIService.TGetFunctionsReq get_functions_req
 
   // Session state for the user who initiated this request. If authorization is
   // enabled, only the server objects this user has access to will be returned.

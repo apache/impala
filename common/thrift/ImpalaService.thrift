@@ -19,7 +19,7 @@ include "ExecStats.thrift"
 include "Status.thrift"
 include "Types.thrift"
 include "beeswax.thrift"
-include "cli_service.thrift"
+include "TCLIService.thrift"
 
 // ImpalaService accepts query execution options through beeswax.Query.configuration in
 // key:value form. For example, the list of strings could be:
@@ -217,31 +217,31 @@ service ImpalaService extends beeswax.BeeswaxService {
 // Impala HiveServer2 service
 
 struct TGetExecSummaryReq {
-  1: optional cli_service.TOperationHandle operationHandle
+  1: optional TCLIService.TOperationHandle operationHandle
 
-  2: optional cli_service.TSessionHandle sessionHandle
+  2: optional TCLIService.TSessionHandle sessionHandle
 }
 
 struct TGetExecSummaryResp {
-  1: required cli_service.TStatus status
+  1: required TCLIService.TStatus status
 
   2: optional ExecStats.TExecSummary summary
 }
 
 struct TGetRuntimeProfileReq {
-  1: optional cli_service.TOperationHandle operationHandle
+  1: optional TCLIService.TOperationHandle operationHandle
 
-  2: optional cli_service.TSessionHandle sessionHandle
+  2: optional TCLIService.TSessionHandle sessionHandle
 }
 
 struct TGetRuntimeProfileResp {
-  1: required cli_service.TStatus status
+  1: required TCLIService.TStatus status
 
   2: optional string profile
 }
 
 
-service ImpalaHiveServer2Service extends cli_service.TCLIService {
+service ImpalaHiveServer2Service extends TCLIService.TCLIService {
   // Returns the exec summary for the given query
   TGetExecSummaryResp GetExecSummary(1:TGetExecSummaryReq req);
 

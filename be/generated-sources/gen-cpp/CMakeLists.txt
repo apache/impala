@@ -42,8 +42,8 @@ set(SRC_FILES
   beeswax_types.cpp
   BeeswaxService.cpp
   TCLIService.cpp
-  cli_service_constants.cpp
-  cli_service_types.cpp
+  TCLIService_constants.cpp
+  TCLIService_types.cpp
   Data_constants.cpp
   Data_types.cpp
   DataSinks_constants.cpp

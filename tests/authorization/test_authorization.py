@@ -22,7 +22,7 @@ import tempfile
 import json
 from time import sleep, time
 from getpass import getuser
-from cli_service import TCLIService
+from TCLIService import TCLIService
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport
 from thrift.protocol import TBinaryProtocol

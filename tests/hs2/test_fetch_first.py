@@ -20,7 +20,7 @@
 
 import pytest
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
-from cli_service import TCLIService
+from TCLIService import TCLIService
 from tests.common.impala_cluster import ImpalaCluster
 
 class TestFetchFirst(HS2TestSuite):

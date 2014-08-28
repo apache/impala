@@ -14,10 +14,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// NOTE: This file is obsolete and included ONLY for backwards compatibility with
-// Hive 0.12 (see HIVE-6050). As soon as Impala's bundled version of Hive supports the V6
-// protocol, this file will be removed.
-
 // Coding Conventions for this file:
 //
 // Structs/Enums/Unions
@@ -55,6 +51,12 @@ enum TProtocolVersion {
 
   // V5 adds error details when GetOperationStatus returns in error state
   HIVE_CLI_SERVICE_PROTOCOL_V5
+
+  // V6 uses binary type for binary payload (was string) and uses columnar result set
+  HIVE_CLI_SERVICE_PROTOCOL_V6
+
+  // V7 adds support for delegation token based connection
+  HIVE_CLI_SERVICE_PROTOCOL_V7
 }
 
 enum TTypeId {
@@ -92,9 +94,9 @@ const set<TTypeId> PRIMITIVE_TYPES = [
   TTypeId.TIMESTAMP_TYPE,
   TTypeId.BINARY_TYPE,
   TTypeId.DECIMAL_TYPE,
-  TTypeId.NULL_TYPE
-  TTypeId.DATE_TYPE
-  TTypeId.VARCHAR_TYPE
+  TTypeId.NULL_TYPE,
+  TTypeId.DATE_TYPE,
+  TTypeId.VARCHAR_TYPE,
   TTypeId.CHAR_TYPE
 ]
 
@@ -308,16 +310,6 @@ struct TStringValue {
   1: optional string value
 }
 
-union TColumn {
-  1: list<TBoolValue> boolColumn
-  2: list<TByteValue> byteColumn
-  3: list<TI16Value> i16Column
-  4: list<TI32Value> i32Column
-  5: list<TI64Value> i64Column
-  6: list<TDoubleValue> doubleColumn
-  7: list<TStringValue> stringColumn
-}
-
 // A single column value in a result set.
 // Note that Hive's type system is richer than Thrift's,
 // so in some cases we have to map multiple Hive types
@@ -337,6 +329,62 @@ union TColumnValue {
 // Represents a row in a rowset.
 struct TRow {
   1: required list<TColumnValue> colVals
+}
+
+struct TBoolColumn {
+  1: required list<bool> values
+  2: required binary nulls
+}
+
+struct TByteColumn {
+  1: required list<byte> values
+  2: required binary nulls
+}
+
+struct TI16Column {
+  1: required list<i16> values
+  2: required binary nulls
+}
+
+struct TI32Column {
+  1: required list<i32> values
+  2: required binary nulls
+}
+
+struct TI64Column {
+  1: required list<i64> values
+  2: required binary nulls
+}
+
+struct TDoubleColumn {
+  1: required list<double> values
+  2: required binary nulls
+}
+
+struct TStringColumn {
+  1: required list<string> values
+  2: required binary nulls
+}
+
+struct TBinaryColumn {
+  1: required list<binary> values
+  2: required binary nulls
+}
+
+// Note that Hive's type system is richer than Thrift's,
+// so in some cases we have to map multiple Hive types
+// to the same Thrift type. On the client-side this is
+// disambiguated by looking at the Schema of the
+// result set.
+union TColumn {
+  1: TBoolColumn   boolVal      // BOOLEAN
+  2: TByteColumn   byteVal      // TINYINT
+  3: TI16Column    i16Val       // SMALLINT
+  4: TI32Column    i32Val       // INT
+  5: TI64Column    i64Val       // BIGINT, TIMESTAMP
+  6: TDoubleColumn doubleVal    // FLOAT, DOUBLE
+  7: TStringColumn stringVal    // STRING, LIST, MAP, STRUCT, UNIONTYPE, DECIMAL, NULL
+  8: TBinaryColumn binaryVal    // BINARY
 }
 
 // Represents a rowset
@@ -494,7 +542,7 @@ struct TOperationHandle {
 // which operations may be executed.
 struct TOpenSessionReq {
   // The version of the HiveServer2 protocol that the client is using.
-  1: required TProtocolVersion client_protocol = TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V1
+  1: required TProtocolVersion client_protocol = TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6
 
   // Username and password for authentication.
   // Depending on the authentication scheme being used,
@@ -513,7 +561,7 @@ struct TOpenSessionResp {
   1: required TStatus status
 
   // The protocol version that the server is using.
-  2: required TProtocolVersion serverProtocolVersion = TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V5
+  2: required TProtocolVersion serverProtocolVersion = TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6
 
   // Session Handle
   3: optional TSessionHandle sessionHandle
@@ -1073,6 +1121,7 @@ struct TRenewDelegationTokenResp {
 }
 
 // GetLog()
+// Not present in Hive 0.13, re-added for backwards compatibility.
 //
 // Fetch operation log from the server corresponding to
 // a particular OperationHandle.
@@ -1083,12 +1132,10 @@ struct TGetLogReq {
 
 struct TGetLogResp {
   1: required TStatus status
-
   2: required string log
-
 }
 
-service LegacyTCLIService {
+service TCLIService {
 
   TOpenSessionResp OpenSession(1:TOpenSessionReq req);
 
@@ -1122,5 +1169,12 @@ service LegacyTCLIService {
 
   TFetchResultsResp FetchResults(1:TFetchResultsReq req);
 
+  TGetDelegationTokenResp GetDelegationToken(1:TGetDelegationTokenReq req);
+
+  TCancelDelegationTokenResp CancelDelegationToken(1:TCancelDelegationTokenReq req);
+
+  TRenewDelegationTokenResp RenewDelegationToken(1:TRenewDelegationTokenReq req);
+
+  // Not present in Hive 0.13, re-added for backwards compatibility.
   TGetLogResp GetLog(1:TGetLogReq req);
 }

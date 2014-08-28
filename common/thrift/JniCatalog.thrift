@@ -18,7 +18,7 @@ namespace java com.cloudera.impala.thrift
 include "CatalogObjects.thrift"
 include "Types.thrift"
 include "Status.thrift"
-include "cli_service.thrift"
+include "TCLIService.thrift"
 
 // Structs used to execute DDL operations using the JniCatalog.
 

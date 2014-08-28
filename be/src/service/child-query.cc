@@ -16,7 +16,6 @@
 #include "service/impala-server.inline.h"
 #include "service/query-exec-state.h"
 #include "util/debug-util.h"
-#include "gen-cpp/cli_service_types.h"
 
 using namespace std;
 using namespace impala;
