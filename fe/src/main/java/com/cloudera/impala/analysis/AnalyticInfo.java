@@ -32,7 +32,7 @@ import com.google.common.collect.Lists;
 public class AnalyticInfo extends AggregateExprsTupleInfo {
   private final static Logger LOG = LoggerFactory.getLogger(AnalyticInfo.class);
 
-  private final ArrayList<AnalyticExpr> analyticExprs_;
+  private final ArrayList<Expr> analyticExprs_;
 
   // map from analyticExprs_ to their corresponding analytic tuple slotrefs
   private final ExprSubstitutionMap analyticTupleSmap_ = new ExprSubstitutionMap();
@@ -40,13 +40,13 @@ public class AnalyticInfo extends AggregateExprsTupleInfo {
   // indices into analyticExprs_ for those exprs/slots that need to be materialized
   private final ArrayList<Integer> materializedSlots_ = Lists.newArrayList();
 
-  private AnalyticInfo(ArrayList<AnalyticExpr> analyticExprs,
+  private AnalyticInfo(ArrayList<Expr> analyticExprs,
       ArrayList<FunctionCallExpr> analyticFnCalls) {
     super(Lists.<Expr>newArrayList(), analyticFnCalls);
     analyticExprs_ = Expr.cloneList(analyticExprs);
   }
 
-  public ArrayList<AnalyticExpr> getAnalyticExprs() { return analyticExprs_; }
+  public ArrayList<Expr> getAnalyticExprs() { return analyticExprs_; }
   public ExprSubstitutionMap getSmap() { return analyticTupleSmap_; }
 
   /**
@@ -54,12 +54,12 @@ public class AnalyticInfo extends AggregateExprsTupleInfo {
    * smaps.
    */
   static public AnalyticInfo create(
-      ArrayList<AnalyticExpr> analyticExprs, Analyzer analyzer) {
+      ArrayList<Expr> analyticExprs, Analyzer analyzer) {
     Preconditions.checkState(analyticExprs != null && !analyticExprs.isEmpty());
     Expr.removeDuplicates(analyticExprs);
     ArrayList<FunctionCallExpr> analyticFnCalls = Lists.newArrayList();
     // Extract the analytic function calls for each analytic expr.
-    for (AnalyticExpr analyticExpr: analyticExprs) {
+    for (Expr analyticExpr: analyticExprs) {
       Expr analyticFnCall = analyticExpr.getChild(0);
       Preconditions.checkState(analyticFnCall instanceof FunctionCallExpr);
       analyticFnCalls.add((FunctionCallExpr) analyticFnCall);
@@ -73,7 +73,9 @@ public class AnalyticInfo extends AggregateExprsTupleInfo {
       result.analyticTupleSmap_.put(result.analyticExprs_.get(i),
           new SlotRef(result.outputTupleDesc_.getSlots().get(i)));
     }
-    LOG.info("analytic info:\n" + result.debugString());
+    LOG.trace("analytictuple=" + result.outputTupleDesc_.debugString());
+    LOG.trace("analytictuplesmap=" + result.analyticTupleSmap_.debugString());
+    LOG.trace("analytic info:\n" + result.debugString());
     return result;
   }
 

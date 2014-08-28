@@ -315,3 +315,73 @@ true,NULL,NULL
 ---- TYPES
 BOOLEAN, TINYINT, BIGINT
 ====
+---- QUERY
+# multiple analytics in the same select block
+select tinyint_col, int_col, bigint_col,
+count(bigint_col)
+  over(partition by tinyint_col, bigint_col order by int_col desc
+  rows between unbounded preceding and 1 following),
+max(tinyint_col)
+  over(partition by bigint_col, tinyint_col order by int_col desc
+  rows between unbounded preceding and 1 following),
+# different window
+min(int_col)
+  over(partition by bigint_col, tinyint_col order by int_col desc
+  rows between unbounded preceding and 2 following),
+# different sort order but same partition
+max(int_col)
+  over(partition by bigint_col, tinyint_col order by int_col asc
+  rows between unbounded preceding and 2 following),
+# different partition
+sum(int_col)
+  over(partition by tinyint_col order by int_col desc
+  rows between unbounded preceding and 2 following)
+from functional.alltypesagg
+where id < 20
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,1,10,1,1,1,1,12
+1,11,110,1,1,11,11,12
+2,2,20,1,2,2,2,14
+2,12,120,1,2,12,12,14
+3,3,30,1,3,3,3,16
+3,13,130,1,3,13,13,16
+4,4,40,1,4,4,4,18
+4,14,140,1,4,14,14,18
+5,5,50,1,5,5,5,20
+5,15,150,1,5,15,15,20
+6,6,60,1,6,6,6,22
+6,16,160,1,6,16,16,22
+7,7,70,1,7,7,7,24
+7,17,170,1,7,17,17,24
+8,8,80,1,8,8,8,26
+8,18,180,1,8,18,18,26
+9,9,90,1,9,9,9,28
+9,19,190,1,9,19,19,28
+NULL,10,100,2,NULL,10,10,20
+NULL,10,100,2,NULL,10,10,20
+NULL,NULL,NULL,0,NULL,NULL,NULL,10
+NULL,NULL,NULL,0,NULL,NULL,NULL,20
+---- TYPES
+TINYINT, INT, BIGINT, BIGINT, TINYINT, INT, INT, BIGINT
+====
+---- QUERY
+# analytics on a grouped aggregation with a final order by
+select bool_col,
+sum(min(int_col))
+  over(partition by min(tinyint_col) order by max(int_col)
+  rows between unbounded preceding and 1 following),
+max(sum(bigint_col))
+  over(partition by min(tinyint_col) order by max(int_col)
+  rows between unbounded preceding and 1 following),
+min(sum(bigint_col))
+  over(partition by min(tinyint_col) order by sum(int_col)
+  rows between unbounded preceding and 4 following)
+from functional.alltypes
+group by 1
+order by 1, 2, 3
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+false,1,182500,182500
+true,0,146000,146000
+---- TYPES
+BOOLEAN, BIGINT, BIGINT, BIGINT
+====

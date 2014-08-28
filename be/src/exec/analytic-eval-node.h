@@ -138,11 +138,17 @@ class AnalyticEvalNode : public ExecNode {
   // Debug string containing the window definition.
   std::string DebugWindowString() const;
 
+  // Tuple id for storing intermediate results of analytic fn evaluation.
+  const TupleId intermediate_tuple_id_;
+
+  // Tuple id for storing results of analytic fn evaluation.
+  const TupleId output_tuple_id_;
+
   // Tuple descriptor for storing intermediate values of analytic fn evaluation.
-  const TupleDescriptor* intermediate_tuple_desc_;
+  TupleDescriptor* intermediate_tuple_desc_;
 
   // Tuple descriptor for storing results of analytic fn evaluation.
-  const TupleDescriptor* output_tuple_desc_;
+  TupleDescriptor* output_tuple_desc_;
 
   // The scope over which analytic functions are evaluated.
   // TODO: fn_scope_ and window_ are candidates to be removed during codegen

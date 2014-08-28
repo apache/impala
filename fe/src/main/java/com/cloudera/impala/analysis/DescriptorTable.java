@@ -22,6 +22,7 @@ import java.util.List;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.thrift.TDescriptorTable;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -62,6 +63,7 @@ public class DescriptorTable {
       copySlotDescriptor(d, slot);
     }
     d.computeMemLayout();
+    Preconditions.checkState(d.getByteSize() == src.getByteSize());
     return d;
   }
 

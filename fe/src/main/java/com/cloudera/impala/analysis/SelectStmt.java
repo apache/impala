@@ -15,31 +15,23 @@
 package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
-import java.util.Map;
 import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.BinaryPredicate;
-import com.cloudera.impala.analysis.BinaryPredicate.Operator;
-import com.cloudera.impala.analysis.CompoundPredicate;
-import com.cloudera.impala.analysis.Predicate;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.ColumnAliasGenerator;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TableAliasGenerator;
 import com.cloudera.impala.common.TreeNode;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 /**
@@ -276,9 +268,16 @@ public class SelectStmt extends QueryStmt {
     materializeSlots(analyzer, baseTblJoinConjuncts);
 
     if (evaluateOrderBy_) {
-      // mark exprs for sort exprs before marking agg exprs because the ordering exprs
-      // may contain agg exprs that are not referenced anywhere but the ORDER BY clause
+      // mark ordering exprs before marking agg exprs because they could contain agg
+      // exprs that are not referenced anywhere but the ORDER BY clause
       sortInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
+    }
+
+    if (analyticInfo_ != null) {
+      // TODO: take conjuncts into account (analytic exprs might be in an inline view)
+      // mark analytic exprs before marking agg exprs because they could contain agg
+      // exprs that are not referenced anywhere but analytic expr
+      analyticInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
     }
 
     if (aggInfo_ != null) {
@@ -302,12 +301,6 @@ public class SelectStmt extends QueryStmt {
           analyzer.getUnassignedConjuncts(aggInfo_.getResultTupleId().asList(), false));
       materializeSlots(analyzer, havingConjuncts);
       aggInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
-    }
-
-    if (analyticInfo_ != null) {
-      // TODO: take conjuncts into account (analytic exprs might be part of an inline
-      // view)
-      analyticInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
     }
   }
 
@@ -655,20 +648,14 @@ public class SelectStmt extends QueryStmt {
    */
   private void analyzeAnalytics(Analyzer analyzer)
       throws AnalysisException {
-    boolean hasAnalyticExprs = TreeNode.contains(resultExprs_, AnalyticExpr.class);
-    if (sortInfo_ != null) {
-      hasAnalyticExprs |=
-          TreeNode.contains(sortInfo_.getOrderingExprs(), AnalyticExpr.class);
-    }
-    if (!hasAnalyticExprs) return;
-
     // collect AnalyticExprs from the SELECT and ORDER BY clauses
-    ArrayList<AnalyticExpr> analyticExprs = Lists.newArrayList();
+    ArrayList<Expr> analyticExprs = Lists.newArrayList();
     TreeNode.collect(resultExprs_, AnalyticExpr.class, analyticExprs);
     if (sortInfo_ != null) {
       TreeNode.collect(sortInfo_.getOrderingExprs(), AnalyticExpr.class,
           analyticExprs);
     }
+    if (analyticExprs.isEmpty()) return;
     analyticInfo_ = AnalyticInfo.create(analyticExprs, analyzer);
 
     // change select list and ordering exprs to point to agg output. We need

@@ -86,6 +86,8 @@ class SelectListItem {
     }
     // Optionally return auto-generated column label.
     if (useHiveColLabels) return "_c" + selectListPos;
+    // Abbreviate the toSql() for analytic exprs.
+    if (expr_ instanceof AnalyticExpr) return expr_.getChild(0).toSql() + " OVER(...)";
     return expr_.toSql().toLowerCase();
   }
 

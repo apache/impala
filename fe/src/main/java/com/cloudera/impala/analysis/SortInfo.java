@@ -98,4 +98,13 @@ public class SortInfo {
   public void substituteOrderingExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
     orderingExprs_ = Expr.substituteList(orderingExprs_, smap, analyzer);
   }
+
+  /**
+   * Asserts that all ordering exprs are bound by the sort tuple.
+   */
+  public void checkConsistency() {
+    for (Expr orderingExpr: orderingExprs_) {
+      Preconditions.checkState(orderingExpr.isBound(sortTupleDesc_.getId()));
+    }
+  }
 }

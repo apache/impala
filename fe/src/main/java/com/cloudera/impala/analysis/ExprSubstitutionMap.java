@@ -109,8 +109,8 @@ public final class ExprSubstitutionMap {
     lhs_ = Expr.substituteList(lhs_, lhsSmap, analyzer);
   }
 
-  ArrayList<Expr> getLhs() { return lhs_; }
-  ArrayList<Expr> getRhs() { return rhs_; }
+  public ArrayList<Expr> getLhs() { return lhs_; }
+  public ArrayList<Expr> getRhs() { return rhs_; }
 
   public int size() { return lhs_.size(); }
 

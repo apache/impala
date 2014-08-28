@@ -196,6 +196,14 @@ public class SlotRef extends Expr {
   public Expr clone() { return new SlotRef(this); }
 
   @Override
+  public String toString() {
+    if (desc_ != null) {
+      return "tid=" + desc_.getParent().getId() + " " + "sid=" + desc_.getId();
+    }
+    return "no desc set";
+  }
+
+  @Override
   protected Expr uncheckedCastTo(Type targetType) throws AnalysisException {
     if (type_.isNull()) {
       // Hack to prevent null SlotRefs in the BE

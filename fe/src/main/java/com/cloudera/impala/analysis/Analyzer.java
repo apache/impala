@@ -546,6 +546,24 @@ public class Analyzer {
   }
 
   /**
+   * Adds a new slot descriptor in tupleDesc that is identical to srcSlotDesc
+   * except for the slot id.
+   */
+  public SlotDescriptor addSlotDescriptor(SlotDescriptor srcSlotDesc,
+      TupleDescriptor tupleDesc) {
+    SlotDescriptor result = globalState_.descTbl.addSlotDescriptor(tupleDesc);
+    globalState_.blockBySlot.put(result.getId(), this);
+    result.setLabel(srcSlotDesc.getLabel());
+    result.setStats(srcSlotDesc.getStats());
+    if (srcSlotDesc.getColumn() != null) {
+      result.setColumn(srcSlotDesc.getColumn());
+    } else {
+      result.setType(srcSlotDesc.getType());
+    }
+    return result;
+  }
+
+  /**
    * Resolve column name with table alias in the context of the registered tuple
    * descriptor of table 'tblName'. If 'resolveInAncestors' is true, the resolution
    * process will continue along the chain of ancestors until we either resolve the

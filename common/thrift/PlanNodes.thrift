@@ -291,10 +291,14 @@ struct TAnalyticNode {
   // order_by_exprs are empty
   7: optional Types.TTupleId buffered_tuple_id
 
-  // child.row_tuples[0] '<' buffered_tuple_id for partition_exprs
+  // predicate that checks: child tuple '<' buffered tuple for partition_exprs;
+  // only set if buffered_tuple_id is set; should be evaluated over a row that
+  // is composed of the child tuple and the buffered tuple
   8: optional Exprs.TExpr partition_by_lt
 
-  // child.row_tuples[0] '<' buffered_tuple_id for order_by_exprs
+  // predicate that checks: child tuple '<' buffered tuple for order_by_exprs;
+  // only set if buffered_tuple_id is set; should be evaluated over a row that
+  // is composed of the child tuple and the buffered tuple
   9: optional Exprs.TExpr order_by_lt
 }
 

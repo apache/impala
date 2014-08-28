@@ -192,4 +192,9 @@ public class AggregateExprsTupleInfo {
   public ExprSubstitutionMap getOutputToIntermediateSmap() {
     return outputToIntermediateTupleSmap_;
   }
+  public boolean hasDiffIntermediateTuple() {
+    Preconditions.checkNotNull(intermediateTupleDesc_);
+    Preconditions.checkNotNull(outputTupleDesc_);
+    return intermediateTupleDesc_ != outputTupleDesc_;
+  }
 }

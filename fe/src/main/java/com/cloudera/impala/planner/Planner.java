@@ -282,6 +282,7 @@ public class Planner {
           (AggregationNode) root, childFragments.get(0), fragments, analyzer);
     } else if (root instanceof SortNode) {
       if (((SortNode) root).isAnalyticSort()) {
+        // don't parallelize this like a regular SortNode
         result = createAnalyticFragment(
             (SortNode) root, childFragments.get(0), fragments, analyzer);
       } else {
@@ -912,11 +913,6 @@ public class Planner {
         fragment.addPlanRoot(analyticNode);
         return fragment;
       } else {
-        // the input to the AnalyticEvalNode comes from a SortNode that's
-        // already sitting in a plan fragment with the appropriate partitioning
-        Preconditions.checkState(childFragment.getPlanRoot() instanceof SortNode);
-        Preconditions.checkState(
-            ((SortNode) childFragment.getPlanRoot()).getAnalyticParent() == node);
         childFragment.addPlanRoot(analyticNode);
         return childFragment;
       }
@@ -924,28 +920,14 @@ public class Planner {
 
     SortNode sortNode = (SortNode) node;
     Preconditions.checkState(sortNode.isAnalyticSort());
-    AnalyticEvalNode analyticParent = sortNode.getAnalyticParent();
-    PlanFragment analyticFragment = null;
-    if (analyticParent.getPartitionExprs().isEmpty()) {
-      // no Partition By clause: analytic exprs are computed in an unpartitioned
-      // fragment
-      if (!childFragment.getDataPartition().isPartitioned()) {
-        analyticFragment = childFragment;
-      } else {
-        analyticFragment = createParentFragment(
-            analyzer, childFragment, DataPartition.UNPARTITIONED);
-      }
-    } else {
-      // we need the input partitioned on the Partition By exprs
-      List<Expr> partitionExprs = Expr.substituteList(analyticParent.getPartitionExprs(),
+    PlanFragment analyticFragment = childFragment;
+    if (sortNode.getRequiredInputPartition() != null) {
+      // make sure the childFragment's output is partitioned as required by the sortNode
+      sortNode.getRequiredInputPartition().substitutePartitionExprs(
           childFragment.getPlanRoot().getBaseTblSmap(), analyzer);
-      DataPartition parentPartition = new DataPartition(TPartitionType.HASH_PARTITIONED,
-          partitionExprs);
-      // TODO: should this use Analyzer.isEquivSlots() instead?
-      if (childFragment.getDataPartition().equals(parentPartition)) {
-        analyticFragment = childFragment;
-      } else {
-        analyticFragment = createParentFragment(analyzer, childFragment, parentPartition);
+      if (!childFragment.getDataPartition().equals(sortNode.getRequiredInputPartition())) {
+        analyticFragment = createParentFragment(
+            analyzer, childFragment, sortNode.getRequiredInputPartition());
       }
     }
     analyticFragment.addPlanRoot(sortNode);
@@ -1017,8 +999,9 @@ public class Planner {
       // insert possible AnalyticEvalNode before SortNode
       if (((SelectStmt) stmt).getAnalyticInfo() != null) {
         AnalyticInfo analyticInfo = ((SelectStmt) stmt).getAnalyticInfo();
-        AnalyticPlanner analyticPlanner = new AnalyticPlanner(analyzer, nodeIdGenerator_);
-        root = analyticPlanner.createSingleNodePlan(root, analyticInfo);
+        AnalyticPlanner analyticPlanner =
+            new AnalyticPlanner(analyticInfo, analyzer, nodeIdGenerator_);
+        root = analyticPlanner.createSingleNodePlan(root);
       }
     } else {
       Preconditions.checkState(stmt instanceof UnionStmt);

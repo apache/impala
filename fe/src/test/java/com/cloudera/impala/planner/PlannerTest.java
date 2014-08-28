@@ -548,8 +548,8 @@ public class PlannerTest {
   }
 
   @Test
-  public void testAnalytics() {
-    runPlannerTestFile("analytics");
+  public void testAnalyticFns() {
+    runPlannerTestFile("analytic-fns");
   }
 
   @Test

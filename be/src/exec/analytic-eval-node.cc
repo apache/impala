@@ -27,8 +27,8 @@ namespace impala {
 AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
-    output_tuple_desc_(
-        row_desc().tuple_descriptors()[tnode.analytic_node.output_tuple_id]),
+    intermediate_tuple_id_(tnode.analytic_node.intermediate_tuple_id),
+    output_tuple_id_(tnode.analytic_node.output_tuple_id),
     fn_scope_(GetAnalyticFnScope(tnode.analytic_node)),
     window_(tnode.analytic_node.window),
     current_tuple_(NULL),
@@ -79,6 +79,10 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
       mem_tracker()));
 
   fn_ctxs_.resize(evaluators_.size());
+  intermediate_tuple_desc_ =
+      state->desc_tbl().GetTupleDescriptor(intermediate_tuple_id_);
+  output_tuple_desc_ = state->desc_tbl().GetTupleDescriptor(output_tuple_id_);
+  DCHECK_EQ(output_tuple_desc_->slots().size(), evaluators_.size());
   for (int i = 0; i < evaluators_.size(); ++i) {
     // TODO: These should be different slots once we fully support
     // different intermediate and output tuples.

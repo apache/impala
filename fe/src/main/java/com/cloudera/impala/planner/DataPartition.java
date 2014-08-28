@@ -19,7 +19,9 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.thrift.TDataPartition;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.google.common.base.Joiner;
@@ -33,7 +35,6 @@ import com.google.common.collect.Lists;
  * of a plan fragment; etc. (ie, this is not restricted to direct exchanges
  * between two fragments, which in the backend is facilitated by the classes
  * DataStreamSender/DataStreamMgr/DataStreamRecvr).
- * TODO: better name? just Partitioning?
  */
 public class DataPartition {
   private final static Logger LOG = LoggerFactory.getLogger(DataPartition.class);
@@ -41,7 +42,7 @@ public class DataPartition {
   private final TPartitionType type_;
 
   // for hash partition: exprs used to compute hash value
-  private final List<Expr> partitionExprs_;
+  private List<Expr> partitionExprs_;
 
   public DataPartition(TPartitionType type, List<Expr> exprs) {
     Preconditions.checkNotNull(exprs);
@@ -70,6 +71,10 @@ public class DataPartition {
   public TPartitionType getType() { return type_; }
   public List<Expr> getPartitionExprs() { return partitionExprs_; }
 
+  public void substitutePartitionExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
+    partitionExprs_ = Expr.substituteList(partitionExprs_, smap, analyzer);
+  }
+
   public TDataPartition toThrift() {
     TDataPartition result = new TDataPartition(type_);
     if (partitionExprs_ != null) {
@@ -78,6 +83,7 @@ public class DataPartition {
     return result;
   }
 
+  @Override
   public boolean equals(Object obj) {
     if (obj == null) return false;
     if (obj.getClass() != this.getClass()) return false;

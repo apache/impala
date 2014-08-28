@@ -30,6 +30,7 @@ import com.google.common.base.Preconditions;
  * Windowing clause of an analytic expr
  */
 public class AnalyticWindow {
+  // default window used when an analytic expr was given an order by but no window
   public static final AnalyticWindow DEFAULT_WINDOW = new AnalyticWindow(Type.RANGE,
       new Boundary(BoundaryType.UNBOUNDED_PRECEDING, null),
       new Boundary(BoundaryType.CURRENT_ROW, null));

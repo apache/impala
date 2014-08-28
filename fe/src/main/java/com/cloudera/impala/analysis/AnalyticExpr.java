@@ -42,6 +42,10 @@ import com.google.common.collect.Lists;
  *   ordering exprs:
  *     children numPartitionExprs_ + 1 .. numPartitionExprs_ + orderByElements_.size()
  *   exprs in windowing clause: remaining children
+ *
+ * TODO: standardize on canonical format:
+ * - map lead() to lag() by reversing ordering
+ * - ...
  */
 public class AnalyticExpr extends Expr {
   private final List<OrderByElement> orderByElements_;  // never null
@@ -103,7 +107,18 @@ public class AnalyticExpr extends Expr {
     }
     return result;
   }
-  public AnalyticWindow getWindow() { return window_; }
+
+  /**
+  * Returns the explicit or implicit window of this AnalyticExpr. Returns the default
+  * window if an order by was specified without a window clause. A null return value
+  * implies that no order by was specified (and hence, no window).
+  */
+  public AnalyticWindow getWindow() {
+    if (!orderingExprs_.isEmpty() && window_ == null) {
+      return AnalyticWindow.DEFAULT_WINDOW;
+    }
+    return window_;
+  }
 
   @Override
   public boolean equals(Object obj) {
@@ -260,7 +275,6 @@ public class AnalyticExpr extends Expr {
       }
       if (isOffsetFn(fn) && getFnCall().getChildren().size() > 1) checkOffset(analyzer);
     }
-
 
     if (window_ != null) {
       if (orderByElements_.isEmpty()) {
