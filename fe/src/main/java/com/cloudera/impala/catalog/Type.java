@@ -233,14 +233,14 @@ public abstract class Type {
         throw new IllegalStateException("Couldn't parse create table stmt.");
       }
       createTableStmt = (CreateTableStmt) o;
-      if (createTableStmt.getColumnDescs().isEmpty()) {
+      if (createTableStmt.getColumnDefs().isEmpty()) {
         // Should never get here.
         throw new IllegalStateException("Invalid create table stmt.");
       }
     } catch (Exception e) {
       return null;
     }
-    return createTableStmt.getColumnDescs().get(0).getType();
+    return createTableStmt.getColumnDefs().get(0).getType();
   }
 
   /**

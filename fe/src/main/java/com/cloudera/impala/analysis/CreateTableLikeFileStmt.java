@@ -210,7 +210,7 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
     schemaLocation_.analyze(analyzer, Privilege.ALL);
     switch (schemaFileFormat_) {
       case PARQUET:
-        getColumnDescs().addAll(extractParquetSchema(schemaLocation_));
+        getColumnDefs().addAll(extractParquetSchema(schemaLocation_));
         break;
       default:
         throw new AnalysisException("Unsupported file type for schema inference: "

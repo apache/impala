@@ -72,7 +72,7 @@ public class CreateTableDataSrcStmt extends CreateTableStmt {
       throw new AnalysisException("Data source does not exist: " + dataSourceName);
     }
 
-    for (ColumnDesc col: getColumnDescs()) {
+    for (ColumnDesc col: getColumnDefs()) {
       if (!DataSourceTable.isSupportedColumnType(col.getType())) {
         throw new AnalysisException("Tables produced by an external data source do " +
             "not support the column type: " + col.getType());

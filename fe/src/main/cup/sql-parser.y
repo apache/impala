@@ -360,7 +360,7 @@ nonterminal CreateDbStmt create_db_stmt;
 nonterminal CreateTableAsSelectStmt create_tbl_as_select_stmt;
 nonterminal CreateTableLikeStmt create_tbl_like_stmt;
 nonterminal CreateTableLikeFileStmt create_tbl_like_file_stmt;
-nonterminal CreateTableStmt create_tbl_stmt;
+nonterminal CreateTableStmt create_unpartitioned_tbl_stmt, create_partitioned_tbl_stmt;
 nonterminal CreateViewStmt create_view_stmt;
 nonterminal CreateDataSrcStmt create_data_src_stmt;
 nonterminal DropDataSrcStmt drop_data_src_stmt;
@@ -485,7 +485,9 @@ stmt ::=
   {: RESULT = create_tbl_like; :}
   | create_tbl_like_file_stmt:create_tbl_like_file
   {: RESULT = create_tbl_like_file; :}
-  | create_tbl_stmt:create_tbl
+  | create_unpartitioned_tbl_stmt:create_tbl
+  {: RESULT = create_tbl; :}
+  | create_partitioned_tbl_stmt:create_tbl
   {: RESULT = create_tbl; :}
   | create_view_stmt:create_view
   {: RESULT = create_view; :}
@@ -706,17 +708,31 @@ create_tbl_as_select_stmt ::=
   :}
   ;
 
-create_tbl_stmt ::=
+// Create unpartitioned tables with and without column definitions.
+// We cannot coalesce this production with create_partitioned_tbl_stmt because
+// that results in an unresolvable reduce/reduce conflict due to the many
+// optional clauses (not clear which rule to reduce on 'empty').
+// TODO: Clean up by consolidating everything after the column defs and
+// partition clause into a CreateTableParams.
+create_unpartitioned_tbl_stmt ::=
   KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
-  table_name:table LPAREN column_def_list:col_defs RPAREN
-  partition_column_defs:partition_col_defs comment_val:comment
+  table_name:table LPAREN column_def_list:col_defs RPAREN comment_val:comment
   row_format_val:row_format serde_properties:serde_props
   file_format_create_table_val:file_format location_val:location cache_op_val:cache_op
   tbl_properties:tbl_props
   {:
-    RESULT = new CreateTableStmt(table, col_defs, partition_col_defs, external, comment,
-        row_format, file_format, location, cache_op, if_not_exists, tbl_props,
+    RESULT = new CreateTableStmt(table, col_defs, new ArrayList<ColumnDesc>(), external,
+        comment, row_format, file_format, location, cache_op, if_not_exists, tbl_props,
         serde_props);
+  :}
+  | KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
+    table_name:table comment_val:comment row_format_val:row_format
+    serde_properties:serde_props file_format_create_table_val:file_format
+    location_val:location cache_op_val:cache_op tbl_properties:tbl_props
+  {:
+    RESULT = new CreateTableStmt(table, new ArrayList<ColumnDesc>(),
+        new ArrayList<ColumnDesc>(), external, comment, row_format, file_format,
+        location, cache_op, if_not_exists, tbl_props, serde_props);
   :}
   | KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
     table_name:table LPAREN column_def_list:col_defs RPAREN
@@ -728,6 +744,34 @@ create_tbl_stmt ::=
     if (external) parser.parseError("external", SqlParserSymbols.KW_EXTERNAL);
     RESULT = new CreateTableDataSrcStmt(table, col_defs, data_src_name, init_string,
         comment, if_not_exists);
+  :}
+  ;
+
+// Create partitioned tables with and without column definitions.
+// TODO: Clean up by consolidating everything after the column defs and
+// partition clause into a CreateTableParams.
+create_partitioned_tbl_stmt ::=
+  KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
+  table_name:table LPAREN column_def_list:col_defs RPAREN KW_PARTITIONED KW_BY
+  LPAREN column_def_list:partition_col_defs RPAREN comment_val:comment
+  row_format_val:row_format serde_properties:serde_props
+  file_format_create_table_val:file_format location_val:location cache_op_val:cache_op
+  tbl_properties:tbl_props
+  {:
+    RESULT = new CreateTableStmt(table, col_defs, partition_col_defs, external, comment,
+        row_format, file_format, location, cache_op, if_not_exists, tbl_props,
+        serde_props);
+  :}
+  | KW_CREATE external_val:external KW_TABLE if_not_exists_val:if_not_exists
+    table_name:table KW_PARTITIONED KW_BY
+    LPAREN column_def_list:partition_col_defs RPAREN
+    comment_val:comment row_format_val:row_format serde_properties:serde_props
+    file_format_create_table_val:file_format location_val:location cache_op_val:cache_op
+    tbl_properties:tbl_props
+  {:
+    RESULT = new CreateTableStmt(table, new ArrayList<ColumnDesc>(), partition_col_defs,
+        external, comment, row_format, file_format, location, cache_op, if_not_exists,
+        tbl_props, serde_props);
   :}
   ;
 

@@ -1817,13 +1817,12 @@ public class Analyzer {
   public Map<String, View> getLocalViews() { return localViews_; }
 
   /**
-   * Add a warning that will be displayed to the user.
+   * Add a warning that will be displayed to the user. Ignores null messages.
    */
   public void addWarning(String msg) {
+    if (msg == null) return;
     Integer count = globalState_.warnings.get(msg);
-    if (count == null) {
-      count = 0;
-    }
+    if (count == null) count = 0;
     globalState_.warnings.put(msg, count + 1);
   }
 

@@ -1682,17 +1682,24 @@ public class ParserTest {
     // Table and column names starting with digits.
     ParsesOk("CREATE TABLE 01_Foo (01_i int, 02_j string)");
 
+    // Unpartitioned tables
     ParsesOk("CREATE TABLE Foo (i int, s string)");
     ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string)");
     ParsesOk("CREATE EXTERNAL TABLE Foo (i int, s string) LOCATION '/test-warehouse/'");
     ParsesOk("CREATE TABLE Foo (i int, s string) COMMENT 'hello' LOCATION '/a/b/'");
     ParsesOk("CREATE TABLE Foo (i int, s string) COMMENT 'hello' LOCATION '/a/b/' " +
         "TBLPROPERTIES ('123'='1234')");
+    // No column definitions.
+    ParsesOk("CREATE TABLE Foo COMMENT 'hello' LOCATION '/a/b/' " +
+        "TBLPROPERTIES ('123'='1234')");
 
     // Partitioned tables
     ParsesOk("CREATE TABLE Foo (i int) PARTITIONED BY (j string)");
     ParsesOk("CREATE TABLE Foo (i int) PARTITIONED BY (s string, d double)");
     ParsesOk("CREATE TABLE Foo (i int, s string) PARTITIONED BY (s string, d double)" +
+        " COMMENT 'hello' LOCATION '/a/b/'");
+    // No column definitions.
+    ParsesOk("CREATE TABLE Foo PARTITIONED BY (s string, d double)" +
         " COMMENT 'hello' LOCATION '/a/b/'");
     ParserError("CREATE TABLE Foo (i int) PARTITIONED BY (int)");
     ParserError("CREATE TABLE Foo (i int) PARTITIONED BY ()");
@@ -1714,6 +1721,9 @@ public class ParserTest {
       ParsesOk(String.format(
           "CREATE EXTERNAL TABLE Foo (f float) COMMENT 'c' STORED AS %s LOCATION '/b'",
           format));
+      // No column definitions.
+      ParsesOk(String.format(
+          "CREATE EXTERNAL TABLE Foo COMMENT 'c' STORED AS %s LOCATION '/b'", format));
     }
 
     // Table Properties
@@ -1814,11 +1824,8 @@ public class ParserTest {
     ParserError("CREATE TABLE Foo (i intt)");
     ParserError("CREATE TABLE Foo (int i)");
     ParserError("CREATE TABLE Foo ()");
-    ParserError("CREATE TABLE Foo.Bar");
-    ParserError("CREATE TABLE Foo");
     ParserError("CREATE TABLE");
     ParserError("CREATE EXTERNAL");
-    ParserError("CREATE EXTERNAL TABLE Foo");
     ParserError("CREATE");
 
     // Valid syntax for tables PRODUCED BY DATA SOURCE

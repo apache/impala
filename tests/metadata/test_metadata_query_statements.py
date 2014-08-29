@@ -17,6 +17,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
       "CLASS 'com.cloudera.impala.extdatasource.AllTypesDataSource' API_VERSION 'V1'")
   DROP_DATA_SRC_STMT = "DROP DATA SOURCE IF EXISTS %s"
   TEST_DATA_SRC_NAMES = ["show_test_ds1", "show_test_ds2"]
+  AVRO_SCHEMA_LOC = "hdfs:///test-warehouse/avro_schemas/functional/alltypes.json"
 
   @classmethod
   def get_workload(self):
@@ -69,6 +70,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   def test_describe_table(self, vector):
     self.run_test_case('QueryTest/describe', vector)
 
+  @pytest.mark.execute_serially
   def test_describe_formatted(self, vector):
     # Describe a partitioned table.
     self.exec_and_compare_hive_and_impala_hs2("describe formatted functional.alltypes")
@@ -77,6 +79,23 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
     # Describe an unpartitioned table.
     self.exec_and_compare_hive_and_impala_hs2("describe formatted tpch.lineitem")
     self.exec_and_compare_hive_and_impala_hs2("describe formatted functional.jointbl")
+
+    # Create and describe an unpartitioned and partitioned Avro table created
+    # by Impala without any column definitions.
+    # TODO: Instead of creating new tables here, change one of the existing
+    # Avro tables to be created without any column definitions.
+    db_name = "hive_test_db"
+    self.client.execute("create database if not exists %s" % db_name)
+    self.client.execute((
+        "create table %s.%s with serdeproperties ('avro.schema.url'='%s') stored as avro"
+        % (db_name, "avro_alltypes_nopart", self.AVRO_SCHEMA_LOC)))
+    self.exec_and_compare_hive_and_impala_hs2("describe formatted avro_alltypes_nopart")
+
+    self.client.execute((
+        "create table %s.%s partitioned by (year int, month int) "
+        "with serdeproperties ('avro.schema.url'='%s') stored as avro"
+        % (db_name, "avro_alltypes_part", self.AVRO_SCHEMA_LOC)))
+    self.exec_and_compare_hive_and_impala_hs2("describe formatted avro_alltypes_part")
 
     try:
       # Describe a view

@@ -600,14 +600,15 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Extra column definition is ok because the schema mismatch is resolved
     // in the CREATE TABLE.
     AnalyzesOk("compute stats functional_avro_snap.alltypes_extra_coldef");
-    // Mismatched column name.
+    // Mismatched column name (tables were created by Hive).
     AnalysisError("compute stats functional_avro_snap.schema_resolution_test",
         "Cannot COMPUTE STATS on Avro table 'schema_resolution_test' because its " +
             "column definitions do not match those in the Avro schema.\nDefinition of " +
             "column 'col1' of type 'string' does not match the Avro-schema column " +
             "'boolean1' of type 'BOOLEAN' at position '0'.\nPlease re-create the table " +
             "with column definitions, e.g., using the result of 'SHOW CREATE TABLE'");
-    // No column definitions were given at all. This case is broken in Hive (HIVE-6308).
+    // No column definitions were given at all. This case is broken in Hive (HIVE-6308),
+    // but works when such a table is created through Impala.
     AnalysisError("compute stats functional_avro_snap.alltypes_no_coldef",
         "Cannot COMPUTE STATS on Avro table 'alltypes_no_coldef' because its column " +
             "definitions do not match those in the Avro schema.\nMissing column " +
@@ -861,6 +862,18 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Varchar size must be <= 32672. Size was set to: 32673.");
     AnalyzesOk("create table new_table (i int) PARTITIONED BY (s varchar(3))");
 
+    // Supported file formats. Exclude Avro since it is tested separately.
+    String [] fileFormats =
+        {"TEXTFILE", "SEQUENCEFILE", "PARQUET", "PARQUETFILE", "RCFILE"};
+    for (String format: fileFormats) {
+      AnalyzesOk(String.format("create table new_table (i int) " +
+          "partitioned by (d decimal) comment 'c' stored as %s", format));
+      // No column definitions.
+      AnalysisError(String.format("create table new_table " +
+          "partitioned by (d decimal) comment 'c' stored as %s", format),
+          "Table requires at least 1 column");
+    }
+
     // Note: Backslashes need to be escaped twice - once for Java and once for Impala.
     // For example, if this were a real query the value '\' would be stored in the
     // metastore for the ESCAPED BY field.
@@ -974,22 +987,87 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
   @Test
   public void TestCreateAvroTest() {
-    // Analysis of Avro schemas
-    AnalyzesOk("create table foo_avro (i int) with serdeproperties ('avro.schema.url'=" +
-        "'hdfs://localhost:20500/test-warehouse/avro_schemas/functional/" +
-        "alltypes.json') stored as avro");
-    AnalyzesOk("create table foo_avro (i int) stored as avro tblproperties " +
-        "('avro.schema.url'='hdfs://localhost:20500/test-warehouse/avro_schemas/" +
-        "functional/alltypes.json')");
-    AnalyzesOk("create table foo_avro (i int) stored as avro tblproperties " +
+    String alltypesSchemaLoc =
+        "hdfs:///test-warehouse/avro_schemas/functional/alltypes.json";
+
+    // Analysis of Avro schemas. Column definitions match the Avro schema exactly.
+    // Note: Avro does not have a tinyint and smallint type.
+    AnalyzesOk(String.format(
+        "create table foo_avro (id int, bool_col boolean, tinyint_col int, " +
+        "smallint_col int, int_col int, bigint_col bigint, float_col float," +
+        "double_col double, date_string_col string, string_col string, " +
+        "timestamp_col timestamp) with serdeproperties ('avro.schema.url'='%s')" +
+        "stored as avro", alltypesSchemaLoc));
+    AnalyzesOk(String.format(
+        "create table foo_avro (id int, bool_col boolean, tinyint_col int, " +
+        "smallint_col int, int_col int, bigint_col bigint, float_col float," +
+        "double_col double, date_string_col string, string_col string, " +
+        "timestamp_col timestamp) stored as avro tblproperties ('avro.schema.url'='%s')",
+        alltypesSchemaLoc));
+    AnalyzesOk("create table foo_avro (string1 string) stored as avro tblproperties " +
         "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
         "\"fields\": [{\"name\": \"string1\", \"type\": \"string\"}]}')");
+
+    // No column definitions.
+    AnalyzesOk(String.format(
+        "create table foo_avro with serdeproperties ('avro.schema.url'='%s')" +
+        "stored as avro", alltypesSchemaLoc));
+    AnalyzesOk(String.format(
+        "create table foo_avro stored as avro tblproperties ('avro.schema.url'='%s')",
+        alltypesSchemaLoc));
+    AnalyzesOk("create table foo_avro stored as avro tblproperties " +
+        "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
+        "\"fields\": [{\"name\": \"string1\", \"type\": \"string\"}]}')");
+
+    // Analysis of Avro schemas. Column definitions do not match Avro schema.
+    AnalyzesOk(String.format(
+        "create table foo_avro (id int) with serdeproperties ('avro.schema.url'='%s')" +
+        "stored as avro", alltypesSchemaLoc),
+        "Ignoring column definitions in favor of Avro schema.\n" +
+        "The Avro schema has 11 column(s) but 1 column definition(s) were given.");
+    AnalyzesOk(String.format(
+        "create table foo_avro (bool_col boolean, string_col string) " +
+        "stored as avro tblproperties ('avro.schema.url'='%s')",
+        alltypesSchemaLoc),
+        "Ignoring column definitions in favor of Avro schema.\n" +
+        "The Avro schema has 11 column(s) but 2 column definition(s) were given.");
+    AnalyzesOk("create table foo_avro (string1 string) stored as avro tblproperties " +
+        "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
+        "\"fields\": [{\"name\": \"string1\", \"type\": \"string\"}," +
+        "{\"name\": \"string2\", \"type\": \"string\"}]}')",
+        "Ignoring column definitions in favor of Avro schema.\n" +
+        "The Avro schema has 2 column(s) but 1 column definition(s) were given.");
+    // Mismatched name.
+    AnalyzesOk(String.format(
+        "create table foo_avro (id int, bool_col boolean, tinyint_col int, " +
+        "smallint_col int, bad_int_col int, bigint_col bigint, float_col float," +
+        "double_col double, date_string_col string, string_col string, " +
+        "timestamp_col timestamp) with serdeproperties ('avro.schema.url'='%s')" +
+        "stored as avro", alltypesSchemaLoc),
+        "Ignoring column definitions in favor of Avro schema due to a mismatched " +
+        "column name at position 5.\n" +
+        "Column definition: bad_int_col INT\n" +
+        "Avro schema column: int_col INT");
+    // Mismatched type.
+    AnalyzesOk(String.format(
+        "create table foo_avro (id int, bool_col boolean, tinyint_col int, " +
+        "smallint_col int, int_col int, bigint_col bigint, float_col float," +
+        "double_col bigint, date_string_col string, string_col string, " +
+        "timestamp_col timestamp) stored as avro tblproperties ('avro.schema.url'='%s')",
+        alltypesSchemaLoc),
+        "Ignoring column definitions in favor of Avro schema due to a mismatched " +
+        "column type at position 8.\n" +
+        "Column definition: double_col BIGINT\n" +
+        "Avro schema column: double_col DOUBLE");
 
     // No Avro schema specified for Avro format table.
     AnalysisError("create table foo_avro (i int) stored as avro",
         "Error loading Avro schema: No Avro schema provided in SERDEPROPERTIES or " +
         "TBLPROPERTIES for table: default.foo_avro");
     AnalysisError("create table foo_avro (i int) stored as avro tblproperties ('a'='b')",
+        "Error loading Avro schema: No Avro schema provided in SERDEPROPERTIES or " +
+        "TBLPROPERTIES for table: default.foo_avro");
+    AnalysisError("create table foo_avro stored as avro tblproperties ('a'='b')",
         "Error loading Avro schema: No Avro schema provided in SERDEPROPERTIES or " +
         "TBLPROPERTIES for table: default.foo_avro");
     // Invalid schema URL
@@ -1585,7 +1663,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
       Preconditions.checkState(stmt instanceof CreateTableStmt);
       CreateTableStmt createTableStmt = (CreateTableStmt) stmt;
-      Type t = createTableStmt.getColumnDescs().get(0).getType();
+      Type t = createTableStmt.getColumnDefs().get(0).getType();
       // If the given type is complex, don't use it as a map key.
       if (t.isComplexType()) {
         AnalyzesOk(String.format(

@@ -534,6 +534,67 @@ STRING, STRING, STRING
 'month','int',''
 ====
 ---- QUERY
+# Test creating an unpartitioned Avro table without column definitions.
+create table avro_alltypes_nopart
+with serdeproperties
+('avro.schema.url'='hdfs:///test-warehouse/avro_schemas/functional/alltypes.json')
+stored as avro
+---- RESULTS
+====
+---- QUERY
+describe avro_alltypes_nopart
+---- TYPES
+STRING, STRING, STRING
+---- RESULTS
+'bigint_col','bigint','from deserializer'
+'bool_col','boolean','from deserializer'
+'date_string_col','string','from deserializer'
+'double_col','double','from deserializer'
+'float_col','float','from deserializer'
+'id','int','from deserializer'
+'int_col','int','from deserializer'
+'smallint_col','int','from deserializer'
+'string_col','string','from deserializer'
+'timestamp_col','string','from deserializer'
+'tinyint_col','int','from deserializer'
+====
+---- QUERY
+# Test creating a partitioned Avro table without column definitions.
+create table avro_alltypes_part
+partitioned by (year int, month int)
+with serdeproperties
+('avro.schema.url'='hdfs:///test-warehouse/avro_schemas/functional/alltypes.json')
+stored as avro
+---- RESULTS
+====
+---- QUERY
+describe avro_alltypes_part
+---- TYPES
+STRING, STRING, STRING
+---- RESULTS
+'bigint_col','bigint','from deserializer'
+'bool_col','boolean','from deserializer'
+'date_string_col','string','from deserializer'
+'double_col','double','from deserializer'
+'float_col','float','from deserializer'
+'id','int','from deserializer'
+'int_col','int','from deserializer'
+'month','int',''
+'smallint_col','int','from deserializer'
+'string_col','string','from deserializer'
+'timestamp_col','string','from deserializer'
+'tinyint_col','int','from deserializer'
+'year','int',''
+====
+---- QUERY
+drop table avro_alltypes_part
+---- RESULTS
+====
+---- QUERY
+drop table avro_alltypes_nopart
+---- RESULTS
+====
+---- QUERY
 drop table allcomplextypes_clone
 ---- RESULTS
 ====

@@ -87,7 +87,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
     // Add the columns from the select statement to the create statement.
     int colCnt = tmpQueryStmt.getColLabels().size();
     for (int i = 0; i < colCnt; ++i) {
-      createStmt_.getColumnDescs().add(new ColumnDesc(
+      createStmt_.getColumnDefs().add(new ColumnDesc(
           tmpQueryStmt.getColLabels().get(i),
           tmpQueryStmt.getBaseTblResultExprs().get(i).getType(), null));
     }

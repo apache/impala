@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HdfsStorageDescriptor;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.RowFormat;
@@ -45,7 +46,7 @@ public class CreateTableStmt extends StatementBase {
   private final boolean isExternal_;
   private final boolean ifNotExists_;
   private final THdfsFileFormat fileFormat_;
-  private final ArrayList<ColumnDesc> partitionColumnDescs_;
+  private final ArrayList<ColumnDesc> partitionColDefs_;
   private final RowFormat rowFormat_;
   private final TableName tableName_;
   private final Map<String, String> tblProperties_;
@@ -61,7 +62,7 @@ public class CreateTableStmt extends StatementBase {
    * Builds a CREATE TABLE statement
    * @param tableName - Name of the new table
    * @param columnDefs - List of column definitions for the table
-   * @param partitionColumnDescs - List of partition column definitions for the table
+   * @param partitionColumnDefs - List of partition column definitions for the table
    * @param isExternal - If true, the table's data will be preserved if dropped.
    * @param comment - Comment to attach to the table
    * @param rowFormat - Custom row format of the table. Use RowFormat.DEFAULT_ROW_FORMAT
@@ -75,12 +76,12 @@ public class CreateTableStmt extends StatementBase {
    *                          metadata.
    */
   public CreateTableStmt(TableName tableName, List<ColumnDesc> columnDefs,
-      List<ColumnDesc> partitionColumnDescs, boolean isExternal, String comment,
+      List<ColumnDesc> partitionColumnDefs, boolean isExternal, String comment,
       RowFormat rowFormat, THdfsFileFormat fileFormat, HdfsUri location,
       HdfsCachingOp cachingOp, boolean ifNotExists, Map<String, String> tblProperties,
       Map<String, String> serdeProperties) {
     Preconditions.checkNotNull(columnDefs);
-    Preconditions.checkNotNull(partitionColumnDescs);
+    Preconditions.checkNotNull(partitionColumnDefs);
     Preconditions.checkNotNull(fileFormat);
     Preconditions.checkNotNull(rowFormat);
     Preconditions.checkNotNull(tableName);
@@ -92,7 +93,7 @@ public class CreateTableStmt extends StatementBase {
     this.fileFormat_ = fileFormat;
     this.location_ = location;
     this.cachingOp_ = cachingOp;
-    this.partitionColumnDescs_ = Lists.newArrayList(partitionColumnDescs);
+    this.partitionColDefs_ = Lists.newArrayList(partitionColumnDefs);
     this.rowFormat_ = rowFormat;
     this.tableName_ = tableName;
     this.tblProperties_ = tblProperties;
@@ -112,19 +113,20 @@ public class CreateTableStmt extends StatementBase {
     fileFormat_ = other.fileFormat_;
     location_ = other.location_;
     cachingOp_ = other.cachingOp_;
-    partitionColumnDescs_ = Lists.newArrayList(other.partitionColumnDescs_);
+    partitionColDefs_ = Lists.newArrayList(other.partitionColDefs_);
     rowFormat_ = other.rowFormat_;
     tableName_ = other.tableName_;
     tblProperties_ = other.tblProperties_;
     serdeProperties_ = other.serdeProperties_;
   }
 
+  @Override
   public CreateTableStmt clone() { return new CreateTableStmt(this); }
 
   public String getTbl() { return tableName_.getTbl(); }
   public TableName getTblName() { return tableName_; }
-  public List<ColumnDesc> getColumnDescs() { return columnDefs_; }
-  public List<ColumnDesc> getPartitionColumnDescs() { return partitionColumnDescs_; }
+  public List<ColumnDesc> getColumnDefs() { return columnDefs_; }
+  public List<ColumnDesc> getPartitionColumnDefs() { return partitionColDefs_; }
   public String getComment() { return comment_; }
   public boolean isExternal() { return isExternal_; }
   public boolean getIfNotExists() { return ifNotExists_; }
@@ -161,10 +163,10 @@ public class CreateTableStmt extends StatementBase {
   public TCreateTableParams toThrift() {
     TCreateTableParams params = new TCreateTableParams();
     params.setTable_name(new TTableName(getDb(), getTbl()));
-    for (ColumnDesc col: getColumnDescs()) {
+    for (ColumnDesc col: getColumnDefs()) {
       params.addToColumns(col.toThrift());
     }
-    for (ColumnDesc col: getPartitionColumnDescs()) {
+    for (ColumnDesc col: getPartitionColumnDefs()) {
       params.addToPartition_columns(col.toThrift());
     }
     params.setOwner(getOwner());
@@ -196,8 +198,10 @@ public class CreateTableStmt extends StatementBase {
     analyzer.addAccessEvent(new TAccessEvent(dbName_ + "." + tableName_.getTbl(),
         TCatalogObjectType.TABLE, Privilege.CREATE.toString()));
 
-    if (columnDefs_.size() == 0) {
-      throw new AnalysisException("A table requires at least 1 column");
+    // Only Avro tables can have empty column defs because they can infer them from
+    // the Avro schema.
+    if (columnDefs_.isEmpty() && fileFormat_ != THdfsFileFormat.AVRO) {
+      throw new AnalysisException("Table requires at least 1 column");
     }
 
     if (location_ != null) location_.analyze(analyzer, Privilege.ALL);
@@ -207,6 +211,26 @@ public class CreateTableStmt extends StatementBase {
     analyzeRowFormatValue(rowFormat_.getEscapeChar());
 
     // Check that all the column names are valid and unique.
+    analyzeColumnDefs(analyzer);
+
+    if (fileFormat_ == THdfsFileFormat.AVRO) {
+      List<ColumnDesc> newColumnDefs = analyzeAvroSchema(analyzer);
+      if (newColumnDefs != columnDefs_) {
+        // Replace the old column defs with the new ones and analyze them.
+        columnDefs_.clear();
+        columnDefs_.addAll(newColumnDefs);
+        analyzeColumnDefs(analyzer);
+      }
+    }
+
+    if (cachingOp_ != null) cachingOp_.analyze(analyzer);
+  }
+
+  /**
+   * Analyzes columnDefs_ and partitionColumnDescs_ checking whether all column
+   * names are unique.
+   */
+  private void analyzeColumnDefs(Analyzer analyzer) throws AnalysisException {
     Set<String> colNames = Sets.newHashSet();
     for (ColumnDesc colDef: columnDefs_) {
       colDef.analyze();
@@ -214,7 +238,7 @@ public class CreateTableStmt extends StatementBase {
         throw new AnalysisException("Duplicate column name: " + colDef.getColName());
       }
     }
-    for (ColumnDesc colDef: partitionColumnDescs_) {
+    for (ColumnDesc colDef: partitionColDefs_) {
       colDef.analyze();
       if (!colDef.getType().supportsTablePartitioning()) {
         throw new AnalysisException(
@@ -225,37 +249,93 @@ public class CreateTableStmt extends StatementBase {
         throw new AnalysisException("Duplicate column name: " + colDef.getColName());
       }
     }
+  }
 
-    if (fileFormat_ == THdfsFileFormat.AVRO) {
-      // Look for the schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
-      // taking precedence.
-      List<Map<String, String>> schemaSearchLocations = Lists.newArrayList();
-      String fullTblName = dbName_ + "." + tableName_.getTbl();
-      schemaSearchLocations.add(serdeProperties_);
-      schemaSearchLocations.add(tblProperties_);
-      String avroSchema = null;
-      try {
-        avroSchema = HdfsTable.getAvroSchema(schemaSearchLocations,
-            dbName_ + "." + tableName_.getTbl(), true);
-      } catch (TableLoadingException e) {
-        throw new AnalysisException("Error loading Avro schema: " + e.getMessage(), e);
-      }
+  /**
+   * Analyzes the Avro schema and compares it with the columnDefs_ to detect
+   * inconsistencies. Returns a list of column descriptors that should be
+   * used for creating the table (possibly identical to columnDefs_).
+   */
+  private List<ColumnDesc> analyzeAvroSchema(Analyzer analyzer)
+      throws AnalysisException {
+    Preconditions.checkState(fileFormat_ == THdfsFileFormat.AVRO);
+    // Look for the schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
+    // taking precedence.
+    List<Map<String, String>> schemaSearchLocations = Lists.newArrayList();
+    String fullTblName = dbName_ + "." + tableName_.getTbl();
+    schemaSearchLocations.add(serdeProperties_);
+    schemaSearchLocations.add(tblProperties_);
+    String avroSchema = null;
+    try {
+      avroSchema = HdfsTable.getAvroSchema(schemaSearchLocations,
+          dbName_ + "." + tableName_.getTbl(), true);
+    } catch (TableLoadingException e) {
+      throw new AnalysisException("Error loading Avro schema: " + e.getMessage(), e);
+    }
 
-      if (Strings.isNullOrEmpty(avroSchema)) {
-        throw new AnalysisException("Avro schema is null or empty: " + fullTblName);
-      }
+    if (Strings.isNullOrEmpty(avroSchema)) {
+      throw new AnalysisException("Avro schema is null or empty: " + fullTblName);
+    }
 
-      try {
-        // Ignore the return value, we just want to check if the Avro schema is invalid.
-        AvroSchemaParser.parse(avroSchema);
-      } catch (Exception e) {
-        throw new AnalysisException(String.format(
-            "Error parsing Avro schema for table '%s': %s", fullTblName,
-            e.getMessage()));
+    // List of columns parsed from the Avro schema.
+    List<Column> avroColumns = null;
+    try {
+      avroColumns = AvroSchemaParser.parse(avroSchema);
+    } catch (Exception e) {
+      throw new AnalysisException(String.format(
+          "Error parsing Avro schema for table '%s': %s", fullTblName,
+          e.getMessage()));
+    }
+    Preconditions.checkNotNull(avroColumns);
+
+    // Analyze the Avro schema to detect inconsistencies with the columnDefs_.
+    // In case of inconsistencies, the column defs are ignored in favor of the Avro
+    // schema for simplicity and, in particular, to enable COMPUTE STATS (IMPALA-1104).
+    String warnStr = null; // set if inconsistency detected
+    if (avroColumns.size() != columnDefs_.size() && !columnDefs_.isEmpty()) {
+      warnStr = String.format(
+          "Ignoring column definitions in favor of Avro schema.\n" +
+          "The Avro schema has %s column(s) but %s column definition(s) were given.",
+           avroColumns.size(), columnDefs_.size());
+    } else {
+      // Determine whether the column names and the types match.
+      for (int i = 0; i < columnDefs_.size(); ++i) {
+        ColumnDesc colDesc = columnDefs_.get(i);
+        Column avroCol = avroColumns.get(i);
+        avroCol.getType().analyze();
+        String warnDetail = null;
+        if (!colDesc.getType().equals(avroCol.getType())) {
+          warnDetail = "type";
+        } else if (!colDesc.getColName().equalsIgnoreCase(avroCol.getName())) {
+          warnDetail = "name";
+        }
+        if (warnDetail != null) {
+          warnStr = String.format(
+              "Ignoring column definitions in favor of Avro schema due to a " +
+              "mismatched column %s at position %s.\n" +
+              "Column definition: %s\n" +
+              "Avro schema column: %s", warnDetail, i + 1,
+              colDesc.getColName() + " " + colDesc.getType().toSql(),
+              avroCol.getName() + " " + avroCol.getType().toSql());
+          break;
+        }
       }
     }
 
-    if (cachingOp_ != null) cachingOp_.analyze(analyzer);
+    if (warnStr != null || columnDefs_.isEmpty()) {
+      analyzer.addWarning(warnStr);
+      // Create new columnDefs_ based on the Avro schema and return them.
+      List<ColumnDesc> avroSchemaColDefs =
+          Lists.newArrayListWithCapacity(avroColumns.size());
+      for (Column avroCol: avroColumns) {
+        avroSchemaColDefs.add(new ColumnDesc(avroCol.getName(), avroCol.getType(),
+            avroCol.getComment()));
+      }
+      return avroSchemaColDefs;
+    }
+
+    // The existing col defs are consistent with the Avro schema.
+    return columnDefs_;
   }
 
   private void analyzeRowFormatValue(String value) throws AnalysisException {

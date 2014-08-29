@@ -519,27 +519,28 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
 ====
 ---- QUERY
-# IMPALA-867: Test computing stats on Avro tables with matching/mismatched
-# column definitions and Avro schema. Clone the used tables here.
-create table compute_stats_db.avro_alltypes
+# IMPALA-867: Test computing stats on Avro tables created by Hive with
+# matching/mismatched column definitions and Avro schema.
+# Clone the used tables here.
+create table compute_stats_db.avro_hive_alltypes
 like functional_avro_snap.alltypes;
-create table compute_stats_db.avro_alltypes_extra_coldef
+create table compute_stats_db.avro_hive_alltypes_extra_coldef
 like functional_avro_snap.alltypes_extra_coldef;
-create table compute_stats_db.avro_alltypes_missing_coldef
+create table compute_stats_db.avro_hive_alltypes_missing_coldef
 like functional_avro_snap.alltypes_missing_coldef;
-create table compute_stats_db.avro_alltypes_type_mismatch
+create table compute_stats_db.avro_hive_alltypes_type_mismatch
 like functional_avro_snap.alltypes_type_mismatch;
 ====
 ---- QUERY
 # Avro table with matching column definitions and Avro schema
-compute stats compute_stats_db.avro_alltypes
+compute stats compute_stats_db.avro_hive_alltypes
 ---- RESULTS
 'Updated 0 partition(s) and 11 column(s).'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show table stats compute_stats_db.avro_alltypes
+show table stats compute_stats_db.avro_hive_alltypes
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
@@ -548,7 +549,7 @@ Total,,0,0,'0B','0B',''
 INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
-show column stats compute_stats_db.avro_alltypes
+show column stats compute_stats_db.avro_hive_alltypes
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
@@ -570,14 +571,14 @@ STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
 ====
 ---- QUERY
 # Avro table with an extra column definition.
-compute stats compute_stats_db.avro_alltypes_extra_coldef
+compute stats compute_stats_db.avro_hive_alltypes_extra_coldef
 ---- RESULTS
 'Updated 0 partition(s) and 12 column(s).'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show table stats compute_stats_db.avro_alltypes_extra_coldef
+show table stats compute_stats_db.avro_hive_alltypes_extra_coldef
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
@@ -586,7 +587,7 @@ Total,,0,0,'0B','0B',''
 INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
-show column stats compute_stats_db.avro_alltypes_extra_coldef
+show column stats compute_stats_db.avro_hive_alltypes_extra_coldef
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
@@ -609,14 +610,14 @@ STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
 ====
 ---- QUERY
 # Avro table with missing two column definitions.
-compute stats compute_stats_db.avro_alltypes_missing_coldef
+compute stats compute_stats_db.avro_hive_alltypes_missing_coldef
 ---- RESULTS
 'Updated 0 partition(s) and 9 column(s).'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show table stats compute_stats_db.avro_alltypes_missing_coldef
+show table stats compute_stats_db.avro_hive_alltypes_missing_coldef
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
@@ -625,7 +626,7 @@ Total,,0,0,'0B','0B',''
 INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
-show column stats compute_stats_db.avro_alltypes_missing_coldef
+show column stats compute_stats_db.avro_hive_alltypes_missing_coldef
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
@@ -646,14 +647,14 @@ STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
 ---- QUERY
 # Avro table with one column definition having a different
 # type than the Avro schema (bigint_col is a string).
-compute stats compute_stats_db.avro_alltypes_type_mismatch
+compute stats compute_stats_db.avro_hive_alltypes_type_mismatch
 ---- RESULTS
 'Updated 0 partition(s) and 11 column(s).'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show table stats compute_stats_db.avro_alltypes_type_mismatch
+show table stats compute_stats_db.avro_hive_alltypes_type_mismatch
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
@@ -662,7 +663,7 @@ Total,,0,0,'0B','0B',''
 INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
-show column stats compute_stats_db.avro_alltypes_type_mismatch
+show column stats compute_stats_db.avro_hive_alltypes_type_mismatch
 ---- LABELS
 COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- RESULTS
@@ -677,6 +678,149 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'date_string_col','STRING',0,-1,0,0
 'string_col','STRING',0,-1,0,0
 'timestamp_col','TIMESTAMP',0,-1,16,16
+'year','INT',0,0,4,4
+'month','INT',0,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
+---- QUERY
+# Test Avro table created without any column definitions.
+create table compute_stats_db.avro_impala_alltypes_no_coldefs
+partitioned by (year int, month int)
+with serdeproperties
+('avro.schema.url'='hdfs:///test-warehouse/avro_schemas/functional/alltypes.json')
+stored as avro;
+====
+---- QUERY
+compute stats compute_stats_db.avro_impala_alltypes_no_coldefs
+---- RESULTS
+'Updated 0 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.avro_impala_alltypes_no_coldefs
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
+---- RESULTS
+Total,,0,0,'0B','0B',''
+---- TYPES
+INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
+====
+---- QUERY
+show column stats compute_stats_db.avro_impala_alltypes_no_coldefs
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',0,-1,4,4
+'bool_col','BOOLEAN',2,-1,1,1
+'tinyint_col','INT',0,-1,4,4
+'smallint_col','INT',0,-1,4,4
+'int_col','INT',0,-1,4,4
+'bigint_col','BIGINT',0,-1,8,8
+'float_col','FLOAT',0,-1,4,4
+'double_col','DOUBLE',0,-1,8,8
+'date_string_col','STRING',0,-1,0,0
+'string_col','STRING',0,-1,0,0
+'timestamp_col','STRING',0,-1,0,0
+'year','INT',0,0,4,4
+'month','INT',0,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
+---- QUERY
+# IMPALA-1104: Test computing stats on Avro tables created by Impala
+# with mismatched column definitions and Avro schema. Mismatched column name.
+create table compute_stats_db.avro_impala_alltypes_bad_colname
+(id int, bool_col boolean, tinyint_col int, smallint_col int, bad_int_col int,
+bigint_col bigint, float_col float, double_col double, date_string_col string,
+string_col string, timestamp_col timestamp)
+partitioned by (year int, month int)
+with serdeproperties
+('avro.schema.url'='hdfs:///test-warehouse/avro_schemas/functional/alltypes.json')
+stored as avro;
+====
+---- QUERY
+compute stats compute_stats_db.avro_impala_alltypes_bad_colname
+---- RESULTS
+'Updated 0 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.avro_impala_alltypes_bad_colname
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
+---- RESULTS
+Total,,0,0,'0B','0B',''
+---- TYPES
+INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
+====
+---- QUERY
+show column stats compute_stats_db.avro_impala_alltypes_bad_colname
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',0,-1,4,4
+'bool_col','BOOLEAN',2,-1,1,1
+'tinyint_col','INT',0,-1,4,4
+'smallint_col','INT',0,-1,4,4
+'int_col','INT',0,-1,4,4
+'bigint_col','BIGINT',0,-1,8,8
+'float_col','FLOAT',0,-1,4,4
+'double_col','DOUBLE',0,-1,8,8
+'date_string_col','STRING',0,-1,0,0
+'string_col','STRING',0,-1,0,0
+'timestamp_col','STRING',0,-1,0,0
+'year','INT',0,0,4,4
+'month','INT',0,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+====
+---- QUERY
+# IMPALA-1104: Test computing stats on Avro tables created by Impala
+# with mismatched column definitions and Avro schema. Mismatched column type.
+create table compute_stats_db.avro_impala_alltypes_bad_coltype
+(id int, bool_col boolean, tinyint_col int, smallint_col int, int_col int,
+bigint_col bigint, float_col float, double_col bigint, date_string_col string,
+string_col string, timestamp_col timestamp)
+partitioned by (year int, month int)
+with serdeproperties
+('avro.schema.url'='hdfs:///test-warehouse/avro_schemas/functional/alltypes.json')
+stored as avro;
+====
+---- QUERY
+compute stats compute_stats_db.avro_impala_alltypes_bad_coltype
+---- RESULTS
+'Updated 0 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.avro_impala_alltypes_bad_coltype
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
+---- RESULTS
+Total,,0,0,'0B','0B',''
+---- TYPES
+INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
+====
+---- QUERY
+show column stats compute_stats_db.avro_impala_alltypes_bad_coltype
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',0,-1,4,4
+'bool_col','BOOLEAN',2,-1,1,1
+'tinyint_col','INT',0,-1,4,4
+'smallint_col','INT',0,-1,4,4
+'int_col','INT',0,-1,4,4
+'bigint_col','BIGINT',0,-1,8,8
+'float_col','FLOAT',0,-1,4,4
+'double_col','DOUBLE',0,-1,8,8
+'date_string_col','STRING',0,-1,0,0
+'string_col','STRING',0,-1,0,0
+'timestamp_col','STRING',0,-1,0,0
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
