@@ -1,149 +1,131 @@
 ====
 ---- QUERY: TPCDS-Q89
-select
-  *
-from
-  (select
-    i_category,
-    i_class,
-    i_brand,
-    s_store_name,
-    s_company_name,
-    d_moy,
-    sum(ss_sales_price) sum_sales
-    -- avg(sum(ss_sales_price)) over (partition by i_category, i_brand, s_store_name, s_company_name) avg_monthly_sales
-  from
-    item,
-    store_sales,
-    date_dim,
-    store
-  where
-    ss_item_sk = i_item_sk
-    and ss_sold_date_sk = d_date_sk
-    and ss_store_sk = s_store_sk
-    and d_year in (2000)
-    and ((i_category in ('Home', 'Books', 'Electronics')
-        and i_class in ('wallpaper', 'parenting', 'musical'))
-      or (i_category in ('Shoes', 'Jewelry', 'Men')
-        and i_class in ('womens', 'birdal', 'pants')))
-    and ss_sold_date_sk between 2451545 and 2451910  -- partition key filter
-  group by
-    i_category,
-    i_class,
-    i_brand,
-    s_store_name,
-    s_company_name,
-    d_moy
-  ) tmp1
--- where
---   case when (avg_monthly_sales <> 0) then (abs(sum_sales - avg_monthly_sales) / avg_monthly_sales) else null end > 0.1
-order by
-  -- sum_sales - avg_monthly_sales,
-  sum_sales,  -- modification
-  s_store_name,
-  i_category -- modification: added this sorting column to break ties for stable test results
-limit 100;
+select * from (select  *
+from (
+select i_category, i_class, i_brand,
+       s_store_name, s_company_name,
+       d_moy,
+       sum(ss_sales_price) sum_sales,
+       avg(sum(ss_sales_price)) over
+         (partition by i_category, i_brand, s_store_name, s_company_name)
+         avg_monthly_sales
+from item, store_sales, date_dim, store
+where ss_item_sk = i_item_sk and
+      ss_sold_date_sk = d_date_sk and
+      ss_store_sk = s_store_sk and
+      d_year in (1999) and
+        ((i_category in ('Children','Music','Home') and
+          i_class in ('toddlers','pop','lighting')
+         )
+      or (i_category in ('Jewelry','Books','Sports') and
+          i_class in ('costume','travel','football')
+        ))
+group by i_category, i_class, i_brand,
+         s_store_name, s_company_name, d_moy) tmp1
+where case when (avg_monthly_sales <> 0) then (abs(sum_sales - avg_monthly_sales) / avg_monthly_sales) else null end > 0.1
+order by sum_sales - avg_monthly_sales, s_store_name
+limit 100) tmp2;
 ---- RESULTS
-'Electronics','musical','corpunivamalg #6','ation','Unknown',11,0.00
-'Books','parenting','corpmaxi #12','bar','Unknown',9,0.00
-'Home','wallpaper','exportinameless #6','bar','Unknown',7,0.00
-'Jewelry','birdal','amalgcorp #3','bar','Unknown',9,0.00
-'Books','parenting','corpmaxi #8','ought','Unknown',4,0.10
-'Electronics','musical','corpunivamalg #17','ese','Unknown',9,0.12
-'Home','wallpaper','exportinameless #1','eing','Unknown',9,0.34
-'Jewelry','birdal','amalgcorp #1','eing','Unknown',2,0.37
-'Books','parenting','corpmaxi #9','ese','Unknown',4,0.42
-'Electronics','musical','corpunivamalg #11','bar','Unknown',12,0.47
-'Home','wallpaper','exportinameless #6','eing','Unknown',10,0.59
-'Jewelry','birdal','amalgcorp #2','able','Unknown',12,0.72
-'Jewelry','birdal','amalgcorp #5','ese','Unknown',4,0.78
-'Books','parenting','corpmaxi #9','ese','Unknown',10,0.83
-'Jewelry','birdal','amalgcorp #2','able','Unknown',3,0.89
-'Electronics','musical','corpunivamalg #6','ought','Unknown',10,0.89
-'Electronics','musical','corpunivamalg #8','ation','Unknown',7,0.97
-'Jewelry','birdal','amalgcorp #2','ought','Unknown',12,0.97
-'Jewelry','birdal','amalgcorp #8','ought','Unknown',6,0.99
-'Books','parenting','corpmaxi #6','able','Unknown',4,1.07
-'Home','wallpaper','exportinameless #7','ation','Unknown',12,1.12
-'Jewelry','birdal','amalgcorp #4','bar','Unknown',8,1.13
-'Electronics','musical','corpunivamalg #8','able','Unknown',6,1.15
-'Home','wallpaper','exportinameless #8','bar','Unknown',10,1.19
-'Home','wallpaper','exportinameless #3','eing','Unknown',11,1.19
-'Home','wallpaper','exportinameless #10','bar','Unknown',9,1.24
-'Home','wallpaper','exportinameless #10','ought','Unknown',6,1.30
-'Men','pants','exportiimporto #1','able','Unknown',6,1.32
-'Home','wallpaper','exportinameless #4','ought','Unknown',5,1.52
-'Home','wallpaper','exportinameless #2','ought','Unknown',6,1.55
-'Electronics','musical','corpunivamalg #6','ation','Unknown',10,1.57
-'Jewelry','birdal','amalgcorp #8','eing','Unknown',11,1.62
-'Home','wallpaper','exportinameless #10','able','Unknown',1,1.64
-'Books','parenting','corpmaxi #9','bar','Unknown',8,1.69
-'Shoes','womens','amalgedu pack #2','eing','Unknown',7,1.76
-'Home','wallpaper','exportinameless #8','ese','Unknown',10,1.85
-'Books','parenting','corpmaxi #12','ought','Unknown',1,1.87
-'Electronics','musical','corpunivamalg #6','able','Unknown',9,1.95
-'Home','wallpaper','exportinameless #6','ation','Unknown',8,2.00
-'Books','parenting','corpmaxi #8','ought','Unknown',3,2.00
-'Home','wallpaper','exportinameless #5','ought','Unknown',1,2.00
-'Electronics','musical','corpunivamalg #2','bar','Unknown',10,2.02
-'Electronics','musical','corpunivamalg #8','bar','Unknown',7,2.12
-'Electronics','musical','corpunivamalg #11','able','Unknown',3,2.19
-'Home','wallpaper','exportinameless #1','ought','Unknown',4,2.34
-'Men','pants','exportiimporto #1','eing','Unknown',6,2.39
-'Electronics','musical','corpunivamalg #11','eing','Unknown',11,2.41
-'Home','wallpaper','exportinameless #8','ought','Unknown',1,2.42
-'Electronics','musical','corpunivamalg #12','ation','Unknown',9,2.44
-'Jewelry','birdal','amalgcorp #5','ese','Unknown',5,2.44
-'Books','parenting','corpmaxi #6','ese','Unknown',12,2.56
-'Books','parenting','corpmaxi #3','eing','Unknown',1,2.57
-'Jewelry','birdal','amalgcorp #6','eing','Unknown',11,2.68
-'Electronics','musical','corpunivamalg #3','able','Unknown',12,2.72
-'Shoes','womens','amalgedu pack #1','able','Unknown',10,2.94
-'Jewelry','birdal','amalgcorp #7','ation','Unknown',2,3.07
-'Electronics','musical','corpunivamalg #7','eing','Unknown',2,3.11
-'Electronics','musical','corpunivamalg #8','ese','Unknown',11,3.31
-'Books','parenting','corpmaxi #8','ation','Unknown',10,3.38
-'Electronics','musical','corpunivamalg #1','able','Unknown',4,3.39
-'Home','wallpaper','exportinameless #4','ought','Unknown',9,3.46
-'Books','parenting','corpmaxi #6','bar','Unknown',5,3.52
-'Home','wallpaper','exportinameless #4','ese','Unknown',12,3.67
-'Electronics','musical','corpunivamalg #13','ese','Unknown',7,3.72
-'Electronics','musical','corpunivamalg #5','ought','Unknown',5,3.73
-'Electronics','musical','corpunivamalg #17','ation','Unknown',10,3.75
-'Home','wallpaper','exportinameless #7','able','Unknown',7,3.80
-'Books','parenting','corpmaxi #6','able','Unknown',7,3.81
-'Jewelry','birdal','amalgcorp #8','eing','Unknown',3,3.81
-'Electronics','musical','corpunivamalg #4','ought','Unknown',10,4.02
-'Home','wallpaper','exportinameless #2','eing','Unknown',8,4.05
-'Electronics','musical','corpunivamalg #4','bar','Unknown',1,4.08
-'Electronics','musical','corpunivamalg #13','able','Unknown',12,4.18
-'Electronics','musical','corpunivamalg #8','ation','Unknown',10,4.21
-'Books','parenting','corpmaxi #3','ese','Unknown',9,4.23
-'Jewelry','birdal','amalgcorp #7','able','Unknown',9,4.41
-'Jewelry','birdal','amalgcorp #4','able','Unknown',3,4.48
-'Electronics','musical','corpunivamalg #11','eing','Unknown',9,4.69
-'Home','wallpaper','exportinameless #9','ought','Unknown',7,4.69
-'Books','parenting','corpmaxi #5','ation','Unknown',1,4.73
-'Books','parenting','corpmaxi #2','bar','Unknown',1,4.79
-'Jewelry','birdal','amalgcorp #5','ation','Unknown',9,4.83
-'Electronics','musical','corpunivamalg #2','ought','Unknown',1,4.86
-'Home','wallpaper','exportinameless #8','ought','Unknown',11,4.86
-'Jewelry','birdal','amalgcorp #7','able','Unknown',8,4.89
-'Electronics','musical','corpunivamalg #7','bar','Unknown',10,5.20
-'Electronics','musical','corpunivamalg #7','ought','Unknown',11,5.20
-'Jewelry','birdal','amalgcorp #7','ation','Unknown',11,5.24
-'Books','parenting','corpmaxi #12','eing','Unknown',11,5.36
-'Books','parenting','corpmaxi #6','bar','Unknown',11,5.56
-'Books','parenting','corpmaxi #9','ese','Unknown',6,5.66
-'Books','parenting','corpmaxi #6','ese','Unknown',10,5.71
-'Jewelry','birdal','amalgcorp #5','ation','Unknown',1,5.77
-'Jewelry','birdal','amalgcorp #1','ation','Unknown',7,6.08
-'Shoes','womens','amalgedu pack #1','ese','Unknown',6,6.09
-'Men','pants','exportiimporto #1','ese','Unknown',4,6.14
-'Electronics','musical','corpunivamalg #6','ese','Unknown',2,6.15
-'Electronics','musical','corpunivamalg #2','bar','Unknown',11,6.22
-'Electronics','musical','corpunivamalg #3','ought','Unknown',7,6.25
-'Electronics','musical','corpunivamalg #1','eing','Unknown',11,6.36
+'Children','toddlers','exportiexporti #1','ought','Unknown',6,19.89,417.00
+'Children','toddlers','exportiexporti #1','ought','Unknown',3,57.49,417.00
+'Children','toddlers','exportiexporti #1','ese','Unknown',4,27.36,367.67
+'Children','toddlers','exportiexporti #1','ation','Unknown',6,25.65,360.45
+'Children','toddlers','exportiexporti #1','able','Unknown',3,7.40,340.40
+'Music','pop','exportischolar #1','bar','Unknown',7,30.79,349.48
+'Music','pop','exportischolar #1','ought','Unknown',6,27.34,343.60
+'Children','toddlers','exportiexporti #1','ese','Unknown',6,57.93,367.67
+'Children','toddlers','exportiexporti #1','able','Unknown',5,34.87,340.40
+'Children','toddlers','exportiexporti #1','eing','Unknown',2,34.87,329.98
+'Children','toddlers','exportiexporti #1','bar','Unknown',4,68.51,355.83
+'Children','toddlers','exportiexporti #1','ation','Unknown',2,85.92,360.45
+'Children','toddlers','exportiexporti #1','ought','Unknown',4,146.11,417.00
+'Children','toddlers','exportiexporti #1','ese','Unknown',3,101.24,367.67
+'Music','pop','exportischolar #1','ation','Unknown',5,77.59,331.72
+'Children','toddlers','exportiexporti #1','ation','Unknown',4,109.87,360.45
+'Music','pop','exportischolar #1','ation','Unknown',6,81.26,331.72
+'Music','pop','exportischolar #1','able','Unknown',3,175.83,426.09
+'Music','pop','exportischolar #1','able','Unknown',4,176.92,426.09
+'Children','toddlers','exportiexporti #1','ese','Unknown',7,118.79,367.67
+'Music','pop','exportischolar #1','eing','Unknown',5,128.76,361.83
+'Music','pop','exportischolar #1','ese','Unknown',4,92.91,317.85
+'Children','toddlers','exportiexporti #1','bar','Unknown',7,132.58,355.83
+'Music','pop','exportischolar #1','ation','Unknown',4,109.62,331.72
+'Music','pop','exportischolar #1','ese','Unknown',6,96.11,317.85
+'Children','toddlers','exportiexporti #1','able','Unknown',7,122.17,340.40
+'Music','pop','exportischolar #1','ought','Unknown',5,129.52,343.60
+'Children','toddlers','exportiexporti #1','eing','Unknown',3,120.24,329.98
+'Children','toddlers','exportiexporti #1','able','Unknown',8,135.86,340.40
+'Music','pop','exportischolar #2','ese','Unknown',8,5.68,209.52
+'Music','pop','exportischolar #1','eing','Unknown',4,159.76,361.83
+'Music','pop','exportischolar #2','able','Unknown',3,27.37,225.48
+'Children','toddlers','exportiexporti #1','eing','Unknown',6,133.10,329.98
+'Music','pop','exportischolar #1','ese','Unknown',8,125.56,317.85
+'Music','pop','exportischolar #2','able','Unknown',2,34.20,225.48
+'Children','toddlers','exportiexporti #1','eing','Unknown',5,141.31,329.98
+'Music','pop','exportischolar #2','ese','Unknown',7,21.02,209.52
+'Music','pop','exportischolar #1','bar','Unknown',6,161.20,349.48
+'Music','pop','exportischolar #1','ought','Unknown',9,157.42,343.60
+'Music','pop','exportischolar #1','eing','Unknown',7,176.33,361.83
+'Children','toddlers','exportiexporti #1','ation','Unknown',5,182.18,360.45
+'Music','pop','exportischolar #2','ese','Unknown',4,32.68,209.52
+'Children','toddlers','exportiexporti #1','able','Unknown',10,165.22,340.40
+'Music','pop','exportischolar #2','ese','Unknown',3,38.05,209.52
+'Music','pop','exportischolar #1','eing','Unknown',9,192.32,361.83
+'Music','pop','exportischolar #1','bar','Unknown',4,183.53,349.48
+'Music','pop','exportischolar #1','ought','Unknown',7,179.89,343.60
+'Music','pop','exportischolar #1','able','Unknown',7,263.93,426.09
+'Children','toddlers','exportiexporti #1','bar','Unknown',5,193.70,355.83
+'Music','pop','exportischolar #2','eing','Unknown',3,7.38,169.24
+'Children','toddlers','exportiexporti #1','ought','Unknown',5,258.30,417.00
+'Music','pop','exportischolar #2','able','Unknown',5,70.72,225.48
+'Music','pop','exportischolar #2','eing','Unknown',6,16.13,169.24
+'Music','pop','exportischolar #2','eing','Unknown',7,19.55,169.24
+'Music','pop','exportischolar #2','ation','Unknown',2,16.40,163.70
+'Children','toddlers','exportiexporti #1','ought','Unknown',7,269.70,417.00
+'Music','pop','exportischolar #1','eing','Unknown',2,215.30,361.83
+'Music','pop','exportischolar #2','eing','Unknown',2,24.03,169.24
+'Children','toddlers','exportiexporti #2','able','Unknown',4,18.03,161.25
+'Music','pop','exportischolar #1','ation','Unknown',2,190.12,331.72
+'Music','pop','exportischolar #1','ese','Unknown',5,176.92,317.85
+'Music','pop','exportischolar #2','bar','Unknown',5,25.83,165.80
+'Children','toddlers','exportiexporti #1','bar','Unknown',8,220.28,355.83
+'Music','pop','exportischolar #1','able','Unknown',2,291.65,426.09
+'Music','pop','exportischolar #2','ation','Unknown',6,29.94,163.70
+'Music','pop','exportischolar #1','bar','Unknown',2,219.04,349.48
+'Children','toddlers','exportiexporti #1','ese','Unknown',9,237.41,367.67
+'Music','pop','exportischolar #2','ese','Unknown',9,80.55,209.52
+'Music','pop','exportischolar #2','bar','Unknown',6,37.56,165.80
+'Music','pop','exportischolar #1','ese','Unknown',7,193.17,317.85
+'Children','toddlers','exportiexporti #1','ese','Unknown',8,246.38,367.67
+'Children','toddlers','exportiexporti #2','able','Unknown',1,40.09,161.25
+'Music','pop','exportischolar #2','ation','Unknown',3,42.56,163.70
+'Music','pop','exportischolar #1','ese','Unknown',2,196.95,317.85
+'Children','toddlers','exportiexporti #2','ought','Unknown',4,15.83,135.74
+'Children','toddlers','exportiexporti #2','ation','Unknown',5,15.95,135.57
+'Children','toddlers','exportiexporti #2','able','Unknown',9,42.14,161.25
+'Music','pop','exportischolar #1','bar','Unknown',3,230.96,349.48
+'Children','toddlers','exportiexporti #2','eing','Unknown',6,14.02,129.03
+'Children','toddlers','exportiexporti #2','eing','Unknown',4,15.38,129.03
+'Children','toddlers','exportiexporti #1','ought','Unknown',9,304.39,417.00
+'Children','toddlers','exportiexporti #1','ese','Unknown',5,259.99,367.67
+'Music','pop','exportischolar #1','ese','Unknown',1,210.21,317.85
+'Children','toddlers','exportiexporti #2','ation','Unknown',1,32.47,135.57
+'Children','toddlers','exportiexporti #2','ought','Unknown',5,37.35,135.74
+'Music','pop','exportischolar #2','able','Unknown',6,127.24,225.48
+'Children','toddlers','exportiexporti #1','eing','Unknown',7,236.80,329.98
+'Children','toddlers','exportiexporti #2','ese','Unknown',5,20.71,111.78
+'Music','pop','exportischolar #2','ought','Unknown',5,73.53,164.26
+'Children','toddlers','exportiexporti #2','ought','Unknown',6,45.28,135.74
+'Children','toddlers','exportiexporti #2','ation','Unknown',10,45.50,135.57
+'Music','pop','exportischolar #1','ese','Unknown',3,227.84,317.85
+'Children','toddlers','exportiexporti #2','bar','Unknown',8,50.21,138.73
+'Children','toddlers','exportiexporti #2','ese','Unknown',2,23.26,111.78
+'Sports','football','corpnameless #6','able','Unknown',12,51.78,139.99
+'Books','travel','univunivamalg #8','eing','Unknown',10,14.90,102.64
+'Home','lighting','namelessbrand #3','ought','Unknown',6,11.29,98.75
+'Music','pop','exportischolar #1','ought','Unknown',4,257.01,343.60
+'Children','toddlers','exportiexporti #1','ation','Unknown',7,274.17,360.45
+'Children','toddlers','exportiexporti #2','ese','Unknown',8,26.23,111.78
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, INT, DECIMAL
+STRING, STRING, STRING, STRING, STRING, INT, DECIMAL, DECIMAL
 ====

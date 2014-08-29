@@ -5,8 +5,8 @@ select
 from
   (select
     i_manager_id,
-    sum(ss_sales_price) sum_sales
-    -- avg(sum(ss_sales_price)) over (partition by i_manager_id) avg_monthly_sales
+    sum(ss_sales_price) sum_sales,
+    avg(sum(ss_sales_price)) over (partition by i_manager_id) avg_monthly_sales
   from
     item,
     store_sales,
@@ -28,28 +28,27 @@ from
     i_manager_id,
     d_moy
   ) tmp1
--- where
---   case when avg_monthly_sales > 0 then abs (sum_sales - avg_monthly_sales) / avg_monthly_sales else null end > 0.1
+where
+case when avg_monthly_sales > 0 then abs (sum_sales - avg_monthly_sales) / avg_monthly_sales else null end > 0.1
 order by
   i_manager_id,
-  -- avg_monthly_sales,
+  avg_monthly_sales,
   sum_sales
 limit 100;
 ---- RESULTS
-10,50.08
-10,92.64
-13,1.75
-13,4.72
-13,66.86
-13,136.13
-29,2.27
-29,25.35
-29,71.67
-29,81.19
-34,2.79
-34,21.91
-34,83.14
-34,201.00
+10,50.08,71.36
+10,92.64,71.36
+13,1.75,52.36
+13,4.72,52.36
+13,66.86,52.36
+13,136.13,52.36
+29,2.27,45.12
+29,25.35,45.12
+29,71.67,45.12
+29,81.19,45.12
+34,2.79,77.21
+34,21.91,77.21
+34,201.00,77.21
 ---- TYPES
-INT, DECIMAL
+INT, DECIMAL, DECIMAL
 ====
