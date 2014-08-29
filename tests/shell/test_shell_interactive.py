@@ -78,6 +78,13 @@ class TestImpalaShellInteractive(object):
     result = run_impala_shell_interactive('select * from non_existent_table;')
     assert result.stdout.count("Welcome to the Impala shell") == 1
 
+  @pytest.mark.execute_serially
+  def test_bash_cmd_timing(self):
+    """Test existence of time output in bash commands run from shell"""
+    args = "! ls;"
+    result = run_impala_shell_interactive(args)
+    assert "Executed in" in result.stderr
+
 def run_impala_shell_interactive(command, shell_args=''):
   """Runs a command in the Impala shell interactively."""
   cmd = "%s %s" % (SHELL_CMD, shell_args)

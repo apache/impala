@@ -186,7 +186,9 @@ class ImpalaShell(cmd.Cmd):
 
     """
     try:
+      start_time = time.time()
       os.system(args)
+      self._print_if_verbose("--------\nExecuted in %2.2fs" % (time.time() - start_time))
     except Exception, e:
       print_to_stderr('Error running command : %s' % e)
       return CmdStatus.ERROR
