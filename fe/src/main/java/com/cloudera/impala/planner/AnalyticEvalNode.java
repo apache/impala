@@ -55,7 +55,8 @@ public class AnalyticEvalNode extends PlanNode {
   private List<Expr> substitutedPartitionExprs_;
   private List<Expr> orderingExprs_;
   private final AnalyticWindow analyticWindow_;
-  private final TupleDescriptor analyticTupleDesc_;
+  private final TupleDescriptor intermediateTupleDesc_;
+  private final TupleDescriptor outputTupleDesc_;
   private final ExprSubstitutionMap analyticSmap_;
 
   // id of buffered copy of input tuple; null if no partition and ordering exprs
@@ -71,7 +72,8 @@ public class AnalyticEvalNode extends PlanNode {
   public AnalyticEvalNode(
       PlanNodeId id, PlanNode input, List<Expr> analyticFnCalls,
       List<Expr> partitionExprs, List<Expr> orderingExprs,
-      AnalyticWindow analyticWindow, TupleDescriptor analyticTupleDesc,
+      AnalyticWindow analyticWindow, TupleDescriptor intermediateTupleDesc,
+      TupleDescriptor outputTupleDesc,
       ExprSubstitutionMap analyticSmap) {
     super(id, input.getTupleIds(), "ANALYTIC");
     // we assume to get our input from a SortNode if there are partition
@@ -80,12 +82,13 @@ public class AnalyticEvalNode extends PlanNode {
         (partitionExprs.isEmpty() && orderingExprs.isEmpty())
           || input.getTupleIds().size() == 1);
     // we're materializing the input row augmented with the analytic tuple
-    tupleIds_.add(analyticTupleDesc.getId());
+    tupleIds_.add(outputTupleDesc.getId());
     analyticFnCalls_ = analyticFnCalls;
     partitionExprs_ = partitionExprs;
     orderingExprs_ = orderingExprs;
     analyticWindow_ = analyticWindow;
-    analyticTupleDesc_ = analyticTupleDesc;
+    intermediateTupleDesc_ = intermediateTupleDesc;
+    outputTupleDesc_ = outputTupleDesc;
     analyticSmap_ = analyticSmap;
     children_.add(input);
     nullableTupleIds_.addAll(input.getNullableTupleIds());
@@ -166,7 +169,8 @@ public class AnalyticEvalNode extends PlanNode {
         .add("subtitutedPartitionExprs", Expr.debugString(substitutedPartitionExprs_))
         .add("orderingExprs", Expr.debugString(orderingExprs_))
         .add("window", analyticWindow_)
-        .add("analyticTid", analyticTupleDesc_.getId())
+        .add("intermediateTid", intermediateTupleDesc_.getId())
+        .add("outputTid", outputTupleDesc_.getId())
         .add("bufferedTid",
           bufferedTupleDesc_ != null ? bufferedTupleDesc_.getId() : "null")
         .add("partitionByLt",
@@ -214,7 +218,8 @@ public class AnalyticEvalNode extends PlanNode {
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.ANALYTIC_EVAL_NODE;
     msg.analytic_node = new TAnalyticNode();
-    msg.analytic_node.setTuple_id(analyticTupleDesc_.getId().asInt());
+    msg.analytic_node.setIntermediate_tuple_id(intermediateTupleDesc_.getId().asInt());
+    msg.analytic_node.setOutput_tuple_id(outputTupleDesc_.getId().asInt());
     msg.analytic_node.setPartition_exprs(Expr.treesToThrift(substitutedPartitionExprs_));
     msg.analytic_node.setOrder_by_exprs(Expr.treesToThrift(orderingExprs_));
     msg.analytic_node.setAnalytic_functions(Expr.treesToThrift(analyticFnCalls_));

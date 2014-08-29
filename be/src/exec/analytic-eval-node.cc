@@ -26,13 +26,17 @@ namespace impala {
 AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
-    output_tuple_desc_(row_desc().tuple_descriptors()[tnode.analytic_node.tuple_id]),
+    output_tuple_desc_(
+        row_desc().tuple_descriptors()[tnode.analytic_node.output_tuple_id]),
     current_tuple_(NULL),
     num_owned_output_tuples_(0),
     prev_input_row_(NULL),
     input_row_idx_(0),
     input_eos_(false),
     evaluation_timer_(NULL) {
+  // TODO: Properly handle different intermediate and output tuples.
+  DCHECK_EQ(tnode.analytic_node.output_tuple_id,
+      tnode.analytic_node.intermediate_tuple_id);
 }
 
 AnalyticEvalNode::~AnalyticEvalNode() {

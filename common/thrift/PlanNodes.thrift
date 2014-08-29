@@ -271,19 +271,25 @@ struct TAnalyticNode {
   // Window specification
   4: optional TAnalyticWindow window
 
-  // Analytic function results are materialized into this tuple.
-  5: required Types.TTupleId tuple_id
+  // Tuple used for intermediate results of analytic function evaluations
+  // (with slots of analytic intermediate types)
+  5: required Types.TTupleId intermediate_tuple_id
+
+  // Tupld used for the analytic function output (with slots of analytic output types)
+  // Equal to intermediate_tuple_id if intermediate type == output type for all
+  // analytic functions.
+  6: required Types.TTupleId output_tuple_id
 
   // id of the buffered tuple (identical to the input tuple, which is assumed
   // to come from a single SortNode); not set if both partition_exprs and
   // order_by_exprs are empty
-  6: optional Types.TTupleId buffered_tuple_id
+  7: optional Types.TTupleId buffered_tuple_id
 
   // child.row_tuples[0] '<' buffered_tuple_id for partition_exprs
-  7: optional Exprs.TExpr partition_by_lt
+  8: optional Exprs.TExpr partition_by_lt
 
   // child.row_tuples[0] '<' buffered_tuple_id for order_by_exprs
-  8: optional Exprs.TExpr order_by_lt
+  9: optional Exprs.TExpr order_by_lt
 }
 
 struct TUnionNode {

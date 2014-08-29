@@ -95,7 +95,8 @@ public class AnalyticPlanner {
 
     root = new AnalyticEvalNode(idGenerator_.getNextId(), root,
         Lists.newArrayList((Expr) e.getFnCall()), partitionExprs, orderByExprs,
-        e.getWindow(), analyticInfo.getTupleDesc(), analyticInfo.getSmap());
+        e.getWindow(), analyticInfo.getIntermediateTupleDesc(),
+        analyticInfo.getOutputTupleDesc(), analyticInfo.getSmap());
     root.init(analyzer_);
     if (sortNode != null) sortNode.setAnalyticParent((AnalyticEvalNode) root);
     return root;

@@ -20,7 +20,6 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.Type;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -30,14 +29,10 @@ import com.google.common.collect.Lists;
  * Encapsulates the analytic functions found in a single select block plus
  * the corresponding analytic result tuple and its substitution map.
  */
-public class AnalyticInfo {
+public class AnalyticInfo extends AggregateExprsTupleInfo {
   private final static Logger LOG = LoggerFactory.getLogger(AnalyticInfo.class);
 
   private final ArrayList<AnalyticExpr> analyticExprs_;
-
-  // The tuple into which the output of analyticExprs_ is (logically)
-  // materialized; contains one slot for every element of analyticExprs_
-  private TupleDescriptor analyticTupleDesc_;
 
   // map from analyticExprs_ to their corresponding analytic tuple slotrefs
   private final ExprSubstitutionMap analyticTupleSmap_ = new ExprSubstitutionMap();
@@ -45,41 +40,52 @@ public class AnalyticInfo {
   // indices into analyticExprs_ for those exprs/slots that need to be materialized
   private final ArrayList<Integer> materializedSlots_ = Lists.newArrayList();
 
-  // C'tor creates copies of groupingExprs and aggExprs.
-  // Does *not* set aggTupleDesc, aggTupleSMap, mergeAggInfo, secondPhaseDistinctAggInfo.
-  private AnalyticInfo(ArrayList<AnalyticExpr> analyticExprs) {
+  private AnalyticInfo(ArrayList<AnalyticExpr> analyticExprs,
+      ArrayList<FunctionCallExpr> analyticFnCalls) {
+    super(Lists.<Expr>newArrayList(), analyticFnCalls);
     analyticExprs_ = Expr.cloneList(analyticExprs);
   }
 
   public ArrayList<AnalyticExpr> getAnalyticExprs() { return analyticExprs_; }
   public ExprSubstitutionMap getSmap() { return analyticTupleSmap_; }
-  public TupleId getTupleId() { return analyticTupleDesc_.getId(); }
-  public TupleDescriptor getTupleDesc() { return analyticTupleDesc_; }
 
   /**
-   * Creates complete AnalyticInfo for analyticExprs, including tuple descriptor and
-   * smap.
+   * Creates complete AnalyticInfo for analyticExprs, including tuple descriptors and
+   * smaps.
    */
   static public AnalyticInfo create(
       ArrayList<AnalyticExpr> analyticExprs, Analyzer analyzer) {
     Preconditions.checkState(analyticExprs != null && !analyticExprs.isEmpty());
     Expr.removeDuplicates(analyticExprs);
-    AnalyticInfo result = new AnalyticInfo(analyticExprs);
-    result.createTupleDesc(analyzer);
+    ArrayList<FunctionCallExpr> analyticFnCalls = Lists.newArrayList();
+    // Extract the analytic function calls for each analytic expr.
+    for (AnalyticExpr analyticExpr: analyticExprs) {
+      Expr analyticFnCall = analyticExpr.getChild(0);
+      Preconditions.checkState(analyticFnCall instanceof FunctionCallExpr);
+      analyticFnCalls.add((FunctionCallExpr) analyticFnCall);
+    }
+    AnalyticInfo result = new AnalyticInfo(analyticExprs, analyticFnCalls);
+    result.createTupleDescs(analyzer);
+    // Populate analyticTupleSmap_
+    Preconditions.checkState(analyticExprs.size() ==
+        result.outputTupleDesc_.getSlots().size());
+    for (int i = 0; i < analyticExprs.size(); ++i) {
+      result.analyticTupleSmap_.put(result.analyticExprs_.get(i),
+          new SlotRef(result.outputTupleDesc_.getSlots().get(i)));
+    }
     LOG.info("analytic info:\n" + result.debugString());
     return result;
   }
-
 
   /**
    * Append ids of all slots that are being referenced in the process
    * of performing the analytic computation described by this AnalyticInfo.
    */
   public void getRefdSlots(List<SlotId> ids) {
-    Preconditions.checkState(analyticTupleDesc_ != null);
+    Preconditions.checkState(intermediateTupleDesc_ != null);
     Expr.getIds(analyticExprs_, null, ids);
-    // The backend assumes that the entire analyticTupleDesc is materialized
-    for (SlotDescriptor slotDesc: analyticTupleDesc_.getSlots()) {
+    // The backend assumes that the entire intermediateTupleDesc is materialized
+    for (SlotDescriptor slotDesc: intermediateTupleDesc_.getSlots()) {
       ids.add(slotDesc.getId());
     }
   }
@@ -124,31 +130,13 @@ public class AnalyticInfo {
   }
    */
 
-  /**
-   * Creates descriptor for output tuple for analytic exprs.
-   */
-  public void createTupleDesc(Analyzer analyzer) {
-    analyticTupleDesc_ = analyzer.getDescTbl().createTupleDescriptor();
-    for (Expr expr: analyticExprs_) {
-      SlotDescriptor outputSlotDesc =
-          analyzer.addSlotDescriptor(analyticTupleDesc_);
-      outputSlotDesc.setLabel(expr.toSql());
-      Preconditions.checkState(expr.getType().isValid());
-      outputSlotDesc.setType(expr.getType());
-      outputSlotDesc.setStats(ColumnStats.fromExpr(expr));
-      LOG.info(outputSlotDesc.debugString());
-      analyticTupleSmap_.put(expr.clone(), new SlotRef(outputSlotDesc));
-    }
-    LOG.info("analytictuple=" + analyticTupleDesc_.debugString());
-    LOG.info("analytictuplesmap=" + analyticTupleSmap_.debugString());
-  }
-
   public void materializeRequiredSlots(Analyzer analyzer, ExprSubstitutionMap smap) {
     materializedSlots_.clear();
     List<Expr> exprs = Lists.newArrayList();
     for (int i = 0; i < analyticExprs_.size(); ++i) {
-      SlotDescriptor slotDesc = analyticTupleDesc_.getSlots().get(i);
-      if (!slotDesc.isMaterialized()) continue;
+      SlotDescriptor outputSlotDesc = outputTupleDesc_.getSlots().get(i);
+      if (!outputSlotDesc.isMaterialized()) continue;
+      intermediateTupleDesc_.getSlots().get(i).setIsMaterialized(true);
       exprs.add(analyticExprs_.get(i));
       materializedSlots_.add(i);
     }
@@ -163,7 +151,7 @@ public class AnalyticInfo {
    * analytic tuple.
    */
   public void checkConsistency() {
-    ArrayList<SlotDescriptor> slots = analyticTupleDesc_.getSlots();
+    ArrayList<SlotDescriptor> slots = intermediateTupleDesc_.getSlots();
 
     // Check materialized slots.
     int numMaterializedSlots = 0;
@@ -190,8 +178,12 @@ public class AnalyticInfo {
     StringBuilder out = new StringBuilder();
     out.append(Objects.toStringHelper(this)
         .add("analytic_exprs", Expr.debugString(analyticExprs_))
-        .add("analytic_tuple",
-          (analyticTupleDesc_ == null ? "null" : analyticTupleDesc_.debugString()))
+        .add("intermediate_tuple",
+            (intermediateTupleDesc_ == null ? "null" :
+                intermediateTupleDesc_.debugString()))
+        .add("output_tuple",
+            (outputTupleDesc_ == null ? "null" :
+                outputTupleDesc_.debugString()))
         .add("smap", analyticTupleSmap_.debugString())
         .toString());
     return out.toString();
