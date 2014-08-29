@@ -854,3 +854,52 @@ where a.int_col <
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 size=814.73KB
 ====
+# Distinct in the outer select block
+select distinct id, bool_col
+from functional.alltypesagg g
+where 100 < (select count(*) from functional.alltypes where bool_col = false and id < 5)
+and bool_col = false
+---- PLAN
+04:AGGREGATE [FINALIZE]
+|  group by: id, bool_col
+|
+03:CROSS JOIN [BROADCAST]
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |  having: 100 < count(*)
+|  |
+|  01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 size=478.45KB
+|     predicates: bool_col = FALSE, id < 5
+|
+00:SCAN HDFS [functional.alltypesagg g]
+   partitions=11/11 size=814.73KB
+   predicates: bool_col = FALSE
+====
+# Distinct with an unqualified star in the outer select block
+select distinct *
+from functional.alltypesagg g
+where 100 > (select count(distinct id) from functional.alltypestiny where int_col < 5)
+and g.bigint_col < 1000 and g.bigint_col = true
+---- PLAN
+05:AGGREGATE [FINALIZE]
+|  group by: g.id, g.bool_col, g.tinyint_col, g.smallint_col, g.int_col, g.bigint_col, g.float_col, g.double_col, g.date_string_col, g.string_col, g.timestamp_col, g.year, g.month, g.day
+|
+04:CROSS JOIN [BROADCAST]
+|
+|--03:AGGREGATE [FINALIZE]
+|  |  output: count(id)
+|  |  having: 100 > count(id)
+|  |
+|  02:AGGREGATE
+|  |  group by: id
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=460B
+|     predicates: int_col < 5
+|
+00:SCAN HDFS [functional.alltypesagg g]
+   partitions=11/11 size=814.73KB
+   predicates: g.bigint_col < 1000, g.bigint_col = TRUE
+====

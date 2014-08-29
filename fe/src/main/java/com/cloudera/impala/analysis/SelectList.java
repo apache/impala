@@ -39,6 +39,13 @@ public class SelectList {
     this.items_.addAll(items);
   }
 
+  public SelectList(List<SelectListItem> items, boolean isDistinct,
+      boolean isStraightJoin) {
+    isDistinct_ = isDistinct;
+    isStraightJoin_ = isStraightJoin;
+    items_.addAll(items);
+  }
+
   public ArrayList<SelectListItem> getItems() { return items_; }
   public boolean isDistinct() { return isDistinct_; }
   public void setIsDistinct(boolean value) { isDistinct_ = value; }

@@ -496,6 +496,10 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
           "int_col %s (select max(timestamp_col) from functional.alltypessmall)", cmpOp),
           String.format("operands of type INT and TIMESTAMP are not comparable: " +
           "int_col %s (SELECT max(timestamp_col) FROM functional.alltypessmall)", cmpOp));
+      // Distinct in the outer select block
+      AnalyzesOk(String.format("select distinct id from functional.alltypes a " +
+          "where 100 %s (select count(*) from functional.alltypesagg g where " +
+          "a.int_col %s g.int_col) and a.bool_col = false", cmpOp, cmpOp));
     }
 
     // Subquery returns multiple rows
@@ -672,5 +676,11 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "(select count(*) from functional.alltypesagg)",
         "LIMIT expression must be a constant expression: " +
         "(SELECT count(*) FROM functional.alltypesagg)");
+
+    // NOT predicates in conjunction with subqueries
+    AnalyzesOk("select * from functional.alltypes t where t.id not in " +
+        "(select id from functional.alltypesagg g where g.bool_col = false) " +
+        "and t.string_col not like '%1%' and not (t.int_col < 5) " +
+        "and not (t.int_col is null) and not (t.int_col between 5 and 10)");
   }
 }

@@ -431,7 +431,9 @@ public class StmtRewriter {
       }
     }
     Preconditions.checkState(!newItems.isEmpty());
-    stmt.selectList_ = new SelectList(newItems);
+    boolean isDistinct = stmt.selectList_.isDistinct();
+    boolean isStraightJoin = stmt.selectList_.isStraightJoin();
+    stmt.selectList_ = new SelectList(newItems, isDistinct, isStraightJoin);
   }
 
   /**
@@ -543,7 +545,10 @@ public class StmtRewriter {
     }
 
     // Update the subquery's select list.
-    stmt.selectList_ = new SelectList(items);
+    boolean isStraightJoin = stmt.selectList_.isStraightJoin();
+    boolean isDistinct = stmt.selectList_.isDistinct();
+    Preconditions.checkState(!isDistinct);
+    stmt.selectList_ = new SelectList(items, isDistinct, isStraightJoin);
     // Update subquery's GROUP BY clause
     if (groupByExprs != null && !groupByExprs.isEmpty()) {
       if (stmt.hasGroupByClause()) {

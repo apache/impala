@@ -273,3 +273,26 @@ where d3 < (select max(double_col) from functional.alltypestiny)
 ---- TYPES
 DECIMAL, DECIMAL, DECIMAL
 ====
+---- QUERY
+# Distinct in the outer select block
+select distinct bool_col
+from functional.alltypestiny t
+where 1 < (select count(*) from functional.alltypessmall)
+---- RESULTS
+false
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+# Distinct with an unqualified star in the outer select block
+select distinct *
+from functional.alltypestiny t
+where 1 < (select avg(distinct id) from functional.alltypessmall)
+and id < 2
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00,2009,1
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+====
