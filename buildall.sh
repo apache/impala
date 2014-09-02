@@ -56,8 +56,6 @@ do
       ;;
     -testdata)
       TESTDATA_ACTION=1
-      FORMAT_CLUSTER=1
-      FORMAT_METASTORE=1
       ;;
     -skiptests)
       TESTS_ACTION=0
@@ -135,8 +133,9 @@ Examples of common tasks:
   # Build, load a snapshot file, run tests
   ./buildall.sh -snapshot_file <file>
 
-  # Build, generate and load test data without formatting the mini-cluster (reuses
-  # existing data in HDFS if it exists). Can be faster than loading from a snapshot.
+  # Build, generate, and incrementally load test data without formatting the mini-cluster
+  # (reuses existing data in HDFS if it exists). Can be faster than loading from a
+  # snapshot.
   ./buildall.sh -testdata
 
   # Build, format mini-cluster and metastore, load all test data, run tests
