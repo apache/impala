@@ -105,7 +105,8 @@ AggFnEvaluator::~AggFnEvaluator() {
 
 Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
       const SlotDescriptor* intermediate_slot_desc,
-      const SlotDescriptor* output_slot_desc) {
+      const SlotDescriptor* output_slot_desc,
+      MemPool* agg_fn_pool, FunctionContext** agg_fn_ctx) {
   DCHECK(intermediate_slot_desc != NULL);
   DCHECK(intermediate_slot_desc_ == NULL);
   intermediate_slot_desc_ = intermediate_slot_desc;
@@ -156,8 +157,6 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
     finalize_fn_ = NULL;
   }
 
-  ctx_pool_.reset(new MemPool(state->udf_mem_tracker()));
-
   vector<FunctionContext::TypeDesc> arg_types;
   for (int i = 0; i < input_expr_ctxs_.size(); ++i) {
     arg_types.push_back(
@@ -168,12 +167,12 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
       AnyValUtil::ColumnTypeToTypeDesc(intermediate_slot_desc_->type());
   FunctionContext::TypeDesc output_type =
        AnyValUtil::ColumnTypeToTypeDesc(output_slot_desc_->type());
-  ctx_.reset(FunctionContextImpl::CreateContext(
-      state, ctx_pool_.get(), intermediate_type, output_type, arg_types));
+  *agg_fn_ctx = FunctionContextImpl::CreateContext(
+      state, agg_fn_pool, intermediate_type, output_type, arg_types);
   return Status::OK;
 }
 
-Status AggFnEvaluator::Open(RuntimeState* state) {
+Status AggFnEvaluator::Open(RuntimeState* state, FunctionContext* agg_fn_ctx) {
   RETURN_IF_ERROR(Expr::Open(input_expr_ctxs_, state));
   // Now that we have opened all our input exprs, it is safe to evaluate any constant
   // values for the UDA's FunctionContext (we cannot evaluate exprs before calling Open()
@@ -182,23 +181,12 @@ Status AggFnEvaluator::Open(RuntimeState* state) {
   for (int i = 0; i < input_expr_ctxs_.size(); ++i) {
     constant_args[i] = input_expr_ctxs_[i]->root()->GetConstVal(input_expr_ctxs_[i]);
   }
-  ctx_->impl()->SetConstantArgs(constant_args);
+  agg_fn_ctx->impl()->SetConstantArgs(constant_args);
   return Status::OK;
 }
 
 void AggFnEvaluator::Close(RuntimeState* state) {
   Expr::Close(input_expr_ctxs_, state);
-  if (ctx_.get() != NULL) {
-    bool previous_error = ctx_->has_error();
-    ctx_->impl()->Close();
-    if (!previous_error && ctx_->has_error()) {
-      // TODO: revisit this (see comment in NativeUdfExpr)
-      stringstream ss;
-      ss << "UDA ERROR: " << ctx_->error_msg();
-      state->LogError(ss.str());
-    }
-  }
-  if (ctx_pool_.get() != NULL) ctx_pool_->FreeAll();
 
   if (cache_entry_ != NULL) {
     LibCache::instance()->DecrementUseCount(cache_entry_);
@@ -279,13 +267,14 @@ inline void AggFnEvaluator::SetDstSlot(const AnyVal* src,
 }
 
 // This function would be replaced in codegen.
-void AggFnEvaluator::Init(Tuple* dst) {
+void AggFnEvaluator::Init(FunctionContext* agg_fn_ctx, Tuple* dst) {
   DCHECK(init_fn_ != NULL);
-  reinterpret_cast<InitFn>(init_fn_)(ctx_.get(), staging_intermediate_val_);
+  reinterpret_cast<InitFn>(init_fn_)(agg_fn_ctx, staging_intermediate_val_);
   SetDstSlot(staging_intermediate_val_, intermediate_slot_desc_, dst);
 }
 
-void AggFnEvaluator::UpdateOrMerge(TupleRow* row, Tuple* dst, void* fn) {
+void AggFnEvaluator::UpdateOrMerge(
+    FunctionContext* agg_fn_ctx, TupleRow* row, Tuple* dst, void* fn) {
   if (fn == NULL) return;
 
   bool dst_null = dst->IsNull(intermediate_slot_desc_->null_indicator_offset());
@@ -305,47 +294,47 @@ void AggFnEvaluator::UpdateOrMerge(TupleRow* row, Tuple* dst, void* fn) {
   // debugging.
   switch (input_expr_ctxs_.size()) {
     case 0:
-      reinterpret_cast<UpdateFn0>(fn)(ctx_.get(), staging_intermediate_val_);
+      reinterpret_cast<UpdateFn0>(fn)(agg_fn_ctx, staging_intermediate_val_);
       break;
     case 1:
-      reinterpret_cast<UpdateFn1>(fn)(ctx_.get(),
+      reinterpret_cast<UpdateFn1>(fn)(agg_fn_ctx,
           *staging_input_vals_[0], staging_intermediate_val_);
       break;
     case 2:
-      reinterpret_cast<UpdateFn2>(fn)(ctx_.get(),
+      reinterpret_cast<UpdateFn2>(fn)(agg_fn_ctx,
           *staging_input_vals_[0], *staging_input_vals_[1], staging_intermediate_val_);
       break;
     case 3:
-      reinterpret_cast<UpdateFn3>(fn)(ctx_.get(),
+      reinterpret_cast<UpdateFn3>(fn)(agg_fn_ctx,
           *staging_input_vals_[0], *staging_input_vals_[1],
           *staging_input_vals_[2], staging_intermediate_val_);
       break;
     case 4:
-      reinterpret_cast<UpdateFn4>(fn)(ctx_.get(),
+      reinterpret_cast<UpdateFn4>(fn)(agg_fn_ctx,
           *staging_input_vals_[0], *staging_input_vals_[1],
           *staging_input_vals_[2], *staging_input_vals_[3], staging_intermediate_val_);
       break;
     case 5:
-      reinterpret_cast<UpdateFn5>(fn)(ctx_.get(),
+      reinterpret_cast<UpdateFn5>(fn)(agg_fn_ctx,
           *staging_input_vals_[0], *staging_input_vals_[1],
           *staging_input_vals_[2], *staging_input_vals_[3],
           *staging_input_vals_[4], staging_intermediate_val_);
       break;
     case 6:
-      reinterpret_cast<UpdateFn6>(fn)(ctx_.get(),
+      reinterpret_cast<UpdateFn6>(fn)(agg_fn_ctx,
           *staging_input_vals_[0], *staging_input_vals_[1],
           *staging_input_vals_[2], *staging_input_vals_[3],
           *staging_input_vals_[4], *staging_input_vals_[5], staging_intermediate_val_);
       break;
     case 7:
-      reinterpret_cast<UpdateFn7>(fn)(ctx_.get(),
+      reinterpret_cast<UpdateFn7>(fn)(agg_fn_ctx,
           *staging_input_vals_[0], *staging_input_vals_[1],
           *staging_input_vals_[2], *staging_input_vals_[3],
           *staging_input_vals_[4], *staging_input_vals_[5],
           *staging_input_vals_[6], staging_intermediate_val_);
       break;
     case 8:
-      reinterpret_cast<UpdateFn8>(fn)(ctx_.get(),
+      reinterpret_cast<UpdateFn8>(fn)(agg_fn_ctx,
           *staging_input_vals_[0], *staging_input_vals_[1],
           *staging_input_vals_[2], *staging_input_vals_[3],
           *staging_input_vals_[4], *staging_input_vals_[5],
@@ -358,16 +347,16 @@ void AggFnEvaluator::UpdateOrMerge(TupleRow* row, Tuple* dst, void* fn) {
   SetDstSlot(staging_intermediate_val_, intermediate_slot_desc_, dst);
 }
 
-void AggFnEvaluator::Update(TupleRow* row, Tuple* dst) {
-  return UpdateOrMerge(row, dst, update_fn_);
+void AggFnEvaluator::Update(FunctionContext* agg_fn_ctx, TupleRow* row, Tuple* dst) {
+  return UpdateOrMerge(agg_fn_ctx, row, dst, update_fn_);
 }
 
-void AggFnEvaluator::Merge(TupleRow* row, Tuple* dst) {
-  return UpdateOrMerge(row, dst, merge_fn_);
+void AggFnEvaluator::Merge(FunctionContext* agg_fn_ctx, TupleRow* row, Tuple* dst) {
+  return UpdateOrMerge(agg_fn_ctx, row, dst, merge_fn_);
 }
 
-void AggFnEvaluator::SerializeOrFinalize(Tuple* src, const SlotDescriptor* dst_slot_desc,
-    Tuple* dst, void* fn) {
+void AggFnEvaluator::SerializeOrFinalize(FunctionContext* agg_fn_ctx, Tuple* src,
+    const SlotDescriptor* dst_slot_desc, Tuple* dst, void* fn) {
   // No fn was given and the src and dst are identical. Nothing to be done.
   if (fn == NULL && src == dst) return;
   // src != dst means we are performing a Finalize(), so even if fn == null we
@@ -390,62 +379,62 @@ void AggFnEvaluator::SerializeOrFinalize(Tuple* src, const SlotDescriptor* dst_s
   switch (dst_slot_desc->type().type) {
     case TYPE_BOOLEAN: {
       typedef BooleanVal(*Fn)(FunctionContext*, AnyVal*);
-      BooleanVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_intermediate_val_);
+      BooleanVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
       SetDstSlot(&v, dst_slot_desc, dst);
       break;
     }
     case TYPE_TINYINT: {
       typedef TinyIntVal(*Fn)(FunctionContext*, AnyVal*);
-      TinyIntVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_intermediate_val_);
+      TinyIntVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
       SetDstSlot(&v, dst_slot_desc, dst);
       break;
     }
     case TYPE_SMALLINT: {
       typedef SmallIntVal(*Fn)(FunctionContext*, AnyVal*);
-      SmallIntVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_intermediate_val_);
+      SmallIntVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
       SetDstSlot(&v, dst_slot_desc, dst);
       break;
     }
     case TYPE_INT: {
       typedef IntVal(*Fn)(FunctionContext*, AnyVal*);
-      IntVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_intermediate_val_);
+      IntVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
       SetDstSlot(&v, dst_slot_desc, dst);
       break;
     }
     case TYPE_BIGINT: {
       typedef BigIntVal(*Fn)(FunctionContext*, AnyVal*);
-      BigIntVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_intermediate_val_);
+      BigIntVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
       SetDstSlot(&v, dst_slot_desc, dst);
       break;
     }
     case TYPE_FLOAT: {
       typedef FloatVal(*Fn)(FunctionContext*, AnyVal*);
-      FloatVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_intermediate_val_);
+      FloatVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
       SetDstSlot(&v, dst_slot_desc, dst);
       break;
     }
     case TYPE_DOUBLE: {
       typedef DoubleVal(*Fn)(FunctionContext*, AnyVal*);
-      DoubleVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_intermediate_val_);
+      DoubleVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
       SetDstSlot(&v, dst_slot_desc, dst);
       break;
     }
     case TYPE_STRING:
     case TYPE_VARCHAR: {
       typedef StringVal(*Fn)(FunctionContext*, AnyVal*);
-      StringVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_intermediate_val_);
+      StringVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
       SetDstSlot(&v, dst_slot_desc, dst);
       break;
     }
     case TYPE_DECIMAL: {
       typedef DecimalVal(*Fn)(FunctionContext*, AnyVal*);
-      DecimalVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_intermediate_val_);
+      DecimalVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
       SetDstSlot(&v, dst_slot_desc, dst);
       break;
     }
     case TYPE_TIMESTAMP: {
       typedef TimestampVal(*Fn)(FunctionContext*, AnyVal*);
-      TimestampVal v = reinterpret_cast<Fn>(fn)(ctx_.get(), staging_intermediate_val_);
+      TimestampVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
       SetDstSlot(&v, dst_slot_desc, dst);
       break;
     }
@@ -454,12 +443,12 @@ void AggFnEvaluator::SerializeOrFinalize(Tuple* src, const SlotDescriptor* dst_s
   }
 }
 
-void AggFnEvaluator::Serialize(Tuple* tuple) {
-  SerializeOrFinalize(tuple, intermediate_slot_desc_, tuple, serialize_fn_);
+void AggFnEvaluator::Serialize(FunctionContext* agg_fn_ctx, Tuple* tuple) {
+  SerializeOrFinalize(agg_fn_ctx, tuple, intermediate_slot_desc_, tuple, serialize_fn_);
 }
 
-void AggFnEvaluator::Finalize(Tuple* src, Tuple* dst) {
-  SerializeOrFinalize(src, output_slot_desc_, dst, finalize_fn_);
+void AggFnEvaluator::Finalize(FunctionContext* agg_fn_ctx, Tuple* src, Tuple* dst) {
+  SerializeOrFinalize(agg_fn_ctx, src, output_slot_desc_, dst, finalize_fn_);
 }
 
 string AggFnEvaluator::DebugString(const vector<AggFnEvaluator*>& exprs) {
@@ -470,6 +459,42 @@ string AggFnEvaluator::DebugString(const vector<AggFnEvaluator*>& exprs) {
   }
   out << "]";
   return out.str();
+}
+
+void AggFnEvaluator::Init(const vector<AggFnEvaluator*>& evaluators,
+      const vector<FunctionContext*>& fn_ctxs, Tuple* dst) {
+  DCHECK_EQ(evaluators.size(), fn_ctxs.size());
+  for (int i = 0; i < evaluators.size(); ++i) {
+    evaluators[i]->Init(fn_ctxs[i], dst);
+  }
+}
+void AggFnEvaluator::Update(const vector<AggFnEvaluator*>& evaluators,
+      const vector<FunctionContext*>& fn_ctxs, TupleRow* src, Tuple* dst) {
+  DCHECK_EQ(evaluators.size(), fn_ctxs.size());
+  for (int i = 0; i < evaluators.size(); ++i) {
+    evaluators[i]->Update(fn_ctxs[i], src, dst);
+  }
+}
+void AggFnEvaluator::Merge(const vector<AggFnEvaluator*>& evaluators,
+      const vector<FunctionContext*>& fn_ctxs, TupleRow* src, Tuple* dst) {
+  DCHECK_EQ(evaluators.size(), fn_ctxs.size());
+  for (int i = 0; i < evaluators.size(); ++i) {
+    evaluators[i]->Merge(fn_ctxs[i], src, dst);
+  }
+}
+void AggFnEvaluator::Serialize(const vector<AggFnEvaluator*>& evaluators,
+      const vector<FunctionContext*>& fn_ctxs, Tuple* dst) {
+  DCHECK_EQ(evaluators.size(), fn_ctxs.size());
+  for (int i = 0; i < evaluators.size(); ++i) {
+    evaluators[i]->Serialize(fn_ctxs[i], dst);
+  }
+}
+void AggFnEvaluator::Finalize(const vector<AggFnEvaluator*>& evaluators,
+      const vector<FunctionContext*>& fn_ctxs, Tuple* src, Tuple* dst) {
+  DCHECK_EQ(evaluators.size(), fn_ctxs.size());
+  for (int i = 0; i < evaluators.size(); ++i) {
+    evaluators[i]->Finalize(fn_ctxs[i], src, dst);
+  }
 }
 
 string AggFnEvaluator::DebugString() const {

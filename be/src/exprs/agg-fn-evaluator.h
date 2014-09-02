@@ -28,6 +28,8 @@
 #include "gen-cpp/PlanNodes_types.h"
 #include "gen-cpp/Types_types.h"
 
+using namespace impala_udf;
+
 namespace impala {
 
 class AggregationNode;
@@ -46,10 +48,14 @@ class TExprNode;
 // This class evaluates aggregate functions. Aggregate functions can either be
 // builtins or external UDAs. For both of types types, they can either use codegen
 // or not.
+//
 // This class provides an interface that's 1:1 with the UDA interface and serves
 // as glue code between the TupleRow/Tuple signature used by the AggregationNode
 // and the AnyVal signature of the UDA interface. It handles evaluating input
 // slots from TupleRows and aggregating the result to the result tuple.
+//
+// This class is not threadsafe. However, it can be used for multiple interleaved
+// evaluations of the aggregation function by using multiple FunctionContexts.
 class AggFnEvaluator {
  public:
   // TODO: The aggregation node has custom codegen paths for a few of the builtins.
@@ -76,18 +82,24 @@ class AggFnEvaluator {
   // results of Update()/Merge()/Serialize().
   // 'output_slot_desc' is the slot into which this evaluator should write the results
   // of Finalize()
+  // 'agg_fn_ctx' will be initialized for the agg function using 'agg_fn_pool'. Caller
+  // is responsible for closing and deleting 'agg_fn_ctx'.
   Status Prepare(RuntimeState* state, const RowDescriptor& desc,
       const SlotDescriptor* intermediate_slot_desc,
-      const SlotDescriptor* output_slot_desc);
+      const SlotDescriptor* output_slot_desc,
+      MemPool* agg_fn_pool, FunctionContext** agg_fn_ctx);
 
   ~AggFnEvaluator();
 
-  Status Open(RuntimeState* state);
+  // 'agg_fn_ctx' may be cloned after calling Open(). Note that closing all
+  // FunctionContexts, including the original one returned by Prepare(), is the
+  // responsibility of the caller.
+  Status Open(RuntimeState* state, FunctionContext* agg_fn_ctx);
+
   void Close(RuntimeState* state);
 
   bool is_merge() { return is_merge_; }
   AggregationOp agg_op() const { return agg_op_; }
-  impala_udf::FunctionContext* ctx() { return ctx_.get(); }
   const std::vector<ExprContext*>& input_expr_ctxs() const { return input_expr_ctxs_; }
   bool is_count_star() const {
     return agg_op_ == COUNT && input_expr_ctxs_.empty();
@@ -98,11 +110,23 @@ class AggFnEvaluator {
   std::string DebugString() const;
 
   // Functions for different phases of the aggregation.
-  void Init(Tuple* dst);
-  void Update(TupleRow* src, Tuple* dst);
-  void Merge(TupleRow* src, Tuple* dst);
-  void Serialize(Tuple* dst);
-  void Finalize(Tuple* src, Tuple* dst);
+  void Init(FunctionContext* agg_fn_ctx, Tuple* dst);
+  void Update(FunctionContext* agg_fn_ctx, TupleRow* src, Tuple* dst);
+  void Merge(FunctionContext* agg_fn_ctx, TupleRow* src, Tuple* dst);
+  void Serialize(FunctionContext* agg_fn_ctx, Tuple* dst);
+  void Finalize(FunctionContext* agg_fn_ctx, Tuple* src, Tuple* dst);
+
+  // Helper functions for calling the above functions on many evaluators.
+  static void Init(const std::vector<AggFnEvaluator*>& evaluators,
+      const std::vector<FunctionContext*>& fn_ctxs, Tuple* dst);
+  static void Update(const std::vector<AggFnEvaluator*>& evaluators,
+      const std::vector<FunctionContext*>& fn_ctxs, TupleRow* src, Tuple* dst);
+  static void Merge(const std::vector<AggFnEvaluator*>& evaluators,
+      const std::vector<FunctionContext*>& fn_ctxs, TupleRow* src, Tuple* dst);
+  static void Serialize(const std::vector<AggFnEvaluator*>& evaluators,
+      const std::vector<FunctionContext*>& fn_ctxs, Tuple* dst);
+  static void Finalize(const std::vector<AggFnEvaluator*>& evaluators,
+      const std::vector<FunctionContext*>& fn_ctxs, Tuple* src, Tuple* dst);
 
   // TODO: implement codegen path. These functions would return IR functions with
   // the same signature as the interpreted ones above.
@@ -126,13 +150,6 @@ class AggFnEvaluator {
   // Slot into which Finalize() results are written. Not owned. Identical to
   // intermediate_slot_desc_ if this agg fn has the same intermediate and output type.
   const SlotDescriptor* output_slot_desc_;
-
-  // Context to run all steps of this aggregation including Init(), Update()/Merge(),
-  // Serialize()/Finalize().
-  boost::scoped_ptr<impala_udf::FunctionContext> ctx_;
-
-  // Pool used by ctx_ for allocations.
-  boost::scoped_ptr<MemPool> ctx_pool_;
 
   // Created to a subclass of AnyVal for type(). We use this to convert values
   // from the UDA interface to the Expr interface.
@@ -160,14 +177,14 @@ class AggFnEvaluator {
 
   // Sets up the arguments to call fn. This converts from the agg-expr signature,
   // taking TupleRow to the UDA signature taking AnvVals.
-  void UpdateOrMerge(TupleRow* row, Tuple* dst, void* fn);
+  void UpdateOrMerge(FunctionContext* agg_fn_ctx, TupleRow* row, Tuple* dst, void* fn);
 
   // Sets up the arguments to call fn. This converts from the agg-expr signature,
   // taking TupleRow to the UDA signature taking AnvVals. Writes the serialize/finalize
   // result to the given destination slot/tuple. The fn can be NULL to indicate the src
   // value should simply be written into the destination.
-  void SerializeOrFinalize(Tuple* src, const SlotDescriptor* dst_slot_desc, Tuple* dst,
-      void* fn);
+  void SerializeOrFinalize(FunctionContext* agg_fn_ctx, Tuple* src,
+      const SlotDescriptor* dst_slot_desc, Tuple* dst, void* fn);
 
   // Writes the result in src into dst pointed to by dst_slot_desc
   void SetDstSlot(const impala_udf::AnyVal* src, const SlotDescriptor* dst_slot_desc,

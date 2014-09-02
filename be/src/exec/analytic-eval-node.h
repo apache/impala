@@ -58,7 +58,6 @@ class AggFnEvaluator;
 class AnalyticEvalNode : public ExecNode {
  public:
   AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
-  ~AnalyticEvalNode();
 
   virtual Status Init(const TPlanNode& tnode);
   virtual Status Prepare(RuntimeState* state);
@@ -117,6 +116,10 @@ class AnalyticEvalNode : public ExecNode {
 
   // Analytic function evaluators.
   std::vector<AggFnEvaluator*> evaluators_;
+
+  // FunctionContext for each analytic function. String data returned by the analytic
+  // functions is allocated via these contexts.
+  std::vector<impala_udf::FunctionContext*> fn_ctxs_;
 
   // Queue of tuples which are ready to be set in output rows, with the index into
   // the input_stream_ stream of the last TupleRow that gets the Tuple. Pairs are

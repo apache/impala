@@ -69,16 +69,7 @@ void ExprContext::Close(RuntimeState* state) {
   root_->Close(state, this, scope);
 
   for (int i = 0; i < fn_contexts_.size(); ++i) {
-    bool previous_error = fn_contexts_[i]->has_error();
     fn_contexts_[i]->impl()->Close();
-    if (!previous_error && fn_contexts_[i]->has_error()) {
-      // TODO: revisit this. Errors logged in close will likely not be displayed to the
-      // shell, and we may want to automatically log bad query statuses set in close
-      // rather than manually doing it here and in AggFnEvaluator.
-      stringstream ss;
-      ss << "UDF ERROR: " << fn_contexts_[i]->error_msg();
-      state->LogError(ss.str());
-    }
   }
   // pool_ can be NULL if Prepare() was never called
   if (pool_ != NULL) pool_->FreeAll();
@@ -111,6 +102,12 @@ Status ExprContext::Clone(RuntimeState* state, ExprContext** new_ctx) {
   (*new_ctx)->is_clone_ = true;
 
   return root_->Open(state, *new_ctx, FunctionContext::THREAD_LOCAL);
+}
+
+void ExprContext::FreeLocalAllocations() {
+  for (int i = 0; i < fn_contexts_.size(); ++i) {
+    fn_contexts_[i]->impl()->FreeLocalAllocations();
+  }
 }
 
 void ExprContext::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {

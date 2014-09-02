@@ -117,6 +117,10 @@ class ExprContext {
   TimestampVal GetTimestampVal(TupleRow* row);
   DecimalVal GetDecimalVal(TupleRow* row);
 
+  // Frees all local allocations made by fn_contexts_. This can be called when result data
+  // from this context is no longer needed (e.g., if it has been written to disk).
+  void FreeLocalAllocations();
+
   static const char* LLVM_CLASS_NAME;
 
  private:

@@ -120,6 +120,15 @@ class PartitionedAggregationNode : public ExecNode {
 
   std::vector<AggFnEvaluator*> aggregate_evaluators_;
 
+  // FunctionContext for each aggregate function and backing MemPool. String data returned
+  // by the aggregate functions is allocated via these contexts.
+  // These contexts are only passed to the evaluators in the non-partitioned
+  // (non-grouping) case. Otherwise they are only used to clone FunctionContexts for the
+  // partitions.
+  // TODO: we really need to plumb through CHAR(N) for intermediate types.
+  std::vector<impala_udf::FunctionContext*> agg_fn_ctxs_;
+  boost::scoped_ptr<MemPool> agg_fn_pool_;
+
   // Exprs used to evaluate input rows
   std::vector<ExprContext*> probe_expr_ctxs_;
 
@@ -189,12 +198,9 @@ class PartitionedAggregationNode : public ExecNode {
     // is spilled).
     boost::scoped_ptr<HashTable> hash_tbl;
 
-    // MemPool used if the grouping expr needs to allocate strings.
-    // TODO: we really need to plumb through CHAR(N) for intermediate types.
-    boost::scoped_ptr<MemPool> mem_pool;
-
-    // We want each partition's aggregate functions to use the per partition mem_pool.
-    ExprContext* expr_ctx;
+    // Clone of parent's agg_fn_ctxs_ and backing MemPool.
+    std::vector<impala_udf::FunctionContext*> agg_fn_ctxs;
+    boost::scoped_ptr<MemPool> agg_fn_pool;
 
     // Tuple stream used to store aggregated rows. When the partition is not spilled,
     // (meaning the hash table is maintained), this stream is pinned and contains the
@@ -218,19 +224,23 @@ class PartitionedAggregationNode : public ExecNode {
   std::list<Partition*> aggregated_partitions_;
 
   // Allocates a new allocated aggregation intermediate tuple.
-  // initialized to grouping values computed over 'current_row_'.
+  // Initialized to grouping values computed over 'current_row_' using 'agg_fn_ctxs'.
   // Aggregation expr slots are set to their initial values.
   // Pool/Stream specify where the memory (tuple and var len slots) should be allocated
   // from. Only one can be set.
   // Returns NULL if there was not enough memory to allocate the tuple.
-  Tuple* ConstructIntermediateTuple(MemPool* pool, BufferedTupleStream* stream);
+  Tuple* ConstructIntermediateTuple(
+      const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs,
+      MemPool* pool, BufferedTupleStream* stream);
 
   // Updates the given aggregation intermediate tuple with aggregation values computed
-  // over 'row'. Whether the agg fn evaluator calls Update() or Merge() is controlled by
-  // the evaluator itself, unless enforced explicitly by passing in is_merge == true.
-  // The override is needed to merge spilled and non-spilled rows belonging to the same
-  // partition independent of whether the agg fn evaluators have is_merge() == true.
-  void UpdateTuple(Tuple* tuple, TupleRow* row, bool is_merge = false);
+  // over 'row' using 'agg_fn_ctxs'. Whether the agg fn evaluator calls Update() or
+  // Merge() is controlled by the evaluator itself, unless enforced explicitly by passing
+  // in is_merge == true.  The override is needed to merge spilled and non-spilled rows
+  // belonging to the same partition independent of whether the agg fn evaluators have
+  // is_merge() == true.
+  void UpdateTuple(const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs,
+                   Tuple* tuple, TupleRow* row, bool is_merge = false);
 
   // Called on the intermediate tuple of each group after all input rows have been
   // consumed and aggregated. Computes the final aggregate values to be returned in
@@ -240,7 +250,8 @@ class PartitionedAggregationNode : public ExecNode {
   // Returns the tuple holding the final aggregate values.
   // TODO: Coordinate the allocation of new tuples with the release of memory
   // so as not to make memory consumption blow up.
-  Tuple* FinalizeTuple(Tuple* tuple, MemPool* pool);
+  Tuple* FinalizeTuple(const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs,
+                       Tuple* tuple, MemPool* pool);
 
   // Do the aggregation for all tuple rows in the batch when there is no grouping.
   void ProcessRowBatchNoGrouping(RowBatch* batch);
@@ -251,11 +262,11 @@ class PartitionedAggregationNode : public ExecNode {
   // pre-aggregated.
   // level is the level of repartitioning (0 for child(0)'s input, then 1, etc).
   // Each level needs to use a different hash function.
-  Status ProcessBatch(RowBatch* batch, bool aggregated_rows, int level);
+  template<bool aggregated_rows> Status ProcessBatch(RowBatch* batch, int level);
 
   // Reads all the rows from input_stream and process them by calling ProcessBatch().
-  Status ProcessStream(BufferedTupleStream* input_stream, bool aggregated_rows,
-      int level);
+  template<bool aggregated_rows>
+  Status ProcessStream(BufferedTupleStream* input_stream, int level);
 
   // Initializes hash_partitions_. Level is the level for the partitions to create.
   Status CreateHashPartitions(int level);

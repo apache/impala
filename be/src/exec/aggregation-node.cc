@@ -72,8 +72,7 @@ AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode,
 Status AggregationNode::Init(const TPlanNode& tnode) {
   RETURN_IF_ERROR(ExecNode::Init(tnode));
   RETURN_IF_ERROR(
-      Expr::CreateExprTrees(pool_, tnode.agg_node.grouping_exprs,
-                            &probe_expr_ctxs_));
+      Expr::CreateExprTrees(pool_, tnode.agg_node.grouping_exprs, &probe_expr_ctxs_));
   for (int i = 0; i < tnode.agg_node.aggregate_functions.size(); ++i) {
     AggFnEvaluator* evaluator;
     RETURN_IF_ERROR(AggFnEvaluator::Create(
@@ -88,6 +87,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
   tuple_pool_.reset(new MemPool(mem_tracker()));
+  agg_fn_pool_.reset(new MemPool(state->udf_mem_tracker()));
   build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
   get_results_timer_ = ADD_TIMER(runtime_profile(), "GetResultsTime");
   hash_table_buckets_counter_ =
@@ -122,6 +122,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   RowDescriptor build_row_desc(intermediate_tuple_desc_, false);
   RETURN_IF_ERROR(Expr::Prepare(build_expr_ctxs_, state, build_row_desc));
 
+  agg_fn_ctxs_.resize(aggregate_evaluators_.size());
   int j = probe_expr_ctxs_.size();
   for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
     // skip non-materialized slots; we don't have evaluators instantiated for those
@@ -134,7 +135,8 @@ Status AggregationNode::Prepare(RuntimeState* state) {
     SlotDescriptor* intermediate_slot_desc = intermediate_tuple_desc_->slots()[j];
     SlotDescriptor* output_slot_desc = output_tuple_desc_->slots()[j];
     RETURN_IF_ERROR(aggregate_evaluators_[i]->Prepare(state, child(0)->row_desc(),
-        intermediate_slot_desc, output_slot_desc));
+        intermediate_slot_desc, output_slot_desc, agg_fn_pool_.get(), &agg_fn_ctxs_[i]));
+    state->obj_pool()->Add(agg_fn_ctxs_[i]);
   }
 
   // TODO: how many buckets?
@@ -174,8 +176,9 @@ Status AggregationNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Open(probe_expr_ctxs_, state));
   RETURN_IF_ERROR(Expr::Open(build_expr_ctxs_, state));
 
+  DCHECK_EQ(aggregate_evaluators_.size(), agg_fn_ctxs_.size());
   for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
-    RETURN_IF_ERROR(aggregate_evaluators_[i]->Open(state));
+    RETURN_IF_ERROR(aggregate_evaluators_[i]->Open(state, agg_fn_ctxs_[i]));
   }
 
   RETURN_IF_ERROR(children_[0]->Open(state));
@@ -272,9 +275,14 @@ void AggregationNode::Close(RuntimeState* state) {
 
   if (tuple_pool_.get() != NULL) tuple_pool_->FreeAll();
   if (hash_tbl_.get() != NULL) hash_tbl_->Close();
+
+  DCHECK(agg_fn_ctxs_.empty() || aggregate_evaluators_.size() == agg_fn_ctxs_.size());
   for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
     aggregate_evaluators_[i]->Close(state);
+    if (!agg_fn_ctxs_.empty()) agg_fn_ctxs_[i]->impl()->Close();
   }
+  if (agg_fn_pool_.get() != NULL) agg_fn_pool_->FreeAll();
+
   Expr::Close(probe_expr_ctxs_, state);
   Expr::Close(build_expr_ctxs_, state);
   ExecNode::Close(state);
@@ -301,7 +309,7 @@ Tuple* AggregationNode::ConstructIntermediateTuple() {
   for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++slot_desc) {
     while (!(*slot_desc)->is_materialized()) ++slot_desc;
     AggFnEvaluator* evaluator = aggregate_evaluators_[i];
-    evaluator->Init(intermediate_tuple);
+    evaluator->Init(agg_fn_ctxs_[i], intermediate_tuple);
     // Codegen specific path.
     // To minimize branching on the UpdateTuple path, initialize the result value
     // so that UpdateTuple doesn't have to check if the aggregation
@@ -337,12 +345,13 @@ Tuple* AggregationNode::ConstructIntermediateTuple() {
 
 void AggregationNode::UpdateTuple(Tuple* tuple, TupleRow* row) {
   DCHECK(tuple != NULL || aggregate_evaluators_.empty());
-  for (vector<AggFnEvaluator*>::const_iterator evaluator = aggregate_evaluators_.begin();
-      evaluator != aggregate_evaluators_.end(); ++evaluator) {
-    if ((*evaluator)->is_merge()) {
-      (*evaluator)->Merge(row, tuple);
+  for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
+    AggFnEvaluator* evaluator = aggregate_evaluators_[i];
+    FunctionContext* agg_fn_ctx = agg_fn_ctxs_[i];
+    if (evaluator->is_merge()) {
+      evaluator->Merge(agg_fn_ctx, row, tuple);
     } else {
-      (*evaluator)->Update(row, tuple);
+      evaluator->Update(agg_fn_ctx, row, tuple);
     }
   }
 }
@@ -353,12 +362,13 @@ Tuple* AggregationNode::FinalizeTuple(Tuple* tuple, MemPool* pool) {
   if (needs_finalize_ && intermediate_tuple_id_ != output_tuple_id_) {
     dst = Tuple::Create(output_tuple_desc_->byte_size(), pool);
   }
-  for (vector<AggFnEvaluator*>::const_iterator evaluator = aggregate_evaluators_.begin();
-      evaluator != aggregate_evaluators_.end(); ++evaluator) {
+  for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
+    AggFnEvaluator* evaluator = aggregate_evaluators_[i];
+    FunctionContext* agg_fn_ctx = agg_fn_ctxs_[i];
     if (needs_finalize_) {
-      (*evaluator)->Finalize(tuple, dst);
+      evaluator->Finalize(agg_fn_ctx, tuple, dst);
     } else {
-      (*evaluator)->Serialize(tuple);
+      evaluator->Serialize(agg_fn_ctx, tuple);
     }
   }
   // Copy grouping values from tuple to dst.
@@ -746,7 +756,7 @@ Function* AggregationNode::CodegenUpdateTuple(RuntimeState* state) {
       if (update_slot_fn == NULL) return NULL;
       Value* fn_ctx_arg = codegen->CastPtrToLlvmPtr(
           codegen->GetPtrType(FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME),
-          evaluator->ctx());
+          agg_fn_ctxs_[i]);
       builder.CreateCall3(update_slot_fn, fn_ctx_arg, args[1], args[2]);
     }
   }

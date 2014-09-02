@@ -194,6 +194,7 @@ void FunctionContextImpl::Close() {
   if (!error_ss.str().empty()) {
     // Treat memory leaks as errors in the SDK build so they trigger test failures, but
     // don't blow up actual queries due to leaks (unless abort_on_error is true).
+    // TODO: revisit abort_on_error case. Setting the error won't do anything in close.
     if (state_ == NULL || state_->abort_on_error()) {
       context_->SetError(error_ss.str().c_str());
     } else {

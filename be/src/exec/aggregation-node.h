@@ -67,6 +67,11 @@ class AggregationNode : public ExecNode {
   HashTable::Iterator output_iterator_;
 
   std::vector<AggFnEvaluator*> aggregate_evaluators_;
+
+  // FunctionContext for each agg fn and backing pool.
+  std::vector<impala_udf::FunctionContext*> agg_fn_ctxs_;
+  boost::scoped_ptr<MemPool> agg_fn_pool_;
+
   // Exprs used to evaluate input rows
   std::vector<ExprContext*> probe_expr_ctxs_;
   // Exprs used to insert constructed aggregation tuple into the hash table.

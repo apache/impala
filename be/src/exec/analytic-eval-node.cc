@@ -18,6 +18,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "udf/udf-internal.h"
 
 using namespace std;
 
@@ -37,9 +38,6 @@ AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
   // TODO: Properly handle different intermediate and output tuples.
   DCHECK_EQ(tnode.analytic_node.output_tuple_id,
       tnode.analytic_node.intermediate_tuple_id);
-}
-
-AnalyticEvalNode::~AnalyticEvalNode() {
 }
 
 Status AnalyticEvalNode::Init(const TPlanNode& tnode) {
@@ -67,12 +65,14 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
   input_batch_.reset(new RowBatch(child(0)->row_desc(), state->batch_size(),
       mem_tracker()));
 
+  fn_ctxs_.resize(evaluators_.size());
   for (int i = 0; i < evaluators_.size(); ++i) {
     // TODO: These should be different slots once we fully support
     // different intermediate and output tuples.
     RETURN_IF_ERROR(evaluators_[i]->Prepare(state, child(0)->row_desc(),
-        output_tuple_desc_->slots()[i],
-        output_tuple_desc_->slots()[i]));
+        output_tuple_desc_->slots()[i], output_tuple_desc_->slots()[i],
+        mem_pool_.get(), &fn_ctxs_[i]));
+    state->obj_pool()->Add(fn_ctxs_[i]);
   }
   RETURN_IF_ERROR(partition_exprs_.Prepare(state, child(0)->row_desc(), row_descriptor_));
   RETURN_IF_ERROR(ordering_exprs_.Prepare(state, child(0)->row_desc(), row_descriptor_));
@@ -102,8 +102,9 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
       state->block_mgr(), client_, true /* delete_on_read */, true /* read_write */));
   RETURN_IF_ERROR(input_stream_->Init());
 
-  BOOST_FOREACH(AggFnEvaluator* evaluator, evaluators_) {
-    RETURN_IF_ERROR(evaluator->Open(state));
+  DCHECK_EQ(evaluators_.size(), fn_ctxs_.size());
+  for (int i = 0; i < evaluators_.size(); ++i) {
+    RETURN_IF_ERROR(evaluators_[i]->Open(state, fn_ctxs_[i]));
   }
 
   RETURN_IF_ERROR(partition_exprs_.Open(state));
@@ -118,7 +119,7 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   // Only allocated once, output tuples are allocated from output_tuple_pool_ and copy
   // the intermediate state from current_tuple_.
   current_tuple_ = Tuple::Create(output_tuple_desc_->byte_size(), mem_pool_.get());
-  for (int i = 0; i < evaluators_.size(); ++i) evaluators_[i]->Init(current_tuple_);
+  AggFnEvaluator::Init(evaluators_, fn_ctxs_, current_tuple_);
 
   // Initialize and process the first input batch so that some initial state can be
   // set here to avoid special casing in GetNext().
@@ -153,7 +154,7 @@ void AnalyticEvalNode::FinalizeOutputTuple(bool reinitialize_current_tuple) {
   for (int i = 0; i < evaluators_.size(); ++i) {
     // TODO: Currently assumes UDAs can call Finalize() repeatedly, will need to change
     // for functions that have different intermediate state.
-    evaluators_[i]->Finalize(output_tuple, output_tuple);
+    evaluators_[i]->Finalize(fn_ctxs_[i], output_tuple, output_tuple);
   }
   DCHECK(result_tuples_.empty() ||
       input_stream_->num_rows() > result_tuples_.back().first);
@@ -162,7 +163,7 @@ void AnalyticEvalNode::FinalizeOutputTuple(bool reinitialize_current_tuple) {
 
   if (reinitialize_current_tuple) {
     current_tuple_->Init(output_tuple_desc_->byte_size());
-    BOOST_FOREACH(AggFnEvaluator* evaluator, evaluators_) evaluator->Init(current_tuple_);
+    AggFnEvaluator::Init(evaluators_, fn_ctxs_, current_tuple_);
   }
 }
 
@@ -188,9 +189,7 @@ Status AnalyticEvalNode::ProcessInputBatch(RuntimeState* state, RowBatch* row_ba
     }
 
     // The evaluators_ are updated with the current row.
-    for (int i = 0; i < evaluators_.size(); ++i) {
-      evaluators_[i]->Update(row, current_tuple_);
-    }
+    AggFnEvaluator::Update(evaluators_, fn_ctxs_, row, current_tuple_);
 
     if (UNLIKELY(!input_stream_->AddRow(row))) {
       // AddRow returns false if an error occurs (available via status()) or there is
@@ -327,10 +326,12 @@ void AnalyticEvalNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (input_stream_.get() != NULL) input_stream_->Close();
 
+  DCHECK_EQ(evaluators_.size(), fn_ctxs_.size());
   for (int i = 0; i < evaluators_.size(); ++i) {
     // Need to make sure finalize is called in case there is any state to clean up.
-    evaluators_[i]->Finalize(current_tuple_, current_tuple_);
+    evaluators_[i]->Finalize(fn_ctxs_[i], current_tuple_, current_tuple_);
     evaluators_[i]->Close(state);
+    fn_ctxs_[i]->impl()->Close();
   }
   partition_exprs_.Close(state);
   ordering_exprs_.Close(state);
