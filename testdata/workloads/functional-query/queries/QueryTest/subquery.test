@@ -110,6 +110,31 @@ order by id
 INT, INT
 ====
 ---- QUERY
+# Uncorrelated EXISTS
+select id
+from functional.alltypestiny t
+where exists (select 1 from functional.alltypessmall where bool_col = false)
+and bool_col = true
+order by id
+---- RESULTS
+0
+2
+4
+6
+---- TYPES
+INT
+====
+---- QUERY
+# Uncorrelated EXISTS that returns an empty set
+select 1
+from functional.alltypestiny t
+where exists (select null from functional.alltypessmall where id < 0)
+and t.id > 0
+---- RESULTS
+---- TYPES
+TINYINT
+====
+---- QUERY
 # Uncorrelated aggregate subquery
 select count(*) from
 functional.alltypessmall t

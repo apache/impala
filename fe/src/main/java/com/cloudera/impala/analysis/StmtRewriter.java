@@ -18,6 +18,7 @@ import com.cloudera.impala.analysis.AnalysisContext.AnalysisResult;
 import com.cloudera.impala.analysis.BinaryPredicate.Operator;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.CompoundPredicate;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 
 import com.google.common.base.Preconditions;
@@ -229,9 +230,9 @@ public class StmtRewriter {
    * 2. Create a new inline view using the transformed subquery stmt; the new
    *    inline view is analyzed.
    * 3. Add the inline view to stmt's tableRefs and create a
-   *    join (left semi join, anti-join or left outer join for agg functions
-   *    that return a non-NULL value for an empty input) with stmt's right-most
-   *    table.
+   *    join (left semi join, anti-join, left outer join for agg functions
+   *    that return a non-NULL value for an empty input, or cross-join) with
+   *    stmt's right-most table.
    * 4. Initialize the ON clause of the new join from the original subquery
    *    predicate and the new inline view.
    * 5. Apply expr substitutions such that the extracted correlated predicates
@@ -273,9 +274,17 @@ public class StmtRewriter {
           exprMap, updateGroupBy);
     }
 
-    // Create an alias for the first item of the subquery's select list; to be
-    // used later for the construction of a join conjunct.
-    if (!(pred instanceof ExistsPredicate)) {
+    if (pred instanceof ExistsPredicate) {
+      // Modify the select list of an EXISTS subquery to avoid potential name
+      // clashes with stmt's select list items in case we rewrite it using a
+      // CROSS JOIN. Also, we reduce the overhead of computing the CROSS JOIN by
+      // eliminating unecessary columns from the subquery's select list; for
+      // uncorrelated subqueries, we limit the number of rows returned by the subquery.
+      pruneSelectList(subqueryStmt);
+      if (onClauseConjuncts.isEmpty()) subqueryStmt.setLimit(1);
+    } else {
+      // Create an alias for the first item of the subquery's select list; to be
+      // used later for the construction of a join conjunct.
       List<SelectListItem> selectList = subqueryStmt.getSelectList().getItems();
       if (selectList.get(0).getAlias() == null) {
         selectList.get(0).setAlias(subqueryStmt.getColumnAliasGenerator().getNextAlias());
@@ -305,9 +314,9 @@ public class StmtRewriter {
 
         // Correlated aggregate subquery predicates with 'count' are rewritten using
         // a LEFT OUTER JOIN because we need to ensure that there is one count
-        // value for every tuple in the parent select block. For every tuple in
-        // the outer select block that gets rejected by the subquery (due to
-        // some predicate), the value of count is 0.
+        // value for every tuple of 'stmt' (parent select block). The value of count
+        // is 0 for every tuple of 'stmt' that gets rejected by the subquery
+        // due to some predicate.
         //
         // TODO Handle other aggregate functions and UDAs that return a non-NULL value
         // on an empty set.
@@ -338,11 +347,25 @@ public class StmtRewriter {
     Expr onClausePredicate =
         CompoundPredicate.createConjunctivePredicate(onClauseConjuncts);
 
-    // TODO Uncorrelared EXISTS are not supported.
     if (onClausePredicate == null) {
       Preconditions.checkState(pred instanceof ExistsPredicate);
-      throw new AnalysisException("Unsupported uncorrelated EXISTS subquery: " +
-          subqueryStmt.toSql());
+      // TODO: Remove this when we support independent subquery evaluation.
+      if (((ExistsPredicate)pred).isNotExists()) {
+        throw new AnalysisException("Unsupported uncorrelated NOT EXISTS subquery: " +
+            subqueryStmt.toSql());
+      }
+      // We don't have an ON clause predicate to create an equi-join. Rewrite the
+      // subquery using a CROSS JOIN.
+      // TODO This is very expensive. Remove it when we implement independent
+      // subquery evaluation.
+      inlineView.setJoinOp(JoinOperator.CROSS_JOIN);
+      if (stmt.hasAggInfo()) {
+        throw new AnalysisException("Unsupported uncorrelated subquery in statement " +
+            "with aggregate functions or GROUP BY: " + stmt.toSql());
+      }
+      LOG.warn("uncorrelated subquery rewritten using a cross join");
+      // Indicate that new visible tuples may be added in stmt's select list.
+      return true;
     }
 
     // Create an smap from the original select-list exprs of the select list to
@@ -361,7 +384,7 @@ public class StmtRewriter {
           subqueryStmt.toSql());
     }
 
-    // Check if we have a valid ON clause.
+    // Check if we have a valid ON clause for an equi-join.
     boolean hasEqJoinPred = false;
     for (Expr conjunct: onClausePredicate.getConjuncts()) {
       if (!(conjunct instanceof BinaryPredicate) ||
@@ -378,23 +401,23 @@ public class StmtRewriter {
 
     if (!hasEqJoinPred) {
       // TODO: Remove this when independent subquery evaluation is implemented.
-      if (!(pred instanceof BinaryPredicate)) {
-        // The subquery is not correlated if we have an invalid ON clause.
-        throw new AnalysisException("Unsupported uncorrelated subquery: " +
+      // TODO: Requires support for non-equi joins.
+      if (!(pred instanceof BinaryPredicate) || onClauseConjuncts.size() != 1) {
+        throw new AnalysisException("Unsupported correlated subquery: " +
             subqueryStmt.toSql());
       }
 
-      // Uncorrelated aggregate subquery predicates are converted into a CROSS JOIN.
-      // All conjuncts that were extracted from the subquery are added to stmt's
-      // WHERE clause.
+      // We can rewrite the aggregate subquery using a cross join. All conjuncts
+      // that were extracted from the subquery are added to stmt's WHERE clause.
       stmt.whereClause_ =
           CompoundPredicate.addConjunct(onClausePredicate, stmt.whereClause_);
       inlineView.setJoinOp(JoinOperator.CROSS_JOIN);
-      // Indicate that the CROSS JOIN may change the select list of 'stmt' (if the latter
-      // contains a '*').
+      // Indicate that the CROSS JOIN may add a new visible tuple to stmt's
+      // select list (if the latter contains an unqualified star item '*')
       return true;
     }
 
+    // We have a valid equi-join conjunct.
     if (pred instanceof InPredicate && ((InPredicate)pred).isNotIn() ||
         pred instanceof ExistsPredicate && ((ExistsPredicate)pred).isNotExists()) {
       joinOp = JoinOperator.LEFT_ANTI_JOIN;
@@ -431,6 +454,37 @@ public class StmtRewriter {
       }
     }
     Preconditions.checkState(!newItems.isEmpty());
+    boolean isDistinct = stmt.selectList_.isDistinct();
+    boolean isStraightJoin = stmt.selectList_.isStraightJoin();
+    stmt.selectList_ = new SelectList(newItems, isDistinct, isStraightJoin);
+  }
+
+  /**
+   * Prune stmt's select list by keeping the minimum set of items. Star items
+   * are replaced by a constant expr. An alias is generated for all other (non-star)
+   * items. We need to maintain non-star items because the select list may
+   * have been expanded with new items from correlated predicates during
+   * subquery rewrite.
+   */
+  private static void pruneSelectList(SelectStmt stmt) throws AnalysisException {
+    ArrayList<SelectListItem> newItems = Lists.newArrayList();
+    boolean replacedStarItem = false;
+    for (int i = 0; i < stmt.selectList_.getItems().size(); ++i) {
+      SelectListItem item = stmt.selectList_.getItems().get(i);
+      if (item.isStar()) {
+        if (replacedStarItem) continue;
+        newItems.add(new SelectListItem(new NumericLiteral(Long.toString(1),
+            Type.BIGINT), stmt.getColumnAliasGenerator().getNextAlias()));
+        replacedStarItem = true;
+        continue;
+      }
+      if (item.getAlias() == null) {
+        newItems.add(new SelectListItem(item.getExpr(),
+            stmt.getColumnAliasGenerator().getNextAlias()));
+      } else {
+        newItems.add(new SelectListItem(item.getExpr(), item.getAlias()));
+      }
+    }
     boolean isDistinct = stmt.selectList_.isDistinct();
     boolean isStraightJoin = stmt.selectList_.isStraightJoin();
     stmt.selectList_ = new SelectList(newItems, isDistinct, isStraightJoin);
@@ -506,7 +560,6 @@ public class StmtRewriter {
       matches.add(root);
       return new BoolLiteral(true);
     }
-
     for (int i = 0; i < root.getChildren().size(); ++i) {
       root.getChildren().set(i, extractCorrelatedPredicates(root.getChild(i), tupleIds,
           matches));

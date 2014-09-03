@@ -14,12 +14,14 @@
 
 package com.cloudera.impala.analysis;
 
+import java.lang.Math;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnStats;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TreeNode;
@@ -42,7 +44,7 @@ public abstract class QueryStmt extends StatementBase {
   protected WithClause withClause_;
 
   protected ArrayList<OrderByElement> orderByElements_;
-  protected final LimitElement limitElement_;
+  protected LimitElement limitElement_;
 
   // For a select statment:
   // original list of exprs in select clause (star-expanded, ordinals and
@@ -261,6 +263,12 @@ public abstract class QueryStmt extends StatementBase {
   public boolean evaluateOrderBy() { return evaluateOrderBy_; }
   public ArrayList<Expr> getResultExprs() { return resultExprs_; }
   public ArrayList<Expr> getBaseTblResultExprs() { return baseTblResultExprs_; }
+  public void setLimit(long limit) throws AnalysisException {
+    Preconditions.checkState(limit >= 0);
+    long newLimit = hasLimit() ? Math.min(limit, getLimit()) : limit;
+    limitElement_ = new LimitElement(new NumericLiteral(Long.toString(newLimit),
+        Type.BIGINT), null);
+  }
 
   /**
    * Mark all slots that need to be materialized for the execution of this stmt.

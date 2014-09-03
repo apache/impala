@@ -480,34 +480,32 @@ where not exists
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 size=478.45KB
 ====
-# Multiple EXISTS predicates
-select max(id)
-from functional.alltypes t
-where exists
-  (select * from functional.alltypesagg a where t.id = a.id and
-   a.bool_col = false) and not exists
-    (select * from functional.alltypestiny s
-     where t.int_col = s.int_col and s.bigint_col < 10)
+# Uncorrelated EXISTS
+select *
+from functional.alltypestiny t
+where exists (select * from functional.alltypessmall s where s.id < 5)
 ---- PLAN
-05:AGGREGATE [FINALIZE]
-|  output: max(id)
+02:CROSS JOIN [BROADCAST]
 |
-04:HASH JOIN [LEFT ANTI JOIN]
-|  hash predicates: t.int_col = s.int_col
+|--01:SCAN HDFS [functional.alltypessmall s]
+|     partitions=4/4 size=6.32KB compact
+|     predicates: s.id < 5
+|     limit: 1
 |
-|--02:SCAN HDFS [functional.alltypestiny s]
-|     partitions=4/4 size=460B compact
-|     predicates: s.bigint_col < 10
+00:SCAN HDFS [functional.alltypestiny t]
+   partitions=4/4 size=460B
+====
+# Uncorrelated EXISTS with a LIMIT 0 clause
+select 1
+from functional.alltypestiny t
+where exists (select * from functional.alltypessmall limit 0)
+---- PLAN
+02:CROSS JOIN [BROADCAST]
 |
-03:HASH JOIN [LEFT SEMI JOIN]
-|  hash predicates: t.id = a.id
+|--01:EMPTYSET
 |
-|--01:SCAN HDFS [functional.alltypesagg a]
-|     partitions=11/11 size=814.73KB compact
-|     predicates: a.bool_col = FALSE
-|
-00:SCAN HDFS [functional.alltypes t]
-   partitions=24/24 size=478.45KB
+00:SCAN HDFS [functional.alltypestiny t]
+   partitions=4/4 size=460B
 ====
 # Multiple nesting levels
 select count(*)
