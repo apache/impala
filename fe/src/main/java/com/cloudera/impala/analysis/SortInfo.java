@@ -79,7 +79,7 @@ public class SortInfo {
   public void materializeRequiredSlots(Analyzer analyzer, ExprSubstitutionMap smap) {
     Preconditions.checkNotNull(sortTupleDesc_);
     Preconditions.checkNotNull(sortTupleSlotExprs_);
-    Preconditions.checkState(sortTupleDesc_.getIsMaterialized());
+    Preconditions.checkState(sortTupleDesc_.isMaterialized());
     analyzer.materializeSlots(orderingExprs_);
     List<SlotDescriptor> sortTupleSlotDescs = sortTupleDesc_.getSlots();
     List<Expr> materializedExprs = Lists.newArrayList();

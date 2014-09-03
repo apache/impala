@@ -149,18 +149,18 @@ public class DescriptorTable {
     TDescriptorTable result = new TDescriptorTable();
     HashSet<Table> referencedTbls = Sets.newHashSet();
     HashSet<Table> allPartitionsTbls = Sets.newHashSet();
-    for (TupleDescriptor tupleD: tupleDescs_.values()) {
+    for (TupleDescriptor tupleDesc: tupleDescs_.values()) {
       // inline view of a non-constant select has a non-materialized tuple descriptor
       // in the descriptor table just for type checking, which we need to skip
-      if (tupleD.getIsMaterialized()) {
-        result.addToTupleDescriptors(tupleD.toThrift());
+      if (tupleDesc.isMaterialized()) {
+        result.addToTupleDescriptors(tupleDesc.toThrift());
         // views and inline views have a materialized tuple if they are defined by a
         // constant select. they do not require or produce a thrift table descriptor.
-        Table table = tupleD.getTable();
+        Table table = tupleDesc.getTable();
         if (table != null && !table.isVirtualTable()) {
           referencedTbls.add(table);
         }
-        for (SlotDescriptor slotD: tupleD.getSlots()) {
+        for (SlotDescriptor slotD: tupleDesc.getSlots()) {
           result.addToSlotDescriptors(slotD.toThrift());
         }
       }

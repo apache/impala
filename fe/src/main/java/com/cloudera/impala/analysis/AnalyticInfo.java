@@ -62,6 +62,12 @@ public class AnalyticInfo extends AggregateInfoBase {
     Expr.removeDuplicates(analyticExprs);
     AnalyticInfo result = new AnalyticInfo(analyticExprs);
     result.createTupleDescs(analyzer);
+
+    // The tuple descriptors are logical. Their slots are remapped to physical tuples
+    // during plan generation.
+    result.outputTupleDesc_.setIsMaterialized(false);
+    result.intermediateTupleDesc_.setIsMaterialized(false);
+
     // Populate analyticTupleSmap_
     Preconditions.checkState(analyticExprs.size() ==
         result.outputTupleDesc_.getSlots().size());

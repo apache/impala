@@ -14,15 +14,13 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.Iterator;
-import java.util.List;
 
 
 /**
  * Combination of expr, ASC/DESC, and nulls ordering.
  */
 public class OrderByElement {
-  private final Expr expr_;
+  private Expr expr_;
   private final boolean isAsc_;
   // Represents the NULLs ordering specified: true when "NULLS FIRST", false when
   // "NULLS LAST", and null if not specified.
@@ -42,6 +40,7 @@ public class OrderByElement {
   }
 
   public Expr getExpr() { return expr_; }
+  public void setExpr(Expr e) { expr_ = e; }
   public boolean getIsAsc() { return isAsc_; }
   public Boolean getNullsFirstParam() { return nullsFirstParam_; }
 
@@ -78,6 +77,7 @@ public class OrderByElement {
     return expr_.equals(o.expr_) && isAsc_ == o.isAsc_ && nullsFirstEqual;
   }
 
+  @Override
   public OrderByElement clone() {
     OrderByElement clone = new OrderByElement(
         expr_.clone(), isAsc_,

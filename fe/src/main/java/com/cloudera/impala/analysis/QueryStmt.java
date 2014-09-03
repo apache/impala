@@ -248,6 +248,8 @@ public abstract class QueryStmt extends StatementBase {
    * Used in case this stmt is part of an @InlineViewRef,
    * since we need to know the materialized tupls ids of a TableRef.
    * This call must be idempotent because it may be called more than once for Union stmt.
+   * TODO: The name of this function has become outdated due to analytics
+   * producing logical (non-materialized) tuples. Re-think and clean up.
    */
   public abstract void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList);
 

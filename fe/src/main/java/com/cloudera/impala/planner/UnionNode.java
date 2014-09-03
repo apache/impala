@@ -52,7 +52,8 @@ public class UnionNode extends PlanNode {
   // We keep them separate from the regular expr lists to avoid null children.
   protected List<List<Expr>> constExprLists_ = Lists.newArrayList();
 
-  // Materialized result/const exprs corresponding to materialized slots. Set in init().
+  // Materialized result/const exprs corresponding to materialized slots.
+  // Set in init() and substituted against the corresponding child's output smap.
   protected List<List<Expr>> materializedResultExprLists_ = Lists.newArrayList();
   protected List<List<Expr>> materializedConstExprLists_ = Lists.newArrayList();
 
@@ -165,12 +166,14 @@ public class UnionNode extends PlanNode {
     materializedResultExprLists_.clear();
     Preconditions.checkState(resultExprLists_.size() == children_.size());
     List<SlotDescriptor> slots = analyzer.getDescTbl().getTupleDesc(tupleId_).getSlots();
-    for (List<Expr> exprList: resultExprLists_) {
+    for (int i = 0; i < resultExprLists_.size(); ++i) {
+      List<Expr> exprList = resultExprLists_.get(i);
       List<Expr> newExprList = Lists.newArrayList();
-      for (int i = 0; i < exprList.size(); ++i) {
-        if (slots.get(i).isMaterialized()) newExprList.add(exprList.get(i));
+      for (int j = 0; j < exprList.size(); ++j) {
+        if (slots.get(j).isMaterialized()) newExprList.add(exprList.get(j));
       }
-      materializedResultExprLists_.add(newExprList);
+      materializedResultExprLists_.add(
+          Expr.substituteList(newExprList, getChild(i).getOutputSmap(), analyzer));
     }
     Preconditions.checkState(
         materializedResultExprLists_.size() == getChildren().size());

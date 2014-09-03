@@ -93,6 +93,9 @@ import com.google.common.collect.Sets;
  * never assigned during plan generation.
  * Also tracks each catalog object access, so authorization checks can be performed once
  * analysis is complete.
+ * TODO: We often use the terms stmt/block/analyzer interchangeably, although they may
+ * have slightly different meanings (sometimes depending on the context). Use the terms
+ * more accurately and consistently here and elsewhere.
  */
 public class Analyzer {
   // Common analysis error messages
@@ -1472,14 +1475,17 @@ public class Analyzer {
    * Returns true if e1 and e2 are equivalent SlotRefs.
    */
   public boolean isEquivSlots(Expr e1, Expr e2) {
-    SlotRef aSlot = e1.unwrapSlotRef(true);
-    SlotRef bSlot = e2.unwrapSlotRef(true);
-    if (aSlot == null || bSlot == null) return false;
-    Preconditions.checkNotNull(globalState_.equivClassBySlotId.get(aSlot.getSlotId()));
-    Preconditions.checkNotNull(globalState_.equivClassBySlotId.get(bSlot.getSlotId()));
+    SlotRef aSlotRef = e1.unwrapSlotRef(true);
+    SlotRef bSlotRef = e2.unwrapSlotRef(true);
+    if (aSlotRef == null || bSlotRef == null) return false;
+    EquivalenceClassId aEqClassId =
+        globalState_.equivClassBySlotId.get(aSlotRef.getSlotId());
+    Preconditions.checkNotNull(aEqClassId);
+    EquivalenceClassId bEqClassId =
+        globalState_.equivClassBySlotId.get(bSlotRef.getSlotId());
+    Preconditions.checkNotNull(bEqClassId);
     // Check whether aSlot and bSlot are in the same equivalence class.
-    return globalState_.equivClassBySlotId.get(aSlot.getSlotId()).equals(
-        globalState_.equivClassBySlotId.get(bSlot.getSlotId()));
+    return aEqClassId.equals(bEqClassId);
   }
 
   /**
@@ -1814,6 +1820,29 @@ public class Analyzer {
     return globalState_.valueTransferGraph.hasValueTransfer(a, b);
   }
 
+  /**
+   * Updates the value transfer graph and the equivalence classes with the given list of
+   * mutual value transfers between slots. The first element of each pair must be an
+   * existing slot id already in the value transfer graph and the second element must be
+   * a new slot id not yet in the value transfer graph.
+   * Requires an existing value transfer graph.
+   */
+  public void bulkUpdateValueTransfers(List<Pair<SlotId, SlotId>> mutualValueTransfers) {
+    Preconditions.checkNotNull(globalState_.valueTransferGraph);
+    globalState_.valueTransferGraph.bulkUpdate(mutualValueTransfers);
+    for (Pair<SlotId, SlotId> valTrans: mutualValueTransfers) {
+      SlotId existingSid = valTrans.first;
+      SlotId newSid = valTrans.second;
+      // Update equivalence class of existingSid to include newSid.
+      EquivalenceClassId eqClassId = globalState_.equivClassBySlotId.get(existingSid);
+      Preconditions.checkNotNull(eqClassId);
+      ArrayList<SlotId> eqClassMembers = globalState_.equivClassMembers.get(eqClassId);
+      Preconditions.checkNotNull(eqClassMembers);
+      eqClassMembers.add(newSid);
+      globalState_.equivClassBySlotId.put(newSid, eqClassId);
+    }
+  }
+
   public Map<String, View> getLocalViews() { return localViews_; }
 
   /**
@@ -1959,6 +1988,33 @@ public class Analyzer {
 
       long end = System.currentTimeMillis();
       LOG.trace("Time taken in computeValueTransfers(): " + (end - start) + "ms");
+    }
+
+    /**
+     * Bulk updates the value transfer graph based on the given list of new mutual value
+     * transfers. The first element of each pair must be an existing slot id already in
+     * the value transfer graph and the second element must be a new slot id not yet in
+     * the value transfer graph. In particular, this requirement means that no new
+     * complete subgraphs may be introduced by the new slots.
+     */
+    public void bulkUpdate(List<Pair<SlotId, SlotId>> mutualValueTransfers) {
+      // Requires an existing value transfer graph.
+      Preconditions.checkState(valueTransfer_ != null);
+      int oldNumSlots = coalescedSlots_.length;
+      int maxNumSlots = globalState_.descTbl.getMaxSlotId().asInt() + 1;
+      // Expand the coalesced slots to the new maximum number of slots,
+      // and initalize the new entries with -1.
+      coalescedSlots_ = Arrays.copyOf(coalescedSlots_, maxNumSlots);
+      Arrays.fill(coalescedSlots_, oldNumSlots, maxNumSlots, -1);
+      for (Pair<SlotId, SlotId> valTrans: mutualValueTransfers) {
+        SlotId existingSid = valTrans.first;
+        SlotId newSid = valTrans.second;
+        // New slot id must not already be registered in the value transfer graph.
+        Preconditions.checkState(completeSubGraphs_.get(newSid) == null);
+        Preconditions.checkState(coalescedSlots_[newSid.asInt()] == -1);
+        completeSubGraphs_.union(existingSid, newSid);
+        coalescedSlots_[newSid.asInt()] = coalescedSlots_[existingSid.asInt()];
+      }
     }
 
     /**

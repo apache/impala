@@ -72,7 +72,7 @@ public class TupleDescriptor {
   public void setTable(Table tbl) { table_ = tbl; }
   public int getByteSize() { return byteSize_; }
   public float getAvgSerializedSize() { return avgSerializedSize_; }
-  public boolean getIsMaterialized() { return isMaterialized_; }
+  public boolean isMaterialized() { return isMaterialized_; }
   public void setIsMaterialized(boolean value) { isMaterialized_ = value; }
   public String getAlias() { return alias_; }
   public boolean hasExplicitAlias() { return hasExplicitAlias_; }

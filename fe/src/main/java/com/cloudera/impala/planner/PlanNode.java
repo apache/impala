@@ -90,7 +90,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   protected PlanFragment fragment_;
 
   // if set, needs to be applied by parent node to reference this node's output
-  protected ExprSubstitutionMap baseTblSmap_;
+  protected ExprSubstitutionMap outputSmap_;
 
   // global state of planning wrt conjunct assignment; used by planner as a shortcut
   // to avoid having to pass assigned conjuncts back and forth
@@ -179,8 +179,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public void setFragment(PlanFragment fragment) { fragment_ = fragment; }
   public PlanFragment getFragment() { return fragment_; }
   public List<Expr> getConjuncts() { return conjuncts_; }
-  public ExprSubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
-  public void setBaseTblSmap(ExprSubstitutionMap sMap) { baseTblSmap_ = sMap; }
+  public ExprSubstitutionMap getOutputSmap() { return outputSmap_; }
+  public void setOutputSmap(ExprSubstitutionMap smap) { outputSmap_ = smap; }
   public Set<ExprId> getAssignedConjuncts() { return assignedConjuncts_; }
   public void setAssignedConjuncts(Set<ExprId> conjuncts) {
     assignedConjuncts_ = conjuncts;
@@ -420,24 +420,24 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    */
   protected ExprSubstitutionMap getCombinedChildSmap() {
     if (getChildren().size() == 0) return new ExprSubstitutionMap();
-    if (getChildren().size() == 1) return getChild(0).getBaseTblSmap();
+    if (getChildren().size() == 1) return getChild(0).getOutputSmap();
     ExprSubstitutionMap result = ExprSubstitutionMap.combine(
-        getChild(0).getBaseTblSmap(), getChild(1).getBaseTblSmap());
+        getChild(0).getOutputSmap(), getChild(1).getOutputSmap());
     for (int i = 2; i < getChildren().size(); ++i) {
-      result = ExprSubstitutionMap.combine(result, getChild(i).getBaseTblSmap());
+      result = ExprSubstitutionMap.combine(result, getChild(i).getOutputSmap());
     }
     return result;
   }
 
   /**
-   * Sets baseTblSmap to compose(existing smap, combined child smap). Also
+   * Sets outputSmap_ to compose(existing smap, combined child smap). Also
    * substitutes conjuncts_ using the combined child smap.
    */
   protected void createDefaultSmap(Analyzer analyzer) throws InternalException {
     ExprSubstitutionMap combinedChildSmap = getCombinedChildSmap();
-    baseTblSmap_ =
-        ExprSubstitutionMap.compose(baseTblSmap_, combinedChildSmap, analyzer);
-    conjuncts_ = Expr.substituteList(conjuncts_, baseTblSmap_, analyzer);
+    outputSmap_ =
+        ExprSubstitutionMap.compose(outputSmap_, combinedChildSmap, analyzer);
+    conjuncts_ = Expr.substituteList(conjuncts_, outputSmap_, analyzer);
   }
 
   /**

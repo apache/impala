@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import com.cloudera.impala.catalog.AggregateFunction;
@@ -48,12 +47,11 @@ import com.google.common.collect.Lists;
  * - ...
  */
 public class AnalyticExpr extends Expr {
-  private final List<OrderByElement> orderByElements_;  // never null
+  // These elements are modified to point to the corresponding child exprs to keep them
+  // in sync through expr substitutions.
+  private final List<OrderByElement> orderByElements_ = Lists.newArrayList();
   private final int numPartitionExprs_;
   private final AnalyticWindow window_;
-
-  // only used during analysis; should not be passed outside
-  private final ArrayList<Expr> orderingExprs_ = Lists.newArrayList();
 
   private static String LEAD = "lead";
   private static String LAG = "lag";
@@ -67,17 +65,13 @@ public class AnalyticExpr extends Expr {
     addChild(fnCall);
     numPartitionExprs_ = partitionExprs != null ? partitionExprs.size() : 0;
     if (numPartitionExprs_ > 0) addChildren(partitionExprs);
-    orderByElements_ = Lists.newArrayList();
     if (orderByElements != null) {
-      // add ordering exprs to children
       for (OrderByElement e: orderByElements) {
-        // create copies, we don't want to modify the original parse node, in case
-        // we need to print it
-        OrderByElement orderByElement = e.clone();
-        orderByElements_.add(orderByElement);
-        orderingExprs_.add(orderByElement.getExpr());
-        addChild(orderByElement.getExpr());
+        addChild(e.getExpr());
       }
+      orderByElements_.addAll(orderByElements);
+      // Point the order-by exprs to our children to avoid analyzing them separately.
+      setOrderByExprs();
     }
     window_ = window;
   }
@@ -87,7 +81,6 @@ public class AnalyticExpr extends Expr {
    */
   protected AnalyticExpr(AnalyticExpr other) {
     super(other);
-    orderByElements_ = Lists.newArrayList();
     for (OrderByElement e: other.orderByElements_) {
       orderByElements_.add(e.clone());
     }
@@ -114,7 +107,7 @@ public class AnalyticExpr extends Expr {
   * implies that no order by was specified (and hence, no window).
   */
   public AnalyticWindow getWindow() {
-    if (!orderingExprs_.isEmpty() && window_ == null) {
+    if (!orderByElements_.isEmpty() && window_ == null) {
       return AnalyticWindow.DEFAULT_WINDOW;
     }
     return window_;
@@ -203,18 +196,18 @@ public class AnalyticExpr extends Expr {
   private void checkRangeOffsetBoundaryExpr(AnalyticWindow.Boundary boundary)
       throws AnalysisException {
     Preconditions.checkState(boundary.getType().isOffset());
-    if (orderingExprs_.size() > 1) {
+    if (orderByElements_.size() > 1) {
       throw new AnalysisException("Only one ORDER BY expression allowed if used with "
           + "a RANGE window with PRECEDING/FOLLOWING: " + toSql());
     }
     Expr rangeExpr = boundary.getExpr();
     if (!Type.isImplicitlyCastable(
-        rangeExpr.getType(), orderingExprs_.get(0).getType())) {
+        rangeExpr.getType(), orderByElements_.get(0).getExpr().getType())) {
       throw new AnalysisException(
           "The value expression of a PRECEDING/FOLLOWING clause of a RANGE window must "
             + "be implicitly convertable to the ORDER BY expression's type: "
             + rangeExpr.toSql() + " cannot be implicitly converted to "
-            + orderingExprs_.get(0).getType().toSql());
+            + orderByElements_.get(0).getExpr().getType().toSql());
     }
   }
 
@@ -293,7 +286,8 @@ public class AnalyticExpr extends Expr {
         addChild(window_.getRightBoundary().getExpr());
       }
 
-      if (!orderingExprs_.isEmpty() && window_.getType() == AnalyticWindow.Type.RANGE) {
+      if (!orderByElements_.isEmpty() &&
+          window_.getType() == AnalyticWindow.Type.RANGE) {
         // check that preceding/following ranges match ordering
         if (window_.getLeftBoundary().getType().isOffset()) {
           checkRangeOffsetBoundaryExpr(window_.getLeftBoundary());
@@ -312,6 +306,17 @@ public class AnalyticExpr extends Expr {
     }
   }
 
+  /**
+   * Point the order by elements to the corresponding children because they
+   * may have been substituted and/or analyzed.
+   */
+  private void setOrderByExprs() {
+    for (int i = 0; i < orderByElements_.size(); ++i) {
+      Expr childExpr = getChild(numPartitionExprs_ + 1 + i);
+      orderByElements_.get(i).setExpr(childExpr);
+    }
+  }
+
   @Override
   protected void resetAnalysisState() {
     super.resetAnalysisState();
@@ -319,5 +324,15 @@ public class AnalyticExpr extends Expr {
     // remove window clause exprs added as children in analyze()
     children_.subList(
         1 + numPartitionExprs_ + orderByElements_.size(), children_.size()).clear();
+  }
+
+  @Override
+  protected Expr substituteImpl(ExprSubstitutionMap smap, Analyzer analyzer)
+      throws AnalysisException {
+    Expr e = super.substituteImpl(smap, analyzer);
+    if (!(e instanceof AnalyticExpr)) return e;
+    // Keep the order-by elements in sync with the possibly substituted child exprs.
+    setOrderByExprs();
+    return e;
   }
 }

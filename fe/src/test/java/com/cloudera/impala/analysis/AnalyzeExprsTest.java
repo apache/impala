@@ -656,7 +656,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError(
         "select min(id) over (order by tinyint_col) as X from functional.alltypes "
           + "group by id, tinyint_col order by rank() over (order by X)",
-        "Nesting of analytic expressions is not allowed: rank() OVER (ORDER BY X ASC)");
+        "Nesting of analytic expressions is not allowed");
 
     // nested analytic exprs
     AnalysisError(

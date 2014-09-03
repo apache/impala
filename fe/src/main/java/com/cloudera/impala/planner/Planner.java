@@ -33,6 +33,7 @@ import com.cloudera.impala.analysis.BaseTableRef;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.EquivalenceClassId;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.InlineViewRef;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.JoinOperator;
@@ -165,17 +166,8 @@ public class Planner {
     if (analysisResult.isInsertStmt()) {
       rootFragment.setOutputExprs(analysisResult.getInsertStmt().getResultExprs());
     } else {
-      List<Expr> resultExprs = null;
-      if (queryStmt instanceof SelectStmt
-          && ((SelectStmt) queryStmt).getAnalyticInfo() != null) {
-        // TODO: fix this hack: always apply the smap of the root of fragment 0
-        resultExprs =
-            Expr.substituteList(
-                queryStmt.getBaseTblResultExprs(),
-                rootFragment.getPlanRoot().getBaseTblSmap(), analyzer);
-      } else {
-        resultExprs = queryStmt.getBaseTblResultExprs();
-      }
+      List<Expr> resultExprs = Expr.substituteList(queryStmt.getBaseTblResultExprs(),
+          rootFragment.getPlanRoot().getOutputSmap(), analyzer);
       rootFragment.setOutputExprs(resultExprs);
     }
     LOG.info("desctbl: " + analyzer.getDescTbl().debugString());
@@ -924,7 +916,7 @@ public class Planner {
     if (sortNode.getInputPartition() != null) {
       // make sure the childFragment's output is partitioned as required by the sortNode
       sortNode.getInputPartition().substitute(
-          childFragment.getPlanRoot().getBaseTblSmap(), analyzer);
+          childFragment.getPlanRoot().getOutputSmap(), analyzer);
       if (!childFragment.getDataPartition().equals(sortNode.getInputPartition())) {
         analyticFragment = createParentFragment(
             analyzer, childFragment, sortNode.getInputPartition());
@@ -999,8 +991,10 @@ public class Planner {
       // insert possible AnalyticEvalNode before SortNode
       if (((SelectStmt) stmt).getAnalyticInfo() != null) {
         AnalyticInfo analyticInfo = ((SelectStmt) stmt).getAnalyticInfo();
+        ArrayList<TupleId> stmtTupleIds = Lists.newArrayList();
+        stmt.getMaterializedTupleIds(stmtTupleIds);
         AnalyticPlanner analyticPlanner =
-            new AnalyticPlanner(analyticInfo, analyzer, nodeIdGenerator_);
+            new AnalyticPlanner(stmtTupleIds, analyticInfo, analyzer, nodeIdGenerator_);
         root = analyticPlanner.createSingleNodePlan(root);
       }
     } else {
@@ -1522,10 +1516,16 @@ public class Planner {
     // the avg row size is availble during optimization; however, that means we need to
     // select references to its resultExprs from the enclosing scope(s)
     rootNode.setTblRefIds(Lists.newArrayList(inlineViewRef.getId()));
-    // set smap *before* creating a SelectNode in order to allow proper resolution
-    rootNode.setBaseTblSmap(inlineViewRef.getBaseTblSmap());
-    // if the view has a limit clause we may have conjuncts_ from the enclosing scope
-    // left
+    // Set smap *before* creating a SelectNode in order to allow proper resolution.
+    // Analytics have an additional level of logical to physical slot remapping.
+    // The composition creates a mapping from the logical output of the inline view
+    // to the physical analytic output. In addition, it retains the logical to
+    // physical analytic slot mappings which are needed to resolve exprs that already
+    // reference the logical analytic tuple (and not the inline view tuple), e.g.,
+    // the result exprs set in the coordinator fragment.
+    rootNode.setOutputSmap(ExprSubstitutionMap.compose(inlineViewRef.getBaseTblSmap(),
+        rootNode.getOutputSmap(), analyzer));
+    // if the view has a limit we may have conjuncts_ from the enclosing scope left
     rootNode = addUnassignedConjuncts(
         analyzer, inlineViewRef.getDesc().getId().asList(), rootNode);
     return rootNode;

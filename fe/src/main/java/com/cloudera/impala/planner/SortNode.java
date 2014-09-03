@@ -55,9 +55,9 @@ public class SortNode extends PlanNode {
   // if true, the output of this node feeds an AnalyticNode
   private boolean isAnalyticSort_;
 
-  // info_.sortTupleSlotExprs_ substituted with the baseTblSmap_ for materialized slots
+  // info_.sortTupleSlotExprs_ substituted with the outputSmap_ for materialized slots
   // in init().
-  private List<Expr> baseTblMaterializedTupleExprs_;
+  private List<Expr> resolvedTupleExprs_;
   private final boolean useTopN_;
   // The offset of the first row to return.
   protected long offset_;
@@ -97,34 +97,31 @@ public class SortNode extends PlanNode {
     computeMemLayout(analyzer);
     computeStats(analyzer);
 
-    // populate baseTblMaterializedTupleExprs_ and baseTblSmap_
+    // populate resolvedTupleExprs_ and outputSmap_
     List<SlotDescriptor> sortTupleSlots = info_.getSortTupleDescriptor().getSlots();
     List<Expr> slotExprs = info_.getSortTupleSlotExprs();
     Preconditions.checkState(sortTupleSlots.size() == slotExprs.size());
-    baseTblMaterializedTupleExprs_ = Lists.newArrayList();
-    baseTblSmap_ = new ExprSubstitutionMap();
+    resolvedTupleExprs_ = Lists.newArrayList();
+    outputSmap_ = new ExprSubstitutionMap();
     for (int i = 0; i < slotExprs.size(); ++i) {
       if (!sortTupleSlots.get(i).isMaterialized()) continue;
-      baseTblMaterializedTupleExprs_.add(slotExprs.get(i));
-      baseTblSmap_.put(slotExprs.get(i), new SlotRef(sortTupleSlots.get(i)));
+      resolvedTupleExprs_.add(slotExprs.get(i));
+      outputSmap_.put(slotExprs.get(i), new SlotRef(sortTupleSlots.get(i)));
     }
     ExprSubstitutionMap childSmap = getCombinedChildSmap();
-    baseTblMaterializedTupleExprs_ =
-        Expr.substituteList(baseTblMaterializedTupleExprs_, childSmap, analyzer);
+    resolvedTupleExprs_ = Expr.substituteList(resolvedTupleExprs_, childSmap, analyzer);
 
     // Remap the ordering exprs to the tuple materialized by this sort node. The mapping
-    // is a composition of the childSmap and the baseTblSmap_ because the child node may
+    // is a composition of the childSmap and the outputSmap_ because the child node may
     // have also remapped its input (e.g., as in a a series of (sort->analytic)* nodes).
-    // Parent nodes have have to do the same so set the composition as the baseTblSmap_.
-    if (childSmap != null) {
-      baseTblSmap_ = ExprSubstitutionMap.compose(childSmap, baseTblSmap_, analyzer);
-    }
-    info_.substituteOrderingExprs(baseTblSmap_, analyzer);
+    // Parent nodes have have to do the same so set the composition as the outputSmap_.
+    outputSmap_ = ExprSubstitutionMap.compose(childSmap, outputSmap_, analyzer);
+    info_.substituteOrderingExprs(outputSmap_, analyzer);
     info_.checkConsistency();
 
     LOG.info("sort id " + tupleIds_.get(0).toString() + " smap: "
-        + baseTblSmap_.debugString());
-    LOG.info("sort input exprs: " + Expr.debugString(baseTblMaterializedTupleExprs_));
+        + outputSmap_.debugString());
+    LOG.info("sort input exprs: " + Expr.debugString(resolvedTupleExprs_));
   }
 
   @Override
@@ -156,7 +153,7 @@ public class SortNode extends PlanNode {
         info_.getIsAscOrder(), info_.getNullsFirst());
     Preconditions.checkState(tupleIds_.size() == 1,
         "Incorrect size for tupleIds_ in SortNode");
-    sort_info.sort_tuple_slot_exprs = Expr.treesToThrift(baseTblMaterializedTupleExprs_);
+    sort_info.sort_tuple_slot_exprs = Expr.treesToThrift(resolvedTupleExprs_);
     TSortNode sort_node = new TSortNode(sort_info, useTopN_);
     sort_node.setOffset(offset_);
     msg.sort_node = sort_node;

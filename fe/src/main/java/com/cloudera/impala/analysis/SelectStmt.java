@@ -106,9 +106,9 @@ public class SelectStmt extends QueryStmt {
   public Expr getWhereClause() { return whereClause_; }
   public void setWhereClause(Expr whereClause) { whereClause_ = whereClause; }
   public AggregateInfo getAggInfo() { return aggInfo_; }
+  public boolean hasAggInfo() { return aggInfo_ != null; }
   public AnalyticInfo getAnalyticInfo() { return analyticInfo_; }
   public boolean hasAnalyticInfo() { return analyticInfo_ != null; }
-  public boolean hasAggInfo() { return aggInfo_ != null; }
   @Override
   public ArrayList<String> getColLabels() { return colLabels_; }
   public ExprSubstitutionMap getBaseTblSmap() { return baseTblSmap_; }
@@ -269,15 +269,22 @@ public class SelectStmt extends QueryStmt {
     materializeSlots(analyzer, baseTblJoinConjuncts);
 
     if (evaluateOrderBy_) {
-      // mark ordering exprs before marking agg exprs because they could contain agg
-      // exprs that are not referenced anywhere but the ORDER BY clause
+      // mark ordering exprs before marking agg/analytic exprs because they could contain
+      // agg/analytic exprs that are not referenced anywhere but the ORDER BY clause
       sortInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
     }
 
-    if (analyticInfo_ != null) {
-      // TODO: take conjuncts into account (analytic exprs might be in an inline view)
-      // mark analytic exprs before marking agg exprs because they could contain agg
-      // exprs that are not referenced anywhere but analytic expr
+    if (hasAnalyticInfo()) {
+      // Mark analytic exprs before marking agg exprs because they could contain agg
+      // exprs that are not referenced anywhere but the analytic expr.
+      // Gather unassigned predicates and mark their slots. It is not desirable
+      // to account for propagated predicates because if an analytic expr is only
+      // referenced by a propagated predicate, then it's better to not materialize the
+      // analytic expr at all.
+      ArrayList<TupleId> tids = Lists.newArrayList();
+      getMaterializedTupleIds(tids); // includes the analytic tuple
+      List<Expr> conjuncts = analyzer.getUnassignedConjuncts(tids, false);
+      materializeSlots(analyzer, conjuncts);
       analyticInfo_.materializeRequiredSlots(analyzer, baseTblSmap_);
     }
 
@@ -766,12 +773,15 @@ public class SelectStmt extends QueryStmt {
     return strBuilder.toString();
   }
 
+  /**
+   * If the select statement has a sort/top that is evaluated, then the sort tuple
+   * is materialized. Else, if there is aggregation then the aggregate tuple id is
+   * materialized. Otherwise, all referenced tables are materialized.
+   * If there are analytics and no sort, then the returned tuple ids also include
+   * the logical analytic output tuple.
+   */
   @Override
   public void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList) {
-    // If the select statement has a sort/TopN that is evaluated, then the sort tuple
-    // is materialized. Else, if select statement has an aggregate, then the aggregate
-    // tuple id is materialized.
-    // Otherwise, all referenced tables are materialized.
     if (evaluateOrderBy_) {
       tupleIdList.add(sortInfo_.getSortTupleDescriptor().getId());
     } else if (aggInfo_ != null) {
@@ -781,6 +791,10 @@ public class SelectStmt extends QueryStmt {
       for (TableRef tblRef: tableRefs_) {
         tupleIdList.addAll(tblRef.getMaterializedTupleIds());
       }
+    }
+    // We materialize the agg tuple or the table refs together with the analytic tuple.
+    if (hasAnalyticInfo() && !evaluateOrderBy_) {
+      tupleIdList.add(analyticInfo_.getOutputTupleId());
     }
   }
 

@@ -31,6 +31,7 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.OrderByElement;
 import com.cloudera.impala.analysis.SlotDescriptor;
+import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.analysis.TupleDescriptor;
@@ -38,6 +39,7 @@ import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -65,12 +67,26 @@ import com.google.common.collect.Lists;
 public class AnalyticPlanner {
   private final static Logger LOG = LoggerFactory.getLogger(AnalyticPlanner.class);
 
+  // List of tuple ids materialized by the originating SelectStmt (i.e., what is returned
+  // by SelectStmt.getMaterializedTupleIds()). During analysis, conjuncts have been
+  // registered against these tuples, so we need them to find unassigned conjuncts during
+  // plan generation.
+  // If the size of this list is 1 it means the stmt has a sort after the analytics.
+  // Otherwise, the last tuple id must be analyticInfo_.getOutputTupleDesc().
+  private final List<TupleId> stmtTupleIds_;
+
   private final AnalyticInfo analyticInfo_;
   private final Analyzer analyzer_;
   private final IdGenerator<PlanNodeId> idGenerator_;
 
-  public AnalyticPlanner(AnalyticInfo analyticInfo, Analyzer analyzer,
+  public AnalyticPlanner(List<TupleId> stmtTupleIds,
+      AnalyticInfo analyticInfo, Analyzer analyzer,
       IdGenerator<PlanNodeId> idGenerator) {
+    Preconditions.checkState(!stmtTupleIds.isEmpty());
+    TupleId lastStmtTupleId = stmtTupleIds.get(stmtTupleIds.size() - 1);
+    Preconditions.checkState(stmtTupleIds.size() == 1 ||
+        lastStmtTupleId.equals(analyticInfo.getOutputTupleId()));
+    stmtTupleIds_ = stmtTupleIds;
     analyticInfo_ = analyticInfo;
     analyzer_ = analyzer;
     idGenerator_ = idGenerator;
@@ -79,10 +95,7 @@ public class AnalyticPlanner {
   /**
    * Augment planFragment with plan nodes that implement single-node evaluation of
    * the AnalyticExprs in analyticInfo.
-   * TODO: this only works for non-nested, non-Union select stmts; add the rest
-   * TODO: missing limits
    * TODO: deal with OrderByElements, not just ordering exprs
-   * TODO: prune non-materialized output slots
    * TODO: create partition groups that are not based on set identity: the subset
    * of partition exprs common to the partition group should be large enough to
    * parallelize across all machines
@@ -98,6 +111,23 @@ public class AnalyticPlanner {
         root = createSortGroupPlan(root, partitionGroup.sortGroups.get(i), i == 0);
       }
     }
+
+    // Bulk update the value transfer graph and equivalence classes based on the new
+    // physical output slots of all window groups.
+    List<Pair<SlotId, SlotId>> newMutualValueTransfers = Lists.newArrayList();
+    for (WindowGroup windowGroup: windowGroups) {
+      ExprSubstitutionMap smap = windowGroup.logicalToPhysicalSmap;
+      for (int i = 0; i < smap.getLhs().size(); ++i) {
+        Preconditions.checkState(smap.getLhs().get(i) instanceof SlotRef);
+        Preconditions.checkState(smap.getRhs().get(i) instanceof SlotRef);
+        SlotRef lhs = (SlotRef) smap.getLhs().get(i);
+        SlotRef rhs = (SlotRef) smap.getRhs().get(i);
+        newMutualValueTransfers.add(
+            new Pair<SlotId, SlotId>(lhs.getSlotId(), rhs.getSlotId()));
+      }
+    }
+    analyzer_.bulkUpdateValueTransfers(newMutualValueTransfers);
+
     return root;
   }
 
@@ -207,11 +237,11 @@ public class AnalyticPlanner {
       // pb/ob predicates compare the output of the preceding sort to our
       // buffered input; we need to remap the pb/ob exprs to a) the sort output,
       // b) our buffer of the sort input
-      ExprSubstitutionMap sortSmap = sortNode.getBaseTblSmap();
+      ExprSubstitutionMap sortSmap = sortNode.getOutputSmap();
       LOG.trace("sort smap: " + sortSmap.debugString());
-      if (sortNode.getChild(0).getBaseTblSmap() != null) {
+      if (sortNode.getChild(0).getOutputSmap() != null) {
         LOG.trace("sort child smap: " +
-            sortNode.getChild(0).getBaseTblSmap().debugString());
+            sortNode.getChild(0).getOutputSmap().debugString());
       }
       if (!partitionByExprs.isEmpty()) {
         partitionByLessThan = createLessThan(
@@ -236,9 +266,10 @@ public class AnalyticPlanner {
       windowGroup.finalize(analyzer_);
 
       // create one AnalyticEvalNode per window group
-      root = new AnalyticEvalNode(idGenerator_.getNextId(), root,
+      root = new AnalyticEvalNode(idGenerator_.getNextId(), root, stmtTupleIds_,
           windowGroup.analyticFnCalls, windowGroup.partitionByExprs, orderByExprs,
-          windowGroup.window, windowGroup.physicalIntermediateTuple,
+          windowGroup.window, analyticInfo_.getOutputTupleDesc(),
+          windowGroup.physicalIntermediateTuple,
           windowGroup.physicalOutputTuple, windowGroup.logicalToPhysicalSmap,
           partitionByLessThan, orderByLessThan,
           bufferedTupleDesc);
@@ -382,8 +413,8 @@ public class AnalyticPlanner {
               logicalIntermediateSlot, physicalIntermediateTuple);
           physicalIntermediateSlot.setIsMaterialized(true);
         }
-        logicalToPhysicalSmap.put(new SlotRef(logicalOutputSlot),
-            new SlotRef(physicalOutputSlot));
+        logicalToPhysicalSmap.put(
+            new SlotRef(logicalOutputSlot), new SlotRef(physicalOutputSlot));
       }
       physicalOutputTuple.computeMemLayout();
       if (requiresIntermediateTuple) physicalIntermediateTuple.computeMemLayout();
@@ -398,6 +429,10 @@ public class AnalyticPlanner {
     List<WindowGroup> groups = Lists.newArrayList();
     for (int i = 0; i < analyticExprs.size(); ++i) {
       AnalyticExpr analyticExpr = (AnalyticExpr) analyticExprs.get(i);
+      // Do not generate the plan for non-materialized analytic exprs.
+      if (!analyticInfo_.getOutputTupleDesc().getSlots().get(i).isMaterialized()) {
+        continue;
+      }
       boolean match = false;
       for (WindowGroup group: groups) {
         if (group.isCompatible(analyticExpr)) {

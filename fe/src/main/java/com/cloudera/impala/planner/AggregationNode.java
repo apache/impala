@@ -24,7 +24,6 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.FunctionCallExpr;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.common.InternalException;
@@ -137,9 +136,8 @@ public class AggregationNode extends PlanNode {
     // don't call createDefaultSMap(), it would point our conjuncts (= Having clause)
     // to our input; our conjuncts don't get substituted because they already
     // refer to our output
-    ExprSubstitutionMap combinedChildSmap = getCombinedChildSmap();
-    aggInfo_.substitute(combinedChildSmap, analyzer);
-    baseTblSmap_ = aggInfo_.getOutputSmap();
+    outputSmap_ = getCombinedChildSmap();
+    aggInfo_.substitute(outputSmap_, analyzer);
     // assert consistent aggregate expr and slot materialization
     aggInfo_.checkConsistency();
   }
