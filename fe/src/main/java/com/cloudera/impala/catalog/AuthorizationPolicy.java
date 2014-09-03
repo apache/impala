@@ -48,6 +48,7 @@ import com.google.common.collect.Sets;
  */
 public class AuthorizationPolicy implements PrivilegeCache {
   private static final Logger LOG = Logger.getLogger(AuthorizationPolicy.class);
+
   // Cache of role names (case-insensitive) to role objects.
   private final CatalogObjectCache<Role> roleCache_ = new CatalogObjectCache<Role>();
 
@@ -200,7 +201,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
       List<Role> grantedRoles = getGrantedRoles(groupName);
       for (Role role: grantedRoles) {
         for (RolePrivilege privilege: role.getPrivileges()) {
-          String authorizeable = toSentryAuthorizeableStr(privilege);
+          String authorizeable = privilege.getName();
           if (authorizeable == null) {
             LOG.error("Ignoring invalid privilege: " + privilege.getName());
             continue;
@@ -210,55 +211,6 @@ public class AuthorizationPolicy implements PrivilegeCache {
       }
     }
     return privileges;
-  }
-
-  /**
-   * Converts a RolePrivilege to the string format that can be sent to Sentry.
-   * Returns null if the privilege is not in the correct format.
-   */
-  private String toSentryAuthorizeableStr(RolePrivilege privilege) {
-    List<String> authorizable = Lists.newArrayListWithExpectedSize(4);
-    try {
-      String[] priv = privilege.getName().split("\\+");
-      switch (privilege.getScope()) {
-        case SERVER: {
-          Preconditions.checkState(priv.length >= 1);
-          authorizable.add(KV_JOINER.join("server", priv[0]));
-          break;
-        }
-        case URI: {
-          Preconditions.checkState(priv.length >= 2);
-          authorizable.add(KV_JOINER.join("server", priv[0]));
-          authorizable.add(KV_JOINER.join("uri", priv[1]));
-          break;
-        }
-        case DATABASE: {
-          Preconditions.checkState(priv.length >= 2);
-          authorizable.add(KV_JOINER.join("server", priv[0]));
-          authorizable.add(KV_JOINER.join("db", priv[1]));
-          break;
-        }
-        case TABLE: {
-          Preconditions.checkState(priv.length >= 3);
-          authorizable.add(KV_JOINER.join("server", priv[0]));
-          authorizable.add(KV_JOINER.join("db", priv[1]));
-          authorizable.add(KV_JOINER.join("table", priv[2]));
-          break;
-        }
-      }
-
-      if (authorizable.size() < priv.length) {
-        // There is an action associated with this privilege. The action is the final
-        String action = priv[priv.length - 1];
-        // The * action is implied. Sentry does not accept it as an action.
-        if (!action.equals("*")) authorizable.add(KV_JOINER.join("action", action));
-      }
-      return AUTHORIZABLE_JOINER.join(authorizable);
-    } catch (Exception e) {
-      // Should never make it here unless the privilege is malformed.
-      LOG.error("ERROR: ", e);
-      return null;
-    }
   }
 
   @Override

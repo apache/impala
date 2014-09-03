@@ -345,18 +345,44 @@ enum TPrivilegeScope {
   TABLE,
 }
 
-// Represents a privilege granted to a role in an authorization policy.
+// The privilege level allowed.
+enum TPrivilegeLevel {
+  ALL,
+  INSERT,
+  SELECT
+}
+
+// Represents a privilege in an authorization policy. Privileges contain the level
+// of access, the scope and role the privilege applies to, and details on what
+// catalog object the privilege is securing. Objects are hierarchical, so a privilege
+// corresponding to a table must also specify all the parent objects (database name
+// and server name).
 struct TPrivilege {
   // The Sentry defined name of this privilege. Will be in the form of:
   // [ServerName]->[DbName]->[TableName]->[Action Granted] and may contain wildcard/"*"
   // characters. The combination of role_id + privilege_name is guaranteed to be unique.
   1: required string privilege_name
 
+  // The level of access this privilege provides.
+  2: required TPrivilegeLevel privilege_level
+
   // The scope of the privilege: SERVER, DATABASE, URI, or TABLE
-  2: required TPrivilegeScope scope
+  3: required TPrivilegeScope scope
 
   // The ID of the role this privilege belongs to.
-  3: required i32 role_id
+  4: optional i32 role_id
+
+  // Set if scope is SERVER, URI, DATABASE, or TABLE
+  5: optional string server_name
+
+  // Set if scope is DATABASE or TABLE
+  6: optional string db_name
+
+  // Unqualified table name. Set if scope is TABLE.
+  7: optional string table_name
+
+  // Set if scope is URI
+  8: optional string uri
 }
 
 // Thrift representation of an HdfsCachePool.

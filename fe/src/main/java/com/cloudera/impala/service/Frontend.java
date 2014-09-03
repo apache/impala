@@ -201,7 +201,15 @@ public class Frontend {
     if (!req.is_delta) catalog = new ImpaladCatalog();
 
     TUpdateCatalogCacheResponse response = catalog.updateCatalog(req);
-    if (!req.is_delta) impaladCatalog_ = catalog;
+
+    if (!req.is_delta) {
+      // This was not a delta update. Now that the catalog has been updated,
+      // replace the references to impaladCatalog_/authzChecker_ ensure
+      // clients continue don't see the catalog disappear.
+      impaladCatalog_ = catalog;
+      authzChecker_.set(new AuthorizationChecker(authzConfig_,
+          impaladCatalog_.getAuthPolicy()));
+    }
     return response;
   }
 
@@ -386,7 +394,10 @@ public class Frontend {
       TResetMetadataRequest req = resetMetadataStmt.toThrift();
       ddl.setReset_metadata_params(req);
       metadata.setColumns(Collections.<TColumn>emptyList());
+    } else {
+      throw new IllegalStateException("Unexpected CatalogOp statement type.");
     }
+
     result.setResult_set_metadata(metadata);
     result.setCatalog_op_request(ddl);
   }
