@@ -148,6 +148,8 @@ class DictDecoderBase {
     data_decoder_.reset(new RleDecoder(buffer, buffer_len, bit_width));
   }
 
+  virtual ~DictDecoderBase() {}
+
   virtual int num_entries() const = 0;
 
  protected:

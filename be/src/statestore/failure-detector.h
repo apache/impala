@@ -39,6 +39,8 @@ class FailureDetector {
     UNKNOWN = 3
   };
 
+  virtual ~FailureDetector() {}
+
   // Updates the state of a peer according to the most recent heartbeat
   // state. If 'seen' is true, this method indicates that a heartbeat has been
   // received. If seen is 'false', this method indicates that a heartbeat has
@@ -129,7 +131,7 @@ class MissedHeartbeatFailureDetector : public FailureDetector {
   int32_t max_missed_heartbeats_;
 
   // The maximum number of heartbeats that can be missed consecutively before a
-  // peer is suspected of failre.
+  // peer is suspected of failure.
   int32_t suspect_missed_heartbeats_;
 
   // Number of consecutive heartbeats missed by peer.
