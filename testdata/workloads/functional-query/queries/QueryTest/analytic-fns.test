@@ -385,3 +385,73 @@ true,0,146000,146000
 ---- TYPES
 BOOLEAN, BIGINT, BIGINT, BIGINT
 ====
+---- QUERY
+# Tests rank()
+select year, month, bool_col, tinyint_col,
+rank() over (partition by year, month order by bool_col, tinyint_col)
+from alltypes
+where tinyint_col < 2 and month < 3 and (id % 100 < 10)
+order by year, month, bool_col, tinyint_col
+---- RESULTS
+2009,1,false,1,1
+2009,1,false,1,1
+2009,1,false,1,1
+2009,1,false,1,1
+2009,1,true,0,5
+2009,1,true,0,5
+2009,1,true,0,5
+2009,1,true,0,5
+2009,2,false,1,1
+2009,2,false,1,1
+2009,2,true,0,3
+2009,2,true,0,3
+2010,1,false,1,1
+2010,1,false,1,1
+2010,1,false,1,1
+2010,1,true,0,4
+2010,1,true,0,4
+2010,1,true,0,4
+2010,2,false,1,1
+2010,2,false,1,1
+2010,2,false,1,1
+2010,2,true,0,4
+2010,2,true,0,4
+2010,2,true,0,4
+---- TYPES
+INT, INT, BOOLEAN, TINYINT, BIGINT
+====
+---- QUERY
+# Tests dense_rank()
+select month, bool_col, tinyint_col,
+dense_rank() over (partition by month order by bool_col, tinyint_col)
+from alltypes
+where year = 2009 and tinyint_col < 5 and month < 3 and (id % 100 < 4)
+order by month, bool_col, tinyint_col
+---- RESULTS
+1,false,1,1
+1,false,1,1
+1,false,1,1
+1,false,1,1
+1,false,3,2
+1,false,3,2
+1,false,3,2
+1,false,3,2
+1,true,0,3
+1,true,0,3
+1,true,0,3
+1,true,0,3
+1,true,2,4
+1,true,2,4
+1,true,2,4
+1,true,2,4
+2,false,1,1
+2,false,1,1
+2,false,3,2
+2,false,3,2
+2,true,0,3
+2,true,0,3
+2,true,2,4
+2,true,2,4
+---- TYPES
+INT, BOOLEAN, TINYINT, BIGINT
+====

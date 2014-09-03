@@ -93,6 +93,7 @@ public class AnalyticEvalNode extends PlanNode {
   public void init(Analyzer analyzer) throws InternalException {
     // TODO: deal with conjuncts
     computeMemLayout(analyzer);
+    intermediateTupleDesc_.computeMemLayout();
 
     // do this at the end so it can take all conjuncts into account
     computeStats(analyzer);

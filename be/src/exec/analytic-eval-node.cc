@@ -27,20 +27,20 @@ namespace impala {
 AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
-    intermediate_tuple_id_(tnode.analytic_node.intermediate_tuple_id),
-    output_tuple_id_(tnode.analytic_node.output_tuple_id),
+    intermediate_tuple_desc_(
+        descs.GetTupleDescriptor(tnode.analytic_node.intermediate_tuple_id)),
+    result_tuple_desc_(
+        descs.GetTupleDescriptor(tnode.analytic_node.output_tuple_id)),
     fn_scope_(GetAnalyticFnScope(tnode.analytic_node)),
     window_(tnode.analytic_node.window),
     current_tuple_(NULL),
-    num_owned_output_tuples_(0),
+    dummy_result_tuple_(NULL),
+    num_owned_result_tuples_(0),
     current_partition_stream_idx_(0),
     prev_input_row_(NULL),
     input_row_idx_(0),
     input_eos_(false),
     evaluation_timer_(NULL) {
-  // TODO: Properly handle different intermediate and output tuples.
-  DCHECK_EQ(tnode.analytic_node.output_tuple_id,
-      tnode.analytic_node.intermediate_tuple_id);
 }
 
 AnalyticEvalNode::AnalyticFnScope AnalyticEvalNode::GetAnalyticFnScope(
@@ -57,7 +57,7 @@ Status AnalyticEvalNode::Init(const TPlanNode& tnode) {
   for (int i = 0; i < analytic_node.analytic_functions.size(); ++i) {
     AggFnEvaluator* evaluator;
     RETURN_IF_ERROR(AggFnEvaluator::Create(
-          pool_, analytic_node.analytic_functions[i], &evaluator));
+          pool_, analytic_node.analytic_functions[i], true, &evaluator));
     evaluators_.push_back(evaluator);
   }
   DCHECK(fn_scope_ != PARTITION || analytic_node.order_by_exprs.empty());
@@ -72,37 +72,23 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   DCHECK(child(0)->row_desc().IsPrefixOf(row_desc()));
-  output_tuple_pool_.reset(new MemPool(mem_tracker()));
+  result_tuple_pool_.reset(new MemPool(mem_tracker()));
   mem_pool_.reset(new MemPool(mem_tracker()));
   evaluation_timer_ = ADD_TIMER(runtime_profile(), "EvaluationTime");
-  input_batch_.reset(new RowBatch(child(0)->row_desc(), state->batch_size(),
+  input_stream_batch_.reset(new RowBatch(child(0)->row_desc(), state->batch_size(),
       mem_tracker()));
 
   fn_ctxs_.resize(evaluators_.size());
-  intermediate_tuple_desc_ =
-      state->desc_tbl().GetTupleDescriptor(intermediate_tuple_id_);
-  output_tuple_desc_ = state->desc_tbl().GetTupleDescriptor(output_tuple_id_);
-  DCHECK_EQ(output_tuple_desc_->slots().size(), evaluators_.size());
+  DCHECK_EQ(result_tuple_desc_->slots().size(), evaluators_.size());
   for (int i = 0; i < evaluators_.size(); ++i) {
-    // TODO: These should be different slots once we fully support
-    // different intermediate and output tuples.
     RETURN_IF_ERROR(evaluators_[i]->Prepare(state, child(0)->row_desc(),
-        output_tuple_desc_->slots()[i], output_tuple_desc_->slots()[i],
+        intermediate_tuple_desc_->slots()[i], result_tuple_desc_->slots()[i],
         mem_pool_.get(), &fn_ctxs_[i]));
     state->obj_pool()->Add(fn_ctxs_[i]);
   }
   RETURN_IF_ERROR(partition_exprs_.Prepare(state, child(0)->row_desc(), row_descriptor_));
   RETURN_IF_ERROR(ordering_exprs_.Prepare(state, child(0)->row_desc(), row_descriptor_));
   return Status::OK;
-}
-
-inline Tuple* AnalyticEvalNode::CreateOutputTuple() {
-  Tuple* result = Tuple::Create(output_tuple_desc_->byte_size(),
-      output_tuple_pool_.get());
-  ++num_owned_output_tuples_;
-  DCHECK(current_tuple_ != NULL);
-  memcpy(result, current_tuple_, output_tuple_desc_->byte_size());
-  return result;
 }
 
 Status AnalyticEvalNode::Open(RuntimeState* state) {
@@ -130,22 +116,33 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
       ordering_exprs_.lhs_ordering_expr_ctxs(),
       ordering_exprs_.rhs_ordering_expr_ctxs(), false, false));
 
-  // Only allocated once, output tuples are allocated from output_tuple_pool_ and copy
-  // the intermediate state from current_tuple_.
-  current_tuple_ = Tuple::Create(output_tuple_desc_->byte_size(), mem_pool_.get());
+  // An intermediate tuple is only allocated once and is reused.
+  current_tuple_ = Tuple::Create(intermediate_tuple_desc_->byte_size(), mem_pool_.get());
   AggFnEvaluator::Init(evaluators_, fn_ctxs_, current_tuple_);
+  dummy_result_tuple_ = Tuple::Create(result_tuple_desc_->byte_size(), mem_pool_.get());
 
-  // Initialize and process the first input batch so that some initial state can be
-  // set here to avoid special casing in GetNext().
+  // Initialize state for the first partition.
   InitPartition(0);
-  RowBatch input_batch(child(0)->row_desc(), state->batch_size(), mem_tracker());
+
+  // Fetch the first input batch so that some prev_input_row_ can be set here to avoid
+  // special casing in GetNext().
+  prev_child_batch_.reset(new RowBatch(child(0)->row_desc(), state->batch_size(),
+      mem_tracker()));
+  current_child_batch_.reset(new RowBatch(child(0)->row_desc(), state->batch_size(),
+      mem_tracker()));
   while (!input_eos_ && prev_input_row_ == NULL) {
-    RETURN_IF_ERROR(child(0)->GetNext(state, &input_batch, &input_eos_));
-    if (input_batch.num_rows() > 0) {
-      prev_input_row_ = input_batch.GetRow(0);
-      RETURN_IF_ERROR(ProcessInputBatch(state, &input_batch));
+    RETURN_IF_ERROR(child(0)->GetNext(state, current_child_batch_.get(), &input_eos_));
+    if (current_child_batch_->num_rows() > 0) {
+      prev_input_row_ = current_child_batch_->GetRow(0);
+    } else {
+      // Empty batch, still need to reset.
+      current_child_batch_->Reset();
     }
-    input_batch.Reset();
+  }
+  if (prev_input_row_ == NULL) {
+    DCHECK(input_eos_);
+    // Delete current_child_batch_ to indicate there is no batch to process in GetNext()
+    current_child_batch_.reset();
   }
   return Status::OK;
 }
@@ -207,42 +204,50 @@ string AnalyticEvalNode::DebugEvaluatedRowsString() const {
   return ss.str();
 }
 
-void AnalyticEvalNode::FinalizeOutputTuple(int64_t stream_idx) {
-  VLOG_ROW << "FinalizeOutputTuple idx=" << stream_idx;
+void AnalyticEvalNode::AddResultTuple(int64_t stream_idx) {
+  VLOG_ROW << "AddResultTuple idx=" << stream_idx;
   DCHECK(current_tuple_ != NULL);
-  Tuple* output_tuple = CreateOutputTuple();
+  Tuple* result_tuple = Tuple::Create(result_tuple_desc_->byte_size(),
+      result_tuple_pool_.get());
+  ++num_owned_result_tuples_;
   for (int i = 0; i < evaluators_.size(); ++i) {
-    // TODO: Currently assumes UDAs can call Finalize() repeatedly, will need to change
-    // for functions that have different intermediate state.
-    evaluators_[i]->Finalize(fn_ctxs_[i], output_tuple, output_tuple);
+    // TODO: Assumes we can call GetValue() or Finalize() repeatedly; need to register
+    // agg fns as being compatible for analytic fn evaluation.
+    if (evaluators_[i]->SupportsGetValue()) {
+      evaluators_[i]->GetValue(fn_ctxs_[i], current_tuple_, result_tuple);
+    } else {
+      evaluators_[i]->Finalize(fn_ctxs_[i], current_tuple_, result_tuple);
+    }
   }
   DCHECK(result_tuples_.empty() || stream_idx > result_tuples_.back().first)
       << "stream_idx=" << stream_idx << " state:" << DebugEvaluatedRowsString();
   result_tuples_.push_back(
-      pair<int64_t, Tuple*>(stream_idx, output_tuple));
-  VLOG_ROW << "Added output tuple, final state: " << DebugEvaluatedRowsString();
+      pair<int64_t, Tuple*>(stream_idx, result_tuple));
+  VLOG_ROW << "Added result tuple, final state: " << DebugEvaluatedRowsString();
 }
 
-inline void AnalyticEvalNode::TryFinalizePrevRow(bool next_partition, int64_t stream_idx,
-    TupleRow* row) {
+inline void AnalyticEvalNode::TryAddResultTupleForPrevRow(bool next_partition,
+    int64_t stream_idx, TupleRow* row) {
   // The analytic fns are finalized after the previous row if we found a new partition
   // or the window is a RANGE and the order by exprs changed. For ROWS windows we do not
   // need to compare the current row to the previous row.
-  VLOG_ROW << "TryFinalizePrevRow partition=" << next_partition << " idx=" << stream_idx;
+  VLOG_ROW << "TryAddResultTupleForPrevRow partition=" << next_partition
+           << " idx=" << stream_idx;
   if (fn_scope_ == ROWS) return;
   if (next_partition || (fn_scope_ == RANGE &&
       0 != ordering_comparator_->Compare(prev_input_row_, row))) {
-    FinalizeOutputTuple(stream_idx - 1);
+    AddResultTuple(stream_idx - 1);
   }
 }
 
-inline void AnalyticEvalNode::TryFinalizeCurrentRow(int64_t stream_idx, TupleRow* row) {
-  VLOG_ROW << "TryFinalizeCurrentRow idx=" << stream_idx;
+inline void AnalyticEvalNode::TryAddResultTupleForCurrRow(int64_t stream_idx,
+    TupleRow* row) {
+  VLOG_ROW << "TryAddResultTupleForCurrRow idx=" << stream_idx;
   // Analytic functions are only finalized for the current row for ROWS windows.
   if (fn_scope_ != ROWS) return;
   DCHECK(window_.__isset.window_end);
   if (stream_idx - rows_end_idx() < current_partition_stream_idx_) return;
-  FinalizeOutputTuple(stream_idx - rows_end_idx());
+  AddResultTuple(stream_idx - rows_end_idx());
 }
 
 inline void AnalyticEvalNode::InitPartition(int64_t stream_idx) {
@@ -260,53 +265,56 @@ inline void AnalyticEvalNode::InitPartition(int64_t stream_idx) {
 
   if (fn_scope_ == ROWS && current_partition_stream_idx_ > 0 &&
       window_.window_end.type == TAnalyticWindowBoundaryType::FOLLOWING) {
-    FinalizeOutputTuple(current_partition_stream_idx_ - 1);
+    AddResultTuple(current_partition_stream_idx_ - 1);
   }
 
   VLOG_ROW << "Reset current_tuple";
-  AggFnEvaluator::Finalize(evaluators_, fn_ctxs_, current_tuple_, current_tuple_);
-  current_tuple_->Init(output_tuple_desc_->byte_size());
+  // Call finalize to release resources; result is not needed but the dst tuple must be
+  // a tuple described by result_tuple_desc_.
+  AggFnEvaluator::Finalize(evaluators_, fn_ctxs_, current_tuple_, dummy_result_tuple_);
+  // Re-initialize current_tuple_.
+  current_tuple_->Init(intermediate_tuple_desc_->byte_size());
   AggFnEvaluator::Init(evaluators_, fn_ctxs_, current_tuple_);
 
-  // Add an output tuple containing values set by Init() (e.g. NULL for sum(), 0 for
+  // Add a result tuple containing values set by Init() (e.g. NULL for sum(), 0 for
   // count()) for output rows that have no input rows in the window. We need to add this
   // result tuple before any input rows are consumed and the evaluators are updated.
   if (fn_scope_ == ROWS &&
       window_.window_end.type == TAnalyticWindowBoundaryType::PRECEDING) {
-    FinalizeOutputTuple(current_partition_stream_idx_ - rows_end_idx() - 1);
+    AddResultTuple(current_partition_stream_idx_ - rows_end_idx() - 1);
   }
 }
 
-Status AnalyticEvalNode::ProcessInputBatch(RuntimeState* state, RowBatch* row_batch) {
+Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
   // TODO: DCHECK input is sorted (even just first row vs prev_input_row_)
-  VLOG_ROW << "ProcessInputBatch: " << DebugEvaluatedRowsString()
-           << " input num_rows=" << row_batch->num_rows();
+  VLOG_ROW << "ProcessChildBatch: " << DebugEvaluatedRowsString()
+           << " input batch num_rows=" << current_child_batch_->num_rows();
   SCOPED_TIMER(evaluation_timer_);
   // BufferedTupleStream::num_rows() returns the total number of rows that have been
   // inserted into the stream (it does not decrease when we read rows), so the index of
   // the next input row that will be inserted will be the current size of the stream.
   int64_t stream_idx = input_stream_->num_rows();
-  for (int i = 0; i < row_batch->num_rows(); ++i, ++stream_idx) {
-    TupleRow* row = row_batch->GetRow(i);
+  for (int i = 0; i < current_child_batch_->num_rows(); ++i, ++stream_idx) {
+    TupleRow* row = current_child_batch_->GetRow(i);
 
     // Every row is first compared against the previous row to determine if (a) the row
     // starts a new partition or (b) the row does not share the same values for the
     // ordering exprs. When either of these occurs, the evaluators_ are finalized and
     // the result tuple is added to result_tuples_ so that it may be added to output
     // rows in GetNextOutputBatch(). When a new partition is found (a), a new, empty
-    // output tuple is created and initialized over the evaluators_. If the row has
+    // result tuple is created and initialized over the evaluators_. If the row has
     // different values for the ordering exprs (b), then a new tuple is created but
     // copied from current_tuple_ because the original is used for one or more previous
     // row(s) but the incremental state still applies to the current row.
     // TODO: Replace TupleRowComparators with predicates (to be generated by the planner)
     bool next_partition = 0 != partition_comparator_->Compare(prev_input_row_, row);
-    TryFinalizePrevRow(next_partition, stream_idx, row);
+    TryAddResultTupleForPrevRow(next_partition, stream_idx, row);
     if (next_partition) InitPartition(stream_idx);
 
     // The evaluators_ are updated with the current row.
     VLOG_ROW << "UpdateRow idx=" << stream_idx;
     AggFnEvaluator::Update(evaluators_, fn_ctxs_, row, current_tuple_);
-    TryFinalizeCurrentRow(stream_idx, row);
+    TryAddResultTupleForCurrRow(stream_idx, row);
 
     if (UNLIKELY(!input_stream_->AddRow(row))) {
       // AddRow returns false if an error occurs (available via status()) or there is
@@ -331,7 +339,7 @@ Status AnalyticEvalNode::ProcessInputBatch(RuntimeState* state, RowBatch* row_ba
   // We need to add the results for the last row(s).
   if (input_eos_ && (result_tuples_.empty() ||
       result_tuples_.back().first < stream_idx - 1)) {
-    FinalizeOutputTuple(stream_idx - 1);
+    AddResultTuple(stream_idx - 1);
   }
   return Status::OK;
 }
@@ -349,16 +357,16 @@ Status AnalyticEvalNode::GetNextOutputBatch(RowBatch* output_batch, bool* eos) {
   ExprContext** ctxs = &conjunct_ctxs_[0];
   int num_ctxs = conjunct_ctxs_.size();
   while (true) {
-    // Copy rows until we hit the limit/capacity or exhaust input_batch_
+    // Copy rows until we hit the limit/capacity or exhaust input_stream_batch_
     while (!ReachedLimit() && !output_batch->AtCapacity() &&
-        input_row_idx_ < input_batch_->num_rows()) {
+        input_row_idx_ < input_stream_batch_->num_rows()) {
       DCHECK(!result_tuples_.empty());
-      TupleRow* src = input_batch_->GetRow(input_row_idx_);
+      TupleRow* src = input_stream_batch_->GetRow(input_row_idx_);
       ++input_row_idx_;
       TupleRow* dest = output_batch->GetRow(output_batch->AddRow());
       // CopyRow works as expected: input_batch tuples form a prefix of output_batch
       // tuples.
-      input_batch_->CopyRow(src, dest);
+      input_stream_batch_->CopyRow(src, dest);
       dest->SetTuple(num_child_tuples, result_tuples_.front().second);
 
       if (ExecNode::EvalConjuncts(ctxs, num_ctxs, dest)) {
@@ -375,8 +383,8 @@ Status AnalyticEvalNode::GetNextOutputBatch(RowBatch* output_batch, bool* eos) {
     }
     if (output_batch->AtCapacity()) return Status::OK;
 
-    input_batch_->TransferResourceOwnership(output_batch);
-    input_batch_->Reset();
+    input_stream_batch_->TransferResourceOwnership(output_batch);
+    input_stream_batch_->Reset();
     input_row_idx_ = 0;
     if (ReachedLimit() || input_stream_->rows_returned() == input_stream_->num_rows()) {
       *eos = true;
@@ -385,7 +393,7 @@ Status AnalyticEvalNode::GetNextOutputBatch(RowBatch* output_batch, bool* eos) {
 
     // Need more rows
     bool stream_eos = false;
-    RETURN_IF_ERROR(input_stream_->GetNext(input_batch_.get(), &stream_eos));
+    RETURN_IF_ERROR(input_stream_->GetNext(input_stream_batch_.get(), &stream_eos));
     DCHECK(!stream_eos || input_stream_->rows_returned() == input_stream_->num_rows());
   }
   return Status::OK;
@@ -406,20 +414,26 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
   }
 
   // Processes input row batches until there are enough rows that are ready to return.
-  RowBatch input_batch(child(0)->row_desc(), state->batch_size(), mem_tracker());
   int64_t num_rows_to_return = -1;
-  while (!input_eos_ && num_rows_to_return < state->batch_size()) {
+  while (current_child_batch_.get() != NULL && num_rows_to_return < state->batch_size()) {
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(state->CheckQueryState());
-    RETURN_IF_ERROR(child(0)->GetNext(state, &input_batch, &input_eos_));
-    RETURN_IF_ERROR(ProcessInputBatch(state, &input_batch));
+    RETURN_IF_ERROR(ProcessChildBatch(state));
     // result_tuples_ should be bounded by 2x the row batch size because we return
     // output batches when there are enough rows to return.
     DCHECK_LT(result_tuples_.size(), 2 * state->batch_size());
-    input_batch.Reset();
+    if (input_eos_) {
+      // Already processed the last child batch. Clean up and break.
+      current_child_batch_.reset();
+      prev_child_batch_.reset();
+      break;
+    }
+    prev_child_batch_->Reset();
+    prev_child_batch_.swap(current_child_batch_);
+    RETURN_IF_ERROR(child(0)->GetNext(state, current_child_batch_.get(), &input_eos_));
     if (!result_tuples_.empty()) {
       // Compute the number of rows that are ready to be returned, i.e. rows in
-      // input_stream_ that have an output tuple (containing the analytic fn results) in
+      // input_stream_ that have a result tuple (containing the analytic fn results) in
       // result_tuples_. If there is at least enough rows to return an entire row
       // batch, break out of the input row processing loop to return a row batch.
       int64_t last_evaluated_row_idx = result_tuples_.back().first;
@@ -430,13 +444,13 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
 
   bool output_eos = false;
   RETURN_IF_ERROR(GetNextOutputBatch(row_batch, &output_eos));
-  if (input_eos_ && output_eos) *eos = true;
+  if (current_child_batch_.get() == NULL && output_eos) *eos = true;
 
-  // When the number of tuples allocated from output_tuple_pool_ reaches the row batch
+  // When the number of tuples allocated from result_tuple_pool_ reaches the row batch
   // size, transfer resources to the output row batch so that resources don't accumulate.
-  if (num_owned_output_tuples_ >= state->batch_size()) {
-    row_batch->tuple_data_pool()->AcquireData(output_tuple_pool_.get(), !*eos);
-    num_owned_output_tuples_ = 0;
+  if (num_owned_result_tuples_ >= state->batch_size()) {
+    row_batch->tuple_data_pool()->AcquireData(result_tuple_pool_.get(), !*eos);
+    num_owned_result_tuples_ = 0;
   }
 
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
@@ -450,14 +464,16 @@ void AnalyticEvalNode::Close(RuntimeState* state) {
   DCHECK_EQ(evaluators_.size(), fn_ctxs_.size());
   for (int i = 0; i < evaluators_.size(); ++i) {
     // Need to make sure finalize is called in case there is any state to clean up.
-    evaluators_[i]->Finalize(fn_ctxs_[i], current_tuple_, current_tuple_);
+    evaluators_[i]->Finalize(fn_ctxs_[i], current_tuple_, dummy_result_tuple_);
     evaluators_[i]->Close(state);
     fn_ctxs_[i]->impl()->Close();
   }
   partition_exprs_.Close(state);
   ordering_exprs_.Close(state);
-  if (input_batch_.get() != NULL) input_batch_.reset();
-  if (output_tuple_pool_.get() != NULL) output_tuple_pool_->FreeAll();
+  if (prev_child_batch_.get() != NULL) prev_child_batch_.reset();
+  if (current_child_batch_.get() != NULL) current_child_batch_.reset();
+  if (input_stream_batch_.get() != NULL) input_stream_batch_.reset();
+  if (result_tuple_pool_.get() != NULL) result_tuple_pool_->FreeAll();
   if (mem_pool_.get() != NULL) mem_pool_->FreeAll();
   ExecNode::Close(state);
 }

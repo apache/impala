@@ -296,7 +296,8 @@ public class Function implements CatalogObject {
           Type.fromThrift(aggFn.getIntermediate_type()),
           new HdfsUri(fn.getHdfs_location()), aggFn.getUpdate_fn_symbol(),
           aggFn.getInit_fn_symbol(), aggFn.getSerialize_fn_symbol(),
-          aggFn.getMerge_fn_symbol(), aggFn.getFinalize_fn_symbol());
+          aggFn.getMerge_fn_symbol(), aggFn.getGet_value_fn_symbol(),
+          null, aggFn.getFinalize_fn_symbol());
     } else {
       // In the case where we are trying to look up the object, we only have the
       // signature.

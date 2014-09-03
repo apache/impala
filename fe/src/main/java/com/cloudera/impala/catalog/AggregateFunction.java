@@ -25,6 +25,7 @@ import com.cloudera.impala.thrift.TFunctionBinaryType;
 
 /**
  * Internal representation of an aggregate function.
+ * TODO: Create separate AnalyticFunction class
  */
 public class AggregateFunction extends Function {
   // Set if different from retType_, null otherwise.
@@ -36,6 +37,8 @@ public class AggregateFunction extends Function {
   private String initFnSymbol_;
   private String serializeFnSymbol_;
   private String mergeFnSymbol_;
+  private String getValueFnSymbol_;
+  private String removeFnSymbol_;
   private String finalizeFnSymbol_;
 
   private static String BE_BUILTINS_CLASS = "AggregateFunctions";
@@ -56,7 +59,8 @@ public class AggregateFunction extends Function {
   public AggregateFunction(FunctionName fnName, List<Type> argTypes,
       Type retType, Type intermediateType,
       HdfsUri location, String updateFnSymbol, String initFnSymbol,
-      String serializeFnSymbol, String mergeFnSymbol, String finalizeFnSymbol) {
+      String serializeFnSymbol, String mergeFnSymbol, String getValueFnSymbol,
+      String removeFnSymbol, String finalizeFnSymbol) {
     super(fnName, argTypes, retType, false);
     setLocation(location);
     intermediateType_ = (intermediateType.equals(retType)) ? null : intermediateType;
@@ -64,6 +68,8 @@ public class AggregateFunction extends Function {
     initFnSymbol_ = initFnSymbol;
     serializeFnSymbol_ = serializeFnSymbol;
     mergeFnSymbol_ = mergeFnSymbol;
+    getValueFnSymbol_ = getValueFnSymbol;
+    removeFnSymbol_ = removeFnSymbol;
     finalizeFnSymbol_ = finalizeFnSymbol;
     ignoresDistinct_ = false;
     needsAnalyticExpr_ = false;
@@ -72,11 +78,10 @@ public class AggregateFunction extends Function {
   public static AggregateFunction createBuiltin(Db db, String name,
       List<Type> argTypes, Type retType, Type intermediateType,
       String initFnSymbol, String updateFnSymbol, String mergeFnSymbol,
-      String serializeFnSymbol, String finalizeFnSymbol,
-      boolean ignoresDistinct) {
+      String serializeFnSymbol, String finalizeFnSymbol, boolean ignoresDistinct) {
     AggregateFunction fn = new AggregateFunction(new FunctionName(db.getName(), name),
         argTypes, retType, intermediateType, null, updateFnSymbol, initFnSymbol,
-        serializeFnSymbol, mergeFnSymbol, finalizeFnSymbol);
+        serializeFnSymbol, mergeFnSymbol, null, null, finalizeFnSymbol);
     fn.setBinaryType(TFunctionBinaryType.BUILTIN);
     fn.ignoresDistinct_ = ignoresDistinct;
     fn.needsAnalyticExpr_ = false;
@@ -84,12 +89,27 @@ public class AggregateFunction extends Function {
   }
 
   public static AggregateFunction createAnalyticBuiltin(Db db, String name,
-      List<Type> argTypes, Type retType, Type intermediateType) {
+      List<Type> argTypes, Type retType, Type intermediateType,
+      String initFnSymbol, String updateFnSymbol, String removeFnSymbol,
+      String getValueFnSymbol, String finalizeFnSymbol) {
     AggregateFunction fn = new AggregateFunction(new FunctionName(db.getName(), name),
-        argTypes, retType, intermediateType, null, null, null, null, null, null);
+        argTypes, retType, intermediateType, null, updateFnSymbol, initFnSymbol,
+        null, null, getValueFnSymbol, null, finalizeFnSymbol);
     fn.setBinaryType(TFunctionBinaryType.BUILTIN);
     fn.ignoresDistinct_ = false;
     fn.needsAnalyticExpr_ = true;
+    return fn;
+  }
+
+  public static AggregateFunction createAnalyticBuiltin(Db db, String name,
+      List<Type> argTypes, Type retType, Type intermediateType) {
+    AggregateFunction fn = new AggregateFunction(new FunctionName(db.getName(), name),
+        argTypes, retType, intermediateType, null, null, null, null, null, null, null,
+        null);
+    fn.setBinaryType(TFunctionBinaryType.BUILTIN);
+    fn.ignoresDistinct_ = false;
+    fn.needsAnalyticExpr_ = true;
+    fn.setUserVisible(true);
     return fn;
   }
 
@@ -97,6 +117,8 @@ public class AggregateFunction extends Function {
   public String getInitFnSymbol() { return initFnSymbol_; }
   public String getSerializeFnSymbol() { return serializeFnSymbol_; }
   public String getMergeFnSymbol() { return mergeFnSymbol_; }
+  public String getGetValueFnSymbol() { return getValueFnSymbol_; }
+  public String getRemoveFnSymbol() { return removeFnSymbol_; }
   public String getFinalizeFnSymbol() { return finalizeFnSymbol_; }
   public boolean ignoresDistinct() { return ignoresDistinct_; }
   public boolean needsAnalyticExpr() { return needsAnalyticExpr_; }
@@ -110,6 +132,8 @@ public class AggregateFunction extends Function {
   public void setInitFnSymbol(String fn) { initFnSymbol_ = fn; }
   public void setSerializeFnSymbol(String fn) { serializeFnSymbol_ = fn; }
   public void setMergeFnSymbol(String fn) { mergeFnSymbol_ = fn; }
+  public void setGetValueFnSymbol(String fn) { getValueFnSymbol_ = fn; }
+  public void setRemoveFnSymbol(String fn) { removeFnSymbol_ = fn; }
   public void setFinalizeFnSymbol(String fn) { finalizeFnSymbol_ = fn; }
   public void setIntermediateType(Type t) { intermediateType_ = t; }
 
@@ -121,6 +145,8 @@ public class AggregateFunction extends Function {
     agg_fn.setInit_fn_symbol(initFnSymbol_);
     if (serializeFnSymbol_ != null) agg_fn.setSerialize_fn_symbol(serializeFnSymbol_);
     agg_fn.setMerge_fn_symbol(mergeFnSymbol_);
+    if (getValueFnSymbol_  != null) agg_fn.setGet_value_fn_symbol(getValueFnSymbol_);
+    if (removeFnSymbol_  != null) agg_fn.setRemove_fn_symbol(removeFnSymbol_);
     if (finalizeFnSymbol_  != null) agg_fn.setFinalize_fn_symbol(finalizeFnSymbol_);
     if (intermediateType_ != null) {
       agg_fn.setIntermediate_type(intermediateType_.toThrift());

@@ -73,7 +73,12 @@ class AggFnEvaluator {
   // and returned in *result. This constructs the input Expr trees for
   // this aggregate function as specified in desc. The result is returned in
   // *result.
-  static Status Create(ObjectPool* pool, const TExpr& desc,
+  static Status Create(ObjectPool* pool, const TExpr& desc, AggFnEvaluator** result);
+
+  // Creates an AggFnEvaluator object from desc. If is_analytic_fn, the evaluator is
+  // prepared for analytic function evaluation.
+  // TODO: Avoid parameter for analytic fns, should this be added to TAggregateExpr?
+  static Status Create(ObjectPool* pool, const TExpr& desc, bool is_analytic_fn,
       AggFnEvaluator** result);
 
   // Initializes the agg expr. 'desc' must be the row descriptor for the input TupleRow.
@@ -101,30 +106,47 @@ class AggFnEvaluator {
   bool is_merge() { return is_merge_; }
   AggregationOp agg_op() const { return agg_op_; }
   const std::vector<ExprContext*>& input_expr_ctxs() const { return input_expr_ctxs_; }
-  bool is_count_star() const {
-    return agg_op_ == COUNT && input_expr_ctxs_.empty();
-  }
+  bool is_count_star() const { return agg_op_ == COUNT && input_expr_ctxs_.empty(); }
   bool is_builtin() const { return fn_.binary_type == TFunctionBinaryType::BUILTIN; }
+  bool SupportsGetValue() const { return get_value_fn_ != NULL; }
+  bool SupportsRemove() const { return remove_fn_ != NULL; }
 
   static std::string DebugString(const std::vector<AggFnEvaluator*>& exprs);
   std::string DebugString() const;
 
   // Functions for different phases of the aggregation.
   void Init(FunctionContext* agg_fn_ctx, Tuple* dst);
+
+  // Updates the intermediate state dst based on the input src row.
   void Update(FunctionContext* agg_fn_ctx, TupleRow* src, Tuple* dst);
+
+  // Updates the intermediate state dst to remove the input src row, i.e. undoes
+  // Update(src, dst). Only used internally for analytic fn builtins.
+  void Remove(FunctionContext* agg_fn_ctx, TupleRow* src, Tuple* dst);
+
   void Merge(FunctionContext* agg_fn_ctx, TupleRow* src, Tuple* dst);
   void Serialize(FunctionContext* agg_fn_ctx, Tuple* dst);
   void Finalize(FunctionContext* agg_fn_ctx, Tuple* src, Tuple* dst);
+
+  // Puts the finalized value from Tuple* src in Tuple* dst just as Finalize() does.
+  // However, unlike Finalize(), GetValue() does not clean up state in src. GetValue()
+  // can be called repeatedly with the same src. Only used internally for analytic fn
+  // builtins.
+  void GetValue(FunctionContext* agg_fn_ctx, Tuple* src, Tuple* dst);
 
   // Helper functions for calling the above functions on many evaluators.
   static void Init(const std::vector<AggFnEvaluator*>& evaluators,
       const std::vector<FunctionContext*>& fn_ctxs, Tuple* dst);
   static void Update(const std::vector<AggFnEvaluator*>& evaluators,
       const std::vector<FunctionContext*>& fn_ctxs, TupleRow* src, Tuple* dst);
+  static void Remove(const std::vector<AggFnEvaluator*>& evaluators,
+      const std::vector<FunctionContext*>& fn_ctxs, TupleRow* src, Tuple* dst);
   static void Merge(const std::vector<AggFnEvaluator*>& evaluators,
       const std::vector<FunctionContext*>& fn_ctxs, TupleRow* src, Tuple* dst);
   static void Serialize(const std::vector<AggFnEvaluator*>& evaluators,
       const std::vector<FunctionContext*>& fn_ctxs, Tuple* dst);
+  static void GetValue(const std::vector<AggFnEvaluator*>& evaluators,
+      const std::vector<FunctionContext*>& fn_ctxs, Tuple* src, Tuple* dst);
   static void Finalize(const std::vector<AggFnEvaluator*>& evaluators,
       const std::vector<FunctionContext*>& fn_ctxs, Tuple* src, Tuple* dst);
 
@@ -132,17 +154,18 @@ class AggFnEvaluator {
   // the same signature as the interpreted ones above.
   // Function* GetIrInitFn();
   // Function* GetIrUpdateFn();
+  // Function* GetIrRemoveFn();
   // Function* GetIrMergeFn();
   // Function* GetIrSerializeFn();
+  // Function* GetIrGetValueFn();
   // Function* GetIrFinalizeFn();
 
  private:
-  TFunction fn_;
-  bool is_merge_; // indicates whether to Update() or Merge()
-  std::vector<ExprContext*> input_expr_ctxs_;
-
-  // The enum for some of the builtins that still require special cased logic.
-  AggregationOp agg_op_;
+  const TFunction fn_;
+  // Indicates whether to Update() or Merge()
+  const bool is_merge_;
+  // Indicates which functions must be loaded.
+  const bool is_analytic_fn_;
 
   // Slot into which Update()/Merge()/Serialize() write their result. Not owned.
   const SlotDescriptor* intermediate_slot_desc_;
@@ -150,6 +173,11 @@ class AggFnEvaluator {
   // Slot into which Finalize() results are written. Not owned. Identical to
   // intermediate_slot_desc_ if this agg fn has the same intermediate and output type.
   const SlotDescriptor* output_slot_desc_;
+
+  std::vector<ExprContext*> input_expr_ctxs_;
+
+  // The enum for some of the builtins that still require special cased logic.
+  AggregationOp agg_op_;
 
   // Created to a subclass of AnyVal for type(). We use this to convert values
   // from the UDA interface to the Expr interface.
@@ -164,12 +192,14 @@ class AggFnEvaluator {
   // Function ptrs for the different phases of the aggregate function.
   void* init_fn_;
   void* update_fn_;
+  void* remove_fn_;
   void* merge_fn_;
   void* serialize_fn_;
+  void* get_value_fn_;
   void* finalize_fn_;
 
   // Use Create() instead.
-  AggFnEvaluator(const TExprNode& desc);
+  AggFnEvaluator(const TExprNode& desc, bool is_analytic_fn);
 
   // TODO: these functions below are not extensible and we need to use codegen to
   // generate the calls into the UDA functions (like for UDFs).

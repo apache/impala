@@ -173,6 +173,34 @@ class AggregateFunctions {
 
   // Calculates the biased STDDEV, uses KnuthVar Init-Update-Merge functions
   static StringVal KnuthStddevPopFinalize(FunctionContext* context, const StringVal& val);
+
+
+  // ----------------------------- Analytic Functions ---------------------------------
+  // Analytic functions implement the UDA interface (except Merge(), Serialize()) and are
+  // used internally by the AnalyticEvalNode. Some analytic functions store intermediate
+  // state as a StringVal which is needed for multiple calls to Finalize(), so some fns
+  // also implement a (private) GetValue() method to just return the value. In that
+  // case, Finalize() is only called at the end to clean up.
+
+  // Initializes the state for RANK and DENSE_RANK
+  static void RankInit(FunctionContext*, StringVal* slot);
+
+  // Update state for RANK
+  static void RankUpdate(FunctionContext*, StringVal* dst);
+
+  // Update state for DENSE_RANK
+  static void DenseRankUpdate(FunctionContext*, StringVal* dst);
+
+  // Returns the result for RANK and prepares the state for the next Update().
+  static BigIntVal RankGetValue(FunctionContext*, StringVal& src);
+
+  // Returns the result for DENSE_RANK and prepares the state for the next Update().
+  // TODO: Implement DENSE_RANK with a single BigIntVal. Requires src can be modified,
+  // AggFnEvaluator would need to handle copying the src AnyVal back into the src slot.
+  static BigIntVal DenseRankGetValue(FunctionContext*, StringVal& src);
+
+  // Returns the result for RANK and DENSE_RANK and cleans up intermediate state in src.
+  static BigIntVal RankFinalize(FunctionContext*, StringVal& src);
 };
 
 }

@@ -1062,6 +1062,68 @@ StringVal AggregateFunctions::KnuthStddevPopFinalize(FunctionContext* ctx,
   return ToStringVal(ctx, sqrt(variance));
 }
 
+struct RankState {
+  int64_t rank;
+  int64_t count;
+  RankState() : rank(1), count(0) { }
+};
+
+void AggregateFunctions::RankInit(FunctionContext* ctx, StringVal* dst) {
+  int str_len = sizeof(RankState);
+  dst->is_null = false;
+  dst->ptr = ctx->Allocate(str_len);
+  dst->len = str_len;
+  *reinterpret_cast<RankState*>(dst->ptr) = RankState();
+}
+
+void AggregateFunctions::RankUpdate(FunctionContext* ctx, StringVal* dst) {
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(RankState));
+  RankState* state = reinterpret_cast<RankState*>(dst->ptr);
+  ++state->count;
+}
+
+void AggregateFunctions::DenseRankUpdate(FunctionContext* ctx, StringVal* dst) { }
+
+BigIntVal AggregateFunctions::RankGetValue(FunctionContext* ctx,
+    StringVal& src_val) {
+  DCHECK(!src_val.is_null);
+  DCHECK_EQ(src_val.len, sizeof(RankState));
+  RankState* state = reinterpret_cast<RankState*>(src_val.ptr);
+  DCHECK_GT(state->count, 0);
+  DCHECK_GT(state->rank, 0);
+  int64_t result = state->rank;
+
+  // Prepares future calls for the next rank
+  state->rank += state->count;
+  state->count = 0;
+  return BigIntVal(result);
+}
+
+BigIntVal AggregateFunctions::DenseRankGetValue(FunctionContext* ctx,
+    StringVal& src_val) {
+  DCHECK(!src_val.is_null);
+  DCHECK_EQ(src_val.len, sizeof(RankState));
+  RankState* state = reinterpret_cast<RankState*>(src_val.ptr);
+  DCHECK_EQ(state->count, 0);
+  DCHECK_GT(state->rank, 0);
+  int64_t result = state->rank;
+
+  // Prepares future calls for the next rank
+  ++state->rank;
+  return BigIntVal(result);
+}
+
+BigIntVal AggregateFunctions::RankFinalize(FunctionContext* ctx,
+    StringVal& src_val) {
+  DCHECK(!src_val.is_null);
+  DCHECK_EQ(src_val.len, sizeof(RankState));
+  RankState* state = reinterpret_cast<RankState*>(src_val.ptr);
+  int64_t result = state->rank;
+  ctx->Free(src_val.ptr);
+  return BigIntVal(result);
+}
+
 // Stamp out the templates for the types we need.
 template void AggregateFunctions::InitZero<BigIntVal>(FunctionContext*, BigIntVal* dst);
 

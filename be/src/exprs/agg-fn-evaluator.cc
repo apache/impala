@@ -57,12 +57,18 @@ typedef void (*UpdateFn8)(FunctionContext*, const AnyVal&, const AnyVal&,
     const AnyVal&, const AnyVal&, const AnyVal&, const AnyVal&, const AnyVal&,
     const AnyVal&, AnyVal*);
 typedef StringVal (*SerializeFn)(FunctionContext*, const StringVal&);
+typedef AnyVal (*GetValueFn)(FunctionContext*, const AnyVal&);
 typedef AnyVal (*FinalizeFn)(FunctionContext*, const AnyVal&);
 
 Status AggFnEvaluator::Create(ObjectPool* pool, const TExpr& desc,
     AggFnEvaluator** result) {
+  return Create(pool, desc, false, result);
+}
+
+Status AggFnEvaluator::Create(ObjectPool* pool, const TExpr& desc,
+    bool is_analytic_fn, AggFnEvaluator** result) {
   DCHECK_GT(desc.nodes.size(), 0);
-  *result = pool->Add(new AggFnEvaluator(desc.nodes[0]));
+  *result = pool->Add(new AggFnEvaluator(desc.nodes[0], is_analytic_fn));
   int node_idx = 0;
   for (int i = 0; i < desc.nodes[0].num_children; ++i) {
     ++node_idx;
@@ -75,12 +81,20 @@ Status AggFnEvaluator::Create(ObjectPool* pool, const TExpr& desc,
   return Status::OK;
 }
 
-AggFnEvaluator::AggFnEvaluator(const TExprNode& desc)
+AggFnEvaluator::AggFnEvaluator(const TExprNode& desc, bool is_analytic_fn)
   : fn_(desc.fn),
     is_merge_(desc.agg_expr.is_merge_agg),
+    is_analytic_fn_(is_analytic_fn),
     intermediate_slot_desc_(NULL),
     output_slot_desc_(NULL),
-    cache_entry_(NULL) {
+    cache_entry_(NULL),
+    init_fn_(NULL),
+    update_fn_(NULL),
+    remove_fn_(NULL),
+    merge_fn_(NULL),
+    serialize_fn_(NULL),
+    get_value_fn_(NULL),
+    finalize_fn_(NULL) {
   DCHECK(desc.fn.__isset.aggregate_fn);
   DCHECK(desc.node_type == TExprNodeType::AGGREGATE_EXPR);
   // TODO: remove. See comment with AggregationOp
@@ -123,10 +137,11 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
   }
   staging_intermediate_val_ = CreateAnyVal(obj_pool, intermediate_slot_desc_->type());
 
-  // Load the function pointers.
+  // Load the function pointers. Merge is not required if this is evaluating an
+  // analytic function.
   if (fn_.aggregate_fn.init_fn_symbol.empty() ||
       fn_.aggregate_fn.update_fn_symbol.empty() ||
-      fn_.aggregate_fn.merge_fn_symbol.empty()) {
+      (!is_analytic_fn_ && fn_.aggregate_fn.merge_fn_symbol.empty())) {
     // This path is only for partially implemented builtins.
     DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::BUILTIN);
     stringstream ss;
@@ -138,23 +153,33 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
       fn_.hdfs_location, fn_.aggregate_fn.init_fn_symbol, &init_fn_, &cache_entry_));
   RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
       fn_.hdfs_location, fn_.aggregate_fn.update_fn_symbol, &update_fn_, &cache_entry_));
-  RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
-      fn_.hdfs_location, fn_.aggregate_fn.merge_fn_symbol, &merge_fn_, &cache_entry_));
 
-  // Serialize and Finalize are optional
+  // Merge() is not loaded if evaluating the agg fn as an analytic function.
+  if (!is_analytic_fn_) {
+    RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(fn_.hdfs_location,
+          fn_.aggregate_fn.merge_fn_symbol, &merge_fn_, &cache_entry_));
+  }
+
+  // Serialize(), GetValue(), Remove() and Finalize() are optional
   if (!fn_.aggregate_fn.serialize_fn_symbol.empty()) {
     RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
         fn_.hdfs_location, fn_.aggregate_fn.serialize_fn_symbol, &serialize_fn_,
         &cache_entry_));
-  } else {
-    serialize_fn_ = NULL;
+  }
+  if (!fn_.aggregate_fn.get_value_fn_symbol.empty()) {
+    RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
+        fn_.hdfs_location, fn_.aggregate_fn.get_value_fn_symbol, &get_value_fn_,
+        &cache_entry_));
+  }
+  if (!fn_.aggregate_fn.remove_fn_symbol.empty()) {
+    RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
+        fn_.hdfs_location, fn_.aggregate_fn.remove_fn_symbol, &remove_fn_,
+        &cache_entry_));
   }
   if (!fn_.aggregate_fn.finalize_fn_symbol.empty()) {
     RETURN_IF_ERROR(LibCache::instance()->GetSoFunctionPtr(
         fn_.hdfs_location, fn_.aggregate_fn.finalize_fn_symbol, &finalize_fn_,
         &cache_entry_));
-  } else {
-    finalize_fn_ = NULL;
   }
 
   vector<FunctionContext::TypeDesc> arg_types;
@@ -355,6 +380,10 @@ void AggFnEvaluator::Merge(FunctionContext* agg_fn_ctx, TupleRow* row, Tuple* ds
   return UpdateOrMerge(agg_fn_ctx, row, dst, merge_fn_);
 }
 
+void AggFnEvaluator::Remove(FunctionContext* agg_fn_ctx, TupleRow* row, Tuple* dst) {
+  return UpdateOrMerge(agg_fn_ctx, row, dst, remove_fn_);
+}
+
 void AggFnEvaluator::SerializeOrFinalize(FunctionContext* agg_fn_ctx, Tuple* src,
     const SlotDescriptor* dst_slot_desc, Tuple* dst, void* fn) {
   // No fn was given and the src and dst are identical. Nothing to be done.
@@ -451,6 +480,10 @@ void AggFnEvaluator::Finalize(FunctionContext* agg_fn_ctx, Tuple* src, Tuple* ds
   SerializeOrFinalize(agg_fn_ctx, src, output_slot_desc_, dst, finalize_fn_);
 }
 
+void AggFnEvaluator::GetValue(FunctionContext* agg_fn_ctx, Tuple* src, Tuple* dst) {
+  SerializeOrFinalize(agg_fn_ctx, src, output_slot_desc_, dst, get_value_fn_);
+}
+
 string AggFnEvaluator::DebugString(const vector<AggFnEvaluator*>& exprs) {
   stringstream out;
   out << "[";
@@ -475,6 +508,13 @@ void AggFnEvaluator::Update(const vector<AggFnEvaluator*>& evaluators,
     evaluators[i]->Update(fn_ctxs[i], src, dst);
   }
 }
+void AggFnEvaluator::Remove(const vector<AggFnEvaluator*>& evaluators,
+      const vector<FunctionContext*>& fn_ctxs, TupleRow* src, Tuple* dst) {
+  DCHECK_EQ(evaluators.size(), fn_ctxs.size());
+  for (int i = 0; i < evaluators.size(); ++i) {
+    evaluators[i]->Remove(fn_ctxs[i], src, dst);
+  }
+}
 void AggFnEvaluator::Merge(const vector<AggFnEvaluator*>& evaluators,
       const vector<FunctionContext*>& fn_ctxs, TupleRow* src, Tuple* dst) {
   DCHECK_EQ(evaluators.size(), fn_ctxs.size());
@@ -487,6 +527,13 @@ void AggFnEvaluator::Serialize(const vector<AggFnEvaluator*>& evaluators,
   DCHECK_EQ(evaluators.size(), fn_ctxs.size());
   for (int i = 0; i < evaluators.size(); ++i) {
     evaluators[i]->Serialize(fn_ctxs[i], dst);
+  }
+}
+void AggFnEvaluator::GetValue(const vector<AggFnEvaluator*>& evaluators,
+      const vector<FunctionContext*>& fn_ctxs, Tuple* src, Tuple* dst) {
+  DCHECK_EQ(evaluators.size(), fn_ctxs.size());
+  for (int i = 0; i < evaluators.size(); ++i) {
+    evaluators[i]->GetValue(fn_ctxs[i], src, dst);
   }
 }
 void AggFnEvaluator::Finalize(const vector<AggFnEvaluator*>& evaluators,

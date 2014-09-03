@@ -245,8 +245,9 @@ public class AnalyticPlanner {
    * function calls (child[0] of every analytic expr in the window group).
    * Computes the mem layout for the returned tuple descriptors.
    */
-  private Pair<TupleDescriptor, TupleDescriptor> createPhysicalTuples(WindowGroup windowGroup,
-      ExprSubstitutionMap logicalToPhysicalSmap, List<Expr> analyticFnCalls) {
+  private Pair<TupleDescriptor, TupleDescriptor> createPhysicalTuples(
+      WindowGroup windowGroup, ExprSubstitutionMap logicalToPhysicalSmap,
+      List<Expr> analyticFnCalls) {
     // Physical intermediate and output tuples. If needed, create the intermediate
     // tuple first to maintain intermediateTupleId < outputTupleId for debugging
     // purposes and consistency with tuple creation for aggregations.
@@ -273,8 +274,9 @@ public class AnalyticPlanner {
       if (analyticInfo_.hasDiffIntermediateTuple()) {
         SlotDescriptor logicalIntermediateSlot =
             windowGroup.logicalIntermediateSlots.get(i);
-        analyzer_.addSlotDescriptor(logicalIntermediateSlot, intermediateTuple);
-        logicalIntermediateSlot.setIsMaterialized(true);
+        SlotDescriptor physicalIntermediateSlot =
+            analyzer_.addSlotDescriptor(logicalIntermediateSlot, intermediateTuple);
+        physicalIntermediateSlot.setIsMaterialized(true);
       }
       logicalToPhysicalSmap.put(new SlotRef(logicalOutputSlot),
           new SlotRef(physicalOutputSlot));
@@ -375,7 +377,6 @@ public class AnalyticPlanner {
 
   /**
    * Extract a minimal set of WindowGroups from analyticExprs.
-   * TODO: Handle non-materialized analytic expr output slots.
    */
   private List<WindowGroup> collectWindowGroups() {
     List<Expr> analyticExprs = analyticInfo_.getAnalyticExprs();
@@ -386,8 +387,8 @@ public class AnalyticPlanner {
       for (WindowGroup group: groups) {
         if (group.isCompatible(analyticExpr)) {
           group.add((AnalyticExpr) analyticInfo_.getAnalyticExprs().get(i),
-              analyticInfo_.getIntermediateTupleDesc().getSlots().get(i),
-              analyticInfo_.getOutputTupleDesc().getSlots().get(i));
+              analyticInfo_.getOutputTupleDesc().getSlots().get(i),
+              analyticInfo_.getIntermediateTupleDesc().getSlots().get(i));
           match = true;
           break;
         }
@@ -395,8 +396,8 @@ public class AnalyticPlanner {
       if (!match) {
         groups.add(new WindowGroup(
             (AnalyticExpr) analyticInfo_.getAnalyticExprs().get(i),
-            analyticInfo_.getIntermediateTupleDesc().getSlots().get(i),
-            analyticInfo_.getOutputTupleDesc().getSlots().get(i)));
+            analyticInfo_.getOutputTupleDesc().getSlots().get(i),
+            analyticInfo_.getIntermediateTupleDesc().getSlots().get(i)));
       }
     }
     return groups;

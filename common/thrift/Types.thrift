@@ -160,8 +160,11 @@ struct TAggregateFunction {
   2: required string update_fn_symbol
   3: required string init_fn_symbol
   4: optional string serialize_fn_symbol
-  5: required string merge_fn_symbol
+  5: optional string merge_fn_symbol
   6: optional string finalize_fn_symbol
+  8: optional string get_value_fn_symbol
+  9: optional string remove_fn_symbol
+
   7: optional bool ignores_distinct
 }
 

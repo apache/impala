@@ -598,11 +598,22 @@ public class BuiltinsDb extends Db {
         false));
 
     // analytic functions
-    db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
-        db, "rank", new ArrayList<Type>(), Type.BIGINT, Type.BIGINT));
-    db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
-        db, "dense_rank", new ArrayList<Type>(), Type.BIGINT,
-        Type.BIGINT));
+    // Rank
+    db.addBuiltin(AggregateFunction.createAnalyticBuiltin(db, "rank",
+        Lists.<Type>newArrayList(), Type.BIGINT, Type.STRING,
+        prefix + "8RankInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix + "10RankUpdateEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        null,
+        prefix + "12RankGetValueEPN10impala_udf15FunctionContextERNS1_9StringValE",
+        prefix + "12RankFinalizeEPN10impala_udf15FunctionContextERNS1_9StringValE"));
+    // Dense rank
+    db.addBuiltin(AggregateFunction.createAnalyticBuiltin(db, "dense_rank",
+        Lists.<Type>newArrayList(), Type.BIGINT, Type.STRING,
+        prefix + "8RankInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        prefix + "15DenseRankUpdateEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+        null,
+        prefix + "17DenseRankGetValueEPN10impala_udf15FunctionContextERNS1_9StringValE",
+        prefix + "12RankFinalizeEPN10impala_udf15FunctionContextERNS1_9StringValE"));
     db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
         db, "row_number", new ArrayList<Type>(), Type.BIGINT,
         Type.BIGINT));

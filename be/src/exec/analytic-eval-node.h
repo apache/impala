@@ -39,7 +39,7 @@ class AggFnEvaluator;
 // When enough input rows have been consumed to produce the results of all analytic
 // functions for one or more rows (e.g. because the order by values are different for a
 // RANGE window), the results of all the analytic functions for those rows are produced
-// in an output result tuple by calling Finalize() on the evaluators and storing the
+// in a result tuple by calling GetValue()/Finalize() on the evaluators and storing the
 // tuple in result_tuples_. Input row batches are fetched from the BufferedTupleStream,
 // copied into output row batches, and the associated result tuple is set in each
 // corresponding row. Result tuples may apply to many rows (e.g. an arbitrary number or
@@ -91,42 +91,38 @@ class AnalyticEvalNode : public ExecNode {
   // in the initializer list.
   static AnalyticFnScope GetAnalyticFnScope(const TAnalyticNode& node);
 
-  // Evaluates analytic functions over the input batch. Each input row is passed to the
-  // evaluators and added to input_stream_ where they are stored until a tuple
+  // Evaluates analytic functions over current_child_batch_. Each input row is passed
+  // to the evaluators and added to input_stream_ where they are stored until a tuple
   // containing the results of the analytic functions for that row is ready to be
   // returned. When enough rows have been processed so that results can be produced for
   // one or more rows, a tuple containing those results are stored in result_tuples_.
   // That tuple gets set in the associated output row(s) later in GetNextOutputBatch().
-  Status ProcessInputBatch(RuntimeState* state, RowBatch* row_batch);
+  Status ProcessChildBatch(RuntimeState* state);
 
   // Returns a batch of output rows from input_stream_ with the analytic function
   // results (from result_tuples_) set as the last tuple.
   Status GetNextOutputBatch(RowBatch* row_batch, bool* eos);
 
-  // Creates a new output tuple (described by output_tuple_desc_). If current_tuple_ is
-  // not NULL (only happens in Open() to initialize), current_tuple_ is copied into the
-  // new tuple.
-  Tuple* CreateOutputTuple();
+  // Determines if there is a window ending at the previous row, and if so, calls
+  // AddResultTuple() with the index of the previous row in input_stream_. next_partition
+  // indicates if the current row is the start of a new partition. stream_idx is the
+  // index of the current input row from input_stream_.
+  void TryAddResultTupleForPrevRow(bool next_partition, int64_t stream_idx,
+      TupleRow* row);
 
-  // Determines if there is a window ending at the previous row, and if so, finalizes an
-  // output tuple with the analytic fn results. next_partition indicates if the current
-  // row is the start of a new partition. stream_idx is the index of the current input
-  // row from input_stream_.
-  void TryFinalizePrevRow(bool next_partition, int64_t stream_idx, TupleRow* row);
-
-  // Determines if there is a window ending at the current row, and if so, finalizes an
-  // output tuple with the analytic fn results. stream_idx is the index of the current
-  // input row from input_stream_.
-  void TryFinalizeCurrentRow(int64_t stream_idx, TupleRow* row);
+  // Determines if there is a window ending at the current row, and if so, calls
+  // AddResultTuple() with the index of the current row in input_stream_. stream_idx is
+  // the index of the current input row from input_stream_.
+  void TryAddResultTupleForCurrRow(int64_t stream_idx, TupleRow* row);
 
   // Initializes state at the start of a new partition. stream_idx is the index of the
   // current input row from input_stream_.
   void InitPartition(int64_t stream_idx);
 
-  // Copies current_tuple_ to a new output tuple and finalizes over the evaluators_. The
-  // output tuple is stored in result_tuples_ with the index into input_stream_ specified
-  // by stream_idx.
-  void FinalizeOutputTuple(int64_t stream_idx);
+  // Produces a result tuple with analytic function results by calling GetValue() or
+  // Finalize() for current_tuple_ on the evaluators_. The result tuple is stored in
+  // result_tuples_ with the index into input_stream_ specified by stream_idx.
+  void AddResultTuple(int64_t stream_idx);
 
   // Gets the window start and end index offsets for ROWS windows.
   int64_t rows_start_idx() const;
@@ -138,17 +134,11 @@ class AnalyticEvalNode : public ExecNode {
   // Debug string containing the window definition.
   std::string DebugWindowString() const;
 
-  // Tuple id for storing intermediate results of analytic fn evaluation.
-  const TupleId intermediate_tuple_id_;
-
-  // Tuple id for storing results of analytic fn evaluation.
-  const TupleId output_tuple_id_;
-
   // Tuple descriptor for storing intermediate values of analytic fn evaluation.
-  TupleDescriptor* intermediate_tuple_desc_;
+  const TupleDescriptor* intermediate_tuple_desc_;
 
   // Tuple descriptor for storing results of analytic fn evaluation.
-  TupleDescriptor* output_tuple_desc_;
+  const TupleDescriptor* result_tuple_desc_;
 
   // The scope over which analytic functions are evaluated.
   // TODO: fn_scope_ and window_ are candidates to be removed during codegen
@@ -181,7 +171,7 @@ class AnalyticEvalNode : public ExecNode {
 
   // Queue of tuples which are ready to be set in output rows, with the index into
   // the input_stream_ stream of the last TupleRow that gets the Tuple. Pairs are
-  // pushed onto the queue in ProcessInputBatch() and dequeued in order in
+  // pushed onto the queue in ProcessChildBatch() and dequeued in order in
   // GetNextOutputBatch(). The size of result_tuples_ is limited by 2 times the
   // row batch size because we only process input batches if there are not enough
   // result tuples to produce a single batch of output rows. In the worst case there
@@ -190,18 +180,25 @@ class AnalyticEvalNode : public ExecNode {
   // (inserting one result tuple per input row) before returning a row batch.
   std::list<std::pair<int64_t, Tuple*> > result_tuples_;
 
-  // The output tuple described by output_tuple_desc_ storing intermediate state for
-  // the evaluators_. When enough input rows have been consumed to produce the analytic
-  // function results, a copy is created. The copy gets finalized over the evaluators
-  // to set the results and then added to result_tuples_.
+  // The tuple described by intermediate_tuple_desc_ storing intermediate state for the
+  // evaluators_. When enough input rows have been consumed to produce the analytic
+  // function results, a result tuple (described by result_tuple_desc_) is created and
+  // the agg fn results are written to that tuple by calling Finalize()/GetValue()
+  // on the evaluators with current_tuple_ as the source tuple.
   Tuple* current_tuple_;
 
-  // Pool used to allocate output tuples.
-  boost::scoped_ptr<MemPool> output_tuple_pool_;
+  // A tuple described by result_tuple_desc_ used when calling Finalize() on the
+  // evaluators_ to release resources between partitions; the value is never used.
+  // TODO: Remove when agg fns implement a separate Close() method to release resources.
+  Tuple* dummy_result_tuple_;
 
-  // Number of tuples currently owned by output_tuple_pool_. Resources are transfered
-  // to the output row batches when the number of tuples reaches the row batch size.
-  int num_owned_output_tuples_;
+  // Pool used to allocate result tuples.
+  boost::scoped_ptr<MemPool> result_tuple_pool_;
+
+  // Number of result tuples currently owned by result_tuple_pool_. Resources are
+  // transfered to the output row batches when the number of tuples reaches the row
+  // batch size.
+  int num_owned_result_tuples_;
 
   // Index of the row in input_stream_ at which the current partition started.
   int64_t current_partition_stream_idx_;
@@ -213,9 +210,18 @@ class AnalyticEvalNode : public ExecNode {
   // previous batch).
   TupleRow* prev_input_row_;
 
+  // Current and previous input row batches from the child. RowBatches are allocated
+  // once and reused. Previous input row batch owns prev_input_row_ between calls to
+  // ProcessChildBatch(). The prev batch is Reset() after calling ProcessChildBatch()
+  // and then swapped with the curr batch so the RowBatch owning prev_input_row_ is
+  // stored in prev_child_batch_ for the next call to ProcessChildBatch().
+  boost::scoped_ptr<RowBatch> prev_child_batch_;
+  boost::scoped_ptr<RowBatch> current_child_batch_;
+
+  // Block manager client used by input_stream_. Not owned.
   BufferedBlockMgr::Client* client_;
 
-  // Buffers input rows added in ProcessInputBatch() until enough rows are able to
+  // Buffers input rows added in ProcessChildBatch() until enough rows are able to
   // be returned by GetNextOutputBatch(), in which case row batches are returned from
   // the front of the stream and the underlying buffered blocks are deleted once read.
   // The number of rows that must be buffered may vary from an entire partition (e.g.
@@ -226,12 +232,12 @@ class AnalyticEvalNode : public ExecNode {
   boost::scoped_ptr<BufferedTupleStream> input_stream_;
 
   // RowBatch used to read rows from input_stream_.
-  boost::scoped_ptr<RowBatch> input_batch_;
+  boost::scoped_ptr<RowBatch> input_stream_batch_;
 
-  // Pool used for allocations that live until Close().
+  // Pool used for O(1) allocations that live until close.
   boost::scoped_ptr<MemPool> mem_pool_;
 
-  // Current index in input_batch_.
+  // Current index in input_stream_batch_.
   int input_row_idx_;
 
   // True when there are no more input rows to consume from our child.
