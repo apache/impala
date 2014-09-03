@@ -22,23 +22,31 @@ namespace impala {
 
 inline bool HashTableCtx::EvalAndHashBuild(TupleRow* row, uint32_t* hash) {
   bool has_null = EvalBuildRow(row);
-  if (!stores_nulls_ && has_null) return false;
-  *hash = HashCurrentRow();
-  return true;
+  if (!stores_nulls_ && has_null) {
+    skip_row_ = true;
+  } else {
+    *hash = HashCurrentRow();
+    skip_row_ = false;
+  }
+  return !skip_row_;
 }
 
 inline bool HashTableCtx::EvalAndHashProbe(TupleRow* row, uint32_t* hash) {
   bool has_null = EvalProbeRow(row);
-  if ((!stores_nulls_ || !finds_nulls_) && has_null) return false;
-  *hash = HashCurrentRow();
-  return true;
+  if ((!stores_nulls_ || !finds_nulls_) && has_null) {
+    skip_row_ = true;
+  } else {
+    *hash = HashCurrentRow();
+    skip_row_ = false;
+  }
+  return !skip_row_;
 }
 
-inline HashTable::Iterator HashTable::Find(HashTableCtx* ht_ctx,
-    TupleRow* probe_row) {
-  uint32_t hash;
+inline HashTable::Iterator HashTable::Find(HashTableCtx* ht_ctx) {
   DCHECK_NOTNULL(ht_ctx);
-  if (!ht_ctx->EvalAndHashProbe(probe_row, &hash)) return End();
+  if (ht_ctx->skip_row_) return End();
+  uint32_t hash = ht_ctx->hash_;
+  DCHECK_EQ(hash, ht_ctx->HashCurrentRow());
   int64_t bucket_idx = hash & (num_buckets_ - 1);
   Bucket* bucket = &buckets_[bucket_idx];
   Node* node = bucket->node;
@@ -86,16 +94,15 @@ inline HashTable::Bucket* HashTable::NextBucket(int64_t* bucket_idx) {
 }
 
 inline bool HashTable::InsertImpl(HashTableCtx* ht_ctx, void* data) {
-  uint32_t hash = ht_ctx->HashCurrentRow();
-  int64_t bucket_idx = hash & (num_buckets_ - 1);
   if (node_remaining_current_page_ == 0) {
     GrowNodeArray();
     if (UNLIKELY(mem_limit_exceeded_)) return false;
   }
+  uint32_t hash = ht_ctx->HashCurrentRow();
+  int64_t bucket_idx = hash & (num_buckets_ - 1);
   next_node_->hash = hash;
   next_node_->data = data;
   next_node_->matched = false;
-  DCHECK_GT(num_buckets_, bucket_idx);
   AddToBucket(&buckets_[bucket_idx], next_node_);
   DCHECK_GT(node_remaining_current_page_, 0);
   --node_remaining_current_page_;
@@ -183,6 +190,12 @@ inline bool HashTable::Iterator::NextUnmatched() {
       return true;
     }
   }
+}
+
+inline void HashTableCtx::set_level(int level) {
+  DCHECK_GE(level, 0);
+  DCHECK_LT(level, seeds_.size());
+  level_ = level;
 }
 
 }

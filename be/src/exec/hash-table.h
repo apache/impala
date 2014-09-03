@@ -78,6 +78,7 @@ class HashTable;
 // Inserts().  We can want to optimize joins more heavily for Inserts() (in particular
 // growing).
 // TODO: batched interface for inserts and finds.
+// TODO: do we need to check mem limit exceeded so often. Check once per batch?
 
 // Control block for a hash table.  This class contains the logic as well as the variables
 // needed by a thread to operate on a hash table.
@@ -89,13 +90,17 @@ class HashTableCtx {
   //  - stores_nulls: if false, TupleRows with nulls are ignored during Insert
   //  - finds_nulls: if false, Find() returns End() for TupleRows with nulls
   //      even if stores_nulls is true
-  //  - initial_seed: Initial seed value to use when computing hashes for rows
+  //  - initial_seed: Initial seed value to use when computing hashes for rows with
+  //    level 0. Other levels have their seeds derived from this seed.
+  //  - The max levels we will hash with.
   HashTableCtx(const std::vector<ExprContext*>& build_expr_ctxs,
       const std::vector<ExprContext*>& probe_expr_ctxs, bool stores_nulls,
-      bool finds_nulls, int32_t initial_seed);
+      bool finds_nulls, int32_t initial_seed, int max_levels);
 
   // Call to cleanup any resources.
   void Close();
+
+  void set_level(int level);
 
   // Returns the results of the exprs at 'expr_idx' evaluated over the last row
   // processed.
@@ -111,25 +116,6 @@ class HashTableCtx {
     return expr_value_null_bits_[expr_idx];
   }
 
-  // Evaluate the exprs over row and cache the results in 'expr_val_buf'.
-  // Returns whether any expr evaluated to NULL.
-  // This will be replaced by codegen.
-  bool EvalRow(TupleRow* row, const std::vector<ExprContext*>& ctxs);
-
-  // Evaluate 'row' over build exprs caching the results in 'expr_values_buffer_' This
-  // will be replaced by codegen.  We do not want this function inlined when cross
-  // compiled because we need to be able to differentiate between EvalBuildRow and
-  // EvalProbeRow by name and the build/probe exprs are baked into the codegen'd function.
-  bool IR_NO_INLINE EvalBuildRow(TupleRow* row) {
-    return EvalRow(row, build_expr_ctxs_);
-  }
-
-  // Evaluate 'row' over probe exprs caching the results in 'expr_values_buffer_'
-  // This will be replaced by codegen.
-  bool IR_NO_INLINE EvalProbeRow(TupleRow* row) {
-    return EvalRow(row, probe_expr_ctxs_);
-  }
-
   // Evaluate and hash the build/probe row, returning in *hash. Returns false if this
   // row should be rejected (doesn't need to be processed further) because it
   // contains NULL.
@@ -137,11 +123,6 @@ class HashTableCtx {
   // EvalBuildRow()/EvalProbeRow().
   bool IR_ALWAYS_INLINE EvalAndHashBuild(TupleRow* row, uint32_t* hash);
   bool IR_ALWAYS_INLINE EvalAndHashProbe(TupleRow* row, uint32_t* hash);
-
-  // Returns true if the values of build_exprs evaluated over 'build_row' equal
-  // the values cached in expr_values_buffer_.
-  // This will be replaced by codegen.
-  bool Equals(TupleRow* build_row);
 
   // Codegen for evaluating a tuple row.  Codegen'd function matches the signature
   // for EvalBuildRow and EvalTupleRow.
@@ -164,20 +145,46 @@ class HashTableCtx {
   // Compute the hash of the values in expr_values_buffer_.
   // This will be replaced by codegen.  We don't want this inlined for replacing
   // with codegen'd functions so the function name does not change.
-  uint32_t IR_NO_INLINE HashCurrentRow(int level = 0) {
-    // TODO: use level
+  uint32_t IR_NO_INLINE HashCurrentRow() {
+    DCHECK_LT(level_, seeds_.size());
+    uint32_t seed = seeds_[level_];
     if (var_result_begin_ == -1) {
       // This handles NULLs implicitly since a constant seed value was put
       // into results buffer for nulls.
-      return HashUtil::Hash(expr_values_buffer_, results_buffer_size_, initial_seed_);
+      hash_ = HashUtil::Hash(expr_values_buffer_, results_buffer_size_, seed);
     } else {
-      return HashTableCtx::HashVariableLenRow();
+      hash_ = HashTableCtx::HashVariableLenRow();
     }
+    return hash_;
+  }
+
+  // Evaluate 'row' over build exprs caching the results in 'expr_values_buffer_' This
+  // will be replaced by codegen.  We do not want this function inlined when cross
+  // compiled because we need to be able to differentiate between EvalBuildRow and
+  // EvalProbeRow by name and the build/probe exprs are baked into the codegen'd function.
+  bool IR_NO_INLINE EvalBuildRow(TupleRow* row) {
+    return EvalRow(row, build_expr_ctxs_);
+  }
+
+  // Evaluate 'row' over probe exprs caching the results in 'expr_values_buffer_'
+  // This will be replaced by codegen.
+  bool IR_NO_INLINE EvalProbeRow(TupleRow* row) {
+    return EvalRow(row, probe_expr_ctxs_);
   }
 
   // Compute the hash of the values in expr_values_buffer_ for rows with variable length
   // fields (e.g. strings)
   uint32_t HashVariableLenRow();
+
+  // Evaluate the exprs over row and cache the results in 'expr_val_buf'.
+  // Returns whether any expr evaluated to NULL.
+  // This will be replaced by codegen.
+  bool EvalRow(TupleRow* row, const std::vector<ExprContext*>& ctxs);
+
+  // Returns true if the values of build_exprs evaluated over 'build_row' equal
+  // the values cached in expr_values_buffer_.
+  // This will be replaced by codegen.
+  bool Equals(TupleRow* build_row);
 
   const std::vector<ExprContext*>& build_expr_ctxs_;
   const std::vector<ExprContext*>& probe_expr_ctxs_;
@@ -188,7 +195,13 @@ class HashTableCtx {
   // TODO: ..or with template-ization
   const bool stores_nulls_;
   const bool finds_nulls_;
-  const int32_t initial_seed_;
+
+  // The current level this context is working on. Each level needs to use a
+  // different seed.
+  int level_;
+
+  // The seeds to use for hashing. Indexed by the level.
+  std::vector<uint32_t> seeds_;
 
   // Cache of exprs values for the current row being evaluated.  This can either
   // be a build row (during Insert()) or probe row (during Find()).
@@ -207,6 +220,15 @@ class HashTableCtx {
   // Use bytes instead of bools to be compatible with llvm.  This address must
   // not change once allocated.
   uint8_t* expr_value_null_bits_;
+
+  // The hash of the current row. Valid until EvalAndHashBuild/EvalAndHashProbe
+  // is called again.
+  uint32_t hash_;
+
+  // If true, the current row can be skipped on subsequent hash table operations.
+  // It cannot match existing hash table entries and/or should not be inserted.
+  // This value is valid until EvalAndHashBuild/EvalAndHashProbe is called again.
+  bool skip_row_;
 };
 
 // The hash table data structure. Consists of a vector of buckets (of linked nodes).
@@ -241,6 +263,8 @@ class HashTable {
   bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx, TupleRow* row) {
     DCHECK_NOTNULL(ht_ctx);
     if (UNLIKELY(mem_limit_exceeded_)) return false;
+    // TODO: can we remove this Eval and guarantee that the values in ht_ctx are
+    // valid for this row?
     bool has_null = ht_ctx->EvalBuildRow(row);
     if (!ht_ctx->stores_nulls_ && has_null) return true;
 
@@ -255,6 +279,7 @@ class HashTable {
   bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx, Tuple* tuple) {
     DCHECK_NOTNULL(ht_ctx);
     if (UNLIKELY(mem_limit_exceeded_)) return false;
+    // TODO: remove this eval too.
     bool has_null = ht_ctx->EvalBuildRow(reinterpret_cast<TupleRow*>(&tuple));
     if (!ht_ctx->stores_nulls_ && has_null) return true;
 
@@ -266,16 +291,17 @@ class HashTable {
     return InsertImpl(ht_ctx, tuple);
   }
 
-  // Returns the start iterator for all rows that match 'probe_row'.  'probe_row' is
-  // evaluated with probe exprs.  The iterator can be iterated until
-  // HashTable::End() to find all the matching rows.
+  // Returns the start iterator for all rows that match the last row evaluated in
+  // 'ht_cxt'. EvalAndHashBuild/EvalAndHashProbe must have been called before calling
+  // this.
+  // The iterator can be iterated until HashTable::End() to find all the matching rows.
   // Only one scan can be in progress at any time (i.e. it is not legal to call
   // Find(), begin iterating through all the matches, call another Find(),
   // and continuing iterator from the first scan iterator).
   // Advancing the returned iterator will go to the next matching row.  The matching
   // rows are evaluated lazily (i.e. computed as the Iterator is moved).
   // Returns HashTable::End() if there is no match.
-  Iterator IR_ALWAYS_INLINE Find(HashTableCtx* ht_ctx, TupleRow* probe_row);
+  Iterator IR_ALWAYS_INLINE Find(HashTableCtx* ht_ctx);
 
   // Returns number of elements in the hash table
   int64_t size() const { return num_nodes_; }

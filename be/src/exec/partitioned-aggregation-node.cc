@@ -154,7 +154,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   }
 
   ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_,
-      true, true, state->fragment_hash_seed()));
+      true, true, state->fragment_hash_seed(), MAX_PARTITION_DEPTH));
 
   if (probe_expr_ctxs_.empty()) {
     // create single output tuple now; we need to output something
@@ -207,7 +207,7 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
       ProcessRowBatchNoGrouping(&batch);
     } else {
       // There is grouping, so we will do partitioned aggregation.
-      RETURN_IF_ERROR(ProcessBatch<false>(&batch, 0));
+      RETURN_IF_ERROR(ProcessBatch<false>(&batch));
     }
     batch.Reset();
   }
@@ -391,6 +391,7 @@ void PartitionedAggregationNode::Partition::Close(bool finalize_rows) {
           parent->FinalizeTuple(
               agg_fn_ctxs, batch.GetRow(i)->GetTuple(0), batch.tuple_data_pool());
         }
+        batch.Reset();
       }
     }
     aggregated_row_stream->Close();
@@ -517,6 +518,7 @@ Status PartitionedAggregationNode::CreateHashPartitions(int level) {
     // TODO: better error msg.
     return Status("Cannot perform hash aggregation. Input that has too much skew");
   }
+  ht_ctx_->set_level(level);
   DCHECK(hash_partitions_.empty());
   for (int i = 0; i < PARTITION_FAN_OUT; ++i) {
     hash_partitions_.push_back(state_->obj_pool()->Add(new Partition(this, level)));
@@ -525,14 +527,14 @@ Status PartitionedAggregationNode::CreateHashPartitions(int level) {
   return Status::OK;
 }
 
-template<bool aggregated_rows>
-Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, int level) {
+template<bool AGGREGATED_ROWS>
+Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch) {
   DCHECK(!hash_partitions_.empty());
 
   for (int i = 0; i < batch->num_rows(); ++i) {
     TupleRow* row = batch->GetRow(i);
     uint32_t hash = 0;
-    if (aggregated_rows) {
+    if (AGGREGATED_ROWS) {
       ht_ctx_->EvalAndHashBuild(row, &hash);
     } else {
       ht_ctx_->EvalAndHashProbe(row, &hash);
@@ -547,17 +549,17 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, int level) {
     if (!dst_partition->is_spilled()) {
       HashTable* ht = dst_partition->hash_tbl.get();
       DCHECK(ht != NULL);
-      HashTable::Iterator it = ht->Find(ht_ctx_.get(), row);
+      HashTable::Iterator it = ht->Find(ht_ctx_.get());
       if (!it.AtEnd()) {
         // Row is already in hash table. Do the aggregation and we're done.
-        UpdateTuple(dst_partition->agg_fn_ctxs, it.GetTuple(), row, aggregated_rows);
+        UpdateTuple(dst_partition->agg_fn_ctxs, it.GetTuple(), row, AGGREGATED_ROWS);
         continue;
       }
 
       // Row was not in hash table, we need to (optionally) construct the intermediate
       // tuple and then insert it into the hash table.
       Tuple* intermediate_tuple = NULL;
-      if (aggregated_rows) {
+      if (AGGREGATED_ROWS) {
         intermediate_tuple = row->GetTuple(0);
         DCHECK(intermediate_tuple != NULL);
         if (ht->Insert(ht_ctx_.get(), intermediate_tuple)) continue;
@@ -583,11 +585,11 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, int level) {
 
       // In this case, we already constructed the intermediate tuple in the spill stream,
       // no need to do any more work.
-      if (!aggregated_rows && intermediate_tuple != NULL) continue;
+      if (!AGGREGATED_ROWS && intermediate_tuple != NULL) continue;
     }
 
     // This partition is already spilled, just append the row.
-    BufferedTupleStream* dst_stream = aggregated_rows ?
+    BufferedTupleStream* dst_stream = AGGREGATED_ROWS ?
         dst_partition->aggregated_row_stream.get() :
         dst_partition->unaggregated_row_stream.get();
     DCHECK(dst_stream != NULL);
@@ -631,10 +633,8 @@ Status PartitionedAggregationNode::NextPartition() {
 
       // Rows in this partition could have been spilled into two streams, depending
       // on if it is an aggregated intermediate, or an unaggregated row.
-      RETURN_IF_ERROR(ProcessStream<true>(partition->aggregated_row_stream.get(),
-          partition->level + 1));
-      RETURN_IF_ERROR(ProcessStream<false>(partition->unaggregated_row_stream.get(),
-          partition->level + 1));
+      RETURN_IF_ERROR(ProcessStream<true>(partition->aggregated_row_stream.get()));
+      RETURN_IF_ERROR(ProcessStream<false>(partition->unaggregated_row_stream.get()));
 
       // Done processing this partition. Move the new partitions into
       // spilled_partitions_/aggregated_partitions_.
@@ -656,16 +656,15 @@ Status PartitionedAggregationNode::NextPartition() {
   return Status::OK;
 }
 
-template<bool aggregated_rows>
-Status PartitionedAggregationNode::ProcessStream(
-    BufferedTupleStream* input_stream, int level) {
+template<bool AGGREGATED_ROWS>
+Status PartitionedAggregationNode::ProcessStream(BufferedTupleStream* input_stream) {
   RETURN_IF_ERROR(input_stream->PrepareForRead());
   bool eos = false;
-  RowBatch batch(aggregated_rows ? *intermediate_row_desc_ : children_[0]->row_desc(),
+  RowBatch batch(AGGREGATED_ROWS ? *intermediate_row_desc_ : children_[0]->row_desc(),
       state_->batch_size(), mem_tracker());
   while (!eos) {
     RETURN_IF_ERROR(input_stream->GetNext(&batch, &eos));
-    RETURN_IF_ERROR(ProcessBatch<aggregated_rows>(&batch, level));
+    RETURN_IF_ERROR(ProcessBatch<AGGREGATED_ROWS>(&batch));
   }
   input_stream->Close();
   return Status::OK;

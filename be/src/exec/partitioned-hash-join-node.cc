@@ -127,7 +127,7 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
       join_op_ == TJoinOp::FULL_OUTER_JOIN;
 
   ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_,
-      should_store_nulls, false, state->fragment_hash_seed()));
+      should_store_nulls, false, state->fragment_hash_seed(), MAX_PARTITION_DEPTH));
 
   if (state->codegen_enabled()) {
     // Codegen for hashing rows
@@ -329,9 +329,9 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state) {
     SCOPED_TIMER(build_timer_);
 
     if (process_build_batch_fn_ == NULL) {
-      RETURN_IF_ERROR(ProcessBuildBatch(&build_batch, level));
+      RETURN_IF_ERROR(ProcessBuildBatch(&build_batch));
     } else {
-      process_build_batch_fn_(&build_batch, level);
+      process_build_batch_fn_(&build_batch);
     }
     build_batch.Reset();
     DCHECK(!build_batch.AtCapacity());
@@ -340,12 +340,10 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state) {
   return Status::OK;
 }
 
-Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch, int level) {
+Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch) {
   for (int i = 0; i < build_batch->num_rows(); ++i) {
     TupleRow* build_row = build_batch->GetRow(i);
     uint32_t hash;
-    // TODO: plumb level through when we change the hashing interface. We need different
-    // hash functions.
     if (!ht_ctx_->EvalAndHashBuild(build_row, &hash)) continue;
     Partition* partition = hash_partitions_[hash >> (32 - NUM_PARTITIONING_BITS)];
     // TODO: Should we maintain a histogram with the size of each partition?
@@ -420,6 +418,7 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
   mem_limit -= state->block_mgr()->block_size();
 
   input_partition_ = spilled_partitions_.front();
+  ht_ctx_->set_level(input_partition_->level_);
   spilled_partitions_.pop_front();
 
   DCHECK(input_partition_->hash_tbl() == NULL);
@@ -513,6 +512,9 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
     // Establish current_probe_row_ and find its corresponding partition.
     current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
     matched_probe_ = false;
+    uint32_t hash;
+    if (!ht_ctx_->EvalAndHashProbe(current_probe_row_, &hash)) continue;
+
     Partition* partition = NULL;
     if (input_partition_ != NULL && input_partition_->hash_tbl() != NULL) {
       // In this case we are working on a spilled partition (input_partition_ != NULL).
@@ -521,8 +523,6 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
       partition = input_partition_;
     } else {
       // We don't know which partition this probe row should go to.
-      uint32_t hash;
-      if (!ht_ctx_->EvalAndHashProbe(current_probe_row_, &hash)) continue;
       partition = hash_partitions_[hash >> (32 - NUM_PARTITIONING_BITS)];
     }
     DCHECK(partition != NULL);
@@ -541,7 +541,7 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
     } else {
       // Perform the actual probe in the hash table for the current probe (left) row.
       // TODO: At this point it would be good to do some prefetching.
-      hash_tbl_iterator_= partition->hash_tbl()->Find(ht_ctx_.get(), current_probe_row_);
+      hash_tbl_iterator_= partition->hash_tbl()->Find(ht_ctx_.get());
     }
   }
 

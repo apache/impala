@@ -34,12 +34,12 @@ const char* HashTableCtx::LLVM_CLASS_NAME = "class.impala::HashTableCtx";
 
 HashTableCtx::HashTableCtx(const std::vector<ExprContext*>& build_expr_ctxs,
     const std::vector<ExprContext*>& probe_expr_ctxs, bool stores_nulls, bool finds_nulls,
-    int32_t initial_seed)
+    int32_t initial_seed, int max_levels)
     : build_expr_ctxs_(build_expr_ctxs),
       probe_expr_ctxs_(probe_expr_ctxs),
       stores_nulls_(stores_nulls),
       finds_nulls_(finds_nulls),
-      initial_seed_(initial_seed) {
+      level_(0) {
   // Compute the layout and buffer size to store the evaluated expr results
   DCHECK_EQ(build_expr_ctxs_.size(), probe_expr_ctxs_.size());
   results_buffer_size_ = Expr::ComputeResultsLayout(build_expr_ctxs_,
@@ -47,6 +47,14 @@ HashTableCtx::HashTableCtx(const std::vector<ExprContext*>& build_expr_ctxs,
   expr_values_buffer_ = new uint8_t[results_buffer_size_];
   memset(expr_values_buffer_, 0, sizeof(uint8_t) * results_buffer_size_);
   expr_value_null_bits_ = new uint8_t[build_expr_ctxs.size()];
+
+  // Populate the seeds to use for all the levels. TODO: throw some primes in here.
+  DCHECK_GE(max_levels, 0);
+  seeds_.resize(max_levels + 1);
+  seeds_[0] = initial_seed;
+  for (int i = 1; i <= max_levels; ++i) {
+    seeds_[i] = initial_seed + (i << 16);
+  }
 }
 
 void HashTableCtx::Close() {
@@ -93,7 +101,7 @@ Function* HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build) {
 
 
 uint32_t HashTableCtx::HashVariableLenRow() {
-  uint32_t hash = initial_seed_;
+  uint32_t hash = seeds_[level_];
   // Hash the non-var length portions (if there are any)
   if (var_result_begin_ != 0) {
     hash = HashUtil::Hash(expr_values_buffer_, var_result_begin_, hash);
@@ -198,6 +206,9 @@ void HashTable::AddBitmapFilters(HashTableCtx* ht_ctx) {
       bitmaps[i].second = NULL;
     }
   }
+  // For the bitmap filters, always use the initial seed. The other parts of the plan
+  // tree (e.g. the scan node) relies on this.
+  uint32_t seed = ht_ctx->seeds_[0];
 
   // Walk the build table and generate a bitmap for each probe side slot.
   HashTable::Iterator iter = Begin();
@@ -207,8 +218,7 @@ void HashTable::AddBitmapFilters(HashTableCtx* ht_ctx) {
       if (bitmaps[i].second == NULL) continue;
       void* e = ht_ctx->build_expr_ctxs_[i]->GetValue(row);
       uint32_t h =
-          RawValue::GetHashValue(e, ht_ctx->build_expr_ctxs_[i]->root()->type(),
-              ht_ctx->initial_seed_);
+          RawValue::GetHashValue(e, ht_ctx->build_expr_ctxs_[i]->root()->type(), seed);
       bitmaps[i].second->Set<true>(h, true);
     }
     iter.Next<false>(ht_ctx);

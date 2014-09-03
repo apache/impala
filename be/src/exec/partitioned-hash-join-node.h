@@ -128,10 +128,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   Status ProcessBuildInput(RuntimeState* state);
 
   // Processes all the build rows by partitioning them.
-  // Reads the rows in build_batch and partition them in hash_partitions_. Partition level
-  // is how many times the rows have been partitioned. We need to use a different
-  // hash function/bits for each level.
-  Status ProcessBuildBatch(RowBatch* build_batch, int partition_level);
+  // Reads the rows in build_batch and partition them in hash_partitions_.
+  Status ProcessBuildBatch(RowBatch* build_batch);
 
   // Call at the end of partitioning the build rows (which could be from the build child
   // or from repartitioning an existing partition). After this function returns, all
@@ -292,7 +290,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   // llvm function and signature for codegening build batch.
   llvm::Function* codegen_process_build_batch_fn_;
-  typedef void (*ProcessBuildBatchFn)(RowBatch*, int);
+  typedef void (*ProcessBuildBatchFn)(RowBatch*);
   // Jitted ProcessBuildBatch function pointer.  Null if codegen is disabled.
   ProcessBuildBatchFn process_build_batch_fn_;
 

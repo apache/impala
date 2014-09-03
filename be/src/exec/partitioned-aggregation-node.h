@@ -259,17 +259,16 @@ class PartitionedAggregationNode : public ExecNode {
 
   // Processes a batch of rows. This is the core function of the algorithm. We partition
   // the rows into hash_partitions_, spilling as necessary.
-  // If aggregated_rows is true, it means that the rows in the batch are already
+  // If AGGREGATED_ROWS is true, it means that the rows in the batch are already
   // pre-aggregated.
-  // level is the level of repartitioning (0 for child(0)'s input, then 1, etc).
-  // Each level needs to use a different hash function.
-  template<bool aggregated_rows> Status ProcessBatch(RowBatch* batch, int level);
+  template<bool AGGREGATED_ROWS> Status ProcessBatch(RowBatch* batch);
 
   // Reads all the rows from input_stream and process them by calling ProcessBatch().
-  template<bool aggregated_rows>
-  Status ProcessStream(BufferedTupleStream* input_stream, int level);
+  template<bool AGGREGATED_ROWS>
+  Status ProcessStream(BufferedTupleStream* input_stream);
 
   // Initializes hash_partitions_. Level is the level for the partitions to create.
+  // Also sets ht_ctx_'s level to level.
   Status CreateHashPartitions(int level);
 
   // Prepares the next partition to return results from. On return, this function
