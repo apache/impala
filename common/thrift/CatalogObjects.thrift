@@ -383,6 +383,9 @@ struct TPrivilege {
 
   // Set if scope is URI
   8: optional string uri
+
+  // Time this privilege was created (in milliseconds since epoch).
+  9: optional i64 create_time_ms
 }
 
 // Thrift representation of an HdfsCachePool.
