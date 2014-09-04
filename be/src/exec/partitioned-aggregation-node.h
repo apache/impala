@@ -357,7 +357,8 @@ class PartitionedAggregationNode : public ExecNode {
   Status MoveHashPartitions(int64_t input_rows);
 
   // Calls finalizes on all tuples starting at it.
-  void CleanupHashTbl(HashTable::Iterator it);
+  void CleanupHashTbl(const std::vector<impala_udf::FunctionContext*>& fn_ctxs,
+      HashTable::Iterator it);
 
   // Codegen UpdateSlot(). Returns NULL if codegen is unsuccessful.
   // Assumes is_merge = false;

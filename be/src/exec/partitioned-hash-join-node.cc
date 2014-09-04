@@ -284,6 +284,7 @@ Status PartitionedHashJoinNode::SpillPartition() {
   }
   VLOG(2) << "Spilling partition: " << partition_idx << endl << DebugString();
   COUNTER_ADD(num_spilled_partitions_, 1);
+  if (num_spilled_partitions_->value() == 1) AddRuntimeExecOption("Spilled");
   hash_partitions_[partition_idx]->is_spilled_ = true;
   if (hash_partitions_[partition_idx]->hash_tbl() != NULL) {
     hash_partitions_[partition_idx]->hash_tbl()->Close();
@@ -306,7 +307,12 @@ Status PartitionedHashJoinNode::ConstructBuildSide(RuntimeState* state) {
 
 Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level) {
   if (level >= MAX_PARTITION_DEPTH) {
-    return Status("Build rows have too much skew. Cannot perform join.");
+    Status status = Status::MEM_LIMIT_EXCEEDED;
+    status.AddErrorMsg("Cannot perform hash aggregation. Partitioned input data too many"
+       " times. This could mean there is too much skew in the data or the memory"
+       " limit is set too low.");
+    state->SetMemLimitExceeded();
+    return status;
   }
 
   DCHECK(hash_partitions_.empty());
@@ -404,8 +410,14 @@ Status PartitionedHashJoinNode::NextProbeRowBatch(
 Status PartitionedHashJoinNode::NextSpilledProbeRowBatch(
     RuntimeState* state, RowBatch* out_batch) {
   DCHECK(input_partition_ != NULL);
-  BufferedTupleStream* probe_rows = input_partition_->probe_rows();
   probe_batch_->TransferResourceOwnership(out_batch);
+  if (out_batch->AtCapacity()) {
+    // The out_batch has resources associated with it that will be recycled on the
+    // next call to GetNext() on the probe stream. Return this batch now.
+    probe_batch_pos_ = -1;
+    return Status::OK;
+  }
+  BufferedTupleStream* probe_rows = input_partition_->probe_rows();
   if (LIKELY(probe_rows->rows_returned() < probe_rows->num_rows())) {
     // Continue from the current probe stream.
     bool eos = false;
@@ -458,7 +470,7 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
   if (!built) {
     // This build partition still does not fit in memory, repartition.
     DCHECK(input_partition_->is_spilled());
-    DCHECK_NOTNULL(input_partition_->hash_tbl_.get());
+    DCHECK(input_partition_->hash_tbl() == NULL);
     ht_ctx_->set_level(input_partition_->level_ + 1);
     RETURN_IF_ERROR(ProcessBuildInput(state, input_partition_->level_ + 1));
     UpdateState(REPARTITIONING);
@@ -752,7 +764,8 @@ string PartitionedHashJoinNode::PrintState() const {
 
 string PartitionedHashJoinNode::DebugString() const {
   stringstream ss;
-  ss << "PartitionedHashJoinNode (op=" << join_op_ << " state=" << PrintState()
+  ss << "PartitionedHashJoinNode (id=" << id() << " op=" << join_op_
+     << " state=" << PrintState()
      << " #partitions=" << hash_partitions_.size()
      << " #spilled_partitions=" << spilled_partitions_.size()
      << ")" << endl;

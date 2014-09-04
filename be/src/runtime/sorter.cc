@@ -341,16 +341,18 @@ Sorter::Run::Run(Sorter* parent, TupleDescriptor* sort_tuple_desc,
 
 Status Sorter::Run::Init() {
   BufferedBlockMgr::Block* block = NULL;
-  RETURN_IF_ERROR(sorter_->block_mgr_->GetNewBlock(sorter_->block_mgr_client_, &block));
+  RETURN_IF_ERROR(
+      sorter_->block_mgr_->GetNewBlock(sorter_->block_mgr_client_, NULL, &block));
   DCHECK(block != NULL);
   fixed_len_blocks_.push_back(block);
   if (has_var_len_slots_) {
-    RETURN_IF_ERROR(sorter_->block_mgr_->GetNewBlock(sorter_->block_mgr_client_, &block));
+    RETURN_IF_ERROR(
+        sorter_->block_mgr_->GetNewBlock(sorter_->block_mgr_client_, NULL, &block));
     DCHECK(block != NULL);
     var_len_blocks_.push_back(block);
     if (!is_sorted_) {
       RETURN_IF_ERROR(sorter_->block_mgr_->GetNewBlock(
-          sorter_->block_mgr_client_, &var_len_copy_block_));
+          sorter_->block_mgr_client_, NULL, &var_len_copy_block_));
       DCHECK(var_len_copy_block_ != NULL);
     }
   }
@@ -697,16 +699,16 @@ Status Sorter::Run::TryAddBlock(vector<BufferedBlockMgr::Block*>* block_sequence
     bool* added) {
   DCHECK(!block_sequence->empty());
   BufferedBlockMgr::Block* last_block = block_sequence->back();
-  if (is_sorted_) {
-    // If the run is sorted, we can unpin the last block and extend the run.
-    RETURN_IF_ERROR(last_block->Unpin());
-  } else {
+  if (!is_sorted_) {
     sorter_->sorted_data_size_->Add(last_block->valid_data_len());
+    last_block = NULL;
+  } else {
+    // If the run is sorted, we will unpin the last block and extend the run.
   }
 
   BufferedBlockMgr::Block* new_block;
-  RETURN_IF_ERROR(
-      sorter_->block_mgr_->GetNewBlock(sorter_->block_mgr_client_, &new_block));
+  RETURN_IF_ERROR(sorter_->block_mgr_->GetNewBlock(
+      sorter_->block_mgr_client_, last_block, &new_block));
   if (new_block != NULL) {
     *added = true;
     block_sequence->push_back(new_block);

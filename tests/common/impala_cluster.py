@@ -72,6 +72,9 @@ class ImpalaCluster(object):
     """Returns the catalogd process, or None if no catalogd process was found"""
     return self.__catalogd
 
+  def get_first_impalad(self):
+    return self.impalads[0]
+
   def get_any_impalad(self):
     """Selects a random impalad from the list of known processes"""
     return choice(self.impalads)

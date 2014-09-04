@@ -145,8 +145,8 @@ string BufferedBlockMgr::Block::DebugString() const {
      << " Data Len: " << valid_data_len_
      << " Deleted: " << is_deleted_
      << " Pinned: " << is_pinned_
-     << " Write Issued: " << in_write_;
-
+     << " Write Issued: " << in_write_
+     << " Client Local: " << client_local_;
   return ss.str();
 }
 
@@ -210,7 +210,7 @@ void BufferedBlockMgr::Cancel() {
   io_mgr_->CancelContext(io_request_context_);
 }
 
-Status BufferedBlockMgr::GetNewBlock(Client* client, Block** block) {
+Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block** block) {
   *block = NULL;
   {
     lock_guard<mutex> lock(lock_);
@@ -220,14 +220,46 @@ Status BufferedBlockMgr::GetNewBlock(Client* client, Block** block) {
   DCHECK_NOTNULL(*block);
   DCHECK((*block)->client_ == client);
   bool in_mem;
-  Status status = FindBufferForBlock(*block, &in_mem);
+  RETURN_IF_ERROR(FindBufferForBlock(*block, &in_mem));
   DCHECK(!in_mem) << "A new block cannot start in mem.";
-  if (!status.ok() || !(*block)->is_pinned_) {
-    (*block)->is_deleted_ = true;
-    ReturnUnusedBlock(*block);
-    *block = NULL;
+
+  if (!(*block)->is_pinned_) {
+    if (unpin_block == NULL) {
+      // We couldn't get a new block and no unpin block was provided. Can't return
+      // a block.
+      (*block)->is_deleted_ = true;
+      ReturnUnusedBlock(*block);
+      *block = NULL;
+    } else {
+      // We need to transfer the buffer from unpin_block to *block.
+
+      // First write out the old block.
+      unpin_block->is_pinned_ = false;
+      unpin_block->client_local_ = true;
+
+      unique_lock<mutex> lock(lock_);
+      RETURN_IF_ERROR(WriteUnpinnedBlock(unpin_block));
+
+      // Wait for the write to complete.
+      while (unpin_block->in_write_ && !is_cancelled_) {
+        unpin_block->write_complete_cv_.wait(lock);
+      }
+      if (is_cancelled_) return Status::CANCELLED;
+
+      // Assign the buffer to the new block.
+      DCHECK(!unpin_block->is_pinned_);
+      DCHECK(!unpin_block->in_write_);
+      (*block)->buffer_desc_ = unpin_block->buffer_desc_;
+      (*block)->buffer_desc_->block = *block;
+      unpin_block->buffer_desc_ = NULL;
+      (*block)->is_pinned_ = true;
+    }
+  } else if (unpin_block != NULL) {
+    // Got a new block without needing to transfer. Just unpin this block.
+    RETURN_IF_ERROR(unpin_block->Unpin());
   }
-  return status;
+
+  return Status::OK;
 }
 
 BufferedBlockMgr::~BufferedBlockMgr() {
@@ -360,43 +392,48 @@ Status BufferedBlockMgr::WriteUnpinnedBlocks() {
   while (num_outstanding_writes_ + free_buffers_.size() < block_write_threshold_) {
     if (unpinned_blocks_.empty()) break;
     // Pop a block from the back of the list (LIFO)
-    Block* block_to_write = unpinned_blocks_.PopBack();
-    DCHECK(!block_to_write->is_pinned_) << block_to_write->DebugString();
-    DCHECK(!block_to_write->in_write_) << block_to_write->DebugString();
-
-    if (block_to_write->write_range_ == NULL) {
-      // First time the block is being persisted. Find the next physical file in
-      // round-robin order and create a write range for it.
-      TmpFileMgr::File& tmp_file = tmp_files_[next_block_index_];
-      next_block_index_ = (next_block_index_ + 1) % tmp_files_.size();
-      int64_t file_offset;
-      RETURN_IF_ERROR(tmp_file.AllocateSpace(block_size_, &file_offset));
-      // Assign a valid disk id to the write range if the tmp file was not assigned one.
-      int disk_id = tmp_file.disk_id();
-      if (disk_id < 0) {
-        static unsigned int next_disk_id = 0;
-        disk_id = (++next_disk_id) % io_mgr_->num_disks();
-      }
-      disk_id %= io_mgr_->num_disks();
-      DiskIoMgr::WriteRange::WriteDoneCallback callback =
-          bind(mem_fn(&BufferedBlockMgr::WriteComplete), this, block_to_write, _1);
-      block_to_write->write_range_ = obj_pool_.Add(new DiskIoMgr::WriteRange(
-          tmp_file.path(), file_offset, disk_id, callback));
-    }
-
-    block_to_write->write_range_->SetData(block_to_write->buffer(),
-        block_to_write->valid_data_len_);
-
-    // Issue write through DiskIoMgr.
-    RETURN_IF_ERROR(
-        io_mgr_->AddWriteRange(io_request_context_, block_to_write->write_range_));
-    block_to_write->in_write_ = true;
-    DCHECK(block_to_write->Validate()) << endl << block_to_write->DebugString();
+    Block* write_block = unpinned_blocks_.PopBack();
+    write_block->client_local_ = false;
+    RETURN_IF_ERROR(WriteUnpinnedBlock(write_block));
     ++num_outstanding_writes_;
-    outstanding_writes_counter_->Add(1);
-    writes_issued_counter_->Add(1);
   }
   DCHECK(Validate()) << endl << DebugInternal();
+  return Status::OK;
+}
+
+Status BufferedBlockMgr::WriteUnpinnedBlock(Block* block) {
+  // Assumes block manager lock is already taken.
+  DCHECK(!block->is_pinned_) << block->DebugString();
+  DCHECK(!block->in_write_) << block->DebugString();
+
+  if (block->write_range_ == NULL) {
+    // First time the block is being persisted. Find the next physical file in
+    // round-robin order and create a write range for it.
+    TmpFileMgr::File& tmp_file = tmp_files_[next_block_index_];
+    next_block_index_ = (next_block_index_ + 1) % tmp_files_.size();
+    int64_t file_offset;
+    RETURN_IF_ERROR(tmp_file.AllocateSpace(block_size_, &file_offset));
+    int disk_id = tmp_file.disk_id();
+    if (disk_id < 0) {
+      // Assign a valid disk id to the write range if the tmp file was not assigned one.
+      static unsigned int next_disk_id = 0;
+      disk_id = (++next_disk_id) % io_mgr_->num_disks();
+    }
+    disk_id %= io_mgr_->num_disks();
+    DiskIoMgr::WriteRange::WriteDoneCallback callback =
+        bind(mem_fn(&BufferedBlockMgr::WriteComplete), this, block, _1);
+    block->write_range_ = obj_pool_.Add(new DiskIoMgr::WriteRange(
+        tmp_file.path(), file_offset, disk_id, callback));
+  }
+
+  block->write_range_->SetData(block->buffer(), block->valid_data_len_);
+
+  // Issue write through DiskIoMgr.
+  RETURN_IF_ERROR(io_mgr_->AddWriteRange(io_request_context_, block->write_range_));
+  block->in_write_ = true;
+  DCHECK(block->Validate()) << endl << block->DebugString();
+  outstanding_writes_counter_->Add(1);
+  writes_issued_counter_->Add(1);
   return Status::OK;
 }
 
@@ -404,17 +441,23 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
   outstanding_writes_counter_->Add(-1);
   lock_guard<mutex> lock(lock_);
   DCHECK(Validate()) << endl << DebugInternal();
-  DCHECK_GT(num_outstanding_writes_, 0);
   DCHECK(block->in_write_) << "WriteComplete() for block not in write."
                            << endl << block->DebugString();
-  --num_outstanding_writes_;
+  if (!block->client_local_) {
+    DCHECK_GT(num_outstanding_writes_, 0) << block->DebugString();
+    --num_outstanding_writes_;
+  }
   block->in_write_ = false;
   if (is_cancelled_) return;
   // Check for an error. Set cancelled and wake up waiting threads if an error occurred.
   if (!write_status.ok()) {
     block->client_->state_->LogError(write_status);
     is_cancelled_ = true;
-    buffer_available_cv_.notify_all();
+    if (block->client_local_) {
+      block->write_complete_cv_.notify_one();
+    } else {
+      buffer_available_cv_.notify_all();
+    }
     return;
   }
 
@@ -422,8 +465,16 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
   if (block->is_pinned_) {
     // The number of outstanding writes has decreased but the number of free buffers
     // hasn't.
+    DCHECK(!block->client_local_)
+        << "Client should be waiting, No one should have pinned this block.";
     WriteUnpinnedBlocks();
     DCHECK(Validate()) << endl << DebugInternal();
+    return;
+  }
+  if (block->client_local_) {
+    DCHECK(!block->is_deleted_)
+        << "Client should be waiting. No one should have deleted this block.";
+    block->write_complete_cv_.notify_one();
     return;
   }
   free_buffers_.Enqueue(block->buffer_desc_);

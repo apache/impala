@@ -120,21 +120,29 @@ int64_t BufferedTupleStream::bytes_unpinned() const {
 
 Status BufferedTupleStream::NewBlockForWrite(bool* got_block) {
   DCHECK(!closed_);
+  BufferedBlockMgr::Block* unpin_block = write_block_;
   if (write_block_ != NULL) {
     DCHECK(write_block_->is_pinned());
-    if (!pinned_ && write_block_ != *read_block_) {
-      RETURN_IF_ERROR(write_block_->Unpin());
-      --num_pinned_;
-      DCHECK_EQ(num_pinned_, NumPinned(blocks_));
-    }
-    write_block_ = NULL;
+    if (pinned_ || write_block_ == *read_block_) unpin_block = NULL;
   }
 
   BufferedBlockMgr::Block* new_block = NULL;
-  RETURN_IF_ERROR(block_mgr_->GetNewBlock(block_mgr_client_, &new_block));
+  RETURN_IF_ERROR(block_mgr_->GetNewBlock(block_mgr_client_, unpin_block, &new_block));
   *got_block = (new_block != NULL);
 
-  if (!*got_block) return Status::OK;
+  if (!*got_block) {
+    DCHECK(unpin_block == NULL);
+    return Status::OK;
+  }
+
+  if (!pinned_ && write_block_ != NULL) {
+    if (!pinned_ && write_block_ != *read_block_) {
+      DCHECK(!write_block_->is_pinned());
+      --num_pinned_;
+      DCHECK_EQ(num_pinned_, NumPinned(blocks_));
+    }
+  }
+
   blocks_.push_back(new_block);
   write_block_ = new_block;
   DCHECK(write_block_->is_pinned());
@@ -317,5 +325,10 @@ Status BufferedTupleStream::GetNext(RowBatch* batch, bool* eos) {
   batch->CommitRows(i);
   rows_returned_ += i;
   *eos = (rows_returned_ == num_rows_);
+  if (!pinned_ && data_len - read_bytes_ < fixed_tuple_row_size_) {
+    // No more data in this block. Mark this batch as needing to return so
+    // the caller can pass the rows up the operator tree.
+    batch->MarkNeedToReturn();
+  }
   return Status::OK;
 }

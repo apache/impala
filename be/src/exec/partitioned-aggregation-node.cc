@@ -208,6 +208,7 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
     serialize_stream_.reset(new BufferedTupleStream(state, *intermediate_row_desc_,
         state->block_mgr(), block_mgr_client_));
     RETURN_IF_ERROR(serialize_stream_->Init(false));
+    DCHECK(serialize_stream_->has_write_block());
   }
 
   // Read all the rows from the child and process them.
@@ -322,10 +323,11 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
   return Status::OK;
 }
 
-void PartitionedAggregationNode::CleanupHashTbl(HashTable::Iterator it) {
+void PartitionedAggregationNode::CleanupHashTbl(const vector<FunctionContext*>& ctxs,
+    HashTable::Iterator it) {
   if (!needs_finalize_) return;
   while (!it.AtEnd()) {
-    FinalizeTuple(output_partition_->agg_fn_ctxs, it.GetTuple(), mem_pool_.get());
+    FinalizeTuple(ctxs, it.GetTuple(), mem_pool_.get());
     // Avoid consuming excessive memory.
     if (mem_pool_->total_allocated_bytes() > 1024 * 1024) mem_pool_->FreeAll();
     it.Next<false>(ht_ctx_.get());
@@ -342,7 +344,7 @@ void PartitionedAggregationNode::Close(RuntimeState* state) {
   // Iterate through the remaining rows in the hash table and call Serialize/Finalize on
   // them in order to free any memory allocated by UDAs
   if (output_partition_ != NULL) {
-    CleanupHashTbl(output_iterator_);
+    CleanupHashTbl(output_partition_->agg_fn_ctxs, output_iterator_);
     output_partition_->Close(false);
   }
 
@@ -395,6 +397,7 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
       parent->block_mgr_client_));
   // This stream is only used to spill, no need to ever have this pinned.
   RETURN_IF_ERROR(unaggregated_row_stream->Init(false));
+  DCHECK(unaggregated_row_stream->has_write_block());
   return Status::OK;
 }
 
@@ -420,6 +423,7 @@ Status PartitionedAggregationNode::Partition::Spill() {
     // for those UDAs.
     DCHECK(parent->serialize_stream_.get() != NULL);
     DCHECK(!parent->serialize_stream_->is_pinned());
+    DCHECK(parent->serialize_stream_->has_write_block());
 
     // Serialize and copy the spilled partition's stream into the new stream.
     bool failed_to_add = false;
@@ -440,7 +444,7 @@ Status PartitionedAggregationNode::Partition::Spill() {
     // to make clean up easier (someone has to finalize this stream and we don't want
     // to remember where we are).
     if (failed_to_add) {
-      parent->CleanupHashTbl(it);
+      parent->CleanupHashTbl(agg_fn_ctxs, it);
       aggregated_row_stream->Close();
       RETURN_IF_ERROR(new_stream->status());
       DCHECK(false) << "How do we get here";
@@ -457,6 +461,7 @@ Status PartitionedAggregationNode::Partition::Spill() {
         *parent->intermediate_row_desc_, parent->state_->block_mgr(),
         parent->block_mgr_client_));
     RETURN_IF_ERROR(parent->serialize_stream_->Init(false));
+    DCHECK(parent->serialize_stream_->has_write_block());
   }
 
   // Free the in-memory result data
@@ -470,12 +475,13 @@ Status PartitionedAggregationNode::Partition::Spill() {
 
   hash_tbl->Close();
   hash_tbl.reset();
-  RETURN_IF_ERROR(aggregated_row_stream->UnpinStream(true));
+  DCHECK(aggregated_row_stream->has_write_block());
+  RETURN_IF_ERROR(aggregated_row_stream->UnpinStream(false));
 
-  if (parent->num_spilled_partitions_->value() == 0) {
+  COUNTER_ADD(parent->num_spilled_partitions_, 1);
+  if (parent->num_spilled_partitions_->value() == 1) {
     parent->AddRuntimeExecOption("Spilled");
   }
-  COUNTER_ADD(parent->num_spilled_partitions_, 1);
   return Status::OK;
 }
 
@@ -483,30 +489,11 @@ void PartitionedAggregationNode::Partition::Close(bool finalize_rows) {
   if (is_closed) return;
   is_closed = true;
   if (aggregated_row_stream.get() != NULL) {
-    if (finalize_rows && parent->needs_finalize_) {
+    if (finalize_rows && parent->needs_finalize_ && hash_tbl.get() != NULL) {
       // We need to walk all the rows and Finalize them here so the UDA gets a chance
-      // to cleanup.
-      if (hash_tbl.get() != NULL) {
-        // If the rows are in the hash table, we need to access them via the hash table.
-        // In the case where there is an aggregate function with a string slot, the
-        // tuples in aggregated_row_stream are incomplete (they don't have those string
-        // slots populated) so we cannot read them from the stream.
-        // TODO: there are other ways to make this work.
-        parent->CleanupHashTbl(hash_tbl->Begin());
-      } else {
-        aggregated_row_stream->PrepareForRead();
-        RowBatch batch(*parent->intermediate_row_desc_,
-            parent->state_->batch_size(), parent->mem_tracker());
-        bool eos = false;
-        while (!eos) {
-          aggregated_row_stream->GetNext(&batch, &eos);
-          for (int i = 0; i < batch.num_rows(); ++i) {
-            parent->FinalizeTuple(
-                agg_fn_ctxs, batch.GetRow(i)->GetTuple(0), batch.tuple_data_pool());
-          }
-          batch.Reset();
-        }
-      }
+      // to cleanup. If the hash table is gone (meaning this was spilled), the rows
+      // should have been finalized/serialized in Spill().
+      parent->CleanupHashTbl(agg_fn_ctxs, hash_tbl->Begin());
     }
     aggregated_row_stream->Close();
   }
@@ -660,10 +647,12 @@ void PartitionedAggregationNode::DebugString(int indentation_level,
 
 Status PartitionedAggregationNode::CreateHashPartitions(int level) {
   if (level >= MAX_PARTITION_DEPTH) {
-    // TODO: better error msg.
-    return Status("Cannot perform hash aggregation. Partitioned input data too many"
+    Status status = Status::MEM_LIMIT_EXCEEDED;
+    status.AddErrorMsg("Cannot perform hash aggregation. Partitioned input data too many"
        " times. This could mean there is too much skew in the data or the memory"
        " limit is set too low.");
+    state_->SetMemLimitExceeded();
+    return status;
   }
   ht_ctx_->set_level(level);
 

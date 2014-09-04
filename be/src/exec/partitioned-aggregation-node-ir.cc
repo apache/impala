@@ -48,7 +48,7 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, HashTableCtx* h
     // so we can try again to insert the row.
     Partition* dst_partition = hash_partitions_[hash >> (32 - NUM_PARTITIONING_BITS)];
     if (!dst_partition->is_spilled()) {
-      DCHECK(dst_partition->hash_tbl.get() != NULL);
+      DCHECK_NOTNULL(dst_partition->hash_tbl.get());
       DCHECK(dst_partition->aggregated_row_stream->is_pinned());
 
       HashTable* ht = dst_partition->hash_tbl.get();
@@ -69,6 +69,8 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, HashTableCtx* h
 
       Tuple* intermediate_tuple = NULL;
 allocate_tuple:
+#if 0
+      // TODO: this optimization doesn't work. Why?
       // First construct the intermediate tuple in the dst partition's stream.
       // TODO: needs_serialize can be removed with codegen.
       if (AGGREGATED_ROWS && !needs_serialize_) {
@@ -77,16 +79,16 @@ allocate_tuple:
             row, reinterpret_cast<uint8_t**>(&intermediate_tuple))) {
           intermediate_tuple = NULL;
         }
-      } else {
-        // If this aggregate function requires serialize, or we are seeing this
-        // result row the first time, we need to construct the result row and
-        // initialize it.
-        intermediate_tuple = ConstructIntermediateTuple(dst_partition->agg_fn_ctxs,
-            NULL, dst_partition->aggregated_row_stream.get());
-        if (intermediate_tuple != NULL) {
-          UpdateTuple(&dst_partition->agg_fn_ctxs[0],
-              intermediate_tuple, row, AGGREGATED_ROWS);
-        }
+      }
+#endif
+      // If this aggregate function requires serialize, or we are seeing this
+      // result row the first time, we need to construct the result row and
+      // initialize it.
+      intermediate_tuple = ConstructIntermediateTuple(dst_partition->agg_fn_ctxs,
+          NULL, dst_partition->aggregated_row_stream.get());
+      if (intermediate_tuple != NULL) {
+        UpdateTuple(&dst_partition->agg_fn_ctxs[0],
+            intermediate_tuple, row, AGGREGATED_ROWS);
       }
 
       // After copying and initialize it, try to insert the tuple into the hash table.
@@ -120,9 +122,10 @@ allocate_tuple:
         dst_partition->unaggregated_row_stream.get();
     DCHECK(dst_stream != NULL);
     DCHECK(!dst_stream->is_pinned()) << AGGREGATED_ROWS;
+    DCHECK(dst_stream->has_write_block()) << AGGREGATED_ROWS;
     if (dst_stream->AddRow(row)) continue;
     Status status = dst_stream->status();
-    DCHECK(!status.ok());
+    DCHECK(!status.ok()) << AGGREGATED_ROWS;
     status.AddErrorMsg("Could not append row even after spilling a partition.");
     return status;
   }

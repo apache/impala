@@ -119,7 +119,7 @@ class RowBatch {
   // enough memory.
   bool AtCapacity() {
     return num_rows_ == capacity_ || auxiliary_mem_usage_ >= AT_CAPACITY_MEM_USAGE ||
-      num_tuple_streams() > 0;
+      num_tuple_streams() > 0 || need_to_return_;
   }
 
   // The total size of all data represented in this row batch (tuples and referenced
@@ -148,6 +148,13 @@ class RowBatch {
   // Add tuple stream to this row batch. The row batch must call Close() on the stream
   // when freeing resources.
   void AddTupleStream(BufferedTupleStream* stream);
+
+  // Called to indicate this row batch must be returned up the operator tree.
+  // This is used to control memory management for streaming rows.
+  // TODO: consider using this mechanism instead of AddIoBuffer/AddTupleStream. This is
+  // the property we need rather than meticulously passing resources up so the operator
+  // tree.
+  void MarkNeedToReturn() { need_to_return_ = true; }
 
   // Transfer ownership of resources to dest.  This includes tuple data in mem
   // pool and io buffers.
@@ -229,6 +236,10 @@ class RowBatch {
   // Sum of all auxiliary bytes. This includes IoBuffers and memory from
   // TransferResourceOwnership().
   int64_t auxiliary_mem_usage_;
+
+  // If true, this batch is considered at capacity. This is explicitly set by streaming
+  // components that return rows via row batches.
+  bool need_to_return_;
 
   // holding (some of the) data referenced by rows
   boost::scoped_ptr<MemPool> tuple_data_pool_;

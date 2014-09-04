@@ -151,6 +151,8 @@ class BufferedTupleStream {
 
   bool is_pinned() const { return pinned_; }
   int blocks_pinned() const { return num_pinned_; }
+  bool has_read_block() const { return read_block_ != blocks_.end(); }
+  bool has_write_block() const { return write_block_ != NULL; }
 
  private:
   // If true, blocks are deleted after they are read.

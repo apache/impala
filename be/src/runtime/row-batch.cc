@@ -39,6 +39,7 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, int capacity,
     num_tuples_per_row_(row_desc.tuple_descriptors().size()),
     row_desc_(row_desc),
     auxiliary_mem_usage_(0),
+    need_to_return_(false),
     tuple_data_pool_(new MemPool(mem_tracker_)) {
   DCHECK(mem_tracker_ != NULL);
   DCHECK_GT(capacity, 0);
@@ -235,6 +236,7 @@ void RowBatch::Reset() {
   tuple_streams_.clear();
   auxiliary_mem_usage_ = 0;
   tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_->Allocate(tuple_ptrs_size_));
+  need_to_return_ = false;
 }
 
 void RowBatch::TransferResourceOwnership(RowBatch* dest) {
@@ -252,6 +254,7 @@ void RowBatch::TransferResourceOwnership(RowBatch* dest) {
     dest->auxiliary_mem_usage_ += tuple_streams_[i]->byte_size();
   }
   tuple_streams_.clear();
+  dest->need_to_return_ |= need_to_return_;
   auxiliary_mem_usage_ = 0;
   tuple_ptrs_ = NULL;
   Reset();
@@ -289,6 +292,7 @@ void RowBatch::AcquireState(RowBatch* src) {
   has_in_flight_row_ = src->has_in_flight_row_;
   num_rows_ = src->num_rows_;
   capacity_ = src->capacity_;
+  need_to_return_ = src->need_to_return_;
   std::swap(tuple_ptrs_, src->tuple_ptrs_);
   tuple_data_pool_->AcquireData(src->tuple_data_pool_.get(), false);
   auxiliary_mem_usage_ += src->tuple_data_pool_->total_allocated_bytes();

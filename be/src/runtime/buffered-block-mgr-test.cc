@@ -70,7 +70,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
 
   static void GetFreeBlock(BufferedBlockMgr* block_mgr, BufferedBlockMgr::Client* client,
       BufferedBlockMgr::Block** new_block, Promise<bool>* promise) {
-    block_mgr->GetNewBlock(client, new_block);
+    block_mgr->GetNewBlock(client, NULL, new_block);
     promise->Set(true);
   }
 
@@ -95,7 +95,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
     Status status;
     BufferedBlockMgr::Block* new_block;
     for (int i = 0; i < num_blocks; ++i) {
-      status = block_mgr->GetNewBlock(client, &new_block);
+      status = block_mgr->GetNewBlock(client, NULL, &new_block);
       EXPECT_TRUE(new_block != NULL);
       data = new_block->Allocate<int32_t>(sizeof(int32_t));
       *data = blocks->size();
@@ -121,17 +121,33 @@ TEST_F(BufferedBlockMgrTest, GetNewBlock) {
   // Allocate blocks until max_num_blocks, they should all succeed and memory
   // usage should go up.
   BufferedBlockMgr::Block* new_block;
+  BufferedBlockMgr::Block* first_block = NULL;
   for (int i = 0; i < max_num_blocks; ++i) {
-    status = block_mgr->GetNewBlock(client, &new_block);
+    status = block_mgr->GetNewBlock(client, NULL, &new_block);
     EXPECT_TRUE(new_block != NULL);
     EXPECT_EQ(block_mgr->bytes_allocated(), (i + 1) * block_size_);
+    if (first_block == NULL) first_block = new_block;
   }
 
   // Trying to allocate a new one should fail.
-  status = block_mgr->GetNewBlock(client, &new_block);
+  status = block_mgr->GetNewBlock(client, NULL, &new_block);
   EXPECT_TRUE(new_block == NULL);
   EXPECT_EQ(block_mgr->bytes_allocated(), max_num_blocks * block_size_);
 
+  // We can allocate a new block by transferring an already allocated one.
+  uint8_t* old_buffer = first_block->buffer();
+  status = block_mgr->GetNewBlock(client, first_block, &new_block);
+  EXPECT_TRUE(new_block != NULL);
+  EXPECT_TRUE(old_buffer == new_block->buffer());
+  EXPECT_EQ(block_mgr->bytes_allocated(), max_num_blocks * block_size_);
+  EXPECT_TRUE(!first_block->is_pinned());
+
+  // Trying to allocate a new one should still fail.
+  status = block_mgr->GetNewBlock(client, NULL, &new_block);
+  EXPECT_TRUE(new_block == NULL);
+  EXPECT_EQ(block_mgr->bytes_allocated(), max_num_blocks * block_size_);
+
+  EXPECT_EQ(block_mgr->profile()->GetCounter("BlockWritesIssued")->value(), 1);;
   block_mgr.reset();
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
@@ -284,7 +300,7 @@ TEST_F(BufferedBlockMgrTest, Close) {
   block_mgr->Cancel();
 
   BufferedBlockMgr::Block* new_block;
-  status = block_mgr->GetNewBlock(client, &new_block);
+  status = block_mgr->GetNewBlock(client, NULL, &new_block);
   EXPECT_TRUE(new_block == NULL);
   EXPECT_TRUE(status.IsCancelled());
   status = blocks[0]->Unpin();
@@ -343,7 +359,7 @@ TEST_F(BufferedBlockMgrTest, WriteError) {
   status = blocks[2]->Delete();
   EXPECT_TRUE(status.IsCancelled());
   BufferedBlockMgr::Block* new_block;
-  status = block_mgr->GetNewBlock(client, &new_block);
+  status = block_mgr->GetNewBlock(client, NULL, &new_block);
   EXPECT_TRUE(new_block == NULL);
   EXPECT_TRUE(status.IsCancelled());
   block_mgr.reset();
@@ -376,7 +392,7 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
 
   // Try allocating one more, that should fail.
   BufferedBlockMgr::Block* block;
-  status = block_mgr->GetNewBlock(client1, &block);
+  status = block_mgr->GetNewBlock(client1, NULL, &block);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block == NULL);
 
@@ -385,7 +401,7 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
   AllocateBlocks(block_mgr.get(), client2, client2_buffers, &client2_blocks);
 
   // Try allocating one more from client 2, that should fail.
-  status = block_mgr->GetNewBlock(client2, &block);
+  status = block_mgr->GetNewBlock(client2, NULL, &block);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block == NULL);
 
@@ -394,12 +410,12 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
   EXPECT_TRUE(status.ok());
 
   // Client two should still not be able to allocate.
-  status = block_mgr->GetNewBlock(client2, &block);
+  status = block_mgr->GetNewBlock(client2, NULL, &block);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block == NULL);
 
   // Client 1 should be able to though.
-  status = block_mgr->GetNewBlock(client1, &block);
+  status = block_mgr->GetNewBlock(client1, NULL, &block);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block != NULL);
 
@@ -437,18 +453,18 @@ TEST_F(BufferedBlockMgrTest, MultipleClientsExtraBuffers) {
   AllocateBlocks(block_mgr.get(), client2, client2_buffers, &client2_blocks);
 
   // We have two spare buffers now. Each client should be able to allocate it.
-  status = block_mgr->GetNewBlock(client1, &block);
+  status = block_mgr->GetNewBlock(client1, NULL, &block);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block != NULL);
-  status = block_mgr->GetNewBlock(client2, &block);
+  status = block_mgr->GetNewBlock(client2, NULL, &block);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block != NULL);
 
   // Now we are completely full, no one should be able to allocate a new block.
-  status = block_mgr->GetNewBlock(client1, &block);
+  status = block_mgr->GetNewBlock(client1, NULL, &block);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block == NULL);
-  status = block_mgr->GetNewBlock(client2, &block);
+  status = block_mgr->GetNewBlock(client2, NULL, &block);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block == NULL);
 
@@ -478,24 +494,24 @@ TEST_F(BufferedBlockMgrTest, ClientOversubscription) {
   EXPECT_TRUE(client2 != NULL);
 
   // Client one allocates first block, should work.
-  status = block_mgr->GetNewBlock(client1, &block);
+  status = block_mgr->GetNewBlock(client1, NULL, &block);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block != NULL);
 
   // Client two allocates first block, should work.
-  status = block_mgr->GetNewBlock(client2, &block);
+  status = block_mgr->GetNewBlock(client2, NULL, &block);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block != NULL);
 
   // At this point we've used both buffers. Client one reserved one so subsequent
   // calls should fail with no error (but returns no block).
-  status = block_mgr->GetNewBlock(client1, &block);
+  status = block_mgr->GetNewBlock(client1, NULL, &block);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block == NULL);
 
   // Allocate with client two. Since client two reserved 2 buffers, this should fail
   // with MEM_LIMIT_EXCEEDED.
-  status = block_mgr->GetNewBlock(client2, &block);
+  status = block_mgr->GetNewBlock(client2, NULL, &block);
   EXPECT_TRUE(status.IsMemLimitExceeded());
 
   block_mgr.reset();
@@ -551,7 +567,7 @@ TEST_F(BufferedBlockMgrTest, Random) {
     bool pinned;
     switch (api_function) {
       case New:
-        status = block_mgr->GetNewBlock(client, &new_block);
+        status = block_mgr->GetNewBlock(client, NULL, &new_block);
         if (close_called) {
           EXPECT_TRUE(new_block == NULL);
           EXPECT_TRUE(status.IsCancelled());

@@ -156,6 +156,8 @@ class BufferedBlockMgr {
 
     bool is_pinned() const { return is_pinned_; }
 
+    int64_t buffer_len() const { return block_mgr_->block_size(); }
+
     // Debug helper method to print the state of a block.
     std::string DebugString() const;
 
@@ -204,6 +206,15 @@ class BufferedBlockMgr {
 
     // True if the block is deleted by the client.
     bool is_deleted_;
+
+    // Condition variable for when there is a specific client waiting for this block.
+    // Only used if client_local_ is true.
+    boost::condition_variable write_complete_cv_;
+
+    // If true, this block is being written out so the underlying buffer can be
+    // transferred to another block from the same client. We don't want this buffer
+    // getting picked up by another client.
+    bool client_local_;
   }; // class Block
 
   // Create a block manager with the specified mem_limit. If a block mgr with the
@@ -241,7 +252,14 @@ class BufferedBlockMgr {
   // set to NULL.
   // This function will try to allocate new memory for the block up to the limit.
   // Otherwise it will (conceptually) write out a unpinned block and use that memory.
-  Status GetNewBlock(Client* client, Block** block);
+  // The caller can pass a non-NULL 'unpin_block' to transfer memory from 'unpin_block'
+  // to the new block. If unpin_block is non-NULL, the new block can never fail to
+  // get a buffer. The semantics of this are:
+  //   - If unpin_block is non-NULL, it must be pinned.
+  //   - If the call succeeds, unpin_block is unpinned.
+  //   - If there is no memory pressure, block will get a new block.
+  //   - If there is memory pressure, block will get the buffer from unpin_block.
+  Status GetNewBlock(Client* client, Block* unpin_block, Block** block);
 
   // Cancels the block mgr. All subsequent calls fail with Status::CANCELLED.
   // Idempotent.
@@ -290,7 +308,7 @@ class BufferedBlockMgr {
   void InitCounters(RuntimeProfile* profile);
 
   // PinBlock(), UnpinBlock(), DeleteBlock() perform the actual work of Block::Pin(),
-  // Unpin() and Delete().
+  // Unpin() and Delete(). The lock_ must be taken by the caller.
   Status PinBlock(Block* block, bool* pinned);
   Status UnpinBlock(Block* block);
   Status DeleteBlock(Block* block);
@@ -312,6 +330,9 @@ class BufferedBlockMgr {
   // 2) There are no more unpinned blocks
   // Assumes the block manager lock_ is already taken. Is not blocking.
   Status WriteUnpinnedBlocks();
+
+  // Issues the write for this block to the io mgr.
+  Status WriteUnpinnedBlock(Block* block);
 
   // Callback used by DiskIoMgr to indicate a block write has completed.
   // write_status is the status of the write. is_cancelled_ is set to true if
@@ -360,6 +381,7 @@ class BufferedBlockMgr {
   boost::mutex lock_;
 
   // Number of outstanding writes (Writes issued but not completed).
+  // This does not include client-local writes.
   int num_outstanding_writes_;
 
   // Signal availability of free buffers.
