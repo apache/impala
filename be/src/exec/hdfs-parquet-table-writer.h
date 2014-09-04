@@ -75,7 +75,9 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
 
   // Returns the target HDFS block size to use. This can either be a query option
   // or the default value: 'HDFS_BLOCK_SIZE'
-  virtual uint64_t default_block_size();
+  virtual uint64_t default_block_size() const;
+
+  virtual std::string file_extension() const { return "parq"; }
 
  private:
   // Default data page size. In bytes.

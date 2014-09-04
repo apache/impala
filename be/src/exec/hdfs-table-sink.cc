@@ -146,6 +146,7 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
       ADD_COUNTER(profile(), "BytesWritten", TCounterType::BYTES);
   encode_timer_ = ADD_TIMER(profile(), "EncodeTimer");
   hdfs_write_timer_ = ADD_TIMER(profile(), "HdfsWriteTimer");
+  compress_timer_ = ADD_TIMER(profile(), "CompressTimer");
 
   return Status::OK;
 }
@@ -274,7 +275,8 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
   SCOPED_TIMER(ADD_TIMER(profile(), "TmpFileCreateTimer"));
   stringstream filename;
   filename << output_partition->tmp_hdfs_file_name_prefix
-           << "." << output_partition->num_files;
+           << "." << output_partition->num_files
+           << "." << output_partition->writer->file_extension();
   output_partition->current_file_name = filename.str();
   // Check if tmp_hdfs_file_name exists.
   const char* tmp_hdfs_file_name_cstr =
@@ -297,8 +299,9 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
 
   // Save the ultimate destination for this file (it will be moved by the coordinator)
   stringstream dest;
-  dest << output_partition->final_hdfs_file_name_prefix << "."
-       << output_partition->num_files;
+  dest << output_partition->final_hdfs_file_name_prefix
+       << "." << output_partition->num_files
+       << "." << output_partition->writer->file_extension();
   (*state->hdfs_files_to_move())[output_partition->current_file_name] = dest.str();
 
   ++output_partition->num_files;

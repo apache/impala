@@ -58,8 +58,7 @@ struct TQueryOptions {
   11: optional string debug_action = ""
   12: optional i64 mem_limit = 0
   13: optional bool abort_on_default_limit_exceeded = 0 // Deprecated in 1.4
-  14: optional CatalogObjects.THdfsCompression compression_codec =
-      CatalogObjects.THdfsCompression.SNAPPY
+  14: optional CatalogObjects.THdfsCompression compression_codec
   15: optional i32 hbase_caching = 0
   16: optional bool hbase_cache_blocks = 0
   17: optional i64 parquet_file_size = 0

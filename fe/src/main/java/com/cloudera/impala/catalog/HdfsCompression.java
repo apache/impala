@@ -51,7 +51,7 @@ public enum HdfsCompression {
     case DEFLATE: return THdfsCompression.DEFLATE;
     case GZIP: return THdfsCompression.GZIP;
     case BZIP2: return THdfsCompression.BZIP2;
-    case SNAPPY: return THdfsCompression.SNAPPY_BLOCKED;
+    case SNAPPY: return THdfsCompression.SNAPPY;
     case LZO: return THdfsCompression.LZO;
     default: throw new IllegalStateException("Unexpected codec: " + this);
     }

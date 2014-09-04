@@ -152,6 +152,7 @@ class HdfsTableSink : public DataSink {
   RuntimeProfile::Counter* bytes_written_counter() { return bytes_written_counter_; }
   RuntimeProfile::Counter* encode_timer() { return encode_timer_; }
   RuntimeProfile::Counter* hdfs_write_timer() { return hdfs_write_timer_; }
+  RuntimeProfile::Counter* compress_timer() { return compress_timer_; }
 
   std::string DebugString() const;
 
@@ -276,6 +277,8 @@ class HdfsTableSink : public DataSink {
   RuntimeProfile::Counter* encode_timer_;
   // Time spent writing to hdfs
   RuntimeProfile::Counter* hdfs_write_timer_;
+  // Time spent compressing data
+  RuntimeProfile::Counter* compress_timer_;
 };
 }
 #endif

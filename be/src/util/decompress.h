@@ -31,6 +31,7 @@ class GzipDecompressor : public Codec {
   virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
       const uint8_t* input, int64_t* output_length, uint8_t** output);
+  virtual std::string file_extension() const { return "gz"; }
 
  private:
   friend class Codec;
@@ -55,6 +56,7 @@ class BzipDecompressor : public Codec {
   virtual Status ProcessBlock(bool output_preallocated,
                               int64_t input_length, const uint8_t* input,
                               int64_t* output_length, uint8_t** output);
+  virtual std::string file_extension() const { return "bz2"; }
  private:
   friend class Codec;
   BzipDecompressor(MemPool* mem_pool, bool reuse_buffer);
@@ -72,6 +74,7 @@ class SnappyDecompressor : public Codec {
   virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
       const uint8_t* input, int64_t* output_length, uint8_t** output);
+  virtual std::string file_extension() const { return "snappy"; }
 
  private:
   friend class Codec;
@@ -88,6 +91,7 @@ class Lz4Decompressor : public Codec {
   virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
       const uint8_t* input, int64_t* output_length, uint8_t** output);
+  virtual std::string file_extension() const { return "lz4"; }
 
  private:
   friend class Codec;
@@ -101,6 +105,7 @@ class SnappyBlockDecompressor : public Codec {
   virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
       const uint8_t* input, int64_t* output_length, uint8_t** output);
+  virtual std::string file_extension() const { return "snappy"; }
 
  private:
   friend class Codec;

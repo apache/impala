@@ -17,12 +17,12 @@
 #include <vector>
 #include <hdfs.h>
 #include <boost/scoped_ptr.hpp>
-#include <boost/crc.hpp>
 #include <stdlib.h>
 #include <codec.h>
 #include <gutil/strings/substitute.h>
 
 #include "exec/exec-node.h"
+#include "util/compress.h"
 #include "util/hdfs-util.h"
 #include "util/uid-util.h"
 #include "exprs/expr.h"
@@ -233,16 +233,18 @@ Status HdfsAvroTableWriter::Flush() {
   const uint8_t* output;
   int64_t output_length;
   // Snappy format requires a CRC after the compressed data
-  crc_32_type crc;
+  uint32_t crc;
   const string& text = out_.String();
 
   if (codec_type_ != THdfsCompression::NONE) {
+    SCOPED_TIMER(parent_->compress_timer());
     uint8_t* temp;
     RETURN_IF_ERROR(compressor_->ProcessBlock(false, text.size(),
         reinterpret_cast<const uint8_t*>(text.data()), &output_length, &temp));
     output = temp;
     if (codec_type_ == THdfsCompression::SNAPPY) {
-      crc.process_bytes(reinterpret_cast<const char*>(text.data()), text.size());
+      crc = SnappyCompressor::ComputeChecksum(
+          text.size(), reinterpret_cast<const uint8_t*>(text.data()));
     }
   } else {
     output = reinterpret_cast<const uint8_t*>(text.data());
@@ -268,11 +270,7 @@ Status HdfsAvroTableWriter::Flush() {
 
     // Write CRC checksum
     if (codec_type_ == THdfsCompression::SNAPPY) {
-      uint32_t chk = crc.checksum();
-      // mask the checksum, see
-      // http://code.google.com/p/snappy/source/browse/trunk/framing_format.txt
-      chk = ((chk >> 15) | (chk << 17)) + 0xa282ead8;
-      RETURN_IF_ERROR(Write(reinterpret_cast<const uint8_t*>(&chk), sizeof(uint32_t)));
+      RETURN_IF_ERROR(Write(reinterpret_cast<const uint8_t*>(&crc), sizeof(uint32_t)));
     }
   }
 

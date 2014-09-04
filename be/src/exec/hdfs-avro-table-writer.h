@@ -67,7 +67,8 @@ class HdfsAvroTableWriter : public HdfsTableWriter {
   virtual Status Finalize() { return Flush(); }
   virtual Status InitNewFile() { return WriteFileHeader(); }
   virtual void Close() { mem_pool_->FreeAll(); }
-  virtual uint64_t default_block_size() { return 0; }
+  virtual uint64_t default_block_size() const { return 0; }
+  virtual std::string file_extension() const { return "avro"; }
 
   // Outputs the given rows into an HDFS sequence file. The rows are buffered
   // to fill a sequence file block.

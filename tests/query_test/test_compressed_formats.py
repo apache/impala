@@ -117,3 +117,6 @@ class TestTableWriters(ImpalaTestSuite):
 
   def test_avro_writer(self, vector):
     self.run_test_case('QueryTest/avro-writer', vector)
+
+  def test_text_writer(self, vector):
+    self.run_test_case('QueryTest/text-writer', vector)

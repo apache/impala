@@ -445,6 +445,7 @@ Status HdfsParquetTableWriter::BaseColumnWriter::Flush(int64_t* file_pos,
         header.uncompressed_page_size);
     dict_encoder_base_->WriteDict(dict_buffer);
     if (compressor_.get() != NULL) {
+      SCOPED_TIMER(parent_->parent_->compress_timer());
       int64_t max_compressed_size =
           compressor_->MaxOutputLen(header.uncompressed_page_size);
       DCHECK_GT(max_compressed_size, 0);
@@ -554,6 +555,7 @@ int64_t HdfsParquetTableWriter::BaseColumnWriter::FinalizeCurrentPage() {
     current_page_->data = reinterpret_cast<uint8_t*>(uncompressed_data);
     header.compressed_page_size = header.uncompressed_page_size;
   } else {
+    SCOPED_TIMER(parent_->parent_->compress_timer());
     int64_t max_compressed_size =
         compressor_->MaxOutputLen(header.uncompressed_page_size);
     DCHECK_GT(max_compressed_size, 0);
@@ -775,7 +777,7 @@ Status HdfsParquetTableWriter::AddRowGroup() {
   return Status::OK;
 }
 
-uint64_t HdfsParquetTableWriter::default_block_size() {
+uint64_t HdfsParquetTableWriter::default_block_size() const {
   if (state_->query_options().__isset.parquet_file_size &&
       state_->query_options().parquet_file_size > 0) {
     // HDFS does not like block sizes that are not aligned

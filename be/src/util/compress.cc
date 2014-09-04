@@ -22,6 +22,8 @@
 #include <snappy.h>
 #include <lz4.h>
 
+#include <boost/crc.hpp>
+
 using namespace std;
 using namespace boost;
 using namespace impala;
@@ -247,6 +249,14 @@ Status SnappyCompressor::ProcessBlock(bool output_preallocated, int64_t input_le
       reinterpret_cast<char*>(*output), &out_len);
   *output_length = out_len;
   return Status::OK;
+}
+
+uint32_t SnappyCompressor::ComputeChecksum(int64_t input_len, const uint8_t* input) {
+  crc_32_type crc;
+  crc.process_bytes(reinterpret_cast<const char*>(input), input_len);
+  uint32_t chk = crc.checksum();
+  // Snappy requires the checksum to be masked.
+  return ((chk >> 15) | (chk << 17)) + 0xa282ead8;
 }
 
 Lz4Compressor::Lz4Compressor(MemPool* mem_pool, bool reuse_buffer)

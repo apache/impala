@@ -49,7 +49,8 @@ class HdfsSequenceTableWriter : public HdfsTableWriter {
   virtual Status Finalize() { return Flush(); }
   virtual Status InitNewFile() { return WriteFileHeader(); }
   virtual void Close() { return; }
-  virtual uint64_t default_block_size() { return 0; }
+  virtual uint64_t default_block_size() const { return 0; }
+  virtual std::string file_extension() const { return "seq"; }
 
   // Outputs the given rows into an HDFS sequence file. The rows are buffered
   // to fill a sequence file block.

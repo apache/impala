@@ -33,8 +33,11 @@ class RuntimeState;
 // algorithm, generally, both a compressor and a decompressor will be added.  Each of
 // these objects inherits from this class. The objects are instantiated in the Create
 // static methods defined here.  The type of compression is defined in the Thrift
-// interface THdfsCompression.  TODO: make this pure virtual (no members) so that external
-// codecs (e.g. Lzo) can implement this without binary dependency issues.
+// interface THdfsCompression.
+// TODO: make this pure virtual (no members) so that external codecs (e.g. Lzo)
+// can implement this without binary dependency issues.
+// TODO: this interface is clunky. There should be one class that implements both the
+// compress and decompress APIs so remove duplication.
 class Codec {
  public:
   // These are the codec string representations used in Hadoop.
@@ -116,6 +119,9 @@ class Codec {
 
   // Must be called on codec before destructor for final cleanup.
   virtual void Close();
+
+  // File extension to use for this compression codec.
+  virtual std::string file_extension() const = 0;
 
   bool reuse_output_buffer() const { return reuse_buffer_; }
 

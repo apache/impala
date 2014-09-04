@@ -56,6 +56,11 @@ Status HdfsSequenceTableWriter::Init() {
   const TQueryOptions& query_options = state_->query_options();
   if (query_options.__isset.compression_codec) {
     codec = query_options.compression_codec;
+    if (codec == THdfsCompression::SNAPPY) {
+      // Seq file (and in general things that use hadoop.io.codec) always
+      // mean snappy_blocked.
+      codec = THdfsCompression::SNAPPY_BLOCKED;
+    }
   }
   if (codec != THdfsCompression::NONE) {
     compress_flag_ = true;
@@ -139,7 +144,7 @@ Status HdfsSequenceTableWriter::WriteFileHeader() {
                    reinterpret_cast<const uint8_t*>(codec_name_.data()));
   }
 
-  // Meta data is formmated as an integer N followed by N*2 strings,
+  // Meta data is formated as an integer N followed by N*2 strings,
   // which are key-value pairs. Hive does not write meta data, so neither does Impala
   out_.WriteInt(0);
 
@@ -172,8 +177,11 @@ Status HdfsSequenceTableWriter::WriteCompressedBlock() {
   uint8_t *output;
   int64_t output_length;
   string text = out_.String();
-  RETURN_IF_ERROR(compressor_->ProcessBlock(false, text.size(),
-      reinterpret_cast<uint8_t*>(&text[0]), &output_length, &output));
+  {
+    SCOPED_TIMER(parent_->compress_timer());
+    RETURN_IF_ERROR(compressor_->ProcessBlock(false, text.size(),
+        reinterpret_cast<uint8_t*>(&text[0]), &output_length, &output));
+  }
 
   header.WriteVInt(output_length);
   string head = header.String();

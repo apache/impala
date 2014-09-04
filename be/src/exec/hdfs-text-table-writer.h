@@ -17,8 +17,8 @@
 #define IMPALA_EXEC_HDFS_TEXT_TABLE_WRITER_H
 
 #include <hdfs.h>
-
 #include <sstream>
+#include <boost/scoped_ptr.hpp>
 
 #include "runtime/descriptors.h"
 #include "exec/hdfs-table-sink.h"
@@ -26,12 +26,14 @@
 
 namespace impala {
 
+class Codec;
 class Expr;
-class TupleDescriptor;
-class TupleRow;
+class MemPool;
+struct OutputPartition;
 class RuntimeState;
 struct StringValue;
-struct OutputPartition;
+class TupleDescriptor;
+class TupleRow;
 
 // The writer consumes all rows passed to it and writes the evaluated output_exprs_
 // as delimited text into Hdfs files.
@@ -45,12 +47,12 @@ class HdfsTextTableWriter : public HdfsTableWriter {
 
   ~HdfsTextTableWriter() { }
 
-  // There is nothing to do for text.
-  virtual Status Init() { return Status::OK; }
+  virtual Status Init();
   virtual Status Finalize();
   virtual Status InitNewFile() { return Status::OK; }
-  virtual void Close() { }
-  virtual uint64_t default_block_size() { return 0; }
+  virtual void Close();
+  virtual uint64_t default_block_size() const;
+  virtual std::string file_extension() const;
 
   // Appends delimited string representation of the rows in the batch to output partition.
   // The resulting output is buffered until HDFS_FLUSH_WRITE_SIZE before being written
@@ -64,6 +66,10 @@ class HdfsTextTableWriter : public HdfsTableWriter {
   // support escaping tuple_delim_.
   inline void PrintEscaped(const StringValue* str_val);
 
+  // Writes the buffered data in rowbatch_stringstream_ to HDFS, applying
+  // compression if necessary.
+  Status Flush();
+
   // Character delimiting tuples.
   char tuple_delim_;
 
@@ -73,9 +79,21 @@ class HdfsTextTableWriter : public HdfsTableWriter {
   // Escape character.
   char escape_char_;
 
+  // Size in rowbatch_stringstream_ before we call flush.
+  int64_t flush_size_;
+
   // Stringstream to buffer output.  The stream is cleared between HDFS
   // Write calls to allow for the internal buffers to be reused.
   std::stringstream rowbatch_stringstream_;
+
+  // Compression codec.
+  THdfsCompression::type codec_;
+
+  // Compressor if compression is enabled.
+  boost::scoped_ptr<Codec> compressor_;
+
+  // Memory pool to use with compressor_.
+  boost::scoped_ptr<MemPool> mem_pool_;
 };
 
 }

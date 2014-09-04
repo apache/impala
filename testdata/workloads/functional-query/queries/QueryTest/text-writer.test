@@ -1,0 +1,38 @@
+====
+---- QUERY
+drop table if exists __text_write;
+====
+---- QUERY
+SET COMPRESSION_CODEC=NONE;
+create table __text_write (i int, s string, d double)
+stored as SEQUENCEFILE;
+====
+---- QUERY
+SET COMPRESSION_CODEC=NONE;
+insert into __text_write select 0, "a", 1.1;
+====
+---- QUERY
+SET COMPRESSION_CODEC=DEFAULT;
+insert into __text_write values (1, "b", 2.2);
+====
+---- QUERY
+SET COMPRESSION_CODEC=SNAPPY;
+insert into __text_write values (2, "c", 3.3);
+====
+---- QUERY
+SET COMPRESSION_CODEC=GZIP;
+insert into __text_write values (3, "d", 4.4);
+====
+---- QUERY
+select * from __text_write;
+---- RESULTS
+0,'a',1.1
+1,'b',2.2
+2,'c',3.3
+3,'d',4.4
+---- TYPES
+INT,STRING,DOUBLE
+====
+---- QUERY
+drop table __text_write;
+====

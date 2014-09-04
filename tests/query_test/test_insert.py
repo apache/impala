@@ -123,37 +123,6 @@ class TestInsertWideTable(ImpalaTestSuite):
     actual = QueryTestResult(parse_result_rows(result), types, labels, order_matters=False)
     assert expected == actual
 
-class TestUnsupportedInsertFormats(ImpalaTestSuite):
-  @classmethod
-  def get_workload(self):
-    return 'functional-query'
-
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestUnsupportedInsertFormats, cls).add_test_dimensions()
-    # Only run on file formats we can't write to
-    # TODO: Remove the 'text'/codec combination once the compressed text writers are in.
-    cls.TestMatrix.add_constraint(lambda v: \
-        not (v.get_value('table_format').file_format == 'parquet' or
-             v.get_value('table_format').file_format == 'hbase' or
-             v.get_value('table_format').file_format == 'avro' or
-             (v.get_value('table_format').file_format == 'text' and
-              v.get_value('table_format').compression_codec == 'none')))
-
-  def test_unsupported_formats(self, vector):
-    try:
-      # TODO: Once the compressed text writers are in, the text/codec combinations won't
-      # be unsupported anymore.
-      if (vector.get_value('table_format').file_format == 'text' and
-          vector.get_value('table_format').compression_codec != 'none'):
-        pytest.skip("Until compressed text writers are implemented, inserting to text "
-                    "will ignore compression type and succeed by inserting "
-                    "uncompressed text.")
-      self.execute_query_using_client(
-        self.client, 'insert into table tinytable values("hi", "there")', vector)
-      assert False, 'Query was expected to fail'
-    except ImpalaBeeswaxException, e: pass
-
 class TestInsertPartKey(ImpalaTestSuite):
   """Regression test for IMPALA-875"""
   @classmethod

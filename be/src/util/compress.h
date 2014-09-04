@@ -43,6 +43,8 @@ class GzipCompressor : public Codec {
   virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
       const uint8_t* input, int64_t* output_length, uint8_t** output);
 
+  virtual std::string file_extension() const { return "gz"; }
+
  private:
   friend class Codec;
   GzipCompressor(Format format, MemPool* mem_pool = NULL, bool reuse_buffer = false);
@@ -71,6 +73,7 @@ class BzipCompressor : public Codec {
   virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
       const uint8_t* input, int64_t* output_length, uint8_t** output);
+  virtual std::string file_extension() const { return "bz2"; }
 
  private:
   friend class Codec;
@@ -84,6 +87,7 @@ class SnappyBlockCompressor : public Codec {
   virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
       const uint8_t* input, int64_t* output_length, uint8_t** output);
+  virtual std::string file_extension() const { return "snappy"; }
 
  private:
   friend class Codec;
@@ -97,6 +101,12 @@ class SnappyCompressor : public Codec {
   virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
       const uint8_t* input, int64_t* output_length, uint8_t** output);
+  virtual std::string file_extension() const { return "snappy"; }
+
+  // Computes the crc checksum that snappy expects when used in a framing format.
+  // This checksum needs to come after the compressed data.
+  // http://code.google.com/p/snappy/source/browse/trunk/framing_format.txt
+  static uint32_t ComputeChecksum(int64_t input_len, const uint8_t* input);
 
  private:
   friend class Codec;
@@ -114,6 +124,7 @@ class Lz4Compressor : public Codec {
   virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
       const uint8_t* input, int64_t* output_length, uint8_t** output);
+  virtual std::string file_extension() const { return "lz4"; }
 
  private:
   friend class Codec;

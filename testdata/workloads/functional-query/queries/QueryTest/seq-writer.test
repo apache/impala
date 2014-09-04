@@ -16,12 +16,16 @@ SET COMPRESSION_CODEC=DEFAULT;
 insert into __seq_write values (1, "b", 2.2);
 ====
 ---- QUERY
-SET COMPRESSION_CODEC=SNAPPY_BLOCKED;
+SET COMPRESSION_CODEC=SNAPPY;
 insert into __seq_write values (2, "c", 3.3);
 ====
 ---- QUERY
-SET COMPRESSION_CODEC=GZIP;
+SET COMPRESSION_CODEC=SNAPPY_BLOCKED;
 insert into __seq_write values (3, "d", 4.4);
+====
+---- QUERY
+SET COMPRESSION_CODEC=GZIP;
+insert into __seq_write values (4, "e", 5.5);
 ====
 ---- QUERY
 select * from __seq_write;
@@ -30,6 +34,7 @@ select * from __seq_write;
 1,'b',2.2
 2,'c',3.3
 3,'d',4.4
+4,'e',5.5
 ---- TYPES
 INT,STRING,DOUBLE
 ====
