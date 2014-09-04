@@ -870,6 +870,18 @@ Status ImpalaServer::ParseQueryOptions(const string& options,
   return Status::OK;
 }
 
+static Status ParseMemValue(const string& value, const string& key, int64_t* result) {
+  bool is_percent;
+  *result = ParseUtil::ParseMemSpec(value, &is_percent);
+  if (*result < 0) {
+    return Status("Failed to parse " + key + " from '" + value + "'.");
+  }
+  if (is_percent) {
+    return Status("Invalid " + key + " with percent '" + value + "'.");
+  }
+  return Status::OK;
+}
+
 Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
     TQueryOptions* query_options) {
   int option = GetQueryOption(key);
@@ -895,14 +907,8 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
         break;
       case TImpalaQueryOptions::MEM_LIMIT: {
         // Parse the mem limit spec and validate it.
-        bool is_percent;
-        int64_t bytes_limit = ParseUtil::ParseMemSpec(value, &is_percent);
-        if (bytes_limit < 0) {
-          return Status("Failed to parse mem limit from '" + value + "'.");
-        }
-        if (is_percent) {
-          return Status("Invalid query memory limit with percent '" + value + "'.");
-        }
+        int64_t bytes_limit;
+        RETURN_IF_ERROR(ParseMemValue(value, "query memory limit", &bytes_limit));
         query_options->__set_mem_limit(bytes_limit);
         break;
       }
@@ -960,9 +966,12 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
         query_options->__set_hbase_cache_blocks(
             iequals(value, "true") || iequals(value, "1"));
         break;
-      case TImpalaQueryOptions::PARQUET_FILE_SIZE:
-        query_options->__set_parquet_file_size(atoi(value.c_str()));
+      case TImpalaQueryOptions::PARQUET_FILE_SIZE: {
+        int64_t file_size;
+        RETURN_IF_ERROR(ParseMemValue(value, "parquet file size", &file_size));
+        query_options->__set_parquet_file_size(file_size);
         break;
+      }
       case TImpalaQueryOptions::EXPLAIN_LEVEL:
         if (iequals(value, "minimal") || iequals(value, "0")) {
           query_options->__set_explain_level(TExplainLevel::MINIMAL);
@@ -999,14 +1008,8 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
             iequals(value, "true") || iequals(value, "1"));
         break;
       case TImpalaQueryOptions::RM_INITIAL_MEM: {
-        bool is_percent;
-        int64_t reservation_size = ParseUtil::ParseMemSpec(value, &is_percent);
-        if (reservation_size < 0) {
-          return Status("Failed to parse mem limit from '" + value + "'.");
-        }
-        if (is_percent) {
-          return Status("Invalid RM memory limit with percent '" + value + "'.");
-        }
+        int64_t reservation_size;
+        RETURN_IF_ERROR(ParseMemValue(value, "RM memory limit", &reservation_size));
         query_options->__set_rm_initial_mem(reservation_size);
         break;
       }
