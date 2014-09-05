@@ -1110,3 +1110,18 @@ order by bigint_col limit 10) A
 01:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
 ====
+# Sort node is unnecessary (IMPALA-1148).
+select 1 from functional.alltypes order by 1
+---- PLAN
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
+# Sort node is unnecessary (IMPALA-1148).
+select a from
+  (select 1 as a, int_col, bigint_col
+   from functional.alltypes order by 1 limit 1) v
+---- PLAN
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+   limit: 1
+====

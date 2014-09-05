@@ -1008,7 +1008,19 @@ public class Planner {
       root = createUnionPlan((UnionStmt) stmt, analyzer);
     }
 
+    // Avoid adding a sort node if the sort tuple has no materialized slots.
+    boolean sortHasMaterializedSlots = false;
     if (stmt.evaluateOrderBy()) {
+      for (SlotDescriptor sortSlotDesc:
+        stmt.getSortInfo().getSortTupleDescriptor().getSlots()) {
+        if (sortSlotDesc.isMaterialized()) {
+          sortHasMaterializedSlots = true;
+          break;
+        }
+      }
+    }
+
+    if (stmt.evaluateOrderBy() && sortHasMaterializedSlots) {
       long limit = stmt.getLimit();
       // TODO: External sort could be used for very large limits
       // not just unlimited order-by

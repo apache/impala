@@ -4092,3 +4092,18 @@ order by
 ---- TYPES
 INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
 ====
+---- QUERY
+# Regression test for IMPALA-1148.
+select 1 from functional.alltypestiny order by 1
+---- RESULTS
+1
+1
+1
+1
+1
+1
+1
+1
+---- TYPES
+TINYINT
+====
