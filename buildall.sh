@@ -175,16 +175,6 @@ if [ ${IMPALA_KERBERIZE} -eq 0 ]; then
   NEEDS_RE_SOURCE_NOTE=0
 fi
 
-# Test for HADOOP_LZO and IMAPALA_LZO
-if [ ! -d "${HADOOP_LZO}" ]; then
-    echo "HADOOP_LZO is either not set or not a directory: ${HADOOP_LZO}"
-    exit 1
-fi
-if [ ! -d "${IMPALA_LZO}" ]; then
-    echo "IMPALA_LZO is either not set or not a directory: ${IMPALA_LZO}"
-    exit 1
-fi
-
 # Sanity check that thirdparty is built.
 if [ ! -e $IMPALA_HOME/thirdparty/gflags-${IMPALA_GFLAGS_VERSION}/libgflags.la ]
 then
