@@ -269,16 +269,25 @@ public class StmtRewriter {
 
     // Extract all correlated predicates from the subquery.
     List<Expr> onClauseConjuncts = extractCorrelatedPredicates(subqueryStmt);
-    if (!onClauseConjuncts.isEmpty() && (expr instanceof InPredicate ||
-        expr instanceof ExistsPredicate)) {
-      // Correlated EXISTS and IN subqueries that contain the following clauses
-      // are not eligible for rewriting:
-      // - GROUP BY
-      // - Aggregate functions
-      // - DISTINCT
-      if (subqueryStmt.hasAggInfo()) {
+    if (!onClauseConjuncts.isEmpty()) {
+      // Check for correlated subqueries that are not eligible for rewrite by
+      // transforming into a join.
+      if ((expr instanceof BinaryPredicate && subqueryStmt.hasGroupByClause())
+          || ((expr instanceof InPredicate || expr instanceof ExistsPredicate)
+              && subqueryStmt.hasAggInfo())) {
         throw new AnalysisException("Unsupported correlated subquery with grouping " +
             "and/or aggregation: " + subqueryStmt.toSql());
+      }
+      if (subqueryStmt.hasLimit()) {
+        if (expr instanceof BinaryPredicate) {
+          // The limit does not affect the results of a non-grouping aggregate
+          // subquery, so we can safely remove it.
+          subqueryStmt.limitElement_ = null;
+        } else {
+          // For all other cases, throw an error.
+          throw new AnalysisException("Unsupported correlated subquery with a LIMIT " +
+              "clause: " + subqueryStmt.toSql());
+        }
       }
     }
 

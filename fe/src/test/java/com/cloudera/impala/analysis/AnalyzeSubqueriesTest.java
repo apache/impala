@@ -362,6 +362,13 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "(select int_col from functional.alltypessmall where bigint_col = 1000) and " +
         "string_col not in (select string_col from functional.alltypesagg where " +
         "tinyint_col > 10) and bool_col = false");
+
+    // Correlated subquery with a LIMIT clause
+    AnalysisError("select * from functional.alltypes t where id in " +
+        "(select s.id from functional.alltypesagg s where s.int_col = t.int_col " +
+        "limit 1)", "Unsupported correlated subquery with a LIMIT clause: " +
+        "SELECT s.id FROM functional.alltypesagg s WHERE s.int_col = t.int_col " +
+        "LIMIT 1");
   }
 
   @Test
@@ -481,6 +488,11 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "if(exists(select * from functional.alltypesagg), 1, 0) = 1",
         "IN and/or EXISTS subquery predicates are not supported in binary predicates: " +
         "if(EXISTS (SELECT * FROM functional.alltypesagg), 1, 0) = 1");
+    // Correlated subquery with a LIMIT clause
+    AnalysisError("select count(*) from functional.alltypes t where exists " +
+        "(select 1 from functional.alltypesagg g where t.id = g.id limit 1)",
+        "Unsupported correlated subquery with a LIMIT clause: " +
+        "SELECT 1 FROM functional.alltypesagg g WHERE t.id = g.id LIMIT 1");
   }
 
   @Test
@@ -698,6 +710,17 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
           "isnull((select %s from functional.alltypestiny s where s.bool_col = false " +
           "), 10) < 5", aggFn));
     }
+    // Correlated aggregate subquery with a GROUP BY
+    AnalysisError("select min(t.id) as min_id from functional.alltypestiny t " +
+        "where t.int_col < (select max(s.int_col) from functional.alltypessmall s " +
+        "where s.id = t.id group by s.bigint_col order by 1 limit 1)",
+        "Unsupported correlated subquery with grouping and/or aggregation: " +
+        "SELECT max(s.int_col) FROM functional.alltypessmall s WHERE " +
+        "s.id = t.id GROUP BY s.bigint_col ORDER BY 1 ASC LIMIT 1");
+    // Correlated aggregate subquery with a LIMIT clause
+    AnalyzesOk("select count(*) from functional.alltypes t where " +
+        "t.id = (select count(*) from functional.alltypesagg g where " +
+        "g.int_col = t.int_col limit 1)");
   }
 
   @Test

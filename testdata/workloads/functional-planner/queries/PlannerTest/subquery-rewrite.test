@@ -1011,4 +1011,32 @@ and t.id < 10
 00:SCAN HDFS [functional.alltypestiny t]
    partitions=4/4 size=460B
    predicates: t.id < 10
+=======
+# Correlated aggregate subquery with a LIMIT clause that is removed during the rewrite
+select min(t.id)
+from functional.alltypes t
+where t.int_col <
+  (select sum(s.int_col)
+   from functional.alltypessmall s
+   where s.id = t.id
+   limit 1)
+group by t.bool_col
+---- PLAN
+04:AGGREGATE [FINALIZE]
+|  output: min(t.id)
+|  group by: t.bool_col
+|
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t.id = s.id
+|  other join predicates: t.int_col < sum(s.int_col)
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: sum(s.int_col)
+|  |  group by: s.id
+|  |
+|  01:SCAN HDFS [functional.alltypessmall s]
+|     partitions=4/4 size=6.32KB
+|
+00:SCAN HDFS [functional.alltypes t]
+   partitions=24/24 size=478.45KB
 ====
