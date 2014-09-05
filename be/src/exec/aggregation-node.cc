@@ -399,7 +399,7 @@ void AggregationNode::DebugString(int indentation_level, stringstream* out) cons
   *out << ")";
 }
 
-IRFunction::Type GetHllUpdateFunction(const ColumnType& type) {
+IRFunction::Type GetHllUpdateFunction2(const ColumnType& type) {
   switch (type.type) {
     case TYPE_BOOLEAN: return IRFunction::HLL_UPDATE_BOOLEAN;
     case TYPE_TINYINT: return IRFunction::HLL_UPDATE_TINYINT;
@@ -588,7 +588,7 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(
     case AggFnEvaluator::NDV: {
       DCHECK_EQ(slot_desc->type().type, TYPE_STRING);
       IRFunction::Type ir_function_type = evaluator->is_merge() ? IRFunction::HLL_MERGE
-                                          : GetHllUpdateFunction(input_expr->type());
+                                          : GetHllUpdateFunction2(input_expr->type());
       Function* hll_fn = codegen->GetFunction(ir_function_type);
 
       // Create pointer to src_anyval to pass to HllUpdate() function. We must use the

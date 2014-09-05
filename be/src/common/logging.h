@@ -28,6 +28,7 @@
   #define DCHECK_LT(a, b) while(false) std::cout
   #define DCHECK_GE(a, b) while(false) std::cout
   #define DCHECK_LE(a, b) while(false) std::cout
+  #define DCHECK_NOTNULL(a) while(false) std::cout
   // Similar to how glog defines DCHECK for release.
   #define LOG(level) while(false) std::cout
   #define VLOG(level) while(false) std::cout

@@ -55,8 +55,10 @@ set(IR_DEPENDENT_FILES
   codegen-anyval-ir.cc
   ../exec/aggregation-node-ir.cc
   ../exec/hash-join-node-ir.cc
+  ../exec/hash-table-ir.cc
   ../exec/hdfs-avro-scanner-ir.cc
   ../exec/hdfs-scanner-ir.cc
+  ../exec/partitioned-aggregation-node-ir.cc
   ../exprs/aggregate-functions.cc
   ../exprs/cast-functions.cc
   ../exprs/compound-predicates-ir.cc

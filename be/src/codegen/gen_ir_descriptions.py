@@ -40,6 +40,9 @@ options, args = parser.parse_args()
 ir_functions = [
   ["AGG_NODE_PROCESS_ROW_BATCH_WITH_GROUPING", "ProcessRowBatchWithGrouping"],
   ["AGG_NODE_PROCESS_ROW_BATCH_NO_GROUPING", "ProcessRowBatchNoGrouping"],
+  ["PART_AGG_NODE_PROCESS_BATCH_TRUE", "ProcessBatch_true"],
+  ["PART_AGG_NODE_PROCESS_BATCH_FALSE", "ProcessBatch_false"],
+  ["PART_AGG_NODE_PROCESS_BATCH_NO_GROUPING", "ProcessBatchNoGrouping"],
   ["CODEGEN_ANYVAL_STRING_VAL_EQ", "StringValEq"],
   ["CODEGEN_ANYVAL_STRING_VALUE_EQ", "StringValueEq"],
   ["CODEGEN_ANYVAL_TIMESTAMP_VAL_EQ", "TimestampValEq"],
@@ -58,6 +61,8 @@ ir_functions = [
   ["HASH_FNV", "IrFnvHash"],
   ["HASH_JOIN_PROCESS_BUILD_BATCH", "ProcessBuildBatch"],
   ["HASH_JOIN_PROCESS_PROBE_BATCH", "ProcessProbeBatch"],
+  ["HASH_TABLE_GET_HASH_SEED", "GetHashSeed"],
+  ["HASH_TABLE_SET_HASH", "set_hash"],
   ["HLL_UPDATE_BOOLEAN", "HllUpdateIN10impala_udf10BooleanVal"],
   ["HLL_UPDATE_TINYINT", "HllUpdateIN10impala_udf10TinyIntVal"],
   ["HLL_UPDATE_SMALLINT", "HllUpdateIN10impala_udf11SmallIntVal"],

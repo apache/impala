@@ -229,6 +229,10 @@ class HashTableCtx {
   // It cannot match existing hash table entries and/or should not be inserted.
   // This value is valid until EvalAndHashBuild/EvalAndHashProbe is called again.
   bool skip_row_;
+
+  // Cross-compiled functions to access member variables used in CodegenHashCurrentRow().
+  uint32_t GetHashSeed() const;
+  void set_hash(uint32_t hash);
 };
 
 // The hash table data structure. Consists of a vector of buckets (of linked nodes).

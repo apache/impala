@@ -93,11 +93,30 @@ class PartitionedAggregationNode : public ExecNode {
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual void Close(RuntimeState* state);
 
+  static const char* LLVM_CLASS_NAME;
+
  protected:
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
   struct Partition;
+
+  // Number of initial partitions to create. Must be a power of 2.
+  static const int PARTITION_FANOUT = 4;
+
+  // Needs to be the log(PARTITION_FANOUT)
+  // We use the upper bits to pick the partition and lower bits in the HT.
+  // TODO: different hash functions here too? We don't need that many bits to pick
+  // the partition so this might be okay.
+  static const int NUM_PARTITIONING_BITS = 2;
+
+  // Maximum number of times we will repartition. The maximum build table we can process
+  // is: MEM_LIMIT * (PARTITION_FANOUT ^ MAX_PARTITION_DEPTH). With a (low) 1GB limit and
+  // 64 fanout, we can support 256TB build tables in the case where there is no skew.  In
+  // the case where there is skew, repartitioning is unlikely to help (assuming a
+  // reasonable hash function).
+  // TODO: we can revisit and try harder to explicitly detect skew.
+  static const int MAX_PARTITION_DEPTH = 3;
 
   // Tuple into which Update()/Merge()/Serialize() results are stored.
   TupleId intermediate_tuple_id_;
@@ -163,6 +182,11 @@ class PartitionedAggregationNode : public ExecNode {
   // to return in GetNext()
   Partition* output_partition_;
   HashTable::Iterator output_iterator_;
+
+  typedef Status (*ProcessRowBatchFn)(
+      PartitionedAggregationNode*, RowBatch*, HashTableCtx*);
+  // Jitted ProcessRowBatch function pointer.  Null if codegen is disabled.
+  ProcessRowBatchFn process_row_batch_fn_;
 
   // Time spent processing the child rows
   RuntimeProfile::Counter* build_timer_;
@@ -255,8 +279,10 @@ class PartitionedAggregationNode : public ExecNode {
   // in is_merge == true.  The override is needed to merge spilled and non-spilled rows
   // belonging to the same partition independent of whether the agg fn evaluators have
   // is_merge() == true.
-  void UpdateTuple(const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs,
-                   Tuple* tuple, TupleRow* row, bool is_merge = false);
+  // This function is replaced by codegen (which is why we don't use a vector argument for
+  // agg_fn_ctxs).
+  void UpdateTuple(impala_udf::FunctionContext** agg_fn_ctxs, Tuple* tuple, TupleRow* row,
+                   bool is_merge = false);
 
   // Called on the intermediate tuple of each group after all input rows have been
   // consumed and aggregated. Computes the final aggregate values to be returned in
@@ -270,13 +296,19 @@ class PartitionedAggregationNode : public ExecNode {
                        Tuple* tuple, MemPool* pool);
 
   // Do the aggregation for all tuple rows in the batch when there is no grouping.
-  void ProcessRowBatchNoGrouping(RowBatch* batch);
+  // The HashTableCtx argument is unused, but included so the signature matches that of
+  // ProcessBatch() for codegen. This function is replaced by codegen.
+  Status ProcessBatchNoGrouping(RowBatch* batch, HashTableCtx* ht_ctx = NULL);
 
   // Processes a batch of rows. This is the core function of the algorithm. We partition
   // the rows into hash_partitions_, spilling as necessary.
   // If AGGREGATED_ROWS is true, it means that the rows in the batch are already
   // pre-aggregated.
-  template<bool AGGREGATED_ROWS> Status ProcessBatch(RowBatch* batch);
+  //
+  // This function is replaced by codegen. It's inlined into ProcessBatch_true/false in
+  // the IR module. We pass in ht_ctx_.get() as an argument for performance.
+  template<bool AGGREGATED_ROWS>
+  Status IR_ALWAYS_INLINE ProcessBatch(RowBatch* batch, HashTableCtx* ht_ctx);
 
   // Reads all the rows from input_stream and process them by calling ProcessBatch().
   template<bool AGGREGATED_ROWS>
@@ -294,6 +326,28 @@ class PartitionedAggregationNode : public ExecNode {
 
   // Picks a partition from hash_partitions_ to spill.
   Status SpillPartition();
+
+  // Codegen UpdateSlot(). Returns NULL if codegen is unsuccessful.
+  // Assumes is_merge = false;
+  llvm::Function* CodegenUpdateSlot(
+      RuntimeState* state, AggFnEvaluator* evaluator, SlotDescriptor* slot_desc);
+
+  // Codegen UpdateTuple(). Returns NULL if codegen is unsuccessful.
+  llvm::Function* CodegenUpdateTuple(RuntimeState* state);
+
+  // Codegen the process row batch loop.  The loop has already been compiled to
+  // IR and loaded into the codegen object.  UpdateAggTuple has also been
+  // codegen'd to IR.  This function will modify the loop subsituting the
+  // UpdateAggTuple function call with the (inlined) codegen'd 'update_tuple_fn'.
+  // Assumes AGGREGATED_ROWS = false.
+  llvm::Function* CodegenProcessBatch(
+      RuntimeState* state, llvm::Function* update_tuple_fn);
+
+  // Functions to instantiate templated versions of ProcessBatch().
+  // The xcompiled versions of these functions are used in CodegenProcessBatch().
+  // TODO: is there a better way to do this?
+  Status ProcessBatch_false(RowBatch* batch, HashTableCtx* ht_ctx);
+  Status ProcessBatch_true(RowBatch* batch, HashTableCtx* ht_ctx);
 };
 
 }

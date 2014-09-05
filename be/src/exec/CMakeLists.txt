@@ -61,6 +61,7 @@ add_library(Exec
   hbase-scan-node.cc
   hbase-table-scanner.cc
   partitioned-aggregation-node.cc
+  partitioned-aggregation-node-ir.cc
   partitioned-hash-join-node.cc
   read-write-util.cc
   scan-node.cc
