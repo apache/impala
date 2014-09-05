@@ -426,7 +426,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   if (broadcast_ || channels_.size() == 1) {
     // current_thrift_batch_ is *not* the one that was written by the last call
     // to Serialize()
-    SerializeBatch(batch, current_thrift_batch_);
+    SerializeBatch(batch, current_thrift_batch_, channels_.size());
     // SendBatch() will block if there are still in-flight rpcs (and those will
     // reference the previously written thrift batch)
     for (int i = 0; i < channels_.size(); ++i) {
@@ -474,13 +474,13 @@ void DataStreamSender::Close(RuntimeState* state) {
   closed_ = true;
 }
 
-void DataStreamSender::SerializeBatch(RowBatch* src, TRowBatch* dest) {
+void DataStreamSender::SerializeBatch(RowBatch* src, TRowBatch* dest, int num_receivers) {
   VLOG_ROW << "serializing " << src->num_rows() << " rows";
   {
     SCOPED_TIMER(serialize_batch_timer_);
     int uncompressed_bytes = src->Serialize(dest);
-    COUNTER_UPDATE(bytes_sent_counter_, RowBatch::GetBatchSize(*dest));
-    COUNTER_UPDATE(uncompressed_bytes_counter_, uncompressed_bytes);
+    COUNTER_UPDATE(bytes_sent_counter_, RowBatch::GetBatchSize(*dest) * num_receivers);
+    COUNTER_UPDATE(uncompressed_bytes_counter_, uncompressed_bytes * num_receivers);
   }
 }
 
