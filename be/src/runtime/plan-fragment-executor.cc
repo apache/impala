@@ -475,7 +475,7 @@ Status PlanFragmentExecutor::GetNextInternal(RowBatch** batch) {
         plan_->GetNext(runtime_state_.get(), row_batch_.get(), &done_));
     *batch = row_batch_.get();
     if (row_batch_->num_rows() > 0) {
-      COUNTER_UPDATE(rows_produced_counter_, row_batch_->num_rows());
+      COUNTER_ADD(rows_produced_counter_, row_batch_->num_rows());
       break;
     }
   }
@@ -498,7 +498,7 @@ void PlanFragmentExecutor::FragmentComplete() {
   // Timing is not perfect.
   if (cpu_time < 0)
     cpu_time = 0;
-  runtime_state_->total_cpu_timer()->Update(cpu_time);
+  runtime_state_->total_cpu_timer()->Add(cpu_time);
 
   ReleaseThreadToken();
   StopReportThread();

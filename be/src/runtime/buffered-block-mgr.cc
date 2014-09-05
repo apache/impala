@@ -392,15 +392,15 @@ Status BufferedBlockMgr::WriteUnpinnedBlocks() {
     block_to_write->in_write_ = true;
     DCHECK(block_to_write->Validate()) << endl << block_to_write->DebugString();
     ++num_outstanding_writes_;
-    outstanding_writes_counter_->Update(1);
-    writes_issued_counter_->Update(1);
+    outstanding_writes_counter_->Add(1);
+    writes_issued_counter_->Add(1);
   }
   DCHECK(Validate()) << endl << DebugInternal();
   return Status::OK;
 }
 
 void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
-  outstanding_writes_counter_->Update(-1);
+  outstanding_writes_counter_->Add(-1);
   lock_guard<mutex> lock(lock_);
   DCHECK(Validate()) << endl << DebugInternal();
   DCHECK_GT(num_outstanding_writes_, 0);
@@ -513,7 +513,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
     } else {
       free_buffers_.Remove(block->buffer_desc_);
     }
-    buffered_pin_counter_->Update(1);
+    buffered_pin_counter_->Add(1);
     *in_mem = true;
   } else {
     // We need to find a new buffer for this block. We prefer getting this buffer in
@@ -526,7 +526,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
     if (free_buffers_.size() < block_write_threshold_) {
       uint8_t* new_buffer = buffer_pool_->TryAllocate(block_size_);
       if (new_buffer != NULL) {
-        mem_used_counter_->Update(block_size_);
+        mem_used_counter_->Add(block_size_);
         buffer_desc = obj_pool_.Add(new BufferDescriptor(new_buffer));
         all_buffers_.push_back(buffer_desc);
       }
@@ -581,10 +581,10 @@ BufferedBlockMgr::Block* BufferedBlockMgr::GetUnusedBlock(Client* client) {
   if (unused_blocks_.empty()) {
     new_block = obj_pool_.Add(new Block(this));
     new_block->Init();
-    created_block_counter_->Update(1);
+    created_block_counter_->Add(1);
   } else {
     new_block = unused_blocks_.Dequeue();
-    recycled_blocks_counter_->Update(1);
+    recycled_blocks_counter_->Add(1);
   }
   new_block->client_ = client;
 

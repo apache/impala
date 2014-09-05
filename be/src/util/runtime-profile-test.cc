@@ -53,8 +53,8 @@ TEST(CountersTest, Basic) {
   // Updating/setting counter
   counter_a = profile_a.AddCounter("A", TCounterType::UNIT);
   EXPECT_TRUE(counter_a != NULL);
-  counter_a->Update(10);
-  counter_a->Update(-5);
+  counter_a->Add(10);
+  counter_a->Add(-5);
   EXPECT_EQ(counter_a->value(), 5);
   counter_a->Set(1L);
   EXPECT_EQ(counter_a->value(), 1);
@@ -129,10 +129,10 @@ TEST(CountersTest, MergeAndUpdate) {
       profile1.AddCounter("Parent 1 Only", TCounterType::UNIT);
   RuntimeProfile::Counter* parent2_only =
       profile2.AddCounter("Parent 2 Only", TCounterType::UNIT);
-  parent1_shared->Update(1);
-  parent2_shared->Update(3);
-  parent1_only->Update(2);
-  parent2_only->Update(5);
+  parent1_shared->Add(1);
+  parent2_shared->Add(3);
+  parent1_only->Add(2);
+  parent2_only->Add(5);
 
   // Create child level counters
   RuntimeProfile::Counter* p1_c1_shared =
@@ -147,12 +147,12 @@ TEST(CountersTest, MergeAndUpdate) {
     p1_child1.AddCounter("Child1 Parent 2 Only", TCounterType::UNIT);
   RuntimeProfile::Counter* p2_c3 =
     p2_child3.AddCounter("Child3", TCounterType::UNIT);
-  p1_c1_shared->Update(10);
-  p1_c1_only->Update(50);
-  p2_c1_shared->Update(20);
-  p2_c1_only->Update(100);
-  p2_c3->Update(30);
-  p1_c2->Update(40);
+  p1_c1_shared->Add(10);
+  p1_c1_only->Add(50);
+  p2_c1_shared->Add(20);
+  p2_c1_only->Add(100);
+  p2_c3->Add(30);
+  p1_c2->Add(40);
 
   // Merge the two and validate
   TRuntimeProfileTree tprofile1;

@@ -984,7 +984,7 @@ void DiskIoMgr::ReadRange(DiskQueue* disk_queue, RequestContext* reader,
   if (buffer_desc->status_.ok()) {
     // Update counters.
     if (reader->active_read_thread_counter_) {
-      reader->active_read_thread_counter_->Update(1L);
+      reader->active_read_thread_counter_->Add(1L);
     }
     if (reader->disks_accessed_bitmap_) {
       int64_t disk_bit = 1 << disk_queue->disk_id;
@@ -997,12 +997,12 @@ void DiskIoMgr::ReadRange(DiskQueue* disk_queue, RequestContext* reader,
     buffer_desc->scan_range_offset_ = range->bytes_read_ - buffer_desc->len_;
 
     if (reader->bytes_read_counter_ != NULL) {
-      COUNTER_UPDATE(reader->bytes_read_counter_, buffer_desc->len_);
+      COUNTER_ADD(reader->bytes_read_counter_, buffer_desc->len_);
     }
 
-    COUNTER_UPDATE(&total_bytes_read_counter_, buffer_desc->len_);
+    COUNTER_ADD(&total_bytes_read_counter_, buffer_desc->len_);
     if (reader->active_read_thread_counter_) {
-      reader->active_read_thread_counter_->Update(-1L);
+      reader->active_read_thread_counter_->Add(-1L);
     }
   }
 

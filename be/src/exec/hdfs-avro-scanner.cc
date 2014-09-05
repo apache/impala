@@ -567,7 +567,7 @@ Status HdfsAvroScanner::ProcessRange() {
       }
       RETURN_IF_ERROR(CommitRows(num_to_commit));
       num_records -= max_tuples;
-      COUNTER_UPDATE(scan_node_->rows_read_counter(), max_tuples);
+      COUNTER_ADD(scan_node_->rows_read_counter(), max_tuples);
 
       if (scan_node_->ReachedLimit()) return Status::OK;
     }

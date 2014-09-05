@@ -174,7 +174,7 @@ Status HdfsAvroTableWriter::AppendRowBatch(RowBatch* batch,
   } else {
     limit = row_group_indices.size();
   }
-  COUNTER_UPDATE(parent_->rows_inserted_counter(), limit);
+  COUNTER_ADD(parent_->rows_inserted_counter(), limit);
 
   {
     SCOPED_TIMER(parent_->encode_timer());

@@ -52,7 +52,7 @@ namespace impala {
       (profile)->AddCounter(name, TCounterType::TIME_NS, parent)
   #define SCOPED_TIMER(c) \
       ScopedTimer<MonotonicStopWatch> MACRO_CONCAT(SCOPED_TIMER, __COUNTER__)(c)
-  #define COUNTER_UPDATE(c, v) (c)->Update(v)
+  #define COUNTER_ADD(c, v) (c)->Add(v)
   #define COUNTER_SET(c, v) (c)->Set(v)
   #define ADD_THREAD_COUNTERS(profile, prefix) (profile)->AddThreadCounters(prefix)
   #define SCOPED_THREAD_COUNTER_MEASUREMENT(c) \
@@ -64,7 +64,7 @@ namespace impala {
   #define ADD_TIMER(profile, name) NULL
   #define ADD_CHILD_TIMER(profile, name, parent) NULL
   #define SCOPED_TIMER(c)
-  #define COUNTER_UPDATE(c, v)
+  #define COUNTER_ADD(c, v)
   #define COUNTER_SET(c, v)
   #define ADD_THREAD_COUNTERS(profile, prefix) NULL
   #define SCOPED_THREAD_COUNTER_MEASUREMENT(c)
@@ -90,7 +90,7 @@ class RuntimeProfile {
     }
     virtual ~Counter(){}
 
-    virtual void Update(int64_t delta) {
+    virtual void Add(int64_t delta) {
       value_ += delta;
     }
 
@@ -126,14 +126,14 @@ class RuntimeProfile {
    public:
     HighWaterMarkCounter(TCounterType::type type) : Counter(type) {}
 
-    virtual void Update(int64_t delta) {
+    virtual void Add(int64_t delta) {
       int64_t new_val = current_value_.UpdateAndFetch(delta);
       value_.UpdateMax(new_val);
     }
 
-    // Tries to update the current value by delta. If current_value() + delta
+    // Tries to increase the current value by delta. If current_value() + delta
     // exceeds max, return false and current_value is not changed.
-    bool TryUpdate(int64_t delta, int64_t max) {
+    bool TryAdd(int64_t delta, int64_t max) {
       while (true) {
         int64_t old_val = current_value_;
         int64_t new_val = old_val + delta;
@@ -161,7 +161,7 @@ class RuntimeProfile {
   typedef boost::function<int64_t ()> DerivedCounterFunction;
 
   // A DerivedCounter also has a name and type, but the value is computed.
-  // Do not call Set() and Update().
+  // Do not call Set() and Add().
   class DerivedCounter : public Counter {
    public:
     DerivedCounter(TCounterType::type type, const DerivedCounterFunction& counter_fn)
@@ -179,7 +179,7 @@ class RuntimeProfile {
   // An AveragedCounter maintains a set of counters and its value is the
   // average of the values in that set. The average is updated through calls
   // to UpdateCounter(), which may add a new counter or update an existing counter.
-  // Set() and Update() should not be called.
+  // Set() and Add() should not be called.
   class AveragedCounter : public Counter {
    public:
     AveragedCounter(TCounterType::type type)
@@ -216,7 +216,7 @@ class RuntimeProfile {
     }
 
     // The value for this counter should be updated through UpdateCounter().
-    // Set() and Update() should not be used.
+    // Set() and Add() should not be used.
     virtual void Set(double value) {
       DCHECK(false);
     }
@@ -225,7 +225,7 @@ class RuntimeProfile {
       DCHECK(false);
     }
 
-    virtual void Update(int64_t delta) {
+    virtual void Add(int64_t delta) {
       DCHECK(false);
     }
 
@@ -678,12 +678,12 @@ class ScopedCounter {
     val_(val),
     counter_(counter) {
     if (counter == NULL) return;
-    counter_->Update(-1L * val_);
+    counter_->Add(-1L * val_);
   }
 
   // Increment the counter when object is destroyed
   ~ScopedCounter() {
-    if (counter_ != NULL) counter_->Update(val_);
+    if (counter_ != NULL) counter_->Add(val_);
   }
 
  private:
@@ -713,7 +713,7 @@ class ScopedTimer {
 
   void UpdateCounter() {
     if (counter_ != NULL) {
-      counter_->Update(sw_.ElapsedTime());
+      counter_->Add(sw_.ElapsedTime());
     }
   }
 
@@ -765,11 +765,11 @@ class ThreadCounterMeasurement {
     int64_t stime_diff =
         (usage.ru_stime.tv_sec - usage_base_.ru_stime.tv_sec) * 1000L * 1000L * 1000L +
         (usage.ru_stime.tv_usec - usage_base_.ru_stime.tv_usec) * 1000L;
-    counters_->total_time_->Update(sw_.ElapsedTime());
-    counters_->user_time_->Update(utime_diff);
-    counters_->sys_time_->Update(stime_diff);
-    counters_->voluntary_context_switches_->Update(usage.ru_nvcsw - usage_base_.ru_nvcsw);
-    counters_->involuntary_context_switches_->Update(
+    counters_->total_time_->Add(sw_.ElapsedTime());
+    counters_->user_time_->Add(utime_diff);
+    counters_->sys_time_->Add(stime_diff);
+    counters_->voluntary_context_switches_->Add(usage.ru_nvcsw - usage_base_.ru_nvcsw);
+    counters_->involuntary_context_switches_->Add(
         usage.ru_nivcsw - usage_base_.ru_nivcsw);
   }
 

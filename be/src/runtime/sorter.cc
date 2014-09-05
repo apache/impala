@@ -354,7 +354,7 @@ Status Sorter::Run::Init() {
       DCHECK(var_len_copy_block_ != NULL);
     }
   }
-  if (!is_sorted_) sorter_->initial_runs_counter_->Update(1);
+  if (!is_sorted_) sorter_->initial_runs_counter_->Add(1);
   return Status::OK;
 }
 
@@ -701,7 +701,7 @@ Status Sorter::Run::TryAddBlock(vector<BufferedBlockMgr::Block*>* block_sequence
     // If the run is sorted, we can unpin the last block and extend the run.
     RETURN_IF_ERROR(last_block->Unpin());
   } else {
-    sorter_->sorted_data_size_->Update(last_block->valid_data_len());
+    sorter_->sorted_data_size_->Add(last_block->valid_data_len());
   }
 
   BufferedBlockMgr::Block* new_block;
@@ -973,7 +973,7 @@ Status Sorter::GetNext(RowBatch* output_batch, bool* eos) {
 Status Sorter::SortRun() {
   BufferedBlockMgr::Block* last_block = unsorted_run_->fixed_len_blocks_.back();
   if (last_block->valid_data_len() > 0) {
-    sorted_data_size_->Update(last_block->valid_data_len());
+    sorted_data_size_->Add(last_block->valid_data_len());
   } else {
     RETURN_IF_ERROR(last_block->Delete());
     unsorted_run_->fixed_len_blocks_.pop_back();
@@ -982,7 +982,7 @@ Status Sorter::SortRun() {
     DCHECK_NOTNULL(unsorted_run_->var_len_copy_block_);
     last_block = unsorted_run_->var_len_blocks_.back();
     if (last_block->valid_data_len() > 0) {
-      sorted_data_size_->Update(last_block->valid_data_len());
+      sorted_data_size_->Add(last_block->valid_data_len());
     } else {
       RETURN_IF_ERROR(last_block->Delete());
       unsorted_run_->var_len_blocks_.pop_back();
@@ -1119,7 +1119,7 @@ Status Sorter::CreateMerger(int num_runs) {
   }
   RETURN_IF_ERROR(merger_->Prepare(merge_runs));
 
-  num_merges_counter_->Update(1);
+  num_merges_counter_->Add(1);
   return Status::OK;
 }
 

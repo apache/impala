@@ -92,7 +92,7 @@ Status HdfsSequenceTableWriter::AppendRowBatch(RowBatch* batch,
   } else {
     limit = row_group_indices.size();
   }
-  COUNTER_UPDATE(parent_->rows_inserted_counter(), limit);
+  COUNTER_ADD(parent_->rows_inserted_counter(), limit);
 
   bool all_rows = row_group_indices.empty();
   int num_non_partition_cols =

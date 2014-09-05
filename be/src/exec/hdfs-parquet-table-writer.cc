@@ -873,7 +873,7 @@ Status HdfsParquetTableWriter::Finalize() {
   RETURN_IF_ERROR(FlushCurrentRowGroup());
   RETURN_IF_ERROR(WriteFileFooter());
   stats_.__set_parquet_stats(parquet_stats_);
-  COUNTER_UPDATE(parent_->rows_inserted_counter(), row_count_);
+  COUNTER_ADD(parent_->rows_inserted_counter(), row_count_);
   return Status::OK;
 }
 

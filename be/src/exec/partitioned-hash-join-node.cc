@@ -250,7 +250,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(
       return Status::OK;
     }
   }
-  COUNTER_UPDATE(parent_->num_hash_buckets_, hash_tbl_->num_buckets());
+  COUNTER_ADD(parent_->num_hash_buckets_, hash_tbl_->num_buckets());
   return Status::OK;
 }
 
@@ -280,7 +280,7 @@ Status PartitionedHashJoinNode::SpillPartitions() {
     return status;
   }
   VLOG(2) << "Spilling partition: " << partition_idx << endl << DebugString();
-  COUNTER_UPDATE(num_spilled_partitions_, 1);
+  COUNTER_ADD(num_spilled_partitions_, 1);
   return hash_partitions_[partition_idx]->build_rows()->UnpinStream();
 }
 
@@ -313,7 +313,7 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
     hash_partitions_.push_back(pool_->Add(new Partition(state, this, level)));
     RETURN_IF_ERROR(hash_partitions_[i]->build_rows()->Init());
   }
-  COUNTER_UPDATE(partitions_created_, PARTITION_FANOUT);
+  COUNTER_ADD(partitions_created_, PARTITION_FANOUT);
   COUNTER_SET(max_partition_level_, level);
 
   RowBatch build_batch(child(1)->row_desc(), state->batch_size(), mem_tracker());
@@ -323,7 +323,7 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
     RETURN_IF_ERROR(state->CheckQueryState());
     if (input_partition_ == NULL) {
       RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch, &eos));
-      COUNTER_UPDATE(build_row_counter_, build_batch.num_rows());
+      COUNTER_ADD(build_row_counter_, build_batch.num_rows());
     } else {
       RETURN_IF_ERROR(input_partition_->build_rows()->GetNext(&build_batch, &eos));
     }
@@ -360,7 +360,7 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
   }
   LOG(ERROR) << ss.str();
 
-  COUNTER_UPDATE(num_build_rows_partitioned_, total_build_rows);
+  COUNTER_ADD(num_build_rows_partitioned_, total_build_rows);
   RETURN_IF_ERROR(BuildHashTables(state));
   return Status::OK;
 }
@@ -383,7 +383,7 @@ Status PartitionedHashJoinNode::NextProbeRowBatch(
       return Status::OK;
     }
     RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_side_eos_));
-    COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
+    COUNTER_ADD(probe_row_counter_, probe_batch_->num_rows());
   } while (probe_batch_->num_rows() == 0);
 
   ResetForProbe();
@@ -455,9 +455,8 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
     UpdateState(PROBING_SPILLED_PARTITION);
   }
 
-  COUNTER_UPDATE(num_repartitions_, 1);
-  COUNTER_UPDATE(num_probe_rows_partitioned_,
-      input_partition_->probe_rows()->num_rows());
+  COUNTER_ADD(num_repartitions_, 1);
+  COUNTER_ADD(num_probe_rows_partitioned_, input_partition_->probe_rows()->num_rows());
   return Status::OK;
 }
 

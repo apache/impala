@@ -763,7 +763,7 @@ Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
             // are reading.
             DCHECK(c == 0 || !parse_status_.ok())
               << "c=" << c << " " << parse_status_.GetErrorMsg();;
-            COUNTER_UPDATE(scan_node_->rows_read_counter(), i);
+            COUNTER_ADD(scan_node_->rows_read_counter(), i);
             RETURN_IF_ERROR(CommitRows(num_to_commit));
 
             // If we reach this point, it means that we reached the end of file for
@@ -815,7 +815,7 @@ Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
       }
     }
     rows_read += num_rows;
-    COUNTER_UPDATE(scan_node_->rows_read_counter(), num_rows);
+    COUNTER_ADD(scan_node_->rows_read_counter(), num_rows);
     RETURN_IF_ERROR(CommitRows(num_to_commit));
 
     reached_limit = scan_node_->ReachedLimit();
@@ -949,7 +949,7 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
     // No materialized columns.  We can serve this query from just the metadata.  We
     // don't need to read the column data.
     int64_t num_tuples = file_metadata_.num_rows;
-    COUNTER_UPDATE(scan_node_->rows_read_counter(), num_tuples);
+    COUNTER_ADD(scan_node_->rows_read_counter(), num_tuples);
 
     while (num_tuples > 0) {
       MemPool* pool;

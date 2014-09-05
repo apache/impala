@@ -479,8 +479,8 @@ void DataStreamSender::SerializeBatch(RowBatch* src, TRowBatch* dest, int num_re
   {
     SCOPED_TIMER(serialize_batch_timer_);
     int uncompressed_bytes = src->Serialize(dest);
-    COUNTER_UPDATE(bytes_sent_counter_, RowBatch::GetBatchSize(*dest) * num_receivers);
-    COUNTER_UPDATE(uncompressed_bytes_counter_, uncompressed_bytes * num_receivers);
+    COUNTER_ADD(bytes_sent_counter_, RowBatch::GetBatchSize(*dest) * num_receivers);
+    COUNTER_ADD(uncompressed_bytes_counter_, uncompressed_bytes * num_receivers);
   }
 }
 

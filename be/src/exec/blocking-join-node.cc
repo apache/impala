@@ -146,7 +146,7 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
   // Seed left child in preparation for GetNext().
   while (true) {
     RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_side_eos_));
-    COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
+    COUNTER_ADD(probe_row_counter_, probe_batch_->num_rows());
     probe_batch_pos_ = 0;
     if (probe_batch_->num_rows() == 0) {
       if (probe_side_eos_) {

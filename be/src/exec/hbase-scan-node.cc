@@ -267,7 +267,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
       // the tuple assembled for the previous row
       tuple_->Init(tuple_desc_->byte_size());
     }
-    COUNTER_UPDATE(rows_read_counter_, 1);
+    COUNTER_ADD(rows_read_counter_, 1);
   }
 
   return Status::OK;

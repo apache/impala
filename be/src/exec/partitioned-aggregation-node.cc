@@ -593,11 +593,10 @@ Status PartitionedAggregationNode::CreateHashPartitions(RuntimeState* state, int
       hash_partitions_[i]->hash_tbl->Close();
       hash_partitions_[i]->hash_tbl.reset();
       RETURN_IF_ERROR(hash_partitions_[i]->aggregated_row_stream->UnpinStream(true));
-      COUNTER_UPDATE(num_spilled_partitions_, 1);
+      COUNTER_ADD(num_spilled_partitions_, 1);
     }
   }
-
-  COUNTER_UPDATE(partitions_created_, PARTITION_FANOUT);
+  COUNTER_ADD(partitions_created_, PARTITION_FANOUT);
   COUNTER_SET(max_partition_level_, level);
   return Status::OK;
 }
@@ -631,7 +630,7 @@ Status PartitionedAggregationNode::NextPartition(RuntimeState* state) {
       // of the input so it's reasonably likely it can fit. We should look at this
       // partitions size and just do the aggregation if it fits in memory.
       RETURN_IF_ERROR(CreateHashPartitions(state, partition->level + 1));
-      COUNTER_UPDATE(num_repartitions_, 1);
+      COUNTER_ADD(num_repartitions_, 1);
 
       // Rows in this partition could have been spilled into two streams, depending
       // on if it is an aggregated intermediate, or an unaggregated row.
@@ -640,9 +639,8 @@ Status PartitionedAggregationNode::NextPartition(RuntimeState* state) {
       RETURN_IF_ERROR(ProcessStream<true>(partition->aggregated_row_stream.get()));
       RETURN_IF_ERROR(ProcessStream<false>(partition->unaggregated_row_stream.get()));
 
-      COUNTER_UPDATE(num_row_repartitioned_,
-          partition->aggregated_row_stream->num_rows());
-      COUNTER_UPDATE(num_row_repartitioned_,
+      COUNTER_ADD(num_row_repartitioned_, partition->aggregated_row_stream->num_rows());
+      COUNTER_ADD(num_row_repartitioned_,
           partition->unaggregated_row_stream->num_rows());
 
       partition->Close(false);
@@ -662,7 +660,7 @@ Status PartitionedAggregationNode::NextPartition(RuntimeState* state) {
 
   output_partition_ = partition;
   output_iterator_ = output_partition_->hash_tbl->Begin();
-  COUNTER_UPDATE(num_hash_buckets_, output_partition_->hash_tbl->num_buckets());
+  COUNTER_ADD(num_hash_buckets_, output_partition_->hash_tbl->num_buckets());
   return Status::OK;
 }
 
@@ -718,7 +716,7 @@ Status PartitionedAggregationNode::SpillPartition() {
   partition->hash_tbl->Close();
   partition->hash_tbl.reset();
   RETURN_IF_ERROR(partition->aggregated_row_stream->UnpinStream(true));
-  COUNTER_UPDATE(num_spilled_partitions_, 1);
+  COUNTER_ADD(num_spilled_partitions_, 1);
 
   // We need to do a lot more work in this case. The result tuple contains var-len
   // strings, meaning the current in memory layout is not the on disk block layout.

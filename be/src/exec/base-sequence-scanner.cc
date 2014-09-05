@@ -159,7 +159,7 @@ Status BaseSequenceScanner::ProcessSplit() {
     parse_status_ = Status::OK;
     int64_t error_offset = stream_->file_offset();
     status = SkipToSync(header_->sync, SYNC_HASH_SIZE);
-    COUNTER_UPDATE(bytes_skipped_counter_, stream_->file_offset() - error_offset);
+    COUNTER_ADD(bytes_skipped_counter_, stream_->file_offset() - error_offset);
     RETURN_IF_ERROR(status);
     DCHECK(parse_status_.ok());
   }
@@ -277,7 +277,7 @@ void BaseSequenceScanner::CloseFileRanges(const char* filename) {
   HdfsFileDesc* desc = scan_node_->GetFileDesc(filename);
   const vector<DiskIoMgr::ScanRange*>& splits = desc->splits;
   for (int i = 0; i < splits.size(); ++i) {
-    COUNTER_UPDATE(bytes_skipped_counter_, splits[i]->len());
+    COUNTER_ADD(bytes_skipped_counter_, splits[i]->len());
     scan_node_->RangeComplete(file_format(), THdfsCompression::NONE);
   }
 }

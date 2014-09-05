@@ -138,7 +138,7 @@ Status LlvmCodeGen::LoadModule(LlvmCodeGen* codegen, const string& file,
     ss << "Could not load module " << file << ": " << err.message();
     return Status(ss.str());
   }
-  COUNTER_UPDATE(codegen->module_file_size_, file_buffer->getBufferSize());
+  COUNTER_ADD(codegen->module_file_size_, file_buffer->getBufferSize());
 
   string error;
   *module = ParseBitcodeFile(file_buffer.get(), codegen->context(), &error);

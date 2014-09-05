@@ -307,7 +307,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
             if (out_batch->AtCapacity()) return Status::OK;
             continue;
           } else {
-            COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
+            COUNTER_ADD(probe_row_counter_, probe_batch_->num_rows());
             break;
           }
         }
@@ -397,7 +397,7 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
         probe_timer.Stop();
         RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_side_eos_));
         probe_timer.Start();
-        COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
+        COUNTER_ADD(probe_row_counter_, probe_batch_->num_rows());
       }
     }
   }

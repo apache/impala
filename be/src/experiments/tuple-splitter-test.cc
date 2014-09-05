@@ -221,7 +221,7 @@ class DataPartitioner {
   uint8_t* Allocate(BuildPartition* partition, int p, int size = 0) {
     if (size == 0) size = tuples_per_partition_ * size_;
     else size = size * size_;
-    COUNTER_UPDATE(bytes_allocated_, size);
+    COUNTER_ADD(bytes_allocated_, size);
     uint8_t* out_mem = pool_->Allocate(size);
     partition->blocks.push_back(out_mem);
     outputs_[p].Update(out_mem, 0);
@@ -250,7 +250,7 @@ class DataPartitioner {
 
 void DataPartitioner::AddData(int n, uint8_t* data) {
   SCOPED_TIMER(add_time_);
-  COUNTER_UPDATE(bytes_copied_, n * size_);
+  COUNTER_ADD(bytes_copied_, n * size_);
 
   for (int i = 0; i < n; ++i) {
     int32_t hash = *reinterpret_cast<int32_t*>(data + hash_offset_);
@@ -268,7 +268,7 @@ void DataPartitioner::AddData(int n, uint8_t* data) {
 }
 
 bool DataPartitioner::Split(const BuildPartition& build_partition) {
-  COUNTER_UPDATE(splits_, 1);
+  COUNTER_ADD(splits_, 1);
   const int num_blocks = build_partition.blocks.size();
   const int next_level = build_partition.level + 1;
   if (next_level >= 8) {
@@ -298,7 +298,7 @@ bool DataPartitioner::Split(const BuildPartition& build_partition) {
 
   for (int i = 0; i < partitions; ++i) {
     if (split_counts_[i] > 0) {
-      COUNTER_UPDATE(bytes_allocated_, split_counts_[i] * size_);
+      COUNTER_ADD(bytes_allocated_, split_counts_[i] * size_);
       uint8_t* mem = pool_->Allocate(split_counts_[i] * size_);
       child_partitions_[i].blocks.clear();
       child_partitions_[i].level = next_level;
@@ -306,7 +306,7 @@ bool DataPartitioner::Split(const BuildPartition& build_partition) {
       outputs_[i].ptr = mem;
     }
   }
-  COUNTER_UPDATE(bytes_copied_, TotalTuples(build_partition) * size_);
+  COUNTER_ADD(bytes_copied_, TotalTuples(build_partition) * size_);
 
   for (int i = 0; i < num_blocks; ++i) {
     uint8_t* data = build_partition.blocks[i];

@@ -742,8 +742,8 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
     // Case 6
     if (!pool->TryAcquireThreadToken()) break;
 
-    COUNTER_UPDATE(&active_scanner_thread_counter_, 1);
-    COUNTER_UPDATE(num_scanner_threads_started_counter_, 1);
+    COUNTER_ADD(&active_scanner_thread_counter_, 1);
+    COUNTER_ADD(num_scanner_threads_started_counter_, 1);
     stringstream ss;
     ss << "scanner-thread(" << num_scanner_threads_started_counter_->value() << ")";
     scanner_threads_.AddThread(
@@ -771,7 +771,7 @@ void HdfsScanNode::ScannerThread() {
             !EnoughMemoryForScannerThread(false)) {
           // We can't break here. We need to update the counter with the lock held or else
           // all threads might see active_scanner_thread_counter_.value > 1
-          COUNTER_UPDATE(&active_scanner_thread_counter_, -1);
+          COUNTER_ADD(&active_scanner_thread_counter_, -1);
           // Unlock before releasing the thread token to avoid deadlock in
           // ThreadTokenAvailableCb().
           l.unlock();
@@ -877,7 +877,7 @@ void HdfsScanNode::ScannerThread() {
     }
   }
 
-  COUNTER_UPDATE(&active_scanner_thread_counter_, -1);
+  COUNTER_ADD(&active_scanner_thread_counter_, -1);
   if (runtime_state_->query_resource_mgr() != NULL) {
     runtime_state_->query_resource_mgr()->NotifyThreadUsageChange(-1);
   }
@@ -893,7 +893,7 @@ void HdfsScanNode::RangeComplete(const THdfsFileFormat::type& file_type,
 
 void HdfsScanNode::RangeComplete(const THdfsFileFormat::type& file_type,
     const vector<THdfsCompression::type>& compression_types) {
-  scan_ranges_complete_counter()->Update(1);
+  scan_ranges_complete_counter()->Add(1);
   progress_.Update(1);
 
   {

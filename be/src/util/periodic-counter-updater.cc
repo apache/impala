@@ -169,7 +169,7 @@ void PeriodicCounterUpdater::UpdateLoop() {
         it != bucketing_counters_.end(); ++it) {
       int64_t val = it->second.src_counter->value();
       if (val >= it->first->size()) val = it->first->size() - 1;
-      it->first->at(val)->Update(1);
+      it->first->at(val)->Add(1);
       ++it->second.num_sampled;
     }
 

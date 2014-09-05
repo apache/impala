@@ -145,7 +145,7 @@ void DataStreamRecvr::SenderQueue::AddBatch(const TRowBatch& thrift_batch) {
   if (is_cancelled_) return;
 
   int batch_size = RowBatch::GetBatchSize(thrift_batch);
-  COUNTER_UPDATE(recvr_->bytes_received_counter_, batch_size);
+  COUNTER_ADD(recvr_->bytes_received_counter_, batch_size);
   DCHECK_GT(num_remaining_senders_, 0);
 
   // if there's something in the queue and this batch will push us over the

@@ -127,7 +127,7 @@ class MemTracker {
     if (UNLIKELY(enable_logging_)) LogUpdate(true, bytes);
     for (std::vector<MemTracker*>::iterator tracker = all_trackers_.begin();
          tracker != all_trackers_.end(); ++tracker) {
-      (*tracker)->consumption_->Update(bytes);
+      (*tracker)->consumption_->Add(bytes);
       if ((*tracker)->consumption_metric_ == NULL) {
         DCHECK_GE((*tracker)->consumption_->current_value(), 0);
       }
@@ -145,7 +145,7 @@ class MemTracker {
     for (int i = 0; i < all_trackers_.size(); ++i) {
       if (all_trackers_[i] == end_tracker) return;
       DCHECK(!all_trackers_[i]->has_limit());
-      all_trackers_[i]->consumption_->Update(bytes);
+      all_trackers_[i]->consumption_->Add(bytes);
     }
   }
 
@@ -168,16 +168,16 @@ class MemTracker {
       MemTracker* tracker = all_trackers_[i];
       int64_t limit = tracker->effective_limit();
       if (limit < 0) {
-        tracker->consumption_->Update(bytes);
+        tracker->consumption_->Add(bytes);
       } else {
-        if (!tracker->consumption_->TryUpdate(bytes, limit)) {
+        if (!tracker->consumption_->TryAdd(bytes, limit)) {
           // One of the trackers failed, attempt to GC memory or expand our limit. If that
           // succeeds, TryUpdate() again. Bail if either fails.
           //
           // TODO: This may not be right if more than one tracker can actually change its
           // rm reservation limit.
           if (!tracker->GcMemory(limit - bytes) || tracker->ExpandRmReservation(bytes)) {
-            if (!tracker->consumption_->TryUpdate(bytes, tracker->limit_)) break;
+            if (!tracker->consumption_->TryAdd(bytes, tracker->limit_)) break;
           } else {
             break;
           }
@@ -197,7 +197,7 @@ class MemTracker {
     // to adjust the consumption of the query tracker to stop the resource from never
     // getting used by a subsequent TryConsume()?
     for (int j = all_trackers_.size() - 1; j > i; --j) {
-      all_trackers_[j]->consumption_->Update(-bytes);
+      all_trackers_[j]->consumption_->Add(-bytes);
     }
     return false;
   }
@@ -222,7 +222,7 @@ class MemTracker {
     if (UNLIKELY(enable_logging_)) LogUpdate(false, bytes);
     for (std::vector<MemTracker*>::iterator tracker = all_trackers_.begin();
          tracker != all_trackers_.end(); ++tracker) {
-      (*tracker)->consumption_->Update(-bytes);
+      (*tracker)->consumption_->Add(-bytes);
       // If a UDF calls FunctionContext::TrackAllocation() but allocates less than the
       // reported amount, the subsequent call to FunctionContext::Free() may cause the
       // process mem tracker to go negative until it is synced back to the tcmalloc

@@ -204,7 +204,7 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
   if (scan_node_->materialized_slots().empty()) {
     // Handle case where there are no slots to materialize (e.g. count(*))
     num_to_process = WriteEmptyTuples(context_, tuple_row, num_to_process);
-    COUNTER_UPDATE(scan_node_->rows_read_counter(), num_to_process);
+    COUNTER_ADD(scan_node_->rows_read_counter(), num_to_process);
     RETURN_IF_ERROR(CommitRows(num_to_process));
     return Status::OK;
   }
@@ -262,7 +262,7 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
   }
 
   if (tuples_returned == -1) return parse_status_;
-  COUNTER_UPDATE(scan_node_->rows_read_counter(), num_to_process);
+  COUNTER_ADD(scan_node_->rows_read_counter(), num_to_process);
   RETURN_IF_ERROR(CommitRows(tuples_returned));
   return Status::OK;
 }
@@ -322,7 +322,7 @@ Status HdfsSequenceScanner::ProcessRange() {
       add_row = WriteEmptyTuples(context_, tuple_row_mem, 1);
     }
 
-    COUNTER_UPDATE(scan_node_->rows_read_counter(), 1);
+    COUNTER_ADD(scan_node_->rows_read_counter(), 1);
     if (add_row) RETURN_IF_ERROR(CommitRows(1));
     if (scan_node_->ReachedLimit()) break;
 

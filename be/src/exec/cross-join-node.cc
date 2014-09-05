@@ -113,7 +113,7 @@ Status CrossJoinNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool*
         timer.Stop();
         RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_side_eos_));
         timer.Start();
-        COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
+        COUNTER_ADD(probe_row_counter_, probe_batch_->num_rows());
       }
     }
   }

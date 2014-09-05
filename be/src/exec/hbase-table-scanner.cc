@@ -574,7 +574,7 @@ inline void HBaseTableScanner::GetRowKey(JNIEnv* env, jobject cell,
       (jbyteArray) env->CallObjectMethod(cell, cell_get_row_array_);
   *data = value_pool_->Allocate(*length);
   env->GetByteArrayRegion(jdata, offset, *length, reinterpret_cast<jbyte*>(*data));
-  COUNTER_UPDATE(scan_node_->bytes_read_counter(), *length);
+  COUNTER_ADD(scan_node_->bytes_read_counter(), *length);
 }
 
 inline void HBaseTableScanner::GetFamily(JNIEnv* env, jobject cell,
@@ -585,7 +585,7 @@ inline void HBaseTableScanner::GetFamily(JNIEnv* env, jobject cell,
       (jbyteArray) env->CallObjectMethod(cell, cell_get_family_array_);
   *data = value_pool_->Allocate(*length);
   env->GetByteArrayRegion(jdata, offset, *length, reinterpret_cast<jbyte*>(*data));
-  COUNTER_UPDATE(scan_node_->bytes_read_counter(), *length);
+  COUNTER_ADD(scan_node_->bytes_read_counter(), *length);
 }
 
 inline void HBaseTableScanner::GetQualifier(JNIEnv* env, jobject cell,
@@ -596,7 +596,7 @@ inline void HBaseTableScanner::GetQualifier(JNIEnv* env, jobject cell,
       (jbyteArray) env->CallObjectMethod(cell, cell_get_qualifier_array_);
   *data = value_pool_->Allocate(*length);
   env->GetByteArrayRegion(jdata, offset, *length, reinterpret_cast<jbyte*>(*data));
-  COUNTER_UPDATE(scan_node_->bytes_read_counter(), *length);
+  COUNTER_ADD(scan_node_->bytes_read_counter(), *length);
 }
 
 inline void HBaseTableScanner::GetValue(JNIEnv* env, jobject cell,
@@ -607,7 +607,7 @@ inline void HBaseTableScanner::GetValue(JNIEnv* env, jobject cell,
       (jbyteArray) env->CallObjectMethod(cell, cell_get_value_array_);
   *data = value_pool_->Allocate(*length);
   env->GetByteArrayRegion(jdata, offset, *length, reinterpret_cast<jbyte*>(*data));
-  COUNTER_UPDATE(scan_node_->bytes_read_counter(), *length);
+  COUNTER_ADD(scan_node_->bytes_read_counter(), *length);
 }
 
 Status HBaseTableScanner::GetRowKey(JNIEnv* env, void** key, int* key_length) {

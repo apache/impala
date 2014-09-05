@@ -58,8 +58,7 @@ void* DataProvider::NextBatch(int* rows_returned) {
   int num_rows = min(batch_size_, num_rows_ - rows_returned_);
   *rows_returned = num_rows;
   if (num_rows == 0) return NULL;
-
-  COUNTER_UPDATE(bytes_generated_, num_rows * row_size_);
+  COUNTER_ADD(bytes_generated_, num_rows * row_size_);
 
   uniform_real<> dist(0,1);
   variate_generator<minstd_rand&, uniform_real<> > rand_double(rand_generator_, dist);
