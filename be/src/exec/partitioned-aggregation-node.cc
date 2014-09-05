@@ -47,6 +47,12 @@ using namespace llvm;
 // Must be a power of 2.
 const int PARTITION_FAN_OUT = 4;
 
+// Needs to be the log(PARTITION_FANOUT)
+// We use the upper bits to pick the partition and lower bits in the HT.
+// TODO: different hash functions here too? We don't need that many bits to pick
+// the partition so this might be okay.
+static const int NUM_PARTITIONING_BITS = 2;
+
 // Maximum number of times we will repartition. The maximum build table we
 // can process is:
 // MEM_LIMIT * (PARTITION_FANOUT ^ MAX_PARTITION_DEPTH). With a (low) 1GB
@@ -100,6 +106,16 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
 
   build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
   get_results_timer_ = ADD_TIMER(runtime_profile(), "GetResultsTime");
+  num_hash_buckets_ =
+      ADD_COUNTER(runtime_profile(), "HashBuckets", TCounterType::UNIT);
+  partitions_created_ =
+      ADD_COUNTER(runtime_profile(), "PartitionsCreated", TCounterType::UNIT);
+  max_partition_level_ =
+      ADD_COUNTER(runtime_profile(), "MaxPartitionLevel", TCounterType::UNIT);
+  num_row_repartitioned_ =
+      ADD_COUNTER(runtime_profile(), "RowsRepartitioned", TCounterType::UNIT);
+  num_repartitions_ =
+      ADD_COUNTER(runtime_profile(), "NumRepartitions", TCounterType::UNIT);
 
   intermediate_tuple_desc_ =
       state->desc_tbl().GetTupleDescriptor(intermediate_tuple_id_);
@@ -525,6 +541,10 @@ Status PartitionedAggregationNode::CreateHashPartitions(int level) {
     hash_partitions_.push_back(state_->obj_pool()->Add(new Partition(this, level)));
     RETURN_IF_ERROR(hash_partitions_[i]->Init());
   }
+  COUNTER_UPDATE(partitions_created_, PARTITION_FAN_OUT);
+  if (max_partition_level_->value() < level) {
+    COUNTER_SET(max_partition_level_, static_cast<int64_t>(level));
+  }
   return Status::OK;
 }
 
@@ -541,7 +561,7 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch) {
       ht_ctx_->EvalAndHashProbe(row, &hash);
     }
 
-    Partition* dst_partition = hash_partitions_[hash & (PARTITION_FAN_OUT - 1)];
+    Partition* dst_partition = hash_partitions_[hash >> (32 - NUM_PARTITIONING_BITS)];
 
     // To process this row, we first see if it can be aggregated or inserted into this
     // partition's hash table. If we need to insert it and that fails, due to OOM, we
@@ -631,11 +651,16 @@ Status PartitionedAggregationNode::NextPartition() {
       // of the input so it's very likely it can fit. We should look at this partitions
       // size and just do the aggregation if it fits in memory.
       RETURN_IF_ERROR(CreateHashPartitions(partition->level + 1));
+      COUNTER_UPDATE(num_repartitions_, 1);
 
       // Rows in this partition could have been spilled into two streams, depending
       // on if it is an aggregated intermediate, or an unaggregated row.
       RETURN_IF_ERROR(ProcessStream<true>(partition->aggregated_row_stream.get()));
       RETURN_IF_ERROR(ProcessStream<false>(partition->unaggregated_row_stream.get()));
+
+      COUNTER_UPDATE(num_row_repartitioned_, partition->aggregated_row_stream->num_rows());
+      COUNTER_UPDATE(num_row_repartitioned_,
+          partition->unaggregated_row_stream->num_rows());
 
       // Done processing this partition. Move the new partitions into
       // spilled_partitions_/aggregated_partitions_.
@@ -654,6 +679,7 @@ Status PartitionedAggregationNode::NextPartition() {
   DCHECK(partition->hash_tbl.get() != NULL);
   output_partition_ = partition;
   output_iterator_ = output_partition_->hash_tbl->Begin();
+  COUNTER_UPDATE(num_hash_buckets_, output_partition_->hash_tbl->num_buckets());
   return Status::OK;
 }
 

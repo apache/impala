@@ -170,6 +170,21 @@ class PartitionedAggregationNode : public ExecNode {
   // Time spent returning the aggregated rows
   RuntimeProfile::Counter* get_results_timer_;
 
+  // Total number of hash buckets across all partitions.
+  RuntimeProfile::Counter* num_hash_buckets_;
+
+  // Total number of partitions created.
+  RuntimeProfile::Counter* partitions_created_;
+
+  // Level of max partition (i.e. number of repartitioning steps).
+  RuntimeProfile::Counter* max_partition_level_;
+
+  // Number of rows that have been repartitioned.
+  RuntimeProfile::Counter* num_row_repartitioned_;
+
+  // Number of partitions that have been repartitioned.
+  RuntimeProfile::Counter* num_repartitions_;
+
   struct Partition {
     Partition(PartitionedAggregationNode* parent, int level)
       : parent(parent), is_closed(false), level(level) {}
