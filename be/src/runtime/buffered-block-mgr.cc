@@ -36,6 +36,7 @@ struct BufferedBlockMgr::Client {
     : mgr_(mgr),
       state_(state),
       tracker_(tracker),
+      query_tracker_(mgr_->mem_tracker_->parent()),
       num_reserved_buffers_(num_reserved_buffers),
       num_pinned_buffers_(0) {
   }
@@ -55,6 +56,10 @@ struct BufferedBlockMgr::Client {
   // fixed pool of buffers regardless of if they are in the block mgr or the clients).
   MemTracker* tracker_;
 
+  // This is the common ancestor between the block mgr tracker and the client tracker.
+  // When memory is transferred to the client, we want it to stop at this tracker.
+  MemTracker* query_tracker_;
+
   // Number of buffers reserved by this client.
   int num_reserved_buffers_;
 
@@ -63,13 +68,13 @@ struct BufferedBlockMgr::Client {
 
   void PinBuffer() {
     ++num_pinned_buffers_;
-    if (tracker_ != NULL) tracker_->ConsumeLocal(mgr_->block_size());
+    if (tracker_ != NULL) tracker_->ConsumeLocal(mgr_->block_size(), query_tracker_);
   }
 
   void UnpinBuffer() {
     DCHECK_GT(num_pinned_buffers_, 0);
     --num_pinned_buffers_;
-    if (tracker_ != NULL) tracker_->ReleaseLocal(mgr_->block_size());
+    if (tracker_ != NULL) tracker_->ReleaseLocal(mgr_->block_size(), query_tracker_);
   }
 };
 

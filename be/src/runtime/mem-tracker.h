@@ -134,18 +134,23 @@ class MemTracker {
     }
   }
 
-  // Increases/Decreases the consumption of just this tracker. This is useful if
-  // we only want to update accounting on one tracker. This happens when we want
+  // Increases/Decreases the consumption of this tracker and the ancestors up to (but
+  // not including) end_tracker. This is useful if we want to move tracking between
+  // trackers that share a common (i.e. end_tracker) ancestor. This happens when we want
   // to update tracking on a particular mem tracker but the consumption against
   // the limit recorded in one of its ancestors already happened.
-  void ConsumeLocal(int64_t bytes) {
+  void ConsumeLocal(int64_t bytes, MemTracker* end_tracker) {
     DCHECK(consumption_metric_ == NULL) << "Should not be called on root.";
     if (UNLIKELY(enable_logging_)) LogUpdate(bytes > 0, bytes);
-    all_trackers_[0]->consumption_->Update(bytes);
+    for (int i = 0; i < all_trackers_.size(); ++i) {
+      if (all_trackers_[i] == end_tracker) return;
+      DCHECK(!all_trackers_[i]->has_limit());
+      all_trackers_[i]->consumption_->Update(bytes);
+    }
   }
 
-  void ReleaseLocal(int64_t bytes) {
-    ConsumeLocal(-bytes);
+  void ReleaseLocal(int64_t bytes, MemTracker* end_tracker) {
+    ConsumeLocal(-bytes, end_tracker);
   }
 
   // Increases consumption of this tracker and its ancestors by 'bytes' only if

@@ -201,13 +201,16 @@ class PartitionedAggregationNode : public ExecNode {
   RuntimeProfile::Counter* partitions_created_;
 
   // Level of max partition (i.e. number of repartitioning steps).
-  RuntimeProfile::Counter* max_partition_level_;
+  RuntimeProfile::HighWaterMarkCounter* max_partition_level_;
 
   // Number of rows that have been repartitioned.
   RuntimeProfile::Counter* num_row_repartitioned_;
 
   // Number of partitions that have been repartitioned.
   RuntimeProfile::Counter* num_repartitions_;
+
+  // Number of partitions that have been spilled.
+  RuntimeProfile::Counter* num_spilled_partitions_;
 
   struct Partition {
     Partition(PartitionedAggregationNode* parent, int level)
@@ -348,6 +351,11 @@ class PartitionedAggregationNode : public ExecNode {
   // TODO: is there a better way to do this?
   Status ProcessBatch_false(RowBatch* batch, HashTableCtx* ht_ctx);
   Status ProcessBatch_true(RowBatch* batch, HashTableCtx* ht_ctx);
+
+  // We need two buffers per partition, one for the aggregated stream and one
+  // for the unaggregated stream. We need an additional buffer to read the stream
+  // we are currently repartitioning.
+  static int MinRequiredBuffers() { return 2 * PARTITION_FANOUT + 1; }
 };
 
 }

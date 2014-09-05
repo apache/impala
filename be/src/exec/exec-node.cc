@@ -53,7 +53,7 @@ using namespace boost;
 
 // TODO: remove when we remove hash-join-node.cc and aggregation-node.cc
 DEFINE_bool(enable_partitioned_hash_join, false, "Enable partitioned hash join");
-DEFINE_bool(enable_partitioned_aggregation, false, "Enable partitioned hash agg");
+DEFINE_bool(enable_partitioned_aggregation, true, "Enable partitioned hash agg");
 
 namespace impala {
 

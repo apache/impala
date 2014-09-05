@@ -81,12 +81,13 @@ string BufferedTupleStream::DebugString() const {
   return ss.str();
 }
 
-Status BufferedTupleStream::Init() {
+Status BufferedTupleStream::Init(bool pinned) {
   bool got_block = false;
   RETURN_IF_ERROR(NewBlockForWrite(&got_block));
   if (!got_block) return Status("Not enough memory to initialize BufferedTupleStream.");
   DCHECK(write_block_ != NULL);
-  if (read_write_) PrepareForRead();
+  if (read_write_) RETURN_IF_ERROR(PrepareForRead());
+  if (!pinned) RETURN_IF_ERROR(UnpinAllBlocks());
   return Status::OK;
 }
 
@@ -172,6 +173,8 @@ Status BufferedTupleStream::NextBlockForRead() {
 }
 
 Status BufferedTupleStream::PrepareForRead() {
+  if (blocks_.empty()) return Status::OK;
+
   if (!read_write_ && write_block_ != NULL) {
     DCHECK(write_block_->is_pinned());
     if (!pinned_ && write_block_ != blocks_.front()) {

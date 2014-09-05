@@ -740,8 +740,7 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
   for (int i = 0; i < hash_partitions_.size(); ++i) {
     if (hash_partitions_[i]->is_closed()) continue;
     if (hash_partitions_[i]->hash_tbl() != NULL) continue;
-    RETURN_IF_ERROR(hash_partitions_[i]->probe_rows()->Init());
-    RETURN_IF_ERROR(hash_partitions_[i]->probe_rows()->UnpinAllBlocks());
+    RETURN_IF_ERROR(hash_partitions_[i]->probe_rows()->Init(false));
   }
   return Status::OK;
 }

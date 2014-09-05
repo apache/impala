@@ -94,11 +94,14 @@ class BufferedTupleStream {
 
   // Initializes the tuple stream object. Must be called once before any of the
   // other APIs.
-  Status Init();
+  // If pinned, the tuple stream starts of pinned, otherwise it is unpinned.
+  Status Init(bool pinned = true);
 
   // Adds a single row to the stream. Returns false if an error occurred.
   // BufferedTupleStream will do a deep copy of the memory in the row.
-  bool AddRow(TupleRow* row);
+  // *dst is the ptr to the memory (in the underlying block) that this row
+  // was copied to.
+  bool AddRow(TupleRow* row, uint8_t** dst = NULL);
 
   // Allocates space to store a row of size 'size'. Returns NULL if there is
   // not enough memory. The returned memory is guaranteed to fit on one block.
@@ -143,6 +146,8 @@ class BufferedTupleStream {
   // Returns the number of bytes that are in unpinned blocks.
   int64_t bytes_unpinned() const;
 
+  bool is_pinned() const { return pinned_; }
+
  private:
   // If true, blocks are deleted after they are read.
   const bool delete_on_read_;
@@ -158,7 +163,7 @@ class BufferedTupleStream {
   // Description of rows stored in the stream.
   const RowDescriptor& desc_;
 
-  // Sum of the fixed length portition of all the tuples in desc_.
+  // Sum of the fixed length portion of all the tuples in desc_.
   int fixed_tuple_row_size_;
 
   // Vector of all the strings slots grouped by tuple_idx.
@@ -204,7 +209,9 @@ class BufferedTupleStream {
 
   // Copies row into 'write_block_'. Returns false if there is not enough space
   // in 'write_block_'.
-  bool DeepCopy(TupleRow* row);
+  // *dst is the ptr to the memory (in the underlying block) that this row
+  // was copied to.
+  bool DeepCopy(TupleRow* row, uint8_t** dst);
 
   // Gets a new block from the block_mgr_, updating write_block_ and
   // setting *got_block. If there are no blocks available, write_block_ is set to NULL

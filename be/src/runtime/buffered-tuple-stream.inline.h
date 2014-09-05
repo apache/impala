@@ -23,7 +23,7 @@
 namespace impala {
 
 // TODO: this really needs codegen
-inline bool BufferedTupleStream::DeepCopy(TupleRow* row) {
+inline bool BufferedTupleStream::DeepCopy(TupleRow* row, uint8_t** dst) {
   if (UNLIKELY(write_block_ == NULL)) return false;
   DCHECK(write_block_->is_pinned());
 
@@ -34,6 +34,7 @@ inline bool BufferedTupleStream::DeepCopy(TupleRow* row) {
   // Copy the fixed len tuples.
   if (UNLIKELY(write_block_->BytesRemaining() < fixed_tuple_row_size_)) return false;
   uint8_t* tuple_buf = write_block_->Allocate<uint8_t>(fixed_tuple_row_size_);
+  if (dst != NULL) *dst = tuple_buf;
   bytes_allocated += fixed_tuple_row_size_;
   for (int i = 0; i < desc_.tuple_descriptors().size(); ++i) {
     int tuple_size = desc_.tuple_descriptors()[i]->byte_size();
@@ -68,23 +69,23 @@ inline bool BufferedTupleStream::DeepCopy(TupleRow* row) {
   return true;
 }
 
-inline bool BufferedTupleStream::AddRow(TupleRow* row) {
-  if (LIKELY(DeepCopy(row))) return true;
+inline bool BufferedTupleStream::AddRow(TupleRow* row, uint8_t** dst) {
+  if (LIKELY(DeepCopy(row, dst))) return true;
   bool got_block = false;
   status_ = NewBlockForWrite(&got_block);
   if (!status_.ok() || !got_block) return false;
-  return DeepCopy(row);
+  return DeepCopy(row, dst);
 }
 
 inline uint8_t* BufferedTupleStream::AllocateRow(int size) {
-  DCHECK(write_block_ != NULL);
-  DCHECK(write_block_->is_pinned());
   DCHECK_GE(size, fixed_tuple_row_size_);
-  if (UNLIKELY(write_block_->BytesRemaining() < size)) {
+  if (UNLIKELY(write_block_ == NULL || write_block_->BytesRemaining() < size)) {
     bool got_block = false;
     status_ = NewBlockForWrite(&got_block);
     if (!status_.ok() || !got_block) return NULL;
   }
+  DCHECK(write_block_ != NULL);
+  DCHECK(write_block_->is_pinned());
   DCHECK_GE(write_block_->BytesRemaining(), size);
   ++num_rows_;
   return write_block_->Allocate<uint8_t>(size);
