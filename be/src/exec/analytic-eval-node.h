@@ -91,7 +91,7 @@ class AnalyticEvalNode : public ExecNode {
   // in the initializer list.
   static AnalyticFnScope GetAnalyticFnScope(const TAnalyticNode& node);
 
-  // Evaluates analytic functions over current_child_batch_. Each input row is passed
+  // Evaluates analytic functions over curr_child_batch_. Each input row is passed
   // to the evaluators and added to input_stream_ where they are stored until a tuple
   // containing the results of the analytic functions for that row is ready to be
   // returned. When enough rows have been processed so that results can be produced for
@@ -120,13 +120,17 @@ class AnalyticEvalNode : public ExecNode {
   void InitPartition(int64_t stream_idx);
 
   // Produces a result tuple with analytic function results by calling GetValue() or
-  // Finalize() for current_tuple_ on the evaluators_. The result tuple is stored in
+  // Finalize() for curr_tuple_ on the evaluators_. The result tuple is stored in
   // result_tuples_ with the index into input_stream_ specified by stream_idx.
   void AddResultTuple(int64_t stream_idx);
 
   // Gets the window start and end index offsets for ROWS windows.
   int64_t rows_start_idx() const;
   int64_t rows_end_idx() const;
+
+  // Gets the number of rows that are ready to be returned by subsequent calls to
+  // GetNextOutputBatch().
+  int64_t NumOutputRowsReady() const;
 
   // Debug string about the rows that have been evaluated and are ready to be returned.
   std::string DebugEvaluatedRowsString() const;
@@ -184,24 +188,33 @@ class AnalyticEvalNode : public ExecNode {
   // evaluators_. When enough input rows have been consumed to produce the analytic
   // function results, a result tuple (described by result_tuple_desc_) is created and
   // the agg fn results are written to that tuple by calling Finalize()/GetValue()
-  // on the evaluators with current_tuple_ as the source tuple.
-  Tuple* current_tuple_;
+  // on the evaluators with curr_tuple_ as the source tuple.
+  Tuple* curr_tuple_;
 
   // A tuple described by result_tuple_desc_ used when calling Finalize() on the
   // evaluators_ to release resources between partitions; the value is never used.
   // TODO: Remove when agg fns implement a separate Close() method to release resources.
   Tuple* dummy_result_tuple_;
 
-  // Pool used to allocate result tuples.
-  boost::scoped_ptr<MemPool> result_tuple_pool_;
+  // Pool used to allocate result tuples. Resources are transferred to
+  // prev_result_tuple_pool_ once MAX_NUM_OWNED_RESULT_TUPLES have been allocated.
+  boost::scoped_ptr<MemPool> curr_result_tuple_pool_;
 
-  // Number of result tuples currently owned by result_tuple_pool_. Resources are
-  // transfered to the output row batches when the number of tuples reaches the row
-  // batch size.
-  int num_owned_result_tuples_;
+  // Number of result tuples currently owned by curr_result_tuple_pool_.
+  int num_tuples_in_curr_result_pool_;
+
+  // Pool containing resources for result tuples that will be transferred to an output
+  // batch.
+  boost::scoped_ptr<MemPool> prev_result_tuple_pool_;
+
+  // The last index of the row from input_stream_ associated with output row containing
+  // resources in prev_result_tuple_pool_. -1 when the pool is empty. Resources from
+  // prev_result_tuple_pool_ can only be transferred to an output batch once all rows
+  // containing these tuples have been returned.
+  int64_t prev_result_tuple_pool_stream_idx_;
 
   // Index of the row in input_stream_ at which the current partition started.
-  int64_t current_partition_stream_idx_;
+  int64_t curr_partition_stream_idx_;
 
   // Previous input row used to compare partition boundaries and to determine when the
   // order-by expressions change.
@@ -216,7 +229,7 @@ class AnalyticEvalNode : public ExecNode {
   // and then swapped with the curr batch so the RowBatch owning prev_input_row_ is
   // stored in prev_child_batch_ for the next call to ProcessChildBatch().
   boost::scoped_ptr<RowBatch> prev_child_batch_;
-  boost::scoped_ptr<RowBatch> current_child_batch_;
+  boost::scoped_ptr<RowBatch> curr_child_batch_;
 
   // Block manager client used by input_stream_. Not owned.
   BufferedBlockMgr::Client* client_;
@@ -238,7 +251,10 @@ class AnalyticEvalNode : public ExecNode {
   boost::scoped_ptr<MemPool> mem_pool_;
 
   // Current index in input_stream_batch_.
-  int input_row_idx_;
+  int input_stream_batch_idx_;
+
+  // The index in input_stream_ of the next row to be returned by GetNextOutputBatch().
+  int64_t input_stream_idx_;
 
   // True when there are no more input rows to consume from our child.
   bool input_eos_;
