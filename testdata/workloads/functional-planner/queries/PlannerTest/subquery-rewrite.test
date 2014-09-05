@@ -648,7 +648,7 @@ and a.int_col < 10
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: max(id)
-|  |  having: 10 < max(id)
+|  |  having: max(id) > 10
 |  |
 |  01:SCAN HDFS [functional.alltypes t]
 |     partitions=24/24 size=478.45KB
@@ -900,4 +900,115 @@ and g.bigint_col < 1000 and g.bigint_col = true
 00:SCAN HDFS [functional.alltypesagg g]
    partitions=11/11 size=814.73KB
    predicates: g.bigint_col < 1000, g.bigint_col = TRUE
+====
+# Aggregate subquery in an IS NULL predicate
+select *
+from functional.alltypestiny t
+where (select max(int_col) from functional.alltypesagg where int_col is null) is null
+---- PLAN
+03:CROSS JOIN [BROADCAST]
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: max(int_col)
+|  |  having: max(int_col) IS NULL
+|  |
+|  01:SCAN HDFS [functional.alltypesagg]
+|     partitions=11/11 size=814.73KB
+|     predicates: int_col IS NULL
+|
+00:SCAN HDFS [functional.alltypestiny t]
+   partitions=4/4 size=460B
+====
+# Correlated aggregate subquery with a count in an IS NULL predicate
+select int_col, count(*)
+from functional.alltypestiny t
+where (select count(*) from functional.alltypesagg g where t.id = g.id) is null
+and bool_col = false
+group by int_col
+---- PLAN
+04:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: int_col
+|
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t.id = g.id
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |  group by: g.id
+|  |  having: count(*) IS NULL
+|  |
+|  01:SCAN HDFS [functional.alltypesagg g]
+|     partitions=11/11 size=814.73KB
+|
+00:SCAN HDFS [functional.alltypestiny t]
+   partitions=4/4 size=460B
+   predicates: bool_col = FALSE
+====
+# Correlated aggregate subquery in an IS NULL predicate
+select *
+from functional.alltypestiny t
+where
+  (select max(int_col)
+   from functional.alltypesagg g
+   where g.id = t.id and g.int_col is null) is null
+and t.bool_col = false
+---- PLAN
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t.id = g.id
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: max(int_col)
+|  |  group by: g.id
+|  |  having: max(int_col) IS NULL
+|  |
+|  01:SCAN HDFS [functional.alltypesagg g]
+|     partitions=11/11 size=814.73KB
+|     predicates: g.int_col IS NULL
+|
+00:SCAN HDFS [functional.alltypestiny t]
+   partitions=4/4 size=460B
+   predicates: t.bool_col = FALSE
+====
+# Complex expr with a scalar subquery
+select *
+from functional.alltypestiny t
+where 1 +
+  (select count(*) from functional.alltypesagg where bool_col = false) = t.int_col + 2
+and t.bigint_col < 100
+---- PLAN
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t.int_col + 2 = 1 + count(*)
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |
+|  01:SCAN HDFS [functional.alltypesagg]
+|     partitions=11/11 size=814.73KB
+|     predicates: bool_col = FALSE
+|
+00:SCAN HDFS [functional.alltypestiny t]
+   partitions=4/4 size=460B
+   predicates: t.bigint_col < 100
+====
+# Scalar subquery in a function
+select *
+from functional.alltypestiny t
+where nullifzero((select min(id) from functional.alltypessmall s where s.bool_col = false))
+  is null
+and t.id < 10
+---- PLAN
+03:CROSS JOIN [BROADCAST]
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(id)
+|  |  having: nullifzero(min(id)) IS NULL
+|  |
+|  01:SCAN HDFS [functional.alltypessmall s]
+|     partitions=4/4 size=6.32KB
+|     predicates: s.bool_col = FALSE
+|
+00:SCAN HDFS [functional.alltypestiny t]
+   partitions=4/4 size=460B
+   predicates: t.id < 10
 ====

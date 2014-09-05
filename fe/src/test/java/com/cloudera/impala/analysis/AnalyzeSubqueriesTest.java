@@ -418,6 +418,16 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
           "(select * from functional.alltypessmall s where t.id = s.id and %s " +
           "(select * from functional.alltypestiny g where g.bool_col = " +
           "s.bool_col))", op, op));
+      String nullOps[] = {"is null", "is not null"};
+      for (String nullOp: nullOps) {
+        // Uncorrelated EXISTS subquery in an IS [NOT] NULL predicate
+        AnalyzesOk(String.format("select * from functional.alltypes where %s " +
+            "(select * from functional.alltypestiny) %s and id < 5", op, nullOp));
+        // Correlated EXISTS subquery in an IS [NOT] NULL predicate
+        AnalyzesOk(String.format("select * from functional.alltypes t where " +
+            "%s (select 1 from functional.alltypestiny s where t.id = s.id) " +
+            "%s and t.bool_col = false", op, nullOp));
+      }
     }
 
     // Different non-equi comparison operators in the correlated predicate
@@ -466,6 +476,11 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "exists (select * from t)", "Table does not exist: default.t");
     // Uncorrelated subquery with no FROM clause
     AnalyzesOk("select * from functional.alltypes where exists (select 1,2)");
+    // EXISTS subquery in a binary predicate
+    AnalysisError("select * from functional.alltypes where " +
+        "if(exists(select * from functional.alltypesagg), 1, 0) = 1",
+        "IN and/or EXISTS subquery predicates are not supported in binary predicates: " +
+        "if(EXISTS (SELECT * FROM functional.alltypesagg), 1, 0) = 1");
   }
 
   @Test
@@ -489,6 +504,9 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
             "(select %s + 1 from functional.alltypestiny)", cmpOp, aggFn));
         AnalyzesOk(String.format("select * from functional.alltypes where " +
             "(select %s + 1 from functional.alltypestiny) %s id + 10", aggFn, cmpOp));
+        AnalyzesOk(String.format("select 1 from functional.alltypes where " +
+            "1 + (select %s - 1 from functional.alltypestiny where bool_col = false) " +
+            "%s id - 10", aggFn, cmpOp));
         // Correlated
         AnalyzesOk(String.format("select count(*) from functional.alltypes a where " +
             "id %s (select %s from functional.alltypestiny t where t.bool_col = false " +
@@ -508,6 +526,9 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         AnalyzesOk(String.format("select count(*) from functional.alltypes a where " +
             "(select 1 + %s from functional.alltypestiny t where t.bool_col = false " +
             "and a.int_col = t.int_col) %s id - 10 and a.bigint_col < 10", aggFn, cmpOp));
+        AnalyzesOk(String.format("select count(*) from functional.alltypes a where " +
+            "1 + (select 1 + %s from functional.alltypestiny t where t.id = a.id " +
+            "and t.int_col < 10) %s a.id + 10", aggFn, cmpOp));
       }
     }
 
@@ -626,6 +647,57 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "1 < (select sum(int_col) from functional.alltypessmall s where " +
         "t.id < 10)", "Unsupported correlated subquery: SELECT sum(int_col) " +
         "FROM functional.alltypessmall s WHERE t.id < 10");
+    // Aggregate subqueries in an IS [NOT] NULL predicate
+    String nullOps[] = {"is null", "is not null"};
+    for (String aggFn: aggFns) {
+      for (String nullOp: nullOps) {
+        // Uncorrelated aggregate subquery
+        AnalyzesOk(String.format("select * from functional.alltypestiny where " +
+            "(select %s from functional.alltypessmall where bool_col = false) " +
+            "%s and int_col < 10", aggFn, nullOp));
+        // Correlated aggregate subquery
+        AnalyzesOk(String.format("select * from functional.alltypestiny t where " +
+            "(select %s from functional.alltypessmall s where s.id = t.id " +
+            "and s.bool_col = false) %s and bool_col = true", aggFn, nullOp));
+      }
+    }
+    // Aggregate subquery with a correlated predicate that can't be transformed
+    // into an equi-join in an IS NULL predicate
+    AnalysisError("select 1 from functional.alltypestiny t where " +
+        "(select max(id) from functional.alltypessmall s where t.id < 10) " +
+        "is null", "Unsupported correlated subquery: SELECT max(id) FROM " +
+        "functional.alltypessmall s WHERE t.id < 10");
+
+    // Mathematical functions with scalar subqueries
+    String mathFns[] = {"abs", "cos", "ceil", "floor"};
+    for (String mathFn: mathFns) {
+      for (String aggFn: aggFns) {
+        for (String cmpOp: cmpOperators) {
+          // Uncorrelated scalar subquery
+          AnalyzesOk(String.format("select count(*) from functional.alltypes t where " +
+              "%s((select 1 + %s from functional.alltypessmall where bool_col = " +
+              "false)) %s 100 - t.int_col and t.bigint_col < 100", mathFn, aggFn, cmpOp));
+          // Correlated scalar subquery
+          AnalyzesOk(String.format("select count(*) from functional.alltypes t where " +
+              "%s((select 1 + %s from functional.alltypessmall s where bool_col = false " +
+              "and t.id = s.id)) %s 100 - t.int_col and t.bigint_col < 100", mathFn, aggFn,
+              cmpOp));
+        }
+      }
+    }
+
+    // Conditional functions with scalar subqueries
+    for (String aggFn: aggFns) {
+      AnalyzesOk(String.format("select * from functional.alltypestiny t where " +
+          "nullifzero((select %s from functional.alltypessmall s where " +
+          "s.bool_col = false)) is null", aggFn));
+      AnalyzesOk(String.format("select count(*) from functional.alltypes t where " +
+          "zeroifnull((select %s from functional.alltypessmall s where t.id = s.id)) " +
+          "= 0 and t.int_col < 10", aggFn));
+      AnalyzesOk(String.format("select 1 from functional.alltypes t where " +
+          "isnull((select %s from functional.alltypestiny s where s.bool_col = false " +
+          "), 10) < 5", aggFn));
+    }
   }
 
   @Test
@@ -740,5 +812,13 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "(select id from functional.alltypesagg g where g.bool_col = false) " +
         "and t.string_col not like '%1%' and not (t.int_col < 5) " +
         "and not (t.int_col is null) and not (t.int_col between 5 and 10)");
+    // IS NULL with an InPredicate that contains a subquery
+    AnalysisError("select * from functional.alltypestiny t where (id in " +
+        "(select id from functional.alltypes)) is null", "Unsupported IS NULL " +
+        "predicate that contains a subquery: (id IN (SELECT id FROM " +
+        "functional.alltypes)) IS NULL");
+    // IS NULL with a BinaryPredicate that contains a subquery
+    AnalyzesOk("select * from functional.alltypestiny where (id = " +
+        "(select max(id) from functional.alltypessmall)) is null");
   }
 }

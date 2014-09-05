@@ -175,6 +175,10 @@ public class BinaryPredicate extends Predicate {
       throw new AnalysisException("Multiple subqueries are not supported in binary " +
           "predicates: " + toSql());
     }
+    if (contains(InPredicate.class) || contains(ExistsPredicate.class)) {
+      throw new AnalysisException("IN and/or EXISTS subquery predicates are not " +
+          "supported in binary predicates: " + toSql());
+    }
 
     // Don't perform any casting for predicates with subqueries here. Any casting
     // required will be performed when the subquery is unnested.
@@ -282,42 +286,4 @@ public class BinaryPredicate extends Predicate {
 
   @Override
   public Expr clone() { return new BinaryPredicate(this); }
-
-  /**
-   * Return true if this BinaryPredicate contains a Subquery, false
-   * otherwise.
-   */
-  @Override
-  public boolean isSubqueryPredicate() {
-    return contains(Subquery.class);
-  }
-
-  @Override
-  public Subquery getSubquery() {
-    Preconditions.checkState(isSubqueryPredicate());
-    ArrayList<Subquery> subqueries = Lists.newArrayList();
-    collect(Predicates.instanceOf(Subquery.class), subqueries);
-    Preconditions.checkState(subqueries.size() == 1);
-    return subqueries.get(0);
-  }
-
-  @Override
-  public Expr createJoinConjunct(InlineViewRef inlineView) {
-    Preconditions.checkNotNull(inlineView);
-    Preconditions.checkState(isSubqueryPredicate());
-    boolean converseOperator = false;
-    Expr cmpExpr = null;
-    if (getChild(0).contains(Subquery.class)) {
-      cmpExpr = getChild(1);
-      converseOperator = true;
-    } else {
-      cmpExpr = getChild(0);
-    }
-
-    Operator op = (converseOperator) ? op_.converse() : op_;
-    // Return an unanalyzed expr.
-    return new BinaryPredicate(op, cmpExpr,
-        new SlotRef(new TableName(null, inlineView.getAlias()),
-        inlineView.getViewStmt().getColLabels().get(0)));
-  }
 }

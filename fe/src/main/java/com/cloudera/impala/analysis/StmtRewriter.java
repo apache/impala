@@ -20,6 +20,7 @@ import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.CompoundPredicate;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.TreeNode;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
@@ -116,16 +117,15 @@ public class StmtRewriter {
   }
 
   /**
-   * Rewrite all subqueries of a stmt's WHERE clause. Initially, all the subquery
-   * predicates are extracted from the WHERE clause and are replaced with
-   * true BoolLiterals. Subsequently, each subquery predicate is
+   * Rewrite all subqueries of a stmt's WHERE clause. Initially, all the
+   * conjuncts containing subqueries are extracted from the WHERE clause and are
+   * replaced with true BoolLiterals. Subsequently, each extracted conjunct is
    * merged into its parent select block by converting it into a join.
-   * Subquery predicates that themselves contain subquery predicates are
+   * Conjuncts with subqueries that themselves contain conjuncts with subqueries are
    * recursively rewritten in a bottom up fashion.
    *
-   * The following example illustrates the bottom up rewriting of subquery
-   * predicates (nested queries). Suppose we have the following three level
-   * nested query Q0:
+   * The following example illustrates the bottom up rewriting of nested queries.
+   * Suppose we have the following three level nested query Q0:
    *
    * SELECT *
    * FROM T1                                            : Q0
@@ -134,27 +134,27 @@ public class StmtRewriter {
    *                                       FROM T3))
    * AND T1.c < 10;
    *
-   * This query will be rewritten as follows. Initially, the subquery predicate
+   * This query will be rewritten as follows. Initially, the IN predicate
    * T1.a IN (SELECT a FROM T2 WHERE T2.b IN (SELECT b FROM T3)) is extracted
-   * from the top level block (Q0) and is replaced by a true BoolLiteral,
-   * resulting in the following query Q1:
+   * from the top level block (Q0) since it contains a subquery and is
+   * replaced by a true BoolLiteral, resulting in the following query Q1:
    *
    * SELECT * FROM T1 WHERE TRUE : Q1
    *
-   * Since the stmt in the subquery predicate contains a subquery
-   * predicate, it is also rewritten. As before, rewriting stmt SELECT a FROM T2
-   * WHERE T2.b IN (SELECT b FROM T3) works by first extracting the subquery predicate
-   * (T2.b IN (SELECT b FROM T3)) and substituting it with a true BoolLiteral,
-   * producing the following stmt Q2:
+   * Since the stmt in the extracted predicate contains a conjunct with a subquery,
+   * it is also rewritten. As before, rewriting stmt SELECT a FROM T2
+   * WHERE T2.b IN (SELECT b FROM T3) works by first extracting the conjunct that
+   * contains the subquery (T2.b IN (SELECT b FROM T3)) and substituting it with
+   * a true BoolLiteral, producing the following stmt Q2:
    *
    * SELECT a FROM T2 WHERE TRUE : Q2
    *
-   * The subquery predicate T2.b IN (SELECT b FROM T3) is then merged with Q2,
+   * The predicate T2.b IN (SELECT b FROM T3) is then merged with Q2,
    * producing the following unnested query Q3:
    *
    * SELECT a FROM T2 LEFT SEMI JOIN (SELECT b FROM T3) $a$1 ON T2.b = $a$1.b : Q3
    *
-   * The extracted subquery predicate becomes:
+   * The extracted IN predicate becomes:
    *
    * T1.a IN (SELECT a FROM T2 LEFT SEMI JOIN (SELECT b FROM T3) $a$1 ON T2.b = $a$1.b)
    *
@@ -173,23 +173,40 @@ public class StmtRewriter {
   private static void rewriteWhereClauseSubqueries(SelectStmt stmt, Analyzer analyzer)
      throws AnalysisException {
     int numTableRefs = stmt.tableRefs_.size();
-    ArrayList<Expr> subqueryPredicates = Lists.newArrayList();
-    stmt.whereClause_.collectAll(Expr.IS_SUBQUERY_PREDICATE, subqueryPredicates);
-    // Replace all subquery predicates with true BoolLiterals using an smap.
+    ArrayList<Expr> exprsWithSubqueries = Lists.newArrayList();
     ExprSubstitutionMap smap = new ExprSubstitutionMap();
-    for (Expr subqueryPred: subqueryPredicates) {
+    List<Expr> conjuncts = stmt.whereClause_.getConjuncts();
+    // Check if all the conjuncts in the WHERE clause that contain subqueries
+    // can currently be rewritten as joins.
+    for (Expr conjunct: conjuncts) {
+      List<Subquery> subqueries = Lists.newArrayList();
+      conjunct.collectAll(Predicates.instanceOf(Subquery.class), subqueries);
+      if (subqueries.size() == 0) continue;
+      if (subqueries.size() > 1) {
+        throw new AnalysisException("Multiple subqueries are not supported in " +
+            "expression: " + conjunct.toSql());
+      }
+      if (!(conjunct instanceof InPredicate) && !(conjunct instanceof ExistsPredicate) &&
+          !(conjunct instanceof BinaryPredicate) &&
+          !conjunct.contains(Expr.IS_SCALAR_SUBQUERY)) {
+        throw new AnalysisException("Non-scalar subquery is not supported in " +
+            "expression: " + conjunct.toSql());
+      }
+
+      // Replace all the supported exprs with subqueries with true BoolLiterals
+      // using an smap.
       BoolLiteral boolLiteral = new BoolLiteral(true);
       boolLiteral.analyze(analyzer);
-      smap.put(subqueryPred, boolLiteral);
+      smap.put(conjunct, boolLiteral);
+      exprsWithSubqueries.add(conjunct);
     }
     stmt.whereClause_ = stmt.whereClause_.substitute(smap, analyzer);
 
     boolean hasNewVisibleTuple = false;
-    // Recursively rewrite all subquery predicates and merge them with 'stmt'.
-    for (Expr pred: subqueryPredicates) {
-      Preconditions.checkState(pred instanceof Predicate);
-      if (mergeSubqueryPredicate(stmt, rewriteSubqueryPredicate((Predicate)pred, analyzer),
-          analyzer)) {
+    // Recursively rewrite all the exprs that contain subqueries and merge them
+    // with 'stmt'.
+    for (Expr expr: exprsWithSubqueries) {
+      if (mergeExpr(stmt, rewriteExpr(expr, analyzer), analyzer)) {
         hasNewVisibleTuple = true;
       }
     }
@@ -198,30 +215,30 @@ public class StmtRewriter {
   }
 
   /**
-   * Modifies a subquery predicate in place by rewriting its subquery stmt.
-   * The modified subquery predicate is returned.
+   * Modifies in place an expr that contains a subquery by rewriting its
+   * subquery stmt. The modified analyzed expr is returned.
    */
-  private static Predicate rewriteSubqueryPredicate(Predicate pred, Analyzer analyzer)
+  private static Expr rewriteExpr(Expr expr, Analyzer analyzer)
       throws AnalysisException {
-    Preconditions.checkState(pred.isSubqueryPredicate());
-    // Extract the subquery from this predicate and rewrite it.
-    Subquery subquery = pred.getSubquery();
+    // Extract the subquery and rewrite it.
+    Subquery subquery = expr.getSubquery();
     Preconditions.checkNotNull(subquery);
     rewriteStatement((SelectStmt)subquery.getStatement(), subquery.getAnalyzer());
     // Create a new Subquery with the rewritten stmt and use a substitution map
-    // to replace the original subquery from the subquery predicate.
+    // to replace the original subquery from the expr.
     Subquery newSubquery = new Subquery(subquery.getStatement().clone());
     newSubquery.analyze(analyzer);
     ExprSubstitutionMap smap = new ExprSubstitutionMap();
     smap.put(subquery, newSubquery);
-    return (Predicate)pred.substitute(smap, analyzer);
+    return expr.substitute(smap, analyzer);
   }
 
   /**
-   * Merge a subquery predicate 'pred' with a SelectStmt 'stmt' by converting
-   * the former into an inline view and creating a join between the new inline
-   * view and the right-most table from 'stmt'. Return true if the rewrite
-   * introduced a new visible tuple due to a CROSS JOIN or a LEFT OUTER JOIN.
+   * Merge an expr containing a subquery with a SelectStmt 'stmt' by
+   * converting the subquery stmt of the former into an inline view and
+   * creating a join between the new inline view and the right-most table
+   * from 'stmt'. Return true if the rewrite introduced a new visible tuple
+   * due to a CROSS JOIN or a LEFT OUTER JOIN.
    *
    * This process works as follows:
    * 1. Extract all correlated predicates from the subquery's WHERE
@@ -239,20 +256,21 @@ public class StmtRewriter {
    *    refer to columns of the new inline view.
    * 6. Add all extracted correlated predicates to the ON clause.
    */
-  private static boolean mergeSubqueryPredicate(SelectStmt stmt, Predicate pred,
+  private static boolean mergeExpr(SelectStmt stmt, Expr expr,
       Analyzer analyzer) throws AnalysisException {
-    Preconditions.checkNotNull(pred);
+    Preconditions.checkNotNull(expr);
     Preconditions.checkNotNull(analyzer);
     boolean updateSelectList = false;
     List<TupleId> stmtTupleIds = stmt.getTableRefIds();
 
-    SelectStmt subqueryStmt = (SelectStmt)pred.getSubquery().getStatement();
+    SelectStmt subqueryStmt = (SelectStmt)expr.getSubquery().getStatement();
     // Generate an alias for the new inline view.
     String inlineViewAlias = stmt.getTableAliasGenerator().getNextAlias();
 
     // Extract all correlated predicates from the subquery.
     List<Expr> onClauseConjuncts = extractCorrelatedPredicates(subqueryStmt);
-    if (!onClauseConjuncts.isEmpty() && !(pred instanceof BinaryPredicate)) {
+    if (!onClauseConjuncts.isEmpty() && (expr instanceof InPredicate ||
+        expr instanceof ExistsPredicate)) {
       // Correlated EXISTS and IN subqueries that contain the following clauses
       // are not eligible for rewriting:
       // - GROUP BY
@@ -266,7 +284,7 @@ public class StmtRewriter {
 
     // Update the subquery's select list and/or its GROUP BY clause by adding
     // SlotRefs from the extracted correlated predicates.
-    boolean updateGroupBy = pred instanceof BinaryPredicate;
+    boolean updateGroupBy = expr.getSubquery().isScalarSubquery();
     Map<Expr, Expr> exprMap = Maps.newHashMap();
     List<TupleId> subqueryTupleIds = subqueryStmt.getTableRefIds();
     for (Expr conjunct: onClauseConjuncts) {
@@ -274,7 +292,7 @@ public class StmtRewriter {
           exprMap, updateGroupBy);
     }
 
-    if (pred instanceof ExistsPredicate) {
+    if (expr instanceof ExistsPredicate) {
       // Modify the select list of an EXISTS subquery to avoid potential name
       // clashes with stmt's select list items in case we rewrite it using a
       // CROSS JOIN. Also, we reduce the overhead of computing the CROSS JOIN by
@@ -299,11 +317,10 @@ public class StmtRewriter {
     stmt.tableRefs_.add(inlineView);
     JoinOperator joinOp = JoinOperator.LEFT_SEMI_JOIN;
 
-    // Create a join conjunct from the comparison expr of the subquery predicate and
-    // the first expr from the subquery's select list.
-    Expr joinConjunct = pred.createJoinConjunct(inlineView);
+    // Create a join conjunct from the expr that contains a subquery.
+    Expr joinConjunct = expr.createJoinConjunct(inlineView, analyzer);
     if (joinConjunct != null) {
-      if (pred instanceof BinaryPredicate && !onClauseConjuncts.isEmpty()) {
+      if (expr instanceof BinaryPredicate && !onClauseConjuncts.isEmpty()) {
         com.google.common.base.Predicate<Expr> isCountAggFn =
           new com.google.common.base.Predicate<Expr>() {
             public boolean apply(Expr expr) {
@@ -312,7 +329,7 @@ public class StmtRewriter {
             }
           };
 
-        // Correlated aggregate subquery predicates with 'count' are rewritten using
+        // Correlated aggregate subqueries with 'count' are rewritten using
         // a LEFT OUTER JOIN because we need to ensure that there is one count
         // value for every tuple of 'stmt' (parent select block). The value of count
         // is 0 for every tuple of 'stmt' that gets rejected by the subquery
@@ -348,9 +365,9 @@ public class StmtRewriter {
         CompoundPredicate.createConjunctivePredicate(onClauseConjuncts);
 
     if (onClausePredicate == null) {
-      Preconditions.checkState(pred instanceof ExistsPredicate);
+      Preconditions.checkState(expr instanceof ExistsPredicate);
       // TODO: Remove this when we support independent subquery evaluation.
-      if (((ExistsPredicate)pred).isNotExists()) {
+      if (((ExistsPredicate)expr).isNotExists()) {
         throw new AnalysisException("Unsupported uncorrelated NOT EXISTS subquery: " +
             subqueryStmt.toSql());
       }
@@ -402,7 +419,7 @@ public class StmtRewriter {
     if (!hasEqJoinPred) {
       // TODO: Remove this when independent subquery evaluation is implemented.
       // TODO: Requires support for non-equi joins.
-      if (!(pred instanceof BinaryPredicate) || onClauseConjuncts.size() != 1) {
+      if (!(expr.getSubquery().isScalarSubquery()) || onClauseConjuncts.size() != 1) {
         throw new AnalysisException("Unsupported correlated subquery: " +
             subqueryStmt.toSql());
       }
@@ -418,8 +435,8 @@ public class StmtRewriter {
     }
 
     // We have a valid equi-join conjunct.
-    if (pred instanceof InPredicate && ((InPredicate)pred).isNotIn() ||
-        pred instanceof ExistsPredicate && ((ExistsPredicate)pred).isNotExists()) {
+    if (expr instanceof InPredicate && ((InPredicate)expr).isNotIn() ||
+        expr instanceof ExistsPredicate && ((ExistsPredicate)expr).isNotExists()) {
       joinOp = JoinOperator.LEFT_ANTI_JOIN;
     }
     inlineView.setJoinOp(joinOp);

@@ -89,6 +89,23 @@ public class IsNullPredicate extends Predicate {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
 
+    if (contains(Subquery.class)) {
+      if (getChild(0) instanceof ExistsPredicate) {
+        // Replace the EXISTS subquery with a BoolLiteral as it can never return
+        // a null value.
+        setChild(0, new BoolLiteral(true));
+        getChild(0).analyze(analyzer);
+      } else if (!getChild(0).contains(Expr.IS_SCALAR_SUBQUERY)) {
+        // We only support scalar subqueries in an IS NULL predicate because
+        // they can be rewritten into a join.
+        // TODO: Add support for InPredicates and BinaryPredicates with
+        // subqueries when we implement independent subquery evaluation.
+        // TODO: Handle arbitrary UDA/Udfs
+        throw new AnalysisException("Unsupported IS NULL predicate that contains " +
+            "a subquery: " + toSqlImpl());
+      }
+    }
+
     // Make sure the BE never sees TYPE_NULL
     if (getChild(0).getType().isNull()) {
       uncheckedCastChild(ScalarType.BOOLEAN, 0);

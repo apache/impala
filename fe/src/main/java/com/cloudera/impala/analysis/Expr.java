@@ -91,12 +91,12 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         }
       };
 
-  // Returns true if an Expr is a subquery predicate.
-  public final static com.google.common.base.Predicate<Expr> IS_SUBQUERY_PREDICATE =
+  // Returns true if an Expr is a scalar subquery
+  public final static com.google.common.base.Predicate<Expr> IS_SCALAR_SUBQUERY =
       new com.google.common.base.Predicate<Expr>() {
         @Override
         public boolean apply(Expr arg) {
-          return arg instanceof Predicate && ((Predicate)arg).isSubqueryPredicate();
+          return arg.isScalarSubquery();
         }
       };
 
@@ -838,6 +838,14 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
+   * Return true if this expr is a scalar subquery.
+   */
+  public boolean isScalarSubquery() {
+    Preconditions.checkState(isAnalyzed_);
+    return this instanceof Subquery && getType().isScalarType();
+  }
+
+  /**
    * Checks whether this expr returns a boolean type or NULL type.
    * If not, throws an AnalysisException with an appropriate error message using
    * 'name' as a prefix. For example, 'name' could be "WHERE clause".
@@ -1003,5 +1011,37 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public Expr negate() {
     Preconditions.checkState(type_.getPrimitiveType() == PrimitiveType.BOOLEAN);
     return new CompoundPredicate(CompoundPredicate.Operator.NOT, this, null);
+  }
+
+  /**
+   * Returns the subquery of an expr. Returns null if this expr does not contain
+   * a subquery.
+   *
+   * TODO: Support predicates with more that one subqueries when we implement
+   * the independent subquery evaluation.
+   */
+  public Subquery getSubquery() {
+    if (!contains(Subquery.class)) return null;
+    List<Subquery> subqueries = Lists.newArrayList();
+    collect(Subquery.class, subqueries);
+    Preconditions.checkState(subqueries.size() == 1);
+    return subqueries.get(0);
+  }
+
+  /**
+   * Converts a subquery expr into an analyzed conjunct to be used in a join. The
+   * conversion is performed in place by replacing the subquery with the first
+   * expr from the associated inline view.
+   */
+  public Expr createJoinConjunct(InlineViewRef inlineView, Analyzer analyzer)
+      throws AnalysisException {
+    Preconditions.checkNotNull(inlineView);
+    ExprSubstitutionMap smap = new ExprSubstitutionMap();
+    Subquery subquery = getSubquery();
+    SlotRef slotRef = new SlotRef(new TableName(null, inlineView.getAlias()),
+        inlineView.getViewStmt().getColLabels().get(0));
+    slotRef.analyze(analyzer);
+    smap.put(subquery, slotRef);
+    return substitute(smap, analyzer);
   }
 }

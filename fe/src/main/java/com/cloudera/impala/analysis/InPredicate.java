@@ -78,29 +78,19 @@ public class InPredicate extends Predicate {
   }
 
   /**
-   * Create a join conjunct from the comparison expr of the IN predicate (first
-   * child) and the first expr from the subquery's select list. 'viewAlias' is
-   * the table alias that is used to qualify the expr from the subquery select
-   * list. Returns an unanalyzed conjunct.
+   * Create an analyzed join conjunct from the comparison expr of the IN predicate
+   * (first child) and the first expr from the subquery's select list;
+   * 'inlineView' is the inline view generated from the subquery.
    */
   @Override
-  public Expr createJoinConjunct(InlineViewRef inlineView) {
+  public Expr createJoinConjunct(InlineViewRef inlineView, Analyzer analyzer)
+      throws AnalysisException {
     Preconditions.checkNotNull(inlineView);
-    Preconditions.checkState(isSubqueryPredicate());
-    return new BinaryPredicate(Operator.EQ, getChild(0),
+    BinaryPredicate pred = new BinaryPredicate(Operator.EQ, getChild(0),
         new SlotRef(new TableName(null, inlineView.getAlias()),
         inlineView.getViewStmt().getColLabels().get(0)));
-  }
-
-  @Override
-  public boolean isSubqueryPredicate() {
-    return getChild(1) instanceof Subquery ? true : false;
-  }
-
-  @Override
-  public Subquery getSubquery() {
-    Preconditions.checkState(isSubqueryPredicate());
-    return (Subquery)getChild(1);
+    pred.analyze(analyzer);
+    return pred;
   }
 
   @Override
@@ -111,8 +101,10 @@ public class InPredicate extends Predicate {
     if (contains(Subquery.class)) {
       // An [NOT] IN predicate with a subquery must contain two children, the second of
       // which is a Subquery.
-      Preconditions.checkState(children_.size() == 2);
-      Preconditions.checkState(getChild(1) instanceof Subquery);
+      if (children_.size() != 2 || !(getChild(1) instanceof Subquery)) {
+        throw new AnalysisException("Unsupported IN predicate with a subquery: " +
+            toSqlImpl());
+      }
       Subquery subquery = (Subquery)getChild(1);
       if (!subquery.returnsScalarColumn()) {
         throw new AnalysisException("Subquery must return a single column: " +
@@ -177,7 +169,7 @@ public class InPredicate extends Predicate {
     StringBuilder strBuilder = new StringBuilder();
     String notStr = (isNotIn_) ? "NOT " : "";
     strBuilder.append(getChild(0).toSql() + " " + notStr + "IN ");
-    boolean hasSubquery = isSubqueryPredicate();
+    boolean hasSubquery = contains(Subquery.class);
     if (!hasSubquery) strBuilder.append("(");
     for (int i = 1; i < children_.size(); ++i) {
       strBuilder.append(getChild(i).toSql());

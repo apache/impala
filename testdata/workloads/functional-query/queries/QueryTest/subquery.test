@@ -328,3 +328,79 @@ and id < 2
 ---- TYPES
 INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
 ====
+---- QUERY
+# Aggregate subquery in an IS NULL predicate
+select count(*)
+from functional.alltypestiny
+where (select max(int_col) from functional.alltypesagg where int_col is null) is null
+---- RESULTS
+8
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Aggregate subquery in an IS NOT NULL predicate
+select count(*)
+from functional.alltypestiny
+where (select max(int_col) from functional.alltypesagg where int_col is null) is not null
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Correlated aggregate subquery in an IS NULL predicate
+select id, bool_col
+from functional.alltypestiny t
+where (select sum(int_col) from functional.alltypesagg g where t.id = g.id) is null
+order by id
+---- RESULTS
+0,true
+---- TYPES
+INT, BOOLEAN
+====
+---- QUERY
+# Correlated aggregate subquery in an IS NOT NULL predicate
+select id, bool_col
+from functional.alltypestiny t
+where (select sum(int_col) from functional.alltypesagg g where t.id = g.id) is not null
+order by id
+---- RESULTS
+1,false
+2,true
+3,false
+4,true
+5,false
+6,true
+7,false
+---- TYPES
+INT, BOOLEAN
+====
+---- QUERY
+# Function with a scalar subquery
+select count(*)
+from functional.alltypestiny t
+where
+ zeroifnull((select max(int_col) from functional.alltypesagg where int_col is null)) = 0
+---- RESULTS
+8
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Function with a scalar subquery
+select id
+from functional.alltypestiny t
+where
+  nullifzero((select min(id) from functional.alltypesagg where int_col is null)) is null
+and id < 5
+order by id
+---- RESULTS
+0
+1
+2
+3
+4
+---- TYPES
+INT
+====

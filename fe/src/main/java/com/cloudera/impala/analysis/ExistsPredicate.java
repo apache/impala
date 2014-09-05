@@ -45,14 +45,6 @@ public class ExistsPredicate extends Predicate {
     return new ExistsPredicate((Subquery)getChild(0), !notExists_);
   }
 
-  @Override
-  public boolean isSubqueryPredicate() { return true; }
-
-  @Override
-  public Subquery getSubquery() {
-    return (Subquery)getChild(0);
-  }
-
   /**
    * Copy c'tor used in clone.
    */
@@ -83,5 +75,11 @@ public class ExistsPredicate extends Predicate {
     strBuilder.append("EXISTS ");
     strBuilder.append(getChild(0).toSql());
     return strBuilder.toString();
+  }
+
+  @Override
+  public Expr createJoinConjunct(InlineViewRef inlineView, Analyzer analyzer)
+      throws AnalysisException {
+    return null;
   }
 }
