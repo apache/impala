@@ -720,13 +720,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // any running queries associated with those sessions are cancelled.
   void ExpireSessions();
 
-  // Cancels all queries associated with a session
-  void CancelSessionQueries(SessionState* session_state);
-
-  // Cancels all queries associated with a session asynchronously, by placing them on the
-  // cancellation queue.
-  void CancelSessionQueriesAsync(SessionState* session_state, const std::string& cause);
-
   // Runs forever, walking queries_by_timestamp_ and expiring any queries that have been
   // idle (i.e. no client input and no time spent processing locally) for
   // FLAGS_idle_query_timeout seconds.

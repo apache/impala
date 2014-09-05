@@ -550,11 +550,10 @@ Status ImpalaServer::ExecuteInternal(
     bool* registered_exec_state,
     shared_ptr<QueryExecState>* exec_state) {
   DCHECK(session_state != NULL);
+  *registered_exec_state = false;
   if (IsOffline()) {
     return Status("This Impala server is offline. Please retry your query later.");
   }
-  *registered_exec_state = false;
-
   exec_state->reset(new QueryExecState(query_ctx, exec_env_, exec_env_->frontend(),
       this, session_state));
 
@@ -633,14 +632,13 @@ void ImpalaServer::PrepareQueryContext(TQueryCtx* query_ctx) {
 Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
     const shared_ptr<QueryExecState>& exec_state) {
   lock_guard<mutex> l2(session_state->lock);
+  // The session wasn't expired at the time it was checked out and it isn't allowed to
+  // expire while checked out, so it must not be expired.
+  DCHECK(session_state->ref_count > 0 && !session_state->expired);
+  // The session may have been closed after it was checked out.
   if (session_state->closed) {
     return Status("Session has been closed, ignoring query.");
   }
-
-  if (session_state->expired) {
-    return Status("Session has expired, ignoring query.");
-  }
-
   const TUniqueId& query_id = exec_state->query_id();
   {
     lock_guard<mutex> l(query_exec_state_map_lock_);
@@ -652,7 +650,6 @@ Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
       ss << "query id " << PrintId(query_id) << " already exists";
       return Status(TStatusCode::INTERNAL_ERROR, ss.str());
     }
-
     session_state->inflight_queries.insert(query_id);
     query_exec_state_map_.insert(make_pair(query_id, exec_state));
   }
@@ -756,41 +753,6 @@ Status ImpalaServer::CancelInternal(const TUniqueId& query_id, const Status* cau
   return Status::OK;
 }
 
-void ImpalaServer::CancelSessionQueriesAsync(SessionState* session_state,
-    const string& cause) {
-  unordered_set<TUniqueId> inflight_queries;
-  {
-    lock_guard<mutex> l(session_state->lock);
-    // Once closed is set to true, no more queries can be started. The inflight list
-    // will not grow.
-    inflight_queries.insert(session_state->inflight_queries.begin(),
-        session_state->inflight_queries.end());
-  }
-
-  // Unregister all open queries from this session.
-  Status status(cause);
-  BOOST_FOREACH(const TUniqueId& query_id, inflight_queries) {
-    cancellation_thread_pool_->Offer(CancellationWork(query_id, status, true));
-  }
-}
-
-void ImpalaServer::CancelSessionQueries(SessionState* session_state) {
-  unordered_set<TUniqueId> inflight_queries;
-  {
-    lock_guard<mutex> l(session_state->lock);
-    // Once closed is set to true, no more queries can be started. The inflight list
-    // will not grow.
-    inflight_queries.insert(session_state->inflight_queries.begin(),
-        session_state->inflight_queries.end());
-  }
-
-  // Unregister all open queries from this session.
-  Status status("Session closed", true);
-  BOOST_FOREACH(const TUniqueId& query_id, inflight_queries) {
-    UnregisterQuery(query_id, &status);
-  }
-}
-
 Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
     bool ignore_if_absent) {
   // Find the session_state and remove it from the map.
@@ -814,12 +776,20 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
   } else {
     ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS->Increment(-1L);
   }
+  unordered_set<TUniqueId> inflight_queries;
   {
     lock_guard<mutex> l(session_state->lock);
     DCHECK(!session_state->closed);
     session_state->closed = true;
+    // Since closed is true, no more queries will be added to the inflight list.
+    inflight_queries.insert(session_state->inflight_queries.begin(),
+        session_state->inflight_queries.end());
   }
-  CancelSessionQueries(session_state.get());
+  // Unregister all open queries from this session.
+  Status status("Session closed", true);
+  BOOST_FOREACH(const TUniqueId& query_id, inflight_queries) {
+    UnregisterQuery(query_id, &status);
+  }
   return Status::OK;
 }
 
@@ -1772,6 +1742,7 @@ void ImpalaServer::ExpireSessions() {
     // TODO: If holding session_state_map_lock_ for the duration of this loop is too
     // expensive, consider a priority queue.
     BOOST_FOREACH(SessionStateMap::value_type& session_state, session_state_map_) {
+      unordered_set<TUniqueId> inflight_queries;
       {
         lock_guard<mutex> l(session_state.second->lock);
         if (session_state.second->ref_count > 0) continue;
@@ -1785,9 +1756,15 @@ void ImpalaServer::ExpireSessions() {
                   << TimestampValue(last_accessed_ms / 1000).DebugString();
         session_state.second->expired = true;
         ImpaladMetrics::NUM_SESSIONS_EXPIRED->Increment(1L);
+        // Since expired is true, no more queries will be added to the inflight list.
+        inflight_queries.insert(session_state.second->inflight_queries.begin(),
+            session_state.second->inflight_queries.end());
       }
-      CancelSessionQueriesAsync(session_state.second.get(),
-          "Session expired due to inactivity");
+      // Unregister all open queries from this session.
+      Status status("Session expired due to inactivity");
+      BOOST_FOREACH(const TUniqueId& query_id, inflight_queries) {
+        cancellation_thread_pool_->Offer(CancellationWork(query_id, status, true));
+      }
     }
   }
 }
