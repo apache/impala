@@ -343,8 +343,8 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
     }
   }
 
-  VLOG_QUERY << "Rendering page " << request_info->uri << " took "
-             << PrettyPrinter::Print(sw.ElapsedTime(), TCounterType::CPU_TICKS);
+  VLOG(3) << "Rendering page " << request_info->uri << " took "
+          << PrettyPrinter::Print(sw.ElapsedTime(), TCounterType::CPU_TICKS);
 
   const string& str = output.str();
   // Without styling, render the page as plain text
