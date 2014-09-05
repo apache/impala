@@ -371,6 +371,8 @@ public class BuiltinsDb extends Db {
         "8InitNullEPN10impala_udf15FunctionContextEPNS1_6AnyValE";
     final String stringValSerializeOrFinalize = prefix +
         "28StringValSerializeOrFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE";
+    final String stringValGetValue = prefix +
+        "17StringValGetValueEPN10impala_udf15FunctionContextERKNS1_9StringValE";
 
     Db db = this;
     // Count (*)
@@ -394,17 +396,20 @@ public class BuiltinsDb extends Db {
       String minMaxInit = t.isStringType() ? initNullString : initNull;
       String minMaxSerializeOrFinalize = t.isStringType() ?
           stringValSerializeOrFinalize : null;
+      String minMaxGetValue = t.isStringType() ? stringValGetValue : null;
       db.addBuiltin(AggregateFunction.createBuiltin(db, "min",
           Lists.newArrayList(t), t, t, minMaxInit,
           prefix + MIN_UPDATE_SYMBOL.get(t),
           prefix + MIN_UPDATE_SYMBOL.get(t),
-          minMaxSerializeOrFinalize, minMaxSerializeOrFinalize, true));
+          minMaxSerializeOrFinalize, minMaxGetValue,
+          minMaxSerializeOrFinalize, true));
       // Max
       db.addBuiltin(AggregateFunction.createBuiltin(db, "max",
           Lists.newArrayList(t), t, t, minMaxInit,
           prefix + MAX_UPDATE_SYMBOL.get(t),
           prefix + MAX_UPDATE_SYMBOL.get(t),
-          minMaxSerializeOrFinalize, minMaxSerializeOrFinalize, true));
+          minMaxSerializeOrFinalize, minMaxGetValue,
+          minMaxSerializeOrFinalize, true));
 
       // Sample
       db.addBuiltin(AggregateFunction.createBuiltin(db, "sample",
@@ -546,6 +551,7 @@ public class BuiltinsDb extends Db {
         prefix + "9AvgUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE",
         prefix + "8AvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
         stringValSerializeOrFinalize,
+        prefix + "11AvgGetValueEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         prefix + "11AvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         false));
     db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",
@@ -554,6 +560,7 @@ public class BuiltinsDb extends Db {
         prefix + "9AvgUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE",
         prefix + "8AvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
         stringValSerializeOrFinalize,
+        prefix + "11AvgGetValueEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         prefix + "11AvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         false));
     db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",
@@ -562,6 +569,7 @@ public class BuiltinsDb extends Db {
         prefix + "16DecimalAvgUpdateEPN10impala_udf15FunctionContextERKNS1_10DecimalValEPNS1_9StringValE",
         prefix + "15DecimalAvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
         stringValSerializeOrFinalize,
+        prefix + "18DecimalAvgGetValueEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         prefix + "18DecimalAvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE", false));
     // Avg(Timestamp)
     db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",
@@ -570,6 +578,7 @@ public class BuiltinsDb extends Db {
         prefix + "18TimestampAvgUpdateEPN10impala_udf15FunctionContextERKNS1_12TimestampValEPNS1_9StringValE",
         prefix + "8AvgMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
         stringValSerializeOrFinalize,
+        prefix + "20TimestampAvgGetValueEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         prefix + "20TimestampAvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         false));
 

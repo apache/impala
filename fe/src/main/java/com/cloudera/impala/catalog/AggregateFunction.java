@@ -79,9 +79,19 @@ public class AggregateFunction extends Function {
       List<Type> argTypes, Type retType, Type intermediateType,
       String initFnSymbol, String updateFnSymbol, String mergeFnSymbol,
       String serializeFnSymbol, String finalizeFnSymbol, boolean ignoresDistinct) {
+    return createBuiltin(db, name, argTypes, retType, intermediateType, initFnSymbol,
+        updateFnSymbol, mergeFnSymbol, serializeFnSymbol, null, finalizeFnSymbol,
+        ignoresDistinct);
+  }
+
+  public static AggregateFunction createBuiltin(Db db, String name,
+      List<Type> argTypes, Type retType, Type intermediateType,
+      String initFnSymbol, String updateFnSymbol, String mergeFnSymbol,
+      String serializeFnSymbol, String getValueFnSymbol, String finalizeFnSymbol,
+      boolean ignoresDistinct) {
     AggregateFunction fn = new AggregateFunction(new FunctionName(db.getName(), name),
         argTypes, retType, intermediateType, null, updateFnSymbol, initFnSymbol,
-        serializeFnSymbol, mergeFnSymbol, null, null, finalizeFnSymbol);
+        serializeFnSymbol, mergeFnSymbol, getValueFnSymbol, null, finalizeFnSymbol);
     fn.setBinaryType(TFunctionBinaryType.BUILTIN);
     fn.ignoresDistinct_ = ignoresDistinct;
     fn.needsAnalyticExpr_ = false;

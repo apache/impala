@@ -71,11 +71,17 @@ void AggregateFunctions::InitZero(FunctionContext*, DecimalVal* dst) {
   dst->val16 = 0;
 }
 
-StringVal AggregateFunctions::StringValSerializeOrFinalize(
+StringVal AggregateFunctions::StringValGetValue(
     FunctionContext* ctx, const StringVal& src) {
   if (src.is_null) return src;
   StringVal result(ctx, src.len);
   memcpy(result.ptr, src.ptr, src.len);
+  return result;
+}
+
+StringVal AggregateFunctions::StringValSerializeOrFinalize(
+    FunctionContext* ctx, const StringVal& src) {
+  StringVal result = StringValGetValue(ctx, src);
   ctx->Free(src.ptr);
   return result;
 }
@@ -131,13 +137,14 @@ void AggregateFunctions::AvgMerge(FunctionContext* ctx, const StringVal& src,
   dst_struct->count += src_struct->count;
 }
 
-DoubleVal AggregateFunctions::AvgFinalize(FunctionContext* ctx, const StringVal& src) {
+DoubleVal AggregateFunctions::AvgGetValue(FunctionContext* ctx, const StringVal& src) {
   AvgState* val_struct = reinterpret_cast<AvgState*>(src.ptr);
-  if (val_struct->count == 0) {
-    ctx->Free(src.ptr);
-    return DoubleVal::null();
-  }
-  DoubleVal result(val_struct->sum / val_struct->count);
+  if (val_struct->count == 0) return DoubleVal::null();
+  return DoubleVal(val_struct->sum / val_struct->count);
+}
+
+DoubleVal AggregateFunctions::AvgFinalize(FunctionContext* ctx, const StringVal& src) {
+  DoubleVal result = AvgGetValue(ctx, src);
   ctx->Free(src.ptr);
   return result;
 }
@@ -153,17 +160,20 @@ void AggregateFunctions::TimestampAvgUpdate(FunctionContext* ctx,
   ++avg->count;
 }
 
-TimestampVal AggregateFunctions::TimestampAvgFinalize(FunctionContext* ctx,
+TimestampVal AggregateFunctions::TimestampAvgGetValue(FunctionContext* ctx,
     const StringVal& src) {
   AvgState* val_struct = reinterpret_cast<AvgState*>(src.ptr);
-  if (val_struct->count == 0) {
-    ctx->Free(src.ptr);
-    return TimestampVal::null();
-  }
+  if (val_struct->count == 0) return TimestampVal::null();
   TimestampValue tv(val_struct->sum / val_struct->count);
-  ctx->Free(src.ptr);
   TimestampVal result;
   tv.ToTimestampVal(&result);
+  return result;
+}
+
+TimestampVal AggregateFunctions::TimestampAvgFinalize(FunctionContext* ctx,
+    const StringVal& src) {
+  TimestampVal result = TimestampAvgGetValue(ctx, src);
+  ctx->Free(src.ptr);
   return result;
 }
 
@@ -218,18 +228,14 @@ void AggregateFunctions::DecimalAvgMerge(FunctionContext* ctx,
   dst_struct->count += src_struct->count;
 }
 
-DecimalVal AggregateFunctions::DecimalAvgFinalize(FunctionContext* ctx,
+DecimalVal AggregateFunctions::DecimalAvgGetValue(FunctionContext* ctx,
     const StringVal& src) {
   DecimalAvgState* val_struct = reinterpret_cast<DecimalAvgState*>(src.ptr);
-  if (val_struct->count == 0) {
-    ctx->Free(src.ptr);
-    return DecimalVal::null();
-  }
+  if (val_struct->count == 0) return DecimalVal::null();
   const FunctionContext::TypeDesc& output_desc = ctx->GetReturnType();
   DCHECK_EQ(FunctionContext::TYPE_DECIMAL, output_desc.type);
   Decimal16Value sum(val_struct->sum.val16);
   Decimal16Value count(val_struct->count);
-  ctx->Free(src.ptr);
   // The scale of the accumulated sum must be the same as the scale of the return type.
   // TODO: Investigate whether this is always the right thing to do. Does the current
   // implementation result in an unacceptable loss of output precision?
@@ -244,6 +250,13 @@ DecimalVal AggregateFunctions::DecimalAvgFinalize(FunctionContext* ctx,
     return DecimalVal::null();
   }
   return DecimalVal(result.value());
+}
+
+DecimalVal AggregateFunctions::DecimalAvgFinalize(FunctionContext* ctx,
+    const StringVal& src) {
+  DecimalVal result = DecimalAvgGetValue(ctx, src);
+  ctx->Free(src.ptr);
+  return result;
 }
 
 template<typename SRC_VAL, typename DST_VAL>

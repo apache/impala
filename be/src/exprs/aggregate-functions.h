@@ -38,6 +38,9 @@ class AggregateFunctions {
   template <typename T>
   static void InitZero(FunctionContext*, T* dst);
 
+  // StringVal GetValue() function that returns a copy of src
+  static StringVal StringValGetValue(FunctionContext* ctx, const StringVal& src);
+
   // StringVal Serialize/Finalize function that copies and frees src
   static StringVal StringValSerializeOrFinalize(
       FunctionContext* ctx, const StringVal& src);
@@ -53,11 +56,13 @@ class AggregateFunctions {
   template <typename T>
   static void AvgUpdate(FunctionContext* ctx, const T& src, StringVal* dst);
   static void AvgMerge(FunctionContext* ctx, const StringVal& src, StringVal* dst);
+  static DoubleVal AvgGetValue(FunctionContext* ctx, const StringVal& val);
   static DoubleVal AvgFinalize(FunctionContext* ctx, const StringVal& val);
 
   // Avg for timestamp. Uses AvgInit() and AvgMerge().
   static void TimestampAvgUpdate(FunctionContext* ctx, const TimestampVal& src,
       StringVal* dst);
+  static TimestampVal TimestampAvgGetValue(FunctionContext* ctx, const StringVal& val);
   static TimestampVal TimestampAvgFinalize(FunctionContext* ctx, const StringVal& val);
 
   // Avg for decimals.
@@ -66,6 +71,7 @@ class AggregateFunctions {
       StringVal* dst);
   static void DecimalAvgMerge(FunctionContext* ctx, const StringVal& src,
       StringVal* dst);
+  static DecimalVal DecimalAvgGetValue(FunctionContext* ctx, const StringVal& val);
   static DecimalVal DecimalAvgFinalize(FunctionContext* ctx, const StringVal& val);
 
   // SumUpdate, SumMerge
