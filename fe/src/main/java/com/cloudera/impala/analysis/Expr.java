@@ -207,6 +207,20 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     if (analyzer != null) analyzer.decrementCallDepth();
   }
 
+  /**
+   * Helper function to analyze this expr and assert that the analysis was successful.
+   * TODO: This function could be used in many more places to clean up. Consider
+   * adding an IAnalyzable interface or similar to and move this helper into Analyzer
+   * such that non-Expr things can use the helper also.
+   */
+  public void analyzeNoThrow(Analyzer analyzer) {
+    try {
+      analyze(analyzer);
+    } catch (AnalysisException e) {
+      throw new IllegalStateException(e);
+    }
+  }
+
   protected void computeNumDistinctValues() {
     if (isConstant()) {
       numDistinctValues_ = 1;

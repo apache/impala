@@ -48,7 +48,7 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
 ---- PLAN
 02:ANALYTIC
 |  functions: rank()
-|  order by: int_col
+|  order by: int_col ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 01:SORT
@@ -59,7 +59,7 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
 ---- DISTRIBUTEDPLAN
 02:ANALYTIC
 |  functions: rank()
-|  order by: int_col
+|  order by: int_col ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 01:SORT
@@ -80,7 +80,7 @@ limit 10
 02:ANALYTIC
 |  functions: count(double_col)
 |  partition by: tinyint_col + 1, double_col / 2
-|  order by: 4 - int_col, 4 * smallint_col
+|  order by: 4 - int_col ASC, 4 * smallint_col ASC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |  limit: 10
 |
@@ -96,7 +96,7 @@ limit 10
 02:ANALYTIC
 |  functions: count(double_col)
 |  partition by: tinyint_col + 1, double_col / 2
-|  order by: 4 - int_col, 4 * smallint_col
+|  order by: 4 - int_col ASC, 4 * smallint_col ASC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |  limit: 10
 |
@@ -129,7 +129,7 @@ limit 10
 ---- PLAN
 05:ANALYTIC
 |  functions: min(double_col)
-|  order by: int_col
+|  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |  limit: 10
 |
@@ -139,13 +139,13 @@ limit 10
 03:ANALYTIC
 |  functions: min(double_col)
 |  partition by: bool_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
 |
 02:ANALYTIC
 |  functions: count(bigint_col), sum(double_col)
 |  partition by: bool_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
 01:SORT
@@ -156,7 +156,7 @@ limit 10
 ---- DISTRIBUTEDPLAN
 05:ANALYTIC
 |  functions: min(double_col)
-|  order by: int_col
+|  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |  limit: 10
 |
@@ -168,13 +168,13 @@ limit 10
 03:ANALYTIC
 |  functions: min(double_col)
 |  partition by: bool_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
 |
 02:ANALYTIC
 |  functions: count(bigint_col), sum(double_col)
 |  partition by: bool_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
 01:SORT
@@ -197,7 +197,7 @@ order by a.tinyint_col, a.int_col
 04:ANALYTIC
 |  functions: count(double_col)
 |  partition by: a.tinyint_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
 03:SORT
@@ -221,7 +221,7 @@ order by a.tinyint_col, a.int_col
 04:ANALYTIC
 |  functions: count(double_col)
 |  partition by: a.tinyint_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
 03:SORT
@@ -261,7 +261,7 @@ order by 1, 2, 3
 05:ANALYTIC
 |  functions: min(sum(bigint_col))
 |  partition by: min(tinyint_col)
-|  order by: sum(int_col)
+|  order by: sum(int_col) ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 4 FOLLOWING
 |
 04:SORT
@@ -270,7 +270,7 @@ order by 1, 2, 3
 03:ANALYTIC
 |  functions: sum(min(int_col)), max(sum(bigint_col))
 |  partition by: min(tinyint_col)
-|  order by: max(int_col)
+|  order by: max(int_col) ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
 |
 02:SORT
@@ -292,7 +292,7 @@ order by 1, 2, 3
 05:ANALYTIC
 |  functions: min(sum(bigint_col))
 |  partition by: min(tinyint_col)
-|  order by: sum(int_col)
+|  order by: sum(int_col) ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 4 FOLLOWING
 |
 04:SORT
@@ -301,7 +301,7 @@ order by 1, 2, 3
 03:ANALYTIC
 |  functions: sum(min(int_col)), max(sum(bigint_col))
 |  partition by: min(tinyint_col)
-|  order by: max(int_col)
+|  order by: max(int_col) ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
 |
 02:SORT
@@ -354,7 +354,7 @@ from functional.alltypesagg
 09:ANALYTIC
 |  functions: min(int_col)
 |  partition by: tinyint_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
 |
 08:SORT
@@ -363,7 +363,7 @@ from functional.alltypesagg
 07:ANALYTIC
 |  functions: max(int_col)
 |  partition by: double_col, tinyint_col
-|  order by: int_col
+|  order by: int_col ASC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
 |
 06:SORT
@@ -372,25 +372,25 @@ from functional.alltypesagg
 05:ANALYTIC
 |  functions: min(int_col)
 |  partition by: double_col, tinyint_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
 |
 04:ANALYTIC
 |  functions: sum(smallint_col)
 |  partition by: double_col, tinyint_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
 03:ANALYTIC
 |  functions: sum(tinyint_col)
 |  partition by: tinyint_col, double_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 02:ANALYTIC
 |  functions: count(double_col), max(tinyint_col)
 |  partition by: tinyint_col, double_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
 01:SORT
@@ -404,7 +404,7 @@ from functional.alltypesagg
 09:ANALYTIC
 |  functions: min(int_col)
 |  partition by: tinyint_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
 |
 08:SORT
@@ -415,7 +415,7 @@ from functional.alltypesagg
 07:ANALYTIC
 |  functions: max(int_col)
 |  partition by: double_col, tinyint_col
-|  order by: int_col
+|  order by: int_col ASC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
 |
 06:SORT
@@ -424,25 +424,25 @@ from functional.alltypesagg
 05:ANALYTIC
 |  functions: min(int_col)
 |  partition by: double_col, tinyint_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
 |
 04:ANALYTIC
 |  functions: sum(smallint_col)
 |  partition by: double_col, tinyint_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
 03:ANALYTIC
 |  functions: sum(tinyint_col)
 |  partition by: tinyint_col, double_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 02:ANALYTIC
 |  functions: count(double_col), max(tinyint_col)
 |  partition by: tinyint_col, double_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
 01:SORT
@@ -476,7 +476,7 @@ from functional.alltypesagg
 08:ANALYTIC
 |  functions: max(smallint_col)
 |  partition by: bigint_col
-|  order by: tinyint_col
+|  order by: tinyint_col ASC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
 |
 07:SORT
@@ -484,7 +484,7 @@ from functional.alltypesagg
 |
 06:ANALYTIC
 |  functions: sum(tinyint_col)
-|  order by: int_col
+|  order by: int_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 05:SORT
@@ -500,7 +500,7 @@ from functional.alltypesagg
 02:ANALYTIC
 |  functions: count(double_col)
 |  partition by: tinyint_col, double_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
 01:SORT
@@ -514,7 +514,7 @@ from functional.alltypesagg
 08:ANALYTIC
 |  functions: max(smallint_col)
 |  partition by: bigint_col
-|  order by: tinyint_col
+|  order by: tinyint_col ASC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
 |
 07:SORT
@@ -524,7 +524,7 @@ from functional.alltypesagg
 |
 06:ANALYTIC
 |  functions: sum(tinyint_col)
-|  order by: int_col
+|  order by: int_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 05:SORT
@@ -542,7 +542,7 @@ from functional.alltypesagg
 02:ANALYTIC
 |  functions: count(double_col)
 |  partition by: tinyint_col, double_col
-|  order by: int_col
+|  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
 01:SORT
@@ -667,7 +667,7 @@ where e < 10
 04:ANALYTIC
 |  functions: count(1)
 |  partition by: bool_col
-|  order by: string_col
+|  order by: string_col ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
 |  predicates: count(1) < 10
 |
@@ -689,7 +689,7 @@ where e < 10
 04:ANALYTIC
 |  functions: count(1)
 |  partition by: bool_col
-|  order by: string_col
+|  order by: string_col ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
 |  predicates: count(1) < 10
 |
@@ -754,7 +754,7 @@ order by 1 desc nulls first
 11:ANALYTIC
 |  functions: sum(bigint_col)
 |  partition by: int_col
-|  order by: id
+|  order by: id ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 10:SORT
@@ -774,7 +774,7 @@ order by 1 desc nulls first
 |--11:ANALYTIC
 |  |  functions: sum(bigint_col)
 |  |  partition by: int_col
-|  |  order by: id
+|  |  order by: id ASC
 |  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |  |
 |  10:SORT
@@ -901,14 +901,14 @@ where
 06:ANALYTIC
 |  functions: avg(int_col)
 |  partition by: bigint_col
-|  order by: id
+|  order by: id ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 FOLLOWING
 |  predicates: avg(int_col) < bigint_col + 5, avg(int_col) < 5, min(int_col) != avg(int_col)
 |
 05:ANALYTIC
 |  functions: sum(int_col)
 |  partition by: bigint_col
-|  order by: id
+|  order by: id ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
 |  predicates: sum(int_col) < bigint_col + 4, sum(int_col) < 4
 |
@@ -953,7 +953,7 @@ where t2.id < 10 and t2.int_col < 20
 02:ANALYTIC
 |  functions: sum(int_col)
 |  partition by: bigint_col
-|  order by: id
+|  order by: id ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
 |  predicates: sum(int_col) < 20
 |
@@ -988,7 +988,7 @@ where t2.id < 10 and t2.int_col < 20
 02:ANALYTIC
 |  functions: sum(int_col)
 |  partition by: bigint_col
-|  order by: id
+|  order by: id ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
 |
 01:SORT
@@ -996,4 +996,259 @@ where t2.id < 10 and t2.int_col < 20
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
+====
+# test canonical function/window/order: row_number() gets a ROWS window
+select
+row_number() over(partition by tinyint_col order by id)
+from functional.alltypesagg
+---- PLAN
+02:ANALYTIC
+|  functions: row_number()
+|  partition by: tinyint_col
+|  order by: id ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+01:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id ASC
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 size=814.73KB
+====
+# test canonical function/window/order: lead() and lag() have default
+# arguments explicitly set
+select
+lead(int_col) over(partition by tinyint_col order by id),
+lag(int_col) over(partition by tinyint_col order by id),
+lead(int_col, 4) over(partition by smallint_col order by id),
+lag(int_col, 4) over(partition by smallint_col order by id),
+lead(int_col, 8, 20) over(partition by int_col order by id),
+lag(int_col, 8, 20) over(partition by int_col order by id)
+from functional.alltypesagg
+---- PLAN
+09:ANALYTIC
+|  functions: lag(int_col, 8, 20)
+|  partition by: int_col
+|  order by: id ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 8 PRECEDING
+|
+08:ANALYTIC
+|  functions: lead(int_col, 8, 20)
+|  partition by: int_col
+|  order by: id ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 8 FOLLOWING
+|
+07:SORT
+|  order by: int_col ASC NULLS FIRST, id ASC
+|
+06:ANALYTIC
+|  functions: lag(int_col, 4, NULL)
+|  partition by: smallint_col
+|  order by: id ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 4 PRECEDING
+|
+05:ANALYTIC
+|  functions: lead(int_col, 4, NULL)
+|  partition by: smallint_col
+|  order by: id ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 4 FOLLOWING
+|
+04:SORT
+|  order by: smallint_col ASC NULLS FIRST, id ASC
+|
+03:ANALYTIC
+|  functions: lag(int_col, 1, NULL)
+|  partition by: tinyint_col
+|  order by: id ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+|
+02:ANALYTIC
+|  functions: lead(int_col, 1, NULL)
+|  partition by: tinyint_col
+|  order by: id ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
+|
+01:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id ASC
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 size=814.73KB
+====
+# Test canonical function/window/order: Reverse windows ending in UNBOUNDED FOLLOWING
+# and not starting with UNBOUNDED PRECEDING.
+select
+# windows and sort order should be reversed
+sum(int_col) over(partition by tinyint_col order by id desc nulls first, bool_col asc nulls last
+                  rows between 2 preceding and unbounded following),
+min(int_col) over(partition by tinyint_col order by id asc nulls last
+                  range between 4 preceding and unbounded following),
+# windows and sort order should remain unchanged
+count(bigint_col) over(partition by tinyint_col order by id),
+count(bigint_col) over(partition by tinyint_col order by id, int_col
+                       rows between 6 preceding and 8 following),
+count(bigint_col) over(partition by tinyint_col order by id
+                       range between unbounded preceding and 10 following)
+from functional.alltypesagg
+---- PLAN
+09:ANALYTIC
+|  functions: count(bigint_col)
+|  partition by: tinyint_col
+|  order by: id ASC, int_col ASC
+|  window: ROWS BETWEEN 6 PRECEDING AND 8 FOLLOWING
+|
+08:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id ASC, int_col ASC
+|
+07:ANALYTIC
+|  functions: count(bigint_col)
+|  partition by: tinyint_col
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND 10 FOLLOWING
+|
+06:ANALYTIC
+|  functions: count(bigint_col)
+|  partition by: tinyint_col
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+05:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id ASC
+|
+04:ANALYTIC
+|  functions: min(int_col)
+|  partition by: tinyint_col
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND 4 FOLLOWING
+|
+03:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id DESC NULLS FIRST
+|
+02:ANALYTIC
+|  functions: sum(int_col)
+|  partition by: tinyint_col
+|  order by: id ASC, bool_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 FOLLOWING
+|
+01:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id ASC NULLS LAST, bool_col DESC NULLS FIRST
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 size=814.73KB
+====
+# Test canonical function/window/order: Reverse windows ending in UNBOUNDED FOLLOWING
+# and not starting with UNBOUNDED PRECEDING, and change first_value() to last_value().
+# Set the upper boundary to CURRENT_ROW for first_value() if the lower boundary is
+# UNBOUNDED_PRECEDING.
+select
+# windows, sort order and function should be reversed
+first_value(int_col) over(partition by tinyint_col order by id desc nulls first, bool_col asc nulls last
+                          rows between 2 preceding and unbounded following),
+first_value(int_col) over(partition by tinyint_col order by id asc nulls last
+                          range between 4 preceding and unbounded following),
+# windows, sort order and function should remain unchanged
+first_value(bigint_col) over(partition by tinyint_col order by id),
+first_value(bigint_col) over(partition by tinyint_col order by id, int_col
+                             rows between 6 preceding and 8 following),
+first_value(bigint_col) over(partition by tinyint_col order by id
+                             range between unbounded preceding and 10 following)
+from functional.alltypesagg
+---- PLAN
+08:ANALYTIC
+|  functions: first_value(bigint_col)
+|  partition by: tinyint_col
+|  order by: id ASC, int_col ASC
+|  window: ROWS BETWEEN 6 PRECEDING AND 8 FOLLOWING
+|
+07:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id ASC, int_col ASC
+|
+06:ANALYTIC
+|  functions: first_value(bigint_col), first_value(bigint_col)
+|  partition by: tinyint_col
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+05:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id ASC
+|
+04:ANALYTIC
+|  functions: last_value(int_col)
+|  partition by: tinyint_col
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND 4 FOLLOWING
+|
+03:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id DESC NULLS FIRST
+|
+02:ANALYTIC
+|  functions: last_value(int_col)
+|  partition by: tinyint_col
+|  order by: id ASC, bool_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 FOLLOWING
+|
+01:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id ASC NULLS LAST, bool_col DESC NULLS FIRST
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 size=814.73KB
+====
+# Test canonical function/window/order: Reverse windows ending in UNBOUNDED FOLLOWING
+# and not starting with UNBOUNDED PRECEDING, and change last_value() to first_value()
+select
+# windows, sort order and function should be reversed
+last_value(int_col) over(partition by tinyint_col order by id desc nulls first, bool_col asc nulls last
+                          rows between 2 preceding and unbounded following),
+last_value(int_col) over(partition by tinyint_col order by id asc nulls last
+                          range between 4 preceding and unbounded following),
+# windows, sort order and function should remain unchanged
+last_value(bigint_col) over(partition by tinyint_col order by id),
+last_value(bigint_col) over(partition by tinyint_col order by id, int_col
+                       rows between 6 preceding and 8 following),
+last_value(bigint_col) over(partition by tinyint_col order by id
+                            range between unbounded preceding and 10 following)
+from functional.alltypesagg
+---- PLAN
+09:ANALYTIC
+|  functions: last_value(bigint_col)
+|  partition by: tinyint_col
+|  order by: id ASC, int_col ASC
+|  window: ROWS BETWEEN 6 PRECEDING AND 8 FOLLOWING
+|
+08:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id ASC, int_col ASC
+|
+07:ANALYTIC
+|  functions: last_value(bigint_col)
+|  partition by: tinyint_col
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND 10 FOLLOWING
+|
+06:ANALYTIC
+|  functions: last_value(bigint_col)
+|  partition by: tinyint_col
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+05:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id ASC
+|
+04:ANALYTIC
+|  functions: first_value(int_col)
+|  partition by: tinyint_col
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+03:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id DESC NULLS FIRST
+|
+02:ANALYTIC
+|  functions: first_value(int_col)
+|  partition by: tinyint_col
+|  order by: id ASC, bool_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+01:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id ASC NULLS LAST, bool_col DESC NULLS FIRST
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 size=814.73KB
 ====

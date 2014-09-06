@@ -36,7 +36,6 @@ import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
-import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.Pair;
@@ -171,10 +170,6 @@ public class AnalyticPlanner {
       boolean isFirstInPartition) throws ImpalaException {
     List<Expr> partitionByExprs = sortGroup.partitionByExprs;
     List<OrderByElement> orderByElements = sortGroup.orderByElements;
-    List<Expr> orderByExprs = Lists.newArrayList();
-    for (OrderByElement e: sortGroup.orderByElements) {
-      orderByExprs.add(e.getExpr());
-    }
     SortNode sortNode = null;
     Expr partitionByLessThan = null;
     Expr orderByLessThan = null;
@@ -249,8 +244,9 @@ public class AnalyticPlanner {
             sortTupleId, bufferedSmap);
         LOG.trace("partitionByLt: " + partitionByLessThan.debugString());
       }
-      if (!orderByExprs.isEmpty()) {
+      if (!orderByElements.isEmpty()) {
         // TODO: take asc/desc, nulls first/last into account
+        List<Expr> orderByExprs = OrderByElement.getOrderByExprs(orderByElements);
         orderByLessThan = createLessThan(
             Expr.substituteList(orderByExprs, sortSmap, analyzer_),
             sortTupleId, bufferedSmap);
@@ -267,7 +263,7 @@ public class AnalyticPlanner {
 
       // create one AnalyticEvalNode per window group
       root = new AnalyticEvalNode(idGenerator_.getNextId(), root, stmtTupleIds_,
-          windowGroup.analyticFnCalls, windowGroup.partitionByExprs, orderByExprs,
+          windowGroup.analyticFnCalls, windowGroup.partitionByExprs, orderByElements,
           windowGroup.window, analyticInfo_.getOutputTupleDesc(),
           windowGroup.physicalIntermediateTuple,
           windowGroup.physicalOutputTuple, windowGroup.logicalToPhysicalSmap,
@@ -306,11 +302,7 @@ public class AnalyticPlanner {
           result,
           new CompoundPredicate(CompoundPredicate.Operator.AND, eqClause, ltClause));
     }
-    try {
-      result.analyze(analyzer_);
-    } catch (AnalysisException e) {
-      throw new IllegalStateException(e.getMessage());
-    }
+    result.analyzeNoThrow(analyzer_);
     return result;
   }
 

@@ -14,6 +14,9 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.List;
+
+import com.google.common.collect.Lists;
 
 
 /**
@@ -97,5 +100,46 @@ public class OrderByElement {
    */
   public static boolean nullsFirst(Boolean nullsFirstParam, boolean isAsc) {
     return nullsFirstParam == null ? !isAsc : nullsFirstParam;
+  }
+
+  /**
+   * Returns a new list of order-by elements with the order by exprs of src substituted
+   * according to smap. Preserves the other sort params from src.
+   */
+  public static List<OrderByElement> substitute(List<OrderByElement> src,
+      ExprSubstitutionMap smap, Analyzer analyzer) {
+    List<OrderByElement> result = Lists.newArrayListWithCapacity(src.size());
+    for (OrderByElement element: src) {
+      result.add(new OrderByElement(element.getExpr().substitute(smap, analyzer),
+          element.isAsc_, element.nullsFirstParam_));
+    }
+    return result;
+  }
+
+  /**
+   * Extracts the order-by exprs from the list of order-by elements and returns them.
+   */
+  public static List<Expr> getOrderByExprs(List<OrderByElement> src) {
+    List<Expr> result = Lists.newArrayListWithCapacity(src.size());
+    for (OrderByElement element: src) {
+      result.add(element.getExpr());
+    }
+    return result;
+  }
+
+  /**
+   * Returns a new list of OrderByElements with the same (cloned) expressions but the
+   * ordering direction reversed (asc becomes desc, nulls first becomes nulls last, etc.)
+   */
+  public static List<OrderByElement> reverse(List<OrderByElement> src) {
+    List<OrderByElement> result = Lists.newArrayListWithCapacity(src.size());
+    for (int i = 0; i < src.size(); ++i) {
+      OrderByElement element = src.get(i);
+      OrderByElement reverseElement =
+          new OrderByElement(element.getExpr().clone(), !element.isAsc_,
+              Boolean.valueOf(!nullsFirst(element.nullsFirstParam_, element.isAsc_)));
+      result.add(reverseElement);
+    }
+    return result;
   }
 }

@@ -95,6 +95,16 @@ public class AnalyticWindow {
     public boolean isFollowing() {
       return this == UNBOUNDED_FOLLOWING || this == FOLLOWING;
     }
+
+    public BoundaryType converse() {
+      switch (this) {
+        case UNBOUNDED_PRECEDING: return UNBOUNDED_FOLLOWING;
+        case UNBOUNDED_FOLLOWING: return UNBOUNDED_PRECEDING;
+        case PRECEDING: return FOLLOWING;
+        case FOLLOWING: return PRECEDING;
+        default: return CURRENT_ROW;
+      }
+    }
   }
 
   public static class Boundary {
@@ -154,6 +164,13 @@ public class AnalyticWindow {
       return type_ == o.type_ && exprEqual;
     }
 
+    public Boundary converse() {
+      Boundary result = new Boundary(type_.converse(),
+          (expr_ != null) ? expr_.clone() : null);
+      result.rowsOffset_ = rowsOffset_;
+      return result;
+    }
+
     @Override
     public Boundary clone() {
       return new Boundary(type_, expr_ != null ? expr_.clone() : null, rowsOffset_);
@@ -172,6 +189,7 @@ public class AnalyticWindow {
   public Type getType() { return type_; }
   public Boundary getLeftBoundary() { return leftBoundary_; }
   public Boundary getRightBoundary() { return rightBoundary_; }
+  public Boundary setRightBoundary(Boundary b) { return rightBoundary_ = b; }
 
   public AnalyticWindow(Type type, Boundary b) {
     type_ = type;
@@ -199,6 +217,17 @@ public class AnalyticWindow {
       rightBoundary_ = other.rightBoundary_.clone();
     }
     toSqlString_ = other.toSqlString_;  // safe to share
+  }
+
+  public AnalyticWindow reverse() {
+    Boundary newRightBoundary = leftBoundary_.converse();
+    Boundary newLeftBoundary = null;
+    if (rightBoundary_ == null) {
+      newLeftBoundary = new Boundary(leftBoundary_.getType(), null);
+    } else {
+      newLeftBoundary = rightBoundary_.converse();
+    }
+    return new AnalyticWindow(type_, newLeftBoundary, newRightBoundary);
   }
 
   public String toSql() {

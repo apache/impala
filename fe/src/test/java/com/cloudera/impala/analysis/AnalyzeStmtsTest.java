@@ -1218,7 +1218,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select bool_col from functional.alltypes " +
         "union select lag(string_col) over(order by int_col) from functional.alltypes",
         "Incompatible return types 'BOOLEAN' and 'STRING' of exprs " +
-        "'bool_col' and 'lag(string_col)'.");
+        "'bool_col' and 'lag(string_col, 1, NULL)'.");
     // Incompatible types, longer union chain.
     AnalysisError("select int_col, string_col from functional.alltypes " +
         "union select tinyint_col, bool_col from functional.alltypes " +

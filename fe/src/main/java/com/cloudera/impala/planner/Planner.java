@@ -894,7 +894,7 @@ public class Planner {
     if (node instanceof AnalyticEvalNode) {
       AnalyticEvalNode analyticNode = (AnalyticEvalNode) node;
       if (analyticNode.getPartitionExprs().isEmpty()
-          && analyticNode.getOrderingExprs().isEmpty()) {
+          && analyticNode.getOrderByElements().isEmpty()) {
         // no Partition-By/Order-By exprs: compute analytic exprs in single
         // unpartitioned fragment
         PlanFragment fragment = childFragment;

@@ -24,6 +24,7 @@ import com.cloudera.impala.analysis.AnalyticWindow;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.ExprSubstitutionMap;
+import com.cloudera.impala.analysis.OrderByElement;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.common.InternalException;
@@ -55,7 +56,7 @@ public class AnalyticEvalNode extends PlanNode {
 
   // TODO: Remove when the BE uses partitionByLessThan rather than the exprs
   private List<Expr> substitutedPartitionExprs_;
-  private List<Expr> orderingExprs_;
+  private List<OrderByElement> orderByElements_;
   private final AnalyticWindow analyticWindow_;
 
   // Logical output tuple for the analytic exprs of the originating stmt.
@@ -77,11 +78,10 @@ public class AnalyticEvalNode extends PlanNode {
 
   public AnalyticEvalNode(
       PlanNodeId id, PlanNode input, List<TupleId> stmtTupleIds,
-      List<Expr> analyticFnCalls,
-      List<Expr> partitionExprs, List<Expr> orderingExprs,
-      AnalyticWindow analyticWindow, TupleDescriptor logicalTupleDesc,
-      TupleDescriptor intermediateTupleDesc, TupleDescriptor outputTupleDesc,
-      ExprSubstitutionMap logicalToPhysicalSmap,
+      List<Expr> analyticFnCalls, List<Expr> partitionExprs,
+      List<OrderByElement> orderByElements, AnalyticWindow analyticWindow,
+      TupleDescriptor logicalTupleDesc, TupleDescriptor intermediateTupleDesc,
+      TupleDescriptor outputTupleDesc, ExprSubstitutionMap logicalToPhysicalSmap,
       Expr partitionByLessThan, Expr orderByLessThan,
       TupleDescriptor bufferedTupleDesc) {
     super(id, input.getTupleIds(), "ANALYTIC");
@@ -91,7 +91,7 @@ public class AnalyticEvalNode extends PlanNode {
     stmtTupleIds_ = stmtTupleIds;
     analyticFnCalls_ = analyticFnCalls;
     partitionExprs_ = partitionExprs;
-    orderingExprs_ = orderingExprs;
+    orderByElements_ = orderByElements;
     analyticWindow_ = analyticWindow;
     logicalTupleDesc_ = logicalTupleDesc;
     intermediateTupleDesc_ = intermediateTupleDesc;
@@ -107,7 +107,7 @@ public class AnalyticEvalNode extends PlanNode {
   @Override
   public boolean isBlockingNode() { return true; }
   public List<Expr> getPartitionExprs() { return partitionExprs_; }
-  public List<Expr> getOrderingExprs() { return orderingExprs_; }
+  public List<OrderByElement> getOrderByElements() { return orderByElements_; }
 
   @Override
   public void init(Analyzer analyzer) throws InternalException {
@@ -151,7 +151,7 @@ public class AnalyticEvalNode extends PlanNode {
     analyticFnCalls_ = Expr.substituteList(analyticFnCalls_, childSmap, analyzer);
     substitutedPartitionExprs_ = Expr.substituteList(partitionExprs_, childSmap,
         analyzer);
-    orderingExprs_ = Expr.substituteList(orderingExprs_, childSmap, analyzer);
+    orderByElements_ = OrderByElement.substitute(orderByElements_, childSmap, analyzer);
     LOG.trace("evalnode: " + debugString());
   }
 
@@ -163,11 +163,15 @@ public class AnalyticEvalNode extends PlanNode {
 
   @Override
   protected String debugString() {
+    List<String> orderByElementStrs = Lists.newArrayList();
+    for (OrderByElement element: orderByElements_) {
+      orderByElementStrs.add(element.toSql());
+    }
     return Objects.toStringHelper(this)
         .add("analyticFnCalls", Expr.debugString(analyticFnCalls_))
         .add("partitionExprs", Expr.debugString(partitionExprs_))
         .add("subtitutedPartitionExprs", Expr.debugString(substitutedPartitionExprs_))
-        .add("orderingExprs", Expr.debugString(orderingExprs_))
+        .add("orderByElements", Joiner.on(", ").join(orderByElementStrs))
         .add("window", analyticWindow_)
         .add("intermediateTid", intermediateTupleDesc_.getId())
         .add("outputTid", outputTupleDesc_.getId())
@@ -186,10 +190,11 @@ public class AnalyticEvalNode extends PlanNode {
     msg.analytic_node.setIntermediate_tuple_id(intermediateTupleDesc_.getId().asInt());
     msg.analytic_node.setOutput_tuple_id(outputTupleDesc_.getId().asInt());
     msg.analytic_node.setPartition_exprs(Expr.treesToThrift(substitutedPartitionExprs_));
-    msg.analytic_node.setOrder_by_exprs(Expr.treesToThrift(orderingExprs_));
+    msg.analytic_node.setOrder_by_exprs(
+        Expr.treesToThrift(OrderByElement.getOrderByExprs(orderByElements_)));
     msg.analytic_node.setAnalytic_functions(Expr.treesToThrift(analyticFnCalls_));
     if (analyticWindow_ == null) {
-      if (!orderingExprs_.isEmpty()) {
+      if (!orderByElements_.isEmpty()) {
         msg.analytic_node.setWindow(AnalyticWindow.DEFAULT_WINDOW.toThrift());
       }
     } else {
@@ -231,11 +236,11 @@ public class AnalyticEvalNode extends PlanNode {
         output.append("\n");
       }
 
-      if (!orderingExprs_.isEmpty()) {
+      if (!orderByElements_.isEmpty()) {
         output.append(detailPrefix + "order by: ");
         strings.clear();
-        for (Expr orderingExpr: orderingExprs_) {
-          strings.add(orderingExpr.toSql());
+        for (OrderByElement element: orderByElements_) {
+          strings.add(element.toSql());
         }
         output.append(Joiner.on(", ").join(strings));
         output.append("\n");
