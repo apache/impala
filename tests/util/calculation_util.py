@@ -41,7 +41,11 @@ def calculate_median(values):
 def calculate_geomean(values):
   """ Calculates the geometric mean of the given collection of numerics """
   if len(values) > 0:
-    return (reduce(lambda x, y: float(x) * float(y), values)) ** (1.0 / len(values))
+    product = 1.0
+    exponent = 1.0 / len(values)
+    for value in values:
+      product *= value ** exponent
+    return product
 
 def calculate_tval(avg, stddev, iters, ref_avg, ref_stddev, ref_iters):
   """
