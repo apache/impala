@@ -478,21 +478,21 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
     status = exec_state->SetResultCache(
         new ImpalaServer::TRowQueryResultSet(*exec_state->result_metadata()),
             cache_num_rows);
-    HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
+    if (!status.ok()) {
+      UnregisterQuery(exec_state->query_id(), &status);
+      HS2_RETURN_ERROR(return_val, status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
+    }
   }
+  exec_state->UpdateQueryState(QueryState::RUNNING);
+  // Start thread to wait for results to become available.
+  exec_state->WaitAsync();
 
   return_val.__isset.operationHandle = true;
   return_val.operationHandle.__set_operationType(TOperationType::EXECUTE_STATEMENT);
-
-  exec_state->UpdateQueryState(QueryState::RUNNING);
   return_val.operationHandle.__set_hasResultSet(exec_state->returns_result_set());
   // TODO: create secret for operationId and store the secret in exec_state
   TUniqueIdToTHandleIdentifier(exec_state->query_id(), exec_state->query_id(),
                                &return_val.operationHandle.operationId);
-
-  // Start thread to wait for results to become available.
-  exec_state->WaitAsync();
-
   return_val.status.__set_statusCode(
       apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS);
 

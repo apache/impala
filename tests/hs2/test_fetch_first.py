@@ -21,6 +21,7 @@
 import pytest
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 from cli_service import TCLIService
+from tests.common.impala_cluster import ImpalaCluster
 
 class TestFetchFirst(HS2TestSuite):
   IMPALA_RESULT_CACHING_OPT = "impala.resultset.cache.size";
@@ -28,6 +29,9 @@ class TestFetchFirst(HS2TestSuite):
   def __test_invalid_result_caching(self, sql_stmt):
     """ Tests that invalid requests for query-result caching fail
     using the given sql_stmt."""
+    impala_cluster = ImpalaCluster()
+    impalad = impala_cluster.impalads[0].service
+
     execute_statement_req = TCLIService.TExecuteStatementReq()
     execute_statement_req.sessionHandle = self.session_handle
     execute_statement_req.statement = sql_stmt
@@ -40,6 +44,7 @@ class TestFetchFirst(HS2TestSuite):
         TCLIService.TStatusCode.ERROR_STATUS,
         "Invalid value 'bad_number' for 'impala.resultset.cache.size' option")
     self.__verify_num_cached_rows(0)
+    assert 0 == impalad.get_num_in_flight_queries()
 
     # Test that a result-cache size exceeding the per-Impalad maximum returns an error.
     # The default maximum result-cache size is 100000.
@@ -49,6 +54,7 @@ class TestFetchFirst(HS2TestSuite):
         TCLIService.TStatusCode.ERROR_STATUS,
         "Requested result-cache size of 100001 exceeds Impala's maximum of 100000")
     self.__verify_num_cached_rows(0)
+    assert 0 == impalad.get_num_in_flight_queries()
 
   def __verify_num_cached_rows(self, num_cached_rows):
     """Asserts that Impala has the given number of rows in its result set cache. Also
