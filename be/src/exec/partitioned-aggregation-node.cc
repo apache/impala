@@ -113,6 +113,8 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
       ADD_COUNTER(runtime_profile(), "NumRepartitions", TCounterType::UNIT);
   num_spilled_partitions_ =
       ADD_COUNTER(runtime_profile(), "SpilledPartitions", TCounterType::UNIT);
+  largest_partition_percent_ = runtime_profile()->AddHighWaterMarkCounter(
+      "LargestPartitionPercent", TCounterType::UNIT);
 
   intermediate_tuple_desc_ =
       state->desc_tbl().GetTupleDescriptor(intermediate_tuple_id_);
@@ -247,14 +249,9 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
   // Done consuming child(0)'s input. Move all the partitions in hash_partitions_
   // to spilled_partitions_/aggregated_partitions_. We'll finish the processing in
   // GetNext().
-  for (int i = 0; i < hash_partitions_.size(); ++i) {
-    if (hash_partitions_[i]->is_spilled()) {
-      spilled_partitions_.push_back(hash_partitions_[i]);
-    } else {
-      aggregated_partitions_.push_back(hash_partitions_[i]);
-    }
+  if (!probe_expr_ctxs_.empty()) {
+    RETURN_IF_ERROR(MoveHashPartitions(child(0)->rows_returned()));
   }
-  hash_partitions_.clear();
 
   return Status::OK;
 }
@@ -572,7 +569,7 @@ void PartitionedAggregationNode::DebugString(int indentation_level,
 }
 
 Status PartitionedAggregationNode::CreateHashPartitions(int level) {
-  if (level > MAX_PARTITION_DEPTH) {
+  if (level >= MAX_PARTITION_DEPTH) {
     // TODO: better error msg.
     return Status("Cannot perform hash aggregation. Input data has too much skew");
   }
@@ -607,7 +604,6 @@ Status PartitionedAggregationNode::NextPartition() {
       // can base this on the amount written to disk, etc.
       partition = spilled_partitions_.front();
       DCHECK(partition->is_spilled());
-      spilled_partitions_.pop_front();
 
       // Create the new hash partitions to repartition into.
       // TODO: we don't need to repartition here. We are now working on 1 / FANOUT
@@ -623,21 +619,20 @@ Status PartitionedAggregationNode::NextPartition() {
       RETURN_IF_ERROR(ProcessStream<true>(partition->aggregated_row_stream.get()));
       RETURN_IF_ERROR(ProcessStream<false>(partition->unaggregated_row_stream.get()));
 
-      COUNTER_UPDATE(num_row_repartitioned_, partition->aggregated_row_stream->num_rows());
+      COUNTER_UPDATE(num_row_repartitioned_,
+          partition->aggregated_row_stream->num_rows());
       COUNTER_UPDATE(num_row_repartitioned_,
           partition->unaggregated_row_stream->num_rows());
 
+      partition->Close(false);
+      spilled_partitions_.pop_front();
+
       // Done processing this partition. Move the new partitions into
       // spilled_partitions_/aggregated_partitions_.
-      partition->Close(false);
-      for (int i = 0; i < hash_partitions_.size(); ++i) {
-        if (hash_partitions_[i]->is_spilled()) {
-          spilled_partitions_.push_back(hash_partitions_[i]);
-        } else {
-          aggregated_partitions_.push_back(hash_partitions_[i]);
-        }
-      }
-      hash_partitions_.clear();
+      int64_t num_input_rows = 0;
+      num_input_rows += partition->aggregated_row_stream->num_rows();
+      num_input_rows += partition->unaggregated_row_stream->num_rows();
+      RETURN_IF_ERROR(MoveHashPartitions(num_input_rows));
     }
   }
 
@@ -692,7 +687,7 @@ Status PartitionedAggregationNode::SpillPartition() {
   DCHECK(partition->hash_tbl.get() != NULL);
   partition->hash_tbl->Close();
   partition->hash_tbl.reset();
-  RETURN_IF_ERROR(partition->aggregated_row_stream->UnpinAllBlocks());
+  RETURN_IF_ERROR(partition->aggregated_row_stream->UnpinStream());
 
   // We need to do a lot more work in this case. The result tuple contains var-len
   // strings, meaning the current in memory layout is not the on disk block layout.
@@ -731,6 +726,44 @@ Status PartitionedAggregationNode::SpillPartition() {
     }
   }
   COUNTER_UPDATE(num_spilled_partitions_, 1);
+  return Status::OK;
+}
+
+Status PartitionedAggregationNode::MoveHashPartitions(int64_t num_input_rows) {
+  DCHECK(!hash_partitions_.empty());
+  stringstream ss;
+  ss << "PA(node_id=" << id() << ") partitioned(level="
+     << hash_partitions_[0]->level << ") "
+     << num_input_rows << " rows into:" << endl;
+  for (int i = 0; i < hash_partitions_.size(); ++i) {
+    Partition* partition = hash_partitions_[i];
+    if (partition->is_spilled()) {
+      // We need to unpin all the spilled partitions to make room to allocate new
+      // hash_partitions_ when we repartition the spilled partitions.
+      // TODO: we only need to do this when we have memory pressure. This might be
+      // okay though since the block mgr should only write these to disk if there
+      // is memory pressure.
+      RETURN_IF_ERROR(partition->aggregated_row_stream->UnpinStream(true));
+      RETURN_IF_ERROR(partition->unaggregated_row_stream->UnpinStream(true));
+      spilled_partitions_.push_back(partition);
+    } else {
+      aggregated_partitions_.push_back(partition);
+    }
+
+    int64_t aggregated_rows = partition->aggregated_row_stream->num_rows();
+    int64_t unaggregated_rows = partition->unaggregated_row_stream->num_rows();
+    double total_rows = aggregated_rows + unaggregated_rows;
+    double percent = total_rows * 100 / num_input_rows;
+    ss << "  " << i << " "  << (partition->is_spilled() ? "spilled" : "not spilled")
+       << " (fraction=" << fixed << setprecision(2) << percent << "%)" << endl
+       << "    #aggregated rows:" << aggregated_rows << endl
+       << "    #unaggregated rows: " << unaggregated_rows << endl;
+
+    // TODO: update counters to support doubles.
+    COUNTER_SET(largest_partition_percent_, static_cast<int64_t>(percent));
+  }
+  LOG(ERROR) << ss.str();
+  hash_partitions_.clear();
   return Status::OK;
 }
 

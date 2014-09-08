@@ -174,7 +174,7 @@ class BufferedTupleStreamTest : public testing::Test {
     BufferedTupleStream stream(runtime_state_.get(), *desc, block_mgr_.get(), client_);
     Status status = stream.Init();
     ASSERT_TRUE(status.ok());
-    status = stream.UnpinAllBlocks();
+    status = stream.UnpinStream();
     ASSERT_TRUE(status.ok());
 
     // Add rows to the stream
@@ -218,7 +218,7 @@ class BufferedTupleStreamTest : public testing::Test {
         true); // read_write
     Status status = stream.Init();
     ASSERT_TRUE(status.ok());
-    status = stream.UnpinAllBlocks();
+    status = stream.UnpinStream();
     ASSERT_TRUE(status.ok());
 
     vector<int32_t> results;
@@ -324,11 +324,11 @@ TEST_F(BufferedTupleStreamTest, UnpinPin) {
     offset += j;
   }
 
-  status = stream.UnpinAllBlocks();
+  status = stream.UnpinStream();
   ASSERT_TRUE(status.ok());
 
   bool pinned = false;
-  status = stream.PinAllBlocks(&pinned);
+  status = stream.PinStream(&pinned);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(pinned);
 

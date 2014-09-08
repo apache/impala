@@ -113,11 +113,11 @@ class BufferedTupleStream {
   Status PrepareForRead();
 
   // Pins all blocks in this stream and switches to pinned mode.
-  Status PinAllBlocks(bool* pinned);
+  Status PinStream(bool* pinned);
 
-  // Unpins all blocks except the write_block_ and the read_block_ if read_write_ is
-  // true. Switches to unpinned mode.
-  Status UnpinAllBlocks();
+  // Unpins stream. If all is true, all blocks are unpinned, otherwise all blocks
+  // except the write_block_ and read_block_ are unpinned.
+  Status UnpinStream(bool all = false);
 
   // Get the next batch of output rows. Memory is still owned by the BufferedTupleStream
   // and must be copied out by the caller.

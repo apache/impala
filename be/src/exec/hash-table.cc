@@ -98,7 +98,7 @@ uint32_t HashTableCtx::HashVariableLenRow() {
   uint32_t hash = seeds_[level_];
   // Hash the non-var length portions (if there are any)
   if (var_result_begin_ != 0) {
-    hash = HashUtil::Hash(expr_values_buffer_, var_result_begin_, hash);
+    hash = HashUtil::FnvHash64to32(expr_values_buffer_, var_result_begin_, hash);
   }
 
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
@@ -109,11 +109,11 @@ uint32_t HashTableCtx::HashVariableLenRow() {
     void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
     if (expr_value_null_bits_[i]) {
       // Hash the null random seed values at 'loc'
-      hash = HashUtil::Hash(loc, sizeof(StringValue), hash);
+      hash = HashUtil::FnvHash64to32(loc, sizeof(StringValue), hash);
     } else {
       // Hash the string
       StringValue* str = reinterpret_cast<StringValue*>(loc);
-      hash = HashUtil::Hash(str->ptr, str->len, hash);
+      hash = HashUtil::FnvHash64to32(str->ptr, str->len, hash);
     }
   }
   return hash;

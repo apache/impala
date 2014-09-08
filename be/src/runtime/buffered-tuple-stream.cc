@@ -19,6 +19,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
+#include "util/debug-util.h"
 
 using namespace boost;
 using namespace impala;
@@ -87,7 +88,7 @@ Status BufferedTupleStream::Init(bool pinned) {
   if (!got_block) return Status("Not enough memory to initialize BufferedTupleStream.");
   DCHECK(write_block_ != NULL);
   if (read_write_) RETURN_IF_ERROR(PrepareForRead());
-  if (!pinned) RETURN_IF_ERROR(UnpinAllBlocks());
+  if (!pinned) RETURN_IF_ERROR(UnpinStream());
   return Status::OK;
 }
 
@@ -201,7 +202,7 @@ Status BufferedTupleStream::PrepareForRead() {
   return Status::OK;
 }
 
-Status BufferedTupleStream::PinAllBlocks(bool* pinned) {
+Status BufferedTupleStream::PinStream(bool* pinned) {
   DCHECK(pinned != NULL);
   *pinned = true;
 
@@ -210,7 +211,7 @@ Status BufferedTupleStream::PinAllBlocks(bool* pinned) {
     if ((*it)->is_pinned()) continue;
     RETURN_IF_ERROR((*it)->Pin(pinned));
     if (!*pinned) {
-      UnpinAllBlocks();
+      UnpinStream();
       return Status::OK;
     }
     ++num_pinned_;
@@ -221,14 +222,18 @@ Status BufferedTupleStream::PinAllBlocks(bool* pinned) {
   return Status::OK;
 }
 
-Status BufferedTupleStream::UnpinAllBlocks() {
+Status BufferedTupleStream::UnpinStream(bool all) {
   for (list<BufferedBlockMgr::Block*>::iterator it = blocks_.begin();
       it != blocks_.end(); ++it) {
-    if (!(*it)->is_pinned() || *it == write_block_) continue;
-    if (read_write_ && it == read_block_) continue;
+    if (!(*it)->is_pinned()) continue;
+    if (!all && (*it == write_block_ || (read_write_ && it == read_block_))) continue;
     RETURN_IF_ERROR((*it)->Unpin());
     --num_pinned_;
     DCHECK_EQ(num_pinned_, NumPinned(blocks_));
+  }
+  if (all) {
+    read_block_ = blocks_.end();
+    write_block_ = NULL;
   }
   pinned_ = false;
   return Status::OK;

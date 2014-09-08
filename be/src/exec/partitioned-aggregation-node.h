@@ -116,7 +116,7 @@ class PartitionedAggregationNode : public ExecNode {
   // the case where there is skew, repartitioning is unlikely to help (assuming a
   // reasonable hash function).
   // TODO: we can revisit and try harder to explicitly detect skew.
-  static const int MAX_PARTITION_DEPTH = 3;
+  static const int MAX_PARTITION_DEPTH = 4;
 
   // Tuple into which Update()/Merge()/Serialize() results are stored.
   TupleId intermediate_tuple_id_;
@@ -211,6 +211,10 @@ class PartitionedAggregationNode : public ExecNode {
 
   // Number of partitions that have been spilled.
   RuntimeProfile::Counter* num_spilled_partitions_;
+
+  // The largest fraction after repartitioning. This is expected to be
+  // 1 / PARTITION_FANOUT. A value much larger indicates skew.
+  RuntimeProfile::HighWaterMarkCounter* largest_partition_percent_;
 
   struct Partition {
     Partition(PartitionedAggregationNode* parent, int level)
@@ -329,6 +333,12 @@ class PartitionedAggregationNode : public ExecNode {
 
   // Picks a partition from hash_partitions_ to spill.
   Status SpillPartition();
+
+  // Moves the partitions in hash_partitions_ to aggregated_partitions_ or
+  // spilled_partitions_. Partitions moved to spilled_partitions_ are unpinned.
+  // input_rows is the number of rows the number of input rows that have been
+  // repartitioned. Used for diagnostics.
+  Status MoveHashPartitions(int64_t input_rows);
 
   // Codegen UpdateSlot(). Returns NULL if codegen is unsuccessful.
   // Assumes is_merge = false;

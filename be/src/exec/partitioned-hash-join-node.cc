@@ -221,7 +221,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(
   DCHECK(build_rows_ != NULL);
   *built = false;
   // First pin the entire build stream in memory.
-  RETURN_IF_ERROR(build_rows_->PinAllBlocks(built));
+  RETURN_IF_ERROR(build_rows_->PinStream(built));
   if (!*built) return Status::OK;
   RETURN_IF_ERROR(build_rows_->PrepareForRead());
 
@@ -243,7 +243,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(
 
     if (hash_tbl_->mem_limit_exceeded()) {
       hash_tbl_->Close();
-      RETURN_IF_ERROR(build_rows_->UnpinAllBlocks());
+      RETURN_IF_ERROR(build_rows_->UnpinStream());
       *built = false;
       return Status::OK;
     }
@@ -277,7 +277,7 @@ Status PartitionedHashJoinNode::SpillPartitions() {
     return status;
   }
   LOG(ERROR) << "Spilling partition: " << partition_idx << endl << DebugString();
-  return hash_partitions_[partition_idx]->build_rows()->UnpinAllBlocks();
+  return hash_partitions_[partition_idx]->build_rows()->UnpinStream();
 }
 
 Status PartitionedHashJoinNode::ConstructBuildSide(RuntimeState* state) {
@@ -700,7 +700,7 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
       // TODO: this unpin is unnecessary but makes it simple. We should pick the
       // partitions to keep in memory based on how much of the build tuples in that
       // partition are on disk/in memory.
-      RETURN_IF_ERROR(hash_partitions_[i]->build_rows()->UnpinAllBlocks());
+      RETURN_IF_ERROR(hash_partitions_[i]->build_rows()->UnpinStream());
     }
   }
 
@@ -724,7 +724,7 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
       RETURN_IF_ERROR(hash_partitions_[i]->BuildHashTable(state, &built));
       if (!built) {
         // Estimate was wrong, cleanup hash table.
-        RETURN_IF_ERROR(hash_partitions_[i]->build_rows()->UnpinAllBlocks());
+        RETURN_IF_ERROR(hash_partitions_[i]->build_rows()->UnpinStream());
         if (hash_partitions_[i]->hash_tbl_.get() != NULL) {
           hash_partitions_[i]->hash_tbl_->Close();
           hash_partitions_[i]->hash_tbl_.reset();
@@ -760,7 +760,7 @@ Status PartitionedHashJoinNode::CleanUpHashPartitions(RowBatch* batch) {
     if (hash_partitions_[i]->is_closed()) continue;
     if (hash_partitions_[i]->hash_tbl() == NULL) {
       // Unpin the probe stream to free up more memory.
-      RETURN_IF_ERROR(hash_partitions_[i]->probe_rows()->UnpinAllBlocks());
+      RETURN_IF_ERROR(hash_partitions_[i]->probe_rows()->UnpinStream());
       spilled_partitions_.push_back(hash_partitions_[i]);
     } else {
       DCHECK_EQ(hash_partitions_[i]->probe_rows()->num_rows(), 0)

@@ -334,7 +334,7 @@ Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
       // the stream and continue writing/reading in unpinned mode.
       // TODO: Consider re-pinning later if the output stream is fully consumed.
       RETURN_IF_ERROR(input_stream_->status());
-      RETURN_IF_ERROR(input_stream_->UnpinAllBlocks());
+      RETURN_IF_ERROR(input_stream_->UnpinStream());
       if (!input_stream_->AddRow(row)) {
         // Rows should be added in unpinned mode unless an error occurs.
         RETURN_IF_ERROR(input_stream_->status());
