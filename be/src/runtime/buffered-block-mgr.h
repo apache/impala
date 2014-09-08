@@ -256,6 +256,8 @@ class BufferedBlockMgr {
     return all_buffers_.size();
   }
 
+  int num_pinned_buffers(Client* client) const;
+
   int64_t block_size() const { return block_size_; }
   int64_t bytes_allocated() const;
 

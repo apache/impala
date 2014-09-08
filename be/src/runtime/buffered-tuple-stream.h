@@ -38,10 +38,9 @@ class TupleRow;
 // object is thread safe wrt to the underlying block mgr.
 //
 // Buffer management:
-// The stream is either pinned or unpinned, set via PinAllBlocks() and UnpinAllBlocks().
-// PinAllBlocks() will pin all unpinned blocks, if possible. UnpinAllBlocks() will unpin
-// all blocks except the write_block_ and the read_block_ (if read_write is true). Blocks
-// are optionally deleted as they are read, set with the delete_on_read c'tor parameter.
+// The stream is either pinned or unpinned, set via PinStream() and UnpinStream().
+// Blocks are optionally deleted as they are read, set with the delete_on_read c'tor
+// parameter.
 //
 // The behavior of reads and writes is as follows:
 // Read:
@@ -113,6 +112,7 @@ class BufferedTupleStream {
   Status PrepareForRead();
 
   // Pins all blocks in this stream and switches to pinned mode.
+  // If there is not enough memory, *pinned is set to false and the stream is unpinned.
   Status PinStream(bool* pinned);
 
   // Unpins stream. If all is true, all blocks are unpinned, otherwise all blocks
@@ -147,6 +147,7 @@ class BufferedTupleStream {
   int64_t bytes_unpinned() const;
 
   bool is_pinned() const { return pinned_; }
+  int blocks_pinned() const { return num_pinned_; }
 
  private:
   // If true, blocks are deleted after they are read.

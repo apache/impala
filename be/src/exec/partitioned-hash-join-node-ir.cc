@@ -22,6 +22,7 @@ using namespace std;
 
 template<int const JoinOp>
 Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
+  SCOPED_TIMER(probe_timer_);
   ExprContext* const* join_conjunct_ctxs = &other_join_conjunct_ctxs_[0];
   int num_join_conjuncts = other_join_conjunct_ctxs_.size();
   ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
@@ -110,13 +111,10 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
     }
     DCHECK(partition != NULL);
 
-    if (partition->hash_tbl() == NULL) {
-      if (partition->is_closed()) {
-        // This partition is closed, meaning the build side for this partition was empty.
-        DCHECK_EQ(state_, PROCESSING_PROBE);
-        hash_tbl_iterator_.reset();
-        continue;
-      }
+    if (UNLIKELY(partition->is_closed())) {
+      // This partition is closed, meaning the build side for this partition was empty.
+      DCHECK_EQ(state_, PROCESSING_PROBE);
+    } else if (partition->is_spilled()) {
       // This partition is not in memory, spill the probe row.
       if (UNLIKELY(!AppendRow(partition->probe_rows(), current_probe_row_))) {
         return status_;
@@ -124,7 +122,7 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
     } else {
       // Perform the actual probe in the hash table for the current probe (left) row.
       // TODO: At this point it would be good to do some prefetching.
-      hash_tbl_iterator_= partition->hash_tbl()->Find(ht_ctx_.get());
+      hash_tbl_iterator_ = partition->hash_tbl()->Find(ht_ctx_.get());
     }
   }
 

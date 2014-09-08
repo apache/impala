@@ -276,6 +276,10 @@ int64_t BufferedBlockMgr::bytes_allocated() const {
   return buffer_pool_->total_allocated_bytes();
 }
 
+int BufferedBlockMgr::num_pinned_buffers(Client* client) const {
+  return client->num_pinned_buffers_;
+}
+
 Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned) {
   DCHECK(!block->is_deleted_);
   *pinned = false;

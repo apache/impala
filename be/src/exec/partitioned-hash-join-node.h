@@ -53,7 +53,7 @@ class BufferedTupleStream;
 // or new bits. Multiplicative hashing?
 // TODO: think about details about multithreading. Multiple partitions in parallel?
 // Multiple threads against a single partition? How to build hash tables in parallel?
-// TODO: BuildHashTables should start with the partitions that are already pinned.
+// TODO: BuildHashTables() should start with the partitions that are already pinned.
 class PartitionedHashJoinNode : public BlockingJoinNode {
  public:
   PartitionedHashJoinNode(ObjectPool* pool, const TPlanNode& tnode,
@@ -124,7 +124,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // In the case where there is skew, repartitioning is unlikely to help (assuming a
   // reasonable hash function).
   // TODO: we can revisit and try harder to explicitly detect skew.
-  static const int MAX_PARTITION_DEPTH = 3;
+  static const int MAX_PARTITION_DEPTH = 4;
 
   // Maximum number of build tables that can be in memory at any time. This is in
   // addition to the memory constraints and is used for testing to trigger code paths
@@ -147,7 +147,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // Partitions the entire build input (either from child(1) or input_partition_) into
   // hash_partitions_. When this call returns, hash_partitions_ is ready to consume
   // the probe input.
-  Status ProcessBuildInput(RuntimeState* state);
+  // level is the level new partitions (in hash_partitions_) should be created with.
+  Status ProcessBuildInput(RuntimeState* state, int level);
 
   // Processes all the build rows by partitioning them.
   // Reads the rows in build_batch and partition them in hash_partitions_.
@@ -253,6 +254,29 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // The iterator that corresponds to the look up of current_probe_row_.
   HashTable::Iterator hash_tbl_iterator_;
 
+  // Total number of hash buckets across all partitions.
+  RuntimeProfile::Counter* num_hash_buckets_;
+
+  // Total number of partitions created.
+  RuntimeProfile::Counter* partitions_created_;
+
+  // Level of max partition (i.e. number of repartitioning steps).
+  RuntimeProfile::HighWaterMarkCounter* max_partition_level_;
+
+  // Number of build/probe rows that have been partitioned.
+  RuntimeProfile::Counter* num_build_rows_partitioned_;
+  RuntimeProfile::Counter* num_probe_rows_partitioned_;
+
+  // Number of partitions that have been repartitioned.
+  RuntimeProfile::Counter* num_repartitions_;
+
+  // Number of partitions that have been spilled.
+  RuntimeProfile::Counter* num_spilled_partitions_;
+
+  // The largest fraction (of build side) after repartitioning. This is expected to be
+  // 1 / PARTITION_FANOUT. A value much larger indicates skew.
+  RuntimeProfile::HighWaterMarkCounter* largest_partition_percent_;
+
   class Partition {
    public:
     Partition(RuntimeState* state, PartitionedHashJoinNode* parent, int level);
@@ -260,9 +284,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
     BufferedTupleStream* build_rows() { return build_rows_; }
     BufferedTupleStream* probe_rows() { return probe_rows_; }
-    HashTable* hash_tbl() { return hash_tbl_.get(); }
+    HashTable* hash_tbl() const { return hash_tbl_.get(); }
 
     bool is_closed() const { return is_closed_; }
+    bool is_spilled() const;
 
     // Must be called once per partition to release any resources. This should be called
     // as soon as possible to release memory.

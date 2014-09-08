@@ -211,7 +211,7 @@ Status BufferedTupleStream::PinStream(bool* pinned) {
     if ((*it)->is_pinned()) continue;
     RETURN_IF_ERROR((*it)->Pin(pinned));
     if (!*pinned) {
-      UnpinStream();
+      UnpinStream(true);
       return Status::OK;
     }
     ++num_pinned_;

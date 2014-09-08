@@ -145,9 +145,6 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   intermediate_row_desc_.reset(new RowDescriptor(intermediate_tuple_desc_, false));
   RETURN_IF_ERROR(Expr::Prepare(build_expr_ctxs_, state, *intermediate_row_desc_));
 
-  RETURN_IF_ERROR(state_->block_mgr()->RegisterClient(
-      MinRequiredBuffers(), mem_tracker(), state, &block_mgr_client_));
-
   agg_fn_ctxs_.resize(aggregate_evaluators_.size());
   int j = probe_expr_ctxs_.size();
   for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
@@ -175,6 +172,10 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   } else {
     ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_, true, true,
                                    state->fragment_hash_seed(), MAX_PARTITION_DEPTH));
+
+    RETURN_IF_ERROR(state_->block_mgr()->RegisterClient(
+        MinRequiredBuffers(), mem_tracker(), state, &block_mgr_client_));
+
     Status status = CreateHashPartitions(0);
     if (status.IsMemLimitExceeded()) {
       int64_t min_mem_required =

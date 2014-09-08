@@ -118,7 +118,8 @@ class RowBatch {
   // Returns true if the row batch has filled all the rows or has accumulated
   // enough memory.
   bool AtCapacity() {
-    return num_rows_ == capacity_ || auxiliary_mem_usage_ >= AT_CAPACITY_MEM_USAGE;
+    return num_rows_ == capacity_ || auxiliary_mem_usage_ >= AT_CAPACITY_MEM_USAGE ||
+      num_tuple_streams() > 0;
   }
 
   // The total size of all data represented in this row batch (tuples and referenced
@@ -135,7 +136,8 @@ class RowBatch {
 
   int row_byte_size() { return num_tuples_per_row_ * sizeof(Tuple*); }
   MemPool* tuple_data_pool() { return tuple_data_pool_.get(); }
-  int num_io_buffers() { return io_buffers_.size(); }
+  int num_io_buffers() const { return io_buffers_.size(); }
+  int num_tuple_streams() const { return tuple_streams_.size(); }
 
   // Resets the row batch, returning all resources it has accumulated.
   void Reset();

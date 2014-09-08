@@ -168,7 +168,8 @@ Status RuntimeState::CreateBlockMgr() {
   block_mgr_limit = min(static_cast<int64_t>(block_mgr_limit * BLOCK_MGR_MEM_FRACTION),
       block_mgr_limit - BLOCK_MGR_MEM_MIN_REMAINING);
   if (block_mgr_limit < 0) block_mgr_limit = 0;
-  if (query_options().__isset.max_block_mgr_memory) {
+  if (query_options().__isset.max_block_mgr_memory &&
+      query_options().max_block_mgr_memory > 0) {
     block_mgr_limit = query_options().max_block_mgr_memory;
     LOG(ERROR) << "Block mgr mem limit: "
                << PrettyPrinter::Print(block_mgr_limit, TCounterType::BYTES);
