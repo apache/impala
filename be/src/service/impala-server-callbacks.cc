@@ -125,22 +125,21 @@ static Status ParseQueryId(const Webserver::ArgumentMap& args, TUniqueId* id) {
 void ImpalaServer::CancelQueryUrlCallback(const Webserver::ArgumentMap& args,
     Document* document) {
   TUniqueId unique_id;
-  Status parse_status = ParseQueryId(args, &unique_id);
-  if (!parse_status.ok()) {
-    Value error(parse_status.GetErrorMsg().c_str(), document->GetAllocator());
+  Status status = ParseQueryId(args, &unique_id);
+  if (!status.ok()) {
+    Value error(status.GetErrorMsg().c_str(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
     return;
   }
-  Status status("Cancelled from Impala's debug web interface");
-  if (UnregisterQuery(unique_id, &status)) {
-    Value message("Query cancellation successful", document->GetAllocator());
-    document->AddMember("contents", message, document->GetAllocator());
-  } else {
-    Value error(
-        Substitute("Error cancelling query: $0 not found", PrintId(unique_id)).c_str(),
-        document->GetAllocator());
+  Status cause("Cancelled from Impala's debug web interface");
+  status = UnregisterQuery(unique_id, true, &cause);
+  if (!status.ok()) {
+    Value error(status.GetErrorMsg().c_str(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
+    return;
   }
+  Value message("Query cancellation successful", document->GetAllocator());
+  document->AddMember("contents", message, document->GetAllocator());
 }
 
 void ImpalaServer::QueryProfileUrlCallback(const Webserver::ArgumentMap& args,

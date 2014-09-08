@@ -184,11 +184,17 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
   exec_state->UpdateQueryState(QueryState::RUNNING);
-  TUniqueIdToQueryHandle(exec_state->query_id(), &query_handle);
-
   // start thread to wait for results to become available, which will allow
   // us to advance query state to FINISHED or EXCEPTION
   exec_state->WaitAsync();
+  // Once the query is running do a final check for session closure and add it to the
+  // set of in-flight queries.
+  Status status = SetQueryInflight(session, exec_state);
+  if (!status.ok()) {
+    UnregisterQuery(exec_state->query_id(), false, &status);
+    RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
+  }
+  TUniqueIdToQueryHandle(exec_state->query_id(), &query_handle);
 }
 
 void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
@@ -219,11 +225,18 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
       SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
 
   exec_state->UpdateQueryState(QueryState::RUNNING);
+  // Once the query is running do a final check for session closure and add it to the
+  // set of in-flight queries.
+  Status status = SetQueryInflight(session, exec_state);
+  if (!status.ok()) {
+    UnregisterQuery(exec_state->query_id(), false, &status);
+    RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
+  }
   // block until results are ready
   exec_state->Wait();
-  const Status& status = exec_state->query_status();
+  status = exec_state->query_status();
   if (!status.ok()) {
-    UnregisterQuery(exec_state->query_id(), &status);
+    UnregisterQuery(exec_state->query_id(), false, &status);
     RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
   }
 
@@ -274,7 +287,7 @@ void ImpalaServer::fetch(Results& query_results, const QueryHandle& query_handle
   VLOG_ROW << "fetch result: #results=" << query_results.data.size()
            << " has_more=" << (query_results.has_more ? "true" : "false");
   if (!status.ok()) {
-    UnregisterQuery(query_id, &status);
+    UnregisterQuery(query_id, false, &status);
     RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
   }
 }
@@ -332,13 +345,9 @@ void ImpalaServer::close(const QueryHandle& handle) {
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
   VLOG_QUERY << "close(): query_id=" << PrintId(query_id);
-
-  // TODO: do we need to raise an exception if the query state is
-  // EXCEPTION?
+  // TODO: do we need to raise an exception if the query state is EXCEPTION?
   // TODO: use timeout to get rid of unwanted exec_state.
-  if (!UnregisterQuery(query_id)) {
-    RaiseBeeswaxException("Invalid query handle", SQLSTATE_GENERAL_ERROR);
-  }
+  RAISE_IF_ERROR(UnregisterQuery(query_id, true), SQLSTATE_GENERAL_ERROR);
 }
 
 QueryState::type ImpalaServer::get_state(const QueryHandle& handle) {
@@ -429,12 +438,8 @@ void ImpalaServer::Cancel(impala::TStatus& tstatus,
   // Convert QueryHandle to TUniqueId and get the query exec state.
   TUniqueId query_id;
   QueryHandleToTUniqueId(query_handle, &query_id);
-  Status status = CancelInternal(query_id);
-  if (status.ok()) {
-    tstatus.status_code = TStatusCode::OK;
-  } else {
-    RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
-  }
+  RAISE_IF_ERROR(CancelInternal(query_id, true), SQLSTATE_GENERAL_ERROR);
+  tstatus.status_code = TStatusCode::OK;
 }
 
 void ImpalaServer::CloseInsert(TInsertResult& insert_result,
@@ -632,12 +637,7 @@ Status ImpalaServer::CloseInsertInternal(const TUniqueId& query_id,
       }
     }
   }
-
-  if (!UnregisterQuery(query_id)) {
-    stringstream ss;
-    ss << "Failed to unregister query ID '" << ThriftDebugString(query_id) << "'";
-    return Status(ss.str());
-  }
+  RETURN_IF_ERROR(UnregisterQuery(query_id, true));
   return query_status;
 }
 

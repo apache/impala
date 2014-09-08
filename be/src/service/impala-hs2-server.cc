@@ -470,6 +470,7 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
 
   Status exec_status = exec_state->Exec(*request);
   if (!exec_status.ok()) {
+    UnregisterQuery(exec_state->query_id(), false, &exec_status);
     status->__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
     status->__set_errorMessage(exec_status.GetErrorMsg());
     status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
@@ -478,6 +479,14 @@ void ImpalaServer::ExecuteMetadataOp(const THandleIdentifier& session_handle,
 
   exec_state->UpdateQueryState(QueryState::FINISHED);
 
+  Status inflight_status = SetQueryInflight(session, exec_state);
+  if (!inflight_status.ok()) {
+    UnregisterQuery(exec_state->query_id(), false, &inflight_status);
+    status->__set_statusCode(thrift::TStatusCode::ERROR_STATUS);
+    status->__set_errorMessage(inflight_status.GetErrorMsg());
+    status->__set_sqlState(SQLSTATE_GENERAL_ERROR);
+    return;
+  }
   handle->__set_hasResultSet(true);
   // TODO: create secret for operationId
   TUniqueId operation_id = exec_state->query_id();
@@ -727,14 +736,20 @@ void ImpalaServer::ExecuteStatement(TExecuteStatementResp& return_val,
     status = exec_state->SetResultCache(CreateHS2ResultSet(session->hs2_version,
             *exec_state->result_metadata()), cache_num_rows);
     if (!status.ok()) {
-      UnregisterQuery(exec_state->query_id(), &status);
+      UnregisterQuery(exec_state->query_id(), false, &status);
       HS2_RETURN_ERROR(return_val, status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
     }
   }
   exec_state->UpdateQueryState(QueryState::RUNNING);
   // Start thread to wait for results to become available.
   exec_state->WaitAsync();
-
+  // Once the query is running do a final check for session closure and add it to the
+  // set of in-flight queries.
+  status = SetQueryInflight(session, exec_state);
+  if (!status.ok()) {
+    UnregisterQuery(exec_state->query_id(), false, &status);
+    HS2_RETURN_ERROR(return_val, status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
+  }
   return_val.__isset.operationHandle = true;
   return_val.operationHandle.__set_operationType(TOperationType::EXECUTE_STATEMENT);
   return_val.operationHandle.__set_hasResultSet(exec_state->returns_result_set());
@@ -922,9 +937,7 @@ void ImpalaServer::CancelOperation(TCancelOperationResp& return_val,
   const TUniqueId session_id = exec_state->session_id();
   HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id),
       SQLSTATE_GENERAL_ERROR);
-
-  Status status = CancelInternal(query_id);
-  HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
+  HS2_RETURN_IF_ERROR(return_val, CancelInternal(query_id, true), SQLSTATE_GENERAL_ERROR);
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }
 
@@ -945,12 +958,9 @@ void ImpalaServer::CloseOperation(TCloseOperationResp& return_val,
   const TUniqueId session_id = exec_state->session_id();
   HS2_RETURN_IF_ERROR(return_val, session_handle.WithSession(session_id),
       SQLSTATE_GENERAL_ERROR);
-
   // TODO: use timeout to get rid of unwanted exec_state.
-  if (!UnregisterQuery(query_id)) {
-    // No handle was found
-    HS2_RETURN_ERROR(return_val, "Invalid query handle", SQLSTATE_GENERAL_ERROR);
-  }
+  HS2_RETURN_IF_ERROR(return_val, UnregisterQuery(query_id, true),
+      SQLSTATE_GENERAL_ERROR);
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);
 }
 
@@ -1033,8 +1043,11 @@ void ImpalaServer::FetchResults(TFetchResultsResp& return_val,
     // and hence, the query must eventually be closed by the client.
     // It is important to ensure FETCH_NEXT does not return recoverable errors to
     // preserve compatibility with clients written against Impala versions < 1.3.
-    if (status.IsRecoverableError()) DCHECK(fetch_first);
-    if (!status.IsRecoverableError()) UnregisterQuery(query_id);
+    if (status.IsRecoverableError()) {
+      DCHECK(fetch_first);
+    } else {
+      UnregisterQuery(query_id, false, &status);
+    }
     HS2_RETURN_ERROR(return_val, status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
   }
   return_val.status.__set_statusCode(thrift::TStatusCode::SUCCESS_STATUS);

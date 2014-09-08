@@ -365,7 +365,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // in exec_state), registers it and calls Coordinator::Execute().
   // If it returns with an error status, exec_state will be NULL and nothing
   // will have been registered in query_exec_state_map_.
-  // session_state is a ptr to the session running this query.
+  // session_state is a ptr to the session running this query and must have
+  // been checked out.
   // query_session_state is a snapshot of session state that changes when the
   // query was run. (e.g. default database).
   Status Execute(TQueryCtx* query_ctx,
@@ -380,22 +381,38 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Registers the query exec state with query_exec_state_map_ using the globally
   // unique query_id and add the query id to session state's open query list.
+  // The caller must have checked out the session state.
   Status RegisterQuery(boost::shared_ptr<SessionState> session_state,
       const boost::shared_ptr<QueryExecState>& exec_state);
 
-  // Cancel the query execution if the query is still running. Removes exec_state from
-  // query_exec_state_map_, and removes the query id from session state's open query list.
-  // Updates the query's status to that provided, unless status is already not OK or
-  // provided status is NULL.
-  // Returns true if it found a registered exec_state, otherwise false.
-  bool UnregisterQuery(const TUniqueId& query_id, const Status* status = NULL);
+  // Adds the query to the set of in-flight queries for the session. The query remains
+  // in-flight until the query is unregistered.  Until a query is in-flight, an attempt
+  // to cancel or close the query by the user will return an error status.  If the
+  // session is closed before a query is in-flight, then the query cancellation is
+  // deferred until after the issuing path has completed initializing the query.  Once
+  // a query is in-flight, it can be cancelled/closed asynchronously by the user
+  // (e.g. via an RPC) and the session close path can close (cancel and unregister) it.
+  // The query must have already been registered using RegisterQuery().  The caller
+  // must have checked out the session state.
+  Status SetQueryInflight(boost::shared_ptr<SessionState> session_state,
+      const boost::shared_ptr<QueryExecState>& exec_state);
+
+  // Unregister the query by cancelling it, removing exec_state from
+  // query_exec_state_map_, and removing the query id from session state's in-flight
+  // query list.  If check_inflight is true, then return an error if the query is not
+  // yet in-flight.  Otherwise, preceed even if the query isn't yet in-flight (for
+  // cleaning up after an error on the query issuing path).
+  Status UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
+      const Status *cause = NULL);
 
   // Initiates query cancellation reporting the given cause as the query status.
-  // Assumes deliberate cancellation by the user if the cause is NULL.
-  // Returns OK unless query_id is not found.
-  // Queries still need to be unregistered, usually via Close, after cancellation.
-  // Caller should not hold any locks when calling this function.
-  Status CancelInternal(const TUniqueId& query_id, const Status* cause = NULL);
+  // Assumes deliberate cancellation by the user if the cause is NULL.  Returns an
+  // error if query_id is not found.  If check_inflight is true, then return an error
+  // if the query is not yet in-flight.  Otherwise, returns OK.  Queries still need to
+  // be unregistered, after cancellation.  Caller should not hold any locks when
+  // calling this function.
+  Status CancelInternal(const TUniqueId& query_id, bool check_inflight,
+      const Status* cause = NULL);
 
   // Close the session and release all resource used by this session.
   // Caller should not hold any locks when calling this function.
@@ -977,7 +994,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       ProxyUserMap;
   ProxyUserMap authorized_proxy_user_config_;
 
-  // Guards queries_by_timestamp_
+  // Guards queries_by_timestamp_.  Must not be acquired before the corresponding
+  // session state lock.
   boost::mutex query_expiration_lock_;
 
   // Describes a query expiration event (t, q) where t is the expiration deadline in

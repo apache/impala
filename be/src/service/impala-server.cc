@@ -539,7 +539,7 @@ Status ImpalaServer::Execute(TQueryCtx* query_ctx,
   Status status = ExecuteInternal(*query_ctx, session_state, &registered_exec_state,
       exec_state);
   if (!status.ok() && registered_exec_state) {
-    UnregisterQuery((*exec_state)->query_id(), &status);
+    UnregisterQuery((*exec_state)->query_id(), false, &status);
   }
   return status;
 }
@@ -636,9 +636,7 @@ Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
   // expire while checked out, so it must not be expired.
   DCHECK(session_state->ref_count > 0 && !session_state->expired);
   // The session may have been closed after it was checked out.
-  if (session_state->closed) {
-    return Status("Session has been closed, ignoring query.");
-  }
+  if (session_state->closed) return Status("Session has been closed, ignoring query.");
   const TUniqueId& query_id = exec_state->query_id();
   {
     lock_guard<mutex> l(query_exec_state_map_lock_);
@@ -650,10 +648,24 @@ Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
       ss << "query id " << PrintId(query_id) << " already exists";
       return Status(TStatusCode::INTERNAL_ERROR, ss.str());
     }
-    session_state->inflight_queries.insert(query_id);
     query_exec_state_map_.insert(make_pair(query_id, exec_state));
   }
+  return Status::OK;
+}
 
+Status ImpalaServer::SetQueryInflight(shared_ptr<SessionState> session_state,
+    const shared_ptr<QueryExecState>& exec_state) {
+  const TUniqueId& query_id = exec_state->query_id();
+  lock_guard<mutex> l(session_state->lock);
+  // The session wasn't expired at the time it was checked out and it isn't allowed to
+  // expire while checked out, so it must not be expired.
+  DCHECK_GT(session_state->ref_count, 0);
+  DCHECK(!session_state->expired);
+  // The session may have been closed after it was checked out.
+  if (session_state->closed) return Status("Session closed");
+  // Add query to the set that will be unregistered if sesssion is closed.
+  session_state->inflight_queries.insert(query_id);
+  // Set query expiration.
   int32_t timeout_s = exec_state->query_options().query_timeout_s;
   if (FLAGS_idle_query_timeout > 0 && timeout_s > 0) {
     timeout_s = min(FLAGS_idle_query_timeout, timeout_s);
@@ -661,9 +673,8 @@ Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
     // Use a non-zero timeout, if one exists
     timeout_s = max(FLAGS_idle_query_timeout, timeout_s);
   }
-
   if (timeout_s > 0) {
-    lock_guard<mutex> l(query_expiration_lock_);
+    lock_guard<mutex> l2(query_expiration_lock_);
     VLOG_QUERY << "Query " << PrintId(query_id) << " has timeout of "
                << PrettyPrinter::Print(timeout_s * 1000L * 1000L * 1000L,
                      TCounterType::TIME_NS);
@@ -673,19 +684,18 @@ Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
   return Status::OK;
 }
 
-bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id, const Status* cause) {
+Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
+    const Status *cause) {
   VLOG_QUERY << "UnregisterQuery(): query_id=" << query_id;
 
-  // Cancel the query if it's still running
-  CancelInternal(query_id, cause);
+  RETURN_IF_ERROR(CancelInternal(query_id, check_inflight, cause));
 
   shared_ptr<QueryExecState> exec_state;
   {
     lock_guard<mutex> l(query_exec_state_map_lock_);
     QueryExecStateMap::iterator entry = query_exec_state_map_.find(query_id);
     if (entry == query_exec_state_map_.end()) {
-      VLOG_QUERY << "unknown query id: " << PrintId(query_id);
-      return false;
+      return Status("Invalid or unknown query handle");
     } else {
       exec_state = entry->second;
     }
@@ -725,7 +735,7 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id, const Status* caus
     }
   }
   ArchiveQuery(*exec_state);
-  return true;
+  return Status::OK;
 }
 
 Status ImpalaServer::UpdateCatalogMetrics() {
@@ -742,12 +752,19 @@ Status ImpalaServer::UpdateCatalogMetrics() {
   return Status::OK;
 }
 
-Status ImpalaServer::CancelInternal(const TUniqueId& query_id, const Status* cause) {
+Status ImpalaServer::CancelInternal(const TUniqueId& query_id, bool check_inflight,
+    const Status* cause) {
   VLOG_QUERY << "Cancel(): query_id=" << PrintId(query_id);
   shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
   if (exec_state == NULL) return Status("Invalid or unknown query handle");
-
   lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
+  if (check_inflight) {
+    lock_guard<mutex> l2(exec_state->session()->lock);
+    if (exec_state->session()->inflight_queries.find(query_id) ==
+        exec_state->session()->inflight_queries.end()) {
+      return Status("Query not yet running");
+    }
+  }
   // TODO: can we call Coordinator::Cancel() here while holding lock?
   exec_state->Cancel(cause);
   return Status::OK;
@@ -788,7 +805,7 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
   // Unregister all open queries from this session.
   Status status("Session closed", true);
   BOOST_FOREACH(const TUniqueId& query_id, inflight_queries) {
-    UnregisterQuery(query_id, &status);
+    UnregisterQuery(query_id, false, &status);
   }
   return Status::OK;
 }
@@ -1322,13 +1339,15 @@ void ImpalaServer::SessionState::ToThrift(const TUniqueId& session_id,
 void ImpalaServer::CancelFromThreadPool(uint32_t thread_id,
     const CancellationWork& cancellation_work) {
   if (cancellation_work.unregister()) {
-    if (!UnregisterQuery(cancellation_work.query_id(), &cancellation_work.cause())) {
+    Status status = UnregisterQuery(cancellation_work.query_id(), true,
+        &cancellation_work.cause());
+    if (!status.ok()) {
       VLOG_QUERY << "Query de-registration (" << cancellation_work.query_id()
                  << ") failed";
     }
   } else {
-    Status status =
-        CancelInternal(cancellation_work.query_id(), &cancellation_work.cause());
+    Status status = CancelInternal(cancellation_work.query_id(), true,
+        &cancellation_work.cause());
     if (!status.ok()) {
       VLOG_QUERY << "Query cancellation (" << cancellation_work.query_id()
                  << ") did not succeed: " << status.GetErrorMsg();
