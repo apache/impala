@@ -153,6 +153,8 @@ Status HdfsTextScanner::ProcessSplit() {
   if (tuple_found) {
     // Update the decompressor depending on the compression type of the file in the
     // context.
+    DCHECK(stream_->file_desc()->file_compression != THdfsCompression::SNAPPY)
+        << "FE should have generated SNAPPY_BLOCKED instead.";
     RETURN_IF_ERROR(UpdateDecompressor(stream_->file_desc()->file_compression));
 
     // Process the scan range.
@@ -395,10 +397,10 @@ Status HdfsTextScanner::FillByteBuffer(bool* eosr, int num_bytes) {
       *eosr = true;
       return Status::OK;
     }
+    DCHECK(decompression_type_ != THdfsCompression::SNAPPY);
 
     // For gzip and snappy it needs to read the entire file.
     if ((decompression_type_ == THdfsCompression::GZIP ||
-         decompression_type_ == THdfsCompression::SNAPPY ||
          decompression_type_ == THdfsCompression::SNAPPY_BLOCKED ||
          decompression_type_ == THdfsCompression::BZIP2) &&
         (file_size < byte_buffer_read_size_)) {
@@ -407,16 +409,6 @@ Status HdfsTextScanner::FillByteBuffer(bool* eosr, int num_bytes) {
          << "But only read " << byte_buffer_read_size_ << " bytes. This may indicate "
          << "data file corruption. (file: " << stream_->filename() << ").";
       return Status(ss.str());
-    }
-    if (decompression_type_ == THdfsCompression::SNAPPY) {
-      byte_buffer_read_size_ -= SnappyDecompressor::TRAILING_CHECKSUM_LEN;
-      if (byte_buffer_read_size_ <= 0) {
-        stringstream ss;
-        ss << "Read a snappy-compressed file whose length without the checksum is "
-           << "invalid. This may indicate data file corruption. (file: "
-           << stream_->filename() << ").";
-        return Status(ss.str());
-      }
     }
 
     // Decompress and adjust the byte_buffer_ptr_ and byte_buffer_read_size_ accordingly.

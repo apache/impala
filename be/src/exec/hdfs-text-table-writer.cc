@@ -62,9 +62,9 @@ Status HdfsTextTableWriter::Init() {
   codec_ = THdfsCompression::NONE;
   if (query_options.__isset.compression_codec) {
     codec_ = query_options.compression_codec;
-    if (codec_ == THdfsCompression::SNAPPY_BLOCKED) {
-      return Status(
-          "SNAPPY_BLOCKED is not valid for compressed text. Use SNAPPY instead.");
+    if (codec_ == THdfsCompression::SNAPPY) {
+      // hadoop.io.codec always means SNAPPY_BLOCKED. Alias the two.
+      codec_ = THdfsCompression::SNAPPY_BLOCKED;
     }
   }
 
@@ -182,12 +182,6 @@ Status HdfsTextTableWriter::Flush() {
   {
     SCOPED_TIMER(parent_->hdfs_write_timer());
     RETURN_IF_ERROR(Write(data, len));
-  }
-  if (codec_ == THdfsCompression::SNAPPY) {
-    SCOPED_TIMER(parent_->compress_timer());
-    // Snappy requires checksumming.
-    uint32_t crc = SnappyCompressor::ComputeChecksum(uncompressed_len, uncompressed_data);
-    RETURN_IF_ERROR(Write(reinterpret_cast<const uint8_t*>(&crc), sizeof(uint32_t)));
   }
 
   return Status::OK;

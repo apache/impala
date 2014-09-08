@@ -293,7 +293,7 @@ static Status SnappyBlockDecompress(int64_t input_len, const uint8_t* input,
         // Decompress this snappy block
         if (!snappy::RawUncompress(reinterpret_cast<const char*>(input),
               compressed_len, output)) {
-          return Status("Snappy: RawUncompress failed");
+          return Status("SnappyBlock: RawUncompress failed");
         }
         output += uncompressed_len;
       }
