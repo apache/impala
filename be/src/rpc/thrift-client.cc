@@ -15,8 +15,10 @@
 #include "rpc/thrift-client.h"
 
 #include <boost/assign.hpp>
+#include <boost/lexical_cast.hpp>
 #include <ostream>
 #include <thrift/Thrift.h>
+#include <gutil/strings/substitute.h>
 
 #include "util/time.h"
 
@@ -24,6 +26,7 @@ using namespace std;
 using namespace boost;
 using namespace apache::thrift::transport;
 using namespace apache::thrift;
+using namespace strings;
 
 DECLARE_string(ssl_client_ca_certificate);
 
@@ -36,9 +39,8 @@ Status ThriftClientImpl::Open() {
       transport_->open();
     }
   } catch (const TException& e) {
-    stringstream msg;
-    msg << "Couldn't open transport for " << address_ << "(" << e.what() << ")";
-    return Status(msg.str());
+    return Status(Substitute("Couldn't open transport for $0 ($1)",
+        lexical_cast<string>(address_), e.what()));
   }
   return Status::OK;
 }
@@ -65,7 +67,20 @@ Status ThriftClientImpl::OpenWithRetry(uint32_t num_tries, uint64_t wait_ms) {
 }
 
 void ThriftClientImpl::Close() {
-  if (transport_.get() != NULL && transport_->isOpen()) transport_->close();
+  try {
+    if (transport_.get() != NULL && transport_->isOpen()) transport_->close();
+  } catch (const TException& e) {
+    LOG(INFO) << "Error closing connection to: " << address_ << ", ignoring (" << e.what()
+              << ")";
+    // Forcibly close the socket (since the transport may have failed to get that far
+    // during close())
+    try {
+      if (socket_.get() != NULL) socket_->close();
+    } catch (const TException& e) {
+      LOG(INFO) << "Error closing socket to: " << address_ << ", ignoring (" << e.what()
+                << ")";
+    }
+  }
 }
 
 Status ThriftClientImpl::CreateSocket() {
@@ -79,10 +94,8 @@ Status ThriftClientImpl::CreateSocket() {
       // complex infrastructure to do right.
       factory.loadTrustedCertificates(FLAGS_ssl_client_ca_certificate.c_str());
       socket_ = factory.createSocket(address_.hostname, address_.port);
-    } catch (const TException& ex) {
-      stringstream err_msg;
-      err_msg << "Failed to create socket: " << ex.what();
-      return Status(err_msg.str());
+    } catch (const TException& e) {
+      return Status(Substitute("Failed to create socket: $0", e.what()));
     }
   }
 

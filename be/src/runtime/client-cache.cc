@@ -78,6 +78,7 @@ Status ClientCacheHelper::ReopenClient(ClientFactory factory_method,
     DCHECK(client != client_map_.end());
     client_impl = client->second;
   }
+
   client_impl->Close();
 
   // TODO: Thrift TBufferedTransport cannot be re-opened after Close() because it does not
