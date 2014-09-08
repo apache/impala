@@ -134,6 +134,9 @@ export CLUSTER_DIR=${IMPALA_HOME}/testdata/cluster
 
 export IMPALA_BUILD_THREADS=`nproc`
 
+# Some environments (like the packaging build) might not have $USER set.  Fix that here.
+export USER=${USER-`id -un`}
+
 # Configure python path
 . $IMPALA_HOME/bin/set-pythonpath.sh
 
