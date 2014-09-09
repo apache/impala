@@ -425,7 +425,17 @@ inline int64_t AnalyticEvalNode::NumOutputRowsReady() const {
   if (result_tuples_.empty()) return 0;
   int64_t last_evaluated_row_idx = result_tuples_.back().first;
   int64_t rows_to_return = last_evaluated_row_idx - input_stream_idx_;
-  DCHECK_GE(rows_to_return, 0);
+  if (last_evaluated_row_idx > input_stream_->num_rows()) {
+    // This happens when we were able to add a result tuple before consuming child rows,
+    // e.g. initializing a new partition with an end bound that is X preceding. The first
+    // X rows get the default value and we add that tuple to result_tuples_ before
+    // consuming child rows. It's possible the result is negative, and that's fine
+    // because this result is only used to determine if the number of rows to return
+    // is at least as big as the batch size.
+    rows_to_return -= last_evaluated_row_idx - input_stream_->num_rows();
+  } else {
+    DCHECK_GE(rows_to_return, 0);
+  }
   return rows_to_return;
 }
 
@@ -444,13 +454,13 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
   }
 
   // Processes input row batches until there are enough rows that are ready to return.
-  while (curr_child_batch_.get() != NULL && NumOutputRowsReady() <= state->batch_size()) {
+  while (curr_child_batch_.get() != NULL && NumOutputRowsReady() < state->batch_size()) {
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(state->CheckQueryState());
     RETURN_IF_ERROR(ProcessChildBatch(state));
-    // result_tuples_ should be bounded by 2x the row batch size because we return
-    // output batches when there are enough rows to return.
-    DCHECK_LE(result_tuples_.size(), 2 * state->batch_size());
+    // TODO: DCHECK that the size of result_tuples_ is bounded. It shouldn't be larger
+    // than 2x the batch size unless the end bound has an offset preceding, in which
+    // case it may be slightly larger (proportional to the offset but still bounded).
     if (input_eos_) {
       // Already processed the last child batch. Clean up and break.
       curr_child_batch_.reset();
