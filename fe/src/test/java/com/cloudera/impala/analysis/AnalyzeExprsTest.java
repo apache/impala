@@ -1416,6 +1416,19 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // No matching signature for complex type.
     AnalysisError("select lower(int_struct_col) from functional.allcomplextypes",
         "No matching function with signature: lower(STRUCT<f1:INT,f2:INT>).");
+
+    // Special cases for FROM in function call
+    AnalyzesOk("select extract(year from now())");
+    AnalysisError("select extract(foo from now())",
+        "Time unit 'foo' in expression 'EXTRACT(foo FROM now())' is invalid. Expected " +
+        "one of YEAR, MONTH, DAY, HOUR, MINUTE, SECOND, MILLISECOND, EPOCH.");
+    AnalysisError("select extract(year from 0)",
+        "Expression '0' in 'EXTRACT(year FROM 0)' has a return type of TINYINT but a " +
+        "TIMESTAMP is required.");
+    AnalysisError("select functional.extract(year from now())",
+        "Function functional.extract conflicts with the EXTRACT builtin");
+    AnalysisError("select date_part(year from now())",
+        "Function DATE_PART does not accept the keyword FROM");
   }
 
   @Test

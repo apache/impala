@@ -22,6 +22,7 @@ import com.cloudera.impala.catalog.StructType;
 import com.cloudera.impala.catalog.StructField;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.View;
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.analysis.ColumnDesc;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
@@ -2102,6 +2103,9 @@ function_call_expr ::=
   :}
   | function_name:fn_name LPAREN function_params:params RPAREN
   {: RESULT = FunctionCallExpr.createExpr(fn_name, params); :}
+  // Below is a special case for EXTRACT. Idents are used to avoid adding new keywords.
+  | function_name:fn_name LPAREN IDENT:u KW_FROM expr:t RPAREN
+  {:  RESULT = new ExtractFromExpr(fn_name, u, t); :}
   ;
 
 // TODO: allow an arbitrary expr here instead of agg/fn call, and check during analysis?

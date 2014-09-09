@@ -37,7 +37,9 @@ java_registry_preamble = '\
 //  limitations under the License.\n\
 \n\
 // This is a generated file, DO NOT EDIT.\n\
-// To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
+// To add new functions, see the generator at\n\
+// common/function-registry/gen_builtins_catalog.py or the function list at\n\
+// common/function-registry/impala_functions.py.\n\
 \n\
 package com.cloudera.impala.builtins;\n\
 \n\

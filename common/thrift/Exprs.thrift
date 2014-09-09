@@ -63,6 +63,21 @@ struct TIntLiteral {
   1: required i64 value
 }
 
+// The units which can be used when extracting a Timestamp. TExtractField is never used
+// in any messages. This enum is here to provide a single definition that can be shared
+// by the front and backend.
+enum TExtractField {
+  INVALID_FIELD,
+  YEAR,
+  MONTH,
+  DAY,
+  HOUR,
+  MINUTE,
+  SECOND,
+  MILLISECOND,
+  EPOCH
+}
+
 struct TInPredicate {
   1: required bool is_not_in
 }

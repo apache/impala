@@ -60,23 +60,37 @@ class UdfBuiltins {
   //    Reference:
   //    http://docs.oracle.com/cd/B19306_01/server.102/b14200/functions201.htm
   static TimestampVal Trunc(FunctionContext* context, const TimestampVal& date,
-                            const StringVal& unit_str);
+      const StringVal& unit_str);
   static void TruncPrepare(FunctionContext* context,
-                           FunctionContext::FunctionStateScope scope);
+      FunctionContext::FunctionStateScope scope);
   static void TruncClose(FunctionContext* context,
-                         FunctionContext::FunctionStateScope scope);
+      FunctionContext::FunctionStateScope scope);
 
   // Returns a single field from a timestamp
   //    Fields:
   //      YEAR, MONTH, DAY, HOUR, MINUTE, SECOND, MILLISECOND, EPOCH
   //    Reference:
   //    http://docs.oracle.com/cd/B19306_01/server.102/b14200/functions050.htm
+  //
+  // This is used by the DATE_PART function.
+  static IntVal Extract(FunctionContext* context, const StringVal& field_str,
+      const TimestampVal& date);
+
+  // This is for the EXTRACT(Timestamp, String) and EXTRACT(Timeunit FROM
+  // Timestamp) functions.
   static IntVal Extract(FunctionContext* context, const TimestampVal& date,
-                        const StringVal& field_str);
+      const StringVal& field_str);
+  // This is used by the DATE_PART function.
   static void ExtractPrepare(FunctionContext* context,
-                             FunctionContext::FunctionStateScope scope);
+      FunctionContext::FunctionStateScope scope);
+
+  // This is for the EXTRACT(Timestamp, String) and EXTRACT(Timeunit FROM
+  // Timestamp) functions.
+  static void SwappedExtractPrepare(FunctionContext* context,
+      FunctionContext::FunctionStateScope scope);
+  // This is used by both EXTRACT and DATE_PART
   static void ExtractClose(FunctionContext* context,
-                           FunctionContext::FunctionStateScope scope);
+      FunctionContext::FunctionStateScope scope);
 
   // Converts a set of doubles to double[] stored as a StringVal
   // Stored as a StringVal with each double value encoded in IEEE back to back
@@ -88,7 +102,7 @@ class UdfBuiltins {
 
   // Returns the n-th (0-indexed) element of a double[] stored as a StringVal
   static DoubleVal VectorGet(FunctionContext* context, const BigIntVal& n,
-                            const StringVal& arr);
+      const StringVal& arr);
 
   // Converts a double[] stored as a StringVal to an printable ascii encoding
   // MADlib operates on binary strings but the Impala shell is not friendly to
@@ -99,6 +113,13 @@ class UdfBuiltins {
 
   // Converts a printable ascii encoding of a vector to a double[] stored as a StringVal
   static StringVal DecodeVector(FunctionContext* context, const StringVal& arr);
+
+ private:
+  // Does the preparation for EXTRACT. The unit_idx parameter should indicate which
+  // parameter of the EXTRACT call is the time unit param. DATE_PART will also use this
+  // with a different unit_idx than EXTRACT.
+  static void ExtractPrepare(FunctionContext* context,
+      FunctionContext::FunctionStateScope scope, int unit_idx);
 };
 
 } // namespace impala

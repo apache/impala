@@ -225,7 +225,7 @@ public class FunctionCallExpr extends Expr {
   // a bit more user friendly than a generic function not found.
   // TODO: should we bother to do this? We could also improve the general
   // error messages. For example, listing the alternatives.
-  private String getFunctionNotFoundError(Type[] argTypes) {
+  protected String getFunctionNotFoundError(Type[] argTypes) {
     if (fnName_.isBuiltin_) {
       // Some custom error message for builtins
       if (params_.isStar()) {

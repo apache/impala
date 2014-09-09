@@ -13,16 +13,17 @@
 // limitations under the License.
 
 #include "exprs/udf-builtins.h"
-#include "runtime/timestamp-value.h"
-#include "util/bit-util.h"
 
 #include <ctype.h>
-#include <math.h>
-#include <string>
-#include <sstream>
-#include <iostream>
-
 #include <gutil/strings/substitute.h>
+#include <iostream>
+#include <math.h>
+#include <sstream>
+#include <string>
+
+#include "gen-cpp/Exprs_types.h"
+#include "runtime/timestamp-value.h"
+#include "util/bit-util.h"
 
 using namespace impala;
 using namespace std;
@@ -213,10 +214,9 @@ TimestampValue TruncMinute(const date& orig_date, const time_duration& orig_time
   return TimestampValue(orig_date, new_time);
 }
 
-TimestampVal UdfBuiltins::Trunc(
-    FunctionContext* context, const TimestampVal& tv, const StringVal &unit_str) {
+TimestampVal UdfBuiltins::Trunc(FunctionContext* context, const TimestampVal& tv,
+    const StringVal &unit_str) {
   if (tv.is_null) return TimestampVal::null();
-
   const TimestampValue& ts = TimestampValue::FromTimestampVal(tv);
   const date& orig_date = ts.get_date();
   const time_duration& orig_time = ts.get_time();
@@ -297,7 +297,7 @@ TimestampVal UdfBuiltins::Trunc(
 }
 
 void UdfBuiltins::TruncPrepare(FunctionContext* ctx,
-                               FunctionContext::FunctionStateScope scope) {
+    FunctionContext::FunctionStateScope scope) {
   // Parse the unit up front if we can, otherwise do it on the fly in Trunc()
   if (ctx->IsArgConstant(1)) {
     StringVal* unit_str = reinterpret_cast<StringVal*>(ctx->GetConstantArg(1));
@@ -315,7 +315,7 @@ void UdfBuiltins::TruncPrepare(FunctionContext* ctx,
 }
 
 void UdfBuiltins::TruncClose(FunctionContext* ctx,
-                             FunctionContext::FunctionStateScope scope) {
+    FunctionContext::FunctionStateScope scope) {
   void* state = ctx->GetFunctionState(scope);
   if (state != NULL) {
     ctx->Free(reinterpret_cast<uint8_t*>(state));
@@ -323,49 +323,34 @@ void UdfBuiltins::TruncClose(FunctionContext* ctx,
   }
 }
 
-// The units which can be used when extracting a Timestamp
-struct ExtractField {
-  enum Type {
-    INVALID_FIELD,
-    YEAR,
-    MONTH,
-    DAY,
-    HOUR,
-    MINUTE,
-    SECOND,
-    MILLISECOND,
-    EPOCH
-  };
-};
-
-// Maps the user facing name of a unit to a ExtractField
-// Returns the ExtractField for the given unit
-ExtractField::Type StrToExtractField(FunctionContext* ctx, const StringVal& unit_str) {
+// Maps the user facing name of a unit to a TExtractField
+// Returns the TExtractField for the given unit
+TExtractField::type StrToExtractField(FunctionContext* ctx, const StringVal& unit_str) {
   StringVal unit = UdfBuiltins::Lower(ctx, unit_str);
-  if (unit == "year") return ExtractField::YEAR;
-  if (unit == "month") return ExtractField::MONTH;
-  if (unit == "day") return ExtractField::DAY;
-  if (unit == "hour") return ExtractField::HOUR;
-  if (unit == "minute") return ExtractField::MINUTE;
-  if (unit == "second") return ExtractField::SECOND;
-  if (unit == "millisecond") return ExtractField::MILLISECOND;
-  if (unit == "epoch") return ExtractField::EPOCH;
-  return ExtractField::INVALID_FIELD;
+  if (unit == "year") return TExtractField::YEAR;
+  if (unit == "month") return TExtractField::MONTH;
+  if (unit == "day") return TExtractField::DAY;
+  if (unit == "hour") return TExtractField::HOUR;
+  if (unit == "minute") return TExtractField::MINUTE;
+  if (unit == "second") return TExtractField::SECOND;
+  if (unit == "millisecond") return TExtractField::MILLISECOND;
+  if (unit == "epoch") return TExtractField::EPOCH;
+  return TExtractField::INVALID_FIELD;
 }
 
-IntVal UdfBuiltins::Extract(
-    FunctionContext* context, const TimestampVal& tv, const StringVal &unit_str) {
+IntVal UdfBuiltins::Extract(FunctionContext* context, const StringVal& unit_str,
+    const TimestampVal& tv) {
   // resolve extract_field using the prepared state if possible, o.w. parse now
   // ExtractPrepare() can only parse extract_field if user passes it as a string literal
   if (tv.is_null) return IntVal::null();
 
-  ExtractField::Type field;
+  TExtractField::type field;
   void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
   if (state != NULL) {
-    field = *reinterpret_cast<ExtractField::Type*>(state);
+    field = *reinterpret_cast<TExtractField::type*>(state);
   } else {
     field = StrToExtractField(context, unit_str);
-    if (field == ExtractField::INVALID_FIELD) {
+    if (field == TExtractField::INVALID_FIELD) {
       string string_unit(reinterpret_cast<char*>(unit_str.ptr), unit_str.len);
       context->SetError(Substitute("invalid extract field: $0", string_unit).c_str());
       return IntVal::null();
@@ -376,47 +361,47 @@ IntVal UdfBuiltins::Extract(
   const time_duration& time = *reinterpret_cast<const time_duration*>(&tv.time_of_day);
 
   switch (field) {
-    case ExtractField::YEAR:
-    case ExtractField::MONTH:
-    case ExtractField::DAY:
+    case TExtractField::YEAR:
+    case TExtractField::MONTH:
+    case TExtractField::DAY:
       if (orig_date.is_special()) return IntVal::null();
       break;
-    case ExtractField::HOUR:
-    case ExtractField::MINUTE:
-    case ExtractField::SECOND:
-    case ExtractField::MILLISECOND:
+    case TExtractField::HOUR:
+    case TExtractField::MINUTE:
+    case TExtractField::SECOND:
+    case TExtractField::MILLISECOND:
       if (time.is_special()) return IntVal::null();
       break;
-    case ExtractField::EPOCH:
+    case TExtractField::EPOCH:
       if (time.is_special() || orig_date.is_special()) return IntVal::null();
       break;
-    case ExtractField::INVALID_FIELD:
+    case TExtractField::INVALID_FIELD:
       DCHECK(false);
   }
 
   switch (field) {
-    case ExtractField::YEAR: {
+    case TExtractField::YEAR: {
       return IntVal(orig_date.year());
     }
-    case ExtractField::MONTH: {
+    case TExtractField::MONTH: {
       return IntVal(orig_date.month());
     }
-    case ExtractField::DAY: {
+    case TExtractField::DAY: {
       return IntVal(orig_date.day());
     }
-    case ExtractField::HOUR: {
+    case TExtractField::HOUR: {
       return IntVal(time.hours());
     }
-    case ExtractField::MINUTE: {
+    case TExtractField::MINUTE: {
       return IntVal(time.minutes());
     }
-    case ExtractField::SECOND: {
+    case TExtractField::SECOND: {
       return IntVal(time.seconds());
     }
-    case ExtractField::MILLISECOND: {
+    case TExtractField::MILLISECOND: {
       return IntVal(time.total_milliseconds() - time.total_seconds() * 1000);
     }
-    case ExtractField::EPOCH: {
+    case TExtractField::EPOCH: {
       ptime epoch_date(date(1970, 1, 1), time_duration(0, 0, 0));
       ptime cur_date(orig_date, time);
       time_duration diff = cur_date - epoch_date;
@@ -429,26 +414,41 @@ IntVal UdfBuiltins::Extract(
   }
 }
 
+IntVal UdfBuiltins::Extract(FunctionContext* context, const TimestampVal& tv,
+    const StringVal& unit_str) {
+  return Extract(context, unit_str, tv);
+}
+
 void UdfBuiltins::ExtractPrepare(FunctionContext* ctx,
-                                 FunctionContext::FunctionStateScope scope) {
+    FunctionContext::FunctionStateScope scope, int unit_idx) {
   // Parse the unit up front if we can, otherwise do it on the fly in Extract()
-  if (ctx->IsArgConstant(1)) {
-    StringVal* unit_str = reinterpret_cast<StringVal*>(ctx->GetConstantArg(1));
-    ExtractField::Type field = StrToExtractField(ctx, *unit_str);
-    if (field == ExtractField::INVALID_FIELD) {
+  if (ctx->IsArgConstant(unit_idx)) {
+    StringVal* unit_str = reinterpret_cast<StringVal*>(ctx->GetConstantArg(unit_idx));
+    TExtractField::type field = StrToExtractField(ctx, *unit_str);
+    if (field == TExtractField::INVALID_FIELD) {
       string string_field(reinterpret_cast<char*>(unit_str->ptr), unit_str->len);
       ctx->SetError(Substitute("invalid extract field: $0", string_field).c_str());
     } else {
-      ExtractField::Type* state = reinterpret_cast<ExtractField::Type*>(
-          ctx->Allocate(sizeof(ExtractField::Type)));
+      TExtractField::type* state = reinterpret_cast<TExtractField::type*>(
+          ctx->Allocate(sizeof(TExtractField::type)));
       *state = field;
       ctx->SetFunctionState(scope, state);
     }
   }
 }
 
+void UdfBuiltins::ExtractPrepare(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  ExtractPrepare(ctx, scope, 0);
+}
+
+void UdfBuiltins::SwappedExtractPrepare(FunctionContext* ctx,
+    FunctionContext::FunctionStateScope scope) {
+  ExtractPrepare(ctx, scope, 1);
+}
+
 void UdfBuiltins::ExtractClose(FunctionContext* ctx,
-                               FunctionContext::FunctionStateScope scope) {
+    FunctionContext::FunctionStateScope scope) {
   void* state = ctx->GetFunctionState(scope);
   if (state != NULL) {
     ctx->Free(reinterpret_cast<uint8_t*>(state));
@@ -500,7 +500,7 @@ StringVal UdfBuiltins::PrintVector(FunctionContext* context, const StringVal& ar
 }
 
 DoubleVal UdfBuiltins::VectorGet(FunctionContext* context, const BigIntVal& index,
-                                 const StringVal& arr) {
+    const StringVal& arr) {
   if (!ValidateMADlibVector(context, arr)) return DoubleVal::null();
   if (index.is_null) return DoubleVal::null();
   uint64_t i = index.val;
