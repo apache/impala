@@ -63,6 +63,7 @@ add_library(Exec
   partitioned-aggregation-node.cc
   partitioned-aggregation-node-ir.cc
   partitioned-hash-join-node.cc
+  partitioned-hash-join-node-ir.cc
   read-write-util.cc
   scan-node.cc
   scanner-context.cc

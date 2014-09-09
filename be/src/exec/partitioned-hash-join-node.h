@@ -109,6 +109,30 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     REPARTITIONING,
   };
 
+  // Number of initial partitions to create. Must be a power of two.
+  // TODO: this is set to a lower than actual value for testing.
+  static const int PARTITION_FANOUT = 4;
+
+  // Needs to be the log(PARTITION_FANOUT)
+  static const int NUM_PARTITIONING_BITS = 2;
+
+  // Maximum number of times we will repartition. The maximum build table we
+  // can process is:
+  // MEM_LIMIT * (PARTITION_FANOUT ^ MAX_PARTITION_DEPTH). With a (low) 1GB
+  // limit and 64 fanout, we can support 256TB build tables in the case where
+  // there is no skew.
+  // In the case where there is skew, repartitioning is unlikely to help (assuming a
+  // reasonable hash function).
+  // TODO: we can revisit and try harder to explicitly detect skew.
+  static const int MAX_PARTITION_DEPTH = 3;
+
+  // Maximum number of build tables that can be in memory at any time. This is in
+  // addition to the memory constraints and is used for testing to trigger code paths
+  // for small tables.
+  // Note: In order to test the spilling paths more easily, set it to PARTITION_FANOUT / 2.
+  // TODO: Eventually remove.
+  static const int MAX_IN_MEM_BUILD_TABLES = PARTITION_FANOUT;
+
   // Append the row to stream. In the common case, the row is just in memory. If we
   // run out of memory, this will spill a partition and try to add the row again.
   // returns true if the row was added and false otherwise. If false is returned,
@@ -141,6 +165,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // probe_batch_ is entirely consumed.
   template<int const JoinOp>
   Status ProcessProbeBatch(RowBatch* out_batch);
+
+  // Wrapper that calls templated version of ProcessProbeBatch() based on 'join_op'.
+  Status ProcessProbeBatch(const TJoinOp::type join_op, RowBatch* out_batch);
 
   // Sweep the hash_tbl_ of the partition that it is in the front of
   // flush_build_partitions_, using hash_tbl_iterator_ and output any unmatched build
