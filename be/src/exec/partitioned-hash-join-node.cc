@@ -455,6 +455,7 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
         matched_probe_ = true;
         if (JoinOp == TJoinOp::LEFT_ANTI_JOIN) {
           // In this case we can safely ignore this probe row.
+          hash_tbl_iterator_.reset();
           break;
         }
         if (JoinOp == TJoinOp::RIGHT_OUTER_JOIN || JoinOp == TJoinOp::FULL_OUTER_JOIN) {
@@ -476,7 +477,7 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
       }
 
       if ((JoinOp == TJoinOp::LEFT_ANTI_JOIN || JoinOp == TJoinOp::LEFT_OUTER_JOIN ||
-          JoinOp == TJoinOp::FULL_OUTER_JOIN) &&
+           JoinOp == TJoinOp::FULL_OUTER_JOIN) &&
           !matched_probe_) {
         // No match for this row, we need to output it in the case of anti, left-outer and
         // full-outer joins.
@@ -490,6 +491,9 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
         }
       }
     }
+    // Must have reached the end of the hash table iterator for the current row before
+    // moving to the row.
+    DCHECK(hash_tbl_iterator_.AtEnd());
 
     if (UNLIKELY(probe_batch_pos_ == probe_batch_->num_rows())) {
       // Finished this batch.
@@ -511,7 +515,8 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
       partition = input_partition_;
     } else {
       // We don't know which partition this probe row should go to.
-      partition = hash_partitions_[hash >> (32 - NUM_PARTITIONING_BITS)];
+      const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
+      partition = hash_partitions_[partition_idx];
     }
     DCHECK(partition != NULL);
 

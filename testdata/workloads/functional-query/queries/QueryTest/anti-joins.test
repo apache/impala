@@ -58,3 +58,29 @@ NULL,NULL,30
 ---- TYPES
 INT, INT, INT
 ====
+---- QUERY
+# Regression tests for IMPALA-1177: Incorrect results in query with ANTI JOIN on tinyint
+# column with nulls.
+SELECT COUNT(*) FROM functional.alltypesagg t1 LEFT ANTI JOIN functional.alltypes t2
+ON t2.tinyint_col = t1.tinyint_col
+---- RESULTS
+2000
+---- TYPES
+BIGINT
+====
+---- QUERY
+SELECT COUNT(*) FROM functional.alltypesagg t1 LEFT ANTI JOIN functional.alltypes t2
+ON t2.tinyint_col = t1.tinyint_col and t1.day = 1;
+---- RESULTS
+100
+---- TYPES
+BIGINT
+====
+---- QUERY
+SELECT COUNT(*) FROM functional.alltypesagg t1 LEFT ANTI JOIN functional.alltypes t2
+ON t2.tinyint_col = t1.tinyint_col and t2.month = 1;
+---- RESULTS
+2000
+---- TYPES
+BIGINT
+====
