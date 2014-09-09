@@ -205,6 +205,7 @@ Literal* Literal::CreateLiteral(const ColumnType& type, const string& str) {
       return new Literal(type, v);
     }
     case TYPE_STRING:
+    case TYPE_VARCHAR:
     case TYPE_CHAR:
       return new Literal(type, str);
     case TYPE_TIMESTAMP: {
@@ -369,6 +370,8 @@ Status Literal::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
       v.SetVal(value_.double_val);
       break;
     case TYPE_STRING:
+    case TYPE_VARCHAR:
+    case TYPE_CHAR:
       v.SetLen(builder.getInt32(value_.string_val.len));
       v.SetPtr(codegen->CastPtrToLlvmPtr(codegen->ptr_type(), value_.string_val.ptr));
       break;

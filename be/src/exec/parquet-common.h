@@ -48,6 +48,8 @@ const parquet::Type::type IMPALA_TO_PARQUET_TYPES[] = {
   parquet::Type::BYTE_ARRAY,  // DateTime, NYI
   parquet::Type::BYTE_ARRAY,  // Binary NYI
   parquet::Type::FIXED_LEN_BYTE_ARRAY, // Decimal
+  parquet::Type::BYTE_ARRAY,  // VARCHAR(N)
+  parquet::Type::BYTE_ARRAY,  // CHAR(N)
 };
 
 // Mapping of Parquet codec enums to Impala enums
@@ -87,6 +89,8 @@ class ParquetPlainEncoder {
     switch (t.type) {
       case TYPE_STRING:
       case TYPE_VARCHAR:
+      case TYPE_CHAR:
+        // CHAR is varlen here because we don't write the padding to the file
         return -1;
       case TYPE_TINYINT:
       case TYPE_SMALLINT:
@@ -100,7 +104,6 @@ class ParquetPlainEncoder {
         return 12;
       case TYPE_DECIMAL:
         return DecimalSize(t);
-
       case TYPE_NULL:
       case TYPE_BOOLEAN: // These types are not plain encoded.
       default:

@@ -85,3 +85,25 @@ string
 'hello'
 'hel'
 ====
+---- QUERY
+insert into allchars values (cast("123456" as char(5)), cast("123456" as char(140)),
+cast("123456" as varchar(5)))
+====
+---- QUERY
+select cshort, clong, vc from allchars
+---- TYPES
+char,char,string
+---- RESULTS
+'12345','123456                                                                                                                                      ','12345'
+====
+---- QUERY
+insert into allchars_par values (cast("123456" as char(5)), cast("123456" as char(140)),
+cast("123456" as varchar(5)))
+====
+---- QUERY
+select cshort, clong, vc from allchars_par
+---- TYPES
+char,char,string
+---- RESULTS
+'12345','123456                                                                                                                                      ','12345'
+====

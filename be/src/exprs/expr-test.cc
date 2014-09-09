@@ -1574,6 +1574,10 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("lower(cast('HELLO' as VARCHAR(3)))", "hel");
   TestStringValue("lower(cast(123456 as VARCHAR(3)))", "123");
   TestIsNull("cast(NULL as VARCHAR(3))", TYPE_STRING);
+  TestCharValue("cast('12345' as CHAR(130))",
+      "12345                                                                  "
+      "                                                           ",
+      ColumnType::CreateCharType(130));
 
   if (disable_codegen_) {
     // TODO remove if guard once CHAR codegen is committed

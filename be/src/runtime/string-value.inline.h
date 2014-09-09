@@ -17,6 +17,7 @@
 #define IMPALA_RUNTIME_STRING_VALUE_INLINE_H
 
 #include "runtime/string-value.h"
+
 #include <cstring>
 #include "util/cpu-info.h"
 #ifdef __SSE4_2__
@@ -116,6 +117,27 @@ inline int64_t StringValue::UnpaddedCharLength(const char* cptr, int64_t len) {
   return last + 1;
 }
 
+inline char* StringValue::CharSlotToPtr(void* slot, const ColumnType& type) {
+  DCHECK(type.type == TYPE_CHAR);
+  if (slot == NULL) return NULL;
+  if (type.IsVarLen()) {
+    StringValue* sv = reinterpret_cast<StringValue*>(slot);
+    DCHECK_EQ(sv->len, type.len);
+    return sv->ptr;
+  }
+  return reinterpret_cast<char*>(slot);
+}
+
+inline const char* StringValue::CharSlotToPtr(const void* slot, const ColumnType& type) {
+  DCHECK(type.type == TYPE_CHAR);
+  if (slot == NULL) return NULL;
+  if (type.IsVarLen()) {
+    const StringValue* sv = reinterpret_cast<const StringValue*>(slot);
+    DCHECK_EQ(sv->len, type.len);
+    return sv->ptr;
+  }
+  return reinterpret_cast<const char*>(slot);
+}
+
 }
 #endif
-

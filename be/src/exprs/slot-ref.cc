@@ -421,7 +421,8 @@ StringVal SlotRef::GetStringVal(ExprContext* context, TupleRow* row) {
   if (t == NULL || t->IsNull(null_indicator_offset_)) return StringVal::null();
   StringVal result;
   if (type_.type == TYPE_CHAR) {
-    result.ptr = reinterpret_cast<uint8_t*>(t->GetSlot(slot_offset_));
+    result.ptr = reinterpret_cast<uint8_t*>(
+        StringValue::CharSlotToPtr(t->GetSlot(slot_offset_), type_));
     result.len = type_.len;
   } else {
     StringValue* sv = reinterpret_cast<StringValue*>(t->GetSlot(slot_offset_));

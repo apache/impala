@@ -251,7 +251,7 @@ class HdfsParquetTableWriter::ColumnWriter :
  protected:
   virtual bool EncodeValue(void* value, int64_t* bytes_needed) {
     if (current_encoding_ == Encoding::PLAIN_DICTIONARY) {
-      *bytes_needed = dict_encoder_->Put(*reinterpret_cast<T*>(value));
+      *bytes_needed = dict_encoder_->Put(*CastValue(value));
       parent_->file_size_estimate_ += *bytes_needed;
 
       // If the dictionary contains the maximum number of values, switch to plain
@@ -268,7 +268,7 @@ class HdfsParquetTableWriter::ColumnWriter :
         }
       }
     } else if (current_encoding_ == Encoding::PLAIN) {
-      T* v = reinterpret_cast<T*>(value);
+      T* v = CastValue(value);
       *bytes_needed = encoded_value_size_ < 0 ?
           ParquetPlainEncoder::ByteSize<T>(*v) : encoded_value_size_;
       if (current_page_->header.uncompressed_page_size + *bytes_needed > DATA_PAGE_SIZE) {
@@ -304,7 +304,26 @@ class HdfsParquetTableWriter::ColumnWriter :
 
   // Size of each encoded value. -1 if the size is type is variable-length.
   int64_t encoded_value_size_;
+
+  // Temporary string value to hold CHAR(N)
+  StringValue temp_;
+
+  // Converts a slot pointer to a raw value suitable for encoding
+  inline T* CastValue(void* value) {
+    return reinterpret_cast<T*>(value);
+  }
 };
+
+template<>
+inline StringValue* HdfsParquetTableWriter::ColumnWriter<StringValue>::CastValue(
+    void* value) {
+  if (type().type == TYPE_CHAR) {
+    temp_.ptr = StringValue::CharSlotToPtr(value, type());
+    temp_.len = StringValue::UnpaddedCharLength(temp_.ptr, type().len);
+    return &temp_;
+  }
+  return reinterpret_cast<StringValue*>(value);
+}
 
 // Bools are encoded a bit differently so subclass it explicitly.
 class HdfsParquetTableWriter::BoolColumnWriter :
@@ -634,7 +653,8 @@ Status HdfsParquetTableWriter::Init() {
   // Initialize each column structure.
   for (int i = 0; i < columns_.size(); ++i) {
     BaseColumnWriter* writer = NULL;
-    switch (output_expr_ctxs_[i]->root()->type().type) {
+    const ColumnType& type = output_expr_ctxs_[i]->root()->type();
+    switch (type.type) {
       case TYPE_BOOLEAN:
         writer = new BoolColumnWriter(
             this, output_expr_ctxs_[i], codec);
@@ -669,6 +689,7 @@ Status HdfsParquetTableWriter::Init() {
         break;
       case TYPE_VARCHAR:
       case TYPE_STRING:
+      case TYPE_CHAR:
         writer = new ColumnWriter<StringValue>(
             this, output_expr_ctxs_[i], codec);
         break;

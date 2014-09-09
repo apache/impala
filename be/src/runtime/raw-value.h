@@ -137,12 +137,11 @@ inline bool RawValue::Eq(const void* v1, const void* v2, const ColumnType& type)
       return *reinterpret_cast<const TimestampValue*>(v1) ==
           *reinterpret_cast<const TimestampValue*>(v2);
     case TYPE_CHAR: {
-      int64_t l1 = StringValue::UnpaddedCharLength(reinterpret_cast<const char*>(v1),
-                                                   type.len);
-      int64_t l2 = StringValue::UnpaddedCharLength(reinterpret_cast<const char*>(v2),
-                                                   type.len);
-      return StringCompare(reinterpret_cast<const char*>(v1), l1,
-          reinterpret_cast<const char*>(v2), l2, std::min(l1, l2)) == 0;
+      const char* v1ptr = StringValue::CharSlotToPtr(v1, type);
+      const char* v2ptr = StringValue::CharSlotToPtr(v2, type);
+      int64_t l1 = StringValue::UnpaddedCharLength(v1ptr, type.len);
+      int64_t l2 = StringValue::UnpaddedCharLength(v2ptr, type.len);
+      return StringCompare(v1ptr, l1, v2ptr, l2, std::min(l1, l2)) == 0;
     }
     case TYPE_DECIMAL:
       switch (type.GetByteSize()) {
@@ -185,7 +184,8 @@ inline uint32_t RawValue::GetHashValue(const void* v, const ColumnType& type,
     case TYPE_FLOAT: return HashUtil::Hash(v, 4, seed);
     case TYPE_DOUBLE: return HashUtil::Hash(v, 8, seed);
     case TYPE_TIMESTAMP: return HashUtil::Hash(v, 12, seed);
-    case TYPE_CHAR: return HashUtil::Hash(v, type.len, seed);
+    case TYPE_CHAR: return HashUtil::Hash(StringValue::CharSlotToPtr(v, type),
+                                          type.len, seed);
     case TYPE_DECIMAL: return HashUtil::Hash(v, type.GetByteSize(), seed);
     default:
       DCHECK(false);
@@ -212,7 +212,8 @@ inline uint32_t RawValue::GetHashValueFnv(const void* v, const ColumnType& type,
     case TYPE_FLOAT: return HashUtil::FnvHash64to32(v, 4, seed);
     case TYPE_DOUBLE: return HashUtil::FnvHash64to32(v, 8, seed);
     case TYPE_TIMESTAMP: return HashUtil::FnvHash64to32(v, 12, seed);
-    case TYPE_CHAR: return HashUtil::FnvHash64to32(v, type.len, seed);
+    case TYPE_CHAR: return HashUtil::FnvHash64to32(StringValue::CharSlotToPtr(v, type),
+                                                   type.len, seed);
     case TYPE_DECIMAL: return HashUtil::FnvHash64to32(v, type.GetByteSize(), seed);
     default:
       DCHECK(false);
@@ -294,7 +295,7 @@ inline void RawValue::PrintValue(const void* value, const ColumnType& type, int 
       *stream << *reinterpret_cast<const TimestampValue*>(value);
       break;
     case TYPE_CHAR:
-      stream->write(static_cast<const char*>(value), type.len);
+      stream->write(StringValue::CharSlotToPtr(value, type), type.len);
       break;
     case TYPE_DECIMAL:
       switch (type.GetByteSize()) {

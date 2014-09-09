@@ -63,7 +63,7 @@ void RawValue::PrintValueAsBytes(const void* value, const ColumnType& type,
       stream->write(chars, TimestampValue::Size());
       break;
     case TYPE_CHAR:
-      stream->write(chars, type.len);
+      stream->write(StringValue::CharSlotToPtr(chars, type), type.len);
       break;
     case TYPE_DECIMAL:
       stream->write(chars, type.GetByteSize());
@@ -99,7 +99,7 @@ void RawValue::PrintValue(const void* value, const ColumnType& type, int scale,
       str->swap(tmp);
       return;
     case TYPE_CHAR:
-      *str = string(static_cast<const char*>(value), type.len);
+      *str = string(StringValue::CharSlotToPtr(value, type), type.len);
       return;
     default:
       PrintValue(value, type, scale, &out);
@@ -160,13 +160,11 @@ int RawValue::Compare(const void* v1, const void* v2, const ColumnType& type) {
       ts_value2 = reinterpret_cast<const TimestampValue*>(v2);
       return *ts_value1 > *ts_value2 ? 1 : (*ts_value1 < *ts_value2 ? -1 : 0);
     case TYPE_CHAR: {
-      int64_t l1 = StringValue::UnpaddedCharLength(reinterpret_cast<const char*>(v1),
-                                                   type.len);
-      int64_t l2 = StringValue::UnpaddedCharLength(reinterpret_cast<const char*>(v2),
-                                                   type.len);
-
-      return StringCompare(reinterpret_cast<const char*>(v1), l1,
-          reinterpret_cast<const char*>(v2), l2, std::min(l1, l2));
+      const char* v1ptr = StringValue::CharSlotToPtr(v1, type);
+      const char* v2ptr = StringValue::CharSlotToPtr(v2, type);
+      int64_t l1 = StringValue::UnpaddedCharLength(v1ptr, type.len);
+      int64_t l2 = StringValue::UnpaddedCharLength(v2ptr, type.len);
+      return StringCompare(v1ptr, l1, v2ptr, l2, std::min(l1, l2));
     }
     case TYPE_DECIMAL:
       switch (type.GetByteSize()) {
@@ -221,7 +219,13 @@ void RawValue::Write(const void* value, void* dst, const ColumnType& type,
           *reinterpret_cast<const TimestampValue*>(value);
       break;
     case TYPE_STRING:
-    case TYPE_VARCHAR: {
+    case TYPE_VARCHAR:
+    case TYPE_CHAR: {
+      if (!type.IsVarLen()) {
+        DCHECK_EQ(type.type, TYPE_CHAR);
+        memcpy(StringValue::CharSlotToPtr(dst, type), value, type.len);
+        break;
+      }
       const StringValue* src = reinterpret_cast<const StringValue*>(value);
       StringValue* dest = reinterpret_cast<StringValue*>(dst);
       dest->len = src->len;
@@ -234,9 +238,6 @@ void RawValue::Write(const void* value, void* dst, const ColumnType& type,
       }
       break;
     }
-    case TYPE_CHAR:
-      memcpy(dst, value, type.len);
-      break;
     case TYPE_DECIMAL:
       memcpy(dst, value, type.GetByteSize());
       break;
@@ -275,8 +276,15 @@ void RawValue::Write(const void* value, const ColumnType& type,
       *reinterpret_cast<TimestampValue*>(dst) =
           *reinterpret_cast<const TimestampValue*>(value);
       break;
-    case TYPE_STRING: {
+    case TYPE_STRING:
+    case TYPE_VARCHAR:
+    case TYPE_CHAR: {
       DCHECK(buf != NULL);
+      if (!type.IsVarLen()) {
+        DCHECK_EQ(type.type, TYPE_CHAR);
+        memcpy(dst, value, type.len);
+        break;
+      }
       const StringValue* src = reinterpret_cast<const StringValue*>(value);
       StringValue* dest = reinterpret_cast<StringValue*>(dst);
       dest->len = src->len;
@@ -285,9 +293,6 @@ void RawValue::Write(const void* value, const ColumnType& type,
       *buf += dest->len;
       break;
     }
-    case TYPE_CHAR:
-      memcpy(dst, value, type.len);
-      break;
     case TYPE_DECIMAL:
       memcpy(dst, value, type.GetByteSize());
       break;

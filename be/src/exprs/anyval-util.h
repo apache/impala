@@ -219,18 +219,21 @@ class AnyValUtil {
         return;
       case TYPE_STRING:
       case TYPE_VARCHAR:
-        reinterpret_cast<const StringValue*>(slot)->ToStringVal(
-            reinterpret_cast<StringVal*>(dst));
-        if (type.type == TYPE_VARCHAR) {
-          StringVal* sv = reinterpret_cast<StringVal*>(dst);
-          DCHECK(type.len >= 0);
-          DCHECK_LE(sv->len, type.len);
-        }
-        return;
       case TYPE_CHAR: {
-        StringVal* sv = reinterpret_cast<StringVal*>(dst);
-        sv->ptr = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(slot));
-        sv->len = type.len;
+        if (type.IsVarLen()) {
+          reinterpret_cast<const StringValue*>(slot)->ToStringVal(
+              reinterpret_cast<StringVal*>(dst));
+          if (type.type == TYPE_VARCHAR) {
+            StringVal* sv = reinterpret_cast<StringVal*>(dst);
+            DCHECK(type.len >= 0);
+            DCHECK_LE(sv->len, type.len);
+          }
+        } else {
+          DCHECK_EQ(type.type, TYPE_CHAR);
+          StringVal* sv = reinterpret_cast<StringVal*>(dst);
+          sv->ptr = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(slot));
+          sv->len = type.len;
+        }
         return;
       }
       case TYPE_TIMESTAMP:

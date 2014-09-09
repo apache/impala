@@ -128,7 +128,7 @@ Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
           if (type.IsVarLen()) {
             PrintEscaped(reinterpret_cast<const StringValue*>(value));
           } else if (type.type == TYPE_CHAR) {
-            StringValue sv(reinterpret_cast<char*>(value), type.len);
+            StringValue sv(StringValue::CharSlotToPtr(value, type), type.len);
             PrintEscaped(&sv);
           } else {
             output_expr_ctxs_[j]->PrintValue(value, &rowbatch_stringstream_);

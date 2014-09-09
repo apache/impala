@@ -50,38 +50,39 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
   void* slot = tuple->GetSlot(slot_desc->tuple_offset());
 
   // Parse the raw-text data. Translate the text string to internal format.
-  switch (slot_desc->type().type) {
+  const ColumnType& type = slot_desc->type();
+  switch (type.type) {
+    case TYPE_STRING:
     case TYPE_VARCHAR:
-    case TYPE_STRING: {
-      StringValue* str_slot = reinterpret_cast<StringValue*>(slot);
-      str_slot->ptr = const_cast<char*>(data);
-      str_slot->len = len;
-      if (len != 0 && (copy_string || need_escape)) {
-        DCHECK(pool != NULL);
-        char* slot_data = reinterpret_cast<char*>(pool->Allocate(len));
-        if (need_escape) {
-          int64_t maxlen = slot_desc->type().type == TYPE_VARCHAR ?
-              slot_desc->type().len : -1;
-          UnescapeString(data, slot_data, &str_slot->len, maxlen);
-        } else {
-          if (slot_desc->type().type == TYPE_VARCHAR) {
-            str_slot->len = std::min(str_slot->len, slot_desc->type().len);
-          }
-          memcpy(slot_data, data, str_slot->len);
-        }
-        str_slot->ptr = slot_data;
-      }
-      break;
-    }
     case TYPE_CHAR: {
-      char* char_slot = reinterpret_cast<char*>(slot);
-      if (need_escape) {
-        UnescapeString(data, char_slot, &len, slot_desc->type().len);
+      int buffer_len = len;
+      if (type.type == TYPE_VARCHAR || type.type == TYPE_CHAR) buffer_len = type.len;
+
+      bool reuse_data = type.IsVarLen() && !(len != 0 && (copy_string || need_escape));
+      if (type.type == TYPE_CHAR) reuse_data &= (buffer_len <= len);
+
+      StringValue str;
+      str.len = std::min(buffer_len, len);
+      if (reuse_data) {
+        str.ptr = const_cast<char*>(data);
       } else {
-        len = std::min(slot_desc->type().len, len);
-        memcpy(char_slot, data, len);
+        str.ptr = type.IsVarLen() ? reinterpret_cast<char*>(pool->Allocate(buffer_len)) :
+            reinterpret_cast<char*>(slot);
+        if (need_escape) {
+          UnescapeString(data, str.ptr, &str.len, buffer_len);
+        } else {
+          memcpy(str.ptr, data, str.len);
+        }
       }
-      StringValue::PadWithSpaces(char_slot, slot_desc->type().len, len);
+
+      if (type.type == TYPE_CHAR) {
+        StringValue::PadWithSpaces(str.ptr, buffer_len, str.len);
+      }
+      // write back to the slot, if !IsVarLen() we already wrote to the slot
+      if (type.IsVarLen()) {
+        StringValue* str_slot = reinterpret_cast<StringValue*>(slot);
+        *str_slot = str;
+      }
       break;
     }
     case TYPE_BOOLEAN:

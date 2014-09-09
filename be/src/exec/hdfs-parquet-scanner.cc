@@ -266,6 +266,7 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
     } else {
       fixed_len_size_ = -1;
     }
+    needs_conversion_ = desc_->type().type == TYPE_CHAR;
   }
 
  protected:
@@ -296,16 +297,21 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
   virtual bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_failed)  {
     parquet::Encoding::type page_encoding =
         current_page_header_.data_page_header.encoding;
+    bool needs_compaction = (page_encoding != parquet::Encoding::PLAIN_DICTIONARY) &&
+        parent_->scan_node_->requires_compaction();
     bool result = true;
+    T val;
+    T* val_ptr = needs_conversion_ ? &val : reinterpret_cast<T*>(slot);
     if (page_encoding == parquet::Encoding::PLAIN_DICTIONARY) {
-      result = dict_decoder_->GetValue(reinterpret_cast<T*>(slot));
+      result = dict_decoder_->GetValue(val_ptr);
     } else {
       DCHECK(page_encoding == parquet::Encoding::PLAIN);
-      data_ += ParquetPlainEncoder::Decode<T>(data_, fixed_len_size_,
-          reinterpret_cast<T*>(slot));
-      if (parent_->scan_node_->requires_compaction()) {
-        CopySlot(reinterpret_cast<T*>(slot), pool);
-      }
+      data_ += ParquetPlainEncoder::Decode<T>(data_, fixed_len_size_, val_ptr);
+    }
+    if (needs_conversion_) {
+      ConvertSlot(&val, reinterpret_cast<T*>(slot), pool);
+    } else if (needs_compaction) {
+      CopySlot(reinterpret_cast<T*>(slot), pool);
     }
     ++rows_returned_;
     if (!*conjuncts_failed && bitmap_filter_ != NULL) {
@@ -321,7 +327,15 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
     // no-op for non-string columns.
   }
 
+  // Converts and writes src into dst based on desc_->type()
+  void ConvertSlot(const T* src, void* dst, MemPool* pool) {
+    DCHECK(false);
+  }
+
   scoped_ptr<DictDecoder<T> > dict_decoder_;
+
+  // true decoded values must be converted before being written to an output tuple
+  bool needs_conversion_;
 
   // The size of this column with plain encoding for FIXED_LEN_BYTE_ARRAY, or
   // the max length for VARCHAR columns. Unused otherwise.
@@ -336,6 +350,26 @@ void HdfsParquetScanner::ColumnReader<StringValue>::CopySlot(
   memcpy(buffer, slot->ptr, slot->len);
   slot->ptr = reinterpret_cast<char*>(buffer);
 }
+
+template<>
+void HdfsParquetScanner::ColumnReader<StringValue>::ConvertSlot(
+    const StringValue* src, void* dst, MemPool* pool) {
+  DCHECK(desc_->type().type == TYPE_CHAR);
+  int len = desc_->type().len;
+  StringValue sv;
+  sv.len = len;
+  if (desc_->type().IsVarLen()) {
+    sv.ptr = reinterpret_cast<char*>(pool->Allocate(len));
+  } else {
+    sv.ptr = reinterpret_cast<char*>(dst);
+  }
+  int unpadded_len = min(len, src->len);
+  memcpy(sv.ptr, src->ptr, unpadded_len);
+  StringValue::PadWithSpaces(sv.ptr, len, unpadded_len);
+
+  if (desc_->type().IsVarLen()) *reinterpret_cast<StringValue*>(dst) = sv;
+}
+
 
 class HdfsParquetScanner::BoolColumnReader : public HdfsParquetScanner::BaseColumnReader {
  public:
@@ -430,6 +464,7 @@ HdfsParquetScanner::BaseColumnReader* HdfsParquetScanner::CreateReader(
       break;
     case TYPE_STRING:
     case TYPE_VARCHAR:
+    case TYPE_CHAR:
       reader = new ColumnReader<StringValue>(this, desc, file_idx);
       break;
     case TYPE_DECIMAL:

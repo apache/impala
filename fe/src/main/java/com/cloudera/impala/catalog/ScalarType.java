@@ -40,6 +40,10 @@ public class ScalarType extends Type {
   // Longest supported VARCHAR and CHAR. Chosen to match Oracle.
   static final int MAX_VARCHAR_LENGTH = 32672;
 
+  // Longest CHAR that we in line in the tuple.
+  // Keep consistent with backend ColumnType::CHAR_INLINE_LENGTH
+  static final int CHAR_INLINE_LENGTH = 128;
+
   // Hive, mysql, sql server standard.
   public static final int MAX_PRECISION = 38;
   public static final int MAX_SCALE = MAX_PRECISION;
@@ -302,7 +306,9 @@ public class ScalarType extends Type {
   @Override
   public int getSlotSize() {
     switch (type_) {
-      case CHAR: return len_;
+      case CHAR:
+        if (len_ > CHAR_INLINE_LENGTH) return STRING.getSlotSize();
+        return len_;
       case DECIMAL: return TypesUtil.getDecimalSlotSize(this);
       default:
         return type_.getSlotSize();
