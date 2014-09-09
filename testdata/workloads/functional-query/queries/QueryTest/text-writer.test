@@ -3,9 +3,7 @@
 drop table if exists __text_write;
 ====
 ---- QUERY
-SET COMPRESSION_CODEC=NONE;
-create table __text_write (i int, s string, d double)
-stored as SEQUENCEFILE;
+create table __text_write (i int, s string, d double);
 ====
 ---- QUERY
 SET COMPRESSION_CODEC=NONE;
