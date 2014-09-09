@@ -69,7 +69,7 @@ class RuntimeState;
 // TODO: When a block is read from disk, data is copied from the IOMgr buffer to the
 // block manager's buffer. This should be avoided in the common case where these buffers
 // are of the same size.
-// TODO: see if the one big lock is a bottleneck.
+// TODO: see if the one big lock is a bottleneck. Break it up.
 class BufferedBlockMgr {
  private:
   struct BufferDescriptor;
@@ -297,6 +297,8 @@ class BufferedBlockMgr {
   //      the unpinned list by writing them out).
   // If we can't get a buffer (no more memory, nothing in the unpinned and free lists,
   // this function returns with the block unpinned.
+  // TODO: this function is shared by all spilling operators in a query. We need to
+  // see if the locking is a bottleneck here.
   Status FindBufferForBlock(Block* block, bool* in_mem);
 
   // Writes unpinned blocks via DiskIoMgr until one of the following is true:
@@ -314,6 +316,7 @@ class BufferedBlockMgr {
 
   // Return a deleted block to the list of free blocks. Assumes the block's buffer has
   // already been returned to the free buffers list. Non-blocking.
+  // Thread-safe.
   void ReturnUnusedBlock(Block* block);
 
   // Checks unused_blocks_ for an unused block object, else allocates a new one.

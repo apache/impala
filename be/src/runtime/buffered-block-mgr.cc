@@ -212,18 +212,16 @@ Status BufferedBlockMgr::GetNewBlock(Client* client, Block** block) {
   {
     lock_guard<mutex> lock(lock_);
     if (is_cancelled_) return Status::CANCELLED;
+    *block = GetUnusedBlock(client);
   }
-
-  Block* new_block = GetUnusedBlock(client);
-  DCHECK(new_block->client_ == client);
+  DCHECK_NOTNULL(*block);
+  DCHECK((*block)->client_ == client);
   bool in_mem;
-  RETURN_IF_ERROR(FindBufferForBlock(new_block, &in_mem));
+  RETURN_IF_ERROR(FindBufferForBlock(*block, &in_mem));
   DCHECK(!in_mem) << "A new block cannot start in mem.";
-  if (new_block->is_pinned_) {
-    *block = new_block;
-  } else {
-    new_block->is_deleted_ = true;
-    ReturnUnusedBlock(new_block);
+  if (!(*block)->is_pinned_) {
+    (*block)->is_deleted_ = true;
+    ReturnUnusedBlock(*block);
     *block = NULL;
   }
   return Status::OK;
@@ -464,12 +462,11 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
 }
 
 void BufferedBlockMgr::ReturnUnusedBlock(Block* block) {
-  // Assumes the lock is already taken.
   DCHECK(block->is_deleted_) << block->DebugString();
   DCHECK(!block->is_pinned_) << block->DebugString();;
   DCHECK(block->buffer_desc_ == NULL);
-  unused_blocks_.Enqueue(block);
   block->Init();
+  unused_blocks_.Enqueue(block);
 }
 
 Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {

@@ -496,7 +496,6 @@ TEST_F(BufferedBlockMgrTest, ClientOversubscription) {
   // Allocate with client two. Since client two reserved 2 buffers, this should fail
   // with MEM_LIMIT_EXCEEDED.
   status = block_mgr->GetNewBlock(client2, &block);
-  EXPECT_TRUE(block == NULL);
   EXPECT_TRUE(status.IsMemLimitExceeded());
 
   block_mgr.reset();
