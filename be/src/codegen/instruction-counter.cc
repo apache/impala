@@ -16,13 +16,7 @@
 
 #include <boost/foreach.hpp>
 
-#include <string>
-#include <iomanip>
-#include <algorithm>
-#include "base/logging.h"
 #include "common/logging.h"
-
-#include "util/util.h"
 
 using namespace boost;
 using namespace impala;
@@ -54,16 +48,16 @@ InstructionCounter::InstructionCounter() {
   counters_.insert(make_pair(OTHER_INSTS, 0));
 }
 
-void InstructionCounter::visit(const Module &M) {
+void InstructionCounter::visit(const Module& M) {
   visit(M.begin(), M.end());
 }
 
-void InstructionCounter::visit(const Function &F) {
+void InstructionCounter::visit(const Function& F) {
   IncrementCount(TOTAL_FUNCTIONS);
   visit(F.begin(), F.end());
 }
 
-void InstructionCounter::visit(const BasicBlock &BB) {
+void InstructionCounter::visit(const BasicBlock& BB) {
   IncrementCount(TOTAL_BLOCKS);
   visit(BB.begin(), BB.end());
 }
@@ -74,7 +68,7 @@ int InstructionCounter::GetCount(const char* name) {
   return counter->second;
 }
 
-void InstructionCounter::visit(const Instruction &I) {
+void InstructionCounter::visit(const Instruction& I) {
   IncrementCount(TOTAL_INSTS);
   switch (I.getOpcode()) {
     case llvm::Instruction::Ret:
@@ -197,7 +191,6 @@ string InstructionCounter::PrintCounters() const {
 
 void InstructionCounter::IncrementCount(const char* name) {
   CounterMap::iterator iter = counters_.find(name);
-  DCHECK_NE(iter, counters_.end());
+  DCHECK(iter != counters_.end());
   iter->second++;
 }
-

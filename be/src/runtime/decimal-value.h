@@ -147,8 +147,8 @@ class DecimalValue {
   DecimalValue<RESULT_T> Add(const ColumnType& this_type, const DecimalValue& other,
       const ColumnType& other_type, int result_scale, bool* overflow) const {
     DCHECK_EQ(result_scale, std::max(this_type.scale, other_type.scale));
-    RESULT_T x;
-    RESULT_T y;
+    RESULT_T x = 0;
+    RESULT_T y = 0;
     *overflow |= AdjustToSameScale(*this, this_type, other, other_type, &x, &y);
     if (sizeof(RESULT_T) == 16) {
       // Check overflow.
@@ -420,7 +420,7 @@ inline int Decimal4Value::Compare(const ColumnType& this_type,
 template <>
 inline int Decimal8Value::Compare(const ColumnType& this_type,
     const Decimal8Value& other, const ColumnType& other_type) const {
-  int128_t x, y;
+  int128_t x = 0, y = 0;
   bool overflow = AdjustToSameScale(*this, this_type, other, other_type, &x, &y);
   DCHECK(!overflow) << "Overflow cannot happen with Decimal8Value";
   if (x == y) return 0;

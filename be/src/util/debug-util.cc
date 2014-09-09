@@ -29,7 +29,10 @@
 #include "util/cpu-info.h"
 #include "util/string-parser.h"
 
-// For DumpStackTraceToString
+// For DumpStackTraceToString(). Silence warnings for repeated definitions of preprocessor
+// variables (these are also defined in gutil/port.h)
+#undef HAVE_ATTRIBUTE_NOINLINE
+#undef _XOPEN_SOURCE
 #include <glog/../utilities.h>
 
 #define PRECISION 2

@@ -41,6 +41,13 @@
   #undef _XOPEN_SOURCE
   #include <glog/logging.h>
   #include <gflags/gflags.h>
+
+  #ifdef NDEBUG
+  #undef DCHECK_NOTNULL
+  // Fix warnings of unused variables when NDEBUG is defined (glog emits (a) for the
+  // following macro which triggers the warning).
+  #define DCHECK_NOTNULL(a) while(false)
+  #endif
 #endif
 
 // Define verbose logging levels.  Per-row logging is ore verbase than per-file / per-rpc

@@ -274,6 +274,8 @@ DecimalVal Literal::GetDecimalVal(ExprContext* context, TupleRow* row) {
     default:
       DCHECK(false) << type_.DebugString();
   }
+  // Quieten GCC.
+  return DecimalVal();
 }
 
 string Literal::DebugString() const {
@@ -401,4 +403,3 @@ Status Literal::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
 }
 
 }
-
