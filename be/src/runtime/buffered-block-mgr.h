@@ -247,6 +247,9 @@ class BufferedBlockMgr {
   // Idempotent.
   void Cancel();
 
+  // Dumps block mgr state. Grabs lock.
+  std::string DebugString();
+
   int num_free_buffers() const {
     return free_buffers_.size();
   }
@@ -257,6 +260,7 @@ class BufferedBlockMgr {
   }
 
   int num_pinned_buffers(Client* client) const;
+  int num_reserved_buffers_remaining(Client* client) const;
 
   int64_t block_size() const { return block_size_; }
   int64_t bytes_allocated() const;
@@ -327,7 +331,7 @@ class BufferedBlockMgr {
 
   // Used to debug the state of the block manager. Lock must already be taken.
   bool Validate() const;
-  std::string DebugString() const;
+  std::string DebugInternal() const;
 
   // Size of a block in bytes.
   const int64_t block_size_;
@@ -339,6 +343,9 @@ class BufferedBlockMgr {
   // The number of unreserved buffers. This can be less than 0 if we've oversubscribed
   // the number of reserved buffers.
   AtomicInt<int> num_unreserved_buffers_;
+
+  // The total number of reserved buffers by all clients.
+  AtomicInt<int> total_reserved_buffers_;
 
   // The number of unreserved buffers that are currently pinned. Must be >= 0.
   AtomicInt<int> num_unreserved_pinned_buffers_;

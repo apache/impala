@@ -45,6 +45,7 @@ inline bool HashTableCtx::EvalAndHashProbe(TupleRow* row, uint32_t* hash) {
 inline HashTable::Iterator HashTable::Find(HashTableCtx* ht_ctx) {
   DCHECK_NOTNULL(ht_ctx);
   DCHECK(!ht_ctx->skip_row_);
+  DCHECK(!buckets_.empty());
   uint32_t hash = ht_ctx->hash_;
   DCHECK_EQ(hash, ht_ctx->HashCurrentRow());
   int64_t bucket_idx = hash & (num_buckets_ - 1);
@@ -60,6 +61,7 @@ inline HashTable::Iterator HashTable::Find(HashTableCtx* ht_ctx) {
 }
 
 inline HashTable::Iterator HashTable::Begin() {
+  DCHECK(!buckets_.empty());
   int64_t bucket_idx = -1;
   Bucket* bucket = NextBucket(&bucket_idx);
   if (bucket != NULL) return Iterator(this, bucket_idx, bucket->node, 0);
@@ -94,14 +96,13 @@ inline HashTable::Bucket* HashTable::NextBucket(int64_t* bucket_idx) {
 }
 
 inline bool HashTable::InsertImpl(HashTableCtx* ht_ctx, void* data) {
+  DCHECK(!buckets_.empty());
   if (UNLIKELY(num_filled_buckets_ > num_buckets_till_resize_)) {
     // TODO: next prime instead of double?
-    ResizeBuckets(num_buckets_ * 2);
-    if (UNLIKELY(mem_limit_exceeded_)) return false;
+    if (!ResizeBuckets(num_buckets_ * 2)) return false;
   }
   if (node_remaining_current_page_ == 0) {
-    GrowNodeArray();
-    if (UNLIKELY(mem_limit_exceeded_)) return false;
+    if (!GrowNodeArray()) return false;
   }
   uint32_t hash = ht_ctx->hash_;
   DCHECK_EQ(hash, ht_ctx->HashCurrentRow());

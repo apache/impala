@@ -18,12 +18,13 @@
 
 #include <vector>
 #include <boost/cstdint.hpp>
+#include <boost/scoped_ptr.hpp>
 #include "codegen/impala-ir.h"
 #include "common/logging.h"
-#include "runtime/mem-pool.h"
+#include "runtime/buffered-block-mgr.h"
+#include "runtime/mem-tracker.h"
 #include "util/bitmap.h"
 #include "util/hash-util.h"
-#include "util/runtime-profile.h"
 
 namespace llvm {
   class Function;
@@ -239,6 +240,7 @@ class HashTableCtx {
 };
 
 // The hash table data structure. Consists of a vector of buckets (of linked nodes).
+// The data allocated by the hash table comes from the BufferedBlockMgr.
 class HashTable {
  private:
   struct Node;
@@ -247,14 +249,20 @@ class HashTable {
   class Iterator;
 
   // Create a hash table.
+  //  - client: block mgr client to allocate data pages from.
   //  - num_build_tuples: number of Tuples in the build tuple row.
-  //  - mem_tracker: if non-empty, all memory allocations for nodes and for buckets are
-  //    tracked; the tracker must be valid until the d'tor is called.
   //  - stores_tuples: If true, the hash table stores tuples, otherwise it stores tuple
   //    rows.
   //  - num_buckets: number of buckets that the hash table should be initialized to.
-  HashTable(RuntimeState* state, int num_build_tuples, MemTracker* mem_tracker,
-      bool stores_tuples = false, int64_t num_buckets = 1024);
+  HashTable(RuntimeState* state, BufferedBlockMgr::Client* client,
+      int num_build_tuples, bool stores_tuples = false, int64_t num_buckets = 1024);
+
+  // Ctor used only for testing. Memory is allocated from the pool instead of the
+  // block mgr.
+  HashTable(MemPool* pool, int num_buckets = 1024);
+
+  // Allocates the initial bucket structure. Returns false if OOM.
+  bool Init();
 
   // Call to cleanup any resources. Must be called once.
   void Close();
@@ -268,14 +276,12 @@ class HashTable {
   // Returns false if there was not enough memory to insert the row.
   bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx, TupleRow* row) {
     DCHECK_NOTNULL(ht_ctx);
-    if (UNLIKELY(mem_limit_exceeded_)) return false;
     DCHECK(!ht_ctx->skip_row_) << "Caller should have checked";
     return InsertImpl(ht_ctx, row);
   }
 
   bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx, Tuple* tuple) {
     DCHECK_NOTNULL(ht_ctx);
-    if (UNLIKELY(mem_limit_exceeded_)) return false;
     DCHECK(!ht_ctx->skip_row_) << "Caller should have checked";
     return InsertImpl(ht_ctx, tuple);
   }
@@ -312,12 +318,7 @@ class HashTable {
   }
 
   // Returns the number of bytes allocated to the hash table
-  int64_t byte_size() const {
-    int64_t nodes_mem = (num_nodes_ + node_remaining_current_page_) * sizeof(Node);
-    return nodes_mem + sizeof(Bucket) * buckets_.capacity();
-  }
-
-  bool mem_limit_exceeded() const { return mem_limit_exceeded_; }
+  int64_t byte_size() const;
 
   // Can be called after all insert calls to add bitmap filters for the probe side values.
   // For each 'probe_expr_' in 'ht_ctx' that is a slot ref, generate a bitmap filter on
@@ -449,8 +450,8 @@ class HashTable {
   // If there are no more buckets, returns NULL and sets idx to -1
   Bucket* NextBucket(int64_t* bucket_idx);
 
-  // Resize the hash table to 'num_buckets'
-  void ResizeBuckets(int64_t num_buckets);
+  // Resize the hash table to 'num_buckets'. Returns false on OOM.
+  bool ResizeBuckets(int64_t num_buckets);
 
   // Insert row into the hash table
   bool IR_ALWAYS_INLINE InsertImpl(HashTableCtx* ht_ctx, void* data);
@@ -472,19 +473,20 @@ class HashTable {
     }
   }
 
-  // Grow the node array.
-  void GrowNodeArray();
-
-  // Sets mem_limit_exceeded_ to true and MEM_LIMIT_EXCEEDED for the query.
-  // allocation_size is the attempted size of the allocation that would have
-  // brought us over the mem limit.
-  void MemLimitExceeded(int64_t allocation_size);
+  // Grow the node array. Returns false on OOM.
+  bool GrowNodeArray();
 
   // Load factor that will trigger growing the hash table on insert.  This is
   // defined as the number of non-empty buckets / total_buckets
   static const float MAX_BUCKET_OCCUPANCY_FRACTION;
 
   RuntimeState* state_;
+
+  // Client to allocate data pages with.
+  BufferedBlockMgr::Client* block_mgr_client_;
+
+  // Only used for tests to allocate data pages instead of the block mgr.
+  MemPool* data_page_pool_;
 
   // Number of Tuple* in the build tuple row
   const int num_build_tuples_;
@@ -501,23 +503,14 @@ class HashTable {
   // number of nodes stored (i.e. size of hash table)
   int64_t num_nodes_;
 
-  // MemPool used to allocate data pages.
-  boost::scoped_ptr<MemPool> mem_pool_;
-
-  // Number of data pages for nodes.
-  int num_data_pages_;
+  // Data pages for all nodes. These are always pinned.
+  std::vector<BufferedBlockMgr::Block*> data_pages_;
 
   // Next node to insert.
   Node* next_node_;
 
   // Number of nodes left in the current page.
   int node_remaining_current_page_;
-
-  MemTracker* mem_tracker_;
-
-  // Set to true if the hash table exceeds the memory limit. If this is set,
-  // subsequent calls to Insert() will be ignored.
-  bool mem_limit_exceeded_;
 
   std::vector<Bucket> buckets_;
 

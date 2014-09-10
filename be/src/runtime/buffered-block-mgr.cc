@@ -187,6 +187,7 @@ Status BufferedBlockMgr::RegisterClient(int num_reserved_buffers, MemTracker* tr
   DCHECK_GE(num_reserved_buffers, 0);
   *client = obj_pool_.Add(new Client(this, num_reserved_buffers, tracker, state));
   num_unreserved_buffers_ -= num_reserved_buffers;
+  total_reserved_buffers_ += num_reserved_buffers;
   return Status::OK;
 }
 
@@ -196,6 +197,7 @@ void BufferedBlockMgr::LowerBufferReservation(Client* client, int num_buffers) {
   int delta = client->num_reserved_buffers_ - num_buffers;
   client->num_reserved_buffers_ = num_buffers;
   num_unreserved_buffers_ += delta;
+  total_reserved_buffers_ -= delta;
 }
 
 void BufferedBlockMgr::Cancel() {
@@ -217,14 +219,14 @@ Status BufferedBlockMgr::GetNewBlock(Client* client, Block** block) {
   DCHECK_NOTNULL(*block);
   DCHECK((*block)->client_ == client);
   bool in_mem;
-  RETURN_IF_ERROR(FindBufferForBlock(*block, &in_mem));
+  Status status = FindBufferForBlock(*block, &in_mem);
   DCHECK(!in_mem) << "A new block cannot start in mem.";
-  if (!(*block)->is_pinned_) {
+  if (!status.ok() || !(*block)->is_pinned_) {
     (*block)->is_deleted_ = true;
     ReturnUnusedBlock(*block);
     *block = NULL;
   }
-  return Status::OK;
+  return status;
 }
 
 BufferedBlockMgr::~BufferedBlockMgr() {
@@ -280,6 +282,10 @@ int BufferedBlockMgr::num_pinned_buffers(Client* client) const {
   return client->num_pinned_buffers_;
 }
 
+int BufferedBlockMgr::num_reserved_buffers_remaining(Client* client) const {
+  return max(client->num_reserved_buffers_ - client->num_pinned_buffers_, 0);
+}
+
 Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned) {
   DCHECK(!block->is_deleted_);
   *pinned = false;
@@ -297,7 +303,7 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned) {
   RETURN_IF_ERROR(FindBufferForBlock(block, &in_mem));
   *pinned = block->is_pinned_;
 
-  if (!block->is_pinned_ || in_mem) {
+  if (!block->is_pinned_ || in_mem || block->valid_data_len_ == 0) {
     // Either there was no memory for this block or the buffer was never evicted
     // and already contains the data. Either way, nothing left to do.
     return Status::OK;
@@ -332,7 +338,7 @@ Status BufferedBlockMgr::UnpinBlock(Block* block) {
   lock_guard<mutex> unpinned_lock(lock_);
   if (is_cancelled_) return Status::CANCELLED;
   if (!block->is_pinned_) return Status::OK;
-  DCHECK(Validate()) << endl << DebugString();
+  DCHECK(Validate()) << endl << DebugInternal();
   // Add 'block' to the list of unpinned blocks and set is_pinned_ to false.
   // Cache its position in the list for later removal.
   block->is_pinned_ = false;
@@ -344,7 +350,7 @@ Status BufferedBlockMgr::UnpinBlock(Block* block) {
   }
   block->client_->UnpinBuffer();
   RETURN_IF_ERROR(WriteUnpinnedBlocks());
-  DCHECK(Validate()) << endl << DebugString();
+  DCHECK(Validate()) << endl << DebugInternal();
   return Status::OK;
 }
 
@@ -389,14 +395,14 @@ Status BufferedBlockMgr::WriteUnpinnedBlocks() {
     outstanding_writes_counter_->Update(1);
     writes_issued_counter_->Update(1);
   }
-  DCHECK(Validate()) << endl << DebugString();
+  DCHECK(Validate()) << endl << DebugInternal();
   return Status::OK;
 }
 
 void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
   outstanding_writes_counter_->Update(-1);
   lock_guard<mutex> lock(lock_);
-  DCHECK(Validate()) << endl << DebugString();
+  DCHECK(Validate()) << endl << DebugInternal();
   DCHECK_GT(num_outstanding_writes_, 0);
   DCHECK(block->in_write_) << "WriteComplete() for block not in write."
                            << endl << block->DebugString();
@@ -416,7 +422,7 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
     // The number of outstanding writes has decreased but the number of free buffers
     // hasn't.
     WriteUnpinnedBlocks();
-    DCHECK(Validate()) << endl << DebugString();
+    DCHECK(Validate()) << endl << DebugInternal();
     return;
   }
   free_buffers_.Enqueue(block->buffer_desc_);
@@ -425,7 +431,7 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
     block->buffer_desc_ = NULL;
     ReturnUnusedBlock(block);
   }
-  DCHECK(Validate()) << endl << DebugString();
+  DCHECK(Validate()) << endl << DebugInternal();
   buffer_available_cv_.notify_one();
 }
 
@@ -433,7 +439,7 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
   DCHECK(!block->is_deleted_);
   lock_guard<mutex> lock(lock_);
   if (is_cancelled_) return Status::CANCELLED;
-  DCHECK(block->Validate()) << endl << DebugString();
+  DCHECK(block->Validate()) << endl << DebugInternal();
 
   block->is_deleted_ = true;
   if (block->is_pinned_) {
@@ -461,7 +467,7 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
     block->buffer_desc_ = NULL;
   }
   ReturnUnusedBlock(block);
-  DCHECK(Validate()) << endl << DebugString();
+  DCHECK(Validate()) << endl << DebugInternal();
   return Status::OK;
 }
 
@@ -483,7 +489,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
 
   DCHECK(!block->is_pinned_ && !block->is_deleted_)
       << "FindBufferForBlock() " << endl << block->DebugString();
-  DCHECK(Validate()) << endl << DebugString();
+  DCHECK(Validate()) << endl << DebugInternal();
 
   bool is_optional_request = client->num_pinned_buffers_ >= client->num_reserved_buffers_;
   if (is_optional_request && num_unreserved_pinned_buffers_ >= num_unreserved_buffers_) {
@@ -565,7 +571,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
   // The number of free buffers has decreased. Write unpinned blocks if the number
   // of free buffers below the threshold is reached.
   RETURN_IF_ERROR(WriteUnpinnedBlocks());
-  DCHECK(Validate()) << endl << DebugString();
+  DCHECK(Validate()) << endl << DebugInternal();
   return Status::OK;
 }
 
@@ -600,7 +606,7 @@ bool BufferedBlockMgr::Validate() const {
     bool is_free = free_buffers_.Contains(buffer);
     num_free_buffers += is_free;
     if (buffer->block == NULL && !is_free) {
-      LOG(ERROR) << "Buffer with no block not in free list." << endl << DebugString();
+      LOG(ERROR) << "Buffer with no block not in free list." << endl << DebugInternal();
       return false;
     }
 
@@ -628,7 +634,7 @@ bool BufferedBlockMgr::Validate() const {
     LOG(ERROR) << "free_buffer_list_ inconsistency."
                   << " num_free_buffers = " << num_free_buffers
                   << " free_buffer_list_.size() = " << free_buffers_.size()
-                  << endl << DebugString();
+                  << endl << DebugInternal();
     return false;
   }
 
@@ -661,7 +667,12 @@ bool BufferedBlockMgr::Validate() const {
   return true;
 }
 
-string BufferedBlockMgr::DebugString() const {
+string BufferedBlockMgr::DebugString() {
+  unique_lock<mutex> l(lock_);
+  return DebugInternal();
+}
+
+string BufferedBlockMgr::DebugInternal() const {
   stringstream ss;
   ss << "Buffered block mgr" << endl
      << " Num writes outstanding " << outstanding_writes_counter_->value() << endl

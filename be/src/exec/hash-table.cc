@@ -19,6 +19,7 @@
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
 #include "exprs/slot-ref.h"
+#include "runtime/buffered-block-mgr.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/raw-value.h"
 #include "runtime/runtime-state.h"
@@ -32,8 +33,20 @@ using namespace std;
 
 const char* HashTableCtx::LLVM_CLASS_NAME = "class.impala::HashTableCtx";
 
-HashTableCtx::HashTableCtx(const std::vector<ExprContext*>& build_expr_ctxs,
-    const std::vector<ExprContext*>& probe_expr_ctxs, bool stores_nulls, bool finds_nulls,
+// Page sizes used only for BE test. For non-testing, we use the io buffer size.
+static const int64_t TEST_PAGE_SIZE = 8 * 1024 * 1024;
+
+// Random primes to multiply the seed with.
+static uint32_t SEED_PRIMES[] = {
+  1, // First seed must be 1, level 0 is used by other operators in the fragment.
+  1431655781,
+  1183186591,
+  622729787,
+  338294347,
+};
+
+HashTableCtx::HashTableCtx(const vector<ExprContext*>& build_expr_ctxs,
+    const vector<ExprContext*>& probe_expr_ctxs, bool stores_nulls, bool finds_nulls,
     int32_t initial_seed, int max_levels)
     : build_expr_ctxs_(build_expr_ctxs),
       probe_expr_ctxs_(probe_expr_ctxs),
@@ -49,12 +62,14 @@ HashTableCtx::HashTableCtx(const std::vector<ExprContext*>& build_expr_ctxs,
   memset(expr_values_buffer_, 0, sizeof(uint8_t) * results_buffer_size_);
   expr_value_null_bits_ = new uint8_t[build_expr_ctxs.size()];
 
-  // Populate the seeds to use for all the levels. TODO: throw some primes in here.
+  // Populate the seeds to use for all the levels. TODO: revisit how we generate these.
   DCHECK_GE(max_levels, 0);
+  DCHECK_LE(max_levels, sizeof(SEED_PRIMES) / sizeof(SEED_PRIMES[0]));
+  DCHECK_NE(initial_seed, 0);
   seeds_.resize(max_levels + 1);
   seeds_[0] = initial_seed;
   for (int i = 1; i <= max_levels; ++i) {
-    seeds_[i] = initial_seed + (i << 16);
+    seeds_[i] = seeds_[i - 1] * SEED_PRIMES[i];
   }
 }
 
@@ -139,39 +154,62 @@ bool HashTableCtx::Equals(TupleRow* build_row) {
 }
 
 const float HashTable::MAX_BUCKET_OCCUPANCY_FRACTION = 0.75f;
-static const int PAGE_SIZE = 8 * 1024 * 1024;
 
-HashTable::HashTable(RuntimeState* state, int num_build_tuples,
-    MemTracker* mem_tracker, bool stores_tuples, int64_t num_buckets)
+HashTable::HashTable(RuntimeState* state, BufferedBlockMgr::Client* client,
+    int num_build_tuples, bool stores_tuples, int64_t num_buckets)
   : state_(state),
+    block_mgr_client_(client),
+    data_page_pool_(NULL),
     num_build_tuples_(num_build_tuples),
     stores_tuples_(stores_tuples),
     num_filled_buckets_(0),
     num_nodes_(0),
-    mem_pool_(new MemPool(mem_tracker)),
-    num_data_pages_(0),
     next_node_(NULL),
     node_remaining_current_page_(0),
-    mem_tracker_(mem_tracker),
-    mem_limit_exceeded_(false) {
-  DCHECK(mem_tracker != NULL);
+    num_buckets_(num_buckets),
+    num_buckets_till_resize_(num_buckets_ * MAX_BUCKET_OCCUPANCY_FRACTION) {
   DCHECK_EQ((num_buckets & (num_buckets-1)), 0) << "num_buckets must be a power of 2";
   DCHECK_GT(num_buckets, 0) << "num_buckets must be larger than 0";
-  buckets_.resize(num_buckets);
-  num_buckets_ = num_buckets;
-  num_buckets_till_resize_ = MAX_BUCKET_OCCUPANCY_FRACTION * num_buckets_;
-  mem_tracker_->Consume(buckets_.capacity() * sizeof(Bucket));
+  buckets_.resize(num_buckets_);
+}
 
-  GrowNodeArray();
+HashTable::HashTable(MemPool* pool, int num_buckets)
+  : state_(NULL),
+    block_mgr_client_(NULL),
+    data_page_pool_(pool),
+    num_build_tuples_(1),
+    stores_tuples_(false),
+    num_filled_buckets_(0),
+    num_nodes_(0),
+    next_node_(NULL),
+    node_remaining_current_page_(0),
+    num_buckets_(num_buckets),
+    num_buckets_till_resize_(num_buckets_ * MAX_BUCKET_OCCUPANCY_FRACTION) {
+  DCHECK_EQ((num_buckets & (num_buckets-1)), 0) << "num_buckets must be a power of 2";
+  DCHECK_GT(num_buckets, 0) << "num_buckets must be larger than 0";
+  buckets_.resize(num_buckets_);
+  bool ret = GrowNodeArray();
+  DCHECK(ret);
+}
+
+bool HashTable::Init() {
+  return GrowNodeArray();
 }
 
 void HashTable::Close() {
-  mem_pool_->FreeAll();
-  if (ImpaladMetrics::HASH_TABLE_TOTAL_BYTES != NULL) {
-    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(-num_data_pages_ * PAGE_SIZE);
+  for (int i = 0; i < data_pages_.size(); ++i) {
+    data_pages_[i]->Delete();
   }
-  mem_tracker_->Release(buckets_.capacity() * sizeof(Bucket));
+  if (ImpaladMetrics::HASH_TABLE_TOTAL_BYTES != NULL) {
+    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(
+        -data_pages_.size() * state_->io_mgr()->max_read_buffer_size());
+  }
+  data_pages_.clear();
   buckets_.clear();
+}
+
+int64_t HashTable::byte_size() const {
+  return data_pages_.size() * state_->io_mgr()->max_read_buffer_size();
 }
 
 void HashTable::AddBitmapFilters(HashTableCtx* ht_ctx) {
@@ -215,18 +253,21 @@ void HashTable::AddBitmapFilters(HashTableCtx* ht_ctx) {
   }
 }
 
-void HashTable::ResizeBuckets(int64_t num_buckets) {
+bool HashTable::ResizeBuckets(int64_t num_buckets) {
   DCHECK_EQ((num_buckets & (num_buckets-1)), 0)
       << "num_buckets=" << num_buckets << " must be a power of 2";
+  VLOG(2) << "Resizing hash table from "
+          << num_buckets_ << " to " << num_buckets << " buckets.";
 
   int64_t old_num_buckets = num_buckets_;
+#if 0
+  // TODO (Ippo): remove the bucket structure and merge it with nodes. All the allocations
+  // should come from the BufferedBlockMgr.
   // This can be a rather large allocation so check the limit before (to prevent
   // us from going over the limits too much).
   int64_t delta_size = (num_buckets - old_num_buckets) * sizeof(Bucket);
-  if (!mem_tracker_->TryConsume(delta_size)) {
-    MemLimitExceeded(delta_size);
-    return;
-  }
+  //if (!TryConsume(delta_size)) return false;
+#endif
   buckets_.resize(num_buckets);
 
   // If we're doubling the number of buckets, all nodes in a particular bucket
@@ -267,21 +308,29 @@ void HashTable::ResizeBuckets(int64_t num_buckets) {
 
   num_buckets_ = num_buckets;
   num_buckets_till_resize_ = MAX_BUCKET_OCCUPANCY_FRACTION * num_buckets_;
+  return true;
 }
 
-void HashTable::GrowNodeArray() {
-  node_remaining_current_page_ = PAGE_SIZE / sizeof(Node);
-  next_node_ = reinterpret_cast<Node*>(mem_pool_->Allocate(PAGE_SIZE));
-  ++num_data_pages_;
-  if (ImpaladMetrics::HASH_TABLE_TOTAL_BYTES != NULL) {
-    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(PAGE_SIZE);
+bool HashTable::GrowNodeArray() {
+  int64_t buffer_size = 0;
+  if (block_mgr_client_ != NULL) {
+    BufferedBlockMgr::Block* block = NULL;
+    state_->block_mgr()->GetNewBlock(block_mgr_client_, &block);
+    if (block == NULL) return false;
+    data_pages_.push_back(block);
+    buffer_size = state_->io_mgr()->max_read_buffer_size();
+    next_node_ = block->Allocate<Node>(buffer_size);
+    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(buffer_size);
+  } else {
+    // Only used for testing.
+    DCHECK(data_page_pool_ != NULL);
+    buffer_size = TEST_PAGE_SIZE;
+    next_node_ = reinterpret_cast<Node*>(data_page_pool_->Allocate(buffer_size));
+    if (data_page_pool_->mem_tracker()->LimitExceeded()) return false;
+    DCHECK(next_node_ != NULL);
   }
-  if (mem_tracker_->LimitExceeded()) MemLimitExceeded(PAGE_SIZE);
-}
-
-void HashTable::MemLimitExceeded(int64_t allocation_size) {
-  mem_limit_exceeded_ = true;
-  if (state_ != NULL) state_->SetMemLimitExceeded(mem_tracker_, allocation_size);
+  node_remaining_current_page_ = buffer_size / sizeof(Node);
+  return true;
 }
 
 string HashTable::DebugString(bool skip_empty, bool show_match,
@@ -725,7 +774,7 @@ Function* HashTableCtx::CodegenEquals(RuntimeState* state) {
         codegen->GetPtrType(ExprContext::LLVM_CLASS_NAME), build_expr_ctxs_[i]);
     Value* expr_fn_args[] = { ctx_arg, row };
     CodegenAnyVal result = CodegenAnyVal::CreateCallWrapped(codegen, &builder,
-                                                            build_expr_ctxs_[i]->root()->type(), expr_fn, expr_fn_args, "result");
+        build_expr_ctxs_[i]->root()->type(), expr_fn, expr_fn_args, "result");
     Value* is_null = result.GetIsNull();
 
     // Determine if probe is null (i.e. expr_value_null_bits_[i] == true). In

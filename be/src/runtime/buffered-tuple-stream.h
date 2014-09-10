@@ -109,7 +109,10 @@ class BufferedTupleStream {
   // Prepares the stream for reading. If read_write_, this does not need to be called in
   // order to begin reading, otherwise this must be called after the last AddRow() and
   // before GetNext().
-  Status PrepareForRead();
+  // If got_buffer is NULL, this function will fail (with a bad status) if no buffer
+  // is available. If got_buffer is non-null, this function will not fail on OOM and
+  // *got_buffer is true if a buffer was pinned.
+  Status PrepareForRead(bool* got_buffer = NULL);
 
   // Pins all blocks in this stream and switches to pinned mode.
   // If there is not enough memory, *pinned is set to false and the stream is unpinned.
@@ -123,7 +126,7 @@ class BufferedTupleStream {
   // and must be copied out by the caller.
   Status GetNext(RowBatch* batch, bool* eos);
 
-  // Must be called once at the end to cleanup all resources.
+  // Must be called once at the end to cleanup all resources. Idempotent.
   void Close();
 
   // Returns the status of the stream. We don't want to return a more costly Status
@@ -197,6 +200,7 @@ class BufferedTupleStream {
   // to compute bytes_in_mem and bytes_unpinned.
   int num_pinned_;
 
+  bool closed_; // Used for debugging.
   Status status_;
 
   // Number of rows stored in the stream.

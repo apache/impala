@@ -38,6 +38,7 @@ PartitionedHashJoinNode::PartitionedHashJoinNode(
   : BlockingJoinNode("PartitionedHashJoinNode", tnode.hash_join_node.join_op,
         pool, tnode, descs),
     state_(PARTITIONING_BUILD),
+    block_mgr_client_(NULL),
     process_build_batch_fn_(NULL),
     process_probe_batch_fn_(NULL),
     input_partition_(NULL) {
@@ -145,6 +146,9 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
     (*it)->Close(NULL);
   }
   if (input_partition_ != NULL) input_partition_->Close(NULL);
+  if (block_mgr_client_ != NULL) {
+    state->block_mgr()->LowerBufferReservation(block_mgr_client_, 0);
+  }
   Expr::Close(build_expr_ctxs_, state);
   Expr::Close(probe_expr_ctxs_, state);
   Expr::Close(other_join_conjunct_ctxs_, state);
@@ -213,9 +217,13 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(
   RETURN_IF_ERROR(build_rows_->PrepareForRead());
 
   // Allocate the partition-local hash table.
-  hash_tbl_.reset(new HashTable(state,
-      parent_->child(1)->row_desc().tuple_descriptors().size(),
-      parent_->mem_tracker()));
+  hash_tbl_.reset(new HashTable(state, parent_->block_mgr_client_,
+      parent_->child(1)->row_desc().tuple_descriptors().size()));
+  if (!hash_tbl_->Init()) {
+    *built = false;
+    hash_tbl_.reset();
+    return Status::OK;
+  }
 
   bool eos = false;
   RowBatch batch(parent_->child(1)->row_desc(), state->batch_size(),
@@ -227,15 +235,18 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(
       TupleRow* row = batch.GetRow(i);
       uint32_t hash = 0;
       if (!ctx->EvalAndHashBuild(row, &hash)) continue;
-      hash_tbl_->Insert(ctx, row);
+      if (UNLIKELY(!hash_tbl_->Insert(ctx, row))) {
+        *built = false;
+        break;
+      }
     }
     parent_->build_pool_->AcquireData(batch.tuple_data_pool(), false);
     batch.Reset();
 
-    if (hash_tbl_->mem_limit_exceeded()) {
+    if (!*built) {
       hash_tbl_->Close();
+      hash_tbl_.reset();
       RETURN_IF_ERROR(build_rows_->UnpinStream(true));
-      *built = false;
       return Status::OK;
     }
   }
@@ -433,6 +444,7 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
   }
 
   if (!built) {
+    DCHECK(input_partition_->hash_tbl_.get() == NULL);
     // This build partition still does not fit in memory, repartition.
     ht_ctx_->set_level(input_partition_->level_ + 1);
     RETURN_IF_ERROR(input_partition_->probe_rows()->UnpinStream(true));
@@ -626,18 +638,14 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
       RETURN_IF_ERROR(partition->BuildHashTable(state, &built));
     }
     if (!built) {
-      // Estimate was wrong, cleanup hash table.
-      RETURN_IF_ERROR(partition->build_rows()->UnpinStream(true));
-      if (partition->hash_tbl_.get() != NULL) {
-        partition->hash_tbl_->Close();
-        partition->hash_tbl_.reset();
-      }
+      DCHECK(partition->hash_tbl() == NULL);
       continue;
     }
 
-    // Hash table is built.
+    // Hash table is built. We will not be using the probe stream since the probe rows
+    // can just be evaluated and will never require buffering.
     max_mem_build_tables -= partition->InMemSize();
-    RETURN_IF_ERROR(partition->probe_rows()->UnpinStream(true));
+    partition->probe_rows()->Close();
   }
 
   return Status::OK;

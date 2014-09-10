@@ -102,7 +102,7 @@ allocate_tuple:
         if (intermediate_tuple == NULL) goto allocate_tuple;
         if (ht->Insert(ht_ctx, intermediate_tuple)) continue;
         DCHECK(false) << "How can we get here. We spilled a different partition but "
-          " still did not have enough memory.";
+          "still did not have enough memory.";
         return Status::MEM_LIMIT_EXCEEDED;
       }
 
@@ -116,7 +116,7 @@ allocate_tuple:
         dst_partition->aggregated_row_stream.get() :
         dst_partition->unaggregated_row_stream.get();
     DCHECK(dst_stream != NULL);
-    DCHECK(!dst_stream->is_pinned());
+    DCHECK(!dst_stream->is_pinned()) << AGGREGATED_ROWS;
     if (dst_stream->AddRow(row)) continue;
     Status status = dst_stream->status();
     DCHECK(!status.ok());

@@ -306,7 +306,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
     // Pins the build tuples for this partition and constructs the hash_tbl_ from it.
     // Build rows cannot be added after calling this.
-    // If the partition could not be built due to memory pressure, *built is set to false.
+    // If the partition could not be built due to memory pressure, *built is set to false
+    // and this function cleans up the hash_tbl.
     Status BuildHashTable(RuntimeState* state, bool* built);
 
    private:

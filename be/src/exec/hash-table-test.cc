@@ -200,9 +200,8 @@ TEST_F(HashTableTest, BasicTest) {
   }
 
   // Create the hash table and insert the build rows
-  MemTracker tracker;
-  HashTable hash_table(NULL, 1, &tracker, false);
-  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 0, 0);
+  HashTable hash_table(&mem_pool_);
+  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 0);
 
   uint32_t hash = 0;
   for (int i = 0; i < 5; ++i) {
@@ -245,9 +244,8 @@ TEST_F(HashTableTest, BasicTest) {
 
 // This tests makes sure we can scan ranges of buckets
 TEST_F(HashTableTest, ScanTest) {
-  MemTracker tracker;
-  HashTable hash_table(NULL, 1, &tracker, false);
-  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 0, 0);
+  HashTable hash_table(&mem_pool_);
+  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 0);
 
   // Add 1 row with val 1, 2 with val 2, etc
   vector<TupleRow*> build_rows;
@@ -294,12 +292,12 @@ TEST_F(HashTableTest, ScanTest) {
 TEST_F(HashTableTest, GrowTableTest) {
   int num_to_add = 4;
   int expected_size = 0;
-  MemTracker tracker(100 * 1024 * 1024);
-  HashTable hash_table(NULL, 1, &tracker, false, num_to_add);
-  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 0, 0);
 
-  EXPECT_FALSE(hash_table.mem_limit_exceeded());
-  EXPECT_TRUE(!tracker.LimitExceeded());
+  // Allocate a new pool to test OOM.
+  MemTracker tracker(100 * 1024 * 1024);
+  MemPool pool(&tracker);
+  HashTable hash_table(&pool, num_to_add);
+  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 0);
 
   // This inserts about 5M entries
   int build_row_val = 0;
@@ -308,12 +306,12 @@ TEST_F(HashTableTest, GrowTableTest) {
     for (int j = 0; j < num_to_add; ++build_row_val, ++j) {
       TupleRow* row = CreateTupleRow(build_row_val);
       if (!ht_ctx.EvalAndHashBuild(row, &hash)) continue;
-      hash_table.Insert(&ht_ctx, row);
+      if (!hash_table.Insert(&ht_ctx, row)) goto done_inserting;
     }
     expected_size += num_to_add;
     num_to_add *= 2;
   }
-  EXPECT_TRUE(hash_table.mem_limit_exceeded());
+done_inserting:
   EXPECT_TRUE(tracker.LimitExceeded());
 
   // Validate that we can find the entries before we went over the limit
@@ -329,6 +327,7 @@ TEST_F(HashTableTest, GrowTableTest) {
     }
   }
   hash_table.Close();
+  pool.FreeAll();
   mem_pool_.FreeAll();
 }
 

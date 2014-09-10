@@ -153,8 +153,8 @@ class RuntimeState {
   }
 
   // The seed value to use when hashing tuples.
-  // See comment on root_node_id_.
-  uint32_t fragment_hash_seed() const { return root_node_id_; }
+  // See comment on root_node_id_. We add one to prevent having a hash seed of 0.
+  uint32_t fragment_hash_seed() const { return root_node_id_ + 1; }
 
   // Size to use when building bitmap filters. This is a prime number which reduces
   // collisions and the resulting bitmap is just under 4Kb.

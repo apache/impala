@@ -61,6 +61,7 @@ PartitionedAggregationNode::PartitionedAggregationNode(
     output_tuple_id_(tnode.agg_node.output_tuple_id),
     output_tuple_desc_(NULL),
     needs_finalize_(tnode.agg_node.need_finalize),
+    block_mgr_client_(NULL),
     singleton_output_tuple_(NULL),
     singleton_output_tuple_returned_(true),
     output_partition_(NULL),
@@ -172,19 +173,9 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   } else {
     ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_, true, true,
                                    state->fragment_hash_seed(), MAX_PARTITION_DEPTH));
-
     RETURN_IF_ERROR(state_->block_mgr()->RegisterClient(
         MinRequiredBuffers(), mem_tracker(), state, &block_mgr_client_));
-
-    Status status = CreateHashPartitions(0);
-    if (status.IsMemLimitExceeded()) {
-      int64_t min_mem_required =
-          MinRequiredBuffers() * state->io_mgr()->max_read_buffer_size();
-      status.AddErrorMsg(Substitute(
-          "Mem limit set to below minimum required memory: $0",
-          PrettyPrinter::Print(min_mem_required, TCounterType::BYTES)));
-    }
-    RETURN_IF_ERROR(status);
+    RETURN_IF_ERROR(CreateHashPartitions(state, 0));
   }
 
   if (state->codegen_enabled()) {
@@ -302,7 +293,7 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
       return Status::OK;
     }
     // Process next partition.
-    RETURN_IF_ERROR(NextPartition());
+    RETURN_IF_ERROR(NextPartition(state));
     DCHECK(output_partition_ != NULL);
   }
 
@@ -374,19 +365,22 @@ void PartitionedAggregationNode::Close(RuntimeState* state) {
   if (agg_fn_pool_.get() != NULL) agg_fn_pool_->FreeAll();
   if (mem_pool_.get() != NULL) mem_pool_->FreeAll();
   if (ht_ctx_.get() != NULL) ht_ctx_->Close();
+
+  if (block_mgr_client_ != NULL) {
+    state->block_mgr()->LowerBufferReservation(block_mgr_client_, 0);
+  }
+
   Expr::Close(probe_expr_ctxs_, state);
   Expr::Close(build_expr_ctxs_, state);
   ExecNode::Close(state);
 }
 
-Status PartitionedAggregationNode::Partition::Init() {
+Status PartitionedAggregationNode::Partition::InitStreams() {
   agg_fn_pool.reset(new MemPool(parent->state_->udf_mem_tracker()));
   for (int i = 0; i < parent->agg_fn_ctxs_.size(); ++i) {
     agg_fn_ctxs.push_back(parent->agg_fn_ctxs_[i]->impl()->Clone(agg_fn_pool.get()));
   }
 
-  // TODO: how many buckets?
-  hash_tbl.reset(new HashTable(parent->state_, 1, parent->mem_tracker(), true));
   aggregated_row_stream.reset(new BufferedTupleStream(parent->state_, parent->row_desc(),
       parent->state_->block_mgr(), parent->block_mgr_client_));
   RETURN_IF_ERROR(aggregated_row_stream->Init());
@@ -397,6 +391,13 @@ Status PartitionedAggregationNode::Partition::Init() {
   // This stream is only used to spill, no need to ever have this pinned.
   RETURN_IF_ERROR(unaggregated_row_stream->Init(false));
   return Status::OK;
+}
+
+bool PartitionedAggregationNode::Partition::InitHashTable() {
+  DCHECK(hash_tbl.get() == NULL);
+  // TODO: how many buckets?
+  hash_tbl.reset(new HashTable(parent->state_, parent->block_mgr_client_, 1, true));
+  return hash_tbl->Init();
 }
 
 void PartitionedAggregationNode::Partition::Close(bool finalize_rows) {
@@ -569,28 +570,45 @@ void PartitionedAggregationNode::DebugString(int indentation_level,
   *out << ")";
 }
 
-Status PartitionedAggregationNode::CreateHashPartitions(int level) {
+Status PartitionedAggregationNode::CreateHashPartitions(RuntimeState* state, int level) {
   if (level >= MAX_PARTITION_DEPTH) {
     // TODO: better error msg.
-    return Status("Cannot perform hash aggregation. Input data has too much skew");
+    return Status("Cannot perform hash aggregation. Partitioned input data too many"
+       " times. This could mean there is too much skew in the data or the memory"
+       " limit is set too low.");
   }
   ht_ctx_->set_level(level);
+
   DCHECK(hash_partitions_.empty());
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
     hash_partitions_.push_back(state_->obj_pool()->Add(new Partition(this, level)));
-    RETURN_IF_ERROR(hash_partitions_[i]->Init());
+    RETURN_IF_ERROR(hash_partitions_[i]->InitStreams());
   }
+  DCHECK_GT(state->block_mgr()->num_reserved_buffers_remaining(block_mgr_client_), 0);
+
+  // Now that all the streams are reserved (meaning we have enough memory to execute
+  // the algorithm), allocate the hash tables. These can fail and we can still continue.
+  for (int i = 0; i < PARTITION_FANOUT; ++i) {
+    if (!hash_partitions_[i]->InitHashTable()) {
+      hash_partitions_[i]->hash_tbl->Close();
+      hash_partitions_[i]->hash_tbl.reset();
+      RETURN_IF_ERROR(hash_partitions_[i]->aggregated_row_stream->UnpinStream(true));
+      COUNTER_UPDATE(num_spilled_partitions_, 1);
+    }
+  }
+
   COUNTER_UPDATE(partitions_created_, PARTITION_FANOUT);
   COUNTER_SET(max_partition_level_, level);
   return Status::OK;
 }
 
-Status PartitionedAggregationNode::NextPartition() {
+Status PartitionedAggregationNode::NextPartition(RuntimeState* state) {
   DCHECK(output_partition_ == NULL);
 
   // Keep looping until we get to a partition that fits in memory.
   Partition* partition = NULL;
   while (true) {
+    partition = NULL;
     // First return partitions that are fully aggregated (and in memory).
     if (!aggregated_partitions_.empty()) {
       partition = aggregated_partitions_.front();
@@ -599,8 +617,10 @@ Status PartitionedAggregationNode::NextPartition() {
       break;
     }
 
-    while (partition == NULL) {
+    if (partition == NULL) {
       DCHECK(!spilled_partitions_.empty());
+      DCHECK_EQ(state->block_mgr()->num_pinned_buffers(block_mgr_client_), 0);
+
       // TODO: we can probably do better than just picking the first partition. We
       // can base this on the amount written to disk, etc.
       partition = spilled_partitions_.front();
@@ -610,7 +630,7 @@ Status PartitionedAggregationNode::NextPartition() {
       // TODO: we don't need to repartition here. We are now working on 1 / FANOUT
       // of the input so it's reasonably likely it can fit. We should look at this
       // partitions size and just do the aggregation if it fits in memory.
-      RETURN_IF_ERROR(CreateHashPartitions(partition->level + 1));
+      RETURN_IF_ERROR(CreateHashPartitions(state, partition->level + 1));
       COUNTER_UPDATE(num_repartitions_, 1);
 
       // Rows in this partition could have been spilled into two streams, depending
@@ -648,7 +668,14 @@ Status PartitionedAggregationNode::NextPartition() {
 
 template<bool AGGREGATED_ROWS>
 Status PartitionedAggregationNode::ProcessStream(BufferedTupleStream* input_stream) {
-  RETURN_IF_ERROR(input_stream->PrepareForRead());
+  bool got_buffer = false;
+  RETURN_IF_ERROR(input_stream->PrepareForRead(&got_buffer));
+  if (!got_buffer) {
+    // Did not have a buffer to read the input stream. Spill and try again.
+    RETURN_IF_ERROR(SpillPartition());
+    RETURN_IF_ERROR(input_stream->PrepareForRead());
+  }
+
   bool eos = false;
   RowBatch batch(AGGREGATED_ROWS ? *intermediate_row_desc_ : children_[0]->row_desc(),
       state_->batch_size(), mem_tracker());
@@ -677,6 +704,8 @@ Status PartitionedAggregationNode::SpillPartition() {
     }
   }
   if (partition_idx == -1) {
+    DCHECK(false) << "This should never happen due to the reservation. This is "
+      "defense on release builds";
     // Could not find a partition to spill. This means the mem limit was just too
     // low.
     Status status = Status::MEM_LIMIT_EXCEEDED;
@@ -688,7 +717,8 @@ Status PartitionedAggregationNode::SpillPartition() {
   DCHECK(partition->hash_tbl.get() != NULL);
   partition->hash_tbl->Close();
   partition->hash_tbl.reset();
-  RETURN_IF_ERROR(partition->aggregated_row_stream->UnpinStream());
+  RETURN_IF_ERROR(partition->aggregated_row_stream->UnpinStream(true));
+  COUNTER_UPDATE(num_spilled_partitions_, 1);
 
   // We need to do a lot more work in this case. The result tuple contains var-len
   // strings, meaning the current in memory layout is not the on disk block layout.
@@ -726,7 +756,6 @@ Status PartitionedAggregationNode::SpillPartition() {
       partition->agg_fn_ctxs[i]->impl()->FreeLocalAllocations();
     }
   }
-  COUNTER_UPDATE(num_spilled_partitions_, 1);
   return Status::OK;
 }
 
@@ -738,7 +767,21 @@ Status PartitionedAggregationNode::MoveHashPartitions(int64_t num_input_rows) {
      << num_input_rows << " rows into:" << endl;
   for (int i = 0; i < hash_partitions_.size(); ++i) {
     Partition* partition = hash_partitions_[i];
-    if (partition->is_spilled()) {
+    int64_t aggregated_rows = partition->aggregated_row_stream->num_rows();
+    int64_t unaggregated_rows = partition->unaggregated_row_stream->num_rows();
+    double total_rows = aggregated_rows + unaggregated_rows;
+    double percent = total_rows * 100 / num_input_rows;
+    ss << "  " << i << " "  << (partition->is_spilled() ? "spilled" : "not spilled")
+       << " (fraction=" << fixed << setprecision(2) << percent << "%)" << endl
+       << "    #aggregated rows:" << aggregated_rows << endl
+       << "    #unaggregated rows: " << unaggregated_rows << endl;
+
+    // TODO: update counters to support doubles.
+    COUNTER_SET(largest_partition_percent_, static_cast<int64_t>(percent));
+
+    if (total_rows == 0) {
+      partition->Close(false);
+    } else if (partition->is_spilled()) {
       // We need to unpin all the spilled partitions to make room to allocate new
       // hash_partitions_ when we repartition the spilled partitions.
       // TODO: we only need to do this when we have memory pressure. This might be
@@ -751,17 +794,6 @@ Status PartitionedAggregationNode::MoveHashPartitions(int64_t num_input_rows) {
       aggregated_partitions_.push_back(partition);
     }
 
-    int64_t aggregated_rows = partition->aggregated_row_stream->num_rows();
-    int64_t unaggregated_rows = partition->unaggregated_row_stream->num_rows();
-    double total_rows = aggregated_rows + unaggregated_rows;
-    double percent = total_rows * 100 / num_input_rows;
-    ss << "  " << i << " "  << (partition->is_spilled() ? "spilled" : "not spilled")
-       << " (fraction=" << fixed << setprecision(2) << percent << "%)" << endl
-       << "    #aggregated rows:" << aggregated_rows << endl
-       << "    #unaggregated rows: " << unaggregated_rows << endl;
-
-    // TODO: update counters to support doubles.
-    COUNTER_SET(largest_partition_percent_, static_cast<int64_t>(percent));
   }
   LOG(ERROR) << ss.str();
   hash_partitions_.clear();

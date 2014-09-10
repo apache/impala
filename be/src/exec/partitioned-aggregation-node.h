@@ -220,8 +220,14 @@ class PartitionedAggregationNode : public ExecNode {
     Partition(PartitionedAggregationNode* parent, int level)
       : parent(parent), is_closed(false), level(level) {}
 
-    // Initializes a partition.
-    Status Init();
+    // Initializes aggregated_row_stream and unaggregated_row_stream, reserving
+    // one buffer for each. The buffers backing these streams are reserved, so this
+    // function will not fail with a continuable OOM. If we fail to init these buffers,
+    // the mem limit is too low to run this algorithm.
+    Status InitStreams();
+
+    // Initializes the hash table. Returns false on OOM.
+    bool InitHashTable();
 
     // Closes this partition. If finalize_rows is true, this iterates over all rows
     // in aggregated_row_stream and finalizes them (this is only used in the cancellation
@@ -323,13 +329,13 @@ class PartitionedAggregationNode : public ExecNode {
 
   // Initializes hash_partitions_. Level is the level for the partitions to create.
   // Also sets ht_ctx_'s level to level.
-  Status CreateHashPartitions(int level);
+  Status CreateHashPartitions(RuntimeState* state, int level);
 
   // Prepares the next partition to return results from. On return, this function
   // initializes output_iterator_ and output_partition_. This either removes
   // a partition from aggregated_partitions_ (and is done) or removes the next
   // partition from aggregated_partitions_ and repartitions it.
-  Status NextPartition();
+  Status NextPartition(RuntimeState* state);
 
   // Picks a partition from hash_partitions_ to spill.
   Status SpillPartition();

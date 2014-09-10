@@ -39,6 +39,7 @@ BufferedTupleStream::BufferedTupleStream(RuntimeState* state,
     rows_returned_(0),
     write_block_(NULL),
     num_pinned_(0),
+    closed_(false),
     num_rows_(0),
     pinned_(true) {
   read_block_ = blocks_.end();
@@ -100,6 +101,7 @@ void BufferedTupleStream::Close() {
   blocks_.clear();
   num_pinned_ = 0;
   DCHECK_EQ(num_pinned_, NumPinned(blocks_));
+  closed_ = true;
 }
 
 int64_t BufferedTupleStream::bytes_in_mem(bool ignore_current) const {
@@ -116,6 +118,7 @@ int64_t BufferedTupleStream::bytes_unpinned() const {
 }
 
 Status BufferedTupleStream::NewBlockForWrite(bool* got_block) {
+  DCHECK(!closed_);
   if (write_block_ != NULL) {
     DCHECK(write_block_->is_pinned());
     if (!pinned_ && write_block_ != *read_block_) {
@@ -140,6 +143,7 @@ Status BufferedTupleStream::NewBlockForWrite(bool* got_block) {
 }
 
 Status BufferedTupleStream::NextBlockForRead() {
+  DCHECK(!closed_);
   DCHECK(read_block_ != blocks_.end());
   if (delete_on_read_ && !pinned_) {
     DCHECK(read_block_ == blocks_.begin());
@@ -173,7 +177,8 @@ Status BufferedTupleStream::NextBlockForRead() {
   return Status::OK;
 }
 
-Status BufferedTupleStream::PrepareForRead() {
+Status BufferedTupleStream::PrepareForRead(bool* got_buffer) {
+  DCHECK(!closed_);
   if (blocks_.empty()) return Status::OK;
 
   if (!read_write_ && write_block_ != NULL) {
@@ -190,7 +195,15 @@ Status BufferedTupleStream::PrepareForRead() {
   if (!(*read_block_)->is_pinned()) {
     bool current_pinned;
     RETURN_IF_ERROR((*read_block_)->Pin(&current_pinned));
-    DCHECK(current_pinned) << "Should have reserved enough blocks";
+    if (!current_pinned) {
+      if (got_buffer == NULL) {
+        DCHECK(current_pinned) << "Should have reserved enough blocks";
+        return Status::MEM_LIMIT_EXCEEDED;
+      } else {
+        *got_buffer = false;
+        return Status::OK;
+      }
+    }
     ++num_pinned_;
     DCHECK_EQ(num_pinned_, NumPinned(blocks_));
   }
@@ -199,10 +212,12 @@ Status BufferedTupleStream::PrepareForRead() {
   read_ptr_ = (*read_block_)->buffer();
   read_bytes_ = 0;
   rows_returned_ = 0;
+  if (got_buffer != NULL) *got_buffer = true;
   return Status::OK;
 }
 
 Status BufferedTupleStream::PinStream(bool* pinned) {
+  DCHECK(!closed_);
   DCHECK(pinned != NULL);
   *pinned = true;
 
@@ -223,6 +238,7 @@ Status BufferedTupleStream::PinStream(bool* pinned) {
 }
 
 Status BufferedTupleStream::UnpinStream(bool all) {
+  DCHECK(!closed_);
   for (list<BufferedBlockMgr::Block*>::iterator it = blocks_.begin();
       it != blocks_.end(); ++it) {
     if (!(*it)->is_pinned()) continue;
@@ -240,6 +256,7 @@ Status BufferedTupleStream::UnpinStream(bool all) {
 }
 
 Status BufferedTupleStream::GetNext(RowBatch* batch, bool* eos) {
+  DCHECK(!closed_);
   DCHECK(batch->row_desc().Equals(desc_));
   DCHECK_EQ(batch->num_rows(), 0);
   *eos = (rows_returned_ == num_rows_);
