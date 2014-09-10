@@ -894,5 +894,30 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     // IS NULL with a BinaryPredicate that contains a subquery
     AnalyzesOk("select * from functional.alltypestiny where (id = " +
         "(select max(id) from functional.alltypessmall)) is null");
+
+    // between predicates with subqueries
+    AnalyzesOk("select * from functional.alltypestiny where " +
+        "(select avg(id) from functional.alltypesagg where bool_col = true) " +
+        "between 1 and 100 and int_col < 10");
+    AnalyzesOk("select count(*) from functional.alltypestiny t where " +
+        "(select count(id) from functional.alltypesagg g where t.id = g.id " +
+        "and g.bigint_col < 10) between 1 and 1000");
+    AnalyzesOk("select id from functional.alltypestiny where " +
+        "int_col between (select min(int_col) from functional.alltypesagg where " +
+        "id < 10) and 100 and bool_col = false");
+    AnalyzesOk("select * from functional.alltypessmall s where " +
+        "int_col between (select count(t.id) from functional.alltypestiny t where " +
+        "t.int_col = s.int_col) and (select max(int_col) from " +
+        "functional.alltypes a where a.id = s.id and a.bool_col = false)");
+    AnalyzesOk("select * from functional.alltypessmall where " +
+        "int_col between (select min(int_col) from functional.alltypestiny) and " +
+        "(select max(int_col) from functional.alltypestiny) and bigint_col between " +
+        "(select min(bigint_col) from functional.alltypesagg) and (select " +
+        "max(bigint_col) from functional.alltypesagg)");
+    AnalysisError("select * from functional.alltypestiny where (select min(id) " +
+        "from functional.alltypes) between 1 and (select max(id) from " +
+        "functional.alltypes)", "Comparison between subqueries is not supported " +
+        "in a between predicate: (SELECT min(id) FROM functional.alltypes) BETWEEN " +
+        "1 AND (SELECT max(id) FROM functional.alltypes)");
   }
 }

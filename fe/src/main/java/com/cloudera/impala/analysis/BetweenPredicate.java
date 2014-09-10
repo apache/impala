@@ -59,12 +59,22 @@ public class BetweenPredicate extends Predicate {
     }
   }
 
+  public CompoundPredicate getRewrittenPredicate() {
+    Preconditions.checkState(isAnalyzed_);
+    return rewrittenPredicate_;
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
+    if (originalChildren_.get(0) instanceof Subquery &&
+        (originalChildren_.get(1) instanceof Subquery ||
+         originalChildren_.get(2) instanceof Subquery)) {
+      throw new AnalysisException("Comparison between subqueries is not " +
+          "supported in a between predicate: " + toSqlImpl());
+    }
     analyzer.castAllToCompatibleType(originalChildren_);
-
     // TODO: improve with histograms
     selectivity_ = Expr.DEFAULT_SELECTIVITY;
 

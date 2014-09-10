@@ -175,10 +175,12 @@ public class StmtRewriter {
     int numTableRefs = stmt.tableRefs_.size();
     ArrayList<Expr> exprsWithSubqueries = Lists.newArrayList();
     ExprSubstitutionMap smap = new ExprSubstitutionMap();
-    List<Expr> conjuncts = stmt.whereClause_.getConjuncts();
+    // Replace all BetweenPredicates that contain subqueries with their
+    // equivalent compound predicates.
+    stmt.whereClause_ = replaceBetweenPredicates(stmt.whereClause_);
     // Check if all the conjuncts in the WHERE clause that contain subqueries
-    // can currently be rewritten as joins.
-    for (Expr conjunct: conjuncts) {
+    // can currently be rewritten as a join.
+    for (Expr conjunct: stmt.whereClause_.getConjuncts()) {
       List<Subquery> subqueries = Lists.newArrayList();
       conjunct.collectAll(Predicates.instanceOf(Subquery.class), subqueries);
       if (subqueries.size() == 0) continue;
@@ -212,6 +214,21 @@ public class StmtRewriter {
     }
     if (canEliminate(stmt.whereClause_)) stmt.whereClause_ = null;
     if (hasNewVisibleTuple) replaceUnqualifiedStarItems(stmt, numTableRefs);
+  }
+
+  /**
+   * Replace all BetweenPredicates containing subqueries with their
+   * equivalent compound predicates from the expr tree rooted at 'expr'.
+   * The modified expr tree is returned.
+   */
+  private static Expr replaceBetweenPredicates(Expr expr) {
+    if (expr instanceof BetweenPredicate && expr.contains(Subquery.class)) {
+      return ((BetweenPredicate)expr).getRewrittenPredicate();
+    }
+    for (int i = 0; i < expr.getChildren().size(); ++i) {
+      expr.setChild(i, replaceBetweenPredicates(expr.getChild(i)));
+    }
+    return expr;
   }
 
   /**

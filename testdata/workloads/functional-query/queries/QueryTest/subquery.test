@@ -404,3 +404,25 @@ order by id
 ---- TYPES
 INT
 ====
+---- QUERY
+# Between predicate with subqueries
+select id from functional.alltypessmall
+where id between
+  (select min(bigint_col) from functional.alltypestiny) and
+  (select max(bigint_col) from functional.alltypestiny)
+order by id
+---- RESULTS
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+---- TYPES
+INT
+====

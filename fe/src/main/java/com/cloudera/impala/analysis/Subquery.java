@@ -61,6 +61,7 @@ public class Subquery extends Expr {
   public Subquery(Subquery other) {
     super(other);
     stmt_ = other.stmt_.clone();
+    isAnalyzed_ = false;
   }
 
   /**
@@ -68,6 +69,7 @@ public class Subquery extends Expr {
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (isAnalyzed_) return;
     super.analyze(analyzer);
     if (!(stmt_ instanceof SelectStmt)) {
       throw new AnalysisException("A subquery must contain a single select block: " +

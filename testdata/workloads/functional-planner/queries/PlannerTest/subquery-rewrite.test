@@ -1040,3 +1040,33 @@ group by t.bool_col
 00:SCAN HDFS [functional.alltypes t]
    partitions=24/24 size=478.45KB
 ====
+# Between predicate with subqueries
+select *
+from functional.alltypestiny t
+where int_col between
+  (select min(int_col) from functional.alltypessmall where bool_col = false) and
+  (select max(int_col) from functional.alltypessmall where bool_col = true)
+---- PLAN
+06:CROSS JOIN [BROADCAST]
+|  predicates: int_col <= max(int_col)
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  output: max(int_col)
+|  |
+|  03:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|     predicates: bool_col = TRUE
+|
+05:CROSS JOIN [BROADCAST]
+|  predicates: int_col >= min(int_col)
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(int_col)
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|     predicates: bool_col = FALSE
+|
+00:SCAN HDFS [functional.alltypestiny t]
+   partitions=4/4 size=460B
+====
