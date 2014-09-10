@@ -207,6 +207,33 @@ class AggregateFunctions {
 
   // Returns the result for RANK and DENSE_RANK and cleans up intermediate state in src.
   static BigIntVal RankFinalize(FunctionContext*, StringVal& src);
+
+  // Implements LAST_VALUE.
+  template <typename T>
+  static void LastValUpdate(FunctionContext*, const T& src, T* dst);
+
+  // Implements FIRST_VALUE.
+  template <typename T>
+  static void FirstValUpdate(FunctionContext*, const T& src, StringVal* dst);
+
+  template <typename T>
+  static T FirstValGetValue(FunctionContext*, const StringVal& src);
+
+  template <typename T>
+  static T FirstValFinalize(FunctionContext*, const StringVal& src);
+
+  // OffsetFn*() implement LAG and LEAD. Init() sets the default value (the last
+  // constant parameter) as dst.
+  template <typename T>
+  static void OffsetFnInit(FunctionContext*, T* dst);
+
+  // Update() takes all the parameters to LEAD/LAG, including the integer offset and
+  // the default value, neither which are needed by Update(). (The offset is already
+  // used in the window for the analytic fn evaluation and the default value is set
+  // in Init().
+  template <typename T>
+  static void OffsetFnUpdate(FunctionContext*, const T& src, const BigIntVal&, const T&,
+      T* dst);
 };
 
 }

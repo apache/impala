@@ -64,10 +64,12 @@ Status AnalyticEvalNode::Init(const TPlanNode& tnode) {
     RETURN_IF_ERROR(AggFnEvaluator::Create(
           pool_, analytic_node.analytic_functions[i], true, &evaluator));
     evaluators_.push_back(evaluator);
+    is_lead_fn_.push_back(
+      "lead" == analytic_node.analytic_functions[i].nodes[0].fn.name.function_name);
   }
   DCHECK(fn_scope_ != PARTITION || analytic_node.order_by_exprs.empty());
-  DCHECK(fn_scope_ == PARTITION || window_.__isset.window_end)
-      << "UNBOUNDED FOLLOWING is not supported.";
+  DCHECK(window_.__isset.window_end || !window_.__isset.window_start)
+      << "UNBOUNDED FOLLOWING is only supported with UNBOUNDED PRECEDING.";
   RETURN_IF_ERROR(partition_exprs_.Init(analytic_node.partition_exprs, NULL, pool_));
   RETURN_IF_ERROR(ordering_exprs_.Init(analytic_node.order_by_exprs, NULL, pool_));
   return Status::OK;
@@ -190,8 +192,13 @@ string AnalyticEvalNode::DebugWindowString() const {
   } else {
     ss << "UNBOUNDED_PRECEDING";
   }
-  DCHECK(window_.__isset.window_end) << "UNBOUNDED FOLLOWING is not implemented";
-  ss << ", end=" << DebugWindowBoundString(window_.window_end) << "}";
+
+  ss << ", end=";
+  if (window_.__isset.window_end) {
+    ss << DebugWindowBoundString(window_.window_end) << "}";
+  } else {
+    ss << "UNBOUNDED_FOLLOWING";
+  }
   return ss.str();
 }
 
@@ -215,16 +222,7 @@ void AnalyticEvalNode::AddResultTuple(int64_t stream_idx) {
       curr_result_tuple_pool_.get());
   ++num_tuples_in_curr_result_pool_;
 
-  for (int i = 0; i < evaluators_.size(); ++i) {
-    // TODO: Assumes we can call GetValue() or Finalize() repeatedly; need to register
-    // agg fns as being compatible for analytic fn evaluation.
-    if (evaluators_[i]->SupportsGetValue()) {
-      evaluators_[i]->GetValue(fn_ctxs_[i], curr_tuple_, result_tuple);
-    } else {
-      evaluators_[i]->Finalize(fn_ctxs_[i], curr_tuple_, result_tuple);
-    }
-  }
-
+  AggFnEvaluator::GetValue(evaluators_, fn_ctxs_, curr_tuple_, result_tuple);
   DCHECK(result_tuples_.empty() || stream_idx > result_tuples_.back().first)
       << "stream_idx=" << stream_idx << " state:" << DebugEvaluatedRowsString();
   result_tuples_.push_back(
@@ -249,11 +247,16 @@ inline void AnalyticEvalNode::TryAddResultTupleForPrevRow(bool next_partition,
 inline void AnalyticEvalNode::TryAddResultTupleForCurrRow(int64_t stream_idx,
     TupleRow* row) {
   VLOG_ROW << "TryAddResultTupleForCurrRow idx=" << stream_idx;
-  // Analytic functions are only finalized for the current row for ROWS windows.
-  if (fn_scope_ != ROWS) return;
-  DCHECK(window_.__isset.window_end);
+  // We only add results at this point for ROWS windows (unless unbounded following)
+  if (fn_scope_ != ROWS || !window_.__isset.window_end) return;
   if (stream_idx - rows_end_idx() < curr_partition_stream_idx_) return;
   AddResultTuple(stream_idx - rows_end_idx());
+}
+
+inline void AnalyticEvalNode::ResetLeadFnSlots() {
+  for (int i = 0; i < evaluators_.size(); ++i) {
+    if (is_lead_fn_[i]) evaluators_[i]->Init(fn_ctxs_[i], curr_tuple_);
+  }
 }
 
 inline void AnalyticEvalNode::InitPartition(int64_t stream_idx) {
@@ -264,13 +267,16 @@ inline void AnalyticEvalNode::InitPartition(int64_t stream_idx) {
   // tuples for rows beyond the partition so they should be removed.
   while (!result_tuples_.empty() &&
       result_tuples_.back().first >= curr_partition_stream_idx_) {
-    DCHECK(window_.window_end.type == TAnalyticWindowBoundaryType::PRECEDING);
+    DCHECK(window_.__isset.window_end &&
+        window_.window_end.type == TAnalyticWindowBoundaryType::PRECEDING);
     VLOG_ROW << "Removing result past partition, idx=" << result_tuples_.back().first;
     result_tuples_.pop_back();
   }
 
   if (fn_scope_ == ROWS && curr_partition_stream_idx_ > 0 &&
-      window_.window_end.type == TAnalyticWindowBoundaryType::FOLLOWING) {
+      (!window_.__isset.window_end ||
+       window_.window_end.type == TAnalyticWindowBoundaryType::FOLLOWING)) {
+    ResetLeadFnSlots();
     AddResultTuple(curr_partition_stream_idx_ - 1);
   }
 
@@ -285,7 +291,7 @@ inline void AnalyticEvalNode::InitPartition(int64_t stream_idx) {
   // Add a result tuple containing values set by Init() (e.g. NULL for sum(), 0 for
   // count()) for output rows that have no input rows in the window. We need to add this
   // result tuple before any input rows are consumed and the evaluators are updated.
-  if (fn_scope_ == ROWS &&
+  if (fn_scope_ == ROWS && window_.__isset.window_end &&
       window_.window_end.type == TAnalyticWindowBoundaryType::PRECEDING) {
     AddResultTuple(curr_partition_stream_idx_ - rows_end_idx() - 1);
   }
@@ -346,6 +352,7 @@ Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
   // We need to add the results for the last row(s).
   if (input_eos_ && (result_tuples_.empty() ||
       result_tuples_.back().first < stream_idx - 1)) {
+    ResetLeadFnSlots();
     AddResultTuple(stream_idx - 1);
   }
 

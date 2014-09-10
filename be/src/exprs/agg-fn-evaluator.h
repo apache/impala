@@ -108,7 +108,6 @@ class AggFnEvaluator {
   const std::vector<ExprContext*>& input_expr_ctxs() const { return input_expr_ctxs_; }
   bool is_count_star() const { return agg_op_ == COUNT && input_expr_ctxs_.empty(); }
   bool is_builtin() const { return fn_.binary_type == TFunctionBinaryType::BUILTIN; }
-  bool SupportsGetValue() const { return get_value_fn_ != NULL; }
   bool SupportsRemove() const { return remove_fn_ != NULL; }
 
   static std::string DebugString(const std::vector<AggFnEvaluator*>& exprs);

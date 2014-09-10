@@ -426,6 +426,73 @@ WHERE t1.int_col_1 IS NULL
 BIGINT
 ====
 ---- QUERY
+# Test for IMPALA-1200
+select DISTINCT t1.c1 FROM
+  (SELECT MAX(smallint_col) OVER (PARTITION BY year ORDER BY id DESC) AS c1
+   FROM alltypesagg) t1
+---- RESULTS
+99
+---- TYPES
+SMALLINT
+====
+---- QUERY
+select tinyint_col, id,
+row_number() over (order by tinyint_col, id) total_order,
+row_number() over (partition by tinyint_col order by id) partitioned_order,
+first_value(id) over (partition by tinyint_col order by id),
+first_value(cast(id as string)) over (partition by tinyint_col order by id),
+last_value(id) over (partition by tinyint_col order by id),
+last_value(cast(id as string)) over (partition by tinyint_col order by id),
+last_value(id) over (partition by tinyint_col order by id
+                     rows between unbounded preceding and unbounded following)
+from alltypes where id < 25 order by tinyint_col, id
+---- RESULTS
+0,0,1,1,0,'0',0,'9',20
+0,10,2,2,0,'0',10,'19',20
+0,20,3,3,0,'0',20,'19',20
+1,1,4,1,1,'1',1,'9',21
+1,11,5,2,1,'1',11,'19',21
+1,21,6,3,1,'1',21,'19',21
+2,2,7,1,2,'2',2,'9',22
+2,12,8,2,2,'2',12,'19',22
+2,22,9,3,2,'2',22,'19',22
+3,3,10,1,3,'3',3,'9',23
+3,13,11,2,3,'3',13,'19',23
+3,23,12,3,3,'3',23,'19',23
+4,4,13,1,4,'4',4,'9',24
+4,14,14,2,4,'4',14,'19',24
+4,24,15,3,4,'4',24,'19',24
+5,5,16,1,5,'5',5,'9',15
+5,15,17,2,5,'5',15,'19',15
+6,6,18,1,6,'6',6,'9',16
+6,16,19,2,6,'6',16,'19',16
+7,7,20,1,7,'7',7,'9',17
+7,17,21,2,7,'7',17,'19',17
+8,8,22,1,8,'8',8,'9',18
+8,18,23,2,8,'8',18,'19',18
+9,9,24,1,9,'9',9,'9',19
+9,19,25,2,9,'9',19,'19',19
+---- TYPES
+TINYINT, INT, BIGINT, BIGINT, INT, STRING, INT, STRING, INT
+====
+---- QUERY
+select bool_col, id,
+lag(id, 2, -12345) over (partition by bool_col order by id),
+lead(id, 2, -12345) over (partition by bool_col order by id)
+from alltypestiny
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+false,1,-12345,5
+false,3,-12345,7
+false,5,1,-12345
+false,7,3,-12345
+true,0,-12345,4
+true,2,-12345,6
+true,4,0,-12345
+true,6,2,-12345
+---- TYPES
+BOOLEAN, INT, INT, INT
+====
+---- QUERY
 # Tests rank()
 select year, month, bool_col, tinyint_col,
 rank() over (partition by year, month order by bool_col, tinyint_col)

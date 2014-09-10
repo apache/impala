@@ -132,6 +132,10 @@ class AnalyticEvalNode : public ExecNode {
   // GetNextOutputBatch().
   int64_t NumOutputRowsReady() const;
 
+  // Resets the slots in current_tuple_ that store the intermedatiate results for lead().
+  // This is necessary to produce the default value (set by Init()).
+  void ResetLeadFnSlots();
+
   // Debug string about the rows that have been evaluated and are ready to be returned.
   std::string DebugEvaluatedRowsString() const;
 
@@ -168,6 +172,10 @@ class AnalyticEvalNode : public ExecNode {
 
   // Analytic function evaluators.
   std::vector<AggFnEvaluator*> evaluators_;
+
+  // Indicates if each evaluator is the lead() fn. Used by ResetLeadFnSlots() to
+  // determine which slots need to be reset.
+  std::vector<bool> is_lead_fn_;
 
   // FunctionContext for each analytic function. String data returned by the analytic
   // functions is allocated via these contexts.
