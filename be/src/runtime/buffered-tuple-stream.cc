@@ -66,14 +66,15 @@ int NumPinned(const list<BufferedBlockMgr::Block*>& blocks) {
 string BufferedTupleStream::DebugString() const {
   stringstream ss;
   ss << "BufferedTupleStream num_rows=" << num_rows_ << " rows_returned="
-     << rows_returned_ << " pinned=" << pinned_ << " num_pinned=" << num_pinned_
+     << rows_returned_ << " pinned=" << (pinned_ ? "true" : "false")
+     << " num_pinned=" << num_pinned_
      << " write_block=" << write_block_ << " read_block_=";
   if (read_block_ == blocks_.end()) {
     ss << "<end>";
   } else {
     ss << *read_block_;
   }
-  ss << " blocks=[";
+  ss << " blocks=[\n";
   for (list<BufferedBlockMgr::Block*>::const_iterator it = blocks_.begin();
       it != blocks_.end(); ++it) {
     ss << "{" << (*it)->DebugString() << "}";

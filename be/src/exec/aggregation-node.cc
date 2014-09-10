@@ -345,15 +345,7 @@ Tuple* AggregationNode::ConstructIntermediateTuple() {
 
 void AggregationNode::UpdateTuple(Tuple* tuple, TupleRow* row) {
   DCHECK(tuple != NULL || aggregate_evaluators_.empty());
-  for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
-    AggFnEvaluator* evaluator = aggregate_evaluators_[i];
-    FunctionContext* agg_fn_ctx = agg_fn_ctxs_[i];
-    if (evaluator->is_merge()) {
-      evaluator->Merge(agg_fn_ctx, row, tuple);
-    } else {
-      evaluator->Update(agg_fn_ctx, row, tuple);
-    }
-  }
+  AggFnEvaluator::Add(aggregate_evaluators_, agg_fn_ctxs_, row, tuple);
 }
 
 Tuple* AggregationNode::FinalizeTuple(Tuple* tuple, MemPool* pool) {
@@ -429,7 +421,7 @@ IRFunction::Type GetHllUpdateFunction2(const ColumnType& type) {
 //   %0 = extractvalue { i8, double } %src, 0
 //   %is_null = trunc i8 %0 to i1
 //   br i1 %is_null, label %ret, label %src_not_null
-// 
+//
 // src_not_null:                                     ; preds = %entry
 //   %dst_slot_ptr = getelementptr inbounds { i8, double }* %agg_tuple, i32 0, i32 1
 //   call void @SetNotNull({ i8, double }* %agg_tuple)
@@ -438,7 +430,7 @@ IRFunction::Type GetHllUpdateFunction2(const ColumnType& type) {
 //   %1 = fadd double %dst_val, %val
 //   store double %1, double* %dst_slot_ptr
 //   br label %ret
-// 
+//
 // ret:                                              ; preds = %src_not_null, %entry
 //   ret void
 // }
@@ -455,7 +447,7 @@ IRFunction::Type GetHllUpdateFunction2(const ColumnType& type) {
 //   %0 = extractvalue { i8, double } %src, 0
 //   %is_null = trunc i8 %0 to i1
 //   br i1 %is_null, label %ret, label %src_not_null
-// 
+//
 // src_not_null:                                     ; preds = %entry
 //   %dst_slot_ptr = getelementptr inbounds
 //     { i8, %"struct.impala::StringValue" }* %agg_tuple, i32 0, i32 1
@@ -488,7 +480,7 @@ IRFunction::Type GetHllUpdateFunction2(const ColumnType& type) {
 //   %11 = insertvalue %"struct.impala::StringValue" %7, i32 %10, 1
 //   store %"struct.impala::StringValue" %11, %"struct.impala::StringValue"* %dst_slot_ptr
 //   br label %ret
-// 
+//
 // ret:                                              ; preds = %src_not_null, %entry
 //   ret void
 // }

@@ -142,6 +142,7 @@ string BufferedBlockMgr::Block::DebugString() const {
   stringstream ss;
   ss << "Block: " << this
      << " Buffer Desc: " << buffer_desc_
+     << " Data Len: " << valid_data_len_
      << " Deleted: " << is_deleted_
      << " Pinned: " << is_pinned_
      << " Write Issued: " << in_write_;

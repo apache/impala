@@ -60,37 +60,38 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, HashTableCtx* h
         HashTable::Iterator it = ht->Find(ht_ctx);
         if (!it.AtEnd()) {
           // Row is already in hash table. Do the aggregation and we're done.
-          UpdateTuple(&dst_partition->agg_fn_ctxs[0], it.GetTuple(), row, AGGREGATED_ROWS);
+          UpdateTuple(&dst_partition->agg_fn_ctxs[0], it.GetTuple(), row);
           continue;
         }
+      } else {
+        DCHECK(ht->Find(ht_ctx).AtEnd()) << ht->size();
       }
 
-      // Intermediate tuple for 'row'. This tuple is appended to the dst partition's
-      // aggregated_row_stream.
       Tuple* intermediate_tuple = NULL;
-
 allocate_tuple:
-      if (AGGREGATED_ROWS) {
-        // Row was already aggregated. Copy the row from the input stream to the
-        // dst stream.
-        DCHECK(ht->Find(ht_ctx).AtEnd());
+      // First construct the intermediate tuple in the dst partition's stream.
+      // TODO: needs_serialize can be removed with codegen.
+      if (AGGREGATED_ROWS && !needs_serialize_) {
+        // We can just copy the row into the stream.
         if (!dst_partition->aggregated_row_stream->AddRow(
             row, reinterpret_cast<uint8_t**>(&intermediate_tuple))) {
           intermediate_tuple = NULL;
         }
       } else {
-        // Row was not in hash table, we need to construct the intermediate tuple and
-        // then insert it into the hash table.
-        intermediate_tuple = ConstructIntermediateTuple(
-            dst_partition->agg_fn_ctxs, NULL, dst_partition->aggregated_row_stream.get());
+        // If this aggregate function requires serialize, or we are seeing this
+        // result row the first time, we need to construct the result row and
+        // initialize it.
+        intermediate_tuple = ConstructIntermediateTuple(dst_partition->agg_fn_ctxs,
+            NULL, dst_partition->aggregated_row_stream.get());
         if (intermediate_tuple != NULL) {
-          UpdateTuple(&dst_partition->agg_fn_ctxs[0], intermediate_tuple, row);
+          UpdateTuple(&dst_partition->agg_fn_ctxs[0],
+              intermediate_tuple, row, AGGREGATED_ROWS);
         }
       }
 
-      if (intermediate_tuple != NULL && ht->Insert(ht_ctx, intermediate_tuple)) {
-        continue;
-      }
+      // After copying and initialize it, try to insert the tuple into the hash table.
+      // If it inserts, we are done.
+      if (intermediate_tuple != NULL && ht->Insert(ht_ctx, intermediate_tuple)) continue;
 
       // In this case, we either didn't have enough memory to add the intermediate_tuple
       // to the stream or we didn't have enough memory to insert it into the hash table.

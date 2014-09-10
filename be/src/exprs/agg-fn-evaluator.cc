@@ -137,7 +137,12 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
     staging_input_vals_.push_back(
         CreateAnyVal(obj_pool, input_expr_ctxs_[i]->root()->type()));
   }
-  staging_intermediate_val_ = CreateAnyVal(obj_pool, intermediate_slot_desc_->type());
+  staging_intermediate_val_ = CreateAnyVal(obj_pool, intermediate_type());
+  staging_merge_input_val_ = CreateAnyVal(obj_pool, intermediate_type());
+
+  if (is_merge_) {
+    DCHECK_EQ(staging_input_vals_.size(), 1) << "Merge should only have 1 input.";
+  }
 
   // Load the function pointers. Merge is not required if this is evaluating an
   // analytic function.
@@ -300,15 +305,18 @@ void AggFnEvaluator::Init(FunctionContext* agg_fn_ctx, Tuple* dst) {
   SetDstSlot(staging_intermediate_val_, intermediate_slot_desc_, dst);
 }
 
-void AggFnEvaluator::UpdateOrMerge(
+static void SetAnyVal(const SlotDescriptor* desc, Tuple* tuple, AnyVal* dst) {
+  bool is_null = tuple->IsNull(desc->null_indicator_offset());
+  void* slot = NULL;
+  if (!is_null) slot = tuple->GetSlot(desc->tuple_offset());
+  AnyValUtil::SetAnyVal(slot, desc->type(), dst);
+}
+
+void AggFnEvaluator::Update(
     FunctionContext* agg_fn_ctx, TupleRow* row, Tuple* dst, void* fn) {
   if (fn == NULL) return;
 
-  bool dst_null = dst->IsNull(intermediate_slot_desc_->null_indicator_offset());
-  void* dst_slot = NULL;
-  if (!dst_null) dst_slot = dst->GetSlot(intermediate_slot_desc_->tuple_offset());
-  AnyValUtil::SetAnyVal(
-      dst_slot, intermediate_slot_desc_->type(), staging_intermediate_val_);
+  SetAnyVal(intermediate_slot_desc_, dst, staging_intermediate_val_);
 
   for (int i = 0; i < input_expr_ctxs_.size(); ++i) {
     void* src_slot = input_expr_ctxs_[i]->GetValue(row);
@@ -374,16 +382,16 @@ void AggFnEvaluator::UpdateOrMerge(
   SetDstSlot(staging_intermediate_val_, intermediate_slot_desc_, dst);
 }
 
-void AggFnEvaluator::Update(FunctionContext* agg_fn_ctx, TupleRow* row, Tuple* dst) {
-  return UpdateOrMerge(agg_fn_ctx, row, dst, update_fn_);
-}
+void AggFnEvaluator::Merge(FunctionContext* agg_fn_ctx, Tuple* src, Tuple* dst) {
+  DCHECK(merge_fn_ != NULL);
 
-void AggFnEvaluator::Merge(FunctionContext* agg_fn_ctx, TupleRow* row, Tuple* dst) {
-  return UpdateOrMerge(agg_fn_ctx, row, dst, merge_fn_);
-}
+  SetAnyVal(intermediate_slot_desc_, dst, staging_intermediate_val_);
+  SetAnyVal(intermediate_slot_desc_, src, staging_merge_input_val_);
 
-void AggFnEvaluator::Remove(FunctionContext* agg_fn_ctx, TupleRow* row, Tuple* dst) {
-  return UpdateOrMerge(agg_fn_ctx, row, dst, remove_fn_);
+  // The merge fn always takes one input argument.
+  reinterpret_cast<UpdateFn1>(merge_fn_)(agg_fn_ctx,
+      *staging_merge_input_val_, staging_intermediate_val_);
+  SetDstSlot(staging_intermediate_val_, intermediate_slot_desc_, dst);
 }
 
 void AggFnEvaluator::SerializeOrFinalize(FunctionContext* agg_fn_ctx, Tuple* src,
@@ -400,13 +408,12 @@ void AggFnEvaluator::SerializeOrFinalize(FunctionContext* agg_fn_ctx, Tuple* src
   // No fn was given but the src and dst tuples are different (doing a Finalize()).
   // Just copy the src slot into the dst tuple.
   if (fn == NULL) {
-    DCHECK_EQ(intermediate_slot_desc_->type(), dst_slot_desc->type());
+    DCHECK_EQ(intermediate_type(), dst_slot_desc->type());
     RawValue::Write(src_slot, dst, dst_slot_desc, NULL);
     return;
   }
 
-  AnyValUtil::SetAnyVal(
-      src_slot, intermediate_slot_desc_->type(), staging_intermediate_val_);
+  AnyValUtil::SetAnyVal(src_slot, intermediate_type(), staging_intermediate_val_);
   switch (dst_slot_desc->type().type) {
     case TYPE_BOOLEAN: {
       typedef BooleanVal(*Fn)(FunctionContext*, AnyVal*);
@@ -474,18 +481,6 @@ void AggFnEvaluator::SerializeOrFinalize(FunctionContext* agg_fn_ctx, Tuple* src
   }
 }
 
-void AggFnEvaluator::Serialize(FunctionContext* agg_fn_ctx, Tuple* tuple) {
-  SerializeOrFinalize(agg_fn_ctx, tuple, intermediate_slot_desc_, tuple, serialize_fn_);
-}
-
-void AggFnEvaluator::Finalize(FunctionContext* agg_fn_ctx, Tuple* src, Tuple* dst) {
-  SerializeOrFinalize(agg_fn_ctx, src, output_slot_desc_, dst, finalize_fn_);
-}
-
-void AggFnEvaluator::GetValue(FunctionContext* agg_fn_ctx, Tuple* src, Tuple* dst) {
-  SerializeOrFinalize(agg_fn_ctx, src, output_slot_desc_, dst, get_value_fn_);
-}
-
 string AggFnEvaluator::DebugString(const vector<AggFnEvaluator*>& exprs) {
   stringstream out;
   out << "[";
@@ -494,56 +489,6 @@ string AggFnEvaluator::DebugString(const vector<AggFnEvaluator*>& exprs) {
   }
   out << "]";
   return out.str();
-}
-
-void AggFnEvaluator::Init(const vector<AggFnEvaluator*>& evaluators,
-      const vector<FunctionContext*>& fn_ctxs, Tuple* dst) {
-  DCHECK_EQ(evaluators.size(), fn_ctxs.size());
-  for (int i = 0; i < evaluators.size(); ++i) {
-    evaluators[i]->Init(fn_ctxs[i], dst);
-  }
-}
-void AggFnEvaluator::Update(const vector<AggFnEvaluator*>& evaluators,
-      const vector<FunctionContext*>& fn_ctxs, TupleRow* src, Tuple* dst) {
-  DCHECK_EQ(evaluators.size(), fn_ctxs.size());
-  for (int i = 0; i < evaluators.size(); ++i) {
-    evaluators[i]->Update(fn_ctxs[i], src, dst);
-  }
-}
-void AggFnEvaluator::Remove(const vector<AggFnEvaluator*>& evaluators,
-      const vector<FunctionContext*>& fn_ctxs, TupleRow* src, Tuple* dst) {
-  DCHECK_EQ(evaluators.size(), fn_ctxs.size());
-  for (int i = 0; i < evaluators.size(); ++i) {
-    evaluators[i]->Remove(fn_ctxs[i], src, dst);
-  }
-}
-void AggFnEvaluator::Merge(const vector<AggFnEvaluator*>& evaluators,
-      const vector<FunctionContext*>& fn_ctxs, TupleRow* src, Tuple* dst) {
-  DCHECK_EQ(evaluators.size(), fn_ctxs.size());
-  for (int i = 0; i < evaluators.size(); ++i) {
-    evaluators[i]->Merge(fn_ctxs[i], src, dst);
-  }
-}
-void AggFnEvaluator::Serialize(const vector<AggFnEvaluator*>& evaluators,
-      const vector<FunctionContext*>& fn_ctxs, Tuple* dst) {
-  DCHECK_EQ(evaluators.size(), fn_ctxs.size());
-  for (int i = 0; i < evaluators.size(); ++i) {
-    evaluators[i]->Serialize(fn_ctxs[i], dst);
-  }
-}
-void AggFnEvaluator::GetValue(const vector<AggFnEvaluator*>& evaluators,
-      const vector<FunctionContext*>& fn_ctxs, Tuple* src, Tuple* dst) {
-  DCHECK_EQ(evaluators.size(), fn_ctxs.size());
-  for (int i = 0; i < evaluators.size(); ++i) {
-    evaluators[i]->GetValue(fn_ctxs[i], src, dst);
-  }
-}
-void AggFnEvaluator::Finalize(const vector<AggFnEvaluator*>& evaluators,
-      const vector<FunctionContext*>& fn_ctxs, Tuple* src, Tuple* dst) {
-  DCHECK_EQ(evaluators.size(), fn_ctxs.size());
-  for (int i = 0; i < evaluators.size(); ++i) {
-    evaluators[i]->Finalize(fn_ctxs[i], src, dst);
-  }
 }
 
 string AggFnEvaluator::DebugString() const {

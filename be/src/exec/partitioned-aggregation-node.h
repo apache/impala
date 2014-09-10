@@ -134,8 +134,10 @@ class PartitionedAggregationNode : public ExecNode {
   // aggregate after consuming all input rows. The finalize step converts the aggregate
   // value into its final form. This is true if this node contains aggregate that requires
   // a finalize step.
-  // TODO: push this to AggFnEvaluator after expr refactoring patch.
   const bool needs_finalize_;
+
+  // Contains any evaluators that require the serialize step.
+  bool needs_serialize_;
 
   std::vector<AggFnEvaluator*> aggregate_evaluators_;
 
@@ -157,7 +159,6 @@ class PartitionedAggregationNode : public ExecNode {
 
   // True if the resulting tuple contains var-len agg/grouping expressions. This
   // means we need to do more work when allocating and spilling these rows.
-  bool contains_var_len_agg_exprs_;
   bool contains_var_len_grouping_exprs_;
 
   RuntimeState* state_;
@@ -234,6 +235,10 @@ class PartitionedAggregationNode : public ExecNode {
     // path).
     void Close(bool finalize_rows);
 
+    // Spills this partition, unpinning streams and cleaning up hash tables as
+    // necessary.
+    Status Spill();
+
     bool is_spilled() const { return hash_tbl.get() == NULL; }
 
     PartitionedAggregationNode* parent;
@@ -275,6 +280,11 @@ class PartitionedAggregationNode : public ExecNode {
   // After consuming all the input, hash_partitions_ is split into spilled_partitions_
   // or aggregated_partitions_, depending on if it was spilled or not.
   std::list<Partition*> aggregated_partitions_;
+
+  // Stream used to store serialized spilled rows. Only used if needs_serialize_
+  // is set. This stream is never pinned and only used in Partition::Spill as a
+  // a temporary buffer.
+  boost::scoped_ptr<BufferedTupleStream> serialize_stream_;
 
   // Allocates a new allocated aggregation intermediate tuple.
   // Initialized to grouping values computed over 'current_row_' using 'agg_fn_ctxs'.
@@ -329,13 +339,13 @@ class PartitionedAggregationNode : public ExecNode {
 
   // Initializes hash_partitions_. Level is the level for the partitions to create.
   // Also sets ht_ctx_'s level to level.
-  Status CreateHashPartitions(RuntimeState* state, int level);
+  Status CreateHashPartitions(int level);
 
   // Prepares the next partition to return results from. On return, this function
   // initializes output_iterator_ and output_partition_. This either removes
   // a partition from aggregated_partitions_ (and is done) or removes the next
   // partition from aggregated_partitions_ and repartitions it.
-  Status NextPartition(RuntimeState* state);
+  Status NextPartition();
 
   // Picks a partition from hash_partitions_ to spill.
   Status SpillPartition();
@@ -346,21 +356,22 @@ class PartitionedAggregationNode : public ExecNode {
   // repartitioned. Used for diagnostics.
   Status MoveHashPartitions(int64_t input_rows);
 
+  // Calls finalizes on all tuples starting at it.
+  void CleanupHashTbl(HashTable::Iterator it);
+
   // Codegen UpdateSlot(). Returns NULL if codegen is unsuccessful.
   // Assumes is_merge = false;
-  llvm::Function* CodegenUpdateSlot(
-      RuntimeState* state, AggFnEvaluator* evaluator, SlotDescriptor* slot_desc);
+  llvm::Function* CodegenUpdateSlot(AggFnEvaluator* evaluator, SlotDescriptor* slot_desc);
 
   // Codegen UpdateTuple(). Returns NULL if codegen is unsuccessful.
-  llvm::Function* CodegenUpdateTuple(RuntimeState* state);
+  llvm::Function* CodegenUpdateTuple();
 
   // Codegen the process row batch loop.  The loop has already been compiled to
   // IR and loaded into the codegen object.  UpdateAggTuple has also been
-  // codegen'd to IR.  This function will modify the loop subsituting the
-  // UpdateAggTuple function call with the (inlined) codegen'd 'update_tuple_fn'.
+  // codegen'd to IR.  This function will modify the loop subsituting the statically
+  // compiled functions with codegen'd ones.
   // Assumes AGGREGATED_ROWS = false.
-  llvm::Function* CodegenProcessBatch(
-      RuntimeState* state, llvm::Function* update_tuple_fn);
+  llvm::Function* CodegenProcessBatch();
 
   // Functions to instantiate templated versions of ProcessBatch().
   // The xcompiled versions of these functions are used in CodegenProcessBatch().
@@ -371,7 +382,11 @@ class PartitionedAggregationNode : public ExecNode {
   // We need two buffers per partition, one for the aggregated stream and one
   // for the unaggregated stream. We need an additional buffer to read the stream
   // we are currently repartitioning.
-  static int MinRequiredBuffers() { return 2 * PARTITION_FANOUT + 1; }
+  // If we need to serialize, we need an additional buffer while spilling a partition
+  // as the partitions aggregate stream needs to be serialized and rewritten.
+  int MinRequiredBuffers() const {
+    return 2 * PARTITION_FANOUT + 1 + (needs_serialize_ ? 1 : 0);
+  }
 };
 
 }

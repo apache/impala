@@ -111,6 +111,7 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   DCHECK_EQ(evaluators_.size(), fn_ctxs_.size());
   for (int i = 0; i < evaluators_.size(); ++i) {
     RETURN_IF_ERROR(evaluators_[i]->Open(state, fn_ctxs_[i]));
+    DCHECK(!evaluators_[i]->is_merge());
   }
 
   RETURN_IF_ERROR(partition_exprs_.Open(state));
@@ -326,7 +327,7 @@ Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
 
     // The evaluators_ are updated with the current row.
     VLOG_ROW << "UpdateRow idx=" << stream_idx;
-    AggFnEvaluator::Update(evaluators_, fn_ctxs_, row, curr_tuple_);
+    AggFnEvaluator::Add(evaluators_, fn_ctxs_, row, curr_tuple_);
     TryAddResultTupleForCurrRow(stream_idx, row);
 
     if (UNLIKELY(!input_stream_->AddRow(row))) {
