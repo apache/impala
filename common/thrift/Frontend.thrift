@@ -164,8 +164,8 @@ struct TShowStatsParams {
 
 // Parameters for SHOW FUNCTIONS commands
 struct TShowFunctionsParams {
-  // Type of function to show.
-  1: Types.TFunctionType type
+  // Category of function to show.
+  1: Types.TFunctionCategory category
 
   // Database to use for SHOW FUNCTIONS
   2: optional string db
@@ -187,7 +187,7 @@ struct TShowTablesParams {
 // Arguments to getFunctions(), which returns a list of non-qualified function
 // signatures that match an optional pattern. Parameters for SHOW FUNCTIONS.
 struct TGetFunctionsParams {
-  1: required Types.TFunctionType type
+  1: required Types.TFunctionCategory category
 
   // Database to use for SHOW FUNCTIONS
   2: optional string db

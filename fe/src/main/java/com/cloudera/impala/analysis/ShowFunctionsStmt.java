@@ -16,7 +16,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.thrift.TFunctionType;
+import com.cloudera.impala.thrift.TFunctionCategory;
 import com.cloudera.impala.thrift.TShowFunctionsParams;
 import com.google.common.base.Preconditions;
 
@@ -35,8 +35,8 @@ public class ShowFunctionsStmt extends StatementBase {
   // DB (if any) as seen by the parser
   private final String parsedDb_;
 
-  // If true, show UDAs, otherwise, show UDFs
-  private final boolean isAggregate_;
+  // Category of functions to be shown. Always set.
+  private final TFunctionCategory fnCategory_;
 
   // Set during analysis
   private String postAnalysisDb_;
@@ -45,10 +45,11 @@ public class ShowFunctionsStmt extends StatementBase {
    * Constructs a show statement which matches all functions against the
    * supplied pattern.
    */
-  public ShowFunctionsStmt(String db, String pattern, boolean isAggregate) {
+  public ShowFunctionsStmt(String db, String pattern, TFunctionCategory fnCategory) {
+    Preconditions.checkNotNull(fnCategory);
     parsedDb_ = db;
     pattern_ = pattern;
-    isAggregate_ = isAggregate;
+    fnCategory_ = fnCategory;
   }
 
   /**
@@ -64,10 +65,11 @@ public class ShowFunctionsStmt extends StatementBase {
 
   @Override
   public String toSql() {
+    String fnCategory = (fnCategory_ == null) ? "" : fnCategory_.toString() + " ";
     if (pattern_ == null) {
-        return "SHOW FUNCTIONS";
+      return "SHOW " + fnCategory + "FUNCTIONS";
     } else {
-        return "SHOW FUNCTIONS LIKE '" + pattern_ + "'";
+      return "SHOW " + fnCategory + "FUNCTIONS LIKE '" + pattern_ + "'";
     }
   }
 
@@ -81,7 +83,7 @@ public class ShowFunctionsStmt extends StatementBase {
 
   public TShowFunctionsParams toThrift() {
     TShowFunctionsParams params = new TShowFunctionsParams();
-    params.setType(isAggregate_ ? TFunctionType.AGGREGATE : TFunctionType.SCALAR);
+    params.setCategory(fnCategory_);
     params.setDb(getDb());
     params.setShow_pattern(getPattern());
     return params;

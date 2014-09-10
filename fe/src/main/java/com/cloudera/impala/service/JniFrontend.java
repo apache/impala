@@ -305,7 +305,7 @@ public class JniFrontend {
     TGetFunctionsResult result = new TGetFunctionsResult();
     List<String> signatures = Lists.newArrayList();
     List<String> retTypes = Lists.newArrayList();
-    List<Function> fns = frontend_.getFunctions(params.type, params.db, params.pattern);
+    List<Function> fns = frontend_.getFunctions(params.category, params.db, params.pattern);
     for (Function fn: fns) {
       signatures.add(fn.signatureString());
       retTypes.add(fn.getReturnType().toString());

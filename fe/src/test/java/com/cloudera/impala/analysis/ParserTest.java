@@ -1251,20 +1251,16 @@ public class ParserTest {
     ParsesOk("SHOW DATA SOURCES 'pattern'");
     ParsesOk("SHOW DATA SOURCES LIKE 'pattern'");
     ParsesOk("SHOW DATA SOURCES LIKE 'p*ttern'");
-    // Functions
-    ParsesOk("SHOW FUNCTIONS");
-    ParsesOk("SHOW FUNCTIONS LIKE 'pattern'");
-    ParsesOk("SHOW FUNCTIONS LIKE 'p*ttern'");
-    ParsesOk("SHOW FUNCTIONS");
-    ParsesOk("SHOW FUNCTIONS in DB LIKE 'pattern'");
-    ParsesOk("SHOW FUNCTIONS in DB");
 
-    ParsesOk("SHOW AGGREGATE FUNCTIONS");
-    ParsesOk("SHOW AGGREGATE FUNCTIONS LIKE 'pattern'");
-    ParsesOk("SHOW AGGREGATE FUNCTIONS LIKE 'p*ttern'");
-    ParsesOk("SHOW AGGREGATE FUNCTIONS");
-    ParsesOk("SHOW AGGREGATE FUNCTIONS in DB LIKE 'pattern'");
-    ParsesOk("SHOW AGGREGATE FUNCTIONS in DB");
+    // Functions
+    for (String fnType: new String[] { "", "AGGREGATE", "ANALYTIC"}) {
+      ParsesOk(String.format("SHOW %s FUNCTIONS", fnType));
+      ParsesOk(String.format("SHOW %s FUNCTIONS LIKE 'pattern'", fnType));
+      ParsesOk(String.format("SHOW %s FUNCTIONS LIKE 'p*ttern'", fnType));
+      ParsesOk(String.format("SHOW %s FUNCTIONS", fnType));
+      ParsesOk(String.format("SHOW %s FUNCTIONS in DB LIKE 'pattern'", fnType));
+      ParsesOk(String.format("SHOW %s FUNCTIONS in DB", fnType));
+    }
 
     // Show table/column stats.
     ParsesOk("SHOW TABLE STATS tbl");

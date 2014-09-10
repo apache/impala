@@ -54,6 +54,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("aggregate", new Integer(SqlParserSymbols.KW_AGGREGATE));
     keywordMap.put("all", new Integer(SqlParserSymbols.KW_ALL));
     keywordMap.put("alter", new Integer(SqlParserSymbols.KW_ALTER));
+    keywordMap.put("analytic", new Integer(SqlParserSymbols.KW_ANALYTIC));
     keywordMap.put("and", new Integer(SqlParserSymbols.KW_AND));
     keywordMap.put("anti", new Integer(SqlParserSymbols.KW_ANTI));
     keywordMap.put("api_version", new Integer(SqlParserSymbols.KW_API_VERSION));

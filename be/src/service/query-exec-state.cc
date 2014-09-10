@@ -250,7 +250,7 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
       const string* fn_pattern =
           params->__isset.show_pattern ? (&params->show_pattern) : NULL;
       RETURN_IF_ERROR(frontend_->GetFunctions(
-          params->type, params->db, fn_pattern, &query_ctx_.session, &functions));
+          params->category, params->db, fn_pattern, &query_ctx_.session, &functions));
       SetResultSet(functions.fn_ret_types, functions.fn_signatures);
       return Status::OK;
     }

@@ -96,6 +96,13 @@ show aggregate functions in function_ddl_test
 STRING, STRING
 ====
 ---- QUERY
+# Check that none of the functions show up as analytic functions.
+show analytic functions in function_ddl_test
+---- RESULTS
+---- TYPES
+STRING, STRING
+====
+---- QUERY
 drop function function_ddl_test.fn2(int, string)
 ====
 ---- QUERY
@@ -210,6 +217,67 @@ STRING, STRING
 show aggregate functions
 ---- RESULTS
 'INT','agg_fn(INT, STRING)'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+show analytic functions
+---- RESULTS
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+# Negative test for showing builtin scalar functions. The result
+# should not contain aggregate or analytic functions. Note that
+# the result must be non-empty for the test to suceed.
+show functions in _impala_builtins;
+---- RESULTS: VERIFY_IS_NOT_IN
+'DOUBLE','avg(BIGINT)'
+'BIGINT','rank()'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+# Positive test for showing builtin scalar functions.
+show functions in _impala_builtins;
+---- RESULTS: VERIFY_IS_SUBSET
+'STRING','upper(STRING)'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+# Negative test for showing builtin aggregate fuctions. The result should
+# not contain scalar or analytic functions.
+show aggregate functions in _impala_builtins;
+---- RESULTS: VERIFY_IS_NOT_IN
+'BIGINT','rank()'
+'STRING','upper(STRING)'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+# Positive test for showing builtin aggregate functions.
+show aggregate functions in _impala_builtins;
+---- RESULTS: VERIFY_IS_SUBSET
+'STRING','group_concat(STRING)'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+# Negative test for showing builtin analytic functions. The result should
+# not contain non-analytic aggregate functions or scalar functions.
+show analytic functions in _impala_builtins;
+---- RESULTS: VERIFY_IS_NOT_IN
+'STRING','group_concat(STRING)'
+'STRING','upper(STRING)'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+# Positive test for showing builtin analytic functions.
+show analytic functions in _impala_builtins;
+---- RESULTS: VERIFY_IS_SUBSET
+'BIGINT','rank()'
 ---- TYPES
 STRING, STRING
 ====

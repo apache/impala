@@ -23,7 +23,7 @@ import org.apache.log4j.Logger;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TDatabase;
-import com.cloudera.impala.thrift.TFunctionType;
+import com.cloudera.impala.thrift.TFunctionCategory;
 import com.cloudera.impala.util.PatternMatcher;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -262,16 +262,22 @@ public class Db implements CatalogObject {
   /**
    * Returns all functions that match 'fnPattern'.
    */
-  public List<Function> getFunctions(TFunctionType type, PatternMatcher fnPattern) {
+  public List<Function> getFunctions(TFunctionCategory category,
+      PatternMatcher fnPattern) {
     List<Function> functions = Lists.newArrayList();
     synchronized (functions_) {
       for (Map.Entry<String, List<Function>> fns: functions_.entrySet()) {
         if (fnPattern.matches(fns.getKey())) {
           for (Function fn: fns.getValue()) {
-            if (fn.userVisible()) {
-              if (type == null ||
-                  (type == TFunctionType.SCALAR && fn instanceof ScalarFunction) ||
-                  (type == TFunctionType.AGGREGATE && fn instanceof AggregateFunction))
+            if (!fn.userVisible()) continue;
+            if (category == null
+                || (category == TFunctionCategory.SCALAR && fn instanceof ScalarFunction)
+                || (category == TFunctionCategory.AGGREGATE
+                    && fn instanceof AggregateFunction
+                    && ((AggregateFunction)fn).isAggregateFn())
+                || (category == TFunctionCategory.ANALYTIC
+                    && fn instanceof AggregateFunction
+                    && ((AggregateFunction)fn).isAnalyticFn())) {
               functions.add(fn);
             }
           }

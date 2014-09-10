@@ -725,6 +725,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select aggfn(int_col) from functional.alltypesagg");
     AnalysisError("select default.AggFn(1)",
         "aggregation without a FROM clause is not allowed");
+    AnalysisError(
+        "select aggfn(int_col) over (partition by int_col) from functional.alltypesagg",
+        "Aggregate function 'default.aggfn(int_col)' not supported with OVER clause.");
     AnalysisError("select aggfn(distinct int_col) from functional.alltypesagg",
         "User defined aggregates do not support DISTINCT.");
     AnalyzesOk("select default.aggfn(int_col) from functional.alltypes");

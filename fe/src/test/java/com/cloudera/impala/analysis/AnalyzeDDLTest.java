@@ -1766,10 +1766,13 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("show tables");
     AnalyzesOk("show tables like '*pattern'");
 
-    AnalyzesOk("show functions");
-    AnalyzesOk("show functions like '*pattern'");
-    AnalyzesOk("show functions in functional");
-    AnalyzesOk("show functions in functional like '*pattern'");
+    for (String fnType: new String[]{"", "aggregate", "analytic"}) {
+      AnalyzesOk(String.format("show %s functions", fnType));
+      AnalyzesOk(String.format("show %s functions like '*pattern'", fnType));
+      AnalyzesOk(String.format("show %s functions in functional", fnType));
+      AnalyzesOk(String.format(
+          "show %s functions in functional like '*pattern'", fnType));
+    }
     // Database doesn't exist.
     AnalysisError("show functions in baddb", "Database does not exist: baddb");
     AnalysisError("show functions in baddb like '*pattern'",

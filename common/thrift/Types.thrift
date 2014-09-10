@@ -119,9 +119,10 @@ struct TUniqueId {
   2: required i64 lo
 }
 
-enum TFunctionType {
+enum TFunctionCategory {
   SCALAR,
   AGGREGATE,
+  ANALYTIC
 }
 
 enum TFunctionBinaryType {

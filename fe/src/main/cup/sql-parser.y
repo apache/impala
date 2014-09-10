@@ -25,6 +25,7 @@ import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.analysis.ColumnDesc;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
+import com.cloudera.impala.thrift.TFunctionCategory;
 import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
 import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.cloudera.impala.thrift.TTablePropertyType;
@@ -227,13 +228,13 @@ parser code {:
 
 // List of keywords. Please keep them sorted alphabetically.
 terminal
-  KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_AND, KW_ANTI, KW_API_VERSION, KW_ARRAY,
-  KW_AS, KW_ASC, KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BOOLEAN, KW_BY, KW_CACHED,
-  KW_CASE, KW_CAST, KW_CHANGE, KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN, KW_COLUMNS,
-  KW_COMMENT, KW_COMPUTE, KW_CREATE, KW_CROSS, KW_CURRENT, KW_DATA, KW_DATABASE,
-  KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DELIMITED, KW_DESC, KW_DESCRIBE,
-  KW_DISTINCT, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED, KW_EXISTS,
-  KW_EXPLAIN, KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN,
+  KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_ANALYTIC, KW_AND, KW_ANTI, KW_API_VERSION,
+  KW_ARRAY, KW_AS, KW_ASC, KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BOOLEAN, KW_BY,
+  KW_CACHED, KW_CASE, KW_CAST, KW_CHANGE, KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN,
+  KW_COLUMNS, KW_COMMENT, KW_COMPUTE, KW_CREATE, KW_CROSS, KW_CURRENT, KW_DATA,
+  KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DELIMITED, KW_DESC,
+  KW_DESCRIBE, KW_DISTINCT, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED,
+  KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN,
   KW_FIRST, KW_FLOAT, KW_FOLLOWING, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL,
   KW_FUNCTION, KW_FUNCTIONS, KW_GROUP, KW_HAVING, KW_IF, KW_IN, KW_INIT_FN, KW_INNER,
   KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL, KW_INTO, KW_INVALIDATE,
@@ -414,6 +415,7 @@ nonterminal CreateUdfStmt create_udf_stmt;
 nonterminal CreateUdaStmt create_uda_stmt;
 nonterminal ShowFunctionsStmt show_functions_stmt;
 nonterminal DropFunctionStmt drop_function_stmt;
+nonterminal TFunctionCategory opt_function_category;
 // Accepts space separated key='v' arguments.
 nonterminal HashMap create_function_args_map;
 nonterminal CreateFunctionStmtBase.OptArg create_function_arg_key;
@@ -1434,15 +1436,24 @@ show_partitions_stmt ::=
   ;
 
 show_functions_stmt ::=
-  KW_SHOW opt_is_aggregate_fn:is_aggregate KW_FUNCTIONS
-  {: RESULT = new ShowFunctionsStmt(null, null, is_aggregate); :}
-  | KW_SHOW opt_is_aggregate_fn:is_aggregate KW_FUNCTIONS show_pattern:showPattern
-  {: RESULT = new ShowFunctionsStmt(null, showPattern, is_aggregate); :}
-  | KW_SHOW opt_is_aggregate_fn:is_aggregate KW_FUNCTIONS KW_IN IDENT:db
-  {: RESULT = new ShowFunctionsStmt(db, null, is_aggregate); :}
-  | KW_SHOW opt_is_aggregate_fn:is_aggregate KW_FUNCTIONS KW_IN IDENT:db
+  KW_SHOW opt_function_category:fn_type KW_FUNCTIONS
+  {: RESULT = new ShowFunctionsStmt(null, null, fn_type); :}
+  | KW_SHOW opt_function_category:fn_type KW_FUNCTIONS show_pattern:showPattern
+  {: RESULT = new ShowFunctionsStmt(null, showPattern, fn_type); :}
+  | KW_SHOW opt_function_category:fn_type KW_FUNCTIONS KW_IN IDENT:db
+  {: RESULT = new ShowFunctionsStmt(db, null, fn_type); :}
+  | KW_SHOW opt_function_category:fn_type KW_FUNCTIONS KW_IN IDENT:db
       show_pattern:showPattern
-  {: RESULT = new ShowFunctionsStmt(db, showPattern, is_aggregate); :}
+  {: RESULT = new ShowFunctionsStmt(db, showPattern, fn_type); :}
+  ;
+
+opt_function_category ::=
+  KW_AGGREGATE
+  {: RESULT = TFunctionCategory.AGGREGATE; :}
+  | KW_ANALYTIC
+  {: RESULT = TFunctionCategory.ANALYTIC; :}
+  | /* empty */
+  {: RESULT = TFunctionCategory.SCALAR; :}
   ;
 
 show_data_srcs_stmt ::=

@@ -189,13 +189,19 @@ def assert_args_not_none(*args):
 
 def verify_query_result_is_subset(expected_results, actual_results):
   assert_args_not_none(expected_results, actual_results)
-  expected_set= set(map(str, expected_results.rows))
+  expected_set = set(map(str, expected_results.rows))
   actual_set = set(map(str, actual_results.rows))
   assert expected_set <= actual_set
 
 def verify_query_result_is_equal(expected_results, actual_results):
   assert_args_not_none(expected_results, actual_results)
   assert expected_results == actual_results
+
+def verify_query_result_is_not_in(expected_results, actual_results):
+  assert_args_not_none(expected_results, actual_results)
+  expected_set = set(map(str, expected_results.rows))
+  actual_set = set(map(str, actual_results.rows))
+  assert expected_set.isdisjoint(actual_set)
 
 # Global dictionary that maps the verification type to appropriate verifier.
 # The RESULTS section of a .test file is tagged with the verifier type. We may
@@ -204,6 +210,7 @@ def verify_query_result_is_equal(expected_results, actual_results):
 VERIFIER_MAP = {'VERIFY_IS_SUBSET' : verify_query_result_is_subset,
                 'VERIFY_IS_EQUAL_SORTED'  : verify_query_result_is_equal,
                 'VERIFY_IS_EQUAL'  : verify_query_result_is_equal,
+                'VERIFY_IS_NOT_IN' : verify_query_result_is_not_in,
                  None              : verify_query_result_is_equal}
 
 def verify_results(expected_results, actual_results, order_matters):

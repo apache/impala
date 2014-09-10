@@ -416,7 +416,9 @@ public class FunctionCallExpr extends Expr {
         throw new AnalysisException("Cannot pass 'DISTINCT' to scalar function.");
       }
     }
-    if (fn_ instanceof AggregateFunction && ((AggregateFunction) fn_).needsAnalyticExpr()
+    if (fn_ instanceof AggregateFunction
+        && ((AggregateFunction) fn_).isAnalyticFn()
+        && !((AggregateFunction) fn_).isAggregateFn()
         && !isAnalyticFnCall_) {
       throw new AnalysisException(
           "Analytic function requires an OVER clause: " + toSql());

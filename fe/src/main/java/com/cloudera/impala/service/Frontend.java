@@ -95,7 +95,7 @@ import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExplainResult;
 import com.cloudera.impala.thrift.TFinalizeParams;
-import com.cloudera.impala.thrift.TFunctionType;
+import com.cloudera.impala.thrift.TFunctionCategory;
 import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TLoadDataResp;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
@@ -571,14 +571,15 @@ public class Frontend {
    * Returns all function signatures that match the pattern. If pattern is null,
    * matches all functions.
    */
-  public List<Function> getFunctions(TFunctionType type, String dbName, String fnPattern)
+  public List<Function> getFunctions(TFunctionCategory category,
+      String dbName, String fnPattern)
       throws DatabaseNotFoundException {
     Db db = impaladCatalog_.getDb(dbName);
     if (db == null) {
       throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
     }
     List<Function> fns = db.getFunctions(
-        type, PatternMatcher.createHivePatternMatcher(fnPattern));
+        category, PatternMatcher.createHivePatternMatcher(fnPattern));
     Collections.sort(fns,
         new Comparator<Function>() {
           public int compare(Function f1, Function f2) {

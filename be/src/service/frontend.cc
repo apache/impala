@@ -141,10 +141,11 @@ Status Frontend::GetStats(const TShowStatsParams& params,
   return JniUtil::CallJniMethod(fe_, get_stats_id_, params, result);
 }
 
-Status Frontend::GetFunctions(TFunctionType::type fn_type, const string& db,
-    const string* pattern, const TSessionState* session, TGetFunctionsResult* functions) {
+Status Frontend::GetFunctions(TFunctionCategory::type fn_category, const string& db,
+    const string* pattern, const TSessionState* session,
+    TGetFunctionsResult* functions) {
   TGetFunctionsParams params;
-  params.__set_type(fn_type);
+  params.__set_category(fn_category);
   params.__set_db(db);
   if (pattern != NULL) params.__set_pattern(*pattern);
   if (session != NULL) params.__set_session(*session);

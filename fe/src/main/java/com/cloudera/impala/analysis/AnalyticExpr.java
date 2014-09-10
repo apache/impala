@@ -168,7 +168,12 @@ public class AnalyticExpr extends Expr {
 
   public static boolean isAnalyticFn(Function fn) {
     return fn instanceof AggregateFunction
-        && ((AggregateFunction) fn).needsAnalyticExpr();
+        && ((AggregateFunction) fn).isAnalyticFn();
+  }
+
+  public static boolean isAggregateFn(Function fn) {
+    return fn instanceof AggregateFunction
+        && ((AggregateFunction) fn).isAggregateFn();
   }
 
   static private boolean isOffsetFn(Function fn) {
@@ -251,7 +256,14 @@ public class AnalyticExpr extends Expr {
               + getFnCall().toSql());
     }
 
-    if (isAnalyticFn(fn)) {
+    // check for non-analytic aggregate functions
+    if (!isAnalyticFn(fn)) {
+      throw new AnalysisException(
+          String.format("Aggregate function '%s' not supported with OVER clause.",
+              getFnCall().toSql()));
+    }
+
+    if (isAnalyticFn(fn) && !isAggregateFn(fn)) {
       if (orderByElements_.isEmpty()) {
         throw new AnalysisException(
             "'" + getFnCall().toSql() + "' requires an ORDER BY clause");

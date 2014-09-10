@@ -766,6 +766,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select abs(float_col) over (partition by id order by tinyint_col "
         + "rows between unbounded preceding and current row) from functional.alltypes",
         "OVER clause requires aggregate or analytic function: abs(float_col)");
+    AnalysisError("select group_concat(string_col) over (order by tinyint_col "
+        + "rows between unbounded preceding and current row) from functional.alltypes",
+        "Aggregate function 'group_concat(string_col)' not supported with OVER clause.");
     // Order By missing
     AnalysisError("select sum(int_col) over (partition by id "
         + "rows between unbounded preceding and current row) from functional.alltypes",

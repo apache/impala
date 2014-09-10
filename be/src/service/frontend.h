@@ -81,7 +81,7 @@ class Frontend {
   // Call FE to get the table/column stats.
   Status GetStats(const TShowStatsParams& params, TResultSet* result);
 
-  // Return all functions of 'type' that match the optional argument 'pattern'.
+  // Return all functions of 'category' that match the optional argument 'pattern'.
   // If pattern is NULL match all functions, otherwise match only those functions that
   // match the pattern string.
   // The TSessionState parameter is used to filter results of metadata operations when
@@ -89,7 +89,7 @@ class Frontend {
   // be set to the user's current session. If this is an Impala internal request,
   // the session should be set to NULL which will skip privilege checks returning all
   // results.
-  Status GetFunctions(TFunctionType::type fn_type, const std::string& db,
+  Status GetFunctions(TFunctionCategory::type fn_category, const std::string& db,
       const std::string* pattern, const TSessionState* session,
       TGetFunctionsResult* functions);
 
