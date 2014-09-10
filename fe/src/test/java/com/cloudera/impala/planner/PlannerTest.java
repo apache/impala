@@ -76,6 +76,8 @@ public class PlannerTest {
   public static void setUp() throws Exception {
     // Use 8 cores for resource estimation.
     RuntimeEnv.INSTANCE.setNumCores(8);
+    // Set test env to control the explain level.
+    RuntimeEnv.INSTANCE.setTestEnv(true);
   }
 
   @AfterClass

@@ -24,6 +24,9 @@ public class RuntimeEnv {
 
   private int numCores_;
 
+  // Indicates whether this is an environment for testing.
+  private boolean isTestEnv_;
+
   public RuntimeEnv() {
     reset();
   }
@@ -37,4 +40,7 @@ public class RuntimeEnv {
 
   public int getNumCores() { return numCores_; }
   public void setNumCores(int numCores) { this.numCores_ = numCores; }
+  public void setTestEnv(boolean v) { isTestEnv_ = v; }
+  public boolean isTestEnv() { return isTestEnv_; }
+
 }

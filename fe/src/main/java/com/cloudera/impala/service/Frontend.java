@@ -79,6 +79,7 @@ import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
+import com.cloudera.impala.common.RuntimeEnv;
 import com.cloudera.impala.planner.PlanFragment;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.planner.ScanNode;
@@ -817,12 +818,11 @@ public class Frontend {
 
     // Use VERBOSE by default for all non-explain statements.
     TExplainLevel explainLevel = TExplainLevel.VERBOSE;
-    if (queryCtx.request.query_options.isSetExplain_level()) {
+    // Use the query option for explain stmts and tests (e.g., planner tests).
+    if (analysisResult.isExplainStmt() || RuntimeEnv.INSTANCE.isTestEnv()) {
       explainLevel = queryCtx.request.query_options.getExplain_level();
-    } else if (analysisResult.isExplainStmt()) {
-      // Use the STANDARD by default for explain statements.
-      explainLevel = TExplainLevel.STANDARD;
     }
+
     // Global query parameters to be set in each TPlanExecRequest.
     queryExecRequest.setQuery_ctx(queryCtx);
 
