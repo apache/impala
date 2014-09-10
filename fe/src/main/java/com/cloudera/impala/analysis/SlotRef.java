@@ -198,7 +198,7 @@ public class SlotRef extends Expr {
   @Override
   public String toString() {
     if (desc_ != null) {
-      return "tid=" + desc_.getParent().getId() + " " + "sid=" + desc_.getId();
+      return "tid=" + desc_.getParent().getId() + " sid=" + desc_.getId();
     }
     return "no desc set";
   }

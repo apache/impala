@@ -253,7 +253,7 @@ public class SelectStmt extends QueryStmt {
    * Marks all unassigned join predicates as well as exprs in aggInfo and sortInfo.
    */
   @Override
-  public void materializeRequiredSlots(Analyzer analyzer) throws InternalException {
+  public void materializeRequiredSlots(Analyzer analyzer) {
     // Mark unassigned join predicates. Some predicates that must be evaluated by a join
     // can also be safely evaluated below the join (picked up by getBoundPredicates()).
     // Such predicates will be marked twice and that is ok.

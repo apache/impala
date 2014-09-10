@@ -921,13 +921,13 @@ public class Planner {
     SortNode sortNode = (SortNode) node;
     Preconditions.checkState(sortNode.isAnalyticSort());
     PlanFragment analyticFragment = childFragment;
-    if (sortNode.getRequiredInputPartition() != null) {
+    if (sortNode.getInputPartition() != null) {
       // make sure the childFragment's output is partitioned as required by the sortNode
-      sortNode.getRequiredInputPartition().substitutePartitionExprs(
+      sortNode.getInputPartition().substitute(
           childFragment.getPlanRoot().getBaseTblSmap(), analyzer);
-      if (!childFragment.getDataPartition().equals(sortNode.getRequiredInputPartition())) {
+      if (!childFragment.getDataPartition().equals(sortNode.getInputPartition())) {
         analyticFragment = createParentFragment(
-            analyzer, childFragment, sortNode.getRequiredInputPartition());
+            analyzer, childFragment, sortNode.getInputPartition());
       }
     }
     analyticFragment.addPlanRoot(sortNode);

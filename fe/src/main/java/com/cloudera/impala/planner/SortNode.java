@@ -50,7 +50,7 @@ public class SortNode extends PlanNode {
   private final SortInfo info_;
 
   // if set, this SortNode requires its input to have this data partition
-  private DataPartition requiredInputPartition_;
+  private DataPartition inputPartition_;
 
   // if true, the output of this node feeds an AnalyticNode
   private boolean isAnalyticSort_;
@@ -77,10 +77,10 @@ public class SortNode extends PlanNode {
   public boolean hasOffset() { return offset_ > 0; }
   public boolean useTopN() { return useTopN_; }
   public SortInfo getSortInfo() { return info_; }
-  public void setRequiredInputPartition(DataPartition inputPartition) {
-    requiredInputPartition_ = inputPartition;
+  public void setInputPartition(DataPartition inputPartition) {
+    inputPartition_ = inputPartition;
   }
-  public DataPartition getRequiredInputPartition() { return requiredInputPartition_; }
+  public DataPartition getInputPartition() { return inputPartition_; }
   public boolean isAnalyticSort() { return isAnalyticSort_; }
   public void setIsAnalyticSort(boolean v) { isAnalyticSort_ = v; }
 

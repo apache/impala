@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.catalog.AggregateFunction;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.Type;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -16,17 +17,17 @@ import com.google.common.collect.Lists;
  * Base class for AggregateInfo and AnalyticInfo containing the intermediate and output
  * tuple descriptors as well as their smaps for evaluating aggregate functions.
  */
-public class AggregateExprsTupleInfo {
+public abstract class AggregateInfoBase {
   private final static Logger LOG =
-      LoggerFactory.getLogger(AggregateExprsTupleInfo.class);
+      LoggerFactory.getLogger(AggregateInfoBase.class);
 
   // For aggregations: All unique grouping expressions from a select block.
   // For analytics: Empty.
   protected ArrayList<Expr> groupingExprs_;
 
   // For aggregations: All unique aggregate expressions from a select block.
-  // For analytics: All unique analytic function calls from a set of compatible
-  // AnalyticExprs of the same select block.
+  // For analytics: The results of AnalyticExpr.getFnCall() for the unique
+  // AnalyticExprs of a select block.
   protected ArrayList<FunctionCallExpr> aggregateExprs_;
 
   // The tuple into which the intermediate output of an aggregation is materialized.
@@ -45,73 +46,35 @@ public class AggregateExprsTupleInfo {
   // functions' output types.
   protected TupleDescriptor outputTupleDesc_;
 
-  // Map from all grouping and aggregate exprs to a SlotRef referencing the corresp. slot
-  // in the intermediate tuple. Identical to outputTupleSmap_ if no aggregateExpr has an
-  // output type that is different from its intermediate type.
-  protected ExprSubstitutionMap intermediateTupleSmap_ = new ExprSubstitutionMap();
+  // For aggregation: indices into aggregate exprs for that need to be materialized
+  // For analytics: indices into the analytic exprs and their corresponding aggregate
+  // exprs that need to be materialized.
+  // Populated in materializeRequiredSlots() which must be implemented by subclasses.
+  protected ArrayList<Integer> materializedSlots_ = Lists.newArrayList();
 
-  // Map from all grouping and aggregate exprs to a SlotRef referencing the corresp. slot
-  // in the output tuple.
-  protected ExprSubstitutionMap outputTupleSmap_ = new ExprSubstitutionMap();
-
-  // Map from slots of outputTupleSmap_ to the corresponding slot in
-  // intermediateTupleSmap_.
-  protected final ExprSubstitutionMap outputToIntermediateTupleSmap_ =
-      new ExprSubstitutionMap();
-
-  protected AggregateExprsTupleInfo(ArrayList<Expr> groupingExprs,
+  protected AggregateInfoBase(ArrayList<Expr> groupingExprs,
       ArrayList<FunctionCallExpr> aggExprs)  {
     Preconditions.checkState(groupingExprs != null || aggExprs != null);
     groupingExprs_ =
-        (groupingExprs != null
-        ? Expr.cloneList(groupingExprs)
-            : new ArrayList<Expr>());
+        groupingExprs != null ? Expr.cloneList(groupingExprs) : new ArrayList<Expr>();
     Preconditions.checkState(aggExprs != null || !(this instanceof AnalyticInfo));
     aggregateExprs_ =
-        (aggExprs != null
-        ? Expr.cloneList(aggExprs)
-            : new ArrayList<FunctionCallExpr>());
+        aggExprs != null ? Expr.cloneList(aggExprs) : new ArrayList<FunctionCallExpr>();
   }
 
   /**
-   * Creates the intermediate and output tuple descriptors as well as their smaps.
-   * If no agg expr has an intermediate type different from its output type, then
-   * only the output tuple descriptor is created and the intermediate tuple/smap
-   * are set to the output tuple/smap. If two different tuples are required, also
-   * populates the output-to-intermediate smap and registers auxiliary equivalence
-   * predicates between the grouping slots of the two tuples.
+   * Creates the intermediate and output tuple descriptors. If no agg expr has an
+   * intermediate type different from its output type, then only the output tuple
+   * descriptor is created and the intermediate tuple is set to the output tuple.
    */
   protected void createTupleDescs(Analyzer analyzer) {
-    // Determine whether we need different output and intermediate tuples.
-    boolean requiresIntermediateTuple = false;
-    for (FunctionCallExpr aggExpr: aggregateExprs_) {
-      Type intermediateType = ((AggregateFunction)aggExpr.fn_).getIntermediateType();
-      if (intermediateType != null) {
-        requiresIntermediateTuple = true;
-        break;
-      }
-    }
-
     // Create the intermediate tuple desc first, so that the tuple ids are increasing
     // from bottom to top in the plan tree.
-    intermediateTupleDesc_ = createAggTupleDesc(analyzer, false);
-    if (requiresIntermediateTuple) {
-      outputTupleDesc_ = createAggTupleDesc(analyzer, true);
-      // Populate smap from output slots to intermediate slots, and register aux
-      // equivalence predicates between the corresponding grouping slots.
-      for (int i = 0; i < outputTupleDesc_.getSlots().size(); ++i) {
-        outputToIntermediateTupleSmap_.put(
-            new SlotRef(outputTupleDesc_.getSlots().get(i)),
-            new SlotRef(intermediateTupleDesc_.getSlots().get(i)));
-        if (i < groupingExprs_.size()) {
-          analyzer.createAuxEquivPredicate(
-              new SlotRef(outputTupleDesc_.getSlots().get(i)),
-              new SlotRef(intermediateTupleDesc_.getSlots().get(i)));
-        }
-      }
+    intermediateTupleDesc_ = createTupleDesc(analyzer, false);
+    if (requiresIntermediateTuple(aggregateExprs_)) {
+      outputTupleDesc_ = createTupleDesc(analyzer, true);
     } else {
       outputTupleDesc_ = intermediateTupleDesc_;
-      outputTupleSmap_ = intermediateTupleSmap_;
     }
   }
 
@@ -121,15 +84,13 @@ public class AggregateExprsTupleInfo {
    * Also updates the appropriate substitution map, and creates and registers auxiliary
    * equality predicates between the grouping slots and the grouping exprs.
    */
-  private TupleDescriptor createAggTupleDesc(Analyzer analyzer, boolean isOutputTuple) {
+  private TupleDescriptor createTupleDesc(Analyzer analyzer, boolean isOutputTuple) {
     TupleDescriptor result = analyzer.getDescTbl().createTupleDescriptor();
     List<Expr> exprs = Lists.newArrayListWithCapacity(
         groupingExprs_.size() + aggregateExprs_.size());
     exprs.addAll(groupingExprs_);
     exprs.addAll(aggregateExprs_);
 
-    ExprSubstitutionMap smap =
-        (isOutputTuple) ? outputTupleSmap_ : intermediateTupleSmap_;
     int aggregateExprStartIndex = groupingExprs_.size();
     for (int i = 0; i < exprs.size(); ++i) {
       Expr expr = exprs.get(i);
@@ -173,13 +134,19 @@ public class AggregateExprsTupleInfo {
           }
         }
       }
-      smap.put(expr.clone(), new SlotRef(slotDesc));
     }
     String prefix = (isOutputTuple ? "result " : "intermediate ");
     LOG.trace(prefix + " tuple=" + result.debugString());
-    LOG.trace(prefix + " smap=" + smap.debugString());
     return result;
   }
+
+  /**
+   * Marks the slots required for evaluating an Analytic/AggregateInfo by
+   * resolving the materialized aggregate/analytic exprs against smap,
+   * and then marking their slots.
+   */
+  public abstract void materializeRequiredSlots(Analyzer analyzer,
+      ExprSubstitutionMap smap);
 
   public ArrayList<Expr> getGroupingExprs() { return groupingExprs_; }
   public ArrayList<FunctionCallExpr> getAggregateExprs() { return aggregateExprs_; }
@@ -187,14 +154,35 @@ public class AggregateExprsTupleInfo {
   public TupleDescriptor getIntermediateTupleDesc() { return intermediateTupleDesc_; }
   public TupleId getIntermediateTupleId() { return intermediateTupleDesc_.getId(); }
   public TupleId getOutputTupleId() { return outputTupleDesc_.getId(); }
-  public ExprSubstitutionMap getIntermediateSmap() { return intermediateTupleSmap_; }
-  public ExprSubstitutionMap getOutputSmap() { return outputTupleSmap_; }
-  public ExprSubstitutionMap getOutputToIntermediateSmap() {
-    return outputToIntermediateTupleSmap_;
-  }
-  public boolean hasDiffIntermediateTuple() {
+  public boolean requiresIntermediateTuple() {
     Preconditions.checkNotNull(intermediateTupleDesc_);
     Preconditions.checkNotNull(outputTupleDesc_);
     return intermediateTupleDesc_ != outputTupleDesc_;
+  }
+
+  /**
+   * Returns true if evaluating the given aggregate exprs requires an intermediate tuple,
+   * i.e., whether one of the aggregate functions has an intermediate type different from
+   * its output type.
+   */
+  public static <T extends Expr> boolean requiresIntermediateTuple(List<T> aggExprs) {
+    for (Expr aggExpr: aggExprs) {
+      Type intermediateType = ((AggregateFunction) aggExpr.fn_).getIntermediateType();
+      if (intermediateType != null) return true;
+    }
+    return false;
+  }
+
+  public String debugString() {
+    StringBuilder out = new StringBuilder();
+    out.append(Objects.toStringHelper(this)
+        .add("grouping_exprs", Expr.debugString(groupingExprs_))
+        .add("aggregate_exprs", Expr.debugString(aggregateExprs_))
+        .add("intermediate_tuple", (intermediateTupleDesc_ == null)
+            ? "null" : intermediateTupleDesc_.debugString())
+        .add("output_tuple", (outputTupleDesc_ == null)
+            ? "null" : outputTupleDesc_.debugString())
+        .toString());
+    return out.toString();
   }
 }

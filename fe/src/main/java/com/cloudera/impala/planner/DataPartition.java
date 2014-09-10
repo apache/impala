@@ -71,7 +71,7 @@ public class DataPartition {
   public TPartitionType getType() { return type_; }
   public List<Expr> getPartitionExprs() { return partitionExprs_; }
 
-  public void substitutePartitionExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
+  public void substitute(ExprSubstitutionMap smap, Analyzer analyzer) {
     partitionExprs_ = Expr.substituteList(partitionExprs_, smap, analyzer);
   }
 

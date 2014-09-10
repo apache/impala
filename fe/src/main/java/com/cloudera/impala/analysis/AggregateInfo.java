@@ -62,7 +62,7 @@ import com.google.common.collect.Lists;
  *
  * TODO: move the merge construction logic from SelectStmt into AggregateInfo
  */
-public class AggregateInfo extends AggregateExprsTupleInfo {
+public class AggregateInfo extends AggregateInfoBase {
   private final static Logger LOG = LoggerFactory.getLogger(AggregateInfo.class);
 
   public enum AggPhase {
@@ -74,10 +74,6 @@ public class AggregateInfo extends AggregateExprsTupleInfo {
     public boolean isMerge() { return this == FIRST_MERGE || this == SECOND_MERGE; }
   };
 
-  // indices into aggregateExprs for those that need to be materialized;
-  // shared between this, mergeAggInfo and secondPhaseDistinctAggInfo
-  private ArrayList<Integer> materializedAggregateSlots_ = Lists.newArrayList();
-
   // created by createMergeAggInfo()
   private AggregateInfo mergeAggInfo_;
 
@@ -85,6 +81,20 @@ public class AggregateInfo extends AggregateExprsTupleInfo {
   private AggregateInfo secondPhaseDistinctAggInfo_;
 
   private final AggPhase aggPhase_;
+
+  // Map from all grouping and aggregate exprs to a SlotRef referencing the corresp. slot
+  // in the intermediate tuple. Identical to outputTupleSmap_ if no aggregateExpr has an
+  // output type that is different from its intermediate type.
+  protected ExprSubstitutionMap intermediateTupleSmap_ = new ExprSubstitutionMap();
+
+  // Map from all grouping and aggregate exprs to a SlotRef referencing the corresp. slot
+  // in the output tuple.
+  protected ExprSubstitutionMap outputTupleSmap_ = new ExprSubstitutionMap();
+
+  // Map from slots of outputTupleSmap_ to the corresponding slot in
+  // intermediateTupleSmap_.
+  protected final ExprSubstitutionMap outputToIntermediateTupleSmap_ =
+      new ExprSubstitutionMap();
 
   // C'tor creates copies of groupingExprs and aggExprs.
   private AggregateInfo(ArrayList<Expr> groupingExprs,
@@ -124,6 +134,7 @@ public class AggregateInfo extends AggregateExprsTupleInfo {
     if (distinctAggExprs.isEmpty()) {
       if (tupleDesc == null) {
         result.createTupleDescs(analyzer);
+        result.createSmaps(analyzer);
       } else {
         // A tupleDesc should only be given for UNION DISTINCT.
         Preconditions.checkState(aggExprs == null);
@@ -199,6 +210,7 @@ public class AggregateInfo extends AggregateExprsTupleInfo {
     aggregateExprs_.removeAll(distinctAggExprs);
 
     createTupleDescs(analyzer);
+    createSmaps(analyzer);
     createMergeAggInfo(analyzer);
     createSecondPhaseAggInfo(origGroupingExprs, distinctAggExprs, analyzer);
   }
@@ -210,6 +222,11 @@ public class AggregateInfo extends AggregateExprsTupleInfo {
   public AggPhase getAggPhase() { return aggPhase_; }
   public boolean isMerge() { return aggPhase_.isMerge(); }
   public boolean isDistinctAgg() { return secondPhaseDistinctAggInfo_ != null; }
+  public ExprSubstitutionMap getIntermediateSmap() { return intermediateTupleSmap_; }
+  public ExprSubstitutionMap getOutputSmap() { return outputTupleSmap_; }
+  public ExprSubstitutionMap getOutputToIntermediateSmap() {
+    return outputToIntermediateTupleSmap_;
+  }
 
   /**
    * Return the tuple id produced in the final aggregation step.
@@ -221,7 +238,7 @@ public class AggregateInfo extends AggregateExprsTupleInfo {
 
   public ArrayList<FunctionCallExpr> getMaterializedAggregateExprs() {
     ArrayList<FunctionCallExpr> result = Lists.newArrayList();
-    for (Integer i: materializedAggregateSlots_) {
+    for (Integer i: materializedSlots_) {
       result.add(aggregateExprs_.get(i));
     }
     return result;
@@ -331,7 +348,7 @@ public class AggregateInfo extends AggregateExprsTupleInfo {
     mergeAggInfo_.intermediateTupleSmap_ = intermediateTupleSmap_;
     mergeAggInfo_.outputTupleSmap_ = outputTupleSmap_;
     mergeAggInfo_.mergeAggInfo_ = mergeAggInfo_;
-    mergeAggInfo_.materializedAggregateSlots_ = materializedAggregateSlots_;
+    mergeAggInfo_.materializedSlots_ = materializedSlots_;
   }
 
   /**
@@ -492,6 +509,41 @@ public class AggregateInfo extends AggregateExprsTupleInfo {
   }
 
   /**
+   * Populates the output and intermediate smaps based on the output and intermediate
+   * tuples that are assumed to be set. If an intermediate tuple is required, also
+   * populates the output-to-intermediate smap and registers auxiliary equivalence
+   * predicates between the grouping slots of the two tuples.
+   */
+  public void createSmaps(Analyzer analyzer) {
+    Preconditions.checkNotNull(outputTupleDesc_);
+    Preconditions.checkNotNull(intermediateTupleDesc_);
+
+    List<Expr> exprs = Lists.newArrayListWithCapacity(
+        groupingExprs_.size() + aggregateExprs_.size());
+    exprs.addAll(groupingExprs_);
+    exprs.addAll(aggregateExprs_);
+    for (int i = 0; i < exprs.size(); ++i) {
+      outputTupleSmap_.put(exprs.get(i).clone(),
+          new SlotRef(outputTupleDesc_.getSlots().get(i)));
+      if (!requiresIntermediateTuple()) continue;
+      intermediateTupleSmap_.put(exprs.get(i).clone(),
+          new SlotRef(intermediateTupleDesc_.getSlots().get(i)));
+      outputToIntermediateTupleSmap_.put(
+          new SlotRef(outputTupleDesc_.getSlots().get(i)),
+          new SlotRef(intermediateTupleDesc_.getSlots().get(i)));
+      if (i < groupingExprs_.size()) {
+        analyzer.createAuxEquivPredicate(
+            new SlotRef(outputTupleDesc_.getSlots().get(i)),
+            new SlotRef(intermediateTupleDesc_.getSlots().get(i)));
+      }
+    }
+    if (!requiresIntermediateTuple()) intermediateTupleSmap_ = outputTupleSmap_;
+
+    LOG.trace("output smap=" + outputTupleSmap_.debugString());
+    LOG.trace("intermediate smap=" + intermediateTupleSmap_.debugString());
+  }
+
+  /**
    * Mark slots required for this aggregation as materialized:
    * - all grouping output slots as well as grouping exprs
    * - for non-distinct aggregation: the aggregate exprs of materialized aggregate slots;
@@ -502,8 +554,8 @@ public class AggregateInfo extends AggregateExprsTupleInfo {
    * Also computes materializedAggregateExprs.
    * This call must be idempotent because it may be called more than once for Union stmt.
    */
-  public void materializeRequiredSlots(Analyzer analyzer, ExprSubstitutionMap smap)
-      throws InternalException {
+  @Override
+  public void materializeRequiredSlots(Analyzer analyzer, ExprSubstitutionMap smap) {
     for (int i = 0; i < groupingExprs_.size(); ++i) {
       outputTupleDesc_.getSlots().get(i).setIsMaterialized(true);
       intermediateTupleDesc_.getSlots().get(i).setIsMaterialized(true);
@@ -511,7 +563,7 @@ public class AggregateInfo extends AggregateExprsTupleInfo {
 
     // collect input exprs: grouping exprs plus aggregate exprs that need to be
     // materialized
-    materializedAggregateSlots_.clear();
+    materializedSlots_.clear();
     List<Expr> exprs = Lists.newArrayList();
     exprs.addAll(groupingExprs_);
     for (int i = 0; i < aggregateExprs_.size(); ++i) {
@@ -526,7 +578,7 @@ public class AggregateInfo extends AggregateExprsTupleInfo {
       if (!slotDesc.isMaterialized()) continue;
       intermediateSlotDesc.setIsMaterialized(true);
       exprs.add(aggregateExprs_.get(i));
-      materializedAggregateSlots_.add(i);
+      materializedSlots_.add(i);
     }
     List<Expr> resolvedExprs = Expr.substituteList(exprs, smap, analyzer);
     analyzer.materializeSlots(resolvedExprs);
@@ -552,7 +604,7 @@ public class AggregateInfo extends AggregateExprsTupleInfo {
       if (slotDesc.isMaterialized()) ++numMaterializedSlots;
     }
     Preconditions.checkState(numMaterializedSlots ==
-        materializedAggregateSlots_.size() + groupingExprs_.size());
+        materializedSlots_.size() + groupingExprs_.size());
 
     // Check that grouping expr return types match the slot descriptors.
     int slotIdx = 0;
@@ -591,16 +643,11 @@ public class AggregateInfo extends AggregateExprsTupleInfo {
     }
   }
 
+  @Override
   public String debugString() {
-    StringBuilder out = new StringBuilder();
+    StringBuilder out = new StringBuilder(super.debugString());
     out.append(Objects.toStringHelper(this)
         .add("phase", aggPhase_)
-        .add("grouping_exprs", Expr.debugString(groupingExprs_))
-        .add("aggregate_exprs", Expr.debugString(aggregateExprs_))
-        .add("intermediate_tuple", (intermediateTupleDesc_ == null)
-            ? "null" : intermediateTupleDesc_.debugString())
-        .add("output_tuple", (outputTupleDesc_ == null)
-            ? "null" : outputTupleDesc_.debugString())
         .add("intermediate_smap", intermediateTupleSmap_.debugString())
         .add("output_smap", outputTupleSmap_.debugString())
         .toString());
@@ -611,7 +658,6 @@ public class AggregateInfo extends AggregateExprsTupleInfo {
       out.append("\nsecondPhaseDistinctAggInfo:\n"
           + secondPhaseDistinctAggInfo_.debugString());
     }
-
     return out.toString();
   }
 }

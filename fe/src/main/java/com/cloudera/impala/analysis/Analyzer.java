@@ -549,7 +549,7 @@ public class Analyzer {
    * Adds a new slot descriptor in tupleDesc that is identical to srcSlotDesc
    * except for the slot id.
    */
-  public SlotDescriptor addSlotDescriptor(SlotDescriptor srcSlotDesc,
+  public SlotDescriptor copySlotDescriptor(SlotDescriptor srcSlotDesc,
       TupleDescriptor tupleDesc) {
     SlotDescriptor result = globalState_.descTbl.addSlotDescriptor(tupleDesc);
     globalState_.blockBySlot.put(result.getId(), this);

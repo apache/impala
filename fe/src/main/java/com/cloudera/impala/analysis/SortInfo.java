@@ -16,7 +16,6 @@ package com.cloudera.impala.analysis;
 
 import java.util.List;
 
-import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -77,8 +76,7 @@ public class SortInfo {
    * Materializes the slots referenced by the corresponding sortTupleSlotExpr after
    * applying the 'smap'.
    */
-  public void materializeRequiredSlots(Analyzer analyzer, ExprSubstitutionMap smap)
-      throws InternalException {
+  public void materializeRequiredSlots(Analyzer analyzer, ExprSubstitutionMap smap) {
     Preconditions.checkNotNull(sortTupleDesc_);
     Preconditions.checkNotNull(sortTupleSlotExprs_);
     Preconditions.checkState(sortTupleDesc_.getIsMaterialized());

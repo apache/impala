@@ -29,21 +29,24 @@ import com.google.common.collect.Lists;
  * Encapsulates the analytic functions found in a single select block plus
  * the corresponding analytic result tuple and its substitution map.
  */
-public class AnalyticInfo extends AggregateExprsTupleInfo {
+public class AnalyticInfo extends AggregateInfoBase {
   private final static Logger LOG = LoggerFactory.getLogger(AnalyticInfo.class);
 
+  // All unique analytic exprs of a select block. Used to populate
+  // super.aggregateExprs_ based on AnalyticExpr.getFnCall() for each analytic expr
+  // in this list.
   private final ArrayList<Expr> analyticExprs_;
 
   // map from analyticExprs_ to their corresponding analytic tuple slotrefs
   private final ExprSubstitutionMap analyticTupleSmap_ = new ExprSubstitutionMap();
 
-  // indices into analyticExprs_ for those exprs/slots that need to be materialized
-  private final ArrayList<Integer> materializedSlots_ = Lists.newArrayList();
-
-  private AnalyticInfo(ArrayList<Expr> analyticExprs,
-      ArrayList<FunctionCallExpr> analyticFnCalls) {
-    super(Lists.<Expr>newArrayList(), analyticFnCalls);
+  private AnalyticInfo(ArrayList<Expr> analyticExprs) {
+    super(new ArrayList<Expr>(), new ArrayList<FunctionCallExpr>());
     analyticExprs_ = Expr.cloneList(analyticExprs);
+    // Extract the analytic function calls for each analytic expr.
+    for (Expr analyticExpr: analyticExprs) {
+      aggregateExprs_.add(((AnalyticExpr) analyticExpr).getFnCall());
+    }
   }
 
   public ArrayList<Expr> getAnalyticExprs() { return analyticExprs_; }
@@ -57,14 +60,7 @@ public class AnalyticInfo extends AggregateExprsTupleInfo {
       ArrayList<Expr> analyticExprs, Analyzer analyzer) {
     Preconditions.checkState(analyticExprs != null && !analyticExprs.isEmpty());
     Expr.removeDuplicates(analyticExprs);
-    ArrayList<FunctionCallExpr> analyticFnCalls = Lists.newArrayList();
-    // Extract the analytic function calls for each analytic expr.
-    for (Expr analyticExpr: analyticExprs) {
-      Expr analyticFnCall = analyticExpr.getChild(0);
-      Preconditions.checkState(analyticFnCall instanceof FunctionCallExpr);
-      analyticFnCalls.add((FunctionCallExpr) analyticFnCall);
-    }
-    AnalyticInfo result = new AnalyticInfo(analyticExprs, analyticFnCalls);
+    AnalyticInfo result = new AnalyticInfo(analyticExprs);
     result.createTupleDescs(analyzer);
     // Populate analyticTupleSmap_
     Preconditions.checkState(analyticExprs.size() ==
@@ -132,6 +128,7 @@ public class AnalyticInfo extends AggregateExprsTupleInfo {
   }
    */
 
+  @Override
   public void materializeRequiredSlots(Analyzer analyzer, ExprSubstitutionMap smap) {
     materializedSlots_.clear();
     List<Expr> exprs = Lists.newArrayList();
@@ -176,16 +173,11 @@ public class AnalyticInfo extends AggregateExprsTupleInfo {
     }
   }
 
+  @Override
   public String debugString() {
-    StringBuilder out = new StringBuilder();
+    StringBuilder out = new StringBuilder(super.debugString());
     out.append(Objects.toStringHelper(this)
         .add("analytic_exprs", Expr.debugString(analyticExprs_))
-        .add("intermediate_tuple",
-            (intermediateTupleDesc_ == null ? "null" :
-                intermediateTupleDesc_.debugString()))
-        .add("output_tuple",
-            (outputTupleDesc_ == null ? "null" :
-                outputTupleDesc_.debugString()))
         .add("smap", analyticTupleSmap_.debugString())
         .toString());
     return out.toString();

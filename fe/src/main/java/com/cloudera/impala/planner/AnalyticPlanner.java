@@ -20,6 +20,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.AggregateInfoBase;
 import com.cloudera.impala.analysis.AnalyticExpr;
 import com.cloudera.impala.analysis.AnalyticInfo;
 import com.cloudera.impala.analysis.AnalyticWindow;
@@ -37,15 +38,29 @@ import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 
 /**
- * The analytic planner adds plan nodes to an existing set of PlanFragments in order to
- * implement the AnalyticInfo of a given query stmt.
+ * The analytic planner adds plan nodes to an existing plan tree in order to
+ * implement the AnalyticInfo of a given query stmt. The resulting plan reflects
+ * similarities among analytic exprs with respect to partitioning, ordering and
+ * windowing to reduce data exchanges and sorts (the exchanges and sorts are currently
+ * not minimal). The generated plan has the following structure:
+ * ...
+ * (
+ *  (
+ *    (
+ *      analytic node  <-- group of analytic exprs with compatible window
+ *    )+               <-- group of analytic exprs with compatible ordering
+ *    sort node?
+ *  )+                 <-- group of analytic exprs with compatible partitioning
+ *  hash exchange?
+ * )*                  <-- group of analytic exprs that have different partitioning
+ * input plan node
+ * ...
  */
 public class AnalyticPlanner {
   private final static Logger LOG = LoggerFactory.getLogger(AnalyticPlanner.class);
@@ -103,7 +118,7 @@ public class AnalyticPlanner {
       for (SlotDescriptor inputSlotDesc: tupleDesc.getSlots()) {
         if (!inputSlotDesc.isMaterialized()) continue;
         SlotDescriptor sortSlotDesc =
-            analyzer_.addSlotDescriptor(inputSlotDesc, sortTupleDesc);
+            analyzer_.copySlotDescriptor(inputSlotDesc, sortTupleDesc);
         // all output slots need to be materialized
         sortSlotDesc.setIsMaterialized(true);
         sortSmap.put(new SlotRef(inputSlotDesc), new SlotRef(sortSlotDesc));
@@ -163,7 +178,7 @@ public class AnalyticPlanner {
           inputPartition = new DataPartition(TPartitionType.HASH_PARTITIONED,
               partitionByExprs);
         }
-        sortNode.setRequiredInputPartition(inputPartition);
+        sortNode.setInputPartition(inputPartition);
       }
 
       root = sortNode;
@@ -218,73 +233,18 @@ public class AnalyticPlanner {
     // Consider creating only a single physical output tuple for all window
     // groups, although it's not always a clear win due to spilling.
     for (WindowGroup windowGroup: sortGroup.windowGroups) {
-      // child[0] of every analytic expr in this window group
-      List<Expr> analyticFnCalls = Lists.newArrayList();
-      // maps from the logical output tuple (analyticInfo_.outputTupleDesc_) to
-      // the physical output tuple materialized by the plan implementing this
-      // window group
-      ExprSubstitutionMap logicalToPhysicalSmap = new ExprSubstitutionMap();
-      Pair<TupleDescriptor, TupleDescriptor> physicalTuples =
-          createPhysicalTuples(windowGroup, logicalToPhysicalSmap, analyticFnCalls);
+      windowGroup.finalize(analyzer_);
 
       // create one AnalyticEvalNode per window group
       root = new AnalyticEvalNode(idGenerator_.getNextId(), root,
-          analyticFnCalls, windowGroup.partitionByExprs, orderByExprs,
-          windowGroup.window, physicalTuples.first, physicalTuples.second,
-          logicalToPhysicalSmap, partitionByLessThan, orderByLessThan,
+          windowGroup.analyticFnCalls, windowGroup.partitionByExprs, orderByExprs,
+          windowGroup.window, windowGroup.physicalIntermediateTuple,
+          windowGroup.physicalOutputTuple, windowGroup.logicalToPhysicalSmap,
+          partitionByLessThan, orderByLessThan,
           bufferedTupleDesc);
       root.init(analyzer_);
     }
     return root;
-  }
-
-  /**
-   * Returns the physical intermediate and output tuples for the given window group in
-   * pair.first and pair.second, respectively. Populates an smap from the logical
-   * analytic output slots to the physical ones, as well as the given list of analytic
-   * function calls (child[0] of every analytic expr in the window group).
-   * Computes the mem layout for the returned tuple descriptors.
-   */
-  private Pair<TupleDescriptor, TupleDescriptor> createPhysicalTuples(
-      WindowGroup windowGroup, ExprSubstitutionMap logicalToPhysicalSmap,
-      List<Expr> analyticFnCalls) {
-    // Physical intermediate and output tuples. If needed, create the intermediate
-    // tuple first to maintain intermediateTupleId < outputTupleId for debugging
-    // purposes and consistency with tuple creation for aggregations.
-    TupleDescriptor intermediateTuple = null;
-    TupleDescriptor outputTuple = null;
-    if (analyticInfo_.hasDiffIntermediateTuple()) {
-      intermediateTuple = analyzer_.getDescTbl().createTupleDescriptor();
-      outputTuple = analyzer_.getDescTbl().createTupleDescriptor();
-    } else {
-      outputTuple = analyzer_.getDescTbl().createTupleDescriptor();
-      intermediateTuple = outputTuple;
-    }
-
-    Preconditions.checkState(windowGroup.analyticExprs.size() ==
-        windowGroup.logicalIntermediateSlots.size());
-    Preconditions.checkState(windowGroup.analyticExprs.size() ==
-        windowGroup.logicalOutputSlots.size());
-    for (int i = 0; i < windowGroup.analyticExprs.size(); ++i) {
-      analyticFnCalls.add(windowGroup.analyticExprs.get(i).getChild(0));
-      SlotDescriptor logicalOutputSlot = windowGroup.logicalOutputSlots.get(i);
-      SlotDescriptor physicalOutputSlot =
-          analyzer_.addSlotDescriptor(logicalOutputSlot, outputTuple);
-      physicalOutputSlot.setIsMaterialized(true);
-      if (analyticInfo_.hasDiffIntermediateTuple()) {
-        SlotDescriptor logicalIntermediateSlot =
-            windowGroup.logicalIntermediateSlots.get(i);
-        SlotDescriptor physicalIntermediateSlot =
-            analyzer_.addSlotDescriptor(logicalIntermediateSlot, intermediateTuple);
-        physicalIntermediateSlot.setIsMaterialized(true);
-      }
-      logicalToPhysicalSmap.put(new SlotRef(logicalOutputSlot),
-          new SlotRef(physicalOutputSlot));
-    }
-    outputTuple.computeMemLayout();
-    if (analyticInfo_.hasDiffIntermediateTuple()) intermediateTuple.computeMemLayout();
-
-    return new Pair<TupleDescriptor, TupleDescriptor>(intermediateTuple, outputTuple);
   }
 
   /**
@@ -295,22 +255,22 @@ public class AnalyticPlanner {
    *   || (input_expr0 == buffered_expr0 && input_expr1 < buffered_expr1)
    *   || ...
    */
-  private Expr createLessThan(List<Expr> inputRowExprs, TupleId inputTid,
+  private Expr createLessThan(List<Expr> exprs, TupleId inputTid,
       ExprSubstitutionMap bufferedSmap) {
-    Preconditions.checkState(!inputRowExprs.isEmpty());
-    LOG.trace("expr0: " + inputRowExprs.get(0).debugString());
-    Preconditions.checkState(inputRowExprs.get(0).isBound(inputTid));
+    Preconditions.checkState(!exprs.isEmpty());
+    LOG.trace("expr0: " + exprs.get(0).debugString());
+    Preconditions.checkState(exprs.get(0).isBound(inputTid));
     Expr result = new BinaryPredicate(BinaryPredicate.Operator.LT,
-        inputRowExprs.get(0).clone(),
-        inputRowExprs.get(0).substitute(bufferedSmap, analyzer_));
-    for (int i = 1; i < inputRowExprs.size(); ++i) {
+        exprs.get(0).clone(),
+        exprs.get(0).substitute(bufferedSmap, analyzer_));
+    for (int i = 1; i < exprs.size(); ++i) {
       Expr eqClause = new BinaryPredicate(BinaryPredicate.Operator.EQ,
-          inputRowExprs.get(i - 1).clone(),
-          inputRowExprs.get(i - 1).substitute(bufferedSmap, analyzer_));
-      Preconditions.checkState(inputRowExprs.get(i).isBound(inputTid));
+          exprs.get(i - 1).clone(),
+          exprs.get(i - 1).substitute(bufferedSmap, analyzer_));
+      Preconditions.checkState(exprs.get(i).isBound(inputTid));
       Expr ltClause = new BinaryPredicate(BinaryPredicate.Operator.LT,
-          inputRowExprs.get(i).clone(),
-          inputRowExprs.get(i).substitute(bufferedSmap, analyzer_));
+          exprs.get(i).clone(),
+          exprs.get(i).substitute(bufferedSmap, analyzer_));
       result = new CompoundPredicate(CompoundPredicate.Operator.OR,
           result,
           new CompoundPredicate(CompoundPredicate.Operator.AND, eqClause, ltClause));
@@ -333,10 +293,20 @@ public class AnalyticPlanner {
     public final AnalyticWindow window; // not null
 
     // Analytic exprs belonging to this window group and their corresponding logical
-    // intermediate and output slots.
+    // intermediate and output slots from AnalyticInfo.intermediateTupleDesc_
+    // and AnalyticInfo.outputTupleDesc_.
     public final List<AnalyticExpr> analyticExprs = Lists.newArrayList();
+    // Result of getFnCall() for every analytic expr.
+    public final List<Expr> analyticFnCalls = Lists.newArrayList();
     public final List<SlotDescriptor> logicalOutputSlots = Lists.newArrayList();
     public final List<SlotDescriptor> logicalIntermediateSlots = Lists.newArrayList();
+
+    // Physical output and intermediate tuples as well as an smap that maps the
+    // corresponding logical output slots to their physical slots in physicalOutputTuple.
+    // Set in finalize().
+    public TupleDescriptor physicalOutputTuple;
+    public TupleDescriptor physicalIntermediateTuple;
+    public final ExprSubstitutionMap logicalToPhysicalSmap = new ExprSubstitutionMap();
 
     public WindowGroup(AnalyticExpr analyticExpr, SlotDescriptor logicalOutputSlot,
         SlotDescriptor logicalIntermediateSlot) {
@@ -344,6 +314,7 @@ public class AnalyticPlanner {
       orderByElements = analyticExpr.getOrderByElements();
       window = analyticExpr.getWindow();
       analyticExprs.add(analyticExpr);
+      analyticFnCalls.add(analyticExpr.getFnCall());
       logicalOutputSlots.add(logicalOutputSlot);
       logicalIntermediateSlots.add(logicalIntermediateSlot);
     }
@@ -370,8 +341,52 @@ public class AnalyticPlanner {
         SlotDescriptor logicalIntermediateSlot) {
       Preconditions.checkState(isCompatible(analyticExpr));
       analyticExprs.add(analyticExpr);
+      analyticFnCalls.add(analyticExpr.getFnCall());
       logicalOutputSlots.add(logicalOutputSlot);
       logicalIntermediateSlots.add(logicalIntermediateSlot);
+    }
+
+    /**
+     * Sets the physical output and intermediate tuples as well as the logical to
+     * physical smap for this window group. Computes the mem layout for the tuple
+     * descriptors.
+     */
+    public void finalize(Analyzer analyzer) {
+      Preconditions.checkState(physicalOutputTuple == null);
+      Preconditions.checkState(physicalIntermediateTuple == null);
+      Preconditions.checkState(analyticFnCalls.size() == analyticExprs.size());
+
+      // If needed, create the intermediate tuple first to maintain
+      // intermediateTupleId < outputTupleId for debugging purposes and consistency with
+      // tuple creation for aggregations.
+      boolean requiresIntermediateTuple =
+          AggregateInfoBase.requiresIntermediateTuple(analyticFnCalls);
+      if (requiresIntermediateTuple) {
+        physicalIntermediateTuple = analyzer.getDescTbl().createTupleDescriptor();
+        physicalOutputTuple = analyzer.getDescTbl().createTupleDescriptor();
+      } else {
+        physicalOutputTuple = analyzer.getDescTbl().createTupleDescriptor();
+        physicalIntermediateTuple = physicalOutputTuple;
+      }
+
+      Preconditions.checkState(analyticExprs.size() == logicalIntermediateSlots.size());
+      Preconditions.checkState(analyticExprs.size() == logicalOutputSlots.size());
+      for (int i = 0; i < analyticExprs.size(); ++i) {
+        SlotDescriptor logicalOutputSlot = logicalOutputSlots.get(i);
+        SlotDescriptor physicalOutputSlot =
+            analyzer.copySlotDescriptor(logicalOutputSlot, physicalOutputTuple);
+        physicalOutputSlot.setIsMaterialized(true);
+        if (requiresIntermediateTuple) {
+          SlotDescriptor logicalIntermediateSlot = logicalIntermediateSlots.get(i);
+          SlotDescriptor physicalIntermediateSlot = analyzer.copySlotDescriptor(
+              logicalIntermediateSlot, physicalIntermediateTuple);
+          physicalIntermediateSlot.setIsMaterialized(true);
+        }
+        logicalToPhysicalSmap.put(new SlotRef(logicalOutputSlot),
+            new SlotRef(physicalOutputSlot));
+      }
+      physicalOutputTuple.computeMemLayout();
+      if (requiresIntermediateTuple) physicalIntermediateTuple.computeMemLayout();
     }
   }
 
