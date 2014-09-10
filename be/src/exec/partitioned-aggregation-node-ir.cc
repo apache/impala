@@ -15,6 +15,7 @@
 #include "exec/partitioned-aggregation-node.h"
 
 #include "exec/hash-table.inline.h"
+#include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
 

@@ -15,6 +15,7 @@
 #include "exec/analytic-eval-node.h"
 
 #include "exprs/agg-fn-evaluator.h"
+#include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/descriptors.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
