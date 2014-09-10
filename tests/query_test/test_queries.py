@@ -47,6 +47,12 @@ class TestQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/hdfs-scan-node', vector)
 
   def test_analytic_fns(self, vector):
+    # TODO: Enable some of these tests for Avro if possible
+    # Don't attempt to evaluate timestamp expressions with Avro tables which doesn't
+    # support a timestamp type yet
+    table_format = vector.get_value('table_format')
+    if table_format.file_format == 'avro':
+      pytest.skip()
     self.run_test_case('QueryTest/analytic-fns', vector)
 
   def test_file_partitions(self, vector):
