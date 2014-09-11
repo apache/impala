@@ -91,6 +91,19 @@ inline uint8_t* BufferedTupleStream::AllocateRow(int size) {
   return write_block_->Allocate<uint8_t>(size);
 }
 
+inline void BufferedTupleStream::GetTupleRow(const RowIdx& idx, TupleRow* row) const {
+  DCHECK(is_pinned());
+  DCHECK(!delete_on_read_);
+  DCHECK_EQ(blocks_.size(), block_start_idx_.size());
+  DCHECK_LT(idx.block_idx, blocks_.size());
+
+  uint8_t* data = block_start_idx_[idx.block_idx] + idx.offset;
+  for (int i = 0; i < desc_.tuple_descriptors().size(); ++i) {
+    row->SetTuple(i, reinterpret_cast<Tuple*>(data));
+    data += desc_.tuple_descriptors()[i]->byte_size();
+  }
+}
+
 }
 
 #endif

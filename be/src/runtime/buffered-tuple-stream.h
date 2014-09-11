@@ -80,6 +80,16 @@ class TupleRow;
 //   - Return row batches in GetNext() instead of filling one in.
 class BufferedTupleStream {
  public:
+  // Ordinal index into the stream to retrieve a row in O(1) time. This index can
+  // only be used if the stream is pinned.
+  struct RowIdx {
+    // Index into blocks_.
+    uint32_t block_idx;
+
+    // Byte offset within the block.
+    uint32_t offset;
+  };
+
   // row_desc: description of rows stored in the stream. This is the desc for rows
   // that are added and the rows being returned.
   // block_mgr: Underlying block mgr that owns the data blocks.
@@ -89,7 +99,7 @@ class BufferedTupleStream {
   // The tuple stream is initially in pinned mode.
   BufferedTupleStream(RuntimeState* state, const RowDescriptor& row_desc,
       BufferedBlockMgr* block_mgr, BufferedBlockMgr::Client* client,
-      bool delete_on_read = true, bool read_write = false);
+      bool delete_on_read = false, bool read_write = false);
 
   // Initializes the tuple stream object. Must be called once before any of the
   // other APIs.
@@ -105,6 +115,10 @@ class BufferedTupleStream {
   // Allocates space to store a row of size 'size'. Returns NULL if there is
   // not enough memory. The returned memory is guaranteed to fit on one block.
   uint8_t* AllocateRow(int size);
+
+  // Populates 'row' with the row at idx. The stream must be pinned. The row must have
+  // been allocated with the stream's row_desc.
+  void GetTupleRow(const RowIdx& idx, TupleRow* row) const;
 
   // Prepares the stream for reading. If read_write_, this does not need to be called in
   // order to begin reading, otherwise this must be called after the last AddRow() and
@@ -124,7 +138,9 @@ class BufferedTupleStream {
 
   // Get the next batch of output rows. Memory is still owned by the BufferedTupleStream
   // and must be copied out by the caller.
-  Status GetNext(RowBatch* batch, bool* eos);
+  // If indices is non-NULL, that is also populated for each returned row with the index
+  // for that row.
+  Status GetNext(RowBatch* batch, bool* eos, std::vector<RowIdx>* indices = NULL);
 
   // Must be called once at the end to cleanup all resources. Idempotent.
   void Close();
@@ -186,6 +202,11 @@ class BufferedTupleStream {
   // valid block, otherwise equal to list.end() until PrepareForRead() is called.
   std::list<BufferedBlockMgr::Block*>::iterator read_block_;
 
+  // For each block in the stream, the buffer of the start of the block. This is only
+  // valid when the stream is pinned, giving random access to data in the stream.
+  // This is not maintained for delete_on_read_.
+  std::vector<uint8_t*> block_start_idx_;
+
   // Current ptr offset in read_block_'s buffer.
   uint8_t* read_ptr_;
 
@@ -194,6 +215,9 @@ class BufferedTupleStream {
 
   // Number of rows returned to the caller from GetNext().
   int64_t rows_returned_;
+
+  // The block index of the current read block.
+  int read_block_idx_;
 
   // The current block for writing. NULL if there is no available block to write to.
   BufferedBlockMgr::Block* write_block_;

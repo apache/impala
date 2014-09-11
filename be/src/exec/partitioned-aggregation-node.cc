@@ -75,9 +75,6 @@ PartitionedAggregationNode::PartitionedAggregationNode(
     num_row_repartitioned_(NULL),
     num_repartitions_(NULL) {
   DCHECK_EQ(PARTITION_FANOUT, 1 << NUM_PARTITIONING_BITS);
-  // TODO: remove when aggregation-node is removed (too easy to get confused which
-  // node is running otherwise).
-  LOG(ERROR) << "Partitioned aggregation";
 }
 
 Status PartitionedAggregationNode::Init(const TPlanNode& tnode) {
@@ -174,7 +171,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
     singleton_output_tuple_returned_ = false;
   } else {
     ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_, true, true,
-                                   state->fragment_hash_seed(), MAX_PARTITION_DEPTH));
+        state->fragment_hash_seed(), MAX_PARTITION_DEPTH, 1));
     RETURN_IF_ERROR(state_->block_mgr()->RegisterClient(
         MinRequiredBuffers(), mem_tracker(), state, &block_mgr_client_));
     RETURN_IF_ERROR(CreateHashPartitions(0));
@@ -404,7 +401,7 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
 bool PartitionedAggregationNode::Partition::InitHashTable() {
   DCHECK(hash_tbl.get() == NULL);
   // TODO: how many buckets?
-  hash_tbl.reset(new HashTable(parent->state_, parent->block_mgr_client_, 1, true));
+  hash_tbl.reset(new HashTable(parent->state_, parent->block_mgr_client_, 1, NULL));
   return hash_tbl->Init();
 }
 
@@ -431,7 +428,7 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
     bool failed_to_add = false;
     BufferedTupleStream* new_stream = parent->serialize_stream_.get();
     HashTableCtx* ctx = parent->ht_ctx_.get();
-    HashTable::Iterator it = hash_tbl->Begin();
+    HashTable::Iterator it = hash_tbl->Begin(ctx);
     while (!it.AtEnd()) {
       Tuple* tuple = it.GetTuple();
       it.Next<false>(ctx);
@@ -503,7 +500,7 @@ void PartitionedAggregationNode::Partition::Close(bool finalize_rows) {
       // We need to walk all the rows and Finalize them here so the UDA gets a chance
       // to cleanup. If the hash table is gone (meaning this was spilled), the rows
       // should have been finalized/serialized in Spill().
-      parent->CleanupHashTbl(agg_fn_ctxs, hash_tbl->Begin());
+      parent->CleanupHashTbl(agg_fn_ctxs, hash_tbl->Begin(parent->ht_ctx_.get()));
     }
     aggregated_row_stream->Close();
   }
@@ -744,7 +741,7 @@ Status PartitionedAggregationNode::NextPartition() {
   DCHECK(partition->aggregated_row_stream->is_pinned());
 
   output_partition_ = partition;
-  output_iterator_ = output_partition_->hash_tbl->Begin();
+  output_iterator_ = output_partition_->hash_tbl->Begin(ht_ctx_.get());
   COUNTER_ADD(num_hash_buckets_, output_partition_->hash_tbl->num_buckets());
   return Status::OK;
 }
@@ -839,7 +836,7 @@ Status PartitionedAggregationNode::MoveHashPartitions(int64_t num_input_rows) {
     }
 
   }
-  LOG(ERROR) << ss.str();
+  VLOG_QUERY << ss.str();
   hash_partitions_.clear();
   return Status::OK;
 }

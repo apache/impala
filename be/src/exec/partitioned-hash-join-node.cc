@@ -47,9 +47,6 @@ PartitionedHashJoinNode::PartitionedHashJoinNode(
   memset(hash_tbls_, 0, sizeof(hash_tbls_));
 }
 
-PartitionedHashJoinNode::~PartitionedHashJoinNode() {
-}
-
 Status PartitionedHashJoinNode::Init(const TPlanNode& tnode) {
   RETURN_IF_ERROR(BlockingJoinNode::Init(tnode));
   DCHECK(tnode.__isset.hash_join_node);
@@ -91,7 +88,8 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   bool should_store_nulls = join_op_ == TJoinOp::RIGHT_OUTER_JOIN ||
       join_op_ == TJoinOp::RIGHT_ANTI_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN;
   ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_,
-      should_store_nulls, false, state->fragment_hash_seed(), MAX_PARTITION_DEPTH));
+      should_store_nulls, false, state->fragment_hash_seed(), MAX_PARTITION_DEPTH,
+      child(1)->row_desc().tuple_descriptors().size()));
 
   partition_build_timer_ = ADD_TIMER(runtime_profile(), "BuildPartitionTime");
   num_hash_buckets_ =
@@ -213,30 +211,32 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(
 
   // Allocate the partition-local hash table.
   hash_tbl_.reset(new HashTable(state, parent_->block_mgr_client_,
-      parent_->child(1)->row_desc().tuple_descriptors().size()));
+      parent_->child(1)->row_desc().tuple_descriptors().size(), build_rows()));
   if (!hash_tbl_->Init()) {
     *built = false;
     hash_tbl_.reset();
     return Status::OK;
   }
 
+  // TODO: move the batch and indices as members to avoid reallocating.
   bool eos = false;
   RowBatch batch(parent_->child(1)->row_desc(), state->batch_size(),
       parent_->mem_tracker());
   HashTableCtx* ctx = parent_->ht_ctx_.get();
+  vector<BufferedTupleStream::RowIdx> indices;
   while (!eos) {
-    RETURN_IF_ERROR(build_rows_->GetNext(&batch, &eos));
+    RETURN_IF_ERROR(build_rows_->GetNext(&batch, &eos, &indices));
+    DCHECK_EQ(batch.num_rows(), indices.size());
     SCOPED_TIMER(parent_->build_timer_);
     for (int i = 0; i < batch.num_rows(); ++i) {
       TupleRow* row = batch.GetRow(i);
       uint32_t hash = 0;
       if (!ctx->EvalAndHashBuild(row, &hash)) continue;
-      if (UNLIKELY(!hash_tbl_->Insert(ctx, row, hash))) {
+      if (UNLIKELY(!hash_tbl_->Insert(ctx, indices[i], row, hash))) {
         *built = false;
         break;
       }
     }
-    parent_->build_pool_->AcquireData(batch.tuple_data_pool(), false);
     batch.Reset();
 
     if (!*built) {
@@ -374,7 +374,7 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
        << "    #rows:" << partition->build_rows()->num_rows() << endl;
     COUNTER_SET(largest_partition_percent_, static_cast<int64_t>(percent));
   }
-  LOG(ERROR) << ss.str();
+  VLOG_QUERY << ss.str();
 
   COUNTER_ADD(num_build_rows_partitioned_, total_build_rows);
   RETURN_IF_ERROR(BuildHashTables(state));
@@ -434,7 +434,7 @@ Status PartitionedHashJoinNode::NextSpilledProbeRowBatch(
       // to the list of partitions that we need to output their unmatched build rows.
       DCHECK(output_build_partitions_.empty());
       DCHECK(input_partition_->hash_tbl_.get() != NULL);
-      hash_tbl_iterator_ = input_partition_->hash_tbl_->FirstUnmatched();
+      hash_tbl_iterator_ = input_partition_->hash_tbl_->FirstUnmatched(ht_ctx_.get());
       output_build_partitions_.push_back(input_partition_);
     } else {
       // In any other case, just close the input partition.
@@ -632,7 +632,8 @@ Status PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
     output_build_partitions_.pop_front();
     // Move to the next partition to output unmatched rows.
     if (!output_build_partitions_.empty()) {
-      hash_tbl_iterator_ = output_build_partitions_.front()->hash_tbl_->FirstUnmatched();
+      hash_tbl_iterator_ =
+          output_build_partitions_.front()->hash_tbl_->FirstUnmatched(ht_ctx_.get());
     }
   }
 
@@ -731,7 +732,7 @@ Status PartitionedHashJoinNode::CleanUpHashPartitions(RowBatch* batch) {
           join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
           join_op_ == TJoinOp::FULL_OUTER_JOIN) {
         if (output_build_partitions_.empty()) {
-          hash_tbl_iterator_ = partition->hash_tbl_->FirstUnmatched();
+          hash_tbl_iterator_ = partition->hash_tbl_->FirstUnmatched(ht_ctx_.get());
         }
         output_build_partitions_.push_back(partition);
       } else {

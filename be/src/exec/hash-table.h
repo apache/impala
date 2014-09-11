@@ -22,7 +22,9 @@
 #include "codegen/impala-ir.h"
 #include "common/logging.h"
 #include "runtime/buffered-block-mgr.h"
+#include "runtime/buffered-tuple-stream.h"
 #include "runtime/mem-tracker.h"
+#include "runtime/tuple-row.h"
 #include "util/bitmap.h"
 #include "util/hash-util.h"
 
@@ -96,7 +98,8 @@ class HashTableCtx {
   //  - The max levels we will hash with.
   HashTableCtx(const std::vector<ExprContext*>& build_expr_ctxs,
       const std::vector<ExprContext*>& probe_expr_ctxs, bool stores_nulls,
-      bool finds_nulls, int32_t initial_seed, int max_levels);
+      bool finds_nulls, int32_t initial_seed, int max_levels,
+      int num_build_tuples);
 
   // Call to cleanup any resources.
   void Close();
@@ -236,6 +239,9 @@ class HashTableCtx {
   // not change once allocated.
   uint8_t* expr_value_null_bits_;
 
+  // Scratch buffer to generate rows on the fly.
+  TupleRow* row_;
+
   // Cross-compiled functions to access member variables used in CodegenHashCurrentRow().
   uint32_t GetHashSeed() const;
 };
@@ -252,11 +258,13 @@ class HashTable {
   // Create a hash table.
   //  - client: block mgr client to allocate data pages from.
   //  - num_build_tuples: number of Tuples in the build tuple row.
-  //  - stores_tuples: If true, the hash table stores tuples, otherwise it stores tuple
-  //    rows.
+  //  - tuple_stream: the tuple stream which contains the tuple rows index by the
+  //    hash table. Can be NULL if the rows contain only a single tuple, in which
+  //    the 'tuple_stream' is unused.
   //  - num_buckets: number of buckets that the hash table should be initialized to.
   HashTable(RuntimeState* state, BufferedBlockMgr::Client* client,
-      int num_build_tuples, bool stores_tuples = false, int64_t num_buckets = 1024);
+      int num_build_tuples, BufferedTupleStream* tuple_stream = NULL,
+      int64_t num_buckets = 1024);
 
   // Ctor used only for testing. Memory is allocated from the pool instead of the
   // block mgr.
@@ -274,15 +282,36 @@ class HashTable {
   // the insert fails and this function returns false.
   // The 'row' is not copied by the hash table and the caller must guarantee it
   // stays in memory.
+  // 'idx' is the index into tuple_stream_ for this row. If the row contains more
+  // than one tuple, the idx is stored instead of the row.
   // Returns false if there was not enough memory to insert the row.
-  bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx, TupleRow* row, uint32_t hash) {
-    DCHECK_NOTNULL(ht_ctx);
-    return InsertImpl(ht_ctx, row, hash);
+  bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx,
+      const BufferedTupleStream::RowIdx& idx, TupleRow* row, uint32_t hash) {
+    DCHECK_NOTNULL(tuple_stream_);
+#ifndef NDEBUG
+    Tuple* debug_row[num_build_tuples_];
+    tuple_stream_->GetTupleRow(idx, reinterpret_cast<TupleRow*>(debug_row));
+    DCHECK(memcmp(debug_row, row, sizeof(debug_row)) == 0);
+#endif
+
+    Node* node = InsertImpl(ht_ctx, hash);
+    if (node == NULL) return false;
+    if (stores_tuples_) {
+      DCHECK_EQ(num_build_tuples_, 1);
+      // Optimization: if this row is just a single tuple, just store the tuple*.
+      node->tuple = row->GetTuple(0);
+    } else {
+      node->idx = idx;
+    }
+    return true;
   }
 
   bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx, Tuple* tuple, uint32_t hash) {
-    DCHECK_NOTNULL(ht_ctx);
-    return InsertImpl(ht_ctx, tuple, hash);
+    DCHECK(stores_tuples_);
+    Node* node = InsertImpl(ht_ctx, hash);
+    if (node == NULL) return false;
+    node->tuple = tuple;
+    return true;
   }
 
   // Returns the start iterator for all rows that match the last row evaluated in
@@ -329,11 +358,11 @@ class HashTable {
 
   // Returns an iterator at the beginning of the hash table.  Advancing this iterator
   // will traverse all elements.
-  Iterator Begin();
+  Iterator Begin(HashTableCtx* ht_ctx);
 
   // Return an iterator pointing to the first element in the hash table that does not
   // have its matched flag set. Used in right-outer and full-outer joins.
-  Iterator FirstUnmatched();
+  Iterator FirstUnmatched(HashTableCtx* ctx);
 
   // Returns end marker
   Iterator End() { return Iterator(); }
@@ -362,17 +391,17 @@ class HashTable {
     bool NextUnmatched();
 
     // Returns the current row. Callers must check the iterator is not AtEnd() before
-    // calling GetRow().
+    // calling GetRow(). The returned row is owned by the iterator and valid until
+    // the next call to GetRow(). It is safe to advance the iterator.
     TupleRow* GetRow() {
       DCHECK(!AtEnd());
-      DCHECK(!table_->stores_tuples_);
-      return reinterpret_cast<TupleRow*>(node_->data);
+      return table_->GetRow(node_, ctx_->row_);
     }
 
     Tuple* GetTuple() {
       DCHECK(!AtEnd());
       DCHECK(table_->stores_tuples_);
-      return reinterpret_cast<Tuple*>(node_->data);
+      return reinterpret_cast<Tuple*>(node_->tuple);
     }
 
     void set_matched(bool v) {
@@ -401,14 +430,17 @@ class HashTable {
    private:
     friend class HashTable;
 
-    Iterator(HashTable* table, int bucket_idx, Node* node, uint32_t hash) :
-      table_(table),
-      bucket_idx_(bucket_idx),
-      node_(node),
-      scan_hash_(hash) {
+    Iterator(HashTable* table, HashTableCtx* ctx,
+        int bucket_idx, Node* node, uint32_t hash)
+      : table_(table),
+        ctx_(ctx),
+        bucket_idx_(bucket_idx),
+        node_(node),
+        scan_hash_(hash) {
     }
 
     HashTable* table_;
+    HashTableCtx* ctx_;
 
     // Current bucket idx
     int64_t bucket_idx_;
@@ -437,7 +469,10 @@ class HashTable {
     // TODO: Do we even have to cache the hash value?
     uint32_t hash;   // Cache of the hash for data_
     Node* next;      // Chain to next node for collisions
-    void* data;      // Either the Tuple* or TupleRow*
+    union {
+      BufferedTupleStream::RowIdx idx;
+      Tuple* tuple;
+    };
   };
 
   struct Bucket {
@@ -452,8 +487,9 @@ class HashTable {
   // Resize the hash table to 'num_buckets'. Returns false on OOM.
   bool ResizeBuckets(int64_t num_buckets);
 
-  // Insert row into the hash table
-  bool IR_ALWAYS_INLINE InsertImpl(HashTableCtx* ht_ctx, void* data, uint32_t hash);
+  // Insert row into the hash table. Returns the node that was inserted. Returns NULL
+  // if there was not enough memory.
+  Node* IR_ALWAYS_INLINE InsertImpl(HashTableCtx* ht_ctx, uint32_t hash);
 
   // Chains the node at 'node_idx' to 'bucket'.  Nodes in a bucket are chained
   // as a linked list; this places the new node at the beginning of the list.
@@ -464,11 +500,12 @@ class HashTable {
   void MoveNode(Bucket* from_bucket, Bucket* to_bucket, Node* node,
      Node* previous_node);
 
-  TupleRow* GetRow(Node* node) const {
+  TupleRow* GetRow(Node* node, TupleRow* row) const {
     if (stores_tuples_) {
-      return reinterpret_cast<TupleRow*>(&node->data);
+      return reinterpret_cast<TupleRow*>(&node->tuple);
     } else {
-      return reinterpret_cast<TupleRow*>(node->data);
+      tuple_stream_->GetTupleRow(node->idx, row);
+      return row;
     }
   }
 
@@ -483,6 +520,11 @@ class HashTable {
 
   // Client to allocate data pages with.
   BufferedBlockMgr::Client* block_mgr_client_;
+
+  // Stream contains the rows referenced by the hash table. Can be NULL if the
+  // row only contains a single tuple, in which case the TupleRow indirection
+  // is removed by the hash table.
+  BufferedTupleStream* tuple_stream_;
 
   // Only used for tests to allocate data pages instead of the block mgr.
   MemPool* data_page_pool_;

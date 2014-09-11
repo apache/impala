@@ -37,6 +37,7 @@ BufferedTupleStream::BufferedTupleStream(RuntimeState* state,
     read_ptr_(NULL),
     read_bytes_(0),
     rows_returned_(0),
+    read_block_idx_(-1),
     write_block_(NULL),
     num_pinned_(0),
     closed_(false),
@@ -144,6 +145,7 @@ Status BufferedTupleStream::NewBlockForWrite(bool* got_block) {
   }
 
   blocks_.push_back(new_block);
+  block_start_idx_.push_back(new_block->buffer());
   write_block_ = new_block;
   DCHECK(write_block_->is_pinned());
   ++num_pinned_;
@@ -161,6 +163,7 @@ Status BufferedTupleStream::NextBlockForRead() {
     DCHECK_EQ(num_pinned_, NumPinned(blocks_));
     blocks_.pop_front();
     read_block_ = blocks_.begin();
+    read_block_idx_ = 0;
   } else {
     DCHECK((*read_block_)->is_pinned());
     if (!pinned_) {
@@ -169,6 +172,7 @@ Status BufferedTupleStream::NextBlockForRead() {
       DCHECK_EQ(num_pinned_, NumPinned(blocks_));
     }
     ++read_block_;
+    ++read_block_idx_;
   }
 
   if (read_block_ != blocks_.end()) {
@@ -221,6 +225,7 @@ Status BufferedTupleStream::PrepareForRead(bool* got_buffer) {
   read_ptr_ = (*read_block_)->buffer();
   read_bytes_ = 0;
   rows_returned_ = 0;
+  read_block_idx_ = 0;
   if (got_buffer != NULL) *got_buffer = true;
   return Status::OK;
 }
@@ -240,6 +245,16 @@ Status BufferedTupleStream::PinStream(bool* pinned) {
     }
     ++num_pinned_;
     DCHECK_EQ(num_pinned_, NumPinned(blocks_));
+  }
+
+  if (!delete_on_read_) {
+    // Populate block_start_idx_ on pin.
+    DCHECK_EQ(block_start_idx_.size(), blocks_.size());
+    block_start_idx_.clear();
+    for (list<BufferedBlockMgr::Block*>::iterator it = blocks_.begin();
+        it != blocks_.end(); ++it) {
+      block_start_idx_.push_back((*it)->buffer());
+    }
   }
   *pinned = true;
   pinned_ = true;
@@ -264,10 +279,16 @@ Status BufferedTupleStream::UnpinStream(bool all) {
   return Status::OK;
 }
 
-Status BufferedTupleStream::GetNext(RowBatch* batch, bool* eos) {
+Status BufferedTupleStream::GetNext(RowBatch* batch, bool* eos,
+    vector<RowIdx>* indices) {
   DCHECK(!closed_);
   DCHECK(batch->row_desc().Equals(desc_));
   DCHECK_EQ(batch->num_rows(), 0);
+  if (indices != NULL) {
+    DCHECK(is_pinned());
+    DCHECK(!delete_on_read_);
+    indices->clear();
+  }
   *eos = (rows_returned_ == num_rows_);
   if (*eos) return Status::OK;
 
@@ -298,6 +319,11 @@ Status BufferedTupleStream::GetNext(RowBatch* batch, bool* eos) {
 
     // Copy the row into the output batch.
     TupleRow* row = reinterpret_cast<TupleRow*>(tuple_row_mem);
+    if (indices != NULL) {
+      indices->push_back(RowIdx());
+      (*indices)[i].block_idx = read_block_idx_;
+      (*indices)[i].offset = read_bytes_;
+    }
     for (int j = 0; j < desc_.tuple_descriptors().size(); ++j) {
       row->SetTuple(j, reinterpret_cast<Tuple*>(read_ptr_));
       read_ptr_ += desc_.tuple_descriptors()[j]->byte_size();

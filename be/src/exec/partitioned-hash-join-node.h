@@ -58,7 +58,6 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
  public:
   PartitionedHashJoinNode(ObjectPool* pool, const TPlanNode& tnode,
       const DescriptorTbl& descs);
-  ~PartitionedHashJoinNode();
 
   virtual Status Init(const TPlanNode& tnode);
   virtual Status Prepare(RuntimeState* state);

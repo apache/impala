@@ -94,7 +94,7 @@ class HashTableTest : public testing::Test {
   // be at least max size.
   void FullScan(HashTable* table, HashTableCtx* ht_ctx, int min, int max,
       bool all_unique, TupleRow** results, TupleRow** expected) {
-    HashTable::Iterator iter = table->Begin();
+    HashTable::Iterator iter = table->Begin(ht_ctx);
     while (iter != table->End()) {
       TupleRow* row = iter.GetRow();
       int32_t val = *reinterpret_cast<int32_t*>(build_expr_ctxs_[0]->GetValue(row));
@@ -201,12 +201,12 @@ TEST_F(HashTableTest, BasicTest) {
 
   // Create the hash table and insert the build rows
   HashTable hash_table(&mem_pool_);
-  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 0);
+  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 0, 1);
 
   uint32_t hash = 0;
   for (int i = 0; i < 5; ++i) {
     if (!ht_ctx.EvalAndHashBuild(build_rows[i], &hash)) continue;
-    hash_table.Insert(&ht_ctx, build_rows[i], hash);
+    hash_table.Insert(&ht_ctx, build_rows[i]->GetTuple(0), hash);
   }
   EXPECT_EQ(hash_table.size(), 5);
 
@@ -245,7 +245,7 @@ TEST_F(HashTableTest, BasicTest) {
 // This tests makes sure we can scan ranges of buckets
 TEST_F(HashTableTest, ScanTest) {
   HashTable hash_table(&mem_pool_);
-  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 0);
+  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 0, 1);
 
   // Add 1 row with val 1, 2 with val 2, etc
   vector<TupleRow*> build_rows;
@@ -257,7 +257,7 @@ TEST_F(HashTableTest, ScanTest) {
     for (int i = 0; i < val; ++i) {
       TupleRow* row = CreateTupleRow(val);
       if (!ht_ctx.EvalAndHashBuild(row, &hash)) continue;
-      hash_table.Insert(&ht_ctx, row, hash);
+      hash_table.Insert(&ht_ctx, row->GetTuple(0), hash);
       build_rows.push_back(row);
       probe_rows[val].expected_build_rows.push_back(row);
     }
@@ -297,7 +297,7 @@ TEST_F(HashTableTest, GrowTableTest) {
   MemTracker tracker(100 * 1024 * 1024);
   MemPool pool(&tracker);
   HashTable hash_table(&pool, num_to_add);
-  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 0);
+  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 0, 1);
 
   // This inserts about 5M entries
   int build_row_val = 0;
@@ -306,7 +306,7 @@ TEST_F(HashTableTest, GrowTableTest) {
     for (int j = 0; j < num_to_add; ++build_row_val, ++j) {
       TupleRow* row = CreateTupleRow(build_row_val);
       if (!ht_ctx.EvalAndHashBuild(row, &hash)) continue;
-      if (!hash_table.Insert(&ht_ctx, row, hash)) goto done_inserting;
+      if (!hash_table.Insert(&ht_ctx, row->GetTuple(0), hash)) goto done_inserting;
     }
     expected_size += num_to_add;
     num_to_add *= 2;

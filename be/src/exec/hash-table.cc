@@ -47,12 +47,13 @@ static uint32_t SEED_PRIMES[] = {
 
 HashTableCtx::HashTableCtx(const vector<ExprContext*>& build_expr_ctxs,
     const vector<ExprContext*>& probe_expr_ctxs, bool stores_nulls, bool finds_nulls,
-    int32_t initial_seed, int max_levels)
+    int32_t initial_seed, int max_levels, int num_build_tuples)
     : build_expr_ctxs_(build_expr_ctxs),
       probe_expr_ctxs_(probe_expr_ctxs),
       stores_nulls_(stores_nulls),
       finds_nulls_(finds_nulls),
-      level_(0) {
+      level_(0),
+      row_(reinterpret_cast<TupleRow*>(malloc(sizeof(Tuple*) * num_build_tuples))) {
   // Compute the layout and buffer size to store the evaluated expr results
   DCHECK_EQ(build_expr_ctxs_.size(), probe_expr_ctxs_.size());
   DCHECK(!build_expr_ctxs_.empty());
@@ -81,6 +82,8 @@ void HashTableCtx::Close() {
   DCHECK_NOTNULL(expr_value_null_bits_);
   delete[] expr_value_null_bits_;
   expr_value_null_bits_ = NULL;
+  free(row_);
+  row_ = NULL;
 }
 
 bool HashTableCtx::EvalRow(TupleRow* row, const vector<ExprContext*>& ctxs) {
@@ -156,12 +159,13 @@ bool HashTableCtx::Equals(TupleRow* build_row) {
 const float HashTable::MAX_BUCKET_OCCUPANCY_FRACTION = 0.75f;
 
 HashTable::HashTable(RuntimeState* state, BufferedBlockMgr::Client* client,
-    int num_build_tuples, bool stores_tuples, int64_t num_buckets)
+    int num_build_tuples, BufferedTupleStream* stream, int64_t num_buckets)
   : state_(state),
     block_mgr_client_(client),
+    tuple_stream_(stream),
     data_page_pool_(NULL),
     num_build_tuples_(num_build_tuples),
-    stores_tuples_(stores_tuples),
+    stores_tuples_(num_build_tuples == 1),
     num_filled_buckets_(0),
     num_nodes_(0),
     next_node_(NULL),
@@ -171,14 +175,16 @@ HashTable::HashTable(RuntimeState* state, BufferedBlockMgr::Client* client,
   DCHECK_EQ((num_buckets & (num_buckets-1)), 0) << "num_buckets must be a power of 2";
   DCHECK_GT(num_buckets, 0) << "num_buckets must be larger than 0";
   buckets_.resize(num_buckets_);
+  if (!stores_tuples_) DCHECK_NOTNULL(stream);
 }
 
 HashTable::HashTable(MemPool* pool, int num_buckets)
   : state_(NULL),
     block_mgr_client_(NULL),
+    tuple_stream_(NULL),
     data_page_pool_(pool),
     num_build_tuples_(1),
-    stores_tuples_(false),
+    stores_tuples_(true),
     num_filled_buckets_(0),
     num_nodes_(0),
     next_node_(NULL),
@@ -231,7 +237,7 @@ void HashTable::AddBitmapFilters(HashTableCtx* ht_ctx) {
   uint32_t seed = ht_ctx->seeds_[0];
 
   // Walk the build table and generate a bitmap for each probe side slot.
-  HashTable::Iterator iter = Begin();
+  HashTable::Iterator iter = Begin(ht_ctx);
   while (iter != End()) {
     TupleRow* row = iter.GetRow();
     for (int i = 0; i < ht_ctx->build_expr_ctxs_.size(); ++i) {
@@ -336,6 +342,7 @@ bool HashTable::GrowNodeArray() {
 
 string HashTable::DebugString(bool skip_empty, bool show_match,
     const RowDescriptor* desc) {
+  Tuple* row[num_build_tuples_];
   stringstream ss;
   ss << endl;
   for (int i = 0; i < buckets_.size(); ++i) {
@@ -345,8 +352,14 @@ string HashTable::DebugString(bool skip_empty, bool show_match,
     ss << i << ": ";
     while (node != NULL) {
       if (!first) ss << ",";
-      ss << node << "(" << node->data << ")";
-      if (desc != NULL) ss << " " << PrintRow(GetRow(node), *desc);
+      if (stores_tuples_) {
+        ss << node << "(" << node->tuple << ")";
+      } else {
+        ss << node << "(" << node->idx.block_idx << ", " << node->idx.offset << ")";
+      }
+      if (desc != NULL) {
+        ss << " " << PrintRow(GetRow(node, reinterpret_cast<TupleRow*>(row)), *desc);
+      }
       if (show_match) {
         if (node->matched) {
           ss << " [M]";
