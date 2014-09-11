@@ -79,12 +79,11 @@ HADOOP_HOME=
 # Start HBase and 3 regionserver
 $HBASE_HOME/bin/start-hbase.sh 2>&1 | tee ${HBASE_LOGDIR}/hbase-startup.out
 
-# TODO: Remove once the race between master and RS has been
-# resolved. Note this script requires having
-# org.apache.zookeeper.ZooKeeperMain on the classpath, so make sure
-# that the classpath has been set properly.
-. ${IMPALA_HOME}/bin/set-classpath.sh
-
+# TODO: Remove once the race between master and RS has been resolved.
+# Note wait-for-hbase-master.py requires having org.apache.zookeeper.ZooKeeperMain on the
+# classpath. ZooKeeper has conflicts with JARs added as part of set-classpath.sh, so
+# generate a valid classpath using the 'hadoop classpath' command.
+export CLASSPATH=`hadoop classpath`
 python ${CLUSTER_BIN}/wait-for-hbase-master.py
 
 $HBASE_HOME/bin/local-regionservers.sh start 1 2 3 2>&1 | \
