@@ -553,6 +553,8 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select min(int_col) over (partition by id order by tinyint_col "
         + "rows between 2 preceding and unbounded following) from functional.alltypes");
     AnalyzesOk("select min(int_col) over (partition by id order by tinyint_col "
+        + "rows 2 preceding) from functional.alltypes");
+    AnalyzesOk("select min(int_col) over (partition by id order by tinyint_col "
         + "rows between unbounded preceding and 2 preceding) from functional.alltypes");
     AnalyzesOk("select min(int_col) over (partition by id order by tinyint_col "
         + "rows between 2 following and unbounded following) from functional.alltypes");

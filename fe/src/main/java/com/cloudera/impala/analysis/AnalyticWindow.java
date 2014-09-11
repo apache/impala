@@ -28,6 +28,7 @@ import com.google.common.base.Preconditions;
 
 /**
  * Windowing clause of an analytic expr
+ * Both left and right boundaries are always non-null after analyze().
  */
 public class AnalyticWindow {
   // default window used when an analytic expr was given an order by but no window
@@ -165,7 +166,8 @@ public class AnalyticWindow {
 
   private final Type type_;
   private final Boundary leftBoundary_;
-  private final Boundary rightBoundary_;  // may be null
+  private Boundary rightBoundary_;  // may be null before analyze()
+  private String toSqlString_;  // cached after analysis
 
   public Type getType() { return type_; }
   public Boundary getLeftBoundary() { return leftBoundary_; }
@@ -186,7 +188,21 @@ public class AnalyticWindow {
     rightBoundary_ = r;
   }
 
+  /**
+   * Clone c'tor
+   */
+  private AnalyticWindow(AnalyticWindow other) {
+    type_ = other.type_;
+    Preconditions.checkNotNull(other.leftBoundary_);
+    leftBoundary_ = other.leftBoundary_.clone();
+    if (other.rightBoundary_ != null) {
+      rightBoundary_ = other.rightBoundary_.clone();
+    }
+    toSqlString_ = other.toSqlString_;  // safe to share
+  }
+
   public String toSql() {
+    if (toSqlString_ != null) return toSqlString_;
     StringBuilder sb = new StringBuilder();
     sb.append(type_.toString()).append(" ");
     if (rightBoundary_ == null) {
@@ -203,6 +219,7 @@ public class AnalyticWindow {
     if (leftBoundary_.getType() != BoundaryType.UNBOUNDED_PRECEDING) {
       result.setWindow_start(leftBoundary_.toThrift());
     }
+    Preconditions.checkNotNull(rightBoundary_);
     if (rightBoundary_.getType() != BoundaryType.UNBOUNDED_FOLLOWING) {
       result.setWindow_end(rightBoundary_.toThrift());
     }
@@ -225,9 +242,7 @@ public class AnalyticWindow {
   }
 
   @Override
-  public AnalyticWindow clone() {
-    return new AnalyticWindow(type_, leftBoundary_.clone(), rightBoundary_.clone());
-  }
+  public AnalyticWindow clone() { return new AnalyticWindow(this); }
 
   /**
    * Semantic analysis for expr of a PRECEDING/FOLLOWING clause.
@@ -320,7 +335,13 @@ public class AnalyticWindow {
     }
 
     if (leftBoundary_.getType().isOffset()) checkOffsetExpr(analyzer, leftBoundary_);
-    if (rightBoundary_ == null) return;
+    if (rightBoundary_ == null) {
+      // set right boundary to implied value, but make sure to cache toSql string
+      // beforehand
+      toSqlString_ = toSql();
+      rightBoundary_ = new Boundary(BoundaryType.CURRENT_ROW, null);
+      return;
+    }
     if (rightBoundary_.getType().isOffset()) checkOffsetExpr(analyzer, rightBoundary_);
 
     if (leftBoundary_.getType() == BoundaryType.FOLLOWING) {
