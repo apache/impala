@@ -259,42 +259,24 @@ class HashTable {
   // Call to cleanup any resources. Must be called once.
   void Close();
 
-  // Insert row into the hash table.  Row will be evaluated over build exprs.
-  // This will grow the hash table if necessary.
-  // If the hash table has or needs to go over the mem limit, the Insert will
-  // be ignored. The caller is assumed to periodically (e.g. per row batch) check
-  // the limits to identify this case.
+  // Insert row into the hash table. EvalAndHashBuild()/EvalAndHashProbe() must
+  // be called on 'row' before inserting.
+  // This will grow the hash table if necessary. If there is not enough memory,
+  // the insert fails and this function returns false.
   // The 'row' is not copied by the hash table and the caller must guarantee it
   // stays in memory.
   // Returns false if there was not enough memory to insert the row.
   bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx, TupleRow* row) {
     DCHECK_NOTNULL(ht_ctx);
     if (UNLIKELY(mem_limit_exceeded_)) return false;
-    // TODO: can we remove this Eval and guarantee that the values in ht_ctx are
-    // valid for this row?
-    bool has_null = ht_ctx->EvalBuildRow(row);
-    if (!ht_ctx->stores_nulls_ && has_null) return true;
-
-    if (UNLIKELY(num_filled_buckets_ > num_buckets_till_resize_)) {
-      // TODO: next prime instead of double?
-      ResizeBuckets(num_buckets_ * 2);
-      if (UNLIKELY(mem_limit_exceeded_)) return false;
-    }
+    DCHECK(!ht_ctx->skip_row_) << "Caller should have checked";
     return InsertImpl(ht_ctx, row);
   }
 
   bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx, Tuple* tuple) {
     DCHECK_NOTNULL(ht_ctx);
     if (UNLIKELY(mem_limit_exceeded_)) return false;
-    // TODO: remove this eval too.
-    bool has_null = ht_ctx->EvalBuildRow(reinterpret_cast<TupleRow*>(&tuple));
-    if (!ht_ctx->stores_nulls_ && has_null) return true;
-
-    if (UNLIKELY(num_filled_buckets_ > num_buckets_till_resize_)) {
-      // TODO: next prime instead of double?
-      ResizeBuckets(num_buckets_ * 2);
-      if (UNLIKELY(mem_limit_exceeded_)) return false;
-    }
+    DCHECK(!ht_ctx->skip_row_) << "Caller should have checked";
     return InsertImpl(ht_ctx, tuple);
   }
 

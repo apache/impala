@@ -130,7 +130,7 @@ class HashTableTest : public testing::Test {
       TupleRow* row = data[i].probe_row;
 
       HashTable::Iterator iter;
-      ht_ctx->EvalAndHashProbe(row, &hash);
+      if (ht_ctx->EvalAndHashProbe(row, &hash)) continue;
       iter = table->Find(ht_ctx);
 
       if (data[i].expected_build_rows.size() == 0) {
@@ -204,7 +204,9 @@ TEST_F(HashTableTest, BasicTest) {
   HashTable hash_table(NULL, 1, &tracker, false);
   HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 0, 0);
 
+  uint32_t hash = 0;
   for (int i = 0; i < 5; ++i) {
+    if (!ht_ctx.EvalAndHashBuild(build_rows[i], &hash)) continue;
     hash_table.Insert(&ht_ctx, build_rows[i]);
   }
   EXPECT_EQ(hash_table.size(), 5);
@@ -251,10 +253,12 @@ TEST_F(HashTableTest, ScanTest) {
   vector<TupleRow*> build_rows;
   ProbeTestData probe_rows[15];
   probe_rows[0].probe_row = CreateTupleRow(0);
+  uint32_t hash = 0;
   for (int val = 1; val <= 10; ++val) {
     probe_rows[val].probe_row = CreateTupleRow(val);
     for (int i = 0; i < val; ++i) {
       TupleRow* row = CreateTupleRow(val);
+      if (!ht_ctx.EvalAndHashBuild(row, &hash)) continue;
       hash_table.Insert(&ht_ctx, row);
       build_rows.push_back(row);
       probe_rows[val].expected_build_rows.push_back(row);
@@ -299,9 +303,12 @@ TEST_F(HashTableTest, GrowTableTest) {
 
   // This inserts about 5M entries
   int build_row_val = 0;
+  uint32_t hash = 0;
   for (int i = 0; i < 20; ++i) {
     for (int j = 0; j < num_to_add; ++build_row_val, ++j) {
-      hash_table.Insert(&ht_ctx, CreateTupleRow(build_row_val));
+      TupleRow* row = CreateTupleRow(build_row_val);
+      if (!ht_ctx.EvalAndHashBuild(row, &hash)) continue;
+      hash_table.Insert(&ht_ctx, row);
     }
     expected_size += num_to_add;
     num_to_add *= 2;
@@ -310,10 +317,9 @@ TEST_F(HashTableTest, GrowTableTest) {
   EXPECT_TRUE(tracker.LimitExceeded());
 
   // Validate that we can find the entries before we went over the limit
-  uint32_t hash = 0;
   for (int i = 0; i < expected_size * 5; i += 100000) {
     TupleRow* probe_row = CreateTupleRow(i);
-    ht_ctx.EvalAndHashProbe(probe_row, &hash);
+    if (!ht_ctx.EvalAndHashProbe(probe_row, &hash)) continue;
     HashTable::Iterator iter = hash_table.Find(&ht_ctx);
     if (i < hash_table.size()) {
       EXPECT_TRUE(iter != hash_table.End());

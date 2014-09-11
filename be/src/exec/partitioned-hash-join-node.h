@@ -254,6 +254,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // The iterator that corresponds to the look up of current_probe_row_.
   HashTable::Iterator hash_tbl_iterator_;
 
+  // Total time spent partitioning build.
+  RuntimeProfile::Counter* partition_build_timer_;
+
   // Total number of hash buckets across all partitions.
   RuntimeProfile::Counter* num_hash_buckets_;
 

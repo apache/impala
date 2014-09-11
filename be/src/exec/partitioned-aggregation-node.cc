@@ -1166,27 +1166,18 @@ Function* PartitionedAggregationNode::CodegenProcessBatch(
     Function* equals_fn = ht_ctx_->CodegenEquals(state);
     if (equals_fn == NULL) return NULL;
 
-    // Codegen for evaluating build rows
-    Function* eval_build_row_fn = ht_ctx_->CodegenEvalRow(state, true);
-    if (eval_build_row_fn == NULL) return NULL;
-
     // Codegen for evaluating probe rows
     Function* eval_probe_row_fn = ht_ctx_->CodegenEvalRow(state, false);
     if (eval_probe_row_fn == NULL) return NULL;
 
     // Replace call sites
-    // TODO: look into the number of replacements, they seem high
-    process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
-        eval_build_row_fn, "EvalBuildRow", &replaced);
-    DCHECK_EQ(replaced, 2);
-
     process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
         eval_probe_row_fn, "EvalProbeRow", &replaced);
     DCHECK_EQ(replaced, 1);
 
     process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
         hash_fn, "HashCurrentRow", &replaced);
-    DCHECK_EQ(replaced, 3);
+    DCHECK_EQ(replaced, 1);
 
     process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
         equals_fn, "Equals", &replaced);

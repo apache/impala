@@ -37,9 +37,9 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, HashTableCtx* h
     TupleRow* row = batch->GetRow(i);
     uint32_t hash = 0;
     if (AGGREGATED_ROWS) {
-      ht_ctx->EvalAndHashBuild(row, &hash);
+      if (!ht_ctx->EvalAndHashBuild(row, &hash)) continue;
     } else {
-      ht_ctx->EvalAndHashProbe(row, &hash);
+      if (!ht_ctx->EvalAndHashProbe(row, &hash)) continue;
     }
 
     // To process this row, we first see if it can be aggregated or inserted into this

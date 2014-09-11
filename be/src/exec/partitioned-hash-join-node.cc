@@ -92,6 +92,7 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_,
       should_store_nulls, false, state->fragment_hash_seed(), MAX_PARTITION_DEPTH));
 
+  partition_build_timer_ = ADD_TIMER(runtime_profile(), "BuildPartitionTime");
   num_hash_buckets_ =
       ADD_COUNTER(runtime_profile(), "HashBuckets", TCounterType::UNIT);
   partitions_created_ =
@@ -214,6 +215,7 @@ void PartitionedHashJoinNode::Partition::Close(RowBatch* batch) {
 
 Status PartitionedHashJoinNode::Partition::BuildHashTable(
     RuntimeState* state, bool* built) {
+  SCOPED_TIMER(parent_->build_timer_);
   DCHECK(build_rows_ != NULL);
   *built = false;
   // First pin the entire build stream in memory.
@@ -229,10 +231,14 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(
   bool eos = false;
   RowBatch batch(parent_->child(1)->row_desc(), state->batch_size(),
       parent_->mem_tracker());
+  HashTableCtx* ctx = parent_->ht_ctx_.get();
   while (!eos) {
     RETURN_IF_ERROR(build_rows_->GetNext(&batch, &eos));
     for (int i = 0; i < batch.num_rows(); ++i) {
-      hash_tbl_->Insert(parent_->ht_ctx_.get(), batch.GetRow(i));
+      TupleRow* row = batch.GetRow(i);
+      uint32_t hash = 0;
+      if (!ctx->EvalAndHashBuild(row, &hash)) continue;
+      hash_tbl_->Insert(ctx, row);
     }
     parent_->build_pool_->AcquireData(batch.tuple_data_pool(), false);
     batch.Reset();
@@ -322,8 +328,8 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
       RETURN_IF_ERROR(input_partition_->build_rows()->GetNext(&build_batch, &eos));
     }
     total_build_rows += build_batch.num_rows();
-    SCOPED_TIMER(build_timer_);
 
+    SCOPED_TIMER(partition_build_timer_);
     if (process_build_batch_fn_ == NULL) {
       RETURN_IF_ERROR(ProcessBuildBatch(&build_batch));
     } else {
