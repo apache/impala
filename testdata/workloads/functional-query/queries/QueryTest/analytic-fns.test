@@ -8,7 +8,7 @@ min(string_col) over (partition by year, month),
 max(string_col) over (partition by year, month)
 from alltypessmall
 where id % 4 = 0 and month != 1;
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,2,6,4.666666666666667,2009-02-01 20:13:00.541666746,'1','9'
 2009,2,6,4.666666666666667,2009-02-01 20:13:00.541666746,'1','9'
 2009,2,6,4.666666666666667,2009-02-01 20:13:00.541666746,'1','9'
@@ -52,7 +52,7 @@ select tinyint_col,
 count(int_col) over (order by tinyint_col)
 from alltypessmall
 where month = 1 and tinyint_col < 5
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 0,3
 0,3
 0,3
@@ -138,7 +138,7 @@ select year, month, tinyint_col,
 count(int_col) over (partition by year, month order by tinyint_col)
 from alltypessmall
 where month >= 3 and tinyint_col < 3
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 2009,3,0,3
 2009,3,0,3
 2009,3,0,3
@@ -201,7 +201,7 @@ select (month % 2), int_col,
 sum(int_col) over (partition by (month % 2)
                    order by int_col rows between unbounded preceding and current row)
 from alltypestiny
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 0,0,0
 0,0,0
 0,1,1
@@ -219,7 +219,7 @@ select bool_col, tinyint_col,
 sum(tinyint_col) over (partition by bool_col order by tinyint_col
                        rows between unbounded preceding and 1 following)
 from alltypesagg where id <= 10 and day = 1
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 false,1,4
 false,3,9
 false,5,16
@@ -240,7 +240,7 @@ select bool_col, tinyint_col,
 count(tinyint_col) over (partition by bool_col order by tinyint_col
                          rows between unbounded preceding and 1 following)
 from alltypesagg where id <= 10 and day = 1
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 false,1,2
 false,3,3
 false,5,4
@@ -261,7 +261,7 @@ select bool_col, tinyint_col,
 sum(tinyint_col) over (partition by bool_col order by tinyint_col
                        rows between unbounded preceding and 3 preceding)
 from alltypesagg where id <= 10 and day = 1
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 false,1,NULL
 false,3,NULL
 false,5,NULL
@@ -282,7 +282,7 @@ select bool_col, tinyint_col,
 sum(tinyint_col) over (partition by bool_col order by tinyint_col
                        rows between unbounded preceding and 20 following)
 from alltypesagg where id <= 10 and day = 1
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 false,1,25
 false,3,25
 false,5,25
@@ -303,7 +303,7 @@ select bool_col, tinyint_col,
 sum(tinyint_col) over (partition by bool_col order by tinyint_col
                        rows between unbounded preceding and 20 preceding)
 from alltypesagg where id <= 10 and day = 1
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 false,1,NULL
 false,3,NULL
 false,5,NULL
@@ -382,12 +382,13 @@ min(sum(bigint_col))
 from functional.alltypes
 group by 1
 order by 1, 2, 3
----- RESULTS: VERIFY_IS_EQUAL_SORTED
+---- RESULTS
 false,1,182500,182500
 true,0,146000,146000
 ---- TYPES
 BOOLEAN, BIGINT, BIGINT, BIGINT
 ====
+---- QUERY
 #TODO: Enable after analytic functions are supported in inline views
 #---- QUERY
 ## Test for IMPALA-1200
@@ -399,7 +400,6 @@ BOOLEAN, BIGINT, BIGINT, BIGINT
 #---- TYPES
 #SMALLINT
 #====
----- QUERY
 # Tests rank()
 select year, month, bool_col, tinyint_col,
 rank() over (partition by year, month order by bool_col, tinyint_col)
