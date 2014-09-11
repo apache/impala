@@ -1777,8 +1777,12 @@ join_operator ::=
   {: RESULT = JoinOperator.FULL_OUTER_JOIN; :}
   | KW_LEFT KW_SEMI KW_JOIN
   {: RESULT = JoinOperator.LEFT_SEMI_JOIN; :}
+  | KW_RIGHT KW_SEMI KW_JOIN
+  {: RESULT = JoinOperator.RIGHT_SEMI_JOIN; :}
   | KW_LEFT KW_ANTI KW_JOIN
   {: RESULT = JoinOperator.LEFT_ANTI_JOIN; :}
+  | KW_RIGHT KW_ANTI KW_JOIN
+  {: RESULT = JoinOperator.RIGHT_ANTI_JOIN; :}
   ;
 
 opt_inner ::=

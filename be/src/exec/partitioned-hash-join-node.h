@@ -164,6 +164,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   // Process probe rows from probe_batch_. Returns either if out_batch is full or
   // probe_batch_ is entirely consumed.
+  // For RIGHT_ANTI_JOIN, all this function does is to mark whether each build row
+  // had a match.
   template<int const JoinOp>
   Status ProcessProbeBatch(RowBatch* out_batch, HashTableCtx* ht_ctx);
 

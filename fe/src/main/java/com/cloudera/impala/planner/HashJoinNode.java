@@ -246,6 +246,12 @@ public class HashJoinNode extends PlanNode {
         }
         break;
       }
+      case RIGHT_SEMI_JOIN: {
+        if (rightCard != -1) {
+          cardinality_ = Math.min(rightCard, cardinality_);
+        }
+        break;
+      }
       case LEFT_OUTER_JOIN: {
         if (leftCard != -1) {
           cardinality_ = Math.max(leftCard, cardinality_);
@@ -270,6 +276,15 @@ public class HashJoinNode extends PlanNode {
           cardinality_ = leftCard;
           if (rightCard != -1) {
             cardinality_ = Math.max(0, leftCard - rightCard);
+          }
+        }
+        break;
+      }
+      case RIGHT_ANTI_JOIN: {
+        if (rightCard != -1) {
+          cardinality_ = rightCard;
+          if (leftCard != -1) {
+            cardinality_ = Math.max(0, rightCard - leftCard);
           }
         }
         break;

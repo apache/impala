@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-# join cols aren't part of select list (and still get materialized)
+# join cols are not part of select list (and still get materialized)
 select j.test_name, d.name
 from JoinTbl j inner join DimTbl d on (j.test_id = d.id)
 ---- RESULTS
@@ -356,46 +356,6 @@ NULL,'NULL',NULL,NULL,1009,'Name9',94615
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
 ---- TYPES
 bigint, string, int, int, bigint, string, int
-====
----- QUERY
-# semi-join on bigint
-select d.*
-from DimTbl d left semi join JoinTbl j on (d.id = j.test_id)
----- RESULTS
-1001,'Name1',94611
-1002,'Name2',94611
-1003,'Name3',94612
-1004,'Name4',94612
-1005,'Name5',94613
-1006,'Name6',94613
----- TYPES
-bigint, string, int
-====
----- QUERY
-# semi-join on string
-select d.*
-from DimTbl d left semi join JoinTbl j on (j.test_name = d.name)
----- RESULTS
-1001,'Name1',94611
-1002,'Name2',94611
-1003,'Name3',94612
-1004,'Name4',94612
-1005,'Name5',94613
-1006,'Name6',94613
----- TYPES
-bigint, string, int
-====
----- QUERY
-# semi-join on int
-select d.*
-from DimTbl d left semi join JoinTbl j on (j.test_zip = d.zip)
----- RESULTS
-1001,'Name1',94611
-1002,'Name2',94611
-1003,'Name3',94612
-1004,'Name4',94612
----- TYPES
-bigint, string, int
 ====
 ---- QUERY
 # joins on empty tables

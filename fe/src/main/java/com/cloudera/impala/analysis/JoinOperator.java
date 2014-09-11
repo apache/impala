@@ -22,6 +22,8 @@ public enum JoinOperator {
   LEFT_SEMI_JOIN("LEFT SEMI JOIN", TJoinOp.LEFT_SEMI_JOIN),
   LEFT_ANTI_JOIN("LEFT ANTI JOIN", TJoinOp.LEFT_ANTI_JOIN),
   RIGHT_OUTER_JOIN("RIGHT OUTER JOIN", TJoinOp.RIGHT_OUTER_JOIN),
+  RIGHT_SEMI_JOIN("RIGHT SEMI JOIN", TJoinOp.RIGHT_SEMI_JOIN),
+  RIGHT_ANTI_JOIN("RIGHT ANTI JOIN", TJoinOp.RIGHT_ANTI_JOIN),
   FULL_OUTER_JOIN("FULL OUTER JOIN", TJoinOp.FULL_OUTER_JOIN),
   CROSS_JOIN("CROSS JOIN", TJoinOp.CROSS_JOIN);
 
@@ -49,7 +51,8 @@ public enum JoinOperator {
   }
 
   public boolean isSemiJoin() {
-    return this == JoinOperator.LEFT_SEMI_JOIN || this == JoinOperator.LEFT_ANTI_JOIN;
+    return this == JoinOperator.LEFT_SEMI_JOIN || this == JoinOperator.LEFT_ANTI_JOIN ||
+        this == JoinOperator.RIGHT_SEMI_JOIN || this == JoinOperator.RIGHT_ANTI_JOIN;
   }
 
   public boolean isCrossJoin() {
@@ -57,6 +60,6 @@ public enum JoinOperator {
   }
 
   public boolean isAntiJoin() {
-    return this == JoinOperator.LEFT_ANTI_JOIN;
+    return this == JoinOperator.LEFT_ANTI_JOIN || this == JoinOperator.RIGHT_ANTI_JOIN;
   }
 }

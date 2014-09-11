@@ -85,11 +85,8 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(state->block_mgr()->RegisterClient(
       num_reserved_buffers, mem_tracker(), state, &block_mgr_client_));
 
-  // Construct the dummy hash table used to evaluate hashes of rows.
-  // TODO: this is obviously not the right abstraction. We need a Hash utility class of
-  // some kind.
   bool should_store_nulls = join_op_ == TJoinOp::RIGHT_OUTER_JOIN ||
-      join_op_ == TJoinOp::FULL_OUTER_JOIN;
+      join_op_ == TJoinOp::RIGHT_ANTI_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN;
   ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_,
       should_store_nulls, false, state->fragment_hash_seed(), MAX_PARTITION_DEPTH));
 
@@ -411,9 +408,10 @@ Status PartitionedHashJoinNode::NextSpilledProbeRowBatch(
     ResetForProbe();
   } else {
     // Done with this partition.
-    if (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN) {
-      // In case of right-outer or full-outer joins, we move this partition to the list
-      // of partitions that we need to output their unmatched build rows.
+    if (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
+        join_op_ == TJoinOp::FULL_OUTER_JOIN) {
+      // In case of right-outer, right-anti and full-outer joins, we move this partition
+      // to the list of partitions that we need to output their unmatched build rows.
       DCHECK(output_build_partitions_.empty());
       DCHECK(input_partition_->hash_tbl_.get() != NULL);
       hash_tbl_iterator_ = input_partition_->hash_tbl_->FirstUnmatched();
@@ -483,10 +481,12 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(state->CheckQueryState());
 
-    if ((join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN) &&
+    if ((join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
+         join_op_ == TJoinOp::FULL_OUTER_JOIN) &&
         !output_build_partitions_.empty())  {
-      // In case of right-outer and full-outer joins, flush the remaining unmatched build
-      // rows of any partition we are done processing, before processing the next batch.
+      // In case of right-outer, right-anti and full-outer joins, flush the remaining
+      // unmatched build rows of any partition we are done processing, before processing
+      // the next batch.
       RETURN_IF_ERROR(OutputUnmatchedBuild(out_batch));
       if (!output_build_partitions_.empty()) break;
 
@@ -533,7 +533,8 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
     RETURN_IF_ERROR(CleanUpHashPartitions(out_batch));
     if (out_batch->AtCapacity()) break;
 
-    if ((join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN) &&
+    if ((join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
+         join_op_ == TJoinOp::FULL_OUTER_JOIN) &&
         !output_build_partitions_.empty()) {
       // There are some partitions that need to flush their unmatched build rows.
       continue;
@@ -552,23 +553,28 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
 
 Status PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
   SCOPED_TIMER(probe_timer_);
-  DCHECK(join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN);
+  DCHECK(join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
+         join_op_ == TJoinOp::FULL_OUTER_JOIN);
   DCHECK(!output_build_partitions_.empty());
   ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
-  int num_conjuncts = conjunct_ctxs_.size();
+  const int num_conjuncts = conjunct_ctxs_.size();
+
+  TupleRow* out_row = out_batch->GetRow(out_batch->AddRow());
+  const int max_rows = out_batch->capacity() - out_batch->num_rows();
   int num_rows_added = 0;
 
-  while (!out_batch->AtCapacity() && !hash_tbl_iterator_.AtEnd()) {
+  while (!out_batch->AtCapacity() && !hash_tbl_iterator_.AtEnd() &&
+         num_rows_added < max_rows) {
     // Output remaining unmatched build rows.
-    DCHECK(!hash_tbl_iterator_.matched());
-    TupleRow* build_row = hash_tbl_iterator_.GetRow();
-    int row_idx = out_batch->AddRow();
-    TupleRow* out_row = out_batch->GetRow(row_idx);
-    DCHECK(build_row != NULL);
-    CreateOutputRow(out_row, NULL, build_row);
-    if (ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
-      out_batch->CommitLastRow();
-      ++num_rows_added;
+    if (!hash_tbl_iterator_.matched()) {
+      hash_tbl_iterator_.set_matched(true);
+      TupleRow* build_row = hash_tbl_iterator_.GetRow();
+      DCHECK(build_row != NULL);
+      CreateOutputRow(out_row, NULL, build_row);
+      if (ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
+        ++num_rows_added;
+        out_row = out_row->next_row(out_batch);
+      }
     }
     // Move to the next unmatched entry
     hash_tbl_iterator_.NextUnmatched();
@@ -588,6 +594,8 @@ Status PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
     }
   }
 
+  DCHECK_LE(num_rows_added, max_rows);
+  out_batch->CommitRows(num_rows_added);
   num_rows_returned_ += num_rows_added;
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   return Status::OK;
@@ -677,7 +685,9 @@ Status PartitionedHashJoinNode::CleanUpHashPartitions(RowBatch* batch) {
     } else {
       DCHECK_EQ(partition->probe_rows()->num_rows(), 0)
         << "No probe rows should have been spilled for this partition.";
-      if (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN) {
+      if (join_op_ == TJoinOp::RIGHT_OUTER_JOIN ||
+          join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
+          join_op_ == TJoinOp::FULL_OUTER_JOIN) {
         if (output_build_partitions_.empty()) {
           hash_tbl_iterator_ = partition->hash_tbl_->FirstUnmatched();
         }
@@ -882,9 +892,6 @@ Function* PartitionedHashJoinNode::CodegenProcessProbeBatch(
   // Get cross compiled function
   IRFunction::Type ir_fn;
   switch (join_op_) {
-    case TJoinOp::LEFT_ANTI_JOIN:
-      ir_fn = IRFunction::PHJ_PROCESS_PROBE_BATCH_LEFT_ANTI_JOIN;
-      break;
     case TJoinOp::INNER_JOIN:
       ir_fn = IRFunction::PHJ_PROCESS_PROBE_BATCH_INNER_JOIN;
       break;
@@ -894,8 +901,17 @@ Function* PartitionedHashJoinNode::CodegenProcessProbeBatch(
     case TJoinOp::LEFT_SEMI_JOIN:
       ir_fn = IRFunction::PHJ_PROCESS_PROBE_BATCH_LEFT_SEMI_JOIN;
       break;
+    case TJoinOp::LEFT_ANTI_JOIN:
+      ir_fn = IRFunction::PHJ_PROCESS_PROBE_BATCH_LEFT_ANTI_JOIN;
+      break;
     case TJoinOp::RIGHT_OUTER_JOIN:
       ir_fn = IRFunction::PHJ_PROCESS_PROBE_BATCH_RIGHT_OUTER_JOIN;
+      break;
+    case TJoinOp::RIGHT_SEMI_JOIN:
+      ir_fn = IRFunction::PHJ_PROCESS_PROBE_BATCH_RIGHT_SEMI_JOIN;
+      break;
+    case TJoinOp::RIGHT_ANTI_JOIN:
+      ir_fn = IRFunction::PHJ_PROCESS_PROBE_BATCH_RIGHT_ANTI_JOIN;
       break;
     case TJoinOp::FULL_OUTER_JOIN:
       ir_fn = IRFunction::PHJ_PROCESS_PROBE_BATCH_FULL_OUTER_JOIN;
@@ -956,7 +972,17 @@ Function* PartitionedHashJoinNode::CodegenProcessProbeBatch(
 
   process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, true,
       eval_conjuncts_fn, "EvalConjuncts", &replaced);
-  DCHECK(replaced == 1 || replaced == 2) << replaced; // Depends on join_op_
+  // Depends on join_op_:
+  // INNER_JOIN -> 1
+  // LEFT_OUTER_JOIN -> 2
+  // LEFT_SEMI_JOIN -> 1
+  // LEFT_ANTI_JOIN -> 2
+  // RIGHT_OUTER_JOIN -> 1
+  // RIGHT_SEMI_JOIN -> 1
+  // RIGHT_ANTI_JOIN -> 0
+  // FULL_OUTER_JOIN -> 2
+  // CROSS_JOIN -> N/A
+  DCHECK(replaced == 0 || replaced == 1 || replaced == 2) << replaced;
 
   process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, true,
       eval_other_conjuncts_fn, "EvalOtherJoinConjuncts", &replaced);
@@ -964,7 +990,8 @@ Function* PartitionedHashJoinNode::CodegenProcessProbeBatch(
 
   process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, true,
       equals_fn, "Equals", &replaced);
-  DCHECK(replaced == 2 || replaced == 3) << replaced; // Depends on join_op_
+  // Depends on join_op_
+  DCHECK(replaced == 2 || replaced == 3 || replaced == 4) << replaced;
 
   // Bake in %this pointer argument to process_probe_batch_fn. %this is the second
   // argument, the first argument is the return Status.

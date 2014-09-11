@@ -209,6 +209,10 @@ public class ParserTest {
         "  src2.key = src3.key and src3.key < 10 " +
         "left anti join src src3 on " +
         "  src2.key = src3.key and src3.key < 10 " +
+        "right semi join src src3 on " +
+        "  src2.key = src3.key and src3.key < 10 " +
+        "right anti join src src3 on " +
+        "  src2.key = src3.key and src3.key < 10 " +
         "join src src3 on " +
         "  src2.key = src3.key and src3.key < 10 " +
         "inner join src src3 on " +
@@ -226,6 +230,10 @@ public class ParserTest {
         "  (src2.key = src3.key and src3.key < 10) " +
         "left anti join src src3 on " +
         "  src2.key = src3.key and src3.key < 10 " +
+        "right semi join src src3 on " +
+        "  (src2.key = src3.key and src3.key < 10) " +
+        "right anti join src src3 on " +
+        "  src2.key = src3.key and src3.key < 10 " +
         "join src src3 on " +
         "  (src2.key = src3.key and src3.key < 10) " +
         "inner join src src3 on " +
@@ -238,6 +246,8 @@ public class ParserTest {
         "full outer join src src3 using (d, e, f) " +
         "left semi join src src3 using (d, e, f) " +
         "left anti join src src3 using (d, e, f) " +
+        "right semi join src src3 using (d, e, f) " +
+        "right anti join src src3 using (d, e, f) " +
         "join src src3 using (d, e, f) " +
         "inner join src src3 using (d, e, f) " +
         "where src2.bla = src3.bla " +
@@ -249,6 +259,8 @@ public class ParserTest {
         "full outer join src src3 on NULL " +
         "left semi join src src3 on (NULL) " +
         "left anti join src src3 on (NULL) " +
+        "right semi join src src3 on (NULL) " +
+        "right anti join src src3 on (NULL) " +
         "join src src3 on NULL " +
         "inner join src src3 on (NULL) " +
         "where src2.bla = src3.bla " +

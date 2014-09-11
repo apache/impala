@@ -263,8 +263,11 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       }
       break;
     case TPlanNodeType::HASH_JOIN_NODE:
-      // Only the partitioned hash join impl supports anti-join
+      // The (old) HashJoinNode does not support left-anti, right-semi, and right-anti
+      // joins.
       if (tnode.hash_join_node.join_op == TJoinOp::LEFT_ANTI_JOIN ||
+          tnode.hash_join_node.join_op == TJoinOp::RIGHT_SEMI_JOIN ||
+          tnode.hash_join_node.join_op == TJoinOp::RIGHT_ANTI_JOIN ||
           FLAGS_enable_partitioned_hash_join) {
         *node = pool->Add(new PartitionedHashJoinNode(pool, tnode, descs));
       } else {

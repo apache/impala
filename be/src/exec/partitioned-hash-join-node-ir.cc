@@ -53,8 +53,15 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(
       while (!hash_tbl_iterator_.AtEnd()) {
         TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
         DCHECK(matched_build_row != NULL);
-        CreateOutputRow(out_row, current_probe_row_, matched_build_row);
 
+        if ((JoinOp == TJoinOp::RIGHT_SEMI_JOIN || JoinOp == TJoinOp::RIGHT_ANTI_JOIN) &&
+            hash_tbl_iterator_.matched()) {
+          // We have already matched this build row, continue to next match.
+          hash_tbl_iterator_.Next<true>(ht_ctx);
+          continue;
+        }
+
+        CreateOutputRow(out_row, current_probe_row_, matched_build_row);
         if (!EvalOtherJoinConjuncts(join_conjunct_ctxs, num_join_conjuncts, out_row)) {
           hash_tbl_iterator_.Next<true>(ht_ctx);
           continue;
@@ -63,22 +70,25 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(
         // At this point the probe is considered matched.
         matched_probe_ = true;
         if (JoinOp == TJoinOp::LEFT_ANTI_JOIN) {
-          // In this case we can safely ignore this probe row.
+          // We can safely ignore this probe row for left anti joins.
           hash_tbl_iterator_.reset();
           break;
         }
-        if (JoinOp == TJoinOp::RIGHT_OUTER_JOIN || JoinOp == TJoinOp::FULL_OUTER_JOIN) {
-          // There is a match for this row, mark it as matched in case of right-outer and
-          // full-outer joins.
+        if (JoinOp == TJoinOp::RIGHT_OUTER_JOIN || JoinOp == TJoinOp::RIGHT_SEMI_JOIN ||
+            JoinOp == TJoinOp::RIGHT_ANTI_JOIN || JoinOp == TJoinOp::FULL_OUTER_JOIN) {
+          // There is a match for this build row, mark it as matched for right/full joins.
           hash_tbl_iterator_.set_matched(true);
         }
+
+        // Update hash_tbl_iterator.
         if (JoinOp == TJoinOp::LEFT_SEMI_JOIN) {
           hash_tbl_iterator_.reset();
         } else {
           hash_tbl_iterator_.Next<true>(ht_ctx);
         }
 
-        if (ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
+        if ((JoinOp != TJoinOp::RIGHT_ANTI_JOIN) &&
+            ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
           ++num_rows_added;
           out_row = out_row->next_row(out_batch);
           if (num_rows_added == max_rows) goto end;
@@ -88,13 +98,12 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(
       if ((JoinOp == TJoinOp::LEFT_ANTI_JOIN || JoinOp == TJoinOp::LEFT_OUTER_JOIN ||
            JoinOp == TJoinOp::FULL_OUTER_JOIN) &&
           !matched_probe_) {
-        // No match for this row, we need to output it in the case of anti, left-outer and
-        // full-outer joins.
+        // No match for this row, we need to output it.
         CreateOutputRow(out_row, current_probe_row_, NULL);
         if (ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
           ++num_rows_added;
-          out_row = out_row->next_row(out_batch);
           matched_probe_ = true;
+          out_row = out_row->next_row(out_batch);
           if (num_rows_added == max_rows) goto end;
         }
       }
@@ -156,16 +165,20 @@ end:
 Status PartitionedHashJoinNode::ProcessProbeBatch(
     const TJoinOp::type join_op, RowBatch* out_batch, HashTableCtx* ht_ctx) {
  switch (join_op) {
-    case TJoinOp::LEFT_ANTI_JOIN:
-      return ProcessProbeBatch<TJoinOp::LEFT_ANTI_JOIN>(out_batch, ht_ctx);
     case TJoinOp::INNER_JOIN:
       return ProcessProbeBatch<TJoinOp::INNER_JOIN>(out_batch, ht_ctx);
     case TJoinOp::LEFT_OUTER_JOIN:
       return ProcessProbeBatch<TJoinOp::LEFT_OUTER_JOIN>(out_batch, ht_ctx);
     case TJoinOp::LEFT_SEMI_JOIN:
       return ProcessProbeBatch<TJoinOp::LEFT_SEMI_JOIN>(out_batch, ht_ctx);
+    case TJoinOp::LEFT_ANTI_JOIN:
+      return ProcessProbeBatch<TJoinOp::LEFT_ANTI_JOIN>(out_batch, ht_ctx);
     case TJoinOp::RIGHT_OUTER_JOIN:
       return ProcessProbeBatch<TJoinOp::RIGHT_OUTER_JOIN>(out_batch, ht_ctx);
+    case TJoinOp::RIGHT_SEMI_JOIN:
+      return ProcessProbeBatch<TJoinOp::RIGHT_SEMI_JOIN>(out_batch, ht_ctx);
+    case TJoinOp::RIGHT_ANTI_JOIN:
+      return ProcessProbeBatch<TJoinOp::RIGHT_ANTI_JOIN>(out_batch, ht_ctx);
     case TJoinOp::FULL_OUTER_JOIN:
       return ProcessProbeBatch<TJoinOp::FULL_OUTER_JOIN>(out_batch, ht_ctx);
     default:

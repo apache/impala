@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-# Testing anti join
+# Testing left anti join
 select j.* from JoinTbl j left anti join DimTbl d on j.test_id = d.id
 ---- RESULTS
 1106,'Name6',94612,5000
@@ -15,7 +15,7 @@ select j.* from JoinTbl j left anti join DimTbl d on j.test_id = d.id
 bigint, string, int, int
 ====
 ---- QUERY
-# Testing anti join on string column
+# Testing left anti join on string column
 select j.* from JoinTbl j left anti join DimTbl d on j.test_name = d.name
 ---- RESULTS
 1006,'Name16',94612,5000
@@ -30,7 +30,7 @@ select j.* from JoinTbl j left anti join DimTbl d on j.test_name = d.name
 bigint, string, int, int
 ====
 ---- QUERY
-# Testing multi-way joins that include an anti join
+# Testing multi-way joins that include a left anti join
 select count(*) from JoinTbl j left anti join DimTbl d on j.test_id = d.id
 left outer join JoinTbl k on j.test_id = k.test_id
 ---- RESULTS
@@ -39,7 +39,7 @@ left outer join JoinTbl k on j.test_id = k.test_id
 bigint
 ====
 ---- QUERY
-# Testing multi-way joins that include only anti joins
+# Testing multi-way joins that include only left anti joins
 select count(*) from JoinTbl j left anti join DimTbl d on j.test_id = d.id
 left anti join JoinTbl k on j.test_id = k.test_id
 ---- RESULTS
@@ -48,7 +48,7 @@ left anti join JoinTbl k on j.test_id = k.test_id
 bigint
 ====
 ---- QUERY
-# Regression test for IMPALA-1160. Proper handling of anti joins with NULLs
+# Regression test for IMPALA-1160. Proper handling of left anti joins with NULLs
 select a.* FROM functional.imp1160a a left anti join functional.imp1160b b on a.b = b.b
 ---- RESULTS
 2,4,30
@@ -59,7 +59,7 @@ NULL,NULL,30
 INT, INT, INT
 ====
 ---- QUERY
-# Regression tests for IMPALA-1177: Incorrect results in query with ANTI JOIN on tinyint
+# Regression tests for IMPALA-1177: Incorrect results in query left anti join on tinyint
 # column with nulls.
 SELECT COUNT(*) FROM functional.alltypesagg t1 LEFT ANTI JOIN functional.alltypes t2
 ON t2.tinyint_col = t1.tinyint_col
@@ -83,4 +83,67 @@ ON t2.tinyint_col = t1.tinyint_col and t2.month = 1;
 2000
 ---- TYPES
 BIGINT
+====
+---- QUERY
+# left semi-join on bigint
+select d.*
+from DimTbl d left semi join JoinTbl j on (d.id = j.test_id)
+---- RESULTS
+1001,'Name1',94611
+1002,'Name2',94611
+1003,'Name3',94612
+1004,'Name4',94612
+1005,'Name5',94613
+1006,'Name6',94613
+---- TYPES
+bigint, string, int
+====
+---- QUERY
+# left semi-join on string
+select d.*
+from DimTbl d left semi join JoinTbl j on (j.test_name = d.name)
+---- RESULTS
+1001,'Name1',94611
+1002,'Name2',94611
+1003,'Name3',94612
+1004,'Name4',94612
+1005,'Name5',94613
+1006,'Name6',94613
+---- TYPES
+bigint, string, int
+====
+---- QUERY
+# left semi-join on int
+select d.*
+from DimTbl d left semi join JoinTbl j on (j.test_zip = d.zip)
+---- RESULTS
+1001,'Name1',94611
+1002,'Name2',94611
+1003,'Name3',94612
+1004,'Name4',94612
+---- TYPES
+bigint, string, int
+====
+---- QUERY
+# Testing right semi joins
+select b.* FROM functional.imp1160a a
+right semi join [shuffle] functional.imp1160b b on a.b = b.b
+---- RESULTS
+1,1,10
+1,1,1
+1,2,5
+---- TYPES
+INT, INT, INT
+====
+---- QUERY
+# Testing right anti joins
+select b.* FROM functional.imp1160a a
+right anti join [shuffle] functional.imp1160b b on a.b = b.b
+---- RESULTS
+2,10,NULL
+1,NULL,10
+3,NULL,50
+3,NULL,NULL
+---- TYPES
+INT, INT, INT
 ====
