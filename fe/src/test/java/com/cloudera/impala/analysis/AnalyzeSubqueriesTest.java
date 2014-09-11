@@ -245,6 +245,12 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
           "where t.id %s (select a.id from functional.alltypesagg a where " +
           "t.int_col %s a.int_col)", op, cmpOp));
       }
+
+      // Uncorrelated IN subquery with analytic function
+      AnalyzesOk(String.format("select id, int_col, bool_col from " +
+        "functional.alltypestiny t1 where int_col %s (select min(bigint_col) " +
+        "over (partition by bool_col) from functional.alltypessmall t2 where " +
+        "int_col < 10)", op));
     }
 
     // IN subquery that is equivalent to an uncorrelated EXISTS subquery
@@ -369,6 +375,14 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "limit 1)", "Unsupported correlated subquery with a LIMIT clause: " +
         "SELECT s.id FROM functional.alltypesagg s WHERE s.int_col = t.int_col " +
         "LIMIT 1");
+
+    // Correlated IN with an analytic function
+    AnalysisError("select id, int_col, bool_col from functional.alltypestiny t1 " +
+        "where int_col in (select min(bigint_col) over (partition by bool_col) " +
+        "from functional.alltypessmall t2 where t1.id < t2.id)", "Unsupported " +
+        "correlated subquery with grouping and/or aggregation: SELECT " +
+        "min(bigint_col) OVER (PARTITION BY bool_col) FROM " +
+        "functional.alltypessmall t2 WHERE t1.id < t2.id");
   }
 
   @Test
@@ -493,6 +507,20 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "(select 1 from functional.alltypesagg g where t.id = g.id limit 1)",
         "Unsupported correlated subquery with a LIMIT clause: " +
         "SELECT 1 FROM functional.alltypesagg g WHERE t.id = g.id LIMIT 1");
+
+    // Uncorrelated EXISTS subquery with analytic function
+    AnalyzesOk("select id, int_col, bool_col from " +
+      "functional.alltypestiny t1 where exists (select min(bigint_col) " +
+      "over (partition by bool_col) from functional.alltypessmall t2 where " +
+      "int_col < 10)");
+
+    // Correlated EXISTS with an analytic function
+    AnalysisError("select id, int_col, bool_col from functional.alltypestiny t1 " +
+        "where exists (select min(bigint_col) over (partition by bool_col) " +
+        "from functional.alltypessmall t2 where t1.id = t2.id)", "Unsupported " +
+        "correlated subquery with grouping and/or aggregation: SELECT " +
+        "min(bigint_col) OVER (PARTITION BY bool_col) FROM " +
+        "functional.alltypessmall t2 WHERE t1.id = t2.id");
   }
 
   @Test
@@ -721,6 +749,29 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     AnalyzesOk("select count(*) from functional.alltypes t where " +
         "t.id = (select count(*) from functional.alltypesagg g where " +
         "g.int_col = t.int_col limit 1)");
+
+    // Aggregate subquery with analytic function
+    AnalysisError("select id, int_col, bool_col from " +
+      "functional.alltypestiny t1 where int_col = (select min(bigint_col) " +
+      "over (partition by bool_col) from functional.alltypessmall t2 where " +
+      "int_col < 10)", "Subquery must return a single row: (SELECT " +
+      "min(bigint_col) OVER (PARTITION BY bool_col) FROM " +
+      "functional.alltypessmall t2 WHERE int_col < 10)");
+
+    // Aggregate subquery with analytic function and limit 1 clause
+    AnalysisError("select id, int_col, bool_col from " +
+      "functional.alltypestiny t1 where int_col = (select min(bigint_col) " +
+      "over (partition by bool_col) from functional.alltypessmall t2 where " +
+      "t1.id = t2.id and int_col < 10 limit 1)", "Unsupported correlated " +
+      "subquery with grouping and/or aggregation: SELECT min(bigint_col) " +
+      "OVER (PARTITION BY bool_col) FROM functional.alltypessmall t2 WHERE " +
+      "t1.id = t2.id AND int_col < 10 LIMIT 1");
+
+    // Uncorrelated aggregate subquery with analytic function and limit 1 clause
+    AnalyzesOk("select id, int_col, bool_col from " +
+      "functional.alltypestiny t1 where int_col = (select min(bigint_col) " +
+      "over (partition by bool_col) from functional.alltypessmall t2 where " +
+      "int_col < 10 limit 1)");
   }
 
   @Test

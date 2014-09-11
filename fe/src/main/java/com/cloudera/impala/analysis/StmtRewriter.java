@@ -272,9 +272,10 @@ public class StmtRewriter {
     if (!onClauseConjuncts.isEmpty()) {
       // Check for correlated subqueries that are not eligible for rewrite by
       // transforming into a join.
-      if ((expr instanceof BinaryPredicate && subqueryStmt.hasGroupByClause())
+      if ((expr instanceof BinaryPredicate
+            && (subqueryStmt.hasGroupByClause() || subqueryStmt.hasAnalyticInfo()))
           || ((expr instanceof InPredicate || expr instanceof ExistsPredicate)
-              && subqueryStmt.hasAggInfo())) {
+            && (subqueryStmt.hasAggInfo() || subqueryStmt.hasAnalyticInfo()))) {
         throw new AnalysisException("Unsupported correlated subquery with grouping " +
             "and/or aggregation: " + subqueryStmt.toSql());
       }

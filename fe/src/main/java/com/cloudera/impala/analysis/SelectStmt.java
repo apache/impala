@@ -107,6 +107,7 @@ public class SelectStmt extends QueryStmt {
   public void setWhereClause(Expr whereClause) { whereClause_ = whereClause; }
   public AggregateInfo getAggInfo() { return aggInfo_; }
   public AnalyticInfo getAnalyticInfo() { return analyticInfo_; }
+  public boolean hasAnalyticInfo() { return analyticInfo_ != null; }
   public boolean hasAggInfo() { return aggInfo_ != null; }
   @Override
   public ArrayList<String> getColLabels() { return colLabels_; }
