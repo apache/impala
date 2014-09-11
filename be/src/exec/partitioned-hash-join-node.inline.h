@@ -44,6 +44,10 @@ inline bool PartitionedHashJoinNode::AppendRow(BufferedTupleStream* stream,
   return true;
 }
 
+inline bool PartitionedHashJoinNode::Partition::is_spilled() const {
+  return build_rows_ != NULL && !build_rows_->is_pinned();
+}
+
 }
 
 #endif

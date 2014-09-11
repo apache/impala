@@ -29,7 +29,7 @@ using namespace impala;
 // we will not be able to replace the functions with codegen'd versions.
 // TODO: explicitly set the calling convention?
 // TODO: investigate using fastcc for all codegen internal functions?
-bool IR_NO_INLINE EvalOtherJoinConjuncts(
+bool IR_NO_INLINE EvalOtherJoinConjuncts2(
     ExprContext* const* ctxs, int num_ctxs, TupleRow* row) {
   return ExecNode::EvalConjuncts(ctxs, num_ctxs, row);
 }
@@ -62,7 +62,7 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
       hash_tbl_iterator_.Next<true>();
       CreateOutputRow(out_row, current_probe_row_, matched_build_row);
 
-      if (!EvalOtherJoinConjuncts(
+      if (!EvalOtherJoinConjuncts2(
               other_conjunct_ctxs, num_other_conjunct_ctxs, out_row)) {
         continue;
       }

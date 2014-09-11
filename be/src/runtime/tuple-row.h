@@ -18,6 +18,7 @@
 
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
+#include "runtime/row-batch.h"
 #include "runtime/tuple.h"
 
 namespace impala {
@@ -63,6 +64,11 @@ class TupleRow {
         dst->SetTuple(i, NULL);
       }
     }
+  }
+
+  inline TupleRow* next_row(RowBatch* batch) const {
+    uint8_t* mem = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(this));
+    return reinterpret_cast<TupleRow*>(mem + batch->row_byte_size());
   }
 
   // TODO: make a macro for doing this

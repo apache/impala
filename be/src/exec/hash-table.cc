@@ -98,7 +98,7 @@ uint32_t HashTableCtx::HashVariableLenRow() {
   uint32_t hash = seeds_[level_];
   // Hash the non-var length portions (if there are any)
   if (var_result_begin_ != 0) {
-    hash = HashUtil::FnvHash64to32(expr_values_buffer_, var_result_begin_, hash);
+    hash = HashUtil::Hash(expr_values_buffer_, var_result_begin_, hash);
   }
 
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
@@ -109,11 +109,11 @@ uint32_t HashTableCtx::HashVariableLenRow() {
     void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
     if (expr_value_null_bits_[i]) {
       // Hash the null random seed values at 'loc'
-      hash = HashUtil::FnvHash64to32(loc, sizeof(StringValue), hash);
+      hash = HashUtil::Hash(loc, sizeof(StringValue), hash);
     } else {
       // Hash the string
       StringValue* str = reinterpret_cast<StringValue*>(loc);
-      hash = HashUtil::FnvHash64to32(str->ptr, str->len, hash);
+      hash = HashUtil::Hash(str->ptr, str->len, hash);
     }
   }
   return hash;
@@ -469,7 +469,6 @@ Function* HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build) {
       builder.CreateRet(codegen->true_value());
     } else {
       CodegenAssignNullValue(codegen, &builder, llvm_loc, ctxs[i]->root()->type());
-      has_null = codegen->true_value();
       builder.CreateBr(continue_block);
     }
 
@@ -478,7 +477,15 @@ Function* HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build) {
     result.ToNativePtr(llvm_loc);
     builder.CreateBr(continue_block);
 
+    // Continue block
     builder.SetInsertPoint(continue_block);
+    if (stores_nulls_) {
+      // Update has_null
+      PHINode* is_null_phi = builder.CreatePHI(codegen->boolean_type(), 2, "is_null_phi");
+      is_null_phi->addIncoming(codegen->true_value(), null_block);
+      is_null_phi->addIncoming(codegen->false_value(), not_null_block);
+      has_null = builder.CreateOr(has_null, is_null_phi, "has_null");
+    }
   }
   builder.CreateRet(has_null);
 
@@ -540,13 +547,13 @@ Function* HashTableCtx::CodegenHashCurrentRow(RuntimeState* state) {
     if (results_buffer_size_ > 0) {
       Function* hash_fn = codegen->GetHashFunction(results_buffer_size_);
       Value* len = codegen->GetIntConstant(TYPE_INT, results_buffer_size_);
-      hash_result = builder.CreateCall3(hash_fn, data, len, hash_result);
+      hash_result = builder.CreateCall3(hash_fn, data, len, hash_result, "hash");
     }
   } else {
     if (var_result_begin_ > 0) {
       Function* hash_fn = codegen->GetHashFunction(var_result_begin_);
       Value* len = codegen->GetIntConstant(TYPE_INT, var_result_begin_);
-      hash_result = builder.CreateCall3(hash_fn, data, len, hash_result);
+      hash_result = builder.CreateCall3(hash_fn, data, len, hash_result, "hash");
     }
 
     // Hash string slots
@@ -571,9 +578,9 @@ Function* HashTableCtx::CodegenHashCurrentRow(RuntimeState* state) {
         uint8_t* null_byte_loc = &expr_value_null_bits_[i];
         Value* llvm_null_byte_loc =
             codegen->CastPtrToLlvmPtr(codegen->ptr_type(), null_byte_loc);
-        Value* null_byte = builder.CreateLoad(llvm_null_byte_loc);
+        Value* null_byte = builder.CreateLoad(llvm_null_byte_loc, "null_byte");
         Value* is_null = builder.CreateICmpNE(null_byte,
-            codegen->GetIntConstant(TYPE_TINYINT, 0));
+            codegen->GetIntConstant(TYPE_TINYINT, 0), "is_null");
         builder.CreateCondBr(is_null, null_block, not_null_block);
 
         // For null, we just want to call the hash function on the portion of
@@ -582,7 +589,8 @@ Function* HashTableCtx::CodegenHashCurrentRow(RuntimeState* state) {
         Function* null_hash_fn = codegen->GetHashFunction(sizeof(StringValue));
         Value* llvm_loc = codegen->CastPtrToLlvmPtr(codegen->ptr_type(), loc);
         Value* len = codegen->GetIntConstant(TYPE_INT, sizeof(StringValue));
-        str_null_result = builder.CreateCall3(null_hash_fn, llvm_loc, len, hash_result);
+        str_null_result =
+            builder.CreateCall3(null_hash_fn, llvm_loc, len, hash_result, "str_null");
         builder.CreateBr(continue_block);
 
         builder.SetInsertPoint(not_null_block);
@@ -591,22 +599,22 @@ Function* HashTableCtx::CodegenHashCurrentRow(RuntimeState* state) {
       // Convert expr_values_buffer_ loc to llvm value
       Value* str_val = codegen->CastPtrToLlvmPtr(codegen->GetPtrType(TYPE_STRING), loc);
 
-      Value* ptr = builder.CreateStructGEP(str_val, 0, "ptr");
-      Value* len = builder.CreateStructGEP(str_val, 1, "len");
-      ptr = builder.CreateLoad(ptr);
-      len = builder.CreateLoad(len);
+      Value* ptr = builder.CreateStructGEP(str_val, 0);
+      Value* len = builder.CreateStructGEP(str_val, 1);
+      ptr = builder.CreateLoad(ptr, "ptr");
+      len = builder.CreateLoad(len, "len");
 
       // Call hash(ptr, len, hash_result);
       Function* general_hash_fn = codegen->GetHashFunction();
       Value* string_hash_result =
-          builder.CreateCall3(general_hash_fn, ptr, len, hash_result);
+          builder.CreateCall3(general_hash_fn, ptr, len, hash_result, "string_hash");
 
       if (stores_nulls_) {
         builder.CreateBr(continue_block);
         builder.SetInsertPoint(continue_block);
         // Use phi node to reconcile that we could have come from the string-null
         // path and string not null paths.
-        PHINode* phi_node = builder.CreatePHI(codegen->GetType(TYPE_INT), 2);
+        PHINode* phi_node = builder.CreatePHI(codegen->GetType(TYPE_INT), 2, "hash_phi");
         phi_node->addIncoming(string_hash_result, not_null_block);
         phi_node->addIncoming(str_null_result, null_block);
         hash_result = phi_node;

@@ -426,6 +426,14 @@ tinyint, int, string, smallint
 ====
 ---- QUERY
 # FULL OUTER JOIN between two inline views followed by a GROUP BY (IMPALA-964)
+select a.x FROM (VALUES(1 x, 1 y)) a FULL OUTER JOIN (VALUES(1 x, 1 y)) b
+ON (a.x = b.y) GROUP BY a.x
+---- RESULTS
+1
+---- TYPES
+TINYINT
+====
+---- QUERY
 select 1 FROM (VALUES(1 x, 1 y)) a RIGHT OUTER JOIN (VALUES(1 x, 1 y)) b
 ON (a.x = b.y) GROUP BY a.x
 ---- RESULTS

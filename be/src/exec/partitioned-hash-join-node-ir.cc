@@ -14,31 +14,49 @@
 
 #include "exec/partitioned-hash-join-node.inline.h"
 
+#include "codegen/impala-ir.h"
 #include "exec/hash-table.inline.h"
 #include "runtime/row-batch.h"
 
 using namespace impala;
 using namespace std;
 
+// Wrapper around ExecNode's eval conjuncts with a different function name.
+// This lets us distinguish between the join conjuncts vs. non-join conjuncts
+// for codegen.
+// Note: don't declare this static.  LLVM will pick the fastcc calling convention and
+// we will not be able to replace the functions with codegen'd versions.
+// TODO: explicitly set the calling convention?
+// TODO: investigate using fastcc for all codegen internal functions?
+bool IR_NO_INLINE EvalOtherJoinConjuncts(
+    ExprContext* const* ctxs, int num_ctxs, TupleRow* row) {
+  return ExecNode::EvalConjuncts(ctxs, num_ctxs, row);
+}
+
+// CreateOutputRow, EvalOtherJoinConjuncts, and EvalConjuncts are replaced by
+// codegen.
 template<int const JoinOp>
-Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
-  SCOPED_TIMER(probe_timer_);
+Status PartitionedHashJoinNode::ProcessProbeBatch(
+    RowBatch* out_batch, HashTableCtx* ht_ctx) {
   ExprContext* const* join_conjunct_ctxs = &other_join_conjunct_ctxs_[0];
   int num_join_conjuncts = other_join_conjunct_ctxs_.size();
   ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
   int num_conjuncts = conjunct_ctxs_.size();
+
+  DCHECK(!out_batch->AtCapacity());
+  TupleRow* out_row = out_batch->GetRow(out_batch->AddRow());
+  int max_rows = out_batch->capacity() - out_batch->num_rows();
   int num_rows_added = 0;
 
   while (probe_batch_pos_ >= 0) {
     if (current_probe_row_ != NULL) {
       while (!hash_tbl_iterator_.AtEnd()) {
-        TupleRow* out_row = out_batch->GetRow(out_batch->AddRow());
         TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
         DCHECK(matched_build_row != NULL);
         CreateOutputRow(out_row, current_probe_row_, matched_build_row);
 
-        if (!ExecNode::EvalConjuncts(join_conjunct_ctxs, num_join_conjuncts, out_row)) {
-          hash_tbl_iterator_.Next<true>(ht_ctx_.get());
+        if (!EvalOtherJoinConjuncts(join_conjunct_ctxs, num_join_conjuncts, out_row)) {
+          hash_tbl_iterator_.Next<true>(ht_ctx);
           continue;
         }
 
@@ -57,13 +75,13 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
         if (JoinOp == TJoinOp::LEFT_SEMI_JOIN) {
           hash_tbl_iterator_.reset();
         } else {
-          hash_tbl_iterator_.Next<true>(ht_ctx_.get());
+          hash_tbl_iterator_.Next<true>(ht_ctx);
         }
 
         if (ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
-          out_batch->CommitLastRow();
           ++num_rows_added;
-          if (out_batch->AtCapacity()) goto end;
+          out_row = out_row->next_row(out_batch);
+          if (num_rows_added == max_rows) goto end;
         }
       }
 
@@ -72,13 +90,12 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
           !matched_probe_) {
         // No match for this row, we need to output it in the case of anti, left-outer and
         // full-outer joins.
-        TupleRow* out_row = out_batch->GetRow(out_batch->AddRow());
         CreateOutputRow(out_row, current_probe_row_, NULL);
         if (ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
-          out_batch->CommitLastRow();
           ++num_rows_added;
+          out_row = out_row->next_row(out_batch);
           matched_probe_ = true;
-          if (out_batch->AtCapacity()) goto end;
+          if (num_rows_added == max_rows) goto end;
         }
       }
     }
@@ -96,7 +113,7 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
     current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
     matched_probe_ = false;
     uint32_t hash;
-    if (!ht_ctx_->EvalAndHashProbe(current_probe_row_, &hash)) continue;
+    if (!ht_ctx->EvalAndHashProbe(current_probe_row_, &hash)) continue;
 
     Partition* partition = NULL;
     if (input_partition_ != NULL && input_partition_->hash_tbl() != NULL) {
@@ -122,36 +139,36 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(RowBatch* out_batch) {
     } else {
       // Perform the actual probe in the hash table for the current probe (left) row.
       // TODO: At this point it would be good to do some prefetching.
-      hash_tbl_iterator_ = partition->hash_tbl()->Find(ht_ctx_.get());
+      hash_tbl_iterator_= partition->hash_tbl()->Find(ht_ctx);
     }
   }
 
 end:
+  DCHECK_LE(num_rows_added, max_rows);
+  out_batch->CommitRows(num_rows_added);
   num_rows_returned_ += num_rows_added;
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   return Status::OK;
 }
 
-Status PartitionedHashJoinNode::ProcessProbeBatch(const TJoinOp::type join_op,
-                                                  RowBatch* out_batch) {
+Status PartitionedHashJoinNode::ProcessProbeBatch(
+    const TJoinOp::type join_op, RowBatch* out_batch, HashTableCtx* ht_ctx) {
  switch (join_op) {
     case TJoinOp::LEFT_ANTI_JOIN:
-      return ProcessProbeBatch<TJoinOp::LEFT_ANTI_JOIN>(out_batch);
+      return ProcessProbeBatch<TJoinOp::LEFT_ANTI_JOIN>(out_batch, ht_ctx);
     case TJoinOp::INNER_JOIN:
-      return ProcessProbeBatch<TJoinOp::INNER_JOIN>(out_batch);
+      return ProcessProbeBatch<TJoinOp::INNER_JOIN>(out_batch, ht_ctx);
     case TJoinOp::LEFT_OUTER_JOIN:
-      return ProcessProbeBatch<TJoinOp::LEFT_OUTER_JOIN>(out_batch);
+      return ProcessProbeBatch<TJoinOp::LEFT_OUTER_JOIN>(out_batch, ht_ctx);
     case TJoinOp::LEFT_SEMI_JOIN:
-      return ProcessProbeBatch<TJoinOp::LEFT_SEMI_JOIN>(out_batch);
+      return ProcessProbeBatch<TJoinOp::LEFT_SEMI_JOIN>(out_batch, ht_ctx);
     case TJoinOp::RIGHT_OUTER_JOIN:
-      return ProcessProbeBatch<TJoinOp::RIGHT_OUTER_JOIN>(out_batch);
+      return ProcessProbeBatch<TJoinOp::RIGHT_OUTER_JOIN>(out_batch, ht_ctx);
     case TJoinOp::FULL_OUTER_JOIN:
-      return ProcessProbeBatch<TJoinOp::FULL_OUTER_JOIN>(out_batch);
+      return ProcessProbeBatch<TJoinOp::FULL_OUTER_JOIN>(out_batch, ht_ctx);
     default:
       DCHECK(false);
-      stringstream ss;
-      ss << "Unknown join type: " << join_op_;
-      return Status(ss.str());
+      return Status("Unknown join type");
   }
 }
 

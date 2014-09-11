@@ -486,7 +486,7 @@ Function* LlvmCodeGen::ReplaceCallSites(Function* caller, bool update_in_place,
         CallInst* call_instr = reinterpret_cast<CallInst*>(instr);
         Function* old_fn = call_instr->getCalledFunction();
         // look for call instruction that matches the name
-        if (old_fn->getName().find(replacee_name) != string::npos) {
+        if (old_fn != NULL && old_fn->getName().find(replacee_name) != string::npos) {
           // Replace the called function
           call_instr->setCalledFunction(new_fn);
           ++*replaced;

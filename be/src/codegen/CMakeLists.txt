@@ -59,6 +59,7 @@ set(IR_DEPENDENT_FILES
   ../exec/hdfs-avro-scanner-ir.cc
   ../exec/hdfs-scanner-ir.cc
   ../exec/partitioned-aggregation-node-ir.cc
+  ../exec/partitioned-hash-join-node-ir.cc
   ../exprs/aggregate-functions.cc
   ../exprs/cast-functions.cc
   ../exprs/compound-predicates-ir.cc

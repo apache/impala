@@ -165,10 +165,11 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // Process probe rows from probe_batch_. Returns either if out_batch is full or
   // probe_batch_ is entirely consumed.
   template<int const JoinOp>
-  Status ProcessProbeBatch(RowBatch* out_batch);
+  Status ProcessProbeBatch(RowBatch* out_batch, HashTableCtx* ht_ctx);
 
   // Wrapper that calls templated version of ProcessProbeBatch() based on 'join_op'.
-  Status ProcessProbeBatch(const TJoinOp::type join_op, RowBatch* out_batch);
+  Status ProcessProbeBatch(
+      const TJoinOp::type join_op, RowBatch* out_batch, HashTableCtx* ht_ctx);
 
   // Sweep the hash_tbl_ of the partition that it is in the front of
   // flush_build_partitions_, using hash_tbl_iterator_ and output any unmatched build
@@ -205,14 +206,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // Prepares for probing the next batch.
   void ResetForProbe();
 
-  // Returns the current state of the partition as a string.
-  std::string PrintState() const;
-
-  // Codegen processing build batches.  Identical signature to ProcessBuildBatch.
-  // hash_fn is the codegen'd function for computing hashes over tuple rows in the
-  // hash table.
-  // Returns NULL if codegen was not possible.
-  llvm::Function* CodegenProcessBuildInput(RuntimeState* state, llvm::Function* hash_fn);
+  // Codegen function to create output row. Assumes that the probe row is non-NULL.
+  llvm::Function* CodegenCreateOutputRow(LlvmCodeGen* codegen);
 
   // Codegen processing build batches.  Identical signature to ProcessBuildBatch.
   // hash_fn is the codegen'd function for computing hashes over tuple rows in the
@@ -225,6 +220,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // hash table.
   // Returns NULL if codegen was not possible.
   llvm::Function* CodegenProcessProbeBatch(RuntimeState* state, llvm::Function* hash_fn);
+
+  // Returns the current state of the partition as a string.
+  std::string PrintState() const;
 
   // Updates state_ to 's', logging the transition.
   void UpdateState(State s);
@@ -338,22 +336,15 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   };
 
   // llvm function and signature for codegening build batch.
-  llvm::Function* codegen_process_build_batch_fn_;
-  typedef void (*ProcessBuildBatchFn)(RowBatch*);
-  // Jitted ProcessBuildBatch function pointer.  Null if codegen is disabled.
+  typedef Status (*ProcessBuildBatchFn)(PartitionedHashJoinNode*, RowBatch*);
+  // Jitted ProcessBuildBatch function pointer.  NULL if codegen is disabled.
   ProcessBuildBatchFn process_build_batch_fn_;
 
   // llvm function and signature for codegening probe batch.
-  llvm::Function* codegen_process_probe_batch_fn_;
-  typedef int (*ProcessProbeBatchFn)(PartitionedHashJoinNode*, RowBatch*);
-  // Jitted ProcessProbeBatch function pointer.  Null if codegen is disabled.
+  typedef Status (*ProcessProbeBatchFn)(
+      PartitionedHashJoinNode*, RowBatch*, HashTableCtx*);
+  // Jitted ProcessProbeBatch function pointer.  NULL if codegen is disabled.
   ProcessProbeBatchFn process_probe_batch_fn_;
-
-  // llvm function and signature for hashing
-  llvm::Function* codegen_hash_fn_;
-  typedef int (*HashFn)(HashTableCtx*, Partition*);
-  // Jitted HashFn function pointer.  Null if codegen is disabled.
-  HashFn hash_fn_;
 
   // The list of partitions that have been spilled on both sides and still need more
   // processing. These partitions could need repartitioning, in which cases more

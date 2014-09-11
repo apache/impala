@@ -25,6 +25,7 @@
 #include "exec/hdfs-avro-scanner-ir.cc"
 #include "exec/hdfs-scanner-ir.cc"
 #include "exec/partitioned-aggregation-node-ir.cc"
+#include "exec/partitioned-hash-join-node-ir.cc"
 #include "exprs/aggregate-functions.cc"
 #include "exprs/cast-functions.cc"
 #include "exprs/compound-predicates-ir.cc"
