@@ -810,12 +810,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "truncate() must be called with a constant second argument.");
   }
 
-  void addTestUda(String name, Type retType, Type... argTypes) {
-    FunctionName fnName = new FunctionName("default", name);
-    catalog_.addFunction(new AggregateFunction(fnName,
-        new FunctionArgs(Lists.newArrayList(argTypes), false), retType));
-  }
-
   @Test
   public void TestAggregates() throws AnalysisException {
     // Add udas:

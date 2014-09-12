@@ -151,16 +151,31 @@ public class FunctionCallExpr extends Expr {
 
   public FunctionParams getParams() { return params_; }
   public boolean isScalarFunction() {
-    Preconditions.checkState(fn_ != null);
+    Preconditions.checkNotNull(fn_);
     return fn_ instanceof ScalarFunction ;
+  }
+
+  public Type getReturnType() {
+    Preconditions.checkNotNull(fn_);
+    return fn_.getReturnType();
   }
 
   /**
    * Returns true if this is a call to a non-analytic aggregate function.
    */
   public boolean isAggregateFunction() {
-    Preconditions.checkState(fn_ != null);
+    Preconditions.checkNotNull(fn_);
     return fn_ instanceof AggregateFunction && !isAnalyticFnCall_;
+  }
+
+  /**
+   * Returns true if this is a call to an aggregate function that returns
+   * non-null on an empty input (e.g. count).
+   */
+  public boolean returnsNonNullOnEmpty() {
+    Preconditions.checkNotNull(fn_);
+    return fn_ instanceof AggregateFunction &&
+        ((AggregateFunction)fn_).returnsNonNullOnEmpty();
   }
 
   public boolean isDistinct() {

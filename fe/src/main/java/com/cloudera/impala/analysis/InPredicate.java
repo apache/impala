@@ -77,22 +77,6 @@ public class InPredicate extends Predicate {
     isNotIn_ = other.isNotIn_;
   }
 
-  /**
-   * Create an analyzed join conjunct from the comparison expr of the IN predicate
-   * (first child) and the first expr from the subquery's select list;
-   * 'inlineView' is the inline view generated from the subquery.
-   */
-  @Override
-  public Expr createJoinConjunct(InlineViewRef inlineView, Analyzer analyzer)
-      throws AnalysisException {
-    Preconditions.checkNotNull(inlineView);
-    BinaryPredicate pred = new BinaryPredicate(Operator.EQ, getChild(0),
-        new SlotRef(new TableName(null, inlineView.getAlias()),
-        inlineView.getViewStmt().getColLabels().get(0)));
-    pred.analyze(analyzer);
-    return pred;
-  }
-
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;

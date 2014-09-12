@@ -76,10 +76,4 @@ public class ExistsPredicate extends Predicate {
     strBuilder.append(getChild(0).toSql());
     return strBuilder.toString();
   }
-
-  @Override
-  public Expr createJoinConjunct(InlineViewRef inlineView, Analyzer analyzer)
-      throws AnalysisException {
-    return null;
-  }
 }

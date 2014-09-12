@@ -523,7 +523,7 @@ public class BuiltinsDb extends Db {
         prefix + "8InitZeroIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextEPT_",
         prefix + "15CountStarUpdateEPN10impala_udf15FunctionContextEPNS1_9BigIntValE",
         prefix + "10CountMergeEPN10impala_udf15FunctionContextERKNS1_9BigIntValEPS4_",
-        null, null, false, true));
+        null, null, false, true, true));
 
     for (Type t: Type.getSupportedTypes()) {
       if (t.isNull()) continue; // NULL is handled through type promotion.
@@ -533,7 +533,7 @@ public class BuiltinsDb extends Db {
           prefix + "8InitZeroIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextEPT_",
           prefix + "11CountUpdateEPN10impala_udf15FunctionContextERKNS1_6AnyValEPNS1_9BigIntValE",
           prefix + "10CountMergeEPN10impala_udf15FunctionContextERKNS1_9BigIntValEPS4_",
-          null, null, false, true));
+          null, null, false, true, true));
       // Min
       String minMaxInit = t.isStringType() ? initNullString : initNull;
       String minMaxSerializeOrFinalize = t.isStringType() ?
@@ -544,14 +544,14 @@ public class BuiltinsDb extends Db {
           prefix + MIN_UPDATE_SYMBOL.get(t),
           prefix + MIN_UPDATE_SYMBOL.get(t),
           minMaxSerializeOrFinalize, minMaxGetValue,
-          minMaxSerializeOrFinalize, true, true));
+          minMaxSerializeOrFinalize, true, true, false));
       // Max
       db.addBuiltin(AggregateFunction.createBuiltin(db, "max",
           Lists.newArrayList(t), t, t, minMaxInit,
           prefix + MAX_UPDATE_SYMBOL.get(t),
           prefix + MAX_UPDATE_SYMBOL.get(t),
           minMaxSerializeOrFinalize, minMaxGetValue,
-          minMaxSerializeOrFinalize, true, true));
+          minMaxSerializeOrFinalize, true, true, false));
 
       // Sample
       db.addBuiltin(AggregateFunction.createBuiltin(db, "sample",
@@ -561,7 +561,7 @@ public class BuiltinsDb extends Db {
           prefix + SAMPLE_MERGE_SYMBOL.get(t),
           prefix + SAMPLE_SERIALIZE_SYMBOL.get(t),
           prefix + SAMPLE_FINALIZE_SYMBOL.get(t),
-          true, false));
+          true, false, true));
 
       // Approximate median
       db.addBuiltin(AggregateFunction.createBuiltin(db, "appx_median",
@@ -571,7 +571,7 @@ public class BuiltinsDb extends Db {
           prefix + SAMPLE_MERGE_SYMBOL.get(t),
           prefix + SAMPLE_SERIALIZE_SYMBOL.get(t),
           prefix + APPX_MEDIAN_FINALIZE_SYMBOL.get(t),
-          true, false));
+          true, false, true));
 
       // Histogram
       db.addBuiltin(AggregateFunction.createBuiltin(db, "histogram",
@@ -581,7 +581,7 @@ public class BuiltinsDb extends Db {
           prefix + SAMPLE_MERGE_SYMBOL.get(t),
           prefix + SAMPLE_SERIALIZE_SYMBOL.get(t),
           prefix + HISTOGRAM_FINALIZE_SYMBOL.get(t),
-          true, false));
+          true, false, true));
 
       // NDV
       // TODO: this needs to switch to CHAR(64) as the intermediate type
@@ -592,7 +592,7 @@ public class BuiltinsDb extends Db {
           prefix + "8HllMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
           stringValSerializeOrFinalize,
           prefix + "11HllFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
-          true, false));
+          true, false, true));
 
       // distinctpc
       // TODO: this needs to switch to CHAR(64) as the intermediate type
@@ -603,7 +603,7 @@ public class BuiltinsDb extends Db {
           prefix + "7PcMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
           stringValSerializeOrFinalize,
           prefix + "10PcFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
-          true, false));
+          true, false, true));
 
       // distinctpcsa
       // TODO: this needs to switch to CHAR(64) as the intermediate type
@@ -614,7 +614,7 @@ public class BuiltinsDb extends Db {
           prefix + "7PcMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
           stringValSerializeOrFinalize,
           prefix + "12PcsaFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
-          true, false));
+          true, false, true));
 
       if (STDDEV_UPDATE_SYMBOL.containsKey(t)) {
         db.addBuiltin(AggregateFunction.createBuiltin(db, "stddev",
@@ -624,7 +624,7 @@ public class BuiltinsDb extends Db {
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
             stringValSerializeOrFinalize,
             prefix + "19KnuthStddevFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
-            true, false));
+            true, false, false));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "stddev_samp",
             Lists.newArrayList(t), Type.STRING, Type.STRING,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
@@ -632,7 +632,7 @@ public class BuiltinsDb extends Db {
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
             stringValSerializeOrFinalize,
             prefix + "19KnuthStddevFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
-            true, false));
+            true, false, false));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "stddev_pop",
             Lists.newArrayList(t), Type.STRING, Type.STRING,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
@@ -640,7 +640,7 @@ public class BuiltinsDb extends Db {
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
             stringValSerializeOrFinalize,
             prefix + "22KnuthStddevPopFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
-            true, false));
+            true, false, false));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "variance",
             Lists.newArrayList(t), Type.DOUBLE, Type.STRING,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
@@ -648,7 +648,7 @@ public class BuiltinsDb extends Db {
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
             stringValSerializeOrFinalize,
             prefix + "16KnuthVarFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
-            true, false));
+            true, false, false));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "variance_samp",
             Lists.newArrayList(t), Type.STRING, Type.STRING,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
@@ -656,7 +656,7 @@ public class BuiltinsDb extends Db {
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
             stringValSerializeOrFinalize,
             prefix + "16KnuthVarFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
-            true, false));
+            true, false, false));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "variance_pop",
             Lists.newArrayList(t), Type.STRING, Type.STRING,
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
@@ -664,7 +664,7 @@ public class BuiltinsDb extends Db {
             prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
             stringValSerializeOrFinalize,
             prefix + "19KnuthVarPopFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
-            true, false));
+            true, false, false));
       }
     }
 
@@ -673,17 +673,17 @@ public class BuiltinsDb extends Db {
         Lists.<Type>newArrayList(Type.BIGINT), Type.BIGINT, Type.BIGINT, initNull,
         prefix + "3SumIN10impala_udf9BigIntValES3_EEvPNS2_15FunctionContextERKT_PT0_",
         prefix + "3SumIN10impala_udf9BigIntValES3_EEvPNS2_15FunctionContextERKT_PT0_",
-        null, null, false, true));
+        null, null, false, true, false));
     db.addBuiltin(AggregateFunction.createBuiltin(db, "sum",
         Lists.<Type>newArrayList(Type.DOUBLE), Type.DOUBLE, Type.DOUBLE, initNull,
         prefix + "3SumIN10impala_udf9DoubleValES3_EEvPNS2_15FunctionContextERKT_PT0_",
         prefix + "3SumIN10impala_udf9DoubleValES3_EEvPNS2_15FunctionContextERKT_PT0_",
-        null, null, false, true));
+        null, null, false, true, false));
     db.addBuiltin(AggregateFunction.createBuiltin(db, "sum",
         Lists.<Type>newArrayList(Type.DECIMAL), Type.DECIMAL, Type.DECIMAL, initNull,
         prefix + "9SumUpdateEPN10impala_udf15FunctionContextERKNS1_10DecimalValEPS4_",
         prefix + "8SumMergeEPN10impala_udf15FunctionContextERKNS1_10DecimalValEPS4_",
-        null, null, false, true));
+        null, null, false, true, false));
 
     // Avg
     // TODO: switch to CHAR(sizeof(AvgIntermediateType) when that becomes available
@@ -695,7 +695,7 @@ public class BuiltinsDb extends Db {
         stringValSerializeOrFinalize,
         prefix + "11AvgGetValueEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         prefix + "11AvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
-        false, true));
+        false, true, false));
     db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",
         Lists.<Type>newArrayList(Type.DOUBLE), Type.DOUBLE, Type.STRING,
         prefix + "7AvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
@@ -704,7 +704,7 @@ public class BuiltinsDb extends Db {
         stringValSerializeOrFinalize,
         prefix + "11AvgGetValueEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         prefix + "11AvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
-        false, true));
+        false, true, false));
     db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",
         Lists.<Type>newArrayList(Type.DECIMAL), Type.DECIMAL, Type.STRING,
         prefix + "14DecimalAvgInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
@@ -713,7 +713,7 @@ public class BuiltinsDb extends Db {
         stringValSerializeOrFinalize,
         prefix + "18DecimalAvgGetValueEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         prefix + "18DecimalAvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
-        false, true));
+        false, true, false));
     // Avg(Timestamp)
     db.addBuiltin(AggregateFunction.createBuiltin(db, "avg",
         Lists.<Type>newArrayList(Type.TIMESTAMP), Type.TIMESTAMP, Type.STRING,
@@ -723,7 +723,7 @@ public class BuiltinsDb extends Db {
         stringValSerializeOrFinalize,
         prefix + "20TimestampAvgGetValueEPN10impala_udf15FunctionContextERKNS1_9StringValE",
         prefix + "20TimestampAvgFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
-        false, true));
+        false, true, false));
 
     // Group_concat(string)
     db.addBuiltin(AggregateFunction.createBuiltin(db, "group_concat",
@@ -735,7 +735,7 @@ public class BuiltinsDb extends Db {
         stringValSerializeOrFinalize,
         prefix +
             "20StringConcatFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
-        false, false));
+        false, false, false));
     // Group_concat(string, string)
     db.addBuiltin(AggregateFunction.createBuiltin(db, "group_concat",
         Lists.<Type>newArrayList(Type.STRING, Type.STRING), Type.STRING, Type.STRING,
@@ -747,7 +747,7 @@ public class BuiltinsDb extends Db {
         stringValSerializeOrFinalize,
         prefix +
             "20StringConcatFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
-        false, false));
+        false, false, false));
 
     // analytic functions
     // Rank

@@ -86,7 +86,7 @@ public class StmtRewriter {
       stmt.whereClause_ = Expr.pushNegationToOperands(stmt.whereClause_);
       // Check if we can rewrite the subqueries in the WHERE clause. OR predicates with
       // subqueries are not supported.
-      if (!canRewriteSubqueries(stmt.whereClause_)) {
+      if (hasSubqueryInDisjunction(stmt.whereClause_)) {
         throw new AnalysisException("Subqueries in OR predicates are not supported: " +
             stmt.whereClause_.toSql());
       }
@@ -97,18 +97,18 @@ public class StmtRewriter {
   }
 
   /**
-   * Returns true if all subqueries in the Expr tree rooted at 'expr' can be
-   * rewritten. A subquery can be rewritten if it is not part of a disjunction.
+   * Returns true if the Expr tree rooted at 'expr' has at least one subquery
+   * that participates in a disjunction.
    */
-  private static boolean canRewriteSubqueries(Expr expr) {
-    if (!(expr instanceof CompoundPredicate)) return true;
+  private static boolean hasSubqueryInDisjunction(Expr expr) {
+    if (!(expr instanceof CompoundPredicate)) return false;
     if (Expr.IS_OR_PREDICATE.apply(expr)) {
-      return !expr.contains(Subquery.class);
+      return expr.contains(Subquery.class);
     }
     for (Expr child: expr.getChildren()) {
-      if (!canRewriteSubqueries(child)) return false;
+      if (hasSubqueryInDisjunction(child)) return true;
     }
-    return true;
+    return false;
   }
 
   /**
@@ -281,26 +281,11 @@ public class StmtRewriter {
     // Extract all correlated predicates from the subquery.
     List<Expr> onClauseConjuncts = extractCorrelatedPredicates(subqueryStmt);
     if (!onClauseConjuncts.isEmpty()) {
-      // Check for correlated subqueries that are not eligible for rewrite by
-      // transforming into a join.
-      if ((expr instanceof BinaryPredicate
-            && (subqueryStmt.hasGroupByClause() || subqueryStmt.hasAnalyticInfo()))
-          || ((expr instanceof InPredicate || expr instanceof ExistsPredicate)
-            && (subqueryStmt.hasAggInfo() || subqueryStmt.hasAnalyticInfo()))) {
-        throw new AnalysisException("Unsupported correlated subquery with grouping " +
-            "and/or aggregation: " + subqueryStmt.toSql());
-      }
-      if (subqueryStmt.hasLimit()) {
-        if (expr instanceof BinaryPredicate) {
-          // The limit does not affect the results of a non-grouping aggregate
-          // subquery, so we can safely remove it.
-          subqueryStmt.limitElement_ = null;
-        } else {
-          // For all other cases, throw an error.
-          throw new AnalysisException("Unsupported correlated subquery with a LIMIT " +
-              "clause: " + subqueryStmt.toSql());
-        }
-      }
+      canRewriteCorrelatedSubquery(expr);
+      // For correlated subqueries that are eligible for rewrite by transforming
+      // into a join, a LIMIT clause has no effect on the results, so we can
+      // safely remove it.
+      subqueryStmt.limitElement_ = null;
     }
 
     // Update the subquery's select list and/or its GROUP BY clause by adding
@@ -339,43 +324,30 @@ public class StmtRewriter {
     JoinOperator joinOp = JoinOperator.LEFT_SEMI_JOIN;
 
     // Create a join conjunct from the expr that contains a subquery.
-    Expr joinConjunct = expr.createJoinConjunct(inlineView, analyzer);
+    Expr joinConjunct = createJoinConjunct(expr, inlineView, analyzer,
+        !onClauseConjuncts.isEmpty());
     if (joinConjunct != null) {
-      if (expr instanceof BinaryPredicate && !onClauseConjuncts.isEmpty()) {
-        com.google.common.base.Predicate<Expr> isCountAggFn =
-          new com.google.common.base.Predicate<Expr>() {
-            public boolean apply(Expr expr) {
-              return expr instanceof FunctionCallExpr &&
-                  ((FunctionCallExpr)expr).getFnName().getFunction().equals("count");
-            }
-          };
-
-        // Correlated aggregate subqueries with 'count' are rewritten using
-        // a LEFT OUTER JOIN because we need to ensure that there is one count
-        // value for every tuple of 'stmt' (parent select block). The value of count
-        // is 0 for every tuple of 'stmt' that gets rejected by the subquery
-        // due to some predicate.
+      SelectListItem firstItem =
+          ((SelectStmt) inlineView.getViewStmt()).getSelectList().getItems().get(0);
+      if (!onClauseConjuncts.isEmpty() &&
+          firstItem.getExpr().contains(Expr.NON_NULL_EMPTY_AGG)) {
+        // Correlated subqueries with an aggregate function that returns non-null on
+        // an empty input are rewritten using a LEFT OUTER JOIN because we
+        // need to ensure that there is one agg value for every tuple of 'stmt'
+        // (parent select block), even for those tuples of 'stmt' that get rejected
+        // by the subquery due to some predicate. The new join conjunct is added to
+        // stmt's WHERE clause because it needs to be applied to the result of the
+        // LEFT OUTER JOIN (both matched and unmatched tuples).
         //
         // TODO Handle other aggregate functions and UDAs that return a non-NULL value
         // on an empty set.
-        SelectListItem item =
-            ((SelectStmt)inlineView.getViewStmt()).getSelectList().getItems().get(0);
-        if (item.getExpr().contains(isCountAggFn)) {
-          FunctionCallExpr zeroIfNull = new FunctionCallExpr("zeroifnull",
-              Lists.newArrayList(joinConjunct.getChild(1)));
-          zeroIfNull.analyze(analyzer);
-          Preconditions.checkState(joinConjunct instanceof BinaryPredicate);
-          joinConjunct = new BinaryPredicate(((BinaryPredicate)joinConjunct).getOp(),
-              joinConjunct.getChild(0), zeroIfNull);
-          // Add the new join conjunct to stmt's WHERE clause because it needs
-          // to be applied to the result of the LEFT OUTER JOIN (both matched
-          // and unmatched tuples).
-          stmt.whereClause_ =
-              CompoundPredicate.addConjunct(joinConjunct, stmt.whereClause_);
-          joinConjunct = null;
-          joinOp = JoinOperator.LEFT_OUTER_JOIN;
-          updateSelectList = true;
-        }
+        // TODO Handle count aggregate functions in an expression in subqueries
+        // select list.
+        stmt.whereClause_ =
+            CompoundPredicate.addConjunct(joinConjunct, stmt.whereClause_);
+        joinConjunct = null;
+        joinOp = JoinOperator.LEFT_OUTER_JOIN;
+        updateSelectList = true;
       }
 
       if (joinConjunct != null) onClauseConjuncts.add(joinConjunct);
@@ -397,10 +369,6 @@ public class StmtRewriter {
       // TODO This is very expensive. Remove it when we implement independent
       // subquery evaluation.
       inlineView.setJoinOp(JoinOperator.CROSS_JOIN);
-      if (stmt.hasAggInfo()) {
-        throw new AnalysisException("Unsupported uncorrelated subquery in statement " +
-            "with aggregate functions or GROUP BY: " + stmt.toSql());
-      }
       LOG.warn("uncorrelated subquery rewritten using a cross join");
       // Indicate that new visible tuples may be added in stmt's select list.
       return true;
@@ -606,6 +574,33 @@ public class StmtRewriter {
   }
 
   /**
+   * Checks if an expr containing a correlated subquery is eligible for
+   * rewrite by tranforming into a join. Throws an AnalysisException if 'expr'
+   * is not eligible for rewrite.
+   * TODO: Merge all the rewrite eligibility tests into a single function.
+   */
+  private static void canRewriteCorrelatedSubquery(Expr expr)
+        throws AnalysisException {
+    Preconditions.checkNotNull(expr);
+    Preconditions.checkState(expr.contains(Subquery.class));
+    SelectStmt stmt = (SelectStmt) expr.getSubquery().getStatement();
+    Preconditions.checkNotNull(stmt);
+    if ((expr instanceof BinaryPredicate
+          && (stmt.hasGroupByClause() || stmt.hasAnalyticInfo()))
+        || ((expr instanceof InPredicate || expr instanceof ExistsPredicate)
+          && (stmt.hasAggInfo() || stmt.hasAnalyticInfo()))) {
+      throw new AnalysisException("Unsupported correlated subquery with grouping " +
+          "and/or aggregation: " + stmt.toSql());
+    }
+    if (stmt.hasLimit() &&
+        (!(expr instanceof BinaryPredicate) || !stmt.hasAggInfo() ||
+         stmt.selectList_.isDistinct())) {
+      throw new AnalysisException("Unsupported correlated subquery with a " +
+          "LIMIT clause: " + stmt.toSql());
+    }
+  }
+
+  /**
    * Update a subquery by expanding its select list with SlotRefs from 'expr'.
    * If 'updateGroupBy' is true, the SlotRefs from 'expr' are also added in
    * stmt's GROUP BY clause. 'expr' is a correlated predicate from the
@@ -688,5 +683,81 @@ public class StmtRewriter {
   private static boolean isCorrelatedPredicate(Expr expr, List<TupleId> tupleIds) {
     return (expr instanceof BinaryPredicate || expr instanceof SlotRef)
         && !expr.isBoundByTupleIds(tupleIds);
+  }
+
+  /**
+   * Converts an expr containing a subquery into an analyzed conjunct to be
+   * used in a join. The conversion is performed in place by replacing the
+   * subquery with the first expr from the select list of 'inlineView'.
+   * If 'isCorrelated' is true and the first expr from the inline view contains
+   * an aggregate function that returns non-null on an empty input,
+   * the aggregate function is wrapped into a 'zeroifnull' function.
+   */
+  private static Expr createJoinConjunct(Expr exprWithSubquery, InlineViewRef inlineView,
+      Analyzer analyzer, boolean isCorrelated) throws AnalysisException {
+    Preconditions.checkNotNull(exprWithSubquery);
+    Preconditions.checkNotNull(inlineView);
+    Preconditions.checkState(exprWithSubquery.contains(Subquery.class));
+    if (exprWithSubquery instanceof ExistsPredicate) return null;
+    // Create a SlotRef from the first item of inlineView's select list
+    SlotRef slotRef = new SlotRef(new TableName(null, inlineView.getAlias()),
+        inlineView.getViewStmt().getColLabels().get(0));
+    slotRef.analyze(analyzer);
+    Expr subquerySubstitute = slotRef;
+    if (exprWithSubquery instanceof InPredicate) {
+      BinaryPredicate pred = new BinaryPredicate(BinaryPredicate.Operator.EQ,
+          exprWithSubquery.getChild(0), slotRef);
+      pred.analyze(analyzer);
+      return pred;
+    }
+    // Only scalar subqueries are supported
+    Subquery subquery = exprWithSubquery.getSubquery();
+    if (!subquery.isScalarSubquery()) {
+      throw new AnalysisException("Unsupported predicate with a non-scalar subquery: "
+          + subquery.toSql());
+    }
+    ExprSubstitutionMap smap = new ExprSubstitutionMap();
+    SelectListItem item =
+      ((SelectStmt) inlineView.getViewStmt()).getSelectList().getItems().get(0);
+    if (isCorrelated && !item.getExpr().contains(Expr.IS_BUILTIN_AGG_FN)) {
+      throw new AnalysisException("UDAs are not supported in the select list of " +
+          "correlated subqueries: " + subquery.toSql());
+    }
+    if (isCorrelated && item.getExpr().contains(Expr.NON_NULL_EMPTY_AGG)) {
+      // TODO: Add support for multiple agg functions that return non-null on an
+      // empty input, by wrapping them with zeroifnull functions before the inline
+      // view is analyzed.
+      if (!Expr.NON_NULL_EMPTY_AGG.apply(item.getExpr()) &&
+        (!(item.getExpr() instanceof CastExpr) ||
+         !Expr.NON_NULL_EMPTY_AGG.apply(item.getExpr().getChild(0)))) {
+        throw new AnalysisException("Aggregate function that returns non-null on " +
+          "an empty input cannot be used in an expression in a " +
+          "correlated subquery's select list: " + subquery.toSql());
+      }
+
+      List<Expr> aggFns = Lists.newArrayList();
+      item.getExpr().collectAll(Expr.NON_NULL_EMPTY_AGG, aggFns);
+      // TODO Generalize this by making the aggregate functions aware of the
+      // literal expr that they return on empty input, e.g. max returns a
+      // NullLiteral whereas count returns a NumericLiteral.
+      if (((FunctionCallExpr)aggFns.get(0)).getReturnType().isNumericType()) {
+        FunctionCallExpr zeroIfNull = new FunctionCallExpr("zeroifnull",
+            Lists.newArrayList((Expr) slotRef));
+        zeroIfNull.analyze(analyzer);
+        subquerySubstitute = zeroIfNull;
+      } else if (((FunctionCallExpr)aggFns.get(0)).getReturnType().isStringType()) {
+        List<Expr> params = Lists.newArrayList();
+        params.add(slotRef);
+        params.add(new StringLiteral(""));
+        FunctionCallExpr ifnull = new FunctionCallExpr("ifnull", params);
+        ifnull.analyze(analyzer);
+        subquerySubstitute = ifnull;
+      } else {
+        throw new AnalysisException("Unsupported aggregate function used in " +
+            "a correlated subquery's select list: " + subquery.toSql());
+      }
+    }
+    smap.put(subquery, subquerySubstitute);
+    return exprWithSubquery.substitute(smap, analyzer);
   }
 }

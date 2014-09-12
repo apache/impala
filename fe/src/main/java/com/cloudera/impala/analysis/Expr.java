@@ -100,6 +100,27 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
         }
       };
 
+  // Returns true if an Expr is an aggregate function that returns non-null on
+  // an empty set (e.g. count).
+  public final static com.google.common.base.Predicate<Expr>
+      NON_NULL_EMPTY_AGG = new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) {
+          return arg instanceof FunctionCallExpr &&
+              ((FunctionCallExpr)arg).returnsNonNullOnEmpty();
+        }
+      };
+
+  // Returns true if an Expr is a builtin aggregate function.
+  public final static com.google.common.base.Predicate<Expr> IS_BUILTIN_AGG_FN =
+      new com.google.common.base.Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr arg) {
+          return arg instanceof FunctionCallExpr &&
+              ((FunctionCallExpr)arg).getFnName().isBuiltin();
+        }
+      };
+
   public final static com.google.common.base.Predicate<Expr> IS_TRUE_LITERAL =
       new com.google.common.base.Predicate<Expr>() {
         @Override
@@ -1040,22 +1061,5 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     collect(Subquery.class, subqueries);
     Preconditions.checkState(subqueries.size() == 1);
     return subqueries.get(0);
-  }
-
-  /**
-   * Converts a subquery expr into an analyzed conjunct to be used in a join. The
-   * conversion is performed in place by replacing the subquery with the first
-   * expr from the associated inline view.
-   */
-  public Expr createJoinConjunct(InlineViewRef inlineView, Analyzer analyzer)
-      throws AnalysisException {
-    Preconditions.checkNotNull(inlineView);
-    ExprSubstitutionMap smap = new ExprSubstitutionMap();
-    Subquery subquery = getSubquery();
-    SlotRef slotRef = new SlotRef(new TableName(null, inlineView.getAlias()),
-        inlineView.getViewStmt().getColLabels().get(0));
-    slotRef.analyze(analyzer);
-    smap.put(subquery, slotRef);
-    return substitute(smap, analyzer);
   }
 }

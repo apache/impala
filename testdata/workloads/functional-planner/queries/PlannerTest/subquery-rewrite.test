@@ -930,13 +930,14 @@ group by int_col
 |  output: count(*)
 |  group by: int_col
 |
-03:HASH JOIN [LEFT SEMI JOIN]
+03:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: t.id = g.id
+|  other predicates: zeroifnull(count(*)) IS NULL
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: count(*)
 |  |  group by: g.id
-|  |  having: count(*) IS NULL
+|  |  having: zeroifnull(count(*)) IS NULL
 |  |
 |  01:SCAN HDFS [functional.alltypesagg g]
 |     partitions=11/11 size=814.73KB
@@ -1011,7 +1012,7 @@ and t.id < 10
 00:SCAN HDFS [functional.alltypestiny t]
    partitions=4/4 size=460B
    predicates: t.id < 10
-=======
+====
 # Correlated aggregate subquery with a LIMIT clause that is removed during the rewrite
 select min(t.id)
 from functional.alltypes t
@@ -1069,4 +1070,81 @@ where int_col between
 |
 00:SCAN HDFS [functional.alltypestiny t]
    partitions=4/4 size=460B
+====
+# Aggregate subquery with count (subquery op slotRef)
+select t1.id
+from functional.alltypestiny t1
+where
+  (select count(tt1.smallint_col) as int_col_1
+   from functional.alltypestiny tt1
+   where t1.id = tt1.month) < t1.id
+---- PLAN
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = tt1.month
+|  other predicates: zeroifnull(count(tt1.smallint_col)) < t1.id
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: count(tt1.smallint_col)
+|  |  group by: tt1.month
+|  |
+|  01:SCAN HDFS [functional.alltypestiny tt1]
+|     partitions=4/4 size=460B
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   partitions=4/4 size=460B
+====
+# Correlated aggregate subquery with count in a function participating in
+# a complex arithmetic expr
+select int_col, count(*)
+from functional.alltypestiny t
+where
+  1 + log(abs((select count(int_col) from functional.alltypes s where s.id = t.id)), 2)
+  < 10
+group by int_col
+---- PLAN
+04:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: int_col
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.id = s.id
+|  other predicates: 1 + log(abs(zeroifnull(count(int_col))), 2) < 10
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: count(int_col)
+|  |  group by: s.id
+|  |
+|  01:SCAN HDFS [functional.alltypes s]
+|     partitions=24/24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypestiny t]
+   partitions=4/4 size=460B
+====
+# Correlated scalar subquery with an ggregate function that returns a
+# non-numeric type on empty input
+select int_col, count(*)
+from functional.alltypestiny t
+where
+  (select sample(int_col) from functional.alltypes s where s.id = t.id) = t.string_col
+and bool_col = false
+group by int_col
+---- PLAN
+04:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: int_col
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t.id = s.id
+|  other predicates: ifnull(sample(int_col), '') = t.string_col
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: sample(int_col)
+|  |  group by: s.id
+|  |
+|  01:SCAN HDFS [functional.alltypes s]
+|     partitions=24/24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypestiny t]
+   partitions=4/4 size=460B
+   predicates: bool_col = FALSE
 ====
