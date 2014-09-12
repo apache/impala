@@ -96,6 +96,7 @@ fi
 
 set +e
 echo "Creating Sentry Policy Server DB"
+dropdb -U hiveuser sentry_policy
 createdb -U hiveuser sentry_policy
 set -e
 

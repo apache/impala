@@ -58,4 +58,8 @@
  <name>sentry.verify.schema.version</name>
  <value>false</value>
 </property>
+<property>
+  <name>sentry.store.jdbc.driver</name>
+ <value>org.postgresql.Driver</value>
+</property>
 </configuration>
