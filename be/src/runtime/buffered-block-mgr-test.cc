@@ -152,6 +152,67 @@ TEST_F(BufferedBlockMgrTest, GetNewBlock) {
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
 
+TEST_F(BufferedBlockMgrTest, GetNewBlockSmallBlocks) {
+  int max_num_blocks = 3;
+  shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_blocks);
+  BufferedBlockMgr::Client* client;
+  Status status = block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client);
+  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
+
+  vector<BufferedBlockMgr::Block*> blocks;
+
+  // Allocate a small block.
+  BufferedBlockMgr::Block* new_block = NULL;
+  status = block_mgr->GetNewBlock(client, NULL, &new_block, 128);
+  EXPECT_TRUE(new_block != NULL);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(block_mgr->bytes_allocated(), 128);
+  EXPECT_EQ(block_mgr_parent_tracker_->consumption(), 128);
+  EXPECT_TRUE(new_block->is_pinned());
+  EXPECT_EQ(new_block->BytesRemaining(), 128);
+  EXPECT_TRUE(new_block->buffer() != NULL);
+  blocks.push_back(new_block);
+
+  // Allocate a normal block
+  status = block_mgr->GetNewBlock(client, NULL, &new_block);
+  EXPECT_TRUE(new_block != NULL);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(block_mgr->bytes_allocated(), 128 + block_mgr->max_block_size());
+  EXPECT_EQ(block_mgr_parent_tracker_->consumption(), 128 + block_mgr->max_block_size());
+  EXPECT_TRUE(new_block->is_pinned());
+  EXPECT_EQ(new_block->BytesRemaining(), block_mgr->max_block_size());
+  EXPECT_TRUE(new_block->buffer() != NULL);
+  blocks.push_back(new_block);
+
+  // Allocate another small block.
+  status = block_mgr->GetNewBlock(client, NULL, &new_block, 512);
+  EXPECT_TRUE(new_block != NULL);
+  EXPECT_TRUE(status.ok());
+  EXPECT_EQ(block_mgr->bytes_allocated(), 128 + 512 + block_mgr->max_block_size());
+  EXPECT_EQ(block_mgr_parent_tracker_->consumption(),
+      128 + 512 + block_mgr->max_block_size());
+  EXPECT_TRUE(new_block->is_pinned());
+  EXPECT_EQ(new_block->BytesRemaining(), 512);
+  EXPECT_TRUE(new_block->buffer() != NULL);
+  blocks.push_back(new_block);
+
+  // Should be able to unpin and pin the middle block
+  status = blocks[1]->Unpin();
+  EXPECT_TRUE(status.ok());
+
+  bool pinned;
+  status = blocks[1]->Pin(&pinned);
+  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(pinned);
+
+  for (int i = 0; i < blocks.size(); ++i) {
+    blocks[i]->Delete();
+  }
+  block_mgr.reset();
+  EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
+}
+
 // Test that pinning more blocks than the max available buffers.
 TEST_F(BufferedBlockMgrTest, Pin) {
   int max_num_blocks = 5;

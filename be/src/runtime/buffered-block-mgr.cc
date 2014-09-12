@@ -67,15 +67,17 @@ struct BufferedBlockMgr::Client {
   // Number of buffers pinned by this client.
   int num_pinned_buffers_;
 
-  void PinBuffer() {
+  void PinBuffer(BufferDescriptor* buffer) {
+    DCHECK(buffer != NULL);
     ++num_pinned_buffers_;
-    if (tracker_ != NULL) tracker_->ConsumeLocal(mgr_->block_size(), query_tracker_);
+    if (tracker_ != NULL) tracker_->ConsumeLocal(buffer->len, query_tracker_);
   }
 
-  void UnpinBuffer() {
+  void UnpinBuffer(BufferDescriptor* buffer) {
+    DCHECK(buffer != NULL);
     DCHECK_GT(num_pinned_buffers_, 0);
     --num_pinned_buffers_;
-    if (tracker_ != NULL) tracker_->ReleaseLocal(mgr_->block_size(), query_tracker_);
+    if (tracker_ != NULL) tracker_->ReleaseLocal(buffer->len, query_tracker_);
   }
 };
 
@@ -211,7 +213,8 @@ void BufferedBlockMgr::Cancel() {
   io_mgr_->CancelContext(io_request_context_);
 }
 
-Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block** block) {
+Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block** block,
+    int64_t len) {
   *block = NULL;
   Block* new_block = NULL;
   {
@@ -221,6 +224,27 @@ Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block**
   }
   DCHECK_NOTNULL(new_block);
   DCHECK(new_block->client_ == client);
+
+  if (len >= 0) {
+    DCHECK(unpin_block == NULL);
+    DCHECK_LT(len, max_block_size_) << "Cannot request blocks bigger than max_len";
+    if (mem_tracker_->TryConsume(len)) {
+      mem_used_counter_->Add(len);
+      uint8_t* buffer = reinterpret_cast<uint8_t*>(malloc(len));
+      new_block->buffer_desc_ = obj_pool_.Add(new BufferDescriptor(buffer, len));
+      new_block->buffer_desc_->block = new_block;
+      new_block->is_pinned_ = true;
+      client->PinBuffer(new_block->buffer_desc_);
+      ++num_unreserved_pinned_buffers_;
+      *block = new_block;
+      return Status::OK;
+    } else {
+      new_block->is_deleted_ = true;
+      ReturnUnusedBlock(new_block);
+      return Status::OK;
+    }
+  }
+
   bool in_mem;
   RETURN_IF_ERROR(FindBufferForBlock(new_block, &in_mem));
   DCHECK(!in_mem) << "A new block cannot start in mem.";
@@ -290,15 +314,15 @@ BufferedBlockMgr::~BufferedBlockMgr() {
   if (buffer_pool_ != NULL) {
     buffer_pool_->FreeAll();
     buffer_pool_.reset();
-    DCHECK_EQ(mem_tracker_->consumption(), 0);
-    mem_tracker_->UnregisterFromParent();
-    mem_tracker_.reset();
   }
+  DCHECK_EQ(mem_tracker_->consumption(), 0);
+  mem_tracker_->UnregisterFromParent();
+  mem_tracker_.reset();
 }
 
 BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, MemTracker* parent,
     int64_t mem_limit, int64_t block_size)
-  : block_size_(block_size),
+  : max_block_size_(block_size),
     block_write_threshold_(TmpFileMgr::num_tmp_devices()),
     query_id_(state->query_id()),
     num_outstanding_writes_(0),
@@ -312,7 +336,7 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, MemTracker* parent,
 }
 
 int64_t BufferedBlockMgr::bytes_allocated() const {
-  return buffer_pool_->total_allocated_bytes();
+  return mem_tracker_->consumption();
 }
 
 int BufferedBlockMgr::num_pinned_buffers(Client* client) const {
@@ -376,6 +400,7 @@ Status BufferedBlockMgr::UnpinBlock(Block* block) {
   if (is_cancelled_) return Status::CANCELLED;
   if (!block->is_pinned_) return Status::OK;
   DCHECK(Validate()) << endl << DebugInternal();
+  DCHECK_EQ(block->buffer_desc_->len, max_block_size_) << "Can only unpin io blocks.";
   // Add 'block' to the list of unpinned blocks and set is_pinned_ to false.
   // Cache its position in the list for later removal.
   block->is_pinned_ = false;
@@ -385,7 +410,7 @@ Status BufferedBlockMgr::UnpinBlock(Block* block) {
   if (block->client_->num_pinned_buffers_ > block->client_->num_reserved_buffers_) {
     --num_unreserved_pinned_buffers_;
   }
-  block->client_->UnpinBuffer();
+  block->client_->UnpinBuffer(block->buffer_desc_);
   RETURN_IF_ERROR(WriteUnpinnedBlocks());
   DCHECK(Validate()) << endl << DebugInternal();
   return Status::OK;
@@ -393,7 +418,7 @@ Status BufferedBlockMgr::UnpinBlock(Block* block) {
 
 Status BufferedBlockMgr::WriteUnpinnedBlocks() {
   // Assumes block manager lock is already taken.
-  while (num_outstanding_writes_ + free_buffers_.size() < block_write_threshold_) {
+  while (num_outstanding_writes_ + free_io_buffers_.size() < block_write_threshold_) {
     if (unpinned_blocks_.empty()) break;
     // Pop a block from the back of the list (LIFO)
     Block* write_block = unpinned_blocks_.PopBack();
@@ -416,7 +441,7 @@ Status BufferedBlockMgr::WriteUnpinnedBlock(Block* block) {
     TmpFileMgr::File& tmp_file = tmp_files_[next_block_index_];
     next_block_index_ = (next_block_index_ + 1) % tmp_files_.size();
     int64_t file_offset;
-    RETURN_IF_ERROR(tmp_file.AllocateSpace(block_size_, &file_offset));
+    RETURN_IF_ERROR(tmp_file.AllocateSpace(max_block_size_, &file_offset));
     int disk_id = tmp_file.disk_id();
     if (disk_id < 0) {
       // Assign a valid disk id to the write range if the tmp file was not assigned one.
@@ -480,13 +505,17 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
     DCHECK(Validate()) << endl << DebugInternal();
     return;
   }
+
   if (block->client_local_) {
     DCHECK(!block->is_deleted_)
         << "Client should be waiting. No one should have deleted this block.";
     block->write_complete_cv_.notify_one();
     return;
   }
-  free_buffers_.Enqueue(block->buffer_desc_);
+
+  DCHECK_EQ(block->buffer_desc_->len, max_block_size_)
+      << "Only io sized buffers should spill";
+  free_io_buffers_.Enqueue(block->buffer_desc_);
   if (block->is_deleted_) {
     block->buffer_desc_->block = NULL;
     block->buffer_desc_ = NULL;
@@ -508,7 +537,7 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
     if (block->client_->num_pinned_buffers_ > block->client_->num_reserved_buffers_) {
       --num_unreserved_pinned_buffers_;
     }
-    block->client_->UnpinBuffer();
+    block->client_->UnpinBuffer(block->buffer_desc_);
   } else if (unpinned_blocks_.Contains(block)) {
     // Remove block from unpinned list.
     unpinned_blocks_.Remove(block);
@@ -520,8 +549,13 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
   }
 
   if (block->buffer_desc_ != NULL) {
-    if (!free_buffers_.Contains(block->buffer_desc_)) {
-      free_buffers_.Enqueue(block->buffer_desc_);
+    if (block->buffer_desc_->len != max_block_size_) {
+      // Just delete the block for now.
+      free(block->buffer_desc_->buffer);
+      mem_used_counter_->Add(-block->buffer_desc_->len);
+      mem_tracker_->Release(block->buffer_desc_->len);
+    } else if (!free_io_buffers_.Contains(block->buffer_desc_)) {
+      free_io_buffers_.Enqueue(block->buffer_desc_);
       buffer_available_cv_.notify_one();
     }
     block->buffer_desc_->block = NULL;
@@ -565,14 +599,14 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
     // 3) Or, the buffer is free, but hasn't yet been reassigned to a different block.
     DCHECK(unpinned_blocks_.Contains(block) ||
            block->in_write_ ||
-           free_buffers_.Contains(block->buffer_desc_));
+           free_io_buffers_.Contains(block->buffer_desc_));
     if (unpinned_blocks_.Contains(block)) {
       unpinned_blocks_.Remove(block);
-      DCHECK(!free_buffers_.Contains(block->buffer_desc_));
+      DCHECK(!free_io_buffers_.Contains(block->buffer_desc_));
     } else if (block->in_write_) {
-      DCHECK(block->in_write_ && !free_buffers_.Contains(block->buffer_desc_));
+      DCHECK(block->in_write_ && !free_io_buffers_.Contains(block->buffer_desc_));
     } else {
-      free_buffers_.Remove(block->buffer_desc_);
+      free_io_buffers_.Remove(block->buffer_desc_);
     }
     buffered_pin_counter_->Add(1);
     *in_mem = true;
@@ -584,16 +618,16 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
     //  2. Pick a buffer from the free list.
     //  3. Wait and evict an unpinned buffer.
     BufferDescriptor* buffer_desc = NULL;
-    if (free_buffers_.size() < block_write_threshold_) {
-      uint8_t* new_buffer = buffer_pool_->TryAllocate(block_size_);
+    if (free_io_buffers_.size() < block_write_threshold_) {
+      uint8_t* new_buffer = buffer_pool_->TryAllocate(max_block_size_);
       if (new_buffer != NULL) {
-        mem_used_counter_->Add(block_size_);
-        buffer_desc = obj_pool_.Add(new BufferDescriptor(new_buffer));
-        all_buffers_.push_back(buffer_desc);
+        mem_used_counter_->Add(max_block_size_);
+        buffer_desc = obj_pool_.Add(new BufferDescriptor(new_buffer, max_block_size_));
+        all_io_buffers_.push_back(buffer_desc);
       }
     }
     if (buffer_desc == NULL) {
-      if (free_buffers_.empty() && unpinned_blocks_.empty() &&
+      if (free_io_buffers_.empty() && unpinned_blocks_.empty() &&
           num_outstanding_writes_ == 0) {
         // There are no free buffers or blocks we can evict. We need to fail this request.
         // If this is an optional request, return OK. If it is required, return OOM.
@@ -606,14 +640,14 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
 
       // At this point, this block needs to use a buffer that was unpinned from another
       // block. Get a free buffer from the front of the queue and assign it to the block.
-      while (free_buffers_.empty()) {
+      while (free_io_buffers_.empty()) {
         SCOPED_TIMER(buffer_wait_timer_);
         // Try to evict unpinned blocks before waiting.
         RETURN_IF_ERROR(WriteUnpinnedBlocks());
         buffer_available_cv_.wait(l);
         if (is_cancelled_) return Status::CANCELLED;
       }
-      buffer_desc = free_buffers_.Dequeue();
+      buffer_desc = free_io_buffers_.Dequeue();
     }
 
     DCHECK(buffer_desc != NULL);
@@ -626,7 +660,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
     buffer_desc->block = block;
     block->buffer_desc_ = buffer_desc;
   }
-  client->PinBuffer();
+  client->PinBuffer(block->buffer_desc_);
   if (is_optional_request) ++num_unreserved_pinned_buffers_;
 
   DCHECK_NOTNULL(block->buffer_desc_);
@@ -658,7 +692,7 @@ BufferedBlockMgr::Block* BufferedBlockMgr::GetUnusedBlock(Client* client) {
 }
 
 bool BufferedBlockMgr::Validate() const {
-  int num_free_buffers = 0;
+  int num_free_io_buffers = 0;
 
   if (num_unreserved_pinned_buffers_ < 0) {
     LOG(ERROR) << "num_unreserved_pinned_buffers_ < 0: "
@@ -666,11 +700,16 @@ bool BufferedBlockMgr::Validate() const {
     return false;
   }
 
-  BOOST_FOREACH(BufferDescriptor* buffer, all_buffers_) {
-    bool is_free = free_buffers_.Contains(buffer);
-    num_free_buffers += is_free;
+  BOOST_FOREACH(BufferDescriptor* buffer, all_io_buffers_) {
+    bool is_free = free_io_buffers_.Contains(buffer);
+    num_free_io_buffers += is_free;
     if (buffer->block == NULL && !is_free) {
       LOG(ERROR) << "Buffer with no block not in free list." << endl << DebugInternal();
+      return false;
+    }
+
+    if (buffer->len != max_block_size_) {
+      LOG(ERROR) << "Non-io sized buffers should not end up on free list.";
       return false;
     }
 
@@ -694,10 +733,10 @@ bool BufferedBlockMgr::Validate() const {
     }
   }
 
-  if (free_buffers_.size() != num_free_buffers) {
+  if (free_io_buffers_.size() != num_free_io_buffers) {
     LOG(ERROR) << "free_buffer_list_ inconsistency."
-                  << " num_free_buffers = " << num_free_buffers
-                  << " free_buffer_list_.size() = " << free_buffers_.size()
+                  << " num_free_io_buffers = " << num_free_io_buffers
+                  << " free_io_buffers_.size() = " << free_io_buffers_.size()
                   << endl << DebugInternal();
     return false;
   }
@@ -710,11 +749,11 @@ bool BufferedBlockMgr::Validate() const {
       return false;
     }
 
-    if (block->in_write_ || free_buffers_.Contains(block->buffer_desc_)) {
+    if (block->in_write_ || free_io_buffers_.Contains(block->buffer_desc_)) {
       LOG(ERROR) << "Block in unpinned list with"
                     << " in_write_ = " << block->in_write_
-                    << " free_buffers_.Contains = "
-                    << free_buffers_.Contains(block->buffer_desc_)
+                    << " free_io_buffers_.Contains = "
+                    << free_io_buffers_.Contains(block->buffer_desc_)
                     << endl << block->DebugString();
       return false;
     }
@@ -724,7 +763,7 @@ bool BufferedBlockMgr::Validate() const {
   // Check if we're writing blocks when the number of free buffers falls below
   // threshold. We don't write blocks after cancellation.
   if (!is_cancelled_ && !unpinned_blocks_.empty() &&
-      (free_buffers_.size() + num_outstanding_writes_ < block_write_threshold_)) {
+      (free_io_buffers_.size() + num_outstanding_writes_ < block_write_threshold_)) {
     LOG(ERROR) << "Missed writing unpinned blocks";
     return false;
   }
@@ -740,7 +779,7 @@ string BufferedBlockMgr::DebugInternal() const {
   stringstream ss;
   ss << "Buffered block mgr" << endl
      << " Num writes outstanding " << outstanding_writes_counter_->value() << endl
-     << " Num free buffers " << free_buffers_.size() << endl
+     << " Num free io buffers " << free_io_buffers_.size() << endl
      << " Num unpinned blocks " << unpinned_blocks_.size() << endl
      << " Num unreserved buffers " << num_unreserved_buffers_ << endl
      << " Num unreserved pinned buffers " << num_unreserved_pinned_buffers_ << endl
@@ -756,8 +795,8 @@ void BufferedBlockMgr::InitCounters(RuntimeProfile* profile) {
   mem_limit_counter_ = ADD_COUNTER(profile_.get(), "MemoryLimit", TCounterType::BYTES);
   mem_limit_counter_->Set(mem_tracker_->limit());
   mem_used_counter_ = ADD_COUNTER(profile_.get(), "MemoryUsed", TCounterType::BYTES);
-  block_size_counter_ = ADD_COUNTER(profile_.get(), "BlockSize", TCounterType::BYTES);
-  block_size_counter_->Set(block_size_);
+  block_size_counter_ = ADD_COUNTER(profile_.get(), "MaxBlockSize", TCounterType::BYTES);
+  block_size_counter_->Set(max_block_size_);
   created_block_counter_ = ADD_COUNTER(
       profile_.get(), "BlocksCreated", TCounterType::UNIT);
   recycled_blocks_counter_ = ADD_COUNTER(

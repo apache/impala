@@ -562,9 +562,6 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
   if (spilled_partitions_.empty()) return Status::OK;
   VLOG(2) << "PrepareNextPartition\n" << DebugString();
 
-  int64_t mem_limit = mem_tracker()->SpareCapacity();
-  mem_limit -= state->block_mgr()->block_size();
-
   input_partition_ = spilled_partitions_.front();
   spilled_partitions_.pop_front();
   DCHECK(input_partition_->is_spilled());
@@ -573,6 +570,7 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
   RETURN_IF_ERROR(input_partition_->probe_rows()->PrepareForRead());
   ht_ctx_->set_level(input_partition_->level_);
 
+  int64_t mem_limit = mem_tracker()->SpareCapacity();
   // Try to build a hash table on top the spilled build rows.
   bool built = false;
   if (input_partition_->EstimatedInMemSize() < mem_limit) {

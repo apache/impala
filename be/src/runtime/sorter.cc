@@ -330,7 +330,7 @@ Sorter::Run::Run(Sorter* parent, TupleDescriptor* sort_tuple_desc,
   : sorter_(parent),
     sort_tuple_desc_(sort_tuple_desc),
     sort_tuple_size_(sort_tuple_desc->byte_size()),
-    block_size_(parent->block_mgr_->block_size()),
+    block_size_(parent->block_mgr_->max_block_size()),
     has_var_len_slots_(sort_tuple_desc->string_slots().size() > 0),
     materialize_slots_(materialize_slots),
     is_sorted_(!materialize_slots),
@@ -399,10 +399,10 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
       if (materialize_slots_) {
         new_tuple->MaterializeExprs<has_var_len_data>(input_row, *sort_tuple_desc_,
             sorter_->sort_tuple_slot_expr_ctxs_, NULL, &var_values, &total_var_len);
-        if (total_var_len > sorter_->block_mgr_->block_size()) {
+        if (total_var_len > sorter_->block_mgr_->max_block_size()) {
           return Status(TStatusCode::INTERNAL_ERROR, Substitute(
               "Variable length data in a single tuple larger than block size $0 > $1",
-              total_var_len, sorter_->block_mgr_->block_size()));
+              total_var_len, sorter_->block_mgr_->max_block_size()));
         }
       } else {
         memcpy(new_tuple, input_row->GetTuple(0), sort_tuple_size_);
@@ -861,8 +861,8 @@ Sorter::Sorter(const TupleRowComparator& compare_less_than,
     profile_(profile) {
   TupleDescriptor* sort_tuple_desc = output_row_desc->tuple_descriptors()[0];
   has_var_len_slots_ = sort_tuple_desc->string_slots().size() > 0;
-  in_mem_tuple_sorter_.reset(new TupleSorter(compare_less_than, block_mgr_->block_size(),
-      sort_tuple_desc->byte_size(), state));
+  in_mem_tuple_sorter_.reset(new TupleSorter(compare_less_than,
+      block_mgr_->max_block_size(), sort_tuple_desc->byte_size(), state));
 
   initial_runs_counter_ = ADD_COUNTER(profile_, "InitialRunsCreated", TCounterType::UNIT);
   num_merges_counter_ = ADD_COUNTER(profile_, "TotalMergesPerformed", TCounterType::UNIT);

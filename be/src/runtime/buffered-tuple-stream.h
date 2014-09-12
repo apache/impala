@@ -156,7 +156,7 @@ class BufferedTupleStream {
   int64_t rows_returned() const { return rows_returned_; }
 
   // Returns the byte size necessary to store the entire stream in memory.
-  int64_t byte_size() const { return blocks_.size() * block_mgr_->block_size(); }
+  int64_t byte_size() const { return blocks_.size() * block_mgr_->max_block_size(); }
 
   // Returns the byte size of the stream that is currently pinned in memory.
   // If ignore_current is true, the write_block_ memory is not included.

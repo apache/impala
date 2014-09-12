@@ -31,15 +31,23 @@ class RuntimeState;
 // pool and is 'pinned' in memory. Clients can also unpin a block, allowing the manager
 // to reassign its buffer to a different block.
 //
+// The BufferedBlockMgr typically allocates blocks in io buffer size, to get maximal
+// io efficiency when spilling. Clients can also request smaller buffers that cannot
+// spill. This is useful to present the same block API and mem tracking for clients.
+// Clients that do partitioning will start with these smaller to reduce the minimum
+// buffering requirements and grow to the max sized buffer as input grows. For simplicity,
+// these buffers are not recycled (there's also not really a need since they are allocated
+// all at once on query startup and then not allocated again).
+//
 // BufferedBlockMgr reserves one buffer per disk ('block_write_threshold_') for itself.
 // When the number of free buffers falls below 'block_write_threshold', unpinned blocks
 // are persisted in Last-In_First-Out order. (It is assumed that unpinned blocks are
 // re-read in FIFO order). TmpFileMgr is used to obtain file handles to write to within
 // the tmp directories configured for Impala.
 //
-// It is expected to have one BufferedBlockMgr per PlanFragmentInstance (ideally per
-// query). All allocations that can grow proportional to input size and might need
-// to spill to disk should allocate from the same BufferedBlockMgr.
+// It is expected to have one BufferedBlockMgr per query. All allocations that can grow
+// proportional to input size and might need to spill to disk should allocate from the
+// same BufferedBlockMgr.
 //
 // A client must pin a block in memory to read/write its contents and unpin it
 // when it is no longer in active use. BufferedBlockMgr guarantees that
@@ -70,6 +78,8 @@ class RuntimeState;
 // block manager's buffer. This should be avoided in the common case where these buffers
 // are of the same size.
 // TODO: see if the one big lock is a bottleneck. Break it up.
+// TODO: no reason we can't spill the smaller buffers. Add it if we need to (it's likely
+// just removing dchecks).
 class BufferedBlockMgr {
  private:
   struct BufferDescriptor;
@@ -138,7 +148,8 @@ class BufferedBlockMgr {
 
     // Return the number of remaining bytes that can be allocated in this block.
     int BytesRemaining() const {
-      return block_mgr_->block_size_ - valid_data_len_;
+      DCHECK(buffer_desc_ != NULL);
+      return buffer_desc_->len - valid_data_len_;
     }
 
     // Return size bytes from the most recent allocation.
@@ -155,8 +166,6 @@ class BufferedBlockMgr {
     int64_t valid_data_len() const { return valid_data_len_; }
 
     bool is_pinned() const { return is_pinned_; }
-
-    int64_t buffer_len() const { return block_mgr_->block_size(); }
 
     // Debug helper method to print the state of a block.
     std::string DebugString() const;
@@ -250,6 +259,8 @@ class BufferedBlockMgr {
 
   // Return a new pinned block. If there is no memory for this block, *block will be
   // set to NULL.
+  // If len > 0, GetNewBlock() will return a block with a buffer of size len. len
+  // must be less than max_block_size and this block cannot be unpinned.
   // This function will try to allocate new memory for the block up to the limit.
   // Otherwise it will (conceptually) write out a unpinned block and use that memory.
   // The caller can pass a non-NULL 'unpin_block' to transfer memory from 'unpin_block'
@@ -259,7 +270,7 @@ class BufferedBlockMgr {
   //   - If the call succeeds, unpin_block is unpinned.
   //   - If there is no memory pressure, block will get a new block.
   //   - If there is memory pressure, block will get the buffer from unpin_block.
-  Status GetNewBlock(Client* client, Block* unpin_block, Block** block);
+  Status GetNewBlock(Client* client, Block* unpin_block, Block** block, int64_t len = -1);
 
   // Cancels the block mgr. All subsequent calls fail with Status::CANCELLED.
   // Idempotent.
@@ -268,21 +279,13 @@ class BufferedBlockMgr {
   // Dumps block mgr state. Grabs lock.
   std::string DebugString();
 
-  int num_free_buffers() const {
-    return free_buffers_.size();
-  }
-
   // The number of allocated buffers that can be simultaneously pinned by clients.
-  int available_allocated_buffers() const {
-    return all_buffers_.size();
-  }
-
+  int available_allocated_buffers() const { return all_io_buffers_.size(); }
+  int num_free_buffers() const { return free_io_buffers_.size(); }
   int num_pinned_buffers(Client* client) const;
   int num_reserved_buffers_remaining(Client* client) const;
-
-  int64_t block_size() const { return block_size_; }
+  int64_t max_block_size() const { return max_block_size_; }
   int64_t bytes_allocated() const;
-
   RuntimeProfile* profile() { return profile_.get(); }
 
  private:
@@ -293,13 +296,16 @@ class BufferedBlockMgr {
     // Start of the buffer
     uint8_t* buffer;
 
+    // Length of the buffer
+    int64_t len;
+
     // Block that this buffer is assigned to. May be NULL.
     Block* block;
 
-    BufferDescriptor(uint8_t* buf)
-      : buffer(buf), block(NULL) {
+    BufferDescriptor(uint8_t* buf, int64_t len)
+      : buffer(buf), len(len), block(NULL) {
     }
-  }; // struct BufferDescriptor
+  };
 
   BufferedBlockMgr(RuntimeState* state, MemTracker* parent, int64_t mem_limit,
       int64_t block_size);
@@ -354,8 +360,8 @@ class BufferedBlockMgr {
   bool Validate() const;
   std::string DebugInternal() const;
 
-  // Size of a block in bytes.
-  const int64_t block_size_;
+  // Size of the largest/default block in bytes.
+  const int64_t max_block_size_;
 
   // Unpinned blocks are written when the number of free buffers is below this threshold.
   // Equal to the number of disks.
@@ -369,6 +375,9 @@ class BufferedBlockMgr {
   AtomicInt<int> total_reserved_buffers_;
 
   // The number of unreserved buffers that are currently pinned. Must be >= 0.
+  // Currently, buffers that are less than the max size are still counted here.
+  // TODO: revisit. This will trigger spilling in clients sooner but that is probably
+  // correct.
   AtomicInt<int> num_unreserved_pinned_buffers_;
 
   TUniqueId query_id_;
@@ -403,10 +412,11 @@ class BufferedBlockMgr {
   // These buffers either have no block associated with them or are associated with an
   // an unpinned block that has been persisted. That is, either block = NULL or
   // (!block->is_pinned_  && !block->in_write_  && !unpinned_blocks_.Contains(block)).
-  InternalQueue<BufferDescriptor> free_buffers_;
+  // All of these buffers are io sized.
+  InternalQueue<BufferDescriptor> free_io_buffers_;
 
-  // All allocated buffers.
-  std::vector<BufferDescriptor*> all_buffers_;
+  // All allocated io-sized buffers.
+  std::vector<BufferDescriptor*> all_io_buffers_;
 
   // Temporary physical file handle, (one per tmp device) to which blocks may be written.
   // Blocks are round-robined across these files.

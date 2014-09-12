@@ -112,11 +112,11 @@ int64_t BufferedTupleStream::bytes_in_mem(bool ignore_current) const {
     DCHECK(write_block_->is_pinned());
     --num_in_mem_blocks;
   }
-  return num_in_mem_blocks * block_mgr_->block_size();
+  return num_in_mem_blocks * block_mgr_->max_block_size();
 }
 
 int64_t BufferedTupleStream::bytes_unpinned() const {
-  return (blocks_.size() - num_pinned_) * block_mgr_->block_size();
+  return (blocks_.size() - num_pinned_) * block_mgr_->max_block_size();
 }
 
 Status BufferedTupleStream::NewBlockForWrite(bool* got_block) {
