@@ -44,8 +44,9 @@ public class OrderByElement {
 
   public Expr getExpr() { return expr_; }
   public void setExpr(Expr e) { expr_ = e; }
-  public boolean getIsAsc() { return isAsc_; }
+  public boolean isAsc() { return isAsc_; }
   public Boolean getNullsFirstParam() { return nullsFirstParam_; }
+  public boolean nullsFirst() { return nullsFirst(nullsFirstParam_, isAsc_); }
 
   public String toSql() {
     StringBuilder strBuilder = new StringBuilder();

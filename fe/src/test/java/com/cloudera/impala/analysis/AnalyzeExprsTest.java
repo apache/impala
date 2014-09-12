@@ -626,6 +626,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select min(count(id)) over (order by tinyint_col) "
         + "from functional.alltypes group by id, tinyint_col "
         + "order by rank() over (order by tinyint_col)");
+    // IMPALA-1231: COUNT(t1.int_col) shows up in two different ways: as agg output
+    // and as an analytic fn call
+    AnalyzesOk("select t1.int_col, COUNT(t1.int_col) OVER (ORDER BY t1.int_col) "
+        + "FROM functional.alltypes t1 GROUP BY t1.int_col HAVING COUNT(t1.int_col) > 1");
 
     // legal windows
     AnalyzesOk(

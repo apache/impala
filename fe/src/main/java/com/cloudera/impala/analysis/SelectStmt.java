@@ -526,27 +526,27 @@ public class SelectStmt extends QueryStmt {
           ? aggInfo_.getSecondPhaseDistinctAggInfo()
           : aggInfo_;
 
-    ExprSubstitutionMap combinedSMap =
+    ExprSubstitutionMap combinedSmap =
         ExprSubstitutionMap.compose(countAllMap, finalAggInfo.getOutputSmap(), analyzer);
-    LOG.debug("combined smap: " + combinedSMap.debugString());
+    LOG.trace("combined smap: " + combinedSmap.debugString());
 
     // change select list, having and ordering exprs to point to agg output. We need
     // to reanalyze the exprs at this point.
-    // TODO: substitute really needs to bundle the reanalysis.
-    resultExprs_ = Expr.substituteList(resultExprs_, combinedSMap, analyzer);
-    LOG.info("desctbl: " + analyzer.getDescTbl().debugString());
-    LOG.info("post-agg selectListExprs: " + Expr.debugString(resultExprs_));
+    LOG.trace("desctbl: " + analyzer.getDescTbl().debugString());
+    LOG.trace("resultexprs: " + Expr.debugString(resultExprs_));
+    resultExprs_ = Expr.substituteList(resultExprs_, combinedSmap, analyzer);
+    LOG.trace("post-agg selectListExprs: " + Expr.debugString(resultExprs_));
     if (havingPred_ != null) {
       // Make sure the predicate in the HAVING clause does not contain a
       // subquery.
       Preconditions.checkState(!havingPred_.contains(
           Predicates.instanceOf(Subquery.class)));
-      havingPred_ = havingPred_.substitute(combinedSMap, analyzer);
+      havingPred_ = havingPred_.substitute(combinedSmap, analyzer);
       analyzer.registerConjuncts(havingPred_, true);
       LOG.debug("post-agg havingPred: " + havingPred_.debugString());
     }
     if (sortInfo_ != null) {
-      sortInfo_.substituteOrderingExprs(combinedSMap, analyzer);
+      sortInfo_.substituteOrderingExprs(combinedSmap, analyzer);
       LOG.debug("post-agg orderingExprs: " +
           Expr.debugString(sortInfo_.getOrderingExprs()));
     }
@@ -666,13 +666,13 @@ public class SelectStmt extends QueryStmt {
     if (analyticExprs.isEmpty()) return;
     analyticInfo_ = AnalyticInfo.create(analyticExprs, analyzer);
 
-    // change select list and ordering exprs to point to agg output. We need
+    // change select list and ordering exprs to point to analytic output. We need
     // to reanalyze the exprs at this point.
     resultExprs_ = Expr.substituteList(resultExprs_, analyticInfo_.getSmap(), analyzer);
-    LOG.info("post-analytic selectListExprs: " + Expr.debugString(resultExprs_));
+    LOG.trace("post-analytic selectListExprs: " + Expr.debugString(resultExprs_));
     if (sortInfo_ != null) {
       sortInfo_.substituteOrderingExprs(analyticInfo_.getSmap(), analyzer);
-      LOG.debug("post-analytic orderingExprs: " +
+      LOG.trace("post-analytic orderingExprs: " +
           Expr.debugString(sortInfo_.getOrderingExprs()));
     }
   }

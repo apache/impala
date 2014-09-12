@@ -26,9 +26,11 @@ import com.cloudera.impala.analysis.AnalyticInfo;
 import com.cloudera.impala.analysis.AnalyticWindow;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BinaryPredicate;
+import com.cloudera.impala.analysis.BoolLiteral;
 import com.cloudera.impala.analysis.CompoundPredicate;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.ExprSubstitutionMap;
+import com.cloudera.impala.analysis.IsNullPredicate;
 import com.cloudera.impala.analysis.OrderByElement;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
@@ -36,6 +38,7 @@ import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.Pair;
@@ -157,7 +160,7 @@ public class AnalyticPlanner {
 
     SortInfo sortInfo = new SortInfo(
         Expr.substituteList(sortExprs, sortSmap, analyzer_), isAsc, nullsFirst);
-    LOG.info("sortinfo exprs: " + Expr.debugString(sortInfo.getOrderingExprs()));
+    LOG.trace("sortinfo exprs: " + Expr.debugString(sortInfo.getOrderingExprs()));
     sortInfo.setMaterializedTupleInfo(sortTupleDesc, sortSlotExprs);
     return sortInfo;
   }
@@ -188,7 +191,7 @@ public class AnalyticPlanner {
       // then sort on orderByExprs
       for (OrderByElement orderByElement: sortGroup.orderByElements) {
         sortExprs.add(orderByElement.getExpr());
-        isAsc.add(orderByElement.getIsAsc());
+        isAsc.add(orderByElement.isAsc());
         nullsFirst.add(orderByElement.getNullsFirstParam());
       }
 
@@ -239,16 +242,14 @@ public class AnalyticPlanner {
             sortNode.getChild(0).getOutputSmap().debugString());
       }
       if (!partitionByExprs.isEmpty()) {
-        partitionByLessThan = createLessThan(
+        partitionByLessThan = createExprLessThan(
             Expr.substituteList(partitionByExprs, sortSmap, analyzer_),
             sortTupleId, bufferedSmap);
         LOG.trace("partitionByLt: " + partitionByLessThan.debugString());
       }
       if (!orderByElements.isEmpty()) {
-        // TODO: take asc/desc, nulls first/last into account
-        List<Expr> orderByExprs = OrderByElement.getOrderByExprs(orderByElements);
         orderByLessThan = createLessThan(
-            Expr.substituteList(orderByExprs, sortSmap, analyzer_),
+            OrderByElement.substitute(orderByElements, sortSmap, analyzer_),
             sortTupleId, bufferedSmap);
         LOG.trace("orderByLt: " + orderByLessThan.debugString());
       }
@@ -275,34 +276,68 @@ public class AnalyticPlanner {
   }
 
   /**
-   * Create '<' predicate between exprs of input row and buffered row
-   * ('exprs' refers to input row).
-   * Example:
-   * (input_expr0 < buffered_expr0)
-   *   || (input_expr0 == buffered_expr0 && input_expr1 < buffered_expr1)
-   *   || ...
+   * Create '<input row> < <buffered row>' predicate.
    */
-  private Expr createLessThan(List<Expr> exprs, TupleId inputTid,
+  private Expr createExprLessThan(List<Expr> orderByExprs, TupleId inputTid,
       ExprSubstitutionMap bufferedSmap) {
-    Preconditions.checkState(!exprs.isEmpty());
-    LOG.trace("expr0: " + exprs.get(0).debugString());
-    Preconditions.checkState(exprs.get(0).isBound(inputTid));
-    Expr result = new BinaryPredicate(BinaryPredicate.Operator.LT,
-        exprs.get(0).clone(),
-        exprs.get(0).substitute(bufferedSmap, analyzer_));
-    for (int i = 1; i < exprs.size(); ++i) {
-      Expr eqClause = new BinaryPredicate(BinaryPredicate.Operator.EQ,
-          exprs.get(i - 1).clone(),
-          exprs.get(i - 1).substitute(bufferedSmap, analyzer_));
-      Preconditions.checkState(exprs.get(i).isBound(inputTid));
-      Expr ltClause = new BinaryPredicate(BinaryPredicate.Operator.LT,
-          exprs.get(i).clone(),
-          exprs.get(i).substitute(bufferedSmap, analyzer_));
-      result = new CompoundPredicate(CompoundPredicate.Operator.OR,
-          result,
-          new CompoundPredicate(CompoundPredicate.Operator.AND, eqClause, ltClause));
+    List<OrderByElement> elements = Lists.newArrayList();
+    for (Expr e: orderByExprs) {
+      elements.add(new OrderByElement(e, true, true));
     }
-    result.analyzeNoThrow(analyzer_);
+    return createLessThan(elements, inputTid, bufferedSmap);
+  }
+
+  /**
+   * Create '<input row> < <buffered row>' predicate.
+   */
+  private Expr createLessThan(List<OrderByElement> elements, TupleId inputTid,
+      ExprSubstitutionMap bufferedSmap) {
+    Preconditions.checkState(!elements.isEmpty());
+    Expr result = createLessThanAux(elements, 0, inputTid, bufferedSmap);
+    try {
+      result.analyze(analyzer_);
+    } catch (AnalysisException e) {
+      throw new IllegalStateException(e);
+    }
+    return result;
+  }
+
+  /**
+   * Create an unanalyzed '<' predicate for elements >= i.
+   *
+   * With asc/nulls first, the predicate has the form
+   * rhs[i] is not null && (
+   *   lhs[i] is null
+   *   || lhs[i] < rhs[i]
+   *   || (lhs[i] = rhs[i] && <createLessThanAux(i + 1)>)
+   *  )
+   *
+   * TODO: this is extremely contorted; we need to introduce a builtin
+   * compare(lhs, rhs, is_asc, nulls_first)
+   */
+  private Expr createLessThanAux(List<OrderByElement> elements, int i, TupleId inputTid,
+      ExprSubstitutionMap bufferedSmap) {
+    if (i > elements.size() - 1) return new BoolLiteral(false);
+
+    // compare elements[i]
+    Expr lhs = elements.get(i).getExpr();
+    Preconditions.checkState(lhs.isBound(inputTid));
+    Expr rhs = lhs.substitute(bufferedSmap, analyzer_);
+    Expr rhsIsNotFirst = new IsNullPredicate(
+        elements.get(i).nullsFirst() ? rhs : lhs, true);
+    Expr lhsIsFirst = new IsNullPredicate(
+        elements.get(i).nullsFirst() ? lhs : rhs, false);
+    BinaryPredicate.Operator comparison = elements.get(i).isAsc()
+        ? BinaryPredicate.Operator.LT
+        : BinaryPredicate.Operator.GT;
+    Expr lhsPrecedesRhs = new BinaryPredicate(comparison, lhs, rhs);
+    Expr lhsEqRhs = new BinaryPredicate(BinaryPredicate.Operator.EQ, lhs, rhs);
+    Expr remainder = createLessThanAux(elements, i + 1, inputTid, bufferedSmap);
+    Expr result = new CompoundPredicate(CompoundPredicate.Operator.AND,
+        rhsIsNotFirst,
+        new CompoundPredicate(CompoundPredicate.Operator.OR,
+          new CompoundPredicate(CompoundPredicate.Operator.OR, lhsIsFirst, lhsPrecedesRhs),
+          new CompoundPredicate(CompoundPredicate.Operator.AND, lhsEqRhs, remainder)));
     return result;
   }
 

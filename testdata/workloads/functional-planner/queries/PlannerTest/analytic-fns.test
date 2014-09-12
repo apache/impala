@@ -1162,7 +1162,7 @@ from functional.alltypesagg
 |  order by: tinyint_col ASC NULLS FIRST, id ASC, int_col ASC
 |
 06:ANALYTIC
-|  functions: first_value(bigint_col), first_value(bigint_col)
+|  functions: first_value(bigint_col)
 |  partition by: tinyint_col
 |  order by: id ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW

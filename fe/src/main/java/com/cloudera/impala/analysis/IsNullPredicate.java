@@ -25,6 +25,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Reference;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -82,6 +83,14 @@ public class IsNullPredicate extends Predicate {
   @Override
   public String toSqlImpl() {
     return getChild(0).toSql() + (isNotNull_ ? " IS NOT NULL" : " IS NULL");
+  }
+
+  @Override
+  public String debugString() {
+    return Objects.toStringHelper(this)
+        .add("notNull", isNotNull_)
+        .addValue(super.debugString())
+        .toString();
   }
 
   @Override
