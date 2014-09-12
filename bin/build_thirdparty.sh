@@ -217,18 +217,16 @@ fi
 
 # Build Sasl
 if [ $BUILD_ALL -eq 1 ] || [ $BUILD_SASL -eq 1 ]; then
-  if [ -z "$USE_PIC_LIB_PATH" ]; then
-    build_preamble $IMPALA_HOME/thirdparty/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION} Sasl
-    # Disable everything except those protocols needed -- currently just Kerberos.
-    # Sasl does not have a --with-pic configuration.
-    CFLAGS="-fPIC -DPIC" CXXFLAGS="-fPIC -DPIC" ./configure \
-      --disable-sql --disable-otp --disable-ldap --disable-digest --with-saslauthd=no \
-      --prefix=$IMPALA_HOME/thirdparty/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION}/build \
-      --enable-static --enable-staticdlopen
-    # the first time you do a make it fails, ignore the error.
-    (make || true)
-    make install
-  fi
+  build_preamble $IMPALA_HOME/thirdparty/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION} Sasl
+  # Disable everything except those protocols needed -- currently just Kerberos.
+  # Sasl does not have a --with-pic configuration.
+  CFLAGS="-fPIC -DPIC" CXXFLAGS="-fPIC -DPIC" ./configure \
+    --disable-sql --disable-otp --disable-ldap --disable-digest --with-saslauthd=no \
+    --prefix=$IMPALA_HOME/thirdparty/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION}/build \
+    --enable-static --enable-staticdlopen
+  # the first time you do a make it fails, ignore the error.
+  (make || true)
+  make install
 fi
 
 # Build Avro

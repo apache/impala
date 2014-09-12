@@ -115,6 +115,8 @@ include_directories(${SASL_INCLUDE_DIR})
 add_library(saslstatic STATIC IMPORTED)
 set_target_properties(saslstatic PROPERTIES IMPORTED_LOCATION ${SASL_STATIC_LIBRARY})
 set(SASL_LIBRARY saslstatic)
+message(STATUS "Sasl include dir: " ${SASL_INCLUDE_DIR})
+message(STATUS "Sasl library: " ${SASL_LIBRARY})
 
 # find openldap
 find_package(Ldap REQUIRED)

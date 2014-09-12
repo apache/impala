@@ -15,7 +15,7 @@
 #ifndef IMPALA_SERVICE_SIMPLE_LOGGER_H
 #define IMPALA_SERVICE_SIMPLE_LOGGER_H
 
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/thread.hpp>
 #include <fstream>
 
 #include "common/status.h"

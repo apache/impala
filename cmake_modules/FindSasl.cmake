@@ -6,18 +6,13 @@
 
 set(THIRDPARTY_SASL thirdparty/cyrus-sasl-$ENV{IMPALA_CYRUS_SASL_VERSION})
 
-if (DEFINED ENV{PIC_LIB_PATH})
-  set(SASL_SEARCH_LIB_PATH $ENV{PIC_LIB_PATH}/lib)
-  set(SASL_INCLUDE_DIR $ENV{PIC_LIB_PATH}/include)
-else ()
-  set (THIRDPARTY ${CMAKE_SOURCE_DIR}/thirdparty)
-  set(SASL_SEARCH_LIB_PATH
-    ${THIRDPARTY}/cyrus-sasl-$ENV{IMPALA_CYRUS_SASL_VERSION}/build/lib
-  )
-  set(SASL_INCLUDE_DIR 
-    ${THIRDPARTY}/cyrus-sasl-$ENV{IMPALA_CYRUS_SASL_VERSION}/build/include
-  )
-endif ()
+set (THIRDPARTY ${CMAKE_SOURCE_DIR}/thirdparty)
+set(SASL_SEARCH_LIB_PATH
+  ${THIRDPARTY}/cyrus-sasl-$ENV{IMPALA_CYRUS_SASL_VERSION}/build/lib
+)
+set(SASL_INCLUDE_DIR 
+  ${THIRDPARTY}/cyrus-sasl-$ENV{IMPALA_CYRUS_SASL_VERSION}/build/include
+)
 
 find_library(SASL_LIB_PATH NAMES sasl2
   PATHS ${SASL_SEARCH_LIB_PATH}

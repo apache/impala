@@ -15,6 +15,11 @@
 #ifndef IMPALA_RUNTIME_MULTI_PRECISION_H
 #define IMPALA_RUNTIME_MULTI_PRECISION_H
 
+
+// We want to use boost's multi precision library which is only available starting
+// in boost 1.5. For older version of boost we will use the copy in thirdparty.
+#include <boost/version.hpp>
+#if BOOST_VERSION < 105000
 // The boost library is for C++11 on a newer version of boost than we use.
 // We need to make these #defines to compile for pre c++11
 #define BOOST_NOEXCEPT
@@ -32,6 +37,11 @@
 // Finally include the boost library.
 #include "boost_multiprecision/cpp_int.hpp"
 #include "boost_multiprecision/cpp_dec_float.hpp"
+
+#else
+#include <boost/multiprecision/cpp_int.hpp>
+#include <boost/multiprecision/cpp_dec_float.hpp>
+#endif
 
 #include <limits>
 

@@ -20,7 +20,7 @@
 #include "util/internal-queue.h"
 
 #include <thrift/TProcessor.h>
-#include <boost/thread/mutex.hpp>
+#include <boost/thread/thread.hpp>
 #include <boost/unordered_map.hpp>
 
 #include <rapidjson/document.h>
