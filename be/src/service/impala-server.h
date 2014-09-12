@@ -341,10 +341,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Report status of fragment execution to initiating coord.
   Status ReportStatus(FragmentExecState* exec_state);
 
-  Status CreateDataSink(
-      const TPlanExecRequest& request, const TPlanExecParams& params,
-      const RowDescriptor& row_desc, DataSink** sink);
-
   // Return exec state for given query_id, or NULL if not found.
   // If 'lock' is true, the returned exec state's lock() will be acquired before
   // the query_exec_state_map_lock_ is released.
