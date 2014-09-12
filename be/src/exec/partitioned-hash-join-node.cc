@@ -19,6 +19,8 @@
 #include "codegen/llvm-codegen.h"
 #include "exec/hash-table.inline.h"
 #include "exprs/expr.h"
+#include "exprs/expr-context.h"
+#include "exprs/slot-ref.h"
 #include "runtime/buffered-block-mgr.h"
 #include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/row-batch.h"
@@ -27,6 +29,9 @@
 #include "util/runtime-profile.h"
 
 #include "gen-cpp/PlanNodes_types.h"
+
+DEFINE_bool(enable_phj_probe_side_filtering, true,
+    "Enables pushing PHJ build side filters to probe side");
 
 using namespace boost;
 using namespace impala;
@@ -46,6 +51,8 @@ PartitionedHashJoinNode::PartitionedHashJoinNode(
     input_partition_(NULL),
     null_aware_partition_(NULL) {
   memset(hash_tbls_, 0, sizeof(hash_tbls_));
+  can_add_probe_filters_ = tnode.hash_join_node.add_probe_filters;
+  can_add_probe_filters_ &= FLAGS_enable_phj_probe_side_filtering;
 }
 
 Status PartitionedHashJoinNode::Init(const TPlanNode& tnode) {
@@ -234,7 +241,17 @@ Status PartitionedHashJoinNode::Partition::Spill(bool unpin_all_build) {
   return build_rows()->UnpinStream(unpin_all_build);
 }
 
-Status PartitionedHashJoinNode::Partition::BuildHashTable(
+Status PartitionedHashJoinNode::Partition::BuildHashTable(RuntimeState* state,
+    bool* built, const bool add_probe_filters) {
+  if (add_probe_filters) {
+    return BuildHashTableInternal<true>(state, built);
+  } else {
+    return BuildHashTableInternal<false>(state, built);
+  }
+}
+
+template<bool const AddProbeFilters>
+Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
     RuntimeState* state, bool* built) {
   DCHECK(build_rows_ != NULL);
   *built = false;
@@ -266,6 +283,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(
       TupleRow* row = batch.GetRow(i);
       uint32_t hash = 0;
       if (!ctx->EvalAndHashBuild(row, &hash)) continue;
+      // TODO: If we are going to AddProbeFilters we should do it here.
       if (UNLIKELY(!hash_tbl_->Insert(ctx, indices[i], row, hash))) {
         *built = false;
         break;
@@ -279,7 +297,61 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(
   DCHECK_NOTNULL(hash_tbl_.get());
   is_spilled_ = false;
   COUNTER_ADD(parent_->num_hash_buckets_, hash_tbl_->num_buckets());
+
+  // TODO: We build the filters after we constructed the hash table.  This is what the
+  // old (HashJoinNode) code was doing.  We can do better, because now we know a priori
+  // whether we are going to add probe filter or not. For example, we can be building
+  // the filters while we are streaming the rows from the batch, and not at the end after
+  // the HT has been built.
+  if (AddProbeFilters) {
+    DCHECK_EQ(level_, 0) << "Should not add filters if repartitioning";
+    hash_tbl_->UpdateProbeFilters(ctx, parent_->probe_filters_);
+  }
   return Status::OK;
+}
+
+bool PartitionedHashJoinNode::AllocateProbeFilters(RuntimeState* state) {
+  if (!can_add_probe_filters_) return false;
+  DCHECK_NOTNULL(ht_ctx_.get());
+  DCHECK_EQ(build_expr_ctxs_.size(), probe_expr_ctxs_.size());
+  probe_filters_.resize(probe_expr_ctxs_.size());
+  for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
+    if (probe_expr_ctxs_[i]->root()->is_slotref()) {
+      probe_filters_[i].first =
+          reinterpret_cast<SlotRef*>(probe_expr_ctxs_[i]->root())->slot_id();
+      probe_filters_[i].second = new Bitmap(state->slot_filter_bitmap_size());
+    } else {
+      probe_filters_[i].second = NULL;
+    }
+  }
+  return true;
+}
+
+bool PartitionedHashJoinNode::AttachProbeFilters(RuntimeState* state) {
+  if (can_add_probe_filters_) {
+    // Add all the bitmaps to the runtime state.
+    bool acquired_ownership = false;
+    for (int i = 0; i < probe_filters_.size(); ++i) {
+      if (probe_filters_[i].second == NULL) continue;
+      state->AddBitmapFilter(probe_filters_[i].first, probe_filters_[i].second,
+                             &acquired_ownership);
+      VLOG(2) << "Bitmap filter added on slot: " << probe_filters_[i].first;
+      if (!acquired_ownership) {
+        delete probe_filters_[i].second;
+        probe_filters_[i].second = NULL;
+      }
+    }
+    return true;
+  } else {
+    // Make sure there are no memory leaks.
+    for (int i = 0; i < probe_filters_.size(); ++i) {
+      if (probe_filters_[i].second != NULL) {
+        delete probe_filters_[i].second;
+        probe_filters_[i].second = NULL;
+      }
+    }
+    return false;
+  }
 }
 
 // TODO: can we do better with the spilling heuristic.
@@ -321,10 +393,13 @@ Status PartitionedHashJoinNode::ConstructBuildSide(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Open(build_expr_ctxs_, state));
   RETURN_IF_ERROR(Expr::Open(probe_expr_ctxs_, state));
   RETURN_IF_ERROR(Expr::Open(other_join_conjunct_ctxs_, state));
+  AllocateProbeFilters(state);
 
   // Do a full scan of child(1) and partition the rows.
   RETURN_IF_ERROR(child(1)->Open(state));
   RETURN_IF_ERROR(ProcessBuildInput(state, 0));
+
+  AttachProbeFilters(state);
   UpdateState(PROCESSING_PROBE);
   return Status::OK;
 }
@@ -369,9 +444,11 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
   while (!eos) {
     RETURN_IF_ERROR(state->CheckQueryState());
     if (input_partition_ == NULL) {
+      // If we are still consuming batches from the build side.
       RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch, &eos));
       COUNTER_ADD(build_row_counter_, build_batch.num_rows());
     } else {
+      // If we are consuming batches that have already been partitioned.
       RETURN_IF_ERROR(input_partition_->build_rows()->GetNext(&build_batch, &eos));
     }
     total_build_rows += build_batch.num_rows();
@@ -499,7 +576,10 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
   // Try to build a hash table on top the spilled build rows.
   bool built = false;
   if (input_partition_->EstimatedInMemSize() < mem_limit) {
-    RETURN_IF_ERROR(input_partition_->BuildHashTable(state, &built));
+    ht_ctx_->set_level(input_partition_->level_);
+    // TODO: We disable filter on spilled partitions, but perhaps we can revisit
+    // this, especially if the probe side is very big (e.g. has spilled as well).
+    RETURN_IF_ERROR(input_partition_->BuildHashTable(state, &built, false));
   }
 
   if (!built) {
@@ -786,6 +866,28 @@ Status PartitionedHashJoinNode::OutputNullAwareProbeRows(RuntimeState* state,
 Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
   DCHECK_EQ(hash_partitions_.size(), PARTITION_FANOUT);
 
+  // Decide whether probe filters will be built.
+  if (input_partition_ == NULL && can_add_probe_filters_) {
+    // TODO: Should we just give up in case we have any spilled partition?
+    uint64_t num_build_rows = 0;
+    BOOST_FOREACH(Partition* partition, hash_partitions_) {
+      const uint64_t partition_num_rows = partition->build_rows()->num_rows();
+      num_build_rows += partition_num_rows;
+    }
+    // TODO: Using this simple heuristic where we compare the number of build rows
+    // to the size of the slot filter bitmap. This is essentially not a Bloom filter
+    // but a 1-1 filter, and probably it is missing oportunities. Should revisit.
+    can_add_probe_filters_ = (num_build_rows < state->slot_filter_bitmap_size());
+    if (can_add_probe_filters_) {
+      AddRuntimeExecOption("Build-Side Filter Pushed Down");
+    } else {
+      VLOG(2) << "Disabling probe filter push down because build side is too large: "
+              << num_build_rows;
+    }
+  } else {
+    can_add_probe_filters_ = false;
+  }
+
   // First loop over the partitions and build hash tables for the partitions that
   // didn't already spill.
   BOOST_FOREACH(Partition* partition, hash_partitions_) {
@@ -798,7 +900,7 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
     bool built = false;
     if (!partition->is_spilled()) {
       DCHECK(partition->build_rows()->is_pinned());
-      RETURN_IF_ERROR(partition->BuildHashTable(state, &built));
+      RETURN_IF_ERROR(partition->BuildHashTable(state, &built, can_add_probe_filters_));
     }
 
     if (built) {

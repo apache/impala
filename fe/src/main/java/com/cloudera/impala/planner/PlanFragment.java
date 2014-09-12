@@ -24,6 +24,8 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.JoinOperator;
 import com.cloudera.impala.analysis.SlotRef;
+import com.cloudera.impala.catalog.HdfsFileFormat;
+import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
@@ -187,7 +189,7 @@ public class PlanFragment {
    * We compute this by walking the tree bottom up.
    *
    * TODO: move this to PlanNode.init() which is normally responsible for computing
-   * internal state of PlanNodes. We can't do this currently since we need the
+   * internal state of PlanNodes. We cannot do this currently since we need the
    * distrubutionMode() set on HashJoin nodes. Once we call init() properly for
    * repartitioned joins, this logic can move to init().
    */
@@ -197,9 +199,11 @@ public class PlanFragment {
       boolean childResult = computeCanAddSlotFilters(node.getChild(0));
       if (!childResult) return false;
       if (hashJoinNode.getJoinOp().equals(JoinOperator.FULL_OUTER_JOIN) ||
-          hashJoinNode.getJoinOp().equals(JoinOperator.LEFT_OUTER_JOIN)) {
-        // Never correct to push through an outer join on the probe side. We can't
-        // filter those rows out.
+          hashJoinNode.getJoinOp().equals(JoinOperator.LEFT_OUTER_JOIN) ||
+          hashJoinNode.getJoinOp().equals(JoinOperator.LEFT_ANTI_JOIN)) {
+        // It is not correct to push through an outer or anti join on the probe side.
+        // We cannot filter those rows out.
+        // TODO: Add NULL_AWARE_LEFT_ANTI_JOIN.
         return false;
       }
       // We can't push down predicates for partitioned joins yet.
@@ -221,7 +225,20 @@ public class PlanFragment {
       // Even if this join cannot add predicates, return true so the parent node can.
       return true;
     } else if (node instanceof HdfsScanNode) {
-      return true;
+      // Since currently only the Parquet scanner employs the slot filter optimization,
+      // we enable it only if the majority format is Parquet. Otherwise we are adding
+      // the overhead of creating the SlotFilters in the build side in queries not on
+      // Parquet data.
+      // TODO: Modify the other scanners to exploit the slot filter optimization.
+      HdfsScanNode scanNode = (HdfsScanNode) node;
+      Preconditions.checkNotNull(scanNode.desc_);
+      Preconditions.checkNotNull(scanNode.desc_.getTable() instanceof HdfsTable);
+      HdfsTable table = (HdfsTable) scanNode.desc_.getTable();
+      if (table.getMajorityFormat() == HdfsFileFormat.PARQUET) {
+        return true;
+      } else {
+        return false;
+      }
     } else {
       for (PlanNode child : node.getChildren()) {
         computeCanAddSlotFilters(child);

@@ -218,25 +218,14 @@ int64_t HashTable::byte_size() const {
   return data_pages_.size() * state_->io_mgr()->max_read_buffer_size();
 }
 
-void HashTable::AddBitmapFilters(HashTableCtx* ht_ctx) {
+void HashTable::UpdateProbeFilters(HashTableCtx* ht_ctx,
+    vector<pair<SlotId, Bitmap*> >& bitmaps) {
   DCHECK_NOTNULL(ht_ctx);
-  DCHECK_EQ(ht_ctx->build_expr_ctxs_.size(), ht_ctx->probe_expr_ctxs_.size());
-  vector<pair<SlotId, Bitmap*> > bitmaps;
-  bitmaps.resize(ht_ctx->probe_expr_ctxs_.size());
-  for (int i = 0; i < ht_ctx->build_expr_ctxs_.size(); ++i) {
-    if (ht_ctx->probe_expr_ctxs_[i]->root()->is_slotref()) {
-      bitmaps[i].first =
-          reinterpret_cast<SlotRef*>(ht_ctx->probe_expr_ctxs_[i]->root())->slot_id();
-      bitmaps[i].second = new Bitmap(state_->slot_filter_bitmap_size());
-    } else {
-      bitmaps[i].second = NULL;
-    }
-  }
   // For the bitmap filters, always use the initial seed. The other parts of the plan
   // tree (e.g. the scan node) relies on this.
   uint32_t seed = ht_ctx->seeds_[0];
 
-  // Walk the build table and generate a bitmap for each probe side slot.
+  // Walk the build table and update the bitmap for each probe side slot.
   HashTable::Iterator iter = Begin(ht_ctx);
   while (iter != End()) {
     TupleRow* row = iter.GetRow();
@@ -248,14 +237,6 @@ void HashTable::AddBitmapFilters(HashTableCtx* ht_ctx) {
       bitmaps[i].second->Set<true>(h, true);
     }
     iter.Next<false>(ht_ctx);
-  }
-
-  // Add all the bitmaps to the runtime state.
-  for (int i = 0; i < bitmaps.size(); ++i) {
-    if (bitmaps[i].second == NULL) continue;
-    state_->AddBitmapFilter(bitmaps[i].first, bitmaps[i].second);
-    VLOG(2) << "Bitmap filter added on slot: " << bitmaps[i].first;
-    delete bitmaps[i].second;
   }
 }
 

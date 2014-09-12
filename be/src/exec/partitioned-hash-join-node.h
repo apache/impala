@@ -149,8 +149,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // level is the level new partitions (in hash_partitions_) should be created with.
   Status ProcessBuildInput(RuntimeState* state, int level);
 
-  // Processes all the build rows by partitioning them.
-  // Reads the rows in build_batch and partition them in hash_partitions_.
+  // Reads the rows in build_batch and partitions them in hash_partitions_.
   Status ProcessBuildBatch(RowBatch* build_batch);
 
   // Call at the end of partitioning the build rows (which could be from the build child
@@ -170,7 +169,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   template<int const JoinOp>
   int ProcessProbeBatch(RowBatch* out_batch, HashTableCtx* ht_ctx);
 
-  // Wrapper that calls templated version of ProcessProbeBatch() based on 'join_op'.
+  // Wrapper that calls the templated version of ProcessProbeBatch() based on 'join_op'.
   int ProcessProbeBatch(
       const TJoinOp::type join_op, RowBatch* out_batch, HashTableCtx* ht_ctx);
 
@@ -212,6 +211,13 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   // Prepares for probing the next batch.
   void ResetForProbe();
+
+  // For each 'probe_expr_' in 'ht_ctx' that is a slot ref, allocate a bitmap filter on
+  // that slot. Returns false if it should not add probe filters.
+  bool AllocateProbeFilters(RuntimeState* state);
+
+  // Attach the probe filters to runtime state.
+  bool AttachProbeFilters(RuntimeState* state);
 
   // Codegen function to create output row. Assumes that the probe row is non-NULL.
   llvm::Function* CodegenCreateOutputRow(LlvmCodeGen* codegen);
@@ -313,7 +319,12 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     // Build rows cannot be added after calling this.
     // If the partition could not be built due to memory pressure, *built is set to false
     // and the caller is responsible for spilling this partition.
-    Status BuildHashTable(RuntimeState* state, bool* built);
+    // If 'AddProbeFilters' is set, it creates the probe filters.
+    template<bool const AddProbeFilters>
+    Status BuildHashTableInternal(RuntimeState* state, bool* built);
+
+    // Wrapper for the template-based BuildHashTable() based on 'add_probe_filters'.
+    Status BuildHashTable(RuntimeState* state, bool* built, const bool add_probe_filters);
 
     // Spills this partition, cleaning up and unpinning blocks.
     // If unpin_all_build is true, the build stream is completely unpinned, otherwise,
@@ -410,6 +421,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // Used while processing null_aware_partition_. It contains all the build tuple rows
   // with a NULL when evaluating the hash table expr.
   boost::scoped_ptr<RowBatch> nulls_build_batch_;
+
+  // Used for concentrating the existence bits from all the partitions, used by the
+  // probe-side filter optimization.
+  std::vector<std::pair<SlotId, Bitmap*> > probe_filters_;
 };
 
 }

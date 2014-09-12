@@ -163,8 +163,10 @@ class RuntimeState {
 
   // Adds a bitmap filter on slot 'slot'. If hash(slot) % bitmap.Size() is false, this
   // value can be filtered out. Multiple bitmap filters can be added to a single slot.
+  // If it is the first call to add a bitmap filter for the specific slot, indicated by
+  // 'acquired_ownership', then the passed bitmap should not be deleted by the caller.
   // Thread safe.
-  void AddBitmapFilter(SlotId slot, const Bitmap* bitmap);
+  void AddBitmapFilter(SlotId slot, Bitmap* bitmap, bool* acquired_ownership);
 
   // Returns bitmap filter on 'slot'. Returns NULL if there are no bitmap filters on this
   // slot.
@@ -378,7 +380,7 @@ class RuntimeState {
   PlanNodeId root_node_id_;
 
   // Lock protecting slot_bitmap_filters_
-  boost::mutex bitmap_lock_;
+  SpinLock bitmap_lock_;
 
   // Bitmap filter on the hash for 'SlotId'. If bitmap[hash(slot]] is unset, this
   // value can be filtered out. These filters are generated during the query execution.

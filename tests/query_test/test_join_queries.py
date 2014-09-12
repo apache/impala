@@ -92,6 +92,7 @@ class TestSemiJoinQueries(ImpalaTestSuite):
     for t in self.IMP1160_TABLES:
       self.client.execute('drop table if exists %s' % t)
 
+  @pytest.mark.execute_serially
   def test_semi_joins(self, vector):
     new_vector = copy(vector)
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')

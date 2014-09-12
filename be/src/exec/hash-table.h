@@ -349,13 +349,12 @@ class HashTable {
   // Returns the number of bytes allocated to the hash table
   int64_t byte_size() const;
 
-  // Can be called after all insert calls to add bitmap filters for the probe side values.
-  // For each 'probe_expr_' in 'ht_ctx' that is a slot ref, generate a bitmap filter on
-  // that slot.
-  // These filters are added to the runtime state.
-  // The bitmap filter is similar to a Bloom filter in that has no false negatives but
-  // will have false positives.
-  void AddBitmapFilters(HashTableCtx* ht_ctx);
+  // Can be called after all insert calls to update the bitmap filters for the probe
+  // side values. The bitmap filters are similar to Bloom filters in that they have no
+  // false negatives but they will have false positives.
+  // These filters are not added to the runtime state.
+  void UpdateProbeFilters(HashTableCtx* ht_ctx,
+      std::vector<std::pair<SlotId, Bitmap*> >& bitmaps);
 
   // Returns an iterator at the beginning of the hash table.  Advancing this iterator
   // will traverse all elements.

@@ -144,11 +144,12 @@ void OldHashTable::AddBitmapFilters() {
   }
 
   // Add all the bitmaps to the runtime state.
+  bool acquired_ownership = false;
   for (int i = 0; i < bitmaps.size(); ++i) {
     if (bitmaps[i].second == NULL) continue;
-    state_->AddBitmapFilter(bitmaps[i].first, bitmaps[i].second);
+    state_->AddBitmapFilter(bitmaps[i].first, bitmaps[i].second, &acquired_ownership);
     VLOG(2) << "Bitmap filter added on slot: " << bitmaps[i].first;
-    delete bitmaps[i].second;
+    if (!acquired_ownership) delete bitmaps[i].second;
   }
 }
 

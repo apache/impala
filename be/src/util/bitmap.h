@@ -59,7 +59,7 @@ class Bitmap {
     return (buffer_[word_index] & (1 << bit_index)) != 0;
   }
 
-  // Ands the src bitmap into this one.
+  // Bitwise ANDs the src bitmap into this one.
   void And(const Bitmap* src) {
     DCHECK_EQ(size(), src->size());
     for (int i = 0; i < buffer_.size(); ++i) {
@@ -67,15 +67,22 @@ class Bitmap {
     }
   }
 
-  void SetAllBits(bool b) {
-    if (b) {
-      memset(&buffer_[0], 255, buffer_.size() * sizeof(uint64_t));
-    } else {
-      memset(&buffer_[0], 0, buffer_.size() * sizeof(uint64_t));
+  // Bitwise ORs the src bitmap into this one.
+  void Or(const Bitmap* src) {
+    DCHECK_EQ(size(), src->size());
+    for (int i = 0; i < buffer_.size(); ++i) {
+      buffer_[i] |= src->buffer_[i];
     }
   }
 
+  void SetAllBits(bool b) {
+    memset(&buffer_[0], 255 * b, buffer_.size() * sizeof(uint64_t));
+  }
+
   int64_t size() const { return size_; }
+
+  // If 'print_bits' prints 0/1 per bit, otherwise it prints the int64_t value.
+  std::string DebugString(bool print_bits);
 
  private:
   std::vector<uint64_t> buffer_;

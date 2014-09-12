@@ -179,7 +179,8 @@ Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
   // We've finished constructing the build side. Set the bitmap of the build side values
   // so that the probe side can use this as an additional predicate.
   // We only do this if the build side is sufficiently small.
-  // TODO: better heuristic?
+  // TODO: Better heuristic? Currently we simply compare the size of the HT with a
+  // constant value.
   if (can_add_probe_filters_) {
     if (hash_tbl_->size() < state->slot_filter_bitmap_size()) {
       AddRuntimeExecOption("Build-Side Filter Pushed Down");
