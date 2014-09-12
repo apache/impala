@@ -138,6 +138,7 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(
         return status_;
       }
     } else {
+      DCHECK(partition->hash_tbl() != NULL);
       // Perform the actual probe in the hash table for the current probe (left) row.
       // TODO: At this point it would be good to do some prefetching.
       hash_tbl_iterator_= partition->hash_tbl()->Find(ht_ctx);

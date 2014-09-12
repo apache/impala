@@ -140,9 +140,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // sensitive).
   bool AppendRow(BufferedTupleStream* stream, TupleRow* row);
 
-  // Called when we need to free up memory by spilling 1 or more partitions.
+  // Called when we need to free up memory by spilling a partition.
   // This function walks hash_partitions_ and picks on to spill.
-  Status SpillPartitions();
+  Status SpillPartition();
 
   // Partitions the entire build input (either from child(1) or input_partition_) into
   // hash_partitions_. When this call returns, hash_partitions_ is ready to consume
@@ -288,7 +288,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     HashTable* hash_tbl() const { return hash_tbl_.get(); }
 
     bool is_closed() const { return is_closed_; }
-    bool is_spilled() const;
+    bool is_spilled() const { return is_spilled_; }
 
     // Must be called once per partition to release any resources. This should be called
     // as soon as possible to release memory.
@@ -318,6 +318,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     // This partition is completely processed and nothing needs to be done for it again.
     // All resources associated with this partition are returned.
     bool is_closed_;
+
+    // True if this partition is spilled.
+    bool is_spilled_;
 
     // How many times rows in this partition have been repartitioned. Partitions created
     // from the node's children's input is level 0, 1 after the first repartitionining,

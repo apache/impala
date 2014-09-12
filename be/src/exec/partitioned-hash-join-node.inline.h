@@ -34,7 +34,7 @@ inline bool PartitionedHashJoinNode::AppendRow(BufferedTupleStream* stream,
   status_ = stream->status();
   if (!status_.ok()) return false;
   // We ran out of memory. Pick a partition to spill.
-  status_ = SpillPartitions();
+  status_ = SpillPartition();
   if (!status_.ok()) return false;
   if (!stream->AddRow(row)) {
     // Can this happen? we just spilled a partition so this shouldn't fail.
@@ -42,10 +42,6 @@ inline bool PartitionedHashJoinNode::AppendRow(BufferedTupleStream* stream,
     return false;
   }
   return true;
-}
-
-inline bool PartitionedHashJoinNode::Partition::is_spilled() const {
-  return build_rows_ != NULL && !build_rows_->is_pinned();
 }
 
 }
