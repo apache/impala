@@ -798,7 +798,25 @@ Status PartitionedAggregationNode::MoveHashPartitions(int64_t num_input_rows) {
   return Status::OK;
 }
 
-IRFunction::Type GetHllUpdateFunction(const ColumnType& type) {
+IRFunction::Type GetAvgFunction(const ColumnType& type, bool is_merge) {
+  if (!is_merge) {
+    switch (type.type) {
+      case TYPE_BIGINT: return IRFunction::AVG_UPDATE_BIGINT;
+      case TYPE_DOUBLE: return IRFunction::AVG_UPDATE_DOUBLE;
+      case TYPE_TIMESTAMP: return IRFunction::AVG_UPDATE_TIMESTAMP;
+      case TYPE_DECIMAL: return IRFunction::AVG_UPDATE_DECIMAL;
+      default:
+        DCHECK(false) << "Unsupported type: " << type;
+        return IRFunction::FN_END;
+    }
+  } else {
+    if (type.type == TYPE_DECIMAL) return IRFunction::AVG_MERGE_DECIMAL;
+    return IRFunction::AVG_MERGE;
+  }
+}
+
+IRFunction::Type GetHllFunction(const ColumnType& type, bool is_merge) {
+  if (is_merge) return IRFunction::HLL_MERGE;
   switch (type.type) {
     case TYPE_BOOLEAN: return IRFunction::HLL_UPDATE_BOOLEAN;
     case TYPE_TINYINT: return IRFunction::HLL_UPDATE_TINYINT;
@@ -899,8 +917,13 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
   DCHECK_EQ(evaluator->input_expr_ctxs().size(), 1);
   ExprContext* input_expr_ctx = evaluator->input_expr_ctxs()[0];
   Expr* input_expr = input_expr_ctx->root();
+
   // TODO: implement timestamp
-  if (input_expr->type().type == TYPE_TIMESTAMP) return NULL;
+  if (input_expr->type().type == TYPE_TIMESTAMP &&
+      evaluator->agg_op() != AggFnEvaluator::AVG) {
+    return NULL;
+  }
+
   Function* agg_expr_fn;
   Status status = input_expr->GetCodegendComputeFn(state, &agg_expr_fn);
   if (!status.ok()) {
@@ -933,9 +956,9 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
   BasicBlock* ret_block = BasicBlock::Create(codegen->context(), "ret", fn);
 
   // Call expr function to get src slot value
-  Value* ctx_arg = codegen->CastPtrToLlvmPtr(
+  Value* expr_ctx = codegen->CastPtrToLlvmPtr(
       codegen->GetPtrType(ExprContext::LLVM_CLASS_NAME), input_expr_ctx);
-  Value* agg_expr_fn_args[] = { ctx_arg, row_arg };
+  Value* agg_expr_fn_args[] = { expr_ctx, row_arg };
   CodegenAnyVal src = CodegenAnyVal::CreateCallWrapped(
       codegen, &builder, input_expr->type(), agg_expr_fn, agg_expr_fn_args, "src");
 
@@ -984,11 +1007,19 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
         result = builder.CreateAdd(dst_value, src.GetVal());
       }
       break;
+    case AggFnEvaluator::AVG:
     case AggFnEvaluator::NDV: {
       DCHECK_EQ(slot_desc->type().type, TYPE_STRING);
-      IRFunction::Type ir_function_type = evaluator->is_merge() ? IRFunction::HLL_MERGE
-                                          : GetHllUpdateFunction(input_expr->type());
-      Function* hll_fn = codegen->GetFunction(ir_function_type);
+
+      IRFunction::Type ir_function_type;
+      if (evaluator->agg_op() == AggFnEvaluator::AVG) {
+        ir_function_type = GetAvgFunction(input_expr->type(), evaluator->is_merge());
+      } else {
+        DCHECK_EQ(evaluator->agg_op(), AggFnEvaluator::NDV);
+        ir_function_type = GetHllFunction(input_expr->type(), evaluator->is_merge());
+      }
+
+      Function* ir_fn = codegen->GetFunction(ir_function_type);
 
       // Create pointer to src_anyval to pass to HllUpdate() function. We must use the
       // unlowered type.
@@ -1015,8 +1046,8 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
       Value* dst_unlowered_ptr =
           builder.CreateBitCast(dst_lowered_ptr, unlowered_ptr_type, "dst_unlowered_ptr");
 
-      // Call 'hll_fn'
-      builder.CreateCall3(hll_fn, fn_ctx_arg, src_unlowered_ptr, dst_unlowered_ptr);
+      // Call 'ir_fn'
+      builder.CreateCall3(ir_fn, fn_ctx_arg, src_unlowered_ptr, dst_unlowered_ptr);
 
       // Convert StringVal intermediate 'dst_arg' back to StringValue
       Value* anyval_result = builder.CreateLoad(dst_lowered_ptr, "anyval_result");
@@ -1082,21 +1113,22 @@ Function* PartitionedAggregationNode::CodegenUpdateTuple(RuntimeState* state) {
     SlotDescriptor* slot_desc = intermediate_tuple_desc_->slots()[j];
     AggFnEvaluator* evaluator = aggregate_evaluators_[i];
 
-    // Timestamp and char are never supported. NDV supports decimal and string but no
-    // other functions.
-    // TODO: the other aggregate functions might work with decimal as-is
-    if (slot_desc->type().type == TYPE_TIMESTAMP || slot_desc->type().type == TYPE_CHAR ||
-        (evaluator->agg_op() != AggFnEvaluator::NDV &&
-         (slot_desc->type().type == TYPE_DECIMAL ||
-          slot_desc->type().type == TYPE_STRING ||
-          slot_desc->type().type == TYPE_VARCHAR))) {
-      VLOG_QUERY << "Could not codegen UpdateTuple because "
-                 << "string, char, timestamp and decimal are not yet supported.";
-      return NULL;
-    }
-
     // Don't codegen things that aren't builtins (for now)
     if (!evaluator->is_builtin()) return NULL;
+
+    // Char and timestamp are never supported.  Only AVG and NDV support string and
+    // decimal.
+    AggFnEvaluator::AggregationOp op = evaluator->agg_op();
+    PrimitiveType type = slot_desc->type().type;
+    if (type == TYPE_TIMESTAMP || type == TYPE_CHAR ||
+        (op != AggFnEvaluator::AVG && op != AggFnEvaluator::NDV &&
+         (type == TYPE_DECIMAL || type == TYPE_STRING || type == TYPE_VARCHAR))) {
+      VLOG_QUERY << "Could not codegen UpdateTuple because intermediate type "
+                 << slot_desc->type()
+                 << "is not yet supported for aggregate function \""
+                 << evaluator->fn_name() << "()\"";
+      return NULL;
+    }
   }
 
   if (intermediate_tuple_desc_->GenerateLlvmStruct(codegen) == NULL) {

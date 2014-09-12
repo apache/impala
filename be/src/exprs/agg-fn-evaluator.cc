@@ -106,6 +106,8 @@ AggFnEvaluator::AggFnEvaluator(const TExprNode& desc, bool is_analytic_fn)
     agg_op_ = MAX;
   } else if (fn_.name.function_name == "sum") {
     agg_op_ = SUM;
+  } else if (fn_.name.function_name == "avg") {
+    agg_op_ = AVG;
   } else if (fn_.name.function_name == "ndv") {
     agg_op_ = NDV;
   } else {

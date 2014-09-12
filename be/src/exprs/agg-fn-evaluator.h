@@ -65,6 +65,7 @@ class AggFnEvaluator {
     MIN,
     MAX,
     SUM,
+    AVG,
     NDV,
     OTHER,
   };
@@ -109,6 +110,7 @@ class AggFnEvaluator {
   bool is_count_star() const { return agg_op_ == COUNT && input_expr_ctxs_.empty(); }
   bool is_builtin() const { return fn_.binary_type == TFunctionBinaryType::BUILTIN; }
   bool SupportsRemove() const { return remove_fn_ != NULL; }
+  const std::string& fn_name() { return fn_.name.function_name; }
 
   static std::string DebugString(const std::vector<AggFnEvaluator*>& exprs);
   std::string DebugString() const;
