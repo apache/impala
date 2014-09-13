@@ -824,10 +824,10 @@ order by 1 desc nulls first
    partitions=24/24 size=478.45KB
 ====
 # analytics in an uncorrelated subquery
-select id, int_col, bool_col from functional.alltypestiny t1
+select id, int_col, bool_col from functional.alltypessmall t1
 where int_col in
   (select min(bigint_col) over(partition by bool_col)
-   from functional.alltypessmall t2 where t2.id < 10)
+   from functional.alltypestiny t2 where t2.id < 10)
 ---- PLAN
 04:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: int_col = min(bigint_col)
@@ -839,19 +839,19 @@ where int_col in
 |  02:SORT
 |  |  order by: bool_col ASC NULLS FIRST
 |  |
-|  01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB
+|  01:SCAN HDFS [functional.alltypestiny t2]
+|     partitions=4/4 size=460B
 |     predicates: t2.id < 10
 |
-00:SCAN HDFS [functional.alltypestiny t1]
-   partitions=4/4 size=460B
+00:SCAN HDFS [functional.alltypessmall t1]
+   partitions=4/4 size=6.32KB
 ---- DISTRIBUTEDPLAN
-08:EXCHANGE [UNPARTITIONED]
+07:EXCHANGE [UNPARTITIONED]
 |
-04:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
+04:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
 |  hash predicates: int_col = min(bigint_col)
 |
-|--07:EXCHANGE [HASH(min(bigint_col))]
+|--06:EXCHANGE [BROADCAST]
 |  |
 |  03:ANALYTIC
 |  |  functions: min(bigint_col)
@@ -862,14 +862,12 @@ where int_col in
 |  |
 |  05:EXCHANGE [HASH(bool_col)]
 |  |
-|  01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB
+|  01:SCAN HDFS [functional.alltypestiny t2]
+|     partitions=4/4 size=460B
 |     predicates: t2.id < 10
 |
-06:EXCHANGE [HASH(int_col)]
-|
-00:SCAN HDFS [functional.alltypestiny t1]
-   partitions=4/4 size=460B
+00:SCAN HDFS [functional.alltypessmall t1]
+   partitions=4/4 size=6.32KB
 ====
 # test conjunct assignment and slot materialization due to conjuncts
 # (see IMPALA-1243)

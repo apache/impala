@@ -303,12 +303,18 @@ public class TableRef implements ParseNode {
       lhsIsNullable = true;
     }
 
-    // register the tuple id of the rhs of a left semi join or anti join
+    // register the tuple id of the rhs of a left semi join
     TupleId semiJoinedTupleId = null;
     if (joinOp_ == JoinOperator.LEFT_SEMI_JOIN
         || joinOp_ == JoinOperator.LEFT_ANTI_JOIN) {
       analyzer.registerSemiJoinedTid(getId(), this);
       semiJoinedTupleId = getId();
+    }
+    // register the tuple id of the lhs of a right semi join
+    if (joinOp_ == JoinOperator.RIGHT_SEMI_JOIN
+        || joinOp_ == JoinOperator.RIGHT_ANTI_JOIN) {
+      analyzer.registerSemiJoinedTid(leftTblRef_.getId(), leftTblRef_);
+      semiJoinedTupleId = leftTblRef_.getId();
     }
 
     if (onClause_ != null) {
@@ -349,6 +355,16 @@ public class TableRef implements ParseNode {
     if (rhsIsNullable && this instanceof InlineViewRef) {
       ((InlineViewRef) this).makeOutputNullable(analyzer);
     }
+  }
+
+  public void invertJoin() {
+    Preconditions.checkState(joinOp_.isCrossJoin() || leftTblRef_.leftTblRef_ == null);
+    leftTblRef_.setJoinOp(getJoinOp().invert());
+    leftTblRef_.setLeftTblRef(this);
+    leftTblRef_.setOnClause(onClause_);
+    joinOp_ = null;
+    leftTblRef_ = null;
+    onClause_ = null;
   }
 
   protected String tableRefToSql() {

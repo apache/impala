@@ -62,4 +62,16 @@ public enum JoinOperator {
   public boolean isAntiJoin() {
     return this == JoinOperator.LEFT_ANTI_JOIN || this == JoinOperator.RIGHT_ANTI_JOIN;
   }
+
+  public JoinOperator invert() {
+    switch (this) {
+      case LEFT_OUTER_JOIN: return RIGHT_OUTER_JOIN;
+      case RIGHT_OUTER_JOIN: return LEFT_OUTER_JOIN;
+      case LEFT_SEMI_JOIN: return RIGHT_SEMI_JOIN;
+      case RIGHT_SEMI_JOIN: return LEFT_SEMI_JOIN;
+      case LEFT_ANTI_JOIN: return RIGHT_ANTI_JOIN;
+      case RIGHT_ANTI_JOIN: return LEFT_ANTI_JOIN;
+      default: return this;
+    }
+  }
 }

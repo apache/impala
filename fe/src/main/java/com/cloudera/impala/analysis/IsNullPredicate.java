@@ -131,10 +131,11 @@ public class IsNullPredicate extends Predicate {
     // determine selectivity
     // TODO: increase this to make sure we don't end up favoring broadcast joins
     // due to underestimated cardinalities?
-    selectivity_ = 0.1;
+    selectivity_ = DEFAULT_SELECTIVITY;
     Reference<SlotRef> slotRefRef = new Reference<SlotRef>();
     if (isSingleColumnPredicate(slotRefRef, null)) {
       SlotDescriptor slotDesc = slotRefRef.getRef().getDesc();
+      if (!slotDesc.getStats().hasNulls()) return;
       Table table = slotDesc.getParent().getTable();
       if (table != null && table.getNumRows() > 0) {
         long numRows = table.getNumRows();

@@ -181,23 +181,23 @@ where a.bool_col = false and t.bigint_col < 100
 05:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
-04:HASH JOIN [LEFT OUTER JOIN]
-|  hash predicates: a.int_col = g.int_col
+04:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: g.int_col = a.int_col
 |  other predicates: g.bigint_col < 100
 |
-|--03:HASH JOIN [LEFT SEMI JOIN]
-|  |  hash predicates: id = id
-|  |
-|  |--02:SCAN HDFS [functional.alltypestiny]
-|  |     partitions=4/4 size=460B compact
-|  |
-|  01:SCAN HDFS [functional.alltypesagg g]
-|     partitions=11/11 size=814.73KB compact
-|     predicates: g.bigint_col < 100
+|--00:SCAN HDFS [functional.alltypes a]
+|     partitions=24/24 size=478.45KB compact
+|     predicates: a.bool_col = FALSE
 |
-00:SCAN HDFS [functional.alltypes a]
-   partitions=24/24 size=478.45KB
-   predicates: a.bool_col = FALSE
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: id = id
+|
+|--02:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=460B compact
+|
+01:SCAN HDFS [functional.alltypesagg g]
+   partitions=11/11 size=814.73KB
+   predicates: g.bigint_col < 100
 ====
 # Multiple tables in the FROM clause of the subquery
 select count(distinct id)
@@ -213,27 +213,27 @@ where a.int_col in
 07:AGGREGATE
 |  group by: id
 |
-06:HASH JOIN [LEFT SEMI JOIN]
-|  hash predicates: a.int_col = t.int_col
+06:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: t.int_col = a.int_col
 |
-|--05:HASH JOIN [INNER JOIN]
-|  |  hash predicates: s.bigint_col = n.bigint_col
-|  |
-|  |--03:SCAN HDFS [functional.alltypestiny n]
-|  |     partitions=4/4 size=460B compact
-|  |     predicates: n.bool_col = FALSE
-|  |
-|  04:HASH JOIN [INNER JOIN]
-|  |  hash predicates: t.id = s.id
-|  |
-|  |--02:SCAN HDFS [functional.alltypessmall s]
-|  |     partitions=4/4 size=6.32KB compact
-|  |
-|  01:SCAN HDFS [functional.alltypes t]
-|     partitions=24/24 size=478.45KB compact
+|--00:SCAN HDFS [functional.alltypesagg a]
+|     partitions=11/11 size=814.73KB compact
 |
-00:SCAN HDFS [functional.alltypesagg a]
-   partitions=11/11 size=814.73KB
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: s.bigint_col = n.bigint_col
+|
+|--03:SCAN HDFS [functional.alltypestiny n]
+|     partitions=4/4 size=460B compact
+|     predicates: n.bool_col = FALSE
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t.id = s.id
+|
+|--02:SCAN HDFS [functional.alltypessmall s]
+|     partitions=4/4 size=6.32KB compact
+|
+01:SCAN HDFS [functional.alltypes t]
+   partitions=24/24 size=478.45KB
 ====
 # Subqueries with inline views
 select *
@@ -453,14 +453,14 @@ where exists
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
-02:HASH JOIN [LEFT SEMI JOIN]
-|  hash predicates: t.id = a.id
+02:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: a.id = t.id
 |
-|--01:SCAN HDFS [functional.alltypesagg a]
-|     partitions=11/11 size=814.73KB compact
+|--00:SCAN HDFS [functional.alltypes t]
+|     partitions=24/24 size=478.45KB compact
 |
-00:SCAN HDFS [functional.alltypes t]
-   partitions=24/24 size=478.45KB
+01:SCAN HDFS [functional.alltypesagg a]
+   partitions=11/11 size=814.73KB
 ====
 # Correlated NOT EXISTS
 select count(*)
@@ -471,14 +471,14 @@ where not exists
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
-02:HASH JOIN [LEFT ANTI JOIN]
-|  hash predicates: t.int_col = a.int_col
+02:HASH JOIN [RIGHT ANTI JOIN]
+|  hash predicates: a.int_col = t.int_col
 |
-|--01:SCAN HDFS [functional.alltypesagg a]
-|     partitions=11/11 size=814.73KB compact
+|--00:SCAN HDFS [functional.alltypes t]
+|     partitions=24/24 size=478.45KB compact
 |
-00:SCAN HDFS [functional.alltypes t]
-   partitions=24/24 size=478.45KB
+01:SCAN HDFS [functional.alltypesagg a]
+   partitions=11/11 size=814.73KB
 ====
 # Uncorrelated EXISTS
 select *
@@ -521,15 +521,15 @@ where exists
 04:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: a.id = t.id
 |
-|--03:HASH JOIN [LEFT SEMI JOIN]
-|  |  hash predicates: t.int_col = g.int_col
+|--03:HASH JOIN [RIGHT SEMI JOIN]
+|  |  hash predicates: g.int_col = t.int_col
 |  |
-|  |--02:SCAN HDFS [functional.alltypesagg g]
-|  |     partitions=11/11 size=814.73KB compact
-|  |     predicates: g.bool_col = FALSE
+|  |--01:SCAN HDFS [functional.alltypestiny t]
+|  |     partitions=4/4 size=460B compact
 |  |
-|  01:SCAN HDFS [functional.alltypestiny t]
-|     partitions=4/4 size=460B compact
+|  02:SCAN HDFS [functional.alltypesagg g]
+|     partitions=11/11 size=814.73KB compact
+|     predicates: g.bool_col = FALSE
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 size=478.45KB
@@ -553,12 +553,12 @@ and g.tinyint_col <
 group by g.int_col
 having count(*) < 100
 ---- PLAN
-10:AGGREGATE [FINALIZE]
+11:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: g.int_col
 |  having: count(*) < 100
 |
-09:HASH JOIN [LEFT OUTER JOIN]
+10:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: g.id = t.id
 |  other predicates: g.tinyint_col < zeroifnull(count(*))
 |
@@ -570,29 +570,29 @@ having count(*) < 100
 |     partitions=24/24 size=478.45KB
 |     predicates: t.bool_col = TRUE
 |
-08:HASH JOIN [LEFT SEMI JOIN]
+09:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: g.bigint_col = bigint_col, g.id = s.id
 |
 |--03:SCAN HDFS [functional.alltypessmall s]
 |     partitions=4/4 size=6.32KB compact
 |     predicates: s.int_col > 10
 |
-07:HASH JOIN [LEFT SEMI JOIN]
+08:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: g.id = t.id
 |
 |--02:SCAN HDFS [functional.alltypestiny t]
 |     partitions=4/4 size=460B compact
 |     predicates: t.bool_col = FALSE
 |
-06:HASH JOIN [LEFT OUTER JOIN]
-|  hash predicates: g.id = a.id
+07:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: a.id = g.id
 |
-|--01:SCAN HDFS [functional.alltypes a]
-|     partitions=24/24 size=478.45KB compact
+|--00:SCAN HDFS [functional.alltypesagg g]
+|     partitions=11/11 size=814.73KB compact
+|     predicates: g.int_col < 100
 |
-00:SCAN HDFS [functional.alltypesagg g]
-   partitions=11/11 size=814.73KB
-   predicates: g.int_col < 100
+01:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 size=478.45KB compact
 ====
 # Subqueries with aggregation
 select *
@@ -930,21 +930,21 @@ group by int_col
 |  output: count(*)
 |  group by: int_col
 |
-03:HASH JOIN [LEFT OUTER JOIN]
-|  hash predicates: t.id = g.id
+03:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: g.id = t.id
 |  other predicates: zeroifnull(count(*)) IS NULL
 |
-|--02:AGGREGATE [FINALIZE]
-|  |  output: count(*)
-|  |  group by: g.id
-|  |  having: zeroifnull(count(*)) IS NULL
-|  |
-|  01:SCAN HDFS [functional.alltypesagg g]
-|     partitions=11/11 size=814.73KB
+|--00:SCAN HDFS [functional.alltypestiny t]
+|     partitions=4/4 size=460B compact
+|     predicates: bool_col = FALSE
 |
-00:SCAN HDFS [functional.alltypestiny t]
-   partitions=4/4 size=460B
-   predicates: bool_col = FALSE
+02:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: g.id
+|  having: zeroifnull(count(*)) IS NULL
+|
+01:SCAN HDFS [functional.alltypesagg g]
+   partitions=11/11 size=814.73KB
 ====
 # Correlated aggregate subquery in an IS NULL predicate
 select *
@@ -955,21 +955,21 @@ where
    where g.id = t.id and g.int_col is null) is null
 and t.bool_col = false
 ---- PLAN
-03:HASH JOIN [LEFT SEMI JOIN]
-|  hash predicates: t.id = g.id
+03:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: g.id = t.id
 |
-|--02:AGGREGATE [FINALIZE]
-|  |  output: max(int_col)
-|  |  group by: g.id
-|  |  having: max(int_col) IS NULL
-|  |
-|  01:SCAN HDFS [functional.alltypesagg g]
-|     partitions=11/11 size=814.73KB
-|     predicates: g.int_col IS NULL
+|--00:SCAN HDFS [functional.alltypestiny t]
+|     partitions=4/4 size=460B compact
+|     predicates: t.bool_col = FALSE
 |
-00:SCAN HDFS [functional.alltypestiny t]
-   partitions=4/4 size=460B
-   predicates: t.bool_col = FALSE
+02:AGGREGATE [FINALIZE]
+|  output: max(int_col)
+|  group by: g.id
+|  having: max(int_col) IS NULL
+|
+01:SCAN HDFS [functional.alltypesagg g]
+   partitions=11/11 size=814.73KB
+   predicates: g.int_col IS NULL
 ====
 # Complex expr with a scalar subquery
 select *
@@ -1079,18 +1079,18 @@ where
    from functional.alltypestiny tt1
    where t1.id = tt1.month) < t1.id
 ---- PLAN
-03:HASH JOIN [LEFT OUTER JOIN]
-|  hash predicates: t1.id = tt1.month
+03:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: tt1.month = t1.id
 |  other predicates: zeroifnull(count(tt1.smallint_col)) < t1.id
 |
-|--02:AGGREGATE [FINALIZE]
-|  |  output: count(tt1.smallint_col)
-|  |  group by: tt1.month
-|  |
-|  01:SCAN HDFS [functional.alltypestiny tt1]
-|     partitions=4/4 size=460B
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     partitions=4/4 size=460B compact
 |
-00:SCAN HDFS [functional.alltypestiny t1]
+02:AGGREGATE [FINALIZE]
+|  output: count(tt1.smallint_col)
+|  group by: tt1.month
+|
+01:SCAN HDFS [functional.alltypestiny tt1]
    partitions=4/4 size=460B
 ====
 # Correlated aggregate subquery with count in a function participating in
@@ -1106,19 +1106,19 @@ group by int_col
 |  output: count(*)
 |  group by: int_col
 |
-03:HASH JOIN [LEFT OUTER JOIN]
-|  hash predicates: t.id = s.id
+03:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: s.id = t.id
 |  other predicates: 1 + log(abs(zeroifnull(count(int_col))), 2) < 10
 |
-|--02:AGGREGATE [FINALIZE]
-|  |  output: count(int_col)
-|  |  group by: s.id
-|  |
-|  01:SCAN HDFS [functional.alltypes s]
-|     partitions=24/24 size=478.45KB
+|--00:SCAN HDFS [functional.alltypestiny t]
+|     partitions=4/4 size=460B compact
 |
-00:SCAN HDFS [functional.alltypestiny t]
-   partitions=4/4 size=460B
+02:AGGREGATE [FINALIZE]
+|  output: count(int_col)
+|  group by: s.id
+|
+01:SCAN HDFS [functional.alltypes s]
+   partitions=24/24 size=478.45KB
 ====
 # Correlated scalar subquery with an ggregate function that returns a
 # non-numeric type on empty input
@@ -1133,18 +1133,17 @@ group by int_col
 |  output: count(*)
 |  group by: int_col
 |
-03:HASH JOIN [LEFT OUTER JOIN]
-|  hash predicates: t.id = s.id
-|  other predicates: ifnull(sample(int_col), '') = t.string_col
+03:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: s.id = t.id, ifnull(sample(int_col), '') = t.string_col
 |
-|--02:AGGREGATE [FINALIZE]
-|  |  output: sample(int_col)
-|  |  group by: s.id
-|  |
-|  01:SCAN HDFS [functional.alltypes s]
-|     partitions=24/24 size=478.45KB
+|--00:SCAN HDFS [functional.alltypestiny t]
+|     partitions=4/4 size=460B compact
+|     predicates: bool_col = FALSE
 |
-00:SCAN HDFS [functional.alltypestiny t]
-   partitions=4/4 size=460B
-   predicates: bool_col = FALSE
+02:AGGREGATE [FINALIZE]
+|  output: sample(int_col)
+|  group by: s.id
+|
+01:SCAN HDFS [functional.alltypes s]
+   partitions=24/24 size=478.45KB
 ====

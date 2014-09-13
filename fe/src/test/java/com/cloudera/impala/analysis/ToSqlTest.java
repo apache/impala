@@ -32,14 +32,32 @@ public class ToSqlTest extends AnalyzerTest {
   private static final String[] joinConditions_ =
       new String[] {"USING (id)", "ON (a.id = b.id)"};
 
+  // All left semi join types.
+  private static final String[] leftSemiJoinTypes_ =
+      new String[] {"LEFT SEMI JOIN", "LEFT ANTI JOIN"};
+
+  // All right semi join types.
+  private static final String[] rightSemiJoinTypes_ =
+      new String[] {"RIGHT SEMI JOIN", "RIGHT ANTI JOIN"};
+
   // All join types that take an ON or USING clause, i.e., all joins except CROSS JOIN.
   private static final String[] joinTypes_;
+
+  // Same as joinTypes_, but excluding semi joins.
+  private static final String[] nonSemiJoinTypes_;
+
   static {
     joinTypes_ = new String[JoinOperator.values().length - 1];
+    int numNonSemiJoinTypes = JoinOperator.values().length - 1 -
+        leftSemiJoinTypes_.length - rightSemiJoinTypes_.length;
+    nonSemiJoinTypes_ = new String[numNonSemiJoinTypes];
     int i = 0;
+    int j = 0;
     for (JoinOperator op: JoinOperator.values()) {
       if (op.isCrossJoin()) continue;
       joinTypes_[i++] = op.toString();
+      if (op.isSemiJoin()) continue;
+      nonSemiJoinTypes_[j++] = op.toString();
     }
   }
 
@@ -466,7 +484,15 @@ public class ToSqlTest extends AnalyzerTest {
     runTestTemplate("select t.* from (select a.* from functional.alltypes a %s " +
         "functional.alltypes b %s) t",
         "SELECT t.* FROM (SELECT a.* FROM functional.alltypes a %s " +
-        "functional.alltypes b %s) t", joinTypes_, joinConditions_);
+        "functional.alltypes b %s) t", nonSemiJoinTypes_, joinConditions_);
+    runTestTemplate("select t.* from (select a.* from functional.alltypes a %s " +
+        "functional.alltypes b %s) t",
+        "SELECT t.* FROM (SELECT a.* FROM functional.alltypes a %s " +
+        "functional.alltypes b %s) t", leftSemiJoinTypes_, joinConditions_);
+    runTestTemplate("select t.* from (select b.* from functional.alltypes a %s " +
+        "functional.alltypes b %s) t",
+        "SELECT t.* FROM (SELECT b.* FROM functional.alltypes a %s " +
+        "functional.alltypes b %s) t", rightSemiJoinTypes_, joinConditions_);
 
     // Test undoing expr substitution in select-list exprs and on clause.
     testToSql("select t1.int_col, t2.int_col from " +
@@ -618,7 +644,17 @@ public class ToSqlTest extends AnalyzerTest {
     runTestTemplate("with t as (select a.* from functional.alltypes a %s " +
         "functional.alltypes b %s) select * from t",
         "WITH t AS (SELECT a.* FROM functional.alltypes a %s " +
-        "functional.alltypes b %s) SELECT * FROM t", joinTypes_, joinConditions_);
+        "functional.alltypes b %s) SELECT * FROM t", nonSemiJoinTypes_, joinConditions_);
+    runTestTemplate("with t as (select a.* from functional.alltypes a %s " +
+        "functional.alltypes b %s) select * from t",
+        "WITH t AS (SELECT a.* FROM functional.alltypes a %s " +
+        "functional.alltypes b %s) SELECT * FROM t",
+        leftSemiJoinTypes_, joinConditions_);
+    runTestTemplate("with t as (select b.* from functional.alltypes a %s " +
+        "functional.alltypes b %s) select * from t",
+        "WITH t AS (SELECT b.* FROM functional.alltypes a %s " +
+        "functional.alltypes b %s) SELECT * FROM t",
+        rightSemiJoinTypes_, joinConditions_);
     // WITH clause in complex query with joins and and order by + limit.
     testToSql("with t as (select int_col x, bigint_col y from functional.alltypestiny " +
         "order by id nulls first limit 2) " +

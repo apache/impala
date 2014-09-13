@@ -589,31 +589,31 @@ from (
      on (j.test_name = d.name)
 where j.test_id <= 1006
 ---- PLAN
-02:HASH JOIN [LEFT OUTER JOIN]
-|  hash predicates: a.test_name = b.name
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: b.name = a.test_name
 |
-|--01:SCAN HDFS [functional.dimtbl b]
-|     partitions=1/1 size=171B compact
+|--00:SCAN HDFS [functional.jointbl a]
+|     partitions=1/1 size=433B compact
+|     predicates: a.test_id <= 1006
 |
-00:SCAN HDFS [functional.jointbl a]
-   partitions=1/1 size=433B
-   predicates: a.test_id <= 1006
+01:SCAN HDFS [functional.dimtbl b]
+   partitions=1/1 size=171B
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
-02:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
-|  hash predicates: a.test_name = b.name
+02:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
+|  hash predicates: b.name = a.test_name
 |
-|--04:EXCHANGE [HASH(b.name)]
+|--04:EXCHANGE [HASH(a.test_name)]
 |  |
-|  01:SCAN HDFS [functional.dimtbl b]
-|     partitions=1/1 size=171B
+|  00:SCAN HDFS [functional.jointbl a]
+|     partitions=1/1 size=433B
+|     predicates: a.test_id <= 1006
 |
-03:EXCHANGE [HASH(a.test_name)]
+03:EXCHANGE [HASH(b.name)]
 |
-00:SCAN HDFS [functional.jointbl a]
-   partitions=1/1 size=433B
-   predicates: a.test_id <= 1006
+01:SCAN HDFS [functional.dimtbl b]
+   partitions=1/1 size=171B
 ====
 # complex join, having joined subquery on the rhs, and predicate
 # at multiple subquery level
@@ -638,20 +638,20 @@ group by x.smallint_col
 |  output: count(b.id)
 |  group by: a.smallint_col
 |
-04:HASH JOIN [LEFT OUTER JOIN]
-|  hash predicates: c.id = a.tinyint_col
+04:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: a.tinyint_col = c.id
 |
-|--03:HASH JOIN [INNER JOIN]
-|  |  hash predicates: a.smallint_col = b.id
-|  |
-|  |--02:SCAN HDFS [functional.alltypessmall b]
-|  |     partitions=4/4 size=6.32KB compact
-|  |
-|  01:SCAN HDFS [functional.alltypesagg a]
-|     partitions=11/11 size=814.73KB compact
+|--00:SCAN HDFS [functional.alltypessmall c]
+|     partitions=4/4 size=6.32KB compact
 |
-00:SCAN HDFS [functional.alltypessmall c]
-   partitions=4/4 size=6.32KB
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: a.smallint_col = b.id
+|
+|--02:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 size=6.32KB compact
+|
+01:SCAN HDFS [functional.alltypesagg a]
+   partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 11:EXCHANGE [UNPARTITIONED]
 |
@@ -665,26 +665,26 @@ group by x.smallint_col
 |  output: count(b.id)
 |  group by: a.smallint_col
 |
-04:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
-|  hash predicates: c.id = a.tinyint_col
+04:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
+|  hash predicates: a.tinyint_col = c.id
 |
-|--08:EXCHANGE [HASH(a.tinyint_col)]
+|--08:EXCHANGE [HASH(c.id)]
 |  |
-|  03:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: a.smallint_col = b.id
-|  |
-|  |--06:EXCHANGE [BROADCAST]
-|  |  |
-|  |  02:SCAN HDFS [functional.alltypessmall b]
-|  |     partitions=4/4 size=6.32KB
-|  |
-|  01:SCAN HDFS [functional.alltypesagg a]
-|     partitions=11/11 size=814.73KB
+|  00:SCAN HDFS [functional.alltypessmall c]
+|     partitions=4/4 size=6.32KB
 |
-07:EXCHANGE [HASH(c.id)]
+07:EXCHANGE [HASH(a.tinyint_col)]
 |
-00:SCAN HDFS [functional.alltypessmall c]
-   partitions=4/4 size=6.32KB
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.smallint_col = b.id
+|
+|--06:EXCHANGE [BROADCAST]
+|  |
+|  02:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 size=6.32KB
+|
+01:SCAN HDFS [functional.alltypesagg a]
+   partitions=11/11 size=814.73KB
 ====
 # complex join, having joined subquery on the lhs, and predicate
 # at multiple subquery level

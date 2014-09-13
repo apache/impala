@@ -127,7 +127,7 @@ bigint, string, int
 ---- QUERY
 # Testing right semi joins
 select b.* FROM functional.imp1160a a
-right semi join [shuffle] functional.imp1160b b on a.b = b.b
+right semi join functional.imp1160b b on a.b = b.b
 ---- RESULTS
 1,1,10
 1,1,1
@@ -138,7 +138,7 @@ INT, INT, INT
 ---- QUERY
 # Testing right anti joins
 select b.* FROM functional.imp1160a a
-right anti join [shuffle] functional.imp1160b b on a.b = b.b
+right anti join functional.imp1160b b on a.b = b.b
 ---- RESULTS
 2,10,NULL
 1,NULL,10

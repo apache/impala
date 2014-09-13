@@ -500,18 +500,20 @@ public class Planner {
     // we do a broadcast join if
     // - we're explicitly told to do so
     // - or if it's cheaper and we weren't explicitly told to do a partitioned join
-    // - and we're not doing a full or right outer join (those require the left-hand
-    //   side to be partitioned for correctness)
+    // - and we're not doing a full outer or right outer/semi join (those require the
+    //   left-hand side to be partitioned for correctness)
     // - and the expected size of the hash tbl doesn't exceed perNodeMemLimit
     // we do a "<=" comparison of the costs so that we default to broadcast joins if
     // we're unable to estimate the cost
     if (node.getJoinOp() != JoinOperator.RIGHT_OUTER_JOIN
         && node.getJoinOp() != JoinOperator.FULL_OUTER_JOIN
+        && node.getJoinOp() != JoinOperator.RIGHT_SEMI_JOIN
+        && node.getJoinOp() != JoinOperator.RIGHT_ANTI_JOIN
         && (perNodeMemLimit == 0
             || Math.round((double) rhsDataSize * HASH_TBL_SPACE_OVERHEAD)
                 <= perNodeMemLimit)
-        && (node.getInnerRef().isBroadcastJoin()
-            || (!node.getInnerRef().isPartitionedJoin()
+        && (node.getTableRef().isBroadcastJoin()
+            || (!node.getTableRef().isPartitionedJoin()
                 && broadcastCost <= partitionCost))) {
       doBroadcast = true;
     } else {
@@ -1060,19 +1062,23 @@ public class Planner {
   }
 
   /**
-   * Return the cheapest plan that materializes the joins of all TblRefs in
-   * refPlans; for this plan:
+   * Return the cheapest plan that materializes the joins of all TblRefs in refPlans.
+   * Assumes that refPlans are in the order as they originally appeared in the query.
+   * For this plan:
    * - the plan is executable, ie, all non-cross joins have equi-join predicates
    * - the leftmost scan is over the largest of the inputs for which we can still
    *   construct an executable plan
    * - all rhs's are in decreasing order of selectiveness (percentage of rows they
    *   eliminate)
+   * - outer/cross/semi joins: rhs serialized size is < lhs serialized size;
+   *   enforced via join inversion, if necessary
    * Returns null if we can't create an executable plan.
    */
   private PlanNode createCheapestJoinPlan(
       Analyzer analyzer, List<Pair<TableRef, PlanNode>> refPlans)
       throws ImpalaException {
     LOG.trace("createCheapestJoinPlan");
+    if (refPlans.size() == 1) return refPlans.get(0).second;
 
     // collect eligible candidates for the leftmost input; list contains
     // (plan, materialized size)
@@ -1080,10 +1086,14 @@ public class Planner {
     for (Pair<TableRef, PlanNode> entry: refPlans) {
       TableRef ref = entry.first;
       JoinOperator joinOp = ref.getJoinOp();
-      if (joinOp.isOuterJoin() || joinOp.isSemiJoin() || joinOp.isCrossJoin()) {
-        // this cannot appear as the leftmost input
-        // TODO: make this less restrictive by considering plans with inverted Outer
-        // Join directions
+
+      // The rhs table of an outer/semi join can appear as the left-most input if we
+      // invert the lhs/rhs and the join op. However, we may only consider this inversion
+      // for the very first join in refPlans, otherwise we could reorder tables/joins
+      // across outer/semi joins which is generally incorrect.
+      if ((joinOp.isOuterJoin() || joinOp.isSemiJoin()) &&
+          ref != refPlans.get(1).first) {
+        // ref cannot appear as the leftmost input
         continue;
       }
 
@@ -1099,7 +1109,7 @@ public class Planner {
       long materializedSize =
           (long) Math.ceil(plan.getAvgRowSize() * (double) plan.getCardinality());
       candidates.add(new Pair(ref, new Long(materializedSize)));
-      LOG.trace("candidate " + ref.getAlias() + Long.toString(materializedSize));
+      LOG.trace("candidate " + ref.getAlias() + ": " + Long.toString(materializedSize));
     }
     if (candidates.isEmpty()) return null;
 
@@ -1122,10 +1132,12 @@ public class Planner {
   /**
    * Returns a plan with leftmostRef's plan as its leftmost input; the joins
    * are in decreasing order of selectiveness (percentage of rows they eliminate).
+   * The leftmostRef's join will be inverted if it is an outer/semi/cross join.
    */
   private PlanNode createJoinPlan(
       Analyzer analyzer, TableRef leftmostRef, List<Pair<TableRef, PlanNode>> refPlans)
       throws ImpalaException {
+
     LOG.trace("createJoinPlan: " + leftmostRef.getAlias());
     // the refs that have yet to be joined
     List<Pair<TableRef, PlanNode>> remainingRefs = Lists.newArrayList();
@@ -1143,6 +1155,13 @@ public class Planner {
     Set<TableRef> joinedRefs = Sets.newHashSet();
     joinedRefs.add(leftmostRef);
 
+    // If the leftmostTblRef is an outer/semi/cross join, we must invert it.
+    if (leftmostRef.getJoinOp().isOuterJoin()
+        || leftmostRef.getJoinOp().isSemiJoin()
+        || leftmostRef.getJoinOp().isCrossJoin()) {
+      leftmostRef.invertJoin();
+    }
+
     long numOps = 0;
     int i = 0;
     while (!remainingRefs.isEmpty()) {
@@ -1155,28 +1174,23 @@ public class Planner {
         LOG.trace(Integer.toString(i) + " considering ref " + ref.getAlias());
 
         // Determine whether we can or must consider this join at this point in the plan.
-        // Place outer/semi/anti joins at a fixed position in the plan tree (IMPALA-860),
-        // s.t. all the tables appearing to the left/right of an outer/semi/anti join in
+        // Place outer/semi joins at a fixed position in the plan tree (IMPALA-860),
+        // s.t. all the tables appearing to the left/right of an outer/semi join in
         // the original query still remain to the left/right after join ordering. This
-        // prevents join ordering across outer/semi/anti joins which is generally
-        // incorrect. The checks below relies on remainingRefs being in the order as they
-        // originally appeared in the query.
-        boolean fixedJoinPos = false;
+        // prevents join re-ordering across outer/semi joins which is generally wrong.
+        // The checks below relies on remainingRefs being in the order as they originally
+        // appeared in the query.
         JoinOperator joinOp = ref.getJoinOp();
-        if (joinOp.isOuterJoin() || joinOp.isSemiJoin() || joinOp.isAntiJoin()) {
+        if (joinOp.isOuterJoin() || joinOp.isSemiJoin()) {
           List<TupleId> currentTids = Lists.newArrayList(root.getTblRefIds());
           currentTids.add(ref.getId());
-          // TODO: make this less restrictive by considering plans with inverted Outer
-          // Join directions
-          // Place outer/semi/anti joins at a fixed position in the plan tree. We know
-          // that the join resulting from 'ref' must become the new root if the current
+          // Place outer/semi joins at a fixed position in the plan tree. We know that
+          // the join resulting from 'ref' must become the new root if the current
           // root materializes exactly those tuple ids corresponding to TableRefs
           // appearing to the left of 'ref' in the original query.
           List<TupleId> tableRefTupleIds = ref.getAllTupleIds();
-          if (currentTids.containsAll(tableRefTupleIds) &&
-              tableRefTupleIds.containsAll(currentTids)) {
-            fixedJoinPos = true;
-          } else {
+          if (!currentTids.containsAll(tableRefTupleIds) ||
+              !tableRefTupleIds.containsAll(currentTids)) {
             // Do not consider the remaining table refs to prevent incorrect re-ordering
             // of tables across outer/semi/anti joins.
             break;
@@ -1187,16 +1201,30 @@ public class Planner {
 
         PlanNode rhsPlan = entry.second;
         analyzer.setAssignedConjuncts(root.getAssignedConjuncts());
-        PlanNode candidate = createJoinNode(analyzer, root, rhsPlan, ref, false);
+        PlanNode candidate = createJoinNode(analyzer, root, rhsPlan, null, ref, false);
         if (candidate == null) continue;
         LOG.trace("cardinality=" + Long.toString(candidate.getCardinality()));
 
-        // Use 'candidate' as the new root; don't consider any other table refs at this
-        // position in the plan.
-        if (fixedJoinPos) {
-          newRoot = candidate;
-          minEntry = entry;
-          break;
+        if (joinOp.isOuterJoin() || joinOp.isSemiJoin() || joinOp.isCrossJoin()) {
+          // Invert the join if doing so reduces the size of build-side hash table
+          // (may also reduce network costs depending on the join strategy).
+          // Only consider this optimization if both the lhs/rhs cardinalities are known.
+          long lhsCard = root.getCardinality();
+          long rhsCard = rhsPlan.getCardinality();
+          if (lhsCard != -1 && rhsCard != -1 &&
+              lhsCard * root.getAvgRowSize() < rhsCard * rhsPlan.getAvgRowSize()) {
+            ref.setJoinOp(ref.getJoinOp().invert());
+            candidate = createJoinNode(analyzer, rhsPlan, root, ref, null, false);
+            Preconditions.checkNotNull(candidate);
+          }
+
+          // Use 'candidate' as the new root; don't consider any other table refs at this
+          // position in the plan.
+          if (joinOp.isOuterJoin() || joinOp.isSemiJoin()) {
+            newRoot = candidate;
+            minEntry = entry;
+            break;
+          }
         }
 
         if (newRoot == null || candidate.getCardinality() < newRoot.getCardinality()) {
@@ -1242,7 +1270,7 @@ public class Planner {
     for (int i = 1; i < refPlans.size(); ++i) {
       TableRef innerRef = refPlans.get(i).first;
       PlanNode innerPlan = refPlans.get(i).second;
-      root = createJoinNode(analyzer, root, innerPlan, innerRef, true);
+      root = createJoinNode(analyzer, root, innerPlan, null, innerRef, true);
       root.setId(nodeIdGenerator_.getNextId());
       // build side copies data to a compact representation in the tuple buffer.
       root.getChildren().get(1).setCompactData(true);
@@ -1600,33 +1628,33 @@ public class Planner {
   }
 
   /**
-   * Return join conjuncts_ that can be used for hash table lookups.
+   * Return conjuncts for join between a plan tree and a single TableRef; the conjuncts
+   * can be used for hash table lookups.
    * - for inner joins, those are equi-join predicates in which one side is fully bound
-   *   by lhsIds and the other by rhs' id_;
+   *   by planIds and the other by joinedTblRef.id_;
    * - for outer joins: same type of conjuncts_ as inner joins, but only from the JOIN
    *   clause
    * Returns the conjuncts_ in 'joinConjuncts' (in which "<lhs> = <rhs>" is returned
    * as Pair(<lhs>, <rhs>)) and also in their original form in 'joinPredicates'.
+   * Each lhs is bound by planIds, and each rhs by the tuple id of joinedTblRef.
    * If no conjuncts_ are found, constructs them based on equivalence classes, where
    * possible. In that case, they are still returned through joinConjuncts, but
    * joinPredicates would be empty.
    */
   private void getHashLookupJoinConjuncts(
-      Analyzer analyzer,
-      List<TupleId> lhsIds, TableRef rhs,
-      List<Pair<Expr, Expr>> joinConjuncts,
-      List<Expr> joinPredicates) {
+      Analyzer analyzer, List<TupleId> planIds, TableRef joinedTblRef,
+      List<Pair<Expr, Expr>> joinConjuncts, List<Expr> joinPredicates) {
     joinConjuncts.clear();
     joinPredicates.clear();
-    TupleId rhsId = rhs.getId();
-    List<TupleId> rhsIds = Lists.newArrayList(rhsId);
+    TupleId tblRefId = joinedTblRef.getId();
+    List<TupleId> tblRefIds = tblRefId.asList();
     List<Expr> candidates;
-    if (rhs.getJoinOp().isOuterJoin()) {
+    if (joinedTblRef.getJoinOp().isOuterJoin()) {
       // TODO: create test for this
-      Preconditions.checkState(rhs.getOnClause() != null);
-      candidates = analyzer.getEqJoinConjuncts(rhsId, rhs);
+      Preconditions.checkState(joinedTblRef.getOnClause() != null);
+      candidates = analyzer.getEqJoinConjuncts(tblRefId, joinedTblRef);
     } else {
-      candidates = analyzer.getEqJoinConjuncts(rhsId, null);
+      candidates = analyzer.getEqJoinConjuncts(tblRefId, null);
     }
     if (candidates == null) return;
 
@@ -1638,17 +1666,17 @@ public class Planner {
       if (e.getChild(0).isConstant() || e.getChild(1).isConstant()) continue;
 
       Expr rhsExpr = null;
-      if (e.getChild(0).isBoundByTupleIds(rhsIds)) {
+      if (e.getChild(0).isBoundByTupleIds(tblRefIds)) {
         rhsExpr = e.getChild(0);
       } else {
-        Preconditions.checkState(e.getChild(1).isBoundByTupleIds(rhsIds));
+        Preconditions.checkState(e.getChild(1).isBoundByTupleIds(tblRefIds));
         rhsExpr = e.getChild(1);
       }
 
       Expr lhsExpr = null;
-      if (e.getChild(1).isBoundByTupleIds(lhsIds)) {
+      if (e.getChild(1).isBoundByTupleIds(planIds)) {
         lhsExpr = e.getChild(1);
-      } else if (e.getChild(0).isBoundByTupleIds(lhsIds)) {
+      } else if (e.getChild(0).isBoundByTupleIds(planIds)) {
         lhsExpr = e.getChild(0);
       } else {
         // not an equi-join condition between lhsIds and rhsId
@@ -1681,16 +1709,15 @@ public class Planner {
       // e is a non-redundant join predicate
       Preconditions.checkState(lhsExpr != rhsExpr);
       joinPredicates.add(e);
-      Pair<Expr, Expr> entry = Pair.create(lhsExpr, rhsExpr);
-      joinConjuncts.add(entry);
+      joinConjuncts.add(Pair.create(lhsExpr, rhsExpr));
     }
     if (!joinPredicates.isEmpty()) return;
     Preconditions.checkState(joinConjuncts.isEmpty());
 
     // construct joinConjunct entries derived from equivalence class membership
     List<SlotId> lhsSlotIds = Lists.newArrayList();
-    for (SlotDescriptor slotDesc: rhs.getDesc().getSlots()) {
-      analyzer.getEquivSlots(slotDesc.getId(), lhsIds, lhsSlotIds);
+    for (SlotDescriptor slotDesc: joinedTblRef.getDesc().getSlots()) {
+      analyzer.getEquivSlots(slotDesc.getId(), planIds, lhsSlotIds);
       if (!lhsSlotIds.isEmpty()) {
         // construct a BinaryPredicates in order to get correct casting;
         // we only do this for one of the equivalent slots, all the other implied
@@ -1702,14 +1729,18 @@ public class Planner {
   }
 
   /**
-   * Create a node to join outer with inner.
+   * Create a node to join outer with inner. Either the outer or the inner may be a plan
+   * created from a table ref (but not both), and the corresponding outer/innerRef
+   * should be non-null.
    */
   private PlanNode createJoinNode(
-      Analyzer analyzer, PlanNode outer, PlanNode inner, TableRef innerRef,
-      boolean throwOnError) throws ImpalaException {
-    if (innerRef.getJoinOp() == JoinOperator.CROSS_JOIN) {
+      Analyzer analyzer, PlanNode outer, PlanNode inner, TableRef outerRef,
+      TableRef innerRef, boolean throwOnError) throws ImpalaException {
+    Preconditions.checkState(innerRef != null ^ outerRef != null);
+    TableRef tblRef = (innerRef != null) ? innerRef : outerRef;
+    if (tblRef.getJoinOp() == JoinOperator.CROSS_JOIN) {
       // TODO If there are eq join predicates then we should construct a hash join
-      CrossJoinNode result = new CrossJoinNode(outer, inner, innerRef);
+      CrossJoinNode result = new CrossJoinNode(outer, inner);
       result.init(analyzer);
       result.getChildren().get(1).setCompactData(true);
       return result;
@@ -1719,8 +1750,19 @@ public class Planner {
     List<Expr> eqJoinPredicates = Lists.newArrayList();
     // get eq join predicates for the TableRefs' ids (not the PlanNodes' ids, which
     // are materialized)
-    getHashLookupJoinConjuncts(
-        analyzer, outer.getTblRefIds(), innerRef, eqJoinConjuncts, eqJoinPredicates);
+    if (innerRef != null) {
+      getHashLookupJoinConjuncts(
+          analyzer, outer.getTblRefIds(), innerRef, eqJoinConjuncts, eqJoinPredicates);
+    } else {
+      getHashLookupJoinConjuncts(
+          analyzer, inner.getTblRefIds(), outerRef, eqJoinConjuncts, eqJoinPredicates);
+      // Reverse the lhs/rhs of the join conjuncts.
+      for (Pair<Expr, Expr> eqJoinConjunct: eqJoinConjuncts) {
+        Expr swapTmp = eqJoinConjunct.first;
+        eqJoinConjunct.first = eqJoinConjunct.second;
+        eqJoinConjunct.second = swapTmp;
+      }
+    }
     if (eqJoinConjuncts.isEmpty()) {
       if (!throwOnError) return null;
       throw new NotImplementedException(
@@ -1732,21 +1774,21 @@ public class Planner {
     analyzer.markConjunctsAssigned(eqJoinPredicates);
 
     List<Expr> otherJoinConjuncts = Lists.newArrayList();
-    if (innerRef.getJoinOp().isOuterJoin()) {
+    if (tblRef.getJoinOp().isOuterJoin()) {
       // Also assign conjuncts from On clause. All remaining unassigned conjuncts
       // that can be evaluated by this join are assigned in createSelectPlan().
-      otherJoinConjuncts = analyzer.getUnassignedOjConjuncts(innerRef);
-    } else if (innerRef.getJoinOp().isSemiJoin()) {
+      otherJoinConjuncts = analyzer.getUnassignedOjConjuncts(tblRef);
+    } else if (tblRef.getJoinOp().isSemiJoin()) {
       // Unassigned conjuncts bound by the rhs tuple id of a semi join must have come
       // from the join's On-clause, and therefore, must be added to the other join
       // conjuncts to produce correct results.
       otherJoinConjuncts =
-          analyzer.getUnassignedConjuncts(innerRef.getAllTupleIds(), false);
+          analyzer.getUnassignedConjuncts(tblRef.getAllTupleIds(), false);
     }
     analyzer.markConjunctsAssigned(otherJoinConjuncts);
 
     HashJoinNode result =
-        new HashJoinNode(outer, inner, innerRef, eqJoinConjuncts, otherJoinConjuncts);
+        new HashJoinNode(outer, inner, tblRef, eqJoinConjuncts, otherJoinConjuncts);
     result.init(analyzer);
 
     // build side of join copies data to a compact representation in the tuple buffer

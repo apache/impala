@@ -18,7 +18,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.planner.HashJoinNode.DistributionMode;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -36,11 +35,9 @@ public class CrossJoinNode extends PlanNode {
   // Default per-host memory requirement used if no valid stats are available.
   // TODO: Come up with a more useful heuristic (e.g., based on scanned partitions).
   private final static long DEFAULT_PER_HOST_MEM = 2L * 1024L * 1024L * 1024L;
-  private final TableRef innerRef_;
 
-  public CrossJoinNode(PlanNode outer, PlanNode inner, TableRef innerRef) {
+  public CrossJoinNode(PlanNode outer, PlanNode inner) {
     super("CROSS JOIN");
-    innerRef_ = innerRef;
     tupleIds_.addAll(outer.getTupleIds());
     tupleIds_.addAll(inner.getTupleIds());
     tblRefIds_.addAll(outer.getTblRefIds());
@@ -53,8 +50,6 @@ public class CrossJoinNode extends PlanNode {
     nullableTupleIds_.addAll(outer.getNullableTupleIds());
     nullableTupleIds_.addAll(inner.getNullableTupleIds());
   }
-
-  public TableRef getInnerRef() { return innerRef_; }
 
   @Override
   public void init(Analyzer analyzer) throws InternalException {

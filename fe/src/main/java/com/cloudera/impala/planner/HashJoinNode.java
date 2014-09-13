@@ -44,10 +44,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
- * Hash join between left child and right child.
- * The right child must be a leaf node, ie, can only materialize
- * a single input tuple.
- *
+ * Hash join between left child (outer) and right child (inner). One child must be the
+ * plan generated for a table ref. Typically, that is the right child, but due to join
+ * inversion (for outer/semi/cross joins) it could also be the left child.
  */
 public class HashJoinNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(HashJoinNode.class);
@@ -56,7 +55,9 @@ public class HashJoinNode extends PlanNode {
   // TODO: Come up with a more useful heuristic (e.g., based on scanned partitions).
   private final static long DEFAULT_PER_HOST_MEM = 2L * 1024L * 1024L * 1024L;
 
-  private final TableRef innerRef_;
+  // tableRef corresponding to the left or right child of this join; only used for
+  // getting the plan hints of this join, so it's irrelevant which child exactly
+  private final TableRef tblRef_;
   private final JoinOperator joinOp_;
 
   enum DistributionMode {
@@ -88,7 +89,7 @@ public class HashJoinNode extends PlanNode {
   private boolean addProbeFilters_;
 
   public HashJoinNode(
-      PlanNode outer, PlanNode inner, TableRef innerRef,
+      PlanNode outer, PlanNode inner, TableRef tblRef,
       List<Pair<Expr, Expr> > eqJoinConjuncts, List<Expr> otherJoinConjuncts) {
     super("HASH JOIN");
     Preconditions.checkArgument(eqJoinConjuncts != null);
@@ -97,8 +98,8 @@ public class HashJoinNode extends PlanNode {
     tupleIds_.addAll(inner.getTupleIds());
     tblRefIds_.addAll(outer.getTblRefIds());
     tblRefIds_.addAll(inner.getTblRefIds());
-    innerRef_ = innerRef;
-    joinOp_ = innerRef.getJoinOp();
+    tblRef_ = tblRef;
+    joinOp_ = tblRef.getJoinOp();
     distrMode_ = DistributionMode.NONE;
     eqJoinConjuncts_ = eqJoinConjuncts;
     otherJoinConjuncts_ = otherJoinConjuncts;
@@ -121,7 +122,7 @@ public class HashJoinNode extends PlanNode {
 
   public List<Pair<Expr, Expr>> getEqJoinConjuncts() { return eqJoinConjuncts_; }
   public JoinOperator getJoinOp() { return joinOp_; }
-  public TableRef getInnerRef() { return innerRef_; }
+  public TableRef getTableRef() { return tblRef_; }
   public DistributionMode getDistributionMode() { return distrMode_; }
   public void setDistributionMode(DistributionMode distrMode) { distrMode_ = distrMode; }
   public void setAddProbeFilters(boolean b) { addProbeFilters_ = true; }
@@ -271,11 +272,12 @@ public class HashJoinNode extends PlanNode {
         }
         break;
       }
+      // Cap cardinality at 1 because a value of 0 triggers pathological edge cases.
       case LEFT_ANTI_JOIN: {
         if (leftCard != -1) {
           cardinality_ = leftCard;
           if (rightCard != -1) {
-            cardinality_ = Math.max(0, leftCard - rightCard);
+            cardinality_ = Math.max(1, leftCard - rightCard);
           }
         }
         break;
@@ -284,7 +286,7 @@ public class HashJoinNode extends PlanNode {
         if (rightCard != -1) {
           cardinality_ = rightCard;
           if (leftCard != -1) {
-            cardinality_ = Math.max(0, rightCard - leftCard);
+            cardinality_ = Math.max(1, rightCard - leftCard);
           }
         }
         break;

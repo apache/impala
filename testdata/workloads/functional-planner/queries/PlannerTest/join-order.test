@@ -430,16 +430,16 @@ limit 10
 |  output: count(*)
 |  group by: o_orderpriority
 |
-02:HASH JOIN [LEFT SEMI JOIN]
-|  hash predicates: o_orderkey = l_orderkey
+02:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: l_orderkey = o_orderkey
 |
-|--01:SCAN HDFS [tpch.lineitem]
-|     partitions=1/1 size=718.94MB compact
-|     predicates: l_commitdate < l_receiptdate
+|--00:SCAN HDFS [tpch.orders]
+|     partitions=1/1 size=162.56MB compact
+|     predicates: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
 |
-00:SCAN HDFS [tpch.orders]
-   partitions=1/1 size=162.56MB
-   predicates: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
+01:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 size=718.94MB
+   predicates: l_commitdate < l_receiptdate
 ---- DISTRIBUTEDPLAN
 09:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: o_orderpriority ASC
@@ -458,20 +458,20 @@ limit 10
 |  output: count(*)
 |  group by: o_orderpriority
 |
-02:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
-|  hash predicates: o_orderkey = l_orderkey
+02:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
+|  hash predicates: l_orderkey = o_orderkey
 |
-|--06:EXCHANGE [HASH(l_orderkey)]
+|--06:EXCHANGE [HASH(o_orderkey)]
 |  |
-|  01:SCAN HDFS [tpch.lineitem]
-|     partitions=1/1 size=718.94MB
-|     predicates: l_commitdate < l_receiptdate
+|  00:SCAN HDFS [tpch.orders]
+|     partitions=1/1 size=162.56MB
+|     predicates: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
 |
-05:EXCHANGE [HASH(o_orderkey)]
+05:EXCHANGE [HASH(l_orderkey)]
 |
-00:SCAN HDFS [tpch.orders]
-   partitions=1/1 size=162.56MB
-   predicates: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
+01:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 size=718.94MB
+   predicates: l_commitdate < l_receiptdate
 ====
 # the largest input is prevented from becoming the leftmost input by the full outer join
 select o_orderpriority, count(*) as order_count
@@ -599,14 +599,14 @@ where n_name = 'x'
 |     partitions=1/1 size=2.15KB compact
 |     predicates: n_name = 'x'
 |
-03:HASH JOIN [LEFT OUTER JOIN]
-|  hash predicates: c_custkey = o_custkey
+03:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: o_custkey = c_custkey
 |
-|--01:SCAN HDFS [tpch.orders]
-|     partitions=1/1 size=162.56MB compact
+|--00:SCAN HDFS [tpch.customer]
+|     partitions=1/1 size=23.08MB compact
 |
-00:SCAN HDFS [tpch.customer]
-   partitions=1/1 size=23.08MB
+01:SCAN HDFS [tpch.orders]
+   partitions=1/1 size=162.56MB
 ---- DISTRIBUTEDPLAN
 10:AGGREGATE [FINALIZE]
 |  output: count:merge(*)
@@ -625,18 +625,18 @@ where n_name = 'x'
 |     partitions=1/1 size=2.15KB
 |     predicates: n_name = 'x'
 |
-03:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
-|  hash predicates: c_custkey = o_custkey
+03:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
+|  hash predicates: o_custkey = c_custkey
 |
-|--07:EXCHANGE [HASH(o_custkey)]
+|--07:EXCHANGE [HASH(c_custkey)]
 |  |
-|  01:SCAN HDFS [tpch.orders]
-|     partitions=1/1 size=162.56MB
+|  00:SCAN HDFS [tpch.customer]
+|     partitions=1/1 size=23.08MB
 |
-06:EXCHANGE [HASH(c_custkey)]
+06:EXCHANGE [HASH(o_custkey)]
 |
-00:SCAN HDFS [tpch.customer]
-   partitions=1/1 size=23.08MB
+01:SCAN HDFS [tpch.orders]
+   partitions=1/1 size=162.56MB
 ====
 # order does not become the leftmost input because of the cross join;
 # the join with nation is done first because it reduces the intermediate output
@@ -699,40 +699,40 @@ cross join functional.alltypes
 where alltypes.id = alltypestiny.id and alltypes.id = alltypessmall.id
 ---- PLAN
 04:CROSS JOIN [BROADCAST]
-|  predicates: alltypes.id = alltypestiny.id, alltypes.id = alltypessmall.id
+|  predicates: alltypes.id = alltypessmall.id
 |
-|--02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB compact
+|--01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB compact
 |
 03:HASH JOIN [INNER JOIN]
-|  hash predicates: functional.alltypessmall.id = functional.alltypestiny.id
+|  hash predicates: alltypes.id = alltypestiny.id
 |
 |--00:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 size=460B compact
 |
-01:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+02:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
 |
 04:CROSS JOIN [BROADCAST]
-|  predicates: alltypes.id = alltypestiny.id, alltypes.id = alltypessmall.id
+|  predicates: alltypes.id = alltypessmall.id
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
-|  02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: functional.alltypessmall.id = functional.alltypestiny.id
+|  hash predicates: alltypes.id = alltypestiny.id
 |
 |--05:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [functional.alltypestiny]
 |     partitions=4/4 size=460B
 |
-01:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+02:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
 ====
 # Test that tables are not re-ordered across outer/semi joins (IMPALA-860),
 # but the tables to the left/right of outer/semi joins are still re-ordered.
@@ -817,14 +817,14 @@ right join functional.alltypestiny t6 on (t5.id = t6.id)
 |--02:SCAN HDFS [functional.alltypessmall t3]
 |     partitions=4/4 size=6.32KB compact
 |
-08:HASH JOIN [LEFT OUTER JOIN]
-|  hash predicates: t1.id = t2.id
+08:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: t2.id = t1.id
 |
-|--01:SCAN HDFS [functional.alltypes t2]
-|     partitions=24/24 size=478.45KB compact
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     partitions=4/4 size=460B compact
 |
-00:SCAN HDFS [functional.alltypestiny t1]
-   partitions=4/4 size=460B compact
+01:SCAN HDFS [functional.alltypes t2]
+   partitions=24/24 size=478.45KB compact
 ====
 # Check that a join in between outer/semi joins is re-ordered correctly.
 # We expect t4 is joined before t3.
@@ -836,41 +836,41 @@ inner join functional.alltypessmall t4 on (t3.id = t4.id)
 left semi join functional.alltypes t5 on (t4.id = t5.id)
 inner join functional.alltypestiny t6 on (t3.id = t6.id)
 ---- PLAN
-13:AGGREGATE [FINALIZE]
+15:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
-12:HASH JOIN [INNER JOIN]
+14:HASH JOIN [INNER JOIN]
 |  hash predicates: t3.id = t6.id
 |
 |--05:SCAN HDFS [functional.alltypestiny t6]
 |     partitions=4/4 size=460B compact
 |
-11:HASH JOIN [LEFT SEMI JOIN]
+13:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t4.id = t5.id
 |
 |--04:SCAN HDFS [functional.alltypes t5]
 |     partitions=24/24 size=478.45KB compact
 |
-10:HASH JOIN [INNER JOIN]
+12:HASH JOIN [INNER JOIN]
 |  hash predicates: t3.id = t4.id
 |
 |--03:SCAN HDFS [functional.alltypessmall t4]
 |     partitions=4/4 size=6.32KB compact
 |
-09:HASH JOIN [INNER JOIN]
+11:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.id = t3.id
 |
 |--02:SCAN HDFS [functional.alltypesagg t3]
 |     partitions=11/11 size=814.73KB compact
 |
-08:HASH JOIN [LEFT OUTER JOIN]
-|  hash predicates: t1.id = t2.id
+10:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: t2.id = t1.id
 |
-|--01:SCAN HDFS [functional.alltypes t2]
-|     partitions=24/24 size=478.45KB compact
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     partitions=4/4 size=460B compact
 |
-00:SCAN HDFS [functional.alltypestiny t1]
-   partitions=4/4 size=460B compact
+01:SCAN HDFS [functional.alltypes t2]
+   partitions=24/24 size=478.45KB compact
 ====
 # Same above but using an anti join instead of a semi join.
 select count(*) from
@@ -881,39 +881,261 @@ inner join functional.alltypessmall t4 on (t3.id = t4.id)
 left anti join functional.alltypes t5 on (t4.id = t5.id)
 inner join functional.alltypestiny t6 on (t3.id = t6.id)
 ---- PLAN
-13:AGGREGATE [FINALIZE]
+15:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
-12:HASH JOIN [INNER JOIN]
+14:HASH JOIN [INNER JOIN]
 |  hash predicates: t3.id = t6.id
 |
 |--05:SCAN HDFS [functional.alltypestiny t6]
 |     partitions=4/4 size=460B compact
 |
-11:HASH JOIN [LEFT ANTI JOIN]
+13:HASH JOIN [LEFT ANTI JOIN]
 |  hash predicates: t4.id = t5.id
 |
 |--04:SCAN HDFS [functional.alltypes t5]
 |     partitions=24/24 size=478.45KB compact
 |
-10:HASH JOIN [INNER JOIN]
+12:HASH JOIN [INNER JOIN]
 |  hash predicates: t3.id = t4.id
 |
 |--03:SCAN HDFS [functional.alltypessmall t4]
 |     partitions=4/4 size=6.32KB compact
 |
-09:HASH JOIN [INNER JOIN]
+11:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.id = t3.id
 |
 |--02:SCAN HDFS [functional.alltypesagg t3]
 |     partitions=11/11 size=814.73KB compact
 |
-08:HASH JOIN [LEFT OUTER JOIN]
-|  hash predicates: t1.id = t2.id
+10:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: t2.id = t1.id
 |
-|--01:SCAN HDFS [functional.alltypes t2]
-|     partitions=24/24 size=478.45KB compact
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     partitions=4/4 size=460B compact
 |
-00:SCAN HDFS [functional.alltypestiny t1]
-   partitions=4/4 size=460B compact
+01:SCAN HDFS [functional.alltypes t2]
+   partitions=24/24 size=478.45KB compact
+====
+# Test inverting outer joins in a complex query plan.
+select 1 from
+  (select count(distinct a.id) as id from functional.alltypestiny a
+   inner join functional.alltypestiny b
+   on (a.id = b.id)) t1
+inner join
+  (select a.* from functional.alltypes a
+   right outer join functional.alltypestiny b
+   on (a.id = b.id)
+   where a.year < 10) t2
+on (t1.id = t2.id)
+left outer join functional.alltypes t3
+on (t2.id = t3.id)
+inner join functional.alltypestiny t4
+on (t3.id = t4.id)
+---- PLAN
+12:HASH JOIN [INNER JOIN]
+|  hash predicates: t3.id = t4.id
+|
+|--09:SCAN HDFS [functional.alltypestiny t4]
+|     partitions=4/4 size=460B compact
+|
+11:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: t3.id = a.id
+|
+|--10:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.id = count(a.id)
+|  |
+|  |--04:AGGREGATE [FINALIZE]
+|  |  |  output: count(a.id)
+|  |  |
+|  |  03:AGGREGATE
+|  |  |  group by: a.id
+|  |  |
+|  |  02:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: a.id = b.id
+|  |  |
+|  |  |--01:SCAN HDFS [functional.alltypestiny b]
+|  |  |     partitions=4/4 size=460B compact
+|  |  |
+|  |  00:SCAN HDFS [functional.alltypestiny a]
+|  |     partitions=4/4 size=460B
+|  |
+|  07:HASH JOIN [LEFT OUTER JOIN]
+|  |  hash predicates: b.id = a.id
+|  |  other predicates: a.year < 10
+|  |
+|  |--05:SCAN HDFS [functional.alltypes a]
+|  |     partitions=0/24 size=0B compact
+|  |
+|  06:SCAN HDFS [functional.alltypestiny b]
+|     partitions=4/4 size=460B compact
+|
+08:SCAN HDFS [functional.alltypes t3]
+   partitions=24/24 size=478.45KB compact
+====
+# Same as above but with full outer joins.
+select 1 from
+  (select count(distinct a.id) as id from functional.alltypestiny a
+   inner join functional.alltypestiny b
+   on (a.id = b.id)) t1
+inner join
+  (select a.* from functional.alltypes a
+   full outer join functional.alltypestiny b
+   on (a.id = b.id)
+   where a.year < 10) t2
+on (t1.id = t2.id)
+full outer join functional.alltypes t3
+on (t2.id = t3.id)
+inner join functional.alltypestiny t4
+on (t3.id = t4.id)
+---- PLAN
+12:HASH JOIN [INNER JOIN]
+|  hash predicates: t3.id = t4.id
+|
+|--09:SCAN HDFS [functional.alltypestiny t4]
+|     partitions=4/4 size=460B compact
+|
+11:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: t3.id = a.id
+|
+|--10:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.id = count(a.id)
+|  |
+|  |--04:AGGREGATE [FINALIZE]
+|  |  |  output: count(a.id)
+|  |  |
+|  |  03:AGGREGATE
+|  |  |  group by: a.id
+|  |  |
+|  |  02:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: a.id = b.id
+|  |  |
+|  |  |--01:SCAN HDFS [functional.alltypestiny b]
+|  |  |     partitions=4/4 size=460B compact
+|  |  |
+|  |  00:SCAN HDFS [functional.alltypestiny a]
+|  |     partitions=4/4 size=460B
+|  |
+|  07:HASH JOIN [FULL OUTER JOIN]
+|  |  hash predicates: b.id = a.id
+|  |  other predicates: a.year < 10
+|  |
+|  |--05:SCAN HDFS [functional.alltypes a]
+|  |     partitions=0/24 size=0B compact
+|  |
+|  06:SCAN HDFS [functional.alltypestiny b]
+|     partitions=4/4 size=460B compact
+|
+08:SCAN HDFS [functional.alltypes t3]
+   partitions=24/24 size=478.45KB compact
+====
+# Test inverting semi joins in a complex query plan.
+select 1 from
+  (select count(distinct a.id) as id from functional.alltypestiny a
+   inner join functional.alltypestiny b
+   on (a.id = b.id)) t1
+inner join
+  (select b.* from functional.alltypestiny a
+   right semi join functional.alltypes b
+   on (a.id = b.id)) t2
+on (t1.id = t2.id)
+left semi join functional.alltypes t3
+on (t2.id = t3.id)
+inner join functional.alltypestiny t4
+on (t2.id = t4.id)
+where t2.month = 1
+---- PLAN
+12:HASH JOIN [INNER JOIN]
+|  hash predicates: b.id = t4.id
+|
+|--09:SCAN HDFS [functional.alltypestiny t4]
+|     partitions=4/4 size=460B compact
+|
+11:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: t3.id = b.id
+|
+|--10:HASH JOIN [INNER JOIN]
+|  |  hash predicates: b.id = count(a.id)
+|  |
+|  |--04:AGGREGATE [FINALIZE]
+|  |  |  output: count(a.id)
+|  |  |
+|  |  03:AGGREGATE
+|  |  |  group by: a.id
+|  |  |
+|  |  02:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: a.id = b.id
+|  |  |
+|  |  |--01:SCAN HDFS [functional.alltypestiny b]
+|  |  |     partitions=4/4 size=460B compact
+|  |  |
+|  |  00:SCAN HDFS [functional.alltypestiny a]
+|  |     partitions=4/4 size=460B
+|  |
+|  07:HASH JOIN [LEFT SEMI JOIN]
+|  |  hash predicates: b.id = a.id
+|  |
+|  |--05:SCAN HDFS [functional.alltypestiny a]
+|  |     partitions=4/4 size=460B compact
+|  |
+|  06:SCAN HDFS [functional.alltypes b]
+|     partitions=2/24 size=40.32KB compact
+|
+08:SCAN HDFS [functional.alltypes t3]
+   partitions=24/24 size=478.45KB compact
+====
+# Same as above but with anti joins.
+select 1 from
+  (select count(distinct a.id) as id from functional.alltypestiny a
+   inner join functional.alltypestiny b
+   on (a.id = b.id)) t1
+inner join
+  (select b.* from functional.alltypestiny a
+   right anti join functional.alltypes b
+   on (a.id = b.id)) t2
+on (t1.id = t2.id)
+left anti join functional.alltypes t3
+on (t2.id = t3.id)
+inner join functional.alltypestiny t4
+on (t2.id = t4.id)
+where t2.month = 1
+---- PLAN
+12:HASH JOIN [INNER JOIN]
+|  hash predicates: b.id = t4.id
+|
+|--09:SCAN HDFS [functional.alltypestiny t4]
+|     partitions=4/4 size=460B compact
+|
+11:HASH JOIN [RIGHT ANTI JOIN]
+|  hash predicates: t3.id = b.id
+|
+|--10:HASH JOIN [INNER JOIN]
+|  |  hash predicates: b.id = count(a.id)
+|  |
+|  |--04:AGGREGATE [FINALIZE]
+|  |  |  output: count(a.id)
+|  |  |
+|  |  03:AGGREGATE
+|  |  |  group by: a.id
+|  |  |
+|  |  02:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: a.id = b.id
+|  |  |
+|  |  |--01:SCAN HDFS [functional.alltypestiny b]
+|  |  |     partitions=4/4 size=460B compact
+|  |  |
+|  |  00:SCAN HDFS [functional.alltypestiny a]
+|  |     partitions=4/4 size=460B
+|  |
+|  07:HASH JOIN [LEFT ANTI JOIN]
+|  |  hash predicates: b.id = a.id
+|  |
+|  |--05:SCAN HDFS [functional.alltypestiny a]
+|  |     partitions=4/4 size=460B compact
+|  |
+|  06:SCAN HDFS [functional.alltypes b]
+|     partitions=2/24 size=40.32KB compact
+|
+08:SCAN HDFS [functional.alltypes t3]
+   partitions=24/24 size=478.45KB compact
 ====

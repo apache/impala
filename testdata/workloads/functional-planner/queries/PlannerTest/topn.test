@@ -127,23 +127,21 @@ limit 2
 00:SCAN HDFS [functional.alltypessmall t1]
    partitions=4/4 size=6.32KB
 ---- DISTRIBUTEDPLAN
-06:MERGING-EXCHANGE [UNPARTITIONED]
+05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: int_col ASC
 |  limit: 2
 |
 03:TOP-N [LIMIT=2]
 |  order by: int_col ASC
 |
-02:HASH JOIN [INNER JOIN, PARTITIONED]
+02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: t1.id = t2.id
 |
-|--05:EXCHANGE [HASH(t2.id)]
+|--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall t2]
 |     partitions=4/4 size=6.32KB
 |     predicates: t2.int_col IS NOT NULL
-|
-04:EXCHANGE [HASH(t1.id)]
 |
 00:SCAN HDFS [functional.alltypessmall t1]
    partitions=4/4 size=6.32KB
@@ -218,7 +216,7 @@ NODE 1:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
 ---- DISTRIBUTEDPLAN
-06:MERGING-EXCHANGE [UNPARTITIONED]
+05:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
 |  order by: int_col ASC
 |  limit: 10
@@ -226,16 +224,14 @@ NODE 1:
 03:TOP-N [LIMIT=15]
 |  order by: int_col ASC
 |
-02:HASH JOIN [INNER JOIN, PARTITIONED]
+02:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: t1.id = t2.id
 |
-|--05:EXCHANGE [HASH(t2.id)]
+|--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall t2]
 |     partitions=4/4 size=6.32KB
 |     predicates: t2.int_col IS NOT NULL
-|
-04:EXCHANGE [HASH(t1.id)]
 |
 00:SCAN HDFS [functional.alltypessmall t1]
    partitions=4/4 size=6.32KB
