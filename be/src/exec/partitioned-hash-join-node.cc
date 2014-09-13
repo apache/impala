@@ -210,7 +210,6 @@ void PartitionedHashJoinNode::Partition::Close(RowBatch* batch) {
 
 Status PartitionedHashJoinNode::Partition::BuildHashTable(
     RuntimeState* state, bool* built) {
-  SCOPED_TIMER(parent_->build_timer_);
   DCHECK(build_rows_ != NULL);
   *built = false;
   // First pin the entire build stream in memory.
@@ -233,6 +232,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(
   HashTableCtx* ctx = parent_->ht_ctx_.get();
   while (!eos) {
     RETURN_IF_ERROR(build_rows_->GetNext(&batch, &eos));
+    SCOPED_TIMER(parent_->build_timer_);
     for (int i = 0; i < batch.num_rows(); ++i) {
       TupleRow* row = batch.GetRow(i);
       uint32_t hash = 0;

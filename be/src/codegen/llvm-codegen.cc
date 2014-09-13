@@ -1037,6 +1037,10 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
   }
 }
 
+Function* LlvmCodeGen::GetFnvHashFunction(int num_bytes) {
+  return GetFunction(IRFunction::HASH_FNV);
+}
+
 void LlvmCodeGen::ReplaceInstWithValue(Instruction* from, Value* to) {
   BasicBlock::iterator iter(from);
   llvm::ReplaceInstWithValue(from->getParent()->getInstList(), iter, to);

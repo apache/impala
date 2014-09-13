@@ -155,7 +155,7 @@ class HashTableCtx {
       // TODO: figure out which hash function to use. We need to generate uncorrelated
       // hashes by changing just the seed. CRC does not have this property and FNV is
       // okay. We should switch to something else.
-      hash_ = HashUtil::Hash(expr_values_buffer_, results_buffer_size_, seed);
+      hash_ = HashUtil::FnvHash64to32(expr_values_buffer_, results_buffer_size_, seed);
     } else {
       hash_ = HashTableCtx::HashVariableLenRow();
     }

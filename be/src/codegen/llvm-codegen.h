@@ -341,6 +341,7 @@ class LlvmCodeGen {
   // work for that number of bytes.  It is invalid to call that function with a
   // different 'len'.
   llvm::Function* GetHashFunction(int num_bytes = -1);
+  llvm::Function* GetFnvHashFunction(int num_bytes = -1);
 
   // Allocate stack storage for local variables.  This is similar to traditional c, where
   // all the variables must be declared at the top of the function.  This helper can be
