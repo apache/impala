@@ -839,8 +839,8 @@ public class SelectStmt extends QueryStmt {
     if (limitElement_ != null && limitElement_.getLimit() == 1) return true;
     // No from clause (base tables or inline views)
     if (tableRefs_.isEmpty()) return true;
-    // Aggregation with no group by
-    if (aggInfo_ != null && groupingExprs_ == null) return true;
+    // Aggregation with no group by and no DISTINCT
+    if (hasAggInfo() && !hasGroupByClause() && !selectList_.isDistinct()) return true;
     // In all other cases, return false.
     return false;
   }

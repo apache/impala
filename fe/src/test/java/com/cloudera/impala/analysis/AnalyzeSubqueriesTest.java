@@ -772,6 +772,14 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
       "functional.alltypestiny t1 where int_col = (select min(bigint_col) " +
       "over (partition by bool_col) from functional.alltypessmall t2 where " +
       "int_col < 10 limit 1)");
+
+    // Subquery with distinct in binary predicate
+    AnalysisError("select * from functional.alltypes where int_col = " +
+        "(select distinct int_col from functional.alltypesagg)", "Subquery " +
+        "must return a single row: (SELECT DISTINCT int_col FROM " +
+        "functional.alltypesagg)");
+    AnalyzesOk("select * from functional.alltypes where int_col = " +
+        "(select count(distinct int_col) from functional.alltypesagg)");
   }
 
   @Test
