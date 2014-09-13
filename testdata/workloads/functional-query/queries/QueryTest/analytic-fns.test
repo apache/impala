@@ -403,17 +403,29 @@ true,0,146000,146000
 BOOLEAN, BIGINT, BIGINT, BIGINT
 ====
 ---- QUERY
-#TODO: Enable after analytic functions are supported in inline views
-#---- QUERY
-## Test for IMPALA-1200
-#SELECT DISTINCT c1 FROM
-#  (SELECT MAX(smallint_col) OVER (PARTITION BY year ORDER BY id DESC) AS c1
-#   FROM alltypesagg);
-#---- RESULTS
-#99
-#---- TYPES
-#SMALLINT
-#====
+# Test for IMPALA-1200
+select DISTINCT t1.c1 FROM
+  (SELECT MAX(smallint_col) OVER (PARTITION BY year ORDER BY id DESC) AS c1
+   FROM alltypesagg) t1
+---- RESULTS
+99
+---- TYPES
+SMALLINT
+====
+---- QUERY
+# Test for IMPALA-1233
+with with_1 AS (
+  SELECT RANK() OVER (ORDER BY t1.id) AS int_col_1
+  FROM alltypesagg t1)
+SELECT COUNT(t1.int_col_1) AS int_col_1
+FROM with_1 t1
+WHERE t1.int_col_1 IS NULL
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
 # Tests rank()
 select year, month, bool_col, tinyint_col,
 rank() over (partition by year, month order by bool_col, tinyint_col)

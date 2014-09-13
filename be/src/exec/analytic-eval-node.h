@@ -101,7 +101,7 @@ class AnalyticEvalNode : public ExecNode {
 
   // Returns a batch of output rows from input_stream_ with the analytic function
   // results (from result_tuples_) set as the last tuple.
-  Status GetNextOutputBatch(RowBatch* row_batch, bool* eos);
+  Status GetNextOutputBatch(RuntimeState* state, RowBatch* row_batch, bool* eos);
 
   // Determines if there is a window ending at the previous row, and if so, calls
   // AddResultTuple() with the index of the previous row in input_stream_. next_partition
@@ -244,17 +244,8 @@ class AnalyticEvalNode : public ExecNode {
   // TODO: Consider re-pinning unpinned streams when possible.
   boost::scoped_ptr<BufferedTupleStream> input_stream_;
 
-  // RowBatch used to read rows from input_stream_.
-  boost::scoped_ptr<RowBatch> input_stream_batch_;
-
   // Pool used for O(1) allocations that live until close.
   boost::scoped_ptr<MemPool> mem_pool_;
-
-  // Current index in input_stream_batch_.
-  int input_stream_batch_idx_;
-
-  // The index in input_stream_ of the next row to be returned by GetNextOutputBatch().
-  int64_t input_stream_idx_;
 
   // True when there are no more input rows to consume from our child.
   bool input_eos_;

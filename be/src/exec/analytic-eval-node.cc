@@ -44,8 +44,6 @@ AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
     prev_result_tuple_pool_stream_idx_(-1),
     curr_partition_stream_idx_(0),
     prev_input_row_(NULL),
-    input_stream_batch_idx_(0),
-    input_stream_idx_(0),
     input_eos_(false),
     evaluation_timer_(NULL) {
 }
@@ -83,8 +81,6 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
   prev_result_tuple_pool_.reset(new MemPool(mem_tracker()));
   mem_pool_.reset(new MemPool(mem_tracker()));
   evaluation_timer_ = ADD_TIMER(runtime_profile(), "EvaluationTime");
-  input_stream_batch_.reset(new RowBatch(child(0)->row_desc(), state->batch_size(),
-      mem_tracker()));
 
   fn_ctxs_.resize(evaluators_.size());
   DCHECK_EQ(result_tuple_desc_->slots().size(), evaluators_.size());
@@ -201,8 +197,7 @@ string AnalyticEvalNode::DebugWindowString() const {
 
 string AnalyticEvalNode::DebugEvaluatedRowsString() const {
   stringstream ss;
-  ss << "stream idx=" << input_stream_idx_ << " num_returned="
-     << input_stream_->rows_returned() << " num_rows="
+  ss << "stream num_returned=" << input_stream_->rows_returned() << " num_rows="
      << input_stream_->num_rows() << " evaluated_tuple_idx=[";
   for (list<pair<int64_t, Tuple*> >::const_iterator it = result_tuples_.begin();
        it != result_tuples_.end(); ++it) {
@@ -366,7 +361,8 @@ Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
   return Status::OK;
 }
 
-Status AnalyticEvalNode::GetNextOutputBatch(RowBatch* output_batch, bool* eos) {
+Status AnalyticEvalNode::GetNextOutputBatch(RuntimeState* state, RowBatch* output_batch,
+    bool* eos) {
   SCOPED_TIMER(evaluation_timer_);
   VLOG_ROW << "GetNextOutputBatch: " << DebugEvaluatedRowsString();
   if (input_stream_->rows_returned() == input_stream_->num_rows()) {
@@ -377,55 +373,42 @@ Status AnalyticEvalNode::GetNextOutputBatch(RowBatch* output_batch, bool* eos) {
   const int num_child_tuples = child(0)->row_desc().tuple_descriptors().size();
   ExprContext** ctxs = &conjunct_ctxs_[0];
   int num_ctxs = conjunct_ctxs_.size();
-  while (true) {
-    // Copy rows until we hit the limit/capacity or exhaust input_stream_batch_
-    while (!ReachedLimit() && !output_batch->AtCapacity() &&
-        input_stream_batch_idx_ < input_stream_batch_->num_rows()) {
-      DCHECK(!result_tuples_.empty());
-      TupleRow* src = input_stream_batch_->GetRow(input_stream_batch_idx_);
-      ++input_stream_batch_idx_;
-      TupleRow* dest = output_batch->GetRow(output_batch->AddRow());
-      // CopyRow works as expected: input_batch tuples form a prefix of output_batch
-      // tuples.
-      input_stream_batch_->CopyRow(src, dest);
-      dest->SetTuple(num_child_tuples, result_tuples_.front().second);
 
-      if (ExecNode::EvalConjuncts(ctxs, num_ctxs, dest)) {
-        output_batch->CommitLastRow();
-        ++num_rows_returned_;
-      }
+  RowBatch input_batch(child(0)->row_desc(), output_batch->capacity(), mem_tracker());
+  int64_t stream_idx = input_stream_->rows_returned();
+  RETURN_IF_ERROR(input_stream_->GetNext(&input_batch, eos));
+  for (int i = 0; i < input_batch.num_rows(); ++i) {
+    if (ReachedLimit()) break;
+    DCHECK(!output_batch->AtCapacity());
+    DCHECK(!result_tuples_.empty());
+    VLOG_ROW << "Output row idx=" << stream_idx << " " << DebugEvaluatedRowsString();
 
-      // Remove the head of result_tuples_ if all rows using that evaluated tuple
-      // have been returned.
-      VLOG_ROW << "Output row idx: " << input_stream_idx_ << " "
-               << DebugEvaluatedRowsString();
-      DCHECK_LE(input_stream_idx_, result_tuples_.front().first);
-      if (input_stream_idx_ >= result_tuples_.front().first) result_tuples_.pop_front();
-      ++input_stream_idx_;
-    }
-    if (output_batch->AtCapacity()) return Status::OK;
+    // CopyRow works as expected: input_batch tuples form a prefix of output_batch
+    // tuples.
+    TupleRow* dest = output_batch->GetRow(output_batch->AddRow());
+    input_batch.CopyRow(input_batch.GetRow(i), dest);
+    dest->SetTuple(num_child_tuples, result_tuples_.front().second);
 
-    input_stream_batch_->TransferResourceOwnership(output_batch);
-    input_stream_batch_->Reset();
-    input_stream_batch_idx_ = 0;
-    if (ReachedLimit() || input_stream_->rows_returned() == input_stream_->num_rows()) {
-      *eos = true;
-      break;
+    if (ExecNode::EvalConjuncts(ctxs, num_ctxs, dest)) {
+      output_batch->CommitLastRow();
+      ++num_rows_returned_;
     }
 
-    // Need more rows
-    bool stream_eos = false;
-    DCHECK_EQ(input_stream_idx_, input_stream_->rows_returned());
-    RETURN_IF_ERROR(input_stream_->GetNext(input_stream_batch_.get(), &stream_eos));
-    DCHECK(!stream_eos || input_stream_->rows_returned() == input_stream_->num_rows());
+    // Remove the head of result_tuples_ if all rows using that evaluated tuple
+    // have been returned.
+    DCHECK_LE(stream_idx, result_tuples_.front().first);
+    if (stream_idx >= result_tuples_.front().first) result_tuples_.pop_front();
+    ++stream_idx;
   }
+  input_batch.TransferResourceOwnership(output_batch);
+  if (ReachedLimit()) *eos = true;
   return Status::OK;
 }
 
 inline int64_t AnalyticEvalNode::NumOutputRowsReady() const {
   if (result_tuples_.empty()) return 0;
   int64_t last_evaluated_row_idx = result_tuples_.back().first;
-  int64_t rows_to_return = last_evaluated_row_idx - input_stream_idx_;
+  int64_t rows_to_return = last_evaluated_row_idx - input_stream_->rows_returned();
   if (last_evaluated_row_idx > input_stream_->num_rows()) {
     // This happens when we were able to add a result tuple before consuming child rows,
     // e.g. initializing a new partition with an end bound that is X preceding. The first
@@ -474,7 +457,7 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
   }
 
   bool output_eos = false;
-  RETURN_IF_ERROR(GetNextOutputBatch(row_batch, &output_eos));
+  RETURN_IF_ERROR(GetNextOutputBatch(state, row_batch, &output_eos));
   if (curr_child_batch_.get() == NULL && output_eos) *eos = true;
 
   // Transfer resources to the output row batch if enough have accumulated and they're
@@ -482,7 +465,7 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
   VLOG_ROW << "Transfer prev_result_tuple_pool_ thru idx:"
            << prev_result_tuple_pool_stream_idx_;
   if (prev_result_tuple_pool_stream_idx_ != -1 &&
-      prev_result_tuple_pool_stream_idx_ < input_stream_idx_) {
+      prev_result_tuple_pool_stream_idx_ < input_stream_->rows_returned()) {
     VLOG_ROW << "Transfer prev_result_tuple_pool_";
     row_batch->tuple_data_pool()->AcquireData(prev_result_tuple_pool_.get(), !*eos);
     prev_result_tuple_pool_stream_idx_ = -1;
@@ -499,7 +482,9 @@ void AnalyticEvalNode::Close(RuntimeState* state) {
   DCHECK_EQ(evaluators_.size(), fn_ctxs_.size());
   for (int i = 0; i < evaluators_.size(); ++i) {
     // Need to make sure finalize is called in case there is any state to clean up.
-    evaluators_[i]->Finalize(fn_ctxs_[i], curr_tuple_, dummy_result_tuple_);
+    if (curr_tuple_ != NULL) {
+      evaluators_[i]->Finalize(fn_ctxs_[i], curr_tuple_, dummy_result_tuple_);
+    }
     evaluators_[i]->Close(state);
     fn_ctxs_[i]->impl()->Close();
   }
@@ -507,7 +492,6 @@ void AnalyticEvalNode::Close(RuntimeState* state) {
   ordering_exprs_.Close(state);
   if (prev_child_batch_.get() != NULL) prev_child_batch_.reset();
   if (curr_child_batch_.get() != NULL) curr_child_batch_.reset();
-  if (input_stream_batch_.get() != NULL) input_stream_batch_.reset();
   if (curr_result_tuple_pool_.get() != NULL) curr_result_tuple_pool_->FreeAll();
   if (prev_result_tuple_pool_.get() != NULL) prev_result_tuple_pool_->FreeAll();
   if (mem_pool_.get() != NULL) mem_pool_->FreeAll();
