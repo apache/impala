@@ -401,7 +401,7 @@ Status DiskIoMgr::ScanRange::ReadFromCache(bool* read_succeeded) {
   bytes_read_ = bytes_read;
   EnqueueBuffer(desc);
   if (reader_->bytes_read_counter_ != NULL) {
-    COUNTER_UPDATE(reader_->bytes_read_counter_, bytes_read);
+    COUNTER_ADD(reader_->bytes_read_counter_, bytes_read);
   }
   *read_succeeded = true;
   ++reader_->num_used_buffers_;
