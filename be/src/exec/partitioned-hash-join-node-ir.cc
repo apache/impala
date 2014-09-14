@@ -36,7 +36,7 @@ bool IR_NO_INLINE EvalOtherJoinConjuncts(
 // CreateOutputRow, EvalOtherJoinConjuncts, and EvalConjuncts are replaced by
 // codegen.
 template<int const JoinOp>
-Status PartitionedHashJoinNode::ProcessProbeBatch(
+int PartitionedHashJoinNode::ProcessProbeBatch(
     RowBatch* out_batch, HashTableCtx* ht_ctx) {
   ExprContext* const* join_conjunct_ctxs = &other_join_conjunct_ctxs_[0];
   int num_join_conjuncts = other_join_conjunct_ctxs_.size();
@@ -124,45 +124,30 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(
     uint32_t hash;
     if (!ht_ctx->EvalAndHashProbe(current_probe_row_, &hash)) continue;
 
-    Partition* partition = NULL;
-    if (input_partition_ != NULL && input_partition_->hash_tbl() != NULL) {
-      // In this case we are working on a spilled partition (input_partition_ != NULL).
-      // If the input partition has a hash table built, it means we are *not*
-      // repartitioning and simply probing into input_partition_'s hash table.
-      partition = input_partition_;
-    } else {
-      // We don't know which partition this probe row should go to.
-      const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
-      partition = hash_partitions_[partition_idx];
+    const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
+    if (LIKELY(hash_tbls_[partition_idx] != NULL)) {
+      hash_tbl_iterator_= hash_tbls_[partition_idx]->Find(ht_ctx, hash);
+      continue;
     }
-    DCHECK(partition != NULL);
 
+    Partition* partition = hash_partitions_[partition_idx];
     if (UNLIKELY(partition->is_closed())) {
       // This partition is closed, meaning the build side for this partition was empty.
       DCHECK_EQ(state_, PROCESSING_PROBE);
-    } else if (partition->is_spilled()) {
+    } else {
+      DCHECK(partition->is_spilled());
       DCHECK(partition->probe_rows() != NULL);
       // This partition is not in memory, spill the probe row.
-      if (UNLIKELY(!AppendRow(partition->probe_rows(), current_probe_row_))) {
-        return status_;
-      }
-    } else {
-      DCHECK(partition->hash_tbl() != NULL);
-      // Perform the actual probe in the hash table for the current probe (left) row.
-      // TODO: At this point it would be good to do some prefetching.
-      hash_tbl_iterator_= partition->hash_tbl()->Find(ht_ctx);
+      if (UNLIKELY(!AppendRow(partition->probe_rows(), current_probe_row_))) return -1;
     }
   }
 
 end:
   DCHECK_LE(num_rows_added, max_rows);
-  out_batch->CommitRows(num_rows_added);
-  num_rows_returned_ += num_rows_added;
-  COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-  return Status::OK;
+  return num_rows_added;
 }
 
-Status PartitionedHashJoinNode::ProcessProbeBatch(
+int PartitionedHashJoinNode::ProcessProbeBatch(
     const TJoinOp::type join_op, RowBatch* out_batch, HashTableCtx* ht_ctx) {
  switch (join_op) {
     case TJoinOp::INNER_JOIN:
@@ -182,8 +167,8 @@ Status PartitionedHashJoinNode::ProcessProbeBatch(
     case TJoinOp::FULL_OUTER_JOIN:
       return ProcessProbeBatch<TJoinOp::FULL_OUTER_JOIN>(out_batch, ht_ctx);
     default:
-      DCHECK(false);
-      return Status("Unknown join type");
+      DCHECK(false) << "Unknown join type";
+      return -1;
   }
 }
 

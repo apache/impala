@@ -1032,13 +1032,29 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
     }
     return fn;
   } else {
-    // Don't bother with optimizations without crc hash instruction
-    return GetFunction(IRFunction::HASH_FNV);
+    return GetFnvHashFunction(num_bytes);
   }
 }
 
-Function* LlvmCodeGen::GetFnvHashFunction(int num_bytes) {
-  return GetFunction(IRFunction::HASH_FNV);
+static Function* GetLenOptimizedHashFn(LlvmCodeGen* codegen, IRFunction::Type f, int len) {
+  Function* fn = codegen->GetFunction(f);
+  DCHECK(fn != NULL);
+  if (len != -1) {
+    // Clone this function since we're going to modify it by replacing the
+    // length with num_bytes.
+    fn = codegen->CloneFunction(fn);
+    Value* len_arg = codegen->GetArgument(fn, 1);
+    len_arg->replaceAllUsesWith(codegen->GetIntConstant(TYPE_INT, len));
+  }
+  return codegen->FinalizeFunction(fn);
+}
+
+Function* LlvmCodeGen::GetFnvHashFunction(int len) {
+  return GetLenOptimizedHashFn(this, IRFunction::HASH_FNV, len);
+}
+
+Function* LlvmCodeGen::GetMurmurHashFunction(int len) {
+  return GetLenOptimizedHashFn(this, IRFunction::HASH_MURMUR, len);
 }
 
 void LlvmCodeGen::ReplaceInstWithValue(Instruction* from, Value* to) {

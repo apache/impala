@@ -42,6 +42,7 @@ PartitionedHashJoinNode::PartitionedHashJoinNode(
     process_build_batch_fn_(NULL),
     process_probe_batch_fn_(NULL),
     input_partition_(NULL) {
+  memset(hash_tbls_, 0, sizeof(hash_tbls_));
 }
 
 PartitionedHashJoinNode::~PartitionedHashJoinNode() {
@@ -234,7 +235,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(
       TupleRow* row = batch.GetRow(i);
       uint32_t hash = 0;
       if (!ctx->EvalAndHashBuild(row, &hash)) continue;
-      if (UNLIKELY(!hash_tbl_->Insert(ctx, row))) {
+      if (UNLIKELY(!hash_tbl_->Insert(ctx, row, hash))) {
         *built = false;
         break;
       }
@@ -250,6 +251,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(
     }
   }
   DCHECK(*built);
+  DCHECK_NOTNULL(hash_tbl_.get());
   is_spilled_ = false;
   COUNTER_ADD(parent_->num_hash_buckets_, hash_tbl_->num_buckets());
   return Status::OK;
@@ -285,6 +287,7 @@ Status PartitionedHashJoinNode::SpillPartition() {
   hash_partitions_[partition_idx]->is_spilled_ = true;
   if (hash_partitions_[partition_idx]->hash_tbl() != NULL) {
     hash_partitions_[partition_idx]->hash_tbl()->Close();
+    hash_tbls_[partition_idx] = NULL;
   }
   return hash_partitions_[partition_idx]->build_rows()->UnpinStream();
 }
@@ -367,6 +370,9 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
 
   COUNTER_ADD(num_build_rows_partitioned_, total_build_rows);
   RETURN_IF_ERROR(BuildHashTables(state));
+  for (int i = 0; i < PARTITION_FANOUT; ++i) {
+    hash_tbls_[i] = hash_partitions_[i]->hash_tbl();
+  }
   return Status::OK;
 }
 
@@ -441,21 +447,30 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
 
   // Reserve one buffer to read the probe side.
   RETURN_IF_ERROR(input_partition_->probe_rows()->PrepareForRead());
+  ht_ctx_->set_level(input_partition_->level_);
 
   // Try to build a hash table on top the spilled build rows.
   bool built = false;
   if (input_partition_->EstimatedInMemSize() < mem_limit) {
-    ht_ctx_->set_level(input_partition_->level_);
     RETURN_IF_ERROR(input_partition_->BuildHashTable(state, &built));
   }
 
   if (!built) {
-    DCHECK(input_partition_->hash_tbl_.get() == NULL);
     // This build partition still does not fit in memory, repartition.
+    DCHECK(input_partition_->is_spilled());
+    DCHECK_NOTNULL(input_partition_->hash_tbl_.get());
     ht_ctx_->set_level(input_partition_->level_ + 1);
     RETURN_IF_ERROR(ProcessBuildInput(state, input_partition_->level_ + 1));
     UpdateState(REPARTITIONING);
   } else {
+    DCHECK(hash_partitions_.empty());
+    DCHECK(!input_partition_->is_spilled());
+    DCHECK_NOTNULL(input_partition_->hash_tbl());
+    // In this case, we did not have to partition the build again, we just built
+    // a hash table. This means the probe does not have to be partitioned either.
+    for (int i = 0; i < PARTITION_FANOUT; ++i) {
+      hash_tbls_[i] = input_partition_->hash_tbl();
+    }
     UpdateState(PROBING_SPILLED_PARTITION);
   }
 
@@ -503,12 +518,20 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
     {
       // Putting SCOPED_TIMER in ProcessProbeBatch() causes weird exception handling IR in
       // the xcompiled function, so call it here instead.
+      int rows_added = 0;
       SCOPED_TIMER(probe_timer_);
       if (process_probe_batch_fn_ == NULL) {
-        RETURN_IF_ERROR(ProcessProbeBatch(join_op_, out_batch, ht_ctx_.get()));
+        rows_added = ProcessProbeBatch(join_op_, out_batch, ht_ctx_.get());
       } else {
-        RETURN_IF_ERROR(process_probe_batch_fn_(this, out_batch, ht_ctx_.get()));
+        rows_added = process_probe_batch_fn_(this, out_batch, ht_ctx_.get());
       }
+      if (UNLIKELY(rows_added < 0)) {
+        DCHECK(!status_.ok());
+        return status_;
+      }
+      out_batch->CommitRows(rows_added);
+      num_rows_returned_ += rows_added;
+      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
     }
     if (out_batch->AtCapacity() || ReachedLimit()) break;
     DCHECK(current_probe_row_ == NULL);
@@ -993,15 +1016,13 @@ Function* PartitionedHashJoinNode::CodegenProcessProbeBatch(
   // Depends on join_op_
   DCHECK(replaced == 2 || replaced == 3 || replaced == 4) << replaced;
 
-  // Bake in %this pointer argument to process_probe_batch_fn. %this is the second
-  // argument, the first argument is the return Status.
-  DCHECK(process_probe_batch_fn->hasStructRetAttr());
-  Value* this_arg = codegen->GetArgument(process_probe_batch_fn, 1);
+  // Bake in %this pointer argument to process_probe_batch_fn.
+  Value* this_arg = codegen->GetArgument(process_probe_batch_fn, 0);
   Value* this_loc = codegen->CastPtrToLlvmPtr(this_arg->getType(), this);
   this_arg->replaceAllUsesWith(this_loc);
 
   // Bake in %ht_ctx pointer argument to process_probe_batch_fn
-  Value* ht_ctx_arg = codegen->GetArgument(process_probe_batch_fn, 3);
+  Value* ht_ctx_arg = codegen->GetArgument(process_probe_batch_fn, 2);
   Value* ht_ctx_loc = codegen->CastPtrToLlvmPtr(ht_ctx_arg->getType(), ht_ctx_.get());
   ht_ctx_arg->replaceAllUsesWith(ht_ctx_loc);
 

@@ -102,6 +102,7 @@ class HashTableCtx {
   void Close();
 
   void set_level(int level);
+  int level() const { return level_; }
 
   // Returns the results of the exprs at 'expr_idx' evaluated over the last row
   // processed.
@@ -155,11 +156,10 @@ class HashTableCtx {
       // TODO: figure out which hash function to use. We need to generate uncorrelated
       // hashes by changing just the seed. CRC does not have this property and FNV is
       // okay. We should switch to something else.
-      hash_ = HashUtil::FnvHash64to32(expr_values_buffer_, results_buffer_size_, seed);
+      return HashUtil::MurmurHash2_64(expr_values_buffer_, results_buffer_size_, seed);
     } else {
-      hash_ = HashTableCtx::HashVariableLenRow();
+      return HashTableCtx::HashVariableLenRow();
     }
-    return hash_;
   }
 
   // Evaluate 'row' over build exprs caching the results in 'expr_values_buffer_' This
@@ -225,18 +225,8 @@ class HashTableCtx {
   // not change once allocated.
   uint8_t* expr_value_null_bits_;
 
-  // The hash of the current row. Valid until EvalAndHashBuild/EvalAndHashProbe
-  // is called again.
-  uint32_t hash_;
-
-  // If true, the current row can be skipped on subsequent hash table operations.
-  // It cannot match existing hash table entries and/or should not be inserted.
-  // This value is valid until EvalAndHashBuild/EvalAndHashProbe is called again.
-  bool skip_row_;
-
   // Cross-compiled functions to access member variables used in CodegenHashCurrentRow().
   uint32_t GetHashSeed() const;
-  void set_hash(uint32_t hash);
 };
 
 // The hash table data structure. Consists of a vector of buckets (of linked nodes).
@@ -274,21 +264,19 @@ class HashTable {
   // The 'row' is not copied by the hash table and the caller must guarantee it
   // stays in memory.
   // Returns false if there was not enough memory to insert the row.
-  bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx, TupleRow* row) {
+  bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx, TupleRow* row, uint32_t hash) {
     DCHECK_NOTNULL(ht_ctx);
-    DCHECK(!ht_ctx->skip_row_) << "Caller should have checked";
-    return InsertImpl(ht_ctx, row);
+    return InsertImpl(ht_ctx, row, hash);
   }
 
-  bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx, Tuple* tuple) {
+  bool IR_ALWAYS_INLINE Insert(HashTableCtx* ht_ctx, Tuple* tuple, uint32_t hash) {
     DCHECK_NOTNULL(ht_ctx);
-    DCHECK(!ht_ctx->skip_row_) << "Caller should have checked";
-    return InsertImpl(ht_ctx, tuple);
+    return InsertImpl(ht_ctx, tuple, hash);
   }
 
   // Returns the start iterator for all rows that match the last row evaluated in
   // 'ht_cxt'. EvalAndHashBuild/EvalAndHashProbe must have been called before calling
-  // this.
+  // this. Hash must be the hash returned by EvalAndHashBuild/Probe.
   // The iterator can be iterated until HashTable::End() to find all the matching rows.
   // Only one scan can be in progress at any time (i.e. it is not legal to call
   // Find(), begin iterating through all the matches, call another Find(),
@@ -296,7 +284,7 @@ class HashTable {
   // Advancing the returned iterator will go to the next matching row.  The matching
   // rows are evaluated lazily (i.e. computed as the Iterator is moved).
   // Returns HashTable::End() if there is no match.
-  Iterator IR_ALWAYS_INLINE Find(HashTableCtx* ht_ctx);
+  Iterator IR_ALWAYS_INLINE Find(HashTableCtx* ht_ctx, uint32_t hash);
 
   // Returns number of elements in the hash table
   int64_t size() const { return num_nodes_; }
@@ -454,7 +442,7 @@ class HashTable {
   bool ResizeBuckets(int64_t num_buckets);
 
   // Insert row into the hash table
-  bool IR_ALWAYS_INLINE InsertImpl(HashTableCtx* ht_ctx, void* data);
+  bool IR_ALWAYS_INLINE InsertImpl(HashTableCtx* ht_ctx, void* data, uint32_t hash);
 
   // Chains the node at 'node_idx' to 'bucket'.  Nodes in a bucket are chained
   // as a linked list; this places the new node at the beginning of the list.

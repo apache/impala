@@ -131,7 +131,7 @@ class HashTableTest : public testing::Test {
 
       HashTable::Iterator iter;
       if (ht_ctx->EvalAndHashProbe(row, &hash)) continue;
-      iter = table->Find(ht_ctx);
+      iter = table->Find(ht_ctx, hash);
 
       if (data[i].expected_build_rows.size() == 0) {
         EXPECT_TRUE(iter == table->End());
@@ -206,7 +206,7 @@ TEST_F(HashTableTest, BasicTest) {
   uint32_t hash = 0;
   for (int i = 0; i < 5; ++i) {
     if (!ht_ctx.EvalAndHashBuild(build_rows[i], &hash)) continue;
-    hash_table.Insert(&ht_ctx, build_rows[i]);
+    hash_table.Insert(&ht_ctx, build_rows[i], hash);
   }
   EXPECT_EQ(hash_table.size(), 5);
 
@@ -257,7 +257,7 @@ TEST_F(HashTableTest, ScanTest) {
     for (int i = 0; i < val; ++i) {
       TupleRow* row = CreateTupleRow(val);
       if (!ht_ctx.EvalAndHashBuild(row, &hash)) continue;
-      hash_table.Insert(&ht_ctx, row);
+      hash_table.Insert(&ht_ctx, row, hash);
       build_rows.push_back(row);
       probe_rows[val].expected_build_rows.push_back(row);
     }
@@ -306,7 +306,7 @@ TEST_F(HashTableTest, GrowTableTest) {
     for (int j = 0; j < num_to_add; ++build_row_val, ++j) {
       TupleRow* row = CreateTupleRow(build_row_val);
       if (!ht_ctx.EvalAndHashBuild(row, &hash)) continue;
-      if (!hash_table.Insert(&ht_ctx, row)) goto done_inserting;
+      if (!hash_table.Insert(&ht_ctx, row, hash)) goto done_inserting;
     }
     expected_size += num_to_add;
     num_to_add *= 2;
@@ -318,7 +318,7 @@ done_inserting:
   for (int i = 0; i < expected_size * 5; i += 100000) {
     TupleRow* probe_row = CreateTupleRow(i);
     if (!ht_ctx.EvalAndHashProbe(probe_row, &hash)) continue;
-    HashTable::Iterator iter = hash_table.Find(&ht_ctx);
+    HashTable::Iterator iter = hash_table.Find(&ht_ctx, hash);
     if (i < hash_table.size()) {
       EXPECT_TRUE(iter != hash_table.End());
       ValidateMatch(probe_row, iter.GetRow());

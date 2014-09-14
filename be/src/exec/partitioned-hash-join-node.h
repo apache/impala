@@ -166,11 +166,13 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // probe_batch_ is entirely consumed.
   // For RIGHT_ANTI_JOIN, all this function does is to mark whether each build row
   // had a match.
+  // Returns the number of rows added to out_batch; -1 on error (and status_ will be
+  // set).
   template<int const JoinOp>
-  Status ProcessProbeBatch(RowBatch* out_batch, HashTableCtx* ht_ctx);
+  int ProcessProbeBatch(RowBatch* out_batch, HashTableCtx* ht_ctx);
 
   // Wrapper that calls templated version of ProcessProbeBatch() based on 'join_op'.
-  Status ProcessProbeBatch(
+  int ProcessProbeBatch(
       const TJoinOp::type join_op, RowBatch* out_batch, HashTableCtx* ht_ctx);
 
   // Sweep the hash_tbl_ of the partition that it is in the front of
@@ -347,7 +349,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   ProcessBuildBatchFn process_build_batch_fn_;
 
   // llvm function and signature for codegening probe batch.
-  typedef Status (*ProcessProbeBatchFn)(
+  typedef int (*ProcessProbeBatchFn)(
       PartitionedHashJoinNode*, RowBatch*, HashTableCtx*);
   // Jitted ProcessProbeBatch function pointer.  NULL if codegen is disabled.
   ProcessProbeBatchFn process_probe_batch_fn_;
@@ -361,6 +363,13 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // mode 1 and 2 when we need to partition the build and probe inputs.
   // This is not used when processing a single partition.
   std::vector<Partition*> hash_partitions_;
+
+  // Cache of the per partition hash table to speed up ProcessProbeBatch.
+  // In the case where we need to partition the probe:
+  //  hash_tbls_[i] = hash_partitions_[i]->hash_tbl();
+  // In the case where we don't need to partition the probe:
+  //  hash_tbls_[i] = input_partition_->hash_tbl();
+  HashTable* hash_tbls_[PARTITION_FANOUT];
 
   // The current input partition to be processed (not in spilled_partitions_).
   // This partition can either serve as the source for a repartitioning step, or

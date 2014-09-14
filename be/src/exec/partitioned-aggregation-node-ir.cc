@@ -57,14 +57,14 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, HashTableCtx* h
         // hash table since we process the aggregate rows first. These rows should
         // have been aggregated in the initial pass.
         // TODO: change HT interface to have FindOrInsert()
-        HashTable::Iterator it = ht->Find(ht_ctx);
+        HashTable::Iterator it = ht->Find(ht_ctx, hash);
         if (!it.AtEnd()) {
           // Row is already in hash table. Do the aggregation and we're done.
           UpdateTuple(&dst_partition->agg_fn_ctxs[0], it.GetTuple(), row);
           continue;
         }
       } else {
-        DCHECK(ht->Find(ht_ctx).AtEnd()) << ht->size();
+        DCHECK(ht->Find(ht_ctx, hash).AtEnd()) << ht->size();
       }
 
       Tuple* intermediate_tuple = NULL;
@@ -91,7 +91,9 @@ allocate_tuple:
 
       // After copying and initialize it, try to insert the tuple into the hash table.
       // If it inserts, we are done.
-      if (intermediate_tuple != NULL && ht->Insert(ht_ctx, intermediate_tuple)) continue;
+      if (intermediate_tuple != NULL && ht->Insert(ht_ctx, intermediate_tuple, hash)) {
+        continue;
+      }
 
       // In this case, we either didn't have enough memory to add the intermediate_tuple
       // to the stream or we didn't have enough memory to insert it into the hash table.
@@ -101,7 +103,7 @@ allocate_tuple:
         DCHECK(dst_partition->aggregated_row_stream->is_pinned());
         // We spilled a different partition, try to insert this tuple.
         if (intermediate_tuple == NULL) goto allocate_tuple;
-        if (ht->Insert(ht_ctx, intermediate_tuple)) continue;
+        if (ht->Insert(ht_ctx, intermediate_tuple, hash)) continue;
         DCHECK(false) << "How can we get here. We spilled a different partition but "
           "still did not have enough memory.";
         return Status::MEM_LIMIT_EXCEEDED;

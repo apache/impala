@@ -22,31 +22,21 @@ namespace impala {
 
 inline bool HashTableCtx::EvalAndHashBuild(TupleRow* row, uint32_t* hash) {
   bool has_null = EvalBuildRow(row);
-  if (!stores_nulls_ && has_null) {
-    skip_row_ = true;
-  } else {
-    *hash = HashCurrentRow();
-    skip_row_ = false;
-  }
-  return !skip_row_;
+  if (!stores_nulls_ && has_null) return false;
+  *hash = HashCurrentRow();
+  return true;
 }
 
 inline bool HashTableCtx::EvalAndHashProbe(TupleRow* row, uint32_t* hash) {
   bool has_null = EvalProbeRow(row);
-  if ((!stores_nulls_ || !finds_nulls_) && has_null) {
-    skip_row_ = true;
-  } else {
-    *hash = HashCurrentRow();
-    skip_row_ = false;
-  }
-  return !skip_row_;
+  if ((!stores_nulls_ || !finds_nulls_) && has_null) return false;
+  *hash = HashCurrentRow();
+  return true;
 }
 
-inline HashTable::Iterator HashTable::Find(HashTableCtx* ht_ctx) {
+inline HashTable::Iterator HashTable::Find(HashTableCtx* ht_ctx, uint32_t hash) {
   DCHECK_NOTNULL(ht_ctx);
-  DCHECK(!ht_ctx->skip_row_);
   DCHECK(!buckets_.empty());
-  uint32_t hash = ht_ctx->hash_;
   DCHECK_EQ(hash, ht_ctx->HashCurrentRow());
   int64_t bucket_idx = hash & (num_buckets_ - 1);
   Bucket* bucket = &buckets_[bucket_idx];
@@ -95,7 +85,7 @@ inline HashTable::Bucket* HashTable::NextBucket(int64_t* bucket_idx) {
   return NULL;
 }
 
-inline bool HashTable::InsertImpl(HashTableCtx* ht_ctx, void* data) {
+inline bool HashTable::InsertImpl(HashTableCtx* ht_ctx, void* data, uint32_t hash) {
   DCHECK(!buckets_.empty());
   if (UNLIKELY(num_filled_buckets_ > num_buckets_till_resize_)) {
     // TODO: next prime instead of double?
@@ -104,7 +94,6 @@ inline bool HashTable::InsertImpl(HashTableCtx* ht_ctx, void* data) {
   if (node_remaining_current_page_ == 0) {
     if (!GrowNodeArray()) return false;
   }
-  uint32_t hash = ht_ctx->hash_;
   DCHECK_EQ(hash, ht_ctx->HashCurrentRow());
   int64_t bucket_idx = hash & (num_buckets_ - 1);
   next_node_->hash = hash;

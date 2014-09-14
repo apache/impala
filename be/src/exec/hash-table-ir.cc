@@ -19,6 +19,5 @@
 using namespace impala;
 
 uint32_t HashTableCtx::GetHashSeed() const { return seeds_[level_]; }
-void HashTableCtx::set_hash(uint32_t hash) { hash_ = hash; }
 
 #endif
