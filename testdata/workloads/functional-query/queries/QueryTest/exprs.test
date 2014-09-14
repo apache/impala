@@ -1102,6 +1102,44 @@ select timestamp_col, count(*) from alltypesagg where case timestamp_col when
 TIMESTAMP, BIGINT
 ====
 ---- QUERY
+select decode(id, 1, 100) from alltypesagg where day = 1 and id < 3
+---- RESULTS
+100
+NULL
+NULL
+---- TYPES
+TINYINT
+====
+---- QUERY
+select id
+from alltypesagg
+where day = 1 and id < 3 and decode(tinyint_col, null, 4) is not null
+---- RESULTS
+0
+---- TYPES
+INT
+====
+---- QUERY
+select distinct decode(id, tinyint_col, round(float_col)) from alltypestiny
+---- RESULTS
+NULL
+0
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+select decode(tinyint_col, null, -2), count(*)
+from alltypesagg
+where day = 1 and decode(smallint_col, 11, -1, id) < 10
+group by 1
+---- RESULTS
+-2,1
+NULL,19
+---- TYPES
+TINYINT,BIGINT
+====
+---- QUERY
 # BETWEEN predicate
 select count(*) from alltypesagg where tinyint_col between 1 and 2
 ---- RESULTS

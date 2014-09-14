@@ -22,6 +22,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.cloudera.impala.thrift.TExpr;
 import junit.framework.Assert;
 
 import org.junit.Test;
@@ -39,6 +40,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 
 public class AnalyzeExprsTest extends AnalyzerTest {
@@ -1524,6 +1526,76 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select case 1 when 2 then NULL else 3 end");
     AnalyzesOk("select case 1 when 2 then 3 else NULL end");
     AnalyzesOk("select case NULL when NULL then NULL else NULL end");
+  }
+
+  @Test
+  public void TestDecodeExpr() throws AnalysisException {
+    AnalyzesOk("select decode(1, 1, 1)");
+    AnalyzesOk("select decode(1, 1, 'foo')");
+    AnalyzesOk("select decode(1, 2, true, false)");
+    AnalyzesOk("select decode(null, null, null, null, null, null)");
+    assertCaseEquivalence(
+        "CASE WHEN 1 = 2 THEN NULL ELSE 'foo' END",
+        "decode(1, 2, NULL, 'foo')");
+    assertCaseEquivalence(
+        "CASE WHEN 1 = 2 THEN NULL ELSE 4 END",
+        "decode(1, 2, NULL, 4)");
+    assertCaseEquivalence(
+        "CASE WHEN string_col = 'a' THEN 1 WHEN string_col = 'b' THEN 2 ELSE 3 END",
+        "decode(string_col, 'a', 1, 'b', 2, 3)");
+    assertCaseEquivalence(
+        "CASE WHEN int_col IS NULL AND bigint_col IS NULL "
+            + "OR int_col = bigint_col THEN tinyint_col ELSE smallint_col END",
+        "decode(int_col, bigint_col, tinyint_col, smallint_col)");
+    assertCaseEquivalence(
+        "CASE WHEN int_col = 1 THEN 1 WHEN int_col IS NULL AND bigint_col IS NULL OR "
+            + "int_col = bigint_col THEN 2 WHEN int_col IS NULL THEN 3 ELSE 4 END",
+        "decode(int_col, 1, 1, bigint_col, 2, NULL, 3, 4)");
+    assertCaseEquivalence(
+        "CASE WHEN NULL IS NULL THEN NULL ELSE NULL END",
+        "decode(null, null, null, null)");
+
+    AnalysisError("select decode()",
+        "DECODE in 'decode()' requires at least 3 arguments");
+    AnalysisError("select decode(1)",
+        "DECODE in 'decode(1)' requires at least 3 arguments");
+    AnalysisError("select decode(1, 2)",
+        "DECODE in 'decode(1, 2)' requires at least 3 arguments");
+    AnalysisError("select decode(*)", "Cannot pass '*'");
+    AnalysisError("select decode(distinct 1, 2, 3)", "Cannot pass 'DISTINCT'");
+    AnalysisError("select decode(true, 'foo', 1)",
+        "operands of type BOOLEAN and STRING are not comparable: TRUE = 'foo'");
+    AnalysisError("select functional.decode(1, 1, 1)", "functional.decode() unknown");
+  }
+
+  /**
+   * Assert that the caseSql and decodeSql have the same underlying child expr
+   * and thrift representation.
+   */
+  void assertCaseEquivalence(String caseSql, String decodeSql)
+      throws AnalysisException {
+    String sqlTemplate = "select %s from functional.alltypes";
+    SelectStmt stmt = (SelectStmt)AnalyzesOk(String.format(sqlTemplate, caseSql));
+    CaseExpr caseExpr =
+        (CaseExpr)stmt.getSelectList().getItems().get(0).getExpr();
+    List<SlotRef> slotRefs = Lists.newArrayList();
+    caseExpr.collect(Predicates.instanceOf(SlotRef.class), slotRefs);
+    for (SlotRef slotRef: slotRefs) {
+      slotRef.getDesc().setIsMaterialized(true);
+      slotRef.getDesc().setByteOffset(0);
+    }
+    TExpr caseThrift = caseExpr.treeToThrift();
+    stmt = (SelectStmt)AnalyzesOk(String.format(sqlTemplate, decodeSql));
+    CaseExpr decodeExpr =
+        (CaseExpr)stmt.getSelectList().getItems().get(0).getExpr();
+    Assert.assertEquals(caseSql, decodeExpr.toCaseSql());
+    slotRefs.clear();
+    decodeExpr.collect(Predicates.instanceOf(SlotRef.class), slotRefs);
+    for (SlotRef slotRef: slotRefs) {
+      slotRef.getDesc().setIsMaterialized(true);
+      slotRef.getDesc().setByteOffset(0);
+    }
+    Assert.assertEquals(caseThrift, decodeExpr.treeToThrift());
   }
 
   @Test

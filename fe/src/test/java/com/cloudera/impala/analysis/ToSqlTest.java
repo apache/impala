@@ -794,6 +794,11 @@ public class ToSqlTest extends AnalyzerTest {
         "(case true when true then 1 when false then 2 else 3 end)",
         "SELECT CASE TRUE WHEN TRUE THEN 1 WHEN FALSE THEN 2 ELSE 3 END, " +
         "(CASE TRUE WHEN TRUE THEN 1 WHEN FALSE THEN 2 ELSE 3 END)");
+    // DECODE version of CaseExpr.
+    testToSql("select decode(1, 2, 3), (decode(4, 5, 6))",
+        "SELECT decode(1, 2, 3), (decode(4, 5, 6))");
+    testToSql("select decode(1, 2, 3, 4, 5, 6), (decode(1, 2, 3, 4, 5, 6))",
+        "SELECT decode(1, 2, 3, 4, 5, 6), (decode(1, 2, 3, 4, 5, 6))");
 
     // CastExpr.
     testToSql("select cast(NULL as INT), (cast(NULL as INT))",

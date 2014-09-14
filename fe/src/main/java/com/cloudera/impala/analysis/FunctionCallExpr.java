@@ -18,6 +18,7 @@ import java.util.List;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.AggregateFunction;
+import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.ScalarFunction;
@@ -65,6 +66,21 @@ public class FunctionCallExpr extends Expr {
     params_ = params;
     isMergeAggFn_ = isMergeAggFn;
     if (params.exprs() != null) children_.addAll(params.exprs());
+  }
+
+  /**
+   * Returns an Expr that evaluates the function call <fnName>(<params>). The returned
+   * Expr is not necessarily a FunctionCallExpr (example: DECODE())
+   */
+  public static Expr createExpr(FunctionName fnName, FunctionParams params) {
+    FunctionCallExpr functionCallExpr = new FunctionCallExpr(fnName, params);
+    if (fnName.getFunction().equals("decode")
+        && (fnName.getDb() == null) || Catalog.BUILTINS_DB.equals(fnName.getDb())) {
+      // If someone created the DECODE function before it became a builtin, they can
+      // continue to use it by the fully qualified name.
+      return new CaseExpr(functionCallExpr);
+    }
+    return functionCallExpr;
   }
 
   /**
@@ -423,14 +439,7 @@ public class FunctionCallExpr extends Expr {
       if (aggFn.ignoresDistinct()) params_.setIsDistinct(false);
     }
 
-    if (isScalarFunction()) {
-      if (params_.isStar()) {
-        throw new AnalysisException("Cannot pass '*' to scalar function.");
-      }
-      if (params_.isDistinct()) {
-        throw new AnalysisException("Cannot pass 'DISTINCT' to scalar function.");
-      }
-    }
+    if (isScalarFunction()) validateScalarFnParams(params_);
     if (fn_ instanceof AggregateFunction
         && ((AggregateFunction) fn_).isAnalyticFn()
         && !((AggregateFunction) fn_).isAggregateFn()
@@ -443,6 +452,20 @@ public class FunctionCallExpr extends Expr {
     type_ = fn_.getReturnType();
     if (type_.isDecimal() && type_.isWildcardDecimal()) {
       type_ = resolveDecimalReturnType(analyzer);
+    }
+  }
+
+  /**
+   * Checks that no special aggregate params are included in 'params' that would be
+   * invalid for a scalar function. Analysis of the param exprs is not done.
+   */
+  static void validateScalarFnParams(FunctionParams params)
+      throws AnalysisException {
+    if (params.isStar()) {
+      throw new AnalysisException("Cannot pass '*' to scalar function.");
+    }
+    if (params.isDistinct()) {
+      throw new AnalysisException("Cannot pass 'DISTINCT' to scalar function.");
     }
   }
 

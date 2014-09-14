@@ -319,7 +319,7 @@ nonterminal Expr opt_offset_param;
 nonterminal LimitElement opt_limit_offset_clause;
 nonterminal Expr opt_limit_clause, opt_offset_clause;
 nonterminal Expr cast_expr, case_else_clause, analytic_expr;
-nonterminal FunctionCallExpr function_call_expr;
+nonterminal Expr function_call_expr;
 nonterminal AnalyticWindow opt_window_clause;
 nonterminal AnalyticWindow.Type window_type;
 nonterminal AnalyticWindow.Boundary window_boundary;
@@ -2088,17 +2088,25 @@ non_pred_expr ::=
 
 function_call_expr ::=
   function_name:fn_name LPAREN RPAREN
-  {: RESULT = new FunctionCallExpr(fn_name, new ArrayList<Expr>()); :}
+  {:
+    RESULT = FunctionCallExpr.createExpr(
+        fn_name, new FunctionParams(new ArrayList<Expr>()));
+  :}
   | function_name:fn_name LPAREN function_params:params RPAREN
-  {: RESULT = new FunctionCallExpr(fn_name, params); :}
+  {: RESULT = FunctionCallExpr.createExpr(fn_name, params); :}
   ;
 
 // TODO: allow an arbitrary expr here instead of agg/fn call, and check during analysis?
 // The parser errors aren't particularly easy to parse.
 analytic_expr ::=
-  function_call_expr:f KW_OVER
+  function_call_expr:e KW_OVER
     LPAREN opt_partition_by_clause:p opt_order_by_clause:o opt_window_clause:w RPAREN
   {:
+    // Handle cases where function_call_expr resulted in a plain Expr
+    if (!(e instanceof FunctionCallExpr)) {
+      parser.parseError("over", SqlParserSymbols.KW_OVER);
+    }
+    FunctionCallExpr f = (FunctionCallExpr)e;
     f.setIsAnalyticFnCall(true);
     RESULT = new AnalyticExpr(f, p, o, w);
   :}

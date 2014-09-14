@@ -177,6 +177,7 @@ public class Db implements CatalogObject {
    * See comment in Catalog.
    */
   public boolean addFunction(Function fn) {
+    Preconditions.checkState(fn.dbName().equals(getName()));
     // TODO: add this to persistent store
     synchronized (functions_) {
       if (getFunction(fn, Function.CompareMode.IS_INDISTINGUISHABLE) != null) {

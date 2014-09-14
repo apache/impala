@@ -48,7 +48,9 @@ public class BinaryPredicate extends Predicate {
     GE(">=", "ge", TComparisonOp.GE),
     LT("<", "lt", TComparisonOp.LT),
     GT(">", "gt", TComparisonOp.GT),
-    // Same as EQ, except it returns True if the rhs is NULL
+    // Same as EQ, except it returns True if the rhs is NULL. There is no backend
+    // function for this. The functionality is embedded in the hash-join
+    // implementation.
     NULL_MATCHING_EQ("=", "null_matching_eq", TComparisonOp.EQ);
 
     private final String description_;

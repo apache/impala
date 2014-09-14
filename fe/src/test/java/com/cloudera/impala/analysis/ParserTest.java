@@ -980,6 +980,7 @@ public class ParserTest {
     ParsesOk("select f1(*)");
     ParsesOk("select f1(distinct col)");
     ParsesOk("select f1(distinct col, col2)");
+    ParsesOk("select decode(col, col2, col3)");
     ParserError("select f( from t");
     ParserError("select f(5.0 5.0) from t");
   }
@@ -1151,6 +1152,10 @@ public class ParserTest {
     ParserError("select sum(v) over (partition by a, 2*b order by 3*c rows 2 "
         + "preceding and 2 following) from t");
     ParsesOk("select sum(v) over (partition by a, 2*b) from t");
+    // Special case for DECODE, which results in a parse error when used in
+    // an analytic context. Note that "ecode() over ()" would parse fine since
+    // that is handled by the standard function call lookup.
+    ParserError("select decode(1, 2, 3) over () from t");
   }
 
   @Test
