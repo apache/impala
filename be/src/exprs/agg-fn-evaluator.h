@@ -107,14 +107,16 @@ class AggFnEvaluator {
   void Close(RuntimeState* state);
 
   const ColumnType& intermediate_type() const { return intermediate_slot_desc_->type(); }
-  bool is_merge() { return is_merge_; }
+  bool is_merge() const { return is_merge_; }
   AggregationOp agg_op() const { return agg_op_; }
   const std::vector<ExprContext*>& input_expr_ctxs() const { return input_expr_ctxs_; }
   bool is_count_star() const { return agg_op_ == COUNT && input_expr_ctxs_.empty(); }
   bool is_builtin() const { return fn_.binary_type == TFunctionBinaryType::BUILTIN; }
   bool SupportsRemove() const { return remove_fn_ != NULL; }
   bool SupportsSerialize() const { return serialize_fn_ != NULL; }
-  const std::string& fn_name() { return fn_.name.function_name; }
+  const std::string& fn_name() const { return fn_.name.function_name; }
+  const std::string& update_symbol() const { return fn_.aggregate_fn.update_fn_symbol; }
+  const std::string& merge_symbol() const { return fn_.aggregate_fn.merge_fn_symbol; }
 
   static std::string DebugString(const std::vector<AggFnEvaluator*>& exprs);
   std::string DebugString() const;

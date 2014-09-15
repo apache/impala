@@ -134,6 +134,13 @@ order by t1.c1 desc limit 3
 DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
 ====
 ---- QUERY
+select avg(d1), avg(d2), avg(d3), avg(d4), avg(d5), avg(d6) from decimal_tbl;
+---- RESULTS
+32222,666,0.0034551650,0.00000000000000000000000000000536870912,2472.20577,1
+---- TYPES
+decimal,decimal,decimal,decimal,decimal,decimal
+====
+---- QUERY
 select cast(avg(c1) as decimal(10,4)) as c from decimal_tiny
 group by c3 having c > 5.5 order by 1
 ---- RESULTS

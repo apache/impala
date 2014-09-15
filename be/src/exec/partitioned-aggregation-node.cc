@@ -842,41 +842,6 @@ Status PartitionedAggregationNode::MoveHashPartitions(int64_t num_input_rows) {
   return Status::OK;
 }
 
-IRFunction::Type GetAvgFunction(const ColumnType& type, bool is_merge) {
-  if (!is_merge) {
-    switch (type.type) {
-      case TYPE_BIGINT: return IRFunction::AVG_UPDATE_BIGINT;
-      case TYPE_DOUBLE: return IRFunction::AVG_UPDATE_DOUBLE;
-      case TYPE_TIMESTAMP: return IRFunction::AVG_UPDATE_TIMESTAMP;
-      case TYPE_DECIMAL: return IRFunction::AVG_UPDATE_DECIMAL;
-      default:
-        DCHECK(false) << "Unsupported type: " << type;
-        return IRFunction::FN_END;
-    }
-  } else {
-    if (type.type == TYPE_DECIMAL) return IRFunction::AVG_MERGE_DECIMAL;
-    return IRFunction::AVG_MERGE;
-  }
-}
-
-IRFunction::Type GetHllFunction(const ColumnType& type, bool is_merge) {
-  if (is_merge) return IRFunction::HLL_MERGE;
-  switch (type.type) {
-    case TYPE_BOOLEAN: return IRFunction::HLL_UPDATE_BOOLEAN;
-    case TYPE_TINYINT: return IRFunction::HLL_UPDATE_TINYINT;
-    case TYPE_SMALLINT: return IRFunction::HLL_UPDATE_SMALLINT;
-    case TYPE_INT: return IRFunction::HLL_UPDATE_INT;
-    case TYPE_BIGINT: return IRFunction::HLL_UPDATE_BIGINT;
-    case TYPE_FLOAT: return IRFunction::HLL_UPDATE_FLOAT;
-    case TYPE_DOUBLE: return IRFunction::HLL_UPDATE_DOUBLE;
-    case TYPE_STRING: return IRFunction::HLL_UPDATE_STRING;
-    case TYPE_DECIMAL: return IRFunction::HLL_UPDATE_DECIMAL;
-    default:
-      DCHECK(false) << "Unsupported type: " << type;
-      return IRFunction::FN_END;
-  }
-}
-
 // IR Generation for updating a single aggregation slot. Signature is:
 // void UpdateSlot(FunctionContext* fn_ctx, AggTuple* agg_tuple, char** row)
 //
@@ -1055,18 +1020,13 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
     case AggFnEvaluator::NDV: {
       DCHECK_EQ(slot_desc->type().type, TYPE_STRING);
 
-      IRFunction::Type ir_function_type;
-      if (evaluator->agg_op() == AggFnEvaluator::AVG) {
-        ir_function_type = GetAvgFunction(input_expr->type(), evaluator->is_merge());
-      } else {
-        DCHECK_EQ(evaluator->agg_op(), AggFnEvaluator::NDV);
-        ir_function_type = GetHllFunction(input_expr->type(), evaluator->is_merge());
-      }
+      // Get xcompiled update/merge function from IR module
+      const string& symbol = evaluator->is_merge() ?
+                             evaluator->merge_symbol() : evaluator->update_symbol();
+      Function* ir_fn = codegen->module()->getFunction(symbol);
+      DCHECK_NOTNULL(ir_fn);
 
-      Function* ir_fn = codegen->GetFunction(ir_function_type);
-
-      // Create pointer to src_anyval to pass to HllUpdate() function. We must use the
-      // unlowered type.
+      // Create pointer to src_anyval to pass to ir_fn. We must use the unlowered type.
       Value* src_lowered_ptr = codegen->CreateEntryBlockAlloca(
           fn, LlvmCodeGen::NamedVariable("src_lowered_ptr", src.value()->getType()));
       builder.CreateStore(src.value(), src_lowered_ptr);
@@ -1079,8 +1039,7 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
       CodegenAnyVal dst_stringval = CodegenAnyVal::GetNonNullVal(
           codegen, &builder, TYPE_STRING, "dst_stringval");
       dst_stringval.SetFromRawValue(dst_value);
-      // Create pointer to dst_stringval to pass to HllUpdate() function. We must use
-      // the unlowered type.
+      // Create pointer to dst_stringval to pass to ir_fn. We must use the unlowered type.
       Value* dst_lowered_ptr = codegen->CreateEntryBlockAlloca(
           fn, LlvmCodeGen::NamedVariable("dst_lowered_ptr",
                                          dst_stringval.value()->getType()));
