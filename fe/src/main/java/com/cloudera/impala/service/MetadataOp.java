@@ -263,6 +263,7 @@ public class MetadataOp {
       if (!schemaPattern.matches(dbName)) continue;
 
       Db db = catalog.getDb(dbName);
+      if (db == null) continue;
 
       if (functionName != null) {
         // Get function metadata
