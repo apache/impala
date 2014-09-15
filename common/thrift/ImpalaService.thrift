@@ -150,6 +150,9 @@ enum TImpalaQueryOptions {
 
   // Test hook for spill to disk operators
   MAX_BLOCK_MGR_MEMORY,
+
+  // Transforms all count(distinct) aggregations into NDV()
+  APPX_COUNT_DISTINCT
 }
 
 // The summary of an insert.

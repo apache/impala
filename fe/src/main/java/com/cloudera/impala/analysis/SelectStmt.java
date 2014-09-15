@@ -502,6 +502,31 @@ public class SelectStmt extends QueryStmt {
           aggExprs);
     }
 
+    // Optionally rewrite all count(distinct <expr>) into equivalent NDV() calls.
+    ExprSubstitutionMap ndvSmap = null;
+    if (analyzer.getQueryCtx().getRequest().query_options.appx_count_distinct) {
+      ndvSmap = new ExprSubstitutionMap();
+      for (FunctionCallExpr aggExpr: aggExprs) {
+        if (!aggExpr.isDistinct()
+            || !aggExpr.getFnName().getFunction().equals("count")
+            || aggExpr.getParams().size() != 1) {
+          continue;
+        }
+        FunctionCallExpr ndvFnCall =
+            new FunctionCallExpr("ndv", aggExpr.getParams().exprs());
+        ndvFnCall.analyzeNoThrow(analyzer);
+        Preconditions.checkState(ndvFnCall.getType().equals(aggExpr.getType()));
+        ndvSmap.put(aggExpr, ndvFnCall);
+      }
+      // Replace all count(distinct <expr>) with NDV(<expr>).
+      List<Expr> substAggExprs = Expr.substituteList(aggExprs, ndvSmap, analyzer);
+      aggExprs.clear();
+      for (Expr aggExpr: substAggExprs) {
+        Preconditions.checkState(aggExpr instanceof FunctionCallExpr);
+        aggExprs.add((FunctionCallExpr) aggExpr);
+      }
+    }
+
     // When DISTINCT aggregates are present, non-distinct (i.e. ALL) aggregates are
     // evaluated in two phases (see AggregateInfo for more details). In particular,
     // COUNT(c) in "SELECT COUNT(c), AGG(DISTINCT d) from R" is transformed to
@@ -513,6 +538,7 @@ public class SelectStmt extends QueryStmt {
     // i) There is no GROUP-BY clause, and
     // ii) Other DISTINCT aggregates are present.
     ExprSubstitutionMap countAllMap = createCountAllMap(aggExprs, analyzer);
+    countAllMap = ExprSubstitutionMap.compose(ndvSmap, countAllMap, analyzer);
     List<Expr> substitutedAggs = Expr.substituteList(aggExprs, countAllMap, analyzer);
     aggExprs.clear();
     TreeNode.collect(substitutedAggs, Expr.isAggregatePredicate(), aggExprs);

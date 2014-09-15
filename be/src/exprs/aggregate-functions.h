@@ -176,7 +176,7 @@ class AggregateFunctions {
   template <typename T>
   static void HllUpdate(FunctionContext*, const T& src, StringVal* dst);
   static void HllMerge(FunctionContext*, const StringVal& src, StringVal* dst);
-  static StringVal HllFinalize(FunctionContext*, const StringVal& src);
+  static BigIntVal HllFinalize(FunctionContext*, const StringVal& src);
 
   // Knuth's variance algorithm, more numerically stable than canonical stddev
   // algorithms; reference implementation:

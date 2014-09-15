@@ -214,15 +214,8 @@ void CatalogOpExecutor::SetColumnStats(const TTableSchema& col_stats_schema,
   // col_stats_row, respectively. Positions i + 2 and i + 3 contain the max/avg
   // length for string columns, and -1 for non-string columns.
   for (int i = 0; i < col_stats_row.colVals.size(); i += 4) {
-    // The NDVs are written as a string column by the estimation function.
-    StringParser::ParseResult parse_result;
-    const string& ndvs_str = col_stats_row.colVals[i].stringVal.value;
-    int64_t ndvs = StringParser::StringToInt<int64_t>(ndvs_str.data(),
-        ndvs_str.size(), &parse_result);
-    DCHECK_EQ(StringParser::PARSE_SUCCESS, parse_result);
-
     TColumnStats col_stats;
-    col_stats.__set_num_distinct_values(ndvs);
+    col_stats.__set_num_distinct_values(col_stats_row.colVals[i].i64Val.value);
     col_stats.__set_num_nulls(col_stats_row.colVals[i + 1].i64Val.value);
     col_stats.__set_max_size(col_stats_row.colVals[i + 2].i32Val.value);
     col_stats.__set_avg_size(col_stats_row.colVals[i + 3].doubleVal.value);

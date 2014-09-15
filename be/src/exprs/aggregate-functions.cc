@@ -1016,7 +1016,7 @@ void AggregateFunctions::HllMerge(FunctionContext* ctx, const StringVal& src,
   }
 }
 
-StringVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal& src) {
+BigIntVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal& src) {
   DCHECK(!src.is_null);
   DCHECK_EQ(src.len, HLL_LEN);
 
@@ -1048,14 +1048,7 @@ StringVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal&
     estimate = num_streams * log(static_cast<float>(num_streams) / num_zero_registers);
   }
   ctx->Free(src.ptr);
-
-  // Output the estimate as ascii string
-  stringstream out;
-  out << estimate;
-  string out_str = out.str();
-  StringVal result_str(ctx, out_str.size());
-  memcpy(result_str.ptr, out_str.c_str(), result_str.len);
-  return result_str;
+  return estimate;
 }
 
 // An implementation of a simple single pass variance algorithm. A standard UDA must

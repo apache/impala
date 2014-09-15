@@ -27,12 +27,17 @@ import junit.framework.Assert;
 import org.junit.Test;
 
 import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
+import com.cloudera.impala.catalog.CatalogException;
+import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TestSchemaUtils;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TQueryOptions;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -1938,5 +1943,70 @@ public class AnalyzeExprsTest extends AnalyzerTest {
       exprStr.append(closeFunc);
     }
     return exprStr.toString();
+  }
+
+  @Test
+  public void TestAppxCountDistinctOption() throws AnalysisException, CatalogException {
+    TQueryOptions queryOptions = new TQueryOptions();
+    queryOptions.setAppx_count_distinct(true);
+
+    // Accumulates count(distinct) for all columns of alltypesTbl or decimalTbl.
+    List<String> countDistinctFns = Lists.newArrayList();
+    // Accumulates count(distinct) for all columns of both alltypesTbl and decimalTbl.
+    List<String> allCountDistinctFns = Lists.newArrayList();
+
+    Table alltypesTbl = catalog_.getTable("functional", "alltypes");
+    for (Column col: alltypesTbl.getColumns()) {
+      String colName = col.getName();
+      // Test a single count(distinct) with some other aggs.
+      AnalyzesOk(String.format(
+          "select count(distinct %s), sum(distinct smallint_col), " +
+          "avg(float_col), min(%s) " +
+          "from functional.alltypes",
+          colName, colName), createAnalyzer(queryOptions));
+      countDistinctFns.add(String.format("count(distinct %s)", colName));
+    }
+    // Test a single query with a count(distinct) on all columns of alltypesTbl.
+    AnalyzesOk(String.format("select %s from functional.alltypes",
+        Joiner.on(",").join(countDistinctFns)), createAnalyzer(queryOptions));
+
+    allCountDistinctFns.addAll(countDistinctFns);
+    countDistinctFns.clear();
+    Table decimalTbl = catalog_.getTable("functional", "decimal_tbl");
+    for (Column col: decimalTbl.getColumns()) {
+      String colName = col.getName();
+      // Test a single count(distinct) with some other aggs.
+      AnalyzesOk(String.format(
+          "select count(distinct %s), sum(distinct d1), " +
+          "avg(d2), min(%s) " +
+          "from functional.decimal_tbl",
+          colName, colName), createAnalyzer(queryOptions));
+      countDistinctFns.add(String.format("count(distinct %s)", colName));
+    }
+    // Test a single query with a count(distinct) on all columns of decimalTbl.
+    AnalyzesOk(String.format("select %s from functional.decimal_tbl",
+        Joiner.on(",").join(countDistinctFns)), createAnalyzer(queryOptions));
+
+    allCountDistinctFns.addAll(countDistinctFns);
+
+    // Test a single query with a count(distinct) on all columns of both
+    // alltypes/decimalTbl.
+    AnalyzesOk(String.format(
+        "select %s from functional.alltypes cross join functional.decimal_tbl",
+        Joiner.on(",").join(countDistinctFns)), createAnalyzer(queryOptions));
+
+    // The rewrite does not work for multiple count() arguments.
+    AnalysisError("select count(distinct int_col, bigint_col), " +
+        "count(distinct string_col, float_col) from functional.alltypes",
+        createAnalyzer(queryOptions),
+        "all DISTINCT aggregate functions need to have the same set of parameters as " +
+        "count(DISTINCT int_col, bigint_col); deviating function: " +
+        "count(DISTINCT string_col, float_col)");
+    // The rewrite only applies to the count() function.
+    AnalysisError(
+        "select avg(distinct int_col), sum(distinct float_col) from functional.alltypes",
+        createAnalyzer(queryOptions),
+        "all DISTINCT aggregate functions need to have the same set of parameters as " +
+        "avg(DISTINCT int_col); deviating function: sum(DISTINCT");
   }
 }

@@ -43,6 +43,7 @@ import com.cloudera.impala.testutil.ImpaladTestCatalog;
 import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TQueryCtx;
+import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -77,6 +78,12 @@ public class AnalyzerTest {
         TestUtils.createQueryContext(defaultDb, System.getProperty("user.name"));
     return new Analyzer(catalog_, queryCtx,
         AuthorizationConfig.createAuthDisabledConfig());
+  }
+
+  protected Analyzer createAnalyzer(TQueryOptions queryOptions) {
+    TQueryCtx queryCtx = TestUtils.createQueryContext();
+    queryCtx.request.query_options = queryOptions;
+    return new Analyzer(catalog_, queryCtx);
   }
 
   protected Analyzer createAnalyzerUsingHiveColLabels() {

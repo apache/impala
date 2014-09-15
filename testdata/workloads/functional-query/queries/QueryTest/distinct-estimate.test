@@ -119,9 +119,9 @@ select
   ndv(timestamp_col)
 from alltypesagg
 ---- TYPES
-string, string, string, string, string, string, string, string, string, string
+bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint
 ---- RESULTS
-'10549','2','9','104','1881','1342','944','991','1178','9880'
+10549,2,9,104,1881,1342,944,991,1178,9880
 ====
 ---- QUERY
 # Test the distinctpc aggregate function on empty table
@@ -135,7 +135,7 @@ string
 # Test the hll aggregate function on empty table
 select ndv(field) from EmptyTable
 ---- TYPES
-string
+bigint
 ---- RESULTS
-'0'
+0
 ====

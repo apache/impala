@@ -93,6 +93,9 @@ struct TQueryOptions {
 
   // test hook to cap max memory for spilling operators (to force them to spill).
   27: optional i64 max_block_mgr_memory
+
+  // If true, transforms all count(distinct) aggregations into NDV()
+  28: optional bool appx_count_distinct = 0
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

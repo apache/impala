@@ -992,6 +992,11 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
         query_options->__set_max_block_mgr_memory(mem);
         break;
       }
+      case TImpalaQueryOptions::APPX_COUNT_DISTINCT: {
+        query_options->__set_appx_count_distinct(
+            iequals(value, "true") || iequals(value, "1"));
+        break;
+      }
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
@@ -1279,6 +1284,9 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
         break;
       case TImpalaQueryOptions::MAX_BLOCK_MGR_MEMORY:
         val << query_option.max_block_mgr_memory;
+        break;
+      case TImpalaQueryOptions::APPX_COUNT_DISTINCT:
+        val << query_option.appx_count_distinct;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

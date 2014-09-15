@@ -1,4 +1,3 @@
-====
 ---- QUERY
 # count(distinct)
 select count(distinct smallint_col, tinyint_col)
@@ -349,4 +348,21 @@ false,5,3650,50
 true,4,3650,40
 ---- TYPES
 boolean, double, bigint, double
+====
+---- QUERY
+# Test rewriting count(distinct) into NDV() via a query option.
+set appx_count_distinct=true;
+select count(distinct int_col), count(distinct float_col), count(distinct string_col)
+from alltypesagg
+---- RESULTS
+1881,944,1178
+---- TYPES
+bigint, bigint, bigint
+====
+---- QUERY
+# Unset the query option from the previous test.
+set appx_count_distinct=false
+---- RESULTS
+---- TYPES
+string, string
 ====
