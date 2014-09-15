@@ -48,6 +48,8 @@ class AggregateFunctions {
   // Implementation of Count and Count(*)
   static void CountUpdate(FunctionContext*, const AnyVal& src, BigIntVal* dst);
   static void CountStarUpdate(FunctionContext*, BigIntVal* dst);
+  static void CountRemove(FunctionContext*, const AnyVal& src, BigIntVal* dst);
+  static void CountStarRemove(FunctionContext*, BigIntVal* dst);
   static void CountMerge(FunctionContext*, const BigIntVal& src, BigIntVal* dst);
 
   // Implementation of Avg.
@@ -55,12 +57,16 @@ class AggregateFunctions {
   static void AvgInit(FunctionContext* ctx, StringVal* dst);
   template <typename T>
   static void AvgUpdate(FunctionContext* ctx, const T& src, StringVal* dst);
+  template <typename T>
+  static void AvgRemove(FunctionContext* ctx, const T& src, StringVal* dst);
   static void AvgMerge(FunctionContext* ctx, const StringVal& src, StringVal* dst);
   static DoubleVal AvgGetValue(FunctionContext* ctx, const StringVal& val);
   static DoubleVal AvgFinalize(FunctionContext* ctx, const StringVal& val);
 
   // Avg for timestamp. Uses AvgInit() and AvgMerge().
   static void TimestampAvgUpdate(FunctionContext* ctx, const TimestampVal& src,
+      StringVal* dst);
+  static void TimestampAvgRemove(FunctionContext* ctx, const TimestampVal& src,
       StringVal* dst);
   static TimestampVal TimestampAvgGetValue(FunctionContext* ctx, const StringVal& val);
   static TimestampVal TimestampAvgFinalize(FunctionContext* ctx, const StringVal& val);
@@ -69,6 +75,10 @@ class AggregateFunctions {
   static void DecimalAvgInit(FunctionContext* ctx, StringVal* dst);
   static void DecimalAvgUpdate(FunctionContext* ctx, const DecimalVal& src,
       StringVal* dst);
+  static void DecimalAvgRemove(FunctionContext* ctx, const DecimalVal& src,
+      StringVal* dst);
+  static void DecimalAvgAddOrRemove(FunctionContext* ctx, const DecimalVal& src,
+      StringVal* dst, bool remove = false);
   static void DecimalAvgMerge(FunctionContext* ctx, const StringVal& src,
       StringVal* dst);
   static DecimalVal DecimalAvgGetValue(FunctionContext* ctx, const StringVal& val);
@@ -76,11 +86,18 @@ class AggregateFunctions {
 
   // SumUpdate, SumMerge
   template <typename SRC_VAL, typename DST_VAL>
-  static void Sum(FunctionContext*, const SRC_VAL& src, DST_VAL* dst);
+  static void SumUpdate(FunctionContext*, const SRC_VAL& src, DST_VAL* dst);
+
+  template <typename SRC_VAL, typename DST_VAL>
+  static void SumRemove(FunctionContext*, const SRC_VAL& src, DST_VAL* dst);
 
   // Sum for decimals
-  static void SumUpdate(FunctionContext*, const DecimalVal& src, DecimalVal* dst);
-  static void SumMerge(FunctionContext*, const DecimalVal& src, DecimalVal* dst);
+  static void SumDecimalUpdate(FunctionContext*, const DecimalVal& src, DecimalVal* dst);
+  static void SumDecimalRemove(FunctionContext*, const DecimalVal& src, DecimalVal* dst);
+  static void SumDecimalMerge(FunctionContext*, const DecimalVal& src, DecimalVal* dst);
+  // Adds or or subtracts src from dst. Implements Update() and Remove().
+  static void SumDecimalAddOrSubtract(FunctionContext*, const DecimalVal& src,
+      DecimalVal* dst, bool subtract = false);
 
   // MinUpdate/MinMerge
   template <typename T>

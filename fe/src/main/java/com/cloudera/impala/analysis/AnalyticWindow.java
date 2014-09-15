@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
+import java.math.BigDecimal;
+
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.service.FeSupport;
@@ -109,10 +111,13 @@ public class AnalyticWindow {
 
   public static class Boundary {
     private final BoundaryType type_;
-    private final Expr expr_;  // only set for PRECEDING/FOLLOWING
 
-    // set during analysis if the boundary is for a ROWS window
-    private Long rowsOffset_;
+    // Offset expr. Only set for PRECEDING/FOLLOWING. Needed for toSql().
+    private final Expr expr_;
+
+    // The offset value. Set during analysis after evaluating expr_. Integral valued
+    // for ROWS windows.
+    private BigDecimal offsetValue_;
 
     public BoundaryType getType() { return type_; }
     public Expr getExpr() { return expr_; }
@@ -122,13 +127,13 @@ public class AnalyticWindow {
     }
 
     // c'tor used by clone()
-    private Boundary(BoundaryType type, Expr e, Long rowsOffset) {
+    private Boundary(BoundaryType type, Expr e, BigDecimal offsetValue) {
       Preconditions.checkState(
         (type.isOffset() && e != null)
         || (!type.isOffset() && e == null));
       type_ = type;
       expr_ = e;
-      rowsOffset_ = rowsOffset;
+      offsetValue_ = offsetValue;
     }
 
     public String toSql() {
@@ -138,19 +143,12 @@ public class AnalyticWindow {
       return sb.toString();
     }
 
-    public TAnalyticWindowBoundary toThrift() {
+    public TAnalyticWindowBoundary toThrift(Type windowType) {
       TAnalyticWindowBoundary result = new TAnalyticWindowBoundary(type_.toThrift());
-      if (type_.isOffset()) {
-        if (rowsOffset_ == null) {
-          result.setRange_offset_expr(expr_.treeToThrift());
-        } else {
-          long relativeOffset = rowsOffset_;
-          if (type_ == BoundaryType.PRECEDING) relativeOffset *= -1;
-          result.setRows_offset_idx(relativeOffset);
-        }
-      } else if (type_ == BoundaryType.CURRENT_ROW) {
-        result.setRows_offset_idx(0);
+      if (type_.isOffset() && windowType == Type.ROWS) {
+        result.setRows_offset_value(offsetValue_.longValue());
       }
+      // TODO: range windows need range_offset_predicate
       return result;
     }
 
@@ -167,13 +165,13 @@ public class AnalyticWindow {
     public Boundary converse() {
       Boundary result = new Boundary(type_.converse(),
           (expr_ != null) ? expr_.clone() : null);
-      result.rowsOffset_ = rowsOffset_;
+      result.offsetValue_ = offsetValue_;
       return result;
     }
 
     @Override
     public Boundary clone() {
-      return new Boundary(type_, expr_ != null ? expr_.clone() : null, rowsOffset_);
+      return new Boundary(type_, expr_ != null ? expr_.clone() : null, offsetValue_);
     }
 
     public void analyze(Analyzer analyzer) throws AnalysisException {
@@ -246,11 +244,11 @@ public class AnalyticWindow {
   public TAnalyticWindow toThrift() {
     TAnalyticWindow result = new TAnalyticWindow(type_.toThrift());
     if (leftBoundary_.getType() != BoundaryType.UNBOUNDED_PRECEDING) {
-      result.setWindow_start(leftBoundary_.toThrift());
+      result.setWindow_start(leftBoundary_.toThrift(type_));
     }
     Preconditions.checkNotNull(rightBoundary_);
     if (rightBoundary_.getType() != BoundaryType.UNBOUNDED_FOLLOWING) {
-      result.setWindow_end(rightBoundary_.toThrift());
+      result.setWindow_end(rightBoundary_.toThrift(type_));
     }
     return result;
   }
@@ -301,13 +299,14 @@ public class AnalyticWindow {
               + "constant positive integer: " + boundary.toSql());
       }
       Preconditions.checkNotNull(val);
-      boundary.rowsOffset_ = val.longValue();
+      boundary.offsetValue_ = new BigDecimal(val.longValue());
     } else {
       if (!e.isConstant() || !e.getType().isNumericType() || !isPos) {
         throw new AnalysisException(
             "For RANGE window, the value of a PRECEDING/FOLLOWING offset must be a "
               + "constant positive number: " + boundary.toSql());
       }
+      boundary.offsetValue_ = new BigDecimal(val);
     }
   }
 

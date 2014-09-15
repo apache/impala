@@ -97,6 +97,21 @@ void AggregateFunctions::CountStarUpdate(FunctionContext*, BigIntVal* dst) {
   ++dst->val;
 }
 
+void AggregateFunctions::CountRemove(
+    FunctionContext*, const AnyVal& src, BigIntVal* dst) {
+  DCHECK(!dst->is_null);
+  if (!src.is_null) {
+    --dst->val;
+    DCHECK_GE(dst->val, 0);
+  }
+}
+
+void AggregateFunctions::CountStarRemove(FunctionContext*, BigIntVal* dst) {
+  DCHECK(!dst->is_null);
+  --dst->val;
+  DCHECK_GE(dst->val, 0);
+}
+
 void AggregateFunctions::CountMerge(FunctionContext*, const BigIntVal& src,
     BigIntVal* dst) {
   DCHECK(!dst->is_null);
@@ -117,14 +132,24 @@ void AggregateFunctions::AvgInit(FunctionContext* ctx, StringVal* dst) {
 }
 
 template <typename T>
-void AggregateFunctions::AvgUpdate(FunctionContext* ctx, const T& src,
-    StringVal* dst) {
+void AggregateFunctions::AvgUpdate(FunctionContext* ctx, const T& src, StringVal* dst) {
   if (src.is_null) return;
   DCHECK(dst->ptr != NULL);
   DCHECK_EQ(sizeof(AvgState), dst->len);
   AvgState* avg = reinterpret_cast<AvgState*>(dst->ptr);
   avg->sum += src.val;
   ++avg->count;
+}
+
+template <typename T>
+void AggregateFunctions::AvgRemove(FunctionContext* ctx, const T& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(dst->ptr != NULL);
+  DCHECK_EQ(sizeof(AvgState), dst->len);
+  AvgState* avg = reinterpret_cast<AvgState*>(dst->ptr);
+  avg->sum -= src.val;
+  --avg->count;
+  DCHECK_GE(avg->count, 0);
 }
 
 void AggregateFunctions::AvgMerge(FunctionContext* ctx, const StringVal& src,
@@ -160,6 +185,18 @@ void AggregateFunctions::TimestampAvgUpdate(FunctionContext* ctx,
   ++avg->count;
 }
 
+void AggregateFunctions::TimestampAvgRemove(FunctionContext* ctx,
+    const TimestampVal& src, StringVal* dst) {
+  if (src.is_null) return;
+  DCHECK(dst->ptr != NULL);
+  DCHECK_EQ(sizeof(AvgState), dst->len);
+  AvgState* avg = reinterpret_cast<AvgState*>(dst->ptr);
+  double val = TimestampValue::FromTimestampVal(src);
+  avg->sum -= val;
+  --avg->count;
+  DCHECK_GE(avg->count, 0);
+}
+
 TimestampVal AggregateFunctions::TimestampAvgGetValue(FunctionContext* ctx,
     const StringVal& src) {
   AvgState* val_struct = reinterpret_cast<AvgState*>(src.ptr);
@@ -191,6 +228,16 @@ void AggregateFunctions::DecimalAvgInit(FunctionContext* ctx, StringVal* dst) {
 
 void AggregateFunctions::DecimalAvgUpdate(FunctionContext* ctx, const DecimalVal& src,
     StringVal* dst) {
+  DecimalAvgAddOrRemove(ctx, src, dst, false);
+}
+
+void AggregateFunctions::DecimalAvgRemove(FunctionContext* ctx, const DecimalVal& src,
+    StringVal* dst) {
+  DecimalAvgAddOrRemove(ctx, src, dst, true);
+}
+
+void AggregateFunctions::DecimalAvgAddOrRemove(FunctionContext* ctx,
+    const DecimalVal& src, StringVal* dst, bool remove) {
   if (src.is_null) return;
   DCHECK(dst->ptr != NULL);
   DCHECK_EQ(sizeof(DecimalAvgState), dst->len);
@@ -201,20 +248,26 @@ void AggregateFunctions::DecimalAvgUpdate(FunctionContext* ctx, const DecimalVal
 
   // Since the src and dst are guaranteed to be the same scale, we can just
   // do a simple add.
+  int m = remove ? -1 : 1;
   switch (arg_type.GetByteSize()) {
     case 4:
-      avg->sum.val16 += src.val4;
+      avg->sum.val16 += m * src.val4;
       break;
     case 8:
-      avg->sum.val16 += src.val8;
+      avg->sum.val16 += m * src.val8;
       break;
     case 16:
-      avg->sum.val16 += src.val4;
+      avg->sum.val16 += m * src.val16;
       break;
     default:
       DCHECK(false) << "Invalid byte size for type " << arg_type.DebugString();
   }
-  ++avg->count;
+  if (remove) {
+    --avg->count;
+    DCHECK_GE(avg->count, 0);
+  } else {
+    ++avg->count;
+  }
 }
 
 void AggregateFunctions::DecimalAvgMerge(FunctionContext* ctx,
@@ -261,29 +314,49 @@ DecimalVal AggregateFunctions::DecimalAvgFinalize(FunctionContext* ctx,
 }
 
 template<typename SRC_VAL, typename DST_VAL>
-void AggregateFunctions::Sum(FunctionContext* ctx, const SRC_VAL& src, DST_VAL* dst) {
+void AggregateFunctions::SumUpdate(FunctionContext* ctx, const SRC_VAL& src,
+    DST_VAL* dst) {
   if (src.is_null) return;
   if (dst->is_null) InitZero<DST_VAL>(ctx, dst);
   dst->val += src.val;
 }
 
-void AggregateFunctions::SumUpdate(FunctionContext* ctx,
+template<typename SRC_VAL, typename DST_VAL>
+void AggregateFunctions::SumRemove(FunctionContext* ctx, const SRC_VAL& src,
+    DST_VAL* dst) {
+  if (src.is_null) return;
+  if (dst->is_null) InitZero<DST_VAL>(ctx, dst);
+  dst->val -= src.val;
+}
+
+void AggregateFunctions::SumDecimalUpdate(FunctionContext* ctx,
     const DecimalVal& src, DecimalVal* dst) {
+  SumDecimalAddOrSubtract(ctx, src, dst);
+}
+
+void AggregateFunctions::SumDecimalRemove(FunctionContext* ctx,
+    const DecimalVal& src, DecimalVal* dst) {
+  SumDecimalAddOrSubtract(ctx, src, dst, true);
+}
+
+void AggregateFunctions::SumDecimalAddOrSubtract(FunctionContext* ctx,
+    const DecimalVal& src, DecimalVal* dst, bool subtract) {
   if (src.is_null) return;
   if (dst->is_null) InitZero<DecimalVal>(ctx, dst);
   const FunctionContext::TypeDesc* arg_desc = ctx->GetArgType(0);
   // Since the src and dst are guaranteed to be the same scale, we can just
   // do a simple add.
+  int m = subtract ? -1 : 1;
   if (arg_desc->precision <= 9) {
-    dst->val16 += src.val4;
+    dst->val16 += m * src.val4;
   } else if (arg_desc->precision <= 19) {
-    dst->val16 += src.val8;
+    dst->val16 += m * src.val8;
   } else {
-    dst->val16 += src.val16;
+    dst->val16 += m * src.val16;
   }
 }
 
-void AggregateFunctions::SumMerge(FunctionContext* ctx,
+void AggregateFunctions::SumDecimalMerge(FunctionContext* ctx,
     const DecimalVal& src, DecimalVal* dst) {
   if (src.is_null) return;
   if (dst->is_null) InitZero<DecimalVal>(ctx, dst);
@@ -1225,18 +1298,35 @@ template void AggregateFunctions::AvgUpdate<BigIntVal>(
     FunctionContext* ctx, const BigIntVal& input, StringVal* dst);
 template void AggregateFunctions::AvgUpdate<DoubleVal>(
     FunctionContext* ctx, const DoubleVal& input, StringVal* dst);
+template void AggregateFunctions::AvgRemove<BigIntVal>(
+    FunctionContext* ctx, const BigIntVal& input, StringVal* dst);
+template void AggregateFunctions::AvgRemove<DoubleVal>(
+    FunctionContext* ctx, const DoubleVal& input, StringVal* dst);
 
-template void AggregateFunctions::Sum<TinyIntVal, BigIntVal>(
+template void AggregateFunctions::SumUpdate<TinyIntVal, BigIntVal>(
     FunctionContext*, const TinyIntVal& src, BigIntVal* dst);
-template void AggregateFunctions::Sum<SmallIntVal, BigIntVal>(
+template void AggregateFunctions::SumUpdate<SmallIntVal, BigIntVal>(
     FunctionContext*, const SmallIntVal& src, BigIntVal* dst);
-template void AggregateFunctions::Sum<IntVal, BigIntVal>(
+template void AggregateFunctions::SumUpdate<IntVal, BigIntVal>(
     FunctionContext*, const IntVal& src, BigIntVal* dst);
-template void AggregateFunctions::Sum<BigIntVal, BigIntVal>(
+template void AggregateFunctions::SumUpdate<BigIntVal, BigIntVal>(
     FunctionContext*, const BigIntVal& src, BigIntVal* dst);
-template void AggregateFunctions::Sum<FloatVal, DoubleVal>(
+template void AggregateFunctions::SumUpdate<FloatVal, DoubleVal>(
     FunctionContext*, const FloatVal& src, DoubleVal* dst);
-template void AggregateFunctions::Sum<DoubleVal, DoubleVal>(
+template void AggregateFunctions::SumUpdate<DoubleVal, DoubleVal>(
+    FunctionContext*, const DoubleVal& src, DoubleVal* dst);
+
+template void AggregateFunctions::SumRemove<TinyIntVal, BigIntVal>(
+    FunctionContext*, const TinyIntVal& src, BigIntVal* dst);
+template void AggregateFunctions::SumRemove<SmallIntVal, BigIntVal>(
+    FunctionContext*, const SmallIntVal& src, BigIntVal* dst);
+template void AggregateFunctions::SumRemove<IntVal, BigIntVal>(
+    FunctionContext*, const IntVal& src, BigIntVal* dst);
+template void AggregateFunctions::SumRemove<BigIntVal, BigIntVal>(
+    FunctionContext*, const BigIntVal& src, BigIntVal* dst);
+template void AggregateFunctions::SumRemove<FloatVal, DoubleVal>(
+    FunctionContext*, const FloatVal& src, DoubleVal* dst);
+template void AggregateFunctions::SumRemove<DoubleVal, DoubleVal>(
     FunctionContext*, const DoubleVal& src, DoubleVal* dst);
 
 template void AggregateFunctions::Min<BooleanVal>(

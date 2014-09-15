@@ -198,6 +198,7 @@ public class AnalyticEvalNode extends PlanNode {
         msg.analytic_node.setWindow(AnalyticWindow.DEFAULT_WINDOW.toThrift());
       }
     } else {
+      // TODO: Window boundaries should have range_offset_predicate set
       msg.analytic_node.setWindow(analyticWindow_.toThrift());
     }
     if (partitionByLessThan_ != null) {
