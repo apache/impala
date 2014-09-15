@@ -28,6 +28,7 @@ import org.apache.thrift.TSerializer;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TProtocolFactory;
 
 import com.cloudera.impala.thrift.TGetJvmMetricsRequest;
 import com.cloudera.impala.thrift.TGetJvmMetricsResponse;
@@ -74,9 +75,9 @@ public class JniUtil {
   /**
    * Deserialize a serialized form of a Thrift data structure to its object form.
    */
-  public static <T extends TBase<?, ?>> void deserializeThrift(
-      TBinaryProtocol.Factory protocolFactory, T result, byte[] thriftData)
-          throws ImpalaException {
+  public static <T extends TBase<?, ?>, F extends TProtocolFactory>
+  void deserializeThrift(F protocolFactory, T result, byte[] thriftData)
+      throws ImpalaException {
     // TODO: avoid creating deserializer for each query?
     TDeserializer deserializer = new TDeserializer(protocolFactory);
     try {

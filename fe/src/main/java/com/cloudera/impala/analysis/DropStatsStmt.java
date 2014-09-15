@@ -22,10 +22,14 @@ import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
 
 /**
- * Represents a DROP STATS statement.
+ * Represents both a DROP STATS statement, and the DROP INCREMENTAL STATS <tbl> PARTITION
+ * <part_spec> variant.
  */
 public class DropStatsStmt extends StatementBase {
   protected final TableName tableName_;
+
+  // If non-null, only drop the statistics for a given partition
+  PartitionSpec partitionSpec_ = null;
 
   // Set during analysis
   protected String dbName_;
@@ -37,17 +41,34 @@ public class DropStatsStmt extends StatementBase {
     this.tableName_ = tableName;
   }
 
+  public DropStatsStmt(TableName tableName, PartitionSpec partSpec) {
+    this.tableName_ = tableName;
+    this.partitionSpec_ = partSpec;
+  }
+
   @Override
   public String toSql() {
-    StringBuilder sb = new StringBuilder("DROP STATS ");
-    if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
-    sb.append(tableName_.getTbl());
+    StringBuilder sb = new StringBuilder("DROP ");
+    if (partitionSpec_ == null) {
+      sb.append(" STATS ");
+      if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
+      sb.append(tableName_.toSql());
+    } else {
+      sb.append(" INCREMENTAL STATS ");
+      if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
+      sb.append(tableName_.toSql());
+      sb.append(partitionSpec_.toSql());
+    }
     return sb.toString();
   }
 
   public TDropStatsParams toThrift() {
     TDropStatsParams params = new TDropStatsParams();
     params.setTable_name(new TTableName(getDb(), getTbl()));
+
+    if (partitionSpec_ != null) {
+      params.setPartition_spec(partitionSpec_.toThrift());
+    }
     return params;
   }
 
@@ -60,6 +81,12 @@ public class DropStatsStmt extends StatementBase {
     dbName_ = analyzer.getTargetDbName(tableName_);
     Table table = analyzer.getTable(tableName_, Privilege.ALTER);
     Preconditions.checkNotNull(table);
+    if (partitionSpec_ != null) {
+      partitionSpec_.setTableName(tableName_);
+      partitionSpec_.setPrivilegeRequirement(Privilege.ALTER);
+      partitionSpec_.setPartitionShouldExist();
+      partitionSpec_.analyze(analyzer);
+    }
   }
 
   /**

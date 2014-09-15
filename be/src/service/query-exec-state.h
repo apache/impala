@@ -55,8 +55,7 @@ class QueryExecStateCleaner;
 class ImpalaServer::QueryExecState {
  public:
   QueryExecState(const TQueryCtx& query_ctx, ExecEnv* exec_env, Frontend* frontend,
-                 ImpalaServer* server,
-                 boost::shared_ptr<ImpalaServer::SessionState> session);
+      ImpalaServer* server, boost::shared_ptr<ImpalaServer::SessionState> session);
 
   ~QueryExecState();
 

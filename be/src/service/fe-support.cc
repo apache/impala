@@ -282,7 +282,7 @@ Java_com_cloudera_impala_service_FeSupport_NativePrioritizeLoad(
   TPrioritizeLoadRequest request;
   DeserializeThriftMsg(env, thrift_struct, &request);
 
-  CatalogOpExecutor catalog_op_executor(ExecEnv::GetInstance(), NULL);
+  CatalogOpExecutor catalog_op_executor(ExecEnv::GetInstance(), NULL, NULL);
   TPrioritizeLoadResponse result;
   Status status = catalog_op_executor.PrioritizeLoad(request, &result);
   if (!status.ok()) {

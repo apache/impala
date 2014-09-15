@@ -1,0 +1,350 @@
+====
+---- QUERY
+# test computing stats on a partitioned text table with all types
+create table compute_stats_db.alltypes_incremental like functional.alltypes;
+insert into compute_stats_db.alltypes_incremental partition(year, month)
+select * from functional.alltypes;
+====
+---- QUERY
+compute incremental stats compute_stats_db.alltypes_incremental
+---- RESULTS
+'Updated 24 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.alltypes_incremental
+---- RESULTS
+'2009','1',310,1,'24.56KB','NOT CACHED','TEXT','true'
+'2009','2',280,1,'22.27KB','NOT CACHED','TEXT','true'
+'2009','3',310,1,'24.67KB','NOT CACHED','TEXT','true'
+'2009','4',300,1,'24.06KB','NOT CACHED','TEXT','true'
+'2009','5',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2009','6',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2009','7',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2009','8',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2009','9',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2009','10',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2009','11',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2009','12',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','1',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','2',280,1,'22.54KB','NOT CACHED','TEXT','true'
+'2010','3',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','4',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2010','5',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','6',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2010','7',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','8',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','9',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2010','10',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','11',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2010','12',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'Total','',7300,24,'586.84KB','0B','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING,STRING
+====
+---- QUERY
+show column stats compute_stats_db.alltypes_incremental
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',8161,-1,4,4
+'bool_col','BOOLEAN',2,-1,1,1
+'tinyint_col','TINYINT',10,-1,1,1
+'smallint_col','SMALLINT',10,-1,2,2
+'int_col','INT',10,-1,4,4
+'bigint_col','BIGINT',10,-1,8,8
+'float_col','FLOAT',10,-1,4,4
+'double_col','DOUBLE',10,-1,8,8
+'date_string_col','STRING',666,-1,8,8
+'string_col','STRING',10,-1,1,1
+'timestamp_col','TIMESTAMP',5678,-1,16,16
+'year','INT',2,0,4,4
+'month','INT',12,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+====
+---- QUERY
+drop incremental stats compute_stats_db.alltypes_incremental partition(year=2010, month=12)
+====
+---- QUERY
+show table stats compute_stats_db.alltypes_incremental;
+---- RESULTS
+'2009','1',310,1,'24.56KB','NOT CACHED','TEXT','true'
+'2009','2',280,1,'22.27KB','NOT CACHED','TEXT','true'
+'2009','3',310,1,'24.67KB','NOT CACHED','TEXT','true'
+'2009','4',300,1,'24.06KB','NOT CACHED','TEXT','true'
+'2009','5',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2009','6',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2009','7',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2009','8',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2009','9',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2009','10',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2009','11',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2009','12',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','1',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','2',280,1,'22.54KB','NOT CACHED','TEXT','true'
+'2010','3',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','4',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2010','5',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','6',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2010','7',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','8',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','9',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2010','10',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','11',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2010','12',-1,1,'24.97KB','NOT CACHED','TEXT','false'
+'Total','',7300,24,'586.84KB','0B','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING,STRING
+====
+---- QUERY
+compute incremental stats compute_stats_db.alltypes_incremental
+---- RESULTS
+'Updated 1 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.alltypes_incremental;
+---- RESULTS
+'2009','1',310,1,'24.56KB','NOT CACHED','TEXT','true'
+'2009','2',280,1,'22.27KB','NOT CACHED','TEXT','true'
+'2009','3',310,1,'24.67KB','NOT CACHED','TEXT','true'
+'2009','4',300,1,'24.06KB','NOT CACHED','TEXT','true'
+'2009','5',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2009','6',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2009','7',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2009','8',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2009','9',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2009','10',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2009','11',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2009','12',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','1',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','2',280,1,'22.54KB','NOT CACHED','TEXT','true'
+'2010','3',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','4',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2010','5',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','6',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2010','7',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','8',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','9',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2010','10',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','11',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2010','12',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'Total','',7300,24,'586.84KB','0B','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show column stats compute_stats_db.alltypes_incremental
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',8161,-1,4,4
+'bool_col','BOOLEAN',2,-1,1,1
+'tinyint_col','TINYINT',10,-1,1,1
+'smallint_col','SMALLINT',10,-1,2,2
+'int_col','INT',10,-1,4,4
+'bigint_col','BIGINT',10,-1,8,8
+'float_col','FLOAT',10,-1,4,4
+'double_col','DOUBLE',10,-1,8,8
+'date_string_col','STRING',666,-1,8,8
+'string_col','STRING',10,-1,1,1
+'timestamp_col','TIMESTAMP',5678,-1,16,16
+'year','INT',2,0,4,4
+'month','INT',12,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+====
+---- QUERY
+create table compute_stats_db.incremental_empty_partitioned (i int) partitioned by (j int);
+alter table compute_stats_db.incremental_empty_partitioned add partition (j=1);
+====
+---- QUERY
+compute incremental stats compute_stats_db.incremental_empty_partitioned;
+---- RESULTS
+'Updated 1 partition(s) and 1 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.incremental_empty_partitioned;
+---- RESULTS
+'1',0,0,'0B','NOT CACHED','TEXT','true'
+'Total',0,0,'0B','0B','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING
+====
+---- QUERY
+drop incremental stats compute_stats_db.alltypes_incremental partition(year=2010, month=1);
+drop incremental stats compute_stats_db.alltypes_incremental partition(year=2010, month=2);
+====
+---- QUERY
+compute incremental stats compute_stats_db.alltypes_incremental partition(year=2010, month=2);
+---- RESULTS
+'Updated 1 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.alltypes_incremental;
+---- RESULTS
+'2009','1',310,1,'24.56KB','NOT CACHED','TEXT','true'
+'2009','2',280,1,'22.27KB','NOT CACHED','TEXT','true'
+'2009','3',310,1,'24.67KB','NOT CACHED','TEXT','true'
+'2009','4',300,1,'24.06KB','NOT CACHED','TEXT','true'
+'2009','5',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2009','6',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2009','7',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2009','8',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2009','9',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2009','10',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2009','11',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2009','12',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','1',-1,1,'24.97KB','NOT CACHED','TEXT','false'
+'2010','2',280,1,'22.54KB','NOT CACHED','TEXT','true'
+'2010','3',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','4',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2010','5',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','6',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2010','7',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','8',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','9',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2010','10',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'2010','11',300,1,'24.16KB','NOT CACHED','TEXT','true'
+'2010','12',310,1,'24.97KB','NOT CACHED','TEXT','true'
+'Total','',6990,24,'586.84KB','0B','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING,STRING
+====
+---- QUERY
+show column stats compute_stats_db.alltypes_incremental
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',7979,-1,4,4
+'bool_col','BOOLEAN',2,-1,1,1
+'tinyint_col','TINYINT',10,-1,1,1
+'smallint_col','SMALLINT',10,-1,2,2
+'int_col','INT',10,-1,4,4
+'bigint_col','BIGINT',10,-1,8,8
+'float_col','FLOAT',10,-1,4,4
+'double_col','DOUBLE',10,-1,8,8
+'date_string_col','STRING',651,-1,8,8
+'string_col','STRING',10,-1,1,1
+'timestamp_col','TIMESTAMP',5678,-1,16,16
+'year','INT',2,0,4,4
+'month','INT',12,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+====
+---- QUERY
+# Confirm that dropping stats drops incremental stats as well
+drop stats compute_stats_db.alltypes_incremental;
+show table stats compute_stats_db.alltypes_incremental;
+---- RESULTS
+'2009','1',-1,1,'24.56KB','NOT CACHED','TEXT','false'
+'2009','2',-1,1,'22.27KB','NOT CACHED','TEXT','false'
+'2009','3',-1,1,'24.67KB','NOT CACHED','TEXT','false'
+'2009','4',-1,1,'24.06KB','NOT CACHED','TEXT','false'
+'2009','5',-1,1,'24.97KB','NOT CACHED','TEXT','false'
+'2009','6',-1,1,'24.16KB','NOT CACHED','TEXT','false'
+'2009','7',-1,1,'24.97KB','NOT CACHED','TEXT','false'
+'2009','8',-1,1,'24.97KB','NOT CACHED','TEXT','false'
+'2009','9',-1,1,'24.16KB','NOT CACHED','TEXT','false'
+'2009','10',-1,1,'24.97KB','NOT CACHED','TEXT','false'
+'2009','11',-1,1,'24.16KB','NOT CACHED','TEXT','false'
+'2009','12',-1,1,'24.97KB','NOT CACHED','TEXT','false'
+'2010','1',-1,1,'24.97KB','NOT CACHED','TEXT','false'
+'2010','2',-1,1,'22.54KB','NOT CACHED','TEXT','false'
+'2010','3',-1,1,'24.97KB','NOT CACHED','TEXT','false'
+'2010','4',-1,1,'24.16KB','NOT CACHED','TEXT','false'
+'2010','5',-1,1,'24.97KB','NOT CACHED','TEXT','false'
+'2010','6',-1,1,'24.16KB','NOT CACHED','TEXT','false'
+'2010','7',-1,1,'24.97KB','NOT CACHED','TEXT','false'
+'2010','8',-1,1,'24.97KB','NOT CACHED','TEXT','false'
+'2010','9',-1,1,'24.16KB','NOT CACHED','TEXT','false'
+'2010','10',-1,1,'24.97KB','NOT CACHED','TEXT','false'
+'2010','11',-1,1,'24.16KB','NOT CACHED','TEXT','false'
+'2010','12',-1,1,'24.97KB','NOT CACHED','TEXT','false'
+'Total','',-1,24,'586.84KB','0B','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Test that many partition keys work correctly
+create table compute_stats_db.incremental_many_part_keys(col int)
+partitioned by (p1 int, p2 int, p3 int, p4 int, p5 int, p6 int);
+insert into compute_stats_db.incremental_many_part_keys
+partition(p1=1, p2=2, p3=3, p4=4, p5=5, p6=6) values(1);
+====
+---- QUERY
+compute incremental stats compute_stats_db.incremental_many_part_keys;
+show table stats compute_stats_db.incremental_many_part_keys;
+---- RESULTS
+'1','2','3','4','5','6',1,1,'2B','NOT CACHED','TEXT','true'
+'Total','','','','','',1,1,'2B','0B','',''
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING
+====
+---- QUERY
+create table compute_stats_db.incremental_null_part_key(col int) partitioned by (p int);
+insert into compute_stats_db.incremental_null_part_key partition(p) values(1,NULL), (1,2);
+compute incremental stats compute_stats_db.incremental_null_part_key partition(p=2);
+====
+---- QUERY
+compute incremental stats compute_stats_db.incremental_null_part_key partition(p=NULL);
+show table stats compute_stats_db.incremental_null_part_key;
+---- RESULTS
+'NULL',1,1,'2B','NOT CACHED','TEXT','true'
+'2',1,1,'2B','NOT CACHED','TEXT','true'
+'Total',2,2,'4B','0B','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Check that incremental stats queries handle partitions with keyword names
+create table compute_stats_db.incremental_keyword_part_key(col int) partitioned by
+(`date` int);
+insert into compute_stats_db.incremental_keyword_part_key partition(`date`=1) values(2);
+compute incremental stats compute_stats_db.incremental_keyword_part_key
+partition(`date`=1);
+show table stats compute_stats_db.incremental_keyword_part_key;
+---- RESULTS
+'1',1,1,'2B','NOT CACHED','TEXT','true'
+'Total',1,1,'2B','0B','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING
+====
+---- QUERY
+drop stats compute_stats_db.incremental_keyword_part_key;
+compute incremental stats compute_stats_db.incremental_keyword_part_key;
+show table stats compute_stats_db.incremental_keyword_part_key;
+---- RESULTS
+'1',1,1,'2B','NOT CACHED','TEXT','true'
+'Total',1,1,'2B','0B','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING
+====
+---- QUERY
+create table compute_stats_db.incremental_string_part_value(col int) partitioned by
+(p string);
+insert into compute_stats_db.incremental_string_part_value partition(p="test_string")
+values(2);
+compute incremental stats compute_stats_db.incremental_string_part_value
+partition(p="test_string");
+show table stats compute_stats_db.incremental_string_part_value;
+---- RESULTS
+'test_string',1,1,'2B','NOT CACHED','TEXT','true'
+'Total',1,1,'2B','0B','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING
+====
+---- QUERY
+compute incremental stats functional_hbase.alltypes;
+---- RESULTS
+'Updated 1 partition(s) and 13 column(s).'
+---- TYPES
+STRING
+====

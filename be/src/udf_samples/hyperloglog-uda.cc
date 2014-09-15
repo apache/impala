@@ -130,4 +130,3 @@ StringVal HllFinalize(FunctionContext* ctx, const StringVal& src) {
   ctx->Free(src.ptr);
   return result_str;
 }
-

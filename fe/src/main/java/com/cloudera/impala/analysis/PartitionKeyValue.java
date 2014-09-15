@@ -57,6 +57,19 @@ public class PartitionKeyValue {
   }
 
   /**
+   * Returns a binary predicate as a SQL string which matches the column and value of this
+   * PartitionKeyValue. If the value is null, correctly substitutes 'IS' as the operator.
+   */
+  public String toPredicateSql() {
+    String ident = ToSqlUtils.getIdentSql(colName_);
+    if (literalValue_ instanceof NullLiteral ||
+        literalValue_.getStringValue().isEmpty()) {
+      return ident + " IS NULL";
+    }
+    return isStatic() ? ident + "=" + value_.toSql() : ident;
+  }
+
+  /**
    * Utility method that returns the string value for the given partition key. For
    * NULL values (a NullLiteral type) or empty literal values this will return the
    * given null partition key value.

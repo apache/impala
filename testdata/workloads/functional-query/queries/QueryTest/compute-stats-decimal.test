@@ -13,12 +13,12 @@ compute stats compute_stats_db.decimal_tbl
 ---- QUERY
 show table stats compute_stats_db.decimal_tbl
 ---- LABELS
-d6, #Rows, #Files, Size, Bytes Cached, Format
+d6, #Rows, #Files, Size, Bytes Cached, Format, Incremental Stats
 ---- RESULTS
-'1',5,1,'375B','NOT CACHED','TEXT'
-'Total',5,1,'375B','0B',''
+'1',5,1,'375B','NOT CACHED','TEXT','false'
+'Total',5,1,'375B','0B','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.decimal_tbl
@@ -47,11 +47,11 @@ compute stats compute_stats_db.mixed_types
 ---- QUERY
 show table stats compute_stats_db.mixed_types
 ---- LABELS
-#Rows, #Files, Size, Bytes Cached, Format
+#Rows, #Files, Size, Bytes Cached, Format, Incremental Stats
 ---- RESULTS
-2,1,regex:.+B,'NOT CACHED','PARQUET'
+2,1,regex:.+B,'NOT CACHED','PARQUET','false'
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, STRING
+BIGINT, BIGINT, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.mixed_types

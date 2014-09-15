@@ -54,3 +54,6 @@ class TestComputeStats(ImpalaTestSuite):
     # partitions if performing an exhaustive test run.
     if self.exploration_strategy() != 'exhaustive': return
     self.run_test_case('QueryTest/compute-stats-many-partitions', vector)
+
+  def test_compute_stats_incremental(self, vector):
+    self.run_test_case('QueryTest/compute-stats-incremental', vector)

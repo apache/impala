@@ -559,34 +559,30 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "ALTER VIEW not allowed on a table: functional.alltypes");
   }
 
+  void checkComputeStatsStmt(String stmt) throws AnalysisException {
+    ParseNode parseNode = AnalyzesOk(stmt);
+    assertTrue(parseNode instanceof ComputeStatsStmt);
+    ComputeStatsStmt parsedStmt = (ComputeStatsStmt)parseNode;
+    AnalyzesOk(parsedStmt.getTblStatsQuery());
+    AnalyzesOk(parsedStmt.getColStatsQuery());
+  }
+
   @Test
   public void TestComputeStats() throws AnalysisException {
     // Analyze the stmt itself as well as the generated child queries.
-    ParseNode parseNode = AnalyzesOk("compute stats functional.alltypes");
-    assertTrue(parseNode instanceof ComputeStatsStmt);
-    ComputeStatsStmt stmt = (ComputeStatsStmt) parseNode;
-    AnalyzesOk(stmt.getTblStatsQuery());
-    AnalyzesOk(stmt.getColStatsQuery());
+    checkComputeStatsStmt("compute stats functional.alltypes");
 
-    parseNode = AnalyzesOk("compute stats functional_hbase.alltypes");
-    assertTrue(parseNode instanceof ComputeStatsStmt);
-    stmt = (ComputeStatsStmt) parseNode;
-    AnalyzesOk(stmt.getTblStatsQuery());
-    AnalyzesOk(stmt.getColStatsQuery());
+    checkComputeStatsStmt("compute stats functional_hbase.alltypes");
 
     // Test that complex-typed columns are ignored.
-    parseNode = AnalyzesOk("compute stats functional.allcomplextypes");
-    assertTrue(parseNode instanceof ComputeStatsStmt);
-    stmt = (ComputeStatsStmt) parseNode;
-    AnalyzesOk(stmt.getTblStatsQuery());
-    AnalyzesOk(stmt.getColStatsQuery());
+    checkComputeStatsStmt("compute stats functional.allcomplextypes");
 
     // Cannot compute stats on a database.
     AnalysisError("compute stats tbl_does_not_exist",
         "Table does not exist: default.tbl_does_not_exist");
     // Cannot compute stats on a view.
     AnalysisError("compute stats functional.alltypes_view",
-        "COMPUTE STATS not allowed on a view: functional.alltypes_view");
+        "COMPUTE STATS not supported for view functional.alltypes_view");
 
     AnalyzesOk("compute stats functional_avro_snap.alltypes");
     // Test mismatched column definitions and Avro schema (HIVE-6308, IMPALA-867).
@@ -618,6 +614,46 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestComputeIncrementalStats() throws AnalysisException {
+    checkComputeStatsStmt("compute incremental stats functional.alltypes");
+    checkComputeStatsStmt(
+        "compute incremental stats functional.alltypes partition(year=2010, month=10)");
+
+    AnalysisError(
+        "compute incremental stats functional.alltypes partition(year=9999, month=10)",
+        "Partition spec does not exist: (year=9999, month=10)");
+    AnalysisError(
+        "compute incremental stats functional.alltypes partition(year=2010)",
+        "Items in partition spec must exactly match the partition columns in the table " +
+        "definition: functional.alltypes (1 vs 2)");
+    AnalysisError(
+        "compute incremental stats functional.alltypes partition(year=2010, month)",
+        "Syntax error");
+
+    // Test that NULL partitions generates a valid query
+    checkComputeStatsStmt("compute incremental stats functional.alltypesagg " +
+        "partition(year=2010, month=1, day=NULL)");
+
+    AnalysisError("compute incremental stats functional_hbase.alltypes " +
+        "partition(year=2010, month=1)", "COMPUTE INCREMENTAL ... PARTITION not " +
+        "supported for non-HDFS table functional_hbase.alltypes");
+
+    AnalysisError("compute incremental stats functional.view_view",
+        "COMPUTE STATS not supported for view functional.view_view");
+  }
+
+
+  @Test
+  public void TestDropIncrementalStats() throws AnalysisException {
+    AnalyzesOk(
+        "drop incremental stats functional.alltypes partition(year=2010, month=10)");
+    AnalysisError(
+        "drop incremental stats functional.alltypes partition(year=9999, month=10)",
+        "Partition spec does not exist: (year=9999, month=10)");
+  }
+
+
+  @Test
   public void TestDropStats() throws AnalysisException {
     AnalyzesOk("drop stats functional.alltypes");
 
@@ -627,6 +663,11 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Database does not exist
     AnalysisError("drop stats no_db.no_tbl",
         "Database does not exist: no_db");
+
+    AnalysisError("drop stats functional.alltypes partition(year=2010, month=10)",
+        "Syntax error");
+    AnalysisError("drop stats functional.alltypes partition(year, month)",
+        "Syntax error");
   }
 
   @Test

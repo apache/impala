@@ -2836,4 +2836,29 @@ public class ParserTest {
     ParserError("SHOW GRANT ROLE foo ON TABLE");
     ParserError("SHOW GRANT ROLE foo ON URI abc");
   }
+
+  @Test
+  public void TestComputeStats() {
+    ParsesOk("COMPUTE STATS functional.alltypes");
+    ParserError("COMPUTE functional.alltypes");
+    ParserError("COMPUTE STATS ON functional.alltypes");
+    ParserError("COMPUTE STATS");
+  }
+
+  @Test
+  public void TestComputeStatsIncremental() {
+    ParsesOk("COMPUTE INCREMENTAL STATS functional.alltypes");
+    ParserError("COMPUTE INCREMENTAL functional.alltypes");
+
+    ParsesOk(
+        "COMPUTE INCREMENTAL STATS functional.alltypes PARTITION(month=10, year=2010)");
+    // No dynamic partition specs
+    ParserError("COMPUTE INCREMENTAL STATS functional.alltypes PARTITION(month, year)");
+
+    ParserError("COMPUTE INCREMENTAL STATS");
+
+    ParsesOk("DROP INCREMENTAL STATS functional.alltypes PARTITION(month=10, year=2010)");
+    ParserError("DROP INCREMENTAL STATS functional.alltypes PARTITION(month, year)");
+    ParserError("DROP INCREMENTAL STATS functional.alltypes");
+  }
 }

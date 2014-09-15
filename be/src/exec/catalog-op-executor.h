@@ -25,6 +25,7 @@ namespace impala {
 class ExecEnv;
 class Frontend;
 class Status;
+class RuntimeProfile;
 
 // The CatalogOpExecutor is responsible for executing catalog operations.
 // This includes DDL statements such as CREATE and ALTER as well as statements such
@@ -32,7 +33,8 @@ class Status;
 // operation.
 class CatalogOpExecutor {
  public:
-  CatalogOpExecutor(ExecEnv* env, Frontend* fe) : env_(env), fe_(fe) {}
+  CatalogOpExecutor(ExecEnv* env, Frontend* fe, RuntimeProfile* profile)
+      : env_(env), fe_(fe), profile_(profile) {}
 
   // Executes the given catalog operation against the catalog server.
   Status Exec(const TCatalogOpRequest& catalog_op);
@@ -82,6 +84,7 @@ class CatalogOpExecutor {
   static void SetTableStats(
       const apache::hive::service::cli::thrift::TTableSchema& tbl_stats_schema,
       const apache::hive::service::cli::thrift::TRowSet& tbl_stats_data,
+      const std::vector<TPartitionStats>& existing_part_stats,
       TAlterTableUpdateStatsParams* params);
   static void SetColumnStats(
       const apache::hive::service::cli::thrift::TTableSchema& col_stats_schema,
@@ -96,6 +99,7 @@ class CatalogOpExecutor {
 
   ExecEnv* env_;
   Frontend* fe_;
+  RuntimeProfile* profile_;
 
   // Handles additional BE work that needs to be done for drop function and data source,
   // in particular, clearing the local library cache for this function.

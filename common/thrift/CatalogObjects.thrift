@@ -132,6 +132,39 @@ struct TColumnStats {
   4: required i64 num_nulls
 }
 
+// Intermediate state for the computation of per-column stats. Impala can aggregate these
+// structures together to produce final stats for a column.
+struct TIntermediateColumnStats {
+  // One byte for each bucket of the NDV HLL computation
+  1: optional binary intermediate_ndv
+
+  // If true, intermediate_ndv is RLE-compressed
+  2: optional bool is_ndv_encoded
+
+  // Number of nulls seen so far (or -1 if nulls are not counted)
+  3: optional i64 num_nulls
+
+  // The maximum width, in bytes, of the column
+  4: optional i32 max_width
+
+  // The average width (in bytes) of the column
+  5: optional double avg_width
+
+  // The number of rows counted, needed to compute NDVs from intermediate_ndv
+  6: optional i64 num_rows
+}
+
+// Per-partition statistics
+struct TPartitionStats {
+  // Number of rows gathered per-partition by non-incremental stats.
+  // TODO: This can probably be removed in favour of the intermediate_col_stats, but doing
+  // so would interfere with the non-incremental stats path
+  1: required TTableStats stats
+
+  // Intermediate state for incremental statistics, one entry per column name.
+  2: optional map<string, TIntermediateColumnStats> intermediate_col_stats
+}
+
 struct TColumn {
   1: required string columnName
   2: required Types.TColumnType columnType
@@ -213,6 +246,9 @@ struct THdfsPartition {
   // Unique (in this table) id of this partition. If -1, the partition does not currently
   // exist.
   14: optional i64 id
+
+  // (key,value) pairs stored in the Hive Metastore.
+  15: optional map<string, string> hms_parameters
 }
 
 struct THdfsTable {

@@ -60,6 +60,7 @@ add_library(Exec
   hdfs-parquet-table-writer.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc
+  incr-stats-util.cc
   partitioned-aggregation-node.cc
   partitioned-aggregation-node-ir.cc
   partitioned-hash-join-node.cc
@@ -83,3 +84,4 @@ ADD_BE_TEST(read-write-util-test)
 ADD_BE_TEST(parquet-plain-test)
 ADD_BE_TEST(parquet-version-test)
 ADD_BE_TEST(row-batch-list-test)
+ADD_BE_TEST(incr-stats-util-test)

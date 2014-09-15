@@ -52,8 +52,8 @@ static const StringVal DEFAULT_STRING_CONCAT_DELIM((uint8_t*)", ", 2);
 
 // Hyperloglog precision. Default taken from paper. Doesn't seem to matter very
 // much when between [6,12]
-const int HLL_PRECISION = 10;
-const int HLL_LEN = 1024; // 2^HLL_PRECISION
+const int AggregateFunctions::HLL_PRECISION = 10;
+const int AggregateFunctions::HLL_LEN = 1024; // 2^HLL_PRECISION
 
 void AggregateFunctions::InitNull(FunctionContext*, AnyVal* dst) {
   dst->is_null = true;
@@ -1026,37 +1026,45 @@ void AggregateFunctions::HllMerge(FunctionContext* ctx, const StringVal& src,
   }
 }
 
-BigIntVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal& src) {
-  DCHECK(!src.is_null);
-  DCHECK_EQ(src.len, HLL_LEN);
+inline uint64_t AggregateFunctions::HllFinalEstimate(const uint8_t* buckets,
+    int32_t num_buckets) {
+  DCHECK_NOTNULL(buckets);
+  DCHECK_EQ(num_buckets, HLL_LEN);
 
-  const int num_streams = HLL_LEN;
   // Empirical constants for the algorithm.
   float alpha = 0;
-  if (num_streams == 16) {
+  if (HLL_LEN == 16) {
     alpha = 0.673f;
-  } else if (num_streams == 32) {
+  } else if (HLL_LEN == 32) {
     alpha = 0.697f;
-  } else if (num_streams == 64) {
+  } else if (HLL_LEN == 64) {
     alpha = 0.709f;
   } else {
-    alpha = 0.7213f / (1 + 1.079f / num_streams);
+    alpha = 0.7213f / (1 + 1.079f / HLL_LEN);
   }
 
   float harmonic_mean = 0;
   int num_zero_registers = 0;
-  for (int i = 0; i < src.len; ++i) {
-    harmonic_mean += powf(2.0f, -src.ptr[i]);
-    if (src.ptr[i] == 0) ++num_zero_registers;
+  // TODO: Consider improving this loop (e.g. replacing 'if' with arithmetic op).
+  for (int i = 0; i < num_buckets; ++i) {
+    harmonic_mean += powf(2.0f, -buckets[i]);
+    if (buckets[i] == 0) ++num_zero_registers;
   }
   harmonic_mean = 1.0f / harmonic_mean;
-  int64_t estimate = alpha * num_streams * num_streams * harmonic_mean;
+  int64_t estimate = alpha * HLL_LEN * HLL_LEN * harmonic_mean;
 
   if (num_zero_registers != 0) {
     // Estimated cardinality is too low. Hll is too inaccurate here, instead use
     // linear counting.
-    estimate = num_streams * log(static_cast<float>(num_streams) / num_zero_registers);
+    estimate = HLL_LEN * log(static_cast<float>(HLL_LEN) / num_zero_registers);
   }
+
+  return estimate;
+}
+
+BigIntVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal& src) {
+  DCHECK(!src.is_null);
+  uint64_t estimate = HllFinalEstimate(src.ptr, src.len);
   ctx->Free(src.ptr);
   return estimate;
 }

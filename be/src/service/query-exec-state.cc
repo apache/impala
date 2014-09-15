@@ -162,7 +162,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       reset_req.reset_metadata_params.__set_table_name(
           exec_request_.load_data_request.table_name);
       catalog_op_executor_.reset(
-          new CatalogOpExecutor(exec_env_, frontend_));
+          new CatalogOpExecutor(exec_env_, frontend_, &server_profile_));
       RETURN_IF_ERROR(catalog_op_executor_->Exec(reset_req));
       RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(
           *catalog_op_executor_->update_catalog_result(),
@@ -265,9 +265,10 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
     case TCatalogOpType::SHOW_ROLES: {
       const TShowRolesParams& params = catalog_op.show_roles_params;
       if (params.is_admin_op) {
-        // Verify the user has privileges to perform this operation by checking against the
-        // Sentry Service (via the Catalog Server).
-        catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_, frontend_));
+        // Verify the user has privileges to perform this operation by checking against
+        // the Sentry Service (via the Catalog Server).
+        catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_, frontend_,
+            &server_profile_));
 
         TSentryAdminCheckRequest req;
         req.__set_header(TCatalogServiceRequestHeader());
@@ -285,9 +286,10 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
     case TCatalogOpType::SHOW_GRANT_ROLE: {
       const TShowGrantRoleParams& params = catalog_op.show_grant_role_params;
       if (params.is_admin_op) {
-        // Verify the user has privileges to perform this operation by checking against the
-        // Sentry Service (via the Catalog Server).
-        catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_, frontend_));
+        // Verify the user has privileges to perform this operation by checking against
+        // the Sentry Service (via the Catalog Server).
+        catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_, frontend_,
+            &server_profile_));
 
         TSentryAdminCheckRequest req;
         req.__set_header(TCatalogServiceRequestHeader());
@@ -424,17 +426,20 @@ Status ImpalaServer::QueryExecState::ExecDdlRequest() {
     TComputeStatsParams& compute_stats_params =
         exec_request_.catalog_op_request.ddl_params.compute_stats_params;
     // Add child queries for computing table and column stats.
-    child_queries_.push_back(
-        ChildQuery(compute_stats_params.tbl_stats_query, this, parent_server_));
+    if (compute_stats_params.__isset.tbl_stats_query) {
+      child_queries_.push_back(
+          ChildQuery(compute_stats_params.tbl_stats_query, this, parent_server_));
+    }
     if (compute_stats_params.__isset.col_stats_query) {
       child_queries_.push_back(
           ChildQuery(compute_stats_params.col_stats_query, this, parent_server_));
     }
-    ExecChildQueriesAsync();
+    if (child_queries_.size() > 0) ExecChildQueriesAsync();
     return Status::OK;
   }
 
-  catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_, frontend_));
+  catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_, frontend_,
+      &server_profile_));
   Status status = catalog_op_executor_->Exec(exec_request_.catalog_op_request);
   {
     lock_guard<mutex> l(lock_);
@@ -548,7 +553,7 @@ Status ImpalaServer::QueryExecState::WaitInternal() {
     RETURN_IF_ERROR(UpdateCatalog());
   }
 
-  if (ddl_type() == TDdlType::COMPUTE_STATS) {
+  if (ddl_type() == TDdlType::COMPUTE_STATS && child_queries_.size() > 0) {
     RETURN_IF_ERROR(UpdateTableAndColumnStats());
   }
 
@@ -932,7 +937,8 @@ void ImpalaServer::QueryExecState::MarkActive() {
 Status ImpalaServer::QueryExecState::UpdateTableAndColumnStats() {
   DCHECK_GE(child_queries_.size(), 1);
   DCHECK_LE(child_queries_.size(), 2);
-  catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_, frontend_));
+  catalog_op_executor_.reset(
+      new CatalogOpExecutor(exec_env_, frontend_, &server_profile_));
 
   // If there was no column stats query, pass in empty thrift structures to
   // ExecComputeStats(). Otherwise pass in the column stats result.

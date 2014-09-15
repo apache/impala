@@ -41,4 +41,7 @@ void ExprValueToHS2TColumnValue(const void* value, const TColumnType& type,
 void StitchNulls(uint32_t num_rows_before, uint32_t num_rows_added, uint32_t start_idx,
     const std::string& from, std::string* to);
 
+void PrintTColumnValue(const apache::hive::service::cli::thrift::TColumnValue& colval,
+    std::stringstream* out);
+
 }

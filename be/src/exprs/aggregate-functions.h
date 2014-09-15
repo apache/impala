@@ -171,11 +171,17 @@ class AggregateFunctions {
   // 1) Hyperloglog: The analysis of a near-optimal cardinality estimation
   // algorithm (2007)
   // 2) HyperLogLog in Practice (paper from google with some improvements)
+  static const int HLL_PRECISION;
+  static const int HLL_LEN;
   static void HllInit(FunctionContext*, StringVal* slot);
   template <typename T>
   static void HllUpdate(FunctionContext*, const T& src, StringVal* dst);
   static void HllMerge(FunctionContext*, const StringVal& src, StringVal* dst);
   static BigIntVal HllFinalize(FunctionContext*, const StringVal& src);
+
+  // Utility method to compute the final result of an HLL estimation from num_buckets
+  // estimates.
+  static uint64_t HllFinalEstimate(const uint8_t* buckets, int32_t num_buckets);
 
   // Knuth's variance algorithm, more numerically stable than canonical stddev
   // algorithms; reference implementation:

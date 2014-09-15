@@ -830,16 +830,16 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |     partitions=24/24 files=24 size=478.45KB
 |
 09:HASH JOIN [INNER JOIN]
-|  hash predicates: t3.id = t4.id
-|
-|--03:SCAN HDFS [functional.alltypessmall t4]
-|     partitions=4/4 files=4 size=6.32KB
-|
-08:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.id = t3.id
 |
 |--02:SCAN HDFS [functional.alltypesagg t3]
 |     partitions=11/11 files=11 size=814.73KB
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t4.id
+|
+|--03:SCAN HDFS [functional.alltypessmall t4]
+|     partitions=4/4 files=4 size=6.32KB
 |
 07:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: t2.id = t1.id
@@ -875,16 +875,16 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |     partitions=24/24 files=24 size=478.45KB
 |
 09:HASH JOIN [INNER JOIN]
-|  hash predicates: t3.id = t4.id
-|
-|--03:SCAN HDFS [functional.alltypessmall t4]
-|     partitions=4/4 files=4 size=6.32KB
-|
-08:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.id = t3.id
 |
 |--02:SCAN HDFS [functional.alltypesagg t3]
 |     partitions=11/11 files=11 size=814.73KB
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t4.id
+|
+|--03:SCAN HDFS [functional.alltypessmall t4]
+|     partitions=4/4 files=4 size=6.32KB
 |
 07:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: t2.id = t1.id

@@ -383,3 +383,37 @@ void impala::ExprValueToHS2TColumnValue(const void* value, const TColumnType& ty
       break;
   }
 }
+
+template<typename T>
+void PrintVal(const T& val, ostream* ss) {
+  if (val.__isset.value) {
+    (*ss) << val.value;
+  } else {
+    (*ss) << "NULL";
+  }
+}
+
+void impala::PrintTColumnValue(
+    const apache::hive::service::cli::thrift::TColumnValue& colval, stringstream* out) {
+  if (colval.__isset.boolVal) {
+    if (colval.boolVal.__isset.value) {
+      (*out) << ((colval.boolVal.value) ? "true" : "false");
+    } else {
+      (*out) << "NULL";
+    }
+  } else if (colval.__isset.doubleVal) {
+    PrintVal(colval.doubleVal, out);
+  } else if (colval.__isset.byteVal) {
+    PrintVal(colval.byteVal, out);
+  } else if (colval.__isset.i32Val) {
+    PrintVal(colval.i32Val, out);
+  } else if (colval.__isset.i16Val) {
+    PrintVal(colval.i16Val, out);
+  } else if (colval.__isset.i64Val) {
+    PrintVal(colval.i64Val, out);
+  } else if (colval.__isset.stringVal) {
+    PrintVal(colval.stringVal, out);
+  } else {
+    (*out) << "NULL";
+  }
+}
