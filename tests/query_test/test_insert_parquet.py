@@ -52,3 +52,57 @@ class TestInsertParquetQueries(ImpalaTestSuite):
     vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
         vector.get_value('compression_codec')
     self.run_test_case('insert_parquet', vector, multiple_impalad=True)
+
+class TestInsertParquetVerifySize(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'tpch'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestInsertParquetVerifySize, cls).add_test_dimensions()
+    # Fix the exec_option vector to have a single value.
+    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+        cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
+        sync_ddl=[1]))
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').file_format == 'parquet')
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').compression_codec == 'none')
+    cls.TestMatrix.add_dimension(TestDimension("compression_codec", *PARQUET_CODECS));
+
+  @classmethod
+  def setup_class(cls):
+    super(TestInsertParquetVerifySize, cls).setup_class()
+
+  @pytest.mark.execute_serially
+  def test_insert_parquet_verify_size(self, vector):
+    # Test to verify that the result file size is close to what we expect.
+    DROP = "drop table if exists parquet_insert_size";
+    CREATE = "create table parquet_insert_size like tpch_parquet.orders stored as parquet"
+    QUERY = "insert overwrite parquet_insert_size select * from tpch.orders"
+    DIR = "test-warehouse/parquet_insert_size/"
+    BLOCK_SIZE = 40 * 1024 * 1024
+
+    self.execute_query(DROP )
+    self.execute_query(CREATE)
+
+    vector.get_value('exec_option')['PARQUET_FILE_SIZE'] = BLOCK_SIZE
+    vector.get_value('exec_option')['COMPRESSION_CODEC'] =\
+        vector.get_value('compression_codec')
+    vector.get_value('exec_option')['num_nodes'] = 1
+    self.execute_query(QUERY, vector.get_value('exec_option'))
+
+    # Get the files in hdfs and verify. There can be at most 1 file that is smaller
+    # that the BLOCK_SIZE. The rest should be within 80% of it and not over.
+    found_small_file = False
+    ls = self.hdfs_client.list_dir(DIR)
+    for f in ls['FileStatuses']['FileStatus']:
+      if f['type'] != 'FILE':
+        continue
+      length = f['length']
+      print length
+      assert length < BLOCK_SIZE
+      if length < BLOCK_SIZE * 0.80:
+        assert found_small_file == False
+        found_small_file = True
