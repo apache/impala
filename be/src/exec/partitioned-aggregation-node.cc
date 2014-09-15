@@ -1010,42 +1010,43 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
       break;
     }
     case AggFnEvaluator::SUM:
-      if (slot_desc->type().type == TYPE_FLOAT || slot_desc->type().type == TYPE_DOUBLE) {
-        result = builder.CreateFAdd(dst_value, src.GetVal());
-      } else {
-        result = builder.CreateAdd(dst_value, src.GetVal());
+      if (slot_desc->type().type != TYPE_DECIMAL) {
+        if (slot_desc->type().type == TYPE_FLOAT ||
+            slot_desc->type().type == TYPE_DOUBLE) {
+          result = builder.CreateFAdd(dst_value, src.GetVal());
+        } else {
+          result = builder.CreateAdd(dst_value, src.GetVal());
+        }
+        break;
       }
-      break;
+      DCHECK_EQ(slot_desc->type().type, TYPE_DECIMAL);
+      // Fall through to xcompiled case
     case AggFnEvaluator::AVG:
     case AggFnEvaluator::NDV: {
-      DCHECK_EQ(slot_desc->type().type, TYPE_STRING);
-
       // Get xcompiled update/merge function from IR module
       const string& symbol = evaluator->is_merge() ?
                              evaluator->merge_symbol() : evaluator->update_symbol();
       Function* ir_fn = codegen->module()->getFunction(symbol);
       DCHECK_NOTNULL(ir_fn);
 
-      // Create pointer to src_anyval to pass to ir_fn. We must use the unlowered type.
+      // Create pointer to src to pass to ir_fn. We must use the unlowered type.
       Value* src_lowered_ptr = codegen->CreateEntryBlockAlloca(
           fn, LlvmCodeGen::NamedVariable("src_lowered_ptr", src.value()->getType()));
       builder.CreateStore(src.value(), src_lowered_ptr);
       Type* unlowered_ptr_type =
-          CodegenAnyVal::GetUnloweredType(codegen, input_expr->type())->getPointerTo();
+          CodegenAnyVal::GetUnloweredPtrType(codegen, input_expr->type());
       Value* src_unlowered_ptr =
           builder.CreateBitCast(src_lowered_ptr, unlowered_ptr_type, "src_unlowered_ptr");
 
-      // Create StringVal* intermediate argument from dst_value
-      CodegenAnyVal dst_stringval = CodegenAnyVal::GetNonNullVal(
-          codegen, &builder, TYPE_STRING, "dst_stringval");
-      dst_stringval.SetFromRawValue(dst_value);
-      // Create pointer to dst_stringval to pass to ir_fn. We must use the unlowered type.
+      // Create intermediate argument 'dst' from 'dst_value'
+      const ColumnType& dst_type = evaluator->intermediate_type();
+      CodegenAnyVal dst = CodegenAnyVal::GetNonNullVal(codegen, &builder, dst_type, "dst");
+      dst.SetFromRawValue(dst_value);
+      // Create pointer to dst to pass to ir_fn. We must use the unlowered type.
       Value* dst_lowered_ptr = codegen->CreateEntryBlockAlloca(
-          fn, LlvmCodeGen::NamedVariable("dst_lowered_ptr",
-                                         dst_stringval.value()->getType()));
-      builder.CreateStore(dst_stringval.value(), dst_lowered_ptr);
-      unlowered_ptr_type =
-          codegen->GetPtrType(CodegenAnyVal::GetUnloweredType(codegen, TYPE_STRING));
+          fn, LlvmCodeGen::NamedVariable("dst_lowered_ptr", dst.value()->getType()));
+      builder.CreateStore(dst.value(), dst_lowered_ptr);
+      unlowered_ptr_type = CodegenAnyVal::GetUnloweredPtrType(codegen, dst_type);
       Value* dst_unlowered_ptr =
           builder.CreateBitCast(dst_lowered_ptr, unlowered_ptr_type, "dst_unlowered_ptr");
 
@@ -1054,8 +1055,7 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
 
       // Convert StringVal intermediate 'dst_arg' back to StringValue
       Value* anyval_result = builder.CreateLoad(dst_lowered_ptr, "anyval_result");
-      result = CodegenAnyVal(codegen, &builder, TYPE_STRING, anyval_result)
-               .ToNativeValue();
+      result = CodegenAnyVal(codegen, &builder, dst_type, anyval_result).ToNativeValue();
       break;
     }
     default:
@@ -1119,13 +1119,23 @@ Function* PartitionedAggregationNode::CodegenUpdateTuple() {
     // Don't codegen things that aren't builtins (for now)
     if (!evaluator->is_builtin()) return NULL;
 
-    // Char and timestamp are never supported.  Only AVG and NDV support string and
-    // decimal.
+    bool supported = true;
     AggFnEvaluator::AggregationOp op = evaluator->agg_op();
     PrimitiveType type = slot_desc->type().type;
-    if (type == TYPE_TIMESTAMP || type == TYPE_CHAR ||
-        (op != AggFnEvaluator::AVG && op != AggFnEvaluator::NDV &&
-         (type == TYPE_DECIMAL || type == TYPE_STRING || type == TYPE_VARCHAR))) {
+    // Char and timestamp intermediates aren't supported
+    if (type == TYPE_TIMESTAMP || type == TYPE_CHAR) supported = false;
+    // Only AVG and NDV support string intermediates
+    if ((type == TYPE_STRING || type == TYPE_VARCHAR) &&
+        !(op == AggFnEvaluator::AVG || op == AggFnEvaluator::NDV)) {
+      supported = false;
+    }
+    // Only SUM, AVG, and NDV support decimal intermediates
+    if (type == TYPE_DECIMAL &&
+        !(op == AggFnEvaluator::SUM || op == AggFnEvaluator::AVG ||
+          op == AggFnEvaluator::NDV)) {
+      supported = false;
+    }
+    if (!supported) {
       VLOG_QUERY << "Could not codegen UpdateTuple because intermediate type "
                  << slot_desc->type()
                  << "is not yet supported for aggregate function \""
