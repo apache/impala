@@ -36,7 +36,8 @@ class TestStringQueries(ImpalaTestSuite):
     cls.TestMatrix.add_dimension(
       create_exec_option_dimension(disable_codegen_options=[True]))
     cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format in ['text'])
+        v.get_value('table_format').file_format in ['text'] and
+        v.get_value('table_format').compression_codec in ['none'])
 
   def test_varchar(self, vector):
     self.run_test_case('QueryTest/chars', vector)
