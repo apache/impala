@@ -594,7 +594,8 @@ public class HdfsScanNode extends ScanNode {
       }
     }
 
-    Preconditions.checkState(cardinality_ >= 0 || cardinality_ == -1);
+    Preconditions.checkState(cardinality_ >= 0 || cardinality_ == -1,
+        "Internal error: invalid scan node cardinality: " + cardinality_);
     if (cardinality_ > 0) {
       LOG.debug("cardinality_=" + Long.toString(cardinality_) +
                 " sel=" + Double.toString(computeSelectivity()));
