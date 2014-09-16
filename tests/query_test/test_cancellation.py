@@ -34,7 +34,6 @@ DEBUG_ACTIONS = [None, 'WAIT']
 # Extra dimensions to test order by without limit
 SORT_QUERY = 'select * from lineitem order by l_orderkey'
 SORT_CANCEL_DELAY = range(6, 10)
-SORT_MEM_LIMIT = ['-1', '300m']
 
 class TestCancellation(ImpalaTestSuite):
   @classmethod
@@ -48,7 +47,6 @@ class TestCancellation(ImpalaTestSuite):
     cls.TestMatrix.add_dimension(TestDimension('query_type', *QUERY_TYPE))
     cls.TestMatrix.add_dimension(TestDimension('cancel_delay', *CANCEL_DELAY_IN_SECONDS))
     cls.TestMatrix.add_dimension(TestDimension('action', *DEBUG_ACTIONS))
-    cls.TestMatrix.add_dimension(TestDimension('mem_limit', "-1"))
 
     cls.TestMatrix.add_constraint(lambda v: v.get_value('query_type') != 'CTAS' or (\
         v.get_value('table_format').file_format in ['text', 'parquet'] and\
@@ -84,9 +82,6 @@ class TestCancellation(ImpalaTestSuite):
     # node ID 0 is the scan node
     debug_action = '0:GETNEXT:' + action if action != None else ''
     vector.get_value('exec_option')['debug_action'] = debug_action
-
-    # Set a mem_limit
-    vector.get_value('exec_option')['mem_limit'] = vector.get_value('mem_limit')
 
     # Execute the query multiple times, cancelling it each time.
     for i in xrange(NUM_CANCELATION_ITERATIONS):
@@ -169,20 +164,18 @@ class TestCancellationSerial(TestCancellation):
     except AssertionError:
       pytest.xfail("IMPALA-551: File handle leak for INSERT")
 
-# TODO: IMPALA-1240: This test fails on tpch_parquet with a mem. limit of 300MB
-# class TestCancellationFullSort(TestCancellation):
-#   @classmethod
-#   def add_test_dimensions(cls):
-#     super(TestCancellation, cls).add_test_dimensions()
-#     # Override dimensions to only execute the order-by without limit query.
-#     cls.TestMatrix.add_dimension(TestDimension('query', SORT_QUERY))
-#     cls.TestMatrix.add_dimension(TestDimension('query_type', 'SELECT'))
-#     cls.TestMatrix.add_dimension(TestDimension('cancel_delay', *SORT_CANCEL_DELAY))
-#     cls.TestMatrix.add_dimension(TestDimension('mem_limit', *SORT_MEM_LIMIT))
-#     cls.TestMatrix.add_dimension(TestDimension('action', None))
-#     cls.TestMatrix.add_constraint(lambda v:\
-#         v.get_value('table_format').file_format =='parquet' and\
-#         v.get_value('table_format').compression_codec == 'none')
+  class TestCancellationFullSort(TestCancellation):
+    @classmethod
+    def add_test_dimensions(cls):
+      super(TestCancellation, cls).add_test_dimensions()
+      # Override dimensions to only execute the order-by without limit query.
+      cls.TestMatrix.add_dimension(TestDimension('query', SORT_QUERY))
+      cls.TestMatrix.add_dimension(TestDimension('query_type', 'SELECT'))
+      cls.TestMatrix.add_dimension(TestDimension('cancel_delay', *SORT_CANCEL_DELAY))
+      cls.TestMatrix.add_dimension(TestDimension('action', None))
+      cls.TestMatrix.add_constraint(lambda v:\
+         v.get_value('table_format').file_format =='parquet' and\
+         v.get_value('table_format').compression_codec == 'none')
 
-#   def test_cancel_sort(self, vector):
-#     self.execute_cancel_test(vector)
+    def test_cancel_sort(self, vector):
+      self.execute_cancel_test(vector)
