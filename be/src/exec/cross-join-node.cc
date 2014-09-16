@@ -82,6 +82,7 @@ Status CrossJoinNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool*
     *eos = true;
     return Status::OK;
   }
+  *eos = false;
 
   ScopedTimer<MonotonicStopWatch> timer(probe_timer_);
   while (!eos_) {

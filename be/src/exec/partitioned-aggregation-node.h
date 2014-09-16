@@ -71,6 +71,12 @@ class SlotDescriptor;
 // 4) Unaggregated tuple stream. Stream to spill unaggregated rows.
 //    Rows in this stream always have child(0)'s layout.
 //
+// Buffering: Each stream and hash table needs to maintain at least one buffer for
+// some duration of the processing. To minimize the memory requirements of small queries
+// (memory usage is less than one buffer per partition), the initial streams and
+// hash tables will use smaller (less than io-sized) buffers. Once we spill, the streams
+// and hash table will use io-sized buffers only.
+//
 // TODO: Buffer rows before probing into the hash table?
 // TODO: after spilling, we can still maintain a very small hash table just to remove
 // some number of rows (from likely going to disk).

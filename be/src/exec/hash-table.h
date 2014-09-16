@@ -262,14 +262,17 @@ class HashTable {
   //  - tuple_stream: the tuple stream which contains the tuple rows index by the
   //    hash table. Can be NULL if the rows contain only a single tuple, in which
   //    the 'tuple_stream' is unused.
+  //  - use_initial_small_pages: if true the first fixed N data_pages_ will be smaller
+  //    than the io buffer size.
   //  - max_num_buckets: the maximum number of buckets that can be stored. If we
   //    try to grow the number of buckets to a larger number, the inserts will fail.
   //    -1, if it unlimited.
   //  - initial_num_buckets: number of buckets that the hash table
   //    should be initialized with.
   HashTable(RuntimeState* state, BufferedBlockMgr::Client* client,
-      int num_build_tuples, BufferedTupleStream* tuple_stream = NULL,
-      int64_t max_num_buckets = -1, int64_t initial_num_buckets = 1024);
+      int num_build_tuples, BufferedTupleStream* tuple_stream,
+      bool use_initial_small_pages, int64_t max_num_buckets,
+      int64_t initial_num_buckets = 1024);
 
   // Ctor used only for testing. Memory is allocated from the pool instead of the
   // block mgr.
@@ -333,7 +336,7 @@ class HashTable {
   }
 
   // Returns the number of bytes allocated to the hash table
-  int64_t byte_size() const;
+  int64_t byte_size() const { return total_data_page_size_; }
 
   // Can be called after all insert calls to update the bitmap filters for the probe
   // side values. The bitmap filters are similar to Bloom filters in that they have no
@@ -524,6 +527,9 @@ class HashTable {
   // TODO: ..or with template-ization
   const bool stores_tuples_;
 
+  // If true use small pages for the first few allocated data pages.
+  const bool use_initial_small_pages_;
+
   const int64_t max_num_buckets_;
 
   // Number of non-empty buckets.  Used to determine when to grow and rehash
@@ -534,6 +540,9 @@ class HashTable {
 
   // Data pages for all nodes. These are always pinned.
   std::vector<BufferedBlockMgr::Block*> data_pages_;
+
+  // Byte size of all buffers in data_pages_.
+  int64_t total_data_page_size_;
 
   // Next node to insert.
   Node* next_node_;

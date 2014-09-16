@@ -138,4 +138,23 @@ select max(t1.total_count), max(t1.l_shipinstruct), max(t1.l_comment) from
 6001215,'TAKE BACK RETURN','zzle? slyly final platelets sleep quickly. '
 ---- TYPES
 BIGINT, STRING, STRING
-====
+---- QUERY
+# Run this query with very low memory. Since the tables are small, the PA/PHJ should be
+# using buffers much smaller than the io buffer.
+set max_block_mgr_memory=10m;
+select a.int_col, count(*)
+from functional.alltypessmall a, functional.alltypessmall b, functional.alltypessmall c
+where a.id = b.id and b.id = c.id group by a.int_col;
+---- RESULTS
+0,12
+1,12
+2,12
+3,12
+4,12
+5,8
+6,8
+7,8
+8,8
+9,8
+---- TYPES
+INT, BIGINT

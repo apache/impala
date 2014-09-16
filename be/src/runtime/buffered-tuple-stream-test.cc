@@ -94,7 +94,7 @@ class SimpleTupleStreamTest : public testing::Test {
     Status status = BufferedBlockMgr::Create(runtime_state_.get(),
         &tracker_, runtime_state_->runtime_profile(), limit, block_size, &block_mgr_);
     EXPECT_TRUE(status.ok());
-    status = block_mgr_->RegisterClient(0, NULL, runtime_state_.get(), &client_);
+    status = block_mgr_->RegisterClient(0, &tracker_, runtime_state_.get(), &client_);
     EXPECT_TRUE(status.ok());
   }
 
@@ -235,7 +235,7 @@ class SimpleTupleStreamTest : public testing::Test {
       for (int i = 0; i < results.size(); i += int_tuples) {
         for (int j = 0; j < int_tuples; ++j) {
           if (!gen_null || (j % 2) == 0) {
-            ASSERT_TRUE(results[i+j] == i / int_tuples)
+            ASSERT_EQ(results[i+j], i / int_tuples)
                 << " results[" << (i + j) << "]: " << results[i + j]
                 << " != " << (i / int_tuples) << " gen_null=" << gen_null;
           } else {
@@ -337,39 +337,43 @@ class SimpleTupleStreamTest : public testing::Test {
   }
 
   void TestIntValuesInterleaved(int num_batches, int num_batches_before_read) {
-    BufferedTupleStream stream(runtime_state_.get(), *int_desc_, block_mgr_.get(),
-        client_,
-        true,  // delete_on_read
-        true); // read_write
-    Status status = stream.Init();
-    ASSERT_TRUE(status.ok());
-    status = stream.UnpinStream();
-    ASSERT_TRUE(status.ok());
+    for (int small_buffers = 0; small_buffers < 2; ++small_buffers) {
+      BufferedTupleStream stream(runtime_state_.get(), *int_desc_, block_mgr_.get(),
+          client_,
+          small_buffers == 0,  // initial small buffers
+          true,  // delete_on_read
+          true); // read_write
+      Status status = stream.Init();
+      ASSERT_TRUE(status.ok());
+      status = stream.UnpinStream();
+      ASSERT_TRUE(status.ok());
 
-    vector<int> results;
+      vector<int> results;
 
-    for (int i = 0; i < num_batches; ++i) {
-      RowBatch* batch = CreateIntBatch(i * BATCH_SIZE, BATCH_SIZE, false);
-      for (int j = 0; j < batch->num_rows(); ++j) {
-        bool b = stream.AddRow(batch->GetRow(j));
-        ASSERT_TRUE(b);
+      for (int i = 0; i < num_batches; ++i) {
+        RowBatch* batch = CreateIntBatch(i * BATCH_SIZE, BATCH_SIZE, false);
+        for (int j = 0; j < batch->num_rows(); ++j) {
+          bool b = stream.AddRow(batch->GetRow(j));
+          ASSERT_TRUE(b);
+        }
+        // Reset the batch to make sure the stream handles the memory correctly.
+        batch->Reset();
+        if (i % num_batches_before_read == 0) {
+          ReadValues(&stream, int_desc_, &results,
+              (rand() % num_batches_before_read) + 1);
+        }
       }
-      // Reset the batch to make sure the stream handles the memory correctly.
-      batch->Reset();
-      if (i % num_batches_before_read == 0) {
-        ReadValues(&stream, int_desc_, &results, (rand() % num_batches_before_read) + 1);
+      ReadValues(&stream, int_desc_, &results);
+
+      // Verify result
+      const int int_tuples = int_desc_->tuple_descriptors().size();
+      EXPECT_EQ(results.size(), BATCH_SIZE * num_batches * int_tuples);
+      for (int i = 0; i < results.size(); ++i) {
+        ASSERT_EQ(results[i], i / int_tuples);
       }
-    }
-    ReadValues(&stream, int_desc_, &results);
 
-    // Verify result
-    const int int_tuples = int_desc_->tuple_descriptors().size();
-    EXPECT_EQ(results.size(), BATCH_SIZE * num_batches * int_tuples);
-    for (int i = 0; i < results.size(); ++i) {
-      ASSERT_EQ(results[i], i / int_tuples);
+      stream.Close();
     }
-
-    stream.Close();
   }
 
   scoped_ptr<ExecEnv> exec_env_;
@@ -549,6 +553,36 @@ TEST_F(SimpleTupleStreamTest, UnpinPin) {
     ReadValues(&stream, int_desc_, &results);
     VerifyResults(results, offset, false);
   }
+
+  stream.Close();
+}
+
+TEST_F(SimpleTupleStreamTest, SmallBuffers) {
+  int buffer_size = 8 * 1024 * 1024;
+  CreateMgr(2 * buffer_size, buffer_size);
+
+  BufferedTupleStream stream(runtime_state_.get(), *int_desc_, block_mgr_.get(), client_);
+  Status status = stream.Init(NULL, false);
+  ASSERT_TRUE(status.ok());
+
+  // Initial buffer should be small.
+  EXPECT_LT(stream.bytes_in_mem(false), buffer_size);
+
+  RowBatch* batch = CreateIntBatch(0, 1024, false);
+  for (int i = 0; i < batch->num_rows(); ++i) {
+    bool ret = stream.AddRow(batch->GetRow(i));
+    EXPECT_TRUE(ret);
+  }
+  EXPECT_LT(stream.bytes_in_mem(false), buffer_size);
+  EXPECT_LT(stream.byte_size(), buffer_size);
+
+  // 40 MB of ints
+  batch = CreateIntBatch(0, 10 * 1024 * 1024, false);
+  for (int i = 0; i < batch->num_rows(); ++i) {
+    bool ret = stream.AddRow(batch->GetRow(i));
+    ASSERT_TRUE(ret);
+  }
+  EXPECT_EQ(stream.bytes_in_mem(false), buffer_size);
 
   stream.Close();
 }

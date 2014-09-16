@@ -60,11 +60,12 @@ Status SelectNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) 
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(QueryMaintenance(state));
     if (child_row_idx_ == child_row_batch_->num_rows()) {
+      child_row_idx_ = 0;
       // fetch next batch
       child_row_batch_->TransferResourceOwnership(row_batch);
       child_row_batch_->Reset();
+      if (row_batch->AtCapacity()) return Status::OK;
       RETURN_IF_ERROR(child(0)->GetNext(state, child_row_batch_.get(), &child_eos_));
-      child_row_idx_ = 0;
     }
 
     if (CopyRows(row_batch)) {

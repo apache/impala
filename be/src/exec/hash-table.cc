@@ -45,6 +45,12 @@ static uint32_t SEED_PRIMES[] = {
   338294347,
 };
 
+// The first NUM_SMALL_BLOCKS of nodes_ are made of blocks less than the io size to
+// reduce the memory footprint of small queries.
+static const int64_t INITIAL_DATA_PAGE_SIZES[] =
+    { 64 * 1024, 512 * 1024 };
+static const int NUM_SMALL_DATA_PAGES = sizeof(INITIAL_DATA_PAGE_SIZES) / sizeof(int64_t);
+
 HashTableCtx::HashTableCtx(const vector<ExprContext*>& build_expr_ctxs,
     const vector<ExprContext*>& probe_expr_ctxs, bool stores_nulls, bool finds_nulls,
     int32_t initial_seed, int max_levels, int num_build_tuples)
@@ -159,17 +165,19 @@ bool HashTableCtx::Equals(TupleRow* build_row) {
 const float HashTable::MAX_BUCKET_OCCUPANCY_FRACTION = 0.75f;
 
 HashTable::HashTable(RuntimeState* state, BufferedBlockMgr::Client* client,
-    int num_build_tuples, BufferedTupleStream* stream, int64_t max_num_buckets,
-    int64_t num_buckets)
+    int num_build_tuples, BufferedTupleStream* stream, bool use_initial_small_pages,
+    int64_t max_num_buckets, int64_t num_buckets)
   : state_(state),
     block_mgr_client_(client),
     tuple_stream_(stream),
     data_page_pool_(NULL),
     num_build_tuples_(num_build_tuples),
     stores_tuples_(num_build_tuples == 1),
+    use_initial_small_pages_(use_initial_small_pages),
     max_num_buckets_(max_num_buckets),
     num_filled_buckets_(0),
     num_nodes_(0),
+    total_data_page_size_(0),
     next_node_(NULL),
     node_remaining_current_page_(0),
     buckets_(NULL),
@@ -187,9 +195,11 @@ HashTable::HashTable(MemPool* pool, int num_buckets)
     data_page_pool_(pool),
     num_build_tuples_(1),
     stores_tuples_(true),
+    use_initial_small_pages_(false),
     max_num_buckets_(-1),
     num_filled_buckets_(0),
     num_nodes_(0),
+    total_data_page_size_(0),
     next_node_(NULL),
     node_remaining_current_page_(0),
     buckets_(NULL),
@@ -218,18 +228,13 @@ void HashTable::Close() {
     data_pages_[i]->Delete();
   }
   if (ImpaladMetrics::HASH_TABLE_TOTAL_BYTES != NULL) {
-    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(
-        -data_pages_.size() * state_->io_mgr()->max_read_buffer_size());
+    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(-total_data_page_size_);
   }
   data_pages_.clear();
   if (buckets_ != NULL) free(buckets_);
   if (block_mgr_client_ != NULL) {
     state_->block_mgr()->ReleaseMemory(block_mgr_client_, num_buckets_ * sizeof(Bucket));
   }
-}
-
-int64_t HashTable::byte_size() const {
-  return data_pages_.size() * state_->io_mgr()->max_read_buffer_size();
 }
 
 void HashTable::UpdateProbeFilters(HashTableCtx* ht_ctx,
@@ -317,25 +322,30 @@ bool HashTable::ResizeBuckets(int64_t num_buckets) {
 }
 
 bool HashTable::GrowNodeArray() {
-  int64_t buffer_size = 0;
+  int64_t page_size = 0;
   if (block_mgr_client_ != NULL) {
+    page_size = state_->block_mgr()->max_block_size();;
+    if (use_initial_small_pages_ && data_pages_.size() < NUM_SMALL_DATA_PAGES) {
+      page_size = min(page_size, INITIAL_DATA_PAGE_SIZES[data_pages_.size()]);
+    }
     BufferedBlockMgr::Block* block = NULL;
-    Status status = state_->block_mgr()->GetNewBlock(block_mgr_client_, NULL, &block);
+    Status status = state_->block_mgr()->GetNewBlock(
+        block_mgr_client_, NULL, &block, page_size);
     if (!status.ok()) DCHECK(block == NULL);
     if (block == NULL) return false;
     data_pages_.push_back(block);
-    buffer_size = state_->io_mgr()->max_read_buffer_size();
-    next_node_ = block->Allocate<Node>(buffer_size);
-    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(buffer_size);
+    next_node_ = block->Allocate<Node>(page_size);
+    ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(page_size);
   } else {
     // Only used for testing.
     DCHECK(data_page_pool_ != NULL);
-    buffer_size = TEST_PAGE_SIZE;
-    next_node_ = reinterpret_cast<Node*>(data_page_pool_->Allocate(buffer_size));
+    page_size = TEST_PAGE_SIZE;
+    next_node_ = reinterpret_cast<Node*>(data_page_pool_->Allocate(page_size));
     if (data_page_pool_->mem_tracker()->LimitExceeded()) return false;
     DCHECK(next_node_ != NULL);
   }
-  node_remaining_current_page_ = buffer_size / sizeof(Node);
+  node_remaining_current_page_ = page_size / sizeof(Node);
+  total_data_page_size_ += page_size;
   return true;
 }
 

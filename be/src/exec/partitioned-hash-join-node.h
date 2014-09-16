@@ -257,6 +257,17 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   std::string NodeDebugString() const;
 
+  // We need two output buffers per partition (one for build and one for probe) and
+  // and one additional buffer for the input (while repartitioning).
+  // For NAAJ, we need 3 additional buffers to maintain the null_aware_partition_.
+  int MinRequiredBuffers() const {
+    int num_reserved_buffers = PARTITION_FANOUT * 2 + 1;
+    num_reserved_buffers += join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN ? 3 : 0;
+    return num_reserved_buffers;
+  }
+
+  RuntimeState* runtime_state_;
+
   // our equi-join predicates "<lhs> = <rhs>" are separated into
   // build_expr_ctxs_ (over child(1)) and probe_expr_ctxs_ (over child(0))
   std::vector<ExprContext*> probe_expr_ctxs_;

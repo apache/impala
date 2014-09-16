@@ -33,6 +33,16 @@ class TupleRow;
 //
 // The underlying memory management is done by the BufferedBlockMgr.
 //
+// The tuple stream consists of a number of small (less than io sized blocks) before
+// an arbitrary number of io sized blocks. The smaller blocks do not spill and are
+// there to lower the minimum buffering requirements. For example, an operator that
+// needs to maintain 64 streams (1 buffer per partition) would need, by default,
+// 64 * 8MB = 512MB of buffering. A query with 5 of these operators would require
+// 2.56 GB just to run any query, regardless of how much of that is used. This is
+// problematic for small queries. Instead we will start with a fixed number of small
+// buffers and only start using IO sized buffers when those fill up. The small buffers
+// never spill.
+//
 // The BufferedTupleStream is *not* thread safe from the caller's point of view. It is
 // expected that all the APIs are called from a single thread. Internally, the
 // object is thread safe wrt to the underlying block mgr.
@@ -78,6 +88,8 @@ class TupleRow;
 // TODO: see if this can be merged with Sorter::Run. The key difference is that this
 // does not need to return rows in the order they were added, which allows it to be
 // simpler.
+// TODO: we could compact the small buffers when we need to spill but they use very
+// little memory so ths might not be very useful.
 // TODO: improvements:
 //   - Think about how to layout for the var len data more, possibly filling in them
 //     from the end of the same block. Don't interleave fixed and var len data.
@@ -144,11 +156,13 @@ class BufferedTupleStream {
   // that are added and the rows being returned.
   // block_mgr: Underlying block mgr that owns the data blocks.
   // delete_on_read: Blocks are deleted after they are read.
+  // use_initial_small_buffers: If true, the initial N buffers allocated for the
+  // tuple stream use smaller than io sized buffers.
   // read_write: Stream allows interchanging read and write operations. Requires at
   // least two blocks may be pinned.
-  // The tuple stream is initially in pinned mode.
   BufferedTupleStream(RuntimeState* state, const RowDescriptor& row_desc,
       BufferedBlockMgr* block_mgr, BufferedBlockMgr::Client* client,
+      bool use_initial_small_buffers = true,
       bool delete_on_read = false, bool read_write = false);
 
   // Initializes the tuple stream object. Must be called once before any of the
@@ -218,22 +232,24 @@ class BufferedTupleStream {
   int64_t rows_returned() const { return rows_returned_; }
 
   // Returns the byte size necessary to store the entire stream in memory.
-  int64_t byte_size() const { return blocks_.size() * block_mgr_->max_block_size(); }
+  int64_t byte_size() const { return total_byte_size_; }
 
   // Returns the byte size of the stream that is currently pinned in memory.
   // If ignore_current is true, the write_block_ memory is not included.
   int64_t bytes_in_mem(bool ignore_current) const;
 
-  // Returns the number of bytes that are in unpinned blocks.
-  int64_t bytes_unpinned() const;
-
   bool is_pinned() const { return pinned_; }
   int blocks_pinned() const { return num_pinned_; }
-  int blocks_unpinned() const { return blocks_.size() - num_pinned_; }
+  int blocks_unpinned() const { return blocks_.size() - num_pinned_ - num_small_blocks_; }
   bool has_read_block() const { return read_block_ != blocks_.end(); }
   bool has_write_block() const { return write_block_ != NULL; }
 
+  std::string DebugString() const;
+
  private:
+  // If true, this stream is still using small buffers.
+  bool use_small_buffers_;
+
   // If true, blocks are deleted after they are read.
   const bool delete_on_read_;
 
@@ -254,15 +270,13 @@ class BufferedTupleStream {
   // Sum of the fixed length portion of all the tuples in desc_.
   int fixed_tuple_row_size_;
 
-  // Sum of the non-nullable fixed-length portion of all the tuples in desc. This
-  // constitutes the minimum possible space occupied by a single row.
-  int min_tuple_row_size_;
-
-  // Max size (in bytes) of null indicators bitstring in each block. If 0, it means that
-  // there is no need to store null indicators for this RowDesc. We calculate this value
-  // based on the block size and the fixed_tuple_row_size_. When not 0, this value is
-  // also an upper bound for the number of (rows * tuples_per_row) in a block.
-  uint32_t null_indicators_per_block_;
+  // Max size (in bytes) of null indicators bitstring in the current read and write
+  // blocks. If 0, it means that there is no need to store null indicators for this
+  // RowDesc. We calculate this value based on the block's size and the
+  // fixed_tuple_row_size_. When not 0, this value is also an upper bound for the number
+  // of (rows * tuples_per_row) in this block.
+  uint32_t null_indicators_read_block_;
+  uint32_t null_indicators_write_block_;
 
   // Vector of all the strings slots grouped by tuple_idx.
   std::vector<std::pair<int, std::vector<SlotDescriptor*> > > string_slots_;
@@ -273,6 +287,9 @@ class BufferedTupleStream {
 
   // List of blocks in the stream.
   std::list<BufferedBlockMgr::Block*> blocks_;
+
+  // Total size of blocks_, including small blocks.
+  int64_t total_byte_size_;
 
   // Iterator pointing to the current block for read. If read_write_, this is always a
   // valid block, otherwise equal to list.end() until PrepareForRead() is called.
@@ -306,7 +323,11 @@ class BufferedTupleStream {
 
   // Number of pinned blocks in blocks_, stored to avoid iterating over the list
   // to compute bytes_in_mem and bytes_unpinned.
+  // This does not include small blocks.
   int num_pinned_;
+
+  // The total number of small blocks in blocks_;
+  int num_small_blocks_;
 
   bool closed_; // Used for debugging.
   Status status_;
@@ -336,19 +357,23 @@ class BufferedTupleStream {
   bool DeepCopy(TupleRow* row, uint8_t** dst);
 
   // Gets a new block from the block_mgr_, updating write_block_ and write_tuple_idx_, and
-  // setting *got_block. If there are no blocks available, write_block_ is set to NULL
-  // and *got_block is set to false.
+  // setting *got_block. If there are no blocks available, *got_block is set to false
+  // and write_block_ is unchanged.
   // min_size is the minimum number of bytes required for this block.
   Status NewBlockForWrite(int min_size, bool* got_block);
 
   // Reads the next block from the block_mgr_. This blocks if necessary.
-  // Updates read_block_, read_ptr_, read_tuple_idx_ and read_bytes_left_.
+  // Updates read_block_, read_ptr_, read_tuple_idx_ and read_bytes_.
   Status NextBlockForRead();
 
   // Returns the byte size of this row when encoded in a block.
   int ComputeRowSize(TupleRow* row) const;
 
-  std::string DebugString() const;
+  // Unpins block if it is an io sized block and updates tracking stats.
+  Status UnpinBlock(BufferedBlockMgr::Block* block);
+
+  // Computes the number of bytes needed for null indicators for a block of 'block_size'
+  int ComputeNumNullIndicatorBytes(int block_size) const;
 };
 
 }

@@ -31,12 +31,14 @@ bool BufferedTupleStream::DeepCopy(TupleRow* row, uint8_t** dst) {
 template <bool HasNullableTuple>
 bool BufferedTupleStream::DeepCopyInternal(TupleRow* row, uint8_t** dst) {
   if (UNLIKELY(write_block_ == NULL)) return false;
-  DCHECK(write_block_->is_pinned());
+  DCHECK_GE(null_indicators_write_block_, 0);
+  DCHECK(write_block_->is_pinned()) << DebugString() << std::endl
+      << write_block_->DebugString();
 
   const uint64_t tuples_per_row = desc_.tuple_descriptors().size();
   if (UNLIKELY((write_block_->BytesRemaining() < fixed_tuple_row_size_) ||
-               (HasNullableTuple &&
-                (write_tuple_idx_ + tuples_per_row > null_indicators_per_block_ * 8)))) {
+              (HasNullableTuple &&
+              (write_tuple_idx_ + tuples_per_row > null_indicators_write_block_ * 8)))) {
     return false;
   }
   // Allocate the maximum possible buffer for the fixed portion of the tuple.
@@ -49,7 +51,7 @@ bool BufferedTupleStream::DeepCopyInternal(TupleRow* row, uint8_t** dst) {
   // Copy the not NULL fixed len tuples. For the NULL tuples just update the NULL tuple
   // indicator.
   if (HasNullableTuple) {
-    DCHECK_GT(null_indicators_per_block_, 0);
+    DCHECK_GT(null_indicators_write_block_, 0);
     uint8_t* null_word = NULL;
     uint32_t null_pos = 0;
     // Calculate how much space it should return.
@@ -70,16 +72,16 @@ bool BufferedTupleStream::DeepCopyInternal(TupleRow* row, uint8_t** dst) {
         to_return += tuple_size;
       }
     }
-    DCHECK_LE(write_tuple_idx_ - 1, null_indicators_per_block_ * 8);
+    DCHECK_LE(write_tuple_idx_ - 1, null_indicators_write_block_ * 8);
     write_block_->ReturnAllocation(to_return);
     bytes_allocated -= to_return;
   } else {
     // If we know that there are no nullable tuples no need to set the nullability flags.
-    DCHECK_EQ(null_indicators_per_block_, 0);
+    DCHECK_EQ(null_indicators_write_block_, 0);
     for (int i = 0; i < tuples_per_row; ++i) {
       const int tuple_size = desc_.tuple_descriptors()[i]->byte_size();
       Tuple* t = row->GetTuple(i);
-      // TODO: Once IMPALA-1306 (Avoid passing empty tuples of non-materiliazed slots)
+      // TODO: Once IMPALA-1306 (Avoid passing empty tuples of non-materialized slots)
       // is delivered, the check below should become DCHECK_NOTNULL(t).
       DCHECK(t != NULL || tuple_size == 0);
       memcpy(tuple_buf, t, tuple_size);
@@ -108,6 +110,7 @@ bool BufferedTupleStream::DeepCopyInternal(TupleRow* row, uint8_t** dst) {
       }
     }
   }
+  write_block_->AddRow();
   ++num_rows_;
   return true;
 }

@@ -310,7 +310,8 @@ TEST_F(BufferedBlockMgrTest, GetNewBlockSmallBlocks) {
   int max_num_blocks = 3;
   shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_blocks);
   BufferedBlockMgr::Client* client;
-  Status status = block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client);
+  MemTracker tracker;
+  Status status = block_mgr->RegisterClient(0, &tracker, runtime_state_.get(), &client);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 
@@ -321,8 +322,9 @@ TEST_F(BufferedBlockMgrTest, GetNewBlockSmallBlocks) {
   status = block_mgr->GetNewBlock(client, NULL, &new_block, 128);
   EXPECT_TRUE(new_block != NULL);
   EXPECT_TRUE(status.ok());
-  EXPECT_EQ(block_mgr->bytes_allocated(), 128);
-  EXPECT_EQ(block_mgr_parent_tracker_->consumption(), 128);
+  EXPECT_EQ(block_mgr->bytes_allocated(), 0);
+  EXPECT_EQ(block_mgr_parent_tracker_->consumption(), 0);
+  EXPECT_EQ(tracker.consumption(), 128);
   EXPECT_TRUE(new_block->is_pinned());
   EXPECT_EQ(new_block->BytesRemaining(), 128);
   EXPECT_TRUE(new_block->buffer() != NULL);
@@ -332,8 +334,9 @@ TEST_F(BufferedBlockMgrTest, GetNewBlockSmallBlocks) {
   status = block_mgr->GetNewBlock(client, NULL, &new_block);
   EXPECT_TRUE(new_block != NULL);
   EXPECT_TRUE(status.ok());
-  EXPECT_EQ(block_mgr->bytes_allocated(), 128 + block_mgr->max_block_size());
-  EXPECT_EQ(block_mgr_parent_tracker_->consumption(), 128 + block_mgr->max_block_size());
+  EXPECT_EQ(block_mgr->bytes_allocated(), block_mgr->max_block_size());
+  EXPECT_EQ(block_mgr_parent_tracker_->consumption(), block_mgr->max_block_size());
+  EXPECT_EQ(tracker.consumption(), 128 + block_mgr->max_block_size());
   EXPECT_TRUE(new_block->is_pinned());
   EXPECT_EQ(new_block->BytesRemaining(), block_mgr->max_block_size());
   EXPECT_TRUE(new_block->buffer() != NULL);
@@ -343,9 +346,9 @@ TEST_F(BufferedBlockMgrTest, GetNewBlockSmallBlocks) {
   status = block_mgr->GetNewBlock(client, NULL, &new_block, 512);
   EXPECT_TRUE(new_block != NULL);
   EXPECT_TRUE(status.ok());
-  EXPECT_EQ(block_mgr->bytes_allocated(), 128 + 512 + block_mgr->max_block_size());
-  EXPECT_EQ(block_mgr_parent_tracker_->consumption(),
-      128 + 512 + block_mgr->max_block_size());
+  EXPECT_EQ(block_mgr->bytes_allocated(), block_mgr->max_block_size());
+  EXPECT_EQ(block_mgr_parent_tracker_->consumption(), block_mgr->max_block_size());
+  EXPECT_EQ(tracker.consumption(), 128 + 512 + block_mgr->max_block_size());
   EXPECT_TRUE(new_block->is_pinned());
   EXPECT_EQ(new_block->BytesRemaining(), 512);
   EXPECT_TRUE(new_block->buffer() != NULL);

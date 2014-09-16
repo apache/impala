@@ -216,7 +216,9 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
 
   if (needs_serialize_ && block_mgr_client_ != NULL) {
     serialize_stream_.reset(new BufferedTupleStream(state, *intermediate_row_desc_,
-        state->block_mgr(), block_mgr_client_, true /* delete on read */));
+        state->block_mgr(), block_mgr_client_,
+        false, /* use initial small buffers */
+        true  /* delete on read */));
     RETURN_IF_ERROR(serialize_stream_->Init(runtime_profile(), false));
     DCHECK(serialize_stream_->has_write_block());
   }
@@ -339,12 +341,13 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
   }
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   *eos = ReachedLimit();
+  if (output_iterator_.AtEnd()) row_batch->MarkNeedToReturn();
   return Status::OK;
 }
 
 void PartitionedAggregationNode::CleanupHashTbl(const vector<FunctionContext*>& ctxs,
     HashTable::Iterator it) {
-  if (!needs_finalize_) return;
+  if (!needs_finalize_ && !needs_serialize_) return;
   while (!it.AtEnd()) {
     FinalizeTuple(ctxs, it.GetTuple(), mem_pool_.get());
     // Avoid consuming excessive memory.
@@ -410,12 +413,16 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
 
   aggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
       *parent->intermediate_row_desc_, parent->state_->block_mgr(),
-      parent->block_mgr_client_, true /* delete on read */));
+      parent->block_mgr_client_,
+      level == 0, /* use small buffers */
+      false /* delete on read */));
   RETURN_IF_ERROR(aggregated_row_stream->Init(parent->runtime_profile()));
 
   unaggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
       parent->child(0)->row_desc(), parent->state_->block_mgr(),
-      parent->block_mgr_client_, true /* delete on read */));
+      parent->block_mgr_client_,
+      level == 0, /* use small buffers */
+      true /* delete on read */));
   // This stream is only used to spill, no need to ever have this pinned.
   RETURN_IF_ERROR(unaggregated_row_stream->Init(parent->runtime_profile(), false));
   DCHECK(unaggregated_row_stream->has_write_block());
@@ -430,8 +437,9 @@ bool PartitionedAggregationNode::Partition::InitHashTable() {
   // TODO: we could switch to 64 bit hashes and then we don't need a max size.
   // It might be reasonable to limit individual hash table size for other reasons
   // though.
+  // Only use small buffers on level 0 (no repartitioning).
   hash_tbl.reset(new HashTable(parent->state_, parent->block_mgr_client_, 1, NULL,
-      1 << (32 - NUM_PARTITIONING_BITS)));
+      level == 0, 1 << (32 - NUM_PARTITIONING_BITS)));
   return hash_tbl->Init();
 }
 
@@ -452,7 +460,7 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
     DCHECK(!parent->serialize_stream_->is_pinned());
     DCHECK(parent->serialize_stream_->has_write_block());
 
-    const std::vector<AggFnEvaluator*>& evaluators = parent->aggregate_evaluators_;;
+    const vector<AggFnEvaluator*>& evaluators = parent->aggregate_evaluators_;;
 
     // Serialize and copy the spilled partition's stream into the new stream.
     bool failed_to_add = false;
@@ -482,10 +490,11 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
     // to remember where we are).
     if (failed_to_add) {
       parent->CleanupHashTbl(agg_fn_ctxs, it);
+      hash_tbl->Close();
+      hash_tbl.reset();
       aggregated_row_stream->Close();
       RETURN_IF_ERROR(new_stream->status());
-      DCHECK(false) << "How do we get here";
-      return Status::MEM_LIMIT_EXCEEDED;
+      return parent->state_->block_mgr()->MemLimitTooLowError(parent->block_mgr_client_);
     }
 
     aggregated_row_stream->Close();
@@ -496,7 +505,9 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
     // freed at least one buffer from this partition's (old) aggregated_row_stream.
     parent->serialize_stream_.reset(new BufferedTupleStream(parent->state_,
         *parent->intermediate_row_desc_, parent->state_->block_mgr(),
-        parent->block_mgr_client_, true /* delete on read */));
+        parent->block_mgr_client_,
+        false, /* use small buffers */
+        true   /* delete on read */));
     RETURN_IF_ERROR(parent->serialize_stream_->Init(parent->runtime_profile(), false));
     DCHECK(parent->serialize_stream_->has_write_block());
   }
@@ -512,7 +523,8 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
 
   hash_tbl->Close();
   hash_tbl.reset();
-  DCHECK(aggregated_row_stream->has_write_block());
+  DCHECK(aggregated_row_stream->has_write_block())
+      << aggregated_row_stream->DebugString();
   RETURN_IF_ERROR(aggregated_row_stream->UnpinStream(false));
 
   COUNTER_ADD(parent->num_spilled_partitions_, 1);
@@ -526,7 +538,7 @@ void PartitionedAggregationNode::Partition::Close(bool finalize_rows) {
   if (is_closed) return;
   is_closed = true;
   if (aggregated_row_stream.get() != NULL) {
-    if (finalize_rows && parent->needs_finalize_ && hash_tbl.get() != NULL) {
+    if (finalize_rows && hash_tbl.get() != NULL) {
       // We need to walk all the rows and Finalize them here so the UDA gets a chance
       // to cleanup. If the hash table is gone (meaning this was spilled), the rows
       // should have been finalized/serialized in Spill().
@@ -815,13 +827,8 @@ Status PartitionedAggregationNode::SpillPartition(Partition* curr_partition,
     }
   }
   if (partition_idx == -1) {
-    DCHECK(false) << "This should never happen due to the reservation. This is "
-      "defense on release builds";
-    // Could not find a partition to spill. This means the mem limit was just too
-    // low.
-    Status status = Status::MEM_LIMIT_EXCEEDED;
-    status.AddErrorMsg("Mem limit is too low to perform partitioned aggregation");
-    return status;
+    // Could not find a partition to spill. This means the mem limit was just too low.
+    return state_->block_mgr()->MemLimitTooLowError(block_mgr_client_);
   }
 
   Partition* spilled_partition = hash_partitions_[partition_idx];
@@ -871,7 +878,7 @@ Status PartitionedAggregationNode::MoveHashPartitions(int64_t num_input_rows) {
     }
 
   }
-  VLOG_QUERY << ss.str();
+  VLOG(2) << ss.str();
   hash_partitions_.clear();
   return Status::OK;
 }
@@ -1086,7 +1093,8 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
 
       // Create intermediate argument 'dst' from 'dst_value'
       const ColumnType& dst_type = evaluator->intermediate_type();
-      CodegenAnyVal dst = CodegenAnyVal::GetNonNullVal(codegen, &builder, dst_type, "dst");
+      CodegenAnyVal dst = CodegenAnyVal::GetNonNullVal(
+          codegen, &builder, dst_type, "dst");
       dst.SetFromRawValue(dst_value);
       // Create pointer to dst to pass to ir_fn. We must use the unlowered type.
       Value* dst_lowered_ptr = codegen->CreateEntryBlockAlloca(

@@ -22,19 +22,22 @@
 #include "util/filesystem-util.h"
 #include "util/impalad-metrics.h"
 #include "util/uid-util.h"
-#include <gutil/strings/substitute.h>
 
 #include <openssl/rand.h>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
 #include <openssl/err.h>
 
-using namespace std;
+#include <gutil/strings/substitute.h>
+
 using namespace boost;
 using namespace strings;   // for Substitute
 
 DEFINE_bool(disk_spill_encryption, false, "Set this to encrypt and perform an integrity "
     "check on all data spilled to disk during a query");
+
+using namespace std;
+using namespace strings;
 
 namespace impala {
 
@@ -83,15 +86,19 @@ struct BufferedBlockMgr::Client {
 
   void PinBuffer(BufferDescriptor* buffer) {
     DCHECK_NOTNULL(buffer);
-    ++num_pinned_buffers_;
-    if (tracker_ != NULL) tracker_->ConsumeLocal(buffer->len, query_tracker_);
+    if (buffer->len == mgr_->max_block_size()) {
+      ++num_pinned_buffers_;
+      if (tracker_ != NULL) tracker_->ConsumeLocal(buffer->len, query_tracker_);
+    }
   }
 
   void UnpinBuffer(BufferDescriptor* buffer) {
     DCHECK_NOTNULL(buffer);
-    DCHECK_GT(num_pinned_buffers_, 0);
-    --num_pinned_buffers_;
-    if (tracker_ != NULL) tracker_->ReleaseLocal(buffer->len, query_tracker_);
+    if (buffer->len == mgr_->max_block_size()) {
+      DCHECK_GT(num_pinned_buffers_, 0);
+      --num_pinned_buffers_;
+      if (tracker_ != NULL) tracker_->ReleaseLocal(buffer->len, query_tracker_);
+    }
   }
 
   string DebugString() const {
@@ -110,7 +117,8 @@ BufferedBlockMgr::Block::Block(BufferedBlockMgr* block_mgr)
     block_mgr_(block_mgr),
     client_(NULL),
     write_range_(NULL),
-    valid_data_len_(0) {
+    valid_data_len_(0),
+    num_rows_(0) {
 }
 
 Status BufferedBlockMgr::Block::Pin(bool* pinned, Block* release_block, bool unpin) {
@@ -138,6 +146,7 @@ void BufferedBlockMgr::Block::Init() {
   is_deleted_ = false;
   valid_data_len_ = 0;
   client_ = NULL;
+  num_rows_ = 0;
 }
 
 bool BufferedBlockMgr::Block::Validate() const {
@@ -169,7 +178,9 @@ string BufferedBlockMgr::Block::DebugString() const {
   ss << "Block: " << this << endl
      << "  Buffer Desc: " << buffer_desc_ << endl
      << "  Data Len: " << valid_data_len_ << endl
-     << "  Deleted: " << is_deleted_ << endl
+     << "  Num Rows: " << num_rows_ << endl;
+  if (is_pinned_) ss << "  Buffer Len: " << buffer_len() << endl;
+  ss << "  Deleted: " << is_deleted_ << endl
      << "  Pinned: " << is_pinned_ << endl
      << "  Write Issued: " << in_write_ << endl
      << "  Client Local: " << client_local_;
@@ -291,6 +302,12 @@ void BufferedBlockMgr::ClearTmpReservation(Client* client) {
 bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
   int buffers_needed = BitUtil::Ceil(size, max_block_size());
 
+  if (size < max_block_size() && mem_tracker_->TryConsume(size)) {
+    // For small allocations (less than a block size), just let the allocation through.
+    client->tracker_->ConsumeLocal(size, client->query_tracker_);
+    return true;
+  }
+
   unique_lock<mutex> lock(lock_);
 
   if (max(0L, remaining_unreserved_buffers()) + client->num_tmp_reserved_buffers_ <
@@ -316,7 +333,7 @@ bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
   // Loop until we have freed enough memory.
   while (buffers_needed > 0) {
     BufferDescriptor* buffer_desc = NULL;
-    FindBuffer(lock, &buffer_desc);
+    FindBuffer(lock, false, &buffer_desc);
     if (buffer_desc == NULL) {
       if (additional_tmp_reservations > 0) {
         client->num_tmp_reserved_buffers_ -= additional_tmp_reservations;
@@ -328,17 +345,17 @@ bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
     all_io_buffers_.erase(buffer_desc->all_buffers_it);
     if (buffer_desc->block != NULL) buffer_desc->block->buffer_desc_ = NULL;
     delete[] buffer_desc->buffer;
-
     mem_tracker_->Release(buffer_desc->len);
+
     --additional_tmp_reservations;
     DCHECK_GT(client->num_tmp_reserved_buffers_, 0);
     --client->num_tmp_reserved_buffers_;
     --unfullfilled_reserved_buffers_;
   }
 
-  mem_tracker_->Consume(size);
-  client->tracker_->ConsumeLocal(size, client->query_tracker_);
   WriteUnpinnedBlocks();
+  if (!mem_tracker_->TryConsume(size)) return false;
+  client->tracker_->ConsumeLocal(size, client->query_tracker_);
   DCHECK(Validate()) << endl << DebugInternal();
   return true;
 }
@@ -354,34 +371,49 @@ void BufferedBlockMgr::Cancel() {
   io_mgr_->CancelContext(io_request_context_);
 }
 
+Status BufferedBlockMgr::MemLimitTooLowError(Client* client) {
+  // TODO: what to print here. We can't know the value of the entire query here.
+  Status status = Status::MEM_LIMIT_EXCEEDED;
+  status.AddErrorMsg(Substitute("The memory limit is set too low initialize the"
+      " spilling operator. The minimum required memory to spill this operator is $0.",
+      PrettyPrinter::Print(client->num_reserved_buffers_ * max_block_size(),
+          TCounterType::BYTES)));
+  VLOG_QUERY << "Query: " << query_id_ << " ran out of memory: " << endl
+             << DebugInternal() << endl << client->DebugString() << endl
+             << GetStackTrace();
+  return status;
+}
+
 Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block** block,
     int64_t len) {
+  DCHECK_LE(len, max_block_size_) << "Cannot request blocks bigger than max_len";
+
   *block = NULL;
   if (is_cancelled_.Read() == 1) return Status::CANCELLED;
   Block* new_block = NULL;
   {
     lock_guard<mutex> lock(lock_);
     new_block = GetUnusedBlock(client);
-  }
-  DCHECK_NOTNULL(new_block);
-  DCHECK(new_block->client_ == client);
 
-  if (len >= 0) {
-    DCHECK(unpin_block == NULL);
-    DCHECK_LT(len, max_block_size_) << "Cannot request blocks bigger than max_len";
-    if (mem_tracker_->TryConsume(len)) {
-      uint8_t* buffer = new uint8_t[len];
-      new_block->buffer_desc_ = obj_pool_.Add(new BufferDescriptor(buffer, len));
-      new_block->buffer_desc_->block = new_block;
-      new_block->is_pinned_ = true;
-      client->PinBuffer(new_block->buffer_desc_);
-      ++total_pinned_buffers_;
-      *block = new_block;
-      return Status::OK;
-    } else {
-      new_block->is_deleted_ = true;
-      ReturnUnusedBlock(new_block);
-      return Status::OK;
+    DCHECK_NOTNULL(new_block);
+    DCHECK(new_block->client_ == client);
+
+    if (len >= 0 && len < max_block_size_) {
+      DCHECK(unpin_block == NULL);
+      if (client->tracker_->TryConsume(len)) {
+        uint8_t* buffer = new uint8_t[len];
+        new_block->buffer_desc_ = obj_pool_.Add(new BufferDescriptor(buffer, len));
+        new_block->buffer_desc_->block = new_block;
+        new_block->is_pinned_ = true;
+        client->PinBuffer(new_block->buffer_desc_);
+        ++total_pinned_buffers_;
+        *block = new_block;
+        return Status::OK;
+      } else {
+        new_block->is_deleted_ = true;
+        ReturnUnusedBlock(new_block);
+        return Status::OK;
+      }
     }
   }
 
@@ -726,12 +758,12 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
   block->is_deleted_ = true;
 
   if (block->is_pinned_) {
+    if (block->is_max_size()) --total_pinned_buffers_;
     block->is_pinned_ = false;
     block->client_->UnpinBuffer(block->buffer_desc_);
     if (block->client_->num_pinned_buffers_ < block->client_->num_reserved_buffers_) {
       ++unfullfilled_reserved_buffers_;
     }
-    --total_pinned_buffers_;
   } else if (unpinned_blocks_.Contains(block)) {
     // Remove block from unpinned list.
     unpinned_blocks_.Remove(block);
@@ -746,7 +778,7 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
     if (block->buffer_desc_->len != max_block_size_) {
       // Just delete the block for now.
       delete[] block->buffer_desc_->buffer;
-      mem_tracker_->Release(block->buffer_desc_->len);
+      block->client_->tracker_->Release(block->buffer_desc_->len);
     } else if (!free_io_buffers_.Contains(block->buffer_desc_)) {
       free_io_buffers_.Enqueue(block->buffer_desc_);
       buffer_available_cv_.notify_one();
@@ -820,7 +852,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
     *in_mem = true;
   } else {
     BufferDescriptor* buffer_desc = NULL;
-    RETURN_IF_ERROR(FindBuffer(l, &buffer_desc));
+    RETURN_IF_ERROR(FindBuffer(l, true, &buffer_desc));
 
     if (buffer_desc == NULL) {
       // There are no free buffers or blocks we can evict. We need to fail this request.
@@ -849,11 +881,11 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
     buffer_desc->block = block;
     block->buffer_desc_ = buffer_desc;
   }
+  DCHECK_NOTNULL(block->buffer_desc_);
+  block->is_pinned_ = true;
   client->PinBuffer(block->buffer_desc_);
   ++total_pinned_buffers_;
 
-  DCHECK_NOTNULL(block->buffer_desc_);
-  block->is_pinned_ = true;
   DCHECK(block->Validate()) << endl << block->DebugString();
   // The number of free buffers has decreased. Write unpinned blocks if the number
   // of free buffers below the threshold is reached.
@@ -867,12 +899,12 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
 //     threshold, until we run out of memory.
 //  2. Pick a buffer from the free list.
 //  3. Wait and evict an unpinned buffer.
-Status BufferedBlockMgr::FindBuffer(unique_lock<mutex>& lock,
+Status BufferedBlockMgr::FindBuffer(unique_lock<mutex>& lock, bool can_allocate,
     BufferDescriptor** buffer_desc) {
   *buffer_desc = NULL;
 
   // First try to allocate a new buffer.
-  if (free_io_buffers_.size() < block_write_threshold_ &&
+  if (can_allocate && free_io_buffers_.size() < block_write_threshold_ &&
       mem_tracker_->TryConsume(max_block_size_)) {
     uint8_t* new_buffer = new uint8_t[max_block_size_];
     *buffer_desc = obj_pool_.Add(new BufferDescriptor(new_buffer, max_block_size_));

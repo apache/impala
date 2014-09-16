@@ -168,7 +168,10 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(child(0)->Open(state));
   RETURN_IF_ERROR(state->block_mgr()->RegisterClient(2, mem_tracker(), state, &client_));
   input_stream_.reset(new BufferedTupleStream(state, child(0)->row_desc(),
-      state->block_mgr(), client_, true /* delete_on_read */, true /* read_write */));
+      state->block_mgr(), client_,
+      false /* initial_small_buffers */,
+      true /* delete_on_read */,
+      true /* read_write */));
   RETURN_IF_ERROR(input_stream_->Init(runtime_profile()));
 
   DCHECK_EQ(evaluators_.size(), fn_ctxs_.size());

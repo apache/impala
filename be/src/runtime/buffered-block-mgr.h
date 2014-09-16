@@ -40,7 +40,8 @@ class RuntimeState;
 // Clients that do partitioning will start with these smaller to reduce the minimum
 // buffering requirements and grow to the max sized buffer as input grows. For simplicity,
 // these buffers are not recycled (there's also not really a need since they are allocated
-// all at once on query startup and then not allocated again).
+// all at once on query startup and then not allocated again). These buffers are
+// not counted against the reservation.
 //
 // BufferedBlockMgr reserves one buffer per disk ('block_write_threshold_') for itself.
 // When the number of free buffers falls below 'block_write_threshold', unpinned blocks
@@ -148,6 +149,9 @@ class BufferedBlockMgr {
     // Non-blocking.
     Status Delete();
 
+    void AddRow() { ++num_rows_; }
+    int num_rows() const { return num_rows_; }
+
     // Allocates the specified number of bytes from this block.
     template <typename T> T* Allocate(int size) {
       DCHECK_GE(BytesRemaining(), size);
@@ -177,6 +181,20 @@ class BufferedBlockMgr {
 
     // Return the number of bytes allocated in this block.
     int64_t valid_data_len() const { return valid_data_len_; }
+
+    // Returns the length of the underlying buffer. Only callable if the block is
+    // pinned.
+    int64_t buffer_len() const {
+      DCHECK(is_pinned());
+      return buffer_desc_->len;
+    }
+
+    // Returns true if this block is the max block size. Only callable if the block
+    // is pinned.
+    bool is_max_size() const {
+      DCHECK(is_pinned());
+      return buffer_desc_->len == block_mgr_->max_block_size();
+    }
 
     bool is_pinned() const { return is_pinned_; }
 
@@ -214,6 +232,9 @@ class BufferedBlockMgr {
 
     // Length of valid (i.e. allocated) data within the block.
     int64_t valid_data_len_;
+
+    // Number of rows in this block.
+    int num_rows_;
 
     // If encryption_ is on, in the write path we allocate a new buffer to hold
     // encrypted data while it's being written to disk.  The read path, having no
@@ -338,6 +359,10 @@ class BufferedBlockMgr {
   // stopped, the number of buffers this client could get.
   int64_t available_buffers(Client* client) const;
 
+  // Returns a MEM_LIMIT_EXCEEDED error which includes the minimum memory required
+  // by this client.
+  Status MemLimitTooLowError(Client* client);
+
   // TODO: remove these two. Not clear what the sorter really needs.
   int available_allocated_buffers() const { return all_io_buffers_.size(); }
   int num_free_buffers() const { return free_io_buffers_.size(); }
@@ -403,11 +428,12 @@ class BufferedBlockMgr {
   // Return a new buffer that can be used. *buffer is set to NULL if there was no
   // memory.
   // Otherwise, this function gets a new buffer by:
-  //   1. Allocating a new buffer if possible.
+  //   1. Allocating a new buffer if possible (if can_allocate is true).
   //   2. Using a buffer from the free list (which is populated by moving blocks from
   //      the unpinned list by writing them out).
   // lock must be taken before calling this. This function can block.
-  Status FindBuffer(boost::unique_lock<boost::mutex>& lock, BufferDescriptor** buffer);
+  Status FindBuffer(boost::unique_lock<boost::mutex>& lock, bool can_allocate,
+      BufferDescriptor** buffer);
 
   // Writes unpinned blocks via DiskIoMgr until one of the following is true:
   // 1) The number of outstanding writes >= (block_write_threshold_ - num free buffers)
@@ -580,7 +606,6 @@ class BufferedBlockMgr {
   // and hence no real reason to keep this separate from encryption.  When true, blocks
   // will have an integrity check (SHA-256) performed after being read from disk.
   const bool check_integrity_;
-
 }; // class BufferedBlockMgr
 
 } // namespace impala.

@@ -94,6 +94,7 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   }
 
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
+  runtime_state_ = state;
 
   // build and probe exprs are evaluated in the context of the rows produced by our
   // right and left children, respectively
@@ -110,17 +111,8 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Prepare(other_join_conjunct_ctxs_, state, row_descriptor_));
   AddExprCtxsToFree(other_join_conjunct_ctxs_);
 
-  // We need two output buffer per partition (one for build and one for probe) and
-  // and one additional buffer either for the input (while repartitioning).
-  // TODO: with more careful reasoning we can turn this to 1 per partition I think.
-  int num_reserved_buffers = PARTITION_FANOUT * 2 + 1;
-  if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
-    // We need to maintain three additional buffers in this case to store the build/probe
-    // on the null aware partition.
-    num_reserved_buffers += 3;
-  }
   RETURN_IF_ERROR(state->block_mgr()->RegisterClient(
-      num_reserved_buffers, mem_tracker(), state, &block_mgr_client_));
+      MinRequiredBuffers(), mem_tracker(), state, &block_mgr_client_));
 
   bool should_store_nulls = join_op_ == TJoinOp::RIGHT_OUTER_JOIN ||
       join_op_ == TJoinOp::RIGHT_ANTI_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN;
@@ -209,10 +201,12 @@ PartitionedHashJoinNode::Partition::Partition(RuntimeState* state,
     level_(level),
     build_rows_(state->obj_pool()->Add(new BufferedTupleStream(
         state, parent_->child(1)->row_desc(), state->block_mgr(),
-        parent_->block_mgr_client_))),
+        parent_->block_mgr_client_,
+        level == 0 /* use small buffers */))),
     probe_rows_(state->obj_pool()->Add(new BufferedTupleStream(
         state, parent_->child(0)->row_desc(),
         state->block_mgr(), parent_->block_mgr_client_,
+        level == 0, /* use small buffers */
         true /* delete on read */))) {
 }
 
@@ -309,7 +303,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
       HashTable::EstimatedNumBuckets(build_rows()->num_rows());
   hash_tbl_.reset(new HashTable(state, parent_->block_mgr_client_,
       parent_->child(1)->row_desc().tuple_descriptors().size(), build_rows(),
-      1 << (32 - NUM_PARTITIONING_BITS), estimated_num_buckets));
+      level_ == 0, 1 << (32 - NUM_PARTITIONING_BITS), estimated_num_buckets));
   if (!hash_tbl_->Init()) goto not_built;
 
   while (!eos) {
@@ -417,13 +411,8 @@ Status PartitionedHashJoinNode::SpillPartition() {
   }
 
   if (partition_idx == -1) {
-    // Could not find a partition to spill. This means the mem limit was just too
-    // low. e.g. mem_limit too small that we can't put a buffer in front of each
-    // partition.
-    Status status = Status::MEM_LIMIT_EXCEEDED;
-    status.AddErrorMsg("Mem limit is too low to perform partitioned join. We do not "
-        "have enough memory to maintain a buffer per partition.");
-    return status;
+    // Could not find a partition to spill. This means the mem limit was just too low.
+    return runtime_state_->block_mgr()->MemLimitTooLowError(block_mgr_client_);
   }
   VLOG(2) << "Spilling partition: " << partition_idx << endl << NodeDebugString();
   RETURN_IF_ERROR(hash_partitions_[partition_idx]->Spill(false));
@@ -530,7 +519,7 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
        << "    #rows:" << partition->build_rows()->num_rows() << endl;
     COUNTER_SET(largest_partition_percent_, static_cast<int64_t>(percent));
   }
-  VLOG_QUERY << ss.str();
+  VLOG(2) << ss.str();
 
   COUNTER_ADD(num_build_rows_partitioned_, total_build_rows);
   non_empty_build_ |= (total_build_rows > 0);
