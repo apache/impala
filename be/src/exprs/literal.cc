@@ -68,8 +68,7 @@ Literal::Literal(const TExprNode& node)
     case TYPE_STRING:
       DCHECK_EQ(node.node_type, TExprNodeType::STRING_LITERAL);
       DCHECK(node.__isset.string_literal);
-      string_data_ = node.string_literal.value;
-      value_.string_val = StringValue(string_data_);
+      value_ = ExprValue(node.string_literal.value);
       break;
     case TYPE_DECIMAL: {
       DCHECK_EQ(node.node_type, TExprNodeType::DECIMAL_LITERAL);
@@ -150,16 +149,15 @@ Literal::Literal(ColumnType type, double v)
 }
 
 Literal::Literal(ColumnType type, const string& v)
-  : Expr(type) {
+  : Expr(type),
+    value_(v) {
   DCHECK(type.type == TYPE_STRING || type.type == TYPE_CHAR) << type;
-  string_data_ = v;
-  value_.string_val = StringValue(string_data_);
 }
 
 Literal::Literal(ColumnType type, const StringValue& v)
-  : Expr(type) {
+  : Expr(type),
+    value_(v.DebugString()) {
   DCHECK(type.type == TYPE_STRING || type.type == TYPE_CHAR) << type;
-  value_.string_val = string(v.ptr, v.len);
 }
 
 template<class T>

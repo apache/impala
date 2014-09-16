@@ -3662,6 +3662,8 @@ TEST_F(ExprTest, DecimalFunctions) {
   TestIsNull("negative(cast(NULL as decimal(32,2)))",
       ColumnType::CreateDecimalType(32,2));
 
+#ifndef ADDRESS_SANITIZER
+  // TODO: Disabled due to IMPALA-1111.
   // Least()
   TestDecimalValue("least(cast('10' as decimal(2,0)), cast('-10' as decimal(2,0)))",
       Decimal4Value(-10), ColumnType::CreateDecimalType(2, 0));
@@ -3691,6 +3693,7 @@ TEST_F(ExprTest, DecimalFunctions) {
       ColumnType::CreateDecimalType(32,2));
   TestIsNull("greatest(cast(NULl as decimal(32,2)), NULL)",
       ColumnType::CreateDecimalType(32,2));
+#endif
 
   Decimal4Value dec4(10);
   // DecimalFunctions::FnvHash hashes both the unscaled value and scale
@@ -3965,7 +3968,7 @@ TEST_F(ExprTest, DecimalFunctions) {
 
   // Overflow on Round()/etc. This can only happen when the input is has enough
   // leading 9's.
-  // Rounding this value requries a precision of 39 so it overflows.
+  // Rounding this value requires a precision of 39 so it overflows.
   TestIsNull("round(99999999999999999999999999999999999999., -1)",
       ColumnType::CreateDecimalType(38, 0));
   TestIsNull("round(-99999999999999999999999999999999000000., -7)",

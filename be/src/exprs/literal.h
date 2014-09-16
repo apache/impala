@@ -63,7 +63,6 @@ class Literal: public Expr {
 
  private:
   ExprValue value_;
-  std::string string_data_; // stores string data if TYPE_STRING
 };
 
 }
