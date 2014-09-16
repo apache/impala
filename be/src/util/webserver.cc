@@ -115,16 +115,16 @@ Webserver::~Webserver() {
 }
 
 void Webserver::RootHandler(const Webserver::ArgumentMap& args, Document* document) {
-  document->AddMember("version", GetVersionString().c_str(),
-      document->GetAllocator());
-  document->AddMember("cpu_info", CpuInfo::DebugString().c_str(),
-      document->GetAllocator());
-  document->AddMember("mem_info", MemInfo::DebugString().c_str(),
-      document->GetAllocator());
-  document->AddMember("disk_info", DiskInfo::DebugString().c_str(),
-      document->GetAllocator());
-  document->AddMember("os_info", OsInfo::DebugString().c_str(),
-      document->GetAllocator());
+  Value version(GetVersionString().c_str(), document->GetAllocator());
+  document->AddMember("version", version, document->GetAllocator());
+  Value cpu_info(CpuInfo::DebugString().c_str(), document->GetAllocator());
+  document->AddMember("cpu_info", cpu_info, document->GetAllocator());
+  Value mem_info(MemInfo::DebugString().c_str(), document->GetAllocator());
+  document->AddMember("mem_info", mem_info, document->GetAllocator());
+  Value disk_info(DiskInfo::DebugString().c_str(), document->GetAllocator());
+  document->AddMember("disk_info", disk_info, document->GetAllocator());
+  Value os_info(OsInfo::DebugString().c_str(), document->GetAllocator());
+  document->AddMember("os_info", os_info, document->GetAllocator());
   document->AddMember("pid", getpid(), document->GetAllocator());
 }
 
