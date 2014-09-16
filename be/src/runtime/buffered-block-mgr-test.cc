@@ -45,6 +45,9 @@ using namespace std;
 // FLAGS_scratch_dirs + TmpFileMgr::TMP_SUB_DIR_NAME.
 const string SCRATCH_DIR = "/tmp/impala-scratch";
 
+DECLARE_bool(disk_spill_encryption);
+DECLARE_bool(disk_spill_integrity);
+
 namespace impala {
 
 class BufferedBlockMgrTest : public ::testing::Test {
@@ -79,6 +82,35 @@ class BufferedBlockMgrTest : public ::testing::Test {
     EXPECT_TRUE(*reinterpret_cast<int32_t*>(block->buffer()) == data);
   }
 
+  static int32_t* MakeRandomSizeData(BufferedBlockMgr::Block* block) {
+    // Format is int32_t size, followed by size bytes of data
+    int32_t size = (rand() % 252) + 4; // So blocks have 4-256 bytes of data
+    uint8_t* data = block->Allocate<uint8_t>(size);
+    *(reinterpret_cast<int32_t*>(data)) = size;
+    int i;
+    for (i = 4; i < size-5; ++i) {
+      data[i] = i;
+    }
+    for (; i < size; ++i) {  // End marker of at least 5 0xff's
+      data[i] = 0xff;
+    }
+    return reinterpret_cast<int32_t*>(data);  // Really returns a pointer to size
+  }
+
+  static void ValidateRandomSizeData(BufferedBlockMgr::Block* block, int32_t size) {
+    int32_t bsize = *(reinterpret_cast<int32_t*>(block->buffer()));
+    uint8_t* data = reinterpret_cast<uint8_t*>(block->buffer());
+    int i;
+    EXPECT_EQ(block->valid_data_len(), size);
+    EXPECT_EQ(size, bsize);
+    for (i = 4; i < size-5; ++i) {
+      EXPECT_EQ(data[i], i);
+    }
+    for (; i < size; ++i) {
+      EXPECT_EQ(data[i], 0xff);
+    }
+  }
+
   shared_ptr<BufferedBlockMgr> CreateMgr(int max_buffers) {
     shared_ptr<BufferedBlockMgr> mgr;
     BufferedBlockMgr::Create(runtime_state_.get(),
@@ -102,6 +134,130 @@ class BufferedBlockMgrTest : public ::testing::Test {
       EXPECT_TRUE(status.ok());
       blocks->push_back(new_block);
     }
+  }
+
+  // Test that randomly issues GetFreeBlock(), Pin(), Unpin(), Delete() and Close()
+  // calls. All calls made are legal - error conditions are not expected until the
+  // first call to Close().  This is called 4 times, each with different integrity
+  // and encryption command line flags set.
+  void TestRandomInternal() {
+    const int num_buffers = 10;
+    const int num_iterations = 100000;
+    const int iters_before_close = num_iterations - 5000;
+    bool close_called = false;
+    unordered_map<BufferedBlockMgr::Block*, int> pinned_block_map;
+    vector<pair<BufferedBlockMgr::Block*, int32_t> > pinned_blocks;
+    unordered_map<BufferedBlockMgr::Block*, int> unpinned_block_map;
+    vector<pair<BufferedBlockMgr::Block*, int32_t> > unpinned_blocks;
+
+    typedef enum { Pin, New, Unpin, Delete, Close } ApiFunction;
+    ApiFunction api_function;
+    shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(num_buffers);
+    BufferedBlockMgr::Client* client;
+    Status status = block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client);
+    EXPECT_TRUE(status.ok());
+    EXPECT_TRUE(client != NULL);
+
+    pinned_blocks.reserve(num_buffers);
+    BufferedBlockMgr::Block* new_block;
+    for (int i = 0; i < num_iterations; ++i) {
+      if ((i % 20000) == 0) LOG (ERROR) << " Iteration " << i << endl;
+      if (i > iters_before_close && (rand() % 5 == 0)) {
+        api_function = Close;
+      } else if (pinned_blocks.size() == 0 && unpinned_blocks.size() == 0) {
+        api_function = New;
+      } else if (pinned_blocks.size() == 0) {
+        // Pin or New. Can't unpin or delete.
+        api_function = static_cast<ApiFunction>(rand() % 2);
+      } else if (pinned_blocks.size() >= num_buffers) {
+        // Unpin or delete. Can't pin or get new.
+        api_function = static_cast<ApiFunction>(2 + (rand() % 2));
+      } else if (unpinned_blocks.size() == 0) {
+        // Can't pin. Unpin, new or delete.
+        api_function = static_cast<ApiFunction>(1 + (rand() % 3));
+      } else {
+        // Any api function.
+        api_function = static_cast<ApiFunction>(rand() % 4);
+      }
+
+      pair<BufferedBlockMgr::Block*, int32_t> block_data;
+      int rand_pick;
+      int32_t* data;
+      bool pinned;
+      switch (api_function) {
+        case New:
+          status = block_mgr->GetNewBlock(client, NULL, &new_block);
+          if (close_called) {
+            EXPECT_TRUE(new_block == NULL);
+            EXPECT_TRUE(status.IsCancelled());
+            continue;
+          }
+          EXPECT_TRUE(status.ok());
+          EXPECT_TRUE(new_block != NULL);
+          data = MakeRandomSizeData(new_block);
+          block_data = make_pair(new_block, *data);
+
+          pinned_blocks.push_back(block_data);
+          pinned_block_map.insert(make_pair(block_data.first, pinned_blocks.size() - 1));
+          break;
+        case Pin:
+          rand_pick = rand() % unpinned_blocks.size();
+          block_data = unpinned_blocks[rand_pick];
+          status = block_data.first->Pin(&pinned);
+          if (close_called) {
+            EXPECT_TRUE(status.IsCancelled());
+            EXPECT_FALSE(pinned);
+            continue;
+          }
+          EXPECT_TRUE(status.ok());
+          EXPECT_TRUE(pinned);
+          ValidateRandomSizeData(block_data.first, block_data.second);
+          unpinned_blocks[rand_pick] = unpinned_blocks.back();
+          unpinned_blocks.pop_back();
+          unpinned_block_map[unpinned_blocks[rand_pick].first] = rand_pick;
+
+          pinned_blocks.push_back(block_data);
+          pinned_block_map.insert(make_pair(block_data.first, pinned_blocks.size() - 1));
+          break;
+        case Unpin:
+          rand_pick = rand() % pinned_blocks.size();
+          block_data = pinned_blocks[rand_pick];
+          status = block_data.first->Unpin();
+          if (close_called) {
+            EXPECT_TRUE(status.IsCancelled());
+            continue;
+          }
+          EXPECT_TRUE(status.ok());
+          pinned_blocks[rand_pick] = pinned_blocks.back();
+          pinned_blocks.pop_back();
+          pinned_block_map[pinned_blocks[rand_pick].first] = rand_pick;
+
+          unpinned_blocks.push_back(block_data);
+          unpinned_block_map.insert(make_pair(block_data.first,
+              unpinned_blocks.size() - 1));
+          break;
+        case Delete:
+          rand_pick = rand() % pinned_blocks.size();
+          block_data = pinned_blocks[rand_pick];
+          status = block_data.first->Delete();
+          if (close_called) {
+            EXPECT_TRUE(status.IsCancelled());
+            continue;
+          }
+          EXPECT_TRUE(status.ok());
+          pinned_blocks[rand_pick] = pinned_blocks.back();
+          pinned_blocks.pop_back();
+          pinned_block_map[pinned_blocks[rand_pick].first] = rand_pick;
+          break;
+        case Close:
+          block_mgr->Cancel();
+          close_called = true;
+          break;
+      } // end switch (apiFunction)
+    } // end for ()
+
+    block_mgr.reset();
+    EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
   }
 
   scoped_ptr<ExecEnv> exec_env_;
@@ -579,128 +735,28 @@ TEST_F(BufferedBlockMgrTest, ClientOversubscription) {
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
 
-// Test that randomly issues GetFreeBlock(), Pin(), Unpin(), Delete() and Close()
-// calls. All calls made are legal - error conditions are not expected until the
-// first call to Close().
-TEST_F(BufferedBlockMgrTest, Random) {
-  const int num_buffers = 10;
-  const int num_iterations = 100000;
-  const int iters_before_close = num_iterations - 5000;
-  bool close_called = false;
-  unordered_map<BufferedBlockMgr::Block*, int> pinned_block_map;
-  vector<pair<BufferedBlockMgr::Block*, int32_t> > pinned_blocks;
-  unordered_map<BufferedBlockMgr::Block*, int> unpinned_block_map;
-  vector<pair<BufferedBlockMgr::Block*, int32_t> > unpinned_blocks;
+TEST_F(BufferedBlockMgrTest, Random_plain) {
+  FLAGS_disk_spill_encryption = false;
+  FLAGS_disk_spill_integrity = false;
+  TestRandomInternal();
+}
 
-  typedef enum { Pin, New, Unpin, Delete, Close } ApiFunction;
-  ApiFunction api_function;
-  shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(num_buffers);
-  BufferedBlockMgr::Client* client;
-  Status status = block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client);
-  EXPECT_TRUE(status.ok());
-  EXPECT_TRUE(client != NULL);
+TEST_F(BufferedBlockMgrTest, Random_integrity) {
+  FLAGS_disk_spill_encryption = false;
+  FLAGS_disk_spill_integrity = true;
+  TestRandomInternal();
+}
 
-  pinned_blocks.reserve(num_buffers);
-  BufferedBlockMgr::Block* new_block;
-  for (int i = 0; i < num_iterations; ++i) {
-    if ((i % 20000) == 0) LOG (ERROR) << " Iteration " << i << endl;
-    if (i > iters_before_close && (rand() % 5 == 0)) {
-      api_function = Close;
-    } else if (pinned_blocks.size() == 0 && unpinned_blocks.size() == 0) {
-      api_function = New;
-    } else if (pinned_blocks.size() == 0) {
-      // Pin or New. Can't unpin or delete.
-      api_function = static_cast<ApiFunction>(rand() % 2);
-    } else if (pinned_blocks.size() >= num_buffers) {
-      // Unpin or delete. Can't pin or get new.
-      api_function = static_cast<ApiFunction>(2 + (rand() % 2));
-    } else if (unpinned_blocks.size() == 0) {
-      // Can't pin. Unpin, new or delete.
-      api_function = static_cast<ApiFunction>(1 + (rand() % 3));
-    } else {
-      // Any api function.
-      api_function = static_cast<ApiFunction>(rand() % 4);
-    }
+TEST_F(BufferedBlockMgrTest, Random_encryption) {
+  FLAGS_disk_spill_encryption = true;
+  FLAGS_disk_spill_integrity = false;
+  TestRandomInternal();
+}
 
-    pair<BufferedBlockMgr::Block*, int32_t> block_data;
-    int rand_pick;
-    int32_t* data;
-    bool pinned;
-    switch (api_function) {
-      case New:
-        status = block_mgr->GetNewBlock(client, NULL, &new_block);
-        if (close_called) {
-          EXPECT_TRUE(new_block == NULL);
-          EXPECT_TRUE(status.IsCancelled());
-          continue;
-        }
-        EXPECT_TRUE(status.ok());
-        EXPECT_TRUE(new_block != NULL);
-        data = new_block->Allocate<int32_t>(sizeof(int32_t));
-        *data = rand();
-        block_data = make_pair(new_block, *data);
-
-        pinned_blocks.push_back(block_data);
-        pinned_block_map.insert(make_pair(block_data.first, pinned_blocks.size() - 1));
-        break;
-      case Pin:
-        rand_pick = rand() % unpinned_blocks.size();
-        block_data = unpinned_blocks[rand_pick];
-        status = block_data.first->Pin(&pinned);
-        if (close_called) {
-          EXPECT_TRUE(status.IsCancelled());
-          EXPECT_FALSE(pinned);
-          continue;
-        }
-        EXPECT_TRUE(status.ok());
-        EXPECT_TRUE(pinned);
-        ValidateBlock(block_data.first, block_data.second);
-        unpinned_blocks[rand_pick] = unpinned_blocks.back();
-        unpinned_blocks.pop_back();
-        unpinned_block_map[unpinned_blocks[rand_pick].first] = rand_pick;
-
-        pinned_blocks.push_back(block_data);
-        pinned_block_map.insert(make_pair(block_data.first, pinned_blocks.size() - 1));
-        break;
-      case Unpin:
-        rand_pick = rand() % pinned_blocks.size();
-        block_data = pinned_blocks[rand_pick];
-        status = block_data.first->Unpin();
-        if (close_called) {
-          EXPECT_TRUE(status.IsCancelled());
-          continue;
-        }
-        EXPECT_TRUE(status.ok());
-        pinned_blocks[rand_pick] = pinned_blocks.back();
-        pinned_blocks.pop_back();
-        pinned_block_map[pinned_blocks[rand_pick].first] = rand_pick;
-
-        unpinned_blocks.push_back(block_data);
-        unpinned_block_map.insert(make_pair(block_data.first,
-            unpinned_blocks.size() - 1));
-        break;
-      case Delete:
-        rand_pick = rand() % pinned_blocks.size();
-        block_data = pinned_blocks[rand_pick];
-        status = block_data.first->Delete();
-        if (close_called) {
-          EXPECT_TRUE(status.IsCancelled());
-          continue;
-        }
-        EXPECT_TRUE(status.ok());
-        pinned_blocks[rand_pick] = pinned_blocks.back();
-        pinned_blocks.pop_back();
-        pinned_block_map[pinned_blocks[rand_pick].first] = rand_pick;
-        break;
-      case Close:
-        block_mgr->Cancel();
-        close_called = true;
-        break;
-    } // end switch (apiFunction)
-  } // end for ()
-
-  block_mgr.reset();
-  EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
+TEST_F(BufferedBlockMgrTest, Random_integ_enc) {
+  FLAGS_disk_spill_encryption = true;
+  FLAGS_disk_spill_integrity = true;
+  TestRandomInternal();
 }
 
 }

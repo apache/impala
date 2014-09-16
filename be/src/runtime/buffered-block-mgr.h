@@ -20,6 +20,9 @@
 #include "runtime/disk-io-mgr.h"
 #include "runtime/tmp-file-mgr.h"
 
+#include <openssl/aes.h>
+#include <openssl/sha.h>
+
 namespace impala {
 
 class MemPool;
@@ -201,6 +204,27 @@ class BufferedBlockMgr {
 
     // Length of valid (i.e. allocated) data within the block.
     int64_t valid_data_len_;
+
+    // If encryption_ is on, in the write path we allocate a new buffer to hold
+    // encrypted data while it's being written to disk.  The read path, having no
+    // references to the data, can be decrypted in place.
+    boost::scoped_array<uint8_t> encrypted_write_buffer_;
+
+    // If encryption_ is on, a AES 256-bit key.  Regenerated on each write.
+    uint8_t key_[32];
+
+    // If encryption_ is on, the IV to use.  IV stands for Initialization Vector,
+    // and is used as an input to the cipher as the "block to supply before the
+    // first block of plaintext".  This is required because all ciphers (except the
+    // weak ECB) are built such that each block depends on the output from the
+    // previous block.  Since the first block doesn't have a previous block, we
+    // supply this IV.  Think of it as starting off the chain of encryption.
+    // This IV is also regenerated on each write.
+    uint8_t iv_[AES_BLOCK_SIZE];
+
+    // If integrity_ is on, our SHA256 hash of the data being written. Filled in on
+    // writes; verified on reads. This is calculated _after_ encryption.
+    uint8_t hash_[SHA256_DIGEST_LENGTH];
 
     // Block state variables. The block's buffer can be freed only if is_pinned_ and
     // in_write_ are both false.
@@ -466,6 +490,12 @@ class BufferedBlockMgr {
   // Number of writes outstanding (issued but not completed)
   RuntimeProfile::Counter* outstanding_writes_counter_;
 
+  // Time spent in disk spill encryption and decryption
+  RuntimeProfile::Counter* encryption_timer_;
+
+  // Time spent in disk spill integrity generation and checking
+  RuntimeProfile::Counter* integrity_check_timer_;
+
   // Protects query_to_block_mgrs_
   static boost::mutex static_block_mgrs_lock_;
 
@@ -476,6 +506,30 @@ class BufferedBlockMgr {
   typedef boost::unordered_map<TUniqueId, boost::weak_ptr<BufferedBlockMgr> >
       BlockMgrsMap;
   static BlockMgrsMap query_to_block_mgrs_;
+
+  // Takes the data in buffer(), allocates encrypted_write_buffer_, and returns
+  // a pointer to the encrypted data in outbuf.
+  Status Encrypt(Block* block, uint8_t** outbuf);
+
+  // Deallocates temporary buffer alloced in Encrypt()
+  void EncryptDone(Block* block);
+
+  // Decrypts the contents of buffer() in place
+  Status Decrypt(Block* block);
+
+  // Takes a cryptographic hash of the data and sets hash_ with it.
+  void SetHash(Block* block);
+
+  // Verifies that the contents of buffer() match those that were set by SetHash()
+  Status VerifyHash(Block* block);
+
+  // Set to true if --disk_spill_encryption is true.  When true, blocks will be encrypted
+  // before being written to disk.
+  const bool encryption_;
+
+  // Set to true if --disk_spill_integrity is true.  When true, blocks will have an
+  // integrity check (SHA-256) performed after being read from disk.
+  const bool check_integrity_;
 
 }; // class BufferedBlockMgr
 

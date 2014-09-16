@@ -22,9 +22,21 @@
 #include "util/filesystem-util.h"
 #include "util/impalad-metrics.h"
 #include "util/uid-util.h"
+#include <gutil/strings/substitute.h>
+
+#include <openssl/rand.h>
+#include <openssl/evp.h>
+#include <openssl/sha.h>
+#include <openssl/err.h>
 
 using namespace std;
 using namespace boost;
+using namespace strings;   // for Substitute
+
+DEFINE_bool(disk_spill_encryption, false, "Set this to turn on the encryption of all "
+    "data spilled to disk during a query");
+DEFINE_bool(disk_spill_integrity, false, "Set this to turn on an integrity check of "
+    "all data spilled to disk during a query");
 
 namespace impala {
 
@@ -205,10 +217,11 @@ void BufferedBlockMgr::LowerBufferReservation(Client* client, int num_buffers) {
 }
 
 void BufferedBlockMgr::Cancel() {
-  lock_guard<mutex> lock(lock_);
-  if (is_cancelled_) return;
-  is_cancelled_ = true;
-
+  {
+    lock_guard<mutex> lock(lock_);
+    if (is_cancelled_) return;
+    is_cancelled_ = true;
+  }
   // Cancel to the underlying io mgr to unblock any waiting threads.
   io_mgr_->CancelContext(io_request_context_);
 }
@@ -327,12 +340,26 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, MemTracker* parent,
     query_id_(state->query_id()),
     num_outstanding_writes_(0),
     io_mgr_(state->io_mgr()),
-    is_cancelled_(false) {
+    is_cancelled_(false),
+    encryption_(FLAGS_disk_spill_encryption),
+    check_integrity_(FLAGS_disk_spill_integrity) {
   DCHECK(parent != NULL);
   // Create a new mem_tracker and allocate buffers.
   mem_tracker_.reset(new MemTracker(mem_limit, -1, "Block Manager", parent));
   buffer_pool_.reset(new MemPool(mem_tracker_.get(), block_size));
   state->io_mgr()->RegisterContext(NULL, &io_request_context_);
+  if (encryption_) {
+    static bool openssl_loaded = false;
+    if (!openssl_loaded) {
+      // These are idempotent, so no threading worries.
+      OpenSSL_add_all_algorithms();
+      ERR_load_crypto_strings();
+      openssl_loaded = true;
+    }
+    // Seed the random number generator
+    // TODO: try non-blocking read from /dev/random and add that, too.
+    RAND_load_file("/dev/urandom", 4096);
+  }
 }
 
 int64_t BufferedBlockMgr::bytes_allocated() const {
@@ -391,6 +418,13 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned) {
     io_mgr_buffer->Return();
   } while (!io_mgr_buffer->eosr());
   DCHECK_EQ(offset, block->write_range_->len());
+
+  // Verify integrity first, becase the hash was generated from encrypted data
+  if (check_integrity_) RETURN_IF_ERROR(VerifyHash(block));
+
+  // Decryption is done in-place, since the buffer can't be accessed by anyone else
+  if (encryption_) RETURN_IF_ERROR(Decrypt(block));
+
   return Status::OK;
 }
 
@@ -455,7 +489,18 @@ Status BufferedBlockMgr::WriteUnpinnedBlock(Block* block) {
         tmp_file.path(), file_offset, disk_id, callback));
   }
 
-  block->write_range_->SetData(block->buffer(), block->valid_data_len_);
+  uint8_t* outbuf = NULL;
+  if (encryption_) {
+    // The block->buffer() could be accessed during the write path, so we have to
+    // make a copy of it while writing.
+    RETURN_IF_ERROR(Encrypt(block, &outbuf));
+  } else {
+    outbuf = block->buffer();
+  }
+
+  if (check_integrity_) SetHash(block);
+
+  block->write_range_->SetData(outbuf, block->valid_data_len_);
 
   // Issue write through DiskIoMgr.
   RETURN_IF_ERROR(io_mgr_->AddWriteRange(io_request_context_, block->write_range_));
@@ -482,6 +527,11 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
     --num_outstanding_writes_;
   }
   block->in_write_ = false;
+  if (encryption_) {
+    // Explicitly release our temporarily allocated buffer here so that it doesn't
+    // hang around needlessly.
+    EncryptDone(block);
+  }
   if (is_cancelled_) return;
   // Check for an error. Set cancelled and wake up waiting threads if an error occurred.
   if (!write_status.ok()) {
@@ -808,6 +858,143 @@ void BufferedBlockMgr::InitCounters(RuntimeProfile* profile) {
   buffered_pin_counter_ = ADD_COUNTER(profile_.get(), "BufferedPins", TCounterType::UNIT);
   disk_read_timer_ = ADD_TIMER(profile_.get(), "TotalReadBlockTime");
   buffer_wait_timer_ = ADD_TIMER(profile_.get(), "TotalBufferWaitTime");
+  encryption_timer_ = ADD_TIMER(profile_.get(), "TotalEncryptionTime");
+  integrity_check_timer_ = ADD_TIMER(profile_.get(), "TotalIntegrityCheckTime");
+}
+
+// Callback used by OpenSSLErr() - write the error given to us through buf to the
+// stringstream that's passed in through ctx.
+static int OpenSSLErrCallback(const char *buf, size_t len, void* ctx) {
+  stringstream* errstream = static_cast<stringstream*>(ctx);
+  *errstream << buf;
+  return 1;
+}
+
+// Called upon OpenSSL errors; returns a non-OK status with an error message.
+static Status OpenSSLErr(const string& msg) {
+  stringstream errstream;
+  errstream << msg << ": ";
+  ERR_print_errors_cb (OpenSSLErrCallback, &errstream);
+  return Status(Substitute("Openssl Error: $0", errstream.str()));
+}
+
+Status BufferedBlockMgr::Encrypt(Block* block, uint8_t** outbuf) {
+  DCHECK(encryption_);
+  DCHECK(block->buffer());
+  DCHECK(!block->is_pinned_);
+  DCHECK(!block->in_write_);
+  DCHECK(outbuf);
+  SCOPED_TIMER(encryption_timer_);
+
+  // Since we're using AES-CFB mode, we must take care not to reuse a key/iv pair.
+  // Regenerate a new key and iv for every block of data we write, including between
+  // writes of the same Block.
+  RAND_bytes(block->key_, sizeof(block->key_));
+  RAND_bytes(block->iv_, sizeof(block->iv_));
+  block->encrypted_write_buffer_.reset(new uint8_t[block->valid_data_len_]);
+
+  EVP_CIPHER_CTX ctx;
+  int len = static_cast<int>(block->valid_data_len_);
+
+  // Create and initialize the context for encryption
+  EVP_CIPHER_CTX_init(&ctx);
+  EVP_CIPHER_CTX_set_padding(&ctx, 0);
+
+  // Start encryption.  We use a 256-bit AES key, and the cipher block mode
+  // is CFB because this gives us a stream cipher, which supports arbitrary
+  // length ciphertexts - it doesn't have to be a multiple of 16 bytes.
+  if(EVP_EncryptInit_ex(&ctx, EVP_aes_256_cfb(), NULL, block->key_, block->iv_) != 1) {
+    return OpenSSLErr("EVP_EncryptInit_ex failure");
+  }
+
+  // Encrypt block->buffer() into the new encrypted_write_buffer_
+  if(EVP_EncryptUpdate(&ctx, block->encrypted_write_buffer_.get(), &len,
+          block->buffer(), len) != 1) {
+    return OpenSSLErr("EVP_EncryptUpdate failure");
+  }
+
+  // This is safe because we're using CFB mode without padding.
+  DCHECK_EQ(len, block->valid_data_len_);
+
+  // Finalize encryption.
+  if(1 != EVP_EncryptFinal_ex(&ctx, block->encrypted_write_buffer_.get() + len, &len)) {
+    return OpenSSLErr("EVP_EncryptFinal failure");
+  }
+
+  // Again safe due to CFB with no padding
+  DCHECK_EQ(len, 0);
+
+  *outbuf = block->encrypted_write_buffer_.get();
+  return Status::OK;
+}
+
+void BufferedBlockMgr::EncryptDone(Block* block) {
+  DCHECK(encryption_);
+  DCHECK(block->encrypted_write_buffer_.get());
+  block->encrypted_write_buffer_.reset();
+}
+
+Status BufferedBlockMgr::Decrypt(Block* block) {
+  DCHECK(encryption_);
+  DCHECK(block->buffer());
+  SCOPED_TIMER(encryption_timer_);
+
+  EVP_CIPHER_CTX ctx;
+  int len = static_cast<int>(block->valid_data_len_);
+
+  // Create and initialize the context for encryption
+  EVP_CIPHER_CTX_init(&ctx);
+  EVP_CIPHER_CTX_set_padding(&ctx, 0);
+
+  // Start decryption; same parameters as encryption for obvious reasons
+  if(EVP_DecryptInit_ex(&ctx, EVP_aes_256_cfb(), NULL, block->key_, block->iv_) != 1) {
+    return OpenSSLErr("EVP_DecryptInit_ex failure");
+  }
+
+  // Decrypt block->buffer() in-place.  Safe because no one is accessing it.
+  if(EVP_DecryptUpdate(&ctx, block->buffer(), &len, block->buffer(), len) != 1) {
+    return OpenSSLErr("EVP_DecryptUpdate failure");
+  }
+
+  // This is safe because we're using CFB mode without padding.
+  DCHECK_EQ(len, block->valid_data_len_);
+
+  // Finalize decryption.
+  if(1 != EVP_DecryptFinal_ex(&ctx, block->buffer() + len, &len)) {
+    return OpenSSLErr("EVP_DecryptFinal failure");
+  }
+
+  // Again safe due to CFB with no padding
+  DCHECK_EQ(len, 0);
+
+  return Status::OK;
+}
+
+void BufferedBlockMgr::SetHash(Block* block) {
+  DCHECK(check_integrity_);
+  SCOPED_TIMER(integrity_check_timer_);
+  uint8_t* data = NULL;
+  if (encryption_) {
+    DCHECK(block->encrypted_write_buffer_.get());
+    data = block->encrypted_write_buffer_.get();
+  } else {
+    DCHECK(block->buffer());
+    data = block->buffer();
+  }
+  // Explicitly ignore the return value from SHA256(); it can't fail.
+  (void) SHA256(data, block->valid_data_len_, block->hash_);
+}
+
+Status BufferedBlockMgr::VerifyHash(Block* block) {
+  DCHECK(check_integrity_);
+  DCHECK(block->buffer());
+  SCOPED_TIMER(integrity_check_timer_);
+  uint8_t test_hash[SHA256_DIGEST_LENGTH];
+  (void) SHA256(block->buffer(), block->valid_data_len_, test_hash);
+  if (memcmp(test_hash, block->hash_, SHA256_DIGEST_LENGTH) != 0) {
+    return Status("Block verification failure");
+  }
+  return Status::OK;
 }
 
 } // namespace impala
