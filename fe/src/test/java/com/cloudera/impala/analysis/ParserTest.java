@@ -2720,8 +2720,12 @@ public class ParserTest {
   @Test
   public void TestShowRoles() {
     ParsesOk("SHOW ROLES");
+    ParsesOk("SHOW CURRENT ROLES");
     ParsesOk("SHOW ROLE GRANT GROUP myGroup");
     ParserError("SHOW ROLES blah");
     ParserError("SHOW ROLE GRANT GROUP");
+    ParserError("SHOW CURRENT");
+    ParserError("SHOW ROLE");
+    ParserError("SHOW");
   }
 }

@@ -30,11 +30,14 @@
 #include "gen-cpp/CatalogService.h"
 #include "gen-cpp/CatalogService_types.h"
 
+#include <thrift/Thrift.h>
+
 using namespace std;
 using namespace boost;
 using namespace boost::uuids;
 using namespace beeswax;
 using namespace strings;
+using namespace apache::thrift;
 using namespace apache::hive::service::cli::thrift;
 
 DECLARE_int32(catalog_service_port);
@@ -261,6 +264,33 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
     }
     case TCatalogOpType::SHOW_ROLES: {
       const TShowRolesParams& params = catalog_op.show_roles_params;
+      if (params.is_admin_op) {
+        // Verify the user has privileges to perform this operation.
+        Status cnxn_status;
+        const TNetworkAddress& address =
+            MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
+        CatalogServiceConnection client(
+            exec_env_->catalogd_client_cache(), address, &cnxn_status);
+        RETURN_IF_ERROR(cnxn_status);
+
+        // Perform the access check against the Sentry Service (via the Catalog Server).
+        TSentryAdminCheckResponse resp;
+        TSentryAdminCheckRequest req;
+        req.__set_header(TCatalogServiceRequestHeader());
+        req.header.__set_requesting_user(effective_user());
+        try {
+          client->SentryAdminCheck(resp, req);
+        } catch (const TException& e) {
+          RETURN_IF_ERROR(client.Reopen());
+          client->SentryAdminCheck(resp, req);
+        }
+
+        Status status(resp.status);
+        RETURN_IF_ERROR(status);
+      }
+
+      // If we have made it here, the user has privileges to execute this operation.
+      // Return the results.
       TShowRolesResult result;
       RETURN_IF_ERROR(frontend_->ShowRoles(params, &result));
       SetResultSet(result.role_names);
@@ -747,7 +777,12 @@ Status ImpalaServer::QueryExecState::UpdateCatalog() {
 
       VLOG_QUERY << "Executing FinalizeDml() using CatalogService";
       TUpdateCatalogResponse resp;
-      client->UpdateCatalog(resp, catalog_update);
+      try {
+        client->UpdateCatalog(resp, catalog_update);
+      } catch (const TException& e) {
+        RETURN_IF_ERROR(client.Reopen());
+        client->UpdateCatalog(resp, catalog_update);
+      }
 
       Status status(resp.result.status);
       if (!status.ok()) LOG(ERROR) << "ERROR Finalizing DML: " << status.GetErrorMsg();

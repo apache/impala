@@ -65,7 +65,7 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
     try:
       self.client.execute("grant all on server to grant_revoke_test_admin")
       self.client.execute("grant role grant_revoke_test_admin to group %s" % group_name)
-      self.cleanup_db('grant_rev_db')
+      self.cleanup_db('grant_rev_db', sync_ddl=0)
     finally:
       self.client.execute("drop role grant_revoke_test_admin")
 
@@ -74,7 +74,4 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
       impalad_args="--server_name=server1",
       catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE)
   def test_grant_revoke(self, vector):
-    try:
-      self.run_test_case('QueryTest/grant_revoke', vector, use_db="default")
-    except AssertionError, e:
-      pytest.xfail('Investigating test failure on some machines: ' + str(e))
+    self.run_test_case('QueryTest/grant_revoke', vector, use_db="default")

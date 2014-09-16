@@ -16,6 +16,7 @@ create role grant_revoke_test_ALL_URI
 ---- RESULTS
 ====
 ---- QUERY
+# Shows all roles in the system
 show roles
 ---- RESULTS: VERIFY_IS_SUBSET
 'grant_revoke_test_ALL_SERVER'
@@ -37,6 +38,56 @@ grant all on server to grant_revoke_test_ALL_SERVER
 # Group name will be replaced with the actual user's group in the test
 # framework.
 grant role grant_revoke_test_ALL_SERVER to group $GROUP_NAME
+====
+---- QUERY
+show current roles
+---- RESULTS: VERIFY_IS_SUBSET
+'grant_revoke_test_ALL_SERVER'
+---- TYPES
+STRING
+====
+---- USER
+does_not_exist
+---- QUERY
+# Run this query as a different user and verify no roles show up but the
+# stmt does not fail with an authorization error.
+show current roles
+---- RESULTS: VERIFY_IS_SUBSET
+---- TYPES
+STRING
+====
+---- USER
+does_not_exist
+---- QUERY
+# User should not have privileges to execute SHOW ROLES
+show roles
+---- RESULTS: VERIFY_IS_SUBSET
+---- TYPES
+STRING
+---- CATCH
+User 'does_not_exist' does not have privileges to access the requested policy metadata
+====
+---- USER
+does_not_exist
+---- QUERY
+# User should not have privileges to execute SHOW ROLE GRANT GROUP for a group they do not
+# belong to.
+show role grant group root
+---- RESULTS: VERIFY_IS_SUBSET
+---- TYPES
+STRING
+---- CATCH
+User 'does_not_exist' does not have privileges to access the requested policy metadata
+====
+---- USER
+root
+---- QUERY
+# The 'root' user doesn't have any roles granted to them, but since they are part of the
+# 'root' group, they should have privileges to execute this statement.
+show role grant group root
+---- RESULTS: VERIFY_IS_SUBSET
+---- TYPES
+STRING
 ====
 ---- QUERY
 drop database if exists grant_rev_db
@@ -164,6 +215,48 @@ select * from grant_rev_db.test_tbl1
 1
 ---- TYPES
 INT
+====
+---- USER
+test_user
+---- QUERY
+create role some_test_role
+---- CATCH
+User 'test_user' does not have privileges to execute: CREATE_ROLE
+====
+---- USER
+test_user
+---- QUERY
+drop role grant_revoke_test_ALL_SERVER
+---- CATCH
+User 'test_user' does not have privileges to execute: DROP_ROLE
+====
+---- USER
+test_user
+---- QUERY
+grant role grant_revoke_test_ALL_SERVER to group $GROUP_NAME
+---- CATCH
+User 'test_user' does not have privileges to execute: GRANT_ROLE
+====
+---- USER
+test_user
+---- QUERY
+revoke role grant_revoke_test_ALL_SERVER from group $GROUP_NAME
+---- CATCH
+User 'test_user' does not have privileges to execute: REVOKE_ROLE
+====
+---- USER
+test_user
+---- QUERY
+grant all on server to grant_revoke_test_ALL_SERVER
+---- CATCH
+User 'test_user' does not have privileges to execute: GRANT_PRIVILEGE
+====
+---- USER
+test_user
+---- QUERY
+revoke all on server from grant_revoke_test_ALL_SERVER
+---- CATCH
+User 'test_user' does not have privileges to execute: REVOKE_PRIVILEGE
 ====
 ---- QUERY
 # Cleanup test roles

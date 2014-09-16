@@ -92,6 +92,9 @@ class Catalog {
   // TPrioritizeLoadRequest.
   Status PrioritizeLoad(const TPrioritizeLoadRequest& req);
 
+  // Checks whether the requesting user has admin privileges on the Sentry Service.
+  Status SentryAdminCheck(const TSentryAdminCheckRequest& req);
+
  private:
   // Descriptor of Java Catalog class itself, used to create a new instance.
   jclass catalog_class_;
@@ -107,6 +110,7 @@ class Catalog {
   jmethodID get_table_names_id_; // JniCatalog.getTableNames()
   jmethodID get_functions_id_; // JniCatalog.getFunctions()
   jmethodID prioritize_load_id_; // JniCatalog.prioritizeLoad()
+  jmethodID sentry_admin_check_id_; // JniCatalog.checkUserSentryAdmin()
   jmethodID catalog_ctor_;
 };
 

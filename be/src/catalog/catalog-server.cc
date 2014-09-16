@@ -128,6 +128,17 @@ class CatalogServiceThriftIf : public CatalogServiceIf {
     VLOG_RPC << "PrioritizeLoad(): response=" << ThriftDebugString(resp);
   }
 
+  virtual void SentryAdminCheck(TSentryAdminCheckResponse& resp,
+      const TSentryAdminCheckRequest& req) {
+    VLOG_RPC << "SentryAdminCheck(): request=" << ThriftDebugString(req);
+    Status status = catalog_server_->catalog()->SentryAdminCheck(req);
+    if (!status.ok()) LOG(ERROR) << status.GetErrorMsg();
+    TStatus thrift_status;
+    status.ToThrift(&thrift_status);
+    resp.__set_status(thrift_status);
+    VLOG_RPC << "SentryAdminCheck(): response=" << ThriftDebugString(resp);
+  }
+
  private:
   CatalogServer* catalog_server_;
 };

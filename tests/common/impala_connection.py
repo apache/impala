@@ -154,13 +154,13 @@ class BeeswaxConnection(ImpalaConnection):
     LOG.info("-- closing query for operation handle: %s" % operation_handle)
     self.__beeswax_client.close_query(operation_handle.get_handle())
 
-  def execute(self, sql_stmt):
+  def execute(self, sql_stmt, user=None):
     LOG.info("-- executing against %s\n%s;\n" % (self.__host_port, sql_stmt))
-    return self.__beeswax_client.execute(sql_stmt)
+    return self.__beeswax_client.execute(sql_stmt, user=user)
 
-  def execute_async(self, sql_stmt):
+  def execute_async(self, sql_stmt, user=None):
     LOG.info("-- executing async: %s\n%s;\n" % (self.__host_port, sql_stmt))
-    return OperationHandle(self.__beeswax_client.execute_query_async(sql_stmt))
+    return OperationHandle(self.__beeswax_client.execute_query_async(sql_stmt, user=user))
 
   def cancel(self, operation_handle):
     LOG.info("-- canceling operation: %s" % operation_handle)

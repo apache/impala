@@ -45,6 +45,7 @@ Catalog::Catalog() {
     {"getTableNames", "([B)[B", &get_table_names_id_},
     {"getDbNames", "([B)[B", &get_db_names_id_},
     {"getFunctions", "([B)[B", &get_functions_id_},
+    {"checkUserSentryAdmin", "([B)V", &sentry_admin_check_id_},
     {"getCatalogObject", "([B)[B", &get_catalog_object_id_},
     {"getCatalogObjects", "(J)[B", &get_catalog_objects_id_},
     {"getCatalogVersion", "()J", &get_catalog_version_id_},
@@ -74,7 +75,6 @@ Status Catalog::GetCatalogObject(const TCatalogObject& req,
     TCatalogObject* resp) {
   return JniUtil::CallJniMethod(catalog_, get_catalog_object_id_, req, resp);
 }
-
 
 Status Catalog::GetCatalogVersion(long* version) {
   JNIEnv* jni_env = getJNIEnv();
@@ -134,4 +134,8 @@ Status Catalog::GetFunctions(const TGetFunctionsRequest& request,
 
 Status Catalog::PrioritizeLoad(const TPrioritizeLoadRequest& req) {
   return JniUtil::CallJniMethod(catalog_, prioritize_load_id_, req);
+}
+
+Status Catalog::SentryAdminCheck(const TSentryAdminCheckRequest& req) {
+  return JniUtil::CallJniMethod(catalog_, sentry_admin_check_id_, req);
 }

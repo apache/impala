@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.authorization.SentryConfig;
+import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.CatalogServiceCatalog;
 import com.cloudera.impala.catalog.Function;
@@ -44,6 +45,7 @@ import com.cloudera.impala.thrift.TGetTablesResult;
 import com.cloudera.impala.thrift.TLogLevel;
 import com.cloudera.impala.thrift.TPrioritizeLoadRequest;
 import com.cloudera.impala.thrift.TResetMetadataRequest;
+import com.cloudera.impala.thrift.TSentryAdminCheckRequest;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.cloudera.impala.thrift.TUpdateCatalogRequest;
 import com.cloudera.impala.util.GlogAppender;
@@ -209,6 +211,19 @@ public class JniCatalog {
     TPrioritizeLoadRequest request = new TPrioritizeLoadRequest();
     JniUtil.deserializeThrift(protocolFactory_, request, thriftLoadReq);
     catalog_.prioritizeLoad(request.getObject_descs());
+  }
+
+  /**
+   * Verifies whether the user is configured as an admin on the Sentry Service. Throws
+   * an AuthorizationException if the user does not have admin privileges or if there
+   * were errors communicating with the Sentry Service.
+   */
+  public void checkUserSentryAdmin(byte[] thriftReq) throws ImpalaException,
+      TException  {
+    TSentryAdminCheckRequest request = new TSentryAdminCheckRequest();
+    JniUtil.deserializeThrift(protocolFactory_, request, thriftReq);
+    catalog_.getSentryProxy().checkUserSentryAdmin(
+        new User(request.getHeader().getRequesting_user()));
   }
 
   /**

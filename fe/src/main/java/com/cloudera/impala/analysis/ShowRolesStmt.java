@@ -14,29 +14,37 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TShowRolesParams;
 import com.google.common.base.Preconditions;
 
 /**
- * Represents a "SHOW ROLES"/"SHOW ROLE GRANT GROUP" statement.
+ * Represents "SHOW [CURRENT] ROLES" and "SHOW ROLE GRANT GROUP <groupName>"
+ * statements.
  */
 public class ShowRolesStmt extends AuthorizationStmt {
   // If null, all roles will be shown. Otherwise only roles granted to this
   // group will be shown.
   private final String groupName_;
+  private final boolean isShowCurrentRoles_;
 
-  public ShowRolesStmt(String groupName) {
+  // Set during analysis.
+  private User requestingUser_;
+
+  public ShowRolesStmt(boolean isShowCurrentRoles, String groupName) {
     // An empty group name should never be possible since group name is an identifier
     // and Impala does not allow empty identifiers.
-    Preconditions.checkState(groupName == null || !groupName.isEmpty());
+    Preconditions.checkState(!isShowCurrentRoles ||
+        (groupName == null || !groupName.isEmpty()));
     groupName_ = groupName;
+    isShowCurrentRoles_ = isShowCurrentRoles;
   }
 
   @Override
   public String toSql() {
-    if (groupName_ != null) {
-      return "SHOW ROLES";
+    if (groupName_ == null) {
+      return isShowCurrentRoles_ ? "SHOW CURRENT ROLES" : "SHOW ROLES";
     } else {
       return "SHOW ROLE GRANT GROUP " + groupName_;
     }
@@ -44,13 +52,17 @@ public class ShowRolesStmt extends AuthorizationStmt {
 
   public TShowRolesParams toThrift() {
     TShowRolesParams params = new TShowRolesParams();
+    params.setRequesting_user(requestingUser_.getShortName());
+    params.setIs_show_current_roles(isShowCurrentRoles_);
     if (groupName_ != null) params.setGrant_group(groupName_);
+    // Users should always be able to execute SHOW CURRENT ROLES.
+    params.setIs_admin_op(!isShowCurrentRoles_);
     return params;
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
-    // TODO: Verify whether user has privileges to execute SHOW ROLES.
+    requestingUser_ = analyzer.getUser();
   }
 }

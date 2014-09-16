@@ -184,10 +184,22 @@ struct TShowTablesParams {
   2: optional string show_pattern
 }
 
-// Parameters for SHOW ROLES commands
+// Parameters for SHOW [CURRENT] ROLES and SHOW ROLE GRANT GROUP <groupName> commands
 struct TShowRolesParams {
-  // Filter roles to the specified grant group. If not set, show all roles.
-  1: optional string grant_group
+  // The effective user who submitted this request.
+  1: optional string requesting_user
+
+  // True if this opertion requires admin privileges on the Sentry Service. This is
+  // needed to check for the case where an operation is_user_scope, but the user does
+  // not belong to the specified grant_group.
+  2: required bool is_admin_op
+
+  // True if the statement is "SHOW CURRENT ROLES".
+  3: required bool is_show_current_roles
+
+  // Filters roles to the specified grant group. If null or not set, show roles for all
+  // groups.
+  4: optional string grant_group
 }
 
 // Result of a SHOW ROLES command

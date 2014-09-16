@@ -407,6 +407,16 @@ public class Frontend {
       ddl.op_type = TCatalogOpType.SHOW_ROLES;
       ShowRolesStmt showRolesStmt = (ShowRolesStmt) analysis.getStmt();
       ddl.setShow_roles_params(showRolesStmt.toThrift());
+      Set<String> groupNames =
+          getAuthzChecker().getUserGroups(analysis.getAnalyzer().getUser());
+      // Check if the user is part of the group (case-sensitive) this SHOW ROLE
+      // statement is targeting. If they are already a member of the group,
+      // the admin requirement can be removed.
+      Preconditions.checkState(ddl.getShow_roles_params().isSetIs_admin_op());
+      if (ddl.getShow_roles_params().isSetGrant_group() &&
+          groupNames.contains(ddl.getShow_roles_params().getGrant_group())) {
+        ddl.getShow_roles_params().setIs_admin_op(false);
+      }
       metadata.setColumns(Arrays.asList(
           new TColumn("role_name", Type.STRING.toThrift())));
     } else if (analysis.isCreateDropRoleStmt()) {

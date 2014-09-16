@@ -26,6 +26,7 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -87,6 +88,7 @@ import com.cloudera.impala.util.TSessionStateUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 /**
  * JNI-callable interface onto a wrapped Frontend instance. The main point is to serialise
@@ -138,7 +140,7 @@ public class JniFrontend {
 
     StringBuilder explainString = new StringBuilder();
     TExecRequest result = frontend_.createExecRequest(queryCtx, explainString);
-    LOG.debug(explainString.toString());
+    if (explainString.length() > 0) LOG.debug(explainString.toString());
 
     // TODO: avoid creating serializer for each query?
     TSerializer serializer = new TSerializer(protocolFactory_);
@@ -376,18 +378,29 @@ public class JniFrontend {
     JniUtil.deserializeThrift(protocolFactory_, params, showRolesParams);
     TShowRolesResult result = new TShowRolesResult();
 
-    List<Role> roles;
-    if (params.isSetGrant_group()) {
-      roles = frontend_.getCatalog().getAuthPolicy().getGrantedRoles(
-          params.getGrant_group());
-      if (roles == null) roles = Lists.newArrayList();
+    List<Role> roles = Lists.newArrayList();
+    if (params.isIs_show_current_roles() || params.isSetGrant_group()) {
+      User user = new User(params.getRequesting_user());
+      Set<String> groupNames;
+      if (params.isIs_show_current_roles()) {
+        groupNames = frontend_.getAuthzChecker().getUserGroups(user);
+      } else {
+        Preconditions.checkState(params.isSetGrant_group());
+        groupNames = Sets.newHashSet(params.getGrant_group());
+      }
+      for (String groupName: groupNames) {
+        roles.addAll(frontend_.getCatalog().getAuthPolicy().getGrantedRoles(groupName));
+      }
     } else {
+      Preconditions.checkState(!params.isIs_show_current_roles());
       roles = frontend_.getCatalog().getAuthPolicy().getAllRoles();
     }
+
     result.setRole_names(Lists.<String>newArrayListWithExpectedSize(roles.size()));
     for (Role role: roles) {
       result.getRole_names().add(role.getName());
     }
+
     Collections.sort(result.getRole_names());
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {

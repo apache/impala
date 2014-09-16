@@ -154,13 +154,13 @@ class ImpalaBeeswaxClient(object):
                             service='impala', transport_type=trans_type, user=self.user,
                             password=self.password, use_ssl=self.use_ssl)
 
-  def execute(self, query_string):
+  def execute(self, query_string, user=None):
     """Re-directs the query to its appropriate handler, returns ImpalaBeeswaxResult"""
     # Take care of leading/trailing whitespaces.
     query_string = query_string.strip()
     start = time.time()
     start_time = datetime.now()
-    handle = self.__execute_query(query_string.strip())
+    handle = self.__execute_query(query_string.strip(), user=user)
     result = self.fetch_results(query_string, handle)
     result.time_taken = time.time() - start
     result.start_time = start_time
@@ -288,12 +288,10 @@ class ImpalaBeeswaxClient(object):
       output += first_child_output
     return idx
 
-
-
   def get_runtime_profile(self, handle):
     return self.__do_rpc(lambda: self.imp_service.GetRuntimeProfile(handle))
 
-  def execute_query_async(self, query_string):
+  def execute_query_async(self, query_string, user=None):
     """
     Executes a query asynchronously
 
@@ -301,13 +299,13 @@ class ImpalaBeeswaxClient(object):
     """
     query = BeeswaxService.Query()
     query.query = query_string
-    query.hadoop_user = getpass.getuser()
+    query.hadoop_user = user if user is not None else getpass.getuser()
     query.configuration = self.__options_to_string_list()
     return self.__do_rpc(lambda: self.imp_service.query(query,))
 
-  def __execute_query(self, query_string):
+  def __execute_query(self, query_string, user=None):
     """Executes a query and waits for completion"""
-    handle = self.execute_query_async(query_string)
+    handle = self.execute_query_async(query_string, user=user)
     # Wait for the query to finish execution.
     self.wait_for_completion(handle)
     return handle

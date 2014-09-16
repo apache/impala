@@ -20,15 +20,16 @@
 #include "runtime/lib-cache.h"
 #include "service/impala-server.h"
 #include "util/string-parser.h"
-#include <thrift/protocol/TDebugProtocol.h>
 #include "gen-cpp/CatalogService.h"
 #include "gen-cpp/CatalogService_types.h"
 
 #include <thrift/protocol/TDebugProtocol.h>
+#include <thrift/Thrift.h>
 
 using namespace std;
 using namespace impala;
 using namespace apache::hive::service::cli::thrift;
+using namespace apache::thrift;
 
 DECLARE_int32(catalog_service_port);
 DECLARE_string(catalog_service_host);
@@ -45,7 +46,12 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
       DCHECK(request.ddl_params.ddl_type != TDdlType::COMPUTE_STATS);
 
       exec_response_.reset(new TDdlExecResponse());
-      client->ExecDdl(*exec_response_.get(), request.ddl_params);
+      try {
+        client->ExecDdl(*exec_response_.get(), request.ddl_params);
+      } catch (const TException& e) {
+        RETURN_IF_ERROR(client.Reopen());
+        client->ExecDdl(*exec_response_.get(), request.ddl_params);
+      }
       catalog_update_result_.reset(
           new TCatalogUpdateResult(exec_response_.get()->result));
       Status status(exec_response_->result.status);
@@ -60,7 +66,12 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
     }
     case TCatalogOpType::RESET_METADATA: {
       TResetMetadataResponse response;
-      client->ResetMetadata(response, request.reset_metadata_params);
+      try {
+        client->ResetMetadata(response, request.reset_metadata_params);
+      } catch (const TException& e) {
+        RETURN_IF_ERROR(client.Reopen());
+        client->ResetMetadata(response, request.reset_metadata_params);
+      }
       catalog_update_result_.reset(new TCatalogUpdateResult(response.result));
       return Status(response.result.status);
     }
@@ -232,7 +243,12 @@ Status CatalogOpExecutor::GetCatalogObject(const TCatalogObject& object_desc,
   request.__set_object_desc(object_desc);
 
   TGetCatalogObjectResponse response;
-  client->GetCatalogObject(response, request);
+  try {
+    client->GetCatalogObject(response, request);
+  } catch (const TException& e) {
+    RETURN_IF_ERROR(client.Reopen());
+    client->GetCatalogObject(response, request);
+  }
   *result = response.catalog_object;
   return Status::OK;
 }
@@ -244,6 +260,11 @@ Status CatalogOpExecutor::PrioritizeLoad(const TPrioritizeLoadRequest& req,
   Status status;
   CatalogServiceConnection client(env_->catalogd_client_cache(), address, &status);
   RETURN_IF_ERROR(status);
-  client->PrioritizeLoad(*result, req);
+  try {
+    client->PrioritizeLoad(*result, req);
+  } catch (const TException& e) {
+    RETURN_IF_ERROR(client.Reopen());
+    client->PrioritizeLoad(*result, req);
+  }
   return Status::OK;
 }

@@ -625,9 +625,11 @@ opt_kw_table ::=
 
 show_roles_stmt ::=
   KW_SHOW KW_ROLES
-  {: RESULT = new ShowRolesStmt(null); :}
+  {: RESULT = new ShowRolesStmt(false, null); :}
   | KW_SHOW KW_ROLE KW_GRANT KW_GROUP IDENT:group
-  {: RESULT = new ShowRolesStmt(group); :}
+  {: RESULT = new ShowRolesStmt(false, group); :}
+  | KW_SHOW KW_CURRENT KW_ROLES
+  {: RESULT = new ShowRolesStmt(true, null); :}
   ;
 
 create_drop_role_stmt ::=
