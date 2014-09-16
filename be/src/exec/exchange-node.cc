@@ -179,7 +179,7 @@ Status ExchangeNode::GetNextMerging(RuntimeState* state, RowBatch* output_batch,
     } else {
       output_batch->set_num_rows(0);
     }
-    if (rows_to_keep > 0 || *eos) break;
+    if (rows_to_keep > 0 || *eos || output_batch->AtCapacity()) break;
     RETURN_IF_ERROR(stream_recvr_->GetNext(output_batch, eos));
   }
 
