@@ -62,8 +62,10 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
 
   FunctionContext::TypeDesc return_type = AnyValUtil::ColumnTypeToTypeDesc(type_);
   vector<FunctionContext::TypeDesc> arg_types;
+  bool char_arg = false;
   for (int i = 0; i < children_.size(); ++i) {
     arg_types.push_back(AnyValUtil::ColumnTypeToTypeDesc(children_[i]->type_));
+    char_arg = char_arg || (children_[i]->type_.type == TYPE_CHAR);
   }
 
   // Compute buffer size for varargs
@@ -80,8 +82,10 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
   // If codegen is disabled and we're calling a non-variadic builtin with <= 3 arguments,
   // we can use the interpreted path and call the builtin without codegen.
   // TODO: no need to restrict this to builtins.
-  if (state->codegen() == NULL && vararg_start_idx_ == -1 && children_.size() <= 3 &&
-      fn_.binary_type == TFunctionBinaryType::BUILTIN) {
+  if (char_arg || (state->codegen() == NULL && vararg_start_idx_ == -1 &&
+      children_.size() <= 3 && fn_.binary_type == TFunctionBinaryType::BUILTIN)) {
+    DCHECK(vararg_start_idx_ == -1 && children_.size() <= 3 &&
+      fn_.binary_type == TFunctionBinaryType::BUILTIN);
     Status status = LibCache::instance()->GetSoFunctionPtr(
         fn_.hdfs_location, fn_.scalar_fn.symbol, &scalar_fn_, &cache_entry_);
     if (!status.ok()) {

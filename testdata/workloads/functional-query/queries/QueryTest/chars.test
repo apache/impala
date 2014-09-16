@@ -13,7 +13,8 @@ char
 'hello'
 ====
 ---- QUERY
-insert into test_char_tmp select cast("hel" as char(5))
+# Regression test for IMPALA-1248
+insert into test_char_tmp values (cast("hel" as char(5)))
 ====
 ---- QUERY
 insert into test_char_tmp select cast(cast("hello000" as VARCHAR(8)) as char(5))

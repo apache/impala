@@ -433,6 +433,8 @@ Function* Expr::GetStaticGetValWrapper(ColumnType type, LlvmCodeGen* codegen) {
     case TYPE_DOUBLE:
       return codegen->GetFunction(IRFunction::EXPR_GET_DOUBLE_VAL);
     case TYPE_STRING:
+    case TYPE_CHAR:
+    case TYPE_VARCHAR:
       return codegen->GetFunction(IRFunction::EXPR_GET_STRING_VAL);
     case TYPE_TIMESTAMP:
       return codegen->GetFunction(IRFunction::EXPR_GET_TIMESTAMP_VAL);
