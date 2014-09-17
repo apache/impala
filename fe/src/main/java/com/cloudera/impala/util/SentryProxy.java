@@ -261,16 +261,36 @@ public class SentryProxy {
   }
 
   /**
-   * Removes the privileges on a role using the Sentry Service and the Impala catalog.
-   * If the RPC to the Sentry Service fails the Impala catalog will not be modified.
+   * Revokes a privileges on a role using the Sentry Service and updates the Impala
+   * catalog. If the RPC to the Sentry Service fails the Impala catalog will not be
+   * modified.
    * Returns the removed privilege, or null if the privilege did not exist. Throws an
    * exception if there was any error updating the Sentry Service or if the Impala
    * catalog does not contain the given role name.
    */
   public synchronized RolePrivilege revokeRolePrivilege(User user, String roleName,
       TPrivilege privilege) throws ImpalaException {
-    sentryPolicyService_.revokeRolePrivilege(user, roleName, privilege);
-    return catalog_.removeRolePrivilege(roleName, privilege);
+    if (!privilege.isHas_grant_opt()) {
+      sentryPolicyService_.revokeRolePrivilege(user, roleName, privilege);
+      return catalog_.removeRolePrivilege(roleName, privilege);
+    } else {
+      // If the REVOKE GRANT OPTION has been specified the privilege should not be
+      // removed, it should just be updated to clear the GRANT OPTION flag.
+      RolePrivilege existingPriv = catalog_.getRolePrivilege(roleName, privilege);
+      if (existingPriv == null || !existingPriv.toThrift().isHas_grant_opt()) {
+        // Nothing to do. The privilege doesn't exist or the grant option flag is not set
+        return existingPriv;
+      }
+
+      // Sentry does not yet provide an "alter privilege" API so we need to remove the
+      // privilege and re-add it.
+      sentryPolicyService_.revokeRolePrivilege(user, roleName, privilege);
+      TPrivilege updatedPriv = existingPriv.toThrift();
+      updatedPriv.setHas_grant_opt(false);
+      sentryPolicyService_.grantRolePrivilege(user, roleName, privilege);
+      LOG.info("NEW PRIV: " + updatedPriv.toString());
+      return catalog_.addRolePrivilege(roleName, updatedPriv);
+    }
   }
 
   /**

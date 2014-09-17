@@ -1844,6 +1844,10 @@ public class CatalogOpExecutor {
       } else {
         rolePriv = catalog_.getSentryProxy().revokeRolePrivilege(requestingUser,
             roleName, privilege);
+        if (rolePriv == null) {
+          rolePriv = RolePrivilege.fromThrift(privilege);
+          rolePriv.setCatalogVersion(catalog_.getCatalogVersion());
+        }
       }
       Preconditions.checkNotNull(rolePriv);
       TCatalogObject catalogObject = new TCatalogObject();
@@ -1858,13 +1862,15 @@ public class CatalogOpExecutor {
     // catalog version so subscribers can wait for the statestore heartbeat that contains
     // all updates.
     if (updatedPrivs.size() == 1) {
-      if (grantRevokePrivParams.isIs_grant()) {
+      // If this is a REVOKE statement with hasGrantOpt, only the GRANT OPTION is revoked
+      // from the privilege.
+      if (grantRevokePrivParams.isIs_grant() ||
+          grantRevokePrivParams.getPrivileges().get(0).isHas_grant_opt()) {
         resp.result.setUpdated_catalog_object(updatedPrivs.get(0));
       } else {
         resp.result.setRemoved_catalog_object(updatedPrivs.get(0));
       }
-      resp.result.setVersion(
-          resp.result.getUpdated_catalog_object().getCatalog_version());
+      resp.result.setVersion(updatedPrivs.get(0).getCatalog_version());
     } else if (updatedPrivs.size() > 1) {
       resp.result.setVersion(
           updatedPrivs.get(updatedPrivs.size() - 1).getCatalog_version());

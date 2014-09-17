@@ -107,6 +107,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("first", new Integer(SqlParserSymbols.KW_FIRST));
     keywordMap.put("float", new Integer(SqlParserSymbols.KW_FLOAT));
     keywordMap.put("following", new Integer(SqlParserSymbols.KW_FOLLOWING));
+    keywordMap.put("for", new Integer(SqlParserSymbols.KW_FOR));
     keywordMap.put("format", new Integer(SqlParserSymbols.KW_FORMAT));
     keywordMap.put("formatted", new Integer(SqlParserSymbols.KW_FORMATTED));
     keywordMap.put("from", new Integer(SqlParserSymbols.KW_FROM));

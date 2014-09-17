@@ -259,9 +259,97 @@ revoke all on server from grant_revoke_test_ALL_SERVER
 User 'test_user' does not have privileges to execute: REVOKE_PRIVILEGE
 ====
 ---- QUERY
+# Set up a role to test the WITH GRANT OPTION. Assumes that tests are not running as
+# 'root' and that 'root' exists on all machines.
+create role grant_revoke_test_ROOT;
+grant role grant_revoke_test_ROOT to group root;
+grant all on database functional to grant_revoke_test_ROOT WITH GRANT OPTION;
+====
+---- USER
+root
+---- QUERY
+# There should only be one role that exists for root
+show current roles
+---- RESULTS
+'grant_revoke_test_ROOT'
+---- TYPES
+STRING
+====
+---- USER
+root
+---- QUERY
+# This privilege actually active
+show databases
+---- RESULTS
+'default'
+'functional'
+---- TYPES
+STRING
+====
+---- USER
+root
+---- QUERY
+# The root user should be able to grant/revoke child privileges.
+# Due to SENTRY-445 they cannot grant SELECT/INSERT even though they have been granted
+# ALL.
+grant all on table functional.alltypes to grant_revoke_test_ROOT
+====
+---- USER
+root
+---- QUERY
+revoke all on table functional.alltypes from grant_revoke_test_ROOT
+====
+---- USER
+root
+---- QUERY
+# User should not be able to grant privileges outside of this scope.
+grant all on table functional_seq.alltypes to grant_revoke_test_ROOT
+---- CATCH
+User 'root' does not have privileges to execute: GRANT_PRIVILEGE
+====
+---- USER
+root
+---- QUERY
+# Also cannot create/drop/grant roles
+create role grant_revoke_test_ROOT2
+---- CATCH
+User 'root' does not have privileges to execute: CREATE_ROLE
+====
+---- USER
+root
+---- QUERY
+# Also cannot create/drop/grant roles
+grant role grant_revoke_test_ROOT to group root
+---- CATCH
+User 'root' does not have privileges to execute: GRANT_ROLE
+====
+---- QUERY
+# Revoke the GRANT OPTION and verify the user can no longer GRANT or REVOKE
+revoke grant option for all on database functional from grant_revoke_test_ROOT
+====
+#---- USER
+#root
+#---- QUERY
+#grant all on table functional.alltypes to grant_revoke_test_ROOT
+#---- CATCH
+#User 'root' does not have privileges to execute: GRANT_PRIVILEGE
+#====
+---- USER
+root
+---- QUERY
+# The privilege is still active
+show databases
+---- RESULTS
+'default'
+'functional'
+---- TYPES
+STRING
+====
+---- QUERY
 # Cleanup test roles
 drop role grant_revoke_test_ALL_SERVER;
 drop role grant_revoke_test_SELECT_INSERT_TEST_TBL;
 drop role grant_revoke_test_ALL_URI;
+drop role grant_revoke_test_ROOT;
 ---- RESULTS
 ====

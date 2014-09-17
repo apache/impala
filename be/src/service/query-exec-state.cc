@@ -284,7 +284,6 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
           RETURN_IF_ERROR(client.Reopen());
           client->SentryAdminCheck(resp, req);
         }
-
         Status status(resp.status);
         RETURN_IF_ERROR(status);
       }

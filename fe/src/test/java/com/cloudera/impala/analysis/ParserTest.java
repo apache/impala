@@ -2709,6 +2709,19 @@ public class ParserTest {
       // Invalid privilege
       ParserError(String.format("%s FAKE ON TABLE foo %s myRole", formatStr));
     }
+    ParsesOk("GRANT ALL ON TABLE foo TO myRole WITH GRANT OPTION");
+    ParsesOk("GRANT ALL ON DATABASE foo TO myRole WITH GRANT OPTION");
+    ParsesOk("GRANT ALL ON SERVER TO myRole WITH GRANT OPTION");
+    ParsesOk("GRANT ALL ON URI '/abc/' TO myRole WITH GRANT OPTION");
+    ParserError("GRANT ALL ON TABLE foo TO myRole WITH GRANT");
+    ParserError("GRANT ALL ON TABLE foo TO myRole WITH");
+
+    ParsesOk("REVOKE GRANT OPTION FOR ALL ON TABLE foo FROM myRole");
+    ParsesOk("REVOKE GRANT OPTION FOR ALL ON DATABASE foo FROM myRole");
+    ParsesOk("REVOKE GRANT OPTION FOR ALL ON SERVER FROM myRole");
+    ParsesOk("REVOKE GRANT OPTION FOR ALL ON URI '/abc/' FROM myRole");
+    ParserError("REVOKE GRANT OPTION ALL ON URI '/abc/' FROM myRole");
+    ParserError("REVOKE GRANT ALL ON URI '/abc/' FROM myRole");
 
     ParserError("ALL ON TABLE foo TO myrole");
     ParserError("ALL ON TABLE foo FROM myrole");

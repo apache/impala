@@ -236,7 +236,7 @@ terminal
   KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DELIMITED, KW_DESC,
   KW_DESCRIBE, KW_DISTINCT, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED,
   KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN,
-  KW_FIRST, KW_FLOAT, KW_FOLLOWING, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL,
+  KW_FIRST, KW_FLOAT, KW_FOLLOWING, KW_FOR, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL,
   KW_FUNCTION, KW_FUNCTIONS, KW_GRANT, KW_GROUP, KW_HAVING, KW_IF, KW_IN, KW_INIT_FN,
   KW_INNER, KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL, KW_INTO,
   KW_INVALIDATE, KW_IS, KW_JOIN, KW_LAST, KW_LEFT, KW_LIKE, KW_LIMIT, KW_LINES, KW_LOAD,
@@ -409,6 +409,8 @@ nonterminal GrantRevokeRoleStmt revoke_role_stmt;
 nonterminal GrantRevokePrivStmt grant_privilege_stmt;
 nonterminal GrantRevokePrivStmt revoke_privilege_stmt;
 nonterminal TPrivilegeLevel privilege;
+nonterminal Boolean opt_with_grantopt;
+nonterminal Boolean opt_grantopt_for;
 
 // To avoid creating common keywords such as 'SERVER' or 'SOURCES' we treat them as
 // identifiers rather than keywords. Throws a parse exception if the identifier does not
@@ -417,6 +419,7 @@ nonterminal Boolean source_ident;
 nonterminal Boolean sources_ident;
 nonterminal Boolean server_ident;
 nonterminal Boolean uri_ident;
+nonterminal Boolean option_ident;
 
 // For Create/Drop/Show function ddl
 nonterminal FunctionArgs function_def_args;
@@ -651,27 +654,48 @@ revoke_role_stmt ::=
 
 grant_privilege_stmt ::=
   KW_GRANT privilege:priv KW_ON server_ident:server_kw KW_TO IDENT:role
-  {: RESULT = GrantRevokePrivStmt.createServerScopedStmt(priv, role, true); :}
+    opt_with_grantopt:grant_opt
+  {: RESULT = GrantRevokePrivStmt.createServerScopedStmt(priv, role, true, grant_opt); :}
   | KW_GRANT privilege:priv KW_ON KW_DATABASE IDENT:db_name KW_TO IDENT:role
-  {: RESULT = GrantRevokePrivStmt.createDbScopedStmt(priv, role, true, db_name); :}
-  | KW_GRANT privilege:priv KW_ON KW_TABLE table_name:tbl_name KW_TO IDENT:role
-  {: RESULT = GrantRevokePrivStmt.createTableScopedStmt(priv, role, true, tbl_name); :}
-  | KW_GRANT privilege:priv KW_ON uri_ident:uri_kw STRING_LITERAL:uri KW_TO IDENT:role
+    opt_with_grantopt:grant_opt
   {:
-    RESULT = GrantRevokePrivStmt.createUriScopedStmt(priv, role, true, new HdfsUri(uri));
+    RESULT = GrantRevokePrivStmt.createDbScopedStmt(priv, role, true, db_name, grant_opt);
+  :}
+  | KW_GRANT privilege:priv KW_ON KW_TABLE table_name:tbl_name KW_TO IDENT:role
+    opt_with_grantopt:grant_opt
+  {:
+    RESULT = GrantRevokePrivStmt.createTableScopedStmt(priv, role, true, tbl_name,
+        grant_opt);
+  :}
+  | KW_GRANT privilege:priv KW_ON uri_ident:uri_kw STRING_LITERAL:uri KW_TO IDENT:role
+    opt_with_grantopt:grant_opt
+  {:
+    RESULT = GrantRevokePrivStmt.createUriScopedStmt(priv, role, true, new HdfsUri(uri),
+        grant_opt);
   :}
   ;
 
 revoke_privilege_stmt ::=
-  KW_REVOKE privilege:priv KW_ON server_ident:server_kw KW_FROM IDENT:role
-  {: RESULT = GrantRevokePrivStmt.createServerScopedStmt(priv, role, false); :}
-  | KW_REVOKE privilege:priv KW_ON KW_DATABASE IDENT:db_name KW_FROM IDENT:role
-  {: RESULT = GrantRevokePrivStmt.createDbScopedStmt(priv, role, false, db_name); :}
-  | KW_REVOKE privilege:priv KW_ON KW_TABLE table_name:tbl_name KW_FROM IDENT:role
-  {: RESULT = GrantRevokePrivStmt.createTableScopedStmt(priv, role, false, tbl_name); :}
-  | KW_REVOKE privilege:priv KW_ON uri_ident:uri_kw STRING_LITERAL:uri KW_FROM IDENT:role
+  KW_REVOKE opt_grantopt_for:grant_opt privilege:priv KW_ON server_ident:server_kw
+  KW_FROM IDENT:role
+  {: RESULT = GrantRevokePrivStmt.createServerScopedStmt(priv, role, false, grant_opt); :}
+  | KW_REVOKE opt_grantopt_for:grant_opt privilege:priv KW_ON KW_DATABASE IDENT:db_name
+    KW_FROM IDENT:role
   {:
-    RESULT = GrantRevokePrivStmt.createUriScopedStmt(priv, role, false, new HdfsUri(uri));
+    RESULT = GrantRevokePrivStmt.createDbScopedStmt(priv, role, false, db_name,
+        grant_opt);
+  :}
+  | KW_REVOKE opt_grantopt_for:grant_opt privilege:priv KW_ON KW_TABLE table_name:tbl_name
+    KW_FROM IDENT:role
+  {:
+    RESULT = GrantRevokePrivStmt.createTableScopedStmt(priv, role, false, tbl_name,
+        grant_opt);
+  :}
+  | KW_REVOKE opt_grantopt_for:grant_opt privilege:priv KW_ON uri_ident:uri_kw
+    STRING_LITERAL:uri KW_FROM IDENT:role
+  {:
+    RESULT = GrantRevokePrivStmt.createUriScopedStmt(priv, role, false, new HdfsUri(uri),
+        grant_opt);
   :}
   ;
 
@@ -682,6 +706,20 @@ privilege ::=
   {: RESULT = TPrivilegeLevel.INSERT; :}
   | KW_ALL
   {: RESULT = TPrivilegeLevel.ALL; :}
+  ;
+
+opt_grantopt_for ::=
+  KW_GRANT option_ident:option KW_FOR
+  {: RESULT = true; :}
+  | /* empty */
+  {: RESULT = false; :}
+  ;
+
+opt_with_grantopt ::=
+  KW_WITH KW_GRANT option_ident:option
+  {: RESULT = true; :}
+  | /* empty */
+  {: RESULT = false; :}
   ;
 
 alter_tbl_stmt ::=
@@ -1097,6 +1135,16 @@ server_ident ::=
   {:
     if (!ident.toUpperCase().equals("SERVER")) {
       parser.parseError("identifier", SqlParserSymbols.IDENT, "SERVER");
+    }
+    RESULT = true;
+  :}
+  ;
+
+option_ident ::=
+  IDENT:ident
+  {:
+    if (!ident.toUpperCase().equals("OPTION")) {
+      parser.parseError("identifier", SqlParserSymbols.IDENT, "OPTION");
     }
     RESULT = true;
   :}

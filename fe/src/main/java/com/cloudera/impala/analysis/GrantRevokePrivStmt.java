@@ -41,6 +41,7 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
   private final TableName tableName_;
   private final HdfsUri uri_;
   private final boolean isGrantPrivStmt_;
+  private final boolean hasGrantOpt_;
 
   // Set/modified during analysis
   private String dbName_;
@@ -49,7 +50,7 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
 
   private GrantRevokePrivStmt(TPrivilegeLevel privilegeLevel, TPrivilegeScope scope,
       String roleName, boolean isGrantPrivStmt, String dbName, TableName tableName,
-      HdfsUri uri) {
+      HdfsUri uri, boolean hasGrantOpt) {
     Preconditions.checkNotNull(privilegeLevel);
     Preconditions.checkNotNull(scope);
     Preconditions.checkNotNull(roleName);
@@ -60,31 +61,34 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
     tableName_ = tableName;
     dbName_ = (tableName_ != null ? tableName_.getDb() : dbName);
     uri_ = uri;
+    hasGrantOpt_ = hasGrantOpt;
   }
 
   public static GrantRevokePrivStmt createServerScopedStmt(
-      TPrivilegeLevel privilegeLevel, String roleName, boolean isGrantPrivStmt) {
+      TPrivilegeLevel privilegeLevel, String roleName, boolean isGrantPrivStmt,
+      boolean hasGrantOpt) {
     return new GrantRevokePrivStmt(privilegeLevel, TPrivilegeScope.SERVER, roleName,
-        isGrantPrivStmt, null, null, null);
+        isGrantPrivStmt, null, null, null, hasGrantOpt);
   }
 
   public static GrantRevokePrivStmt createDbScopedStmt(TPrivilegeLevel privilegeLevel,
-      String roleName, boolean isGrantPrivStmt, String dbName) {
+      String roleName, boolean isGrantPrivStmt, String dbName, boolean hasGrantOpt) {
     return new GrantRevokePrivStmt(privilegeLevel, TPrivilegeScope.DATABASE, roleName,
-        isGrantPrivStmt, dbName, null, null);
+        isGrantPrivStmt, dbName, null, null, hasGrantOpt);
   }
 
   public static GrantRevokePrivStmt createTableScopedStmt(TPrivilegeLevel privilegeLevel,
-      String roleName, boolean isGrantPrivStmt, TableName tableName) {
+      String roleName, boolean isGrantPrivStmt, TableName tableName,
+      boolean hasGrantOpt) {
     Preconditions.checkNotNull(tableName);
     return new GrantRevokePrivStmt(privilegeLevel, TPrivilegeScope.TABLE, roleName,
-        isGrantPrivStmt, null, tableName, null);
+        isGrantPrivStmt, null, tableName, null, hasGrantOpt);
   }
 
   public static GrantRevokePrivStmt createUriScopedStmt(TPrivilegeLevel privilegeLevel,
-      String roleName, boolean isGrantPrivStmt, HdfsUri uri) {
+      String roleName, boolean isGrantPrivStmt, HdfsUri uri, boolean hasGrantOpt) {
     return new GrantRevokePrivStmt(privilegeLevel, TPrivilegeScope.URI, roleName,
-        isGrantPrivStmt, null, null, uri);
+        isGrantPrivStmt, null, null, uri, hasGrantOpt);
   }
 
   public TGrantRevokePrivParams toThrift() {
@@ -100,14 +104,15 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
     if (uri_ != null) privilege.setUri(uri_.toString());
     params.setIs_grant(isGrantPrivStmt_);
     params.setPrivileges(Lists.newArrayList(privilege));
-    privilege.setPrivilege_name(
-        RolePrivilege.buildRolePrivilegeName(privilege));
+    privilege.setHas_grant_opt(hasGrantOpt_);
+    privilege.setPrivilege_name(RolePrivilege.buildRolePrivilegeName(privilege));
     return params;
   }
 
   @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder(isGrantPrivStmt_ ? "GRANT " : "REVOKE ");
+    if (!isGrantPrivStmt_ && hasGrantOpt_) sb.append("GRANT OPTION FOR ");
     sb.append(privilegeLevel_.toString());
     sb.append(" ON ");
     sb.append(scope_.toString() + " ");
@@ -120,6 +125,7 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
     }
     sb.append(isGrantPrivStmt_ ? "TO " : "FROM ");
     sb.append(roleName_);
+    if (isGrantPrivStmt_ && hasGrantOpt_) sb.append(" WITH GRANT OPTION");
     return sb.toString();
   }
 

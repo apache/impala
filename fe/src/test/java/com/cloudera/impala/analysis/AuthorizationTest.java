@@ -126,7 +126,7 @@ public class AuthorizationTest {
     sentryService.createRole(USER, roleName, true);
 
     TPrivilege privilege = new TPrivilege("", TPrivilegeLevel.ALL,
-        TPrivilegeScope.SERVER);
+        TPrivilegeScope.SERVER, false);
     privilege.setServer_name("server1");
     sentryService.grantRolePrivilege(USER, roleName, privilege);
     sentryService.revokeRoleFromGroup(USER, "admin", USER.getName());
@@ -137,7 +137,8 @@ public class AuthorizationTest {
     sentryService.createRole(USER, roleName, true);
     sentryService.grantRoleToGroup(USER, roleName, USER.getName());
 
-    privilege = new TPrivilege("", TPrivilegeLevel.INSERT, TPrivilegeScope.TABLE);
+    privilege = new TPrivilege("", TPrivilegeLevel.INSERT, TPrivilegeScope.TABLE,
+        false);
     privilege.setServer_name("server1");
     privilege.setDb_name("functional");
     privilege.setTable_name("alltypes");
@@ -148,7 +149,8 @@ public class AuthorizationTest {
     sentryService.createRole(USER, roleName, true);
     sentryService.grantRoleToGroup(USER, roleName, USER.getName());
 
-    privilege = new TPrivilege("", TPrivilegeLevel.INSERT, TPrivilegeScope.TABLE);
+    privilege = new TPrivilege("", TPrivilegeLevel.INSERT, TPrivilegeScope.TABLE,
+        false);
     privilege.setServer_name("server1");
     privilege.setDb_name("functional_parquet");
     privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
@@ -159,12 +161,14 @@ public class AuthorizationTest {
     sentryService.createRole(USER, roleName, true);
     sentryService.grantRoleToGroup(USER, roleName, USER.getName());
 
-    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.DATABASE);
+    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.DATABASE,
+        false);
     privilege.setServer_name("server1");
     privilege.setDb_name("newdb");
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
-    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.URI);
+    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.URI,
+        false);
     privilege.setServer_name("server1");
     privilege.setUri("hdfs://localhost:20500/test-warehouse/new_table");
     privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
@@ -174,12 +178,12 @@ public class AuthorizationTest {
     roleName = "all_tpch";
     sentryService.createRole(USER, roleName, true);
     sentryService.grantRoleToGroup(USER, roleName, USER.getName());
-    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.URI);
+    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.URI, false);
     privilege.setServer_name("server1");
     privilege.setUri("hdfs://localhost:20500/test-warehouse/tpch.lineitem");
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
-    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.DATABASE);
+    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.DATABASE, false);
     privilege.setServer_name("server1");
     privilege.setDb_name("tpch");
     sentryService.grantRolePrivilege(USER, roleName, privilege);
@@ -189,7 +193,7 @@ public class AuthorizationTest {
     sentryService.createRole(USER, roleName, true);
     sentryService.grantRoleToGroup(USER, roleName, USER.getName());
 
-    privilege = new TPrivilege("", TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE);
+    privilege = new TPrivilege("", TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE, false);
     privilege.setServer_name("server1");
     privilege.setDb_name("tpcds");
     privilege.setTable_name(AuthorizeableTable.ANY_TABLE_NAME);
@@ -200,7 +204,7 @@ public class AuthorizationTest {
     sentryService.createRole(USER, roleName, true);
     sentryService.grantRoleToGroup(USER, roleName, USER.getName());
 
-    privilege = new TPrivilege("", TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE);
+    privilege = new TPrivilege("", TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE, false);
     privilege.setServer_name("server1");
     privilege.setDb_name("functional");
     privilege.setTable_name("alltypesagg");
@@ -211,7 +215,7 @@ public class AuthorizationTest {
     sentryService.createRole(USER, roleName, true);
     sentryService.grantRoleToGroup(USER, roleName, USER.getName());
 
-    privilege = new TPrivilege("", TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE);
+    privilege = new TPrivilege("", TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE, false);
     privilege.setServer_name("server1");
     privilege.setDb_name("functional");
     privilege.setTable_name("complex_view");
@@ -222,7 +226,7 @@ public class AuthorizationTest {
     sentryService.createRole(USER, roleName, true);
     sentryService.grantRoleToGroup(USER, roleName, USER.getName());
 
-    privilege = new TPrivilege("", TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE);
+    privilege = new TPrivilege("", TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE, false);
     privilege.setServer_name("server1");
     privilege.setDb_name("functional");
     privilege.setTable_name("view_view");
@@ -235,7 +239,7 @@ public class AuthorizationTest {
     sentryService.createRole(USER, roleName, true);
     sentryService.grantRoleToGroup(USER, roleName, USER.getName());
 
-    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.DATABASE);
+    privilege = new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.DATABASE, false);
     privilege.setServer_name("server1");
     privilege.setDb_name("functional_seq_snap");
     sentryService.grantRolePrivilege(USER, roleName, privilege);
@@ -252,14 +256,15 @@ public class AuthorizationTest {
     String dbName = UUID.randomUUID().toString();
     AuthorizeableDb db = new AuthorizeableDb(dbName);
     TPrivilege privilege =
-        new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.DATABASE);
+        new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.DATABASE, false);
     privilege.setServer_name("server1");
     privilege.setDb_name(dbName);
     sentryService.grantRoleToGroup(USER, roleName, USER.getName());
     sentryService.grantRolePrivilege(USER, roleName, privilege);
 
     for (int i = 0; i < 2; ++i) {
-      privilege = new TPrivilege("", TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE);
+      privilege = new TPrivilege("", TPrivilegeLevel.SELECT, TPrivilegeScope.TABLE,
+          false);
       privilege.setServer_name("server1");
       privilege.setDb_name(dbName);
       privilege.setTable_name("test_tbl_" + String.valueOf(i));

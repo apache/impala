@@ -919,6 +919,23 @@ public class CatalogServiceCatalog extends Catalog {
   }
 
   /**
+   * Gets a RolePrivilege from the given role name. Returns the privilege if it exists,
+   * or null of no privilege matching the privilege spec exists.
+   * Throws a CatalogException if the role does not exist.
+   */
+  public RolePrivilege getRolePrivilege(String roleName, TPrivilege privSpec)
+      throws CatalogException {
+    catalogLock_.readLock().lock();
+    try {
+      Role role = authPolicy_.getRole(roleName);
+      if (role == null) throw new CatalogException("Role does not exist: " + roleName);
+      return role.getPrivilege(privSpec.getPrivilege_name());
+    } finally {
+      catalogLock_.readLock().unlock();
+    }
+  }
+
+  /**
    * Increments the current Catalog version and returns the new value.
    */
   public long incrementAndGetCatalogVersion() {
