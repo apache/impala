@@ -28,6 +28,7 @@ class TestSessionExpiration(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--idle_session_timeout=6")
   def test_session_expiration(self, vector):
+    pytest.xfail("IMPALA-1264")
     impalad = self.cluster.get_any_impalad()
     num_expired = impalad.service.get_metric_value("impala-server.num-sessions-expired")
     client = impalad.service.create_beeswax_client()

@@ -78,6 +78,7 @@ class TestFetchFirst(HS2TestSuite):
     Regardless of whether a FETCH_FIRST succeeds or not, clients may always resume
     fetching with FETCH_NEXT.
     """
+    pytest.xfail("IMPALA-1264")
     # Negative tests for the result caching option.
     self.__test_invalid_result_caching("SELECT COUNT(*) FROM functional.alltypes")
 
