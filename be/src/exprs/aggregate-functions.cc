@@ -241,7 +241,8 @@ DecimalVal AggregateFunctions::DecimalAvgGetValue(FunctionContext* ctx,
   // implementation result in an unacceptable loss of output precision?
   ColumnType sum_type = ColumnType::CreateDecimalType(38, output_desc.scale);
   ColumnType count_type = ColumnType::CreateDecimalType(38, 0);
-  bool is_nan, overflow;
+  bool is_nan = false;
+  bool overflow = false;
   Decimal16Value result = sum.Divide<int128_t>(sum_type, count, count_type,
       output_desc.scale, &is_nan, &overflow);
   if (UNLIKELY(is_nan)) return DecimalVal::null();
