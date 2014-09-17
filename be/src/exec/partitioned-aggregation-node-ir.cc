@@ -100,7 +100,7 @@ allocate_tuple:
       // In this case, we either didn't have enough memory to add the intermediate_tuple
       // to the stream or we didn't have enough memory to insert it into the hash table.
       // We need to spill.
-      RETURN_IF_ERROR(SpillPartition());
+      RETURN_IF_ERROR(SpillPartition(dst_partition, intermediate_tuple));
       if (!dst_partition->is_spilled()) {
         DCHECK(dst_partition->aggregated_row_stream->is_pinned());
         // We spilled a different partition, try to insert this tuple.

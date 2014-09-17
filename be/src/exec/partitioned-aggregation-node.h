@@ -237,7 +237,9 @@ class PartitionedAggregationNode : public ExecNode {
 
     // Spills this partition, unpinning streams and cleaning up hash tables as
     // necessary.
-    Status Spill();
+    // If tuple is non-NULL, tuple should also be cleaned up (it was added to this
+    // partitions aggregated_row_stream but not in the hash table).
+    Status Spill(Tuple* tuple = NULL);
 
     bool is_spilled() const { return hash_tbl.get() == NULL; }
 
@@ -348,7 +350,12 @@ class PartitionedAggregationNode : public ExecNode {
   Status NextPartition();
 
   // Picks a partition from hash_partitions_ to spill.
-  Status SpillPartition();
+  // If curr_partition and curr_intermediate_tuple are non-NULL, it means if
+  // curr_partition is spilled, curr_intermediate_tuple must also be cleaned up.
+  // curr_intermediate_tuple has been added to curr_partition's aggregated_row_stream
+  // but not the hash table.
+  Status SpillPartition(Partition* curr_partition = NULL,
+      Tuple* curr_intermediate_tuple = NULL);
 
   // Moves the partitions in hash_partitions_ to aggregated_partitions_ or
   // spilled_partitions_. Partitions moved to spilled_partitions_ are unpinned.

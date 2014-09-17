@@ -408,7 +408,7 @@ bool PartitionedAggregationNode::Partition::InitHashTable() {
   return hash_tbl->Init();
 }
 
-Status PartitionedAggregationNode::Partition::Spill() {
+Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
   DCHECK(!is_spilled());
   if (parent->needs_serialize_ && aggregated_row_stream->num_rows() != 0) {
     // We need to do a lot more work in this case. This step effectively does a merge
@@ -425,6 +425,8 @@ Status PartitionedAggregationNode::Partition::Spill() {
     DCHECK(!parent->serialize_stream_->is_pinned());
     DCHECK(parent->serialize_stream_->has_write_block());
 
+    const std::vector<AggFnEvaluator*>& evaluators = parent->aggregate_evaluators_;;
+
     // Serialize and copy the spilled partition's stream into the new stream.
     bool failed_to_add = false;
     BufferedTupleStream* new_stream = parent->serialize_stream_.get();
@@ -433,10 +435,18 @@ Status PartitionedAggregationNode::Partition::Spill() {
     while (!it.AtEnd()) {
       Tuple* tuple = it.GetTuple();
       it.Next<false>(ctx);
-      AggFnEvaluator::Serialize(parent->aggregate_evaluators_, agg_fn_ctxs, tuple);
+      AggFnEvaluator::Serialize(evaluators, agg_fn_ctxs, tuple);
       if (UNLIKELY(!new_stream->AddRow(reinterpret_cast<TupleRow*>(&tuple)))) {
         failed_to_add = true;
         break;
+      }
+    }
+
+    if (intermediate_tuple != NULL) {
+      AggFnEvaluator::Serialize(evaluators, agg_fn_ctxs, intermediate_tuple);
+      if (!failed_to_add &&
+          !new_stream->AddRow(reinterpret_cast<TupleRow*>(&intermediate_tuple))) {
+        failed_to_add = true;
       }
     }
 
@@ -761,7 +771,8 @@ Status PartitionedAggregationNode::ProcessStream(BufferedTupleStream* input_stre
   return Status::OK;
 }
 
-Status PartitionedAggregationNode::SpillPartition() {
+Status PartitionedAggregationNode::SpillPartition(Partition* curr_partition,
+    Tuple* intermediate_tuple) {
   int64_t max_freed_mem = 0;
   int partition_idx = -1;
 
@@ -786,7 +797,9 @@ Status PartitionedAggregationNode::SpillPartition() {
     return status;
   }
 
-  RETURN_IF_ERROR(hash_partitions_[partition_idx]->Spill());
+  Partition* spilled_partition = hash_partitions_[partition_idx];
+  RETURN_IF_ERROR(spilled_partition->Spill(
+      spilled_partition == curr_partition ? intermediate_tuple : NULL));
   return Status::OK;
 }
 

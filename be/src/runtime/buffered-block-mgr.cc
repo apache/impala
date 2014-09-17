@@ -212,26 +212,27 @@ void BufferedBlockMgr::Cancel() {
 
 Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block** block) {
   *block = NULL;
+  Block* new_block = NULL;
   {
     lock_guard<mutex> lock(lock_);
     if (is_cancelled_) return Status::CANCELLED;
-    *block = GetUnusedBlock(client);
+    new_block = GetUnusedBlock(client);
   }
-  DCHECK_NOTNULL(*block);
-  DCHECK((*block)->client_ == client);
+  DCHECK_NOTNULL(new_block);
+  DCHECK(new_block->client_ == client);
   bool in_mem;
-  RETURN_IF_ERROR(FindBufferForBlock(*block, &in_mem));
+  RETURN_IF_ERROR(FindBufferForBlock(new_block, &in_mem));
   DCHECK(!in_mem) << "A new block cannot start in mem.";
 
-  if (!(*block)->is_pinned_) {
+  if (!new_block->is_pinned()) {
     if (unpin_block == NULL) {
       // We couldn't get a new block and no unpin block was provided. Can't return
       // a block.
-      (*block)->is_deleted_ = true;
-      ReturnUnusedBlock(*block);
-      *block = NULL;
+      new_block->is_deleted_ = true;
+      ReturnUnusedBlock(new_block);
+      new_block = NULL;
     } else {
-      // We need to transfer the buffer from unpin_block to *block.
+      // We need to transfer the buffer from unpin_block to new_block.
 
       // First write out the old block.
       unpin_block->is_pinned_ = false;
@@ -249,16 +250,18 @@ Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block**
       // Assign the buffer to the new block.
       DCHECK(!unpin_block->is_pinned_);
       DCHECK(!unpin_block->in_write_);
-      (*block)->buffer_desc_ = unpin_block->buffer_desc_;
-      (*block)->buffer_desc_->block = *block;
+      new_block->buffer_desc_ = unpin_block->buffer_desc_;
+      new_block->buffer_desc_->block = new_block;
       unpin_block->buffer_desc_ = NULL;
-      (*block)->is_pinned_ = true;
+      new_block->is_pinned_ = true;
     }
   } else if (unpin_block != NULL) {
     // Got a new block without needing to transfer. Just unpin this block.
     RETURN_IF_ERROR(unpin_block->Unpin());
   }
 
+  if (new_block != NULL) DCHECK(new_block->is_pinned());
+  *block = new_block;
   return Status::OK;
 }
 
@@ -589,7 +592,10 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
         // There are no free buffers or blocks we can evict. We need to fail this request.
         // If this is an optional request, return OK. If it is required, return OOM.
         if (is_optional_request) return Status::OK;
-        return Status::MEM_LIMIT_EXCEEDED;
+        Status status = Status::MEM_LIMIT_EXCEEDED;
+        status.AddErrorMsg("Query did not have enough memory to get the minimum required "
+            "buffers.");
+        return status;
       }
 
       // At this point, this block needs to use a buffer that was unpinned from another

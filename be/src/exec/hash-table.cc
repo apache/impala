@@ -315,7 +315,8 @@ bool HashTable::GrowNodeArray() {
   int64_t buffer_size = 0;
   if (block_mgr_client_ != NULL) {
     BufferedBlockMgr::Block* block = NULL;
-    state_->block_mgr()->GetNewBlock(block_mgr_client_, NULL, &block);
+    Status status = state_->block_mgr()->GetNewBlock(block_mgr_client_, NULL, &block);
+    if (!status.ok()) DCHECK(block == NULL);
     if (block == NULL) return false;
     data_pages_.push_back(block);
     buffer_size = state_->io_mgr()->max_read_buffer_size();
