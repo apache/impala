@@ -47,7 +47,9 @@ public class BinaryPredicate extends Predicate {
     LE("<=", "le", TComparisonOp.LE),
     GE(">=", "ge", TComparisonOp.GE),
     LT("<", "lt", TComparisonOp.LT),
-    GT(">", "gt", TComparisonOp.GT);
+    GT(">", "gt", TComparisonOp.GT),
+    // Same as EQ, except it returns True if the rhs is NULL
+    NULL_MATCHING_EQ("=", "null_matching_eq", TComparisonOp.EQ);
 
     private final String description_;
     private final String name_;
@@ -72,6 +74,8 @@ public class BinaryPredicate extends Predicate {
         case GE: return LE;
         case LT: return GT;
         case GT: return LT;
+        case NULL_MATCHING_EQ:
+          throw new IllegalStateException("Not implemented");
         default: throw new IllegalStateException("Invalid operator");
       }
     }
@@ -95,9 +99,10 @@ public class BinaryPredicate extends Predicate {
     }
   }
 
-  private final Operator op_;
+  private Operator op_;
 
   public Operator getOp() { return op_; }
+  public void setOp(Operator op) { op_ = op; }
 
   public BinaryPredicate(Operator op, Expr e1, Expr e2) {
     super();
@@ -112,6 +117,8 @@ public class BinaryPredicate extends Predicate {
     super(other);
     op_ = other.op_;
   }
+
+  public boolean isNullMatchingEq() { return op_ == Operator.NULL_MATCHING_EQ; }
 
   @Override
   public String toSqlImpl() {
@@ -147,7 +154,8 @@ public class BinaryPredicate extends Predicate {
     super.analyze(analyzer);
 
     convertNumericLiteralsFromDecimal(analyzer);
-    fn_ = getBuiltinFunction(analyzer, op_.getName(), collectChildReturnTypes(),
+    String opName = op_.getName().equals("null_matching_eq") ? "eq" : op_.getName();
+    fn_ = getBuiltinFunction(analyzer, opName, collectChildReturnTypes(),
         CompareMode.IS_SUPERTYPE_OF);
     if (fn_ == null) {
       // Construct an appropriate error message and throw an AnalysisException.
@@ -273,6 +281,8 @@ public class BinaryPredicate extends Predicate {
       case GT:
         newOp = Operator.LE;
         break;
+      case NULL_MATCHING_EQ:
+        throw new IllegalStateException("Not implemented");
     }
     return new BinaryPredicate(newOp, getChild(0), getChild(1));
   }

@@ -13,13 +13,13 @@ where id in
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ====
-# NOT IN predicate
+# NOT IN predicate rewritten into a null-aware anti join
 select *
 from functional.alltypes
 where id not in
   (select id from functional.alltypesagg)
 ---- PLAN
-02:HASH JOIN [LEFT ANTI JOIN]
+02:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
 |  hash predicates: id = id
 |
 |--01:SCAN HDFS [functional.alltypesagg]
@@ -28,24 +28,60 @@ where id not in
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ====
+# Correlated NOT IN rewritten into a null-aware anti join
+select *
+from functional.alltypes a
+where a.int_col not in
+  (select int_col
+   from functional.alltypesagg g
+   where g.id = a.id and g.bigint_col < a.bigint_col)
+and a.int_col < 100
+---- PLAN
+02:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
+|  hash predicates: a.int_col = int_col
+|  other join predicates: g.bigint_col < a.bigint_col, a.id = g.id
+|
+|--01:SCAN HDFS [functional.alltypesagg g]
+|     partitions=11/11 size=814.73KB compact
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 size=478.45KB
+   predicates: a.int_col < 100
+====
+# Correlated NOT IN subquery resulting in the same eq conjunct
+# being used in both the hash and the other join predicate
+select *
+from functional.alltypes a
+where a.id not in (select id from functional.alltypes b where a.id = b.id)
+---- PLAN
+02:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
+|  hash predicates: a.id = id
+|  other join predicates: a.id = b.id
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 size=478.45KB compact
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 size=478.45KB
+====
 # Subquery with predicate in the WHERE clause
 select count(*)
-from functional.alltypes
+from functional.alltypes a
 where int_col in
-  (select int_col from functional.alltypesagg where bigint_col < 10)
+  (select int_col from functional.alltypesagg g where a.id = g.id and g.bigint_col < 10)
 and bool_col = false
 ---- PLAN
 03:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
 02:HASH JOIN [LEFT SEMI JOIN]
-|  hash predicates: int_col = int_col
+|  hash predicates: int_col = int_col, a.id = g.id
 |
-|--01:SCAN HDFS [functional.alltypesagg]
+|--01:SCAN HDFS [functional.alltypesagg g]
 |     partitions=11/11 size=814.73KB compact
-|     predicates: bigint_col < 10
+|     predicates: g.bigint_col < 10
 |
-00:SCAN HDFS [functional.alltypes]
+00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 size=478.45KB
    predicates: bool_col = FALSE
 ====
@@ -72,7 +108,7 @@ where t.id in
 and t.tinyint_col not in (select tinyint_col from functional.alltypestiny)
 and t.bigint_col < 1000
 ---- PLAN
-04:HASH JOIN [LEFT ANTI JOIN]
+04:HASH JOIN [NULL AWARE LEFT ANTI JOIN]
 |  hash predicates: t.tinyint_col = tinyint_col
 |
 |--02:SCAN HDFS [functional.alltypestiny]

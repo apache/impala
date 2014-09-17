@@ -50,7 +50,7 @@ struct TRowBatch {
 
 // Comparison operators used in predicates.
 enum TComparisonOp {
-  LT, LE, EQ, NE, GE, GT
+  LT, LE, EQ, NE, GE, GT,
 }
 
 // Binary predicates that can be pushed to the external data source and

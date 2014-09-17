@@ -69,10 +69,11 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
 
         // At this point the probe is considered matched.
         matched_probe_ = true;
-        if (JoinOp == TJoinOp::LEFT_ANTI_JOIN) {
+        if (JoinOp == TJoinOp::LEFT_ANTI_JOIN ||
+            JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
           // We can safely ignore this probe row for left anti joins.
           hash_tbl_iterator_.reset();
-          break;
+          goto next_row;
         }
         if (JoinOp == TJoinOp::RIGHT_OUTER_JOIN || JoinOp == TJoinOp::RIGHT_SEMI_JOIN ||
             JoinOp == TJoinOp::RIGHT_ANTI_JOIN || JoinOp == TJoinOp::FULL_OUTER_JOIN) {
@@ -96,7 +97,8 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
       }
 
       if ((JoinOp == TJoinOp::LEFT_ANTI_JOIN || JoinOp == TJoinOp::LEFT_OUTER_JOIN ||
-           JoinOp == TJoinOp::FULL_OUTER_JOIN) &&
+           JoinOp == TJoinOp::FULL_OUTER_JOIN ||
+           JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) &&
           !matched_probe_) {
         // No match for this row, we need to output it.
         CreateOutputRow(out_row, current_probe_row_, NULL);
@@ -124,8 +126,17 @@ next_row:
     current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
     matched_probe_ = false;
     uint32_t hash;
-    if (!ht_ctx->EvalAndHashProbe(current_probe_row_, &hash)) continue;
-
+    if (!ht_ctx->EvalAndHashProbe(current_probe_row_, &hash)) {
+      // For NAAJ, return the probe row only if there are no build rows.
+      if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
+        if (null_aware_partition_->build_rows()->num_rows() == 0) {
+          continue;
+        } else {
+          goto next_row;
+        }
+      }
+      continue;
+    }
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
     if (LIKELY(hash_tbls_[partition_idx] != NULL)) {
       hash_tbl_iterator_= hash_tbls_[partition_idx]->Find(ht_ctx, hash);
@@ -144,9 +155,12 @@ next_row:
     }
 
     if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN && hash_tbl_iterator_.AtEnd()) {
-      // Null aware behavior.
+      // Null aware behavior. The probe row did not match in the hash table so we
+      // should interpret the hash table probe as "unknown" if there are nulls on the
+      // build size. For those rows, we need to process the remaining join
+      // predicates later.
+      if (null_aware_partition_->build_rows()->num_rows() == 0) continue;
       if (num_join_conjuncts == 0) goto next_row;
-      if (null_aware_partition_->build_rows()->num_rows() == 0) goto next_row;
       if (!null_aware_partition_->probe_rows()->AddRow(current_probe_row_)) return -1;
       goto next_row;
     }

@@ -279,12 +279,7 @@ public class TableRef implements ParseNode {
             new BinaryPredicate(BinaryPredicate.Operator.EQ,
               new SlotRef(leftTblRef_.getAliasAsName(), colName),
               new SlotRef(getAliasAsName(), colName));
-        if (onClause_ == null) {
-          onClause_ = eqPred;
-        } else {
-          onClause_ =
-              new CompoundPredicate(CompoundPredicate.Operator.AND, onClause_, eqPred);
-        }
+        onClause_ = CompoundPredicate.createConjunction(eqPred, onClause_);
       }
     }
 
@@ -306,7 +301,8 @@ public class TableRef implements ParseNode {
     // register the tuple id of the rhs of a left semi join
     TupleId semiJoinedTupleId = null;
     if (joinOp_ == JoinOperator.LEFT_SEMI_JOIN
-        || joinOp_ == JoinOperator.LEFT_ANTI_JOIN) {
+        || joinOp_ == JoinOperator.LEFT_ANTI_JOIN
+        || joinOp_ == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN) {
       analyzer.registerSemiJoinedTid(getId(), this);
       semiJoinedTupleId = getId();
     }

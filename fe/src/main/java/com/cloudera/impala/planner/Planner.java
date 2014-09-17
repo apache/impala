@@ -17,6 +17,7 @@ package com.cloudera.impala.planner;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -470,10 +471,10 @@ public class Planner {
     long partitionCost = Long.MAX_VALUE;
     List<Expr> lhsJoinExprs = Lists.newArrayList();
     List<Expr> rhsJoinExprs = Lists.newArrayList();
-    for (Pair<Expr, Expr> pair: node.getEqJoinConjuncts()) {
+    for (Expr joinConjunct: node.getEqJoinConjuncts()) {
       // no remapping necessary
-      lhsJoinExprs.add(pair.first.clone());
-      rhsJoinExprs.add(pair.second.clone());
+      lhsJoinExprs.add(joinConjunct.getChild(0).clone());
+      rhsJoinExprs.add(joinConjunct.getChild(1).clone());
     }
     boolean lhsHasCompatPartition = false;
     boolean rhsHasCompatPartition = false;
@@ -503,9 +504,11 @@ public class Planner {
     // - and we're not doing a full outer or right outer/semi join (those require the
     //   left-hand side to be partitioned for correctness)
     // - and the expected size of the hash tbl doesn't exceed perNodeMemLimit
+    // - or we are doing a null-aware left anti join (broadcast is required for
+    //   correctness)
     // we do a "<=" comparison of the costs so that we default to broadcast joins if
     // we're unable to estimate the cost
-    if (node.getJoinOp() != JoinOperator.RIGHT_OUTER_JOIN
+    if ((node.getJoinOp() != JoinOperator.RIGHT_OUTER_JOIN
         && node.getJoinOp() != JoinOperator.FULL_OUTER_JOIN
         && node.getJoinOp() != JoinOperator.RIGHT_SEMI_JOIN
         && node.getJoinOp() != JoinOperator.RIGHT_ANTI_JOIN
@@ -514,7 +517,8 @@ public class Planner {
                 <= perNodeMemLimit)
         && (node.getTableRef().isBroadcastJoin()
             || (!node.getTableRef().isPartitionedJoin()
-                && broadcastCost <= partitionCost))) {
+                && broadcastCost <= partitionCost)))
+        || node.getJoinOp().isNullAwareLeftAntiJoin()) {
       doBroadcast = true;
     } else {
       doBroadcast = false;
@@ -1090,9 +1094,11 @@ public class Planner {
       // The rhs table of an outer/semi join can appear as the left-most input if we
       // invert the lhs/rhs and the join op. However, we may only consider this inversion
       // for the very first join in refPlans, otherwise we could reorder tables/joins
-      // across outer/semi joins which is generally incorrect.
-      if ((joinOp.isOuterJoin() || joinOp.isSemiJoin()) &&
-          ref != refPlans.get(1).first) {
+      // across outer/semi joins which is generally incorrect. The null-aware
+      // left anti-join operator is never considered for inversion because we can't
+      // execute the null-aware right anti-join efficiently.
+      if (((joinOp.isOuterJoin() || joinOp.isSemiJoin()) &&
+          ref != refPlans.get(1).first) || joinOp.isNullAwareLeftAntiJoin()) {
         // ref cannot appear as the leftmost input
         continue;
       }
@@ -1209,10 +1215,13 @@ public class Planner {
           // Invert the join if doing so reduces the size of build-side hash table
           // (may also reduce network costs depending on the join strategy).
           // Only consider this optimization if both the lhs/rhs cardinalities are known.
+          // The null-aware left anti-join operator is never considered for inversion
+          // because we can't execute the null-aware right anti-join efficiently.
           long lhsCard = root.getCardinality();
           long rhsCard = rhsPlan.getCardinality();
           if (lhsCard != -1 && rhsCard != -1 &&
-              lhsCard * root.getAvgRowSize() < rhsCard * rhsPlan.getAvgRowSize()) {
+              lhsCard * root.getAvgRowSize() < rhsCard * rhsPlan.getAvgRowSize() &&
+              !joinOp.isNullAwareLeftAntiJoin()) {
             ref.setJoinOp(ref.getJoinOp().invert());
             candidate = createJoinNode(analyzer, rhsPlan, root, ref, null, false);
             Preconditions.checkNotNull(candidate);
@@ -1635,15 +1644,12 @@ public class Planner {
    * - for outer joins: same type of conjuncts_ as inner joins, but only from the JOIN
    *   clause
    * Returns the conjuncts_ in 'joinConjuncts' (in which "<lhs> = <rhs>" is returned
-   * as Pair(<lhs>, <rhs>)) and also in their original form in 'joinPredicates'.
+   * as BinaryPredicate and also in their original form in 'joinPredicates'.
    * Each lhs is bound by planIds, and each rhs by the tuple id of joinedTblRef.
-   * If no conjuncts_ are found, constructs them based on equivalence classes, where
-   * possible. In that case, they are still returned through joinConjuncts, but
-   * joinPredicates would be empty.
    */
   private void getHashLookupJoinConjuncts(
       Analyzer analyzer, List<TupleId> planIds, TableRef joinedTblRef,
-      List<Pair<Expr, Expr>> joinConjuncts, List<Expr> joinPredicates) {
+      List<BinaryPredicate> joinConjuncts, List<Expr> joinPredicates) {
     joinConjuncts.clear();
     joinPredicates.clear();
     TupleId tblRefId = joinedTblRef.getId();
@@ -1709,7 +1715,8 @@ public class Planner {
       // e is a non-redundant join predicate
       Preconditions.checkState(lhsExpr != rhsExpr);
       joinPredicates.add(e);
-      joinConjuncts.add(Pair.create(lhsExpr, rhsExpr));
+      joinConjuncts.add(new BinaryPredicate(((BinaryPredicate)e).getOp(), lhsExpr,
+          rhsExpr));
     }
     if (!joinPredicates.isEmpty()) return;
     Preconditions.checkState(joinConjuncts.isEmpty());
@@ -1723,7 +1730,8 @@ public class Planner {
         // we only do this for one of the equivalent slots, all the other implied
         // equalities are redundant
         Expr pred = analyzer.createEqPredicate(lhsSlotIds.get(0), slotDesc.getId());
-        joinConjuncts.add(new Pair<Expr, Expr>(pred.getChild(0), pred.getChild(1)));
+        joinConjuncts.add(new BinaryPredicate(BinaryPredicate.Operator.EQ,
+            pred.getChild(0), pred.getChild(1)));
       }
     }
   }
@@ -1746,7 +1754,7 @@ public class Planner {
       return result;
     }
 
-    List<Pair<Expr, Expr>> eqJoinConjuncts = Lists.newArrayList();
+    List<BinaryPredicate> eqJoinConjuncts = Lists.newArrayList();
     List<Expr> eqJoinPredicates = Lists.newArrayList();
     // get eq join predicates for the TableRefs' ids (not the PlanNodes' ids, which
     // are materialized)
@@ -1757,10 +1765,10 @@ public class Planner {
       getHashLookupJoinConjuncts(
           analyzer, inner.getTblRefIds(), outerRef, eqJoinConjuncts, eqJoinPredicates);
       // Reverse the lhs/rhs of the join conjuncts.
-      for (Pair<Expr, Expr> eqJoinConjunct: eqJoinConjuncts) {
-        Expr swapTmp = eqJoinConjunct.first;
-        eqJoinConjunct.first = eqJoinConjunct.second;
-        eqJoinConjunct.second = swapTmp;
+      for (BinaryPredicate eqJoinConjunct: eqJoinConjuncts) {
+        Expr swapTmp = eqJoinConjunct.getChild(0);
+        eqJoinConjunct.setChild(0, eqJoinConjunct.getChild(1));
+        eqJoinConjunct.setChild(1, swapTmp);
       }
     }
     if (eqJoinConjuncts.isEmpty()) {
@@ -1784,6 +1792,25 @@ public class Planner {
       // conjuncts to produce correct results.
       otherJoinConjuncts =
           analyzer.getUnassignedConjuncts(tblRef.getAllTupleIds(), false);
+      if (tblRef.getJoinOp().isNullAwareLeftAntiJoin()) {
+        boolean hasNullMatchingEqOperator = false;
+        // Keep only the null-matching eq conjunct in the eqJoinConjuncts and move
+        // all the others in otherJoinConjuncts. The BE relies on this
+        // separation for correct execution of the null-aware left anti join.
+        Iterator<BinaryPredicate> it = eqJoinConjuncts.iterator();
+        while (it.hasNext()) {
+          BinaryPredicate conjunct = it.next();
+          if (!conjunct.isNullMatchingEq()) {
+            otherJoinConjuncts.add(conjunct);
+            it.remove();
+          } else {
+            // Only one null-matching eq conjunct is allowed
+            Preconditions.checkState(!hasNullMatchingEqOperator);
+            hasNullMatchingEqOperator = true;
+          }
+        }
+        Preconditions.checkState(hasNullMatchingEqOperator);
+      }
     }
     analyzer.markConjunctsAssigned(otherJoinConjuncts);
 

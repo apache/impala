@@ -645,6 +645,19 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
       }
     }
 
+    if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
+      // In this case, we want to output rows from the null aware partition.
+      if (null_aware_partition_ == NULL) {
+        *eos = true;
+        break;
+      }
+      if (nulls_build_batch_.get() != NULL) {
+        RETURN_IF_ERROR(OutputNullAwareProbeRows(state, out_batch));
+        if (out_batch->AtCapacity()) return Status::OK;
+        continue;
+      }
+    }
+
     // Finish up the current batch.
     {
       // Putting SCOPED_TIMER in ProcessProbeBatch() causes weird exception handling IR in
@@ -700,15 +713,12 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
     }
     // Move onto the next partition.
     RETURN_IF_ERROR(PrepareNextPartition(state));
+
     if (input_partition_ == NULL) {
       if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
-        if (null_aware_partition_ != NULL) {
-          RETURN_IF_ERROR(OutputNullAwareProbeRows(state, out_batch));
-        }
-        *eos = null_aware_partition_ == NULL;
-      } else {
-        *eos = true;
+        RETURN_IF_ERROR(PrepareNullAwarePartition());
       }
+      *eos = null_aware_partition_ == NULL;
       if (*eos) break;
     }
   }
@@ -768,44 +778,55 @@ Status PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
   return Status::OK;
 }
 
-Status PartitionedHashJoinNode::OutputNullAwareProbeRows(RuntimeState* state,
-    RowBatch* out_batch) {
+Status PartitionedHashJoinNode::PrepareNullAwarePartition() {
   DCHECK_NOTNULL(null_aware_partition_);
-  DCHECK_GT(null_aware_partition_->build_rows()->num_rows(), 0);
+  DCHECK(nulls_build_batch_.get() == NULL);
+  DCHECK_EQ(probe_batch_pos_, -1);
+  DCHECK_EQ(probe_batch_->num_rows(), 0);
 
   BufferedTupleStream* build_stream = null_aware_partition_->build_rows();
   BufferedTupleStream* probe_stream = null_aware_partition_->probe_rows();
 
-  if (probe_batch_pos_ < 0) {
-    DCHECK(nulls_build_batch_.get() == NULL);
-    // First time this is called.
-    DCHECK_EQ(probe_batch_->num_rows(), 0);
-    probe_batch_pos_ = 0;
-
-    // Bring the entire spilled build stream into memory.
-    bool pinned;
-    RETURN_IF_ERROR(build_stream->PinStream(&pinned));
-    if (!pinned) {
-      // In this case we had a lot of NULLs on the build side. While this is possible
-      // to process by re-reading the spilled build stream for each probe row with
-      // minimal code effort, this would behave very slowly (we'd need to do IO for
-      // each probe row). This seems like a reasonable limitation for now.
-      // TODO: revisit
-      return Status("Too many NULLs on the build side to perform this join.");
-    }
-
-    // Initialize the streams for read.
-    RETURN_IF_ERROR(build_stream->PrepareForRead());
-    RETURN_IF_ERROR(probe_stream->PrepareForRead());
-
-    // Read all the build rows into a single batch.
-    nulls_build_batch_.reset(new RowBatch(
-        child(1)->row_desc(), build_stream->num_rows(), mem_tracker()));
-    bool eos = false;
-    RETURN_IF_ERROR(build_stream->GetNext(nulls_build_batch_.get(), &eos));
-    DCHECK(eos);
+  if (build_stream->num_rows() == 0) {
+    // There were no build rows. Nothing to do. Just close this partition.
+    DCHECK_EQ(probe_stream->num_rows(), 0);
+    null_aware_partition_->Close(NULL);
+    null_aware_partition_ = NULL;
+    nulls_build_batch_.reset();
+    return Status::OK;
+  }
+  // Bring the entire spilled build stream into memory.
+  bool pinned;
+  RETURN_IF_ERROR(build_stream->PinStream(&pinned));
+  if (!pinned) {
+    // In this case we had a lot of NULLs on the build side. While this is possible
+    // to process by re-reading the spilled build stream for each probe row with
+    // minimal code effort, this would behave very slowly (we'd need to do IO for
+    // each probe row). This seems like a reasonable limitation for now.
+    // TODO: revisit
+    return Status("Too many NULLs on the build side to perform this join.");
   }
 
+  // Initialize the streams for read.
+  RETURN_IF_ERROR(build_stream->PrepareForRead());
+  RETURN_IF_ERROR(probe_stream->PrepareForRead());
+
+  // Read all the build rows into a single batch.
+  nulls_build_batch_.reset(new RowBatch(
+      child(1)->row_desc(), build_stream->num_rows(), mem_tracker()));
+  bool eos = false;
+  RETURN_IF_ERROR(build_stream->GetNext(nulls_build_batch_.get(), &eos));
+
+  probe_batch_pos_ = 0;
+  return Status::OK;
+}
+
+Status PartitionedHashJoinNode::OutputNullAwareProbeRows(RuntimeState* state,
+    RowBatch* out_batch) {
+  DCHECK_NOTNULL(null_aware_partition_);
+  DCHECK(nulls_build_batch_.get() != NULL);
+
+  BufferedTupleStream* probe_stream = null_aware_partition_->probe_rows();
   if (probe_batch_pos_ == probe_batch_->num_rows()) {
     probe_batch_pos_ = 0;
     probe_batch_->TransferResourceOwnership(out_batch);
@@ -1116,7 +1137,8 @@ Function* PartitionedHashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen) 
   BasicBlock* build_null_block = NULL;
 
   if (join_op_ == TJoinOp::LEFT_ANTI_JOIN || join_op_ == TJoinOp::LEFT_OUTER_JOIN ||
-      join_op_ == TJoinOp::FULL_OUTER_JOIN) {
+      join_op_ == TJoinOp::FULL_OUTER_JOIN ||
+      join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
     // build tuple can be null
     build_null_block = BasicBlock::Create(context, "build_null", fn);
     Value* is_build_null = builder.CreateIsNull(build_row_arg, "is_build_null");
@@ -1289,7 +1311,7 @@ bool PartitionedHashJoinNode::CodegenProcessProbeBatch(
   // INNER_JOIN -> 1
   // LEFT_OUTER_JOIN -> 2
   // LEFT_SEMI_JOIN -> 1
-  // LEFT_ANTI_JOIN -> 2
+  // LEFT_ANTI_JOIN/NULL_AWARE_ANTI_JOIN -> 2
   // RIGHT_OUTER_JOIN -> 1
   // RIGHT_SEMI_JOIN -> 1
   // RIGHT_ANTI_JOIN -> 0

@@ -344,7 +344,7 @@ public class StmtRewriter {
         // TODO Handle count aggregate functions in an expression in subqueries
         // select list.
         stmt.whereClause_ =
-            CompoundPredicate.addConjunct(joinConjunct, stmt.whereClause_);
+            CompoundPredicate.createConjunction(joinConjunct, stmt.whereClause_);
         joinConjunct = null;
         joinOp = JoinOperator.LEFT_OUTER_JOIN;
         updateSelectList = true;
@@ -409,14 +409,14 @@ public class StmtRewriter {
       // TODO: Remove this when independent subquery evaluation is implemented.
       // TODO: Requires support for non-equi joins.
       if (!(expr.getSubquery().isScalarSubquery()) || onClauseConjuncts.size() != 1) {
-        throw new AnalysisException("Unsupported correlated subquery: " +
-            subqueryStmt.toSql());
+        throw new AnalysisException("Unsupported predicate with subquery: " +
+            expr.toSql());
       }
 
       // We can rewrite the aggregate subquery using a cross join. All conjuncts
       // that were extracted from the subquery are added to stmt's WHERE clause.
       stmt.whereClause_ =
-          CompoundPredicate.addConjunct(onClausePredicate, stmt.whereClause_);
+          CompoundPredicate.createConjunction(onClausePredicate, stmt.whereClause_);
       inlineView.setJoinOp(JoinOperator.CROSS_JOIN);
       // Indicate that the CROSS JOIN may add a new visible tuple to stmt's
       // select list (if the latter contains an unqualified star item '*')
@@ -426,7 +426,30 @@ public class StmtRewriter {
     // We have a valid equi-join conjunct.
     if (expr instanceof InPredicate && ((InPredicate)expr).isNotIn() ||
         expr instanceof ExistsPredicate && ((ExistsPredicate)expr).isNotExists()) {
-      joinOp = JoinOperator.LEFT_ANTI_JOIN;
+      // For the case of a NOT IN with an eq join conjunct, replace the join
+      // conjunct with a conjunct that uses the null-matching eq operator.
+      if (expr instanceof InPredicate) {
+        joinOp = JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN;
+        List<TupleId> tIds = Lists.newArrayList();
+        joinConjunct.getIds(tIds, null);
+        if (tIds.size() <= 1 || !tIds.contains(inlineView.getDesc().getId())) {
+          throw new AnalysisException("Unsupported NOT IN predicate with subquery: " +
+              expr.toSql());
+        }
+        // Replace the EQ operator in the generated join conjunct with a
+        // null-matching EQ operator.
+        for (Expr conjunct: onClausePredicate.getConjuncts()) {
+          if (conjunct.equals(joinConjunct)) {
+            Preconditions.checkState(conjunct instanceof BinaryPredicate);
+            Preconditions.checkState(((BinaryPredicate)conjunct).getOp() ==
+                BinaryPredicate.Operator.EQ);
+            ((BinaryPredicate)conjunct).setOp(BinaryPredicate.Operator.NULL_MATCHING_EQ);
+            break;
+          }
+        }
+      } else {
+        joinOp = JoinOperator.LEFT_ANTI_JOIN;
+      }
     }
     inlineView.setJoinOp(joinOp);
     inlineView.setOnClause(onClausePredicate);

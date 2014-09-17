@@ -203,8 +203,10 @@ public class CompoundPredicate extends Predicate {
   @Override
   public Expr clone() { return new CompoundPredicate(this); }
 
-  public static Expr addConjunct(Expr conjunct, Expr dst) {
-    if (dst == null) return conjunct;
-    return new CompoundPredicate(Operator.AND, dst, conjunct);
+  // Create an AND predicate between two exprs, 'lhs' and 'rhs'. If
+  // 'rhs' is null, simply return 'lhs'.
+  public static Expr createConjunction(Expr lhs, Expr rhs) {
+    if (rhs == null) return lhs;
+    return new CompoundPredicate(Operator.AND, rhs, lhs);
   }
 }

@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
+import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.JoinOperator;
 import com.cloudera.impala.analysis.SlotRef;
@@ -212,12 +213,12 @@ public class PlanFragment {
         return false;
       }
 
-      List<Pair<Expr, Expr>> joinConjuncts = hashJoinNode.getEqJoinConjuncts();
+      List<BinaryPredicate> joinConjuncts = hashJoinNode.getEqJoinConjuncts();
       // We can only add these filters for conjuncts of the form:
       // <probe_slot> = *. If the hash join has any equal join conjuncts in this form,
       // mark the hash join node.
-      for (Pair<Expr, Expr> c: joinConjuncts) {
-        if (c.first instanceof SlotRef) {
+      for (Expr c: joinConjuncts) {
+        if (c.getChild(0) instanceof SlotRef) {
           hashJoinNode.setAddProbeFilters(true);
           break;
         }

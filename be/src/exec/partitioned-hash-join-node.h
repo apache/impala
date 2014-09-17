@@ -180,6 +180,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // partition in the front of flush_build_partitions_.
   Status OutputUnmatchedBuild(RowBatch* out_batch);
 
+  // Initializes null_aware_partition_ and nulls_build_batch_ to output rows.
+  Status PrepareNullAwarePartition();
+
   // Continues processing from null_aware_partition_. Called after we have finished
   // processing all build and probe input (including repartitioning them).
   Status OutputNullAwareProbeRows(RuntimeState* state, RowBatch* out_batch);
