@@ -227,6 +227,12 @@ Status ScalarFnCall::GetCodegendComputeFn(RuntimeState* state, llvm::Function** 
     *fn = ir_compute_fn_;
     return Status::OK;
   }
+  for (int i = 0; i < GetNumChildren(); ++i) {
+    if (children_[i]->type().type == TYPE_CHAR) {
+      *fn = NULL;
+      return Status("ScalarFnCall Codegen not supported for CHAR");
+    }
+  }
 
   LlvmCodeGen* codegen = state->codegen();
   DCHECK(codegen != NULL);

@@ -77,6 +77,7 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
 
       if (type.type == TYPE_CHAR) {
         StringValue::PadWithSpaces(str.ptr, buffer_len, str.len);
+        str.len = type.len;
       }
       // write back to the slot, if !IsVarLen() we already wrote to the slot
       if (type.IsVarLen()) {

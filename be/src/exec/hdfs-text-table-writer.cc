@@ -125,11 +125,12 @@ Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
         void* value = output_expr_ctxs_[j]->GetValue(current_row);
         if (value != NULL) {
           const ColumnType& type = output_expr_ctxs_[j]->root()->type();
-          if (type.IsVarLen()) {
-            PrintEscaped(reinterpret_cast<const StringValue*>(value));
-          } else if (type.type == TYPE_CHAR) {
-            StringValue sv(StringValue::CharSlotToPtr(value, type), type.len);
+          if (type.type == TYPE_CHAR) {
+            char* val_ptr = StringValue::CharSlotToPtr(value, type);
+            StringValue sv(val_ptr, StringValue::UnpaddedCharLength(val_ptr, type.len));
             PrintEscaped(&sv);
+          } else if (type.IsVarLen()) {
+            PrintEscaped(reinterpret_cast<const StringValue*>(value));
           } else {
             output_expr_ctxs_[j]->PrintValue(value, &rowbatch_stringstream_);
           }

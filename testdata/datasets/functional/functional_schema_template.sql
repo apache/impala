@@ -1332,6 +1332,23 @@ select * from functional.{table_name};
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+chars_tiny
+---- COLUMNS
+cs CHAR(5)
+cl CHAR(140)
+vc VARCHAR(32)
+---- ROW_FORMAT
+delimited fields terminated by ','
+---- LOAD
+`hadoop fs -mkdir -p /test-warehouse/chars_tiny && hadoop fs -put -f \
+${IMPALA_HOME}/testdata/data/chars-tiny.txt /test-warehouse/chars_tiny/
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name}
+select * from functional.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 widetable_250_cols
 ---- COLUMNS
 `${IMPALA_HOME}/testdata/common/widetable.py --get_columns -n 250

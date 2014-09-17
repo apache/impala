@@ -170,6 +170,7 @@ public class ScalarType extends Type {
       if (isWildcardChar()) return "CHAR(*)";
       return "CHAR(" + len_ + ")";
     } else  if (type_ == PrimitiveType.DECIMAL) {
+      if (isWildcardDecimal()) return "DECIMAL(*,*)";
       return "DECIMAL(" + precision_ + "," + scale_ + ")";
     } else if (type_ == PrimitiveType.VARCHAR) {
       if (isWildcardVarchar()) return "VARCHAR(*)";

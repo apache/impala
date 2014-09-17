@@ -106,4 +106,70 @@ select cshort, clong, vc from allchars_par
 char,char,string
 ---- RESULTS
 '12345','123456                                                                                                                                      ','12345'
+=======
+---- QUERY
+select count(*), count(cs), count(cl), count(vc) from chars_tiny
+---- TYPES
+bigint,bigint,bigint,bigint
+---- RESULTS
+9,8,8,8
+====
+---- QUERY
+select * from chars_tiny where cs = cast('6a' as CHAR(2))
+---- TYPES
+char,char,string
+---- RESULTS
+'6a   ','6b                                                                                                                                          ','6c'
+'6a   ','6b                                                                                                                                          ','6c'
+====
+---- QUERY
+select count(*) from chars_tiny where vc != cast('5c' as varchar(3))
+---- TYPES
+bigint
+---- RESULTS
+7
+====
+---- QUERY
+select count(*) from chars_tiny where cs != cast('a' as char(3))
+---- TYPES
+bigint
+---- RESULTS
+7
+====
+---- QUERY
+select count(DISTINCT cs) from chars_tiny where vc = cast('5c' as varchar(10))
+---- TYPES
+bigint
+---- RESULTS
+1
+====
+---- QUERY
+select count(DISTINCT cs) from chars_tiny where cs = cast('5a' as char(10))
+---- TYPES
+bigint
+---- RESULTS
+1
+====
+---- QUERY
+select cs, count(cl) from functional.chars_tiny group by cs having count(vc) > 1
+---- TYPES
+char, bigint
+---- RESULTS
+'6a   ',2
+====
+---- QUERY
+select A.cs from functional.chars_tiny as A, functional.chars_tiny as B where 
+cast(A.cs as char(1)) = cast(B.cl as char(1)) order by A.cs
+---- TYPES
+char
+---- RESULTS
+'1aaaa'
+'2aaaa'
+'3aaa '
+'4aa  '
+'5a   '
+'6a   '
+'6a   '
+'6a   '
+'6a   '
 ====

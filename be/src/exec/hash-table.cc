@@ -483,10 +483,9 @@ Function* HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build) {
     Function* expr_fn;
     Status status = ctxs[i]->root()->GetCodegendComputeFn(state, &expr_fn);
     if (!status.ok()) {
-      stringstream ss;
-      ss << "Problem with codegen: " << status.GetErrorMsg();
-      state->LogError(ss.str());
-      fn->eraseFromParent(); // deletes function
+      // TODO disabled because CHAR codegen can fail
+      //stringstream ss;
+      //ss << "Problem with codegen: " << status.GetErrorMsg();
       return NULL;
     }
 
@@ -752,7 +751,6 @@ Function* HashTableCtx::CodegenEquals(RuntimeState* state) {
   Value* row = args[1];
 
   BasicBlock* false_block = BasicBlock::Create(context, "false_block", fn);
-
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
     BasicBlock* null_block = BasicBlock::Create(context, "null", fn);
     BasicBlock* not_null_block = BasicBlock::Create(context, "not_null", fn);
@@ -762,10 +760,9 @@ Function* HashTableCtx::CodegenEquals(RuntimeState* state) {
     Function* expr_fn;
     Status status = build_expr_ctxs_[i]->root()->GetCodegendComputeFn(state, &expr_fn);
     if (!status.ok()) {
-      stringstream ss;
-      ss << "Problem with codegen: " << status.GetErrorMsg();
-      state->LogError(ss.str());
-      fn->eraseFromParent(); // deletes function
+      // TODO disabled because CHAR codegen can fail
+      //stringstream ss;
+      //ss << "Problem with codegen: " << status.GetErrorMsg();
       return NULL;
     }
 

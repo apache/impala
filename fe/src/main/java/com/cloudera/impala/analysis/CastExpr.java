@@ -104,6 +104,15 @@ public class CastExpr extends Expr {
               beSymbol, null, null, true));
           continue;
         }
+        if (fromType.getPrimitiveType() == PrimitiveType.CHAR
+            && toType.getPrimitiveType() == PrimitiveType.CHAR) {
+          // Allow casting from CHAR(N) to Char(N)
+          String beSymbol = "impala::CastFunctions::CastToChar";
+          db.addBuiltin(ScalarFunction.createBuiltin(getFnName(ScalarType.CHAR),
+              Lists.newArrayList((Type) ScalarType.createCharType(-1)), false,
+              ScalarType.CHAR, beSymbol, null, null, true));
+          continue;
+        }
         if (fromType.getPrimitiveType() == PrimitiveType.VARCHAR
             && toType.getPrimitiveType() == PrimitiveType.VARCHAR) {
           // Allow casting from VARCHAR(N) to VARCHAR(M)

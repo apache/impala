@@ -1,0 +1,9 @@
+1aaaa,1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,1cccc
+2aaaaaa,2bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,2cccccc
+3aaa,3bbbbb,3ccc
+4aa,4bbbb,4cc
+5a,5bbb,5c
+\N,\N,\N
+6a,6b,6c
+6a,6b,6c
+a,b,c

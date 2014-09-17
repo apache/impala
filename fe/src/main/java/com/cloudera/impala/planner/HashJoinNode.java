@@ -147,12 +147,18 @@ public class HashJoinNode extends PlanNode {
       Type t0 = eqPred.getChild(0).getType();
       Type t1 = eqPred.getChild(1).getType();
       if (!t0.matchesType(t1)) {
-        // With decimal types, the child types do not have to match because the equality
-        // builtin handles it. However, they will not hash correctly so insert a cast.
-        Preconditions.checkState(t0.isDecimal());
-        Preconditions.checkState(t1.isDecimal());
+        // With decimal and char types, the child types do not have to match because
+        // the equality builtin handles it. However, they will not hash correctly so
+        // insert a cast.
+        boolean bothDecimal = t0.isDecimal() && t1.isDecimal();
+        boolean bothString = t0.isStringType() && t1.isStringType();
+        if (!bothDecimal && !bothString) {
+          throw new InternalException("Cannot compare " +
+              t0.toSql() + " to " + t1.toSql() + " in join predicate.");
+        }
         Type compatibleType = Type.getAssignmentCompatibleType(t0, t1);
-        Preconditions.checkState(compatibleType.isDecimal());
+        Preconditions.checkState(compatibleType.isDecimal() ||
+            compatibleType.isStringType());
         try {
           if (!t0.equals(compatibleType)) {
             eqPred.setChild(0, eqPred.getChild(0).castTo(compatibleType));
