@@ -329,3 +329,24 @@ select count(*), COUNT(distinct 1) from alltypesagg
 ---- TYPES
 bigint, bigint
 ====
+---- QUERY
+# Test distinct + non-distinct aggregation with intermediate tuples (IMPALA-1247).
+select avg(int_col), count(int_col), avg(distinct bigint_col)
+from functional.alltypes
+---- RESULTS
+4.5,7300,45
+---- TYPES
+double, bigint, double
+====
+---- QUERY
+# Test distinct + non-distinct aggregation with intermediate tuples (IMPALA-1247).
+select bool_col, avg(int_col), count(int_col), avg(distinct bigint_col)
+from functional.alltypes
+group by bool_col
+order by bool_col
+---- RESULTS
+false,5,3650,50
+true,4,3650,40
+---- TYPES
+boolean, double, bigint, double
+====

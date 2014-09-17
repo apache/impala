@@ -399,7 +399,8 @@ public class AggregateInfo extends AggregateInfoBase {
       throws AnalysisException, InternalException {
     Preconditions.checkState(secondPhaseDistinctAggInfo_ == null);
     Preconditions.checkState(!distinctAggExprs.isEmpty());
-    TupleDescriptor inputDesc = outputTupleDesc_;
+    // The output of the 1st phase agg is the 1st phase intermediate.
+    TupleDescriptor inputDesc = intermediateTupleDesc_;
 
     // construct agg exprs for original DISTINCT aggregate functions
     // (these aren't part of aggExprs_)
@@ -440,11 +441,11 @@ public class AggregateInfo extends AggregateInfoBase {
     for (int i = 0; i < aggregateExprs_.size(); ++i) {
       FunctionCallExpr inputExpr = aggregateExprs_.get(i);
       Preconditions.checkState(inputExpr.isAggregateFunction());
-      // we're aggregating an output slot of the 1st agg phase
+      // we're aggregating an intermediate slot of the 1st agg phase
       Expr aggExprParam =
           new SlotRef(inputDesc.getSlots().get(i + getGroupingExprs().size()));
-      FunctionCallExpr aggExpr =
-          FunctionCallExpr.createMergeAggCall(inputExpr, Lists.newArrayList(aggExprParam));
+      FunctionCallExpr aggExpr = FunctionCallExpr.createMergeAggCall(
+          inputExpr, Lists.newArrayList(aggExprParam));
       secondPhaseAggExprs.add(aggExpr);
     }
     Preconditions.checkState(
@@ -462,7 +463,7 @@ public class AggregateInfo extends AggregateInfoBase {
     }
 
     ArrayList<Expr> substGroupingExprs =
-        Expr.substituteList(origGroupingExprs, outputTupleSmap_, analyzer);
+        Expr.substituteList(origGroupingExprs, intermediateTupleSmap_, analyzer);
     secondPhaseDistinctAggInfo_ =
         new AggregateInfo(substGroupingExprs, secondPhaseAggExprs, AggPhase.SECOND);
     secondPhaseDistinctAggInfo_.createTupleDescs(analyzer);

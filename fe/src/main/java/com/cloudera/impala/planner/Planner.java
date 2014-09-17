@@ -851,6 +851,8 @@ public class Planner {
             nodeIdGenerator_.getNextId(), node.getChild(0), mergeAggInfo);
     mergeAggNode.init(analyzer);
     mergeAggNode.unsetNeedsFinalize();
+    // The output of the 1st phase agg is the 1st phase intermediate.
+    mergeAggNode.setIntermediateTuple();
     mergeFragment.addPlanRoot(mergeAggNode);
     // the 2nd-phase aggregation consumes the output of the merge agg;
     // if there is a limit, it had already been placed with the 2nd aggregation
