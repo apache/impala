@@ -122,6 +122,7 @@ public class Planner {
       analyzer.materializeSlots(queryStmt.getBaseTblResultExprs());
     }
 
+    LOG.trace("desctbl: " + analyzer.getDescTbl().debugString());
     PlanNode singleNodePlan = createQueryPlan(queryStmt, analyzer,
         queryOptions.isDisable_outermost_topn());
     Preconditions.checkNotNull(singleNodePlan);
@@ -170,8 +171,8 @@ public class Planner {
           rootFragment.getPlanRoot().getOutputSmap(), analyzer);
       rootFragment.setOutputExprs(resultExprs);
     }
-    LOG.info("desctbl: " + analyzer.getDescTbl().debugString());
-    LOG.info("resultexprs: " + Expr.debugString(rootFragment.getOutputExprs()));
+    LOG.debug("desctbl: " + analyzer.getDescTbl().debugString());
+    LOG.debug("resultexprs: " + Expr.debugString(rootFragment.getOutputExprs()));
 
     LOG.debug("finalize plan fragments");
     for (PlanFragment fragment: fragments) {
@@ -1037,6 +1038,8 @@ public class Planner {
   /**
    * If there are unassigned conjuncts_ that are bound by tupleIds_, returns a SelectNode
    * on top of root that evaluate those conjuncts_; otherwise returns root unchanged.
+   * TODO: change this to assign the unassigned conjuncts to root itself, if that is
+   * semantically correct
    */
   private PlanNode addUnassignedConjuncts(
       Analyzer analyzer, List<TupleId> tupleIds, PlanNode root)
@@ -1461,10 +1464,21 @@ public class Planner {
     // via the equality predicates created for the view's select list.
     // Include outer join conjuncts here as well because predicates from the
     // On-clause of an outer join may be pushed into the inline view as well.
+    //
+    // Limitations on predicate propagation into inline views:
+    // If the inline view computes analytic functions, we cannot push any
+    // predicate into the inline view tree (see IMPALA-1243). The reason is that
+    // analytic functions compute aggregates over their entire input, and applying
+    // filters from the enclosing scope *before* the aggregate computation would
+    // alter the results. This is unlike regular aggregate computation, which only
+    // makes the *output* of the computation visible to the enclosing scope, so that
+    // filters from the enclosing scope can be safely applied (to the grouping cols, say)
     List<Expr> unassigned =
         analyzer.getUnassignedConjuncts(inlineViewRef.getId().asList(), true);
     if (!inlineViewRef.getViewStmt().hasLimit()
-        && !inlineViewRef.getViewStmt().hasOffset()) {
+        && !inlineViewRef.getViewStmt().hasOffset()
+        && (!(inlineViewRef.getViewStmt() instanceof SelectStmt)
+            || !((SelectStmt)(inlineViewRef.getViewStmt())).hasAnalyticInfo())) {
       // check if we can evaluate them
       List<Expr> preds = Lists.newArrayList();
       for (Expr e: unassigned) {

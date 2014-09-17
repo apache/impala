@@ -226,6 +226,9 @@ public class Analyzer {
     public final LinkedHashMap<String, Integer> warnings =
         new LinkedHashMap<String, Integer>();
 
+    public final IdGenerator<EquivalenceClassId> equivClassIdGenerator =
+        EquivalenceClassId.createGenerator();
+
     // map from equivalence class id to the list of its member slots
     private final Map<EquivalenceClassId, ArrayList<SlotId>> equivClassMembers =
         Maps.newHashMap();
@@ -1375,10 +1378,8 @@ public class Analyzer {
 
     // we start out by assigning each slot to its own equiv class
     int numSlots = globalState_.descTbl.getMaxSlotId().asInt() + 1;
-    IdGenerator<EquivalenceClassId> equivClassIdGenerator =
-        EquivalenceClassId.createGenerator();
     for (int i = 0; i < numSlots; ++i) {
-      EquivalenceClassId id = equivClassIdGenerator.getNextId();
+      EquivalenceClassId id = globalState_.equivClassIdGenerator.getNextId();
       globalState_.equivClassMembers.put(id, Lists.newArrayList(new SlotId(i)));
     }
 
@@ -1829,25 +1830,17 @@ public class Analyzer {
   }
 
   /**
-   * Updates the value transfer graph and the equivalence classes with the given list of
-   * mutual value transfers between slots. The first element of each pair must be an
-   * existing slot id already in the value transfer graph and the second element must be
-   * a new slot id not yet in the value transfer graph.
-   * Requires an existing value transfer graph.
+   * Assign all remaining unassigned slots to their own equivalence classes.
    */
-  public void bulkUpdateValueTransfers(List<Pair<SlotId, SlotId>> mutualValueTransfers) {
-    Preconditions.checkNotNull(globalState_.valueTransferGraph);
-    globalState_.valueTransferGraph.bulkUpdate(mutualValueTransfers);
-    for (Pair<SlotId, SlotId> valTrans: mutualValueTransfers) {
-      SlotId existingSid = valTrans.first;
-      SlotId newSid = valTrans.second;
-      // Update equivalence class of existingSid to include newSid.
-      EquivalenceClassId eqClassId = globalState_.equivClassBySlotId.get(existingSid);
-      Preconditions.checkNotNull(eqClassId);
-      ArrayList<SlotId> eqClassMembers = globalState_.equivClassMembers.get(eqClassId);
-      Preconditions.checkNotNull(eqClassMembers);
-      eqClassMembers.add(newSid);
-      globalState_.equivClassBySlotId.put(newSid, eqClassId);
+  public void createIdentityEquivClasses() {
+    int numSlots = globalState_.descTbl.getMaxSlotId().asInt() + 1;
+    for (int i = 0; i < numSlots; ++i) {
+      SlotId slotId = new SlotId(i);
+      if (globalState_.equivClassBySlotId.get(slotId) == null) {
+        EquivalenceClassId classId = globalState_.equivClassIdGenerator.getNextId();
+        globalState_.equivClassMembers.put(classId, Lists.newArrayList(slotId));
+        globalState_.equivClassBySlotId.put(slotId, classId);
+      }
     }
   }
 

@@ -97,7 +97,6 @@ public class AnalyticPlanner {
   /**
    * Augment planFragment with plan nodes that implement single-node evaluation of
    * the AnalyticExprs in analyticInfo.
-   * TODO: deal with OrderByElements, not just ordering exprs
    * TODO: create partition groups that are not based on set identity: the subset
    * of partition exprs common to the partition group should be large enough to
    * parallelize across all machines
@@ -114,21 +113,8 @@ public class AnalyticPlanner {
       }
     }
 
-    // Bulk update the value transfer graph and equivalence classes based on the new
-    // physical output slots of all window groups.
-    List<Pair<SlotId, SlotId>> newMutualValueTransfers = Lists.newArrayList();
-    for (WindowGroup windowGroup: windowGroups) {
-      ExprSubstitutionMap smap = windowGroup.logicalToPhysicalSmap;
-      for (int i = 0; i < smap.getLhs().size(); ++i) {
-        Preconditions.checkState(smap.getLhs().get(i) instanceof SlotRef);
-        Preconditions.checkState(smap.getRhs().get(i) instanceof SlotRef);
-        SlotRef lhs = (SlotRef) smap.getLhs().get(i);
-        SlotRef rhs = (SlotRef) smap.getRhs().get(i);
-        newMutualValueTransfers.add(
-            new Pair<SlotId, SlotId>(lhs.getSlotId(), rhs.getSlotId()));
-      }
-    }
-    analyzer_.bulkUpdateValueTransfers(newMutualValueTransfers);
+    // create equiv classes for newly added slots
+    analyzer_.createIdentityEquivClasses();
 
     return root;
   }

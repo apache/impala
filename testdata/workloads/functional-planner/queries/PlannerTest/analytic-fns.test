@@ -664,12 +664,14 @@ select b from
    from functional.alltypes) v
 where e < 10
 ---- PLAN
+05:SELECT
+|  predicates: count(1) < 10
+|
 04:ANALYTIC
 |  functions: count(1)
 |  partition by: bool_col
 |  order by: string_col ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
-|  predicates: count(1) < 10
 |
 03:SORT
 |  order by: bool_col ASC NULLS FIRST, string_col ASC
@@ -684,19 +686,21 @@ where e < 10
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-07:EXCHANGE [UNPARTITIONED]
+08:EXCHANGE [UNPARTITIONED]
+|
+05:SELECT
+|  predicates: count(1) < 10
 |
 04:ANALYTIC
 |  functions: count(1)
 |  partition by: bool_col
 |  order by: string_col ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
-|  predicates: count(1) < 10
 |
 03:SORT
 |  order by: bool_col ASC NULLS FIRST, string_col ASC
 |
-06:EXCHANGE [HASH(bool_col)]
+07:EXCHANGE [HASH(bool_col)]
 |
 02:ANALYTIC
 |  functions: sum(int_col)
@@ -705,7 +709,7 @@ where e < 10
 01:SORT
 |  order by: bigint_col ASC NULLS FIRST
 |
-05:EXCHANGE [HASH(bigint_col)]
+06:EXCHANGE [HASH(bigint_col)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -868,6 +872,7 @@ where int_col in
    partitions=4/4 size=460B
 ====
 # test conjunct assignment and slot materialization due to conjuncts
+# (see IMPALA-1243)
 select 1 from
   (select bigint_col,
    min(int_col) over() a,
@@ -877,12 +882,12 @@ select 1 from
                      rows between unbounded preceding and 1 following) d,
    avg(int_col) over(partition by bigint_col order by id
                      rows between unbounded preceding and 2 following) e
-   from functional.alltypes) v
-where
+   from functional.alltypes
 # assigned in scan
+   where int_col between 5 and 10) v
+where
+# assigned to separate Select node
   v.bigint_col > 10 and
-# assigned in bottom-most analytic node that materializes the lhs slots
-# (rhs slot is materialized by the scan)
   v.a < 1 and
   v.a < v.bigint_col + 1 and
   v.b < 2 and
@@ -893,24 +898,24 @@ where
   v.d < v.bigint_col + 4 and
   v.e < 5 and
   v.e < v.bigint_col + 5 and
-# assigned in bottom-most analytic node that materializes the lhs and rhs slots
   v.a != v.c and
   v.a != v.e and
   v.b != v.c
 ---- PLAN
+07:SELECT
+|  predicates: bigint_col > 10, min(int_col) < 1, min(int_col) < bigint_col + 1, max(int_col) < 2, max(int_col) < bigint_col + 2, count(int_col) < 3, count(int_col) < bigint_col + 3, sum(int_col) < 4, sum(int_col) < bigint_col + 4, avg(int_col) < 5, avg(int_col) < bigint_col + 5, min(int_col) != count(int_col), min(int_col) != avg(int_col), max(int_col) != count(int_col)
+|
 06:ANALYTIC
 |  functions: avg(int_col)
 |  partition by: bigint_col
 |  order by: id ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 FOLLOWING
-|  predicates: avg(int_col) < bigint_col + 5, avg(int_col) < 5, min(int_col) != avg(int_col)
 |
 05:ANALYTIC
 |  functions: sum(int_col)
 |  partition by: bigint_col
 |  order by: id ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
-|  predicates: sum(int_col) < bigint_col + 4, sum(int_col) < 4
 |
 04:SORT
 |  order by: bigint_col ASC NULLS FIRST, id ASC
@@ -918,20 +923,19 @@ where
 03:ANALYTIC
 |  functions: max(int_col), count(int_col)
 |  partition by: bool_col
-|  predicates: max(int_col) < bigint_col + 2, count(int_col) < bigint_col + 3, max(int_col) < 2, count(int_col) < 3, min(int_col) != count(int_col), max(int_col) != count(int_col)
 |
 02:SORT
 |  order by: bool_col ASC NULLS FIRST
 |
 01:ANALYTIC
 |  functions: min(int_col)
-|  predicates: min(int_col) < bigint_col + 1, min(int_col) < 1
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
-   predicates: functional.alltypes.bigint_col > 10
+   predicates: int_col >= 5, int_col <= 10
 ====
 # test predicate propagation onto and through analytic nodes
+# TODO: allow AnalyticEvalNode to apply a < 20
 select 1 from
   (select id, int_col, bigint_col,
    sum(int_col) over(partition by bigint_col order by id
@@ -955,14 +959,12 @@ where t2.id < 10 and t2.int_col < 20
 |  partition by: bigint_col
 |  order by: id ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
-|  predicates: sum(int_col) < 20
 |
 01:SORT
 |  order by: bigint_col ASC NULLS FIRST, id ASC
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
-   predicates: functional.alltypes.id < 10
 ====
 # test that predicates are correctly propagated in the presence of outer joins
 # (i.e., no predicates should be propagated in this query)
@@ -1250,5 +1252,27 @@ from functional.alltypesagg
 |  order by: tinyint_col ASC NULLS FIRST, id ASC NULLS LAST, bool_col DESC NULLS FIRST
 |
 00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 size=814.73KB
+====
+# IMPALA-1229
+select DENSE_RANK() OVER (ORDER BY t1.day ASC)
+FROM functional.alltypesagg t1
+WHERE EXISTS (SELECT t1.year AS int_col_1 FROM functional.alltypesagg t1)
+---- PLAN
+04:ANALYTIC
+|  functions: dense_rank()
+|  order by: day ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+03:SORT
+|  order by: day ASC
+|
+02:CROSS JOIN [BROADCAST]
+|
+|--01:SCAN HDFS [functional.alltypesagg t1]
+|     partitions=11/11 size=814.73KB compact
+|     limit: 1
+|
+00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 size=814.73KB
 ====

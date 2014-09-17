@@ -118,28 +118,9 @@ public class AnalyticEvalNode extends PlanNode {
     outputSmap_ = logicalToPhysicalSmap_;
     createDefaultSmap(analyzer);
 
-    // Gather candidate conjuncts from propagated predicates (bound by the logical
-    // analytic output tuple) as well as unassigned conjuncts bound by the stmtTupleIds.
-    List<Expr> boundConjuncts = analyzer.getBoundPredicates(logicalTupleDesc_.getId());
-    List<Expr> candidateConjuncts = analyzer.getUnassignedConjuncts(stmtTupleIds_, true);
-    candidateConjuncts.addAll(boundConjuncts);
-
-    // Resolve candidate conjuncts against our outputSmap_.
-    List<Expr> resolvedCandidateConjuncts =
-        Expr.substituteList(candidateConjuncts, outputSmap_, analyzer);
-
-    // Assign conjuncts to the bottom-most analytic node that can evaluate them.
-    ArrayList<TupleId> inputTids = Lists.newArrayList(getChild(0).getTupleIds());
-    for (Expr e: resolvedCandidateConjuncts) {
-      // A conjunct can be evaluated by this node if it is bound by the tuples
-      // materialized by this node. Ignore the conjunct if it can also be evaluated
-      // by our input node (it has already been assigned there). Note that
-      // getBoundPredicates() may return predicates based on already assigned conjuncts.
-      if (e.isBoundByTupleIds(tupleIds_) && !e.isBoundByTupleIds(inputTids)) {
-        conjuncts_.add(e);
-        analyzer.markConjunctAssigned(e);
-      }
-    }
+    // Do not assign any conjuncts here: the conjuncts out of our SelectStmt's
+    // Where clause have already been assigned, and conjuncts coming out of an
+    // enclosing scope need to be evaluated *after* all analytic computations.
 
     // do this at the end so it can take all conjuncts into account
     computeStats(analyzer);
