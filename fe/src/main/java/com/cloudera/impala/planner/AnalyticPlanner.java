@@ -15,6 +15,7 @@
 package com.cloudera.impala.planner;
 
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -33,7 +34,6 @@ import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.IsNullPredicate;
 import com.cloudera.impala.analysis.OrderByElement;
 import com.cloudera.impala.analysis.SlotDescriptor;
-import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.analysis.TupleDescriptor;
@@ -41,7 +41,6 @@ import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -100,12 +99,19 @@ public class AnalyticPlanner {
    * TODO: create partition groups that are not based on set identity: the subset
    * of partition exprs common to the partition group should be large enough to
    * parallelize across all machines
-   * TODO: unpartitioned partition groups should go last
    */
   public PlanNode createSingleNodePlan(PlanNode root) throws ImpalaException {
     List<WindowGroup> windowGroups = collectWindowGroups();
+    for (WindowGroup g: windowGroups) {
+      g.init(analyzer_);
+    }
     List<SortGroup> sortGroups = collectSortGroups(windowGroups);
+    mergeSortGroups(sortGroups);
+    for (SortGroup g: sortGroups) {
+      g.init();
+    }
     List<PartitionGroup> partitionGroups = collectPartitionGroups(sortGroups);
+    orderGroups(partitionGroups);
 
     for (PartitionGroup partitionGroup: partitionGroups) {
       for (int i = 0; i < partitionGroup.sortGroups.size(); ++i) {
@@ -117,6 +123,62 @@ public class AnalyticPlanner {
     analyzer_.createIdentityEquivClasses();
 
     return root;
+  }
+
+  /**
+   * Coalesce sort groups that have compatible partition-by exprs and
+   * have a prefix relationship.
+   */
+  private void mergeSortGroups(List<SortGroup> sortGroups) {
+    boolean hasMerged = false;
+    do {
+      hasMerged = false;
+      for (SortGroup sg1: sortGroups) {
+        for (SortGroup sg2: sortGroups) {
+          if (sg1 != sg2 && sg1.isPrefixOf(sg2)) {
+            sg1.absorb(sg2);
+            sortGroups.remove(sg2);
+            hasMerged = true;
+            break;
+          }
+        }
+        if (hasMerged) break;
+      }
+    } while (hasMerged);
+  }
+
+  /**
+   * Order partition groups (and the sort groups within them) by increasing
+   * totalOutputTupleSize. This minimizes the total volume of data that needs to be
+   * repartitioned and sorted.
+   * Also move the non-partitioning partition group to the end.
+   */
+  private void orderGroups(List<PartitionGroup> partitionGroups) {
+    // remove the non-partitioning group from partitionGroups
+    PartitionGroup nonPartitioning = null;
+    for (PartitionGroup pg: partitionGroups) {
+      if (pg.partitionByExprs.isEmpty()) {
+        nonPartitioning = pg;
+        break;
+      }
+    }
+    if (nonPartitioning != null) partitionGroups.remove(nonPartitioning);
+
+    // order by ascending combined output tuple size
+    Collections.sort(partitionGroups,
+        new Comparator<PartitionGroup>() {
+          public int compare(PartitionGroup pg1, PartitionGroup pg2) {
+            Preconditions.checkState(pg1.totalOutputTupleSize > 0);
+            Preconditions.checkState(pg2.totalOutputTupleSize > 0);
+            int diff = pg1.totalOutputTupleSize - pg2.totalOutputTupleSize;
+            return (diff < 0 ? -1 : (diff > 0 ? 1 : 0));
+          }
+        });
+    if (nonPartitioning != null) partitionGroups.add(nonPartitioning);
+
+    for (PartitionGroup pg: partitionGroups) {
+      pg.orderSortGroups();
+    }
   }
 
   /**
@@ -159,10 +221,11 @@ public class AnalyticPlanner {
       boolean isFirstInPartition) throws ImpalaException {
     List<Expr> partitionByExprs = sortGroup.partitionByExprs;
     List<OrderByElement> orderByElements = sortGroup.orderByElements;
-    SortNode sortNode = null;
-    Expr partitionByLessThan = null;
-    Expr orderByLessThan = null;
+    ExprSubstitutionMap sortSmap = null;
+    TupleId sortTupleId = null;
     TupleDescriptor bufferedTupleDesc = null;
+    // map from input to buffered tuple
+    ExprSubstitutionMap bufferedSmap = new ExprSubstitutionMap();
 
     // sort on partition by (pb) + order by (ob) exprs and create pb/ob predicates
     if (!partitionByExprs.isEmpty() || !orderByElements.isEmpty()) {
@@ -182,8 +245,12 @@ public class AnalyticPlanner {
       }
 
       SortInfo sortInfo = createSortInfo(root, sortExprs, isAsc, nullsFirst);
-      sortNode = new SortNode(idGenerator_.getNextId(), root, sortInfo, false, 0);
-      sortNode.setIsAnalyticSort(true);
+      SortNode sortNode =
+          new SortNode(idGenerator_.getNextId(), root, sortInfo, false, 0);
+
+      // if this sort group does not have partitioning exprs, we want the sort
+      // to be executed like a regular distributed sort
+      if (!partitionByExprs.isEmpty()) sortNode.setIsAnalyticSort(true);
 
       if (isFirstInPartition) {
         // create required input partition
@@ -197,20 +264,13 @@ public class AnalyticPlanner {
 
       root = sortNode;
       root.init(analyzer_);
+      sortSmap = sortNode.getOutputSmap();
 
-      // Create partition-by (pb) and order-by (ob) less-than predicates between the
-      // input tuple (the output of the preceding sort) and a buffered tuple that is
-      // identical to the input tuple. We need a different tuple descriptor for the
-      // buffered tuple because the generated predicates should compare two different
-      // tuple instances from the same input stream (i.e., the predicates should be
-      // evaluated over a row that is composed of the input and the buffered tuple).
-      // First, create the output tuple for this particular group of AnalyticExprs.
-      TupleId sortTupleId = sortNode.tupleIds_.get(0);
+      // create bufferedTupleDesc and bufferedSmap
+      sortTupleId = sortNode.tupleIds_.get(0);
       bufferedTupleDesc = analyzer_.getDescTbl().copyTupleDescriptor(sortTupleId);
       LOG.trace("desctbl: " + analyzer_.getDescTbl().debugString());
 
-      // map from input to buffered tuple
-      ExprSubstitutionMap bufferedSmap = new ExprSubstitutionMap();
       List<SlotDescriptor> inputSlots = analyzer_.getTupleDesc(sortTupleId).getSlots();
       List<SlotDescriptor> bufferedSlots = bufferedTupleDesc.getSlots();
       for (int i = 0; i < inputSlots.size(); ++i) {
@@ -218,44 +278,41 @@ public class AnalyticPlanner {
             new SlotRef(inputSlots.get(i)), new SlotRef(bufferedSlots.get(i)));
       }
 
-      // pb/ob predicates compare the output of the preceding sort to our
-      // buffered input; we need to remap the pb/ob exprs to a) the sort output,
-      // b) our buffer of the sort input
-      ExprSubstitutionMap sortSmap = sortNode.getOutputSmap();
-      LOG.trace("sort smap: " + sortSmap.debugString());
-      if (sortNode.getChild(0).getOutputSmap() != null) {
-        LOG.trace("sort child smap: " +
-            sortNode.getChild(0).getOutputSmap().debugString());
-      }
-      if (!partitionByExprs.isEmpty()) {
+    }
+
+    // create one AnalyticEvalNode per window group
+    for (WindowGroup windowGroup: sortGroup.windowGroups) {
+      // Create partition-by (pb) and order-by (ob) less-than predicates between the
+      // input tuple (the output of the preceding sort) and a buffered tuple that is
+      // identical to the input tuple. We need a different tuple descriptor for the
+      // buffered tuple because the generated predicates should compare two different
+      // tuple instances from the same input stream (i.e., the predicates should be
+      // evaluated over a row that is composed of the input and the buffered tuple).
+
+      // we need to remap the pb/ob exprs to a) the sort output, b) our buffer of the
+      // sort input
+      Expr partitionByLessThan = null;
+      if (!windowGroup.partitionByExprs.isEmpty()) {
         partitionByLessThan = createExprLessThan(
-            Expr.substituteList(partitionByExprs, sortSmap, analyzer_),
+            Expr.substituteList(windowGroup.partitionByExprs, sortSmap, analyzer_),
             sortTupleId, bufferedSmap);
         LOG.trace("partitionByLt: " + partitionByLessThan.debugString());
       }
-      if (!orderByElements.isEmpty()) {
+      Expr orderByLessThan = null;
+      if (!windowGroup.orderByElements.isEmpty()) {
         orderByLessThan = createLessThan(
-            OrderByElement.substitute(orderByElements, sortSmap, analyzer_),
+            OrderByElement.substitute(windowGroup.orderByElements, sortSmap, analyzer_),
             sortTupleId, bufferedSmap);
         LOG.trace("orderByLt: " + orderByLessThan.debugString());
       }
-    }
 
-    // Create physical intermediate and output tuples plus smap for every window group.
-    // TODO: The current solution is easy to handle and reason about in the FE/BE.
-    // Consider creating only a single physical output tuple for all window
-    // groups, although it's not always a clear win due to spilling.
-    for (WindowGroup windowGroup: sortGroup.windowGroups) {
-      windowGroup.finalize(analyzer_);
-
-      // create one AnalyticEvalNode per window group
       root = new AnalyticEvalNode(idGenerator_.getNextId(), root, stmtTupleIds_,
-          windowGroup.analyticFnCalls, windowGroup.partitionByExprs, orderByElements,
+          windowGroup.analyticFnCalls, windowGroup.partitionByExprs,
+          windowGroup.orderByElements,
           windowGroup.window, analyticInfo_.getOutputTupleDesc(),
           windowGroup.physicalIntermediateTuple,
           windowGroup.physicalOutputTuple, windowGroup.logicalToPhysicalSmap,
-          partitionByLessThan, orderByLessThan,
-          bufferedTupleDesc);
+          partitionByLessThan, orderByLessThan, bufferedTupleDesc);
       root.init(analyzer_);
     }
     return root;
@@ -347,7 +404,7 @@ public class AnalyticPlanner {
 
     // Physical output and intermediate tuples as well as an smap that maps the
     // corresponding logical output slots to their physical slots in physicalOutputTuple.
-    // Set in finalize().
+    // Set in init().
     public TupleDescriptor physicalOutputTuple;
     public TupleDescriptor physicalIntermediateTuple;
     public final ExprSubstitutionMap logicalToPhysicalSmap = new ExprSubstitutionMap();
@@ -391,11 +448,11 @@ public class AnalyticPlanner {
     }
 
     /**
-     * Sets the physical output and intermediate tuples as well as the logical to
+     * Creates the physical output and intermediate tuples as well as the logical to
      * physical smap for this window group. Computes the mem layout for the tuple
      * descriptors.
      */
-    public void finalize(Analyzer analyzer) {
+    public void init(Analyzer analyzer) {
       Preconditions.checkState(physicalOutputTuple == null);
       Preconditions.checkState(physicalIntermediateTuple == null);
       Preconditions.checkState(analyticFnCalls.size() == analyticExprs.size());
@@ -475,6 +532,9 @@ public class AnalyticPlanner {
     public List<OrderByElement> orderByElements;
     public List<WindowGroup> windowGroups = Lists.newArrayList();
 
+    // sum of windowGroups.physicalOutputTuple.getByteSize()
+    public int totalOutputTupleSize = -1;
+
     public SortGroup(WindowGroup windowGroup) {
       partitionByExprs = windowGroup.partitionByExprs;
       orderByElements = windowGroup.orderByElements;
@@ -492,6 +552,71 @@ public class AnalyticPlanner {
     public void add(WindowGroup windowGroup) {
       Preconditions.checkState(isCompatible(windowGroup));
       windowGroups.add(windowGroup);
+    }
+
+    /**
+     * Return true if 'this' and other have compatible partition exprs and
+     * our orderByElements are a prefix of other's.
+     */
+    public boolean isPrefixOf(SortGroup other) {
+      if (other.orderByElements.size() > orderByElements.size()) return false;
+      if (!Expr.equalSets(partitionByExprs, other.partitionByExprs)) return false;
+      for (int i = 0; i < other.orderByElements.size(); ++i) {
+        OrderByElement ob = orderByElements.get(i);
+        OrderByElement otherOb = other.orderByElements.get(i);
+        // TODO: compare equiv classes by comparing each equiv class's placeholder
+        // slotref
+        if (!ob.getExpr().equals(otherOb.getExpr())) return false;
+        if (ob.isAsc() != otherOb.isAsc()) return false;
+        if (ob.nullsFirst() != otherOb.nullsFirst()) return false;
+      }
+      return true;
+    }
+
+    /**
+     * Adds other's window groups to ours, assuming that we're a prefix of other.
+     */
+    public void absorb(SortGroup other) {
+      Preconditions.checkState(isPrefixOf(other));
+      windowGroups.addAll(other.windowGroups);
+    }
+
+    /**
+     * Compute totalOutputTupleSize.
+     */
+    public void init() {
+      totalOutputTupleSize = 0;
+      for (WindowGroup g: windowGroups) {
+        TupleDescriptor outputTuple = g.physicalOutputTuple;
+        Preconditions.checkState(outputTuple.isMaterialized());
+        Preconditions.checkState(outputTuple.getByteSize() != -1);
+        totalOutputTupleSize += outputTuple.getByteSize();
+      }
+    }
+
+    private static class SizeLt implements Comparator<WindowGroup> {
+      public int compare(WindowGroup wg1, WindowGroup wg2) {
+        Preconditions.checkState(wg1.physicalIntermediateTuple != null
+            && wg1.physicalIntermediateTuple.getByteSize() != -1);
+        Preconditions.checkState(wg2.physicalIntermediateTuple != null
+            && wg2.physicalIntermediateTuple.getByteSize() != -1);
+        int diff = wg1.physicalIntermediateTuple.getByteSize()
+            - wg2.physicalIntermediateTuple.getByteSize();
+        return (diff < 0 ? -1 : (diff > 0 ? 1 : 0));
+      }
+    }
+
+    private static final SizeLt SIZE_LT;
+    static {
+      SIZE_LT = new SizeLt();
+    }
+
+    /**
+     * Order window groups by increasing size of the intermediate tuple. This minimizes
+     * the total volume of data that needs to be buffered.
+     */
+    public void orderWindowGroups() {
+      Collections.sort(windowGroups, SIZE_LT);
     }
   }
 
@@ -521,9 +646,13 @@ public class AnalyticPlanner {
     public List<Expr> partitionByExprs;
     public List<SortGroup> sortGroups = Lists.newArrayList();
 
+    // sum of sortGroups.windowGroups.physicalOutputTuple.getByteSize()
+    public int totalOutputTupleSize = -1;
+
     public PartitionGroup(SortGroup sortGroup) {
       partitionByExprs = sortGroup.partitionByExprs;
       sortGroups.add(sortGroup);
+      totalOutputTupleSize = sortGroup.totalOutputTupleSize;
     }
 
     /**
@@ -537,6 +666,26 @@ public class AnalyticPlanner {
     public void add(SortGroup sortGroup) {
       Preconditions.checkState(isCompatible(sortGroup));
       sortGroups.add(sortGroup);
+      totalOutputTupleSize += sortGroup.totalOutputTupleSize;
+    }
+
+    /**
+     * Order sort groups by increasing totalOutputTupleSize. This minimizes the total
+     * volume of data that needs to be sorted.
+     */
+    public void orderSortGroups() {
+      Collections.sort(sortGroups,
+          new Comparator<SortGroup>() {
+            public int compare(SortGroup sg1, SortGroup sg2) {
+              Preconditions.checkState(sg1.totalOutputTupleSize > 0);
+              Preconditions.checkState(sg2.totalOutputTupleSize > 0);
+              int diff = sg1.totalOutputTupleSize - sg2.totalOutputTupleSize;
+              return (diff < 0 ? -1 : (diff > 0 ? 1 : 0));
+            }
+          });
+      for (SortGroup sortGroup: sortGroups) {
+        sortGroup.orderWindowGroups();
+      }
     }
   }
 

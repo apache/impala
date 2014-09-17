@@ -1,3 +1,283 @@
+# unpartitioned analytics are executed with distributed sorts
+# TODO: avoid resorting on the same exprs
+select
+max(int_col) over(partition by int_col),
+min(int_col) over(order by int_col)
+from functional.alltypes
+---- PLAN
+04:ANALYTIC
+|  functions: min(int_col)
+|  order by: int_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+03:SORT
+|  order by: int_col ASC
+|
+02:ANALYTIC
+|  functions: max(int_col)
+|  partition by: int_col
+|
+01:SORT
+|  order by: int_col ASC NULLS FIRST
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+04:ANALYTIC
+|  functions: min(int_col)
+|  order by: int_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+06:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: int_col ASC
+|
+03:SORT
+|  order by: int_col ASC
+|
+02:ANALYTIC
+|  functions: max(int_col)
+|  partition by: int_col
+|
+01:SORT
+|  order by: int_col ASC NULLS FIRST
+|
+05:EXCHANGE [HASH(int_col)]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
+# coalesce sort groups
+select
+# sort group 1
+max(int_col) over(partition by bool_col order by bigint_col, tinyint_col),
+max(int_col) over(partition by bool_col order by bigint_col),
+max(int_col) over(partition by bool_col),
+
+# sort group 2
+max(int_col) over(partition by int_col order by bigint_col),
+
+# sort group 3
+max(int_col) over(partition by int_col order by bigint_col desc)
+from functional.alltypes
+---- PLAN
+08:ANALYTIC
+|  functions: max(int_col)
+|  partition by: bool_col
+|
+07:ANALYTIC
+|  functions: max(int_col)
+|  partition by: bool_col
+|  order by: bigint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+06:ANALYTIC
+|  functions: max(int_col)
+|  partition by: bool_col
+|  order by: bigint_col ASC, tinyint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+05:SORT
+|  order by: bool_col ASC NULLS FIRST, bigint_col ASC, tinyint_col ASC
+|
+04:ANALYTIC
+|  functions: max(int_col)
+|  partition by: int_col
+|  order by: bigint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+03:SORT
+|  order by: int_col ASC NULLS FIRST, bigint_col DESC
+|
+02:ANALYTIC
+|  functions: max(int_col)
+|  partition by: int_col
+|  order by: bigint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+01:SORT
+|  order by: int_col ASC NULLS FIRST, bigint_col ASC
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+11:EXCHANGE [UNPARTITIONED]
+|
+08:ANALYTIC
+|  functions: max(int_col)
+|  partition by: bool_col
+|
+07:ANALYTIC
+|  functions: max(int_col)
+|  partition by: bool_col
+|  order by: bigint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+06:ANALYTIC
+|  functions: max(int_col)
+|  partition by: bool_col
+|  order by: bigint_col ASC, tinyint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+05:SORT
+|  order by: bool_col ASC NULLS FIRST, bigint_col ASC, tinyint_col ASC
+|
+10:EXCHANGE [HASH(bool_col)]
+|
+04:ANALYTIC
+|  functions: max(int_col)
+|  partition by: int_col
+|  order by: bigint_col DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+03:SORT
+|  order by: int_col ASC NULLS FIRST, bigint_col DESC
+|
+02:ANALYTIC
+|  functions: max(int_col)
+|  partition by: int_col
+|  order by: bigint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+01:SORT
+|  order by: int_col ASC NULLS FIRST, bigint_col ASC
+|
+09:EXCHANGE [HASH(int_col)]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
+# check ordering of partition, sort and window groups
+select
+# non-partitioning group with 2 sort groups
+# 2nd sort group
+min(int_col) over(order by bigint_col),
+max(int_col) over(order by bigint_col),
+# 1st sort group
+min(int_col) over(),
+
+# 2nd partition group, with two sort groups
+# 2nd sort group
+max(int_col) over(partition by bool_col order by bigint_col),
+min(int_col) over(partition by bool_col order by bigint_col),
+count(int_col) over(partition by bool_col order by bigint_col),
+# 1st sort group
+max(int_col) over(partition by bool_col order by int_col),
+
+# 1st partition group, with two sort groups
+# 2nd sort group
+max(int_col) over(partition by int_col, smallint_col order by bigint_col),
+min(int_col) over(partition by int_col, smallint_col order by bigint_col),
+# 1st sort group
+max(int_col) over(partition by int_col, smallint_col order by int_col)
+from functional.alltypes
+---- PLAN
+11:ANALYTIC
+|  functions: min(int_col), max(int_col)
+|  order by: bigint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+10:ANALYTIC
+|  functions: min(int_col)
+|
+09:SORT
+|  order by: bigint_col ASC
+|
+08:ANALYTIC
+|  functions: max(int_col), min(int_col), count(int_col)
+|  partition by: bool_col
+|  order by: bigint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+07:SORT
+|  order by: bool_col ASC NULLS FIRST, bigint_col ASC
+|
+06:ANALYTIC
+|  functions: max(int_col)
+|  partition by: bool_col
+|  order by: int_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+05:SORT
+|  order by: bool_col ASC NULLS FIRST, int_col ASC
+|
+04:ANALYTIC
+|  functions: max(int_col), min(int_col)
+|  partition by: int_col, smallint_col
+|  order by: bigint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+03:SORT
+|  order by: int_col ASC NULLS FIRST, smallint_col ASC NULLS FIRST, bigint_col ASC
+|
+02:ANALYTIC
+|  functions: max(int_col)
+|  partition by: int_col, smallint_col
+|  order by: int_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+01:SORT
+|  order by: int_col ASC NULLS FIRST, smallint_col ASC NULLS FIRST, int_col ASC
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+11:ANALYTIC
+|  functions: min(int_col), max(int_col)
+|  order by: bigint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+10:ANALYTIC
+|  functions: min(int_col)
+|
+14:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: bigint_col ASC
+|
+09:SORT
+|  order by: bigint_col ASC
+|
+08:ANALYTIC
+|  functions: max(int_col), min(int_col), count(int_col)
+|  partition by: bool_col
+|  order by: bigint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+07:SORT
+|  order by: bool_col ASC NULLS FIRST, bigint_col ASC
+|
+06:ANALYTIC
+|  functions: max(int_col)
+|  partition by: bool_col
+|  order by: int_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+05:SORT
+|  order by: bool_col ASC NULLS FIRST, int_col ASC
+|
+13:EXCHANGE [HASH(bool_col)]
+|
+04:ANALYTIC
+|  functions: max(int_col), min(int_col)
+|  partition by: int_col, smallint_col
+|  order by: bigint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+03:SORT
+|  order by: int_col ASC NULLS FIRST, smallint_col ASC NULLS FIRST, bigint_col ASC
+|
+02:ANALYTIC
+|  functions: max(int_col)
+|  partition by: int_col, smallint_col
+|  order by: int_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+01:SORT
+|  order by: int_col ASC NULLS FIRST, smallint_col ASC NULLS FIRST, int_col ASC
+|
+12:EXCHANGE [HASH(int_col,smallint_col)]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
 # basic analytic with default window and no partition/ordering
 select count(*) over() from functional.alltypesagg
 ---- PLAN
@@ -62,10 +342,11 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
 |  order by: int_col ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
-01:SORT
+03:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: int_col ASC
 |
-03:EXCHANGE [UNPARTITIONED]
+01:SORT
+|  order by: int_col ASC
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
@@ -137,16 +418,16 @@ limit 10
 |  order by: int_col DESC
 |
 03:ANALYTIC
-|  functions: min(double_col)
-|  partition by: bool_col
-|  order by: int_col DESC
-|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
-|
-02:ANALYTIC
 |  functions: count(bigint_col), sum(double_col)
 |  partition by: bool_col
 |  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+|
+02:ANALYTIC
+|  functions: min(double_col)
+|  partition by: bool_col
+|  order by: int_col DESC
+|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
 |
 01:SORT
 |  order by: bool_col ASC NULLS FIRST, int_col DESC
@@ -160,22 +441,23 @@ limit 10
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |  limit: 10
 |
+07:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: int_col DESC
+|
 04:SORT
 |  order by: int_col DESC
 |
-07:EXCHANGE [UNPARTITIONED]
-|
 03:ANALYTIC
-|  functions: min(double_col)
-|  partition by: bool_col
-|  order by: int_col DESC
-|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
-|
-02:ANALYTIC
 |  functions: count(bigint_col), sum(double_col)
 |  partition by: bool_col
 |  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+|
+02:ANALYTIC
+|  functions: min(double_col)
+|  partition by: bool_col
+|  order by: int_col DESC
+|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
 |
 01:SORT
 |  order by: bool_col ASC NULLS FIRST, int_col DESC
@@ -259,22 +541,22 @@ order by 1, 2, 3
 |  order by: bool_col ASC, sum(min(int_col)) ASC, max(sum(bigint_col)) ASC
 |
 05:ANALYTIC
-|  functions: min(sum(bigint_col))
-|  partition by: min(tinyint_col)
-|  order by: sum(int_col) ASC
-|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 4 FOLLOWING
-|
-04:SORT
-|  order by: min(tinyint_col) ASC NULLS FIRST, sum(int_col) ASC
-|
-03:ANALYTIC
 |  functions: sum(min(int_col)), max(sum(bigint_col))
 |  partition by: min(tinyint_col)
 |  order by: max(int_col) ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
 |
-02:SORT
+04:SORT
 |  order by: min(tinyint_col) ASC NULLS FIRST, max(int_col) ASC
+|
+03:ANALYTIC
+|  functions: min(sum(bigint_col))
+|  partition by: min(tinyint_col)
+|  order by: sum(int_col) ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 4 FOLLOWING
+|
+02:SORT
+|  order by: min(tinyint_col) ASC NULLS FIRST, sum(int_col) ASC
 |
 01:AGGREGATE [FINALIZE]
 |  output: min(int_col), min(tinyint_col), max(int_col), sum(bigint_col), sum(int_col)
@@ -290,22 +572,22 @@ order by 1, 2, 3
 |  order by: bool_col ASC, sum(min(int_col)) ASC, max(sum(bigint_col)) ASC
 |
 05:ANALYTIC
-|  functions: min(sum(bigint_col))
-|  partition by: min(tinyint_col)
-|  order by: sum(int_col) ASC
-|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 4 FOLLOWING
-|
-04:SORT
-|  order by: min(tinyint_col) ASC NULLS FIRST, sum(int_col) ASC
-|
-03:ANALYTIC
 |  functions: sum(min(int_col)), max(sum(bigint_col))
 |  partition by: min(tinyint_col)
 |  order by: max(int_col) ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
 |
-02:SORT
+04:SORT
 |  order by: min(tinyint_col) ASC NULLS FIRST, max(int_col) ASC
+|
+03:ANALYTIC
+|  functions: min(sum(bigint_col))
+|  partition by: min(tinyint_col)
+|  order by: sum(int_col) ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 4 FOLLOWING
+|
+02:SORT
+|  order by: min(tinyint_col) ASC NULLS FIRST, sum(int_col) ASC
 |
 09:EXCHANGE [HASH(min(tinyint_col))]
 |
@@ -327,7 +609,7 @@ select
 count(double_col)
   over(partition by tinyint_col, double_col order by int_col desc
   rows between 1 preceding and 1 following),
-max(tinyint_col)
+max(double_col)
   over(partition by double_col, tinyint_col order by int_col desc
   rows between 1 preceding and 1 following),
 # compatible default RANGE window
@@ -352,49 +634,49 @@ min(int_col)
 from functional.alltypesagg
 ---- PLAN
 09:ANALYTIC
-|  functions: min(int_col)
-|  partition by: tinyint_col
+|  functions: count(double_col), max(double_col)
+|  partition by: tinyint_col, double_col
 |  order by: int_col DESC
-|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
+|  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
-08:SORT
-|  order by: tinyint_col ASC NULLS FIRST, int_col DESC
-|
-07:ANALYTIC
-|  functions: max(int_col)
-|  partition by: double_col, tinyint_col
-|  order by: int_col ASC
-|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
-|
-06:SORT
-|  order by: double_col ASC NULLS FIRST, tinyint_col ASC NULLS FIRST, int_col ASC
-|
-05:ANALYTIC
-|  functions: min(int_col)
-|  partition by: double_col, tinyint_col
-|  order by: int_col DESC
-|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
-|
-04:ANALYTIC
+08:ANALYTIC
 |  functions: sum(smallint_col)
 |  partition by: double_col, tinyint_col
 |  order by: int_col DESC
 |  window: RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
-03:ANALYTIC
+07:ANALYTIC
 |  functions: sum(tinyint_col)
 |  partition by: tinyint_col, double_col
 |  order by: int_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
-02:ANALYTIC
-|  functions: count(double_col), max(tinyint_col)
-|  partition by: tinyint_col, double_col
+06:ANALYTIC
+|  functions: min(int_col)
+|  partition by: double_col, tinyint_col
 |  order by: int_col DESC
-|  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
+|
+05:SORT
+|  order by: tinyint_col ASC NULLS FIRST, double_col ASC NULLS FIRST, int_col DESC
+|
+04:ANALYTIC
+|  functions: max(int_col)
+|  partition by: double_col, tinyint_col
+|  order by: int_col ASC
+|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
+|
+03:SORT
+|  order by: double_col ASC NULLS FIRST, tinyint_col ASC NULLS FIRST, int_col ASC
+|
+02:ANALYTIC
+|  functions: min(int_col)
+|  partition by: tinyint_col
+|  order by: int_col DESC
+|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
 |
 01:SORT
-|  order by: tinyint_col ASC NULLS FIRST, double_col ASC NULLS FIRST, int_col DESC
+|  order by: tinyint_col ASC NULLS FIRST, int_col DESC
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
@@ -402,61 +684,58 @@ from functional.alltypesagg
 12:EXCHANGE [UNPARTITIONED]
 |
 09:ANALYTIC
-|  functions: min(int_col)
-|  partition by: tinyint_col
+|  functions: count(double_col), max(double_col)
+|  partition by: tinyint_col, double_col
 |  order by: int_col DESC
-|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
+|  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
-08:SORT
-|  order by: tinyint_col ASC NULLS FIRST, int_col DESC
-|
-11:EXCHANGE [HASH(tinyint_col)]
-|
-07:ANALYTIC
-|  functions: max(int_col)
-|  partition by: double_col, tinyint_col
-|  order by: int_col ASC
-|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
-|
-06:SORT
-|  order by: double_col ASC NULLS FIRST, tinyint_col ASC NULLS FIRST, int_col ASC
-|
-05:ANALYTIC
-|  functions: min(int_col)
-|  partition by: double_col, tinyint_col
-|  order by: int_col DESC
-|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
-|
-04:ANALYTIC
+08:ANALYTIC
 |  functions: sum(smallint_col)
 |  partition by: double_col, tinyint_col
 |  order by: int_col DESC
 |  window: RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
-03:ANALYTIC
+07:ANALYTIC
 |  functions: sum(tinyint_col)
 |  partition by: tinyint_col, double_col
 |  order by: int_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
-02:ANALYTIC
-|  functions: count(double_col), max(tinyint_col)
-|  partition by: tinyint_col, double_col
+06:ANALYTIC
+|  functions: min(int_col)
+|  partition by: double_col, tinyint_col
 |  order by: int_col DESC
-|  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
 |
-01:SORT
+05:SORT
 |  order by: tinyint_col ASC NULLS FIRST, double_col ASC NULLS FIRST, int_col DESC
 |
-10:EXCHANGE [HASH(tinyint_col,double_col)]
+04:ANALYTIC
+|  functions: max(int_col)
+|  partition by: double_col, tinyint_col
+|  order by: int_col ASC
+|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
+|
+03:SORT
+|  order by: double_col ASC NULLS FIRST, tinyint_col ASC NULLS FIRST, int_col ASC
+|
+11:EXCHANGE [HASH(double_col,tinyint_col)]
+|
+02:ANALYTIC
+|  functions: min(int_col)
+|  partition by: tinyint_col
+|  order by: int_col DESC
+|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
+|
+01:SORT
+|  order by: tinyint_col ASC NULLS FIRST, int_col DESC
+|
+10:EXCHANGE [HASH(tinyint_col)]
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
 ====
 # grouping of multiple analytic exprs by compatible window/partition/order
-# TODO: Unpartitioned analytic exprs should go last. We could even do
-# a sort-merge exchange instead of an unpartitioned sort if we're lucky.
-# TODO: We can avoid the second sort.
 select
 count(double_col)
   over(partition by tinyint_col, double_col order by int_col desc
@@ -473,82 +752,75 @@ max(smallint_col)
   rows between 2 preceding and 2 following)
 from functional.alltypesagg
 ---- PLAN
-08:ANALYTIC
-|  functions: max(smallint_col)
-|  partition by: bigint_col
-|  order by: tinyint_col ASC
-|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
-|
-07:SORT
-|  order by: bigint_col ASC NULLS FIRST, tinyint_col ASC
-|
-06:ANALYTIC
+07:ANALYTIC
 |  functions: sum(tinyint_col)
 |  order by: int_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
-05:SORT
+06:SORT
 |  order by: int_col DESC
 |
-04:ANALYTIC
+05:ANALYTIC
 |  functions: sum(smallint_col)
 |  partition by: double_col, tinyint_col
 |
-03:SORT
-|  order by: double_col ASC NULLS FIRST, tinyint_col ASC NULLS FIRST
-|
-02:ANALYTIC
+04:ANALYTIC
 |  functions: count(double_col)
 |  partition by: tinyint_col, double_col
 |  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
-01:SORT
+03:SORT
 |  order by: tinyint_col ASC NULLS FIRST, double_col ASC NULLS FIRST, int_col DESC
+|
+02:ANALYTIC
+|  functions: max(smallint_col)
+|  partition by: bigint_col
+|  order by: tinyint_col ASC
+|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
+|
+01:SORT
+|  order by: bigint_col ASC NULLS FIRST, tinyint_col ASC
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
-12:EXCHANGE [UNPARTITIONED]
-|
-08:ANALYTIC
-|  functions: max(smallint_col)
-|  partition by: bigint_col
-|  order by: tinyint_col ASC
-|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
-|
-07:SORT
-|  order by: bigint_col ASC NULLS FIRST, tinyint_col ASC
-|
-11:EXCHANGE [HASH(bigint_col)]
-|
-06:ANALYTIC
+07:ANALYTIC
 |  functions: sum(tinyint_col)
 |  order by: int_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
-05:SORT
+10:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: int_col DESC
 |
-10:EXCHANGE [UNPARTITIONED]
+06:SORT
+|  order by: int_col DESC
 |
-04:ANALYTIC
+05:ANALYTIC
 |  functions: sum(smallint_col)
 |  partition by: double_col, tinyint_col
 |
-03:SORT
-|  order by: double_col ASC NULLS FIRST, tinyint_col ASC NULLS FIRST
-|
-02:ANALYTIC
+04:ANALYTIC
 |  functions: count(double_col)
 |  partition by: tinyint_col, double_col
 |  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
-01:SORT
+03:SORT
 |  order by: tinyint_col ASC NULLS FIRST, double_col ASC NULLS FIRST, int_col DESC
 |
 09:EXCHANGE [HASH(tinyint_col,double_col)]
+|
+02:ANALYTIC
+|  functions: max(smallint_col)
+|  partition by: bigint_col
+|  order by: tinyint_col ASC
+|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
+|
+01:SORT
+|  order by: bigint_col ASC NULLS FIRST, tinyint_col ASC
+|
+08:EXCHANGE [HASH(bigint_col)]
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
@@ -567,37 +839,34 @@ order by 2, 3, 4
 |  order by: a ASC, b ASC, a + b ASC
 |
 03:ANALYTIC
+|  functions: count(int_col)
+|
+02:ANALYTIC
 |  functions: sum(int_col + bigint_col)
 |  partition by: bool_col
 |
-02:SORT
+01:SORT
 |  order by: bool_col ASC NULLS FIRST
-|
-01:ANALYTIC
-|  functions: count(functional.alltypes.int_col)
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-07:MERGING-EXCHANGE [UNPARTITIONED]
-|  order by: a ASC, b ASC, a + b ASC
-|
 04:SORT
 |  order by: a ASC, b ASC, a + b ASC
 |
 03:ANALYTIC
+|  functions: count(int_col)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:ANALYTIC
 |  functions: sum(int_col + bigint_col)
 |  partition by: bool_col
 |
-02:SORT
+01:SORT
 |  order by: bool_col ASC NULLS FIRST
 |
-06:EXCHANGE [HASH(functional.alltypes.bool_col)]
-|
-01:ANALYTIC
-|  functions: count(functional.alltypes.int_col)
-|
-05:EXCHANGE [UNPARTITIONED]
+05:EXCHANGE [HASH(functional.alltypes.bool_col)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -617,37 +886,34 @@ order by 2, 3, 4
 |  order by: a ASC, b ASC, a + b ASC
 |
 03:ANALYTIC
+|  functions: count(int_col)
+|
+02:ANALYTIC
 |  functions: sum(int_col + bigint_col)
 |  partition by: bool_col
 |
-02:SORT
+01:SORT
 |  order by: bool_col ASC NULLS FIRST
-|
-01:ANALYTIC
-|  functions: count(functional.alltypes.int_col)
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
-07:MERGING-EXCHANGE [UNPARTITIONED]
-|  order by: a ASC, b ASC, a + b ASC
-|
 04:SORT
 |  order by: a ASC, b ASC, a + b ASC
 |
 03:ANALYTIC
+|  functions: count(int_col)
+|
+06:EXCHANGE [UNPARTITIONED]
+|
+02:ANALYTIC
 |  functions: sum(int_col + bigint_col)
 |  partition by: bool_col
 |
-02:SORT
+01:SORT
 |  order by: bool_col ASC NULLS FIRST
 |
-06:EXCHANGE [HASH(functional.alltypes.bool_col)]
-|
-01:ANALYTIC
-|  functions: count(functional.alltypes.int_col)
-|
-05:EXCHANGE [UNPARTITIONED]
+05:EXCHANGE [HASH(functional.alltypes.bool_col)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -904,29 +1170,67 @@ where
 |  predicates: bigint_col > 10, min(int_col) < 1, min(int_col) < bigint_col + 1, max(int_col) < 2, max(int_col) < bigint_col + 2, count(int_col) < 3, count(int_col) < bigint_col + 3, sum(int_col) < 4, sum(int_col) < bigint_col + 4, avg(int_col) < 5, avg(int_col) < bigint_col + 5, min(int_col) != count(int_col), min(int_col) != avg(int_col), max(int_col) != count(int_col)
 |
 06:ANALYTIC
+|  functions: min(int_col)
+|
+05:ANALYTIC
 |  functions: avg(int_col)
 |  partition by: bigint_col
 |  order by: id ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 FOLLOWING
 |
-05:ANALYTIC
+04:ANALYTIC
 |  functions: sum(int_col)
 |  partition by: bigint_col
 |  order by: id ASC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
 |
-04:SORT
+03:SORT
 |  order by: bigint_col ASC NULLS FIRST, id ASC
 |
-03:ANALYTIC
+02:ANALYTIC
 |  functions: max(int_col), count(int_col)
 |  partition by: bool_col
 |
-02:SORT
+01:SORT
 |  order by: bool_col ASC NULLS FIRST
 |
-01:ANALYTIC
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+   predicates: int_col >= 5, int_col <= 10
+---- DISTRIBUTEDPLAN
+07:SELECT
+|  predicates: bigint_col > 10, min(int_col) < 1, min(int_col) < bigint_col + 1, max(int_col) < 2, max(int_col) < bigint_col + 2, count(int_col) < 3, count(int_col) < bigint_col + 3, sum(int_col) < 4, sum(int_col) < bigint_col + 4, avg(int_col) < 5, avg(int_col) < bigint_col + 5, min(int_col) != count(int_col), min(int_col) != avg(int_col), max(int_col) != count(int_col)
+|
+06:ANALYTIC
 |  functions: min(int_col)
+|
+10:EXCHANGE [UNPARTITIONED]
+|
+05:ANALYTIC
+|  functions: avg(int_col)
+|  partition by: bigint_col
+|  order by: id ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 FOLLOWING
+|
+04:ANALYTIC
+|  functions: sum(int_col)
+|  partition by: bigint_col
+|  order by: id ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
+|
+03:SORT
+|  order by: bigint_col ASC NULLS FIRST, id ASC
+|
+09:EXCHANGE [HASH(bigint_col)]
+|
+02:ANALYTIC
+|  functions: max(int_col), count(int_col)
+|  partition by: bool_col
+|
+01:SORT
+|  order by: bool_col ASC NULLS FIRST
+|
+08:EXCHANGE [HASH(bool_col)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -1089,47 +1393,44 @@ count(bigint_col) over(partition by tinyint_col order by id
                        range between unbounded preceding and 10 following)
 from functional.alltypesagg
 ---- PLAN
-09:ANALYTIC
-|  functions: count(bigint_col)
-|  partition by: tinyint_col
-|  order by: id ASC, int_col ASC
-|  window: ROWS BETWEEN 6 PRECEDING AND 8 FOLLOWING
-|
-08:SORT
-|  order by: tinyint_col ASC NULLS FIRST, id ASC, int_col ASC
-|
-07:ANALYTIC
+08:ANALYTIC
 |  functions: count(bigint_col)
 |  partition by: tinyint_col
 |  order by: id ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND 10 FOLLOWING
 |
-06:ANALYTIC
+07:ANALYTIC
 |  functions: count(bigint_col)
 |  partition by: tinyint_col
 |  order by: id ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
-05:SORT
-|  order by: tinyint_col ASC NULLS FIRST, id ASC
-|
-04:ANALYTIC
-|  functions: min(int_col)
-|  partition by: tinyint_col
-|  order by: id DESC
-|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND 4 FOLLOWING
-|
-03:SORT
-|  order by: tinyint_col ASC NULLS FIRST, id DESC NULLS FIRST
-|
-02:ANALYTIC
+06:ANALYTIC
 |  functions: sum(int_col)
 |  partition by: tinyint_col
 |  order by: id ASC, bool_col DESC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 FOLLOWING
 |
-01:SORT
+05:SORT
 |  order by: tinyint_col ASC NULLS FIRST, id ASC NULLS LAST, bool_col DESC NULLS FIRST
+|
+04:ANALYTIC
+|  functions: count(bigint_col)
+|  partition by: tinyint_col
+|  order by: id ASC, int_col ASC
+|  window: ROWS BETWEEN 6 PRECEDING AND 8 FOLLOWING
+|
+03:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id ASC, int_col ASC
+|
+02:ANALYTIC
+|  functions: min(int_col)
+|  partition by: tinyint_col
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND 4 FOLLOWING
+|
+01:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id DESC NULLS FIRST
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
@@ -1152,41 +1453,38 @@ first_value(bigint_col) over(partition by tinyint_col order by id
                              range between unbounded preceding and 10 following)
 from functional.alltypesagg
 ---- PLAN
-08:ANALYTIC
-|  functions: first_value(bigint_col)
-|  partition by: tinyint_col
-|  order by: id ASC, int_col ASC
-|  window: ROWS BETWEEN 6 PRECEDING AND 8 FOLLOWING
-|
-07:SORT
-|  order by: tinyint_col ASC NULLS FIRST, id ASC, int_col ASC
-|
-06:ANALYTIC
+07:ANALYTIC
 |  functions: first_value(bigint_col)
 |  partition by: tinyint_col
 |  order by: id ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
-05:SORT
-|  order by: tinyint_col ASC NULLS FIRST, id ASC
-|
-04:ANALYTIC
-|  functions: last_value(int_col)
-|  partition by: tinyint_col
-|  order by: id DESC
-|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND 4 FOLLOWING
-|
-03:SORT
-|  order by: tinyint_col ASC NULLS FIRST, id DESC NULLS FIRST
-|
-02:ANALYTIC
+06:ANALYTIC
 |  functions: last_value(int_col)
 |  partition by: tinyint_col
 |  order by: id ASC, bool_col DESC
 |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 FOLLOWING
 |
-01:SORT
+05:SORT
 |  order by: tinyint_col ASC NULLS FIRST, id ASC NULLS LAST, bool_col DESC NULLS FIRST
+|
+04:ANALYTIC
+|  functions: first_value(bigint_col)
+|  partition by: tinyint_col
+|  order by: id ASC, int_col ASC
+|  window: ROWS BETWEEN 6 PRECEDING AND 8 FOLLOWING
+|
+03:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id ASC, int_col ASC
+|
+02:ANALYTIC
+|  functions: last_value(int_col)
+|  partition by: tinyint_col
+|  order by: id DESC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND 4 FOLLOWING
+|
+01:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id DESC NULLS FIRST
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
@@ -1207,14 +1505,11 @@ last_value(bigint_col) over(partition by tinyint_col order by id
                             range between unbounded preceding and 10 following)
 from functional.alltypesagg
 ---- PLAN
-09:ANALYTIC
-|  functions: last_value(bigint_col)
+08:ANALYTIC
+|  functions: first_value(int_col)
 |  partition by: tinyint_col
-|  order by: id ASC, int_col ASC
-|  window: ROWS BETWEEN 6 PRECEDING AND 8 FOLLOWING
-|
-08:SORT
-|  order by: tinyint_col ASC NULLS FIRST, id ASC, int_col ASC
+|  order by: id ASC, bool_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 07:ANALYTIC
 |  functions: last_value(bigint_col)
@@ -1229,25 +1524,25 @@ from functional.alltypesagg
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 05:SORT
-|  order by: tinyint_col ASC NULLS FIRST, id ASC
+|  order by: tinyint_col ASC NULLS FIRST, id ASC NULLS LAST, bool_col DESC NULLS FIRST
 |
 04:ANALYTIC
+|  functions: last_value(bigint_col)
+|  partition by: tinyint_col
+|  order by: id ASC, int_col ASC
+|  window: ROWS BETWEEN 6 PRECEDING AND 8 FOLLOWING
+|
+03:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id ASC, int_col ASC
+|
+02:ANALYTIC
 |  functions: first_value(int_col)
 |  partition by: tinyint_col
 |  order by: id DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
-03:SORT
-|  order by: tinyint_col ASC NULLS FIRST, id DESC NULLS FIRST
-|
-02:ANALYTIC
-|  functions: first_value(int_col)
-|  partition by: tinyint_col
-|  order by: id ASC, bool_col DESC
-|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|
 01:SORT
-|  order by: tinyint_col ASC NULLS FIRST, id ASC NULLS LAST, bool_col DESC NULLS FIRST
+|  order by: tinyint_col ASC NULLS FIRST, id DESC NULLS FIRST
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
