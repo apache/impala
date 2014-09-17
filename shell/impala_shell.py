@@ -474,11 +474,11 @@ class ImpalaShell(cmd.Cmd):
     elif len(host_port) == 1:
       host_port.append('21000')
     self.impalad = tuple(host_port)
-    if not self.imp_client:
-      self.imp_client = ImpalaClient(self.impalad, self.use_kerberos,
-                                   self.kerberos_service_name, self.use_ssl,
-                                   self.ca_cert, self.user, self.ldap_password,
-                                   self.use_ldap)
+    if self.imp_client: self.imp_client.close_connection()
+    self.imp_client = ImpalaClient(self.impalad, self.use_kerberos,
+                                 self.kerberos_service_name, self.use_ssl,
+                                 self.ca_cert, self.user, self.ldap_password,
+                                 self.use_ldap)
     self._connect()
     # If the connection fails and the Kerberos has not been enabled,
     # check for a valid kerberos ticket and retry the connection

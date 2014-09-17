@@ -18,10 +18,13 @@
 import os
 import pytest
 import shlex
+import socket
 import signal
 
 from impala_shell_results import get_shell_cmd_result, cancellation_helper
 from subprocess import Popen, PIPE
+from tests.common.impala_service import ImpaladService
+from tests.verifiers.metric_verifier import MetricVerifier
 from time import sleep
 
 SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
@@ -84,6 +87,43 @@ class TestImpalaShellInteractive(object):
     args = "! ls;"
     result = run_impala_shell_interactive(args)
     assert "Executed in" in result.stderr
+
+  @pytest.mark.execute_serially
+  def test_reconnect(self):
+    """Regression Test for IMPALA-1235
+
+    Verifies that a connect command by the user is honoured.
+    """
+
+    def get_num_open_sessions(impala_service):
+      """Helper method to retrieve the number of open sessions"""
+      return impala_service.get_metric_value('impala-server.num-open-beeswax-sessions')
+
+    hostname = socket.getfqdn()
+    initial_impala_service = ImpaladService(hostname)
+    target_impala_service = ImpaladService(hostname, webserver_port=25001,
+        beeswax_port=21001, be_port=22001)
+    # Get the initial state for the number of sessions.
+    num_sessions_initial = get_num_open_sessions(initial_impala_service)
+    num_sessions_target = get_num_open_sessions(target_impala_service)
+    # Connect to localhost:21000 (default)
+    p = Popen(shlex.split(SHELL_CMD), shell=True,
+              stdout=PIPE, stdin=PIPE, stderr=PIPE)
+    sleep(2)
+    # Make sure we're connected <hostname>:21000
+    assert get_num_open_sessions(initial_impala_service) == num_sessions_initial + 1, \
+        "Not connected to %s:21000" % hostname
+    p.stdin.write("connect %s:21001;\n" % hostname)
+    p.stdin.flush()
+    # Wait for a little while
+    sleep(2)
+    # The number of sessions on the target impalad should have been incremented.
+    assert get_num_open_sessions(target_impala_service) == num_sessions_target + 1, \
+        "Not connected to %s:21001" % hostname
+    # The number of sessions on the initial impalad should have been decremented.
+    assert get_num_open_sessions(initial_impala_service) == num_sessions_initial, \
+        "Connection to %s:21000 should have been closed" % hostname
+
 
 def run_impala_shell_interactive(command, shell_args=''):
   """Runs a command in the Impala shell interactively."""
