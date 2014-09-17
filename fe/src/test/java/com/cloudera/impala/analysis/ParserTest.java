@@ -2741,4 +2741,23 @@ public class ParserTest {
     ParserError("SHOW ROLE");
     ParserError("SHOW");
   }
+
+  @Test
+  public void TestShowGrantRole() {
+    // Show all grants on a role
+    ParsesOk("SHOW GRANT ROLE foo");
+
+    // Show grants on a specific object
+    ParsesOk("SHOW GRANT ROLE foo ON SERVER");
+    ParsesOk("SHOW GRANT ROLE foo ON DATABASE foo");
+    ParsesOk("SHOW GRANT ROLE foo ON TABLE foo");
+    ParsesOk("SHOW GRANT ROLE foo ON TABLE foo.bar");
+    ParsesOk("SHOW GRANT ROLE foo ON URI '/abc/123'");
+
+    ParserError("SHOW GRANT ROLE");
+    ParserError("SHOW GRANT ROLE foo ON SERVER foo");
+    ParserError("SHOW GRANT ROLE foo ON DATABASE");
+    ParserError("SHOW GRANT ROLE foo ON TABLE");
+    ParserError("SHOW GRANT ROLE foo ON URI abc");
+  }
 }

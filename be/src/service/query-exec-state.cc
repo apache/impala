@@ -265,27 +265,14 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
     case TCatalogOpType::SHOW_ROLES: {
       const TShowRolesParams& params = catalog_op.show_roles_params;
       if (params.is_admin_op) {
-        // Verify the user has privileges to perform this operation.
-        Status cnxn_status;
-        const TNetworkAddress& address =
-            MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
-        CatalogServiceConnection client(
-            exec_env_->catalogd_client_cache(), address, &cnxn_status);
-        RETURN_IF_ERROR(cnxn_status);
+        // Verify the user has privileges to perform this operation by checking against the
+        // Sentry Service (via the Catalog Server).
+        catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_, frontend_));
 
-        // Perform the access check against the Sentry Service (via the Catalog Server).
-        TSentryAdminCheckResponse resp;
         TSentryAdminCheckRequest req;
         req.__set_header(TCatalogServiceRequestHeader());
         req.header.__set_requesting_user(effective_user());
-        try {
-          client->SentryAdminCheck(resp, req);
-        } catch (const TException& e) {
-          RETURN_IF_ERROR(client.Reopen());
-          client->SentryAdminCheck(resp, req);
-        }
-        Status status(resp.status);
-        RETURN_IF_ERROR(status);
+        RETURN_IF_ERROR(catalog_op_executor_->SentryAdminCheck(req));
       }
 
       // If we have made it here, the user has privileges to execute this operation.
@@ -293,6 +280,26 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
       TShowRolesResult result;
       RETURN_IF_ERROR(frontend_->ShowRoles(params, &result));
       SetResultSet(result.role_names);
+      return Status::OK;
+    }
+    case TCatalogOpType::SHOW_GRANT_ROLE: {
+      const TShowGrantRoleParams& params = catalog_op.show_grant_role_params;
+      if (params.is_admin_op) {
+        // Verify the user has privileges to perform this operation by checking against the
+        // Sentry Service (via the Catalog Server).
+        catalog_op_executor_.reset(new CatalogOpExecutor(exec_env_, frontend_));
+
+        TSentryAdminCheckRequest req;
+        req.__set_header(TCatalogServiceRequestHeader());
+        req.header.__set_requesting_user(effective_user());
+        RETURN_IF_ERROR(catalog_op_executor_->SentryAdminCheck(req));
+      }
+
+      TResultSet response;
+      RETURN_IF_ERROR(frontend_->GetRolePrivileges(params, &response));
+      // Set the result set and its schema from the response.
+      request_result_set_.reset(new vector<TResultRow>(response.rows));
+      result_metadata_ = response.schema;
       return Status::OK;
     }
     case TCatalogOpType::DESCRIBE: {

@@ -18,10 +18,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.commons.net.ntp.TimeStamp;
 import org.apache.log4j.Logger;
 import org.apache.sentry.core.common.ActiveRoleSet;
 import org.apache.sentry.provider.cache.PrivilegeCache;
 
+import com.cloudera.impala.thrift.TColumn;
+import com.cloudera.impala.thrift.TPrivilege;
+import com.cloudera.impala.thrift.TResultRow;
+import com.cloudera.impala.thrift.TResultSet;
+import com.cloudera.impala.thrift.TResultSetMetadata;
+import com.cloudera.impala.util.TResultRowBuilder;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -277,5 +285,51 @@ public class AuthorizationPolicy implements PrivilegeCache {
   @Override
   public void close() {
     // Nothing to do, but required by PrivilegeCache.
+  }
+
+  /**
+   * Returns the privileges that have been granted to a role as a tabular result set.
+   * Allows for filtering based on a specific privilege spec or showing all privileges
+   * granted to the role. Used by the SHOW GRANT ROLE statement.
+   */
+  public synchronized TResultSet getRolePrivileges(String roleName, TPrivilege filter) {
+    TResultSet result = new TResultSet();
+    result.setSchema(new TResultSetMetadata());
+    result.getSchema().addToColumns(new TColumn("scope", Type.STRING.toThrift()));
+    result.getSchema().addToColumns(new TColumn("database", Type.STRING.toThrift()));
+    result.getSchema().addToColumns(new TColumn("table", Type.STRING.toThrift()));
+    result.getSchema().addToColumns(new TColumn("uri", Type.STRING.toThrift()));
+    result.getSchema().addToColumns(new TColumn("privilege", Type.STRING.toThrift()));
+    result.getSchema().addToColumns(
+        new TColumn("grant_option", Type.BOOLEAN.toThrift()));
+    result.getSchema().addToColumns(new TColumn("create_time", Type.STRING.toThrift()));
+    result.setRows(Lists.<TResultRow>newArrayList());
+
+    Role role = getRole(roleName);
+    if (role == null) return result;
+    for (RolePrivilege p: role.getPrivileges()) {
+      TPrivilege privilege = p.toThrift();
+      if (filter != null) {
+        // Check if the privileges are targeting the same object.
+        filter.setPrivilege_level(privilege.getPrivilege_level());
+        String privName = RolePrivilege.buildRolePrivilegeName(filter);
+        if (!privName.equalsIgnoreCase(privilege.getPrivilege_name())) continue;
+      }
+      TResultRowBuilder rowBuilder = new TResultRowBuilder();
+      rowBuilder.add(privilege.getScope().toString());
+      rowBuilder.add(Strings.nullToEmpty(privilege.getDb_name()));
+      rowBuilder.add(Strings.nullToEmpty(privilege.getTable_name()));
+      rowBuilder.add(Strings.nullToEmpty(privilege.getUri()));
+      rowBuilder.add(privilege.getPrivilege_level().toString());
+      rowBuilder.add(Boolean.toString(privilege.isHas_grant_opt()));
+      if (privilege.getCreate_time_ms() == -1) {
+        rowBuilder.add(null);
+      } else {
+        rowBuilder.add(
+            TimeStamp.getNtpTime(privilege.getCreate_time_ms()).toDateString());
+      }
+      result.addToRows(rowBuilder.get());
+    }
+    return result;
   }
 }

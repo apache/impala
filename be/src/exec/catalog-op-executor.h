@@ -57,6 +57,11 @@ class CatalogOpExecutor {
   Status PrioritizeLoad(const TPrioritizeLoadRequest& req,
       TPrioritizeLoadResponse* result);
 
+  // Makes an RPC to the CatalogServer to verify whether the specified user has privileges
+  // to access the Sentry Policy Service. Returns OK if the user has privileges or
+  // a bad status if the user does not have privileges (or if there was an error).
+  Status SentryAdminCheck(const TSentryAdminCheckRequest& re);
+
   // Set in Exec(), returns a pointer to the TDdlExecResponse of the DDL execution.
   // If called before Exec(), this will return NULL. Only set if the
   // TCatalogOpType is DDL.

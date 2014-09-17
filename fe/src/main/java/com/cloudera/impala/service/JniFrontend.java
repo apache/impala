@@ -78,6 +78,7 @@ import com.cloudera.impala.thrift.TLogLevel;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.thrift.TResultSet;
+import com.cloudera.impala.thrift.TShowGrantRoleParams;
 import com.cloudera.impala.thrift.TShowRolesParams;
 import com.cloudera.impala.thrift.TShowRolesResult;
 import com.cloudera.impala.thrift.TShowStatsParams;
@@ -402,6 +403,19 @@ public class JniFrontend {
     }
 
     Collections.sort(result.getRole_names());
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    try {
+      return serializer.serialize(result);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  public byte[] getRolePrivileges(byte[] showGrantRolesParams) throws ImpalaException {
+    TShowGrantRoleParams params = new TShowGrantRoleParams();
+    JniUtil.deserializeThrift(protocolFactory_, params, showGrantRolesParams);
+    TResultSet result = frontend_.getCatalog().getAuthPolicy().getRolePrivileges(
+        params.getRole_name(), params.getPrivilege());
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(result);

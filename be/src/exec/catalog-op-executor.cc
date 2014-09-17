@@ -268,3 +268,19 @@ Status CatalogOpExecutor::PrioritizeLoad(const TPrioritizeLoadRequest& req,
   }
   return Status::OK;
 }
+
+Status CatalogOpExecutor::SentryAdminCheck(const TSentryAdminCheckRequest& req) {
+  const TNetworkAddress& address =
+      MakeNetworkAddress(FLAGS_catalog_service_host, FLAGS_catalog_service_port);
+  Status cnxn_status;
+  CatalogServiceConnection client(env_->catalogd_client_cache(), address, &cnxn_status);
+  RETURN_IF_ERROR(cnxn_status);
+  TSentryAdminCheckResponse resp;
+  try {
+    client->SentryAdminCheck(resp, req);
+  } catch (const TException& e) {
+    RETURN_IF_ERROR(client.Reopen());
+    client->SentryAdminCheck(resp, req);
+  }
+  return Status(resp.status);
+}

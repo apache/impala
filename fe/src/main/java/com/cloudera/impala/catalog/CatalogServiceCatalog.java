@@ -920,7 +920,7 @@ public class CatalogServiceCatalog extends Catalog {
 
   /**
    * Gets a RolePrivilege from the given role name. Returns the privilege if it exists,
-   * or null of no privilege matching the privilege spec exists.
+   * or null if no privilege matching the privilege spec exist.
    * Throws a CatalogException if the role does not exist.
    */
   public RolePrivilege getRolePrivilege(String roleName, TPrivilege privSpec)

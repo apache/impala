@@ -287,8 +287,7 @@ public class SentryProxy {
       sentryPolicyService_.revokeRolePrivilege(user, roleName, privilege);
       TPrivilege updatedPriv = existingPriv.toThrift();
       updatedPriv.setHas_grant_opt(false);
-      sentryPolicyService_.grantRolePrivilege(user, roleName, privilege);
-      LOG.info("NEW PRIV: " + updatedPriv.toString());
+      sentryPolicyService_.grantRolePrivilege(user, roleName, updatedPriv);
       return catalog_.addRolePrivilege(roleName, updatedPriv);
     }
   }

@@ -403,11 +403,13 @@ nonterminal Boolean overwrite_val;
 
 // For GRANT/REVOKE/AUTH DDL statements
 nonterminal ShowRolesStmt show_roles_stmt;
+nonterminal ShowGrantRoleStmt show_grant_role_stmt;
 nonterminal CreateDropRoleStmt create_drop_role_stmt;
 nonterminal GrantRevokeRoleStmt grant_role_stmt;
 nonterminal GrantRevokeRoleStmt revoke_role_stmt;
 nonterminal GrantRevokePrivStmt grant_privilege_stmt;
 nonterminal GrantRevokePrivStmt revoke_privilege_stmt;
+nonterminal PrivilegeSpec privilege_spec;
 nonterminal TPrivilegeLevel privilege;
 nonterminal Boolean opt_with_grantopt;
 nonterminal Boolean opt_grantopt_for;
@@ -535,6 +537,8 @@ stmt ::=
   {: RESULT = set; :}
   | show_roles_stmt:show_roles
   {: RESULT = show_roles; :}
+  | show_grant_role_stmt:show_grant_role
+  {: RESULT = show_grant_role; :}
   | create_drop_role_stmt:create_drop_role
   {: RESULT = create_drop_role; :}
   | grant_role_stmt:grant_role
@@ -635,6 +639,31 @@ show_roles_stmt ::=
   {: RESULT = new ShowRolesStmt(true, null); :}
   ;
 
+show_grant_role_stmt ::=
+  KW_SHOW KW_GRANT KW_ROLE IDENT:role
+  {: RESULT = new ShowGrantRoleStmt(role, null); :}
+  | KW_SHOW KW_GRANT KW_ROLE IDENT:role KW_ON server_ident:server_kw
+  {:
+    RESULT = new ShowGrantRoleStmt(role,
+        PrivilegeSpec.createServerScopedPriv(TPrivilegeLevel.ALL));
+  :}
+  | KW_SHOW KW_GRANT KW_ROLE IDENT:role KW_ON KW_DATABASE IDENT:db_name
+  {:
+    RESULT = new ShowGrantRoleStmt(role,
+        PrivilegeSpec.createDbScopedPriv(TPrivilegeLevel.ALL, db_name));
+  :}
+  | KW_SHOW KW_GRANT KW_ROLE IDENT:role KW_ON KW_TABLE table_name:tbl_name
+  {:
+    RESULT = new ShowGrantRoleStmt(role,
+        PrivilegeSpec.createTableScopedPriv(TPrivilegeLevel.ALL, tbl_name));
+  :}
+  | KW_SHOW KW_GRANT KW_ROLE IDENT:role KW_ON uri_ident:uri_kw STRING_LITERAL:uri
+  {:
+    RESULT = new ShowGrantRoleStmt(role,
+        PrivilegeSpec.createUriScopedPriv(TPrivilegeLevel.ALL, new HdfsUri(uri)));
+  :}
+  ;
+
 create_drop_role_stmt ::=
   KW_CREATE KW_ROLE IDENT:role
   {: RESULT = new CreateDropRoleStmt(role, false); :}
@@ -653,50 +682,24 @@ revoke_role_stmt ::=
   ;
 
 grant_privilege_stmt ::=
-  KW_GRANT privilege:priv KW_ON server_ident:server_kw KW_TO IDENT:role
-    opt_with_grantopt:grant_opt
-  {: RESULT = GrantRevokePrivStmt.createServerScopedStmt(priv, role, true, grant_opt); :}
-  | KW_GRANT privilege:priv KW_ON KW_DATABASE IDENT:db_name KW_TO IDENT:role
-    opt_with_grantopt:grant_opt
-  {:
-    RESULT = GrantRevokePrivStmt.createDbScopedStmt(priv, role, true, db_name, grant_opt);
-  :}
-  | KW_GRANT privilege:priv KW_ON KW_TABLE table_name:tbl_name KW_TO IDENT:role
-    opt_with_grantopt:grant_opt
-  {:
-    RESULT = GrantRevokePrivStmt.createTableScopedStmt(priv, role, true, tbl_name,
-        grant_opt);
-  :}
-  | KW_GRANT privilege:priv KW_ON uri_ident:uri_kw STRING_LITERAL:uri KW_TO IDENT:role
-    opt_with_grantopt:grant_opt
-  {:
-    RESULT = GrantRevokePrivStmt.createUriScopedStmt(priv, role, true, new HdfsUri(uri),
-        grant_opt);
-  :}
+  KW_GRANT privilege_spec:priv KW_TO IDENT:role opt_with_grantopt:grant_opt
+  {: RESULT = new GrantRevokePrivStmt(role, priv, true, grant_opt); :}
   ;
 
 revoke_privilege_stmt ::=
-  KW_REVOKE opt_grantopt_for:grant_opt privilege:priv KW_ON server_ident:server_kw
-  KW_FROM IDENT:role
-  {: RESULT = GrantRevokePrivStmt.createServerScopedStmt(priv, role, false, grant_opt); :}
-  | KW_REVOKE opt_grantopt_for:grant_opt privilege:priv KW_ON KW_DATABASE IDENT:db_name
-    KW_FROM IDENT:role
-  {:
-    RESULT = GrantRevokePrivStmt.createDbScopedStmt(priv, role, false, db_name,
-        grant_opt);
-  :}
-  | KW_REVOKE opt_grantopt_for:grant_opt privilege:priv KW_ON KW_TABLE table_name:tbl_name
-    KW_FROM IDENT:role
-  {:
-    RESULT = GrantRevokePrivStmt.createTableScopedStmt(priv, role, false, tbl_name,
-        grant_opt);
-  :}
-  | KW_REVOKE opt_grantopt_for:grant_opt privilege:priv KW_ON uri_ident:uri_kw
-    STRING_LITERAL:uri KW_FROM IDENT:role
-  {:
-    RESULT = GrantRevokePrivStmt.createUriScopedStmt(priv, role, false, new HdfsUri(uri),
-        grant_opt);
-  :}
+  KW_REVOKE opt_grantopt_for:grant_opt privilege_spec:priv KW_FROM IDENT:role
+  {: RESULT = new GrantRevokePrivStmt(role, priv, false, grant_opt); :}
+  ;
+
+privilege_spec ::=
+  privilege:priv KW_ON server_ident:server_kw
+  {: RESULT = PrivilegeSpec.createServerScopedPriv(priv); :}
+  | privilege:priv KW_ON KW_DATABASE IDENT:db_name
+  {: RESULT = PrivilegeSpec.createDbScopedPriv(priv, db_name); :}
+  | privilege:priv KW_ON KW_TABLE table_name:tbl_name
+  {: RESULT = PrivilegeSpec.createTableScopedPriv(priv, tbl_name); :}
+  | privilege:priv KW_ON uri_ident:uri_kw STRING_LITERAL:uri
+  {: RESULT = PrivilegeSpec.createUriScopedPriv(priv, new HdfsUri(uri)); :}
   ;
 
 privilege ::=

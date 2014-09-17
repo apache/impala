@@ -56,6 +56,24 @@ show current roles
 ---- TYPES
 STRING
 ====
+---- QUERY
+show grant role grant_revoke_test_ALL_SERVER
+---- RESULTS
+'SERVER','','','','ALL',FALSE,regex:.+
+---- LABELS
+scope, database, table, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+====
+---- QUERY
+show grant role grant_revoke_test_ALL_SERVER on server
+---- RESULTS
+'SERVER','','','','ALL',FALSE,regex:.+
+---- LABELS
+scope, database, table, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+====
 ---- USER
 does_not_exist
 ---- QUERY
@@ -165,6 +183,15 @@ show tables in grant_rev_db
 STRING
 ====
 ---- QUERY
+show grant role grant_revoke_test_ALL_URI
+---- RESULTS
+'URI','','','hdfs://localhost:20500/test-warehouse/grant_rev_test_tbl2','ALL',FALSE,regex:.+
+---- LABELS
+scope, database, table, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+====
+---- QUERY
 # To create a database server-level privileges are required.
 create database grant_rev_db
 ---- CATCH
@@ -203,6 +230,16 @@ does not have privileges to execute 'INSERT' on: grant_rev_db.test_tbl1
 ====
 ---- QUERY
 GRANT INSERT ON TABLE grant_rev_db.test_tbl1 TO grant_revoke_test_SELECT_INSERT_TEST_TBL
+====
+---- QUERY
+show grant role grant_revoke_test_SELECT_INSERT_TEST_TBL on table grant_rev_db.test_tbl1
+---- RESULTS
+'TABLE','grant_rev_db','test_tbl1','','SELECT',FALSE,regex:.+
+'TABLE','grant_rev_db','test_tbl1','','INSERT',FALSE,regex:.+
+---- LABELS
+scope, database, table, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
 insert overwrite grant_rev_db.test_tbl1 select 1
@@ -297,6 +334,18 @@ grant all on table functional.alltypes to grant_revoke_test_ROOT
 ---- USER
 root
 ---- QUERY
+show grant role grant_revoke_test_ROOT
+---- RESULTS
+'DATABASE','functional','','','ALL',TRUE,regex:.+
+'TABLE','functional','alltypes','','ALL',FALSE,regex:.+
+---- LABELS
+scope, database, table, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+---- USER
+root
+====
+---- QUERY
 revoke all on table functional.alltypes from grant_revoke_test_ROOT
 ====
 ---- USER
@@ -327,13 +376,13 @@ User 'root' does not have privileges to execute: GRANT_ROLE
 # Revoke the GRANT OPTION and verify the user can no longer GRANT or REVOKE
 revoke grant option for all on database functional from grant_revoke_test_ROOT
 ====
-#---- USER
-#root
-#---- QUERY
-#grant all on table functional.alltypes to grant_revoke_test_ROOT
-#---- CATCH
-#User 'root' does not have privileges to execute: GRANT_PRIVILEGE
-#====
+---- USER
+root
+---- QUERY
+grant all on table functional.alltypes to grant_revoke_test_ROOT
+---- CATCH
+User 'root' does not have privileges to execute: GRANT_PRIVILEGE
+====
 ---- USER
 root
 ---- QUERY
@@ -344,6 +393,18 @@ show databases
 'functional'
 ---- TYPES
 STRING
+====
+---- QUERY
+# Privilege still exists, but grant option is set to false
+show grant role grant_revoke_test_ROOT
+---- RESULTS
+'DATABASE','functional','','','ALL',FALSE,regex:.+
+---- LABELS
+scope, database, table, uri, privilege, grant_option, create_time
+---- TYPES
+STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
+---- USER
+root
 ====
 ---- QUERY
 # Cleanup test roles

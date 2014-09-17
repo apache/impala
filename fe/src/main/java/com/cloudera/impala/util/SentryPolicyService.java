@@ -274,12 +274,12 @@ public class SentryPolicyService {
       switch (privilege.getScope()) {
         case SERVER:
           client.get().revokeServerPrivilege(requestingUser.getShortName(), roleName,
-              privilege.getServer_name(), privilege.isHas_grant_opt());
+              privilege.getServer_name(), null);
           break;
         case DATABASE:
           client.get().revokeDatabasePrivilege(requestingUser.getShortName(), roleName,
               privilege.getServer_name(), privilege.getDb_name(),
-              privilege.getPrivilege_level().toString(), privilege.isHas_grant_opt());
+              privilege.getPrivilege_level().toString(), null);
           break;
         case TABLE:
           String tblName = privilege.getTable_name();
@@ -287,12 +287,12 @@ public class SentryPolicyService {
           client.get().revokeTablePrivilege(requestingUser.getShortName(), roleName,
               privilege.getServer_name(), dbName, tblName,
               privilege.getPrivilege_level().toString(),
-              privilege.isHas_grant_opt());
+              null);
           break;
         case URI:
           client.get().revokeURIPrivilege(requestingUser.getShortName(),
               roleName, privilege.getServer_name(), privilege.getUri(),
-              privilege.isHas_grant_opt());
+              null);
           break;
       }
     } catch (SentryAccessDeniedException e) {

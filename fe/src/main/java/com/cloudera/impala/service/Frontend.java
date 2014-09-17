@@ -55,6 +55,7 @@ import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.ResetMetadataStmt;
 import com.cloudera.impala.analysis.ShowFunctionsStmt;
+import com.cloudera.impala.analysis.ShowGrantRoleStmt;
 import com.cloudera.impala.analysis.ShowRolesStmt;
 import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.authorization.AuthorizationChecker;
@@ -419,6 +420,18 @@ public class Frontend {
       }
       metadata.setColumns(Arrays.asList(
           new TColumn("role_name", Type.STRING.toThrift())));
+    } else if (analysis.isShowGrantRoleStmt()) {
+      ddl.op_type = TCatalogOpType.SHOW_GRANT_ROLE;
+      ShowGrantRoleStmt showGrantRoleStmt = (ShowGrantRoleStmt) analysis.getStmt();
+      ddl.setShow_grant_role_params(showGrantRoleStmt.toThrift());
+      Set<String> groupNames =
+          getAuthzChecker().getUserGroups(analysis.getAnalyzer().getUser());
+      // User must be an admin to execute this operation if they have not been granted
+      // this role.
+      ddl.getShow_grant_role_params().setIs_admin_op(Sets.intersection(groupNames,
+          showGrantRoleStmt.getRole().getGrantGroups()).isEmpty());
+      metadata.setColumns(Arrays.asList(
+          new TColumn("name", Type.STRING.toThrift())));
     } else if (analysis.isCreateDropRoleStmt()) {
       CreateDropRoleStmt createDropRoleStmt = (CreateDropRoleStmt) analysis.getStmt();
       TCreateDropRoleParams params = createDropRoleStmt.toThrift();

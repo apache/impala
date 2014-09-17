@@ -90,6 +90,7 @@ public class AnalysisContext {
     public boolean isResetMetadataStmt() { return stmt_ instanceof ResetMetadataStmt; }
     public boolean isExplainStmt() { return stmt_.isExplain(); }
     public boolean isShowRolesStmt() { return stmt_ instanceof ShowRolesStmt; }
+    public boolean isShowGrantRoleStmt() { return stmt_ instanceof ShowGrantRoleStmt; }
     public boolean isCreateDropRoleStmt() { return stmt_ instanceof CreateDropRoleStmt; }
     public boolean isGrantRevokeRoleStmt() {
       return stmt_ instanceof GrantRevokeRoleStmt;
@@ -114,8 +115,8 @@ public class AnalysisContext {
 
     private boolean isViewMetadataStmt() {
       return isShowTablesStmt() || isShowDbsStmt() || isShowFunctionsStmt() ||
-          isShowRolesStmt() || isShowCreateTableStmt() || isShowDataSrcsStmt() ||
-          isShowStatsStmt() || isDescribeStmt();
+          isShowRolesStmt() || isShowGrantRoleStmt() || isShowCreateTableStmt() ||
+          isShowDataSrcsStmt() || isShowStatsStmt() || isDescribeStmt();
     }
 
     private boolean isGrantRevokeStmt() {

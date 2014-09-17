@@ -120,10 +120,9 @@ public class RolePrivilege implements CatalogObject {
 
   // The time this role was created. Used to quickly check if the same privilege
   // was dropped and re-created. Assumes a role will not be created + dropped + created
-  // in less than 1ms. Returns 0 if create_time_ms was not set for the
-  // privilege.
+  // in less than 1ms. Returns -1 if create_time_ms was not set for the privilege.
   public long getCreateTimeMs() {
-    return privilege_.isSetCreate_time_ms() ? privilege_.getCreate_time_ms() : 0L;
+    return privilege_.isSetCreate_time_ms() ? privilege_.getCreate_time_ms() : -1L;
   }
   public TPrivilegeScope getScope() { return privilege_.getScope(); }
 }

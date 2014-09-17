@@ -14,14 +14,10 @@
 
 package com.cloudera.impala.analysis;
 
-import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.Role;
-import com.cloudera.impala.catalog.RolePrivilege;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TGrantRevokePrivParams;
 import com.cloudera.impala.thrift.TPrivilege;
-import com.cloudera.impala.thrift.TPrivilegeLevel;
-import com.cloudera.impala.thrift.TPrivilegeScope;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
@@ -35,77 +31,32 @@ import com.google.common.collect.Lists;
  * the Sentry Service).
  */
 public class GrantRevokePrivStmt extends AuthorizationStmt {
-  private final TPrivilegeLevel privilegeLevel_;
-  private final TPrivilegeScope scope_;
+  private final PrivilegeSpec privilegeSpec_;
   private final String roleName_;
-  private final TableName tableName_;
-  private final HdfsUri uri_;
   private final boolean isGrantPrivStmt_;
   private final boolean hasGrantOpt_;
 
   // Set/modified during analysis
-  private String dbName_;
-  private String serverName_;
   private Role role_;
 
-  private GrantRevokePrivStmt(TPrivilegeLevel privilegeLevel, TPrivilegeScope scope,
-      String roleName, boolean isGrantPrivStmt, String dbName, TableName tableName,
-      HdfsUri uri, boolean hasGrantOpt) {
-    Preconditions.checkNotNull(privilegeLevel);
-    Preconditions.checkNotNull(scope);
+  public GrantRevokePrivStmt(String roleName, PrivilegeSpec privilegeSpec,
+      boolean isGrantPrivStmt, boolean hasGrantOpt) {
+    Preconditions.checkNotNull(privilegeSpec);
     Preconditions.checkNotNull(roleName);
-    privilegeLevel_ = privilegeLevel;
-    scope_ = scope;
+    privilegeSpec_ = privilegeSpec;
     roleName_ = roleName;
     isGrantPrivStmt_ = isGrantPrivStmt;
-    tableName_ = tableName;
-    dbName_ = (tableName_ != null ? tableName_.getDb() : dbName);
-    uri_ = uri;
     hasGrantOpt_ = hasGrantOpt;
-  }
-
-  public static GrantRevokePrivStmt createServerScopedStmt(
-      TPrivilegeLevel privilegeLevel, String roleName, boolean isGrantPrivStmt,
-      boolean hasGrantOpt) {
-    return new GrantRevokePrivStmt(privilegeLevel, TPrivilegeScope.SERVER, roleName,
-        isGrantPrivStmt, null, null, null, hasGrantOpt);
-  }
-
-  public static GrantRevokePrivStmt createDbScopedStmt(TPrivilegeLevel privilegeLevel,
-      String roleName, boolean isGrantPrivStmt, String dbName, boolean hasGrantOpt) {
-    return new GrantRevokePrivStmt(privilegeLevel, TPrivilegeScope.DATABASE, roleName,
-        isGrantPrivStmt, dbName, null, null, hasGrantOpt);
-  }
-
-  public static GrantRevokePrivStmt createTableScopedStmt(TPrivilegeLevel privilegeLevel,
-      String roleName, boolean isGrantPrivStmt, TableName tableName,
-      boolean hasGrantOpt) {
-    Preconditions.checkNotNull(tableName);
-    return new GrantRevokePrivStmt(privilegeLevel, TPrivilegeScope.TABLE, roleName,
-        isGrantPrivStmt, null, tableName, null, hasGrantOpt);
-  }
-
-  public static GrantRevokePrivStmt createUriScopedStmt(TPrivilegeLevel privilegeLevel,
-      String roleName, boolean isGrantPrivStmt, HdfsUri uri, boolean hasGrantOpt) {
-    return new GrantRevokePrivStmt(privilegeLevel, TPrivilegeScope.URI, roleName,
-        isGrantPrivStmt, null, null, uri, hasGrantOpt);
   }
 
   public TGrantRevokePrivParams toThrift() {
     TGrantRevokePrivParams params = new TGrantRevokePrivParams();
     params.setRole_name(roleName_);
-    TPrivilege privilege = new TPrivilege();
-    privilege.setScope(scope_);
-    privilege.setRole_id(role_.getId());
-    privilege.setServer_name(serverName_);
-    privilege.setPrivilege_level(privilegeLevel_);
-    if (dbName_ != null) privilege.setDb_name(dbName_);
-    if (tableName_ != null) privilege.setTable_name(tableName_.getTbl());
-    if (uri_ != null) privilege.setUri(uri_.toString());
     params.setIs_grant(isGrantPrivStmt_);
-    params.setPrivileges(Lists.newArrayList(privilege));
+    TPrivilege privilege = privilegeSpec_.toThrift();
+    privilege.setRole_id(role_.getId());
     privilege.setHas_grant_opt(hasGrantOpt_);
-    privilege.setPrivilege_name(RolePrivilege.buildRolePrivilegeName(privilege));
+    params.setPrivileges(Lists.newArrayList(privilege));
     return params;
   }
 
@@ -113,17 +64,8 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
   public String toSql() {
     StringBuilder sb = new StringBuilder(isGrantPrivStmt_ ? "GRANT " : "REVOKE ");
     if (!isGrantPrivStmt_ && hasGrantOpt_) sb.append("GRANT OPTION FOR ");
-    sb.append(privilegeLevel_.toString());
-    sb.append(" ON ");
-    sb.append(scope_.toString() + " ");
-    if (scope_ == TPrivilegeScope.DATABASE) {
-      sb.append(dbName_ + " ");
-    } else if (scope_ == TPrivilegeScope.TABLE) {
-      sb.append(tableName_.toString() + " ");
-    } else if (scope_ == TPrivilegeScope.URI) {
-      sb.append("'" + uri_.getLocation() + "' ");
-    }
-    sb.append(isGrantPrivStmt_ ? "TO " : "FROM ");
+    sb.append(privilegeSpec_.toSql());
+    sb.append(isGrantPrivStmt_ ? " TO " : " FROM ");
     sb.append(roleName_);
     if (isGrantPrivStmt_ && hasGrantOpt_) sb.append(" WITH GRANT OPTION");
     return sb.toString();
@@ -140,40 +82,6 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
     if (role_ == null) {
       throw new AnalysisException(String.format("Role '%s' does not exist.", roleName_));
     }
-    serverName_ = analyzer.getAuthzConfig().getServerName();
-    Preconditions.checkState(!Strings.isNullOrEmpty(serverName_));
-
-    switch (scope_) {
-      case SERVER:
-        if (privilegeLevel_ != TPrivilegeLevel.ALL) {
-          throw new AnalysisException("Only 'ALL' privilege may be GRANTED/REVOKED " +
-              "to/from a SERVER.");
-        }
-        break;
-      case DATABASE:
-        if (Strings.isNullOrEmpty(dbName_)) {
-          throw new AnalysisException("Database name in GRANT/REVOKE privilege cannot " +
-              "be empty");
-        }
-        break;
-      case URI:
-        if (privilegeLevel_ != TPrivilegeLevel.ALL) {
-          throw new AnalysisException("Only 'ALL' privilege may be GRANTED/REVOKED " +
-              "to/from a URI.");
-        }
-        uri_.analyze(analyzer, Privilege.ALL, false);
-        break;
-      case TABLE:
-        if (Strings.isNullOrEmpty(tableName_.getTbl())) {
-          throw new AnalysisException("Table name in GRANT/REVOKE privilege cannot be " +
-              "empty");
-        }
-        dbName_ = analyzer.getTargetDbName(tableName_);
-        Preconditions.checkNotNull(dbName_);
-        break;
-      default:
-        throw new IllegalStateException("Unknown SCOPE in GRANT/REVOKE privilege " +
-            "statement: " + scope_.toString());
-    }
+    privilegeSpec_.analyze(analyzer);
   }
 }

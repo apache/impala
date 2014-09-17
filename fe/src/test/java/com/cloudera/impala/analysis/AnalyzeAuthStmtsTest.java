@@ -63,6 +63,26 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
   }
 
   @Test
+  public void AnalyzeShowGrantRole() {
+    AnalyzesOk("SHOW GRANT ROLE myRole");
+    AnalyzesOk("SHOW GRANT ROLE myRole ON SERVER");
+    AnalyzesOk("SHOW GRANT ROLE myRole ON DATABASE functional");
+    AnalyzesOk("SHOW GRANT ROLE myRole ON TABLE foo");
+    AnalyzesOk("SHOW GRANT ROLE myRole ON TABLE functional.alltypes");
+    AnalyzesOk("SHOW GRANT ROLE myRole ON URI 'hdfs:////test-warehouse//foo'");
+    AnalysisError("SHOW GRANT ROLE does_not_exist",
+        "Role 'does_not_exist' does not exist.");
+    AnalysisError("SHOW GRANT ROLE does_not_exist ON SERVER",
+        "Role 'does_not_exist' does not exist.");
+
+    Analyzer authDisabledAnalyzer = createAuthDisabledAnalyzer(Catalog.DEFAULT_DB);
+    AnalysisError("SHOW GRANT ROLE myRole", authDisabledAnalyzer,
+        "Authorization is not enabled.");
+    AnalysisError("SHOW GRANT ROLE myRole ON SERVER", authDisabledAnalyzer,
+        "Authorization is not enabled.");
+  }
+
+  @Test
   public void AnalyzeCreateDropRole() throws AnalysisException {
     AnalyzesOk("DROP ROLE myRole");
     AnalyzesOk("CREATE ROLE doesNotExist");
@@ -118,10 +138,10 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
       AnalyzesOk(String.format("%s INSERT ON TABLE bar.foo %s myrole", formatArgs));
       AnalyzesOk(String.format("%s INSERT ON DATABASE foo %s myrole", formatArgs));
       AnalysisError(String.format("%s INSERT ON SERVER %s myrole", formatArgs),
-          "Only 'ALL' privilege may be GRANTED/REVOKED to/from a SERVER");
+          "Only 'ALL' privilege may be applied at SERVER scope in privilege spec.");
       AnalysisError(String.format("%s INSERT ON URI 'hdfs:////abc//123' %s myrole",
-          formatArgs), "Only 'ALL' privilege may be GRANTED/REVOKED to/from " +
-          "a URI");
+          formatArgs), "Only 'ALL' privilege may be applied at URI scope in " +
+            "privilege spec.");
 
       AnalyzesOk(String.format("%s SELECT ON TABLE foo %s myrole", formatArgs));
       AnalyzesOk(String.format("%s SELECT ON TABLE bar.foo %s myrole", formatArgs));
@@ -129,10 +149,10 @@ public class AnalyzeAuthStmtsTest extends AnalyzerTest {
       AnalyzesOk(String.format("%s SELECT ON TABLE foo %s myrole", formatArgs));
       AnalyzesOk(String.format("%s SELECT ON TABLE bar.foo %s myrole", formatArgs));
       AnalysisError(String.format("%s SELECT ON SERVER %s myrole", formatArgs),
-          "Only 'ALL' privilege may be GRANTED/REVOKED to/from a SERVER");
+          "Only 'ALL' privilege may be applied at SERVER scope in privilege spec.");
       AnalysisError(String.format("%s SELECT ON URI 'hdfs:////abc//123' %s myrole",
-          formatArgs), "Only 'ALL' privilege may be GRANTED/REVOKED to/from " +
-          "a URI");
+          formatArgs), "Only 'ALL' privilege may be applied at URI scope in " +
+          "privilege spec.");
     }
 
     Analyzer authDisabledAnalyzer = createAuthDisabledAnalyzer(Catalog.DEFAULT_DB);

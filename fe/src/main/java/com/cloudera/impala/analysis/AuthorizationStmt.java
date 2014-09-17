@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Strings;
 
@@ -22,6 +23,9 @@ import com.google.common.base.Strings;
  * ROLE/privilege, etc.
  */
 public class AuthorizationStmt extends StatementBase {
+  // Set during analysis
+  protected User requestingUser_;
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (!analyzer.getAuthzConfig().isEnabled()) {
@@ -37,5 +41,6 @@ public class AuthorizationStmt extends StatementBase {
       throw new AnalysisException("Cannot execute authorization statement with an " +
           "empty username.");
     }
+    requestingUser_ = analyzer.getUser();
   }
 }
