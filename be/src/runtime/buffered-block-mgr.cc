@@ -20,6 +20,7 @@
 #include "util/runtime-profile.h"
 #include "util/disk-info.h"
 #include "util/filesystem-util.h"
+#include "util/impalad-metrics.h"
 #include "util/uid-util.h"
 
 using namespace std;
@@ -437,6 +438,11 @@ Status BufferedBlockMgr::WriteUnpinnedBlock(Block* block) {
   DCHECK(block->Validate()) << endl << block->DebugString();
   outstanding_writes_counter_->Add(1);
   writes_issued_counter_->Add(1);
+  if (writes_issued_counter_->value() == 1) {
+    if (ImpaladMetrics::NUM_QUERIES_SPILLED != NULL) {
+      ImpaladMetrics::NUM_QUERIES_SPILLED->Increment(1);
+    }
+  }
   return Status::OK;
 }
 

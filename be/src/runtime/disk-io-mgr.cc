@@ -1057,6 +1057,9 @@ Status DiskIoMgr::WriteRangeHelper(FILE* file_handle, WriteRange* write_range) {
         Substitute("fwrite(buffer, 1, $0, $1) failed with errno=$2 description=$3",
             write_range->len_, write_range->file_, errno, GetStrErrMsg()));
   }
+  if (ImpaladMetrics::IO_MGR_BYTES_WRITTEN != NULL) {
+    ImpaladMetrics::IO_MGR_BYTES_WRITTEN->Increment(write_range->len_);
+  }
 
   return Status::OK;
 }

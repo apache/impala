@@ -86,6 +86,9 @@ class ImpaladMetricKeys {
   // Total number of cached bytes read by the io mgr
   static const char* IO_MGR_CACHED_BYTES_READ;
 
+  // Total number of bytes written to disk by the io mgr (for spilling)
+  static const char* IO_MGR_BYTES_WRITTEN;
+
   // Number of DBs in the catalog
   static const char* CATALOG_NUM_DBS;
 
@@ -106,6 +109,9 @@ class ImpaladMetricKeys {
 
   // Number of queries expired due to inactivity
   static const char* NUM_QUERIES_EXPIRED;
+
+  // Number of queries that spilled.
+  static const char* NUM_QUERIES_SPILLED;
 
   // Total number of rows cached to support HS2 FETCH_FIRST.
   static const char* RESULTSET_CACHE_TOTAL_NUM_ROWS;
@@ -140,12 +146,14 @@ class ImpaladMetrics {
   static Metrics::BytesMetric* IO_MGR_LOCAL_BYTES_READ;
   static Metrics::BytesMetric* IO_MGR_SHORT_CIRCUIT_BYTES_READ;
   static Metrics::BytesMetric* IO_MGR_CACHED_BYTES_READ;
+  static Metrics::BytesMetric* IO_MGR_BYTES_WRITTEN;
   static Metrics::IntMetric* CATALOG_NUM_DBS;
   static Metrics::IntMetric* CATALOG_NUM_TABLES;
   static Metrics::BooleanMetric* CATALOG_READY;
   static Metrics::IntMetric* NUM_FILES_OPEN_FOR_INSERT;
   static Metrics::IntMetric* NUM_SESSIONS_EXPIRED;
   static Metrics::IntMetric* NUM_QUERIES_EXPIRED;
+  static Metrics::IntMetric* NUM_QUERIES_SPILLED;
   static Metrics::IntMetric* RESULTSET_CACHE_TOTAL_NUM_ROWS;
   static Metrics::BytesMetric* RESULTSET_CACHE_TOTAL_BYTES;
 

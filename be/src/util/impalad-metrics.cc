@@ -58,6 +58,8 @@ const char* ImpaladMetricKeys::IO_MGR_SHORT_CIRCUIT_BYTES_READ =
     "impala-server.io-mgr.short-circuit-bytes-read";
 const char* ImpaladMetricKeys::IO_MGR_CACHED_BYTES_READ =
     "impala-server.io-mgr.cached-bytes-read";
+const char* ImpaladMetricKeys::IO_MGR_BYTES_WRITTEN =
+    "impala-server.io-mgr.bytes-written";
 const char* ImpaladMetricKeys::CATALOG_NUM_DBS =
     "catalog.num-databases";
 const char* ImpaladMetricKeys::CATALOG_NUM_TABLES =
@@ -74,6 +76,8 @@ const char* ImpaladMetricKeys::NUM_SESSIONS_EXPIRED =
     "impala-server.num-sessions-expired";
 const char* ImpaladMetricKeys::NUM_QUERIES_EXPIRED =
     "impala-server.num-queries-expired";
+const char* ImpaladMetricKeys::NUM_QUERIES_SPILLED =
+    "impala-server.num-queries-spilled";
 const char* ImpaladMetricKeys::RESULTSET_CACHE_TOTAL_NUM_ROWS =
     "impala-server.resultset-cache.total-num-rows";
 const char* ImpaladMetricKeys::RESULTSET_CACHE_TOTAL_BYTES =
@@ -100,12 +104,14 @@ Metrics::BytesMetric* ImpaladMetrics::IO_MGR_BYTES_READ = NULL;
 Metrics::BytesMetric* ImpaladMetrics::IO_MGR_LOCAL_BYTES_READ = NULL;
 Metrics::BytesMetric* ImpaladMetrics::IO_MGR_SHORT_CIRCUIT_BYTES_READ = NULL;
 Metrics::BytesMetric* ImpaladMetrics::IO_MGR_CACHED_BYTES_READ = NULL;
+Metrics::BytesMetric* ImpaladMetrics::IO_MGR_BYTES_WRITTEN = NULL;
 Metrics::IntMetric* ImpaladMetrics::CATALOG_NUM_DBS = NULL;
 Metrics::IntMetric* ImpaladMetrics::CATALOG_NUM_TABLES = NULL;
 Metrics::BooleanMetric* ImpaladMetrics::CATALOG_READY = NULL;
 Metrics::IntMetric* ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT = NULL;
 Metrics::IntMetric* ImpaladMetrics::NUM_SESSIONS_EXPIRED = NULL;
 Metrics::IntMetric* ImpaladMetrics::NUM_QUERIES_EXPIRED = NULL;
+Metrics::IntMetric* ImpaladMetrics::NUM_QUERIES_SPILLED = NULL;
 Metrics::IntMetric* ImpaladMetrics::RESULTSET_CACHE_TOTAL_NUM_ROWS = NULL;
 Metrics::BytesMetric* ImpaladMetrics::RESULTSET_CACHE_TOTAL_BYTES = NULL;
 
@@ -123,6 +129,8 @@ void ImpaladMetrics::CreateMetrics(Metrics* m) {
       ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES, 0L);
   NUM_QUERIES_EXPIRED = m->CreateAndRegisterPrimitiveMetric(
       ImpaladMetricKeys::NUM_QUERIES_EXPIRED, 0L);
+  NUM_QUERIES_SPILLED = m->CreateAndRegisterPrimitiveMetric(
+      ImpaladMetricKeys::NUM_QUERIES_SPILLED, 0L);
   IMPALA_SERVER_NUM_FRAGMENTS = m->CreateAndRegisterPrimitiveMetric(
       ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS, 0L);
   IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS = m->CreateAndRegisterPrimitiveMetric(
@@ -169,6 +177,8 @@ void ImpaladMetrics::CreateMetrics(Metrics* m) {
       new Metrics::BytesMetric(ImpaladMetricKeys::IO_MGR_SHORT_CIRCUIT_BYTES_READ, 0L));
   IO_MGR_CACHED_BYTES_READ = m->RegisterMetric(
       new Metrics::BytesMetric(ImpaladMetricKeys::IO_MGR_CACHED_BYTES_READ, 0L));
+  IO_MGR_BYTES_WRITTEN = m->RegisterMetric(
+      new Metrics::BytesMetric(ImpaladMetricKeys::IO_MGR_BYTES_WRITTEN, 0L));
 
   // Initialize catalog metrics
   CATALOG_NUM_DBS = m->CreateAndRegisterPrimitiveMetric(
