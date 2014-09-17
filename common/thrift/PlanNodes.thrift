@@ -156,6 +156,13 @@ enum TJoinOp {
   LEFT_OUTER_JOIN,
   LEFT_SEMI_JOIN,
   LEFT_ANTI_JOIN,
+
+  // Similar to LEFT_ANTI_JOIN with special handling for NULLs for the join conjuncts
+  // on the build side. Those NULLs are considered candidate matches, and therefore could
+  // be rejected (ANTI-join), based on the other join conjuncts. This is in contrast
+  // to LEFT_ANTI_JOIN where NULLs are not matches and therefore always returned.
+  NULL_AWARE_LEFT_ANTI_JOIN,
+
   RIGHT_OUTER_JOIN,
   RIGHT_SEMI_JOIN,
   RIGHT_ANTI_JOIN,

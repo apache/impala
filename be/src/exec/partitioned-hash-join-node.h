@@ -181,6 +181,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // partition in the front of flush_build_partitions_.
   Status OutputUnmatchedBuild(RowBatch* out_batch);
 
+  // Continues processing from null_aware_partition_. Called after we have finished
+  // processing all build and probe input (including repartitioning them).
+  Status OutputNullAwareProbeRows(RuntimeState* state, RowBatch* out_batch);
+
   // Call at the end of consuming the probe rows. Walks hash_partitions_ and
   //  - If this partition had a hash table, close it. This partition is fully processed
   //    on both the build and probe sides. The streams are transferred to batch.
@@ -390,6 +394,22 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // that we need to output their unmatched build rows. We always flush the unmatched
   // rows of the partition that it is in the front.
   std::list<Partition*> output_build_partitions_;
+
+  // Partition used if null_aware_ is set. This partition is always processed at the end
+  // after all build and probe rows are processed. Rows are added to this partition along
+  // the way.
+  // In this partition's build_rows_, we store all the rows for which build_expr_ctxs_
+  // evaluated over the row returns NULL (i.e. it has a NULL on the eq join slot).
+  // In this partition's probe_rows, we store all probe rows that did not have a match
+  // in the hash table.
+  // At the very end, we then iterate over all the probe rows. For each probe row, we
+  // return the rows that did not match any of the build rows.
+  // NULL if we this join is not null aware or we are done processing this partition.
+  Partition* null_aware_partition_;
+
+  // Used while processing null_aware_partition_. It contains all the build tuple rows
+  // with a NULL when evaluating the hash table expr.
+  boost::scoped_ptr<RowBatch> nulls_build_batch_;
 };
 
 }

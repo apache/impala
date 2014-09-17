@@ -108,6 +108,8 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
         }
       }
     }
+
+next_row:
     // Must have reached the end of the hash table iterator for the current row before
     // moving to the row.
     DCHECK(hash_tbl_iterator_.AtEnd());
@@ -127,18 +129,26 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
     if (LIKELY(hash_tbls_[partition_idx] != NULL)) {
       hash_tbl_iterator_= hash_tbls_[partition_idx]->Find(ht_ctx, hash);
-      continue;
+    } else {
+      Partition* partition = hash_partitions_[partition_idx];
+      if (UNLIKELY(partition->is_closed())) {
+        // This partition is closed, meaning the build side for this partition was empty.
+        DCHECK_EQ(state_, PROCESSING_PROBE);
+      } else {
+        DCHECK(partition->is_spilled());
+        DCHECK(partition->probe_rows() != NULL);
+        // This partition is not in memory, spill the probe row.
+        if (UNLIKELY(!AppendRow(partition->probe_rows(), current_probe_row_))) return -1;
+        continue;
+      }
     }
 
-    Partition* partition = hash_partitions_[partition_idx];
-    if (UNLIKELY(partition->is_closed())) {
-      // This partition is closed, meaning the build side for this partition was empty.
-      DCHECK_EQ(state_, PROCESSING_PROBE);
-    } else {
-      DCHECK(partition->is_spilled());
-      DCHECK(partition->probe_rows() != NULL);
-      // This partition is not in memory, spill the probe row.
-      if (UNLIKELY(!AppendRow(partition->probe_rows(), current_probe_row_))) return -1;
+    if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN && hash_tbl_iterator_.AtEnd()) {
+      // Null aware behavior.
+      if (num_join_conjuncts == 0) goto next_row;
+      if (null_aware_partition_->build_rows()->num_rows() == 0) goto next_row;
+      if (!null_aware_partition_->probe_rows()->AddRow(current_probe_row_)) return -1;
+      goto next_row;
     }
   }
 
@@ -158,6 +168,8 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
       return ProcessProbeBatch<TJoinOp::LEFT_SEMI_JOIN>(out_batch, ht_ctx);
     case TJoinOp::LEFT_ANTI_JOIN:
       return ProcessProbeBatch<TJoinOp::LEFT_ANTI_JOIN>(out_batch, ht_ctx);
+    case TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN:
+      return ProcessProbeBatch<TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN>(out_batch, ht_ctx);
     case TJoinOp::RIGHT_OUTER_JOIN:
       return ProcessProbeBatch<TJoinOp::RIGHT_OUTER_JOIN>(out_batch, ht_ctx);
     case TJoinOp::RIGHT_SEMI_JOIN:
@@ -176,7 +188,17 @@ Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch) {
   for (int i = 0; i < build_batch->num_rows(); ++i) {
     TupleRow* build_row = build_batch->GetRow(i);
     uint32_t hash;
-    if (!ht_ctx_->EvalAndHashBuild(build_row, &hash)) continue;
+    if (!ht_ctx_->EvalAndHashBuild(build_row, &hash)) {
+      if (null_aware_partition_ != NULL) {
+        // TODO: remove with codegen/template
+        // If we are NULL aware and this build row has NULL in the eq join slot,
+        // append it to the null_aware partition. We will need it later.
+        if (!null_aware_partition_->build_rows()->AddRow(build_row)) {
+          return null_aware_partition_->build_rows()->status();
+        }
+      }
+      continue;
+    }
     Partition* partition = hash_partitions_[hash >> (32 - NUM_PARTITIONING_BITS)];
     // TODO: Should we maintain a histogram with the size of each partition?
     bool result = AppendRow(partition->build_rows(), build_row);
