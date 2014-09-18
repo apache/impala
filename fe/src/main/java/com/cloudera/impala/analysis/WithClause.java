@@ -82,23 +82,30 @@ public class WithClause implements ParseNode {
       withClauseAnalyzer = new Analyzer(analyzer);
     }
     if (analyzer.isExplain()) withClauseAnalyzer.setIsExplain();
-    for (View view: views_) {
-      Analyzer viewAnalyzer = new Analyzer(withClauseAnalyzer);
-      view.getQueryStmt().analyze(viewAnalyzer);
-      // Register this view so that the next view can reference it.
-      withClauseAnalyzer.registerLocalView(view);
-    }
-    // Register all local views with the analyzer.
-    for (View localView: withClauseAnalyzer.getLocalViews().values()) {
-      analyzer.registerLocalView(localView);
-    }
-    // Record audit events because the resolved table references won't generate any
-    // when a view is referenced.
-    analyzer.getAccessEvents().addAll(withClauseAnalyzer.getAccessEvents());
+    try {
+      for (View view: views_) {
+        Analyzer viewAnalyzer = new Analyzer(withClauseAnalyzer);
+        view.getQueryStmt().analyze(viewAnalyzer);
+        // Register this view so that the next view can reference it.
+        withClauseAnalyzer.registerLocalView(view);
+      }
+      // Register all local views with the analyzer.
+      for (View localView: withClauseAnalyzer.getLocalViews().values()) {
+        analyzer.registerLocalView(localView);
+      }
+      // Record audit events because the resolved table references won't generate any
+      // when a view is referenced.
+      analyzer.getAccessEvents().addAll(withClauseAnalyzer.getAccessEvents());
 
-    // Register all privilege requests made from the root analyzer.
-    for (PrivilegeRequest req: withClauseAnalyzer.getPrivilegeReqs()) {
-      analyzer.registerPrivReq(req);
+      // Register all privilege requests made from the root analyzer.
+      for (PrivilegeRequest req: withClauseAnalyzer.getPrivilegeReqs()) {
+        analyzer.registerPrivReq(req);
+      }
+    } finally {
+      // Record missing tables in the original analyzer.
+      if (analyzer.isRootAnalyzer()) {
+        analyzer.getMissingTbls().addAll(withClauseAnalyzer.getMissingTbls());
+      }
     }
   }
 
