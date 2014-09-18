@@ -361,9 +361,8 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
         HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
         continue;
       }
-      Status status = SetQueryOptions(conf_itr->first, conf_itr->second,
-          &state->default_query_options);
-      HS2_RETURN_IF_ERROR(return_val, status, SQLSTATE_GENERAL_ERROR);
+      // Ignore failure to set query options (will be logged)
+      SetQueryOptions(conf_itr->first, conf_itr->second, &state->default_query_options);
     }
   }
   TQueryOptionsToMap(state->default_query_options, &return_val.configuration);
