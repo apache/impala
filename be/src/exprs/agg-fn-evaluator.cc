@@ -303,6 +303,8 @@ void AggFnEvaluator::Init(FunctionContext* agg_fn_ctx, Tuple* dst) {
   DCHECK(init_fn_ != NULL);
   reinterpret_cast<InitFn>(init_fn_)(agg_fn_ctx, staging_intermediate_val_);
   SetDstSlot(staging_intermediate_val_, intermediate_slot_desc_, dst);
+  agg_fn_ctx->impl()->set_num_updates(0);
+  agg_fn_ctx->impl()->set_num_removes(0);
 }
 
 static void SetAnyVal(const SlotDescriptor* desc, Tuple* tuple, AnyVal* dst) {

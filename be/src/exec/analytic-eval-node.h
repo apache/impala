@@ -128,8 +128,9 @@ class AnalyticEvalNode : public ExecNode {
   void TryAddResultTupleForCurrRow(int64_t stream_idx, TupleRow* row);
 
   // Adds additional result tuples at the end of a partition, e.g. if the end bound is
-  // FOLLOWING. partition_idx is the index into input_stream_ of the new partition.
-  void TryAddRemainingResults(int64_t partition_idx);
+  // FOLLOWING. partition_idx is the index into input_stream_ of the new partition,
+  // prev_partition_idx is the index of the previous partition.
+  void TryAddRemainingResults(int64_t partition_idx, int64_t prev_partition_idx);
 
   // Removes rows from curr_tuple_ (by calling AggFnEvaluator::Remove()) that are no
   // longer in the window (i.e. they are before the window start boundary). stream_idx
@@ -139,7 +140,7 @@ class AnalyticEvalNode : public ExecNode {
 
   // Initializes state at the start of a new partition. stream_idx is the index of the
   // current input row from input_stream_.
-  void InitPartition(int64_t stream_idx);
+  void InitNextPartition(int64_t stream_idx);
 
   // Produces a result tuple with analytic function results by calling GetValue() or
   // Finalize() for curr_tuple_ on the evaluators_. The result tuple is stored in

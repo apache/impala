@@ -143,6 +143,8 @@ void AggregateFunctions::AvgUpdate(FunctionContext* ctx, const T& src, StringVal
 
 template <typename T>
 void AggregateFunctions::AvgRemove(FunctionContext* ctx, const T& src, StringVal* dst) {
+  // Remove doesn't need to explicitly check the number of calls to Update() or Remove()
+  // because Finalize() returns NULL if count is 0.
   if (src.is_null) return;
   DCHECK(dst->ptr != NULL);
   DCHECK_EQ(sizeof(AvgState), dst->len);
@@ -316,7 +318,11 @@ DecimalVal AggregateFunctions::DecimalAvgFinalize(FunctionContext* ctx,
 template<typename SRC_VAL, typename DST_VAL>
 void AggregateFunctions::SumUpdate(FunctionContext* ctx, const SRC_VAL& src,
     DST_VAL* dst) {
-  if (src.is_null) return;
+  if (src.is_null) {
+    // Do not count null values towards the number of updates
+    ctx->impl()->IncrementNumUpdates(-1);
+    return;
+  }
   if (dst->is_null) InitZero<DST_VAL>(ctx, dst);
   dst->val += src.val;
 }
@@ -324,6 +330,12 @@ void AggregateFunctions::SumUpdate(FunctionContext* ctx, const SRC_VAL& src,
 template<typename SRC_VAL, typename DST_VAL>
 void AggregateFunctions::SumRemove(FunctionContext* ctx, const SRC_VAL& src,
     DST_VAL* dst) {
+  // Do not count null values towards the number of removes
+  if (src.is_null) ctx->impl()->IncrementNumRemoves(-1);
+  if (ctx->impl()->num_removes() >= ctx->impl()->num_updates()) {
+    *dst = DST_VAL::null();
+    return;
+  }
   if (src.is_null) return;
   if (dst->is_null) InitZero<DST_VAL>(ctx, dst);
   dst->val -= src.val;
@@ -336,6 +348,10 @@ void AggregateFunctions::SumDecimalUpdate(FunctionContext* ctx,
 
 void AggregateFunctions::SumDecimalRemove(FunctionContext* ctx,
     const DecimalVal& src, DecimalVal* dst) {
+  if (ctx->impl()->num_removes() >= ctx->impl()->num_updates()) {
+    *dst = DecimalVal::null();
+    return;
+  }
   SumDecimalAddOrSubtract(ctx, src, dst, true);
 }
 

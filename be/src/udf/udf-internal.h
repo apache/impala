@@ -83,6 +83,13 @@ class FunctionContextImpl {
   bool debug() { return debug_; }
   bool closed() { return closed_; }
 
+  int64_t num_updates() const { return num_updates_; }
+  int64_t num_removes() const { return num_removes_; }
+  void set_num_updates(int64_t n) { num_updates_ = n; }
+  void set_num_removes(int64_t n) { num_removes_ = n; }
+  void IncrementNumUpdates(int64_t n = 1) { num_updates_ += n; }
+  void IncrementNumRemoves(int64_t n = 1) { num_removes_ += n; }
+
   static const char* LLVM_FUNCTIONCONTEXT_NAME;
 
   RuntimeState* state() { return state_; }
@@ -118,6 +125,10 @@ class FunctionContextImpl {
 
   // The number of warnings reported.
   int64_t num_warnings_;
+
+  // The number of calls to Update()/Remove().
+  int64_t num_updates_;
+  int64_t num_removes_;
 
   // Allocations made and still owned by the user function.
   std::map<uint8_t*, int> allocations_;

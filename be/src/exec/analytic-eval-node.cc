@@ -42,7 +42,7 @@ AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
     prev_pool_last_window_idx_(-1),
     curr_tuple_(NULL),
     dummy_result_tuple_(NULL),
-    curr_partition_stream_idx_(0),
+    curr_partition_stream_idx_(-1),
     prev_input_row_(NULL),
     input_eos_(false),
     evaluation_timer_(NULL) {
@@ -153,7 +153,7 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   dummy_result_tuple_ = Tuple::Create(result_tuple_desc_->byte_size(), mem_pool_.get());
 
   // Initialize state for the first partition.
-  InitPartition(0);
+  InitNextPartition(0);
 
   // Fetch the first input batch so that some prev_input_row_ can be set here to avoid
   // special casing in GetNext().
@@ -305,7 +305,9 @@ inline void AnalyticEvalNode::TryRemoveRowsBeforeWindow(int64_t stream_idx) {
   window_tuples_.pop_front();
 }
 
-inline void AnalyticEvalNode::TryAddRemainingResults(int64_t partition_idx) {
+inline void AnalyticEvalNode::TryAddRemainingResults(int64_t partition_idx,
+    int64_t prev_partition_idx) {
+  DCHECK_LT(prev_partition_idx, partition_idx);
   // For PARTITION, RANGE, or ROWS with UNBOUNDED PRECEDING: add a result tuple for the
   // remaining rows in the partition that do not have an associated result tuple yet.
   if (fn_scope_ != ROWS || !window_.__isset.window_end) {
@@ -321,20 +323,26 @@ inline void AnalyticEvalNode::TryAddRemainingResults(int64_t partition_idx) {
   }
 
   // If the start bound is not UNBOUNDED PRECEDING and there are still rows in the
-  // for which we need to produce result tuples, we need to continue removing input
-  // tuples at the start of the window from each row that we're adding results for.
-  for (int64_t i = last_result_idx_ + 1; i < partition_idx; ++i) {
+  // partition for which we need to produce result tuples, we need to continue removing
+  // input tuples at the start of the window from each row that we're adding results for.
+  VLOG_ROW << "TryAddRemainingResults partition_idx=" << partition_idx
+           << " prev_partition_idx=" << prev_partition_idx << " last_result_idx="
+           << last_result_idx_ << " : " << DebugEvaluatedRowsString();
+  for (int64_t next_result_idx = last_result_idx_ + 1; next_result_idx < partition_idx;
+      ++next_result_idx) {
     if (window_tuples_.empty()) break;
-    // For every tuple that is removed from the window: Remove() from the evaluators
-    // and add the result tuple at the next index.
-    VLOG_ROW << "Remove window row at idx=" << window_tuples_.front().first
-             << " for row at idx=" << i;
-    TupleRow* remove_row = reinterpret_cast<TupleRow*>(&window_tuples_.front().second);
-    AggFnEvaluator::Remove(evaluators_, fn_ctxs_, remove_row, curr_tuple_);
-    AddResultTuple(i);
-    window_tuples_.pop_front();
+    if (next_result_idx + rows_start_offset_ > window_tuples_.front().first) {
+      DCHECK_EQ(next_result_idx + rows_start_offset_ - 1, window_tuples_.front().first);
+      // For every tuple that is removed from the window: Remove() from the evaluators
+      // and add the result tuple at the next index.
+      VLOG_ROW << "Remove window_row_idx=" << window_tuples_.front().first
+               << " for result row at idx=" << next_result_idx;
+      TupleRow* remove_row = reinterpret_cast<TupleRow*>(&window_tuples_.front().second);
+      AggFnEvaluator::Remove(evaluators_, fn_ctxs_, remove_row, curr_tuple_);
+      window_tuples_.pop_front();
+    }
+    AddResultTuple(last_result_idx_ + 1);
   }
-  window_tuples_.clear();
 
   // If there are still rows between the row with the last result (AddResultTuple() may
   // have updated last_result_idx_) and the partition boundary, add the current results
@@ -342,25 +350,38 @@ inline void AnalyticEvalNode::TryAddRemainingResults(int64_t partition_idx) {
   if (last_result_idx_ < partition_idx - 1) AddResultTuple(partition_idx - 1);
 }
 
-inline void AnalyticEvalNode::InitPartition(int64_t stream_idx) {
-  VLOG_FILE << "InitPartition idx=" << stream_idx;
+inline void AnalyticEvalNode::InitNextPartition(int64_t stream_idx) {
+  VLOG_FILE << "InitNextPartition idx=" << stream_idx;
+  DCHECK_LT(curr_partition_stream_idx_, stream_idx);
+  int64_t prev_partition_stream_idx = curr_partition_stream_idx_;
   curr_partition_stream_idx_ = stream_idx;
 
   // If the window has an end bound preceding the current row, we will have output
   // tuples for rows beyond the partition so they should be removed.
+  bool removed_results_past_partition = false;
   while (!result_tuples_.empty() && last_result_idx_ >= curr_partition_stream_idx_) {
+    removed_results_past_partition = true;
     DCHECK(window_.__isset.window_end &&
         window_.window_end.type == TAnalyticWindowBoundaryType::PRECEDING);
-    VLOG_ROW << "Removing result past partition, idx=" << last_result_idx_;
+    VLOG_ROW << "Removing result past partition, last result idx:" << last_result_idx_
+             << " removing result tuple with idx:" << result_tuples_.back().first;
     result_tuples_.pop_back();
-    last_result_idx_ = result_tuples_.back().first;
+    if (result_tuples_.empty()) {
+      last_result_idx_ = curr_partition_stream_idx_ - 1;
+    } else {
+      last_result_idx_ = result_tuples_.back().first;
+    }
+  }
+  if (removed_results_past_partition) {
+    DCHECK_EQ(last_result_idx_, curr_partition_stream_idx_ - 1);
   }
 
 
   if (fn_scope_ == ROWS && stream_idx > 0 && (!window_.__isset.window_end ||
         window_.window_end.type == TAnalyticWindowBoundaryType::FOLLOWING)) {
-    TryAddRemainingResults(stream_idx);
+    TryAddRemainingResults(stream_idx, prev_partition_stream_idx);
   }
+  window_tuples_.clear();
 
   VLOG_ROW << "Reset curr_tuple";
   // Call finalize to release resources; result is not needed but the dst tuple must be
@@ -408,7 +429,7 @@ Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
     // TODO: Replace TupleRowComparators with predicates (to be generated by the planner)
     bool next_partition = 0 != partition_comparator_->Compare(prev_input_row_, row);
     TryAddResultTupleForPrevRow(next_partition, stream_idx, row);
-    if (next_partition) InitPartition(stream_idx);
+    if (next_partition) InitNextPartition(stream_idx);
 
     // The evaluators_ are updated with the current row.
     if (fn_scope_ != ROWS || !window_.__isset.window_start ||
@@ -442,7 +463,7 @@ Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
     prev_input_row_ = row;
   }
   // We need to add the results for the last row(s).
-  if (input_eos_) TryAddRemainingResults(stream_idx);
+  if (input_eos_) TryAddRemainingResults(stream_idx, curr_partition_stream_idx_);
 
   if (curr_tuple_pool_->total_allocated_bytes() > MAX_TUPLE_POOL_SIZE) {
     prev_tuple_pool_->AcquireData(curr_tuple_pool_.get(), false);

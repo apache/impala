@@ -162,6 +162,8 @@ FunctionContextImpl::FunctionContextImpl(FunctionContext* parent)
     debug_(false),
     version_(FunctionContext::v1_3),
     num_warnings_(0),
+    num_updates_(0),
+    num_removes_(0),
     thread_local_fn_state_(NULL),
     fragment_local_fn_state_(NULL),
     external_bytes_tracked_(0),

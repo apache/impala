@@ -25,6 +25,7 @@
 #include "runtime/tuple-row.h"
 #include "runtime/types.h"
 #include "udf/udf.h"
+#include "udf/udf-internal.h"
 
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/PlanNodes_types.h"
@@ -236,10 +237,12 @@ class AggFnEvaluator {
 
 inline void AggFnEvaluator::Add(
     FunctionContext* agg_fn_ctx, TupleRow* row, Tuple* dst) {
+  agg_fn_ctx->impl()->IncrementNumUpdates();
   Update(agg_fn_ctx, row, dst, is_merge() ? merge_fn_ : update_fn_);
 }
 inline void AggFnEvaluator::Remove(
     FunctionContext* agg_fn_ctx, TupleRow* row, Tuple* dst) {
+  agg_fn_ctx->impl()->IncrementNumRemoves();
   Update(agg_fn_ctx, row, dst, remove_fn_);
 }
 inline void AggFnEvaluator::Serialize(
