@@ -28,7 +28,6 @@ class TestSessionExpiration(CustomClusterTestSuite):
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--idle_session_timeout=6")
   def test_session_expiration(self, vector):
-    pytest.xfail("IMPALA-1264")
     impalad = self.cluster.get_any_impalad()
     num_expired = impalad.service.get_metric_value("impala-server.num-sessions-expired")
     client = impalad.service.create_beeswax_client()
@@ -37,6 +36,10 @@ class TestSessionExpiration(CustomClusterTestSuite):
     sleep(3)
     assert num_expired == impalad.service.get_metric_value(
       "impala-server.num-sessions-expired")
-    # Wait for session expiration
+    # Wait for session expiration. Session timeout was set for 6 seconds, so Impala
+    # will poll the session expiry queue every 3 seconds. So, as long as the sleep in
+    # ImpalaSever::ExpireSessions() is not late, the session will expire in at most 9
+    # seconds. The test has already waited 3 seconds.  Wait another 20 seconds so we
+    # have plenty of slop in case the Impala sleep occasionally wakes late.
     impalad.service.wait_for_metric_value(
-      "impala-server.num-sessions-expired", num_expired + 1)
+      "impala-server.num-sessions-expired", num_expired + 1, 20)
