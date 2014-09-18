@@ -135,9 +135,12 @@ class HashTableCtx {
   // 'expr_values_buffer_'.  Function signature matches HashTable::Equals().
   llvm::Function* CodegenEquals(RuntimeState* state);
 
-  // Codegen for hashing the expr values in 'expr_values_buffer_'.  Function
-  // prototype matches HashCurrentRow identically.
-  llvm::Function* CodegenHashCurrentRow(RuntimeState* state);
+  // Codegen for hashing the expr values in 'expr_values_buffer_'. Function prototype
+  // matches HashCurrentRow identically. Unlike HashCurrentRow(), the returned function
+  // only uses a single hash function, rather than switching based on level_.
+  // If 'use_murmur' is true, murmur hash is used, otherwise CRC is used if the hardware
+  // supports it (see hash-util.h).
+  llvm::Function* CodegenHashCurrentRow(RuntimeState* state, bool use_murmur);
 
   static const char* LLVM_CLASS_NAME;
 
@@ -156,10 +159,18 @@ class HashTableCtx {
       // TODO: figure out which hash function to use. We need to generate uncorrelated
       // hashes by changing just the seed. CRC does not have this property and FNV is
       // okay. We should switch to something else.
-      return HashUtil::MurmurHash2_64(expr_values_buffer_, results_buffer_size_, seed);
+      return Hash(expr_values_buffer_, results_buffer_size_, seed);
     } else {
       return HashTableCtx::HashVariableLenRow();
     }
+  }
+
+  // Wrapper function for calling correct HashUtil function in non-codegen'd case.
+  uint32_t inline Hash(const void* input, int len, int32_t hash) {
+    // Use CRC hash at first level for better performance. Switch to murmur hash at
+    // subsequent levels since CRC doesn't randomize well with different seed inputs.
+    if (level_ == 0) return HashUtil::Hash(input, len, hash);
+    return HashUtil::MurmurHash2_64(input, len, hash);
   }
 
   // Evaluate 'row' over build exprs caching the results in 'expr_values_buffer_' This

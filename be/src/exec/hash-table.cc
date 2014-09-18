@@ -113,7 +113,7 @@ uint32_t HashTableCtx::HashVariableLenRow() {
   uint32_t hash = seeds_[level_];
   // Hash the non-var length portions (if there are any)
   if (var_result_begin_ != 0) {
-    hash = HashUtil::MurmurHash2_64(expr_values_buffer_, var_result_begin_, hash);
+    hash = Hash(expr_values_buffer_, var_result_begin_, hash);
   }
 
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
@@ -124,11 +124,11 @@ uint32_t HashTableCtx::HashVariableLenRow() {
     void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
     if (expr_value_null_bits_[i]) {
       // Hash the null random seed values at 'loc'
-      hash = HashUtil::MurmurHash2_64(loc, sizeof(StringValue), hash);
+      hash = Hash(loc, sizeof(StringValue), hash);
     } else {
       // Hash the string
       StringValue* str = reinterpret_cast<StringValue*>(loc);
-      hash = HashUtil::MurmurHash2_64(str->ptr, str->len, hash);
+      hash = Hash(str->ptr, str->len, hash);
     }
   }
   return hash;
@@ -569,7 +569,7 @@ Function* HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build) {
 //   call void @set_hash(%"class.impala::HashTableCtx"* %this_ptr, i32 %7)
 //   ret i32 %7
 // }
-Function* HashTableCtx::CodegenHashCurrentRow(RuntimeState* state) {
+Function* HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur) {
   LlvmCodeGen* codegen = state->codegen();
 
   // Get types to generate function prototype
@@ -595,13 +595,17 @@ Function* HashTableCtx::CodegenHashCurrentRow(RuntimeState* state) {
   if (var_result_begin_ == -1) {
     // No variable length slots, just hash what is in 'expr_values_buffer_'
     if (results_buffer_size_ > 0) {
-      Function* hash_fn = codegen->GetMurmurHashFunction(results_buffer_size_);
+      Function* hash_fn = use_murmur ?
+                          codegen->GetMurmurHashFunction(results_buffer_size_) :
+                          codegen->GetHashFunction(results_buffer_size_);
       Value* len = codegen->GetIntConstant(TYPE_INT, results_buffer_size_);
       hash_result = builder.CreateCall3(hash_fn, data, len, hash_result, "hash");
     }
   } else {
     if (var_result_begin_ > 0) {
-      Function* hash_fn = codegen->GetMurmurHashFunction(var_result_begin_);
+      Function* hash_fn = use_murmur ?
+                          codegen->GetMurmurHashFunction(var_result_begin_) :
+                          codegen->GetHashFunction(var_result_begin_);
       Value* len = codegen->GetIntConstant(TYPE_INT, var_result_begin_);
       hash_result = builder.CreateCall3(hash_fn, data, len, hash_result, "hash");
     }
@@ -636,7 +640,9 @@ Function* HashTableCtx::CodegenHashCurrentRow(RuntimeState* state) {
         // For null, we just want to call the hash function on the portion of
         // the data
         builder.SetInsertPoint(null_block);
-        Function* null_hash_fn = codegen->GetMurmurHashFunction(sizeof(StringValue));
+        Function* null_hash_fn = use_murmur ?
+                                 codegen->GetMurmurHashFunction(sizeof(StringValue)) :
+                                 codegen->GetHashFunction(sizeof(StringValue));
         Value* llvm_loc = codegen->CastPtrToLlvmPtr(codegen->ptr_type(), loc);
         Value* len = codegen->GetIntConstant(TYPE_INT, sizeof(StringValue));
         str_null_result =
@@ -655,7 +661,8 @@ Function* HashTableCtx::CodegenHashCurrentRow(RuntimeState* state) {
       len = builder.CreateLoad(len, "len");
 
       // Call hash(ptr, len, hash_result);
-      Function* general_hash_fn = codegen->GetMurmurHashFunction();
+      Function* general_hash_fn = use_murmur ? codegen->GetMurmurHashFunction() :
+                                  codegen->GetHashFunction();
       Value* string_hash_result =
           builder.CreateCall3(general_hash_fn, ptr, len, hash_result, "string_hash");
 

@@ -40,7 +40,9 @@ PartitionedHashJoinNode::PartitionedHashJoinNode(
     state_(PARTITIONING_BUILD),
     block_mgr_client_(NULL),
     process_build_batch_fn_(NULL),
+    process_build_batch_fn_level0_(NULL),
     process_probe_batch_fn_(NULL),
+    process_probe_batch_fn_level0_(NULL),
     input_partition_(NULL) {
   memset(hash_tbls_, 0, sizeof(hash_tbls_));
 }
@@ -111,21 +113,15 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
 
   if (state->codegen_enabled()) {
     // Codegen for hashing rows
-    Function* ir_hash_fn = ht_ctx_->CodegenHashCurrentRow(state);
-    if (ir_hash_fn != NULL) {
+    Function* hash_fn = ht_ctx_->CodegenHashCurrentRow(state, false);
+    Function* murmur_hash_fn = ht_ctx_->CodegenHashCurrentRow(state, true);
+    if (hash_fn != NULL && murmur_hash_fn != NULL) {
       // Codegen for build path
-      Function* ir_process_build_fn = CodegenProcessBuildBatch(state, ir_hash_fn);
-      if (ir_process_build_fn != NULL) {
-        state->codegen()->AddFunctionToJit(ir_process_build_fn,
-            reinterpret_cast<void**>(&process_build_batch_fn_));
+      if (CodegenProcessBuildBatch(state, hash_fn, murmur_hash_fn)) {
         AddRuntimeExecOption("Build Side Codegen Enabled");
       }
-
       // Codegen for probe path
-      Function* ir_process_probe_fn = CodegenProcessProbeBatch(state, ir_hash_fn);
-      if (ir_process_probe_fn != NULL) {
-        state->codegen()->AddFunctionToJit(ir_process_probe_fn,
-            reinterpret_cast<void**>(&process_probe_batch_fn_));
+      if (CodegenProcessProbeBatch(state, hash_fn, murmur_hash_fn)) {
         AddRuntimeExecOption("Probe Side Codegen Enabled");
       }
     }
@@ -345,9 +341,15 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
 
     SCOPED_TIMER(partition_build_timer_);
     if (process_build_batch_fn_ == NULL) {
+      DCHECK(process_build_batch_fn_level0_ == NULL);
       RETURN_IF_ERROR(ProcessBuildBatch(&build_batch));
     } else {
-      RETURN_IF_ERROR(process_build_batch_fn_(this, &build_batch));
+      DCHECK_NOTNULL(process_build_batch_fn_level0_);
+      if (ht_ctx_->level() == 0) {
+        RETURN_IF_ERROR(process_build_batch_fn_level0_(this, &build_batch));
+      } else {
+        RETURN_IF_ERROR(process_build_batch_fn_(this, &build_batch));
+      }
     }
     build_batch.Reset();
     DCHECK(!build_batch.AtCapacity());
@@ -535,7 +537,12 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
       if (process_probe_batch_fn_ == NULL) {
         rows_added = ProcessProbeBatch(join_op_, out_batch, ht_ctx_.get());
       } else {
-        rows_added = process_probe_batch_fn_(this, out_batch, ht_ctx_.get());
+        DCHECK_NOTNULL(process_probe_batch_fn_level0_);
+        if (ht_ctx_->level() == 0) {
+          rows_added = process_probe_batch_fn_level0_(this, out_batch, ht_ctx_.get());
+        } else {
+          rows_added = process_probe_batch_fn_(this, out_batch, ht_ctx_.get());
+        }
       }
       if (UNLIKELY(rows_added < 0)) {
         DCHECK(!status_.ok());
@@ -896,8 +903,8 @@ Function* PartitionedHashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen) 
   return codegen->FinalizeFunction(fn);
 }
 
-Function* PartitionedHashJoinNode::CodegenProcessBuildBatch(
-    RuntimeState* state, Function* hash_fn) {
+bool PartitionedHashJoinNode::CodegenProcessBuildBatch(
+    RuntimeState* state, Function* hash_fn, Function* murmur_hash_fn) {
   LlvmCodeGen* codegen = state->codegen();
   // Get cross compiled function
   Function* process_build_batch_fn =
@@ -906,7 +913,7 @@ Function* PartitionedHashJoinNode::CodegenProcessBuildBatch(
 
   // Codegen for evaluating build rows
   Function* eval_row_fn = ht_ctx_->CodegenEvalRow(state, true);
-  if (eval_row_fn == NULL) return NULL;
+  if (eval_row_fn == NULL) return false;
 
   int replaced = 0;
   // Replace call sites
@@ -914,15 +921,33 @@ Function* PartitionedHashJoinNode::CodegenProcessBuildBatch(
       eval_row_fn, "EvalBuildRow", &replaced);
   DCHECK_EQ(replaced, 1);
 
-  process_build_batch_fn = codegen->ReplaceCallSites(process_build_batch_fn, false,
-      hash_fn, "HashCurrentRow", &replaced);
+  // process_build_batch_fn_level0 uses CRC hash if available,
+  // process_build_batch_fn uses murmur
+  Function* process_build_batch_fn_level0 = codegen->ReplaceCallSites(
+      process_build_batch_fn, false, hash_fn, "HashCurrentRow", &replaced);
   DCHECK_EQ(replaced, 1);
 
-  return codegen->OptimizeFunctionWithExprs(process_build_batch_fn);
+  process_build_batch_fn = codegen->ReplaceCallSites(
+      process_build_batch_fn, true, murmur_hash_fn, "HashCurrentRow", &replaced);
+  DCHECK_EQ(replaced, 1);
+
+  // Finalize ProcessBuildBatch functions
+  process_build_batch_fn = codegen->OptimizeFunctionWithExprs(process_build_batch_fn);
+  if (process_build_batch_fn == NULL) return false;
+  process_build_batch_fn_level0 =
+      codegen->OptimizeFunctionWithExprs(process_build_batch_fn_level0);
+  if (process_build_batch_fn_level0 == NULL) return false;
+
+  // Register native function pointers
+  codegen->AddFunctionToJit(process_build_batch_fn,
+                            reinterpret_cast<void**>(&process_build_batch_fn_));
+  codegen->AddFunctionToJit(process_build_batch_fn_level0,
+                            reinterpret_cast<void**>(&process_build_batch_fn_level0_));
+  return true;
 }
 
-Function* PartitionedHashJoinNode::CodegenProcessProbeBatch(
-    RuntimeState* state, Function* hash_fn) {
+bool PartitionedHashJoinNode::CodegenProcessProbeBatch(
+    RuntimeState* state, Function* hash_fn, Function* murmur_hash_fn) {
   LlvmCodeGen* codegen = state->codegen();
 
   // Get cross compiled function
@@ -954,7 +979,7 @@ Function* PartitionedHashJoinNode::CodegenProcessProbeBatch(
       break;
     default:
       DCHECK(false);
-      return NULL;
+      return false;
   }
   Function* process_probe_batch_fn = codegen->GetFunction(ir_fn);
   DCHECK(process_probe_batch_fn != NULL);
@@ -971,33 +996,39 @@ Function* PartitionedHashJoinNode::CodegenProcessProbeBatch(
       << LlvmCodeGen::Print(process_probe_batch_fn);
   process_probe_batch_fn->setLinkage(GlobalValue::WeakODRLinkage);
 
+  // Bake in %this pointer argument to process_probe_batch_fn.
+  Value* this_arg = codegen->GetArgument(process_probe_batch_fn, 0);
+  Value* this_loc = codegen->CastPtrToLlvmPtr(this_arg->getType(), this);
+  this_arg->replaceAllUsesWith(this_loc);
+
+  // Bake in %ht_ctx pointer argument to process_probe_batch_fn
+  Value* ht_ctx_arg = codegen->GetArgument(process_probe_batch_fn, 2);
+  Value* ht_ctx_loc = codegen->CastPtrToLlvmPtr(ht_ctx_arg->getType(), ht_ctx_.get());
+  ht_ctx_arg->replaceAllUsesWith(ht_ctx_loc);
+
   // Codegen HashTable::Equals
   Function* equals_fn = ht_ctx_->CodegenEquals(state);
-  if (equals_fn == NULL) return NULL;
+  if (equals_fn == NULL) return false;
 
   // Codegen for evaluating probe rows
   Function* eval_row_fn = ht_ctx_->CodegenEvalRow(state, false);
-  if (eval_row_fn == NULL) return NULL;
+  if (eval_row_fn == NULL) return false;
 
   // Codegen CreateOutputRow
   Function* create_output_row_fn = CodegenCreateOutputRow(codegen);
-  if (create_output_row_fn == NULL) return NULL;
+  if (create_output_row_fn == NULL) return false;
 
   // Codegen evaluating other join conjuncts
   Function* eval_other_conjuncts_fn = ExecNode::CodegenEvalConjuncts(
       state, other_join_conjunct_ctxs_, "EvalOtherConjuncts");
-  if (eval_other_conjuncts_fn == NULL) return NULL;
+  if (eval_other_conjuncts_fn == NULL) return false;
 
   // Codegen evaluating conjuncts
   Function* eval_conjuncts_fn = ExecNode::CodegenEvalConjuncts(state, conjunct_ctxs_);
-  if (eval_conjuncts_fn == NULL) return NULL;
+  if (eval_conjuncts_fn == NULL) return false;
 
   // Replace all call sites with codegen version
   int replaced = 0;
-  process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, true,
-      hash_fn, "HashCurrentRow", &replaced);
-  DCHECK_EQ(replaced, 1);
-
   process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, true,
       eval_row_fn, "EvalProbeRow", &replaced);
   DCHECK_EQ(replaced, 1);
@@ -1029,15 +1060,27 @@ Function* PartitionedHashJoinNode::CodegenProcessProbeBatch(
   // Depends on join_op_
   DCHECK(replaced == 2 || replaced == 3 || replaced == 4) << replaced;
 
-  // Bake in %this pointer argument to process_probe_batch_fn.
-  Value* this_arg = codegen->GetArgument(process_probe_batch_fn, 0);
-  Value* this_loc = codegen->CastPtrToLlvmPtr(this_arg->getType(), this);
-  this_arg->replaceAllUsesWith(this_loc);
+  // process_probe_batch_fn_level0 uses CRC hash if available,
+  // process_probe_batch_fn uses murmur
+  Function* process_probe_batch_fn_level0 = codegen->ReplaceCallSites(
+      process_probe_batch_fn, false, hash_fn, "HashCurrentRow", &replaced);
+  DCHECK_EQ(replaced, 1);
 
-  // Bake in %ht_ctx pointer argument to process_probe_batch_fn
-  Value* ht_ctx_arg = codegen->GetArgument(process_probe_batch_fn, 2);
-  Value* ht_ctx_loc = codegen->CastPtrToLlvmPtr(ht_ctx_arg->getType(), ht_ctx_.get());
-  ht_ctx_arg->replaceAllUsesWith(ht_ctx_loc);
+  process_probe_batch_fn = codegen->ReplaceCallSites(
+      process_probe_batch_fn, true, murmur_hash_fn, "HashCurrentRow", &replaced);
+  DCHECK_EQ(replaced, 1);
 
-  return codegen->FinalizeFunction(process_probe_batch_fn);
+  // Finalize ProcessProbeBatch functions
+  process_probe_batch_fn = codegen->OptimizeFunctionWithExprs(process_probe_batch_fn);
+  if (process_probe_batch_fn == NULL) return false;
+  process_probe_batch_fn_level0 =
+      codegen->OptimizeFunctionWithExprs(process_probe_batch_fn_level0);
+  if (process_probe_batch_fn_level0 == NULL) return false;
+
+  // Register native function pointers
+  codegen->AddFunctionToJit(process_probe_batch_fn,
+                            reinterpret_cast<void**>(&process_probe_batch_fn_));
+  codegen->AddFunctionToJit(process_probe_batch_fn_level0,
+                            reinterpret_cast<void**>(&process_probe_batch_fn_level0_));
+  return true;
 }

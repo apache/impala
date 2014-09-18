@@ -1237,7 +1237,9 @@ Function* PartitionedAggregationNode::CodegenProcessBatch() {
     // Aggregation w/o grouping does not use a hash table.
 
     // Codegen for hash
-    Function* hash_fn = ht_ctx_->CodegenHashCurrentRow(state_);
+    // The codegen'd ProcessBatch function is only used in Open() with level_ = 0,
+    // so don't use murmur hash
+    Function* hash_fn = ht_ctx_->CodegenHashCurrentRow(state_, /* use murmur */ false);
     if (hash_fn == NULL) return NULL;
 
     // Codegen HashTable::Equals
@@ -1253,11 +1255,11 @@ Function* PartitionedAggregationNode::CodegenProcessBatch() {
         eval_probe_row_fn, "EvalProbeRow", &replaced);
     DCHECK_EQ(replaced, 1);
 
-    process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
+    process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, true,
         hash_fn, "HashCurrentRow", &replaced);
     DCHECK_EQ(replaced, 1);
 
-    process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
+    process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, true,
         equals_fn, "Equals", &replaced);
     DCHECK_EQ(replaced, 1);
   }

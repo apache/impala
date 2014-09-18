@@ -416,7 +416,7 @@ TEST_F(LlvmCodeGenTest, HashTest) {
     uint32_t result = test_fn();
 
     // Validate that the hashes are identical
-    EXPECT_EQ(result, expected_hash);
+    EXPECT_EQ(result, expected_hash) << CpuInfo::IsSupported(CpuInfo::SSE4_2);
 
     if (i == 0 && CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
       CpuInfo::EnableFeature(CpuInfo::SSE4_2, false);

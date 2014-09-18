@@ -136,8 +136,8 @@ class HashUtil {
     return (hash_u64 >> 32) ^ (hash_u64 & 0xFFFFFFFF);
   }
 
-  // Computes the hash value for data.  Will call either CrcHash or FnvHash
-  // depending on hardware capabilities.
+  // Computes the hash value for data.  Will call either CrcHash or MurmurHash depending on
+  // hardware capabilities.
   // Seed values for different steps of the query execution should use different seeds
   // to prevent accidental key collisions. (See IMPALA-219 for more details).
   static uint32_t Hash(const void* data, int32_t bytes, uint32_t seed) {
@@ -145,10 +145,10 @@ class HashUtil {
     if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
       return CrcHash(data, bytes, seed);
     } else {
-      return FnvHash64to32(data, bytes, seed);
+      return MurmurHash2_64(data, bytes, seed);
     }
 #else
-    return FnvHash64to32(data, bytes, seed);
+    return MurmurHash2_64(data, bytes, seed);
 #endif
   }
 

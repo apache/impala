@@ -1032,7 +1032,7 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
     }
     return fn;
   } else {
-    return GetFnvHashFunction(num_bytes);
+    return GetMurmurHashFunction(num_bytes);
   }
 }
 

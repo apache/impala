@@ -214,16 +214,14 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   llvm::Function* CodegenCreateOutputRow(LlvmCodeGen* codegen);
 
   // Codegen processing build batches.  Identical signature to ProcessBuildBatch.
-  // hash_fn is the codegen'd function for computing hashes over tuple rows in the
-  // hash table.
-  // Returns NULL if codegen was not possible.
-  llvm::Function* CodegenProcessBuildBatch(RuntimeState* state, llvm::Function* hash_fn);
+  // Returns false if codegen was not possible.
+  bool CodegenProcessBuildBatch(
+      RuntimeState* state, llvm::Function* hash_fn, llvm::Function* murmur_hash_fn);
 
   // Codegen processing probe batches.  Identical signature to ProcessProbeBatch.
-  // hash_fn is the codegen'd function for computing hashes over tuple rows in the
-  // hash table.
-  // Returns NULL if codegen was not possible.
-  llvm::Function* CodegenProcessProbeBatch(RuntimeState* state, llvm::Function* hash_fn);
+  // Returns false if codegen was not possible.
+  bool CodegenProcessProbeBatch(
+      RuntimeState* state, llvm::Function* hash_fn, llvm::Function* murmur_hash_fn);
 
   // Returns the current state of the partition as a string.
   std::string PrintState() const;
@@ -345,14 +343,22 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   // llvm function and signature for codegening build batch.
   typedef Status (*ProcessBuildBatchFn)(PartitionedHashJoinNode*, RowBatch*);
-  // Jitted ProcessBuildBatch function pointer.  NULL if codegen is disabled.
+  // Jitted ProcessBuildBatch function pointers.  NULL if codegen is disabled.
+  // process_build_batch_fn_level0_ uses CRC hashing when available and is used when the
+  // partition level is 0, otherwise process_build_batch_fn_ uses murmur hash and is used
+  // for subsequent levels.
   ProcessBuildBatchFn process_build_batch_fn_;
+  ProcessBuildBatchFn process_build_batch_fn_level0_;
 
   // llvm function and signature for codegening probe batch.
   typedef int (*ProcessProbeBatchFn)(
       PartitionedHashJoinNode*, RowBatch*, HashTableCtx*);
   // Jitted ProcessProbeBatch function pointer.  NULL if codegen is disabled.
+  // process_probe_batch_fn_level0_ uses CRC hashing when available and is used when the
+  // partition level is 0, otherwise process_probe_batch_fn_ uses murmur hash and is used
+  // for subsequent levels.
   ProcessProbeBatchFn process_probe_batch_fn_;
+  ProcessProbeBatchFn process_probe_batch_fn_level0_;
 
   // The list of partitions that have been spilled on both sides and still need more
   // processing. These partitions could need repartitioning, in which cases more
