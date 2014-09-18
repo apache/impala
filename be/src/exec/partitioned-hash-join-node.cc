@@ -200,6 +200,21 @@ void PartitionedHashJoinNode::Partition::Close(RowBatch* batch) {
   }
 }
 
+Status PartitionedHashJoinNode::Partition::Spill(bool unpin_all_build) {
+  if (!is_spilled_) {
+    COUNTER_ADD(parent_->num_spilled_partitions_, 1);
+    if (parent_->num_spilled_partitions_->value() == 1) {
+      parent_->AddRuntimeExecOption("Spilled");
+    }
+  }
+  is_spilled_ = true;
+  if (hash_tbl() != NULL) {
+    hash_tbl()->Close();
+    hash_tbl_.reset();
+  }
+  return build_rows()->UnpinStream(unpin_all_build);
+}
+
 Status PartitionedHashJoinNode::Partition::BuildHashTable(
     RuntimeState* state, bool* built) {
   DCHECK(build_rows_ != NULL);
@@ -239,12 +254,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(
     }
     batch.Reset();
 
-    if (!*built) {
-      hash_tbl_->Close();
-      hash_tbl_.reset();
-      RETURN_IF_ERROR(build_rows_->UnpinStream(true));
-      return Status::OK;
-    }
+    if (!*built) return Status::OK;
   }
   DCHECK(*built);
   DCHECK_NOTNULL(hash_tbl_.get());
@@ -262,7 +272,10 @@ Status PartitionedHashJoinNode::SpillPartition() {
   for (int i = 0; i < hash_partitions_.size(); ++i) {
     if (hash_partitions_[i]->is_closed()) continue;
     if (hash_partitions_[i]->is_spilled()) continue;
-    int64_t mem = hash_partitions_[i]->build_rows()->bytes_in_mem(true);
+    int64_t mem = hash_partitions_[i]->build_rows()->bytes_in_mem(false);
+    if (hash_partitions_[i]->hash_tbl() != NULL) {
+      mem += hash_partitions_[i]->hash_tbl()->byte_size();
+    }
     if (mem > max_freed_mem) {
       max_freed_mem = mem;
       partition_idx = i;
@@ -279,14 +292,10 @@ Status PartitionedHashJoinNode::SpillPartition() {
     return status;
   }
   VLOG(2) << "Spilling partition: " << partition_idx << endl << DebugString();
-  COUNTER_ADD(num_spilled_partitions_, 1);
-  if (num_spilled_partitions_->value() == 1) AddRuntimeExecOption("Spilled");
-  hash_partitions_[partition_idx]->is_spilled_ = true;
-  if (hash_partitions_[partition_idx]->hash_tbl() != NULL) {
-    hash_partitions_[partition_idx]->hash_tbl()->Close();
-    hash_tbls_[partition_idx] = NULL;
-  }
-  return hash_partitions_[partition_idx]->build_rows()->UnpinStream();
+  RETURN_IF_ERROR(hash_partitions_[partition_idx]->Spill(false));
+  DCHECK(hash_partitions_[partition_idx]->probe_rows()->has_write_block());
+  hash_tbls_[partition_idx] = NULL;
+  return Status::OK;
 }
 
 Status PartitionedHashJoinNode::ConstructBuildSide(RuntimeState* state) {
@@ -314,14 +323,23 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
   DCHECK(hash_partitions_.empty());
   if (input_partition_ != NULL) {
     DCHECK(input_partition_->build_rows() != NULL);
-    DCHECK_EQ(input_partition_->build_rows()->blocks_pinned(), 0);
-    DCHECK_EQ(input_partition_->build_rows()->blocks_pinned(), 0);
+    DCHECK_EQ(input_partition_->build_rows()->blocks_pinned(), 0) << DebugString();
+    DCHECK_EQ(input_partition_->build_rows()->blocks_pinned(), 0) << DebugString();
     RETURN_IF_ERROR(input_partition_->build_rows()->PrepareForRead());
   }
 
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
     hash_partitions_.push_back(pool_->Add(new Partition(state, this, level)));
     RETURN_IF_ERROR(hash_partitions_[i]->build_rows()->Init());
+
+    // Initialize a buffer for the probe here to make sure why have it if we
+    // need it. While this is not strictly necessary (there are some cases where we
+    // won't need this buffer), the benefit is low. Not grabbing this buffer means
+    // there is an additional buffer that could be used for the build side. However
+    // since this is only one buffer, there is only a small range of build input
+    // sizes where this is beneficial (an IO buffer size). It makes the logic
+    // much more complex to enable this optimization.
+    RETURN_IF_ERROR(hash_partitions_[i]->probe_rows()->Init(false));
   }
   COUNTER_ADD(partitions_created_, PARTITION_FANOUT);
   COUNTER_SET(max_partition_level_, level);
@@ -340,8 +358,7 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
     total_build_rows += build_batch.num_rows();
 
     SCOPED_TIMER(partition_build_timer_);
-    if (process_build_batch_fn_ == NULL) {
-      DCHECK(process_build_batch_fn_level0_ == NULL);
+    if (process_build_batch_fn_ == NULL || ht_ctx_->level() != 0) {
       RETURN_IF_ERROR(ProcessBuildBatch(&build_batch));
     } else {
       DCHECK_NOTNULL(process_build_batch_fn_level0_);
@@ -378,9 +395,6 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
 
   COUNTER_ADD(num_build_rows_partitioned_, total_build_rows);
   RETURN_IF_ERROR(BuildHashTables(state));
-  for (int i = 0; i < PARTITION_FANOUT; ++i) {
-    hash_tbls_[i] = hash_partitions_[i]->hash_tbl();
-  }
   return Status::OK;
 }
 
@@ -472,7 +486,7 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
   if (!built) {
     // This build partition still does not fit in memory, repartition.
     DCHECK(input_partition_->is_spilled());
-    DCHECK(input_partition_->hash_tbl() == NULL);
+    input_partition_->Spill(false);
     ht_ctx_->set_level(input_partition_->level_ + 1);
     RETURN_IF_ERROR(ProcessBuildInput(state, input_partition_->level_ + 1));
     UpdateState(REPARTITIONING);
@@ -534,7 +548,7 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
       // the xcompiled function, so call it here instead.
       int rows_added = 0;
       SCOPED_TIMER(probe_timer_);
-      if (process_probe_batch_fn_ == NULL) {
+      if (process_probe_batch_fn_ == NULL || ht_ctx_->level() != 0) {
         rows_added = ProcessProbeBatch(join_op_, out_batch, ht_ctx_.get());
       } else {
         DCHECK_NOTNULL(process_probe_batch_fn_level0_);
@@ -644,61 +658,63 @@ Status PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
   return Status::OK;
 }
 
-// TODO: rework this logic. We should not unpin non-spilled partitions.
+// When this function is called, we've finished processing the current build input
+// (either from child(1) or from repartitioning a spilled partition). The build rows
+// have only been partitioned, we still need to build hash tables over them. Some
+// of the partitions could have already been spilled and attempting to build hash
+// tables over the non-spilled ones can cause them to spill.
+//
+// At the end of the function we'd like all partitions to either have a hash table
+// (and therefore not spilled) or be spilled. Partitions that have a hash table don't
+// need to spill on the probe side.
+//
+// This maps perfectly to a 0-1 knapsack where the weight is the memory to keep the
+// build rows and hash table and the value is the expected IO savings.
+// For now, we go with a greedy solution.
+//
+// TODO: implement the knapsack solution.
 Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
-  int num_remaining_partitions = 0;
-  int num_spilled_partitions = 0;
+  DCHECK_EQ(hash_partitions_.size(), PARTITION_FANOUT);
 
+  // First loop over the partitions and build hash tables for the partitions that
+  // didn't already spill.
   BOOST_FOREACH(Partition* partition, hash_partitions_) {
     if (partition->build_rows()->num_rows() == 0) {
       // This partition is empty, no need to do anything else.
       partition->Close(NULL);
       continue;
     }
-    ++num_remaining_partitions;
-    if (partition->build_rows()->bytes_unpinned() > 0) {
-      ++num_spilled_partitions;
-    }
-  }
 
-  if (num_remaining_partitions == 0) {
-    eos_ = true;
-    return Status::OK;
-  }
-
-  if (num_spilled_partitions > 0) {
-    BOOST_FOREACH(Partition* partition, hash_partitions_) {
-      if (partition->is_closed()) continue;
-      // TODO: this unpin is unnecessary but makes it simple. We should pick the
-      // partitions to keep in memory based on how much of the build tuples in that
-      // partition are on disk/in memory.
-      RETURN_IF_ERROR(partition->build_rows()->UnpinStream(true));
-      // Initialize (reserve one buffer) for each probe partition that needs to spill
-      RETURN_IF_ERROR(partition->probe_rows()->Init(false));
-      partition->is_spilled_ = true;
-    }
-  }
-
-  int64_t max_mem_build_tables = mem_tracker()->SpareCapacity();
-  if (max_mem_build_tables == -1) max_mem_build_tables = numeric_limits<int64_t>::max();
-
-  // Greedily pick the first N partitions until we run out of memory.
-  // TODO: We could do better. We know exactly how many rows are in the partition now so
-  // this is an optimization problem (i.e. 0-1 knapsack) to find the subset of partitions
-  // that fit and result in the least amount of IO.
-  BOOST_FOREACH(Partition* partition, hash_partitions_) {
-    if (partition->is_closed()) continue;
     bool built = false;
-    if (partition->EstimatedInMemSize() < max_mem_build_tables) {
+    if (!partition->is_spilled()) {
+      DCHECK(partition->build_rows()->is_pinned());
       RETURN_IF_ERROR(partition->BuildHashTable(state, &built));
     }
-    if (!built) {
-      partition->is_spilled_ = true;
-      DCHECK(partition->hash_tbl() == NULL);
-      continue;
+
+    if (built) {
+      // This partition's build is in memory and has a hash table, we won't be needing
+      // the probe stream anymore.
+      partition->probe_rows()->Close();
+    } else {
+      RETURN_IF_ERROR(partition->Spill(true));
+      DCHECK(partition->probe_rows()->has_write_block());
     }
-    // Hash table is built.
-    max_mem_build_tables -= partition->InMemSize();
+  }
+
+  // TODO: at this point we could have freed enough memory to pin and build some
+  // spilled partitions. This can happen, for example is there is a lot of skew.
+  // Partition 1: 10GB (pinned initially).
+  // Partition 2,3,4: 1GB (spilled during partitioning the build).
+  // In the previous step, we could have unpinned 10GB (because there was not enough
+  // memory to build a hash table over it) which can now free enough memory to
+  // build hash tables over the remaining 3 partitions.
+  // We start by spilling the largest partition though so the build input would have
+  // to be pretty pathological.
+  // Investigate if this is worthwhile.
+
+  // Initialize the hash_tbl_ caching array.
+  for (int i = 0; i < PARTITION_FANOUT; ++i) {
+    hash_tbls_[i] = hash_partitions_[i]->hash_tbl();
   }
 
   return Status::OK;
@@ -719,6 +735,7 @@ Status PartitionedHashJoinNode::CleanUpHashPartitions(RowBatch* batch) {
     Partition* partition = hash_partitions_[i];
     if (partition->is_closed()) continue;
     if (partition->is_spilled()) {
+      DCHECK(partition->hash_tbl() == NULL) << DebugString();
       // Unpin the build and probe stream to free up more memory. We need to free all
       // memory so we can recurse the algorithm and create new hash partitions from
       // spilled partitions.
@@ -777,25 +794,34 @@ string PartitionedHashJoinNode::DebugString() const {
      << " #partitions=" << hash_partitions_.size()
      << " #spilled_partitions=" << spilled_partitions_.size()
      << ")" << endl;
+
   for (int i = 0; i < hash_partitions_.size(); ++i) {
     ss << i << ": ptr=" << hash_partitions_[i];
-    if (hash_partitions_[i]->is_closed()) {
+    Partition* partition = hash_partitions_[i];
+    if (partition->is_closed()) {
       ss << " closed" << endl;
       continue;
     }
     ss << endl
-       << "   (Spilled) Build Rows: "
-       << hash_partitions_[i]->build_rows()->num_rows() << endl;
-    if (hash_partitions_[i]->hash_tbl() != NULL) {
-      ss << "   Hash Table Rows: " << hash_partitions_[i]->hash_tbl()->size() << endl;
+       << "   "
+       << (partition->is_spilled() ? "(Spilled)" : "")
+       << " Build Rows: " << partition->build_rows()->num_rows()
+       << " (Blocks pinned: " << partition->build_rows()->blocks_pinned() << ")"
+       << endl;
+    if (partition->hash_tbl() != NULL) {
+      ss << "   Hash Table Rows: " << partition->hash_tbl()->size() << endl;
     }
-    ss << "   (Spilled) Probe Rows: "
-       << hash_partitions_[i]->probe_rows()->num_rows() << endl;
+    ss << "   (Spilled) Probe Rows: " << partition->probe_rows()->num_rows()
+       << " (Blocks pinned: " << partition->probe_rows()->blocks_pinned() << ")"
+       << endl;
   }
+
   if (!spilled_partitions_.empty()) {
     ss << "SpilledPartitions" << endl;
     for (list<Partition*>::const_iterator it = spilled_partitions_.begin();
         it != spilled_partitions_.end(); ++it) {
+      DCHECK((*it)->is_spilled());
+      DCHECK((*it)->hash_tbl() == NULL);
       ss << "  Partition=" << *it << endl
         << "   Spilled Build Rows: "
         << (*it)->build_rows()->num_rows() << endl

@@ -308,8 +308,13 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     // Pins the build tuples for this partition and constructs the hash_tbl_ from it.
     // Build rows cannot be added after calling this.
     // If the partition could not be built due to memory pressure, *built is set to false
-    // and this function cleans up the hash_tbl.
+    // and the caller is responsible for spilling this partition.
     Status BuildHashTable(RuntimeState* state, bool* built);
+
+    // Spills this partition, cleaning up and unpinning blocks.
+    // If unpin_all_build is true, the build stream is completely unpinned, otherwise,
+    // it is unpinned with one buffer remaining.
+    Status Spill(bool unpin_all_build);
 
    private:
     friend class PartitionedHashJoinNode;

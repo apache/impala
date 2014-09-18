@@ -1036,7 +1036,8 @@ Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
   }
 }
 
-static Function* GetLenOptimizedHashFn(LlvmCodeGen* codegen, IRFunction::Type f, int len) {
+static Function* GetLenOptimizedHashFn(
+    LlvmCodeGen* codegen, IRFunction::Type f, int len) {
   Function* fn = codegen->GetFunction(f);
   DCHECK(fn != NULL);
   if (len != -1) {

@@ -66,7 +66,7 @@ order by 1,2 limit 3;
 STRING, BIGINT, DOUBLE, STRING
 ====
 ---- QUERY
-set max_block_mgr_memory=250m;
+set max_block_mgr_memory=100m;
 select count(l1.l_tax)
 from
 lineitem l1,

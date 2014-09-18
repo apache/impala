@@ -590,7 +590,8 @@ Function* HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murm
   DCHECK(this_type != NULL);
   PointerType* this_ptr_type = PointerType::get(this_type, 0);
 
-  LlvmCodeGen::FnPrototype prototype(codegen, "HashCurrentRow",
+  LlvmCodeGen::FnPrototype prototype(codegen,
+      (use_murmur ? "MurmurHashCurrentRow" : "HashCurrentRow"),
       codegen->GetType(TYPE_INT));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", this_ptr_type));
 
