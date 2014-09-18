@@ -429,76 +429,29 @@ public class BuiltinsDb extends Db {
         .put(Type.STRING,
              "13LastValUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
         .build();
+
   private static final Map<Type, String> FIRST_VALUE_UPDATE_SYMBOL =
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,
-             "14FirstValUpdateIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+             "14FirstValUpdateIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.DECIMAL,
-             "14FirstValUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+             "14FirstValUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.TINYINT,
-             "14FirstValUpdateIN10impala_udf10TinyIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+             "14FirstValUpdateIN10impala_udf10TinyIntValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.SMALLINT,
-             "14FirstValUpdateIN10impala_udf11SmallIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+             "14FirstValUpdateIN10impala_udf11SmallIntValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.TIMESTAMP,
-             "14FirstValUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+             "14FirstValUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.INT,
-             "14FirstValUpdateIN10impala_udf6IntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+             "14FirstValUpdateIN10impala_udf6IntValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.FLOAT,
-             "14FirstValUpdateIN10impala_udf8FloatValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+             "14FirstValUpdateIN10impala_udf8FloatValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.BIGINT,
-             "14FirstValUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+             "14FirstValUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.DOUBLE,
-             "14FirstValUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
+             "14FirstValUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.STRING,
-             "14FirstValUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
-        .build();
-
-  private static final Map<Type, String> FIRST_VALUE_FINALIZE_SYMBOL =
-      ImmutableMap.<Type, String>builder()
-        .put(Type.BOOLEAN,
-             "16FirstValFinalizeIN10impala_udf10BooleanValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.DECIMAL,
-             "16FirstValFinalizeIN10impala_udf10DecimalValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.TINYINT,
-             "16FirstValFinalizeIN10impala_udf10TinyIntValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.SMALLINT,
-             "16FirstValFinalizeIN10impala_udf11SmallIntValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.TIMESTAMP,
-             "16FirstValFinalizeIN10impala_udf12TimestampValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.INT,
-             "16FirstValFinalizeIN10impala_udf6IntValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.FLOAT,
-             "16FirstValFinalizeIN10impala_udf8FloatValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.BIGINT,
-             "16FirstValFinalizeIN10impala_udf9BigIntValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.DOUBLE,
-             "16FirstValFinalizeIN10impala_udf9DoubleValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.STRING,
-             "16FirstValFinalizeIN10impala_udf9StringValEEET_PNS2_15FunctionContextERKS3_")
-        .build();
-
-  private static final Map<Type, String> FIRST_VALUE_GET_VALUE_SYMBOL =
-      ImmutableMap.<Type, String>builder()
-        .put(Type.BOOLEAN,
-             "16FirstValGetValueIN10impala_udf10BooleanValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.DECIMAL,
-             "16FirstValGetValueIN10impala_udf10DecimalValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.TINYINT,
-             "16FirstValGetValueIN10impala_udf10TinyIntValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.SMALLINT,
-             "16FirstValGetValueIN10impala_udf11SmallIntValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.TIMESTAMP,
-             "16FirstValGetValueIN10impala_udf12TimestampValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.INT,
-             "16FirstValGetValueIN10impala_udf6IntValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.FLOAT,
-             "16FirstValGetValueIN10impala_udf8FloatValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.BIGINT,
-             "16FirstValGetValueIN10impala_udf9BigIntValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.DOUBLE,
-             "16FirstValGetValueIN10impala_udf9DoubleValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
-        .put(Type.STRING,
-             "16FirstValGetValueIN10impala_udf9StringValEEET_PNS2_15FunctionContextERKS3_")
+             "14FirstValUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
         .build();
 
   // Populate all the aggregate builtins in the catalog.
@@ -791,12 +744,12 @@ public class BuiltinsDb extends Db {
     for (Type t: Type.getSupportedTypes()) {
       if (t.isNull()) continue; // NULL is handled through type promotion.
       db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
-          db, "first_value", Lists.newArrayList(t), t, Type.STRING,
-          initNullString,
+          db, "first_value", Lists.newArrayList(t), t, t,
+          t.isStringType() ? initNullString : initNull,
           prefix + FIRST_VALUE_UPDATE_SYMBOL.get(t),
           null,
-          prefix + FIRST_VALUE_GET_VALUE_SYMBOL.get(t),
-          prefix + FIRST_VALUE_FINALIZE_SYMBOL.get(t)));
+          t == Type.STRING ? stringValGetValue : null,
+          t == Type.STRING ? stringValSerializeOrFinalize : null));
 
       db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
           db, "last_value", Lists.newArrayList(t), t, t,

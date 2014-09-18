@@ -757,3 +757,40 @@ select sum(t2.int_col_1) from
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# Test FIRST_VALUE with strings and null handling
+select cast(floor(id/3) as int), tinyint_col,
+first_value(tinyint_col) over (partition by cast(floor(id/3) as int) order by tinyint_col nulls first),
+first_value(cast(tinyint_col as string)) over (partition by cast(floor(id/3) as int) order by cast(tinyint_col as string) nulls first),
+last_value(tinyint_col) over (partition by cast(floor(id/3) as int) order by tinyint_col nulls first),
+last_value(cast(tinyint_col as string)) over (partition by cast(floor(id/3) as int) order by cast(tinyint_col as string) nulls first)
+from alltypesagg where id < 50 and (tinyint_col is null or tinyint_col < 4)
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,NULL,NULL,'NULL',NULL,'NULL'
+0,NULL,NULL,'NULL',NULL,'NULL'
+0,1,NULL,'NULL',1,'1'
+0,2,NULL,'NULL',2,'2'
+1,3,3,'3',3,'3'
+3,NULL,NULL,'NULL',NULL,'NULL'
+3,NULL,NULL,'NULL',NULL,'NULL'
+3,1,NULL,'NULL',1,'1'
+4,2,2,'2',2,'2'
+4,3,2,'2',3,'3'
+6,NULL,NULL,'NULL',NULL,'NULL'
+6,NULL,NULL,'NULL',NULL,'NULL'
+7,1,1,'1',1,'1'
+7,2,1,'1',2,'2'
+7,3,1,'1',3,'3'
+10,NULL,NULL,'NULL',NULL,'NULL'
+10,NULL,NULL,'NULL',NULL,'NULL'
+10,1,NULL,'NULL',1,'1'
+10,2,NULL,'NULL',2,'2'
+11,3,3,'3',3,'3'
+13,NULL,NULL,'NULL',NULL,'NULL'
+13,NULL,NULL,'NULL',NULL,'NULL'
+13,1,NULL,'NULL',1,'1'
+14,2,2,'2',2,'2'
+14,3,2,'2',3,'3'
+---- TYPES
+INT, TINYINT, TINYINT, STRING, TINYINT, STRING
+====

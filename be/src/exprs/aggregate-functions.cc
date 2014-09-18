@@ -1245,43 +1245,28 @@ void AggregateFunctions::LastValUpdate(FunctionContext* ctx, const StringVal& sr
 }
 
 template <typename T>
-void AggregateFunctions::FirstValUpdate(FunctionContext* ctx, const T& src,
-    StringVal* dst) {
-  if (!dst->is_null) return;
-  *dst = StringVal(ctx->Allocate(sizeof(T)), sizeof(T));
-  *reinterpret_cast<T*>(dst->ptr) = src;
+void AggregateFunctions::FirstValUpdate(FunctionContext* ctx, const T& src, T* dst) {
+  // The first call to FirstValUpdate sets the value of dst.
+  if (ctx->impl()->num_updates() > 1) return;
+  // num_updates is incremented before calling Update(), so it should never be 0.
+  // Remove() should never be called for FIRST_VALUE.
+  DCHECK_GT(ctx->impl()->num_updates(), 0);
+  DCHECK_EQ(ctx->impl()->num_removes(), 0);
+  *dst = src;
 }
 
 template <>
 void AggregateFunctions::FirstValUpdate(FunctionContext* ctx, const StringVal& src,
     StringVal* dst) {
-  if (!dst->is_null) return;
-  int len = sizeof(StringVal) + src.len;
-  *dst = StringVal(ctx->Allocate(len), len);
-  *reinterpret_cast<StringVal*>(dst->ptr) = src;
-}
-
-template <typename T>
-T AggregateFunctions::FirstValGetValue(FunctionContext* ctx, const StringVal& src) {
-  if (src.is_null) return T::null();
-  return *reinterpret_cast<T*>(src.ptr);
-}
-
-template <>
-StringVal AggregateFunctions::FirstValGetValue(FunctionContext* ctx, const StringVal& src) {
-  if (src.is_null) return StringVal::null();
-  StringVal* src_val = reinterpret_cast<StringVal*>(src.ptr);
-  // TODO: Revisit whether we should do this without a copy (and having the caller copy)
-  StringVal result(ctx, src_val->len);
-  memcpy(result.ptr, src_val->ptr, src_val->len);
-  return result;
-}
-
-template <typename T>
-T AggregateFunctions::FirstValFinalize(FunctionContext* ctx, const StringVal& src) {
-  T val = FirstValGetValue<T>(ctx, src);
-  if (!src.is_null) ctx->Free(src.ptr);
-  return val;
+  if (ctx->impl()->num_updates() > 1) return;
+  DCHECK_GT(ctx->impl()->num_updates(), 0);
+  DCHECK_EQ(ctx->impl()->num_removes(), 0);
+  if (src.is_null) {
+    *dst = StringVal::null();
+    return;
+  }
+  *dst = StringVal(ctx->Allocate(src.len), src.len);
+  memcpy(dst->ptr, src.ptr, src.len);
 }
 
 template <typename T>
@@ -1621,67 +1606,25 @@ template void AggregateFunctions::LastValUpdate<DecimalVal>(
     FunctionContext*, const DecimalVal& src, DecimalVal* dst);
 
 template void AggregateFunctions::FirstValUpdate<BooleanVal>(
-    FunctionContext*, const BooleanVal& src, StringVal* dst);
+    FunctionContext*, const BooleanVal& src, BooleanVal* dst);
 template void AggregateFunctions::FirstValUpdate<TinyIntVal>(
-    FunctionContext*, const TinyIntVal& src, StringVal* dst);
+    FunctionContext*, const TinyIntVal& src, TinyIntVal* dst);
 template void AggregateFunctions::FirstValUpdate<SmallIntVal>(
-    FunctionContext*, const SmallIntVal& src, StringVal* dst);
+    FunctionContext*, const SmallIntVal& src, SmallIntVal* dst);
 template void AggregateFunctions::FirstValUpdate<IntVal>(
-    FunctionContext*, const IntVal& src, StringVal* dst);
+    FunctionContext*, const IntVal& src, IntVal* dst);
 template void AggregateFunctions::FirstValUpdate<BigIntVal>(
-    FunctionContext*, const BigIntVal& src, StringVal* dst);
+    FunctionContext*, const BigIntVal& src, BigIntVal* dst);
 template void AggregateFunctions::FirstValUpdate<FloatVal>(
-    FunctionContext*, const FloatVal& src, StringVal* dst);
+    FunctionContext*, const FloatVal& src, FloatVal* dst);
 template void AggregateFunctions::FirstValUpdate<DoubleVal>(
-    FunctionContext*, const DoubleVal& src, StringVal* dst);
+    FunctionContext*, const DoubleVal& src, DoubleVal* dst);
 template void AggregateFunctions::FirstValUpdate<StringVal>(
     FunctionContext*, const StringVal& src, StringVal* dst);
 template void AggregateFunctions::FirstValUpdate<TimestampVal>(
-    FunctionContext*, const TimestampVal& src, StringVal* dst);
+    FunctionContext*, const TimestampVal& src, TimestampVal* dst);
 template void AggregateFunctions::FirstValUpdate<DecimalVal>(
-    FunctionContext*, const DecimalVal& src, StringVal* dst);
-
-template BooleanVal AggregateFunctions::FirstValGetValue<BooleanVal>(
-    FunctionContext*, const StringVal& src);
-template TinyIntVal AggregateFunctions::FirstValGetValue<TinyIntVal>(
-    FunctionContext*, const StringVal& src);
-template SmallIntVal AggregateFunctions::FirstValGetValue<SmallIntVal>(
-    FunctionContext*, const StringVal& src);
-template IntVal AggregateFunctions::FirstValGetValue<IntVal>(
-    FunctionContext*, const StringVal& src);
-template BigIntVal AggregateFunctions::FirstValGetValue<BigIntVal>(
-    FunctionContext*, const StringVal& src);
-template FloatVal AggregateFunctions::FirstValGetValue<FloatVal>(
-    FunctionContext*, const StringVal& src);
-template DoubleVal AggregateFunctions::FirstValGetValue<DoubleVal>(
-    FunctionContext*, const StringVal& src);
-template StringVal AggregateFunctions::FirstValGetValue<StringVal>(
-    FunctionContext*, const StringVal& src);
-template TimestampVal AggregateFunctions::FirstValGetValue<TimestampVal>(
-    FunctionContext*, const StringVal& src);
-template DecimalVal AggregateFunctions::FirstValGetValue<DecimalVal>(
-    FunctionContext*, const StringVal& src);
-
-template BooleanVal AggregateFunctions::FirstValFinalize<BooleanVal>(
-    FunctionContext*, const StringVal& src);
-template TinyIntVal AggregateFunctions::FirstValFinalize<TinyIntVal>(
-    FunctionContext*, const StringVal& src);
-template SmallIntVal AggregateFunctions::FirstValFinalize<SmallIntVal>(
-    FunctionContext*, const StringVal& src);
-template IntVal AggregateFunctions::FirstValFinalize<IntVal>(
-    FunctionContext*, const StringVal& src);
-template BigIntVal AggregateFunctions::FirstValFinalize<BigIntVal>(
-    FunctionContext*, const StringVal& src);
-template FloatVal AggregateFunctions::FirstValFinalize<FloatVal>(
-    FunctionContext*, const StringVal& src);
-template DoubleVal AggregateFunctions::FirstValFinalize<DoubleVal>(
-    FunctionContext*, const StringVal& src);
-template StringVal AggregateFunctions::FirstValFinalize<StringVal>(
-    FunctionContext*, const StringVal& src);
-template TimestampVal AggregateFunctions::FirstValFinalize<TimestampVal>(
-    FunctionContext*, const StringVal& src);
-template DecimalVal AggregateFunctions::FirstValFinalize<DecimalVal>(
-    FunctionContext*, const StringVal& src);
+    FunctionContext*, const DecimalVal& src, DecimalVal* dst);
 
 template void AggregateFunctions::OffsetFnInit<BooleanVal>(
     FunctionContext*, BooleanVal*);

@@ -1506,22 +1506,22 @@ last_value(bigint_col) over(partition by tinyint_col order by id
 from functional.alltypesagg
 ---- PLAN
 08:ANALYTIC
-|  functions: first_value(int_col)
-|  partition by: tinyint_col
-|  order by: id ASC, bool_col DESC
-|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|
-07:ANALYTIC
 |  functions: last_value(bigint_col)
 |  partition by: tinyint_col
 |  order by: id ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND 10 FOLLOWING
 |
-06:ANALYTIC
+07:ANALYTIC
 |  functions: last_value(bigint_col)
 |  partition by: tinyint_col
 |  order by: id ASC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+06:ANALYTIC
+|  functions: first_value(int_col)
+|  partition by: tinyint_col
+|  order by: id ASC, bool_col DESC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 05:SORT
 |  order by: tinyint_col ASC NULLS FIRST, id ASC NULLS LAST, bool_col DESC NULLS FIRST

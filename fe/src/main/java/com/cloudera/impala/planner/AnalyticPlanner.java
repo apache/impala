@@ -629,12 +629,12 @@ public class AnalyticPlanner {
 
     private static class SizeLt implements Comparator<WindowGroup> {
       public int compare(WindowGroup wg1, WindowGroup wg2) {
-        Preconditions.checkState(wg1.physicalIntermediateTuple != null
-            && wg1.physicalIntermediateTuple.getByteSize() != -1);
-        Preconditions.checkState(wg2.physicalIntermediateTuple != null
-            && wg2.physicalIntermediateTuple.getByteSize() != -1);
-        int diff = wg1.physicalIntermediateTuple.getByteSize()
-            - wg2.physicalIntermediateTuple.getByteSize();
+        Preconditions.checkState(wg1.physicalOutputTuple != null
+            && wg1.physicalOutputTuple.getByteSize() != -1);
+        Preconditions.checkState(wg2.physicalOutputTuple != null
+            && wg2.physicalOutputTuple.getByteSize() != -1);
+        int diff = wg1.physicalOutputTuple.getByteSize()
+            - wg2.physicalOutputTuple.getByteSize();
         return (diff < 0 ? -1 : (diff > 0 ? 1 : 0));
       }
     }
@@ -645,7 +645,7 @@ public class AnalyticPlanner {
     }
 
     /**
-     * Order window groups by increasing size of the intermediate tuple. This minimizes
+     * Order window groups by increasing size of the output tuple. This minimizes
      * the total volume of data that needs to be buffered.
      */
     public void orderWindowGroups() {

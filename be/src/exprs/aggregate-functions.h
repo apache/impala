@@ -231,13 +231,7 @@ class AggregateFunctions {
 
   // Implements FIRST_VALUE.
   template <typename T>
-  static void FirstValUpdate(FunctionContext*, const T& src, StringVal* dst);
-
-  template <typename T>
-  static T FirstValGetValue(FunctionContext*, const StringVal& src);
-
-  template <typename T>
-  static T FirstValFinalize(FunctionContext*, const StringVal& src);
+  static void FirstValUpdate(FunctionContext*, const T& src, T* dst);
 
   // OffsetFn*() implement LAG and LEAD. Init() sets the default value (the last
   // constant parameter) as dst.
