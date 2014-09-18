@@ -72,7 +72,7 @@ public class AnalyticEvalNode extends PlanNode {
 
   // predicates constructed from partitionExprs_/orderingExprs_ to
   // compare input to buffered tuples
-  private final Expr partitionByLessThan_;
+  private final Expr partitionByEq_;
   private final Expr orderByLessThan_;
   private final TupleDescriptor bufferedTupleDesc_;
 
@@ -82,7 +82,7 @@ public class AnalyticEvalNode extends PlanNode {
       List<OrderByElement> orderByElements, AnalyticWindow analyticWindow,
       TupleDescriptor logicalTupleDesc, TupleDescriptor intermediateTupleDesc,
       TupleDescriptor outputTupleDesc, ExprSubstitutionMap logicalToPhysicalSmap,
-      Expr partitionByLessThan, Expr orderByLessThan,
+      Expr partitionByEq, Expr orderByLessThan,
       TupleDescriptor bufferedTupleDesc) {
     super(id, input.getTupleIds(), "ANALYTIC");
     Preconditions.checkState(!tupleIds_.contains(outputTupleDesc.getId()));
@@ -97,7 +97,7 @@ public class AnalyticEvalNode extends PlanNode {
     intermediateTupleDesc_ = intermediateTupleDesc;
     outputTupleDesc_ = outputTupleDesc;
     logicalToPhysicalSmap_ = logicalToPhysicalSmap;
-    partitionByLessThan_ = partitionByLessThan;
+    partitionByEq_ = partitionByEq;
     orderByLessThan_ = orderByLessThan;
     bufferedTupleDesc_ = bufferedTupleDesc;
     children_.add(input);
@@ -156,8 +156,8 @@ public class AnalyticEvalNode extends PlanNode {
         .add("window", analyticWindow_)
         .add("intermediateTid", intermediateTupleDesc_.getId())
         .add("outputTid", outputTupleDesc_.getId())
-        .add("partitionByLt",
-            partitionByLessThan_ != null ? partitionByLessThan_.debugString() : "null")
+        .add("partitionByEq",
+            partitionByEq_ != null ? partitionByEq_.debugString() : "null")
         .add("orderByLt",
             orderByLessThan_ != null ? orderByLessThan_.debugString() : "null")
         .addValue(super.debugString())
@@ -182,8 +182,8 @@ public class AnalyticEvalNode extends PlanNode {
       // TODO: Window boundaries should have range_offset_predicate set
       msg.analytic_node.setWindow(analyticWindow_.toThrift());
     }
-    if (partitionByLessThan_ != null) {
-      msg.analytic_node.setPartition_by_lt(partitionByLessThan_.treeToThrift());
+    if (partitionByEq_ != null) {
+      msg.analytic_node.setPartition_by_eq(partitionByEq_.treeToThrift());
     }
     if (orderByLessThan_ != null) {
       msg.analytic_node.setOrder_by_lt(orderByLessThan_.treeToThrift());

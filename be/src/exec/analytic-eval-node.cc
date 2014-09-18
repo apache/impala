@@ -30,11 +30,14 @@ namespace impala {
 AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
+    window_(tnode.analytic_node.window),
     intermediate_tuple_desc_(
         descs.GetTupleDescriptor(tnode.analytic_node.intermediate_tuple_id)),
     result_tuple_desc_(
         descs.GetTupleDescriptor(tnode.analytic_node.output_tuple_id)),
-    window_(tnode.analytic_node.window),
+    buffered_tuple_desc_(NULL),
+    partition_by_expr_ctx_(NULL),
+    order_by_expr_ctx_(NULL),
     rows_start_offset_(0),
     rows_end_offset_(0),
     last_result_idx_(-1),
@@ -46,6 +49,10 @@ AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
     prev_input_row_(NULL),
     input_eos_(false),
     evaluation_timer_(NULL) {
+  if (tnode.analytic_node.__isset.buffered_tuple_id) {
+    buffered_tuple_desc_ = descs.GetTupleDescriptor(
+        tnode.analytic_node.buffered_tuple_id);
+  }
   if (!tnode.analytic_node.__isset.window) {
     fn_scope_ = AnalyticEvalNode::PARTITION;
   } else if (tnode.analytic_node.window.type == TAnalyticWindowType::RANGE) {
@@ -93,8 +100,16 @@ Status AnalyticEvalNode::Init(const TPlanNode& tnode) {
   DCHECK(fn_scope_ != PARTITION || analytic_node.order_by_exprs.empty());
   DCHECK(window_.__isset.window_end || !window_.__isset.window_start)
       << "UNBOUNDED FOLLOWING is only supported with UNBOUNDED PRECEDING.";
-  RETURN_IF_ERROR(partition_exprs_.Init(analytic_node.partition_exprs, NULL, pool_));
-  RETURN_IF_ERROR(ordering_exprs_.Init(analytic_node.order_by_exprs, NULL, pool_));
+  if (analytic_node.__isset.partition_by_eq) {
+    DCHECK(analytic_node.__isset.buffered_tuple_id);
+    RETURN_IF_ERROR(Expr::CreateExprTree(pool_, analytic_node.partition_by_eq,
+          &partition_by_expr_ctx_));
+  }
+  if (analytic_node.__isset.order_by_lt) {
+    DCHECK(analytic_node.__isset.buffered_tuple_id);
+    RETURN_IF_ERROR(Expr::CreateExprTree(pool_, analytic_node.order_by_lt,
+          &order_by_expr_ctx_));
+  }
   return Status::OK;
 }
 
@@ -116,8 +131,21 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
         mem_pool_.get(), &fn_ctxs_[i]));
     state->obj_pool()->Add(fn_ctxs_[i]);
   }
-  RETURN_IF_ERROR(partition_exprs_.Prepare(state, child(0)->row_desc(), row_descriptor_));
-  RETURN_IF_ERROR(ordering_exprs_.Prepare(state, child(0)->row_desc(), row_descriptor_));
+  if (buffered_tuple_desc_ != NULL) {
+    DCHECK(partition_by_expr_ctx_ != NULL || order_by_expr_ctx_ != NULL);
+    vector<TTupleId> tuple_ids;
+    tuple_ids.push_back(child(0)->row_desc().tuple_descriptors()[0]->id());
+    tuple_ids.push_back(buffered_tuple_desc_->id());
+    RowDescriptor cmp_row_desc(state->desc_tbl(), tuple_ids, vector<bool>(2, false));
+    if (partition_by_expr_ctx_ != NULL) {
+      RETURN_IF_ERROR(partition_by_expr_ctx_->Prepare(state, cmp_row_desc));
+    }
+    if (order_by_expr_ctx_ != NULL) {
+      RETURN_IF_ERROR(order_by_expr_ctx_->Prepare(state, cmp_row_desc));
+    }
+  }
+  child_tuple_cmp_row_ = reinterpret_cast<TupleRow*>(
+      mem_pool_->Allocate(sizeof(Tuple*) * 2));
   return Status::OK;
 }
 
@@ -138,14 +166,12 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
     DCHECK(!evaluators_[i]->is_merge());
   }
 
-  RETURN_IF_ERROR(partition_exprs_.Open(state));
-  partition_comparator_.reset(new TupleRowComparator(
-      partition_exprs_.lhs_ordering_expr_ctxs(),
-      partition_exprs_.rhs_ordering_expr_ctxs(), false, false));
-  RETURN_IF_ERROR(ordering_exprs_.Open(state));
-  ordering_comparator_.reset(new TupleRowComparator(
-      ordering_exprs_.lhs_ordering_expr_ctxs(),
-      ordering_exprs_.rhs_ordering_expr_ctxs(), false, false));
+  if (partition_by_expr_ctx_ != NULL) {
+    RETURN_IF_ERROR(partition_by_expr_ctx_->Open(state));
+  }
+  if (order_by_expr_ctx_ != NULL) {
+    RETURN_IF_ERROR(order_by_expr_ctx_->Open(state));
+  }
 
   // An intermediate tuple is only allocated once and is reused.
   curr_tuple_ = Tuple::Create(intermediate_tuple_desc_->byte_size(), mem_pool_.get());
@@ -272,8 +298,7 @@ inline void AnalyticEvalNode::TryAddResultTupleForPrevRow(bool next_partition,
   VLOG_ROW << "TryAddResultTupleForPrevRow partition=" << next_partition
            << " idx=" << stream_idx;
   if (fn_scope_ == ROWS) return;
-  if (next_partition || (fn_scope_ == RANGE &&
-      0 != ordering_comparator_->Compare(prev_input_row_, row))) {
+  if (next_partition || (fn_scope_ == RANGE && PrevRowCompare(order_by_expr_ctx_))) {
     AddResultTuple(stream_idx - 1);
   }
 }
@@ -400,6 +425,13 @@ inline void AnalyticEvalNode::InitNextPartition(int64_t stream_idx) {
   }
 }
 
+inline bool AnalyticEvalNode::PrevRowCompare(ExprContext* pred_ctx) {
+  DCHECK(pred_ctx != NULL);
+  BooleanVal result = pred_ctx->GetBooleanVal(child_tuple_cmp_row_);
+  DCHECK(!result.is_null);
+  return result.val;
+}
+
 Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
   // TODO: DCHECK input is sorted (even just first row vs prev_input_row_)
   VLOG_FILE << "ProcessChildBatch: " << DebugEvaluatedRowsString()
@@ -415,6 +447,8 @@ Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
   int64_t last_window_tuple_idx = -1;
   for (int i = 0; i < curr_child_batch_->num_rows(); ++i, ++stream_idx) {
     TupleRow* row = curr_child_batch_->GetRow(i);
+    child_tuple_cmp_row_->SetTuple(0, prev_input_row_->GetTuple(0));
+    child_tuple_cmp_row_->SetTuple(1, row->GetTuple(0));
     TryRemoveRowsBeforeWindow(stream_idx);
 
     // Every row is compared against the previous row to determine if (a) the row
@@ -426,8 +460,11 @@ Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
     // different values for the ordering exprs (b), then a new tuple is created but
     // copied from curr_tuple_ because the original is used for one or more previous
     // row(s) but the incremental state still applies to the current row.
-    // TODO: Replace TupleRowComparators with predicates (to be generated by the planner)
-    bool next_partition = 0 != partition_comparator_->Compare(prev_input_row_, row);
+    bool next_partition = false;
+    if (partition_by_expr_ctx_ != NULL) {
+      // partition_by_expr_ctx_ checks equality over the predicate exprs
+      next_partition = !PrevRowCompare(partition_by_expr_ctx_);
+    }
     TryAddResultTupleForPrevRow(next_partition, stream_idx, row);
     if (next_partition) InitNextPartition(stream_idx);
 
@@ -606,8 +643,8 @@ void AnalyticEvalNode::Close(RuntimeState* state) {
     evaluators_[i]->Close(state);
     fn_ctxs_[i]->impl()->Close();
   }
-  partition_exprs_.Close(state);
-  ordering_exprs_.Close(state);
+  if (partition_by_expr_ctx_ != NULL) partition_by_expr_ctx_->Close(state);
+  if (order_by_expr_ctx_ != NULL) order_by_expr_ctx_->Close(state);
   if (prev_child_batch_.get() != NULL) prev_child_batch_.reset();
   if (curr_child_batch_.get() != NULL) curr_child_batch_.reset();
   if (curr_tuple_pool_.get() != NULL) curr_tuple_pool_->FreeAll();
@@ -619,11 +656,14 @@ void AnalyticEvalNode::Close(RuntimeState* state) {
 void AnalyticEvalNode::DebugString(int indentation_level, stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
   *out << "AnalyticEvalNode("
-       << " window=" << DebugWindowString()
-       << " partition_exprs="
-       << Expr::DebugString(partition_exprs_.lhs_ordering_expr_ctxs())
-       << " ordering_exprs="
-       << Expr::DebugString(ordering_exprs_.lhs_ordering_expr_ctxs());
+       << " window=" << DebugWindowString();
+  if (partition_by_expr_ctx_ != NULL) {
+    *out << " partition_exprs=" << partition_by_expr_ctx_->root()->DebugString();
+  }
+  if (order_by_expr_ctx_ != NULL) {
+    *out << " order_by_exprs=" << order_by_expr_ctx_->root()->DebugString();
+  }
+  *out << AggFnEvaluator::DebugString(evaluators_);
   ExecNode::DebugString(indentation_level, out);
   *out << ")";
 }

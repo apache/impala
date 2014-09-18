@@ -29,6 +29,7 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.BoolLiteral;
 import com.cloudera.impala.analysis.CompoundPredicate;
+import com.cloudera.impala.analysis.CompoundPredicate.Operator;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.IsNullPredicate;
@@ -277,7 +278,6 @@ public class AnalyticPlanner {
         bufferedSmap.put(
             new SlotRef(inputSlots.get(i)), new SlotRef(bufferedSlots.get(i)));
       }
-
     }
 
     // create one AnalyticEvalNode per window group
@@ -291,12 +291,12 @@ public class AnalyticPlanner {
 
       // we need to remap the pb/ob exprs to a) the sort output, b) our buffer of the
       // sort input
-      Expr partitionByLessThan = null;
+      Expr partitionByEq = null;
       if (!windowGroup.partitionByExprs.isEmpty()) {
-        partitionByLessThan = createExprLessThan(
+        partitionByEq = createNullMatchingEquals(
             Expr.substituteList(windowGroup.partitionByExprs, sortSmap, analyzer_),
             sortTupleId, bufferedSmap);
-        LOG.trace("partitionByLt: " + partitionByLessThan.debugString());
+        LOG.trace("partitionByEq: " + partitionByEq.debugString());
       }
       Expr orderByLessThan = null;
       if (!windowGroup.orderByElements.isEmpty()) {
@@ -312,22 +312,10 @@ public class AnalyticPlanner {
           windowGroup.window, analyticInfo_.getOutputTupleDesc(),
           windowGroup.physicalIntermediateTuple,
           windowGroup.physicalOutputTuple, windowGroup.logicalToPhysicalSmap,
-          partitionByLessThan, orderByLessThan, bufferedTupleDesc);
+          partitionByEq, orderByLessThan, bufferedTupleDesc);
       root.init(analyzer_);
     }
     return root;
-  }
-
-  /**
-   * Create '<input row> < <buffered row>' predicate.
-   */
-  private Expr createExprLessThan(List<Expr> orderByExprs, TupleId inputTid,
-      ExprSubstitutionMap bufferedSmap) {
-    List<OrderByElement> elements = Lists.newArrayList();
-    for (Expr e: orderByExprs) {
-      elements.add(new OrderByElement(e, true, true));
-    }
-    return createLessThan(elements, inputTid, bufferedSmap);
   }
 
   /**
@@ -382,6 +370,51 @@ public class AnalyticPlanner {
           new CompoundPredicate(CompoundPredicate.Operator.OR, lhsIsFirst, lhsPrecedesRhs),
           new CompoundPredicate(CompoundPredicate.Operator.AND, lhsEqRhs, remainder)));
     return result;
+  }
+
+  /**
+   * Create a predicate that checks if all exprs are equal or both sides are null.
+   */
+  private Expr createNullMatchingEquals(List<Expr> exprs, TupleId inputTid,
+      ExprSubstitutionMap bufferedSmap) {
+    Preconditions.checkState(!exprs.isEmpty());
+    Expr result = createNullMatchingEqualsAux(exprs, 0, inputTid, bufferedSmap);
+    try {
+      result.analyze(analyzer_);
+    } catch (AnalysisException e) {
+      throw new IllegalStateException(e);
+    }
+    return result;
+  }
+
+  /**
+   * Create an unanalyzed predicate that checks if elements >= i are equal or
+   * both sides are null.
+   *
+   * The predicate has the form
+   * ((lhs[i] is null && rhs[i] is null) || (
+   *   lhs[i] is not null && rhs[i] is not null && lhs[i] = rhs[i]))
+   * && <createEqualsAux(i + 1)>
+   */
+  private Expr createNullMatchingEqualsAux(List<Expr> elements, int i,
+      TupleId inputTid, ExprSubstitutionMap bufferedSmap) {
+    if (i > elements.size() - 1) return new BoolLiteral(true);
+
+    // compare elements[i]
+    Expr lhs = elements.get(i);
+    Preconditions.checkState(lhs.isBound(inputTid));
+    Expr rhs = lhs.substitute(bufferedSmap, analyzer_);
+
+    Expr bothNull = new CompoundPredicate(Operator.AND,
+        new IsNullPredicate(lhs, false), new IsNullPredicate(rhs, false));
+    Expr lhsEqRhsNotNull = new CompoundPredicate(Operator.AND,
+        new CompoundPredicate(Operator.AND,
+            new IsNullPredicate(lhs, true), new IsNullPredicate(rhs, true)),
+        new BinaryPredicate(BinaryPredicate.Operator.EQ, lhs, rhs));
+    Expr remainder = createNullMatchingEqualsAux(elements, i + 1, inputTid, bufferedSmap);
+    return new CompoundPredicate(CompoundPredicate.Operator.AND,
+        new CompoundPredicate(Operator.OR, bothNull, lhsEqRhsNotNull),
+        remainder);
   }
 
   /**

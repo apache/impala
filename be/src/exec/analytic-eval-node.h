@@ -16,10 +16,11 @@
 #define IMPALA_EXEC_ANALYTIC_EVAL_NODE_H
 
 #include "exec/exec-node.h"
-#include "exec/sort-exec-exprs.h"
+#include "exprs/expr.h"
+#include "exprs/expr-context.h"
 #include "runtime/buffered-block-mgr.h"
 #include "runtime/buffered-tuple-stream.h"
-#include "util/tuple-row-compare.h"
+#include "runtime/tuple.h"
 
 namespace impala {
 
@@ -155,11 +156,20 @@ class AnalyticEvalNode : public ExecNode {
   // This is necessary to produce the default value (set by Init()).
   void ResetLeadFnSlots();
 
+  // Evaluates the predicate pred_ctx over child_tuple_cmp_row_, which is a TupleRow*
+  // containing the previous row and the current row set during ProcessChildBatch().
+  bool PrevRowCompare(ExprContext* pred_ctx);
+
   // Debug string about the rows that have been evaluated and are ready to be returned.
   std::string DebugEvaluatedRowsString() const;
 
   // Debug string containing the window definition.
   std::string DebugWindowString() const;
+
+  // Window over which the analytic functions are evaluated. Only used if fn_scope_
+  // is ROWS or RANGE.
+  // TODO: fn_scope_ and window_ are candidates to be removed during codegen
+  const TAnalyticWindow window_;
 
   // Tuple descriptor for storing intermediate values of analytic fn evaluation.
   const TupleDescriptor* intermediate_tuple_desc_;
@@ -167,10 +177,23 @@ class AnalyticEvalNode : public ExecNode {
   // Tuple descriptor for storing results of analytic fn evaluation.
   const TupleDescriptor* result_tuple_desc_;
 
-  // Window over which the analytic functions are evaluated. Only used if fn_scope_
-  // is ROWS or RANGE.
-  // TODO: fn_scope_ and window_ are candidates to be removed during codegen
-  const TAnalyticWindow window_;
+  // Tuple descriptor of the buffered tuple (identical to the input child tuple, which is
+  // assumed to come from a single SortNode). NULL if both partition_exprs and
+  // order_by_exprs are empty.
+  TupleDescriptor* buffered_tuple_desc_;
+
+  // TupleRow* composed of the first child tuple and the buffered tuple, used by
+  // partition_by_expr_ctx_ and order_by_expr_ctx_. Set in Prepare() if
+  // buffered_tuple_desc_ is not NULL, allocated from mem_pool_.
+  TupleRow* child_tuple_cmp_row_;
+
+  // Expr context for a predicate that checks if child tuple '<' buffered tuple for
+  // partitioning exprs.
+  ExprContext* partition_by_expr_ctx_;
+
+  // Expr context for a predicate that checks if child tuple '<' buffered tuple for
+  // order by exprs.
+  ExprContext* order_by_expr_ctx_;
 
   // The scope over which analytic functions are evaluated.
   // TODO: Consider adding additional state to capture whether different kinds of window
@@ -182,20 +205,6 @@ class AnalyticEvalNode : public ExecNode {
   // if type is CURRENT ROW or UNBOUNDED PRECEDING/FOLLOWING.
   int64_t rows_start_offset_;
   int64_t rows_end_offset_;
-
-  // Exprs on which the analytic function input is partitioned. Used to identify
-  // partition boundaries using partition_comparator_. Empty if no partition-by clause
-  // is specified.
-  // TODO: Remove and use TAnalyticNode.partition_by_lt
-  SortExecExprs partition_exprs_;
-  boost::scoped_ptr<TupleRowComparator> partition_comparator_;
-
-  // Exprs specified by an order-by clause for RANGE windows. Used to evaluate RANGE
-  // window boundaries using ordering_comparator_. Empty if no order-by clause is
-  // specified or for windows specifying ROWS.
-  // TODO: Remove and use TAnalyticNode.order_by_lt
-  SortExecExprs ordering_exprs_;
-  boost::scoped_ptr<TupleRowComparator> ordering_comparator_;
 
   // Analytic function evaluators.
   std::vector<AggFnEvaluator*> evaluators_;
