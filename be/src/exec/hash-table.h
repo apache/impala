@@ -23,6 +23,7 @@
 #include "common/logging.h"
 #include "runtime/buffered-block-mgr.h"
 #include "runtime/buffered-tuple-stream.h"
+#include "runtime/buffered-tuple-stream.inline.h"
 #include "runtime/mem-tracker.h"
 #include "runtime/tuple-row.h"
 #include "util/bitmap.h"
