@@ -144,3 +144,111 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
                                       "functional.insert_inherit_acls "
                                       "PARTITION(p1=1, p2=2, p3=30) VALUES(1)")
     check_has_acls("p1=1/p2=2/p3=30", "default:group:new_leaf_group:-w-")
+
+  def test_insert_acl_permissions(self):
+    """Test that INSERT correctly respects ACLs"""
+    TBL = "functional.insert_acl_permissions"
+    TBL_PATH = "test-warehouse/functional.db/insert_acl_permissions"
+
+    INSERT_QUERY = "INSERT INTO %s VALUES(1)" % TBL
+
+    self.execute_query_expect_success(self.client, "DROP TABLE IF EXISTS"
+                                      " functional.insert_acl_permissions")
+    self.execute_query_expect_success(self.client, "CREATE TABLE "
+                                      "functional.insert_acl_permissions (col int) ")
+
+    # Check that a simple insert works
+    self.execute_query_expect_success(self.client, INSERT_QUERY)
+
+    # Remove the permission to write and confirm that INSERTs won't work
+    self.hdfs_client.setacl(TBL_PATH, "user::r-x,group::r-x,other::r-x")
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.insert_acl_permissions")
+    self.execute_query_expect_failure(self.client, INSERT_QUERY)
+
+    # Now add group access, still should fail (because the user will match and take
+    # priority)
+    self.hdfs_client.setacl(TBL_PATH, "user::r-x,group::rwx,other::r-x")
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.insert_acl_permissions")
+    self.execute_query_expect_failure(self.client, INSERT_QUERY)
+
+    # Check that the mask correctly applies to the anonymous group ACL
+    self.hdfs_client.setacl(TBL_PATH, "user::r-x,group::rwx,other::rwx,mask::r--")
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.insert_acl_permissions")
+    # Should be unwritable because mask applies to unnamed group and disables writing
+    self.execute_query_expect_failure(self.client, INSERT_QUERY)
+
+    # Now make the target directory non-writable with posix permissions, but writable with
+    # ACLs (ACLs should take priority). Note: chmod affects ACLs (!) so it has to be done
+    # first.
+    self.hdfs_client.chmod(TBL_PATH, "000")
+    self.hdfs_client.setacl(TBL_PATH, "user::rwx,group::r-x,other::r-x")
+
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.insert_acl_permissions")
+    self.execute_query_expect_success(self.client, INSERT_QUERY)
+
+    # Finally, change the owner
+    self.hdfs_client.chown(TBL_PATH, "another_user", "another_group")
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.insert_acl_permissions")
+    # Should be unwritable because 'other' ACLs don't allow writes
+    self.execute_query_expect_failure(self.client, INSERT_QUERY)
+
+    # Give write perms back to 'other'
+    self.hdfs_client.setacl(TBL_PATH, "user::rwx,group::r-x,other::rwx")
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.insert_acl_permissions")
+    # Should be unwritable because 'other' ACLs don't allow writes
+    self.execute_query_expect_success(self.client, INSERT_QUERY)
+
+  def test_load_permissions(self):
+    # We rely on test_insert_acl_permissions() to exhaustively check that ACL semantics
+    # are correct. Here we just validate that LOADs can't be done when we cannot read from
+    # or write to the src directory, or write to the dest directory.
+    TBL = "functional.load_acl_permissions"
+    TBL_PATH = "test-warehouse/functional.db/load_acl_permissions"
+    FILE_PATH = "tmp/impala_load_test"
+    FILE_NAME = "%s/impala_data_file" % FILE_PATH
+    LOAD_FILE_QUERY = "LOAD DATA INPATH '/%s' INTO TABLE %s" % (FILE_NAME, TBL)
+    LOAD_DIR_QUERY = "LOAD DATA INPATH '/%s' INTO TABLE %s" % (FILE_PATH, TBL)
+
+    self.hdfs_client.make_dir(FILE_PATH)
+
+    self.hdfs_client.setacl(FILE_PATH, "user::rwx,group::rwx,other::---")
+    self.execute_query_expect_success(self.client, "DROP TABLE IF EXISTS"
+                                      " functional.load_acl_permissions")
+    self.execute_query_expect_success(self.client, "CREATE TABLE "
+                                      "functional.load_acl_permissions (col int)")
+    self.hdfs_client.delete_file_dir(FILE_NAME)
+    self.hdfs_client.create_file(FILE_NAME, "1")
+
+    self.execute_query_expect_success(self.client, LOAD_FILE_QUERY)
+
+    # Now remove write perms from the source directory
+    self.hdfs_client.create_file(FILE_NAME, "1")
+    self.hdfs_client.setacl(FILE_PATH, "user::---,group::---,other::---")
+    self.hdfs_client.setacl(TBL_PATH, "user::rwx,group::r-x,other::r-x")
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.load_acl_permissions")
+    self.execute_query_expect_failure(self.client, LOAD_FILE_QUERY)
+    self.execute_query_expect_failure(self.client, LOAD_DIR_QUERY)
+
+    # Remove write perms from target
+    self.hdfs_client.setacl(FILE_PATH, "user::rwx,group::rwx,other::rwx")
+    self.hdfs_client.setacl(TBL_PATH, "user::r-x,group::r-x,other::r-x")
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.load_acl_permissions")
+    self.execute_query_expect_failure(self.client, LOAD_FILE_QUERY)
+    self.execute_query_expect_failure(self.client, LOAD_DIR_QUERY)
+
+    # Finally remove read perms from file itself
+    self.hdfs_client.setacl(FILE_NAME, "user::-wx,group::rwx,other::rwx")
+    self.hdfs_client.setacl(TBL_PATH, "user::rwx,group::rwx,other::rwx")
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.load_acl_permissions")
+    self.execute_query_expect_failure(self.client, LOAD_FILE_QUERY)
+    # We expect this to succeed, it's not an error if all files in the dir cannot be read
+    self.execute_query_expect_success(self.client, LOAD_DIR_QUERY)

@@ -31,6 +31,14 @@ class PyWebHdfsClientWithChmod(PyWebHdfsClient):
       _raise_pywebhdfs_exception(response.status_code, response.text)
     return True
 
+  def chown(self, path, user, group):
+    """Sets the owner and the group of 'path to 'user' / 'group'"""
+    uri = self._create_uri(path, "SETOWNER", owner=user, group=group)
+    response = requests.put(uri, allow_redirects=True)
+    if not response.status_code == httplib.OK:
+      _raise_pywebhdfs_exception(response.status_code, response.text)
+    return True
+
   def setacl(self, path, acls):
     uri = self._create_uri(path, "SETACL", aclspec=acls)
     response = requests.put(uri, allow_redirects=True)

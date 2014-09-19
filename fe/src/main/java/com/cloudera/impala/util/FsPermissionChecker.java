@@ -18,7 +18,16 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.Map;
+import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.apache.hadoop.fs.permission.AclEntry;
+import org.apache.hadoop.fs.permission.AclEntryType;
+import org.apache.hadoop.fs.permission.AclStatus;
+import org.apache.hadoop.fs.permission.AclEntryScope;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -27,12 +36,16 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Lists;
 
 /**
  * Singleton class that can check whether the current user has permission to access paths
  * in a FileSystem.
  */
 public class FsPermissionChecker {
+  private final static Logger LOG = LoggerFactory.getLogger(FsPermissionChecker.class);
   private final static FsPermissionChecker instance_;
   protected final String user_;
   private final Set<String> groups_ = new HashSet<String>();
@@ -52,6 +65,10 @@ public class FsPermissionChecker {
     user_ = ugi.getShortUserName();
   }
 
+
+  private static List<AclEntryType> ACL_TYPE_PRIORITY =
+      ImmutableList.of(AclEntryType.USER, AclEntryType.GROUP, AclEntryType.OTHER);
+
   /**
    * Allows checking different access permissions of a file without repeatedly accessing
    * the underlying filesystem by caching the results of a status call at construction.
@@ -59,11 +76,93 @@ public class FsPermissionChecker {
   public class Permissions {
     private final FileStatus fileStatus_;
     private final FsPermission permissions_;
+    private final AclStatus aclStatus_;
+    private Map<AclEntryType, List<AclEntry>> entriesByTypes_ = Maps.newHashMap();
+    private AclEntry mask_;
 
-    protected Permissions(FileStatus fileStatus) {
+    protected Permissions(FileStatus fileStatus, AclStatus aclStatus) {
       Preconditions.checkNotNull(fileStatus);
       fileStatus_ = fileStatus;
       permissions_ = fileStatus.getPermission();
+      aclStatus_ = aclStatus;
+      if (aclStatus_ == null) return;
+
+      // Group the ACLs by type, so that we can apply them in correct priority order. Not
+      // clear from documentation whether aclStatus_.getEntries() guarantees this
+      // ordering, so this is defensive.
+      for (AclEntryType t: ACL_TYPE_PRIORITY) {
+        entriesByTypes_.put(t, Lists.<AclEntry>newArrayList());
+      }
+
+      for (AclEntry e: aclStatus_.getEntries()) {
+        if (e.getType() == AclEntryType.MASK) {
+          if (shouldApplyMask(e)) mask_ = e;
+        } else if (isApplicableAcl(e)) {
+          entriesByTypes_.get(e.getType()).add(e);
+        }
+      }
+    }
+
+    /**
+     * Returns true if the mask should apply. The mask ACL applies only to unnamed user
+     * ACLs (e.g. user::r-x), and all group ACLs.
+     */
+    private boolean shouldApplyMask(AclEntry acl) {
+      switch (acl.getType()) {
+        case USER:
+          return acl.getName() != null;
+        case GROUP:
+          return true;
+      }
+      return false;
+    }
+
+    /**
+     * Returns true if this ACL applies to the current user and / or group
+     */
+    private boolean isApplicableAcl(AclEntry e) {
+      // Default ACLs are not used for permission checking, but instead control the
+      // permissions received by child directories
+      if (e.getScope() == AclEntryScope.DEFAULT) return false;
+
+      switch (e.getType()) {
+        case USER:
+          String aclUser = e.getName() == null ? aclStatus_.getOwner() : e.getName();
+          return FsPermissionChecker.this.user_.equals(aclUser);
+        case GROUP:
+          String aclGroup = e.getName() == null ? aclStatus_.getGroup() : e.getName();
+          return FsPermissionChecker.this.groups_.contains(aclGroup);
+        case OTHER:
+          return true;
+        case MASK:
+          return false;
+        default:
+          LOG.warn("Unknown Acl type: " + e.getType());
+          return false;
+      }
+    }
+
+    /**
+     * Returns true if ACLs allow 'action', false if they explicitly disallow 'action',
+     * and 'null' if no ACLs are available.
+     */
+    private Boolean checkAcls(FsAction action) {
+      // ACLs may not be enabled, so we need this ternary logic. If no ACLs are available,
+      // returning null causes us to fall back to standard ugo permissions.
+      if (aclStatus_ == null) return null;
+
+      for (AclEntryType t: ACL_TYPE_PRIORITY) {
+        for (AclEntry e: entriesByTypes_.get(t)) {
+          // If there is an applicable mask, 'action' is allowed iff both the mask and
+          // the underlying ACL permit it.
+          if (mask_ != null) {
+            return mask_.getPermission().implies(action) &&
+                e.getPermission().implies(action);
+          }
+          return e.getPermission().implies(action);
+        }
+      }
+      return null;
     }
 
     /**
@@ -71,6 +170,9 @@ public class FsPermissionChecker {
      * permissions.
      */
     public boolean checkPermissions(FsAction action) {
+      Boolean aclPerms = checkAcls(action);
+      if (aclPerms != null) return aclPerms;
+
       // Check user, group and then 'other' permissions in turn.
       if (FsPermissionChecker.this.user_.equals(fileStatus_.getOwner())) {
         // If the user matches, we must return their access rights whether or not the user
@@ -98,7 +200,7 @@ public class FsPermissionChecker {
   public Permissions getPermissions(FileSystem fs, Path path) throws IOException {
     Preconditions.checkNotNull(fs);
     Preconditions.checkNotNull(path);
-    return new Permissions(fs.getFileStatus(path));
+    return new Permissions(fs.getFileStatus(path), fs.getAclStatus(path));
   }
 
   /**

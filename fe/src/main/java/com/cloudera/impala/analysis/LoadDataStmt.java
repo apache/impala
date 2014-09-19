@@ -19,6 +19,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 
@@ -32,6 +33,7 @@ import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.thrift.TLoadDataReq;
 import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.util.TAccessLevelUtil;
+import com.cloudera.impala.util.FsPermissionChecker;
 import com.google.common.base.Preconditions;
 
 /*
@@ -114,12 +116,19 @@ public class LoadDataStmt extends StatementBase {
     analyzePaths(analyzer, (HdfsTable) table);
   }
 
+  /**
+   * Check to see if Impala has the necessary permissions to access the source and dest
+   * paths for this LOAD statement (which maps onto a sequence of file move operations,
+   * with the requisite permission requirements), and check to see if all files to be
+   * moved are in format that Impala understands. Errors are raised as AnalysisExceptions.
+   */
   private void analyzePaths(Analyzer analyzer, HdfsTable hdfsTable)
       throws AnalysisException {
     // The user must have permission to access the source location. Since the files will
     // be moved from this location, the user needs to have all permission.
     sourceDataPath_.analyze(analyzer, Privilege.ALL);
 
+    // Catch all exceptions thrown by accessing files, and rethrow as AnalysisExceptions.
     try {
       Path source = sourceDataPath_.getPath();
       FileSystem fs = source.getFileSystem(FileSystemUtil.getConfiguration());
@@ -128,6 +137,11 @@ public class LoadDataStmt extends StatementBase {
         throw new AnalysisException(String.format(
             "INPATH location '%s' does not exist.", sourceDataPath_));
       }
+
+      // If the source file is a directory, we must be able to read from and write to
+      // it. If the source file is a file, we must be able to read from it, and write to
+      // its parent directory (in order to delete the file as part of the move operation).
+      FsPermissionChecker checker = FsPermissionChecker.getInstance();
 
       if (dfs.isDirectory(source)) {
         if (FileSystemUtil.getTotalNumVisibleFiles(source) == 0) {
@@ -138,13 +152,32 @@ public class LoadDataStmt extends StatementBase {
           throw new AnalysisException(String.format(
               "INPATH location '%s' cannot contain subdirectories.", sourceDataPath_));
         }
-      } else { // INPATH points to a file.
+        if (!checker.getPermissions(dfs, source).checkPermissions(
+            FsAction.READ_WRITE)) {
+          throw new AnalysisException(String.format("Unable to LOAD DATA from %s " +
+              "because Impala does not have READ or WRITE permissions on this directory",
+              source));
+        }
+      } else {
+        // INPATH names a file.
         if (FileSystemUtil.isHiddenFile(source.getName())) {
           throw new AnalysisException(String.format(
               "INPATH location '%s' points to a hidden file.", source));
         }
-      }
 
+        if (!checker.getPermissions(dfs, source.getParent()).checkPermissions(
+            FsAction.WRITE)) {
+          throw new AnalysisException(String.format("Unable to LOAD DATA from %s " +
+              "because Impala does not have WRITE permissions on its parent " +
+              "directory %s", source, source.getParent()));
+        }
+
+        if (!checker.getPermissions(dfs, source).checkPermissions(
+            FsAction.READ)) {
+          throw new AnalysisException(String.format("Unable to LOAD DATA from %s " +
+              "because Impala does not have READ permissions on this file", source));
+        }
+      }
 
       String noWriteAccessErrorMsg = String.format("Unable to LOAD DATA into " +
           "target table (%s) because Impala does not have WRITE access to HDFS " +
