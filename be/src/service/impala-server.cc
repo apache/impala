@@ -1490,13 +1490,11 @@ void ImpalaServer::CatalogUpdateCallback(
 
 Status ImpalaServer::ProcessCatalogUpdateResult(
     const TCatalogUpdateResult& catalog_update_result, bool wait_for_all_subscribers) {
-  // If wait_for_all_subscribers is false, or if this this update result contains a
-  // catalog object to add or remove, assume it is "fast" update and directly apply the
-  // update to the local impalad's catalog cache. Otherwise, wait for a statestore
+  // If this this update result contains a catalog object to add or remove, directly apply
+  // the update to the local impalad's catalog cache. Otherwise, wait for a statestore
   // heartbeat that contains this update version.
   if ((catalog_update_result.__isset.updated_catalog_object ||
-      catalog_update_result.__isset.removed_catalog_object) &&
-      !wait_for_all_subscribers) {
+      catalog_update_result.__isset.removed_catalog_object)) {
     TUpdateCatalogCacheRequest update_req;
     update_req.__set_is_delta(true);
     update_req.__set_catalog_service_id(catalog_update_result.catalog_service_id);
@@ -1511,35 +1509,36 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
     TUpdateCatalogCacheResponse resp;
     Status status = exec_env_->frontend()->UpdateCatalogCache(update_req, &resp);
     if (!status.ok()) LOG(ERROR) << status.GetErrorMsg();
-    return status;
-  } else {
-    unique_lock<mutex> unique_lock(catalog_version_lock_);
-    int64_t min_req_catalog_version = catalog_update_result.version;
-    const TUniqueId& catalog_service_id = catalog_update_result.catalog_service_id;
-
-    // Wait for the update to be processed locally.
-    // TODO: What about query cancellation?
-    VLOG_QUERY << "Waiting for catalog version: " << min_req_catalog_version
-               << " current version: " << catalog_update_info_.catalog_version;
-    while (catalog_update_info_.catalog_version < min_req_catalog_version &&
-           catalog_update_info_.catalog_service_id == catalog_service_id) {
-      catalog_version_update_cv_.wait(unique_lock);
-    }
-
+    RETURN_IF_ERROR(status);
     if (!wait_for_all_subscribers) return Status::OK;
+  }
 
-    // Now wait for this update to be propagated to all catalog topic subscribers.
-    // If we make it here it implies the first condition was met (the update was processed
-    // locally or the catalog service id has changed).
-    int64_t min_req_subscriber_topic_version = catalog_update_info_.catalog_topic_version;
+  unique_lock<mutex> unique_lock(catalog_version_lock_);
+  int64_t min_req_catalog_version = catalog_update_result.version;
+  const TUniqueId& catalog_service_id = catalog_update_result.catalog_service_id;
 
-    VLOG_QUERY << "Waiting for min subscriber topic version: "
-               << min_req_subscriber_topic_version << " current version: "
-               << min_subscriber_catalog_topic_version_;
-    while (min_subscriber_catalog_topic_version_ < min_req_subscriber_topic_version &&
-           catalog_update_info_.catalog_service_id == catalog_service_id) {
-      catalog_version_update_cv_.wait(unique_lock);
-    }
+  // Wait for the update to be processed locally.
+  // TODO: What about query cancellation?
+  VLOG_QUERY << "Waiting for catalog version: " << min_req_catalog_version
+             << " current version: " << catalog_update_info_.catalog_version;
+  while (catalog_update_info_.catalog_version < min_req_catalog_version &&
+         catalog_update_info_.catalog_service_id == catalog_service_id) {
+    catalog_version_update_cv_.wait(unique_lock);
+  }
+
+  if (!wait_for_all_subscribers) return Status::OK;
+
+  // Now wait for this update to be propagated to all catalog topic subscribers.
+  // If we make it here it implies the first condition was met (the update was processed
+  // locally or the catalog service id has changed).
+  int64_t min_req_subscriber_topic_version = catalog_update_info_.catalog_topic_version;
+
+  VLOG_QUERY << "Waiting for min subscriber topic version: "
+             << min_req_subscriber_topic_version << " current version: "
+             << min_subscriber_catalog_topic_version_;
+  while (min_subscriber_catalog_topic_version_ < min_req_subscriber_topic_version &&
+         catalog_update_info_.catalog_service_id == catalog_service_id) {
+    catalog_version_update_cv_.wait(unique_lock);
   }
   return Status::OK;
 }

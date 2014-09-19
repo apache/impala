@@ -111,7 +111,19 @@ class TestDdlStatements(ImpalaTestSuite):
     self.__create_db_synced('ddl_test_db', vector)
     self.run_test_case('QueryTest/create', vector, use_db='ddl_test_db',
         multiple_impalad=self.__use_multiple_impalad(vector))
-  
+
+  @pytest.mark.execute_serially
+  def test_sync_ddl_drop(self, vector):
+    """Verifies the catalog gets updated properly when dropping objects with sync_ddl
+    enabled"""
+    self.client.set_configuration({'sync_ddl': 0})
+    self.client.execute('create database ddl_test_db')
+    self.client.set_configuration({'sync_ddl': 1})
+    # Drop the database immediately after creation (within a statestore heartbeat) and
+    # verify the catalog gets updated properly.
+    self.client.execute('drop database ddl_test_db')
+    assert 'ddl_test_db' not in self.client.execute("show databases").data
+
   @pytest.mark.execute_serially
   def test_alter_table(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
