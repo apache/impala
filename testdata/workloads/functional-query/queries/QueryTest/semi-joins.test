@@ -147,3 +147,17 @@ right anti join functional.imp1160b b on a.b = b.b
 ---- TYPES
 INT, INT, INT
 ====
+---- QUERY
+# Anti joins have a uni-directional value transfer (IMPALA-1249).
+select a.* FROM functional.imp1160a a
+left anti join
+  (select * from functional.imp1160b where b <= 3) b
+on a.b = b.b
+---- RESULTS
+1,3,10
+2,4,30
+2,NULL,20
+NULL,NULL,30
+---- TYPES
+INT, INT, INT
+====

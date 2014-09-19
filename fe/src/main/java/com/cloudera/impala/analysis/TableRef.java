@@ -309,7 +309,7 @@ public class TableRef implements ParseNode {
     // register the tuple id of the lhs of a right semi join
     if (joinOp_ == JoinOperator.RIGHT_SEMI_JOIN
         || joinOp_ == JoinOperator.RIGHT_ANTI_JOIN) {
-      analyzer.registerSemiJoinedTid(leftTblRef_.getId(), leftTblRef_);
+      analyzer.registerSemiJoinedTid(leftTblRef_.getId(), this);
       semiJoinedTupleId = leftTblRef_.getId();
     }
 

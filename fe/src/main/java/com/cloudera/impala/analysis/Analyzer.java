@@ -203,6 +203,10 @@ public class Analyzer {
     // correctly evaluated by the originating outer join, including constant conjuncts
     public final Map<ExprId, TableRef> ojClauseByConjunct = Maps.newHashMap();
 
+    // map from registered conjunct to its containing semi join On clause (represented
+    // by its right-hand side table ref)
+    public final Map<ExprId, TableRef> sjClauseByConjunct = Maps.newHashMap();
+
     // map from slot id to the analyzer/block in which it was registered
     public final Map<SlotId, Analyzer> blockBySlot = Maps.newHashMap();
 
@@ -693,6 +697,9 @@ public class Analyzer {
       if (rhsRef.getJoinOp().isOuterJoin()) {
         globalState_.ojClauseByConjunct.put(conjunct.getId(), rhsRef);
         ojConjuncts.add(conjunct.getId());
+      }
+      if (rhsRef.getJoinOp().isSemiJoin()) {
+        globalState_.sjClauseByConjunct.put(conjunct.getId(), rhsRef);
       }
       markConstantConjunct(conjunct, false);
     }
@@ -2081,10 +2088,16 @@ public class Analyzer {
         Expr e = globalState_.conjuncts.get(id);
         Pair<SlotId, SlotId> slotIds = BinaryPredicate.getEqSlots(e);
         if (slotIds == null) continue;
-        TableRef tblRef = globalState_.ojClauseByConjunct.get(id);
-        Preconditions.checkState(tblRef == null || tblRef.getJoinOp().isOuterJoin());
-        if (tblRef == null) {
-          // this eq predicate doesn't involve any outer join, ie, it is true for
+
+        boolean isAntiJoin = false;
+        TableRef sjTblRef = globalState_.sjClauseByConjunct.get(id);
+        Preconditions.checkState(sjTblRef == null || sjTblRef.getJoinOp().isSemiJoin());
+        isAntiJoin = sjTblRef != null && sjTblRef.getJoinOp().isAntiJoin();
+
+        TableRef ojTblRef = globalState_.ojClauseByConjunct.get(id);
+        Preconditions.checkState(ojTblRef == null || ojTblRef.getJoinOp().isOuterJoin());
+        if (ojTblRef == null && !isAntiJoin) {
+          // this eq predicate doesn't involve any outer or anti join, ie, it is true for
           // each result row;
           // value transfer is not legal if the receiving slot is in an enclosed
           // scope of the source slot and the receiving slot's block has a limit
@@ -2112,13 +2125,16 @@ public class Analyzer {
           }
           continue;
         }
+        // Outer or semi-joined table ref.
+        TableRef tblRef = (ojTblRef != null) ? ojTblRef : sjTblRef;
+        Preconditions.checkNotNull(tblRef);
 
         if (tblRef.getJoinOp() == JoinOperator.FULL_OUTER_JOIN) {
           // full outer joins don't guarantee any value transfer
           continue;
         }
 
-        // this is some form of outer join
+        // this is some form of outer or anti join
         SlotId outerSlot, innerSlot;
         if (tblRef.getId() == getTupleId(slotIds.first)) {
           innerSlot = slotIds.first;
@@ -2127,7 +2143,7 @@ public class Analyzer {
           innerSlot = slotIds.second;
           outerSlot = slotIds.first;
         } else {
-          // this eq predicate is part of an OJ clause but doesn't reference
+          // this eq predicate is part of an OJ/AJ clause but doesn't reference
           // the joined table -> ignore this, we can't reason about when it'll
           // actually be true
           continue;
@@ -2137,9 +2153,14 @@ public class Analyzer {
         // the same block; transitive value transfers into inline views with a limit are
         // prevented because the inline view's aux predicates won't transfer values into
         // the inline view's block (handled in the 'tableRef == null' case above)
-        if (tblRef.getJoinOp() == JoinOperator.LEFT_OUTER_JOIN) {
+        // TODO: We could propagate predicates into anti-joined plan subtrees by
+        // inverting the condition (paying special attention to NULLs).
+        if (tblRef.getJoinOp() == JoinOperator.LEFT_OUTER_JOIN
+            || tblRef.getJoinOp() == JoinOperator.LEFT_ANTI_JOIN
+            || tblRef.getJoinOp() == JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN) {
           valueTransfers.add(new Pair<SlotId, SlotId>(outerSlot, innerSlot));
-        } else if (tblRef.getJoinOp() == JoinOperator.RIGHT_OUTER_JOIN) {
+        } else if (tblRef.getJoinOp() == JoinOperator.RIGHT_OUTER_JOIN
+            || tblRef.getJoinOp() == JoinOperator.RIGHT_ANTI_JOIN) {
           valueTransfers.add(new Pair<SlotId, SlotId>(innerSlot, outerSlot));
         }
       }

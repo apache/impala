@@ -1081,3 +1081,42 @@ where t1.id + t1.int_col > 10
    partitions=24/24 size=478.45KB
    predicates: t1.id + t1.int_col > 10
 ====
+# Anti-joins have a uni-directional value transfer (IMPALA-1249).
+select * from
+functional.alltypes a
+left anti join
+  (select id from functional.alltypestiny
+   where id > 20) b
+on (a.id = b.id)
+where a.id < 10
+---- PLAN
+02:HASH JOIN [LEFT ANTI JOIN]
+|  hash predicates: a.id = id
+|
+|--01:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=460B compact
+|     predicates: id > 20, functional.alltypestiny.id < 10
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 size=478.45KB
+   predicates: a.id < 10
+====
+# Anti-joins have a uni-directional value transfer (IMPALA-1249).
+select * from
+  (select id from functional.alltypes
+   where id > 20) a
+right anti join functional.alltypestiny b
+on (a.id = b.id)
+where b.id < 10
+---- PLAN
+02:HASH JOIN [RIGHT ANTI JOIN]
+|  hash predicates: id = b.id
+|
+|--01:SCAN HDFS [functional.alltypestiny b]
+|     partitions=4/4 size=460B compact
+|     predicates: b.id < 10
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+   predicates: id > 20, functional.alltypes.id < 10
+====

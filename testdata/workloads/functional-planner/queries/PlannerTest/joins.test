@@ -1061,7 +1061,24 @@ where j.test_id < 10
    partitions=1/1 size=433B
    predicates: j.test_id < 10
 ====
-# Test anti join including correct predicate assignment and propagation
+# Test right semi join including correct predicate assignment and propagation
+select b.* from functional.alltypes a right semi join functional.alltypestiny b
+  on (a.id = b.id and a.int_col < b.int_col and a.bool_col = false)
+where b.id < 10
+---- PLAN
+02:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: a.id = b.id
+|  other join predicates: a.int_col < b.int_col
+|
+|--01:SCAN HDFS [functional.alltypestiny b]
+|     partitions=4/4 size=460B compact
+|     predicates: b.id < 10
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 size=478.45KB
+   predicates: a.bool_col = FALSE, a.id < 10
+====
+# Test left anti join including correct predicate assignment and propagation
 select j.* from functional.jointbl j left anti join functional.dimtbl d
   on (j.test_id = d.id and j.test_zip < d.zip and d.name = 'Name2')
 where j.test_id < 10

@@ -1790,8 +1790,8 @@ public class Planner {
       // that can be evaluated by this join are assigned in createSelectPlan().
       otherJoinConjuncts = analyzer.getUnassignedOjConjuncts(tblRef);
     } else if (tblRef.getJoinOp().isSemiJoin()) {
-      // Unassigned conjuncts bound by the rhs tuple id of a semi join must have come
-      // from the join's On-clause, and therefore, must be added to the other join
+      // Unassigned conjuncts bound by the invisible tuple id of a semi join must have
+      // come from the join's On-clause, and therefore, must be added to the other join
       // conjuncts to produce correct results.
       otherJoinConjuncts =
           analyzer.getUnassignedConjuncts(tblRef.getAllTupleIds(), false);
