@@ -74,6 +74,7 @@ void impala::TColumnValueToHS2TColumn(const TColumnValue& col_val,
     case TPrimitiveType::TIMESTAMP:
     case TPrimitiveType::NULL_TYPE:
     case TPrimitiveType::STRING:
+    case TPrimitiveType::CHAR:
     case TPrimitiveType::VARCHAR:
     case TPrimitiveType::DECIMAL:
       is_null = !col_val.__isset.string_val;
@@ -145,6 +146,15 @@ void impala::ExprValueToHS2TColumn(const void* value, const TColumnType& type,
         const StringValue* str_val = reinterpret_cast<const StringValue*>(value);
         column->stringVal.values.back().assign(
             static_cast<char*>(str_val->ptr), str_val->len);
+      }
+      nulls = &column->stringVal.nulls;
+      break;
+    case TPrimitiveType::CHAR:
+      column->stringVal.values.push_back("");
+      if (value != NULL) {
+        ColumnType char_type = ColumnType::CreateCharType(type.types[0].scalar_type.len);
+        column->stringVal.values.back().assign(
+            StringValue::CharSlotToPtr(value, char_type), char_type.len);
       }
       nulls = &column->stringVal.nulls;
       break;
@@ -225,6 +235,7 @@ void impala::TColumnValueToHS2TColumnValue(const TColumnValue& col_val,
     case TPrimitiveType::STRING:
     case TPrimitiveType::TIMESTAMP:
     case TPrimitiveType::VARCHAR:
+    case TPrimitiveType::CHAR:
       // HiveServer2 requires timestamp to be presented as string. Note that the .thrift
       // spec says it should be a BIGINT; AFAICT Hive ignores that and produces a string.
       hs2_col_val->__isset.stringVal = true;
@@ -298,7 +309,16 @@ void impala::ExprValueToHS2TColumnValue(const void* value, const TColumnType& ty
       if (not_null) {
         const StringValue* string_val = reinterpret_cast<const StringValue*>(value);
         hs2_col_val->stringVal.value.assign(static_cast<char*>(string_val->ptr),
-            string_val->len);
+                                            string_val->len);
+      }
+      break;
+    case TPrimitiveType::CHAR:
+      hs2_col_val->__isset.stringVal = true;
+      hs2_col_val->stringVal.__isset.value = not_null;
+      if (not_null) {
+        ColumnType char_type = ColumnType::CreateCharType(type.types[0].scalar_type.len);
+        hs2_col_val->stringVal.value.assign(
+           StringValue::CharSlotToPtr(value, char_type), char_type.len);
       }
       break;
     case TPrimitiveType::TIMESTAMP:

@@ -121,10 +121,20 @@ class TestFetch(HS2TestSuite):
     assert result == ("1234, 2222, 1.2345678900, "
                       "0.12345678900000000000000000000000000000, 12345.78900, 1\n")
 
-    # VARCHAR (TODO: CHAR)
+    # VARCHAR
     fetch_results_resp = self.__query_and_fetch("SELECT CAST('str' AS VARCHAR(3))")
     num_rows, result = self.__column_results_to_string(fetch_results_resp.results.columns)
     assert result == "str\n"
+
+    # CHAR not inlined
+    fetch_results_resp = self.__query_and_fetch("SELECT CAST('car' AS CHAR(140))")
+    num_rows, result = self.__column_results_to_string(fetch_results_resp.results.columns)
+    assert result == "car" + (" " * 137) + "\n"
+
+    # CHAR inlined
+    fetch_results_resp = self.__query_and_fetch("SELECT CAST('car' AS CHAR(5))")
+    num_rows, result = self.__column_results_to_string(fetch_results_resp.results.columns)
+    assert result == "car  \n"
 
   @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V1)
   def test_execute_select_v1(self):

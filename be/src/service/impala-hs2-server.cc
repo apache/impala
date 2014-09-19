@@ -242,6 +242,7 @@ class ImpalaServer::HS2ColumnarResultSet : public ImpalaServer::QueryResultSet {
         case TPrimitiveType::DECIMAL:
         case TPrimitiveType::STRING:
         case TPrimitiveType::VARCHAR:
+        case TPrimitiveType::CHAR:
           to->stringVal.values.insert(to->stringVal.values.end(),
               from->stringVal.values.begin() + start_idx,
               from->stringVal.values.begin() + start_idx + rows_added);
@@ -313,6 +314,7 @@ class ImpalaServer::HS2ColumnarResultSet : public ImpalaServer::QueryResultSet {
         case TPrimitiveType::NULL_TYPE:
         case TPrimitiveType::DECIMAL:
         case TPrimitiveType::VARCHAR:
+        case TPrimitiveType::CHAR:
         case TPrimitiveType::STRING:
           column.__isset.stringVal = true;
           break;
