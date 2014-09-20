@@ -244,7 +244,7 @@ class DecimalValue {
     }
     *is_nan = false;
     RESULT_T x, y;
-    AdjustToSameScale(*this, this_type, other, other_type, &x, &y);
+    *overflow |= AdjustToSameScale(*this, this_type, other, other_type, &x, &y);
     // TODO: are these the semantics for decimal mod?
     return DecimalValue<RESULT_T>(x % y);
   }
