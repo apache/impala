@@ -393,23 +393,23 @@ limit 10
 select
 count(bigint_col)
   over(partition by bool_col order by int_col desc rows between 1 preceding and 1 following),
-min(double_col)
+avg(double_col)
   over(partition by bool_col order by int_col desc rows between 2 preceding and 2 following),
 sum(double_col)
   over(partition by bool_col order by int_col desc rows between 1 preceding and 1 following),
 # duplicate analytic expr
 count(bigint_col)
   over(partition by bool_col order by int_col desc rows between 1 preceding and 1 following),
-min(double_col)
+avg(double_col)
   over(order by int_col desc rows between 1 preceding and 1 following),
 # duplicate analytic expr
-min(double_col)
+avg(double_col)
   over(partition by bool_col order by int_col desc rows between 2 preceding and 2 following)
 from functional.alltypes
 limit 10
 ---- PLAN
 05:ANALYTIC
-|  functions: min(double_col)
+|  functions: avg(double_col)
 |  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |  limit: 10
@@ -424,7 +424,7 @@ limit 10
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
 02:ANALYTIC
-|  functions: min(double_col)
+|  functions: avg(double_col)
 |  partition by: bool_col
 |  order by: int_col DESC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
@@ -436,7 +436,7 @@ limit 10
    partitions=24/24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 05:ANALYTIC
-|  functions: min(double_col)
+|  functions: avg(double_col)
 |  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |  limit: 10
@@ -454,7 +454,7 @@ limit 10
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
 02:ANALYTIC
-|  functions: min(double_col)
+|  functions: avg(double_col)
 |  partition by: bool_col
 |  order by: int_col DESC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
@@ -609,7 +609,7 @@ select
 count(double_col)
   over(partition by tinyint_col, double_col order by int_col desc
   rows between 1 preceding and 1 following),
-max(double_col)
+last_value(double_col)
   over(partition by double_col, tinyint_col order by int_col desc
   rows between 1 preceding and 1 following),
 # compatible default RANGE window
@@ -620,21 +620,21 @@ sum(smallint_col)
   over(partition by double_col, tinyint_col order by int_col desc
   range between 1 preceding and 1 following),
 # different window
-min(int_col)
+first_value(int_col)
   over(partition by double_col, tinyint_col order by int_col desc
   rows between 2 preceding and 2 following),
 # different sort order but same partition
-max(int_col)
+last_value(int_col)
   over(partition by double_col, tinyint_col order by int_col asc
   rows between 2 preceding and 2 following),
 # different partition
-min(int_col)
+first_value(int_col)
   over(partition by tinyint_col order by int_col desc
   rows between 2 preceding and 2 following)
 from functional.alltypesagg
 ---- PLAN
 09:ANALYTIC
-|  functions: count(double_col), max(double_col)
+|  functions: count(double_col), last_value(double_col)
 |  partition by: tinyint_col, double_col
 |  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
@@ -652,7 +652,7 @@ from functional.alltypesagg
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 06:ANALYTIC
-|  functions: min(int_col)
+|  functions: first_value(int_col)
 |  partition by: double_col, tinyint_col
 |  order by: int_col DESC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
@@ -661,7 +661,7 @@ from functional.alltypesagg
 |  order by: tinyint_col ASC NULLS FIRST, double_col ASC NULLS FIRST, int_col DESC
 |
 04:ANALYTIC
-|  functions: max(int_col)
+|  functions: last_value(int_col)
 |  partition by: double_col, tinyint_col
 |  order by: int_col ASC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
@@ -670,7 +670,7 @@ from functional.alltypesagg
 |  order by: double_col ASC NULLS FIRST, tinyint_col ASC NULLS FIRST, int_col ASC
 |
 02:ANALYTIC
-|  functions: min(int_col)
+|  functions: first_value(int_col)
 |  partition by: tinyint_col
 |  order by: int_col DESC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
@@ -684,7 +684,7 @@ from functional.alltypesagg
 12:EXCHANGE [UNPARTITIONED]
 |
 09:ANALYTIC
-|  functions: count(double_col), max(double_col)
+|  functions: count(double_col), last_value(double_col)
 |  partition by: tinyint_col, double_col
 |  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
@@ -702,7 +702,7 @@ from functional.alltypesagg
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 06:ANALYTIC
-|  functions: min(int_col)
+|  functions: first_value(int_col)
 |  partition by: double_col, tinyint_col
 |  order by: int_col DESC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
@@ -711,7 +711,7 @@ from functional.alltypesagg
 |  order by: tinyint_col ASC NULLS FIRST, double_col ASC NULLS FIRST, int_col DESC
 |
 04:ANALYTIC
-|  functions: max(int_col)
+|  functions: last_value(int_col)
 |  partition by: double_col, tinyint_col
 |  order by: int_col ASC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
@@ -722,7 +722,7 @@ from functional.alltypesagg
 11:EXCHANGE [HASH(double_col,tinyint_col)]
 |
 02:ANALYTIC
-|  functions: min(int_col)
+|  functions: first_value(int_col)
 |  partition by: tinyint_col
 |  order by: int_col DESC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
@@ -747,7 +747,7 @@ sum(tinyint_col)
 sum(smallint_col)
   over(partition by double_col, tinyint_col),
 # incompatible analytic expr
-max(smallint_col)
+sum(smallint_col)
   over(partition by bigint_col order by tinyint_col
   rows between 2 preceding and 2 following)
 from functional.alltypesagg
@@ -774,7 +774,7 @@ from functional.alltypesagg
 |  order by: tinyint_col ASC NULLS FIRST, double_col ASC NULLS FIRST, int_col DESC
 |
 02:ANALYTIC
-|  functions: max(smallint_col)
+|  functions: sum(smallint_col)
 |  partition by: bigint_col
 |  order by: tinyint_col ASC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
@@ -812,7 +812,7 @@ from functional.alltypesagg
 09:EXCHANGE [HASH(tinyint_col,double_col)]
 |
 02:ANALYTIC
-|  functions: max(smallint_col)
+|  functions: sum(smallint_col)
 |  partition by: bigint_col
 |  order by: tinyint_col ASC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
@@ -1383,7 +1383,7 @@ select
 # windows and sort order should be reversed
 sum(int_col) over(partition by tinyint_col order by id desc nulls first, bool_col asc nulls last
                   rows between 2 preceding and unbounded following),
-min(int_col) over(partition by tinyint_col order by id asc nulls last
+sum(int_col) over(partition by tinyint_col order by id asc nulls last
                   range between 4 preceding and unbounded following),
 # windows and sort order should remain unchanged
 count(bigint_col) over(partition by tinyint_col order by id),
@@ -1424,7 +1424,7 @@ from functional.alltypesagg
 |  order by: tinyint_col ASC NULLS FIRST, id ASC, int_col ASC
 |
 02:ANALYTIC
-|  functions: min(int_col)
+|  functions: sum(int_col)
 |  partition by: tinyint_col
 |  order by: id DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND 4 FOLLOWING

@@ -1275,7 +1275,6 @@ void AggregateFunctions::OffsetFnInit(FunctionContext* ctx, T* dst) {
   DCHECK(ctx->IsArgConstant(1));
   DCHECK(ctx->IsArgConstant(2));
   DCHECK_EQ(ctx->GetArgType(0)->type, ctx->GetArgType(2)->type);
-  // TODO: Does this work for strings?
   *dst = *static_cast<T*>(ctx->GetConstantArg(2));
 }
 

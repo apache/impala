@@ -599,20 +599,20 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         + "from functional.alltypes");
     AnalyzesOk("select min(int_col) over (partition by id order by tinyint_col "
         + "rows between unbounded preceding and current row) from functional.alltypes");
-    AnalyzesOk("select min(int_col) over (partition by id order by tinyint_col "
+    AnalyzesOk("select sum(int_col) over (partition by id order by tinyint_col "
+        + "rows 2 preceding) from functional.alltypes");
+    AnalyzesOk("select sum(int_col) over (partition by id order by tinyint_col "
         + "rows between 2 preceding and unbounded following) from functional.alltypes");
     AnalyzesOk("select min(int_col) over (partition by id order by tinyint_col "
-        + "rows 2 preceding) from functional.alltypes");
-    AnalyzesOk("select min(int_col) over (partition by id order by tinyint_col "
         + "rows between unbounded preceding and 2 preceding) from functional.alltypes");
-    AnalyzesOk("select min(int_col) over (partition by id order by tinyint_col "
+    AnalyzesOk("select sum(int_col) over (partition by id order by tinyint_col "
         + "rows between 2 following and unbounded following) from functional.alltypes");
-    AnalyzesOk("select max(int_col) over (partition by id order by tinyint_col "
+    AnalyzesOk("select sum(int_col) over (partition by id order by tinyint_col "
         + "range between 2 preceding and 6 following) from functional.alltypes");
         // TODO: substitute constants in-line so that 2*3 becomes implicitly castable
         // to tinyint
         //+ "range between 2 preceding and 2 * 3 following) from functional.alltypes");
-    AnalyzesOk("select max(int_col) over (partition by id order by tinyint_col "
+    AnalyzesOk("select sum(int_col) over (partition by id order by tinyint_col "
         + "range between 2 preceding and unbounded following) from functional.alltypes");
     AnalyzesOk("select lead(int_col, 1, null) over "
         + "(partition by id order by tinyint_col) from functional.alltypes");
@@ -638,16 +638,16 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     // legal windows
     AnalyzesOk(
-        "select max(int_col) over (partition by id order by tinyint_col, int_col "
+        "select sum(int_col) over (partition by id order by tinyint_col, int_col "
           + "rows between 2 following and 4 following) from functional.alltypes");
     AnalyzesOk(
         "select max(int_col) over (partition by id order by tinyint_col, int_col "
           + "range between unbounded preceding and current row) from functional.alltypes");
-    AnalyzesOk("select max(int_col) over (partition by id order by tinyint_col "
+    AnalyzesOk("select sum(int_col) over (partition by id order by tinyint_col "
         + "rows between 4 preceding and 2 preceding) from functional.alltypes");
-    AnalyzesOk("select max(int_col) over (partition by id order by tinyint_col "
+    AnalyzesOk("select sum(int_col) over (partition by id order by tinyint_col "
         + "rows between 2 following and 4 following) from functional.alltypes");
-    AnalyzesOk("select max(int_col) over (partition by id order by tinyint_col "
+    AnalyzesOk("select sum(int_col) over (partition by id order by tinyint_col "
         + "range between 2 following and 2 following) from functional.alltypes");
     AnalyzesOk( "select "
         + "2 * min(tinyint_col) over (partition by id order by tinyint_col "
@@ -659,6 +659,17 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         + "  order by tinyint_col, smallint_col "
         + "  rows between unbounded preceding and current row)) "
         + "from functional.alltypes");
+
+    // Min/max do not support start bounds with offsets
+    AnalysisError("select min(int_col) over (partition by id order by tinyint_col "
+        + "rows between 2 preceding and unbounded following) from functional.alltypes",
+        "'min(int_col)' is only supported with an UNBOUNDED PRECEDING start bound.");
+    AnalysisError("select max(int_col) over (partition by id order by tinyint_col "
+        + "rows 2 preceding) from functional.alltypes",
+        "'max(int_col)' is only supported with an UNBOUNDED PRECEDING start bound.");
+    AnalysisError("select max(int_col) over (partition by id order by tinyint_col "
+        + "range 2 preceding) from functional.alltypes",
+        "'max(int_col)' is only supported with an UNBOUNDED PRECEDING start bound.");
 
     // missing grouping expr
     AnalysisError(
@@ -713,7 +724,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
 
     // nested analytic exprs
     AnalysisError(
-        "select max(int_col) over (partition by id, rank() over (order by int_col) "
+        "select sum(int_col) over (partition by id, rank() over (order by int_col) "
           + "order by tinyint_col, int_col "
           + "rows between 2 following and 4 following) from functional.alltypes",
         "Nesting of analytic expressions is not allowed");

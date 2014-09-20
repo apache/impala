@@ -277,9 +277,6 @@ class AnalyticEvalNode : public ExecNode {
 
   // Previous input row used to compare partition boundaries and to determine when the
   // order-by expressions change.
-  // TODO: Maintain the previous two row batches rather than deep copying into mem_pool_
-  // (which we do because the last row in a batch references memory belonging to the
-  // previous batch).
   TupleRow* prev_input_row_;
 
   // Current and previous input row batches from the child. RowBatches are allocated

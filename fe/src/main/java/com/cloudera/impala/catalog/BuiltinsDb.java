@@ -501,16 +501,14 @@ public class BuiltinsDb extends Db {
           prefix + MIN_UPDATE_SYMBOL.get(t),
           prefix + MIN_UPDATE_SYMBOL.get(t),
           minMaxSerializeOrFinalize, minMaxGetValue,
-          null /* TODO: Add remove() */,
-          minMaxSerializeOrFinalize, true, true, false));
+          null, minMaxSerializeOrFinalize, true, true, false));
       // Max
       db.addBuiltin(AggregateFunction.createBuiltin(db, "max",
           Lists.newArrayList(t), t, t, minMaxInit,
           prefix + MAX_UPDATE_SYMBOL.get(t),
           prefix + MAX_UPDATE_SYMBOL.get(t),
           minMaxSerializeOrFinalize, minMaxGetValue,
-          null /* TODO: Add remove() */,
-          minMaxSerializeOrFinalize, true, true, false));
+          null, minMaxSerializeOrFinalize, true, true, false));
       // Sample
       db.addBuiltin(AggregateFunction.createBuiltin(db, "sample",
           Lists.newArrayList(t), Type.STRING, Type.STRING,

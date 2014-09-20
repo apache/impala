@@ -81,6 +81,8 @@ public class AnalyticExpr extends Expr {
   private static String RANK = "rank";
   private static String DENSERANK = "dense_rank";
   private static String ROWNUMBER = "row_number";
+  private static String MIN = "min";
+  private static String MAX = "max";
 
   public AnalyticExpr(FunctionCallExpr fnCall, List<Expr> partitionExprs,
       List<OrderByElement> orderByElements, AnalyticWindow window) {
@@ -187,6 +189,11 @@ public class AnalyticExpr extends Expr {
   static private boolean isOffsetFn(Function fn) {
     if (!isAnalyticFn(fn)) return false;
     return fn.functionName().equals(LEAD) || fn.functionName().equals(LAG);
+  }
+
+  static private boolean isMinMax(Function fn) {
+    if (!isAnalyticFn(fn)) return false;
+    return fn.functionName().equals(MIN) || fn.functionName().equals(MAX);
   }
 
   static private boolean isRankingFn(Function fn) {
@@ -301,6 +308,12 @@ public class AnalyticExpr extends Expr {
             && window_.getRightBoundary().getType().isOffset()) {
           checkRangeOffsetBoundaryExpr(window_.getRightBoundary());
         }
+      }
+      if (isMinMax(fn) &&
+          window_.getLeftBoundary().getType() != BoundaryType.UNBOUNDED_PRECEDING) {
+        throw new AnalysisException(
+            "'" + getFnCall().toSql() + "' is only supported with an "
+              + "UNBOUNDED PRECEDING start bound.");
       }
     }
 
