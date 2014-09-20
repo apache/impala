@@ -62,26 +62,32 @@ public class CreateTableAsSelectStmt extends StatementBase {
     // the target table exists and we want to validate the CREATE statement and the
     // query portion of the insert statement. If this passes, analysis will be run
     // over the full INSERT statement. To avoid duplicate registrations of table/colRefs,
-    // create a new analyzer and clone the query statement for this initial pass.
+    // create a new root analyzer and clone the query statement for this initial pass.
+    Analyzer dummyRootAnalyzer = new Analyzer(analyzer.getCatalog(),
+        analyzer.getQueryCtx(), analyzer.getAuthzConfig());
     QueryStmt tmpQueryStmt = insertStmt_.getQueryStmt().clone();
-    Analyzer tmpAnalyzer = new Analyzer(analyzer);
-    tmpAnalyzer.setUseHiveColLabels(true);
-    tmpQueryStmt.analyze(tmpAnalyzer);
-
-    if (analyzer.containsSubquery()) {
-      // The select statement of this CTAS is nested. Rewrite the
-      // statement to unnest all subqueries and re-analyze using a new analyzer.
-      Preconditions.checkState(tmpQueryStmt instanceof SelectStmt);
-      SelectStmt selectStmt = (SelectStmt)tmpQueryStmt;
-      StmtRewriter.rewriteStatement(selectStmt, tmpAnalyzer);
-      // Update the insert statement with the unanalyzed rewritten select stmt.
-      insertStmt_.setQueryStmt(selectStmt.clone());
-
-      // Re-analyze the select statement of the CTAS.
-      tmpQueryStmt = insertStmt_.getQueryStmt().clone();
-      tmpAnalyzer = new Analyzer(analyzer);
+    try {
+      Analyzer tmpAnalyzer = new Analyzer(dummyRootAnalyzer);
       tmpAnalyzer.setUseHiveColLabels(true);
       tmpQueryStmt.analyze(tmpAnalyzer);
+      if (analyzer.containsSubquery()) {
+        // The select statement of this CTAS is nested. Rewrite the
+        // statement to unnest all subqueries and re-analyze using a new analyzer.
+        Preconditions.checkState(tmpQueryStmt instanceof SelectStmt);
+        SelectStmt selectStmt = (SelectStmt)tmpQueryStmt;
+        StmtRewriter.rewriteStatement(selectStmt, tmpAnalyzer);
+        // Update the insert statement with the unanalyzed rewritten select stmt.
+        insertStmt_.setQueryStmt(selectStmt.clone());
+
+        // Re-analyze the select statement of the CTAS.
+        tmpQueryStmt = insertStmt_.getQueryStmt().clone();
+        tmpAnalyzer = new Analyzer(dummyRootAnalyzer);
+        tmpAnalyzer.setUseHiveColLabels(true);
+        tmpQueryStmt.analyze(tmpAnalyzer);
+      }
+    } finally {
+      // Record missing tables in the original analyzer.
+      analyzer.getMissingTbls().addAll(dummyRootAnalyzer.getMissingTbls());
     }
 
     // Add the columns from the select statement to the create statement.

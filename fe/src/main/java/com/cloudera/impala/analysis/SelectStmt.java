@@ -842,9 +842,9 @@ public class SelectStmt extends QueryStmt {
   @Override
   public QueryStmt clone() {
     SelectStmt selectClone = new SelectStmt(selectList_.clone(), cloneTableRefs(),
-        (whereClause_ != null) ? whereClause_.reset().clone() : null,
-        (groupingExprs_ != null) ? Expr.cloneList(Expr.resetList(groupingExprs_)) : null,
-        (havingClause_ != null) ? havingClause_.reset().clone() : null,
+        (whereClause_ != null) ? whereClause_.clone().reset() : null,
+        (groupingExprs_ != null) ? Expr.resetList(Expr.cloneList(groupingExprs_)) : null,
+        (havingClause_ != null) ? havingClause_.clone().reset() : null,
         cloneOrderByElements(),
         (limitElement_ != null) ? limitElement_.clone() : null);
     selectClone.setWithClause(cloneWithClause());

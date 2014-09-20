@@ -1561,6 +1561,19 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // WITH clause in insert statement.
     AnalyzesOk("with t1 as (select * from functional.alltypestiny)" +
         "insert into functional.alltypes partition(year, month) select * from t1");
+    // WITH clause in insert statement with a select statement that has a WITH
+    // clause and an inline view (IMPALA-1100)
+    AnalyzesOk("with test_ctas_1 as (select * from functional.alltypestiny) insert " +
+        "into functional.alltypes partition (year, month) with with_1 as " +
+        "(select t1.* from test_ctas_1 as t1 right join (select 1 as int_col " +
+        "from functional.alltypestiny as t1) as t2 ON t2.int_col = t1.int_col) " +
+        "select * from with_1 limit 10");
+    // Insert with a select statement containing a WITH clause and an inline
+    // view
+    AnalyzesOk("insert into functional.alltypes partition (year, month) with " +
+        "with_1 as (select t1.* from functional.alltypes as t1 right " +
+        "join (select * from functional.alltypestiny as t1) t2 on t1.int_col = " +
+        "t2.int_col) select * from with_1 limit 10");
     // WITH-clause views belong to different scopes.
     AnalyzesOk("with t1 as (select id from functional.alltypestiny) " +
         "insert into functional.alltypes partition(year, month) " +

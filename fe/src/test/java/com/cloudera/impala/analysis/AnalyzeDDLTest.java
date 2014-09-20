@@ -828,6 +828,12 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create table foo stored as RCFILE as select 1",
         "CREATE TABLE AS SELECT does not support (RCFILE) file format. " +
          "Supported formats are: (PARQUET, TEXTFILE)");
+
+    // CTAS with a WITH clause and inline view (IMPALA-1100)
+    AnalyzesOk("create table test_with as with with_1 as (select 1 as int_col from " +
+        "functional.alltypes as t1 right join (select 1 as int_col from " +
+        "functional.alltypestiny as t1) as t2 on t2.int_col = t1.int_col) " +
+        "select * from with_1 limit 10");
   }
 
   @Test

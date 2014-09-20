@@ -80,7 +80,7 @@ public class TableRef implements ParseNode {
         (other.joinHints_ != null) ? Lists.newArrayList(other.joinHints_) : null;
     this.usingColNames_ =
         (other.usingColNames_ != null) ? Lists.newArrayList(other.usingColNames_) : null;
-    this.onClause_ = (other.onClause_ != null) ? other.onClause_.reset().clone() : null;
+    this.onClause_ = (other.onClause_ != null) ? other.onClause_.clone().reset() : null;
     isAnalyzed_ = false;
   }
 
