@@ -592,11 +592,13 @@ public class InsertStmt extends StatementBase {
           throw new AnalysisException("Conflicting INSERT hint: " + hint);
         }
         isRepartition_ = Boolean.TRUE;
+        analyzer.setHasPlanHints();
       } else if (hint.equalsIgnoreCase("NOSHUFFLE")) {
         if (isRepartition_ != null && isRepartition_) {
           throw new AnalysisException("Conflicting INSERT hint: " + hint);
         }
         isRepartition_ = Boolean.FALSE;
+        analyzer.setHasPlanHints();
       } else {
         analyzer.addWarning("INSERT hint not recognized: " + hint);
       }

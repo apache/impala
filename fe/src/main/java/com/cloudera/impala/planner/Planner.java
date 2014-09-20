@@ -216,6 +216,12 @@ public class Planner {
           "and/or column statistics.\n" + Joiner.on(", ").join(tableNames) + "\n");
       hasHeader = true;
     }
+    if (request.query_ctx.isDisable_spilling()) {
+      str.append("WARNING: Spilling is disabled for this query as a safety guard.\n" +
+          "Reason: Query option disable_unsafe_spills is set, at least one table\n" +
+          "is missing relevant stats, and no plan hints were given.\n");
+      hasHeader = true;
+    }
     if (hasHeader) str.append("\n");
 
     if (explainLevel.ordinal() < TExplainLevel.VERBOSE.ordinal()) {

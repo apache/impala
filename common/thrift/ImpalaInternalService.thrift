@@ -96,6 +96,11 @@ struct TQueryOptions {
 
   // If true, transforms all count(distinct) aggregations into NDV()
   28: optional bool appx_count_distinct = 0
+
+  // If true, allows Impala to internally disable spilling for potentially
+  // disastrous query plans. Impala will excercise this option if a query
+  // has no plan hints, and at least one table is missing relevant stats.
+  29: optional bool disable_unsafe_spills = 0
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
@@ -160,6 +165,11 @@ struct TQueryCtx {
   // List of tables missing relevant table and/or column stats. Used for
   // populating query-profile fields consumed by CM as well as warning messages.
   7: optional list<CatalogObjects.TTableName> tables_missing_stats
+
+  // Internal flag to disable spilling. Used as a guard against potentially
+  // disastrous query plans. The rationale is that cancelling queries, e.g.,
+  // with a huge join build is preferable over spilling "forever".
+  8: optional bool disable_spilling
 }
 
 // Context of a fragment instance, including its unique id, the total number

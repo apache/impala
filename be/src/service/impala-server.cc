@@ -997,6 +997,11 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
             iequals(value, "true") || iequals(value, "1"));
         break;
       }
+      case TImpalaQueryOptions::DISABLE_UNSAFE_SPILLS: {
+        query_options->__set_disable_unsafe_spills(
+            iequals(value, "true") || iequals(value, "1"));
+        break;
+      }
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
@@ -1287,6 +1292,9 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
         break;
       case TImpalaQueryOptions::APPX_COUNT_DISTINCT:
         val << query_option.appx_count_distinct;
+        break;
+      case TImpalaQueryOptions::DISABLE_UNSAFE_SPILLS:
+        val << query_option.disable_unsafe_spills;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

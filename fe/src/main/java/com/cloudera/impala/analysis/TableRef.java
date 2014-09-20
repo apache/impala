@@ -229,6 +229,7 @@ public class TableRef implements ParseNode {
           throw new AnalysisException("Conflicting JOIN hint: " + hint);
         }
         isBroadcastJoin_ = true;
+        analyzer.setHasPlanHints();
       } else if (hint.equalsIgnoreCase("SHUFFLE")) {
         if (joinOp_ == JoinOperator.CROSS_JOIN) {
           throw new AnalysisException("CROSS JOIN does not support SHUFFLE.");
@@ -237,6 +238,7 @@ public class TableRef implements ParseNode {
           throw new AnalysisException("Conflicting JOIN hint: " + hint);
         }
         isPartitionedJoin_ = true;
+        analyzer.setHasPlanHints();
       } else {
         analyzer.addWarning("JOIN hint not recognized: " + hint);
       }

@@ -147,6 +147,9 @@ public class Analyzer {
 
   public boolean isSubquery() { return isSubquery_; }
 
+  public boolean setHasPlanHints() { return globalState_.hasPlanHints = true; }
+  public boolean hasPlanHints() { return globalState_.hasPlanHints; }
+
   // state shared between all objects of an Analyzer tree
   private static class GlobalState {
     // TODO: Consider adding an "exec-env"-like global singleton that contains the
@@ -160,6 +163,9 @@ public class Analyzer {
     // True if we are analyzing an explain request. Should be set before starting
     // analysis.
     public boolean isExplain;
+
+    // Indicates whether the query has plan hints.
+    public boolean hasPlanHints = false;
 
     // True if at least one of the analyzers belongs to a subquery.
     public boolean containsSubquery = false;

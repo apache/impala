@@ -153,6 +153,11 @@ enum TImpalaQueryOptions {
 
   // Transforms all count(distinct) aggregations into NDV()
   APPX_COUNT_DISTINCT
+
+  // If true, allows Impala to internally disable spilling for potentially
+  // disastrous query plans. Impala will excercise this option if a query
+  // has no plan hints, and at least one table is missing relevant stats.
+  DISABLE_UNSAFE_SPILLS
 }
 
 // The summary of an insert.

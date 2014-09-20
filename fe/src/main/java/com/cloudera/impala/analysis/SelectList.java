@@ -78,6 +78,7 @@ public class SelectList {
         analyzer.addWarning("PLAN hint not recognized: " + hint);
       }
       isStraightJoin_ = true;
+      analyzer.setHasPlanHints();
     }
   }
 

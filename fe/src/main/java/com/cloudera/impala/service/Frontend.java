@@ -871,6 +871,14 @@ public class Frontend {
       queryCtx.addToTables_missing_stats(tableName);
     }
 
+    // Optionally disable spilling in the backend. Allow spilling if there are plan hints
+    // or if all tables have stats.
+    if (queryCtx.request.query_options.isDisable_unsafe_spills()
+        && !tablesMissingStats.isEmpty()
+        && !analysisResult.getAnalyzer().hasPlanHints()) {
+      queryCtx.setDisable_spilling(true);
+    }
+
     // Compute resource requirements after scan range locations because the cost
     // estimates of scan nodes rely on them.
     try {
