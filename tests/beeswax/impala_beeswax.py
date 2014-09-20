@@ -187,10 +187,11 @@ class ImpalaBeeswaxClient(object):
       # get the function __build_summary_table which requires TExecStats to be imported.
 
     output = []
-    self.__build_summary_table(summary, 0, False, 0, output)
+    self.__build_summary_table(summary, 0, False, 0, False, output)
     return output
 
-  def __build_summary_table(self, summary, idx, is_fragment_root, indent_level, output):
+  def __build_summary_table(self, summary, idx, is_fragment_root, indent_level,
+      new_indent_level, output):
     """NOTE: This was taken impala_shell.py. This method will be a placed in a library
     that is shared between impala_shell and this file.
 
@@ -207,6 +208,8 @@ class ImpalaBeeswaxClient(object):
     indent_level: the number of spaces to print before writing the node's label, to give
     the appearance of a tree. The 0th child of a node has the same indent_level as its
     parent. All other children have an indent_level of one greater than their parent.
+
+    new_indent_level: If true, this indent level is different from the previous row's.
 
     output: the list of rows into which to append the rows produced for this node and its
     children.
@@ -249,10 +252,11 @@ class ImpalaBeeswaxClient(object):
     label_prefix = ""
     if indent_level > 0:
       label_prefix = "|"
-      if is_fragment_root:
-        label_prefix += "  " * indent_level
+      label_prefix += "  |" * (indent_level - 1)
+      if new_indent_level:
+        label_prefix += "--"
       else:
-        label_prefix += "--" * indent_level
+        label_prefix += "  "
 
     row = {}
     row["prefix"] = label_prefix
@@ -271,7 +275,7 @@ class ImpalaBeeswaxClient(object):
       sender_idx = summary.exch_to_sender_map[idx]
       # This is an exchange node, so the sender is a fragment root, and should be printed
       # next.
-      self.__build_summary_table(summary, sender_idx, True, indent_level, output)
+      self.__build_summary_table(summary, sender_idx, True, indent_level, False, output)
     except (KeyError, TypeError):
       # Fall through if idx not in map, or if exch_to_sender_map itself is not set
       pass
@@ -280,11 +284,13 @@ class ImpalaBeeswaxClient(object):
     if node.num_children > 0:
       first_child_output = []
       idx = \
-        self.__build_summary_table(summary, idx, False, indent_level, first_child_output)
+        self.__build_summary_table(
+            summary, idx, False, indent_level, False, first_child_output)
       for child_idx in xrange(1, node.num_children):
         # All other children are indented (we only have 0, 1 or 2 children for every exec
         # node at the moment)
-        idx = self.__build_summary_table(summary, idx, False, indent_level + 1, output)
+        idx = self.__build_summary_table(
+            summary, idx, False, indent_level + 1, True, output)
       output += first_child_output
     return idx
 

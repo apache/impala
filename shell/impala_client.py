@@ -90,7 +90,8 @@ class ImpalaClient(object):
     for option in options:
       self.default_query_options[option.key.upper()] = option.value
 
-  def build_summary_table(self, summary, idx, is_fragment_root, indent_level, output):
+  def build_summary_table(self, summary, idx, is_fragment_root, indent_level,
+      new_indent_level, output):
     """Direct translation of Coordinator::PrintExecSummary() to recursively build a list
     of rows of summary statistics, one per exec node
 
@@ -145,10 +146,11 @@ class ImpalaClient(object):
     label_prefix = ""
     if indent_level > 0:
       label_prefix = "|"
-      if is_fragment_root:
-        label_prefix += "  " * indent_level
+      label_prefix += "  |" * (indent_level - 1)
+      if new_indent_level:
+        label_prefix += "--"
       else:
-        label_prefix += "--" * indent_level
+        label_prefix += "  "
 
     def prettyprint(val, units, divisor):
       for unit in units:
@@ -183,7 +185,7 @@ class ImpalaClient(object):
       sender_idx = summary.exch_to_sender_map[idx]
       # This is an exchange node, so the sender is a fragment root, and should be printed
       # next.
-      self.build_summary_table(summary, sender_idx, True, indent_level, output)
+      self.build_summary_table(summary, sender_idx, True, indent_level, False, output)
     except (KeyError, TypeError):
       # Fall through if idx not in map, or if exch_to_sender_map itself is not set
       pass
@@ -192,11 +194,13 @@ class ImpalaClient(object):
     if node.num_children > 0:
       first_child_output = []
       idx = \
-        self.build_summary_table(summary, idx, False, indent_level, first_child_output)
+        self.build_summary_table(
+            summary, idx, False, indent_level, False, first_child_output)
       for child_idx in xrange(1, node.num_children):
         # All other children are indented (we only have 0, 1 or 2 children for every exec
         # node at the moment)
-        idx = self.build_summary_table(summary, idx, False, indent_level + 1, output)
+        idx = self.build_summary_table(
+            summary, idx, False, indent_level + 1, True, output)
       output += first_child_output
     return idx
 

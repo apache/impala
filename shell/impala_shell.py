@@ -395,7 +395,7 @@ class ImpalaShell(cmd.Cmd):
     table = self.construct_table_header(["Operator", "#Hosts", "Avg Time", "Max Time",
                                            "#Rows", "Est. #Rows", "Peak Mem",
                                            "Est. Peak Mem", "Detail"])
-    self.imp_client.build_summary_table(summary, 0, False, 0, output)
+    self.imp_client.build_summary_table(summary, 0, False, 0, False, output)
     formatter = PrettyOutputFormatter(table)
     self.output_stream = OutputStream(formatter, filename=self.output_file)
     self.output_stream.write(output)
