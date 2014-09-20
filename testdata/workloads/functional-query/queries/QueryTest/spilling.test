@@ -84,3 +84,12 @@ l1.l_shipdate = l3.l_shipdate;
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+set max_block_mgr_memory=45m;
+select max(t1.total_count), max(t1.l_shipinstruct), max(t1.l_comment) from
+(select l_shipinstruct, l_comment, count(*) over () total_count from lineitem) t1
+---- RESULTS
+6001215,'TAKE BACK RETURN','zzle? slyly final platelets sleep quickly. '
+---- TYPES
+BIGINT, STRING, STRING
+====
