@@ -77,7 +77,7 @@ class CustomClusterTestSuite(ImpalaTestSuite):
       if arg in method.func_dict:
         cluster_args.append("--%s=\"%s\" " % (arg, method.func_dict[arg]))
     # Start a clean new cluster before each test
-    self.__start_impala_cluster(cluster_args)
+    self._start_impala_cluster(cluster_args)
     super(CustomClusterTestSuite, self).setup_class()
 
   def teardown_method(self, method):

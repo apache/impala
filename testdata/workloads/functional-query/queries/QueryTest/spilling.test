@@ -63,7 +63,7 @@ order by 1,2 limit 3;
 'A',5,0.03,'AIR'
 'A',6,0.03,'TRUCK'
 ---- TYPES
-STRING, BIGINT, DOUBLE, STRING
+STRING, BIGINT, DECIMAL, STRING
 ====
 ---- QUERY
 set max_block_mgr_memory=100m;

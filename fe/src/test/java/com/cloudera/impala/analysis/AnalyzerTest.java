@@ -83,7 +83,8 @@ public class AnalyzerTest {
   protected Analyzer createAnalyzer(TQueryOptions queryOptions) {
     TQueryCtx queryCtx = TestUtils.createQueryContext();
     queryCtx.request.query_options = queryOptions;
-    return new Analyzer(catalog_, queryCtx);
+    return new Analyzer(catalog_, queryCtx,
+        AuthorizationConfig.createAuthDisabledConfig());
   }
 
   protected Analyzer createAnalyzerUsingHiveColLabels() {
