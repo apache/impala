@@ -140,8 +140,8 @@ public abstract class QueryStmt extends StatementBase {
     substituteOrdinals(orderingExprs, "ORDER BY", analyzer);
     Expr ambiguousAlias = getFirstAmbiguousAlias(orderingExprs);
     if (ambiguousAlias != null) {
-      throw new AnalysisException("Column " + ambiguousAlias.toSql() +
-          " in order clause is ambiguous");
+      throw new AnalysisException("Column '" + ambiguousAlias.toSql() +
+          "' in ORDER BY clause is ambiguous");
     }
     orderingExprs = Expr.trySubstituteList(orderingExprs, aliasSmap_, analyzer);
 

@@ -186,7 +186,8 @@ public class SelectStmt extends QueryStmt {
         resultExprs_.add(item.getExpr());
         String label = item.toColumnLabel(i, analyzer.useHiveColLabels());
         SlotRef aliasRef = new SlotRef(null, label);
-        if (aliasSmap_.containsMappingFor(aliasRef)) {
+        Expr existingAliasExpr = aliasSmap_.get(aliasRef);
+        if (existingAliasExpr != null && !existingAliasExpr.equals(item.getExpr())) {
           // If we have already seen this alias, it refers to more than one column and
           // therefore is ambiguous.
           ambiguousAliasList_.add(aliasRef);
@@ -450,8 +451,8 @@ public class SelectStmt extends QueryStmt {
       substituteOrdinals(groupingExprsCopy, "GROUP BY", analyzer);
       Expr ambiguousAlias = getFirstAmbiguousAlias(groupingExprsCopy);
       if (ambiguousAlias != null) {
-        throw new AnalysisException("Column " + ambiguousAlias.toSql() +
-            " in group by clause is ambiguous");
+        throw new AnalysisException("Column '" + ambiguousAlias.toSql() +
+            "' in GROUP BY clause is ambiguous");
       }
       groupingExprsCopy =
           Expr.trySubstituteList(groupingExprsCopy, aliasSmap_, analyzer);

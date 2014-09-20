@@ -21,7 +21,6 @@ import java.lang.reflect.Field;
 
 import org.junit.Test;
 
-import com.cloudera.impala.catalog.AggregateFunction;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
@@ -1194,14 +1193,16 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // picks up select item alias
     AnalyzesOk("select zip z, id iD1, id ID2, count(*) " +
         "from functional.testtbl group by z, ID1, id2");
+    // same alias is not ambiguous if it refers to the same expr
+    AnalyzesOk("select int_col, INT_COL from functional.alltypes group by int_col");
+    AnalyzesOk("select bool_col a, bool_col A from functional.alltypes group by a");
+    AnalyzesOk("select int_col A, bool_col b, int_col a, bool_col B " +
+        "from functional.alltypes group by a, b");
     // ambiguous alias
     AnalysisError("select zip a, id a, count(*) from functional.testtbl group by a",
-        "Column a in group by clause is ambiguous");
+        "Column 'a' in GROUP BY clause is ambiguous");
     AnalysisError("select zip id, id, count(*) from functional.testtbl group by id",
-        "Column id in group by clause is ambiguous");
-    AnalysisError("select zip id, zip ID, count(*) from functional.testtbl group by id",
-        "Column id in group by clause is ambiguous");
-
+        "Column 'id' in GROUP BY clause is ambiguous");
 
     // can't group by aggregate
     AnalysisError("select zip, count(*) from functional.testtbl group by count(*)",
@@ -1276,13 +1277,18 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select t1.int_col from functional.alltypes t1, " +
         "functional.alltypes t2 where t1.id = t2.id order by int_col");
 
-    // Ambiguous alias cause error
+    // same alias is not ambiguous if it refers to the same expr
+    AnalyzesOk("select int_col, INT_COL from functional.alltypes order by int_col");
+    AnalyzesOk("select bool_col a, bool_col A from functional.alltypes order by a");
+    AnalyzesOk("select int_col A, bool_col b, int_col a, bool_col B " +
+        "from functional.alltypes order by a, b");
+    // ambiguous alias causes error
     AnalysisError("select string_col a, int_col a from " +
         "functional.alltypessmall order by a limit 1",
-        "Column a in order clause is ambiguous");
+        "Column 'a' in ORDER BY clause is ambiguous");
     AnalysisError("select string_col a, int_col A from " +
         "functional.alltypessmall order by a limit 1",
-        "Column a in order clause is ambiguous");
+        "Column 'a' in ORDER BY clause is ambiguous");
 
     // Test if an ignored order by produces the expected warning.
     AnalyzesOk("select * from (select * from functional.alltypes order by int_col) A",
@@ -1436,11 +1442,16 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("(select int_col a, string_col a from functional.alltypes) " +
         "union (select int_col a, string_col a " +
         "from functional.alltypessmall) order by a",
-        "Column a in order clause is ambiguous");
+        "Column 'a' in ORDER BY clause is ambiguous");
     // Ambiguous alias in the second union operand should work.
     AnalyzesOk("(select int_col a, string_col b from functional.alltypes) " +
         "union (select int_col a, string_col a " +
         "from functional.alltypessmall) order by a");
+    // Ambiguous alias even though the exprs of the first operand are identical
+    // (the corresponding in exprs in the other operand are different)
+    AnalysisError("select int_col a, int_col a from functional.alltypes " +
+        "union all (select 1, bigint_col from functional.alltypessmall) order by a",
+        "Column 'a' in ORDER BY clause is ambiguous");
 
     // Column labels are inherited from first select block.
     // Order by references an invalid column
