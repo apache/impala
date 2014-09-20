@@ -506,6 +506,11 @@ Status PartitionedHashJoinNode::NextProbeRowBatch(
   do {
     // Loop until we find a non-empty row batch.
     probe_batch_->TransferResourceOwnership(out_batch);
+    if (out_batch->AtCapacity()) {
+      // This out batch is full. Need to return it before getting the next batch.
+      probe_batch_pos_ = -1;
+      return Status::OK;
+    }
     if (probe_side_eos_) {
       current_probe_row_ = NULL;
       probe_batch_pos_ = -1;
@@ -608,6 +613,7 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
     bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
+  DCHECK(!out_batch->AtCapacity());
 
   if (ReachedLimit()) {
     *eos = true;
