@@ -145,7 +145,6 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   intermediate_row_desc_.reset(new RowDescriptor(intermediate_tuple_desc_, false));
   RETURN_IF_ERROR(Expr::Prepare(build_expr_ctxs_, state, *intermediate_row_desc_));
 
-  agg_fn_ctxs_.resize(aggregate_evaluators_.size());
   int j = probe_expr_ctxs_.size();
   for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
     // skip non-materialized slots; we don't have evaluators instantiated for those
@@ -157,9 +156,11 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
     }
     SlotDescriptor* intermediate_slot_desc = intermediate_tuple_desc_->slots()[j];
     SlotDescriptor* output_slot_desc = output_tuple_desc_->slots()[j];
+    FunctionContext* agg_fn_ctx = NULL;
     RETURN_IF_ERROR(aggregate_evaluators_[i]->Prepare(state, child(0)->row_desc(),
-        intermediate_slot_desc, output_slot_desc, agg_fn_pool_.get(), &agg_fn_ctxs_[i]));
-    state->obj_pool()->Add(agg_fn_ctxs_[i]);
+        intermediate_slot_desc, output_slot_desc, agg_fn_pool_.get(), &agg_fn_ctx));
+    agg_fn_ctxs_.push_back(agg_fn_ctx);
+    state->obj_pool()->Add(agg_fn_ctx);
     needs_serialize_ |= aggregate_evaluators_[i]->SupportsSerialize();
   }
 
@@ -335,6 +336,7 @@ void PartitionedAggregationNode::Close(RuntimeState* state) {
   if (is_closed()) return;
 
   if (!singleton_output_tuple_returned_) {
+    DCHECK_EQ(agg_fn_ctxs_.size(), aggregate_evaluators_.size());
     FinalizeTuple(agg_fn_ctxs_, singleton_output_tuple_, mem_pool_.get());
   }
 
@@ -359,10 +361,11 @@ void PartitionedAggregationNode::Close(RuntimeState* state) {
   aggregated_partitions_.clear();
   spilled_partitions_.clear();
 
-  DCHECK(aggregate_evaluators_.size() == agg_fn_ctxs_.size() || agg_fn_ctxs_.empty());
   for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
     aggregate_evaluators_[i]->Close(state);
-    if (!agg_fn_ctxs_.empty()) agg_fn_ctxs_[i]->impl()->Close();
+  }
+  for (int i = 0; i < agg_fn_ctxs_.size(); ++i) {
+    agg_fn_ctxs_[i]->impl()->Close();
   }
   if (agg_fn_pool_.get() != NULL) agg_fn_pool_->FreeAll();
   if (mem_pool_.get() != NULL) mem_pool_->FreeAll();
