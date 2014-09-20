@@ -53,6 +53,8 @@ class TestQueries(ImpalaTestSuite):
     table_format = vector.get_value('table_format')
     if table_format.file_format == 'avro':
       pytest.skip()
+    if table_format.file_format == 'hbase':
+      pytest.xfail("A lot of queries check for NULLs, which hbase does not recognize")
     self.run_test_case('QueryTest/analytic-fns', vector)
 
   def test_file_partitions(self, vector):
