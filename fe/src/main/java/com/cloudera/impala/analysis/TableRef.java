@@ -354,7 +354,7 @@ public class TableRef implements ParseNode {
   }
 
   public void invertJoin() {
-    Preconditions.checkState(joinOp_.isCrossJoin() || leftTblRef_.leftTblRef_ == null);
+    Preconditions.checkState(leftTblRef_.leftTblRef_ == null);
     leftTblRef_.setJoinOp(getJoinOp().invert());
     leftTblRef_.setLeftTblRef(this);
     leftTblRef_.setOnClause(onClause_);

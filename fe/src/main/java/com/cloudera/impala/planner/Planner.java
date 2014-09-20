@@ -1097,7 +1097,9 @@ public class Planner {
       // across outer/semi joins which is generally incorrect. The null-aware
       // left anti-join operator is never considered for inversion because we can't
       // execute the null-aware right anti-join efficiently.
-      if (((joinOp.isOuterJoin() || joinOp.isSemiJoin()) &&
+      // TODO: Allow the rhs of any cross join as the leftmost table. This needs careful
+      // consideration of the joinOps that result from such a re-ordering (IMPALA-1281).
+      if (((joinOp.isOuterJoin() || joinOp.isSemiJoin() || joinOp.isCrossJoin()) &&
           ref != refPlans.get(1).first) || joinOp.isNullAwareLeftAntiJoin()) {
         // ref cannot appear as the leftmost input
         continue;
@@ -1128,6 +1130,7 @@ public class Planner {
             return (diff < 0 ? -1 : (diff > 0 ? 1 : 0));
           }
         });
+
     for (Pair<TableRef, Long> candidate: candidates) {
       PlanNode result = createJoinPlan(analyzer, candidate.first, refPlans);
       if (result != null) return result;
