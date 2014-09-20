@@ -95,6 +95,12 @@ public class Planner {
    * Create plan fragments for an analyzed statement, given a set of execution options.
    * The fragments are returned in a list such that element i of that list can
    * only consume output of the following fragments j > i.
+   *
+   * TODO: take data partition of the plan fragments into account; in particular,
+   * coordinate between hash partitioning for aggregation and hash partitioning
+   * for analytic computation more generally than what createQueryPlan() does
+   * right now (the coordination only happens if the same select block does both
+   * the aggregation and analytic computation).
    */
   public ArrayList<PlanFragment> createPlanFragments(
       AnalysisContext.AnalysisResult analysisResult, TQueryOptions queryOptions)
@@ -782,11 +788,10 @@ public class Planner {
       if (hasGrouping) {
         // the parent fragment is partitioned on the grouping exprs;
         // substitute grouping exprs to reference the *output* of the agg, not the input
-        // TODO: add infrastructure so that all PlanNodes have smaps to make this
-        // process of turning exprs into executable exprs less ad-hoc; might even want to
-        // introduce another mechanism that simply records a mapping of slots
-        List<Expr> partitionExprs = Expr.substituteList(
-            groupingExprs, node.getAggInfo().getIntermediateSmap(), analyzer);
+        List<Expr> partitionExprs = node.getAggInfo().getPartitionExprs();
+        if (partitionExprs == null) partitionExprs = groupingExprs;
+        partitionExprs = Expr.substituteList(
+            partitionExprs, node.getAggInfo().getIntermediateSmap(), analyzer);
         parentPartition =
             new DataPartition(TPartitionType.HASH_PARTITIONED, partitionExprs);
       } else {
@@ -1004,7 +1009,14 @@ public class Planner {
         stmt.getMaterializedTupleIds(stmtTupleIds);
         AnalyticPlanner analyticPlanner =
             new AnalyticPlanner(stmtTupleIds, analyticInfo, analyzer, nodeIdGenerator_);
-        root = analyticPlanner.createSingleNodePlan(root);
+        List<Expr> inputPartitionExprs = Lists.newArrayList();
+        AggregateInfo aggInfo = ((SelectStmt) stmt).getAggInfo();
+        root = analyticPlanner.createSingleNodePlan(root,
+            aggInfo != null ? aggInfo.getGroupingExprs() : null, inputPartitionExprs);
+        if (aggInfo != null && !inputPartitionExprs.isEmpty()) {
+          // analytic computation will benefit from a partition on inputPartitionExprs
+          aggInfo.setPartitionExprs(inputPartitionExprs);
+        }
       }
     } else {
       Preconditions.checkState(stmt instanceof UnionStmt);

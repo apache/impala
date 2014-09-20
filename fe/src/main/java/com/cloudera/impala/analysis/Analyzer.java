@@ -241,6 +241,9 @@ public class Analyzer {
     // only visible at the root Analyzer
     private final Map<SlotId, EquivalenceClassId> equivClassBySlotId = Maps.newHashMap();
 
+    // map for each slot to the canonical slot of its equivalence class
+    private final ExprSubstitutionMap equivClassSmap = new ExprSubstitutionMap();
+
     // represents the direct and transitive value transfers between slots
     private ValueTransferGraph valueTransferGraph;
 
@@ -1430,6 +1433,19 @@ public class Analyzer {
       }
     } while (merged);
 
+    // populate equivClassSmap
+    for (EquivalenceClassId id: globalState_.equivClassMembers.keySet()) {
+      List<SlotId> members = globalState_.equivClassMembers.get(id);
+      if (members.isEmpty()) continue;
+      SlotDescriptor canonicalSlotDesc =
+          globalState_.descTbl.getSlotDesc(members.get(0));
+      for (SlotId slotId: globalState_.equivClassMembers.get(id)) {
+        SlotDescriptor slotDesc = globalState_.descTbl.getSlotDesc(slotId);
+        globalState_.equivClassSmap.put(
+            new SlotRef(slotDesc), new SlotRef(canonicalSlotDesc));
+      }
+    }
+
     // populate equivClassBySlotId
     for (EquivalenceClassId id: globalState_.equivClassMembers.keySet()) {
       for (SlotId slotId: globalState_.equivClassMembers.get(id)) {
@@ -1458,6 +1474,8 @@ public class Analyzer {
   public EquivalenceClassId getEquivClassId(SlotId slotId) {
     return globalState_.equivClassBySlotId.get(slotId);
   }
+
+  public ExprSubstitutionMap getEquivClassSmap() { return globalState_.equivClassSmap; }
 
   /**
    * Returns true if l1 and l2 only contain SlotRefs, and for all SlotRefs in l1 there

@@ -487,6 +487,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * the exprs have an invalid number of distinct values.
    */
   public static long getNumDistinctValues(List<Expr> exprs) {
+    if (exprs == null || exprs.isEmpty()) return 0;
     long numDistinctValues = 1;
     for (Expr expr: exprs) {
       if (expr.getNumDistinctValues() == -1) {
@@ -592,6 +593,43 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public static <C extends Expr> boolean isSubset(List<C> l1, List<C> l2) {
     if (l1.size() > l2.size()) return false;
     return l2.containsAll(l1);
+  }
+
+  /**
+   * Return the intersection of l1 and l2.599
+   */
+  public static <C extends Expr> List<C> intersect(List<C> l1, List<C> l2) {
+    List<C> result = new ArrayList<C>();
+    for (C element: l1) {
+      if (l2.contains(element)) result.add(element);
+    }
+    return result;
+  }
+
+  /**
+   * Compute the intersection of l1 and l2, given the smap, and
+   * return the intersecting l1 elements in i1 and the intersecting l2 elements in i2.
+   */
+  public static void intersect(Analyzer analyzer,
+      List<Expr> l1, List<Expr> l2, ExprSubstitutionMap smap,
+      List<Expr> i1, List<Expr> i2) {
+    i1.clear();
+    i2.clear();
+    List<Expr> s1List = Expr.substituteList(l1, smap, analyzer);
+    Preconditions.checkState(s1List.size() == l1.size());
+    List<Expr> s2List = Expr.substituteList(l2, smap, analyzer);
+    Preconditions.checkState(s2List.size() == l2.size());
+    for (int i = 0; i < s1List.size(); ++i) {
+      Expr s1 = s1List.get(i);
+      for (int j = 0; j < s2List.size(); ++j) {
+        Expr s2 = s2List.get(j);
+        if (s1.equals(s2)) {
+          i1.add(l1.get(i));
+          i2.add(l2.get(j));
+          break;
+        }
+      }
+    }
   }
 
   @Override

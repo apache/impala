@@ -95,13 +95,20 @@ public class AnalyticPlanner {
   }
 
   /**
-   * Augment planFragment with plan nodes that implement single-node evaluation of
-   * the AnalyticExprs in analyticInfo.
-   * TODO: create partition groups that are not based on set identity: the subset
-   * of partition exprs common to the partition group should be large enough to
-   * parallelize across all machines
+   * Return plan tree that augments 'root' with plan nodes that implement single-node
+   * evaluation of the AnalyticExprs in analyticInfo.
+   * This plan takes into account a possible hash partition of its input on
+   * 'groupingExprs'; if this is non-null, it returns in 'inputPartitionExprs'
+   * a subset of the grouping exprs which should be used for the aggregate
+   * hash partitioning during the parallelization of 'root'.
+   * TODO: when generating sort orders for the sort groups, optimize the ordering
+   * of the partition exprs (so that subsequent sort operations see the input sorted
+   * on a prefix of their required sort exprs)
+   * TODO: when merging sort groups, recognize equivalent exprs
+   * (using the equivalence classes) rather than looking for expr equality
    */
-  public PlanNode createSingleNodePlan(PlanNode root) throws ImpalaException {
+  public PlanNode createSingleNodePlan(PlanNode root,
+      List<Expr> groupingExprs, List<Expr> inputPartitionExprs) throws ImpalaException {
     List<WindowGroup> windowGroups = collectWindowGroups();
     for (WindowGroup g: windowGroups) {
       g.init(analyzer_);
@@ -112,11 +119,18 @@ public class AnalyticPlanner {
       g.init();
     }
     List<PartitionGroup> partitionGroups = collectPartitionGroups(sortGroups);
+    mergePartitionGroups(partitionGroups, root.getNumNodes());
     orderGroups(partitionGroups);
+    if (groupingExprs != null) {
+      Preconditions.checkNotNull(inputPartitionExprs);
+      computeInputPartitionExprs(
+          partitionGroups, groupingExprs, root.getNumNodes(), inputPartitionExprs);
+    }
 
     for (PartitionGroup partitionGroup: partitionGroups) {
       for (int i = 0; i < partitionGroup.sortGroups.size(); ++i) {
-        root = createSortGroupPlan(root, partitionGroup.sortGroups.get(i), i == 0);
+        root = createSortGroupPlan(root, partitionGroup.sortGroups.get(i),
+            i == 0 ? partitionGroup.partitionByExprs : null);
       }
     }
 
@@ -146,6 +160,75 @@ public class AnalyticPlanner {
         if (hasMerged) break;
       }
     } while (hasMerged);
+  }
+
+  /**
+   * Coalesce partition groups for which the intersection of their
+   * partition exprs has ndv estimate > numNodes, so that the resulting plan
+   * still parallelizes across all nodes.
+   */
+  private void mergePartitionGroups(
+      List<PartitionGroup> partitionGroups, int numNodes) {
+    boolean hasMerged = false;
+    do {
+      hasMerged = false;
+      for (PartitionGroup pg1: partitionGroups) {
+        for (PartitionGroup pg2: partitionGroups) {
+          if (pg1 != pg2) {
+            long ndv = Expr.getNumDistinctValues(
+                Expr.intersect(pg1.partitionByExprs, pg2.partitionByExprs));
+            if (ndv == -1 || ndv < 0 || ndv < numNodes) {
+              // didn't get a usable value or the number of partitions is too small
+              continue;
+            }
+            pg1.merge(pg2);
+            partitionGroups.remove(pg2);
+            hasMerged = true;
+            break;
+          }
+        }
+        if (hasMerged) break;
+      }
+    } while (hasMerged);
+  }
+
+  /**
+   * Determine the partition group that has the maximum intersection in terms
+   * of the estimated ndv of the partition exprs with groupingExprs.
+   * That partition group is placed at the front of partitionGroups, with its
+   * partition exprs reduced to the intersection, and the intersecting groupingExprs
+   * are returned in inputPartitionExprs.
+   */
+  private void computeInputPartitionExprs(List<PartitionGroup> partitionGroups,
+      List<Expr> groupingExprs, int numNodes, List<Expr> inputPartitionExprs) {
+    inputPartitionExprs.clear();
+    // find partition group with maximum intersection
+    long maxNdv = 0;
+    PartitionGroup maxPg = null;
+    List<Expr> maxGroupingExprs = null;
+    for (PartitionGroup pg: partitionGroups) {
+      List<Expr> l1 = Lists.newArrayList();
+      List<Expr> l2 = Lists.newArrayList();
+      Expr.intersect(analyzer_, pg.partitionByExprs, groupingExprs,
+          analyzer_.getEquivClassSmap(), l1, l2);
+      // TODO: also look at l2 and take the max?
+      long ndv = Expr.getNumDistinctValues(l1);
+      if (ndv < 0 || ndv < numNodes || ndv < maxNdv) continue;
+      // found a better partition group
+      maxPg = pg;
+      maxPg.partitionByExprs = l1;
+      maxGroupingExprs = l2;
+      maxNdv = ndv;
+    }
+
+    if (maxNdv > numNodes) {
+      Preconditions.checkNotNull(maxPg);
+      // we found a partition group that gives us enough parallelism;
+      // move it to the front
+      partitionGroups.remove(maxPg);
+      partitionGroups.add(0, maxPg);
+      inputPartitionExprs.addAll(maxGroupingExprs);
+    }
   }
 
   /**
@@ -216,10 +299,12 @@ public class AnalyticPlanner {
 
   /**
    * Create plan tree for the entire sort group, including all contained window groups.
-   * Marks the SortNode as requiring its input to be partitioned if isFirstInPartition.
+   * Marks the SortNode as requiring its input to be partitioned if partitionExprs
+   * is not null (partitionExprs represent the data partition of the entire partition
+   * group of which this sort group is a part).
    */
   private PlanNode createSortGroupPlan(PlanNode root, SortGroup sortGroup,
-      boolean isFirstInPartition) throws ImpalaException {
+      List<Expr> partitionExprs) throws ImpalaException {
     List<Expr> partitionByExprs = sortGroup.partitionByExprs;
     List<OrderByElement> orderByElements = sortGroup.orderByElements;
     ExprSubstitutionMap sortSmap = null;
@@ -234,7 +319,8 @@ public class AnalyticPlanner {
       List<Expr> sortExprs = Lists.newArrayList(partitionByExprs);
       List<Boolean> isAsc =
           Lists.newArrayList(Collections.nCopies(sortExprs.size(), new Boolean(true)));
-      // TODO: should nulls come first or last?
+      // TODO: utilize a direction and nulls/first last that has benefit
+      // for subsequent sort groups
       List<Boolean> nullsFirst =
           Lists.newArrayList(Collections.nCopies(sortExprs.size(), new Boolean(true)));
 
@@ -253,12 +339,12 @@ public class AnalyticPlanner {
       // to be executed like a regular distributed sort
       if (!partitionByExprs.isEmpty()) sortNode.setIsAnalyticSort(true);
 
-      if (isFirstInPartition) {
+      if (partitionExprs != null) {
         // create required input partition
         DataPartition inputPartition = DataPartition.UNPARTITIONED;
-        if (!partitionByExprs.isEmpty()) {
-          inputPartition = new DataPartition(TPartitionType.HASH_PARTITIONED,
-              partitionByExprs);
+        if (!partitionExprs.isEmpty()) {
+          inputPartition =
+              new DataPartition(TPartitionType.HASH_PARTITIONED, partitionExprs);
         }
         sortNode.setInputPartition(inputPartition);
       }
@@ -700,6 +786,17 @@ public class AnalyticPlanner {
       Preconditions.checkState(isCompatible(sortGroup));
       sortGroups.add(sortGroup);
       totalOutputTupleSize += sortGroup.totalOutputTupleSize;
+    }
+
+    /**
+     * Merge 'other' into 'this'
+     * - partitionByExprs is the intersection of the two
+     * - sortGroups becomes the union
+     */
+    public void merge(PartitionGroup other) {
+      partitionByExprs = Expr.intersect(partitionByExprs, other.partitionByExprs);
+      Preconditions.checkState(Expr.getNumDistinctValues(partitionByExprs) >= 0);
+      sortGroups.addAll(other.sortGroups);
     }
 
     /**

@@ -119,7 +119,8 @@ public class HdfsTableSink extends TableSink {
       if (totalNumPartitions == -1) {
         output.append(detailPrefix + "partitions=unavailable");
       } else {
-        output.append(detailPrefix + "partitions=" + totalNumPartitions);
+        output.append(detailPrefix + "partitions="
+            + (totalNumPartitions == 0 ? 1 : totalNumPartitions));
       }
       output.append("\n");
       if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {

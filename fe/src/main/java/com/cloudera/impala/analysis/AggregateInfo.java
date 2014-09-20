@@ -96,12 +96,18 @@ public class AggregateInfo extends AggregateInfoBase {
   protected final ExprSubstitutionMap outputToIntermediateTupleSmap_ =
       new ExprSubstitutionMap();
 
+  // if set, a subset of groupingExprs_; set and used during planning
+  private List<Expr> partitionExprs_;
+
   // C'tor creates copies of groupingExprs and aggExprs.
   private AggregateInfo(ArrayList<Expr> groupingExprs,
       ArrayList<FunctionCallExpr> aggExprs, AggPhase aggPhase)  {
     super(groupingExprs, aggExprs);
     aggPhase_ = aggPhase;
   }
+
+  public List<Expr> getPartitionExprs() { return partitionExprs_; }
+  public void setPartitionExprs(List<Expr> exprs) { partitionExprs_ = exprs; }
 
   /**
    * Creates complete AggregateInfo for groupingExprs and aggExprs, including

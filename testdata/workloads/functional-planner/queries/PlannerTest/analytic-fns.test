@@ -1,3 +1,58 @@
+# the hash partition for aggregation is adjusted if subsequent analytic computation
+# can take advantage of it
+select
+max(tinyint_col) over(partition by int_col)
+from functional.alltypes
+group by int_col, tinyint_col
+---- DISTRIBUTEDPLAN
+06:EXCHANGE [UNPARTITIONED]
+|
+03:ANALYTIC
+|  functions: max(tinyint_col)
+|  partition by: int_col
+|
+02:SORT
+|  order by: int_col ASC NULLS FIRST
+|
+05:AGGREGATE [FINALIZE]
+|  group by: int_col, tinyint_col
+|
+04:EXCHANGE [HASH(int_col)]
+|
+01:AGGREGATE
+|  group by: int_col, tinyint_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
+# partition groups are coalesced if the intersection of their partition exprs
+# has a high enough cardinality to allow distribution across all nodes
+select
+max(int_col) over(partition by int_col, bool_col),
+max(int_col) over(partition by int_col, tinyint_col)
+from functional.alltypes
+---- DISTRIBUTEDPLAN
+06:EXCHANGE [UNPARTITIONED]
+|
+04:ANALYTIC
+|  functions: max(int_col)
+|  partition by: int_col, tinyint_col
+|
+03:SORT
+|  order by: int_col ASC NULLS FIRST, tinyint_col ASC NULLS FIRST
+|
+02:ANALYTIC
+|  functions: max(int_col)
+|  partition by: int_col, bool_col
+|
+01:SORT
+|  order by: int_col ASC NULLS FIRST, bool_col ASC NULLS FIRST
+|
+05:EXCHANGE [HASH(int_col)]
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+====
 # unpartitioned analytics are executed with distributed sorts
 # TODO: avoid resorting on the same exprs
 select
@@ -604,8 +659,10 @@ order by 1, 2, 3
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ====
-# grouping of multiple analytic exprs by compatible window/partition/order
+# grouping of multiple analytic exprs by compatible window/partition/order;
+# the distributed plan repartitions only once on tinyint_col
 select
+# sort group 1
 count(double_col)
   over(partition by tinyint_col, double_col order by int_col desc
   rows between 1 preceding and 1 following),
@@ -623,14 +680,18 @@ sum(smallint_col)
 first_value(int_col)
   over(partition by double_col, tinyint_col order by int_col desc
   rows between 2 preceding and 2 following),
-# different sort order but same partition
+# sort group 2
 last_value(int_col)
   over(partition by double_col, tinyint_col order by int_col asc
   rows between 2 preceding and 2 following),
 # different partition
 first_value(int_col)
+  over(partition by double_col, tinyint_col order by int_col asc
+  rows between 2 preceding and 2 following),
+# same partition group but different sort group
+min(int_col)
   over(partition by tinyint_col order by int_col desc
-  rows between 2 preceding and 2 following)
+  rows between unbounded preceding and 2 following)
 from functional.alltypesagg
 ---- PLAN
 09:ANALYTIC
@@ -661,7 +722,7 @@ from functional.alltypesagg
 |  order by: tinyint_col ASC NULLS FIRST, double_col ASC NULLS FIRST, int_col DESC
 |
 04:ANALYTIC
-|  functions: last_value(int_col)
+|  functions: last_value(int_col), first_value(int_col)
 |  partition by: double_col, tinyint_col
 |  order by: int_col ASC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
@@ -670,10 +731,10 @@ from functional.alltypesagg
 |  order by: double_col ASC NULLS FIRST, tinyint_col ASC NULLS FIRST, int_col ASC
 |
 02:ANALYTIC
-|  functions: first_value(int_col)
+|  functions: min(int_col)
 |  partition by: tinyint_col
 |  order by: int_col DESC
-|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 FOLLOWING
 |
 01:SORT
 |  order by: tinyint_col ASC NULLS FIRST, int_col DESC
@@ -681,7 +742,7 @@ from functional.alltypesagg
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
-12:EXCHANGE [UNPARTITIONED]
+11:EXCHANGE [UNPARTITIONED]
 |
 09:ANALYTIC
 |  functions: count(double_col), last_value(double_col)
@@ -711,7 +772,7 @@ from functional.alltypesagg
 |  order by: tinyint_col ASC NULLS FIRST, double_col ASC NULLS FIRST, int_col DESC
 |
 04:ANALYTIC
-|  functions: last_value(int_col)
+|  functions: last_value(int_col), first_value(int_col)
 |  partition by: double_col, tinyint_col
 |  order by: int_col ASC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
@@ -719,13 +780,11 @@ from functional.alltypesagg
 03:SORT
 |  order by: double_col ASC NULLS FIRST, tinyint_col ASC NULLS FIRST, int_col ASC
 |
-11:EXCHANGE [HASH(double_col,tinyint_col)]
-|
 02:ANALYTIC
-|  functions: first_value(int_col)
+|  functions: min(int_col)
 |  partition by: tinyint_col
 |  order by: int_col DESC
-|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 FOLLOWING
 |
 01:SORT
 |  order by: tinyint_col ASC NULLS FIRST, int_col DESC
