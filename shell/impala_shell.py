@@ -91,6 +91,8 @@ class ImpalaShell(cmd.Cmd):
   DEFAULT_DB = 'default'
   # Regex applied to all tokens of a query to detect the query type.
   INSERT_REGEX = re.compile("^insert$", re.I)
+  # Seperator for queries in the history file.
+  HISTORY_FILE_QUERY_DELIM = '_IMP_DELIM_'
 
   def __init__(self, options):
     cmd.Cmd.__init__(self)
@@ -299,8 +301,7 @@ class ImpalaShell(cmd.Cmd):
       - The contents are passed to the appropriate method for execution.
       - partial_cmd is reset to an empty string.
     """
-    if self.readline:
-      current_history_len = self.readline.get_current_history_length()
+    if self.readline: current_history_len = self.readline.get_current_history_length()
     # Input is incomplete, store the contents and do nothing.
     if not self._cmd_ends_with_delim(cmd):
       # The user input is incomplete, change the prompt to reflect this.
@@ -329,21 +330,15 @@ class ImpalaShell(cmd.Cmd):
       # Reset partial_cmd to an empty string
       self.partial_cmd = str()
       # Replace the most recent history item with the completed command.
-      completed_cmd = sqlparse.format(completed_cmd, strip_comments=True)
+      completed_cmd = sqlparse.format(completed_cmd)
       if self.readline and current_history_len > 0:
-        # Update the history item to replace newlines with spaces. This is needed so
-        # readline can properly restore the history (otherwise it interprets each newline
-        # as a separate history item).
         self.readline.replace_history_item(current_history_len - 1,
-          completed_cmd.encode('utf-8').replace('\n', ' '))
+            completed_cmd.encode('utf-8'))
       # Revert the prompt to its earlier state
       self.prompt = self.cached_prompt
     else:  # Input has a delimiter and partial_cmd is empty
-      completed_cmd = sqlparse.format(cmd, strip_comments=True)
-    # The comments have been parsed out, there is no need to retain the newlines.
-    # They can cause parse errors in sqlparse when unescaped quotes and delimiters
-    # come into play.
-    return completed_cmd.replace('\n', ' ')
+      completed_cmd = sqlparse.format(cmd)
+    return completed_cmd
 
   def _signal_handler(self, signal, frame):
     """Handles query cancellation on a Ctrl+C event"""
@@ -821,6 +816,7 @@ class ImpalaShell(cmd.Cmd):
       if not os.path.exists(self.history_file): return
       try:
         self.readline.read_history_file(self.history_file)
+        self._replace_history_delimiters(ImpalaShell.HISTORY_FILE_QUERY_DELIM, '\n')
       except IOError, i:
         msg = "Unable to load command history (disabling history collection): %s" % i
         print_to_stderr(msg)
@@ -831,12 +827,28 @@ class ImpalaShell(cmd.Cmd):
     """Save session commands in history."""
     if self.readline:
       try:
+        self._replace_history_delimiters('\n', ImpalaShell.HISTORY_FILE_QUERY_DELIM)
         self.readline.write_history_file(self.history_file)
       except IOError, i:
         msg = "Unable to save command history (disabling history collection): %s" % i
         print_to_stderr(msg)
         # The history file is not writable, disable readline.
         self._disable_readline()
+
+  def _replace_history_delimiters(self, src_delim, tgt_delim):
+    """Replaces source_delim with target_delim for all items in history.
+
+    Read all the items from history into a local list. Clear the history and copy them
+    back after doing the transformation.
+    """
+    history_len = self.readline.get_current_history_length()
+    # load the history and replace the shell's delimiter with EOL
+    history_items = map(self.readline.get_history_item, xrange(1, history_len + 1))
+    history_items = [item.replace(src_delim, tgt_delim) for item in history_items]
+    # Clear the original history and replace it with the mutated history.
+    self.readline.clear_history()
+    for history_item in history_items:
+      self.readline.add_history(history_item)
 
   def default(self, args):
     query = self.imp_client.create_beeswax_query(args, self.set_query_options)
@@ -874,15 +886,8 @@ def print_to_stderr(message):
   print >> sys.stderr, message
 
 def parse_query_text(query_text, utf8_encode_policy='strict'):
-  """Parse query file text, by stripping comments and encoding into utf-8"""
-  return [ strip_comments_from_query(q).encode('utf-8', utf8_encode_policy)
-           for q in sqlparse.split(query_text) ]
-
-def strip_comments_from_query(query):
-  """Strip comments from an individual query """
-  # We only use the strip_comments filter, using other filters can lead to a significant
-  # performance hit if the query is very large.
-  return sqlparse.format(query, strip_comments=True)
+  """Parse query file text to extract queries and encode into utf-8"""
+  return [q.encode('utf-8', utf8_encode_policy) for q in sqlparse.split(query_text)]
 
 def execute_queries_non_interactive_mode(options):
   """Run queries in non-interactive mode."""

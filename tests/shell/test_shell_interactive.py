@@ -16,8 +16,10 @@
 
 
 import os
+import pexpect
 import pytest
 import shlex
+import shutil
 import socket
 import signal
 
@@ -28,6 +30,8 @@ from tests.verifiers.metric_verifier import MetricVerifier
 from time import sleep
 
 SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
+SHELL_HISTORY_FILE = os.path.expanduser("~/.impalahistory")
+TMP_HISTORY_FILE = os.path.expanduser("~/.impalahistorytmp")
 
 class TestImpalaShellInteractive(object):
   """Test the impala shell interactively"""
@@ -46,6 +50,15 @@ class TestImpalaShellInteractive(object):
     cmd = "%s %s" % (SHELL_CMD, args) if args else SHELL_CMD
     return Popen(shlex.split(SHELL_CMD), shell=True, stdout=PIPE,
                  stdin=PIPE, stderr=PIPE)
+
+  @classmethod
+  def setup_class(cls):
+    if os.path.exists(SHELL_HISTORY_FILE):
+      shutil.move(SHELL_HISTORY_FILE, TMP_HISTORY_FILE)
+
+  @classmethod
+  def teardown_class(cls):
+    if os.path.exists(TMP_HISTORY_FILE): shutil.move(TMP_HISTORY_FILE, SHELL_HISTORY_FILE)
 
   @pytest.mark.execute_serially
   def test_escaped_quotes(self):
@@ -168,6 +181,31 @@ class TestImpalaShellInteractive(object):
     finally:
       run_impala_shell_interactive("drop table if exists %s.%s;" % (TMP_DB, TMP_TBL))
       run_impala_shell_interactive("drop database if exists foo;")
+
+  @pytest.mark.execute_serially
+  def test_multiline_queries_in_history(self):
+    """Test to ensure that multiline queries with comments are preserved in history
+
+    Ensure that multiline queries are preserved when they're read back from history.
+    Additionally, also test that comments are preserved.
+    """
+    # regex for pexpect, a shell prompt is expected after each command..
+    prompt_regex = '.*%s:2100.*' % socket.getfqdn()
+    # readline gets its input from tty, so using stdin does not work.
+    child_proc = pexpect.spawn(SHELL_CMD)
+    queries = ["select\n1--comment;",
+        "select /*comment*/\n1;",
+        "select\n/*comm\nent*/\n1;"]
+    for query in queries:
+      child_proc.expect(prompt_regex)
+      child_proc.sendline(query)
+    child_proc.expect(prompt_regex)
+    child_proc.sendline('quit;')
+    p = self._start_new_shell_process()
+    self._send_cmd_to_shell(p, 'history')
+    result = get_shell_cmd_result(p)
+    for query in queries:
+      assert query in result.stderr, "'%s' not in '%s'" % (query, result.stderr)
 
 def run_impala_shell_interactive(command, shell_args=''):
   """Runs a command in the Impala shell interactively."""
