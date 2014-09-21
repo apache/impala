@@ -112,6 +112,10 @@ class AnalyticEvalNode : public ExecNode {
   // That tuple gets set in the associated output row(s) later in GetNextOutputBatch().
   Status ProcessChildBatch(RuntimeState* state);
 
+  // Processes child batches (calling ProcessChildBatch()) until enough output rows
+  // are ready to return an output batch.
+  Status ProcessChildBatches(RuntimeState* state);
+
   // Returns a batch of output rows from input_stream_ with the analytic function
   // results (from result_tuples_) set as the last tuple.
   Status GetNextOutputBatch(RuntimeState* state, RowBatch* row_batch, bool* eos);

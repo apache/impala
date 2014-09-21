@@ -196,6 +196,7 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
     RETURN_IF_ERROR(child(0)->GetNext(state, curr_child_batch_.get(), &input_eos_));
     if (curr_child_batch_->num_rows() > 0) {
       prev_input_row_ = curr_child_batch_->GetRow(0);
+      ProcessChildBatches(state);
     } else {
       // Empty batch, still need to reset.
       curr_child_batch_->Reset();
@@ -438,6 +439,27 @@ inline bool AnalyticEvalNode::PrevRowCompare(ExprContext* pred_ctx) {
   return result.val;
 }
 
+Status AnalyticEvalNode::ProcessChildBatches(RuntimeState* state) {
+  while (curr_child_batch_.get() != NULL && NumOutputRowsReady() < state->batch_size()) {
+    RETURN_IF_CANCELLED(state);
+    RETURN_IF_ERROR(state->CheckQueryState());
+    RETURN_IF_ERROR(ProcessChildBatch(state));
+    // TODO: DCHECK that the size of result_tuples_ is bounded. It shouldn't be larger
+    // than 2x the batch size unless the end bound has an offset preceding, in which
+    // case it may be slightly larger (proportional to the offset but still bounded).
+    if (input_eos_) {
+      // Already processed the last child batch. Clean up and break.
+      curr_child_batch_.reset();
+      prev_child_batch_.reset();
+      break;
+    }
+    prev_child_batch_->Reset();
+    prev_child_batch_.swap(curr_child_batch_);
+    RETURN_IF_ERROR(child(0)->GetNext(state, curr_child_batch_.get(), &input_eos_));
+  }
+  return Status::OK;
+}
+
 Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
   // TODO: DCHECK input is sorted (even just first row vs prev_input_row_)
   VLOG_FILE << "ProcessChildBatch: " << DebugEvaluatedRowsString()
@@ -597,25 +619,7 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
     *eos = false;
   }
 
-  // Processes input row batches until there are enough rows that are ready to return.
-  while (curr_child_batch_.get() != NULL && NumOutputRowsReady() < state->batch_size()) {
-    RETURN_IF_CANCELLED(state);
-    RETURN_IF_ERROR(state->CheckQueryState());
-    RETURN_IF_ERROR(ProcessChildBatch(state));
-    // TODO: DCHECK that the size of result_tuples_ is bounded. It shouldn't be larger
-    // than 2x the batch size unless the end bound has an offset preceding, in which
-    // case it may be slightly larger (proportional to the offset but still bounded).
-    if (input_eos_) {
-      // Already processed the last child batch. Clean up and break.
-      curr_child_batch_.reset();
-      prev_child_batch_.reset();
-      break;
-    }
-    prev_child_batch_->Reset();
-    prev_child_batch_.swap(curr_child_batch_);
-    RETURN_IF_ERROR(child(0)->GetNext(state, curr_child_batch_.get(), &input_eos_));
-  }
-
+  RETURN_IF_ERROR(ProcessChildBatches(state));
   bool output_eos = false;
   RETURN_IF_ERROR(GetNextOutputBatch(state, row_batch, &output_eos));
   if (curr_child_batch_.get() == NULL && output_eos) *eos = true;

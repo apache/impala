@@ -24,7 +24,8 @@ class TestRowsAvailability(ImpalaTestSuite):
              'select * from %s %s order by id limit 1' % (TABLE, WHERE_CLAUSE),
              'select * from %s %s order by id' % (TABLE, WHERE_CLAUSE),
              'select count(*) from %s %s' % (TABLE, WHERE_CLAUSE),
-             'select 1 union all select count(*) from %s %s' % (TABLE, WHERE_CLAUSE)]
+             'select 1 union all select count(*) from %s %s' % (TABLE, WHERE_CLAUSE),
+             'select count(*) over () from %s %s' % (TABLE, WHERE_CLAUSE)]
   ROWS_AVAIL_LOWER_BOUND_MS = 2000
 
   @classmethod
