@@ -265,3 +265,27 @@ select * from decimal_tiny
 ---- TYPES
 DECIMAL, DECIMAL, DECIMAL
 ====
+---- QUERY
+# Test sum() and avg() analytic fns with start bounds (tests Remove() for decimal)
+select
+sum(c1) over (order by c1 rows between 5 preceding and current row),
+sum(c2) over (order by c1 rows between 5 preceding and 5 following),
+sum(c3) over (order by c1 rows between 5 preceding and 2 preceding),
+avg(c1) over (order by c1 rows between 5 preceding and current row),
+avg(c2) over (order by c1 rows between 5 preceding and 5 following),
+avg(c3) over (order by c1 rows between 5 preceding and 2 preceding)
+from decimal_tiny where c2 < 112
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0.0000,618.33330,NULL,0.0000,103.05555,NULL
+0.1111,725.66662,NULL,0.0555,103.66666,NULL
+0.3333,834.22216,0.0,0.1111,104.27777,0.0
+0.6666,943.99992,0.1,0.1666,104.88888,0.0
+1.1110,1054.99990,0.3,0.2222,105.49999,0.1
+1.6665,1054.99990,0.6,0.2777,105.49999,0.1
+2.3331,954.99990,1.0,0.3888,106.11110,0.2
+2.9997,853.77768,1.4,0.4999,106.72221,0.3
+3.6663,751.33324,1.8,0.6110,107.33332,0.4
+4.3329,647.66658,2.2,0.7221,107.94443,0.5
+---- TYPES
+DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
+====
