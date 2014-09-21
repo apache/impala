@@ -22,34 +22,21 @@ from tests.common.test_dimensions import (TestDimension,
     create_single_exec_option_dimension,
     create_parquet_dimension)
 
-class TestSpillingBase(CustomClusterTestSuite):
+class TestSpilling(CustomClusterTestSuite):
   @classmethod
   def get_workload(self):
     return 'functional-query'
 
   @classmethod
   def add_test_dimensions(cls):
+    super(TestSpilling, cls).add_test_dimensions()
+    cls.TestMatrix.clear_constraints()
+    cls.TestMatrix.add_dimension(create_parquet_dimension('tpch'))
     cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
 
-  @classmethod
-  def setup_class(cls):
-    # Reduce the IO read size. This reduces the memory required to trigger spilling.
-    options = ["--impalad_args=--read_size=1000000"]
-    cls._start_impala_cluster(options)
-    cls.client = cls.cluster.get_first_impalad().service.create_beeswax_client()
-
-  def setup_method(self, method):
-    pass
-
-  def teardown_method(self, method):
-    pass
-
-class TestSpilling(TestSpillingBase):
-  @classmethod
-  def add_test_dimensions(cls):
-    super(TestSpilling, cls).add_test_dimensions()
-    cls.TestMatrix.add_dimension(create_parquet_dimension('tpch'))
-
+  # Reduce the IO read size. This reduces the memory required to trigger spilling.
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+      impalad_args="--read_size=1000000")
   def test_spilling(self, vector):
     self.run_test_case('QueryTest/spilling', vector)
-

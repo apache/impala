@@ -120,6 +120,9 @@ class TestMatrix(object):
   def add_constraint(self, constraint_func):
     self.constraint_list.append(constraint_func)
 
+  def clear_constraints(self):
+    self.constraint_list = list()
+
   def __extract_vector_values(self):
     # The data is stored as a tuple of (name, [val1, val2, val3]). So extract the actual
     # values from this
