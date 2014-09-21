@@ -2467,6 +2467,8 @@ limit 100
    partitions=120/120 size=22.02MB
 ====
 # TPCDS-Q89
+/* Modifications: Added Partition Key filter because Impala does not do dynamic partition
+   pruning.*/
 select * from (select  *
 from (
 select i_category, i_class, i_brand,
@@ -2480,13 +2482,14 @@ from item, store_sales, date_dim, store
 where ss_item_sk = i_item_sk and
       ss_sold_date_sk = d_date_sk and
       ss_store_sk = s_store_sk and
-      d_year in (1999) and
+      d_year in (2000) and
         ((i_category in ('Children','Music','Home') and
           i_class in ('toddlers','pop','lighting')
          )
       or (i_category in ('Jewelry','Books','Sports') and
           i_class in ('costume','travel','football')
         ))
+      and ss_sold_date_sk between 2451545 and 2451910  -- partition key filter
 group by i_category, i_class, i_brand,
          s_store_name, s_company_name, d_moy) tmp1
 where case when (avg_monthly_sales <> 0) then (abs(sum_sales - avg_monthly_sales) / avg_monthly_sales) else null end > 0.1
@@ -2519,7 +2522,7 @@ limit 100) tmp2
 |
 |--02:SCAN HDFS [tpcds.date_dim]
 |     partitions=1/1 size=9.84MB compact
-|     predicates: d_year IN (1999)
+|     predicates: d_year IN (2000), tpcds.date_dim.d_date_sk >= 2451545, tpcds.date_dim.d_date_sk <= 2451910
 |
 04:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_item_sk = i_item_sk
@@ -2529,7 +2532,7 @@ limit 100) tmp2
 |     predicates: ((i_category IN ('Children', 'Music', 'Home') AND i_class IN ('toddlers', 'pop', 'lighting')) OR (i_category IN ('Jewelry', 'Books', 'Sports') AND i_class IN ('costume', 'travel', 'football')))
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=120/120 size=22.02MB
+   partitions=24/120 size=4.30MB
 ---- DISTRIBUTEDPLAN
 17:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: sum_sales - avg_monthly_sales ASC, s_store_name ASC
@@ -2573,7 +2576,7 @@ limit 100) tmp2
 |  |
 |  02:SCAN HDFS [tpcds.date_dim]
 |     partitions=1/1 size=9.84MB
-|     predicates: d_year IN (1999)
+|     predicates: d_year IN (2000), tpcds.date_dim.d_date_sk >= 2451545, tpcds.date_dim.d_date_sk <= 2451910
 |
 04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_item_sk = i_item_sk
@@ -2585,7 +2588,7 @@ limit 100) tmp2
 |     predicates: ((i_category IN ('Children', 'Music', 'Home') AND i_class IN ('toddlers', 'pop', 'lighting')) OR (i_category IN ('Jewelry', 'Books', 'Sports') AND i_class IN ('costume', 'travel', 'football')))
 |
 01:SCAN HDFS [tpcds.store_sales]
-   partitions=120/120 size=22.02MB
+   partitions=24/120 size=4.30MB
 ====
 # TPCDS-Q96
 SELECT
