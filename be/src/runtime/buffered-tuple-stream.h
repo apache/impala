@@ -253,11 +253,15 @@ class BufferedTupleStream {
   // Gets a new block from the block_mgr_, updating write_block_ and
   // setting *got_block. If there are no blocks available, write_block_ is set to NULL
   // and *got_block is set to false.
-  Status NewBlockForWrite(bool* got_block);
+  // min_size is the minimum number of bytes required for this block.
+  Status NewBlockForWrite(int min_size, bool* got_block);
 
   // Reads the next block from the block_mgr_. This blocks if necessary.
   // Updates read_block_, read_ptr_ and read_bytes_left_.
   Status NextBlockForRead();
+
+  // Returns the byte size of this row when encoded in a block.
+  int ComputeRowSize(TupleRow* row) const;
 
   std::string DebugString() const;
 };

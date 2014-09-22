@@ -15,6 +15,7 @@
 #include "runtime/buffered-tuple-stream.h"
 
 #include <boost/bind.hpp>
+#include <gutil/strings/substitute.h>
 
 #include "runtime/descriptors.h"
 #include "runtime/row-batch.h"
@@ -24,6 +25,7 @@
 using namespace boost;
 using namespace impala;
 using namespace std;
+using namespace strings;
 
 BufferedTupleStream::BufferedTupleStream(RuntimeState* state,
     const RowDescriptor& row_desc, BufferedBlockMgr* block_mgr,
@@ -96,7 +98,7 @@ Status BufferedTupleStream::Init(RuntimeProfile* profile, bool pinned) {
   }
 
   bool got_block = false;
-  RETURN_IF_ERROR(NewBlockForWrite(&got_block));
+  RETURN_IF_ERROR(NewBlockForWrite(fixed_tuple_row_size_, &got_block));
   if (!got_block) return Status("Not enough memory to initialize BufferedTupleStream.");
   DCHECK(write_block_ != NULL);
   if (read_write_) RETURN_IF_ERROR(PrepareForRead());
@@ -128,8 +130,14 @@ int64_t BufferedTupleStream::bytes_unpinned() const {
   return (blocks_.size() - num_pinned_) * block_mgr_->max_block_size();
 }
 
-Status BufferedTupleStream::NewBlockForWrite(bool* got_block) {
+Status BufferedTupleStream::NewBlockForWrite(int min_size, bool* got_block) {
   DCHECK(!closed_);
+  if (min_size > block_mgr_->max_block_size()) {
+    return Status(Substitute("Cannot process row that is bigger than the IO size "
+          "(row_size=$0). To run this query, increase the io size (--read_size option).",
+          PrettyPrinter::Print(min_size, TCounterType::BYTES)));
+  }
+
   BufferedBlockMgr::Block* unpin_block = write_block_;
   if (write_block_ != NULL) {
     DCHECK(write_block_->is_pinned());
@@ -377,4 +385,21 @@ Status BufferedTupleStream::GetNext(RowBatch* batch, bool* eos,
     batch->MarkNeedToReturn();
   }
   return Status::OK;
+}
+
+// TODO: Move this somewhere in general. We don't want this function inlined
+// for the buffered tuple stream case though.
+int BufferedTupleStream::ComputeRowSize(TupleRow* row) const {
+  int size = fixed_tuple_row_size_;
+  for (int i = 0; i < string_slots_.size(); ++i) {
+    Tuple* tuple = row->GetTuple(string_slots_[i].first);
+    if (tuple == NULL) continue;
+    for (int j = 0; j < string_slots_[i].second.size(); ++j) {
+      const SlotDescriptor* slot_desc = string_slots_[i].second[j];
+      if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
+      StringValue* sv = tuple->GetStringSlot(slot_desc->tuple_offset());
+      size += sv->len;
+    }
+  }
+  return size;
 }
