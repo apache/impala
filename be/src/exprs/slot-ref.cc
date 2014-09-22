@@ -162,7 +162,8 @@ Status SlotRef::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
   }
 
   DCHECK_EQ(GetNumChildren(), 0);
-  LlvmCodeGen* codegen = state->codegen();
+  LlvmCodeGen* codegen;
+  RETURN_IF_ERROR(state->GetCodegen(&codegen));
 
   // SlotRefs are based on the slot_id and tuple_idx.  Combine them to make a
   // query-wide unique id. We also need to combine whether the tuple is nullable. For

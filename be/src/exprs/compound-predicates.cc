@@ -112,7 +112,8 @@ Status CompoundPredicate::CodegenComputeFn(
   Function* rhs_function;
   RETURN_IF_ERROR(children()[1]->GetCodegendComputeFn(state, &rhs_function));
   
-  LlvmCodeGen* codegen = state->codegen();
+  LlvmCodeGen* codegen;
+  RETURN_IF_ERROR(state->GetCodegen(&codegen));
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
   Value* args[2];

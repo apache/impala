@@ -50,7 +50,8 @@ HdfsSequenceScanner::~HdfsSequenceScanner() {
 Function* HdfsSequenceScanner::Codegen(HdfsScanNode* node,
     const vector<ExprContext*>& conjunct_ctxs) {
   if (!node->runtime_state()->codegen_enabled()) return NULL;
-  LlvmCodeGen* codegen = node->runtime_state()->codegen();
+  LlvmCodeGen* codegen;
+  if (!node->runtime_state()->GetCodegen(&codegen).ok()) return NULL;
   Function* write_complete_tuple_fn =
       CodegenWriteCompleteTuple(node, codegen, conjunct_ctxs);
   if (write_complete_tuple_fn == NULL) return NULL;

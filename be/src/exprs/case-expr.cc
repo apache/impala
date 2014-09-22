@@ -187,7 +187,8 @@ Status CaseExpr::GetCodegendComputeFn(RuntimeState* state, Function** fn) {
     RETURN_IF_ERROR(children()[i]->GetCodegendComputeFn(state, &child_fns[i]));
   }
 
-  LlvmCodeGen* codegen = state->codegen();
+  LlvmCodeGen* codegen;
+  RETURN_IF_ERROR(state->GetCodegen(&codegen));
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
 

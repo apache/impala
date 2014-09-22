@@ -427,7 +427,8 @@ Function* ExecNode::CodegenEvalConjuncts(
       return NULL;
     }
   }
-  LlvmCodeGen* codegen = state->codegen();
+  LlvmCodeGen* codegen;
+  if (!state->GetCodegen(&codegen).ok()) return NULL;
 
   // Construct function signature to match
   // bool EvalConjuncts(Expr** exprs, int num_exprs, TupleRow* row)

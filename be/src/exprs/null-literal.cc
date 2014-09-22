@@ -89,7 +89,8 @@ Status NullLiteral::GetCodegendComputeFn(RuntimeState* state, llvm::Function** f
   }
 
   DCHECK_EQ(GetNumChildren(), 0);
-  LlvmCodeGen* codegen = state->codegen();
+  LlvmCodeGen* codegen;
+  RETURN_IF_ERROR(state->GetCodegen(&codegen));
   Value* args[2];
   *fn = CreateIrFunctionPrototype(codegen, "NullLiteral", &args);
   BasicBlock* entry_block = BasicBlock::Create(codegen->context(), "entry", *fn);

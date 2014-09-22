@@ -595,7 +595,12 @@ Status LlvmCodeGen::FinalizeModule() {
   SCOPED_TIMER(profile_.total_time_counter());
   SCOPED_TIMER(compile_timer_);
 
-  if (optimizations_enabled_ && !FLAGS_disable_optimization_passes) OptimizeModule();
+  // Don't waste time optimizing module if there are no functions to JIT. This can happen
+  // if the codegen object is created but no functions are successfully codegen'd.
+  if (optimizations_enabled_ && !FLAGS_disable_optimization_passes &&
+      !fns_to_jit_compile_.empty()) {
+    OptimizeModule();
+  }
 
   // JIT compile all codegen'd functions
   for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {

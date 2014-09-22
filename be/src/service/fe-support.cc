@@ -101,10 +101,13 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExprs(
     expr_ctxs.push_back(ctx);
   }
 
-  // Optimize the module so any UDF functions are jit'd
-  if (state.codegen() != NULL) {
-    state.codegen()->EnableOptimizations(false);
-    state.codegen()->FinalizeModule();
+  if (state.codegen_created()) {
+    // Finalize the module so any UDF functions are jit'd
+    LlvmCodeGen* codegen = NULL;
+    state.GetCodegen(&codegen, /* initialize */ false);
+    DCHECK_NOTNULL(codegen);
+    codegen->EnableOptimizations(false);
+    codegen->FinalizeModule();
   }
 
   vector<TColumnValue> results;

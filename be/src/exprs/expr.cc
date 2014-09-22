@@ -541,7 +541,8 @@ Status Expr::GetCodegendComputeFnWrapper(RuntimeState* state, llvm::Function** f
     *fn = ir_compute_fn_;
     return Status::OK;
   }
-  LlvmCodeGen* codegen = state->codegen();
+  LlvmCodeGen* codegen;
+  RETURN_IF_ERROR(state->GetCodegen(&codegen));
   Function* static_getval_fn = GetStaticGetValWrapper(type(), codegen);
 
   // Call it passing this as the additional first argument.

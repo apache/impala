@@ -124,11 +124,6 @@ Status RuntimeState::Init(ExecEnv* exec_env) {
   exec_env_ = exec_env;
   TQueryOptions& query_options =
       fragment_instance_ctx_.query_ctx.request.query_options;
-  if (!query_options.disable_codegen) {
-    RETURN_IF_ERROR(CreateCodegen());
-  } else {
-    codegen_.reset(NULL);
-  }
   if (query_options.max_errors <= 0) {
     // TODO: fix linker error and uncomment this
     //query_options_.max_errors = FLAGS_max_errors;
@@ -318,6 +313,12 @@ void RuntimeState::AddBitmapFilter(SlotId slot, Bitmap* bitmap,
       *acquired_ownership = true;
     }
   }
+}
+
+Status RuntimeState::GetCodegen(LlvmCodeGen** codegen, bool initialize) {
+  if (codegen_.get() == NULL && initialize) RETURN_IF_ERROR(CreateCodegen());
+  *codegen = codegen_.get();
+  return Status::OK;
 }
 
 }

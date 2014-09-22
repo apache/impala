@@ -152,15 +152,15 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   }
 
   if (state->codegen_enabled()) {
-    DCHECK(state->codegen() != NULL);
+    LlvmCodeGen* codegen;
+    RETURN_IF_ERROR(state->GetCodegen(&codegen));
     Function* update_tuple_fn = CodegenUpdateTuple(state);
     if (update_tuple_fn != NULL) {
       codegen_process_row_batch_fn_ =
           CodegenProcessRowBatch(state, update_tuple_fn);
       if (codegen_process_row_batch_fn_ != NULL) {
         // Update to using codegen'd process row batch.
-        state->codegen()->AddFunctionToJit(
-            codegen_process_row_batch_fn_,
+        codegen->AddFunctionToJit(codegen_process_row_batch_fn_,
             reinterpret_cast<void**>(&process_row_batch_fn_));
         AddRuntimeExecOption("Codegen Enabled");
       }
@@ -487,7 +487,8 @@ IRFunction::Type GetHllUpdateFunction2(const ColumnType& type) {
 llvm::Function* AggregationNode::CodegenUpdateSlot(
     RuntimeState* state, AggFnEvaluator* evaluator, SlotDescriptor* slot_desc) {
   DCHECK(slot_desc->is_materialized());
-  LlvmCodeGen* codegen = state->codegen();
+  LlvmCodeGen* codegen;
+  if (!state->GetCodegen(&codegen).ok()) return NULL;
 
   DCHECK_EQ(evaluator->input_expr_ctxs().size(), 1);
   ExprContext* input_expr_ctx = evaluator->input_expr_ctxs()[0];
@@ -656,7 +657,8 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(
 //   ret void
 // }
 Function* AggregationNode::CodegenUpdateTuple(RuntimeState* state) {
-  LlvmCodeGen* codegen = state->codegen();
+  LlvmCodeGen* codegen;
+  if (!state->GetCodegen(&codegen).ok()) return NULL;
   SCOPED_TIMER(codegen->codegen_timer());
 
   int j = probe_expr_ctxs_.size();
@@ -760,7 +762,8 @@ Function* AggregationNode::CodegenUpdateTuple(RuntimeState* state) {
 
 Function* AggregationNode::CodegenProcessRowBatch(
     RuntimeState* state, Function* update_tuple_fn) {
-  LlvmCodeGen* codegen = state->codegen();
+  LlvmCodeGen* codegen;
+  if (!state->GetCodegen(&codegen).ok()) return NULL;
   SCOPED_TIMER(codegen->codegen_timer());
   DCHECK(update_tuple_fn != NULL);
 

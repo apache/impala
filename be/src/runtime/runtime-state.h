@@ -185,17 +185,14 @@ class RuntimeState {
   // Returns true if codegen is enabled for this query.
   bool codegen_enabled() const { return !query_options().disable_codegen; }
 
-  // Returns CodeGen object.  Returns NULL if the codegen object has not been
-  // created. If codegen is enabled for the query, the codegen object will be
-  // created as part of the RuntimeState's initialization.
-  // Otherwise, it can be created by calling CreateCodegen().
-  LlvmCodeGen* codegen() { return codegen_.get(); }
+  // Returns true if the codegen object has been created. Note that this may return false
+  // even when codegen is enabled if nothing has been codegen'd.
+  bool codegen_created() const { return codegen_.get() != NULL; }
 
-  // Create a codegen object in codegen_. No-op if it has already been called.
-  // If codegen is enabled for the query, this is created when the runtime
-  // state is created. If codegen is disabled for the query, this is created
-  // on first use.
-  Status CreateCodegen();
+  // Returns codegen_ in 'codegen'. If 'initialize' is true, codegen_ will be created if
+  // it has not been initialized by a previous call already. If 'initialize' is false,
+  // 'codegen' will be set to NULL if codegen_ has not been initialized.
+  Status GetCodegen(LlvmCodeGen** codegen, bool initialize = true);
 
   BufferedBlockMgr* block_mgr() {
     DCHECK(block_mgr_.get() != NULL);
@@ -279,6 +276,10 @@ class RuntimeState {
  private:
   // Set per-fragment state.
   Status Init(ExecEnv* exec_env);
+
+  // Create a codegen object in codegen_. No-op if it has already been called. This is
+  // created on first use.
+  Status CreateCodegen();
 
   static const int DEFAULT_BATCH_SIZE = 1024;
 

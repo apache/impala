@@ -485,7 +485,9 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
         fn = NULL;
     }
     if (fn != NULL) {
-      runtime_state_->codegen()->AddFunctionToJit(
+      LlvmCodeGen* codegen;
+      RETURN_IF_ERROR(runtime_state_->GetCodegen(&codegen));
+      codegen->AddFunctionToJit(
           fn, &codegend_fn_map_[static_cast<THdfsFileFormat::type>(format)]);
     }
   }

@@ -104,6 +104,9 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
       false, state->fragment_hash_seed(), mem_tracker()));
 
   if (state->codegen_enabled()) {
+    LlvmCodeGen* codegen;
+    RETURN_IF_ERROR(state->GetCodegen(&codegen));
+
     // Codegen for hashing rows
     Function* hash_fn = hash_tbl_->CodegenHashCurrentRow(state);
     if (hash_fn == NULL) return Status::OK;
@@ -111,7 +114,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
     // Codegen for build path
     codegen_process_build_batch_fn_ = CodegenProcessBuildBatch(state, hash_fn);
     if (codegen_process_build_batch_fn_ != NULL) {
-      state->codegen()->AddFunctionToJit(codegen_process_build_batch_fn_,
+      codegen->AddFunctionToJit(codegen_process_build_batch_fn_,
           reinterpret_cast<void**>(&process_build_batch_fn_));
       AddRuntimeExecOption("Build Side Codegen Enabled");
     }
@@ -120,7 +123,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
     if (!match_all_build_) {
       Function* codegen_process_probe_batch_fn = CodegenProcessProbeBatch(state, hash_fn);
       if (codegen_process_probe_batch_fn != NULL) {
-        state->codegen()->AddFunctionToJit(codegen_process_probe_batch_fn,
+        codegen->AddFunctionToJit(codegen_process_probe_batch_fn,
             reinterpret_cast<void**>(&process_probe_batch_fn_));
         AddRuntimeExecOption("Probe Side Codegen Enabled");
       }
@@ -518,7 +521,9 @@ Function* HashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen) {
 
 Function* HashJoinNode::CodegenProcessBuildBatch(RuntimeState* state,
     Function* hash_fn) {
-  LlvmCodeGen* codegen = state->codegen();
+  LlvmCodeGen* codegen;
+  if (!state->GetCodegen(&codegen).ok()) return NULL;
+
   // Get cross compiled function
   Function* process_build_batch_fn = codegen->GetFunction(
       IRFunction::HASH_JOIN_PROCESS_BUILD_BATCH);
@@ -542,7 +547,8 @@ Function* HashJoinNode::CodegenProcessBuildBatch(RuntimeState* state,
 }
 
 Function* HashJoinNode::CodegenProcessProbeBatch(RuntimeState* state, Function* hash_fn) {
-  LlvmCodeGen* codegen = state->codegen();
+  LlvmCodeGen* codegen;
+  if (!state->GetCodegen(&codegen).ok()) return NULL;
 
   // Get cross compiled function
   Function* process_probe_batch_fn =

@@ -179,10 +179,11 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   }
 
   if (state->codegen_enabled()) {
-    DCHECK(state->codegen() != NULL);
+    LlvmCodeGen* codegen;
+    RETURN_IF_ERROR(state->GetCodegen(&codegen));
     Function* codegen_process_row_batch_fn = CodegenProcessBatch();
     if (codegen_process_row_batch_fn != NULL) {
-      state->codegen()->AddFunctionToJit(codegen_process_row_batch_fn,
+      codegen->AddFunctionToJit(codegen_process_row_batch_fn,
           reinterpret_cast<void**>(&process_row_batch_fn_));
       AddRuntimeExecOption("Codegen Enabled");
     }
@@ -923,7 +924,8 @@ Status PartitionedAggregationNode::MoveHashPartitions(int64_t num_input_rows) {
 llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
     AggFnEvaluator* evaluator, SlotDescriptor* slot_desc) {
   DCHECK(slot_desc->is_materialized());
-  LlvmCodeGen* codegen = state_->codegen();
+  LlvmCodeGen* codegen;
+  if (!state_->GetCodegen(&codegen).ok()) return NULL;
 
   DCHECK_EQ(evaluator->input_expr_ctxs().size(), 1);
   ExprContext* input_expr_ctx = evaluator->input_expr_ctxs()[0];
@@ -1105,7 +1107,8 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
 //   ret void
 // }
 Function* PartitionedAggregationNode::CodegenUpdateTuple() {
-  LlvmCodeGen* codegen = state_->codegen();
+  LlvmCodeGen* codegen;
+  if (!state_->GetCodegen(&codegen).ok()) return NULL;
   SCOPED_TIMER(codegen->codegen_timer());
 
   int j = probe_expr_ctxs_.size();
@@ -1219,7 +1222,8 @@ Function* PartitionedAggregationNode::CodegenUpdateTuple() {
 }
 
 Function* PartitionedAggregationNode::CodegenProcessBatch() {
-  LlvmCodeGen* codegen = state_->codegen();
+  LlvmCodeGen* codegen;
+  if (!state_->GetCodegen(&codegen).ok()) return NULL;
   SCOPED_TIMER(codegen->codegen_timer());
 
   Function* update_tuple_fn = CodegenUpdateTuple();

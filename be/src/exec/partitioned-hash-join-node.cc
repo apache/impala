@@ -1170,7 +1170,8 @@ Function* PartitionedHashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen) 
 
 bool PartitionedHashJoinNode::CodegenProcessBuildBatch(
     RuntimeState* state, Function* hash_fn, Function* murmur_hash_fn) {
-  LlvmCodeGen* codegen = state->codegen();
+  LlvmCodeGen* codegen;
+  if (!state->GetCodegen(&codegen).ok()) return false;
   // Get cross compiled function
   Function* process_build_batch_fn =
       codegen->GetFunction(IRFunction::PHJ_PROCESS_BUILD_BATCH);
@@ -1213,7 +1214,8 @@ bool PartitionedHashJoinNode::CodegenProcessBuildBatch(
 
 bool PartitionedHashJoinNode::CodegenProcessProbeBatch(
     RuntimeState* state, Function* hash_fn, Function* murmur_hash_fn) {
-  LlvmCodeGen* codegen = state->codegen();
+  LlvmCodeGen* codegen;
+  if (!state->GetCodegen(&codegen).ok()) return false;
 
   // Get cross compiled function
   IRFunction::Type ir_fn;

@@ -340,7 +340,8 @@ Status Literal::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
   }
 
   DCHECK_EQ(GetNumChildren(), 0);
-  LlvmCodeGen* codegen = state->codegen();
+  LlvmCodeGen* codegen;
+  RETURN_IF_ERROR(state->GetCodegen(&codegen));
   Value* args[2];
   *fn = CreateIrFunctionPrototype(codegen, "Literal", &args);
   BasicBlock* entry_block = BasicBlock::Create(codegen->context(), "entry", *fn);

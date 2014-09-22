@@ -442,7 +442,8 @@ Function* HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build) {
     if (type == TYPE_TIMESTAMP || type == TYPE_DECIMAL) return NULL;
   }
 
-  LlvmCodeGen* codegen = state->codegen();
+  LlvmCodeGen* codegen;
+  if (!state->GetCodegen(&codegen).ok()) return NULL;
 
   // Get types to generate function prototype
   Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
@@ -563,7 +564,8 @@ Function* HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build) {
 //   ret i32 %7
 // }
 Function* HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur) {
-  LlvmCodeGen* codegen = state->codegen();
+  LlvmCodeGen* codegen;
+  if (!state->GetCodegen(&codegen).ok()) return NULL;
 
   // Get types to generate function prototype
   Type* this_type = codegen->GetType(HashTableCtx::LLVM_CLASS_NAME);
@@ -730,7 +732,8 @@ Function* HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murm
 //   ret i1 true
 // }
 Function* HashTableCtx::CodegenEquals(RuntimeState* state) {
-  LlvmCodeGen* codegen = state->codegen();
+  LlvmCodeGen* codegen;
+  if (!state->GetCodegen(&codegen).ok()) return NULL;
   // Get types to generate function prototype
   Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
   DCHECK(tuple_row_type != NULL);
