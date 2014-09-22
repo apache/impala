@@ -307,6 +307,18 @@ Status BufferedTupleStream::UnpinStream(bool all) {
   return Status::OK;
 }
 
+Status BufferedTupleStream::GetRows(scoped_ptr<RowBatch>* batch, bool* got_rows) {
+  RETURN_IF_ERROR(PinStream(got_rows));
+  if (!*got_rows) return Status::OK;
+  RETURN_IF_ERROR(PrepareForRead());
+  batch->reset(
+      new RowBatch(desc_, num_rows(), block_mgr_->get_tracker(block_mgr_client_)));
+  bool eos = false;
+  RETURN_IF_ERROR(GetNext(batch->get(), &eos));
+  DCHECK(eos);
+  return Status::OK;
+}
+
 Status BufferedTupleStream::GetNext(RowBatch* batch, bool* eos,
     vector<RowIdx>* indices) {
   DCHECK(!closed_);

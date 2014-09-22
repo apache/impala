@@ -187,6 +187,20 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // processing all build and probe input (including repartitioning them).
   Status OutputNullAwareProbeRows(RuntimeState* state, RowBatch* out_batch);
 
+  // Evaluates all other_join_conjuncts against null_probe_rows_ with all the
+  // rows in build. This updates matched_null_probe_, short-circuiting if one of the
+  // conjuncts pass (i.e. there is a match).
+  // This is used for NAAJ, when there are NULL probe rows.
+  Status EvaluateNullProbe(BufferedTupleStream* build);
+
+  // Prepares to output NULLs on the probe side for NAAJ. Before calling this,
+  // matched_null_probe_ should have been fully evaluated.
+  Status PrepareNullAwareNullProbe();
+
+  // Outputs NULLs on the probe side, returning rows where matched_null_probe_[i] is
+  // false. Used for NAAJ.
+  Status OutputNullAwareNullProbe(RuntimeState* state, RowBatch* out_batch);
+
   // Call at the end of consuming the probe rows. Walks hash_partitions_ and
   //  - If this partition had a hash table, close it. This partition is fully processed
   //    on both the build and probe sides. The streams are transferred to batch.
@@ -291,6 +305,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // The largest fraction (of build side) after repartitioning. This is expected to be
   // 1 / PARTITION_FANOUT. A value much larger indicates skew.
   RuntimeProfile::HighWaterMarkCounter* largest_partition_percent_;
+
+  // Time spent evaluating other_join_conjuncts for NAAJ.
+  RuntimeProfile::Counter* null_aware_eval_timer_;
 
   class Partition {
    public:
@@ -409,6 +426,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // rows of the partition that it is in the front.
   std::list<Partition*> output_build_partitions_;
 
+  // Used for concentrating the existence bits from all the partitions, used by the
+  // probe-side filter optimization.
+  std::vector<std::pair<SlotId, Bitmap*> > probe_filters_;
+
   // Partition used if null_aware_ is set. This partition is always processed at the end
   // after all build and probe rows are processed. Rows are added to this partition along
   // the way.
@@ -425,9 +446,21 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // with a NULL when evaluating the hash table expr.
   boost::scoped_ptr<RowBatch> nulls_build_batch_;
 
-  // Used for concentrating the existence bits from all the partitions, used by the
-  // probe-side filter optimization.
-  std::vector<std::pair<SlotId, Bitmap*> > probe_filters_;
+  // If true, the build side has at least one row.
+  bool non_empty_build_;
+
+  // For NAAJ, this stream contains all probe rows that had NULL on the hash table
+  // conjuncts.
+  BufferedTupleStream* null_probe_rows_;
+
+  // For each row in null_probe_rows_, true if this row has matched any build row
+  // (i.e. the resulting joined row passes other_join_conjuncts).
+  // TODO: remove this. We need to be able to put these bits inside the tuple itself.
+  std::vector<bool> matched_null_probe_;
+
+  // The current index into null_probe_rows_/matched_null_probe_ that we are
+  // outputting.
+  int64_t null_probe_output_idx_;
 };
 
 }

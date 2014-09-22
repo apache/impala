@@ -374,6 +374,10 @@ int BufferedBlockMgr::num_reserved_buffers_remaining(Client* client) const {
   return max(client->num_reserved_buffers_ - client->num_pinned_buffers_, 0);
 }
 
+MemTracker* BufferedBlockMgr::get_tracker(Client* client) const {
+  return client->tracker_;
+}
+
 Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned) {
   DCHECK(!block->is_deleted_);
   *pinned = false;

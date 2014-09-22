@@ -105,6 +105,30 @@ order by id
 INT, INT
 ====
 ---- QUERY
+# Outer with NULLS and an uncorrelated NOT IN
+select id
+from functional.alltypesagg
+where int_col is null and
+int_col not in (select int_col from functional.alltypestiny)
+---- RESULTS
+---- TYPES
+INT
+====
+---- QUERY
+# Outer with NULLS and an uncorrelated NOT IN subquery that returns an empty set
+select id, int_col
+from functional.alltypesagg
+where int_col is null and
+int_col not in (select int_col from functional.alltypestiny where id < 0)
+and id < 10
+order by id
+---- RESULTS
+0,NULL
+0,NULL
+---- TYPES
+INT, INT
+====
+---- QUERY
 # Correlated IN subquery
 select s.id, s.bool_col, s.int_col, s.date_string_col
 from functional.alltypessmall s

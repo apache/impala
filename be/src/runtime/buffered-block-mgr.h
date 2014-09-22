@@ -308,6 +308,7 @@ class BufferedBlockMgr {
   int num_free_buffers() const { return free_io_buffers_.size(); }
   int num_pinned_buffers(Client* client) const;
   int num_reserved_buffers_remaining(Client* client) const;
+  MemTracker* get_tracker(Client* client) const;
   int64_t max_block_size() const { return max_block_size_; }
   int64_t bytes_allocated() const;
   RuntimeProfile* profile() { return profile_.get(); }

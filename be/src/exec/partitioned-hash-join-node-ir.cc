@@ -127,13 +127,19 @@ next_row:
     matched_probe_ = false;
     uint32_t hash;
     if (!ht_ctx->EvalAndHashProbe(current_probe_row_, &hash)) {
-      // For NAAJ, return the probe row only if there are no build rows.
       if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
-        if (null_aware_partition_->build_rows()->num_rows() == 0) {
-          continue;
-        } else {
-          goto next_row;
-        }
+        // For NAAJ, we need to treat NULLs on the probe carefully. The logic is:
+        // 1. No build rows -> Return this row.
+        // 2. Has build rows & no other join predicates, skip row.
+        // 3. Has build rows & other join predicates, we need to evaluate against all
+        // build rows. First evaluate it against this partition, and if there is not
+        // a match, save it to evaluate against other partitions later. If there
+        // is a match, the row is skipped.
+        if (!non_empty_build_) continue;
+        if (num_join_conjuncts == 0) goto next_row;
+        if (UNLIKELY(!null_probe_rows_->AddRow(current_probe_row_))) return -1;
+        matched_null_probe_.push_back(false);
+        goto next_row;
       }
       continue;
     }
