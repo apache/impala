@@ -202,7 +202,8 @@ Status BufferedTupleStream::NextBlockForRead() {
       DCHECK(!pinned_) << DebugString(); // Should already be pinned if pinned_
       bool pinned;
       RETURN_IF_ERROR((*read_block_)->Pin(&pinned));
-      DCHECK(pinned) << "Should have reserved enough blocks";
+      DCHECK(pinned) << "Should have reserved enough blocks." << endl
+          << block_mgr_->DebugString(block_mgr_client_);;
       ++num_pinned_;
       DCHECK_EQ(num_pinned_, NumPinned(blocks_));
     }
@@ -234,7 +235,8 @@ Status BufferedTupleStream::PrepareForRead(bool* got_buffer) {
     RETURN_IF_ERROR((*read_block_)->Pin(&current_pinned));
     if (!current_pinned) {
       if (got_buffer == NULL) {
-        DCHECK(current_pinned) << "Should have reserved enough blocks";
+        DCHECK(current_pinned) << "Should have reserved enough blocks." << endl
+            << block_mgr_->DebugString(block_mgr_client_);;
         return Status::MEM_LIMIT_EXCEEDED;
       } else {
         *got_buffer = false;

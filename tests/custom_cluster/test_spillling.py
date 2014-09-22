@@ -39,4 +39,7 @@ class TestSpilling(CustomClusterTestSuite):
   @CustomClusterTestSuite.with_args(
       impalad_args="--read_size=1000000")
   def test_spilling(self, vector):
-    self.run_test_case('QueryTest/spilling', vector)
+    new_vector = deepcopy(vector)
+    # remove this. the test cases set this explicitly.
+    del new_vector.get_value('exec_option')['num_nodes']
+    self.run_test_case('QueryTest/spilling', new_vector)

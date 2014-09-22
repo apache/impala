@@ -107,7 +107,7 @@ allocate_tuple:
         if (intermediate_tuple == NULL) goto allocate_tuple;
         if (ht->Insert(ht_ctx, intermediate_tuple, hash)) continue;
         DCHECK(false) << "How can we get here. We spilled a different partition but "
-          "still did not have enough memory.";
+            "still did not have enough memory.";
         return Status::MEM_LIMIT_EXCEEDED;
       }
 

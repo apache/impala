@@ -25,7 +25,6 @@
 
 namespace impala {
 
-class MemPool;
 class RuntimeState;
 
 // BufferedBlockMgr is used to allocate and manage blocks of data using a fixed memory
@@ -312,17 +311,27 @@ class BufferedBlockMgr {
   // Dumps block mgr state. Grabs lock. If client is not NULL, also dumps its state.
   std::string DebugString(Client* client = NULL);
 
+  // Consumes 'size' bytes from the buffered block mgr. This is used by callers that
+  // want the memory to come from the block mgr pool (and therefore trigger spilling)
+  // but need the allocation to be more flexible than blocks.
+  // Returns false if there was not enough memory.
+  // TODO: this is added specifically to support the Buckets structure in the hash table
+  // which does not map well to Blocks. Revisit this.
+  bool ConsumeMemory(Client* client, int64_t size);
+
+  // All successful allocates bytes from ConsumeMemory() must have a corresponding
+  // ReleaseMemory() call.
+  void ReleaseMemory(Client* client, int64_t size);
+
   // The number of buffers available for client. That is, if all other clients were
   // stopped, the number of buffers this client could get.
   int64_t available_buffers(Client* client) const;
 
-  // The number of allocated buffers that can be simultaneously pinned by clients.
-  int available_allocated_buffers() const { return all_io_buffers_.size(); }
-
   // TODO: remove these two. Not clear what the sorter really needs.
+  int available_allocated_buffers() const { return all_io_buffers_.size(); }
   int num_free_buffers() const { return free_io_buffers_.size(); }
-  int num_pinned_buffers(Client* client) const;
 
+  int num_pinned_buffers(Client* client) const;
   int num_reserved_buffers_remaining(Client* client) const;
   MemTracker* get_tracker(Client* client) const;
   int64_t max_block_size() const { return max_block_size_; }
@@ -343,16 +352,19 @@ class BufferedBlockMgr {
     // Block that this buffer is assigned to. May be NULL.
     Block* block;
 
+    // Iterator into all_io_buffers_ for this buffer.
+    std::list<BufferDescriptor*>::iterator all_buffers_it;
+
     BufferDescriptor(uint8_t* buf, int64_t len)
       : buffer(buf), len(len), block(NULL) {
     }
   };
 
-  BufferedBlockMgr(RuntimeState* state, MemTracker* parent, int64_t mem_limit,
-      int64_t block_size);
+  BufferedBlockMgr(RuntimeState* state, int64_t block_size);
 
-  // Initialize the counters to track the block manager behavior.
-  void InitCounters(RuntimeProfile* profile);
+  // Initialize the counters to track the block manager behavior and mem_tracker_ with
+  // mem_limit.
+  void Init(RuntimeProfile* profile, MemTracker* parent_tracker, int64_t mem_limit);
 
   // PinBlock(), UnpinBlock(), DeleteBlock() perform the actual work of Block::Pin(),
   // Unpin() and Delete(). The lock_ must be taken by the caller.
@@ -369,15 +381,20 @@ class BufferedBlockMgr {
 
   // Finds a buffer for a block and pins it. If the block's buffer has not been evicted,
   // removes the block from the unpinned list and sets *in_mem = true.
-  // Otherwise, this function gets a new buffer by:
-  //   1. Allocating a new buffer if possible.
-  //   2. Using a buffer from the free list (which is populated by moving blocks from
-  //      the unpinned list by writing them out).
   // If we can't get a buffer (no more memory, nothing in the unpinned and free lists,
   // this function returns with the block unpinned.
   // TODO: this function is shared by all spilling operators in a query. We need to
   // see if the locking is a bottleneck here.
   Status FindBufferForBlock(Block* block, bool* in_mem);
+
+  // Return a new buffer that can be used. *buffer is set to NULL if there was no
+  // memory.
+  // Otherwise, this function gets a new buffer by:
+  //   1. Allocating a new buffer if possible.
+  //   2. Using a buffer from the free list (which is populated by moving blocks from
+  //      the unpinned list by writing them out).
+  // lock must be taken before calling this. This function can block.
+  Status FindBuffer(boost::unique_lock<boost::mutex>& lock, BufferDescriptor** buffer);
 
   // Writes unpinned blocks via DiskIoMgr until one of the following is true:
   // 1) The number of outstanding writes >= (block_write_threshold_ - num free buffers)
@@ -418,6 +435,9 @@ class BufferedBlockMgr {
   // The total number of reserved buffers across all clients that are not pinned.
   int unfullfilled_reserved_buffers_;
 
+  // The total number of pinned buffers across all clients.
+  int total_pinned_buffers_;
+
   TUniqueId query_id_;
   ObjectPool obj_pool_;
 
@@ -454,7 +474,7 @@ class BufferedBlockMgr {
   InternalQueue<BufferDescriptor> free_io_buffers_;
 
   // All allocated io-sized buffers.
-  std::vector<BufferDescriptor*> all_io_buffers_;
+  std::list<BufferDescriptor*> all_io_buffers_;
 
   // Temporary physical file handle, (one per tmp device) to which blocks may be written.
   // Blocks are round-robined across these files.
@@ -467,9 +487,6 @@ class BufferedBlockMgr {
   // DiskIoMgr handles to read and write blocks.
   DiskIoMgr* io_mgr_;
   DiskIoMgr::RequestContext* io_request_context_;
-
-  // Memory pool from which buffers are allocated.
-  boost::scoped_ptr<MemPool> buffer_pool_;
 
   // If true, the block manager is cancelled and all API calls return
   // Status::CANCELLED. Set to true on Close() or if there was an error writing a block.

@@ -165,7 +165,7 @@ void ExecNode::Close(RuntimeState* state) {
   }
   if (mem_tracker() != NULL) {
     DCHECK_EQ(mem_tracker()->consumption(), 0)
-        << "Leaked memory." << endl << mem_tracker()->LogUsage();
+        << "Leaked memory." << endl << state->instance_mem_tracker()->LogUsage();
   }
   Expr::Close(conjunct_ctxs_, state);
 }

@@ -827,6 +827,7 @@ Status PartitionedAggregationNode::MoveHashPartitions(int64_t num_input_rows) {
     if (total_rows == 0) {
       partition->Close(false);
     } else if (partition->is_spilled()) {
+      DCHECK(partition->hash_tbl.get() == NULL);
       // We need to unpin all the spilled partitions to make room to allocate new
       // hash_partitions_ when we repartition the spilled partitions.
       // TODO: we only need to do this when we have memory pressure. This might be

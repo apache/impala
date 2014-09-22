@@ -36,7 +36,7 @@ inline bool HashTableCtx::EvalAndHashProbe(TupleRow* row, uint32_t* hash) {
 
 inline HashTable::Iterator HashTable::Find(HashTableCtx* ht_ctx, uint32_t hash) {
   DCHECK_NOTNULL(ht_ctx);
-  DCHECK(!buckets_.empty());
+  DCHECK_NE(num_buckets_, 0);
   DCHECK_EQ(hash, ht_ctx->HashCurrentRow());
   int64_t bucket_idx = hash & (num_buckets_ - 1);
   Bucket* bucket = &buckets_[bucket_idx];
@@ -51,7 +51,7 @@ inline HashTable::Iterator HashTable::Find(HashTableCtx* ht_ctx, uint32_t hash) 
 }
 
 inline HashTable::Iterator HashTable::Begin(HashTableCtx* ctx) {
-  DCHECK(!buckets_.empty());
+  DCHECK_NE(num_buckets_, 0);
   int64_t bucket_idx = -1;
   Bucket* bucket = NextBucket(&bucket_idx);
   if (bucket != NULL) return Iterator(this, ctx, bucket_idx, bucket->node, 0);
@@ -87,7 +87,7 @@ inline HashTable::Bucket* HashTable::NextBucket(int64_t* bucket_idx) {
 
 inline HashTable::Node* HashTable::InsertImpl(HashTableCtx* ht_ctx, uint32_t hash) {
   DCHECK_NOTNULL(ht_ctx);
-  DCHECK(!buckets_.empty());
+  DCHECK_NE(num_buckets_, 0);
   if (UNLIKELY(num_filled_buckets_ > num_buckets_till_resize_)) {
     // TODO: next prime instead of double?
     if (!ResizeBuckets(num_buckets_ * 2)) return NULL;

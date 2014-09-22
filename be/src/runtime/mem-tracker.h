@@ -230,7 +230,8 @@ class MemTracker {
       // trackers since we can enforce that the reported memory usage is internally
       // consistent.)
       if ((*tracker)->consumption_metric_ == NULL) {
-        DCHECK_GE((*tracker)->consumption_->current_value(), 0);
+        DCHECK_GE((*tracker)->consumption_->current_value(), 0)
+          << std::endl << (*tracker)->LogUsage();
       }
     }
 

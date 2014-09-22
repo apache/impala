@@ -251,7 +251,7 @@ class PartitionedAggregationNode : public ExecNode {
     // How many times rows in this partition have been repartitioned. Partitions created
     // from the node's children's input is level 0, 1 after the first repartitionining,
     // etc.
-    int level;
+    const int level;
 
     // Hash table for this partition.
     // Can be NULL if this partition is no longer maintaining a hash table (i.e.

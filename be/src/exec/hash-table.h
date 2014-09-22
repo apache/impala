@@ -331,11 +331,11 @@ class HashTable {
   int64_t size() const { return num_nodes_; }
 
   // Returns the number of buckets
-  int64_t num_buckets() const { return buckets_.size(); }
+  int64_t num_buckets() const { return num_buckets_; }
 
   // Returns the load factor (the number of non-empty buckets)
   float load_factor() const {
-    return num_filled_buckets_ / static_cast<float>(buckets_.size());
+    return num_filled_buckets_ / static_cast<float>(num_buckets_);
   }
 
   // Returns an estimate of the number of bytes needed to build the hash table
@@ -559,9 +559,11 @@ class HashTable {
   // Number of nodes left in the current page.
   int node_remaining_current_page_;
 
-  std::vector<Bucket> buckets_;
+  // Array of all buckets. Owned by this node. Using c-style array to control
+  // control memory footprint.
+  Bucket* buckets_;
 
-  // equal to buckets_.size() but more efficient than the size function
+  // Number of buckets.
   int64_t num_buckets_;
 
   // The number of filled buckets to trigger a resize.  This is cached for efficiency

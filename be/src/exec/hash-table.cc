@@ -170,11 +170,11 @@ HashTable::HashTable(RuntimeState* state, BufferedBlockMgr::Client* client,
     num_nodes_(0),
     next_node_(NULL),
     node_remaining_current_page_(0),
+    buckets_(NULL),
     num_buckets_(num_buckets),
     num_buckets_till_resize_(num_buckets_ * MAX_BUCKET_OCCUPANCY_FRACTION) {
   DCHECK_EQ((num_buckets & (num_buckets-1)), 0) << "num_buckets must be a power of 2";
   DCHECK_GT(num_buckets, 0) << "num_buckets must be larger than 0";
-  buckets_.resize(num_buckets_);
   if (!stores_tuples_) DCHECK_NOTNULL(stream);
 }
 
@@ -189,16 +189,24 @@ HashTable::HashTable(MemPool* pool, int num_buckets)
     num_nodes_(0),
     next_node_(NULL),
     node_remaining_current_page_(0),
+    buckets_(NULL),
     num_buckets_(num_buckets),
     num_buckets_till_resize_(num_buckets_ * MAX_BUCKET_OCCUPANCY_FRACTION) {
   DCHECK_EQ((num_buckets & (num_buckets-1)), 0) << "num_buckets must be a power of 2";
   DCHECK_GT(num_buckets, 0) << "num_buckets must be larger than 0";
-  buckets_.resize(num_buckets_);
-  bool ret = GrowNodeArray();
+  bool ret = Init();
   DCHECK(ret);
 }
 
 bool HashTable::Init() {
+  int64_t buckets_byte_size = num_buckets_ * sizeof(Bucket);
+  if (block_mgr_client_ != NULL &&
+      !state_->block_mgr()->ConsumeMemory(block_mgr_client_, buckets_byte_size)) {
+    num_buckets_ = 0;
+    return false;
+  }
+  buckets_ = reinterpret_cast<Bucket*>(malloc(buckets_byte_size));
+  memset(buckets_, 0, buckets_byte_size);
   return GrowNodeArray();
 }
 
@@ -211,7 +219,10 @@ void HashTable::Close() {
         -data_pages_.size() * state_->io_mgr()->max_read_buffer_size());
   }
   data_pages_.clear();
-  buckets_.clear();
+  if (buckets_ != NULL) free(buckets_);
+  if (block_mgr_client_ != NULL) {
+    state_->block_mgr()->ReleaseMemory(block_mgr_client_, num_buckets_ * sizeof(Bucket));
+  }
 }
 
 int64_t HashTable::byte_size() const {
@@ -247,15 +258,17 @@ bool HashTable::ResizeBuckets(int64_t num_buckets) {
           << num_buckets_ << " to " << num_buckets << " buckets.";
 
   int64_t old_num_buckets = num_buckets_;
-#if 0
-  // TODO (Ippo): remove the bucket structure and merge it with nodes. All the allocations
-  // should come from the BufferedBlockMgr.
-  // This can be a rather large allocation so check the limit before (to prevent
-  // us from going over the limits too much).
+  // All memory that can grow proportional to the input should come from the block mgrs
+  // mem tracker.
   int64_t delta_size = (num_buckets - old_num_buckets) * sizeof(Bucket);
-  //if (!TryConsume(delta_size)) return false;
-#endif
-  buckets_.resize(num_buckets);
+  if (block_mgr_client_ != NULL &&
+      !state_->block_mgr()->ConsumeMemory(block_mgr_client_, delta_size)) {
+    return false;
+  }
+  if (num_buckets > old_num_buckets) {
+    buckets_ = reinterpret_cast<Bucket*>(realloc(buckets_, num_buckets * sizeof(Bucket)));
+    memset(&buckets_[old_num_buckets], 0, delta_size);
+  }
 
   // If we're doubling the number of buckets, all nodes in a particular bucket
   // either remain there, or move down to an analogous bucket in the other half.
@@ -326,7 +339,7 @@ string HashTable::DebugString(bool skip_empty, bool show_match,
   Tuple* row[num_build_tuples_];
   stringstream ss;
   ss << endl;
-  for (int i = 0; i < buckets_.size(); ++i) {
+  for (int i = 0; i < num_buckets_; ++i) {
     Node* node = buckets_[i].node;
     bool first = true;
     if (skip_empty && node == NULL) continue;

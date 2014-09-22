@@ -1,5 +1,46 @@
 ====
 ---- QUERY
+set num_nodes=1;
+set max_block_mgr_memory=15m;
+select l_orderkey, count(*)
+from lineitem
+group by 1
+order by 1 limit 10;
+---- RESULTS
+1,6
+2,1
+3,6
+4,1
+5,3
+6,1
+7,7
+32,6
+33,4
+34,3
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
+# Test query with string grouping column and string agg columns
+set num_nodes=1;
+set max_block_mgr_memory=20m;
+select l_returnflag, l_orderkey, round(avg(l_tax),2), min(l_shipmode)
+from lineitem
+group by 1,2
+order by 1,2 limit 3;
+---- RESULTS
+'A',3,0.05,'RAIL'
+'A',5,0.03,'AIR'
+'A',6,0.03,'TRUCK'
+---- TYPES
+STRING, BIGINT, DOUBLE, STRING
+====
+---- QUERY
+# TODO: the distributed agg tests have a high likely of becoming flaking. The memory is
+# split between the local and merge agg in an uncontrolled way which can lead to
+# pathological cases causing the queries to fail with OOM. These cases are expected
+# to be unlikely with reasonable limits but we are explicitly trying to pick very low
+# limits. (IMPALA-1305)
 set max_block_mgr_memory=45m;
 select l_orderkey, count(*)
 from lineitem
@@ -21,6 +62,7 @@ BIGINT, BIGINT
 ====
 ---- QUERY
 # Test query with string intermediate state.
+set num_nodes=0;
 set max_block_mgr_memory=50m;
 select l_orderkey, avg(l_orderkey)
 from lineitem
@@ -37,7 +79,8 @@ BIGINT, DOUBLE
 ====
 ---- QUERY
 # Test query with string grouping column
-set max_block_mgr_memory=120m;
+set num_nodes=0;
+set max_block_mgr_memory=140m;
 select l_comment, count(*)
 from lineitem
 group by 1
@@ -53,7 +96,8 @@ STRING, BIGINT
 ====
 ---- QUERY
 # Test query with string grouping column and string agg columns
-set max_block_mgr_memory=70m;
+set num_nodes=0;
+set max_block_mgr_memory=80m;
 select l_returnflag, l_orderkey, round(avg(l_tax),2), min(l_shipmode)
 from lineitem
 group by 1,2
@@ -66,6 +110,7 @@ order by 1,2 limit 3;
 STRING, BIGINT, DECIMAL, STRING
 ====
 ---- QUERY
+set num_nodes=0;
 set max_block_mgr_memory=100m;
 select count(l1.l_tax)
 from
@@ -85,6 +130,7 @@ l1.l_shipdate = l3.l_shipdate;
 BIGINT
 ====
 ---- QUERY
+set num_nodes=0;
 set max_block_mgr_memory=45m;
 select max(t1.total_count), max(t1.l_shipinstruct), max(t1.l_comment) from
 (select l_shipinstruct, l_comment, count(*) over () total_count from lineitem) t1
