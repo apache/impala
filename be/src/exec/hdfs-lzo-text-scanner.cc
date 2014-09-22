@@ -30,6 +30,9 @@ using namespace boost::algorithm;
 using namespace impala;
 using namespace std;
 
+DEFINE_bool(skip_lzo_version_check, false, "Disables checking the LZO library version "
+            "against the running Impala version.");
+
 const string HdfsLzoTextScanner::LIB_IMPALA_LZO = "libimpalalzo.so";
 
 namespace impala {
@@ -90,7 +93,11 @@ Status HdfsLzoTextScanner::LoadLzoLibrary() {
     ss << "Impala LZO library was built against Impala version "
        << (*GetImpalaBuildVersion)() << ", but the running Impala version is "
        << IMPALA_BUILD_VERSION;
-    return Status(ss.str());
+    if (FLAGS_skip_lzo_version_check) {
+      LOG(ERROR) << ss.str();
+    } else {
+      return Status(ss.str());
+    }
   }
 
   RETURN_IF_ERROR(DynamicLookup(handle,
