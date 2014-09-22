@@ -306,7 +306,7 @@ Status ScalarFnCall::GetCodegendComputeFn(RuntimeState* state, llvm::Function** 
     if (vararg_start_idx_ == -1 || i < vararg_start_idx_) {
       // Either no varargs or arguments before varargs begin. Allocate space to store
       // 'child_fn's result so we can pass the pointer to the UDF.
-      arg_val_ptr = builder.CreateAlloca(arg_type, 0, "arg_val_ptr");
+      arg_val_ptr = codegen->CreateEntryBlockAlloca(builder, arg_type, "arg_val_ptr");
 
       if (children_[i]->type().type == TYPE_DECIMAL) {
         // UDFs may manipulate DecimalVal arguments via SIMD instructions such as 'movaps'

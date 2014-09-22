@@ -3680,7 +3680,6 @@ TEST_F(ExprTest, DecimalFunctions) {
   TestIsNull("negative(cast(NULL as decimal(32,2)))",
       ColumnType::CreateDecimalType(32,2));
 
-#ifndef ADDRESS_SANITIZER
   // TODO: Disabled due to IMPALA-1111.
   // Least()
   TestDecimalValue("least(cast('10' as decimal(2,0)), cast('-10' as decimal(2,0)))",
@@ -3711,7 +3710,6 @@ TEST_F(ExprTest, DecimalFunctions) {
       ColumnType::CreateDecimalType(32,2));
   TestIsNull("greatest(cast(NULl as decimal(32,2)), NULL)",
       ColumnType::CreateDecimalType(32,2));
-#endif
 
   Decimal4Value dec4(10);
   // DecimalFunctions::FnvHash hashes both the unscaled value and scale

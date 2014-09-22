@@ -372,7 +372,20 @@ Value* LlvmCodeGen::GetIntConstant(PrimitiveType type, int64_t val) {
 
 AllocaInst* LlvmCodeGen::CreateEntryBlockAlloca(Function* f, const NamedVariable& var) {
   IRBuilder<> tmp(&f->getEntryBlock(), f->getEntryBlock().begin());
-  return tmp.CreateAlloca(var.type, 0, var.name.c_str());
+  AllocaInst* alloca = tmp.CreateAlloca(var.type, 0, var.name.c_str());
+  if (var.type == GetType(CodegenAnyVal::LLVM_DECIMALVAL_NAME)) {
+    // Generated functions may manipulate DecimalVal arguments via SIMD instructions such
+    // as 'movaps' that require 16-byte memory alignment. LLVM uses 8-byte alignment by
+    // default, so explicitly set the alignment for DecimalVals.
+    alloca->setAlignment(16);
+  }
+  return alloca;
+}
+
+AllocaInst* LlvmCodeGen::CreateEntryBlockAlloca(const LlvmBuilder& builder, Type* type,
+                                                const char* name) {
+  return CreateEntryBlockAlloca(builder.GetInsertBlock()->getParent(),
+                                NamedVariable(name, type));
 }
 
 void LlvmCodeGen::CreateIfElseBlocks(Function* fn, const string& if_name,

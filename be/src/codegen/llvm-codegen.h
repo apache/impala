@@ -354,6 +354,8 @@ class LlvmCodeGen {
   // LLVM doesn't optimize alloca's occuring in the middle of functions very well (e.g, an
   // alloca may end up in a loop, potentially blowing the stack).
   llvm::AllocaInst* CreateEntryBlockAlloca(llvm::Function* f, const NamedVariable& var);
+  llvm::AllocaInst* CreateEntryBlockAlloca(const LlvmBuilder& builder, llvm::Type* type,
+                                           const char* name = "");
 
   // Utility to create two blocks in 'fn' for if/else codegen.  if_block and else_block
   // are return parameters.  insert_before is optional and if set, the two blocks
