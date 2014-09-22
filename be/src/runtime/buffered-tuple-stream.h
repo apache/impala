@@ -104,7 +104,8 @@ class BufferedTupleStream {
   // Initializes the tuple stream object. Must be called once before any of the
   // other APIs.
   // If pinned, the tuple stream starts of pinned, otherwise it is unpinned.
-  Status Init(bool pinned = true);
+  // If profile is non-NULL, counters are created.
+  Status Init(RuntimeProfile* profile = NULL, bool pinned = true);
 
   // Adds a single row to the stream. Returns false if an error occurred.
   // BufferedTupleStream will do a deep copy of the memory in the row.
@@ -237,6 +238,11 @@ class BufferedTupleStream {
   // UnpinAllBlocks(). If false, only the write_block_ and/or read_block_ are pinned
   // (both are if read_write_ is true).
   bool pinned_;
+
+  // Counters added by this object to the parent runtime profile.
+  RuntimeProfile::Counter* pin_timer_;
+  RuntimeProfile::Counter* unpin_timer_;
+  RuntimeProfile::Counter* get_new_block_timer_;
 
   // Copies row into 'write_block_'. Returns false if there is not enough space
   // in 'write_block_'.

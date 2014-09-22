@@ -110,8 +110,8 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
 
   if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
     null_aware_partition_ = pool_->Add(new Partition(state, this, 0));
-    RETURN_IF_ERROR(null_aware_partition_->build_rows()->Init(false));
-    RETURN_IF_ERROR(null_aware_partition_->probe_rows()->Init(false));
+    RETURN_IF_ERROR(null_aware_partition_->build_rows()->Init(runtime_profile(), false));
+    RETURN_IF_ERROR(null_aware_partition_->probe_rows()->Init(runtime_profile(), false));
   }
 
   partition_build_timer_ = ADD_TIMER(runtime_profile(), "BuildPartitionTime");
@@ -424,7 +424,7 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
 
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
     hash_partitions_.push_back(pool_->Add(new Partition(state, this, level)));
-    RETURN_IF_ERROR(hash_partitions_[i]->build_rows()->Init());
+    RETURN_IF_ERROR(hash_partitions_[i]->build_rows()->Init(runtime_profile()));
 
     // Initialize a buffer for the probe here to make sure why have it if we
     // need it. While this is not strictly necessary (there are some cases where we
@@ -433,7 +433,7 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
     // since this is only one buffer, there is only a small range of build input
     // sizes where this is beneficial (an IO buffer size). It makes the logic
     // much more complex to enable this optimization.
-    RETURN_IF_ERROR(hash_partitions_[i]->probe_rows()->Init(false));
+    RETURN_IF_ERROR(hash_partitions_[i]->probe_rows()->Init(runtime_profile(), false));
   }
   COUNTER_ADD(partitions_created_, PARTITION_FANOUT);
   COUNTER_SET(max_partition_level_, level);
