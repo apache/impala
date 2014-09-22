@@ -1363,7 +1363,7 @@ public class Analyzer {
     return true;
   }
 
-  private TupleId getTupleId(SlotId slotId) {
+  public TupleId getTupleId(SlotId slotId) {
     return globalState_.descTbl.getSlotDesc(slotId).getParent().getId();
   }
 
@@ -1373,6 +1373,10 @@ public class Analyzer {
 
   public boolean isOuterJoined(TupleId tid) {
     return globalState_.outerJoinedTupleIds.containsKey(tid);
+  }
+
+  public boolean isOuterJoined(SlotId sid) {
+    return isOuterJoined(getTupleId(sid));
   }
 
   public boolean isSemiJoined(TupleId tid) {
@@ -1531,6 +1535,27 @@ public class Analyzer {
     Preconditions.checkNotNull(bEqClassId);
     // Check whether aSlot and bSlot are in the same equivalence class.
     return aEqClassId.equals(bEqClassId);
+  }
+
+  /**
+   * Removes redundant expressions from exprs based on equivalence classes, as follows:
+   * First, normalizes the exprs using the canonical SlotRef representative of each
+   * equivalence class. Then retains the first original element of exprs that is
+   * non-redundant in the normalized exprs. Returns a new list with the unique exprs.
+   */
+  public List<Expr> removeRedundantExprs(List<Expr> exprs) {
+    List<Expr> result = Lists.newArrayList();
+    List<Expr> normalizedExprs =
+        Expr.substituteList(exprs, globalState_.equivClassSmap, this);
+    Preconditions.checkState(exprs.size() == normalizedExprs.size());
+    List<Expr> uniqueExprs = Lists.newArrayList();
+    for (int i = 0; i < normalizedExprs.size(); ++i) {
+      if (!uniqueExprs.contains(normalizedExprs.get(i))) {
+        uniqueExprs.add(normalizedExprs.get(i));
+        result.add(exprs.get(i).clone());
+      }
+    }
+    return result;
   }
 
   /**

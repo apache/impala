@@ -571,7 +571,8 @@ public class Planner {
       // ExchangeNode that is fed by the rhsInputFragment whose sink repartitions
       // its data by the rhs join exprs.
       DataPartition rhsJoinPartition = new DataPartition(
-          TPartitionType.HASH_PARTITIONED, Expr.cloneList(rhsJoinExprs));
+          TPartitionType.HASH_PARTITIONED,
+          analyzer.removeRedundantExprs(Expr.cloneList(rhsJoinExprs)));
       if (lhsHasCompatPartition) {
         node.setChild(0, leftChildFragment.getPlanRoot());
         connectChildFragment(analyzer, node, 1, rightChildFragment);
@@ -582,7 +583,8 @@ public class Planner {
 
       // Same as above but with rhs and lhs reversed.
       DataPartition lhsJoinPartition = new DataPartition(
-          TPartitionType.HASH_PARTITIONED, Expr.cloneList(lhsJoinExprs));
+          TPartitionType.HASH_PARTITIONED,
+          analyzer.removeRedundantExprs(Expr.cloneList(lhsJoinExprs)));
       if (rhsHasCompatPartition) {
         node.setChild(1, rightChildFragment.getPlanRoot());
         connectChildFragment(analyzer, node, 0, leftChildFragment);
@@ -1682,6 +1684,8 @@ public class Planner {
 
     // equivalence classes of eq predicates in joinPredicates
     Set<EquivalenceClassId> joinEquivClasses = Sets.newHashSet();
+    // set of outer-joined slots referenced by joinPredicates
+    Set<SlotId> outerJoinedSlots = Sets.newHashSet();
 
     for (Expr e: candidates) {
       // Ignore predicate if one of its children is a constant.
@@ -1713,13 +1717,33 @@ public class Planner {
       // a single join predicate per equivalence class, i.e., any join predicates beyond
       // that are redundant. We still return those predicates in joinPredicates so they
       // get marked as assigned.
+      // Retain an otherwise redundant predicate if it references a slot of an
+      // outer-joined tuple that is not already referenced by another join predicate
+      // to maintain that the output of this join satisfies outer-joined-slot IS NOT NULL
+      // (otherwise NULL tuples from outer joins could survive).
+      // TODO: Consider better fixes for outer-joined slots: (1) Create IS NOT NULL
+      // predicates and place them at the lowest possible plan node. (2) Convert outer
+      // joins into inner joins (or full outer joins into left/right outer joins).
       Pair<SlotId, SlotId> joinSlots = BinaryPredicate.getEqSlots(e);
+      // Set of outer-joined slots that are already covered by an eq predicate.
       if (joinSlots != null) {
+        boolean hasOuterJoinedSlot = false;
+        if (analyzer.isOuterJoined(joinSlots.first)
+            && !outerJoinedSlots.contains(joinSlots.first)) {
+          outerJoinedSlots.add(joinSlots.first);
+          hasOuterJoinedSlot = true;
+        }
+        if (analyzer.isOuterJoined(joinSlots.second)
+            && !outerJoinedSlots.contains(joinSlots.second)) {
+          outerJoinedSlots.add(joinSlots.second);
+          hasOuterJoinedSlot = true;
+        }
+
         EquivalenceClassId id1 = analyzer.getEquivClassId(joinSlots.first);
         EquivalenceClassId id2 = analyzer.getEquivClassId(joinSlots.second);
         // both slots need not be in the same equiv class, due to outer joins
         // null check: we don't have equiv classes for anything in subqueries
-        if (id1 != null && id2 != null && id1.equals(id2)
+        if (!hasOuterJoinedSlot && id1 != null && id2 != null && id1.equals(id2)
             && joinEquivClasses.contains(id1)) {
           // record this so it gets marked as assigned later
           joinPredicates.add(e);

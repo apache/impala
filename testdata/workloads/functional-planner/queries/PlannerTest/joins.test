@@ -853,6 +853,66 @@ on a.int_col = b.int_col and a.int_col = b.smallint_col and a.int_col = b.c
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ====
+# Test retainment of join predicates referencing outer-joined tuples
+# that are otherwise redundant (equivalence class already covered
+# by another predicate). Regression test for IMPALA-1118.
+# Force a partitioned join to excercise removal of redundant hash exprs.
+select t3.int_col, t2.bigint_col
+from functional.alltypes t1
+left outer join [shuffle] functional.alltypesagg t2
+on t2.smallint_col = t1.smallint_col
+inner join [shuffle] functional.alltypestiny t3
+on t3.int_col = t1.smallint_col
+# equivalence class already covered by predicates in scans, plus the join
+# conditions up to here; still need to retain this predicate to remove
+# tuples with t2.bigint_col IS NULL
+and t3.int_col = t2.bigint_col
+# predicate is redundant because t2.bigint_col IS NOT NULL has
+# already been established by 't3.int_col = t2.bigint_col'
+and t3.bigint_col = t2.bigint_col
+---- PLAN
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.smallint_col = t3.int_col, t2.bigint_col = t3.int_col
+|
+|--02:SCAN HDFS [functional.alltypestiny t3]
+|     partitions=4/4 size=460B
+|     predicates: t3.int_col = t3.bigint_col
+|
+03:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.smallint_col = t2.smallint_col
+|
+|--01:SCAN HDFS [functional.alltypesagg t2]
+|     partitions=11/11 size=814.73KB
+|     predicates: t2.smallint_col = t2.bigint_col
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 size=478.45KB
+---- DISTRIBUTEDPLAN
+08:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: t1.smallint_col = t3.int_col, t2.bigint_col = t3.int_col
+|
+|--07:EXCHANGE [HASH(t3.int_col)]
+|  |
+|  02:SCAN HDFS [functional.alltypestiny t3]
+|     partitions=4/4 size=460B
+|     predicates: t3.int_col = t3.bigint_col
+|
+03:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
+|  hash predicates: t1.smallint_col = t2.smallint_col
+|
+|--06:EXCHANGE [HASH(t2.smallint_col)]
+|  |
+|  01:SCAN HDFS [functional.alltypesagg t2]
+|     partitions=11/11 size=814.73KB
+|     predicates: t2.smallint_col = t2.bigint_col
+|
+05:EXCHANGE [HASH(t1.smallint_col)]
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 size=478.45KB
+====
 # Regression test for IMPALA-935.
 select 1 from
 (select int_col from functional.alltypessmall group by int_col) a
