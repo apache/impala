@@ -673,9 +673,11 @@ last_value(double_col)
 sum(tinyint_col)
   over(partition by tinyint_col, double_col order by int_col desc),
 # compatible RANGE window
+# TODO: Revert window when RANGE offsets are supported
 sum(smallint_col)
   over(partition by double_col, tinyint_col order by int_col desc
-  range between 1 preceding and 1 following),
+  range between unbounded preceding and unbounded following),
+# range between 1 preceding and 1 following),
 # different window
 first_value(int_col)
   over(partition by double_col, tinyint_col order by int_col desc
@@ -704,7 +706,7 @@ from functional.alltypesagg
 |  functions: sum(smallint_col)
 |  partition by: double_col, tinyint_col
 |  order by: int_col DESC
-|  window: RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
 |
 07:ANALYTIC
 |  functions: sum(tinyint_col)
@@ -754,7 +756,7 @@ from functional.alltypesagg
 |  functions: sum(smallint_col)
 |  partition by: double_col, tinyint_col
 |  order by: int_col DESC
-|  window: RANGE BETWEEN 1 PRECEDING AND 1 FOLLOWING
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
 |
 07:ANALYTIC
 |  functions: sum(tinyint_col)
@@ -1442,21 +1444,25 @@ select
 # windows and sort order should be reversed
 sum(int_col) over(partition by tinyint_col order by id desc nulls first, bool_col asc nulls last
                   rows between 2 preceding and unbounded following),
+# TODO: Revert window when RANGE offsets are supported
 sum(int_col) over(partition by tinyint_col order by id asc nulls last
-                  range between 4 preceding and unbounded following),
+                  range between current row and unbounded following),
+#                  range between 4 preceding and unbounded following),
 # windows and sort order should remain unchanged
 count(bigint_col) over(partition by tinyint_col order by id),
 count(bigint_col) over(partition by tinyint_col order by id, int_col
                        rows between 6 preceding and 8 following),
+# TODO: Revert window when RANGE offsets are supported
 count(bigint_col) over(partition by tinyint_col order by id
-                       range between unbounded preceding and 10 following)
+                       range between unbounded preceding and unbounded following)
+#                       range between unbounded preceding and 10 following)
 from functional.alltypesagg
 ---- PLAN
 08:ANALYTIC
 |  functions: count(bigint_col)
 |  partition by: tinyint_col
 |  order by: id ASC
-|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND 10 FOLLOWING
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
 |
 07:ANALYTIC
 |  functions: count(bigint_col)
@@ -1486,7 +1492,7 @@ from functional.alltypesagg
 |  functions: sum(int_col)
 |  partition by: tinyint_col
 |  order by: id DESC
-|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND 4 FOLLOWING
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 01:SORT
 |  order by: tinyint_col ASC NULLS FIRST, id DESC NULLS FIRST
@@ -1502,14 +1508,18 @@ select
 # windows, sort order and function should be reversed
 first_value(int_col) over(partition by tinyint_col order by id desc nulls first, bool_col asc nulls last
                           rows between 2 preceding and unbounded following),
+# TODO: Revert window when RANGE offsets are supported
 first_value(int_col) over(partition by tinyint_col order by id asc nulls last
-                          range between 4 preceding and unbounded following),
+                          range between current row and unbounded following),
+#                          range between 4 preceding and unbounded following),
 # windows, sort order and function should remain unchanged
 first_value(bigint_col) over(partition by tinyint_col order by id),
 first_value(bigint_col) over(partition by tinyint_col order by id, int_col
                              rows between 6 preceding and 8 following),
+# TODO: Revert window when RANGE offsets are supported
 first_value(bigint_col) over(partition by tinyint_col order by id
-                             range between unbounded preceding and 10 following)
+                             range between unbounded preceding and unbounded following)
+#                             range between unbounded preceding and 10 following)
 from functional.alltypesagg
 ---- PLAN
 07:ANALYTIC
@@ -1540,7 +1550,7 @@ from functional.alltypesagg
 |  functions: last_value(int_col)
 |  partition by: tinyint_col
 |  order by: id DESC
-|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND 4 FOLLOWING
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 01:SORT
 |  order by: tinyint_col ASC NULLS FIRST, id DESC NULLS FIRST
@@ -1554,21 +1564,25 @@ select
 # windows, sort order and function should be reversed
 last_value(int_col) over(partition by tinyint_col order by id desc nulls first, bool_col asc nulls last
                           rows between 2 preceding and unbounded following),
+# TODO: Revert window when RANGE offsets are supported
 last_value(int_col) over(partition by tinyint_col order by id asc nulls last
-                          range between 4 preceding and unbounded following),
+                          range between current row and unbounded following),
+#                          range between 4 preceding and unbounded following),
 # windows, sort order and function should remain unchanged
 last_value(bigint_col) over(partition by tinyint_col order by id),
 last_value(bigint_col) over(partition by tinyint_col order by id, int_col
                        rows between 6 preceding and 8 following),
+# TODO: Revert window when RANGE offsets are supported
 last_value(bigint_col) over(partition by tinyint_col order by id
-                            range between unbounded preceding and 10 following)
+                            range between unbounded preceding and unbounded following)
+#                            range between unbounded preceding and 10 following)
 from functional.alltypesagg
 ---- PLAN
 08:ANALYTIC
 |  functions: last_value(bigint_col)
 |  partition by: tinyint_col
 |  order by: id ASC
-|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND 10 FOLLOWING
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
 |
 07:ANALYTIC
 |  functions: last_value(bigint_col)

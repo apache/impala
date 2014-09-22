@@ -770,3 +770,58 @@ from alltypesagg where id < 50 and (tinyint_col is null or tinyint_col < 4)
 ---- TYPES
 INT, TINYINT, TINYINT, STRING, TINYINT, STRING
 ====
+---- QUERY
+# Test RANGE with UNBOUNDED FOLLOWING
+select id,
+sum(id) over (order by id range between unbounded preceding and unbounded following)
+from alltypesagg where id <= 30 order by id;
+---- RESULTS
+0,525
+0,525
+1,525
+2,525
+3,525
+4,525
+5,525
+6,525
+7,525
+8,525
+9,525
+10,525
+10,525
+11,525
+12,525
+13,525
+14,525
+15,525
+16,525
+17,525
+18,525
+19,525
+20,525
+20,525
+21,525
+22,525
+23,525
+24,525
+25,525
+26,525
+27,525
+28,525
+29,525
+30,525
+30,525
+---- TYPES
+INT, BIGINT
+====
+---- QUERY
+# Test RANGE with UNBOUNDED FOLLOWING on many partitions
+select count(distinct t1.c1) from
+(select sum(id) over (partition by day order by tinyint_col
+                      range between unbounded preceding and unbounded following) c1
+ from alltypesagg) t1;
+---- RESULTS
+11
+---- TYPES
+BIGINT
+====

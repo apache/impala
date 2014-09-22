@@ -348,15 +348,27 @@ public class AnalyticWindow {
       throw new AnalysisException(
           leftBoundary_.getType().toString() + " is only allowed for upper bound of "
             + "BETWEEN");
-
     }
     if (rightBoundary_ != null
         && rightBoundary_.getType() == BoundaryType.UNBOUNDED_PRECEDING) {
       throw new AnalysisException(
           rightBoundary_.getType().toString() + " is only allowed for lower bound of "
             + "BETWEEN");
-
     }
+
+    // TODO: Remove when RANGE windows with offset boundaries are supported.
+    if (type_ == Type.RANGE) {
+      if (leftBoundary_.type_.isOffset()
+          || (rightBoundary_ != null && rightBoundary_.type_.isOffset())
+          || (leftBoundary_.type_ == BoundaryType.CURRENT_ROW
+              && (rightBoundary_ == null
+                  || rightBoundary_.type_ == BoundaryType.CURRENT_ROW))) {
+        throw new AnalysisException(
+            "RANGE is only supported with both the lower and upper bounds UNBOUNDED or"
+            + " one UNBOUNDED and the other CURRENT ROW.");
+      }
+    }
+
     if (rightBoundary_ == null && leftBoundary_.getType() == BoundaryType.FOLLOWING) {
       throw new AnalysisException(
           leftBoundary_.getType().toString() + " requires a BETWEEN clause");

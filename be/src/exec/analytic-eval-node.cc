@@ -57,6 +57,11 @@ AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
     fn_scope_ = AnalyticEvalNode::PARTITION;
   } else if (tnode.analytic_node.window.type == TAnalyticWindowType::RANGE) {
     fn_scope_ = AnalyticEvalNode::RANGE;
+    DCHECK(!window_.__isset.window_start)
+      << "RANGE windows must have UNBOUNDED PRECEDING";
+    DCHECK(!window_.__isset.window_end ||
+        window_.window_end.type == TAnalyticWindowBoundaryType::CURRENT_ROW)
+      << "RANGE window end bound must be CURRENT ROW or UNBOUNDED FOLLOWING";
   } else {
     DCHECK_EQ(tnode.analytic_node.window.type, TAnalyticWindowType::ROWS);
     fn_scope_ = AnalyticEvalNode::ROWS;
@@ -298,7 +303,8 @@ inline void AnalyticEvalNode::TryAddResultTupleForPrevRow(bool next_partition,
   VLOG_ROW << "TryAddResultTupleForPrevRow partition=" << next_partition
            << " idx=" << stream_idx;
   if (fn_scope_ == ROWS) return;
-  if (next_partition || (fn_scope_ == RANGE && PrevRowCompare(order_by_expr_ctx_))) {
+  if (next_partition || (fn_scope_ == RANGE && window_.__isset.window_end &&
+      PrevRowCompare(order_by_expr_ctx_))) {
     AddResultTuple(stream_idx - 1);
   }
 }

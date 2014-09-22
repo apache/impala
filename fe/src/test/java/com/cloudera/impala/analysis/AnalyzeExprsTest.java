@@ -607,13 +607,18 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         + "rows between unbounded preceding and 2 preceding) from functional.alltypes");
     AnalyzesOk("select sum(int_col) over (partition by id order by tinyint_col "
         + "rows between 2 following and unbounded following) from functional.alltypes");
+    // TODO: Enable after RANGE windows with offset boundaries are supported
+    //AnalyzesOk("select sum(int_col) over (partition by id order by tinyint_col "
+    //    + "range between 2 preceding and unbounded following) from functional.alltypes");
+    //AnalyzesOk("select sum(int_col) over (partition by id order by tinyint_col "
+    //    + "range between 2 preceding and unbounded following) from functional.alltypes");
     AnalyzesOk("select sum(int_col) over (partition by id order by tinyint_col "
-        + "range between 2 preceding and 6 following) from functional.alltypes");
+        + "rows between 2 preceding and 6 following) from functional.alltypes");
         // TODO: substitute constants in-line so that 2*3 becomes implicitly castable
         // to tinyint
         //+ "range between 2 preceding and 2 * 3 following) from functional.alltypes");
     AnalyzesOk("select sum(int_col) over (partition by id order by tinyint_col "
-        + "range between 2 preceding and unbounded following) from functional.alltypes");
+        + "rows between 2 preceding and unbounded following) from functional.alltypes");
     AnalyzesOk("select lead(int_col, 1, null) over "
         + "(partition by id order by tinyint_col) from functional.alltypes");
     AnalyzesOk("select rank() over "
@@ -642,13 +647,20 @@ public class AnalyzeExprsTest extends AnalyzerTest {
           + "rows between 2 following and 4 following) from functional.alltypes");
     AnalyzesOk(
         "select max(int_col) over (partition by id order by tinyint_col, int_col "
-          + "range between unbounded preceding and current row) from functional.alltypes");
+          + "range between unbounded preceding and current row) "
+          + "from functional.alltypes");
+    AnalyzesOk(
+        "select sum(int_col) over (partition by id order by tinyint_col, int_col "
+          + "range between current row and unbounded following) "
+          + "from functional.alltypes");
+    AnalyzesOk(
+        "select max(int_col) over (partition by id order by tinyint_col, int_col "
+          + "range between unbounded preceding and unbounded following) "
+          + "from functional.alltypes");
     AnalyzesOk("select sum(int_col) over (partition by id order by tinyint_col "
         + "rows between 4 preceding and 2 preceding) from functional.alltypes");
     AnalyzesOk("select sum(int_col) over (partition by id order by tinyint_col "
         + "rows between 2 following and 4 following) from functional.alltypes");
-    AnalyzesOk("select sum(int_col) over (partition by id order by tinyint_col "
-        + "range between 2 following and 2 following) from functional.alltypes");
     AnalyzesOk( "select "
         + "2 * min(tinyint_col) over (partition by id order by tinyint_col "
         + "  rows between unbounded preceding and current row), "
@@ -659,6 +671,18 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         + "  order by tinyint_col, smallint_col "
         + "  rows between unbounded preceding and current row)) "
         + "from functional.alltypes");
+    AnalyzesOk(
+        "select sum(int_col) over (partition by id order by tinyint_col, int_col "
+          + "rows between current row and current row) from functional.alltypes");
+    AnalysisError(
+        "select sum(int_col) over (partition by id order by tinyint_col, int_col "
+          + "range between current row and current row) from functional.alltypes",
+        "RANGE is only supported with both the lower and upper bounds UNBOUNDED or one "
+          + "UNBOUNDED and the other CURRENT ROW.");
+    AnalysisError("select sum(int_col) over (partition by id order by tinyint_col "
+          + "range between 2 following and 2 following) from functional.alltypes",
+        "RANGE is only supported with both the lower and upper bounds UNBOUNDED or one "
+            + "UNBOUNDED and the other CURRENT ROW.");
 
     // Min/max do not support start bounds with offsets
     AnalysisError("select min(int_col) over (partition by id order by tinyint_col "
@@ -667,9 +691,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select max(int_col) over (partition by id order by tinyint_col "
         + "rows 2 preceding) from functional.alltypes",
         "'max(int_col)' is only supported with an UNBOUNDED PRECEDING start bound.");
-    AnalysisError("select max(int_col) over (partition by id order by tinyint_col "
-        + "range 2 preceding) from functional.alltypes",
-        "'max(int_col)' is only supported with an UNBOUNDED PRECEDING start bound.");
+    // TODO: Enable after RANGE windows with offset boundaries are supported
+    //AnalysisError("select max(int_col) over (partition by id order by tinyint_col "
+    //    + "range 2 preceding) from functional.alltypes",
+    //    "'max(int_col)' is only supported with an UNBOUNDED PRECEDING start bound.");
 
     // missing grouping expr
     AnalysisError(
@@ -866,35 +891,36 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "For ROWS window, the value of a PRECEDING/FOLLOWING offset must be a "
           + "constant positive integer: count(*) PRECEDING");
 
-    AnalysisError(
-        "select min(int_col) over (partition by id order by float_col "
-          + "range between -2.1 preceding and current row) from functional.alltypes",
-        "For RANGE window, the value of a PRECEDING/FOLLOWING offset must be a "
-          + "constant positive number: -2.1 PRECEDING");
-    AnalysisError(
-        "select min(int_col) over (partition by id order by int_col "
-          + "range between current row and 2.1 following) from functional.alltypes",
-        "The value expression of a PRECEDING/FOLLOWING clause of a RANGE window must "
-          + "be implicitly convertable to the ORDER BY expression's type: 2.1 cannot "
-          + "be implicitly converted to INT");
-    AnalysisError(
-        "select min(int_col) over (partition by id order by int_col "
-          + "range between 2 * tinyint_col preceding and current row) "
-          + "from functional.alltypes",
-        "For RANGE window, the value of a PRECEDING/FOLLOWING offset must be a "
-          + "constant positive number");
-    AnalysisError(
-        "select min(int_col) over (partition by id order by int_col "
-          + "range between 3.1 following and 2.0 following) "
-          + "from functional.alltypes",
-        "Offset boundaries are in the wrong order");
-    // multiple ordering exprs w/ range offset
-    AnalysisError(
-        "select min(int_col) over (partition by id order by int_col, tinyint_col "
-          + "range between 2 preceding and current row) "
-          + "from functional.alltypes",
-        "Only one ORDER BY expression allowed if used with a RANGE window with "
-          + "PRECEDING/FOLLOWING");
+    // TODO: Enable after RANGE windows with offset boundaries are supported.
+    //AnalysisError(
+    //    "select min(int_col) over (partition by id order by float_col "
+    //      + "range between -2.1 preceding and current row) from functional.alltypes",
+    //    "For RANGE window, the value of a PRECEDING/FOLLOWING offset must be a "
+    //      + "constant positive number: -2.1 PRECEDING");
+    //AnalysisError(
+    //    "select min(int_col) over (partition by id order by int_col "
+    //      + "range between current row and 2.1 following) from functional.alltypes",
+    //    "The value expression of a PRECEDING/FOLLOWING clause of a RANGE window must "
+    //      + "be implicitly convertable to the ORDER BY expression's type: 2.1 cannot "
+    //      + "be implicitly converted to INT");
+    //AnalysisError(
+    //    "select min(int_col) over (partition by id order by int_col "
+    //      + "range between 2 * tinyint_col preceding and current row) "
+    //      + "from functional.alltypes",
+    //    "For RANGE window, the value of a PRECEDING/FOLLOWING offset must be a "
+    //      + "constant positive number");
+    //AnalysisError(
+    //    "select min(int_col) over (partition by id order by int_col "
+    //      + "range between 3.1 following and 2.0 following) "
+    //      + "from functional.alltypes",
+    //    "Offset boundaries are in the wrong order");
+    //// multiple ordering exprs w/ range offset
+    //AnalysisError(
+    //    "select min(int_col) over (partition by id order by int_col, tinyint_col "
+    //      + "range between 2 preceding and current row) "
+    //      + "from functional.alltypes",
+    //    "Only one ORDER BY expression allowed if used with a RANGE window with "
+    //      + "PRECEDING/FOLLOWING");
   }
 
   /**
