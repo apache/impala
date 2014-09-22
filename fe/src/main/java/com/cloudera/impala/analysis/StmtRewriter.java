@@ -93,7 +93,7 @@ public class StmtRewriter {
       rewriteWhereClauseSubqueries(stmt, analyzer);
     }
     stmt.sqlString_ = null;
-    LOG.info("rewritten stmt: " + stmt.toSql());
+    LOG.trace("rewritten stmt: " + stmt.toSql());
   }
 
   /**

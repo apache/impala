@@ -119,9 +119,9 @@ public class SortNode extends PlanNode {
     info_.substituteOrderingExprs(outputSmap_, analyzer);
     info_.checkConsistency();
 
-    LOG.info("sort id " + tupleIds_.get(0).toString() + " smap: "
+    LOG.trace("sort id " + tupleIds_.get(0).toString() + " smap: "
         + outputSmap_.debugString());
-    LOG.info("sort input exprs: " + Expr.debugString(resolvedTupleExprs_));
+    LOG.trace("sort input exprs: " + Expr.debugString(resolvedTupleExprs_));
   }
 
   @Override
