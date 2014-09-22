@@ -53,6 +53,34 @@ class TestInsertParquetQueries(ImpalaTestSuite):
         vector.get_value('compression_codec')
     self.run_test_case('insert_parquet', vector, multiple_impalad=True)
 
+class TestInsertParquetInvalidCodec(ImpalaTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestInsertParquetInvalidCodec, cls).add_test_dimensions()
+    # Fix the exec_option vector to have a single value.
+    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+        cluster_sizes=[0], disable_codegen_options=[False], batch_sizes=[0],
+        sync_ddl=[1]))
+    cls.TestMatrix.add_dimension(TestDimension("compression_codec", 'bzip2'));
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').file_format == 'parquet')
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').compression_codec == 'none')
+
+  @classmethod
+  def setup_class(cls):
+    super(TestInsertParquetInvalidCodec, cls).setup_class()
+
+  def test_insert_parquet_invalid_codec(self, vector):
+    vector.get_value('exec_option')['COMPRESSION_CODEC'] = \
+        vector.get_value('compression_codec')
+    self.run_test_case('QueryTest/insert_parquet_invalid_codec', vector,\
+                       multiple_impalad=True)
+
 class TestInsertParquetVerifySize(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

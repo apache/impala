@@ -623,8 +623,6 @@ HdfsParquetTableWriter::~HdfsParquetTableWriter() {
 }
 
 Status HdfsParquetTableWriter::Init() {
-  columns_.resize(table_desc_->num_cols() - table_desc_->num_clustering_cols());
-
   // Initialize file metadata
   file_metadata_.version = PARQUET_CURRENT_VERSION;
 
@@ -644,12 +642,13 @@ Status HdfsParquetTableWriter::Init() {
         codec == THdfsCompression::GZIP ||
         codec == THdfsCompression::SNAPPY)) {
     stringstream ss;
-    ss << "Invalid parquet compression codec." << Codec::GetCodecName(codec);
+    ss << "Invalid parquet compression codec " << Codec::GetCodecName(codec);
     return Status(ss.str());
   }
 
   VLOG_FILE << "Using compression codec: " << codec;
 
+  columns_.resize(table_desc_->num_cols() - table_desc_->num_clustering_cols());
   // Initialize each column structure.
   for (int i = 0; i < columns_.size(); ++i) {
     BaseColumnWriter* writer = NULL;
