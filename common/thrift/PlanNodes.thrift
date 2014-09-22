@@ -303,10 +303,11 @@ struct TAnalyticNode {
   // child tuple and the buffered tuple
   8: optional Exprs.TExpr partition_by_eq
 
-  // predicate that checks: child tuple '<' buffered tuple for order_by_exprs;
-  // only set if buffered_tuple_id is set; should be evaluated over a row that
-  // is composed of the child tuple and the buffered tuple
-  9: optional Exprs.TExpr order_by_lt
+  // predicate that checks: the order_by_exprs are equal or both NULL when evaluated
+  // over the child tuple and the buffered tuple. only set if buffered_tuple_id is set;
+  // should be evaluated over a row that is composed of the child tuple and the buffered
+  // tuple
+  9: optional Exprs.TExpr order_by_eq
 }
 
 struct TUnionNode {

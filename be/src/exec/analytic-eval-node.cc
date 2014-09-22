@@ -36,8 +36,8 @@ AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
     result_tuple_desc_(
         descs.GetTupleDescriptor(tnode.analytic_node.output_tuple_id)),
     buffered_tuple_desc_(NULL),
-    partition_by_expr_ctx_(NULL),
-    order_by_expr_ctx_(NULL),
+    partition_by_eq_expr_ctx_(NULL),
+    order_by_eq_expr_ctx_(NULL),
     rows_start_offset_(0),
     rows_end_offset_(0),
     last_result_idx_(-1),
@@ -108,12 +108,12 @@ Status AnalyticEvalNode::Init(const TPlanNode& tnode) {
   if (analytic_node.__isset.partition_by_eq) {
     DCHECK(analytic_node.__isset.buffered_tuple_id);
     RETURN_IF_ERROR(Expr::CreateExprTree(pool_, analytic_node.partition_by_eq,
-          &partition_by_expr_ctx_));
+          &partition_by_eq_expr_ctx_));
   }
-  if (analytic_node.__isset.order_by_lt) {
+  if (analytic_node.__isset.order_by_eq) {
     DCHECK(analytic_node.__isset.buffered_tuple_id);
-    RETURN_IF_ERROR(Expr::CreateExprTree(pool_, analytic_node.order_by_lt,
-          &order_by_expr_ctx_));
+    RETURN_IF_ERROR(Expr::CreateExprTree(pool_, analytic_node.order_by_eq,
+          &order_by_eq_expr_ctx_));
   }
   return Status::OK;
 }
@@ -137,16 +137,16 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
     state->obj_pool()->Add(fn_ctxs_[i]);
   }
   if (buffered_tuple_desc_ != NULL) {
-    DCHECK(partition_by_expr_ctx_ != NULL || order_by_expr_ctx_ != NULL);
+    DCHECK(partition_by_eq_expr_ctx_ != NULL || order_by_eq_expr_ctx_ != NULL);
     vector<TTupleId> tuple_ids;
     tuple_ids.push_back(child(0)->row_desc().tuple_descriptors()[0]->id());
     tuple_ids.push_back(buffered_tuple_desc_->id());
     RowDescriptor cmp_row_desc(state->desc_tbl(), tuple_ids, vector<bool>(2, false));
-    if (partition_by_expr_ctx_ != NULL) {
-      RETURN_IF_ERROR(partition_by_expr_ctx_->Prepare(state, cmp_row_desc));
+    if (partition_by_eq_expr_ctx_ != NULL) {
+      RETURN_IF_ERROR(partition_by_eq_expr_ctx_->Prepare(state, cmp_row_desc));
     }
-    if (order_by_expr_ctx_ != NULL) {
-      RETURN_IF_ERROR(order_by_expr_ctx_->Prepare(state, cmp_row_desc));
+    if (order_by_eq_expr_ctx_ != NULL) {
+      RETURN_IF_ERROR(order_by_eq_expr_ctx_->Prepare(state, cmp_row_desc));
     }
   }
   child_tuple_cmp_row_ = reinterpret_cast<TupleRow*>(
@@ -171,11 +171,11 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
     DCHECK(!evaluators_[i]->is_merge());
   }
 
-  if (partition_by_expr_ctx_ != NULL) {
-    RETURN_IF_ERROR(partition_by_expr_ctx_->Open(state));
+  if (partition_by_eq_expr_ctx_ != NULL) {
+    RETURN_IF_ERROR(partition_by_eq_expr_ctx_->Open(state));
   }
-  if (order_by_expr_ctx_ != NULL) {
-    RETURN_IF_ERROR(order_by_expr_ctx_->Open(state));
+  if (order_by_eq_expr_ctx_ != NULL) {
+    RETURN_IF_ERROR(order_by_eq_expr_ctx_->Open(state));
   }
 
   // An intermediate tuple is only allocated once and is reused.
@@ -305,7 +305,7 @@ inline void AnalyticEvalNode::TryAddResultTupleForPrevRow(bool next_partition,
            << " idx=" << stream_idx;
   if (fn_scope_ == ROWS) return;
   if (next_partition || (fn_scope_ == RANGE && window_.__isset.window_end &&
-      PrevRowCompare(order_by_expr_ctx_))) {
+      !PrevRowCompare(order_by_eq_expr_ctx_))) {
     AddResultTuple(stream_idx - 1);
   }
 }
@@ -489,9 +489,9 @@ Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
     // copied from curr_tuple_ because the original is used for one or more previous
     // row(s) but the incremental state still applies to the current row.
     bool next_partition = false;
-    if (partition_by_expr_ctx_ != NULL) {
-      // partition_by_expr_ctx_ checks equality over the predicate exprs
-      next_partition = !PrevRowCompare(partition_by_expr_ctx_);
+    if (partition_by_eq_expr_ctx_ != NULL) {
+      // partition_by_eq_expr_ctx_ checks equality over the predicate exprs
+      next_partition = !PrevRowCompare(partition_by_eq_expr_ctx_);
     }
     TryAddResultTupleForPrevRow(next_partition, stream_idx, row);
     if (next_partition) InitNextPartition(stream_idx);
@@ -654,8 +654,8 @@ void AnalyticEvalNode::Close(RuntimeState* state) {
     evaluators_[i]->Close(state);
     fn_ctxs_[i]->impl()->Close();
   }
-  if (partition_by_expr_ctx_ != NULL) partition_by_expr_ctx_->Close(state);
-  if (order_by_expr_ctx_ != NULL) order_by_expr_ctx_->Close(state);
+  if (partition_by_eq_expr_ctx_ != NULL) partition_by_eq_expr_ctx_->Close(state);
+  if (order_by_eq_expr_ctx_ != NULL) order_by_eq_expr_ctx_->Close(state);
   if (prev_child_batch_.get() != NULL) prev_child_batch_.reset();
   if (curr_child_batch_.get() != NULL) curr_child_batch_.reset();
   if (curr_tuple_pool_.get() != NULL) curr_tuple_pool_->FreeAll();
@@ -668,11 +668,11 @@ void AnalyticEvalNode::DebugString(int indentation_level, stringstream* out) con
   *out << string(indentation_level * 2, ' ');
   *out << "AnalyticEvalNode("
        << " window=" << DebugWindowString();
-  if (partition_by_expr_ctx_ != NULL) {
-    *out << " partition_exprs=" << partition_by_expr_ctx_->root()->DebugString();
+  if (partition_by_eq_expr_ctx_ != NULL) {
+    *out << " partition_exprs=" << partition_by_eq_expr_ctx_->root()->DebugString();
   }
-  if (order_by_expr_ctx_ != NULL) {
-    *out << " order_by_exprs=" << order_by_expr_ctx_->root()->DebugString();
+  if (order_by_eq_expr_ctx_ != NULL) {
+    *out << " order_by_exprs=" << order_by_eq_expr_ctx_->root()->DebugString();
   }
   *out << AggFnEvaluator::DebugString(evaluators_);
   ExecNode::DebugString(indentation_level, out);

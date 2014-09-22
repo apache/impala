@@ -187,17 +187,17 @@ class AnalyticEvalNode : public ExecNode {
   TupleDescriptor* buffered_tuple_desc_;
 
   // TupleRow* composed of the first child tuple and the buffered tuple, used by
-  // partition_by_expr_ctx_ and order_by_expr_ctx_. Set in Prepare() if
+  // partition_by_eq_expr_ctx_ and order_by_eq_expr_ctx_. Set in Prepare() if
   // buffered_tuple_desc_ is not NULL, allocated from mem_pool_.
   TupleRow* child_tuple_cmp_row_;
 
   // Expr context for a predicate that checks if child tuple '<' buffered tuple for
   // partitioning exprs.
-  ExprContext* partition_by_expr_ctx_;
+  ExprContext* partition_by_eq_expr_ctx_;
 
   // Expr context for a predicate that checks if child tuple '<' buffered tuple for
   // order by exprs.
-  ExprContext* order_by_expr_ctx_;
+  ExprContext* order_by_eq_expr_ctx_;
 
   // The scope over which analytic functions are evaluated.
   // TODO: Consider adding additional state to capture whether different kinds of window

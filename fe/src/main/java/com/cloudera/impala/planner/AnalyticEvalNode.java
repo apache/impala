@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.planner;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -73,7 +72,7 @@ public class AnalyticEvalNode extends PlanNode {
   // predicates constructed from partitionExprs_/orderingExprs_ to
   // compare input to buffered tuples
   private final Expr partitionByEq_;
-  private final Expr orderByLessThan_;
+  private final Expr orderByEq_;
   private final TupleDescriptor bufferedTupleDesc_;
 
   public AnalyticEvalNode(
@@ -82,8 +81,7 @@ public class AnalyticEvalNode extends PlanNode {
       List<OrderByElement> orderByElements, AnalyticWindow analyticWindow,
       TupleDescriptor logicalTupleDesc, TupleDescriptor intermediateTupleDesc,
       TupleDescriptor outputTupleDesc, ExprSubstitutionMap logicalToPhysicalSmap,
-      Expr partitionByEq, Expr orderByLessThan,
-      TupleDescriptor bufferedTupleDesc) {
+      Expr partitionByEq, Expr orderByEq, TupleDescriptor bufferedTupleDesc) {
     super(id, input.getTupleIds(), "ANALYTIC");
     Preconditions.checkState(!tupleIds_.contains(outputTupleDesc.getId()));
     // we're materializing the input row augmented with the analytic output tuple
@@ -98,7 +96,7 @@ public class AnalyticEvalNode extends PlanNode {
     outputTupleDesc_ = outputTupleDesc;
     logicalToPhysicalSmap_ = logicalToPhysicalSmap;
     partitionByEq_ = partitionByEq;
-    orderByLessThan_ = orderByLessThan;
+    orderByEq_ = orderByEq;
     bufferedTupleDesc_ = bufferedTupleDesc;
     children_.add(input);
     nullableTupleIds_.addAll(input.getNullableTupleIds());
@@ -158,8 +156,8 @@ public class AnalyticEvalNode extends PlanNode {
         .add("outputTid", outputTupleDesc_.getId())
         .add("partitionByEq",
             partitionByEq_ != null ? partitionByEq_.debugString() : "null")
-        .add("orderByLt",
-            orderByLessThan_ != null ? orderByLessThan_.debugString() : "null")
+        .add("orderByEq",
+            orderByEq_ != null ? orderByEq_.debugString() : "null")
         .addValue(super.debugString())
         .toString();
   }
@@ -185,8 +183,8 @@ public class AnalyticEvalNode extends PlanNode {
     if (partitionByEq_ != null) {
       msg.analytic_node.setPartition_by_eq(partitionByEq_.treeToThrift());
     }
-    if (orderByLessThan_ != null) {
-      msg.analytic_node.setOrder_by_lt(orderByLessThan_.treeToThrift());
+    if (orderByEq_ != null) {
+      msg.analytic_node.setOrder_by_eq(orderByEq_.treeToThrift());
     }
     if (bufferedTupleDesc_ != null) {
       msg.analytic_node.setBuffered_tuple_id(bufferedTupleDesc_.getId().asInt());

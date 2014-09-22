@@ -825,3 +825,43 @@ select count(distinct t1.c1) from
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# IMPALA-1292: Incorrect result in analytic SUM when ORDER BY column is null
+select tinyint_col, id,
+SUM(id) OVER (ORDER BY tinyint_col ASC, id ASC)
+FROM alltypesagg
+where (tinyint_col is NULL or tinyint_col < 2) and id < 100 order by 1, 2
+---- RESULTS
+1,1,1
+1,11,12
+1,21,33
+1,31,64
+1,41,105
+1,51,156
+1,61,217
+1,71,288
+1,81,369
+1,91,460
+NULL,0,460
+NULL,0,460
+NULL,10,480
+NULL,10,480
+NULL,20,520
+NULL,20,520
+NULL,30,580
+NULL,30,580
+NULL,40,660
+NULL,40,660
+NULL,50,760
+NULL,50,760
+NULL,60,880
+NULL,60,880
+NULL,70,1020
+NULL,70,1020
+NULL,80,1180
+NULL,80,1180
+NULL,90,1360
+NULL,90,1360
+---- TYPES
+TINYINT, INT, BIGINT
+====
