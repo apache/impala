@@ -341,9 +341,15 @@ class HashTable {
   // Returns an estimate of the number of bytes needed to build the hash table
   // structure for 'num_rows'.
   static int64_t EstimateSize(int64_t num_rows) {
+    return EstimatedNumBuckets(num_rows) * sizeof(Bucket) + num_rows * sizeof(Node);
+  }
+
+  // Returns the estimated number of buckets (rounded up to a power of two) to
+  // store num_rows.
+  static int64_t EstimatedNumBuckets(int64_t num_rows) {
     // Assume 50% fill factor.
     int64_t num_buckets = num_rows * 2;
-    return num_buckets * sizeof(Bucket) + num_rows * sizeof(Node);
+    return BitUtil::NextPowerOfTwo(num_buckets);
   }
 
   // Returns the number of bytes allocated to the hash table

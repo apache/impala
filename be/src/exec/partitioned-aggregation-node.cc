@@ -834,7 +834,11 @@ Status PartitionedAggregationNode::MoveHashPartitions(int64_t num_input_rows) {
       // is memory pressure.
       RETURN_IF_ERROR(partition->aggregated_row_stream->UnpinStream(true));
       RETURN_IF_ERROR(partition->unaggregated_row_stream->UnpinStream(true));
-      spilled_partitions_.push_back(partition);
+
+      // Push new created partitions at the front. This means a depth first walk
+      // (more finely partitioned partitions are processed first). This allows us
+      // to delete blocks earlier and bottom out the recursion earlier.
+      spilled_partitions_.push_front(partition);
     } else {
       aggregated_partitions_.push_back(partition);
     }

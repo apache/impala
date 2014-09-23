@@ -272,9 +272,17 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
   if (!*built) return Status::OK;
   RETURN_IF_ERROR(build_rows_->PrepareForRead());
 
-  // Allocate the partition-local hash table.
+  // Allocate the partition-local hash table. Initialize the number of buckets
+  // based on the number of build rows (the number of rows is known at this point).
+  // This assumes there are no duplicates which can be wrong. However, the
+  // upside in the common case (few/no duplicates) is large and the downside
+  // when there are is low (a bit more memory; the bucket memory is small compared
+  // to the memory needed for all the build side allocations).
+  int64_t estimated_num_buckets =
+      HashTable::EstimatedNumBuckets(build_rows()->num_rows());
   hash_tbl_.reset(new HashTable(state, parent_->block_mgr_client_,
-      parent_->child(1)->row_desc().tuple_descriptors().size(), build_rows()));
+      parent_->child(1)->row_desc().tuple_descriptors().size(), build_rows(),
+      estimated_num_buckets));
   if (!hash_tbl_->Init()) {
     *built = false;
     hash_tbl_.reset();
@@ -1072,7 +1080,11 @@ Status PartitionedHashJoinNode::CleanUpHashPartitions(RowBatch* batch) {
       // spilled partitions.
       RETURN_IF_ERROR(partition->build_rows()->UnpinStream(true));
       RETURN_IF_ERROR(partition->probe_rows()->UnpinStream(true));
-      spilled_partitions_.push_back(partition);
+
+      // Push new created partitions at the front. This means a depth first walk
+      // (more finely partitioned partitions are processed first). This allows us
+      // to delete blocks earlier and bottom out the recursion earlier.
+      spilled_partitions_.push_front(partition);
     } else {
       DCHECK_EQ(partition->probe_rows()->num_rows(), 0)
         << "No probe rows should have been spilled for this partition.";

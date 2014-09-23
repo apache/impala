@@ -42,6 +42,20 @@ class BitUtil {
     return (value / factor) * factor;
   }
 
+  // Returns the smallest power of two that contains v. Taken from
+  // http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
+  static inline int64_t NextPowerOfTwo(int64_t v) {
+    --v;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v |= v >> 32;
+    ++v;
+    return v;
+  }
+
   // Non hw accelerated pop count.
   // TODO: we don't use this in any perf sensitive code paths currently.  There
   // might be a much faster way to implement this.
