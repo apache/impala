@@ -43,6 +43,7 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
     self.__test_cleanup()
 
   def teardown_method(self, method):
+    self.__test_cleanup()
     super(TestGrantRevoke, self).teardown_method(method)
 
   def __test_cleanup(self):
