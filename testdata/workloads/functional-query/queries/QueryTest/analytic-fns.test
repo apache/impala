@@ -826,6 +826,21 @@ select count(distinct t1.c1) from
 BIGINT
 ====
 ---- QUERY
+# IMPALA-1296: Fix DCHECK when unnecessary buffered tuple (for sum() analytic) not null
+select
+sum(month) over (),
+dense_rank() over (order by date_string_col)
+from alltypes where id < 5
+---- RESULTS
+5,1
+5,1
+5,1
+5,1
+5,1
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
 # IMPALA-1292: Incorrect result in analytic SUM when ORDER BY column is null
 select tinyint_col, id,
 SUM(id) OVER (ORDER BY tinyint_col ASC, id ASC)

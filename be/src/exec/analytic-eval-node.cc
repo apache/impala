@@ -136,8 +136,9 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
         mem_pool_.get(), &fn_ctxs_[i]));
     state->obj_pool()->Add(fn_ctxs_[i]);
   }
-  if (buffered_tuple_desc_ != NULL) {
-    DCHECK(partition_by_eq_expr_ctx_ != NULL || order_by_eq_expr_ctx_ != NULL);
+
+  if (partition_by_eq_expr_ctx_ != NULL || order_by_eq_expr_ctx_ != NULL) {
+    DCHECK(buffered_tuple_desc_ != NULL);
     vector<TTupleId> tuple_ids;
     tuple_ids.push_back(child(0)->row_desc().tuple_descriptors()[0]->id());
     tuple_ids.push_back(buffered_tuple_desc_->id());
