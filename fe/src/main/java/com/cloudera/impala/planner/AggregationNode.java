@@ -115,7 +115,7 @@ public class AggregationNode extends PlanNode {
         groupBySlots.add(aggInfo_.getOutputTupleDesc().getSlots().get(i).getId());
       }
       ArrayList<Expr> bindingPredicates =
-          analyzer.getBoundPredicates(tupleIds_.get(0), groupBySlots);
+          analyzer.getBoundPredicates(tupleIds_.get(0), groupBySlots, true);
       conjuncts_.addAll(bindingPredicates);
 
       // also add remaining unassigned conjuncts_

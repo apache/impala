@@ -307,7 +307,7 @@ public class SelectStmt extends QueryStmt {
       // Binding predicates are assigned to the final output tuple of the aggregation,
       // which is the tuple of the 2nd phase agg for distinct aggs.
       ArrayList<Expr> bindingPredicates =
-          analyzer.getBoundPredicates(aggInfo_.getResultTupleId(), groupBySlots);
+          analyzer.getBoundPredicates(aggInfo_.getResultTupleId(), groupBySlots, false);
       havingConjuncts.addAll(bindingPredicates);
       havingConjuncts.addAll(
           analyzer.getUnassignedConjuncts(aggInfo_.getResultTupleId().asList(), false));

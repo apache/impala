@@ -994,3 +994,23 @@ on (a.d1 = b.d1)
 00:SCAN HDFS [functional.decimal_tbl a]
    partitions=1/1 size=195B
 ====
+# Test predicate assignment through inline view when the query contains
+# group by and distinct (IMPALA-1165)
+select foo, sum(distinct foo)
+from (select int_col + int_col as foo from functional.alltypesagg) t
+where foo = 10
+group by foo
+limit 10
+---- PLAN
+02:AGGREGATE [FINALIZE]
+|  output: sum(foo)
+|  group by: foo
+|  limit: 10
+|
+01:AGGREGATE
+|  group by: int_col + int_col, int_col + int_col
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 size=814.73KB
+   predicates: int_col + int_col = 10
+====

@@ -1051,15 +1051,16 @@ public class Analyzer {
    * In particular, the returned list contains predicates that must be evaluated
    * at a join node (bound to outer-joined tuple) but can also be safely evaluated by a
    * plan node materializing destTid. Such predicates are not marked as assigned.
-   * All other inferred predicates are marked as assigned.
-   * This function returns bound predicates regardless of whether the source predicates
-   * have been assigned. It is up to the caller to decide if a bound predicate
+   * All other inferred predicates are marked as assigned if 'markAssigned'
+   * is true. This function returns bound predicates regardless of whether the source
+   * predicated have been assigned. It is up to the caller to decide if a bound predicate
    * should actually be used.
    * Destination slots in destTid can be ignored by passing them in ignoreSlots.
    * TODO: exclude UDFs from predicate propagation? their overloaded variants could
    * have very different semantics
    */
-  public ArrayList<Expr> getBoundPredicates(TupleId destTid, Set<SlotId> ignoreSlots) {
+  public ArrayList<Expr> getBoundPredicates(TupleId destTid, Set<SlotId> ignoreSlots,
+      boolean markAssigned) {
     ArrayList<Expr> result = Lists.newArrayList();
     for (ExprId srcConjunctId: globalState_.singleTidConjuncts) {
       Expr srcConjunct = globalState_.conjuncts.get(srcConjunctId);
@@ -1133,27 +1134,29 @@ public class Analyzer {
           LOG.trace("new pred: " + p.toSql() + " " + p.debugString());
         }
 
-        // predicate assignment doesn't hold if:
-        // - the application against slotId doesn't transfer the value back to its
-        //   originating slot
-        // - the original predicate is on an OJ'd table but doesn't originate from
-        //   that table's OJ clause's ON clause (if it comes from anywhere but that
-        //   ON clause, it needs to be evaluated directly by the join node that
-        //   materializes the OJ'd table)
-        boolean reverseValueTransfer = true;
-        for (int i = 0; i < srcSids.size(); ++i) {
-          if (!hasValueTransfer(destSids.get(i), srcSids.get(i))) {
-            reverseValueTransfer = false;
-            break;
+        if (markAssigned) {
+          // predicate assignment doesn't hold if:
+          // - the application against slotId doesn't transfer the value back to its
+          //   originating slot
+          // - the original predicate is on an OJ'd table but doesn't originate from
+          //   that table's OJ clause's ON clause (if it comes from anywhere but that
+          //   ON clause, it needs to be evaluated directly by the join node that
+          //   materializes the OJ'd table)
+          boolean reverseValueTransfer = true;
+          for (int i = 0; i < srcSids.size(); ++i) {
+            if (!hasValueTransfer(destSids.get(i), srcSids.get(i))) {
+              reverseValueTransfer = false;
+              break;
+            }
           }
+
+          boolean evalByJoin = evalByJoin(srcConjunct) &&
+              (globalState_.ojClauseByConjunct.get(srcConjunct.getId())
+                  != globalState_.outerJoinedTupleIds.get(srcTid));
+
+          // mark all bound predicates including duplicate ones
+          if (reverseValueTransfer && !evalByJoin) markConjunctAssigned(srcConjunct);
         }
-
-        boolean evalByJoin = evalByJoin(srcConjunct) &&
-            (globalState_.ojClauseByConjunct.get(srcConjunct.getId())
-                != globalState_.outerJoinedTupleIds.get(srcTid));
-
-        // mark all bound predicates including duplicate ones
-        if (reverseValueTransfer && !evalByJoin) markConjunctAssigned(srcConjunct);
 
         // check if we already created this predicate
         if (!result.contains(p)) result.add(p);
@@ -1163,7 +1166,7 @@ public class Analyzer {
   }
 
   public ArrayList<Expr> getBoundPredicates(TupleId destTid) {
-    return getBoundPredicates(destTid, new HashSet<SlotId>());
+    return getBoundPredicates(destTid, new HashSet<SlotId>(), true);
   }
 
   /**
