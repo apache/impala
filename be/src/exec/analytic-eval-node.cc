@@ -390,23 +390,34 @@ inline void AnalyticEvalNode::InitNextPartition(int64_t stream_idx) {
   curr_partition_stream_idx_ = stream_idx;
 
   // If the window has an end bound preceding the current row, we will have output
-  // tuples for rows beyond the partition so they should be removed.
+  // tuples for rows beyond the partition so they should be removed. If there was only
+  // one result tuple left in the partition it will remain in result_tuples_ because it
+  // is the empty result tuple (i.e. called Init() and never Update()) that was added
+  // when initializing the previous partition so that the first rows have the default
+  // values (where there are no preceding rows in the window).
   bool removed_results_past_partition = false;
   while (!result_tuples_.empty() && last_result_idx_ >= curr_partition_stream_idx_) {
     removed_results_past_partition = true;
     DCHECK(window_.__isset.window_end &&
         window_.window_end.type == TAnalyticWindowBoundaryType::PRECEDING);
-    VLOG_ROW << "Removing result past partition, last result idx:" << last_result_idx_
-             << " removing result tuple with idx:" << result_tuples_.back().first;
+    VLOG_ROW << "Removing tuple past partition idx: " << result_tuples_.back().first;
+    Tuple* prev_result_tuple = result_tuples_.back().second;
     result_tuples_.pop_back();
-    if (result_tuples_.empty()) {
-      last_result_idx_ = curr_partition_stream_idx_ - 1;
-    } else {
-      last_result_idx_ = result_tuples_.back().first;
+    if (result_tuples_.empty() ||
+        result_tuples_.back().first < prev_partition_stream_idx) {
+      // prev_result_tuple was the last result tuple in the partition, add it back with
+      // the index of the last row in the partition so that all output rows in this
+      // partition get the default result tuple.
+      result_tuples_.push_back(
+          pair<int64_t, Tuple*>(curr_partition_stream_idx_ - 1, prev_result_tuple));
     }
+    last_result_idx_ = result_tuples_.back().first;
   }
+  VLOG_ROW << "Partition last result idx: " << last_result_idx_ << " : "
+             << DebugEvaluatedRowsString();
   if (removed_results_past_partition) {
     DCHECK_EQ(last_result_idx_, curr_partition_stream_idx_ - 1);
+    DCHECK_LE(input_stream_->rows_returned(), last_result_idx_);
   }
 
 
@@ -441,7 +452,11 @@ inline bool AnalyticEvalNode::PrevRowCompare(ExprContext* pred_ctx) {
 }
 
 Status AnalyticEvalNode::ProcessChildBatches(RuntimeState* state) {
-  while (curr_child_batch_.get() != NULL && NumOutputRowsReady() < state->batch_size()) {
+  // Consume child batches until eos or there are enough rows to return more than an
+  // output batch. Ensuring there is at least one more row left after returning results
+  // allows us to simplify the logic dealing with last_result_idx_ and result_tuples_.
+  while (curr_child_batch_.get() != NULL &&
+      NumOutputRowsReady() < state->batch_size() + 1) {
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(state->CheckQueryState());
     RETURN_IF_ERROR(ProcessChildBatch(state));

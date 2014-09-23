@@ -815,6 +815,19 @@ from alltypesagg where id <= 30 order by id;
 INT, BIGINT
 ====
 ---- QUERY
+# IMPALA-1293: DCHECK failure with window ROWS BETWEEN UNBOUNDED PRECEDING
+# AND <large> PRECEDING
+select count(*), count(t1.c1) from
+(select SUM(tinyint_col) OVER (PARTITION BY bigint_col ORDER BY tinyint_col ASC,
+                               id ASC, timestamp_col ASC, day ASC
+                               ROWS BETWEEN UNBOUNDED PRECEDING AND 11 PRECEDING) c1
+ FROM alltypesagg) t1
+---- RESULTS
+11000,0
+---- TYPES
+BIGINT, BIGINT
+====
+---- QUERY
 # Test RANGE with UNBOUNDED FOLLOWING on many partitions
 select count(distinct t1.c1) from
 (select sum(id) over (partition by day order by tinyint_col
