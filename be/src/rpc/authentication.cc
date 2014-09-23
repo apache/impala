@@ -43,6 +43,10 @@
 #include "util/thread.h"
 #include "util/time.h"
 
+#include <sys/types.h>    // for stat system call
+#include <sys/stat.h>     // for stat system call
+#include <unistd.h>       // for stat system call
+
 using namespace apache::thrift;
 using namespace std;
 using namespace strings;
@@ -590,6 +594,30 @@ Status InitAuth(const string& appname) {
   return Status::OK;
 }
 
+// Ensure that /var/tmp (the location of the Kerberos replay cache) has drwxrwxrwt
+// permissions.  If it doesn't, Kerberos will be unhappy in a way that's very difficult
+// to debug.  We do this using direct stat() calls because boost doesn't support the
+// detail we need.
+Status CheckReplayCacheDirPermissions() {
+  struct stat st;
+
+  if (stat("/var/tmp", &st) < 0) {
+    return Status(Substitute("Problem accessing /var/tmp: $0", GetStrErrMsg()));
+  }
+
+  if (!(st.st_mode & S_IFDIR)) {
+    return Status("Error: /var/tmp is not a directory");
+  }
+
+  if ((st.st_mode & 01777) != 01777) {
+    return Status("Error: The permissions on /var/tmp must precisely match "
+        "\"drwxrwxrwt\". This directory is used by the Kerberos replay cache. To "
+        "rectify this issue, run \"chmod 01777 /var/tmp\" as root.");
+  }
+
+  return Status::OK;
+}
+
 Status SaslAuthProvider::InitKerberos(const string& principal,
     const string& keytab_file) {
   principal_ = principal;
@@ -618,6 +646,7 @@ Status SaslAuthProvider::InitKerberos(const string& principal,
   hostname_ = names[1];
   realm_ = names[2];
 
+  RETURN_IF_ERROR(CheckReplayCacheDirPermissions());
   RETURN_IF_ERROR(InitKerberosEnv());
 
   LOG(INFO) << "Using " << (is_internal_ ? "internal" : "external")
