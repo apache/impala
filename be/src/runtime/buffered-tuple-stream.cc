@@ -291,11 +291,15 @@ Status BufferedTupleStream::PinStream(bool* pinned) {
 Status BufferedTupleStream::UnpinStream(bool all) {
   DCHECK(!closed_);
   SCOPED_TIMER(unpin_timer_);
-  for (list<BufferedBlockMgr::Block*>::iterator it = blocks_.begin();
-      it != blocks_.end(); ++it) {
-    if (!(*it)->is_pinned()) continue;
-    if (!all && (*it == write_block_ || (read_write_ && it == read_block_))) continue;
-    RETURN_IF_ERROR((*it)->Unpin());
+
+  // Unpin the stream from the back. We read from the front so we want those blocks
+  // evicted last.
+  BOOST_REVERSE_FOREACH(BufferedBlockMgr::Block* block, blocks_) {
+    if (!block->is_pinned()) continue;
+    if (!all && (block == write_block_ || (read_write_ && block == *read_block_))) {
+      continue;
+    }
+    RETURN_IF_ERROR(block->Unpin());
     --num_pinned_;
     DCHECK_EQ(num_pinned_, NumPinned(blocks_));
   }
