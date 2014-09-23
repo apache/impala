@@ -544,7 +544,7 @@ order by a.tinyint_col, a.int_col
 |  hash predicates: a.id = b.id
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 size=478.45KB
@@ -1314,7 +1314,7 @@ where t2.id < 10 and t2.int_col < 20
 |  hash predicates: id = t2.id, sum(int_col) = t2.int_col
 |
 |--03:SCAN HDFS [functional.alltypes t2]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |     predicates: t2.id < 10, t2.int_col < 20
 |
 02:ANALYTIC
@@ -1347,7 +1347,7 @@ where t2.id < 10 and t2.int_col < 20
 |  other predicates: t2.id < 10, t2.int_col < 20
 |
 |--03:SCAN HDFS [functional.alltypes t2]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |     predicates: t2.id < 10, t2.int_col < 20
 |
 02:ANALYTIC
@@ -1636,7 +1636,7 @@ WHERE EXISTS (SELECT t1.year AS int_col_1 FROM functional.alltypesagg t1)
 02:CROSS JOIN [BROADCAST]
 |
 |--01:SCAN HDFS [functional.alltypesagg t1]
-|     partitions=11/11 size=814.73KB compact
+|     partitions=11/11 size=814.73KB
 |     limit: 1
 |
 00:SCAN HDFS [functional.alltypesagg t1]

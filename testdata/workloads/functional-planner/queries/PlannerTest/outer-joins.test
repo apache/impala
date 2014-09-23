@@ -33,7 +33,7 @@ and t1.zip + t2.zip + t3.zip= 20
 |  other predicates: t3.id IS NOT NULL, t1.zip + t2.zip + t3.zip = 20
 |
 |--02:SCAN HDFS [functional.testtbl t3]
-|     partitions=1/1 size=0B compact
+|     partitions=1/1 size=0B
 |     predicates: t3.zip = 94720, t3.id > 0, t3.id IS NOT NULL
 |
 03:HASH JOIN [LEFT OUTER JOIN]
@@ -42,7 +42,7 @@ and t1.zip + t2.zip + t3.zip= 20
 |  other predicates: t2.id IS NULL, t1.zip + t2.zip = 10
 |
 |--01:SCAN HDFS [functional.testtbl t2]
-|     partitions=1/1 size=0B compact
+|     partitions=1/1 size=0B
 |     predicates: t2.zip = 94104
 |
 00:SCAN HDFS [functional.testtbl t1]
@@ -93,7 +93,7 @@ and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 |  other predicates: a3.id IS NOT NULL, a1.zip + a2.zip + a3.zip = 20
 |
 |--02:SCAN HDFS [functional.testtbl a3]
-|     partitions=1/1 size=0B compact
+|     partitions=1/1 size=0B
 |     predicates: a3.id > 0, a3.id IS NOT NULL, a3.zip = 94720
 |
 03:HASH JOIN [LEFT OUTER JOIN]
@@ -102,7 +102,7 @@ and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 |  other predicates: a2.id IS NULL, a1.zip + a2.zip = 10
 |
 |--01:SCAN HDFS [functional.testtbl a2]
-|     partitions=1/1 size=0B compact
+|     partitions=1/1 size=0B
 |     predicates: a2.zip = 94104
 |
 00:SCAN HDFS [functional.testtbl a1]
@@ -149,14 +149,14 @@ from functional.testtbl t1
 |  hash predicates: t1.id = t3.id
 |
 |--02:SCAN HDFS [functional.testtbl t3]
-|     partitions=1/1 size=0B compact
+|     partitions=1/1 size=0B
 |
 03:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: t1.id = t2.id
 |  other join predicates: t1.id = 17
 |
 |--01:SCAN HDFS [functional.testtbl t2]
-|     partitions=1/1 size=0B compact
+|     partitions=1/1 size=0B
 |     predicates: t2.id = 17
 |
 00:SCAN HDFS [functional.testtbl t1]
@@ -198,7 +198,7 @@ and t1.zip + t2.zip + t3.zip= 20
 |  other predicates: t1.id > 0, t2.id IS NULL, t1.zip + t2.zip = 10, t1.zip + t2.zip + t3.zip = 20
 |
 |--02:SCAN HDFS [functional.testtbl t3]
-|     partitions=1/1 size=0B compact
+|     partitions=1/1 size=0B
 |     predicates: t3.id IS NOT NULL
 |
 03:HASH JOIN [RIGHT OUTER JOIN]
@@ -206,7 +206,7 @@ and t1.zip + t2.zip + t3.zip= 20
 |  other join predicates: t1.zip = 94611, t2.zip = 94104
 |
 |--01:SCAN HDFS [functional.testtbl t2]
-|     partitions=1/1 size=0B compact
+|     partitions=1/1 size=0B
 |     predicates: t2.id = 15
 |
 00:SCAN HDFS [functional.testtbl t1]
@@ -259,7 +259,7 @@ and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 |  other predicates: a2.id IS NULL, a1.id > 0, a1.zip + a2.zip = 10, a1.zip + a2.zip + a3.zip = 20
 |
 |--02:SCAN HDFS [functional.testtbl a3]
-|     partitions=1/1 size=0B compact
+|     partitions=1/1 size=0B
 |     predicates: a3.id IS NOT NULL
 |
 03:HASH JOIN [RIGHT OUTER JOIN]
@@ -267,7 +267,7 @@ and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 |  other join predicates: a1.zip = 94611, a2.zip = 94104
 |
 |--01:SCAN HDFS [functional.testtbl a2]
-|     partitions=1/1 size=0B compact
+|     partitions=1/1 size=0B
 |     predicates: a2.id = 15
 |
 00:SCAN HDFS [functional.testtbl a1]
@@ -317,7 +317,7 @@ where a.tinyint_col is null
 |  other predicates: a.tinyint_col IS NULL
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 size=814.73KB
@@ -349,7 +349,7 @@ where a.tinyint_col is null
 |  other predicates: a.tinyint_col IS NULL
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 size=814.73KB

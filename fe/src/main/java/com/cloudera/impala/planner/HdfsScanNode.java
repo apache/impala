@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 
-import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -645,11 +644,7 @@ public class HdfsScanNode extends ScanNode {
       output.append(String.format("%spartitions=%s/%s size=%s", detailPrefix,
           numPartitions, table.getPartitions().size() - 1,
           PrintUtils.printBytes(totalBytes_)));
-      if (compactData_) {
-        output.append(" compact\n");
-      } else {
-        output.append("\n");
-      }
+      output.append("\n");
       if (!conjuncts_.isEmpty()) {
         output.append(
             detailPrefix + "predicates: " + getExplainString(conjuncts_) + "\n");

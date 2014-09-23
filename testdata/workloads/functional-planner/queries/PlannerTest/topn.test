@@ -121,7 +121,7 @@ limit 2
 |  hash predicates: t1.id = t2.id
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: t2.int_col IS NOT NULL
 |
 00:SCAN HDFS [functional.alltypessmall t1]
@@ -199,7 +199,7 @@ limit 10 offset 5
 |  hash predicates: t1.id = t2.id
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: t2.int_col IS NOT NULL
 |
 00:SCAN HDFS [functional.alltypessmall t1]

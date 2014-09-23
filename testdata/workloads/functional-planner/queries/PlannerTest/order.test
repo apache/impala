@@ -266,7 +266,7 @@ order by j.test_id, j.test_name, j.test_zip, j.alltypes_id, d.name
 |  hash predicates: j.test_id = d.id
 |
 |--01:SCAN HDFS [functional.dimtbl d]
-|     partitions=1/1 size=171B compact
+|     partitions=1/1 size=171B
 |
 00:SCAN HDFS [functional.jointbl j]
    partitions=1/1 size=433B
@@ -311,14 +311,14 @@ order by c.string_col desc, a.smallint_col
 |  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000
 |
 |--02:SCAN HDFS [functional.alltypessmall c]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: c.string_col < '7'
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.smallint_col = b.id
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: b.float_col > 4.5
 |
 00:SCAN HDFS [functional.alltypesagg a]
@@ -403,7 +403,7 @@ order by t1.id,t2.id
 |  hash predicates: t1.int_col = t2.int_col
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 size=814.73KB
@@ -436,7 +436,7 @@ order by t1.id, t2.id
 02:CROSS JOIN [BROADCAST]
 |
 |--01:SCAN HDFS [functional.alltypestiny t2]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |     predicates: t2.id < 3
 |
 00:SCAN HDFS [functional.alltypestiny t1]
@@ -790,7 +790,7 @@ join B on (A.string_col = B.string_col)
 |  hash predicates: functional.alltypes.string_col = functional.alltypes.string_col
 |
 |--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB

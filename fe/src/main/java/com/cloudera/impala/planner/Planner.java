@@ -436,9 +436,6 @@ public class Planner {
       PlanFragment rightChildFragment, PlanFragment leftChildFragment,
       long perNodeMemLimit, ArrayList<PlanFragment> fragments,
       Analyzer analyzer) throws InternalException {
-    // The rhs tree is going to send data through an exchange node which effectively
-    // compacts the data. No reason to do it again at the rhs root node.
-    rightChildFragment.getPlanRoot().setCompactData(false);
     node.setChild(0, leftChildFragment.getPlanRoot());
     connectChildFragment(analyzer, node, 1, rightChildFragment);
     leftChildFragment.setPlanRoot(node);
@@ -536,9 +533,6 @@ public class Planner {
       doBroadcast = false;
     }
 
-    // The rhs tree is going to send data through an exchange node which effectively
-    // compacts the data. No reason to do it again at the rhs root node.
-    rhsTree.setCompactData(false);
     if (doBroadcast) {
       node.setDistributionMode(HashJoinNode.DistributionMode.BROADCAST);
       // Doesn't create a new fragment, but modifies leftChildFragment to execute
@@ -1285,8 +1279,6 @@ public class Planner {
       // with a dense sequence of node ids
       root.setId(nodeIdGenerator_.getNextId());
       analyzer.setAssignedConjuncts(root.getAssignedConjuncts());
-      // build side copies data to a compact representation in the tuple buffer.
-      root.getChildren().get(1).setCompactData(true);
       ++i;
     }
 
@@ -1307,8 +1299,6 @@ public class Planner {
       PlanNode innerPlan = refPlans.get(i).second;
       root = createJoinNode(analyzer, root, innerPlan, null, innerRef, true);
       root.setId(nodeIdGenerator_.getNextId());
-      // build side copies data to a compact representation in the tuple buffer.
-      root.getChildren().get(1).setCompactData(true);
     }
     return root;
   }
@@ -1776,7 +1766,6 @@ public class Planner {
       // TODO If there are eq join predicates then we should construct a hash join
       CrossJoinNode result = new CrossJoinNode(outer, inner);
       result.init(analyzer);
-      result.getChildren().get(1).setCompactData(true);
       return result;
     }
 
@@ -1843,9 +1832,6 @@ public class Planner {
     HashJoinNode result =
         new HashJoinNode(outer, inner, tblRef, eqJoinConjuncts, otherJoinConjuncts);
     result.init(analyzer);
-
-    // build side of join copies data to a compact representation in the tuple buffer
-    result.getChildren().get(1).setCompactData(true);
     return result;
   }
 

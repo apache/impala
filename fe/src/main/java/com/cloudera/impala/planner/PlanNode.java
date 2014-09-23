@@ -109,9 +109,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // sum of tupleIds_' avgSerializedSizes; set in computeStats()
   protected float avgRowSize_;
 
-  //  Node should compact data.
-  protected boolean compactData_;
-
   // estimated per-host memory requirement for this node;
   // set in computeCosts(); invalid: -1
   protected long perHostMemCost_ = -1;
@@ -161,7 +158,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     conjuncts_ = Expr.cloneList(node.conjuncts_);
     cardinality_ = -1;
     numNodes_ = -1;
-    compactData_ = node.compactData_;
     displayName_ = displayName;
   }
 
@@ -184,14 +180,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public Set<ExprId> getAssignedConjuncts() { return assignedConjuncts_; }
   public void setAssignedConjuncts(Set<ExprId> conjuncts) {
     assignedConjuncts_ = conjuncts;
-  }
-
-  /** Set the value of compactData_ in all children. */
-  public void setCompactData(boolean on) {
-    compactData_ = on;
-    for (PlanNode child: this.getChildren()) {
-      child.setCompactData(on);
-    }
   }
 
   /**
@@ -376,7 +364,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     for (Expr e: conjuncts_) {
       msg.addToConjuncts(e.treeToThrift());
     }
-    msg.compact_data = compactData_;
+    msg.compact_data = false;
     toThrift(msg);
     container.addToNodes(msg);
     // For the purpose of the BE consider ExchangeNodes to have no children.

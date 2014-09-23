@@ -85,9 +85,6 @@ public class SortNode extends PlanNode {
   public void setIsAnalyticSort(boolean v) { isAnalyticSort_ = v; }
 
   @Override
-  public void setCompactData(boolean on) { compactData_ = on; }
-
-  @Override
   public boolean isBlockingNode() { return true; }
 
   @Override

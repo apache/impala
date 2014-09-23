@@ -34,14 +34,14 @@ limit 10
 |  hash predicates: o.o_custkey = c.c_custkey
 |
 |--00:SCAN HDFS [tpch.customer c]
-|     partitions=1/1 size=23.08MB compact
+|     partitions=1/1 size=23.08MB
 |     predicates: c.c_mktsegment = 'BUILDING'
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: l.l_orderkey = o.o_orderkey
 |
 |--01:SCAN HDFS [tpch.orders o]
-|     partitions=1/1 size=162.56MB compact
+|     partitions=1/1 size=162.56MB
 |     predicates: o_orderdate < '1995-03-15'
 |
 02:SCAN HDFS [tpch.lineitem l]
@@ -123,14 +123,14 @@ limit 10
 |  hash predicates: o.o_orderkey = l.l_orderkey
 |
 |--02:SCAN HDFS [tpch.lineitem l]
-|     partitions=1/1 size=718.94MB compact
+|     partitions=1/1 size=718.94MB
 |     predicates: l_shipdate > '1995-03-15'
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: c.c_custkey = o.o_custkey
 |
 |--01:SCAN HDFS [tpch.orders o]
-|     partitions=1/1 size=162.56MB compact
+|     partitions=1/1 size=162.56MB
 |     predicates: o_orderdate < '1995-03-15'
 |
 00:SCAN HDFS [tpch.customer c]
@@ -218,32 +218,32 @@ limit 100
 |  hash predicates: n_regionkey = r_regionkey
 |
 |--05:SCAN HDFS [tpch.region]
-|     partitions=1/1 size=384B compact
+|     partitions=1/1 size=384B
 |     predicates: r_name = 'ASIA'
 |
 09:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n_nationkey
 |
 |--04:SCAN HDFS [tpch.nation]
-|     partitions=1/1 size=2.15KB compact
+|     partitions=1/1 size=2.15KB
 |
 08:HASH JOIN [INNER JOIN]
 |  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
 |
 |--03:SCAN HDFS [tpch.supplier s]
-|     partitions=1/1 size=1.33MB compact
+|     partitions=1/1 size=1.33MB
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
 |
 |--00:SCAN HDFS [tpch.customer]
-|     partitions=1/1 size=23.08MB compact
+|     partitions=1/1 size=23.08MB
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: l_orderkey = o_orderkey
 |
 |--01:SCAN HDFS [tpch.orders o]
-|     partitions=1/1 size=162.56MB compact
+|     partitions=1/1 size=162.56MB
 |     predicates: o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
 |
 02:SCAN HDFS [tpch.lineitem l]
@@ -341,26 +341,26 @@ where
 |  hash predicates: n.n_regionkey = r.r_regionkey
 |
 |--04:SCAN HDFS [tpch.region r]
-|     partitions=1/1 size=384B compact
+|     partitions=1/1 size=384B
 |     predicates: r.r_name = 'EUROPE'
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: s.s_nationkey = n.n_nationkey
 |
 |--03:SCAN HDFS [tpch.nation n]
-|     partitions=1/1 size=2.15KB compact
+|     partitions=1/1 size=2.15KB
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: ps.ps_suppkey = s.s_suppkey
 |
 |--01:SCAN HDFS [tpch.supplier s]
-|     partitions=1/1 size=1.33MB compact
+|     partitions=1/1 size=1.33MB
 |
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: ps.ps_partkey = p.p_partkey
 |
 |--00:SCAN HDFS [tpch.part p]
-|     partitions=1/1 size=22.83MB compact
+|     partitions=1/1 size=22.83MB
 |     predicates: p.p_size = 15, p.p_type LIKE '%BRASS'
 |
 02:SCAN HDFS [tpch.partsupp ps]
@@ -434,7 +434,7 @@ limit 10
 |  hash predicates: l_orderkey = o_orderkey
 |
 |--00:SCAN HDFS [tpch.orders]
-|     partitions=1/1 size=162.56MB compact
+|     partitions=1/1 size=162.56MB
 |     predicates: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
 |
 01:SCAN HDFS [tpch.lineitem]
@@ -492,7 +492,7 @@ order by o_orderpriority limit 10
 |  hash predicates: o_orderkey = l_orderkey
 |
 |--01:SCAN HDFS [tpch.lineitem]
-|     partitions=1/1 size=718.94MB compact
+|     partitions=1/1 size=718.94MB
 |
 00:SCAN HDFS [tpch.orders]
    partitions=1/1 size=162.56MB
@@ -546,7 +546,7 @@ order by o_orderpriority limit 10
 |  hash predicates: o_orderkey = l_orderkey
 |
 |--01:SCAN HDFS [tpch.lineitem]
-|     partitions=1/1 size=718.94MB compact
+|     partitions=1/1 size=718.94MB
 |
 00:SCAN HDFS [tpch.orders]
    partitions=1/1 size=162.56MB
@@ -596,14 +596,14 @@ where n_name = 'x'
 |  hash predicates: c_nationkey = n_nationkey
 |
 |--02:SCAN HDFS [tpch.nation]
-|     partitions=1/1 size=2.15KB compact
+|     partitions=1/1 size=2.15KB
 |     predicates: n_name = 'x'
 |
 03:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: o_custkey = c_custkey
 |
 |--00:SCAN HDFS [tpch.customer]
-|     partitions=1/1 size=23.08MB compact
+|     partitions=1/1 size=23.08MB
 |
 01:SCAN HDFS [tpch.orders]
    partitions=1/1 size=162.56MB
@@ -652,13 +652,13 @@ where n_name = 'x'
 04:CROSS JOIN [BROADCAST]
 |
 |--01:SCAN HDFS [tpch.orders]
-|     partitions=1/1 size=162.56MB compact
+|     partitions=1/1 size=162.56MB
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: c_nationkey = n_nationkey
 |
 |--02:SCAN HDFS [tpch.nation]
-|     partitions=1/1 size=2.15KB compact
+|     partitions=1/1 size=2.15KB
 |     predicates: n_name = 'x'
 |
 00:SCAN HDFS [tpch.customer]
@@ -704,10 +704,10 @@ cross join functional.alltypes c
 |--03:CROSS JOIN [BROADCAST]
 |  |
 |  |--01:SCAN HDFS [functional.alltypestiny b]
-|  |     partitions=4/4 size=460B compact
+|  |     partitions=4/4 size=460B
 |  |
 |  00:SCAN HDFS [functional.alltypestiny a]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 02:SCAN HDFS [functional.alltypes c]
    partitions=24/24 size=478.45KB
@@ -729,31 +729,31 @@ inner join functional.alltypestiny t6 on (t5.id = t6.id)
 |  hash predicates: t5.id = t6.id
 |
 |--05:SCAN HDFS [functional.alltypestiny t6]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 09:HASH JOIN [INNER JOIN]
 |  hash predicates: t4.id = t5.id
 |
 |--04:SCAN HDFS [functional.alltypes t5]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |
 08:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: t3.id = t4.id
 |
 |--03:SCAN HDFS [functional.alltypesagg t4]
-|     partitions=11/11 size=814.73KB compact
+|     partitions=11/11 size=814.73KB
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.id = t3.id
 |
 |--02:SCAN HDFS [functional.alltypessmall t3]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.id = t1.id
 |
 |--00:SCAN HDFS [functional.alltypestiny t1]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 01:SCAN HDFS [functional.alltypes t2]
    partitions=24/24 size=478.45KB
@@ -775,31 +775,31 @@ right join functional.alltypestiny t6 on (t5.id = t6.id)
 |  hash predicates: t5.id = t6.id
 |
 |--05:SCAN HDFS [functional.alltypestiny t6]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 11:HASH JOIN [INNER JOIN]
 |  hash predicates: t3.id = t5.id
 |
 |--04:SCAN HDFS [functional.alltypes t5]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |
 10:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t3.id = t4.id
 |
 |--03:SCAN HDFS [functional.alltypesagg t4]
-|     partitions=11/11 size=814.73KB compact
+|     partitions=11/11 size=814.73KB
 |
 09:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.id = t3.id
 |
 |--02:SCAN HDFS [functional.alltypessmall t3]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |
 08:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: t2.id = t1.id
 |
 |--00:SCAN HDFS [functional.alltypestiny t1]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 01:SCAN HDFS [functional.alltypes t2]
    partitions=24/24 size=478.45KB
@@ -821,31 +821,31 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |  hash predicates: t3.id = t6.id
 |
 |--05:SCAN HDFS [functional.alltypestiny t6]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 13:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t4.id = t5.id
 |
 |--04:SCAN HDFS [functional.alltypes t5]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |
 12:HASH JOIN [INNER JOIN]
 |  hash predicates: t3.id = t4.id
 |
 |--03:SCAN HDFS [functional.alltypessmall t4]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |
 11:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.id = t3.id
 |
 |--02:SCAN HDFS [functional.alltypesagg t3]
-|     partitions=11/11 size=814.73KB compact
+|     partitions=11/11 size=814.73KB
 |
 10:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: t2.id = t1.id
 |
 |--00:SCAN HDFS [functional.alltypestiny t1]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 01:SCAN HDFS [functional.alltypes t2]
    partitions=24/24 size=478.45KB
@@ -866,31 +866,31 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |  hash predicates: t3.id = t6.id
 |
 |--05:SCAN HDFS [functional.alltypestiny t6]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 13:HASH JOIN [LEFT ANTI JOIN]
 |  hash predicates: t4.id = t5.id
 |
 |--04:SCAN HDFS [functional.alltypes t5]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |
 12:HASH JOIN [INNER JOIN]
 |  hash predicates: t3.id = t4.id
 |
 |--03:SCAN HDFS [functional.alltypessmall t4]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |
 11:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.id = t3.id
 |
 |--02:SCAN HDFS [functional.alltypesagg t3]
-|     partitions=11/11 size=814.73KB compact
+|     partitions=11/11 size=814.73KB
 |
 10:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: t2.id = t1.id
 |
 |--00:SCAN HDFS [functional.alltypestiny t1]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 01:SCAN HDFS [functional.alltypes t2]
    partitions=24/24 size=478.45KB
@@ -915,7 +915,7 @@ on (t3.id = t4.id)
 |  hash predicates: t3.id = t4.id
 |
 |--09:SCAN HDFS [functional.alltypestiny t4]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 11:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: t3.id = a.id
@@ -933,7 +933,7 @@ on (t3.id = t4.id)
 |  |  |  hash predicates: a.id = b.id
 |  |  |
 |  |  |--01:SCAN HDFS [functional.alltypestiny b]
-|  |  |     partitions=4/4 size=460B compact
+|  |  |     partitions=4/4 size=460B
 |  |  |
 |  |  00:SCAN HDFS [functional.alltypestiny a]
 |  |     partitions=4/4 size=460B
@@ -943,10 +943,10 @@ on (t3.id = t4.id)
 |  |  other predicates: a.year < 10
 |  |
 |  |--05:SCAN HDFS [functional.alltypes a]
-|  |     partitions=0/24 size=0B compact
+|  |     partitions=0/24 size=0B
 |  |
 |  06:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 08:SCAN HDFS [functional.alltypes t3]
    partitions=24/24 size=478.45KB
@@ -971,7 +971,7 @@ on (t3.id = t4.id)
 |  hash predicates: t3.id = t4.id
 |
 |--09:SCAN HDFS [functional.alltypestiny t4]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 11:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: t3.id = a.id
@@ -989,7 +989,7 @@ on (t3.id = t4.id)
 |  |  |  hash predicates: a.id = b.id
 |  |  |
 |  |  |--01:SCAN HDFS [functional.alltypestiny b]
-|  |  |     partitions=4/4 size=460B compact
+|  |  |     partitions=4/4 size=460B
 |  |  |
 |  |  00:SCAN HDFS [functional.alltypestiny a]
 |  |     partitions=4/4 size=460B
@@ -999,10 +999,10 @@ on (t3.id = t4.id)
 |  |  other predicates: a.year < 10
 |  |
 |  |--05:SCAN HDFS [functional.alltypes a]
-|  |     partitions=0/24 size=0B compact
+|  |     partitions=0/24 size=0B
 |  |
 |  06:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 08:SCAN HDFS [functional.alltypes t3]
    partitions=24/24 size=478.45KB
@@ -1027,7 +1027,7 @@ where t2.month = 1
 |  hash predicates: b.id = t4.id
 |
 |--09:SCAN HDFS [functional.alltypestiny t4]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 11:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: t3.id = b.id
@@ -1045,7 +1045,7 @@ where t2.month = 1
 |  |  |  hash predicates: a.id = b.id
 |  |  |
 |  |  |--01:SCAN HDFS [functional.alltypestiny b]
-|  |  |     partitions=4/4 size=460B compact
+|  |  |     partitions=4/4 size=460B
 |  |  |
 |  |  00:SCAN HDFS [functional.alltypestiny a]
 |  |     partitions=4/4 size=460B
@@ -1054,10 +1054,10 @@ where t2.month = 1
 |  |  hash predicates: b.id = a.id
 |  |
 |  |--05:SCAN HDFS [functional.alltypestiny a]
-|  |     partitions=4/4 size=460B compact
+|  |     partitions=4/4 size=460B
 |  |
 |  06:SCAN HDFS [functional.alltypes b]
-|     partitions=2/24 size=40.32KB compact
+|     partitions=2/24 size=40.32KB
 |
 08:SCAN HDFS [functional.alltypes t3]
    partitions=24/24 size=478.45KB
@@ -1082,7 +1082,7 @@ where t2.month = 1
 |  hash predicates: b.id = t4.id
 |
 |--09:SCAN HDFS [functional.alltypestiny t4]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 11:HASH JOIN [RIGHT ANTI JOIN]
 |  hash predicates: t3.id = b.id
@@ -1100,7 +1100,7 @@ where t2.month = 1
 |  |  |  hash predicates: a.id = b.id
 |  |  |
 |  |  |--01:SCAN HDFS [functional.alltypestiny b]
-|  |  |     partitions=4/4 size=460B compact
+|  |  |     partitions=4/4 size=460B
 |  |  |
 |  |  00:SCAN HDFS [functional.alltypestiny a]
 |  |     partitions=4/4 size=460B
@@ -1109,10 +1109,10 @@ where t2.month = 1
 |  |  hash predicates: b.id = a.id
 |  |
 |  |--05:SCAN HDFS [functional.alltypestiny a]
-|  |     partitions=4/4 size=460B compact
+|  |     partitions=4/4 size=460B
 |  |
 |  06:SCAN HDFS [functional.alltypes b]
-|     partitions=2/24 size=40.32KB compact
+|     partitions=2/24 size=40.32KB
 |
 08:SCAN HDFS [functional.alltypes t3]
    partitions=24/24 size=478.45KB

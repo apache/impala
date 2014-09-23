@@ -24,7 +24,7 @@ select * from functional.complex_view
 |  hash predicates: a.id = b.id
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 00:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 size=814.73KB
@@ -117,7 +117,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |  hash predicates: functional.alltypes.id = int_col
 |
 |--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |     predicates: functional.alltypes.int_col > 1
 |
 07:HASH JOIN [INNER JOIN]
@@ -135,7 +135,7 @@ functional.complex_view t3 where t1.id = t2.x and t2.x = t3.abc
 |  |  hash predicates: a.id = b.id
 |  |
 |  |--03:SCAN HDFS [functional.alltypestiny b]
-|  |     partitions=4/4 size=460B compact
+|  |     partitions=4/4 size=460B
 |  |
 |  02:SCAN HDFS [functional.alltypesagg a]
 |     partitions=11/11 size=814.73KB
@@ -205,13 +205,13 @@ inner join functional.alltypes_view t3 on (t2.id = t3.id)
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
 |
 |--02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
 |
 |--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -249,13 +249,13 @@ inner join functional.alltypes_view t3 using(id)
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
 |
 |--02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
 |
 |--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -293,13 +293,13 @@ full outer join functional.alltypes_view t3 using(id)
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
 |
 |--02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |
 03:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
 |
 |--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -339,13 +339,13 @@ inner join [shuffle] functional.alltypes_view t3 using(id)
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
 |
 |--02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.id = functional.alltypes.id
 |
 |--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB

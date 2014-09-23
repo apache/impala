@@ -10,7 +10,7 @@ where b.bigint_col div 2 = 0
 |  hash predicates: a.double_col = b.bigint_col
 |
 |--01:SCAN HDFS [functional.alltypes b]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |     predicates: b.bigint_col DIV 2 = 0
 |
 00:SCAN HDFS [functional.alltypes a]
@@ -28,7 +28,7 @@ where b.id < 10
 |  hash predicates: count(id) = b.id
 |
 |--02:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: b.id < 10
 |
 01:AGGREGATE [FINALIZE]
@@ -63,7 +63,7 @@ from
 |  other join predicates: string_col = 'a'
 |
 |--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |     predicates: string_col = 'b'
 |
 00:SCAN HDFS [functional.alltypes]
@@ -83,7 +83,7 @@ where a.string_col = 'a' and b.string_col = 'b'
 |  other predicates: string_col = 'b'
 |
 |--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |     predicates: functional.alltypes.string_col = 'b'
 |
 00:SCAN HDFS [functional.alltypes]
@@ -100,7 +100,7 @@ where a.string_col = 'a' and b.string_col = 'b'
 02:CROSS JOIN [BROADCAST]
 |
 |--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |     predicates: functional.alltypes.string_col = 'b'
 |
 00:SCAN HDFS [functional.alltypes]
@@ -191,14 +191,14 @@ where a.year = 2009 and b.month + 2 <= 4 and b.id = 17
 |  hash predicates: b.smallint_col = c.int_col, b.id = c.id, b.year = c.year, b.month = c.month
 |
 |--02:SCAN HDFS [functional.alltypestiny c]
-|     partitions=2/4 size=230B compact
+|     partitions=2/4 size=230B
 |     predicates: c.id = 17, CAST(sin(c.int_col) AS BOOLEAN) = TRUE
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.tinyint_col = b.smallint_col, a.id = b.id, a.year = b.year, a.month = b.month
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=2/4 size=3.16KB compact
+|     partitions=2/4 size=3.16KB
 |     predicates: b.id = 17, CAST(sin(b.smallint_col) AS BOOLEAN) = TRUE
 |
 00:SCAN HDFS [functional.alltypes a]
@@ -254,14 +254,14 @@ where a.year = 2009 and b.month + 2 <= 4 and b.id = 17
 |  hash predicates: functional.alltypessmall.smallint_col = functional.alltypestiny.int_col, functional.alltypessmall.id = functional.alltypestiny.id, functional.alltypessmall.year = functional.alltypestiny.year, functional.alltypessmall.month = functional.alltypestiny.month
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partitions=2/4 size=230B compact
+|     partitions=2/4 size=230B
 |     predicates: functional.alltypestiny.id = 17, CAST(sin(functional.alltypestiny.int_col) AS BOOLEAN) = TRUE
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.tinyint_col = functional.alltypessmall.smallint_col, functional.alltypes.id = functional.alltypessmall.id, functional.alltypes.year = functional.alltypessmall.year, functional.alltypes.month = functional.alltypessmall.month
 |
 |--01:SCAN HDFS [functional.alltypessmall]
-|     partitions=2/4 size=3.16KB compact
+|     partitions=2/4 size=3.16KB
 |     predicates: functional.alltypessmall.id = 17, CAST(sin(functional.alltypessmall.smallint_col) AS BOOLEAN) = TRUE
 |
 00:SCAN HDFS [functional.alltypes]
@@ -323,7 +323,7 @@ where a.year = 2009 and a.tinyint_col = 7 and a.id is null and b.id = 17 and b.i
 |  other predicates: b.id = 17, b.int_col IS NULL
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=1/4 size=1.57KB compact
+|     partitions=1/4 size=1.57KB
 |     predicates: b.tinyint_col = 7, b.id = 17
 |
 00:SCAN HDFS [functional.alltypes a]
@@ -383,7 +383,7 @@ where b.year = 2009 and b.tinyint_col = 7 and b.id is null and a.id = 17 and a.i
 |  other predicates: a.id = 17, a.int_col IS NULL
 |
 |--01:SCAN HDFS [functional.alltypes b]
-|     partitions=12/24 size=238.68KB compact
+|     partitions=12/24 size=238.68KB
 |     predicates: b.tinyint_col = 7, b.id IS NULL
 |
 00:SCAN HDFS [functional.alltypessmall a]
@@ -689,7 +689,7 @@ and z.month = 1
 |  |  predicates: functional.alltypesagg.month = 1
 |  |
 |  01:SCAN HDFS [functional.alltypesagg]
-|     partitions=11/11 size=814.73KB compact
+|     partitions=11/11 size=814.73KB
 |     limit: 10
 |
 00:SCAN HDFS [functional.alltypes]
@@ -719,7 +719,7 @@ and x.id + x.b_id = 17
 |  |  predicates: functional.alltypesagg.month = 1
 |  |
 |  03:SCAN HDFS [functional.alltypesagg]
-|     partitions=11/11 size=814.73KB compact
+|     partitions=11/11 size=814.73KB
 |     limit: 10
 |
 02:HASH JOIN [INNER JOIN]
@@ -727,7 +727,7 @@ and x.id + x.b_id = 17
 |  other predicates: a.id + b.id = 17
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=12/24 size=238.68KB
@@ -795,7 +795,7 @@ where a.id is null and isnull(b.id, 0) = 0 and b.int_col = 17
 |  other predicates: isnull(id, 0) = 0, int_col = 17
 |
 |--02:SCAN HDFS [functional.alltypes a]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |     predicates: a.id IS NULL
 |
 01:AGGREGATE [FINALIZE]
@@ -817,7 +817,7 @@ where isnull(a.id, 0) = 0 and b.id is null  and b.int_col = 17
 |  other predicates: id IS NULL, int_col = 17
 |
 |--05:SCAN HDFS [functional.alltypes a]
-|     partitions=24/24 size=478.45KB compact
+|     partitions=24/24 size=478.45KB
 |     predicates: isnull(a.id, 0) = 0
 |
 00:UNION
@@ -845,7 +845,7 @@ ON a.id=b.id
 |  hash predicates: a.id = functional.alltypessmall.id
 |
 |--01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: id > 0
 |
 00:SCAN HDFS [functional.alltypes a]
@@ -871,10 +871,10 @@ on a.id=b.id
 |  |  hash predicates: x.id = y.id
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny y]
-|  |     partitions=4/4 size=460B compact
+|  |     partitions=4/4 size=460B
 |  |
 |  01:SCAN HDFS [functional.alltypessmall x]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: x.id IS NULL
 |
 00:SCAN HDFS [functional.alltypes a]
@@ -919,14 +919,14 @@ and t2.id + t3.int_col > 40
 |  other predicates: t2.id + functional.alltypestiny.int_col > 40
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |     predicates: functional.alltypestiny.id + functional.alltypestiny.int_col > 10, functional.alltypestiny.id + functional.alltypestiny.bigint_col > 20, functional.alltypestiny.id + functional.alltypestiny.int_col + functional.alltypestiny.bigint_col > 30
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id, t1.tinyint_col = t2.smallint_col
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: t2.id + t2.smallint_col > 10, t2.id + t2.bigint_col > 20, t2.id + t2.smallint_col + t2.bigint_col > 30
 |
 00:SCAN HDFS [functional.alltypes t1]
@@ -1000,7 +1000,7 @@ and t1.id * t1.int_col < 100
 |  other predicates: functional.alltypestiny.tinyint_col + functional.alltypestiny.smallint_col + functional.alltypestiny.int_col > 10, ifnull(functional.alltypestiny.tinyint_col + functional.alltypestiny.bigint_col, TRUE) = TRUE
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |     predicates: functional.alltypestiny.tinyint_col + functional.alltypestiny.smallint_col + functional.alltypestiny.int_col > 10, functional.alltypestiny.id * functional.alltypestiny.int_col < 100
 |
 03:HASH JOIN [LEFT OUTER JOIN]
@@ -1008,7 +1008,7 @@ and t1.id * t1.int_col < 100
 |  other predicates: t2.tinyint_col = t2.smallint_col, ifnull(t2.tinyint_col + t2.bigint_col, TRUE) = TRUE
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: t2.tinyint_col = t2.smallint_col, t2.id * t2.int_col < 100
 |
 00:SCAN HDFS [functional.alltypes t1]
@@ -1027,7 +1027,7 @@ where t2.year + t2.month > 10
 |  hash predicates: t1.id = t2.month, t1.year = t2.year
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 size=478.45KB
@@ -1048,7 +1048,7 @@ where t1.id + t1.tinyint_col > 10
 |  hash predicates: t1.id = t2.id, t1.tinyint_col = t2.tinyint_col
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: t2.id + t2.tinyint_col > 10, t2.id = t2.smallint_col, t2.tinyint_col = t2.int_col
 |
 00:SCAN HDFS [functional.alltypes t1]
@@ -1094,7 +1094,7 @@ where a.id < 10
 |  hash predicates: a.id = id
 |
 |--01:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |     predicates: id > 20, functional.alltypestiny.id < 10
 |
 00:SCAN HDFS [functional.alltypes a]
@@ -1113,7 +1113,7 @@ where b.id < 10
 |  hash predicates: id = b.id
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |     predicates: b.id < 10
 |
 00:SCAN HDFS [functional.alltypes]

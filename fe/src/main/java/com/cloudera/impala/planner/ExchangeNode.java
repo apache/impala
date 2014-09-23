@@ -65,20 +65,15 @@ public class ExchangeNode extends PlanNode {
       Preconditions.checkState(limit_ == node.limit_);
       Preconditions.checkState(tupleIds_.equals(node.tupleIds_));
       Preconditions.checkState(nullableTupleIds_.equals(node.nullableTupleIds_));
-      Preconditions.checkState(compactData_ == node.compactData_);
     } else {
       // Only apply the limit at the receiver if there are multiple senders.
       if (node.getFragment().isPartitioned()) limit_ = node.limit_;
       tupleIds_ = Lists.newArrayList(node.tupleIds_);
       nullableTupleIds_ = Sets.newHashSet(node.nullableTupleIds_);
-      compactData_ = node.compactData_;
     }
     if (copyConjuncts) conjuncts_.addAll(Expr.cloneList(node.conjuncts_));
     children_.add(node);
   }
-
-  @Override
-  public void setCompactData(boolean on) { this.compactData_ = on; }
 
   @Override
   public void computeStats(Analyzer analyzer) {

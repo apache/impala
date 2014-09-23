@@ -27,7 +27,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |  hash predicates: a.id = b.id
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=1/4 size=1.58KB compact
+|     partitions=1/4 size=1.58KB
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=12/24 size=238.68KB

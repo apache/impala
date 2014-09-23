@@ -140,7 +140,7 @@ where id < 5 limit 5
 |  limit: 10
 |
 |--01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypessmall a]
    partitions=4/4 size=6.32KB
@@ -216,7 +216,7 @@ limit 5
 |  limit: 10
 |
 |--01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypessmall a]
    partitions=4/4 size=6.32KB
@@ -251,7 +251,7 @@ from functional.alltypes
 |  hash predicates: functional.alltypes.id = id
 |
 |--01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     limit: 10
 |
 00:SCAN HDFS [functional.alltypes]
@@ -268,7 +268,7 @@ from functional.alltypes
 |  |  limit: 10
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     limit: 10
 |
 00:SCAN HDFS [functional.alltypes]
@@ -335,10 +335,10 @@ limit 5
 |  |  limit: 10
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
-|  |     partitions=4/4 size=460B compact
+|  |     partitions=4/4 size=460B
 |  |
 |  01:SCAN HDFS [functional.alltypessmall a]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -369,7 +369,7 @@ limit 5
 |  |     partitions=4/4 size=460B
 |  |
 |  01:SCAN HDFS [functional.alltypessmall a]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -401,7 +401,7 @@ limit 5
 |  |  hash predicates: a.id = functional.alltypestiny.id
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
-|  |     partitions=4/4 size=460B compact
+|  |     partitions=4/4 size=460B
 |  |
 |  01:SCAN HDFS [functional.alltypessmall a]
 |     partitions=4/4 size=6.32KB
@@ -488,7 +488,7 @@ where a.id > 10 and b.id > 20
 |  other predicates: id > 20
 |
 |--01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: id != 2
 |     limit: 10
 |
@@ -511,7 +511,7 @@ where a.id > 10 and b.id > 20
 |  other predicates: id > 20
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: functional.alltypessmall.id != 1, id != 2, functional.alltypessmall.id > 10, functional.alltypessmall.id > 20
 |
 01:SELECT
@@ -537,7 +537,7 @@ where a.id > 10 and b.id > 20
 |  other predicates: id > 10
 |
 |--01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: id != 2, functional.alltypessmall.id > 20
 |
 00:SCAN HDFS [functional.alltypes]
@@ -563,7 +563,7 @@ where a.id > 10 and b.id > 20
 |  |  predicates: id > 20
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: id != 2
 |     limit: 10
 |

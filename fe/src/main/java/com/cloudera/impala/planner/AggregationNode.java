@@ -99,9 +99,6 @@ public class AggregationNode extends PlanNode {
   }
 
   @Override
-  public void setCompactData(boolean on) { compactData_ = on; }
-
-  @Override
   public boolean isBlockingNode() { return true; }
 
   @Override

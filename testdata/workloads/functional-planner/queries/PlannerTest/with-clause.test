@@ -75,13 +75,13 @@ select * from t1, t2, t3 where t1.x = t2.x and t2.x = t3.x
 |  hash predicates: int_col = int_col
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
 |
 |--01:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
@@ -187,13 +187,13 @@ select * from t t1 inner join t t2 on (t1.x = t2.x) inner join t t3 on (t2.x = t
 |  hash predicates: int_col = int_col
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
 |
 |--01:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 size=460B
@@ -230,13 +230,13 @@ select * from t t1 inner join t t2 using(x) inner join t t3 using(x)
 |  hash predicates: int_col = int_col
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
 |
 |--01:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 size=460B
@@ -273,13 +273,13 @@ select * from t t1 left outer join t t2 using(x) full outer join t t3 using(x)
 |  hash predicates: int_col = int_col
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 03:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: int_col = int_col
 |
 |--01:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 size=460B
@@ -318,13 +318,13 @@ select * from t t1 inner join [broadcast] t t2 using(x) inner join [shuffle] t t
 |  hash predicates: int_col = int_col
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: int_col = int_col
 |
 |--01:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 size=460B

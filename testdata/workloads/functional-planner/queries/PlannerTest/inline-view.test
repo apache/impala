@@ -78,7 +78,7 @@ where t1.zip = 94611) x
 |  hash predicates: t1.id = t2.id
 |
 |--01:SCAN HDFS [functional.testtbl t2]
-|     partitions=1/1 size=0B compact
+|     partitions=1/1 size=0B
 |
 00:SCAN HDFS [functional.testtbl t1]
    partitions=1/1 size=0B
@@ -118,7 +118,7 @@ from
 |  other predicates: a.day >= 6, a.tinyint_col = 15, a.tinyint_col + b.tinyint_col < 15
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=2/4 size=3.17KB compact
+|     partitions=2/4 size=3.17KB
 |     predicates: b.string_col = '15'
 |
 00:SCAN HDFS [functional.alltypesagg a]
@@ -181,7 +181,7 @@ and b.id + 15 = 27
 |  other predicates: day >= 6, tinyint_col = 15, tinyint_col + tinyint_col < 15
 |
 |--01:SCAN HDFS [functional.alltypessmall]
-|     partitions=2/4 size=3.17KB compact
+|     partitions=2/4 size=3.17KB
 |     predicates: functional.alltypessmall.string_col = '15', functional.alltypessmall.id + 15 = 27
 |
 00:SCAN HDFS [functional.alltypesagg]
@@ -229,7 +229,7 @@ and a.tinyint_col + b.tinyint_col < 15
 |  other predicates: tinyint_col = 15, tinyint_col + tinyint_col < 15
 |
 |--01:SCAN HDFS [functional.alltypessmall]
-|     partitions=2/4 size=3.17KB compact
+|     partitions=2/4 size=3.17KB
 |     predicates: functional.alltypessmall.string_col = '15'
 |
 00:SCAN HDFS [functional.alltypesagg]
@@ -286,14 +286,14 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
 |  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000
 |
 |--00:SCAN HDFS [functional.alltypessmall c]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: c.string_col < '7'
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.smallint_col = b.id
 |
 |--02:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: b.float_col > 4.5
 |
 01:SCAN HDFS [functional.alltypesagg a]
@@ -593,7 +593,7 @@ where j.test_id <= 1006
 |  hash predicates: b.name = a.test_name
 |
 |--00:SCAN HDFS [functional.jointbl a]
-|     partitions=1/1 size=433B compact
+|     partitions=1/1 size=433B
 |     predicates: a.test_id <= 1006
 |
 01:SCAN HDFS [functional.dimtbl b]
@@ -642,13 +642,13 @@ group by x.smallint_col
 |  hash predicates: a.tinyint_col = c.id
 |
 |--00:SCAN HDFS [functional.alltypessmall c]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.smallint_col = b.id
 |
 |--02:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 size=814.73KB
@@ -716,14 +716,14 @@ and x.int_col + x.float_col + CAST(c.string_col AS FLOAT) < 1000
 |  other predicates: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000
 |
 |--03:SCAN HDFS [functional.alltypessmall c]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: c.string_col < '7'
 |
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: a.smallint_col = b.id
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 size=6.32KB compact
+|     partitions=4/4 size=6.32KB
 |     predicates: b.float_col > 4.5
 |
 00:SCAN HDFS [functional.alltypesagg a]
@@ -782,7 +782,7 @@ group by x.smallint_col
 |  |  hash predicates: a.smallint_col = b.id
 |  |
 |  |--02:SCAN HDFS [functional.alltypessmall b]
-|  |     partitions=4/4 size=6.32KB compact
+|  |     partitions=4/4 size=6.32KB
 |  |
 |  01:SCAN HDFS [functional.alltypesagg a]
 |     partitions=11/11 size=814.73KB
@@ -989,7 +989,7 @@ on (a.d1 = b.d1)
 |  hash predicates: a.d1 = d1
 |
 |--01:SCAN HDFS [functional.decimal_tbl]
-|     partitions=1/1 size=195B compact
+|     partitions=1/1 size=195B
 |
 00:SCAN HDFS [functional.decimal_tbl a]
    partitions=1/1 size=195B

@@ -125,7 +125,7 @@ having count(t2.int_col) = count(t1.bigint_col)
 |  hash predicates: t1.smallint_col = t2.smallint_col
 |
 |--01:SCAN HDFS [functional.alltypestiny t2]
-|     partitions=4/4 size=460B compact
+|     partitions=4/4 size=460B
 |
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 size=478.45KB
