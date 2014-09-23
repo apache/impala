@@ -165,6 +165,7 @@ and (b.double_col * c.tinyint_col > 1000 or c.tinyint_col < 1000)
 ---- PLAN
 04:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: c.id = a.id, c.string_col = b.string_col
+|  other predicates: a.day >= 6, b.month > 2, a.tinyint_col = 15, b.string_col = '15', a.tinyint_col + b.tinyint_col < 15, a.float_col - c.double_col < 0, (b.double_col * c.tinyint_col > 1000 OR c.tinyint_col < 1000)
 |
 |--03:HASH JOIN [FULL OUTER JOIN]
 |  |  hash predicates: a.id = b.id, a.int_col = b.int_col
@@ -178,12 +179,13 @@ and (b.double_col * c.tinyint_col > 1000 or c.tinyint_col < 1000)
 |     predicates: a.tinyint_col = 15
 |
 02:SCAN HDFS [functional.alltypesaggnonulls c]
-   partitions=2/10 size=148.10KB compact
+   partitions=2/10 size=148.10KB
 ---- DISTRIBUTEDPLAN
 09:EXCHANGE [UNPARTITIONED]
 |
 04:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
 |  hash predicates: c.id = a.id, c.string_col = b.string_col
+|  other predicates: a.day >= 6, b.month > 2, a.tinyint_col = 15, b.string_col = '15', a.tinyint_col + b.tinyint_col < 15, a.float_col - c.double_col < 0, (b.double_col * c.tinyint_col > 1000 OR c.tinyint_col < 1000)
 |
 |--08:EXCHANGE [HASH(a.id,b.string_col)]
 |  |
@@ -205,7 +207,7 @@ and (b.double_col * c.tinyint_col > 1000 or c.tinyint_col < 1000)
 07:EXCHANGE [HASH(c.id,c.string_col)]
 |
 02:SCAN HDFS [functional.alltypesaggnonulls c]
-   partitions=2/10 size=148.10KB compact
+   partitions=2/10 size=148.10KB
 ====
 # non-equi join predicate not supported
 select *
@@ -1208,4 +1210,29 @@ functional.alltypessmall c on b.id = c.id
 |
 00:SCAN HDFS [functional.alltypestiny a]
    partitions=4/4 size=460B
+====
+# Regression test for IMPALA-1289. Predicates should be assigned correctly
+# to inverted joins.
+select * from functional.alltypestiny a
+inner join functional.alltypestiny b
+on (a.id = b.id)
+# should be inverted
+cross join functional.alltypes c
+# assigned to inverted cross join
+where c.id != b.id
+---- PLAN
+04:CROSS JOIN [BROADCAST]
+|  predicates: c.id != b.id
+|
+|--03:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.id = b.id
+|  |
+|  |--01:SCAN HDFS [functional.alltypestiny b]
+|  |     partitions=4/4 size=460B compact
+|  |
+|  00:SCAN HDFS [functional.alltypestiny a]
+|     partitions=4/4 size=460B compact
+|
+02:SCAN HDFS [functional.alltypes c]
+   partitions=24/24 size=478.45KB
 ====

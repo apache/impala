@@ -710,7 +710,7 @@ cross join functional.alltypes c
 |     partitions=4/4 size=460B compact
 |
 02:SCAN HDFS [functional.alltypes c]
-   partitions=24/24 size=478.45KB compact
+   partitions=24/24 size=478.45KB
 ====
 # Test that tables are not re-ordered across outer/semi joins (IMPALA-860),
 # but the tables to the left/right of outer/semi joins are still re-ordered.
@@ -802,7 +802,7 @@ right join functional.alltypestiny t6 on (t5.id = t6.id)
 |     partitions=4/4 size=460B compact
 |
 01:SCAN HDFS [functional.alltypes t2]
-   partitions=24/24 size=478.45KB compact
+   partitions=24/24 size=478.45KB
 ====
 # Check that a join in between outer/semi joins is re-ordered correctly.
 # We expect t4 is joined before t3.
@@ -848,7 +848,7 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |     partitions=4/4 size=460B compact
 |
 01:SCAN HDFS [functional.alltypes t2]
-   partitions=24/24 size=478.45KB compact
+   partitions=24/24 size=478.45KB
 ====
 # Same above but using an anti join instead of a semi join.
 select count(*) from
@@ -893,7 +893,7 @@ inner join functional.alltypestiny t6 on (t3.id = t6.id)
 |     partitions=4/4 size=460B compact
 |
 01:SCAN HDFS [functional.alltypes t2]
-   partitions=24/24 size=478.45KB compact
+   partitions=24/24 size=478.45KB
 ====
 # Test inverting outer joins in a complex query plan.
 select 1 from
@@ -949,7 +949,7 @@ on (t3.id = t4.id)
 |     partitions=4/4 size=460B compact
 |
 08:SCAN HDFS [functional.alltypes t3]
-   partitions=24/24 size=478.45KB compact
+   partitions=24/24 size=478.45KB
 ====
 # Same as above but with full outer joins.
 select 1 from
@@ -1005,7 +1005,7 @@ on (t3.id = t4.id)
 |     partitions=4/4 size=460B compact
 |
 08:SCAN HDFS [functional.alltypes t3]
-   partitions=24/24 size=478.45KB compact
+   partitions=24/24 size=478.45KB
 ====
 # Test inverting semi joins in a complex query plan.
 select 1 from
@@ -1060,7 +1060,7 @@ where t2.month = 1
 |     partitions=2/24 size=40.32KB compact
 |
 08:SCAN HDFS [functional.alltypes t3]
-   partitions=24/24 size=478.45KB compact
+   partitions=24/24 size=478.45KB
 ====
 # Same as above but with anti joins.
 select 1 from
@@ -1115,5 +1115,5 @@ where t2.month = 1
 |     partitions=2/24 size=40.32KB compact
 |
 08:SCAN HDFS [functional.alltypes t3]
-   partitions=24/24 size=478.45KB compact
+   partitions=24/24 size=478.45KB
 ====

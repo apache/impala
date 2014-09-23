@@ -628,7 +628,7 @@ having count(*) < 100
 |     predicates: g.int_col < 100
 |
 01:SCAN HDFS [functional.alltypes a]
-   partitions=24/24 size=478.45KB compact
+   partitions=24/24 size=478.45KB
 ====
 # Subqueries with aggregation
 select *

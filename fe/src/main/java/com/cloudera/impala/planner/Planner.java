@@ -1228,10 +1228,8 @@ public class Planner {
 
         PlanNode rhsPlan = entry.second;
         analyzer.setAssignedConjuncts(root.getAssignedConjuncts());
-        PlanNode candidate = createJoinNode(analyzer, root, rhsPlan, null, ref, false);
-        if (candidate == null) continue;
-        LOG.trace("cardinality=" + Long.toString(candidate.getCardinality()));
 
+        boolean invertJoin = false;
         if (joinOp.isOuterJoin() || joinOp.isSemiJoin() || joinOp.isCrossJoin()) {
           // Invert the join if doing so reduces the size of build-side hash table
           // (may also reduce network costs depending on the join strategy).
@@ -1243,18 +1241,25 @@ public class Planner {
           if (lhsCard != -1 && rhsCard != -1 &&
               lhsCard * root.getAvgRowSize() < rhsCard * rhsPlan.getAvgRowSize() &&
               !joinOp.isNullAwareLeftAntiJoin()) {
-            ref.setJoinOp(ref.getJoinOp().invert());
-            candidate = createJoinNode(analyzer, rhsPlan, root, ref, null, false);
-            Preconditions.checkNotNull(candidate);
+            invertJoin = true;
           }
+        }
+        PlanNode candidate = null;
+        if (invertJoin) {
+          ref.setJoinOp(ref.getJoinOp().invert());
+          candidate = createJoinNode(analyzer, rhsPlan, root, ref, null, false);
+        } else {
+          candidate = createJoinNode(analyzer, root, rhsPlan, null, ref, false);
+        }
+        if (candidate == null) continue;
+        LOG.trace("cardinality=" + Long.toString(candidate.getCardinality()));
 
-          // Use 'candidate' as the new root; don't consider any other table refs at this
-          // position in the plan.
-          if (joinOp.isOuterJoin() || joinOp.isSemiJoin()) {
-            newRoot = candidate;
-            minEntry = entry;
-            break;
-          }
+        // Use 'candidate' as the new root; don't consider any other table refs at this
+        // position in the plan.
+        if (joinOp.isOuterJoin() || joinOp.isSemiJoin()) {
+          newRoot = candidate;
+          minEntry = entry;
+          break;
         }
 
         if (newRoot == null || candidate.getCardinality() < newRoot.getCardinality()) {
