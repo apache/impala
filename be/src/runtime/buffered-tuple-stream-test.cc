@@ -173,7 +173,7 @@ class BufferedTupleStreamTest : public testing::Test {
   void TestValues(int num_batches, RowDescriptor* desc) {
     BufferedTupleStream stream(runtime_state_.get(), *desc, block_mgr_.get(), client_);
     Status status = stream.Init();
-    ASSERT_TRUE(status.ok());
+    ASSERT_TRUE(status.ok()) << status.GetErrorMsg();
     status = stream.UnpinStream();
     ASSERT_TRUE(status.ok());
 
@@ -328,7 +328,7 @@ TEST_F(BufferedTupleStreamTest, UnpinPin) {
   ASSERT_TRUE(status.ok());
 
   bool pinned = false;
-  status = stream.PinStream(&pinned);
+  status = stream.PinStream(false, &pinned);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(pinned);
 

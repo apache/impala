@@ -128,10 +128,10 @@ class BufferedBlockMgrTest : public ::testing::Test {
     BufferedBlockMgr::Block* new_block;
     for (int i = 0; i < num_blocks; ++i) {
       status = block_mgr->GetNewBlock(client, NULL, &new_block);
+      EXPECT_TRUE(status.ok());
       EXPECT_TRUE(new_block != NULL);
       data = new_block->Allocate<int32_t>(sizeof(int32_t));
       *data = blocks->size();
-      EXPECT_TRUE(status.ok());
       blocks->push_back(new_block);
     }
   }
@@ -593,6 +593,7 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
   BufferedBlockMgr::Client* client1;
   BufferedBlockMgr::Client* client2;
   Status status;
+  bool reserved = false;
 
   status = block_mgr->RegisterClient(client1_buffers, NULL, runtime_state_.get(),
       &client1);
@@ -603,6 +604,12 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client2 != NULL);
 
+  // Reserve client 1's and 2's buffers. They should succeed.
+  reserved = block_mgr->TryAcquireTmpReservation(client1, 1);
+  EXPECT_TRUE(reserved);
+  reserved = block_mgr->TryAcquireTmpReservation(client2, 1);
+  EXPECT_TRUE(reserved);
+
   vector<BufferedBlockMgr::Block*> client1_blocks;
   // Allocate all of client1's reserved blocks, they should all succeed.
   AllocateBlocks(block_mgr.get(), client1, client1_buffers, &client1_blocks);
@@ -612,6 +619,10 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
   status = block_mgr->GetNewBlock(client1, NULL, &block);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block == NULL);
+
+  // Trying to reserve should also fail.
+  reserved = block_mgr->TryAcquireTmpReservation(client1, 1);
+  EXPECT_FALSE(reserved);
 
   // Allocate all of client2's reserved blocks, these should succeed.
   vector<BufferedBlockMgr::Block*> client2_blocks;
@@ -626,15 +637,60 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
   status = client1_blocks[0]->Unpin();
   EXPECT_TRUE(status.ok());
 
-  // Client two should still not be able to allocate.
+  // Client 2 should still not be able to allocate.
   status = block_mgr->GetNewBlock(client2, NULL, &block);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block == NULL);
+
+  // Client 2 should still not be able to reserve.
+  reserved = block_mgr->TryAcquireTmpReservation(client2, 1);
+  EXPECT_FALSE(reserved);
 
   // Client 1 should be able to though.
   status = block_mgr->GetNewBlock(client1, NULL, &block);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(block != NULL);
+
+  // Unpin two of client 1's blocks (client 1 should have 3 unpinned blocks now).
+  status = client1_blocks[1]->Unpin();
+  EXPECT_TRUE(status.ok());
+  status = client1_blocks[2]->Unpin();
+  EXPECT_TRUE(status.ok());
+
+  // Clear client 1's reservation
+  block_mgr->ClearReservation(client1);
+
+  // Client 2 should be able to reserve 1 buffers now (there are 2 left);
+  reserved = block_mgr->TryAcquireTmpReservation(client2, 1);
+  EXPECT_TRUE(reserved);
+
+  // Client one can only pin 1.
+  bool pinned;
+  status = client1_blocks[0]->Pin(&pinned);
+  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(pinned);
+  // Can't get this one.
+  status = client1_blocks[1]->Pin(&pinned);
+  EXPECT_TRUE(status.ok());
+  EXPECT_FALSE(pinned);
+
+  // Client 2 can pick up the one reserved buffer
+  status = block_mgr->GetNewBlock(client2, NULL, &block);
+  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(block != NULL);
+  // But not a second
+  BufferedBlockMgr::Block* block2;
+  status = block_mgr->GetNewBlock(client2, NULL, &block2);
+  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(block2 == NULL);
+
+  // Unpin client 2's block it got from the reservation. Sine this is a tmp
+  // reservation, client 1 can pick it up again (it is not longer reserved).
+  status = block->Unpin();
+  EXPECT_TRUE(status.ok());
+  status = client1_blocks[1]->Pin(&pinned);
+  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(pinned);
 
   block_mgr.reset();
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);

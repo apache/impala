@@ -269,12 +269,21 @@ class BufferedBlockMgr {
   Status RegisterClient(int num_reserved_buffers, MemTracker* tracker,
       RuntimeState* state, Client** client);
 
-  // Lowers the buffer reservation of the client to num_buffers. This doesn't change
-  // buffers that have already been given to this client.
-  // num_buffers must be less than the current reservation.
-  // TODO: we could relax this and let the reservation go up but there isn't a use
-  // case now.
-  void LowerBufferReservation(Client* client, int num_buffers);
+  // Clears the reservation for this client.
+  void ClearReservation(Client* client);
+
+  // Tries to acquire a one-time reservation of num_buffers. The semantics are:
+  //  - If this call fails, the next 'num_buffers' calls to Pin()/GetNewBlock() might
+  //    not have enough memory.
+  //  - If this call succeeds, the next 'num_buffers' call to Pin()/GetNewBlock() will
+  //    be guaranteed to get the block. Once these blocks have been pinned, the
+  //    reservation from this call has no more effect.
+  // Blocks coming from the tmp reservation also count towards the regular reservation.
+  // This is useful to Pin() a number of blocks and guarantee all or nothing behavior.
+  bool TryAcquireTmpReservation(Client* client, int num_buffers);
+
+  // Sets tmp reservation to 0 on this client.
+  void ClearTmpReservation(Client* client);
 
   // Return the number of blocks a block manager will reserve for its I/O buffers.
   static int GetNumReservedBlocks() {
@@ -300,13 +309,20 @@ class BufferedBlockMgr {
   // Idempotent.
   void Cancel();
 
-  // Dumps block mgr state. Grabs lock.
-  std::string DebugString();
+  // Dumps block mgr state. Grabs lock. If client is not NULL, also dumps its state.
+  std::string DebugString(Client* client = NULL);
+
+  // The number of buffers available for client. That is, if all other clients were
+  // stopped, the number of buffers this client could get.
+  int64_t available_buffers(Client* client) const;
 
   // The number of allocated buffers that can be simultaneously pinned by clients.
   int available_allocated_buffers() const { return all_io_buffers_.size(); }
+
+  // TODO: remove these two. Not clear what the sorter really needs.
   int num_free_buffers() const { return free_io_buffers_.size(); }
   int num_pinned_buffers(Client* client) const;
+
   int num_reserved_buffers_remaining(Client* client) const;
   MemTracker* get_tracker(Client* client) const;
   int64_t max_block_size() const { return max_block_size_; }
@@ -343,6 +359,13 @@ class BufferedBlockMgr {
   Status PinBlock(Block* block, bool* pinned);
   Status UnpinBlock(Block* block);
   Status DeleteBlock(Block* block);
+
+  // Returns the total number of unreserved buffers. This is the sum of unpinned,
+  // free and buffers we can still allocate minus the total number of reserved buffers
+  // that are not pinned.
+  // Note this can be negative if the buffers are oversubscribed.
+  // Must be called with lock_ taken.
+  int64_t remaining_unreserved_buffers() const;
 
   // Finds a buffer for a block and pins it. If the block's buffer has not been evicted,
   // removes the block from the unpinned list and sets *in_mem = true.
@@ -392,18 +415,8 @@ class BufferedBlockMgr {
   // Equal to the number of disks.
   const int block_write_threshold_;
 
-  // The number of unreserved buffers. This can be less than 0 if we've oversubscribed
-  // the number of reserved buffers.
-  AtomicInt<int> num_unreserved_buffers_;
-
-  // The total number of reserved buffers by all clients.
-  AtomicInt<int> total_reserved_buffers_;
-
-  // The number of unreserved buffers that are currently pinned. Must be >= 0.
-  // Currently, buffers that are less than the max size are still counted here.
-  // TODO: revisit. This will trigger spilling in clients sooner but that is probably
-  // correct.
-  AtomicInt<int> num_unreserved_pinned_buffers_;
+  // The total number of reserved buffers across all clients that are not pinned.
+  int unfullfilled_reserved_buffers_;
 
   TUniqueId query_id_;
   ObjectPool obj_pool_;

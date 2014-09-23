@@ -254,10 +254,17 @@ Status BufferedTupleStream::PrepareForRead(bool* got_buffer) {
   return Status::OK;
 }
 
-Status BufferedTupleStream::PinStream(bool* pinned) {
+Status BufferedTupleStream::PinStream(bool already_reserved, bool* pinned) {
   DCHECK(!closed_);
   DCHECK(pinned != NULL);
-  *pinned = true;
+
+  if (!already_reserved) {
+    // If we can't get all the blocks, don't try at all.
+    if (!block_mgr_->TryAcquireTmpReservation(block_mgr_client_, blocks_unpinned())) {
+      *pinned = false;
+      return Status::OK;
+    }
+  }
 
   for (list<BufferedBlockMgr::Block*>::iterator it = blocks_.begin();
       it != blocks_.end(); ++it) {
@@ -266,10 +273,8 @@ Status BufferedTupleStream::PinStream(bool* pinned) {
       SCOPED_TIMER(pin_timer_);
       RETURN_IF_ERROR((*it)->Pin(pinned));
     }
-    if (!*pinned) {
-      UnpinStream(true);
-      return Status::OK;
-    }
+    DCHECK(*pinned) << "Should have been reserved."
+        << endl << block_mgr_->DebugString(block_mgr_client_);
     ++num_pinned_;
     DCHECK_EQ(num_pinned_, NumPinned(blocks_));
   }
@@ -292,9 +297,7 @@ Status BufferedTupleStream::UnpinStream(bool all) {
   DCHECK(!closed_);
   SCOPED_TIMER(unpin_timer_);
 
-  // Unpin the stream from the back. We read from the front so we want those blocks
-  // evicted last.
-  BOOST_REVERSE_FOREACH(BufferedBlockMgr::Block* block, blocks_) {
+  BOOST_FOREACH(BufferedBlockMgr::Block* block, blocks_) {
     if (!block->is_pinned()) continue;
     if (!all && (block == write_block_ || (read_write_ && block == *read_block_))) {
       continue;
@@ -312,7 +315,7 @@ Status BufferedTupleStream::UnpinStream(bool all) {
 }
 
 Status BufferedTupleStream::GetRows(scoped_ptr<RowBatch>* batch, bool* got_rows) {
-  RETURN_IF_ERROR(PinStream(got_rows));
+  RETURN_IF_ERROR(PinStream(false, got_rows));
   if (!*got_rows) return Status::OK;
   RETURN_IF_ERROR(PrepareForRead());
   batch->reset(

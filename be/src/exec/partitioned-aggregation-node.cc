@@ -374,7 +374,7 @@ void PartitionedAggregationNode::Close(RuntimeState* state) {
   if (serialize_stream_.get() != NULL) serialize_stream_->Close();
 
   if (block_mgr_client_ != NULL) {
-    state->block_mgr()->LowerBufferReservation(block_mgr_client_, 0);
+    state->block_mgr()->ClearReservation(block_mgr_client_);
   }
 
   Expr::Close(probe_expr_ctxs_, state);

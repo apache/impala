@@ -178,7 +178,7 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
   nulls_build_batch_.reset();
 
   if (block_mgr_client_ != NULL) {
-    state->block_mgr()->LowerBufferReservation(block_mgr_client_, 0);
+    state->block_mgr()->ClearReservation(block_mgr_client_);
   }
   Expr::Close(build_expr_ctxs_, state);
   Expr::Close(probe_expr_ctxs_, state);
@@ -267,10 +267,21 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
     RuntimeState* state, bool* built) {
   DCHECK(build_rows_ != NULL);
   *built = false;
-  // First pin the entire build stream in memory.
-  RETURN_IF_ERROR(build_rows_->PinStream(built));
+
+  // TODO: estimate the entire size of the hash table and reserve all of it from
+  // the block mgr.
+
+  // We got the buffers we think we will need, try to build the hash table.
+  RETURN_IF_ERROR(build_rows_->PinStream(false, built));
   if (!*built) return Status::OK;
   RETURN_IF_ERROR(build_rows_->PrepareForRead());
+
+  bool eos = false;
+  RowBatch batch(parent_->child(1)->row_desc(), state->batch_size(),
+      parent_->mem_tracker());
+  HashTableCtx* ctx = parent_->ht_ctx_.get();
+  // TODO: move the batch and indices as members to avoid reallocating.
+  vector<BufferedTupleStream::RowIdx> indices;
 
   // Allocate the partition-local hash table. Initialize the number of buckets
   // based on the number of build rows (the number of rows is known at this point).
@@ -283,18 +294,8 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
   hash_tbl_.reset(new HashTable(state, parent_->block_mgr_client_,
       parent_->child(1)->row_desc().tuple_descriptors().size(), build_rows(),
       estimated_num_buckets));
-  if (!hash_tbl_->Init()) {
-    *built = false;
-    hash_tbl_.reset();
-    return Status::OK;
-  }
+  if (!hash_tbl_->Init()) goto not_built;
 
-  // TODO: move the batch and indices as members to avoid reallocating.
-  bool eos = false;
-  RowBatch batch(parent_->child(1)->row_desc(), state->batch_size(),
-      parent_->mem_tracker());
-  HashTableCtx* ctx = parent_->ht_ctx_.get();
-  vector<BufferedTupleStream::RowIdx> indices;
   while (!eos) {
     RETURN_IF_ERROR(build_rows_->GetNext(&batch, &eos, &indices));
     DCHECK_EQ(batch.num_rows(), indices.size());
@@ -304,15 +305,12 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
       uint32_t hash = 0;
       if (!ctx->EvalAndHashBuild(row, &hash)) continue;
       // TODO: If we are going to AddProbeFilters we should do it here.
-      if (UNLIKELY(!hash_tbl_->Insert(ctx, indices[i], row, hash))) {
-        *built = false;
-        break;
-      }
+      if (UNLIKELY(!hash_tbl_->Insert(ctx, indices[i], row, hash))) goto not_built;
     }
     batch.Reset();
-
-    if (!*built) return Status::OK;
   }
+
+  // If we got here, the hash table fit in memory and is built.
   DCHECK(*built);
   DCHECK_NOTNULL(hash_tbl_.get());
   is_spilled_ = false;
@@ -326,6 +324,17 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
   if (AddProbeFilters) {
     DCHECK_EQ(level_, 0) << "Should not add filters if repartitioning";
     hash_tbl_->UpdateProbeFilters(ctx, parent_->probe_filters_);
+  }
+
+  // Clear any unused reserved blocks (the estimate could have been too high).
+  state->block_mgr()->ClearTmpReservation(parent_->block_mgr_client_);
+  return Status::OK;
+
+not_built:
+  *built = false;
+  if (hash_tbl_.get() != NULL) {
+    hash_tbl_->Close();
+    hash_tbl_.reset();
   }
   return Status::OK;
 }

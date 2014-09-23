@@ -130,8 +130,10 @@ class BufferedTupleStream {
   Status PrepareForRead(bool* got_buffer = NULL);
 
   // Pins all blocks in this stream and switches to pinned mode.
-  // If there is not enough memory, *pinned is set to false and the stream is unpinned.
-  Status PinStream(bool* pinned);
+  // If there is not enough memory, *pinned is set to false and the stream is unmodified.
+  // If already_reserved is true, the caller has already made a reservation on
+  // block_mgr_client_ to pin the stream.
+  Status PinStream(bool already_reserved, bool* pinned);
 
   // Unpins stream. If all is true, all blocks are unpinned, otherwise all blocks
   // except the write_block_ and read_block_ are unpinned.
@@ -173,6 +175,7 @@ class BufferedTupleStream {
 
   bool is_pinned() const { return pinned_; }
   int blocks_pinned() const { return num_pinned_; }
+  int blocks_unpinned() const { return blocks_.size() - num_pinned_; }
   bool has_read_block() const { return read_block_ != blocks_.end(); }
   bool has_write_block() const { return write_block_ != NULL; }
 
