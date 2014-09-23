@@ -189,13 +189,13 @@ class AggregateFunctions {
   static DoubleVal KnuthVarFinalize(FunctionContext* context, const StringVal& val);
 
   // Calculates the biased variance, uses KnuthVar Init-Update-Merge functions
-  static StringVal KnuthVarPopFinalize(FunctionContext* context, const StringVal& val);
+  static DoubleVal KnuthVarPopFinalize(FunctionContext* context, const StringVal& val);
 
   // Calculates STDDEV, uses KnuthVar Init-Update-Merge functions
-  static StringVal KnuthStddevFinalize(FunctionContext* context, const StringVal& val);
+  static DoubleVal KnuthStddevFinalize(FunctionContext* context, const StringVal& val);
 
   // Calculates the biased STDDEV, uses KnuthVar Init-Update-Merge functions
-  static StringVal KnuthStddevPopFinalize(FunctionContext* context, const StringVal& val);
+  static DoubleVal KnuthStddevPopFinalize(FunctionContext* context, const StringVal& val);
 
 
   // ----------------------------- Analytic Functions ---------------------------------

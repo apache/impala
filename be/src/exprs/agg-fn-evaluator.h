@@ -231,8 +231,8 @@ class AggFnEvaluator {
       const SlotDescriptor* dst_slot_desc, Tuple* dst, void* fn);
 
   // Writes the result in src into dst pointed to by dst_slot_desc
-  void SetDstSlot(const impala_udf::AnyVal* src, const SlotDescriptor* dst_slot_desc,
-      Tuple* dst);
+  void SetDstSlot(FunctionContext* ctx, const impala_udf::AnyVal* src,
+      const SlotDescriptor* dst_slot_desc, Tuple* dst);
 };
 
 inline void AggFnEvaluator::Add(

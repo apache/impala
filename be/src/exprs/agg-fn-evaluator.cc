@@ -226,7 +226,7 @@ void AggFnEvaluator::Close(RuntimeState* state) {
   }
 }
 
-inline void AggFnEvaluator::SetDstSlot(const AnyVal* src,
+inline void AggFnEvaluator::SetDstSlot(FunctionContext* ctx, const AnyVal* src,
     const SlotDescriptor* dst_slot_desc, Tuple* dst) {
   if (src->is_null) {
     dst->SetNull(dst_slot_desc->null_indicator_offset());
@@ -263,6 +263,11 @@ inline void AggFnEvaluator::SetDstSlot(const AnyVal* src,
     case TYPE_VARCHAR:
       *reinterpret_cast<StringValue*>(slot) =
           StringValue::FromStringVal(*reinterpret_cast<const StringVal*>(src));
+      return;
+    case TYPE_CHAR:
+      if (slot != reinterpret_cast<const StringVal*>(src)->ptr) {
+        ctx->SetError("UDA should not set pointer of CHAR(N) intermediate");
+      }
       return;
     case TYPE_TIMESTAMP:
       *reinterpret_cast<TimestampValue*>(slot) = TimestampValue::FromTimestampVal(
@@ -301,8 +306,18 @@ inline void AggFnEvaluator::SetDstSlot(const AnyVal* src,
 // This function would be replaced in codegen.
 void AggFnEvaluator::Init(FunctionContext* agg_fn_ctx, Tuple* dst) {
   DCHECK(init_fn_ != NULL);
+  if (intermediate_type().type == TYPE_CHAR) {
+    // For type char, we want to initialize the staging_intermediate_val_ with
+    // a pointer into the tuple (the UDA should not be allocating it).
+    void* slot = dst->GetSlot(intermediate_slot_desc_->tuple_offset());
+    StringVal* sv = reinterpret_cast<StringVal*>(staging_intermediate_val_);
+    sv->is_null = dst->IsNull(intermediate_slot_desc_->null_indicator_offset());
+    sv->ptr = reinterpret_cast<uint8_t*>(
+        StringValue::CharSlotToPtr(slot, intermediate_type()));
+    sv->len = intermediate_type().len;
+  }
   reinterpret_cast<InitFn>(init_fn_)(agg_fn_ctx, staging_intermediate_val_);
-  SetDstSlot(staging_intermediate_val_, intermediate_slot_desc_, dst);
+  SetDstSlot(agg_fn_ctx, staging_intermediate_val_, intermediate_slot_desc_, dst);
   agg_fn_ctx->impl()->set_num_updates(0);
   agg_fn_ctx->impl()->set_num_removes(0);
 }
@@ -381,7 +396,7 @@ void AggFnEvaluator::Update(
     default:
       DCHECK(false) << "NYI";
   }
-  SetDstSlot(staging_intermediate_val_, intermediate_slot_desc_, dst);
+  SetDstSlot(agg_fn_ctx, staging_intermediate_val_, intermediate_slot_desc_, dst);
 }
 
 void AggFnEvaluator::Merge(FunctionContext* agg_fn_ctx, Tuple* src, Tuple* dst) {
@@ -393,7 +408,7 @@ void AggFnEvaluator::Merge(FunctionContext* agg_fn_ctx, Tuple* src, Tuple* dst) 
   // The merge fn always takes one input argument.
   reinterpret_cast<UpdateFn1>(merge_fn_)(agg_fn_ctx,
       *staging_merge_input_val_, staging_intermediate_val_);
-  SetDstSlot(staging_intermediate_val_, intermediate_slot_desc_, dst);
+  SetDstSlot(agg_fn_ctx, staging_intermediate_val_, intermediate_slot_desc_, dst);
 }
 
 void AggFnEvaluator::SerializeOrFinalize(FunctionContext* agg_fn_ctx, Tuple* src,
@@ -420,62 +435,62 @@ void AggFnEvaluator::SerializeOrFinalize(FunctionContext* agg_fn_ctx, Tuple* src
     case TYPE_BOOLEAN: {
       typedef BooleanVal(*Fn)(FunctionContext*, AnyVal*);
       BooleanVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
-      SetDstSlot(&v, dst_slot_desc, dst);
+      SetDstSlot(agg_fn_ctx, &v, dst_slot_desc, dst);
       break;
     }
     case TYPE_TINYINT: {
       typedef TinyIntVal(*Fn)(FunctionContext*, AnyVal*);
       TinyIntVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
-      SetDstSlot(&v, dst_slot_desc, dst);
+      SetDstSlot(agg_fn_ctx, &v, dst_slot_desc, dst);
       break;
     }
     case TYPE_SMALLINT: {
       typedef SmallIntVal(*Fn)(FunctionContext*, AnyVal*);
       SmallIntVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
-      SetDstSlot(&v, dst_slot_desc, dst);
+      SetDstSlot(agg_fn_ctx, &v, dst_slot_desc, dst);
       break;
     }
     case TYPE_INT: {
       typedef IntVal(*Fn)(FunctionContext*, AnyVal*);
       IntVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
-      SetDstSlot(&v, dst_slot_desc, dst);
+      SetDstSlot(agg_fn_ctx, &v, dst_slot_desc, dst);
       break;
     }
     case TYPE_BIGINT: {
       typedef BigIntVal(*Fn)(FunctionContext*, AnyVal*);
       BigIntVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
-      SetDstSlot(&v, dst_slot_desc, dst);
+      SetDstSlot(agg_fn_ctx, &v, dst_slot_desc, dst);
       break;
     }
     case TYPE_FLOAT: {
       typedef FloatVal(*Fn)(FunctionContext*, AnyVal*);
       FloatVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
-      SetDstSlot(&v, dst_slot_desc, dst);
+      SetDstSlot(agg_fn_ctx, &v, dst_slot_desc, dst);
       break;
     }
     case TYPE_DOUBLE: {
       typedef DoubleVal(*Fn)(FunctionContext*, AnyVal*);
       DoubleVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
-      SetDstSlot(&v, dst_slot_desc, dst);
+      SetDstSlot(agg_fn_ctx, &v, dst_slot_desc, dst);
       break;
     }
     case TYPE_STRING:
     case TYPE_VARCHAR: {
       typedef StringVal(*Fn)(FunctionContext*, AnyVal*);
       StringVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
-      SetDstSlot(&v, dst_slot_desc, dst);
+      SetDstSlot(agg_fn_ctx, &v, dst_slot_desc, dst);
       break;
     }
     case TYPE_DECIMAL: {
       typedef DecimalVal(*Fn)(FunctionContext*, AnyVal*);
       DecimalVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
-      SetDstSlot(&v, dst_slot_desc, dst);
+      SetDstSlot(agg_fn_ctx, &v, dst_slot_desc, dst);
       break;
     }
     case TYPE_TIMESTAMP: {
       typedef TimestampVal(*Fn)(FunctionContext*, AnyVal*);
       TimestampVal v = reinterpret_cast<Fn>(fn)(agg_fn_ctx, staging_intermediate_val_);
-      SetDstSlot(&v, dst_slot_desc, dst);
+      SetDstSlot(agg_fn_ctx, &v, dst_slot_desc, dst);
       break;
     }
     default:

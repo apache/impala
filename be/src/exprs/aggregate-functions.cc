@@ -1087,14 +1087,15 @@ double ComputeKnuthVariance(const KnuthVarianceState& state, bool pop) {
 
 void AggregateFunctions::KnuthVarInit(FunctionContext* ctx, StringVal* dst) {
   dst->is_null = false;
-  dst->len = sizeof(KnuthVarianceState);
-  dst->ptr = ctx->Allocate(dst->len);
+  DCHECK_EQ(dst->len, sizeof(KnuthVarianceState));
   memset(dst->ptr, 0, dst->len);
 }
 
 template <typename T>
 void AggregateFunctions::KnuthVarUpdate(FunctionContext* ctx, const T& src,
                                         StringVal* dst) {
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(KnuthVarianceState));
   if (src.is_null) return;
   KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(dst->ptr);
   double temp = 1 + state->count;
@@ -1107,6 +1108,10 @@ void AggregateFunctions::KnuthVarUpdate(FunctionContext* ctx, const T& src,
 
 void AggregateFunctions::KnuthVarMerge(FunctionContext* ctx, const StringVal& src,
                                        StringVal* dst) {
+  DCHECK(!dst->is_null);
+  DCHECK_EQ(dst->len, sizeof(KnuthVarianceState));
+  DCHECK(!src.is_null);
+  DCHECK_EQ(src.len, sizeof(KnuthVarianceState));
   // Reference implementation:
   // http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
   KnuthVarianceState* src_state = reinterpret_cast<KnuthVarianceState*>(src.ptr);
@@ -1128,34 +1133,31 @@ DoubleVal AggregateFunctions::KnuthVarFinalize(
   return DoubleVal(variance);
 }
 
-StringVal AggregateFunctions::KnuthVarPopFinalize(FunctionContext* ctx,
+DoubleVal AggregateFunctions::KnuthVarPopFinalize(FunctionContext* ctx,
                                                   const StringVal& state_sv) {
   DCHECK(!state_sv.is_null);
-  KnuthVarianceState state = *reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
-  ctx->Free(state_sv.ptr);
-  if (state.count == 0) return StringVal::null();
-  double variance = ComputeKnuthVariance(state, true);
-  return ToStringVal(ctx, variance);
+  DCHECK_EQ(state_sv.len, sizeof(KnuthVarianceState));
+  KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
+  if (state->count == 0) return DoubleVal::null();
+  return ComputeKnuthVariance(*state, true);
 }
 
-StringVal AggregateFunctions::KnuthStddevFinalize(FunctionContext* ctx,
+DoubleVal AggregateFunctions::KnuthStddevFinalize(FunctionContext* ctx,
                                                   const StringVal& state_sv) {
   DCHECK(!state_sv.is_null);
-  KnuthVarianceState state = *reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
-  ctx->Free(state_sv.ptr);
-  if (state.count == 0) return StringVal::null();
-  double variance = ComputeKnuthVariance(state, false);
-  return ToStringVal(ctx, sqrt(variance));
+  DCHECK_EQ(state_sv.len, sizeof(KnuthVarianceState));
+  KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
+  if (state->count == 0) return DoubleVal::null();
+  return sqrt(ComputeKnuthVariance(*state, false));
 }
 
-StringVal AggregateFunctions::KnuthStddevPopFinalize(FunctionContext* ctx,
+DoubleVal AggregateFunctions::KnuthStddevPopFinalize(FunctionContext* ctx,
                                                      const StringVal& state_sv) {
   DCHECK(!state_sv.is_null);
-  KnuthVarianceState state = *reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
-  ctx->Free(state_sv.ptr);
-  if (state.count == 0) return StringVal::null();
-  double variance = ComputeKnuthVariance(state, true);
-  return ToStringVal(ctx, sqrt(variance));
+  DCHECK_EQ(state_sv.len, sizeof(KnuthVarianceState));
+  KnuthVarianceState* state = reinterpret_cast<KnuthVarianceState*>(state_sv.ptr);
+  if (state->count == 0) return DoubleVal::null();
+  return sqrt(ComputeKnuthVariance(*state, true));
 }
 
 struct RankState {
