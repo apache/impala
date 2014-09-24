@@ -685,7 +685,7 @@ Status ImpalaServer::SetQueryInflight(shared_ptr<SessionState> session_state,
 }
 
 Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
-    const Status *cause) {
+    const Status* cause) {
   VLOG_QUERY << "UnregisterQuery(): query_id=" << query_id;
 
   RETURN_IF_ERROR(CancelInternal(query_id, check_inflight, cause));

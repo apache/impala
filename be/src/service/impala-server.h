@@ -400,10 +400,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Unregister the query by cancelling it, removing exec_state from
   // query_exec_state_map_, and removing the query id from session state's in-flight
   // query list.  If check_inflight is true, then return an error if the query is not
-  // yet in-flight.  Otherwise, preceed even if the query isn't yet in-flight (for
+  // yet in-flight.  Otherwise, proceed even if the query isn't yet in-flight (for
   // cleaning up after an error on the query issuing path).
   Status UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
-      const Status *cause = NULL);
+      const Status* cause = NULL);
 
   // Initiates query cancellation reporting the given cause as the query status.
   // Assumes deliberate cancellation by the user if the cause is NULL.  Returns an
@@ -994,8 +994,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       ProxyUserMap;
   ProxyUserMap authorized_proxy_user_config_;
 
-  // Guards queries_by_timestamp_.  Must not be acquired before the corresponding
-  // session state lock.
+  // Guards queries_by_timestamp_.  Must not be acquired before a session state lock.
   boost::mutex query_expiration_lock_;
 
   // Describes a query expiration event (t, q) where t is the expiration deadline in
