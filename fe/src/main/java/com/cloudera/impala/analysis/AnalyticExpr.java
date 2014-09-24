@@ -499,6 +499,8 @@ public class AnalyticExpr extends Expr {
     fnCall_.resetAnalysisState();
     if (resetWindow_) window_ = null;
     resetWindow_ = false;
+    // sync with children, now that they've been reset
+    syncWithChildren();
   }
 
   @Override

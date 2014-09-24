@@ -746,6 +746,20 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "select min(id) over (order by tinyint_col) as X from functional.alltypes "
           + "group by id, tinyint_col order by rank() over (order by X)",
         "Nesting of analytic expressions is not allowed");
+    // IMPALA-1256: AnalyticExpr.resetAnalysisState() didn't sync up w/ orderByElements_
+    AnalyzesOk("with t as ("
+        + "select * from (select sum(t1.year) over ("
+        + "  order by max(t1.id), t1.year "
+        + "  rows between unbounded preceding and 5 preceding) "
+        + "from functional.alltypes t1 group by t1.year) t1) select * from t");
+    AnalyzesOk("with t as ("
+        + "select sum(t1.smallint_col) over () from functional.alltypes t1) "
+        + "select * from t");
+    // IMPALA-1234
+    AnalyzesOk("with t as (select 1 as int_col_1 from functional.alltypesagg t1) "
+        + "select count(t1.int_col_1) as int_col_1 from t t1 where t1.int_col_1 is null "
+        + "group by t1.int_col_1 union all "
+        + "select min(t1.day) over () from functional.alltypesagg t1");
 
     // nested analytic exprs
     AnalysisError(
