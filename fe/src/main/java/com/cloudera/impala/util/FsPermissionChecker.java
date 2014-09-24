@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.fs.permission.AclEntry;
 import org.apache.hadoop.fs.permission.AclEntryType;
 import org.apache.hadoop.fs.permission.AclStatus;
+import org.apache.hadoop.fs.permission.AclStatus;
 import org.apache.hadoop.fs.permission.AclEntryScope;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -34,6 +35,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.hdfs.protocol.AclException;
+import org.apache.hadoop.ipc.RemoteException;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -80,6 +83,9 @@ public class FsPermissionChecker {
     private Map<AclEntryType, List<AclEntry>> entriesByTypes_ = Maps.newHashMap();
     private AclEntry mask_;
 
+    /**
+     * If aclStatus is null, ACL permissions are not checked.
+     */
     protected Permissions(FileStatus fileStatus, AclStatus aclStatus) {
       Preconditions.checkNotNull(fileStatus);
       fileStatus_ = fileStatus;
@@ -200,7 +206,13 @@ public class FsPermissionChecker {
   public Permissions getPermissions(FileSystem fs, Path path) throws IOException {
     Preconditions.checkNotNull(fs);
     Preconditions.checkNotNull(path);
-    return new Permissions(fs.getFileStatus(path), fs.getAclStatus(path));
+    AclStatus aclStatus = null;
+    try {
+      aclStatus = fs.getAclStatus(path);
+    } catch (AclException ex) {
+      LOG.trace("No ACLs retrieved, skipping ACLs check (HDFS will enforce ACLs)", ex);
+    }
+    return new Permissions(fs.getFileStatus(path), aclStatus);
   }
 
   /**
