@@ -588,8 +588,10 @@ struct DecimalVal : public impala_udf::AnyVal {
 
   DecimalVal& operator=(const DecimalVal& other) {
     // Depending on the compiler, the default assignment operator may require 16-byte
-    // alignment of 'this' and 'other'.
-    memcpy(this, &other, sizeof(DecimalVal));
+    // alignment of 'this' and 'other'. Cast to void* so the compiler doesn't change back
+    // to an assignment.
+    memcpy(reinterpret_cast<void*>(this), reinterpret_cast<const void*>(&other),
+           sizeof(DecimalVal));
     return *this;
   }
 
