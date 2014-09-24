@@ -870,7 +870,7 @@ TINYINT, INT, BIGINT
 select sum(t1.int_col) over (partition by t1.id order by t1.int_col, t1.month) 
 from alltypestiny t1 
 where exists (select tt1.month from alltypes tt1 where t1.int_col = tt1.smallint_col)
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 0
 0
 0
