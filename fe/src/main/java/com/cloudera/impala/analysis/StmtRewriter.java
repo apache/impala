@@ -397,18 +397,29 @@ public class StmtRewriter {
           ((BinaryPredicate)conjunct).getOp() != BinaryPredicate.Operator.EQ) {
         continue;
       }
-      List<TupleId> tupleIds = Lists.newArrayList();
-      conjunct.getIds(tupleIds, null);
-      if (tupleIds.size() > 1 && tupleIds.contains(inlineView.getDesc().getId())) {
-        hasEqJoinPred = true;
-        break;
+      List<TupleId> lhsTupleIds = Lists.newArrayList();
+      conjunct.getChild(0).getIds(lhsTupleIds, null);
+      if (lhsTupleIds.isEmpty()) continue;
+      List<TupleId> rhsTupleIds = Lists.newArrayList();
+      conjunct.getChild(1).getIds(rhsTupleIds, null);
+      if (rhsTupleIds.isEmpty()) continue;
+      // Check if columns from the outer query block (stmt) appear in both sides
+      // of the binary predicate.
+      if ((lhsTupleIds.contains(inlineView.getDesc().getId()) && lhsTupleIds.size() > 1)
+          || (rhsTupleIds.contains(inlineView.getDesc().getId())
+              && rhsTupleIds.size() > 1)) {
+        continue;
       }
+      hasEqJoinPred = true;
+      break;
     }
 
     if (!hasEqJoinPred) {
       // TODO: Remove this when independent subquery evaluation is implemented.
       // TODO: Requires support for non-equi joins.
-      if (!(expr.getSubquery().isScalarSubquery()) || onClauseConjuncts.size() != 1) {
+      boolean hasGroupBy = ((SelectStmt) inlineView.getViewStmt()).hasGroupByClause();
+      if (!expr.getSubquery().isScalarSubquery() ||
+          (!(hasGroupBy && stmt.selectList_.isDistinct()) && hasGroupBy)) {
         throw new AnalysisException("Unsupported predicate with subquery: " +
             expr.toSql());
       }

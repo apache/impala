@@ -1183,3 +1183,70 @@ group by int_col
 01:SCAN HDFS [functional.alltypes s]
    partitions=24/24 size=478.45KB
 ====
+# Uncorrelated scalar subquery where columns from the outer appear in both sides
+# of the binary predicate
+select 1
+from functional.alltypestiny t1
+where (select count(*) from functional.alltypessmall) + t1.int_col = t1.bigint_col - 1
+---- PLAN
+03:CROSS JOIN [BROADCAST]
+|  predicates: count(*) + t1.int_col = t1.bigint_col - 1
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+00:SCAN HDFS [functional.alltypestiny t1]
+   partitions=4/4 size=460B
+====
+# Uncorrelated scalar subquery in complex binary predicate that contains columns
+# from two tables of the outer
+select 1
+from functional.alltypestiny t1 join functional.alltypessmall t2 on t1.id = t2.id
+where (select count(*) from functional.alltypes) + 1 = t1.int_col + t2.int_col
+---- PLAN
+05:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t1.int_col + t2.int_col = count(*) + 1
+|
+|--03:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |
+|  02:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t2.id = t1.id
+|
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     partitions=4/4 size=460B
+|
+01:SCAN HDFS [functional.alltypessmall t2]
+   partitions=4/4 size=6.32KB
+====
+# Uncorrelated scalar subquery in complex binary predicate that contains columns
+# from two tables of the outer that appear in both sides of the predicate
+select 1
+from functional.alltypestiny t1 join functional.alltypessmall t2 on t1.id = t2.id
+where
+  (select count(*) from functional.alltypes) + t2.bigint_col = t1.int_col + t2.int_col
+---- PLAN
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: t2.id = t1.id
+|  other predicates: count(*) + t2.bigint_col = t1.int_col + t2.int_col
+|
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     partitions=4/4 size=460B
+|
+04:CROSS JOIN [BROADCAST]
+|
+|--03:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |
+|  02:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 size=478.45KB
+|
+01:SCAN HDFS [functional.alltypessmall t2]
+   partitions=4/4 size=6.32KB
+====

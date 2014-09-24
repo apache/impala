@@ -548,6 +548,17 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         AnalyzesOk(String.format("select 1 from functional.alltypes where " +
             "1 + (select %s - 1 from functional.alltypestiny where bool_col = false) " +
             "%s id - 10", aggFn, cmpOp));
+        AnalyzesOk(String.format("select 1 from functional.alltypestiny t1 where " +
+            "(select %s from functional.alltypes) - t1.id %s " +
+            "t1.tinyint_col", aggFn, cmpOp));
+        AnalyzesOk(String.format("select 1 from functional.alltypestiny t1 where " +
+            "(select %s from functional.alltypes) + t1.id %s " +
+            "t1.tinyint_col + t1.bigint_col + 1", aggFn, cmpOp));
+        AnalyzesOk(String.format("select 1 from functional.alltypestiny t1 inner " +
+            "join functional.alltypessmall t2 on t1.id = t2.id where " +
+            "(select %s from functional.alltypes) + 1 %s t1.int_col + t2.int_col",
+            aggFn, cmpOp));
+
         // Correlated
         AnalyzesOk(String.format("select count(*) from functional.alltypes a where " +
             "id %s (select %s from functional.alltypestiny t where t.bool_col = false " +
@@ -698,10 +709,9 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "(select int_col from functional.alltypessmall limit 1)");
     // Correlated aggregate suquery with correlated predicate that can't be
     // transformed into an equi-join
-    AnalysisError("select id from functional.alltypestiny t where " +
+    AnalyzesOk("select id from functional.alltypestiny t where " +
         "1 < (select sum(int_col) from functional.alltypessmall s where " +
-        "t.id < 10)", "Unsupported predicate with subquery: 1 < (SELECT sum(int_col) " +
-        "FROM functional.alltypessmall s WHERE t.id < 10)");
+        "t.id < 10)");
     // Aggregate subqueries in an IS [NOT] NULL predicate
     String nullOps[] = {"is null", "is not null"};
     for (String aggFn: aggFns) {
@@ -718,10 +728,9 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     }
     // Aggregate subquery with a correlated predicate that can't be transformed
     // into an equi-join in an IS NULL predicate
-    AnalysisError("select 1 from functional.alltypestiny t where " +
+    AnalyzesOk("select 1 from functional.alltypestiny t where " +
         "(select max(id) from functional.alltypessmall s where t.id < 10) " +
-        "is null", "Unsupported predicate with subquery: (SELECT max(id) FROM " +
-        "functional.alltypessmall s WHERE t.id < 10) IS NULL");
+        "is null");
 
     // Mathematical functions with scalar subqueries
     String mathFns[] = {"abs", "cos", "ceil", "floor"};
