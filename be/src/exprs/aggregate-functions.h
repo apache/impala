@@ -128,8 +128,8 @@ class AggregateFunctions {
   static void PcsaUpdate(FunctionContext*, const T& src, StringVal* dst);
 
   static void PcMerge(FunctionContext*, const StringVal& src, StringVal* dst);
-  static StringVal PcFinalize(FunctionContext*, const StringVal& src);
-  static StringVal PcsaFinalize(FunctionContext*, const StringVal& src);
+  static BigIntVal PcFinalize(FunctionContext*, const StringVal& src);
+  static BigIntVal PcsaFinalize(FunctionContext*, const StringVal& src);
 
   // Reservoir sampling produces a uniform random sample without knowing the total number
   // of items. ReservoirSample{Init, Update, Merge, Serialize} implement distributed

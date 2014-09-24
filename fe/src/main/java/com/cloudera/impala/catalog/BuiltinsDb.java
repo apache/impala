@@ -601,7 +601,7 @@ public class BuiltinsDb extends Db {
       // distinctpc
       // TODO: this needs to switch to CHAR(64) as the intermediate type
       db.addBuiltin(AggregateFunction.createBuiltin(db, "distinctpc",
-          Lists.newArrayList(t), Type.STRING, Type.STRING,
+          Lists.newArrayList(t), Type.BIGINT, Type.STRING,
           prefix + "6PcInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
           prefix + PC_UPDATE_SYMBOL.get(t),
           prefix + "7PcMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
@@ -612,7 +612,7 @@ public class BuiltinsDb extends Db {
       // distinctpcsa
       // TODO: this needs to switch to CHAR(64) as the intermediate type
       db.addBuiltin(AggregateFunction.createBuiltin(db, "distinctpcsa",
-          Lists.newArrayList(t), Type.STRING, Type.STRING,
+          Lists.newArrayList(t), Type.BIGINT, Type.STRING,
           prefix + "6PcInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
           prefix + PCSA_UPDATE_SYMBOL.get(t),
           prefix + "7PcMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",

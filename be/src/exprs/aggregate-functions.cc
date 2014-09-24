@@ -705,35 +705,19 @@ double DistinceEstimateFinalize(const StringVal& src) {
   return result;
 }
 
-StringVal AggregateFunctions::PcFinalize(FunctionContext* c, const StringVal& src) {
+BigIntVal AggregateFunctions::PcFinalize(FunctionContext* c, const StringVal& src) {
   DCHECK(!src.is_null);
   double estimate = DistinceEstimateFinalize(src);
-  int64_t result = estimate;
   c->Free(src.ptr);
-
-  // TODO: this should return bigint. this is a hack
-  stringstream ss;
-  ss << result;
-  string str = ss.str();
-  StringVal dst(c, str.length());
-  memcpy(dst.ptr, str.c_str(), str.length());
-  return dst;
+  return static_cast<int64_t>(estimate);
 }
 
-StringVal AggregateFunctions::PcsaFinalize(FunctionContext* c, const StringVal& src) {
+BigIntVal AggregateFunctions::PcsaFinalize(FunctionContext* c, const StringVal& src) {
   DCHECK(!src.is_null);
   // When using stochastic averaging, the result has to be multiplied by NUM_PC_BITMAPS.
   double estimate = DistinceEstimateFinalize(src) * NUM_PC_BITMAPS;
-  int64_t result = estimate;
   c->Free(src.ptr);
-
-  // TODO: this should return bigint. this is a hack
-  stringstream ss;
-  ss << result;
-  string str = ss.str();
-  StringVal dst(c, str.length());
-  memcpy(dst.ptr, str.c_str(), str.length());
-  return dst;
+  return static_cast<int64_t>(estimate);
 }
 
 // Histogram constants
@@ -990,7 +974,8 @@ StringVal AggregateFunctions::HistogramFinalize(FunctionContext* ctx,
 }
 
 template <typename T>
-T AggregateFunctions::AppxMedianFinalize(FunctionContext* ctx, const StringVal& src_val) {
+T AggregateFunctions::AppxMedianFinalize(FunctionContext* ctx,
+    const StringVal& src_val) {
   DCHECK(!src_val.is_null);
   DCHECK_EQ(src_val.len, sizeof(ReservoirSampleState<T>));
 

@@ -832,9 +832,8 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "(select aggfn(int_col) from functional.alltypes s where " +
         "s.bool_col = false) < 10");
 
-    // sample, histogram, ndv, distinctpc, distinctpcsa is scalar subqueries
-    String aggFnsReturningStringOnEmpty[] = {"sample(int_col)", "histogram(int_col)",
-        "distinctpc(int_col)", "distinctpcsa(int_col)"};
+    // sample, histogram in scalar subqueries
+    String aggFnsReturningStringOnEmpty[] = {"sample(int_col)", "histogram(int_col)"};
     for (String aggFn: aggFnsReturningStringOnEmpty) {
       AnalyzesOk(String.format("select * from functional.alltypestiny t where " +
         "t.string_col = (select %s from functional.alltypesagg g where t.id = " +
