@@ -84,7 +84,7 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
   static const int DATA_PAGE_SIZE = 64 * 1024;
 
   // Default hdfs block size. In bytes.
-  static const int HDFS_BLOCK_SIZE = 512 * 1024 * 1024;
+  static const int HDFS_BLOCK_SIZE = 256 * 1024 * 1024;
 
   // Align block sizes to this constant. In bytes.
   static const int HDFS_BLOCK_ALIGNMENT = 1024 * 1024;
