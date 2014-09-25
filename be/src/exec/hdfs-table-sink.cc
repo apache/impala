@@ -351,6 +351,31 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
   BuildHdfsFileNames(partition_descriptor, output_partition);
 
   output_partition->hdfs_connection = hdfs_connection_;
+
+  bool allow_unsupported_formats =
+      state->query_options().__isset.allow_unsupported_formats &&
+      state->query_options().allow_unsupported_formats;
+  if (!allow_unsupported_formats) {
+    if (partition_descriptor.file_format() == THdfsFileFormat::SEQUENCE_FILE ||
+        partition_descriptor.file_format() == THdfsFileFormat::AVRO) {
+      stringstream error_msg;
+      map<int, const char*>::const_iterator i =
+          _THdfsFileFormat_VALUES_TO_NAMES.find(partition_descriptor.file_format());
+      error_msg << "Writing to table format " << i->second
+          << " is not supported. Use query option ALLOW_UNSUPPORTED_FORMATS"
+          " to override.";
+      return Status(error_msg.str());
+    }
+    if (partition_descriptor.file_format() == THdfsFileFormat::TEXT &&
+        state->query_options().__isset.compression_codec &&
+        state->query_options().compression_codec != THdfsCompression::NONE) {
+      stringstream error_msg;
+      error_msg << "Writing to compressed text table is not supported. "
+          "Use query option ALLOW_UNSUPPORTED_FORMATS to override.";
+      return Status(error_msg.str());
+    }
+  }
+
   switch (partition_descriptor.file_format()) {
     case THdfsFileFormat::TEXT:
       output_partition->writer.reset(
@@ -382,10 +407,10 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
           _THdfsFileFormat_VALUES_TO_NAMES.find(partition_descriptor.file_format());
       if (i != _THdfsFileFormat_VALUES_TO_NAMES.end()) {
         error_msg << "Cannot write to table with format " << i->second << ". "
-            << "Impala only supports writing to TEXT, PARQUET, SEQ, and AVRO tables.";
+            << "Impala only supports writing to TEXT and PARQUET.";
       } else {
-        error_msg << "Cannot write to table. Impala only supports writing to TEXT,"
-                  << " PARQUET, SEQ, and AVRO tables. (Unknown file format: "
+        error_msg << "Cannot write to table. Impala only supports writing to TEXT"
+                  << " and PARQUET tables. (Unknown file format: "
                   << partition_descriptor.file_format() << ")";
       }
       return Status(error_msg.str());

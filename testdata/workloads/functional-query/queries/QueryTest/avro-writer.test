@@ -16,10 +16,12 @@ TBLPROPERTIES ('avro.schema.literal'='{
 ====
 ---- QUERY
 SET COMPRESSION_CODEC=NONE;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
 insert into __avro_write select 0, "a", 1.1;
 ====
 ---- QUERY
 SET COMPRESSION_CODEC=SNAPPY;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
 insert into __avro_write select 1, "b", 2.2;
 ====
 ---- QUERY
@@ -29,6 +31,12 @@ select * from __avro_write;
 1,'b',2.2
 ---- TYPES
 INT,STRING,DOUBLE
+====
+---- QUERY
+SET ALLOW_UNSUPPORTED_FORMATS=0;
+insert into __avro_write select 1, "b", 2.2;
+---- CATCH
+Writing to table format AVRO is not supported. Use query option ALLOW_UNSUPPORTED_FORMATS
 ====
 ---- QUERY
 drop table __avro_write;

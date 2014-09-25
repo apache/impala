@@ -4,28 +4,40 @@ drop table if exists __seq_write;
 ====
 ---- QUERY
 SET COMPRESSION_CODEC=NONE;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
 create table __seq_write (i int, s string, d double)
 stored as SEQUENCEFILE;
 ====
 ---- QUERY
 SET COMPRESSION_CODEC=NONE;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
 insert into __seq_write select 0, "a", 1.1;
 ====
 ---- QUERY
 SET COMPRESSION_CODEC=DEFAULT;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
 insert into __seq_write values (1, "b", 2.2);
 ====
 ---- QUERY
 SET COMPRESSION_CODEC=SNAPPY;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
 insert into __seq_write values (2, "c", 3.3);
 ====
 ---- QUERY
 SET COMPRESSION_CODEC=SNAPPY_BLOCKED;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
 insert into __seq_write values (3, "d", 4.4);
 ====
 ---- QUERY
 SET COMPRESSION_CODEC=GZIP;
+SET ALLOW_UNSUPPORTED_FORMATS=1;
 insert into __seq_write values (4, "e", 5.5);
+====
+---- QUERY
+SET ALLOW_UNSUPPORTED_FORMATS=0;
+insert into __seq_write values (4, "e", 5.5);
+---- CATCH
+Writing to table format SEQUENCEFILE is not supported. Use query option
 ====
 ---- QUERY
 select * from __seq_write;
