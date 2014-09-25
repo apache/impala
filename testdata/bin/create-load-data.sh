@@ -85,14 +85,14 @@ hadoop fs -put ${IMPALA_HOME}/testdata/data/schemas/decimal.parquet \
   /test-warehouse/schemas/
 
 # CHAR and VARCHAR tables written by Hive
-hadoop fs -mkdir /test-warehouse/chars_formats_avro_snap/
-hadoop fs -put ${IMPALA_HOME}/testdata/data/chars-formats.avro \
+hadoop fs -mkdir -p /test-warehouse/chars_formats_avro_snap/
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/chars-formats.avro \
   /test-warehouse/chars_formats_avro_snap
-hadoop fs -mkdir /test-warehouse/chars_formats_parquet/
-hadoop fs -put ${IMPALA_HOME}/testdata/data/chars-formats.parquet \
+hadoop fs -mkdir -p /test-warehouse/chars_formats_parquet/
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/chars-formats.parquet \
   /test-warehouse/chars_formats_parquet
-hadoop fs -mkdir /test-warehouse/chars_formats_text/
-hadoop fs -put ${IMPALA_HOME}/testdata/data/chars-formats.txt \
+hadoop fs -mkdir -p /test-warehouse/chars_formats_text/
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/chars-formats.txt \
   /test-warehouse/chars_formats_text
 
 # Load the data set
