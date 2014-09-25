@@ -300,7 +300,7 @@ bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
     if (buffer_desc->block != NULL) {
       buffer_desc->block->buffer_desc_ = NULL;
     }
-    delete buffer_desc->buffer;
+    delete[] buffer_desc->buffer;
     mem_tracker_->Release(buffer_desc->len);
     --additional_tmp_reservations;
     --client->num_tmp_reserved_buffers_;
@@ -345,7 +345,7 @@ Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block**
     DCHECK(unpin_block == NULL);
     DCHECK_LT(len, max_block_size_) << "Cannot request blocks bigger than max_len";
     if (mem_tracker_->TryConsume(len)) {
-      uint8_t* buffer = reinterpret_cast<uint8_t*>(malloc(len));
+      uint8_t* buffer = new uint8_t[len];
       new_block->buffer_desc_ = obj_pool_.Add(new BufferDescriptor(buffer, len));
       new_block->buffer_desc_->block = new_block;
       new_block->is_pinned_ = true;
@@ -428,7 +428,7 @@ BufferedBlockMgr::~BufferedBlockMgr() {
   // Free memory resources.
   BOOST_FOREACH(BufferDescriptor* buffer, all_io_buffers_) {
     mem_tracker_->Release(buffer->len);
-    delete buffer->buffer;
+    delete[] buffer->buffer;
   }
   DCHECK_EQ(mem_tracker_->consumption(), 0);
   mem_tracker_->UnregisterFromParent();
@@ -709,7 +709,7 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
   if (block->buffer_desc_ != NULL) {
     if (block->buffer_desc_->len != max_block_size_) {
       // Just delete the block for now.
-      free(block->buffer_desc_->buffer);
+      delete[] block->buffer_desc_->buffer;
       mem_tracker_->Release(block->buffer_desc_->len);
     } else if (!free_io_buffers_.Contains(block->buffer_desc_)) {
       free_io_buffers_.Enqueue(block->buffer_desc_);
