@@ -290,7 +290,8 @@ public class StmtRewriter {
 
     // Update the subquery's select list and/or its GROUP BY clause by adding
     // SlotRefs from the extracted correlated predicates.
-    boolean updateGroupBy = expr.getSubquery().isScalarSubquery();
+    boolean updateGroupBy = expr.getSubquery().isScalarSubquery() ||
+        (expr instanceof ExistsPredicate && subqueryStmt.hasAggInfo());
     Map<Expr, Expr> exprMap = Maps.newHashMap();
     List<TupleId> subqueryTupleIds = subqueryStmt.getTableRefIds();
     for (Expr conjunct: onClauseConjuncts) {
@@ -619,16 +620,22 @@ public class StmtRewriter {
     Preconditions.checkState(expr.contains(Subquery.class));
     SelectStmt stmt = (SelectStmt) expr.getSubquery().getStatement();
     Preconditions.checkNotNull(stmt);
+    // Grouping and/or aggregation (including analytic functions) is only
+    // allowed on correlated EXISTS subqueries
     if ((expr instanceof BinaryPredicate
           && (stmt.hasGroupByClause() || stmt.hasAnalyticInfo()))
-        || ((expr instanceof InPredicate || expr instanceof ExistsPredicate)
-          && (stmt.hasAggInfo() || stmt.hasAnalyticInfo()))) {
+        || (expr instanceof InPredicate
+            && (stmt.hasAggInfo() || stmt.hasAnalyticInfo()))) {
       throw new AnalysisException("Unsupported correlated subquery with grouping " +
           "and/or aggregation: " + stmt.toSql());
     }
+    // The following correlated subqueries with a limit clause are supported:
+    // 1. EXISTS subqueries
+    // 2. Scalar subqueries with aggregation
     if (stmt.hasLimit() &&
         (!(expr instanceof BinaryPredicate) || !stmt.hasAggInfo() ||
-         stmt.selectList_.isDistinct())) {
+         stmt.selectList_.isDistinct()) &&
+        !(expr instanceof ExistsPredicate)) {
       throw new AnalysisException("Unsupported correlated subquery with a " +
           "LIMIT clause: " + stmt.toSql());
     }

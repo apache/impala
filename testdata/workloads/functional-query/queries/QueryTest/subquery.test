@@ -621,3 +621,44 @@ order by id
 ---- TYPES
 INT
 ====
+---- QUERY
+# Correlated EXISTS subquery with an analytic function and a group by clause
+select id, int_col
+from functional.alltypesagg a
+where exists
+  (select id, sum(int_col) over (partition by bool_col)
+   from functional.alltypes b
+   where a.id = b.id and b.bigint_col < 100
+   group by id, int_col, bool_col
+   order by id)
+and id < 5
+order by id
+---- RESULTS
+0,NULL
+0,NULL
+1,1
+2,2
+3,3
+4,4
+---- TYPES
+INT, INT
+====
+---- QUERY
+# Correlated NOT EXISTS subquery with analytic function and group by
+select id, int_col from alltypestiny t
+where not exists
+  (select id, sum(int_col) over (partition by bool_col)
+   from alltypesagg a where bool_col = false and t.id = a.int_col
+   group by id, int_col, bool_col having sum(id) = 1)
+order by id, int_col
+---- RESULTS
+0,0
+2,0
+3,1
+4,0
+5,1
+6,0
+7,1
+---- TYPES
+INT, INT
+====

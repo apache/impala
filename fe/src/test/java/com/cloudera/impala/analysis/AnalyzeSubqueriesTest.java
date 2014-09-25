@@ -445,6 +445,22 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
           "(select * from functional.alltypessmall s where t.id = s.id and %s " +
           "(select * from functional.alltypestiny g where g.bool_col = " +
           "s.bool_col))", op, op));
+      // Correlated EXISTS subquery with a group by and aggregation
+      AnalyzesOk(String.format("select 1 from functional.alltypestiny t " +
+          "where %s (select id, count(*) from functional.alltypesagg g where " +
+          "t.id = g.id group by id)", op));
+      // Correlated EXISTS subquery with an analytic function
+      AnalyzesOk(String.format("select id, int_col, bool_col from " +
+          "functional.alltypestiny t1 where %s (select min(bigint_col) over " +
+          "(partition by bool_col) from functional.alltypessmall t2 where " +
+          "t1.id = t2.id)", op));
+      // Correlated EXISTS subquery with an analytic function and a group by
+      // clause
+      AnalyzesOk(String.format("select id, int_col, bool_col from " +
+          "functional.alltypestiny t1 where exists (select min(bigint_col) " +
+          "over (partition by bool_col) from functional.alltypessmall t2 " +
+          "where t1.id = t2.id group by bigint_col, bool_col)", op));
+
       String nullOps[] = {"is null", "is not null"};
       for (String nullOp: nullOps) {
         // Uncorrelated EXISTS subquery in an IS [NOT] NULL predicate
@@ -456,6 +472,11 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
             "%s and t.bool_col = false", op, nullOp));
       }
     }
+
+    // Uncorrelated EXISTS subquery with an analytic function
+    AnalyzesOk("select * from functional.alltypestiny t " +
+        "where EXISTS (select id, min(int_col) over (partition by bool_col) " +
+        "from functional.alltypesagg a where bigint_col < 10)");
 
     // Different non-equi comparison operators in the correlated predicate
     String nonEquiCmpOperators[] = {"!=", "<=", ">=", ">", "<"};
@@ -505,24 +526,8 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "IN and/or EXISTS subquery predicates are not supported in binary predicates: " +
         "if(EXISTS (SELECT * FROM functional.alltypesagg), 1, 0) = 1");
     // Correlated subquery with a LIMIT clause
-    AnalysisError("select count(*) from functional.alltypes t where exists " +
-        "(select 1 from functional.alltypesagg g where t.id = g.id limit 1)",
-        "Unsupported correlated subquery with a LIMIT clause: " +
-        "SELECT 1 FROM functional.alltypesagg g WHERE t.id = g.id LIMIT 1");
-
-    // Uncorrelated EXISTS subquery with analytic function
-    AnalyzesOk("select id, int_col, bool_col from " +
-      "functional.alltypestiny t1 where exists (select min(bigint_col) " +
-      "over (partition by bool_col) from functional.alltypessmall t2 where " +
-      "int_col < 10)");
-
-    // Correlated EXISTS with an analytic function
-    AnalysisError("select id, int_col, bool_col from functional.alltypestiny t1 " +
-        "where exists (select min(bigint_col) over (partition by bool_col) " +
-        "from functional.alltypessmall t2 where t1.id = t2.id)", "Unsupported " +
-        "correlated subquery with grouping and/or aggregation: SELECT " +
-        "min(bigint_col) OVER (PARTITION BY bool_col) FROM " +
-        "functional.alltypessmall t2 WHERE t1.id = t2.id");
+    AnalyzesOk("select count(*) from functional.alltypes t where exists " +
+        "(select 1 from functional.alltypesagg g where t.id = g.id limit 1)");
   }
 
   @Test

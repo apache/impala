@@ -498,6 +498,29 @@ where exists
 01:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 size=814.73KB
 ====
+# Correlated EXISTS with an analytic function and a group by clause
+select 1
+from functional.alltypesagg a
+where exists
+  (select id, count(int_col) over (partition by bool_col)
+   from functional.alltypestiny b
+   where a.tinyint_col = b.tinyint_col
+   group by id, int_col, bool_col)
+and tinyint_col < 10
+---- PLAN
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: a.tinyint_col = b.tinyint_col
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  group by: id, int_col, bool_col, b.tinyint_col
+|  |
+|  01:SCAN HDFS [functional.alltypestiny b]
+|     partitions=4/4 size=460B
+|
+00:SCAN HDFS [functional.alltypesagg a]
+   partitions=11/11 size=814.73KB
+   predicates: tinyint_col < 10
+====
 # Correlated NOT EXISTS
 select count(*)
 from functional.alltypes t
@@ -516,6 +539,39 @@ where not exists
 01:SCAN HDFS [functional.alltypesagg a]
    partitions=11/11 size=814.73KB
 ====
+# Correlated NOT EXISTS with an analytic function and a group by clause
+select count(*)
+from functional.alltypesagg a
+where not exists
+  (select b.id, count(b.int_col) over (partition by b.bigint_col)
+   from functional.alltypessmall b inner join functional.alltypes c on b.id = c.id
+   where c.bool_col = false and a.int_col = b.int_col
+   group by b.id, b.int_col, b.bigint_col)
+and bool_col = false
+---- PLAN
+06:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+05:HASH JOIN [RIGHT ANTI JOIN]
+|  hash predicates: b.int_col = a.int_col
+|
+|--00:SCAN HDFS [functional.alltypesagg a]
+|     partitions=11/11 size=814.73KB
+|     predicates: bool_col = FALSE
+|
+04:AGGREGATE [FINALIZE]
+|  group by: b.id, b.int_col, b.bigint_col
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: c.id = b.id
+|
+|--01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 size=6.32KB
+|
+02:SCAN HDFS [functional.alltypes c]
+   partitions=24/24 size=478.45KB
+   predicates: c.bool_col = FALSE
+====
 # Uncorrelated EXISTS
 select *
 from functional.alltypestiny t
@@ -530,6 +586,27 @@ where exists (select * from functional.alltypessmall s where s.id < 5)
 |
 00:SCAN HDFS [functional.alltypestiny t]
    partitions=4/4 size=460B
+====
+# Uncorrelated EXISTS with an analytic function and a group by clause
+select 1
+from functional.alltypestiny t
+where exists
+  (select id, max(int_col) over (partition by bigint_col)
+   from functional.alltypesagg where tinyint_col = 10
+   group by id, int_col, bigint_col)
+---- PLAN
+03:CROSS JOIN [BROADCAST]
+|
+|--00:SCAN HDFS [functional.alltypestiny t]
+|     partitions=4/4 size=460B
+|
+02:AGGREGATE [FINALIZE]
+|  group by: id, int_col, bigint_col
+|  limit: 1
+|
+01:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 size=814.73KB
+   predicates: tinyint_col = 10
 ====
 # Uncorrelated EXISTS with a LIMIT 0 clause
 select 1
