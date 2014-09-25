@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#
 
 import logging
 import pytest
@@ -21,6 +20,46 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.test_dimensions import (TestDimension,
     create_single_exec_option_dimension,
     create_parquet_dimension)
+
+class TestSpillStress(CustomClusterTestSuite):
+  @classmethod
+  def get_workload(self):
+    return 'targeted-stress'
+
+  @classmethod
+  def setup_class(cls):
+    #start impala with args
+    cls._start_impala_cluster(['--impalad_args=--"read_size=1000000"'])
+    super(CustomClusterTestSuite, cls).setup_class()
+
+  @classmethod
+  def teardown_class(cls):
+    pass
+
+  @classmethod
+  def setup_method(self, method):
+    pass
+
+  @classmethod
+  def teardown_method(self, method):
+    pass
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestSpillStress, cls).add_test_dimensions()
+    # Each client will get a different test id.
+    TEST_IDS = xrange(0, 10)
+    cls.TestMatrix.add_dimension(TestDimension('test_id', *TEST_IDS))
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').file_format == 'text')
+
+  @pytest.mark.skipif(True, reason='This test causes impala to crash')
+  @pytest.mark.stress
+  def test_agg_stress(self, vector):
+    # Number of times to execute each query
+    NUM_ITERATIONS = 5
+    for i in xrange(NUM_ITERATIONS):
+      self.run_test_case('agg_stress', vector)
 
 class TestSpilling(CustomClusterTestSuite):
   @classmethod

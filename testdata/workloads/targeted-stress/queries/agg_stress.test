@@ -1,0 +1,25 @@
+====
+---- QUERY
+# This memory limit causes a spill to happen for this query
+set max_block_mgr_memory=150m;
+# This query forces many joins and aggregations with spilling
+# and can expose race conditions in the spilling code if run in parallel
+select
+  count(distinct l2.l_comment)
+from
+  tpch.lineitem l1,
+  tpch.lineitem l2,
+  tpch.lineitem l3
+where
+  # We can make the query faster by lowering the values below
+  l1.l_tax < 1.0
+  and l2.l_tax < 1.0
+  and l1.l_orderkey = l2.l_orderkey
+  and l1.l_orderkey = l3.l_orderkey
+  and l1.l_comment = l3.l_comment
+  and l1.l_shipdate = l3.l_shipdate;
+---- RESULTS
+4580667
+---- TYPES
+BIGINT
+====
