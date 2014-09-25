@@ -430,6 +430,54 @@ public class BuiltinsDb extends Db {
              "13LastValUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
         .build();
 
+  private static final Map<Type, String> FIRST_VALUE_REWRITE_UPDATE_SYMBOL =
+      ImmutableMap.<Type, String>builder()
+        .put(Type.BOOLEAN,
+             "21FirstValRewriteUpdateIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValEPS6_")
+        .put(Type.DECIMAL,
+             "21FirstValRewriteUpdateIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValEPS6_")
+        .put(Type.TINYINT,
+             "21FirstValRewriteUpdateIN10impala_udf10TinyIntValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValEPS6_")
+        .put(Type.SMALLINT,
+             "21FirstValRewriteUpdateIN10impala_udf11SmallIntValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValEPS6_")
+        .put(Type.TIMESTAMP,
+             "21FirstValRewriteUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValEPS6_")
+        .put(Type.INT,
+             "21FirstValRewriteUpdateIN10impala_udf6IntValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValEPS6_")
+        .put(Type.FLOAT,
+             "21FirstValRewriteUpdateIN10impala_udf8FloatValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValEPS6_")
+        .put(Type.BIGINT,
+             "21FirstValRewriteUpdateIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_RKS3_PS6_")
+        .put(Type.DOUBLE,
+             "21FirstValRewriteUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValEPS6_")
+        .put(Type.STRING,
+             "21FirstValRewriteUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValEPS6_")
+        .build();
+
+  private static final Map<Type, String> LAST_VALUE_REMOVE_SYMBOL =
+      ImmutableMap.<Type, String>builder()
+        .put(Type.BOOLEAN,
+             "13LastValRemoveIN10impala_udf10BooleanValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.DECIMAL,
+             "13LastValRemoveIN10impala_udf10DecimalValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.TINYINT,
+             "13LastValRemoveIN10impala_udf10TinyIntValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.SMALLINT,
+             "13LastValRemoveIN10impala_udf11SmallIntValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.TIMESTAMP,
+             "13LastValRemoveIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.INT,
+             "13LastValRemoveIN10impala_udf6IntValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.FLOAT,
+             "13LastValRemoveIN10impala_udf8FloatValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.BIGINT,
+             "13LastValRemoveIN10impala_udf9BigIntValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.DOUBLE,
+             "13LastValRemoveIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.STRING,
+             "13LastValRemoveIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .build();
+
   private static final Map<Type, String> FIRST_VALUE_UPDATE_SYMBOL =
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,
@@ -748,12 +796,20 @@ public class BuiltinsDb extends Db {
           null,
           t == Type.STRING ? stringValGetValue : null,
           t == Type.STRING ? stringValSerializeOrFinalize : null));
+      // Implements FIRST_VALUE for some windows that require rewrites during planning.
+      db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
+          db, "first_value_rewrite", Lists.newArrayList(t, Type.BIGINT), t, t,
+          t.isStringType() ? initNullString : initNull,
+          prefix + FIRST_VALUE_REWRITE_UPDATE_SYMBOL.get(t),
+          null,
+          t == Type.STRING ? stringValGetValue : null,
+          t == Type.STRING ? stringValSerializeOrFinalize : null));
 
       db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
           db, "last_value", Lists.newArrayList(t), t, t,
           t.isStringType() ? initNullString : initNull,
           prefix + LAST_VALUE_UPDATE_SYMBOL.get(t),
-          null,
+          prefix + LAST_VALUE_REMOVE_SYMBOL.get(t),
           t == Type.STRING ? stringValGetValue : null,
           t == Type.STRING ? stringValSerializeOrFinalize : null));
 

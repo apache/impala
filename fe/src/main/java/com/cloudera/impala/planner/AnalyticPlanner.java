@@ -487,10 +487,23 @@ public class AnalyticPlanner {
     }
 
     /**
+     * True if this analytic function must be evaluated in its own WindowGroup.
+     */
+    private static boolean requiresIndependentEval(AnalyticExpr analyticExpr) {
+      return analyticExpr.getFnCall().getFnName().getFunction().equals(
+          AnalyticExpr.FIRST_VALUE_REWRITE);
+    }
+
+    /**
      * True if the partition exprs and ordering elements and the window of analyticExpr
      * match ours.
      */
     public boolean isCompatible(AnalyticExpr analyticExpr) {
+      if (requiresIndependentEval(analyticExprs.get(0)) ||
+          requiresIndependentEval(analyticExpr)) {
+        return false;
+      }
+
       if (!Expr.equalSets(analyticExpr.getPartitionExprs(), partitionByExprs)) {
         return false;
       }

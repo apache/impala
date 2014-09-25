@@ -40,6 +40,8 @@ AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
     order_by_eq_expr_ctx_(NULL),
     rows_start_offset_(0),
     rows_end_offset_(0),
+    has_first_val_null_offset_(false),
+    first_val_null_offset_(0),
     last_result_idx_(-1),
     prev_pool_last_result_idx_(-1),
     prev_pool_last_window_idx_(-1),
@@ -86,6 +88,7 @@ AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
       }
     }
   }
+  VLOG_FILE << "Window=" << DebugWindowString();
 }
 
 Status AnalyticEvalNode::Init(const TPlanNode& tnode) {
@@ -97,8 +100,8 @@ Status AnalyticEvalNode::Init(const TPlanNode& tnode) {
     RETURN_IF_ERROR(AggFnEvaluator::Create(
           pool_, analytic_node.analytic_functions[i], true, &evaluator));
     evaluators_.push_back(evaluator);
-    is_lead_fn_.push_back(
-      "lead" == analytic_node.analytic_functions[i].nodes[0].fn.name.function_name);
+    const TFunction& fn = analytic_node.analytic_functions[i].nodes[0].fn;
+    is_lead_fn_.push_back("lead" == fn.name.function_name);
     has_lead_fn = has_lead_fn || is_lead_fn_.back();
   }
   DCHECK(!has_lead_fn || !window_.__isset.window_start);
@@ -170,6 +173,15 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   for (int i = 0; i < evaluators_.size(); ++i) {
     RETURN_IF_ERROR(evaluators_[i]->Open(state, fn_ctxs_[i]));
     DCHECK(!evaluators_[i]->is_merge());
+
+    if ("first_value_rewrite" == evaluators_[i]->fn_name() &&
+        fn_ctxs_[i]->GetNumArgs() == 2) {
+      DCHECK(!has_first_val_null_offset_);
+      first_val_null_offset_ =
+        reinterpret_cast<BigIntVal*>(fn_ctxs_[i]->GetConstantArg(1))->val;
+      VLOG_FILE << "FIRST_VAL rewrite null offset: " << first_val_null_offset_;
+      has_first_val_null_offset_ = true;
+    }
   }
 
   if (partition_by_eq_expr_ctx_ != NULL) {
@@ -440,7 +452,26 @@ inline void AnalyticEvalNode::InitNextPartition(int64_t stream_idx) {
   // result tuple before any input rows are consumed and the evaluators are updated.
   if (fn_scope_ == ROWS && window_.__isset.window_end &&
       window_.window_end.type == TAnalyticWindowBoundaryType::PRECEDING) {
-    AddResultTuple(curr_partition_stream_idx_ - rows_end_offset_ - 1);
+    if (has_first_val_null_offset_) {
+      // Special handling for FIRST_VALUE which has the window rewritten in the FE
+      // in order to evaluate the fn efficiently with a trivial agg fn implementation.
+      // This occurs when the original analytic window has a start bound X PRECEDING. In
+      // that case, the window is rewritten to have an end bound X PRECEDING which would
+      // normally mean we add the newly Init()'d result tuple X rows down (so that those
+      // first rows have the initial value because they have no rows in their windows).
+      // However, the original query did not actually have X PRECEDING so we need to do
+      // one of the following:
+      // 1) Do not insert the initial result tuple with at all, indicated by
+      //    first_val_null_offset_ == -1. This happens when the original end bound was
+      //    actually CURRENT ROW or Y FOLLOWING.
+      // 2) Insert the initial result tuple at first_val_null_offset_. This happens when
+      //    the end bound was actually Y PRECEDING.
+      if (first_val_null_offset_ != -1) {
+        AddResultTuple(curr_partition_stream_idx_ + first_val_null_offset_ - 1);
+      }
+    } else {
+      AddResultTuple(curr_partition_stream_idx_ - rows_end_offset_ - 1);
+    }
   }
 }
 

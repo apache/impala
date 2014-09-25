@@ -696,35 +696,41 @@ min(int_col)
   rows between unbounded preceding and 2 following)
 from functional.alltypesagg
 ---- PLAN
-09:ANALYTIC
+10:ANALYTIC
 |  functions: count(double_col), last_value(double_col)
 |  partition by: tinyint_col, double_col
 |  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
-08:ANALYTIC
+09:ANALYTIC
 |  functions: sum(smallint_col)
 |  partition by: double_col, tinyint_col
 |  order by: int_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
 |
-07:ANALYTIC
+08:ANALYTIC
 |  functions: sum(tinyint_col)
 |  partition by: tinyint_col, double_col
 |  order by: int_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
-06:ANALYTIC
-|  functions: first_value(int_col)
+07:ANALYTIC
+|  functions: first_value_rewrite(int_col, -1)
 |  partition by: double_col, tinyint_col
 |  order by: int_col DESC
-|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 PRECEDING
 |
-05:SORT
+06:SORT
 |  order by: tinyint_col ASC NULLS FIRST, double_col ASC NULLS FIRST, int_col DESC
 |
+05:ANALYTIC
+|  functions: first_value_rewrite(int_col, -1)
+|  partition by: double_col, tinyint_col
+|  order by: int_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 PRECEDING
+|
 04:ANALYTIC
-|  functions: last_value(int_col), first_value(int_col)
+|  functions: last_value(int_col)
 |  partition by: double_col, tinyint_col
 |  order by: int_col ASC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
@@ -744,37 +750,43 @@ from functional.alltypesagg
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
 ---- DISTRIBUTEDPLAN
-11:EXCHANGE [UNPARTITIONED]
+12:EXCHANGE [UNPARTITIONED]
 |
-09:ANALYTIC
+10:ANALYTIC
 |  functions: count(double_col), last_value(double_col)
 |  partition by: tinyint_col, double_col
 |  order by: int_col DESC
 |  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
 |
-08:ANALYTIC
+09:ANALYTIC
 |  functions: sum(smallint_col)
 |  partition by: double_col, tinyint_col
 |  order by: int_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
 |
-07:ANALYTIC
+08:ANALYTIC
 |  functions: sum(tinyint_col)
 |  partition by: tinyint_col, double_col
 |  order by: int_col DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
-06:ANALYTIC
-|  functions: first_value(int_col)
+07:ANALYTIC
+|  functions: first_value_rewrite(int_col, -1)
 |  partition by: double_col, tinyint_col
 |  order by: int_col DESC
-|  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 PRECEDING
 |
-05:SORT
+06:SORT
 |  order by: tinyint_col ASC NULLS FIRST, double_col ASC NULLS FIRST, int_col DESC
 |
+05:ANALYTIC
+|  functions: first_value_rewrite(int_col, -1)
+|  partition by: double_col, tinyint_col
+|  order by: int_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 PRECEDING
+|
 04:ANALYTIC
-|  functions: last_value(int_col), first_value(int_col)
+|  functions: last_value(int_col)
 |  partition by: double_col, tinyint_col
 |  order by: int_col ASC
 |  window: ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
@@ -791,7 +803,7 @@ from functional.alltypesagg
 01:SORT
 |  order by: tinyint_col ASC NULLS FIRST, int_col DESC
 |
-10:EXCHANGE [HASH(tinyint_col)]
+11:EXCHANGE [HASH(tinyint_col)]
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 size=814.73KB
@@ -1506,10 +1518,10 @@ from functional.alltypesagg
 # UNBOUNDED_PRECEDING.
 select
 # windows, sort order and function should be reversed
-first_value(int_col) over(partition by tinyint_col order by id desc nulls first, bool_col asc nulls last
-                          rows between 2 preceding and unbounded following),
+last_value(int_col) over(partition by tinyint_col order by id desc nulls first, bool_col asc nulls last
+                         rows between 2 preceding and unbounded following),
 # TODO: Revert window when RANGE offsets are supported
-first_value(int_col) over(partition by tinyint_col order by id asc nulls last
+last_value(int_col) over(partition by tinyint_col order by id asc nulls last
                           range between current row and unbounded following),
 #                          range between 4 preceding and unbounded following),
 # windows, sort order and function should remain unchanged
@@ -1529,25 +1541,25 @@ from functional.alltypesagg
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 06:ANALYTIC
-|  functions: last_value(int_col)
+|  functions: first_value(int_col)
 |  partition by: tinyint_col
 |  order by: id ASC, bool_col DESC
-|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 2 FOLLOWING
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
 |
 05:SORT
 |  order by: tinyint_col ASC NULLS FIRST, id ASC NULLS LAST, bool_col DESC NULLS FIRST
 |
 04:ANALYTIC
-|  functions: first_value(bigint_col)
+|  functions: first_value_rewrite(bigint_col, -1)
 |  partition by: tinyint_col
 |  order by: id ASC, int_col ASC
-|  window: ROWS BETWEEN 6 PRECEDING AND 8 FOLLOWING
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 6 PRECEDING
 |
 03:SORT
 |  order by: tinyint_col ASC NULLS FIRST, id ASC, int_col ASC
 |
 02:ANALYTIC
-|  functions: last_value(int_col)
+|  functions: first_value(int_col)
 |  partition by: tinyint_col
 |  order by: id DESC
 |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW

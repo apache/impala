@@ -15,6 +15,7 @@
 package com.cloudera.impala.analysis;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -83,6 +84,10 @@ public class AnalyticExpr extends Expr {
   private static String ROWNUMBER = "row_number";
   private static String MIN = "min";
   private static String MAX = "max";
+
+  // Internal function used to implement FIRST_VALUE with a window rewrite and
+  // additional null handling in the backend.
+  public static String FIRST_VALUE_REWRITE = "first_value_rewrite";
 
   public AnalyticExpr(FunctionCallExpr fnCall, List<Expr> partitionExprs,
       List<OrderByElement> orderByElements, AnalyticWindow window) {
@@ -356,6 +361,26 @@ public class AnalyticExpr extends Expr {
    *    UNBOUNDED_PRECEDING.
    * 5. Explicitly set the default window if no window was given but there
    *    are order-by elements.
+   * 6. FIRST_VALUE without UNBOUNDED PRECEDING gets rewritten to use a different window
+   *    and change the function to return the last value. We either set the fn to be
+   *    'last_value' or 'first_value_rewrite', which simply wraps the 'last_value'
+   *    implementation but allows us to handle the first rows in a partition in a special
+   *    way in the backend. There are a few cases:
+   *     a) Start bound is X FOLLOWING or CURRENT ROW (X=0):
+   *        Use 'last_value' with a window where both bounds are X FOLLOWING (or
+   *        CURRENT ROW). Setting the start bound to X following is necessary because the
+   *        X rows at the end of a partition have no rows in their window. Note that X
+   *        FOLLOWING could be rewritten as lead(X) but that would not work for CURRENT
+   *        ROW.
+   *     b) Start bound is X PRECEDING and end bound is CURRENT ROW or FOLLOWING:
+   *        Use 'first_value_rewrite' and a window with an end bound X PRECEDING. An
+   *        extra parameter '-1' is added to indicate to the backend that NULLs should
+   *        not be added for the first X rows.
+   *     c) Start bound is X PRECEDING and end bound is Y PRECEDING:
+   *        Use 'first_value_rewrite' and a window with an end bound X PRECEDING. The
+   *        first Y rows in a partition have empty windows and should be NULL. An extra
+   *        parameter with the integer constant Y is added to indicate to the backend
+   *        that NULLs should be added for the first Y rows.
    */
   private void standardize(Analyzer analyzer) {
     FunctionName analyticFnName = getFnCall().getFnName();
@@ -417,6 +442,37 @@ public class AnalyticExpr extends Expr {
       return;
     }
 
+    if (analyticFnName.getFunction().equals(FIRSTVALUE)
+        && window_ != null
+        && window_.getLeftBoundary().getType() != BoundaryType.UNBOUNDED_PRECEDING) {
+      if (window_.getLeftBoundary().getType() != BoundaryType.PRECEDING) {
+        window_ = new AnalyticWindow(window_.getType(), window_.getLeftBoundary(),
+            window_.getLeftBoundary());
+        fnCall_ = new FunctionCallExpr(new FunctionName("last_value"),
+            getFnCall().getParams());
+      } else {
+        List<Expr> paramExprs = Expr.cloneList(getFnCall().getParams().exprs());
+        if (window_.getRightBoundary().getType() == BoundaryType.PRECEDING) {
+          // The number of rows preceding for the end bound determines the number of
+          // rows at the beginning of each partition that should have a NULL value.
+          paramExprs.add(window_.getRightBoundary().getExpr());
+        } else {
+          // -1 indicates that no NULL values are inserted even though we set the end
+          // bound to the start bound (which is PRECEDING) below; this is different from
+          // the default behavior of windows with an end bound PRECEDING.
+          paramExprs.add(new NumericLiteral(BigInteger.valueOf(-1), Type.BIGINT));
+        }
+        window_ = new AnalyticWindow(window_.getType(),
+            new Boundary(BoundaryType.UNBOUNDED_PRECEDING, null),
+            window_.getLeftBoundary());
+        fnCall_ = new FunctionCallExpr(new FunctionName("first_value_rewrite"),
+            new FunctionParams(paramExprs));
+      }
+      fnCall_.setIsAnalyticFnCall(true);
+      fnCall_.analyzeNoThrow(analyzer);
+      analyticFnName = getFnCall().getFnName();
+    }
+
     // Reverse the ordering and window for windows ending with UNBOUNDED FOLLOWING,
     // and and not starting with UNBOUNDED PRECEDING.
     if (window_ != null
@@ -445,6 +501,7 @@ public class AnalyticExpr extends Expr {
     // is UNBOUNDED_PRECEDING.
     if (window_ != null
         && window_.getLeftBoundary().getType() == BoundaryType.UNBOUNDED_PRECEDING
+        && window_.getRightBoundary().getType() != BoundaryType.PRECEDING
         && analyticFnName.getFunction().equals(FIRSTVALUE)) {
       window_.setRightBoundary(new Boundary(BoundaryType.CURRENT_ROW, null));
     }

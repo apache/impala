@@ -125,7 +125,7 @@ public class AggregateFunction extends Function {
       String getValueFnSymbol, String finalizeFnSymbol) {
     AggregateFunction fn = new AggregateFunction(new FunctionName(db.getName(), name),
         argTypes, retType, intermediateType, null, updateFnSymbol, initFnSymbol,
-        null, null, getValueFnSymbol, null, finalizeFnSymbol);
+        null, null, getValueFnSymbol, removeFnSymbol, finalizeFnSymbol);
     fn.setBinaryType(TFunctionBinaryType.BUILTIN);
     fn.ignoresDistinct_ = false;
     fn.isAnalyticFn_ = true;

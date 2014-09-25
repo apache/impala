@@ -771,6 +771,62 @@ from alltypesagg where id < 50 and (tinyint_col is null or tinyint_col < 4)
 INT, TINYINT, TINYINT, STRING, TINYINT, STRING
 ====
 ---- QUERY
+# IMPALA-1302: Incorrect result of FIRST_VALUE query.
+select
+first_value(id) over (order by id rows between 3 preceding and 3 following),
+first_value(id) over (order by id rows between 3 preceding and 2 following),
+first_value(id) over (order by id rows between 3 preceding and 1 following),
+first_value(id) over (order by id rows between 3 preceding and current row),
+first_value(id) over (order by id rows between 3 preceding and 1 preceding),
+first_value(id) over (order by id rows between 3 preceding and 2 preceding),
+first_value(id) over (order by id rows between 3 preceding and 3 preceding),
+first_value(id) over (order by id rows between 2 preceding and 3 following),
+first_value(id) over (order by id rows between 1 preceding and 3 following),
+first_value(id) over (order by id rows between current row and 3 following),
+first_value(id) over (order by id rows between 1 following and 3 following),
+first_value(id) over (order by id rows between 2 following and 3 following),
+first_value(id) over (order by id rows between 3 following and 3 following),
+first_value(id) over (order by id rows between 15 preceding and 15 preceding),
+first_value(id) over (order by id rows between 15 preceding and 15 following),
+first_value(id) over (order by id rows between 15 preceding and 6 preceding),
+first_value(id) over (order by id rows between 6 preceding and 15 following),
+first_value(id) over (order by id rows between 15 following and 15 following),
+first_value(id) over (order by id rows between unbounded preceding and 8 preceding),
+last_value(id) over (order by id rows between 3 preceding and 3 following),
+last_value(id) over (order by id rows between 3 preceding and 2 following),
+last_value(id) over (order by id rows between 3 preceding and 1 following),
+last_value(id) over (order by id rows between 3 preceding and current row),
+last_value(id) over (order by id rows between 3 preceding and 1 preceding),
+last_value(id) over (order by id rows between 3 preceding and 2 preceding),
+last_value(id) over (order by id rows between 3 preceding and 3 preceding),
+last_value(id) over (order by id rows between 2 preceding and 3 following),
+last_value(id) over (order by id rows between 1 preceding and 3 following),
+last_value(id) over (order by id rows between current row and 3 following),
+last_value(id) over (order by id rows between 1 following and 3 following),
+last_value(id) over (order by id rows between 2 following and 3 following),
+last_value(id) over (order by id rows between 3 following and 3 following),
+last_value(id) over (order by id rows between 15 preceding and 15 preceding),
+last_value(id) over (order by id rows between 15 preceding and 15 following),
+last_value(id) over (order by id rows between 15 preceding and 6 preceding),
+last_value(id) over (order by id rows between 6 preceding and 15 following),
+last_value(id) over (order by id rows between 15 following and 15 following),
+last_value(id) over (order by id rows between 8 following and unbounded following)
+from alltypes where id < 10 order by id;
+---- RESULTS
+0,0,0,0,NULL,NULL,NULL,0,0,0,1,2,3,NULL,0,NULL,0,NULL,NULL,3,2,1,0,NULL,NULL,NULL,3,3,3,3,3,3,NULL,9,NULL,9,NULL,9
+0,0,0,0,0,NULL,NULL,0,0,1,2,3,4,NULL,0,NULL,0,NULL,NULL,4,3,2,1,0,NULL,NULL,4,4,4,4,4,4,NULL,9,NULL,9,NULL,9
+0,0,0,0,0,0,NULL,0,1,2,3,4,5,NULL,0,NULL,0,NULL,NULL,5,4,3,2,1,0,NULL,5,5,5,5,5,5,NULL,9,NULL,9,NULL,NULL
+0,0,0,0,0,0,0,1,2,3,4,5,6,NULL,0,NULL,0,NULL,NULL,6,5,4,3,2,1,0,6,6,6,6,6,6,NULL,9,NULL,9,NULL,NULL
+1,1,1,1,1,1,1,2,3,4,5,6,7,NULL,0,NULL,0,NULL,NULL,7,6,5,4,3,2,1,7,7,7,7,7,7,NULL,9,NULL,9,NULL,NULL
+2,2,2,2,2,2,2,3,4,5,6,7,8,NULL,0,NULL,0,NULL,NULL,8,7,6,5,4,3,2,8,8,8,8,8,8,NULL,9,NULL,9,NULL,NULL
+3,3,3,3,3,3,3,4,5,6,7,8,9,NULL,0,0,0,NULL,NULL,9,8,7,6,5,4,3,9,9,9,9,9,9,NULL,9,0,9,NULL,NULL
+4,4,4,4,4,4,4,5,6,7,8,9,NULL,NULL,0,0,1,NULL,NULL,9,9,8,7,6,5,4,9,9,9,9,9,NULL,NULL,9,1,9,NULL,NULL
+5,5,5,5,5,5,5,6,7,8,9,NULL,NULL,NULL,0,0,2,NULL,0,9,9,9,8,7,6,5,9,9,9,9,NULL,NULL,NULL,9,2,9,NULL,NULL
+6,6,6,6,6,6,6,7,8,9,NULL,NULL,NULL,NULL,0,0,3,NULL,0,9,9,9,9,8,7,6,9,9,9,NULL,NULL,NULL,NULL,9,3,9,NULL,NULL
+---- TYPES
+INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT, INT
+====
+---- QUERY
 # Test RANGE with UNBOUNDED FOLLOWING
 select id,
 sum(id) over (order by id range between unbounded preceding and unbounded following)

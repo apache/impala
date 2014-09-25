@@ -217,6 +217,11 @@ class AnalyticEvalNode : public ExecNode {
   // determine which slots need to be reset.
   std::vector<bool> is_lead_fn_;
 
+  // If true, evaluating FIRST_VALUE requires special null handling when initializing new
+  // partitions determined by the offset. Set in Open() by inspecting the agg fns.
+  bool has_first_val_null_offset_;
+  long first_val_null_offset_;
+
   // FunctionContext for each analytic function. String data returned by the analytic
   // functions is allocated via these contexts.
   std::vector<impala_udf::FunctionContext*> fn_ctxs_;

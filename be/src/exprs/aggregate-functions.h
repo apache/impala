@@ -227,10 +227,18 @@ class AggregateFunctions {
   // Implements LAST_VALUE.
   template <typename T>
   static void LastValUpdate(FunctionContext*, const T& src, T* dst);
+  template <typename T>
+  static void LastValRemove(FunctionContext*, const T& src, T* dst);
 
   // Implements FIRST_VALUE.
   template <typename T>
   static void FirstValUpdate(FunctionContext*, const T& src, T* dst);
+  // Implements FIRST_VALUE for some windows that require rewrites during planning.
+  // The BigIntVal is unused by FirstValRewriteUpdate() (it is used by the
+  // AnalyticEvalNode).
+  template <typename T>
+  static void FirstValRewriteUpdate(FunctionContext*, const T& src, const BigIntVal&,
+      T* dst);
 
   // OffsetFn*() implement LAG and LEAD. Init() sets the default value (the last
   // constant parameter) as dst.
