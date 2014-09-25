@@ -488,8 +488,8 @@ where a.id = b.id and
       b.count_col + 1 = 17 and
       a.tinyint_col != 5
 ---- PLAN
-03:CROSS JOIN [BROADCAST]
-|  predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: count(*)
@@ -506,8 +506,8 @@ where a.id = b.id and
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
 |
-03:CROSS JOIN [BROADCAST]
-|  predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
+03:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
 |
 |--06:EXCHANGE [BROADCAST]
 |  |
@@ -605,7 +605,7 @@ NODE 1:
    partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
 ====
-# Same as above but with cross join
+# Similar to the above, converts the cross join to a hash join
 select straight_join a.id, b.id
 from functional.alltypes a
   cross join (select year, month, id, int_col, count(*) as count_col
@@ -623,8 +623,8 @@ where a.year = 2009 and
       a.year = b.year and
       a.month = b.month
 ---- PLAN
-04:CROSS JOIN [BROADCAST]
-|  predicates: a.id = id, a.tinyint_col = int_col, a.month = month, a.year = year
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
 |
 |--03:SELECT
 |  |  predicates: count(*) + 1 = 17
@@ -644,8 +644,8 @@ where a.year = 2009 and
 ---- DISTRIBUTEDPLAN
 09:EXCHANGE [UNPARTITIONED]
 |
-04:CROSS JOIN [BROADCAST]
-|  predicates: a.id = id, a.tinyint_col = int_col, a.month = month, a.year = year
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: a.id = id, a.tinyint_col = int_col, a.year = year, a.month = month
 |
 |--08:EXCHANGE [BROADCAST]
 |  |

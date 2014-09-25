@@ -99,14 +99,6 @@ from (select * from functional.alltypestiny) t1
 00:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
 ====
-# test that our join inference recognizes that we cannot do a hash join
-select t1.*
-from (select * from functional.alltypestiny) t1
-  join (select * from functional.alltypestiny) t2 on (t1.id = t2.id)
-  join functional.alltypestiny t3 on (coalesce(t1.id, t3.id) = t3.id)
----- PLAN
-not implemented: Join with 't3' requires at least one conjunctive equality predicate. To perform a Cartesian product between two tables, use a CROSS JOIN.
-====
 # multiple join predicates;
 # scan predicates get propagated correctly;
 # non-eq join predicates are evaluated as extra conjuncts by the join node
@@ -208,13 +200,6 @@ and (b.double_col * c.tinyint_col > 1000 or c.tinyint_col < 1000)
 |
 02:SCAN HDFS [functional.alltypesaggnonulls c]
    partitions=2/10 files=2 size=148.10KB
-====
-# non-equi join predicate not supported
-select *
-from functional.testtbl t1 join functional.testtbl t2
-where t1.zip < t2.zip
----- PLAN
-not implemented: Join with 't2' requires at least one conjunctive equality predicate. To perform a Cartesian product between two tables, use a CROSS JOIN.
 ====
 # equi join with constants in the on clause are not supported
 select a.id, b.id from

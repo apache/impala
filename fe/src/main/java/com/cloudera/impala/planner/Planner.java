@@ -33,6 +33,7 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BaseTableRef;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.ExprId;
 import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.InlineViewRef;
 import com.cloudera.impala.analysis.InsertStmt;
@@ -1359,12 +1360,13 @@ public class Planner {
         PlanNode candidate = null;
         if (invertJoin) {
           ref.setJoinOp(ref.getJoinOp().invert());
-          candidate = createJoinNode(analyzer, rhsPlan, root, ref, null, false);
+          candidate = createJoinNode(analyzer, rhsPlan, root, ref, null);
           planHasInvertedJoin = true;
         } else {
-          candidate = createJoinNode(analyzer, root, rhsPlan, null, ref, false);
+          candidate = createJoinNode(analyzer, root, rhsPlan, null, ref);
         }
         if (candidate == null) continue;
+
         LOG.trace("cardinality=" + Long.toString(candidate.getCardinality()));
 
         // Use 'candidate' as the new root; don't consider any other table refs at this
@@ -1375,7 +1377,10 @@ public class Planner {
           break;
         }
 
-        if (newRoot == null || candidate.getCardinality() < newRoot.getCardinality()) {
+        // Always prefer Hash Join over Cross Join due to limited costing infrastructure
+        if (newRoot == null || (candidate.getClass().equals(newRoot.getClass()) &&
+            candidate.getCardinality() < newRoot.getCardinality())
+            || (candidate instanceof HashJoinNode && newRoot instanceof CrossJoinNode)) {
           newRoot = candidate;
           minEntry = entry;
         }
@@ -1426,7 +1431,7 @@ public class Planner {
     for (int i = 1; i < refPlans.size(); ++i) {
       TableRef innerRef = refPlans.get(i).first;
       PlanNode innerPlan = refPlans.get(i).second;
-      root = createJoinNode(analyzer, root, innerPlan, null, innerRef, true);
+      root = createJoinNode(analyzer, root, innerPlan, null, innerRef);
       root.setId(nodeIdGenerator_.getNextId());
     }
     return root;
@@ -1487,7 +1492,9 @@ public class Planner {
 
     PlanNode root = null;
     if (!selectStmt.getSelectList().isStraightJoin()) {
+      Set<ExprId> assignedConjuncts = analyzer.getAssignedConjuncts();
       root = createCheapestJoinPlan(analyzer, refPlans);
+      if (root == null) analyzer.setAssignedConjuncts(assignedConjuncts);
     }
     if (selectStmt.getSelectList().isStraightJoin() || root == null) {
       // we didn't have enough stats to do a cost-based join plan, or the STRAIGHT_JOIN
@@ -1895,15 +1902,9 @@ public class Planner {
    */
   private PlanNode createJoinNode(
       Analyzer analyzer, PlanNode outer, PlanNode inner, TableRef outerRef,
-      TableRef innerRef, boolean throwOnError) throws ImpalaException {
+      TableRef innerRef) throws ImpalaException {
     Preconditions.checkState(innerRef != null ^ outerRef != null);
     TableRef tblRef = (innerRef != null) ? innerRef : outerRef;
-    if (tblRef.getJoinOp() == JoinOperator.CROSS_JOIN) {
-      // TODO If there are eq join predicates then we should construct a hash join
-      CrossJoinNode result = new CrossJoinNode(outer, inner);
-      result.init(analyzer);
-      return result;
-    }
 
     List<BinaryPredicate> eqJoinConjuncts = Lists.newArrayList();
     List<Expr> eqJoinPredicates = Lists.newArrayList();
@@ -1932,14 +1933,31 @@ public class Planner {
         eqJoinConjunct.setChild(1, swapTmp);
       }
     }
+
+    // Handle implicit cross joins
     if (eqJoinConjuncts.isEmpty()) {
-      if (!throwOnError) return null;
-      throw new NotImplementedException(
-          String.format(
-            "Join with '%s' requires at least one conjunctive equality predicate. To " +
-            "perform a Cartesian product between two tables, use a CROSS JOIN.",
+      // Since our only implementation of semi and outer joins is hash-based, and we do
+      // not re-order semi and outer joins, we must have eqJoinConjuncts here to execute
+      // this query.
+      // TODO Revisit when we add more semi/join implementations.
+      if (tblRef.getJoinOp().isOuterJoin() ||
+          tblRef.getJoinOp().isSemiJoin()) {
+        throw new NotImplementedException(
+            String.format("%s join with '%s' without equi-join " +
+            "conjuncts is not supported.",
+            tblRef.getJoinOp().isOuterJoin() ? "Outer" : "Semi",
             innerRef.getAliasAsName()));
+      }
+      CrossJoinNode result = new CrossJoinNode(outer, inner);
+      result.init(analyzer);
+      return result;
     }
+
+    // Handle explicit cross joins with equi join conditions
+    if (tblRef.getJoinOp() == JoinOperator.CROSS_JOIN) {
+      tblRef.setJoinOp(JoinOperator.INNER_JOIN);
+    }
+
     analyzer.markConjunctsAssigned(eqJoinPredicates);
 
     List<Expr> otherJoinConjuncts = Lists.newArrayList();

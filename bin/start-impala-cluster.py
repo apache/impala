@@ -235,8 +235,8 @@ if __name__ == "__main__":
     print 'Valid values: %s' % ', '.join(KNOWN_BUILD_TYPES)
     sys.exit(1)
 
-  if options.cluster_size <= 0:
-    print 'Please specify a cluster size > 0'
+  if options.cluster_size < 0:
+    print 'Please specify a cluster size >= 0'
     sys.exit(1)
 
   # Kill existing cluster processes based on the current configuration.

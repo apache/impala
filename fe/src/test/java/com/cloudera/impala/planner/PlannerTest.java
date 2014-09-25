@@ -591,6 +591,11 @@ public class PlannerTest {
   }
 
   @Test
+  public void testImplicitJoins() {
+    runPlannerTestFile("implicit-joins");
+  }
+
+  @Test
   public void testOrder() {
     runPlannerTestFile("order");
   }

@@ -1,0 +1,323 @@
+# test that our join inference recognizes that we cannot do a hash join but
+# can switch to a cross join and apply the predicate later in the plan
+select t1.*
+from (select * from functional.alltypestiny) t1
+  join (select * from functional.alltypestiny) t2 on (t1.id = t2.id)
+  join functional.alltypestiny t3 on (coalesce(t1.id, t3.id) = t3.id)
+---- PLAN
+04:CROSS JOIN [BROADCAST]
+|  predicates: (coalesce(functional.alltypestiny.id, t3.id) = t3.id)
+|
+|--02:SCAN HDFS [functional.alltypestiny t3]
+|     partitions=4/4 files=4 size=460B
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: functional.alltypestiny.id = functional.alltypestiny.id
+|
+|--01:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 files=4 size=460B
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+====
+select *
+from
+  (select t1.id x, t2.id y
+   from functional.alltypes t1,
+        functional.alltypes t2) v
+where
+  v.x < v.y
+---- PLAN
+02:CROSS JOIN [BROADCAST]
+|  predicates: t1.id < t2.id
+|
+|--01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+====
+select *
+from
+  functional.alltypes t1,
+  functional.alltypes t2,
+  functional.alltypes t3
+where
+  t1.id = t2.id
+---- PLAN
+04:CROSS JOIN [BROADCAST]
+|
+|--02:SCAN HDFS [functional.alltypes t3]
+|     partitions=24/24 files=24 size=478.45KB
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|
+|--01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+====
+select *
+from
+  functional.alltypes t1,
+  functional.alltypes t2,
+  functional.alltypes t3
+where
+  t1.id = t3.id
+---- PLAN
+04:CROSS JOIN [BROADCAST]
+|
+|--01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t3.id
+|
+|--02:SCAN HDFS [functional.alltypes t3]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+====
+# The hash join will not be executed first, because this is the first executable
+# plan we find and t1 is the largest table (which is moved to the front of
+# the candidate list)
+select *
+from
+  functional.alltypes t1,
+  functional.alltypestiny t2,
+  functional.alltypessmall t3
+where
+  t2.id = t3.id
+---- PLAN
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t2.id = t3.id
+|
+|--02:SCAN HDFS [functional.alltypessmall t3]
+|     partitions=4/4 files=4 size=6.32KB
+|
+03:CROSS JOIN [BROADCAST]
+|
+|--01:SCAN HDFS [functional.alltypestiny t2]
+|     partitions=4/4 files=4 size=460B
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+====
+select *
+from
+  functional.alltypes t1,
+  functional.alltypes t2 left join
+  functional.alltypes t3 on t3.id = t2.id,
+  functional.alltypes t4
+---- PLAN
+06:CROSS JOIN [BROADCAST]
+|
+|--03:SCAN HDFS [functional.alltypes t4]
+|     partitions=24/24 files=24 size=478.45KB
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t2.id = t3.id
+|
+|--02:SCAN HDFS [functional.alltypes t3]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:CROSS JOIN [BROADCAST]
+|
+|--01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Test that the non-equi predicate on the outer join does not
+# discard detecting the implicit cross join
+select a.* from
+  functional.alltypes a,
+  functional.alltypessmall b full outer join
+  functional.alltypes c on a.id = c.id and a.id < b.id
+---- PLAN
+04:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: a.id = c.id
+|  other join predicates: a.id < b.id
+|
+|--02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+03:CROSS JOIN [BROADCAST]
+|
+|--01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 files=4 size=6.32KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+====
+select a.* from
+functional.alltypestiny a,
+functional.alltypes b,
+functional.alltypestiny c,
+functional.alltypes d
+where a.id = d.id and b.id = c.id
+---- PLAN
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = d.id
+|
+|--03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+05:CROSS JOIN [BROADCAST]
+|
+|--00:SCAN HDFS [functional.alltypestiny a]
+|     partitions=4/4 files=4 size=460B
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: b.id = c.id
+|
+|--02:SCAN HDFS [functional.alltypestiny c]
+|     partitions=4/4 files=4 size=460B
+|
+01:SCAN HDFS [functional.alltypes b]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Do not allow a non-equi outer join
+select count(*)
+from
+  functional.alltypes t0,
+  functional.alltypes t1 left outer join functional.alltypes t2
+    on t1.id < t2.id,
+  functional.alltypes t3
+---- PLAN
+not implemented: Outer join with 't2' without equi-join conjuncts is not supported.
+====
+select count(*)
+from
+  functional.alltypes t0,
+  functional.alltypes t1 left outer join functional.alltypes t2
+    on t1.id < t2.id,
+  functional.alltypes t3
+where
+  t1.id = t2.id
+---- PLAN
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+06:CROSS JOIN [BROADCAST]
+|
+|--03:SCAN HDFS [functional.alltypes t3]
+|     partitions=24/24 files=24 size=478.45KB
+|
+05:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other join predicates: t1.id < t2.id
+|  other predicates: t1.id = t2.id
+|
+|--02:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:CROSS JOIN [BROADCAST]
+|
+|--00:SCAN HDFS [functional.alltypes t0]
+|     partitions=24/24 files=24 size=478.45KB
+|
+01:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+====
+select count(*)
+from
+  functional.alltypes t0,
+  functional.alltypes t1 full outer join functional.alltypes t2
+    on t1.id < t2.id,
+  functional.alltypes t3
+where
+  t1.id = t2.id
+---- PLAN
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+06:CROSS JOIN [BROADCAST]
+|
+|--03:SCAN HDFS [functional.alltypes t3]
+|     partitions=24/24 files=24 size=478.45KB
+|
+05:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: t1.id = t2.id
+|  other join predicates: t1.id < t2.id
+|  other predicates: t1.id = t2.id
+|
+|--02:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:CROSS JOIN [BROADCAST]
+|
+|--00:SCAN HDFS [functional.alltypes t0]
+|     partitions=24/24 files=24 size=478.45KB
+|
+01:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+====
+select count(*)
+from
+  functional.alltypes t0 left semi join
+  functional.alltypes t1 on ( t0.id < t1.id )
+---- PLAN
+not implemented: Semi join with 't1' without equi-join conjuncts is not supported.
+====
+# Check for implicit cross joins conversion in presence of complex where
+# clauses that lead to query rewriting
+select count(*)
+from
+  functional.alltypestiny a,
+  functional.alltypestiny b
+where
+  b.id in (select avg(id) from functional.alltypes group by month) and
+  a.id < b.id
+---- PLAN
+06:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+05:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: avg(id) = b.id
+|
+|--04:CROSS JOIN [BROADCAST]
+|  |  predicates: a.id < b.id
+|  |
+|  |--01:SCAN HDFS [functional.alltypestiny b]
+|  |     partitions=4/4 files=4 size=460B
+|  |
+|  00:SCAN HDFS [functional.alltypestiny a]
+|     partitions=4/4 files=4 size=460B
+|
+03:AGGREGATE [FINALIZE]
+|  output: avg(id)
+|  group by: month
+|
+02:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Check that cross joins are correctly detected and the first join becomes a hash join
+select *
+from functional.alltypes t1,
+functional.alltypes t2 join functional.alltypes t3 on (t1.id = t2.id),
+functional.alltypes t4
+---- PLAN
+06:CROSS JOIN [BROADCAST]
+|
+|--03:SCAN HDFS [functional.alltypes t4]
+|     partitions=24/24 files=24 size=478.45KB
+|
+05:CROSS JOIN [BROADCAST]
+|
+|--02:SCAN HDFS [functional.alltypes t3]
+|     partitions=24/24 files=24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|
+|--01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+====

@@ -3131,3 +3131,459 @@ with v1 as (
 01:SCAN HDFS [tpcds.store_sales]
    partitions=120/120 files=120 size=22.02MB
 ====
+# TPCDS-Q66
+select promotions,total,cast(promotions as decimal(15,4))/cast(total as decimal(15,4))*100
+from
+  (select sum(ss_ext_sales_price) promotions
+   from  store_sales
+        ,store
+        ,promotion
+        ,date_dim
+        ,customer
+        ,customer_address
+        ,item
+   where ss_sold_date_sk = d_date_sk
+   and   ss_store_sk = s_store_sk
+   and   ss_promo_sk = p_promo_sk
+   and   ss_customer_sk= c_customer_sk
+   and   ca_address_sk = c_current_addr_sk
+   and   ss_item_sk = i_item_sk
+   and   ca_gmt_offset = -5
+   and   i_category = 'Books'
+   and   (p_channel_dmail = 'Y' or p_channel_email = 'Y' or p_channel_tv = 'Y')
+   and   s_gmt_offset = -5
+   and   d_year = 2000
+   and   d_moy  = 11) promotional_sales,
+  (select sum(ss_ext_sales_price) total
+   from  store_sales
+        ,store
+        ,date_dim
+        ,customer
+        ,customer_address
+        ,item
+   where ss_sold_date_sk = d_date_sk
+   and   ss_store_sk = s_store_sk
+   and   ss_customer_sk= c_customer_sk
+   and   ca_address_sk = c_current_addr_sk
+   and   ss_item_sk = i_item_sk
+   and   ca_gmt_offset = -5
+   and   i_category = 'Books'
+   and   s_gmt_offset = -5
+   and   d_year = 2000
+   and   d_moy  = 11) all_sales
+order by promotions, total
+---- PLAN
+27:SORT
+|  order by: promotions ASC, total ASC
+|
+26:CROSS JOIN [BROADCAST]
+|
+|--25:AGGREGATE [FINALIZE]
+|  |  output: sum(ss_ext_sales_price)
+|  |
+|  24:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_item_sk = i_item_sk
+|  |
+|  |--19:SCAN HDFS [tpcds.item]
+|  |     partitions=1/1 files=1 size=4.82MB
+|  |     predicates: i_category = 'Books'
+|  |
+|  23:HASH JOIN [INNER JOIN]
+|  |  hash predicates: c_current_addr_sk = ca_address_sk
+|  |
+|  |--18:SCAN HDFS [tpcds.customer_address]
+|  |     partitions=1/1 files=1 size=5.25MB
+|  |     predicates: ca_gmt_offset = -5
+|  |
+|  22:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_customer_sk = c_customer_sk
+|  |
+|  |--17:SCAN HDFS [tpcds.customer]
+|  |     partitions=1/1 files=1 size=12.60MB
+|  |
+|  21:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_sold_date_sk = d_date_sk
+|  |
+|  |--16:SCAN HDFS [tpcds.date_dim]
+|  |     partitions=1/1 files=1 size=9.84MB
+|  |     predicates: d_year = 2000, d_moy = 11
+|  |
+|  20:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_store_sk = s_store_sk
+|  |
+|  |--15:SCAN HDFS [tpcds.store]
+|  |     partitions=1/1 files=1 size=3.08KB
+|  |     predicates: s_gmt_offset = -5
+|  |
+|  14:SCAN HDFS [tpcds.store_sales]
+|     partitions=120/120 files=120 size=22.02MB
+|
+13:AGGREGATE [FINALIZE]
+|  output: sum(ss_ext_sales_price)
+|
+12:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_item_sk = i_item_sk
+|
+|--06:SCAN HDFS [tpcds.item]
+|     partitions=1/1 files=1 size=4.82MB
+|     predicates: i_category = 'Books'
+|
+11:HASH JOIN [INNER JOIN]
+|  hash predicates: c_current_addr_sk = ca_address_sk
+|
+|--05:SCAN HDFS [tpcds.customer_address]
+|     partitions=1/1 files=1 size=5.25MB
+|     predicates: ca_gmt_offset = -5
+|
+10:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_customer_sk = c_customer_sk
+|
+|--04:SCAN HDFS [tpcds.customer]
+|     partitions=1/1 files=1 size=12.60MB
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_date_sk = d_date_sk
+|
+|--03:SCAN HDFS [tpcds.date_dim]
+|     partitions=1/1 files=1 size=9.84MB
+|     predicates: d_year = 2000, d_moy = 11
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_promo_sk = p_promo_sk
+|
+|--02:SCAN HDFS [tpcds.promotion]
+|     partitions=1/1 files=1 size=36.36KB
+|     predicates: (p_channel_dmail = 'Y' OR p_channel_email = 'Y' OR p_channel_tv = 'Y')
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_store_sk = s_store_sk
+|
+|--01:SCAN HDFS [tpcds.store]
+|     partitions=1/1 files=1 size=3.08KB
+|     predicates: s_gmt_offset = -5
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=120/120 files=120 size=22.02MB
+====
+# TPCDS-Q88
+select  *
+from
+ (select count(*) h8_30_to_9
+ from store_sales, household_demographics , time_dim, store
+ where ss_sold_time_sk = time_dim.t_time_sk
+     and ss_hdemo_sk = household_demographics.hd_demo_sk
+     and ss_store_sk = s_store_sk
+     and time_dim.t_hour = 8
+     and time_dim.t_minute >= 30
+     and ((household_demographics.hd_dep_count = 1 and household_demographics.hd_vehicle_count<=1+2) or
+          (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2))
+     and store.s_store_name = 'ese') s1,
+ (select count(*) h9_to_9_30
+ from store_sales, household_demographics , time_dim, store
+ where ss_sold_time_sk = time_dim.t_time_sk
+     and ss_hdemo_sk = household_demographics.hd_demo_sk
+     and ss_store_sk = s_store_sk
+     and time_dim.t_hour = 9
+     and time_dim.t_minute < 30
+     and ((household_demographics.hd_dep_count = 1 and household_demographics.hd_vehicle_count<=1+2) or
+          (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2))
+     and store.s_store_name = 'ese') s2,
+ (select count(*) h9_30_to_10
+ from store_sales, household_demographics , time_dim, store
+ where ss_sold_time_sk = time_dim.t_time_sk
+     and ss_hdemo_sk = household_demographics.hd_demo_sk
+     and ss_store_sk = s_store_sk
+     and time_dim.t_hour = 9
+     and time_dim.t_minute >= 30
+     and ((household_demographics.hd_dep_count = 1 and household_demographics.hd_vehicle_count<=1+2) or
+          (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2))
+     and store.s_store_name = 'ese') s3,
+ (select count(*) h10_to_10_30
+ from store_sales, household_demographics , time_dim, store
+ where ss_sold_time_sk = time_dim.t_time_sk
+     and ss_hdemo_sk = household_demographics.hd_demo_sk
+     and ss_store_sk = s_store_sk
+     and time_dim.t_hour = 10
+     and time_dim.t_minute < 30
+     and ((household_demographics.hd_dep_count = 1 and household_demographics.hd_vehicle_count<=1+2) or
+          (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2))
+     and store.s_store_name = 'ese') s4,
+ (select count(*) h10_30_to_11
+ from store_sales, household_demographics , time_dim, store
+ where ss_sold_time_sk = time_dim.t_time_sk
+     and ss_hdemo_sk = household_demographics.hd_demo_sk
+     and ss_store_sk = s_store_sk
+     and time_dim.t_hour = 10
+     and time_dim.t_minute >= 30
+     and ((household_demographics.hd_dep_count = 1 and household_demographics.hd_vehicle_count<=1+2) or
+          (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2))
+     and store.s_store_name = 'ese') s5,
+ (select count(*) h11_to_11_30
+ from store_sales, household_demographics , time_dim, store
+ where ss_sold_time_sk = time_dim.t_time_sk
+     and ss_hdemo_sk = household_demographics.hd_demo_sk
+     and ss_store_sk = s_store_sk
+     and time_dim.t_hour = 11
+     and time_dim.t_minute < 30
+     and ((household_demographics.hd_dep_count = 1 and household_demographics.hd_vehicle_count<=1+2) or
+          (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2))
+     and store.s_store_name = 'ese') s6,
+ (select count(*) h11_30_to_12
+ from store_sales, household_demographics , time_dim, store
+ where ss_sold_time_sk = time_dim.t_time_sk
+     and ss_hdemo_sk = household_demographics.hd_demo_sk
+     and ss_store_sk = s_store_sk
+     and time_dim.t_hour = 11
+     and time_dim.t_minute >= 30
+     and ((household_demographics.hd_dep_count = 1 and household_demographics.hd_vehicle_count<=1+2) or
+          (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2))
+     and store.s_store_name = 'ese') s7,
+ (select count(*) h12_to_12_30
+ from store_sales, household_demographics , time_dim, store
+ where ss_sold_time_sk = time_dim.t_time_sk
+     and ss_hdemo_sk = household_demographics.hd_demo_sk
+     and ss_store_sk = s_store_sk
+     and time_dim.t_hour = 12
+     and time_dim.t_minute < 30
+     and ((household_demographics.hd_dep_count = 1 and household_demographics.hd_vehicle_count<=1+2) or
+          (household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2))
+     and store.s_store_name = 'ese') s8
+---- PLAN
+70:CROSS JOIN [BROADCAST]
+|
+|--63:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |
+|  62:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_store_sk = s_store_sk
+|  |
+|  |--59:SCAN HDFS [tpcds.store]
+|  |     partitions=1/1 files=1 size=3.08KB
+|  |     predicates: store.s_store_name = 'ese'
+|  |
+|  61:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
+|  |
+|  |--58:SCAN HDFS [tpcds.time_dim]
+|  |     partitions=1/1 files=1 size=4.87MB
+|  |     predicates: time_dim.t_hour = 12, time_dim.t_minute < 30
+|  |
+|  60:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |
+|  |--57:SCAN HDFS [tpcds.household_demographics]
+|  |     partitions=1/1 files=1 size=148.10KB
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |
+|  56:SCAN HDFS [tpcds.store_sales]
+|     partitions=120/120 files=120 size=22.02MB
+|
+69:CROSS JOIN [BROADCAST]
+|
+|--55:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |
+|  54:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_store_sk = s_store_sk
+|  |
+|  |--51:SCAN HDFS [tpcds.store]
+|  |     partitions=1/1 files=1 size=3.08KB
+|  |     predicates: store.s_store_name = 'ese'
+|  |
+|  53:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
+|  |
+|  |--50:SCAN HDFS [tpcds.time_dim]
+|  |     partitions=1/1 files=1 size=4.87MB
+|  |     predicates: time_dim.t_hour = 11, time_dim.t_minute >= 30
+|  |
+|  52:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |
+|  |--49:SCAN HDFS [tpcds.household_demographics]
+|  |     partitions=1/1 files=1 size=148.10KB
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |
+|  48:SCAN HDFS [tpcds.store_sales]
+|     partitions=120/120 files=120 size=22.02MB
+|
+68:CROSS JOIN [BROADCAST]
+|
+|--47:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |
+|  46:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_store_sk = s_store_sk
+|  |
+|  |--43:SCAN HDFS [tpcds.store]
+|  |     partitions=1/1 files=1 size=3.08KB
+|  |     predicates: store.s_store_name = 'ese'
+|  |
+|  45:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
+|  |
+|  |--42:SCAN HDFS [tpcds.time_dim]
+|  |     partitions=1/1 files=1 size=4.87MB
+|  |     predicates: time_dim.t_hour = 11, time_dim.t_minute < 30
+|  |
+|  44:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |
+|  |--41:SCAN HDFS [tpcds.household_demographics]
+|  |     partitions=1/1 files=1 size=148.10KB
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |
+|  40:SCAN HDFS [tpcds.store_sales]
+|     partitions=120/120 files=120 size=22.02MB
+|
+67:CROSS JOIN [BROADCAST]
+|
+|--39:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |
+|  38:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_store_sk = s_store_sk
+|  |
+|  |--35:SCAN HDFS [tpcds.store]
+|  |     partitions=1/1 files=1 size=3.08KB
+|  |     predicates: store.s_store_name = 'ese'
+|  |
+|  37:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
+|  |
+|  |--34:SCAN HDFS [tpcds.time_dim]
+|  |     partitions=1/1 files=1 size=4.87MB
+|  |     predicates: time_dim.t_hour = 10, time_dim.t_minute >= 30
+|  |
+|  36:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |
+|  |--33:SCAN HDFS [tpcds.household_demographics]
+|  |     partitions=1/1 files=1 size=148.10KB
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |
+|  32:SCAN HDFS [tpcds.store_sales]
+|     partitions=120/120 files=120 size=22.02MB
+|
+66:CROSS JOIN [BROADCAST]
+|
+|--31:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |
+|  30:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_store_sk = s_store_sk
+|  |
+|  |--27:SCAN HDFS [tpcds.store]
+|  |     partitions=1/1 files=1 size=3.08KB
+|  |     predicates: store.s_store_name = 'ese'
+|  |
+|  29:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
+|  |
+|  |--26:SCAN HDFS [tpcds.time_dim]
+|  |     partitions=1/1 files=1 size=4.87MB
+|  |     predicates: time_dim.t_hour = 10, time_dim.t_minute < 30
+|  |
+|  28:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |
+|  |--25:SCAN HDFS [tpcds.household_demographics]
+|  |     partitions=1/1 files=1 size=148.10KB
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |
+|  24:SCAN HDFS [tpcds.store_sales]
+|     partitions=120/120 files=120 size=22.02MB
+|
+65:CROSS JOIN [BROADCAST]
+|
+|--23:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |
+|  22:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_store_sk = s_store_sk
+|  |
+|  |--19:SCAN HDFS [tpcds.store]
+|  |     partitions=1/1 files=1 size=3.08KB
+|  |     predicates: store.s_store_name = 'ese'
+|  |
+|  21:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
+|  |
+|  |--18:SCAN HDFS [tpcds.time_dim]
+|  |     partitions=1/1 files=1 size=4.87MB
+|  |     predicates: time_dim.t_hour = 9, time_dim.t_minute >= 30
+|  |
+|  20:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |
+|  |--17:SCAN HDFS [tpcds.household_demographics]
+|  |     partitions=1/1 files=1 size=148.10KB
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |
+|  16:SCAN HDFS [tpcds.store_sales]
+|     partitions=120/120 files=120 size=22.02MB
+|
+64:CROSS JOIN [BROADCAST]
+|
+|--15:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |
+|  14:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_store_sk = s_store_sk
+|  |
+|  |--11:SCAN HDFS [tpcds.store]
+|  |     partitions=1/1 files=1 size=3.08KB
+|  |     predicates: store.s_store_name = 'ese'
+|  |
+|  13:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
+|  |
+|  |--10:SCAN HDFS [tpcds.time_dim]
+|  |     partitions=1/1 files=1 size=4.87MB
+|  |     predicates: time_dim.t_hour = 9, time_dim.t_minute < 30
+|  |
+|  12:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |
+|  |--09:SCAN HDFS [tpcds.household_demographics]
+|  |     partitions=1/1 files=1 size=148.10KB
+|  |     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|  |
+|  08:SCAN HDFS [tpcds.store_sales]
+|     partitions=120/120 files=120 size=22.02MB
+|
+07:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_store_sk = s_store_sk
+|
+|--03:SCAN HDFS [tpcds.store]
+|     partitions=1/1 files=1 size=3.08KB
+|     predicates: store.s_store_name = 'ese'
+|
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_sold_time_sk = time_dim.t_time_sk
+|
+|--02:SCAN HDFS [tpcds.time_dim]
+|     partitions=1/1 files=1 size=4.87MB
+|     predicates: time_dim.t_hour = 8, time_dim.t_minute >= 30
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_hdemo_sk = household_demographics.hd_demo_sk
+|
+|--01:SCAN HDFS [tpcds.household_demographics]
+|     partitions=1/1 files=1 size=148.10KB
+|     predicates: ((household_demographics.hd_dep_count = 1 AND household_demographics.hd_vehicle_count <= 1 + 2) OR (household_demographics.hd_dep_count = 0 AND household_demographics.hd_vehicle_count <= 0 + 2) OR (household_demographics.hd_dep_count = 2 AND household_demographics.hd_vehicle_count <= 2 + 2))
+|
+00:SCAN HDFS [tpcds.store_sales]
+   partitions=120/120 files=120 size=22.02MB
+====
