@@ -571,8 +571,10 @@ class BufferedBlockMgr {
   // before being written to disk.
   const bool encryption_;
 
-  // Set to true if --disk_spill_integrity is true.  When true, blocks will have an
-  // integrity check (SHA-256) performed after being read from disk.
+  // Set to true if --disk_spill_encryption is true.  We can split this into a different
+  // flag in the future, but there is little performance overhead in the integrity check
+  // and hence no real reason to keep this separate from encryption.  When true, blocks
+  // will have an integrity check (SHA-256) performed after being read from disk.
   const bool check_integrity_;
 
 }; // class BufferedBlockMgr

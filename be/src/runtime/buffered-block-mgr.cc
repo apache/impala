@@ -33,10 +33,8 @@ using namespace std;
 using namespace boost;
 using namespace strings;   // for Substitute
 
-DEFINE_bool(disk_spill_encryption, false, "Set this to turn on the encryption of all "
-    "data spilled to disk during a query");
-DEFINE_bool(disk_spill_integrity, false, "Set this to turn on an integrity check of "
-    "all data spilled to disk during a query");
+DEFINE_bool(disk_spill_encryption, false, "Set this to encrypt and perform an integrity "
+    "check on all data spilled to disk during a query");
 
 namespace impala {
 
@@ -460,7 +458,7 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, int64_t block_size)
     io_mgr_(state->io_mgr()),
     is_cancelled_(false),
     encryption_(FLAGS_disk_spill_encryption),
-    check_integrity_(FLAGS_disk_spill_integrity) {
+    check_integrity_(FLAGS_disk_spill_encryption) {
   state->io_mgr()->RegisterContext(NULL, &io_request_context_);
   if (encryption_) {
     static bool openssl_loaded = false;

@@ -46,7 +46,6 @@ using namespace std;
 const string SCRATCH_DIR = "/tmp/impala-scratch";
 
 DECLARE_bool(disk_spill_encryption);
-DECLARE_bool(disk_spill_integrity);
 
 namespace impala {
 
@@ -138,8 +137,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
 
   // Test that randomly issues GetFreeBlock(), Pin(), Unpin(), Delete() and Close()
   // calls. All calls made are legal - error conditions are not expected until the
-  // first call to Close().  This is called 4 times, each with different integrity
-  // and encryption command line flags set.
+  // first call to Close().  This is called 2 times with encryption+integrity on/off
   void TestRandomInternal() {
     const int num_buffers = 10;
     const int num_iterations = 100000;
@@ -793,25 +791,11 @@ TEST_F(BufferedBlockMgrTest, ClientOversubscription) {
 
 TEST_F(BufferedBlockMgrTest, Random_plain) {
   FLAGS_disk_spill_encryption = false;
-  FLAGS_disk_spill_integrity = false;
-  TestRandomInternal();
-}
-
-TEST_F(BufferedBlockMgrTest, Random_integrity) {
-  FLAGS_disk_spill_encryption = false;
-  FLAGS_disk_spill_integrity = true;
-  TestRandomInternal();
-}
-
-TEST_F(BufferedBlockMgrTest, Random_encryption) {
-  FLAGS_disk_spill_encryption = true;
-  FLAGS_disk_spill_integrity = false;
   TestRandomInternal();
 }
 
 TEST_F(BufferedBlockMgrTest, Random_integ_enc) {
   FLAGS_disk_spill_encryption = true;
-  FLAGS_disk_spill_integrity = true;
   TestRandomInternal();
 }
 
