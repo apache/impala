@@ -776,15 +776,26 @@ Status HdfsParquetTableWriter::AddRowGroup() {
   return Status::OK;
 }
 
+int64_t HdfsParquetTableWriter::MinBlockSize() const {
+  // See file_size_limit_ calculation in InitNewFile().
+  return 3 * DATA_PAGE_SIZE * columns_.size();
+}
+
 uint64_t HdfsParquetTableWriter::default_block_size() const {
+  int64_t block_size;
   if (state_->query_options().__isset.parquet_file_size &&
       state_->query_options().parquet_file_size > 0) {
-    // HDFS does not like block sizes that are not aligned
-    int64_t file_size = state_->query_options().parquet_file_size;
-    return BitUtil::RoundUp(file_size, HDFS_BLOCK_ALIGNMENT);
+    // If the user specified a value explicitly, use it. InitNewFile() will verify that
+    // the actual file's block size is sufficient.
+    block_size = state_->query_options().parquet_file_size;
+  } else {
+    block_size = HDFS_BLOCK_SIZE;
+    // Blocks are usually HDFS_BLOCK_SIZE bytes, unless there are many columns, in
+    // which case a per-column minimum kicks in.
+    block_size = max(block_size, MinBlockSize());
   }
-  DCHECK_EQ(HDFS_BLOCK_SIZE % HDFS_BLOCK_ALIGNMENT, 0);
-  return HDFS_BLOCK_SIZE;
+  // HDFS does not like block sizes that are not aligned
+  return BitUtil::RoundUp(block_size, HDFS_BLOCK_ALIGNMENT);
 }
 
 Status HdfsParquetTableWriter::InitNewFile() {
@@ -814,9 +825,15 @@ Status HdfsParquetTableWriter::InitNewFile() {
   // a two page buffer guarantees we will never go over.
   // TODO: this should be made dynamic based on the size of rows seen so far.
   // This would for example, let us account for very long string columns.
+  if (file_size_limit_ < MinBlockSize()) {
+    stringstream ss;
+    ss << "Parquet file size " << file_size_limit_ << " bytes is too small for "
+       << "a table with " << columns_.size() << " columns. Set query option "
+       << "PARQUET_FILE_SIZE to at least " << MinBlockSize() << ".";
+    return Status(ss.str());
+  }
   file_size_limit_ -= 2 * DATA_PAGE_SIZE * columns_.size();
-  DCHECK_GT(file_size_limit_, DATA_PAGE_SIZE * columns_.size());
-
+  DCHECK_GE(file_size_limit_, DATA_PAGE_SIZE * columns_.size());
   file_pos_ = 0;
   row_count_ = 0;
   file_size_estimate_ = 0;
