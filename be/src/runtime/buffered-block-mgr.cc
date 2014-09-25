@@ -84,13 +84,13 @@ struct BufferedBlockMgr::Client {
   int num_pinned_buffers_;
 
   void PinBuffer(BufferDescriptor* buffer) {
-    DCHECK(buffer != NULL);
+    DCHECK_NOTNULL(buffer);
     ++num_pinned_buffers_;
     if (tracker_ != NULL) tracker_->ConsumeLocal(buffer->len, query_tracker_);
   }
 
   void UnpinBuffer(BufferDescriptor* buffer) {
-    DCHECK(buffer != NULL);
+    DCHECK_NOTNULL(buffer);
     DCHECK_GT(num_pinned_buffers_, 0);
     --num_pinned_buffers_;
     if (tracker_ != NULL) tracker_->ReleaseLocal(buffer->len, query_tracker_);
@@ -115,8 +115,8 @@ BufferedBlockMgr::Block::Block(BufferedBlockMgr* block_mgr)
     valid_data_len_(0) {
 }
 
-Status BufferedBlockMgr::Block::Pin(bool* pinned) {
-  RETURN_IF_ERROR(block_mgr_->PinBlock(this, pinned));
+Status BufferedBlockMgr::Block::Pin(bool* pinned, Block* release_block, bool unpin) {
+  RETURN_IF_ERROR(block_mgr_->PinBlock(this, pinned, release_block, unpin));
   DCHECK(Validate()) << endl << DebugString();
   return Status::OK;
 }
@@ -168,20 +168,20 @@ bool BufferedBlockMgr::Block::Validate() const {
 
 string BufferedBlockMgr::Block::DebugString() const {
   stringstream ss;
-  ss << "Block: " << this
-     << " Buffer Desc: " << buffer_desc_
-     << " Data Len: " << valid_data_len_
-     << " Deleted: " << is_deleted_
-     << " Pinned: " << is_pinned_
-     << " Write Issued: " << in_write_
-     << " Client Local: " << client_local_;
+  ss << "Block: " << this << endl
+     << "  Buffer Desc: " << buffer_desc_ << endl
+     << "  Data Len: " << valid_data_len_ << endl
+     << "  Deleted: " << is_deleted_ << endl
+     << "  Pinned: " << is_pinned_ << endl
+     << "  Write Issued: " << in_write_ << endl
+     << "  Client Local: " << client_local_;
   return ss.str();
 }
 
 Status BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
     RuntimeProfile* profile, int64_t mem_limit, int64_t block_size,
     shared_ptr<BufferedBlockMgr>* block_mgr) {
-  DCHECK(parent != NULL);
+  DCHECK_NOTNULL(parent);
   lock_guard<mutex> lock(static_block_mgrs_lock_);
   BlockMgrsMap::iterator it = query_to_block_mgrs_.find(state->query_id());
   if ((it != query_to_block_mgrs_.end())) {
@@ -373,27 +373,7 @@ Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block**
       new_block = NULL;
     } else {
       // We need to transfer the buffer from unpin_block to new_block.
-
-      // First write out the old block.
-      unpin_block->is_pinned_ = false;
-      unpin_block->client_local_ = true;
-
-      unique_lock<mutex> lock(lock_);
-      RETURN_IF_ERROR(WriteUnpinnedBlock(unpin_block));
-
-      // Wait for the write to complete.
-      while (unpin_block->in_write_ && !is_cancelled_) {
-        unpin_block->write_complete_cv_.wait(lock);
-      }
-      if (is_cancelled_) return Status::CANCELLED;
-
-      // Assign the buffer to the new block.
-      DCHECK(!unpin_block->is_pinned_);
-      DCHECK(!unpin_block->in_write_);
-      new_block->buffer_desc_ = unpin_block->buffer_desc_;
-      new_block->buffer_desc_->block = new_block;
-      unpin_block->buffer_desc_ = NULL;
-      new_block->is_pinned_ = true;
+      RETURN_IF_ERROR(TransferBuffer(new_block, unpin_block, true));
     }
   } else if (unpin_block != NULL) {
     // Got a new block without needing to transfer. Just unpin this block.
@@ -402,6 +382,40 @@ Status BufferedBlockMgr::GetNewBlock(Client* client, Block* unpin_block, Block**
 
   if (new_block != NULL) DCHECK(new_block->is_pinned());
   *block = new_block;
+  return Status::OK;
+}
+
+Status BufferedBlockMgr::TransferBuffer(Block* dst, Block* src, bool unpin) {
+  // First write out the src block.
+  DCHECK(src->is_pinned_);
+  DCHECK(!dst->is_pinned_);
+  DCHECK(dst->buffer_desc_ == NULL);
+
+  if (unpin) {
+    unique_lock<mutex> lock(lock_);
+    src->is_pinned_ = false;
+    src->client_local_ = true;
+    RETURN_IF_ERROR(WriteUnpinnedBlock(src));
+    // Wait for the write to complete.
+    while (src->in_write_ && !is_cancelled_) {
+      src->write_complete_cv_.wait(lock);
+    }
+    if (is_cancelled_) return Status::CANCELLED;
+
+    DCHECK(!src->is_pinned_);
+    DCHECK(!src->in_write_);
+  }
+
+  // Assign the buffer to the new block.
+  dst->buffer_desc_ = src->buffer_desc_;
+  dst->buffer_desc_->block = dst;
+  src->buffer_desc_ = NULL;
+  dst->is_pinned_ = true;
+  if (!unpin) {
+    src->is_pinned_ = false;
+    RETURN_IF_ERROR(DeleteBlock(src));
+  }
+
   return Status::OK;
 }
 
@@ -478,7 +492,13 @@ MemTracker* BufferedBlockMgr::get_tracker(Client* client) const {
   return client->tracker_;
 }
 
-Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned) {
+static Status ReleaseOrUnpin(BufferedBlockMgr::Block* block, bool unpin) {
+  if (block == NULL) return Status::OK;
+  return unpin ? block->Unpin() : block->Delete();
+}
+
+Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_block,
+    bool unpin) {
   DCHECK(!block->is_deleted_);
   *pinned = false;
   {
@@ -488,21 +508,41 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned) {
 
   if (block->is_pinned_) {
     *pinned = true;
-    return Status::OK;
+    return ReleaseOrUnpin(release_block, unpin);
   }
 
   bool in_mem = false;
   RETURN_IF_ERROR(FindBufferForBlock(block, &in_mem));
   *pinned = block->is_pinned_;
 
-  if (!block->is_pinned_ || in_mem || block->valid_data_len_ == 0) {
-    // Either there was no memory for this block or the buffer was never evicted
-    // and already contains the data. Either way, nothing left to do.
-    return Status::OK;
+  // Block was not evicted or had no data, nothing left to do.
+  if (in_mem || block->valid_data_len_ == 0) return ReleaseOrUnpin(release_block, unpin);
+
+  if (!block->is_pinned_) {
+    if (release_block == NULL) return Status::OK;
+
+    if (block->buffer_desc_ != NULL) {
+      if (free_io_buffers_.Contains(block->buffer_desc_)) {
+        free_io_buffers_.Remove(block->buffer_desc_);
+      } else if (unpinned_blocks_.Contains(block)) {
+        unpinned_blocks_.Remove(block);
+      } else {
+        DCHECK(block->in_write_);
+      }
+      block->is_pinned_ = true;
+      *pinned = true;
+      return ReleaseOrUnpin(release_block, unpin);
+    }
+
+    RETURN_IF_ERROR(TransferBuffer(block, release_block, unpin));
+    DCHECK(!release_block->is_pinned_);
+    release_block = NULL; // Handled by transfer.
+    DCHECK(block->is_pinned_);
+    *pinned = true;
   }
 
   // Read the block from disk if it was not in memory.
-  DCHECK_NOTNULL(block->write_range_);
+  DCHECK(block->write_range_ != NULL) << block->DebugString() << endl << release_block;
   SCOPED_TIMER(disk_read_timer_);
   // Create a ScanRange to perform the read.
   DiskIoMgr::ScanRange* scan_range =
@@ -523,13 +563,13 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned) {
   } while (!io_mgr_buffer->eosr());
   DCHECK_EQ(offset, block->write_range_->len());
 
-  // Verify integrity first, becase the hash was generated from encrypted data
+  // Verify integrity first, because the hash was generated from encrypted data
   if (check_integrity_) RETURN_IF_ERROR(VerifyHash(block));
 
   // Decryption is done in-place, since the buffer can't be accessed by anyone else
   if (encryption_) RETURN_IF_ERROR(Decrypt(block));
 
-  return Status::OK;
+  return ReleaseOrUnpin(release_block, unpin);
 }
 
 Status BufferedBlockMgr::UnpinBlock(Block* block) {
@@ -733,7 +773,7 @@ void BufferedBlockMgr::ReturnUnusedBlock(Block* block) {
 
 Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
   Client* client = block->client_;
-  DCHECK(client != NULL);
+  DCHECK_NOTNULL(client);
   DCHECK(!block->is_pinned_);
 
   *in_mem = false;
@@ -862,7 +902,7 @@ Status BufferedBlockMgr::FindBuffer(unique_lock<mutex>& lock,
 }
 
 BufferedBlockMgr::Block* BufferedBlockMgr::GetUnusedBlock(Client* client) {
-  DCHECK(client != NULL);
+  DCHECK_NOTNULL(client);
   Block* new_block;
   if (unused_blocks_.empty()) {
     new_block = obj_pool_.Add(new Block(this));

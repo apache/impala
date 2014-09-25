@@ -205,7 +205,7 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
 
   if (needs_serialize_ && block_mgr_client_ != NULL) {
     serialize_stream_.reset(new BufferedTupleStream(state, *intermediate_row_desc_,
-        state->block_mgr(), block_mgr_client_));
+        state->block_mgr(), block_mgr_client_, true /* delete on read */));
     RETURN_IF_ERROR(serialize_stream_->Init(runtime_profile(), false));
     DCHECK(serialize_stream_->has_write_block());
   }
@@ -390,12 +390,12 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
 
   aggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
       *parent->intermediate_row_desc_, parent->state_->block_mgr(),
-      parent->block_mgr_client_));
+      parent->block_mgr_client_, true /* delete on read */));
   RETURN_IF_ERROR(aggregated_row_stream->Init(parent->runtime_profile()));
 
   unaggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
       parent->child(0)->row_desc(), parent->state_->block_mgr(),
-      parent->block_mgr_client_));
+      parent->block_mgr_client_, true /* delete on read */));
   // This stream is only used to spill, no need to ever have this pinned.
   RETURN_IF_ERROR(unaggregated_row_stream->Init(parent->runtime_profile(), false));
   DCHECK(unaggregated_row_stream->has_write_block());
@@ -470,7 +470,7 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
     // freed at least one buffer from this partition's (old) aggregated_row_stream.
     parent->serialize_stream_.reset(new BufferedTupleStream(parent->state_,
         *parent->intermediate_row_desc_, parent->state_->block_mgr(),
-        parent->block_mgr_client_));
+        parent->block_mgr_client_, true /* delete on read */));
     RETURN_IF_ERROR(parent->serialize_stream_->Init(parent->runtime_profile(), false));
     DCHECK(parent->serialize_stream_->has_write_block());
   }

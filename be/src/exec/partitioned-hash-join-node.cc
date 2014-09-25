@@ -197,7 +197,8 @@ PartitionedHashJoinNode::Partition::Partition(RuntimeState* state,
         parent_->block_mgr_client_))),
     probe_rows_(state->obj_pool()->Add(new BufferedTupleStream(
         state, parent_->child(0)->row_desc(),
-        state->block_mgr(), parent_->block_mgr_client_))) {
+        state->block_mgr(), parent_->block_mgr_client_,
+        true /* delete on read */))) {
 }
 
 PartitionedHashJoinNode::Partition::~Partition() {

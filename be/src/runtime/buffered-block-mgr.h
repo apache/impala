@@ -130,7 +130,11 @@ class BufferedBlockMgr {
     // Pins a block in memory - assigns a free buffer to a block and reads it from
     // disk if necessary. If there are no free blocks and no unpinned blocks,
     // *pinned is set to false and the block is not pinned.
-    Status Pin(bool* pinned);
+    // If release_block is non-NULL, if there is memory pressure, this block will
+    // be pinned using the buffer from release_block. If unpin is true, release_block
+    // will be unpinned (regardless of whether or not the buffer was used for this block).
+    // If unpin is false, release_block is deleted. release_block must be pinned.
+    Status Pin(bool* pinned, Block* release_block = NULL, bool unpin = true);
 
     // Unpin a block - add it to the list of unpinned blocks maintained by the block
     // manager. Is non-blocking.
@@ -368,9 +372,13 @@ class BufferedBlockMgr {
 
   // PinBlock(), UnpinBlock(), DeleteBlock() perform the actual work of Block::Pin(),
   // Unpin() and Delete(). The lock_ must be taken by the caller.
-  Status PinBlock(Block* block, bool* pinned);
+  Status PinBlock(Block* block, bool* pinned, Block* src, bool unpin);
   Status UnpinBlock(Block* block);
   Status DeleteBlock(Block* block);
+
+  // Transfers the buffer from src to dst. src must be pinned. If unpin is true,
+  // src is unpinned, otherwise, it is deleted.
+  Status TransferBuffer(Block* dst, Block* src, bool unpin);
 
   // Returns the total number of unreserved buffers. This is the sum of unpinned,
   // free and buffers we can still allocate minus the total number of reserved buffers
