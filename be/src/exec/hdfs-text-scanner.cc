@@ -106,6 +106,7 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
               files[i]->filename.c_str(), files[i]->file_length, 0,
               metadata->partition_id, split->disk_id(), split->try_cache());
           compressed_text_scan_ranges.push_back(file_range);
+          scan_node->max_compressed_text_file_length()->Set(files[i]->file_length);
         }
         break;
 

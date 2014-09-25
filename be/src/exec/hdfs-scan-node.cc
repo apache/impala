@@ -69,6 +69,10 @@ const string HdfsScanNode::HDFS_SPLIT_STATS_DESC =
 // TODO: revisit how we do this.
 const int SCANNER_THREAD_MEM_USAGE = 32 * 1024 * 1024;
 
+// Estimated upper bound on the compression ratio of compressed text files. Used to
+// estimate scanner thread memory usage.
+const int COMPRESSED_TEXT_COMPRESSION_RATIO = 11;
+
 HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
                            const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
@@ -436,10 +440,19 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
         3 * runtime_state_->io_mgr()->max_read_buffer_size();
   }
   // scanner_thread_bytes_required_ now contains the IoBuffer requirement.
-  // Next we add a constant for the other memory the scanner thread will use.
+  // Next we add in the other memory the scanner thread will use.
   // e.g. decompression buffers, tuple buffers, etc.
+  // For compressed text, we estimate this based on the file size (since the whole file
+  // will need to be decompressed at once). For all other formats, we use a constant.
   // TODO: can we do something better?
-  scanner_thread_bytes_required_ += SCANNER_THREAD_MEM_USAGE;
+  int64_t scanner_thread_mem_usage = SCANNER_THREAD_MEM_USAGE;
+  BOOST_FOREACH(HdfsFileDesc* file, per_type_files_[THdfsFileFormat::TEXT]) {
+    if (file->file_compression != THdfsCompression::NONE) {
+      int64_t bytes_required = file->file_length * COMPRESSED_TEXT_COMPRESSION_RATIO;
+      scanner_thread_mem_usage = ::max(bytes_required, scanner_thread_mem_usage);
+    }
+  }
+  scanner_thread_bytes_required_ += scanner_thread_mem_usage;
 
   // Prepare all the partitions scanned by the scan node
   BOOST_FOREACH(const int64_t& partition_id, partition_ids_) {
@@ -570,6 +583,9 @@ Status HdfsScanNode::Open(RuntimeState* state) {
       TCounterType::BYTES);
   bytes_read_dn_cache_ = ADD_COUNTER(runtime_profile(), "BytesReadDataNodeCache",
       TCounterType::BYTES);
+
+  max_compressed_text_file_length_ = runtime_profile()->AddHighWaterMarkCounter(
+      "MaxCompressedTextFileLength", TCounterType::BYTES);
 
   // Create num_disks+1 bucket counters
   for (int i = 0; i < state->io_mgr()->num_disks() + 1; ++i) {

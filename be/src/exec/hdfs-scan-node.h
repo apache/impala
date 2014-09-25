@@ -136,6 +136,10 @@ class HdfsScanNode : public ScanNode {
 
   DiskIoMgr::RequestContext* reader_context() { return reader_context_; }
 
+  RuntimeProfile::HighWaterMarkCounter* max_compressed_text_file_length() {
+    return max_compressed_text_file_length_;
+  }
+
   const static int SKIP_COLUMN = -1;
 
   // Creates a clone of conjunct_ctxs_. 'ctxs' should be non-NULL and empty.
@@ -379,6 +383,10 @@ class HdfsScanNode : public ScanNode {
   // materialize and conjuncts evaluation code paths.
   AtomicInt<int> num_scanners_codegen_enabled_;
   AtomicInt<int> num_scanners_codegen_disabled_;
+
+  // The size of the largest compressed text file to be scanned. This is used to estimate
+  // scanner thread memory usage.
+  RuntimeProfile::HighWaterMarkCounter* max_compressed_text_file_length_;
 
   // Disk accessed bitmap
   RuntimeProfile::Counter disks_accessed_bitmap_;
