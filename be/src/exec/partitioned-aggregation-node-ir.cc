@@ -126,7 +126,6 @@ allocate_tuple:
     if (dst_stream->AddRow(row)) continue;
     Status status = dst_stream->status();
     DCHECK(!status.ok()) << AGGREGATED_ROWS;
-    status.AddErrorMsg("Could not append row even after spilling a partition.");
     return status;
   }
 

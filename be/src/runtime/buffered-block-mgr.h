@@ -432,14 +432,19 @@ class BufferedBlockMgr {
   // Equal to the number of disks.
   const int block_write_threshold_;
 
+  // If true, spilling is disabled. The client calls will fail if there is not enough
+  // memory.
+  const bool disable_spill_;
+
+  const TUniqueId query_id_;
+
+  ObjectPool obj_pool_;
+
   // The total number of reserved buffers across all clients that are not pinned.
   int unfullfilled_reserved_buffers_;
 
   // The total number of pinned buffers across all clients.
   int total_pinned_buffers_;
-
-  TUniqueId query_id_;
-  ObjectPool obj_pool_;
 
   // Track buffers allocated by the block manager.
   boost::scoped_ptr<MemTracker> mem_tracker_;

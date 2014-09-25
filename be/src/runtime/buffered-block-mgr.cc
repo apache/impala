@@ -438,9 +438,10 @@ BufferedBlockMgr::~BufferedBlockMgr() {
 BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, int64_t block_size)
   : max_block_size_(block_size),
     block_write_threshold_(TmpFileMgr::num_tmp_devices()),
+    disable_spill_(state->query_ctx().disable_spilling),
+    query_id_(state->query_id()),
     unfullfilled_reserved_buffers_(0),
     total_pinned_buffers_(0),
-    query_id_(state->query_id()),
     num_outstanding_writes_(0),
     io_mgr_(state->io_mgr()),
     is_cancelled_(false),
@@ -555,6 +556,8 @@ Status BufferedBlockMgr::UnpinBlock(Block* block) {
 }
 
 Status BufferedBlockMgr::WriteUnpinnedBlocks() {
+  if (disable_spill_) return Status::OK;
+
   // Assumes block manager lock is already taken.
   while (num_outstanding_writes_ + free_io_buffers_.size() < block_write_threshold_) {
     if (unpinned_blocks_.empty()) break;
@@ -833,9 +836,16 @@ Status BufferedBlockMgr::FindBuffer(unique_lock<mutex>& lock,
     return Status::OK;
   }
 
-  if (free_io_buffers_.empty() && unpinned_blocks_.empty() &&
-      num_outstanding_writes_ == 0) {
-    return Status::OK;
+  if (free_io_buffers_.empty()) {
+    // No free buffers. If spills are disabled or there no unpinned blocks we can write,
+    // return. We can't get a buffer.
+    if (disable_spill_) {
+      return Status("Spilling has been disabled for plans that do not have stats and "
+        "are not hinted to prevent potentially bad plans from using too many cluster "
+        "resources. Compute stats on these tables, hint the plan or disable this "
+        "behavior via query options to enable spilling.");
+    }
+    if (unpinned_blocks_.empty() && num_outstanding_writes_ == 0) return Status::OK;
   }
 
   // At this point, this block needs to use a buffer that was unpinned from another
@@ -945,7 +955,7 @@ bool BufferedBlockMgr::Validate() const {
 
   // Check if we're writing blocks when the number of free buffers falls below
   // threshold. We don't write blocks after cancellation.
-  if (!is_cancelled_ && !unpinned_blocks_.empty() &&
+  if (!is_cancelled_ && !unpinned_blocks_.empty() && !disable_spill_ &&
       (free_io_buffers_.size() + num_outstanding_writes_ < block_write_threshold_)) {
     LOG(ERROR) << "Missed writing unpinned blocks";
     return false;
