@@ -822,6 +822,10 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "select lag(int_col, tinyint_col * 2, 5) over ("
           + "order by tinyint_col, int_col) from functional.alltypes",
         "The offset parameter of LEAD/LAG must be a constant positive integer");
+    AnalysisError(
+        "select lag(int_col, 1, int_col) over ("
+          + "order by tinyint_col, int_col) from functional.alltypes",
+        "The default parameter (parameter 3) of LEAD/LAG must be a constant");
 
     // wrong type of function
     AnalysisError("select abs(float_col) over (partition by id order by tinyint_col "

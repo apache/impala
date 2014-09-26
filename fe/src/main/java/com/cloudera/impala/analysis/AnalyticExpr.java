@@ -288,7 +288,18 @@ public class AnalyticExpr extends Expr {
         throw new AnalysisException(
             "Windowing clause not allowed with '" + getFnCall().toSql() + "'");
       }
-      if (isOffsetFn(fn) && getFnCall().getChildren().size() > 1) checkOffset(analyzer);
+      if (isOffsetFn(fn) && getFnCall().getChildren().size() > 1) {
+        checkOffset(analyzer);
+        // check the default, which needs to be a constant at the moment
+        // TODO: remove this check when the backend can handle non-constants
+        if (getFnCall().getChildren().size() > 2) {
+          if (!getFnCall().getChild(2).isConstant()) {
+            throw new AnalysisException(
+                "The default parameter (parameter 3) of LEAD/LAG must be a constant: "
+                  + getFnCall().toSql());
+          }
+        }
+      }
     }
 
     if (window_ != null) {
