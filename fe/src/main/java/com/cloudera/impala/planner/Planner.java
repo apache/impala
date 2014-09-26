@@ -762,7 +762,6 @@ public class Planner {
       // will get created in the next createAggregationFragment() call
       // for the parent AggregationNode
       childFragment.addPlanRoot(node);
-      node.setIntermediateTuple();
       return childFragment;
     }
 
@@ -865,7 +864,6 @@ public class Planner {
             nodeIdGenerator_.getNextId(), node.getChild(0), mergeAggInfo);
     mergeAggNode.init(analyzer);
     mergeAggNode.unsetNeedsFinalize();
-    // The output of the 1st phase agg is the 1st phase intermediate.
     mergeAggNode.setIntermediateTuple();
     mergeFragment.addPlanRoot(mergeAggNode);
     // the 2nd-phase aggregation consumes the output of the merge agg;
@@ -1403,6 +1401,8 @@ public class Planner {
     // 2nd phase agginfo
     if (aggInfo.isDistinctAgg()) {
       ((AggregationNode)root).unsetNeedsFinalize();
+      // The output of the 1st phase agg is the 1st phase intermediate.
+      ((AggregationNode)root).setIntermediateTuple();
       root = new AggregationNode(
           nodeIdGenerator_.getNextId(), root,
           aggInfo.getSecondPhaseDistinctAggInfo());
