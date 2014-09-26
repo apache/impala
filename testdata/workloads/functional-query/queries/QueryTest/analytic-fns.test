@@ -895,8 +895,8 @@ TINYINT, INT, BIGINT
 ====
 ---- QUERY
 # IMPALA-1280: Crash running analytic with LEFT SEMI JOIN
-select sum(t1.int_col) over (partition by t1.id order by t1.int_col, t1.month) 
-from alltypestiny t1 
+select sum(t1.int_col) over (partition by t1.id order by t1.int_col, t1.month)
+from alltypestiny t1
 where exists (select tt1.month from alltypes tt1 where t1.int_col = tt1.smallint_col)
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
 0
@@ -907,4 +907,26 @@ where exists (select tt1.month from alltypes tt1 where t1.int_col = tt1.smallint
 1
 1
 1
+====
+---- QUERY
+# IMPALA-1312
+SELECT
+  SUM(t1.int_col * t1.id) OVER (
+    ORDER BY t1.int_col * t1.id ASC, t3.year + t3.tinyint_col ASC ROWS
+    BETWEEN 66 PRECEDING AND 21 FOLLOWING) AS int_col_1
+FROM alltypes t1
+INNER JOIN alltypes t2 ON t2.month = t1.smallint_col
+INNER JOIN alltypes t3 ON t3.bigint_col = t2.bigint_col
+WHERE
+t2.id <= t3.smallint_col + t2.tinyint_col
+order by 1
+limit 5
+---- TYPES
+BIGINT
+---- RESULTS
+22
+23
+24
+25
+26
 ====

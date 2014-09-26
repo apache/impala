@@ -73,6 +73,7 @@ string BufferedTupleStream::DebugString() const {
   stringstream ss;
   ss << "BufferedTupleStream num_rows=" << num_rows_ << " rows_returned="
      << rows_returned_ << " pinned=" << (pinned_ ? "true" : "false")
+     << " delete_on_read=" << (delete_on_read_ ? "true" : "false")
      << " num_pinned=" << num_pinned_
      << " write_block=" << write_block_ << " read_block_=";
   if (read_block_ == blocks_.end()) {
@@ -176,11 +177,13 @@ Status BufferedTupleStream::NewBlockForWrite(int min_size, bool* got_block) {
 Status BufferedTupleStream::NextBlockForRead() {
   DCHECK(!closed_);
   DCHECK(read_block_ != blocks_.end());
+  DCHECK_EQ(num_pinned_, NumPinned(blocks_)) << pinned_;
 
   // If non-NULL, this will be the current block if we are going to free it while
   // grabbing the next block. This will stay NULL if we don't want to free the
   // current block.
-  BufferedBlockMgr::Block* block_to_free = pinned_ ? NULL : *read_block_;
+  BufferedBlockMgr::Block* block_to_free =
+      (!pinned_ || delete_on_read_) ? *read_block_ : NULL;
   if (delete_on_read_) {
     blocks_.pop_front();
     read_block_ = blocks_.begin();
@@ -214,13 +217,13 @@ Status BufferedTupleStream::NextBlockForRead() {
       DCHECK(block_to_free == NULL) << "Should have been able to pin."
           << endl << block_mgr_->DebugString(block_mgr_client_);;
     }
-    if (block_to_free == NULL) ++num_pinned_;
+    if (block_to_free == NULL && pinned) ++num_pinned_;
   }
 
   if (read_block_ != blocks_.end() && (*read_block_)->is_pinned()) {
     read_ptr_ = (*read_block_)->buffer();
   }
-  DCHECK_EQ(num_pinned_, NumPinned(blocks_));
+  DCHECK_EQ(num_pinned_, NumPinned(blocks_)) << DebugString();
   return Status::OK;
 }
 
