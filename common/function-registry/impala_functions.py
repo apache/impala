@@ -360,6 +360,7 @@ functions = [
   [['lpad'], 'STRING', ['STRING', 'BIGINT', 'STRING'], 'impala::StringFunctions::Lpad'],
   [['rpad'], 'STRING', ['STRING', 'BIGINT', 'STRING'], 'impala::StringFunctions::Rpad'],
   [['length'], 'INT', ['STRING'], 'impala::StringFunctions::Length'],
+  [['length'], 'INT', ['CHAR'], 'impala::StringFunctions::CharLength'],
   [['char_length'], 'INT', ['STRING'], 'impala::StringFunctions::Length'],
   [['character_length'], 'INT', ['STRING'], 'impala::StringFunctions::Length'],
   [['lower', 'lcase'], 'STRING', ['STRING'], 'impala::StringFunctions::Lower'],

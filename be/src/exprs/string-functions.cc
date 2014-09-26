@@ -145,6 +145,13 @@ IntVal StringFunctions::Length(FunctionContext* context, const StringVal& str) {
   return IntVal(str.len);
 }
 
+IntVal StringFunctions::CharLength(FunctionContext* context, const StringVal& str) {
+  if (str.is_null) return IntVal::null();
+  const FunctionContext::TypeDesc* t = context->GetArgType(0);
+  DCHECK_EQ(t->type, FunctionContext::TYPE_FIXED_BUFFER);
+  return StringValue::UnpaddedCharLength(reinterpret_cast<char*>(str.ptr), t->len);
+}
+
 StringVal StringFunctions::Lower(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return StringVal::null();
   StringVal result(context, str.len);

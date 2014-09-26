@@ -41,6 +41,7 @@ class StringFunctions {
   static StringVal Rpad(FunctionContext*, const StringVal& str, const BigIntVal&,
                         const StringVal& pad);
   static IntVal Length(FunctionContext*, const StringVal& str);
+  static IntVal CharLength(FunctionContext*, const StringVal& str);
   static StringVal Lower(FunctionContext*, const StringVal& str);
   static StringVal Upper(FunctionContext*, const StringVal& str);
   static StringVal InitCap(FunctionContext*, const StringVal& str);

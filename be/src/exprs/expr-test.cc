@@ -1594,6 +1594,15 @@ TEST_F(ExprTest, StringFunctions) {
     TestStringValue("lower(cast(123456 as CHAR(3)))", "123");
     TestStringValue("cast(cast(123456 as CHAR(3)) as VARCHAR(3))", "123");
     TestIsNull("cast(NULL as CHAR(3))", ColumnType::CreateCharType(3));
+
+    TestIsNull("length(cast(NULL as CHAR(3)))", TYPE_INT);
+    TestIsNull("length(cast(NULL as CHAR(256)))", TYPE_INT);
+    TestValue("length(cast('foo' as CHAR(5)))", TYPE_INT, 3);
+    TestValue("length(cast('foo ' as CHAR(5)))", TYPE_INT, 3);
+    TestValue("length(cast('foo aXX' as CHAR(5)))", TYPE_INT, 5);
+    TestValue("length(cast('' as CHAR(5)))", TYPE_INT, 0);
+    TestValue("length(cast(' ' as CHAR(5)))", TYPE_INT, 0);
+    TestValue("length(cast('x' as CHAR(256)))", TYPE_INT, 1);
   }
 }
 
