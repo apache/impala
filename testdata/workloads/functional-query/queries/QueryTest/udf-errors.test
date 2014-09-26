@@ -10,6 +10,20 @@ symbol='org.apache.hadoop.hive.ql.udf.UDFPI';
 ---- RESULTS
 ====
 ---- QUERY
+create function if not exists udf_test_errors.foo() returns double
+location '/test-warehouse/not-a-real-file.so'
+symbol='FnDoesNotExist';
+---- CATCH
+Could not load binary: /test-warehouse/not-a-real-file.so
+====
+---- QUERY
+create function if not exists udf_test_errors.foo() returns double
+location '/test-warehouse/not-a-real-file.so'
+symbol='FnDoesNotExist';
+---- CATCH
+Could not load binary: /test-warehouse/not-a-real-file.so
+====
+---- QUERY
 drop database udf_test_errors;
 ---- CATCH
 Cannot drop non-empty database: udf_test_errors

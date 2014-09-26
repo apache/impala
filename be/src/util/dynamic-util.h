@@ -19,7 +19,7 @@
 
 namespace impala {
 
-// Look up smybols in a dynamically linked library.
+// Look up symbols in a dynamically linked library.
 // handle -- handle to the library. NULL if loading from the current process.
 // symbol -- symbol to lookup.
 // fn_ptr -- pointer tor retun addres of function.

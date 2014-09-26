@@ -49,7 +49,7 @@ struct LibCache::LibCacheEntry {
   bool should_remove;
 
   // If true, we need to check if there is a newer version of the cached library in HDFS
-  // on next access.
+  // on next access. Should hold lock_ to read/write.
   bool check_needs_refresh;
 
   // The type of this file.
@@ -77,6 +77,11 @@ struct LibCache::LibCacheEntry {
   // TODO: it would be nice to be able to do this for .so's as well but it's
   // not trivial to walk an .so for the symbol table.
   boost::unordered_set<std::string> symbols;
+
+  // Set if an error occurs loading the cache entry before the cache entry
+  // can be evicted. This allows other threads that attempt to use the entry
+  // before it is removed to return the same error.
+  Status loading_status;
 
   LibCacheEntry() : use_count(0), should_remove(false), check_needs_refresh(false),
                     shared_object_handle(NULL) {}
@@ -216,9 +221,9 @@ void LibCache::SetNeedsRefresh(const string& hdfs_lib_file) {
   LibMap::iterator it = lib_cache_.find(hdfs_lib_file);
   if (it == lib_cache_.end()) return;
   LibCacheEntry* entry = it->second;
-  lib_cache_lock.unlock();
 
   unique_lock<mutex> entry_lock(entry->lock);
+  // Need to hold lock_ before setting check_needs_refresh.
   entry->check_needs_refresh = true;
 }
 
@@ -271,13 +276,48 @@ void LibCache::DropCache() {
 
 Status LibCache::GetCacheEntry(const string& hdfs_lib_file, LibType type,
                                unique_lock<mutex>* entry_lock, LibCacheEntry** entry) {
+  Status status;
+  {
+    // If an error occurs, local_entry_lock is released before calling RemoveEntry()
+    // below because it takes the global lock_ which must be acquired before taking entry
+    // locks.
+    unique_lock<mutex> local_entry_lock;
+    status = GetCacheEntryInternal(hdfs_lib_file, type, &local_entry_lock, entry);
+    if (status.ok()) {
+      entry_lock->swap(local_entry_lock);
+      return status;
+    }
+    if (*entry == NULL) return status;
+
+    // Set loading_status on the entry so that if another thread calls
+    // GetCacheEntry() for this lib before this thread is able to acquire lock_ in
+    // RemoveEntry(), it is able to return the same error.
+    (*entry)->loading_status = status;
+  }
+  // Takes lock_
+  RemoveEntry(hdfs_lib_file);
+  return status;
+}
+
+Status LibCache::GetCacheEntryInternal(const string& hdfs_lib_file, LibType type,
+    unique_lock<mutex>* entry_lock, LibCacheEntry** entry) {
   DCHECK(!hdfs_lib_file.empty());
   *entry = NULL;
 
-  // Check if this file is already cached.
+  // Check if this file is already cached or an error occured on another thread while
+  // loading the library.
   unique_lock<mutex> lib_cache_lock(lock_);
   LibMap::iterator it = lib_cache_.find(hdfs_lib_file);
   if (it != lib_cache_.end()) {
+    {
+      unique_lock<mutex> local_entry_lock((it->second)->lock);
+      if (!(it->second)->loading_status.ok()) {
+        // If loading_status is already set, the returned *entry should be NULL.
+        DCHECK(*entry == NULL);
+        return (it->second)->loading_status;
+      }
+    }
+
     *entry = it->second;
     if ((*entry)->check_needs_refresh) {
       // Check if file has been modified since loading the cached copy. If so, remove the
@@ -285,12 +325,13 @@ Status LibCache::GetCacheEntry(const string& hdfs_lib_file, LibType type,
       (*entry)->check_needs_refresh = false;
       time_t last_mod_time;
       hdfsFS hdfs_conn = HdfsFsCache::instance()->GetDefaultConnection();
-      RETURN_IF_ERROR(
-          GetLastModificationTime(hdfs_conn, hdfs_lib_file.c_str(), &last_mod_time));
-      if ((*entry)->last_mod_time < last_mod_time) {
+      Status status = GetLastModificationTime(hdfs_conn, hdfs_lib_file.c_str(),
+          &last_mod_time);
+      if (!status.ok() || (*entry)->last_mod_time < last_mod_time) {
         RemoveEntryInternal(hdfs_lib_file, it);
         *entry = NULL;
       }
+      RETURN_IF_ERROR(status);
     }
   }
 

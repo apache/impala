@@ -136,7 +136,13 @@ class LibCache {
   // Result is returned in *entry.
   // No locks should be take before calling this. On return the entry's lock is
   // taken and returned in *entry_lock.
+  // If an error is returned, there will be no entry in lib_cache_ and *entry is NULL.
   Status GetCacheEntry(const std::string& hdfs_lib_file, LibType type,
+      boost::unique_lock<boost::mutex>* entry_lock, LibCacheEntry** entry);
+
+  // Implementation to get the cache entry for 'hdfs_lib_file'. Errors are returned
+  // without evicting the cache entry if the status is not OK and *entry is not NULL.
+  Status GetCacheEntryInternal(const std::string& hdfs_lib_file, LibType type,
       boost::unique_lock<boost::mutex>* entry_lock, LibCacheEntry** entry);
 
   // Utility function for generating a filename unique to this process and
