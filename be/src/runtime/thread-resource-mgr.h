@@ -94,7 +94,7 @@ class ThreadResourceMgr {
     // the quota, this will return false and the pool should not run.
     // Pools should use this API for resources they can use but don't
     // need (e.g. scanner threads).
-    bool TryAcquireThreadToken();
+    bool TryAcquireThreadToken(bool* is_reserved = NULL);
 
     // Set a reserved optional number of threads for this pool.  This can be
     // used to implement that a component needs n+ number of threads.  The
@@ -232,7 +232,7 @@ inline void ThreadResourceMgr::ResourcePool::AcquireThreadToken() {
   __sync_fetch_and_add(&num_threads_, 1);
 }
 
-inline bool ThreadResourceMgr::ResourcePool::TryAcquireThreadToken() {
+inline bool ThreadResourceMgr::ResourcePool::TryAcquireThreadToken(bool* is_reserved) {
   while (true) {
     int64_t previous_num_threads = num_threads_;
     int64_t new_optional_threads = (previous_num_threads >> 32) + 1;
@@ -241,10 +241,12 @@ inline bool ThreadResourceMgr::ResourcePool::TryAcquireThreadToken() {
         new_optional_threads + new_required_threads > quota()) {
       return false;
     }
+    bool thread_is_reserved = new_optional_threads <= num_reserved_optional_threads_;
     int64_t new_value = new_optional_threads << 32 | new_required_threads;
     // Atomically swap the new value if no one updated num_threads_.  We do not
     // not care about the ABA problem here.
     if (__sync_bool_compare_and_swap(&num_threads_, previous_num_threads, new_value)) {
+      if (is_reserved != NULL) *is_reserved = thread_is_reserved;
       return true;
     }
   }

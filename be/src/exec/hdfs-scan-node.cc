@@ -733,12 +733,10 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
   //     we are not scanner bound.
   //  5. Don't start up a thread if there isn't enough memory left to run it.
   //  6. Don't start up if there are no thread tokens.
+  //  7. Don't start up if we are running too many threads for our vcore allocation
+  //  (unless the thread is reserved, in which case it has to run).
   bool started_scanner = false;
   while (true) {
-    if (runtime_state_->query_resource_mgr() != NULL &&
-        runtime_state_->query_resource_mgr()->IsVcoreOverSubscribed()) {
-      break;
-    }
     // The lock must be given up between loops in order to give writers to done_,
     // all_ranges_started_ etc. a chance to grab the lock.
     // TODO: This still leans heavily on starvation-free locks, come up with a more
@@ -758,7 +756,16 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
     }
 
     // Case 6
-    if (!pool->TryAcquireThreadToken()) break;
+    bool is_reserved = false;
+    if (!pool->TryAcquireThreadToken(&is_reserved)) break;
+
+    // Case 7
+    if (!is_reserved) {
+      if (runtime_state_->query_resource_mgr() != NULL &&
+          runtime_state_->query_resource_mgr()->IsVcoreOverSubscribed()) {
+        break;
+      }
+    }
 
     COUNTER_ADD(&active_scanner_thread_counter_, 1);
     COUNTER_ADD(num_scanner_threads_started_counter_, 1);

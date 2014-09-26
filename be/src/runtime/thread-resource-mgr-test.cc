@@ -28,7 +28,7 @@ class NotifiedCounter {
  public:
   NotifiedCounter() : counter_(0) {
   }
-  
+
   void Notify(ThreadResourceMgr::ResourcePool* consumer) {
     DCHECK(consumer != NULL);
     DCHECK_LT(consumer->num_threads(), consumer->quota());
@@ -59,17 +59,23 @@ TEST(ThreadResourceMgr, BasicTest) {
   EXPECT_EQ(c1->num_required_threads(), 2);
   EXPECT_EQ(c1->num_optional_threads(), 0);
   EXPECT_EQ(counter1.counter(), 1);
-  EXPECT_TRUE(c1->TryAcquireThreadToken());
-  EXPECT_TRUE(c1->TryAcquireThreadToken());
-  EXPECT_TRUE(c1->TryAcquireThreadToken());
-  EXPECT_FALSE(c1->TryAcquireThreadToken());
+  bool is_reserved = false;
+  c1->ReserveOptionalTokens(1);
+  EXPECT_TRUE(c1->TryAcquireThreadToken(&is_reserved));
+  EXPECT_TRUE(is_reserved);
+  EXPECT_TRUE(c1->TryAcquireThreadToken(&is_reserved));
+  EXPECT_FALSE(is_reserved);
+  EXPECT_TRUE(c1->TryAcquireThreadToken(&is_reserved));
+  EXPECT_FALSE(is_reserved);
+  EXPECT_FALSE(c1->TryAcquireThreadToken(&is_reserved));
+  EXPECT_FALSE(is_reserved);
   EXPECT_EQ(c1->num_threads(), 5);
   EXPECT_EQ(c1->num_required_threads(), 2);
   EXPECT_EQ(c1->num_optional_threads(), 3);
   c1->ReleaseThreadToken(true);
   c1->ReleaseThreadToken(false);
   EXPECT_EQ(counter1.counter(), 3);
-  
+
   // Register a new consumer, quota is cut in half
   ThreadResourceMgr::ResourcePool* c2 = mgr.RegisterPool();
   c2->SetThreadAvailableCb(bind<void>(mem_fn(&NotifiedCounter::Notify), &counter2, _1));
@@ -93,4 +99,3 @@ int main(int argc, char **argv) {
   impala::CpuInfo::Init();
   return RUN_ALL_TESTS();
 }
-
