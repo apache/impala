@@ -30,6 +30,7 @@ import com.google.common.collect.Lists;
 
 public class TupleDescriptor {
   private final TupleId id_;
+  private final String debugName_;  // debug-only
   private final ArrayList<SlotDescriptor> slots_;
 
   // Underlying table, if there is one.
@@ -53,9 +54,10 @@ public class TupleDescriptor {
 
   private float avgSerializedSize_;  // in bytes; includes serialization overhead
 
-  TupleDescriptor(TupleId id) {
-    this.id_ = id;
-    this.slots_ = new ArrayList<SlotDescriptor>();
+  TupleDescriptor(TupleId id, String debugName) {
+    id_ = id;
+    debugName_ = debugName;
+    slots_ = new ArrayList<SlotDescriptor>();
   }
 
   public void addSlot(SlotDescriptor desc) {
@@ -96,6 +98,7 @@ public class TupleDescriptor {
     }
     return Objects.toStringHelper(this)
         .add("id", id_.asInt())
+        .add("name", debugName_)
         .add("tbl", tblStr)
         .add("byte_size", byteSize_)
         .add("is_materialized", isMaterialized_)

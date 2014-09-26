@@ -1541,7 +1541,7 @@ public class Planner {
     ArrayList<Expr> resultExprs = selectStmt.getBaseTblResultExprs();
     ArrayList<String> colLabels = selectStmt.getColLabels();
     // Create tuple descriptor for materialized tuple.
-    TupleDescriptor tupleDesc = analyzer.getDescTbl().createTupleDescriptor();
+    TupleDescriptor tupleDesc = analyzer.getDescTbl().createTupleDescriptor("union");
     tupleDesc.setIsMaterialized(true);
     UnionNode unionNode = new UnionNode(nodeIdGenerator_.getNextId(), tupleDesc.getId());
 
@@ -2036,25 +2036,35 @@ public class Planner {
    *   and duplicates removed via distinct aggregation
    * - the output of that plus the allOperands' plan trees are collected in
    *   another UnionNode which materializes the result of unionStmt
+   * - if any of the union operands contains analytic exprs, we avoid pushing
+   *   predicates directly into the operands and instead evaluate them
+   *   *after* the final UnionNode (see createInlineViewPlan() for the reasoning)
+   *   TODO: optimize this by still pushing predicates into the union operands
+   *   that don't contain analytic exprs and evaluating the conjuncts in Select
+   *   directly above the AnalyticEvalNodes
    */
-  private PlanNode createUnionPlan(UnionStmt unionStmt, Analyzer analyzer )
+  private PlanNode createUnionPlan(UnionStmt unionStmt, Analyzer analyzer)
       throws ImpalaException {
-    // Turn unassigned predicates for unionStmt's tupleId_ into predicates for
-    // the individual operands.
-    // Do this prior to creating the operands' plan trees so they get a chance to
-    // pick up propagated predicates.
     List<Expr> conjuncts =
         analyzer.getUnassignedConjuncts(unionStmt.getTupleId().asList(), false);
-    for (UnionOperand op: unionStmt.getOperands()) {
-      List<Expr> opConjuncts =
-          Expr.substituteList(conjuncts, op.getSmap(), analyzer, false);
-      op.getAnalyzer().registerConjuncts(opConjuncts);
-      // Some of the opConjuncts have become constant and eval'd to false, or an ancestor
-      // block is already guaranteed to return empty results.
-      if (op.getAnalyzer().hasEmptyResultSet()) op.drop();
+    if (!unionStmt.hasAnalyticExprs()) {
+      // Turn unassigned predicates for unionStmt's tupleId_ into predicates for
+      // the individual operands.
+      // Do this prior to creating the operands' plan trees so they get a chance to
+      // pick up propagated predicates.
+      for (UnionOperand op: unionStmt.getOperands()) {
+        List<Expr> opConjuncts =
+            Expr.substituteList(conjuncts, op.getSmap(), analyzer, false);
+        op.getAnalyzer().registerConjuncts(opConjuncts);
+        // Some of the opConjuncts have become constant and eval'd to false, or an
+        // ancestor block is already guaranteed to return empty results.
+        if (op.getAnalyzer().hasEmptyResultSet()) op.drop();
+      }
+      analyzer.markConjunctsAssigned(conjuncts);
+    } else {
+      // mark slots referenced by the yet-unassigned conjuncts
+      analyzer.materializeSlots(conjuncts);
     }
-    analyzer.markConjunctsAssigned(conjuncts);
-
     // mark slots after predicate propagation but prior to plan tree generation
     unionStmt.materializeRequiredSlots(analyzer);
 

@@ -54,7 +54,7 @@ public class BaseTableRef extends TableRef {
   @Override
   public TupleDescriptor createTupleDescriptor(Analyzer analyzer)
       throws AnalysisException {
-    TupleDescriptor result = analyzer.getDescTbl().createTupleDescriptor();
+    TupleDescriptor result = analyzer.getDescTbl().createTupleDescriptor("basetbl");
     result.setTable(table_);
     return result;
   }

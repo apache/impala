@@ -213,7 +213,8 @@ public class InlineViewRef extends TableRef {
     }
 
     // Create the non-materialized tuple and set the fake table in it.
-    TupleDescriptor result = analyzer.getDescTbl().createTupleDescriptor();
+    TupleDescriptor result =
+        analyzer.getDescTbl().createTupleDescriptor("inl-view-" + alias_);
     result.setIsMaterialized(false);
     result.setTable(inlineView);
     return result;

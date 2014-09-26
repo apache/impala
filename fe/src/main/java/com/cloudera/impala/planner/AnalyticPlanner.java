@@ -110,8 +110,8 @@ public class AnalyticPlanner {
   public PlanNode createSingleNodePlan(PlanNode root,
       List<Expr> groupingExprs, List<Expr> inputPartitionExprs) throws ImpalaException {
     List<WindowGroup> windowGroups = collectWindowGroups();
-    for (WindowGroup g: windowGroups) {
-      g.init(analyzer_);
+    for (int i = 0; i < windowGroups.size(); ++i) {
+      windowGroups.get(i).init(analyzer_, "wg-" + i);
     }
     List<SortGroup> sortGroups = collectSortGroups(windowGroups);
     mergeSortGroups(sortGroups);
@@ -273,7 +273,8 @@ public class AnalyticPlanner {
       PlanNode input, List<Expr> sortExprs, List<Boolean> isAsc,
       List<Boolean> nullsFirst) {
     // create tuple for sort output = the entire materialized input in a single tuple
-    TupleDescriptor sortTupleDesc = analyzer_.getDescTbl().createTupleDescriptor();
+    TupleDescriptor sortTupleDesc =
+        analyzer_.getDescTbl().createTupleDescriptor("sort-tuple");
     ExprSubstitutionMap sortSmap = new ExprSubstitutionMap();
     List<Expr> sortSlotExprs = Lists.newArrayList();
     sortTupleDesc.setIsMaterialized(true);
@@ -355,7 +356,8 @@ public class AnalyticPlanner {
 
       // create bufferedTupleDesc and bufferedSmap
       sortTupleId = sortNode.tupleIds_.get(0);
-      bufferedTupleDesc = analyzer_.getDescTbl().copyTupleDescriptor(sortTupleId);
+      bufferedTupleDesc =
+          analyzer_.getDescTbl().copyTupleDescriptor(sortTupleId, "buffered-tuple");
       LOG.trace("desctbl: " + analyzer_.getDescTbl().debugString());
 
       List<SlotDescriptor> inputSlots = analyzer_.getTupleDesc(sortTupleId).getSlots();
@@ -531,7 +533,7 @@ public class AnalyticPlanner {
      * physical smap for this window group. Computes the mem layout for the tuple
      * descriptors.
      */
-    public void init(Analyzer analyzer) {
+    public void init(Analyzer analyzer, String tupleName) {
       Preconditions.checkState(physicalOutputTuple == null);
       Preconditions.checkState(physicalIntermediateTuple == null);
       Preconditions.checkState(analyticFnCalls.size() == analyticExprs.size());
@@ -542,10 +544,13 @@ public class AnalyticPlanner {
       boolean requiresIntermediateTuple =
           AggregateInfoBase.requiresIntermediateTuple(analyticFnCalls);
       if (requiresIntermediateTuple) {
-        physicalIntermediateTuple = analyzer.getDescTbl().createTupleDescriptor();
-        physicalOutputTuple = analyzer.getDescTbl().createTupleDescriptor();
+        physicalIntermediateTuple =
+            analyzer.getDescTbl().createTupleDescriptor(tupleName + "intermed");
+        physicalOutputTuple =
+            analyzer.getDescTbl().createTupleDescriptor(tupleName + "out");
       } else {
-        physicalOutputTuple = analyzer.getDescTbl().createTupleDescriptor();
+        physicalOutputTuple =
+            analyzer.getDescTbl().createTupleDescriptor(tupleName + "out");
         physicalIntermediateTuple = physicalOutputTuple;
       }
 

@@ -44,8 +44,8 @@ public class DescriptorTable {
   private final HashMap<Table, HashSet<Long>> referencedPartitionsPerTable_ =
       Maps.newHashMap();
 
-  public TupleDescriptor createTupleDescriptor() {
-    TupleDescriptor d = new TupleDescriptor(tupleIdGenerator_.getNextId());
+  public TupleDescriptor createTupleDescriptor(String debugName) {
+    TupleDescriptor d = new TupleDescriptor(tupleIdGenerator_.getNextId(), debugName);
     tupleDescs_.put(d.getId(), d);
     return d;
   }
@@ -54,8 +54,8 @@ public class DescriptorTable {
    * Create copy of src with new id. The returned descriptor has its mem layout
    * computed.
    */
-  public TupleDescriptor copyTupleDescriptor(TupleId srcId) {
-    TupleDescriptor d = new TupleDescriptor(tupleIdGenerator_.getNextId());
+  public TupleDescriptor copyTupleDescriptor(TupleId srcId, String debugName) {
+    TupleDescriptor d = new TupleDescriptor(tupleIdGenerator_.getNextId(), debugName);
     tupleDescs_.put(d.getId(), d);
     // create copies of slots
     TupleDescriptor src = tupleDescs_.get(srcId);

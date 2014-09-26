@@ -2420,7 +2420,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   @Test
   public void cloneTest() {
     testNumberOfMembers(QueryStmt.class, 10);
-    testNumberOfMembers(UnionStmt.class, 7);
+    testNumberOfMembers(UnionStmt.class, 8);
     testNumberOfMembers(ValuesStmt.class, 0);
 
     // Also check TableRefs.

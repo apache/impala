@@ -87,6 +87,15 @@ public class UnionStmt extends QueryStmt {
     public UnionOperand clone() {
       return new UnionOperand(queryStmt_.clone(), qualifier_);
     }
+
+    public boolean hasAnalyticExprs() {
+      if (queryStmt_ instanceof SelectStmt) {
+        return ((SelectStmt) queryStmt_).hasAnalyticInfo();
+      } else {
+        Preconditions.checkState(queryStmt_ instanceof UnionStmt);
+        return ((UnionStmt) queryStmt_).hasAnalyticExprs();
+      }
+    }
   }
 
   // before analysis, this contains the list of union operands derived verbatim
@@ -111,6 +120,9 @@ public class UnionStmt extends QueryStmt {
   // set prior to unnesting
   protected String toSqlString_ = null;
 
+  // true if any of the operands_ references an AnalyticExpr
+  private boolean hasAnalyticExprs_ = false;
+
   public UnionStmt(List<UnionOperand> operands,
       ArrayList<OrderByElement> orderByElements, LimitElement limitElement) {
     super(orderByElements, limitElement);
@@ -123,6 +135,7 @@ public class UnionStmt extends QueryStmt {
   public List<UnionOperand> getAllOperands() { return allOperands_; }
   public boolean hasAllOps() { return !allOperands_.isEmpty(); }
   public AggregateInfo getDistinctAggInfo() { return distinctAggInfo_; }
+  public boolean hasAnalyticExprs() { return hasAnalyticExprs_; }
 
   public void removeAllOperands() {
     operands_.removeAll(allOperands_);
@@ -176,6 +189,15 @@ public class UnionStmt extends QueryStmt {
 
     if (!analyzer.getMissingTbls().isEmpty()) {
       throw new AnalysisException("Found missing tables. Aborting analysis.");
+    }
+
+    // compute hasAnalyticExprs_
+    hasAnalyticExprs_ = false;
+    for (UnionOperand op: operands_) {
+      if (op.hasAnalyticExprs()) {
+        hasAnalyticExprs_ = true;
+        break;
+      }
     }
 
     analyzer.castToUnionCompatibleTypes(resultExprLists);
@@ -380,7 +402,7 @@ public class UnionStmt extends QueryStmt {
    */
   private void createMetadata(Analyzer analyzer) throws AnalysisException {
     // Create tuple descriptor for materialized tuple created by the union.
-    TupleDescriptor tupleDesc = analyzer.getDescTbl().createTupleDescriptor();
+    TupleDescriptor tupleDesc = analyzer.getDescTbl().createTupleDescriptor("union");
     tupleDesc.setIsMaterialized(true);
     tupleId_ = tupleDesc.getId();
     LOG.trace("UnionStmt.createMetadata: tupleId=" + tupleId_.toString());
@@ -423,8 +445,11 @@ public class UnionStmt extends QueryStmt {
       }
 
       // register single-directional value transfers from output slot
-      // to operands' result exprs (if those happen to be slotrefs)
+      // to operands' result exprs (if those happen to be slotrefs);
+      // don't do that if the operand computes analytic exprs
+      // (see Planner.createInlineViewPlan() for the reasoning)
       for (UnionOperand op: operands_) {
+        if (op.hasAnalyticExprs()) continue;
         Expr resultExpr = op.getQueryStmt().getBaseTblResultExprs().get(i);
         SlotRef slotRef = resultExpr.unwrapSlotRef(true);
         if (slotRef == null) continue;
@@ -541,6 +566,7 @@ public class UnionStmt extends QueryStmt {
     UnionStmt unionClone = new UnionStmt(operandClones, cloneOrderByElements(),
         limitElement_ == null ? null : limitElement_.clone());
     unionClone.setWithClause(cloneWithClause());
+    unionClone.hasAnalyticExprs_ = hasAnalyticExprs_;
     return unionClone;
   }
 }

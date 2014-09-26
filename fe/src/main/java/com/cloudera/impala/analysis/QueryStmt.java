@@ -192,7 +192,7 @@ public abstract class QueryStmt extends StatementBase {
     TreeNode.collect(sortInfo_.getOrderingExprs(), Predicates.instanceOf(SlotRef.class),
         sourceSlots);
 
-    TupleDescriptor sortTupleDesc = analyzer.getDescTbl().createTupleDescriptor();
+    TupleDescriptor sortTupleDesc = analyzer.getDescTbl().createTupleDescriptor("sort");
     List<Expr> sortTupleExprs = Lists.newArrayList();
     sortTupleDesc.setIsMaterialized(true);
     // substOrderBy is the mapping from slot refs in the input row to slot refs in the

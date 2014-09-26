@@ -1654,3 +1654,70 @@ WHERE EXISTS (SELECT t1.year AS int_col_1 FROM functional.alltypesagg t1)
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 size=814.73KB
 ====
+# IMPALA-1243: the Where clause predicate needs to be evaluated in a Select node
+# not as a scan predicate of alltypes
+select COUNT(*)
+FROM (
+  SELECT id, tinyint_col
+  FROM functional.alltypestiny t1
+  UNION ALL
+  SELECT DENSE_RANK() OVER (ORDER BY t1.id), tinyint_col
+  FROM functional.alltypes t1 ) t1
+WHERE id IS NULL and tinyint_col != 5
+---- PLAN
+06:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+05:SELECT
+|  predicates: id IS NULL, tinyint_col != 5
+|
+00:UNION
+|
+|--04:ANALYTIC
+|  |  functions: dense_rank()
+|  |  order by: id ASC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |
+|  03:SORT
+|  |  order by: id ASC
+|  |
+|  02:SCAN HDFS [functional.alltypes t1]
+|     partitions=24/24 size=478.45KB
+|
+01:SCAN HDFS [functional.alltypestiny t1]
+   partitions=4/4 size=460B
+   predicates: t1.id IS NULL, t1.tinyint_col != 5
+---- DISTRIBUTEDPLAN
+10:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|
+09:EXCHANGE [UNPARTITIONED]
+|
+06:AGGREGATE
+|  output: count(*)
+|
+05:SELECT
+|  predicates: id IS NULL, tinyint_col != 5
+|
+00:UNION
+|
+|--01:SCAN HDFS [functional.alltypestiny t1]
+|     partitions=4/4 size=460B
+|     predicates: t1.id IS NULL, t1.tinyint_col != 5
+|
+08:EXCHANGE [RANDOM]
+|
+04:ANALYTIC
+|  functions: dense_rank()
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+07:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: id ASC
+|
+03:SORT
+|  order by: id ASC
+|
+02:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 size=478.45KB
+====
