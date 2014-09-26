@@ -47,6 +47,12 @@ class HBaseTestDataRegionAssigment {
   private final List<ServerName> sortedRS; // sorted list of region server name
   private final String[] splitPoints = { "1", "3", "5", "7", "9"};
 
+  // Number of times to retry a series region-split/wait-for-split calls.
+  private final static int MAX_SPLIT_ATTEMPTS = 10;
+
+  // Maximum time in ms to wait for a region to be split.
+  private final static int WAIT_FOR_SPLIT_TIMEOUT = 10000;
+
   public HBaseTestDataRegionAssigment() throws IOException {
     conf = new Configuration();
     hbaseAdmin = new HBaseAdmin(conf);
@@ -80,10 +86,27 @@ class HBaseTestDataRegionAssigment {
       // If the table has already been split (i.e. regions count > 1), the same split
       // call will be a no-op and this will cause blockUntilRegionSplit to break.
       for (int i = 0; i < splitPoints.length; ++i) {
+        hbaseAdmin.majorCompact(tableName);
         List<HRegionInfo> regions = hbaseAdmin.getTableRegions(tableName.getBytes());
         HRegionInfo splitRegion = regions.get(regions.size() - 1);
-        hbaseAdmin.split(splitRegion.getRegionNameAsString(), splitPoints[i]);
-        blockUntilRegionSplit(conf, 50000, splitRegion.getRegionName(), true);
+        int attempt = 1;
+        boolean done = false;
+        while (!done && attempt < MAX_SPLIT_ATTEMPTS) {
+          // HBase seems to not always properly receive/process this split RPC,
+          // so we need to retry the split/block several times.
+          hbaseAdmin.split(splitRegion.getRegionNameAsString(), splitPoints[i]);
+          done = blockUntilRegionSplit(conf, WAIT_FOR_SPLIT_TIMEOUT,
+              splitRegion.getRegionName(), true);
+          Thread.sleep(100);
+          ++attempt;
+        }
+        if (!done) {
+          throw new IllegalStateException(
+              String.format("Failed to split region '%s' after %s attempts.",
+                  splitRegion.getRegionNameAsString(), WAIT_FOR_SPLIT_TIMEOUT));
+        }
+        LOG.info(String.format("Split region '%s' after %s attempts.",
+            splitRegion.getRegionNameAsString(), attempt));
       }
     }
     
@@ -157,10 +180,12 @@ class HBaseTestDataRegionAssigment {
    * org.apache.hadoop.hbase.regionserver.TestEndToEndSplitTransaction
    * to help block until a region split is completed.
    * 
+   * The original code was modified to return a true/false in case of success/failure.
+   *
    * Blocks until the region split is complete in META and region server opens the 
    * daughters
    */
-  private static void blockUntilRegionSplit(Configuration conf, long timeout,
+  private static boolean blockUntilRegionSplit(Configuration conf, long timeout,
       final byte[] regionName, boolean waitForDaughters)
       throws IOException, InterruptedException {
     long start = System.currentTimeMillis();
@@ -183,6 +208,7 @@ class HBaseTestDataRegionAssigment {
         }
         Threads.sleep(100);
       }
+      if (daughterA == null || daughterB == null) return false;
 
       //if we are here, this means the region split is complete or timed out
       if (waitForDaughters) {
@@ -201,6 +227,7 @@ class HBaseTestDataRegionAssigment {
     } finally {
       IOUtils.closeQuietly(metaTable);
     }
+    return true;
   }
 
   private static Result getRegionRow(HTable metaTable, byte[] regionName)
