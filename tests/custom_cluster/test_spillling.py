@@ -47,18 +47,25 @@ class TestSpillStress(CustomClusterTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestSpillStress, cls).add_test_dimensions()
-    # Each client will get a different test id.
-    TEST_IDS = xrange(0, 10)
-    cls.TestMatrix.add_dimension(TestDimension('test_id', *TEST_IDS))
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'text')
 
-  @pytest.mark.skipif(True, reason='This test causes impala to crash')
+    # Each client will get a different test id.
+    # TODO: this test takes extremely long so only run on exhaustive. It would
+    # be good to configure it so we can run some version on core.
+    TEST_IDS = xrange(0, 3)
+    NUM_ITERATIONS = [0]
+    if cls.exploration_strategy() == 'exhaustive':
+      TEST_IDS = xrange(0, 3)
+      NUM_ITERATIONS = [1]
+
+    cls.TestMatrix.add_dimension(TestDimension('test_id', *TEST_IDS))
+    cls.TestMatrix.add_dimension(TestDimension('iterations', *NUM_ITERATIONS))
+
   @pytest.mark.stress
-  def test_agg_stress(self, vector):
+  def test_spill_stress(self, vector):
     # Number of times to execute each query
-    NUM_ITERATIONS = 5
-    for i in xrange(NUM_ITERATIONS):
+    for i in xrange(vector.get_value('iterations')):
       self.run_test_case('agg_stress', vector)
 
 class TestSpilling(CustomClusterTestSuite):

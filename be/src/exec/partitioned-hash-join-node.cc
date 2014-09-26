@@ -182,7 +182,7 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
   nulls_build_batch_.reset();
 
   if (block_mgr_client_ != NULL) {
-    state->block_mgr()->ClearReservation(block_mgr_client_);
+    state->block_mgr()->ClearReservations(block_mgr_client_);
   }
   Expr::Close(build_expr_ctxs_, state);
   Expr::Close(probe_expr_ctxs_, state);
@@ -331,8 +331,6 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
     hash_tbl_->UpdateProbeFilters(ctx, parent_->probe_filters_);
   }
 
-  // Clear any unused reserved blocks (the estimate could have been too high).
-  state->block_mgr()->ClearTmpReservation(parent_->block_mgr_client_);
   return Status::OK;
 
 not_built:

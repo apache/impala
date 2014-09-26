@@ -79,9 +79,12 @@ class RuntimeState;
 // TODO: When a block is read from disk, data is copied from the IOMgr buffer to the
 // block manager's buffer. This should be avoided in the common case where these buffers
 // are of the same size.
-// TODO: see if the one big lock is a bottleneck. Break it up.
+// TODO: see if the one big lock is a bottleneck. Break it up. This object is shared by
+// all operators within a query (across fragments).
 // TODO: no reason we can't spill the smaller buffers. Add it if we need to (it's likely
 // just removing dchecks).
+// TODO: the requirements on this object has grown organically. Consider a major
+// reworking.
 class BufferedBlockMgr {
  private:
   struct BufferDescriptor;
@@ -272,8 +275,8 @@ class BufferedBlockMgr {
   Status RegisterClient(int num_reserved_buffers, MemTracker* tracker,
       RuntimeState* state, Client** client);
 
-  // Clears the reservation for this client.
-  void ClearReservation(Client* client);
+  // Clears all reservations for this client.
+  void ClearReservations(Client* client);
 
   // Tries to acquire a one-time reservation of num_buffers. The semantics are:
   //  - If this call fails, the next 'num_buffers' calls to Pin()/GetNewBlock() might
@@ -391,8 +394,6 @@ class BufferedBlockMgr {
   // removes the block from the unpinned list and sets *in_mem = true.
   // If we can't get a buffer (no more memory, nothing in the unpinned and free lists,
   // this function returns with the block unpinned.
-  // TODO: this function is shared by all spilling operators in a query. We need to
-  // see if the locking is a bottleneck here.
   Status FindBufferForBlock(Block* block, bool* in_mem);
 
   // Return a new buffer that can be used. *buffer is set to NULL if there was no

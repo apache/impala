@@ -886,7 +886,7 @@ Sorter::~Sorter() {
     (*it)->DeleteAllBlocks();
   }
   if (unsorted_run_ != NULL) unsorted_run_->DeleteAllBlocks();
-  block_mgr_->ClearReservation(block_mgr_client_);
+  block_mgr_->ClearReservations(block_mgr_client_);
 }
 
 Status Sorter::AddBatch(RowBatch* batch) {

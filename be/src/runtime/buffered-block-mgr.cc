@@ -207,16 +207,15 @@ Status BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
 int64_t BufferedBlockMgr::available_buffers(Client* client) const {
   int64_t unused_reserved = client->num_reserved_buffers_ +
       client->num_tmp_reserved_buffers_ - client->num_pinned_buffers_;
-  return remaining_unreserved_buffers() + max(0L, unused_reserved);
+  return max(0L, remaining_unreserved_buffers()) + max(0L, unused_reserved);
 }
 
 int64_t BufferedBlockMgr::remaining_unreserved_buffers() const {
-  int64_t num_buffers = 0;
-  num_buffers = free_io_buffers_.size() +
+  int64_t num_buffers = free_io_buffers_.size() +
       unpinned_blocks_.size() + num_outstanding_writes_;
   num_buffers += mem_tracker_->SpareCapacity() / max_block_size();
   num_buffers -= unfullfilled_reserved_buffers_;
-  return max(0L, num_buffers);
+  return num_buffers;
 }
 
 Status BufferedBlockMgr::RegisterClient(int num_reserved_buffers, MemTracker* tracker,
@@ -228,13 +227,16 @@ Status BufferedBlockMgr::RegisterClient(int num_reserved_buffers, MemTracker* tr
   return Status::OK;
 }
 
-void BufferedBlockMgr::ClearReservation(Client* client) {
+void BufferedBlockMgr::ClearReservations(Client* client) {
   lock_guard<mutex> lock(lock_);
   if (client->num_pinned_buffers_ < client->num_reserved_buffers_) {
     unfullfilled_reserved_buffers_ -=
         client->num_reserved_buffers_ - client->num_pinned_buffers_;
   }
   client->num_reserved_buffers_ = 0;
+
+  unfullfilled_reserved_buffers_ -= client->num_tmp_reserved_buffers_;
+  client->num_tmp_reserved_buffers_ = 0;
 }
 
 bool BufferedBlockMgr::TryAcquireTmpReservation(Client* client, int num_buffers) {
@@ -253,6 +255,7 @@ bool BufferedBlockMgr::TryAcquireTmpReservation(Client* client, int num_buffers)
 }
 
 void BufferedBlockMgr::ClearTmpReservation(Client* client) {
+  lock_guard<mutex> lock(lock_);
   unfullfilled_reserved_buffers_ -= client->num_tmp_reserved_buffers_;
   client->num_tmp_reserved_buffers_ = 0;
 }
@@ -262,8 +265,8 @@ bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
 
   unique_lock<mutex> lock(lock_);
 
-  if (remaining_unreserved_buffers() +
-      client->num_tmp_reserved_buffers_ < buffers_needed) {
+  if (max(0L, remaining_unreserved_buffers()) + client->num_tmp_reserved_buffers_ <
+        buffers_needed) {
     return false;
   }
 
@@ -282,7 +285,7 @@ bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
     unfullfilled_reserved_buffers_ += additional_tmp_reservations;
   }
 
-  // Loop until we have free enough memory.
+  // Loop until we have freed enough memory.
   while (buffers_needed > 0) {
     BufferDescriptor* buffer_desc = NULL;
     FindBuffer(lock, &buffer_desc);
@@ -295,12 +298,12 @@ bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
     }
     --buffers_needed;
     all_io_buffers_.erase(buffer_desc->all_buffers_it);
-    if (buffer_desc->block != NULL) {
-      buffer_desc->block->buffer_desc_ = NULL;
-    }
+    if (buffer_desc->block != NULL) buffer_desc->block->buffer_desc_ = NULL;
     delete[] buffer_desc->buffer;
+
     mem_tracker_->Release(buffer_desc->len);
     --additional_tmp_reservations;
+    DCHECK_GT(client->num_tmp_reserved_buffers_, 0);
     --client->num_tmp_reserved_buffers_;
     --unfullfilled_reserved_buffers_;
   }
@@ -388,10 +391,11 @@ Status BufferedBlockMgr::TransferBuffer(Block* dst, Block* src, bool unpin) {
   DCHECK(src->is_pinned_);
   DCHECK(!dst->is_pinned_);
   DCHECK(dst->buffer_desc_ == NULL);
+  DCHECK_EQ(src->buffer_desc_->len, max_block_size_);
+  src->is_pinned_ = false;
 
   if (unpin) {
     unique_lock<mutex> lock(lock_);
-    src->is_pinned_ = false;
     src->client_local_ = true;
     RETURN_IF_ERROR(WriteUnpinnedBlock(src));
     // Wait for the write to complete.
@@ -399,8 +403,6 @@ Status BufferedBlockMgr::TransferBuffer(Block* dst, Block* src, bool unpin) {
       src->write_complete_cv_.wait(lock);
     }
     if (is_cancelled_) return Status::CANCELLED;
-
-    DCHECK(!src->is_pinned_);
     DCHECK(!src->in_write_);
   }
 
@@ -410,8 +412,8 @@ Status BufferedBlockMgr::TransferBuffer(Block* dst, Block* src, bool unpin) {
   src->buffer_desc_ = NULL;
   dst->is_pinned_ = true;
   if (!unpin) {
-    src->is_pinned_ = false;
-    RETURN_IF_ERROR(DeleteBlock(src));
+    src->is_deleted_ = true;
+    ReturnUnusedBlock(src);
   }
 
   return Status::OK;
@@ -449,7 +451,8 @@ BufferedBlockMgr::~BufferedBlockMgr() {
 
 BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, int64_t block_size)
   : max_block_size_(block_size),
-    block_write_threshold_(TmpFileMgr::num_tmp_devices()),
+    // Keep two writes in flight per scratch disk so the disks can stay busy.
+    block_write_threshold_(TmpFileMgr::num_tmp_devices() * 2),
     disable_spill_(state->query_ctx().disable_spilling),
     query_id_(state->query_id()),
     unfullfilled_reserved_buffers_(0),
@@ -490,7 +493,7 @@ MemTracker* BufferedBlockMgr::get_tracker(Client* client) const {
   return client->tracker_;
 }
 
-static Status ReleaseOrUnpin(BufferedBlockMgr::Block* block, bool unpin) {
+static Status DeleteOrUnpin(BufferedBlockMgr::Block* block, bool unpin) {
   if (block == NULL) return Status::OK;
   return unpin ? block->Unpin() : block->Delete();
 }
@@ -506,7 +509,7 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
 
   if (block->is_pinned_) {
     *pinned = true;
-    return ReleaseOrUnpin(release_block, unpin);
+    return DeleteOrUnpin(release_block, unpin);
   }
 
   bool in_mem = false;
@@ -514,7 +517,7 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
   *pinned = block->is_pinned_;
 
   // Block was not evicted or had no data, nothing left to do.
-  if (in_mem || block->valid_data_len_ == 0) return ReleaseOrUnpin(release_block, unpin);
+  if (in_mem || block->valid_data_len_ == 0) return DeleteOrUnpin(release_block, unpin);
 
   if (!block->is_pinned_) {
     if (release_block == NULL) return Status::OK;
@@ -529,7 +532,8 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
       }
       block->is_pinned_ = true;
       *pinned = true;
-      return ReleaseOrUnpin(release_block, unpin);
+      block->client_->PinBuffer(block->buffer_desc_);
+      return DeleteOrUnpin(release_block, unpin);
     }
 
     RETURN_IF_ERROR(TransferBuffer(block, release_block, unpin));
@@ -567,7 +571,7 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
   // Decryption is done in-place, since the buffer can't be accessed by anyone else
   if (encryption_) RETURN_IF_ERROR(Decrypt(block));
 
-  return ReleaseOrUnpin(release_block, unpin);
+  return DeleteOrUnpin(release_block, unpin);
 }
 
 Status BufferedBlockMgr::UnpinBlock(Block* block) {
@@ -581,7 +585,6 @@ Status BufferedBlockMgr::UnpinBlock(Block* block) {
   // Cache its position in the list for later removal.
   block->is_pinned_ = false;
   DCHECK(!unpinned_blocks_.Contains(block)) << " Unpin for block in unpinned list";
-  DCHECK_GT(block->client_->num_pinned_buffers_, 0);
   if (!block->in_write_) unpinned_blocks_.Enqueue(block);
   block->client_->UnpinBuffer(block->buffer_desc_);
   if (block->client_->num_pinned_buffers_ < block->client_->num_reserved_buffers_) {
@@ -781,6 +784,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
       << "FindBufferForBlock() " << endl << block->DebugString();
   DCHECK(Validate()) << endl << DebugInternal();
 
+  // First check if there is enough memory to satisfy this request.
   bool is_reserved_request = false;
   if (client->num_pinned_buffers_ < client->num_reserved_buffers_) {
     is_reserved_request = true;
@@ -826,6 +830,13 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
       // There are no free buffers or blocks we can evict. We need to fail this request.
       // If this is an optional request, return OK. If it is required, return OOM.
       if (!is_reserved_request) return Status::OK;
+      if (VLOG_QUERY_IS_ON) {
+        stringstream ss;
+        ss << "Query id=" << query_id_ << " was unable to get minimum required buffers."
+           << endl << DebugInternal() << endl << client->DebugString()
+           << endl << GetStackTrace();
+        VLOG_QUERY << ss.str();
+      }
       Status status = Status::MEM_LIMIT_EXCEEDED;
       status.AddErrorMsg("Query did not have enough memory to get the minimum required "
           "buffers.");

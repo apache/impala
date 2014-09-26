@@ -656,7 +656,7 @@ TEST_F(BufferedBlockMgrTest, MultipleClients) {
   EXPECT_TRUE(status.ok());
 
   // Clear client 1's reservation
-  block_mgr->ClearReservation(client1);
+  block_mgr->ClearReservations(client1);
 
   // Client 2 should be able to reserve 1 buffers now (there are 2 left);
   reserved = block_mgr->TryAcquireTmpReservation(client2, 1);
