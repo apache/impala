@@ -80,7 +80,7 @@ BIGINT, DOUBLE
 ---- QUERY
 # Test query with string grouping column
 set num_nodes=0;
-set max_block_mgr_memory=140m;
+set max_block_mgr_memory=160m;
 select l_comment, count(*)
 from lineitem
 group by 1
