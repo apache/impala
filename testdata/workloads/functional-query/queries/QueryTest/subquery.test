@@ -261,14 +261,14 @@ INT, INT, BIGINT
 ====
 ---- QUERY
 # Correlated NOT IN subquery (IMPALA-1297)
-select count(*)
+select count(distinct id)
 from alltypesagg t1
 where t1.day not in
   (select tt1.tinyint_col as tinyint_col_1
    from alltypesagg tt1
    where t1.smallint_col = tt1.smallint_col)
 ---- RESULTS
-8300
+8200
 ---- TYPES
 BIGINT
 ====
