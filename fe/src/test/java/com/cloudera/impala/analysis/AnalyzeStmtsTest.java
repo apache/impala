@@ -19,9 +19,12 @@ import static org.junit.Assert.fail;
 
 import java.lang.reflect.Field;
 
+import junit.framework.Assert;
+
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.ScalarType;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.ImmutableList;
@@ -1038,6 +1041,16 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Test select stmt avg smap.
     AnalyzesOk("select cast(avg(c1) as decimal(10,4)) as c from " +
         "functional.decimal_tiny group by c3 having c = 5.1106 order by 1");
+
+    // check CHAR and VARCHAR aggregates
+    checkExprType("select min(cast('foo' as char(5))) from functional.chars_tiny",
+        ScalarType.STRING);
+    checkExprType("select max(cast('foo' as varchar(5))) from functional.chars_tiny",
+        ScalarType.STRING);
+    checkExprType("select max(vc) from functional.chars_tiny", ScalarType.STRING);
+    checkExprType("select max(cs) from functional.chars_tiny", ScalarType.STRING);
+    checkExprType("select max(lower(cs)) from functional.chars_tiny",
+        ScalarType.STRING);
   }
 
   @Test

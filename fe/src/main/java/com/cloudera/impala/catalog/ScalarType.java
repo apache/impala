@@ -429,6 +429,9 @@ public class ScalarType extends Type {
       if (t1.type_ == PrimitiveType.VARCHAR && t2.type_ == PrimitiveType.VARCHAR) {
         return createVarcharType(Math.max(t1.len_, t2.len_));
       }
+      if (t1.type_ == PrimitiveType.CHAR || t2.type_ == PrimitiveType.CHAR) {
+        return createVarcharType(Math.max(t1.len_, t2.len_));
+      }
       return INVALID;
     }
 

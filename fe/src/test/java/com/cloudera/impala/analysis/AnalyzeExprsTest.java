@@ -22,7 +22,6 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.cloudera.impala.thrift.TExpr;
 import junit.framework.Assert;
 
 import org.junit.Test;
@@ -37,6 +36,7 @@ import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TestSchemaUtils;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -346,7 +346,6 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testExprCast("cast('Hello' as VARCHAR(5))", ScalarType.createCharType(5));
     testExprCast("1", ScalarType.createCharType(5));
 
-    /* TODO re-enable when we have determined behavior for casting to VARCHAR
     testExprCast("cast('abcde' as char(10)) IN " +
         "(cast('abcde' as CHAR(20)), cast('abcde' as VARCHAR(10)), 'abcde')",
         ScalarType.createCharType(10));
@@ -356,7 +355,6 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testExprCast("cast('abcde' as varchar(10)) IN " +
         "(cast('abcde' as CHAR(20)), cast('abcde' as VARCHAR(10)), 'abcde')",
         ScalarType.createVarcharType(10));
-    */
   }
 
   /**
@@ -389,13 +387,6 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "Unsupported cast to complex type: MAP<INT,INT>");
     AnalysisError("select cast(1 as struct<a:int,b:char(20)>)",
         "Unsupported cast to complex type: STRUCT<a:INT,b:CHAR(20)>");
-  }
-
-  // Analyzes query and asserts that the first result expr returns the given type.
-  // Requires query to parse to a SelectStmt.
-  private void checkExprType(String query, Type type) {
-    SelectStmt select = (SelectStmt) AnalyzesOk(query);
-    assertEquals(select.getResultExprs().get(0).getType(), type);
   }
 
   @Test

@@ -453,6 +453,13 @@ public class FunctionCallExpr extends Expr {
     if (type_.isDecimal() && type_.isWildcardDecimal()) {
       type_ = resolveDecimalReturnType(analyzer);
     }
+
+    // We do not allow any function to return a type CHAR or VARCHAR
+    // TODO add support for CHAR(N) and VARCHAR(N) return values in post 2.0,
+    // support for this was not added to the backend in 2.0
+    if (type_.isWildcardChar() || type_.isWildcardVarchar()) {
+      type_ = ScalarType.STRING;
+    }
   }
 
   /**

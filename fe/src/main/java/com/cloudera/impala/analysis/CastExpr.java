@@ -122,6 +122,24 @@ public class CastExpr extends Expr {
               beSymbol, null, null, true));
           continue;
         }
+        if (fromType.getPrimitiveType() == PrimitiveType.VARCHAR
+            && toType.getPrimitiveType() == PrimitiveType.CHAR) {
+          // Allow casting from VARCHAR(N) to CHAR(M)
+          String beSymbol = "impala::CastFunctions::CastToChar";
+          db.addBuiltin(ScalarFunction.createBuiltin(getFnName(ScalarType.CHAR),
+              Lists.newArrayList((Type) ScalarType.VARCHAR), false, ScalarType.CHAR,
+              beSymbol, null, null, true));
+          continue;
+        }
+        if (fromType.getPrimitiveType() == PrimitiveType.CHAR
+            && toType.getPrimitiveType() == PrimitiveType.VARCHAR) {
+          // Allow casting from CHAR(N) to VARCHAR(M)
+          String beSymbol = "impala::CastFunctions::CastToStringVal";
+          db.addBuiltin(ScalarFunction.createBuiltin(getFnName(ScalarType.VARCHAR),
+              Lists.newArrayList((Type) ScalarType.CHAR), false, ScalarType.VARCHAR,
+              beSymbol, null, null, true));
+          continue;
+        }
         // Disable no-op casts
         if (fromType.equals(toType) && !fromType.isDecimal()) continue;
         String beClass = toType.isDecimal() || fromType.isDecimal() ?

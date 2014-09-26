@@ -427,6 +427,13 @@ public class AnalyzerTest {
     checkLayoutParams(d, byteSize, byteOffset, nullIndicatorByte, nullIndicatorBit);
   }
 
+  // Analyzes query and asserts that the first result expr returns the given type.
+  // Requires query to parse to a SelectStmt.
+  protected void checkExprType(String query, Type type) {
+    SelectStmt select = (SelectStmt) AnalyzesOk(query);
+    Assert.assertEquals(select.getResultExprs().get(0).getType(), type);
+  }
+
   /**
    * We distinguish between three classes of unsupported types:
    * 1. Complex types, e.g., map

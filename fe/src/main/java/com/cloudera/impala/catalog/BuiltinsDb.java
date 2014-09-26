@@ -73,6 +73,10 @@ public class BuiltinsDb extends Db {
             "19ReservoirSampleInitIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextEPNS2_9StringValE")
         .put(Type.STRING,
             "19ReservoirSampleInitIN10impala_udf9StringValEEEvPNS2_15FunctionContextEPS3_")
+        .put(Type.CHAR,
+            "19ReservoirSampleInitIN10impala_udf9StringValEEEvPNS2_15FunctionContextEPS3_")
+        .put(Type.VARCHAR,
+            "19ReservoirSampleInitIN10impala_udf9StringValEEEvPNS2_15FunctionContextEPS3_")
         .put(Type.TIMESTAMP,
             "19ReservoirSampleInitIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextEPNS2_9StringValE")
         .put(Type.DECIMAL,
@@ -96,6 +100,10 @@ public class BuiltinsDb extends Db {
         .put(Type.DOUBLE,
              "24ReservoirSampleSerializeIN10impala_udf9DoubleValEEEKNS2_9StringValEPNS2_15FunctionContextERS5_")
         .put(Type.STRING,
+             "24ReservoirSampleSerializeIN10impala_udf9StringValEEEKS3_PNS2_15FunctionContextERS4_")
+        .put(Type.CHAR,
+             "24ReservoirSampleSerializeIN10impala_udf9StringValEEEKS3_PNS2_15FunctionContextERS4_")
+        .put(Type.VARCHAR,
              "24ReservoirSampleSerializeIN10impala_udf9StringValEEEKS3_PNS2_15FunctionContextERS4_")
         .put(Type.TIMESTAMP,
              "24ReservoirSampleSerializeIN10impala_udf12TimestampValEEEKNS2_9StringValEPNS2_15FunctionContextERS5_")
@@ -121,6 +129,10 @@ public class BuiltinsDb extends Db {
             "20ReservoirSampleMergeIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKNS2_9StringValEPS6_")
         .put(Type.STRING,
             "20ReservoirSampleMergeIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKS3_PS3_")
+        .put(Type.CHAR,
+            "20ReservoirSampleMergeIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKS3_PS3_")
+        .put(Type.VARCHAR,
+            "20ReservoirSampleMergeIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKS3_PS3_")
         .put(Type.TIMESTAMP,
             "20ReservoirSampleMergeIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKNS2_9StringValEPS6_")
         .put(Type.DECIMAL,
@@ -145,6 +157,10 @@ public class BuiltinsDb extends Db {
             "21ReservoirSampleUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.STRING,
             "21ReservoirSampleUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
+        .put(Type.CHAR,
+            "21ReservoirSampleUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
+        .put(Type.VARCHAR,
+            "21ReservoirSampleUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
         .put(Type.TIMESTAMP,
             "21ReservoirSampleUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.DECIMAL,
@@ -168,6 +184,10 @@ public class BuiltinsDb extends Db {
         .put(Type.DOUBLE,
              "23ReservoirSampleFinalizeIN10impala_udf9DoubleValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
         .put(Type.STRING,
+             "23ReservoirSampleFinalizeIN10impala_udf9StringValEEES3_PNS2_15FunctionContextERKS3_")
+        .put(Type.CHAR,
+             "23ReservoirSampleFinalizeIN10impala_udf9StringValEEES3_PNS2_15FunctionContextERKS3_")
+        .put(Type.VARCHAR,
              "23ReservoirSampleFinalizeIN10impala_udf9StringValEEES3_PNS2_15FunctionContextERKS3_")
         .put(Type.TIMESTAMP,
              "23ReservoirSampleFinalizeIN10impala_udf12TimestampValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
@@ -197,6 +217,10 @@ public class BuiltinsDb extends Db {
             "18AppxMedianFinalizeIN10impala_udf9DoubleValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
         .put(Type.STRING,
             "18AppxMedianFinalizeIN10impala_udf9StringValEEET_PNS2_15FunctionContextERKS3_")
+        .put(Type.CHAR,
+            "18AppxMedianFinalizeIN10impala_udf9StringValEEET_PNS2_15FunctionContextERKS3_")
+        .put(Type.VARCHAR,
+            "18AppxMedianFinalizeIN10impala_udf9StringValEEET_PNS2_15FunctionContextERKS3_")
         .build();
 
   private static final Map<Type, String> HISTOGRAM_FINALIZE_SYMBOL =
@@ -216,6 +240,10 @@ public class BuiltinsDb extends Db {
         .put(Type.DOUBLE,
              "17HistogramFinalizeIN10impala_udf9DoubleValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
         .put(Type.STRING,
+             "17HistogramFinalizeIN10impala_udf9StringValEEES3_PNS2_15FunctionContextERKS3_")
+        .put(Type.CHAR,
+             "17HistogramFinalizeIN10impala_udf9StringValEEES3_PNS2_15FunctionContextERKS3_")
+        .put(Type.VARCHAR,
              "17HistogramFinalizeIN10impala_udf9StringValEEES3_PNS2_15FunctionContextERKS3_")
         .put(Type.TIMESTAMP,
              "17HistogramFinalizeIN10impala_udf12TimestampValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
@@ -241,6 +269,10 @@ public class BuiltinsDb extends Db {
             "9HllUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.STRING,
             "9HllUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
+        .put(Type.CHAR,
+            "9HllUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
+        .put(Type.VARCHAR,
+            "9HllUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
         .put(Type.TIMESTAMP,
             "9HllUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.DECIMAL,
@@ -264,6 +296,10 @@ public class BuiltinsDb extends Db {
         .put(Type.DOUBLE,
             "8PcUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
         .put(Type.STRING,
+            "8PcUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
+        .put(Type.CHAR,
+            "8PcUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
+        .put(Type.VARCHAR,
             "8PcUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
         .put(Type.TIMESTAMP,
             "8PcUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
@@ -289,6 +325,10 @@ public class BuiltinsDb extends Db {
               "10PcsaUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
           .put(Type.STRING,
               "10PcsaUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
+          .put(Type.CHAR,
+              "10PcsaUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
+          .put(Type.VARCHAR,
+              "10PcsaUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS3_")
           .put(Type.TIMESTAMP,
               "10PcsaUpdateIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PNS2_9StringValE")
           .put(Type.DECIMAL,
@@ -313,6 +353,10 @@ public class BuiltinsDb extends Db {
             "3MinIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.STRING,
             "3MinIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.CHAR,
+            "3MinIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.VARCHAR,
+            "3MinIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.TIMESTAMP,
             "3MinIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.DECIMAL,
@@ -336,6 +380,10 @@ public class BuiltinsDb extends Db {
         .put(Type.DOUBLE,
             "3MaxIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.STRING,
+            "3MaxIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.CHAR,
+            "3MaxIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.VARCHAR,
             "3MaxIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.TIMESTAMP,
             "3MaxIN10impala_udf12TimestampValEEEvPNS2_15FunctionContextERKT_PS6_")
@@ -380,6 +428,10 @@ public class BuiltinsDb extends Db {
              "12OffsetFnInitIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextEPT_")
         .put(Type.STRING,
              "12OffsetFnInitIN10impala_udf9StringValEEEvPNS2_15FunctionContextEPT_")
+        .put(Type.CHAR,
+             "12OffsetFnInitIN10impala_udf9StringValEEEvPNS2_15FunctionContextEPT_")
+        .put(Type.VARCHAR,
+             "12OffsetFnInitIN10impala_udf9StringValEEEvPNS2_15FunctionContextEPT_")
         .build();
 
   private static final Map<Type, String> OFFSET_FN_UPDATE_SYMBOL =
@@ -404,6 +456,10 @@ public class BuiltinsDb extends Db {
              "14OffsetFnUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValES8_PS6_")
         .put(Type.STRING,
              "14OffsetFnUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValES8_PS6_")
+        .put(Type.CHAR,
+             "14OffsetFnUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValES8_PS6_")
+        .put(Type.VARCHAR,
+             "14OffsetFnUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_RKNS2_9BigIntValES8_PS6_")
         .build();
 
   private static final Map<Type, String> LAST_VALUE_UPDATE_SYMBOL =
@@ -427,6 +483,10 @@ public class BuiltinsDb extends Db {
         .put(Type.DOUBLE,
              "13LastValUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.STRING,
+             "13LastValUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.CHAR,
+             "13LastValUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.VARCHAR,
              "13LastValUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
         .build();
 
@@ -499,6 +559,10 @@ public class BuiltinsDb extends Db {
         .put(Type.DOUBLE,
              "14FirstValUpdateIN10impala_udf9DoubleValEEEvPNS2_15FunctionContextERKT_PS6_")
         .put(Type.STRING,
+             "14FirstValUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.CHAR,
+             "14FirstValUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
+        .put(Type.VARCHAR,
              "14FirstValUpdateIN10impala_udf9StringValEEEvPNS2_15FunctionContextERKT_PS6_")
         .build();
 

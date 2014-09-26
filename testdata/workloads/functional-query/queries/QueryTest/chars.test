@@ -238,3 +238,11 @@ bigint
 ---- RESULTS
 9
 ====
+---- QUERY
+select min(cs), max(vc), ndv(cl), ndv(vc), appx_median(cs), appx_median(vc)
+from functional.chars_tiny
+---- TYPES
+string, string, bigint, bigint, string, string
+---- RESULTS
+'1aaaa','c',7,7,'5a   ','5c'
+====
