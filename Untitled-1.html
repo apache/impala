@@ -1,0 +1,115 @@
+<p><strong>Learn how to configure a basic Maven project that will be able to build applications against CDH</strong></p>
+<p><a href="http://maven.apache.org">Apache Maven</a> is a build automation tool that can be used for Java projects. Since nearly all the Apache Hadoop ecosystem is written in Java, Maven is a great tool for managing projects that build on top of the Hadoop APIs. In this post, we'll configure a basic Maven project that will be able to build applications against CDH (Cloudera's Distribution Including Apache Hadoop) binaries.</p>
+<p>Maven projects are defined using an XML file called <code>pom.xml</code>, which describes things like the project's dependencies on other modules, the build order, and any other plugins that the project uses. A complete example of the <code>pom.xml</code> described below, which can be used with CDH, is available on <a href="https://gist.github.com/3517129">Github</a>. (To use the example, you'll need at least <a href="http://maven.apache.org/download.html">Maven 2.0</a> installed.) If you've never set up a Maven project before, you can get a jumpstart by using Maven's quickstart archetype, which generates a small initial project layout. Choose a group ID (typically a top-level package name) and an artifact ID (the name of the project), and execute the following command with the <code>groupId</code> and <code>artifactId</code>arguments filled in:</p>
+<pre class="code">        mvn archetype:generate \
+      -DarchetypeGroupId=org.apache.maven.archetypes \
+      -DarchetypeArtifactId=maven-archetype-quickstart \
+      -DgroupId=<your-group-id> \
+      -DartifactId=<your-project-name>
+</pre>
+
+<p>There will be a couple of prompts for information, but you can safely just hit enter till you see the build succeed. This will create a new directory with the name you chose as the artifact ID. In that directory will be a <code>pom.xml</code> file, and a src directory. Since the most important part of a Maven project is the <code>pom.xml</code>, we'll focus on what goes in there. Right now, this <code>pom.xml</code> is a bit minimalistic. It has some high-level project metadata, a properties section, and a dependencies section, with a single dependency on the JUnit test framework. Since we want to use this project for Hadoop development, we need to add some dependencies on the Hadoop libraries. Maven resolves dependencies by downloading JAR files from remote repositories, like <a href="http://search.maven.org">Maven Central Repository</a>, but none of the default repositories include CDH, so we need to add a repository. The repository is declared in the <code>pom.xml</code> within the top-level <code>project</code>section like this:</p>
+<pre class="code"><repositories>
+      <repository>
+        <id>cloudera-releases</id>
+        <url>https://repository.cloudera.com/artifactory/cloudera-repos</url>
+        <releases>
+          <enabled>true</enabled>
+        </releases>
+        <snapshots>
+<enabled>false</enabled>
+        </snapshots>
+      </repository>
+    </repositories>
+</pre>
+
+<p>This instructs Maven to pull any Hadoop binaries from the Cloudera repository, and now we can declare a dependency on Hadoop JARs. You can find all the Maven dependencies that are available from Cloudera, including Hadoop, Apache HBase, and the rest of the CDH components <a href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH4/latest/CDH4-Installation-Guide/cdh4ig_topic_31.html">here</a>. In order to specify a project dependency, you'll add a <code>dependency</code> element to the <code>dependencies</code> section of the <code>pom.xml</code>:</p>
+<pre class="code"><dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-client</artifactId>
+      <version>2.0.0-mr1-cdh4.0.1</version>
+    </dependency>
+</pre>
+
+<p>A project with the above dependency would compile against the CDH4 MapReduce v1 library. In practice, it's good to declare the version string as a property, since there is a high likelihood of dependencies on more than one Maven artifact with the same version. The property can be declared in the <code>properties</code> section of the <code>pom.xml</code>:</p>
+<pre class="code"><hadoop.version>2.0.0-mr1-cdh4.0.1</hadoop.version>
+</pre>
+
+<p>The name that is chosen for the property can then be referenced in other sections of the <code>pom.xml</code>. So, if we were to specify the <code>hadoop.version</code>property, we can change our hadoop-client dependency to look like this:</p>
+<pre class="code"><dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-client</artifactId>
+      <version>${hadoop.version}</version>
+    </dependency>
+</pre>
+
+<p>Now, whenever we want to upgrade our code to a new CDH version, we only need to change the version string in one place, at the top of the <code>pom.xml</code>. Since Hadoop requires at least Java 1.6, we should also specify the compiler version for Maven to use by enabling the compiler plugin in the top-level <code>project</code>section:</p>
+<pre class="code">    <build>
+      <pluginManagement>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>2.3.2</version>
+            <configuration>
+              <source>1.6</source>
+              <target>1.6</target>
+            </configuration>
+          </plugin>
+        </plugins>
+      </pluginManagement>
+    </build>
+</pre>
+
+<p>This gets us to a point where we've got a fully functional project, and we can build a JAR by running <code>mvn install</code>. However, the JAR that gets built does not contain the project dependencies within it. This is fine, so long as we only require Hadoop dependencies, since the Hadoop daemons will include all the Hadoop libraries in their own classpaths. If the Hadoop dependencies are not sufficient, it will be necessary to package the other dependencies into the JAR. We can configure Maven to package a JAR with dependencies by adding the following XML block to the <code>build</code>section:</p>
+<pre class="code"><plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>1.7.1</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+</pre>
+
+<p>When executing the <code>mvn package</code>command, the above declarations instruct Maven to package all the dependencies into a JAR file. However, the JAR now contains all the Hadoop libraries, which would conflict with the Hadoop daemons' classpaths. We can indicate to Maven that certain dependencies need to be downloaded for compile-time, but will be provided to the application at runtime by augmenting the Hadoop dependencies:</p>
+<pre class="code">    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-client</artifactId>
+      <version>${hadoop.version}</version>
+      <scope>provided</scope>
+    </dependency>
+</pre>
+
+<p>Remember to only add the provided scope to dependencies that you do not want included in the JAR. Maven also has very tight integration with a number of IDEs, such as <a href="http://eclipse.org">Eclipse</a>, <a href="http://wiki.netbeans.org/Maven ">NetBeans IDE</a>, and <a href="http://devnet.jetbrains.net/community/idea">IntelliJ IDEA</a>. With Eclipse, the integration comes in two forms: by generating Eclipse artifacts through Maven and importing a project into Eclipse, or by using the <a href="http://www.sonatype.org/m2eclipse">m2eclipse Eclipse plugin</a>, which allows you to modify a <code>pom.xml</code>or run Maven builds from within Eclipse. A project can be setup to integrate with Eclipse by adding the following declarations to the <code>plugins</code>section:</p>
+<pre class="code"><plugin>
+      <groupId>org.apache.maven.plugins </groupId>
+      <artifactId>maven-eclipse-plugin</artifactId>
+      <version>2.9</version>
+      <configuration>
+        <projectNameTemplate>
+          ${project.artifactId}
+        </projectNameTemplate>
+        <buildOutputDirectory>
+          eclipse-classes
+        </buildOutputDirectory>
+        <downloadSources>true</downloadSources>
+        <downloadJavadocs>false</downloadJavadocs>
+      </configuration>
+    </plugin>
+</pre>
+
+<p>In order to generate the files necessary to import projects into Eclipse, you'll need to run the following command:</p>
+<pre class="code">mvn -Declipse.workspace=<eclipse-workspace-path>   eclipse:configure-workspace eclipse:eclipse
+</pre>
+
+<p>This command will generate an Eclipse <code>.project</code> file. You can <a href="http://help.eclipse.org/helios/index.jsp?topic=%2Forg.eclipse.platform.doc.user%2Ftasks%2Ftasks-importproject.htm">import</a> the project into Eclipse by selecting <strong>File -> Import</strong>, and then choosing <strong>Existing Projects Into Workspace</strong> from the General dropdown. Browse to the root directory of the project, and click <strong>OK</strong>. You should see the available projects listed in the checkbox. Select the projects you want to import, and then click <strong>Finish</strong> to complete the import. Maven will set up the classpath for the Eclipse project, so all the JARs that you have referenced as dependencies in the <code><projectNameTemplate>${project.artifactId}</projectNameTemplate> </code>should show up under <strong>Referenced Libraries</strong> in the Eclipse project. If you add more dependencies later, the Eclipse files can be regenerated by running the <code>mvn eclipse:eclipse</code> command, and refreshing the project in Eclipse.</p>
+<p>For more information about Maven, and Maven documentation, see <a href="http://maven.apache.org">http://maven.apache.org</a>.</p>
+<p><em>Jon Natkins (<a href="http://www.twitter.com/nattybnatkins">@nattybnatkins</a>) is a Software Engineer at Cloudera, where he worked on Cloudera Manager and Hue, and has contributed patches to Hive and Hadoop. Prior to Cloudera, Jon was an engineer and database wrangler at Vertica. He holds an Sc.B in Computer Science from Brown University.</em></p>
