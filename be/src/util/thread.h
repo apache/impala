@@ -90,6 +90,13 @@ class Thread {
     StartThread(boost::bind(f, a1, a2, a3, a4));
   }
 
+  template <class F, class A1, class A2, class A3, class A4, class A5>
+  Thread(const std::string& category, const std::string& name, const F& f,
+      const A1& a1, const A2& a2, const A3& a3, const A4& a4, const A5& a5)
+      : category_(category), name_(name), tid_(UNINITIALISED_THREAD_ID) {
+    StartThread(boost::bind(f, a1, a2, a3, a4, a5));
+  }
+
   // Blocks until this thread finishes execution. Once this method returns, the thread
   // will be unregistered with the ThreadMgr and will not appear in the debug UI.
   void Join() const { thread_->join(); }

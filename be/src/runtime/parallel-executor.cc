@@ -16,13 +16,15 @@
 
 #include <boost/thread/thread.hpp>
 
+#include "util/stopwatch.h"
 #include "util/thread.h"
 
 using namespace boost;
 using namespace impala;
 using namespace std;
 
-Status ParallelExecutor::Exec(Function function, void** args, int num_args) {
+Status ParallelExecutor::Exec(Function function, void** args, int num_args,
+    StatsMetric<double>* latencies) {
   Status status;
   ThreadGroup worker_threads;
   mutex lock;
@@ -31,17 +33,24 @@ Status ParallelExecutor::Exec(Function function, void** args, int num_args) {
     stringstream ss;
     ss << "worker-thread(" << i << ")";
     worker_threads.AddThread(new Thread("parallel-executor", ss.str(),
-        &ParallelExecutor::Worker, function, args[i], &lock, &status));
+        &ParallelExecutor::Worker, function, args[i], &lock, &status, latencies));
   }
   worker_threads.JoinAll();
 
   return status;
 }
 
-void ParallelExecutor::Worker(Function function, void* arg, mutex* lock, Status* status) {
+void ParallelExecutor::Worker(Function function, void* arg, mutex* lock, Status* status,
+    StatsMetric<double>* latencies) {
+  MonotonicStopWatch sw;
+  if (latencies != NULL) sw.Start();
   Status local_status = function(arg);
   if (!local_status.ok()) {
     unique_lock<mutex> l(*lock);
     if (status->ok()) *status = local_status;
+  }
+
+  if (latencies != NULL) {
+    latencies->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
   }
 }

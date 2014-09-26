@@ -18,7 +18,9 @@
 
 #include <boost/function.hpp>
 #include <boost/thread/mutex.hpp>
+
 #include "common/status.h"
+#include "util/non-primitive-metrics.h"
 
 namespace impala {
 
@@ -42,12 +44,19 @@ class ParallelExecutor {
   // Calls function(args[i]) num_args times in parallel using num_args threads.
   // If any of the work item fails, returns the Status of the first failed work item.
   // Otherwise, returns Status::OK when all work items have been executed.
-  static Status Exec(Function function, void** args, int num_args);
+  //
+  // Callers may pass a StatsMetric to gather the latency distribution of task execution.
+  static Status Exec(Function function, void** args, int num_args,
+      StatsMetric<double>* latencies = NULL);
 
  private:
   // Worker thread function which calls function(arg).  This function updates
   // *status taking *lock to synchronize results from different threads.
-  static void Worker(Function function, void* arg, boost::mutex* lock, Status* status);
+  //
+  // If 'latencies' is not NULL, it is updated with the time elapsed while executing
+  // 'function'.
+  static void Worker(Function function, void* arg, boost::mutex* lock, Status* status,
+      StatsMetric<double>* latencies);
 };
 
 }

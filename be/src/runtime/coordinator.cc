@@ -377,6 +377,7 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<ExprContext*>* output_e
 
   query_events_->MarkEvent("Ready to start remote fragments");
   int backend_num = 0;
+  StatsMetric<double> latencies("fragment-latencies");
   for (int fragment_idx = (has_coordinator_fragment ? 1 : 0);
        fragment_idx < request.fragments.size(); ++fragment_idx) {
     const FragmentExecParams& params = (*fragment_exec_params)[fragment_idx];
@@ -407,7 +408,7 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<ExprContext*>* output_e
     Status fragments_exec_status = ParallelExecutor::Exec(
         bind<Status>(mem_fn(&Coordinator::ExecRemoteFragment), this, _1),
         reinterpret_cast<void**>(&backend_exec_states_[backend_num - num_hosts]),
-        num_hosts);
+        num_hosts, &latencies);
 
     if (!fragments_exec_status.ok()) {
       DCHECK(query_status_.ok());  // nobody should have been able to cancel
@@ -417,7 +418,12 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<ExprContext*>* output_e
       return fragments_exec_status;
     }
   }
+
   query_events_->MarkEvent("Remote fragments started");
+  stringstream remote_fragments_status;
+  latencies.PrintValue(&remote_fragments_status);
+  query_profile_->AddInfoString("Fragment start latencies",
+      remote_fragments_status.str());
 
   // If we have a coordinator fragment and remote fragments (the common case),
   // release the thread token on the coordinator fragment.  This fragment
