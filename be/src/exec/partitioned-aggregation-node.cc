@@ -92,6 +92,15 @@ Status PartitionedAggregationNode::Init(const TPlanNode& tnode) {
 
 Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+
+  // Create the codegen object before preparing conjunct_ctxs_ and children_, so that any
+  // ScalarFnCalls will use codegen.
+  // TODO: this is brittle and hard to reason about, revisit
+  if (state->codegen_enabled()) {
+    LlvmCodeGen* codegen;
+    RETURN_IF_ERROR(state->GetCodegen(&codegen));
+  }
+
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   state_ = state;
 
