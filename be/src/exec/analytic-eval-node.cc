@@ -159,7 +159,7 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
+  RETURN_IF_ERROR(state->QueryMaintenance());
   RETURN_IF_ERROR(child(0)->Open(state));
   RETURN_IF_ERROR(state->block_mgr()->RegisterClient(2, mem_tracker(), state, &client_));
   input_stream_.reset(new BufferedTupleStream(state, child(0)->row_desc(),
@@ -458,7 +458,7 @@ Status AnalyticEvalNode::ProcessChildBatches(RuntimeState* state) {
   while (curr_child_batch_.get() != NULL &&
       NumOutputRowsReady() < state->batch_size() + 1) {
     RETURN_IF_CANCELLED(state);
-    RETURN_IF_ERROR(state->CheckQueryState());
+    RETURN_IF_ERROR(state->QueryMaintenance());
     RETURN_IF_ERROR(ProcessChildBatch(state));
     // TODO: DCHECK that the size of result_tuples_ is bounded. It shouldn't be larger
     // than 2x the batch size unless the end bound has an offset preceding, in which
@@ -625,7 +625,7 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
+  RETURN_IF_ERROR(state->QueryMaintenance());
   VLOG_FILE << "GetNext: " << DebugEvaluatedRowsString();
 
   if (ReachedLimit()) {

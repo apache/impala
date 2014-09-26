@@ -43,8 +43,10 @@ Status SortExecExprs::Prepare(RuntimeState* state, const RowDescriptor& child_ro
     const RowDescriptor& output_row_desc) {
   if (materialize_tuple_) {
     RETURN_IF_ERROR(Expr::Prepare(sort_tuple_slot_expr_ctxs_, state, child_row_desc));
+    state->AddExprCtxsToFree(sort_tuple_slot_expr_ctxs_);
   }
   RETURN_IF_ERROR(Expr::Prepare(lhs_ordering_expr_ctxs_, state, output_row_desc));
+  state->AddExprCtxsToFree(lhs_ordering_expr_ctxs_);
   return Status::OK;
 }
 

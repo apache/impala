@@ -289,9 +289,10 @@ Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
   return query_status_;
 }
 
-Status RuntimeState::CheckQueryState() {
+Status RuntimeState::QueryMaintenance() {
   // TODO: it would be nice if this also checked for cancellation, but doing so breaks
   // cases where we use Status::CANCELLED to indicate that the limit was reached.
+  FreeLocalExprAllocations();
   if (instance_mem_tracker_->AnyLimitExceeded()) return SetMemLimitExceeded();
   lock_guard<mutex> l(query_status_lock_);
   return query_status_;
@@ -319,6 +320,13 @@ Status RuntimeState::GetCodegen(LlvmCodeGen** codegen, bool initialize) {
   if (codegen_.get() == NULL && initialize) RETURN_IF_ERROR(CreateCodegen());
   *codegen = codegen_.get();
   return Status::OK;
+}
+
+void RuntimeState::FreeLocalExprAllocations() {
+  for (int i = 0; i < expr_ctxs_to_free_.size(); ++i) {
+    if (expr_ctxs_to_free_[i]->closed()) continue;
+    expr_ctxs_to_free_[i]->FreeLocalAllocations();
+  }
 }
 
 }

@@ -391,6 +391,7 @@ Status DataStreamSender::Prepare(RuntimeState* state) {
   SCOPED_TIMER(profile_->total_time_counter());
 
   RETURN_IF_ERROR(Expr::Prepare(partition_expr_ctxs_, state, row_desc_));
+  state->AddExprCtxsToFree(partition_expr_ctxs_);
 
   mem_tracker_.reset(new MemTracker(profile(), -1, -1, "DataStreamSender",
       state->instance_mem_tracker()));

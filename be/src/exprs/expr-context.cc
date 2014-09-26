@@ -110,6 +110,12 @@ void ExprContext::FreeLocalAllocations() {
   }
 }
 
+void ExprContext::FreeLocalAllocations(const std::vector<ExprContext*>& ctxs) {
+  for (int i = 0; i < ctxs.size(); ++i) {
+    ctxs[i]->FreeLocalAllocations();
+  }
+}
+
 void ExprContext::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
   void* value = GetValue(row);
   if (as_ascii) {

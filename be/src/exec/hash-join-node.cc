@@ -155,13 +155,13 @@ Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
   RETURN_IF_ERROR(child(1)->Open(state));
   while (true) {
     RETURN_IF_CANCELLED(state);
-    RETURN_IF_ERROR(state->CheckQueryState());
+    RETURN_IF_ERROR(state->QueryMaintenance());
     bool eos;
     RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch, &eos));
     SCOPED_TIMER(build_timer_);
     // take ownership of tuple data of build_batch
     build_pool_->AcquireData(build_batch.tuple_data_pool(), false);
-    RETURN_IF_ERROR(state->CheckQueryState());
+    RETURN_IF_ERROR(state->QueryMaintenance());
 
     // Call codegen version if possible
     if (process_build_batch_fn_ == NULL) {
@@ -210,7 +210,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
+  RETURN_IF_ERROR(state->QueryMaintenance());
   if (ReachedLimit()) {
     *eos = true;
     return Status::OK;

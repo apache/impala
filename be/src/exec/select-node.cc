@@ -46,8 +46,6 @@ Status SelectNode::Open(RuntimeState* state) {
 
 Status SelectNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
-  RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
   SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   if (ReachedLimit() || (child_row_idx_ == child_row_batch_->num_rows() && child_eos_)) {
@@ -59,6 +57,8 @@ Status SelectNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) 
 
   // start (or continue) consuming row batches from child
   while (true) {
+    RETURN_IF_CANCELLED(state);
+    RETURN_IF_ERROR(state->QueryMaintenance());
     if (child_row_idx_ == child_row_batch_->num_rows()) {
       // fetch next batch
       child_row_batch_->TransferResourceOwnership(row_batch);

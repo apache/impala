@@ -26,6 +26,7 @@
 #include "gen-cpp/Descriptors_types.h"
 #include "gen-cpp/PlanNodes_types.h"
 #include "exprs/expr.h"
+#include "runtime/runtime-state.h"
 
 using namespace llvm;
 using namespace std;
@@ -120,6 +121,7 @@ Status HdfsPartitionDescriptor::PrepareExprs(RuntimeState* state) {
     exprs_prepared_ = true;
     // Partition exprs are not used in the codegen case.  Don't codegen them.
     RETURN_IF_ERROR(Expr::Prepare(partition_key_value_ctxs_, state, RowDescriptor()));
+    state->AddExprCtxsToFree(partition_key_value_ctxs_);
   }
   return Status::OK;
 }
