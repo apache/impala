@@ -24,7 +24,7 @@ BIGINT, BIGINT
 # Test query with string grouping column and string agg columns
 set num_nodes=1;
 set max_block_mgr_memory=20m;
-select l_returnflag, l_orderkey, round(avg(l_tax),2), min(l_shipmode)
+select l_returnflag, l_orderkey, avg(l_tax), min(l_shipmode)
 from lineitem
 group by 1,2
 order by 1,2 limit 3;
@@ -33,7 +33,7 @@ order by 1,2 limit 3;
 'A',5,0.03,'AIR'
 'A',6,0.03,'TRUCK'
 ---- TYPES
-STRING, BIGINT, DOUBLE, STRING
+STRING, BIGINT, DECIMAL, STRING
 ====
 ---- QUERY
 # TODO: the distributed agg tests have a high likely of becoming flaking. The memory is
@@ -98,7 +98,7 @@ STRING, BIGINT
 # Test query with string grouping column and string agg columns
 set num_nodes=0;
 set max_block_mgr_memory=80m;
-select l_returnflag, l_orderkey, round(avg(l_tax),2), min(l_shipmode)
+select l_returnflag, l_orderkey, avg(l_tax), min(l_shipmode)
 from lineitem
 group by 1,2
 order by 1,2 limit 3;
