@@ -50,8 +50,8 @@
   #endif
 #endif
 
-// Define verbose logging levels.  Per-row logging is ore verbase than per-file / per-rpc
-// logging which is more verbose than per-connection / per-query logging.
+// Define verbose logging levels.  Per-row logging is more verbase than per-file /
+// per-rpc logging which is more verbose than per-connection / per-query logging.
 #define VLOG_CONNECTION VLOG(1)
 #define VLOG_RPC        VLOG(2)
 #define VLOG_QUERY      VLOG(1)

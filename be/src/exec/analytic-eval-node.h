@@ -164,7 +164,9 @@ class AnalyticEvalNode : public ExecNode {
   // containing the previous row and the current row set during ProcessChildBatch().
   bool PrevRowCompare(ExprContext* pred_ctx);
 
-  // Debug string about the rows that have been evaluated and are ready to be returned.
+  // Debug string containing current state. If 'detailed', per-row state is included.
+  std::string DebugStateString(bool detailed) const;
+
   std::string DebugEvaluatedRowsString() const;
 
   // Debug string containing the window definition.
@@ -282,7 +284,7 @@ class AnalyticEvalNode : public ExecNode {
   Tuple* dummy_result_tuple_;
 
   // Index of the row in input_stream_ at which the current partition started.
-  int64_t curr_partition_stream_idx_;
+  int64_t curr_partition_idx_;
 
   // Previous input row used to compare partition boundaries and to determine when the
   // order-by expressions change.
