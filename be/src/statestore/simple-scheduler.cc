@@ -652,7 +652,6 @@ void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request
   scan_node_types.push_back(TPlanNodeType::HBASE_SCAN_NODE);
   scan_node_types.push_back(TPlanNodeType::DATA_SOURCE_NODE);
 
-  unordered_set<TNetworkAddress> unique_hosts;
   // compute hosts of producer fragment before those of consumer fragment(s),
   // the latter might inherit the set of hosts from the former
   for (int i = exec_request.fragments.size() - 1; i >= 0; --i) {
@@ -694,7 +693,6 @@ void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request
       }
       DCHECK(!hosts.empty()) << "no hosts for fragment " << i << " with a UnionNode";
 
-      // Set unique hosts in the fragment's params.
       params.hosts.assign(hosts.begin(), hosts.end());
       continue;
     }
@@ -716,8 +714,13 @@ void SimpleScheduler::ComputeFragmentHosts(const TQueryExecRequest& exec_request
     // This fragment is executed on those hosts that have scan ranges
     // for the leftmost scan.
     GetScanHosts(leftmost_scan_id, exec_request, params, &params.hosts);
-    unique_hosts.insert(params.hosts.begin(), params.hosts.end());
   }
+
+  unordered_set<TNetworkAddress> unique_hosts;
+  BOOST_FOREACH(const FragmentExecParams& exec_params, *fragment_exec_params) {
+    unique_hosts.insert(exec_params.hosts.begin(), exec_params.hosts.end());
+  }
+
   schedule->SetUniqueHosts(unique_hosts);
 }
 
