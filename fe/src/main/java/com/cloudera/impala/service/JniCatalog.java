@@ -86,6 +86,8 @@ public class JniCatalog {
       sentryConfig = new SentryConfig(sentryServiceConfig);
       sentryConfig.loadConfig();
     }
+    LOG.info(JniUtil.getJavaVersion());
+
     catalog_ = new CatalogServiceCatalog(loadInBackground,
         numMetadataLoadingThreads, sentryConfig, getServiceId());
     try {

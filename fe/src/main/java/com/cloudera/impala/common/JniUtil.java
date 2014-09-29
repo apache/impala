@@ -37,7 +37,7 @@ import com.cloudera.impala.thrift.TJvmMemoryPool;
  * Utility class with methods intended for JNI clients
  */
 public class JniUtil {
-  private final static TBinaryProtocol.Factory protocolFactory =
+  private final static TBinaryProtocol.Factory protocolFactory_ =
       new TBinaryProtocol.Factory();
 
   /**
@@ -93,7 +93,7 @@ public class JniUtil {
    */
   public static byte[] getJvmMetrics(byte[] argument) throws ImpalaException {
     TGetJvmMetricsRequest request = new TGetJvmMetricsRequest();
-    JniUtil.deserializeThrift(protocolFactory, request, argument);
+    JniUtil.deserializeThrift(protocolFactory_, request, argument);
 
     TGetJvmMetricsResponse jvmMetrics = new TGetJvmMetricsResponse();
     jvmMetrics.setMemory_pools(new ArrayList<TJvmMemoryPool>());
@@ -138,7 +138,7 @@ public class JniUtil {
         }
       }
     }
-    TSerializer serializer = new TSerializer(protocolFactory);
+    TSerializer serializer = new TSerializer(protocolFactory_);
     try {
       return serializer.serialize(jvmMetrics);
     } catch (TException e) {
@@ -146,4 +146,16 @@ public class JniUtil {
     }
   }
 
+  /**
+   * Get Java version and vendor information
+   */
+  public static String getJavaVersion() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("Java Version Info: ");
+    sb.append(System.getProperty("java.runtime.name"));
+    sb.append(" (");
+    sb.append(System.getProperty("java.runtime.version"));
+    sb.append(")");
+    return sb.toString();
+  }
 }

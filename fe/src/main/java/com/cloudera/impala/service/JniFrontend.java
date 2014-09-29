@@ -127,6 +127,8 @@ public class JniFrontend {
     } else {
       LOG.info("Authorization is 'DISABLED'.");
     }
+    LOG.info(JniUtil.getJavaVersion());
+
     frontend_ = new Frontend(authConfig);
   }
 
