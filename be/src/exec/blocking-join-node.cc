@@ -38,6 +38,7 @@ BlockingJoinNode::BlockingJoinNode(const string& node_name, const TJoinOp::type 
     join_op_(join_op),
     eos_(false),
     probe_side_eos_(false),
+    semi_join_staging_row_(NULL),
     can_add_probe_filters_(false) {
 }
 
@@ -61,28 +62,55 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
   build_row_counter_ = ADD_COUNTER(runtime_profile(), "BuildRows", TCounterType::UNIT);
   probe_row_counter_ = ADD_COUNTER(runtime_profile(), "ProbeRows", TCounterType::UNIT);
 
-  // Validate the row desc layout is what we expect. The join node returns a row
-  // that is a concatenation of the left side and build side row desc's. For example if
-  // the probe row had 1 tuple and the build row had 2, the resulting row desc
-  // of the join node would have 3 tuples with:
-  //   result[0] = left[0]
-  //   result[1] = build[0]
-  //   result[2] = build[1]
-  // The current join node implementation relies on this property to enable some
-  // optimizations.
+  // Validate the row desc layout is what we expect because the current join
+  // implementation relies on it to enable some optimizations.
   int num_left_tuples = child(0)->row_desc().tuple_descriptors().size();
   int num_build_tuples = child(1)->row_desc().tuple_descriptors().size();
-  for (int i = 0; i < num_left_tuples; ++i) {
-    TupleDescriptor* desc = child(0)->row_desc().tuple_descriptors()[i];
-    DCHECK_EQ(i, row_desc().GetTupleIdx(desc->id()));
+
+#ifndef NDEBUG
+  switch (join_op_) {
+    case TJoinOp::LEFT_ANTI_JOIN:
+    case TJoinOp::LEFT_SEMI_JOIN:
+    case TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN: {
+      // Only return the surviving probe-side tuples.
+      DCHECK(row_desc().Equals(child(0)->row_desc()));
+      break;
+    }
+    case TJoinOp::RIGHT_ANTI_JOIN:
+    case TJoinOp::RIGHT_SEMI_JOIN: {
+      // Only return the surviving build-side tuples.
+      DCHECK(row_desc().Equals(child(1)->row_desc()));
+      break;
+    }
+    default: {
+      // The join node returns a row that is a concatenation of the left side and build
+      // side row desc's. For example if the probe row had 1 tuple and the build row had
+      // 2, the resulting row desc of the join node would have 3 tuples with:
+      //   result[0] = left[0]
+      //   result[1] = build[0]
+      //   result[2] = build[1]
+      for (int i = 0; i < num_left_tuples; ++i) {
+        TupleDescriptor* desc = child(0)->row_desc().tuple_descriptors()[i];
+        DCHECK_EQ(i, row_desc().GetTupleIdx(desc->id()));
+      }
+      for (int i = 0; i < num_build_tuples; ++i) {
+        TupleDescriptor* desc = child(1)->row_desc().tuple_descriptors()[i];
+        DCHECK_EQ(num_left_tuples + i, row_desc().GetTupleIdx(desc->id()));
+      }
+      break;
+    }
   }
-  for (int i = 0; i < num_build_tuples; ++i) {
-    TupleDescriptor* desc = child(1)->row_desc().tuple_descriptors()[i];
-    DCHECK_EQ(num_left_tuples + i, row_desc().GetTupleIdx(desc->id()));
-  }
+#endif
 
   probe_tuple_row_size_ = num_left_tuples * sizeof(Tuple*);
   build_tuple_row_size_ = num_build_tuples * sizeof(Tuple*);
+
+  if (join_op_ == TJoinOp::LEFT_ANTI_JOIN || join_op_ == TJoinOp::LEFT_SEMI_JOIN ||
+      join_op_ == TJoinOp::RIGHT_ANTI_JOIN || join_op_ == TJoinOp::RIGHT_SEMI_JOIN ||
+      join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
+    semi_join_staging_row_ = reinterpret_cast<TupleRow*>(
+        new char[probe_tuple_row_size_ + build_tuple_row_size_]);
+  }
 
   probe_batch_.reset(
       new RowBatch(child(0)->row_desc(), state->batch_size(), mem_tracker()));
@@ -93,6 +121,7 @@ void BlockingJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (build_pool_.get() != NULL) build_pool_->FreeAll();
   probe_batch_.reset();
+  if (semi_join_staging_row_ != NULL) delete[] semi_join_staging_row_;
   ExecNode::Close(state);
 }
 

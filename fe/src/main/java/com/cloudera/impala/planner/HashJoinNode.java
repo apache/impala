@@ -93,12 +93,31 @@ public class HashJoinNode extends PlanNode {
     super("HASH JOIN");
     Preconditions.checkArgument(eqJoinConjuncts != null);
     Preconditions.checkArgument(otherJoinConjuncts != null);
-    tupleIds_.addAll(outer.getTupleIds());
-    tupleIds_.addAll(inner.getTupleIds());
-    tblRefIds_.addAll(outer.getTblRefIds());
-    tblRefIds_.addAll(inner.getTblRefIds());
     tblRef_ = tblRef;
     joinOp_ = tblRef.getJoinOp();
+
+    // Only retain the non-semi-joined tuples of the inputs.
+    switch (joinOp_) {
+      case LEFT_ANTI_JOIN:
+      case LEFT_SEMI_JOIN:
+      case NULL_AWARE_LEFT_ANTI_JOIN: {
+        tupleIds_.addAll(outer.getTupleIds());
+        break;
+      }
+      case RIGHT_ANTI_JOIN:
+      case RIGHT_SEMI_JOIN: {
+        tupleIds_.addAll(inner.getTupleIds());
+        break;
+      }
+      default: {
+        tupleIds_.addAll(outer.getTupleIds());
+        tupleIds_.addAll(inner.getTupleIds());
+        break;
+      }
+    }
+    tblRefIds_.addAll(outer.getTblRefIds());
+    tblRefIds_.addAll(inner.getTblRefIds());
+
     distrMode_ = DistributionMode.NONE;
     eqJoinConjuncts_ = eqJoinConjuncts;
     otherJoinConjuncts_ = otherJoinConjuncts;

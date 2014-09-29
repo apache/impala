@@ -257,6 +257,21 @@ RowDescriptor::RowDescriptor(const DescriptorTbl& desc_tbl,
   InitTupleIdxMap();
 }
 
+RowDescriptor::RowDescriptor(const RowDescriptor& lhs_row_desc,
+    const RowDescriptor& rhs_row_desc) {
+  tuple_desc_map_.insert(tuple_desc_map_.end(), lhs_row_desc.tuple_desc_map_.begin(),
+      lhs_row_desc.tuple_desc_map_.end());
+  tuple_desc_map_.insert(tuple_desc_map_.end(), rhs_row_desc.tuple_desc_map_.begin(),
+      rhs_row_desc.tuple_desc_map_.end());
+  tuple_idx_nullable_map_.insert(tuple_idx_nullable_map_.end(),
+      lhs_row_desc.tuple_idx_nullable_map_.begin(),
+      lhs_row_desc.tuple_idx_nullable_map_.end());
+  tuple_idx_nullable_map_.insert(tuple_idx_nullable_map_.end(),
+      rhs_row_desc.tuple_idx_nullable_map_.begin(),
+      rhs_row_desc.tuple_idx_nullable_map_.end());
+  InitTupleIdxMap();
+}
+
 RowDescriptor::RowDescriptor(const vector<TupleDescriptor*>& tuple_descs,
                              const vector<bool>& nullable_tuples)
   : tuple_desc_map_(tuple_descs),

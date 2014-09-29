@@ -79,10 +79,15 @@ class BlockingJoinNode : public ExecNode {
   bool matched_probe_;  // if true, the current probe row is matched
 
   // Size of the TupleRow (just the Tuple ptrs) from the build (right) and probe (left)
-  // sides.
+  // sides. Set to zero if the build/probe tuples are not returned, e.g., for semi joins.
   // Cached because it is used in the hot path.
   int probe_tuple_row_size_;
   int build_tuple_row_size_;
+
+  // Row assembled from all lhs and rhs tuples used for evaluating the non-equi-join
+  // conjuncts for semi joins. Semi joins only return the lhs or rhs output tuples,
+  // so this tuple is temporarily assembled for evaluating the conjuncts.
+  TupleRow* semi_join_staging_row_;
 
   // If true, this node can add filters to the probe (left child) node after processing
   // the entire build side.

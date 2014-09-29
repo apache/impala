@@ -913,6 +913,9 @@ Status LlvmCodeGen::LoadIntrinsics() {
 }
 
 void LlvmCodeGen::CodegenMemcpy(LlvmBuilder* builder, Value* dst, Value* src, int size) {
+  DCHECK_GE(size, 0);
+  if (size == 0) return;
+
   // Cast src/dst to int8_t*.  If they already are, this will get optimized away
   DCHECK(PointerType::classof(dst->getType()));
   DCHECK(PointerType::classof(src->getType()));

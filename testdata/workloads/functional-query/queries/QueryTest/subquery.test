@@ -702,3 +702,14 @@ WHERE t1.month IN
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# Regression test for IMPALA-1318.
+select count(t1.c) over () from
+  (select max(int_col) c from functional.alltypestiny) t1
+where t1.c not in
+  (select sum(t1.smallint_col) from functional.alltypes t1)
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====

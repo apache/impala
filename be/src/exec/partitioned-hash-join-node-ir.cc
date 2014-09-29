@@ -61,10 +61,36 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
           continue;
         }
 
-        CreateOutputRow(out_row, current_probe_row_, matched_build_row);
-        if (!EvalOtherJoinConjuncts(join_conjunct_ctxs, num_join_conjuncts, out_row)) {
-          hash_tbl_iterator_.Next<true>(ht_ctx);
-          continue;
+        if (JoinOp == TJoinOp::LEFT_ANTI_JOIN || JoinOp == TJoinOp::LEFT_SEMI_JOIN ||
+            JoinOp == TJoinOp::RIGHT_ANTI_JOIN || JoinOp == TJoinOp::RIGHT_SEMI_JOIN ||
+            JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
+          // Evaluate the non-equi-join conjuncts against a temp row assembled from all
+          // build and probe tuples.
+          if (num_join_conjuncts > 0) {
+            CreateOutputRow(semi_join_staging_row_, current_probe_row_,
+                matched_build_row);
+            if (!EvalOtherJoinConjuncts(join_conjunct_ctxs, num_join_conjuncts,
+                semi_join_staging_row_)) {
+              hash_tbl_iterator_.Next<true>(ht_ctx);
+              continue;
+            }
+          }
+
+          // Create output row assembled from build xor probe tuples.
+          if (JoinOp == TJoinOp::LEFT_ANTI_JOIN || JoinOp == TJoinOp::LEFT_SEMI_JOIN ||
+              JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
+            out_batch->CopyRow(current_probe_row_, out_row);
+          } else {
+            out_batch->CopyRow(matched_build_row, out_row);
+          }
+        } else {
+          // Not a semi join; create an output row with all probe/build tuples and evaluate
+          // the non-equi-join conjuncts.
+          CreateOutputRow(out_row, current_probe_row_, matched_build_row);
+          if (!EvalOtherJoinConjuncts(join_conjunct_ctxs, num_join_conjuncts, out_row)) {
+            hash_tbl_iterator_.Next<true>(ht_ctx);
+            continue;
+          }
         }
 
         // At this point the probe is considered matched.
@@ -108,9 +134,7 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
         }
       }
 
-      if ((JoinOp == TJoinOp::LEFT_ANTI_JOIN || JoinOp == TJoinOp::LEFT_OUTER_JOIN ||
-           JoinOp == TJoinOp::FULL_OUTER_JOIN ||
-           JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) &&
+      if ((JoinOp == TJoinOp::LEFT_OUTER_JOIN || JoinOp == TJoinOp::FULL_OUTER_JOIN) &&
           !matched_probe_) {
         // No match for this row, we need to output it.
         CreateOutputRow(out_row, current_probe_row_, NULL);
@@ -120,6 +144,17 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
           out_row = out_row->next_row(out_batch);
           if (num_rows_added == max_rows) goto end;
         }
+      }
+      if ((JoinOp == TJoinOp::LEFT_ANTI_JOIN ||
+          JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) &&
+          !matched_probe_) {
+        // No match for this current_probe_row_, we need to output it. No need to
+        // evaluate the conjunct_ctxs since semi joins cannot have any.
+        out_batch->CopyRow(current_probe_row_, out_row);
+        ++num_rows_added;
+        matched_probe_ = true;
+        out_row = out_row->next_row(out_batch);
+        if (num_rows_added == max_rows) goto end;
       }
     }
 

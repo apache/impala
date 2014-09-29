@@ -403,7 +403,8 @@ class LlvmCodeGen {
   llvm::Function* CodegenMinMax(const ColumnType& type, bool min);
 
   // Codegen to call llvm memcpy intrinsic at the current builder location
-  // dst & src must be pointer types.  size is the number of bytes to copy.
+  // dst & src must be pointer types. size is the number of bytes to copy.
+  // No-op if size is zero.
   void CodegenMemcpy(LlvmBuilder*, llvm::Value* dst, llvm::Value* src, int size);
 
   // Loads an LLVM module. 'file' should be the local path to the LLVM bitcode (.ll)

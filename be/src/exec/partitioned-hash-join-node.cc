@@ -80,6 +80,11 @@ Status PartitionedHashJoinNode::Init(const TPlanNode& tnode) {
   if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
     DCHECK_EQ(eq_join_conjuncts.size(), 1);
   }
+  if (join_op_ == TJoinOp::LEFT_SEMI_JOIN || join_op_ == TJoinOp::LEFT_ANTI_JOIN ||
+      join_op_ == TJoinOp::RIGHT_SEMI_JOIN || join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
+      join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
+    DCHECK_EQ(conjunct_ctxs_.size(), 0);
+  }
   return Status::OK;
 }
 
@@ -107,9 +112,11 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   AddExprCtxsToFree(probe_expr_ctxs_);
   AddExprCtxsToFree(build_expr_ctxs_);
 
-  // other_join_conjunct_ctxs_ are evaluated in the context of the rows produced by this
-  // node
-  RETURN_IF_ERROR(Expr::Prepare(other_join_conjunct_ctxs_, state, row_descriptor_));
+  // other_join_conjunct_ctxs_ are evaluated in the context of rows assembled from all
+  // build and probe tuples; full_row_desc is not necessarily the same as the output row
+  // desc, e.g., because semi joins only return the build xor probe tuples
+  RowDescriptor full_row_desc(child(0)->row_desc(), child(1)->row_desc());
+  RETURN_IF_ERROR(Expr::Prepare(other_join_conjunct_ctxs_, state, full_row_desc));
   AddExprCtxsToFree(other_join_conjunct_ctxs_);
 
   RETURN_IF_ERROR(state->block_mgr()->RegisterClient(
@@ -817,7 +824,11 @@ Status PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
       hash_tbl_iterator_.set_matched(true);
       TupleRow* build_row = hash_tbl_iterator_.GetRow();
       DCHECK(build_row != NULL);
-      CreateOutputRow(out_row, NULL, build_row);
+      if (join_op_ == TJoinOp::RIGHT_ANTI_JOIN) {
+        out_batch->CopyRow(build_row, out_row);
+      } else {
+        CreateOutputRow(out_row, NULL, build_row);
+      }
       if (ExecNode::EvalConjuncts(conjunct_ctxs, num_conjuncts, out_row)) {
         ++num_rows_added;
         out_row = out_row->next_row(out_batch);
@@ -883,7 +894,7 @@ Status PartitionedHashJoinNode::OutputNullAwareNullProbe(RuntimeState* state,
     if (out_batch->AtCapacity()) break;
     if (matched_null_probe_[null_probe_output_idx_]) continue;
     TupleRow* out_row = out_batch->GetRow(out_batch->AddRow());
-    CreateOutputRow(out_row, probe_batch_->GetRow(probe_batch_pos_), NULL);
+    out_batch->CopyRow(probe_batch_->GetRow(probe_batch_pos_), out_row);
     out_batch->CommitLastRow();
   }
 
@@ -960,20 +971,21 @@ Status PartitionedHashJoinNode::OutputNullAwareProbeRows(RuntimeState* state,
   // that did not have any matches.
   for (; probe_batch_pos_ < probe_batch_->num_rows(); ++probe_batch_pos_) {
     if (out_batch->AtCapacity()) break;
-    TupleRow* out_row = out_batch->GetRow(out_batch->AddRow());
     TupleRow* probe_row = probe_batch_->GetRow(probe_batch_pos_);
 
     bool matched = false;
     for (int i = 0; i < nulls_build_batch_->num_rows(); ++i) {
-      CreateOutputRow(out_row, probe_row, nulls_build_batch_->GetRow(i));
-      if (ExecNode::EvalConjuncts(join_conjunct_ctxs, num_join_conjuncts, out_row)) {
+      CreateOutputRow(semi_join_staging_row_, probe_row, nulls_build_batch_->GetRow(i));
+      if (ExecNode::EvalConjuncts(
+          join_conjunct_ctxs, num_join_conjuncts, semi_join_staging_row_)) {
         matched = true;
         break;
       }
     }
 
     if (!matched) {
-      CreateOutputRow(out_row, probe_row, NULL);
+      TupleRow* out_row = out_batch->GetRow(out_batch->AddRow());
+      out_batch->CopyRow(probe_row, out_row);
       out_batch->CommitLastRow();
     }
   }
@@ -1119,17 +1131,16 @@ Status PartitionedHashJoinNode::EvaluateNullProbe(BufferedTupleStream* build) {
   ExprContext* const* join_conjunct_ctxs = &other_join_conjunct_ctxs_[0];
   int num_join_conjuncts = other_join_conjunct_ctxs_.size();
 
-  Tuple* buffer[row_desc().tuple_descriptors().size()];
-  TupleRow* row = reinterpret_cast<TupleRow*>(buffer);
-
   DCHECK_LE(probe_rows->num_rows(), matched_null_probe_.size());
   // For each row, iterate over all rows in the build table.
   SCOPED_TIMER(null_aware_eval_timer_);
   for (int i = 0; i < probe_rows->num_rows(); ++i) {
     if (matched_null_probe_[i]) continue;
     for (int j = 0; j < build_rows->num_rows(); ++j) {
-      CreateOutputRow(row, probe_rows->GetRow(i), build_rows->GetRow(j));
-      if (ExecNode::EvalConjuncts(join_conjunct_ctxs, num_join_conjuncts, row)) {
+      CreateOutputRow(semi_join_staging_row_, probe_rows->GetRow(i),
+          build_rows->GetRow(j));
+      if (ExecNode::EvalConjuncts(
+            join_conjunct_ctxs, num_join_conjuncts, semi_join_staging_row_)) {
         matched_null_probe_[i] = true;
         break;
       }

@@ -369,6 +369,9 @@ class RowDescriptor {
       tuple_idx_map_(desc.tuple_idx_map_) {
   }
 
+  // c'tor for a row assembled from two rows
+  RowDescriptor(const RowDescriptor& lhs_row_desc, const RowDescriptor& rhs_row_desc);
+
   RowDescriptor(const std::vector<TupleDescriptor*>& tuple_descs,
       const std::vector<bool>& nullable_tuples);
 
