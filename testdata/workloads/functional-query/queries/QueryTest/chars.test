@@ -212,3 +212,20 @@ char, char, string
 ---- QUERY
 drop table if exists char_parts
 ====
+---- QUERY
+# Regression test for IMPALA-1316
+select A.vc from functional.chars_tiny as A join functional.chars_tiny using (vc) order by A.vc
+---- TYPES
+string
+---- RESULTS
+'1cccc'
+'2cccccc'
+'3ccc'
+'4cc'
+'5c'
+'6c'
+'6c'
+'6c'
+'6c'
+'c'
+====

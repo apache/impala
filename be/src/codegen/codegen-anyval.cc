@@ -560,7 +560,8 @@ Value* CodegenAnyVal::Eq(CodegenAnyVal* other) {
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
       return builder_->CreateFCmpUEQ(GetVal(), other->GetVal(), "eq");
-    case TYPE_STRING: {
+    case TYPE_STRING:
+    case TYPE_VARCHAR: {
       Function* eq_fn = codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_STRING_VAL_EQ);
       return builder_->CreateCall2(
           eq_fn, GetUnloweredPtr(), other->GetUnloweredPtr(), "eq");
@@ -579,7 +580,7 @@ Value* CodegenAnyVal::Eq(CodegenAnyVal* other) {
 
 Value* CodegenAnyVal::EqToNativePtr(Value* native_ptr) {
   Value* val = NULL;
-  if (type_.type != TYPE_STRING) {
+  if (!type_.IsStringType()) {
      val = builder_->CreateLoad(native_ptr);
   }
   switch (type_.type) {
@@ -595,7 +596,8 @@ Value* CodegenAnyVal::EqToNativePtr(Value* native_ptr) {
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
       return builder_->CreateFCmpUEQ(GetVal(), val, "cmp_raw");
-    case TYPE_STRING: {
+    case TYPE_STRING:
+    case TYPE_VARCHAR: {
       Function* eq_fn = codegen_->GetFunction(IRFunction::CODEGEN_ANYVAL_STRING_VALUE_EQ);
       return builder_->CreateCall2(eq_fn, GetUnloweredPtr(), native_ptr, "cmp_raw");
     }
