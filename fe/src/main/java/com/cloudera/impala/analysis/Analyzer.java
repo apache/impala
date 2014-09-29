@@ -1490,50 +1490,25 @@ public class Analyzer {
   public ExprSubstitutionMap getEquivClassSmap() { return globalState_.equivClassSmap; }
 
   /**
-   * Returns true if l1 and l2 only contain SlotRefs, and for all SlotRefs in l1 there
-   * is an equivalent SlotRef in l2, and vice versa.
-   * Returns false otherwise or if l1 or l2 is empty.
+   * Return true if l1 is equivalent to l2 when both lists are interpreted as sets.
+   * For this check, each SlotRefs in both l1 and l2 is replaced with its canonical
+   * equivalence-class representative, and then duplicate exprs are removed.
    */
-  public boolean isEquivSlots(List<Expr> l1, List<Expr> l2) {
-    if (l1.isEmpty() || l2.isEmpty()) return false;
-    for (Expr e1: l1) {
-      boolean matched = false;
-      for (Expr e2: l2) {
-        if (isEquivSlots(e1, e2)) {
-          matched = true;
-          break;
-        }
-      }
-      if (!matched) return false;
-    }
-    for (Expr e2: l2) {
-      boolean matched = false;
-      for (Expr e1: l1) {
-        if (isEquivSlots(e2, e1)) {
-          matched = true;
-          break;
-        }
-      }
-      if (!matched) return false;
-    }
-    return true;
+  public boolean equivSets(List<Expr> l1, List<Expr> l2) {
+    List<Expr> substL1 = Expr.substituteList(l1, globalState_.equivClassSmap, this);
+    Expr.removeDuplicates(substL1);
+    List<Expr> substL2 = Expr.substituteList(l2, globalState_.equivClassSmap, this);
+    Expr.removeDuplicates(substL2);
+    return Expr.equalSets(substL1, substL2);
   }
 
   /**
-   * Returns true if e1 and e2 are equivalent SlotRefs.
+   * Returns true if e1 and e2 are equivalent expressions.
    */
-  public boolean isEquivSlots(Expr e1, Expr e2) {
-    SlotRef aSlotRef = e1.unwrapSlotRef(true);
-    SlotRef bSlotRef = e2.unwrapSlotRef(true);
-    if (aSlotRef == null || bSlotRef == null) return false;
-    EquivalenceClassId aEqClassId =
-        globalState_.equivClassBySlotId.get(aSlotRef.getSlotId());
-    Preconditions.checkNotNull(aEqClassId);
-    EquivalenceClassId bEqClassId =
-        globalState_.equivClassBySlotId.get(bSlotRef.getSlotId());
-    Preconditions.checkNotNull(bEqClassId);
-    // Check whether aSlot and bSlot are in the same equivalence class.
-    return aEqClassId.equals(bEqClassId);
+  public boolean equivExprs(Expr e1, Expr e2) {
+    Expr substE1 = e1.substitute(globalState_.equivClassSmap, this);
+    Expr substE2 = e2.substitute(globalState_.equivClassSmap, this);
+    return substE1.equals(substE2);
   }
 
   /**

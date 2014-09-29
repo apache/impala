@@ -291,6 +291,9 @@ public class HashJoinNode extends PlanNode {
       long rhsNdv = getNdv(eqJoinPredicate.getChild(1));
       rhsNdv = Math.min(rhsNdv, getChild(1).cardinality_);
 
+      // Skip conjuncts with unknown NDV on either side.
+      if (lhsNdv == -1 || rhsNdv == -1) continue;
+
       double selectivity = 1.0;
       switch (joinOp_) {
         case LEFT_SEMI_JOIN: {

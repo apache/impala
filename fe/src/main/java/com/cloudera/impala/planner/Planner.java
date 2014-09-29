@@ -353,7 +353,7 @@ public class Planner {
     DataPartition inputPartition = inputFragment.getDataPartition();
 
     // do nothing if the input fragment is already appropriately partitioned
-    if (analyzer.isEquivSlots(inputPartition.getPartitionExprs(),
+    if (analyzer.equivSets(inputPartition.getPartitionExprs(),
         nonConstPartitionExprs)) {
       return inputFragment;
     }
@@ -488,9 +488,9 @@ public class Planner {
     boolean lhsHasCompatPartition = false;
     boolean rhsHasCompatPartition = false;
     if (lhsTree.getCardinality() != -1 && rhsTree.getCardinality() != -1) {
-      lhsHasCompatPartition = analyzer.isEquivSlots(lhsJoinExprs,
+      lhsHasCompatPartition = analyzer.equivSets(lhsJoinExprs,
           leftChildFragment.getDataPartition().getPartitionExprs());
-      rhsHasCompatPartition = analyzer.isEquivSlots(rhsJoinExprs,
+      rhsHasCompatPartition = analyzer.equivSets(rhsJoinExprs,
           rightChildFragment.getDataPartition().getPartitionExprs());
 
       double lhsCost = (lhsHasCompatPartition) ? 0.0 :
@@ -544,13 +544,21 @@ public class Planner {
       return leftChildFragment;
     } else {
       node.setDistributionMode(HashJoinNode.DistributionMode.PARTITIONED);
-
       // The lhs and rhs input fragments are already partitioned on the join exprs.
       // Combine the lhs/rhs input fragments into leftChildFragment by placing the join
       // node into leftChildFragment and setting its lhs/rhs children to the plan root of
       // the lhs/rhs child fragment, respectively. No new child fragments or exchanges
       // are created, and the rhs fragment is removed.
-      if (lhsHasCompatPartition && rhsHasCompatPartition) {
+      // TODO: Relax the isCompatPartition() check below. The check is conservative and
+      // may reject partitions that could be made physically compatible. Fix this by
+      // removing equivalent duplicates from partition exprs and impose a canonical order
+      // on partition exprs (both using the canonical equivalence class representatives).
+      if (lhsHasCompatPartition
+          && rhsHasCompatPartition
+          && isCompatPartition(
+              leftChildFragment.getDataPartition(),
+              rightChildFragment.getDataPartition(),
+              lhsJoinExprs, rhsJoinExprs, analyzer)) {
         node.setChild(0, leftChildFragment.getPlanRoot());
         node.setChild(1, rightChildFragment.getPlanRoot());
         // Redirect fragments sending to rightFragment to leftFragment.
@@ -570,28 +578,39 @@ public class Planner {
       // first child to the lhs plan root. The second child of the join is an
       // ExchangeNode that is fed by the rhsInputFragment whose sink repartitions
       // its data by the rhs join exprs.
-      DataPartition rhsJoinPartition = new DataPartition(
-          TPartitionType.HASH_PARTITIONED,
-          analyzer.removeRedundantExprs(Expr.cloneList(rhsJoinExprs)));
+      DataPartition rhsJoinPartition = null;
       if (lhsHasCompatPartition) {
-        node.setChild(0, leftChildFragment.getPlanRoot());
-        connectChildFragment(analyzer, node, 1, rightChildFragment);
-        rightChildFragment.setOutputPartition(rhsJoinPartition);
-        leftChildFragment.setPlanRoot(node);
-        return leftChildFragment;
+        rhsJoinPartition = getCompatPartition(lhsJoinExprs,
+            leftChildFragment.getDataPartition(), rhsJoinExprs, analyzer);
+        if (rhsJoinPartition != null) {
+          node.setChild(0, leftChildFragment.getPlanRoot());
+          connectChildFragment(analyzer, node, 1, rightChildFragment);
+          rightChildFragment.setOutputPartition(rhsJoinPartition);
+          leftChildFragment.setPlanRoot(node);
+          return leftChildFragment;
+        }
       }
 
       // Same as above but with rhs and lhs reversed.
-      DataPartition lhsJoinPartition = new DataPartition(
-          TPartitionType.HASH_PARTITIONED,
-          analyzer.removeRedundantExprs(Expr.cloneList(lhsJoinExprs)));
+      DataPartition lhsJoinPartition = null;
       if (rhsHasCompatPartition) {
-        node.setChild(1, rightChildFragment.getPlanRoot());
-        connectChildFragment(analyzer, node, 0, leftChildFragment);
-        leftChildFragment.setOutputPartition(lhsJoinPartition);
-        rightChildFragment.setPlanRoot(node);
-        return rightChildFragment;
+        lhsJoinPartition = getCompatPartition(rhsJoinExprs,
+            rightChildFragment.getDataPartition(), lhsJoinExprs, analyzer);
+        if (lhsJoinPartition != null) {
+          node.setChild(1, rightChildFragment.getPlanRoot());
+          connectChildFragment(analyzer, node, 0, leftChildFragment);
+          leftChildFragment.setOutputPartition(lhsJoinPartition);
+          rightChildFragment.setPlanRoot(node);
+          return rightChildFragment;
+        }
       }
+
+      Preconditions.checkState(lhsJoinPartition == null);
+      Preconditions.checkState(rhsJoinPartition == null);
+      lhsJoinPartition = new DataPartition(TPartitionType.HASH_PARTITIONED,
+          Expr.cloneList(lhsJoinExprs));
+      rhsJoinPartition = new DataPartition(TPartitionType.HASH_PARTITIONED,
+          Expr.cloneList(rhsJoinExprs));
 
       // Neither lhs nor rhs are already partitioned on the join exprs.
       // Create a new parent fragment containing a HashJoin node with two
@@ -619,6 +638,78 @@ public class Planner {
 
       return joinFragment;
     }
+  }
+
+  /**
+   * Returns true if the lhs and rhs partitions are physically compatible for executing
+   * a partitioned join with the given lhs/rhs join exprs. Physical compatibility means
+   * that lhs/rhs exchange nodes hashing on exactly those partition expressions are
+   * guaranteed to send two rows with identical partition-expr values to the same node.
+   * The requirements for physical compatibility are:
+   * 1. Number of exprs must be the same
+   * 2. The lhs partition exprs are identical to the lhs join exprs and the rhs partition
+   *    exprs are identical to the rhs join exprs
+   * 3. Or for each expr in the lhs partition, there must be an equivalent expr in the
+   *    rhs partition at the same ordinal position within the expr list
+   * (4. The expr types must be identical, but that is enforced later in PlanFragment)
+   * Conditions 2 and 3 are similar but not the same due to outer joins, e.g., for full
+   * outer joins condition 3 can never be met, but condition 2 can.
+   * TODO: Move parts of this function into DataPartition as appropriate.
+   */
+  private boolean isCompatPartition(DataPartition lhsPartition,
+      DataPartition rhsPartition, List<Expr> lhsJoinExprs, List<Expr> rhsJoinExprs,
+      Analyzer analyzer) {
+    List<Expr> lhsPartExprs = lhsPartition.getPartitionExprs();
+    List<Expr> rhsPartExprs = rhsPartition.getPartitionExprs();
+    // 1. Sizes must be equal.
+    if (lhsPartExprs.size() != rhsPartExprs.size()) return false;
+    // 2. Lhs/rhs join exprs are identical to lhs/rhs partition exprs.
+    Preconditions.checkState(lhsJoinExprs.size() == rhsJoinExprs.size());
+    if (lhsJoinExprs.size() == lhsPartExprs.size()) {
+      if (lhsJoinExprs.equals(lhsPartExprs) && rhsJoinExprs.equals(rhsPartExprs)) {
+        return true;
+      }
+    }
+    // 3. Each lhs part expr must have an equivalent expr at the same position
+    // in the rhs part exprs.
+    for (int i = 0; i < lhsPartExprs.size(); ++i) {
+      if (!analyzer.equivExprs(lhsPartExprs.get(i), rhsPartExprs.get(i))) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Returns a new data partition that is suitable for creating an exchange node to feed
+   * a partitioned hash join. The hash join is assumed to be placed in a fragment with an
+   * existing data partition that is compatible with either the lhs or rhs join exprs
+   * (srcPartition belongs to the fragment and srcJoinExprs are the compatible exprs).
+   * The returned partition uses the given joinExprs which are assumed to be the lhs or
+   * rhs join exprs, whichever srcJoinExprs are not.
+   * The returned data partition has two important properties to ensure correctness:
+   * 1. It has exactly the same number of hash exprs as the srcPartition (IMPALA-1307),
+   *    possibly by removing redundant exprs from joinExprs or adding some joinExprs
+   *    multiple times to match the srcPartition
+   * 2. The hash exprs are ordered based on their corresponding 'matches' in
+   *    the existing srcPartition (IMPALA-1324).
+   * Returns null if no compatible data partition could be constructed.
+   * TODO: Move parts of this function into DataPartition as appropriate.
+   * TODO: Make comment less operational and more semantic.
+   */
+  private DataPartition getCompatPartition(List<Expr> srcJoinExprs,
+      DataPartition srcPartition, List<Expr> joinExprs, Analyzer analyzer) {
+    Preconditions.checkState(srcPartition.isHashPartitioned());
+    List<Expr> srcPartExprs = srcPartition.getPartitionExprs();
+    List<Expr> resultPartExprs = Lists.newArrayList();
+    for (int i = 0; i < srcPartExprs.size(); ++i) {
+      for (int j = 0; j < srcJoinExprs.size(); ++j) {
+        if (analyzer.equivExprs(srcPartExprs.get(i), srcJoinExprs.get(j))) {
+          resultPartExprs.add(joinExprs.get(j).clone());
+          break;
+        }
+      }
+    }
+    if (resultPartExprs.size() != srcPartExprs.size()) return null;
+    return new DataPartition(TPartitionType.HASH_PARTITIONED, resultPartExprs);
   }
 
   /**
@@ -1750,6 +1841,7 @@ public class Planner {
           continue;
         }
         joinEquivClasses.add(id1);
+        joinEquivClasses.add(id2);
       }
 
       // e is a non-redundant join predicate

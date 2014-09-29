@@ -1296,3 +1296,267 @@ where c.id != b.id
 02:SCAN HDFS [functional.alltypes c]
    partitions=24/24 size=478.45KB
 ====
+# Tests the generation of a distributed plan in which the input fragments
+# of a join node have compatible but not the same number of partitioning exprs with
+# the corresponding join exprs (IMPALA-1307).
+# TODO: Instead of adding redundant hash exprs to the new exchange node, we
+# should remove redundant group by expressions.
+select * from
+  (select tinyint_col, int_col
+   from functional.alltypestiny
+   group by tinyint_col, int_col) v1
+inner join
+  (select tinyint_col, int_col, bigint_col
+   from functional.alltypessmall
+   group by tinyint_col, int_col, bigint_col) v2
+on (v1.tinyint_col = v2.tinyint_col and
+    v1.tinyint_col = v2.int_col and
+    v1.tinyint_col = v2.bigint_col)
+---- DISTRIBUTEDPLAN
+10:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: tinyint_col = tinyint_col
+|
+|--08:AGGREGATE [FINALIZE]
+|  |  group by: tinyint_col, int_col, bigint_col
+|  |
+|  07:EXCHANGE [HASH(tinyint_col,int_col,bigint_col)]
+|  |
+|  03:AGGREGATE
+|  |  group by: tinyint_col, int_col, bigint_col
+|  |
+|  02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|     predicates: functional.alltypessmall.tinyint_col = functional.alltypessmall.int_col, functional.alltypessmall.tinyint_col = functional.alltypessmall.bigint_col
+|
+09:EXCHANGE [HASH(tinyint_col,tinyint_col,tinyint_col)]
+|
+06:AGGREGATE [FINALIZE]
+|  group by: tinyint_col, int_col
+|
+05:EXCHANGE [HASH(tinyint_col,int_col)]
+|
+01:AGGREGATE
+|  group by: tinyint_col, int_col
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=460B
+====
+# Same as above but with a full outer join.
+# Tests the generation of a distributed plan in which the input fragments
+# of a join node have compatible but not the same number of partitioning exprs with
+# the corresponding join exprs (IMPALA-1307).
+# TODO: Instead of adding redundant hash exprs to the new exchange node, we
+# should remove redundant group by expressions.
+select * from
+  (select tinyint_col, int_col
+   from functional.alltypestiny
+   group by tinyint_col, int_col) v1
+full outer join
+  (select tinyint_col, int_col, bigint_col
+   from functional.alltypessmall
+   group by tinyint_col, int_col, bigint_col) v2
+on (v1.tinyint_col = v2.tinyint_col and
+    v1.tinyint_col = v2.int_col and
+    v1.tinyint_col = v2.bigint_col)
+---- DISTRIBUTEDPLAN
+10:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
+|  hash predicates: tinyint_col = tinyint_col, int_col = tinyint_col, bigint_col = tinyint_col
+|
+|--09:EXCHANGE [HASH(tinyint_col,tinyint_col,tinyint_col)]
+|  |
+|  08:AGGREGATE [FINALIZE]
+|  |  group by: tinyint_col, int_col
+|  |
+|  07:EXCHANGE [HASH(tinyint_col,int_col)]
+|  |
+|  01:AGGREGATE
+|  |  group by: tinyint_col, int_col
+|  |
+|  00:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=460B
+|
+06:AGGREGATE [FINALIZE]
+|  group by: tinyint_col, int_col, bigint_col
+|
+05:EXCHANGE [HASH(tinyint_col,int_col,bigint_col)]
+|
+03:AGGREGATE
+|  group by: tinyint_col, int_col, bigint_col
+|
+02:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=6.32KB
+====
+# Test conservative treatment of partition-compatible input fragments
+# to a partitioned hash join. Making the partitions physically compatible
+# would require changing all senders to the lhs or rhs fragment, so we
+# do not perform this optimization. It is expected that the join is placed
+# into the lhs compatible fragment, and the rhs is exchanged by enforcing
+# physical hash-expr compatibility (IMPALA-1324).
+select straight_join * from
+  (select bigint_col, string_col
+   from functional.alltypestiny
+   group by bigint_col, string_col) v1
+inner join
+  (select string_col, bigint_col
+   from functional.alltypessmall
+   group by string_col, bigint_col) v2
+on (v1.string_col = v2.string_col and
+    v1.bigint_col = v2.bigint_col)
+---- DISTRIBUTEDPLAN
+10:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: string_col = string_col, bigint_col = bigint_col
+|
+|--09:EXCHANGE [HASH(bigint_col,string_col)]
+|  |
+|  08:AGGREGATE [FINALIZE]
+|  |  group by: string_col, bigint_col
+|  |
+|  07:EXCHANGE [HASH(string_col,bigint_col)]
+|  |
+|  03:AGGREGATE
+|  |  group by: string_col, bigint_col
+|  |
+|  02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+06:AGGREGATE [FINALIZE]
+|  group by: bigint_col, string_col
+|
+05:EXCHANGE [HASH(bigint_col,string_col)]
+|
+01:AGGREGATE
+|  group by: bigint_col, string_col
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=460B
+====
+# Test that hash exprs are re-ordered as necessary when placing a join into
+# a fragment with a compatible data partition (IMPALA-1324)
+select straight_join * from
+  (select distinct int_col, string_col
+   from functional.alltypestiny) a
+left semi join functional.alltypes b
+# predicates are in reverse order of compatible group by exprs
+on (a.string_col = b.string_col and a.int_col = b.int_col)
+---- DISTRIBUTEDPLAN
+07:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [LEFT SEMI JOIN, PARTITIONED]
+|  hash predicates: string_col = b.string_col, int_col = b.int_col
+|
+|--06:EXCHANGE [HASH(b.int_col,b.string_col)]
+|  |
+|  02:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 size=478.45KB
+|
+05:AGGREGATE [FINALIZE]
+|  group by: int_col, string_col
+|
+04:EXCHANGE [HASH(int_col,string_col)]
+|
+01:AGGREGATE
+|  group by: int_col, string_col
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=460B
+====
+# Same as above but with the join inverted.
+select straight_join * from
+functional.alltypes a
+right semi join
+  (select distinct int_col, string_col
+   from functional.alltypestiny) b
+# predicates are in reverse order of compatible group by exprs
+on (a.string_col = b.string_col and a.int_col = b.int_col)
+---- DISTRIBUTEDPLAN
+07:EXCHANGE [UNPARTITIONED]
+|
+03:HASH JOIN [RIGHT SEMI JOIN, PARTITIONED]
+|  hash predicates: a.string_col = string_col, a.int_col = int_col
+|
+|--05:AGGREGATE [FINALIZE]
+|  |  group by: int_col, string_col
+|  |
+|  04:EXCHANGE [HASH(int_col,string_col)]
+|  |
+|  02:AGGREGATE
+|  |  group by: int_col, string_col
+|  |
+|  01:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=460B
+|
+06:EXCHANGE [HASH(a.int_col,a.string_col)]
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 size=478.45KB
+====
+# Complex combined regression test for IMPALA-1307 and IMPALA-1324
+select straight_join * from
+  (select distinct string_col, int_col, smallint_col
+   from functional.alltypessmall) a
+inner join [shuffle]
+  (select distinct tinyint_col, smallint_col, int_col, string_col
+   from functional.alltypestiny) b
+on (a.int_col = b.int_col and a.smallint_col = b.int_col and
+    a.smallint_col = b.smallint_col and
+    a.string_col = b.string_col)
+inner join
+   (select distinct string_col, tinyint_col, smallint_col, int_col, bigint_col
+    from functional.alltypes
+    where bigint_col = smallint_col and smallint_col = tinyint_col) c
+on (b.int_col = c.smallint_col and b.string_col = c.string_col)
+---- DISTRIBUTEDPLAN
+16:EXCHANGE [UNPARTITIONED]
+|
+07:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: int_col = smallint_col, string_col = string_col
+|
+|--15:EXCHANGE [HASH(string_col,smallint_col,smallint_col)]
+|  |
+|  14:AGGREGATE [FINALIZE]
+|  |  group by: string_col, tinyint_col, smallint_col, int_col, bigint_col
+|  |
+|  13:EXCHANGE [HASH(string_col,tinyint_col,smallint_col,int_col,bigint_col)]
+|  |
+|  05:AGGREGATE
+|  |  group by: string_col, tinyint_col, smallint_col, int_col, bigint_col
+|  |
+|  04:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 size=478.45KB
+|     predicates: bigint_col = smallint_col, smallint_col = tinyint_col
+|
+06:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: int_col = int_col, string_col = string_col
+|
+|--12:EXCHANGE [HASH(string_col,int_col,int_col)]
+|  |
+|  11:AGGREGATE [FINALIZE]
+|  |  group by: tinyint_col, smallint_col, int_col, string_col
+|  |
+|  10:EXCHANGE [HASH(tinyint_col,smallint_col,int_col,string_col)]
+|  |
+|  03:AGGREGATE
+|  |  group by: tinyint_col, smallint_col, int_col, string_col
+|  |
+|  02:SCAN HDFS [functional.alltypestiny]
+|     partitions=4/4 size=460B
+|     predicates: functional.alltypestiny.int_col = functional.alltypestiny.smallint_col
+|
+09:AGGREGATE [FINALIZE]
+|  group by: string_col, int_col, smallint_col
+|
+08:EXCHANGE [HASH(string_col,int_col,smallint_col)]
+|
+01:AGGREGATE
+|  group by: string_col, int_col, smallint_col
+|
+00:SCAN HDFS [functional.alltypessmall]
+   partitions=4/4 size=6.32KB
+   predicates: functional.alltypessmall.smallint_col = functional.alltypessmall.int_col
+====
