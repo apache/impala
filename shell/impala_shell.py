@@ -534,7 +534,7 @@ class ImpalaShell(cmd.Cmd):
         print_to_stderr(("Unable to import the python 'ssl' module. It is"
                          " required for an SSL-secured connection."))
         sys.exit(1)
-    except socket.error as (code, e):
+    except socket.error, (code, e):
       # if the socket was interrupted, reconnect the connection with the client
       if code == errno.EINTR:
         self._reconnect_cancellation
@@ -707,7 +707,7 @@ class ImpalaShell(cmd.Cmd):
       print_to_stderr(e)
       self.imp_client.connected = False
       self.prompt = ImpalaShell.DISCONNECTED_PROMPT
-    except socket.error as (code, e):
+    except socket.error, (code, e):
       # if the socket was interrupted, reconnect the connection with the client
       if code == errno.EINTR:
         print ImpalaShell.CANCELLATION_MESSAGE
@@ -1004,7 +1004,7 @@ if __name__ == "__main__":
       intro = '\n'
     # a last measure agaisnt any exceptions thrown by an rpc
     # not caught in the shell
-    except socket.error as (code, e):
+    except socket.error, (code, e):
       # if the socket was interrupted, reconnect the connection with the client
       if code == errno.EINTR:
         print shell.CANCELLATION_MESSAGE
