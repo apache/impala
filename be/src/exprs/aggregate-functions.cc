@@ -752,6 +752,9 @@ struct ReservoirSample {
 
   ReservoirSample() : key(-1) { }
   ReservoirSample(const T& val) : val(val), key(-1) { }
+
+  // Gets a copy of the sample value that allocates memory from ctx, if necessary.
+  T GetValue(FunctionContext* ctx) { return val; }
 };
 
 // Template specialization for StringVal because we do not store the StringVal itself.
@@ -767,6 +770,13 @@ struct ReservoirSample<StringVal> {
   ReservoirSample(const StringVal& string_val) : key(-1) {
     len = min(string_val.len, MAX_STRING_SAMPLE_LEN);
     memcpy(&val[0], string_val.ptr, len);
+  }
+
+  // Gets a copy of the sample value that allocates memory from ctx, if necessary.
+  StringVal GetValue(FunctionContext* ctx) {
+    StringVal result = StringVal(ctx, len);
+    memcpy(result.ptr, &val[0], len);
+    return result;
   }
 };
 
@@ -980,21 +990,20 @@ StringVal AggregateFunctions::HistogramFinalize(FunctionContext* ctx,
 }
 
 template <typename T>
-StringVal AggregateFunctions::AppxMedianFinalize(FunctionContext* ctx,
-    const StringVal& src_val) {
+T AggregateFunctions::AppxMedianFinalize(FunctionContext* ctx, const StringVal& src_val) {
   DCHECK(!src_val.is_null);
   DCHECK_EQ(src_val.len, sizeof(ReservoirSampleState<T>));
 
   ReservoirSampleState<T>* src = reinterpret_cast<ReservoirSampleState<T>*>(src_val.ptr);
+  if (src->num_samples == 0) {
+    ctx->Free(src_val.ptr);
+    return T::null();
+  }
   sort(src->samples, src->samples + src->num_samples, SampleValLess<T>);
 
-  stringstream out;
-  PrintSample<T>(src->samples[src->num_samples / 2], &out);
-  const string& out_str = out.str();
-  StringVal result_str(ctx, out_str.size());
-  memcpy(result_str.ptr, out_str.c_str(), result_str.len);
+  T result = src->samples[src->num_samples / 2].GetValue(ctx);
   ctx->Free(src_val.ptr);
-  return result_str;
+  return result;
 }
 
 void AggregateFunctions::HllInit(FunctionContext* ctx, StringVal* dst) {
@@ -1530,25 +1539,25 @@ template StringVal AggregateFunctions::HistogramFinalize<TimestampVal>(
 template StringVal AggregateFunctions::HistogramFinalize<DecimalVal>(
     FunctionContext*, const StringVal&);
 
-template StringVal AggregateFunctions::AppxMedianFinalize<BooleanVal>(
+template BooleanVal AggregateFunctions::AppxMedianFinalize<BooleanVal>(
     FunctionContext*, const StringVal&);
-template StringVal AggregateFunctions::AppxMedianFinalize<TinyIntVal>(
+template TinyIntVal AggregateFunctions::AppxMedianFinalize<TinyIntVal>(
     FunctionContext*, const StringVal&);
-template StringVal AggregateFunctions::AppxMedianFinalize<SmallIntVal>(
+template SmallIntVal AggregateFunctions::AppxMedianFinalize<SmallIntVal>(
     FunctionContext*, const StringVal&);
-template StringVal AggregateFunctions::AppxMedianFinalize<IntVal>(
+template IntVal AggregateFunctions::AppxMedianFinalize<IntVal>(
     FunctionContext*, const StringVal&);
-template StringVal AggregateFunctions::AppxMedianFinalize<BigIntVal>(
+template BigIntVal AggregateFunctions::AppxMedianFinalize<BigIntVal>(
     FunctionContext*, const StringVal&);
-template StringVal AggregateFunctions::AppxMedianFinalize<FloatVal>(
+template FloatVal AggregateFunctions::AppxMedianFinalize<FloatVal>(
     FunctionContext*, const StringVal&);
-template StringVal AggregateFunctions::AppxMedianFinalize<DoubleVal>(
+template DoubleVal AggregateFunctions::AppxMedianFinalize<DoubleVal>(
     FunctionContext*, const StringVal&);
 template StringVal AggregateFunctions::AppxMedianFinalize<StringVal>(
     FunctionContext*, const StringVal&);
-template StringVal AggregateFunctions::AppxMedianFinalize<TimestampVal>(
+template TimestampVal AggregateFunctions::AppxMedianFinalize<TimestampVal>(
     FunctionContext*, const StringVal&);
-template StringVal AggregateFunctions::AppxMedianFinalize<DecimalVal>(
+template DecimalVal AggregateFunctions::AppxMedianFinalize<DecimalVal>(
     FunctionContext*, const StringVal&);
 
 template void AggregateFunctions::HllUpdate(

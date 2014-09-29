@@ -155,9 +155,8 @@ class AggregateFunctions {
   static StringVal ReservoirSampleFinalize(FunctionContext*, const StringVal& src);
 
   // Returns an approximate median using reservoir sampling.
-  // TODO: Return T when return type does not need to be the intermediate type
   template <typename T>
-  static StringVal AppxMedianFinalize(FunctionContext*, const StringVal& src);
+  static T AppxMedianFinalize(FunctionContext*, const StringVal& src);
 
   // Returns an equi-depth histogram computed from a sample of data produced via
   // reservoir sampling. The result is a comma-separated list of up to 100 histogram

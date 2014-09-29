@@ -34,17 +34,9 @@ using namespace std;
 using namespace boost;
 using namespace boost::accumulators;
 
-template <typename T>
-bool CheckAppxMedian(const StringVal& actual, const StringVal& expected_range) {
-  string actual_str(reinterpret_cast<char*>(actual.ptr), actual.len);
-  T val = lexical_cast<T>(actual_str);
-
-  string range_str(reinterpret_cast<char*>(expected_range.ptr), expected_range.len);
-  int split_idx = range_str.find(",");
-  DCHECK_NE(split_idx, string::npos);
-  T range_start = lexical_cast<T>(range_str.substr(0, split_idx));
-  T range_end = lexical_cast<T>(range_str.substr(split_idx + 1));
-  return val >= range_start && val <= range_end;
+template <int RANGE_START, int RANGE_END>
+bool CheckAppxMedian(const IntVal& actual, const IntVal& expected) {
+  return actual.val >= RANGE_START && actual.val <= RANGE_END;
 }
 
 bool CheckHistogramDistribution(const StringVal& actual,
@@ -75,7 +67,7 @@ TEST(HistogramTest, TestInt) {
       AggregateFunctions::ReservoirSampleMerge<IntVal>,
       AggregateFunctions::ReservoirSampleSerialize<IntVal>,
       AggregateFunctions::HistogramFinalize<IntVal>);
-  UdaTestHarness<StringVal, StringVal, IntVal> test_median(
+  UdaTestHarness<IntVal, StringVal, IntVal> test_median(
       AggregateFunctions::ReservoirSampleInit<IntVal>,
       AggregateFunctions::ReservoirSampleUpdate<IntVal>,
       AggregateFunctions::ReservoirSampleMerge<IntVal>,
@@ -107,9 +99,8 @@ TEST(HistogramTest, TestInt) {
     EXPECT_TRUE(test_histogram.Execute(input, max_expected_stdev))
         << test_histogram.GetErrorMsg();
 
-    test_median.SetResultComparator(CheckAppxMedian<int32_t>);
-    StringVal expected_range = StringVal("45000,55000");
-    EXPECT_TRUE(test_median.Execute(input, expected_range))
+    test_median.SetResultComparator(CheckAppxMedian<45000,55000>);
+    EXPECT_TRUE(test_median.Execute(input, IntVal()))
         << test_median.GetErrorMsg();
   }
 }

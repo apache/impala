@@ -178,25 +178,25 @@ public class BuiltinsDb extends Db {
   private static final Map<Type, String> APPX_MEDIAN_FINALIZE_SYMBOL =
       ImmutableMap.<Type, String>builder()
         .put(Type.BOOLEAN,
-             "18AppxMedianFinalizeIN10impala_udf10BooleanValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
-        .put(Type.TINYINT,
-             "18AppxMedianFinalizeIN10impala_udf10TinyIntValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
-        .put(Type.SMALLINT,
-             "18AppxMedianFinalizeIN10impala_udf11SmallIntValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
-        .put(Type.INT,
-             "18AppxMedianFinalizeIN10impala_udf6IntValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
-        .put(Type.BIGINT,
-             "18AppxMedianFinalizeIN10impala_udf9BigIntValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
-        .put(Type.FLOAT,
-             "18AppxMedianFinalizeIN10impala_udf8FloatValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
-        .put(Type.DOUBLE,
-             "18AppxMedianFinalizeIN10impala_udf9DoubleValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
-        .put(Type.STRING,
-             "18AppxMedianFinalizeIN10impala_udf9StringValEEES3_PNS2_15FunctionContextERKS3_")
-        .put(Type.TIMESTAMP,
-             "18AppxMedianFinalizeIN10impala_udf12TimestampValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
+            "18AppxMedianFinalizeIN10impala_udf10BooleanValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
         .put(Type.DECIMAL,
-             "18AppxMedianFinalizeIN10impala_udf10DecimalValEEENS2_9StringValEPNS2_15FunctionContextERKS4_")
+            "18AppxMedianFinalizeIN10impala_udf10DecimalValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
+        .put(Type.TINYINT,
+            "18AppxMedianFinalizeIN10impala_udf10TinyIntValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
+        .put(Type.SMALLINT,
+            "18AppxMedianFinalizeIN10impala_udf11SmallIntValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
+        .put(Type.TIMESTAMP,
+            "18AppxMedianFinalizeIN10impala_udf12TimestampValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
+        .put(Type.INT,
+            "18AppxMedianFinalizeIN10impala_udf6IntValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
+        .put(Type.FLOAT,
+            "18AppxMedianFinalizeIN10impala_udf8FloatValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
+        .put(Type.BIGINT,
+            "18AppxMedianFinalizeIN10impala_udf9BigIntValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
+        .put(Type.DOUBLE,
+            "18AppxMedianFinalizeIN10impala_udf9DoubleValEEET_PNS2_15FunctionContextERKNS2_9StringValE")
+        .put(Type.STRING,
+            "18AppxMedianFinalizeIN10impala_udf9StringValEEET_PNS2_15FunctionContextERKS3_")
         .build();
 
   private static final Map<Type, String> HISTOGRAM_FINALIZE_SYMBOL =
@@ -521,7 +521,7 @@ public class BuiltinsDb extends Db {
 
       // Approximate median
       db.addBuiltin(AggregateFunction.createBuiltin(db, "appx_median",
-          Lists.newArrayList(t), Type.STRING, Type.STRING,
+          Lists.newArrayList(t), t, Type.STRING,
           prefix + SAMPLE_INIT_SYMBOL.get(t),
           prefix + SAMPLE_UPDATE_SYMBOL.get(t),
           prefix + SAMPLE_MERGE_SYMBOL.get(t),

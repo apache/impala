@@ -1099,11 +1099,27 @@ select histogram(d1) from functional.decimal_tbl;
 STRING
 ====
 ---- QUERY
-select appx_median(d1) from functional.decimal_tbl;
+select
+appx_median(bool_col),
+appx_median(tinyint_col),
+appx_median(smallint_col),
+appx_median(int_col),
+appx_median(float_col),
+appx_median(double_col),
+appx_median(string_col),
+appx_median(timestamp_col)
+from alltypestiny
 ---- RESULTS
-'12345'
+true,1,1,1,1.100000023841858,10.1,'1',2009-03-01 00:00:00
 ---- TYPES
-STRING
+BOOLEAN, TINYINT, SMALLINT, INT, FLOAT, DOUBLE, STRING, TIMESTAMP
+====
+---- QUERY
+select appx_median(c1), appx_median(c2), appx_median(c3) from decimal_tiny
+---- RESULTS
+5.5550,161.11100,0.5
+---- TYPES
+DECIMAL, DECIMAL, DECIMAL
 ====
 ---- QUERY
 select sample(d1) from functional.decimal_tbl;
