@@ -159,13 +159,15 @@ bool HashTableCtx::Equals(TupleRow* build_row) {
 const float HashTable::MAX_BUCKET_OCCUPANCY_FRACTION = 0.75f;
 
 HashTable::HashTable(RuntimeState* state, BufferedBlockMgr::Client* client,
-    int num_build_tuples, BufferedTupleStream* stream, int64_t num_buckets)
+    int num_build_tuples, BufferedTupleStream* stream, int64_t max_num_buckets,
+    int64_t num_buckets)
   : state_(state),
     block_mgr_client_(client),
     tuple_stream_(stream),
     data_page_pool_(NULL),
     num_build_tuples_(num_build_tuples),
     stores_tuples_(num_build_tuples == 1),
+    max_num_buckets_(max_num_buckets),
     num_filled_buckets_(0),
     num_nodes_(0),
     next_node_(NULL),
@@ -185,6 +187,7 @@ HashTable::HashTable(MemPool* pool, int num_buckets)
     data_page_pool_(pool),
     num_build_tuples_(1),
     stores_tuples_(true),
+    max_num_buckets_(-1),
     num_filled_buckets_(0),
     num_nodes_(0),
     next_node_(NULL),
@@ -256,6 +259,8 @@ bool HashTable::ResizeBuckets(int64_t num_buckets) {
       << "num_buckets=" << num_buckets << " must be a power of 2";
   VLOG(2) << "Resizing hash table from "
           << num_buckets_ << " to " << num_buckets << " buckets.";
+
+  if (max_num_buckets_ != -1 && num_buckets > max_num_buckets_) return false;
 
   int64_t old_num_buckets = num_buckets_;
   // All memory that can grow proportional to the input should come from the block mgrs

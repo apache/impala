@@ -298,7 +298,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
       HashTable::EstimatedNumBuckets(build_rows()->num_rows());
   hash_tbl_.reset(new HashTable(state, parent_->block_mgr_client_,
       parent_->child(1)->row_desc().tuple_descriptors().size(), build_rows(),
-      estimated_num_buckets));
+      1 << (32 - NUM_PARTITIONING_BITS), estimated_num_buckets));
   if (!hash_tbl_->Init()) goto not_built;
 
   while (!eos) {

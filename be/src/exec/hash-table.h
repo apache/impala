@@ -262,10 +262,14 @@ class HashTable {
   //  - tuple_stream: the tuple stream which contains the tuple rows index by the
   //    hash table. Can be NULL if the rows contain only a single tuple, in which
   //    the 'tuple_stream' is unused.
-  //  - num_buckets: number of buckets that the hash table should be initialized to.
+  //  - max_num_buckets: the maximum number of buckets that can be stored. If we
+  //    try to grow the number of buckets to a larger number, the inserts will fail.
+  //    -1, if it unlimited.
+  //  - initial_num_buckets: number of buckets that the hash table
+  //    should be initialized with.
   HashTable(RuntimeState* state, BufferedBlockMgr::Client* client,
       int num_build_tuples, BufferedTupleStream* tuple_stream = NULL,
-      int64_t num_buckets = 1024);
+      int64_t max_num_buckets = -1, int64_t initial_num_buckets = 1024);
 
   // Ctor used only for testing. Memory is allocated from the pool instead of the
   // block mgr.
@@ -519,6 +523,8 @@ class HashTable {
   // TODO: these constants are an ideal candidate to be removed with codegen.
   // TODO: ..or with template-ization
   const bool stores_tuples_;
+
+  const int64_t max_num_buckets_;
 
   // Number of non-empty buckets.  Used to determine when to grow and rehash
   int64_t num_filled_buckets_;
