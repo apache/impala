@@ -70,8 +70,7 @@ class FunctionContextImpl {
   // TODO: free them at the batch level and save some copies?
   uint8_t* AllocateLocal(int byte_size);
 
-  // Frees all allocations returned by AllocateLocal(). Note that this marks all local
-  // allocations as availble for reuse; it does not actually free the memory.
+  // Frees all allocations returned by AllocateLocal().
   void FreeLocalAllocations();
 
   // Sets constant_args_. The AnyVal* values are owned by the caller.

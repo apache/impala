@@ -90,14 +90,10 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   // right and left children, respectively
   RETURN_IF_ERROR(Expr::Prepare(build_expr_ctxs_, state, child(1)->row_desc()));
   RETURN_IF_ERROR(Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc()));
-  state->AddExprCtxsToFree(probe_expr_ctxs_);
-  // Don't add build_expr_ctxs_ to runtime state, since they will potentially be evaluated
-  // in separate build thread
 
   // other_join_conjunct_ctxs_ are evaluated in the context of the rows produced by this
   // node
   RETURN_IF_ERROR(Expr::Prepare(other_join_conjunct_ctxs_, state, row_descriptor_));
-  state->AddExprCtxsToFree(other_join_conjunct_ctxs_);
 
   // We need two output buffer per partition (one for build and one for probe) and
   // and one additional buffer either for the input (while repartitioning).
@@ -473,9 +469,7 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
   bool eos = false;
   int64_t total_build_rows = 0;
   while (!eos) {
-    RETURN_IF_CANCELLED(state);
-    RETURN_IF_ERROR(state->QueryMaintenance());
-    ExprContext::FreeLocalAllocations(build_expr_ctxs_);
+    RETURN_IF_ERROR(state->CheckQueryState());
     if (input_partition_ == NULL) {
       // If we are still consuming batches from the build side.
       RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch, &eos));
@@ -659,7 +653,7 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
   while (true) {
     DCHECK_NE(state_, PARTITIONING_BUILD) << "Should not be in GetNext()";
     RETURN_IF_CANCELLED(state);
-    RETURN_IF_ERROR(state->QueryMaintenance());
+    RETURN_IF_ERROR(state->CheckQueryState());
 
     if ((join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
          join_op_ == TJoinOp::FULL_OUTER_JOIN) &&

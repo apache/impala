@@ -133,13 +133,10 @@ Status HdfsScanner::CommitRows(int num_rows) {
     context_->ReleaseCompletedResources(batch_, /* done */ false);
     scan_node_->AddMaterializedRowBatch(batch_);
     StartNewRowBatch();
-
-    // Free local allocations made by this thread's conjuncts.
-    ExprContext::FreeLocalAllocations(conjunct_ctxs_);
   }
 
   if (context_->cancelled()) return Status::CANCELLED;
-  RETURN_IF_ERROR(state_->QueryMaintenance());
+  RETURN_IF_ERROR(state_->CheckQueryState());
   return Status::OK;
 }
 

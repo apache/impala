@@ -135,7 +135,7 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
 Status HdfsScanNode::GetNextInternal(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->QueryMaintenance());
+  RETURN_IF_ERROR(state->CheckQueryState());
 
   {
     unique_lock<mutex> l(lock_);
@@ -477,7 +477,6 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::CreateExprTrees(
       runtime_state_->obj_pool(), thrift_plan_node_->conjuncts, &conjunct_ctxs_));
   RETURN_IF_ERROR(Expr::Prepare(conjunct_ctxs_, runtime_state_, row_desc()));
-  state->AddExprCtxsToFree(conjunct_ctxs_);
 
   // Create reusable codegen'd functions for each file type type needed
   for (int format = THdfsFileFormat::TEXT;

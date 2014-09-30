@@ -142,8 +142,6 @@ Status ExecNode::Prepare(RuntimeState* state) {
         runtime_profile()->total_time_counter()));
 
   RETURN_IF_ERROR(Expr::Prepare(conjunct_ctxs_, state, row_desc()));
-  state->AddExprCtxsToFree(conjunct_ctxs_);
-
   for (int i = 0; i < children_.size(); ++i) {
     RETURN_IF_ERROR(children_[i]->Prepare(state));
   }

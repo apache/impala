@@ -43,7 +43,6 @@ Status HBaseTableSink::PrepareExprs(RuntimeState* state) {
                                         &output_expr_ctxs_));
   // Prepare the exprs to run.
   RETURN_IF_ERROR(Expr::Prepare(output_expr_ctxs_, state, row_desc_));
-  state->AddExprCtxsToFree(output_expr_ctxs_);
   return Status::OK;
 }
 

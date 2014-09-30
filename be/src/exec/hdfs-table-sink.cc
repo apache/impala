@@ -72,8 +72,6 @@ Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
   // TODO: codegen table sink
   RETURN_IF_ERROR(Expr::Prepare(output_expr_ctxs_, state, row_desc_));
   RETURN_IF_ERROR(Expr::Prepare(partition_key_expr_ctxs_, state, row_desc_));
-  state->AddExprCtxsToFree(output_expr_ctxs_);
-  state->AddExprCtxsToFree(partition_key_expr_ctxs_);
 
   // Prepare partition key exprs and gather dynamic partition key exprs.
   for (size_t i = 0; i < partition_key_expr_ctxs_.size(); ++i) {

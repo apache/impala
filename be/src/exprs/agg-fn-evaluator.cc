@@ -131,7 +131,6 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
   output_slot_desc_ = output_slot_desc;
 
   RETURN_IF_ERROR(Expr::Prepare(input_expr_ctxs_, state, desc));
-  state->AddExprCtxsToFree(input_expr_ctxs_);
 
   ObjectPool* obj_pool = state->obj_pool();
   for (int i = 0; i < input_expr_ctxs_.size(); ++i) {

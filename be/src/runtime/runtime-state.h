@@ -47,7 +47,7 @@ class DescriptorTbl;
 class ObjectPool;
 class Status;
 class ExecEnv;
-class ExprContext;
+class Expr;
 class LlvmCodeGen;
 class TimestampValue;
 class DataStreamRecvr;
@@ -265,27 +265,10 @@ class RuntimeState {
   Status SetMemLimitExceeded(MemTracker* tracker = NULL,
       int64_t failed_allocation_size = 0);
 
-  // Performs general query mainenance (e.g. calls FreeLocalExprAllocations()) and returns
-  // a non-OK status if query execution should stop (e.g., the query was cancelled or a
-  // mem limit was exceeded). Exec nodes should call this periodically, e.g. once per
-  // input row batch.
-  Status QueryMaintenance();
-
-  // Add an ExprContext to have its local allocations freed by FreeLocalExprAllocations().
-  // Exprs that are evaluated in the main execution thread should be added. Exprs
-  // evaluated in a separate thread are generally not safe to add, since a local
-  // allocation may be freed while it's being used. Rather than using this mechanism,
-  // threads should call FreeLocalAllocations() on local ExprContexts periodically.
-  void AddExprCtxToFree(ExprContext* ctx) { expr_ctxs_to_free_.push_back(ctx); }
-  void AddExprCtxsToFree(const std::vector<ExprContext*>& ctxs) {
-    for (int i = 0; i < ctxs.size(); ++i) AddExprCtxToFree(ctxs[i]);
-  }
-
-  // Free any local allocations from ExprContexts registered with AddExprCtxToFree(). This
-  // should be called periodically by exec nodes to reduce the memory footprint of the
-  // query. This is called in QueryMaintenance(), so it's generally not necessary to call
-  // it explicitly.
-  void FreeLocalExprAllocations();
+  // Returns a non-OK status if query execution should stop (e.g., the query was cancelled
+  // or a mem limit was exceeded). Exec nodes should check this periodically so execution
+  // doesn't continue if the query terminates abnormally.
+  Status CheckQueryState();
 
   QueryResourceMgr* query_resource_mgr() const { return query_resource_mgr_; }
   void SetQueryResourceMgr(QueryResourceMgr* res_mgr) { query_resource_mgr_ = res_mgr; }
@@ -403,8 +386,6 @@ class RuntimeState {
   // Bitmap filter on the hash for 'SlotId'. If bitmap[hash(slot]] is unset, this
   // value can be filtered out. These filters are generated during the query execution.
   boost::unordered_map<SlotId, Bitmap*> slot_bitmap_filters_;
-
-  std::vector<ExprContext*> expr_ctxs_to_free_;
 
   // prohibit copies
   RuntimeState(const RuntimeState&);

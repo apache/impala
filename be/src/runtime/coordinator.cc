@@ -342,7 +342,6 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<ExprContext*>* output_e
     RETURN_IF_ERROR(Expr::CreateExprTrees(
         runtime_state()->obj_pool(), request.fragments[0].output_exprs, output_expr_ctxs));
     RETURN_IF_ERROR(Expr::Prepare(*output_expr_ctxs, runtime_state(), row_desc()));
-    runtime_state()->AddExprCtxsToFree(*output_expr_ctxs);
   } else {
     // The coordinator instance may require a query mem tracker even if there is no
     // coordinator fragment. For example, result-caching tracks memory via the query mem
