@@ -289,3 +289,23 @@ from decimal_tiny where c2 < 112
 ---- TYPES
 DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
 ====
+---- QUERY
+select histogram(d1) from decimal_tbl;
+---- RESULTS
+'1234, 2345, 12345, 12345, 132842'
+---- TYPES
+STRING
+====
+---- QUERY
+select appx_median(c1), appx_median(c2), appx_median(c3) from decimal_tiny
+---- RESULTS
+5.5550,161.11100,0.5
+---- TYPES
+DECIMAL, DECIMAL, DECIMAL
+====
+---- QUERY
+select sample(d1) from decimal_tbl;
+---- TYPES
+# Results are unstable, just check that this doesn't crash
+STRING
+====
