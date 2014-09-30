@@ -100,7 +100,6 @@ ResourceBroker::ResourceBroker(const vector<TNetworkAddress>& llama_addresses,
         FLAGS_resource_broker_send_timeout,
         FLAGS_resource_broker_recv_timeout,
         LLAMA_KERBEROS_SERVICE_NAME)) {
-  DCHECK_GT(llama_addresses_.size(), 0);
   DCHECK(metrics != NULL);
   active_llama_metric_ = metrics->CreateAndRegisterPrimitiveMetric<string>(
       "resource-broker.active-llama", "none");
@@ -168,6 +167,10 @@ Status ResourceBroker::Init() {
   // The scheduler must have been set before calling Init().
   DCHECK(scheduler_ != NULL);
   DCHECK(llama_callback_thrift_iface_ != NULL);
+  if (llama_addresses_.size() == 0) {
+    return Status("No Llama addresses configured (see --llama_addresses)");
+  }
+
   shared_ptr<TProcessor> llama_callback_proc(
       new llama::LlamaNotificationServiceProcessor(llama_callback_thrift_iface_));
   llama_callback_server_.reset(new ThriftServer("llama-callback", llama_callback_proc,

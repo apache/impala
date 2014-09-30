@@ -76,11 +76,11 @@ DEFINE_int32(llama_callback_port, 28000,
              "Port where Llama notification callback should be started");
 // TODO: Deprecate llama_host and llama_port in favor of the new llama_hostports.
 // This needs to be coordinated with CM.
-DEFINE_string(llama_host, "127.0.0.1",
+DEFINE_string(llama_host, "",
               "Host of Llama service that the resource broker should connect to");
 DEFINE_int32(llama_port, 15000,
              "Port of Llama service that the resource broker should connect to");
-DEFINE_string(llama_addresses, "127.0.0.1:15000",
+DEFINE_string(llama_addresses, "",
              "Llama availability group given as a comma-separated list of hostports.");
 DEFINE_int64(llama_registration_timeout_secs, 30,
              "Maximum number of seconds that Impala will attempt to (re-)register "
@@ -217,22 +217,27 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
 void ExecEnv::InitRm() {
   // Unique addresses from FLAGS_llama_addresses and FLAGS_llama_host/FLAGS_llama_port.
   vector<TNetworkAddress> llama_addresses;
-  vector<string> components;
-  split(components, FLAGS_llama_addresses, is_any_of(","), token_compress_on);
-  for (int i = 0; i < components.size(); ++i) {
-    to_lower(components[i]);
-    TNetworkAddress llama_address = MakeNetworkAddress(components[i]);
+  if (!FLAGS_llama_addresses.empty()) {
+    vector<string> components;
+    split(components, FLAGS_llama_addresses, is_any_of(","), token_compress_on);
+    for (int i = 0; i < components.size(); ++i) {
+      to_lower(components[i]);
+      TNetworkAddress llama_address = MakeNetworkAddress(components[i]);
+      if (find(llama_addresses.begin(), llama_addresses.end(), llama_address)
+          == llama_addresses.end()) {
+        llama_addresses.push_back(llama_address);
+      }
+    }
+  }
+  // Add Llama hostport from deprecated flags (if it does not already exist).
+  if (!FLAGS_llama_host.empty()) {
+    to_lower(FLAGS_llama_host);
+    TNetworkAddress llama_address =
+        MakeNetworkAddress(FLAGS_llama_host, FLAGS_llama_port);
     if (find(llama_addresses.begin(), llama_addresses.end(), llama_address)
         == llama_addresses.end()) {
       llama_addresses.push_back(llama_address);
     }
-  }
-  // Add Llama hostport from deprecated flags (if it does not already exist).
-  to_lower(FLAGS_llama_host);
-  TNetworkAddress llama_address = MakeNetworkAddress(FLAGS_llama_host, FLAGS_llama_port);
-  if (find(llama_addresses.begin(), llama_addresses.end(), llama_address)
-      == llama_addresses.end()) {
-    llama_addresses.push_back(llama_address);
   }
   for (int i = 0; i < llama_addresses.size(); ++i) {
     LOG(INFO) << "Llama address " << i << ": " << llama_addresses[i];
