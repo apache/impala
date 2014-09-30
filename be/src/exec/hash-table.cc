@@ -458,7 +458,7 @@ Function* HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build) {
   const vector<ExprContext*>& ctxs = build ? build_expr_ctxs_ : probe_expr_ctxs_;
   for (int i = 0; i < ctxs.size(); ++i) {
     PrimitiveType type = ctxs[i]->root()->type().type;
-    if (type == TYPE_TIMESTAMP || type == TYPE_DECIMAL) return NULL;
+    if (type == TYPE_TIMESTAMP || type == TYPE_DECIMAL || type == TYPE_CHAR) return NULL;
   }
 
   LlvmCodeGen* codegen;
@@ -582,6 +582,11 @@ Function* HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build) {
 //   ret i32 %7
 // }
 Function* HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murmur) {
+  for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
+    // Disable codegen for CHAR
+    if (build_expr_ctxs_[i]->root()->type().type == TYPE_CHAR) return NULL;
+  }
+
   LlvmCodeGen* codegen;
   if (!state->GetCodegen(&codegen).ok()) return NULL;
 
@@ -750,6 +755,11 @@ Function* HashTableCtx::CodegenHashCurrentRow(RuntimeState* state, bool use_murm
 //   ret i1 true
 // }
 Function* HashTableCtx::CodegenEquals(RuntimeState* state) {
+  for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
+    // Disable codegen for CHAR
+    if (build_expr_ctxs_[i]->root()->type().type == TYPE_CHAR) return NULL;
+  }
+
   LlvmCodeGen* codegen;
   if (!state->GetCodegen(&codegen).ok()) return NULL;
   // Get types to generate function prototype

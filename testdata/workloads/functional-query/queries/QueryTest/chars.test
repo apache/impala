@@ -229,3 +229,12 @@ string
 '6c'
 'c'
 ====
+---- QUERY
+# Regression test for IMPALA-1322
+select count(*) from functional.chars_tiny as A, functional.chars_tiny as B 
+where cast(A.cs as CHAR(1)) = cast(B.vc as CHAR(1));
+---- TYPES
+bigint
+---- RESULTS
+9
+====

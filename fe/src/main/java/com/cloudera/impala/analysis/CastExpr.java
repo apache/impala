@@ -179,6 +179,19 @@ public class CastExpr extends Expr {
           "Unsupported cast to complex type: " + targetType_.toSql());
     }
 
+    boolean readyForCharCast =
+        children_.get(0).getType().getPrimitiveType() == PrimitiveType.STRING ||
+        children_.get(0).getType().getPrimitiveType() == PrimitiveType.CHAR;
+    if (targetType_.getPrimitiveType() == PrimitiveType.CHAR && !readyForCharCast) {
+      // Back end functions only exist to cast string types to CHAR, there is not a cast
+      // for every type since it is redundant with STRING. Casts to go through 2 casts:
+      // (1) cast to string, to stringify the value
+      // (2) cast to CHAR, to truncate or pad with spaces
+      CastExpr tostring = new CastExpr(ScalarType.STRING, children_.get(0), true);
+      tostring.analyze();
+      children_.set(0, tostring);
+    }
+
     if (children_.get(0) instanceof NumericLiteral &&
         targetType_.isFloatingPointType()) {
       // Special case casting a decimal literal to a floating point number. The
@@ -220,6 +233,7 @@ public class CastExpr extends Expr {
       throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +
           " from " + childType + " to " + targetType_);
     }
+
     Preconditions.checkState(targetType_.matchesType(fn_.getReturnType()),
         targetType_ + " != " + fn_.getReturnType());
     type_ = targetType_;

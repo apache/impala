@@ -344,6 +344,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testExprCast("cast('Hello' as VARCHAR(7))", ScalarType.createCharType(5));
     testExprCast("cast('Hello' as CHAR(5))", ScalarType.createVarcharType(5));
     testExprCast("cast('Hello' as VARCHAR(5))", ScalarType.createCharType(5));
+    testExprCast("1", ScalarType.createCharType(5));
 
     /* TODO re-enable when we have determined behavior for casting to VARCHAR
     testExprCast("cast('abcde' as char(10)) IN " +

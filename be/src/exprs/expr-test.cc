@@ -1579,31 +1579,39 @@ TEST_F(ExprTest, StringFunctions) {
       "                                                           ",
       ColumnType::CreateCharType(130));
 
-  if (disable_codegen_) {
-    // TODO remove if guard once CHAR codegen is committed
-    TestCharValue("cast('HELLO' as CHAR(3))", "HEL",
-                  ColumnType::CreateCharType(3));
-    TestCharValue("cast('HELLO' as CHAR(7))", "HELLO  ",
-                  ColumnType::CreateCharType(7));
-    TestCharValue("cast('HELLO' as CHAR(70))",
-        "HELLO                                                                 ",
-        ColumnType::CreateCharType(70));
-    TestValue("cast('HELLO' as CHAR(7)) = 'HELLO  '", TYPE_BOOLEAN, true);
-    TestValue("cast('HELLO' as CHAR(7)) = cast('HELLO' as CHAR(5))", TYPE_BOOLEAN, true);
-    TestStringValue("lower(cast('HELLO' as CHAR(3)))", "hel");
-    TestStringValue("lower(cast(123456 as CHAR(3)))", "123");
-    TestStringValue("cast(cast(123456 as CHAR(3)) as VARCHAR(3))", "123");
-    TestIsNull("cast(NULL as CHAR(3))", ColumnType::CreateCharType(3));
+  TestCharValue("cast(cast('HELLO' as VARCHAR(3)) as CHAR(3))", "HEL",
+                ColumnType::CreateCharType(3));
+  TestStringValue("cast(cast('HELLO' as CHAR(3)) as VARCHAR(3))", "HEL");
+  TestCharValue("cast(cast('HELLO' as VARCHAR(7)) as CHAR(7))", "HELLO  ",
+                ColumnType::CreateCharType(7));
+  TestCharValue("cast(cast('HELLO' as STRING) as CHAR(7))", "HELLO  ",
+                ColumnType::CreateCharType(7));
+  TestStringValue("cast(cast('HELLO' as CHAR(7)) as VARCHAR(7))", "HELLO  ");
+  TestStringValue("cast(cast('HELLO' as CHAR(5)) as VARCHAR(3))", "HEL");
+  TestCharValue("cast(cast('HELLO' as VARCHAR(7)) as CHAR(3))", "HEL",
+                ColumnType::CreateCharType(3));
 
-    TestIsNull("length(cast(NULL as CHAR(3)))", TYPE_INT);
-    TestIsNull("length(cast(NULL as CHAR(256)))", TYPE_INT);
-    TestValue("length(cast('foo' as CHAR(5)))", TYPE_INT, 3);
-    TestValue("length(cast('foo ' as CHAR(5)))", TYPE_INT, 3);
-    TestValue("length(cast('foo aXX' as CHAR(5)))", TYPE_INT, 5);
-    TestValue("length(cast('' as CHAR(5)))", TYPE_INT, 0);
-    TestValue("length(cast(' ' as CHAR(5)))", TYPE_INT, 0);
-    TestValue("length(cast('x' as CHAR(256)))", TYPE_INT, 1);
-  }
+  TestCharValue("cast(5 as char(5))", "5    ", ColumnType::CreateCharType(5));
+  TestCharValue("cast(5.1 as char(5))", "5.1  ", ColumnType::CreateCharType(5));
+  TestCharValue("cast(cast(1 as decimal(2,1)) as char(5))", "1.0  ",
+                ColumnType::CreateCharType(5));
+  TestCharValue("cast(cast('2014-09-30 10:35:10.632995000' as TIMESTAMP) as char(35))",
+                "2014-09-30 10:35:10.632995000      ",
+                ColumnType::CreateCharType(35));
+
+  TestCharValue("cast('HELLO' as CHAR(3))", "HEL",
+                ColumnType::CreateCharType(3));
+  TestCharValue("cast('HELLO' as CHAR(7))", "HELLO  ",
+                ColumnType::CreateCharType(7));
+  TestCharValue("cast('HELLO' as CHAR(70))",
+      "HELLO                                                                 ",
+      ColumnType::CreateCharType(70));
+  TestValue("cast('HELLO' as CHAR(7)) = 'HELLO  '", TYPE_BOOLEAN, true);
+  TestValue("cast('HELLO' as CHAR(7)) = cast('HELLO' as CHAR(5))", TYPE_BOOLEAN, true);
+  TestStringValue("lower(cast('HELLO' as CHAR(3)))", "hel");
+  TestStringValue("lower(cast(123456 as CHAR(3)))", "123");
+  TestStringValue("cast(cast(123456 as CHAR(3)) as VARCHAR(3))", "123");
+  TestIsNull("cast(NULL as CHAR(3))", ColumnType::CreateCharType(3));
 }
 
 TEST_F(ExprTest, StringRegexpFunctions) {
