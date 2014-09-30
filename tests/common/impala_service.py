@@ -45,7 +45,7 @@ class BaseImpalaService(object):
 
     while (time() - start_time < timeout):
       try:
-        return urllib.urlopen("http://%s:%d/%s" %\
+        return urllib.urlopen("http://%s:%d/%s" %
             (self.hostname, int(self.webserver_port), page_name)).read()
       except Exception:
         LOG.info("Debug webpage not yet available.")
@@ -60,7 +60,7 @@ class BaseImpalaService(object):
   def wait_for_metric_value(self, metric_name, expected_value, timeout=10, interval=1):
     start_time = time()
     while (time() - start_time < timeout):
-      LOG.info("Getting metric: %s from %s:%s" %\
+      LOG.info("Getting metric: %s from %s:%s" %
           (metric_name, self.hostname, self.webserver_port))
       value = None
       try:
@@ -72,7 +72,7 @@ class BaseImpalaService(object):
         LOG.info("Metric '%s' has reach desired value: %s" % (metric_name, value))
         return value
       else:
-        LOG.info("Waiting for metric value '%s'=%s. Current value: %s" %\
+        LOG.info("Waiting for metric value '%s'=%s. Current value: %s" %
             (metric_name, expected_value, value))
       LOG.info("Sleeping %ds before next retry." % interval)
       sleep(interval)
@@ -88,17 +88,29 @@ class ImpaladService(BaseImpalaService):
     self.be_port = be_port
 
   def get_num_known_live_backends(self, timeout=30, interval=1):
-    LOG.info("Getting num_known_live_backends from %s:%s" %\
+    LOG.info("Getting num_known_live_backends from %s:%s" %
         (self.hostname, self.webserver_port))
     result = json.loads(self.read_debug_webpage('backends?json', timeout, interval))
     num = result['num_backends']
     return None if num is None else int(num)
 
   def get_num_in_flight_queries(self, timeout=30, interval=1):
-    LOG.info("Getting num_in_flight_queries from %s:%s" %\
+    LOG.info("Getting num_in_flight_queries from %s:%s" %
         (self.hostname, self.webserver_port))
     result = self.read_debug_webpage('inflight_query_ids?raw', timeout, interval)
     return None if result is None else len([l for l in result.split('\n') if l])
+
+  def wait_for_num_in_flight_queries(self, expected_val, timeout=10):
+    """Waits for the number of in-flight queries to reach a certain value"""
+    start_time = time()
+    while (time() - start_time < timeout):
+      num_in_flight_queries = self.get_num_in_flight_queries()
+      if num_in_flight_queries == expected_val: return True
+      sleep(1)
+    LOG.info("The number of in flight queries: %s, expected: %s" %
+        (num_in_flight_queries, expected_val))
+    return False
+
 
   def wait_for_num_known_live_backends(self, expected_value, timeout=30, interval=1):
     start_time = time()

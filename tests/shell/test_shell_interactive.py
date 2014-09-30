@@ -31,7 +31,22 @@ SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
 
 class TestImpalaShellInteractive(object):
   """Test the impala shell interactively"""
-  # TODO: Add cancellation tests
+
+  def _send_cmd_to_shell(self, p, cmd):
+    """Given an open shell process, write a cmd to stdin
+
+    This method takes care of adding the delimiter and EOL, callers should send the raw
+    command.
+    """
+    p.stdin.write("%s;\n" % cmd)
+    p.stdin.flush()
+
+  def _start_new_shell_process(self, args=None):
+    """Starts a shell process and returns the process handle"""
+    cmd = "%s %s" % (SHELL_CMD, args) if args else SHELL_CMD
+    return Popen(shlex.split(SHELL_CMD), shell=True, stdout=PIPE,
+                 stdin=PIPE, stderr=PIPE)
+
   @pytest.mark.execute_serially
   def test_escaped_quotes(self):
     """Test escaping quotes"""
@@ -49,10 +64,8 @@ class TestImpalaShellInteractive(object):
   @pytest.mark.execute_serially
   def test_cancellation(self):
     command = "select sleep(10000);"
-    p = Popen(shlex.split(SHELL_CMD), shell=True,
-              stdout=PIPE, stdin=PIPE, stderr=PIPE)
-    p.stdin.write(command + "\n")
-    p.stdin.flush()
+    p = self._start_new_shell_process()
+    self._send_cmd_to_shell(p, command)
     sleep(1)
     # iterate through all processes with psutil
     shell_pid = cancellation_helper()
@@ -107,14 +120,12 @@ class TestImpalaShellInteractive(object):
     num_sessions_initial = get_num_open_sessions(initial_impala_service)
     num_sessions_target = get_num_open_sessions(target_impala_service)
     # Connect to localhost:21000 (default)
-    p = Popen(shlex.split(SHELL_CMD), shell=True,
-              stdout=PIPE, stdin=PIPE, stderr=PIPE)
+    p = self._start_new_shell_process()
     sleep(2)
     # Make sure we're connected <hostname>:21000
     assert get_num_open_sessions(initial_impala_service) == num_sessions_initial + 1, \
         "Not connected to %s:21000" % hostname
-    p.stdin.write("connect %s:21001;\n" % hostname)
-    p.stdin.flush()
+    self._send_cmd_to_shell(p, "connect %s:21001" % hostname)
     # Wait for a little while
     sleep(2)
     # The number of sessions on the target impalad should have been incremented.
@@ -124,6 +135,39 @@ class TestImpalaShellInteractive(object):
     assert get_num_open_sessions(initial_impala_service) == num_sessions_initial, \
         "Connection to %s:21000 should have been closed" % hostname
 
+  @pytest.mark.execute_serially
+  def test_ddl_queries_are_closed(self):
+    """Regression test for IMPALA-1317
+
+    The shell does not call close() for alter, use and drop queries, leaving them in
+    flight. This test issues those queries in interactive mode, and checks the debug
+    webpage to confirm that they've been closed.
+    TODO: Add every statement type.
+    """
+
+    TMP_DB = 'inflight_test_db'
+    TMP_TBL = 'tmp_tbl'
+    MSG = '%s query should be closed'
+    NUM_QUERIES = 'impala-server.num-queries'
+
+    impalad = ImpaladService(socket.getfqdn())
+    p = self._start_new_shell_process()
+    try:
+      start_num_queries = impalad.get_metric_value(NUM_QUERIES)
+      self._send_cmd_to_shell(p, 'create database if not exists %s' % TMP_DB)
+      self._send_cmd_to_shell(p, 'use %s' % TMP_DB)
+      impalad.wait_for_metric_value(NUM_QUERIES, start_num_queries + 2)
+      assert impalad.wait_for_num_in_flight_queries(0), MSG % 'use'
+      self._send_cmd_to_shell(p, 'create table %s(i int)' % TMP_TBL)
+      self._send_cmd_to_shell(p, 'alter table %s add columns (j int)' % TMP_TBL)
+      impalad.wait_for_metric_value(NUM_QUERIES, start_num_queries + 4)
+      assert impalad.wait_for_num_in_flight_queries(0), MSG % 'alter'
+      self._send_cmd_to_shell(p, 'drop table %s' % TMP_TBL)
+      impalad.wait_for_metric_value(NUM_QUERIES, start_num_queries + 5)
+      assert impalad.wait_for_num_in_flight_queries(0), MSG % 'drop'
+    finally:
+      run_impala_shell_interactive("drop table if exists %s.%s;" % (TMP_DB, TMP_TBL))
+      run_impala_shell_interactive("drop database if exists foo;")
 
 def run_impala_shell_interactive(command, shell_args=''):
   """Runs a command in the Impala shell interactively."""

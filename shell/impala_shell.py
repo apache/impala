@@ -663,6 +663,8 @@ class ImpalaShell(cmd.Cmd):
       else:
         # impalad does not support the fetching of metadata for certain types of queries.
         if not self.imp_client.expect_result_metadata(query.query):
+          # Close the query
+          self.imp_client.close_query(self.last_query_handle)
           self.query_handle_closed = True
           return CmdStatus.SUCCESS
 
