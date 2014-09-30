@@ -516,14 +516,15 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
     const TUniqueId& session_id = ThriftServer::GetThreadConnectionId();
     RETURN_IF_ERROR(GetSessionState(session_id, &session));
     DCHECK(session != NULL);
+    {
+      // The session is created when the client connects. Depending on the underlying
+      // transport, the username may be known at that time. If the username hasn't been
+      // set yet, set it now.
+      lock_guard<mutex> l(session->lock);
+      if (session->connected_user.empty()) session->connected_user = query.hadoop_user;
+      query_ctx->request.query_options = session->default_query_options;
+    }
     session->ToThrift(session_id, &query_ctx->session);
-    // The session is created when the client connects. Depending on the underlying
-    // transport, the username may be known at that time. If the username hasn't been set
-    // yet, set it now.
-    lock_guard<mutex> l(session->lock);
-    if (session->connected_user.empty()) session->connected_user = query.hadoop_user;
-    query_ctx->session.connected_user = session->connected_user;
-    query_ctx->request.query_options = session->default_query_options;
   }
 
   // Override default query options with Query.Configuration

@@ -18,16 +18,25 @@
  * limitations under the License.
  *
  ******************************************************************************/
-#include "config.h"
+#include "transport/config.h"
 #ifdef HAVE_SASL_SASL_H
 
 #include <cstring>
 #include <sstream>
 #include <transport/TSasl.h>
+#include <boost/algorithm/string.hpp>
+
+#include "common/logging.h"
+
+DEFINE_bool(force_lowercase_usernames, false, "If true, all principals and usernames are"
+    " mapped to lowercase shortnames before being passed to any components (Sentry, "
+    "admission control) for authorization");
 
 using namespace std;
+using namespace boost;
 
 namespace sasl {
+
 uint8_t* TSasl::unwrap(const uint8_t* incoming,
                        const int offset, const uint32_t len, uint32_t* outLen) {
   uint32_t outputlen;
@@ -69,7 +78,22 @@ string TSasl::getUsername() {
   }
   // Copy the username and return it to the caller. There is no cleanup/delete call for
   // calls to sasl_getprops, the sasl layer handles the cleanup internally.
-  return string(username, strlen(username));
+  string ret(username);
+
+  // Temporary fix to auth_to_local-style lowercase mapping from
+  // USER_NAME/REALM@DOMAIN.COM -> user_name/REALM@DOMAIN.COM
+  //
+  // TODO: The right fix is probably to use UserGroupInformation in the frontend which
+  // will use auth_to_local rules to do this.
+  if (FLAGS_force_lowercase_usernames) {
+    vector<string> components;
+    split(components, ret, is_any_of("@"));
+    if (components.size() > 0 ) {
+      to_lower(components[0]);
+      ret = join(components, "@");
+    }
+  }
+  return ret;
 }
 
 TSaslClient::TSaslClient(const string& mechanisms, const string& authenticationId,
@@ -80,7 +104,7 @@ TSaslClient::TSaslClient(const string& mechanisms, const string& authenticationI
     throw SaslServerImplException("Properties not yet supported");
   }
   int result = sasl_client_new(protocol.c_str(), serverName.c_str(),
-			   NULL, NULL, callbacks, 0, &conn);
+      NULL, NULL, callbacks, 0, &conn);
   if (result != SASL_OK) {
     if (conn) {
       throw SaslServerImplException(sasl_errdetail(conn));
@@ -88,7 +112,7 @@ TSaslClient::TSaslClient(const string& mechanisms, const string& authenticationI
       throw SaslServerImplException(sasl_errstring(result, NULL, NULL));
     }
   }
-  
+
   if (!authenticationId.empty()) {
     /* TODO: setup security property */
     /*
