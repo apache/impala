@@ -661,7 +661,23 @@ public class BuiltinsDb extends Db {
             null,
             prefix + "16KnuthVarFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
             true, false, false));
+        db.addBuiltin(AggregateFunction.createBuiltin(db, "var_samp",
+            Lists.newArrayList(t), Type.DOUBLE, ScalarType.createCharType(24),
+            prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+            prefix + STDDEV_UPDATE_SYMBOL.get(t),
+            prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+            null,
+            prefix + "16KnuthVarFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+            true, false, false));
         db.addBuiltin(AggregateFunction.createBuiltin(db, "variance_pop",
+            Lists.newArrayList(t), Type.DOUBLE, ScalarType.createCharType(24),
+            prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
+            prefix + STDDEV_UPDATE_SYMBOL.get(t),
+            prefix + "13KnuthVarMergeEPN10impala_udf15FunctionContextERKNS1_9StringValEPS4_",
+            null,
+            prefix + "19KnuthVarPopFinalizeEPN10impala_udf15FunctionContextERKNS1_9StringValE",
+            true, false, false));
+        db.addBuiltin(AggregateFunction.createBuiltin(db, "var_pop",
             Lists.newArrayList(t), Type.DOUBLE, ScalarType.createCharType(24),
             prefix + "12KnuthVarInitEPN10impala_udf15FunctionContextEPNS1_9StringValE",
             prefix + STDDEV_UPDATE_SYMBOL.get(t),

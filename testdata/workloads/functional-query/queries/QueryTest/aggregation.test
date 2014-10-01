@@ -32,23 +32,26 @@ from alltypesagg WHERE id = 1006
 double, double, double, double
 ====
 ---- QUERY
-# Includes one row which is null
+# Includes one row which is null, and test the aliases for variance() as well
 SELECT variance(tinyint_col), variance(smallint_col), variance(int_col),
-variance(bigint_col), variance(float_col), variance(double_col)
+variance(bigint_col), variance(float_col), variance(double_col),
+var_samp(double_col), variance_samp(double_col)
 from alltypesagg WHERE id >= 1000 AND id < 1006
 ---- RESULTS
-2.5,2.5,2.5,250,3.025,255.025
+2.5,2.5,2.5,250,3.025,255.025,255.025,255.025
 ---- TYPES
-double, double, double, double, double, double
+double, double, double, double, double, double,double, double
 ====
 ---- QUERY
+# Test population variance (including the var_pop() alias)
 SELECT variance_pop(tinyint_col), variance_pop(smallint_col), variance_pop(int_col),
-variance_pop(bigint_col), variance_pop(float_col), variance_pop(double_col)
+variance_pop(bigint_col), variance_pop(float_col), variance_pop(double_col),
+var_pop(double_col)
 from alltypesagg WHERE id >= 1000 AND id < 1006
 ---- RESULTS
-2,2,2,200,2.42,204.02
+2,2,2,200,2.42,204.02,204.02
 ---- TYPES
-double, double, double, double, double, double
+double, double, double, double, double, double, double
 ====
 ---- QUERY
 SELECT round(stddev(tinyint_col), 5),
@@ -56,12 +59,13 @@ SELECT round(stddev(tinyint_col), 5),
        round(stddev(int_col), 5),
        round(stddev(bigint_col), 5),
        round(stddev(float_col), 5),
-       round(stddev(double_col), 5)
+       round(stddev(double_col), 5),
+       round(stddev_samp(double_col), 5)
 from alltypesagg WHERE id >= 1000 AND id < 1006
 ---- RESULTS
-1.58114,1.58114,1.58114,15.81139,1.73925,15.96950
+1.58114,1.58114,1.58114,15.81139,1.73925,15.96950,15.96950
 ---- TYPES
-double, double, double, double, double, double
+double, double, double, double, double, double, double
 ====
 ---- QUERY
 # no grouping exprs, cols contain nulls except for bool cols
