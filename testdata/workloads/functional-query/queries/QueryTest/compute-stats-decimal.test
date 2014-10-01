@@ -15,10 +15,10 @@ show table stats compute_stats_db.decimal_tbl
 ---- LABELS
 d6, #Rows, #Files, Size, Bytes Cached, Format
 ---- RESULTS
-1,5,1,'375B','NOT CACHED','TEXT'
-Total,5,1,'375B','0B',''
+'1',5,1,'375B','NOT CACHED','TEXT'
+'Total',5,1,'375B','0B',''
 ---- TYPES
-DECIMAL, BIGINT, BIGINT, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.decimal_tbl
@@ -32,7 +32,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'd5','DECIMAL(10,5)',5,-1,8,8
 'd6','DECIMAL(9,0)',1,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # test compute stats on a mixed-type parquet table
@@ -61,5 +61,5 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'a','INT',2,-1,4,4
 'b','DECIMAL(10,0)',2,-1,8,8
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====

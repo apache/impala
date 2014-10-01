@@ -15,6 +15,7 @@
 #
 
 import pytest
+import re
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
 from TCLIService import TCLIService
 
@@ -135,6 +136,26 @@ class TestFetch(HS2TestSuite):
     fetch_results_resp = self.__query_and_fetch("SELECT CAST('car' AS CHAR(5))")
     num_rows, result = self.__column_results_to_string(fetch_results_resp.results.columns)
     assert result == "car  \n"
+
+  @needs_session()
+  def test_show_partitions(self):
+    """Regression test for IMPALA-1330"""
+    for query in ["SHOW PARTITIONS functional.alltypes",
+                  "SHOW TABLE STATS functional.alltypes"]:
+      fetch_results_resp = self.__query_and_fetch(query)
+      num_rows, result = \
+          self.__column_results_to_string(fetch_results_resp.results.columns)
+      assert num_rows == 25
+      # Match whether stats are computed or not
+      assert re.match(
+        r"2009, 1, -?\d+, -?\d+, \d*\.?\d+KB, NOT CACHED, TEXT", result) is not None
+
+  @needs_session()
+  def test_show_column_stats(self):
+    fetch_results_resp = self.__query_and_fetch("SHOW COLUMN STATS functional.alltypes")
+    num_rows, result = self.__column_results_to_string(fetch_results_resp.results.columns)
+    assert num_rows == 13
+    assert re.match(r"id, INT, -?\d+, -?\d+, (NULL|\d+), 4.0", result) is not None
 
   @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V1)
   def test_execute_select_v1(self):

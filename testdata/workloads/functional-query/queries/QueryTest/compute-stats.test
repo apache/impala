@@ -17,33 +17,33 @@ show table stats compute_stats_db.alltypes
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-2009,1,310,1,'24.56KB','NOT CACHED','TEXT'
-2009,2,280,1,'22.27KB','NOT CACHED','TEXT'
-2009,3,310,1,'24.67KB','NOT CACHED','TEXT'
-2009,4,300,1,'24.06KB','NOT CACHED','TEXT'
-2009,5,310,1,'24.97KB','NOT CACHED','TEXT'
-2009,6,300,1,'24.16KB','NOT CACHED','TEXT'
-2009,7,310,1,'24.97KB','NOT CACHED','TEXT'
-2009,8,310,1,'24.97KB','NOT CACHED','TEXT'
-2009,9,300,1,'24.16KB','NOT CACHED','TEXT'
-2009,10,310,1,'24.97KB','NOT CACHED','TEXT'
-2009,11,300,1,'24.16KB','NOT CACHED','TEXT'
-2009,12,310,1,'24.97KB','NOT CACHED','TEXT'
-2010,1,310,1,'24.97KB','NOT CACHED','TEXT'
-2010,2,280,1,'22.54KB','NOT CACHED','TEXT'
-2010,3,310,1,'24.97KB','NOT CACHED','TEXT'
-2010,4,300,1,'24.16KB','NOT CACHED','TEXT'
-2010,5,310,1,'24.97KB','NOT CACHED','TEXT'
-2010,6,300,1,'24.16KB','NOT CACHED','TEXT'
-2010,7,310,1,'24.97KB','NOT CACHED','TEXT'
-2010,8,310,1,'24.97KB','NOT CACHED','TEXT'
-2010,9,300,1,'24.16KB','NOT CACHED','TEXT'
-2010,10,310,1,'24.97KB','NOT CACHED','TEXT'
-2010,11,300,1,'24.16KB','NOT CACHED','TEXT'
-2010,12,310,1,'24.97KB','NOT CACHED','TEXT'
-Total,,7300,24,'586.84KB','0B',''
+'2009','1',310,1,'24.56KB','NOT CACHED','TEXT'
+'2009','2',280,1,'22.27KB','NOT CACHED','TEXT'
+'2009','3',310,1,'24.67KB','NOT CACHED','TEXT'
+'2009','4',300,1,'24.06KB','NOT CACHED','TEXT'
+'2009','5',310,1,'24.97KB','NOT CACHED','TEXT'
+'2009','6',300,1,'24.16KB','NOT CACHED','TEXT'
+'2009','7',310,1,'24.97KB','NOT CACHED','TEXT'
+'2009','8',310,1,'24.97KB','NOT CACHED','TEXT'
+'2009','9',300,1,'24.16KB','NOT CACHED','TEXT'
+'2009','10',310,1,'24.97KB','NOT CACHED','TEXT'
+'2009','11',300,1,'24.16KB','NOT CACHED','TEXT'
+'2009','12',310,1,'24.97KB','NOT CACHED','TEXT'
+'2010','1',310,1,'24.97KB','NOT CACHED','TEXT'
+'2010','2',280,1,'22.54KB','NOT CACHED','TEXT'
+'2010','3',310,1,'24.97KB','NOT CACHED','TEXT'
+'2010','4',300,1,'24.16KB','NOT CACHED','TEXT'
+'2010','5',310,1,'24.97KB','NOT CACHED','TEXT'
+'2010','6',300,1,'24.16KB','NOT CACHED','TEXT'
+'2010','7',310,1,'24.97KB','NOT CACHED','TEXT'
+'2010','8',310,1,'24.97KB','NOT CACHED','TEXT'
+'2010','9',300,1,'24.16KB','NOT CACHED','TEXT'
+'2010','10',310,1,'24.97KB','NOT CACHED','TEXT'
+'2010','11',300,1,'24.16KB','NOT CACHED','TEXT'
+'2010','12',310,1,'24.97KB','NOT CACHED','TEXT'
+'Total','',7300,24,'586.84KB','0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.alltypes
@@ -64,7 +64,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # drop stats from this table
@@ -75,33 +75,33 @@ show table stats compute_stats_db.alltypes
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-2009,1,-1,1,'24.56KB','NOT CACHED','TEXT'
-2009,2,-1,1,'22.27KB','NOT CACHED','TEXT'
-2009,3,-1,1,'24.67KB','NOT CACHED','TEXT'
-2009,4,-1,1,'24.06KB','NOT CACHED','TEXT'
-2009,5,-1,1,'24.97KB','NOT CACHED','TEXT'
-2009,6,-1,1,'24.16KB','NOT CACHED','TEXT'
-2009,7,-1,1,'24.97KB','NOT CACHED','TEXT'
-2009,8,-1,1,'24.97KB','NOT CACHED','TEXT'
-2009,9,-1,1,'24.16KB','NOT CACHED','TEXT'
-2009,10,-1,1,'24.97KB','NOT CACHED','TEXT'
-2009,11,-1,1,'24.16KB','NOT CACHED','TEXT'
-2009,12,-1,1,'24.97KB','NOT CACHED','TEXT'
-2010,1,-1,1,'24.97KB','NOT CACHED','TEXT'
-2010,2,-1,1,'22.54KB','NOT CACHED','TEXT'
-2010,3,-1,1,'24.97KB','NOT CACHED','TEXT'
-2010,4,-1,1,'24.16KB','NOT CACHED','TEXT'
-2010,5,-1,1,'24.97KB','NOT CACHED','TEXT'
-2010,6,-1,1,'24.16KB','NOT CACHED','TEXT'
-2010,7,-1,1,'24.97KB','NOT CACHED','TEXT'
-2010,8,-1,1,'24.97KB','NOT CACHED','TEXT'
-2010,9,-1,1,'24.16KB','NOT CACHED','TEXT'
-2010,10,-1,1,'24.97KB','NOT CACHED','TEXT'
-2010,11,-1,1,'24.16KB','NOT CACHED','TEXT'
-2010,12,-1,1,'24.97KB','NOT CACHED','TEXT'
-Total,,-1,24,'586.84KB','0B',''
+'2009','1',-1,1,'24.56KB','NOT CACHED','TEXT'
+'2009','10',-1,1,'24.97KB','NOT CACHED','TEXT'
+'2009','11',-1,1,'24.16KB','NOT CACHED','TEXT'
+'2009','12',-1,1,'24.97KB','NOT CACHED','TEXT'
+'2009','2',-1,1,'22.27KB','NOT CACHED','TEXT'
+'2009','3',-1,1,'24.67KB','NOT CACHED','TEXT'
+'2009','4',-1,1,'24.06KB','NOT CACHED','TEXT'
+'2009','5',-1,1,'24.97KB','NOT CACHED','TEXT'
+'2009','6',-1,1,'24.16KB','NOT CACHED','TEXT'
+'2009','7',-1,1,'24.97KB','NOT CACHED','TEXT'
+'2009','8',-1,1,'24.97KB','NOT CACHED','TEXT'
+'2009','9',-1,1,'24.16KB','NOT CACHED','TEXT'
+'2010','1',-1,1,'24.97KB','NOT CACHED','TEXT'
+'2010','10',-1,1,'24.97KB','NOT CACHED','TEXT'
+'2010','11',-1,1,'24.16KB','NOT CACHED','TEXT'
+'2010','12',-1,1,'24.97KB','NOT CACHED','TEXT'
+'2010','2',-1,1,'22.54KB','NOT CACHED','TEXT'
+'2010','3',-1,1,'24.97KB','NOT CACHED','TEXT'
+'2010','4',-1,1,'24.16KB','NOT CACHED','TEXT'
+'2010','5',-1,1,'24.97KB','NOT CACHED','TEXT'
+'2010','6',-1,1,'24.16KB','NOT CACHED','TEXT'
+'2010','7',-1,1,'24.97KB','NOT CACHED','TEXT'
+'2010','8',-1,1,'24.97KB','NOT CACHED','TEXT'
+'2010','9',-1,1,'24.16KB','NOT CACHED','TEXT'
+'Total','',-1,24,'586.84KB','0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 # Note - the NDV for partition columns is read from the table metadata.
@@ -123,7 +123,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # Add partitions with NULL values and check for stats.
@@ -149,7 +149,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',3,1,4,4
 'month','INT',13,1,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 alter table compute_stats_db.alltypes add partition (year=2011, month=NULL)
@@ -174,7 +174,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',4,1,4,4
 'month','INT',13,2,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # Drop the partitions with NULL values and check for stats.
@@ -200,7 +200,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',3,0,4,4
 'month','INT',13,1,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 alter table compute_stats_db.alltypes drop partition (year=2011, month=NULL)
@@ -225,7 +225,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # drop stats from this table a second time, should not throw an error.
@@ -272,7 +272,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'string_col','STRING',10,-1,1,1
 'timestamp_col','TIMESTAMP',101,-1,16,16
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # test computing stats on a partitioned parquet table with all types
@@ -293,33 +293,33 @@ show table stats compute_stats_db.alltypes_parquet
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-2009,1,310,1,regex:.+KB,'NOT CACHED','PARQUET'
-2009,2,280,1,regex:.+KB,'NOT CACHED','PARQUET'
-2009,3,310,1,regex:.+KB,'NOT CACHED','PARQUET'
-2009,4,300,1,regex:.+KB,'NOT CACHED','PARQUET'
-2009,5,310,1,regex:.+KB,'NOT CACHED','PARQUET'
-2009,6,300,1,regex:.+KB,'NOT CACHED','PARQUET'
-2009,7,310,1,regex:.+KB,'NOT CACHED','PARQUET'
-2009,8,310,1,regex:.+KB,'NOT CACHED','PARQUET'
-2009,9,300,1,regex:.+KB,'NOT CACHED','PARQUET'
-2009,10,310,1,regex:.+KB,'NOT CACHED','PARQUET'
-2009,11,300,1,regex:.+KB,'NOT CACHED','PARQUET'
-2009,12,310,1,regex:.+KB,'NOT CACHED','PARQUET'
-2010,1,310,1,regex:.+KB,'NOT CACHED','PARQUET'
-2010,2,280,1,regex:.+KB,'NOT CACHED','PARQUET'
-2010,3,310,1,regex:.+KB,'NOT CACHED','PARQUET'
-2010,4,300,1,regex:.+KB,'NOT CACHED','PARQUET'
-2010,5,310,1,regex:.+KB,'NOT CACHED','PARQUET'
-2010,6,300,1,regex:.+KB,'NOT CACHED','PARQUET'
-2010,7,310,1,regex:.+KB,'NOT CACHED','PARQUET'
-2010,8,310,1,regex:.+KB,'NOT CACHED','PARQUET'
-2010,9,300,1,regex:.+KB,'NOT CACHED','PARQUET'
-2010,10,310,1,regex:.+KB,'NOT CACHED','PARQUET'
-2010,11,300,1,regex:.+KB,'NOT CACHED','PARQUET'
-2010,12,310,1,regex:.+KB,'NOT CACHED','PARQUET'
-Total,,7300,24,regex:.+KB,'0B',''
+'2009','1',310,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2009','2',280,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2009','3',310,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2009','4',300,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2009','5',310,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2009','6',300,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2009','7',310,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2009','8',310,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2009','9',300,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2009','10',310,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2009','11',300,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2009','12',310,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2010','1',310,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2010','2',280,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2010','3',310,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2010','4',300,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2010','5',310,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2010','6',300,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2010','7',310,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2010','8',310,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2010','9',300,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2010','10',310,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2010','11',300,1,regex:.+KB,'NOT CACHED','PARQUET'
+'2010','12',310,1,regex:.+KB,'NOT CACHED','PARQUET'
+'Total','',7300,24,regex:.+KB,'0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.alltypes_parquet
@@ -340,7 +340,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',2,0,4,4
 'month','INT',12,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # test computing stats on an HBase table
@@ -388,7 +388,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'tinyint_col','TINYINT',10,-1,1,1
 'year','INT',1,-1,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # test computing stats on an binary HBase table
@@ -430,7 +430,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'tinyint_col','TINYINT',10,-1,1,1
 'year','INT',1,-1,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # test computing stats on an empty table
@@ -448,9 +448,9 @@ show table stats compute_stats_db.alltypes_empty
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-Total,,0,0,'0B','0B',''
+'Total','',0,0,'0B','0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.alltypes_empty
@@ -471,7 +471,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # IMP-1227: Test computing stats on an HBase table that has a
@@ -516,7 +516,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'struct_map_col','MAP<STRING,STRUCT<f1:BIGINT,f2:STRING>>',-1,-1,-1,-1
 'year','INT',0,-1,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # IMPALA-867: Test computing stats on Avro tables created by Hive with
@@ -544,9 +544,9 @@ show table stats compute_stats_db.avro_hive_alltypes
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-Total,,0,0,'0B','0B',''
+'Total','',0,0,'0B','0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.avro_hive_alltypes
@@ -567,7 +567,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # Avro table with an extra column definition.
@@ -582,9 +582,9 @@ show table stats compute_stats_db.avro_hive_alltypes_extra_coldef
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-Total,,0,0,'0B','0B',''
+'Total','',0,0,'0B','0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.avro_hive_alltypes_extra_coldef
@@ -606,7 +606,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # Avro table with missing two column definitions.
@@ -621,9 +621,9 @@ show table stats compute_stats_db.avro_hive_alltypes_missing_coldef
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-Total,,0,0,'0B','0B',''
+'Total','',0,0,'0B','0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.avro_hive_alltypes_missing_coldef
@@ -642,7 +642,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # Avro table with one column definition having a different
@@ -658,9 +658,9 @@ show table stats compute_stats_db.avro_hive_alltypes_type_mismatch
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-Total,,0,0,'0B','0B',''
+'Total','',0,0,'0B','0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.avro_hive_alltypes_type_mismatch
@@ -681,7 +681,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # Test Avro table created without any column definitions.
@@ -703,9 +703,9 @@ show table stats compute_stats_db.avro_impala_alltypes_no_coldefs
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-Total,,0,0,'0B','0B',''
+'Total','',0,0,'0B','0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.avro_impala_alltypes_no_coldefs
@@ -726,7 +726,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # IMPALA-1104: Test computing stats on Avro tables created by Impala
@@ -752,9 +752,9 @@ show table stats compute_stats_db.avro_impala_alltypes_bad_colname
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-Total,,0,0,'0B','0B',''
+'Total','',0,0,'0B','0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.avro_impala_alltypes_bad_colname
@@ -775,7 +775,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # IMPALA-1104: Test computing stats on Avro tables created by Impala
@@ -801,9 +801,9 @@ show table stats compute_stats_db.avro_impala_alltypes_bad_coltype
 ---- LABELS
 YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, FORMAT
 ---- RESULTS
-Total,,0,0,'0B','0B',''
+'Total','',0,0,'0B','0B',''
 ---- TYPES
-INT, INT, BIGINT, BIGINT, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.avro_impala_alltypes_bad_coltype
@@ -824,7 +824,7 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, DOUBLE, DOUBLE
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
 ---- QUERY
 # For IMPALA-1055, using a database called `parquet` to test cases where the name of
@@ -863,10 +863,10 @@ STRING
 ---- QUERY
 show table stats compute_stats_db.empty_partitioned
 ---- RESULTS
-1,0,0,'0B','NOT CACHED','TEXT'
-Total,0,0,'0B','0B',''
+'1',0,0,'0B','NOT CACHED','TEXT'
+'Total',0,0,'0B','0B',''
 ---- TYPES
-INT, BIGINT, BIGINT, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 # Insert non empty partition to the table with empty partition.
@@ -883,11 +883,11 @@ STRING
 ---- QUERY
 show table stats compute_stats_db.empty_partitioned
 ---- RESULTS
-1,0,0,'0B','NOT CACHED','TEXT'
-2,1,1,'2B','NOT CACHED','TEXT'
-Total,1,1,'2B','0B',''
+'1',0,0,'0B','NOT CACHED','TEXT'
+'2',1,1,'2B','NOT CACHED','TEXT'
+'Total',1,1,'2B','0B',''
 ---- TYPES
-INT, BIGINT, BIGINT, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING
 ====
 ---- QUERY
 # Verify partition stats work with empty and non-empty partition.
@@ -901,9 +901,9 @@ STRING
 ---- QUERY
 show table stats compute_stats_db.empty_partitioned
 ---- RESULTS
-1,0,0,'0B','NOT CACHED','TEXT'
-2,1,1,'2B','NOT CACHED','TEXT'
-Total,1,1,'2B','0B',''
+'1',0,0,'0B','NOT CACHED','TEXT'
+'2',1,1,'2B','NOT CACHED','TEXT'
+'Total',1,1,'2B','0B',''
 ---- TYPES
-INT, BIGINT, BIGINT, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING
 ====

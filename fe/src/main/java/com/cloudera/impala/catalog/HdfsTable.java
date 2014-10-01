@@ -1278,12 +1278,14 @@ public class HdfsTable extends Table {
     TResultSet result = new TResultSet();
     TResultSetMetadata resultSchema = new TResultSetMetadata();
     result.setSchema(resultSchema);
+
     for (int i = 0; i < numClusteringCols_; ++i) {
       // Add the partition-key values as strings for simplicity.
       Column partCol = getColumns().get(i);
-      TColumn colDesc = new TColumn(partCol.getName(), partCol.getType().toThrift());
+      TColumn colDesc = new TColumn(partCol.getName(), Type.STRING.toThrift());
       resultSchema.addToColumns(colDesc);
     }
+
     resultSchema.addToColumns(new TColumn("#Rows", Type.BIGINT.toThrift()));
     resultSchema.addToColumns(new TColumn("#Files", Type.BIGINT.toThrift()));
     resultSchema.addToColumns(new TColumn("Size", Type.STRING.toThrift()));
