@@ -604,3 +604,13 @@ on a.int_col = c.tinyint_col
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# Regression test for IMPALA-1329
+select COUNT(t1.string_col) AS int_col_1 FROM alltypestiny t1
+LEFT JOIN alltypestiny t2 ON t2.date_string_col = t1.string_col
+LEFT JOIN alltypesagg t3 ON t3.id = t2.tinyint_col
+---- RESULTS
+8
+---- TYPES
+BIGINT
+====

@@ -54,7 +54,7 @@ inline void BufferedTupleStream::GetTupleRow(const RowIdx& idx, TupleRow* row) c
   if (nullable_tuple_) {
     // Stitch together the tuples from the block and the NULL ones.
     const int tuples_per_row = desc_.tuple_descriptors().size();
-    uint32_t tuple_idx = idx.idx();
+    uint32_t tuple_idx = idx.idx() * tuples_per_row;
     for (int i = 0; i < tuples_per_row; ++i) {
       const uint8_t* null_word = block_start_idx_[idx.block()] + (tuple_idx >> 3);
       const uint32_t null_pos = tuple_idx & 7;
