@@ -413,6 +413,7 @@ nonterminal PrivilegeSpec privilege_spec;
 nonterminal TPrivilegeLevel privilege;
 nonterminal Boolean opt_with_grantopt;
 nonterminal Boolean opt_grantopt_for;
+nonterminal Boolean opt_kw_role;
 
 // To avoid creating common keywords such as 'SERVER' or 'SOURCES' we treat them as
 // identifiers rather than keywords. Throws a parse exception if the identifier does not
@@ -682,12 +683,14 @@ revoke_role_stmt ::=
   ;
 
 grant_privilege_stmt ::=
-  KW_GRANT privilege_spec:priv KW_TO IDENT:role opt_with_grantopt:grant_opt
+  KW_GRANT privilege_spec:priv KW_TO opt_kw_role:opt_role IDENT:role
+  opt_with_grantopt:grant_opt
   {: RESULT = new GrantRevokePrivStmt(role, priv, true, grant_opt); :}
   ;
 
 revoke_privilege_stmt ::=
-  KW_REVOKE opt_grantopt_for:grant_opt privilege_spec:priv KW_FROM IDENT:role
+  KW_REVOKE opt_grantopt_for:grant_opt privilege_spec:priv KW_FROM
+  opt_kw_role:opt_role IDENT:role
   {: RESULT = new GrantRevokePrivStmt(role, priv, false, grant_opt); :}
   ;
 
@@ -723,6 +726,11 @@ opt_with_grantopt ::=
   {: RESULT = true; :}
   | /* empty */
   {: RESULT = false; :}
+  ;
+
+opt_kw_role ::=
+  KW_ROLE
+  | /* empty */
   ;
 
 alter_tbl_stmt ::=

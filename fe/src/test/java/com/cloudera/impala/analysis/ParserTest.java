@@ -2683,6 +2683,10 @@ public class ParserTest {
     Object[][] grantRevFormatStrs = {{"GRANT", "TO"}, {"REVOKE", "FROM"}};
     for (Object[] formatStr: grantRevFormatStrs) {
       ParsesOk(String.format("%s ALL ON TABLE foo %s myRole", formatStr));
+
+      // KW_ROLE is optional (Hive requires KW_ROLE, but Impala does not).
+      ParsesOk(String.format("%s ALL ON TABLE foo %s ROLE myRole", formatStr));
+
       ParsesOk(String.format("%s ALL ON DATABASE foo %s myRole", formatStr));
       ParsesOk(String.format("%s ALL ON URI 'foo' %s  myRole", formatStr));
 
@@ -2720,6 +2724,8 @@ public class ParserTest {
     ParsesOk("GRANT ALL ON URI '/abc/' TO myRole WITH GRANT OPTION");
     ParserError("GRANT ALL ON TABLE foo TO myRole WITH GRANT");
     ParserError("GRANT ALL ON TABLE foo TO myRole WITH");
+    ParserError("GRANT ALL ON TABLE foo TO ROLE");
+    ParserError("REVOKE ALL ON TABLE foo TO ROLE");
 
     ParsesOk("REVOKE GRANT OPTION FOR ALL ON TABLE foo FROM myRole");
     ParsesOk("REVOKE GRANT OPTION FOR ALL ON DATABASE foo FROM myRole");
