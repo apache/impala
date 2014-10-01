@@ -479,6 +479,9 @@ inline Status HdfsTableSink::GetOutputPartition(
 
 Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ExprContext::FreeLocalAllocations(output_expr_ctxs_);
+  ExprContext::FreeLocalAllocations(partition_key_expr_ctxs_);
+  RETURN_IF_ERROR(state->CheckQueryState());
 
   // If there are no partition keys then just pass the whole batch to one partition.
   if (dynamic_partition_key_expr_ctxs_.empty()) {

@@ -56,6 +56,7 @@ Status TopNNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   tuple_pool_.reset(new MemPool(mem_tracker()));
   RETURN_IF_ERROR(sort_exec_exprs_.Prepare(state, child(0)->row_desc(), row_descriptor_));
+  AddExprCtxsToFree(sort_exec_exprs_);
   materialized_tuple_desc_ = row_descriptor_.tuple_descriptors()[0];
   // Allocate memory for a temporary tuple.
   tmp_tuple_ = reinterpret_cast<Tuple*>(
@@ -67,7 +68,7 @@ Status TopNNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
+  RETURN_IF_ERROR(QueryMaintenance(state));
   RETURN_IF_ERROR(sort_exec_exprs_.Open(state));
 
   tuple_row_less_than_.reset(new TupleRowComparator(
@@ -89,7 +90,8 @@ Status TopNNode::Open(RuntimeState* state) {
       for (int i = 0; i < batch.num_rows(); ++i) {
         InsertTupleRow(batch.GetRow(i));
       }
-      RETURN_IF_ERROR(state->CheckQueryState());
+      RETURN_IF_CANCELLED(state);
+      RETURN_IF_ERROR(QueryMaintenance(state));
     } while (!eos);
   }
   DCHECK_LE(priority_queue_->size(), limit_ + offset_);
@@ -102,7 +104,7 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
+  RETURN_IF_ERROR(QueryMaintenance(state));
   while (!row_batch->AtCapacity() && (get_next_iter_ != sorted_top_n_.end())) {
     if (num_rows_skipped_ < offset_) {
       ++get_next_iter_;

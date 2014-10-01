@@ -78,7 +78,7 @@ void ExprContext::Close(RuntimeState* state) {
 
 int ExprContext::Register(RuntimeState* state,
     const impala_udf::FunctionContext::TypeDesc& return_type,
-    const std::vector<impala_udf::FunctionContext::TypeDesc>& arg_types,
+    const vector<impala_udf::FunctionContext::TypeDesc>& arg_types,
     int varargs_buffer_size) {
   fn_contexts_.push_back(FunctionContextImpl::CreateContext(
       state, pool_.get(), return_type, arg_types, varargs_buffer_size));
@@ -105,8 +105,19 @@ Status ExprContext::Clone(RuntimeState* state, ExprContext** new_ctx) {
 }
 
 void ExprContext::FreeLocalAllocations() {
-  for (int i = 0; i < fn_contexts_.size(); ++i) {
-    fn_contexts_[i]->impl()->FreeLocalAllocations();
+  FreeLocalAllocations(fn_contexts_);
+}
+
+void ExprContext::FreeLocalAllocations(const vector<ExprContext*>& ctxs) {
+  for (int i = 0; i < ctxs.size(); ++i) {
+    ctxs[i]->FreeLocalAllocations();
+  }
+}
+
+void ExprContext::FreeLocalAllocations(const vector<FunctionContext*>& fn_ctxs) {
+  for (int i = 0; i < fn_ctxs.size(); ++i) {
+    if (fn_ctxs[i]->impl()->closed()) continue;
+    fn_ctxs[i]->impl()->FreeLocalAllocations();
   }
 }
 
@@ -281,16 +292,16 @@ void* ExprContext::GetValue(Expr* e, TupleRow* row) {
   }
 }
 
-void ExprContext::PrintValue(TupleRow* row, std::string* str) {
+void ExprContext::PrintValue(TupleRow* row, string* str) {
   RawValue::PrintValue(GetValue(row), root_->type(), root_->output_scale_, str);
 }
-void ExprContext::PrintValue(void* value, std::string* str) {
+void ExprContext::PrintValue(void* value, string* str) {
   RawValue::PrintValue(value, root_->type(), root_->output_scale_, str);
 }
-void ExprContext::PrintValue(void* value, std::stringstream* stream) {
+void ExprContext::PrintValue(void* value, stringstream* stream) {
   RawValue::PrintValue(value, root_->type(), root_->output_scale_, stream);
 }
-void ExprContext::PrintValue(TupleRow* row, std::stringstream* stream) {
+void ExprContext::PrintValue(TupleRow* row, stringstream* stream) {
   RawValue::PrintValue(GetValue(row), root_->type(), root_->output_scale_, stream);
 }
 

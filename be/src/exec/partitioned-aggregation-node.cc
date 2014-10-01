@@ -131,6 +131,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
         output_tuple_desc_->slots().size());
 
   RETURN_IF_ERROR(Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc()));
+  AddExprCtxsToFree(probe_expr_ctxs_);
 
   contains_var_len_grouping_exprs_ = false;
 
@@ -153,6 +154,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   // in a single-node plan with an intermediate tuple different from the output tuple.
   intermediate_row_desc_.reset(new RowDescriptor(intermediate_tuple_desc_, false));
   RETURN_IF_ERROR(Expr::Prepare(build_expr_ctxs_, state, *intermediate_row_desc_));
+  AddExprCtxsToFree(build_expr_ctxs_);
 
   int j = probe_expr_ctxs_.size();
   for (int i = 0; i < aggregate_evaluators_.size(); ++i, ++j) {
@@ -225,7 +227,7 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
   bool eos = false;
   while (!eos) {
     RETURN_IF_CANCELLED(state);
-    RETURN_IF_ERROR(state->CheckQueryState());
+    RETURN_IF_ERROR(QueryMaintenance(state));
     RETURN_IF_ERROR(children_[0]->GetNext(state, &batch, &eos));
 
     if (VLOG_ROW_IS_ON) {
@@ -266,7 +268,7 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
+  RETURN_IF_ERROR(QueryMaintenance(state));
 
   if (ReachedLimit()) {
     *eos = true;
@@ -311,8 +313,17 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
   }
 
   SCOPED_TIMER(get_results_timer_);
+  int count = 0;
+  const int N = state->batch_size();
   // Keeping returning rows from the current partition.
   while (!output_iterator_.AtEnd() && !row_batch->AtCapacity()) {
+    // This loop can go on for a long time if the conjuncts are very selective. Do query
+    // maintenance every N iterations.
+    if (count++ % N == 0) {
+      RETURN_IF_CANCELLED(state);
+      RETURN_IF_ERROR(QueryMaintenance(state));
+    }
+
     int row_idx = row_batch->AddRow();
     TupleRow* row = row_batch->GetRow(row_idx);
     Tuple* intermediate_tuple = output_iterator_.GetTuple();
@@ -863,6 +874,17 @@ Status PartitionedAggregationNode::MoveHashPartitions(int64_t num_input_rows) {
   VLOG_QUERY << ss.str();
   hash_partitions_.clear();
   return Status::OK;
+}
+
+Status PartitionedAggregationNode::QueryMaintenance(RuntimeState* state) {
+  for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
+    ExprContext::FreeLocalAllocations(aggregate_evaluators_[i]->input_expr_ctxs());
+  }
+  ExprContext::FreeLocalAllocations(agg_fn_ctxs_);
+  for (int i = 0; i < hash_partitions_.size(); ++i) {
+    ExprContext::FreeLocalAllocations(hash_partitions_[i]->agg_fn_ctxs);
+  }
+  return ExecNode::QueryMaintenance(state);
 }
 
 // IR Generation for updating a single aggregation slot. Signature is:

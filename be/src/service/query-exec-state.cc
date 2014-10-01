@@ -689,6 +689,7 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
       ++current_batch_row_;
     }
   }
+  ExprContext::FreeLocalAllocations(output_expr_ctxs_);
 
   // Update the result cache if necessary.
   if (result_cache_max_size_ > 0 && result_cache_.get() != NULL) {

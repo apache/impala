@@ -422,7 +422,10 @@ Status DataStreamSender::Open(RuntimeState* state) {
 
 Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   SCOPED_TIMER(profile_->total_time_counter());
+  ExprContext::FreeLocalAllocations(partition_expr_ctxs_);
+  RETURN_IF_ERROR(state->CheckQueryState());
   DCHECK(!closed_);
+
   if (broadcast_ || channels_.size() == 1) {
     // current_thrift_batch_ is *not* the one that was written by the last call
     // to Serialize()

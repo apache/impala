@@ -69,12 +69,14 @@ Status UnionNode::Prepare(RuntimeState* state) {
   // Prepare const expr lists.
   for (int i = 0; i < const_result_expr_ctx_lists_.size(); ++i) {
     RETURN_IF_ERROR(Expr::Prepare(const_result_expr_ctx_lists_[i], state, row_desc()));
+    AddExprCtxsToFree(const_result_expr_ctx_lists_[i]);
     DCHECK_EQ(const_result_expr_ctx_lists_[i].size(), materialized_slots_.size());
   }
 
   // Prepare result expr lists.
   for (int i = 0; i < result_expr_ctx_lists_.size(); ++i) {
     RETURN_IF_ERROR(Expr::Prepare(result_expr_ctx_lists_[i], state, child(i)->row_desc()));
+    AddExprCtxsToFree(result_expr_ctx_lists_[i]);
     DCHECK_EQ(result_expr_ctx_lists_[i].size(), materialized_slots_.size());
   }
   return Status::OK;
@@ -113,7 +115,7 @@ Status UnionNode::OpenCurrentChild(RuntimeState* state) {
 Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
+  RETURN_IF_ERROR(QueryMaintenance(state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   // Create new tuple buffer for row_batch.
   int tuple_buffer_size = row_batch->capacity() * tuple_desc_->byte_size();
@@ -126,6 +128,9 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 
     // Start (or continue) consuming row batches from current child.
     while (true) {
+      RETURN_IF_CANCELLED(state);
+      RETURN_IF_ERROR(QueryMaintenance(state));
+
       // Continue materializing exprs on child_row_batch_ into row batch.
       if (EvalAndMaterializeExprs(
               result_expr_ctx_lists_[child_idx_], false, &tuple, row_batch)) {

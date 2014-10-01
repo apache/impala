@@ -56,7 +56,7 @@ Status CrossJoinNode::ConstructBuildSide(RuntimeState* state) {
     RowBatch* batch = build_batch_pool_->Add(
         new RowBatch(child(1)->row_desc(), state->batch_size(), mem_tracker()));
     RETURN_IF_CANCELLED(state);
-    RETURN_IF_ERROR(state->CheckQueryState());
+    RETURN_IF_ERROR(QueryMaintenance(state));
     bool eos;
     RETURN_IF_ERROR(child(1)->GetNext(state, batch, &eos));
     DCHECK_EQ(batch->num_io_buffers(), 0) << "Build batch should be compact.";
@@ -77,8 +77,6 @@ Status CrossJoinNode::InitGetNext(TupleRow* first_left_row) {
 
 Status CrossJoinNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
-  RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   if (ReachedLimit() || eos_) {
     *eos = true;
@@ -87,6 +85,9 @@ Status CrossJoinNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool*
 
   ScopedTimer<MonotonicStopWatch> timer(probe_timer_);
   while (!eos_) {
+    RETURN_IF_CANCELLED(state);
+    RETURN_IF_ERROR(QueryMaintenance(state));
+
     // Compute max rows that should be added to output_batch
     int64_t max_added_rows = output_batch->capacity() - output_batch->num_rows();
     if (limit() != -1) max_added_rows = min(max_added_rows, limit() - rows_returned());

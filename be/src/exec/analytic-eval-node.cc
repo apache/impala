@@ -148,9 +148,11 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
     RowDescriptor cmp_row_desc(state->desc_tbl(), tuple_ids, vector<bool>(2, false));
     if (partition_by_eq_expr_ctx_ != NULL) {
       RETURN_IF_ERROR(partition_by_eq_expr_ctx_->Prepare(state, cmp_row_desc));
+      AddExprCtxToFree(partition_by_eq_expr_ctx_);
     }
     if (order_by_eq_expr_ctx_ != NULL) {
       RETURN_IF_ERROR(order_by_eq_expr_ctx_->Prepare(state, cmp_row_desc));
+      AddExprCtxToFree(order_by_eq_expr_ctx_);
     }
   }
   child_tuple_cmp_row_ = reinterpret_cast<TupleRow*>(
@@ -162,7 +164,7 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
+  RETURN_IF_ERROR(QueryMaintenance(state));
   RETURN_IF_ERROR(child(0)->Open(state));
   RETURN_IF_ERROR(state->block_mgr()->RegisterClient(2, mem_tracker(), state, &client_));
   input_stream_.reset(new BufferedTupleStream(state, child(0)->row_desc(),
@@ -505,7 +507,7 @@ Status AnalyticEvalNode::ProcessChildBatches(RuntimeState* state) {
   while (curr_child_batch_.get() != NULL &&
       NumOutputRowsReady() < state->batch_size() + 1) {
     RETURN_IF_CANCELLED(state);
-    RETURN_IF_ERROR(state->CheckQueryState());
+    RETURN_IF_ERROR(QueryMaintenance(state));
     RETURN_IF_ERROR(ProcessChildBatch(state));
     // TODO: DCHECK that the size of result_tuples_ is bounded. It shouldn't be larger
     // than 2x the batch size unless the end bound has an offset preceding, in which
@@ -674,7 +676,7 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
+  RETURN_IF_ERROR(QueryMaintenance(state));
   VLOG_FILE << id() << " GetNext: " << DebugStateString();
 
   if (ReachedLimit()) {
@@ -743,6 +745,13 @@ void AnalyticEvalNode::DebugString(int indentation_level, stringstream* out) con
   *out << AggFnEvaluator::DebugString(evaluators_);
   ExecNode::DebugString(indentation_level, out);
   *out << ")";
+}
+
+Status AnalyticEvalNode::QueryMaintenance(RuntimeState* state) {
+  for (int i = 0; i < evaluators_.size(); ++i) {
+    ExprContext::FreeLocalAllocations(evaluators_[i]->input_expr_ctxs());
+  }
+  return ExecNode::QueryMaintenance(state);
 }
 
 }

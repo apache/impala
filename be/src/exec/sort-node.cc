@@ -43,6 +43,7 @@ Status SortNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   RETURN_IF_ERROR(sort_exec_exprs_.Prepare(state, child(0)->row_desc(), row_descriptor_));
+  AddExprCtxsToFree(sort_exec_exprs_);
   return Status::OK;
 }
 
@@ -51,7 +52,7 @@ Status SortNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_ERROR(sort_exec_exprs_.Open(state));
   RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
+  RETURN_IF_ERROR(QueryMaintenance(state));
   RETURN_IF_ERROR(child(0)->Open(state));
 
   TupleRowComparator less_than(
@@ -74,7 +75,7 @@ Status SortNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
+  RETURN_IF_ERROR(QueryMaintenance(state));
 
   if (ReachedLimit()) {
     *eos = true;
@@ -137,7 +138,8 @@ Status SortNode::SortInput(RuntimeState* state) {
     batch.Reset();
     RETURN_IF_ERROR(child(0)->GetNext(state, &batch, &eos));
     RETURN_IF_ERROR(sorter_->AddBatch(&batch));
-    RETURN_IF_ERROR(state->CheckQueryState());
+    RETURN_IF_CANCELLED(state);
+    RETURN_IF_ERROR(QueryMaintenance(state));
   } while(!eos);
 
   RETURN_IF_ERROR(sorter_->InputDone());

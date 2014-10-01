@@ -68,6 +68,7 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
       FLAGS_exchg_node_buffer_size_bytes, runtime_profile(), is_merging_);
   if (is_merging_) {
     RETURN_IF_ERROR(sort_exec_exprs_.Prepare(state, row_descriptor_, row_descriptor_));
+    AddExprCtxsToFree(sort_exec_exprs_);
   }
   return Status::OK;
 }
@@ -112,8 +113,6 @@ Status ExchangeNode::FillInputRowBatch(RuntimeState* state) {
 
 Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
-  RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   if (ReachedLimit()) {
     stream_recvr_->TransferAllResources(output_batch);
@@ -128,6 +127,8 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
   while (true) {
     {
       SCOPED_TIMER(convert_row_batch_timer_);
+      RETURN_IF_CANCELLED(state);
+      RETURN_IF_ERROR(QueryMaintenance(state));
       // copy rows until we hit the limit/capacity or until we exhaust input_batch_
       while (!ReachedLimit() && !output_batch->AtCapacity()
           && input_batch_ != NULL && next_row_idx_ < input_batch_->capacity()) {

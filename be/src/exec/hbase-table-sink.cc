@@ -18,6 +18,7 @@
 
 #include "common/logging.h"
 #include "exprs/expr.h"
+#include "exprs/expr-context.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 
 using namespace std;
@@ -80,6 +81,8 @@ Status HBaseTableSink::Open(RuntimeState* state) {
 
 Status HBaseTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  ExprContext::FreeLocalAllocations(output_expr_ctxs_);
+  RETURN_IF_ERROR(state->CheckQueryState());
   // Since everything is set up just forward everything to the writer.
   RETURN_IF_ERROR(hbase_table_writer_->AppendRowBatch(batch));
   (*state->per_partition_status())[ROOT_PARTITION_KEY].num_appended_rows +=

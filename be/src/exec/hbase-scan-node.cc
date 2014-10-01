@@ -121,7 +121,7 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
 Status HBaseScanNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
+  RETURN_IF_ERROR(QueryMaintenance(state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   JNIEnv* env = getJNIEnv();
 
@@ -151,7 +151,7 @@ void HBaseScanNode::WriteTextSlot(
 Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
+  RETURN_IF_ERROR(QueryMaintenance(state));
   // For GetNext, most of the time is spent in HBaseTableScanner::ResultScanner_next,
   // but there's still some considerable time inside here.
   // TODO: need to understand how the time is spent inside this function.
@@ -175,7 +175,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
   bool has_next = false;
   while (true) {
     RETURN_IF_CANCELLED(state);
-    RETURN_IF_ERROR(state->CheckQueryState());
+    RETURN_IF_ERROR(QueryMaintenance(state));
     if (ReachedLimit() || row_batch->AtCapacity() ||
         tuple_pool_->total_allocated_bytes() > RowBatch::AT_CAPACITY_MEM_USAGE) {
       // hang on to last allocated chunk in pool, we'll keep writing into it in the

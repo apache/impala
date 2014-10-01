@@ -96,6 +96,9 @@ class PartitionedAggregationNode : public ExecNode {
   static const char* LLVM_CLASS_NAME;
 
  protected:
+  // Frees local allocations from aggregate_evaluators_ and agg_fn_ctxs
+  virtual Status QueryMaintenance(RuntimeState* state);
+
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:

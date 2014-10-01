@@ -31,6 +31,7 @@ class Expr;
 class ExprContext;
 class ObjectPool;
 class Counters;
+class SortExecExprs;
 class RowBatch;
 class RuntimeState;
 class TPlan;
@@ -244,10 +245,31 @@ class ExecNode {
   // Appends option to 'runtime_exec_options_'
   void AddRuntimeExecOption(const std::string& option);
 
+  // Frees any local allocations made by expr_ctxs_to_free_ and returns the result of
+  // state->CheckQueryState(). Nodes should call this periodically, e.g. once per input
+  // row batch. This should not be called outside the main execution thread.
+  //
+  // Nodes may override this to add extra periodic cleanup, e.g. freeing other local
+  // allocations. ExecNodes overriding this function should return
+  // ExecNode::QueryMaintenance().
+  virtual Status QueryMaintenance(RuntimeState* state);
+
+  // Add an ExprContext to have its local allocations freed by QueryMaintenance().
+  // Exprs that are evaluated in the main execution thread should be added. Exprs
+  // evaluated in a separate thread are generally not safe to add, since a local
+  // allocation may be freed while it's being used. Rather than using this mechanism,
+  // threads should call FreeLocalAllocations() on local ExprContexts periodically.
+  void AddExprCtxToFree(ExprContext* ctx) { expr_ctxs_to_free_.push_back(ctx); }
+  void AddExprCtxsToFree(const std::vector<ExprContext*>& ctxs);
+  void AddExprCtxsToFree(const SortExecExprs& sort_exec_exprs);
+
  private:
   // Set in ExecNode::Close(). Used to make Close() idempotent. This is not protected
   // by a lock, it assumes all calls to Close() are made by the same thread.
   bool is_closed_;
+
+  // Expr contexts whose local allocations are safe to free in the main execution thread.
+  std::vector<ExprContext*> expr_ctxs_to_free_;
 };
 
 }

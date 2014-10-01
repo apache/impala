@@ -104,6 +104,7 @@ class ExprContext {
   }
 
   Expr* root() { return root_; }
+  bool closed() { return closed_; }
 
   // Calls Get*Val on root_
   BooleanVal GetBooleanVal(TupleRow* row);
@@ -118,8 +119,10 @@ class ExprContext {
   DecimalVal GetDecimalVal(TupleRow* row);
 
   // Frees all local allocations made by fn_contexts_. This can be called when result data
-  // from this context is no longer needed (e.g., if it has been written to disk).
+  // from this context is no longer needed.
   void FreeLocalAllocations();
+  static void FreeLocalAllocations(const std::vector<ExprContext*>& ctxs);
+  static void FreeLocalAllocations(const std::vector<FunctionContext*>& ctxs);
 
   static const char* LLVM_CLASS_NAME;
 

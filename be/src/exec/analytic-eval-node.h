@@ -66,6 +66,9 @@ class AnalyticEvalNode : public ExecNode {
   virtual void Close(RuntimeState* state);
 
  protected:
+  // Frees local allocations from evaluators_
+  virtual Status QueryMaintenance(RuntimeState* state);
+
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:

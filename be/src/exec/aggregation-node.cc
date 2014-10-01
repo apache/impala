@@ -188,7 +188,7 @@ Status AggregationNode::Open(RuntimeState* state) {
   while (true) {
     bool eos;
     RETURN_IF_CANCELLED(state);
-    RETURN_IF_ERROR(state->CheckQueryState());
+    RETURN_IF_ERROR(QueryMaintenance(state));
     RETURN_IF_ERROR(children_[0]->GetNext(state, &batch, &eos));
     SCOPED_TIMER(build_timer_);
 
@@ -213,7 +213,7 @@ Status AggregationNode::Open(RuntimeState* state) {
     output_iterator_ = hash_tbl_->Begin();
 
     batch.Reset();
-    RETURN_IF_ERROR(state->CheckQueryState());
+    RETURN_IF_ERROR(QueryMaintenance(state));
     if (eos) break;
   }
 
@@ -229,7 +229,7 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
-  RETURN_IF_ERROR(state->CheckQueryState());
+  RETURN_IF_ERROR(QueryMaintenance(state));
   SCOPED_TIMER(get_results_timer_);
 
   if (ReachedLimit()) {
@@ -239,7 +239,15 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
   ExprContext** ctxs = &conjunct_ctxs_[0];
   int num_ctxs = conjunct_ctxs_.size();
 
+  int count = 0;
+  const int N = state->batch_size();
   while (!output_iterator_.AtEnd() && !row_batch->AtCapacity()) {
+    // This loop can go on for a long time if the conjuncts are very selective. Do query
+    // maintenance every N iterations.
+    if (count++ % N == 0) {
+      RETURN_IF_CANCELLED(state);
+      RETURN_IF_ERROR(QueryMaintenance(state));
+    }
     int row_idx = row_batch->AddRow();
     TupleRow* row = row_batch->GetRow(row_idx);
     Tuple* intermediate_tuple = output_iterator_.GetTuple();

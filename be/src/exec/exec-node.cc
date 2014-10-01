@@ -142,6 +142,8 @@ Status ExecNode::Prepare(RuntimeState* state) {
         runtime_profile()->total_time_counter()));
 
   RETURN_IF_ERROR(Expr::Prepare(conjunct_ctxs_, state, row_desc()));
+  AddExprCtxsToFree(conjunct_ctxs_);
+
   for (int i = 0; i < children_.size(); ++i) {
     RETURN_IF_ERROR(children_[i]->Prepare(state));
   }
@@ -378,6 +380,21 @@ bool ExecNode::EvalConjuncts(ExprContext* const* ctxs, int num_ctxs, TupleRow* r
     if (v.is_null || !v.val) return false;
   }
   return true;
+}
+
+Status ExecNode::QueryMaintenance(RuntimeState* state) {
+  ExprContext::FreeLocalAllocations(expr_ctxs_to_free_);
+  return state->CheckQueryState();
+}
+
+void ExecNode::AddExprCtxsToFree(const vector<ExprContext*>& ctxs) {
+  for (int i = 0; i < ctxs.size(); ++i) AddExprCtxToFree(ctxs[i]);
+}
+
+void ExecNode::AddExprCtxsToFree(const SortExecExprs& sort_exec_exprs) {
+  AddExprCtxsToFree(sort_exec_exprs.sort_tuple_slot_expr_ctxs());
+  AddExprCtxsToFree(sort_exec_exprs.lhs_ordering_expr_ctxs());
+  AddExprCtxsToFree(sort_exec_exprs.rhs_ordering_expr_ctxs());
 }
 
 // Codegen for EvalConjuncts.  The generated signature is
