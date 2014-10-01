@@ -939,6 +939,16 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "A subquery must contain a single select block: " +
         "(SELECT id FROM functional.alltypestiny UNION " +
         "SELECT id FROM functional.alltypesagg)");
+    // Union query with subqueries
+    AnalysisError("select * from functional.alltypes where id = " +
+        "(select max(id) from functional.alltypestiny) union " +
+        "select * from functional.alltypes where id = " +
+        "(select min(id) from functional.alltypessmall)",
+        "Subqueries are not supported in a UNION query: " +
+        "SELECT * FROM functional.alltypes WHERE id = " +
+        "(SELECT max(id) FROM functional.alltypestiny) UNION " +
+        "SELECT * FROM functional.alltypes WHERE id = " +
+        "(SELECT min(id) FROM functional.alltypessmall)");
     AnalysisError("select * from functional.alltypes where exists (values(1))",
         "A subquery must contain a single select block: (VALUES(1))");
 

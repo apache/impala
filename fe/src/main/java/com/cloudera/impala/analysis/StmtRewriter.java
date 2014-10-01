@@ -61,6 +61,9 @@ public class StmtRewriter {
       Preconditions.checkNotNull(analysisResult.getTmpCreateTableStmt());
       rewrittenStmt = new CreateTableAsSelectStmt(analysisResult.getTmpCreateTableStmt(),
           ctasStmt.getQueryStmt().clone());
+    } else if (analysisResult.getStmt() instanceof UnionStmt){
+      throw new AnalysisException("Subqueries are not supported in a UNION query: " +
+          analysisResult.getStmt().toSql());
     } else {
       throw new AnalysisException("Unsupported statement containing subqueries: " +
           analysisResult.getStmt().toSql());
