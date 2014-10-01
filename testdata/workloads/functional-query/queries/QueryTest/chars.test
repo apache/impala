@@ -246,3 +246,30 @@ string, string, bigint, bigint, string, string
 ---- RESULTS
 '1aaaa','c',7,7,'5a   ','5c'
 ====
+---- QUERY
+# Regression test for IMPALA-1322
+drop table if exists functional.t_1822;
+====
+---- QUERY
+# Regression test for IMPALA-1322
+create table functional.t_1822 (c10 char(10), c100 char(100), v100 varchar(100), v200 varchar(200), s string);
+====
+---- QUERY
+# Regression test for IMPALA-1322
+insert into functional.t_1822 values (cast('a' as char(1)), cast('a' as char(1)),
+cast('a' as varchar(1)), cast('a' as varchar(1)), 'a');
+====
+---- QUERY
+# Regression test for IMPALA-1316
+select count(*) from functional.t_1822 as t join functional.t_1822 as tt
+on cast(tt.s as char(129)) = t.c10 and
+cast(tt.s as char(129)) = t.c100 and tt.c10 = t.c100;
+---- TYPES
+bigint
+---- RESULTS
+1
+====
+---- QUERY
+# Regression test for IMPALA-1322
+drop table if exists functional.t_1822;
+====

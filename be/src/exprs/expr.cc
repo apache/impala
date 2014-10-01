@@ -305,7 +305,8 @@ int Expr::ComputeResultsLayout(const vector<Expr*>& exprs, vector<int>* offsets,
     DCHECK_GE(data[i].byte_size, current_alignment);
     // Don't align more than word (8-byte) size.  This is consistent with what compilers
     // do.
-    if (exprs[i]->type().type == TYPE_CHAR && !exprs[i]->type().IsVarLen()) {
+    if (exprs[data[i].expr_idx]->type().type == TYPE_CHAR &&
+        !exprs[data[i].expr_idx]->type().IsVarLen()) {
       // CHARs are not padded, to be consistent with complier layouts
       // aligns the next value on an 8 byte boundary
       current_alignment = (data[i].byte_size + current_alignment) % max_alignment;
