@@ -301,7 +301,7 @@ TEST_F(BufferedBlockMgrTest, GetNewBlock) {
   EXPECT_TRUE(new_block == NULL);
   EXPECT_EQ(block_mgr->bytes_allocated(), max_num_blocks * block_size_);
 
-  EXPECT_EQ(block_mgr->profile()->GetCounter("BlockWritesIssued")->value(), 1);;
+  EXPECT_EQ(block_mgr->writes_issued(), 1);;
   block_mgr.reset();
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
@@ -432,7 +432,6 @@ TEST_F(BufferedBlockMgrTest, Eviction) {
   // Check counters.
   RuntimeProfile* profile = block_mgr->profile();
   RuntimeProfile::Counter* buffered_pin = profile->GetCounter("BufferedPins");
-  RuntimeProfile::Counter* writes_issued = profile->GetCounter("BlockWritesIssued");
 
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr.get(), client, max_num_buffers, &blocks);
@@ -460,7 +459,7 @@ TEST_F(BufferedBlockMgrTest, Eviction) {
   // Get two new blocks.
   AllocateBlocks(block_mgr.get(), client, 2, &blocks);
   // At least two writes must be issued. The first (num_blocks - 2) must be in memory.
-  EXPECT_GE(writes_issued->value(), 2);
+  EXPECT_GE(block_mgr->writes_issued(), 2);
   for (int i = 0; i < (max_num_buffers - 2); ++i) {
     bool pinned;
     status = blocks[i]->Pin(&pinned);

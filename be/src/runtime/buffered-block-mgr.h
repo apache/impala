@@ -373,6 +373,7 @@ class BufferedBlockMgr {
   int64_t max_block_size() const { return max_block_size_; }
   int64_t bytes_allocated() const;
   RuntimeProfile* profile() { return profile_.get(); }
+  int writes_issued() const { return writes_issued_; }
 
  private:
   friend struct Client;
@@ -558,8 +559,8 @@ class BufferedBlockMgr {
   // Time spent waiting for a free buffer.
   RuntimeProfile::Counter* buffer_wait_timer_;
 
-  // Number of writes issued
-  RuntimeProfile::Counter* writes_issued_counter_;
+  // Number of bytes written to disk (includes writes still queued in the IO manager)
+  RuntimeProfile::Counter* bytes_written_counter_;
 
   // Number of writes outstanding (issued but not completed)
   RuntimeProfile::Counter* outstanding_writes_counter_;
@@ -569,6 +570,9 @@ class BufferedBlockMgr {
 
   // Time spent in disk spill integrity generation and checking
   RuntimeProfile::Counter* integrity_check_timer_;
+
+  // Number of writes issued.
+  int writes_issued_;
 
   // Protects query_to_block_mgrs_
   static boost::mutex static_block_mgrs_lock_;

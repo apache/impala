@@ -198,6 +198,7 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, int64_t block_size)
     num_outstanding_writes_(0),
     io_mgr_(state->io_mgr()),
     is_cancelled_(0),
+    writes_issued_(0),
     encryption_(FLAGS_disk_spill_encryption),
     check_integrity_(FLAGS_disk_spill_encryption) {
   state->io_mgr()->RegisterContext(NULL, &io_request_context_);
@@ -681,8 +682,9 @@ Status BufferedBlockMgr::WriteUnpinnedBlock(Block* block) {
   block->in_write_ = true;
   DCHECK(block->Validate()) << endl << block->DebugString();
   outstanding_writes_counter_->Add(1);
-  writes_issued_counter_->Add(1);
-  if (writes_issued_counter_->value() == 1) {
+  bytes_written_counter_->Add(block->valid_data_len_);
+  ++writes_issued_;
+  if (writes_issued_ == 1) {
     if (ImpaladMetrics::NUM_QUERIES_SPILLED != NULL) {
       ImpaladMetrics::NUM_QUERIES_SPILLED->Increment(1);
     }
@@ -1076,8 +1078,8 @@ void BufferedBlockMgr::Init(RuntimeProfile* parent_profile,
       profile_.get(), "BlocksCreated", TCounterType::UNIT);
   recycled_blocks_counter_ = ADD_COUNTER(
       profile_.get(), "BlocksRecycled", TCounterType::UNIT);
-  writes_issued_counter_ = ADD_COUNTER(
-      profile_.get(), "BlockWritesIssued", TCounterType::UNIT);
+  bytes_written_counter_ = ADD_COUNTER(
+      profile_.get(), "BytesWritten", TCounterType::BYTES);
   outstanding_writes_counter_ =
       ADD_COUNTER(profile_.get(), "BlockWritesOutstanding", TCounterType::UNIT);
   buffered_pin_counter_ = ADD_COUNTER(profile_.get(), "BufferedPins", TCounterType::UNIT);
