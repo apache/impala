@@ -292,14 +292,14 @@ public class StmtRewriter {
     }
 
     // Update the subquery's select list and/or its GROUP BY clause by adding
-    // SlotRefs from the extracted correlated predicates.
+    // exprs from the extracted correlated predicates.
     boolean updateGroupBy = expr.getSubquery().isScalarSubquery() ||
         (expr instanceof ExistsPredicate && subqueryStmt.hasAggInfo());
-    Map<Expr, Expr> exprMap = Maps.newHashMap();
-    List<TupleId> subqueryTupleIds = subqueryStmt.getTableRefIds();
+    List<Expr> lhsExprs = Lists.newArrayList();
+    List<Expr> rhsExprs = Lists.newArrayList();
     for (Expr conjunct: onClauseConjuncts) {
-      updateSubquery(subqueryStmt, conjunct, subqueryTupleIds, inlineViewAlias,
-          exprMap, updateGroupBy);
+      updateSubquery(subqueryStmt, conjunct, stmt.getTableRefIds(), inlineViewAlias,
+          lhsExprs, rhsExprs, updateGroupBy);
     }
 
     if (expr instanceof ExistsPredicate) {
@@ -381,9 +381,12 @@ public class StmtRewriter {
     // Create an smap from the original select-list exprs of the select list to
     // the corresponding inline-view columns.
     ExprSubstitutionMap smap = new ExprSubstitutionMap();
-    for (Map.Entry<Expr, Expr> entry: exprMap.entrySet()) {
-      entry.getValue().analyze(analyzer);
-      smap.put(entry.getKey(), entry.getValue());
+    Preconditions.checkState(lhsExprs.size() == rhsExprs.size());
+    for (int i = 0; i < lhsExprs.size(); ++i) {
+      Expr lhsExpr = lhsExprs.get(i);
+      Expr rhsExpr = rhsExprs.get(i);
+      rhsExpr.analyze(analyzer);
+      smap.put(lhsExpr, rhsExpr);
     }
     onClausePredicate = onClausePredicate.substitute(smap, analyzer);
 
@@ -645,33 +648,71 @@ public class StmtRewriter {
   }
 
   /**
-   * Update a subquery by expanding its select list with SlotRefs from 'expr'.
-   * If 'updateGroupBy' is true, the SlotRefs from 'expr' are also added in
-   * stmt's GROUP BY clause. 'expr' is a correlated predicate from the
-   * subquery that will be 'moved' to an ON clause in the subquery's parent query
-   * block. Hence, we need to make sure that every SlotRef of 'expr' originating from
-   * the subquery references an item in the subquery's select list.
+   * Update a subquery by expanding its select list with exprs from a correlated
+   * predicate 'expr' that will be 'moved' to an ON clause in the subquery's parent
+   * query block. We need to make sure that every expr extracted from the
+   * subquery references an item in the subquery's select list. If 'updateGroupBy'
+   * is true, the exprs extracted from 'expr' are also added in stmt's GROUP BY clause.
+   * Throws an AnalysisException if we need to update the GROUP BY clause but
+   * both the lhs and rhs of 'expr' reference a tuple of the subquery stmt.
    */
   private static void updateSubquery(SelectStmt stmt, Expr expr,
-      List<TupleId> subqueryTblIds, String inlineViewAlias, Map<Expr, Expr> exprMap,
-      boolean updateGroupBy) {
+      List<TupleId> parentQueryTids, String inlineViewAlias, List<Expr> lhsExprs,
+      List<Expr> rhsExprs, boolean updateGroupBy) throws AnalysisException {
+    List<TupleId> subqueryTblIds = stmt.getTableRefIds();
     ArrayList<Expr> groupByExprs = null;
     if (updateGroupBy) groupByExprs = Lists.newArrayList();
+
+    List<SelectListItem> items = stmt.selectList_.getItems();
+    // Collect all the SlotRefs from 'expr' and identify those that are bound by
+    // subquery tuple ids.
     ArrayList<Expr> slotRefs = Lists.newArrayList();
     expr.collectAll(Predicates.instanceOf(SlotRef.class), slotRefs);
-    List<SelectListItem> items = stmt.selectList_.getItems();
+    List<Expr> exprsBoundBySubqueryTids = Lists.newArrayList();
     for (Expr slotRef: slotRefs) {
-      // If the slotRef belongs to the subquery, add it to the select list and
-      // register it for substitution. We use a temporary substitution map
-      // because we cannot at this point analyze the new select list expr. Once
-      // the new inline view is analyzed, the entries from this map will be
-      // added to an ExprSubstitutionMap.
       if (slotRef.isBoundByTupleIds(subqueryTblIds)) {
-        String colAlias = stmt.getColumnAliasGenerator().getNextAlias();
-        items.add(new SelectListItem(slotRef, colAlias));
-        exprMap.put(slotRef, new SlotRef(new TableName(null, inlineViewAlias), colAlias));
-        if (groupByExprs != null) groupByExprs.add(slotRef);
+        exprsBoundBySubqueryTids.add(slotRef);
       }
+    }
+    // The correlated predicate only references slots from a parent block,
+    // no need to update the subquery's select or group by list.
+    if (exprsBoundBySubqueryTids.isEmpty()) return;
+    if (updateGroupBy) {
+      Preconditions.checkState(expr instanceof BinaryPredicate);
+      Expr exprBoundBySubqueryTids = null;
+      if (exprsBoundBySubqueryTids.size() > 1) {
+        // If the predicate contains multiple SlotRefs bound by subquery tuple
+        // ids, they must all be on the same side of that predicate.
+        if (expr.getChild(0).isBoundByTupleIds(subqueryTblIds) &&
+           expr.getChild(1).isBoundByTupleIds(parentQueryTids)) {
+          exprBoundBySubqueryTids = expr.getChild(0);
+        } else if (expr.getChild(0).isBoundByTupleIds(parentQueryTids) &&
+            expr.getChild(1).isBoundByTupleIds(subqueryTblIds)) {
+          exprBoundBySubqueryTids = expr.getChild(1);
+        } else {
+          throw new AnalysisException("All subquery columns " +
+              "that participate in a predicate must be on the same side of " +
+              "that predicate: " + expr.toSql());
+        }
+      } else {
+        Preconditions.checkState(exprsBoundBySubqueryTids.size() == 1);
+        exprBoundBySubqueryTids = exprsBoundBySubqueryTids.get(0);
+      }
+      exprsBoundBySubqueryTids.clear();
+      exprsBoundBySubqueryTids.add(exprBoundBySubqueryTids);
+    }
+
+    // Add the exprs bound by subquery tuple ids to the select list and
+    // register it for substitution. We use a temporary substitution map
+    // because we cannot at this point analyze the new select list expr. Once
+    // the new inline view is analyzed, the entries from this map will be
+    // added to an ExprSubstitutionMap.
+    for (Expr boundExpr: exprsBoundBySubqueryTids) {
+      String colAlias = stmt.getColumnAliasGenerator().getNextAlias();
+      items.add(new SelectListItem(boundExpr, colAlias));
+      lhsExprs.add(boundExpr);
+      rhsExprs.add(new SlotRef(new TableName(null, inlineViewAlias), colAlias));
+      if (groupByExprs != null) groupByExprs.add(boundExpr);
     }
 
     // Update the subquery's select list.

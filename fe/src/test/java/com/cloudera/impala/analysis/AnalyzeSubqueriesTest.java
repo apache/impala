@@ -839,6 +839,15 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "t.string_col = (select %s from functional.alltypesagg g where t.id = " +
         "g.id)", aggFn));
     }
+    // Complex correlated predicate in which columns from the subquery appear in
+    // both sides of a correlated binary predicate
+    AnalysisError("select 1 from functional.alltypestiny t where " +
+        "(select sum(t1.id) from functional.alltypesagg t1 inner join " +
+        "functional.alltypes t2 on t1.id = t2.id where " +
+        "t1.id + t2.id = t.int_col + t1.int_col) = t.int_col",
+        "All subquery columns that participate in a predicate " +
+        "must be on the same side of that predicate: t1.id + t2.id = t.int_col " +
+        "+ t1.int_col");
   }
 
   @Test

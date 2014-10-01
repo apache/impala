@@ -1327,3 +1327,94 @@ where
 01:SCAN HDFS [functional.alltypessmall t2]
    partitions=4/4 size=6.32KB
 ====
+# Correlated scalar subquery with complex correlated predicate (IMPALA-1335)
+select 1
+from functional.alltypestiny t
+where
+  (select sum(t1.id)
+   from functional.alltypesagg t1 inner join functional.alltypes t2 on t1.id = t2.id
+   where t1.id + t2.id = t.int_col) = t.int_col
+---- PLAN
+05:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: sum(t1.id) = t.int_col
+|
+|--00:SCAN HDFS [functional.alltypestiny t]
+|     partitions=4/4 size=460B
+|
+04:AGGREGATE [FINALIZE]
+|  output: sum(t1.id)
+|  group by: t1.id + t2.id
+|  having: t1.id + t2.id = sum(t1.id)
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|
+|--02:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 size=478.45KB
+|
+01:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 size=814.73KB
+====
+# Correlated scalar subquery with complex correlared predicate (IMPALA-1335)
+select 1
+from functional.alltypestiny t
+where
+  (select sum(t1.id)
+   from functional.alltypesagg t1 inner join functional.alltypes t2 on t1.id = t2.id
+   where t1.id + t2.id = t.bigint_col) = t.int_col
+---- PLAN
+05:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: sum(t1.id) = t.int_col, t1.id + t2.id = t.bigint_col
+|
+|--00:SCAN HDFS [functional.alltypestiny t]
+|     partitions=4/4 size=460B
+|
+04:AGGREGATE [FINALIZE]
+|  output: sum(t1.id)
+|  group by: t1.id + t2.id
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|
+|--02:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 size=478.45KB
+|
+01:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 size=814.73KB
+====
+# Outer query block with multiple tables and a correlated scalar subquery with
+# complex correlated predicate that references multiple subquery tables and multiple
+# tables from the outer query block (IMPALA-1335)
+select 1
+from functional.alltypestiny t1 inner join functional.alltypessmall t2 on t1.id = t2.id
+where
+  (select sum(tt1.id)
+   from functional.alltypesagg tt1 inner join functional.alltypes tt2
+   on tt1.int_col = tt2.int_col
+   where tt1.id + tt2.id = t1.int_col - t2.int_col) = t1.bigint_col
+---- PLAN
+07:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: sum(tt1.id) = t1.bigint_col, tt1.id + tt2.id = t1.int_col - t2.int_col
+|
+|--06:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t2.id = t1.id
+|  |
+|  |--00:SCAN HDFS [functional.alltypestiny t1]
+|  |     partitions=4/4 size=460B
+|  |
+|  01:SCAN HDFS [functional.alltypessmall t2]
+|     partitions=4/4 size=6.32KB
+|
+05:AGGREGATE [FINALIZE]
+|  output: sum(tt1.id)
+|  group by: tt1.id + tt2.id
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: tt1.int_col = tt2.int_col
+|
+|--03:SCAN HDFS [functional.alltypes tt2]
+|     partitions=24/24 size=478.45KB
+|
+02:SCAN HDFS [functional.alltypesagg tt1]
+   partitions=11/11 size=814.73KB
+====
