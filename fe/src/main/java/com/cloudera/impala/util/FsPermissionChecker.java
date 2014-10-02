@@ -65,6 +65,7 @@ public class FsPermissionChecker {
   private FsPermissionChecker() throws IOException {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     groups_.addAll(Arrays.asList(ugi.getGroupNames()));
+    // Todo: should add HDFS supergroup as well
     user_ = ugi.getShortUserName();
   }
 
@@ -100,7 +101,9 @@ public class FsPermissionChecker {
         entriesByTypes_.put(t, Lists.<AclEntry>newArrayList());
       }
 
-      for (AclEntry e: aclStatus_.getEntries()) {
+      List<AclEntry> fullAclList =
+          getAclFromPermAndEntries(permissions_, aclStatus_.getEntries());
+      for (AclEntry e: fullAclList) {
         if (e.getType() == AclEntryType.MASK && e.getScope() != AclEntryScope.DEFAULT) {
           mask_ = e;
         } else if (isApplicableAcl(e)) {
@@ -199,6 +202,51 @@ public class FsPermissionChecker {
     public boolean canRead() { return checkPermissions(FsAction.READ); }
     public boolean canWrite() { return checkPermissions(FsAction.WRITE); }
     public boolean canReadAndWrite() { return canRead() && canWrite(); }
+
+    // This was originally lifted from Hadoop. Won't need it if HDFS-7177 is resolved.
+    // getAclStatus() returns just extended ACL entries, the default file permissions
+    // like "user::,group::,other::" are not included. We need to combine them together
+    // to get full logic ACL list.
+    private List<AclEntry> getAclFromPermAndEntries(FsPermission perm,
+        List<AclEntry> entries) {
+      // File permission always have 3 items.
+      List<AclEntry> aclEntries = Lists.newArrayListWithCapacity(entries.size() + 3);
+
+      // Owner entry implied by owner permission bits.
+      aclEntries.add(new AclEntry.Builder()
+          .setScope(AclEntryScope.ACCESS)
+          .setType(AclEntryType.USER)
+          .setPermission(perm.getUserAction())
+          .build());
+
+      // All extended access ACL entries add by "-setfacl" other than default file
+      // permission.
+      boolean hasAccessAcl = false;
+      for (AclEntry entry: entries) {
+        // AclEntry list should be ordered, all ACCESS one are in first half, DEFAULT one
+        // are in second half, so no need to continue here.
+        if (entry.getScope() == AclEntryScope.DEFAULT) break;
+        hasAccessAcl = true;
+        aclEntries.add(entry);
+      }
+
+      // Mask entry implied by group permission bits, or group entry if there is
+      // no access ACL (only default ACL).
+      aclEntries.add(new AclEntry.Builder()
+          .setScope(AclEntryScope.ACCESS)
+          .setType(hasAccessAcl ? AclEntryType.MASK : AclEntryType.GROUP)
+          .setPermission(perm.getGroupAction())
+          .build());
+
+      // Other entry implied by other bits.
+      aclEntries.add(new AclEntry.Builder()
+          .setScope(AclEntryScope.ACCESS)
+          .setType(AclEntryType.OTHER)
+          .setPermission(perm.getOtherAction())
+          .build());
+
+      return aclEntries;
+    }
   }
 
   /**

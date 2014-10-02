@@ -17,6 +17,9 @@
 from tests.common.impala_test_suite import ImpalaTestSuite
 import time
 import pytest
+import getpass
+import grp
+import pwd
 
 class TestInsertBehaviour(ImpalaTestSuite):
   """Tests for INSERT behaviour that isn't covered by checking query results"""
@@ -145,8 +148,8 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
                                       "PARTITION(p1=1, p2=2, p3=30) VALUES(1)")
     check_has_acls("p1=1/p2=2/p3=30", "default:group:new_leaf_group:-w-")
 
-  def test_insert_acl_permissions(self):
-    """Test that INSERT correctly respects ACLs"""
+  def test_insert_file_permissions(self):
+    """Test that INSERT correctly respects file permission (minimum ACLs)"""
     TBL = "functional.insert_acl_permissions"
     TBL_PATH = "test-warehouse/functional.db/insert_acl_permissions"
 
@@ -173,21 +176,6 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
                                       "REFRESH functional.insert_acl_permissions")
     self.execute_query_expect_failure(self.client, INSERT_QUERY)
 
-    # Check that the mask correctly applies to the anonymous group ACL
-    self.hdfs_client.setacl(TBL_PATH, "user::r-x,group::rwx,other::rwx,mask::r--")
-    self.execute_query_expect_success(self.client,
-                                      "REFRESH functional.insert_acl_permissions")
-    # Should be unwritable because mask applies to unnamed group and disables writing
-    self.execute_query_expect_failure(self.client, INSERT_QUERY)
-
-    # Check that the mask correctly applies to the user ACL
-    self.hdfs_client.setacl(TBL_PATH,
-                            "user::r-x,user:impala:rwx,group::r-x,other::rwx,mask::r--")
-    self.execute_query_expect_success(self.client,
-                                      "REFRESH functional.insert_acl_permissions")
-    # Should be unwritable because mask applies to unnamed group and disables writing
-    self.execute_query_expect_failure(self.client, INSERT_QUERY)
-
     # Now make the target directory non-writable with posix permissions, but writable with
     # ACLs (ACLs should take priority). Note: chmod affects ACLs (!) so it has to be done
     # first.
@@ -210,6 +198,88 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
     self.execute_query_expect_success(self.client,
                                       "REFRESH functional.insert_acl_permissions")
     # Should be unwritable because 'other' ACLs don't allow writes
+    self.execute_query_expect_success(self.client, INSERT_QUERY)
+
+  def test_insert_acl_permissions(self):
+    """Test that INSERT correctly respects ACLs"""
+    TBL = "functional.insert_acl_permissions"
+    TBL_PATH = "test-warehouse/functional.db/insert_acl_permissions"
+
+    INSERT_QUERY = "INSERT INTO %s VALUES(1)" % TBL
+
+    self.execute_query_expect_success(self.client, "DROP TABLE IF EXISTS"
+                                      " functional.insert_acl_permissions")
+    self.execute_query_expect_success(self.client, "CREATE TABLE "
+                                      "functional.insert_acl_permissions (col int) ")
+
+    # Check that a simple insert works
+    self.execute_query_expect_success(self.client, INSERT_QUERY)
+
+    USER = getpass.getuser()
+    GROUP = grp.getgrgid(pwd.getpwnam(USER).pw_gid).gr_name
+    # First, change the owner to someone other than user who runs impala service
+    self.hdfs_client.chown(TBL_PATH, "another_user", GROUP)
+
+    # Remove the permission to write and confirm that INSERTs won't work
+    self.hdfs_client.setacl(TBL_PATH,
+                            "user::r-x,user:" + USER + ":r-x,group::r-x,other::r-x")
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.insert_acl_permissions")
+    self.execute_query_expect_failure(self.client, INSERT_QUERY)
+
+    # Add the permission to write. if we're not the owner of the file, INSERTs should work
+    self.hdfs_client.setacl(TBL_PATH,
+                            "user::r-x,user:" + USER + ":rwx,group::r-x,other::r-x")
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.insert_acl_permissions")
+    self.execute_query_expect_success(self.client, INSERT_QUERY)
+
+    # Now add group access, still should fail (because the user will match and take
+    # priority)
+    self.hdfs_client.setacl(TBL_PATH,
+                            "user::r-x,user:" + USER + ":r-x,group::rwx,other::r-x")
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.insert_acl_permissions")
+    self.execute_query_expect_failure(self.client, INSERT_QUERY)
+
+    # Check that the mask correctly applies to the anonymous group ACL
+    self.hdfs_client.setacl(TBL_PATH, "user::r-x,group::rwx,other::rwx,mask::r--")
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.insert_acl_permissions")
+    # Should be unwritable because mask applies to unnamed group and disables writing
+    self.execute_query_expect_failure(self.client, INSERT_QUERY)
+
+    # Check that the mask correctly applies to the named user ACL
+    self.hdfs_client.setacl(TBL_PATH, "user::r-x,user:" + USER +
+                            ":rwx,group::r-x,other::rwx,mask::r--")
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.insert_acl_permissions")
+    # Should be unwritable because mask applies to named user and disables writing
+    self.execute_query_expect_failure(self.client, INSERT_QUERY)
+
+    # Now make the target directory non-writable with posix permissions, but writable with
+    # ACLs (ACLs should take priority). Note: chmod affects ACLs (!) so it has to be done
+    # first.
+    self.hdfs_client.chmod(TBL_PATH, "000")
+    self.hdfs_client.setacl(TBL_PATH, "user::rwx,user:foo:rwx,group::rwx,other::r-x")
+
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.insert_acl_permissions")
+    self.execute_query_expect_success(self.client, INSERT_QUERY)
+
+    # Finally, change the owner/group
+    self.hdfs_client.chown(TBL_PATH, "test_user", "invalid")
+
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.insert_acl_permissions")
+    # Should be unwritable because 'other' ACLs don't allow writes
+    self.execute_query_expect_failure(self.client, INSERT_QUERY)
+
+    # Give write perms back to 'other'
+    self.hdfs_client.setacl(TBL_PATH, "user::r-x,user:foo:rwx,group::r-x,other::rwx")
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.insert_acl_permissions")
+    # Should be writable because 'other' ACLs allow writes
     self.execute_query_expect_success(self.client, INSERT_QUERY)
 
   def test_load_permissions(self):
