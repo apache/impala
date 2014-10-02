@@ -336,6 +336,15 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testExprCast("cast('Hello' as VARCHAR(5))", ScalarType.createVarcharType(7));
     testExprCast("cast('Hello' as VARCHAR(5))", ScalarType.createVarcharType(3));
 
+    AnalysisError("select cast('foo' as varchar(0))",
+        "Varchar size must be > 0. Size is too small: 0.");
+    AnalysisError("select cast('foo' as varchar(65356))",
+        "Varchar size must be <= 65355. Size is too large: 65356.");
+    AnalysisError("select cast('foo' as char(0))",
+        "Char size must be > 0. Size is too small: 0.");
+    AnalysisError("select cast('foo' as char(256))",
+        "Char size must be <= 255. Size is too large: 256.");
+
     testExprCast("'Hello'", ScalarType.createCharType(5));
     testExprCast("cast('Hello' as CHAR(5))", ScalarType.STRING);
     testExprCast("cast('Hello' as CHAR(5))", ScalarType.createVarcharType(7));
@@ -355,6 +364,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testExprCast("cast('abcde' as varchar(10)) IN " +
         "(cast('abcde' as CHAR(20)), cast('abcde' as VARCHAR(10)), 'abcde')",
         ScalarType.createVarcharType(10));
+
   }
 
   /**

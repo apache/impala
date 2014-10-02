@@ -60,7 +60,8 @@ struct ColumnType {
   PrimitiveType type;
   // Only set if type == TYPE_CHAR or type == TYPE_VARCHAR
   int len;
-  static const int MAX_VARCHAR_LENGTH = 32672;
+  static const int MAX_VARCHAR_LENGTH = 65355;
+  static const int MAX_CHAR_LENGTH = 255;
   static const int MAX_CHAR_INLINE_LENGTH = 128;
 
   // Only set if type == TYPE_DECIMAL
@@ -78,7 +79,7 @@ struct ColumnType {
 
   static ColumnType CreateCharType(int len) {
     DCHECK_GE(len, 1);
-    DCHECK_LE(len, MAX_VARCHAR_LENGTH);
+    DCHECK_LE(len, MAX_CHAR_LENGTH);
     ColumnType ret;
     ret.type = TYPE_CHAR;
     ret.len = len;

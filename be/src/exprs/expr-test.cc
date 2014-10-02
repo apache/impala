@@ -1611,7 +1611,24 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("lower(cast('HELLO' as CHAR(3)))", "hel");
   TestStringValue("lower(cast(123456 as CHAR(3)))", "123");
   TestStringValue("cast(cast(123456 as CHAR(3)) as VARCHAR(3))", "123");
+  TestStringValue("cast(cast(123456 as CHAR(3)) as VARCHAR(65355))", "123");
   TestIsNull("cast(NULL as CHAR(3))", ColumnType::CreateCharType(3));
+
+  TestCharValue("cast('HELLO' as CHAR(255))",
+      "HELLO                                                                        "
+      "                                                                             "
+      "                                                                             "
+      "                        ", ColumnType::CreateCharType(255));
+
+  // Test maximum VARCHAR value
+  char query[ColumnType::MAX_VARCHAR_LENGTH + 1024];
+  char big_str[ColumnType::MAX_VARCHAR_LENGTH+1];
+  for (int i = 0 ; i < ColumnType::MAX_VARCHAR_LENGTH; i++) {
+    big_str[i] = 'a';
+  }
+  big_str[ColumnType::MAX_VARCHAR_LENGTH] = '\0';
+  sprintf(query, "cast('%sxxx' as VARCHAR(%d))", big_str, ColumnType::MAX_VARCHAR_LENGTH);
+  TestStringValue(query, big_str);
 }
 
 TEST_F(ExprTest, StringRegexpFunctions) {

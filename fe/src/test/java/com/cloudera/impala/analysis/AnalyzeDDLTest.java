@@ -863,11 +863,15 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     AnalyzesOk("create table new_table(s1 varchar(1), s2 varchar(32672))");
     AnalysisError("create table new_table(s1 varchar(0))",
-        "Varchar size must be > 0. Size was set to: 0.");
-    AnalysisError("create table new_table(s1 varchar(32673))",
-        "Varchar size must be <= 32672. Size was set to: 32673.");
+        "Varchar size must be > 0. Size is too small: 0.");
+    AnalysisError("create table new_table(s1 varchar(65356))",
+        "Varchar size must be <= 65355. Size is too large: 65356.");
+    AnalysisError("create table new_table(s1 char(0))",
+        "Char size must be > 0. Size is too small: 0.");
+    AnalysisError("create table new_table(s1 Char(256))",
+        "Char size must be <= 255. Size is too large: 256.");
     AnalyzesOk("create table new_table (i int) PARTITIONED BY (s varchar(3))");
-    AnalyzesOk("create table functional.new_table (c char(1024))");
+    AnalyzesOk("create table functional.new_table (c char(250))");
     AnalyzesOk("create table new_table (i int) PARTITIONED BY (c char(3))");
 
     // Supported file formats. Exclude Avro since it is tested separately.
@@ -1609,7 +1613,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Invalid char(0) type.
     AnalysisError("create aggregate function foo(int) RETURNS int " +
         "INTERMEDIATE CHAR(0) LOCATION '/foo.so' UPDATE_FN='b'",
-        "Char size must be > 0. Size was set to: 0.");
+        "Char size must be > 0. Size is too small: 0.");
     AnalysisError("create aggregate function foo() RETURNS int" + loc,
         "UDAs must take at least one argument.");
     AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +

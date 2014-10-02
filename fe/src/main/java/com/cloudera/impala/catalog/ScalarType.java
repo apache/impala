@@ -37,8 +37,9 @@ public class ScalarType extends Type {
   public static final int DEFAULT_PRECISION = 9;
   public static final int DEFAULT_SCALE = 0; // SQL standard
 
-  // Longest supported VARCHAR and CHAR. Chosen to match Oracle.
-  static final int MAX_VARCHAR_LENGTH = 32672;
+  // Longest supported VARCHAR and CHAR, chosen to match Hive.
+  static final int MAX_VARCHAR_LENGTH = 65355;
+  static final int MAX_CHAR_LENGTH = 255;
 
   // Longest CHAR that we in line in the tuple.
   // Keep consistent with backend ColumnType::CHAR_INLINE_LENGTH
@@ -127,10 +128,13 @@ public class ScalarType extends Type {
       case CHAR:
       case VARCHAR: {
         String name;
+        int maxLen;
         if (type_ == PrimitiveType.VARCHAR) {
           name = "Varchar";
+          maxLen = MAX_VARCHAR_LENGTH;
         } else if (type_ == PrimitiveType.CHAR) {
           name = "Char";
+          maxLen = MAX_CHAR_LENGTH;
         } else {
           Preconditions.checkState(false);
           return;
@@ -138,11 +142,11 @@ public class ScalarType extends Type {
 
         if (len_ <= 0) {
           throw new AnalysisException(name +
-              " size must be > 0. Size was set to: " + len_ + ".");
+              " size must be > 0. Size is too small: " + len_ + ".");
         }
-        if (len_ > MAX_VARCHAR_LENGTH) {
+        if (len_ > maxLen) {
           throw new AnalysisException(name +
-              " size must be <= 32672. Size was set to: " + len_ + ".");
+              " size must be <= " + maxLen + ". Size is too large: " + len_ + ".");
         }
         break;
       }

@@ -75,6 +75,16 @@ insert into test_varchar_tmp values (cast("xyzzzzz12" as varchar(7)))
 would need to be cast to VARCHAR(5)
 ====
 ---- QUERY
+select cast("xyzzzzz12" as varchar(-1))
+---- CATCH
+Syntax error
+====
+---- QUERY
+select (cast("xyzzzzz12" as char(-1)))
+---- CATCH
+Syntax error
+====
+---- QUERY
 insert into test_varchar_tmp values (cast("hel" as varchar(4)))
 ====
 ---- QUERY
