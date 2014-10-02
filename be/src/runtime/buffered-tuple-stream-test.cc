@@ -29,6 +29,7 @@
 #include "runtime/string-value.h"
 #include "service/fe-support.h"
 #include "testutil/desc-tbl-builder.h"
+#include "util/test-info.h"
 
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
@@ -686,7 +687,7 @@ TEST_F(MultiNullableTupleStreamTest, MultiNullableTupleManyBufferSpill) {
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, true);
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();
   impala::TmpFileMgr::Init();
   impala::LlvmCodeGen::InitializeLlvm();

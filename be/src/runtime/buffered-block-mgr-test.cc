@@ -32,6 +32,7 @@
 #include "util/disk-info.h"
 #include "util/cpu-info.h"
 #include "util/promise.h"
+#include "util/test-info.h"
 #include "util/time.h"
 
 #include "gen-cpp/Types_types.h"
@@ -803,9 +804,9 @@ TEST_F(BufferedBlockMgrTest, Random_integ_enc) {
 
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  impala::InitCommonRuntime(argc, argv, true);
+  impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();
   impala::TmpFileMgr::Init();
   impala::LlvmCodeGen::InitializeLlvm();
