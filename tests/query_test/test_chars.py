@@ -24,6 +24,7 @@ class TestStringQueries(ImpalaTestSuite):
     self.client.execute('drop table if exists functional.test_varchar_tmp');
     self.client.execute('drop table if exists functional.allchars');
     self.client.execute('drop table if exists functional.allchars_par');
+    self.client.execute('drop table if exists functional.test_char_nulls');
 
   def __create_char_tables(self):
     self.client.execute(
@@ -37,6 +38,22 @@ class TestStringQueries(ImpalaTestSuite):
     self.client.execute(
         'create table if not exists functional.allchars_par ' +
         '(cshort char(5), clong char(140), vc varchar(5)) stored as parquet')
+
+    # Regression test for IMPALA-1339
+    self.client.execute('create table if not exists ' +
+        '''functional.test_char_nulls ( c20 char(20),
+                                        c40 char(40),
+                                        c60 char(60),
+                                        c80 char(80),
+                                        c81 char(81),
+                                        c82 char(82),
+                                        c100 char(100),
+                                        c120 char(120),
+                                        c140 char(140))''')
+    self.client.execute('insert into functional.test_char_nulls ' +
+        'values (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)');
+    self.client.execute('insert into functional.test_char_nulls ' +
+        'values (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)');
 
   @classmethod
   def add_test_dimensions(cls):

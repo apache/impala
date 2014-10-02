@@ -303,3 +303,75 @@ char, bigint
 'b                                                                                                                                           ',1
 'NULL',1
 ====
+---- QUERY
+# Regression test for IMPALA-1339
+select c20 from test_char_nulls group by c20;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Regression test for IMPALA-1339
+select c40 from test_char_nulls group by c40;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Regression test for IMPALA-1339
+select c60 from test_char_nulls group by c60;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Regression test for IMPALA-1339
+select c80 from test_char_nulls group by c80;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Regression test for IMPALA-1339
+select c81 from test_char_nulls group by c81;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Regression test for IMPALA-1339
+select c82 from test_char_nulls group by c82;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Regression test for IMPALA-1339
+select c100 from test_char_nulls group by c100;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Regression test for IMPALA-1339
+select c120 from test_char_nulls group by c120;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====
+---- QUERY
+# Regression test for IMPALA-1339
+select c140 from test_char_nulls group by c140;
+---- TYPES
+char
+---- RESULTS
+'NULL'
+====

@@ -45,6 +45,20 @@ static uint32_t SEED_PRIMES[] = {
   338294347,
 };
 
+// Put a non-zero constant in the result location for NULL.
+// We don't want(NULL, 1) to hash to the same as (0, 1).
+// This needs to be as big as the biggest primitive type since the bytes
+// get copied directly.
+// TODO find a better approach, since primitives like CHAR(N) can be up to 128 bytes
+static int64_t NULL_VALUE[] = { HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+                                HashUtil::FNV_SEED, HashUtil::FNV_SEED };
+
 // The first NUM_SMALL_BLOCKS of nodes_ are made of blocks less than the io size to
 // reduce the memory footprint of small queries.
 static const int64_t INITIAL_DATA_PAGE_SIZES[] =
@@ -93,12 +107,6 @@ void HashTableCtx::Close() {
 }
 
 bool HashTableCtx::EvalRow(TupleRow* row, const vector<ExprContext*>& ctxs) {
-  // Put a non-zero constant in the result location for NULL.
-  // We don't want(NULL, 1) to hash to the same as (0, 1).
-  // This needs to be as big as the biggest primitive type since the bytes
-  // get copied directly.
-  int64_t null_value[] = { HashUtil::FNV_SEED, HashUtil::FNV_SEED };
-
   bool has_null = false;
   for (int i = 0; i < ctxs.size(); ++i) {
     void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
@@ -108,11 +116,13 @@ bool HashTableCtx::EvalRow(TupleRow* row, const vector<ExprContext*>& ctxs) {
       if (!stores_nulls_) return true;
 
       expr_value_null_bits_[i] = true;
-      val = reinterpret_cast<void*>(&null_value);
+      val = reinterpret_cast<void*>(&NULL_VALUE);
       has_null = true;
     } else {
       expr_value_null_bits_[i] = false;
     }
+    DCHECK_LE(build_expr_ctxs_[i]->root()->type().GetSlotSize(),
+              sizeof(NULL_VALUE));
     RawValue::Write(val, loc, build_expr_ctxs_[i]->root()->type(), NULL);
   }
   return has_null;
