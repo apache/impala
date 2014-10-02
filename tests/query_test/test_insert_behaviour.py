@@ -180,6 +180,14 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
     # Should be unwritable because mask applies to unnamed group and disables writing
     self.execute_query_expect_failure(self.client, INSERT_QUERY)
 
+    # Check that the mask correctly applies to the user ACL
+    self.hdfs_client.setacl(TBL_PATH,
+                            "user::r-x,user:impala:rwx,group::r-x,other::rwx,mask::r--")
+    self.execute_query_expect_success(self.client,
+                                      "REFRESH functional.insert_acl_permissions")
+    # Should be unwritable because mask applies to unnamed group and disables writing
+    self.execute_query_expect_failure(self.client, INSERT_QUERY)
+
     # Now make the target directory non-writable with posix permissions, but writable with
     # ACLs (ACLs should take priority). Note: chmod affects ACLs (!) so it has to be done
     # first.
