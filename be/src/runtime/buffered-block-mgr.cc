@@ -559,6 +559,7 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
       block->is_pinned_ = true;
       *pinned = true;
       block->client_->PinBuffer(block->buffer_desc_);
+      RETURN_IF_ERROR(WriteUnpinnedBlocks());
       return DeleteOrUnpin(release_block, unpin);
     }
 

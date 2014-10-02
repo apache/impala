@@ -42,6 +42,8 @@ class TupleRow;
 // problematic for small queries. Instead we will start with a fixed number of small
 // buffers and only start using IO sized buffers when those fill up. The small buffers
 // never spill.
+// The stream will *not* automatically switch from using small buffers to io sized
+// buffers automatically.
 //
 // The BufferedTupleStream is *not* thread safe from the caller's point of view. It is
 // expected that all the APIs are called from a single thread. Internally, the
@@ -171,6 +173,11 @@ class BufferedTupleStream {
   // If profile is non-NULL, counters are created.
   Status Init(RuntimeProfile* profile = NULL, bool pinned = true);
 
+  // Must be called for streams using small buffers to switch to io sized
+  // buffers.
+  // TODO: this does not seem like the best mechanism.
+  Status InitIoBuffer(bool* got_buffer);
+
   // Adds a single row to the stream. Returns false if an error occurred.
   // BufferedTupleStream will do a deep copy of the memory in the row.
   // *dst is the ptr to the memory (in the underlying block) that this row
@@ -243,6 +250,7 @@ class BufferedTupleStream {
   int blocks_unpinned() const { return blocks_.size() - num_pinned_ - num_small_blocks_; }
   bool has_read_block() const { return read_block_ != blocks_.end(); }
   bool has_write_block() const { return write_block_ != NULL; }
+  bool using_small_buffers() const { return use_small_buffers_; }
 
   std::string DebugString() const;
 

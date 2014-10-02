@@ -63,6 +63,7 @@ PartitionedAggregationNode::PartitionedAggregationNode(
     needs_finalize_(tnode.agg_node.need_finalize),
     needs_serialize_(false),
     block_mgr_client_(NULL),
+    using_small_buffers_(true),
     singleton_output_tuple_(NULL),
     singleton_output_tuple_returned_(true),
     output_partition_(NULL),
@@ -530,6 +531,8 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
   if (parent->num_spilled_partitions_->value() == 1) {
     parent->AddRuntimeExecOption("Spilled");
   }
+  DCHECK(!aggregated_row_stream->using_small_buffers());
+  DCHECK(!unaggregated_row_stream->using_small_buffers());
   return Status::OK;
 }
 
@@ -813,6 +816,27 @@ Status PartitionedAggregationNode::SpillPartition(Partition* curr_partition,
     Tuple* intermediate_tuple) {
   int64_t max_freed_mem = 0;
   int partition_idx = -1;
+
+  if (using_small_buffers_) {
+    for (int i = 0; i < hash_partitions_.size(); ++i) {
+      if (hash_partitions_[i]->is_closed) continue;
+      DCHECK(hash_partitions_[i]->aggregated_row_stream->using_small_buffers());
+      DCHECK(hash_partitions_[i]->unaggregated_row_stream->using_small_buffers());
+      bool got_buffer;
+      RETURN_IF_ERROR(
+          hash_partitions_[i]->aggregated_row_stream->InitIoBuffer(&got_buffer));
+      if (got_buffer) {
+        RETURN_IF_ERROR(
+            hash_partitions_[i]->unaggregated_row_stream->InitIoBuffer(&got_buffer));
+      }
+      if (!got_buffer) {
+        Status status = Status::MEM_LIMIT_EXCEEDED;
+        status.AddErrorMsg("Not enough memory to get the minimum required buffers.");
+        return status;
+      }
+    }
+    using_small_buffers_ = false;
+  }
 
   // Iterate over the partitions and pick the largest partition that is not spilled.
   for (int i = 0; i < hash_partitions_.size(); ++i) {

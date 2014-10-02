@@ -71,6 +71,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   virtual Status ConstructBuildSide(RuntimeState* state);
 
  private:
+  class Partition;
+
   // Implementation details:
   // Logically, the algorithm runs in three modes.
   //   1. Read the build side rows and partition them into hash_partitions_. This is a
@@ -110,10 +112,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   // Number of initial partitions to create. Must be a power of two.
   // TODO: this is set to a lower than actual value for testing.
-  static const int PARTITION_FANOUT = 4;
+  static const int PARTITION_FANOUT = 32;
 
   // Needs to be the log(PARTITION_FANOUT)
-  static const int NUM_PARTITIONING_BITS = 2;
+  static const int NUM_PARTITIONING_BITS = 5;
 
   // Maximum number of times we will repartition. The maximum build table we
   // can process is:
@@ -139,9 +141,14 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // sensitive).
   bool AppendRow(BufferedTupleStream* stream, TupleRow* row);
 
+  // Slow path for AppendRow() above except the stream has failed to append the row.
+  // We need to find more memory by spilling.
+  bool AppendRowStreamFull(BufferedTupleStream* stream, TupleRow* row);
+
   // Called when we need to free up memory by spilling a partition.
   // This function walks hash_partitions_ and picks on to spill.
-  Status SpillPartition();
+  // *spilled_partition is the partition that was spilled.
+  Status SpillPartition(Partition** spilled_partition);
 
   // Partitions the entire build input (either from child(1) or input_partition_) into
   // hash_partitions_. When this call returns, hash_partitions_ is ready to consume
@@ -210,6 +217,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   //    move the partition to spilled_partitions_.
   Status CleanUpHashPartitions(RowBatch* batch);
 
+  // For each partition in hash partitions, reserves an io sized block on both the
+  // build and probe stream.
+  Status ReserveTupleStreamBlocks();
+
   // Get the next row batch from the probe (left) side (child(0)). If we are done
   // consuming the input, sets probe_batch_pos_ to -1, otherwise, sets it to 0.
   Status NextProbeRowBatch(RuntimeState*, RowBatch* out_batch);
@@ -258,10 +269,11 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   std::string NodeDebugString() const;
 
   // We need two output buffers per partition (one for build and one for probe) and
-  // and one additional buffer for the input (while repartitioning).
+  // and two additional buffers for the input (while repartitioning; for the build and
+  // probe sides).
   // For NAAJ, we need 3 additional buffers to maintain the null_aware_partition_.
   int MinRequiredBuffers() const {
-    int num_reserved_buffers = PARTITION_FANOUT * 2 + 1;
+    int num_reserved_buffers = PARTITION_FANOUT * 2 + 2;
     num_reserved_buffers += join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN ? 3 : 0;
     return num_reserved_buffers;
   }
@@ -275,6 +287,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   // non-equi-join conjuncts from the JOIN clause
   std::vector<ExprContext*> other_join_conjunct_ctxs_;
+
+  // If true, the partitions in hash_partitions_ are using small buffers.
+  bool using_small_buffers_;
 
   // State of the algorithm. Used just for debugging.
   State state_;

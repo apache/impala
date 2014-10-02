@@ -31,17 +31,7 @@ inline void PartitionedHashJoinNode::ResetForProbe() {
 inline bool PartitionedHashJoinNode::AppendRow(BufferedTupleStream* stream,
     TupleRow* row) {
   if (LIKELY(stream->AddRow(row))) return true;
-  status_ = stream->status();
-  if (!status_.ok()) return false;
-  // We ran out of memory. Pick a partition to spill.
-  status_ = SpillPartition();
-  if (!status_.ok()) return false;
-  if (!stream->AddRow(row)) {
-    // Can this happen? we just spilled a partition so this shouldn't fail.
-    status_ = Status("Could not spill row.");
-    return false;
-  }
-  return true;
+  return AppendRowStreamFull(stream, row);
 }
 
 }

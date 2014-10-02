@@ -44,6 +44,7 @@ PartitionedHashJoinNode::PartitionedHashJoinNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : BlockingJoinNode("PartitionedHashJoinNode", tnode.hash_join_node.join_op,
         pool, tnode, descs),
+    using_small_buffers_(true),
     state_(PARTITIONING_BUILD),
     block_mgr_client_(NULL),
     process_build_batch_fn_(NULL),
@@ -202,11 +203,11 @@ PartitionedHashJoinNode::Partition::Partition(RuntimeState* state,
     build_rows_(state->obj_pool()->Add(new BufferedTupleStream(
         state, parent_->child(1)->row_desc(), state->block_mgr(),
         parent_->block_mgr_client_,
-        level == 0 /* use small buffers */))),
+        parent_->using_small_buffers_ /* use small buffers */))),
     probe_rows_(state->obj_pool()->Add(new BufferedTupleStream(
         state, parent_->child(0)->row_desc(),
         state->block_mgr(), parent_->block_mgr_client_,
-        level == 0, /* use small buffers */
+        parent_->using_small_buffers_, /* use small buffers */
         true /* delete on read */))) {
 }
 
@@ -260,6 +261,8 @@ Status PartitionedHashJoinNode::Partition::Spill(bool unpin_all_build) {
     hash_tbl()->Close();
     hash_tbl_.reset();
   }
+  DCHECK(!build_rows()->using_small_buffers());
+  DCHECK(!probe_rows()->using_small_buffers());
   return build_rows()->UnpinStream(unpin_all_build);
 }
 
@@ -391,10 +394,36 @@ bool PartitionedHashJoinNode::AttachProbeFilters(RuntimeState* state) {
   }
 }
 
+bool PartitionedHashJoinNode::AppendRowStreamFull(BufferedTupleStream* stream,
+    TupleRow* row) {
+  status_ = stream->status();
+  if (!status_.ok()) return false;
+  if (using_small_buffers_) {
+    status_ = ReserveTupleStreamBlocks();
+    if (!status_.ok()) return false;
+    if (stream->AddRow(row)) return true;
+  }
+
+  // We ran out of memory. Pick a partition to spill.
+  Partition* spilled_partition;
+  status_ = SpillPartition(&spilled_partition);
+  if (!status_.ok()) return false;
+  if (!stream->AddRow(row)) {
+    // Can this happen? we just spilled a partition so this shouldn't fail.
+    VLOG_QUERY << endl << GetStackTrace() << endl
+               << runtime_state_->block_mgr()->DebugString(block_mgr_client_) << endl
+               << stream->DebugString();
+    status_ = Status("Could not spill row.");
+    return false;
+  }
+  return true;
+}
+
 // TODO: can we do better with the spilling heuristic.
-Status PartitionedHashJoinNode::SpillPartition() {
+Status PartitionedHashJoinNode::SpillPartition(Partition** spilled_partition) {
   int64_t max_freed_mem = 0;
   int partition_idx = -1;
+  *spilled_partition = NULL;
 
   // Iterate over the partitions and pick the largest partition to spill.
   for (int i = 0; i < hash_partitions_.size(); ++i) {
@@ -414,10 +443,12 @@ Status PartitionedHashJoinNode::SpillPartition() {
     // Could not find a partition to spill. This means the mem limit was just too low.
     return runtime_state_->block_mgr()->MemLimitTooLowError(block_mgr_client_);
   }
+
   VLOG(2) << "Spilling partition: " << partition_idx << endl << NodeDebugString();
   RETURN_IF_ERROR(hash_partitions_[partition_idx]->Spill(false));
   DCHECK(hash_partitions_[partition_idx]->probe_rows()->has_write_block());
   hash_tbls_[partition_idx] = NULL;
+  *spilled_partition = hash_partitions_[partition_idx];
   return Status::OK;
 }
 
@@ -989,8 +1020,8 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
     can_add_probe_filters_ = false;
   }
 
-  // First loop over the partitions and build hash tables for the partitions that
-  // didn't already spill.
+  // First loop over the partitions and build hash tables for the partitions that didn't
+  // already spill.
   BOOST_FOREACH(Partition* partition, hash_partitions_) {
     if (partition->build_rows()->num_rows() == 0) {
       // This partition is empty, no need to do anything else.
@@ -1004,14 +1035,51 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
       RETURN_IF_ERROR(partition->BuildHashTable(state, &built, can_add_probe_filters_));
     }
 
-    if (built) {
-      // This partition's build is in memory and has a hash table, we won't be needing
-      // the probe stream anymore.
-      partition->probe_rows()->Close();
-    } else {
+    if (!built) {
+      // We did not have enough memory to build this hash table. We need to
+      // 1) spill this partition (clean up the hash table, unpin build)
+      // 2) get an io buffer for the probe stream for this partition.
       RETURN_IF_ERROR(partition->Spill(true));
-      DCHECK(partition->probe_rows()->has_write_block());
     }
+  }
+
+  // Collect all the spilled partitions that don't have an IO buffer. We need to reserve
+  // an IO buffer for those partitions. Reserving an IO buffer can cause more partitions
+  // to spill so this process is recursive.
+  list<Partition*> spilled_partitions;
+  BOOST_FOREACH(Partition* partition, hash_partitions_) {
+    if (partition->is_closed()) continue;
+    if (partition->is_spilled() && partition->probe_rows()->using_small_buffers()) {
+      spilled_partitions.push_back(partition);
+    }
+  }
+  while (!spilled_partitions.empty()) {
+    Partition* partition = spilled_partitions.front();
+    spilled_partitions.pop_front();
+
+    while (true) {
+      bool got_buffer;
+      RETURN_IF_ERROR(partition->probe_rows()->InitIoBuffer(&got_buffer));
+      if (got_buffer) break;
+      Partition* spilled_partition;
+      RETURN_IF_ERROR(SpillPartition(&spilled_partition));
+      DCHECK(spilled_partition->is_spilled());
+      if (spilled_partition->probe_rows()->using_small_buffers()) {
+        spilled_partitions.push_back(spilled_partition);
+      }
+    }
+
+    DCHECK(partition->probe_rows()->has_write_block());
+    DCHECK(!partition->probe_rows()->using_small_buffers());
+  }
+
+  // At this point, the partition is in one of these states:
+  // 1. closed. All done, no buffers in either the build or probe stream.
+  // 2. in_mem. The build side is pinned and has a hash table built.
+  // 3. spilled. The build side is fully unpinned and the probe side has an io
+  //    sized buffer.
+  BOOST_FOREACH(Partition* partition, hash_partitions_) {
+    if (partition->hash_tbl() != NULL) partition->probe_rows()->Close();
   }
 
   // TODO: at this point we could have freed enough memory to pin and build some
@@ -1068,6 +1136,33 @@ Status PartitionedHashJoinNode::EvaluateNullProbe(BufferedTupleStream* build) {
     }
   }
 
+  return Status::OK;
+}
+
+Status PartitionedHashJoinNode::ReserveTupleStreamBlocks() {
+  DCHECK(using_small_buffers_);
+
+  // Partitions that are using small buffers need to switch to io sized buffers. We want
+  // this to happen to all partitions at the same time to ensure that all partitions can
+  // get at least 1 io buffer (at which point then can append indefinitely). This
+  // initial buffer is guaranteed by the reservation for this operator.
+  // TODO: this mechanism sucks. Redo.
+  for (int i = 0; i < hash_partitions_.size(); ++i) {
+    if (hash_partitions_[i]->is_closed()) continue;
+    DCHECK(hash_partitions_[i]->build_rows()->using_small_buffers());
+    DCHECK(hash_partitions_[i]->probe_rows()->using_small_buffers());
+    bool got_buffer;
+    RETURN_IF_ERROR(hash_partitions_[i]->build_rows()->InitIoBuffer(&got_buffer));
+    if (got_buffer) {
+      RETURN_IF_ERROR(hash_partitions_[i]->probe_rows()->InitIoBuffer(&got_buffer));
+    }
+    if (!got_buffer) {
+      Status status = Status::MEM_LIMIT_EXCEEDED;
+      status.AddErrorMsg("Not enough memory to get the minimum required buffers.");
+      return status;
+    }
+  }
+  using_small_buffers_ = false;
   return Status::OK;
 }
 

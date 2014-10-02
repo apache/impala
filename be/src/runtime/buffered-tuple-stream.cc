@@ -120,6 +120,10 @@ Status BufferedTupleStream::Init(RuntimeProfile* profile, bool pinned) {
     get_new_block_timer_ = ADD_TIMER(profile, "GetNewBlockTime");
   }
 
+  if (block_mgr_->max_block_size() < INITIAL_BLOCK_SIZES[0]) {
+    use_small_buffers_ = false;
+  }
+
   bool got_block = false;
   RETURN_IF_ERROR(NewBlockForWrite(fixed_tuple_row_size_, &got_block));
   if (!got_block) return block_mgr_->MemLimitTooLowError(block_mgr_client_);
@@ -127,6 +131,15 @@ Status BufferedTupleStream::Init(RuntimeProfile* profile, bool pinned) {
   if (read_write_) RETURN_IF_ERROR(PrepareForRead());
   if (!pinned) RETURN_IF_ERROR(UnpinStream());
   return Status::OK;
+}
+
+Status BufferedTupleStream::InitIoBuffer(bool* got_buffer) {
+  if (!use_small_buffers_) {
+    *got_buffer = write_block_ != NULL;
+    return Status::OK;
+  }
+  use_small_buffers_ = false;
+  return NewBlockForWrite(block_mgr_->max_block_size(), got_buffer);
 }
 
 void BufferedTupleStream::Close() {
@@ -184,23 +197,18 @@ Status BufferedTupleStream::NewBlockForWrite(int min_size, bool* got_block) {
     block_len = min(block_len, INITIAL_BLOCK_SIZES[blocks_.size()]);
     if (block_len < min_size) block_len = block_mgr_->max_block_size();
   }
+  if (use_small_buffers_ && block_len == block_mgr_->max_block_size()) {
+    // Cannot switch to non small buffers automatically. Don't get a buffer.
+    *got_block = false;
+    return Status::OK;
+  }
+
 
   BufferedBlockMgr::Block* new_block = NULL;
   {
     SCOPED_TIMER(get_new_block_timer_);
     RETURN_IF_ERROR(block_mgr_->GetNewBlock(
         block_mgr_client_, unpin_block, &new_block, block_len));
-    if (new_block == NULL && block_len < block_mgr_->max_block_size()) {
-      // We were unable to get a small buffer. Try again with an io sized buffer. The
-      // io-sized buffers are protected by the reservations, so we should be able to
-      // get one. We don't want the small buffers to take away from the reservation.
-      // With a single io-sized buffer, we can make indefinite progress but we cannot
-      // with a smaller buffer.
-      DCHECK(unpin_block == NULL);
-      RETURN_IF_ERROR(block_mgr_->GetNewBlock(
-          block_mgr_client_, unpin_block, &new_block));
-      use_small_buffers_ = false;
-    }
   }
   *got_block = (new_block != NULL);
 
@@ -363,8 +371,9 @@ Status BufferedTupleStream::PinStream(bool already_reserved, bool* pinned) {
       SCOPED_TIMER(pin_timer_);
       RETURN_IF_ERROR((*it)->Pin(pinned));
     }
-    DCHECK(*pinned) << "Should have been reserved."
-        << endl << block_mgr_->DebugString(block_mgr_client_);
+    VLOG_QUERY << "Should have been reserved." << endl
+               << block_mgr_->DebugString(block_mgr_client_);
+    if (!*pinned) return Status::OK;
     ++num_pinned_;
     DCHECK_EQ(num_pinned_, NumPinned(blocks_));
   }

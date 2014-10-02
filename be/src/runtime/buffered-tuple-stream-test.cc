@@ -317,6 +317,14 @@ class SimpleTupleStreamTest : public testing::Test {
       }
       for (int j = 0; j < batch->num_rows(); ++j) {
         bool b = stream.AddRow(batch->GetRow(j));
+        if (!b) {
+          ASSERT_TRUE(stream.using_small_buffers());
+          bool got_buffer;
+          status = stream.InitIoBuffer(&got_buffer);
+          ASSERT_TRUE(status.ok());
+          ASSERT_TRUE(got_buffer);
+          b = stream.AddRow(batch->GetRow(j));
+        }
         ASSERT_TRUE(b);
       }
       offset += batch->num_rows();
@@ -581,6 +589,14 @@ TEST_F(SimpleTupleStreamTest, SmallBuffers) {
   batch = CreateIntBatch(0, 10 * 1024 * 1024, false);
   for (int i = 0; i < batch->num_rows(); ++i) {
     bool ret = stream.AddRow(batch->GetRow(i));
+    if (!ret) {
+      ASSERT_TRUE(stream.using_small_buffers());
+      bool got_buffer;
+      status = stream.InitIoBuffer(&got_buffer);
+      ASSERT_TRUE(status.ok());
+      ASSERT_TRUE(got_buffer);
+      ret = stream.AddRow(batch->GetRow(i));
+    }
     ASSERT_TRUE(ret);
   }
   EXPECT_EQ(stream.bytes_in_mem(false), buffer_size);

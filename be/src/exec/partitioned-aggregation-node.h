@@ -111,13 +111,13 @@ class PartitionedAggregationNode : public ExecNode {
   struct Partition;
 
   // Number of initial partitions to create. Must be a power of 2.
-  static const int PARTITION_FANOUT = 4;
+  static const int PARTITION_FANOUT = 32;
 
   // Needs to be the log(PARTITION_FANOUT)
   // We use the upper bits to pick the partition and lower bits in the HT.
   // TODO: different hash functions here too? We don't need that many bits to pick
   // the partition so this might be okay.
-  static const int NUM_PARTITIONING_BITS = 2;
+  static const int NUM_PARTITIONING_BITS = 5;
 
   // Maximum number of times we will repartition. The maximum build table we can process
   // is: MEM_LIMIT * (PARTITION_FANOUT ^ MAX_PARTITION_DEPTH). With a (low) 1GB limit and
@@ -172,6 +172,9 @@ class PartitionedAggregationNode : public ExecNode {
 
   RuntimeState* state_;
   BufferedBlockMgr::Client* block_mgr_client_;
+
+  // If true, the partitions in hash_partitions_ are using small buffers.
+  bool using_small_buffers_;
 
   // Result of aggregation w/o GROUP BY.
   // Note: can be NULL even if there is no grouping if the result tuple is 0 width
