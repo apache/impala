@@ -273,3 +273,33 @@ bigint
 # Regression test for IMPALA-1322
 drop table if exists functional.t_1822;
 ====
+---- QUERY
+# Regression test for IMPALA-1316
+select t1.vc, COUNT(1) FROM chars_tiny t1 GROUP BY 1 ORDER BY t1.vc
+---- TYPES
+string, bigint
+---- RESULTS
+'1cccc',1
+'2cccccc',1
+'3ccc',1
+'4cc',1
+'5c',1
+'6c',2
+'c',1
+'NULL',1
+====
+---- QUERY
+# Regression test for IMPALA-1316
+select t1.cl, COUNT(1) FROM chars_tiny t1 GROUP BY 1 ORDER BY t1.cl
+---- TYPES
+char, bigint
+---- RESULTS
+'1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',1
+'2bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',1
+'3bbbbb                                                                                                                                      ',1
+'4bbbb                                                                                                                                       ',1
+'5bbb                                                                                                                                        ',1
+'6b                                                                                                                                          ',2
+'b                                                                                                                                           ',1
+'NULL',1
+====
