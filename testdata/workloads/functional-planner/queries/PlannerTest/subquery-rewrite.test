@@ -1310,20 +1310,20 @@ from functional.alltypestiny t1 join functional.alltypessmall t2 on t1.id = t2.i
 where
   (select count(*) from functional.alltypes) + t2.bigint_col = t1.int_col + t2.int_col
 ---- PLAN
-05:HASH JOIN [INNER JOIN]
-|  hash predicates: t2.id = t1.id
-|  other predicates: count(*) + t2.bigint_col = t1.int_col + t2.int_col
-|
-|--00:SCAN HDFS [functional.alltypestiny t1]
-|     partitions=4/4 size=460B
-|
-04:CROSS JOIN [BROADCAST]
+05:CROSS JOIN [BROADCAST]
+|  predicates: count(*) + t2.bigint_col = t1.int_col + t2.int_col
 |
 |--03:AGGREGATE [FINALIZE]
 |  |  output: count(*)
 |  |
 |  02:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 size=478.45KB
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: t2.id = t1.id
+|
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     partitions=4/4 size=460B
 |
 01:SCAN HDFS [functional.alltypessmall t2]
    partitions=4/4 size=6.32KB

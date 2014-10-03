@@ -1117,7 +1117,7 @@ where t2.month = 1
 08:SCAN HDFS [functional.alltypes t3]
    partitions=24/24 size=478.45KB
 ====
-# Regression test for IMPALA-1343.
+# This should be a regression test for IMPALA-1343.
 SELECT sum(t4.tinyint_col)
 FROM functional.alltypestiny t4
 CROSS JOIN
@@ -1137,36 +1137,36 @@ WHERE `$a$2`.`$c$1` > t4.id
 12:AGGREGATE [FINALIZE]
 |  output: sum(t4.tinyint_col)
 |
-11:HASH JOIN [RIGHT SEMI JOIN]
-|  hash predicates: tt1.int_col = t4.bigint_col
+11:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t4.bigint_col = tt1.int_col
 |
-|--10:CROSS JOIN [BROADCAST]
-|  |  predicates: sum(t1.int_col) > t4.id
-|  |
-|  |--05:AGGREGATE [FINALIZE]
-|  |  |  output: sum(t1.int_col)
-|  |  |  limit: 1
-|  |  |
-|  |  04:SCAN HDFS [functional.alltypesagg t1]
-|  |     partitions=11/11 size=814.73KB
-|  |
-|  09:CROSS JOIN [BROADCAST]
-|  |
-|  |--00:SCAN HDFS [functional.alltypestiny t4]
-|  |     partitions=4/4 size=460B
-|  |
-|  03:HASH JOIN [INNER JOIN]
-|  |  hash predicates: t1.bigint_col = t2.smallint_col
+|--06:SCAN HDFS [functional.alltypestiny tt1]
+|     partitions=4/4 size=460B
+|
+10:CROSS JOIN [BROADCAST]
+|  predicates: sum(t1.int_col) > t4.id
+|
+|--05:AGGREGATE [FINALIZE]
+|  |  output: sum(t1.int_col)
 |  |  limit: 1
 |  |
-|  |--02:SCAN HDFS [functional.alltypestiny t2]
-|  |     partitions=4/4 size=460B
-|  |
-|  01:SCAN HDFS [functional.alltypes t1]
-|     partitions=24/24 size=478.45KB
+|  04:SCAN HDFS [functional.alltypesagg t1]
+|     partitions=11/11 size=814.73KB
 |
-06:SCAN HDFS [functional.alltypestiny tt1]
-   partitions=4/4 size=460B
+09:CROSS JOIN [BROADCAST]
+|
+|--00:SCAN HDFS [functional.alltypestiny t4]
+|     partitions=4/4 size=460B
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.bigint_col = t2.smallint_col
+|  limit: 1
+|
+|--02:SCAN HDFS [functional.alltypestiny t2]
+|     partitions=4/4 size=460B
+|
+01:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 size=478.45KB
 ====
 # Tests assignment of conjuncts to inverted outer joins (IMPALA-1342).
 select 1

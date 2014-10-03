@@ -295,6 +295,7 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
       singleton_output_tuple_returned_ = true;
     }
     *eos = true;
+    COUNTER_SET(rows_returned_counter_, num_rows_returned_);
     return Status::OK;
   }
 

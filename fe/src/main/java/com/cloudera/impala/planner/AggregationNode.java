@@ -142,6 +142,11 @@ public class AggregationNode extends PlanNode {
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
+    if (aggInfo_.getGroupingExprs().isEmpty()) {
+      cardinality_ = 1;
+      return;
+    }
+
     // This is prone to overflow, because we keep multiplying cardinalities,
     // even if the grouping exprs are functionally dependent (example:
     // group by the primary key of a table plus a number of other columns from that
