@@ -1001,35 +1001,36 @@ if __name__ == "__main__":
   shell = ImpalaShell(options)
   while shell.is_alive:
     try:
-      shell.cmdloop(intro)
-    except KeyboardInterrupt:
-      intro = '\n'
-    # a last measure agaisnt any exceptions thrown by an rpc
-    # not caught in the shell
-    except socket.error, (code, e):
-      # if the socket was interrupted, reconnect the connection with the client
-      if code == errno.EINTR:
-        print shell.CANCELLATION_MESSAGE
-        shell._reconnect_cancellation()
-      else:
-        print_to_stderr("Socket error %s: %s" % (code, e))
+      try:
+        shell.cmdloop(intro)
+      except KeyboardInterrupt:
+        intro = '\n'
+      # A last measure against any exceptions thrown by an rpc
+      # not caught in the shell
+      except socket.error, (code, e):
+        # if the socket was interrupted, reconnect the connection with the client
+        if code == errno.EINTR:
+          print shell.CANCELLATION_MESSAGE
+          shell._reconnect_cancellation()
+        else:
+          print_to_stderr("Socket error %s: %s" % (code, e))
+          shell.imp_client.connected = False
+          shell.prompt = shell.DISCONNECTED_PROMPT
+      except DisconnectedException, e:
+        # the client has lost the connection
+        print_to_stderr(e)
         shell.imp_client.connected = False
         shell.prompt = shell.DISCONNECTED_PROMPT
-    except DisconnectedException, e:
-      # the client has lost the connection
-      print_to_stderr(e)
-      shell.imp_client.connected = False
-      shell.prompt = shell.DISCONNECTED_PROMPT
-    except QueryStateException, e:
-      # an exception occurred while executing the query
-      if shell._no_cancellation_error(e):
-        shell.imp_client.close_query(shell.last_query_handle,
-                                     shell.query_handle_closed)
-        print_to_stderr(e)
-    except RPCException, e:
-      # could not complete the rpc successfully
-      # suppress error if reason is cancellation
-      if shell._no_cancellation_error(e):
-        print_to_stderr(e)
+      except QueryStateException, e:
+        # an exception occurred while executing the query
+        if shell._no_cancellation_error(e):
+          shell.imp_client.close_query(shell.last_query_handle,
+                                       shell.query_handle_closed)
+          print_to_stderr(e)
+      except RPCException, e:
+        # could not complete the rpc successfully
+        # suppress error if reason is cancellation
+        if shell._no_cancellation_error(e):
+          print_to_stderr(e)
     finally:
       intro = ''
