@@ -866,19 +866,14 @@ select * from
    predicates: functional.alltypes.tinyint_col < 10
 ====
 # Union of constant selects in subquery
-# TODO: We could combine the merge nodes below.
 select * from (select 1 as y union all select 2 union all select * from (select 11) a) b
 where y < 10
 ---- PLAN
 00:UNION
-|  constant-operands=2
-|
-01:UNION
+   constant-operands=2
 ---- DISTRIBUTEDPLAN
 00:UNION
-|  constant-operands=2
-|
-01:UNION
+   constant-operands=2
 ====
 # Union of values statements in subquery
 # TODO: We could combine the merge nodes below.

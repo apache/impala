@@ -1076,18 +1076,31 @@ public class Planner {
   }
 
   /**
+   * Creates an EmptyNode that 'materializes' the tuples of the given stmt.
+   */
+  private PlanNode createEmptyNode(QueryStmt stmt, Analyzer analyzer)
+      throws InternalException {
+    ArrayList<TupleId> tupleIds = Lists.newArrayList();
+    stmt.getMaterializedTupleIds(tupleIds);
+
+    // If the physical output tuple produced by an AnalyticEvalNode wasn't created
+    // the logical output tuple is returned by getMaterializedTupleIds(). It needs
+    // to be set as materialized (even though it isn't) to avoid failing precondition
+    // checks generating the thrift for slot refs that may reference this tuple.
+    for (TupleId id: tupleIds) analyzer.getTupleDesc(id).setIsMaterialized(true);
+
+    EmptySetNode node = new EmptySetNode(nodeIdGenerator_.getNextId(), tupleIds);
+    node.init(analyzer);
+    return node;
+  }
+
+  /**
    * Create plan tree for single-node execution. Generates PlanNodes for the
    * Select/Project/Join/Union [All]/Group by/Having/Order by clauses of the query stmt.
    */
   private PlanNode createQueryPlan(QueryStmt stmt, Analyzer analyzer, boolean disableTopN)
       throws ImpalaException {
-    if (analyzer.hasEmptyResultSet()) {
-      ArrayList<TupleId> tupleIds = Lists.newArrayList();
-      stmt.getMaterializedTupleIds(tupleIds);
-      EmptySetNode node = new EmptySetNode(nodeIdGenerator_.getNextId(), tupleIds);
-      node.init(analyzer);
-      return node;
-    }
+    if (analyzer.hasEmptyResultSet()) return createEmptyNode(stmt, analyzer);
 
     PlanNode root;
     if (stmt instanceof SelectStmt) {
@@ -1659,7 +1672,7 @@ public class Planner {
       // Mark pre-substitution conjuncts as assigned, since the ids of the new exprs may
       // have changed.
       analyzer.markConjunctsAssigned(preds);
-      analyzer.registerConjuncts(viewPredicates);
+      inlineViewRef.getAnalyzer().registerConjuncts(viewPredicates);
     }
 
     // mark (fully resolve) slots referenced by remaining unassigned conjuncts_ as
@@ -1675,6 +1688,9 @@ public class Planner {
     if (viewStmt instanceof SelectStmt) {
       SelectStmt selectStmt = (SelectStmt) viewStmt;
       if (selectStmt.getTableRefs().isEmpty()) {
+        if (inlineViewRef.getAnalyzer().hasEmptyResultSet()) {
+          return createEmptyNode(viewStmt, inlineViewRef.getAnalyzer());
+        }
         // Analysis should have generated a tuple id_ into which to materialize the exprs.
         Preconditions.checkState(inlineViewRef.getMaterializedTupleIds().size() == 1);
         // we need to materialize all slots of our inline view tuple
@@ -2003,6 +2019,7 @@ public class Planner {
         }
       }
       PlanNode opPlan = createQueryPlan(queryStmt, analyzer, false);
+      if (opPlan instanceof EmptySetNode) continue;
       unionNode.addChild(opPlan, op.getQueryStmt().getBaseTblResultExprs());
     }
     unionNode.init(analyzer);

@@ -227,3 +227,26 @@ limit 0
 ---- PLAN
 00:EMPTYSET
 ====
+# Inline view with a constant select stmt that is guaranteed to be empty.
+select count(w1.c1)
+from
+  (select 1 as c1 from functional.alltypessmall)
+w1 where w1.c1 is null
+union all
+select int_col from functional.alltypesagg
+---- PLAN
+00:UNION
+|
+|--03:SCAN HDFS [functional.alltypesagg]
+|     partitions=11/11 size=814.73KB
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(1)
+|
+01:EMPTYSET
+====
+# IMPALA-1234: Analytic with constant empty result set failed precondition check in FE
+select MIN(int_col) OVER () FROM functional.alltypes limit 0
+---- PLAN
+00:EMPTYSET
+====

@@ -91,3 +91,10 @@ on e.id = f.id
 int, int
 ---- RESULTS
 ====
+---- QUERY
+# IMPALA-1234: Analytic with constant empty result set failed precondition check in FE
+select MIN(int_col) OVER () FROM alltypes limit 0
+---- RESULTS
+---- TYPES
+INT
+====
