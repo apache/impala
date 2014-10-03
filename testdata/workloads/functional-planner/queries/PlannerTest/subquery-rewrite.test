@@ -1233,7 +1233,7 @@ group by int_col
 01:SCAN HDFS [functional.alltypes s]
    partitions=24/24 size=478.45KB
 ====
-# Correlated scalar subquery with an ggregate function that returns a
+# Correlated scalar subquery with an aggregate function that returns a
 # non-numeric type on empty input
 select int_col, count(*)
 from functional.alltypestiny t
@@ -1247,7 +1247,8 @@ group by int_col
 |  group by: int_col
 |
 03:HASH JOIN [RIGHT OUTER JOIN]
-|  hash predicates: s.id = t.id, ifnull(sample(int_col), '') = t.string_col
+|  hash predicates: s.id = t.id
+|  other predicates: ifnull(sample(int_col), '') = t.string_col
 |
 |--00:SCAN HDFS [functional.alltypestiny t]
 |     partitions=4/4 size=460B

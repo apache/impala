@@ -1169,6 +1169,29 @@ public class Analyzer {
   }
 
   /**
+   * Modifies the analysis state associated with the rhs table ref of an outer join
+   * to accomodate a join inversion that changes the rhs table ref of the join from
+   * oldRhsTbl to newRhsTbl.
+   * TODO: Revisit this function and how outer joins are inverted. This function
+   * should not be necessary because the semantics of an inverted outer join do
+   * not change. This function will naturally become obsolete when we can transform
+   * outer joins with otherPredicates into inner joins.
+   */
+  public void invertOuterJoinState(TableRef oldRhsTbl, TableRef newRhsTbl) {
+    Preconditions.checkState(oldRhsTbl.getJoinOp().isOuterJoin());
+    // Invert analysis state for an outer join.
+    List<ExprId> conjunctIds = globalState_.conjunctsByOjClause.remove(oldRhsTbl);
+    Preconditions.checkNotNull(conjunctIds);
+    globalState_.conjunctsByOjClause.put(newRhsTbl, conjunctIds);
+    for (ExprId eid: conjunctIds) {
+      globalState_.ojClauseByConjunct.put(eid, newRhsTbl);
+    }
+    for (Map.Entry<TupleId, TableRef> e: globalState_.outerJoinedTupleIds.entrySet()) {
+      if (e.getValue() == oldRhsTbl) e.setValue(newRhsTbl);
+    }
+  }
+
+  /**
    * For each equivalence class, adds/removes predicates from conjuncts such that
    * it contains a minimum set of <slot> = <slot> predicates that "cover" the equivalent
    * slots belonging to tid. The returned predicates are a minimum spanning tree of the

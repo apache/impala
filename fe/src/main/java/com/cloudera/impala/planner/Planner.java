@@ -1271,7 +1271,11 @@ public class Planner {
     if (leftmostRef.getJoinOp().isOuterJoin()
         || leftmostRef.getJoinOp().isSemiJoin()
         || leftmostRef.getJoinOp().isCrossJoin()) {
-      leftmostRef.invertJoin();
+      // TODO: Revisit the interaction of join inversion here and the analysis state
+      // that is changed in analyzer.invertOuterJoin(). Changing the analysis state
+      // should not be necessary because the semantics of an inverted outer join do
+      // not change.
+      leftmostRef.invertJoin(analyzer);
     }
 
     // Maintains a list of table refs whose join op has been inverted in-place.
@@ -1364,7 +1368,7 @@ public class Planner {
         if (leftmostRef.getJoinOp().isOuterJoin()
             || leftmostRef.getJoinOp().isSemiJoin()
             || leftmostRef.getJoinOp().isCrossJoin()) {
-          leftmostRef.invertJoin();
+          leftmostRef.invertJoin(analyzer);
         }
         for (TableRef tblRef: invertedJoins) {
           tblRef.setJoinOp(tblRef.getJoinOp().invert());
