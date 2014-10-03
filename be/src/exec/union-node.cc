@@ -151,9 +151,9 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     // transfered all resources. It is not OK to close the child above in the case when
     // ReachedLimit() is true as we may end up releasing resources that are referenced
     // by the output row_batch.
+    child_row_batch_.reset();
     child(child_idx_)->Close(state);
     ++child_idx_;
-    child_row_batch_.reset();
   }
 
   // Evaluate and materialize the const expr lists exactly once.

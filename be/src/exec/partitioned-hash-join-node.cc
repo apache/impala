@@ -187,6 +187,11 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
       it != spilled_partitions_.end(); ++it) {
     (*it)->Close(NULL);
   }
+  for (list<Partition*>::iterator it = output_build_partitions_.begin();
+      it != output_build_partitions_.end(); ++it) {
+    (*it)->Close(NULL);
+  }
+
   if (input_partition_ != NULL) input_partition_->Close(NULL);
   if (null_aware_partition_ != NULL) null_aware_partition_->Close(NULL);
   if (null_probe_rows_ != NULL) null_probe_rows_->Close();

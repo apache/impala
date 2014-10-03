@@ -614,3 +614,14 @@ LEFT JOIN alltypesagg t3 ON t3.id = t2.tinyint_col
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# Regression test for IMPALA-1332
+select a.int_col from alltypesagg a
+RIGHT OUTER JOIN alltypesagg b
+using(int_col)
+where a.int_col is NULL limit 1
+---- RESULTS
+NULL
+---- TYPES
+INT
+====
