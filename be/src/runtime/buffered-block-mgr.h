@@ -431,11 +431,11 @@ class BufferedBlockMgr {
   // Return a new buffer that can be used. *buffer is set to NULL if there was no
   // memory.
   // Otherwise, this function gets a new buffer by:
-  //   1. Allocating a new buffer if possible (if can_allocate is true).
+  //   1. Allocating a new buffer if possible
   //   2. Using a buffer from the free list (which is populated by moving blocks from
   //      the unpinned list by writing them out).
   // lock must be taken before calling this. This function can block.
-  Status FindBuffer(boost::unique_lock<boost::mutex>& lock, bool can_allocate,
+  Status FindBuffer(boost::unique_lock<boost::mutex>& lock,
       BufferDescriptor** buffer);
 
   // Writes unpinned blocks via DiskIoMgr until one of the following is true:

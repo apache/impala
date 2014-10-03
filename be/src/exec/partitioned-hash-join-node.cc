@@ -1078,7 +1078,7 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
 
     while (true) {
       bool got_buffer;
-      RETURN_IF_ERROR(partition->probe_rows()->InitIoBuffer(&got_buffer));
+      RETURN_IF_ERROR(partition->probe_rows()->SwitchToIoBuffers(&got_buffer));
       if (got_buffer) break;
       Partition* spilled_partition;
       RETURN_IF_ERROR(SpillPartition(&spilled_partition));
@@ -1170,9 +1170,9 @@ Status PartitionedHashJoinNode::ReserveTupleStreamBlocks() {
     DCHECK(hash_partitions_[i]->build_rows()->using_small_buffers());
     DCHECK(hash_partitions_[i]->probe_rows()->using_small_buffers());
     bool got_buffer;
-    RETURN_IF_ERROR(hash_partitions_[i]->build_rows()->InitIoBuffer(&got_buffer));
+    RETURN_IF_ERROR(hash_partitions_[i]->build_rows()->SwitchToIoBuffers(&got_buffer));
     if (got_buffer) {
-      RETURN_IF_ERROR(hash_partitions_[i]->probe_rows()->InitIoBuffer(&got_buffer));
+      RETURN_IF_ERROR(hash_partitions_[i]->probe_rows()->SwitchToIoBuffers(&got_buffer));
     }
     if (!got_buffer) {
       Status status = Status::MEM_LIMIT_EXCEEDED;

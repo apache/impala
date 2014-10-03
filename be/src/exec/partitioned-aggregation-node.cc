@@ -826,10 +826,10 @@ Status PartitionedAggregationNode::SpillPartition(Partition* curr_partition,
       DCHECK(hash_partitions_[i]->unaggregated_row_stream->using_small_buffers());
       bool got_buffer;
       RETURN_IF_ERROR(
-          hash_partitions_[i]->aggregated_row_stream->InitIoBuffer(&got_buffer));
+          hash_partitions_[i]->aggregated_row_stream->SwitchToIoBuffers(&got_buffer));
       if (got_buffer) {
         RETURN_IF_ERROR(
-            hash_partitions_[i]->unaggregated_row_stream->InitIoBuffer(&got_buffer));
+            hash_partitions_[i]->unaggregated_row_stream->SwitchToIoBuffers(&got_buffer));
       }
       if (!got_buffer) {
         Status status = Status::MEM_LIMIT_EXCEEDED;

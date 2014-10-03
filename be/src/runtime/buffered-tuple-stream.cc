@@ -133,7 +133,7 @@ Status BufferedTupleStream::Init(RuntimeProfile* profile, bool pinned) {
   return Status::OK;
 }
 
-Status BufferedTupleStream::InitIoBuffer(bool* got_buffer) {
+Status BufferedTupleStream::SwitchToIoBuffers(bool* got_buffer) {
   if (!use_small_buffers_) {
     *got_buffer = write_block_ != NULL;
     return Status::OK;

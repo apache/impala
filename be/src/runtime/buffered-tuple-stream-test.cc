@@ -320,7 +320,7 @@ class SimpleTupleStreamTest : public testing::Test {
         if (!b) {
           ASSERT_TRUE(stream.using_small_buffers());
           bool got_buffer;
-          status = stream.InitIoBuffer(&got_buffer);
+          status = stream.SwitchToIoBuffers(&got_buffer);
           ASSERT_TRUE(status.ok());
           ASSERT_TRUE(got_buffer);
           b = stream.AddRow(batch->GetRow(j));
@@ -592,7 +592,7 @@ TEST_F(SimpleTupleStreamTest, SmallBuffers) {
     if (!ret) {
       ASSERT_TRUE(stream.using_small_buffers());
       bool got_buffer;
-      status = stream.InitIoBuffer(&got_buffer);
+      status = stream.SwitchToIoBuffers(&got_buffer);
       ASSERT_TRUE(status.ok());
       ASSERT_TRUE(got_buffer);
       ret = stream.AddRow(batch->GetRow(i));
