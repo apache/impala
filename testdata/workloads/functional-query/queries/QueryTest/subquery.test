@@ -713,3 +713,17 @@ where t1.c not in
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# Regression test for IMPALA-1348.
+select count(*)
+FROM alltypesagg t1
+WHERE t1.int_col NOT IN
+  (SELECT tt1.month AS tinyint_col_1
+   FROM alltypesagg tt1
+   LEFT JOIN alltypestiny tt2 ON tt2.year = tt1.id
+      AND t1.bigint_col = tt2.smallint_col)
+---- RESULTS
+11000
+---- TYPES
+BIGINT
+====

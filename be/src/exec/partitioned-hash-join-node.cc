@@ -890,7 +890,7 @@ Status PartitionedHashJoinNode::OutputNullAwareNullProbe(RuntimeState* state,
     RETURN_IF_ERROR(null_probe_rows_->GetNext(probe_batch_.get(), &eos));
     if (probe_batch_->num_rows() == 0) {
       // All done.
-      null_aware_partition_->Close(NULL);
+      null_aware_partition_->Close(out_batch);
       null_aware_partition_ = NULL;
       return Status::OK;
     }

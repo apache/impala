@@ -214,10 +214,6 @@ class BufferedTupleStream {
   // and must be copied out by the caller.
   // If 'indices' is non-NULL, that is also populated for each returned row with the
   // index for that row.
-  template <bool HasNullableTuple>
-  Status GetNextInternal(RowBatch* batch, bool* eos, std::vector<RowIdx>* indices);
-
-  // Wrapper of the templated GetNextInternal function.
   Status GetNext(RowBatch* batch, bool* eos, std::vector<RowIdx>* indices = NULL);
 
   // Returns all the rows in the stream in batch. This pins the entire stream
@@ -379,6 +375,10 @@ class BufferedTupleStream {
 
   // Unpins block if it is an io sized block and updates tracking stats.
   Status UnpinBlock(BufferedBlockMgr::Block* block);
+
+  // Templated GetNext implementation.
+  template <bool HasNullableTuple>
+  Status GetNextInternal(RowBatch* batch, bool* eos, std::vector<RowIdx>* indices);
 
   // Computes the number of bytes needed for null indicators for a block of 'block_size'
   int ComputeNumNullIndicatorBytes(int block_size) const;

@@ -199,10 +199,10 @@ public class PlanFragment {
       if (!childResult) return false;
       if (hashJoinNode.getJoinOp().equals(JoinOperator.FULL_OUTER_JOIN) ||
           hashJoinNode.getJoinOp().equals(JoinOperator.LEFT_OUTER_JOIN) ||
-          hashJoinNode.getJoinOp().equals(JoinOperator.LEFT_ANTI_JOIN)) {
+          hashJoinNode.getJoinOp().equals(JoinOperator.LEFT_ANTI_JOIN) ||
+          hashJoinNode.getJoinOp().equals(JoinOperator.NULL_AWARE_LEFT_ANTI_JOIN)) {
         // It is not correct to push through an outer or anti join on the probe side.
         // We cannot filter those rows out.
-        // TODO: Add NULL_AWARE_LEFT_ANTI_JOIN.
         return false;
       }
       // We can't push down predicates for partitioned joins yet.

@@ -434,8 +434,12 @@ Status BufferedTupleStream::GetRows(scoped_ptr<RowBatch>* batch, bool* got_rows)
   batch->reset(
       new RowBatch(desc_, num_rows(), block_mgr_->get_tracker(block_mgr_client_)));
   bool eos = false;
-  RETURN_IF_ERROR(GetNext(batch->get(), &eos));
-  DCHECK(eos);
+  // Loop until GetNext fills the entire batch. Each call can stop at block
+  // boundaries. We generally want it to stop, so that blocks can be freed
+  // as we read. It is safe in this case because we pin the entire stream.
+  while (!eos) {
+    RETURN_IF_ERROR(GetNext(batch->get(), &eos));
+  }
   return Status::OK;
 }
 
@@ -453,7 +457,6 @@ Status BufferedTupleStream::GetNextInternal(RowBatch* batch, bool* eos,
     vector<RowIdx>* indices) {
   DCHECK(!closed_);
   DCHECK(batch->row_desc().Equals(desc_));
-  DCHECK_EQ(batch->num_rows(), 0);
   *eos = (rows_returned_ == num_rows_);
   if (*eos) return Status::OK;
   DCHECK_GE(null_indicators_read_block_, 0);
@@ -481,10 +484,11 @@ Status BufferedTupleStream::GetNextInternal(RowBatch* batch, bool* eos,
   DCHECK(read_ptr_ != NULL);
 
   int64_t rows_left = num_rows_ - rows_returned_;
-  int rows_to_fill = std::min(static_cast<int64_t>(batch->capacity()), rows_left);
+  int rows_to_fill = std::min(
+      static_cast<int64_t>(batch->capacity() - batch->num_rows()), rows_left);
   DCHECK_GE(rows_to_fill, 1);
   batch->AddRows(rows_to_fill);
-  uint8_t* tuple_row_mem = reinterpret_cast<uint8_t*>(batch->GetRow(0));
+  uint8_t* tuple_row_mem = reinterpret_cast<uint8_t*>(batch->GetRow(batch->num_rows()));
 
 
   // Produce tuple rows from the current block and the corresponding position on the
@@ -497,6 +501,7 @@ Status BufferedTupleStream::GetNextInternal(RowBatch* batch, bool* eos,
   } else {
     DCHECK(is_pinned());
     DCHECK(!delete_on_read_);
+    DCHECK_EQ(batch->num_rows(), 0);
     indices->clear();
   }
   indices->reserve(rows_to_fill);
@@ -578,7 +583,6 @@ Status BufferedTupleStream::GetNextInternal(RowBatch* batch, bool* eos,
     // the caller can pass the rows up the operator tree.
     batch->MarkNeedToReturn();
   }
-  DCHECK_EQ(batch->num_rows(), i);
   DCHECK_EQ(indices->size(), i);
   return Status::OK;
 }
