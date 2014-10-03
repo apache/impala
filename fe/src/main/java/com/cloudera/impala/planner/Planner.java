@@ -1274,6 +1274,9 @@ public class Planner {
       leftmostRef.invertJoin();
     }
 
+    // Maintains a list of table refs whose join op has been inverted in-place.
+    List<TableRef> invertedJoins = Lists.newArrayList();
+
     long numOps = 0;
     int i = 0;
     while (!remainingRefs.isEmpty()) {
@@ -1333,6 +1336,7 @@ public class Planner {
         if (invertJoin) {
           ref.setJoinOp(ref.getJoinOp().invert());
           candidate = createJoinNode(analyzer, rhsPlan, root, ref, null, false);
+          invertedJoins.add(ref);
         } else {
           candidate = createJoinNode(analyzer, root, rhsPlan, null, ref, false);
         }
@@ -1352,7 +1356,21 @@ public class Planner {
           minEntry = entry;
         }
       }
-      if (newRoot == null) return null;
+      if (newRoot == null) {
+        // Revert in-place changes made to table refs for join inversion.
+        // TODO: Instead of reverting the state changes this way, join ordering should
+        // operate on clones of table refs, but a state-preserving clone() is a rather
+        // involved change.
+        if (leftmostRef.getJoinOp().isOuterJoin()
+            || leftmostRef.getJoinOp().isSemiJoin()
+            || leftmostRef.getJoinOp().isCrossJoin()) {
+          leftmostRef.invertJoin();
+        }
+        for (TableRef tblRef: invertedJoins) {
+          tblRef.setJoinOp(tblRef.getJoinOp().invert());
+        }
+        return null;
+      }
 
       // we need to insert every rhs row into the hash table and then look up
       // every lhs row
