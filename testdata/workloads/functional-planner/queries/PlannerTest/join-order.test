@@ -768,34 +768,34 @@ left semi join functional.alltypesagg t4 on (t3.id = t4.id)
 inner join functional.alltypes t5 on (t3.id = t5.id)
 right join functional.alltypestiny t6 on (t5.id = t6.id)
 ---- PLAN
-13:AGGREGATE [FINALIZE]
+11:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
-12:HASH JOIN [RIGHT OUTER JOIN]
+10:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: t5.id = t6.id
 |
 |--05:SCAN HDFS [functional.alltypestiny t6]
 |     partitions=4/4 size=460B
 |
-11:HASH JOIN [INNER JOIN]
+09:HASH JOIN [INNER JOIN]
 |  hash predicates: t3.id = t5.id
 |
 |--04:SCAN HDFS [functional.alltypes t5]
 |     partitions=24/24 size=478.45KB
 |
-10:HASH JOIN [LEFT SEMI JOIN]
+08:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t3.id = t4.id
 |
 |--03:SCAN HDFS [functional.alltypesagg t4]
 |     partitions=11/11 size=814.73KB
 |
-09:HASH JOIN [INNER JOIN]
+07:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.id = t3.id
 |
 |--02:SCAN HDFS [functional.alltypessmall t3]
 |     partitions=4/4 size=6.32KB
 |
-08:HASH JOIN [RIGHT OUTER JOIN]
+06:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: t2.id = t1.id
 |
 |--00:SCAN HDFS [functional.alltypestiny t1]
@@ -814,34 +814,34 @@ inner join functional.alltypessmall t4 on (t3.id = t4.id)
 left semi join functional.alltypes t5 on (t4.id = t5.id)
 inner join functional.alltypestiny t6 on (t3.id = t6.id)
 ---- PLAN
-15:AGGREGATE [FINALIZE]
+12:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
-14:HASH JOIN [INNER JOIN]
+11:HASH JOIN [INNER JOIN]
 |  hash predicates: t3.id = t6.id
 |
 |--05:SCAN HDFS [functional.alltypestiny t6]
 |     partitions=4/4 size=460B
 |
-13:HASH JOIN [LEFT SEMI JOIN]
+10:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t4.id = t5.id
 |
 |--04:SCAN HDFS [functional.alltypes t5]
 |     partitions=24/24 size=478.45KB
 |
-12:HASH JOIN [INNER JOIN]
+09:HASH JOIN [INNER JOIN]
 |  hash predicates: t3.id = t4.id
 |
 |--03:SCAN HDFS [functional.alltypessmall t4]
 |     partitions=4/4 size=6.32KB
 |
-11:HASH JOIN [INNER JOIN]
+08:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.id = t3.id
 |
 |--02:SCAN HDFS [functional.alltypesagg t3]
 |     partitions=11/11 size=814.73KB
 |
-10:HASH JOIN [RIGHT OUTER JOIN]
+07:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: t2.id = t1.id
 |
 |--00:SCAN HDFS [functional.alltypestiny t1]
@@ -859,34 +859,34 @@ inner join functional.alltypessmall t4 on (t3.id = t4.id)
 left anti join functional.alltypes t5 on (t4.id = t5.id)
 inner join functional.alltypestiny t6 on (t3.id = t6.id)
 ---- PLAN
-15:AGGREGATE [FINALIZE]
+12:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
-14:HASH JOIN [INNER JOIN]
+11:HASH JOIN [INNER JOIN]
 |  hash predicates: t3.id = t6.id
 |
 |--05:SCAN HDFS [functional.alltypestiny t6]
 |     partitions=4/4 size=460B
 |
-13:HASH JOIN [LEFT ANTI JOIN]
+10:HASH JOIN [LEFT ANTI JOIN]
 |  hash predicates: t4.id = t5.id
 |
 |--04:SCAN HDFS [functional.alltypes t5]
 |     partitions=24/24 size=478.45KB
 |
-12:HASH JOIN [INNER JOIN]
+09:HASH JOIN [INNER JOIN]
 |  hash predicates: t3.id = t4.id
 |
 |--03:SCAN HDFS [functional.alltypessmall t4]
 |     partitions=4/4 size=6.32KB
 |
-11:HASH JOIN [INNER JOIN]
+08:HASH JOIN [INNER JOIN]
 |  hash predicates: t2.id = t3.id
 |
 |--02:SCAN HDFS [functional.alltypesagg t3]
 |     partitions=11/11 size=814.73KB
 |
-10:HASH JOIN [RIGHT OUTER JOIN]
+07:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: t2.id = t1.id
 |
 |--00:SCAN HDFS [functional.alltypestiny t1]
@@ -1117,7 +1117,7 @@ where t2.month = 1
 08:SCAN HDFS [functional.alltypes t3]
    partitions=24/24 size=478.45KB
 ====
-# This should be a regression test for IMPALA-1343.
+# Regression test for IMPALA-1343.
 SELECT sum(t4.tinyint_col)
 FROM functional.alltypestiny t4
 CROSS JOIN
@@ -1134,16 +1134,16 @@ LEFT SEMI JOIN
 ON t4.bigint_col = `$a$3`.`$c$1`
 WHERE `$a$2`.`$c$1` > t4.id
 ---- PLAN
-12:AGGREGATE [FINALIZE]
+10:AGGREGATE [FINALIZE]
 |  output: sum(t4.tinyint_col)
 |
-11:HASH JOIN [LEFT SEMI JOIN]
+09:HASH JOIN [LEFT SEMI JOIN]
 |  hash predicates: t4.bigint_col = tt1.int_col
 |
 |--06:SCAN HDFS [functional.alltypestiny tt1]
 |     partitions=4/4 size=460B
 |
-10:CROSS JOIN [BROADCAST]
+08:CROSS JOIN [BROADCAST]
 |  predicates: sum(t1.int_col) > t4.id
 |
 |--05:AGGREGATE [FINALIZE]
@@ -1153,7 +1153,7 @@ WHERE `$a$2`.`$c$1` > t4.id
 |  04:SCAN HDFS [functional.alltypesagg t1]
 |     partitions=11/11 size=814.73KB
 |
-09:CROSS JOIN [BROADCAST]
+07:CROSS JOIN [BROADCAST]
 |
 |--00:SCAN HDFS [functional.alltypestiny t4]
 |     partitions=4/4 size=460B
@@ -1197,11 +1197,11 @@ right outer join functional.alltypes c
 where a.int_col = b.int_col and b.bigint_col < a.tinyint_col
   and b.tinyint_col = c.tinyint_col and b.bool_col != c.bool_col
 ---- PLAN
-05:HASH JOIN [LEFT OUTER JOIN]
+04:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: c.id = b.id
 |  other predicates: a.int_col = b.int_col, b.bigint_col < a.tinyint_col, b.tinyint_col = c.tinyint_col, b.bool_col != c.bool_col
 |
-|--04:HASH JOIN [RIGHT OUTER JOIN]
+|--03:HASH JOIN [RIGHT OUTER JOIN]
 |  |  hash predicates: b.id = a.id
 |  |
 |  |--00:SCAN HDFS [functional.alltypestiny a]

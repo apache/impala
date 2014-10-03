@@ -666,26 +666,26 @@ and g.tinyint_col <
 group by g.int_col
 having count(*) < 100
 ---- PLAN
-11:AGGREGATE [FINALIZE]
+10:AGGREGATE [FINALIZE]
 |  output: count(*)
 |  group by: g.int_col
 |  having: count(*) < 100
 |
-10:HASH JOIN [RIGHT OUTER JOIN]
+09:HASH JOIN [RIGHT OUTER JOIN]
 |  hash predicates: t.id = g.id
 |  other predicates: g.tinyint_col < zeroifnull(count(*))
 |
-|--09:HASH JOIN [RIGHT SEMI JOIN]
+|--08:HASH JOIN [RIGHT SEMI JOIN]
 |  |  hash predicates: bigint_col = g.bigint_col, s.id = g.id
 |  |
-|  |--08:HASH JOIN [LEFT SEMI JOIN]
+|  |--07:HASH JOIN [LEFT SEMI JOIN]
 |  |  |  hash predicates: g.id = t.id
 |  |  |
 |  |  |--02:SCAN HDFS [functional.alltypestiny t]
 |  |  |     partitions=4/4 size=460B
 |  |  |     predicates: t.bool_col = FALSE
 |  |  |
-|  |  07:HASH JOIN [RIGHT OUTER JOIN]
+|  |  06:HASH JOIN [RIGHT OUTER JOIN]
 |  |  |  hash predicates: a.id = g.id
 |  |  |
 |  |  |--00:SCAN HDFS [functional.alltypesagg g]

@@ -1268,6 +1268,7 @@ public class Planner {
     joinedRefs.add(leftmostRef);
 
     // If the leftmostTblRef is an outer/semi/cross join, we must invert it.
+    boolean planHasInvertedJoin = false;
     if (leftmostRef.getJoinOp().isOuterJoin()
         || leftmostRef.getJoinOp().isSemiJoin()
         || leftmostRef.getJoinOp().isCrossJoin()) {
@@ -1275,11 +1276,9 @@ public class Planner {
       // that is changed in analyzer.invertOuterJoin(). Changing the analysis state
       // should not be necessary because the semantics of an inverted outer join do
       // not change.
-      leftmostRef.invertJoin(analyzer);
+      leftmostRef.invertJoin(refPlans, analyzer);
+      planHasInvertedJoin = true;
     }
-
-    // Maintains a list of table refs whose join op has been inverted in-place.
-    List<TableRef> invertedJoins = Lists.newArrayList();
 
     long numOps = 0;
     int i = 0;
@@ -1340,7 +1339,7 @@ public class Planner {
         if (invertJoin) {
           ref.setJoinOp(ref.getJoinOp().invert());
           candidate = createJoinNode(analyzer, rhsPlan, root, ref, null, false);
-          invertedJoins.add(ref);
+          planHasInvertedJoin = true;
         } else {
           candidate = createJoinNode(analyzer, root, rhsPlan, null, ref, false);
         }
@@ -1361,18 +1360,14 @@ public class Planner {
         }
       }
       if (newRoot == null) {
-        // Revert in-place changes made to table refs for join inversion.
-        // TODO: Instead of reverting the state changes this way, join ordering should
-        // operate on clones of table refs, but a state-preserving clone() is a rather
-        // involved change.
-        if (leftmostRef.getJoinOp().isOuterJoin()
-            || leftmostRef.getJoinOp().isSemiJoin()
-            || leftmostRef.getJoinOp().isCrossJoin()) {
-          leftmostRef.invertJoin(analyzer);
-        }
-        for (TableRef tblRef: invertedJoins) {
-          tblRef.setJoinOp(tblRef.getJoinOp().invert());
-        }
+        // Currently, it should not be possible to invert a join for a plan that turns
+        // out to be non-executable because (1) the joins we consider for inversion are
+        // barriers in the join order, and (2) the caller of this function only considers
+        // other leftmost table refs if a plan turns out to be non-executable.
+        // TODO: This preconditions check will need to be changed to undo the in-place
+        // modifications made to table refs for join inversion, if the caller decides to
+        // explore more leftmost table refs.
+        Preconditions.checkState(!planHasInvertedJoin);
         return null;
       }
 
