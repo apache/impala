@@ -25,7 +25,7 @@ select * from (
  group by a.ca_state
  having count(*) >= 10
  order by cnt limit 100) as t
----- RESULTS
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 'OK',10
 'IL',10
 'NY',11
