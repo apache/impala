@@ -186,6 +186,71 @@ public class ParserTest {
   }
 
   /**
+   * Various test cases for (multiline) C-style comments.
+   */
+  @Test
+  public void TestMultilineComment() {
+    ParserError("/**/");
+    ParserError("/*****/");
+    ParserError("/* select 1 */");
+    ParserError("/*/ select 1");
+    ParserError("select 1 /*/");
+    ParsesOk("/**/select 1");
+    ParsesOk("select/* */1");
+    ParsesOk("/** */ select 1");
+    ParsesOk("select 1/* **/");
+    ParsesOk("/*/*/select 1");
+    ParsesOk("/*//*/select 1");
+    ParsesOk("select 1/***/");
+    ParsesOk("/*****/select 1");
+    ParsesOk("/**//**/select 1");
+    ParserError("/**/**/select 1");
+    ParsesOk("\nselect 1/**/");
+    ParsesOk("/*\n*/select 1");
+    ParsesOk("/*\r*/select 1");
+    ParsesOk("/*\r\n*/select 1");
+    ParsesOk("/**\n* Doc style\n*/select 1");
+    ParsesOk("/************\n*\n* Header style\n*\n***********/select 1");
+    ParsesOk("/* 1 */ select 1 /* 2 */");
+    ParsesOk("select\n/**/\n1");
+    ParserError("/**// select 1");
+    ParserError("/**/*/ select 1");
+    ParserError("/ **/ select 1");
+    ParserError("/** / select 1");
+    ParserError("/\n**/ select 1");
+    ParserError("/**\n/ select 1");
+    ParsesOk("/*--*/ select 1");
+    ParsesOk("/* --foo */ select 1");
+    ParsesOk("/*\n--foo */ select 1");
+    ParsesOk("/*\n--foo\n*/ select 1");
+    ParserError("select 1 /* --bar");
+    ParserError("select 1 /*--");
+    ParsesOk("/* select 1; */ select 1");
+    ParsesOk("/** select 1; */ select 1");
+    ParsesOk("/* select */ select 1 /* 1 */");
+  }
+
+  /**
+   * Various test cases for one line comment style (starts with --).
+   */
+  @Test
+  public void TestSinglelineComment() {
+    ParserError("--");
+    ParserError("--select 1");
+    ParsesOk("select 1--");
+    ParsesOk("select 1 --foo");
+    ParsesOk("select 1 --\ncol_name");
+    ParsesOk("--foo\nselect 1 --bar");
+    ParsesOk("--foo\r\nselect 1 --bar");
+    ParsesOk("--/* foo */\n select 1");
+    ParsesOk("select 1 --/**/");
+    ParsesOk("-- foo /*\nselect 1");
+    ParserError("-- baz /*\nselect 1*/");
+    ParsesOk("select -- blah\n 1");
+    ParsesOk("select -- select 1\n 1");
+  }
+
+  /**
    * Parses stmt and checks that the all table refs in stmt have the expected join hints.
    * The expectedHints contains the hints of all table refs from left to right (starting
    * with the second tableRef because the first one cannot have hints).

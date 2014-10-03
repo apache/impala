@@ -301,7 +301,7 @@ TraditionalCommentedPlanHints = "/*" [ ]* "+" [^\r\n*]* "*/"
 EndOfLineCommentedPlanHints = "--" [ ]* "+" {NonTerminator}* {LineTerminator}
 
 Comment = {TraditionalComment} | {EndOfLineComment}
-TraditionalComment = "/*" [^*] ~"*/" | "/*" "*"+ "/"
+TraditionalComment = "/*" ~"*/"
 EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
 
 %%
