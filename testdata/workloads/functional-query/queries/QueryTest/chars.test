@@ -385,3 +385,20 @@ char
 ---- RESULTS
 'NULL'
 ====
+---- QUERY
+# Regression test for IMPALA-1344
+select cs, LAST_VALUE(cs) OVER (ORDER BY cs rows between unbounded preceding and 
+current row) FROM functional.chars_tiny;
+---- TYPES
+char, string
+---- RESULTS
+'1aaaa','1aaaa'
+'2aaaa','2aaaa'
+'3aaa ','3aaa '
+'4aa  ','4aa  '
+'5a   ','5a   '
+'6a   ','6a   '
+'6a   ','6a   '
+'a    ','a    '
+'NULL','NULL'
+====
