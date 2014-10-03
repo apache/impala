@@ -733,7 +733,8 @@ Status HdfsParquetTableWriter::CreateSchema() {
     node.name = table_desc_->col_names()[i + num_clustering_cols];
     node.__set_type(IMPALA_TO_PARQUET_TYPES[output_expr_ctxs_[i]->root()->type().type]);
     node.__set_repetition_type(FieldRepetitionType::OPTIONAL);
-    if (output_expr_ctxs_[i]->root()->type().type == TYPE_DECIMAL) {
+    const ColumnType& type = output_expr_ctxs_[i]->root()->type();
+    if (type.type == TYPE_DECIMAL) {
       // This column is type decimal. Update the file metadata to include the
       // additional fields:
       //  1) converted_type: indicate this is really a decimal column.
@@ -744,6 +745,8 @@ Status HdfsParquetTableWriter::CreateSchema() {
           ParquetPlainEncoder::DecimalSize(output_expr_ctxs_[i]->root()->type()));
       node.__set_scale(output_expr_ctxs_[i]->root()->type().scale);
       node.__set_precision(output_expr_ctxs_[i]->root()->type().precision);
+    } else if (type.type == TYPE_VARCHAR || type.type == TYPE_CHAR) {
+      node.__set_converted_type(ConvertedType::UTF8);
     }
   }
 
