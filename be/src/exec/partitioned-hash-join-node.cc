@@ -417,18 +417,15 @@ bool PartitionedHashJoinNode::AppendRowStreamFull(BufferedTupleStream* stream,
   }
 
   // We ran out of memory. Pick a partition to spill.
-  Partition* spilled_partition;
-  status_ = SpillPartition(&spilled_partition);
-  if (!status_.ok()) return false;
-  if (!stream->AddRow(row)) {
-    // Can this happen? we just spilled a partition so this shouldn't fail.
-    VLOG_QUERY << endl << GetStackTrace() << endl
-               << runtime_state_->block_mgr()->DebugString(block_mgr_client_) << endl
-               << stream->DebugString();
-    status_ = Status("Could not spill row.");
-    return false;
+  while (true) {
+    Partition* spilled_partition;
+    status_ = SpillPartition(&spilled_partition);
+    if (!status_.ok()) return false;
+    if (stream->AddRow(row)) return true;
+    // Spilling one partition does not guarantee we can append a row now. Keep
+    // spilling until we can append this row.
   }
-  return true;
+  return false;
 }
 
 // TODO: can we do better with the spilling heuristic.

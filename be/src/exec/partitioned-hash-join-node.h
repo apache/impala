@@ -148,6 +148,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // Called when we need to free up memory by spilling a partition.
   // This function walks hash_partitions_ and picks on to spill.
   // *spilled_partition is the partition that was spilled.
+  // Returns non-ok status if we couldn't spill a partition.
   Status SpillPartition(Partition** spilled_partition);
 
   // Partitions the entire build input (either from child(1) or input_partition_) into

@@ -99,16 +99,18 @@ allocate_tuple:
 
       // In this case, we either didn't have enough memory to add the intermediate_tuple
       // to the stream or we didn't have enough memory to insert it into the hash table.
-      // We need to spill.
-      RETURN_IF_ERROR(SpillPartition(dst_partition, intermediate_tuple));
-      if (!dst_partition->is_spilled()) {
-        DCHECK(dst_partition->aggregated_row_stream->is_pinned());
-        // We spilled a different partition, try to insert this tuple.
-        if (intermediate_tuple == NULL) goto allocate_tuple;
-        if (ht->Insert(ht_ctx, intermediate_tuple, hash)) continue;
-        DCHECK(false) << "How can we get here. We spilled a different partition but "
-            "still did not have enough memory.";
-        return Status::MEM_LIMIT_EXCEEDED;
+      // We need to spill until there is enough memory to insert this tuple or
+      // dst_partition is spilled.
+      while (true) {
+        RETURN_IF_ERROR(SpillPartition(dst_partition, intermediate_tuple));
+        if (!dst_partition->is_spilled()) {
+          DCHECK(dst_partition->aggregated_row_stream->is_pinned());
+          // We spilled a different partition, try to insert this tuple.
+          if (intermediate_tuple == NULL) goto allocate_tuple;
+          if (ht->Insert(ht_ctx, intermediate_tuple, hash)) break;
+        } else {
+          break;
+        }
       }
 
       // In this case, we were able to add the tuple to the stream but not enough

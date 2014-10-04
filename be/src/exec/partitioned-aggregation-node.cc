@@ -793,12 +793,12 @@ Status PartitionedAggregationNode::NextPartition() {
 
 template<bool AGGREGATED_ROWS>
 Status PartitionedAggregationNode::ProcessStream(BufferedTupleStream* input_stream) {
-  bool got_buffer = false;
-  RETURN_IF_ERROR(input_stream->PrepareForRead(&got_buffer));
-  if (!got_buffer) {
+  while (true) {
+    bool got_buffer = false;
+    RETURN_IF_ERROR(input_stream->PrepareForRead(&got_buffer));
+    if (got_buffer) break;
     // Did not have a buffer to read the input stream. Spill and try again.
     RETURN_IF_ERROR(SpillPartition());
-    RETURN_IF_ERROR(input_stream->PrepareForRead());
   }
 
   bool eos = false;
