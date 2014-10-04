@@ -129,7 +129,10 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
         // predicates later.
         if (null_aware_partition_->build_rows()->num_rows() != 0) {
           if (num_join_conjuncts == 0) goto next_row;
-          if (!null_aware_partition_->probe_rows()->AddRow(current_probe_row_)) return -1;
+          if (!null_aware_partition_->probe_rows()->AddRow(current_probe_row_)) {
+            status_ = null_aware_partition_->probe_rows()->status();
+            return -1;
+          }
           goto next_row;
         }
       }
@@ -184,7 +187,10 @@ next_row:
         // is a match, the row is skipped.
         if (!non_empty_build_) continue;
         if (num_join_conjuncts == 0) goto next_row;
-        if (UNLIKELY(!null_probe_rows_->AddRow(current_probe_row_))) return -1;
+        if (UNLIKELY(!null_probe_rows_->AddRow(current_probe_row_))) {
+          status_ = null_probe_rows_->status();
+          return -1;
+        }
         matched_null_probe_.push_back(false);
         goto next_row;
       }
@@ -202,7 +208,10 @@ next_row:
         DCHECK(partition->is_spilled());
         DCHECK(partition->probe_rows() != NULL);
         // This partition is not in memory, spill the probe row.
-        if (UNLIKELY(!AppendRow(partition->probe_rows(), current_probe_row_))) return -1;
+        if (UNLIKELY(!AppendRow(partition->probe_rows(), current_probe_row_))) {
+          status_ = partition->probe_rows()->status();
+          return -1;
+        }
         continue;
       }
     }

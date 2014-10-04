@@ -338,7 +338,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   class Partition {
    public:
-    Partition(RuntimeState* state, PartitionedHashJoinNode* parent, int level);
+    Partition(RuntimeState* state, PartitionedHashJoinNode* parent, int level,
+        bool use_small_buffers);
     ~Partition();
 
     BufferedTupleStream* build_rows() { return build_rows_; }

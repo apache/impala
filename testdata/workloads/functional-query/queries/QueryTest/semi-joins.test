@@ -245,3 +245,40 @@ RIGHT ANTI JOIN functional.SemiJoinTblB b on v.b = b.b
 ---- TYPES
 INT, INT, INT
 ====
+-- ---- QUERY
+-- # Regression test for IMPALA-1351: PHJ::GetNext() returns -1 in NAAJ w/o error.
+-- # NOTE: Commented out because it takes a few hours to run on a single node.
+-- # TODO: Casey will try to simplify.
+-- SELECT COUNT(t2.month) AS int_col_1
+-- FROM alltypesagg t1 CROSS
+-- JOIN alltypesagg t2 FULL
+-- OUTER JOIN alltypestiny t3 ON t3.year = t2.int_col
+-- AND t3.int_col = t2.year
+-- WHERE t1.day NOT IN
+--    (SELECT tt1.year AS int_col_1
+--     FROM alltypes tt1
+--     RIGHT JOIN alltypes tt2 ON tt2.month = tt1.year
+--     WHERE t3.tinyint_col = tt2.tinyint_col
+--     AND t3.bigint_col = tt2.bigint_col
+--     AND t3.int_col = tt1.id)
+-- AND t1.day NOT IN
+--    (SELECT ttt1.tinyint_col AS tinyint_col_1
+--     FROM alltypestiny ttt1
+--     WHERE t1.tinyint_col = ttt1.month
+--     AND ttt1.month IS NULL
+--     AND ttt1.tinyint_col NOT IN
+--        (SELECT tttt2.int_col AS int_col_1
+--         FROM alltypesagg tttt1
+--         RIGHT JOIN alltypes tttt2 ON tttt2.id = tttt1.year)
+--     AND ttt1.month NOT IN
+--        (SELECT MIN(tttt2.year + tttt1.smallint_col * tttt1.int_col - tttt2.bigint_col) +
+--                MAX(tttt2.tinyint_col) AS bigint_col_1
+--        FROM alltypestiny tttt1
+--        INNER JOIN alltypestiny tttt2 ON tttt2.month = tttt1.smallint_col)
+--        AND ttt1.month IS NOT NULL
+--        AND t2.smallint_col = ttt1.bigint_col)
+-- ---- RESULTS
+-- 121000000
+-- ---- TYPES
+-- BIGINT
+-- ====

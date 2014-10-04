@@ -77,13 +77,14 @@ Status PartitionedHashJoinNode::Init(const TPlanNode& tnode) {
       Expr::CreateExprTrees(pool_, tnode.hash_join_node.other_join_conjuncts,
                             &other_join_conjunct_ctxs_));
 
-  if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
-    DCHECK_EQ(eq_join_conjuncts.size(), 1);
-  }
   if (join_op_ == TJoinOp::LEFT_SEMI_JOIN || join_op_ == TJoinOp::LEFT_ANTI_JOIN ||
       join_op_ == TJoinOp::RIGHT_SEMI_JOIN || join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
       join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
     DCHECK_EQ(conjunct_ctxs_.size(), 0);
+
+    if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
+      DCHECK_EQ(eq_join_conjuncts.size(), 1);
+    }
   }
   return Status::OK;
 }
@@ -129,13 +130,15 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
       child(1)->row_desc().tuple_descriptors().size()));
 
   if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
-    null_aware_partition_ = pool_->Add(new Partition(state, this, 0));
+    // Since there is only one such NAAJ stream, we don't worry about the memory consumed
+    // and always use IO-sized buffers.
+    null_aware_partition_ = pool_->Add(new Partition(state, this, 0, false));
     RETURN_IF_ERROR(null_aware_partition_->build_rows()->Init(runtime_profile(), false));
     RETURN_IF_ERROR(null_aware_partition_->probe_rows()->Init(runtime_profile(), false));
 
     null_probe_rows_ = state->obj_pool()->Add(new BufferedTupleStream(
         state, child(0)->row_desc(), state->block_mgr(), block_mgr_client_,
-        false, true));
+        false /* use small buffers */, false /* delete on read */ ));
     RETURN_IF_ERROR(null_probe_rows_->Init(runtime_profile(), false));
     null_aware_eval_timer_ = ADD_TIMER(runtime_profile(), "NullAwareAntiJoinEvalTime");
   }
@@ -207,20 +210,17 @@ void PartitionedHashJoinNode::Close(RuntimeState* state) {
 }
 
 PartitionedHashJoinNode::Partition::Partition(RuntimeState* state,
-        PartitionedHashJoinNode* parent, int level)
+        PartitionedHashJoinNode* parent, int level, bool use_small_buffers)
   : parent_(parent),
     is_closed_(false),
     is_spilled_(false),
     level_(level),
     build_rows_(state->obj_pool()->Add(new BufferedTupleStream(
         state, parent_->child(1)->row_desc(), state->block_mgr(),
-        parent_->block_mgr_client_,
-        parent_->using_small_buffers_ /* use small buffers */))),
+        parent_->block_mgr_client_, use_small_buffers))),
     probe_rows_(state->obj_pool()->Add(new BufferedTupleStream(
         state, parent_->child(0)->row_desc(),
-        state->block_mgr(), parent_->block_mgr_client_,
-        parent_->using_small_buffers_, /* use small buffers */
-        true /* delete on read */))) {
+        state->block_mgr(), parent_->block_mgr_client_, use_small_buffers))) {
 }
 
 PartitionedHashJoinNode::Partition::~Partition() {
@@ -494,7 +494,8 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
   }
 
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
-    hash_partitions_.push_back(pool_->Add(new Partition(state, this, level)));
+    hash_partitions_.push_back(pool_->Add(
+        new Partition(state, this, level, using_small_buffers_)));
     RETURN_IF_ERROR(hash_partitions_[i]->build_rows()->Init(runtime_profile()));
 
     // Initialize a buffer for the probe here to make sure why have it if we
@@ -798,8 +799,12 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
       if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
         RETURN_IF_ERROR(PrepareNullAwarePartition());
       }
-      *eos = null_aware_partition_ == NULL;
-      if (*eos) break;
+      if (null_aware_partition_ == NULL) {
+        *eos = true;
+        break;
+      } else {
+        *eos = false;
+      }
     }
   }
 
