@@ -137,8 +137,6 @@ public class Planner {
     ArrayList<PlanFragment> fragments = Lists.newArrayList();
     if (queryOptions.num_nodes == 1) {
       // single-node execution; we're almost done
-      singleNodePlan =
-          addUnassignedConjuncts(analyzer, singleNodePlan.getTupleIds(), singleNodePlan);
       fragments.add(new PlanFragment(
           fragmentIdGenerator_.getNextId(), singleNodePlan, DataPartition.UNPARTITIONED));
     } else {
@@ -1158,8 +1156,9 @@ public class Planner {
   }
 
   /**
-   * If there are unassigned conjuncts_ that are bound by tupleIds_, returns a SelectNode
-   * on top of root that evaluate those conjuncts_; otherwise returns root unchanged.
+   * If there are unassigned conjuncts that are bound by tupleIds or if there are slot
+   * equivalences for tupleIds that have not yet been enforced, returns a SelectNode on
+   * top of root that evaluates those conjuncts; otherwise returns root unchanged.
    * TODO: change this to assign the unassigned conjuncts to root itself, if that is
    * semantically correct
    */
@@ -1169,13 +1168,17 @@ public class Planner {
     // No point in adding SelectNode on top of an EmptyNode.
     if (root instanceof EmptySetNode) return root;
     Preconditions.checkNotNull(root);
-    // TODO: standardize on logical tuple ids?
+    // Gather unassigned conjuncts and generate predicates to enfore
+    // slot equivalences for each tuple id.
     List<Expr> conjuncts = analyzer.getUnassignedConjuncts(root);
-    //List<Expr> conjuncts_ = analyzer.getUnassignedConjuncts(tupleIds_);
+    for (TupleId tid: tupleIds) {
+      analyzer.createEquivConjuncts(tid, conjuncts);
+    }
     if (conjuncts.isEmpty()) return root;
-    // evaluate conjuncts_ in SelectNode
-    SelectNode selectNode = new SelectNode(nodeIdGenerator_.getNextId(), root);
-    // init() picks up the unassigned conjuncts_
+    // evaluate conjuncts in SelectNode
+    SelectNode selectNode =
+        new SelectNode(nodeIdGenerator_.getNextId(), root, conjuncts);
+    // init() marks conjuncts as assigned
     selectNode.init(analyzer);
     Preconditions.checkState(selectNode.hasValidStats());
     return selectNode;
@@ -1444,15 +1447,15 @@ public class Planner {
     // Slot materialization:
     // We need to mark all slots as materialized that are needed during the execution
     // of selectStmt, and we need to do that prior to creating plans for the TableRefs
-    // (because createTableRefNode() might end up calling computeMemLayout() on one or more
-    // TupleDescriptors, at which point all referenced slots need to be marked).
+    // (because createTableRefNode() might end up calling computeMemLayout() on one or
+    // more TupleDescriptors, at which point all referenced slots need to be marked).
     //
     // For non-join predicates, slots are marked as follows:
     // - for base table scan predicates, this is done directly by ScanNode.init(), which
     //   can do a better job because it doesn't need to materialize slots that are only
     //   referenced for partition pruning, for instance
-    // - for inline views, non-join predicates are pushed down, at which point the process
-    //   repeats itself.
+    // - for inline views, non-join predicates are pushed down, at which point the
+    //   process repeats itself.
     selectStmt.materializeRequiredSlots(analyzer);
 
     // return a plan that feeds the aggregation of selectStmt with an empty set,
@@ -1486,13 +1489,6 @@ public class Planner {
       // keyword was in the select list: use the FROM clause order instead
       root = createFromClauseJoinPlan(analyzer, refPlans);
       Preconditions.checkNotNull(root);
-    }
-
-    if (root != null) {
-      // add unassigned conjuncts_ before aggregation
-      // (scenario: agg input comes from an inline view which wasn't able to
-      // evaluate all Where clause conjuncts_ from this scope)
-      root = addUnassignedConjuncts(analyzer, root.getTupleIds(), root);
     }
 
     // add aggregation, if any
@@ -1651,16 +1647,22 @@ public class Planner {
     // filters from the enclosing scope can be safely applied (to the grouping cols, say)
     List<Expr> unassigned =
         analyzer.getUnassignedConjuncts(inlineViewRef.getId().asList(), true);
-    if (!inlineViewRef.getViewStmt().hasLimit()
+    boolean migrateConjuncts = !inlineViewRef.getViewStmt().hasLimit()
         && !inlineViewRef.getViewStmt().hasOffset()
         && (!(inlineViewRef.getViewStmt() instanceof SelectStmt)
-            || !((SelectStmt)(inlineViewRef.getViewStmt())).hasAnalyticInfo())) {
+            || !((SelectStmt)(inlineViewRef.getViewStmt())).hasAnalyticInfo());
+    if (migrateConjuncts) {
       // check if we can evaluate them
       List<Expr> preds = Lists.newArrayList();
       for (Expr e: unassigned) {
         if (analyzer.canEvalPredicate(inlineViewRef.getId().asList(), e)) preds.add(e);
       }
       unassigned.removeAll(preds);
+
+      // Generate predicates to enforce equivalences among slots of the inline view
+      // tuple. These predicates are also migrated into the inline view.
+      analyzer.createEquivConjuncts(inlineViewRef.getId(), preds);
+
       // create new predicates against the inline view's unresolved result exprs, not
       // the resolved result exprs, in order to avoid skipping scopes (and ignoring
       // limit clauses on the way)
@@ -1721,8 +1723,10 @@ public class Planner {
     rootNode.setOutputSmap(ExprSubstitutionMap.compose(inlineViewRef.getBaseTblSmap(),
         rootNode.getOutputSmap(), analyzer));
     // if the view has a limit we may have conjuncts_ from the enclosing scope left
-    rootNode = addUnassignedConjuncts(
-        analyzer, inlineViewRef.getDesc().getId().asList(), rootNode);
+    if (!migrateConjuncts) {
+      rootNode = addUnassignedConjuncts(
+          analyzer, inlineViewRef.getDesc().getId().asList(), rootNode);
+    }
     return rootNode;
   }
 
@@ -2071,6 +2075,11 @@ public class Planner {
       if (result != null) allMerge.addChild(result,
           unionStmt.getDistinctAggInfo().getGroupingExprs());
       result = allMerge;
+    }
+
+    if (unionStmt.hasAnalyticExprs()) {
+      result = addUnassignedConjuncts(
+          analyzer, unionStmt.getTupleId().asList(), result);
     }
 
     return result;

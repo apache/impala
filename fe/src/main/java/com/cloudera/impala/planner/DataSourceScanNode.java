@@ -90,7 +90,7 @@ public class DataSourceScanNode extends ScanNode {
   @Override
   public void init(Analyzer analyzer) throws InternalException {
     assignConjuncts(analyzer);
-    analyzer.enforceSlotEquivalences(tupleIds_.get(0), conjuncts_);
+    analyzer.createEquivConjuncts(tupleIds_.get(0), conjuncts_);
     prepareDataSource();
     computeStats(analyzer);
     // materialize slots in remaining conjuncts_

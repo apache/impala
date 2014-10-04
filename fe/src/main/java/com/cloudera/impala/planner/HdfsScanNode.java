@@ -124,7 +124,7 @@ public class HdfsScanNode extends ScanNode {
     // also add remaining unassigned conjuncts
     assignConjuncts(analyzer);
 
-    analyzer.enforceSlotEquivalences(tupleIds_.get(0), conjuncts_);
+    analyzer.createEquivConjuncts(tupleIds_.get(0), conjuncts_);
 
     // do partition pruning before deciding which slots to materialize,
     // we might end up removing some predicates

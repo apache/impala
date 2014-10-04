@@ -14,10 +14,14 @@
 
 package com.cloudera.impala.planner;
 
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
+import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
@@ -29,11 +33,12 @@ import com.google.common.base.Preconditions;
 public class SelectNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(SelectNode.class);
 
-  protected SelectNode(PlanNodeId id, PlanNode child) {
+  protected SelectNode(PlanNodeId id, PlanNode child, List<Expr> conjuncts) {
     super(id, child.getTupleIds(), "SELECT");
     addChild(child);
     this.tblRefIds_ = child.tblRefIds_;
     this.nullableTupleIds_ = child.nullableTupleIds_;
+    conjuncts_.addAll(conjuncts);
   }
 
   @Override
@@ -42,12 +47,20 @@ public class SelectNode extends PlanNode {
   }
 
   @Override
+  public void init(Analyzer analyzer) throws InternalException {
+    analyzer.markConjunctsAssigned(conjuncts_);
+    computeStats(analyzer);
+    createDefaultSmap(analyzer);
+  }
+
+  @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     if (getChild(0).cardinality_ == -1) {
       cardinality_ = -1;
     } else {
-      cardinality_ = Math.round(((double) getChild(0).cardinality_) * computeSelectivity());
+      cardinality_ =
+          Math.round(((double) getChild(0).cardinality_) * computeSelectivity());
       Preconditions.checkState(cardinality_ >= 0);
     }
     LOG.debug("stats Select: cardinality=" + Long.toString(cardinality_));

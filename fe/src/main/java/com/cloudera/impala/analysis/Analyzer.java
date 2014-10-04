@@ -1202,11 +1202,15 @@ public class Analyzer {
    * among slots in ignoreSlots can be assumed to have already been enforced.
    * TODO: Consider optimizing for the cheapest minimum set of predicates.
    */
-  public void enforceSlotEquivalences(TupleId tid, List<Expr> conjuncts,
+  public void createEquivConjuncts(TupleId tid, List<Expr> conjuncts,
       Set<SlotId> ignoreSlots) {
-    // Slot equivalences derived from the given conjuncts per equivalence class.
-    // The map's value maps from slot id to a set of equivalent slots.
+    // Tracks slot equivalences established by the given conjuncts and ignored slots.
+    // Maps each slot id to its set of equivalenc slots.
     DisjointSet<SlotId> conjunctsEquivSlots = new DisjointSet<SlotId>();
+    // Treat ignored slots as already connected. Add the ignored slots at this point
+    // such that redundant conjuncts are removed.
+    conjunctsEquivSlots.bulkUnion(ignoreSlots);
+    conjunctsEquivSlots.checkConsistency();
     Iterator<Expr> conjunctIter = conjuncts.iterator();
     while (conjunctIter.hasNext()) {
       Expr conjunct = conjunctIter.next();
@@ -1257,9 +1261,6 @@ public class Analyzer {
       targetEquivSlots.entrySet()) {
       List<SlotId> equivClassSlots = targetEqClass.getValue();
       if (equivClassSlots.size() < 2) continue;
-      // Treat ignored slots as already connected.
-      conjunctsEquivSlots.bulkUnion(ignoreSlots);
-      conjunctsEquivSlots.checkConsistency();
 
       // Loop over all pairs of equivalent slots and merge their disjoint slots sets,
       // creating missing equality predicates as necessary.
@@ -1282,8 +1283,8 @@ public class Analyzer {
     }
   }
 
-  public void enforceSlotEquivalences(TupleId tid, List<Expr> conjuncts) {
-    enforceSlotEquivalences(tid, conjuncts, new HashSet<SlotId>());
+  public void createEquivConjuncts(TupleId tid, List<Expr> conjuncts) {
+    createEquivConjuncts(tid, conjuncts, new HashSet<SlotId>());
   }
 
   /**
@@ -1596,7 +1597,6 @@ public class Analyzer {
       if (globalState_.assignedConjuncts.contains(id)) continue;
       Expr e = globalState_.conjuncts.get(id);
       if (e.isAuxExpr()) continue;
-      LOG.trace("unassigned: " + e.toSql() + " " + e.debugString());
       return true;
     }
     return false;

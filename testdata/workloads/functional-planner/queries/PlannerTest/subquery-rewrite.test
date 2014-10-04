@@ -60,6 +60,7 @@ where a.id not in (select id from functional.alltypes b where a.id = b.id)
 |
 |--01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 size=478.45KB
+|     predicates: id = b.id
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 size=478.45KB
@@ -1345,7 +1346,7 @@ where
 04:AGGREGATE [FINALIZE]
 |  output: sum(t1.id)
 |  group by: t1.id + t2.id
-|  having: t1.id + t2.id = sum(t1.id)
+|  having: sum(t1.id) = t1.id + t2.id
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id

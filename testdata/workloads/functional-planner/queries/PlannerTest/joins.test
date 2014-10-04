@@ -913,6 +913,118 @@ and t3.bigint_col = t2.bigint_col
 00:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 size=478.45KB
 ====
+# Test correct removal of redundant join predicates (IMPALA-1353):
+# Equivalences among inline-view slots are enforced. The predicates
+# are migrated into the inline view plan.
+select 1
+from functional.alltypes a
+inner join
+  (select id+id as x, tinyint_col,
+          int_col*int_col as y, bigint_col
+   from functional.alltypessmall) b
+on a.id = b.x and a.id = b.tinyint_col and
+   a.int_col = b.y and a.int_col = b.bigint_col
+---- PLAN
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = id + id, a.int_col = int_col * int_col
+|
+|--01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|     predicates: id + id = tinyint_col, int_col * int_col = bigint_col
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 size=478.45KB
+====
+# Test correct removal of redundant join predicates (IMPALA-1353):
+# Equivalences among inline-view slots are enforced. The predicates
+# are assigned to a SelectNode because the inline view has a limit.
+select 1
+from functional.alltypes a
+inner join
+  (select id+id as x, tinyint_col,
+          int_col*int_col as y, bigint_col
+   from functional.alltypessmall
+   order by tinyint_col limit 20) b
+on a.id = b.x and a.id = b.tinyint_col and
+   a.int_col = b.y and a.int_col = b.bigint_col
+---- PLAN
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = id + id, a.int_col = int_col * int_col
+|
+|--03:SELECT
+|  |  predicates: id + id = tinyint_col, int_col * int_col = bigint_col
+|  |
+|  02:TOP-N [LIMIT=20]
+|  |  order by: tinyint_col ASC
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 size=478.45KB
+====
+# Test correct removal of redundant join predicates (IMPALA-1353):
+# Equivalences among inline-view slots are enforced. The predicates
+# are assigned to a SelectNode because the inline view has analytics.
+select 1
+from functional.alltypes a
+inner join
+  (select id+id as x, sum(tinyint_col) over() tinyint_col,
+          int_col*int_col as y, count(bigint_col) over() bigint_col
+   from functional.alltypessmall
+   order by tinyint_col limit 20) b
+on a.id = b.x and a.id = b.tinyint_col and
+   a.int_col = b.y and a.int_col = b.bigint_col
+---- PLAN
+05:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = id + id, a.int_col = int_col * int_col
+|
+|--04:SELECT
+|  |  predicates: id + id = sum(tinyint_col), int_col * int_col = count(bigint_col)
+|  |
+|  03:TOP-N [LIMIT=20]
+|  |  order by: sum(tinyint_col) ASC
+|  |
+|  02:ANALYTIC
+|  |  functions: sum(tinyint_col), count(bigint_col)
+|  |
+|  01:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 size=478.45KB
+====
+# Test correct removal of redundant join predicates (IMPALA-1353):
+# No predicates are removed from the On-clause. The resulting plan is correct
+# but inconsistent with Impala's behavior for other queries.
+# TODO: Investigate why the equivalence class computation appears to not
+# work for the slots of tables a and b. We expect predicates such as
+# 'id+id = tinyint_col' to be assigned in the union operands.
+select 1
+from functional.alltypes a
+inner join
+  (select id+id x, tinyint_col, int_col*int_col y, bigint_col
+   from functional.alltypessmall
+   union all
+   select id-id x, tinyint_col, int_col/int_col y, bigint_col
+   from functional.alltypestiny) b
+on a.id = b.x and a.id = b.tinyint_col and
+   a.int_col = b.y and a.int_col = b.bigint_col
+---- PLAN
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = x, a.id = tinyint_col, a.int_col = y, a.int_col = bigint_col
+|
+|--01:UNION
+|  |
+|  |--03:SCAN HDFS [functional.alltypestiny]
+|  |     partitions=4/4 size=460B
+|  |
+|  02:SCAN HDFS [functional.alltypessmall]
+|     partitions=4/4 size=6.32KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 size=478.45KB
+====
 # Regression test for IMPALA-935.
 select 1 from
 (select int_col from functional.alltypessmall group by int_col) a
