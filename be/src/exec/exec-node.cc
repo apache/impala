@@ -166,8 +166,12 @@ void ExecNode::Close(RuntimeState* state) {
     children_[i]->Close(state);
   }
   if (mem_tracker() != NULL) {
-    DCHECK_EQ(mem_tracker()->consumption(), 0)
-        << "Leaked memory." << endl << state->instance_mem_tracker()->LogUsage();
+    if (mem_tracker()->consumption() != 0) {
+      LOG(WARNING) << "Query " << state->query_id() << " leaked memory." << endl
+          << state->instance_mem_tracker()->LogUsage();
+      DCHECK_EQ(mem_tracker()->consumption(), 0)
+          << "Leaked memory." << endl << state->instance_mem_tracker()->LogUsage();
+    }
   }
   Expr::Close(conjunct_ctxs_, state);
 }
