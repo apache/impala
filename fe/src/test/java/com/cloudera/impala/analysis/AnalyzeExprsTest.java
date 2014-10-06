@@ -764,6 +764,16 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         + "select count(t1.int_col_1) as int_col_1 from t t1 where t1.int_col_1 is null "
         + "group by t1.int_col_1 union all "
         + "select min(t1.day) over () from functional.alltypesagg t1");
+    // IMPALA-1354: Constant expressions in order by and partition by exprs
+    AnalysisError(
+        "select rank() over (order by 1) from functional.alltypestiny",
+        "Expressions in the ORDER BY clause must not be constant: 1");
+    AnalysisError(
+        "select rank() over (partition by 2 order by id) from functional.alltypestiny",
+        "Expressions in the PARTITION BY clause must not be constant: 2");
+    AnalysisError(
+        "select rank() over (partition by 2 order by 1) from functional.alltypestiny",
+        "Expressions in the PARTITION BY clause must not be constant: 2");
 
     // nested analytic exprs
     AnalysisError(

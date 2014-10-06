@@ -264,6 +264,21 @@ public class AnalyticExpr extends Expr {
     super.analyze(analyzer);
     type_ = getFnCall().getType();
 
+    for (Expr e: partitionExprs_) {
+      if (e.isConstant()) {
+        throw new AnalysisException(
+            "Expressions in the PARTITION BY clause must not be constant: "
+              + e.toSql() + " (in " + toSql() + ")");
+      }
+    }
+    for (OrderByElement e: orderByElements_) {
+      if (e.getExpr().isConstant()) {
+        throw new AnalysisException(
+            "Expressions in the ORDER BY clause must not be constant: "
+              + e.getExpr().toSql() + " (in " + toSql() + ")");
+      }
+    }
+
     if (getFnCall().getParams().isDistinct()) {
       throw new AnalysisException(
           "DISTINCT not allowed in analytic function: " + getFnCall().toSql());
