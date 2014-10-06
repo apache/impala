@@ -826,17 +826,12 @@ public class Analyzer {
   /**
    * Creates an analyzed equality predicate between the given slots.
    */
-  public Expr createEqPredicate(SlotId lhsSlotId, SlotId rhsSlotId) {
+  public BinaryPredicate createEqPredicate(SlotId lhsSlotId, SlotId rhsSlotId) {
     BinaryPredicate pred = new BinaryPredicate(BinaryPredicate.Operator.EQ,
         new SlotRef(globalState_.descTbl.getSlotDesc(lhsSlotId)),
         new SlotRef(globalState_.descTbl.getSlotDesc(rhsSlotId)));
     // analyze() creates casts, if needed
-    try {
-      pred.analyze(this);
-    } catch (Exception e) {
-      throw new IllegalStateException(
-          "constructed predicate failed analysis: " + pred.toSql(), e);
-    }
+    pred.analyzeNoThrow(this);
     return pred;
   }
 
@@ -1193,34 +1188,141 @@ public class Analyzer {
 
   /**
    * For each equivalence class, adds/removes predicates from conjuncts such that
-   * it contains a minimum set of <slot> = <slot> predicates that "cover" the equivalent
-   * slots belonging to tid. The returned predicates are a minimum spanning tree of the
-   * complete graph formed by connecting all of tid's equivalent slots of that class.
-   * Preserves original conjuncts when possible. Should be called by PlanNodes that
-   * materialize a new tuple and evaluate conjuncts (scan and aggregation nodes).
-   * Does not enforce equivalence between slots in ignoreSlots. Equivalences (if any)
-   * among slots in ignoreSlots can be assumed to have already been enforced.
+   * it contains a minimum set of <lhsSlot> = <rhsSlot> predicates that establish
+   * the known equivalences between slots in lhsTids and rhsTid. Preserves original
+   * conjuncts when possible. Assumes that predicates for establishing equivalences
+   * among slots in only lhsTids and only rhsTid have already been established.
+   * This function adds the remaining predicates to "connect" the disjoint equivalent
+   * slot sets of lhsTids and rhsTid.
+   * The intent of this function is to enable construction of a minimum spanning tree
+   * to cover the known slot equivalences. This function should be called for join
+   * nodes during plan generation to (1) remove redundant join predicates, and (2)
+   * establish equivalences among slots materialized at that join node.
    * TODO: Consider optimizing for the cheapest minimum set of predicates.
+   * TODO: Consider caching the DisjointSet during plan generation instead of
+   * re-creating it here on every invocation.
    */
-  public void createEquivConjuncts(TupleId tid, List<Expr> conjuncts,
-      Set<SlotId> ignoreSlots) {
-    // Tracks slot equivalences established by the given conjuncts and ignored slots.
-    // Maps each slot id to its set of equivalenc slots.
-    DisjointSet<SlotId> conjunctsEquivSlots = new DisjointSet<SlotId>();
-    // Treat ignored slots as already connected. Add the ignored slots at this point
-    // such that redundant conjuncts are removed.
-    conjunctsEquivSlots.bulkUnion(ignoreSlots);
-    conjunctsEquivSlots.checkConsistency();
-    Iterator<Expr> conjunctIter = conjuncts.iterator();
+  public <T extends Expr> void createEquivConjuncts(List<TupleId> lhsTids, TupleId rhsTid,
+      List<T> conjuncts) {
+    Preconditions.checkState(!lhsTids.contains(rhsTid));
+
+    // Equivalence classes only containing slots belonging to lhsTids.
+    Map<EquivalenceClassId, List<SlotId>> planEquivClasses =
+        getEquivClasses(lhsTids);
+
+    // Equivalence classes only containing slots belonging to rhsTid.
+    Map<EquivalenceClassId, List<SlotId>> tidEquivClasses =
+        getEquivClasses(Lists.newArrayList(rhsTid));
+
+    // Maps from a slot id to its set of equivalent slots. Used to track equivalences
+    // that have been established by predicates assigned/generated to plan nodes
+    // materializing lhsTids as well as the given conjuncts.
+    DisjointSet<SlotId> partialEquivSlots = new DisjointSet<SlotId>();
+    // Add the partial equivalences to the partialEquivSlots map. The equivalent-slot
+    // sets of slots from lhsTids are disjoint from those of slots from rhsTid.
+    // We need to 'connect' the disjoint slot sets by constructing a new predicate
+    // for each equivalence class (unless there is already one in 'conjuncts').
+    for (List<SlotId> partialEquivClass: planEquivClasses.values()) {
+      partialEquivSlots.bulkUnion(partialEquivClass);
+    }
+    for (List<SlotId> partialEquivClass: tidEquivClasses.values()) {
+      partialEquivSlots.bulkUnion(partialEquivClass);
+    }
+
+    // Set of outer-joined slots referenced by conjuncts.
+    Set<SlotId> outerJoinedSlots = Sets.newHashSet();
+
+    // Update partialEquivSlots based on equality predicates in 'conjuncts'. Removes
+    // redundant conjuncts, unless they reference outer-joined slots (see below).
+    Iterator<T> conjunctIter = conjuncts.iterator();
     while (conjunctIter.hasNext()) {
       Expr conjunct = conjunctIter.next();
       Pair<SlotId, SlotId> eqSlots = BinaryPredicate.getEqSlots(conjunct);
       if (eqSlots == null) continue;
-      EquivalenceClassId lhsEqClassId = getEquivClassId(eqSlots.first);
-      EquivalenceClassId rhsEqClassId = getEquivClassId(eqSlots.second);
+      EquivalenceClassId firstEqClassId = getEquivClassId(eqSlots.first);
+      EquivalenceClassId secondEqClassId = getEquivClassId(eqSlots.second);
       // slots may not be in the same eq class due to outer joins
-      if (!lhsEqClassId.equals(rhsEqClassId)) continue;
-      if (!conjunctsEquivSlots.union(eqSlots.first, eqSlots.second)) {
+      if (!firstEqClassId.equals(secondEqClassId)) continue;
+
+      // Retain an otherwise redundant predicate if it references a slot of an
+      // outer-joined tuple that is not already referenced by another join predicate
+      // to maintain that the rows must satisfy outer-joined-slot IS NOT NULL
+      // (otherwise NULL tuples from outer joins could survive).
+      // TODO: Consider better fixes for outer-joined slots: (1) Create IS NOT NULL
+      // predicates and place them at the lowest possible plan node. (2) Convert outer
+      // joins into inner joins (or full outer joins into left/right outer joins).
+      boolean filtersOuterJoinNulls = false;
+      if (isOuterJoined(eqSlots.first)
+          && lhsTids.contains(getTupleId(eqSlots.first))
+          && !outerJoinedSlots.contains(eqSlots.first)) {
+        outerJoinedSlots.add(eqSlots.first);
+        filtersOuterJoinNulls = true;
+      }
+      if (isOuterJoined(eqSlots.second)
+          && lhsTids.contains(getTupleId(eqSlots.second))
+          && !outerJoinedSlots.contains(eqSlots.second)) {
+        outerJoinedSlots.add(eqSlots.second);
+        filtersOuterJoinNulls = true;
+      }
+      // retain conjunct if it connects two formerly unconnected equiv classes or
+      // it is required for outer-join semantics
+      if (!partialEquivSlots.union(eqSlots.first, eqSlots.second)
+          && !filtersOuterJoinNulls) {
+        conjunctIter.remove();
+      }
+    }
+
+    // For each equivalence class, construct a new predicate to 'connect' the disjoint
+    // slot sets.
+    for (Map.Entry<EquivalenceClassId, List<SlotId>> tidEquivClass:
+      tidEquivClasses.entrySet()) {
+      List<SlotId> lhsSlots = planEquivClasses.get(tidEquivClass.getKey());
+      if (lhsSlots == null) continue;
+      List<SlotId> rhsSlots = tidEquivClass.getValue();
+      Preconditions.checkState(!lhsSlots.isEmpty() && !rhsSlots.isEmpty());
+
+      if (!partialEquivSlots.union(lhsSlots.get(0), rhsSlots.get(0))) continue;
+      T newEqPred = (T) createEqPredicate(lhsSlots.get(0), rhsSlots.get(0));
+      newEqPred.analyzeNoThrow(this);
+      conjuncts.add(newEqPred);
+    }
+  }
+
+  /**
+   * For each equivalence class, adds/removes predicates from conjuncts such that
+   * it contains a minimum set of <slot> = <slot> predicates that establish
+   * the known equivalences between slots belonging to tid. Preserves original
+   * conjuncts when possible.
+   * The intent of this function is to enable construction of a minimum spanning tree
+   * to cover the known slot equivalences. This function should be called to add
+   * conjuncts to plan nodes that materialize a new tuple, e.g., scans and aggregations.
+   * Does not enforce equivalence between slots in ignoreSlots. Equivalences (if any)
+   * among slots in ignoreSlots are assumed to have already been enforced.
+   * TODO: Consider optimizing for the cheapest minimum set of predicates.
+   */
+  public <T extends Expr> void createEquivConjuncts(TupleId tid, List<T> conjuncts,
+      Set<SlotId> ignoreSlots) {
+    // Maps from a slot id to its set of equivalent slots. Used to track equivalences
+    // that have been established by 'conjuncts' and the 'ignoredsSlots'.
+    DisjointSet<SlotId> partialEquivSlots = new DisjointSet<SlotId>();
+
+    // Treat ignored slots as already connected. Add the ignored slots at this point
+    // such that redundant conjuncts are removed.
+    partialEquivSlots.bulkUnion(ignoreSlots);
+    partialEquivSlots.checkConsistency();
+
+    // Update partialEquivSlots based on equality predicates in 'conjuncts'. Removes
+    // redundant conjuncts, unless they reference outer-joined slots (see below).
+    Iterator<T> conjunctIter = conjuncts.iterator();
+    while (conjunctIter.hasNext()) {
+      Expr conjunct = conjunctIter.next();
+      Pair<SlotId, SlotId> eqSlots = BinaryPredicate.getEqSlots(conjunct);
+      if (eqSlots == null) continue;
+      EquivalenceClassId firstEqClassId = getEquivClassId(eqSlots.first);
+      EquivalenceClassId secondEqClassId = getEquivClassId(eqSlots.second);
+      // slots may not be in the same eq class due to outer joins
+      if (!firstEqClassId.equals(secondEqClassId)) continue;
+      if (!partialEquivSlots.union(eqSlots.first, eqSlots.second)) {
         // conjunct is redundant
         conjunctIter.remove();
       }
@@ -1239,41 +1341,26 @@ public class Analyzer {
     // Assuming e1 = {s1, s2, s3, s4, s5} we need to generate one additional equality
     // predicate to "connect" {s1, s2} and {s3, s4, s5}.
 
-    // Equivalences among slots belonging to tid by equivalence class. These equivalences
-    // are derived from the whole query and must hold for the final query result.
-    Map<EquivalenceClassId, List<SlotId>> targetEquivSlots = Maps.newHashMap();
-    TupleDescriptor tupleDesc = getTupleDesc(tid);
-    for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
-      EquivalenceClassId eqClassId = getEquivClassId(slotDesc.getId());
-      // Ignore equivalence classes that are empty or only have a single member.
-      if (globalState_.equivClassMembers.get(eqClassId).size() <= 1) continue;
-      List<SlotId> slotIds = targetEquivSlots.get(eqClassId);
-      if (slotIds == null) {
-        slotIds = Lists.newArrayList();
-        targetEquivSlots.put(eqClassId, slotIds);
-      }
-      slotIds.add(slotDesc.getId());
-    }
-
-    // For each equivalence class, add missing predicates to conjuncts to form the
-    // minimum spanning tree.
-    for (Map.Entry<EquivalenceClassId, List<SlotId>> targetEqClass:
-      targetEquivSlots.entrySet()) {
-      List<SlotId> equivClassSlots = targetEqClass.getValue();
-      if (equivClassSlots.size() < 2) continue;
-
+    // These are the equivalences that need to be established by constructing conjuncts
+    // to form a minimum spanning tree.
+    Map<EquivalenceClassId, List<SlotId>> targetEquivClasses =
+        getEquivClasses(Lists.newArrayList(tid));
+    for (Map.Entry<EquivalenceClassId, List<SlotId>> targetEquivClass:
+      targetEquivClasses.entrySet()) {
       // Loop over all pairs of equivalent slots and merge their disjoint slots sets,
       // creating missing equality predicates as necessary.
+      List<SlotId> slotIds = targetEquivClass.getValue();
       boolean done = false;
-      for (int i = 1; i < equivClassSlots.size(); ++i) {
-        SlotId rhs = equivClassSlots.get(i);
+      for (int i = 1; i < slotIds.size(); ++i) {
+        SlotId rhs = slotIds.get(i);
         for (int j = 0; j < i; ++j) {
-          SlotId lhs = equivClassSlots.get(j);
-          if (!conjunctsEquivSlots.union(lhs, rhs)) continue;
-          Expr newEqPred = createEqPredicate(lhs, rhs);
+          SlotId lhs = slotIds.get(j);
+          if (!partialEquivSlots.union(lhs, rhs)) continue;
+          T newEqPred = (T) createEqPredicate(lhs, rhs);
+          newEqPred.analyzeNoThrow(this);
           conjuncts.add(newEqPred);
           // Check for early termination.
-          if (conjunctsEquivSlots.get(lhs).size() == equivClassSlots.size()) {
+          if (partialEquivSlots.get(lhs).size() == slotIds.size()) {
             done = true;
             break;
           }
@@ -1283,8 +1370,30 @@ public class Analyzer {
     }
   }
 
-  public void createEquivConjuncts(TupleId tid, List<Expr> conjuncts) {
+  public <T extends Expr> void createEquivConjuncts(TupleId tid, List<T> conjuncts) {
     createEquivConjuncts(tid, conjuncts, new HashSet<SlotId>());
+  }
+
+  /**
+   * Returns a map of partial equivalence classes that only contains slot ids belonging
+   * to the given tuple ids. Only contains equivalence classes with more than one member.
+   */
+  private Map<EquivalenceClassId, List<SlotId>> getEquivClasses(List<TupleId> tids) {
+    Map<EquivalenceClassId, List<SlotId>> result = Maps.newHashMap();
+    for (TupleId tid: tids) {
+      for (SlotDescriptor slotDesc: getTupleDesc(tid).getSlots()) {
+        EquivalenceClassId eqClassId = getEquivClassId(slotDesc.getId());
+        // Ignore equivalence classes that are empty or only have a single member.
+        if (globalState_.equivClassMembers.get(eqClassId).size() <= 1) continue;
+        List<SlotId> slotIds = result.get(eqClassId);
+        if (slotIds == null) {
+          slotIds = Lists.newArrayList();
+          result.put(eqClassId, slotIds);
+        }
+        slotIds.add(slotDesc.getId());
+      }
+    }
+    return result;
   }
 
   /**
@@ -1597,6 +1706,7 @@ public class Analyzer {
       if (globalState_.assignedConjuncts.contains(id)) continue;
       Expr e = globalState_.conjuncts.get(id);
       if (e.isAuxExpr()) continue;
+      LOG.trace("unassigned: " + e.toSql() + " " + e.debugString());
       return true;
     }
     return false;

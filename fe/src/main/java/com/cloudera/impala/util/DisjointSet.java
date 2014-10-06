@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.util;
 
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -98,7 +99,7 @@ public class DisjointSet<T> {
    * Merges all the item sets corresponding to the given items. Returns true if any item
    * sets were merged or created, false otherwise (item sets are already identical).
    */
-  public boolean bulkUnion(Set<T> items) {
+  public boolean bulkUnion(Collection<T> items) {
     if (items.isEmpty()) return false;
     Iterator<T> it = items.iterator();
     T head = it.next();

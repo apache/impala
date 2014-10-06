@@ -32,7 +32,6 @@ import com.cloudera.impala.analysis.AnalyticInfo;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BaseTableRef;
 import com.cloudera.impala.analysis.BinaryPredicate;
-import com.cloudera.impala.analysis.EquivalenceClassId;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.InlineViewRef;
@@ -1783,8 +1782,8 @@ public class Planner {
   }
 
   /**
-   * Return conjuncts for join between a plan tree and a single TableRef; the conjuncts
-   * can be used for hash table lookups.
+   * Return all applicable conjuncts for join between a plan tree and a single TableRef;
+   * the conjuncts can be used for hash table lookups.
    * - for inner joins, those are equi-join predicates in which one side is fully bound
    *   by planIds and the other by joinedTblRef.id_;
    * - for outer joins: same type of conjuncts_ as inner joins, but only from the JOIN
@@ -1792,6 +1791,10 @@ public class Planner {
    * Returns the conjuncts_ in 'joinConjuncts' (in which "<lhs> = <rhs>" is returned
    * as BinaryPredicate and also in their original form in 'joinPredicates'.
    * Each lhs is bound by planIds, and each rhs by the tuple id of joinedTblRef.
+   * Predicates that are redundant based on equivalences classes are intentionally
+   * returneded by this function because the removal of redundant predicates
+   * and the creation of new predicates for enforcing slot equivalences go hand-in-hand
+   * (see analyzer.createEquivConjuncts()).
    */
   private void getHashLookupJoinConjuncts(
       Analyzer analyzer, List<TupleId> planIds, TableRef joinedTblRef,
@@ -1809,11 +1812,6 @@ public class Planner {
       candidates = analyzer.getEqJoinConjuncts(tblRefId, null);
     }
     if (candidates == null) return;
-
-    // equivalence classes of eq predicates in joinPredicates
-    Set<EquivalenceClassId> joinEquivClasses = Sets.newHashSet();
-    // set of outer-joined slots referenced by joinPredicates
-    Set<SlotId> outerJoinedSlots = Sets.newHashSet();
 
     for (Expr e: candidates) {
       // Ignore predicate if one of its children is a constant.
@@ -1837,55 +1835,12 @@ public class Planner {
         continue;
       }
 
-      // Ignore predicates that express a redundant equivalence relationship. We assume
-      // that for each equivalence class, the equivalences between slots from only the
-      // lhs or rhs are already enforced by predicates in the lhs/rhs plan trees,
-      // respectively (see Analyzer.enforceSlotEquivalences()). Therefore, it is
-      // sufficient to establish equivalence between the lhs and rhs slots by assigning
-      // a single join predicate per equivalence class, i.e., any join predicates beyond
-      // that are redundant. We still return those predicates in joinPredicates so they
-      // get marked as assigned.
-      // Retain an otherwise redundant predicate if it references a slot of an
-      // outer-joined tuple that is not already referenced by another join predicate
-      // to maintain that the output of this join satisfies outer-joined-slot IS NOT NULL
-      // (otherwise NULL tuples from outer joins could survive).
-      // TODO: Consider better fixes for outer-joined slots: (1) Create IS NOT NULL
-      // predicates and place them at the lowest possible plan node. (2) Convert outer
-      // joins into inner joins (or full outer joins into left/right outer joins).
-      Pair<SlotId, SlotId> joinSlots = BinaryPredicate.getEqSlots(e);
-      // Set of outer-joined slots that are already covered by an eq predicate.
-      if (joinSlots != null) {
-        boolean hasOuterJoinedSlot = false;
-        if (analyzer.isOuterJoined(joinSlots.first)
-            && !outerJoinedSlots.contains(joinSlots.first)) {
-          outerJoinedSlots.add(joinSlots.first);
-          hasOuterJoinedSlot = true;
-        }
-        if (analyzer.isOuterJoined(joinSlots.second)
-            && !outerJoinedSlots.contains(joinSlots.second)) {
-          outerJoinedSlots.add(joinSlots.second);
-          hasOuterJoinedSlot = true;
-        }
-
-        EquivalenceClassId id1 = analyzer.getEquivClassId(joinSlots.first);
-        EquivalenceClassId id2 = analyzer.getEquivClassId(joinSlots.second);
-        // both slots need not be in the same equiv class, due to outer joins
-        // null check: we don't have equiv classes for anything in subqueries
-        if (!hasOuterJoinedSlot && id1 != null && id2 != null && id1.equals(id2)
-            && joinEquivClasses.contains(id1)) {
-          // record this so it gets marked as assigned later
-          joinPredicates.add(e);
-          continue;
-        }
-        joinEquivClasses.add(id1);
-        joinEquivClasses.add(id2);
-      }
-
-      // e is a non-redundant join predicate
       Preconditions.checkState(lhsExpr != rhsExpr);
       joinPredicates.add(e);
-      joinConjuncts.add(new BinaryPredicate(((BinaryPredicate)e).getOp(), lhsExpr,
-          rhsExpr));
+      BinaryPredicate joinConjunct =
+          new BinaryPredicate(((BinaryPredicate)e).getOp(), lhsExpr, rhsExpr);
+      joinConjunct.analyzeNoThrow(analyzer);
+      joinConjuncts.add(joinConjunct);
     }
     if (!joinPredicates.isEmpty()) return;
     Preconditions.checkState(joinConjuncts.isEmpty());
@@ -1898,9 +1853,9 @@ public class Planner {
         // construct a BinaryPredicates in order to get correct casting;
         // we only do this for one of the equivalent slots, all the other implied
         // equalities are redundant
-        Expr pred = analyzer.createEqPredicate(lhsSlotIds.get(0), slotDesc.getId());
-        joinConjuncts.add(new BinaryPredicate(BinaryPredicate.Operator.EQ,
-            pred.getChild(0), pred.getChild(1)));
+        BinaryPredicate pred =
+            analyzer.createEqPredicate(lhsSlotIds.get(0), slotDesc.getId());
+        joinConjuncts.add(pred);
       }
     }
   }
@@ -1929,9 +1884,19 @@ public class Planner {
     if (innerRef != null) {
       getHashLookupJoinConjuncts(
           analyzer, outer.getTblRefIds(), innerRef, eqJoinConjuncts, eqJoinPredicates);
+      // Outer joins should only use On-clause predicates as eqJoinConjuncts.
+      if (!innerRef.getJoinOp().isOuterJoin()) {
+        analyzer.createEquivConjuncts(outer.getTblRefIds(), innerRef.getId(),
+            eqJoinConjuncts);
+      }
     } else {
       getHashLookupJoinConjuncts(
           analyzer, inner.getTblRefIds(), outerRef, eqJoinConjuncts, eqJoinPredicates);
+      // Outer joins should only use On-clause predicates as eqJoinConjuncts.
+      if (!outerRef.getJoinOp().isOuterJoin()) {
+        analyzer.createEquivConjuncts(inner.getTblRefIds(), outerRef.getId(),
+            eqJoinConjuncts);
+      }
       // Reverse the lhs/rhs of the join conjuncts.
       for (BinaryPredicate eqJoinConjunct: eqJoinConjuncts) {
         Expr swapTmp = eqJoinConjunct.getChild(0);
