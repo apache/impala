@@ -168,7 +168,7 @@ Status RuntimeState::CreateBlockMgr() {
   DCHECK(block_mgr_.get() == NULL);
 
   // Compute the max memory the block mgr will use.
-  int64_t block_mgr_limit = query_mem_tracker_->SpareCapacity();
+  int64_t block_mgr_limit = query_mem_tracker_->lowest_limit();
   if (block_mgr_limit < 0) block_mgr_limit = numeric_limits<int64_t>::max();
   block_mgr_limit = min(static_cast<int64_t>(block_mgr_limit * BLOCK_MGR_MEM_FRACTION),
       block_mgr_limit - BLOCK_MGR_MEM_MIN_REMAINING);

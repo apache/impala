@@ -283,6 +283,8 @@ class BufferedBlockMgr {
 
   // Create a block manager with the specified mem_limit. If a block mgr with the
   // same query id has already been created, that block mgr is returned.
+  // - mem_limit: maximum memory that will be used by the block mgr.
+  // - buffer_size: maximum size of each buffer.
   static Status Create(RuntimeState* state, MemTracker* parent,
       RuntimeProfile* profile, int64_t mem_limit, int64_t buffer_size,
       boost::shared_ptr<BufferedBlockMgr>* block_mgr);

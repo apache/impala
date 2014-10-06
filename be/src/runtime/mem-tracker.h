@@ -279,6 +279,18 @@ class MemTracker {
   bool has_limit() const { return limit_ >= 0; }
   const std::string& label() const { return label_; }
 
+  // Returns the lowest limit for this tracker and its ancestors. Returns
+  // -1 if there is no limit.
+  int64_t lowest_limit() const {
+    if (limit_trackers_.empty()) return -1;
+    int64_t v = std::numeric_limits<int64_t>::max();
+    for (int i = 0; i < limit_trackers_.size(); ++i) {
+      DCHECK(limit_trackers_[i]->has_limit());
+      v = std::min(v, limit_trackers_[i]->limit());
+    }
+    return v;
+  }
+
   // Returns the memory consumed in bytes.
   int64_t consumption() const { return consumption_->current_value(); }
 
