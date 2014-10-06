@@ -251,22 +251,21 @@ class HdfsParquetTableWriter::ColumnWriter :
  protected:
   virtual bool EncodeValue(void* value, int64_t* bytes_needed) {
     if (current_encoding_ == Encoding::PLAIN_DICTIONARY) {
+      if (UNLIKELY(num_values_since_dict_size_check_ >=
+                   DICTIONARY_DATA_PAGE_SIZE_CHECK_PERIOD)) {
+        num_values_since_dict_size_check_ = 0;
+        if (dict_encoder_->EstimatedDataEncodedSize() >= DATA_PAGE_SIZE) return false;
+      }
+      ++num_values_since_dict_size_check_;
       *bytes_needed = dict_encoder_->Put(*CastValue(value));
-      parent_->file_size_estimate_ += *bytes_needed;
-
       // If the dictionary contains the maximum number of values, switch to plain
       // encoding.  The current dictionary encoded page is written out.
-      if (dict_encoder_->num_entries() == MAX_DICTIONARY_ENTRIES) {
+      if (UNLIKELY(*bytes_needed < 0)) {
         FinalizeCurrentPage();
         current_encoding_ = Encoding::PLAIN;
         return false;
-      } else {
-        ++num_values_since_dict_size_check_;
-        if (num_values_since_dict_size_check_ >= DICTIONARY_DATA_PAGE_SIZE_CHECK_PERIOD) {
-          num_values_since_dict_size_check_ = 0;
-          if (dict_encoder_->EstimatedDataEncodedSize() >= DATA_PAGE_SIZE) return false;
-        }
       }
+      parent_->file_size_estimate_ += *bytes_needed;
     } else if (current_encoding_ == Encoding::PLAIN) {
       T* v = CastValue(value);
       *bytes_needed = encoded_value_size_ < 0 ?

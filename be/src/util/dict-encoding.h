@@ -102,35 +102,62 @@ template<typename T>
 class DictEncoder : public DictEncoderBase {
  public:
   DictEncoder(MemPool* pool, int encoded_value_size) :
-      DictEncoderBase(pool), encoded_value_size_(encoded_value_size) {
-  }
+      DictEncoderBase(pool), buckets_(HASH_TABLE_SIZE, Node::INVALID_INDEX),
+      encoded_value_size_(encoded_value_size) { }
 
-  // Encode value. Returns the number of bytes added to the dictionary page length (will
-  // be 0 if this value is already in the dictionary). Note that this does not actually
-  // write any data, just buffers the value's index to be written later.
+  // Encode value. Returns the number of bytes added to the dictionary page length
+  // (will be 0 if this value is already in the dictionary) or -1 if the dictionary is
+  // full (in which case the caller should give up on dictionary encoding). Note that
+  // this does not actually write any data, just buffers the value's index to be
+  // written later.
   int Put(const T& value);
 
   virtual void WriteDict(uint8_t* buffer);
 
-  virtual int num_entries() const { return dict_index_.size(); }
+  virtual int num_entries() const { return nodes_.size(); }
 
  private:
-  // Dictionary mapping value to index (i.e. the number used to encode this value in the
-  // data).
-  typedef boost::unordered_map<T,int> ValuesIndex;
-  ValuesIndex dict_index_;
+  // Size of the table. Must be a power of 2.
+  enum { HASH_TABLE_SIZE = 1 << 16 };
 
-  // The values of dict_ in order of index (essentially the reverse mapping). Used to
-  // write dictionary page.
-  std::vector<T> dict_;
+  // Dictates an upper bound on the capacity of the hash table.
+  typedef uint16_t NodeIndex;
+
+  // Hash table mapping value to dictionary index (i.e. the number used to encode this
+  // value in the data). Each table entry is a index into the nodes_ vector (giving the
+  // first node of a chain for this bucket) or Node::INVALID_INDEX for an empty bucket.
+  std::vector<NodeIndex> buckets_;
+
+  // Node in the chained hash table.
+  struct Node {
+    Node(const T& v, const NodeIndex& n) : value(v), next(n) { }
+
+    // The dictionary value.
+    T value;
+
+    // Index into nodes_ for the next Node in the chain. INVALID_INDEX indicates end.
+    NodeIndex next;
+
+    // The maximum number of values in the dictionary.  Chosen to be around 60% of
+    // HASH_TABLE_SIZE to limit the expected length of the chains.
+    enum { INVALID_INDEX = 40000 };
+  };
+
+  // The nodes of the hash table. Ordered by dictionary index (and so also represents
+  // the reverse mapping from encoded index to value).
+  std::vector<Node> nodes_;
 
   // Size of each encoded dictionary value. -1 for variable-length types.
   int encoded_value_size_;
 
-  // Adds value to dict_ and updates dict_encoded_size_. Returns the
+  // Hash function for mapping a value to a bucket.
+  inline uint32_t Hash(const T& value) const;
+
+  // Adds value to the hash table and updates dict_encoded_size_. Returns the
   // number of bytes added to dict_encoded_size_.
-  // *index is the output parameter and is the index into the dict_ for 'value'
-  int AddToDict(const T& value, int* index);
+  // bucket gives a pointer to the location (i.e. chain) to add the value
+  // so that the hash for value doesn't need to be recomputed.
+  int AddToTable(const T& value, NodeIndex* bucket);
 };
 
 // Decoder class for dictionary encoded data. This class does not allocate any
@@ -180,36 +207,54 @@ class DictDecoder : public DictDecoderBase {
 
 template<typename T>
 inline int DictEncoder<T>::Put(const T& value) {
-  int index;
-  typename ValuesIndex::iterator it = dict_index_.find(value);
-  int bytes_added = 0;
-  if (it == dict_index_.end()) {
-    bytes_added = AddToDict(value, &index);
-  } else {
-    index = it->second;
+  NodeIndex* bucket = &buckets_[Hash(value) & (HASH_TABLE_SIZE - 1)];
+  NodeIndex i = *bucket;
+  // Look for the value in the dictionary.
+  while (i != Node::INVALID_INDEX) {
+    const Node* n = &nodes_[i];
+    if (LIKELY(n->value == value)) {
+      // Value already in dictionary.
+      buffered_indices_.push_back(i);
+      return 0;
+    }
+    i = n->next;
   }
-  buffered_indices_.push_back(index);
-  return bytes_added;
+  // Value not found. Add it to the dictionary if there's space.
+  i = nodes_.size();
+  if (UNLIKELY(i >= Node::INVALID_INDEX)) return -1;
+  buffered_indices_.push_back(i);
+  return AddToTable(value, bucket);
 }
 
 template<typename T>
-inline int DictEncoder<T>::AddToDict(const T& value, int* index) {
+inline uint32_t DictEncoder<T>::Hash(const T& value) const {
+  return HashUtil::Hash(&value, sizeof(value), 0);
+}
+
+template<>
+inline uint32_t DictEncoder<StringValue>::Hash(const StringValue& value) const {
+  return HashUtil::Hash(value.ptr, value.len, 0);
+}
+
+template<typename T>
+inline int DictEncoder<T>::AddToTable(const T& value, NodeIndex* bucket) {
   DCHECK_GT(encoded_value_size_, 0);
-  *index = dict_index_.size();
-  dict_index_[value] = *index;
-  dict_.push_back(value);
+  // Prepend the new node to this bucket's chain.
+  nodes_.push_back(Node(value, *bucket));
+  *bucket = nodes_.size() - 1;
   dict_encoded_size_ += encoded_value_size_;
   return encoded_value_size_;
 }
 
 template<>
-inline int DictEncoder<StringValue>::AddToDict(const StringValue& value, int* index) {
+inline int DictEncoder<StringValue>::AddToTable(const StringValue& value,
+    NodeIndex* bucket) {
   char* ptr_copy = reinterpret_cast<char*>(pool_->Allocate(value.len));
   memcpy(ptr_copy, value.ptr, value.len);
   StringValue sv(ptr_copy, value.len);
-  *index = dict_index_.size();
-  dict_index_[sv] = *index;
-  dict_.push_back(sv);
+  // Prepend the new node to this bucket's chain.
+  nodes_.push_back(Node(sv, *bucket));
+  *bucket = nodes_.size() - 1;
   int bytes_added = ParquetPlainEncoder::ByteSize(sv);
   dict_encoded_size_ += bytes_added;
   return bytes_added;
@@ -243,8 +288,8 @@ inline bool DictDecoder<Decimal16Value>::GetValue(Decimal16Value* value) {
 
 template<typename T>
 inline void DictEncoder<T>::WriteDict(uint8_t* buffer) {
-  BOOST_FOREACH(const T& value, dict_) {
-    buffer += ParquetPlainEncoder::Encode(buffer, encoded_value_size_, value);
+  BOOST_FOREACH(const Node& node, nodes_) {
+    buffer += ParquetPlainEncoder::Encode(buffer, encoded_value_size_, node.value);
   }
 }
 
