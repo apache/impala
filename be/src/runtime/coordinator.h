@@ -167,7 +167,12 @@ class Coordinator {
   // Returns query_status_.
   Status GetStatus();
 
-  const TExecSummary& exec_summary() const { return exec_summary_; }
+  // Returns the exec summary. The function returns with the exec summary lock taken.
+  // (By setting lock). The caller must not block while holding the lock.
+  const TExecSummary& exec_summary(ScopedSpinLock* lock) const {
+    lock->AcquireLock(&exec_summary_lock_);
+    return exec_summary_;
+  }
 
  private:
   class BackendExecState;
@@ -288,6 +293,7 @@ class Coordinator {
   boost::scoped_ptr<ObjectPool> obj_pool_;
 
   // Execution summary for this query.
+  mutable SpinLock exec_summary_lock_;
   TExecSummary exec_summary_;
 
   // A mapping of plan node ids to index into exec_summary_.nodes
@@ -427,8 +433,7 @@ class Coordinator {
 
   // Populates the summary execution stats from the profile. Can only be called when the
   // query is done.
-  // TODO: we should be able to call this and get live updating stats.
-  void UpdateExecSummary(RuntimeProfile* profile);
+  void UpdateExecSummary(int fragment_idx, int instance_idx, RuntimeProfile* profile);
 
   // Determines what the permissions of directories created by INSERT statements should be
   // if permission inheritance is enabled. Populates a map from all prefixes of path_str

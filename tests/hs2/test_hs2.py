@@ -209,8 +209,10 @@ class TestHS2(HS2TestSuite):
     exec_summary_req.sessionHandle = self.session_handle
     exec_summary_resp = self.hs2_client.GetExecSummary(exec_summary_req)
 
-    # GetExecSummary() only works for closed queries
-    TestHS2.check_response(exec_summary_resp, TCLIService.TStatusCode.ERROR_STATUS)
+    # Test getting the summary while query is running. We can't verify anything
+    # about the summary (depends how much progress query has made) but the call
+    # should work.
+    TestHS2.check_response(exec_summary_resp)
 
     close_operation_req = TCLIService.TCloseOperationReq()
     close_operation_req.operationHandle = execute_statement_resp.operationHandle

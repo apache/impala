@@ -38,7 +38,7 @@ class SpinLock {
   }
 
   void Unlock() {
-    // Memory barrier here. All updates before the unlock need to be made 
+    // Memory barrier here. All updates before the unlock need to be made
     // visible.
     __sync_synchronize();
     DCHECK(locked_);
@@ -67,13 +67,19 @@ class SpinLock {
 
 class ScopedSpinLock {
  public:
-  ScopedSpinLock(SpinLock* lock) {
+  ScopedSpinLock(SpinLock* lock = NULL) {
     lock_ = lock;
-    lock->Lock();
+    if (lock_ != NULL) lock_->Lock();
   }
 
   ~ScopedSpinLock() {
-    lock_->Unlock();
+    if (lock_ != NULL) lock_->Unlock();
+  }
+
+  void AcquireLock(SpinLock* lock) {
+    DCHECK(lock_ == NULL);
+    lock_ = lock;
+    lock_->Lock();
   }
 
  private:

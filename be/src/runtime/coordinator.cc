@@ -54,7 +54,7 @@
 #include "util/container-util.h"
 #include "util/network-util.h"
 #include "util/llama-util.h"
-#include "util/table-printer.h"
+#include "util/summary-util.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Frontend_types.h"
@@ -107,6 +107,9 @@ class Coordinator::BackendExecState {
   // Fragment idx for this ExecState
   int fragment_idx;
 
+  // The 0-based instance idx.
+  int instance_idx;
+
   // protects fields below
   // lock ordering: Coordinator::lock_ can only get obtained *prior*
   // to lock
@@ -137,6 +140,7 @@ class Coordinator::BackendExecState {
       backend_address(params.hosts[instance_idx]),
       total_split_size(0),
       fragment_idx(fragment_idx),
+      instance_idx(instance_idx),
       initiated(false),
       done(false),
       profile_created(false),
@@ -291,7 +295,8 @@ static void ProcessQueryOptions(
       << "because nodes cannot be cancelled in Close()";
 }
 
-Status Coordinator::Exec(QuerySchedule& schedule, vector<ExprContext*>* output_expr_ctxs) {
+Status Coordinator::Exec(QuerySchedule& schedule,
+    vector<ExprContext*>* output_expr_ctxs) {
   const TQueryExecRequest& request = schedule.request();
   DCHECK_GT(request.fragments.size(), 0);
   needs_finalization_ = request.__isset.finalize_params;
@@ -340,7 +345,8 @@ Status Coordinator::Exec(QuerySchedule& schedule, vector<ExprContext*>* output_e
     // coordinator fragment have been prepared in executor_->Prepare().
     DCHECK(output_expr_ctxs != NULL);
     RETURN_IF_ERROR(Expr::CreateExprTrees(
-        runtime_state()->obj_pool(), request.fragments[0].output_exprs, output_expr_ctxs));
+        runtime_state()->obj_pool(), request.fragments[0].output_exprs,
+        output_expr_ctxs));
     RETURN_IF_ERROR(Expr::Prepare(*output_expr_ctxs, runtime_state(), row_desc()));
   } else {
     // The coordinator instance may require a query mem tracker even if there is no
@@ -935,6 +941,7 @@ void Coordinator::InitExecProfile(const TQueryExecRequest& request) {
     // instance of this profile so the average is just the coordinator profile.
     if (i == 0 && has_coordinator_fragment) {
       fragment_profiles_[i].averaged_profile = executor_->profile();
+      fragment_profiles_[i].num_instances = 1;
       continue;
     }
     fragment_profiles_[i].averaged_profile =
@@ -1218,6 +1225,8 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
       // Update the average profile for the fragment corresponding to this instance.
       exec_state->profile->ComputeTimeInProfile();
       UpdateAverageProfile(exec_state);
+      UpdateExecSummary(exec_state->fragment_idx, exec_state->instance_idx,
+          exec_state->profile);
     }
     if (!exec_state->profile_created) {
       CollectScanNodeCounters(exec_state->profile, &exec_state->aggregate_counters);
@@ -1366,31 +1375,35 @@ void Coordinator::ComputeFragmentSummaryStats(BackendExecState* backend_exec_sta
   data.root_profile->AddChild(backend_exec_state->profile);
 }
 
-void Coordinator::UpdateExecSummary(RuntimeProfile* profile) {
+void Coordinator::UpdateExecSummary(int fragment_idx, int instance_idx,
+    RuntimeProfile* profile) {
   vector<RuntimeProfile*> children;
   profile->GetAllChildren(&children);
 
-  for (int j = 0; j < children.size(); ++j) {
-    int id = ExecNode::GetNodeIdFromProfile(children[j]);
+  ScopedSpinLock l(&exec_summary_lock_);
+  for (int i = 0; i < children.size(); ++i) {
+    int id = ExecNode::GetNodeIdFromProfile(children[i]);
     if (id == -1) continue;
 
     TPlanNodeExecSummary& exec_summary =
         exec_summary_.nodes[plan_node_id_to_summary_map_[id]];
-    TExecStats stats;
+    if (exec_summary.exec_stats.empty()) {
+      // First time, make an exec_stats for each instance this plan node is running on.
+      DCHECK_LT(fragment_idx, fragment_profiles_.size());
+      exec_summary.exec_stats.resize(fragment_profiles_[fragment_idx].num_instances);
+    }
+    DCHECK_LT(instance_idx, exec_summary.exec_stats.size());
+    TExecStats& stats = exec_summary.exec_stats[instance_idx];
 
-    RuntimeProfile::Counter* rows_counter = children[j]->GetCounter("RowsReturned");
-    RuntimeProfile::Counter* mem_counter = children[j]->GetCounter("PeakMemoryUsage");
+    RuntimeProfile::Counter* rows_counter = children[i]->GetCounter("RowsReturned");
+    RuntimeProfile::Counter* mem_counter = children[i]->GetCounter("PeakMemoryUsage");
     if (rows_counter != NULL) stats.__set_cardinality(rows_counter->value());
     if (mem_counter != NULL) stats.__set_memory_used(mem_counter->value());
-    stats.__set_latency_ns(children[j]->local_time());
+    stats.__set_latency_ns(children[i]->local_time());
     // TODO: we don't track cpu time per node now. Do that.
     exec_summary.__isset.exec_stats = true;
-
-    // TODO: we can't call UpdateExecSummary until the query is complete because
-    // we just keep appending to exec_summary.exec_stats. We already maintain
-    // fragment instance so this shouldn't be hard to fix.
-    exec_summary.exec_stats.push_back(stats);
   }
+  VLOG(2) << PrintExecSummary(exec_summary_);
 }
 
 // This function appends summary information to the query_profile_ before
@@ -1409,7 +1422,7 @@ void Coordinator::ReportQuerySummary() {
   // fraction of time spent in each node.
   if (executor_.get() != NULL) {
     executor_->profile()->ComputeTimeInProfile();
-    UpdateExecSummary(executor_->profile());
+    UpdateExecSummary(0, 0, executor_->profile());
   }
 
   if (!backend_exec_states_.empty()) {
@@ -1418,7 +1431,8 @@ void Coordinator::ReportQuerySummary() {
       backend_exec_states_[i]->profile->ComputeTimeInProfile();
       UpdateAverageProfile(backend_exec_states_[i]);
       ComputeFragmentSummaryStats(backend_exec_states_[i]);
-      UpdateExecSummary(backend_exec_states_[i]->profile);
+      UpdateExecSummary(backend_exec_states_[i]->fragment_idx,
+          backend_exec_states_[i]->instance_idx, backend_exec_states_[i]->profile);
     }
 
     InstanceComparator comparator;

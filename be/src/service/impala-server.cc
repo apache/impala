@@ -454,8 +454,20 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
 }
 
 Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, TExecSummary* result) {
-  // TODO: this is only populated when the query is done currently so only look
-  // in the log. We'll have to make it thread safe for in flight queries.
+  // Search for the query id in the active query map
+  {
+    lock_guard<mutex> l(query_exec_state_map_lock_);
+    QueryExecStateMap::const_iterator exec_state = query_exec_state_map_.find(query_id);
+    if (exec_state != query_exec_state_map_.end()) {
+      if (exec_state->second->coord() != NULL) {
+        ScopedSpinLock lock;
+        *result = exec_state->second->coord()->exec_summary(&lock);
+        return Status::OK;
+      }
+    }
+  }
+
+  // Look for the query in completed query log.
   {
     lock_guard<mutex> l(query_log_lock_);
     QueryLogIndex::const_iterator query_record = query_log_index_.find(query_id);
@@ -513,7 +525,8 @@ void ImpalaServer::ArchiveQuery(const QueryExecState& query) {
   if (FLAGS_query_log_size == 0) return;
   QueryStateRecord record(query, true, encoded_profile_str);
   if (query.coord() != NULL) {
-    record.exec_summary = query.coord()->exec_summary();
+    ScopedSpinLock lock;
+    record.exec_summary = query.coord()->exec_summary(&lock);
   }
   {
     lock_guard<mutex> l(query_log_lock_);
@@ -715,7 +728,12 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
   }
 
   if (exec_state->coord() != NULL) {
-    const string& exec_summary = PrintExecSummary(exec_state->coord()->exec_summary());
+    string exec_summary;
+    {
+      ScopedSpinLock lock;
+      const TExecSummary& summary = exec_state->coord()->exec_summary(&lock);
+      exec_summary = PrintExecSummary(summary);
+    }
     exec_state->summary_profile()->AddInfoString("ExecSummary", exec_summary);
 
     const unordered_set<TNetworkAddress>& unique_hosts =
