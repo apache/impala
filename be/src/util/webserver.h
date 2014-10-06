@@ -117,6 +117,9 @@ class Webserver {
   // Registered to handle "/", populates document with various system-wide information.
   void RootHandler(const ArgumentMap& args, rapidjson::Document* document);
 
+  // Called when an error is encountered, e.g. when a handler for a URI cannot be found.
+  void ErrorHandler(const ArgumentMap& args, rapidjson::Document* document);
+
   // Builds a map of argument name to argument value from a typical URL argument
   // string (that is, "key1=value1&key2=value2.."). If no value is given for a
   // key, it is entered into the map as (key, "").
@@ -140,6 +143,9 @@ class Webserver {
 
   // Handle to Squeasel context; owned and freed by Squeasel internally
   struct sq_context* context_;
+
+  // Catch-all handler for error messages
+  UrlHandler error_handler_;
 };
 
 }

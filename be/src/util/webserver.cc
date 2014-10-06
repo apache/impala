@@ -77,9 +77,13 @@ static const int DOC_FOLDER_LEN = strlen(DOC_FOLDER);
 static const uint32_t PROCESSING_COMPLETE = 1;
 static const uint32_t NOT_PROCESSED = 0;
 
-// Standard keys in the json document sent to templates for rendering. Must be kept in
+// Standard key in the json document sent to templates for rendering. Must be kept in
 // sync with the templates themselves.
 static const char* COMMON_JSON_KEY = "__common__";
+
+// Standard key used to add errors to the argument map passed to the webserver's error
+// handler.
+static const char* ERROR_KEY = "__error_msg__";
 
 // Returns $IMPALA_HOME if set, otherwise /tmp/impala_www
 const char* GetDefaultDocumentRoot() {
@@ -100,13 +104,42 @@ namespace impala {
 
 const char* Webserver::ENABLE_RAW_JSON_KEY = "__raw__";
 
-Webserver::Webserver() : context_(NULL) {
+// Supported HTTP response codes
+enum ResponseCode {
+  OK = 200,
+  NOT_FOUND = 404
+};
+
+// Supported HTTP content types
+enum ContentType {
+  HTML,
+  PLAIN
+};
+
+// Builds a valid HTTP header given the response code and a content type.
+string BuildHeaderString(ResponseCode response, ContentType content_type) {
+  static const string RESPONSE_TEMPLATE = "HTTP/1.1 $0 $1\r\n"
+      "Content-Type: text/$2\r\n"
+      "Content-Length: %d\r\n"
+      "\r\n";
+
+  return Substitute(RESPONSE_TEMPLATE, response, response == OK ? "OK" : "Not found",
+      content_type == HTML ? "html" : "plain");
+}
+
+Webserver::Webserver()
+    : context_(NULL),
+      error_handler_(UrlHandler(bind<void>(&Webserver::ErrorHandler, this, _1, _2),
+          "error.tmpl", false)) {
   http_address_ = MakeNetworkAddress(
       FLAGS_webserver_interface.empty() ? "0.0.0.0" : FLAGS_webserver_interface,
       FLAGS_webserver_port);
 }
 
-Webserver::Webserver(const int port) : context_(NULL) {
+Webserver::Webserver(const int port)
+    : context_(NULL),
+      error_handler_(UrlHandler(bind<void>(&Webserver::ErrorHandler, this, _1, _2),
+          "error.tmpl", false)) {
   http_address_ = MakeNetworkAddress("0.0.0.0", port);
 }
 
@@ -114,7 +147,7 @@ Webserver::~Webserver() {
   Stop();
 }
 
-void Webserver::RootHandler(const Webserver::ArgumentMap& args, Document* document) {
+void Webserver::RootHandler(const ArgumentMap& args, Document* document) {
   Value version(GetVersionString().c_str(), document->GetAllocator());
   document->AddMember("version", version, document->GetAllocator());
   Value cpu_info(CpuInfo::DebugString().c_str(), document->GetAllocator());
@@ -126,6 +159,14 @@ void Webserver::RootHandler(const Webserver::ArgumentMap& args, Document* docume
   Value os_info(OsInfo::DebugString().c_str(), document->GetAllocator());
   document->AddMember("os_info", os_info, document->GetAllocator());
   document->AddMember("pid", getpid(), document->GetAllocator());
+}
+
+void Webserver::ErrorHandler(const ArgumentMap& args, Document* document) {
+  ArgumentMap::const_iterator it = args.find(ERROR_KEY);
+  if (it == args.end()) return;
+
+  Value error(it->second.c_str(), document->GetAllocator());
+  document->AddMember("error", error, document->GetAllocator());
 }
 
 void Webserver::BuildArgumentMap(const string& args, ArgumentMap* output) {
@@ -286,19 +327,25 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
       return NOT_PROCESSED;
     }
   }
-  shared_lock<shared_mutex> lock(url_handlers_lock_);
-  UrlHandlerMap::const_iterator it = url_handlers_.find(request_info->uri);
-  if (it == url_handlers_.end()) {
-    sq_printf(connection, "HTTP/1.1 404 Not Found\r\n"
-        "Content-Type: text/plain\r\n\r\n");
-    sq_printf(connection, "No handler for URI %s\r\n\r\n", request_info->uri);
-    return PROCESSING_COMPLETE;
-  }
 
   map<string, string> arguments;
   if (request_info->query_string != NULL) {
     BuildArgumentMap(request_info->query_string, &arguments);
   }
+
+  shared_lock<shared_mutex> lock(url_handlers_lock_);
+  UrlHandlerMap::const_iterator it = url_handlers_.find(request_info->uri);
+  ResponseCode response = OK;
+  ContentType content_type = HTML;
+  const UrlHandler* url_handler = NULL;
+  if (it == url_handlers_.end()) {
+    response = NOT_FOUND;
+    arguments[ERROR_KEY] = Substitute("No URI handler for '$0'", request_info->uri);
+    url_handler = &error_handler_;
+  } else {
+    url_handler = &it->second;
+  }
+
   MonotonicStopWatch sw;
   sw.Start();
 
@@ -306,35 +353,33 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
   document.SetObject();
   GetCommonJson(&document);
 
-  bool send_html_headers = true;
   // The output of this page is accumulated into this stringstream.
   stringstream output;
   bool raw_json = (arguments.find("json") != arguments.end());
+  url_handler->callback()(arguments, &document);
   if (raw_json) {
     // Callbacks may optionally be rendered as a text-only, pretty-printed Json document
     // (mostly for debugging or integration with third-party tools).
     StringBuffer strbuf;
     PrettyWriter<StringBuffer> writer(strbuf);
-    it->second.callback()(arguments, &document);
     document.Accept(writer);
     output << strbuf.GetString();
-    send_html_headers = false;
+    content_type = PLAIN;
   } else {
-    it->second.callback()(arguments, &document);
     if (arguments.find("raw") != arguments.end()) {
       document.AddMember(ENABLE_RAW_JSON_KEY, "true", document.GetAllocator());
     }
     if (document.HasMember(ENABLE_RAW_JSON_KEY)) {
-      send_html_headers = false;
+      content_type = PLAIN;
     }
 
     const string& full_template_path =
         Substitute("$0/$1/$2", FLAGS_webserver_doc_root, DOC_FOLDER,
-            it->second.template_filename());
+            url_handler->template_filename());
     ifstream tmpl(full_template_path.c_str());
     if (!tmpl.is_open()) {
       output << "Could not open template: " << full_template_path;
-      send_html_headers = false;
+      content_type = PLAIN;
     } else {
       stringstream buffer;
       buffer << tmpl.rdbuf();
@@ -347,18 +392,8 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
           << PrettyPrinter::Print(sw.ElapsedTime(), TCounterType::CPU_TICKS);
 
   const string& str = output.str();
-  // Without styling, render the page as plain text
-  if (send_html_headers) {
-    sq_printf(connection, "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/html\r\n"
-        "Content-Length: %d\r\n"
-        "\r\n", (int)str.length());
-  } else {
-    sq_printf(connection, "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/plain\r\n"
-        "Content-Length: %d\r\n"
-        "\r\n", (int)str.length());
-  }
+  const string& headers = BuildHeaderString(response, content_type);
+  sq_printf(connection, headers.c_str(), (int)str.length());
 
   // Make sure to use sq_write for printing the body; sq_printf truncates at 8kb
   sq_write(connection, str.c_str(), str.length());

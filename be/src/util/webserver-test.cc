@@ -42,7 +42,7 @@ const string ESCAPED_VALUE = "&lt;script language=&apos;javascript&apos;&gt;";
 // Adapted from:
 // http://stackoverflow.com/questions/10982717/get-html-without-header-with-boostasio
 Status HttpGet(const string& host, const int32_t& port, const string& url_path,
-    ostream* out) {
+    ostream* out, int expected_code = 200) {
   try {
     tcp::iostream request_stream;
     request_stream.connect(host, lexical_cast<string>(port));
@@ -72,7 +72,7 @@ Status HttpGet(const string& host, const int32_t& port, const string& url_path,
       return Status("Malformed response");
     }
 
-    if (status_code != 200) {
+    if (status_code != expected_code) {
       return Status(Substitute("Unexpected status code: $0", status_code));
     }
 
@@ -178,6 +178,17 @@ TEST(Webserver, EscapingTest) {
   ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port, JSON_TEST_PATH, &contents).ok());
   ASSERT_TRUE(contents.str().find(ESCAPED_VALUE) != string::npos);
   ASSERT_TRUE(contents.str().find(TO_ESCAPE_VALUE) == string::npos);
+}
+
+TEST(Webserver, EscapeErrorUriTest) {
+  Webserver webserver(FLAGS_webserver_port);
+  ASSERT_TRUE(webserver.Start().ok());
+  stringstream contents;
+  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port,
+          "/dont-exist<script>alert(42);</script>", &contents, 404).ok());
+  ASSERT_EQ(contents.str().find("<script>alert(42);</script>"), string::npos);
+  ASSERT_TRUE(contents.str().find("dont-exist&lt;script&gt;alert(42);&lt;/script&gt;") !=
+      string::npos);
 }
 
 TEST(Webserver, StartWithPasswordFileTest) {
