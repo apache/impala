@@ -17,6 +17,7 @@ package com.cloudera.impala.analysis;
 import java.lang.Math;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Set;
 
 import com.cloudera.impala.catalog.Column;
@@ -235,8 +236,29 @@ public abstract class QueryStmt extends StatementBase {
    * Substitute exprs of the form "<number>"  with the corresponding
    * expressions.
    */
-  protected abstract void substituteOrdinals(List<Expr> exprs, String errorPrefix,
-      Analyzer analyzer) throws AnalysisException;
+  protected void substituteOrdinals(List<Expr> exprs, String errorPrefix,
+      Analyzer analyzer) throws AnalysisException {
+    // Substitute ordinals.
+    ListIterator<Expr> i = exprs.listIterator();
+    while (i.hasNext()) {
+      Expr expr = i.next();
+      if (!(expr instanceof NumericLiteral)) continue;
+      expr.analyze(analyzer);
+      if (!expr.getType().isIntegerType()) continue;
+      long pos = ((NumericLiteral) expr).getLongValue();
+      if (pos < 1) {
+        throw new AnalysisException(
+            errorPrefix + ": ordinal must be >= 1: " + expr.toSql());
+      }
+      if (pos > resultExprs_.size()) {
+        throw new AnalysisException(
+            errorPrefix + ": ordinal exceeds number of items in select list: "
+            + expr.toSql());
+      }
+      // Create copy to protect against accidentally shared state.
+      i.set(resultExprs_.get((int) pos - 1).clone());
+    }
+  }
 
   /**
    * UnionStmt and SelectStmt have different implementations.

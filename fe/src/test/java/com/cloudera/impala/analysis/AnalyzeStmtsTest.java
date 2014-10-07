@@ -248,11 +248,16 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
 
   @Test
   public void TestOrdinals() throws AnalysisException {
-    // can't group or order on *
     AnalysisError("select * from functional.alltypes group by 1",
         "cannot combine '*' in select list with GROUP BY");
-    AnalysisError("select * from functional.alltypes order by 1",
-        "ORDER BY: ordinal refers to '*' in select list");
+    AnalysisError("select * from functional.alltypes order by 14",
+        "ORDER BY: ordinal exceeds number of items in select list: 14");
+    AnalyzesOk("select t.* from functional.alltypes t order by 1");
+    AnalyzesOk("select t2.* from functional.alltypes t1, " +
+        "functional.alltypes t2 order by 1");
+    AnalyzesOk("select * from (select max(id) from functional.testtbl) t1 order by 1");
+    AnalysisError("select * from (select max(id) from functional.testtbl) t1 order by 2",
+        "ORDER BY: ordinal exceeds number of items in select list: 2");
   }
 
   @Test
@@ -1200,7 +1205,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select zip, count(*) from functional.testtbl group by 1");
     AnalyzesOk("select count(*), zip from functional.testtbl group by 2");
     AnalysisError("select zip, count(*) from functional.testtbl group by 3",
-        "GROUP BY: ordinal exceeds number of items in select list");
+        "GROUP BY: ordinal exceeds number of items in select list: 3");
     AnalysisError("select * from functional.alltypes group by 1",
         "cannot combine '*' in select list with GROUP BY");
     // picks up select item alias
@@ -1260,10 +1265,8 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select zip, id from functional.testtbl order by 0",
         "ORDER BY: ordinal must be >= 1");
     AnalysisError("select zip, id from functional.testtbl order by 3",
-        "ORDER BY: ordinal exceeds number of items in select list");
-    // can't order by '*'
-    AnalysisError("select * from functional.alltypes order by 1",
-        "ORDER BY: ordinal refers to '*' in select list");
+        "ORDER BY: ordinal exceeds number of items in select list: 3");
+    AnalyzesOk("select * from functional.alltypes order by 1");
     // picks up select item alias
     AnalyzesOk("select zip z, id C, id D from functional.testtbl order by z, C, d");
 

@@ -16,7 +16,6 @@ package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -705,41 +704,6 @@ public class SelectStmt extends QueryStmt {
       sortInfo_.substituteOrderingExprs(analyticInfo_.getSmap(), analyzer);
       LOG.trace("post-analytic orderingExprs: " +
           Expr.debugString(sortInfo_.getOrderingExprs()));
-    }
-  }
-
-
-  /**
-   * Substitute exprs of the form "<number>"  with the corresponding
-   * expressions from select list
-   */
-  @Override
-  protected void substituteOrdinals(List<Expr> exprs, String errorPrefix,
-      Analyzer analyzer) throws AnalysisException {
-    // substitute ordinals
-    ListIterator<Expr> i = exprs.listIterator();
-    while (i.hasNext()) {
-      Expr expr = i.next();
-      if (!(expr instanceof NumericLiteral)) continue;
-      expr.analyze(analyzer);
-      if (!expr.getType().isIntegerType()) continue;
-      long pos = ((NumericLiteral) expr).getLongValue();
-      if (pos < 1) {
-        throw new AnalysisException(
-            errorPrefix + ": ordinal must be >= 1: " + expr.toSql());
-      }
-      if (pos > selectList_.getItems().size()) {
-        throw new AnalysisException(
-            errorPrefix + ": ordinal exceeds number of items in select list: "
-            + expr.toSql());
-      }
-      if (selectList_.getItems().get((int) pos - 1).isStar()) {
-        throw new AnalysisException(
-            errorPrefix + ": ordinal refers to '*' in select list: "
-            + expr.toSql());
-      }
-      // create copy to protect against accidentally shared state
-      i.set(selectList_.getItems().get((int)pos - 1).getExpr().clone());
     }
   }
 
