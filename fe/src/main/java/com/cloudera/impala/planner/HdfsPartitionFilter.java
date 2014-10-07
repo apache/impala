@@ -115,7 +115,7 @@ public class HdfsPartitionFilter {
           lhsSlotRefs_.get(i), partition.getPartitionValues().get(refdKeys_.get(i)));
     }
 
-    Expr literalPredicate = predicate_.substitute(sMap, analyzer);
+    Expr literalPredicate = predicate_.substitute(sMap, analyzer, false);
     LOG.trace("buildPartitionPredicate: " + literalPredicate.toSql() + " " +
         literalPredicate.debugString());
     Preconditions.checkState(literalPredicate.isConstant());

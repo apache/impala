@@ -200,7 +200,7 @@ public class StmtRewriter {
       smap.put(conjunct, boolLiteral);
       exprsWithSubqueries.add(conjunct);
     }
-    stmt.whereClause_ = stmt.whereClause_.substitute(smap, analyzer);
+    stmt.whereClause_ = stmt.whereClause_.substitute(smap, analyzer, false);
 
     boolean hasNewVisibleTuple = false;
     // Recursively rewrite all the exprs that contain subqueries and merge them
@@ -245,7 +245,7 @@ public class StmtRewriter {
     newSubquery.analyze(analyzer);
     ExprSubstitutionMap smap = new ExprSubstitutionMap();
     smap.put(subquery, newSubquery);
-    return expr.substitute(smap, analyzer);
+    return expr.substitute(smap, analyzer, false);
   }
 
   /**
@@ -388,7 +388,7 @@ public class StmtRewriter {
       rhsExpr.analyze(analyzer);
       smap.put(lhsExpr, rhsExpr);
     }
-    onClausePredicate = onClausePredicate.substitute(smap, analyzer);
+    onClausePredicate = onClausePredicate.substitute(smap, analyzer, false);
 
     // Check for references to ancestor query blocks (cycles in the dependency
     // graph of query blocks are not supported).
@@ -843,6 +843,6 @@ public class StmtRewriter {
       }
     }
     smap.put(subquery, subquerySubstitute);
-    return exprWithSubquery.substitute(smap, analyzer);
+    return exprWithSubquery.substitute(smap, analyzer, false);
   }
 }

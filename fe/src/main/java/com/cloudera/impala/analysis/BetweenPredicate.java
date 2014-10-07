@@ -134,7 +134,8 @@ public class BetweenPredicate extends Predicate {
       throws AnalysisException {
     BetweenPredicate clone = (BetweenPredicate) super.substituteImpl(smap, analyzer);
     Preconditions.checkNotNull(clone);
-    clone.originalChildren_ = Expr.substituteList(originalChildren_, smap, analyzer);
+    clone.originalChildren_ =
+        Expr.substituteList(originalChildren_, smap, analyzer, false);
     return clone;
   }
 

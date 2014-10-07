@@ -269,7 +269,7 @@ public class SelectStmt extends QueryStmt {
       if (analyzer.evalByJoin(e)) unassignedJoinConjuncts.add(e);
     }
     List<Expr> baseTblJoinConjuncts =
-        Expr.substituteList(unassignedJoinConjuncts, baseTblSmap_, analyzer);
+        Expr.substituteList(unassignedJoinConjuncts, baseTblSmap_, analyzer, false);
     materializeSlots(analyzer, baseTblJoinConjuncts);
 
     if (evaluateOrderBy_) {
@@ -330,7 +330,8 @@ public class SelectStmt extends QueryStmt {
             ExprSubstitutionMap.combine(baseTblSmap_, inlineViewRef.getBaseTblSmap());
       }
     }
-    baseTblResultExprs_ = Expr.trySubstituteList(resultExprs_, baseTblSmap_, analyzer);
+    baseTblResultExprs_ =
+        Expr.trySubstituteList(resultExprs_, baseTblSmap_, analyzer, false);
     LOG.trace("baseTblSmap_: " + baseTblSmap_.debugString());
     LOG.trace("resultExprs: " + Expr.debugString(resultExprs_));
     LOG.trace("baseTblResultExprs: " + Expr.debugString(baseTblResultExprs_));
@@ -455,7 +456,7 @@ public class SelectStmt extends QueryStmt {
             "' in GROUP BY clause is ambiguous");
       }
       groupingExprsCopy =
-          Expr.trySubstituteList(groupingExprsCopy, aliasSmap_, analyzer);
+          Expr.trySubstituteList(groupingExprsCopy, aliasSmap_, analyzer, false);
       for (int i = 0; i < groupingExprsCopy.size(); ++i) {
         groupingExprsCopy.get(i).analyze(analyzer);
         if (groupingExprsCopy.get(i).contains(Expr.isAggregatePredicate())) {
@@ -479,7 +480,7 @@ public class SelectStmt extends QueryStmt {
         throw new AnalysisException("Subqueries are not supported in the HAVING clause.");
       }
       // substitute aliases in place (ordinals not allowed in having clause)
-      havingPred_ = havingClause_.substitute(aliasSmap_, analyzer);
+      havingPred_ = havingClause_.substitute(aliasSmap_, analyzer, false);
       havingPred_.checkReturnsBool("HAVING clause", true);
       // can't contain analytic exprs
       Expr analyticExpr = havingPred_.findFirstOf(AnalyticExpr.class);
@@ -520,7 +521,7 @@ public class SelectStmt extends QueryStmt {
         ndvSmap.put(aggExpr, ndvFnCall);
       }
       // Replace all count(distinct <expr>) with NDV(<expr>).
-      List<Expr> substAggExprs = Expr.substituteList(aggExprs, ndvSmap, analyzer);
+      List<Expr> substAggExprs = Expr.substituteList(aggExprs, ndvSmap, analyzer, false);
       aggExprs.clear();
       for (Expr aggExpr: substAggExprs) {
         Preconditions.checkState(aggExpr instanceof FunctionCallExpr);
@@ -540,7 +541,7 @@ public class SelectStmt extends QueryStmt {
     // ii) Other DISTINCT aggregates are present.
     ExprSubstitutionMap countAllMap = createCountAllMap(aggExprs, analyzer);
     countAllMap = ExprSubstitutionMap.compose(ndvSmap, countAllMap, analyzer);
-    List<Expr> substitutedAggs = Expr.substituteList(aggExprs, countAllMap, analyzer);
+    List<Expr> substitutedAggs = Expr.substituteList(aggExprs, countAllMap, analyzer, false);
     aggExprs.clear();
     TreeNode.collect(substitutedAggs, Expr.isAggregatePredicate(), aggExprs);
     try {
@@ -564,14 +565,14 @@ public class SelectStmt extends QueryStmt {
     // to reanalyze the exprs at this point.
     LOG.trace("desctbl: " + analyzer.getDescTbl().debugString());
     LOG.trace("resultexprs: " + Expr.debugString(resultExprs_));
-    resultExprs_ = Expr.substituteList(resultExprs_, combinedSmap, analyzer);
+    resultExprs_ = Expr.substituteList(resultExprs_, combinedSmap, analyzer, false);
     LOG.trace("post-agg selectListExprs: " + Expr.debugString(resultExprs_));
     if (havingPred_ != null) {
       // Make sure the predicate in the HAVING clause does not contain a
       // subquery.
       Preconditions.checkState(!havingPred_.contains(
           Predicates.instanceOf(Subquery.class)));
-      havingPred_ = havingPred_.substitute(combinedSmap, analyzer);
+      havingPred_ = havingPred_.substitute(combinedSmap, analyzer, false);
       analyzer.registerConjuncts(havingPred_, true);
       LOG.debug("post-agg havingPred: " + havingPred_.debugString());
     }
@@ -698,7 +699,7 @@ public class SelectStmt extends QueryStmt {
 
     // change select list and ordering exprs to point to analytic output. We need
     // to reanalyze the exprs at this point.
-    resultExprs_ = Expr.substituteList(resultExprs_, analyticInfo_.getSmap(), analyzer);
+    resultExprs_ = Expr.substituteList(resultExprs_, analyticInfo_.getSmap(), analyzer, false);
     LOG.trace("post-analytic selectListExprs: " + Expr.debugString(resultExprs_));
     if (sortInfo_ != null) {
       sortInfo_.substituteOrderingExprs(analyticInfo_.getSmap(), analyzer);

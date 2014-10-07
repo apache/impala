@@ -375,7 +375,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       castLiteral.explicitlyCastToFloat(targetType);
       smap.put(l, castLiteral);
     }
-    return child.substitute(smap, analyzer);
+    return child.substitute(smap, analyzer, false);
   }
 
   /**
@@ -615,9 +615,9 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       List<Expr> i1, List<Expr> i2) {
     i1.clear();
     i2.clear();
-    List<Expr> s1List = Expr.substituteList(l1, smap, analyzer);
+    List<Expr> s1List = Expr.substituteList(l1, smap, analyzer, false);
     Preconditions.checkState(s1List.size() == l1.size());
-    List<Expr> s2List = Expr.substituteList(l2, smap, analyzer);
+    List<Expr> s2List = Expr.substituteList(l2, smap, analyzer, false);
     Preconditions.checkState(s2List.size() == l2.size());
     for (int i = 0; i < s1List.size(); ++i) {
       Expr s1 = s1List.get(i);
@@ -670,14 +670,19 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * this tree, such that the returned result has minimal implicit casts and types.
    * Throws if analyzing the post-substitution expr tree failed.
    * If smap is null, this function is equivalent to clone().
+   * If preserveRootType is true, the resulting expr tree will be cast if necessary to
+   * the type of 'this'.
+   * TODO: set preserveRootType to true in more places?
    */
-  public Expr trySubstitute(ExprSubstitutionMap smap, Analyzer analyzer)
+  public Expr trySubstitute(ExprSubstitutionMap smap, Analyzer analyzer,
+      boolean preserveRootType)
       throws AnalysisException {
     Expr result = clone();
     // Return clone to avoid removing casts.
     if (smap == null) return result;
     result = result.substituteImpl(smap, analyzer);
     result.analyze(analyzer);
+    if (preserveRootType) result = result.castTo(type_);
     return result;
   }
 
@@ -687,30 +692,33 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * this tree, such that the returned result has minimal implicit casts and types.
    * Expects the analysis of the post-substitution expr to succeed.
    * If smap is null, this function is equivalent to clone().
+   * If preserveRootType is true, the resulting expr tree will be cast if necessary to
+   * the type of 'this'.
    */
-  public Expr substitute(ExprSubstitutionMap smap, Analyzer analyzer) {
+  public Expr substitute(ExprSubstitutionMap smap, Analyzer analyzer,
+      boolean preserveRootType) {
     try {
-      return trySubstitute(smap, analyzer);
+      return trySubstitute(smap, analyzer, preserveRootType);
     } catch (Exception e) {
       throw new IllegalStateException("Failed analysis after expr substitution.", e);
     }
   }
 
   public static ArrayList<Expr> trySubstituteList(Iterable<? extends Expr> exprs,
-      ExprSubstitutionMap smap, Analyzer analyzer)
+      ExprSubstitutionMap smap, Analyzer analyzer, boolean preserveRootTypes)
           throws AnalysisException {
     if (exprs == null) return null;
     ArrayList<Expr> result = new ArrayList<Expr>();
     for (Expr e: exprs) {
-      result.add(e.trySubstitute(smap, analyzer));
+      result.add(e.trySubstitute(smap, analyzer, preserveRootTypes));
     }
     return result;
   }
 
   public static ArrayList<Expr> substituteList(Iterable<? extends Expr> exprs,
-      ExprSubstitutionMap smap, Analyzer analyzer) {
+      ExprSubstitutionMap smap, Analyzer analyzer, boolean preserveRootTypes) {
     try {
-      return trySubstituteList(exprs, smap, analyzer);
+      return trySubstituteList(exprs, smap, analyzer, preserveRootTypes);
     } catch (Exception e) {
       throw new IllegalStateException("Failed analysis after expr substitution.", e);
     }

@@ -157,11 +157,12 @@ public class HashJoinNode extends PlanNode {
 
     ExprSubstitutionMap combinedChildSmap = getCombinedChildSmap();
     otherJoinConjuncts_ =
-        Expr.substituteList(otherJoinConjuncts_, combinedChildSmap, analyzer);
+        Expr.substituteList(otherJoinConjuncts_, combinedChildSmap, analyzer, false);
 
     List<BinaryPredicate> newEqJoinConjuncts = Lists.newArrayList();
     for (Expr c: eqJoinConjuncts_) {
-      BinaryPredicate eqPred = (BinaryPredicate) c.substitute(combinedChildSmap, analyzer);
+      BinaryPredicate eqPred =
+          (BinaryPredicate) c.substitute(combinedChildSmap, analyzer, false);
       Type t0 = eqPred.getChild(0).getType();
       Type t1 = eqPred.getChild(1).getType();
       if (!t0.matchesType(t1)) {

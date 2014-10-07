@@ -175,7 +175,7 @@ public class Planner {
       rootFragment.setOutputExprs(analysisResult.getInsertStmt().getResultExprs());
     } else {
       List<Expr> resultExprs = Expr.substituteList(queryStmt.getBaseTblResultExprs(),
-          rootFragment.getPlanRoot().getOutputSmap(), analyzer);
+          rootFragment.getPlanRoot().getOutputSmap(), analyzer, false);
       rootFragment.setOutputExprs(resultExprs);
     }
     LOG.debug("desctbl: " + analyzer.getDescTbl().debugString());
@@ -883,7 +883,7 @@ public class Planner {
         List<Expr> partitionExprs = node.getAggInfo().getPartitionExprs();
         if (partitionExprs == null) partitionExprs = groupingExprs;
         partitionExprs = Expr.substituteList(
-            partitionExprs, node.getAggInfo().getIntermediateSmap(), analyzer);
+            partitionExprs, node.getAggInfo().getIntermediateSmap(), analyzer, false);
         parentPartition =
             new DataPartition(TPartitionType.HASH_PARTITIONED, partitionExprs);
       } else {
@@ -930,7 +930,7 @@ public class Planner {
       // parent. The grouping exprs reference the output tuple of the 1st phase, but the
       // partitioning happens on the intermediate tuple of the 1st phase.
       partitionExprs = Expr.substituteList(groupingExprs,
-          firstPhaseAggInfo.getOutputToIntermediateSmap(), analyzer);
+          firstPhaseAggInfo.getOutputToIntermediateSmap(), analyzer, false);
     } else {
       // We need to do
       // - child fragment:
@@ -941,7 +941,7 @@ public class Planner {
       // - merge fragment 2, unpartitioned:
       //   * merge agg of phase 2
       partitionExprs = Expr.substituteList(firstPhaseAggInfo.getGroupingExprs(),
-          firstPhaseAggInfo.getIntermediateSmap(), analyzer);
+          firstPhaseAggInfo.getIntermediateSmap(), analyzer, false);
     }
     DataPartition mergePartition =
         new DataPartition(TPartitionType.HASH_PARTITIONED, partitionExprs);
@@ -1653,7 +1653,7 @@ public class Planner {
       // the resolved result exprs, in order to avoid skipping scopes (and ignoring
       // limit clauses on the way)
       List<Expr> viewPredicates =
-          Expr.substituteList(preds, inlineViewRef.getSmap(), analyzer);
+          Expr.substituteList(preds, inlineViewRef.getSmap(), analyzer, false);
 
       // "migrate" conjuncts_ by marking them as assigned and re-registering them with
       // new ids.
@@ -1666,7 +1666,7 @@ public class Planner {
     // mark (fully resolve) slots referenced by remaining unassigned conjuncts_ as
     // materialized
     List<Expr> substUnassigned =
-        Expr.substituteList(unassigned, inlineViewRef.getBaseTblSmap(), analyzer);
+        Expr.substituteList(unassigned, inlineViewRef.getBaseTblSmap(), analyzer, false);
     analyzer.materializeSlots(substUnassigned);
 
     // Turn a constant select into a UnionNode that materializes the exprs.
@@ -2026,7 +2026,8 @@ public class Planner {
     List<Expr> conjuncts =
         analyzer.getUnassignedConjuncts(unionStmt.getTupleId().asList(), false);
     for (UnionOperand op: unionStmt.getOperands()) {
-      List<Expr> opConjuncts = Expr.substituteList(conjuncts, op.getSmap(), analyzer);
+      List<Expr> opConjuncts =
+          Expr.substituteList(conjuncts, op.getSmap(), analyzer, false);
       op.getAnalyzer().registerConjuncts(opConjuncts);
       // Some of the opConjuncts have become constant and eval'd to false, or an ancestor
       // block is already guaranteed to return empty results.

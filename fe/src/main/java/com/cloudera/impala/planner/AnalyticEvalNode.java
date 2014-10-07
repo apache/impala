@@ -127,9 +127,9 @@ public class AnalyticEvalNode extends PlanNode {
 
     // point fn calls, partition and ordering exprs at our input
     ExprSubstitutionMap childSmap = getCombinedChildSmap();
-    analyticFnCalls_ = Expr.substituteList(analyticFnCalls_, childSmap, analyzer);
+    analyticFnCalls_ = Expr.substituteList(analyticFnCalls_, childSmap, analyzer, false);
     substitutedPartitionExprs_ = Expr.substituteList(partitionExprs_, childSmap,
-        analyzer);
+        analyzer, false);
     orderByElements_ = OrderByElement.substitute(orderByElements_, childSmap, analyzer);
     LOG.trace("evalnode: " + debugString());
   }

@@ -425,7 +425,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     ExprSubstitutionMap combinedChildSmap = getCombinedChildSmap();
     outputSmap_ =
         ExprSubstitutionMap.compose(outputSmap_, combinedChildSmap, analyzer);
-    conjuncts_ = Expr.substituteList(conjuncts_, outputSmap_, analyzer);
+    conjuncts_ = Expr.substituteList(conjuncts_, outputSmap_, analyzer, false);
   }
 
   /**

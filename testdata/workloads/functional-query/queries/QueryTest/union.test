@@ -966,3 +966,45 @@ bigint, bigint
 1000,2000
 7300,328500
 ====
+---- QUERY
+# IMPALA-1340 regression test
+select cast(1 as bigint)
+union all select t1.tinyint_col from alltypestiny t1
+inner join alltypestiny t2 on t2.string_col = t1.string_col
+---- TYPES
+bigint
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0
+0
+0
+0
+1
+1
+1
+1
+0
+0
+0
+0
+1
+1
+1
+1
+0
+0
+0
+0
+1
+1
+1
+1
+0
+0
+0
+0
+1
+1
+1
+1
+1
+====

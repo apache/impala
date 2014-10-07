@@ -143,7 +143,7 @@ public abstract class QueryStmt extends StatementBase {
       throw new AnalysisException("Column '" + ambiguousAlias.toSql() +
           "' in ORDER BY clause is ambiguous");
     }
-    orderingExprs = Expr.trySubstituteList(orderingExprs, aliasSmap_, analyzer);
+    orderingExprs = Expr.trySubstituteList(orderingExprs, aliasSmap_, analyzer, false);
 
     if (!analyzer.isRootAnalyzer() && hasOffset() && !hasLimit()) {
       throw new AnalysisException("Order-by with offset without limit not supported" +
@@ -215,7 +215,7 @@ public abstract class QueryStmt extends StatementBase {
       sortTupleExprs.add(origSlotRef);
     }
 
-    resultExprs_ = Expr.substituteList(resultExprs_, substOrderBy, analyzer);
+    resultExprs_ = Expr.substituteList(resultExprs_, substOrderBy, analyzer, false);
     sortInfo_.substituteOrderingExprs(substOrderBy, analyzer);
     sortInfo_.setMaterializedTupleInfo(sortTupleDesc, sortTupleExprs);
   }

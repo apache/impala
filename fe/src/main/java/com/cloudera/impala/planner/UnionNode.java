@@ -173,7 +173,7 @@ public class UnionNode extends PlanNode {
         if (slots.get(j).isMaterialized()) newExprList.add(exprList.get(j));
       }
       materializedResultExprLists_.add(
-          Expr.substituteList(newExprList, getChild(i).getOutputSmap(), analyzer));
+          Expr.substituteList(newExprList, getChild(i).getOutputSmap(), analyzer, true));
     }
     Preconditions.checkState(
         materializedResultExprLists_.size() == getChildren().size());

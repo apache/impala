@@ -65,7 +65,7 @@ public final class ExprSubstitutionMap {
     ExprSubstitutionMap result = new ExprSubstitutionMap();
     // f's substitution targets need to be substituted via g
     result.lhs_ = Expr.cloneList(f.lhs_);
-    result.rhs_ = Expr.substituteList(f.rhs_, g, analyzer);
+    result.rhs_ = Expr.substituteList(f.rhs_, g, analyzer, false);
     // substitution maps are cumulative: the combined map contains all
     // substitutions from f and g.
     for (int i = 0; i < g.lhs_.size(); i++) {
@@ -106,7 +106,7 @@ public final class ExprSubstitutionMap {
 
   public void substituteLhs(ExprSubstitutionMap lhsSmap, Analyzer analyzer)
       throws InternalException {
-    lhs_ = Expr.substituteList(lhs_, lhsSmap, analyzer);
+    lhs_ = Expr.substituteList(lhs_, lhsSmap, analyzer, false);
   }
 
   public ArrayList<Expr> getLhs() { return lhs_; }

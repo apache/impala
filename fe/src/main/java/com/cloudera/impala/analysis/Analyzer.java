@@ -1125,7 +1125,7 @@ public class Analyzer {
                 new SlotRef(globalState_.descTbl.getSlotDesc(destSids.get(i))));
           }
           try {
-            p = srcConjunct.trySubstitute(smap, this);
+            p = srcConjunct.trySubstitute(smap, this, false);
           } catch (ImpalaException exc) {
             // not an executable predicate; ignore
             continue;
@@ -1348,7 +1348,7 @@ public class Analyzer {
       for (SlotRef slotRef: slotRefs) {
         nullSmap.put(slotRef.clone(), nullLiteral.clone());
       }
-      nullTuplePred = p.substitute(nullSmap, this);
+      nullTuplePred = p.substitute(nullSmap, this, false);
     } catch (Exception e) {
       Preconditions.checkState(false, "Failed to analyze generated predicate: "
           + nullTuplePred.toSql() + "." + e.getMessage());
@@ -1495,9 +1495,11 @@ public class Analyzer {
    * equivalence-class representative, and then duplicate exprs are removed.
    */
   public boolean equivSets(List<Expr> l1, List<Expr> l2) {
-    List<Expr> substL1 = Expr.substituteList(l1, globalState_.equivClassSmap, this);
+    List<Expr> substL1 =
+        Expr.substituteList(l1, globalState_.equivClassSmap, this, false);
     Expr.removeDuplicates(substL1);
-    List<Expr> substL2 = Expr.substituteList(l2, globalState_.equivClassSmap, this);
+    List<Expr> substL2 =
+        Expr.substituteList(l2, globalState_.equivClassSmap, this, false);
     Expr.removeDuplicates(substL2);
     return Expr.equalSets(substL1, substL2);
   }
@@ -1506,8 +1508,8 @@ public class Analyzer {
    * Returns true if e1 and e2 are equivalent expressions.
    */
   public boolean equivExprs(Expr e1, Expr e2) {
-    Expr substE1 = e1.substitute(globalState_.equivClassSmap, this);
-    Expr substE2 = e2.substitute(globalState_.equivClassSmap, this);
+    Expr substE1 = e1.substitute(globalState_.equivClassSmap, this, false);
+    Expr substE2 = e2.substitute(globalState_.equivClassSmap, this, false);
     return substE1.equals(substE2);
   }
 
@@ -1520,7 +1522,7 @@ public class Analyzer {
   public List<Expr> removeRedundantExprs(List<Expr> exprs) {
     List<Expr> result = Lists.newArrayList();
     List<Expr> normalizedExprs =
-        Expr.substituteList(exprs, globalState_.equivClassSmap, this);
+        Expr.substituteList(exprs, globalState_.equivClassSmap, this, false);
     Preconditions.checkState(exprs.size() == normalizedExprs.size());
     List<Expr> uniqueExprs = Lists.newArrayList();
     for (int i = 0; i < normalizedExprs.size(); ++i) {

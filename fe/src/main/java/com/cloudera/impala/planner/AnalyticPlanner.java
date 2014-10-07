@@ -291,7 +291,7 @@ public class AnalyticPlanner {
     }
 
     SortInfo sortInfo = new SortInfo(
-        Expr.substituteList(sortExprs, sortSmap, analyzer_), isAsc, nullsFirst);
+        Expr.substituteList(sortExprs, sortSmap, analyzer_, false), isAsc, nullsFirst);
     LOG.trace("sortinfo exprs: " + Expr.debugString(sortInfo.getOrderingExprs()));
     sortInfo.setMaterializedTupleInfo(sortTupleDesc, sortSlotExprs);
     return sortInfo;
@@ -380,7 +380,7 @@ public class AnalyticPlanner {
       Expr partitionByEq = null;
       if (!windowGroup.partitionByExprs.isEmpty()) {
         partitionByEq = createNullMatchingEquals(
-            Expr.substituteList(windowGroup.partitionByExprs, sortSmap, analyzer_),
+            Expr.substituteList(windowGroup.partitionByExprs, sortSmap, analyzer_, false),
             sortTupleId, bufferedSmap);
         LOG.trace("partitionByEq: " + partitionByEq.debugString());
       }
@@ -436,7 +436,7 @@ public class AnalyticPlanner {
     // compare elements[i]
     Expr lhs = elements.get(i);
     Preconditions.checkState(lhs.isBound(inputTid));
-    Expr rhs = lhs.substitute(bufferedSmap, analyzer_);
+    Expr rhs = lhs.substitute(bufferedSmap, analyzer_, false);
 
     Expr bothNull = new CompoundPredicate(Operator.AND,
         new IsNullPredicate(lhs, false), new IsNullPredicate(rhs, false));

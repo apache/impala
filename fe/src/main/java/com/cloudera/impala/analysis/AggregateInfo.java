@@ -288,12 +288,13 @@ public class AggregateInfo extends AggregateInfoBase {
    */
   public void substitute(ExprSubstitutionMap smap, Analyzer analyzer)
       throws InternalException {
-    groupingExprs_ = Expr.substituteList(groupingExprs_, smap, analyzer);
+    groupingExprs_ = Expr.substituteList(groupingExprs_, smap, analyzer, false);
     LOG.trace("AggInfo: grouping_exprs=" + Expr.debugString(groupingExprs_));
 
     // The smap in this case should not substitute the aggs themselves, only
     // their subexpressions.
-    List<Expr> substitutedAggs = Expr.substituteList(aggregateExprs_, smap, analyzer);
+    List<Expr> substitutedAggs =
+        Expr.substituteList(aggregateExprs_, smap, analyzer, false);
     aggregateExprs_.clear();
     for (Expr substitutedAgg: substitutedAggs) {
       aggregateExprs_.add((FunctionCallExpr) substitutedAgg);
@@ -470,7 +471,7 @@ public class AggregateInfo extends AggregateInfoBase {
     }
 
     ArrayList<Expr> substGroupingExprs =
-        Expr.substituteList(origGroupingExprs, intermediateTupleSmap_, analyzer);
+        Expr.substituteList(origGroupingExprs, intermediateTupleSmap_, analyzer, false);
     secondPhaseDistinctAggInfo_ =
         new AggregateInfo(substGroupingExprs, secondPhaseAggExprs, AggPhase.SECOND);
     secondPhaseDistinctAggInfo_.createTupleDescs(analyzer);
@@ -588,7 +589,7 @@ public class AggregateInfo extends AggregateInfoBase {
       exprs.add(aggregateExprs_.get(i));
       materializedSlots_.add(i);
     }
-    List<Expr> resolvedExprs = Expr.substituteList(exprs, smap, analyzer);
+    List<Expr> resolvedExprs = Expr.substituteList(exprs, smap, analyzer, false);
     analyzer.materializeSlots(resolvedExprs);
 
     if (isDistinctAgg()) {

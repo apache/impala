@@ -106,7 +106,7 @@ public class SortNode extends PlanNode {
       outputSmap_.put(slotExprs.get(i), new SlotRef(sortTupleSlots.get(i)));
     }
     ExprSubstitutionMap childSmap = getCombinedChildSmap();
-    resolvedTupleExprs_ = Expr.substituteList(resolvedTupleExprs_, childSmap, analyzer);
+    resolvedTupleExprs_ = Expr.substituteList(resolvedTupleExprs_, childSmap, analyzer, false);
 
     // Remap the ordering exprs to the tuple materialized by this sort node. The mapping
     // is a composition of the childSmap and the outputSmap_ because the child node may

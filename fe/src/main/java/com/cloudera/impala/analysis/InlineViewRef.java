@@ -280,7 +280,7 @@ public class InlineViewRef extends TableRef {
     // Replace all SlotRefs in expr with NullLiterals, and wrap the result
     // with an IS NOT NULL predicate.
     Expr isNotNullLiteralPred =
-        new IsNullPredicate(expr.substitute(nullSMap, analyzer), true);
+        new IsNullPredicate(expr.substitute(nullSMap, analyzer, false), true);
     Preconditions.checkState(isNotNullLiteralPred.isConstant());
     // analyze to insert casts, etc.
     isNotNullLiteralPred.analyze(analyzer);

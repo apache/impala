@@ -89,12 +89,12 @@ public class SortInfo {
       }
     }
     List<Expr> substMaterializedExprs =
-        Expr.substituteList(materializedExprs, smap, analyzer);
+        Expr.substituteList(materializedExprs, smap, analyzer, false);
     analyzer.materializeSlots(substMaterializedExprs);
   }
 
   public void substituteOrderingExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
-    orderingExprs_ = Expr.substituteList(orderingExprs_, smap, analyzer);
+    orderingExprs_ = Expr.substituteList(orderingExprs_, smap, analyzer, false);
   }
 
   /**
