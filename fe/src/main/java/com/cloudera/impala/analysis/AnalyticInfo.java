@@ -188,4 +188,6 @@ public class AnalyticInfo extends AggregateInfoBase {
         .toString());
     return out.toString();
   }
+
+  protected String tupleDebugName() { return "analytic-tuple"; }
 }

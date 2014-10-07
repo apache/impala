@@ -185,4 +185,6 @@ public abstract class AggregateInfoBase {
         .toString());
     return out.toString();
   }
+
+  protected abstract String tupleDebugName();
 }
