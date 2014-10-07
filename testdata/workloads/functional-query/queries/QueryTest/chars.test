@@ -1,8 +1,7 @@
 ====
 ---- QUERY
-# TODO: string literals should start as CHAR(N) and analysis should promote as necessary
-# TODO: Test min/max aggregates on CHAR(N)
-# TODO: Test hash joins on varchar to char
+# TODO: string literals should start as CHAR(N) and analysis
+# should promote as necessary
 insert into test_char_tmp select cast("hello" as char(5))
 ====
 ---- QUERY
@@ -42,7 +41,7 @@ char, char
 'NULL','hel  '
 ====
 ---- QUERY
-select * from test_char_tmp as A, test_char_tmp as B 
+select * from test_char_tmp as A, test_char_tmp as B
 where A.c = B.c AND A.c != 'hello'
 ---- TYPES
 char, char
@@ -168,7 +167,7 @@ char, bigint
 '6a   ',2
 ====
 ---- QUERY
-select A.cs from functional.chars_tiny as A, functional.chars_tiny as B where 
+select A.cs from functional.chars_tiny as A, functional.chars_tiny as B where
 cast(A.cs as char(1)) = cast(B.cl as char(1)) order by A.cs
 ---- TYPES
 char
@@ -208,7 +207,7 @@ char, char, string
 'a    ','b                                                                                                                                           ','c'
 ====
 ---- QUERY
-insert into char_parts partition (csp=cast('foo' as char(5)), 
+insert into char_parts partition (csp=cast('foo' as char(5)),
 clp=cast('01234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789xxxxxxx' as char(140)),
 vcp=cast('myvar' as varchar(32))) select cast('val' as varchar(32));
 ====
@@ -241,7 +240,7 @@ string
 ====
 ---- QUERY
 # Regression test for IMPALA-1322
-select count(*) from functional.chars_tiny as A, functional.chars_tiny as B 
+select count(*) from functional.chars_tiny as A, functional.chars_tiny as B
 where cast(A.cs as CHAR(1)) = cast(B.vc as CHAR(1));
 ---- TYPES
 bigint
@@ -387,7 +386,7 @@ char
 ====
 ---- QUERY
 # Regression test for IMPALA-1344
-select cs, LAST_VALUE(cs) OVER (ORDER BY cs rows between unbounded preceding and 
+select cs, LAST_VALUE(cs) OVER (ORDER BY cs rows between unbounded preceding and
 current row) FROM functional.chars_tiny;
 ---- TYPES
 char, string

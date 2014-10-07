@@ -55,8 +55,6 @@ class TestExprLimits(ImpalaTestSuite):
     self.__exec_query(case_query)
 
   def test_expr_depth_limit(self, vector):
-    pytest.xfail("TODO: Renable after expr refactoring goes in")
-
     # Compound predicates
     and_query = "select " + self.__gen_deep_infix_expr("true", " and false")
     self.__exec_query(and_query)
