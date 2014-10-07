@@ -165,8 +165,8 @@ void ImpaladMetrics::CreateMetrics(Metrics* m) {
       ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES, 0L);
   IO_MGR_NUM_BUFFERS = m->CreateAndRegisterPrimitiveMetric(
       ImpaladMetricKeys::IO_MGR_NUM_BUFFERS, 0L);
-  IO_MGR_TOTAL_BYTES = m->CreateAndRegisterPrimitiveMetric(
-      ImpaladMetricKeys::IO_MGR_TOTAL_BYTES, 0L);
+  IO_MGR_TOTAL_BYTES = m->RegisterMetric(
+      new Metrics::BytesMetric(ImpaladMetricKeys::IO_MGR_TOTAL_BYTES, 0L));
   IO_MGR_NUM_UNUSED_BUFFERS = m->CreateAndRegisterPrimitiveMetric(
       ImpaladMetricKeys::IO_MGR_NUM_UNUSED_BUFFERS, 0L);
   IO_MGR_BYTES_READ = m->RegisterMetric(
