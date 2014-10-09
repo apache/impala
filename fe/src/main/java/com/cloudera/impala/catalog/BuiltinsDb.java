@@ -824,7 +824,8 @@ public class BuiltinsDb extends Db {
           prefix + FIRST_VALUE_REWRITE_UPDATE_SYMBOL.get(t),
           null,
           t == Type.STRING ? stringValGetValue : null,
-          t == Type.STRING ? stringValSerializeOrFinalize : null));
+          t == Type.STRING ? stringValSerializeOrFinalize : null,
+          false));
 
       db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
           db, "last_value", Lists.newArrayList(t), t, t,

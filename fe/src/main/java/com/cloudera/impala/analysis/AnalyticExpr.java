@@ -482,6 +482,7 @@ public class AnalyticExpr extends Expr {
             window_.getLeftBoundary());
         fnCall_ = new FunctionCallExpr(new FunctionName("first_value_rewrite"),
             new FunctionParams(paramExprs));
+        fnCall_.setIsInternalFnCall(true);
       }
       fnCall_.setIsAnalyticFnCall(true);
       fnCall_.analyzeNoThrow(analyzer);

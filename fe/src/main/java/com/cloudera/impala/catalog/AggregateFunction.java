@@ -120,9 +120,24 @@ public class AggregateFunction extends Function {
   }
 
   public static AggregateFunction createAnalyticBuiltin(Db db, String name,
+      List<Type> argTypes, Type retType, Type intermediateType) {
+    return createAnalyticBuiltin(db, name, argTypes, retType, intermediateType, null,
+        null, null, null, null, true);
+  }
+
+  public static AggregateFunction createAnalyticBuiltin(Db db, String name,
       List<Type> argTypes, Type retType, Type intermediateType,
       String initFnSymbol, String updateFnSymbol, String removeFnSymbol,
       String getValueFnSymbol, String finalizeFnSymbol) {
+    return createAnalyticBuiltin(db, name, argTypes, retType, intermediateType,
+        initFnSymbol, updateFnSymbol, removeFnSymbol, getValueFnSymbol, finalizeFnSymbol,
+        true);
+  }
+
+  public static AggregateFunction createAnalyticBuiltin(Db db, String name,
+      List<Type> argTypes, Type retType, Type intermediateType,
+      String initFnSymbol, String updateFnSymbol, String removeFnSymbol,
+      String getValueFnSymbol, String finalizeFnSymbol, boolean isUserVisible) {
     AggregateFunction fn = new AggregateFunction(new FunctionName(db.getName(), name),
         argTypes, retType, intermediateType, null, updateFnSymbol, initFnSymbol,
         null, null, getValueFnSymbol, removeFnSymbol, finalizeFnSymbol);
@@ -131,20 +146,7 @@ public class AggregateFunction extends Function {
     fn.isAnalyticFn_ = true;
     fn.isAggregateFn_ = false;
     fn.returnsNonNullOnEmpty_ = false;
-    return fn;
-  }
-
-  public static AggregateFunction createAnalyticBuiltin(Db db, String name,
-      List<Type> argTypes, Type retType, Type intermediateType) {
-    AggregateFunction fn = new AggregateFunction(new FunctionName(db.getName(), name),
-        argTypes, retType, intermediateType, null, null, null, null, null, null, null,
-        null);
-    fn.setBinaryType(TFunctionBinaryType.BUILTIN);
-    fn.ignoresDistinct_ = false;
-    fn.isAnalyticFn_ = true;
-    fn.isAggregateFn_ = false;
-    fn.returnsNonNullOnEmpty_ = false;
-    fn.setUserVisible(true);
+    fn.setUserVisible(isUserVisible);
     return fn;
   }
 

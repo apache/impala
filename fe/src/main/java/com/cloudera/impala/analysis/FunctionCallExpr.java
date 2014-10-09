@@ -38,6 +38,7 @@ public class FunctionCallExpr extends Expr {
   private final FunctionName fnName_;
   private final FunctionParams params_;
   private boolean isAnalyticFnCall_ = false;
+  private boolean isInternalFnCall_ = false;
 
   // Indicates whether this is a merge aggregation function that should use the merge
   // instead of the update symbol. This flag also affects the behavior of
@@ -115,6 +116,7 @@ public class FunctionCallExpr extends Expr {
     super(other);
     fnName_ = other.fnName_;
     isAnalyticFnCall_ = other.isAnalyticFnCall_;
+    isInternalFnCall_ = other.isInternalFnCall_;
     isMergeAggFn_ = other.isMergeAggFn_;
     // No need to deep clone the params, its exprs are already in children_.
     params_ = other.params_;
@@ -201,6 +203,7 @@ public class FunctionCallExpr extends Expr {
 
   public FunctionName getFnName() { return fnName_; }
   public void setIsAnalyticFnCall(boolean v) { isAnalyticFnCall_ = v; }
+  public void setIsInternalFnCall(boolean v) { isInternalFnCall_ = v; }
 
   @Override
   protected void toThrift(TExprNode msg) {
@@ -399,7 +402,7 @@ public class FunctionCallExpr extends Expr {
     Function searchDesc = new Function(fnName_, argTypes, Type.INVALID, false);
     fn_ = db.getFunction(searchDesc, Function.CompareMode.IS_SUPERTYPE_OF);
 
-    if (fn_ == null || !fn_.userVisible()) {
+    if (fn_ == null || (!isInternalFnCall_ && !fn_.userVisible())) {
       throw new AnalysisException(getFunctionNotFoundError(argTypes));
     }
 
