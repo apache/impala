@@ -106,6 +106,10 @@ struct TQueryOptions {
   // This field only applies for certain file types and is ignored
   // by all other file types.
   30: optional CatalogObjects.THdfsSeqCompressionMode seq_compression_mode
+
+  // If the number of rows that are processed for a single query is below the
+  // threshold, it will be executed on the coordinator only with codegen disabled
+  31: optional i32 exec_single_node_rows_threshold = 100
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

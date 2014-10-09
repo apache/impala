@@ -161,6 +161,10 @@ enum TImpalaQueryOptions {
   // disastrous query plans. Impala will excercise this option if a query
   // has no plan hints, and at least one table is missing relevant stats.
   DISABLE_UNSAFE_SPILLS
+
+  // If the number of rows that are processed for a single query is below the
+  // threshold, it will be executed on the coordinator only with codegen disabled
+  EXEC_SINGLE_NODE_ROWS_THRESHOLD
 }
 
 // The summary of an insert.

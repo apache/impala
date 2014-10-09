@@ -256,6 +256,7 @@ public class DataSourceScanNode extends ScanNode {
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
+    inputCardinality_ = numRowsEstimate_;
     cardinality_ = numRowsEstimate_;
     cardinality_ *= computeSelectivity();
     cardinality_ = Math.max(0, cardinality_);

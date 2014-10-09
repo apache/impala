@@ -117,7 +117,7 @@ void ChildQuery::SetQueryOptions(const TQueryOptions& parent_options,
     TExecuteStatementReq* exec_stmt_req) {
   // If this DCHECK is hit then handle the missing query option below.
   DCHECK_EQ(_TImpalaQueryOptions_VALUES_TO_NAMES.size(),
-      TImpalaQueryOptions::DISABLE_UNSAFE_SPILLS + 1);
+      TImpalaQueryOptions::EXEC_SINGLE_NODE_ROWS_THRESHOLD + 1);
   SET_QUERY_OPTION(abort_on_default_limit_exceeded, ABORT_ON_DEFAULT_LIMIT_EXCEEDED);
   SET_QUERY_OPTION(abort_on_error, ABORT_ON_ERROR);
   SET_QUERY_OPTION(allow_unsupported_formats, ALLOW_UNSUPPORTED_FORMATS);
@@ -147,6 +147,9 @@ void ChildQuery::SetQueryOptions(const TQueryOptions& parent_options,
   SET_QUERY_OPTION(max_block_mgr_memory, MAX_BLOCK_MGR_MEMORY);
   SET_QUERY_OPTION(appx_count_distinct, APPX_COUNT_DISTINCT);
   SET_QUERY_OPTION(disable_unsafe_spills, DISABLE_UNSAFE_SPILLS);
+  SET_QUERY_OPTION(seq_compression_mode, SEQ_COMPRESSION_MODE);
+  SET_QUERY_OPTION(exec_single_node_rows_threshold,
+      EXEC_SINGLE_NODE_ROWS_THRESHOLD);
 }
 
 void ChildQuery::Cancel() {

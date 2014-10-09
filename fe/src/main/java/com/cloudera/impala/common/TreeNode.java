@@ -15,9 +15,10 @@
 package com.cloudera.impala.common;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Collection;
+import java.util.List;
 
+import com.cloudera.impala.util.Visitor;
 import com.google.common.base.Predicate;
 
 public class TreeNode<NodeType extends TreeNode<NodeType>> {
@@ -184,5 +185,15 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
       if (result != null) return (C) result;
     }
     return null;
+  }
+
+  /**
+   * Visitor pattern accept method
+   */
+  public <C extends TreeNode<NodeType>> void accept(Visitor<C> visitor) {
+    visitor.visit((C) this);
+    for (NodeType p: children_) {
+      p.accept(visitor);
+    }
   }
 }

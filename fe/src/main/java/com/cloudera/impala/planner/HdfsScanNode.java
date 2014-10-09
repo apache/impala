@@ -571,7 +571,6 @@ public class HdfsScanNode extends ScanNode {
   @Override
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
-
     LOG.debug("collecting partitions for table " + tbl_.getName());
     if (tbl_.getPartitions().isEmpty()) {
       cardinality_ = tbl_.getNumRows();
@@ -586,6 +585,8 @@ public class HdfsScanNode extends ScanNode {
         if (p.getNumRows() > 0) {
           cardinality_ = addCardinalities(cardinality_, p.getNumRows());
           hasValidPartitionCardinality = true;
+        } else {
+          ++numPartitionsMissingStats_;
         }
         totalFiles_ += p.getFileDescriptors().size();
         totalBytes_ += p.getSize();
@@ -597,7 +598,7 @@ public class HdfsScanNode extends ScanNode {
         cardinality_ = tbl_.getNumRows();
       }
     }
-
+    inputCardinality_ = cardinality_;
     Preconditions.checkState(cardinality_ >= 0 || cardinality_ == -1,
         "Internal error: invalid scan node cardinality: " + cardinality_);
     if (cardinality_ > 0) {

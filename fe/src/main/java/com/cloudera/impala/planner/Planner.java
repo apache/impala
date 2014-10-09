@@ -65,6 +65,7 @@ import com.cloudera.impala.thrift.TPartitionType;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TTableName;
+import com.cloudera.impala.util.MaxRowsProcessedVisitor;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
@@ -136,8 +137,23 @@ public class Planner {
         queryOptions.isDisable_outermost_topn());
     Preconditions.checkNotNull(singleNodePlan);
 
+    // Determine the maximum number of rows processed of all nodes in the plan tree
+    MaxRowsProcessedVisitor visitor = new MaxRowsProcessedVisitor();
+    singleNodePlan.accept(visitor);
+    long maxRowsProcessed = visitor.get() == -1 ? Long.MAX_VALUE : visitor.get();
+    boolean isSmallQuery = maxRowsProcessed < queryOptions.exec_single_node_rows_threshold;
+
     ArrayList<PlanFragment> fragments = Lists.newArrayList();
-    if (queryOptions.num_nodes == 1) {
+    if (queryOptions.num_nodes == 1 || isSmallQuery) {
+      if(isSmallQuery) {
+        // Disabling codegen for small results
+        queryOptions.setDisable_codegen(true);
+        if (maxRowsProcessed < queryOptions.batch_size ||
+            maxRowsProcessed < 1024 && queryOptions.batch_size == 0) {
+          // Only one scanner thread for small queries
+          queryOptions.setNum_scanner_threads(1);
+        }
+      }
       // single-node execution; we're almost done
       fragments.add(new PlanFragment(
           fragmentIdGenerator_.getNextId(), singleNodePlan, DataPartition.UNPARTITIONED));

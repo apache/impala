@@ -2,12 +2,14 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # General Impala query tests
 #
+import copy
 import logging
 import pytest
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 from tests.util.test_file_parser import QueryTestSectionReader
+from tests.common.test_dimensions import create_exec_option_dimension
 
 class TestQueries(ImpalaTestSuite):
   @classmethod
@@ -16,6 +18,19 @@ class TestQueries(ImpalaTestSuite):
     if cls.exploration_strategy() == 'core':
       cls.TestMatrix.add_constraint(lambda v:\
           v.get_value('table_format').file_format == 'parquet')
+
+    # Manually adding a test dimension here to test the small query opt
+    # in exhaustive.
+    # TODO Cleanup required, allow adding values to dimensions without having to
+    # manually explode them
+    if cls.exploration_strategy() == 'exhaustive':
+      dim = cls.TestMatrix.dimensions["exec_option"]
+      new_value = []
+      for v in dim:
+        new_value.append(TestVector.Value(v.name, copy.copy(v.value)))
+        new_value[-1].value["exec_single_node_rows_threshold"] = 100
+      dim.extend(new_value)
+      cls.TestMatrix.add_dimension(dim)
 
   @classmethod
   def get_workload(cls):

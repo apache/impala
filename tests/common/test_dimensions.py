@@ -106,12 +106,13 @@ ALL_DISABLE_CODEGEN_OPTIONS = [True, False]
 def create_single_exec_option_dimension():
   """Creates an exec_option dimension that will produce a single test vector"""
   return create_exec_option_dimension(cluster_sizes=ALL_NODES_ONLY,
-      disable_codegen_options=[False], batch_sizes=[0])
+                                      disable_codegen_options=[False],
+                                      batch_sizes=[0])
 
 def create_exec_option_dimension(cluster_sizes=ALL_CLUSTER_SIZES,
                                  disable_codegen_options=ALL_DISABLE_CODEGEN_OPTIONS,
                                  batch_sizes=ALL_BATCH_SIZES,
-                                 sync_ddl=None):
+                                 sync_ddl=None, exec_single_node_option=[0]):
   """
   Builds a query exec option test dimension
 
@@ -125,6 +126,7 @@ def create_exec_option_dimension(cluster_sizes=ALL_CLUSTER_SIZES,
   """
   exec_option_dimensions = {
       'abort_on_error': [1],
+      'exec_single_node_rows_threshold': exec_single_node_option,
       'batch_size': batch_sizes,
       'disable_codegen': disable_codegen_options,
       'num_nodes': cluster_sizes}

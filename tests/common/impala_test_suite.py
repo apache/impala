@@ -407,11 +407,13 @@ class ImpalaTestSuite(BaseTestSuite):
     cluster_sizes = ALL_CLUSTER_SIZES
     disable_codegen_options = ALL_DISABLE_CODEGEN_OPTIONS
     batch_sizes = ALL_BATCH_SIZES
+    exec_single_node_option = [0]
     if cls.exploration_strategy() == 'core':
       disable_codegen_options = [False]
       cluster_sizes = ALL_NODES_ONLY
     return create_exec_option_dimension(cluster_sizes, disable_codegen_options,
-                                        batch_sizes)
+                                        batch_sizes,
+                                        exec_single_node_option=exec_single_node_option)
 
   @classmethod
   def exploration_strategy(cls):

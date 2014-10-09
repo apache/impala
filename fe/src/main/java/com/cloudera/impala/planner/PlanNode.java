@@ -563,4 +563,18 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public void computeCosts(TQueryOptions queryOptions) {
     perHostMemCost_ = 0;
   }
+
+  /**
+   * The input cardinality is the sum of output cardinalities of its children.
+   * For scan nodes the input cardinality is the expected number of rows scanned.
+   */
+  public long getInputCardinality() {
+    long sum = 0;
+    for(PlanNode p : children_) {
+      long tmp = p.getCardinality();
+      if (tmp == -1) return -1;
+      sum = addCardinalities(sum, tmp);
+    }
+    return sum;
+  }
 }

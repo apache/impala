@@ -206,6 +206,7 @@ public class HBaseScanNode extends ScanNode {
             Math.max(MAX_HBASE_FETCH_BATCH_SIZE / estimate.second.longValue(), 1);
       }
     }
+    inputCardinality_ = cardinality_;
 
     cardinality_ *= computeSelectivity();
     cardinality_ = Math.max(0, cardinality_);

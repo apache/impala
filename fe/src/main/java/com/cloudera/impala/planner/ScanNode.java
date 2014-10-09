@@ -32,6 +32,12 @@ import com.google.common.collect.Lists;
 abstract public class ScanNode extends PlanNode {
   protected final TupleDescriptor desc_;
 
+  // Total number of rows this node is expected to process
+  protected long inputCardinality_ = -1;
+
+  // Counter indicating if partitions have missing statistics
+  protected int numPartitionsMissingStats_ = 0;
+
   // List of scan-range locations. Populated in init().
   protected List<TScanRangeLocations> scanRanges_;
 
@@ -100,16 +106,25 @@ abstract public class ScanNode extends PlanNode {
    * or column stats relevant to this scan node.
    */
   public boolean isTableMissingStats() {
+    return isTableMissingColumnStats() || isTableMissingTableStats();
+  }
+
+  public boolean isTableMissingTableStats() {
     if (desc_.getTable().getNumRows() == -1) return true;
+    return numPartitionsMissingStats_ > 0;
+  }
+
+  public boolean isTableMissingColumnStats() {
     for (SlotDescriptor slot: desc_.getSlots()) {
       if (!slot.getStats().hasStats()) return true;
     }
     return false;
   }
 
+
   /**
    * Helper function to parse a "host:port" address string into TNetworkAddress
-   * This is called with ipaddress:port when doing scan range assigment.
+   * This is called with ipaddress:port when doing scan range assignment.
    */
   protected static TNetworkAddress addressToTNetworkAddress(String address) {
     TNetworkAddress result = new TNetworkAddress();
@@ -119,4 +134,9 @@ abstract public class ScanNode extends PlanNode {
     return result;
   }
 
+  @Override
+  public long getInputCardinality() {
+    if (getConjuncts().isEmpty() && hasLimit()) return getLimit();
+    return inputCardinality_;
+  }
 }

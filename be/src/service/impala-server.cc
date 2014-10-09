@@ -1046,6 +1046,9 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
             iequals(value, "true") || iequals(value, "1"));
         break;
       }
+      case TImpalaQueryOptions::EXEC_SINGLE_NODE_ROWS_THRESHOLD:
+        query_options->__set_exec_single_node_rows_threshold(atoi(value.c_str()));
+        break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
@@ -1244,6 +1247,9 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
         break;
       case TImpalaQueryOptions::DISABLE_UNSAFE_SPILLS:
         val << query_option.disable_unsafe_spills;
+        break;
+      case TImpalaQueryOptions::EXEC_SINGLE_NODE_ROWS_THRESHOLD:
+        val << query_option.exec_single_node_rows_threshold;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
