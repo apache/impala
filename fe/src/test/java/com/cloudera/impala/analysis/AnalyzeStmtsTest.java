@@ -1683,6 +1683,17 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("with t as (select int_col + 2, !bool_col from functional.alltypes) " +
         "select `int_col + 2`, `NOT bool_col` from t");
 
+    // Test analysis of WITH clause after subquery rewrite does not pollute
+    // global state (IMPALA-1357).
+    AnalyzesOk("select 1 from (with w as (select 1 from functional.alltypes " +
+        "where exists (select 1 from functional.alltypes)) select 1 from w) tt");
+    AnalyzesOk("create table test_with as select 1 from (with w as " +
+        "(select 1 from functional.alltypes where exists " +
+        "(select 1 from functional.alltypes)) select 1 from w) tt");
+    AnalyzesOk("insert into functional.alltypesnopart (id) select 1 from " +
+        "(with w as (select 1 from functional.alltypes where exists " +
+        "(select 1 from functional.alltypes)) select 1 from w) tt");
+
     // Conflicting table aliases in WITH clause.
     AnalysisError("with t1 as (select 1), t1 as (select 2) select * from t1",
         "Duplicate table alias: 't1'");

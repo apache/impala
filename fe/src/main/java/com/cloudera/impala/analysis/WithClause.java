@@ -69,19 +69,11 @@ public class WithClause implements ParseNode {
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    // Create an analyzer for the WITH clause. If this is the top-level WITH
-    // clause or the parent analyzer belongs to a CTAS or an insert stmt,
-    // the new analyzer uses its own global state and is not attached to
-    // the hierarchy of analyzers. Otherwise, it becomes a child of 'analyzer'
-    // to be able to resolve WITH-clause views registered in an ancestor of
-    // 'analyzer' (see IMPALA-1106, IMPALA-1100).
-    Analyzer withClauseAnalyzer = null;
-    if (analyzer.isRootAnalyzer()) {
-      withClauseAnalyzer = new Analyzer(analyzer.getCatalog(), analyzer.getQueryCtx(),
-          analyzer.getAuthzConfig());
-    } else {
-      withClauseAnalyzer = new Analyzer(analyzer);
-    }
+    // Create a new analyzer for the WITH clause with a new global state (IMPALA-1357)
+    // but a child of 'analyzer' so that the global state for 'analyzer' is not polluted
+    // during analysis of the WITH clause. withClauseAnalyzer is a child of 'analyzer' so
+    // that local views registered in parent blocks are visible here.
+    Analyzer withClauseAnalyzer = Analyzer.createWithNewGlobalState(analyzer);
     if (analyzer.isExplain()) withClauseAnalyzer.setIsExplain();
     try {
       for (View view: views_) {

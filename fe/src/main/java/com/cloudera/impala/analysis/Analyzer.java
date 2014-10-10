@@ -317,13 +317,30 @@ public class Analyzer {
    * parentAnalyzer.
    */
   public Analyzer(Analyzer parentAnalyzer) {
+    this(parentAnalyzer, parentAnalyzer.globalState_);
+  }
+
+  /**
+   * Analyzer constructor for nested select block with the specified global state.
+   */
+  private Analyzer(Analyzer parentAnalyzer, GlobalState globalState) {
     ancestors_ = Lists.newArrayList(parentAnalyzer);
     ancestors_.addAll(parentAnalyzer.ancestors_);
-    globalState_ = parentAnalyzer.globalState_;
+    globalState_ = globalState;
     missingTbls_ = parentAnalyzer.missingTbls_;
     user_ = parentAnalyzer.getUser();
     authErrorMsg_ = parentAnalyzer.authErrorMsg_;
     enablePrivChecks_ = parentAnalyzer.enablePrivChecks_;
+  }
+
+  /**
+   * Returns a new analyzer with the specified parent analyzer but with a new
+   * global state.
+   */
+  public static Analyzer createWithNewGlobalState(Analyzer parentAnalyzer) {
+    GlobalState globalState = new GlobalState(parentAnalyzer.globalState_.catalog,
+        parentAnalyzer.getQueryCtx(), parentAnalyzer.getAuthzConfig());
+    return new Analyzer(parentAnalyzer, globalState);
   }
 
   /**
