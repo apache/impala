@@ -241,14 +241,14 @@ public class InlineViewRef extends TableRef {
   }
 
   protected void makeOutputNullableHelper(Analyzer analyzer, ExprSubstitutionMap smap)
-      throws InternalException, AnalysisException {
+      throws InternalException {
     // Gather all unique rhs SlotRefs into rhsSlotRefs
     List<SlotRef> rhsSlotRefs = Lists.newArrayList();
     TreeNode.collect(smap.getRhs(), Predicates.instanceOf(SlotRef.class), rhsSlotRefs);
     // Map for substituting SlotRefs with NullLiterals.
     ExprSubstitutionMap nullSMap = new ExprSubstitutionMap();
     NullLiteral nullLiteral = new NullLiteral();
-    nullLiteral.analyze(analyzer);
+    nullLiteral.analyzeNoThrow(analyzer);
     for (SlotRef rhsSlotRef: rhsSlotRefs) {
       nullSMap.put(rhsSlotRef.clone(), nullLiteral.clone());
     }
@@ -261,7 +261,7 @@ public class InlineViewRef extends TableRef {
       params.add(new NullLiteral());
       params.add(smap.getRhs().get(i));
       Expr ifExpr = new FunctionCallExpr("if", params);
-      ifExpr.analyze(analyzer);
+      ifExpr.analyzeNoThrow(analyzer);
       smap.getRhs().set(i, ifExpr);
     }
   }
@@ -272,7 +272,7 @@ public class InlineViewRef extends TableRef {
    * false otherwise.
    */
   private boolean requiresNullWrapping(Analyzer analyzer, Expr expr,
-      ExprSubstitutionMap nullSMap) throws InternalException, AnalysisException {
+      ExprSubstitutionMap nullSMap) throws InternalException {
     // If the expr is already wrapped in an IF(TupleIsNull(), NULL, expr)
     // then do not try to execute it.
     // TODO: return true in this case?
@@ -284,7 +284,7 @@ public class InlineViewRef extends TableRef {
         new IsNullPredicate(expr.substitute(nullSMap, analyzer, false), true);
     Preconditions.checkState(isNotNullLiteralPred.isConstant());
     // analyze to insert casts, etc.
-    isNotNullLiteralPred.analyze(analyzer);
+    isNotNullLiteralPred.analyzeNoThrow(analyzer);
     return FeSupport.EvalPredicate(isNotNullLiteralPred, analyzer.getQueryCtx());
   }
 

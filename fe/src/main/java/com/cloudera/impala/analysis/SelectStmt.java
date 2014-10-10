@@ -24,7 +24,6 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ColumnAliasGenerator;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TableAliasGenerator;
 import com.cloudera.impala.common.TreeNode;
 import com.google.common.base.Preconditions;
@@ -540,15 +539,11 @@ public class SelectStmt extends QueryStmt {
     // ii) Other DISTINCT aggregates are present.
     ExprSubstitutionMap countAllMap = createCountAllMap(aggExprs, analyzer);
     countAllMap = ExprSubstitutionMap.compose(ndvSmap, countAllMap, analyzer);
-    List<Expr> substitutedAggs = Expr.substituteList(aggExprs, countAllMap, analyzer, false);
+    List<Expr> substitutedAggs =
+        Expr.substituteList(aggExprs, countAllMap, analyzer, false);
     aggExprs.clear();
     TreeNode.collect(substitutedAggs, Expr.isAggregatePredicate(), aggExprs);
-    try {
-      createAggInfo(groupingExprsCopy, aggExprs, analyzer);
-    } catch (InternalException e) {
-      // should never happen
-      Preconditions.checkArgument(false);
-    }
+    createAggInfo(groupingExprsCopy, aggExprs, analyzer);
 
     // combine avg smap with the one that produces the final agg output
     AggregateInfo finalAggInfo =
@@ -665,7 +660,7 @@ public class SelectStmt extends QueryStmt {
    */
   private void createAggInfo(ArrayList<Expr> groupingExprs,
       ArrayList<FunctionCallExpr> aggExprs, Analyzer analyzer)
-          throws AnalysisException, InternalException {
+          throws AnalysisException {
     if (selectList_.isDistinct()) {
        // Create aggInfo for SELECT DISTINCT ... stmt:
        // - all select list items turn into grouping exprs

@@ -122,7 +122,7 @@ public class AggregateInfo extends AggregateInfoBase {
   static public AggregateInfo create(
       ArrayList<Expr> groupingExprs, ArrayList<FunctionCallExpr> aggExprs,
       TupleDescriptor tupleDesc, Analyzer analyzer)
-          throws AnalysisException, InternalException {
+          throws AnalysisException {
     Preconditions.checkState(
         (groupingExprs != null && !groupingExprs.isEmpty())
         || (aggExprs != null && !aggExprs.isEmpty()));
@@ -188,7 +188,7 @@ public class AggregateInfo extends AggregateInfoBase {
   private void createDistinctAggInfo(
       ArrayList<Expr> origGroupingExprs,
       ArrayList<FunctionCallExpr> distinctAggExprs, Analyzer analyzer)
-          throws AnalysisException, InternalException {
+          throws AnalysisException {
     Preconditions.checkState(!distinctAggExprs.isEmpty());
     // make sure that all DISTINCT params are the same;
     // ignore top-level implicit casts in the comparison, we might have inserted
@@ -319,7 +319,7 @@ public class AggregateInfo extends AggregateInfoBase {
    * The returned AggregateInfo shares its descriptor and smap with the input info;
    * createAggTupleDesc() must not be called on it.
    */
-  private void createMergeAggInfo(Analyzer analyzer) throws InternalException {
+  private void createMergeAggInfo(Analyzer analyzer) {
     Preconditions.checkState(mergeAggInfo_ == null);
     TupleDescriptor inputDesc = intermediateTupleDesc_;
     // construct grouping exprs
@@ -338,13 +338,7 @@ public class AggregateInfo extends AggregateInfoBase {
           new SlotRef(inputDesc.getSlots().get(i + getGroupingExprs().size()));
       FunctionCallExpr aggExpr = FunctionCallExpr.createMergeAggCall(
           inputExpr, Lists.newArrayList(aggExprParam));
-      try {
-        aggExpr.analyze(analyzer);
-      } catch (Exception e) {
-        // we shouldn't see this
-        throw new InternalException(
-            "error constructing merge aggregation node: " + e.getMessage());
-      }
+      aggExpr.analyzeNoThrow(analyzer);
       aggExprs.add(aggExpr);
     }
 
@@ -404,7 +398,7 @@ public class AggregateInfo extends AggregateInfoBase {
   private void createSecondPhaseAggInfo(
       ArrayList<Expr> origGroupingExprs,
       ArrayList<FunctionCallExpr> distinctAggExprs, Analyzer analyzer)
-      throws AnalysisException, InternalException {
+      throws AnalysisException {
     Preconditions.checkState(secondPhaseDistinctAggInfo_ == null);
     Preconditions.checkState(!distinctAggExprs.isEmpty());
     // The output of the 1st phase agg is the 1st phase intermediate.
@@ -426,12 +420,7 @@ public class AggregateInfo extends AggregateInfoBase {
             origGroupingExprs.size() + inputExpr.getChildren().size() - 1,
             inputDesc.getSlots());
         Preconditions.checkNotNull(ifExpr);
-        try {
-          ifExpr.analyze(analyzer);
-        } catch (Exception e) {
-          throw new InternalException("Failed to analyze 'IF' function " +
-              "in second phase count distinct aggregation.", e);
-        }
+        ifExpr.analyzeNoThrow(analyzer);
         aggExpr = new FunctionCallExpr("count", Lists.newArrayList(ifExpr));
       } else {
         // SUM(DISTINCT <expr>) -> SUM(<last grouping slot>);
@@ -460,14 +449,8 @@ public class AggregateInfo extends AggregateInfoBase {
         secondPhaseAggExprs.size() == aggregateExprs_.size() + distinctAggExprs.size());
 
     for (FunctionCallExpr aggExpr: secondPhaseAggExprs) {
-      try {
-        aggExpr.analyze(analyzer);
-        Preconditions.checkState(aggExpr.isAggregateFunction());
-      } catch (Exception e) {
-        // we shouldn't see this
-        throw new InternalException(
-            "error constructing merge aggregation node", e);
-      }
+      aggExpr.analyzeNoThrow(analyzer);
+      Preconditions.checkState(aggExpr.isAggregateFunction());
     }
 
     ArrayList<Expr> substGroupingExprs =

@@ -16,7 +16,6 @@ package com.cloudera.impala.analysis;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
@@ -35,7 +34,6 @@ import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.planner.DataSink;
-import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -47,10 +45,6 @@ import com.google.common.collect.Sets;
  */
 public class InsertStmt extends StatementBase {
   private final static Logger LOG = LoggerFactory.getLogger(InsertStmt.class);
-
-  // Insert formats currently supported by Impala.
-  private final static EnumSet<THdfsFileFormat> SUPPORTED_INSERT_FORMATS =
-      EnumSet.of(THdfsFileFormat.PARQUET, THdfsFileFormat.TEXT);
 
   // List of inline views that may be referenced in queryStmt.
   private final WithClause withClause_;

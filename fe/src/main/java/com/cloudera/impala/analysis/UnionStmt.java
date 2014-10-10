@@ -311,9 +311,6 @@ public class UnionStmt extends QueryStmt {
       } catch (AnalysisException e) {
         // this should never happen
         throw new AnalysisException("error creating agg info in UnionStmt.analyze()");
-      } catch (InternalException e) {
-        // this should never happen
-        throw new AnalysisException("error creating agg info in UnionStmt.analyze()");
       }
     }
   }

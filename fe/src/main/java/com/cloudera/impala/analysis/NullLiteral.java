@@ -38,28 +38,19 @@ public class NullLiteral extends LiteralExpr {
    */
   public static NullLiteral create(Type type) {
     NullLiteral l = new NullLiteral();
-    try {
-      l.analyze(null);
-    } catch (Exception e) {
-      Preconditions.checkState(false, "NullLiteral failed to analyze!", e);
-      return null;
-    }
+    l.analyzeNoThrow(null);
     l.uncheckedCastTo(type);
     return l;
   }
 
   @Override
   public boolean equals(Object obj) {
-    if (!super.equals(obj)) {
-      return false;
-    }
+    if (!super.equals(obj)) return false;
     return obj instanceof NullLiteral;
   }
 
   @Override
-  public String toSqlImpl() {
-    return getStringValue();
-  }
+  public String toSqlImpl() { return getStringValue(); }
 
   @Override
   public String debugString() {
@@ -67,9 +58,7 @@ public class NullLiteral extends LiteralExpr {
   }
 
   @Override
-  public String getStringValue() {
-    return "NULL";
-  }
+  public String getStringValue() { return "NULL"; }
 
   @Override
   protected Expr uncheckedCastTo(Type targetType) {

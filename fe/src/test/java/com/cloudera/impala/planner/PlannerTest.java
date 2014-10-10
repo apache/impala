@@ -349,6 +349,7 @@ public class PlannerTest {
       }
     } catch (ImpalaException e) {
       if (e instanceof AnalysisException) {
+        e.printStackTrace();
         errorLog.append(
             "query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
         return;

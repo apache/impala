@@ -672,7 +672,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * If smap is null, this function is equivalent to clone().
    * If preserveRootType is true, the resulting expr tree will be cast if necessary to
    * the type of 'this'.
-   * TODO: set preserveRootType to true in more places?
    */
   public Expr trySubstitute(ExprSubstitutionMap smap, Analyzer analyzer,
       boolean preserveRootType)

@@ -423,7 +423,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * Sets outputSmap_ to compose(existing smap, combined child smap). Also
    * substitutes conjuncts_ using the combined child smap.
    */
-  protected void createDefaultSmap(Analyzer analyzer) throws InternalException {
+  protected void createDefaultSmap(Analyzer analyzer) {
     ExprSubstitutionMap combinedChildSmap = getCombinedChildSmap();
     outputSmap_ =
         ExprSubstitutionMap.compose(outputSmap_, combinedChildSmap, analyzer);

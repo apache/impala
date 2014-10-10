@@ -830,13 +830,6 @@ public class Analyzer {
     BinaryPredicate p = new BinaryPredicate(BinaryPredicate.Operator.EQ, lhs, rhs);
     p.setIsAuxExpr();
     LOG.trace("register equiv predicate: " + p.toSql() + " " + p.debugString());
-    try {
-      // create casts if needed
-      p.analyze(this);
-    } catch (ImpalaException e) {
-      // not an executable predicate; ignore
-      return;
-    }
     registerConjunct(p);
   }
 
@@ -847,7 +840,7 @@ public class Analyzer {
     BinaryPredicate pred = new BinaryPredicate(BinaryPredicate.Operator.EQ,
         new SlotRef(globalState_.descTbl.getSlotDesc(lhsSlotId)),
         new SlotRef(globalState_.descTbl.getSlotDesc(rhsSlotId)));
-    // analyze() creates casts, if needed
+    // create casts if needed
     pred.analyzeNoThrow(this);
     return pred;
   }
@@ -1204,13 +1197,13 @@ public class Analyzer {
   }
 
   /**
-   * For each equivalence class, adds/removes predicates from conjuncts such that
-   * it contains a minimum set of <lhsSlot> = <rhsSlot> predicates that establish
-   * the known equivalences between slots in lhsTids and rhsTid. Preserves original
-   * conjuncts when possible. Assumes that predicates for establishing equivalences
-   * among slots in only lhsTids and only rhsTid have already been established.
-   * This function adds the remaining predicates to "connect" the disjoint equivalent
-   * slot sets of lhsTids and rhsTid.
+   * For each equivalence class, adds/removes predicates from conjuncts such that it
+   * contains a minimum set of <lhsSlot> = <rhsSlot> predicates that establish the known
+   * equivalences between slots in lhsTids and rhsTid (lhsTids must not contain rhsTid).
+   * Preserves original conjuncts when possible. Assumes that predicates for establishing
+   * equivalences among slots in only lhsTids and only rhsTid have already been
+   * established. This function adds the remaining predicates to "connect" the disjoin
+   * equivalent slot sets of lhsTids and rhsTid.
    * The intent of this function is to enable construction of a minimum spanning tree
    * to cover the known slot equivalences. This function should be called for join
    * nodes during plan generation to (1) remove redundant join predicates, and (2)
@@ -1340,10 +1333,8 @@ public class Analyzer {
       EquivalenceClassId secondEqClassId = getEquivClassId(eqSlots.second);
       // slots may not be in the same eq class due to outer joins
       if (!firstEqClassId.equals(secondEqClassId)) continue;
-      if (!partialEquivSlots.union(eqSlots.first, eqSlots.second)) {
-        // conjunct is redundant
-        conjunctIter.remove();
-      }
+      // update equivalences and remove redundant conjuncts
+      if (!partialEquivSlots.union(eqSlots.first, eqSlots.second)) conjunctIter.remove();
     }
     // Suppose conjuncts had these predicates belonging to equivalence classes e1 and e2:
     // e1: s1 = s2, s3 = s4, s3 = s5
@@ -1492,19 +1483,14 @@ public class Analyzer {
     p.collect(Predicates.instanceOf(SlotRef.class), slotRefs);
 
     Expr nullTuplePred = null;
-    try {
-      // Map for substituting SlotRefs with NullLiterals.
-      ExprSubstitutionMap nullSmap = new ExprSubstitutionMap();
-      NullLiteral nullLiteral = new NullLiteral();
-      nullLiteral.analyze(this);
-      for (SlotRef slotRef: slotRefs) {
-        nullSmap.put(slotRef.clone(), nullLiteral.clone());
-      }
-      nullTuplePred = p.substitute(nullSmap, this, false);
-    } catch (Exception e) {
-      Preconditions.checkState(false, "Failed to analyze generated predicate: "
-          + nullTuplePred.toSql() + "." + e.getMessage());
+    // Map for substituting SlotRefs with NullLiterals.
+    ExprSubstitutionMap nullSmap = new ExprSubstitutionMap();
+    NullLiteral nullLiteral = new NullLiteral();
+    nullLiteral.analyzeNoThrow(this);
+    for (SlotRef slotRef: slotRefs) {
+      nullSmap.put(slotRef.clone(), nullLiteral.clone());
     }
+    nullTuplePred = p.substitute(nullSmap, this, false);
     try {
       return FeSupport.EvalPredicate(nullTuplePred, getQueryCtx());
     } catch (InternalException e) {

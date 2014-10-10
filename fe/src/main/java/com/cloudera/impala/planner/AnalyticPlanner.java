@@ -39,7 +39,6 @@ import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
-import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TPartitionType;
@@ -414,11 +413,7 @@ public class AnalyticPlanner {
       ExprSubstitutionMap bufferedSmap) {
     Preconditions.checkState(!exprs.isEmpty());
     Expr result = createNullMatchingEqualsAux(exprs, 0, inputTid, bufferedSmap);
-    try {
-      result.analyze(analyzer_);
-    } catch (AnalysisException e) {
-      throw new IllegalStateException(e);
-    }
+    result.analyzeNoThrow(analyzer_);
     return result;
   }
 
