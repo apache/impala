@@ -21,18 +21,18 @@
 #include "common/status.h"
 #include "runtime/client-cache.h"
 #include "runtime/plan-fragment-executor.h"
-#include "service/impala-server.h"
+#include "service/fragment-mgr.h"
 
 namespace impala {
 
 // Execution state of a single plan fragment.
-class ImpalaServer::FragmentExecState {
+class FragmentMgr::FragmentExecState {
  public:
   FragmentExecState(const TPlanFragmentInstanceCtx& fragment_instance_ctx,
       ExecEnv* exec_env)
     : fragment_instance_ctx_(fragment_instance_ctx),
       executor_(exec_env, boost::bind<void>(
-          boost::mem_fn(&ImpalaServer::FragmentExecState::ReportStatusCb),
+          boost::mem_fn(&FragmentMgr::FragmentExecState::ReportStatusCb),
               this, _1, _2, _3)),
       client_cache_(exec_env->impalad_client_cache()) {
   }

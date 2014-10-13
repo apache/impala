@@ -54,13 +54,9 @@ class RowDescriptor;
 class TCatalogUpdate;
 class TPlanExecRequest;
 class TPlanExecParams;
-class TExecPlanFragmentParams;
-class TExecPlanFragmentResult;
 class TInsertResult;
 class TReportExecStatusArgs;
 class TReportExecStatusResult;
-class TCancelPlanFragmentArgs;
-class TCancelPlanFragmentResult;
 class TTransmitDataArgs;
 class TTransmitDataResult;
 class TNetworkAddress;
@@ -85,7 +81,6 @@ class TGetExecSummaryReq;
 // fragment: the originating coordinator might die, but we can get notified of
 // that via the statestore. This still needs to be implemented.
 class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
-                     public ImpalaInternalServiceIf,
                      public ThriftServer::ConnectionHandlerIf {
  public:
   ImpalaServer(ExecEnv* exec_env);
@@ -208,14 +203,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // ImpalaService common extensions (implemented in impala-server.cc)
   // ImpalaInternalService rpcs
-  virtual void ExecPlanFragment(
-      TExecPlanFragmentResult& return_val, const TExecPlanFragmentParams& params);
-  virtual void ReportExecStatus(
-      TReportExecStatusResult& return_val, const TReportExecStatusParams& params);
-  virtual void CancelPlanFragment(
-      TCancelPlanFragmentResult& return_val, const TCancelPlanFragmentParams& params);
-  virtual void TransmitData(
-      TTransmitDataResult& return_val, const TTransmitDataParams& params);
+  void ReportExecStatus(TReportExecStatusResult& return_val,
+      const TReportExecStatusParams& params);
+  void TransmitData(TTransmitDataResult& return_val,
+      const TTransmitDataParams& params);
 
   // Generates a unique id for this query and sets it in the given query context.
   // Prepares the given query context by populating fields required for evaluating
@@ -267,7 +258,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   }
 
  private:
-  class FragmentExecState;
   friend class ChildQuery;
 
   // Query result set stores converted rows returned by QueryExecState.fetchRows(). It
@@ -328,22 +318,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       const TResultSetMetadata& metadata,
       apache::hive::service::cli::thrift::TRowSet* rowset = NULL);
 
-  // Initiate execution of plan fragment in newly created thread.
-  // Creates new FragmentExecState and registers it in fragment_exec_state_map_.
-  Status StartPlanFragmentExecution(const TExecPlanFragmentParams& exec_params);
-
-  // Top-level loop for synchronously executing plan fragment, which runs in
-  // exec_state's thread. Repeatedly calls GetNext() on the executor
-  // and feeds the result into the data sink.
-  // Returns exec status.
-  Status ExecPlanFragment(FragmentExecState* exec_state);
-
-  // Call ExecPlanFragment() and report status to coord.
-  void RunExecPlanFragment(FragmentExecState* exec_state);
-
-  // Report status of fragment execution to initiating coord.
-  Status ReportStatus(FragmentExecState* exec_state);
-
   // Return exec state for given query_id, or NULL if not found.
   // If 'lock' is true, the returned exec state's lock() will be acquired before
   // the query_exec_state_map_lock_ is released.
@@ -353,10 +327,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Writes the session id, if found, for the given query to the output parameter. Returns
   // false if no query with the given ID is found.
   bool GetSessionIdForQuery(const TUniqueId& query_id, TUniqueId* session_id);
-
-  // Return exec state for given fragment_instance_id, or NULL if not found.
-  boost::shared_ptr<FragmentExecState> GetFragmentExecState(
-      const TUniqueId& fragment_instance_id);
 
   // Updates the number of databases / tables metrics from the FE catalog
   Status UpdateCatalogMetrics();
@@ -779,13 +749,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       QueryExecStateMap;
   QueryExecStateMap query_exec_state_map_;
   boost::mutex query_exec_state_map_lock_;  // protects query_exec_state_map_
-
-  // map from fragment id to exec state; FragmentExecState is owned by us and
-  // referenced as a shared_ptr to allow asynchronous calls to CancelPlanFragment()
-  typedef boost::unordered_map<TUniqueId, boost::shared_ptr<FragmentExecState> >
-      FragmentExecStateMap;
-  FragmentExecStateMap fragment_exec_state_map_;
-  boost::mutex fragment_exec_state_map_lock_;  // protects fragment_exec_state_map_
 
   // Default query options in the form of TQueryOptions and beeswax::ConfigVariable
   TQueryOptions default_query_options_;

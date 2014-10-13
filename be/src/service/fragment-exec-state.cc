@@ -24,27 +24,27 @@ using namespace boost;
 using namespace impala;
 using namespace std;
 
-Status ImpalaServer::FragmentExecState::UpdateStatus(const Status& status) {
+Status FragmentMgr::FragmentExecState::UpdateStatus(const Status& status) {
   lock_guard<mutex> l(status_lock_);
   if (!status.ok() && exec_status_.ok()) exec_status_ = status;
   return exec_status_;
 }
 
-Status ImpalaServer::FragmentExecState::Cancel() {
+Status FragmentMgr::FragmentExecState::Cancel() {
   lock_guard<mutex> l(status_lock_);
   RETURN_IF_ERROR(exec_status_);
   executor_.Cancel();
   return Status::OK;
 }
 
-Status ImpalaServer::FragmentExecState::Prepare(
+Status FragmentMgr::FragmentExecState::Prepare(
     const TExecPlanFragmentParams& exec_params) {
   exec_params_ = exec_params;
   RETURN_IF_ERROR(executor_.Prepare(exec_params));
   return Status::OK;
 }
 
-void ImpalaServer::FragmentExecState::Exec() {
+void FragmentMgr::FragmentExecState::Exec() {
   // Open() does the full execution, because all plan fragments have sinks
   executor_.Open();
   executor_.Close();
@@ -54,7 +54,7 @@ void ImpalaServer::FragmentExecState::Exec() {
 // it is only invoked from the executor's reporting thread.
 // Also, the reported status will always reflect the most recent execution status,
 // including the final status when execution finishes.
-void ImpalaServer::FragmentExecState::ReportStatusCb(
+void FragmentMgr::FragmentExecState::ReportStatusCb(
     const Status& status, RuntimeProfile* profile, bool done) {
   DCHECK(status.ok() || done);  // if !status.ok() => done
   Status exec_status = UpdateStatus(status);

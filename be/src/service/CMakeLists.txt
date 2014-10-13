@@ -22,6 +22,7 @@ add_library(Service
   frontend.cc
   fe-support.cc
   fragment-exec-state.cc
+  fragment-mgr.cc
   hs2-util.cc
   impala-server.cc
   impala-server-callbacks.cc
