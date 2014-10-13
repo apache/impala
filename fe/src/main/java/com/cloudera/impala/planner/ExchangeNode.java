@@ -131,7 +131,7 @@ public class ExchangeNode extends PlanNode {
       output.append(detailPrefix + "offset: ").append(offset_).append("\n");
     }
 
-    if (mergeInfo_ != null) {
+    if (mergeInfo_ != null && detailLevel.ordinal() > TExplainLevel.MINIMAL.ordinal()) {
       output.append(detailPrefix + "order by: ");
       for (int i = 0; i < mergeInfo_.getOrderingExprs().size(); ++i) {
         if (i > 0) output.append(", ");
