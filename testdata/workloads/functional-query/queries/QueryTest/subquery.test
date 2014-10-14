@@ -728,3 +728,34 @@ AND t1.int_col NOT IN
 ---- TYPES
 BIGINT
 ====
+# WITH definition containing a subquery is used in a UNION
+---- QUERY
+WITH foo AS (SELECT 1 FROM alltypestiny WHERE int_col IN (SELECT 1))
+SELECT * FROM foo
+UNION SELECT * FROM foo
+---- RESULTS
+1
+---- TYPES
+TINYINT
+====
+# Regression test for IMPALA-1365
+---- QUERY
+WITH foo AS (SELECT 1 FROM alltypestiny WHERE int_col IN (SELECT 1))
+SELECT * FROM (SELECT * FROM foo UNION SELECT * FROM foo) bar
+---- RESULTS
+1
+---- TYPES
+TINYINT
+====
+# UNION of query with subquery and various other queries
+---- QUERY
+SELECT 1 FROM ALLTYPESTINY WHERE 1 = (SELECT 1)
+UNION VALUES (2)
+UNION ALL SELECT 3
+---- RESULTS
+1
+2
+3
+---- TYPES
+TINYINT
+====

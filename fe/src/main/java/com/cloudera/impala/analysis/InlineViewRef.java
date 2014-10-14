@@ -94,21 +94,6 @@ public class InlineViewRef extends TableRef {
   }
 
   /**
-   * Rewrite all subqueries contained within the inline view. The inline view is
-   * modified in place and the rewrite should not alter its select list.
-   */
-  public void rewrite() throws AnalysisException {
-    if (!(queryStmt_ instanceof SelectStmt)) return;
-    int oldSelectListItemCnt =
-        ((SelectStmt)queryStmt_).getSelectList().getItems().size();
-    StmtRewriter.rewriteStatement((SelectStmt)queryStmt_, inlineViewAnalyzer_);
-    queryStmt_ = queryStmt_.clone();
-    int newSelectListItemCnt =
-        ((SelectStmt)queryStmt_).getSelectList().getItems().size();
-    Preconditions.checkState(oldSelectListItemCnt == newSelectListItemCnt);
-  }
-
-  /**
    * Analyzes the inline view query block in a child analyzer of 'analyzer', creates
    * a new tuple descriptor for the inline view and registers auxiliary eq predicates
    * between the slots of that descriptor and the select list exprs of the inline view;
@@ -311,6 +296,10 @@ public class InlineViewRef extends TableRef {
   }
 
   public QueryStmt getViewStmt() { return queryStmt_; }
+  public void setRewrittenViewStmt(QueryStmt stmt) {
+    Preconditions.checkState(getAnalyzer().containsSubquery());
+    queryStmt_ = stmt;
+  }
 
   @Override
   public TableRef clone() { return new InlineViewRef(this); }

@@ -6,6 +6,7 @@ target
 .project
 
 # IntelliJ artifacts
+.idea
 *.iml
 *.ipr
 *.iws

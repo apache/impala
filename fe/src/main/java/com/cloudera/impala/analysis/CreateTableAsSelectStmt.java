@@ -73,11 +73,9 @@ public class CreateTableAsSelectStmt extends StatementBase {
       if (analyzer.containsSubquery()) {
         // The select statement of this CTAS is nested. Rewrite the
         // statement to unnest all subqueries and re-analyze using a new analyzer.
-        Preconditions.checkState(tmpQueryStmt instanceof SelectStmt);
-        SelectStmt selectStmt = (SelectStmt)tmpQueryStmt;
-        StmtRewriter.rewriteStatement(selectStmt, tmpAnalyzer);
+        StmtRewriter.rewriteQueryStatement(tmpQueryStmt, tmpAnalyzer);
         // Update the insert statement with the unanalyzed rewritten select stmt.
-        insertStmt_.setQueryStmt(selectStmt.clone());
+        insertStmt_.setQueryStmt(tmpQueryStmt.clone());
 
         // Re-analyze the select statement of the CTAS.
         tmpQueryStmt = insertStmt_.getQueryStmt().clone();

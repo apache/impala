@@ -164,8 +164,7 @@ public class InsertStmt extends StatementBase {
         queryStmt_.analyze(queryStmtAnalyzer);
 
         if (analyzer.containsSubquery()) {
-          Preconditions.checkState(queryStmt_ instanceof SelectStmt);
-          StmtRewriter.rewriteStatement((SelectStmt)queryStmt_, queryStmtAnalyzer);
+          StmtRewriter.rewriteQueryStatement(queryStmt_, queryStmtAnalyzer);
           queryStmt_ = queryStmt_.clone();
           queryStmtAnalyzer = new Analyzer(analyzer);
           queryStmt_.analyze(queryStmtAnalyzer);

@@ -321,6 +321,7 @@ public class AnalysisContext {
         analysisResult_.stmt_.analyze(analysisResult_.analyzer_);
         LOG.trace("rewrittenStmt: " + rewrittenStmt.toSql());
         if (isExplain) analysisResult_.stmt_.setIsExplain();
+        Preconditions.checkState(!analysisResult_.requiresRewrite());
       }
     } catch (AnalysisException e) {
       // Don't wrap AnalysisExceptions in another AnalysisException

@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.AnalysisContext.AnalysisResult;
+import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
@@ -41,9 +42,9 @@ public class StmtRewriter {
   public static StatementBase rewrite(AnalysisResult analysisResult)
       throws AnalysisException {
     StatementBase rewrittenStmt = null;
-    if (analysisResult.getStmt() instanceof SelectStmt) {
-      SelectStmt analyzedStmt = (SelectStmt)analysisResult.getStmt();
-      rewriteStatement(analyzedStmt, analysisResult.getAnalyzer());
+    if (analysisResult.getStmt() instanceof QueryStmt) {
+      QueryStmt analyzedStmt = (QueryStmt)analysisResult.getStmt();
+      rewriteQueryStatement(analyzedStmt, analysisResult.getAnalyzer());
       rewrittenStmt = analyzedStmt.clone();
     } else if (analysisResult.getStmt() instanceof InsertStmt) {
       // For an InsertStmt, rewrites are performed during its analysis.
@@ -53,15 +54,11 @@ public class StmtRewriter {
       // For a CTAS, rewrites are performed during its analysis.
       CreateTableAsSelectStmt ctasStmt =
           (CreateTableAsSelectStmt)analysisResult.getStmt();
-      Preconditions.checkState(ctasStmt.getQueryStmt() instanceof SelectStmt);
       // Create a new CTAS from the original create statement and the
       // rewritten insert statement.
       Preconditions.checkNotNull(analysisResult.getTmpCreateTableStmt());
       rewrittenStmt = new CreateTableAsSelectStmt(analysisResult.getTmpCreateTableStmt(),
           ctasStmt.getQueryStmt().clone());
-    } else if (analysisResult.getStmt() instanceof UnionStmt){
-      throw new AnalysisException("Subqueries are not supported in a UNION query: " +
-          analysisResult.getStmt().toSql());
     } else {
       throw new AnalysisException("Unsupported statement containing subqueries: " +
           analysisResult.getStmt().toSql());
@@ -70,16 +67,36 @@ public class StmtRewriter {
   }
 
   /**
+   *  Calls the appropriate rewrite method based on the specific type of query stmt. See
+   *  rewriteSelectStatement() and rewriteUnionStatement() documentation.
+   */
+  public static void rewriteQueryStatement(QueryStmt stmt, Analyzer analyzer)
+      throws AnalysisException {
+    Preconditions.checkNotNull(stmt);
+    if (stmt instanceof SelectStmt) {
+      rewriteSelectStatement((SelectStmt)stmt, analyzer);
+    } else if (stmt instanceof UnionStmt) {
+      rewriteUnionStatement((UnionStmt)stmt, analyzer);
+    } else {
+      throw new AnalysisException("Subqueries not supported for " +
+          stmt.getClass().getSimpleName() + " statements");
+    }
+  }
+
+  /**
    * Rewrite all the subqueries of a SelectStmt in place. Subqueries
    * are currently supported in FROM and WHERE clauses. The rewrite is performed in
    * place and not in a clone of SelectStmt because it requires the stmt to be analyzed.
    */
-  public static void rewriteStatement(SelectStmt stmt, Analyzer analyzer)
+  private static void rewriteSelectStatement(SelectStmt stmt, Analyzer analyzer)
       throws AnalysisException {
     // Rewrite all the subqueries in the FROM clause.
     for (TableRef tblRef: stmt.tableRefs_) {
       if (!(tblRef instanceof InlineViewRef)) continue;
-      ((InlineViewRef)tblRef).rewrite();
+      InlineViewRef inlineViewRef = (InlineViewRef)tblRef;
+      rewriteQueryStatement(inlineViewRef.getViewStmt(), inlineViewRef.getAnalyzer());
+      // Reset the state of the underlying stmt since it was rewritten
+      inlineViewRef.setRewrittenViewStmt(inlineViewRef.getViewStmt().clone());
     }
     // Rewrite all the subqueries in the WHERE clause.
     if (stmt.hasWhereClause()) {
@@ -95,6 +112,19 @@ public class StmtRewriter {
     }
     stmt.sqlString_ = null;
     LOG.trace("rewritten stmt: " + stmt.toSql());
+  }
+
+  /**
+   * Rewrite all operands in a UNION. The conditions that apply to SelectStmt rewriting
+   * also apply here.
+   */
+  private static void rewriteUnionStatement(UnionStmt stmt, Analyzer analyzer)
+      throws AnalysisException {
+    for (UnionOperand operand: stmt.getOperands()) {
+      Preconditions.checkState(operand.getQueryStmt() instanceof SelectStmt);
+      StmtRewriter.rewriteSelectStatement(
+          (SelectStmt)operand.getQueryStmt(), operand.getAnalyzer());
+    }
   }
 
   /**
@@ -236,7 +266,7 @@ public class StmtRewriter {
     // Extract the subquery and rewrite it.
     Subquery subquery = expr.getSubquery();
     Preconditions.checkNotNull(subquery);
-    rewriteStatement((SelectStmt)subquery.getStatement(), subquery.getAnalyzer());
+    rewriteSelectStatement((SelectStmt) subquery.getStatement(), subquery.getAnalyzer());
     // Create a new Subquery with the rewritten stmt and use a substitution map
     // to replace the original subquery from the expr.
     Subquery newSubquery = new Subquery(subquery.getStatement().clone());
