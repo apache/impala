@@ -163,8 +163,8 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
     return Status::OK;
   }
 
-  // create new tuple buffer for row_batch
-  tuple_buffer_size_ = row_batch->capacity() * tuple_desc_->byte_size();
+  // Create new tuple buffer for row_batch.
+  tuple_buffer_size_ = row_batch->MaxTupleBufferSize();
   tuple_ = Tuple::Create(tuple_buffer_size_, tuple_pool_.get());
 
   // Indicates whether the current row has conversion errors. Used for error reporting.
@@ -176,8 +176,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
   while (true) {
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(QueryMaintenance(state));
-    if (ReachedLimit() || row_batch->AtCapacity() ||
-        tuple_pool_->total_allocated_bytes() > RowBatch::AT_CAPACITY_MEM_USAGE) {
+    if (ReachedLimit() || row_batch->AtCapacity(tuple_pool_.get())) {
       // hang on to last allocated chunk in pool, we'll keep writing into it in the
       // next GetNext() call
       row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), !ReachedLimit());

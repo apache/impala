@@ -62,7 +62,7 @@ class TupleDescriptor;
 // excessive memory.
 //
 // A row batch is considered at capacity if all the rows are full or it has accumulated
-// auxiliary memory up to a soft cap. (See AT_CAPACITY_MEM_USAGE comment).
+// auxiliary memory up to a soft cap. (See at_capacity_mem_usage_ comment).
 class RowBatch {
  public:
   // Create RowBatch for a maximum of 'capacity' rows of tuples specified
@@ -120,6 +120,16 @@ class RowBatch {
   bool AtCapacity() {
     return num_rows_ == capacity_ || auxiliary_mem_usage_ >= AT_CAPACITY_MEM_USAGE ||
       num_tuple_streams() > 0 || need_to_return_;
+  }
+
+  // Returns true if the row batch has filled all the rows or has accumulated
+  // enough memory. tuple_pool is an intermediate memory pool containing tuple data
+  // that will eventually be attached to this row batch. We need to make sure
+  // the tuple pool does not accumulate excessive memory.
+  bool AtCapacity(MemPool* tuple_pool) {
+    DCHECK(tuple_pool != NULL);
+    return AtCapacity() ||
+        (tuple_pool->total_allocated_bytes() > AT_CAPACITY_MEM_USAGE && num_rows_ > 0);
   }
 
   // The total size of all data represented in this row batch (tuples and referenced
@@ -209,12 +219,10 @@ class RowBatch {
 
   // Max memory that this row batch can accumulate in tuple_data_pool_ before it
   // is considered at capacity.
-  // If this value is larger, we will use more memory. If this value is smaller,
-  // we are more likely to generate row batches less than the maximum number of rows.
-  // The value currently is very large compared to the typical row size.
-  // TODO: is this numbers reasonable? We can make this dynamic based on the estimated
-  // row size and mem limit.
-  static const int AT_CAPACITY_MEM_USAGE = 8 * 1024 * 1024;
+  static const int AT_CAPACITY_MEM_USAGE;
+
+  // Computes the maximum size needed to store tuple data for this row batch.
+  int MaxTupleBufferSize();
 
  private:
   MemTracker* mem_tracker_;  // not owned

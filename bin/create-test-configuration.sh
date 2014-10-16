@@ -92,6 +92,10 @@ if [ $CREATE_METASTORE -eq 1 ]; then
 
   psql -U hiveuser -d hive_$METASTORE_DB \
        -f ${HIVE_HOME}/scripts/metastore/upgrade/postgres/hive-schema-0.13.0.postgres.sql
+  # Increase the size limit of PARAM_VALUE from SERDE_PARAMS table to be able to create
+  # HBase tables with large number of columns.
+  echo "alter table \"SERDE_PARAMS\" alter column \"PARAM_VALUE\" type character varying" \
+      | psql -U hiveuser -d hive_$METASTORE_DB
 fi
 
 set +e

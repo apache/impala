@@ -153,8 +153,6 @@ class TestWideTable(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestWideTable, cls).add_test_dimensions()
-    cls.TestMatrix.add_constraint(
-      lambda v: v.get_value('table_format').file_format != 'hbase')
     cls.TestMatrix.add_dimension(TestDimension("num_cols", *cls.NUM_COLS))
     # To cut down on test execution time, only run in exhaustive.
     if cls.exploration_strategy() != 'exhaustive':
@@ -162,7 +160,9 @@ class TestWideTable(ImpalaTestSuite):
 
   def test_wide_table(self, vector):
     NUM_COLS = vector.get_value('num_cols')
-    NUM_ROWS = 10
+    # Due to the way HBase handles duplicate row keys, we have different number of
+    # rows in HBase tables compared to HDFS tables.
+    NUM_ROWS = 10 if vector.get_value('table_format').file_format != 'hbase' else 2
     DB_NAME = QueryTestSectionReader.get_db_name(vector.get_value('table_format'))
     TABLE_NAME = "%s.widetable_%s_cols" % (DB_NAME, NUM_COLS)
 
@@ -171,6 +171,10 @@ class TestWideTable(ImpalaTestSuite):
 
     expected_result = widetable.get_data(NUM_COLS, NUM_ROWS, quote_strings=True)
     result = self.client.execute("select * from %s" % TABLE_NAME)
+
+    if vector.get_value('table_format').file_format == 'hbase':
+      assert len(result.data) == NUM_ROWS
+      return
 
     types = parse_column_types(result.schema)
     labels = parse_column_labels(result.schema)

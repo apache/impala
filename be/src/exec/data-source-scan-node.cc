@@ -300,7 +300,7 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
 
   // create new tuple buffer for row_batch
   MemPool* tuple_pool = row_batch->tuple_data_pool();
-  int tuple_buffer_size = row_batch->capacity() * tuple_desc_->byte_size();
+  int tuple_buffer_size = row_batch->MaxTupleBufferSize();
   void* tuple_buffer = tuple_pool->Allocate(tuple_buffer_size);
   tuple_ = reinterpret_cast<Tuple*>(tuple_buffer);
   ExprContext** ctxs = &conjunct_ctxs_[0];
@@ -310,8 +310,8 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
     {
       SCOPED_TIMER(materialize_tuple_timer());
       // copy rows until we hit the limit/capacity or until we exhaust input_batch_
-      while (!ReachedLimit() && !row_batch->AtCapacity() && InputBatchHasNext() &&
-          tuple_pool->total_allocated_bytes() < RowBatch::AT_CAPACITY_MEM_USAGE) {
+      while (!ReachedLimit() && !row_batch->AtCapacity(tuple_pool) &&
+          InputBatchHasNext()) {
         RETURN_IF_ERROR(MaterializeNextRow(tuple_pool));
         int row_idx = row_batch->AddRow();
         TupleRow* tuple_row = row_batch->GetRow(row_idx);

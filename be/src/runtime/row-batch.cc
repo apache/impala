@@ -30,6 +30,8 @@ using namespace std;
 
 namespace impala {
 
+const int RowBatch::AT_CAPACITY_MEM_USAGE = 8 * 1024 * 1024;
+
 RowBatch::RowBatch(const RowDescriptor& row_desc, int capacity,
     MemTracker* mem_tracker)
   : mem_tracker_(mem_tracker),
@@ -319,5 +321,17 @@ int RowBatch::TotalByteSize() {
     }
   }
   return result;
+}
+
+int RowBatch::MaxTupleBufferSize() {
+  int row_size = row_desc_.GetRowSize();
+  if (row_size > AT_CAPACITY_MEM_USAGE) return row_size;
+  int num_rows = 0;
+  if (row_size != 0) {
+    num_rows = std::min(capacity_, AT_CAPACITY_MEM_USAGE / row_size);
+  }
+  int tuple_buffer_size = num_rows * row_size;
+  DCHECK_LE(tuple_buffer_size, AT_CAPACITY_MEM_USAGE);
+  return tuple_buffer_size;
 }
 }

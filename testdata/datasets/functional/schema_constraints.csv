@@ -107,7 +107,10 @@ table_name:avro_decimal_tbl, constraint:restrict_to, table_format:avro/snap/bloc
 # TODO first set of tests are for text/none/none
 table_name:chars_tiny, constraint:restrict_to, table_format:text/none/none
 
-# hbase doesn't seem to like very wide tables
-table_name:widetable_250_cols, constraint:exclude, table_format:hbase/none/none
-table_name:widetable_500_cols, constraint:exclude, table_format:hbase/none/none
-table_name:widetable_1000_cols, constraint:exclude, table_format:hbase/none/none
+# invalid_decimal_part_tbl[1,2,3] tables are used for testing invalid decimal
+# partition key values (see IMPALA-1040)
+table_name:invalid_decimal_part_tbl1, constraint:restrict_to, table_format:text/none/none
+table_name:invalid_decimal_part_tbl2, constraint:restrict_to, table_format:text/none/none
+table_name:invalid_decimal_part_tbl3, constraint:restrict_to, table_format:text/none/none
+
+table_name:avro_decimal_tbl, constraint:restrict_to, table_format:avro/snap/block

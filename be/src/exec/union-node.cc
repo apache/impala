@@ -118,7 +118,7 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_ERROR(QueryMaintenance(state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   // Create new tuple buffer for row_batch.
-  int tuple_buffer_size = row_batch->capacity() * tuple_desc_->byte_size();
+  int tuple_buffer_size = row_batch->MaxTupleBufferSize();
   Tuple* tuple = Tuple::Create(tuple_buffer_size, row_batch->tuple_data_pool());
 
   // Fetch from children, evaluate corresponding exprs and materialize.
