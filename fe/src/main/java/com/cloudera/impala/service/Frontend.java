@@ -832,9 +832,8 @@ public class Frontend {
     TQueryExecRequest queryExecRequest = new TQueryExecRequest();
     // create plan
     LOG.debug("create plan");
-    Planner planner = new Planner();
-    ArrayList<PlanFragment> fragments =
-        planner.createPlanFragments(analysisResult, queryCtx.request.query_options);
+    Planner planner = new Planner(analysisResult, queryCtx);
+    ArrayList<PlanFragment> fragments = planner.createPlan();
     List<ScanNode> scanNodes = Lists.newArrayList();
     // map from fragment to its index in queryExecRequest.fragments; needed for
     // queryExecRequest.dest_fragment_idx
@@ -883,8 +882,7 @@ public class Frontend {
     // Compute resource requirements after scan range locations because the cost
     // estimates of scan nodes rely on them.
     try {
-      planner.computeResourceReqs(fragments, true, queryCtx.request.query_options,
-          queryExecRequest);
+      planner.computeResourceReqs(fragments, true, queryExecRequest);
     } catch (Exception e) {
       // Turn exceptions into a warning to allow the query to execute.
       LOG.error("Failed to compute resource requirements for query\n" +
@@ -907,8 +905,8 @@ public class Frontend {
     // Global query parameters to be set in each TPlanExecRequest.
     queryExecRequest.setQuery_ctx(queryCtx);
 
-    explainString.append(planner.getExplainString(fragments, queryExecRequest,
-        explainLevel));
+    explainString.append(
+        planner.getExplainString(fragments, queryExecRequest, explainLevel));
     queryExecRequest.setQuery_plan(explainString.toString());
     queryExecRequest.setDesc_tbl(analysisResult.getAnalyzer().getDescTbl().toThrift());
 

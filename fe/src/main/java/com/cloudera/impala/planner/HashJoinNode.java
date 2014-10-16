@@ -495,7 +495,7 @@ public class HashJoinNode extends PlanNode {
     }
     perHostMemCost_ =
         (long) Math.ceil(getChild(1).cardinality_ * getChild(1).avgRowSize_
-          * Planner.HASH_TBL_SPACE_OVERHEAD);
+          * PlannerContext.HASH_TBL_SPACE_OVERHEAD);
     if (distrMode_ == DistributionMode.PARTITIONED) perHostMemCost_ /= numNodes_;
   }
 }

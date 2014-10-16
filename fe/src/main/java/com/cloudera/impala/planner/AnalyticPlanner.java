@@ -79,11 +79,11 @@ public class AnalyticPlanner {
 
   private final AnalyticInfo analyticInfo_;
   private final Analyzer analyzer_;
-  private final IdGenerator<PlanNodeId> idGenerator_;
+  private final PlannerContext ctx_;
 
   public AnalyticPlanner(List<TupleId> stmtTupleIds,
       AnalyticInfo analyticInfo, Analyzer analyzer,
-      IdGenerator<PlanNodeId> idGenerator) {
+      PlannerContext ctx) {
     Preconditions.checkState(!stmtTupleIds.isEmpty());
     TupleId lastStmtTupleId = stmtTupleIds.get(stmtTupleIds.size() - 1);
     Preconditions.checkState(stmtTupleIds.size() == 1 ||
@@ -91,7 +91,7 @@ public class AnalyticPlanner {
     stmtTupleIds_ = stmtTupleIds;
     analyticInfo_ = analyticInfo;
     analyzer_ = analyzer;
-    idGenerator_ = idGenerator;
+    ctx_ = ctx;
   }
 
   /**
@@ -344,8 +344,7 @@ public class AnalyticPlanner {
       }
 
       SortInfo sortInfo = createSortInfo(root, sortExprs, isAsc, nullsFirst);
-      SortNode sortNode =
-          new SortNode(idGenerator_.getNextId(), root, sortInfo, false, 0);
+      SortNode sortNode = new SortNode(ctx_.getNextNodeId(), root, sortInfo, false, 0);
 
       // if this sort group does not have partitioning exprs, we want the sort
       // to be executed like a regular distributed sort
@@ -406,7 +405,7 @@ public class AnalyticPlanner {
         LOG.trace("orderByEq: " + orderByEq.debugString());
       }
 
-      root = new AnalyticEvalNode(idGenerator_.getNextId(), root, stmtTupleIds_,
+      root = new AnalyticEvalNode(ctx_.getNextNodeId(), root, stmtTupleIds_,
           windowGroup.analyticFnCalls, windowGroup.partitionByExprs,
           windowGroup.orderByElements,
           windowGroup.window, analyticInfo_.getOutputTupleDesc(),

@@ -58,7 +58,7 @@ public class ExchangeNode extends PlanNode {
     offset_ = 0;
   }
 
-  public void addChild(PlanNode node, boolean copyConjuncts, Analyzer analyzer) {
+  public void addChild(PlanNode node, boolean copyConjuncts) {
     // This ExchangeNode 'inherits' several parameters from its children.
     // Ensure that all children agree on them.
     if (!children_.isEmpty()) {

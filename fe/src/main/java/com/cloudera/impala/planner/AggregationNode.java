@@ -259,6 +259,6 @@ public class AggregationNode extends PlanNode {
       perHostCardinality = Math.min(perHostCardinality, cardinality_);
     }
     perHostMemCost_ += Math.max(perHostCardinality * avgRowSize_ *
-        Planner.HASH_TBL_SPACE_OVERHEAD, MIN_HASH_TBL_MEM);
+        PlannerContext.HASH_TBL_SPACE_OVERHEAD, MIN_HASH_TBL_MEM);
   }
 }
