@@ -480,3 +480,25 @@ where bigint_col = 10 and day = 1
 00:SCAN HBASE [functional_hbase.alltypesagg]
    predicates: bigint_col = 10, day = 1
 ====
+# Simple Joins to make sure cardinality estimates are right (IMPALA-1141)
+select a.id, b.id, c.id
+from
+  functional_hbase.alltypessmall b,
+  functional_hbase.alltypes a,
+  functional_hbase.alltypestiny c
+where
+  a.id = b.id and
+  c.id = b.id
+---- PLAN
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id
+|
+|--00:SCAN HBASE [functional_hbase.alltypessmall b]
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = c.id
+|
+|--02:SCAN HBASE [functional_hbase.alltypestiny c]
+|
+01:SCAN HBASE [functional_hbase.alltypes a]
+====

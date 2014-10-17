@@ -116,16 +116,16 @@ public class HBaseScanNode extends ScanNode {
   public void init(Analyzer analyzer) throws InternalException {
     assignConjuncts(analyzer);
     setStartStopKey(analyzer);
-    computeStats(analyzer);
     // Convert predicates to HBase filters_.
     createHBaseFilters(analyzer);
 
     // materialize slots in remaining conjuncts_
     analyzer.materializeSlots(conjuncts_);
     computeMemLayout(analyzer);
-    computeStats(analyzer);
-
     computeScanRangeLocations(analyzer);
+
+    // Call computeStats() after materializing slots and computing the mem layout.
+    computeStats(analyzer);
   }
 
   /**
@@ -197,8 +197,8 @@ public class HBaseScanNode extends ScanNode {
     } else if (rowRange != null && rowRange.isEqRange()) {
       cardinality_ = 1;
     } else {
-     // Set maxCaching so that each fetch from hbase won't return a batch of more than
-     // MAX_HBASE_FETCH_BATCH_SIZE bytes.
+      // Set maxCaching so that each fetch from hbase won't return a batch of more than
+      // MAX_HBASE_FETCH_BATCH_SIZE bytes.
       Pair<Long, Long> estimate = tbl.getEstimatedRowStats(startKey_, stopKey_);
       cardinality_ = estimate.first.longValue();
       if (estimate.second.longValue() > 0) {

@@ -273,11 +273,14 @@ if __name__ == "__main__":
     # Execute the data loading scripts.
     # Creating tables in Impala has no dependencies, so we execute them first.
     # HBase table inserts are done via hive, so the hbase tables need to be created before
-    # running the hive script. Finally, some of the Impala inserts depend on hive tables,
-    # so they're done at the end.
+    # running the hive script. Some of the Impala inserts depend on hive tables,
+    # so they're done at the end. Finally, the Hbase Tables that have been filled with data
+    # need to be flushed.
     exec_impala_query_from_file_parallel(impala_create_files)
     exec_hbase_query_from_file('load-%s-hbase-generated.create' % load_file_substr)
     exec_hive_query_from_file('load-%s-hive-generated.sql' % load_file_substr)
+    exec_hbase_query_from_file('post-load-%s-hbase-generated.sql' % load_file_substr)
+
     if impala_load_files: invalidate_impala_metadata()
     exec_impala_query_from_file_parallel(impala_load_files)
     loading_time_map[workload] = time.time() - start_time
