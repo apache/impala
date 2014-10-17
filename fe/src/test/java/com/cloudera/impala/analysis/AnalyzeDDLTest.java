@@ -1266,6 +1266,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "select string_col from functional.alltypes",
         "Incompatible return types 'INT' and 'STRING' of exprs " +
         "'int_col' and 'string_col'.");
+    // View with a subquery
+    AnalyzesOk("create view test_view_with_subquery as " +
+        "select * from functional.alltypestiny t where exists " +
+        "(select * from functional.alltypessmall s where s.id = t.id)");
   }
 
   @Test

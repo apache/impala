@@ -263,7 +263,9 @@ public class AnalysisContext {
     public StatementBase getStmt() { return stmt_; }
     public Analyzer getAnalyzer() { return analyzer_; }
     public List<TAccessEvent> getAccessEvents() { return analyzer_.getAccessEvents(); }
-    public boolean requiresRewrite() { return analyzer_.containsSubquery(); }
+    public boolean requiresRewrite() {
+      return analyzer_.containsSubquery() && !(stmt_ instanceof CreateViewStmt);
+    }
   }
 
   /**
