@@ -291,8 +291,6 @@ public class ImpalaJdbcClient {
    */
   public static void main(String[] args) throws SQLException, ClassNotFoundException,
         ParseException {
-    ClientExecOptions execOptions = parseOptions(args);
-
     // Remove all prefixes from the logging output to make it easier to parse and disable
     // the root logger from spewing anything. This is done to make it easier to parse
     // the output.
@@ -300,6 +298,8 @@ public class ImpalaJdbcClient {
     ConsoleAppender consoleAppender = new ConsoleAppender(layout);
     LOG.addAppender(consoleAppender);
     LOG.setAdditivity(false);
+
+    ClientExecOptions execOptions = parseOptions(args);
 
     ImpalaJdbcClient client =
       ImpalaJdbcClient.createClientUsingHiveJdbcDriver(execOptions.getConnStr());
