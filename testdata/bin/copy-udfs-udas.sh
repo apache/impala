@@ -30,9 +30,10 @@ done
 if [ $BUILD -eq 1 ]
 then
   pushd $IMPALA_HOME
-  make -j4 TestUdas TestUdfs test-udfs-ir udfsample udasample udf-sample-ir uda-sample-ir
+  make -j$CORES \
+      TestUdas TestUdfs test-udfs-ir udfsample udasample udf-sample-ir uda-sample-ir
   cd $IMPALA_HOME/tests/test-hive-udfs
-  mvn compile
+  mvn package
   popd
 fi
 

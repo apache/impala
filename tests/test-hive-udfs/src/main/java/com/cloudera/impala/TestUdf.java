@@ -71,22 +71,23 @@ public class TestUdf extends UDF {
     if (a == null) return null;
     return new DoubleWritable(a.get());
   }
-  public BytesWritable evaluate(BytesWritable a) {
-    if (a == null) return null;
-    return new BytesWritable(a.getBytes());
-  }
-  public Text evaluate(Text a) {
-    if (a == null) return null;
-    return new Text(a.getBytes());
-  }
   public TimestampWritable evaluate(TimestampWritable a) {
     if (a == null) return a;
     return new TimestampWritable(a);
   }
-
   public DoubleWritable evaluate(DoubleWritable arg1, DoubleWritable arg2) {
     if (arg1 == null || arg2 == null) return null;
     return new DoubleWritable(arg1.get() + arg2.get());
   }
-
+  // At runtime BytesWritable and Text are equivalent with regards to signature lookup.
+  // If the functions below took the same number of args, one would override the other.
+  // An additional argument is added to be sure each type is tested.
+  public BytesWritable evaluate(BytesWritable a) {
+    if (a == null) return null;
+    return new BytesWritable(a.copyBytes());
+  }
+  public Text evaluate(Text a, Text b) {
+    if (a == null || b == null) return null;
+    return new Text(a.toString() + b.toString());
+  }
 }

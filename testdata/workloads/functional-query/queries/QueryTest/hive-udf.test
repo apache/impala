@@ -84,3 +84,13 @@ boolean
 ---- RESULTS
 NULL
 ====
+---- QUERY
+# IMPALA-1134. Each "identity" call below tests a different type (BytesWritable and Text).
+# The different types are handled slightly differently.
+select length(udf_test.identity("0123456789")),
+       length(udf_test.identity("0123456789", "0123456789"));
+---- TYPES
+int, int
+---- RESULTS
+10,20
+====

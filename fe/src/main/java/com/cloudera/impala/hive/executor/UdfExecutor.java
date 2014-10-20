@@ -311,9 +311,9 @@ public class UdfExecutor {
         if (obj instanceof byte[]) {
           bytes = (byte[]) obj;
         } else if (obj instanceof BytesWritable) {
-          bytes = ((BytesWritable)obj).getBytes();
+          bytes = ((BytesWritable)obj).copyBytes();
         } else if (obj instanceof Text) {
-          bytes = ((Text)obj).getBytes();
+          bytes = ((Text)obj).copyBytes();
         } else if (obj instanceof String) {
           bytes = ((String)obj).getBytes();
         } else {
