@@ -171,6 +171,14 @@ public class TestFileParser {
     public String getQuery() {
       return getSectionAsString(Section.QUERY, false, "\n");
     }
+
+    /**
+     * Returns false if the current test case is invalid due to missing sections or query
+     */
+    public boolean isValid() {
+      return !getQuery().isEmpty() && (!getSectionContents(Section.PLAN).isEmpty() ||
+          !getSectionContents(Section.DISTRIBUTEDPLAN).isEmpty());
+    }
   }
 
   private final List<TestCase> testCases = Lists.newArrayList();
@@ -233,6 +241,10 @@ public class TestFileParser {
       ++lineNum;
       if (line.startsWith("====") && sectionCount > 0) {
         currentTestCase.addSection(currentSection, sectionContents);
+        if(!currentTestCase.isValid()) {
+          throw new IllegalStateException("Invalid test case" +
+              " at line " + currentTestCase.startLineNum + " detected.");
+        }
         return currentTestCase; // done with this test case
       }
       if (line.startsWith("----")) {
@@ -272,6 +284,11 @@ public class TestFileParser {
       } else {
         sectionContents.add(line);
       }
+    }
+
+    if(!currentTestCase.isValid()) {
+      throw new IllegalStateException("Invalid test case" +
+          " at line " + currentTestCase.startLineNum + " detected.");
     }
 
     return currentTestCase;
