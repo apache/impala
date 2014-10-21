@@ -168,13 +168,16 @@ public class Planner {
       rootFragment.setSink(insertStmt.createDataSink());
     }
 
+    List<Expr> resultExprs = null;
     if (analysisResult.isInsertStmt()) {
-      rootFragment.setOutputExprs(analysisResult.getInsertStmt().getResultExprs());
+      resultExprs = analysisResult.getInsertStmt().getResultExprs();
     } else {
-      List<Expr> resultExprs = Expr.substituteList(queryStmt.getBaseTblResultExprs(),
-          rootFragment.getPlanRoot().getOutputSmap(), analyzer, false);
-      rootFragment.setOutputExprs(resultExprs);
+      resultExprs = queryStmt.getBaseTblResultExprs();
     }
+    resultExprs = Expr.substituteList(resultExprs,
+        rootFragment.getPlanRoot().getOutputSmap(), analyzer, false);
+    rootFragment.setOutputExprs(resultExprs);
+
     LOG.debug("desctbl: " + analyzer.getDescTbl().debugString());
     LOG.debug("resultexprs: " + Expr.debugString(rootFragment.getOutputExprs()));
 

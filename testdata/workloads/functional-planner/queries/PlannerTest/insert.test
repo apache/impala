@@ -490,3 +490,25 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(year,1)]
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 size=478.45KB
 ====
+# test insert/select stmt that contains an analytic function (IMPALA-1400)
+insert into table functional.alltypestiny partition(year=2009, month=1)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+  float_col, double_col, date_string_col, string_col,
+  lag(timestamp_col, 1) over (partition by id order by id) as timestamp_col
+from functional.alltypestiny
+---- PLAN
+WRITE TO HDFS [functional.alltypestiny, OVERWRITE=false, PARTITION-KEYS=(2009,1)]
+|  partitions=1
+|
+02:ANALYTIC
+|  functions: lag(timestamp_col, 1, NULL)
+|  partition by: id
+|  order by: id ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+|
+01:SORT
+|  order by: id ASC NULLS FIRST, id ASC
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=460B
+====
