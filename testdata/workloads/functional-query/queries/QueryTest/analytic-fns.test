@@ -984,6 +984,29 @@ RIGHT JOIN alltypestiny t2 ON t2.tinyint_col = t1.bigint_col AND t2.id = t1.mont
 BIGINT
 ====
 ---- QUERY
+## IMPALA-1312: Fix DCHECK failure in BufferedTupleStream
+## Disabled due to slow execution without codegen, breaks exhaustive runs (IMPALA-1414)
+#SELECT
+#  SUM(t1.int_col * t1.id) OVER (
+#    ORDER BY t1.int_col * t1.id ASC, t3.year + t3.tinyint_col ASC ROWS
+#    BETWEEN 66 PRECEDING AND 21 FOLLOWING) AS int_col_1
+#FROM alltypes t1
+#INNER JOIN alltypes t2 ON t2.month = t1.smallint_col
+#INNER JOIN alltypes t3 ON t3.bigint_col = t2.bigint_col
+#WHERE
+#t2.id <= t3.smallint_col + t2.tinyint_col
+#order by 1
+#limit 5
+#---- TYPES
+#BIGINT
+#---- RESULTS
+#22
+#23
+#24
+#25
+#26
+#====
+#----QUERY
 # Testing crashes in buffered tuple stream related to IMPALA-1306.
 SELECT AVG(t1.int_col) OVER () AS double_col_1
 FROM alltypestiny t1
