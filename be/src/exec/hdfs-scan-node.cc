@@ -144,6 +144,7 @@ Status HdfsScanNode::GetNextInternal(RuntimeState* state, RowBatch* row_batch, b
       return status_;
     }
   }
+  *eos = false;
 
   RowBatch* materialized_batch = materialized_row_batches_->GetBatch();
   if (materialized_batch != NULL) {
@@ -167,7 +168,6 @@ Status HdfsScanNode::GetNextInternal(RuntimeState* state, RowBatch* row_batch, b
     }
     DCHECK_EQ(materialized_batch->num_io_buffers(), 0);
     delete materialized_batch;
-    *eos = false;
     return Status::OK;
   }
 

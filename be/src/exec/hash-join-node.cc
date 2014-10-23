@@ -215,6 +215,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
     *eos = true;
     return Status::OK;
   }
+  *eos = false;
 
   // These cases are simpler and use a more efficient processing loop
   if (!match_all_build_) {

@@ -162,6 +162,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
     *eos = true;
     return Status::OK;
   }
+  *eos = false;
 
   // Create new tuple buffer for row_batch.
   tuple_buffer_size_ = row_batch->MaxTupleBufferSize();
