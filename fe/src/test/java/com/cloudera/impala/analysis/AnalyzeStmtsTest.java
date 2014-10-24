@@ -1767,6 +1767,24 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "as (select 1 as int_col_1 from (with with_4 as (select 1 as int_col_1 " +
         "from with_1) select 1 as int_col_1 from with_4) as t1) select 1 as " +
         "int_col_1 from with_3) select 1 as int_col_1 from with_2");
+
+    // WITH clasue with a between predicate
+    AnalyzesOk("with with_1 as (select int_col from functional.alltypestiny " +
+        "where int_col between 0 and 10) select * from with_1");
+    // WITH clause with a between predicate in the select list
+    AnalyzesOk("with with_1 as (select int_col between 0 and 10 " +
+        "from functional.alltypestiny) select * from with_1");
+    // WITH clause with a between predicate in the select list that
+    // uses casting
+    AnalyzesOk("with with_1 as (select timestamp_col between " +
+        "cast('2001-01-01' as timestamp) and " +
+        "(cast('2001-01-01' as timestamp) + interval 10 days) " +
+        "from functional.alltypestiny) select * from with_1");
+    // WITH clause with a between predicate that uses explicit casting
+    AnalyzesOk("with with_1 as (select * from functional.alltypestiny " +
+        "where timestamp_col between cast('2001-01-01' as timestamp) and " +
+        "(cast('2001-01-01' as timestamp) + interval 10 days)) " +
+        "select * from with_1");
   }
 
   @Test

@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.cloudera.impala.common.AnalysisException;
@@ -36,7 +37,7 @@ public class BetweenPredicate extends Predicate {
 
   // Children of the BetweenPredicate, since this.children should hold the children
   // of the rewritten predicate to make sure toThrift() picks up the right ones.
-  private List<Expr> originalChildren_ = Lists.newArrayList();
+  private ArrayList<Expr> originalChildren_ = Lists.newArrayList();
 
   // First child is the comparison expr which should be in [lowerBound, upperBound].
   public BetweenPredicate(Expr compareExpr, Expr lowerBound, Expr upperBound,
@@ -107,6 +108,7 @@ public class BetweenPredicate extends Predicate {
 
     // Make sure toThrift() picks up the children of the rewritten predicate.
     children_ = rewrittenPredicate_.getChildren();
+    isAnalyzed_ = true;
   }
 
   @Override
@@ -141,4 +143,11 @@ public class BetweenPredicate extends Predicate {
 
   @Override
   public Expr clone() { return new BetweenPredicate(this); }
+
+  @Override
+  public Expr reset() {
+    super.reset();
+    originalChildren_ = Expr.resetList(originalChildren_);
+    return this;
+  }
 }

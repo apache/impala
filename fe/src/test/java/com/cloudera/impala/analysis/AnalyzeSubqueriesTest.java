@@ -1005,5 +1005,10 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "functional.alltypes)", "Comparison between subqueries is not supported " +
         "in a between predicate: (SELECT min(id) FROM functional.alltypes) BETWEEN " +
         "1 AND (SELECT max(id) FROM functional.alltypes)");
+    AnalyzesOk("select * from functional.alltypestiny where " +
+        "int_col between 0 and 10 and exists (select 1)");
+    AnalyzesOk("select * from functional.alltypestiny a where " +
+        "double_col between cast(1 as double) and cast(10 as double) and " +
+        "exists (select 1 from functional.alltypessmall b where a.id = b.id)");
   }
 }
