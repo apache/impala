@@ -1668,6 +1668,17 @@ TEST_F(ExprTest, StringRegexpFunctions) {
   TestIsNull("regexp_extract('abxcy1234a', NULL, 2)", TYPE_STRING);
   TestIsNull("regexp_extract('abxcy1234a', 'a.x', NULL)", TYPE_STRING);
   TestIsNull("regexp_extract(NULL, NULL, NULL)", TYPE_STRING);
+  // Character classes.
+  TestStringValue("regexp_extract('abxcy1234a', '[[:lower:]]*', 0)", "abxcy");
+  TestStringValue("regexp_extract('abxcy1234a', '[[:digit:]]+', 0)", "1234");
+  TestStringValue("regexp_extract('abxcy1234a', '[[:lower:]][[:digit:]]', 0)", "y1");
+  TestStringValue("regexp_extract('aBcDeF', '[[:upper:]][[:lower:]]', 0)", "Bc");
+  // "Single character" character classes.
+  TestStringValue("regexp_extract('abxcy1234a', '\\\\w*', 0)", "abxcy1234a");
+  TestStringValue("regexp_extract('abxcy1234a', '\\\\d+', 0)", "1234");
+  TestStringValue("regexp_extract('abxcy1234a', '\\\\d\\\\D', 0)", "4a");
+  // Leftmost longest match.
+  TestStringValue("regexp_extract('abcabcd', '(a|ab|abc|abcd)', 0)", "abc");
 
   TestStringValue("regexp_replace('axcaycazc', 'a.c', 'a')", "aaa");
   TestStringValue("regexp_replace('axcaycazc', 'a.c', '')", "");

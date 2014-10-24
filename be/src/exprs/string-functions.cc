@@ -307,13 +307,12 @@ IntVal StringFunctions::LocatePos(FunctionContext* context, const StringVal& sub
 // The caller owns the returned regex. Returns NULL if the pattern could not be compiled.
 re2::RE2* CompileRegex(const StringVal& pattern, string* error_str) {
   re2::StringPiece pattern_sp(reinterpret_cast<char*>(pattern.ptr), pattern.len);
-  // Use POSIX to return the leftmost maximal match (and not the first match)
-  // TODO: re2 allows setting 'longest_match' to true and 'posix_syntax' to false, but
-  // would this be a incompatible change?
-  re2::RE2::Options options(re2::RE2::POSIX);
+  re2::RE2::Options options;
   // Disable error logging in case e.g. every row causes an error
   options.set_log_errors(false);
-  re2::RE2* re = new re2::RE2(pattern_sp, re2::RE2::POSIX);
+  // Return the leftmost longest match (rather than the first match).
+  options.set_longest_match(true);
+  re2::RE2* re = new re2::RE2(pattern_sp, options);
   if (!re->ok()) {
     stringstream ss;
     ss << "Could not compile regexp pattern: " << AnyValUtil::ToString(pattern) << endl
