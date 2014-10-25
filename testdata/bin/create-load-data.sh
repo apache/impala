@@ -211,6 +211,11 @@ hadoop fs -put -f ${IMPALA_HOME}/testdata/data/repeated_values.parquet \
 hadoop fs -put -f ${IMPALA_HOME}/testdata/data/multiple_rowgroups.parquet \
                   /test-warehouse/bad_parquet_parquet
 
+# IMPALA-1401: data file produced by Hive 13 containing page statistics with long min/max
+# string values
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/long_page_header.parquet \
+                  /test-warehouse/bad_parquet_parquet
+
 # Remove an index file so we test an un-indexed LZO file
 hadoop fs -rm /test-warehouse/alltypes_text_lzo/year=2009/month=1/000000_0.lzo.index
 

@@ -16,5 +16,5 @@ SELECT count(distinct field) from bad_parquet
 ---- TYPES
 bigint
 ---- RESULTS
-1003
+1005
 ====

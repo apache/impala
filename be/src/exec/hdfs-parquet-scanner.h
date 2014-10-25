@@ -90,9 +90,6 @@ class HdfsParquetScanner : public HdfsScanner {
   // need to issue another read.
   static const int FOOTER_SIZE = 100 * 1024;
 
-  // Max page header size in bytes.
-  static const int MAX_PAGE_HEADER_SIZE = 100;
-
   // Per column reader.
   class BaseColumnReader;
   friend class BaseColumnReader;
