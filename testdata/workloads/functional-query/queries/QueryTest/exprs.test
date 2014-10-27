@@ -1747,3 +1747,14 @@ Infinity,NaN,-0,-Infinity,Nan
 ---- TYPES
 double,double,double,double,double
 ====
+# Test that abs() retains the type of the paramter IMPALA-1424
+---- QUERY
+select abs(cast(1 as int)), abs(cast(1 as smallint)),
+  abs(cast(1 as tinyint)), abs(cast(8589934592 as bigint)),
+  abs(cast(-1.3 as double)), abs(cast(-1.3 as float)),
+  abs(cast(-1.32223 as decimal(8,3)))
+---- RESULTS
+1,1,1,8589934592,1.3,1.299999952316284,1.322
+---- TYPES
+int, smallint, tinyint, bigint, double, float, decimal
+====

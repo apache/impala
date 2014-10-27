@@ -44,14 +44,18 @@ DoubleVal MathFunctions::E(FunctionContext* ctx) {
     return RET_TYPE(FN(v.val)); \
   }
 
+ONE_ARG_MATH_FN(Abs, BigIntVal, BigIntVal, llabs);
 ONE_ARG_MATH_FN(Abs, DoubleVal, DoubleVal, fabs);
+ONE_ARG_MATH_FN(Abs, FloatVal, FloatVal, fabs);
+ONE_ARG_MATH_FN(Abs, IntVal, IntVal, abs);
+ONE_ARG_MATH_FN(Abs, SmallIntVal, SmallIntVal, abs);
+ONE_ARG_MATH_FN(Abs, TinyIntVal, TinyIntVal, abs);
 ONE_ARG_MATH_FN(Sin, DoubleVal, DoubleVal, sin);
 ONE_ARG_MATH_FN(Asin, DoubleVal, DoubleVal, asin);
 ONE_ARG_MATH_FN(Cos, DoubleVal, DoubleVal, cos);
 ONE_ARG_MATH_FN(Acos, DoubleVal, DoubleVal, acos);
 ONE_ARG_MATH_FN(Tan, DoubleVal, DoubleVal, tan);
 ONE_ARG_MATH_FN(Atan, DoubleVal, DoubleVal, atan);
-
 ONE_ARG_MATH_FN(Sqrt, DoubleVal, DoubleVal, sqrt);
 ONE_ARG_MATH_FN(Ceil, BigIntVal, DoubleVal, ceil);
 ONE_ARG_MATH_FN(Floor, BigIntVal, DoubleVal, floor);

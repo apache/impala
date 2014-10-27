@@ -2435,7 +2435,7 @@ TEST_F(ExprTest, MathFunctions) {
   TestStringValue("greatest('apples', 'app\rles')", "apples");
 
   // NULL arguments.
-  TestIsNull("abs(NULL)", TYPE_DOUBLE);
+  TestIsNull("abs(NULL)", TYPE_BIGINT);
   TestIsNull("sign(NULL)", TYPE_FLOAT);
   TestIsNull("exp(NULL)", TYPE_DOUBLE);
   TestIsNull("ln(NULL)", TYPE_DOUBLE);

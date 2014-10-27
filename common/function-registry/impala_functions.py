@@ -226,7 +226,12 @@ functions = [
   # Math builtin functions
   [['pi'], 'DOUBLE', [], 'impala::MathFunctions::Pi'],
   [['e'], 'DOUBLE', [], 'impala::MathFunctions::E'],
+  [['abs'], 'BIGINT', ['BIGINT'], 'impala::MathFunctions::Abs'],
   [['abs'], 'DOUBLE', ['DOUBLE'], 'impala::MathFunctions::Abs'],
+  [['abs'], 'FLOAT', ['FLOAT'], 'impala::MathFunctions::Abs'],
+  [['abs'], 'INT', ['INT'], 'impala::MathFunctions::Abs'],
+  [['abs'], 'SMALLINT', ['SMALLINT'], 'impala::MathFunctions::Abs'],
+  [['abs'], 'TINYINT', ['TINYINT'], 'impala::MathFunctions::Abs'],
   [['sign'], 'FLOAT', ['DOUBLE'], 'impala::MathFunctions::Sign'],
   [['sin'], 'DOUBLE', ['DOUBLE'], 'impala::MathFunctions::Sin'],
   [['asin'], 'DOUBLE', ['DOUBLE'], 'impala::MathFunctions::Asin'],

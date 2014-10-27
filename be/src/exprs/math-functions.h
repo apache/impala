@@ -33,7 +33,12 @@ class MathFunctions {
  public:
   static DoubleVal Pi(FunctionContext*);
   static DoubleVal E(FunctionContext*);
+  static BigIntVal Abs(FunctionContext*, const BigIntVal&);
   static DoubleVal Abs(FunctionContext*, const DoubleVal&);
+  static FloatVal Abs(FunctionContext*, const FloatVal&);
+  static IntVal Abs(FunctionContext*, const IntVal&);
+  static SmallIntVal Abs(FunctionContext*, const SmallIntVal&);
+  static TinyIntVal Abs(FunctionContext*, const TinyIntVal&);
   static DoubleVal Sin(FunctionContext*, const DoubleVal&);
   static DoubleVal Asin(FunctionContext*, const DoubleVal&);
   static DoubleVal Cos(FunctionContext*, const DoubleVal&);

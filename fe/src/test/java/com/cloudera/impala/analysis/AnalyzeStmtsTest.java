@@ -905,6 +905,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select year(timestamp_col), count(*) " +
         "from functional.alltypes group by year(timestamp_col)");
 
+    // Check abs() retains type, originally abs() would return double,
+    // which is incompatible with interval, see IMPALA-1424
+    AnalyzesOk("select now() + interval abs(cast(1 as int)) days");
+    AnalyzesOk("select now() + interval abs(cast(1 as smallint)) days");
+    AnalyzesOk("select now() + interval abs(cast(1 as tinyint)) days");
+
     AnalyzesOk("select round(c1) from functional.decimal_tiny");
     AnalyzesOk("select round(c1, 2) from functional.decimal_tiny");
     AnalysisError("select round(c1, cast(c3 as int)) from functional.decimal_tiny",
