@@ -54,3 +54,23 @@ class TestQueryMemLimitScaling(ImpalaTestSuite):
     for query in self.QUERY:
       self.execute_query(query, exec_options, table_format=table_format)
 
+class TestExprMemUsage(ImpalaTestSuite):
+  @classmethod
+  def get_workload(cls):
+    return 'tpch'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestExprMemUsage, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    if cls.exploration_strategy() != 'exhaustive':
+      cls.TestMatrix.add_constraint(lambda v:\
+          v.get_value('table_format').file_format in ['parquet'])
+
+  def test_scanner_mem_usage(self, vector):
+    exec_options = vector.get_value('exec_option')
+    # This value was picked empircally based on the query.
+    exec_options['mem_limit'] = '300m'
+    self.execute_query_expect_success(self.client,
+      "select count(*) from lineitem where lower(l_comment) = 'hello'", exec_options,
+      table_format=vector.get_value('table_format'))

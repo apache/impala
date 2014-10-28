@@ -137,6 +137,8 @@ Status HdfsScanner::CommitRows(int num_rows) {
 
   if (context_->cancelled()) return Status::CANCELLED;
   RETURN_IF_ERROR(state_->CheckQueryState());
+  // Free local expr allocations for this thread
+  ExprContext::FreeLocalAllocations(conjunct_ctxs_);
   return Status::OK;
 }
 
