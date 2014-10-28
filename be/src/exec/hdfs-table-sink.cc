@@ -127,7 +127,7 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
     return Status(error_msg.str());
   }
 
-  staging_dir_ = Substitute("$0/.impala_insert_staging/$1/", table_desc_->hdfs_base_dir(),
+  staging_dir_ = Substitute("$0/_impala_insert_staging/$1/", table_desc_->hdfs_base_dir(),
       PrintId(state->query_id(), "_"));
 
   RETURN_IF_ERROR(PrepareExprs(state));
@@ -239,7 +239,7 @@ void HdfsTableSink::BuildHdfsFileNames(
   // Path: <hdfs_base_dir>/<partition_values>/<unique_id_str>
 
   // Temporary files are written under the following path which is unique to this sink:
-  // <table_dir>/.impala_insert_staging/<query_id>/<per_fragment_unique_id>_dir/
+  // <table_dir>/_impala_insert_staging/<query_id>/<per_fragment_unique_id>_dir/
   // Both the temporary directory and the file name, when moved to the real partition
   // directory must be unique.
   // Prefix the directory name with "." to make it hidden and append "_dir" at the end
