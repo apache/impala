@@ -176,6 +176,7 @@ class ImpalaServer::HS2ColumnarResultSet : public ImpalaServer::QueryResultSet {
       thrift::TColumn* from = &o->result_set_->columns[j];
       thrift::TColumn* to = &result_set_->columns[j];
       switch (metadata_.columns[j].columnType.types[0].scalar_type.type) {
+        case TPrimitiveType::NULL_TYPE:
         case TPrimitiveType::BOOLEAN:
           to->boolVal.values.insert(
               to->boolVal.values.end(),
@@ -238,7 +239,6 @@ class ImpalaServer::HS2ColumnarResultSet : public ImpalaServer::QueryResultSet {
               from->doubleVal.nulls.begin() + start_idx + rows_added);
           break;
         case TPrimitiveType::TIMESTAMP:
-        case TPrimitiveType::NULL_TYPE:
         case TPrimitiveType::DECIMAL:
         case TPrimitiveType::STRING:
         case TPrimitiveType::VARCHAR:
@@ -291,6 +291,7 @@ class ImpalaServer::HS2ColumnarResultSet : public ImpalaServer::QueryResultSet {
           "Structured columns unsupported in HS2 interface";
       thrift::TColumn column;
       switch (col.columnType.types[0].scalar_type.type) {
+        case TPrimitiveType::NULL_TYPE:
         case TPrimitiveType::BOOLEAN:
           column.__isset.boolVal = true;
           break;
@@ -311,7 +312,6 @@ class ImpalaServer::HS2ColumnarResultSet : public ImpalaServer::QueryResultSet {
           column.__isset.doubleVal = true;
           break;
         case TPrimitiveType::TIMESTAMP:
-        case TPrimitiveType::NULL_TYPE:
         case TPrimitiveType::DECIMAL:
         case TPrimitiveType::VARCHAR:
         case TPrimitiveType::CHAR:

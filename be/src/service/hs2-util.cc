@@ -40,6 +40,7 @@ void impala::TColumnValueToHS2TColumn(const TColumnValue& col_val,
   string* nulls;
   bool is_null;
   switch (type.types[0].scalar_type.type) {
+    case TPrimitiveType::NULL_TYPE:
     case TPrimitiveType::BOOLEAN:
       is_null = !col_val.__isset.bool_val;
       column->boolVal.values.push_back(col_val.bool_val);
@@ -72,7 +73,6 @@ void impala::TColumnValueToHS2TColumn(const TColumnValue& col_val,
       nulls = &column->doubleVal.nulls;
       break;
     case TPrimitiveType::TIMESTAMP:
-    case TPrimitiveType::NULL_TYPE:
     case TPrimitiveType::STRING:
     case TPrimitiveType::CHAR:
     case TPrimitiveType::VARCHAR:
@@ -95,6 +95,7 @@ void impala::ExprValueToHS2TColumn(const void* value, const TColumnType& type,
     int64_t row_idx, thrift::TColumn* column) {
   string* nulls;
   switch (type.types[0].scalar_type.type) {
+    case TPrimitiveType::NULL_TYPE:
     case TPrimitiveType::BOOLEAN:
       column->boolVal.values.push_back(
           value == NULL ? false : *reinterpret_cast<const bool*>(value));
@@ -138,7 +139,6 @@ void impala::ExprValueToHS2TColumn(const void* value, const TColumnType& type,
       }
       nulls = &column->stringVal.nulls;
       break;
-    case TPrimitiveType::NULL_TYPE:
     case TPrimitiveType::STRING:
     case TPrimitiveType::VARCHAR:
       column->stringVal.values.push_back("");

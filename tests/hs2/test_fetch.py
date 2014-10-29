@@ -179,3 +179,33 @@ class TestFetch(HS2TestSuite):
       assert not fetch_results_resp.hasMoreRows
     except AssertionError:
       pytest.xfail("IMPALA-558")
+
+  @needs_session()
+  def test_select_null(self):
+    """Regression test for IMPALA-1370, where NULL literals would appear as strings where
+    they should be booleans"""
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = "select null"
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    HS2TestSuite.check_response(execute_statement_resp)
+
+    # Check that the expected type is boolean (for compatibility with Hive, see also
+    # IMPALA-914)
+    get_result_metadata_req = TCLIService.TGetResultSetMetadataReq()
+    get_result_metadata_req.operationHandle = execute_statement_resp.operationHandle
+    get_result_metadata_resp = \
+        self.hs2_client.GetResultSetMetadata(get_result_metadata_req)
+    col = get_result_metadata_resp.schema.columns[0]
+    assert col.typeDesc.types[0].primitiveEntry.type == TCLIService.TTypeId.BOOLEAN_TYPE
+
+    # Check that the actual type is boolean
+    fetch_results_req = TCLIService.TFetchResultsReq()
+    fetch_results_req.operationHandle = execute_statement_resp.operationHandle
+    fetch_results_req.maxRows = 1
+    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
+    HS2TestSuite.check_response(fetch_results_resp)
+    assert fetch_results_resp.results.columns[0].boolVal is not None
+
+    assert self.__column_results_to_string(
+      fetch_results_resp.results.columns) == (1, "NULL\n")
