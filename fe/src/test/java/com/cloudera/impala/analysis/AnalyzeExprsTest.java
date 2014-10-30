@@ -689,12 +689,15 @@ public class AnalyzeExprsTest extends AnalyzerTest {
             + "UNBOUNDED and the other CURRENT ROW.");
 
     // Min/max do not support start bounds with offsets
-    AnalysisError("select min(int_col) over (partition by id order by tinyint_col "
-        + "rows between 2 preceding and unbounded following) from functional.alltypes",
-        "'min(int_col)' is only supported with an UNBOUNDED PRECEDING start bound.");
     AnalysisError("select max(int_col) over (partition by id order by tinyint_col "
         + "rows 2 preceding) from functional.alltypes",
         "'max(int_col)' is only supported with an UNBOUNDED PRECEDING start bound.");
+    // If the query can be re-written so that the start is unbounded, it should
+    // be supported (IMPALA-1433).
+    AnalyzesOk("select max(id) over (order by id rows between current row and "
+        + "unbounded following) from functional.alltypes");
+    AnalyzesOk("select min(int_col) over (partition by id order by tinyint_col "
+        + "rows between 2 preceding and unbounded following) from functional.alltypes");
     // TODO: Enable after RANGE windows with offset boundaries are supported
     //AnalysisError("select max(int_col) over (partition by id order by tinyint_col "
     //    + "range 2 preceding) from functional.alltypes",

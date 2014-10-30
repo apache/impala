@@ -340,12 +340,6 @@ public class AnalyticExpr extends Expr {
           checkRangeOffsetBoundaryExpr(window_.getRightBoundary());
         }
       }
-      if (isMinMax(fn) &&
-          window_.getLeftBoundary().getType() != BoundaryType.UNBOUNDED_PRECEDING) {
-        throw new AnalysisException(
-            "'" + getFnCall().toSql() + "' is only supported with an "
-              + "UNBOUNDED PRECEDING start bound.");
-      }
     }
 
     // check nesting
@@ -356,6 +350,16 @@ public class AnalyticExpr extends Expr {
     sqlString_ = toSql();
 
     standardize(analyzer);
+
+    // min/max is not currently supported on sliding windows (i.e. start bound is not
+    // unbounded).
+    if (window_ != null && isMinMax(fn) &&
+        window_.getLeftBoundary().getType() != BoundaryType.UNBOUNDED_PRECEDING) {
+      throw new AnalysisException(
+          "'" + getFnCall().toSql() + "' is only supported with an "
+            + "UNBOUNDED PRECEDING start bound.");
+    }
+
     setChildren();
   }
 
