@@ -62,7 +62,6 @@ using namespace std;
 const string HdfsScanNode::HDFS_SPLIT_STATS_DESC =
     "Hdfs split stats (<volume id>:<# splits>/<split lengths>)";
 
-
 // Amount of memory that we approximate a scanner thread will use not including IoBuffers.
 // The memory used does not vary considerably between file formats (just a couple of MBs).
 // This value is conservative and taken from running against the tpch lineitem table.
@@ -132,7 +131,8 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   return status;
 }
 
-Status HdfsScanNode::GetNextInternal(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+Status HdfsScanNode::GetNextInternal(
+    RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
@@ -479,10 +479,21 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::Prepare(conjunct_ctxs_, runtime_state_, row_desc()));
   AddExprCtxsToFree(conjunct_ctxs_);
 
-  // Create reusable codegen'd functions for each file type type needed
   for (int format = THdfsFileFormat::TEXT;
        format <= THdfsFileFormat::PARQUET; ++format) {
-    if (per_type_files_[static_cast<THdfsFileFormat::type>(format)].empty()) continue;
+    vector<HdfsFileDesc*>& file_descs =
+        per_type_files_[static_cast<THdfsFileFormat::type>(format)];
+
+    if (file_descs.empty()) continue;
+
+    // Randomize the order this node processes the files. We want to do this to avoid
+    // issuing remote reads to the same DN from different impalads. In file formats such
+    // as avro/seq/rc (i.e. splittable with a header), every node first reads the header.
+    // If every node goes through the files in the same order, all the remote reads are
+    // for the same file meaning a few DN serves a lot of remote reads at the same time.
+    random_shuffle(file_descs.begin(), file_descs.end());
+
+    // Create reusable codegen'd functions for each file type type needed
     Function* fn;
     switch (format) {
       case THdfsFileFormat::TEXT:
@@ -537,7 +548,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
     return Status::OK;
   }
 
-  // Open all the partitions scanned by the scan node
+  // Open all the partition exprs used by the scan node
   BOOST_FOREACH(const int64_t& partition_id, partition_ids_) {
     HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
     DCHECK(partition_desc != NULL);
