@@ -66,6 +66,8 @@ import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -1671,6 +1673,28 @@ public class Planner {
       // limit clauses on the way)
       List<Expr> viewPredicates =
           Expr.substituteList(preds, inlineViewRef.getSmap(), analyzer, false);
+
+      // Remove unregistered predicates that reference the same slot on
+      // both sides (e.g. a = a). Such predicates have been generated from slot
+      // equivalences and may incorrectly reject rows with nulls (IMPALA-1412).
+      Predicate<Expr> isIdentityPredicate = new Predicate<Expr>() {
+        @Override
+        public boolean apply(Expr expr) {
+          if (!(expr instanceof BinaryPredicate)
+              || ((BinaryPredicate) expr).getOp() != BinaryPredicate.Operator.EQ) {
+            return false;
+          }
+          if (!expr.isRegisteredPredicate()
+              && expr.getChild(0) instanceof SlotRef
+              && expr.getChild(1) instanceof SlotRef
+              && (((SlotRef) expr.getChild(0)).getSlotId() ==
+                 ((SlotRef) expr.getChild(1)).getSlotId())) {
+            return true;
+          }
+          return false;
+        }
+      };
+      Iterables.removeIf(viewPredicates, isIdentityPredicate);
 
       // "migrate" conjuncts_ by marking them as assigned and re-registering them with
       // new ids.

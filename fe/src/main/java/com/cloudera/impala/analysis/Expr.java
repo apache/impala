@@ -192,6 +192,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   public boolean isWhereClauseConjunct() { return isWhereClauseConjunct_; }
   public void setIsWhereClauseConjunct() { isWhereClauseConjunct_ = true; }
   public boolean isAuxExpr() { return isAuxExpr_; }
+  public boolean isRegisteredPredicate() { return id_ != null; }
   public void setIsAuxExpr() { isAuxExpr_ = true; }
   public Function getFn() { return fn_; }
 

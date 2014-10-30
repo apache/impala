@@ -60,7 +60,6 @@ where a.id not in (select id from functional.alltypes b where a.id = b.id)
 |
 |--01:SCAN HDFS [functional.alltypes b]
 |     partitions=24/24 files=24 size=478.45KB
-|     predicates: id = b.id
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=24/24 files=24 size=478.45KB

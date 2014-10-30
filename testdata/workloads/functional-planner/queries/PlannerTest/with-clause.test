@@ -454,3 +454,14 @@ WRITE TO HDFS [functional.alltypesinsert, OVERWRITE=false, PARTITION-KEYS=(year,
 01:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
 ====
+# Test with clause with a query statement that references the same column from a
+# base table multiple times (IMPALA-1412)
+with t1 as (
+  select tinyint_col, tinyint_col as tinyint_col2, bigint_col, bigint_col as bigint_col2
+  from functional.alltypestiny)
+select * from t1 where bigint_col = bigint_col2
+---- PLAN
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+   predicates: bigint_col = bigint_col
+====
