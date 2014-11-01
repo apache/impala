@@ -144,7 +144,8 @@ public class Planner {
       // fragment, so we can pass it back to the client.
       boolean isPartitioned = false;
       if ((analysisResult.isInsertStmt() || analysisResult.isCreateTableAsSelectStmt())
-          && !queryStmt.hasLimit() && !queryStmt.hasOffset()) {
+          && !singleNodePlan.hasLimit()) {
+        Preconditions.checkState(!queryStmt.hasOffset());
         isPartitioned = true;
       }
       LOG.debug("create plan fragments");

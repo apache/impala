@@ -54,3 +54,103 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 00:SCAN HDFS [functional.alltypes a]
    partitions=12/24 size=238.68KB
 ====
+# CTAS with a view that has a limit clause (IMPALA-1411)
+create table t as
+select int_col from functional.hive_view
+---- PLAN
+WRITE TO HDFS [default.t, OVERWRITE=false]
+|  partitions=1
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+   limit: 1
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [default.t, OVERWRITE=false]
+|  partitions=1
+|
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 1
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 size=478.45KB
+   limit: 1
+====
+# CTAS with multiple nested inline views that have a limit clause (IMPALA-1411)
+create table t as
+select * from
+  (select * from
+     (select int_col from functional.alltypestiny limit 1) v1 ) v2
+---- PLAN
+WRITE TO HDFS [default.t, OVERWRITE=false]
+|  partitions=1
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=460B
+   limit: 1
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [default.t, OVERWRITE=false]
+|  partitions=1
+|
+01:EXCHANGE [UNPARTITIONED]
+|  limit: 1
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=460B
+   limit: 1
+====
+
+# CTAS with a select statement that has a limit and offset clause (IMPALA-1411)
+create table t as
+select * from functional.alltypestiny order by id limit 1 offset 5
+---- PLAN
+WRITE TO HDFS [default.t, OVERWRITE=false]
+|  partitions=1
+|
+01:TOP-N [LIMIT=1 OFFSET=5]
+|  order by: id ASC
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=460B
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [default.t, OVERWRITE=false]
+|  partitions=1
+|
+02:MERGING-EXCHANGE [UNPARTITIONED]
+|  offset: 5
+|  order by: id ASC
+|  limit: 1
+|
+01:TOP-N [LIMIT=6]
+|  order by: id ASC
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=460B
+====
+# CTAS with an inline view that has a limit and offset clause (IMPALA-1411)
+create table t as
+select * from
+  (select int_col from functional.alltypestiny order by id limit 2 offset 5) v
+---- PLAN
+WRITE TO HDFS [default.t, OVERWRITE=false]
+|  partitions=1
+|
+01:TOP-N [LIMIT=2 OFFSET=5]
+|  order by: id ASC
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=460B
+---- DISTRIBUTEDPLAN
+WRITE TO HDFS [default.t, OVERWRITE=false]
+|  partitions=1
+|
+02:MERGING-EXCHANGE [UNPARTITIONED]
+|  offset: 5
+|  order by: id ASC
+|  limit: 2
+|
+01:TOP-N [LIMIT=7]
+|  order by: id ASC
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 size=460B
+====
