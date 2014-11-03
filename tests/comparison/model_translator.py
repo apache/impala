@@ -12,19 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from copy import deepcopy
 from inspect import getmro
 from logging import getLogger
 from re import sub
 from sqlparse import format
 
-from tests.comparison.model import (
-    Boolean,
+from tests.comparison.types import (
+    Char,
     Float,
     Int,
-    Number,
-    Query,
     String,
-    Timestamp)
+    Timestamp,
+    VarChar)
+from tests.comparison.query import Query
 
 LOG = getLogger(__name__)
 
@@ -33,11 +34,6 @@ class SqlWriter(object):
      specific database such as Impala or MySQL. The SqlWriter.create([dialect=])
      factory method may be used instead of specifying the concrete class.
 
-     Another important function of this class is to ensure that CASTs produce the same
-     results across different databases. Sometimes the CASTs implemented here produce odd
-     results. For example, the result of CAST(date_col AS INT) in MySQL may be an int of
-     YYYYMMDD whereas in Impala it may be seconds since the epoch. For comparison purposes
-     the CAST could be transformed into EXTRACT(DAY from date_col).
   '''
 
   @staticmethod
@@ -48,15 +44,41 @@ class SqlWriter(object):
     '''
     dialect = dialect.upper()
     if dialect == 'IMPALA':
-      return SqlWriter()
-    if dialect == 'POSTGRESQL':
-      return PostgresqlSqlWriter()
+      return ImpalaSqlWriter()
     if dialect == 'MYSQL':
       return MySQLSqlWriter()
+    if dialect == 'ORACLE':
+      return OracleSqlWriter()
+    if dialect == 'POSTGRESQL':
+      return PostgresqlSqlWriter()
     raise Exception('Unknown dialect: %s' % dialect)
 
+  def __init__(self):
+    # Functions that don't follow the usual call syntax of foo(bar, baz) can be listed
+    # here. Parenthesis were added everywhere to avoid problems with operator precedence.
+    # TODO: Account for operator precedence...
+    self.operator_funcs = {
+        'And': '({0}) AND ({1})',
+        'Or': '({0}) OR ({1})',
+        'Plus': '({0}) + ({1})',
+        'Minus': '({0}) - ({1})',
+        'Multiply': '({0}) * ({1})',
+        'Divide': '({0}) / ({1})',
+        'Equals': '({0}) = ({1})',
+        'NotEquals': '({0}) != ({1})',
+        'LessThan': '({0}) < ({1})',
+        'GreaterThan': '({0}) > ({1})',
+        'LessThanOrEquals': '({0}) <= ({1})',
+        'GreaterThanOrEquals': '({0}) >= ({1})',
+        'IsNull': '({0}) IS NULL',
+        'IsNotNull': '({0}) IS NOT NULL'}
+
   def write_query(self, query, pretty=False):
-    '''Return SQL as a string for the given query.'''
+    '''Return SQL as a string for the given query.
+
+       If "pretty" is True, the SQL will be formatted (though not very well) with new
+       lines and indentation.
+    '''
     sql = list()
     # Write out each section in the proper order
     for clause in (
@@ -66,7 +88,9 @@ class SqlWriter(object):
         query.where_clause,
         query.group_by_clause,
         query.having_clause,
-        query.union_clause):
+        query.union_clause,
+        query.order_by_clause,
+        query.limit_clause):
       if clause:
         sql.append(self._write(clause))
     sql = '\n'.join(sql)
@@ -86,22 +110,22 @@ class SqlWriter(object):
                                 for view in with_clause.with_clause_inline_views)
 
   def _write_select_clause(self, select_clause):
-    items = select_clause.non_agg_items + select_clause.agg_items
     sql = 'SELECT'
     if select_clause.distinct:
       sql += ' DISTINCT'
-    sql += '\n' + ',\n'.join(self._write(item) for item in items)
+    sql += '\n' + ',\n'.join(self._write(item) for item in select_clause.items)
     return sql
 
   def _write_select_item(self, select_item):
-    # If the query is nested, the items will have aliases so that the outer query can
-    # easily reference them.
-    if not select_item.alias:
-      raise Exception('An alias is required')
-    return '%s AS %s' % (self._write(select_item.val_expr), select_item.alias)
+    if select_item.alias:
+      return '{0} AS {1}'.format(self._write(select_item.val_expr), select_item.alias))
+    else:
+      return self._write(select_item.val_expr)
 
   def _write_column(self, col):
-    return '%s.%s' % (col.owner.identifier, col.name)
+    if col.owner.alias:
+      return '%s.%s' % (col.owner.alias, col.name)
+    return col.name
 
   def _write_from_clause(self, from_clause):
     sql = 'FROM %s' % self._write(from_clause.table_expr)
@@ -111,20 +135,20 @@ class SqlWriter(object):
 
   def _write_table(self, table):
     if table.alias:
-        return '%s AS %s' % (table.name, table.identifier)
+        return '%s %s' % (table.name, table.identifier)
     return table.name
 
   def _write_inline_view(self, inline_view):
     if not inline_view.identifier:
       raise Exception('An inline view requires an identifier')
-    return '(\n%s\n) AS %s' % (self._write(inline_view.query), inline_view.identifier)
+    return '(\n%s\n) %s' % (self._write(inline_view.query), inline_view.identifier)
 
   def _write_with_clause_inline_view(self, with_clause_inline_view):
     if not with_clause_inline_view.with_clause_alias:
       raise Exception('An with clause entry requires an identifier')
     sql = with_clause_inline_view.with_clause_alias
     if with_clause_inline_view.alias:
-      sql += ' AS ' + with_clause_inline_view.alias
+      sql += ' ' + with_clause_inline_view.alias
     return sql
 
   def _write_join_clause(self, join_clause):
@@ -152,52 +176,156 @@ class SqlWriter(object):
 
   def _write_data_type(self, data_type):
     '''Write a literal value.'''
-    if data_type.returns_string:
+    if data_type.val is None:
+      return 'NULL'
+    if data_type.returns_char:
       return "'{0}'".format(data_type.val)
     if data_type.returns_timestamp:
-      return "CAST('{0}' AS TIMESTAMP)".format(data_type.val)
+      return "CAST('{0}' AS {1})".format(
+          data_type.val, self._write_data_type_metaclass(Timestamp))
     return str(data_type.val)
 
   def _write_func(self, func):
-    return func.FORMAT.format(*[self._write(arg) for arg in func.args])
+    if func.name() in self.operator_funcs:
+      sql = self.operator_funcs[func.name()].format(
+          *[self._write(arg) for arg in func.args])
+    else:
+      sql = '%s(%s)' % \
+          (self._to_sql_name(func.name()), self._write_as_comma_list(func.args))
+    return sql
 
-  def _write_cast(self, cast):
-    # Handle casts that produce different results across database types or just don't
-    # make sense like casting a DATE as a BOOLEAN....
-    if cast.val_expr.returns_boolean:
-      if issubclass(cast.resulting_type, Timestamp):
-        return "CAST(CASE WHEN {0} THEN '2000-01-01' ELSE '1999-01-01' END AS TIMESTAMP)"\
-            .format(self._write(cast.val_expr))
-    elif cast.val_expr.returns_number:
-      if issubclass(cast.resulting_type, Timestamp):
-        return ("CAST(CONCAT('2000-01-', "
-            "LPAD(CAST(ABS(FLOOR({0})) % 31 + 1 AS STRING), 2, '0')) "
-            "AS TIMESTAMP)").format(self._write(cast.val_expr))
-    elif cast.val_expr.returns_string:
-      if issubclass(cast.resulting_type, Boolean):
-        return "(LENGTH({0}) > 2)".format(self._write(cast.val_expr))
-      if issubclass(cast.resulting_type, Timestamp):
-        return ("CAST(CONCAT('2000-01-', LPAD(CAST(LENGTH({0}) % 31 + 1 AS STRING), "
-            "2, '0')) AS TIMESTAMP)").format(self._write(cast.val_expr))
-    elif cast.val_expr.returns_timestamp:
-      if issubclass(cast.resulting_type, Boolean):
-        return '(DAY({0}) > MONTH({0}))'.format(self._write(cast.val_expr))
-      if issubclass(cast.resulting_type, Number):
-        return ('(DAY({0}) + 100 * MONTH({0}) + 100 * 100 * YEAR({0}))').format(
-            self._write(cast.val_expr))
-    return self._write_func(cast)
+  def _write_exists(self, func):
+    return 'EXISTS ' + self._write(func.args[0])
 
-  def _write_agg_func(self, agg_func):
-    sql = type(agg_func).__name__.upper() + '('
-    if agg_func.distinct:
+  def _write_not_exists(self, func):
+    return 'NOT EXISTS ' + self._write(func.args[0])
+
+  def _write_in(self, func, use_not=False):
+    sql = '(%s) ' % self._write(func.args[0])
+    if use_not:
+      sql += 'NOT '
+    sql += 'IN '
+    if func.signature.args[1].is_subquery:
+      sql += self._write(func.args[1])
+    else:
+      sql += '(' + self._write_as_comma_list(func.args[1:]) + ')'
+    return sql
+
+  def _write_not_in(self, func):
+    return self._write_in(func, use_not=True)
+
+  def _write_as_comma_list(self, items):
+    return ', '.join([self._write(item) for item in items])
+
+  def _write_cast_as_char(self, func):
+    return 'CAST(%s AS %s)' % (self._write(func.args[0]), self._write(String))
+
+  def _write_date_add_year(self, func):
+    return "%s + INTERVAL %s YEAR" \
+        % (self._write(func.args[0]), self._write(func.args[1]))
+
+  def _write_date_add_month(self, func):
+    return "%s + INTERVAL %s MONTH" \
+        % (self._write(func.args[0]), self._write(func.args[1]))
+
+  def _write_date_add_day(self, func):
+    return "%s + INTERVAL %s DAY" \
+        % (self._write(func.args[0]), self._write(func.args[1]))
+
+  def _write_date_add_hour(self, func):
+    return "%s + INTERVAL %s HOUR" \
+        % (self._write(func.args[0]), self._write(func.args[1]))
+
+  def _write_date_add_minute(self, func):
+    return "%s + INTERVAL %s MINUTE" \
+        % (self._write(func.args[0]), self._write(func.args[1]))
+
+  def _write_date_add_second(self, func):
+    return "%s + INTERVAL %s SECOND" \
+        % (self._write(func.args[0]), self._write(func.args[1]))
+
+  def _write_extract_year(self, func):
+    return 'EXTRACT(YEAR FROM %s)' % self._write(func.args[0])
+
+  def _write_extract_month(self, func):
+    return 'EXTRACT(MONTH FROM %s)' % self._write(func.args[0])
+
+  def _write_extract_day(self, func):
+    return 'EXTRACT(DAY FROM %s)' % self._write(func.args[0])
+
+  def _write_extract_hour(self, func):
+    return 'EXTRACT(HOUR FROM %s)' % self._write(func.args[0])
+
+  def _write_extract_minute(self, func):
+    return 'EXTRACT(MINUTE FROM %s)' % self._write(func.args[0])
+
+  def _write_extract_second(self, func):
+    return 'EXTRACT(SECOND FROM %s)' % self._write(func.args[0])
+
+  def _write_implicit_cast(self, func):
+    return self._write(func.args[0])
+
+  def _write_analytic_func(self, func):
+    sql = self._to_sql_name(func.name()) \
+        + '(' + self._write_as_comma_list(func.args) \
+        + ') OVER ('
+    options = []
+    if func.partition_by_clause:
+      options.append(self._write(func.partition_by_clause))
+    if func.order_by_clause:
+      options.append(self._write(func.order_by_clause))
+    if func.window_clause:
+      options.append(self._write(func.window_clause))
+    return sql + ' '.join(options) + ')'
+
+  def _write_partition_by_clause(self, partition_by_clause):
+    return 'PARTITION BY ' + \
+        ', '.join(self._write(expr) for expr in partition_by_clause.val_exprs)
+
+  def _write_window_clause(self, window_clause):
+    sql = window_clause.range_or_rows.upper() + ' '
+    if window_clause.end_boundary:
+      sql += 'BETWEEN '
+    if window_clause.start_boundary.val_expr:
+      sql += self._write(window_clause.start_boundary.val_expr) + ' '
+    sql += window_clause.start_boundary.boundary_type.upper() + ' '
+    if window_clause.end_boundary:
+      sql += 'AND '
+      if window_clause.end_boundary.val_expr:
+        sql += self._write(window_clause.end_boundary.val_expr) + ' '
+      sql += window_clause.end_boundary.boundary_type.upper()
+    return sql
+
+  def _write_agg_func(self, func):
+    sql = self._to_sql_name(func.name()) + '('
+    if func.distinct:
       sql += 'DISTINCT '
     # All agg funcs only have a single arg
-    sql += self._write(agg_func.args[0]) + ')'
+    sql += self._write(func.args[0]) + ')'
     return sql
 
   def _write_data_type_metaclass(self, data_type_class):
     '''Write a data type class such as Int or Boolean.'''
+    aliases = getattr(data_type_class, self.DIALECT, None)
+    if aliases:
+      return aliases[0]
     return data_type_class.__name__.upper()
+
+  def _write_subquery(self, subquery):
+    return '({0})'.format(self._write(subquery.query))
+
+  def _write_order_by_clause(self, order_by_clause):
+    sql = 'ORDER BY '
+    for idx, (expr, order) in enumerate(order_by_clause.exprs_to_order):
+      if idx > 0:
+        sql += ', '
+      sql += self._write(expr)
+      if order:
+        sql += ' ' + order
+    return sql
+
+  def _write_limit_clause(self, limit_clause):
+    return 'LIMIT {0}'.format(limit_clause.limit)
 
   def _write(self, object_):
     '''Return a sql string representation of the given object.'''
@@ -212,7 +340,7 @@ class SqlWriter(object):
     #   resolution order (MRO). If _write_and(...) were to be defined, it would be called
     #   instead.
     for type_ in getmro(type(object_)):
-      writer_func_name = '_write' + sub('([A-Z])', r'_\1', type_.__name__).lower()
+      writer_func_name = '_write_' + self._to_py_name(type_.__name__)
       writer_func = getattr(self, writer_func_name, None)
       if writer_func:
         return writer_func(object_)
@@ -223,59 +351,92 @@ class SqlWriter(object):
 
     raise Exception('Unsupported object: %s<%s>' % (type(object_).__name__, object_))
 
+  def _to_py_name(self, name):
+    return sub('([A-Z])', r'_\1', name).lower().lstrip('_')
+
+  def _to_sql_name(self, name):
+    return self._to_py_name(name).upper()
+
+
+class ImpalaSqlWriter(SqlWriter):
+
+  DIALECT = 'IMPALA'
+
+
+class OracleSqlWriter(SqlWriter):
+
+  DIALECT = 'ORACLE'
+
 
 class PostgresqlSqlWriter(SqlWriter):
-  # TODO: This class is out of date since switching to MySQL. This is left here as is
-  #       in case there is a desire to switch back in the future (it should be better than
-  #       starting from nothing).
 
-  def _write_divide(self, divide):
-    # For ints, Postgresql does int division but Impala does float division.
-    return 'CAST({0} AS REAL) / {1}' \
-        .format(*[self._write(arg) for arg in divide.args])
+  DIALECT = 'POSTGRESQL'
+
+  def _write_date_add_year(self, func):
+    return "%s + (%s) * INTERVAL '1' YEAR" \
+        % (self._write(func.args[0]), self._write(func.args[1]))
+
+  def _write_date_add_month(self, func):
+    return "%s + (%s) * INTERVAL '1' MONTH" \
+        % (self._write(func.args[0]), self._write(func.args[1]))
+
+  def _write_date_add_day(self, func):
+    return "%s + (%s) * INTERVAL '1' DAY" \
+        % (self._write(func.args[0]), self._write(func.args[1]))
+
+  def _write_date_add_hour(self, func):
+    return "%s + (%s) * INTERVAL '1' HOUR" \
+        % (self._write(func.args[0]), self._write(func.args[1]))
+
+  def _write_date_add_minute(self, func):
+    return "%s + (%s) * INTERVAL '1' MINUTE" \
+        % (self._write(func.args[0]), self._write(func.args[1]))
+
+  def _write_date_add_second(self, func):
+    return "%s + (%s) * INTERVAL '1' SECOND" \
+        % (self._write(func.args[0]), self._write(func.args[1]))
+
+  def _write_extract_second(self, func):
+    # For some reason Postgresql decided that extracting second should return a FLOAT...
+    return 'FLOOR(EXTRACT(SECOND FROM %s))' % self._write(func.args[0])
+
+  def _write_if(self, func):
+    return 'CASE WHEN {0} THEN {1} ELSE {2} END' \
+        .format(*[self._write(arg) for arg in func.args])
 
   def _write_data_type_metaclass(self, data_type_class):
     '''Write a data type class such as Int or Boolean.'''
-    if hasattr(data_type_class, 'POSTGRESQL'):
-      return data_type_class.POSTGRESQL[0]
+    if data_type_class in (Char, String, VarChar):
+      return 'VARCHAR(%s)' % data_type_class.MAX
     return data_type_class.__name__.upper()
 
-  def _write_cast(self, cast):
-    # Handle casts that produce different results across database types or just don't
-    # make sense like casting a DATE as a BOOLEAN....
-    if cast.val_expr.returns_boolean:
-      if issubclass(cast.resulting_type, Float):
-        return "CASE {0} WHEN TRUE THEN 1.0 WHEN FALSE THEN 0.0 END".format(
-            self._write(cast.val_expr))
-      if issubclass(cast.resulting_type, Timestamp):
-        return "CASE WHEN {0} THEN '2000-01-01' ELSE '1999-01-01' END".format(
-            self._write(cast.val_expr))
-      if issubclass(cast.resulting_type, String):
-        return "CASE {0} WHEN TRUE THEN '1' WHEN FALSE THEN '0' END".format(
-            self._write(cast.val_expr))
-    elif cast.val_expr.returns_number:
-      if issubclass(cast.resulting_type, Boolean):
-        return 'CASE WHEN ({0}) != 0 THEN TRUE WHEN ({0}) = 0 THEN FALSE END'.format(
-            self._write(cast.val_expr))
-      if issubclass(cast.resulting_type, Timestamp):
-        return "CASE WHEN ({0}) > 0 THEN '2000-01-01' ELSE '1999-01-01' END".format(
-            self._write(cast.val_expr))
-    elif cast.val_expr.returns_string:
-      if issubclass(cast.resulting_type, Boolean):
-        return "(LENGTH({0}) > 2)".format(self._write(cast.val_expr))
-    elif cast.val_expr.returns_timestamp:
-      if issubclass(cast.resulting_type, Boolean):
-        return '(EXTRACT(DAY FROM {0}) > EXTRACT(MONTH FROM {0}))'.format(
-        self._write(cast.val_expr))
-      if issubclass(cast.resulting_type, Number):
-        return ('(EXTRACT(DAY FROM {0}) '
-            '+ 100 * EXTRACT(MONTH FROM {0}) '
-            '+ 100 * 100 * EXTRACT(YEAR FROM {0}))').format(
-                self._write(cast.val_expr))
-    return self._write_func(cast)
+  def _write_order_by_clause(self, order_by_clause):
+    sql = 'ORDER BY '
+    for idx, (expr, order) in enumerate(order_by_clause.exprs_to_order):
+      if idx > 0:
+        sql += ', '
+      if expr.returns_char:
+        sql += 'CAST({0} AS BYTEA)'.format(self._write(expr))
+      else:
+        sql += self._write(expr)
+      if order:
+        sql += ' ' + order
+    return sql
+
+  def _write_data_type(self, data_type):
+    '''Write a literal value.'''
+    if data_type.val is None:
+      return 'NULL'
+    if data_type.returns_char:
+      # Literals sometimes produce an error 'could not determine polymorphic type
+      # because input has type "unknown"', adding an "|| ''" avoids the problem.
+      return "'%s' || ''" % data_type.val
+    return SqlWriter._write_data_type(self, data_type)
 
 
 class MySQLSqlWriter(SqlWriter):
+
+  DIALECT = 'MYSQL'
 
   def write_query(self, query, pretty=False):
     # MySQL doesn't support WITH clauses so they need to be converted into inline views.
@@ -288,7 +449,9 @@ class MySQLSqlWriter(SqlWriter):
         query.where_clause,
         query.group_by_clause,
         query.having_clause,
-        query.union_clause):
+        query.union_clause,
+        query.order_by_clause,
+        query.limit_clause):
       if clause:
         sql.append(self._write(clause))
     sql = '\n'.join(sql)
@@ -308,7 +471,7 @@ class MySQLSqlWriter(SqlWriter):
       return 'INTEGER'
     if issubclass(data_type_class, Float):
       return 'DECIMAL(65, 15)'
-    if issubclass(data_type_class, String):
+    if issubclass(data_type_class, VarChar):
       return 'CHAR'
     if hasattr(data_type_class, 'MYSQL'):
       return data_type_class.MYSQL[0]
@@ -323,45 +486,12 @@ class MySQLSqlWriter(SqlWriter):
       return '(0 = 0)' if data_type.val else '(1 = 0)'
     return SqlWriter._write_data_type(self, data_type)
 
-  def _write_cast(self, cast):
-    # Handle casts that produce different results across database types or just don't
-    # make sense like casting a DATE as a BOOLEAN....
-    if cast.val_expr.returns_boolean:
-      if issubclass(cast.resulting_type, Timestamp):
-        return "CAST(CASE WHEN {0} THEN '2000-01-01' ELSE '1999-01-01' END AS DATETIME)"\
-            .format(self._write(cast.val_expr))
-    elif cast.val_expr.returns_number:
-      if issubclass(cast.resulting_type, Boolean):
-        return ("CASE WHEN ({0}) != 0 THEN TRUE WHEN ({0}) = 0 THEN FALSE END").format(
-            self._write(cast.val_expr))
-      if issubclass(cast.resulting_type, Timestamp):
-        return "CAST(CONCAT('2000-01-', ABS(FLOOR({0})) % 31 + 1) AS DATETIME)"\
-            .format(self._write(cast.val_expr))
-    elif cast.val_expr.returns_string:
-      if issubclass(cast.resulting_type, Boolean):
-        return "(LENGTH({0}) > 2)".format(self._write(cast.val_expr))
-      if issubclass(cast.resulting_type, Timestamp):
-        return ("CAST(CONCAT('2000-01-', LENGTH({0}) % 31 + 1) AS DATETIME)").format(
-           self._write(cast.val_expr))
-    elif cast.val_expr.returns_timestamp:
-      if issubclass(cast.resulting_type, Number):
-        return ('(EXTRACT(DAY FROM {0}) '
-            '+ 100 * EXTRACT(MONTH FROM {0}) '
-            '+ 100 * 100 * EXTRACT(YEAR FROM {0}))').format(
-                self._write(cast.val_expr))
-      if issubclass(cast.resulting_type, Boolean):
-        return '(EXTRACT(DAY FROM {0}) > EXTRACT(MONTH FROM {0}))'.format(
-            self._write(cast.val_expr))
-
-    # MySQL uses different type names when casting...
-    if issubclass(cast.resulting_type, Boolean):
-      data_type = 'UNSIGNED'
-    elif issubclass(cast.resulting_type, Float):
-      data_type = 'DECIMAL(65, 15)'
-    elif issubclass(cast.resulting_type, Int):
-      data_type = 'SIGNED'
-    elif issubclass(cast.resulting_type, String):
-      data_type = 'CHAR'
-    elif issubclass(cast.resulting_type, Timestamp):
-      data_type = 'DATETIME'
-    return cast.FORMAT.format(self._write(cast.val_expr), data_type)
+  def _write_order_by_clause(self, order_by_clause):
+    sql = 'ORDER BY '
+    for idx, (expr, order) in enumerate(order_by_clause.exprs_to_order):
+      if idx > 0:
+        sql += ', '
+      sql += 'ISNULL({0}), {0}'.format(self._write(expr))
+      if order:
+        sql += ' ' + order
+    return sql
