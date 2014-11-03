@@ -50,21 +50,6 @@ line parameter.</p>
 {{/in_flight_queries}}
 </table>
 
-<h3>Query Locations</h3>
-
-<table class='table table-hover table-bordered'>
-  <tr>
-    <th>Location</th>
-    <th>Number of Fragments</th>
-  </tr>
-{{#query_locations}}
-  <tr>
-    <td>{{location}}</td>
-    <td>{{count}}</td>
-  </tr>
-{{/query_locations}}
-</table>
-
 <h3>Last {{completed_log_size}} Completed Queries</h3>
 
 <table class='table table-hover table-border'>
@@ -96,6 +81,21 @@ line parameter.</p>
     <td><a href='/query_summary?query_id={{query_id}}'>Summary</a></td>
   </tr>
 {{/completed_queries}}
+</table>
+
+<h3>Query Locations</h3>
+
+<table class='table table-hover table-bordered'>
+  <tr>
+    <th>Location</th>
+    <th>Number of Fragments</th>
+  </tr>
+{{#query_locations}}
+  <tr>
+    <td>{{location}}</td>
+    <td>{{count}}</td>
+  </tr>
+{{/query_locations}}
 </table>
 
 {{> www/common-footer.tmpl }}
