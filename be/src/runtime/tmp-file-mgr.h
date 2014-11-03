@@ -75,12 +75,12 @@ class TmpFileMgr {
   // per disk, only one is created and used. Must be called after DiskInfo::Init().
   static Status Init();
 
-  // Return a new File handle with a unique path for a fragment instance. The file path
+  // Return a new File handle with a unique path for a query instance. The file path
   // is within the (single) tmp directory on the specified device id. The caller owns
   // the returned handle and is responsible for deleting it. The file is not created -
   // creation is deferred until the first call to File::AllocateSpace().
   static Status GetFile(int tmp_device_id, const TUniqueId& query_id,
-      const TUniqueId& fragment_instance_id, File** new_file);
+      File** new_file);
 
   // Total number of devices with tmp directories. This is the same as the number
   // of tmp directories created.

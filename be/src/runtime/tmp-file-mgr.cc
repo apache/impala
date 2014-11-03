@@ -83,16 +83,14 @@ Status TmpFileMgr::Init() {
 }
 
 Status TmpFileMgr::GetFile(int tmp_device_id, const TUniqueId& query_id,
-      const TUniqueId& fragment_instance_id, File** new_file) {
+    File** new_file) {
   DCHECK(initialized_);
   DCHECK_LT(tmp_device_id, tmp_dirs_.size());
 
   // Generate the full file path.
   string unique_name = lexical_cast<string>(random_generator()());
   stringstream file_name;
-  file_name << PrintId(query_id) << "_"
-            << PrintId(fragment_instance_id)
-            << "_" << unique_name;
+  file_name << PrintId(query_id) << "_" << unique_name;
   path new_file_path(tmp_dirs_[tmp_device_id]);
   new_file_path /= file_name.str();
 

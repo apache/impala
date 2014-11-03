@@ -401,9 +401,13 @@ class BufferedBlockMgr {
 
   BufferedBlockMgr(RuntimeState* state, int64_t block_size);
 
-  // Initialize the counters to track the block manager behavior and mem_tracker_ with
-  // mem_limit.
-  void Init(RuntimeProfile* profile, MemTracker* parent_tracker, int64_t mem_limit);
+  // Initializes the block mgr. Idempotent and thread-safe.
+  void Init(DiskIoMgr* io_mgr, RuntimeProfile* profile,
+      MemTracker* parent_tracker, int64_t mem_limit);
+
+  // Initializes tmp_files_. This is initialized the first time we need to write to disk.
+  // Must be called with lock_ taken.
+  Status InitTmpFiles();
 
   // PinBlock(), UnpinBlock(), DeleteBlock() perform the actual work of Block::Pin(),
   // Unpin() and Delete(). The lock_ must be taken by the caller.
@@ -482,17 +486,20 @@ class BufferedBlockMgr {
 
   ObjectPool obj_pool_;
 
-  // The total number of reserved buffers across all clients that are not pinned.
-  int unfullfilled_reserved_buffers_;
-
-  // The total number of pinned buffers across all clients.
-  int total_pinned_buffers_;
-
   // Track buffers allocated by the block manager.
   boost::scoped_ptr<MemTracker> mem_tracker_;
 
   // Protects the block and buffer lists below and changes to block state.
   boost::mutex lock_;
+
+  // If true, Init() has been called.
+  bool initialized_;
+
+  // The total number of reserved buffers across all clients that are not pinned.
+  int unfullfilled_reserved_buffers_;
+
+  // The total number of pinned buffers across all clients.
+  int total_pinned_buffers_;
 
   // Number of outstanding writes (Writes issued but not completed).
   // This does not include client-local writes.
@@ -577,7 +584,7 @@ class BufferedBlockMgr {
   int writes_issued_;
 
   // Protects query_to_block_mgrs_
-  static boost::mutex static_block_mgrs_lock_;
+  static SpinLock static_block_mgrs_lock_;
 
   // All per-query BufferedBlockMgr objects that are in use.  For memory management, this
   // map contains only weak ptrs. BufferedBlockMgrs that are handed out are shared ptrs.

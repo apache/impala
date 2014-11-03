@@ -42,7 +42,7 @@ using namespace strings;
 namespace impala {
 
 BufferedBlockMgr::BlockMgrsMap BufferedBlockMgr::query_to_block_mgrs_;
-mutex BufferedBlockMgr::static_block_mgrs_lock_;
+SpinLock BufferedBlockMgr::static_block_mgrs_lock_;
 
 struct BufferedBlockMgr::Client {
   Client(BufferedBlockMgr* mgr, int num_reserved_buffers, MemTracker* tracker,
@@ -193,6 +193,7 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, int64_t block_size)
     block_write_threshold_(TmpFileMgr::num_tmp_devices() * 2),
     disable_spill_(state->query_ctx().disable_spilling),
     query_id_(state->query_id()),
+    initialized_(false),
     unfullfilled_reserved_buffers_(0),
     total_pinned_buffers_(0),
     num_outstanding_writes_(0),
@@ -201,46 +202,27 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, int64_t block_size)
     writes_issued_(0),
     encryption_(FLAGS_disk_spill_encryption),
     check_integrity_(FLAGS_disk_spill_encryption) {
-  state->io_mgr()->RegisterContext(NULL, &io_request_context_);
-  if (encryption_) {
-    static bool openssl_loaded = false;
-    if (!openssl_loaded) {
-      // These are idempotent, so no threading worries.
-      OpenSSL_add_all_algorithms();
-      ERR_load_crypto_strings();
-      openssl_loaded = true;
-    }
-    // Seed the random number generator
-    // TODO: try non-blocking read from /dev/random and add that, too.
-    RAND_load_file("/dev/urandom", 4096);
-  }
 }
 
 Status BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
     RuntimeProfile* profile, int64_t mem_limit, int64_t block_size,
     shared_ptr<BufferedBlockMgr>* block_mgr) {
   DCHECK_NOTNULL(parent);
-  lock_guard<mutex> lock(static_block_mgrs_lock_);
-  BlockMgrsMap::iterator it = query_to_block_mgrs_.find(state->query_id());
-  if ((it != query_to_block_mgrs_.end())) {
-    *block_mgr = it->second.lock();
-    return Status::OK;
+  block_mgr->reset();
+  {
+    ScopedSpinLock lock(&static_block_mgrs_lock_);
+    BlockMgrsMap::iterator it = query_to_block_mgrs_.find(state->query_id());
+    if (it != query_to_block_mgrs_.end()) *block_mgr = it->second.lock();
+    if (*block_mgr == NULL) {
+      // weak_ptr::lock returns NULL if the weak_ptr is expired. This means
+      // all shared_ptr references have gone to 0 and it is in the process of
+      // being deleted. This can happen if the last shared reference is released
+      // but before the weak ptr is removed from the map.
+      block_mgr->reset(new BufferedBlockMgr(state, block_size));
+      query_to_block_mgrs_[state->query_id()] = *block_mgr;
+    }
   }
-
-  block_mgr->reset(new BufferedBlockMgr(state, block_size));
-  query_to_block_mgrs_[state->query_id()] = *block_mgr;
-
-  // Initialize the tmp files and the initial file to use.
-  int num_tmp_devices = TmpFileMgr::num_tmp_devices();
-  (*block_mgr)->tmp_files_.reserve(num_tmp_devices);
-  for (int i = 0; i < num_tmp_devices; ++i) {
-    TmpFileMgr::File* tmp_file;
-    RETURN_IF_ERROR(TmpFileMgr::GetFile(
-        i, state->query_id(), state->fragment_instance_id(), &tmp_file));
-    (*block_mgr)->tmp_files_.push_back(tmp_file);
-  }
-  (*block_mgr)->next_block_index_ = rand() % num_tmp_devices;
-  (*block_mgr)->Init(profile, parent, mem_limit);
+  (*block_mgr)->Init(state->io_mgr(), profile, parent, mem_limit);
   return Status::OK;
 }
 
@@ -485,7 +467,7 @@ Status BufferedBlockMgr::TransferBuffer(Block* dst, Block* src, bool unpin) {
 
 BufferedBlockMgr::~BufferedBlockMgr() {
   {
-    lock_guard<mutex> lock(static_block_mgrs_lock_);
+    ScopedSpinLock lock(&static_block_mgrs_lock_);
     DCHECK(query_to_block_mgrs_.find(query_id_) != query_to_block_mgrs_.end());
     query_to_block_mgrs_.erase(query_id_);
   }
@@ -653,6 +635,8 @@ Status BufferedBlockMgr::WriteUnpinnedBlock(Block* block) {
   DCHECK(!block->in_write_) << block->DebugString();
 
   if (block->write_range_ == NULL) {
+    if (tmp_files_.empty()) RETURN_IF_ERROR(InitTmpFiles());
+
     // First time the block is being persisted. Find the next physical file in
     // round-robin order and create a write range for it.
     TmpFileMgr::File& tmp_file = tmp_files_[next_block_index_];
@@ -1074,8 +1058,25 @@ string BufferedBlockMgr::DebugInternal() const {
   return ss.str();
 }
 
-void BufferedBlockMgr::Init(RuntimeProfile* parent_profile,
+void BufferedBlockMgr::Init(DiskIoMgr* io_mgr, RuntimeProfile* parent_profile,
     MemTracker* parent_tracker, int64_t mem_limit) {
+  unique_lock<mutex> l(lock_);
+  if (initialized_) return;
+
+  io_mgr->RegisterContext(NULL, &io_request_context_);
+  if (encryption_) {
+    static bool openssl_loaded = false;
+    if (!openssl_loaded) {
+      // These are idempotent, so no threading worries.
+      OpenSSL_add_all_algorithms();
+      ERR_load_crypto_strings();
+      openssl_loaded = true;
+    }
+    // Seed the random number generator
+    // TODO: try non-blocking read from /dev/random and add that, too.
+    RAND_load_file("/dev/urandom", 4096);
+  }
+
   profile_.reset(new RuntimeProfile(&obj_pool_, "BlockMgr"));
   parent_profile->AddChild(profile_.get());
 
@@ -1100,6 +1101,28 @@ void BufferedBlockMgr::Init(RuntimeProfile* parent_profile,
   // Create a new mem_tracker and allocate buffers.
   mem_tracker_.reset(new MemTracker(
       profile(), mem_limit, -1, "Block Manager", parent_tracker));
+
+  initialized_ = true;
+}
+
+Status BufferedBlockMgr::InitTmpFiles() {
+  DCHECK(tmp_files_.empty());
+
+  // Initialize the tmp files and the initial file to use.
+  int num_tmp_devices = TmpFileMgr::num_tmp_devices();
+  if (num_tmp_devices == 0) {
+    return Status(
+        "No spilling directories configured. Cannot spill. Set --scratch_dirs.");
+  }
+
+  tmp_files_.reserve(num_tmp_devices);
+  for (int i = 0; i < num_tmp_devices; ++i) {
+    TmpFileMgr::File* tmp_file;
+    RETURN_IF_ERROR(TmpFileMgr::GetFile(i, query_id_, &tmp_file));
+    tmp_files_.push_back(tmp_file);
+  }
+  next_block_index_ = rand() % num_tmp_devices;
+  return Status::OK;
 }
 
 // Callback used by OpenSSLErr() - write the error given to us through buf to the
