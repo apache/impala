@@ -202,7 +202,10 @@ int SaslLdapCheckPass(sasl_conn_t* conn, void* context, const char* user,
   int ldap_ver = 3;
   ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &ldap_ver);
 
-  if (FLAGS_ldap_tls) {
+  // If -ldap_tls is turned on, and the URI is ldap://, issue a STARTTLS operation.
+  // Note that we'll ignore -ldap_tls when using ldaps:// because we've already
+  // got a secure connection (and the LDAP server will reject the STARTTLS).
+  if (FLAGS_ldap_tls && (FLAGS_ldap_uri.find(LDAP_URI_PREFIX) == 0)) {
     int tls_rc = ldap_start_tls_s(ld, NULL, NULL);
     if (tls_rc != LDAP_SUCCESS) {
       LOG(WARNING) << "Could not start TLS secure connection to LDAP server ("
