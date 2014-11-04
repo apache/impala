@@ -139,6 +139,10 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
   mem_tracker_.reset(new MemTracker(profile(), -1, -1, profile()->name(),
       state->instance_mem_tracker()));
 
+  partitions_created_counter_ =
+      ADD_COUNTER(profile(), "PartitionsCreated", TCounterType::UNIT);
+  files_created_counter_ =
+      ADD_COUNTER(profile(), "FilesCreated", TCounterType::UNIT);
   rows_inserted_counter_ =
       ADD_COUNTER(profile(), "RowsInserted", TCounterType::UNIT);
   bytes_written_counter_ =
@@ -292,9 +296,10 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
   if (output_partition->tmp_hdfs_file == NULL) {
     return Status(GetHdfsErrorMsg("Failed to open HDFS file for writing: ",
         output_partition->current_file_name));
-  } else {
-    ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT->Increment(1);
   }
+
+  ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT->Increment(1);
+  COUNTER_ADD(files_created_counter_, 1);
 
   // Save the ultimate destination for this file (it will be moved by the coordinator)
   stringstream dest;
@@ -416,6 +421,7 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
   }
   RETURN_IF_ERROR(output_partition->writer->Init());
   output_partition->partition_descriptor = &partition_descriptor;
+  COUNTER_ADD(partitions_created_counter_, 1);
   return CreateNewTmpFile(state, output_partition);
 }
 

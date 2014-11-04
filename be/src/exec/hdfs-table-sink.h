@@ -270,6 +270,8 @@ class HdfsTableSink : public DataSink {
 
   // Allocated from runtime state's pool.
   RuntimeProfile* runtime_profile_;
+  RuntimeProfile::Counter* partitions_created_counter_;
+  RuntimeProfile::Counter* files_created_counter_;
   RuntimeProfile::Counter* rows_inserted_counter_;
   RuntimeProfile::Counter* bytes_written_counter_;
 

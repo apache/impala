@@ -77,7 +77,7 @@ class ThriftSerializer {
     try {
       mem_buffer_->resetBuffer();
       obj->write(protocol_.get());
-    } catch (apache::thrift::TApplicationException& e) {
+    } catch (std::exception& e) {
       std::stringstream msg;
       msg << "Couldn't serialize thrift object:\n" << e.what();
       return Status(msg.str());
