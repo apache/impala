@@ -247,13 +247,15 @@ public class ImpalaJdbcClient {
 
     String[] queries = queryString.trim().split(";");
     for (String query: queries) {
-      query = query.trim().toLowerCase();
-      if (query.startsWith("use")) {
-        String[] split_query = query.split(" ");
-        String db_name = split_query[split_query.length - 1];
-        client.changeDatabase(db_name);
-        client.getStatement().close();
-        continue;
+      query = query.trim();
+      if (query.indexOf(" ") > -1) {
+        if (query.substring(0, query.indexOf(" ")).equalsIgnoreCase("use")) {
+          String[] split_query = query.split(" ");
+          String db_name = split_query[split_query.length - 1];
+          client.changeDatabase(db_name);
+          client.getStatement().close();
+          continue;
+        }
       }
       long startTime = System.currentTimeMillis();
       ResultSet res = client.execQuery(query);
