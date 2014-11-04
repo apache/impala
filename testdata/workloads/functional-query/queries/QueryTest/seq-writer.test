@@ -37,7 +37,7 @@ insert into __seq_write values (4, "e", 5.5);
 SET ALLOW_UNSUPPORTED_FORMATS=0;
 insert into __seq_write values (4, "e", 5.5);
 ---- CATCH
-Writing to table format SEQUENCEFILE is not supported. Use query option
+Writing to table format SEQUENCE_FILE is not supported. Use query option
 ====
 ---- QUERY
 select * from __seq_write;

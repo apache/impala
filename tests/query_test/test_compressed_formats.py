@@ -113,9 +113,6 @@ class TestTableWriters(ImpalaTestSuite):
     cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
 
   def test_seq_writer(self, vector):
-    # TODO debug this test, temporarily disabled. Some issue with zlib on some
-    # of the cluster machines.
-    pytest.skip()
     self.run_test_case('QueryTest/seq-writer', vector)
 
   def test_avro_writer(self, vector):
