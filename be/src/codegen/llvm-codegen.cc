@@ -108,9 +108,11 @@ LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& name) :
   DCHECK(llvm_initialized) << "Must call LlvmCodeGen::InitializeLlvm first.";
 
   load_module_timer_ = ADD_TIMER(&profile_, "LoadTime");
+  prepare_module_timer_ = ADD_TIMER(&profile_, "PrepareTime");
   module_file_size_ = ADD_COUNTER(&profile_, "ModuleFileSize", TCounterType::BYTES);
-  compile_timer_ = ADD_TIMER(&profile_, "CompileTime");
   codegen_timer_ = ADD_TIMER(&profile_, "CodegenTime");
+  optimization_timer_ = ADD_TIMER(&profile_, "OptimizationTime");
+  compile_timer_ = ADD_TIMER(&profile_, "CompileTime");
 
   loaded_functions_.resize(IRFunction::FN_END);
 }
@@ -129,17 +131,21 @@ Status LlvmCodeGen::LoadFromFile(ObjectPool* pool,
 
 Status LlvmCodeGen::LoadModule(LlvmCodeGen* codegen, const string& file,
                                Module** module) {
-  SCOPED_TIMER(codegen->load_module_timer_);
-
   OwningPtr<MemoryBuffer> file_buffer;
-  llvm::error_code err = MemoryBuffer::getFile(file, file_buffer);
-  if (err.value() != 0) {
-    stringstream ss;
-    ss << "Could not load module " << file << ": " << err.message();
-    return Status(ss.str());
+  {
+    SCOPED_TIMER(codegen->load_module_timer_);
+
+    llvm::error_code err = MemoryBuffer::getFile(file, file_buffer);
+    if (err.value() != 0) {
+      stringstream ss;
+      ss << "Could not load module " << file << ": " << err.message();
+      return Status(ss.str());
+    }
   }
+
   COUNTER_ADD(codegen->module_file_size_, file_buffer->getBufferSize());
 
+  SCOPED_TIMER(codegen->prepare_module_timer_);
   string error;
   *module = ParseBitcodeFile(file_buffer.get(), codegen->context(), &error);
   if (*module == NULL) {
@@ -184,7 +190,7 @@ Status LlvmCodeGen::LoadImpalaIR(ObjectPool* pool, scoped_ptr<LlvmCodeGen>* code
 
   // Parse module for cross compiled functions and types
   SCOPED_TIMER(codegen->profile_.total_time_counter());
-  SCOPED_TIMER(codegen->load_module_timer_);
+  SCOPED_TIMER(codegen->prepare_module_timer_);
 
   // Get type for StringValue
   codegen->string_val_type_ = codegen->GetType(StringValue::LLVM_CLASS_NAME);
@@ -606,7 +612,6 @@ Status LlvmCodeGen::FinalizeModule() {
 
   if (is_corrupt_) return Status("Module is corrupt.");
   SCOPED_TIMER(profile_.total_time_counter());
-  SCOPED_TIMER(compile_timer_);
 
   // Don't waste time optimizing module if there are no functions to JIT. This can happen
   // if the codegen object is created but no functions are successfully codegen'd.
@@ -615,6 +620,7 @@ Status LlvmCodeGen::FinalizeModule() {
     OptimizeModule();
   }
 
+  SCOPED_TIMER(compile_timer_);
   // JIT compile all codegen'd functions
   for (int i = 0; i < fns_to_jit_compile_.size(); ++i) {
     *fns_to_jit_compile_[i].second = JitFunction(fns_to_jit_compile_[i].first);
@@ -634,6 +640,8 @@ Status LlvmCodeGen::FinalizeModule() {
 }
 
 void LlvmCodeGen::OptimizeModule() {
+  SCOPED_TIMER(optimization_timer_);
+
   // This pass manager will construct optimizations passes that are "typical" for
   // c/c++ programs.  We're relying on llvm to pick the best passes for us.
   // TODO: we can likely muck with this to get better compile speeds or write

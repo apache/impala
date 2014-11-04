@@ -455,10 +455,23 @@ class LlvmCodeGen {
 
   // Codegen counters
   RuntimeProfile profile_;
+
+  // Time spent reading the .ir file from the file system.
   RuntimeProfile::Counter* load_module_timer_;
-  RuntimeProfile::Counter* module_file_size_;
-  RuntimeProfile::Counter* compile_timer_;
+
+  // Time spent constructing the in-memory module from the .ir file.
+  RuntimeProfile::Counter* prepare_module_timer_;
+
+  // Time spent doing codegen (adding IR to the module)
   RuntimeProfile::Counter* codegen_timer_;
+
+  // Time spent optimizing the module.
+  RuntimeProfile::Counter* optimization_timer_;
+
+  // Time spent compiling the module.
+  RuntimeProfile::Counter* compile_timer_;
+
+  RuntimeProfile::Counter* module_file_size_;
 
   // whether or not optimizations are enabled
   bool optimizations_enabled_;
