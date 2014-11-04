@@ -1009,3 +1009,19 @@ limit 10
    partitions=11/11 files=11 size=814.73KB
    predicates: int_col + int_col = 10
 ====
+# Test enforcement of inline-view slot equivalences when the inline-view
+# contains an outer join (IMPALA-1441)
+select * from
+  (select t1.int_col, t1.tinyint_col, t2.int_col as int_col2, t2.tinyint_col as tinyint_col2
+   from functional.alltypestiny t1 left outer join functional.alltypes t2
+   on t1.int_col = t2.int_col and t1.tinyint_col = t2.tinyint_col) t
+---- PLAN
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: t2.int_col = t1.int_col, t2.tinyint_col = t1.tinyint_col
+|
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     partitions=4/4 files=4 size=460B
+|
+01:SCAN HDFS [functional.alltypes t2]
+   partitions=24/24 files=24 size=478.45KB
+====

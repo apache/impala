@@ -878,15 +878,14 @@ and t3.bigint_col = t2.bigint_col
 |     partitions=4/4 files=4 size=460B
 |     predicates: t3.int_col = t3.bigint_col
 |
-03:HASH JOIN [LEFT OUTER JOIN]
-|  hash predicates: t1.smallint_col = t2.smallint_col
+03:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: t2.smallint_col = t1.smallint_col
 |
-|--01:SCAN HDFS [functional.alltypesagg t2]
-|     partitions=11/11 files=11 size=814.73KB
-|     predicates: t2.smallint_col = t2.bigint_col
+|--00:SCAN HDFS [functional.alltypes t1]
+|     partitions=24/24 files=24 size=478.45KB
 |
-00:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 files=24 size=478.45KB
+01:SCAN HDFS [functional.alltypesagg t2]
+   partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 08:EXCHANGE [UNPARTITIONED]
 |
@@ -899,19 +898,18 @@ and t3.bigint_col = t2.bigint_col
 |     partitions=4/4 files=4 size=460B
 |     predicates: t3.int_col = t3.bigint_col
 |
-03:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
-|  hash predicates: t1.smallint_col = t2.smallint_col
+03:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
+|  hash predicates: t2.smallint_col = t1.smallint_col
 |
-|--06:EXCHANGE [HASH(t2.smallint_col)]
+|--06:EXCHANGE [HASH(t1.smallint_col)]
 |  |
-|  01:SCAN HDFS [functional.alltypesagg t2]
-|     partitions=11/11 files=11 size=814.73KB
-|     predicates: t2.smallint_col = t2.bigint_col
+|  00:SCAN HDFS [functional.alltypes t1]
+|     partitions=24/24 files=24 size=478.45KB
 |
-05:EXCHANGE [HASH(t1.smallint_col)]
+05:EXCHANGE [HASH(t2.smallint_col)]
 |
-00:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 files=24 size=478.45KB
+01:SCAN HDFS [functional.alltypesagg t2]
+   partitions=11/11 files=11 size=814.73KB
 ====
 # Test correct removal of redundant join predicates (IMPALA-1353):
 # Equivalences among inline-view slots are enforced. The predicates

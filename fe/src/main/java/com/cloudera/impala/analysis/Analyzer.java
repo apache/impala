@@ -1301,6 +1301,7 @@ public class Analyzer {
       if (!partialEquivSlots.union(lhsSlots.get(0), rhsSlots.get(0))) continue;
       T newEqPred = (T) createEqPredicate(lhsSlots.get(0), rhsSlots.get(0));
       newEqPred.analyzeNoThrow(this);
+      if (!hasMutualValueTransfer(lhsSlots.get(0), rhsSlots.get(0))) continue;
       conjuncts.add(newEqPred);
     }
   }
@@ -1375,6 +1376,7 @@ public class Analyzer {
           if (!partialEquivSlots.union(lhs, rhs)) continue;
           T newEqPred = (T) createEqPredicate(lhs, rhs);
           newEqPred.analyzeNoThrow(this);
+          if (!hasMutualValueTransfer(lhs, rhs)) continue;
           conjuncts.add(newEqPred);
           // Check for early termination.
           if (partialEquivSlots.get(lhs).size() == slotIds.size()) {
@@ -2012,6 +2014,10 @@ public class Analyzer {
   public int incrementCallDepth() { return ++callDepth_; }
   public int decrementCallDepth() { return --callDepth_; }
   public int getCallDepth() { return callDepth_; }
+
+  private boolean hasMutualValueTransfer(SlotId slotA, SlotId slotB) {
+    return hasValueTransfer(slotA, slotB) && hasValueTransfer(slotB, slotA);
+  }
 
   public boolean hasValueTransfer(SlotId a, SlotId b) {
     return globalState_.valueTransferGraph.hasValueTransfer(a, b);
