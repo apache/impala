@@ -32,6 +32,7 @@ line parameter.</p>
     <th>State</th>
     <th># rows fetched</th>
     <th>Profile</th>
+    <th>Summary</th>
     <th>Action</th>
   </tr>
 {{#in_flight_queries}}
@@ -45,6 +46,7 @@ line parameter.</p>
     <td>{{state}}</td>
     <td>{{rows_fetched}}</td>
     <td><a href='/query_profile?query_id={{query_id}}'>Profile</a></td>
+    <td><a href='/query_summary?query_id={{query_id}}'>Summary</a></td>
     <td><a href='/cancel_query?query_id={{query_id}}'>Cancel</a></td>
   </tr>
 {{/in_flight_queries}}

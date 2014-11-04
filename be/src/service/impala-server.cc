@@ -456,12 +456,12 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
 Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, TExecSummary* result) {
   // Search for the query id in the active query map
   {
-    lock_guard<mutex> l(query_exec_state_map_lock_);
-    QueryExecStateMap::const_iterator exec_state = query_exec_state_map_.find(query_id);
-    if (exec_state != query_exec_state_map_.end()) {
-      if (exec_state->second->coord() != NULL) {
+    shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
+    if (exec_state != NULL) {
+      lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
+      if (exec_state->coord() != NULL) {
         ScopedSpinLock lock;
-        *result = exec_state->second->coord()->exec_summary(&lock);
+        *result = exec_state->coord()->exec_summary(&lock);
         return Status::OK;
       }
     }

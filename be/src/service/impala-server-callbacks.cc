@@ -426,11 +426,33 @@ void ImpalaServer::QuerySummaryCallback(const Webserver::ArgumentMap& args,
   string stmt;
   string plan;
   Status query_status;
+  bool found = false;
+
   {
+    shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
+    if (exec_state != NULL) {
+      lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
+      found = true;
+      if (exec_state->coord() != NULL) {
+        query_status = exec_state->query_status();
+        stmt = exec_state->sql_stmt();
+        plan = exec_state->exec_request().query_exec_request.query_plan;
+        ScopedSpinLock lock;
+        summary = exec_state->coord()->exec_summary(&lock);
+      } else {
+        const string& err = Substitute("Invalid query id: $0", PrintId(query_id));
+        Value json_error(err.c_str(), document->GetAllocator());
+        document->AddMember("error", json_error, document->GetAllocator());
+        return;
+      }
+    }
+  }
+
+  if (!found) {
     lock_guard<mutex> l(query_log_lock_);
     QueryLogIndex::const_iterator query_record = query_log_index_.find(query_id);
     if (query_record == query_log_index_.end()) {
-      string err = Substitute("Unknown query id: $0", PrintId(query_id));
+      const string& err = Substitute("Unknown query id: $0", PrintId(query_id));
       Value json_error(err.c_str(), document->GetAllocator());
       document->AddMember("error", json_error, document->GetAllocator());
       return;
