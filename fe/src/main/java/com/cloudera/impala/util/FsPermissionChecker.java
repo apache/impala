@@ -261,6 +261,8 @@ public class FsPermissionChecker {
       aclStatus = fs.getAclStatus(path);
     } catch (AclException ex) {
       LOG.trace("No ACLs retrieved, skipping ACLs check (HDFS will enforce ACLs)", ex);
+    } catch (UnsupportedOperationException ex) {
+      LOG.trace("No ACLs retrieved, unsupported", ex);
     }
     return new Permissions(fs.getFileStatus(path), aclStatus);
   }

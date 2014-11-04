@@ -18,6 +18,7 @@ import static com.cloudera.impala.thrift.ImpalaInternalServiceConstants.DEFAULT_
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -86,7 +87,11 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 /**
- * Internal representation of table-related metadata of an hdfs-resident table.
+ * Internal representation of table-related metadata of a file-resident table on a
+ * Hadoop filesystem.  The table data can be accessed through libHDFS (which is more of
+ * an abstraction over Hadoop's FileSystem class rather than DFS specifically).  A
+ * partitioned table can even span multiple filesystems.
+ *
  * Owned by Catalog instance.
  * The partition keys constitute the clustering columns.
  *
@@ -99,7 +104,7 @@ public class HdfsTable extends Table {
   private static final String DEFAULT_NULL_COLUMN_VALUE = "\\N";
 
   // Number of times to retry fetching the partitions from the HMS should an error occur.
-  private final static int NUM_PARTITION_FETCH_RETRIES = 5;;
+  private final static int NUM_PARTITION_FETCH_RETRIES = 5;
 
   // string to indicate NULL. set in load() from table properties
   private String nullColumnValue_;
@@ -169,27 +174,34 @@ public class HdfsTable extends Table {
   // and its usage in getFileSystem suggests it should be.
   private static final Configuration CONF = new Configuration();
 
-  private static final DistributedFileSystem DFS;
-
   private static final boolean SUPPORTS_VOLUME_ID;
 
-  static {
-    try {
-      // call newInstance() instead of using a shared instance from a cache
-      // to avoid accidentally having it closed by someone else
-      FileSystem fs = FileSystem.newInstance(FileSystem.getDefaultUri(CONF), CONF);
-      if (!(fs instanceof DistributedFileSystem)) {
-        String error = "Cannot connect to HDFS. " +
-            CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY +
-            "(" + CONF.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) + ")" +
-            " might be set incorrectly";
-        throw new RuntimeException(error);
+  // Wrapper around a FileSystem object to hash based on the underlying FileSystem's
+  // scheme and authority.
+  private static class FsKey {
+    FileSystem filesystem;
+
+    public FsKey(FileSystem fs) { filesystem = fs; }
+
+    @Override
+    public int hashCode() { return filesystem.getUri().hashCode(); }
+
+    @Override
+    public boolean equals(Object o) {
+      if (o == this) return true;
+      if (o != null && o instanceof FsKey) {
+        URI uri = filesystem.getUri();
+        URI otherUri = ((FsKey)o).filesystem.getUri();
+        return uri.equals(otherUri);
       }
-      DFS = (DistributedFileSystem) fs;
-    } catch (IOException e) {
-      throw new RuntimeException("couldn't retrieve FileSystem:\n" + e.getMessage(), e);
+      return false;
     }
 
+    @Override
+    public String toString() { return filesystem.getUri().toString(); }
+  }
+
+  static {
     SUPPORTS_VOLUME_ID =
         CONF.getBoolean(DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED,
                         DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED_DEFAULT);
@@ -225,84 +237,88 @@ public class HdfsTable extends Table {
   public Map<String, List<FileDescriptor>> getFileDescMap() { return fileDescMap_; }
 
   /**
-   * Loads the file block metadata for the given collection of FileDescriptors.
-   * The FileDescriptors are passed as a Map of partition location to list of
-   * files that exist under that directory.
+   * Loads the file block metadata for the given collection of FileDescriptors.  The
+   * FileDescriptors are passed as a tree, where the first level is indexed by
+   * filesystem, the second level is indexed by partition location, and the leaves are
+   * the list of files that exist under each directory.
    */
-  private void loadBlockMd(Map<String, List<FileDescriptor>> fileDescriptors)
+  private void loadBlockMd(Map<FsKey, Map<String, List<FileDescriptor>>> perFsFileDescs)
       throws RuntimeException {
-    Preconditions.checkNotNull(fileDescriptors);
+    Preconditions.checkNotNull(perFsFileDescs);
     LOG.debug("load block md for " + name_);
 
-    // Store all BlockLocations so they can be reused when loading the disk IDs.
-    List<BlockLocation> blockLocations = Lists.newArrayList();
-    int numCachedBlocks = 0;
+    for (FsKey fsEntry: perFsFileDescs.keySet()) {
+      FileSystem fs = fsEntry.filesystem;
+      // Store all BlockLocations so they can be reused when loading the disk IDs.
+      List<BlockLocation> blockLocations = Lists.newArrayList();
+      int numCachedBlocks = 0;
+      Map<String, List<FileDescriptor>> partitionToFds = perFsFileDescs.get(fsEntry);
+      Preconditions.checkNotNull(partitionToFds);
+      // loop over all files and record their block metadata, minus volume ids
+      for (String partitionDir: partitionToFds.keySet()) {
+        Path partDirPath = new Path(partitionDir);
+        for (FileDescriptor fileDescriptor: partitionToFds.get(partitionDir)) {
+          Path p = new Path(partDirPath, fileDescriptor.getFileName());
+          try {
+            FileStatus fileStatus = fs.getFileStatus(p);
+            // fileDescriptors should not contain directories.
+            Preconditions.checkArgument(!fileStatus.isDirectory());
+            BlockLocation[] locations = fs.getFileBlockLocations(fileStatus, 0,
+                fileStatus.getLen());
+            Preconditions.checkNotNull(locations);
+            blockLocations.addAll(Arrays.asList(locations));
 
-    // loop over all files and record their block metadata, minus volume ids
-    for (String parentPath: fileDescriptors.keySet()) {
-      for (FileDescriptor fileDescriptor: fileDescriptors.get(parentPath)) {
-        Path p = new Path(parentPath, fileDescriptor.getFileName());
-        BlockLocation[] locations = null;
-        try {
-          FileStatus fileStatus = DFS.getFileStatus(p);
-          // fileDescriptors should not contain directories.
-          Preconditions.checkArgument(!fileStatus.isDirectory());
-          locations = DFS.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
+            // Loop over all blocks in the file.
+            for (BlockLocation block: locations) {
+              Preconditions.checkNotNull(block);
+              // Get the location of all block replicas in ip:port format.
+              String[] blockHostPorts = block.getNames();
 
-          Preconditions.checkNotNull(locations);
-          blockLocations.addAll(Arrays.asList(locations));
+              // Get the hostnames for all block replicas. Used to resolve which hosts
+              // contain cached data. The results are returned in the same order as
+              // block.getNames() so it allows us to match a host specified as ip:port
+              // to corresponding hostname using the same array index.
+              String[] blockHostNames = block.getHosts();
+              Preconditions.checkState(blockHostNames.length == blockHostPorts.length);
 
-          // Loop over all blocks in the file.
-          for (BlockLocation block: locations) {
-            Preconditions.checkNotNull(block);
-            // Get the location of all block replicas in ip:port format.
-            String[] blockHostPorts = block.getNames();
+              // Get the hostnames that contain cached replicas of this block.
+              Set<String> cachedHosts =
+                  Sets.newHashSet(Arrays.asList(block.getCachedHosts()));
+              Preconditions.checkState(cachedHosts.size() <= blockHostNames.length);
 
-            // Get the hostnames for all block replicas. Used to resolve which hosts
-            // contain cached data. The results are returned in the same order as
-            // block.getNames() so it allows us to match a host specified as ip:port
-            // to corresponding hostname using the same array index.
-            String[] blockHostNames = block.getHosts();
-            Preconditions.checkState(blockHostNames.length == blockHostPorts.length);
-
-            // Get the hostnames that contain cached replicas of this block.
-            Set<String> cachedHosts =
-                Sets.newHashSet(Arrays.asList(block.getCachedHosts()));
-            Preconditions.checkState(cachedHosts.size() <= blockHostNames.length);
-
-            // Now enumerate all replicas of the block, adding any unknown hosts
-            // to hostMap_/hostList_. The host ID (index in to the hostList_) for each
-            // replica is stored in replicaHostIdxs.
-            List<BlockReplica> blockReplicas =
-                new ArrayList<BlockReplica>(blockHostPorts.length);
-            for (int i = 0; i < blockHostPorts.length; ++i) {
-              TNetworkAddress networkAddress =
-                  BlockReplica.parseLocation(blockHostPorts[i]);
-              Preconditions.checkState(networkAddress != null);
-              blockReplicas.add(
-                  new BlockReplica(hostIndex_.getIndex(networkAddress),
-                      cachedHosts.contains(blockHostNames[i])));
+              // Now enumerate all replicas of the block, adding any unknown hosts
+              // to hostMap_/hostList_. The host ID (index in to the hostList_) for each
+              // replica is stored in replicaHostIdxs.
+              List<BlockReplica> blockReplicas =
+                  new ArrayList<BlockReplica>(blockHostPorts.length);
+              for (int i = 0; i < blockHostPorts.length; ++i) {
+                TNetworkAddress networkAddress =
+                    BlockReplica.parseLocation(blockHostPorts[i]);
+                Preconditions.checkState(networkAddress != null);
+                blockReplicas.add(
+                    new BlockReplica(hostIndex_.getIndex(networkAddress),
+                        cachedHosts.contains(blockHostNames[i])));
+              }
+              FileBlock fileBlock =
+                  new FileBlock(block.getOffset(), block.getLength(), blockReplicas);
+              fileDescriptor.addFileBlock(fileBlock);
+              if (fileBlock.isCached()) ++numCachedBlocks;
             }
-            FileBlock fileBlock =
-                new FileBlock(block.getOffset(), block.getLength(), blockReplicas);
-            fileDescriptor.addFileBlock(fileBlock);
-            if (fileBlock.isCached()) ++numCachedBlocks;
+          } catch (IOException e) {
+            throw new RuntimeException("couldn't determine block locations for path '"
+                + p + "':\n" + e.getMessage(), e);
           }
-        } catch (IOException e) {
-          throw new RuntimeException("couldn't determine block locations for path '"
-              + p + "':\n" + e.getMessage(), e);
         }
       }
-    }
+      LOG.trace("Table: " + getFullName() + " on filesystem " + fsEntry + " contains " +
+          numCachedBlocks + "/" + blockLocations.size() + " cached blocks.");
 
-    LOG.trace("Table: " + getFullName() + " contains " + numCachedBlocks +
-        "/" + blockLocations.size() + " cached blocks.");
-
-    if (SUPPORTS_VOLUME_ID) {
-      LOG.trace("loading disk ids for: " + getFullName() +
-          ". nodes: " + getNumNodes());
-      loadDiskIds(blockLocations, fileDescriptors);
-      LOG.trace("completed load of disk ids for: " + getFullName());
+      if (SUPPORTS_VOLUME_ID && fs instanceof DistributedFileSystem) {
+        LOG.trace("loading disk ids for: " + getFullName() +
+            ". nodes: " + getNumNodes() + ". file system: " + fsEntry);
+        loadDiskIds((DistributedFileSystem)fs, blockLocations, partitionToFds);
+        LOG.trace("completed load of disk ids for: " + getFullName());
+      }
     }
   }
 
@@ -311,14 +327,14 @@ public class HdfsTable extends Table {
    * BlockLocations. The FileDescriptors are passed as a Map of parent directory
    * (partition location) to list of files (FileDescriptors) under that directory.
    */
-  private void loadDiskIds(List<BlockLocation> blockLocations,
+  private void loadDiskIds(DistributedFileSystem dfs, List<BlockLocation> blockLocations,
       Map<String, List<FileDescriptor>> fileDescriptors) {
     // BlockStorageLocations for all the blocks
     // block described by blockMetadataList[i] is located at locations[i]
     BlockStorageLocation[] locations = null;
     try {
       // Get the BlockStorageLocations for all the blocks
-      locations = DFS.getFileBlockStorageLocations(blockLocations);
+      locations = dfs.getFileBlockStorageLocations(blockLocations);
     } catch (IOException e) {
       LOG.error("Couldn't determine block storage locations:\n" + e.getMessage());
       return;
@@ -573,11 +589,11 @@ public class HdfsTable extends Table {
     partitions_.clear();
     hdfsBaseDir_ = msTbl.getSd().getLocation();
 
-    // Map of parent path to a list of new/modified FileDescriptors. FileDescriptors
-    // in this Map will have their block location information (re)loaded. This is used
-    // to speedup the incremental refresh of a table's metadata by skipping unmodified,
-    // previously loaded FileDescriptors.
-    Map<String, List<FileDescriptor>> fileDescsToLoad = Maps.newHashMap();
+    // Map of filesystem to parent path to a list of new/modified
+    // FileDescriptors. FileDescriptors in this Map will have their block location
+    // information (re)loaded. This is used to speed up the incremental refresh of a
+    // table's metadata by skipping unmodified, previously loaded FileDescriptors.
+    Map<FsKey, Map<String, List<FileDescriptor>>> fileDescsToLoad = Maps.newHashMap();
 
     // INSERT statements need to refer to this if they try to write to new partitions
     // Scans don't refer to this because by definition all partitions they refer to
@@ -598,8 +614,9 @@ public class HdfsTable extends Table {
       addPartition(part);
       if (isMarkedCached_) part.markCached();
       Path location = new Path(hdfsBaseDir_);
-      if (DFS.exists(location)) {
-        accessLevel_ = getAvailableAccessLevel(location);
+      FileSystem fs = location.getFileSystem(CONF);
+      if (fs.exists(location)) {
+        accessLevel_ = getAvailableAccessLevel(fs, location);
       }
     } else {
       for (org.apache.hadoop.hive.metastore.api.Partition msPartition: msPartitions) {
@@ -632,12 +649,13 @@ public class HdfsTable extends Table {
    * path until a existing parent directory is found, and inherit access permissions from
    * that.
    */
-  private TAccessLevel getAvailableAccessLevel(Path location) throws IOException {
+  private TAccessLevel getAvailableAccessLevel(FileSystem fs, Path location)
+      throws IOException {
     FsPermissionChecker permissionChecker = FsPermissionChecker.getInstance();
     while (location != null) {
-      if (DFS.exists(location)) {
+      if (fs.exists(location)) {
         FsPermissionChecker.Permissions perms =
-            permissionChecker.getPermissions(DFS, location);
+            permissionChecker.getPermissions(fs, location);
         if (perms.canReadAndWrite()) {
           return TAccessLevel.READ_WRITE;
         } else if (perms.canRead()) {
@@ -677,7 +695,7 @@ public class HdfsTable extends Table {
   public HdfsPartition createPartition(StorageDescriptor storageDescriptor,
       org.apache.hadoop.hive.metastore.api.Partition msPartition)
       throws CatalogException {
-    Map<String, List<FileDescriptor>> fileDescsToLoad = Maps.newHashMap();
+    Map<FsKey, Map<String, List<FileDescriptor>>> fileDescsToLoad = Maps.newHashMap();
     HdfsPartition hdfsPartition = createPartition(storageDescriptor, msPartition,
         fileDescMap_, fileDescsToLoad);
     loadBlockMd(fileDescsToLoad);
@@ -706,7 +724,7 @@ public class HdfsTable extends Table {
   private HdfsPartition createPartition(StorageDescriptor storageDescriptor,
       org.apache.hadoop.hive.metastore.api.Partition msPartition,
       Map<String, List<FileDescriptor>> oldFileDescMap,
-      Map<String, List<FileDescriptor>> newFileDescMap)
+      Map<FsKey, Map<String, List<FileDescriptor>>> perFsFileDescMap)
       throws CatalogException {
     HdfsStorageDescriptor fileFormatDescriptor =
         HdfsStorageDescriptor.fromStorageDescriptor(this.name_, storageDescriptor);
@@ -743,11 +761,13 @@ public class HdfsTable extends Table {
       }
     }
     try {
-      if (DFS.exists(partDirPath)) {
-        // DistributedFilesystem does not have an API that takes in a timestamp and return
-        // a list of files that has been added/changed since. Therefore, we are calling
-        // DFS.listStatus() to list all the files.
-        for (FileStatus fileStatus: DFS.listStatus(partDirPath)) {
+      // Each partition could reside on a different filesystem.
+      FileSystem fs = partDirPath.getFileSystem(CONF);
+      if (fs.exists(partDirPath)) {
+        // FileSystem does not have an API that takes in a timestamp and returns a list
+        // of files that has been added/changed since. Therefore, we are calling
+        // fs.listStatus() to list all the files.
+        for (FileStatus fileStatus: fs.listStatus(partDirPath)) {
           String fileName = fileStatus.getPath().getName().toString();
           if (fileStatus.isDirectory() || FileSystemUtil.isHiddenFile(fileName) ||
               HdfsCompression.fromFileName(fileName) == HdfsCompression.LZO_INDEX) {
@@ -780,13 +800,7 @@ public class HdfsTable extends Table {
             // loadBlockMd.
             fd = new FileDescriptor(fileName, fileStatus.getLen(),
                 fileStatus.getModificationTime());
-
-            List<FileDescriptor> fds = newFileDescMap.get(partitionDir);
-            if (fds == null) {
-              fds = Lists.newArrayList();
-              newFileDescMap.put(partitionDir, fds);
-            }
-            fds.add(fd);
+            addPerFsFileDesc(perFsFileDescMap, fs, partitionDir, fd);
           }
 
           List<FileDescriptor> fds = fileDescMap_.get(partitionDir);
@@ -802,12 +816,33 @@ public class HdfsTable extends Table {
         numHdfsFiles_ += fileDescriptors.size();
       }
       HdfsPartition partition = new HdfsPartition(this, msPartition, keyValues,
-          fileFormatDescriptor, fileDescriptors, getAvailableAccessLevel(partDirPath));
+          fileFormatDescriptor, fileDescriptors,
+          getAvailableAccessLevel(fs, partDirPath));
       partition.checkWellFormed();
       return partition;
     } catch (Exception e) {
       throw new CatalogException("Failed to create partition: ", e);
     }
+  }
+
+  /**
+   * Add the appropriate nodes to the filesystem -> partition directory -> file
+   * descriptors tree, given fs, partitionDir and fd.
+   */
+  private void addPerFsFileDesc(Map<FsKey, Map<String, List<FileDescriptor>>> root,
+      FileSystem fs, String partitionDir, FileDescriptor fd) {
+    FsKey fsEntry = new FsKey(fs);
+    Map<String, List<FileDescriptor>> dirToFdList = root.get(fsEntry);
+    if (dirToFdList == null) {
+      dirToFdList = Maps.newHashMap();
+      root.put(fsEntry, dirToFdList);
+    }
+    List<FileDescriptor> fds = dirToFdList.get(partitionDir);
+    if (fds == null) {
+      fds = Lists.newArrayList();
+      dirToFdList.put(partitionDir, fds);
+    }
+    fds.add(fd);
   }
 
   /**
