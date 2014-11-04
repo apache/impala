@@ -15,11 +15,14 @@
 #
 # Hdfs access utilities
 
-from xml.etree.ElementTree import parse
+from os import environ
+from os.path import join as join_path
 from pywebhdfs.webhdfs import PyWebHdfsClient, errors, _raise_pywebhdfs_exception
+from xml.etree.ElementTree import parse
 import getpass
+import httplib
+import requests
 import types
-import requests, httplib
 
 class PyWebHdfsClientWithChmod(PyWebHdfsClient):
   def chmod(self, path, permission):
@@ -56,11 +59,12 @@ class PyWebHdfsClientWithChmod(PyWebHdfsClient):
 class HdfsConfig(object):
   """Reads an XML configuration file (produced by a mini-cluster) into a dictionary
   accessible via get()"""
-  def __init__(self, filename):
+  def __init__(self, *filename):
     self.conf = {}
-    tree = parse(filename)
-    for property in tree.getroot().getiterator('property'):
-      self.conf[property.find('name').text] = property.find('value').text
+    for arg in filename:
+      tree = parse(arg)
+      for property in tree.getroot().getiterator('property'):
+        self.conf[property.find('name').text] = property.find('value').text
 
   def get(self, key):
     return self.conf.get(key)
@@ -90,3 +94,11 @@ def get_hdfs_client(host, port, user_name=getpass.getuser()):
   # Bind our "exists" method to hdfs_client.exists
   hdfs_client.exists = types.MethodType(__pyweb_hdfs_client_exists, hdfs_client)
   return hdfs_client
+
+def get_default_hdfs_config():
+  core_site_path = join_path(environ.get('HADOOP_CONF_DIR'), 'core-site.xml')
+  hdfs_site_path = join_path(environ.get('HADOOP_CONF_DIR'), 'hdfs-site.xml')
+  return HdfsConfig(core_site_path, hdfs_site_path)
+
+def create_default_hdfs_client():
+  return get_hdfs_client_from_conf(get_default_hdfs_config())

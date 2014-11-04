@@ -105,6 +105,12 @@ class SqlWriter(object):
       LOG.warn('Unable to format sql: %s', e)
     return sql
 
+  def write_create_table_as(self, query, name, pretty=False):
+    return 'CREATE TABLE %s AS %s' % (name, self.write_query(query, pretty=pretty))
+
+  def write_create_view(self, query, name, pretty=False):
+    return 'CREATE VIEW %s AS %s' % (name, self.write_query(query, pretty=pretty))
+
   def _write_with_clause(self, with_clause):
     return 'WITH ' + ',\n'.join('%s AS (%s)' % (view.identifier, self._write(view.query))
                                 for view in with_clause.with_clause_inline_views)

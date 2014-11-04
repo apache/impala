@@ -21,28 +21,53 @@
 
 '''
 
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
+from copy import copy
+from decimal import Decimal as PyDecimal
 try:
   from impala.dbapi import connect as impala_connect
 except:
   print('Error importing impyla. Please make sure it is installed. '
       'See the README for details.')
   raise
-from itertools import izip
+from itertools import combinations, ifilter, izip
+from json import dumps
 from logging import getLogger
+from os import chmod
+from os.path import basename, dirname
+from random import randint
+from re import compile
+import shelve
 from socket import getfqdn
-from tests.comparison.model import Column, Table, TYPES, String
+from sys import maxint
+from tempfile import NamedTemporaryFile
+
+from tests.comparison.common import Column, Table, TableExprList
+from tests.comparison.types import (
+    Char,
+    Decimal,
+    Double,
+    EXACT_TYPES,
+    Float,
+    get_char_class,
+    get_decimal_class,
+    get_varchar_class,
+    Int,
+    String,
+    Timestamp,
+    TinyInt,
+    VarChar)
+from tests.util.hdfs_util import create_default_hdfs_client, get_default_hdfs_config
 
 LOG = getLogger(__name__)
 
+HIVE = 'HIVE'
 IMPALA = 'IMPALA'
-POSTGRESQL = 'POSTGRESQL'
 MYSQL = 'MYSQL'
+ORACLE = 'ORACLE'
+POSTGRESQL = 'POSTGRESQL'
 
-DATABASES = [IMPALA, POSTGRESQL, MYSQL]
-
-mysql_connect = None
-postgresql_connect = None
+DATABASES = [HIVE, IMPALA, MYSQL, ORACLE, POSTGRESQL]
 
 class DbConnector(object):
   '''Wraps a DB API 2 implementation to provide a standard way of obtaining a
@@ -52,7 +77,13 @@ class DbConnector(object):
 
   '''
 
-  def __init__(self, db_type, user_name=None, password=None, host_name=None, port=None):
+  def __init__(self,
+      db_type,
+      user_name=None,
+      password=None,
+      host_name=None,
+      port=None,
+      service=None):
     self.db_type = db_type.upper()
     if self.db_type not in DATABASES:
       raise Exception('Unsupported database: %s' % db_type)
@@ -60,11 +91,45 @@ class DbConnector(object):
     self.password = password
     self.host_name = host_name or getfqdn()
     self.port = port
+    self.service = service
 
   def create_connection(self, db_name=None):
-    if self.db_type == IMPALA:
+    if self.db_type == HIVE:
+      connection_class = ImpalaDbConnection   # Reuse the Impala class for Hive
+      try:
+        from pyhs2 import connect as hive_connect
+      except:
+        print('Error importing pyhs2. Please make sure it is installed. '
+            'See the README for details.')
+        raise
+      connection = hive_connect(
+          host=self.host_name,
+          port=self.port or 11050,
+          authMechanism='NOSASL')
+    elif self.db_type == IMPALA:
       connection_class = ImpalaDbConnection
-      connection = impala_connect(host=self.host_name, port=self.port or 21050)
+      connection = impala_connect(
+          host=self.host_name,
+          port=self.port or 21050,
+          timeout=maxint)
+    elif self.db_type == ORACLE:
+      connection_class = OracleDbConnection
+      connection_str = '%(user)s/%(password)s@%(host)s:%(port)s/%(service)s'
+      connection_args = {
+        'user': self.user_name or 'system',
+        'password': self.password or 'oracle',
+        'host': self.host_name or 'localhost',
+        'port': self.port or 1521,
+        'service': self.service or 'XE'}
+      try:
+        from cx_Oracle import connect as oracle_connect
+      except:
+        print('Error importing cx_Oracle. Please make sure it is installed. '
+            'See the README for details.')
+        raise
+      connection = oracle_connect(connection_str % connection_args)
+      connection.outputtypehandler = OracleDbConnection.type_converter
+      connection.autocommit = True
     elif self.db_type == POSTGRESQL:
       connection_class = PostgresqlDbConnection
       connection_args = {'user': self.user_name or 'postgres'}
@@ -76,14 +141,12 @@ class DbConnector(object):
         connection_args['host'] = self.host_name
       if self.port:
         connection_args['port'] = self.port
-      global postgresql_connect
-      if not postgresql_connect:
-        try:
-          from psycopg2 import connect as postgresql_connect
-        except:
-          print('Error importing psycopg2. Please make sure it is installed. '
-              'See the README for details.')
-          raise
+      try:
+        from psycopg2 import connect as postgresql_connect
+      except:
+        print('Error importing psycopg2. Please make sure it is installed. '
+            'See the README for details.')
+        raise
       connection = postgresql_connect(**connection_args)
       connection.autocommit = True
     elif self.db_type == MYSQL:
@@ -97,14 +160,12 @@ class DbConnector(object):
         connection_args['host'] = self.host_name
       if self.port:
         connection_args['port'] = self.port
-      global mysql_connect
-      if not mysql_connect:
-        try:
-          from MySQLdb import connect as mysql_connect
-        except:
-          print('Error importing MySQLdb. Please make sure it is installed. '
-              'See the README for details.')
-          raise
+      try:
+        from MySQLdb import connect as mysql_connect
+      except:
+        print('Error importing MySQLdb. Please make sure it is installed. '
+            'See the README for details.')
+        raise
       connection = mysql_connect(**connection_args)
     else:
       raise Exception('Unexpected database type: %s' % self.db_type)
@@ -131,13 +192,9 @@ class DbConnection(object):
   '''
 
   @staticmethod
-  def describe_common_tables(db_connections, filter_col_types=[]):
-    '''Find and return a list of Table objects that the given connections have in
-       common.
-
-       @param filter_col_types: Ignore any cols if they are of a data type contained
-           in this collection.
-
+  def describe_common_tables(db_connections):
+    '''Find and return a TableExprList containing Table objects that the given connections
+       have in common.
     '''
     common_table_names = None
     for db_connection in db_connections:
@@ -148,16 +205,19 @@ class DbConnection(object):
         common_table_names &= table_names
     common_table_names = sorted(common_table_names)
 
-    tables = list()
+    tables = TableExprList()
     for table_name in common_table_names:
       common_table = None
       mismatch = False
       for db_connection in db_connections:
         table = db_connection.describe_table(table_name)
-        table.cols = [col for col in table.cols if col.type not in filter_col_types]
         if common_table is None:
           common_table = table
           continue
+        if not table.cols:
+          LOG.debug('%s has no remaining columns', table_name)
+          mismatch = True
+          break
         if len(common_table.cols) != len(table.cols):
           LOG.debug('Ignoring table %s.'
               ' It has a different number of columns across databases.', table_name)
@@ -176,14 +236,40 @@ class DbConnection(object):
 
     return tables
 
+  SQL_TYPE_PATTERN = compile(r'([^()]+)(\((\d+,? ?)*\))?')
+  TYPE_NAME_ALIASES = \
+      dict((type_.name().upper(), type_.name().upper()) for type_ in EXACT_TYPES)
+  TYPES_BY_NAME =  dict((type_.name().upper(), type_) for type_ in EXACT_TYPES)
+  EXACT_TYPES_TO_SQL = dict((type_, type_.name().upper()) for type_ in EXACT_TYPES)
+
   def __init__(self, connector, connection, db_name=None):
     self.connector = connector
     self.connection = connection
     self.db_name = db_name
 
+    self._bulk_load_table = None
+    self._bulk_load_data_file = None   # If not set by the user, a temp file will be used
+    self._bulk_load_col_delimiter = b'\x01'
+    self._bulk_load_row_delimiter = '\n'
+    self._bulk_load_null_val = '\\N'
+
   @property
   def db_type(self):
     return self.connector.db_type
+
+  @property
+  def supports_kill_connection(self):
+    return False
+
+  def kill_connection(self):
+    '''Kill the current connection and any currently running queries associated with the
+       connection.
+    '''
+    raise Exception('Killing connection is not supported')
+
+  @property
+  def supports_index_creation(self):
+    return True
 
   def create_cursor(self):
     return DatabaseCursor(self.connection.cursor(), self)
@@ -208,6 +294,31 @@ class DbConnection(object):
       except Exception as e:
         LOG.debug('Error closing cursor: %s', e, exc_info=True)
 
+  def execute(self, sql):
+    with self.open_cursor() as cursor:
+      cursor.execute(sql)
+
+  def execute_and_fetchall(self, sql):
+    with self.open_cursor() as cursor:
+      cursor.execute(sql)
+      return cursor.fetchall()
+
+  def close(self):
+    '''Close the underlying connection.'''
+    self.connection.close()
+
+  def reconnect(self):
+    try:
+      self.close()
+    except Exception as e:
+      LOG.warn('Error closing connection: %s' % e)
+    other = self.connector.create_connection(db_name=self.db_name)
+    self.connection = other.connection
+
+  #########################################
+  # Databases                             #
+  #########################################
+
   def list_db_names(self):
     '''Return a list of database names always in lowercase.'''
     rows = self.execute_and_fetchall(self.make_list_db_names_sql())
@@ -215,39 +326,6 @@ class DbConnection(object):
 
   def make_list_db_names_sql(self):
     return 'SHOW DATABASES'
-
-  def list_table_names(self):
-    '''Return a list of table names always in lowercase.'''
-    rows = self.execute_and_fetchall(self.make_list_table_names_sql())
-    return [row[0].lower() for row in rows]
-
-  def make_list_table_names_sql(self):
-    return 'SHOW TABLES'
-
-  def describe_table(self, table_name):
-    '''Return a Table with table and col names always in lowercase.'''
-    rows = self.execute_and_fetchall(self.make_describe_table_sql(table_name))
-    table = Table(table_name.lower())
-    for row in rows:
-      col_name, data_type = row[:2]
-      table.cols.append(Column(table, col_name.lower(), self.parse_data_type(data_type)))
-    return table
-
-  def make_describe_table_sql(self, table_name):
-    return 'DESCRIBE ' + table_name
-
-  def parse_data_type(self, sql):
-    sql = sql.upper()
-    # Types may have declared a database specific alias
-    for type_ in TYPES:
-      if sql in getattr(type_, self.db_type, []):
-        return type_
-    for type_ in TYPES:
-      if type_.__name__.upper() == sql:
-        return type_
-    if 'CHAR' in sql:
-      return String
-    raise Exception('Unknown data type: ' + sql)
 
   def create_database(self, db_name):
     db_name = db_name.lower()
@@ -267,9 +345,82 @@ class DbConnection(object):
     db_name = db_name.lower()
     self.execute('DROP DATABASE ' + db_name)
 
-  @property
-  def supports_index_creation(self):
-    return True
+  #########################################
+  # Tables                                #
+  #########################################
+
+  def list_table_names(self):
+    '''Return a list of table names always in lowercase.'''
+    rows = self.execute_and_fetchall(self.make_list_table_names_sql())
+    return [row[0].lower() for row in rows]
+
+  def make_list_table_names_sql(self):
+    return 'SHOW TABLES'
+
+  def describe_table(self, table_name):
+    '''Return a Table with table and col names always in lowercase.'''
+    rows = self.execute_and_fetchall(self.make_describe_table_sql(table_name))
+    table = Table(table_name.lower())
+    for row in rows:
+      col_name, data_type = row[:2]
+      match = self.SQL_TYPE_PATTERN.match(data_type)
+      if not match:
+        raise Exception('Unexpected data type format: %s' % data_type)
+      type_name = self.TYPE_NAME_ALIASES.get(match.group(1).upper())
+      if not type_name:
+        raise Exception('Unknown data type: ' + match.group(1))
+      if len(match.groups()) > 1 and match.group(2) is not None:
+        type_size = [int(size) for size in match.group(2)[1:-1].split(',')]
+      else:
+        type_size = None
+      table.cols.append(
+          Column(table, col_name.lower(), self.parse_data_type(type_name, type_size)))
+    self.load_unique_col_metadata(table)
+    return table
+
+  def make_describe_table_sql(self, table_name):
+    return 'DESCRIBE ' + table_name
+
+  def parse_data_type(self, type_name, type_size):
+    if type_name in ('DECIMAL', 'NUMERIC'):
+      return get_decimal_class(*type_size)
+    if type_name == 'CHAR':
+      return get_char_class(*type_size)
+    if type_name == 'VARCHAR':
+      if type_size and type_size[0] <= VarChar.MAX:
+        return get_varchar_class(*type_size)
+      type_name = 'STRING'
+    return self.TYPES_BY_NAME[type_name]
+
+  def create_table(self, table):
+    if not table.cols:
+      raise Exception('At least one col is required')
+    table_sql = self.make_create_table_sql(table)
+    self.execute(table_sql)
+
+  def make_create_table_sql(self, table):
+    sql = 'CREATE TABLE %s (%s)' % (
+        table.name,
+        ', '.join('%s %s' %
+            (col.name, self.get_sql_for_data_type(col.exact_type)) +
+            ('' if self.db_type == IMPALA else ' NULL')
+            for col in table.cols))
+    return sql
+
+  def get_sql_for_data_type(self, data_type):
+    if issubclass(data_type, VarChar):
+      return 'VARCHAR(%s)' % data_type.MAX
+    if issubclass(data_type, Char):
+      return 'CHAR(%s)' % data_type.MAX
+    if issubclass(data_type, Decimal):
+      return 'DECIMAL(%s, %s)' % (data_type.MAX_DIGITS, data_type.MAX_FRACTIONAL_DIGITS)
+    return self.EXACT_TYPES_TO_SQL[data_type]
+
+  def drop_table(self, table_name, if_exists=True):
+    self.execute('DROP TABLE IF EXISTS ' + table_name.lower())
+
+  def drop_view(self, view_name, if_exists=True):
+    self.execute('DROP VIEW IF EXISTS ' + view_name.lower())
 
   def index_table(self, table_name):
     table = self.describe_table(table_name)
@@ -280,39 +431,121 @@ class DbConnection(object):
           index_name = '%s_%s' % (self.db_name, index_name)
         cursor.execute('CREATE INDEX %s ON %s(%s)' % (index_name, table_name, col.name))
 
-  @property
-  def supports_kill_connection(self):
-    return False
+  #########################################
+  # Data loading                          #
+  #########################################
 
-  def kill_connection(self):
-    '''Kill the current connection and any currently running queries assosiated with the
-       connection.
-    '''
-    raise Exception('Killing connection is not supported')
+  def make_insert_sql_from_data(self, table, rows):
+    if not rows:
+      raise Exception('At least one row is required')
+    if not table.cols:
+      raise Exception('At least one col is required')
 
-  def materialize_query(self, query_as_text, table_name):
-    self.execute('CREATE TABLE %s AS %s' % (table_name.lower(), query_as_text))
+    sql = 'INSERT INTO %s VALUES ' % table.name
+    for row_idx, row in enumerate(rows):
+      if row_idx > 0:
+        sql += ', '
+      sql += '('
+      for col_idx, col in enumerate(table.cols):
+        if col_idx > 0:
+          sql += ', '
+        val = row[col_idx]
+        if val is None:
+          sql += 'NULL'
+        elif issubclass(col.type, Timestamp):
+          sql += "TIMESTAMP '%s'" % val
+        elif issubclass(col.type, Char):
+          sql += "'%s'" % val.replace("'", "''")
+        else:
+          sql += str(val)
+      sql += ')'
 
-  def drop_table(self, table_name):
-    self.execute('DROP TABLE ' + table_name.lower())
+    return sql
 
-  def execute(self, sql):
+  def begin_bulk_load_table(self, table):
+    self.create_table(table)
+    self._bulk_load_table = table
+    if not self._bulk_load_data_file:
+      self._bulk_load_data_file = NamedTemporaryFile()
+
+  def handle_bulk_load_table_data(self, rows):
+    if not rows:
+      raise Exception('At least one row is required')
+
+    data = list()
+    for row in rows:
+      for col_idx, col in enumerate(self._bulk_load_table.cols):
+        if col_idx > 0:
+          data.append(self._bulk_load_col_delimiter)
+        val = row[col_idx]
+        if val is None:
+          file_val = self._bulk_load_null_val
+        else:
+          file_val = str(val)
+        data.append(file_val)
+      data.append(self._bulk_load_row_delimiter)
+    if data:
+      self._bulk_load_data_file.writelines(data)
+
+  def end_bulk_load_table(self):
+    self._bulk_load_data_file.flush()
+
+  #########################################
+  # Data analysis                         #
+  #########################################
+
+  def search_for_unique_cols(self, table=None, table_name=None, depth=2):
+    if not table:
+      table = self.describe_table(table_name)
+    sql_templ = 'SELECT COUNT(*) FROM %s GROUP BY %%s HAVING COUNT(*) > 1' % table.name
+    unique_cols = list()
     with self.open_cursor() as cursor:
-      cursor.execute(sql)
+      for current_depth in xrange(1, depth + 1):
+        for cols in combinations(table.cols, current_depth):   # redundant combos excluded
+          cols = set(cols)
+          if any(ifilter(lambda unique_subset: unique_subset < cols, unique_cols)):
+            # cols contains a combo known to be unique
+            continue
+          col_names = ', '.join(col.name for col in cols)
+          sql = sql_templ % col_names
+          LOG.debug('Checking column combo (%s) for uniqueness' % col_names)
+          cursor.execute(sql)
+          if not cursor.fetchone():
+            LOG.debug('Found unique column combo (%s)' % col_names)
+            unique_cols.append(cols)
+    return unique_cols
 
-  def execute_and_fetchall(self, sql):
-    with self.open_cursor() as cursor:
-      cursor.execute(sql)
-      return cursor.fetchall()
+  def persist_unique_col_metadata(self, table):
+    if not table.unique_cols:
+      return
+    with closing(shelve.open('/tmp/query_generator.shelve', writeback=True)) as store:
+      if self.db_type not in store:
+        store[self.db_type] = dict()
+      db_type_store = store[self.db_type]
+      if self.db_name not in db_type_store:
+        db_type_store[self.db_name] = dict()
+      db_store = db_type_store[self.db_name]
+      db_store[table.name] = [[col.name for col in cols] for cols in table.unique_cols]
 
-  def close(self):
-    '''Close the underlying connection.'''
-    self.connection.close()
-
-  def reconnect(self):
-    self.close()
-    other = self.connector.create_connection(db_name=self.db_name)
-    self.connection = other.connection
+  def load_unique_col_metadata(self, table):
+    with closing(shelve.open('/tmp/query_generator.shelve')) as store:
+      db_type_store = store.get(self.db_type)
+      if not db_type_store:
+        return
+      db_store = db_type_store.get(self.db_name)
+      if not db_store:
+        return
+      unique_col_names = db_store.get(table.name)
+      if not unique_col_names:
+        return
+      unique_cols = list()
+      for entry in unique_col_names:
+        col_names = set(entry)
+        cols = set((col for col in table.cols if col.name in col_names))
+        if len(col_names) != len(cols):
+          raise Exception("Incorrect unique column data for %s" % table.name)
+        unique_cols.append(cols)
+      table.unique_cols = unique_cols
 
 
 class DatabaseCursor(object):
@@ -329,13 +562,35 @@ class DatabaseCursor(object):
     return getattr(self.cursor, attr)
 
 
+#########################################
+## Impala                              ##
+#########################################
 class ImpalaDbConnection(DbConnection):
 
+  def __init__(self, *args, **kwargs):
+    DbConnection.__init__(self, *args, **kwargs)
+    self.warehouse_dir = '/test-warehouse'
+
+    # Data loading stuff
+    self.natively_supported_writing_formats = ['PARQUET']
+    self._bulk_load_non_text_table = None
+    # A Hive connection is needed for writing data in formats that are unsupported in
+    # Impala (Impala can read the data but not write it). Eventually this should removed.
+    self.hive_connection = None
+
+  @property
+  def supports_index_creation(self):
+    return False
+
   def create_cursor(self):
-    cursor = DbConnection.create_cursor(self)
+    cursor = ImpalaDbCursor(self.connection.cursor(), self)
     if self.db_name:
       cursor.execute('USE %s' % self.db_name)
     return cursor
+
+  #########################################
+  # Databases                             #
+  #########################################
 
   def drop_database(self, db_name):
     '''This should not be called from a connection to the database being dropped.'''
@@ -346,15 +601,186 @@ class ImpalaDbConnection(DbConnection):
           drop_table_cursor.execute('DROP TABLE ' + table_name)
     self.execute('DROP DATABASE ' + db_name)
 
+  #########################################
+  # Tables                                #
+  #########################################
+
+  def make_create_table_sql(self, table):
+    sql = super(ImpalaDbConnection, self).make_create_table_sql(table)
+    if not self._bulk_load_table:
+      return sql
+
+    hdfs_url_base = get_default_hdfs_config().get('fs.defaultFS')
+    sql += "\nLOCATION '%s%s'" % (hdfs_url_base, dirname(self.hdfs_file_path))
+    if self._bulk_load_table.storage_format.upper() != 'TEXTFILE':
+      sql += "\nSTORED AS " + table.storage_format
+
+    if table.storage_format == 'avro':
+      avro_schema = {'name': 'my_record', 'type': 'record', 'fields': []}
+      for col in table.cols:
+        if issubclass(col.type, Int):
+          avro_type = 'int'
+        else:
+          avro_type = col.type.__name__.lower()
+        avro_schema['fields'].append({'name': col.name, 'type': ['null', avro_type]})
+      json_avro_schema = dumps(avro_schema)
+      # The Hive metastore has a limit to the amount of schema it can store inline.
+      # Beyond this limit, the schema needs to be stored in HDFS and Hive is given a
+      # URL instead.
+      if len(json_avro_schema) > 4000:
+        avro_schema_url = 'foo'
+        avro_schema_path = '%s/%s.avro' % (self.hdfs_db_dir, table.name)
+        hdfs = create_default_hdfs_client()
+        hdfs.create_file(avro_schema_path, json_avro_schema, overwrite=True)
+        sql += "\nTBLPROPERTIES ('avro.schema.url' = '%s')" % avro_schema_url
+      else:
+        sql += "\nTBLPROPERTIES ('avro.schema.literal' = '%s')" % json_avro_schema
+
+    return sql
+
+  def get_sql_for_data_type(self, data_type):
+    if issubclass(data_type, String):
+      return 'STRING'
+    return super(ImpalaDbConnection, self).get_sql_for_data_type(data_type)
+
+  #########################################
+  # Data loading                          #
+  #########################################
+
+  def make_insert_sql_from_data(self, table, rows):
+    if not rows:
+      raise Exception('At least one row is required')
+    if not table.cols:
+      raise Exception('At least one col is required')
+
+    sql = 'INSERT INTO %s VALUES ' % table.name
+    for row_idx, row in enumerate(rows):
+      if row_idx > 0:
+        sql += ', '
+      sql += '('
+      for col_idx, col in enumerate(table.cols):
+        if col_idx > 0:
+          sql += ', '
+        val = row[col_idx]
+        if val is None:
+          sql += 'NULL'
+        elif issubclass(col.type, Timestamp):
+          sql += "'%s'" % val
+        elif issubclass(col.type, Char):
+          val = val.replace("'", "''")
+          sql += "'%s'" % val
+        else:
+          sql += str(val)
+      sql += ')'
+
+    return sql
+
   @property
-  def supports_index_creation(self):
-    return False
+  def hdfs_db_dir(self):
+    return '%s/%s.db' % (self.warehouse_dir, self.db_name)
+
+  @property
+  def hdfs_file_path(self):
+    return self.hdfs_db_dir + '/%s/data' % self._bulk_load_table.name
+
+  def begin_bulk_load_table(self, table):
+    if table.storage_format.upper() == 'TEXTFILE':
+      self._bulk_load_table = table
+      super(ImpalaDbConnection, self).begin_bulk_load_table(table)
+    else:
+      # There is no python writer for all the various formats. Instead an additional text
+      # table will be created then either Impala or Hive will be used to write the data
+      # in the desired format into the final table.
+      if not self.natively_supports_writing_format(table.storage_format) \
+          and not self.hive_connection:
+        raise Exception("Creating a " + table.storage_format + " table requires that"
+            "the hive_connection property be set")
+      self._bulk_load_non_text_table = table
+      self._bulk_load_table = copy(table)
+      table_sql = self.make_create_table_sql(self._bulk_load_table)
+      self.execute(table_sql)
+      self._bulk_load_table.name += "_temp_%03d" % randint(1, 999)
+      self._bulk_load_table.storage_format = 'textfile'
+      super(ImpalaDbConnection, self).begin_bulk_load_table(self._bulk_load_table)
+
+  def natively_supports_writing_format(self, storage_format):
+    for supported_format in self.natively_supported_writing_formats:
+      if supported_format == storage_format.upper():
+        return True
+
+  def end_bulk_load_table(self):
+    super(ImpalaDbConnection, self).end_bulk_load_table()
+    hdfs = create_default_hdfs_client()
+    pywebhdfs_dirname = dirname(self.hdfs_file_path).lstrip('/')
+    hdfs.make_dir(pywebhdfs_dirname)
+    pywebhdfs_file_path = pywebhdfs_dirname + '/' + basename(self.hdfs_file_path)
+    try:
+      # TODO: Only delete the file if it exists
+      hdfs.delete_file_dir(pywebhdfs_file_path)
+    except Exception as e:
+      LOG.debug(e)
+    with open(self._bulk_load_data_file.name) as readable_file:
+      hdfs.create_file(pywebhdfs_file_path, readable_file)
+    self._bulk_load_data_file.close()
+    self.execute("INVALIDATE METADATA %s" % self._bulk_load_table.name)
+    if self._bulk_load_non_text_table:
+      self.hive_connection.execute('CREATE TABLE %s AS SELECT * FROM %s'
+          % (self._bulk_load_non_text_table.name, self._bulk_load_table.name))
+      self.drop_table(self._bulk_load_table.name)
+      self.execute("INVALIDATE METADATA %s" % self._bulk_load_non_text_table)
+    self._bulk_load_data_file = None
 
 
+class ImpalaDbCursor(DatabaseCursor):
+
+  def get_log(self):
+    '''Return any messages relating to the most recently executed query or statement.'''
+    return self.cursor.get_log()
+
+#########################################
+## Postgresql                          ##
+#########################################
 class PostgresqlDbConnection(DbConnection):
+
+  TYPE_NAME_ALIASES = dict(DbConnection.TYPE_NAME_ALIASES)
+  TYPE_NAME_ALIASES.update({
+      'INTEGER': 'INT',
+      'NUMERIC': 'DECIMAL',
+      'REAL': 'FLOAT',
+      'DOUBLE PRECISION': 'DOUBLE',
+      'CHARACTER': 'CHAR',
+      'CHARACTER VARYING': 'VARCHAR',
+      'TIMESTAMP WITHOUT TIME ZONE': 'TIMESTAMP'})
+
+  EXACT_TYPES_TO_SQL = dict(DbConnection.EXACT_TYPES_TO_SQL)
+  EXACT_TYPES_TO_SQL.update({
+      Double: 'DOUBLE PRECISION',
+      Float: 'REAL',
+      Int: 'INTEGER',
+      Timestamp: 'TIMESTAMP WITHOUT TIME ZONE',
+      TinyInt: 'SMALLINT'})
+
+  def __init__(self, *args, **kwargs):
+    DbConnection.__init__(self, *args, **kwargs)
+    self._bulk_load_col_delimiter = '\t'
+
+  @property
+  def supports_kill_connection(self):
+    return True
+
+  def kill_connection(self):
+    self.connection.cancel()
+
+  #########################################
+  # Databases                             #
+  #########################################
 
   def make_list_db_names_sql(self):
     return 'SELECT datname FROM pg_database'
+
+  #########################################
+  # Tables                                #
+  #########################################
 
   def make_list_table_names_sql(self):
     return '''
@@ -363,18 +789,96 @@ class PostgresqlDbConnection(DbConnection):
         WHERE table_schema = 'public' '''
 
   def make_describe_table_sql(self, table_name):
+    # When doing a CREATE TABLE AS SELECT... a column  may end up with type "Numeric".
+    # We'll assume that's a DOUBLE.
     return '''
-        SELECT column_name, data_type
+        SELECT column_name,
+               CASE data_type
+                 WHEN 'character' THEN
+                     data_type || '(' || character_maximum_length || ')'
+                 WHEN 'character varying' THEN
+                     data_type || '(' || character_maximum_length || ')'
+                 WHEN 'numeric' THEN
+                     data_type
+                     || '('
+                     || numeric_precision
+                     || ', '
+                     || numeric_scale
+                     || ')'
+                 ELSE data_type
+               END data_type
         FROM information_schema.columns
         WHERE table_name = '%s'
-        ORDER BY ordinal_position''' % table_name
+        ORDER BY ordinal_position''' % \
+        table_name
+
+  def get_sql_for_data_type(self, data_type):
+    if issubclass(data_type, String):
+      return 'VARCHAR(%s)' % VarChar.MAX
+    return super(PostgresqlDbConnection, self).get_sql_for_data_type(data_type)
+
+  #########################################
+  # Data loading                          #
+  #########################################
+
+  def make_insert_sql_from_data(self, table, rows):
+    if not rows:
+      raise Exception('At least one row is required')
+    if not table.cols:
+      raise Exception('At least one col is required')
+
+    sql = 'INSERT INTO %s VALUES ' % table.name
+    for row_idx, row in enumerate(rows):
+      if row_idx > 0:
+        sql += ', '
+      sql += '('
+      for col_idx, col in enumerate(table.cols):
+        if col_idx > 0:
+          sql += ', '
+        val = row[col_idx]
+        if val is None:
+          sql += 'NULL'
+        elif issubclass(col.type, Timestamp):
+          sql += "TIMESTAMP '%s'" % val
+        elif issubclass(col.type, Char):
+          val = val.replace("'", "''")
+          val = val.replace('\\', '\\\\')
+          sql += "'%s'" % val
+        else:
+          sql += str(val)
+      sql += ')'
+
+    return sql
+
+  def end_bulk_load_table(self):
+    super(PostgresqlDbConnection, self).end_bulk_load_table()
+    chmod(self._bulk_load_data_file.name, 0666)
+    self.execute("COPY %s FROM '%s'"
+        % (self._bulk_load_table.name, self._bulk_load_data_file.name))
+    self._bulk_load_data_file.close()
+    self._bulk_load_data_file = None
 
 
+#########################################
+## MySQL                               ##
+#########################################
 class MySQLDbConnection(DbConnection):
 
   def __init__(self, connector, connection, db_name=None):
     DbConnection.__init__(self, connector, connection, db_name=db_name)
     self.session_id = self.execute_and_fetchall('SELECT connection_id()')[0][0]
+
+  @property
+  def supports_kill_connection(self):
+    return True
+
+  def kill_connection(self):
+    with self.connector.open_connection(db_name=self.db_name) as connection:
+      connection.execute('KILL %s' % (self.session_id))
+
+  #########################################
+  # Tables                                #
+  #########################################
 
   def describe_table(self, table_name):
     '''Return a Table with table and col names always in lowercase.'''
@@ -385,19 +889,11 @@ class MySQLDbConnection(DbConnection):
       if data_type == 'tinyint(1)':
         # Just assume this is a boolean...
         data_type = 'boolean'
-      if '(' in data_type:
+      if 'decimal' not in data_type and '(' in data_type:
         # Strip the size of the data type
         data_type = data_type[:data_type.index('(')]
       table.cols.append(Column(table, col_name.lower(), self.parse_data_type(data_type)))
     return table
-
-  @property
-  def supports_kill_connection(self):
-    return True
-
-  def kill_connection(self):
-    with self.connector.open_connection(db_name=self.db_name) as connection:
-      connection.execute('KILL %s' % (self.session_id))
 
   def index_table(self, table_name):
     table = self.describe_table(table_name)
@@ -410,3 +906,101 @@ class MySQLDbConnection(DbConnection):
             raise
           # Some sort of MySQL bug...
           LOG.warn('Could not create index on %s.%s: %s' % (table_name, col.name, e))
+
+  def make_create_table_sql(self, table):
+    table_sql = super(MySQLDbConnection).make_create_table_sql(table)
+    table_sql += ' ENGINE = MYISAM'
+    return table_sql
+
+  #########################################
+  # Data loading                          #
+  #########################################
+
+  def begin_bulk_load_table(self):
+    raise NotImplementedError()
+
+
+#########################################
+## Oracle                              ##
+#########################################
+class OracleDbConnection(DbConnection):
+
+  __imported_types = False
+  __char_type = None
+  __number_type = None
+
+  @classmethod
+  def type_converter(cls, cursor, name, default_type, size, precision, scale):
+    if not cls.__imported_types:
+      from cx_Oracle import FIXED_CHAR, NUMBER
+      cls.__char_type = FIXED_CHAR
+      cls.__number_type = NUMBER
+      cls.__imported_types = True
+
+    if default_type == cls.__char_type and size == 1:
+      return cursor.var(str, 1, cursor.arraysize, outconverter=cls.boolean_converter)
+    if default_type == cls.__number_type and scale:
+      return cursor.var(str, 100, cursor.arraysize, outconverter=PyDecimal)
+
+  @classmethod
+  def boolean_converter(cls, val):
+    if not val:
+      return
+    return val == 'T'
+
+  @property
+  def schema(self):
+    return self.db_name or self.connector.user_name
+
+  def create_cursor(self):
+    cursor = DbConnection.create_cursor(self)
+    if self.db_name and self.db_name != self.connector.user_name:
+      cursor.execute('ALTER SESSION SET CURRENT_SCHEMA =  %s' % self.db_name)
+    return cursor
+
+  def make_list_table_names_sql(self):
+    return 'SELECT table_name FROM user_tables'
+
+  def drop_database(self, db_name):
+    self.execute('DROP USER %s CASCADE' % db_name)
+
+  def drop_db_if_exists(self, db_name):
+    '''This should not be called from a connection to the database being dropped.'''
+    try:
+      self.drop_database(db_name)
+    except Exception as e:
+      if 'ORA-01918' not in str(e):   # Ignore if the user doesn't exist
+        raise
+
+  def create_database(self, db_name):
+    self.execute(
+        'CREATE USER %s IDENTIFIED BY %s DEFAULT TABLESPACE USERS' % (db_name, db_name))
+    self.execute('GRANT ALL PRIVILEGES TO %s' % db_name)
+
+  def make_describe_table_sql(self, table_name):
+    # Recreate the data types as defined in the model
+    return '''
+        SELECT
+          column_name,
+          CASE
+            WHEN data_type = 'NUMBER' AND data_scale = 0  THEN
+                data_type || '(' || data_precision  || ')'
+            WHEN data_type = 'NUMBER' THEN
+                data_type || '(' || data_precision || ', ' || data_scale || ')'
+            WHEN data_type IN ('CHAR', 'VARCHAR2') THEN
+                data_type || '(' || data_length  || ')'
+            WHEN data_type LIKE 'TIMESTAMP%%' THEN
+                'TIMESTAMP'
+            ELSE data_type
+          END
+        FROM all_tab_columns
+        WHERE owner = '%s' AND table_name = '%s'
+        ORDER BY column_id''' \
+        % (self.schema.upper(), table_name.upper())
+
+  #########################################
+  # Data loading                          #
+  #########################################
+
+  def begin_bulk_load_table(self):
+    raise NotImplementedError()

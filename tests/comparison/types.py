@@ -37,7 +37,7 @@ class DataTypeMetaclass(type):
 class DataType(ValExpr):
   '''Base class for data types.
 
-     Data types are represented as classes so inheritence can be used.
+     Data types are represented as classes so inheritance can be used.
 
   '''
 
@@ -54,7 +54,7 @@ class DataType(ValExpr):
   @classmethod
   def get_base_type(cls):
     '''This should only be called from a subclass to find the type that is just below
-       DataType in the class heirarchy. For example Int and Decimal would both return
+       DataType in the class hierarchy. For example Int and Decimal would both return
        Number as their base type.
     '''
     if DataType in cls.__bases__:
@@ -134,8 +134,8 @@ class Decimal(Number):
 
   CMP_VALUE = 4
 
-  MAX_DIGITS = 38
-  MAX_FRACTIONAL_DIGITS = 4
+  MAX_DIGITS = 38   # Arbitrary default values
+  MAX_FRACTIONAL_DIGITS = 10   # Arbitrary default values
 
 class Float(Number):
 
@@ -156,6 +156,7 @@ class Char(DataType):
   CMP_VALUE = 100
 
   MIN = 0
+  MAX = 255   # This is not the true max
 
 
 class VarChar(Char):
@@ -192,3 +193,33 @@ EXACT_TYPES = [
     VarChar]
 JOINABLE_TYPES = (Char, Decimal, Int, Timestamp)
 TYPES = tuple(set(type_.type for type_ in EXACT_TYPES))
+
+__DECIMAL_TYPE_CACHE = dict()
+def get_decimal_class(total_digits, fractional_digits):
+  cache_key = (total_digits, fractional_digits)
+  if cache_key not in __DECIMAL_TYPE_CACHE:
+    __DECIMAL_TYPE_CACHE[cache_key] = type(
+        'Decimal%02d%02d' % (total_digits, fractional_digits),
+        (Decimal, ),
+        {'MAX_DIGITS': total_digits, 'MAX_FRACTIONAL_DIGITS': fractional_digits})
+  return __DECIMAL_TYPE_CACHE[cache_key]
+
+
+__CHAR_TYPE_CACHE = dict()
+def get_char_class(length):
+  if length not in __CHAR_TYPE_CACHE:
+    __CHAR_TYPE_CACHE[length] = type(
+        'Char%04d' % length,
+        (Char, ),
+        {'MAX': length})
+  return __CHAR_TYPE_CACHE[length]
+
+
+__VARCHAR_TYPE_CACHE = dict()
+def get_varchar_class(length):
+  if length not in __VARCHAR_TYPE_CACHE:
+    __VARCHAR_TYPE_CACHE[length] = type(
+        'VarChar%04d' % length,
+        (VarChar, ),
+        {'MAX': length})
+  return __VARCHAR_TYPE_CACHE[length]

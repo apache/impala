@@ -18,12 +18,14 @@
    results.
 
 '''
-from collections import defaultdict
 from decimal import Decimal
 from itertools import izip
 from logging import getLogger
 from math import isinf, isnan
 from os import getenv, symlink, unlink
+from os.path import join as join_path
+from random import choice
+from string import ascii_lowercase, digits
 from subprocess import call
 from threading import current_thread, Thread
 from tempfile import gettempdir
@@ -37,7 +39,6 @@ from tests.comparison.db_connector import (
     MYSQL,
     ORACLE,
     POSTGRESQL)
-from tests.comparison.query import InlineView
 from tests.comparison.query_generator import QueryGenerator
 from tests.comparison.model_translator import SqlWriter
 
@@ -76,8 +77,11 @@ class QueryResultComparator(object):
        summarizes the outcome.
     '''
     comparison_result = ComparisonResult(query, self.ref_db_type)
-    (ref_exception, ref_data_set), (test_exception, test_data_set) = \
+    (ref_sql, ref_exception, ref_data_set), (test_sql, test_exception, test_data_set) = \
         self.query_executor.fetch_query_results(query)
+
+    comparison_result.ref_sql = ref_sql
+    comparison_result.test_sql = test_sql
 
     if ref_exception:
       comparison_result.exception = ref_exception
@@ -209,6 +213,30 @@ class QueryExecutor(object):
     self.query_timeout_seconds = query_timeout_seconds
     self.cursors = cursors
     self.sql_writers = sql_writers
+    self.query_logs = list()
+
+
+    for cursor in cursors:
+      # A list of all queries attempted
+      query_log_path = gettempdir() + '/test_query_log_%s_%s.sql' \
+          % (cursor.connection.db_type.lower(), time())
+      self.query_logs.append(open(query_log_path, 'w'))
+      link = gettempdir() + '/test_query_log_%s.sql' % cursor.connection.db_type.lower()
+      try:
+        unlink(link)
+      except OSError as e:
+        if not 'No such file' in str(e):
+          raise e
+      try:
+        symlink(query_log_path, link)
+      except OSError as e:
+        # TODO: Figure out what the error message is where there is a race condition
+        #       and ignore it.
+        raise e
+
+    # In case the query will be executed as a "CREATE TABLE <name> AS ..." or
+    # "CREATE VIEW <name> AS ...", this will be the value of "<name>".
+    self._table_or_view_name = None
 
   def fetch_query_results(self, query):
     '''Concurrently execute the query using each cursor and return a list of tuples
@@ -221,13 +249,18 @@ class QueryExecutor(object):
 
        "query" should be an instance of query.Query.
     '''
+    if query.execution != 'RAW':
+      self._table_or_view_name = self._create_random_table_name()
+
     query_threads = list()
-    for sql_writer, cursor in izip(self.sql_writers, self.cursors):
+    for sql_writer, cursor, log_file \
+        in izip(self.sql_writers, self.cursors, self.query_logs):
       query_thread = Thread(
           target=self._fetch_sql_results,
-          args=[query, cursor, sql_writer],
+          args=[query, cursor, sql_writer, log_file],
           name='Query execution thread')
       query_thread.daemon = True
+      query_thread.sql = ''
       query_thread.data_set = None
       query_thread.exception = None
       query_thread.start()
@@ -256,17 +289,36 @@ class QueryExecutor(object):
         query_thread.exception = QueryTimeout(
             'Query timed out after %s seconds' % self.query_timeout_seconds)
 
-    return [(query_thread.exception, query_thread.data_set)
+    return [(query_thread.sql, query_thread.exception, query_thread.data_set)
             for query_thread in query_threads]
 
-  def _fetch_sql_results(self, query, cursor, sql_writer):
+  def _fetch_sql_results(self, query, cursor, sql_writer, log_file):
     '''Execute the query using the cursor and set the result or exception on the local
        thread.
     '''
     try:
-      sql = sql_writer.write_query(query)
-      LOG.debug("Executing on %s:\n%s", cursor.connection.db_type, sql)
-      cursor.execute(sql)
+      log_file.write('/***** Start Query *****/\n')
+      if query.execution == 'CREATE_TABLE_AS':
+        setup_sql = sql_writer.write_create_table_as(query, self._table_or_view_name)
+        query_sql = 'SELECT * FROM ' + self._table_or_view_name
+      elif query.execution == 'VIEW':
+        setup_sql = sql_writer.write_create_view(query, self._table_or_view_name)
+        query_sql = 'SELECT * FROM ' + self._table_or_view_name
+      else:
+        setup_sql = None
+        query_sql = sql_writer.write_query(query)
+      if setup_sql:
+        LOG.debug("Executing on %s:\n%s", cursor.connection.db_type, setup_sql)
+        current_thread().sql = setup_sql + ';\n'
+        log_file.write(setup_sql + ';\n')
+        log_file.flush()
+        cursor.execute(setup_sql)
+      LOG.debug("Executing on %s:\n%s", cursor.connection.db_type, query_sql)
+      current_thread().sql += query_sql
+      log_file.write(query_sql + ';\n')
+      log_file.write('/***** End Query *****/\n')
+      log_file.flush()
+      cursor.execute(query_sql)
       col_count = len(cursor.description)
       batch_size = min(10000 / col_count, 1)
       row_limit = self.TOO_MUCH_DATA / col_count
@@ -286,6 +338,21 @@ class QueryExecutor(object):
           raise DataLimitExceeded('Too much data')
     except Exception as e:
       current_thread().exception = e
+    finally:
+      if query.execution == 'CREATE_TABLE_AS':
+        cursor.connection.drop_table(self._table_or_view_name)
+      elif query.execution == 'VIEW':
+        cursor.connection.drop_view(self._table_or_view_name)
+
+  def _create_random_table_name(self):
+    char_choices = ascii_lowercase
+    chars = list()
+    for idx in xrange(4):   # will result in ~1M combinations
+      if idx == 1:
+        char_choices += '_' + digits
+      chars.append(choice(char_choices))
+    return 'qgen_' + ''.join(chars)
+
 
 class ComparisonResult(object):
   '''Represents a result.'''
@@ -293,6 +360,8 @@ class ComparisonResult(object):
   def __init__(self, query, ref_db_type):
     self.query = query
     self.ref_db_type = ref_db_type
+    self.ref_sql = None
+    self.test_sql = None
     self.query_resulted_in_data = False
     self.ref_row_count = None
     self.test_row_count = None
@@ -370,21 +439,6 @@ class QueryResultDiffSearcher(object):
     self.common_tables = DbConnection.describe_common_tables(
         [ref_connection, test_connection])
 
-    # A list of all queries attempted
-    self.query_log_path = gettempdir() + '/test_query_log_%s.sql' % time()
-    link = gettempdir() + '/test_query_log.sql'
-    try:
-      unlink(link)
-    except OSError as e:
-      if not 'No such file' in str(e):
-        raise e
-    try:
-      symlink(self.query_log_path, link)
-    except OSError as e:
-      # TODO: Figure out what the error message is where there is a race condition
-      #       and ignore it.
-      raise e
-
   def search(self, number_of_test_queries, stop_on_result_mismatch, stop_on_crash):
     '''Returns an instance of SearchResults, which is a summary report. This method
        oversees the generation, execution, and comparison of queries.
@@ -393,9 +447,6 @@ class QueryResultDiffSearcher(object):
       to generate and execute.
     '''
     start_time = time()
-    ref_sql_writer = SqlWriter.create(
-        dialect=self.ref_connection.db_type)
-    test_sql_writer = SqlWriter.create(dialect=IMPALA)
     query_result_comparator = QueryResultComparator(
         self.ref_connection, self.test_connection)
     query_generator = QueryGenerator(self.query_profile)
@@ -407,108 +458,91 @@ class QueryResultDiffSearcher(object):
     test_crash_count = 0
     last_error = None
     repeat_error_count = 0
-    with open(self.query_log_path, 'w') as test_query_log:
-      test_query_log.write(
-         '--\n'
-         '-- Stating new run\n'
-         '--\n')
-      test_query_log.flush()
-      while number_of_test_queries > query_count:
-        query = query_generator.create_query(self.common_tables)
-        # We write test_sql to check that it does not contain a full outer join if a
-        # MySQL connection is used. We also add it to test_query_log. It is not used for
-        # anything else.
-        test_sql = test_sql_writer.write_query(query)
-
-        if 'FULL OUTER JOIN' in test_sql and self.ref_connection.db_type == MYSQL:
-          # Not supported by MySQL
+    while number_of_test_queries > query_count:
+      query = query_generator.create_query(self.common_tables)
+      query.execution = self.query_profile.get_query_execution()
+      query_count += 1
+      LOG.info('Running query #%s', query_count)
+      result = query_result_comparator.compare_query_results(query)
+      if result.query_resulted_in_data:
+        queries_resulted_in_data_count += 1
+      if isinstance(result.exception, DataLimitExceeded) \
+          or isinstance(result.exception, TypeOverflow):
+        continue
+      if result.error:
+        # TODO: These first two come from psycopg2, the postgres driver. Maybe we should
+        #       try a different driver? Or maybe the usage of the driver isn't correct.
+        #       Anyhow ignore these failures.
+        if 'division by zero' in result.error \
+            or 'out of range' in result.error:
+          LOG.debug('Ignoring error: %s', result.error)
+          query_count -= 1
           continue
 
-        query_count += 1
-        LOG.info('Running query #%s', query_count)
-        test_query_log.write('/***** query %s *****/\n' % query_count)
-        test_query_log.write(test_sql + ';\n')
-        test_query_log.flush()
-        result = query_result_comparator.compare_query_results(query)
-        if result.query_resulted_in_data:
-          queries_resulted_in_data_count += 1
-        if isinstance(result.exception, DataLimitExceeded) \
-            or isinstance(result.exception, TypeOverflow):
-          continue
-        if result.error:
-          # TODO: These first two come from psycopg2, the postgres driver. Maybe we should
-          #       try a different driver? Or maybe the usage of the driver isn't correct.
-          #       Anyhow ignore these failures.
-          if 'division by zero' in result.error \
-              or 'out of range' in result.error:
-            LOG.debug('Ignoring error: %s', result.error)
-            query_count -= 1
-            continue
+        if result.is_known_error:
+          known_error_count += 1
+        elif result.query_timed_out:
+          query_timeout_count += 1
+        else:
+          mismatch_count += 1
 
-          if result.is_known_error:
-            known_error_count += 1
-          elif result.query_timed_out:
-            query_timeout_count += 1
-          else:
-            mismatch_count += 1
+        print('---Test Query---\n')
+        print(result.test_sql + '\n')
+        print('---Reference Query---\n')
+        print(result.ref_sql + '\n')
+        print('---Error---\n')
+        print(result.error + '\n')
+        print('------\n')
 
-          print('---Test Query---\n')
-          print(test_sql_writer.write_query(query, pretty=True) + '\n')
-          print('---Reference Query---\n')
-          print(ref_sql_writer.write_query(query, pretty=True) + '\n')
-          print('---Error---\n')
-          print(result.error + '\n')
-          print('------\n')
-
-          if 'Could not connect' in result.error \
-              or "Couldn't open transport for" in result.error:
-            if stop_on_crash:
-              break
-            # Assume Impala crashed and try restarting
-            test_crash_count += 1
+        if 'Could not connect' in result.error \
+            or "Couldn't open transport for" in result.error:
+          if stop_on_crash:
+            break
+          # Assume Impala crashed and try restarting
+          test_crash_count += 1
+          LOG.info('Restarting Impala')
+          call([join_path(getenv('IMPALA_HOME'), 'bin/start-impala-cluster.py'),
+                          '--log_dir=%s' % getenv('LOG_DIR', "/tmp/")])
+          self.test_connection.reconnect()
+          query_result_comparator.test_cursor = self.test_connection.create_cursor()
+          result = query_result_comparator.compare_query_results(query)
+          if result.error:
             LOG.info('Restarting Impala')
-            call([join(getenv('IMPALA_HOME'), 'bin/start-impala-cluster.py'),
+            call([join_path(getenv('IMPALA_HOME'), 'bin/start-impala-cluster.py'),
                             '--log_dir=%s' % getenv('LOG_DIR', "/tmp/")])
             self.test_connection.reconnect()
             query_result_comparator.test_cursor = self.test_connection.create_cursor()
-            result = query_result_comparator.compare_query_results(query)
-            if result.error:
-              LOG.info('Restarting Impala')
-              call([join(getenv('IMPALA_HOME'), 'bin/start-impala-cluster.py'),
-                              '--log_dir=%s' % getenv('LOG_DIR', "/tmp/")])
-              self.test_connection.reconnect()
-              query_result_comparator.test_cursor = self.test_connection.create_cursor()
-            else:
-              break
-
-          if stop_on_result_mismatch and \
-              not (result.is_known_error or result.query_timed_out):
+          else:
             break
 
-          if last_error == result.error \
-              and not (result.is_known_error or result.query_timed_out):
-            repeat_error_count += 1
-            if repeat_error_count == self.ABORT_ON_REPEAT_ERROR_COUNT:
-              break
-          else:
-            last_error = result.error
-            repeat_error_count = 0
-        else:
-          if result.query_resulted_in_data:
-            LOG.info('Results matched (%s rows)', result.test_row_count)
-          else:
-            LOG.info('Query did not produce meaningful data')
-          last_error = None
-          repeat_error_count = 0
+        if stop_on_result_mismatch and \
+            not (result.is_known_error or result.query_timed_out):
+          break
 
-      return SearchResults(
-          query_count,
-          queries_resulted_in_data_count,
-          mismatch_count,
-          query_timeout_count,
-          known_error_count,
-          test_crash_count,
-          time() - start_time)
+        if last_error == result.error \
+            and not (result.is_known_error or result.query_timed_out):
+          repeat_error_count += 1
+          if repeat_error_count == self.ABORT_ON_REPEAT_ERROR_COUNT:
+            break
+        else:
+          last_error = result.error
+          repeat_error_count = 0
+      else:
+        if result.query_resulted_in_data:
+          LOG.info('Results matched (%s rows)', result.test_row_count)
+        else:
+          LOG.info('Query did not produce meaningful data')
+        last_error = None
+        repeat_error_count = 0
+
+    return SearchResults(
+        query_count,
+        queries_resulted_in_data_count,
+        mismatch_count,
+        query_timeout_count,
+        known_error_count,
+        test_crash_count,
+        time() - start_time)
 
 
 class SearchResults(object):

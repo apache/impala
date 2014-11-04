@@ -15,7 +15,7 @@ Requirements:
 
 2) Impyla -- an implementation of DB API 2 for Impala.
 
-     sudo pip install git+http://github.com/laserson/impyla.git#impyla
+     sudo pip install impyla
 
 3) At least one python driver for a reference database.
 
@@ -27,9 +27,9 @@ Usage:
 
 1) Generate test data
 
-     ./data_generator.py --use-mysql
+     ./data_generator.py --use-postgresql
 
-   This will generate tables and data in MySQL and Impala
+   This will generate tables and data in Postgresql and Impala
 
 
 2) Run the comparison
@@ -37,30 +37,7 @@ Usage:
      ./discrepancy_searcher.py
 
    This will generate queries using the test database and compare the results against
-   MySQL (the default).
-
-
-Known Issues:
-
-1) Floats will produce false-positives. For example the results of a query that has
-
-   SELECT FLOOR(COUNT(...) * AVG(...)) AS col_1
-
-   will produce different results on Impala and MySQL if COUNT() == 3 and AVG() == 1/3.
-   One of the databasses will FLOOR(1) while the other will FLOOR(0.999).
-
-   Maybe this could be worked around or reduced by replacing all uses of AVG() with
-   "AVG() + foo", where foo is some number that makes it unlikely that
-   "COUNT() * (AVG() + foo)" will result in an int.
-
-   I'd guess this issue comes up in 1 out of 10-20k queries.
-
-2) Impyla may fail with "Invalid query handle". Some queries will fail every time when run
-   through Impyla but run fine through the impala-shell. I need to research more and file
-   an issue with Impyla.
-
-3) Impyla will fail with "Invalid session". I'm pretty sure this is also an Impyla issue
-   but also need to investigate more.
+   Postgresql (the default).
 
 
 Things to Know:
@@ -73,7 +50,7 @@ Things to Know:
    least one discrepancy.
 
 2) It's possible to provide a randomization seed so that the randomness is actually
-   reproducable. The data generation currently has a default seed so will always produce
+   reproducible. The data generation currently has a default seed so will always produce
    the same tables. This also mean if a new data type is added those generated tables
    will change.
 
@@ -97,68 +74,32 @@ Miscellaneous:
 
 Postgresql:
 
-1) Supports bascially all Impala language features
+1) Supports basically all Impala language features
 
-2) Does int division, 1 / 2 == 0
-
-3) Has strange sorting of strings, '-1' > '1'. This may be important if ORDER BY is ever
+2) Has strange sorting of strings, '-1' > '1'. This may be important if ORDER BY is ever
    used. The databases being compared would need to have the same collation, which is
    probably configurable.
 
-4) This was the original reference database but I moved to MySQL while trying to add
-   support for floats and never moved back.
-
-
 MySQL:
 
-1) Supports bascially all Impala language features, except WITH clause requires emulation
-   with inline views.
+1) Does not support analytics.
 
-2) Has poor boolean support. It may be worth switching back to Postgresql for this.
+2) Has poor boolean support.
 
 
 Improvements:
 
-1) Add support for simplifing buggy queries. When a random query fails the comparison
+1) Add the ability to incrementally increase the complexity of query profiles
+   automatically during execution. For example, the profile could start with no joins,
+   then after 100 or so queries, the number of joins could be increased. This would
+   lead to bugs that are not related to joins being found by much simpler queries.
+
+2) Add support for simplifying buggy queries. When a random query fails the comparison
    check it is basically always much too complex for directly posting a bug report. It
    is also time consuming to simplify the queries because there is a lot of trial and
    error and manually editing queries.
 
-2) Add more language features
+3) Add common built-in functions. Ex: NVL, ...
 
-     a) SEMI JOIN
-     b) ORDER BY
-     c) LIMIT, OFFSET
-     d) CASE / WHEN
-
-3) Add common built-in functions. Ex: CAST, IF, NVL, ...
-
-4) Make randomization of the query generation configurable. As of this writing all the
-   probabilities are hard-coded. At a very minimum it should be easy to disable or force
-   the use of some language features such as CROSS JOIN, GROUP BY, etc.
-
-5) More investingation of using the existing "functional" test datasets. A very quick
-   trial run wasn't successful but another attempt with more effort should be made before
-   introducing a new dataset.
-
-   I suspect the problem with using the functional dataset was that I only imported a few
-   tables, maybe alltypes, alltypesagg, and something else. I don't think I imported the
-   tiny tables since the odds of them producing results from a random query would be
-   very low.
-
-6) If the functional dataset cannot be used, someone should think more about what the
-   random data should be like. Only a few minutes of thought were put into selecting
-   random value ranges (including number of tables and columns), and it's not clear how
-   important those ranges are.
-
-7) Add support for comparing results with codegen enabled and disabled. Uri recently added
+4) Add support for comparing results with codegen enabled and disabled. Uri recently added
    support for query options in Impyla.
-
-8) Consider adding Oracle or SQL Server support, these could be useful in the future for
-   analytic queries.
-
-9) Try running with tables in various formats. Ex: parquet and/or avro.
-
-10) Support for more data types. Only int types are known to give good results.
-    Floats may work but non-numeric types are not supported yet.
-

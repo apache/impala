@@ -123,7 +123,11 @@ class DefaultProfile(object):
             ('Scalar', 'AGG', 'CORRELATED'): 0,   # Not supported
             ('Scalar', 'AGG', 'UNCORRELATED'): 1,
             ('Scalar', 'NON_AGG', 'CORRELATED'): 0,   # Not supported
-            ('Scalar', 'NON_AGG', 'UNCORRELATED'): 1}}
+            ('Scalar', 'NON_AGG', 'UNCORRELATED'): 1},
+        'QUERY_EXECUTION': {   # Used by the discrepancy searcher
+            'CREATE_TABLE_AS': 1,
+            'RAW': 10,
+            'VIEW': 1}}
 
     # On/off switches
     self._flags = {
@@ -334,6 +338,9 @@ class DefaultProfile(object):
 
   def use_union_all(self):
     return self._decide_from_probability('MISC', 'UNION_ALL')
+
+  def get_query_execution(self):
+    return self._choose_from_weights('QUERY_EXECUTION')
 
   def choose_val_expr(self, val_exprs, types=TYPES):
     if not val_exprs:

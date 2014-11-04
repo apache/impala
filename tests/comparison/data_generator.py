@@ -23,48 +23,58 @@
 '''
 
 from datetime import datetime, timedelta
+from decimal import Decimal as PyDecimal
 from logging import basicConfig, getLogger
 from random import choice, randint, random, seed, uniform
 
 from tests.comparison.db_connector import (
     DbConnector,
+    HIVE,
     IMPALA,
     MYSQL,
+    ORACLE,
     POSTGRESQL)
-from tests.comparison.model import (
+from tests.comparison.common import Column, Table
+from tests.comparison.types import (
     Boolean,
-    Column,
+    Char,
+    Decimal,
+    EXACT_TYPES,
     Float,
+    get_char_class,
+    get_decimal_class,
+    get_varchar_class,
     Int,
-    Number,
     String,
-    Table,
     Timestamp,
-    TYPES)
+    TYPES,
+    VarChar)
 
 LOG = getLogger(__name__)
 
 class RandomValGenerator(object):
-  '''This class will generate random data of various data types. Currently only numeric
-     and string data types are supported.
-
-  '''
+  '''This class will generate random data of various data types.'''
 
   def __init__(self,
       min_number=-1000,
       max_number=1000,
       min_date=datetime(1990, 1, 1),
       max_date=datetime(2030, 1, 1),
-      null_val_percentage=0.1):
+      null_val_percentage=0.1,
+      max_decimal_fractional_digits=2):
+    if type(min_number) != int or type(max_number) != int:
+      raise Exception("min_number and max_number must be integers but were %s and %s"
+          % (type(min_number), type(max_number)))
     self.min_number = min_number
     self.max_number = max_number
     self.min_date = min_date
     self.max_date = max_date
     self.null_val_percentage = null_val_percentage
+    self.max_decimal_fractional_digits = max_decimal_fractional_digits
 
   def generate_val(self, val_type):
     '''Generate and return a single random val. Use the val_type parameter to
-       specify the type of val to generate. See model.DataType for valid val_type
+       specify the type of val to generate. See types.py for valid val_type
        options.
 
        Ex:
@@ -72,15 +82,30 @@ class RandomValGenerator(object):
          val = generator.generate_val(model.Int)
          assert 1 <= val and val <= 5
     '''
-    if issubclass(val_type, String):
+    if issubclass(val_type, Char):
       val = self.generate_val(Int)
-      return None if val is None else str(val)
+      return None if val is None else str(val)[:val_type.MAX]
     if random() < self.null_val_percentage:
       return None
     if issubclass(val_type, Int):
       return randint(
           max(self.min_number, val_type.MIN), min(val_type.MAX, self.max_number))
-    if issubclass(val_type, Number):
+    if issubclass(val_type, Decimal):
+      # Create an int within the maximum length of the Decimal, then shift the decimal
+      # point as needed.
+      if val_type.MAX_FRACTIONAL_DIGITS > self.max_decimal_fractional_digits:
+        max_digits = val_type.MAX_DIGITS \
+            - (val_type.MAX_FRACTIONAL_DIGITS - self.max_decimal_fractional_digits)
+        fractal_digits = self.max_decimal_fractional_digits
+      else:
+        max_digits = val_type.MAX_DIGITS
+        fractal_digits = val_type.MAX_FRACTIONAL_DIGITS
+      max_type_val = 10 ** max_digits
+      decimal_point_shift = 10 ** fractal_digits
+      max_val = min(self.max_number * decimal_point_shift, max_type_val)
+      min_val = max(self.min_number * decimal_point_shift, -1 * max_type_val)
+      return PyDecimal(randint(min_val + 1, max_val - 1)) / decimal_point_shift
+    if issubclass(val_type, Float):
       return uniform(self.min_number, self.max_number)
     if issubclass(val_type, Timestamp):
       delta = self.max_date - self.min_date
@@ -106,49 +131,59 @@ class DatabasePopulator(object):
   def populate_db_with_random_data(self,
       db_name,
       db_connectors,
-      number_of_tables=10,
-      allowed_data_types=TYPES,
-      create_files=False):
-    '''Create tables with a random number of cols with data types chosen from
-       allowed_data_types, then fill the tables with data.
+      min_number_of_tables,
+      max_number_of_tables,
+      min_number_of_cols,
+      max_number_of_cols,
+      min_number_of_rows,
+      max_number_of_rows,
+      allowed_storage_formats,
+      create_files):
+    '''Create tables with a random number of cols.
 
        The given db_name must have already been created.
-
     '''
-    connections = [connector.create_connection(db_name=db_name)
-                   for connector in db_connectors]
-    for table_idx in xrange(number_of_tables):
+    connections = list()
+    hive_connection = None
+    for connector in db_connectors:
+      connection = connector.create_connection(db_name=db_name)
+      connections.append(connection)
+      if connector.db_type == IMPALA:
+        # The Impala table creator needs help from Hive for some storage formats.
+        # Eventually Impala should be able to write in all formats and this can be
+        # removed.
+        hive_connection = DbConnector(HIVE).create_connection(db_name=db_name)
+        connection.hive_connection = hive_connection
+    for table_idx in xrange(randint(min_number_of_tables, max_number_of_tables)):
       table = self.create_random_table(
           'table_%s' % (table_idx + 1),
-          allowed_data_types=allowed_data_types)
+          min_number_of_cols,
+          max_number_of_cols,
+          allowed_storage_formats)
+
       for connection in connections:
-        sql = self.make_create_table_sql(table, dialect=connection.db_type)
-        LOG.info('Creating %s table %s', connection.db_type, table.name)
-        if create_files:
-          with open('%s_%s.sql' % (table.name, connection.db_type.lower()), 'w') \
-              as f:
-            f.write(sql + '\n')
-        connection.execute(sql)
-      LOG.info('Inserting data into %s', table.name)
-      for _ in xrange(100):   # each iteration will insert 100 rows
-        rows = self.generate_table_data(table)
+        connection.bulk_load_data_file = open(
+            "/tmp/%s_%s.data" % (table.name, connection.db_type.lower()), "w")
+        connection.begin_bulk_load_table(table)
+
+      row_count = randint(min_number_of_rows, max_number_of_rows)
+      LOG.info('Inserting %s rows into %s', row_count, table.name)
+      while row_count:
+        batch_size = min(1000, row_count)
+        rows = self.generate_table_data(table, number_of_rows=batch_size)
+        row_count -= batch_size
         for connection in connections:
-          sql = self.make_insert_sql_from_data(
-              table, rows, dialect=connection.db_type)
-          if create_files:
-            with open('%s_%s.sql' %
-                (table.name, connection.db_type.lower()), 'a') as f:
-              f.write(sql + '\n')
-          try:
-            connection.execute(sql)
-          except:
-            LOG.error('Error executing SQL: %s', sql)
-            raise
+          connection.handle_bulk_load_table_data(rows)
+
+      for connection in connections:
+        connection.end_bulk_load_table()
 
     self.index_tables_in_database(connections)
 
     for connection in connections:
       connection.close()
+    if hive_connection:
+      hive_connection.close()
 
   def migrate_database(self,
       db_name,
@@ -156,7 +191,7 @@ class DatabasePopulator(object):
       destination_db_connectors,
       include_table_names=None):
     '''Read table metadata and data from the source database and create a replica in
-       the destination databases. For example, the Impala funcal test database could
+       the destination databases. For example, the Impala functional test database could
        be copied into Postgresql.
 
        source_db_connector and items in destination_db_connectors should be
@@ -177,8 +212,7 @@ class DatabasePopulator(object):
         LOG.warn('Error fetching metadata for %s: %s', table_name, e)
         continue
       for destination_cursor in cursors:
-        sql = self.make_create_table_sql(
-            table, dialect=destination_cursor.connection.db_type)
+        sql = destination_cursor.connection.make_create_table_sql(table)
         destination_cursor.execute(sql)
       with source_connection.open_cursor() as source_cursor:
         try:
@@ -188,8 +222,7 @@ class DatabasePopulator(object):
             if not rows:
               break
             for destination_cursor in cursors:
-              sql = self.make_insert_sql_from_data(
-                  table, rows, dialect=destination_cursor.connection.db_type)
+              sql = destination_cursor.connection.make_insert_sql_from_data(table, rows)
               destination_cursor.execute(sql)
         except Exception as e:
           LOG.error('Error fetching data for %s: %s', table_name, e)
@@ -201,16 +234,26 @@ class DatabasePopulator(object):
       cursor.close()
       cursor.connection.close()
 
-  def create_random_table(self, table_name, allowed_data_types):
-    '''Create and return a Table with a random number of cols chosen from the
-       given allowed_data_types.
-
-    '''
-    data_type_count = len(allowed_data_types)
-    col_count = randint(data_type_count / 2, data_type_count * 2)
+  def create_random_table(self,
+      table_name,
+      min_number_of_cols,
+      max_number_of_cols,
+      allowed_storage_formats):
+    '''Create and return a Table with a random number of cols.'''
+    col_count = randint(min_number_of_cols, max_number_of_cols)
+    storage_format = choice(allowed_storage_formats)
     table = Table(table_name)
+    table.storage_format = storage_format
     for col_idx in xrange(col_count):
-      col_type = choice(allowed_data_types)
+      col_type = choice(TYPES)
+      col_type = choice(filter(lambda type_: issubclass(type_, col_type), EXACT_TYPES))
+      if issubclass(col_type, VarChar) and not issubclass(col_type, String):
+        col_type = get_varchar_class(randint(1, VarChar.MAX))
+      elif issubclass(col_type, Char) and not issubclass(col_type, String):
+        col_type = get_char_class(randint(1, Char.MAX))
+      elif issubclass(col_type, Decimal):
+        max_digits = randint(1, Decimal.MAX_DIGITS)
+        col_type = get_decimal_class(max_digits, randint(1, max_digits))
       col = Column(
           table,
           '%s_col_%s' % (col_type.__name__.lower(), col_idx + 1),
@@ -218,68 +261,12 @@ class DatabasePopulator(object):
       table.cols.append(col)
     return table
 
-  def make_create_table_sql(self, table, dialect=IMPALA):
-    sql = 'CREATE TABLE %s (%s)' % (
-        table.name,
-        ', '.join('%s %s' %
-            (col.name, self.get_sql_for_data_type(col.type, dialect)) +
-            ('' if dialect == IMPALA else ' NULL')
-            for col in table.cols))
-    if dialect == MYSQL:
-      sql += ' ENGINE = MYISAM'
-    return sql
-
-  def get_sql_for_data_type(self, data_type, dialect=IMPALA):
-    # Check to see if there is an alias and if so, use the first one
-    if hasattr(data_type, dialect):
-      return getattr(data_type, dialect)[0]
-    return data_type.__name__.upper()
-
-  def make_insert_sql_from_data(self, table, rows, dialect=IMPALA):
-    # TODO: Consider using parameterized inserts so the database connector handles
-    #       formatting the data. For example the CAST to workaround IMPALA-803 can
-    #       probably be removed. The vals were generated this way so a data file
-    #       could be made and attached to jiras.
-    if not rows:
-      raise Exception('At least one row is required')
-    if not table.cols:
-      raise Exception('At least one col is required')
-
-    sql = 'INSERT INTO %s VALUES ' % table.name
-    for row_idx, row in enumerate(rows):
-      if row_idx > 0:
-        sql += ', '
-      sql += '('
-      for col_idx, col in enumerate(table.cols):
-        if col_idx > 0:
-          sql += ', '
-        val = row[col_idx]
-        if val is None:
-          sql += 'NULL'
-        elif issubclass(col.type, Timestamp):
-          if dialect != IMPALA:
-            sql += 'TIMESTAMP '
-          sql += "'%s'" % val
-        elif issubclass(col.type, String):
-          val = val.replace("'", "''")
-          if dialect == POSTGRESQL:
-            val = val.replace('\\', '\\\\')
-          sql += "'%s'" % val
-        elif dialect == IMPALA \
-            and issubclass(col.type, Float):
-          # https://issues.cloudera.org/browse/IMPALA-803
-          sql += 'CAST(%s AS FLOAT)' % val
-        else:
-          sql += str(val)
-      sql += ')'
-    return sql
-
   def generate_table_data(self, table, number_of_rows=100):
       rows = list()
       for row_idx in xrange(number_of_rows):
         row = list()
         for col in table.cols:
-          row.append(self.val_generator.generate_val(col.type))
+          row.append(self.val_generator.generate_val(col.exact_type))
         rows.append(row)
       return rows
 
@@ -287,7 +274,7 @@ class DatabasePopulator(object):
     for connector in db_connectors:
       with connector.open_connection() as connection:
         connection.drop_db_if_exists(db_name)
-        connection.execute('CREATE DATABASE ' + db_name)
+        connection.create_database(db_name)
 
   def index_tables_in_database(self, connections):
     for connection in connections:
@@ -296,8 +283,12 @@ class DatabasePopulator(object):
           LOG.info('Indexing %s on %s' % (table_name, connection.db_type))
           connection.index_table(table_name)
 
+
 if __name__ == '__main__':
+  import logging
   from optparse import NO_DEFAULT, OptionGroup, OptionParser
+
+  import tests.comparison.cli_options as cli_options
 
   parser = OptionParser(
       usage='usage: \n'
@@ -307,45 +298,31 @@ if __name__ == '__main__':
             '  %prog [options] migrate\n\n'
             '     Migrate an Impala database to another database type. The destination \n'
             '     database will be dropped and recreated.')
-  parser.add_option('--log-level', default='INFO',
-      help='The log level to use.', choices=('DEBUG', 'INFO', 'WARN', 'ERROR'))
-  parser.add_option('--db-name', default='randomness',
-      help='The name of the database to use. Ex: functional.')
-
-  group = OptionGroup(parser, 'MySQL Options')
-  group.add_option('--use-mysql', action='store_true', default=False,
-      help='Use MySQL')
-  group.add_option('--mysql-host', default='localhost',
-      help='The name of the host running the MySQL database.')
-  group.add_option('--mysql-port', default=3306, type=int,
-      help='The port of the host running the MySQL database.')
-  group.add_option('--mysql-user', default='root',
-      help='The user name to use when connecting to the MySQL database.')
-  group.add_option('--mysql-password',
-      help='The password to use when connecting to the MySQL database.')
-  parser.add_option_group(group)
-
-  group = OptionGroup(parser, 'Postgresql Options')
-  group.add_option('--use-postgresql', action='store_true', default=False,
-      help='Use Postgresql')
-  group.add_option('--postgresql-host', default='localhost',
-      help='The name of the host running the Postgresql database.')
-  group.add_option('--postgresql-port', default=5432, type=int,
-      help='The port of the host running the Postgresql database.')
-  group.add_option('--postgresql-user', default='postgres',
-      help='The user name to use when connecting to the Postgresql database.')
-  group.add_option('--postgresql-password',
-      help='The password to use when connecting to the Postgresql database.')
-  parser.add_option_group(group)
+  cli_options.add_logging_options(parser)
+  cli_options.add_db_name_option(parser)
+  cli_options.add_connection_option_groups(parser)
 
   group = OptionGroup(parser, 'Database Population Options')
   group.add_option('--randomization-seed', default=1, type='int',
       help='The randomization will be initialized with this seed. Using the same seed '
           'will produce the same results across runs.')
+  storage_formats = ['avro', 'parquet', 'rcfile', 'sequencefile', 'textfile']
+  group.add_option('--storage-file-formats', default=','.join(storage_formats),
+      help='A comma separated list of storage formats to choose from.')
   group.add_option('--create-data-files', default=False, action='store_true',
-      help='Create files that can be used to repopulate the databasese elsewhere.')
-  group.add_option('--table-count', default=10, type='int',
-      help='The number of tables to generate.')
+      help='Create files that can be used to repopulate the databases elsewhere.')
+  group.add_option('--min-table-count', default=10, type='int',
+      help='The minimum number of tables to generate.')
+  group.add_option('--max-table-count', default=100, type='int',
+      help='The maximum number of tables to generate.')
+  group.add_option('--min-column-count', default=10, type='int',
+      help='The minimum number of columns to generate per table.')
+  group.add_option('--max-column-count', default=100, type='int',
+      help='The maximum number of columns to generate per table.')
+  group.add_option('--min-row-count', default=(10 ** 3), type='int',
+      help='The minimum number of rows to generate per table.')
+  group.add_option('--max-row-count', default=(10 ** 6), type='int',
+      help='The maximum number of rows to generate per table.')
   parser.add_option_group(group)
 
   group = OptionGroup(parser, 'Database Migration Options')
@@ -364,11 +341,12 @@ if __name__ == '__main__':
   if len(args) > 1 or command not in ['populate', 'migrate']:
     raise Exception('Command must either be "populate" or "migrate" but was "%s"' %
         ' '.join(args))
-  if command == 'migrate' and not any((options.use_mysql, options.use_postgresql)):
+  if command == 'migrate' and \
+      not any((options.use_mysql, options.use_postgresql, options.use_oracle)):
     raise Exception('At least one destination database must be chosen with '
           '--use-<database type>')
 
-  basicConfig(level=options.log_level)
+  basicConfig(level=getattr(logging, options.log_level))
 
   seed(options.randomization_seed)
 
@@ -380,6 +358,12 @@ if __name__ == '__main__':
       password=options.postgresql_password,
       host_name=options.postgresql_host,
       port=options.postgresql_port))
+  if options.use_oracle:
+    db_connectors.append(DbConnector(ORACLE,
+      user_name=options.oracle_user,
+      password=options.oracle_password,
+      host_name=options.oracle_host,
+      port=options.oracle_port))
   if options.use_mysql:
     db_connectors.append(DbConnector(MYSQL,
       user_name=options.mysql_user,
@@ -394,8 +378,14 @@ if __name__ == '__main__':
     populator.populate_db_with_random_data(
         options.db_name,
         db_connectors,
-        number_of_tables=options.table_count,
-        create_files=options.create_data_files)
+        options.min_table_count,
+        options.max_table_count,
+        options.min_column_count,
+        options.max_column_count,
+        options.min_row_count,
+        options.max_row_count,
+        options.storage_file_formats.split(','),
+        options.create_data_files)
   else:
     populator.drop_and_create_database(options.db_name, db_connectors)
     if options.migrate_table_names:
