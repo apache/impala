@@ -25,6 +25,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/foreach.hpp>
 #include <boost/filesystem.hpp>
+#include <gutil/strings/substitute.h>
 
 #include <hdfs.h>
 
@@ -58,6 +59,7 @@ using namespace boost;
 using namespace impala;
 using namespace llvm;
 using namespace std;
+using namespace strings;
 
 const string HdfsScanNode::HDFS_SPLIT_STATS_DESC =
     "Hdfs split stats (<volume id>:<# splits>/<split lengths>)";
@@ -176,7 +178,8 @@ Status HdfsScanNode::GetNextInternal(
 }
 
 DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(const char* file, int64_t len,
-    int64_t offset, int64_t partition_id, int disk_id, bool try_cache) {
+    int64_t offset, int64_t partition_id, int disk_id, bool try_cache,
+    bool expected_local) {
   DCHECK_GE(disk_id, -1);
   if (disk_id == -1) {
     // disk id is unknown, assign it a random one.
@@ -192,7 +195,7 @@ DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(const char* file, int64_t 
       runtime_state_->obj_pool()->Add(new ScanRangeMetadata(partition_id));
   DiskIoMgr::ScanRange* range =
       runtime_state_->obj_pool()->Add(new DiskIoMgr::ScanRange());
-  range->Reset(file, len, offset, disk_id, try_cache, metadata);
+  range->Reset(file, len, offset, disk_id, try_cache, expected_local, metadata);
   return range;
 }
 
@@ -415,13 +418,15 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
     }
 
     bool try_cache = (*scan_range_params_)[i].is_cached;
+    bool expected_local = (*scan_range_params_)[i].__isset.is_remote &&
+                          !(*scan_range_params_)[i].is_remote;
     if (runtime_state_->query_options().disable_cached_reads) {
       DCHECK(!try_cache) << "Params should not have had this set.";
     }
     file_desc->splits.push_back(
         AllocateScanRange(file_desc->filename.c_str(), split.length, split.offset,
                           split.partition_id, (*scan_range_params_)[i].volume_id,
-                          try_cache));
+                          try_cache, expected_local));
   }
 
   // Compute the minimum bytes required to start a new thread. This is based on the
@@ -597,6 +602,8 @@ Status HdfsScanNode::Open(RuntimeState* state) {
       TCounterType::BYTES);
   num_remote_ranges_ = ADD_COUNTER(runtime_profile(), "RemoteScanRanges",
       TCounterType::UNIT);
+  unexpected_remote_bytes_ = ADD_COUNTER(runtime_profile(), "BytesReadRemoteUnexpected",
+      TCounterType::BYTES);
 
   max_compressed_text_file_length_ = runtime_profile()->AddHighWaterMarkCounter(
       "MaxCompressedTextFileLength", TCounterType::BYTES);
@@ -1035,6 +1042,14 @@ void HdfsScanNode::StopAndFinalizeCounters() {
         runtime_state_->io_mgr()->bytes_read_dn_cache(reader_context_));
     num_remote_ranges_->Set(static_cast<int64_t>(
         runtime_state_->io_mgr()->num_remote_ranges(reader_context_)));
+    unexpected_remote_bytes_->Set(
+        runtime_state_->io_mgr()->unexpected_remote_bytes(reader_context_));
+
+    if (unexpected_remote_bytes_->value() > 0) {
+      runtime_state_->LogError(Substitute(
+          "Block locality metadata for table '$0' may be stale. Consider running "
+          "\"INVALIDATE METADATA $0\".", hdfs_table_->name()));
+    }
 
     ImpaladMetrics::IO_MGR_BYTES_READ->Increment(bytes_read_counter()->value());
     ImpaladMetrics::IO_MGR_LOCAL_BYTES_READ->Increment(

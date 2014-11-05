@@ -175,13 +175,14 @@ class HdfsScanNode : public ScanNode {
   // This function will block if materialized_row_batches_ is full.
   void AddMaterializedRowBatch(RowBatch* row_batch);
 
-  // Allocate a new scan range object, stored in the runtime state's object pool.
-  // For scan ranges that correspond to the original hdfs splits, the partition id
-  // must be set to the range's partition id. For other ranges (e.g. columns in parquet,
-  // read past buffers), the partition_id is unused.
+  // Allocate a new scan range object, stored in the runtime state's object pool.  For
+  // scan ranges that correspond to the original hdfs splits, the partition id must be set
+  // to the range's partition id. For other ranges (e.g. columns in parquet, read past
+  // buffers), the partition_id is unused. expected_local should be true if this scan
+  // range is not expected to require a remote read.
   // This is thread safe.
   DiskIoMgr::ScanRange* AllocateScanRange(const char* file, int64_t len, int64_t offset,
-      int64_t partition_id, int disk_id, bool try_cache);
+      int64_t partition_id, int disk_id, bool try_cache, bool expected_local);
 
   // Adds ranges to the io mgr queue and starts up new scanner threads if possible.
   Status AddDiskIoRanges(const std::vector<DiskIoMgr::ScanRange*>& ranges);
@@ -402,6 +403,9 @@ class HdfsScanNode : public ScanNode {
 
   // Total number of remote scan ranges
   RuntimeProfile::Counter* num_remote_ranges_;
+
+  // Total number of bytes read remotely that were expected to be local
+  RuntimeProfile::Counter* unexpected_remote_bytes_;
 
   // Lock protects access between scanner thread and main query thread (the one calling
   // GetNext()) for all fields below.  If this lock and any other locks needs to be taken

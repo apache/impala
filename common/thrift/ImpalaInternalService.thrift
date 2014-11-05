@@ -196,6 +196,7 @@ struct TScanRangeParams {
   1: required PlanNodes.TScanRange scan_range
   2: optional i32 volume_id = -1
   3: optional bool is_cached = false
+  4: optional bool is_remote
 }
 
 // Specification of one output destination of a plan fragment

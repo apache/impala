@@ -49,7 +49,7 @@ class DiskIoMgrTest : public testing::Test {
     if (status.ok()) {
       DiskIoMgr::ScanRange* scan_range = pool_->Add(new DiskIoMgr::ScanRange());
       scan_range->Reset((*written_range)->file(), (*written_range)->len(),
-          (*written_range)->offset(), 0, false);
+          (*written_range)->offset(), 0, false, false);
       ValidateSyncRead(io_mgr, reader, scan_range, reinterpret_cast<const char*>(data),
           sizeof(int32_t));
     }

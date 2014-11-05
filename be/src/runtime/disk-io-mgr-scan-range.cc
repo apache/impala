@@ -203,7 +203,7 @@ bool DiskIoMgr::ScanRange::Validate() {
 DiskIoMgr::ScanRange::ScanRange(int capacity)
   : ready_buffers_capacity_(capacity) {
   request_type_ = RequestType::READ;
-  Reset("", -1, -1, -1, false);
+  Reset("", -1, -1, -1, false, false);
 }
 
 DiskIoMgr::ScanRange::~ScanRange() {
@@ -212,13 +212,14 @@ DiskIoMgr::ScanRange::~ScanRange() {
 }
 
 void DiskIoMgr::ScanRange::Reset(const char* file, int64_t len, int64_t offset,
-    int disk_id, bool try_cache, void* meta_data) {
+    int disk_id, bool try_cache, bool expected_local, void* meta_data) {
   DCHECK(ready_buffers_.empty());
   file_ = file;
   len_ = len;
   offset_ = offset;
   disk_id_ = disk_id;
   try_cache_ = try_cache;
+  expected_local_ = expected_local;
   meta_data_ = meta_data;
   cached_buffer_ = NULL;
   io_mgr_ = NULL;
@@ -293,16 +294,23 @@ void DiskIoMgr::ScanRange::Close() {
   if (reader_->hdfs_connection_ != NULL) {
     if (hdfs_file_ == NULL) return;
 
-    struct hdfsReadStatistics* read_statistics;
-    int success = hdfsFileGetReadStatistics(hdfs_file_, &read_statistics);
+    struct hdfsReadStatistics* stats;
+    int success = hdfsFileGetReadStatistics(hdfs_file_, &stats);
     if (success == 0) {
-      reader_->bytes_read_local_ += read_statistics->totalLocalBytesRead;
-      reader_->bytes_read_short_circuit_ += read_statistics->totalShortCircuitBytesRead;
-      reader_->bytes_read_dn_cache_ += read_statistics->totalZeroCopyBytesRead;
-      if (read_statistics->totalLocalBytesRead != read_statistics->totalBytesRead) {
+      reader_->bytes_read_local_ += stats->totalLocalBytesRead;
+      reader_->bytes_read_short_circuit_ += stats->totalShortCircuitBytesRead;
+      reader_->bytes_read_dn_cache_ += stats->totalZeroCopyBytesRead;
+      if (stats->totalLocalBytesRead != stats->totalBytesRead) {
         ++reader_->num_remote_ranges_;
+        if (expected_local_) {
+          int remote_bytes = stats->totalBytesRead - stats->totalLocalBytesRead;
+          reader_->unexpected_remote_bytes_ += remote_bytes;
+          VLOG_FILE << "Unexpected remote HDFS read of "
+                    << PrettyPrinter::Print(remote_bytes, TCounterType::BYTES)
+                    << " for file '" << file_ << "'";
+        }
       }
-      hdfsFileFreeReadStatistics(read_statistics);
+      hdfsFileFreeReadStatistics(stats);
     }
 
     if (cached_buffer_ != NULL) {

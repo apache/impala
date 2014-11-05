@@ -228,8 +228,8 @@ void DiskIoMgrStress::NewClient(int i) {
     range_len = min(range_len, file_len - assigned_len);
 
     DiskIoMgr::ScanRange* range = new DiskIoMgr::ScanRange();;
-    range->Reset(
-        files_[client.file_idx].filename.c_str(), range_len, assigned_len, 0, false);
+    range->Reset(files_[client.file_idx].filename.c_str(), range_len, assigned_len, 0,
+                 false, false);
     client.scan_ranges.push_back(range);
     assigned_len += range_len;
   }

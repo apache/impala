@@ -224,6 +224,9 @@ class DiskIoMgr::RequestContext {
   // Total number of bytes read from date node cache, updated at end of each range scan
   AtomicInt<int64_t> bytes_read_dn_cache_;
 
+  // Total number of bytes from remote reads that were expected to be local.
+  AtomicInt<int64_t> unexpected_remote_bytes_;
+
   // The number of buffers that have been returned to the reader (via GetNext) that the
   // reader has not returned. Only included for debugging and diagnostics.
   AtomicInt<int> num_buffers_in_reader_;

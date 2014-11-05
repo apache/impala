@@ -287,10 +287,12 @@ class DiskIoMgr {
 
     // Resets this scan range object with the scan range description.
     void Reset(const char* file, int64_t len,
-        int64_t offset, int disk_id, bool try_cache, void* metadata = NULL);
+        int64_t offset, int disk_id, bool try_cache, bool expected_local,
+        void* metadata = NULL);
 
     void* meta_data() const { return meta_data_; }
     bool try_cache() const { return try_cache_; }
+    bool expected_local() const { return expected_local_; }
     int ready_buffers_capacity() const { return ready_buffers_capacity_; }
 
     // Returns the next buffer for this scan range. buffer is an output parameter.
@@ -351,6 +353,13 @@ class DiskIoMgr {
     // since the block could have been uncached. In that case, the cached path
     // will fail and we'll just put the scan range on the normal read path.
     bool try_cache_;
+
+    // If true, we expect this scan range to be a local read. Note that if this is false,
+    // it does not necessarily mean we expect the read to be remote, and that we never
+    // create scan ranges where some of the range is expected to be remote and some of it
+    // local.
+    // TODO: we can do more with this
+    bool expected_local_;
 
     DiskIoMgr* io_mgr_;
 
@@ -539,6 +548,7 @@ class DiskIoMgr {
   int64_t bytes_read_short_circuit(RequestContext* reader) const;
   int64_t bytes_read_dn_cache(RequestContext* reader) const;
   int num_remote_ranges(RequestContext* reader) const;
+  int64_t unexpected_remote_bytes(RequestContext* reader) const;
 
   // Returns the read throughput across all readers.
   // TODO: should this be a sliding window?  This should report metrics for the

@@ -51,7 +51,8 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     // TODO: add remote disk id and plumb that through to the io mgr.  It should have
     // 1 queue for each NIC as well?
     DiskIoMgr::ScanRange* header_range = scan_node->AllocateScanRange(
-        files[i]->filename.c_str(), HEADER_SIZE, 0, metadata->partition_id, -1, false);
+        files[i]->filename.c_str(), HEADER_SIZE, 0, metadata->partition_id, -1, false,
+        false);
     header_ranges.push_back(header_range);
   }
   RETURN_IF_ERROR(scan_node->AddDiskIoRanges(header_ranges));

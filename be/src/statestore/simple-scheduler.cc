@@ -550,6 +550,7 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
     // Explicitly set the optional fields.
     scan_range_params.__set_volume_id(volume_id);
     scan_range_params.__set_is_cached(is_cached);
+    scan_range_params.__set_is_remote(remote_read);
     scan_range_params_list->push_back(scan_range_params);
   }
 

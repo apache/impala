@@ -425,6 +425,10 @@ int DiskIoMgr::num_remote_ranges(RequestContext* reader) const {
   return reader->num_remote_ranges_;
 }
 
+int64_t DiskIoMgr::unexpected_remote_bytes(RequestContext* reader) const {
+  return reader->unexpected_remote_bytes_;
+}
+
 int64_t DiskIoMgr::GetReadThroughput() {
   return RuntimeProfile::UnitsPerSecond(&total_bytes_read_counter_, &read_timer_);
 }
