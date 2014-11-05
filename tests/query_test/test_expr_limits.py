@@ -17,8 +17,8 @@ from tests.common.test_dimensions import create_uncompressed_text_dimension
 # causing crashes. Therefore, this tests succeeds if no Impalads crash.
 class TestExprLimits(ImpalaTestSuite):
   # Keep these in sync with Expr.java
-  EXPR_CHILDREN_LIMIT = 10000;
-  EXPR_DEPTH_LIMIT = 1500;
+  EXPR_CHILDREN_LIMIT = 10000
+  EXPR_DEPTH_LIMIT = 1000
 
   @classmethod
   def get_workload(self):

@@ -53,7 +53,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   // experimentally determined to be safe.
   public final static int EXPR_CHILDREN_LIMIT = 10000;
   // The expr depth limit is mostly due to our recursive implementation of clone().
-  public final static int EXPR_DEPTH_LIMIT = 1500;
+  public final static int EXPR_DEPTH_LIMIT = 1000;
 
   // Name of the function that needs to be implemented by every Expr that
   // supports negation.
