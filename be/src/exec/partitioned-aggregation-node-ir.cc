@@ -33,7 +33,22 @@ template<bool AGGREGATED_ROWS>
 Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, HashTableCtx* ht_ctx) {
   DCHECK(!hash_partitions_.empty());
 
-  for (int i = 0; i < batch->num_rows(); ++i) {
+  // Make sure that no resizes will happen when inserting individual rows to the hash
+  // table of each partition by pessimistically assuming that all the rows in each batch
+  // will end up to the same partition.
+  // TODO: Once we have a histogram with the number of rows per partition, we will have
+  // accurate resize calls.
+  int num_rows = batch->num_rows();
+  for (int partition_idx = 0; partition_idx < PARTITION_FANOUT; ++partition_idx) {
+    Partition* dst_partition = hash_partitions_[partition_idx];
+    while (!dst_partition->is_spilled()) {
+      if (dst_partition->hash_tbl->CheckAndResize(num_rows, ht_ctx)) break;
+      // There was not enough memory for the resize. Spill a partition and retry.
+      RETURN_IF_ERROR(SpillPartition());
+    }
+  }
+
+  for (int i = 0; i < num_rows; ++i) {
     TupleRow* row = batch->GetRow(i);
     uint32_t hash = 0;
     if (AGGREGATED_ROWS) {
@@ -56,7 +71,7 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, HashTableCtx* h
         // If the row is already an aggregate row, it cannot match anything in the
         // hash table since we process the aggregate rows first. These rows should
         // have been aggregated in the initial pass.
-        // TODO: change HT interface to have FindOrInsert()
+        // TODO: change HT interface to use a FindOrInsert() call
         HashTable::Iterator it = ht->Find(ht_ctx, hash);
         if (!it.AtEnd()) {
           // Row is already in hash table. Do the aggregation and we're done.
@@ -97,8 +112,8 @@ allocate_tuple:
         continue;
       }
 
-      // In this case, we either didn't have enough memory to add the intermediate_tuple
-      // to the stream or we didn't have enough memory to insert it into the hash table.
+      // In this case, we either did not have enough memory to add the intermediate_tuple
+      // to the stream or we did not have enough memory to insert it into the hash table.
       // We need to spill until there is enough memory to insert this tuple or
       // dst_partition is spilled.
       while (true) {

@@ -187,7 +187,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // rows. If reaches the end of the hash table it closes that partition, removes it from
   // flush_build_partitions_ and moves hash_tbl_iterator_ to the beginning of the
   // partition in the front of flush_build_partitions_.
-  Status OutputUnmatchedBuild(RowBatch* out_batch);
+  void OutputUnmatchedBuild(RowBatch* out_batch);
 
   // Initializes null_aware_partition_ and nulls_build_batch_ to output rows.
   Status PrepareNullAwarePartition();

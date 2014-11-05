@@ -45,6 +45,8 @@ class BitUtil {
 
   // Returns the smallest power of two that contains v. Taken from
   // http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
+  // TODO: Pick a better name, as it is not clear what happens when the input is
+  // already a power of two.
   static inline int64_t NextPowerOfTwo(int64_t v) {
     --v;
     v |= v >> 1;

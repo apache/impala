@@ -321,7 +321,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
   // to the memory needed for all the build side allocations).
   // We always start with small pages in the hash table.
   int64_t estimated_num_buckets =
-      HashTable::EstimatedNumBuckets(build_rows()->num_rows());
+      HashTable::EstimateNumBuckets(build_rows()->num_rows());
   hash_tbl_.reset(new HashTable(state, parent_->block_mgr_client_,
       parent_->child(1)->row_desc().tuple_descriptors().size(), build_rows(),
       1 << (32 - NUM_PARTITIONING_BITS), estimated_num_buckets));
@@ -332,7 +332,11 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
     RETURN_IF_ERROR(build_rows_->GetNext(&batch, &eos, &indices));
     DCHECK_EQ(batch.num_rows(), indices.size());
     SCOPED_TIMER(parent_->build_timer_);
-    for (int i = 0; i < batch.num_rows(); ++i) {
+
+    int num_rows = batch.num_rows();
+    DCHECK_LE(num_rows, hash_tbl_->EmptyBuckets()) << " hash table was not properly "
+        << " sized. Size=" << estimated_num_buckets;
+    for (int i = 0; i < num_rows; ++i) {
       TupleRow* row = batch.GetRow(i);
       uint32_t hash = 0;
       if (!ctx->EvalAndHashBuild(row, &hash)) continue;
@@ -637,7 +641,8 @@ Status PartitionedHashJoinNode::NextSpilledProbeRowBatch(
       // to the list of partitions that we need to output their unmatched build rows.
       DCHECK(output_build_partitions_.empty());
       DCHECK(input_partition_->hash_tbl_.get() != NULL);
-      hash_tbl_iterator_ = input_partition_->hash_tbl_->FirstUnmatched(ht_ctx_.get());
+      hash_tbl_iterator_ =
+          input_partition_->hash_tbl_->FirstUnmatched(ht_ctx_.get());
       output_build_partitions_.push_back(input_partition_);
     } else {
       // In any other case, just close the input partition.
@@ -748,7 +753,7 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
       // In case of right-outer, right-anti and full-outer joins, flush the remaining
       // unmatched build rows of any partition we are done processing, before processing
       // the next batch.
-      RETURN_IF_ERROR(OutputUnmatchedBuild(out_batch));
+      OutputUnmatchedBuild(out_batch);
       if (!output_build_partitions_.empty()) break;
 
       // Finished to output unmatched build rows, move to next partition.
@@ -853,14 +858,13 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
   return Status::OK;
 }
 
-Status PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
+void PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
   SCOPED_TIMER(probe_timer_);
   DCHECK(join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
          join_op_ == TJoinOp::FULL_OUTER_JOIN);
   DCHECK(!output_build_partitions_.empty());
   ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
   const int num_conjuncts = conjunct_ctxs_.size();
-
   TupleRow* out_row = out_batch->GetRow(out_batch->AddRow());
   const int max_rows = out_batch->capacity() - out_batch->num_rows();
   int num_rows_added = 0;
@@ -868,10 +872,9 @@ Status PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
   while (!out_batch->AtCapacity() && !hash_tbl_iterator_.AtEnd() &&
          num_rows_added < max_rows) {
     // Output remaining unmatched build rows.
-    if (!hash_tbl_iterator_.matched()) {
-      hash_tbl_iterator_.set_matched();
+    if (!hash_tbl_iterator_.IsMatched()) {
       TupleRow* build_row = hash_tbl_iterator_.GetRow();
-      DCHECK(build_row != NULL);
+      DCHECK_NOTNULL(build_row);
       if (join_op_ == TJoinOp::RIGHT_ANTI_JOIN) {
         out_batch->CopyRow(build_row, out_row);
       } else {
@@ -881,14 +884,15 @@ Status PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
         ++num_rows_added;
         out_row = out_row->next_row(out_batch);
       }
+      hash_tbl_iterator_.SetMatched();
     }
-    // Move to the next unmatched entry
+    // Move to the next unmatched entry.
     hash_tbl_iterator_.NextUnmatched();
   }
 
   // If we reached the end of the hash table, then there are no other unmatched build
-  // rows for this partition. In that case we need to close the partition, and move to the
-  // next. If we have not reached the end of the hash table, it means that we reached
+  // rows for this partition. In that case we need to close the partition, and move to
+  // the next. If we have not reached the end of the hash table, it means that we reached
   // out_batch capacity and we need to continue to output unmatched build rows, without
   // closing the partition.
   if (hash_tbl_iterator_.AtEnd()) {
@@ -897,15 +901,13 @@ Status PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
     // Move to the next partition to output unmatched rows.
     if (!output_build_partitions_.empty()) {
       hash_tbl_iterator_ =
-          output_build_partitions_.front()->hash_tbl_->FirstUnmatched(ht_ctx_.get());
+          output_build_partitions_.front()->hash_tbl()->FirstUnmatched(ht_ctx_.get());
     }
   }
-
   DCHECK_LE(num_rows_added, max_rows);
   out_batch->CommitRows(num_rows_added);
   num_rows_returned_ += num_rows_added;
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-  return Status::OK;
 }
 
 Status PartitionedHashJoinNode::PrepareNullAwareNullProbe() {
@@ -1604,7 +1606,7 @@ bool PartitionedHashJoinNode::CodegenProcessProbeBatch(
   process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, true,
       equals_fn, "Equals", &replaced);
   // Depends on join_op_
-  DCHECK(replaced == 2 || replaced == 3 || replaced == 4) << replaced;
+  DCHECK(replaced == 1 || replaced == 2 || replaced == 3 || replaced == 4) << replaced;
 
   // process_probe_batch_fn_level0 uses CRC hash if available,
   // process_probe_batch_fn uses murmur

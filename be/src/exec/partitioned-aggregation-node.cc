@@ -319,12 +319,12 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
 
   SCOPED_TIMER(get_results_timer_);
   int count = 0;
-  const int N = state->batch_size();
+  const int N = BitUtil::NextPowerOfTwo(state->batch_size());
   // Keeping returning rows from the current partition.
   while (!output_iterator_.AtEnd() && !row_batch->AtCapacity()) {
     // This loop can go on for a long time if the conjuncts are very selective. Do query
     // maintenance every N iterations.
-    if (count++ % N == 0) {
+    if ((count++ & (N - 1)) == 0) {
       RETURN_IF_CANCELLED(state);
       RETURN_IF_ERROR(QueryMaintenance(state));
     }
@@ -334,7 +334,7 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
     Tuple* intermediate_tuple = output_iterator_.GetTuple();
     Tuple* output_tuple = FinalizeTuple(
         output_partition_->agg_fn_ctxs, intermediate_tuple, row_batch->tuple_data_pool());
-    output_iterator_.Next<false>(ht_ctx_.get());
+    output_iterator_.Next();
     row->SetTuple(0, output_tuple);
     if (ExecNode::EvalConjuncts(ctxs, num_ctxs, row)) {
       row_batch->CommitLastRow();
@@ -353,9 +353,9 @@ void PartitionedAggregationNode::CleanupHashTbl(const vector<FunctionContext*>& 
   if (!needs_finalize_ && !needs_serialize_) return;
   while (!it.AtEnd()) {
     FinalizeTuple(ctxs, it.GetTuple(), mem_pool_.get());
-    // Avoid consuming excessive memory.
+    // Avoid consuming excessive memory, so free whenever consumption is >1MB.
     if (mem_pool_->total_allocated_bytes() > 1024 * 1024) mem_pool_->FreeAll();
-    it.Next<false>(ht_ctx_.get());
+    it.Next();
   }
 }
 
@@ -468,11 +468,10 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
     // Serialize and copy the spilled partition's stream into the new stream.
     bool failed_to_add = false;
     BufferedTupleStream* new_stream = parent->serialize_stream_.get();
-    HashTableCtx* ctx = parent->ht_ctx_.get();
-    HashTable::Iterator it = hash_tbl->Begin(ctx);
+    HashTable::Iterator it = hash_tbl->Begin(parent->ht_ctx_.get());
     while (!it.AtEnd()) {
       Tuple* tuple = it.GetTuple();
-      it.Next<false>(ctx);
+      it.Next();
       AggFnEvaluator::Serialize(evaluators, agg_fn_ctxs, tuple);
       if (UNLIKELY(!new_stream->AddRow(reinterpret_cast<TupleRow*>(&tuple)))) {
         failed_to_add = true;
@@ -1381,7 +1380,7 @@ Function* PartitionedAggregationNode::CodegenProcessBatch() {
 
     process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, true,
         equals_fn, "Equals", &replaced);
-    DCHECK_EQ(replaced, 1);
+    DCHECK_EQ(replaced, 3);
   }
 
   process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,

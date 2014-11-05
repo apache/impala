@@ -38,8 +38,8 @@ bool IR_NO_INLINE EvalOtherJoinConjuncts(
 template<int const JoinOp>
 int PartitionedHashJoinNode::ProcessProbeBatch(
     RowBatch* out_batch, HashTableCtx* ht_ctx) {
-  ExprContext* const* join_conjunct_ctxs = &other_join_conjunct_ctxs_[0];
-  const int num_join_conjuncts = other_join_conjunct_ctxs_.size();
+  ExprContext* const* other_join_conjunct_ctxs = &other_join_conjunct_ctxs_[0];
+  const int num_other_join_conjuncts = other_join_conjunct_ctxs_.size();
   ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
   const int num_conjuncts = conjunct_ctxs_.size();
 
@@ -55,9 +55,8 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
         DCHECK(matched_build_row != NULL);
 
         if ((JoinOp == TJoinOp::RIGHT_SEMI_JOIN || JoinOp == TJoinOp::RIGHT_ANTI_JOIN) &&
-            hash_tbl_iterator_.matched()) {
-          // We have already matched this build row, continue to next match.
-          hash_tbl_iterator_.Next<true>(ht_ctx);
+            hash_tbl_iterator_.IsMatched()) {
+          hash_tbl_iterator_.NextDuplicate();
           continue;
         }
 
@@ -66,12 +65,12 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
             JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
           // Evaluate the non-equi-join conjuncts against a temp row assembled from all
           // build and probe tuples.
-          if (num_join_conjuncts > 0) {
+          if (num_other_join_conjuncts > 0) {
             CreateOutputRow(semi_join_staging_row_, current_probe_row_,
                 matched_build_row);
-            if (!EvalOtherJoinConjuncts(join_conjunct_ctxs, num_join_conjuncts,
-                semi_join_staging_row_)) {
-              hash_tbl_iterator_.Next<true>(ht_ctx);
+            if (!EvalOtherJoinConjuncts(other_join_conjunct_ctxs,
+                     num_other_join_conjuncts, semi_join_staging_row_)) {
+              hash_tbl_iterator_.NextDuplicate();
               continue;
             }
           }
@@ -84,11 +83,12 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
             out_batch->CopyRow(matched_build_row, out_row);
           }
         } else {
-          // Not a semi join; create an output row with all probe/build tuples and evaluate
-          // the non-equi-join conjuncts.
+          // Not a semi join; create an output row with all probe/build tuples and
+          // evaluate the non-equi-join conjuncts.
           CreateOutputRow(out_row, current_probe_row_, matched_build_row);
-          if (!EvalOtherJoinConjuncts(join_conjunct_ctxs, num_join_conjuncts, out_row)) {
-            hash_tbl_iterator_.Next<true>(ht_ctx);
+          if (!EvalOtherJoinConjuncts(other_join_conjunct_ctxs, num_other_join_conjuncts,
+                   out_row)) {
+            hash_tbl_iterator_.NextDuplicate();
             continue;
           }
         }
@@ -98,20 +98,21 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
         if (JoinOp == TJoinOp::LEFT_ANTI_JOIN ||
             JoinOp == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
           // We can safely ignore this probe row for left anti joins.
-          hash_tbl_iterator_.reset();
+          hash_tbl_iterator_.SetAtEnd();
           goto next_row;
-        }
-        if (JoinOp == TJoinOp::RIGHT_OUTER_JOIN || JoinOp == TJoinOp::RIGHT_SEMI_JOIN ||
-            JoinOp == TJoinOp::RIGHT_ANTI_JOIN || JoinOp == TJoinOp::FULL_OUTER_JOIN) {
-          // There is a match for this build row, mark it as matched for right/full joins.
-          hash_tbl_iterator_.set_matched();
         }
 
         // Update hash_tbl_iterator.
         if (JoinOp == TJoinOp::LEFT_SEMI_JOIN) {
-          hash_tbl_iterator_.reset();
+          hash_tbl_iterator_.SetAtEnd();
         } else {
-          hash_tbl_iterator_.Next<true>(ht_ctx);
+          if (JoinOp == TJoinOp::RIGHT_OUTER_JOIN || JoinOp == TJoinOp::RIGHT_ANTI_JOIN ||
+              JoinOp == TJoinOp::FULL_OUTER_JOIN || JoinOp == TJoinOp::RIGHT_SEMI_JOIN) {
+            // There is a match for this build row. Mark the Bucket or the DuplicateNode
+            // as matched for right/full joins.
+            hash_tbl_iterator_.SetMatched();
+          }
+          hash_tbl_iterator_.NextDuplicate();
         }
 
         if ((JoinOp != TJoinOp::RIGHT_ANTI_JOIN) &&
@@ -128,7 +129,7 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
         // build size. For those rows, we need to process the remaining join
         // predicates later.
         if (null_aware_partition_->build_rows()->num_rows() != 0) {
-          if (num_join_conjuncts == 0) goto next_row;
+          if (num_other_join_conjuncts == 0) goto next_row;
           if (!null_aware_partition_->probe_rows()->AddRow(current_probe_row_)) {
             status_ = null_aware_partition_->probe_rows()->status();
             return -1;
@@ -186,7 +187,7 @@ next_row:
         // a match, save it to evaluate against other partitions later. If there
         // is a match, the row is skipped.
         if (!non_empty_build_) continue;
-        if (num_join_conjuncts == 0) goto next_row;
+        if (num_other_join_conjuncts == 0) goto next_row;
         if (UNLIKELY(!null_probe_rows_->AddRow(current_probe_row_))) {
           status_ = null_probe_rows_->status();
           return -1;

@@ -47,6 +47,7 @@ inline uint8_t* BufferedTupleStream::AllocateRow(int size) {
 }
 
 inline void BufferedTupleStream::GetTupleRow(const RowIdx& idx, TupleRow* row) const {
+  DCHECK_NOTNULL(row);
   DCHECK(!closed_);
   DCHECK(is_pinned());
   DCHECK(!delete_on_read_);
