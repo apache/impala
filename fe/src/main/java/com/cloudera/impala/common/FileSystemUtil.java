@@ -198,6 +198,14 @@ public class FileSystemUtil {
     return fileName.startsWith(".") || fileName.startsWith("_");
   }
 
+  /**
+   * Return true iff path is on a DFS filesystem.
+   */
+  public static boolean isDistributedFileSystem(Path path) throws IOException {
+    FileSystem fs = path.getFileSystem(CONF);
+    return fs instanceof DistributedFileSystem;
+  }
+
   public static DistributedFileSystem getDistributedFileSystem(Path path)
       throws IOException {
     FileSystem fs = path.getFileSystem(CONF);
@@ -216,6 +224,21 @@ public class FileSystemUtil {
    */
   public static Path createFullyQualifiedPath(Path location) {
     return location.makeQualified(FileSystem.getDefaultUri(CONF), location);
+  }
+
+  /**
+   * Return true iff the path is on the given filesystem.
+   */
+  public static Boolean isPathOnFileSystem(Path path, FileSystem fs) {
+    try {
+      // Call makeQualified() for the side-effect of FileSystem.checkPath() which will
+      // throw an exception if path is not on fs.
+      fs.makeQualified(path);
+      return true;
+    } catch (IllegalArgumentException e) {
+      // Path is not on fs.
+      return false;
+    }
   }
 
   /**

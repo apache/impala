@@ -232,6 +232,10 @@ struct THdfsTable {
   // Used so that each THdfsFileBlock can just reference an index in this list rather
   // than duplicate the list of network address, which helps reduce memory usage.
   7: optional list<Types.TNetworkAddress> network_addresses
+
+  // Indicates that this table's partitions reside on more than one filesystem.
+  // TODO: remove once INSERT across filesystems is supported.
+  8: optional bool multiple_filesystems
 }
 
 struct THBaseTable {

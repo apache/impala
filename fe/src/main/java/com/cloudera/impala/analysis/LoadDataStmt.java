@@ -132,6 +132,8 @@ public class LoadDataStmt extends StatementBase {
     try {
       Path source = sourceDataPath_.getPath();
       FileSystem fs = source.getFileSystem(FileSystemUtil.getConfiguration());
+      // sourceDataPath_.analyze() ensured that path is on an HDFS filesystem.
+      Preconditions.checkState(fs instanceof DistributedFileSystem);
       DistributedFileSystem dfs = (DistributedFileSystem) fs;
       if (!dfs.exists(source)) {
         throw new AnalysisException(String.format(
@@ -184,20 +186,33 @@ public class LoadDataStmt extends StatementBase {
           "location: ", hdfsTable.getFullName());
 
       HdfsPartition partition;
+      String location;
       if (partitionSpec_ != null) {
         partition = hdfsTable.getPartition(partitionSpec_.getPartitionSpecKeyValues());
+        location = partition.getLocation();
         if (!TAccessLevelUtil.impliesWriteAccess(partition.getAccessLevel())) {
           throw new AnalysisException(noWriteAccessErrorMsg + partition.getLocation());
         }
       } else {
         // "default" partition
         partition = hdfsTable.getPartitions().get(0);
+        location = hdfsTable.getLocation();
         if (!hdfsTable.hasWriteAccess()) {
           throw new AnalysisException(noWriteAccessErrorMsg + hdfsTable.getLocation());
         }
       }
       Preconditions.checkNotNull(partition);
 
+      // Until Frontend.loadTableData() can handle cross-filesystem and filesystems
+      // that aren't HDFS, require that source and dest are on the same HDFS.
+      if (!FileSystemUtil.isPathOnFileSystem(new Path(location), fs)) {
+        throw new AnalysisException(String.format(
+            "Unable to LOAD DATA into target table (%s) because source path (%s) and " +
+            "destination %s (%s) are on different file-systems.",
+            hdfsTable.getFullName(),
+            source, partitionSpec_ == null ? "table" : "partition",
+            partition.getLocation()));
+      }
       // Verify the files being loaded are supported.
       for (FileStatus fStatus: fs.listStatus(source)) {
         if (fs.isDirectory(fStatus.getPath())) continue;

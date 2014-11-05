@@ -160,6 +160,9 @@ public class HdfsTable extends Table {
   // Sum of sizes of all Hdfs files in this table. Set in load().
   private long totalHdfsBytes_;
 
+  // True iff the table's partitions are located on more than one filesystem.
+  private boolean multipleFileSystems_ = false;
+
   // Base Hdfs directory where files of this table are stored.
   // For unpartitioned tables it is simply the path where all files live.
   // For partitioned tables it is the root directory
@@ -235,6 +238,8 @@ public class HdfsTable extends Table {
   }
 
   public Map<String, List<FileDescriptor>> getFileDescMap() { return fileDescMap_; }
+
+  public boolean spansMultipleFileSystems() { return multipleFileSystems_; }
 
   /**
    * Loads the file block metadata for the given collection of FileDescriptors.  The
@@ -763,6 +768,8 @@ public class HdfsTable extends Table {
     try {
       // Each partition could reside on a different filesystem.
       FileSystem fs = partDirPath.getFileSystem(CONF);
+      multipleFileSystems_ = multipleFileSystems_ ||
+          !FileSystemUtil.isPathOnFileSystem(new Path(getLocation()), fs);
       if (fs.exists(partDirPath)) {
         // FileSystem does not have an API that takes in a timestamp and returns a list
         // of files that has been added/changed since. Therefore, we are calling
@@ -1197,6 +1204,7 @@ public class HdfsTable extends Table {
     hdfsBaseDir_ = hdfsTable.getHdfsBaseDir();
     nullColumnValue_ = hdfsTable.nullColumnValue;
     nullPartitionKeyValue_ = hdfsTable.nullPartitionKeyValue;
+    multipleFileSystems_ = hdfsTable.multiple_filesystems;
     hostIndex_.populate(hdfsTable.getNetwork_addresses());
     resetPartitionMd();
 
@@ -1255,6 +1263,7 @@ public class HdfsTable extends Table {
     THdfsTable hdfsTable = new THdfsTable(hdfsBaseDir_, getColumnNames(),
         nullPartitionKeyValue_, nullColumnValue_, idToPartition);
     hdfsTable.setAvroSchema(avroSchema_);
+    hdfsTable.setMultiple_filesystems(multipleFileSystems_);
     if (includeFileDesc) {
       // Network addresses are used only by THdfsFileBlocks which are inside
       // THdfsFileDesc, so include network addreses only when including THdfsFileDesc.
