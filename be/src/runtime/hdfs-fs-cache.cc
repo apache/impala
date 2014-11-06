@@ -36,7 +36,8 @@ void HdfsFsCache::Init() {
   HdfsFsCache::instance_.reset(new HdfsFsCache());
 }
 
-Status HdfsFsCache::GetConnection(const string& path, hdfsFS* fs) {
+Status HdfsFsCache::GetConnection(const string& path, hdfsFS* fs,
+    HdfsFsMap* local_cache) {
   string namenode;
   size_t n = path.find("://");
   if (n == string::npos) {
@@ -53,21 +54,35 @@ Status HdfsFsCache::GetConnection(const string& path, hdfsFS* fs) {
     namenode = path.substr(0, n + 1);
   }
   DCHECK(!namenode.empty());
-
-  lock_guard<mutex> l(lock_);
-  HdfsFsMap::iterator i = fs_map_.find(namenode);
-  if (i == fs_map_.end()) {
-    hdfsBuilder* hdfs_builder = hdfsNewBuilder();
-    hdfsBuilderSetNameNode(hdfs_builder, namenode.c_str());
-    *fs = hdfsBuilderConnect(hdfs_builder);
-    if (*fs == NULL) {
-      return Status(GetHdfsErrorMsg("Failed to connect to FS: ", namenode));
+  // First, check the local cache to avoid taking the global lock.
+  if (local_cache != NULL) {
+    HdfsFsMap::iterator local_iter = local_cache->find(namenode);
+    if (local_iter != local_cache->end()) {
+      *fs = local_iter->second;
+      return Status::OK;
     }
-    fs_map_.insert(make_pair(namenode, *fs));
-  } else {
-    *fs = i->second;
+  }
+  // Otherwise, check the global cache.
+  {
+    lock_guard<mutex> l(lock_);
+    HdfsFsMap::iterator i = fs_map_.find(namenode);
+    if (i == fs_map_.end()) {
+      hdfsBuilder* hdfs_builder = hdfsNewBuilder();
+      hdfsBuilderSetNameNode(hdfs_builder, namenode.c_str());
+      *fs = hdfsBuilderConnect(hdfs_builder);
+      if (*fs == NULL) {
+        return Status(GetHdfsErrorMsg("Failed to connect to FS: ", namenode));
+      }
+      fs_map_.insert(make_pair(namenode, *fs));
+    } else {
+      *fs = i->second;
+    }
   }
   DCHECK_NOTNULL(*fs);
+  // Populate the local cache for the next lookup.
+  if (local_cache != NULL) {
+    local_cache->insert(make_pair(namenode, *fs));
+  }
   return Status::OK;
 }
 

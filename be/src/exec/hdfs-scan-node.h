@@ -51,6 +51,10 @@ class TScanRange;
 // Maintains per file information for files assigned to this scan node.  This includes
 // all the splits for the file. Note that it is not thread-safe.
 struct HdfsFileDesc {
+  // Connection to the filesystem containing the file.
+  hdfsFS fs;
+
+  // File name including the path.
   std::string filename;
 
   // Length of the file. This is not related to which parts of the file have been
@@ -128,8 +132,6 @@ class HdfsScanNode : public ScanNode {
 
   const HdfsTableDescriptor* hdfs_table() { return hdfs_table_; }
 
-  hdfsFS hdfs_connection() { return hdfs_connection_; }
-
   RuntimeState* runtime_state() { return runtime_state_; }
 
   DiskIoMgr::RequestContext* reader_context() { return reader_context_; }
@@ -180,8 +182,9 @@ class HdfsScanNode : public ScanNode {
   // range is not expected to require a remote read. The range must fall within the file
   // bounds.  That is, the offset must be >= 0, and offset + len <= file_length.
   // This is thread safe.
-  DiskIoMgr::ScanRange* AllocateScanRange(const char* file, int64_t len, int64_t offset,
-      int64_t partition_id, int disk_id, bool try_cache, bool expected_local);
+  DiskIoMgr::ScanRange* AllocateScanRange(
+      hdfsFS fs, const char* file, int64_t len, int64_t offset, int64_t partition_id,
+      int disk_id, bool try_cache, bool expected_local);
 
   // Adds ranges to the io mgr queue and starts up new scanner threads if possible.
   Status AddDiskIoRanges(const std::vector<DiskIoMgr::ScanRange*>& ranges);
@@ -306,9 +309,6 @@ class HdfsScanNode : public ScanNode {
 
   // Number of files that have not been issued from the scanners.
   AtomicInt<int> num_unqueued_files_;
-
-  // Connection to hdfs, established in Open() and closed in Close().
-  hdfsFS hdfs_connection_;
 
   // Map of HdfsScanner objects to file types.  Only one scanner object will be
   // created for each file type.  Objects stored in runtime_state's pool.

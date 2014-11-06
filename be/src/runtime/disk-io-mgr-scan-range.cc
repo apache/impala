@@ -204,7 +204,7 @@ bool DiskIoMgr::ScanRange::Validate() {
 DiskIoMgr::ScanRange::ScanRange(int capacity)
   : ready_buffers_capacity_(capacity) {
   request_type_ = RequestType::READ;
-  Reset("", -1, -1, -1, false, false);
+  Reset(NULL, "", -1, -1, -1, false, false);
 }
 
 DiskIoMgr::ScanRange::~ScanRange() {
@@ -212,9 +212,10 @@ DiskIoMgr::ScanRange::~ScanRange() {
   DCHECK(cached_buffer_ == NULL) << "Cached buffer was not released.";
 }
 
-void DiskIoMgr::ScanRange::Reset(const char* file, int64_t len, int64_t offset,
+void DiskIoMgr::ScanRange::Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset,
     int disk_id, bool try_cache, bool expected_local, void* meta_data) {
   DCHECK(ready_buffers_.empty());
+  fs_ = fs;
   file_ = file;
   len_ = len;
   offset_ = offset;
@@ -250,19 +251,19 @@ Status DiskIoMgr::ScanRange::Open() {
   unique_lock<mutex> hdfs_lock(hdfs_lock_);
   if (is_cancelled_) return Status::CANCELLED;
 
-  if (reader_->hdfs_connection_ != NULL) {
+  if (fs_ != NULL) {
     if (hdfs_file_ != NULL) return Status::OK;
 
     // TODO: is there much overhead opening hdfs files?  Should we try to preserve
     // the handle across multiple scan ranges of a file?
-    hdfs_file_ = hdfsOpenFile(reader_->hdfs_connection_, file(), O_RDONLY, 0, 0, 0);
+    hdfs_file_ = hdfsOpenFile(fs_, file(), O_RDONLY, 0, 0, 0);
     VLOG_FILE << "hdfsOpenFile() file=" << file();
     if (hdfs_file_ == NULL) {
       return Status(GetHdfsErrorMsg("Failed to open HDFS file ", file_));
     }
 
-    if (hdfsSeek(reader_->hdfs_connection_, hdfs_file_, offset_) != 0) {
-      hdfsCloseFile(reader_->hdfs_connection_, hdfs_file_);
+    if (hdfsSeek(fs_, hdfs_file_, offset_) != 0) {
+      hdfsCloseFile(fs_, hdfs_file_);
       VLOG_FILE << "hdfsCloseFile() (error) file=" << file();
       hdfs_file_ = NULL;
       string error_msg = GetHdfsErrorMsg("");
@@ -298,7 +299,7 @@ Status DiskIoMgr::ScanRange::Open() {
 
 void DiskIoMgr::ScanRange::Close() {
   unique_lock<mutex> hdfs_lock(hdfs_lock_);
-  if (reader_->hdfs_connection_ != NULL) {
+  if (fs_ != NULL) {
     if (hdfs_file_ == NULL) return;
 
     struct hdfsReadStatistics* stats;
@@ -325,7 +326,7 @@ void DiskIoMgr::ScanRange::Close() {
       hadoopRzBufferFree(hdfs_file_, cached_buffer_);
       cached_buffer_ = NULL;
     }
-    hdfsCloseFile(reader_->hdfs_connection_, hdfs_file_);
+    hdfsCloseFile(fs_, hdfs_file_);
     VLOG_FILE << "hdfsCloseFile() file=" << file();
     hdfs_file_ = NULL;
   } else {
@@ -350,12 +351,12 @@ Status DiskIoMgr::ScanRange::Read(char* buffer, int64_t* bytes_read, bool* eosr)
   int bytes_to_read =
       min(static_cast<int64_t>(io_mgr_->max_buffer_size_), len_ - bytes_read_);
 
-  if (reader_->hdfs_connection_ != NULL) {
+  if (fs_ != NULL) {
     DCHECK(hdfs_file_ != NULL);
     // TODO: why is this loop necessary? Can hdfs reads come up short?
     while (*bytes_read < bytes_to_read) {
-      int last_read = hdfsRead(reader_->hdfs_connection_, hdfs_file_,
-          buffer + *bytes_read, bytes_to_read - *bytes_read);
+      int last_read = hdfsRead(fs_, hdfs_file_, buffer + *bytes_read,
+          bytes_to_read - *bytes_read);
       if (last_read == -1) {
         return Status(GetHdfsErrorMsg("Error reading from HDFS file: ", file_));
       } else if (last_read == 0) {
@@ -390,7 +391,7 @@ Status DiskIoMgr::ScanRange::ReadFromCache(bool* read_succeeded) {
   if (!status.ok()) return status;
 
   // Cached reads not supported on local filesystem.
-  if (reader_->hdfs_connection_ == NULL) return Status::OK;
+  if (fs_ == NULL) return Status::OK;
 
   {
     unique_lock<mutex> hdfs_lock(hdfs_lock_);

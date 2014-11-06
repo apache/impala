@@ -252,6 +252,7 @@ class DiskIoMgr {
   // WriteRange. Each disk thread processes exactly one RequestRange at a time.
   class RequestRange : public InternalQueue<RequestRange>::Node {
    public:
+    hdfsFS fs() const { return fs_; }
     const char* file() const { return file_.c_str(); }
     int64_t offset() const { return offset_; }
     int64_t len() const { return len_; }
@@ -259,6 +260,9 @@ class DiskIoMgr {
     RequestType::type request_type() const { return request_type_; }
 
    protected:
+    // Hadoop filesystem that contains file_, or set to NULL for local filesystem.
+    hdfsFS fs_;
+
     // Path to file being read or written.
     std::string file_;
 
@@ -287,9 +291,9 @@ class DiskIoMgr {
 
     // Resets this scan range object with the scan range description.  The scan range
     // must fall within the file bounds (offset >= 0 and offset + len <= file_length).
-    void Reset(const char* file, int64_t len,
-        int64_t offset, int disk_id, bool try_cache, bool expected_local,
-        void* metadata = NULL);
+    // Resets this scan range object with the scan range description.
+    void Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset, int disk_id,
+        bool try_cache, bool expected_local, void* metadata = NULL);
 
     void* meta_data() const { return meta_data_; }
     bool try_cache() const { return try_cache_; }
@@ -478,13 +482,11 @@ class DiskIoMgr {
   // Register a new request context which is returned in *request_context.
   // The IoMgr owns the allocated RequestContext object. The caller must call
   // UnregisterContext() for each context.
-  // hdfs: is the handle to the hdfs connection. If NULL, it is assumed that any
-  //    scan ranges are on the local file system, or that only writes are performed.
   // reader_mem_tracker: Is non-null only for readers. IO buffers
   //    used for this reader will be tracked by this. If the limit is exceeded
   //    the reader will be cancelled and MEM_LIMIT_EXCEEDED will be returned via
   //    GetNext().
-  Status RegisterContext(hdfsFS hdfs, RequestContext** request_context,
+  Status RegisterContext(RequestContext** request_context,
       MemTracker* reader_mem_tracker = NULL);
 
   // Unregisters context from the disk IoMgr. This must be called for every

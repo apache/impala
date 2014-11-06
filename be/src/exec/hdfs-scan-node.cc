@@ -175,9 +175,9 @@ Status HdfsScanNode::GetNextInternal(
   return status_;
 }
 
-DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(const char* file, int64_t len,
-    int64_t offset, int64_t partition_id, int disk_id, bool try_cache,
-    bool expected_local) {
+DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(
+    hdfsFS fs, const char* file, int64_t len, int64_t offset, int64_t partition_id,
+    int disk_id, bool try_cache, bool expected_local) {
   DCHECK_GE(disk_id, -1);
   // Require that the scan range is within [0, file_length). While this cannot be used
   // to guarantee safety (file_length metadata may be stale), it avoids different
@@ -201,7 +201,7 @@ DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(const char* file, int64_t 
       runtime_state_->obj_pool()->Add(new ScanRangeMetadata(partition_id));
   DiskIoMgr::ScanRange* range =
       runtime_state_->obj_pool()->Add(new DiskIoMgr::ScanRange());
-  range->Reset(file, len, offset, disk_id, try_cache, expected_local, metadata);
+  range->Reset(fs, file, len, offset, disk_id, try_cache, expected_local, metadata);
   return range;
 }
 
@@ -361,14 +361,12 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   for (int i = 0; i < num_cols; ++i) {
     is_materialized_col_[i] = column_idx_to_materialized_slot_idx_[i] != SKIP_COLUMN;
   }
-  // TODO: don't assume all partitions are on the same filesystem.
-  RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
-      hdfs_table_->hdfs_base_dir(), &hdfs_connection_));
+
+  HdfsFsCache::HdfsFsMap fs_cache;
   // Convert the TScanRangeParams into per-file DiskIO::ScanRange objects and populate
   // partition_ids_, file_descs_, and per_type_files_.
   DCHECK(scan_range_params_ != NULL)
       << "Must call SetScanRanges() before calling Prepare()";
-
   int num_ranges_missing_volume_id = 0;
   for (int i = 0; i < scan_range_params_->size(); ++i) {
     DCHECK((*scan_range_params_)[i].scan_range.__isset.hdfs_file_split);
@@ -388,6 +386,8 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
       file_descs_[native_file_path] = file_desc;
       file_desc->file_length = split.file_length;
       file_desc->file_compression = split.file_compression;
+      RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
+          native_file_path, &file_desc->fs, &fs_cache));
 
       if (partition_desc == NULL) {
         stringstream ss;
@@ -419,9 +419,9 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
       DCHECK(!try_cache) << "Params should not have had this set.";
     }
     file_desc->splits.push_back(
-        AllocateScanRange(file_desc->filename.c_str(), split.length, split.offset,
-                          split.partition_id, (*scan_range_params_)[i].volume_id,
-                          try_cache, expected_local));
+        AllocateScanRange(file_desc->fs, file_desc->filename.c_str(), split.length,
+            split.offset, split.partition_id, (*scan_range_params_)[i].volume_id,
+            try_cache, expected_local));
   }
 
   // Compute the minimum bytes required to start a new thread. This is based on the
@@ -560,7 +560,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   Expr::Open(conjunct_ctxs_, state);
 
   RETURN_IF_ERROR(runtime_state_->io_mgr()->RegisterContext(
-      hdfs_connection_, &reader_context_, mem_tracker()));
+      &reader_context_, mem_tracker()));
 
   // Initialize HdfsScanNode specific counters
   read_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HDFS_READ_TIMER);

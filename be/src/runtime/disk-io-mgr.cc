@@ -326,11 +326,11 @@ Status DiskIoMgr::Init(MemTracker* process_mem_tracker) {
   return Status::OK;
 }
 
-Status DiskIoMgr::RegisterContext(hdfsFS hdfs, RequestContext** request_context,
+Status DiskIoMgr::RegisterContext(RequestContext** request_context,
     MemTracker* mem_tracker) {
   DCHECK(request_context_cache_.get() != NULL) << "Must call Init() first.";
   *request_context = request_context_cache_->GetNewContext();
-  (*request_context)->Reset(hdfs, mem_tracker);
+  (*request_context)->Reset(mem_tracker);
   return Status::OK;
 }
 

@@ -113,7 +113,7 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
           ScanRangeMetadata* metadata =
               reinterpret_cast<ScanRangeMetadata*>(split->meta_data());
           DiskIoMgr::ScanRange* file_range = scan_node->AllocateScanRange(
-              files[i]->filename.c_str(), files[i]->file_length, 0,
+              files[i]->fs, files[i]->filename.c_str(), files[i]->file_length, 0,
               metadata->partition_id, split->disk_id(), split->try_cache(),
               split->expected_local());
           compressed_text_scan_ranges.push_back(file_range);

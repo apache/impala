@@ -566,7 +566,7 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
   // Create a ScanRange to perform the read.
   DiskIoMgr::ScanRange* scan_range =
       obj_pool_.Add(new DiskIoMgr::ScanRange());
-  scan_range->Reset(block->write_range_->file(), block->write_range_->len(),
+  scan_range->Reset(NULL, block->write_range_->file(), block->write_range_->len(),
       block->write_range_->offset(), block->write_range_->disk_id(), false, block);
   vector<DiskIoMgr::ScanRange*> ranges(1, scan_range);
   RETURN_IF_ERROR(io_mgr_->AddScanRanges(io_request_context_, ranges, true));
@@ -1064,7 +1064,7 @@ void BufferedBlockMgr::Init(DiskIoMgr* io_mgr, RuntimeProfile* parent_profile,
   unique_lock<mutex> l(lock_);
   if (initialized_) return;
 
-  io_mgr->RegisterContext(NULL, &io_request_context_);
+  io_mgr->RegisterContext(&io_request_context_);
   if (encryption_) {
     static bool openssl_loaded = false;
     if (!openssl_loaded) {
