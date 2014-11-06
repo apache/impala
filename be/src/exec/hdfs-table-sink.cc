@@ -134,12 +134,8 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
       PrintId(state->query_id(), "_"));
 
   RETURN_IF_ERROR(PrepareExprs(state));
-
-  hdfs_connection_ = HdfsFsCache::instance()->GetDefaultConnection();
-  if (hdfs_connection_ == NULL) {
-    return Status(GetHdfsErrorMsg("Failed to connect to HDFS."));
-  }
-
+  RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
+      staging_dir_, &hdfs_connection_));
   mem_tracker_.reset(new MemTracker(profile(), -1, -1, profile()->name(),
       state->instance_mem_tracker()));
 

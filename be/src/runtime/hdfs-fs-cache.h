@@ -22,6 +22,8 @@
 #include <boost/thread/mutex.hpp>
 #include <hdfs.h>
 
+#include "common/status.h"
+
 namespace impala {
 
 // A (process-wide) cache of hdfsFS objects.
@@ -41,22 +43,18 @@ class HdfsFsCache {
   // Initializes the cache. Must be called before any other APIs.
   static void Init();
 
-  // Get connection to default fs.
-  hdfsFS GetDefaultConnection();
+  // Get connection to the local filesystem.
+  Status GetLocalConnection(hdfsFS* fs);
 
-  // Get connection the local filesystem.
-  hdfsFS GetLocalConnection();
-
-  // Get connection to specific fs by specifying the name node's
-  // ipaddress or hostname and port.
-  hdfsFS GetConnection(const std::string& host, int port);
+  // Get connection to specific fs by specifying a path.
+  Status GetConnection(const std::string& path, hdfsFS* fs);
 
  private:
   // Singleton instance. Instantiated in Init().
   static boost::scoped_ptr<HdfsFsCache> instance_;
 
   boost::mutex lock_;  // protects fs_map_
-  typedef boost::unordered_map<std::pair<std::string, int>, hdfsFS> HdfsFsMap;
+  typedef boost::unordered_map<std::string, hdfsFS> HdfsFsMap;
   HdfsFsMap fs_map_;
 
   HdfsFsCache() { };

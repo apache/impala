@@ -15,14 +15,17 @@
 #include "runtime/hdfs-fs-cache.h"
 
 #include <boost/thread/locks.hpp>
+#include <gutil/strings/substitute.h>
 
 #include "common/logging.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
+#include "util/hdfs-util.h"
 #include "util/test-info.h"
 
 using namespace std;
 using namespace boost;
+using namespace strings;
 
 namespace impala {
 
@@ -33,34 +36,43 @@ void HdfsFsCache::Init() {
   HdfsFsCache::instance_.reset(new HdfsFsCache());
 }
 
-hdfsFS HdfsFsCache::GetConnection(const string& host, int port) {
+Status HdfsFsCache::GetConnection(const string& path, hdfsFS* fs) {
+  string namenode;
+  size_t n = path.find("://");
+  if (n == string::npos) {
+    // Path is not qualified, so use the default FS.
+    namenode = "default";
+  } else {
+    // Path is qualified, i.e. "scheme://authority/path/to/file".  Extract
+    // "scheme://authority/".
+    n = path.find('/', n + 3);
+    if (n == string::npos) {
+      return Status(Substitute("Path missing '/' after authority: $0", path));
+    }
+    // Include the trailling '/' for local filesystem case, i.e. "file:///".
+    namenode = path.substr(0, n + 1);
+  }
+  DCHECK(!namenode.empty());
+
   lock_guard<mutex> l(lock_);
-  HdfsFsMap::iterator i = fs_map_.find(make_pair(host, port));
+  HdfsFsMap::iterator i = fs_map_.find(namenode);
   if (i == fs_map_.end()) {
     hdfsBuilder* hdfs_builder = hdfsNewBuilder();
-    if (!host.empty()) {
-      hdfsBuilderSetNameNode(hdfs_builder, host.c_str());
-    } else {
-      // Connect to local filesystem
-      hdfsBuilderSetNameNode(hdfs_builder, NULL);
+    hdfsBuilderSetNameNode(hdfs_builder, namenode.c_str());
+    *fs = hdfsBuilderConnect(hdfs_builder);
+    if (*fs == NULL) {
+      return Status(GetHdfsErrorMsg("Failed to connect to FS: ", namenode));
     }
-    hdfsBuilderSetNameNodePort(hdfs_builder, port);
-    hdfsFS conn = hdfsBuilderConnect(hdfs_builder);
-    DCHECK(conn != NULL);
-    fs_map_.insert(make_pair(make_pair(host, port), conn));
-    return conn;
+    fs_map_.insert(make_pair(namenode, *fs));
   } else {
-    return i->second;
+    *fs = i->second;
   }
+  DCHECK_NOTNULL(*fs);
+  return Status::OK;
 }
 
-hdfsFS HdfsFsCache::GetDefaultConnection() {
-  // "default" uses the default NameNode configuration from the XML configuration files.
-  return GetConnection("default", 0);
-}
-
-hdfsFS HdfsFsCache::GetLocalConnection() {
-  return GetConnection("", 0);
+Status HdfsFsCache::GetLocalConnection(hdfsFS* fs) {
+  return GetConnection("file:///", fs);
 }
 
 }

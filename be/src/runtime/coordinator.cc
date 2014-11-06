@@ -545,8 +545,13 @@ void Coordinator::PopulatePathPermissionCache(hdfsFS fs, const string& path_str,
 }
 
 Status Coordinator::FinalizeSuccessfulInsert() {
-  hdfsFS hdfs_connection = HdfsFsCache::instance()->GetDefaultConnection();
   PermissionCache permissions_cache;
+  hdfsFS hdfs_connection;
+  // InsertStmt ensures that all partitions are on the same filesystem as the table's
+  // base directory, so opening a single connection is okay.
+  // TODO: modify this code so that restriction can be lifted.
+  RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
+      finalize_params_.hdfs_base_dir, &hdfs_connection));
 
   // INSERT finalization happens in the five following steps
   // 1. If OVERWRITE, remove all the files in the target directory
@@ -722,13 +727,14 @@ Status Coordinator::FinalizeQuery() {
     return_status = FinalizeSuccessfulInsert();
   }
 
-  DCHECK(finalize_params_.__isset.staging_dir);
-
-  hdfsFS hdfs_connection = HdfsFsCache::instance()->GetDefaultConnection();
   stringstream staging_dir;
+  DCHECK(finalize_params_.__isset.staging_dir);
   staging_dir << finalize_params_.staging_dir << "/" << PrintId(query_id_,"_") << "/";
+
+  hdfsFS hdfs_conn;
+  RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(staging_dir.str(), &hdfs_conn));
   VLOG_QUERY << "Removing staging directory: " << staging_dir.str();
-  hdfsDelete(hdfs_connection, staging_dir.str().c_str(), 1);
+  hdfsDelete(hdfs_conn, staging_dir.str().c_str(), 1);
 
   return return_status;
 }

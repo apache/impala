@@ -428,8 +428,7 @@ Status HdfsTextScanner::FillByteBuffer(bool* eosr, int num_bytes) {
     VLOG_FILE << "Decompressed " << byte_buffer_read_size_ << " to " << decompressed_len;
     byte_buffer_ptr_ = reinterpret_cast<char*>(decompressed_buffer);
     byte_buffer_read_size_ = decompressed_len;
-  }
-  else {
+  } else {
     if (num_bytes > 0) {
       stream_->GetBytes(num_bytes, reinterpret_cast<uint8_t**>(&byte_buffer_ptr_),
                         &byte_buffer_read_size_, &status);

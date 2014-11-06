@@ -360,15 +360,9 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   for (int i = 0; i < is_materialized_col_.size(); ++i) {
     is_materialized_col_[i] = column_idx_to_materialized_slot_idx_[i] != SKIP_COLUMN;
   }
-
-  hdfs_connection_ = HdfsFsCache::instance()->GetDefaultConnection();
-  if (hdfs_connection_ == NULL) {
-    string error_msg = GetStrErrMsg();
-    stringstream ss;
-    ss << "Failed to connect to HDFS." << "\n" << error_msg;
-    return Status(ss.str());
-  }
-
+  // TODO: don't assume all partitions are on the same filesystem.
+  RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
+      hdfs_table_->hdfs_base_dir(), &hdfs_connection_));
   // Convert the TScanRangeParams into per-file DiskIO::ScanRange objects and populate
   // partition_ids_, file_descs_, and per_type_files_.
   DCHECK(scan_range_params_ != NULL)
@@ -578,7 +572,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
     num_disks_accessed_counter_ =
         ADD_COUNTER(runtime_profile(), NUM_DISKS_ACCESSED_COUNTER, TCounterType::UNIT);
   } else {
-    num_disks_accessed_counter_ = 0;
+    num_disks_accessed_counter_ = NULL;
   }
   num_scanner_threads_started_counter_ =
       ADD_COUNTER(runtime_profile(), NUM_SCANNER_THREADS_STARTED, TCounterType::UNIT);
