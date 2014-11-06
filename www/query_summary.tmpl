@@ -13,6 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -->
+
 {{> www/common-header.tmpl }}
 
 <!-- Enable the 'highlight' library, which does syntax highlighting of query
@@ -22,14 +23,56 @@ limitations under the License.
 <script>hljs.initHighlightingOnLoad();</script>
 
 <h3>Query <tt>{{query_id}}</tt></h3>
-<h4><em>Status:</em> {{status}}</h4>
+<h4><em>Status:</em> <span id="status">{{status}}</span></h4>
+<div>
+  <label>
+    <input type="checkbox" checked="true" id="toggle" onClick="toggleRefresh()"/>
+    <span id="refresh_on">Auto-refresh on</span>
+  </label>  Last updated: <span id="last-updated"></span>
+</div>
 
 <pre><code>{{stmt}}</code></pre>
 
 <h3>Exec Summary</h3>
-<pre>{{summary}}</pre>
-
+<pre id="summary">{{summary}}</pre>
 <h3>Plan</h3>
 <pre>{{plan}}</pre>
+
+<script>
+
+// Periodically refreshes the summary details
+function refresh() {
+  var xhr = new XMLHttpRequest();
+  xhr.responseType = 'text';
+  xhr.timeout = 60000;
+  xhr.onload = function(ignored_arg) {
+    if (xhr.status != 200) {
+      return;
+    }
+    var blob = xhr.response;
+    json = JSON.parse(blob);
+    document.getElementById("summary").textContent = json["summary"].trim();
+    document.getElementById("status").textContent = json["status"];
+    document.getElementById("last-updated").textContent = new Date();
+  }
+  xhr.ontimeout = function(){ }
+  xhr.open('GET', "/query_summary?query_id={{query_id}}&json", true);
+  xhr.send();
+}
+
+document.getElementById("last-updated").textContent = new Date();
+intervalId = setInterval(refresh, 1000);
+
+function toggleRefresh() {
+  if (document.getElementById("toggle").checked == true) {
+    intervalId = setInterval(refresh, 1000);
+    document.getElementById("refresh_on").textContent = "Auto-refresh on";
+  } else {
+    clearInterval(intervalId);
+    document.getElementById("refresh_on").textContent = "Auto-refresh off";
+  }
+}
+
+</script>
 
 {{> www/common-footer.tmpl}}
