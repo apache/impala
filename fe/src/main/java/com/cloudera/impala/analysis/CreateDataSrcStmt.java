@@ -87,7 +87,7 @@ public class CreateDataSrcStmt extends StatementBase {
 
   public TCreateDataSourceParams toThrift() {
     return new TCreateDataSourceParams(
-        new TDataSource(dataSrcName_, location_.getLocation(), className_,
+        new TDataSource(dataSrcName_, location_.toString(), className_,
             apiVersion_.name())).setIf_not_exists(ifNotExists_);
   }
 }

@@ -269,7 +269,7 @@ public class JniFrontend {
     result.setApi_versions(Lists.<String>newArrayListWithCapacity(dataSources.size()));
     for (DataSource dataSource: dataSources) {
       result.addToData_src_names(dataSource.getName());
-      result.addToLocations(dataSource.getLocation().toUri().getPath());
+      result.addToLocations(dataSource.getLocation());
       result.addToClass_names(dataSource.getClassName());
       result.addToApi_versions(dataSource.getApiVersion());
     }

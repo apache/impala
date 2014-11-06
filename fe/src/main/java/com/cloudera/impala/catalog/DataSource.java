@@ -28,10 +28,11 @@ public class DataSource implements CatalogObject {
   private final String dataSrcName_;
   private final String className_;
   private final String apiVersionString_;
-  private final Path location_;
+  // Qualified path to the data source.
+  private final String location_;
   private long catalogVersion_ =  Catalog.INITIAL_CATALOG_VERSION;
 
-  public DataSource(String dataSrcName, Path location, String className,
+  public DataSource(String dataSrcName, String location, String className,
       String apiVersionString) {
     dataSrcName_ = dataSrcName;
     location_ = location;
@@ -40,7 +41,7 @@ public class DataSource implements CatalogObject {
   }
 
   public static DataSource fromThrift(TDataSource thrift) {
-    return new DataSource(thrift.getName(), new Path(thrift.getHdfs_location()),
+    return new DataSource(thrift.getName(), thrift.getHdfs_location(),
         thrift.getClass_name(), thrift.getApi_version());
   }
 
@@ -61,19 +62,18 @@ public class DataSource implements CatalogObject {
   @Override
   public boolean isLoaded() { return true; }
 
-  public Path getLocation() { return location_; }
+  public String getLocation() { return location_; }
   public String getClassName() { return className_; }
   public String getApiVersion() { return apiVersionString_; }
 
   public TDataSource toThrift() {
-    return new TDataSource(getName(), location_.toUri().getPath(), className_,
-        apiVersionString_);
+    return new TDataSource(getName(), location_, className_, apiVersionString_);
   }
 
   public String debugString() {
     return Objects.toStringHelper(this)
         .add("name", dataSrcName_)
-        .add("location", location_.toUri().getPath())
+        .add("location", location_)
         .add("className", className_)
         .add("apiVersion", apiVersionString_)
         .toString();

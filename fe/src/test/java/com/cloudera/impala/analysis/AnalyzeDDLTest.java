@@ -680,13 +680,15 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   @Test
   public void TestCreateDataSource() {
     final String DATA_SOURCE_NAME = "TestDataSource1";
-    final DataSource DATA_SOURCE = new DataSource(DATA_SOURCE_NAME, new Path("/foo.jar"),
+    final DataSource DATA_SOURCE = new DataSource(DATA_SOURCE_NAME, "/foo.jar",
         "foo.Bar", "V1");
     catalog_.addDataSource(DATA_SOURCE);
     AnalyzesOk("CREATE DATA SOURCE IF NOT EXISTS " + DATA_SOURCE_NAME +
         " LOCATION '/foo.jar' CLASS 'foo.Bar' API_VERSION 'V1'");
     AnalyzesOk("CREATE DATA SOURCE IF NOT EXISTS " + DATA_SOURCE_NAME.toLowerCase() +
         " LOCATION '/foo.jar' CLASS 'foo.Bar' API_VERSION 'V1'");
+    AnalyzesOk("CREATE DATA SOURCE IF NOT EXISTS " + DATA_SOURCE_NAME +
+        " LOCATION 'hdfs://localhost:20500/foo.jar' CLASS 'foo.Bar' API_VERSION 'V1'");
     AnalyzesOk("CREATE DATA SOURCE foo LOCATION '/' CLASS '' API_VERSION 'v1'");
     AnalyzesOk("CREATE DATA SOURCE foo LOCATION '/foo.jar' CLASS 'com.bar.Foo' " +
         "API_VERSION 'V1'");
@@ -695,6 +697,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("CREATE DATA SOURCE foo LOCATION \"/foo.jar\" CLASS \"com.bar.Foo\" " +
         "API_VERSION \"V1\"");
     AnalyzesOk("CREATE DATA SOURCE foo LOCATION '/x/foo@hi_^!#.jar' " +
+        "CLASS 'com.bar.Foo' API_VERSION 'V1'");
+    AnalyzesOk("CREATE DATA SOURCE foo LOCATION 'hdfs://localhost:20500/a/b/foo.jar' " +
         "CLASS 'com.bar.Foo' API_VERSION 'V1'");
 
     AnalysisError("CREATE DATA SOURCE " + DATA_SOURCE_NAME + " LOCATION '/foo.jar' " +
@@ -969,7 +973,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     // Create table PRODUCED BY DATA SOURCE
     final String DATA_SOURCE_NAME = "TestDataSource1";
-    catalog_.addDataSource(new DataSource(DATA_SOURCE_NAME, new Path("/foo.jar"),
+    catalog_.addDataSource(new DataSource(DATA_SOURCE_NAME, "/foo.jar",
         "foo.Bar", "V1"));
     AnalyzesOk("CREATE TABLE DataSrcTable1 (x int) PRODUCED BY DATA SOURCE " +
         DATA_SOURCE_NAME);
