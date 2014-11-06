@@ -76,6 +76,11 @@ Status GzipCompressor::Compress(int64_t input_length, const uint8_t* input,
 
   int64_t ret = 0;
   if ((ret = deflate(&stream_, Z_FINISH)) != Z_STREAM_END) {
+    if (ret == Z_OK) {
+      // will return Z_OK (and stream_.msg NOT set) if stream_.avail_out is too small
+      return Status("zlib deflate failed: output buffer (%ld) is too small.",
+                    output_length);
+    }
     stringstream ss;
     ss << "zlib deflate failed: " << stream_.msg;
     return Status(ss.str());
