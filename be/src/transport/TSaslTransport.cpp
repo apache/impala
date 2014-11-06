@@ -32,7 +32,7 @@ using namespace std;
 
 namespace apache { namespace thrift { namespace transport {
 
-  TSaslTransport::TSaslTransport(boost::shared_ptr<TTransport> transport) 
+  TSaslTransport::TSaslTransport(boost::shared_ptr<TTransport> transport)
       : transport_(transport),
         memBuf_(new TMemoryBuffer()),
         shouldWrap_(false),

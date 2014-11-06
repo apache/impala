@@ -115,7 +115,9 @@ shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
   map<shared_ptr<TTransport>, shared_ptr<TSaslServerTransport> >::iterator transMap =
       transportMap_.find(trans);
   if (transMap == transportMap_.end()) {
-    retTransport.reset(new TSaslServerTransport(serverDefinitionMap_, trans));
+    shared_ptr<TTransport> wrapped(new TBufferedTransport(trans));
+    retTransport.reset(new TSaslServerTransport(serverDefinitionMap_,
+        wrapped));
     retTransport.get()->open();
     transportMap_[trans] = retTransport;
   } else {

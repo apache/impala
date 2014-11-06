@@ -205,15 +205,19 @@ void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtoc
   TTransport* transport = input->getTransport().get();
   shared_ptr<ConnectionContext> connection_ptr =
       shared_ptr<ConnectionContext>(new ConnectionContext);
+  TBufferedTransport* buffered_transport = NULL;
   if (!thrift_server_->auth_provider_->is_sasl()) {
-    socket = static_cast<TSocket*>(
-        static_cast<TBufferedTransport*>(transport)->getUnderlyingTransport().get());
+    buffered_transport = static_cast<TBufferedTransport*>(transport);
   } else {
     TSaslServerTransport* sasl_transport = static_cast<TSaslServerTransport*>(transport);
+    buffered_transport = static_cast<TBufferedTransport*>(
+        sasl_transport->getUnderlyingTransport().get());
+
     // Get the username from the transport.
     connection_ptr->username = sasl_transport->getUsername();
-    socket = static_cast<TSocket*>(sasl_transport->getUnderlyingTransport().get());
   }
+
+  socket = static_cast<TSocket*>(buffered_transport->getUnderlyingTransport().get());
 
   {
     connection_ptr->server_name = thrift_server_->name_;
@@ -251,7 +255,6 @@ void ThriftServer::ThriftServerEventProcessor::processContext(void* context,
 
 void ThriftServer::ThriftServerEventProcessor::deleteContext(void* serverContext,
     shared_ptr<TProtocol> input, shared_ptr<TProtocol> output) {
-
   __connection_context__ = (ConnectionContext*) serverContext;
 
   if (thrift_server_->connection_handler_ != NULL) {
