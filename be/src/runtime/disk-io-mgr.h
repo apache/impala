@@ -538,6 +538,7 @@ class DiskIoMgr {
   int64_t bytes_read_local(RequestContext* reader) const;
   int64_t bytes_read_short_circuit(RequestContext* reader) const;
   int64_t bytes_read_dn_cache(RequestContext* reader) const;
+  int num_remote_ranges(RequestContext* reader) const;
 
   // Returns the read throughput across all readers.
   // TODO: should this be a sliding window?  This should report metrics for the

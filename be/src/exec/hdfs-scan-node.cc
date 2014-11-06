@@ -595,6 +595,8 @@ Status HdfsScanNode::Open(RuntimeState* state) {
       TCounterType::BYTES);
   bytes_read_dn_cache_ = ADD_COUNTER(runtime_profile(), "BytesReadDataNodeCache",
       TCounterType::BYTES);
+  num_remote_ranges_ = ADD_COUNTER(runtime_profile(), "RemoteScanRanges",
+      TCounterType::UNIT);
 
   max_compressed_text_file_length_ = runtime_profile()->AddHighWaterMarkCounter(
       "MaxCompressedTextFileLength", TCounterType::BYTES);
@@ -1031,6 +1033,8 @@ void HdfsScanNode::StopAndFinalizeCounters() {
         runtime_state_->io_mgr()->bytes_read_short_circuit(reader_context_));
     bytes_read_dn_cache_->Set(
         runtime_state_->io_mgr()->bytes_read_dn_cache(reader_context_));
+    num_remote_ranges_->Set(static_cast<int64_t>(
+        runtime_state_->io_mgr()->num_remote_ranges(reader_context_)));
 
     ImpaladMetrics::IO_MGR_BYTES_READ->Increment(bytes_read_counter()->value());
     ImpaladMetrics::IO_MGR_LOCAL_BYTES_READ->Increment(

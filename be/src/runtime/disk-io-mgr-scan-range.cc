@@ -299,6 +299,9 @@ void DiskIoMgr::ScanRange::Close() {
       reader_->bytes_read_local_ += read_statistics->totalLocalBytesRead;
       reader_->bytes_read_short_circuit_ += read_statistics->totalShortCircuitBytesRead;
       reader_->bytes_read_dn_cache_ += read_statistics->totalZeroCopyBytesRead;
+      if (read_statistics->totalLocalBytesRead != read_statistics->totalBytesRead) {
+        ++reader_->num_remote_ranges_;
+      }
       hdfsFileFreeReadStatistics(read_statistics);
     }
 

@@ -7,7 +7,7 @@ limit 1
 |  order by: name ASC
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
 ---- DISTRIBUTEDPLAN
 02:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: name ASC
@@ -17,7 +17,7 @@ limit 1
 |  order by: name ASC
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
 ====
 select zip, count(*)
 from functional.testtbl
@@ -34,7 +34,7 @@ limit 10
 |  group by: zip
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
    predicates: name LIKE 'm%'
 ---- DISTRIBUTEDPLAN
 05:MERGING-EXCHANGE [UNPARTITIONED]
@@ -55,7 +55,7 @@ limit 10
 |  group by: zip
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
    predicates: name LIKE 'm%'
 ====
 select int_col, sum(float_col)
@@ -121,11 +121,11 @@ limit 2
 |  hash predicates: t1.id = t2.id
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: t2.int_col IS NOT NULL
 |
 00:SCAN HDFS [functional.alltypessmall t1]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ---- DISTRIBUTEDPLAN
 05:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: int_col ASC
@@ -140,11 +140,11 @@ limit 2
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: t2.int_col IS NOT NULL
 |
 00:SCAN HDFS [functional.alltypessmall t1]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ====
 # Test that the top-n is on int_col and not on the id column
 select int_col as id from functional.alltypessmall order by id limit 2
@@ -153,7 +153,7 @@ select int_col as id from functional.alltypessmall order by id limit 2
 |  order by: int_col ASC
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ---- DISTRIBUTEDPLAN
 02:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: int_col ASC
@@ -163,7 +163,7 @@ select int_col as id from functional.alltypessmall order by id limit 2
 |  order by: int_col ASC
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ====
 # Test that the top-n is on id and not on int_col
 select int_col as id from functional.alltypessmall order by functional.alltypessmall.id limit 2
@@ -172,7 +172,7 @@ select int_col as id from functional.alltypessmall order by functional.alltypess
 |  order by: id ASC
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ---- DISTRIBUTEDPLAN
 02:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: id ASC
@@ -182,7 +182,7 @@ select int_col as id from functional.alltypessmall order by functional.alltypess
 |  order by: id ASC
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ====
 # Test that the limit/offset is propagated correctly to child nodes. The TOP-N node
 # should have the limit/offset specified in the query. Child sort nodes should have a
@@ -199,11 +199,11 @@ limit 10 offset 5
 |  hash predicates: t1.id = t2.id
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: t2.int_col IS NOT NULL
 |
 00:SCAN HDFS [functional.alltypessmall t1]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
@@ -230,11 +230,11 @@ NODE 1:
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: t2.int_col IS NOT NULL
 |
 00:SCAN HDFS [functional.alltypessmall t1]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ====
 # test distributed top-n over a union (IMPALA-831)
 select int_col, bigint_col from
@@ -249,10 +249,10 @@ order by int_col desc limit 10 offset 5
 00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 04:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
@@ -265,10 +265,10 @@ order by int_col desc limit 10 offset 5
 00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # test distributed top-n over a union distinct (IMPALA-831)
 select int_col, bigint_col from
@@ -286,10 +286,10 @@ order by int_col desc limit 10 offset 5
 00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 07:MERGING-EXCHANGE [UNPARTITIONED]
 |  offset: 5
@@ -310,10 +310,10 @@ order by int_col desc limit 10 offset 5
 00:UNION
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # test that top-n is not placed below an unpartitioned exchange with a limit
 select * from (select * from functional.alltypes limit 10) t
@@ -323,7 +323,7 @@ order by int_col limit 10
 |  order by: int_col ASC
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    limit: 10
 ---- DISTRIBUTEDPLAN
 01:TOP-N [LIMIT=10]
@@ -333,7 +333,7 @@ order by int_col limit 10
 |  limit: 10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    limit: 10
 ====
 # test that top-n is not placed below an unpartitioned exchange with a limit
@@ -350,10 +350,10 @@ order by int_col limit 10
 |  limit: 10
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 03:TOP-N [LIMIT=10]
 |  order by: int_col ASC
@@ -365,8 +365,8 @@ order by int_col limit 10
 |  limit: 10
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====

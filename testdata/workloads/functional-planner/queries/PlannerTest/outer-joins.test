@@ -33,7 +33,7 @@ and t1.zip + t2.zip + t3.zip= 20
 |  other predicates: t3.id IS NOT NULL, t1.zip + t2.zip + t3.zip = 20
 |
 |--02:SCAN HDFS [functional.testtbl t3]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |     predicates: t3.zip = 94720, t3.id > 0, t3.id IS NOT NULL
 |
 03:HASH JOIN [LEFT OUTER JOIN]
@@ -42,11 +42,11 @@ and t1.zip + t2.zip + t3.zip= 20
 |  other predicates: t2.id IS NULL, t1.zip + t2.zip = 10
 |
 |--01:SCAN HDFS [functional.testtbl t2]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |     predicates: t2.zip = 94104
 |
 00:SCAN HDFS [functional.testtbl t1]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
    predicates: t1.id > 0
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
@@ -59,7 +59,7 @@ and t1.zip + t2.zip + t3.zip= 20
 |--06:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [functional.testtbl t3]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |     predicates: t3.zip = 94720, t3.id > 0, t3.id IS NOT NULL
 |
 03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
@@ -70,11 +70,11 @@ and t1.zip + t2.zip + t3.zip= 20
 |--05:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.testtbl t2]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |     predicates: t2.zip = 94104
 |
 00:SCAN HDFS [functional.testtbl t1]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
    predicates: t1.id > 0
 ====
 # the same thing with subqueries; should produce the same result
@@ -93,7 +93,7 @@ and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 |  other predicates: a3.id IS NOT NULL, a1.zip + a2.zip + a3.zip = 20
 |
 |--02:SCAN HDFS [functional.testtbl a3]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |     predicates: a3.id > 0, a3.id IS NOT NULL, a3.zip = 94720
 |
 03:HASH JOIN [LEFT OUTER JOIN]
@@ -102,11 +102,11 @@ and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 |  other predicates: a2.id IS NULL, a1.zip + a2.zip = 10
 |
 |--01:SCAN HDFS [functional.testtbl a2]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |     predicates: a2.zip = 94104
 |
 00:SCAN HDFS [functional.testtbl a1]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
    predicates: a1.id > 0
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
@@ -119,7 +119,7 @@ and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 |--06:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [functional.testtbl a3]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |     predicates: a3.id > 0, a3.id IS NOT NULL, a3.zip = 94720
 |
 03:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
@@ -130,11 +130,11 @@ and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 |--05:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.testtbl a2]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |     predicates: a2.zip = 94104
 |
 00:SCAN HDFS [functional.testtbl a1]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
    predicates: a1.id > 0
 ====
 # correct propagation of scan predicates in OJ On clauses:
@@ -149,18 +149,18 @@ from functional.testtbl t1
 |  hash predicates: t1.id = t3.id
 |
 |--02:SCAN HDFS [functional.testtbl t3]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |
 03:HASH JOIN [LEFT OUTER JOIN]
 |  hash predicates: t1.id = t2.id
 |  other join predicates: t1.id = 17
 |
 |--01:SCAN HDFS [functional.testtbl t2]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |     predicates: t2.id = 17
 |
 00:SCAN HDFS [functional.testtbl t1]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
 ====
 # correct placement of predicates with right outer joins; t1 and t2 are nullable
 select *
@@ -198,7 +198,7 @@ and t1.zip + t2.zip + t3.zip= 20
 |  other predicates: t1.id > 0, t2.id IS NULL, t1.zip + t2.zip = 10, t1.zip + t2.zip + t3.zip = 20
 |
 |--02:SCAN HDFS [functional.testtbl t3]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |     predicates: t3.id IS NOT NULL
 |
 03:HASH JOIN [RIGHT OUTER JOIN]
@@ -206,11 +206,11 @@ and t1.zip + t2.zip + t3.zip= 20
 |  other join predicates: t1.zip = 94611, t2.zip = 94104
 |
 |--01:SCAN HDFS [functional.testtbl t2]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |     predicates: t2.id = 15
 |
 00:SCAN HDFS [functional.testtbl t1]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
    predicates: t1.id > 0, t1.id IS NOT NULL
 ---- DISTRIBUTEDPLAN
 09:EXCHANGE [UNPARTITIONED]
@@ -223,7 +223,7 @@ and t1.zip + t2.zip + t3.zip= 20
 |--08:EXCHANGE [HASH(t3.id)]
 |  |
 |  02:SCAN HDFS [functional.testtbl t3]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |     predicates: t3.id IS NOT NULL
 |
 07:EXCHANGE [HASH(t1.id)]
@@ -235,13 +235,13 @@ and t1.zip + t2.zip + t3.zip= 20
 |--06:EXCHANGE [HASH(t2.id + 1)]
 |  |
 |  01:SCAN HDFS [functional.testtbl t2]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |     predicates: t2.id = 15
 |
 05:EXCHANGE [HASH(t1.id - 1)]
 |
 00:SCAN HDFS [functional.testtbl t1]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
    predicates: t1.id > 0, t1.id IS NOT NULL
 ====
 # the same thing with subqueries; should produce the same result
@@ -259,7 +259,7 @@ and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 |  other predicates: a2.id IS NULL, a1.id > 0, a1.zip + a2.zip = 10, a1.zip + a2.zip + a3.zip = 20
 |
 |--02:SCAN HDFS [functional.testtbl a3]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |     predicates: a3.id IS NOT NULL
 |
 03:HASH JOIN [RIGHT OUTER JOIN]
@@ -267,11 +267,11 @@ and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 |  other join predicates: a1.zip = 94611, a2.zip = 94104
 |
 |--01:SCAN HDFS [functional.testtbl a2]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |     predicates: a2.id = 15
 |
 00:SCAN HDFS [functional.testtbl a1]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
    predicates: a1.id > 0, a1.id IS NOT NULL
 ---- DISTRIBUTEDPLAN
 09:EXCHANGE [UNPARTITIONED]
@@ -284,7 +284,7 @@ and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 |--08:EXCHANGE [HASH(a3.id)]
 |  |
 |  02:SCAN HDFS [functional.testtbl a3]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |     predicates: a3.id IS NOT NULL
 |
 07:EXCHANGE [HASH(a1.id)]
@@ -296,13 +296,13 @@ and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
 |--06:EXCHANGE [HASH(a2.id + 1)]
 |  |
 |  01:SCAN HDFS [functional.testtbl a2]
-|     partitions=1/1 size=0B
+|     partitions=1/1 files=0 size=0B
 |     predicates: a2.id = 15
 |
 05:EXCHANGE [HASH(a1.id - 1)]
 |
 00:SCAN HDFS [functional.testtbl a1]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
    predicates: a1.id > 0, a1.id IS NOT NULL
 ====
 # right outer join requires the join op to be partitioned, otherwise non-matches cause
@@ -317,10 +317,10 @@ where a.tinyint_col is null
 |  other predicates: a.tinyint_col IS NULL
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
@@ -331,12 +331,12 @@ where a.tinyint_col is null
 |--04:EXCHANGE [HASH(b.id)]
 |  |
 |  01:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |
 03:EXCHANGE [HASH(a.tinyint_col)]
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # same for full outer joins
 select a.tinyint_col, b.id
@@ -349,10 +349,10 @@ where a.tinyint_col is null
 |  other predicates: a.tinyint_col IS NULL
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
@@ -363,10 +363,10 @@ where a.tinyint_col is null
 |--04:EXCHANGE [HASH(b.id)]
 |  |
 |  01:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |
 03:EXCHANGE [HASH(a.tinyint_col)]
 |
 00:SCAN HDFS [functional.alltypesagg a]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====

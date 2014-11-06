@@ -400,6 +400,9 @@ class HdfsScanNode : public ScanNode {
   // Total number of bytes read from data node cache
   RuntimeProfile::Counter* bytes_read_dn_cache_;
 
+  // Total number of remote scan ranges
+  RuntimeProfile::Counter* num_remote_ranges_;
+
   // Lock protects access between scanner thread and main query thread (the one calling
   // GetNext()) for all fields below.  If this lock and any other locks needs to be taken
   // together, this lock must be taken first.

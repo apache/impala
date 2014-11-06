@@ -5,7 +5,7 @@ select distinctpc(l_orderkey) from tpch.lineitem
 |  output: distinctpc(l_orderkey)
 |
 00:SCAN HDFS [tpch.lineitem]
-   partitions=1/1 size=718.94MB
+   partitions=1/1 files=1 size=718.94MB
 ---- DISTRIBUTEDPLAN
 03:AGGREGATE [FINALIZE]
 |  output: distinctpc:merge(l_orderkey)
@@ -16,7 +16,7 @@ select distinctpc(l_orderkey) from tpch.lineitem
 |  output: distinctpc(l_orderkey)
 |
 00:SCAN HDFS [tpch.lineitem]
-   partitions=1/1 size=718.94MB
+   partitions=1/1 files=1 size=718.94MB
 ====
 # Distinct estimate with distinct
 select count(distinct l_orderkey), distinctpc(l_orderkey) from tpch.lineitem
@@ -29,7 +29,7 @@ select count(distinct l_orderkey), distinctpc(l_orderkey) from tpch.lineitem
 |  group by: l_orderkey
 |
 00:SCAN HDFS [tpch.lineitem]
-   partitions=1/1 size=718.94MB
+   partitions=1/1 files=1 size=718.94MB
 ---- DISTRIBUTEDPLAN
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(l_orderkey), distinctpc:merge(l_orderkey)
@@ -50,5 +50,5 @@ select count(distinct l_orderkey), distinctpc(l_orderkey) from tpch.lineitem
 |  group by: l_orderkey
 |
 00:SCAN HDFS [tpch.lineitem]
-   partitions=1/1 size=718.94MB
+   partitions=1/1 files=1 size=718.94MB
 ====

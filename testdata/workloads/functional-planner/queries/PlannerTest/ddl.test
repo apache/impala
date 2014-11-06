@@ -4,13 +4,13 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 create table t as
 select distinct a.int_col, a.string_col from functional.alltypes a
@@ -27,10 +27,10 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |  hash predicates: a.id = b.id
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=1/4 size=1.58KB
+|     partitions=1/4 files=1 size=1.58KB
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=12/24 size=238.68KB
+   partitions=12/24 files=12 size=238.68KB
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
 |  partitions=1
@@ -49,10 +49,10 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=1/4 size=1.58KB
+|     partitions=1/4 files=1 size=1.58KB
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=12/24 size=238.68KB
+   partitions=12/24 files=12 size=238.68KB
 ====
 # CTAS with a view that has a limit clause (IMPALA-1411)
 create table t as
@@ -62,7 +62,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    limit: 1
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
@@ -72,7 +72,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |  limit: 1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    limit: 1
 ====
 # CTAS with multiple nested inline views that have a limit clause (IMPALA-1411)
@@ -85,7 +85,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |  partitions=1
 |
 00:SCAN HDFS [functional.alltypestiny]
-   partitions=4/4 size=460B
+   partitions=4/4 files=4 size=460B
    limit: 1
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
@@ -95,7 +95,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |  limit: 1
 |
 00:SCAN HDFS [functional.alltypestiny]
-   partitions=4/4 size=460B
+   partitions=4/4 files=4 size=460B
    limit: 1
 ====
 
@@ -110,7 +110,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |  order by: id ASC
 |
 00:SCAN HDFS [functional.alltypestiny]
-   partitions=4/4 size=460B
+   partitions=4/4 files=4 size=460B
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
 |  partitions=1
@@ -124,7 +124,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |  order by: id ASC
 |
 00:SCAN HDFS [functional.alltypestiny]
-   partitions=4/4 size=460B
+   partitions=4/4 files=4 size=460B
 ====
 # CTAS with an inline view that has a limit and offset clause (IMPALA-1411)
 create table t as
@@ -138,7 +138,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |  order by: id ASC
 |
 00:SCAN HDFS [functional.alltypestiny]
-   partitions=4/4 size=460B
+   partitions=4/4 files=4 size=460B
 ---- DISTRIBUTEDPLAN
 WRITE TO HDFS [default.t, OVERWRITE=false]
 |  partitions=1
@@ -152,5 +152,5 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |  order by: id ASC
 |
 00:SCAN HDFS [functional.alltypestiny]
-   partitions=4/4 size=460B
+   partitions=4/4 files=4 size=460B
 ====

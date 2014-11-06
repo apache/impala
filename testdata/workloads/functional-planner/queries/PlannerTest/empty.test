@@ -80,7 +80,7 @@ on e.id = f.id
 |--01:EMPTYSET
 |
 00:SCAN HDFS [functional.alltypessmall f]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ====
 # Constant conjunct causes union operand to be dropped.
 select * from functional.alltypessmall
@@ -92,10 +92,10 @@ select * from functional.alltypestiny
 00:UNION
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |
 01:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ====
 # Constant conjunct turns union into an empty-set node.
 select *
@@ -114,7 +114,7 @@ on a.id = t2.id
 |--01:EMPTYSET
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # Constant conjunct in the ON-clause of an outer join is
 # assigned to the join.
@@ -128,10 +128,10 @@ on (a.id = b.id and 1 + 1 > 10)
 |  other join predicates: 1 + 1 > 10
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |
 00:SCAN HDFS [functional.alltypessmall a]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ====
 # Constant conjunct in the ON-clause of an outer join is
 # assigned to the join.
@@ -145,10 +145,10 @@ on (a.id = b.id and !true)
 |  other join predicates: NOT TRUE
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |
 00:SCAN HDFS [functional.alltypessmall a]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ====
 # Constant conjunct in the ON-clause of an outer join is
 # assigned to the join.
@@ -162,10 +162,10 @@ on (a.id = b.id and null = "abc")
 |  other join predicates: NULL = 'abc'
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |
 00:SCAN HDFS [functional.alltypessmall a]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ====
 # Limit 0 turns query block into an empty-set node.
 select t1.id, t2.id
@@ -200,7 +200,7 @@ on e.id = f.id
 |--01:EMPTYSET
 |
 00:SCAN HDFS [functional.alltypessmall f]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ====
 # Limit 0 causes union operand to be dropped.
 select * from functional.alltypessmall
@@ -212,10 +212,10 @@ select * from functional.alltypestiny
 00:UNION
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |
 01:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ====
 # Limit 0 causes empty-set union.
 select * from functional.alltypessmall
@@ -238,7 +238,7 @@ select int_col from functional.alltypesagg
 00:UNION
 |
 |--03:SCAN HDFS [functional.alltypesagg]
-|     partitions=11/11 size=814.73KB
+|     partitions=11/11 files=11 size=814.73KB
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(1)

@@ -421,6 +421,10 @@ int64_t DiskIoMgr::bytes_read_dn_cache(RequestContext* reader) const {
   return reader->bytes_read_dn_cache_;
 }
 
+int DiskIoMgr::num_remote_ranges(RequestContext* reader) const {
+  return reader->num_remote_ranges_;
+}
+
 int64_t DiskIoMgr::GetReadThroughput() {
   return RuntimeProfile::UnitsPerSecond(&total_bytes_read_counter_, &read_timer_);
 }

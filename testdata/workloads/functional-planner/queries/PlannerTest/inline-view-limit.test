@@ -2,13 +2,13 @@
 select * from (select * from functional.alltypessmall) a where id < 5
 ---- PLAN
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
    predicates: functional.alltypessmall.id < 5
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
    predicates: functional.alltypessmall.id < 5
 ====
 # predicate pushdown is prevented in presence of limit clause
@@ -19,7 +19,7 @@ select * from (select * from functional.alltypessmall limit 10) a where id < 5 l
 |  limit: 5
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
    limit: 10
 ---- DISTRIBUTEDPLAN
 01:SELECT
@@ -30,7 +30,7 @@ select * from (select * from functional.alltypessmall limit 10) a where id < 5 l
 |  limit: 10
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
    limit: 10
 ====
 # predicate pushdown is prevented in presence of order by/limit clause;
@@ -47,7 +47,7 @@ where id < 5 limit 5
 |  order by: id ASC
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ---- DISTRIBUTEDPLAN
 02:SELECT
 |  predicates: id < 5
@@ -61,7 +61,7 @@ where id < 5 limit 5
 |  order by: id ASC
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ====
 # top-n is not distributed because it depends on the output of the aggregation
 select *
@@ -84,10 +84,10 @@ where a.id < 5 limit 5
 |  |  group by: id
 |  |
 |  01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB
+|     partitions=24/24 files=24 size=478.45KB
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id < 5
 ---- DISTRIBUTEDPLAN
 09:EXCHANGE [UNPARTITIONED]
@@ -117,10 +117,10 @@ where a.id < 5 limit 5
 |  |  group by: id
 |  |
 |  01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB
+|     partitions=24/24 files=24 size=478.45KB
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id < 5
 ====
 # predicate pushdown is prevented in presence of limit clause; variant w/ join
@@ -140,10 +140,10 @@ where id < 5 limit 5
 |  limit: 10
 |
 |--01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypessmall a]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ---- DISTRIBUTEDPLAN
 03:SELECT
 |  predicates: a.id < 5
@@ -159,10 +159,10 @@ where id < 5 limit 5
 |--04:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypessmall a]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ====
 # predicate pushdown is prevented in presence of order by/limit clause
 select *
@@ -178,7 +178,7 @@ limit 5
 |  predicates: functional.alltypessmall.id < 5
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
    limit: 10
 ---- DISTRIBUTEDPLAN
 02:TOP-N [LIMIT=5]
@@ -191,7 +191,7 @@ limit 5
 |  limit: 10
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
    limit: 10
 ====
 # predicate pushdown is prevented in presence of order by/limit clause; variant w/ join
@@ -216,10 +216,10 @@ limit 5
 |  limit: 10
 |
 |--01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypessmall a]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ---- DISTRIBUTEDPLAN
 04:TOP-N [LIMIT=5]
 |  order by: id ASC
@@ -237,10 +237,10 @@ limit 5
 |--05:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypessmall a]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ====
 # join against subquery with limit creates a merge fragment that applies the limit
 select *
@@ -251,11 +251,11 @@ from functional.alltypes
 |  hash predicates: functional.alltypes.id = id
 |
 |--01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     limit: 10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
@@ -268,11 +268,11 @@ from functional.alltypes
 |  |  limit: 10
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     limit: 10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # join against subquery with limit creates a merge fragment that applies the limit;
 # topn is distributed
@@ -287,10 +287,10 @@ from functional.alltypes
 |  |  order by: id ASC
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 06:EXCHANGE [UNPARTITIONED]
 |
@@ -307,10 +307,10 @@ from functional.alltypes
 |  |  order by: id ASC
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # join against subquery with limit;
 # predicate pushdown is prevented in presence of order by/limit clause; variant w/ join
@@ -335,13 +335,13 @@ limit 5
 |  |  limit: 10
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
-|  |     partitions=4/4 size=460B
+|  |     partitions=4/4 files=4 size=460B
 |  |
 |  01:SCAN HDFS [functional.alltypessmall a]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id < 5
 ---- DISTRIBUTEDPLAN
 09:MERGING-EXCHANGE [UNPARTITIONED]
@@ -366,13 +366,13 @@ limit 5
 |  |--06:EXCHANGE [BROADCAST]
 |  |  |
 |  |  02:SCAN HDFS [functional.alltypestiny]
-|  |     partitions=4/4 size=460B
+|  |     partitions=4/4 files=4 size=460B
 |  |
 |  01:SCAN HDFS [functional.alltypessmall a]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id < 5
 ====
 # join against subquery with order by/limit;
@@ -401,13 +401,13 @@ limit 5
 |  |  hash predicates: a.id = functional.alltypestiny.id
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny]
-|  |     partitions=4/4 size=460B
+|  |     partitions=4/4 files=4 size=460B
 |  |
 |  01:SCAN HDFS [functional.alltypessmall a]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id < 5
 ---- DISTRIBUTEDPLAN
 10:MERGING-EXCHANGE [UNPARTITIONED]
@@ -435,13 +435,13 @@ limit 5
 |  |--07:EXCHANGE [BROADCAST]
 |  |  |
 |  |  02:SCAN HDFS [functional.alltypestiny]
-|  |     partitions=4/4 size=460B
+|  |     partitions=4/4 files=4 size=460B
 |  |
 |  01:SCAN HDFS [functional.alltypessmall a]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.id < 5
 ====
 # Subquery containing limit and offset
@@ -457,7 +457,7 @@ limit 100 offset 4
 |  order by: id ASC
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 02:TOP-N [LIMIT=100 OFFSET=4]
 |  order by: id ASC
@@ -471,7 +471,7 @@ limit 100 offset 4
 |  order by: id ASC
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # Test value transfers for outer-joined inline views with a limit.
 # Value transfer a.id->b.id is illegal due to the limit in b.
@@ -488,12 +488,12 @@ where a.id > 10 and b.id > 20
 |  other predicates: id > 20
 |
 |--01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: id != 2
 |     limit: 10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: id != 1, functional.alltypes.id > 10
 ====
 # Test value transfers for outer-joined inline views with a limit.
@@ -511,14 +511,14 @@ where a.id > 10 and b.id > 20
 |  other predicates: id > 20
 |
 |--02:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: functional.alltypessmall.id != 1, id != 2, functional.alltypessmall.id > 10, functional.alltypessmall.id > 20
 |
 01:SELECT
 |  predicates: id > 10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: id != 1
    limit: 10
 ====
@@ -537,11 +537,11 @@ where a.id > 10 and b.id > 20
 |  other predicates: id > 10
 |
 |--01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: id != 2, functional.alltypessmall.id > 20
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: id != 1
    limit: 10
 ====
@@ -563,11 +563,11 @@ where a.id > 10 and b.id > 20
 |  |  predicates: id > 20
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: id != 2
 |     limit: 10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: id != 1, functional.alltypes.id != 2, functional.alltypes.id > 10, functional.alltypes.id > 20
 ====

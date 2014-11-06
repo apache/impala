@@ -23,7 +23,7 @@ group by int_col, tinyint_col
 |  group by: int_col, tinyint_col
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # partition groups are coalesced if the intersection of their partition exprs
 # has a high enough cardinality to allow distribution across all nodes
@@ -51,7 +51,7 @@ from functional.alltypes
 05:EXCHANGE [HASH(int_col)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # unpartitioned analytics are executed with distributed sorts
 # TODO: avoid resorting on the same exprs
@@ -76,7 +76,7 @@ from functional.alltypes
 |  order by: int_col ASC NULLS FIRST
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 04:ANALYTIC
 |  functions: min(int_col)
@@ -99,7 +99,7 @@ from functional.alltypes
 05:EXCHANGE [HASH(int_col)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # coalesce sort groups
 select
@@ -153,7 +153,7 @@ from functional.alltypes
 |  order by: int_col ASC NULLS FIRST, bigint_col ASC
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 11:EXCHANGE [UNPARTITIONED]
 |
@@ -199,7 +199,7 @@ from functional.alltypes
 09:EXCHANGE [HASH(int_col)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # check ordering of partition, sort and window groups
 select
@@ -274,7 +274,7 @@ from functional.alltypes
 |  order by: int_col ASC NULLS FIRST, smallint_col ASC NULLS FIRST, int_col ASC
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 11:ANALYTIC
 |  functions: min(int_col), max(int_col)
@@ -331,7 +331,7 @@ from functional.alltypes
 12:EXCHANGE [HASH(int_col,smallint_col)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # basic analytic with default window and no partition/ordering
 select count(*) over() from functional.alltypesagg
@@ -340,7 +340,7 @@ select count(*) over() from functional.alltypesagg
 |  functions: count(*)
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 01:ANALYTIC
 |  functions: count(*)
@@ -348,7 +348,7 @@ select count(*) over() from functional.alltypesagg
 02:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # basic analytic with default window and partition
 select tinyint_col, sum(bigint_col) over(partition by tinyint_col) sum_of_bigints
@@ -362,7 +362,7 @@ from functional.alltypesagg
 |  order by: tinyint_col ASC NULLS FIRST
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
@@ -376,7 +376,7 @@ from functional.alltypesagg
 03:EXCHANGE [HASH(tinyint_col)]
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # basic analytic with default window and ordering
 select int_col, rank() over(order by int_col) from functional.alltypesagg
@@ -390,7 +390,7 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
 |  order by: int_col ASC
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 02:ANALYTIC
 |  functions: rank()
@@ -404,7 +404,7 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
 |  order by: int_col ASC
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # analytic rows window, partition and ordering using complex expressions, with limit
 select bigint_col, count(double_col)
@@ -424,7 +424,7 @@ limit 10
 |  order by: tinyint_col + 1 ASC NULLS FIRST, double_col / 2 ASC NULLS FIRST, 4 - int_col ASC, 4 * smallint_col ASC
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |  limit: 10
@@ -442,7 +442,7 @@ limit 10
 03:EXCHANGE [HASH(tinyint_col + 1,double_col / 2)]
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # test de-duplication of analytic exprs
 select
@@ -488,7 +488,7 @@ limit 10
 |  order by: bool_col ASC NULLS FIRST, int_col DESC
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 05:ANALYTIC
 |  functions: avg(double_col)
@@ -520,7 +520,7 @@ limit 10
 06:EXCHANGE [HASH(bool_col)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # analytic on the output of a join with a final order by
 select a.tinyint_col, a.int_col, count(a.double_col)
@@ -544,10 +544,10 @@ order by a.tinyint_col, a.int_col
 |  hash predicates: a.id = b.id
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 08:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: tinyint_col ASC, int_col ASC
@@ -572,10 +572,10 @@ order by a.tinyint_col, a.int_col
 |--06:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # analytics on a grouped aggregation with a final order by
 select bool_col,
@@ -618,7 +618,7 @@ order by 1, 2, 3
 |  group by: bool_col
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 10:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: bool_col ASC, sum(min(int_col)) ASC, max(sum(bigint_col)) ASC
@@ -657,7 +657,7 @@ order by 1, 2, 3
 |  group by: bool_col
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # grouping of multiple analytic exprs by compatible window/partition/order;
 # the distributed plan repartitions only once on tinyint_col
@@ -748,7 +748,7 @@ from functional.alltypesagg
 |  order by: tinyint_col ASC NULLS FIRST, int_col DESC
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 12:EXCHANGE [UNPARTITIONED]
 |
@@ -806,7 +806,7 @@ from functional.alltypesagg
 11:EXCHANGE [HASH(tinyint_col)]
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # grouping of multiple analytic exprs by compatible window/partition/order
 select
@@ -856,7 +856,7 @@ from functional.alltypesagg
 |  order by: bigint_col ASC NULLS FIRST, tinyint_col ASC
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 07:ANALYTIC
 |  functions: sum(tinyint_col)
@@ -896,7 +896,7 @@ from functional.alltypesagg
 08:EXCHANGE [HASH(bigint_col)]
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # basic test for analytics and inline views
 select double_col, a, b, a + b, double_col + a from
@@ -922,7 +922,7 @@ order by 2, 3, 4
 |  order by: bool_col ASC NULLS FIRST
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 04:SORT
 |  order by: a ASC, b ASC, a + b ASC
@@ -942,7 +942,7 @@ order by 2, 3, 4
 05:EXCHANGE [HASH(functional.alltypes.bool_col)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # same as above but using a WITH-clause view
 with v2 as
@@ -969,7 +969,7 @@ order by 2, 3, 4
 |  order by: bool_col ASC NULLS FIRST
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 04:SORT
 |  order by: a ASC, b ASC, a + b ASC
@@ -989,7 +989,7 @@ order by 2, 3, 4
 05:EXCHANGE [HASH(functional.alltypes.bool_col)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # test ignoring of non-materialized analytic exprs
 select b from
@@ -1023,7 +1023,7 @@ where e < 10
 |  order by: bigint_col ASC NULLS FIRST
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 08:EXCHANGE [UNPARTITIONED]
 |
@@ -1051,7 +1051,7 @@ where e < 10
 06:EXCHANGE [HASH(bigint_col)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # basic test for analytics and unions
 select min(id) over (partition by int_col)
@@ -1082,7 +1082,7 @@ order by 1 desc nulls first
 |  |  |  order by: bool_col ASC NULLS FIRST
 |  |  |
 |  |  04:SCAN HDFS [functional.alltypessmall]
-|  |     partitions=4/4 size=6.32KB
+|  |     partitions=4/4 files=4 size=6.32KB
 |  |
 |  03:ANALYTIC
 |  |  functions: min(id)
@@ -1092,7 +1092,7 @@ order by 1 desc nulls first
 |  |  order by: int_col ASC NULLS FIRST
 |  |
 |  01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB
+|     partitions=24/24 files=24 size=478.45KB
 |
 11:ANALYTIC
 |  functions: sum(bigint_col)
@@ -1104,7 +1104,7 @@ order by 1 desc nulls first
 |  order by: int_col ASC NULLS FIRST, id ASC
 |
 09:SCAN HDFS [functional.alltypestiny]
-   partitions=4/4 size=460B
+   partitions=4/4 files=4 size=460B
 ---- DISTRIBUTEDPLAN
 18:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: min(id) OVER(...) DESC NULLS FIRST
@@ -1126,7 +1126,7 @@ order by 1 desc nulls first
 |  13:EXCHANGE [HASH(int_col)]
 |  |
 |  09:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |
 17:AGGREGATE [FINALIZE]
 |  group by: min(id) OVER(...)
@@ -1148,7 +1148,7 @@ order by 1 desc nulls first
 |  15:EXCHANGE [HASH(bool_col)]
 |  |
 |  04:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 03:ANALYTIC
 |  functions: min(id)
@@ -1160,7 +1160,7 @@ order by 1 desc nulls first
 14:EXCHANGE [HASH(int_col)]
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # analytics in an uncorrelated subquery
 select id, int_col, bool_col from functional.alltypessmall t1
@@ -1179,11 +1179,11 @@ where int_col in
 |  |  order by: bool_col ASC NULLS FIRST
 |  |
 |  01:SCAN HDFS [functional.alltypestiny t2]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |     predicates: t2.id < 10
 |
 00:SCAN HDFS [functional.alltypessmall t1]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
 |
@@ -1202,11 +1202,11 @@ where int_col in
 |  05:EXCHANGE [HASH(bool_col)]
 |  |
 |  01:SCAN HDFS [functional.alltypestiny t2]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |     predicates: t2.id < 10
 |
 00:SCAN HDFS [functional.alltypessmall t1]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ====
 # test conjunct assignment and slot materialization due to conjuncts
 # (see IMPALA-1243)
@@ -1268,7 +1268,7 @@ where
 |  order by: bool_col ASC NULLS FIRST
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: int_col >= 5, int_col <= 10
 ---- DISTRIBUTEDPLAN
 07:SELECT
@@ -1306,7 +1306,7 @@ where
 08:EXCHANGE [HASH(bool_col)]
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: int_col >= 5, int_col <= 10
 ====
 # test predicate propagation onto and through analytic nodes
@@ -1326,7 +1326,7 @@ where t2.id < 10 and t2.int_col < 20
 |  hash predicates: id = t2.id, sum(int_col) = t2.int_col
 |
 |--03:SCAN HDFS [functional.alltypes t2]
-|     partitions=24/24 size=478.45KB
+|     partitions=24/24 files=24 size=478.45KB
 |     predicates: t2.id < 10, t2.int_col < 20
 |
 02:ANALYTIC
@@ -1339,7 +1339,7 @@ where t2.id < 10 and t2.int_col < 20
 |  order by: bigint_col ASC NULLS FIRST, id ASC
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # test that predicates are correctly propagated in the presence of outer joins
 # (i.e., no predicates should be propagated in this query)
@@ -1359,7 +1359,7 @@ where t2.id < 10 and t2.int_col < 20
 |  other predicates: t2.id < 10, t2.int_col < 20
 |
 |--03:SCAN HDFS [functional.alltypes t2]
-|     partitions=24/24 size=478.45KB
+|     partitions=24/24 files=24 size=478.45KB
 |     predicates: t2.id < 10, t2.int_col < 20
 |
 02:ANALYTIC
@@ -1372,7 +1372,7 @@ where t2.id < 10 and t2.int_col < 20
 |  order by: bigint_col ASC NULLS FIRST, id ASC
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # test canonical function/window/order: row_number() gets a ROWS window
 select
@@ -1389,7 +1389,7 @@ from functional.alltypesagg
 |  order by: tinyint_col ASC NULLS FIRST, id ASC
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # test canonical function/window/order: lead() and lag() have default
 # arguments explicitly set
@@ -1448,7 +1448,7 @@ from functional.alltypesagg
 |  order by: tinyint_col ASC NULLS FIRST, id ASC
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # Test canonical function/window/order: Reverse windows ending in UNBOUNDED FOLLOWING
 # and not starting with UNBOUNDED PRECEDING.
@@ -1510,7 +1510,7 @@ from functional.alltypesagg
 |  order by: tinyint_col ASC NULLS FIRST, id DESC NULLS FIRST
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # Test canonical function/window/order: Reverse windows ending in UNBOUNDED FOLLOWING
 # and not starting with UNBOUNDED PRECEDING, and change first_value() to last_value().
@@ -1568,7 +1568,7 @@ from functional.alltypesagg
 |  order by: tinyint_col ASC NULLS FIRST, id DESC NULLS FIRST
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # Test canonical function/window/order: Reverse windows ending in UNBOUNDED FOLLOWING
 # and not starting with UNBOUNDED PRECEDING, and change last_value() to first_value()
@@ -1630,7 +1630,7 @@ from functional.alltypesagg
 |  order by: tinyint_col ASC NULLS FIRST, id DESC NULLS FIRST
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # IMPALA-1229
 select DENSE_RANK() OVER (ORDER BY t1.day ASC)
@@ -1648,11 +1648,11 @@ WHERE EXISTS (SELECT t1.year AS int_col_1 FROM functional.alltypesagg t1)
 02:CROSS JOIN [BROADCAST]
 |
 |--01:SCAN HDFS [functional.alltypesagg t1]
-|     partitions=11/11 size=814.73KB
+|     partitions=11/11 files=11 size=814.73KB
 |     limit: 1
 |
 00:SCAN HDFS [functional.alltypesagg t1]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # IMPALA-1243: the Where clause predicate needs to be evaluated in a Select node
 # not as a scan predicate of alltypes
@@ -1682,10 +1682,10 @@ WHERE id IS NULL and tinyint_col != 5
 |  |  order by: id ASC
 |  |
 |  02:SCAN HDFS [functional.alltypes t1]
-|     partitions=24/24 size=478.45KB
+|     partitions=24/24 files=24 size=478.45KB
 |
 01:SCAN HDFS [functional.alltypestiny t1]
-   partitions=4/4 size=460B
+   partitions=4/4 files=4 size=460B
    predicates: t1.id IS NULL, t1.tinyint_col != 5
 ---- DISTRIBUTEDPLAN
 10:AGGREGATE [FINALIZE]
@@ -1702,7 +1702,7 @@ WHERE id IS NULL and tinyint_col != 5
 00:UNION
 |
 |--01:SCAN HDFS [functional.alltypestiny t1]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |     predicates: t1.id IS NULL, t1.tinyint_col != 5
 |
 08:EXCHANGE [RANDOM]
@@ -1719,5 +1719,5 @@ WHERE id IS NULL and tinyint_col != 5
 |  order by: id ASC
 |
 02:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====

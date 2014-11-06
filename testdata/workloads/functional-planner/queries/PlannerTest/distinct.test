@@ -6,7 +6,7 @@ from functional.testtbl
 |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
@@ -19,7 +19,7 @@ from functional.testtbl
 |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
 ====
 # distinct w/ explicit select list
 select distinct id, zip
@@ -29,7 +29,7 @@ from functional.testtbl
 |  group by: id, zip
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
@@ -42,7 +42,7 @@ from functional.testtbl
 |  group by: id, zip
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
 ====
 # count(distinct)
 select count(distinct id, zip)
@@ -55,7 +55,7 @@ from functional.testtbl
 |  group by: id, zip
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
 ---- DISTRIBUTEDPLAN
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(if(id IS NULL, NULL, zip))
@@ -74,7 +74,7 @@ from functional.testtbl
 |  group by: id, zip
 |
 00:SCAN HDFS [functional.testtbl]
-   partitions=1/1 size=0B
+   partitions=1/1 files=0 size=0B
 ====
 # count(distinct) w/ grouping
 select tinyint_col, count(distinct int_col, bigint_col)
@@ -89,7 +89,7 @@ group by 1
 |  group by: tinyint_col, int_col, bigint_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
@@ -106,7 +106,7 @@ group by 1
 |  group by: tinyint_col, int_col, bigint_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # count(distinct) and sum(distinct) w/ grouping
 select tinyint_col, count(distinct int_col), sum(distinct int_col)
@@ -121,7 +121,7 @@ group by 1
 |  group by: tinyint_col, int_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
@@ -138,7 +138,7 @@ group by 1
 |  group by: tinyint_col, int_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # sum(distinct) w/o grouping
 select sum(distinct int_col)
@@ -151,7 +151,7 @@ from functional.alltypesagg
 |  group by: int_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 06:AGGREGATE [FINALIZE]
 |  output: sum:merge(int_col)
@@ -170,7 +170,7 @@ from functional.alltypesagg
 |  group by: int_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # count(distinct) and sum(distinct) w/ grouping; distinct in min() and max()
 # is ignored
@@ -187,7 +187,7 @@ from functional.alltypesagg group by 1
 |  group by: tinyint_col, int_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
@@ -206,7 +206,7 @@ from functional.alltypesagg group by 1
 |  group by: tinyint_col, int_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # aggregate fns with and without distinct
 select tinyint_col, count(distinct int_col), count(*), sum(distinct int_col),
@@ -222,7 +222,7 @@ from functional.alltypesagg group by 1
 |  group by: tinyint_col, int_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
 |
@@ -241,7 +241,7 @@ from functional.alltypesagg group by 1
 |  group by: tinyint_col, int_col
 |
 00:SCAN HDFS [functional.alltypesagg]
-   partitions=11/11 size=814.73KB
+   partitions=11/11 files=11 size=814.73KB
 ====
 # test join on inline views containing distinct aggregates to make sure
 # the aggregation info reports the correct tuple ids (from the 2nd phase
@@ -260,7 +260,7 @@ select t1.c, t2.c from
 |  |  group by: bigint_col
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(int_col)
@@ -269,7 +269,7 @@ select t1.c, t2.c from
 |  group by: int_col
 |
 00:SCAN HDFS [functional.alltypestiny]
-   partitions=4/4 size=460B
+   partitions=4/4 files=4 size=460B
 ---- DISTRIBUTEDPLAN
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: count(int_col) = count(bigint_col)
@@ -293,7 +293,7 @@ select t1.c, t2.c from
 |  |  group by: bigint_col
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |
 10:AGGREGATE [FINALIZE]
 |  output: count:merge(int_col)
@@ -312,7 +312,7 @@ select t1.c, t2.c from
 |  group by: int_col
 |
 00:SCAN HDFS [functional.alltypestiny]
-   partitions=4/4 size=460B
+   partitions=4/4 files=4 size=460B
 ====
 # Test placement of having predicate into 2nd phase merge agg for
 # distinct + non-distinct aggregates without group by (IMPALA-845).
@@ -332,7 +332,7 @@ having count(bigint_col) > 0
 |  group by: tinyint_col
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(tinyint_col), count:merge(bigint_col)
@@ -354,7 +354,7 @@ having count(bigint_col) > 0
 |  group by: tinyint_col
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # test slot materialization on a distinct agg inside an inline view
 # triggered by a predicate in an outer query block (IMPALA-861)
@@ -370,7 +370,7 @@ where t.x is not null
 |  group by: 1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(1)
@@ -390,7 +390,7 @@ where t.x is not null
 |  group by: 1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # test slot materialization on a distinct agg inside an inline view
 # triggered by a predicate in an outer query block (IMPALA-861)
@@ -407,7 +407,7 @@ where t.x + t.y > 10 and t.x > 0 and t.y > 1
 |  group by: 1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ---- DISTRIBUTEDPLAN
 06:AGGREGATE [FINALIZE]
 |  output: count:merge(1), count:merge(1)
@@ -429,5 +429,5 @@ where t.x + t.y > 10 and t.x > 0 and t.y > 1
 |  group by: 1
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====

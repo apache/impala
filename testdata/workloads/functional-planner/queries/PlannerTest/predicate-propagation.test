@@ -10,11 +10,11 @@ where b.bigint_col div 2 = 0
 |  hash predicates: a.double_col = b.bigint_col
 |
 |--01:SCAN HDFS [functional.alltypes b]
-|     partitions=24/24 size=478.45KB
+|     partitions=24/24 files=24 size=478.45KB
 |     predicates: b.bigint_col DIV 2 = 0
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # Where clause predicate is turned into Having clause
 select a.cnt, b.int_col
@@ -28,7 +28,7 @@ where b.id < 10
 |  hash predicates: count(id) = b.id
 |
 |--02:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: b.id < 10
 |
 01:AGGREGATE [FINALIZE]
@@ -37,7 +37,7 @@ where b.id < 10
 |  having: count(id) < 10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # single-table test case: partitions are pruned due to predicate inference
 select count(*) from functional.alltypes
@@ -47,7 +47,7 @@ where month = id and id = int_col and tinyint_col = int_col and int_col < 2
 |  output: count(*)
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=2/24 size=40.32KB
+   partitions=2/24 files=2 size=40.32KB
    predicates: month = id, id = int_col, tinyint_col = int_col, functional.alltypes.id < 2, int_col < 2, functional.alltypes.tinyint_col < 2
 ====
 # all subquery results get materialized correctly;
@@ -63,11 +63,11 @@ from
 |  other join predicates: string_col = 'a'
 |
 |--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB
+|     partitions=24/24 files=24 size=478.45KB
 |     predicates: string_col = 'b'
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # variation with Where clause; "b.string_col = 'b'" still needs to be applied
 # by the join node but it's safe to have the 'b' scan apply it as well
@@ -83,11 +83,11 @@ where a.string_col = 'a' and b.string_col = 'b'
 |  other predicates: string_col = 'b'
 |
 |--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB
+|     partitions=24/24 files=24 size=478.45KB
 |     predicates: functional.alltypes.string_col = 'b'
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.string_col = 'a'
 ====
 # Predicates are pushed through cross join to the inline views
@@ -100,11 +100,11 @@ where a.string_col = 'a' and b.string_col = 'b'
 02:CROSS JOIN [BROADCAST]
 |
 |--01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB
+|     partitions=24/24 files=24 size=478.45KB
 |     predicates: functional.alltypes.string_col = 'b'
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.string_col = 'a'
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
@@ -114,11 +114,11 @@ where a.string_col = 'a' and b.string_col = 'b'
 |--03:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB
+|     partitions=24/24 files=24 size=478.45KB
 |     predicates: functional.alltypes.string_col = 'b'
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.string_col = 'a'
 ====
 # c1 > 0 does not get propagated into inl view due to limit clauses
@@ -147,7 +147,7 @@ limit 3
 |  group by: int_col, tinyint_col
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ====
 # same for with clause variant
 with t as (select int_col c1, tinyint_col c2, max(id) c3
@@ -175,7 +175,7 @@ limit 3
 |  group by: int_col, tinyint_col
 |
 00:SCAN HDFS [functional.alltypessmall]
-   partitions=4/4 size=6.32KB
+   partitions=4/4 files=4 size=6.32KB
 ====
 # basic propagation between equivalence classes, with partition pruning
 select straight_join a.year, a.month, b.year, b.month
@@ -191,18 +191,18 @@ where a.year = 2009 and b.month + 2 <= 4 and b.id = 17
 |  hash predicates: b.smallint_col = c.int_col, b.id = c.id, b.year = c.year, b.month = c.month
 |
 |--02:SCAN HDFS [functional.alltypestiny c]
-|     partitions=2/4 size=230B
+|     partitions=2/4 files=2 size=230B
 |     predicates: c.id = 17, CAST(sin(c.int_col) AS BOOLEAN) = TRUE
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: a.tinyint_col = b.smallint_col, a.id = b.id, a.year = b.year, a.month = b.month
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=2/4 size=3.16KB
+|     partitions=2/4 files=2 size=3.16KB
 |     predicates: b.id = 17, CAST(sin(b.smallint_col) AS BOOLEAN) = TRUE
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=2/24 size=38.07KB
+   partitions=2/24 files=2 size=38.07KB
    predicates: a.id = 17, CAST(sin(a.tinyint_col) AS BOOLEAN) = TRUE
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -223,7 +223,7 @@ NODE 2:
 |--06:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [functional.alltypestiny c]
-|     partitions=2/4 size=230B
+|     partitions=2/4 files=2 size=230B
 |     predicates: c.id = 17, CAST(sin(c.int_col) AS BOOLEAN) = TRUE
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
@@ -232,11 +232,11 @@ NODE 2:
 |--05:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=2/4 size=3.16KB
+|     partitions=2/4 files=2 size=3.16KB
 |     predicates: b.id = 17, CAST(sin(b.smallint_col) AS BOOLEAN) = TRUE
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=2/24 size=38.07KB
+   partitions=2/24 files=2 size=38.07KB
    predicates: a.id = 17, CAST(sin(a.tinyint_col) AS BOOLEAN) = TRUE
 ====
 # basic propagation between equivalence classes, with partition pruning;
@@ -254,18 +254,18 @@ where a.year = 2009 and b.month + 2 <= 4 and b.id = 17
 |  hash predicates: functional.alltypessmall.smallint_col = functional.alltypestiny.int_col, functional.alltypessmall.id = functional.alltypestiny.id, functional.alltypessmall.year = functional.alltypestiny.year, functional.alltypessmall.month = functional.alltypestiny.month
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partitions=2/4 size=230B
+|     partitions=2/4 files=2 size=230B
 |     predicates: functional.alltypestiny.id = 17, CAST(sin(functional.alltypestiny.int_col) AS BOOLEAN) = TRUE
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: functional.alltypes.tinyint_col = functional.alltypessmall.smallint_col, functional.alltypes.id = functional.alltypessmall.id, functional.alltypes.year = functional.alltypessmall.year, functional.alltypes.month = functional.alltypessmall.month
 |
 |--01:SCAN HDFS [functional.alltypessmall]
-|     partitions=2/4 size=3.16KB
+|     partitions=2/4 files=2 size=3.16KB
 |     predicates: functional.alltypessmall.id = 17, CAST(sin(functional.alltypessmall.smallint_col) AS BOOLEAN) = TRUE
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=2/24 size=38.07KB
+   partitions=2/24 files=2 size=38.07KB
    predicates: functional.alltypes.id = 17, CAST(sin(functional.alltypes.tinyint_col) AS BOOLEAN) = TRUE
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -286,7 +286,7 @@ NODE 2:
 |--06:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
-|     partitions=2/4 size=230B
+|     partitions=2/4 files=2 size=230B
 |     predicates: functional.alltypestiny.id = 17, CAST(sin(functional.alltypestiny.int_col) AS BOOLEAN) = TRUE
 |
 03:HASH JOIN [INNER JOIN, BROADCAST]
@@ -295,11 +295,11 @@ NODE 2:
 |--05:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=2/4 size=3.16KB
+|     partitions=2/4 files=2 size=3.16KB
 |     predicates: functional.alltypessmall.id = 17, CAST(sin(functional.alltypessmall.smallint_col) AS BOOLEAN) = TRUE
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=2/24 size=38.07KB
+   partitions=2/24 files=2 size=38.07KB
    predicates: functional.alltypes.id = 17, CAST(sin(functional.alltypes.tinyint_col) AS BOOLEAN) = TRUE
 ====
 # propagation between outer-joined tables only goes in one direction:
@@ -323,11 +323,11 @@ where a.year = 2009 and a.tinyint_col = 7 and a.id is null and b.id = 17 and b.i
 |  other predicates: b.id = 17, b.int_col IS NULL
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=1/4 size=1.57KB
+|     partitions=1/4 files=1 size=1.57KB
 |     predicates: b.tinyint_col = 7, b.id = 17
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=12/24 size=238.68KB
+   partitions=12/24 files=12 size=238.68KB
    predicates: a.tinyint_col = 7, a.id IS NULL
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -355,11 +355,11 @@ NODE 1:
 |--03:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=1/4 size=1.57KB
+|     partitions=1/4 files=1 size=1.57KB
 |     predicates: b.tinyint_col = 7, b.id = 17
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=12/24 size=238.68KB
+   partitions=12/24 files=12 size=238.68KB
    predicates: a.tinyint_col = 7, a.id IS NULL
 ====
 # propagation between outer-joined tables only goes in one direction:
@@ -383,11 +383,11 @@ where b.year = 2009 and b.tinyint_col = 7 and b.id is null and a.id = 17 and a.i
 |  other predicates: a.id = 17, a.int_col IS NULL
 |
 |--01:SCAN HDFS [functional.alltypes b]
-|     partitions=12/24 size=238.68KB
+|     partitions=12/24 files=12 size=238.68KB
 |     predicates: b.tinyint_col = 7, b.id IS NULL
 |
 00:SCAN HDFS [functional.alltypessmall a]
-   partitions=1/4 size=1.57KB
+   partitions=1/4 files=1 size=1.57KB
    predicates: a.tinyint_col = 7, a.id = 17
 ---- DISTRIBUTEDPLAN
 05:EXCHANGE [UNPARTITIONED]
@@ -399,13 +399,13 @@ where b.year = 2009 and b.tinyint_col = 7 and b.id is null and a.id = 17 and a.i
 |--04:EXCHANGE [HASH(b.tinyint_col,b.id,b.year,b.month)]
 |  |
 |  01:SCAN HDFS [functional.alltypes b]
-|     partitions=12/24 size=238.68KB
+|     partitions=12/24 files=12 size=238.68KB
 |     predicates: b.tinyint_col = 7, b.id IS NULL
 |
 03:EXCHANGE [HASH(a.tinyint_col,a.id,a.year,a.month)]
 |
 00:SCAN HDFS [functional.alltypessmall a]
-   partitions=1/4 size=1.57KB
+   partitions=1/4 files=1 size=1.57KB
    predicates: a.tinyint_col = 7, a.id = 17
 ====
 # propagation into inline view with aggregation:
@@ -431,11 +431,11 @@ where a.year = 2009 and b.month <= 2 and b.count_col + 1 = 17 and a.tinyint_col 
 |  |  having: count(*) + 1 = 17
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=2/4 size=3.16KB
+|     partitions=2/4 files=2 size=3.16KB
 |     predicates: id > 11, functional.alltypessmall.int_col != 5
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=2/24 size=38.07KB
+   partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -464,11 +464,11 @@ NODE 1:
 |  |  group by: year, month, id, int_col
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=2/4 size=3.16KB
+|     partitions=2/4 files=2 size=3.16KB
 |     predicates: id > 11, functional.alltypessmall.int_col != 5
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=2/24 size=38.07KB
+   partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
 ====
 # Same as above but with cross join
@@ -497,11 +497,11 @@ where a.id = b.id and
 |  |  having: count(*) + 1 = 17
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=2/4 size=3.16KB
+|     partitions=2/4 files=2 size=3.16KB
 |     predicates: id > 11, functional.alltypessmall.int_col != 5
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=2/24 size=38.07KB
+   partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
 ---- DISTRIBUTEDPLAN
 07:EXCHANGE [UNPARTITIONED]
@@ -523,11 +523,11 @@ where a.id = b.id and
 |  |  group by: year, month, id, int_col
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=2/4 size=3.16KB
+|     partitions=2/4 files=2 size=3.16KB
 |     predicates: id > 11, functional.alltypessmall.int_col != 5
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=2/24 size=38.07KB
+   partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
 ====
 # no propagation into select block with limit;
@@ -557,11 +557,11 @@ where a.year = 2009 and b.month <= 2 and b.count_col + 1 = 17 and a.tinyint_col 
 |  |  limit: 5
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: id > 11
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=2/24 size=38.07KB
+   partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -598,11 +598,11 @@ NODE 1:
 |  |  group by: year, month, id, int_col
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: id > 11
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=2/24 size=38.07KB
+   partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
 ====
 # Same as above but with cross join
@@ -635,11 +635,11 @@ where a.year = 2009 and
 |  |  limit: 5
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: id > 11
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=2/24 size=38.07KB
+   partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
 ---- DISTRIBUTEDPLAN
 09:EXCHANGE [UNPARTITIONED]
@@ -667,11 +667,11 @@ where a.year = 2009 and
 |  |  group by: year, month, id, int_col
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: id > 11
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=2/24 size=38.07KB
+   partitions=2/24 files=2 size=38.07KB
    predicates: a.id > 11, a.tinyint_col != 5
 ====
 # propagation of z.month=1 to alltypesagg is prevented
@@ -689,11 +689,11 @@ and z.month = 1
 |  |  predicates: functional.alltypesagg.month = 1
 |  |
 |  01:SCAN HDFS [functional.alltypesagg]
-|     partitions=11/11 size=814.73KB
+|     partitions=11/11 files=11 size=814.73KB
 |     limit: 10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=12/24 size=238.68KB
+   partitions=12/24 files=12 size=238.68KB
 ====
 # extra join predicate "x.id + x.b_id = 17" results in referenced slots being
 # materialized
@@ -719,7 +719,7 @@ and x.id + x.b_id = 17
 |  |  predicates: functional.alltypesagg.month = 1
 |  |
 |  03:SCAN HDFS [functional.alltypesagg]
-|     partitions=11/11 size=814.73KB
+|     partitions=11/11 files=11 size=814.73KB
 |     limit: 10
 |
 02:HASH JOIN [INNER JOIN]
@@ -727,10 +727,10 @@ and x.id + x.b_id = 17
 |  other predicates: a.id + b.id = 17
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=12/24 size=238.68KB
+   partitions=12/24 files=12 size=238.68KB
 ====
 # correct placement of predicates in the presence of aggregation in an inline view
 select straight_join a.id, b.id
@@ -746,11 +746,11 @@ where a.id is null and isnull(b.id, 0) = 0 and b.int_col = 17
 |  |  group by: id, int_col
 |  |
 |  01:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB
+|     partitions=24/24 files=24 size=478.45KB
 |     predicates: functional.alltypes.int_col = 17
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: a.id IS NULL
 ====
 select straight_join a.id, b.id
@@ -770,18 +770,18 @@ where isnull(a.id, 0) = 0 and b.id is null  and b.int_col = 17
 |  |  |  group by: id, int_col
 |  |  |
 |  |  04:SCAN HDFS [functional.alltypessmall]
-|  |     partitions=4/4 size=6.32KB
+|  |     partitions=4/4 files=4 size=6.32KB
 |  |     predicates: functional.alltypessmall.int_col = 17
 |  |
 |  03:AGGREGATE [FINALIZE]
 |  |  group by: id, int_col
 |  |
 |  02:SCAN HDFS [functional.alltypes]
-|     partitions=24/24 size=478.45KB
+|     partitions=24/24 files=24 size=478.45KB
 |     predicates: functional.alltypes.int_col = 17
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: isnull(a.id, 0) = 0
 ====
 select a.id, b.id
@@ -795,14 +795,14 @@ where a.id is null and isnull(b.id, 0) = 0 and b.int_col = 17
 |  other predicates: isnull(id, 0) = 0, int_col = 17
 |
 |--02:SCAN HDFS [functional.alltypes a]
-|     partitions=24/24 size=478.45KB
+|     partitions=24/24 files=24 size=478.45KB
 |     predicates: a.id IS NULL
 |
 01:AGGREGATE [FINALIZE]
 |  group by: id, int_col
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.int_col = 17
 ====
 select straight_join a.id, b.id
@@ -817,7 +817,7 @@ where isnull(a.id, 0) = 0 and b.id is null  and b.int_col = 17
 |  other predicates: id IS NULL, int_col = 17
 |
 |--05:SCAN HDFS [functional.alltypes a]
-|     partitions=24/24 size=478.45KB
+|     partitions=24/24 files=24 size=478.45KB
 |     predicates: isnull(a.id, 0) = 0
 |
 00:UNION
@@ -826,14 +826,14 @@ where isnull(a.id, 0) = 0 and b.id is null  and b.int_col = 17
 |  |  group by: id, int_col
 |  |
 |  03:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: functional.alltypessmall.int_col = 17
 |
 02:AGGREGATE [FINALIZE]
 |  group by: id, int_col
 |
 01:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.int_col = 17
 ====
 # predicate inside outer-joined inline view must be assigned in scan
@@ -845,11 +845,11 @@ ON a.id=b.id
 |  hash predicates: a.id = functional.alltypessmall.id
 |
 |--01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: id > 0
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # TODO: Remove the following limitation in our predicate propagation:
 # It is safe to propagate 'y.id is null' to y's scan, but we prevent it
@@ -871,14 +871,14 @@ on a.id=b.id
 |  |  hash predicates: x.id = y.id
 |  |
 |  |--02:SCAN HDFS [functional.alltypestiny y]
-|  |     partitions=4/4 size=460B
+|  |     partitions=4/4 files=4 size=460B
 |  |
 |  01:SCAN HDFS [functional.alltypessmall x]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: x.id IS NULL
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
 ====
 # Test proper assignment of Having-clause predicates (IMPALA-820):
 # - Predicates only referencing the group-by exprs are assigned in the scan node.
@@ -894,7 +894,7 @@ having bool_col = false and int_col > 0 and count(bigint_col) > 0
 |  having: count(bigint_col) > 0
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: functional.alltypes.bool_col = FALSE, functional.alltypes.int_col > 0
 ====
 # basic propagation of multi-slot, single-tuple predicates
@@ -919,18 +919,18 @@ and t2.id + t3.int_col > 40
 |  other predicates: t2.id + functional.alltypestiny.int_col > 40
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |     predicates: functional.alltypestiny.id + functional.alltypestiny.int_col > 10, functional.alltypestiny.id + functional.alltypestiny.bigint_col > 20, functional.alltypestiny.id + functional.alltypestiny.int_col + functional.alltypestiny.bigint_col > 30
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = t2.id, t1.tinyint_col = t2.smallint_col
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: t2.id + t2.smallint_col > 10, t2.id + t2.bigint_col > 20, t2.id + t2.smallint_col + t2.bigint_col > 30
 |
 00:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: t1.id + t1.tinyint_col > 10
 ====
 # basic propagation of multi-slot, single-tuple predicates with aggregates
@@ -959,7 +959,7 @@ and t2.y + t2.z > 30
 |  |  having: max(smallint_col) + min(int_col) > 30
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |
 05:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.id = count(tinyint_col), t1.tinyint_col = max(smallint_col)
@@ -970,10 +970,10 @@ and t2.y + t2.z > 30
 |  |  having: count(tinyint_col) + max(smallint_col) > 10, count(tinyint_col) + max(smallint_col) > 20, max(smallint_col) + min(int_col) > 30
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: t1.id + t1.tinyint_col > 10, t1.id + t1.tinyint_col > 20
 ====
 # assignment of multi-slot, single-tuple predicates with outer-joined tuple (IMPALA-824)
@@ -1000,7 +1000,7 @@ and t1.id * t1.int_col < 100
 |  other predicates: functional.alltypestiny.tinyint_col + functional.alltypestiny.smallint_col + functional.alltypestiny.int_col > 10, ifnull(functional.alltypestiny.tinyint_col + functional.alltypestiny.bigint_col, TRUE) = TRUE
 |
 |--02:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |     predicates: functional.alltypestiny.tinyint_col + functional.alltypestiny.smallint_col + functional.alltypestiny.int_col > 10, functional.alltypestiny.id * functional.alltypestiny.int_col < 100
 |
 03:HASH JOIN [LEFT OUTER JOIN]
@@ -1008,11 +1008,11 @@ and t1.id * t1.int_col < 100
 |  other predicates: t2.tinyint_col = t2.smallint_col, ifnull(t2.tinyint_col + t2.bigint_col, TRUE) = TRUE
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: t2.tinyint_col = t2.smallint_col, t2.id * t2.int_col < 100
 |
 00:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: t1.id * t1.int_col < 100
 ====
 # TODO: Fix this limitation of our getBindingPredicates() implementation:
@@ -1027,10 +1027,10 @@ where t2.year + t2.month > 10
 |  hash predicates: t1.id = t2.month, t1.year = t2.year
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: t1.year + t1.id > 10, t1.id = t1.month
 ====
 # TODO: Fix this limitation of our getBindingPredicates() implementation:
@@ -1048,11 +1048,11 @@ where t1.id + t1.tinyint_col > 10
 |  hash predicates: t1.id = t2.id, t1.tinyint_col = t2.tinyint_col
 |
 |--01:SCAN HDFS [functional.alltypessmall t2]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |     predicates: t2.id + t2.tinyint_col > 10, t2.id = t2.smallint_col, t2.tinyint_col = t2.int_col
 |
 00:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: t1.id + t1.tinyint_col > 10
 ====
 # TODO: Fix this limitation of our predicate propagation implementation:
@@ -1075,10 +1075,10 @@ where t1.id + t1.int_col > 10
 |  |  group by: bigint_col
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
-|     partitions=4/4 size=6.32KB
+|     partitions=4/4 files=4 size=6.32KB
 |
 00:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: t1.id + t1.int_col > 10
 ====
 # Anti-joins have a uni-directional value transfer (IMPALA-1249).
@@ -1094,11 +1094,11 @@ where a.id < 10
 |  hash predicates: a.id = id
 |
 |--01:SCAN HDFS [functional.alltypestiny]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |     predicates: id > 20, functional.alltypestiny.id < 10
 |
 00:SCAN HDFS [functional.alltypes a]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: a.id < 10
 ====
 # Anti-joins have a uni-directional value transfer (IMPALA-1249).
@@ -1113,10 +1113,10 @@ where b.id < 10
 |  hash predicates: id = b.id
 |
 |--01:SCAN HDFS [functional.alltypestiny b]
-|     partitions=4/4 size=460B
+|     partitions=4/4 files=4 size=460B
 |     predicates: b.id < 10
 |
 00:SCAN HDFS [functional.alltypes]
-   partitions=24/24 size=478.45KB
+   partitions=24/24 files=24 size=478.45KB
    predicates: id > 20, functional.alltypes.id < 10
 ====

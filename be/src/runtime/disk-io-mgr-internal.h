@@ -228,9 +228,12 @@ class DiskIoMgr::RequestContext {
   // reader has not returned. Only included for debugging and diagnostics.
   AtomicInt<int> num_buffers_in_reader_;
 
-  // The number of scan ranges that have been completed for this reader.  Only
-  // used for diagnostics.
+  // The number of scan ranges that have been completed for this reader.
   AtomicInt<int> num_finished_ranges_;
+
+  // The number of scan ranges that required a remote read, updated at the end of each
+  // range scan. Only used for diagnostics.
+  AtomicInt<int> num_remote_ranges_;
 
   // The total number of scan ranges that have not been started. Only used for
   // diagnostics. This is the sum of all unstarted_scan_ranges across all disks.
