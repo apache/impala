@@ -877,7 +877,7 @@ Status SaslAuthProvider::WrapClientTransport(const string& hostname,
 
 Status NoAuthProvider::GetServerTransportFactory(shared_ptr<TTransportFactory>* factory) {
   // No Sasl - yawn.  Here, have a regular old transport.
-  factory->reset(new TTransportFactory());
+  factory->reset(new TBufferedTransportFactory());
   return Status::OK;
 }
 

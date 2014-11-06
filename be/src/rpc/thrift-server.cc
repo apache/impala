@@ -28,7 +28,6 @@
 #include <thrift/transport/TSSLSocket.h>
 #include <thrift/server/TThreadPoolServer.h>
 #include <thrift/transport/TServerSocket.h>
-#include <thrift/transport/TTransport.h>
 #include <gflags/gflags.h>
 
 #include "gen-cpp/Types_types.h"
@@ -346,30 +345,6 @@ Status ThriftServer::EnableSsl(const string& certificate, const string& private_
   return Status::OK;
 }
 
-// This class ensures that the 'bottom' of the stack of transports that we wrap the
-// initial socket in is always a buffered transport. We get an auth transport from the
-// auth provider, and return a transport that has the following structure:
-//
-//  auth transport
-//       V
-//  buffered transport
-//       V
-//    socket
-class AlwaysBufferedTransportFactory : public TTransportFactory {
- public:
-  // 'top' is the top-level transport, between which and the underlying socket we
-  // interpose a buffered transport.
-  AlwaysBufferedTransportFactory(shared_ptr<TTransportFactory> top) : top_(top) { }
-
-  virtual shared_ptr<TTransport> getTransport(shared_ptr<TTransport> trans) {
-    return top_->getTransport(buf_factory_.getTransport(trans));
-  }
-
- private:
-  TBufferedTransportFactory buf_factory_;
-  shared_ptr<TTransportFactory> top_;
-};
-
 Status ThriftServer::Start() {
   DCHECK(!started_);
   shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
@@ -379,11 +354,9 @@ Status ThriftServer::Start() {
   // Note - if you change the transport types here, you must check that the
   // logic in createContext is still accurate.
   shared_ptr<TServerTransport> server_socket;
-  shared_ptr<TTransportFactory> auth_transport_factory;
+  shared_ptr<TTransportFactory> transport_factory;
   RETURN_IF_ERROR(CreateSocket(&server_socket));
-  RETURN_IF_ERROR(auth_provider_->GetServerTransportFactory(&auth_transport_factory));
-  shared_ptr<TTransportFactory> transport_factory(
-      new AlwaysBufferedTransportFactory(auth_transport_factory));
+  RETURN_IF_ERROR(auth_provider_->GetServerTransportFactory(&transport_factory));
   switch (server_type_) {
     case ThreadPool:
       {
