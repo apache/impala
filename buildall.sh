@@ -38,6 +38,7 @@ TARGET_BUILD_TYPE=Debug
 EXPLORATION_STRATEGY=core
 IMPALA_KERBERIZE=0
 SNAPSHOT_FILE=
+METASTORE_SNAPSHOT_FILE=
 MAKE_IMPALA_ARGS=""
 
 # Exit on reference to uninitialized variable
@@ -46,19 +47,11 @@ set -u
 # Exit on non-zero return value
 set -e
 
-# Always run in debug mode
-set -x
-
 # parse command line options
-for ARG in $*
+# TODO: We have to change this to use getopts, or something more sensible.
+while [ -n "$*" ]
 do
-  # Interpret this argument as a snapshot file name
-  if [ "$SNAPSHOT_FILE" = "UNDEFINED" ]; then
-    SNAPSHOT_FILE="$ARG"
-    continue;
-  fi
-
-  case "$ARG" in
+  case "$1" in
     -noclean)
       CLEAN_ACTION=0
       ;;
@@ -72,10 +65,10 @@ do
       ;;
     -so)
       MAKE_IMPALA_ARGS="${MAKE_IMPALA_ARGS} -build_shared_libs"
-      shift
       ;;
     -notests)
       TESTS_ACTION=0
+      MAKE_IMPALA_ARGS="${MAKE_IMPALA_ARGS} -notests"
       ;;
     -format)
       FORMAT_CLUSTER=1
@@ -103,8 +96,26 @@ do
       EXPLORATION_STRATEGY=exhaustive
       ;;
     -snapshot_file)
-      SNAPSHOT_FILE="UNDEFINED"
+      SNAPSHOT_FILE=${2-}
+      if [ ! -f $SNAPSHOT_FILE ]; then
+        echo "-snapshot_file does not exist: $SNAPSHOT_FILE"
+        exit 1;
+      fi
       TESTDATA_ACTION=1
+      # Get the full path.
+      SNAPSHOT_FILE=$(readlink -f $SNAPSHOT_FILE)
+      shift;
+      ;;
+    -metastore_snapshot_file)
+      METASTORE_SNAPSHOT_FILE=${2-}
+      if [ ! -f $METASTORE_SNAPSHOT_FILE ]; then
+        echo "-metastore_snapshot_file does not exist: $METASTORE_SNAPSHOT_FILE"
+        exit 1;
+      fi
+      TESTDATA_ACTION=1
+      # Get the full path.
+      METASTORE_SNAPSHOT_FILE=$(readlink -f $METASTORE_SNAPSHOT_FILE)
+      shift;
       ;;
     -k|-kerberize|-kerberos|-kerb)
       # Export to the environment for all child process tools
@@ -112,6 +123,10 @@ do
       set +u
       . ${MINIKDC_ENV}
       set -u
+      ;;
+    -v|-debug)
+      echo "Running in Debug mode"
+      set -x
       ;;
     -help|*)
       echo "buildall.sh - Builds Impala and runs all tests."
@@ -132,6 +147,7 @@ do
       echo "[-testdata] : Loads test data. Implied as true if -snapshot_file is "\
            "specified. If -snapshot_file is not specified, data will be regenerated."
       echo "[-snapshot_file <file name>] : Load test data from a snapshot file"
+      echo "[-metastore_snapshot_file <file_name>]: Load the hive metastore snapshot"
       echo "[-so|-build_shared_libs] : Dynamically link executables (default is static)"
       echo "[-kerberize] : Enable kerberos on the cluster"
       echo "-----------------------------------------------------------------------------
@@ -149,6 +165,9 @@ Examples of common tasks:
   # Build, load a snapshot file, run tests
   ./buildall.sh -snapshot_file <file>
 
+  # Build, load the hive metastore and the hdfs snapshot, run tests
+  ./buildall.sh -snapshot_file <file> -hive_metastore_snapshot <file>
+
   # Build, generate, and incrementally load test data without formatting the mini-cluster
   # (reuses existing data in HDFS if it exists). Can be faster than loading from a
   # snapshot.
@@ -158,16 +177,9 @@ Examples of common tasks:
   ./buildall.sh -testdata -format"
       exit 1
       ;;
-  esac
+    esac
+  shift;
 done
-
-if [ "$SNAPSHOT_FILE" = "UNDEFINED" ]; then
-  echo "-snapshot_file flag requires a snapshot filename argument"
-  exit 1
-elif [ "$SNAPSHOT_FILE" != "" ] &&  [ ! -e $SNAPSHOT_FILE ]; then
-  echo "Snapshot file: ${SNAPSHOT_FILE} does not exist."
-  exit 1
-fi
 
 # If we aren't kerberized then we certainly don't need to talk about
 # re-sourcing impala-config.
@@ -239,14 +251,20 @@ then
 fi
 
 # Generate the Hadoop configs needed by Impala
-if [ $FORMAT_METASTORE -eq 1 ]; then
+if [ $FORMAT_METASTORE -eq 1 ] && [ -n $METASTORE_SNAPSHOT_FILE ]; then
   ${IMPALA_HOME}/bin/create-test-configuration.sh -create_metastore
 else
   ${IMPALA_HOME}/bin/create-test-configuration.sh
 fi
 
+# If a metastore snapshot exists, load it.
+if [ $METASTORE_SNAPSHOT_FILE ]; then
+  echo "Loading metastore snapshot"
+  ${IMPALA_HOME}/testdata/bin/load-metastore-snapshot.sh $METASTORE_SNAPSHOT_FILE
+fi
+
 # build common and backend
-MAKE_IMPALA_ARGS="${MAKE_IMPALA_ARGS} -build_type=${TARGET_BUILD_TYPE} $*"
+MAKE_IMPALA_ARGS="${MAKE_IMPALA_ARGS} -build_type=${TARGET_BUILD_TYPE}"
 echo "Calling make_impala.sh ${MAKE_IMPALA_ARGS}"
 $IMPALA_HOME/bin/make_impala.sh ${MAKE_IMPALA_ARGS}
 
