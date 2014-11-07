@@ -90,11 +90,25 @@ class HS2TestSuite(ImpalaTestSuite):
     close_op_resp = self.hs2_client.CloseOperation(close_op_req)
     assert close_op_resp.status.statusCode == TCLIService.TStatusCode.SUCCESS_STATUS
 
+  def get_num_rows(self, result_set):
+    # rows will always be set, so the only way to tell if we should use it is to see if
+    # any columns are set
+    if result_set.columns is None or len(result_set.columns) == 0:
+      return len(result_set.rows)
+
+    assert result_set.columns is not None
+    for col_type in HS2TestSuite.HS2_V6_COLUMN_TYPES:
+      typed_col = getattr(result_set.columns[0], col_type)
+      if typed_col != None:
+        return len(typed_col.values)
+
+    assert False
+
   def fetch(self, handle, orientation, size, expected_num_rows = None):
     """Fetches at most size number of rows from the query identified by the given
     operation handle. Uses the given fetch orientation. Asserts that the fetch returns
     a success status, and that the number of rows returned is equal to size, or
-    equal to the given expected_num_rows (it one was given)."""
+    equal to the given expected_num_rows (if one was given)."""
     fetch_results_req = TCLIService.TFetchResultsReq()
     fetch_results_req.operationHandle = handle
     fetch_results_req.orientation = orientation
@@ -104,8 +118,31 @@ class HS2TestSuite(ImpalaTestSuite):
     num_rows = size
     if expected_num_rows is not None:
       num_rows = expected_num_rows
-    assert len(fetch_results_resp.results.rows) == num_rows
+    assert self.get_num_rows(fetch_results_resp.results) == num_rows
     return fetch_results_resp
+
+  def fetch_until(self, handle, orientation, size):
+    """Tries to fetch exactly 'size' rows from the given query handle, with the given
+    fetch orientation. If fewer rows than 'size' are returned by the first fetch, repeated
+    fetches are issued until either 0 rows are returned, or the number of rows fetched is
+    equal to 'size'"""
+    fetch_results_req = TCLIService.TFetchResultsReq()
+    fetch_results_req.operationHandle = handle
+    fetch_results_req.orientation = orientation
+    fetch_results_req.maxRows = size
+    fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
+    HS2TestSuite.check_response(fetch_results_resp)
+    num_rows = size
+    num_rows_fetched = self.get_num_rows(fetch_results_resp.results)
+    while num_rows_fetched < size:
+      fetch_results_req.maxRows = size - num_rows_fetched
+      fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
+      HS2TestSuite.check_response(fetch_results_resp)
+      last_fetch_size = self.get_num_rows(fetch_results_resp.results)
+      assert last_fetch_size > 0
+      num_rows_fetched += last_fetch_size
+
+    assert num_rows_fetched == size
 
   def fetch_fail(self, handle, orientation, expected_error_prefix):
     """Attempts to fetch rows from the query identified by the given operation handle.

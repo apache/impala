@@ -52,3 +52,4 @@ target_link_libraries(impalad
 )
 
 ADD_BE_TEST(session-expiry-test session-expiry-test.cc)
+ADD_BE_TEST(hs2-util-test hs2-util-test.cc)

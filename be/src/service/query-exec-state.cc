@@ -700,6 +700,19 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
       ClearResultCache();
       return Status::OK;
     }
+
+    // We guess the size of the cache after adding fetched_rows by looking at the size of
+    // fetched_rows itself, and using this estimate to confirm that the memtracker will
+    // allow us to use this much extra memory. In fact, this might be an overestimate, as
+    // the size of two result sets combined into one is not always the size of both result
+    // sets added together (the best example is the null bitset for each column: it might
+    // have only one entry in each result set, and as a result consume two bytes, but when
+    // the result sets are combined, only one byte is needed). Therefore after we add the
+    // new result set into the cache, we need to fix up the memory consumption to the
+    // actual levels to ensure we don't 'leak' bytes that we aren't using.
+    int64_t before = result_cache_->ByteSize();
+
+    // Upper-bound on memory required to add fetched_rows to the cache.
     int64_t delta_bytes =
         fetched_rows->ByteSize(num_rows_fetched_from_cache, fetched_rows->size());
     MemTracker* query_mem_tracker = coord_->query_mem_tracker();
@@ -711,6 +724,21 @@ Status ImpalaServer::QueryExecState::FetchRowsInternal(const int32_t max_rows,
     // Append all rows fetched from the coordinator into the cache.
     int num_rows_added = result_cache_->AddRows(
         fetched_rows, num_rows_fetched_from_cache, fetched_rows->size());
+
+    int64_t after = result_cache_->ByteSize();
+
+    // Confirm that this was not an underestimate of the memory required.
+    DCHECK_GE(before + delta_bytes, after)
+        << "Combined result sets consume more memory than both individually "
+        << Substitute("(before: $0, delta_bytes: $1, after: $2)",
+            before, delta_bytes, after);
+
+    // Fix up the tracked values
+    if (before + delta_bytes > after) {
+      query_mem_tracker->Release(before + delta_bytes - after);
+      delta_bytes = after - before;
+    }
+
     // Update result set cache metrics.
     ImpaladMetrics::RESULTSET_CACHE_TOTAL_NUM_ROWS->Increment(num_rows_added);
     ImpaladMetrics::RESULTSET_CACHE_TOTAL_BYTES->Increment(delta_bytes);
@@ -873,7 +901,8 @@ void ImpalaServer::QueryExecState::SetCreateTableAsSelectResultSet() {
   // operation.
   if (catalog_op_executor_->ddl_exec_response()->new_table_created) {
     DCHECK(coord_.get());
-    BOOST_FOREACH(const PartitionStatusMap::value_type& p, coord_->per_partition_status()) {
+    BOOST_FOREACH(
+        const PartitionStatusMap::value_type& p, coord_->per_partition_status()) {
       total_num_rows_inserted += p.second.num_appended_rows;
     }
   }

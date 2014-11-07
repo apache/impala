@@ -22,11 +22,11 @@ namespace impala {
 
 // For V6->
 void TColumnValueToHS2TColumn(const TColumnValue& col_val, const TColumnType& type,
-    int64_t row_idx, apache::hive::service::cli::thrift::TColumn* column);
+    uint32_t row_idx, apache::hive::service::cli::thrift::TColumn* column);
 
 // For V6->
 void ExprValueToHS2TColumn(const void* value, const TColumnType& type,
-    int64_t row_idx, apache::hive::service::cli::thrift::TColumn* column);
+    uint32_t row_idx, apache::hive::service::cli::thrift::TColumn* column);
 
 // For V1->V5
 void TColumnValueToHS2TColumnValue(const TColumnValue& col_val, const TColumnType& type,
@@ -35,5 +35,10 @@ void TColumnValueToHS2TColumnValue(const TColumnValue& col_val, const TColumnTyp
 // For V1->V5
 void ExprValueToHS2TColumnValue(const void* value, const TColumnType& type,
     apache::hive::service::cli::thrift::TColumnValue* hs2_col_val);
+
+// Combine two null columns by appending 'from' to 'to', starting at 'num_rows_before' in
+// 'from', 'start_idx' in 'to', and proceeding for 'num_rows_added' rows.
+void StitchNulls(uint32_t num_rows_before, uint32_t num_rows_added, uint32_t start_idx,
+    const std::string& from, std::string* to);
 
 }

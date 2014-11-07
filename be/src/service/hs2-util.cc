@@ -18,25 +18,48 @@
 #include "runtime/raw-value.h"
 #include "runtime/types.h"
 
+#include <gutil/strings/substitute.h>
+
 using namespace apache::hive::service::cli;
 using namespace impala;
 using namespace std;
+using namespace strings;
 
 // Set the null indicator bit for row 'row_idx', assuming this will be called for
 // successive increasing values of row_idx. If 'is_null' is true, the row_idx'th bit will
 // be set in 'nulls' (taking the LSB as bit 0). If 'is_null' is false, the row_idx'th bit
 // will be unchanged. If 'nulls' does not contain 'row_idx' bits, it will be extended by
 // one byte.
-inline void SetNullBit(int64_t row_idx, bool is_null, string* nulls) {
-  DCHECK_LE(row_idx >> 3, nulls->size());
-  int16_t mod_8 = row_idx & 0x7;
+inline void SetNullBit(uint32_t row_idx, bool is_null, string* nulls) {
+  DCHECK_LE(row_idx / 8, nulls->size());
+  int16_t mod_8 = row_idx % 8;
   if (mod_8 == 0) (*nulls) += '\0';
-  (*nulls)[row_idx >> 3] |= (1 << mod_8) * is_null;
+  (*nulls)[row_idx / 8] |= (1 << mod_8) * is_null;
+}
+
+inline bool GetNullBit(const string& nulls, uint32_t row_idx) {
+  DCHECK_LE(row_idx / 8, nulls.size());
+  return nulls[row_idx / 8] & (1 << row_idx % 8);
+}
+
+void impala::StitchNulls(uint32_t num_rows_before, uint32_t num_rows_added,
+    uint32_t start_idx, const string& from, string* to) {
+  to->reserve((num_rows_before + num_rows_added + 7) / 8);
+
+  // TODO: This is very inefficient, since we could conceivably go one byte at a time
+  // (although the operands should stay live in registers in the loop). However doing this
+  // more efficiently leads to very complex code: we have to deal with the fact that
+  // 'start_idx' and 'num_rows_before' might both lead to offsets into the null bitset
+  // that don't start on a byte boundary. We should revisit this, ideally with a good
+  // bitset implementation.
+  for (int i = 0; i < num_rows_added; ++i) {
+    SetNullBit(num_rows_before + i, GetNullBit(from, i + start_idx), to);
+  }
 }
 
 // For V6 and above
 void impala::TColumnValueToHS2TColumn(const TColumnValue& col_val,
-    const TColumnType& type, int64_t row_idx, thrift::TColumn* column) {
+    const TColumnType& type, uint32_t row_idx, thrift::TColumn* column) {
   string* nulls;
   bool is_null;
   switch (type.types[0].scalar_type.type) {
@@ -92,7 +115,7 @@ void impala::TColumnValueToHS2TColumn(const TColumnValue& col_val,
 
 // For V6 and above
 void impala::ExprValueToHS2TColumn(const void* value, const TColumnType& type,
-    int64_t row_idx, thrift::TColumn* column) {
+    uint32_t row_idx, thrift::TColumn* column) {
   string* nulls;
   switch (type.types[0].scalar_type.type) {
     case TPrimitiveType::NULL_TYPE:

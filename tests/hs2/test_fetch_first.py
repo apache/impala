@@ -69,8 +69,16 @@ class TestFetchFirst(HS2TestSuite):
       assert cached_bytes == 0
 
   @pytest.mark.execute_serially
-  @needs_session
-  def test_query_stmts(self):
+  @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6)
+  def test_query_stmts_v6(self):
+    self.run_query_stmts_test();
+
+  @pytest.mark.execute_serially
+  @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V1)
+  def test_query_stmts_v1(self):
+    self.run_query_stmts_test();
+
+  def run_query_stmts_test(self):
     """Tests Impala's limited support for the FETCH_FIRST fetch orientation for queries.
     Impala permits FETCH_FIRST for a particular query iff result caching is enabled
     via the 'impala.resultset.cache.size' confOverlay option. FETCH_FIRST will succeed as
@@ -78,10 +86,8 @@ class TestFetchFirst(HS2TestSuite):
     Regardless of whether a FETCH_FIRST succeeds or not, clients may always resume
     fetching with FETCH_NEXT.
     """
-    pytest.xfail("IMPALA-1264")
     # Negative tests for the result caching option.
     self.__test_invalid_result_caching("SELECT COUNT(*) FROM functional.alltypes")
-
     # Test that FETCH_NEXT without result caching succeeds and FETCH_FIRST fails.
     execute_statement_req = TCLIService.TExecuteStatementReq()
     execute_statement_req.sessionHandle = self.session_handle
@@ -112,8 +118,8 @@ class TestFetchFirst(HS2TestSuite):
       "SELECT * FROM functional.alltypessmall ORDER BY id LIMIT 30"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     for _ in xrange(1, 5):
-      self.fetch(execute_statement_resp.operationHandle,
-                 TCLIService.TFetchOrientation.FETCH_FIRST, 30)
+      self.fetch_until(execute_statement_resp.operationHandle,
+                       TCLIService.TFetchOrientation.FETCH_FIRST, 30)
       self.__verify_num_cached_rows(30)
     self.close(execute_statement_resp.operationHandle)
 
@@ -125,27 +131,27 @@ class TestFetchFirst(HS2TestSuite):
       "SELECT * FROM functional.alltypessmall ORDER BY id LIMIT 30"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     # Fetch 10 rows. They fit in the result cache.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_NEXT, 10)
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_NEXT, 10)
     self.__verify_num_cached_rows(10)
     # Restart the fetch and expect success.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_FIRST, 10)
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_FIRST, 10)
     # Fetch 10 more rows. The result cache has 20 rows total now.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_NEXT, 10)
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_NEXT, 10)
     self.__verify_num_cached_rows(20)
     # Restart the fetch and expect success.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_FIRST, 10)
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_FIRST, 10)
     self.__verify_num_cached_rows(20)
     # Fetch 10 more rows from the cache.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_NEXT, 10)
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_NEXT, 10)
     self.__verify_num_cached_rows(20)
     # This fetch exhausts the result cache.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_NEXT, 10)
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_NEXT, 10)
     self.__verify_num_cached_rows(0)
     # Since the cache is exhausted, FETCH_FIRST will fail.
     self.fetch_fail(execute_statement_resp.operationHandle,
@@ -166,13 +172,13 @@ class TestFetchFirst(HS2TestSuite):
       "SELECT * FROM functional.alltypessmall ORDER BY id LIMIT 30"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     # Fetch 7 rows. They fit in the result cache.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_NEXT, 7)
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_NEXT, 7)
     self.__verify_num_cached_rows(7)
     # Restart the fetch asking for 12 rows, 7 of which are served from the cache and 5
     # from the coordinator. The result cache should have 12 rows total now.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_FIRST, 12)
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_FIRST, 12)
     self.__verify_num_cached_rows(12)
     # Restart the fetch asking for 40 rows. We expect 30 results returned and that the
     # cache is exhausted.
@@ -197,12 +203,12 @@ class TestFetchFirst(HS2TestSuite):
       "SELECT * FROM functional.alltypessmall ORDER BY id LIMIT 30"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     # Fetch 9 rows. They fit in the result cache.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_NEXT, 9)
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_NEXT, 9)
     self.__verify_num_cached_rows(9)
     # Fetch 9 rows. Cache is exhausted now.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_NEXT, 9)
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_NEXT, 9)
     self.__verify_num_cached_rows(0)
     # Restarting the fetch should fail.
     self.fetch_fail(execute_statement_resp.operationHandle,
