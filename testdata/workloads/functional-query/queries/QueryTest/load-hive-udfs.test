@@ -16,6 +16,7 @@ drop function if exists udf_test.identity(float);
 drop function if exists udf_test.identity(double);
 drop function if exists udf_test.identity(string);
 drop function if exists udf_test.identity(string, string);
+drop function if exists udf_test.identity(string, string, string);
 drop function if exists udf_test.identity(timestamp);
 
 create database if not exists udf_test;
@@ -77,6 +78,10 @@ location '/test-warehouse/impala-hive-udfs.jar'
 symbol='com.cloudera.impala.TestUdf';
 
 create function udf_test.identity(string, string) returns string
+location '/test-warehouse/impala-hive-udfs.jar'
+symbol='com.cloudera.impala.TestUdf';
+
+create function udf_test.identity(string, string, string) returns string
 location '/test-warehouse/impala-hive-udfs.jar'
 symbol='com.cloudera.impala.TestUdf';
 ====

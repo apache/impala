@@ -71,11 +71,15 @@ double
 10
 ====
 ---- QUERY
-select udf_test.identity("why hello there");
+# IMPALA-1456. Each "identity" call below tests a different type (BytesWritable, Text,
+# and String).
+select udf_test.identity("why hello there"),
+       udf_test.identity("why", " hello there"),
+       udf_test.identity("why", " hello", " there");
 ---- TYPES
-string
+string, string, string
 ---- RESULTS
-'why hello there'
+'why hello there','why hello there','why hello there'
 ====
 ---- QUERY
 select udf_test.identity(NULL);
@@ -85,12 +89,13 @@ boolean
 NULL
 ====
 ---- QUERY
-# IMPALA-1134. Each "identity" call below tests a different type (BytesWritable and Text).
-# The different types are handled slightly differently.
+# IMPALA-1134. Each "identity" call below tests a different type (BytesWritable, Text,
+# and String). The different types are handled slightly differently.
 select length(udf_test.identity("0123456789")),
-       length(udf_test.identity("0123456789", "0123456789"));
+       length(udf_test.identity("0123456789", "0123456789")),
+       length(udf_test.identity("0123456789", "0123456789", "0123456789"));
 ---- TYPES
-int, int
+int, int, int
 ---- RESULTS
-10,20
+10,20,30
 ====

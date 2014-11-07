@@ -90,4 +90,8 @@ public class TestUdf extends UDF {
     if (a == null || b == null) return null;
     return new Text(a.toString() + b.toString());
   }
+  public String evaluate(String a, String b, String c) {
+    if (a == null || b == null || c == null) return null;
+    return a + b + c;
+  }
 }

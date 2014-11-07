@@ -51,7 +51,7 @@ import com.google.common.collect.Lists;
 // Wrapper object to run hive UDFs. This class works with UdfCallExpr in the
 // backend to marshall data back and forth between the execution engine and
 // the java UDF class.
-// See the comments in be/src/exprs/udf-call-expr.h for more details.
+// See the comments in be/src/exprs/hive-udf-call.h for more details.
 // TODO: should we cache loaded jars and classes?
 @SuppressWarnings("restriction")
 public class UdfExecutor {
@@ -196,8 +196,9 @@ public class UdfExecutor {
       for (int i = 0; i < argTypes_.length; ++i) {
         if (UnsafeUtil.UNSAFE.getByte(inputNullsPtr_ + i) == 0) {
           if (isArgString_[i]) {
-            Preconditions.checkState(inputArgs_[i] instanceof ImpalaBytesWritable);
-            inputArgs_[i] = ((ImpalaBytesWritable)inputArgs_[i]).toString();
+            Preconditions.checkState(inputObjects_[i] instanceof ImpalaBytesWritable);
+            inputArgs_[i] =
+                new String(((ImpalaBytesWritable)inputObjects_[i]).getBytes());
           } else {
             inputArgs_[i] = inputObjects_[i];
           }
@@ -342,7 +343,7 @@ public class UdfExecutor {
   // These objects are allocated once and reused across calls to evaluate()
   private void allocateInputObjects() throws ImpalaRuntimeException {
     inputObjects_ = new Writable[argTypes_.length];
-    inputArgs_ = new Writable[argTypes_.length];
+    inputArgs_ = new Object[argTypes_.length];
     isArgString_ = new boolean[argTypes_.length];
 
     for (int i = 0; i < argTypes_.length; ++i) {
@@ -378,8 +379,7 @@ public class UdfExecutor {
             inputObjects_[i] = w;
           } else if (method_.getParameterTypes()[i] == String.class) {
             isArgString_[i] = true;
-            // String can be mapped to any String-like Writable class. We need
-            // to call toString on it before calling the UDF.
+            // String can be mapped to any String-like Writable class.
             ImpalaBytesWritable w = new ImpalaBytesWritable(inputBufferPtr_ + offset);
             inputObjects_[i] = w;
           } else {
