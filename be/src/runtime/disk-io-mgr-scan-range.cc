@@ -15,6 +15,7 @@
 #include "runtime/disk-io-mgr.h"
 #include "runtime/disk-io-mgr-internal.h"
 #include "util/error-util.h"
+#include "util/hdfs-util.h"
 
 using namespace boost;
 using namespace impala;
@@ -295,24 +296,25 @@ void DiskIoMgr::ScanRange::Close() {
     if (hdfs_file_ == NULL) return;
 
     struct hdfsReadStatistics* stats;
-    int success = hdfsFileGetReadStatistics(hdfs_file_, &stats);
-    if (success == 0) {
-      reader_->bytes_read_local_ += stats->totalLocalBytesRead;
-      reader_->bytes_read_short_circuit_ += stats->totalShortCircuitBytesRead;
-      reader_->bytes_read_dn_cache_ += stats->totalZeroCopyBytesRead;
-      if (stats->totalLocalBytesRead != stats->totalBytesRead) {
-        ++reader_->num_remote_ranges_;
-        if (expected_local_) {
-          int remote_bytes = stats->totalBytesRead - stats->totalLocalBytesRead;
-          reader_->unexpected_remote_bytes_ += remote_bytes;
-          VLOG_FILE << "Unexpected remote HDFS read of "
-                    << PrettyPrinter::Print(remote_bytes, TCounterType::BYTES)
-                    << " for file '" << file_ << "'";
+    if (IsDfsPath(file())) {
+      int success = hdfsFileGetReadStatistics(hdfs_file_, &stats);
+      if (success == 0) {
+        reader_->bytes_read_local_ += stats->totalLocalBytesRead;
+        reader_->bytes_read_short_circuit_ += stats->totalShortCircuitBytesRead;
+        reader_->bytes_read_dn_cache_ += stats->totalZeroCopyBytesRead;
+        if (stats->totalLocalBytesRead != stats->totalBytesRead) {
+          ++reader_->num_remote_ranges_;
+          if (expected_local_) {
+            int remote_bytes = stats->totalBytesRead - stats->totalLocalBytesRead;
+            reader_->unexpected_remote_bytes_ += remote_bytes;
+            VLOG_FILE << "Unexpected remote HDFS read of "
+                      << PrettyPrinter::Print(remote_bytes, TCounterType::BYTES)
+                      << " for file '" << file_ << "'";
+          }
         }
+        hdfsFileFreeReadStatistics(stats);
       }
-      hdfsFileFreeReadStatistics(stats);
     }
-
     if (cached_buffer_ != NULL) {
       hadoopRzBufferFree(hdfs_file_, cached_buffer_);
       cached_buffer_ = NULL;

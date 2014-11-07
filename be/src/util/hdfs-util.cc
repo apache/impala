@@ -64,4 +64,10 @@ Status CopyHdfsFile(const hdfsFS& src_conn, const string& src_path,
   return Status::OK;
 }
 
+bool IsDfsPath(const char* path) {
+  // TODO: currently, we require defaultFS to be HDFS, but when that is relaxed, we
+  // should fix this to not assume unqualified paths are DFS.
+  return strncmp(path, "hdfs://", 7) == 0 || strstr(path, ":/") == NULL;
+}
+
 }

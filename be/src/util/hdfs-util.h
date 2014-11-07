@@ -40,5 +40,8 @@ bool IsHiddenFile(const std::string& filename);
 // Copy the file at 'src_path' from 'src_conn' to 'dst_path' in 'dst_conn'.
 Status CopyHdfsFile(const hdfsFS& src_conn, const std::string& src_path,
                     const hdfsFS& dst_conn, const std::string& dst_path);
+
+// Returns true iff the path refers to a location on an HDFS filesystem.
+bool IsDfsPath(const char* path);
 }
 #endif // IMPALA_UTIL_HDFS_UTIL_H
