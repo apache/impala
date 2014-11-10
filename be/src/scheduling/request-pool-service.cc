@@ -21,6 +21,7 @@
 #include "rpc/thrift-util.h"
 #include "util/jni-util.h"
 #include "util/parse-util.h"
+#include "util/time.h"
 
 using namespace std;
 using namespace impala;
@@ -60,7 +61,14 @@ DECLARE_bool(enable_rm);
 // Pool name used when the configuration files are not specified.
 const string DEFAULT_POOL_NAME = "default-pool";
 
-RequestPoolService::RequestPoolService() {
+const string RESOLVE_POOL_METRIC_NAME = "request-pool-service.resolve-pool-duration-ms";
+
+RequestPoolService::RequestPoolService(Metrics* metrics) :
+    metrics_(metrics), resolve_pool_ms_metric_(NULL) {
+  DCHECK(metrics_ != NULL);
+  resolve_pool_ms_metric_ = metrics_->RegisterMetric(
+      new StatsMetric<double>(RESOLVE_POOL_METRIC_NAME));
+
   if (FLAGS_fair_scheduler_allocation_path.empty() &&
       FLAGS_llama_site_path.empty()) {
     if (FLAGS_enable_rm) {
@@ -132,8 +140,12 @@ Status RequestPoolService::ResolveRequestPool(const string& requested_pool_name,
   TResolveRequestPoolParams params;
   params.__set_user(user);
   params.__set_requested_pool(requested_pool_name);
-  return JniUtil::CallJniMethod(request_pool_service_, resolve_request_pool_id_, params,
-      resolved_pool);
+
+  int64_t start_time = ms_since_epoch();
+  Status status = JniUtil::CallJniMethod(request_pool_service_, resolve_request_pool_id_,
+      params, resolved_pool);
+  resolve_pool_ms_metric_->Update(ms_since_epoch() - start_time);
+  return status;
 }
 
 Status RequestPoolService::GetPoolConfig(const string& pool_name,
