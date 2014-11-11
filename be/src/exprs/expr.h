@@ -168,10 +168,9 @@ class Expr {
       std::vector<ExprContext*>* ctxs);
 
   // Convenience function for preparing multiple expr trees.
-  // If 'tracker' is provided, it will be used rather than the default UDF tracker from
-  // 'state'. This is used for testing.
+  // Allocations from 'ctxs' will be counted against 'tracker'.
   static Status Prepare(const std::vector<ExprContext*>& ctxs, RuntimeState* state,
-                        const RowDescriptor& row_desc, MemTracker* tracker = NULL);
+                        const RowDescriptor& row_desc, MemTracker* tracker);
 
   // Convenience function for opening multiple expr trees.
   static Status Open(const std::vector<ExprContext*>& ctxs, RuntimeState* state);

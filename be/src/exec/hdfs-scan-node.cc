@@ -481,7 +481,8 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   // Initialize conjunct exprs
   RETURN_IF_ERROR(Expr::CreateExprTrees(
       runtime_state_->obj_pool(), thrift_plan_node_->conjuncts, &conjunct_ctxs_));
-  RETURN_IF_ERROR(Expr::Prepare(conjunct_ctxs_, runtime_state_, row_desc()));
+  RETURN_IF_ERROR(
+      Expr::Prepare(conjunct_ctxs_, runtime_state_, row_desc(), expr_mem_tracker()));
   AddExprCtxsToFree(conjunct_ctxs_);
 
   for (int format = THdfsFileFormat::TEXT;

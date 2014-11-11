@@ -390,10 +390,11 @@ Status DataStreamSender::Prepare(RuntimeState* state) {
   profile_ = pool_->Add(new RuntimeProfile(pool_, title.str()));
   SCOPED_TIMER(profile_->total_time_counter());
 
-  RETURN_IF_ERROR(Expr::Prepare(partition_expr_ctxs_, state, row_desc_));
-
   mem_tracker_.reset(new MemTracker(profile(), -1, -1, "DataStreamSender",
       state->instance_mem_tracker()));
+  RETURN_IF_ERROR(
+      Expr::Prepare(partition_expr_ctxs_, state, row_desc_, mem_tracker_.get()));
+
   bytes_sent_counter_ =
       ADD_COUNTER(profile(), "BytesSent", TCounterType::BYTES);
   uncompressed_bytes_counter_ =

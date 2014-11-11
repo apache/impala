@@ -40,11 +40,13 @@ Status SortExecExprs::Init(const vector<TExpr>& ordering_exprs,
 }
 
 Status SortExecExprs::Prepare(RuntimeState* state, const RowDescriptor& child_row_desc,
-    const RowDescriptor& output_row_desc) {
+    const RowDescriptor& output_row_desc, MemTracker* expr_mem_tracker) {
   if (materialize_tuple_) {
-    RETURN_IF_ERROR(Expr::Prepare(sort_tuple_slot_expr_ctxs_, state, child_row_desc));
+    RETURN_IF_ERROR(Expr::Prepare(
+        sort_tuple_slot_expr_ctxs_, state, child_row_desc, expr_mem_tracker));
   }
-  RETURN_IF_ERROR(Expr::Prepare(lhs_ordering_expr_ctxs_, state, output_row_desc));
+  RETURN_IF_ERROR(Expr::Prepare(
+      lhs_ordering_expr_ctxs_, state, output_row_desc, expr_mem_tracker));
   return Status::OK;
 }
 

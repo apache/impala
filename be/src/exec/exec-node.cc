@@ -135,13 +135,14 @@ Status ExecNode::Prepare(RuntimeState* state) {
   mem_tracker_.reset(new MemTracker(
       runtime_profile_.get(), -1, -1, runtime_profile_->name(),
       state->instance_mem_tracker()));
+  expr_mem_tracker_.reset(new MemTracker(-1, -1, "Exprs", mem_tracker_.get(), false));
 
   rows_returned_rate_ = runtime_profile()->AddDerivedCounter(
       ROW_THROUGHPUT_COUNTER, TCounterType::UNIT_PER_SECOND,
       bind<int64_t>(&RuntimeProfile::UnitsPerSecond, rows_returned_counter_,
         runtime_profile()->total_time_counter()));
 
-  RETURN_IF_ERROR(Expr::Prepare(conjunct_ctxs_, state, row_desc()));
+  RETURN_IF_ERROR(Expr::Prepare(conjunct_ctxs_, state, row_desc(), expr_mem_tracker()));
   AddExprCtxsToFree(conjunct_ctxs_);
 
   for (int i = 0; i < children_.size(); ++i) {
@@ -165,6 +166,8 @@ void ExecNode::Close(RuntimeState* state) {
   for (int i = 0; i < children_.size(); ++i) {
     children_[i]->Close(state);
   }
+  Expr::Close(conjunct_ctxs_, state);
+
   if (mem_tracker() != NULL) {
     if (mem_tracker()->consumption() != 0) {
       LOG(WARNING) << "Query " << state->query_id() << " leaked memory." << endl
@@ -173,7 +176,6 @@ void ExecNode::Close(RuntimeState* state) {
           << "Leaked memory." << endl << state->instance_mem_tracker()->LogUsage();
     }
   }
-  Expr::Close(conjunct_ctxs_, state);
 }
 
 void ExecNode::AddRuntimeExecOption(const string& str) {

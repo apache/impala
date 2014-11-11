@@ -150,6 +150,7 @@ class ExecNode {
 
   RuntimeProfile* runtime_profile() { return runtime_profile_.get(); }
   MemTracker* mem_tracker() { return mem_tracker_.get(); }
+  MemTracker* expr_mem_tracker() { return expr_mem_tracker_.get(); }
 
   // Extract node id from p->name().
   static int GetNodeIdFromProfile(RuntimeProfile* p);
@@ -217,6 +218,9 @@ class ExecNode {
 
   // Account for peak memory used by this node
   boost::scoped_ptr<MemTracker> mem_tracker_;
+
+  // MemTracker that should be used for ExprContexts.
+  boost::scoped_ptr<MemTracker> expr_mem_tracker_;
 
   // Execution options that are determined at runtime.  This is added to the
   // runtime profile at Close().  Examples for options logged here would be

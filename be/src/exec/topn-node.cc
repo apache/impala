@@ -55,7 +55,8 @@ Status TopNNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   tuple_pool_.reset(new MemPool(mem_tracker()));
-  RETURN_IF_ERROR(sort_exec_exprs_.Prepare(state, child(0)->row_desc(), row_descriptor_));
+  RETURN_IF_ERROR(sort_exec_exprs_.Prepare(
+      state, child(0)->row_desc(), row_descriptor_, expr_mem_tracker()));
   AddExprCtxsToFree(sort_exec_exprs_);
   materialized_tuple_desc_ = row_descriptor_.tuple_descriptors()[0];
   // Allocate memory for a temporary tuple.

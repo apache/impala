@@ -67,7 +67,8 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
       input_row_desc_, state->fragment_instance_id(), id_, num_senders_,
       FLAGS_exchg_node_buffer_size_bytes, runtime_profile(), is_merging_);
   if (is_merging_) {
-    RETURN_IF_ERROR(sort_exec_exprs_.Prepare(state, row_descriptor_, row_descriptor_));
+    RETURN_IF_ERROR(sort_exec_exprs_.Prepare(
+        state, row_descriptor_, row_descriptor_, expr_mem_tracker()));
     AddExprCtxsToFree(sort_exec_exprs_);
   }
   return Status::OK;

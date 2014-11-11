@@ -70,8 +70,10 @@ Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
   // Prepare select list expressions.
   // Disable codegen for these - they would be unused anyway.
   // TODO: codegen table sink
-  RETURN_IF_ERROR(Expr::Prepare(output_expr_ctxs_, state, row_desc_));
-  RETURN_IF_ERROR(Expr::Prepare(partition_key_expr_ctxs_, state, row_desc_));
+  RETURN_IF_ERROR(
+      Expr::Prepare(output_expr_ctxs_, state, row_desc_, expr_mem_tracker_.get()));
+  RETURN_IF_ERROR(
+      Expr::Prepare(partition_key_expr_ctxs_, state, row_desc_, expr_mem_tracker_.get()));
 
   // Prepare partition key exprs and gather dynamic partition key exprs.
   for (size_t i = 0; i < partition_key_expr_ctxs_.size(); ++i) {
@@ -100,6 +102,7 @@ Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
 }
 
 Status HdfsTableSink::Prepare(RuntimeState* state) {
+  RETURN_IF_ERROR(DataSink::Prepare(state));
   unique_id_str_ = PrintId(state->fragment_instance_id(), "-");
   runtime_profile_ = state->obj_pool()->Add(
       new RuntimeProfile(state->obj_pool(), "HdfsTableSink"));

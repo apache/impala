@@ -96,8 +96,8 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExprs(
     ExprContext* ctx;
     THROW_IF_ERROR_RET(Expr::CreateExprTree(&obj_pool, *it, &ctx), env,
                        JniUtil::internal_exc_class(), result_bytes);
-    THROW_IF_ERROR_RET(ctx->Prepare(&state, RowDescriptor()), env,
-                       JniUtil::internal_exc_class(), result_bytes);
+    THROW_IF_ERROR_RET(ctx->Prepare(&state, RowDescriptor(), state.query_mem_tracker()),
+                       env, JniUtil::internal_exc_class(), result_bytes);
     expr_ctxs.push_back(ctx);
   }
 

@@ -106,7 +106,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   state_ = state;
 
   mem_pool_.reset(new MemPool(mem_tracker()));
-  agg_fn_pool_.reset(new MemPool(state->udf_mem_tracker()));
+  agg_fn_pool_.reset(new MemPool(expr_mem_tracker()));
 
   build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
   get_results_timer_ = ADD_TIMER(runtime_profile(), "GetResultsTime");
@@ -131,7 +131,8 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   DCHECK_EQ(intermediate_tuple_desc_->slots().size(),
         output_tuple_desc_->slots().size());
 
-  RETURN_IF_ERROR(Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc()));
+  RETURN_IF_ERROR(
+      Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc(), expr_mem_tracker()));
   AddExprCtxsToFree(probe_expr_ctxs_);
 
   contains_var_len_grouping_exprs_ = false;
@@ -153,7 +154,8 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   // nor this node's output row desc may contain the intermediate tuple, e.g.,
   // in a single-node plan with an intermediate tuple different from the output tuple.
   intermediate_row_desc_.reset(new RowDescriptor(intermediate_tuple_desc_, false));
-  RETURN_IF_ERROR(Expr::Prepare(build_expr_ctxs_, state, *intermediate_row_desc_));
+  RETURN_IF_ERROR(
+      Expr::Prepare(build_expr_ctxs_, state, *intermediate_row_desc_, expr_mem_tracker()));
   AddExprCtxsToFree(build_expr_ctxs_);
 
   int j = probe_expr_ctxs_.size();
@@ -407,7 +409,7 @@ void PartitionedAggregationNode::Close(RuntimeState* state) {
 }
 
 Status PartitionedAggregationNode::Partition::InitStreams() {
-  agg_fn_pool.reset(new MemPool(parent->state_->udf_mem_tracker()));
+  agg_fn_pool.reset(new MemPool(parent->expr_mem_tracker()));
   for (int i = 0; i < parent->agg_fn_ctxs_.size(); ++i) {
     agg_fn_ctxs.push_back(parent->agg_fn_ctxs_[i]->impl()->Clone(agg_fn_pool.get()));
     parent->state_->obj_pool()->Add(agg_fn_ctxs[i]);

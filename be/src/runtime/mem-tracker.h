@@ -60,10 +60,13 @@ class QueryResourceMgr;
 // This class is thread-safe.
 class MemTracker {
  public:
-  // byte_limit < 0 means no limit
+  // 'byte_limit' < 0 means no limit
   // 'label' is the label used in the usage string (LogUsage())
+  // If 'log_usage_if_zero' is false, this tracker (and its children) will not be included
+  // in LogUsage() output if consumption is 0.
   MemTracker(int64_t byte_limit = -1, int64_t rm_reserved_limit = -1,
-      const std::string& label = std::string(), MemTracker* parent = NULL);
+      const std::string& label = std::string(), MemTracker* parent = NULL,
+      bool log_usage_if_zero = true);
 
   // C'tor for tracker for which consumption counter is created as part of a profile.
   // The counter is created with name COUNTER_NAME.
@@ -445,6 +448,10 @@ class MemTracker {
   bool enable_logging_;
   // If true, log the stack as well.
   bool log_stack_;
+
+  // If false, this tracker (and its children) will not be included in LogUsage() output
+  // if consumption is 0.
+  bool log_usage_if_zero_;
 
   // Lock is taken during ExpandRmReservation() to prevent concurrent acquisition of new
   // resources.

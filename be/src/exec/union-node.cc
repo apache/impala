@@ -68,14 +68,16 @@ Status UnionNode::Prepare(RuntimeState* state) {
 
   // Prepare const expr lists.
   for (int i = 0; i < const_result_expr_ctx_lists_.size(); ++i) {
-    RETURN_IF_ERROR(Expr::Prepare(const_result_expr_ctx_lists_[i], state, row_desc()));
+    RETURN_IF_ERROR(Expr::Prepare(
+        const_result_expr_ctx_lists_[i], state, row_desc(), expr_mem_tracker()));
     AddExprCtxsToFree(const_result_expr_ctx_lists_[i]);
     DCHECK_EQ(const_result_expr_ctx_lists_[i].size(), materialized_slots_.size());
   }
 
   // Prepare result expr lists.
   for (int i = 0; i < result_expr_ctx_lists_.size(); ++i) {
-    RETURN_IF_ERROR(Expr::Prepare(result_expr_ctx_lists_[i], state, child(i)->row_desc()));
+    RETURN_IF_ERROR(Expr::Prepare(
+        result_expr_ctx_lists_[i], state, child(i)->row_desc(), expr_mem_tracker()));
     AddExprCtxsToFree(result_expr_ctx_lists_[i]);
     DCHECK_EQ(result_expr_ctx_lists_[i].size(), materialized_slots_.size());
   }

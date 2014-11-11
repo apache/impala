@@ -42,7 +42,8 @@ class DataSink {
   virtual ~DataSink() {}
 
   // Setup. Call before Send(), Open(), or Close().
-  virtual Status Prepare(RuntimeState* state) = 0;
+  // Subclasses must call DataSink::Prepare().
+  virtual Status Prepare(RuntimeState* state);
 
   // Call before Send() or Close().
   virtual Status Open(RuntimeState* state) = 0;
@@ -80,6 +81,8 @@ class DataSink {
   // Set to true after Close() has been called. Subclasses should check and set this in
   // Close().
   bool closed_;
+
+  boost::scoped_ptr<MemTracker> expr_mem_tracker_;
 
 };
 

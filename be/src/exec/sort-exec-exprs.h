@@ -39,7 +39,7 @@ class SortExecExprs {
 
   // Prepare all expressions used for sorting and tuple materialization.
   Status Prepare(RuntimeState* state, const RowDescriptor& child_row_desc,
-    const RowDescriptor& output_row_desc);
+    const RowDescriptor& output_row_desc, MemTracker* expr_mem_tracker);
 
   // Open all expressions used for sorting and tuple materialization.
   Status Open(RuntimeState* state);

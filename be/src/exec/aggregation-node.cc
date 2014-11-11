@@ -87,7 +87,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
   tuple_pool_.reset(new MemPool(mem_tracker()));
-  agg_fn_pool_.reset(new MemPool(state->udf_mem_tracker()));
+  agg_fn_pool_.reset(new MemPool(expr_mem_tracker()));
   build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
   get_results_timer_ = ADD_TIMER(runtime_profile(), "GetResultsTime");
   hash_table_buckets_counter_ =
@@ -100,7 +100,8 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   output_tuple_desc_ = state->desc_tbl().GetTupleDescriptor(output_tuple_id_);
   DCHECK_EQ(intermediate_tuple_desc_->slots().size(),
       output_tuple_desc_->slots().size());
-  RETURN_IF_ERROR(Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc()));
+  RETURN_IF_ERROR(
+      Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc(), expr_mem_tracker()));
 
   // Construct build exprs from intermediate_agg_tuple_desc_
   for (int i = 0; i < probe_expr_ctxs_.size(); ++i) {
@@ -120,7 +121,8 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   // nor this node's output row desc may contain the intermediate tuple, e.g.,
   // in a single-node plan with an intermediate tuple different from the output tuple.
   RowDescriptor build_row_desc(intermediate_tuple_desc_, false);
-  RETURN_IF_ERROR(Expr::Prepare(build_expr_ctxs_, state, build_row_desc));
+  RETURN_IF_ERROR(
+      Expr::Prepare(build_expr_ctxs_, state, build_row_desc, expr_mem_tracker()));
 
   agg_fn_ctxs_.resize(aggregate_evaluators_.size());
   int j = probe_expr_ctxs_.size();

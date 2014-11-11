@@ -147,11 +147,13 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
     tuple_ids.push_back(buffered_tuple_desc_->id());
     RowDescriptor cmp_row_desc(state->desc_tbl(), tuple_ids, vector<bool>(2, false));
     if (partition_by_eq_expr_ctx_ != NULL) {
-      RETURN_IF_ERROR(partition_by_eq_expr_ctx_->Prepare(state, cmp_row_desc));
+      RETURN_IF_ERROR(
+          partition_by_eq_expr_ctx_->Prepare(state, cmp_row_desc, expr_mem_tracker()));
       AddExprCtxToFree(partition_by_eq_expr_ctx_);
     }
     if (order_by_eq_expr_ctx_ != NULL) {
-      RETURN_IF_ERROR(order_by_eq_expr_ctx_->Prepare(state, cmp_row_desc));
+      RETURN_IF_ERROR(
+          order_by_eq_expr_ctx_->Prepare(state, cmp_row_desc, expr_mem_tracker()));
       AddExprCtxToFree(order_by_eq_expr_ctx_);
     }
   }

@@ -43,11 +43,13 @@ Status HBaseTableSink::PrepareExprs(RuntimeState* state) {
   RETURN_IF_ERROR(Expr::CreateExprTrees(state->obj_pool(), select_list_texprs_,
                                         &output_expr_ctxs_));
   // Prepare the exprs to run.
-  RETURN_IF_ERROR(Expr::Prepare(output_expr_ctxs_, state, row_desc_));
+  RETURN_IF_ERROR(
+      Expr::Prepare(output_expr_ctxs_, state, row_desc_, expr_mem_tracker_.get()));
   return Status::OK;
 }
 
 Status HBaseTableSink::Prepare(RuntimeState* state) {
+  RETURN_IF_ERROR(DataSink::Prepare(state));
   runtime_profile_ = state->obj_pool()->Add(
       new RuntimeProfile(state->obj_pool(), "HbaseTableSink"));
   SCOPED_TIMER(runtime_profile_->total_time_counter());

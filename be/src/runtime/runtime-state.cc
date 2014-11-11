@@ -159,9 +159,6 @@ void RuntimeState::InitMemTrackers(const TUniqueId& query_id, const string* pool
           query_rm_reservation_limit_bytes, query_parent_tracker, query_resource_mgr());
   instance_mem_tracker_.reset(new MemTracker(runtime_profile(), -1, -1,
       runtime_profile()->name(), query_mem_tracker_.get()));
-
-  udf_mem_tracker_.reset(
-      new MemTracker(-1, -1, "UDFs", instance_mem_tracker_.get()));
 }
 
 Status RuntimeState::CreateBlockMgr() {

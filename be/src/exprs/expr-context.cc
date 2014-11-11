@@ -45,9 +45,10 @@ ExprContext::~ExprContext() {
 
 Status ExprContext::Prepare(RuntimeState* state, const RowDescriptor& row_desc,
                             MemTracker* tracker) {
+  DCHECK(tracker != NULL);
   DCHECK(pool_.get() == NULL);
   prepared_ = true;
-  pool_.reset(new MemPool(tracker != NULL? tracker : state->udf_mem_tracker()));
+  pool_.reset(new MemPool(tracker));
   return root_->Prepare(state, row_desc, this);
 }
 

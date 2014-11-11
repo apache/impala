@@ -42,7 +42,7 @@ AtomicInt<int64_t> MemTracker::released_memory_since_gc_;
 const string REQUEST_POOL_MEM_TRACKER_LABEL_FORMAT = "RequestPool=$0";
 
 MemTracker::MemTracker(int64_t byte_limit, int64_t rm_reserved_limit, const string& label,
-    MemTracker* parent)
+    MemTracker* parent, bool log_usage_if_zero)
   : limit_(byte_limit),
     rm_reserved_limit_(rm_reserved_limit),
     label_(label),
@@ -53,6 +53,7 @@ MemTracker::MemTracker(int64_t byte_limit, int64_t rm_reserved_limit, const stri
     auto_unregister_(false),
     enable_logging_(false),
     log_stack_(false),
+    log_usage_if_zero_(log_usage_if_zero),
     query_resource_mgr_(NULL),
     num_gcs_metric_(NULL),
     bytes_freed_by_last_gc_metric_(NULL),
@@ -74,6 +75,7 @@ MemTracker::MemTracker(
     auto_unregister_(false),
     enable_logging_(false),
     log_stack_(false),
+    log_usage_if_zero_(true),
     query_resource_mgr_(NULL),
     num_gcs_metric_(NULL),
     bytes_freed_by_last_gc_metric_(NULL),
@@ -94,6 +96,7 @@ MemTracker::MemTracker(Metrics::PrimitiveMetric<uint64_t>* consumption_metric,
     auto_unregister_(false),
     enable_logging_(false),
     log_stack_(false),
+    log_usage_if_zero_(true),
     query_resource_mgr_(NULL),
     num_gcs_metric_(NULL),
     bytes_freed_by_last_gc_metric_(NULL),
@@ -224,6 +227,8 @@ void MemTracker::RegisterMetrics(Metrics* metrics, const string& prefix) {
 //     DataStreamMgr:  Consumption=0.00
 //     DataStreamSender:  Consumption=16.00 KB
 string MemTracker::LogUsage(const string& prefix) const {
+  if (!log_usage_if_zero_ && consumption() == 0) return "";
+
   stringstream ss;
   ss << prefix << label_ << ":";
   if (CheckLimitExceeded()) ss << " memory limit exceeded.";
@@ -234,7 +239,8 @@ string MemTracker::LogUsage(const string& prefix) const {
   prefix_ss << prefix << "  ";
   string new_prefix = prefix_ss.str();
   lock_guard<mutex> l(child_trackers_lock_);
-  if (!child_trackers_.empty()) ss << "\n" << LogUsage(new_prefix, child_trackers_);
+  string child_trackers_usage = LogUsage(new_prefix, child_trackers_);
+  if (!child_trackers_usage.empty()) ss << "\n" << child_trackers_usage;
   return ss.str();
 }
 
@@ -242,7 +248,8 @@ string MemTracker::LogUsage(const string& prefix, const list<MemTracker*>& track
   vector<string> usage_strings;
   for (list<MemTracker*>::const_iterator it = trackers.begin();
       it != trackers.end(); ++it) {
-    usage_strings.push_back((*it)->LogUsage(prefix));
+    string usage_string = (*it)->LogUsage(prefix);
+    if (!usage_string.empty()) usage_strings.push_back(usage_string);
   }
   return join(usage_strings, "\n");
 }

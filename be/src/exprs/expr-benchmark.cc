@@ -88,6 +88,7 @@ struct TestData {
 
 Planner planner;
 ObjectPool pool;
+MemTracker tracker;
 
 // Utility function to get prepare select list for exprs.  Assumes this is a
 // constant query
@@ -96,7 +97,7 @@ static Status PrepareSelectList(const TExecRequest& request, ExprContext** ctx) 
   vector<TExpr> texprs = query_request.fragments[0].output_exprs;
   DCHECK_EQ(texprs.size(), 1);
   RETURN_IF_ERROR(Expr::CreateExprTree(&pool, texprs[0], ctx));
-  RETURN_IF_ERROR((*ctx)->Prepare(NULL, RowDescriptor()));
+  RETURN_IF_ERROR((*ctx)->Prepare(NULL, RowDescriptor(), &tracker));
   return Status::OK;
 }
 

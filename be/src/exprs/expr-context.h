@@ -43,10 +43,9 @@ class ExprContext {
   ~ExprContext();
 
   // Prepare expr tree for evaluation.
-  // If 'tracker' is provided, it will be used rather than the default UDF tracker from
-  // 'state'. This is used for testing.
+  // Allocations from this context will be counted against 'tracker'.
   Status Prepare(RuntimeState* state, const RowDescriptor& row_desc,
-                 MemTracker* tracker = NULL);
+                 MemTracker* tracker);
 
   // Must be called after calling Prepare(). Should not be called on clones.
   Status Open(RuntimeState* state);

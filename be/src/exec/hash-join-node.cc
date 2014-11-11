@@ -88,13 +88,14 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   // build and probe exprs are evaluated in the context of the rows produced by our
   // right and left children, respectively
   RETURN_IF_ERROR(
-      Expr::Prepare(build_expr_ctxs_, state, child(1)->row_desc()));
+      Expr::Prepare(build_expr_ctxs_, state, child(1)->row_desc(), expr_mem_tracker()));
   RETURN_IF_ERROR(
-      Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc()));
+      Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc(), expr_mem_tracker()));
 
   // other_join_conjunct_ctxs_ are evaluated in the context of the rows produced by this
   // node
-  RETURN_IF_ERROR(Expr::Prepare(other_join_conjunct_ctxs_, state, row_descriptor_));
+  RETURN_IF_ERROR(Expr::Prepare(
+      other_join_conjunct_ctxs_, state, row_descriptor_, expr_mem_tracker()));
 
   // TODO: default buckets
   bool stores_nulls =
