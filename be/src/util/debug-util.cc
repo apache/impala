@@ -112,7 +112,7 @@ string PrintAsHex(const char* bytes, int64_t len) {
   stringstream out;
   out << hex << std::setfill('0');
   for (int i = 0; i < len; ++i) {
-    out << setw(2) << static_cast<unsigned>(bytes[i]);
+    out << setw(2) << static_cast<uint16_t>(bytes[i]);
   }
   return out.str();
 }

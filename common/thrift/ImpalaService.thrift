@@ -98,6 +98,9 @@ enum TImpalaQueryOptions {
   // Leave blank to use default.
   COMPRESSION_CODEC,
 
+  // Mode for compressing sequence files; either BLOCK, RECORD, or DEFAULT
+  SEQ_COMPRESSION_MODE,
+
   // HBase scan query option. If set and > 0, HBASE_CACHING is the value for
   // "hbase.client.Scan.setCaching()" when querying HBase table. Otherwise, use backend
   // default.

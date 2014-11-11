@@ -60,7 +60,7 @@ class HdfsSequenceTableWriter : public HdfsTableWriter {
 
  private:
   // processes a single row, delegates to Compress or NoCompress ConsumeRow().
-  inline void ConsumeRow(TupleRow* row);
+  inline Status ConsumeRow(TupleRow* row);
 
   // writes the SEQ file header to HDFS
   Status WriteFileHeader();
@@ -102,6 +102,9 @@ class HdfsSequenceTableWriter : public HdfsTableWriter {
   std::string codec_name_;
   // the codec for compressing, only set if compress_flag_
   boost::scoped_ptr<Codec> compressor_;
+
+  // true if compression is applied on each record individually
+  bool record_compression_;
 
   // Character delimiting fields
   char field_delim_;

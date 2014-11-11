@@ -111,6 +111,12 @@ class TestTableWriters(ImpalaTestSuite):
   def add_test_dimensions(cls):
     super(TestTableWriters, cls).add_test_dimensions()
     cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    # This class tests many formats, but doesn't use the contraints
+    # Each format is tested within one test file, we constrain to text/none
+    # as each test file only needs to be run once.
+    cls.TestMatrix.add_constraint(lambda v:
+        (v.get_value('table_format').file_format =='text' and
+        v.get_value('table_format').compression_codec == 'none'))
 
   def test_seq_writer(self, vector):
     # TODO debug this test, same as seq writer.

@@ -936,6 +936,18 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
       case TImpalaQueryOptions::DEBUG_ACTION:
         query_options->__set_debug_action(value.c_str());
         break;
+      case TImpalaQueryOptions::SEQ_COMPRESSION_MODE: {
+        if (iequals(value, "block")) {
+          query_options->__set_seq_compression_mode(THdfsSeqCompressionMode::BLOCK);
+        } else if (iequals(value, "record")) {
+          query_options->__set_seq_compression_mode(THdfsSeqCompressionMode::RECORD);
+        } else {
+          stringstream ss;
+          ss << "Invalid sequence file compression mode: " << value;
+          return Status(ss.str());
+        }
+        break;
+      }
       case TImpalaQueryOptions::COMPRESSION_CODEC: {
         if (value.empty()) break;
         if (iequals(value, "none")) {
@@ -1184,6 +1196,9 @@ void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
         break;
       case TImpalaQueryOptions::COMPRESSION_CODEC:
         val << query_option.compression_codec;
+        break;
+      case TImpalaQueryOptions::SEQ_COMPRESSION_MODE:
+        val << query_option.seq_compression_mode;
         break;
       case TImpalaQueryOptions::HBASE_CACHING:
         val << query_option.hbase_caching;

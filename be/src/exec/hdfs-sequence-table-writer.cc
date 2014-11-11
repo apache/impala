@@ -44,7 +44,7 @@ HdfsSequenceTableWriter::HdfsSequenceTableWriter(HdfsTableSink* parent,
                         const vector<ExprContext*>& output_exprs)
     : HdfsTableWriter(parent, state, output, partition, table_desc, output_exprs),
       mem_pool_(new MemPool(parent->mem_tracker())), compress_flag_(false),
-      unflushed_rows_(0) {
+      unflushed_rows_(0), record_compression_(false) {
   approx_block_size_ = 64 * 1024 * 1024;
   parent->mem_tracker()->Consume(approx_block_size_);
   field_delim_ = partition->field_delim();
@@ -64,6 +64,10 @@ Status HdfsSequenceTableWriter::Init() {
   }
   if (codec != THdfsCompression::NONE) {
     compress_flag_ = true;
+    if (query_options.__isset.seq_compression_mode) {
+      record_compression_ =
+          query_options.seq_compression_mode == THdfsSeqCompressionMode::RECORD;
+    }
     RETURN_IF_ERROR(Codec::GetHadoopCodecClassName(codec, &codec_name_));
     RETURN_IF_ERROR(Codec::CreateCompressor(
         mem_pool_, true, codec_name_, &compressor_));
@@ -103,12 +107,12 @@ Status HdfsSequenceTableWriter::AppendRowBatch(RowBatch* batch,
     SCOPED_TIMER(parent_->encode_timer());
     if (all_rows) {
       for (int row_idx = 0; row_idx < limit; ++row_idx) {
-        ConsumeRow(batch->GetRow(row_idx));
+        RETURN_IF_ERROR(ConsumeRow(batch->GetRow(row_idx)));
       }
     } else {
       for (int row_idx = 0; row_idx < limit; ++row_idx) {
         TupleRow* row = batch->GetRow(row_group_indices[row_idx]);
-        ConsumeRow(row);
+        RETURN_IF_ERROR(ConsumeRow(row));
       }
     }
   }
@@ -135,8 +139,7 @@ Status HdfsSequenceTableWriter::WriteFileHeader() {
   // Flag for if compression is used
   out_.WriteBoolean(compress_flag_);
   // Only valid if compression is used. Indicates if block compression is used.
-  // We currently only support block compression, so these flags have the same value
-  out_.WriteBoolean(compress_flag_);
+  out_.WriteBoolean(!record_compression_);
 
   // Output the name of our compression codec, parsed by readers
   if (compress_flag_) {
@@ -152,8 +155,7 @@ Status HdfsSequenceTableWriter::WriteFileHeader() {
   out_.WriteBytes(sync_marker_.size(), sync_marker_.data());
 
   string text = out_.String();
-  RETURN_IF_ERROR(Write(reinterpret_cast<const uint8_t*>(text.c_str()),
-                        text.size()));
+  RETURN_IF_ERROR(Write(reinterpret_cast<const uint8_t*>(text.c_str()), text.size()));
   out_.Clear();
   return Status::OK;
 }
@@ -228,30 +230,62 @@ void HdfsSequenceTableWriter::EncodeRow(TupleRow* row, WriteStream* buf) {
   }
 }
 
-inline void HdfsSequenceTableWriter::ConsumeRow(TupleRow* row) {
+inline Status HdfsSequenceTableWriter::ConsumeRow(TupleRow* row) {
   ++unflushed_rows_;
   row_buf_.Clear();
-  if (compress_flag_) {
+  if (compress_flag_ && !record_compression_) {
+    // Output row for a block compressed sequence file
     // write the length as a vlong and then write the contents
     EncodeRow(row, &row_buf_);
     out_.WriteVLong(row_buf_.Size());
     out_.WriteBytes(row_buf_.Size(), row_buf_.String().data());
-    return;
+    return Status::OK;
   }
 
   EncodeRow(row, &row_buf_);
 
-  int val_len = row_buf_.Size();
-  int rec_len = sizeof(int32_t) + ReadWriteUtil::VLongRequiredBytes(val_len) + val_len;
+  const uint8_t* value_bytes;
+  int64_t value_length;
+  if (record_compression_) {
+    // apply compression to row_buf_
+    // the length of the buffer must be prefixed to the buffer prior to compression
+    //
+    // TODO this incurs copy overhead to place the length in front of the
+    // buffer prior to compression. We may want to rewrite to avoid copying.
+    string text = row_buf_.String();
+    row_buf_.Clear();
+    // encoding as "Text" writes the length before the text
+    row_buf_.WriteText(text.size(), reinterpret_cast<const uint8_t*>(&text.data()[0]));
+    text = row_buf_.String();
+    uint8_t *tmp;
+    {
+      SCOPED_TIMER(parent_->compress_timer());
+      RETURN_IF_ERROR(compressor_->ProcessBlock(false, text.size(),
+          reinterpret_cast<uint8_t*>(&text[0]), &value_length, &tmp));
+    }
+    value_bytes = tmp;
+  } else {
+    value_length = row_buf_.Size();
+    value_bytes = reinterpret_cast<const uint8_t*>(row_buf_.String().data());
+  }
 
-  // Length of the record (incl. rest of meta data for the record)
+  int rec_len = value_length;
+  // if the record is compressed, the length is part of the compressed text
+  // if not, then we need to write the length (below) and account for it's size
+  if (!record_compression_) rec_len += ReadWriteUtil::VLongRequiredBytes(value_length);
+
+  // Length of the record (incl. key length and value length)
   out_.WriteInt(rec_len);
 
   // Write length of the key (Impala/Hive doesn't write a key)
   out_.WriteInt(0);
 
-  out_.WriteVLong(row_buf_.Size());
-  out_.WriteBytes(row_buf_.Size(), row_buf_.String().data());
+  // if the record is compressed, the length is part of the compressed text
+  if (!record_compression_) out_.WriteVLong(value_length);
+
+  // write out the value (possibly compressed)
+  out_.WriteBytes(value_length, value_bytes);
+  return Status::OK;
 }
 
 Status HdfsSequenceTableWriter::Flush() {
@@ -259,7 +293,7 @@ Status HdfsSequenceTableWriter::Flush() {
 
   SCOPED_TIMER(parent_->hdfs_write_timer());
 
-  if (compress_flag_) {
+  if (compress_flag_ && !record_compression_) {
     RETURN_IF_ERROR(WriteCompressedBlock());
   } else {
     string out_str = out_.String();

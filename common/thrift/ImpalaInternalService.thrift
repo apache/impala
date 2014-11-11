@@ -101,6 +101,11 @@ struct TQueryOptions {
   // disastrous query plans. Impala will excercise this option if a query
   // has no plan hints, and at least one table is missing relevant stats.
   29: optional bool disable_unsafe_spills = 0
+
+  // Mode for compression; RECORD, or BLOCK
+  // This field only applies for certain file types and is ignored
+  // by all other file types.
+  30: optional CatalogObjects.THdfsSeqCompressionMode seq_compression_mode
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2
