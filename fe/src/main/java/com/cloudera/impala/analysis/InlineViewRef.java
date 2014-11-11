@@ -63,6 +63,12 @@ public class InlineViewRef extends TableRef {
   // makeOutputNullable() if this inline view is a nullable side of an outer join.
   protected final ExprSubstitutionMap baseTblSmap_ = new ExprSubstitutionMap();
 
+  // If not null, these will serve as the column labels for the inline view. This provides
+  // a layer of separation between column labels visible from outside the inline view
+  // and column labels used in the query definition. Either all or none of the column
+  // labels must be overridden.
+  private List<String> explicitColLabels_;
+
   /**
    * C'tor for creating inline views parsed directly from the a query string.
    */
@@ -71,6 +77,11 @@ public class InlineViewRef extends TableRef {
     Preconditions.checkNotNull(queryStmt);
     queryStmt_ = queryStmt;
     view_ = null;
+  }
+
+  public InlineViewRef(String alias, QueryStmt queryStmt, List<String> colLabels) {
+    this(alias, queryStmt);
+    explicitColLabels_ = Lists.newArrayList(colLabels);
   }
 
   /**
@@ -91,6 +102,7 @@ public class InlineViewRef extends TableRef {
     Preconditions.checkNotNull(other.queryStmt_);
     queryStmt_ = other.queryStmt_.clone();
     view_ = other.view_;
+    explicitColLabels_ = other.explicitColLabels_;
   }
 
   /**
@@ -124,6 +136,10 @@ public class InlineViewRef extends TableRef {
     inlineViewAnalyzer_.setUseHiveColLabels(
         isCatalogView ? true : analyzer.useHiveColLabels());
     queryStmt_.analyze(inlineViewAnalyzer_);
+    if (explicitColLabels_ != null) {
+      Preconditions.checkState(
+          explicitColLabels_.size() == queryStmt_.getColLabels().size());
+    }
 
     inlineViewAnalyzer_.setHasLimitOffsetClause(
         queryStmt_.hasLimit() || queryStmt_.hasOffset());
@@ -151,8 +167,8 @@ public class InlineViewRef extends TableRef {
     // not into it)
     boolean createAuxPredicates = !(queryStmt_ instanceof SelectStmt)
         || !(((SelectStmt) queryStmt_).hasAnalyticInfo());
-    for (int i = 0; i < queryStmt_.getColLabels().size(); ++i) {
-      String colName = queryStmt_.getColLabels().get(i);
+    for (int i = 0; i < getColLabels().size(); ++i) {
+      String colName = getColLabels().get(i);
       Expr colExpr = queryStmt_.getResultExprs().get(i);
       SlotDescriptor slotDesc = analyzer.registerColumnRef(getAliasAsName(), colName);
       slotDesc.setStats(ColumnStats.fromExpr(colExpr));
@@ -181,10 +197,10 @@ public class InlineViewRef extends TableRef {
       throws AnalysisException {
     InlineView inlineView =
         (view_ != null) ? new InlineView(view_) : new InlineView(alias_);
-    for (int i = 0; i < queryStmt_.getColLabels().size(); ++i) {
+    for (int i = 0; i < getColLabels().size(); ++i) {
       // inline view select statement has been analyzed. Col label should be filled.
       Expr selectItemExpr = queryStmt_.getResultExprs().get(i);
-      String colAlias = queryStmt_.getColLabels().get(i);
+      String colAlias = getColLabels().get(i);
 
       // inline view col cannot have duplicate name
       if (inlineView.getColumn(colAlias) != null) {
@@ -301,6 +317,15 @@ public class InlineViewRef extends TableRef {
     queryStmt_ = stmt;
   }
 
+  public List<String> getExplicitColLabels() { return explicitColLabels_; }
+
+  public List<String> getColLabels() {
+    if (explicitColLabels_ != null) {
+      return explicitColLabels_;
+    }
+    return queryStmt_.getColLabels();
+  }
+
   @Override
   public TableRef clone() { return new InlineViewRef(this); }
 
@@ -313,6 +338,20 @@ public class InlineViewRef extends TableRef {
       return view_.getTableName().toSql() + (aliasSql == null ? "" : " " + aliasSql);
     }
     Preconditions.checkNotNull(aliasSql);
-    return "(" + queryStmt_.toSql() + ") " + aliasSql;
+    StringBuilder sql = new StringBuilder()
+        .append("(")
+        .append(queryStmt_.toSql())
+        .append(") ")
+        .append(aliasSql);
+    // Add explicit col labels for debugging even though this syntax isn't supported.
+    if (explicitColLabels_ != null) {
+      sql.append(" (");
+      for (int i = 0; i < getExplicitColLabels().size(); i++) {
+        if (i > 0) sql.append(", ");
+        sql.append(ToSqlUtils.getIdentSql(getExplicitColLabels().get(i)));
+      }
+      sql.append(")");
+    }
+    return sql.toString();
   }
 }

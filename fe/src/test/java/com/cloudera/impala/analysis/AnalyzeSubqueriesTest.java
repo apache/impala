@@ -390,6 +390,13 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "correlated subquery with grouping and/or aggregation: SELECT " +
         "min(bigint_col) OVER (PARTITION BY bool_col) FROM " +
         "functional.alltypessmall t2 WHERE t1.id < t2.id");
+
+    // Column labels may conflict after the rewrite as an inline view
+    AnalyzesOk("select int_col from functional.alltypestiny where " +
+        "int_col in (select 1 as int_col from functional.alltypesagg)");
+    AnalyzesOk("select int_col from functional.alltypestiny a where " +
+        "int_col not in (select 1 as int_col from functional.alltypesagg b " +
+        "where a.int_col = b.int_col)");
   }
 
   @Test
@@ -528,6 +535,13 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     // Correlated subquery with a LIMIT clause
     AnalyzesOk("select count(*) from functional.alltypes t where exists " +
         "(select 1 from functional.alltypesagg g where t.id = g.id limit 1)");
+
+    // Column labels may conflict after the rewrite as an inline view
+    AnalyzesOk("select int_col from functional.alltypestiny where " +
+        "exists (select int_col from functional.alltypesagg)");
+    AnalyzesOk("select int_col from functional.alltypestiny a where " +
+        "not exists (select 1 as int_col from functional.alltypesagg b " +
+        "where a.int_col = b.int_col)");
   }
 
   @Test
@@ -602,6 +616,11 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         }
       }
     }
+    // Column labels may conflict after the rewrite as an inline view
+    AnalyzesOk("select 1 from functional.alltypestiny where " +
+        "int_col = (select count(int_col) as int_col from functional.alltypesagg)");
+    AnalyzesOk("select 1 from functional.alltypestiny where " +
+        "int_col in (select sum(int_col) as int_col from functional.alltypesagg)");
 
     for (String cmpOp: cmpOperators) {
       // Multiple tables in parent and subquery query blocks
