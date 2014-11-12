@@ -488,23 +488,20 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
     BOOST_FOREACH(const TScanRangeLocation& location, scan_range_locations.locations) {
       DCHECK_LT(location.host_idx, host_list.size());
       const TNetworkAddress& replica_host = host_list[location.host_idx];
+      bool has_local_backend = HasLocalBackend(replica_host);
       // Deprioritize non-collocated datanodes by assigning a very high initial bytes
-      uint64_t initial_bytes =
-          !HasLocalBackend(replica_host) ? numeric_limits<int64_t>::max() : 0L;
+      uint64_t initial_bytes = has_local_backend ? 0L : numeric_limits<int64_t>::max();
       uint64_t* assigned_bytes =
           FindOrInsert(&assigned_bytes_per_host, replica_host, initial_bytes);
-
       // Adjust whether or not this replica should count as being cached based on
       // the query option and whether it is collocated. If the DN is not collocated
       // treat the replica as not cached (network transfer dominates anyway in this
       // case).
       // TODO: measure this in a cluster setup. Are remote reads better with caching?
-      bool is_replica_cached = location.is_cached && schedule_with_caching;
-      if (initial_bytes != 0) is_replica_cached = false;
-
+      bool is_replica_cached = location.is_cached && schedule_with_caching &&
+          has_local_backend;
       // We've found a cached replica and this one is not, skip this replica.
       if (is_cached && !is_replica_cached) continue;
-
       // Update the assignment if this is the first cached replica or if this is
       // a less busy host.
       if ((is_replica_cached && !is_cached) || *assigned_bytes < min_assigned_bytes) {
