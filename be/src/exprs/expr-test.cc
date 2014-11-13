@@ -1294,6 +1294,10 @@ TEST_F(ExprTest, InPredicate) {
   TestValue("'ab' not in ('ab', 'cd', 'efg')", TYPE_BOOLEAN, false);
   TestValue("'ab' not in ('cd', 'efg', 'h')", TYPE_BOOLEAN, true);
 
+  // test chars
+  TestValue("cast('ab' as char(2)) in (cast('ab' as char(2)), cast('cd' as char(2)))",
+            TYPE_BOOLEAN, true);
+
   // Test timestamps.
   TestValue(default_timestamp_str_ + " "
       "in (cast('2011-11-23 09:10:11' as timestamp), "
@@ -1619,6 +1623,10 @@ TEST_F(ExprTest, StringFunctions) {
       "                                                                             "
       "                                                                             "
       "                        ", ColumnType::CreateCharType(255));
+
+  TestStringValue("CASE cast('1.1' as char(3)) when cast('1.1' as char(3)) then "
+      "cast('1' as char(1)) when cast('2.22' as char(4)) then "
+      "cast('2' as char(1)) else cast('3' as char(1)) end", "1");
 
   // Test maximum VARCHAR value
   char query[ColumnType::MAX_VARCHAR_LENGTH + 1024];

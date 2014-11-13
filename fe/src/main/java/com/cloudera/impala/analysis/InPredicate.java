@@ -20,6 +20,7 @@ import java.util.List;
 import com.cloudera.impala.analysis.BinaryPredicate.Operator;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function.CompareMode;
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
@@ -45,6 +46,11 @@ public class InPredicate extends Predicate {
   public static void initBuiltins(Db db) {
     for (Type t: Type.getSupportedTypes()) {
       if (t.isNull()) continue;
+      // TODO we do not support codegen for CHAR and the In predicate must be codegened
+      // because it has variable number of arguments. This will force CHARs to be
+      // cast up to strings; meaning that "in" comparisons will not have CHAR comparison
+      // semantics.
+      if (t.getPrimitiveType() == PrimitiveType.CHAR) continue;
       db.addBuiltin(ScalarFunction.createBuiltin(IN, "impala::InPredicate::In",
           Lists.newArrayList(t, t), true, Type.BOOLEAN, false));
       db.addBuiltin(ScalarFunction.createBuiltin(NOT_IN, "impala::InPredicate::NotIn",

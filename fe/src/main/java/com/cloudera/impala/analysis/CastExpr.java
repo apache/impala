@@ -246,6 +246,11 @@ public class CastExpr extends Expr {
       Preconditions.checkState(fn_ != null);
     } else {
       fn_ = Catalog.getBuiltin(searchDesc, CompareMode.IS_IDENTICAL);
+      if (fn_ == null) {
+        // allow for promotion from CHAR to STRING; only if no exact match is found
+        fn_ = Catalog.getBuiltin(searchDesc.promoteCharsToStrings(),
+            CompareMode.IS_IDENTICAL);
+      }
     }
     if (fn_ == null) {
       throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +

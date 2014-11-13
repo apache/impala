@@ -36,7 +36,7 @@ namespace impala {
 // corresponding changes to CodegenWriteSlot.
 inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tuple,
     const char* data, int len, bool copy_string, bool need_escape, MemPool* pool) {
-  if ((len == 0 && slot_desc->type().type != TYPE_STRING) || data == NULL) {
+  if ((len == 0 && !slot_desc->type().IsStringType()) || data == NULL) {
     tuple->SetNull(slot_desc->null_indicator_offset());
     return true;
   } else if (check_null_ && len == null_col_val_.size() &&

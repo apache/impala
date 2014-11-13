@@ -165,8 +165,6 @@ struct ExprValue {
     }
   }
 
-  std::string& GetStringData() { return string_data; }
-
  private:
   std::string string_data; // Stores the data for string_val if necessary.
 };

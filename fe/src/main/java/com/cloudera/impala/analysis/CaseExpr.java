@@ -18,6 +18,7 @@ import java.util.List;
 
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function.CompareMode;
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.catalog.ScalarType;
 import com.cloudera.impala.catalog.Type;
@@ -159,6 +160,7 @@ public class CaseExpr extends Expr {
   public static void initBuiltins(Db db) {
     for (Type t: Type.getSupportedTypes()) {
       if (t.isNull()) continue;
+      if (t.isScalarType(PrimitiveType.CHAR)) continue;
       // TODO: case is special and the signature cannot be represented.
       // It is alternating varargs
       // e.g. case(bool, type, bool type, bool type, etc).
@@ -214,6 +216,7 @@ public class CaseExpr extends Expr {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
+    castChildCharsToStrings(analyzer);
 
     if (isDecode()) {
       Preconditions.checkState(!hasCaseExpr_);

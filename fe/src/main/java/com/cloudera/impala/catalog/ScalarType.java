@@ -38,12 +38,12 @@ public class ScalarType extends Type {
   public static final int DEFAULT_SCALE = 0; // SQL standard
 
   // Longest supported VARCHAR and CHAR, chosen to match Hive.
-  static final int MAX_VARCHAR_LENGTH = 65355;
-  static final int MAX_CHAR_LENGTH = 255;
+  public static final int MAX_VARCHAR_LENGTH = 65355;
+  public static final int MAX_CHAR_LENGTH = 255;
 
   // Longest CHAR that we in line in the tuple.
   // Keep consistent with backend ColumnType::CHAR_INLINE_LENGTH
-  static final int CHAR_INLINE_LENGTH = 128;
+  public static final int CHAR_INLINE_LENGTH = 128;
 
   // Hive, mysql, sql server standard.
   public static final int MAX_PRECISION = 38;
@@ -250,6 +250,7 @@ public class ScalarType extends Type {
   @Override
   public PrimitiveType getPrimitiveType() { return type_; }
   public int ordinal() { return type_.ordinal(); }
+  public int getLength() { return len_; }
 
   @Override
   public boolean isWildcardDecimal() {
@@ -312,7 +313,7 @@ public class ScalarType extends Type {
   public int getSlotSize() {
     switch (type_) {
       case CHAR:
-        if (len_ > CHAR_INLINE_LENGTH) return STRING.getSlotSize();
+        if (len_ > CHAR_INLINE_LENGTH || len_ == 0) return STRING.getSlotSize();
         return len_;
       case DECIMAL: return TypesUtil.getDecimalSlotSize(this);
       default:
@@ -448,7 +449,6 @@ public class ScalarType extends Type {
       if (t1.type_ == PrimitiveType.STRING || t2.type_ == PrimitiveType.STRING) {
         return STRING;
       }
-      return INVALID;
     }
 
     if (t1.isDecimal() || t2.isDecimal()) {

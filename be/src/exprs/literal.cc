@@ -66,23 +66,27 @@ Literal::Literal(const TExprNode& node)
       value_.double_val = node.float_literal.value;
       break;
     case TYPE_STRING:
-    case TYPE_VARCHAR:
-    case TYPE_CHAR: {
+    case TYPE_VARCHAR: {
       DCHECK_EQ(node.node_type, TExprNodeType::STRING_LITERAL);
       DCHECK(node.__isset.string_literal);
       value_ = ExprValue(node.string_literal.value);
       if (type_.type == TYPE_VARCHAR) {
         value_.string_val.len = min(type_.len, value_.string_val.len);
       }
-      if (type_.type == TYPE_CHAR) {
-        string& str = value_.GetStringData();
-        int str_len = str.size();
-        str.resize(type_.len);
-        if (str_len < type_.len) {
-          str.replace(str_len, type_.len - str_len, type_.len - str_len, ' ');
-        }
-        value_.string_val.len = type_.len;
+      break;
+    }
+    case TYPE_CHAR: {
+      DCHECK_EQ(node.node_type, TExprNodeType::STRING_LITERAL);
+      DCHECK(node.__isset.string_literal);
+      string str = node.string_literal.value;
+      int str_len = str.size();
+      DCHECK_GT(str_len, 0);
+      str.resize(type_.len);
+      if (str_len < type_.len) {
+        // Pad out literal with spaces.
+        str.replace(str_len, type_.len - str_len, type_.len - str_len, ' ');
       }
+      value_ = ExprValue(str);
       break;
     }
     case TYPE_DECIMAL: {
