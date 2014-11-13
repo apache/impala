@@ -84,6 +84,9 @@ class HiveUdfCall : public Expr {
   virtual std::string DebugString() const;
 
  private:
+  // Evalutes the UDF over row. Returns the result as an AnyVal. This function
+  // never returns NULL but rather an AnyVal object with is_null set to true on
+  // error.
   AnyVal* Evaluate(ExprContext* ctx, TupleRow* row);
 
   // The path on the local FS to the UDF's jar

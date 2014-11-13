@@ -99,3 +99,25 @@ int, int, int
 ---- RESULTS
 10,20,30
 ====
+---- QUERY
+# IMPALA-1392: Hive UDFs that throw exceptions should return NULL
+select udf_test.throws_exception();
+---- TYPES
+boolean
+---- RESULTS
+NULL
+====
+---- QUERY
+select udf_test.throws_exception() from functional.alltypestiny;
+---- TYPES
+boolean
+---- RESULTS
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
+NULL
+====
