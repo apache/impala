@@ -23,10 +23,14 @@
 #include <iostream>
 #include <fstream>
 #include "common/logging.h"
+#include "util/error-util.h"
+#include "util/test-info.h"
 
 DEFINE_string(log_filename, "",
     "Prefix of log filename - "
     "full path is <log_dir>/<log_filename>.[INFO|WARN|ERROR|FATAL]");
+DEFINE_bool(redirect_stdout_stderr, true,
+    "If true, redirects stdout/stderr to INFO/ERROR log.");
 
 bool logging_initialized = false;
 
@@ -53,6 +57,15 @@ void impala::InitGoogleLoggingSafe(const char* arg) {
     FLAGS_log_dir = "/tmp";
   }
 
+  if (FLAGS_redirect_stdout_stderr && !TestInfo::is_fe_test()) {
+    // We will be redirecting stdout/stderr to INFO/LOG so override any glog settings
+    // that log to stdout/stderr...
+    FLAGS_logtostderr = false;
+    FLAGS_alsologtostderr = false;
+    // Don't log to stderr on any threshold.
+    FLAGS_stderrthreshold = google::FATAL + 1;
+  }
+
   if (!FLAGS_logtostderr) {
     // Verify that a log file can be created in log_dir by creating a tmp file.
     stringstream ss;
@@ -76,6 +89,31 @@ void impala::InitGoogleLoggingSafe(const char* arg) {
   // Needs to be done after InitGoogleLogging
   if (FLAGS_log_filename.empty()) {
     FLAGS_log_filename = google::ProgramInvocationShortName();
+  }
+
+  if (FLAGS_redirect_stdout_stderr && !TestInfo::is_fe_test()) {
+    // Needs to be done after InitGoogleLogging, to get the INFO/ERROR file paths.
+    // Redirect stdout to INFO log and stderr to ERROR log
+    string info_log_path, error_log_path;
+    GetFullLogFilename(google::INFO, &info_log_path);
+    GetFullLogFilename(google::ERROR, &error_log_path);
+
+    // The log files are created on first use, log something to each before redirecting.
+    LOG(INFO) << "stdout will be logged to this file.";
+    LOG(ERROR) << "stderr will be logged to this file.";
+
+    // Print to stderr/stdout before redirecting so people looking for these logs in
+    // the standard place know where to look.
+    cout << "Redirecting stdout to " << info_log_path << endl;
+    cerr << "Redirecting stderr to " << error_log_path << endl;
+
+    // TODO: how to handle these errors? Maybe abort the process?
+    if (freopen(info_log_path.c_str(), "a", stdout) == NULL) {
+      cout << "Could not redirect stdout: " << GetStrErrMsg();
+    }
+    if (freopen(error_log_path.c_str(), "a", stderr) == NULL) {
+      cerr << "Could not redirect stderr: " << GetStrErrMsg();
+    }
   }
 
   logging_initialized = true;
