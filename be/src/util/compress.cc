@@ -23,10 +23,12 @@
 #include <lz4.h>
 
 #include <boost/crc.hpp>
+#include <gutil/strings/substitute.h>
 
 using namespace std;
 using namespace boost;
 using namespace impala;
+using namespace strings;
 
 GzipCompressor::GzipCompressor(Format format, MemPool* mem_pool, bool reuse_buffer)
   : Codec(mem_pool, reuse_buffer),
@@ -62,8 +64,18 @@ int64_t GzipCompressor::MaxOutputLen(int64_t input_len, const uint8_t* input) {
     // bound for this case. Hardcode the value returned in zlib version 1.2.3.1+.
     return 23;
   }
-#endif
+  // There is a known issue that zlib 1.2.3 does not include the size of the
+  // gzip wrapper. This is has been fixed in zlib 1.2.3.1:
+  // http://www.zlib.net/ChangeLog.txt
+  // "Take into account wrapper variations in deflateBound()"
+  //
+  // Mark, maintainer of zlib, has stated that 12 needs to be added to result for gzip
+  // http://compgroups.net/comp.unix.programmer/gzip-compressing-an-in-memory-string-usi/54854
+  // To have a safe upper bound for "wrapper variations", we add 32 to estimate
+  return deflateBound(&stream_, input_len) + 32;
+#else
   return deflateBound(&stream_, input_len);
+#endif
 }
 
 Status GzipCompressor::Compress(int64_t input_length, const uint8_t* input,
@@ -78,8 +90,8 @@ Status GzipCompressor::Compress(int64_t input_length, const uint8_t* input,
   if ((ret = deflate(&stream_, Z_FINISH)) != Z_STREAM_END) {
     if (ret == Z_OK) {
       // will return Z_OK (and stream_.msg NOT set) if stream_.avail_out is too small
-      return Status("zlib deflate failed: output buffer (%ld) is too small.",
-                    output_length);
+      return Status(Substitute("zlib deflate failed: output buffer ($0) is too small.",
+                    output_length).c_str());
     }
     stringstream ss;
     ss << "zlib deflate failed: " << stream_.msg;
