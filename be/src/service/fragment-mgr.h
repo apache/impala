@@ -52,7 +52,7 @@ class FragmentMgr {
 
   // Call exec_state->Exec(), and then removes exec_state from the fragment map. Run in
   // the fragment's execution thread.
-  void FragmentExecThread(FragmentExecState* exec_state);
+  void FragmentExecThread(boost::shared_ptr<FragmentExecState> exec_state);
 
   boost::shared_ptr<FragmentExecState> GetFragmentExecState(
       const TUniqueId& fragment_instance_id);
