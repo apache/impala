@@ -21,7 +21,9 @@ set -u
 set -e
 
 . $IMPALA_HOME/bin/set-pythonpath.sh
-EXPLORATION_STRATEGY=core
+
+# Allow picking up strateg from environment
+: ${EXPLORATION_STRATEGY:=core}
 NUM_ITERATIONS=1
 KERB_ARGS=""
 
@@ -29,6 +31,20 @@ KERB_ARGS=""
 if ${CLUSTER_DIR}/admin is_kerberized; then
   KERB_ARGS="--use_kerberos"
 fi
+
+
+# Parametrized Test Options
+# Run FE Tests
+: ${FE_TEST:=true}
+# Run Backend Tests
+: ${BE_TEST:=true}
+# Run End-to-end Tests
+: ${EE_TEST:=true}
+: ${EE_TEST_FILES:=}
+# Run JDBC Test
+: ${JDBC_TEST:=true}
+# Run Cluster Tests
+: ${CLUSTER_TEST:=true}
 
 # parse command line options
 while getopts "e:n:" OPTION
@@ -67,8 +83,10 @@ do
   # The BE unit tests cannot run when impalads are started.
   ${IMPALA_HOME}/bin/start-impala-cluster.py --kill_only --force
 
-  # Run backend tests.
-  ${IMPALA_HOME}/bin/run-backend-tests.sh
+  if [[ "$BE_TEST" = true ]]; then
+    # Run backend tests.
+    ${IMPALA_HOME}/bin/run-backend-tests.sh
+  fi
 
   # Increase the admission controller max_requests to prevent builds failing due to
   # queries not being closed.
@@ -79,32 +97,38 @@ do
   ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1\
       --table_format=text/none --exec_options="disable_codegen:False" ${KERB_ARGS}
 
-  # Run end-to-end tests. The EXPLORATION_STRATEGY parameter should only apply to the
-  # functional-query workload because the larger datasets (ex. tpch) are not generated
-  # in all table formats.
-  # KERBEROS TODO - this will need to deal with ${KERB_ARGS}
-  ${IMPALA_HOME}/tests/run-tests.py -x --exploration_strategy=core \
-      --workload_exploration_strategy=functional-query:$EXPLORATION_STRATEGY #${KERB_ARGS}
+  if [[ "$EE_TEST" = true ]]; then
+    # Run end-to-end tests. The EXPLORATION_STRATEGY parameter should only apply to the
+    # functional-query workload because the larger datasets (ex. tpch) are not generated
+    # in all table formats.
+    # KERBEROS TODO - this will need to deal with ${KERB_ARGS}
+    ${IMPALA_HOME}/tests/run-tests.py -x --exploration_strategy=core \
+      --workload_exploration_strategy=functional-query:$EXPLORATION_STRATEGY \
+      ${EE_TEST_FILES} #${KERB_ARGS}
+  fi
 
-  # Run JUnit frontend tests
-  # Requires a running impalad cluster because some tests (such as DataErrorTest and
-  # JdbcTest) queries against an impala cluster.
-  # TODO: Currently planner tests require running the end-to-end tests first
-  # so data is inserted into tables. This will go away once we move the planner
-  # tests to the new python framework.
-  cd $IMPALA_FE_DIR
-  mvn test
+  if [[ "$FE_TEST" = true ]]; then
+    # Run JUnit frontend tests
+    # Requires a running impalad cluster because some tests (such as DataErrorTest and
+    # JdbcTest) queries against an impala cluster.
+    cd $IMPALA_FE_DIR
+    mvn test
+  fi
 
-  # Run the JDBC tests with background loading disabled. This is interesting because
-  # it requires loading missing table metadata.
-  ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} --cluster_size=3 \
-    --catalogd_args=--load_catalog_in_background=false
-  mvn test -Dtest=JdbcTest
+  if [[ "$JDBC_TEST" = true ]]; then
+    # Run the JDBC tests with background loading disabled. This is interesting because
+    # it requires loading missing table metadata.
+    ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} --cluster_size=3 \
+      --catalogd_args=--load_catalog_in_background=false
+    mvn test -Dtest=JdbcTest
+  fi
 
-  # Run the custom-cluster tests after all other tests, since they will restart the
-  # cluster repeatedly and lose state.
-  # TODO: Consider moving in to run-tests.py.
-  ${IMPALA_HOME}/tests/run-custom-cluster-tests.sh
+  if [[ "$CLUSTER_TEST" = true ]]; then
+    # Run the custom-cluster tests after all other tests, since they will restart the
+    # cluster repeatedly and lose state.
+    # TODO: Consider moving in to run-tests.py.
+    ${IMPALA_HOME}/tests/run-custom-cluster-tests.sh
+  fi
 
   # Finally, run the process failure tests.
   # Disabled temporarily until we figure out the proper timeouts required to make the test
