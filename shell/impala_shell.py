@@ -650,10 +650,10 @@ class ImpalaShell(cmd.Cmd):
       self.last_query_handle = self.imp_client.execute_query(query)
       self.query_handle_closed = False
       wait_to_finish = self.imp_client.wait_to_finish(self.last_query_handle)
-      # retrieve the error log
-      warning_log = self.imp_client.get_warning_log(self.last_query_handle)
 
       if is_insert:
+        # retrieve the error log
+        warning_log = self.imp_client.get_warning_log(self.last_query_handle)
         num_rows = self.imp_client.close_insert(self.last_query_handle)
       else:
         # impalad does not support the fetching of metadata for certain types of queries.
@@ -671,6 +671,9 @@ class ImpalaShell(cmd.Cmd):
         for rows in rows_fetched:
           self.output_stream.write(rows)
           num_rows += len(rows)
+
+        # retrieve the error log
+        warning_log = self.imp_client.get_warning_log(self.last_query_handle)
 
       end_time = time.time()
 
