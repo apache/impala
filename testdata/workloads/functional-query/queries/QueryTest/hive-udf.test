@@ -20,8 +20,8 @@ select min(udf_test.hive_pi()) from functional.alltypesagg
 ---- TYPES
 DOUBLE
 ====
-# Test identity functions
 ---- QUERY
+# Test identity functions
 select udf_test.identity(true);
 ---- TYPES
 boolean

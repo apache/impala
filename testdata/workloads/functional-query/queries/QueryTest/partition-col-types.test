@@ -253,8 +253,8 @@ DROP TABLE all_partition_col_types;
 ---- QUERY
 DROP TABLE all_insert_partition_col_types;
 ====
-# Regression test for IMPALA-1026
 ---- QUERY
+# Regression test for IMPALA-1026
 drop table if exists test_dec_partition;
 create table test_dec_partition(id int, dec decimal(5,4))
   partitioned by(decimal_col DECIMAL(5,4));
@@ -308,8 +308,8 @@ WHERE decimal_col = 4.35
 '00:SCAN HDFS [hdfs_partitioning.test_dec_partition]'
 '   partitions=0/1 files=0 size=0B'
 ====
-# Dynamic partitions
 ---- QUERY
+# Dynamic partitions
 insert into test_dec_partition partition(decimal_col)
 values(2, 6.28, 8.68), (0, 1.23, 8.68), (3, 4.56, 1.0);
 SELECT * from test_dec_partition;

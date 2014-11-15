@@ -108,15 +108,15 @@ set parquet_compression_codec=bar
 ---- CATCH
 Invalid compression codec: bar
 ====
+---- QUERY
 # Test that SET actually does change the mem_limit.
 # First, show mem_limit is not hit.
----- QUERY
 select 1
 ---- RESULTS
 1
 ====
-# Set mem_limit really small so that queries will fail.
 ---- QUERY
+# Set mem_limit really small so that queries will fail.
 set mem_limit=1
 ====
 ---- QUERY
@@ -124,8 +124,8 @@ select 1
 ---- CATCH
 Memory limit exceeded
 ====
-# Set mem_limit back to unlimited and query should succeed again.
 ---- QUERY
+# Set mem_limit back to unlimited and query should succeed again.
 set mem_limit=0
 ====
 ---- QUERY

@@ -30,8 +30,8 @@ values((1+8, 2, 5.0, 'a'), (2, 3, 6.0, 'b'), (3, 4, 7.0, 'c')) order by 1 desc l
 ---- TYPES
 SMALLINT, TINYINT, DECIMAL, STRING
 ====
-# Test literal casts by inserting into a table that requires a float.
 ---- QUERY
+# Test literal casts by inserting into a table that requires a float.
 drop table if exists values_test_float_tbl;
 create table values_test_float_tbl(f float);
 insert overwrite values_test_float_tbl values
@@ -50,8 +50,8 @@ select * from values_test_float_tbl;
 ---- TYPES
 float
 ====
-# Test literal casts by inserting into a table that requires a decimal.
 ---- QUERY
+# Test literal casts by inserting into a table that requires a decimal.
 drop table if exists values_test_decimal_tbl;
 create table values_test_decimal_tbl(f decimal(20, 4));
 insert overwrite values_test_decimal_tbl values
