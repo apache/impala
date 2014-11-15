@@ -60,27 +60,27 @@ Status FragmentMgr::ExecPlanFragment(const TExecPlanFragmentParams& exec_params)
   // execute plan fragment in new thread
   // TODO: manage threads via global thread pool
   exec_state->set_exec_thread(new Thread("impala-server", "exec-plan-fragment",
-      &FragmentMgr::FragmentExecThread, this, exec_state));
+      &FragmentMgr::FragmentExecThread, this, exec_state.get()));
 
   return Status::OK;
 }
 
-void FragmentMgr::FragmentExecThread(shared_ptr<FragmentExecState> exec_state) {
+void FragmentMgr::FragmentExecThread(FragmentExecState* exec_state) {
   ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS->Increment(1L);
   exec_state->Exec();
-
   // we're done with this plan fragment
+
+  // The last reference to the FragmentExecState is in the map. We don't
+  // want the destructor to be called while the fragment_exec_state_map_lock_
+  // is taken so we'll first grab a reference here before removing the entry
+  // from the map.
+  shared_ptr<FragmentExecState> exec_state_reference;
   {
     lock_guard<mutex> l(fragment_exec_state_map_lock_);
     FragmentExecStateMap::iterator i =
         fragment_exec_state_map_.find(exec_state->fragment_instance_id());
     if (i != fragment_exec_state_map_.end()) {
-      // ends up calling the d'tor, if there are no async cancellations
-      // We need to make sure that the erased shared_ptr is *not* the last
-      // reference to the FragmentExecState. Tearing down the fragment exec state
-      // is not cheap and we don't want to happen with the lock taken.
-      // We guarantee this since the state is passed as a shared ptr by value
-      // to this function.
+      exec_state_reference = i->second;
       fragment_exec_state_map_.erase(i);
     } else {
       LOG(ERROR) << "missing entry in fragment exec state map: instance_id="
