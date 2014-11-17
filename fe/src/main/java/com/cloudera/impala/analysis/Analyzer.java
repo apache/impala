@@ -194,6 +194,13 @@ public class Analyzer {
     // to the last Join clause (represented by its rhs table ref) that outer-joined it
     public final Map<TupleId, TableRef> outerJoinedTupleIds = Maps.newHashMap();
 
+    // Map of registered conjunct to the last full outer join (represented by its
+    // rhs table ref) that outer joined it.
+    public final Map<ExprId, TableRef> fullOuterJoinedConjuncts = Maps.newHashMap();
+
+    // Map of full-outer-joined tuple id to the last full outer join that outer-joined it
+    public final Map<TupleId, TableRef> fullOuterJoinedTupleIds = Maps.newHashMap();
+
     // Map from semi-joined tuple id, i.e., one that is invisible outside the join's
     // On-clause, to its Join clause (represented by its rhs table ref). An anti-join is
     // a kind of semi-join, so anti-joined tuples are also registered here.
@@ -467,6 +474,40 @@ public class Analyzer {
           table instanceof HBaseTable || table instanceof DataSourceTable);
       return new BaseTableRef(tableRef, table);
     }
+  }
+
+  /**
+   * Register conjuncts that are outer joined by a full outer join. For a given
+   * predicate, we record the last full outer join that outer-joined any of its
+   * tuple ids. We need this additional information because full-outer joins obey
+   * different rules with respect to predicate pushdown compared to left and right
+   * outer joins.
+   */
+  public void registerFullOuterJoinedConjunct(Expr e) {
+    Preconditions.checkState(
+        !globalState_.fullOuterJoinedConjuncts.containsKey(e.getId()));
+    List<TupleId> tids = Lists.newArrayList();
+    e.getIds(tids, null);
+    for (TupleId tid: tids) {
+      if (!globalState_.fullOuterJoinedTupleIds.containsKey(tid)) continue;
+      TableRef currentOuterJoin = globalState_.fullOuterJoinedTupleIds.get(tid);
+      globalState_.fullOuterJoinedConjuncts.put(e.getId(), currentOuterJoin);
+      break;
+    }
+    LOG.trace("registerFullOuterJoinedConjunct: " +
+        globalState_.fullOuterJoinedConjuncts.toString());
+  }
+
+  /**
+   * Register tids as being outer-joined by a full outer join clause represented by
+   * rhsRef.
+   */
+  public void registerFullOuterJoinedTids(List<TupleId> tids, TableRef rhsRef) {
+    for (TupleId tid: tids) {
+      globalState_.fullOuterJoinedTupleIds.put(tid, rhsRef);
+    }
+    LOG.trace("registerFullOuterJoinedTids: " +
+        globalState_.fullOuterJoinedTupleIds.toString());
   }
 
   /**
@@ -782,6 +823,7 @@ public class Analyzer {
     ArrayList<TupleId> tupleIds = Lists.newArrayList();
     ArrayList<SlotId> slotIds = Lists.newArrayList();
     e.getIds(tupleIds, slotIds);
+    registerFullOuterJoinedConjunct(e);
 
     // register single tid conjuncts
     if (tupleIds.size() == 1) globalState_.singleTidConjuncts.add(e.getId());
@@ -871,6 +913,14 @@ public class Analyzer {
     return globalState_.ojClauseByConjunct.containsKey(e.getId());
   }
 
+  public TableRef getFullOuterJoinRef(Expr e) {
+    return globalState_.fullOuterJoinedConjuncts.get(e.getId());
+  }
+
+  public boolean isFullOuterJoined(Expr e) {
+    return globalState_.fullOuterJoinedConjuncts.containsKey(e.getId());
+  }
+
   /**
    * Return all unassigned registered conjuncts that are fully bound by node's
    * (logical) tuple ids, can be evaluated by 'node' and are not tied to an Outer Join
@@ -899,7 +949,7 @@ public class Analyzer {
     if (tids.isEmpty()) return false;
     if (tids.size() > 1 || isOjConjunct(e)
         || (isOuterJoined(tids.get(0)) && e.isWhereClauseConjunct())
-        || isAntiJoinedConjunct(e)) {
+        || isAntiJoinedConjunct(e) || isFullOuterJoined(e)) {
       return true;
     }
     return false;
@@ -960,29 +1010,51 @@ public class Analyzer {
   }
 
   /**
-   * Return list of equi-join conjuncts that reference tid. If rhsRef != null, it is
-   * assumed to be for an outer join, and only equi-join conjuncts from that outer join's
-   * On clause are returned.
+   * Returns list of candidate equi-join conjuncts to be evaluated by the join node
+   * that is specified by: a) the tids materialized by one side (lhs or rhs) and,
+   * b) joinedTblRef which is the new joined table. If joinedTblRef is an outer join,
+   * only equi-join conjuncts from that outer join's On clause are returned. If an
+   * equi-join conjunct is full outer joined, it is not added to the candidate list
+   * if this is not the plan node to full outer join it.
    */
-  public List<Expr> getEqJoinConjuncts(TupleId id, TableRef rhsRef) {
+  public List<Expr> getEqJoinConjuncts(List<TupleId> tids, TableRef joinedTblRef) {
+    Preconditions.checkNotNull(joinedTblRef);
+    TupleId id = joinedTblRef.getId();
+    List<TupleId> nodeTupleIds = Lists.newArrayList(tids);
+    nodeTupleIds.add(id);
     List<ExprId> conjunctIds = globalState_.eqJoinConjuncts.get(id);
     if (conjunctIds == null) return null;
     List<Expr> result = Lists.newArrayList();
     List<ExprId> ojClauseConjuncts = null;
-    if (rhsRef != null) {
-      Preconditions.checkState(rhsRef.getJoinOp().isOuterJoin());
-      ojClauseConjuncts = globalState_.conjunctsByOjClause.get(rhsRef);
+    if (joinedTblRef.getJoinOp().isOuterJoin()) {
+      Preconditions.checkState(joinedTblRef.getOnClause() != null);
+      ojClauseConjuncts = globalState_.conjunctsByOjClause.get(joinedTblRef);
     }
     for (ExprId conjunctId: conjunctIds) {
       Expr e = globalState_.conjuncts.get(conjunctId);
       Preconditions.checkState(e != null);
       if (ojClauseConjuncts != null) {
-        if (ojClauseConjuncts.contains(conjunctId)) result.add(e);
-      } else {
+        if (ojClauseConjuncts.contains(conjunctId)
+            && canEvalFullOuterJoinedConjunct(e, nodeTupleIds)
+            && canEvalAntiJoinedConjunct(e, nodeTupleIds)) {
+          result.add(e);
+        }
+      } else if (canEvalFullOuterJoinedConjunct(e, nodeTupleIds)
+          && canEvalAntiJoinedConjunct(e, nodeTupleIds)) {
         result.add(e);
       }
     }
     return result;
+  }
+
+  /**
+   * Checks if a conjunct can be evaluated at a node materializing a list of tuple ids
+   * 'tids'.
+   */
+  public boolean canEvalFullOuterJoinedConjunct(Expr e, List<TupleId> tids) {
+    TableRef fullOuterJoin = getFullOuterJoinRef(e);
+    if (fullOuterJoin == null) return true;
+    return tids.containsAll(fullOuterJoin.getAllTupleIds());
   }
 
   /**
@@ -1010,7 +1082,11 @@ public class Analyzer {
         if (isAntiJoinedConjunct(e)) return canEvalAntiJoinedConjunct(e, tupleIds);
         // bail if this is from an OJ On clause; the join node will pick
         // it up later via getUnassignedOjConjuncts()
-        return !globalState_.ojClauseByConjunct.containsKey(e.getId());
+        if (globalState_.ojClauseByConjunct.containsKey(e.getId())) return false;
+        // If this is not from an OJ On clause (e.g. where clause or On clause of an
+        // inner join) and is full-outer joined, we need to make sure it is not
+        // assigned below the full outer join node that outer-joined it.
+        return canEvalFullOuterJoinedConjunct(e, tupleIds);
       }
 
       TupleId tid = tids.get(0);
@@ -1023,6 +1099,10 @@ public class Analyzer {
             != globalState_.outerJoinedTupleIds.get(tid)) {
           return false;
         }
+        // Single tuple id conjuncts specified in the FOJ On-clause are not allowed to be
+        // assigned below that full outer join in the operator tree.
+        TableRef tblRef = globalState_.ojClauseByConjunct.get(e.getId());
+        if (tblRef.getJoinOp().isFullOuterJoin()) return false;
       } else {
         // non-OJ On-clause predicate: not okay if tid is nullable and the
         // predicate tests for null
@@ -1034,7 +1114,10 @@ public class Analyzer {
         // can assign it to this node.
         if (isAntiJoinedConjunct(e)) return canEvalAntiJoinedConjunct(e, tupleIds);
       }
-      return true;
+      // Single tid predicate that is not from an OJ On-clause and is outer-joined by a
+      // full outer join cannot be assigned below that full outer join in the
+      // operator tree.
+      return canEvalFullOuterJoinedConjunct(e, tupleIds);
     }
     if (isAntiJoinedConjunct(e)) return canEvalAntiJoinedConjunct(e, tupleIds);
 
@@ -1062,7 +1145,7 @@ public class Analyzer {
    */
   public boolean canEvalAntiJoinedConjunct(Expr e, List<TupleId> nodeTupleIds) {
     TableRef antiJoinRef = getAntiJoinRef(e);
-    if (antiJoinRef == null) return false;
+    if (antiJoinRef == null) return true;
     List<TupleId> tids = Lists.newArrayList();
     e.getIds(tids, null);
     if (tids.size() > 1) {
@@ -1140,6 +1223,9 @@ public class Analyzer {
             != globalState_.outerJoinedTupleIds.get(destTid)) {
           continue;
         }
+        // Do not propagate conjuncts from the on-clause of full-outer or anti-joins.
+        TableRef tblRef = globalState_.ojClauseByConjunct.get(srcConjunct.getId());
+        if (tblRef.getJoinOp().isFullOuterJoin()) continue;
       }
 
       // Conjuncts specified in the ON-clause of an anti-join must be evaluated at that
@@ -1322,6 +1408,12 @@ public class Analyzer {
       Preconditions.checkState(!lhsSlots.isEmpty() && !rhsSlots.isEmpty());
 
       if (!partialEquivSlots.union(lhsSlots.get(0), rhsSlots.get(0))) continue;
+      // Do not create a new predicate from slots that are full outer joined because that
+      // predicate may be incorrectly assigned to a node below the associated full outer
+      // join.
+      if (isFullOuterJoined(lhsSlots.get(0)) || isFullOuterJoined(rhsSlots.get(0))) {
+        continue;
+      }
       T newEqPred = (T) createEqPredicate(lhsSlots.get(0), rhsSlots.get(0));
       newEqPred.analyzeNoThrow(this);
       if (!hasMutualValueTransfer(lhsSlots.get(0), rhsSlots.get(0))) continue;
@@ -1558,6 +1650,14 @@ public class Analyzer {
     TableRef tblRef = globalState_.sjClauseByConjunct.get(e.getId());
     if (tblRef == null) return null;
     return (tblRef.getJoinOp().isAntiJoin()) ? tblRef : null;
+  }
+
+  public boolean isFullOuterJoined(TupleId tid) {
+    return globalState_.fullOuterJoinedTupleIds.containsKey(tid);
+  }
+
+  public boolean isFullOuterJoined(SlotId sid) {
+    return isFullOuterJoined(getTupleId(sid));
   }
 
   private boolean isVisible(TupleId tid) {

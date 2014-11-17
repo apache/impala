@@ -49,6 +49,10 @@ public enum JoinOperator {
     return thriftJoinOp_;
   }
 
+  public boolean isInnerJoin() {
+    return this == INNER_JOIN;
+  }
+
   public boolean isOuterJoin() {
     return this == LEFT_OUTER_JOIN
         || this == RIGHT_OUTER_JOIN
@@ -63,6 +67,10 @@ public enum JoinOperator {
 
   public boolean isCrossJoin() {
     return this == JoinOperator.CROSS_JOIN;
+  }
+
+  public boolean isFullOuterJoin() {
+    return this == JoinOperator.FULL_OUTER_JOIN;
   }
 
   public boolean isNullAwareLeftAntiJoin() {

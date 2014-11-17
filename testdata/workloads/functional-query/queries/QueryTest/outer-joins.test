@@ -411,7 +411,16 @@ FROM alltypes a
      ON a.id=b.id AND a.id = 1
 ORDER BY ts2 DESC LIMIT 10;
 ---- RESULTS
-'1'
+'9'
+'9'
+'9'
+'9'
+'9'
+'9'
+'9'
+'9'
+'9'
+'9'
 ---- TYPES
 string
 ====

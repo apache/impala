@@ -1854,14 +1854,7 @@ public class Planner {
     joinPredicates.clear();
     TupleId tblRefId = joinedTblRef.getId();
     List<TupleId> tblRefIds = tblRefId.asList();
-    List<Expr> candidates;
-    if (joinedTblRef.getJoinOp().isOuterJoin()) {
-      // TODO: create test for this
-      Preconditions.checkState(joinedTblRef.getOnClause() != null);
-      candidates = analyzer.getEqJoinConjuncts(tblRefId, joinedTblRef);
-    } else {
-      candidates = analyzer.getEqJoinConjuncts(tblRefId, null);
-    }
+    List<Expr> candidates = analyzer.getEqJoinConjuncts(planIds, joinedTblRef);
     if (candidates == null) return;
 
     List<TupleId> joinTupleIds = Lists.newArrayList();
@@ -1870,13 +1863,6 @@ public class Planner {
     for (Expr e: candidates) {
       // Ignore predicate if one of its children is a constant.
       if (e.getChild(0).isConstant() || e.getChild(1).isConstant()) continue;
-
-      // Check if an equality conjunct from the On-clause of an anti-join can be
-      // assigned in this node.
-      if (analyzer.isAntiJoinedConjunct(e)
-          && !analyzer.canEvalAntiJoinedConjunct(e, joinTupleIds)) {
-        continue;
-      }
 
       Expr rhsExpr = null;
       if (e.getChild(0).isBoundByTupleIds(tblRefIds)) {

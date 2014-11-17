@@ -301,7 +301,11 @@ public class TableRef implements ParseNode {
       analyzer.registerOuterJoinedTids(leftTblRef_.getAllTupleIds(), this);
       lhsIsNullable = true;
     }
-
+    // register the tuple ids of a full outer join
+    if (joinOp_ == JoinOperator.FULL_OUTER_JOIN) {
+      analyzer.registerFullOuterJoinedTids(leftTblRef_.getAllTupleIds(), this);
+      analyzer.registerFullOuterJoinedTids(getId().asList(), this);
+    }
     // register the tuple id of the rhs of a left semi join
     TupleId semiJoinedTupleId = null;
     if (joinOp_ == JoinOperator.LEFT_SEMI_JOIN
