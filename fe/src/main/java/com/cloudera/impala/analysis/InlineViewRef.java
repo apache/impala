@@ -248,10 +248,10 @@ public class InlineViewRef extends TableRef {
     TreeNode.collect(smap.getRhs(), Predicates.instanceOf(SlotRef.class), rhsSlotRefs);
     // Map for substituting SlotRefs with NullLiterals.
     ExprSubstitutionMap nullSMap = new ExprSubstitutionMap();
-    NullLiteral nullLiteral = new NullLiteral();
-    nullLiteral.analyzeNoThrow(analyzer);
     for (SlotRef rhsSlotRef: rhsSlotRefs) {
-      nullSMap.put(rhsSlotRef.clone(), nullLiteral.clone());
+      // The rhs null literal should have the same type as the lhs SlotRef to ensure
+      // exprs resolve to the same signature after applying this smap.
+      nullSMap.put(rhsSlotRef.clone(), NullLiteral.create(rhsSlotRef.getType()));
     }
 
     // Make rhs exprs nullable if necessary.

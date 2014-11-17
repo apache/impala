@@ -434,6 +434,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "FROM functional.decimal_tbl AS t1) AS t3 " +
         "ON t3.double_col_3 = t1.d3");
 
+    // Test that InlineViewRef.makeOutputNullable() preserves expr signatures when
+    // substituting NULL literals for SlotRefs (IMPALA-1468).
+    AnalyzesOk("select 1 from functional.alltypes a left outer join " +
+        "(select id, upper(decode(string_col, NULL, date_string_col)) " +
+        "from functional.alltypes) v on (a.id = v.id)");
+
     // Inline view with a subquery
     AnalyzesOk("select y x from " +
         "(select id y from functional.alltypestiny where id in " +
