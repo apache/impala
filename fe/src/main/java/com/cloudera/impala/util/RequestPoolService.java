@@ -86,9 +86,9 @@ public class RequestPoolService {
   final static String LLAMA_MAX_PLACED_RESERVATIONS_KEY =
       "llama.am.throttling.maximum.placed.reservations";
 
-  // If the default maximum.placed.reservations property isn't set in the config, Llama
-  // uses this default value.
-  final static int LLAMA_MAX_PLACED_RESERVATIONS_DEFAULT = 20;
+  // Default value for the maximum.placed.reservations property. Note that this value
+  // differs from the current Llama default of 10000 which is too high.
+  final static int LLAMA_MAX_PLACED_RESERVATIONS_DEFAULT = 200;
 
   // Key for the default maximum number of queued requests ("queued reservations")
   // property. The per-pool key name is this key with the pool name appended, e.g.
@@ -96,9 +96,9 @@ public class RequestPoolService {
   final static String LLAMA_MAX_QUEUED_RESERVATIONS_KEY =
       "llama.am.throttling.maximum.queued.reservations";
 
-  // If the default maximum.queued.reservations property isn't set in the config, Llama
-  // uses this default value.
-  final static int LLAMA_MAX_QUEUED_RESERVATIONS_DEFAULT = 50;
+  // Default value for the maximum.queued.reservations property. Note that this value
+  // differs from the current Llama default of 0 which disables queuing.
+  final static int LLAMA_MAX_QUEUED_RESERVATIONS_DEFAULT = 200;
 
   // String format for a per-pool configuration key. First parameter is the key for the
   // default, e.g. LLAMA_MAX_PLACED_RESERVATIONS_KEY, and the second parameter is the

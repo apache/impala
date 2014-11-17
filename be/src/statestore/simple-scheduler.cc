@@ -55,7 +55,8 @@ DECLARE_bool(enable_rm);
 DECLARE_int32(rm_default_cpu_vcores);
 DECLARE_string(rm_default_memory);
 
-DEFINE_bool(disable_admission_control, false, "Disables admission control.");
+DEFINE_bool(disable_admission_control, true, "Disables admission control.");
+
 DEFINE_bool(require_username, false, "Requires that a user be provided in order to "
     "schedule requests. If enabled and a user is not provided, requests will be "
     "rejected, otherwise requests without a username will be submitted with the "

@@ -59,8 +59,10 @@ _STATESTORED_ARGS = "-statestore_heartbeat_frequency_ms=%s" % (STATESTORE_HEARTB
 
 def impalad_admission_ctrl_flags(max_requests, max_queued, mem_limit):
   return ("-vmodule admission-controller=3 -default_pool_max_requests %s "
-      "-default_pool_max_queued %s -default_pool_mem_limit %s" %\
+      "-default_pool_max_queued %s -default_pool_mem_limit %s "
+      "-disable_admission_control=false" %\
       (max_requests, max_queued, mem_limit))
+
 
 def impalad_admission_ctrl_config_args():
   impalad_home = os.environ['IMPALA_HOME']
@@ -68,7 +70,8 @@ def impalad_admission_ctrl_config_args():
   fs_allocation_path = os.path.join(resources_dir, "fair-scheduler-test2.xml")
   llama_site_path = os.path.join(resources_dir, "llama-site-test2.xml")
   return ("-vmodule admission-controller=3 -fair_scheduler_allocation_path %s "
-        "-llama_site_path %s" % (fs_allocation_path, llama_site_path))
+        "-llama_site_path %s -disable_admission_control=false" %\
+        (fs_allocation_path, llama_site_path))
 
 def log_metrics(log_prefix, metrics, log_level=logging.DEBUG):
   LOG.log(log_level, "%sadmitted=%s, queued=%s, dequeued=%s, rejected=%s, "\
