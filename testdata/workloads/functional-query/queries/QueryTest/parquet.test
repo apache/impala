@@ -18,3 +18,21 @@ bigint
 ---- RESULTS
 1005
 ====
+---- QUERY
+# Parquet file with invalid metadata size in the file footer.
+SELECT * from bad_metadata_len
+---- CATCH
+Invalid metadata size in file footer
+====
+---- QUERY
+# Parquet file with invalid column dict_page_offset.
+SELECT * from bad_dict_page_offset
+---- CATCH
+Column 0 has invalid column offsets (offset=10000, size=47, file_size=249)
+====
+---- QUERY
+# Parquet file with invalid column total_compressed_size.
+SELECT * from bad_compressed_size
+---- CATCH
+Column 0 has invalid column offsets (offset=4, size=1000000, file_size=245)
+====

@@ -177,7 +177,8 @@ class HdfsScanNode : public ScanNode {
   // scan ranges that correspond to the original hdfs splits, the partition id must be set
   // to the range's partition id. For other ranges (e.g. columns in parquet, read past
   // buffers), the partition_id is unused. expected_local should be true if this scan
-  // range is not expected to require a remote read.
+  // range is not expected to require a remote read. The range must fall within the file
+  // bounds.  That is, the offset must be >= 0, and offset + len <= file_length.
   // This is thread safe.
   DiskIoMgr::ScanRange* AllocateScanRange(const char* file, int64_t len, int64_t offset,
       int64_t partition_id, int disk_id, bool try_cache, bool expected_local);

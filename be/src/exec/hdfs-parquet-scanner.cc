@@ -746,15 +746,14 @@ inline bool HdfsParquetScanner::BaseColumnReader::ReadValue(
 }
 
 Status HdfsParquetScanner::ProcessSplit() {
-  HdfsFileDesc* file_desc = scan_node_->GetFileDesc(stream_->filename());
-  DCHECK(file_desc != NULL);
-
   // First process the file metadata in the footer
   bool eosr;
   RETURN_IF_ERROR(ProcessFooter(&eosr));
-
   if (eosr) return Status::OK;
 
+  // The scanner-wide stream was used only to read the file footer.  Each column will
+  // add its own stream.
+  stream_ = NULL;
   // We've processed the metadata and there are columns that need to be
   // materialized.
   COUNTER_SET(num_cols_counter_, static_cast<int64_t>(column_readers_.size()));
@@ -946,12 +945,19 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
     // not enough bytes in the footer range from IssueInitialRanges().
     // We'll just issue more ranges to the IoMgr that is the actual footer.
     const HdfsFileDesc* file_desc = scan_node_->GetFileDesc(metadata_range_->file());
+    DCHECK_NOTNULL(file_desc);
     // The start of the metadata is:
     // file_length - 4-byte metadata size - footer-size - metadata size
     int64_t metadata_start = file_desc->file_length -
       sizeof(int32_t) - sizeof(PARQUET_VERSION_NUMBER) - metadata_size;
-    int metadata_bytes_to_read = metadata_size;
-
+    int64_t metadata_bytes_to_read = metadata_size;
+    if (metadata_start < 0) {
+      stringstream ss;
+      ss << "File " << stream_->filename() << " is invalid. Invalid metadata size "
+         << "in file footer: " << metadata_size << " bytes. File size: "
+         << file_desc->file_length << " bytes.";
+      return Status(ss.str());
+    }
     // IoMgr can only do a fixed size Read(). The metadata could be larger
     // so we stitch it here.
     // TODO: consider moving this stitching into the scanner context. The scanner
@@ -959,11 +965,12 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
     // now.
     metadata_buffer.resize(metadata_size);
     metadata_ptr = &metadata_buffer[0];
-    int copy_offset = 0;
+    int64_t copy_offset = 0;
     DiskIoMgr* io_mgr = scan_node_->runtime_state()->io_mgr();
 
     while (metadata_bytes_to_read > 0) {
-      int to_read = ::min(io_mgr->max_read_buffer_size(), metadata_bytes_to_read);
+      int64_t to_read = ::min(static_cast<int64_t>(io_mgr->max_read_buffer_size()),
+          metadata_bytes_to_read);
       DiskIoMgr::ScanRange* range = scan_node_->AllocateScanRange(
           metadata_range_->file(), to_read, metadata_start + copy_offset, -1,
           metadata_range_->disk_id(), metadata_range_->try_cache(),
@@ -1054,8 +1061,9 @@ Status HdfsParquetScanner::CreateColumnReaders() {
 }
 
 Status HdfsParquetScanner::InitColumns(int row_group_idx) {
+  const HdfsFileDesc* file_desc = scan_node_->GetFileDesc(metadata_range_->file());
+  DCHECK_NOTNULL(file_desc);
   parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx];
-
   // All the scan ranges (one for each col).
   vector<DiskIoMgr::ScanRange*> col_ranges;
 
@@ -1075,7 +1083,7 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
     if (col_chunk.meta_data.__isset.dictionary_page_offset) {
       if (col_chunk.meta_data.dictionary_page_offset >= col_start) {
         stringstream ss;
-        ss << "File " << stream_->filename() << ": metadata is corrupt. "
+        ss << "File " << file_desc->filename << ": metadata is corrupt. "
            << "Dictionary page (offset=" << col_chunk.meta_data.dictionary_page_offset
            << ") must come before any data pages (offset=" << col_start << ").";
         return Status(ss.str());
@@ -1083,11 +1091,22 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
       col_start = col_chunk.meta_data.dictionary_page_offset;
     }
     int64_t col_len = col_chunk.meta_data.total_compressed_size;
+    int64_t col_end = col_start + col_len;
+    if (col_end <= 0 || col_end > file_desc->file_length) {
+      stringstream ss;
+      ss << "File " << file_desc->filename << ": metadata is corrupt. "
+         << "Column " << file_col_idx << " has invalid column offsets "
+         << "(offset=" << col_start << ", size=" << col_len << ", "
+         << "file_size=" << file_desc->file_length << ").";
+      return Status(ss.str());
+    }
     if (file_version_.application == "parquet-mr" && file_version_.VersionLt(1, 2, 9)) {
       // The Parquet MR writer had a bug in 1.2.8 and below where it didn't include the
       // dictionary page header size in total_compressed_size and total_uncompressed_size
       // (see IMPALA-694). We pad col_len to compensate.
-      col_len += MAX_DICT_HEADER_SIZE;
+      int64_t bytes_remaining = file_desc->file_length - col_end;
+      int64_t pad = min(static_cast<int64_t>(MAX_DICT_HEADER_SIZE), bytes_remaining);
+      col_len += pad;
     }
 
     // TODO: this will need to change when we have co-located files and the columns
@@ -1119,10 +1138,6 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
   }
   DCHECK_EQ(col_ranges.size(), column_readers_.size());
   DCHECK_GE(scan_node_->materialized_slots().size(), column_readers_.size());
-
-  // The super class stream is not longer valid/used.  It was used
-  // just to parse the file header.
-  stream_ = NULL;
 
   // Issue all the column chunks to the io mgr and have them scheduled immediately.
   // This means these ranges aren't returned via DiskIoMgr::GetNextRange and
@@ -1217,7 +1232,7 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
   for (int i = 0; i < encodings.size(); ++i) {
     if (!IsEncodingSupported(encodings[i])) {
       stringstream ss;
-      ss << "File '" << stream_->filename() << "' uses an unsupported encoding: "
+      ss << "File '" << metadata_range_->file() << "' uses an unsupported encoding: "
          << PrintEncoding(encodings[i]) << " for column '" << schema_element.name
          << "'.";
       return Status(ss.str());
@@ -1229,7 +1244,7 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
       file_data.meta_data.codec != parquet::CompressionCodec::SNAPPY &&
       file_data.meta_data.codec != parquet::CompressionCodec::GZIP) {
     stringstream ss;
-    ss << "File '" << stream_->filename() << "' uses an unsupported compression: "
+    ss << "File '" << metadata_range_->file() << "' uses an unsupported compression: "
         << file_data.meta_data.codec << " for column '" << schema_element.name
         << "'.";
     return Status(ss.str());
@@ -1239,7 +1254,7 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
   parquet::Type::type type = IMPALA_TO_PARQUET_TYPES[slot_desc->type().type];
   if (type != file_data.meta_data.type) {
     stringstream ss;
-    ss << "File '" << stream_->filename() << "' has an incompatible type with the"
+    ss << "File '" << metadata_range_->file() << "' has an incompatible type with the"
        << " table schema for column '" << schema_element.name << "'.  Expected type: "
        << type << ".  Actual type: " << file_data.meta_data.type;
     return Status(ss.str());
@@ -1249,7 +1264,7 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
   const vector<string> schema_path = file_data.meta_data.path_in_schema;
   if (schema_path.size() != 1) {
     stringstream ss;
-    ss << "File '" << stream_->filename() << "' contains a nested schema for column '"
+    ss << "File '" << metadata_range_->file() << "' contains a nested schema for column '"
        << schema_element.name << "'.  This is currently not supported.";
     return Status(ss.str());
   }
@@ -1258,7 +1273,7 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
   if (schema_element.repetition_type != parquet::FieldRepetitionType::OPTIONAL &&
       schema_element.repetition_type != parquet::FieldRepetitionType::REQUIRED) {
     stringstream ss;
-    ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+    ss << "File '" << metadata_range_->file() << "' column '" << schema_element.name
        << "' contains an unsupported column repetition type: "
        << schema_element.repetition_type;
     return Status(ss.str());
@@ -1274,14 +1289,14 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
     // We require that the scale and byte length be set.
     if (schema_element.type != parquet::Type::FIXED_LEN_BYTE_ARRAY) {
       stringstream ss;
-      ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+      ss << "File '" << metadata_range_->file() << "' column '" << schema_element.name
          << "' should be a decimal column encoded using FIXED_LEN_BYTE_ARRAY.";
       return Status(ss.str());
     }
 
     if (!schema_element.__isset.type_length) {
       stringstream ss;
-      ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+      ss << "File '" << metadata_range_->file() << "' column '" << schema_element.name
          << "' does not have type_length set.";
       return Status(ss.str());
     }
@@ -1289,7 +1304,7 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
     int expected_len = ParquetPlainEncoder::DecimalSize(slot_desc->type());
     if (schema_element.type_length != expected_len) {
       stringstream ss;
-      ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+      ss << "File '" << metadata_range_->file() << "' column '" << schema_element.name
          << "' has an invalid type length. Expecting: " << expected_len
          << " len in file: " << schema_element.type_length;
       return Status(ss.str());
@@ -1297,7 +1312,7 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
 
     if (!schema_element.__isset.scale) {
       stringstream ss;
-      ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+      ss << "File '" << metadata_range_->file() << "' column '" << schema_element.name
          << "' does not have the scale set.";
       return Status(ss.str());
     }
@@ -1305,7 +1320,7 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
     if (schema_element.scale != slot_desc->type().scale) {
       // TODO: we could allow a mismatch and do a conversion at this step.
       stringstream ss;
-      ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+      ss << "File '" << metadata_range_->file() << "' column '" << schema_element.name
          << "' has a scale that does not match the table metadata scale."
          << " File metadata scale: " << schema_element.scale
          << " Table metadata scale: " << slot_desc->type().scale;
@@ -1315,7 +1330,7 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
     // The other decimal metadata should be there but we don't need it.
     if (!schema_element.__isset.precision) {
       stringstream ss;
-      ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+      ss << "File '" << metadata_range_->file() << "' column '" << schema_element.name
          << "' does not have the precision set.";
       if (state_->abort_on_error()) return Status(ss.str());
       state_->LogError(ss.str());
@@ -1323,7 +1338,7 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
       if (schema_element.precision != slot_desc->type().precision) {
         // TODO: we could allow a mismatch and do a conversion at this step.
         stringstream ss;
-        ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+        ss << "File '" << metadata_range_->file() << "' column '" << schema_element.name
           << "' has a precision that does not match the table metadata precision."
           << " File metadata precision: " << schema_element.precision
           << " Table metadata precision: " << slot_desc->type().precision;
@@ -1336,7 +1351,7 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
       // TODO: is this validation useful? It is not required at all to read the data and
       // might only serve to reject otherwise perfectly readable files.
       stringstream ss;
-      ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+      ss << "File '" << metadata_range_->file() << "' column '" << schema_element.name
          << "' does not have converted type set to DECIMAL.";
       if (state_->abort_on_error()) return Status(ss.str());
       state_->LogError(ss.str());
@@ -1344,7 +1359,7 @@ Status HdfsParquetScanner::ValidateColumn(const SlotDescriptor* slot_desc, int c
   } else if (schema_element.__isset.scale || schema_element.__isset.precision ||
       is_converted_type_decimal) {
     stringstream ss;
-    ss << "File '" << stream_->filename() << "' column '" << schema_element.name
+    ss << "File '" << metadata_range_->file() << "' column '" << schema_element.name
        << "' contains decimal data but the table metadata has type " << slot_desc->type();
     if (state_->abort_on_error()) return Status(ss.str());
     state_->LogError(ss.str());

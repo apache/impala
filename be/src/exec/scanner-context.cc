@@ -137,8 +137,15 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
 
     int64_t read_past_buffer_size = read_past_size_cb_.empty() ?
         DEFAULT_READ_PAST_SIZE : read_past_size_cb_(offset);
+    int64_t file_bytes_remaining = file_desc()->file_length - offset;
     read_past_buffer_size = ::max(read_past_buffer_size, read_past_size);
-
+    read_past_buffer_size = ::min(read_past_buffer_size, file_bytes_remaining);
+    // We're reading past the scan range. Be careful not to read past the end of file.
+    DCHECK_GE(read_past_buffer_size, 0);
+    if (read_past_buffer_size == 0) {
+      io_buffer_bytes_left_ = 0;
+      return Status::OK;
+    }
     DiskIoMgr::ScanRange* range = parent_->scan_node_->AllocateScanRange(filename(),
         read_past_buffer_size, offset, -1, scan_range_->disk_id(), false, false);
     RETURN_IF_ERROR(parent_->state_->io_mgr()->Read(
@@ -149,7 +156,6 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
   ++parent_->scan_node_->num_owned_io_buffers_;
   io_buffer_pos_ = reinterpret_cast<uint8_t*>(io_buffer_->buffer());
   io_buffer_bytes_left_ = io_buffer_->len();
-
   return Status::OK;
 }
 

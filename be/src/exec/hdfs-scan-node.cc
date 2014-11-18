@@ -179,6 +179,14 @@ DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(const char* file, int64_t 
     int64_t offset, int64_t partition_id, int disk_id, bool try_cache,
     bool expected_local) {
   DCHECK_GE(disk_id, -1);
+  // Require that the scan range is within [0, file_length). While this cannot be used
+  // to guarantee safety (file_length metadata may be stale), it avoids different
+  // behavior between Hadoop FileSystems (e.g. s3n hdfsSeek() returns error when seeking
+  // beyond the end of the file).
+  DCHECK_GE(offset, 0);
+  DCHECK_GE(len, 0);
+  DCHECK_LE(offset + len, GetFileDesc(file)->file_length)
+      << "Scan range beyond end of file (offset=" << offset << ", len=" << len << ")";
   if (disk_id == -1) {
     // disk id is unknown, assign it a random one.
     static int next_disk_id = 0;
