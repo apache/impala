@@ -76,6 +76,8 @@ class TestImpalaShellInteractive(object):
 
   @pytest.mark.execute_serially
   def test_cancellation(self):
+    impalad = ImpaladService(socket.getfqdn())
+    impalad.wait_for_num_in_flight_queries(0)
     command = "select sleep(10000);"
     p = self._start_new_shell_process()
     self._send_cmd_to_shell(p, command)
@@ -85,7 +87,7 @@ class TestImpalaShellInteractive(object):
     sleep(2)
     os.kill(shell_pid, signal.SIGINT)
     result = get_shell_cmd_result(p)
-    assert "Cancelling Query" in result.stderr
+    assert impalad.wait_for_num_in_flight_queries(0)
 
   @pytest.mark.execute_serially
   def test_unicode_input(self):

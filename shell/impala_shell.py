@@ -351,6 +351,7 @@ class ImpalaShell(cmd.Cmd):
       new_imp_client = ImpalaClient(self.impalad)
       new_imp_client.connect()
       new_imp_client.cancel_query(self.last_query_handle, False)
+      self.imp_client.close_query(self.last_query_handle)
       self._validate_database()
     except Exception, e:
       print_to_stderr("Failed to reconnect and close: %s" % str(e))
