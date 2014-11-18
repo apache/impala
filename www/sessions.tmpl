@@ -34,18 +34,20 @@ There are {{num_sessions}} active sessions.
     <th>Ref count</th>
   </tr>
 {{#sessions}}
-  <td>{{type}}</td>
-  <td>{{num_queries}}</td>
-  <td>{{user}}</td>
-  <td>{{delegated_user}}</td>
-  <td>{{session_id}}</td>
-  <td>{{network_address}}</td>
-  <td>{{default_database}}</td>
-  <td>{{start_time}}</td>
-  <td>{{last_accessed}}</td>
-  <td>{{expired}}</td>
-  <td>{{closed}}</td>
-  <td>{{ref_count}}</td>
+  <tr>
+    <td>{{type}}</td>
+    <td>{{num_queries}}</td>
+    <td>{{user}}</td>
+    <td>{{delegated_user}}</td>
+    <td>{{session_id}}</td>
+    <td>{{network_address}}</td>
+    <td>{{default_database}}</td>
+    <td>{{start_time}}</td>
+    <td>{{last_accessed}}</td>
+    <td>{{expired}}</td>
+    <td>{{closed}}</td>
+    <td>{{ref_count}}</td>
+  </tr>
 {{/sessions}}
 </table>
 
