@@ -848,6 +848,7 @@ Status PartitionedAggregationNode::SpillPartition(Partition* curr_partition,
     if (hash_partitions_[i]->is_spilled()) continue;
     int64_t mem = hash_partitions_[i]->aggregated_row_stream->bytes_in_mem(true);
     mem += hash_partitions_[i]->hash_tbl->byte_size();
+    mem += hash_partitions_[i]->agg_fn_pool->total_reserved_bytes();
     if (mem > max_freed_mem) {
       max_freed_mem = mem;
       partition_idx = i;
