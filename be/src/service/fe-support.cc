@@ -158,27 +158,29 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
     }
   }
 
-  if (params.fn_binary_type == TFunctionBinaryType::IR ||
-      params.fn_binary_type == TFunctionBinaryType::HIVE ||
+  // Check if the FE-specified symbol exists as-is.
+  // Set 'quiet' to true so we don't flood the log with unfound builtin symbols on
+  // startup.
+  Status status =
+      LibCache::instance()->CheckSymbolExists(params.location, type, params.symbol, true);
+  if (status.ok()) {
+    result->__set_result_code(TSymbolLookupResultCode::SYMBOL_FOUND);
+    result->__set_symbol(params.symbol);
+    return;
+  }
+
+  if (params.fn_binary_type == TFunctionBinaryType::HIVE ||
       SymbolsUtil::IsMangled(params.symbol)) {
-    // Check if the FE specified symbol exists as-is.
-    Status status =
-        LibCache::instance()->CheckSymbolExists(params.location, type, params.symbol);
-    if (status.ok()) {
-      result->__set_result_code(TSymbolLookupResultCode::SYMBOL_FOUND);
-      result->__set_symbol(params.symbol);
-      // TODO: we can demangle the user symbol here and validate it against
-      // params.arg_types. This would prevent someone from typing the wrong symbol
-      // by accident. This requires more string parsing of the symbol.
-      return;
-    } else if (params.fn_binary_type != TFunctionBinaryType::IR) {
-      // No use trying to mangle Hive or already mangled symbols, return the error.
-      result->__set_result_code(TSymbolLookupResultCode::SYMBOL_NOT_FOUND);
-      stringstream ss;
-      ss << "Could not find symbol '" << params.symbol << "' in: " << params.location;
-      result->__set_error_msg(ss.str());
-      return;
-    }
+    // No use trying to mangle Hive or already mangled symbols, return the error.
+    // TODO: we can demangle the user symbol here and validate it against
+    // params.arg_types. This would prevent someone from typing the wrong symbol
+    // by accident. This requires more string parsing of the symbol.
+    result->__set_result_code(TSymbolLookupResultCode::SYMBOL_NOT_FOUND);
+    stringstream ss;
+    ss << "Could not find symbol '" << params.symbol << "' in: " << params.location;
+    result->__set_error_msg(ss.str());
+    VLOG(1) << ss.str() << endl << status.GetErrorMsg();
+    return;
   }
 
   string symbol = params.symbol;
@@ -197,7 +199,7 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
   }
 
   // Look up the mangled symbol
-  Status status = LibCache::instance()->CheckSymbolExists(params.location, type, symbol);
+  status = LibCache::instance()->CheckSymbolExists(params.location, type, symbol);
   if (!status.ok()) {
     result->__set_result_code(TSymbolLookupResultCode::SYMBOL_NOT_FOUND);
     stringstream ss;

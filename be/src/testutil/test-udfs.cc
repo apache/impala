@@ -281,3 +281,7 @@ BigIntVal DoubleFreeTest(FunctionContext* context, BigIntVal bytes) {
   context->Free(bytes.val);
   return bytes;
 }
+
+extern "C" BigIntVal UnmangledSymbol(FunctionContext* context) {
+  return BigIntVal(5);
+}

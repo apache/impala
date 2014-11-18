@@ -247,6 +247,7 @@ drop function if exists {database}.constant_arg(int);
 drop function if exists {database}.validate_open(int);
 drop function if exists {database}.mem_test(bigint);
 drop function if exists {database}.mem_test_leaks(bigint);
+drop function if exists {database}.unmangled_symbol();
 
 create database if not exists {database};
 
@@ -342,4 +343,8 @@ prepare_fn='MemTestPrepare' close_fn='MemTestClose';
 create function {database}.mem_test_leaks(bigint) returns bigint
 location '{location}' symbol='MemTest'
 prepare_fn='MemTestPrepare';
+
+-- Regression test for IMPALA-1475
+create function {database}.unmangled_symbol() returns bigint
+location '{location}' symbol='UnmangledSymbol';
 """
