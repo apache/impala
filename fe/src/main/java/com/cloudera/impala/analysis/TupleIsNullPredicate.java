@@ -15,12 +15,14 @@
 package com.cloudera.impala.analysis;
 
 import java.util.List;
+import java.util.Set;
 
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TTupleIsNullPredicate;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Internal expr that returns true if all of the given tuples are NULL, otherwise false.
@@ -33,11 +35,12 @@ import com.google.common.collect.Lists;
  *
  */
 public class TupleIsNullPredicate extends Predicate {
-  private final List<TupleId> tupleIds_;
+  private final Set<TupleId> tupleIds_;
+  private Analyzer analyzer_;
 
   public TupleIsNullPredicate(List<TupleId> tupleIds) {
     Preconditions.checkState(tupleIds != null && !tupleIds.isEmpty());
-    this.tupleIds_ = tupleIds;
+    this.tupleIds_ = Sets.newHashSet(tupleIds);
   }
 
   /**
@@ -45,21 +48,44 @@ public class TupleIsNullPredicate extends Predicate {
    */
   protected TupleIsNullPredicate(TupleIsNullPredicate other) {
     super(other);
-    tupleIds_ = Lists.newArrayList(other.tupleIds_);
+    tupleIds_ = Sets.newHashSet(other.tupleIds_);
+    analyzer_ = other.analyzer_;
+  }
+
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (isAnalyzed_) return;
+    super.analyze(analyzer);
+    analyzer_ = analyzer;
   }
 
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.TUPLE_IS_NULL_PRED;
     msg.tuple_is_null_pred = new TTupleIsNullPredicate();
+    Preconditions.checkNotNull(analyzer_);
     for (TupleId tid: tupleIds_) {
+      // Check that all referenced tuples are materialized.
+      TupleDescriptor tupleDesc = analyzer_.getTupleDesc(tid);
+      Preconditions.checkNotNull(tupleDesc, "Unknown tuple id: " + tid.toString());
+      Preconditions.checkState(tupleDesc.isMaterialized(),
+          String.format("Illegal reference to non-materialized tuple: tid=%s", tid));
       msg.tuple_is_null_pred.addToTuple_ids(tid.asInt());
     }
   }
 
   @Override
+  public boolean equals(Object o) {
+    if (!super.equals(o)) return false;
+    if (!(o instanceof TupleIsNullPredicate)) return false;
+    TupleIsNullPredicate other = (TupleIsNullPredicate) o;
+    return other.tupleIds_.containsAll(tupleIds_) &&
+        tupleIds_.containsAll(other.tupleIds_);
+  }
+
+  @Override
   protected String toSqlImpl() { return "TupleIsNull()"; }
-  public List<TupleId> getTupleIds() { return tupleIds_; }
+  public Set<TupleId> getTupleIds() { return tupleIds_; }
 
   @Override
   public Expr clone() { return new TupleIsNullPredicate(this); }

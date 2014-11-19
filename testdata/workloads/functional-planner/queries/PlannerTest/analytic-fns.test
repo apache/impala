@@ -1721,3 +1721,41 @@ WHERE id IS NULL and tinyint_col != 5
 02:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
 ====
+# IMPALA-1483: Check that TupleIsNullPredicates referring to the logical
+# analytic output are substituted with TupleIsNullPredicates referring to
+# the physical output.
+select t2.a, t2.id, t2.int_col
+from functional.alltypes t1
+left outer join
+  (select sum(int_col) over(order by id) a, id, int_col is null as int_col
+   from functional.alltypes
+   where year = 2009 and month between 1 and 2) t2
+on (t1.id = t2.id)
+where year = 2009 and month = 1
+---- DISTRIBUTEDPLAN
+08:EXCHANGE [UNPARTITIONED]
+|
+04:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
+|  hash predicates: id = t1.id
+|
+|--07:EXCHANGE [HASH(t1.id)]
+|  |
+|  00:SCAN HDFS [functional.alltypes t1]
+|     partitions=1/24 files=1 size=19.95KB
+|
+06:EXCHANGE [HASH(id)]
+|
+03:ANALYTIC
+|  functions: sum(int_col)
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+05:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: id ASC
+|
+02:SORT
+|  order by: id ASC
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=2/24 files=2 size=38.07KB
+====

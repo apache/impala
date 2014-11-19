@@ -1025,3 +1025,30 @@ WHERE EXISTS
 ---- TYPES
 DOUBLE
 ====
+----QUERY
+# IMPALA-1483: Check that TupleIsNullPredicates referring to the logical
+# analytic output are substituted with TupleIsNullPredicates referring to
+# the physical output.
+select t2.a, t2.id, t2.int_col
+from functional.alltypes t1
+left outer join
+  (select sum(int_col) over(order by id) a, id, int_col is null as int_col
+   from functional.alltypes
+   where year = 2009 and month between 1 and 2) t2
+on (t1.id = t2.id)
+where year = 2009 and month = 1
+order by t2.id limit 10
+---- RESULTS
+0,0,false
+1,1,false
+3,2,false
+6,3,false
+10,4,false
+15,5,false
+21,6,false
+28,7,false
+36,8,false
+45,9,false
+---- TYPES
+BIGINT, INT, BOOLEAN
+====
