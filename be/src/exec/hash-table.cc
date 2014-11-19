@@ -192,7 +192,8 @@ HashTable::HashTable(RuntimeState* state, BufferedBlockMgr::Client* client,
     node_remaining_current_page_(0),
     buckets_(NULL),
     num_buckets_(num_buckets),
-    num_buckets_till_resize_(num_buckets_ * MAX_BUCKET_OCCUPANCY_FRACTION) {
+    num_buckets_till_resize_(num_buckets_ * MAX_BUCKET_OCCUPANCY_FRACTION),
+    has_matches_(false) {
   DCHECK_EQ((num_buckets & (num_buckets-1)), 0) << "num_buckets must be a power of 2";
   DCHECK_GT(num_buckets, 0) << "num_buckets must be larger than 0";
   if (!stores_tuples_) DCHECK_NOTNULL(stream);
@@ -214,7 +215,8 @@ HashTable::HashTable(MemPool* pool, int num_buckets)
     node_remaining_current_page_(0),
     buckets_(NULL),
     num_buckets_(num_buckets),
-    num_buckets_till_resize_(num_buckets_ * MAX_BUCKET_OCCUPANCY_FRACTION) {
+    num_buckets_till_resize_(num_buckets_ * MAX_BUCKET_OCCUPANCY_FRACTION),
+    has_matches_(false) {
   DCHECK_EQ((num_buckets & (num_buckets-1)), 0) << "num_buckets must be a power of 2";
   DCHECK_GT(num_buckets, 0) << "num_buckets must be larger than 0";
   bool ret = Init();

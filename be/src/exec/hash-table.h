@@ -353,6 +353,9 @@ class HashTable {
   // have its matched flag set. Used in right-outer and full-outer joins.
   Iterator FirstUnmatched(HashTableCtx* ctx);
 
+  // Returns true if there was a least one match.
+  bool HasMatches() const { return has_matches_; }
+
   // Returns end marker
   Iterator End() { return Iterator(); }
 
@@ -393,9 +396,12 @@ class HashTable {
       return reinterpret_cast<Tuple*>(node_->tuple);
     }
 
-    void set_matched(bool v) {
+    // Sets as matched the node currently pointed by the iterator. The iterator
+    // cannot be AtEnd().
+    void set_matched() {
       DCHECK(!AtEnd());
-      node_->matched = v;
+      node_->matched = true;
+      table_->has_matches_ = true;
     }
 
     bool matched() const {
@@ -559,6 +565,11 @@ class HashTable {
 
   // The number of filled buckets to trigger a resize.  This is cached for efficiency
   int64_t num_buckets_till_resize_;
+
+  // Flag used to disable spilling hash tables that already had matches in case of
+  // right joins (IMPALA-1488).
+  // TODO: Not fail when spilling hash tables with matches in right joins
+  bool has_matches_;
 };
 
 }

@@ -104,7 +104,7 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
         if (JoinOp == TJoinOp::RIGHT_OUTER_JOIN || JoinOp == TJoinOp::RIGHT_SEMI_JOIN ||
             JoinOp == TJoinOp::RIGHT_ANTI_JOIN || JoinOp == TJoinOp::FULL_OUTER_JOIN) {
           // There is a match for this build row, mark it as matched for right/full joins.
-          hash_tbl_iterator_.set_matched(true);
+          hash_tbl_iterator_.set_matched();
         }
 
         // Update hash_tbl_iterator.

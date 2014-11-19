@@ -443,6 +443,9 @@ Status PartitionedHashJoinNode::SpillPartition(Partition** spilled_partition) {
     if (hash_partitions_[i]->is_spilled()) continue;
     int64_t mem = hash_partitions_[i]->build_rows()->bytes_in_mem(false);
     if (hash_partitions_[i]->hash_tbl() != NULL) {
+      // IMPALA-1488: Do not spill partitions that already had matches, because we
+      // are going to lose information and return wrong results.
+      if (hash_partitions_[i]->hash_tbl()->HasMatches()) continue;
       mem += hash_partitions_[i]->hash_tbl()->byte_size();
     }
     if (mem > max_freed_mem) {
@@ -831,7 +834,7 @@ Status PartitionedHashJoinNode::OutputUnmatchedBuild(RowBatch* out_batch) {
          num_rows_added < max_rows) {
     // Output remaining unmatched build rows.
     if (!hash_tbl_iterator_.matched()) {
-      hash_tbl_iterator_.set_matched(true);
+      hash_tbl_iterator_.set_matched();
       TupleRow* build_row = hash_tbl_iterator_.GetRow();
       DCHECK(build_row != NULL);
       if (join_op_ == TJoinOp::RIGHT_ANTI_JOIN) {
