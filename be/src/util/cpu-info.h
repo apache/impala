@@ -44,6 +44,10 @@ class CpuInfo {
   // Initialize CpuInfo.
   static void Init();
 
+  // Determine if the CPU meets the minimum CPU requirements and if not, issue an error
+  // and terminate.
+  static void VerifyCpuRequirements();
+
   // Returns all the flags for this cpu
   static int64_t hardware_flags() {
     DCHECK(initialized_);

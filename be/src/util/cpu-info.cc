@@ -18,15 +18,16 @@
 #include <boost/algorithm/string.hpp>
 #include <iostream>
 #include <fstream>
+#include <mmintrin.h>
 #include <sstream>
 #include <stdlib.h>
 #include <string.h>
-
 #include <unistd.h>
 
 using namespace boost;
 using namespace std;
 
+DECLARE_bool(abort_on_config_error);
 DEFINE_int32(num_cores, 0, "(Advanced) If > 0, it sets the number of cores available to"
     " Impala. Setting it to 0 means Impala will use all available cores on the machine"
     " according to /proc/cpuinfo.");
@@ -127,6 +128,23 @@ void CpuInfo::Init() {
   if (FLAGS_num_cores > 0) num_cores_ = FLAGS_num_cores;
 
   initialized_ = true;
+}
+
+void CpuInfo::VerifyCpuRequirements() {
+  if (!CpuInfo::IsSupported(CpuInfo::SSSE3)) {
+    LOG(ERROR) << "CPU does not support the Supplemental SSE3 (SSSE3) instruction set, "
+               << "which is required. Exiting if Supplemental SSE3 is not functional...";
+  }
+  if (FLAGS_abort_on_config_error) {
+    // Flush the log in case we crash on the PSHUFB below.
+    google::FlushLogFiles(google::GLOG_INFO);
+    // Try to execute an SSSE3 instruction so that we deterministically "abort"
+    // (i.e. crash) if the CPU really doesn't support SSSE3. Use the MMX variant and
+    // hand coded assembly to be extra safe that the compiler doesn't emit e.g. SSE 4.1
+    // instructions.
+    static volatile __m64 in, mask;
+    __asm__ __volatile__("pshufb %1, %0" : "+y" (in) : "ym" (mask));
+  }
 }
 
 void CpuInfo::EnableFeature(long flag, bool enable) {

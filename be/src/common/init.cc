@@ -41,7 +41,6 @@
 DECLARE_string(hostname);
 // TODO: renamed this to be more generic when we have a good CM release to do so.
 DECLARE_int32(logbufsecs);
-DECLARE_bool(abort_on_config_error);
 DECLARE_string(heap_profile_dir);
 DECLARE_bool(enable_process_lifetime_heap_profiling);
 
@@ -110,13 +109,11 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   MemInfo::Init();
   OsInfo::Init();
   DecimalUtil::InitMaxUnscaledDecimal();
-
   TestInfo::Init(test_mode);
 
-  if (!CpuInfo::IsSupported(CpuInfo::SSSE3)) {
-    LOG(ERROR) << "CPU does not support the Supplemental SSE3 instruction set, which is "
-               << "required. This could lead to instability.";
-  }
+  // Verify CPU meets the minimum requirements before calling InitGoogleLoggingSafe()
+  // which might use SSSE3 instructions (see IMPALA-160).
+  CpuInfo::VerifyCpuRequirements();
 
   // Set the default hostname. The user can override this with the hostname flag.
   GetHostname(&FLAGS_hostname);
