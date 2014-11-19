@@ -68,11 +68,13 @@ class TestFetchFirst(HS2TestSuite):
     else:
       assert cached_bytes == 0
 
+  @pytest.mark.xfail(run=False, reason="IMPALA-1264")
   @pytest.mark.execute_serially
   @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6)
   def test_query_stmts_v6(self):
     self.run_query_stmts_test();
 
+  @pytest.mark.xfail(run=False, reason="IMPALA-1264")
   @pytest.mark.execute_serially
   @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V1)
   def test_query_stmts_v1(self):
@@ -101,7 +103,7 @@ class TestFetchFirst(HS2TestSuite):
       expected_num_rows = 10
       if i == 4:
         expected_num_rows = 0;
-      self.fetch(execute_statement_resp.operationHandle,
+      self.fetch_until(execute_statement_resp.operationHandle,
                  TCLIService.TFetchOrientation.FETCH_NEXT, 10, expected_num_rows)
       # Fetch 10 rows with the FETCH_FIRST orientation, expecting an error.
       # After a failed FETCH_FIRST, the client can still resume FETCH_NEXT.
