@@ -31,6 +31,13 @@ SHELL_HOME=${IMPALA_SHELL_HOME:-${SCRIPT_DIR}}
 # Set the envrionment's locale settings to allow for utf-8 compatibility
 export LC_CTYPE=${LC_CTYPE:-en_US.UTF-8}
 
+# We should set the EGG_CACHE to a per-user temporary location.
+# This follows what hue does.
+PYTHON_EGG_CACHE=/tmp/impala-shell-python-egg-cache-${USER}
+if [ ! -d ${PYTHON_EGG_CACHE} ]; then
+  mkdir ${PYTHON_EGG_CACHE}
+fi
+
 # External module eggs are located in /ext-py, append them to the PYTHONPATH
 EGG_PATH=''
 for EGG in $(ls ${SHELL_HOME}/ext-py/*.egg); do
