@@ -44,12 +44,15 @@ class FreePool {
  public:
   // C'tor, initializes the FreePool to be empty. All allocations come from the
   // 'mem_pool'.
-  FreePool(MemPool* mem_pool) : mem_pool_(mem_pool) {
+  FreePool(MemPool* mem_pool)
+    : mem_pool_(mem_pool),
+      net_allocations_(0) {
     memset(&lists_, 0, sizeof(lists_));
   }
 
   // Allocates a buffer of size.
   uint8_t* Allocate(int size) {
+    ++net_allocations_;
     if (FLAGS_disable_mem_pools) return reinterpret_cast<uint8_t*>(malloc(size));
 
     // This is the typical malloc behavior. NULL is reserved for failures.
@@ -77,6 +80,7 @@ class FreePool {
   }
 
   void Free(uint8_t* ptr) {
+    --net_allocations_;
     if (FLAGS_disable_mem_pools) {
       free(ptr);
       return;
@@ -121,6 +125,7 @@ class FreePool {
   }
 
   MemTracker* mem_tracker() { return mem_pool_->mem_tracker(); }
+  int64_t net_allocations() const { return net_allocations_; }
 
  private:
   static const int NUM_LISTS = 64;
@@ -171,6 +176,9 @@ class FreePool {
   // While it doesn't make too much sense to use this for very small (e.g. 8 byte)
   // allocations, it makes the indexing easy.
   FreeListNode lists_[NUM_LISTS];
+
+  // Diagnostic counter that tracks (# Allocates - # Frees)
+  int64_t net_allocations_;
 };
 
 }

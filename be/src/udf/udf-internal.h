@@ -130,7 +130,8 @@ class FunctionContextImpl {
   int64_t num_updates_;
   int64_t num_removes_;
 
-  // Allocations made and still owned by the user function.
+  // Allocations made and still owned by the user function. Only used if debug_ is true
+  // because it is very expensive to maintain.
   std::map<uint8_t*, int> allocations_;
   // Allocations owned by Impala.
   std::vector<uint8_t*> local_allocations_;

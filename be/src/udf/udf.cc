@@ -45,9 +45,10 @@ class MemTracker {
 
 class FreePool {
  public:
-  FreePool(MemPool*) { }
+  FreePool(MemPool*) : net_allocations_(0) { }
 
   uint8_t* Allocate(int byte_size) {
+    ++net_allocations_;
     return reinterpret_cast<uint8_t*>(malloc(byte_size));
   }
 
@@ -56,13 +57,16 @@ class FreePool {
   }
 
   void Free(uint8_t* ptr) {
+    --net_allocations_;
     free(ptr);
   }
 
   MemTracker* mem_tracker() { return &mem_tracker_; }
+  int64_t net_allocations() const { return net_allocations_; }
 
  private:
   MemTracker mem_tracker_;
+  int64_t net_allocations_;
 };
 
 class RuntimeState {
@@ -172,8 +176,20 @@ FunctionContextImpl::FunctionContextImpl(FunctionContext* parent)
 
 void FunctionContextImpl::Close() {
   if (closed_) return;
+
+  // Free local allocations first so we can detect leaks through any remaining allocations
+  // (local allocations cannot be leaked, at least not by the UDF)
+  FreeLocalAllocations();
+
   stringstream error_ss;
-  if (!allocations_.empty()) {
+  if (!debug_) {
+    if (pool_->net_allocations() > 0) {
+      error_ss << "Memory leaked via FunctionContext::Allocate()";
+    } else if (pool_->net_allocations() < 0) {
+      error_ss << "FunctionContext::Free() called on buffer that was already freed or "
+                  "was not allocated.";
+    }
+  } else if (!allocations_.empty()) {
     int bytes = 0;
     for (map<uint8_t*, int>::iterator i = allocations_.begin();
          i != allocations_.end(); ++i) {
@@ -204,8 +220,6 @@ void FunctionContextImpl::Close() {
     }
   }
 
-  // Local allocations cannot be leaked (at least not by the UDF)
-  FreeLocalAllocations();
   free(varargs_buffer_);
   varargs_buffer_ = NULL;
   closed_ = true;
@@ -244,8 +258,10 @@ uint8_t* FunctionContext::Allocate(int byte_size) {
   assert(!impl_->closed_);
   if (byte_size == 0) return NULL;
   uint8_t* buffer = impl_->pool_->Allocate(byte_size);
-  impl_->allocations_[buffer] = byte_size;
-  if (impl_->debug_) memset(buffer, 0xff, byte_size);
+  if (impl_->debug_) {
+    impl_->allocations_[buffer] = byte_size;
+    memset(buffer, 0xff, byte_size);
+  }
   VLOG_ROW << "Allocate: FunctionContext=" << this
            << " size=" << byte_size
            << " result=" << reinterpret_cast<void*>(buffer);
@@ -257,12 +273,14 @@ uint8_t* FunctionContext::Reallocate(uint8_t* ptr, int byte_size) {
   VLOG_ROW << "Reallocate: FunctionContext=" << this
            << " size=" << byte_size
            << " ptr=" << reinterpret_cast<void*>(ptr);
-  impl_->allocations_.erase(ptr);
-  ptr = impl_->pool_->Reallocate(ptr, byte_size);
-  impl_->allocations_[ptr] = byte_size;
+  uint8_t* new_ptr = impl_->pool_->Reallocate(ptr, byte_size);
+  if (impl_->debug_) {
+    impl_->allocations_.erase(ptr);
+    impl_->allocations_[new_ptr] = byte_size;
+  }
   VLOG_ROW << "FunctionContext=" << this
-           << " reallocated: " << reinterpret_cast<void*>(ptr);
-  return ptr;
+           << " reallocated: " << reinterpret_cast<void*>(new_ptr);
+  return new_ptr;
 }
 
 void FunctionContext::Free(uint8_t* buffer) {
@@ -278,11 +296,10 @@ void FunctionContext::Free(uint8_t* buffer) {
       impl_->allocations_.erase(it);
       impl_->pool_->Free(buffer);
     } else {
-      SetError(
-          "FunctionContext::Free() on buffer that is not freed or was not allocated.");
+      SetError("FunctionContext::Free() called on buffer that is already freed or was "
+               "not allocated.");
     }
   } else {
-    impl_->allocations_.erase(buffer);
     impl_->pool_->Free(buffer);
   }
 }
