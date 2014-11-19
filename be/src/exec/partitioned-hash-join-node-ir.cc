@@ -205,14 +205,14 @@ next_row:
         // This partition is closed, meaning the build side for this partition was empty.
         DCHECK_EQ(state_, PROCESSING_PROBE);
       } else {
+        // This partition is not in memory, spill the probe row and move to the next row.
         DCHECK(partition->is_spilled());
         DCHECK(partition->probe_rows() != NULL);
-        // This partition is not in memory, spill the probe row.
         if (UNLIKELY(!AppendRow(partition->probe_rows(), current_probe_row_))) {
           status_ = partition->probe_rows()->status();
           return -1;
         }
-        continue;
+        goto next_row;
       }
     }
   }
