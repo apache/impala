@@ -32,6 +32,7 @@ SelectNode::SelectNode(
 }
 
 Status SelectNode::Prepare(RuntimeState* state) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   child_row_batch_.reset(
       new RowBatch(child(0)->row_desc(), state->batch_size(), mem_tracker()));
@@ -39,14 +40,15 @@ Status SelectNode::Prepare(RuntimeState* state) {
 }
 
 Status SelectNode::Open(RuntimeState* state) {
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_ERROR(child(0)->Open(state));
   return Status::OK;
 }
 
 Status SelectNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
-  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
 
   if (ReachedLimit() || (child_row_idx_ == child_row_batch_->num_rows() && child_eos_)) {
     // we're already done or we exhausted the last child batch and there won't be any
