@@ -1848,9 +1848,19 @@ public class Planner {
     }
     if (candidates == null) return;
 
+    List<TupleId> joinTupleIds = Lists.newArrayList();
+    joinTupleIds.addAll(planIds);
+    joinTupleIds.add(tblRefId);
     for (Expr e: candidates) {
       // Ignore predicate if one of its children is a constant.
       if (e.getChild(0).isConstant() || e.getChild(1).isConstant()) continue;
+
+      // Check if an equality conjunct from the On-clause of an anti-join can be
+      // assigned in this node.
+      if (analyzer.isAntiJoinedConjunct(e)
+          && !analyzer.canEvalAntiJoinedConjunct(e, joinTupleIds)) {
+        continue;
+      }
 
       Expr rhsExpr = null;
       if (e.getChild(0).isBoundByTupleIds(tblRefIds)) {

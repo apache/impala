@@ -1270,7 +1270,7 @@ where j.test_id < 10
 |
 |--01:SCAN HDFS [functional.dimtbl d]
 |     partitions=1/1 files=1 size=171B
-|     predicates: d.name = 'Name2', d.id < 10
+|     predicates: d.id < 10, d.name = 'Name2'
 |
 00:SCAN HDFS [functional.jointbl j]
    partitions=1/1 files=1 size=433B
@@ -1678,4 +1678,73 @@ on (b.int_col = c.smallint_col and b.string_col = c.string_col)
 00:SCAN HDFS [functional.alltypessmall]
    partitions=4/4 files=4 size=6.32KB
    predicates: functional.alltypessmall.smallint_col = functional.alltypessmall.int_col
+====
+# Assignment of predicates from the On-clause of an
+# anti join; inner join followed by anti join (IMPALA-1387)
+select a.*
+from functional.alltypes a inner join functional.alltypes b
+on a.id = b.id
+where not exists (select *
+                  from functional.alltypes c
+# Predicate on a (visible side of anti join) is assigned to the anti join, predicate on
+# a and b is also assigned to the anti join
+                  where a.id = c.id and a.int_col = b.int_col and a.tinyint_col = 10
+# Predicate on c (invisible side of anti join) is assigned to the scan node
+                  and c.int_col < 10)
+---- PLAN
+04:HASH JOIN [LEFT ANTI JOIN]
+|  hash predicates: a.id = c.id
+|  other join predicates: a.tinyint_col = 10, a.int_col = b.int_col
+|
+|--02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: c.int_col < 10
+|
+03:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Assignment of predicates from the On-clause of an anti join;
+# sequence of inner joins interleaved with an anti join.
+select *
+from functional.alltypes a inner join functional.alltypes b
+  on (a.id = b.id)
+left anti join functional.alltypestiny c
+# Predicate on a and b from the On-clause is assigned to the anti join,
+# predicate on c is assigned to the scan node
+  on (a.int_col = c.int_col and a.tinyint_col = b.tinyint_col and a.float_col = 2.1
+      and c.bool_col = false)
+inner join functional.alltypesagg d
+  on (a.tinyint_col = d.tinyint_col and a.int_col < 10)
+where a.float_col < b.float_col
+---- PLAN
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: a.tinyint_col = d.tinyint_col
+|
+|--03:SCAN HDFS [functional.alltypesagg d]
+|     partitions=11/11 files=11 size=814.73KB
+|
+07:HASH JOIN [LEFT ANTI JOIN]
+|  hash predicates: a.int_col = c.int_col
+|  other join predicates: a.tinyint_col = b.tinyint_col, a.float_col = 2.1
+|
+|--02:SCAN HDFS [functional.alltypestiny c]
+|     partitions=4/4 files=4 size=460B
+|     predicates: c.int_col < 10, c.bool_col = FALSE
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: b.id = a.id
+|  other predicates: a.float_col < b.float_col
+|
+|--00:SCAN HDFS [functional.alltypes a]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: a.int_col < 10
+|
+01:SCAN HDFS [functional.alltypes b]
+   partitions=24/24 files=24 size=478.45KB
 ====

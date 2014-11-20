@@ -898,7 +898,8 @@ public class Analyzer {
     e.getIds(tids, null);
     if (tids.isEmpty()) return false;
     if (tids.size() > 1 || isOjConjunct(e)
-        || isOuterJoined(tids.get(0)) && e.isWhereClauseConjunct()) {
+        || (isOuterJoined(tids.get(0)) && e.isWhereClauseConjunct())
+        || isAntiJoinedConjunct(e)) {
       return true;
     }
     return false;
@@ -1004,6 +1005,9 @@ public class Analyzer {
 
     if (!e.isWhereClauseConjunct()) {
       if (tids.size() > 1) {
+        // If the conjunct is from the ON-clause of an anti join, check if we can
+        // assign it to this node.
+        if (isAntiJoinedConjunct(e)) return canEvalAntiJoinedConjunct(e, tupleIds);
         // bail if this is from an OJ On clause; the join node will pick
         // it up later via getUnassignedOjConjuncts()
         return !globalState_.ojClauseByConjunct.containsKey(e.getId());
@@ -1026,9 +1030,13 @@ public class Analyzer {
             && isTrueWithNullSlots(e)) {
           return false;
         }
+        // If this single tid conjunct is from the On-clause of an anti-join, check if we
+        // can assign it to this node.
+        if (isAntiJoinedConjunct(e)) return canEvalAntiJoinedConjunct(e, tupleIds);
       }
       return true;
     }
+    if (isAntiJoinedConjunct(e)) return canEvalAntiJoinedConjunct(e, tupleIds);
 
     for (TupleId tid: tids) {
       LOG.trace("canEval: checking tid " + tid.toString());
@@ -1046,6 +1054,24 @@ public class Analyzer {
 
   private boolean canEvalPredicate(PlanNode node, Expr e) {
     return canEvalPredicate(node.getTblRefIds(), e);
+  }
+
+  /**
+   * Checks if a conjunct from the On-clause of an anti join can be evaluated in a node
+   * that materializes a given list of tuple ids.
+   */
+  public boolean canEvalAntiJoinedConjunct(Expr e, List<TupleId> nodeTupleIds) {
+    TableRef antiJoinRef = getAntiJoinRef(e);
+    if (antiJoinRef == null) return false;
+    List<TupleId> tids = Lists.newArrayList();
+    e.getIds(tids, null);
+    if (tids.size() > 1) {
+      return nodeTupleIds.containsAll(antiJoinRef.getAllTupleIds())
+          && antiJoinRef.getAllTupleIds().containsAll(nodeTupleIds);
+    }
+    // A single tid conjunct that is anti-joined can be safely assigned to a
+    // node below the anti join that specified it.
+    return globalState_.semiJoinedTupleIds.containsKey(tids.get(0));
   }
 
   /**
@@ -1115,6 +1141,10 @@ public class Analyzer {
           continue;
         }
       }
+
+      // Conjuncts specified in the ON-clause of an anti-join must be evaluated at that
+      // join node.
+      if (isAntiJoinedConjunct(srcConjunct)) continue;
 
       // Generate predicates for all src-to-dest slot mappings.
       for (List<SlotId> destSids: allDestSids) {
@@ -1518,6 +1548,16 @@ public class Analyzer {
 
   public boolean isSemiJoined(TupleId tid) {
     return globalState_.semiJoinedTupleIds.containsKey(tid);
+  }
+
+  public boolean isAntiJoinedConjunct(Expr e) {
+    return getAntiJoinRef(e) != null;
+  }
+
+  public TableRef getAntiJoinRef(Expr e) {
+    TableRef tblRef = globalState_.sjClauseByConjunct.get(e.getId());
+    if (tblRef == null) return null;
+    return (tblRef.getJoinOp().isAntiJoin()) ? tblRef : null;
   }
 
   private boolean isVisible(TupleId tid) {
