@@ -442,7 +442,7 @@ nonterminal CreateFunctionStmtBase.OptArg create_function_arg_key;
 
 precedence left KW_OR;
 precedence left KW_AND;
-precedence left KW_NOT, NOT;
+precedence right KW_NOT, NOT;
 precedence left KW_BETWEEN, KW_IN, KW_IS, KW_EXISTS;
 precedence left KW_LIKE, KW_RLIKE, KW_REGEXP;
 precedence left EQUAL, LESSTHAN, GREATERTHAN;

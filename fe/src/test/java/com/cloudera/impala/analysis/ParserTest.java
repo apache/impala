@@ -1307,6 +1307,19 @@ public class ParserTest {
         }
       }
     }
+
+    // Test right associativity of NOT.
+    for (String notStr : notStrs) {
+      SelectStmt stmt =
+          (SelectStmt) ParsesOk(String.format("select %s a != b", notStr));
+      // The NOT should be applied on the result of a != b, and not on a only.
+      Expr e = stmt.getSelectList().getItems().get(0).getExpr();
+      assertTrue(e instanceof CompoundPredicate);
+      CompoundPredicate cp = (CompoundPredicate) e;
+      assertEquals(CompoundPredicate.Operator.NOT, cp.getOp());
+      assertEquals(1, cp.getChildren().size());
+      assertTrue(cp.getChild(0) instanceof BinaryPredicate);
+    }
   }
 
   @Test
