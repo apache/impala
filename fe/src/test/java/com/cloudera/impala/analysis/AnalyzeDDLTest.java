@@ -841,9 +841,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   }
 
   @Test
-  public void TestCreateTable() throws AnalysisException {
-    AnalyzesOk("create table functional.new_table (i int)");
-    AnalyzesOk("create table if not exists functional.alltypes (i int)");
+  public void TestCreateTableLike() throws AnalysisException {
     AnalyzesOk("create table if not exists functional.new_tbl like functional.alltypes");
     AnalyzesOk("create table functional.like_view like functional.view_view");
     AnalyzesOk(
@@ -854,6 +852,31 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Table does not exist: functional.tbl_does_not_exist");
     AnalysisError("create table functional.new_table like db_does_not_exist.alltypes",
         "Database does not exist: db_does_not_exist");
+    // Invalid database name.
+    AnalysisError("create table `???`.new_table like functional.alltypes",
+        "Invalid database name: ???");
+    // Invalid table/view name.
+    AnalysisError("create table functional.`^&*` like functional.alltypes",
+        "Invalid table/view name: ^&*");
+    // Invalid source database/table name reports non-existence instead of invalidity.
+    AnalysisError("create table functional.foo like `???`.alltypes",
+        "Database does not exist: ???");
+    AnalysisError("create table functional.foo like functional.`%^&`",
+        "Table does not exist: functional.%^&");
+    // Invalid URI values.
+    AnalysisError("create table functional.bar like functional.alltypes location " +
+        "'file://test-warehouse/new_table'", "URI location " +
+        "'file://test-warehouse/new_table' must point to an HDFS file system.");
+    AnalysisError("create table functional.baz like functional.alltypes location '  '",
+        "URI path cannot be empty.");
+  }
+
+  @Test
+  public void TestCreateTable() throws AnalysisException {
+    AnalyzesOk("create table functional.new_table (i int)");
+    AnalyzesOk("create table if not exists functional.alltypes (i int)");
+    AnalysisError("create table functional.alltypes",
+        "Table already exists: functional.alltypes");
     AnalysisError("create table functional.alltypes (i int)",
         "Table already exists: functional.alltypes");
     AnalyzesOk("create table functional.new_table (i int) row format delimited fields " +
@@ -958,13 +981,13 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Invalid column/field name: ???");
     AnalysisError("create table new_table (i int) PARTITIONED BY (`^&*` int)",
         "Invalid column/field name: ^&*");
-    // Invalid source database/table name reports non-existence instead of invalidity.
-    AnalysisError("create table functional.foo like `???`.alltypes",
-        "Database does not exist: ???");
-    AnalysisError("create table functional.foo like functional.`%^&`",
-        "Table does not exist: functional.%^&");
 
     // Invalid URI values.
+    AnalysisError("create table functional.foo (x int) location " +
+        "'file://test-warehouse/new_table'", "URI location " +
+        "'file://test-warehouse/new_table' must point to an HDFS file system.");
+    AnalysisError("create table functional.foo (x int) location " +
+        "'  '", "URI path cannot be empty.");
     AnalysisError("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
         "'file://test-warehouse/new_table'", "URI location " +
         "'file://test-warehouse/new_table' must point to an HDFS file system.");

@@ -277,7 +277,7 @@ public class AnalyzerTest {
           errorString.startsWith(expectedErrorString));
       return;
     }
-    fail("Stmt didn't result in rewrite error: " + stmt);
+    fail("Stmt didn't result in analysis error: " + stmt);
   }
 
   /**

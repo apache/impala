@@ -129,12 +129,13 @@ public class CreateTableLikeStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(tableName_ != null && !tableName_.isEmpty());
     Preconditions.checkState(srcTableName_ != null && !srcTableName_.isEmpty());
-
     // Make sure the source table exists and the user has permission to access it.
     srcDbName_ = analyzer
         .getTable(srcTableName_, Privilege.VIEW_METADATA)
         .getDb().getName();
+    tableName_.analyze();
     dbName_ = analyzer.getTargetDbName(tableName_);
+    owner_ = analyzer.getUser().getName();
 
     if (analyzer.dbContainsTable(dbName_, tableName_.getTbl(), Privilege.CREATE) &&
         !ifNotExists_) {
@@ -143,6 +144,7 @@ public class CreateTableLikeStmt extends StatementBase {
     }
     analyzer.addAccessEvent(new TAccessEvent(dbName_ + "." + tableName_.getTbl(),
         TCatalogObjectType.TABLE, Privilege.CREATE.toString()));
-    owner_ = analyzer.getUser().getName();
+
+    if (location_ != null) location_.analyze(analyzer, Privilege.ALL);
   }
 }
