@@ -17,6 +17,7 @@
 #include <iostream>
 #include <gtest/gtest.h>
 #include "runtime/mem-tracker.h"
+#include "runtime/mem-pool.h"
 #include "util/decompress.h"
 #include "util/compress.h"
 #include "gen-cpp/Descriptors_types.h"
@@ -229,6 +230,30 @@ TEST_F(DecompressorTest, Bzip) {
 
 TEST_F(DecompressorTest, SnappyBlocked) {
   RunTest(THdfsCompression::SNAPPY_BLOCKED);
+}
+
+TEST_F(DecompressorTest, Impala1506) {
+  // Regression test for IMPALA-1506
+  MemTracker trax;
+  MemPool pool(&trax);
+  scoped_ptr<Codec> compressor;
+  Codec::CreateCompressor(&pool, true, impala::THdfsCompression::GZIP, &compressor);
+
+  int64_t input_len = 3;
+  const uint8_t input[3] = {1, 2, 3};
+  int64_t output_len = -1;
+  uint8_t* output = NULL;
+
+  // call twice because the compressor will reallocate the first time
+  EXPECT_TRUE(
+      compressor->ProcessBlock(false, input_len, input, &output_len, &output).ok());
+  EXPECT_GE(output_len, 0);
+  output_len = -1;
+  EXPECT_TRUE(
+      compressor->ProcessBlock(false, input_len, input, &output_len, &output).ok());
+  EXPECT_GE(output_len, 0);
+
+  pool.FreeAll();
 }
 
 }

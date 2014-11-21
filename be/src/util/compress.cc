@@ -109,15 +109,16 @@ Status GzipCompressor::Compress(int64_t input_length, const uint8_t* input,
 Status GzipCompressor::ProcessBlock(bool output_preallocated,
     int64_t input_length, const uint8_t* input, int64_t* output_length,
     uint8_t** output) {
+  DCHECK(!output_preallocated || (output_preallocated && *output_length > 0));
   int64_t max_compressed_len = MaxOutputLen(input_length);
   if (!output_preallocated) {
     if (!reuse_buffer_ || buffer_length_ < max_compressed_len || out_buffer_ == NULL) {
       DCHECK(memory_pool_ != NULL) << "Can't allocate without passing in a mem pool";
       buffer_length_ = max_compressed_len;
       out_buffer_ = memory_pool_->Allocate(buffer_length_);
-      *output_length = buffer_length_;
     }
     *output = out_buffer_;
+    *output_length = buffer_length_;
   } else if (*output_length < max_compressed_len) {
     return Status("GzipCompressor::ProcessBlock: output length too small");
   }
