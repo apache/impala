@@ -17,6 +17,7 @@
 #include <boost/date_time/time_zone_base.hpp>
 #include <boost/date_time/local_time/local_time.hpp>
 #include <boost/algorithm/string.hpp>
+#include <gutil/strings/substitute.h>
 
 #include "exprs/timestamp-functions.h"
 #include "exprs/expr.h"
@@ -36,8 +37,9 @@ using namespace boost;
 using namespace boost::posix_time;
 using namespace boost::local_time;
 using namespace boost::gregorian;
-using namespace std;
 using namespace impala_udf;
+using namespace std;
+using namespace strings;
 
 namespace impala {
 
@@ -295,15 +297,24 @@ StringVal TimestampFunctions::ToDate(FunctionContext* context,
 }
 
 template <bool ISADD, class VALTYPE, class UNIT>
-TimestampVal TimestampFunctions::DateAddSub(FunctionContext* contenxt,
+TimestampVal TimestampFunctions::DateAddSub(FunctionContext* context,
     const TimestampVal& ts_val, const VALTYPE& count) {
   if (ts_val.is_null || count.is_null) return TimestampVal::null();
   const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
 
   if (ts_value.get_date().is_special()) return TimestampVal::null();
   UNIT unit(count.val);
-  TimestampValue value((ISADD ? ts_value.get_date() + unit : ts_value.get_date() - unit),
-      ts_value.get_time());
+  TimestampValue value;
+  try {
+    // Adding/subtracting boost::gregorian::dates can throw (via constructing a new date)
+    value = TimestampValue(
+        (ISADD ? ts_value.get_date() + unit : ts_value.get_date() - unit),
+        ts_value.get_time());
+  } catch (const std::exception& e) {
+    context->AddWarning(Substitute("Cannot $0 date interval $1: $2",
+        ISADD ? "add" : "subtract", count.val, e.what()).c_str());
+    return TimestampVal::null();
+  }
   TimestampVal return_val;
   value.ToTimestampVal(&return_val);
   return return_val;

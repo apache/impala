@@ -2588,6 +2588,11 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestStringValue("cast(date_sub(cast('2012-01-01 09:10:11.123456789' "
       "as timestamp), interval cast(10 as bigint) years) as string)",
       "2002-01-01 09:10:11.123456789");
+  // These return NULL because year is out of range (IMPALA-1493)
+  TestIsNull(
+      "CAST('2005-10-11 00:00:00' AS TIMESTAMP) - INTERVAL 718 YEAR", TYPE_TIMESTAMP);
+  TestIsNull(
+      "CAST('2005-10-11 00:00:00' AS TIMESTAMP) + INTERVAL -718 YEAR", TYPE_TIMESTAMP);
   // Add/sub months.
   TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
       "as timestamp), interval 13 months) as string)",
