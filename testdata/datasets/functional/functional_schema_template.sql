@@ -1250,6 +1250,16 @@ LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/bad_text_lzo/bad_text.lzo'
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+bad_text_gzip
+---- COLUMNS
+s STRING
+i INT
+---- DEPENDENT_LOAD
+LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/bad_text_gzip/file_not_finished.gz' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 bad_seq_snap
 ---- COLUMNS
 field STRING

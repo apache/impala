@@ -39,6 +39,13 @@ class DecompressorTest : public ::testing::Test {
         *ip++ = ch;
       }
     }
+
+    // The input for the streaming tests is a larger buffer which contains input_
+    // at the beginning and end and is null otherwise.
+    memset(&input_streaming_, 0, sizeof(input_streaming_));
+    memcpy(&input_streaming_, &input_, sizeof(input_));
+    memcpy(&input_streaming_[sizeof(input_streaming_) - sizeof(input_)],
+        &input_, sizeof(input_));
   }
 
   ~DecompressorTest() {
@@ -70,6 +77,23 @@ class DecompressorTest : public ::testing::Test {
         CompressAndDecompress(compressor.get(), decompressor.get(), 0, input_);
       }
     }
+
+    compressor->Close();
+    decompressor->Close();
+  }
+
+  void RunTestStreaming(THdfsCompression::type format) {
+    scoped_ptr<Codec> compressor;
+    scoped_ptr<Codec> decompressor;
+    EXPECT_TRUE(
+        Codec::CreateCompressor(&mem_pool_, true, format, &compressor).ok());
+    EXPECT_TRUE(
+        Codec::CreateDecompressor(&mem_pool_, true, format, &decompressor).ok());
+
+    CompressAndStreamingDecompress(compressor.get(), decompressor.get(),
+        sizeof(input_streaming_), input_streaming_);
+    CompressAndStreamingDecompress(compressor.get(), decompressor.get(),
+        0, NULL);
 
     compressor->Close();
     decompressor->Close();
@@ -115,6 +139,33 @@ class DecompressorTest : public ::testing::Test {
     EXPECT_EQ(memcmp(input, output, input_len), 0);
   }
 
+  void CompressAndStreamingDecompress(Codec* compressor, Codec* decompressor,
+      int64_t input_len, uint8_t* input) {
+    uint8_t* compressed;
+    int64_t compressed_length;
+    EXPECT_TRUE(compressor->ProcessBlock(false, input_len,
+        input, &compressed_length, &compressed).ok());
+
+    // Should take multiple calls to ProcessBlockStreaming() to decompress the buffer.
+    int64_t total_output_produced = 0;
+    int64_t compressed_bytes_remaining = compressed_length;
+    bool eos = false;
+    while (!eos) {
+      EXPECT_LE(total_output_produced, input_len);
+      uint8_t* output = NULL;
+      int64_t output_len = 0;
+      int64_t compressed_bytes_read = 0;
+      EXPECT_TRUE(decompressor->ProcessBlockStreaming(compressed_bytes_remaining,
+            compressed, &compressed_bytes_read, &output_len, &output, &eos).ok());
+      EXPECT_EQ(memcmp(input + total_output_produced, output, output_len), 0);
+      total_output_produced += output_len;
+      compressed = compressed + compressed_bytes_read;
+      compressed_bytes_remaining -= compressed_bytes_read;
+    }
+    EXPECT_EQ(0, compressed_bytes_remaining);
+    EXPECT_EQ(total_output_produced, input_len);
+  }
+
   // Only tests compressors and decompressors with allocated output.
   void CompressAndDecompressNoOutputAllocated(Codec* compressor,
       Codec* decompressor, int64_t input_len, uint8_t* input) {
@@ -137,7 +188,15 @@ class DecompressorTest : public ::testing::Test {
     EXPECT_EQ(memcmp(input, output, input_len), 0);
   }
 
+
   uint8_t input_[2 * 26 * 1024];
+
+  // Buffer for testing ProcessBlockStreaming() which allocates 16mb output buffers. This
+  // is 2x + 1 the size of the output buffers to ensure that the decompressed output
+  // requires several calls and doesn't need to be nicely aligned (the last call gets a
+  // small amount of data).
+  uint8_t input_streaming_[32 * 1024 * 1024 + 1];
+
   MemTracker mem_tracker_;
   MemPool mem_pool_;
 };
@@ -156,10 +215,12 @@ TEST_F(DecompressorTest, LZ4) {
 
 TEST_F(DecompressorTest, Gzip) {
   RunTest(THdfsCompression::GZIP);
+  RunTestStreaming(THdfsCompression::GZIP);
 }
 
 TEST_F(DecompressorTest, Deflate) {
   RunTest(THdfsCompression::DEFLATE);
+  RunTestStreaming(THdfsCompression::GZIP);
 }
 
 TEST_F(DecompressorTest, Bzip) {

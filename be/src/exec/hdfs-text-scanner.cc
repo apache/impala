@@ -34,18 +34,27 @@ using namespace impala;
 using namespace llvm;
 using namespace std;
 
+
+DEFINE_bool(debug_disable_streaming_gzip, false, "Debug flag, will be removed. Disables "
+    "streaming gzip decompression.");
+
 const char* HdfsTextScanner::LLVM_CLASS_NAME = "class.impala::HdfsTextScanner";
 
 // Suffix for lzo index file: hdfs-filename.index
 const string HdfsTextScanner::LZO_INDEX_SUFFIX = ".index";
+
+// Number of bytes to read when the previous attempt to streaming decompress did not make
+// progress.
+const int64_t GZIP_FIXED_READ_SIZE = 1 * 1024 * 1024;
 
 HdfsTextScanner::HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state)
     : HdfsScanner(scan_node, state),
       byte_buffer_ptr_(NULL),
       byte_buffer_end_(NULL),
       byte_buffer_read_size_(0),
-      boundary_row_(data_buffer_pool_.get()),
-      boundary_column_(data_buffer_pool_.get()),
+      boundary_pool_(new MemPool(scan_node->mem_tracker())),
+      boundary_row_(boundary_pool_.get()),
+      boundary_column_(boundary_pool_.get()),
       slot_idx_(0),
       error_in_row_(false) {
 }
@@ -179,6 +188,7 @@ void HdfsTextScanner::Close() {
     decompressor_.reset(NULL);
   }
   AttachPool(data_buffer_pool_.get(), false);
+  AttachPool(boundary_pool_.get(), false);
   AddFinalRowBatch();
   scan_node_->RangeComplete(THdfsFileFormat::TEXT, stream_->file_desc()->file_compression);
   HdfsScanner::Close();
@@ -227,7 +237,7 @@ Status HdfsTextScanner::ResetScanner() {
   byte_buffer_ptr_ = byte_buffer_end_ = NULL;
 
   partial_tuple_ =
-      Tuple::Create(scan_node_->tuple_desc()->byte_size(), data_buffer_pool_.get());
+      Tuple::Create(scan_node_->tuple_desc()->byte_size(), boundary_pool_.get());
 
   // Initialize codegen fn
   RETURN_IF_ERROR(InitializeWriteTuplesFn(
@@ -382,53 +392,7 @@ Status HdfsTextScanner::FillByteBuffer(bool* eosr, int num_bytes) {
   *eosr = false;
   Status status;
 
-  // If compressed text, decompress, point to the decompressed buffer, and then continue
-  // normal processing.
-  if (decompressor_.get() != NULL) {
-    // Attempt to read the whole file.
-    HdfsFileDesc* desc = scan_node_->GetFileDesc(stream_->filename());
-    int64_t file_size = desc->file_length;
-    DCHECK_GT(file_size, 0);
-    stream_->GetBytes(file_size, reinterpret_cast<uint8_t**>(&byte_buffer_ptr_),
-                      &byte_buffer_read_size_, &status);
-    if (!status.ok()) return status;
-
-    // If didn't read anything, return.
-    if (byte_buffer_read_size_ == 0) {
-      *eosr = true;
-      return Status::OK;
-    }
-    DCHECK(decompression_type_ != THdfsCompression::SNAPPY);
-
-    // For gzip and snappy it needs to read the entire file.
-    if ((decompression_type_ == THdfsCompression::GZIP ||
-         decompression_type_ == THdfsCompression::SNAPPY_BLOCKED ||
-         decompression_type_ == THdfsCompression::BZIP2) &&
-        (file_size < byte_buffer_read_size_)) {
-      stringstream ss;
-      ss << "Expected to read a compressed text file of size " << file_size << " bytes. "
-         << "But only read " << byte_buffer_read_size_ << " bytes. This may indicate "
-         << "data file corruption. (file: " << stream_->filename() << ").";
-      return Status(ss.str());
-    }
-
-    // Decompress and adjust the byte_buffer_ptr_ and byte_buffer_read_size_ accordingly.
-    int64_t decompressed_len = 0;
-    uint8_t* decompressed_buffer = NULL;
-    SCOPED_TIMER(decompress_timer_);
-    // TODO: Once the writers are in, add tests with very large compressed files (4GB)
-    // that could overflow.
-    RETURN_IF_ERROR(decompressor_->ProcessBlock(false, byte_buffer_read_size_,
-        reinterpret_cast<uint8_t*>(byte_buffer_ptr_), &decompressed_len,
-        &decompressed_buffer));
-
-    // Inform stream_ that the buffer with the compressed text can be released.
-    context_->ReleaseCompletedResources(NULL, true);
-
-    VLOG_FILE << "Decompressed " << byte_buffer_read_size_ << " to " << decompressed_len;
-    byte_buffer_ptr_ = reinterpret_cast<char*>(decompressed_buffer);
-    byte_buffer_read_size_ = decompressed_len;
-  } else {
+  if (decompressor_.get() == NULL) {
     if (num_bytes > 0) {
       stream_->GetBytes(num_bytes, reinterpret_cast<uint8_t**>(&byte_buffer_ptr_),
                         &byte_buffer_read_size_, &status);
@@ -437,10 +401,156 @@ Status HdfsTextScanner::FillByteBuffer(bool* eosr, int num_bytes) {
       status = stream_->GetBuffer(false, reinterpret_cast<uint8_t**>(&byte_buffer_ptr_),
                                   &byte_buffer_read_size_);
     }
+    *eosr = stream_->eosr();
+  } else if (!FLAGS_debug_disable_streaming_gzip &&
+      decompression_type_ == THdfsCompression::GZIP) {
+    DCHECK_EQ(num_bytes, 0);
+    RETURN_IF_ERROR(FillByteBufferGzip(eosr));
+  } else {
+    DCHECK_EQ(num_bytes, 0);
+    RETURN_IF_ERROR(FillByteBufferCompressedFile(eosr));
   }
+
   byte_buffer_end_ = byte_buffer_ptr_ + byte_buffer_read_size_;
-  *eosr = stream_->eosr();
   return status;
+}
+
+Status HdfsTextScanner::FillByteBufferGzip(bool* eosr) {
+  // Attach any previously decompressed buffers to the row batch before decompressing
+  // any more data.
+  if (!decompressor_->reuse_output_buffer()) {
+    AttachPool(data_buffer_pool_.get(), false);
+  }
+
+  // Gzip compressed text is decompressed as buffers are read from stream_ (unlike
+  // other codecs which decompress the entire file in a single call). A compressed
+  // buffer is passed to ProcessBlockStreaming but it may not consume all of the input.
+  // In the unlikely case that decompressed output is not produced, we attempt to try
+  // again with a reasonably large fixed size input buffer (explicitly calling
+  // GetBytes()) before failing.
+  bool try_read_fixed_size = false;
+  uint8_t* decompressed_buffer = NULL;
+  int64_t decompressed_len = 0;
+  do {
+    uint8_t* gzip_buffer_ptr = NULL;
+    int64_t gzip_buffer_size = 0;
+    // We don't know how many bytes ProcessBlockStreaming() will consume so we set
+    // peak=true and then later advance the stream using SkipBytes().
+    if (!try_read_fixed_size) {
+      RETURN_IF_ERROR(stream_->GetBuffer(true, &gzip_buffer_ptr, &gzip_buffer_size));
+    } else {
+      Status status;
+      stream_->GetBytes(GZIP_FIXED_READ_SIZE, &gzip_buffer_ptr, &gzip_buffer_size,
+          &status, true);
+      RETURN_IF_ERROR(status);
+      try_read_fixed_size = false;
+    }
+    if (gzip_buffer_size == 0) {
+      // If the compressed file was not properly ended, the decoder will not know that
+      // the last buffer should have been eos.
+      stringstream ss;
+      ss << "Unexpected end of file decompressing gzip. File may be malformed. ";
+      ss << "file: " << stream_->filename();
+      return Status(ss.str());
+    }
+
+    int64_t gzip_buffer_bytes_read = 0;
+    {
+      SCOPED_TIMER(decompress_timer_);
+      RETURN_IF_ERROR(decompressor_->ProcessBlockStreaming(gzip_buffer_size,
+            gzip_buffer_ptr, &gzip_buffer_bytes_read, &decompressed_len,
+            &decompressed_buffer, eosr));
+      DCHECK_GE(gzip_buffer_size, gzip_buffer_bytes_read);
+      DCHECK_GE(decompressed_len, 0);
+    }
+
+    // Skip the bytes in stream_ that were decompressed.
+    Status status;
+    stream_->SkipBytes(gzip_buffer_bytes_read, &status);
+    RETURN_IF_ERROR(status);
+
+    if (!*eosr && decompressed_len == 0) {
+      // It's possible (but very unlikely) that ProcessBlockStreaming() wasn't able to
+      // make progress if the compressed buffer returned by GetBytes() is too small.
+      // (Note that this did not even occur in simple experiments where the input buffer
+      // is always 1 byte, but we need to handle this case to be defensive.) In this
+      // case, try again with a reasonably large fixed size buffer. If we still did not
+      // make progress, then return an error.
+      if (try_read_fixed_size) {
+        stringstream ss;
+        ss << "Unable to make progress decoding gzip text. ";
+        ss << "file: " << stream_->filename();
+        return Status(ss.str());
+      }
+      VLOG_FILE << "Unable to make progress decompressing gzip, trying again";
+      try_read_fixed_size = true;
+    }
+  } while (try_read_fixed_size);
+
+  byte_buffer_ptr_ = reinterpret_cast<char*>(decompressed_buffer);
+  byte_buffer_read_size_ = decompressed_len;
+
+  if (*eosr) {
+    if (!stream_->eosr()) {
+      // TODO: Add a test case that exercises this path.
+      stringstream ss;
+      ss << "Unexpected end of gzip stream before end of file: ";
+      ss << stream_->filename();
+      if (state_->LogHasSpace()) state_->LogError(ss.str());
+      if (state_->abort_on_error()) parse_status_ = Status(ss.str());
+      RETURN_IF_ERROR(parse_status_);
+    }
+
+    context_->ReleaseCompletedResources(NULL, true);
+  }
+  return Status::OK;
+}
+
+Status HdfsTextScanner::FillByteBufferCompressedFile(bool* eosr) {
+  // For other compressed text: attempt to read and decompress the entire file, point
+  // to the decompressed buffer, and then continue normal processing.
+  DCHECK(decompression_type_ != THdfsCompression::SNAPPY);
+  HdfsFileDesc* desc = scan_node_->GetFileDesc(stream_->filename());
+  int64_t file_size = desc->file_length;
+  DCHECK_GT(file_size, 0);
+  Status status;
+  stream_->GetBytes(file_size, reinterpret_cast<uint8_t**>(&byte_buffer_ptr_),
+      &byte_buffer_read_size_, &status);
+  RETURN_IF_ERROR(status);
+
+  // If didn't read anything, return.
+  if (byte_buffer_read_size_ == 0) {
+    *eosr = true;
+    return Status::OK;
+  }
+
+  // Need to read the entire file.
+  if (file_size < byte_buffer_read_size_) {
+    stringstream ss;
+    ss << "Expected to read a compressed text file of size " << file_size << " bytes. "
+       << "But only read " << byte_buffer_read_size_ << " bytes. This may indicate "
+       << "data file corruption. (file: " << stream_->filename() << ").";
+    return Status(ss.str());
+  }
+
+  // Decompress and adjust the byte_buffer_ptr_ and byte_buffer_read_size_ accordingly.
+  int64_t decompressed_len = 0;
+  uint8_t* decompressed_buffer = NULL;
+  SCOPED_TIMER(decompress_timer_);
+  // TODO: Once the writers are in, add tests with very large compressed files (4GB)
+  // that could overflow.
+  RETURN_IF_ERROR(decompressor_->ProcessBlock(false, byte_buffer_read_size_,
+      reinterpret_cast<uint8_t*>(byte_buffer_ptr_), &decompressed_len,
+      &decompressed_buffer));
+
+  // Inform stream_ that the buffer with the compressed text can be released.
+  context_->ReleaseCompletedResources(NULL, true);
+
+  VLOG_FILE << "Decompressed " << byte_buffer_read_size_ << " to " << decompressed_len;
+  byte_buffer_ptr_ = reinterpret_cast<char*>(decompressed_buffer);
+  byte_buffer_read_size_ = decompressed_len;
+  *eosr = stream_->eosr();
+  return Status::OK;
 }
 
 Status HdfsTextScanner::FindFirstTuple(bool* tuple_found) {

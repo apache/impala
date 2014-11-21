@@ -31,6 +31,8 @@ class GzipDecompressor : public Codec {
   virtual int64_t MaxOutputLen(int64_t input_len, const uint8_t* input = NULL);
   virtual Status ProcessBlock(bool output_preallocated, int64_t input_length,
       const uint8_t* input, int64_t* output_length, uint8_t** output);
+  virtual Status ProcessBlockStreaming(int64_t input_length, const uint8_t* input,
+      int64_t* input_bytes_read, int64_t* output_length, uint8_t** output, bool* eos);
   virtual std::string file_extension() const { return "gz"; }
 
  private:
@@ -38,6 +40,7 @@ class GzipDecompressor : public Codec {
   GzipDecompressor(
       MemPool* mem_pool = NULL, bool reuse_buffer = false, bool is_deflate = false);
   virtual Status Init();
+  std::string DebugStreamState() const;
 
   // If set assume deflate format, otherwise zlib or gzip
   bool is_deflate_;

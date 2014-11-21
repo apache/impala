@@ -110,6 +110,15 @@ class Codec {
   Status ProcessBlock32(bool output_preallocated, int input_length, const uint8_t* input,
       int* output_length, uint8_t** output);
 
+  // Process data like ProcessBlock(), but can consume partial input and may only produce
+  // partial output. *input_bytes_read returns the number of bytes of input that have
+  // been consumed. Even if all input has been consumed, the caller must continue calling
+  // to fetch output until *eos returns true.
+  virtual Status ProcessBlockStreaming(int64_t input_length, const uint8_t* input,
+      int64_t* input_bytes_read, int64_t* output_length, uint8_t** output, bool* eos) {
+    return Status("Not implemented.");
+  }
+
   // Returns the maximum result length from applying the codec to input.
   // Note this is not the exact result length, simply a bound to allow preallocating
   // a buffer.

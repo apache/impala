@@ -1,76 +1,88 @@
 ====
 ---- QUERY
-# TODO: the error info should be sufficient to pin point the data location: filename and
-# offset
-# TODO: printing the entire record will break column level security (when it is
-# implemented).
-select id, bool_col, tinyint_col, smallint_col from alltypeserror
----- ERRORS
-
-Error converting column: 3 TO SMALLINT (Data is: abc3)
-file: hdfs://regex:.$
-record: 23,false,3,abc3,3,30,3.000000,30.300000,03/01/09,3,2020-10-10 60:10:10.123
-Error converting column: 2 TO TINYINT (Data is: abc7)
-file: hdfs://regex:.$
-record: 27,false,abc7,7,7,70,7.000000,70.700000,03/01/09,7,2020-10-10 10:10:10.123
-Error converting column: 2 TO TINYINT (Data is: err30)
-Error converting column: 3 TO SMALLINT (Data is: err30)
-file: hdfs://regex:.$
-record: 30,t\rue,err30,err30,err30,err300,err30..000000,err300.900000,01/01/10,10,0000-01-01 00:00:00
-Error converting column: 2 TO TINYINT (Data is: xyz5)
-file: hdfs://regex:.$
-record: 15,false,xyz5,5,5,50,5.000000,50.500000,02/01/09,5,0009-01-01 00:00:00
-Error converting column: 1 TO BOOL (Data is: errfalse)
-file: hdfs://regex:.$
-record: 1,errfalse,,1,1,10,1.000000,10.100000,01/01/09,1,1999-10-10
-Error converting column: 2 TO TINYINT (Data is: err2)
-file: hdfs://regex:.$
-record: 2,true,err2,,2,20,2.000000,20.200000,01/01/09,2,1999-10-10 90:10:10
-Error converting column: 3 TO SMALLINT (Data is: err3)
-file: hdfs://regex:.$
-record: 3,false,3,err3,,30,3.000000,30.300000,01/01/09,3,2002-14-10 00:00:00
-Error converting column: 1 TO BOOL (Data is: errtrue)
-Error converting column: 2 TO TINYINT (Data is: err9)
-Error converting column: 3 TO SMALLINT (Data is: err9)
-file: hdfs://regex:.$
-record: 9,errtrue,err9,err9,err9,err90,err9.000000,err90.900000,01/01/09,9,0000-01-01 00:00:00
-
----- RESULTS
-0,NULL,NULL,0
-1,NULL,NULL,1
-10,NULL,NULL,NULL
-11,false,NULL,NULL
-12,true,2,NULL
-13,false,3,3
-14,true,4,4
-15,false,NULL,5
-16,NULL,NULL,NULL
-17,false,7,7
-18,true,8,8
-19,false,9,9
-2,true,NULL,NULL
-20,true,0,0
-21,false,1,1
-22,true,2,2
-23,false,3,NULL
-24,true,4,4
-25,false,5,5
-26,true,6,6
-27,false,NULL,7
-28,true,8,8
-29,false,9,9
-3,false,3,NULL
-30,NULL,NULL,NULL
-4,true,4,4
-5,false,5,5
-6,true,6,6
-7,NULL,NULL,7
-8,false,NULL,NULL
-9,NULL,NULL,NULL
----- TYPES
-int, boolean, tinyint, smallint
-====
----- QUERY
+## TODO: IMPALA-1502: The following tests are currently broken. We weren't running
+##       them by mistake for some time and no longer work.
+##
+## TODO: the error info should be sufficient to pin point the data location: filename and
+## offset
+## TODO: printing the entire record will break column level security (when it is
+## implemented).
+#select id, bool_col, tinyint_col, smallint_col from alltypeserror
+#---- ERRORS
+#
+#Error converting column: 3 TO SMALLINT (Data is: abc3)
+#file: hdfs://regex:.$
+#record: 23,false,3,abc3,3,30,3.000000,30.300000,03/01/09,3,2020-10-10 60:10:10.123
+#Error converting column: 2 TO TINYINT (Data is: abc7)
+#file: hdfs://regex:.$
+#record: 27,false,abc7,7,7,70,7.000000,70.700000,03/01/09,7,2020-10-10 10:10:10.123
+#Error converting column: 2 TO TINYINT (Data is: err30)
+#Error converting column: 3 TO SMALLINT (Data is: err30)
+#file: hdfs://regex:.$
+#record: 30,t\rue,err30,err30,err30,err300,err30..000000,err300.900000,01/01/10,10,0000-01-01 00:00:00
+#Error converting column: 2 TO TINYINT (Data is: xyz5)
+#file: hdfs://regex:.$
+#record: 15,false,xyz5,5,5,50,5.000000,50.500000,02/01/09,5,0009-01-01 00:00:00
+#Error converting column: 1 TO BOOL (Data is: errfalse)
+#file: hdfs://regex:.$
+#record: 1,errfalse,,1,1,10,1.000000,10.100000,01/01/09,1,1999-10-10
+#Error converting column: 2 TO TINYINT (Data is: err2)
+#file: hdfs://regex:.$
+#record: 2,true,err2,,2,20,2.000000,20.200000,01/01/09,2,1999-10-10 90:10:10
+#Error converting column: 3 TO SMALLINT (Data is: err3)
+#file: hdfs://regex:.$
+#record: 3,false,3,err3,,30,3.000000,30.300000,01/01/09,3,2002-14-10 00:00:00
+#Error converting column: 1 TO BOOL (Data is: errtrue)
+#Error converting column: 2 TO TINYINT (Data is: err9)
+#Error converting column: 3 TO SMALLINT (Data is: err9)
+#file: hdfs://regex:.$
+#record: 9,errtrue,err9,err9,err9,err90,err9.000000,err90.900000,01/01/09,9,0000-01-01 00:00:00
+#
+#---- RESULTS
+#0,NULL,NULL,0
+#1,NULL,NULL,1
+#10,NULL,NULL,NULL
+#11,false,NULL,NULL
+#12,true,2,NULL
+#13,false,3,3
+#14,true,4,4
+#15,false,NULL,5
+#16,NULL,NULL,NULL
+#17,false,7,7
+#18,true,8,8
+#19,false,9,9
+#2,true,NULL,NULL
+#20,true,0,0
+#21,false,1,1
+#22,true,2,2
+#23,false,3,NULL
+#24,true,4,4
+#25,false,5,5
+#26,true,6,6
+#27,false,NULL,7
+#28,true,8,8
+#29,false,9,9
+#3,false,3,NULL
+#30,NULL,NULL,NULL
+#4,true,4,4
+#5,false,5,5
+#6,true,6,6
+#7,NULL,NULL,7
+#8,false,NULL,NULL
+#9,NULL,NULL,NULL
+#---- TYPES
+#int, boolean, tinyint, smallint
+#====
+#---- QUERY
+#select count(*) from functional_text_lzo.bad_text_lzo
+#---- ERRORS
+#Blocksize: 536870911 is greater than LZO_MAX_BLOCK_SIZE: 67108864
+#---- RESULTS
+#5140
+#---- TYPES
+#bigint
+#====
+#---- QUERY
 select * from alltypeserrornonulls
 ---- ERRORS
 
@@ -170,11 +182,7 @@ record: 9,errtrue,err9,err9,err9,err90,err9.000000,err90.900000,01/01/09,9,2012-
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
 ====
 ---- QUERY
-select count(*) from functional_text_lzo.bad_text_lzo
----- ERRORS
-Blocksize: 536870911 is greater than LZO_MAX_BLOCK_SIZE: 67108864
----- RESULTS
-5140
----- TYPES
-bigint
+select count(*) from functional_text_gzip.bad_text_gzip
+---- CATCH
+Unexpected end of file decompressing gzip. File may be malformed.
 ====

@@ -16,6 +16,7 @@
 #include "util/decompress.h"
 #include "exec/read-write-util.h"
 #include "runtime/runtime-state.h"
+#include "common/logging.h"
 #include "gen-cpp/Descriptors_types.h"
 
 // Codec libraries
@@ -27,6 +28,9 @@
 using namespace std;
 using namespace boost;
 using namespace impala;
+
+// Output buffer size for streaming gzip
+const int64_t STREAM_GZIP_OUT_BUF_SIZE = 16 * 1024 * 1024;
 
 GzipDecompressor::GzipDecompressor(MemPool* mem_pool, bool reuse_buffer, bool is_deflate)
   : Codec(mem_pool, reuse_buffer),
@@ -51,6 +55,64 @@ Status GzipDecompressor::Init() {
 
 int64_t GzipDecompressor::MaxOutputLen(int64_t input_len, const uint8_t* input) {
   return -1;
+}
+
+string GzipDecompressor::DebugStreamState() const {
+  stringstream ss;
+  ss << "next_in=" << (void*)stream_.next_in;
+  ss << " avail_in=" << stream_.avail_in;
+  ss << " total_in=" << stream_.total_in;
+  ss << " next_out=" << (void*)stream_.next_out;
+  ss << " avail_out=" << stream_.avail_out;
+  ss << " total_out=" << stream_.total_out;
+  return ss.str();
+}
+
+Status GzipDecompressor::ProcessBlockStreaming(int64_t input_length, const uint8_t* input,
+    int64_t* input_bytes_read, int64_t* output_length, uint8_t** output, bool* eos) {
+  if (!reuse_buffer_ || out_buffer_ == NULL) {
+    buffer_length_ = STREAM_GZIP_OUT_BUF_SIZE;
+    out_buffer_ = memory_pool_->Allocate(buffer_length_);
+  }
+  *output = out_buffer_;
+  *output_length = buffer_length_;
+  *input_bytes_read = 0;
+  *eos = false;
+
+  stream_.next_in = const_cast<Bytef*>(reinterpret_cast<const Bytef*>(input));
+  stream_.avail_in = input_length;
+  stream_.next_out = reinterpret_cast<Bytef*>(*output);
+  stream_.avail_out = *output_length;
+  VLOG_ROW << "ProcessBlockStreaming() stream: " << DebugStreamState();
+
+  int ret = inflate(&stream_, Z_SYNC_FLUSH);
+  if (ret != Z_OK && ret != Z_STREAM_END && ret != Z_BUF_ERROR) {
+    stringstream ss;
+    ss << "GzipDecompressor failed, ret=" << ret;
+    if (stream_.msg != NULL) ss << " msg=" << stream_.msg;
+    return Status(ss.str());
+  }
+
+  // stream_.avail_out is the number of bytes *left* in the out buffer, but
+  // we're interested in the number of bytes used.
+  *output_length = *output_length - stream_.avail_out;
+  *input_bytes_read = input_length - stream_.avail_in;
+  VLOG_ROW << "inflate() ret=" << ret << " consumed=" << *input_bytes_read
+           << " produced=" << *output_length << " stream: " << DebugStreamState();
+
+  if (ret == Z_BUF_ERROR) {
+    // Z_BUF_ERROR is returned if no progress was made. This should be very unlikely.
+    // The caller should check for this case (where 0 bytes were consumed, 0 bytes
+    // produced) and try again with more input.
+    DCHECK_EQ(0, *output_length);
+    DCHECK_EQ(0, *input_bytes_read);
+  } else if (ret == Z_STREAM_END) {
+    *eos = true;
+    if (inflateReset(&stream_) != Z_OK) {
+      return Status("zlib inflateReset failed: " + string(stream_.msg));
+    }
+  }
+  return Status::OK;
 }
 
 Status GzipDecompressor::ProcessBlock(bool output_preallocated, int64_t input_length,
