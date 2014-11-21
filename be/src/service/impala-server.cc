@@ -1082,7 +1082,7 @@ void ImpalaServer::ReportExecStatus(
         " $2 done: $3)", PrintId(params.query_id), params.backend_num,
         PrintId(params.fragment_instance_id), params.done);
     return_val.status.error_msgs.push_back(err);
-    LOG(INFO) << err;
+    VLOG_QUERY << err;
     return;
   }
   exec_state->coord()->UpdateFragmentExecStatus(params).SetTStatus(&return_val);
