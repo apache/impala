@@ -535,8 +535,13 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
   if (parent->num_spilled_partitions_->value() == 1) {
     parent->AddRuntimeExecOption("Spilled");
   }
-  DCHECK(!aggregated_row_stream->using_small_buffers());
-  DCHECK(!unaggregated_row_stream->using_small_buffers());
+  // Need to make sure that we are not going to lose any information from the small
+  // buffers. Therefore, we are checking if we using small buffers and we actually have
+  // added some rows there.
+  DCHECK(!(aggregated_row_stream->using_small_buffers() &&
+           aggregated_row_stream->num_rows() > 0));
+  DCHECK(!(unaggregated_row_stream->using_small_buffers() &&
+           unaggregated_row_stream->num_rows() > 0));
   return Status::OK;
 }
 
@@ -835,7 +840,8 @@ Status PartitionedAggregationNode::SpillPartition(Partition* curr_partition,
       }
       if (!got_buffer) {
         Status status = Status::MEM_LIMIT_EXCEEDED;
-        status.AddErrorMsg("Not enough memory to get the minimum required buffers.");
+        status.AddErrorMsg("Not enough memory to get the minimum required buffers for "
+                           "aggregation.");
         return status;
       }
     }

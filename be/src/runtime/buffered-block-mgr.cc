@@ -862,7 +862,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
       }
       Status status = Status::MEM_LIMIT_EXCEEDED;
       status.AddErrorMsg("Query did not have enough memory to get the minimum required "
-          "buffers.");
+          "buffers in the block manager.");
       return status;
     }
 

@@ -193,16 +193,17 @@ Status BufferedTupleStream::NewBlockForWrite(int min_size, bool* got_block) {
   }
 
   int64_t block_len = block_mgr_->max_block_size();
-  if (use_small_buffers_ && blocks_.size() < NUM_SMALL_BLOCKS) {
-    block_len = min(block_len, INITIAL_BLOCK_SIZES[blocks_.size()]);
-    if (block_len < min_size) block_len = block_mgr_->max_block_size();
+  if (use_small_buffers_) {
+    if (blocks_.size() < NUM_SMALL_BLOCKS) {
+      block_len = min(block_len, INITIAL_BLOCK_SIZES[blocks_.size()]);
+      if (block_len < min_size) block_len = block_mgr_->max_block_size();
+    }
+    if (block_len == block_mgr_->max_block_size()) {
+      // Cannot switch to non small buffers automatically. Don't get a buffer.
+      *got_block = false;
+      return Status::OK;
+    }
   }
-  if (use_small_buffers_ && block_len == block_mgr_->max_block_size()) {
-    // Cannot switch to non small buffers automatically. Don't get a buffer.
-    *got_block = false;
-    return Status::OK;
-  }
-
 
   BufferedBlockMgr::Block* new_block = NULL;
   {

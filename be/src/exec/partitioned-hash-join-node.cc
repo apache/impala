@@ -1182,7 +1182,8 @@ Status PartitionedHashJoinNode::ReserveTupleStreamBlocks() {
     }
     if (!got_buffer) {
       Status status = Status::MEM_LIMIT_EXCEEDED;
-      status.AddErrorMsg("Not enough memory to get the minimum required buffers.");
+      status.AddErrorMsg("Not enough memory to get the minimum required buffers for "
+                         "join.");
       return status;
     }
   }
