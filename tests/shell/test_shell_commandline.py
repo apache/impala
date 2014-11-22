@@ -16,6 +16,7 @@
 
 import os
 import pytest
+import re
 import shlex
 import signal
 
@@ -248,8 +249,11 @@ class TestImpalaShell(object):
     # -p option and the one printed by the profile command
     args = "-p -q 'select 1; profile;'"
     result_set = run_impala_shell_cmd(args)
-    summary = 'Operator   #Hosts  Avg Time'
-    assert result_set.stdout.count(summary) == 2
+    # This regex helps us uniquely identify a profile.
+    regex = re.compile("Operator\s+#Hosts\s+Avg\s+Time")
+    # We expect two query profiles.
+    assert len(re.findall(regex, result_set.stdout)) == 2, \
+        "Could not detect two profiles, stdout: %s" % result_set.stdout
 
   @pytest.mark.execute_serially
   def test_summary(self):
