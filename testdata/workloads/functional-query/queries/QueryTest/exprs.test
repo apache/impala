@@ -1762,3 +1762,12 @@ select abs(cast(1 as int)), abs(cast(1 as smallint)),
 ---- TYPES
 int, smallint, tinyint, bigint, double, float, decimal
 ====
+---- QUERY
+# Regression test for IMPALA-1508
+select timestamp_col FROM alltypesagg
+ORDER BY timestamp_col + INTERVAL bigint_col YEAR ASC limit 1;
+---- RESULTS
+2010-01-01 08:25:38.550000000
+---- TYPES
+TIMESTAMP
+====

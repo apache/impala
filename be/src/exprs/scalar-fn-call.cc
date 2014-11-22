@@ -361,14 +361,17 @@ Status ScalarFnCall::GetUdf(RuntimeState* state, llvm::Function** udf) {
   LlvmCodeGen* codegen;
   RETURN_IF_ERROR(state->GetCodegen(&codegen));
 
-  // from_utc_timestamp and to_utc_timestamp have inline ASM that cannot be JIT'd. Always
-  // use the statically compiled versions so the xcompiled versions are not included in
-  // the final module to be JIT'd.
+  // from_utc_timestamp and to_utc_timestamp have inline ASM that cannot be JIT'd.
+  // TimestampFunctions::DateAddSub() contains a try/catch which doesn't work in JIT'd
+  // code.  Always use the statically compiled versions of these functions so the
+  // xcompiled versions are not included in the final module to be JIT'd.
   // TODO: fix this
+  bool broken_builtin = fn_.name.function_name == "from_utc_timestamp" ||
+                        fn_.name.function_name == "to_utc_timestamp" ||
+                        fn_.scalar_fn.symbol.find("DateAddSub") != string::npos;
   if (fn_.binary_type == TFunctionBinaryType::NATIVE ||
       (fn_.binary_type == TFunctionBinaryType::BUILTIN &&
-       (!state->codegen_enabled() || fn_.name.function_name == "from_utc_timestamp"
-        || fn_.name.function_name == "to_utc_timestamp"))) {
+       (!state->codegen_enabled() || broken_builtin))) {
     // In this path, we are code that has been statically compiled to assembly.
     // This can either be a UDF implemented in a .so or a builtin using the UDF
     // interface with the code in impalad.
