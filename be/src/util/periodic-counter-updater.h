@@ -102,18 +102,18 @@ class PeriodicCounterUpdater {
   // and updates all the added rate counters and sampling counters.
   void UpdateLoop();
 
-  // Lock protecting state below
-  boost::mutex lock_;
-
-  // If true, tear down the update thread.
-  volatile bool done_;
-
   // Thread performing asynchronous updates.
   boost::scoped_ptr<boost::thread> update_thread_;
+
+  // Spinlock that protects the map of rate counters
+  SpinLock rate_lock_;
 
   // A map of the dst (rate) counter to the src counter and elapsed time.
   typedef boost::unordered_map<RuntimeProfile::Counter*, RateCounterInfo> RateCounterMap;
   RateCounterMap rate_counters_;
+
+  // Spinlock that protects the map of averages over samples of counters
+  SpinLock sampling_lock_;
 
   // A map of the dst (averages over samples) counter to the src counter (to be sampled)
   // and number of samples taken.
@@ -121,14 +121,23 @@ class PeriodicCounterUpdater {
       SamplingCounterMap;
   SamplingCounterMap sampling_counters_;
 
+  // Spinlock that protects the map of buckets of counters
+  SpinLock bucketing_lock_;
+
   // Map from a bucket of counters to the src counter
   typedef boost::unordered_map<std::vector<RuntimeProfile::Counter*>*, BucketCountersInfo>
       BucketCountersMap;
   BucketCountersMap bucketing_counters_;
 
+  // Spinlock that protects the map of time series counters
+  SpinLock time_series_lock_;
+
   // Set of time series counters that need to be updated
   typedef boost::unordered_set<RuntimeProfile::TimeSeriesCounter*> TimeSeriesCounters;
   TimeSeriesCounters time_series_counters_;
+
+  // If 1, tear down the update thread.
+  AtomicInt<uint32_t> done_;
 
   // Singleton object that keeps track of all rate counters and the thread
   // for updating them.
