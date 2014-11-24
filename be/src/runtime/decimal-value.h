@@ -243,9 +243,9 @@ class DecimalValue {
       return DecimalValue<RESULT_T>();
     }
     *is_nan = false;
-    RESULT_T x, y;
+    RESULT_T x;
+    RESULT_T y = 1; // Initialize y to avoid mod by 0.
     *overflow |= AdjustToSameScale(*this, this_type, other, other_type, &x, &y);
-    // TODO: are these the semantics for decimal mod?
     return DecimalValue<RESULT_T>(x % y);
   }
 
@@ -314,7 +314,7 @@ class DecimalValue {
   // Returns in *x_val and *y_val, the adjusted values so that both
   // are at the same scale. The scale is the number of digits after the decimal.
   // Returns true if the adjusted causes overflow in which case the values in
-  // x_scaled and y_scaled are undefined.
+  // x_scaled and y_scaled are unmodified.
   template <typename RESULT_T>
   static bool AdjustToSameScale(const DecimalValue& x, const ColumnType& x_type,
       const DecimalValue& y, const ColumnType& y_type,
