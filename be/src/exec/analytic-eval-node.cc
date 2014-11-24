@@ -131,13 +131,14 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
   mem_pool_.reset(new MemPool(mem_tracker()));
   evaluation_timer_ = ADD_TIMER(runtime_profile(), "EvaluationTime");
 
-  fn_ctxs_.resize(evaluators_.size());
   DCHECK_EQ(result_tuple_desc_->slots().size(), evaluators_.size());
   for (int i = 0; i < evaluators_.size(); ++i) {
+    impala_udf::FunctionContext* ctx;
     RETURN_IF_ERROR(evaluators_[i]->Prepare(state, child(0)->row_desc(),
         intermediate_tuple_desc_->slots()[i], result_tuple_desc_->slots()[i],
-        mem_pool_.get(), &fn_ctxs_[i]));
-    state->obj_pool()->Add(fn_ctxs_[i]);
+        mem_pool_.get(), &ctx));
+    fn_ctxs_.push_back(ctx);
+    state->obj_pool()->Add(ctx);
   }
 
   if (partition_by_eq_expr_ctx_ != NULL || order_by_eq_expr_ctx_ != NULL) {
@@ -718,15 +719,20 @@ void AnalyticEvalNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (input_stream_.get() != NULL) input_stream_->Close();
 
-  DCHECK_EQ(evaluators_.size(), fn_ctxs_.size());
+  // Close all evaluators and fn ctxs. If an error occurred in Init or Prepare there may
+  // be fewer ctxs than evaluators. We also need to Finalize if curr_tuple_ was created
+  // in Open.
+  DCHECK_LE(fn_ctxs_.size(), evaluators_.size());
+  DCHECK(curr_tuple_ == NULL || fn_ctxs_.size() == evaluators_.size());
   for (int i = 0; i < evaluators_.size(); ++i) {
     // Need to make sure finalize is called in case there is any state to clean up.
     if (curr_tuple_ != NULL) {
       evaluators_[i]->Finalize(fn_ctxs_[i], curr_tuple_, dummy_result_tuple_);
     }
     evaluators_[i]->Close(state);
-    fn_ctxs_[i]->impl()->Close();
   }
+  for (int i = 0; i < fn_ctxs_.size(); ++i) fn_ctxs_[i]->impl()->Close();
+
   if (partition_by_eq_expr_ctx_ != NULL) partition_by_eq_expr_ctx_->Close(state);
   if (order_by_eq_expr_ctx_ != NULL) order_by_eq_expr_ctx_->Close(state);
   if (prev_child_batch_.get() != NULL) prev_child_batch_.reset();
