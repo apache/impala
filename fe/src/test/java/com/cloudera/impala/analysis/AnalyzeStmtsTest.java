@@ -1920,10 +1920,15 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "/test-warehouse/tpch.lineitem/", overwrite),
           "Table does not exist: functional.notbl");
 
+      // Source must be HDFS.
       AnalysisError(String.format("load data inpath '%s' %s into table " +
           "tpch.lineitem", "file:///test-warehouse/test.out", overwrite),
-          "URI location 'file:/test-warehouse/test.out' must point to an " +
-          "HDFS file system");
+          "INPATH location 'file:/test-warehouse/test.out' must point to an " +
+          "HDFS filesystem");
+      AnalysisError(String.format("load data inpath '%s' %s into table " +
+          "tpch.lineitem", "s3n://bucket/test-warehouse/test.out", overwrite),
+          "INPATH location 's3n://bucket/test-warehouse/test.out' must point to an " +
+          "HDFS filesystem");
 
       // File type / table type mismatch.
       AnalyzesOk(String.format("load data inpath '%s' %s into table " +

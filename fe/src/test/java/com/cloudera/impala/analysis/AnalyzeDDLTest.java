@@ -150,6 +150,29 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("alter table functional.alltypes add " +
         "partition(year=2050, month=10) cached in 'badPool'",
         "The specified cache pool does not exist: badPool");
+
+    // Valid URIs.
+    AnalyzesOk("alter table functional.alltypes add " +
+        " partition(year=2050, month=10) location " +
+        "'/test-warehouse/alltypes/year=2010/month=10'");
+    AnalyzesOk("alter table functional.alltypes add " +
+        " partition(year=2050, month=10) location " +
+        "'hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=10'");
+    AnalyzesOk("alter table functional.alltypes add " +
+        " partition(year=2050, month=10) location " +
+        "'s3n://bucket/test-warehouse/alltypes/year=2010/month=10'");
+    AnalyzesOk("alter table functional.alltypes add " +
+        " partition(year=2050, month=10) location " +
+        "'file:///test-warehouse/alltypes/year=2010/month=10'");
+
+    // Invalid URIs.
+    AnalysisError("alter table functional.alltypes add " +
+        " partition(year=2050, month=10) location " +
+        "'foofs://bar/test-warehouse/alltypes/year=2010/month=10'",
+        "No FileSystem for scheme: foofs");
+    AnalysisError("alter table functional.alltypes add " +
+        " partition(year=2050, month=10) location '  '",
+        "URI path cannot be empty.");
   }
 
   @Test
@@ -376,6 +399,14 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Table does not exist: functional.no_tbl");
     AnalysisError("alter table no_db.alltypes partition(i=1) set fileformat textfile",
         "Database does not exist: no_db");
+
+    // Valid location
+    AnalyzesOk("alter table functional.alltypes set location " +
+        "'hdfs://localhost:20500/test-warehouse/a/b'");
+    AnalyzesOk("alter table functional.alltypes set location " +
+        "'s3n://bucket/test-warehouse/a/b'");
+    AnalyzesOk("alter table functional.alltypes set location " +
+        "'file:///test-warehouse/a/b'");
 
     // Invalid location
     AnalysisError("alter table functional.alltypes set location 'test/warehouse'",
@@ -741,7 +772,12 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "CLASS 'com.bar.Foo' API_VERSION 'V1'");
     AnalyzesOk("CREATE DATA SOURCE foo LOCATION 'hdfs://localhost:20500/a/b/foo.jar' " +
         "CLASS 'com.bar.Foo' API_VERSION 'V1'");
+    AnalyzesOk("CREATE DATA SOURCE foo LOCATION 's3n://bucket/a/b/foo.jar' " +
+        "CLASS 'com.bar.Foo' API_VERSION 'V1'");
 
+    AnalysisError("CREATE DATA SOURCE foo LOCATION 'blah://localhost:20500/foo.jar' " +
+        "CLASS 'com.bar.Foo' API_VERSION 'V1'",
+        "No FileSystem for scheme: blah");
     AnalysisError("CREATE DATA SOURCE " + DATA_SOURCE_NAME + " LOCATION '/foo.jar' " +
         "CLASS 'foo.Bar' API_VERSION 'V1'",
         "Data source already exists: " + DATA_SOURCE_NAME.toLowerCase());
@@ -756,6 +792,18 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create database if not exists functional");
     // Invalid database name,
     AnalysisError("create database `%^&`", "Invalid database name: %^&");
+
+    // Valid URIs.
+    AnalyzesOk("create database new_db location " +
+        "'/test-warehouse/new_db'");
+    AnalyzesOk("create database new_db location " +
+        "'hdfs://localhost:50200/test-warehouse/new_db'");
+    AnalyzesOk("create database new_db location " +
+        "'s3n://bucket/test-warehouse/new_db'");
+    // Invalid URI.
+    AnalysisError("create database new_db location " +
+        "'blah://bucket/test-warehouse/new_db'",
+        "No FileSystem for scheme: blah");
   }
 
   @Test
@@ -796,8 +844,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Cannot infer schema, path is not a file: "
         + "hdfs://localhost:20500/not/a/file/path");
     AnalysisError("create table if not exists functional.zipcode_incomes like parquet "
-        + "'file://tmp/foobar'",
-        "URI location 'file://tmp/foobar' must point to an HDFS file system.");
+        + "'file:///tmp/foobar'",
+        "Cannot infer schema, path is not a file: file:/tmp/foobar");
 
     // check valid paths with bad file contents
     AnalysisError("create table database_DNE.newtbl_DNE like parquet "
@@ -904,10 +952,25 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Database does not exist: ???");
     AnalysisError("create table functional.foo like functional.`%^&`",
         "Table does not exist: functional.%^&");
+    // Valid URI values.
+    AnalyzesOk("create table tbl like functional.alltypes location " +
+        "'/test-warehouse/new_table'");
+    AnalyzesOk("create table tbl like functional.alltypes location " +
+        "'hdfs://localhost:20500/test-warehouse/new_table'");
+    // 'file' scheme does not take an authority, so file:/// is equivalent to file://
+    // and file:/.
+    AnalyzesOk("create table tbl like functional.alltypes location " +
+        "'file:///test-warehouse/new_table'");
+    AnalyzesOk("create table tbl like functional.alltypes location " +
+        "'file://test-warehouse/new_table'");
+    AnalyzesOk("create table tbl like functional.alltypes location " +
+        "'file:/test-warehouse/new_table'");
+    AnalyzesOk("create table tbl like functional.alltypes location " +
+        "'s3n://bucket/test-warehouse/new_table'");
     // Invalid URI values.
-    AnalysisError("create table functional.bar like functional.alltypes location " +
-        "'file://test-warehouse/new_table'", "URI location " +
-        "'file://test-warehouse/new_table' must point to an HDFS file system.");
+    AnalysisError("create table tbl like functional.alltypes location " +
+        "'foofs://test-warehouse/new_table'",
+        "No FileSystem for scheme: foofs");
     AnalysisError("create table functional.baz like functional.alltypes location '  '",
         "URI path cannot be empty.");
   }
@@ -1023,15 +1086,26 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create table new_table (i int) PARTITIONED BY (`^&*` int)",
         "Invalid column/field name: ^&*");
 
+    // Valid URI values.
+    AnalyzesOk("create table tbl (i int) location '/test-warehouse/new_table'");
+    AnalyzesOk("create table tbl (i int) location " +
+        "'hdfs://localhost:20500/test-warehouse/new_table'");
+    AnalyzesOk("create table tbl (i int) location " +
+        "'file:///test-warehouse/new_table'");
+    AnalyzesOk("create table tbl (i int) location " +
+        "'s3n://bucket/test-warehouse/new_table'");
+    AnalyzesOk("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
+        "'file://test-warehouse/new_table'");
+
     // Invalid URI values.
     AnalysisError("create table functional.foo (x int) location " +
-        "'file://test-warehouse/new_table'", "URI location " +
-        "'file://test-warehouse/new_table' must point to an HDFS file system.");
+        "'foofs://test-warehouse/new_table'",
+        "No FileSystem for scheme: foofs");
     AnalysisError("create table functional.foo (x int) location " +
         "'  '", "URI path cannot be empty.");
     AnalysisError("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
-        "'file://test-warehouse/new_table'", "URI location " +
-        "'file://test-warehouse/new_table' must point to an HDFS file system.");
+        "'foofs://test-warehouse/new_table'",
+        "No FileSystem for scheme: foofs");
     AnalysisError("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
         "'  '", "URI path cannot be empty.");
 
@@ -1444,6 +1518,12 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Try to create with a bad location
     AnalysisError("create function foo() RETURNS int LOCATION 'bad-location' SYMBOL='c'",
         "URI path must be absolute: bad-location");
+    AnalysisError("create function foo() RETURNS int LOCATION " +
+        "'blah://localhost:50200/bad-location' SYMBOL='c'",
+        "No FileSystem for scheme: blah");
+    AnalysisError("create function foo() RETURNS int LOCATION " +
+        "'file:///foo.jar' SYMBOL='c'",
+        "Could not load binary: file:///foo.jar");
 
     // Try creating udfs with unknown extensions
     AnalysisError("create function foo() RETURNS int LOCATION '/binary' SYMBOL='a'",

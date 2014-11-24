@@ -320,7 +320,7 @@ public class HdfsTable extends Table {
 
       if (SUPPORTS_VOLUME_ID && fs instanceof DistributedFileSystem) {
         LOG.trace("loading disk ids for: " + getFullName() +
-            ". nodes: " + getNumNodes() + ". file system: " + fsEntry);
+            ". nodes: " + getNumNodes() + ". filesystem: " + fsEntry);
         loadDiskIds((DistributedFileSystem)fs, blockLocations, partitionToFds);
         LOG.trace("completed load of disk ids for: " + getFullName());
       }
@@ -686,7 +686,7 @@ public class HdfsTable extends Table {
 
   /**
    * Creates a new HdfsPartition object to be added to HdfsTable's partition list.
-   * Partitions may be empty, or may not even exist in the file system (a partition's
+   * Partitions may be empty, or may not even exist in the filesystem (a partition's
    * location may have been changed to a new path that is about to be created by an
    * INSERT). Also loads the block metadata for this partition.
    * Returns new partition if successful or null if none was added.
@@ -710,7 +710,7 @@ public class HdfsTable extends Table {
   /**
    * Creates a new HdfsPartition object to be added to the internal partition list.
    * Populates with file format information and file locations. Partitions may be empty,
-   * or may not even exist on the file system (a partition's location may have been
+   * or may not even exist on the filesystem (a partition's location may have been
    * changed to a new path that is about to be created by an INSERT). For unchanged
    * files (indicated by unchanged mtime), reuses the FileDescriptor from the
    * oldFileDescMap. The one exception is if the partition is marked as cached

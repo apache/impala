@@ -28,7 +28,7 @@ import com.cloudera.impala.common.FileSystemUtil;
 import com.google.common.base.Preconditions;
 
 /*
- * Represents an HDFS URI in a SQL statement.
+ * Represents a Hadoop FileSystem URI in a SQL statement.
  */
 public class HdfsUri {
   private final String location_;
@@ -66,10 +66,8 @@ public class HdfsUri {
       throw new AnalysisException("URI path must be absolute: " + uriPath_);
     }
     try {
-      if (!FileSystemUtil.isDistributedFileSystem(uriPath_)) {
-        throw new AnalysisException(String.format("URI location '%s' " +
-            "must point to an HDFS file system.", uriPath_));
-      }
+      // Called for the side-effect of throwing if the filesystem isn't valid.
+      uriPath_.getFileSystem(FileSystemUtil.getConfiguration());
     } catch (IOException e) {
       throw new AnalysisException(e.getMessage(), e);
     }

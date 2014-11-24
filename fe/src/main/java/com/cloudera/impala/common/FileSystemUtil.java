@@ -17,6 +17,7 @@ package com.cloudera.impala.common;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.util.UUID;
 
 import org.apache.commons.io.IOUtils;
@@ -218,12 +219,20 @@ public class FileSystemUtil {
   }
 
   /**
-   * Fully-qualifies the given path based on the FileSystem configuration. If the given
-   * path is already fully qualified, a new Path object with the same location will be
-   * returned.
+   * Fully-qualifies the given path based on the FileSystem configuration.
    */
   public static Path createFullyQualifiedPath(Path location) {
-    return location.makeQualified(FileSystem.getDefaultUri(CONF), location);
+    URI defaultUri = FileSystem.getDefaultUri(CONF);
+    URI locationUri = location.toUri();
+    // Use the default URI only if location has no scheme or it has the same scheme as
+    // the default URI.  Otherwise, Path.makeQualified() will incorrectly use the
+    // authority from the default URI even though the schemes don't match.  See HDFS-7031.
+    if (locationUri.getScheme() == null ||
+        locationUri.getScheme().equalsIgnoreCase(defaultUri.getScheme())) {
+      return location.makeQualified(defaultUri, location);
+    }
+    // Already qualified (has scheme).
+    return location;
   }
 
   /**

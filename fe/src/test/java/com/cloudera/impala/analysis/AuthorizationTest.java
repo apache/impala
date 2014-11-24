@@ -858,7 +858,7 @@ public class AuthorizationTest {
         "User '%s' does not have privileges to access: " +
         "hdfs://localhost:20500/test-warehouse/no_access");
 
-    // Different file system, user has permission to base path.
+    // Different filesystem, user has permission to base path.
     AuthzError("ALTER TABLE functional_seq_snap.alltypes SET LOCATION " +
         "'hdfs://localhost:20510/test-warehouse/new_table'",
         "User '%s' does not have privileges to access: " +

@@ -345,12 +345,12 @@ public class InsertStmt extends StatementBase {
       }
       if (hdfsTable.spansMultipleFileSystems()) {
         throw new AnalysisException(String.format("Unable to INSERT into target table " +
-            "(%s) because the table spans multiple file-systems.", targetTableName_));
+            "(%s) because the table spans multiple filesystems.", targetTableName_));
       }
       try {
         if (!FileSystemUtil.isDistributedFileSystem(new Path(hdfsTable.getLocation()))) {
           throw new AnalysisException(String.format("Unable to INSERT into target " +
-              "table (%s) because %s is not an HDFS file-system.", targetTableName_,
+              "table (%s) because %s is not an HDFS filesystem.", targetTableName_,
                hdfsTable.getLocation()));
         }
       } catch (IOException e) {

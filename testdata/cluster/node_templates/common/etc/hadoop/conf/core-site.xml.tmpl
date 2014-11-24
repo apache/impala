@@ -34,6 +34,17 @@
     <value>true</value>
   </property>
 
+  <!-- Needed by frontend tests that reference s3n paths. -->
+  <property>
+    <name>fs.s3n.awsAccessKeyId</name>
+    <value>DummyAccessKeyId</value>
+  </property>
+
+  <property>
+    <name>fs.s3n.awsSecretAccessKey</name>
+    <value>DummySecretAccessKey</value>
+  </property>
+
   <!-- BEGIN Kerberos settings -->
   <property>
     <name>hadoop.security.authentication</name>

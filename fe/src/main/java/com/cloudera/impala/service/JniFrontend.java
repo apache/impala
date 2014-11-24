@@ -609,7 +609,7 @@ public class JniFrontend {
   }
 
   /**
-   * Derive the namenode http address from the current file system,
+   * Derive the namenode http address from the current filesystem,
    * either default or as set by "-fs" in the generic options.
    *
    * @return Returns http address or null if failure.
@@ -812,7 +812,7 @@ public class JniFrontend {
     try {
       FileSystem fs = FileSystem.get(CONF);
       if (!(fs instanceof DistributedFileSystem)) {
-        return "Unsupported file system. Impala only supports DistributedFileSystem " +
+        return "Unsupported filesystem. Impala only supports DistributedFileSystem " +
             "but the configured filesystem is: " + fs.getClass().getSimpleName() + "." +
             CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY +
             "(" + CONF.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) + ")" +
