@@ -64,6 +64,9 @@ class HdfsTextScanner : public HdfsScanner {
   // Actual bytes received from last file read.
   int64_t byte_buffer_read_size_;
 
+  // True if we are parsing the header for this scanner.
+  bool only_parsing_header_;
+
  private:
   const static int NEXT_BLOCK_READ_SIZE = 1024; //bytes
 

@@ -52,6 +52,7 @@ HdfsTextScanner::HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state)
       byte_buffer_ptr_(NULL),
       byte_buffer_end_(NULL),
       byte_buffer_read_size_(0),
+      only_parsing_header_(false),
       boundary_pool_(new MemPool(scan_node->mem_tracker())),
       boundary_row_(boundary_pool_.get()),
       boundary_column_(boundary_pool_.get()),
@@ -190,7 +191,10 @@ void HdfsTextScanner::Close() {
   AttachPool(data_buffer_pool_.get(), false);
   AttachPool(boundary_pool_.get(), false);
   AddFinalRowBatch();
-  scan_node_->RangeComplete(THdfsFileFormat::TEXT, stream_->file_desc()->file_compression);
+  if (!only_parsing_header_) {
+    scan_node_->RangeComplete(
+        THdfsFileFormat::TEXT, stream_->file_desc()->file_compression);
+  }
   HdfsScanner::Close();
 }
 
