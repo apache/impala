@@ -498,3 +498,13 @@ true,50
 ---- TYPES
 boolean, bigint
 ====
+---- QUERY
+# Regression test for IMPALA-1528
+SELECT t2.int_col is NULL FROM alltypesagg t1
+LEFT JOIN (SELECT COALESCE(76, -937, -981) AS int_col FROM alltypestiny) t2
+ON (t2.int_col) = (t1.year) limit 1
+---- RESULTS
+true
+---- TYPES
+boolean
+====
