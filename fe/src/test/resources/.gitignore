@@ -1,2 +1,3 @@
 hdfs-site.xml
 yarn-site.xml
+hbase-env.sh
