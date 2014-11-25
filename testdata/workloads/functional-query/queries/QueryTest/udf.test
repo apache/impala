@@ -472,3 +472,11 @@ bigint
 # TODO: this should print a warning, but we can't retrieve errors from the runtime state
 # log if they're added while the query is closing.
 ====
+---- QUERY
+# Make sure rand() is non-constant
+select constant_arg(cast(rand() as int));
+---- TYPES
+INT
+---- RESULTS
+NULL
+====

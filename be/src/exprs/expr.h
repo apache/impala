@@ -147,9 +147,9 @@ class Expr {
 
   const std::vector<Expr*>& children() const { return children_; }
 
-  // Returns true if expr doesn't contain slotrefs, ie, can be evaluated
-  // with GetValue(NULL). The default implementation returns true if all of
-  // the children are constant.
+  // Returns true if GetValue(NULL) can be called on this expr and always returns the same
+  // result (e.g., exprs that don't contain slotrefs). The default implementation returns
+  // true if all children are constant.
   virtual bool IsConstant() const;
 
   // Returns the slots that are referenced by this expr tree in 'slot_ids'.
@@ -331,7 +331,7 @@ class Expr {
   // Simple debug string that provides no expr subclass-specific information
   std::string DebugString(const std::string& expr_name) const {
     std::stringstream out;
-    out << expr_name << "(" << DebugString() << ")";
+    out << expr_name << "(" << Expr::DebugString() << ")";
     return out.str();
   }
 

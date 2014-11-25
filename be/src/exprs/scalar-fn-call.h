@@ -61,6 +61,8 @@ class ScalarFnCall: public Expr {
   virtual void Close(RuntimeState* state, ExprContext* context,
       FunctionContext::FunctionStateScope scope = FunctionContext::FRAGMENT_LOCAL);
 
+  virtual bool IsConstant() const;
+
   virtual BooleanVal GetBooleanVal(ExprContext* context, TupleRow*);
   virtual TinyIntVal GetTinyIntVal(ExprContext* context, TupleRow*);
   virtual SmallIntVal GetSmallIntVal(ExprContext* context, TupleRow*);

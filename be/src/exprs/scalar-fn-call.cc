@@ -196,6 +196,11 @@ void ScalarFnCall::Close(RuntimeState* state, ExprContext* context,
   Expr::Close(state, context, scope);
 }
 
+bool ScalarFnCall::IsConstant() const {
+  if (fn_.name.function_name == "rand") return false;
+  return Expr::IsConstant();
+}
+
 // Dynamically loads the pre-compiled UDF and codegens a function that calls each child's
 // codegen'd function, then passes those values to the UDF and returns the result.
 // Example generated IR for a UDF with signature
