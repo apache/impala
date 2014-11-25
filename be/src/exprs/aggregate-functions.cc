@@ -1026,7 +1026,7 @@ void AggregateFunctions::HllMerge(FunctionContext* ctx, const StringVal& src,
   }
 }
 
-inline uint64_t AggregateFunctions::HllFinalEstimate(const uint8_t* buckets,
+uint64_t AggregateFunctions::HllFinalEstimate(const uint8_t* buckets,
     int32_t num_buckets) {
   DCHECK_NOTNULL(buckets);
   DCHECK_EQ(num_buckets, HLL_LEN);
