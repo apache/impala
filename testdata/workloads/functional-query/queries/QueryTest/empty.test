@@ -98,3 +98,22 @@ select MIN(int_col) OVER () FROM alltypes limit 0
 ---- TYPES
 INT
 ====
+---- QUERY
+# IMPALA-1524: Materialize all tuples produced by an EmptySet node.
+SELECT
+COALESCE(580, MAX(t2.year), 150) AS int_col FROM (
+  SELECT
+  t1.bool_col,
+  COALESCE(LAG(-826, 69) OVER (
+    ORDER BY t1.bool_col DESC, COALESCE(t2.int_col, t2.smallint_col, t2.id)), 279, -764) AS int_col,
+  COALESCE(t2.int_col, t2.smallint_col, t2.id) AS int_col_2
+  FROM functional.alltypestiny t1
+  INNER JOIN functional.alltypestiny t2
+  ON ((t2.bigint_col) = (t1.id)) AND ((t2.timestamp_col) = (t1.timestamp_col))) t1
+INNER JOIN functional.alltypes t2 ON (t2.year) = (t1.int_col_2)
+WHERE (-339.22) IN (-922.68, -254.84)
+---- RESULTS
+580
+---- TYPES
+INT
+====

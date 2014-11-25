@@ -42,6 +42,11 @@ public class EmptySetNode extends PlanNode {
 
   @Override
   public void init(Analyzer analyzer) throws InternalException {
+    // If the physical output tuple produced by an AnalyticEvalNode wasn't created
+    // the logical output tuple is returned by getMaterializedTupleIds(). It needs
+    // to be set as materialized (even though it isn't) to avoid failing precondition
+    // checks generating the thrift for slot refs that may reference this tuple.
+    for (TupleId id: tupleIds_) analyzer.getTupleDesc(id).setIsMaterialized(true);
     computeMemLayout(analyzer);
     computeStats(analyzer);
   }

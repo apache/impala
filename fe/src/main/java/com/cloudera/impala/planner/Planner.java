@@ -1102,13 +1102,6 @@ public class Planner {
       throws InternalException {
     ArrayList<TupleId> tupleIds = Lists.newArrayList();
     stmt.getMaterializedTupleIds(tupleIds);
-
-    // If the physical output tuple produced by an AnalyticEvalNode wasn't created
-    // the logical output tuple is returned by getMaterializedTupleIds(). It needs
-    // to be set as materialized (even though it isn't) to avoid failing precondition
-    // checks generating the thrift for slot refs that may reference this tuple.
-    for (TupleId id: tupleIds) analyzer.getTupleDesc(id).setIsMaterialized(true);
-
     EmptySetNode node = new EmptySetNode(nodeIdGenerator_.getNextId(), tupleIds);
     node.init(analyzer);
     return node;
