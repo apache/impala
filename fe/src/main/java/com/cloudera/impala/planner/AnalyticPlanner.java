@@ -40,7 +40,6 @@ import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.analysis.TupleIsNullPredicate;
-import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.google.common.base.Preconditions;
@@ -127,7 +126,6 @@ public class AnalyticPlanner {
           partitionGroups, groupingExprs, root.getNumNodes(), inputPartitionExprs);
     }
 
-    PlanNode analyticInputNode = root;
     for (PartitionGroup partitionGroup: partitionGroups) {
       for (int i = 0; i < partitionGroup.sortGroups.size(); ++i) {
         root = createSortGroupPlan(root, partitionGroup.sortGroups.get(i),
@@ -137,17 +135,6 @@ public class AnalyticPlanner {
 
     // create equiv classes for newly added slots
     analyzer_.createIdentityEquivClasses();
-
-    // Add expr mapping to substitute TupleIsNullPredicates referring to the logical
-    // analytic output with TupleIsNullPredicates referring to the physical output.
-    List<TupleId> oldTupleIds = Lists.newArrayList(analyticInputNode.getTupleIds());
-    oldTupleIds.add(analyticInfo_.getOutputTupleId());
-    TupleIsNullPredicate lhs = new TupleIsNullPredicate(oldTupleIds);
-    lhs.analyze(analyzer_);
-    TupleIsNullPredicate rhs = new TupleIsNullPredicate(root.tupleIds_);
-    rhs.analyze(analyzer_);
-    if (root.outputSmap_ == null) root.outputSmap_ = new ExprSubstitutionMap();
-    root.outputSmap_.put(lhs, rhs);
     return root;
   }
 
@@ -299,6 +286,35 @@ public class AnalyticPlanner {
         sortSlotDesc.setIsMaterialized(true);
         sortSmap.put(new SlotRef(inputSlotDesc), new SlotRef(sortSlotDesc));
         sortSlotExprs.add(new SlotRef(inputSlotDesc));
+      }
+    }
+
+    // Lhs exprs to be substituted in ancestor plan nodes could have a rhs that contains
+    // TupleIsNullPredicates. TupleIsNullPredicates require specific tuple ids for
+    // evaluation. Since this sort materializes a new tuple, it's impossible to evaluate
+    // TupleIsNullPredicates referring to this sort's input after this sort,
+    // To preserve the information whether an input tuple was null or not this sort node,
+    // we materialize those rhs TupleIsNullPredicates, which are then substituted
+    // by a SlotRef into the sort's tuple in ancestor nodes (IMPALA-1519).
+    ExprSubstitutionMap inputSmap = input.getOutputSmap();
+    if (inputSmap != null) {
+      List<Expr> tupleIsNullPredsToMaterialize = Lists.newArrayList();
+      for (int i = 0; i < inputSmap.size(); ++i) {
+        Expr rhsExpr = inputSmap.getRhs().get(i);
+        // Ignore substitutions that are irrelevant at this plan node and its ancestors.
+        if (!rhsExpr.isBoundByTupleIds(input.getTupleIds())) continue;
+        rhsExpr.collect(TupleIsNullPredicate.class, tupleIsNullPredsToMaterialize);
+      }
+      Expr.removeDuplicates(tupleIsNullPredsToMaterialize);
+
+      // Materialize relevant unique TupleIsNullPredicates.
+      for (Expr tupleIsNullPred: tupleIsNullPredsToMaterialize) {
+        SlotDescriptor sortSlotDesc = analyzer_.addSlotDescriptor(sortTupleDesc);
+        sortSlotDesc.setType(tupleIsNullPred.getType());
+        sortSlotDesc.setIsMaterialized(true);
+        sortSlotDesc.setSourceExpr(tupleIsNullPred);
+        sortSlotDesc.setLabel(tupleIsNullPred.toSql());
+        sortSlotExprs.add(tupleIsNullPred.clone());
       }
     }
 

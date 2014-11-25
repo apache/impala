@@ -1,12 +1,10 @@
 package com.cloudera.impala.analysis;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -22,8 +20,17 @@ import com.google.common.collect.Lists;
 public final class ExprSubstitutionMap {
   private final static Logger LOG = LoggerFactory.getLogger(ExprSubstitutionMap.class);
 
-  private ArrayList<Expr> lhs_ = Lists.newArrayList(); // left-hand side
-  private ArrayList<Expr> rhs_ =  Lists.newArrayList(); // right-hand side
+  private List<Expr> lhs_; // left-hand side
+  private List<Expr> rhs_; // right-hand side
+
+  public ExprSubstitutionMap() {
+    this(Lists.<Expr>newArrayList(), Lists.<Expr>newArrayList());
+  }
+
+  public ExprSubstitutionMap(List<Expr> lhs, List<Expr> rhs) {
+    lhs_ = lhs;
+    rhs_ = rhs;
+  }
 
   /**
    * Add an expr mapping. The rhsExpr must be analyzed to support correct substitution
@@ -66,6 +73,7 @@ public final class ExprSubstitutionMap {
     // f's substitution targets need to be substituted via g
     result.lhs_ = Expr.cloneList(f.lhs_);
     result.rhs_ = Expr.substituteList(f.rhs_, g, analyzer, false);
+
     // substitution maps are cumulative: the combined map contains all
     // substitutions from f and g.
     for (int i = 0; i < g.lhs_.size(); i++) {
@@ -104,13 +112,12 @@ public final class ExprSubstitutionMap {
     return result;
   }
 
-  public void substituteLhs(ExprSubstitutionMap lhsSmap, Analyzer analyzer)
-      throws InternalException {
+  public void substituteLhs(ExprSubstitutionMap lhsSmap, Analyzer analyzer) {
     lhs_ = Expr.substituteList(lhs_, lhsSmap, analyzer, false);
   }
 
-  public ArrayList<Expr> getLhs() { return lhs_; }
-  public ArrayList<Expr> getRhs() { return rhs_; }
+  public List<Expr> getLhs() { return lhs_; }
+  public List<Expr> getRhs() { return rhs_; }
 
   public int size() { return lhs_.size(); }
 

@@ -18,10 +18,13 @@ import java.util.List;
 import java.util.Set;
 
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TTupleIsNullPredicate;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 /**
@@ -32,7 +35,6 @@ import com.google.common.collect.Sets;
  * because some exprs may be wrapped in a TupleIsNullPredicate that contain
  * SlotRefs on non-nullable tuples, e.g., an expr in the On-clause of an outer join
  * that refers to an outer-joined inline view (see IMPALA-904).
- *
  */
 public class TupleIsNullPredicate extends Predicate {
   private final Set<TupleId> tupleIds_;
@@ -77,7 +79,6 @@ public class TupleIsNullPredicate extends Predicate {
   @Override
   public boolean equals(Object o) {
     if (!super.equals(o)) return false;
-    if (!(o instanceof TupleIsNullPredicate)) return false;
     TupleIsNullPredicate other = (TupleIsNullPredicate) o;
     return other.tupleIds_.containsAll(tupleIds_) &&
         tupleIds_.containsAll(other.tupleIds_);
@@ -85,7 +86,85 @@ public class TupleIsNullPredicate extends Predicate {
 
   @Override
   protected String toSqlImpl() { return "TupleIsNull()"; }
+
   public Set<TupleId> getTupleIds() { return tupleIds_; }
+
+  @Override
+  public boolean isConstant() { return false; }
+
+  /**
+   * Makes each input expr nullable, if necessary, by wrapping it as follows:
+   * IF(TupleIsNull(tids), NULL, expr)
+   *
+   * The given tids must be materialized. The given inputExprs are expected to be bound
+   * by tids once fully substituted against base tables. However, inputExprs may not yet
+   * be fully substituted at this point.
+   *
+   * Returns a new list with the nullable exprs.
+   */
+  public static List<Expr> wrapExprs(List<Expr> inputExprs,
+      List<TupleId> tids, Analyzer analyzer) throws InternalException {
+    // Assert that all tids are materialized.
+    for (TupleId tid: tids) {
+      TupleDescriptor tupleDesc = analyzer.getTupleDesc(tid);
+      Preconditions.checkState(tupleDesc.isMaterialized());
+    }
+    // Perform the wrapping.
+    List<Expr> result = Lists.newArrayListWithCapacity(inputExprs.size());
+    for (Expr e: inputExprs) {
+      result.add(wrapExpr(e, tids, analyzer));
+    }
+    return result;
+  }
+
+  /**
+   * Returns a new analyzed conditional expr 'IF(TupleIsNull(tids), NULL, expr)',
+   * if required to make expr nullable. Otherwise, returns expr.
+   */
+  public static Expr wrapExpr(Expr expr, List<TupleId> tids, Analyzer analyzer)
+      throws InternalException {
+    if (!requiresNullWrapping(expr, analyzer)) return expr;
+    List<Expr> params = Lists.newArrayList();
+    params.add(new TupleIsNullPredicate(tids));
+    params.add(new NullLiteral());
+    params.add(expr);
+    Expr ifExpr = new FunctionCallExpr("if", params);
+    ifExpr.analyzeNoThrow(analyzer);
+    return ifExpr;
+  }
+
+  /**
+   * Returns true if the given expr evaluates to a non-NULL value if all its contained
+   * SlotRefs evaluate to NULL, false otherwise.
+   * Throws an InternalException if expr evaluation in the BE failed.
+   */
+  private static boolean requiresNullWrapping(Expr expr, Analyzer analyzer)
+      throws InternalException {
+    Preconditions.checkNotNull(expr);
+    // If the expr is already wrapped in an IF(TupleIsNull(), NULL, expr)
+    // then it must definitely be wrapped again at this level.
+    // Do not try to execute expr because a TupleIsNullPredicate is not constant.
+    if (expr.contains(TupleIsNullPredicate.class)) return true;
+
+    // Map for substituting SlotRefs with NullLiterals.
+    ExprSubstitutionMap nullSmap = new ExprSubstitutionMap();
+    List<SlotRef> slotRefs = Lists.newArrayList();
+    expr.collect(SlotRef.class, slotRefs);
+    for (SlotRef slotRef: slotRefs) {
+      // The rhs null literal should have the same type as the lhs SlotRef to ensure
+      // exprs resolve to the same signature after applying this smap.
+      nullSmap.put(slotRef, NullLiteral.create(slotRef.getType()));
+    }
+
+    // Replace all SlotRefs in expr with NullLiterals, and wrap the result
+    // with an IS NOT NULL predicate.
+    Expr isNotNullLiteralPred =
+        new IsNullPredicate(expr.substitute(nullSmap, analyzer, false), true);
+    Preconditions.checkState(isNotNullLiteralPred.isConstant());
+    // analyze to insert casts, etc.
+    isNotNullLiteralPred.analyzeNoThrow(analyzer);
+    return FeSupport.EvalPredicate(isNotNullLiteralPred, analyzer.getQueryCtx());
+  }
 
   @Override
   public Expr clone() { return new TupleIsNullPredicate(this); }

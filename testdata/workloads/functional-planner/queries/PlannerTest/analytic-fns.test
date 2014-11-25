@@ -1721,44 +1721,6 @@ WHERE id IS NULL and tinyint_col != 5
 02:SCAN HDFS [functional.alltypes t1]
    partitions=24/24 files=24 size=478.45KB
 ====
-# IMPALA-1483: Check that TupleIsNullPredicates referring to the logical
-# analytic output are substituted with TupleIsNullPredicates referring to
-# the physical output.
-select t2.a, t2.id, t2.int_col
-from functional.alltypes t1
-left outer join
-  (select sum(int_col) over(order by id) a, id, int_col is null as int_col
-   from functional.alltypes
-   where year = 2009 and month between 1 and 2) t2
-on (t1.id = t2.id)
-where year = 2009 and month = 1
----- DISTRIBUTEDPLAN
-08:EXCHANGE [UNPARTITIONED]
-|
-04:HASH JOIN [RIGHT OUTER JOIN, PARTITIONED]
-|  hash predicates: id = t1.id
-|
-|--07:EXCHANGE [HASH(t1.id)]
-|  |
-|  00:SCAN HDFS [functional.alltypes t1]
-|     partitions=1/24 files=1 size=19.95KB
-|
-06:EXCHANGE [HASH(id)]
-|
-03:ANALYTIC
-|  functions: sum(int_col)
-|  order by: id ASC
-|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-|
-05:MERGING-EXCHANGE [UNPARTITIONED]
-|  order by: id ASC
-|
-02:SORT
-|  order by: id ASC
-|
-01:SCAN HDFS [functional.alltypes]
-   partitions=2/24 files=2 size=38.07KB
-====
 # Propagate a predicate on a partition key through an inline view that has an analytic
 # function. Predicates that are not compatible with analytic function's partition by
 # clause are not propagated (IMPALA-1900).
@@ -1960,5 +1922,226 @@ where x = 1
 |  order by: int_col ASC NULLS FIRST, bigint_col ASC
 |
 00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+====
+# IMPALA-1519: Check that the first analytic sort of a select block
+# materializes TupleIsNullPredicates to be substituted in ancestor nodes.
+select
+  sum(t1.id) over (partition by t1.bool_col),
+  count(1) over (order by t1.int_col),
+  avg(g) over (order by f),
+  t2.a,
+  t2.d
+from functional.alltypestiny t1
+left outer join
+  (select
+     id as a,
+     coalesce(id, 10) as b,
+     int_col as c,
+     coalesce(int_col, 20) as d,
+     bigint_col e,
+     coalesce(bigint_col, 30) as f,
+     coalesce(id + bigint_col, 40) as g
+   from functional.alltypestiny) t2
+on (t1.id = t2.a + 100)
+---- PLAN
+08:ANALYTIC
+|  functions: avg(if(TupleIsNull(), NULL, coalesce(id + bigint_col, 40)))
+|  order by: if(TupleIsNull(), NULL, coalesce(bigint_col, 30)) ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+07:SORT
+|  order by: if(TupleIsNull(), NULL, coalesce(bigint_col, 30)) ASC
+|
+06:ANALYTIC
+|  functions: count(1)
+|  order by: int_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+05:SORT
+|  order by: int_col ASC
+|
+04:ANALYTIC
+|  functions: sum(id)
+|  partition by: t1.bool_col
+|
+03:SORT
+|  order by: bool_col ASC NULLS FIRST
+|
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: id + 100 = t1.id
+|
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     partitions=4/4 files=4 size=460B
+|
+01:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+====
+# IMPALA-1519: Check that the first analytic sort of a select block
+# materializes TupleIsNullPredicates to be substituted in ancestor nodes.
+# Same test as the one above, but with an aggregation on top.
+select avg(af1), sum(af3), count(a)
+from
+  (select
+    sum(t1.id) over (partition by t1.bool_col) af1,
+    count(1) over (order by t1.int_col) af2,
+    avg(g) over (order by f) af3,
+    t2.a,
+    t2.d
+  from functional.alltypestiny t1
+  left outer join
+    (select
+       id as a,
+       coalesce(id, 10) as b,
+       int_col as c,
+       coalesce(int_col, 20) as d,
+       bigint_col e,
+       coalesce(bigint_col, 30) as f,
+       coalesce(id + bigint_col, 40) as g
+     from functional.alltypestiny) t2
+  on (t1.id = t2.a + 100)) t3
+group by d
+---- PLAN
+07:AGGREGATE [FINALIZE]
+|  output: avg(sum(t1.id)), sum(avg(g)), count(id)
+|  group by: if(TupleIsNull(), NULL, coalesce(int_col, 20))
+|
+06:ANALYTIC
+|  functions: avg(if(TupleIsNull(), NULL, coalesce(id + bigint_col, 40)))
+|  order by: if(TupleIsNull(), NULL, coalesce(bigint_col, 30)) ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+05:SORT
+|  order by: if(TupleIsNull(), NULL, coalesce(bigint_col, 30)) ASC
+|
+04:ANALYTIC
+|  functions: sum(id)
+|  partition by: t1.bool_col
+|
+03:SORT
+|  order by: bool_col ASC NULLS FIRST
+|
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: id + 100 = t1.id
+|
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     partitions=4/4 files=4 size=460B
+|
+01:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+====
+# IMPALA-1519: Check that expr wrapping with a TupleIsNullPredicate
+# is performed correctly with analytics and multiple nesting levels.
+# The test covers these cases:
+# - analytic output that needs to be wrapped
+# - analytic input that needs to be wrapped
+# - both cases above with and without order by in the over() clause
+# - exprs that need to be wrapped multiple times due to multiple outer joins
+select * from
+  (select
+   a.id,
+   sum(x) over (partition by a.id) as x,
+   ifnull(y, 10) as y,
+   ifnull(z, "b") as z
+   from functional.alltypestiny a
+   left outer join
+     (select id,
+      ifnull(int_col, 1) x,
+      count(bigint_col) over(partition by id) y,
+      ifnull(string_col, "a") z
+      from functional.alltypestiny b) v1
+   on (a.id = v1.id)) v2
+full outer join
+  (select
+   c.id,
+   sum(x) over (order by c.id) as x,
+   ifnull(y, 10) as y,
+   ifnull(z, "b") as z
+   from functional.alltypestiny c
+   left outer join
+     (select id,
+      ifnull(int_col, 1) x,
+      count(bigint_col) over(order by id) y,
+      ifnull(string_col, "a") z
+      from functional.alltypestiny d) v3
+   on (c.id = v3.id)) v4
+on (v2.id = v4.id)
+---- PLAN
+14:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: id = id
+|
+|--13:ANALYTIC
+|  |  functions: sum(if(TupleIsNull(), NULL, ifnull(int_col, 1)))
+|  |  order by: id ASC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |
+|  12:SORT
+|  |  order by: id ASC
+|  |
+|  11:HASH JOIN [RIGHT OUTER JOIN]
+|  |  hash predicates: id = c.id
+|  |
+|  |--07:SCAN HDFS [functional.alltypestiny c]
+|  |     partitions=4/4 files=4 size=460B
+|  |
+|  10:ANALYTIC
+|  |  functions: count(bigint_col)
+|  |  order by: id ASC
+|  |  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |
+|  09:SORT
+|  |  order by: id ASC
+|  |
+|  08:SCAN HDFS [functional.alltypestiny d]
+|     partitions=4/4 files=4 size=460B
+|
+06:ANALYTIC
+|  functions: sum(if(TupleIsNull(), NULL, ifnull(int_col, 1)))
+|  partition by: a.id
+|
+05:SORT
+|  order by: id ASC NULLS FIRST
+|
+04:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: id = a.id
+|
+|--00:SCAN HDFS [functional.alltypestiny a]
+|     partitions=4/4 files=4 size=460B
+|
+03:ANALYTIC
+|  functions: count(bigint_col)
+|  partition by: id
+|
+02:SORT
+|  order by: id ASC NULLS FIRST
+|
+01:SCAN HDFS [functional.alltypestiny b]
+   partitions=4/4 files=4 size=460B
+====
+# IMPALA-1946: Check that On-clause predicates of an outer join assigned in a scan
+# are not wrapped in TupleIsNullPredicates.
+select /* +straight_join */ a.id, b.id
+from functional.alltypestiny a
+left outer join
+  (select t1.id, ifnull(t1.int_col, 10) as int_col
+   from functional.alltypestiny t1
+   inner join functional.alltypestiny t2
+   on (t1.id = t2.id)) b
+on (a.id = b.id and b.int_col < 10)
+---- PLAN
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: a.id = t1.id
+|
+|--03:HASH JOIN [INNER JOIN]
+|  |  hash predicates: t2.id = t1.id
+|  |
+|  |--01:SCAN HDFS [functional.alltypestiny t1]
+|  |     partitions=4/4 files=4 size=460B
+|  |     predicates: ifnull(t1.int_col, 10) < 10
+|  |
+|  02:SCAN HDFS [functional.alltypestiny t2]
+|     partitions=4/4 files=4 size=460B
+|
+00:SCAN HDFS [functional.alltypestiny a]
    partitions=4/4 files=4 size=460B
 ====

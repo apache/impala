@@ -43,6 +43,7 @@ import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
+import com.cloudera.impala.analysis.TupleIsNullPredicate;
 import com.cloudera.impala.analysis.UnionStmt;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.catalog.ColumnStats;
@@ -128,6 +129,11 @@ public class SingleNodePlanner {
     stmt.getMaterializedTupleIds(tupleIds);
     EmptySetNode node = new EmptySetNode(ctx_.getNextNodeId(), tupleIds);
     node.init(analyzer);
+    // Set the output smap to resolve exprs referencing inline views within stmt.
+    // Not needed for a UnionStmt because it materializes its input operands.
+    if (stmt instanceof SelectStmt) {
+      node.setOutputSmap(((SelectStmt) stmt).getBaseTblSmap());
+    }
     return node;
   }
 
@@ -582,7 +588,7 @@ public class SingleNodePlanner {
   private PlanNode createConstantSelectPlan(SelectStmt selectStmt, Analyzer analyzer)
       throws InternalException {
     Preconditions.checkState(selectStmt.getTableRefs().isEmpty());
-    ArrayList<Expr> resultExprs = selectStmt.getBaseTblResultExprs();
+    ArrayList<Expr> resultExprs = selectStmt.getResultExprs();
     ArrayList<String> colLabels = selectStmt.getColLabels();
     // Create tuple descriptor for materialized tuple.
     TupleDescriptor tupleDesc = analyzer.getDescTbl().createTupleDescriptor("union");
@@ -713,15 +719,24 @@ public class SingleNodePlanner {
     // the avg row size is availble during optimization; however, that means we need to
     // select references to its resultExprs from the enclosing scope(s)
     rootNode.setTblRefIds(Lists.newArrayList(inlineViewRef.getId()));
-    // Set smap *before* creating a SelectNode in order to allow proper resolution.
-    // Analytics have an additional level of logical to physical slot remapping.
-    // The composition creates a mapping from the logical output of the inline view
-    // to the physical analytic output. In addition, it retains the logical to
-    // physical analytic slot mappings which are needed to resolve exprs that already
-    // reference the logical analytic tuple (and not the inline view tuple), e.g.,
-    // the result exprs set in the coordinator fragment.
-    rootNode.setOutputSmap(ExprSubstitutionMap.compose(inlineViewRef.getBaseTblSmap(),
-        rootNode.getOutputSmap(), analyzer));
+
+    ExprSubstitutionMap inlineViewSmap = inlineViewRef.getSmap();
+    if (analyzer.isOuterJoined(inlineViewRef.getId())) {
+      // Exprs against non-matched rows of an outer join should always return NULL.
+      // Make the rhs exprs of the inline view's smap nullable, if necessary.
+      List<Expr> nullableRhs = TupleIsNullPredicate.wrapExprs(
+          inlineViewSmap.getRhs(), rootNode.getTupleIds(), analyzer);
+      inlineViewSmap = new ExprSubstitutionMap(inlineViewSmap.getLhs(), nullableRhs);
+    }
+    // Set output smap of rootNode *before* creating a SelectNode for proper resolution.
+    // The output smap is the composition of the inline view's smap and the output smap
+    // of the inline view's plan root. This ensures that all downstream exprs referencing
+    // the inline view are replaced with exprs referencing the physical output of
+    // the inline view's plan.
+    ExprSubstitutionMap composedSmap = ExprSubstitutionMap.compose(inlineViewSmap,
+        rootNode.getOutputSmap(), analyzer);
+    rootNode.setOutputSmap(composedSmap);
+
     // If the inline view has a LIMIT/OFFSET or unassigned conjuncts due to analytic
     // functions, we may have conjuncts that need to be assigned to a SELECT node on
     // top of the current plan root node.

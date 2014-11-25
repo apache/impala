@@ -11,8 +11,8 @@ import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.ColumnLineageGraph;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InsertStmt;
-import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.HBaseTable;
+import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.RuntimeEnv;
@@ -95,7 +95,7 @@ public class Planner {
       targetTable = insertStmt.getTargetTable();
       graph.addTargetColumnLabels(targetTable);
     } else {
-      resultExprs = ctx_.getQueryStmt().getBaseTblResultExprs();
+      resultExprs = ctx_.getQueryStmt().getResultExprs();
       graph.addTargetColumnLabels(ctx_.getQueryStmt().getColLabels());
     }
     resultExprs = Expr.substituteList(resultExprs,

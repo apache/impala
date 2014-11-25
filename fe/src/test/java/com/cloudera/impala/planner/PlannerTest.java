@@ -16,7 +16,6 @@ package com.cloudera.impala.planner;
 
 import org.junit.Test;
 
-import com.cloudera.impala.planner.PlannerTestBase;
 import com.cloudera.impala.thrift.TQueryOptions;
 
 // All planner tests, except for S3 specific tests should go here.

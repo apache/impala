@@ -351,14 +351,6 @@ public class TableRef implements ParseNode {
     } else if (getJoinOp().isOuterJoin() || getJoinOp().isSemiJoin()) {
       throw new AnalysisException(joinOp_.toString() + " requires an ON or USING clause.");
     }
-
-    // Make constant expressions from inline view refs nullable in its substitution map.
-    if (lhsIsNullable && leftTblRef_ instanceof InlineViewRef) {
-      ((InlineViewRef) leftTblRef_).makeOutputNullable(analyzer);
-    }
-    if (rhsIsNullable && this instanceof InlineViewRef) {
-      ((InlineViewRef) this).makeOutputNullable(analyzer);
-    }
   }
 
   /**

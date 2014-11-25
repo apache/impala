@@ -31,12 +31,11 @@ import java.util.regex.Pattern;
 import org.apache.hadoop.fs.Path;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.analysis.ColumnLineageGraph;
+import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
@@ -406,7 +405,6 @@ public class PlannerTestBase {
       }
     } catch (ImpalaException e) {
       if (e instanceof AnalysisException) {
-        e.printStackTrace();
         errorLog.append(
             "query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
         return;
@@ -486,7 +484,6 @@ public class PlannerTestBase {
       }
     } catch (ImpalaException e) {
       if (e instanceof AnalysisException) {
-        e.printStackTrace();
         errorLog.append(
             "query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
         return;
@@ -583,9 +580,9 @@ public class PlannerTestBase {
        errorLog.append(
            "query:\n" + query + "\nunhandled exception: " + e.getMessage() + "\n");
      }
-   } catch (IllegalStateException ie) {
+   } catch (IllegalStateException e) {
        errorLog.append(
-           "query:\n" + query + "\nunhandled exception: " + ie.getMessage() + "\n");
+           "query:\n" + query + "\nunhandled exception: " + e.getMessage() + "\n");
    }
   }
 

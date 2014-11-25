@@ -25,11 +25,7 @@ import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.InlineView;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.common.TreeNode;
-import com.cloudera.impala.service.FeSupport;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 
 /**
@@ -53,13 +49,9 @@ public class InlineViewRef extends TableRef {
   protected final ArrayList<TupleId> materializedTupleIds_ = Lists.newArrayList();
 
   // Map inline view's output slots to the corresponding resultExpr of queryStmt.
-  // Some rhs exprs are wrapped into IF(TupleIsNull(), NULL, expr) by calling
-  // makeOutputNullable() if this inline view is a nullable side of an outer join.
   protected final ExprSubstitutionMap smap_ = new ExprSubstitutionMap();
 
   // Map inline view's output slots to the corresponding baseTblResultExpr of queryStmt.
-  // Some rhs exprs are wrapped into IF(TupleIsNull(), NULL, expr) by calling
-  // makeOutputNullable() if this inline view is a nullable side of an outer join.
   protected final ExprSubstitutionMap baseTblSmap_ = new ExprSubstitutionMap();
 
   // If not null, these will serve as the column labels for the inline view. This provides
@@ -231,74 +223,6 @@ public class InlineViewRef extends TableRef {
     result.setIsMaterialized(false);
     result.setTable(inlineView);
     return result;
-  }
-
-  /**
-   * Makes each rhs expr in baseTblSmap_ nullable, if necessary by wrapping as follows:
-   * IF(TupleIsNull(), NULL, rhs expr)
-   * Should be called only if this inline view is on the nullable side of an outer join.
-   *
-   * We need to make an rhs exprs nullable if it evaluates to a non-NULL value
-   * when all of its contained SlotRefs evaluate to NULL.
-   * For example, constant exprs need to be wrapped or an expr such as
-   * 'case slotref is null then 1 else 2 end'
-   */
-  protected void makeOutputNullable(Analyzer analyzer) {
-    try {
-      makeOutputNullableHelper(analyzer, smap_);
-      makeOutputNullableHelper(analyzer, baseTblSmap_);
-    } catch (Exception e) {
-      // should never happen
-      throw new IllegalStateException(e);
-    }
-  }
-
-  protected void makeOutputNullableHelper(Analyzer analyzer, ExprSubstitutionMap smap)
-      throws InternalException {
-    // Gather all unique rhs SlotRefs into rhsSlotRefs
-    List<SlotRef> rhsSlotRefs = Lists.newArrayList();
-    TreeNode.collect(smap.getRhs(), Predicates.instanceOf(SlotRef.class), rhsSlotRefs);
-    // Map for substituting SlotRefs with NullLiterals.
-    ExprSubstitutionMap nullSMap = new ExprSubstitutionMap();
-    for (SlotRef rhsSlotRef: rhsSlotRefs) {
-      // The rhs null literal should have the same type as the lhs SlotRef to ensure
-      // exprs resolve to the same signature after applying this smap.
-      nullSMap.put(rhsSlotRef.clone(), NullLiteral.create(rhsSlotRef.getType()));
-    }
-
-    // Make rhs exprs nullable if necessary.
-    for (int i = 0; i < smap.getRhs().size(); ++i) {
-      List<Expr> params = Lists.newArrayList();
-      if (!requiresNullWrapping(analyzer, smap.getRhs().get(i), nullSMap)) continue;
-      params.add(new TupleIsNullPredicate(materializedTupleIds_));
-      params.add(new NullLiteral());
-      params.add(smap.getRhs().get(i));
-      Expr ifExpr = new FunctionCallExpr("if", params);
-      ifExpr.analyzeNoThrow(analyzer);
-      smap.getRhs().set(i, ifExpr);
-    }
-  }
-
-  /**
-   * Replaces all SloRefs in expr with a NullLiteral using nullSMap, and evaluates the
-   * resulting constant expr. Returns true if the constant expr yields a non-NULL value,
-   * false otherwise.
-   */
-  private boolean requiresNullWrapping(Analyzer analyzer, Expr expr,
-      ExprSubstitutionMap nullSMap) throws InternalException {
-    // If the expr is already wrapped in an IF(TupleIsNull(), NULL, expr)
-    // then do not try to execute it.
-    // TODO: return true in this case?
-    if (expr.contains(Predicates.instanceOf(TupleIsNullPredicate.class))) return true;
-
-    // Replace all SlotRefs in expr with NullLiterals, and wrap the result
-    // with an IS NOT NULL predicate.
-    Expr isNotNullLiteralPred =
-        new IsNullPredicate(expr.substitute(nullSMap, analyzer, false), true);
-    Preconditions.checkState(isNotNullLiteralPred.isConstant());
-    // analyze to insert casts, etc.
-    isNotNullLiteralPred.analyzeNoThrow(analyzer);
-    return FeSupport.EvalPredicate(isNotNullLiteralPred, analyzer.getQueryCtx());
   }
 
   @Override
