@@ -769,9 +769,9 @@ public class SelectStmt extends QueryStmt {
   /**
    * If the select statement has a sort/top that is evaluated, then the sort tuple
    * is materialized. Else, if there is aggregation then the aggregate tuple id is
-   * materialized. Otherwise, all referenced tables are materialized.
-   * If there are analytics and no sort, then the returned tuple ids also include
-   * the logical analytic output tuple.
+   * materialized. Otherwise, all referenced tables are materialized as long as they are
+   * not semi-joined. If there are analytics and no sort, then the returned tuple
+   * ids also include the logical analytic output tuple.
    */
   @Override
   public void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList) {
@@ -782,6 +782,12 @@ public class SelectStmt extends QueryStmt {
       tupleIdList.add(aggInfo_.getResultTupleId());
     } else {
       for (TableRef tblRef: tableRefs_) {
+        // Don't include materialized tuple ids from semi-joined table
+        // refs (see IMPALA-1526)
+        if (tblRef.getJoinOp().isLeftSemiJoin()) continue;
+        // Remove the materialized tuple ids of all the table refs that
+        // are semi-joined by the right semi/anti join.
+        if (tblRef.getJoinOp().isRightSemiJoin()) tupleIdList.clear();
         tupleIdList.addAll(tblRef.getMaterializedTupleIds());
       }
     }

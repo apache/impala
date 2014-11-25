@@ -499,6 +499,53 @@ true,50
 boolean, bigint
 ====
 ---- QUERY
+# Test that tuple ids from semi-joined table refs are not added in an
+# IsNullPredicate expr; inline view with left semi join between a base table
+# and an inline view (IMPALA-1526)
+select t1.int_col
+from alltypestiny t1 left join
+  (select coalesce(t1.year, 384) as int_col
+   from alltypesagg t1
+   where t1.bigint_col in
+     (select day as int_col from alltypesagg where t1.id = day)) t2
+on t2.int_col = t1.month
+where t1.month is not null
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0
+1
+0
+1
+0
+1
+0
+1
+---- TYPES
+INT
+====
+---- QUERY
+# Test that tuple ids from semi-joined table refs are not added in
+# an IsNullPredicate expr; inline view with right semi join between
+# two inline views (IMPALA-1526)
+select t1.int_col
+from alltypestiny t1 left join
+  (select coalesce(t3.int_col, 384) as int_col
+   from (select int_col from alltypes) t1
+   right semi join (select int_col from alltypesagg) t3 on t1.int_col = t3.int_col) t2
+on t2.int_col = t1.month
+where t1.month is not null
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0
+1
+0
+1
+0
+1
+0
+1
+---- TYPES
+INT
+====
+---- QUERY
 # Regression test for IMPALA-1528
 SELECT t2.int_col is NULL FROM alltypesagg t1
 LEFT JOIN (SELECT COALESCE(76, -937, -981) AS int_col FROM alltypestiny) t2
