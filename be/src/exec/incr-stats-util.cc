@@ -57,17 +57,17 @@ StringVal IncrementNdvFinalize(FunctionContext* ctx, const StringVal& src) {
 // unencoded.
 string EncodeNdv(const string& ndv, bool* is_encoded) {
   DCHECK_EQ(ndv.size(), AggregateFunctions::HLL_LEN);
-  string encoded_ndv(AggregateFunctions::HLL_LEN - 2, 0);
+  string encoded_ndv(AggregateFunctions::HLL_LEN, 0);
   int idx = 0;
   char last = ndv[0];
 
   // Keep a count of how many times a value appears in succession. We encode this count as
-  // a byte 0-255, but the actual count is always one more than the encoded valuye
+  // a byte 0-255, but the actual count is always one more than the encoded value
   // (i.e. in the range 1-256 inclusive).
   uint8_t count = 0;
   for (int i = 1; i < AggregateFunctions::HLL_LEN; ++i) {
-    if (idx + 2 > AggregateFunctions::HLL_LEN) break;
     if (ndv[i] != last || count == numeric_limits<uint8_t>::max()) {
+      if (idx + 2 > AggregateFunctions::HLL_LEN) break;
       // Write a (count, value) pair to two successive bytes
       encoded_ndv[idx++] = count;
       count = 0;
