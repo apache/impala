@@ -263,10 +263,6 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
   private boolean isMarkedCached_ = false;
   private final TAccessLevel accessLevel_;
 
-  // If non-null, the intermediate partition stats computed by a COMPUTE INCREMENTAL STATS
-  // query.
-  private TPartitionStats partStats_;
-
   // (k,v) pairs of parameters for this partition, stored in the HMS. Used by Impala to
   // store intermediate state for statistics computations.
   private Map<String, String> hmsParameters_;
@@ -368,11 +364,22 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
   public boolean isMarkedCached() { return isMarkedCached_; }
   void markCached() { isMarkedCached_ = true; }
 
-  // May return null if no per-partition stats were recorded
-  public TPartitionStats getPartitionStats() { return partStats_; }
+  // May return null if no per-partition stats were recorded, or if the per-partition
+  // stats could not be deserialised from the parameter map.
+  public TPartitionStats getPartitionStats() {
+    try {
+      return PartitionStatsUtil.partStatsFromParameters(hmsParameters_);
+    } catch (ImpalaException e) {
+      LOG.warn("Could not deserialise incremental stats state for " + getPartitionName() +
+          ", consider DROP INCREMENTAL STATS ... PARTITION ... and recomputing " +
+          "incremental stats for this table.");
+      return null;
+    }
+  }
 
   public boolean hasIncrementalStats() {
-    return partStats_ != null && partStats_.intermediate_col_stats != null;
+    TPartitionStats partStats = getPartitionStats();
+    return partStats != null && partStats.intermediate_col_stats != null;
   }
 
   // Returns the HDFS permissions Impala has to this partition's directory - READ_ONLY,
@@ -422,15 +429,8 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
       isMarkedCached_ = HdfsCachingUtil.getCacheDirIdFromParams(
           msPartition.getParameters()) != null;
       hmsParameters_ = msPartition.getParameters();
-      try {
-        partStats_ =
-            PartitionStatsUtil.partStatsFromParameters(hmsParameters_);
-      } catch (ImpalaException e) {
-        LOG.warn("Could not deserialise partition statistics: ", e);
-      }
     } else {
       hmsParameters_ = Maps.newHashMap();
-      partStats_ = null;
     }
 
     // TODO: instead of raising an exception, we should consider marking this partition
@@ -541,14 +541,6 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
       partition.hmsParameters_ = thriftPartition.getHms_parameters();
     } else {
       partition.hmsParameters_ = Maps.newHashMap();
-    }
-
-    try {
-      partition.partStats_ =
-          PartitionStatsUtil.partStatsFromParameters(partition.hmsParameters_);
-    } catch (ImpalaException ex) {
-      LOG.warn("Could not deserialise partition statistics: ", ex);
-      partition.partStats_ = null;
     }
 
     return partition;
