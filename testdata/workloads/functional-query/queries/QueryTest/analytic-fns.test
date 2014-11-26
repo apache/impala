@@ -1052,3 +1052,19 @@ order by t2.id limit 10
 ---- TYPES
 BIGINT, INT, BOOLEAN
 ====
+---- QUERY
+# IMPALA-1542: Analytic fn containing arithmetic expr on NULL crashed
+select lag(coalesce(505, 1 + NULL), 1) over (order by int_col desc)
+from functional.alltypestiny
+---- RESULTS
+NULL
+505
+505
+505
+505
+505
+505
+505
+---- TYPES
+SMALLINT
+====

@@ -1111,3 +1111,11 @@ true,1,1,1,1.100000023841858,10.1,'1',2009-03-01 00:00:00
 ---- TYPES
 BOOLEAN, TINYINT, SMALLINT, INT, FLOAT, DOUBLE, STRING, TIMESTAMP
 ====
+---- QUERY
+# IMPALA-1419: Agg fn containing arithmetic expr on NULL fails
+select count(null * 1) from functional.alltypes
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====

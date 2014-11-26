@@ -80,4 +80,10 @@ public class NullLiteral extends LiteralExpr {
 
   @Override
   public Expr clone() { return new NullLiteral(this); }
+
+  @Override
+  protected void resetAnalysisState() {
+    super.resetAnalysisState();
+    type_ = Type.NULL;
+  }
 }
