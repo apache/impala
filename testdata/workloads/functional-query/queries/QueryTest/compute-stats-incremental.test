@@ -348,3 +348,20 @@ compute incremental stats functional_hbase.alltypes;
 ---- TYPES
 STRING
 ====
+---- QUERY
+# Check that dropping a column still allows stats to be computed
+create table compute_stats_db.incremental_drop_column (a int, b int, c int)
+partitioned by (d int);
+alter table compute_stats_db.incremental_drop_column add partition (d=1);
+insert into compute_stats_db.incremental_drop_column partition(d=1) values (4,4,4);
+compute incremental stats compute_stats_db.incremental_drop_column;
+alter table compute_stats_db.incremental_drop_column drop column c;
+alter table compute_stats_db.incremental_drop_column drop column b;
+compute incremental stats compute_stats_db.incremental_drop_column;
+show table stats compute_stats_db.incremental_drop_column;
+---- RESULTS
+'1',1,1,'6B','NOT CACHED','TEXT','true'
+'Total',1,1,'6B','0B','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING
+====

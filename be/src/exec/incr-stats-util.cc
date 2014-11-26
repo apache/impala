@@ -275,7 +275,7 @@ void FinalizePartitionedColumnStats(const TTableSchema& col_stats_schema,
   BOOST_FOREACH(const TPartitionStats& existing_stats, existing_part_stats) {
     DCHECK_LE(existing_stats.intermediate_col_stats.size(),
         col_stats_schema.columns.size());
-    for (int i = 0; i < existing_stats.intermediate_col_stats.size(); ++i) {
+    for (int i = 0; i < num_cols; ++i) {
       const string& col_name = col_stats_schema.columns[i * COLUMNS_PER_STAT].columnName;
       map<string, TIntermediateColumnStats>::const_iterator it =
           existing_stats.intermediate_col_stats.find(col_name);
