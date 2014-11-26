@@ -485,31 +485,48 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
     const TNetworkAddress* data_host = NULL;  // data server; not necessarily backend
     int volume_id = -1;
     bool is_cached = false;
-    BOOST_FOREACH(const TScanRangeLocation& location, scan_range_locations.locations) {
-      DCHECK_LT(location.host_idx, host_list.size());
-      const TNetworkAddress& replica_host = host_list[location.host_idx];
-      bool has_local_backend = HasLocalBackend(replica_host);
-      // Deprioritize non-collocated datanodes by assigning a very high initial bytes
-      uint64_t initial_bytes = has_local_backend ? 0L : numeric_limits<int64_t>::max();
-      uint64_t* assigned_bytes =
-          FindOrInsert(&assigned_bytes_per_host, replica_host, initial_bytes);
-      // Adjust whether or not this replica should count as being cached based on
-      // the query option and whether it is collocated. If the DN is not collocated
-      // treat the replica as not cached (network transfer dominates anyway in this
-      // case).
-      // TODO: measure this in a cluster setup. Are remote reads better with caching?
-      bool is_replica_cached = location.is_cached && schedule_with_caching &&
-          has_local_backend;
-      // We've found a cached replica and this one is not, skip this replica.
-      if (is_cached && !is_replica_cached) continue;
-      // Update the assignment if this is the first cached replica or if this is
-      // a less busy host.
-      if ((is_replica_cached && !is_cached) || *assigned_bytes < min_assigned_bytes) {
-        min_assigned_bytes = *assigned_bytes;
-        data_host = &replica_host;
-        volume_id = location.volume_id;
-        is_cached = is_replica_cached;
+
+    // Separate cached replicas from non-cached replicas
+    vector<const TScanRangeLocation*> cached_locations;
+    if (schedule_with_caching) {
+      BOOST_FOREACH(const TScanRangeLocation& location, scan_range_locations.locations) {
+        // Adjust whether or not this replica should count as being cached based on
+        // the query option and whether it is collocated. If the DN is not collocated
+        // treat the replica as not cached (network transfer dominates anyway in this
+        // case).
+        // TODO: measure this in a cluster setup. Are remote reads better with caching?
+        if (location.is_cached && HasLocalBackend(host_list[location.host_idx])) {
+          cached_locations.push_back(&location);
+        }
       }
+    }
+    // If no replicas are cached find the ones based on assigned bytes
+    if (cached_locations.size() == 0) {
+      BOOST_FOREACH(const TScanRangeLocation& location, scan_range_locations.locations) {
+        DCHECK_LT(location.host_idx, host_list.size());
+        const TNetworkAddress& replica_host = host_list[location.host_idx];
+        // Deprioritize non-collocated datanodes by assigning a very high initial bytes
+        uint64_t initial_bytes =
+            HasLocalBackend(replica_host) ? 0L : numeric_limits<int64_t>::max();
+        uint64_t* assigned_bytes =
+            FindOrInsert(&assigned_bytes_per_host, replica_host, initial_bytes);
+        // Update the assignment if this is a less busy host.
+        if (*assigned_bytes < min_assigned_bytes) {
+          min_assigned_bytes = *assigned_bytes;
+          data_host = &replica_host;
+          volume_id = location.volume_id;
+          is_cached = false;
+        }
+      }
+    } else {
+      // Randomly pick a cached host based on the extracted list of cached local hosts
+      size_t rand_host = rand() % cached_locations.size();
+      const TNetworkAddress& replica_host = host_list[cached_locations[rand_host]->host_idx];
+      uint64_t initial_bytes = 0L;
+      min_assigned_bytes = *FindOrInsert(&assigned_bytes_per_host, replica_host, initial_bytes);
+      data_host = &replica_host;
+      volume_id = cached_locations[rand_host]->volume_id;
+      is_cached = true;
     }
 
     int64_t scan_range_length = 0;
