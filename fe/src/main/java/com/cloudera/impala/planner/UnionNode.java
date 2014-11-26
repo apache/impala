@@ -190,6 +190,7 @@ public class UnionNode extends PlanNode {
 
   @Override
   protected void toThrift(TPlanNode msg) {
+    Preconditions.checkState(materializedResultExprLists_.size() == children_.size());
     List<List<TExpr>> texprLists = Lists.newArrayList();
     for (List<Expr> exprList: materializedResultExprLists_) {
       texprLists.add(Expr.treesToThrift(exprList));

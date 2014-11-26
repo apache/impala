@@ -2022,9 +2022,13 @@ public class Planner {
   /**
    * Create a plan tree corresponding to 'unionOperands' for the given unionStmt.
    * The individual operands' plan trees are attached to a single UnionNode.
+   * If unionDistinctPlan is not null, it is expected to contain the plan for the
+   * distinct portion of the given unionStmt. The unionDistinctPlan is then added
+   * as a child of the returned UnionNode.
    */
   private UnionNode createUnionPlan(
-      Analyzer analyzer, UnionStmt unionStmt, List<UnionOperand> unionOperands)
+      Analyzer analyzer, UnionStmt unionStmt, List<UnionOperand> unionOperands,
+      PlanNode unionDistinctPlan)
       throws ImpalaException {
     UnionNode unionNode =
         new UnionNode(nodeIdGenerator_.getNextId(), unionStmt.getTupleId());
@@ -2041,6 +2045,12 @@ public class Planner {
       PlanNode opPlan = createQueryPlan(queryStmt, analyzer, false);
       if (opPlan instanceof EmptySetNode) continue;
       unionNode.addChild(opPlan, op.getQueryStmt().getBaseTblResultExprs());
+    }
+    if (unionDistinctPlan != null) {
+      Preconditions.checkState(unionStmt.hasDistinctOps());
+      Preconditions.checkState(unionDistinctPlan instanceof AggregationNode);
+      unionNode.addChild(unionDistinctPlan,
+          unionStmt.getDistinctAggInfo().getGroupingExprs());
     }
     unionNode.init(analyzer);
     return unionNode;
@@ -2088,21 +2098,14 @@ public class Planner {
     // create DISTINCT tree
     if (unionStmt.hasDistinctOps()) {
       result = createUnionPlan(
-          analyzer, unionStmt, unionStmt.getDistinctOperands());
+          analyzer, unionStmt, unionStmt.getDistinctOperands(), null);
       result = new AggregationNode(
           nodeIdGenerator_.getNextId(), result, unionStmt.getDistinctAggInfo());
       result.init(analyzer);
     }
     // create ALL tree
     if (unionStmt.hasAllOps()) {
-      UnionNode allMerge =
-          createUnionPlan(analyzer, unionStmt, unionStmt.getAllOperands());
-      // for unionStmt, baseTblResultExprs = resultExprs
-      if (result != null) {
-        allMerge.addChild(result,
-            unionStmt.getDistinctAggInfo().getGroupingExprs());
-      }
-      result = allMerge;
+      result = createUnionPlan(analyzer, unionStmt, unionStmt.getAllOperands(), result);
     }
 
     if (unionStmt.hasAnalyticExprs()) {
