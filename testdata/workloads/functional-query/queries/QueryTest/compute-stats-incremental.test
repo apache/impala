@@ -365,3 +365,38 @@ show table stats compute_stats_db.incremental_drop_column;
 ---- TYPES
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING
 ====
+---- QUERY
+# Check that adding a column invalidates all incremental stats
+create table compute_stats_db.incremental_add_column (col int) partitioned by (p int);
+insert into compute_stats_db.incremental_add_column partition(p) values(1,1),(2,2);
+compute incremental stats compute_stats_db.incremental_add_column;
+insert into compute_stats_db.incremental_add_column partition(p) values(1,1);
+alter table compute_stats_db.incremental_add_column add columns (c int);
+compute incremental stats compute_stats_db.incremental_add_column;
+show table stats compute_stats_db.incremental_add_column;
+---- RESULTS
+'1',2,2,'4B','NOT CACHED','TEXT','true'
+'2',1,1,'2B','NOT CACHED','TEXT','true'
+'Total',3,3,'6B','0B','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING
+====
+---- QUERY
+create table compute_stats_db.incremental_no_partitions (col int) partitioned by (p int);
+compute incremental stats compute_stats_db.incremental_no_partitions;
+show table stats compute_stats_db.incremental_no_partitions;
+---- RESULTS
+'Total',0,0,'0B','0B','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING
+====
+---- QUERY
+create table compute_stats_db.incremental_not_partitioned (col int);
+insert into compute_stats_db.incremental_not_partitioned values(1),(2);
+compute incremental stats compute_stats_db.incremental_not_partitioned;
+show table stats compute_stats_db.incremental_not_partitioned;
+---- RESULTS
+2,1,'4B','NOT CACHED','TEXT','false'
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING, STRING
+====
