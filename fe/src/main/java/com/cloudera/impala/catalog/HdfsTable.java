@@ -664,17 +664,10 @@ public class HdfsTable extends Table {
         if (perms.canReadAndWrite()) {
           return TAccessLevel.READ_WRITE;
         } else if (perms.canRead()) {
-          LOG.debug(
-              String.format("Impala does not have WRITE access to '%s' in table: %s",
-              location, getFullName()));
           return TAccessLevel.READ_ONLY;
         } else if (perms.canWrite()) {
-          LOG.debug(String.format("Impala does not have READ access to '%s' in table: %s",
-                  location, getFullName()));
           return TAccessLevel.WRITE_ONLY;
         }
-        LOG.debug(String.format("Impala does not have READ or WRITE access to " +
-                "'%s' in table: %s", location, getFullName()));
         return TAccessLevel.NONE;
       }
       location = location.getParent();
