@@ -157,3 +157,27 @@ select count(*) from alltypesaggmultifiles where day is not null
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# Test partition pruning when a binary predicate contains a NullLiteral
+select count(*) from alltypestiny where year != null or year = null
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Test partition pruning when an IN predicate contains a NullLiteral
+select count(*) from alltypesagg where day in (1, null)
+---- RESULTS
+1000
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Test partition pruning when a NOT IN predicate contains a NullLiteral
+select count(*) from alltypesagg where day not in (1, 2, null)
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====

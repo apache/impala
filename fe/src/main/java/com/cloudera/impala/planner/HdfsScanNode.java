@@ -34,6 +34,7 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InPredicate;
 import com.cloudera.impala.analysis.IsNullPredicate;
 import com.cloudera.impala.analysis.LiteralExpr;
+import com.cloudera.impala.analysis.NullLiteral;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SlotRef;
@@ -61,6 +62,7 @@ import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.google.common.base.Objects;
 import com.google.common.base.Objects.ToStringHelper;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -287,6 +289,7 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkNotNull(bindingExpr);
     Preconditions.checkState(bindingExpr.isLiteral());
     LiteralExpr literal = (LiteralExpr)bindingExpr;
+    if (literal instanceof NullLiteral) return Sets.newHashSet();
 
     // Get the partition column position and retrieve the associated partition
     // value metadata.
@@ -380,6 +383,10 @@ public class HdfsScanNode extends ScanNode {
 
     if (inPredicate.isNotIn()) {
       // Case: SlotRef NOT IN (Literal, ..., Literal)
+      // If there is a NullLiteral, return an empty set.
+      List<Expr> nullLiterals = Lists.newArrayList();
+      inPredicate.collectAll(Predicates.instanceOf(NullLiteral.class), nullLiterals);
+      if (!nullLiterals.isEmpty()) return matchingIds;
       matchingIds.addAll(tbl_.getPartitionIds());
       // Exclude partitions with null partition column values
       HashSet<Long> nullIds = tbl_.getNullPartitionIds(partitionPos);
