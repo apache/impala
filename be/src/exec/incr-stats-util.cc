@@ -90,7 +90,7 @@ string EncodeNdv(const string& ndv, bool* is_encoded) {
   *is_encoded = true;
   encoded_ndv.resize(idx);
   DCHECK_GT(encoded_ndv.size(), 0);
-  DCHECK_LE(encoded_ndv.size(), AggregateFunctions::HLL_LEN - 2);
+  DCHECK_LE(encoded_ndv.size(), AggregateFunctions::HLL_LEN);
   return encoded_ndv;
 }
 

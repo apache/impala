@@ -108,7 +108,8 @@ AggFnEvaluator::AggFnEvaluator(const TExprNode& desc, bool is_analytic_fn)
     agg_op_ = SUM;
   } else if (fn_.name.function_name == "avg") {
     agg_op_ = AVG;
-  } else if (fn_.name.function_name == "ndv") {
+  } else if (fn_.name.function_name == "ndv" ||
+      fn_.name.function_name == "ndv_no_finalize") {
     agg_op_ = NDV;
   } else {
     agg_op_ = OTHER;

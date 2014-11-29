@@ -1221,7 +1221,7 @@ Function* PartitionedAggregationNode::CodegenUpdateTuple() {
     if (!supported) {
       VLOG_QUERY << "Could not codegen UpdateTuple because intermediate type "
                  << slot_desc->type()
-                 << "is not yet supported for aggregate function \""
+                 << " is not yet supported for aggregate function \""
                  << evaluator->fn_name() << "()\"";
       return NULL;
     }
