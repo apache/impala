@@ -195,7 +195,7 @@ public class Planner {
       resultExprs = queryStmt.getBaseTblResultExprs();
     }
     resultExprs = Expr.substituteList(resultExprs,
-        rootFragment.getPlanRoot().getOutputSmap(), analyzer, false);
+        rootFragment.getPlanRoot().getOutputSmap(), analyzer, true);
     rootFragment.setOutputExprs(resultExprs);
 
     LOG.debug("desctbl: " + analyzer.getDescTbl().debugString());

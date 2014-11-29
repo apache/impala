@@ -115,7 +115,7 @@ select cshort, clong, vc from allchars_par
 char,char,string
 ---- RESULTS
 '12345','123456                                                                                                                                      ','12345'
-=======
+====
 ---- QUERY
 select count(*), count(cs), count(cl), count(vc) from chars_tiny
 ---- TYPES
