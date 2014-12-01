@@ -110,14 +110,13 @@ void TSaslServerTransport::handleSaslStartMessage() {
 
 shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
     boost::shared_ptr<TTransport> trans) {
-  shared_ptr<TSaslServerTransport> retTransport;
+  shared_ptr<TBufferedTransport> retTransport;
   boost::lock_guard<boost::mutex> l (transportMap_mutex_);
-  map<shared_ptr<TTransport>, shared_ptr<TSaslServerTransport> >::iterator transMap =
+  map<shared_ptr<TTransport>, shared_ptr<TBufferedTransport> >::iterator transMap =
       transportMap_.find(trans);
   if (transMap == transportMap_.end()) {
-    shared_ptr<TTransport> wrapped(new TBufferedTransport(trans));
-    retTransport.reset(new TSaslServerTransport(serverDefinitionMap_,
-        wrapped));
+    shared_ptr<TTransport> wrapped(new TSaslServerTransport(serverDefinitionMap_, trans));
+    retTransport.reset(new TBufferedTransport(wrapped));
     retTransport.get()->open();
     transportMap_[trans] = retTransport;
   } else {

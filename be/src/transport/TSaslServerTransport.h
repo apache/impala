@@ -172,9 +172,9 @@ class TSaslServerTransport : public TSaslTransport {
     /* Map for holding and returning server definitions. */
     std::map<std::string, TSaslServerDefinition*> serverDefinitionMap_;
 
-    /* Map from a wrapped transport to its Sasl Transport. */
+    /* Map from a transport to its Sasl Transport (wrapped by a TBufferedTransport). */
     std::map<boost::shared_ptr<TTransport>,
-        boost::shared_ptr<TSaslServerTransport> > transportMap_;
+        boost::shared_ptr<TBufferedTransport> > transportMap_;
 
     /* Lock to synchronize the transport map. */
     boost::mutex transportMap_mutex_;
