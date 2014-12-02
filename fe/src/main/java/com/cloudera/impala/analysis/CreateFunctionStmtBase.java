@@ -28,6 +28,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TCreateFunctionParams;
 import com.cloudera.impala.thrift.TFunctionBinaryType;
 import com.google.common.collect.Lists;
+import org.apache.hadoop.fs.permission.FsAction;
 
 /**
  * Base class for CREATE [] FUNCTION.
@@ -155,7 +156,7 @@ public class CreateFunctionStmtBase extends StatementBase {
           existingFn.signatureString());
     }
 
-    fn_.getLocation().analyze(analyzer, Privilege.CREATE);
+    fn_.getLocation().analyze(analyzer, Privilege.CREATE, FsAction.READ);
 
     // Check the file type from the binary type to infer the type of the UDA
     fn_.setBinaryType(getBinaryType());

@@ -251,6 +251,23 @@ public class FileSystemUtil {
   }
 
   /**
+   * Return true if the path can be reached, false for all other cases
+   * File doesn't exist, cannot access the FileSystem, etc.
+   */
+  public static Boolean isPathReachable(Path path, FileSystem fs, StringBuilder error_msg) {
+    try {
+      if (fs.exists(path)) {
+        return true;
+      } else {
+        error_msg.append("Path does not exist.");
+      }
+    } catch (Exception e) {
+      error_msg.append(e.getMessage());
+    }
+    return false;
+  }
+
+  /**
    * Returns the configuration.
    */
   public static Configuration getConfiguration() {

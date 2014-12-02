@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
+import org.apache.hadoop.fs.permission.FsAction;
+
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TAccessEvent;
@@ -145,6 +147,8 @@ public class CreateTableLikeStmt extends StatementBase {
     analyzer.addAccessEvent(new TAccessEvent(dbName_ + "." + tableName_.getTbl(),
         TCatalogObjectType.TABLE, Privilege.CREATE.toString()));
 
-    if (location_ != null) location_.analyze(analyzer, Privilege.ALL);
+    if (location_ != null) {
+      location_.analyze(analyzer, Privilege.ALL, FsAction.READ_WRITE);
+    }
   }
 }

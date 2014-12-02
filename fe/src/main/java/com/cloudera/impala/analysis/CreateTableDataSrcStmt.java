@@ -33,6 +33,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import org.apache.hadoop.fs.permission.FsAction;
 
 /**
  * Represents a CREATE TABLE statement for external data sources. Such tables
@@ -85,7 +86,7 @@ public class CreateTableDataSrcStmt extends CreateTableStmt {
     getTblProperties().put(TBL_PROP_LOCATION, location);
     getTblProperties().put(TBL_PROP_CLASS, dataSource.getClassName());
     getTblProperties().put(TBL_PROP_API_VER, dataSource.getApiVersion());
-    new HdfsUri(location).analyze(analyzer, Privilege.ALL);
+    new HdfsUri(location).analyze(analyzer, Privilege.ALL, FsAction.READ);
     // TODO: check class exists and implements API version
   }
 }

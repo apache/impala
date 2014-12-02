@@ -16,10 +16,16 @@ package com.cloudera.impala.analysis;
 
 import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.UUID;
 
 import junit.framework.Assert;
 
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.fs.Path;
 import org.junit.Test;
 
@@ -30,6 +36,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarType;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.FileSystemUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -2001,5 +2008,93 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "SHOW PARTITIONS not applicable to a view: functional.view_view");
     AnalysisError("show partitions functional_hbase.alltypes",
         "SHOW PARTITIONS must target an HDFS table: functional_hbase.alltypes");
+  }
+
+  /**
+   * Validate if location path analysis issues proper warnings when directory
+   * permissions/existence checks fail.
+   */
+  @Test
+  public void TestPermissionValidation() throws AnalysisException {
+    String location = "/test-warehouse/.tmp_" + UUID.randomUUID().toString();
+    Path parentPath = FileSystemUtil.createFullyQualifiedPath(new Path(location));
+    FileSystem fs = null;
+    try {
+      fs = parentPath.getFileSystem(FileSystemUtil.getConfiguration());
+
+      // Test location doesn't exist
+      AnalyzesOk(String.format("create table new_table (col INT) location '%s/new_table'",
+          location),
+          String.format("Path '%s' cannot be reached: Path does not exist.",
+              parentPath));
+
+      // Test localtion path with trailing slash.
+      AnalyzesOk(String.format("create table new_table (col INT) location " +
+          "'%s/new_table/'", location),
+          String.format("Path '%s' cannot be reached: Path does not exist.",
+              parentPath));
+
+      AnalyzesOk(String.format("create table new_table location '%s/new_table' " +
+          "as select 1, 1", location),
+          String.format("Path '%s' cannot be reached: Path does not exist.",
+              parentPath));
+
+      AnalyzesOk(String.format("create table new_table like functional.alltypes " +
+          "location '%s/new_table'", location),
+          String.format("Path '%s' cannot be reached: Path does not exist.",
+              parentPath));
+
+      AnalyzesOk(String.format("create database new_db location '%s/new_db'",
+          location),
+          String.format("Path '%s' cannot be reached: Path does not exist.",
+              parentPath));
+
+      fs.mkdirs(parentPath);
+      // Create a test data file for load data test
+      FSDataOutputStream out =
+          fs.create(new Path(parentPath, "test_loaddata/testdata.txt"));
+      out.close();
+
+      fs.setPermission(parentPath,
+          new FsPermission(FsAction.NONE, FsAction.NONE, FsAction.NONE));
+
+      // Test location exists but Impala doesn't have sufficient permission
+      AnalyzesOk(String.format("create data Source serverlog location " +
+          "'%s/foo.jar' class 'foo.Bar' API_VERSION 'V1'", location),
+          String.format("Impala does not have READ access to path '%s'", parentPath));
+
+      AnalyzesOk(String.format("create external table new_table (col INT) location " +
+          "'%s/new_table'", location),
+          String.format("Impala does not have READ_WRITE access to path '%s'",
+              parentPath));
+
+      AnalyzesOk(String.format("alter table functional.insert_string_partitioned " +
+          "add partition (s2='hello') location '%s/new_partition'", location),
+          String.format("Impala does not have READ_WRITE access to path '%s'",
+              parentPath));
+
+      AnalyzesOk(String.format("alter table functional.insert_string_partitioned " +
+          "partition(s2=NULL) set location '%s/new_part_loc'", location),
+          String.format("Impala does not have READ_WRITE access to path '%s'",
+              parentPath));
+
+      // Test location exists and Impala does have sufficient permission
+      fs.setPermission(parentPath,
+          new FsPermission(FsAction.READ_WRITE, FsAction.NONE, FsAction.NONE));
+
+      AnalyzesOk(String.format("create external table new_table (col INT) location " +
+          "'%s/new_table'", location));
+    } catch (IOException e) {
+      throw new AnalysisException(e.getMessage(), e);
+    } finally {
+      // Clean up
+      try {
+        if (fs != null && fs.exists(parentPath)) {
+          fs.delete(parentPath, true);
+        }
+      } catch (IOException e) {
+        // Ignore
+      }
+    }
   }
 }

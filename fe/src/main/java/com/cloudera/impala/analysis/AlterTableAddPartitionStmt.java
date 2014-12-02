@@ -20,6 +20,7 @@ import com.cloudera.impala.thrift.TAlterTableAddPartitionParams;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.cloudera.impala.thrift.TAlterTableType;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.fs.permission.FsAction;
 
 /**
  * Represents an ALTER TABLE ADD PARTITION statement.
@@ -80,7 +81,9 @@ public class AlterTableAddPartitionStmt extends AlterTableStmt {
     partitionSpec_.setPrivilegeRequirement(Privilege.ALTER);
     partitionSpec_.analyze(analyzer);
 
-    if (location_ != null) location_.analyze(analyzer, Privilege.ALL);
+    if (location_ != null) {
+      location_.analyze(analyzer, Privilege.ALL, FsAction.READ_WRITE);
+    }
     if (cacheOp_ != null) cacheOp_.analyze(analyzer);
   }
 }

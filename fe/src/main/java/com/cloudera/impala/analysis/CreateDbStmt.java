@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 
 import com.cloudera.impala.authorization.Privilege;
@@ -91,6 +92,8 @@ public class CreateDbStmt extends StatementBase {
       throw new AnalysisException(Analyzer.DB_ALREADY_EXISTS_ERROR_MSG + getDb());
     }
 
-    if (location_ != null) location_.analyze(analyzer, Privilege.ALL);
+    if (location_ != null) {
+      location_.analyze(analyzer, Privilege.ALL, FsAction.READ_WRITE);
+    }
   }
 }

@@ -996,7 +996,7 @@ public class CatalogOpExecutor {
             tableName.getDb(), tableName.getTbl(), true, params.if_exists);
       } catch (TException e) {
         throw new ImpalaRuntimeException(
-            String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), e);
+            String.format(HMS_RPC_ERROR_FORMAT_STR, "dropTable"), e);
       } finally {
         msClient.release();
       }

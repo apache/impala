@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 
 import com.cloudera.impala.authorization.Privilege;
@@ -64,7 +65,7 @@ public class CreateDataSrcStmt extends StatementBase {
           "'. Valid API versions: " + Joiner.on(", ").join(ApiVersion.values()));
     }
 
-    location_.analyze(analyzer, Privilege.ALL);
+    location_.analyze(analyzer, Privilege.ALL, FsAction.READ);
     // TODO: Check class exists and implements API version
     // TODO: authorization check
   }

@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
+import org.apache.hadoop.fs.permission.FsAction;
 import parquet.hadoop.ParquetFileReader;
 import parquet.hadoop.metadata.ParquetMetadata;
 import parquet.schema.OriginalType;
@@ -209,7 +210,7 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    schemaLocation_.analyze(analyzer, Privilege.ALL);
+    schemaLocation_.analyze(analyzer, Privilege.ALL, FsAction.READ_WRITE);
     switch (schemaFileFormat_) {
       case PARQUET:
         getColumnDefs().addAll(extractParquetSchema(schemaLocation_));
