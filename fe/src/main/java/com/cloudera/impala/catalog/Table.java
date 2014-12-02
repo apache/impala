@@ -352,15 +352,19 @@ public abstract class Table implements CatalogObject {
    * which Hive enumerates columns.
    */
   public ArrayList<Column> getColumnsInHiveOrder() {
-    ArrayList<Column> columns = Lists.newArrayList();
-    for (Column column: colsByPos_.subList(numClusteringCols_, colsByPos_.size())) {
-      columns.add(column);
-    }
+    ArrayList<Column> columns = Lists.newArrayList(getNonClusteringColumns());
 
     for (Column column: colsByPos_.subList(0, numClusteringCols_)) {
       columns.add(column);
     }
     return columns;
+  }
+
+  /**
+   * Returns the list of all columns excluding any partition columns.
+   */
+  public List<Column> getNonClusteringColumns() {
+    return colsByPos_.subList(numClusteringCols_, colsByPos_.size());
   }
 
   /**

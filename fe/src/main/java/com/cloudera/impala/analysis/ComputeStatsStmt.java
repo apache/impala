@@ -291,13 +291,27 @@ public class ComputeStatsStmt extends StatementBase {
         // TODO: need a better way to invalidate stats for all partitions, so that we can
         // use this logic to only recompute new / changed columns.
         boolean tableIsMissingColStats = false;
-        for (Column col: table_.getColumns()) {
+
+        // We'll warn the user if a column is missing stats (and therefore we rescan the
+        // whole table), but if all columns are missing stats, the table just doesn't have
+        // any stats and there's no need to warn.
+        boolean allColumnsMissingStats = true;
+        String exampleColumnMissingStats = null;
+        // Partition columns always have stats, so exclude them from this search
+        for (Column col: table_.getNonClusteringColumns()) {
           if (!col.getStats().hasStats()) {
-            tableIsMissingColStats = true;
-            analyzer.addWarning("Column " + col.getName() +
-                " does not have statistics, recomputing stats for the whole table");
-            break;
+            if (!tableIsMissingColStats) {
+              tableIsMissingColStats = true;
+              exampleColumnMissingStats = col.getName();
+            }
+          } else {
+            allColumnsMissingStats = false;
           }
+        }
+
+        if (tableIsMissingColStats && !allColumnsMissingStats) {
+          analyzer.addWarning("Column " + exampleColumnMissingStats +
+              " does not have statistics, recomputing stats for the whole table");
         }
 
         for (HdfsPartition p: hdfsTable.getPartitions()) {
