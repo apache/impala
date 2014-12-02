@@ -24,14 +24,12 @@ import org.apache.commons.lang.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.ToSqlUtils;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.NullLiteral;
 import com.cloudera.impala.analysis.PartitionKeyValue;
-import com.cloudera.impala.catalog.PartitionStatsUtil;
+import com.cloudera.impala.analysis.ToSqlUtils;
 import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.JniUtil;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TExpr;
@@ -41,15 +39,15 @@ import com.cloudera.impala.thrift.THdfsFileBlock;
 import com.cloudera.impala.thrift.THdfsFileDesc;
 import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.TNetworkAddress;
-import com.cloudera.impala.thrift.TTableStats;
 import com.cloudera.impala.thrift.TPartitionStats;
+import com.cloudera.impala.thrift.TTableStats;
 import com.cloudera.impala.util.HdfsCachingUtil;
+import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.base.Joiner;
 
 /**
  * Query-relevant information for one table partition. Partitions are comparable
@@ -253,6 +251,8 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
    * It's easy to add per-file metadata to FileDescriptor if this changes.
    */
   private final HdfsStorageDescriptor fileFormatDescriptor_;
+
+  // Note: this field is only set in the catalog server
   private final org.apache.hadoop.hive.metastore.api.Partition msPartition_;
   private final List<FileDescriptor> fileDescriptors_;
   private final String location_;
@@ -275,6 +275,8 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
    * Returns the metastore.api.Partition object this HdfsPartition represents. Returns
    * null if this is the default partition, or if this belongs to a unpartitioned
    * table.
+   *
+   * Note: The return value of this method has no meaning, when called by an impalad
    */
   public org.apache.hadoop.hive.metastore.api.Partition getMetaStorePartition() {
     return msPartition_;
@@ -393,6 +395,8 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
      return hmsParameters_.get(key);
    }
 
+   public Map<String, String> getHmsParameters() { return hmsParameters_; }
+
   /**
    * Marks this partition's metadata as "dirty" indicating that changes have been
    * made and this partition's metadata should not be reused during the next
@@ -426,7 +430,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
     id_ = id;
     accessLevel_ = accessLevel;
     if (msPartition != null && msPartition.getParameters() != null) {
-      isMarkedCached_ = HdfsCachingUtil.getCacheDirIdFromParams(
+      isMarkedCached_ = HdfsCachingUtil.getCacheDirectiveId(
           msPartition.getParameters()) != null;
       hmsParameters_ = msPartition.getParameters();
     } else {

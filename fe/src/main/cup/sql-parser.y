@@ -245,11 +245,11 @@ terminal
   KW_OFFSET, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_OVER, KW_OVERWRITE, KW_PARQUET,
   KW_PARQUETFILE, KW_PARTITION, KW_PARTITIONED, KW_PARTITIONS, KW_PRECEDING,
   KW_PREPARE_FN, KW_PRODUCED, KW_RANGE, KW_RCFILE, KW_REFRESH, KW_REGEXP, KW_RENAME,
-  KW_REPLACE, KW_RETURNS, KW_REVOKE, KW_RIGHT, KW_RLIKE, KW_ROLE, KW_ROLES, KW_ROW,
-  KW_ROWS, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE, KW_SERDEPROPERTIES,
-  KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED, KW_STRAIGHT_JOIN,
-  KW_STRING, KW_STRUCT, KW_SYMBOL, KW_TABLE, KW_TABLES, KW_TBLPROPERTIES, KW_TERMINATED,
-  KW_TEXTFILE, KW_THEN,
+  KW_REPLACE, KW_REPLICATION, KW_RETURNS, KW_REVOKE, KW_RIGHT, KW_RLIKE, KW_ROLE,
+  KW_ROLES, KW_ROW, KW_ROWS, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE,
+  KW_SERDEPROPERTIES, KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED,
+  KW_STRAIGHT_JOIN, KW_STRING, KW_STRUCT, KW_SYMBOL, KW_TABLE, KW_TABLES,
+  KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE, KW_THEN,
   KW_TIMESTAMP, KW_TINYINT, KW_STATS, KW_TO, KW_TRUE, KW_UNBOUNDED, KW_UNCACHED,
   KW_UNION, KW_UPDATE_FN, KW_USE, KW_USING,
   KW_VALUES, KW_VARCHAR, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
@@ -375,6 +375,7 @@ nonterminal ArrayList<ColumnDesc> partition_column_defs, view_column_defs;
 nonterminal ArrayList<StructField> struct_field_def_list;
 // Options for DDL commands - CREATE/DROP/ALTER
 nonterminal HdfsCachingOp cache_op_val;
+nonterminal BigDecimal opt_cache_op_replication;
 nonterminal String comment_val;
 nonterminal Boolean external_val;
 nonterminal String opt_init_string_val;
@@ -939,10 +940,17 @@ create_uda_stmt ::=
   ;
 
 cache_op_val ::=
-  KW_CACHED KW_IN STRING_LITERAL:pool_name
-  {: RESULT = new HdfsCachingOp(pool_name); :}
+  KW_CACHED KW_IN STRING_LITERAL:pool_name opt_cache_op_replication:replication
+  {: RESULT = new HdfsCachingOp(pool_name, replication); :}
   | KW_UNCACHED
   {: RESULT = new HdfsCachingOp(); :}
+  | /* empty */
+  {: RESULT = null; :}
+  ;
+
+opt_cache_op_replication ::=
+  KW_WITH KW_REPLICATION EQUAL INTEGER_LITERAL:replication
+  {: RESULT = replication; :}
   | /* empty */
   {: RESULT = null; :}
   ;

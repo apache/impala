@@ -26,7 +26,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
-import org.apache.commons.codec.binary.Base64;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
@@ -78,6 +77,7 @@ import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
+import com.cloudera.impala.thrift.JniCatalogConstants;
 import com.cloudera.impala.thrift.TAlterTableAddPartitionParams;
 import com.cloudera.impala.thrift.TAlterTableAddReplaceColsParams;
 import com.cloudera.impala.thrift.TAlterTableChangeColParams;
@@ -117,8 +117,8 @@ import com.cloudera.impala.thrift.TGrantRevokeRoleParams;
 import com.cloudera.impala.thrift.THdfsCachingOp;
 import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
-import com.cloudera.impala.thrift.TPrivilege;
 import com.cloudera.impala.thrift.TPartitionStats;
+import com.cloudera.impala.thrift.TPrivilege;
 import com.cloudera.impala.thrift.TResetMetadataRequest;
 import com.cloudera.impala.thrift.TResetMetadataResponse;
 import com.cloudera.impala.thrift.TResultRow;
@@ -132,7 +132,6 @@ import com.cloudera.impala.thrift.TTableStats;
 import com.cloudera.impala.thrift.TUpdateCatalogRequest;
 import com.cloudera.impala.thrift.TUpdateCatalogResponse;
 import com.cloudera.impala.util.HdfsCachingUtil;
-
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -1228,8 +1227,10 @@ public class CatalogOpExecutor {
 
     // Submit the cache request and update the table metadata.
     if (cacheOp != null && cacheOp.isSet_cached()) {
+      short replication = cacheOp.isSetReplication() ? cacheOp.getReplication() :
+          JniCatalogConstants.HDFS_DEFAULT_CACHE_REPLICATION_FACTOR;
       long id = HdfsCachingUtil.submitCacheTblDirective(newTable,
-          cacheOp.getCache_pool_name());
+          cacheOp.getCache_pool_name(), replication);
       catalog_.watchCacheDirs(Lists.<Long>newArrayList(id),
           new TTableName(newTable.getDbName(), newTable.getTableName()));
       applyAlterTable(newTable);
@@ -1337,13 +1338,16 @@ public class CatalogOpExecutor {
           " and ifNotExists is true.", Joiner.on(", ").join(partitionSpec)));
       return null;
     }
+
+    Table result = null;
+    List<Long> cacheIds = null;
     synchronized (metastoreDdlLock_) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
       partition.setDbName(tableName.getDb());
       partition.setTableName(tableName.getTbl());
 
       Long parentTblCacheDirId =
-          HdfsCachingUtil.getCacheDirIdFromParams(msTbl.getParameters());
+          HdfsCachingUtil.getCacheDirectiveId(msTbl.getParameters());
 
       List<String> values = Lists.newArrayList();
       // Need to add in the values in the same order they are defined in the table.
@@ -1363,21 +1367,33 @@ public class CatalogOpExecutor {
         // Add the new partition.
         partition = msClient.getHiveClient().add_partition(partition);
         String cachePoolName = null;
+        Short replication = null;
         if (cacheOp == null && parentTblCacheDirId != null) {
           // The user didn't specify an explicit caching operation, inherit the value
           // from the parent table.
           cachePoolName = HdfsCachingUtil.getCachePool(parentTblCacheDirId);
+          Preconditions.checkNotNull(cachePoolName);
+          replication = HdfsCachingUtil.getCacheReplication(parentTblCacheDirId);
+          Preconditions.checkNotNull(replication);
         } else if (cacheOp != null && cacheOp.isSet_cached()) {
-          // The explicitly stated that this partition should be cached.
+          // The user explicitly stated that this partition should be cached.
           cachePoolName = cacheOp.getCache_pool_name();
-        }
 
+          // When the new partition should be cached and and no replication factor
+          // was specified, inherit the replication factor from the parent table if
+          // it is cached. If the parent is not cached and no replication factor is
+          // explicitly set, use the default value.
+          if (!cacheOp.isSetReplication() && parentTblCacheDirId != null) {
+            replication = HdfsCachingUtil.getCacheReplication(parentTblCacheDirId);
+          } else {
+            replication = HdfsCachingUtil.getReplicationOrDefault(cacheOp);
+          }
+        }
         // If cache pool name is not null, it indicates this partition should be cached.
         if (cachePoolName != null) {
           long id = HdfsCachingUtil.submitCachePartitionDirective(partition,
-              cachePoolName);
-          catalog_.watchCacheDirs(
-              Lists.<Long>newArrayList(id), tableName.toThrift());
+              cachePoolName, replication);
+          cacheIds = Lists.<Long>newArrayList(id);
           // Update the partition metadata to include the cache directive id.
           msClient.getHiveClient().alter_partition(partition.getDbName(),
               partition.getTableName(), partition);
@@ -1399,7 +1415,9 @@ public class CatalogOpExecutor {
     }
     // Create and add the HdfsPartition. Return the table object with an updated catalog
     // version.
-    return addHdfsPartition(tableName, partition);
+    result = addHdfsPartition(tableName, partition);
+    if (cacheIds != null) catalog_.watchCacheDirs(cacheIds, tableName.toThrift());
+    return result;
   }
 
   /**
@@ -1666,24 +1684,24 @@ public class CatalogOpExecutor {
     }
     HdfsTable hdfsTable = (HdfsTable) table;
     org.apache.hadoop.hive.metastore.api.Table msTbl = table.getMetaStoreTable();
-    Long cacheDirId = HdfsCachingUtil.getCacheDirIdFromParams(msTbl.getParameters());
+    Long cacheDirId = HdfsCachingUtil.getCacheDirectiveId(msTbl.getParameters());
     if (cacheOp.isSet_cached()) {
       // List of cache directive IDs that were submitted as part of this
       // ALTER TABLE operation.
       List<Long> cacheDirIds = Lists.newArrayList();
+      short cacheReplication = HdfsCachingUtil.getReplicationOrDefault(cacheOp);
+      // If the table was not previously cached (cacheDirId == null) we issue a new
+      // directive for this table. If the table was already cached, we validate
+      // the pool name and update the cache replication factor if necessary
       if (cacheDirId == null) {
-        // Table was not already cached.
         cacheDirIds.add(HdfsCachingUtil.submitCacheTblDirective(msTbl,
-            cacheOp.getCache_pool_name()));
+            cacheOp.getCache_pool_name(), cacheReplication));
       } else {
-        // Table is already cached, verify the pool name doesn't conflict.
-        String pool = HdfsCachingUtil.getCachePool(cacheDirId);
-        if (!cacheOp.getCache_pool_name().equals(pool)) {
-          throw new ImpalaRuntimeException(String.format("Cannot cache table in " +
-              "pool '%s' because it is already cached in pool '%s'. To change the " +
-              "pool for this table, first uncache using: ALTER TABLE %s.%s SET UNCACHED",
-              cacheOp.getCache_pool_name(), pool, msTbl.getDbName(),
-              msTbl.getTableName()));
+        // Check if the cache directive needs to be changed
+        if (HdfsCachingUtil.isUpdateOp(cacheOp, msTbl.getParameters())) {
+          HdfsCachingUtil.validateCachePool(cacheOp, cacheDirId, tableName);
+          cacheDirIds.add(HdfsCachingUtil.modifyCacheDirective(cacheDirId, msTbl,
+              cacheOp.getCache_pool_name(), cacheReplication));
         }
       }
 
@@ -1699,12 +1717,31 @@ public class CatalogOpExecutor {
           org.apache.hadoop.hive.metastore.api.Partition msPart =
               partition.getMetaStorePartition();
           Preconditions.checkNotNull(msPart);
-          if (!partition.isMarkedCached()) {
+
+          // Only issue cache directives if the data is uncached or the cache directive
+          // needs to be updated
+          if (!partition.isMarkedCached() ||
+              HdfsCachingUtil.isUpdateOp(cacheOp, msPart.getParameters())) {
+
             try {
-              cacheDirIds.add(HdfsCachingUtil.submitCachePartitionDirective(
-                  msPart, cacheOp.getCache_pool_name()));
+              // If the partition was already cached, update the directive otherwise
+              // issue new cache directive
+              if (!partition.isMarkedCached()) {
+                cacheDirIds.add(HdfsCachingUtil.submitCachePartitionDirective(
+                    msPart, cacheOp.getCache_pool_name(), cacheReplication));
+              } else {
+                Long directiveId = HdfsCachingUtil.getCacheDirectiveId(msPart.getParameters());
+                cacheDirIds.add(HdfsCachingUtil.modifyCacheDirective(
+                    directiveId, msPart, cacheOp.getCache_pool_name(), cacheReplication));
+              }
             } catch (ImpalaRuntimeException e) {
-              LOG.error("Unable to cache partition: " + partition.getPartitionName(), e);
+              if (partition.isMarkedCached()) {
+                LOG.error("Unable to modify cache partition: " +
+                    partition.getPartitionName(), e);
+              } else {
+                LOG.error("Unable to cache partition: " +
+                    partition.getPartitionName(), e);
+              }
             }
 
             // Update the partition metadata.
@@ -1771,24 +1808,30 @@ public class CatalogOpExecutor {
           partition.getMetaStorePartition();
       Preconditions.checkNotNull(msPartition);
       if (cacheOp.isSet_cached()) {
-        if (partition.isMarkedCached()) {
-          Long cacheReq = HdfsCachingUtil.getCacheDirIdFromParams(
-              partition.getMetaStorePartition().getParameters());
-          String pool = HdfsCachingUtil.getCachePool(cacheReq);
-          if (!cacheOp.getCache_pool_name().equals(pool)) {
-            throw new ImpalaRuntimeException(String.format("Cannot cache partition in " +
-                "pool '%s' because it is already cached in '%s'. To change the cache " +
-                "pool for this partition, first uncache using: ALTER TABLE %s.%s " +
-                "PARTITION(%s) SET UNCACHED", cacheOp.getCache_pool_name(), pool,
-                tableName.getDb(), tableName,
-                partition.getPartitionName().replaceAll("/", ", ")));
+
+        // The directive is null if the partition is not cached
+        Long directiveId = HdfsCachingUtil.getCacheDirectiveId(
+            msPartition.getParameters());
+        short replication = HdfsCachingUtil.getReplicationOrDefault(cacheOp);
+        List<Long> cacheDirs = Lists.newArrayList();
+
+        if (directiveId == null) {
+          cacheDirs.add(HdfsCachingUtil.submitCachePartitionDirective(msPartition,
+              cacheOp.getCache_pool_name(), replication));
+        } else {
+          if (HdfsCachingUtil.isUpdateOp(cacheOp, msPartition.getParameters())) {
+            HdfsCachingUtil.validateCachePool(cacheOp, directiveId, tableName, partition);
+            cacheDirs.add(HdfsCachingUtil.modifyCacheDirective(directiveId, msPartition,
+                cacheOp.getCache_pool_name(), replication));
           }
-          // Partition is already cached. Nothing to do.
-          return;
         }
-        long id = HdfsCachingUtil.submitCachePartitionDirective(msPartition,
-            cacheOp.getCache_pool_name());
-        catalog_.watchCacheDirs(Lists.<Long>newArrayList(id), tableName.toThrift());
+
+        // Once the cache directives are sbumitted, observe the status of the caching
+        // until no more progress is made -- either fully cached or out of cache memory
+        if (!cacheDirs.isEmpty()) {
+          catalog_.watchCacheDirs(cacheDirs, tableName.toThrift());
+        }
+
       } else {
         // Partition is not cached, just return.
         if (!partition.isMarkedCached()) return;
@@ -2137,6 +2180,7 @@ public class CatalogOpExecutor {
     private final TableName tblName_;
     private final String partName_;
     private final String cachePoolName_;
+    private final Short replication_;
     private final AtomicBoolean partitionCreated_;
     private final AtomicInteger numPartitions_;
     private final SettableFuture<Void> allFinished_;
@@ -2155,7 +2199,7 @@ public class CatalogOpExecutor {
     public CreatePartitionRunnable(TableName tblName,
         String partName, String cachePoolName, AtomicBoolean partitionCreated,
         SettableFuture<Void> allFinished, AtomicInteger numPartitions,
-        List<Long> cacheDirIds) {
+        List<Long> cacheDirIds, Short cacheReplication) {
       tblName_ = tblName;
       partName_ = partName;
       cachePoolName_ = cachePoolName;
@@ -2163,6 +2207,7 @@ public class CatalogOpExecutor {
       allFinished_ = allFinished;
       numPartitions_ = numPartitions;
       cacheDirIds_ = cacheDirIds;
+      replication_ = cacheReplication;
     }
 
     public void run() {
@@ -2176,7 +2221,8 @@ public class CatalogOpExecutor {
         if (cachePoolName_ != null) {
           // Submit a new cache directive and update the partition metadata the
           // directive id.
-          long id = HdfsCachingUtil.submitCachePartitionDirective(part, cachePoolName_);
+          long id = HdfsCachingUtil.submitCachePartitionDirective(
+              part, cachePoolName_, replication_);
           synchronized (cacheDirIds_) {
             cacheDirIds_.add(id);
           }
@@ -2305,13 +2351,16 @@ public class CatalogOpExecutor {
     // complete.
     List<Long> cacheDirIds = Lists.<Long>newArrayList();
 
-    // If the table is cached, get its cache pool name. New partitions will inherit
-    // this property.
+    // If the table is cached, get its cache pool name and replication factor. New
+    // partitions will inherit this property.
     String cachePoolName = null;
-    Long cacheDirId = HdfsCachingUtil.getCacheDirIdFromParams(
+    Short cacheReplication = 0;
+    Long cacheDirId = HdfsCachingUtil.getCacheDirectiveId(
         table.getMetaStoreTable().getParameters());
     if (cacheDirId != null) {
       cachePoolName = HdfsCachingUtil.getCachePool(cacheDirId);
+      cacheReplication = HdfsCachingUtil.getCacheReplication(cacheDirId);
+      Preconditions.checkNotNull(cacheReplication);
       if (table.getNumClusteringCols() == 0) cacheDirIds.add(cacheDirId);
     }
 
@@ -2341,7 +2390,7 @@ public class CatalogOpExecutor {
           // was written to the partition, a watch needs to be placed on the cache
           // cache directive so the TableLoadingMgr can perform an async refresh once
           // all data becomes cached.
-          cacheDirIds.add(HdfsCachingUtil.getCacheDirIdFromParams(
+          cacheDirIds.add(HdfsCachingUtil.getCacheDirectiveId(
               partition.getMetaStorePartition().getParameters()));
         }
         if (partsToCreate.size() == 0) break;
@@ -2355,7 +2404,7 @@ public class CatalogOpExecutor {
           Preconditions.checkState(partName != null && !partName.isEmpty());
           CreatePartitionRunnable rbl = new CreatePartitionRunnable(tblName, partName,
               cachePoolName, addedNewPartition, allFinished, numPartitions,
-              cacheDirIds);
+              cacheDirIds, cacheReplication);
           executor_.execute(rbl);
         }
 

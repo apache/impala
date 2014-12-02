@@ -1774,9 +1774,14 @@ public class ParserTest {
     ParserError("ALTER TABLE Foo ADD PARTITION (j=2) CACHED 'pool'");
     ParserError("ALTER TABLE Foo ADD PARTITION (j=2) CACHED IN");
     ParserError("ALTER TABLE Foo ADD PARTITION (j=2) CACHED");
+    ParsesOk("ALTER TABLE Foo ADD PARTITION (j=2) CACHED IN 'pool' WITH replication = 3");
+    ParserError("ALTER TABLE Foo ADD PARTITION (j=2) CACHED IN 'pool' " +
+        "with replication = -1");
     ParsesOk("ALTER TABLE Foo ADD PARTITION (j=2) UNCACHED");
     ParsesOk("ALTER TABLE Foo ADD PARTITION (j=2) LOCATION 'a/b' UNCACHED");
     ParsesOk("ALTER TABLE Foo ADD PARTITION (j=2) LOCATION 'a/b' CACHED IN 'pool'");
+    ParsesOk("ALTER TABLE Foo ADD PARTITION (j=2) LOCATION 'a/b' CACHED IN 'pool' " +
+        "with replication = 3");
     ParserError("ALTER TABLE Foo ADD PARTITION (j=2) CACHED IN 'pool' LOCATION 'a/b'");
     ParserError("ALTER TABLE Foo ADD PARTITION (j=2) UNCACHED LOCATION 'a/b'");
 
@@ -1907,7 +1912,8 @@ public class ParserTest {
       }
     }
 
-    for (String cacheClause: Lists.newArrayList("UNCACHED", "CACHED in 'pool'")) {
+    for (String cacheClause: Lists.newArrayList("UNCACHED", "CACHED in 'pool'",
+        "CACHED in 'pool' with replication = 4")) {
       ParsesOk("ALTER TABLE Foo SET " + cacheClause);
       ParsesOk("ALTER TABLE Foo PARTITION(j=0) SET " + cacheClause);
       ParserError("ALTER TABLE Foo PARTITION(j=0) " + cacheClause);
@@ -2056,6 +2062,8 @@ public class ParserTest {
     ParserError("CREATE TABLE Foo (d double) LOCATION 'a' COMMENT 'c'");
     ParserError("CREATE TABLE Foo (d double) UNCACHED LOCATION '/a/b'");
     ParserError("CREATE TABLE Foo (d double) CACHED IN 'pool' LOCATION '/a/b'");
+    ParserError("CREATE TABLE Foo (d double) CACHED IN 'pool' REPLICATION = 8 " +
+        "LOCATION '/a/b'");
     ParserError("CREATE TABLE Foo (d double) LOCATION 'a' COMMENT 'c' STORED AS RCFILE");
     ParserError("CREATE TABLE Foo (d double) LOCATION 'a' STORED AS RCFILE");
     ParserError("CREATE TABLE Foo (d double) TBLPROPERTIES('a'='b') LOCATION 'a'");
@@ -2070,7 +2078,10 @@ public class ParserTest {
 
     // Caching
     ParsesOk("CREATE TABLE Foo (i int) CACHED IN 'myPool'");
+    ParsesOk("CREATE TABLE Foo (i int) CACHED IN 'myPool' WITH REPLICATION = 4");
     ParsesOk("CREATE TABLE Foo (i int) PARTITIONED BY(j int) CACHED IN 'myPool'");
+    ParsesOk("CREATE TABLE Foo (i int) PARTITIONED BY(j int) CACHED IN 'myPool'" +
+        " WITH REPLICATION = 4");
     ParsesOk("CREATE TABLE Foo (i int) PARTITIONED BY(j int) CACHED IN 'myPool'");
     ParsesOk("CREATE TABLE Foo (i int) PARTITIONED BY(j int) LOCATION '/a' " +
           "CACHED IN 'myPool'");
@@ -2080,6 +2091,10 @@ public class ParserTest {
     ParserError("CREATE TABLE Foo (i int) IN 'myPool'");
     ParserError("CREATE TABLE Foo (i int) PARTITIONED BY(j int) CACHED IN 'myPool' " +
         "LOCATION '/a'");
+    ParserError("CREATE TABLE Foo (i int) CACHED IN 'myPool' WITH REPLICATION = -1");
+    ParserError("CREATE TABLE Foo (i int) CACHED IN 'myPool' WITH REPLICATION = 1.0");
+    ParserError("CREATE TABLE Foo (i int) CACHED IN 'myPool' " +
+        "WITH REPLICATION = cast(1 as double)");
 
     // Invalid syntax
     ParserError("CREATE TABLE IF EXISTS Foo.Bar (i int)");

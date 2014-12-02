@@ -148,7 +148,7 @@ class TestFetch(HS2TestSuite):
       assert num_rows == 25
       # Match whether stats are computed or not
       assert re.match(
-        r"2009, 1, -?\d+, -?\d+, \d*\.?\d+KB, NOT CACHED, TEXT", result) is not None
+        r"2009, 1, -?\d+, -?\d+, \d*\.?\d+KB, NOT CACHED, NOT CACHED, TEXT", result) is not None
 
   @needs_session()
   def test_show_column_stats(self):

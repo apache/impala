@@ -14,7 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
-import com.cloudera.impala.catalog.AuthorizationException;
+import java.math.BigDecimal;
+
 import com.cloudera.impala.catalog.HdfsCachePool;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.THdfsCachingOp;
@@ -26,20 +27,24 @@ import com.google.common.base.Preconditions;
  */
 public class HdfsCachingOp implements ParseNode {
   private final THdfsCachingOp cacheOp_;
+  private final BigDecimal parsedReplication_;
 
   /**
    * Creates an HdfsCachingOp that specifies the target should be uncached
    */
   public HdfsCachingOp() {
     cacheOp_ = new THdfsCachingOp(false);
+    parsedReplication_ = null;
   }
 
   /**
    * Creates an HdfsCachingOp that specifies the target should be cached in cachePoolName
+   * with an optional replication factor
    */
-  public HdfsCachingOp(String cachePoolName) {
+  public HdfsCachingOp(String cachePoolName, BigDecimal replication) {
     cacheOp_ = new THdfsCachingOp(true);
     cacheOp_.setCache_pool_name(cachePoolName);
+    parsedReplication_ = replication;
   }
 
   @Override
@@ -56,17 +61,29 @@ public class HdfsCachingOp implements ParseNode {
         throw new AnalysisException(
             "The specified cache pool does not exist: " + poolName);
       }
+
+      if (parsedReplication_ != null && (parsedReplication_.longValue() <= 0 ||
+            parsedReplication_.longValue() > Short.MAX_VALUE)) {
+          throw new AnalysisException(
+              "Cache replication factor must be between 0 and Short.MAX_VALUE");
+      }
+
+      if (parsedReplication_ != null) {
+        cacheOp_.setReplication(parsedReplication_.shortValue());
+      }
     }
   }
 
   @Override
   public String toSql() {
-    return shouldCache() ? "CACHED IN '" + getCachePoolName() + "'" : "UNCACHED";
+    return !shouldCache() ? "UNCACHED" : "CACHED IN '" + getCachePoolName() + "' WITH " +
+        "REPLICATION = " + parsedReplication_.longValue();
   }
 
   public THdfsCachingOp toThrift() { return cacheOp_; }
 
   public boolean shouldCache() { return cacheOp_.isSet_cached(); }
+
   public String getCachePoolName() {
     return shouldCache() ? cacheOp_.getCache_pool_name() : null;
   }

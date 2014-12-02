@@ -34,7 +34,6 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.BlockStorageLocation;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -603,9 +602,10 @@ public class HdfsTable extends Table {
     // Scans don't refer to this because by definition all partitions they refer to
     // exist.
     addDefaultPartition(msTbl.getSd());
-    Long cacheDirectiveId =
-        HdfsCachingUtil.getCacheDirIdFromParams(msTbl.getParameters());
-    isMarkedCached_ = cacheDirectiveId != null;
+
+    // We silently ignore cache directives that no longer exist in HDFS
+    isMarkedCached_ =
+        HdfsCachingUtil.getCacheDirectiveId(msTbl.getParameters()) != null;
 
     if (msTbl.getPartitionKeysSize() == 0) {
       Preconditions.checkArgument(msPartitions == null || msPartitions.isEmpty());
@@ -733,7 +733,7 @@ public class HdfsTable extends Table {
     List<LiteralExpr> keyValues = Lists.newArrayList();
     if (msPartition != null) {
       isMarkedCached =
-          HdfsCachingUtil.getCacheDirIdFromParams(msPartition.getParameters()) != null;
+          HdfsCachingUtil.getCacheDirectiveId(msPartition.getParameters()) != null;
       // Load key values
       for (String partitionKey: msPartition.getValues()) {
         Type type = getColumns().get(keyValues.size()).getType();
@@ -1220,7 +1220,7 @@ public class HdfsTable extends Table {
       partitions_.add(hdfsPart);
     }
     avroSchema_ = hdfsTable.isSetAvroSchema() ? hdfsTable.getAvroSchema() : null;
-    isMarkedCached_ = HdfsCachingUtil.getCacheDirIdFromParams(
+    isMarkedCached_ = HdfsCachingUtil.getCacheDirectiveId(
         getMetaStoreTable().getParameters()) != null;
     populatePartitionMd();
   }
@@ -1336,6 +1336,7 @@ public class HdfsTable extends Table {
     resultSchema.addToColumns(new TColumn("#Files", Type.BIGINT.toThrift()));
     resultSchema.addToColumns(new TColumn("Size", Type.STRING.toThrift()));
     resultSchema.addToColumns(new TColumn("Bytes Cached", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Cache Replication", Type.STRING.toThrift()));
     resultSchema.addToColumns(new TColumn("Format", Type.STRING.toThrift()));
     resultSchema.addToColumns(new TColumn("Incremental stats", Type.STRING.toThrift()));
 
@@ -1361,6 +1362,7 @@ public class HdfsTable extends Table {
         // Helps to differentiate partitions that have 0B cached versus partitions
         // that are not marked as cached.
         rowBuilder.add("NOT CACHED");
+        rowBuilder.add("NOT CACHED");
       } else {
         // Calculate the number the number of bytes that are cached.
         long cachedBytes = 0L;
@@ -1373,6 +1375,14 @@ public class HdfsTable extends Table {
         }
         totalCachedBytes += cachedBytes;
         rowBuilder.addBytes(cachedBytes);
+
+        // Extract cache replication factor from the parameters of the table
+        // if the table is not partitioned or directly from the partition.
+        Short rep = HdfsCachingUtil.getCachedCacheReplication(
+            numClusteringCols_ == 0 ?
+            p.getTable().getMetaStoreTable().getParameters() :
+            p.getHmsParameters());
+        rowBuilder.add(rep.toString());
       }
       rowBuilder.add(p.getInputFormatDescriptor().getFileFormat().toString());
 
@@ -1391,7 +1401,7 @@ public class HdfsTable extends Table {
 
       // Total num rows, files, and bytes (leave format empty).
       rowBuilder.add(numRows_).add(numHdfsFiles_).addBytes(totalHdfsBytes_)
-          .addBytes(totalCachedBytes).add("").add("");
+          .addBytes(totalCachedBytes).add("").add("").add("");
       result.addToRows(rowBuilder.get());
     }
     return result;

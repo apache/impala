@@ -24,9 +24,9 @@ import junit.framework.Assert;
 
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.Path;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.CatalogException;
@@ -152,6 +152,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Caching ops
     AnalyzesOk("alter table functional.alltypes add " +
         "partition(year=2050, month=10) cached in 'testPool'");
+    AnalyzesOk("alter table functional.alltypes add " +
+        "partition(year=2050, month=10) cached in 'testPool' with replication = 10");
     AnalyzesOk("alter table functional.alltypes add " +
         "partition(year=2050, month=10) uncached");
     AnalysisError("alter table functional.alltypes add " +
@@ -445,6 +447,18 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("alter table functional.alltypes set cached in 'testPool'");
     AnalyzesOk("alter table functional.alltypes partition(year=2010, month=12) " +
         "set cached in 'testPool'");
+
+    // Replication factor
+    AnalyzesOk("alter table functional.alltypes set cached in 'testPool' " +
+        "with replication = 10");
+    AnalyzesOk("alter table functional.alltypes partition(year=2010, month=12) " +
+        "set cached in 'testPool' with replication = 4");
+    AnalysisError("alter table functional.alltypes set cached in 'testPool' " +
+        "with replication = 0",
+        "Cache replication factor must be between 0 and Short.MAX_VALUE");
+    AnalysisError("alter table functional.alltypes set cached in 'testPool' " +
+        "with replication = 90000",
+        "Cache replication factor must be between 0 and Short.MAX_VALUE");
 
     // Attempt to alter a table that is not backed by HDFS.
     AnalysisError("alter table functional_hbase.alltypesnopart set cached in 'testPool'",

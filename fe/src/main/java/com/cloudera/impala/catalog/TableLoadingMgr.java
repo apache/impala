@@ -204,7 +204,7 @@ public class TableLoadingMgr {
         pendingTableCacheDirs_.put(tblName, cacheDirIds);
         refreshThreadWork_.add(tblName);
       } else {
-        cacheDirIds.addAll(cacheDirIds);
+        existingCacheReqIds.addAll(cacheDirIds);
       }
     }
   }

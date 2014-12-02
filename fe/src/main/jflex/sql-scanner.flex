@@ -168,6 +168,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("regexp", new Integer(SqlParserSymbols.KW_REGEXP));
     keywordMap.put("rename", new Integer(SqlParserSymbols.KW_RENAME));
     keywordMap.put("replace", new Integer(SqlParserSymbols.KW_REPLACE));
+    keywordMap.put("replication", new Integer(SqlParserSymbols.KW_REPLICATION));
     keywordMap.put("returns", new Integer(SqlParserSymbols.KW_RETURNS));
     keywordMap.put("revoke", new Integer(SqlParserSymbols.KW_REVOKE));
     keywordMap.put("right", new Integer(SqlParserSymbols.KW_RIGHT));

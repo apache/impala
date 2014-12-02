@@ -20,6 +20,9 @@ include "Types.thrift"
 include "Status.thrift"
 include "TCLIService.thrift"
 
+// This is a short value due to the HDFS API limits
+const i16 HDFS_DEFAULT_CACHE_REPLICATION_FACTOR = 1
+
 // Structs used to execute DDL operations using the JniCatalog.
 
 enum TDdlType {
@@ -140,6 +143,11 @@ struct THdfsCachingOp {
 
   // Set only if set_cached=true. Provides the name of the pool to use when caching.
   2: optional string cache_pool_name
+
+  // The optional cache replication factor to use. If the replication factor is not
+  // specified it's either inherited from the table if the underlying object is a
+  // partition or is set to our default HDFS cache replication factor.
+  3: optional i16 replication
 }
 
 // Parameters for ALTER TABLE rename commands
