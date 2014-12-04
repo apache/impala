@@ -366,7 +366,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     for (Expr e: conjuncts_) {
       msg.addToConjuncts(e.treeToThrift());
     }
-    msg.compact_data = false;
     toThrift(msg);
     container.addToNodes(msg);
     // For the purpose of the BE consider ExchangeNodes to have no children.

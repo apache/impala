@@ -86,8 +86,8 @@ void HdfsScanner::Close() {
 
 Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
     THdfsFileFormat::type type, const string& scanner_name) {
-  if (!scan_node_->tuple_desc()->string_slots().empty() &&
-        ((partition->escape_char() != '\0') || scan_node_->requires_compaction())) {
+  if (!scan_node_->tuple_desc()->string_slots().empty()
+      && partition->escape_char() != '\0') {
     // Cannot use codegen if there are strings slots and we need to
     // compact (i.e. copy) the data.
     scan_node_->IncNumScannersCodegenDisabled();
@@ -231,7 +231,7 @@ bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
 
     SlotDescriptor* desc = scan_node_->materialized_slots()[i];
     bool error = !text_converter_->WriteSlot(desc, tuple,
-        fields[i].start, len, scan_node_->requires_compaction(), need_escape, pool);
+        fields[i].start, len, false, need_escape, pool);
     error_fields[i] = error;
     *error_in_row |= error;
   }
@@ -304,9 +304,6 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
     if (slot_desc->type().type == TYPE_TIMESTAMP) return NULL;
     if (slot_desc->type().type == TYPE_DECIMAL) return NULL;
   }
-
-  // TODO: can't codegen yet if strings need to be copied
-  if (node->requires_compaction()) return NULL;
 
   // Cast away const-ness.  The codegen only sets the cached typed llvm struct.
   TupleDescriptor* tuple_desc = const_cast<TupleDescriptor*>(node->tuple_desc());

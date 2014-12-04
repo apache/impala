@@ -72,11 +72,9 @@ Status HdfsRCFileScanner::InitNewRange() {
   only_parsing_header_ = false;
   row_group_buffer_size_ = 0;
 
-  // Can reuse buffer if we need to compact (because the data is copied out)
-  reuse_row_group_buffer_ = scan_node_->requires_compaction();
-  // Or, there are no string columns (since the tuple won't contain ptrs into
-  // the decompressed data).
-  reuse_row_group_buffer_ |= scan_node_->tuple_desc()->string_slots().empty();
+  // Can reuse buffer if there are no string columns (since the tuple won't contain
+  // ptrs into the decompressed data).
+  reuse_row_group_buffer_ = scan_node_->tuple_desc()->string_slots().empty();
 
   // The scanner currently copies all the column data out of the io buffer so the
   // stream never contains any tuple data.
@@ -517,7 +515,7 @@ Status HdfsRCFileScanner::ProcessRange() {
               reinterpret_cast<const char*>(row_group_buffer_ + row_group_length_));
 
           if (!text_converter_->WriteSlot(slot_desc, tuple, col_start, field_len,
-              scan_node_->requires_compaction(), false, pool)) {
+              false, false, pool)) {
             ReportColumnParseError(slot_desc, col_start, field_len);
             error_in_row = true;
           }

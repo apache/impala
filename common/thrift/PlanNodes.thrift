@@ -344,19 +344,16 @@ struct TPlanNode {
   6: required list<bool> nullable_tuples
   7: optional list<Exprs.TExpr> conjuncts
 
-  // Produce data in compact format.
-  8: required bool compact_data
-
   // one field per PlanNode subclass
-  9: optional THdfsScanNode hdfs_scan_node
-  10: optional THBaseScanNode hbase_scan_node
-  16: optional TDataSourceScanNode data_source_node
+  8: optional THdfsScanNode hdfs_scan_node
+  9: optional THBaseScanNode hbase_scan_node
+  10: optional TDataSourceScanNode data_source_node
   11: optional THashJoinNode hash_join_node
   12: optional TAggregationNode agg_node
   13: optional TSortNode sort_node
   14: optional TUnionNode union_node
   15: optional TExchangeNode exchange_node
-  20: optional TAnalyticNode analytic_node
+  16: optional TAnalyticNode analytic_node
 
   // Label that should be used to print this node to the user.
   17: optional string label

@@ -750,7 +750,6 @@ void HdfsTextScanner::CopyBoundaryField(FieldLocation* data, MemPool* pool) {
 
 int HdfsTextScanner::WritePartialTuple(FieldLocation* fields,
     int num_fields, bool copy_strings) {
-  copy_strings |= scan_node_->requires_compaction();
   int next_line_offset = 0;
   for (int i = 0; i < num_fields; ++i) {
     int need_escape = false;

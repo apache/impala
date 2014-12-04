@@ -307,8 +307,6 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
   virtual bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_failed)  {
     parquet::Encoding::type page_encoding =
         current_page_header_.data_page_header.encoding;
-    bool needs_compaction = (page_encoding != parquet::Encoding::PLAIN_DICTIONARY) &&
-        parent_->scan_node_->requires_compaction();
     bool result = true;
     T val;
     T* val_ptr = needs_conversion_ ? &val : reinterpret_cast<T*>(slot);
@@ -318,11 +316,7 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
       DCHECK(page_encoding == parquet::Encoding::PLAIN);
       data_ += ParquetPlainEncoder::Decode<T>(data_, fixed_len_size_, val_ptr);
     }
-    if (needs_conversion_) {
-      ConvertSlot(&val, reinterpret_cast<T*>(slot), pool);
-    } else if (needs_compaction) {
-      CopySlot(reinterpret_cast<T*>(slot), pool);
-    }
+    if (needs_conversion_) ConvertSlot(&val, reinterpret_cast<T*>(slot), pool);
     ++rows_returned_;
     if (!*conjuncts_failed && bitmap_filter_ != NULL) {
       uint32_t h = RawValue::GetHashValue(slot, desc_->type(), hash_seed_);

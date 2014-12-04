@@ -80,13 +80,11 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       thrift_plan_node_(new TPlanNode(tnode)),
       runtime_state_(NULL),
       tuple_id_(tnode.hdfs_scan_node.tuple_id),
-      requires_compaction_(tnode.compact_data),
       reader_context_(NULL),
       tuple_desc_(NULL),
       unknown_disk_id_warned_(false),
       initial_ranges_issued_(false),
       scanner_thread_bytes_required_(0),
-      num_partition_keys_(0),
       disks_accessed_bitmap_(TCounterType::UNIT, 0),
       done_(false),
       all_ranges_started_(false),
@@ -315,10 +313,6 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   hdfs_table_ = static_cast<const HdfsTableDescriptor*>(tuple_desc_->table_desc());
   scan_node_pool_.reset(new MemPool(mem_tracker()));
 
-  // If there are no materialized string cols, we never need to compact data
-  // (it is already compact).
-  requires_compaction_ &= tuple_desc_->string_slots().size() > 0;
-
   // Create mapping from column index in table to slot index in output tuple.
   // First, initialize all columns to SKIP_COLUMN.
   int num_cols = hdfs_table_->num_cols();
@@ -326,8 +320,6 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   for (int i = 0; i < num_cols; ++i) {
     column_idx_to_materialized_slot_idx_[i] = SKIP_COLUMN;
   }
-
-  num_partition_keys_ = hdfs_table_->num_clustering_cols();
 
   // Next, collect all materialized (partition key and not) slots
   vector<SlotDescriptor*> all_materialized_slots;
@@ -343,21 +335,22 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
 
   // Finally, populate materialized_slots_ and partition_key_slots_ in the order that
   // the slots appear in the file.
+  int num_partition_keys = hdfs_table_->num_clustering_cols();
   for (int i = 0; i < num_cols; ++i) {
     SlotDescriptor* slot_desc = all_materialized_slots[i];
     if (slot_desc == NULL) continue;
     if (hdfs_table_->IsClusteringCol(slot_desc)) {
       partition_key_slots_.push_back(slot_desc);
     } else {
-      DCHECK_GE(i, num_partition_keys_);
+      DCHECK_GE(i, num_partition_keys);
       column_idx_to_materialized_slot_idx_[i] = materialized_slots_.size();
       materialized_slots_.push_back(slot_desc);
     }
   }
 
   // Initialize is_materialized_col_
-  is_materialized_col_.resize(column_idx_to_materialized_slot_idx_.size());
-  for (int i = 0; i < is_materialized_col_.size(); ++i) {
+  is_materialized_col_.resize(num_cols);
+  for (int i = 0; i < num_cols; ++i) {
     is_materialized_col_[i] = column_idx_to_materialized_slot_idx_[i] != SKIP_COLUMN;
   }
   // TODO: don't assume all partitions are on the same filesystem.

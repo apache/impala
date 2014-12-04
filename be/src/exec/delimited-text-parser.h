@@ -203,7 +203,7 @@ class DelimitedTextParser {
   // Not owned.
   const bool* is_materialized_col_;
 
-  // Index to keep track of the current current column in the current file
+  // Index to keep track of the current column in the current file
   int column_idx_;
 };
 
