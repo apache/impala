@@ -125,18 +125,18 @@ string, string
 ---- RESULTS
 'quote "','quote ''
 ====
-#---- QUERY
+---- QUERY
 #  Select from table that contains unsupported primitive types
-#SELECT int_col, str_col, bigint_col from functional.unsupported_types
-#---- TYPES
-#int, string, bigint
-#---- RESULTS
-#0,'aaaa',0
-#1,'bbbb',10
-#2,'cccc',20
-#NULL,'NULL',NULL
-#4,'eeee',40
-#====
+SELECT int_col, str_col, bigint_col from functional.unsupported_types
+---- TYPES
+int, string, bigint
+---- RESULTS
+0,'aaaa',0
+1,'bbbb',10
+2,'cccc',20
+NULL,'NULL',NULL
+4,'eeee',40
+====
 ---- QUERY
 # where clause is a SlotRef
 SELECT count(*) from functional.alltypes where bool_col
@@ -153,4 +153,3 @@ bigint
 ---- RESULTS
 3650
 ====
-
