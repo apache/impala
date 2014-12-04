@@ -20,6 +20,8 @@ import static com.cloudera.impala.common.ByteUnits.MEGABYTE;
 import static com.cloudera.impala.common.ByteUnits.PETABYTE;
 import static com.cloudera.impala.common.ByteUnits.TERABYTE;
 
+import java.text.DecimalFormat;
+
 /**
  * Utility functions for pretty printing.
  */
@@ -30,11 +32,12 @@ public class PrintUtils {
    */
   public static String printBytes(long bytes) {
     double result = bytes;
-    if (bytes >= PETABYTE) return String.format("%.2f", result / PETABYTE) + "PB";
-    if (bytes >= TERABYTE) return String.format("%.2f", result / TERABYTE) + "TB";
-    if (bytes >= GIGABYTE) return String.format("%.2f", result / GIGABYTE) + "GB";
-    if (bytes >= MEGABYTE) return String.format("%.2f", result / MEGABYTE) + "MB";
-    if (bytes >= KILOBYTE) return String.format("%.2f", result / KILOBYTE) + "KB";
+    // Avoid String.format() due to IMPALA-1572 which happens on JDK7 but not JDK6.
+    if (bytes >= PETABYTE) return new DecimalFormat(".00PB").format(result / PETABYTE);
+    if (bytes >= TERABYTE) return new DecimalFormat(".00TB").format(result / TERABYTE);
+    if (bytes >= GIGABYTE) return new DecimalFormat(".00GB").format(result / GIGABYTE);
+    if (bytes >= MEGABYTE) return new DecimalFormat(".00MB").format(result / MEGABYTE);
+    if (bytes >= KILOBYTE) return new DecimalFormat(".00KB").format(result / KILOBYTE);
     return bytes + "B";
   }
 
