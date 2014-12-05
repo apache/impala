@@ -4168,6 +4168,10 @@ TEST_F(ExprTest, DecimalOverflowCasts) {
   // value has 30 digits before the decimal, casting to 29 is an overflow.
   TestIsNull("cast(99999999999999999999999999999.9 as decimal(29, 1))",
       ColumnType::CreateDecimalType(29, 1));
+
+  // Tests converting a non-trivial empty string to a decimal (IMPALA-1566).
+  TestDecimalValue("cast(regexp_replace('','a','b') as decimal(15,2))",
+      Decimal8Value(0), ColumnType::CreateDecimalType(15,2));
 }
 
 TEST_F(ExprTest, UdfInterfaceBuiltins) {

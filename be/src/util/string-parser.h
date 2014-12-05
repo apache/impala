@@ -117,12 +117,14 @@ class StringParser {
       --len;
     }
 
-    switch (*s) {
-      case '-':
-        negative = true;
-      case '+':
-        ++s;
-        --len;
+    if (len > 0) {
+      switch (*s) {
+        case '-':
+          negative = true;
+        case '+':
+          ++s;
+          --len;
+      }
     }
 
     // Removing leading 0's.
