@@ -996,9 +996,8 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
         } else if (iequals(value, "verbose") || iequals(value, "3")) {
           query_options->__set_explain_level(TExplainLevel::VERBOSE);
         } else {
-          stringstream ss;
-          ss << "Invalid explain level: " << value;
-          return Status(ss.str());
+          return Status(Substitute("Invalid explain level '$0'. Valid levels are"
+              " MINIMAL(0), STANDARD(1), EXTENDED(2) and VERBOSE(3).", value));
         }
         break;
       case TImpalaQueryOptions::SYNC_DDL:
