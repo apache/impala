@@ -4,7 +4,7 @@
 #
 set -e
 set -u
-. ${IMPALA_HOME}/bin/impala-config.sh
+. ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 
 # Run compute stats over as many of the tables used in the Planner tests as possible.
 python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_names=functional\

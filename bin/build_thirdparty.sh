@@ -162,7 +162,7 @@ if [ $BUILD_ALL -eq 1 ] || [ $BUILD_GFLAGS -eq 1 ]; then
   build_preamble $IMPALA_HOME/thirdparty/gflags-${IMPALA_GFLAGS_VERSION} GFlags
   GFLAGS_INSTALL=`pwd`/third-party-install
   ./configure --with-pic --prefix=${GFLAGS_INSTALL}
-  make -j4 install
+   make -j${IMPALA_BUILD_THREADS:-4} install
 fi
 
 # Build pprof
@@ -173,7 +173,7 @@ if [ $BUILD_ALL -eq 1 ] || [ $BUILD_PPROF -eq 1 ]; then
   # we're not compiling the rest of our code to not omit frame pointers but it
   # still seems to generate useful profiling data.
   ./configure --enable-frame-pointers --with-pic
-  make -j4
+   make -j${IMPALA_BUILD_THREADS:-4}
 fi
 
 # Build glog
@@ -189,14 +189,14 @@ logging_unittest-logging_unittest.o : CXXFLAGS= -gstabs -O2
 EOF
   cat Makefile >> Makefile.gcc45sles_workaround
   mv Makefile.gcc45sles_workaround Makefile
-  make -j4
+   make -j${IMPALA_BUILD_THREADS:-4}
 fi
 
 # Build gtest
 if [ $BUILD_ALL -eq 1 ] || [ $BUILD_GTEST -eq 1 ]; then
   build_preamble $IMPALA_HOME/thirdparty/gtest-${IMPALA_GTEST_VERSION} GTest
   cmake .
-  make -j4
+   make -j${IMPALA_BUILD_THREADS:-4}
 fi
 
 # Build Snappy
@@ -217,15 +217,15 @@ fi
 # Build re2
 if [ $BUILD_ALL -eq 1 ] || [ $BUILD_RE2 -eq 1 ]; then
   build_preamble $IMPALA_HOME/thirdparty/re2 RE2
-  make -j4
+   make -j${IMPALA_BUILD_THREADS:-4}
 fi
 
 # Build Ldap
 if [ $BUILD_ALL -eq 1 ] || [ $BUILD_LDAP -eq 1 ]; then
     build_preamble $IMPALA_HOME/thirdparty/openldap-${IMPALA_OPENLDAP_VERSION} Openldap
     ./configure --enable-slapd=no --prefix=`pwd`/impala_install --enable-static --with-pic
-    make -j4
-    make -j4 depend
+     make -j${IMPALA_BUILD_THREADS:-4}
+     make -j${IMPALA_BUILD_THREADS:-4} depend
     make install
 fi
 
@@ -233,5 +233,5 @@ fi
 if [ $BUILD_ALL -eq 1 ] || [ $BUILD_AVRO -eq 1 ]; then
   build_preamble $IMPALA_HOME/thirdparty/avro-c-${IMPALA_AVRO_VERSION} Avro
   cmake .
-  make -j4
+   make -j${IMPALA_BUILD_THREADS:-4}
 fi

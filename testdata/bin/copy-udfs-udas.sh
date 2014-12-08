@@ -7,7 +7,7 @@ if [ x${JAVA_HOME} == x ]; then
   echo JAVA_HOME not set
   exit 1
 fi
-. ${IMPALA_HOME}/bin/impala-config.sh
+. ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 set -e
 
 BUILD=0

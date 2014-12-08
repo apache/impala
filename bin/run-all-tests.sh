@@ -22,12 +22,12 @@ set -e
 
 . $IMPALA_HOME/bin/set-pythonpath.sh
 
-# Allow picking up strateg from environment
+# Allow picking up strategy from environment
 : ${EXPLORATION_STRATEGY:=core}
 NUM_ITERATIONS=1
 KERB_ARGS=""
 
-. ${IMPALA_HOME}/bin/impala-config.sh
+. ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 if ${CLUSTER_DIR}/admin is_kerberized; then
   KERB_ARGS="--use_kerberos"
 fi
@@ -75,7 +75,7 @@ echo "Split and assign HBase regions"
 # To properly test HBase integeration, HBase regions are split and assigned by this
 # script. Restarting HBase will change the region server assignment. Run split-hbase.sh
 # before running any test.
-${IMPALA_HOME}/testdata/bin/split-hbase.sh
+${IMPALA_HOME}/testdata/bin/split-hbase.sh > /dev/null 2>&1
 
 for i in $(seq 1 $NUM_ITERATIONS)
 do

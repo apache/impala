@@ -19,12 +19,11 @@
 #  - 0 implies that the schema diff is emppty, or that a reference githash was not found.
 #  - 1 implies that the schemas have changed.
 
-. ${IMPALA_HOME}/bin/impala-config.sh
+. ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 set -ex
 
-# If /test-warehouse/githash.txt does not exist, exit with a 0
+DATASET=${1-}
 hdfs dfs -test -e  /test-warehouse/githash.txt || { exit 0; }
 GIT_HASH=$(echo $(hdfs dfs -cat /test-warehouse/githash.txt))
 # Check whether a non-empty diff exists.
-# TODO: Make this more granular (on the level of a dataset)
-git diff --exit-code ${GIT_HASH}..HEAD ${IMPALA_HOME}/testdata/datasets
+git diff --exit-code ${GIT_HASH}..HEAD ${IMPALA_HOME}/testdata/datasets/$DATASET

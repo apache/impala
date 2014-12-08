@@ -27,7 +27,7 @@ if [ ! -z "${MINIKDC_REALM}" ]; then
 fi
 
 export IMPALA_HOME=$ROOT
-. "$ROOT"/bin/impala-config.sh
+. "$ROOT"/bin/impala-config.sh > /dev/null 2>&1
 
 CLEAN_ACTION=1
 TESTDATA_ACTION=0
@@ -205,7 +205,7 @@ fi
 # Stop any running Impala services.
 ${IMPALA_HOME}/bin/start-impala-cluster.py --kill --force
 
-if [ $CLEAN_ACTION -eq 1 ] || [ $FORMAT_METASTORE -eq 1 ] || [ $FORMAT_CLUSTER -eq 1 ]
+if [[ $CLEAN_ACTION -eq 1 || $FORMAT_METASTORE -eq 1 || $FORMAT_CLUSTER -eq 1 ]]
 then
   # Kill any processes that may be accessing postgres metastore. To be safe, this is done
   # before we make any changes to the config files.
@@ -338,23 +338,25 @@ if [ ${TESTS_ACTION} -eq 1 -a \
   exit 1
 fi
 
-if [ $TESTDATA_ACTION -eq 1 ]
-then
-  # create and load test data
+if [ $TESTDATA_ACTION -eq 1 ]; then
+  # Create testdata.
   $IMPALA_HOME/bin/create_testdata.sh
-
   cd $ROOT
-  if [ "$SNAPSHOT_FILE" != "" ]
-  then
-    yes | ${IMPALA_HOME}/testdata/bin/create-load-data.sh $SNAPSHOT_FILE
-  else
-    ${IMPALA_HOME}/testdata/bin/create-load-data.sh
+  # We have three conditions.
+  # - A testdata and metastore snapshot exists.
+  # - Only the testdata snapshot exists.
+  # - Neither of the them exist.
+  CREATE_LOAD_DATA_ARGS=""
+  if [ $SNAPSHOT_FILE ] && [ $METASTORE_SNAPSHOT_FILE ]; then
+    CREATE_LOAD_DATA_ARGS="-snapshot_file ${SNAPSHOT_FILE} -skip_metadata_load"
+  elif [ $SNAPSHOT_FILE ] && [ -n $METASTORE_SNAPSHOT_FILE ]; then
+    CREATE_LOAD_DATA_ARGS="-snapshot_file ${SNAPSHOT_FILE}"
   fi
+  yes | ${IMPALA_HOME}/testdata/bin/create-load-data.sh ${CREATE_LOAD_DATA_ARGS}
 fi
 
-if [ $TESTS_ACTION -eq 1 ]
-then
-    ${IMPALA_HOME}/bin/run-all-tests.sh -e $EXPLORATION_STRATEGY
+if [ $TESTS_ACTION -eq 1 ]; then
+  ${IMPALA_HOME}/bin/run-all-tests.sh -e $EXPLORATION_STRATEGY
 fi
 
 # Generate list of files for Cscope to index

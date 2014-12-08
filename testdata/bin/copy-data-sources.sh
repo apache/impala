@@ -3,7 +3,7 @@
 #
 # This script copies the test data source library into hdfs.
 
-. ${IMPALA_HOME}/bin/impala-config.sh
+. ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 set -e
 
 hadoop fs -mkdir -p /test-warehouse/data-sources/

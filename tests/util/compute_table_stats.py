@@ -29,17 +29,10 @@ def compute_stats(impala_client, db_names=None, table_names=None,
 
   all_dbs = set(name.lower() for name in impala_client.execute("show databases").data)
   selected_dbs = all_dbs if db_names is None else set(db_names)
-  if db_names is not None:
-    print 'Skipping compute stats on databases:\n%s' % '\n'.join(all_dbs - selected_dbs)
-
   for db in all_dbs.intersection(selected_dbs):
     all_tables =\
         set([t.lower() for t in impala_client.execute("show tables in %s" % db).data])
     selected_tables = all_tables if table_names is None else set(table_names)
-    if table_names:
-      print 'Skipping compute stats on tables:\n%s' %\
-          '\n'.join(['%s.%s' % (db, tbl)  for tbl in all_tables - selected_tables])
-
     for table in all_tables.intersection(selected_tables):
       statement = "compute stats %s.%s" % (db, table)
       print 'Executing: %s' % statement

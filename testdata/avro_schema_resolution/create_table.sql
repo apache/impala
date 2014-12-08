@@ -25,8 +25,8 @@ INPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat'
 OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat'
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/avro_schema_resolution_test/';
 
-LOAD DATA LOCAL INPATH 'records1.avro' OVERWRITE INTO TABLE schema_resolution_test;
-LOAD DATA LOCAL INPATH 'records2.avro' INTO TABLE schema_resolution_test;
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/avro_schema_resolution/records1.avro' OVERWRITE INTO TABLE schema_resolution_test;
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/avro_schema_resolution/records2.avro' INTO TABLE schema_resolution_test;
 
 -- The following tables are used to test Impala's handling of HIVE-6308 which causes
 -- COMPUTE STATS and Hive's ANALYZE TABLE to fail for Avro tables with mismatched

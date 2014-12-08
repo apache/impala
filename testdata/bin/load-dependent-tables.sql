@@ -49,15 +49,6 @@ ALTER TABLE alltypesmixedformat PARTITION (year=2009, month=2)
 ALTER TABLE alltypesmixedformat PARTITION (year=2009, month=3)
   SET FILEFORMAT RCFILE;
 
-----
--- Used by CatalogTest to confirm that non-external HBase tables are identified
--- correctly (IMP-581) 
--- Note that the usual 'hbase.table.name' property is not specified to avoid
--- creating tables in HBase as a side-effect.
-CREATE TABLE functional_hbase.internal_hbase_table(key int, value string)
-STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
-WITH SERDEPROPERTIES ("hbase.columns.mapping" = ":key,cf1:val");
-
 ---- Unsupported Impala table types
 USE functional;
 CREATE VIEW IF NOT EXISTS hive_view AS SELECT 1 AS int_col FROM alltypes limit 1;

@@ -20,7 +20,7 @@
 # NOTE: Running this script will remove your existing test-warehouse directory. Be sure
 # to backup any data you need before running this script.
 
-. ${IMPALA_HOME}/bin/impala-config.sh
+. ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 TEST_WAREHOUSE_HDFS_DIR=/test-warehouse
 
 if [[ ! $1 ]]; then
@@ -63,6 +63,11 @@ mkdir ${SNAPSHOT_STAGING_DIR}
 
 echo "Extracting tarball"
 tar -C ${SNAPSHOT_STAGING_DIR} -xzf ${SNAPSHOT_FILE}
+
+if [ ! -f ${SNAPSHOT_STAGING_DIR}/test-warehouse/githash.txt ]; then
+  echo "The test-warehouse snapshot does not containa githash, aborting load"
+  exit 1
+fi
 
 echo "Copying data to HDFS"
 hadoop fs -put ${SNAPSHOT_STAGING_DIR}/test-warehouse/* ${TEST_WAREHOUSE_HDFS_DIR}
