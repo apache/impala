@@ -34,6 +34,7 @@
 #include "exprs/expr.h"
 #include "runtime/raw-value.h"
 #include "service/query-exec-state.h"
+#include "service/query-options.h"
 #include "util/debug-util.h"
 #include "rpc/thrift-util.h"
 #include "util/impalad-metrics.h"
@@ -543,7 +544,7 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
         }
         continue;
       }
-      RETURN_IF_ERROR(SetQueryOptions(conf_itr->first, conf_itr->second,
+      RETURN_IF_ERROR(SetQueryOption(conf_itr->first, conf_itr->second,
           &query_ctx->request.query_options));
     }
     VLOG_QUERY << "TClientRequest.queryOptions: "
@@ -612,7 +613,7 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
         continue;
       }
       // Ignore failure to set query options (will be logged)
-      SetQueryOptions(conf_itr->first, conf_itr->second, &state->default_query_options);
+      SetQueryOption(conf_itr->first, conf_itr->second, &state->default_query_options);
     }
   }
   TQueryOptionsToMap(state->default_query_options, &return_val.configuration);

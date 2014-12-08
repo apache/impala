@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 #ifndef IMPALA_SERVICE_IMPALA_SERVER_H
 #define IMPALA_SERVICE_IMPALA_SERVER_H
 
@@ -213,21 +212,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // certain expressions, such as now(), pid(), etc. Should be called before handing
   // the query context to the frontend for query compilation.
   static void PrepareQueryContext(TQueryCtx* query_ctx);
-
-  // Returns the ImpalaQueryOptions enum for the given "key". Input is case in-sensitive.
-  // Return -1 if the input is an invalid option.
-  static int GetQueryOption(const std::string& key);
-
-  // Parse a "," separated key=value pair of query options and set it in TQueryOptions.
-  // If the same query option is specified more than once, the last one wins.
-  // Return an error if the input is invalid (bad format or invalid query option).
-  static Status ParseQueryOptions(const std::string& options,
-      TQueryOptions* query_options);
-
-  // Set the key/value pair in TQueryOptions. It will override existing setting in
-  // query_options.
-  static Status SetQueryOptions(const std::string& key, const std::string& value,
-      TQueryOptions* query_options);
 
   // SessionHandlerIf methods
 
@@ -662,8 +646,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   Status TExecuteStatementReqToTQueryContext(
       const apache::hive::service::cli::thrift::TExecuteStatementReq execute_request,
       TQueryCtx* query_ctx);
-  static void TQueryOptionsToMap(const TQueryOptions& query_option,
-      std::map<std::string, std::string>* configuration);
 
   // Helper method to process cancellations that result from failed backends, called from
   // the cancellation thread pool. The cancellation_work contains the query id to cancel

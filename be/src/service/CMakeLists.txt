@@ -29,6 +29,7 @@ add_library(Service
   impala-hs2-server.cc
   impala-beeswax-server.cc
   query-exec-state.cc
+  query-options.cc
   child-query.cc
 )
 

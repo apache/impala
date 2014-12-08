@@ -28,8 +28,8 @@ include "TCLIService.thrift"
 // Note: If you add an option or change the default, you also need to update:
 // - ImpalaInternalService.thrift: TQueryOptions
 // - ImpaladClientExecutor.getBeeswaxQueryConfigurations()
-// - ImpalaServer::SetQueryOptions()
-// - ImpalaServer::TQueryOptionsToMap()
+// - SetQueryOption()
+// - TQueryOptionsToMap()
 enum TImpalaQueryOptions {
   // if true, abort execution on the first error
   ABORT_ON_ERROR,
@@ -254,7 +254,6 @@ struct TGetRuntimeProfileResp {
 
   2: optional string profile
 }
-
 
 service ImpalaHiveServer2Service extends TCLIService.TCLIService {
   // Returns the exec summary for the given query
