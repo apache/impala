@@ -143,34 +143,34 @@ namespace apache { namespace thrift { namespace transport {
   }
 
   uint32_t TSaslTransport::read(uint8_t* buf, uint32_t len) {
+    uint32_t read_bytes = memBuf_->read(buf, len);
+    if (read_bytes > 0) return read_bytes;
 
     // if there's not enough data in cache, read from underlying transport
-    if (memBuf_->available_read() < len) {
-      uint32_t dataLength = readLength();
+    uint32_t dataLength = readLength();
 
-      // Fast path
-      if (len == dataLength && !shouldWrap_) {
-        transport_->readAll(buf, len);
-        return len;
-      }
-
-      uint8_t* tmpBuf = new uint8_t[dataLength];
-      transport_->readAll(tmpBuf, dataLength);
-      if (shouldWrap_) {
-        tmpBuf = sasl_->unwrap(tmpBuf, 0, dataLength, &dataLength);
-      }
-
-      // We will consume all the data, no need to put it in the memory buffer.
-      if (len == dataLength) {
-        memcpy(buf, tmpBuf, len);
-        delete tmpBuf;
-        return len;
-      }
-
-      memBuf_->write(tmpBuf, dataLength);
-      memBuf_->flush();
-      delete tmpBuf;
+    // Fast path
+    if (len == dataLength && !shouldWrap_) {
+      transport_->readAll(buf, len);
+      return len;
     }
+
+    uint8_t* tmpBuf = new uint8_t[dataLength];
+    transport_->readAll(tmpBuf, dataLength);
+    if (shouldWrap_) {
+      tmpBuf = sasl_->unwrap(tmpBuf, 0, dataLength, &dataLength);
+    }
+
+    // We will consume all the data, no need to put it in the memory buffer.
+    if (len == dataLength) {
+      memcpy(buf, tmpBuf, len);
+      delete tmpBuf;
+      return len;
+    }
+
+    memBuf_->write(tmpBuf, dataLength);
+    memBuf_->flush();
+    delete tmpBuf;
     return memBuf_->read(buf, len);
   }
 
