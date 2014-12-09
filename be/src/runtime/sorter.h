@@ -69,6 +69,8 @@ class RowBatch;
 // copied into the output batch supplied by GetNext, and the data itself is left in
 // pinned blocks held by the sorter.
 //
+// Note that Init() must be called right after the constructor.
+//
 // During a merge, one row batch is created for each input run, and one batch is created
 // for the output of the merge (if is not the final merge). It is assumed that the memory
 // for these batches have already been accounted for in the memory budget for the sort.
@@ -91,6 +93,10 @@ class Sorter {
       RuntimeProfile* profile, RuntimeState* state);
 
   ~Sorter();
+
+  // Initialization code, including registration to the block_mgr and the initialization
+  // of the unsorted_run_, both of these may fail.
+  Status Init();
 
   // Adds a batch of input rows to the current unsorted run.
   Status AddBatch(RowBatch* batch);

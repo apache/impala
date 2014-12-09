@@ -343,17 +343,17 @@ Status Sorter::Run::Init() {
   BufferedBlockMgr::Block* block = NULL;
   RETURN_IF_ERROR(
       sorter_->block_mgr_->GetNewBlock(sorter_->block_mgr_client_, NULL, &block));
-  DCHECK(block != NULL);
+  DCHECK_NOTNULL(block);
   fixed_len_blocks_.push_back(block);
   if (has_var_len_slots_) {
     RETURN_IF_ERROR(
         sorter_->block_mgr_->GetNewBlock(sorter_->block_mgr_client_, NULL, &block));
-    DCHECK(block != NULL);
+    DCHECK_NOTNULL(block);
     var_len_blocks_.push_back(block);
     if (!is_sorted_) {
       RETURN_IF_ERROR(sorter_->block_mgr_->GetNewBlock(
           sorter_->block_mgr_client_, NULL, &var_len_copy_block_));
-      DCHECK(var_len_copy_block_ != NULL);
+      DCHECK_NOTNULL(var_len_copy_block_);
     }
   }
   if (!is_sorted_) sorter_->initial_runs_counter_->Add(1);
@@ -362,6 +362,7 @@ Status Sorter::Run::Init() {
 
 template <bool has_var_len_data>
 Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processed) {
+  DCHECK(!fixed_len_blocks_.empty());
   *num_processed = 0;
   BufferedBlockMgr::Block* cur_fixed_len_block = fixed_len_blocks_.back();
 
@@ -381,8 +382,8 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
   // The outer loop allocates a new block for fixed-len data if the input batch is
   // not exhausted.
 
-  // cur_input_index is the index into the input 'batch' of the current
-  // input row being processed.
+  // cur_input_index is the index into the input 'batch' of the current input row being
+  // processed.
   int cur_input_index = start_index;
   vector<StringValue*> var_values;
   var_values.reserve(sort_tuple_desc_->string_slots().size());
@@ -412,6 +413,7 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
       }
 
       if (has_var_len_data) {
+        DCHECK_GT(var_len_blocks_.size(), 0);
         BufferedBlockMgr::Block* cur_var_len_block = var_len_blocks_.back();
         if (cur_var_len_block->BytesRemaining() < total_var_len) {
           bool added;
@@ -419,7 +421,7 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
           if (added) {
             cur_var_len_block = var_len_blocks_.back();
           } else {
-            // There wasn't enough space in the last var-len block for this tuple, and
+            // There was not enough space in the last var-len block for this tuple, and
             // the run could not be extended. Return the fixed-len allocation and exit.
             cur_fixed_len_block->ReturnAllocation(sort_tuple_size_);
             return Status::OK;
@@ -435,14 +437,13 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
           CopyVarLenDataConvertOffset(var_data_ptr, offset, var_values);
         }
       }
-
       ++num_tuples_;
       ++*num_processed;
       ++cur_input_index;
     }
 
     // If there are still rows left to process, get a new block for the fixed-length
-    // tuples. If the  run is already too long, return.
+    // tuples. If the run is already too long, return.
     if (cur_input_index < batch->num_rows()) {
       bool added;
       RETURN_IF_ERROR(TryAddBlock(&fixed_len_blocks_, &added));
@@ -453,7 +454,6 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
       }
     }
   }
-
   return Status::OK;
 }
 
@@ -855,26 +855,11 @@ Sorter::Sorter(const TupleRowComparator& compare_less_than,
   : state_(state),
     compare_less_than_(compare_less_than),
     block_mgr_(state->block_mgr()),
+    unsorted_run_(NULL),
     output_row_desc_(output_row_desc),
     sort_tuple_slot_expr_ctxs_(slot_materialize_expr_ctxs),
     mem_tracker_(mem_tracker),
     profile_(profile) {
-  TupleDescriptor* sort_tuple_desc = output_row_desc->tuple_descriptors()[0];
-  has_var_len_slots_ = sort_tuple_desc->string_slots().size() > 0;
-  in_mem_tuple_sorter_.reset(new TupleSorter(compare_less_than,
-      block_mgr_->max_block_size(), sort_tuple_desc->byte_size(), state));
-
-  initial_runs_counter_ = ADD_COUNTER(profile_, "InitialRunsCreated", TCounterType::UNIT);
-  num_merges_counter_ = ADD_COUNTER(profile_, "TotalMergesPerformed", TCounterType::UNIT);
-  in_mem_sort_timer_ = ADD_TIMER(profile_, "InMemorySortTime");
-  sorted_data_size_ = ADD_COUNTER(profile_, "SortDataSize", TCounterType::BYTES);
-
-  int min_blocks_required = Sorter::MinBuffersRequired(output_row_desc_);
-  block_mgr_->RegisterClient(min_blocks_required, mem_tracker_, state,
-      &block_mgr_client_);
-
-  unsorted_run_ = obj_pool_.Add(new Run(this, sort_tuple_desc, true));
-  unsorted_run_->Init();
 }
 
 Sorter::~Sorter() {
@@ -889,14 +874,40 @@ Sorter::~Sorter() {
   block_mgr_->ClearReservations(block_mgr_client_);
 }
 
+Status Sorter::Init() {
+  DCHECK(unsorted_run_ == NULL) << "Already initialized";
+  TupleDescriptor* sort_tuple_desc = output_row_desc_->tuple_descriptors()[0];
+  has_var_len_slots_ = sort_tuple_desc->string_slots().size() > 0;
+  in_mem_tuple_sorter_.reset(new TupleSorter(compare_less_than_,
+      block_mgr_->max_block_size(), sort_tuple_desc->byte_size(), state_));
+  unsorted_run_ = obj_pool_.Add(new Run(this, sort_tuple_desc, true));
+
+  initial_runs_counter_ = ADD_COUNTER(profile_, "InitialRunsCreated", TCounterType::UNIT);
+  num_merges_counter_ = ADD_COUNTER(profile_, "TotalMergesPerformed", TCounterType::UNIT);
+  in_mem_sort_timer_ = ADD_TIMER(profile_, "InMemorySortTime");
+  sorted_data_size_ = ADD_COUNTER(profile_, "SortDataSize", TCounterType::BYTES);
+
+  int min_blocks_required = Sorter::MinBuffersRequired(output_row_desc_);
+  RETURN_IF_ERROR(block_mgr_->RegisterClient(min_blocks_required, mem_tracker_, state_,
+      &block_mgr_client_));
+
+  DCHECK_NOTNULL(unsorted_run_);
+  RETURN_IF_ERROR(unsorted_run_->Init());
+  return Status::OK;
+}
+
 Status Sorter::AddBatch(RowBatch* batch) {
+  DCHECK_NOTNULL(unsorted_run_);
+  DCHECK_NOTNULL(batch);
   int num_processed = 0;
   int cur_batch_index = 0;
   while (cur_batch_index < batch->num_rows()) {
     if (has_var_len_slots_) {
-      unsorted_run_->AddBatch<true>(batch, cur_batch_index, &num_processed);
+      RETURN_IF_ERROR(unsorted_run_->AddBatch<true>(
+          batch, cur_batch_index, &num_processed));
     } else {
-      unsorted_run_->AddBatch<false>(batch, cur_batch_index, &num_processed);
+      RETURN_IF_ERROR(unsorted_run_->AddBatch<false>(
+          batch, cur_batch_index, &num_processed));
     }
 
     cur_batch_index += num_processed;
@@ -909,7 +920,6 @@ Status Sorter::AddBatch(RowBatch* batch) {
       unsorted_run_->Init();
     }
   }
-
   return Status::OK;
 }
 

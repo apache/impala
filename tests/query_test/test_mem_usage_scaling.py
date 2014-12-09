@@ -74,3 +74,40 @@ class TestExprMemUsage(ImpalaTestSuite):
     self.execute_query_expect_success(self.client,
       "select count(*) from lineitem where lower(l_comment) = 'hello'", exec_options,
       table_format=vector.get_value('table_format'))
+
+
+class TestMemLimitError(ImpalaTestSuite):
+  # Different values of mem limits and minimum mem limit TPC-H Q1 is expected to run
+  # without problem.
+  MEM_IN_MB = [10, 50, 100, 140, 145, 150]
+  MIN_MEM_FOR_TPCH_Q1 = 145
+  EXPECTED_ERROR_MSG = "Memory limit exceeded"
+
+  @classmethod
+  def get_workload(self):
+    return 'tpch'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestMemLimitError, cls).add_test_dimensions()
+
+    cls.TestMatrix.add_dimension(
+      TestDimension('mem_limit', *TestMemLimitError.MEM_IN_MB))
+
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').file_format in ['parquet'])
+
+  def test_low_mem_limit(self, vector):
+    mem = vector.get_value('mem_limit')
+    # If memory limit larger than the minimum threshold, then it is not expected to fail
+    expects_error = mem < TestMemLimitError.MIN_MEM_FOR_TPCH_Q1;
+    new_vector = copy(vector)
+    new_vector.get_value('exec_option')['mem_limit'] = str(mem) + "m"
+    try:
+      self.run_test_case('tpch-q1', new_vector)
+    except ImpalaBeeswaxException as e:
+      if (expects_error == 0):
+        raise
+      if (TestMemLimitError.EXPECTED_ERROR_MSG in str(e)):
+        print str(e)
+      assert TestMemLimitError.EXPECTED_ERROR_MSG in str(e)

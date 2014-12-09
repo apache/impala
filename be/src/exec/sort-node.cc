@@ -59,9 +59,12 @@ Status SortNode::Open(RuntimeState* state) {
   TupleRowComparator less_than(
       sort_exec_exprs_.lhs_ordering_expr_ctxs(), sort_exec_exprs_.rhs_ordering_expr_ctxs(),
       is_asc_order_, nulls_first_);
+
+  // Create and initialize the external sort impl object
   sorter_.reset(new Sorter(
       less_than, sort_exec_exprs_.sort_tuple_slot_expr_ctxs(),
       &row_descriptor_, mem_tracker(), runtime_profile(), state));
+  RETURN_IF_ERROR(sorter_->Init());
 
   // The child has been opened and the sorter created. Sort the input.
   // The final merge is done on-demand as rows are requested in GetNext().
