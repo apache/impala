@@ -143,16 +143,15 @@ class Sorter::Run {
   // True if all blocks in the run are pinned.
   bool is_pinned_;
 
-  // Sequence of blocks in this run containing the fixed-length portion of the
-  // sort tuples comprising this run. The data pointed to by the var-len slots are in
-  // var_len_blocks_. If is_sorted_ is true, the tuples in fixed_len_blocks_ will be in
-  // sorted order.
+  // Sequence of blocks in this run containing the fixed-length portion of the sort tuples
+  // comprising this run. The data pointed to by the var-len slots are in var_len_blocks_.
+  // If is_sorted_ is true, the tuples in fixed_len_blocks_ will be in sorted order.
   // fixed_len_blocks_[i] is NULL iff it has been deleted.
   vector<BufferedBlockMgr::Block*> fixed_len_blocks_;
 
   // Sequence of blocks in this run containing the var-length data corresponding to the
-  // var-length column data from fixed_len_blocks_. These are reconstructed to be in
-  // sorted order in UnpinAllBlocks().
+  // var-length columns from fixed_len_blocks_. These are reconstructed to be in sorted
+  // order in UnpinAllBlocks().
   // var_len_blocks_[i] is NULL iff it has been deleted.
   vector<BufferedBlockMgr::Block*> var_len_blocks_;
 
@@ -188,10 +187,9 @@ class Sorter::Run {
 }; // class Sorter::Run
 
 // Sorts a sequence of tuples from a run in place using a provided tuple comparator.
-// Quick sort is used for sequences of tuples larger that 16 elements, and
-// insertion sort is used for smaller sequences.
-// The TupleSorter is initialized with a RuntimeState instance to check for
-// cancellation during an in-memory sort.
+// Quick sort is used for sequences of tuples larger that 16 elements, and insertion sort
+// is used for smaller sequences. The TupleSorter is initialized with a RuntimeState
+// instance to check for cancellation during an in-memory sort.
 class Sorter::TupleSorter {
  public:
   TupleSorter(const TupleRowComparator& less_than_comp, int64_t block_size,
@@ -539,16 +537,32 @@ Status Sorter::Run::PrepareRead() {
   if (is_pinned_) return Status::OK;
 
   if (fixed_len_blocks_.size() > 0) {
-    bool pinned;
+    bool pinned = false;
     RETURN_IF_ERROR(fixed_len_blocks_[0]->Pin(&pinned));
     DCHECK(pinned);
   }
-  if (has_var_len_slots_ && var_len_blocks_.size() > 0) {
-    bool pinned;
-    RETURN_IF_ERROR(var_len_blocks_[0]->Pin(&pinned));
-    DCHECK(pinned);
-  }
 
+  if (has_var_len_slots_ && var_len_blocks_.size() > 0) {
+    bool pinned = false;
+    RETURN_IF_ERROR(var_len_blocks_[0]->Pin(&pinned));
+    if (!pinned) {
+      // IMPALA-1590: If the number of var-len blocks is larger than the number of
+      // reserved blocks, then Pin() may fail, probably due to OOM because of
+      // concurrent queries.
+      int min_blocks_required = Sorter::MinBuffersRequired(sorter_->output_row_desc_);
+      if (var_len_blocks_.size() <= min_blocks_required) {
+        DCHECK(false) << " Var-len blocks: " << var_len_blocks_.size()
+                      << " Reserved " << min_blocks_required;
+      } else {
+        Status status = Status::MEM_LIMIT_EXCEEDED;
+        status.AddDetail(Substitute("Failed to pin block for variable length data needed "
+            "for sorting (reserved: $0, needed: $1). Reducing query concurrency or "
+            "increasing the memory available to Impala may help running this query.",
+            min_blocks_required, var_len_blocks_.size()));
+        return status;
+      }
+    }
+  }
   return Status::OK;
 }
 
@@ -582,7 +596,7 @@ Status Sorter::Run::GetNextBatch(RowBatch** output_batch) {
     }
   }
 
-  // *output_batch = NULL indicates eos.
+  // *output_batch == NULL indicates eos.
   *output_batch = buffered_batch_.get();
   return Status::OK;
 }
@@ -909,7 +923,6 @@ Status Sorter::AddBatch(RowBatch* batch) {
       RETURN_IF_ERROR(unsorted_run_->AddBatch<false>(
           batch, cur_batch_index, &num_processed));
     }
-
     cur_batch_index += num_processed;
     if (cur_batch_index < batch->num_rows()) {
       // The current run is full. Sort it and begin the next one.
