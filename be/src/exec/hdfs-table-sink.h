@@ -281,6 +281,10 @@ class HdfsTableSink : public DataSink {
   RuntimeProfile::Counter* hdfs_write_timer_;
   // Time spent compressing data
   RuntimeProfile::Counter* compress_timer_;
+
+  // Flag to indicate the current input batch passed in Send() is empty. It implies that
+  // we must not initialize the OutputPartition writer of a static partition insert.
+  bool has_empty_input_batch_;
 };
 }
 #endif

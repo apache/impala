@@ -617,7 +617,9 @@ public class HdfsScanNode extends ScanNode {
     LOG.debug("computeStats HdfsScan: cardinality_=" + Long.toString(cardinality_));
 
     // TODO: take actual partitions into account
-    numNodes_ = cardinality_ == 0 ? 1 : tbl_.getNumNodes();
+    // Tables can reside on 0 nodes (empty table), but a plan node must always be
+    // executed on at least one node.
+    numNodes_ = (cardinality_ == 0 || tbl_.getNumNodes() == 0) ? 1 : tbl_.getNumNodes();
     LOG.debug("computeStats HdfsScan: #nodes=" + Integer.toString(numNodes_));
   }
 

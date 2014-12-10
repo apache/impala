@@ -24,6 +24,18 @@ import pwd
 class TestInsertBehaviour(ImpalaTestSuite):
   """Tests for INSERT behaviour that isn't covered by checking query results"""
 
+  TEST_DB_NAME = "insert_empty_result_db"
+
+  def setup_method(self, method):
+    # cleanup and create a fresh test database
+    if method.__name__ == "test_insert_select_with_empty_resultset":
+      self.cleanup_db(self.TEST_DB_NAME)
+      self.execute_query("create database if not exists %s" % (self.TEST_DB_NAME))
+
+  def teardown_method(self, method):
+    if method.__name__ == "test_insert_select_with_empty_resultset":
+      self.cleanup_db(self.TEST_DB_NAME)
+
   @pytest.mark.execute_serially
   def test_insert_removes_staging_files(self):
     insert_staging_dir = \
@@ -330,3 +342,52 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
     self.execute_query_expect_failure(self.client, LOAD_FILE_QUERY)
     # We expect this to succeed, it's not an error if all files in the dir cannot be read
     self.execute_query_expect_success(self.client, LOAD_DIR_QUERY)
+
+  @pytest.mark.execute_serially
+  def test_insert_select_with_empty_resultset(self):
+    """Test insert/select query won't trigger partition directory or zero size data file
+    creation if the resultset of select is empty."""
+    def check_path_exists(path, should_exist):
+      fail = None
+      try:
+        self.hdfs_client.get_file_dir_status(path)
+        if not should_exist:
+          pytest.fail("file/dir '%s' unexpectedly exists" % path)
+      except:
+        if should_exist:
+          pytest.fail("file/dir '%s' does not exist" % path)
+
+    db_path = "test-warehouse/%s.db/" % self.TEST_DB_NAME
+    table_path = db_path + "test_insert_empty_result"
+    partition_path = "{0}/year=2009/month=1".format(table_path)
+    check_path_exists(table_path, False)
+
+    table_name = self.TEST_DB_NAME + ".test_insert_empty_result"
+    self.execute_query_expect_success(self.client, "CREATE TABLE " \
+        + table_name + "(id INT, col INT) PARTITIONED BY (year INT, month INT)")
+    check_path_exists(table_path, True)
+    check_path_exists(partition_path, False)
+
+    # Run an insert/select stmt that returns an empty resultset.
+    insert_query = "INSERT INTO TABLE " + table_name + \
+        " PARTITION(year=2009, month=1) select 1, 1 from " + table_name + \
+        " LIMIT 0"
+    self.execute_query_expect_success(self.client, insert_query)
+    # Partition directory should not be created
+    check_path_exists(partition_path, False)
+
+    # Insert one record
+    insert_query_one_row = "INSERT INTO TABLE " + table_name + \
+        " PARTITION(year=2009, month=1) values(2, 2)"
+    self.execute_query_expect_success(self.client, insert_query_one_row)
+    # Partition directory should be created with one data file
+    check_path_exists(partition_path, True)
+    ls = self.hdfs_client.list_dir(partition_path)
+    assert len(ls['FileStatuses']['FileStatus']) == 1
+
+    # Run an insert/select statement that returns an empty resultset again
+    self.execute_query_expect_success(self.client, insert_query)
+    # No new data file should be created
+    new_ls = self.hdfs_client.list_dir(partition_path)
+    assert len(new_ls['FileStatuses']['FileStatus']) == 1
+    assert new_ls['FileStatuses'] == ls['FileStatuses']

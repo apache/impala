@@ -451,24 +451,26 @@ Status ImpalaServer::QueryExecState::ExecDdlRequest() {
   // The exception is if the user specified IF NOT EXISTS and the table already
   // existed, in which case we do not execute the INSERT.
   if (catalog_op_type() == TCatalogOpType::DDL &&
+      ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT &&
+      !catalog_op_executor_->ddl_exec_response()->new_table_created) {
+    DCHECK(exec_request_.catalog_op_request.
+        ddl_params.create_table_params.if_not_exists);
+    return Status::OK;
+  }
+
+  // Add newly created table to catalog cache.
+  RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(
+      *catalog_op_executor_->update_catalog_result(),
+      exec_request_.query_options.sync_ddl));
+
+  if (catalog_op_type() == TCatalogOpType::DDL &&
       ddl_type() == TDdlType::CREATE_TABLE_AS_SELECT) {
-    if (catalog_op_executor_->ddl_exec_response()->new_table_created) {
-      // At this point, the remainder of the CTAS request executes
-      // like a normal DML request. As with other DML requests, it will
-      // wait for another catalog update if any partitions were altered as a result
-      // of the operation.
-      DCHECK(exec_request_.__isset.query_exec_request);
-      RETURN_IF_ERROR(ExecQueryOrDmlRequest(exec_request_.query_exec_request));
-    } else {
-      DCHECK(exec_request_.catalog_op_request.
-          ddl_params.create_table_params.if_not_exists);
-    }
-  } else {
-    // CREATE TABLE AS SELECT performs its catalog update once the DML
-    // portion of the operation has completed.
-    RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(
-        *catalog_op_executor_->update_catalog_result(),
-        exec_request_.query_options.sync_ddl));
+    // At this point, the remainder of the CTAS request executes
+    // like a normal DML request. As with other DML requests, it will
+    // wait for another catalog update if any partitions were altered as a result
+    // of the operation.
+    DCHECK(exec_request_.__isset.query_exec_request);
+    RETURN_IF_ERROR(ExecQueryOrDmlRequest(exec_request_.query_exec_request));
   }
   return Status::OK;
 }

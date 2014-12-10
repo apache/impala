@@ -427,6 +427,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   RETURN_IF_ERROR(state->CheckQueryState());
   DCHECK(!closed_);
 
+  if (batch->num_rows() == 0) return Status::OK;
   if (broadcast_ || channels_.size() == 1) {
     // current_thrift_batch_ is *not* the one that was written by the last call
     // to Serialize()
