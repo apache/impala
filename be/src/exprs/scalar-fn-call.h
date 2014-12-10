@@ -98,6 +98,11 @@ class ScalarFnCall: public Expr {
   // scalar function.
   void* scalar_fn_;
 
+  // Returns the number of non-vararg arguments
+  int NumFixedArgs() const {
+    return vararg_start_idx_ >= 0 ? vararg_start_idx_ : children_.size();
+  }
+
   // Loads the native or IR function from HDFS and puts the result in *udf.
   Status GetUdf(RuntimeState* state, llvm::Function** udf);
 
@@ -111,17 +116,9 @@ class ScalarFnCall: public Expr {
   void EvaluateChildren(ExprContext* context, TupleRow* row,
                         std::vector<impala_udf::AnyVal*>* input_vals);
 
-  // Functions to call scalar_fn_. Used in the interpreted path.
-  BooleanVal InterpretEvalBooleanVal(ExprContext* context, TupleRow* row);
-  TinyIntVal InterpretEvalTinyIntVal(ExprContext* context, TupleRow* row);
-  SmallIntVal InterpretEvalSmallIntVal(ExprContext* context, TupleRow* row);
-  IntVal InterpretEvalIntVal(ExprContext* context, TupleRow* row);
-  BigIntVal InterpretEvalBigIntVal(ExprContext* context, TupleRow* row);
-  FloatVal InterpretEvalFloatVal(ExprContext* context, TupleRow* row);
-  DoubleVal InterpretEvalDoubleVal(ExprContext* context, TupleRow* row);
-  StringVal InterpretEvalStringVal(ExprContext* context, TupleRow* row);
-  TimestampVal InterpretEvalTimestampVal(ExprContext* context, TupleRow* row);
-  DecimalVal InterpretEvalDecimalVal(ExprContext* context, TupleRow* row);
+  // Function to call scalar_fn_. Used in the interpreted path.
+  template<typename RETURN_TYPE>
+  RETURN_TYPE InterpretEval(ExprContext* context, TupleRow* row);
 };
 
 }

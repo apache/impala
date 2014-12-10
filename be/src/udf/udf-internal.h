@@ -162,7 +162,8 @@ class FunctionContextImpl {
 
   // Used by ScalarFnCall to store the arguments when running without codegen. Allows us
   // to pass AnyVal* arguments to the scalar function directly, rather than codegening a
-  // call that passes the correct AnyVal subclass pointer type.
+  // call that passes the correct AnyVal subclass pointer type. Note that this is only
+  // used for non-variadic arguments; varargs are always stored in varargs_buffer_.
   std::vector<impala_udf::AnyVal*> staging_input_vals_;
 
   // Indicates whether this context has been closed. Used for verification/debugging.
