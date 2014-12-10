@@ -27,8 +27,8 @@ class ParseUtil {
   // Sets *is_percent to indicate whether the given spec is in percent.
   // Accepted formats:
   // '<int>[bB]?'  -> bytes (default if no unit given)
-  // '<float>[mM]' -> megabytes
-  // '<float>[gG]' -> in gigabytes
+  // '<float>[mM(bB)]' -> megabytes
+  // '<float>[gG(bB)]' -> in gigabytes
   // '<int>%'      -> in percent of MemInfo::physical_mem()
   // Requires MemInfo to be initialized for the '%' spec to work.
   // Returns 0 if mem_spec_str is empty or '-1'.
