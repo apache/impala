@@ -179,6 +179,9 @@ struct TQueryCtx {
   // disastrous query plans. The rationale is that cancelling queries, e.g.,
   // with a huge join build is preferable over spilling "forever".
   8: optional bool disable_spilling
+
+  // Set if this is a child query (e.g. a child of a COMPUTE STATS request)
+  9: optional Types.TUniqueId parent_query_id
 }
 
 // Context of a fragment instance, including its unique id, the total number

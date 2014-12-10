@@ -209,3 +209,8 @@ class TestFetch(HS2TestSuite):
 
     assert self.__column_results_to_string(
       fetch_results_resp.results.columns) == (1, "NULL\n")
+
+  @needs_session()
+  def test_compute_stats(self):
+    """Exercise the child query path"""
+    self.__query_and_fetch("compute stats functional.alltypes")

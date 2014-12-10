@@ -97,6 +97,10 @@ class ChildQuery {
     return fetch_resp_.results;
   }
 
+  // The key in the HS2 conf overlay which indicates to the executing ImpalaServer that
+  // this query is a child query.
+  static const string PARENT_QUERY_OPT;
+
  private:
   // Sets the query options from the parent query in child's HS2 request.
   // TODO: Consider moving this function into a more appropriate place.

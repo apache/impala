@@ -24,6 +24,8 @@ using namespace apache::hive::service::cli::thrift;
 
 namespace impala {
 
+const string ChildQuery::PARENT_QUERY_OPT = "impala.parent_query_id";
+
 // To detect cancellation of the parent query this function checks IsCancelled() before
 // any HS2 "RPC" into the impala server. It is important not to hold any locks (in
 // particular the parent query's lock_) while invoking HS2 functions to avoid deadlock.
@@ -40,6 +42,7 @@ Status ChildQuery::ExecAndFetch() {
       &exec_stmt_req.sessionHandle.sessionId);
   exec_stmt_req.__set_statement(query_);
   SetQueryOptions(parent_exec_state_->exec_request().query_options, &exec_stmt_req);
+  exec_stmt_req.confOverlay[PARENT_QUERY_OPT] = PrintId(parent_exec_state_->query_id());
 
   // Starting executing of the child query and setting is_running are not made atomic
   // because holding a lock while calling into the parent_server_ may result in deadlock.

@@ -502,7 +502,13 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size
   if (fetch_first) RETURN_IF_ERROR(exec_state->RestartFetch());
 
   fetch_results->results.__set_startRowOffset(exec_state->num_rows_fetched());
-  scoped_ptr<QueryResultSet> result_set(CreateHS2ResultSet(session->hs2_version,
+
+  // Child queries should always return their results in row-major format, rather than
+  // inheriting the parent session's setting.
+  bool is_child_query = exec_state->parent_query_id() != TUniqueId();
+  TProtocolVersion::type version = is_child_query ?
+      TProtocolVersion::HIVE_CLI_SERVICE_PROTOCOL_V1 : session->hs2_version;
+  scoped_ptr<QueryResultSet> result_set(CreateHS2ResultSet(version,
       *(exec_state->result_metadata()), &(fetch_results->results)));
   RETURN_IF_ERROR(exec_state->FetchRows(fetch_size, result_set.get()));
   fetch_results->__isset.results = true;
@@ -531,6 +537,12 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
     map<string, string>::const_iterator conf_itr = execute_request.confOverlay.begin();
     for (; conf_itr != execute_request.confOverlay.end(); ++conf_itr) {
       if (conf_itr->first == IMPALA_RESULT_CACHING_OPT) continue;
+      if (conf_itr->first == ChildQuery::PARENT_QUERY_OPT) {
+        if (ParseId(conf_itr->second, &query_ctx->parent_query_id)) {
+          query_ctx->__isset.parent_query_id = true;
+        }
+        continue;
+      }
       RETURN_IF_ERROR(SetQueryOptions(conf_itr->first, conf_itr->second,
           &query_ctx->request.query_options));
     }
