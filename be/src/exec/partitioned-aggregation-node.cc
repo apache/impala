@@ -708,9 +708,10 @@ void PartitionedAggregationNode::DebugString(int indentation_level,
 Status PartitionedAggregationNode::CreateHashPartitions(int level) {
   if (level >= MAX_PARTITION_DEPTH) {
     Status status = Status::MEM_LIMIT_EXCEEDED;
-    status.AddErrorMsg("Cannot perform hash aggregation. Partitioned input data too many"
-       " times. This could mean there is too much skew in the data or the memory"
-       " limit is set too low.");
+    status.AddErrorMsg(Substitute("Cannot perform aggregation at hash aggregation node"
+        " with id $0. The input data was partitioned the maximum number of $1 times."
+        " This could mean there is significant skew in the data or the memory limit is"
+        " set too low.", id_, MAX_PARTITION_DEPTH));
     state_->SetMemLimitExceeded();
     return status;
   }
