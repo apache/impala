@@ -19,6 +19,8 @@ drop function if exists udf_test.identity(string, string);
 drop function if exists udf_test.identity(string, string, string);
 drop function if exists udf_test.identity(timestamp);
 
+drop function if exists udf_test.throws_exception();
+
 create database if not exists udf_test;
 
 create function udf_test.hive_pi() returns double
