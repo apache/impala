@@ -134,18 +134,8 @@
 <li>Only a single machine pool is needed to scale.
   </li>
   </ul>
-We encourage you to read the <a href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/Impala/impala.html">documentation</a> for further exploration!
-</p>
+We encourage you to read the <a href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/Impala/impala.html">documentation</a> for further exploration. Also, see the <a href="http://www.slideshare.net/cloudera/the-impala-cookbook-42530186">Impala Cookbook</a>, which is continually updated to reflect current best practices.
 <h3>Roadmap</h3>
-<h5>Impala 2.0 (Ships in Fall 2014)</h5>
-<ul>
-  <li>SQL 2003-compliant analytic window functions (aggregation OVER PARTITION, RANK, LEAD, LAG, NTILE, and so on) – to provide more advanced SQL analytic capabilities</li>
-  <li>External joins and aggregations using disk – enables operations to spill to disk if their internal state exceeds the aggregate memory size</li>
-  <li>Subqueries inside WHERE clauses</li>
-  <li>Incremental statistics – only run statistics on the new or changed data for even faster statistics computations</li>
-  <li>Additional data types – including VARCHAR, CHAR</li>
-  <li>Additional built-in functions – enables easier migration of custom language extensions for users of traditional SQL engines</li>
-</ul>
 <h5>Impala 2.1 and Beyond (Ships in 2015)</h5>
 <ul>
   <li>Nested data – enables queries on complex nested structures including maps, structs, and arrays (early 2015)</li>
