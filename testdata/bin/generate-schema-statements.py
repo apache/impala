@@ -358,7 +358,7 @@ def build_db_suffix(file_format, codec, compression_type):
 # Does a hdfs directory listing and returns array with all the subdir names.
 def get_hdfs_subdirs_with_data(path):
   tmp_file = tempfile.TemporaryFile("w+")
-  cmd = "hadoop fs -du %s | grep -v '^0' | awk '{print $2}'" % path
+  cmd = "hadoop fs -du %s | grep -v '^0' | awk '{print $3}'" % path
   subprocess.call([cmd], shell = True, stderr = open('/dev/null'), stdout = tmp_file)
   tmp_file.seek(0)
 
