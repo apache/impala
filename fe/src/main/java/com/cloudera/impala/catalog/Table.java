@@ -188,7 +188,7 @@ public abstract class Table implements CatalogObject {
     Table table = null;
     if (TableType.valueOf(msTbl.getTableType()) == TableType.VIRTUAL_VIEW) {
       table = new View(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
-    } else if (msTbl.getSd().getInputFormat().equals(HBaseTable.getInputFormat())) {
+    } else if (HBaseTable.isHBaseTable(msTbl)) {
       table = new HBaseTable(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     } else if (DataSourceTable.isDataSourceTable(msTbl)) {
       // It's important to check if this is a DataSourceTable before HdfsTable because

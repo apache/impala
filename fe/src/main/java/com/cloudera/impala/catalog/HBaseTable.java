@@ -42,6 +42,7 @@ import org.apache.hadoop.hive.hbase.HBaseSerDe;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.log4j.Logger;
 
@@ -98,6 +99,11 @@ public class HBaseTable extends Table {
   // Input format class for HBase tables read by Hive.
   private static final String HBASE_INPUT_FORMAT =
       "org.apache.hadoop.hive.hbase.HiveHBaseTableInputFormat";
+
+  // Serialization class for HBase tables set in the corresponding Metastore table.
+  private static final String HBASE_SERIALIZATION_LIB =
+      "org.apache.hadoop.hive.hbase.HBaseSerDe";
+
   // Storage handler class for HBase tables read by Hive.
   private static final String HBASE_STORAGE_HANDLER =
       "org.apache.hadoop.hive.hbase.HBaseStorageHandler";
@@ -664,13 +670,6 @@ public class HBaseTable extends Table {
   }
 
   /**
-   * Returns the input-format class string for HBase tables read by Hive.
-   */
-  public static String getInputFormat() {
-    return HBASE_INPUT_FORMAT;
-  }
-
-  /**
    * Returns the storage handler class for HBase tables read by Hive.
    */
   @Override
@@ -729,5 +728,29 @@ public class HBaseTable extends Table {
       throw new RuntimeException(e);
     }
     return result;
+  }
+
+  /**
+   * Returns true if the given Metastore Table represents an HBase table.
+   * Versions of Hive/HBase are inconsistent which HBase related fields are set
+   * (e.g., HIVE-6548 changed the input format to null).
+   * For maximum compatibility consider all known fields that indicate an HBase table.
+   */
+  public static boolean isHBaseTable(
+      org.apache.hadoop.hive.metastore.api.Table msTbl) {
+    if (msTbl.getParameters() != null &&
+        msTbl.getParameters().containsKey(HBASE_STORAGE_HANDLER)) {
+      return true;
+    }
+    StorageDescriptor sd = msTbl.getSd();
+    if (sd == null) return false;
+    if (sd.getInputFormat() != null && sd.getInputFormat().equals(HBASE_INPUT_FORMAT)) {
+      return true;
+    } else if (sd.getSerdeInfo() != null &&
+        sd.getSerdeInfo().getSerializationLib() != null &&
+        sd.getSerdeInfo().getSerializationLib().equals(HBASE_SERIALIZATION_LIB)) {
+      return true;
+    }
+    return false;
   }
 }

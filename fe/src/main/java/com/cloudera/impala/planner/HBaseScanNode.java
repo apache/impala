@@ -294,7 +294,7 @@ public class HBaseScanNode extends ScanNode {
     HTable hbaseTbl = null;
     List<HRegionLocation> regionsLoc;
     try {
-      hbaseTbl   = new HTable(hbaseConf_, tbl.getHBaseTableName());
+      hbaseTbl = new HTable(hbaseConf_, tbl.getHBaseTableName());
       regionsLoc = HBaseTable.getRegionsInRange(hbaseTbl, startKey_, stopKey_);
     } catch (IOException e) {
       throw new RuntimeException(
