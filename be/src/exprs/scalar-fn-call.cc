@@ -15,8 +15,10 @@
 #include "exprs/scalar-fn-call.h"
 
 #include <vector>
+#include <gutil/strings/substitute.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
+
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "exprs/anyval-util.h"
@@ -33,6 +35,7 @@
 using namespace impala;
 using namespace impala_udf;
 using namespace std;
+using namespace strings;
 
 ScalarFnCall::ScalarFnCall(const TExprNode& node)
   : Expr(node),
@@ -79,25 +82,32 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
 
   context_index_ = context->Register(state, return_type, arg_types, varargs_buffer_size);
 
-  // If the codegen object hasn't been created yet and we're calling a builtin with <= 3
-  // non-variadic arguments, we can use the interpreted path and call the builtin without
-  // codegen. This saves us the overhead of creating the codegen object when it's not
-  // necessary (i.e., in plan fragments with no codegen-enabled operators).
-  // TODO: no need to restrict this to builtins.
+  // If the codegen object hasn't been created yet and we're calling a builtin or native
+  // UDF with <= 3 non-variadic arguments, we can use the interpreted path and call the
+  // builtin without codegen. This saves us the overhead of creating the codegen object
+  // when it's not necessary (i.e., in plan fragments with no codegen-enabled operators).
   // TODO: codegen for char arguments
-  if (char_arg || (!state->codegen_created() && NumFixedArgs() <= 3
-          && fn_.binary_type == TFunctionBinaryType::BUILTIN)) {
-    DCHECK(NumFixedArgs() <= 3 && fn_.binary_type == TFunctionBinaryType::BUILTIN);
+  if (char_arg || (!state->codegen_created() && NumFixedArgs() <= 3 &&
+                   (fn_.binary_type == TFunctionBinaryType::BUILTIN ||
+                    fn_.binary_type == TFunctionBinaryType::NATIVE))) {
+    if (char_arg) {
+      DCHECK(NumFixedArgs() <= 3 && fn_.binary_type == TFunctionBinaryType::BUILTIN);
+    }
     Status status = LibCache::instance()->GetSoFunctionPtr(
         fn_.hdfs_location, fn_.scalar_fn.symbol, &scalar_fn_, &cache_entry_);
     if (!status.ok()) {
-      // Builtins symbols should exist unless there is a version mismatch.
-      stringstream ss;
-      ss << "Builtin '" << fn_.name.function_name << "' with symbol '"
-         << fn_.scalar_fn.symbol << "' does not exist. "
-         << "Verify that all your impalads are the same version.";
-      status.AddErrorMsg(ss.str());
-      return status;
+      if (fn_.binary_type == TFunctionBinaryType::BUILTIN) {
+        // Builtins symbols should exist unless there is a version mismatch.
+        status.AddErrorMsg(Substitute(
+            "Builtin '$0' with symbol '$1' does not exist. Verify that all your impalads "
+            "are the same version.", fn_.name.function_name, fn_.scalar_fn.symbol));
+        return status;
+      } else {
+        DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::NATIVE);
+        return Status(Substitute("Problem loading UDF '$0':\n$1",
+            fn_.name.function_name, status.GetErrorMsg()));
+        return status;
+      }
     }
   } else {
     // If we got here, either codegen is enabled or we need codegen to run this function.
