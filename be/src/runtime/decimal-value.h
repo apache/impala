@@ -443,20 +443,49 @@ inline int Decimal16Value::Compare(const ColumnType& this_type,
   return 1;
 }
 
+// Returns as string with full 0 padding on the right and single 0 padded on the left
+// if the whole part is zero otherwise there will be no left padding.
 template<typename T>
 inline std::string DecimalValue<T>::ToString(const ColumnType& type) const {
+  // Decimal values are sent to clients as strings so in the interest of
+  // speed the string will be created without the using stringstream with the
+  // whole/fractional_part().
   DCHECK_EQ(type.type, TYPE_DECIMAL);
-  T before = whole_part(type);
-  T after = fractional_part(type);
-  std::stringstream ss;
-  if (before == 0 && value() < 0) ss << "-";
-  ss << before;
-  if (type.scale > 0) {
-    // Pad with trailing zeros up to the scale.
-    ss << "." << std::right << std::setw(type.scale) << std::setfill('0') << after;
+  int last_char_idx = type.precision
+      + (type.scale > 0)   // Add a space for decimal place
+      + (type.scale == type.precision)   // Add a space for leading 0
+      + (value_ < 0);   // Add a space for negative sign
+  std::string str = std::string(last_char_idx, '0');
+  // Start filling in the values in reverse order by taking the last digit
+  // of the value. Use a positive value and worry about the sign later. At this
+  // point the last_char_idx points to the string terminator.
+  T remaining_value = value_;
+  int first_digit_idx = 0;
+  if (value_ < 0) {
+    remaining_value = -value_;
+    first_digit_idx = 1;
   }
-  return ss.str();
-  return "";
+  if (type.scale > 0) {
+    int remaining_scale = type.scale;
+    do {
+      str[--last_char_idx] = (remaining_value % 10) + '0';   // Ascii offset
+      remaining_value /= 10;
+    } while (--remaining_scale > 0);
+    str[--last_char_idx] = '.';
+    DCHECK_GT(last_char_idx, first_digit_idx) << "Not enough space remaining";
+  }
+  do {
+    str[--last_char_idx] = (remaining_value % 10) + '0';   // Ascii offset
+    remaining_value /= 10;
+    if (remaining_value == 0) {
+      // Trim any extra leading 0's.
+      if (last_char_idx > first_digit_idx) str.erase(0, last_char_idx - first_digit_idx);
+      break;
+    }
+    // For safety, enforce string length independent of remaining_value.
+  } while (last_char_idx > first_digit_idx);
+  if (value_ < 0) str[0] = '-';
+  return str;
 }
 
 }

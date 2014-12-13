@@ -87,6 +87,8 @@ TEST(DoubleToDecimal, Basic) {
   ColumnType t1 = ColumnType::CreateDecimalType(9, 0);
   ColumnType t2 = ColumnType::CreateDecimalType(10, 5);
   ColumnType t3 = ColumnType::CreateDecimalType(10, 10);
+  ColumnType t4 = ColumnType::CreateDecimalType(1, 0);
+  ColumnType t5 = ColumnType::CreateDecimalType(1, 1);
 
   Decimal4Value d4;
   Decimal8Value d8;
@@ -96,16 +98,49 @@ TEST(DoubleToDecimal, Basic) {
   d4 = Decimal4Value::FromDouble(t1, 1.1, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_EQ(d4.value(), 1);
+  VerifyToString(d4, t1, "1");
+
+  d4 = Decimal4Value::FromDouble(t4, 1, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_EQ(d4.value(), 1);
+  VerifyToString(d4, t4, "1");
+
+  d4 = Decimal4Value::FromDouble(t4, 0, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_EQ(d4.value(), 0);
+  VerifyToString(d4, t4, "0");
+
+  d4 = Decimal4Value::FromDouble(t4, -1, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_EQ(d4.value(), -1);
+  VerifyToString(d4, t4, "-1");
+
+  d4 = Decimal4Value::FromDouble(t5, 0.1, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_EQ(d4.value(), 1);
+  VerifyToString(d4, t5, "0.1");
+
+  d4 = Decimal4Value::FromDouble(t5, 0.0, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_EQ(d4.value(), 0);
+  VerifyToString(d4, t5, "0.0");
+
+  d4 = Decimal4Value::FromDouble(t5, -0.1, &overflow);
+  EXPECT_FALSE(overflow);
+  EXPECT_EQ(d4.value(), -1);
+  VerifyToString(d4, t5, "-0.1");
 
   overflow = false;
   d8 = Decimal8Value::FromDouble(t2, -100.1, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_EQ(d8.value(), -10010000);
+  VerifyToString(d8, t2, "-100.10000");
 
   overflow = false;
   d16 = Decimal16Value::FromDouble(t3, -.1, &overflow);
   EXPECT_FALSE(overflow);
   EXPECT_EQ(d16.value(), -1000000000);
+  VerifyToString(d16, t3, "-0.1000000000");
 
   // Test overflow
   overflow = false;
@@ -133,8 +168,9 @@ TEST(DoubleToDecimal, Basic) {
   EXPECT_TRUE(overflow);
 
   overflow = false;
-  Decimal16Value::FromDouble(t3, 0.1234, &overflow);
+  d16 = Decimal16Value::FromDouble(t3, 0.1234, &overflow);
   EXPECT_FALSE(overflow);
+  VerifyToString(d16, t3, "0.1234000000");
 
   overflow = false;
   Decimal16Value::FromDouble(t3, 1.1, &overflow);
