@@ -57,7 +57,7 @@ void impala::InitGoogleLoggingSafe(const char* arg) {
     FLAGS_log_dir = "/tmp";
   }
 
-  if (FLAGS_redirect_stdout_stderr && !TestInfo::is_fe_test()) {
+  if (FLAGS_redirect_stdout_stderr && !TestInfo::is_test()) {
     // We will be redirecting stdout/stderr to INFO/LOG so override any glog settings
     // that log to stdout/stderr...
     FLAGS_logtostderr = false;
@@ -91,7 +91,7 @@ void impala::InitGoogleLoggingSafe(const char* arg) {
     FLAGS_log_filename = google::ProgramInvocationShortName();
   }
 
-  if (FLAGS_redirect_stdout_stderr && !TestInfo::is_fe_test()) {
+  if (FLAGS_redirect_stdout_stderr && !TestInfo::is_test()) {
     // Needs to be done after InitGoogleLogging, to get the INFO/ERROR file paths.
     // Redirect stdout to INFO log and stderr to ERROR log
     string info_log_path, error_log_path;
