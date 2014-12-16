@@ -619,9 +619,11 @@ void Statestore::DoSubscriberUpdate(bool is_keepalive, int thread_id,
       // TODO: This should be a healthcheck in a monitored metric in CM, which would
       // require a 'rate' metric type.
       const string& msg = Substitute("Missed subscriber ($0) $1 deadline by $2ms, "
-          "consider decreasing --$3", update.second, hb_type, diff_ms,
+          "consider increasing --$3 (currently $4)", update.second, hb_type, diff_ms,
           is_keepalive ? "statestore_heartbeat_frequency_ms" :
-          "statestore_update_frequency_ms");
+              "statestore_update_frequency_ms",
+          is_keepalive ? FLAGS_statestore_heartbeat_frequency_ms :
+              FLAGS_statestore_update_frequency_ms);
       if (is_keepalive) {
         LOG(WARNING) << msg;
       } else {
