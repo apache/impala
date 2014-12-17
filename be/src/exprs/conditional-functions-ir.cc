@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "exprs/anyval-util.h"
 #include "exprs/conditional-functions.h"
 #include "udf/udf.h"
 
@@ -68,7 +69,21 @@ NULL_IF_COMPUTE_FUNCTION(DecimalVal);
 
 DecimalVal ConditionalFunctions::NullIfZero(
     FunctionContext* context, const DecimalVal& val) {
-  if (val.is_null || val.val16 == 0) return DecimalVal::null();
+  if (val.is_null) return DecimalVal::null();
+  ColumnType type = AnyValUtil::TypeDescToColumnType(context->GetReturnType());
+  switch (type.GetByteSize()) {
+    case 4:
+      if (val.val4 == 0) return DecimalVal::null();
+      break;
+    case 8:
+      if (val.val8 == 0) return DecimalVal::null();
+      break;
+    case 16:
+      if (val.val16 == 0) return DecimalVal::null();
+      break;
+    default:
+      DCHECK(false);
+  }
   return val;
 }
 
