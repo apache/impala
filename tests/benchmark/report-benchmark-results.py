@@ -221,18 +221,28 @@ def all_query_results(grouped):
       for query_name, results in queries.items():
         yield(results)
 
-def get_impala_version(grouped):
-  """Figure out Impala version by looking at query profiles"""
-  versions = []
-  for result in all_query_results(grouped):
-    profile = result['result_list'][0]['runtime_profile']
-    pattern = re.compile(ur'Impala Version:\s(.*)')
-    version = pattern.search(profile).group(1)
-    if version not in versions:
-      versions.append(version)
 
-  return versions[0] if len(versions) == 1 else 'Multiple Impala Versions Detected:\n'\
-      + ',\n'.join(versions)
+def get_commit_date(commit_sha):
+  import urllib2
+
+  url = 'https://api.github.com/repos/cloudera/Impala/commits/' + commit_sha
+  try:
+    request = urllib2.Request(url)
+    response = urllib2.urlopen(request).read()
+    data = json.loads(response.decode('utf8'))
+    return data['commit']['committer']['date'][:10]
+  except:
+    return ''
+
+def get_impala_version(grouped):
+  """Figure out Impala version by looking at query profile."""
+  first_result = all_query_results(grouped).next()
+  profile = first_result['result_list'][0]['runtime_profile']
+  match = re.search('Impala Version:\s(.*)\s\(build\s(.*)\)', profile)
+  version = match.group(1)
+  commit_sha = match.group(2)
+  commit_date = get_commit_date(commit_sha)
+  return '{0} ({1})'.format(version, commit_date)
 
 def calculate_time_stats(grouped):
   """Adds statistics to the nested dictionary. We are calculating the average runtime
