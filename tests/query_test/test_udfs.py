@@ -248,6 +248,11 @@ drop function if exists {database}.validate_open(int);
 drop function if exists {database}.mem_test(bigint);
 drop function if exists {database}.mem_test_leaks(bigint);
 drop function if exists {database}.unmangled_symbol();
+drop function if exists {database}.four_args(int, int, int, int);
+drop function if exists {database}.five_args(int, int, int, int, int);
+drop function if exists {database}.six_args(int, int, int, int, int, int);
+drop function if exists {database}.seven_args(int, int, int, int, int, int, int);
+drop function if exists {database}.eight_args(int, int, int, int, int, int, int, int);
 
 create database if not exists {database};
 
@@ -347,4 +352,19 @@ prepare_fn='MemTestPrepare';
 -- Regression test for IMPALA-1475
 create function {database}.unmangled_symbol() returns bigint
 location '{location}' symbol='UnmangledSymbol';
+
+create function {database}.four_args(int, int, int, int) returns int
+location '{location}' symbol='FourArgs';
+
+create function {database}.five_args(int, int, int, int, int) returns int
+location '{location}' symbol='FiveArgs';
+
+create function {database}.six_args(int, int, int, int, int, int) returns int
+location '{location}' symbol='SixArgs';
+
+create function {database}.seven_args(int, int, int, int, int, int, int) returns int
+location '{location}' symbol='SevenArgs';
+
+create function {database}.eight_args(int, int, int, int, int, int, int, int) returns int
+location '{location}' symbol='EightArgs';
 """

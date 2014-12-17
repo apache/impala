@@ -480,3 +480,38 @@ INT
 ---- RESULTS
 NULL
 ====
+---- QUERY
+select four_args(1,2,3,4);
+---- TYPES
+INT
+---- RESULTS
+10
+====
+---- QUERY
+select five_args(1,2,3,4,5);
+---- TYPES
+INT
+---- RESULTS
+15
+====
+---- QUERY
+select six_args(1,2,3,4,5,6);
+---- TYPES
+INT
+---- RESULTS
+21
+====
+---- QUERY
+select seven_args(1,2,3,4,5,6,7);
+---- TYPES
+INT
+---- RESULTS
+28
+====
+---- QUERY
+select eight_args(1,2,3,4,5,6,7,8);
+---- TYPES
+INT
+---- RESULTS
+36
+====

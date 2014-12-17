@@ -285,3 +285,31 @@ BigIntVal DoubleFreeTest(FunctionContext* context, BigIntVal bytes) {
 extern "C" BigIntVal UnmangledSymbol(FunctionContext* context) {
   return BigIntVal(5);
 }
+
+// Functions to test interpreted path
+IntVal FourArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
+    const IntVal& v3, const IntVal& v4) {
+  return IntVal(v1.val + v2.val + v3.val + v4.val);
+}
+
+IntVal FiveArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
+    const IntVal& v3, const IntVal& v4, const IntVal& v5) {
+  return IntVal(v1.val + v2.val + v3.val + v4.val + v5.val);
+}
+
+IntVal SixArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
+    const IntVal& v3, const IntVal& v4, const IntVal& v5, const IntVal& v6) {
+  return IntVal(v1.val + v2.val + v3.val + v4.val + v5.val + v6.val);
+}
+
+IntVal SevenArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
+    const IntVal& v3, const IntVal& v4, const IntVal& v5, const IntVal& v6,
+    const IntVal& v7) {
+  return IntVal(v1.val + v2.val + v3.val + v4.val + v5.val + v6.val + v7.val);
+}
+
+IntVal EightArgs(FunctionContext* context, const IntVal& v1, const IntVal& v2,
+    const IntVal& v3, const IntVal& v4, const IntVal& v5, const IntVal& v6,
+    const IntVal& v7, const IntVal& v8) {
+  return IntVal(v1.val + v2.val + v3.val + v4.val + v5.val + v6.val + v7.val + v8.val);
+}

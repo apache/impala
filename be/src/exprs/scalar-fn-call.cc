@@ -83,15 +83,18 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
   context_index_ = context->Register(state, return_type, arg_types, varargs_buffer_size);
 
   // If the codegen object hasn't been created yet and we're calling a builtin or native
-  // UDF with <= 3 non-variadic arguments, we can use the interpreted path and call the
+  // UDF with <= 8 non-variadic arguments, we can use the interpreted path and call the
   // builtin without codegen. This saves us the overhead of creating the codegen object
   // when it's not necessary (i.e., in plan fragments with no codegen-enabled operators).
+  // In addition, we can never codegen char arguments.
   // TODO: codegen for char arguments
-  if (char_arg || (!state->codegen_created() && NumFixedArgs() <= 3 &&
+  if (char_arg || (!state->codegen_created() && NumFixedArgs() <= 8 &&
                    (fn_.binary_type == TFunctionBinaryType::BUILTIN ||
                     fn_.binary_type == TFunctionBinaryType::NATIVE))) {
+    // Builtins with char arguments must still have <= 8 arguments.
+    // TODO: delete when we have codegen for char arguments
     if (char_arg) {
-      DCHECK(NumFixedArgs() <= 3 && fn_.binary_type == TFunctionBinaryType::BUILTIN);
+      DCHECK(NumFixedArgs() <= 8 && fn_.binary_type == TFunctionBinaryType::BUILTIN);
     }
     Status status = LibCache::instance()->GetSoFunctionPtr(
         fn_.hdfs_location, fn_.scalar_fn.symbol, &scalar_fn_, &cache_entry_);
@@ -534,6 +537,38 @@ RETURN_TYPE ScalarFnCall::InterpretEval(ExprContext* context, TupleRow* row) {
             const AnyVal& a2, const AnyVal& a3);
         return reinterpret_cast<ScalarFn3>(scalar_fn_)(fn_ctx,
             *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2]);
+      case 4:
+        typedef RETURN_TYPE (*ScalarFn4)(FunctionContext*, const AnyVal& a1,
+            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4);
+        return reinterpret_cast<ScalarFn4>(scalar_fn_)(fn_ctx,
+            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3]);
+      case 5:
+        typedef RETURN_TYPE (*ScalarFn5)(FunctionContext*, const AnyVal& a1,
+            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, const AnyVal& a5);
+        return reinterpret_cast<ScalarFn5>(scalar_fn_)(fn_ctx,
+            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
+            *(*input_vals)[4]);
+      case 6:
+        typedef RETURN_TYPE (*ScalarFn6)(FunctionContext*, const AnyVal& a1,
+            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, const AnyVal& a5,
+            const AnyVal& a6);
+        return reinterpret_cast<ScalarFn6>(scalar_fn_)(fn_ctx,
+            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
+            *(*input_vals)[4], *(*input_vals)[5]);
+      case 7:
+        typedef RETURN_TYPE (*ScalarFn7)(FunctionContext*, const AnyVal& a1,
+            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, const AnyVal& a5,
+            const AnyVal& a6, const AnyVal& a7);
+        return reinterpret_cast<ScalarFn7>(scalar_fn_)(fn_ctx,
+            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
+            *(*input_vals)[4], *(*input_vals)[5], *(*input_vals)[6]);
+      case 8:
+        typedef RETURN_TYPE (*ScalarFn8)(FunctionContext*, const AnyVal& a1,
+            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, const AnyVal& a5,
+            const AnyVal& a6, const AnyVal& a7, const AnyVal& a8);
+        return reinterpret_cast<ScalarFn8>(scalar_fn_)(fn_ctx,
+            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
+            *(*input_vals)[4], *(*input_vals)[5], *(*input_vals)[6], *(*input_vals)[7]);
       default:
         DCHECK(false) << "Interpreted path not implemented. We should have "
                       << "codegen'd the wrapper";
@@ -561,6 +596,43 @@ RETURN_TYPE ScalarFnCall::InterpretEval(ExprContext* context, TupleRow* row) {
             const AnyVal& a2, const AnyVal& a3, int num_varargs, const AnyVal* varargs);
         return reinterpret_cast<VarargFn3>(scalar_fn_)(fn_ctx, *(*input_vals)[0],
             *(*input_vals)[1], *(*input_vals)[2], num_varargs, varargs);
+      case 4:
+        typedef RETURN_TYPE (*VarargFn4)(FunctionContext*, const AnyVal& a1,
+            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, int num_varargs,
+            const AnyVal* varargs);
+        return reinterpret_cast<VarargFn4>(scalar_fn_)(fn_ctx,
+            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
+            num_varargs, varargs);
+      case 5:
+        typedef RETURN_TYPE (*VarargFn5)(FunctionContext*, const AnyVal& a1,
+            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, const AnyVal& a5,
+            int num_varargs, const AnyVal* varargs);
+        return reinterpret_cast<VarargFn5>(scalar_fn_)(fn_ctx,
+            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
+            *(*input_vals)[4], num_varargs, varargs);
+      case 6:
+        typedef RETURN_TYPE (*VarargFn6)(FunctionContext*, const AnyVal& a1,
+            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, const AnyVal& a5,
+            const AnyVal& a6, int num_varargs, const AnyVal* varargs);
+        return reinterpret_cast<VarargFn6>(scalar_fn_)(fn_ctx,
+            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
+            *(*input_vals)[4], *(*input_vals)[5], num_varargs, varargs);
+      case 7:
+        typedef RETURN_TYPE (*VarargFn7)(FunctionContext*, const AnyVal& a1,
+            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, const AnyVal& a5,
+            const AnyVal& a6, const AnyVal& a7, int num_varargs, const AnyVal* varargs);
+        return reinterpret_cast<VarargFn7>(scalar_fn_)(fn_ctx,
+            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
+            *(*input_vals)[4], *(*input_vals)[5], *(*input_vals)[6], num_varargs, varargs);
+      case 8:
+        typedef RETURN_TYPE (*VarargFn8)(FunctionContext*, const AnyVal& a1,
+            const AnyVal& a2, const AnyVal& a3, const AnyVal& a4, const AnyVal& a5,
+            const AnyVal& a6, const AnyVal& a7, const AnyVal& a8, int num_varargs,
+            const AnyVal* varargs);
+        return reinterpret_cast<VarargFn8>(scalar_fn_)(fn_ctx,
+            *(*input_vals)[0], *(*input_vals)[1], *(*input_vals)[2], *(*input_vals)[3],
+            *(*input_vals)[4], *(*input_vals)[5], *(*input_vals)[6], *(*input_vals)[7],
+            num_varargs, varargs);
       default:
         DCHECK(false) << "Interpreted path not implemented. We should have "
                       << "codegen'd the wrapper";
