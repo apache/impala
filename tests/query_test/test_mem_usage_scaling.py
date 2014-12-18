@@ -77,10 +77,11 @@ class TestExprMemUsage(ImpalaTestSuite):
 
 
 class TestMemLimitError(ImpalaTestSuite):
-  # Different values of mem limits and minimum mem limit TPC-H Q1 is expected to run
+  # Different values of mem limits and minimum mem limit the queries are expected to run
   # without problem.
-  MEM_IN_MB = [10, 50, 100, 140, 145, 150]
+  MEM_IN_MB = [20, 50, 100, 115, 120, 125, 140, 145, 150]
   MIN_MEM_FOR_TPCH_Q1 = 145
+  MIN_MEM_FOR_TPCH_Q4 = 150
   EXPECTED_ERROR_MSG = "Memory limit exceeded"
 
   @classmethod
@@ -97,7 +98,13 @@ class TestMemLimitError(ImpalaTestSuite):
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format in ['parquet'])
 
-  def test_low_mem_limit(self, vector):
+  @classmethod
+  def setup_class(cls):
+    super(TestMemLimitError, cls).setup_class()
+    cls.client.execute('compute stats tpch_parquet.lineitem');
+    cls.client.execute('compute stats tpch_parquet.orders');
+
+  def test_low_mem_limit_q1(self, vector):
     mem = vector.get_value('mem_limit')
     # If memory limit larger than the minimum threshold, then it is not expected to fail
     expects_error = mem < TestMemLimitError.MIN_MEM_FOR_TPCH_Q1;
@@ -105,6 +112,21 @@ class TestMemLimitError(ImpalaTestSuite):
     new_vector.get_value('exec_option')['mem_limit'] = str(mem) + "m"
     try:
       self.run_test_case('tpch-q1', new_vector)
+    except ImpalaBeeswaxException as e:
+      if (expects_error == 0):
+        raise
+      if (TestMemLimitError.EXPECTED_ERROR_MSG in str(e)):
+        print str(e)
+      assert TestMemLimitError.EXPECTED_ERROR_MSG in str(e)
+
+  def test_low_mem_limit_q4(self, vector):
+    mem = vector.get_value('mem_limit')
+    # If memory limit larger than the minimum threshold, then it is not expected to fail
+    expects_error = mem < TestMemLimitError.MIN_MEM_FOR_TPCH_Q4;
+    new_vector = copy(vector)
+    new_vector.get_value('exec_option')['mem_limit'] = str(mem) + "m"
+    try:
+      self.run_test_case('tpch-q4', new_vector)
     except ImpalaBeeswaxException as e:
       if (expects_error == 0):
         raise

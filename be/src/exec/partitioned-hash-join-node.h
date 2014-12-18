@@ -218,7 +218,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   //    move the partition to spilled_partitions_.
   Status CleanUpHashPartitions(RowBatch* batch);
 
-  // For each partition in hash partitions, reserves an io sized block on both the
+  // For each partition in hash partitions, reserves an IO sized block on both the
   // build and probe stream.
   Status ReserveTupleStreamBlocks();
 

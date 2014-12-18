@@ -276,8 +276,9 @@ Status PartitionedHashJoinNode::Partition::Spill(bool unpin_all_build) {
     hash_tbl()->Close();
     hash_tbl_.reset();
   }
-  DCHECK(!build_rows()->using_small_buffers());
-  DCHECK(!probe_rows()->using_small_buffers());
+  // If it is still using small buffers, then there is nothing else to do, as the small
+  // buffers are always kept in memory.
+  if (build_rows()->using_small_buffers()) return Status::OK;
   return build_rows()->UnpinStream(unpin_all_build);
 }
 
@@ -293,7 +294,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTable(RuntimeState* state,
 template<bool const AddProbeFilters>
 Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
     RuntimeState* state, bool* built) {
-  DCHECK(build_rows_ != NULL);
+  DCHECK_NOTNULL(build_rows_);
   *built = false;
 
   // TODO: estimate the entire size of the hash table and reserve all of it from
@@ -1045,8 +1046,8 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
     can_add_probe_filters_ = false;
   }
 
-  // First loop over the partitions and build hash tables for the partitions that didn't
-  // already spill.
+  // First loop over the partitions and build hash tables for the partitions that did
+  // not already spill.
   BOOST_FOREACH(Partition* partition, hash_partitions_) {
     if (partition->build_rows()->num_rows() == 0) {
       // This partition is empty, no need to do anything else.
@@ -1054,17 +1055,16 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
       continue;
     }
 
-    bool built = false;
     if (!partition->is_spilled()) {
+      bool built = false;
       DCHECK(partition->build_rows()->is_pinned());
       RETURN_IF_ERROR(partition->BuildHashTable(state, &built, can_add_probe_filters_));
-    }
-
-    if (!built) {
-      // We did not have enough memory to build this hash table. We need to
-      // 1) spill this partition (clean up the hash table, unpin build)
-      // 2) get an io buffer for the probe stream for this partition.
-      RETURN_IF_ERROR(partition->Spill(true));
+      if (!built) {
+        // We did not have enough memory to build this hash table. We need to
+        // 1) spill this partition (clean up the hash table, unpin build)
+        // 2) get an IO buffer for the probe stream for this partition.
+        RETURN_IF_ERROR(partition->Spill(true));
+      }
     }
   }
 
@@ -1166,7 +1166,7 @@ Status PartitionedHashJoinNode::EvaluateNullProbe(BufferedTupleStream* build) {
 Status PartitionedHashJoinNode::ReserveTupleStreamBlocks() {
   DCHECK(using_small_buffers_);
 
-  // Partitions that are using small buffers need to switch to io sized buffers. We want
+  // Partitions that are using small buffers need to switch to IO sized buffers. We want
   // this to happen to all partitions at the same time to ensure that all partitions can
   // get at least 1 io buffer (at which point then can append indefinitely). This
   // initial buffer is guaranteed by the reservation for this operator.

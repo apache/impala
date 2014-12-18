@@ -29,7 +29,7 @@ using namespace std;
 using namespace strings;
 
 // The first NUM_SMALL_BLOCKS of the tuple stream are made of blocks less than the
-// io size. These blocks never spill.
+// IO size. These blocks never spill.
 static const int64_t INITIAL_BLOCK_SIZES[] =
     { 64 * 1024, 512 * 1024 };
 static const int NUM_SMALL_BLOCKS = sizeof(INITIAL_BLOCK_SIZES) / sizeof(int64_t);
@@ -135,7 +135,7 @@ Status BufferedTupleStream::Init(RuntimeProfile* profile, bool pinned) {
 
 Status BufferedTupleStream::SwitchToIoBuffers(bool* got_buffer) {
   if (!use_small_buffers_) {
-    *got_buffer = write_block_ != NULL;
+    *got_buffer = (write_block_ != NULL);
     return Status::OK;
   }
   use_small_buffers_ = false;
@@ -179,7 +179,7 @@ Status BufferedTupleStream::NewBlockForWrite(int min_size, bool* got_block) {
   DCHECK(!closed_);
   if (min_size > block_mgr_->max_block_size()) {
     return Status(Substitute("Cannot process row that is bigger than the IO size "
-          "(row_size=$0). To run this query, increase the io size (--read_size option).",
+          "(row_size=$0). To run this query, increase the IO size (--read_size option).",
           PrettyPrinter::Print(min_size, TCounterType::BYTES)));
   }
 
