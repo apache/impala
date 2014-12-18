@@ -437,8 +437,8 @@ void ImpalaServer::QuerySummaryCallback(const Webserver::ArgumentMap& args,
         query_status = exec_state->query_status();
         stmt = exec_state->sql_stmt();
         plan = exec_state->exec_request().query_exec_request.query_plan;
-        ScopedSpinLock lock;
-        summary = exec_state->coord()->exec_summary(&lock);
+        ScopedSpinLock lock(exec_state->coord()->GetExecSummaryLock());
+        summary = exec_state->coord()->exec_summary();
       } else {
         const string& err = Substitute("Invalid query id: $0", PrintId(query_id));
         Value json_error(err.c_str(), document->GetAllocator());

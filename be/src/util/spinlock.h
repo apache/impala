@@ -29,7 +29,7 @@ class SpinLock {
   void Lock() {
     while (true) {
       if(__sync_bool_compare_and_swap(&locked_, false, true)) return;
-      for (int i = 0; i < NUM_SPIN_CYCLES + 1; ++i) {
+      for (int i = 0; i < NUM_SPIN_CYCLES; ++i) {
         AtomicUtil::CpuWait();
       }
       if(__sync_bool_compare_and_swap(&locked_, false, true)) return;
@@ -38,21 +38,21 @@ class SpinLock {
   }
 
   void Unlock() {
-    // Memory barrier here. All updates before the unlock need to be made
-    // visible.
+    // Memory barrier here. All updates before the unlock need to be made visible.
     __sync_synchronize();
     DCHECK(locked_);
     locked_ = false;
   }
 
+  void DCheckLocked() { DCHECK(locked_); }
+
  private:
-  // In typical spin lock implements, we want to spin (and keep the core fully
-  // busy), for some number of cycles before yielding. Consider these three
-  // cases:
+  // In typical spin lock implements, we want to spin (and keep the core fully busy),
+  // for some number of cycles before yielding. Consider these three cases:
   //  1) lock is un-contended - spinning doesn't kick in and has no effect.
-  //  2) lock is taken by another thread and that thread finishes quickly
-  //  3) lock is taken by another thread and that thread is slow (e.g. scheduled
-  //     away).
+  //  2) lock is taken by another thread and that thread finishes quickly.
+  //  3) lock is taken by another thread and that thread is slow (e.g. scheduled away).
+  //
   // In case 3), we'd want to yield so another thread can do work. This thread
   // won't be able to do anything useful until the thread with the lock runs again.
   // In case 2), we don't want to yield (and give up our scheduling time slice)
@@ -67,19 +67,15 @@ class SpinLock {
 
 class ScopedSpinLock {
  public:
-  ScopedSpinLock(SpinLock* lock = NULL) {
+  ScopedSpinLock(SpinLock* lock) {
+    DCHECK_NOTNULL(lock);
     lock_ = lock;
-    if (lock_ != NULL) lock_->Lock();
+    lock_->Lock();
   }
 
   ~ScopedSpinLock() {
-    if (lock_ != NULL) lock_->Unlock();
-  }
-
-  void AcquireLock(SpinLock* lock) {
-    DCHECK(lock_ == NULL);
-    lock_ = lock;
-    lock_->Lock();
+    DCHECK_NOTNULL(lock_);
+    lock_->Unlock();
   }
 
  private:

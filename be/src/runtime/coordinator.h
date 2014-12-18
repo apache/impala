@@ -167,12 +167,14 @@ class Coordinator {
   // Returns query_status_.
   Status GetStatus();
 
-  // Returns the exec summary. The function returns with the exec summary lock taken.
-  // (By setting lock). The caller must not block while holding the lock.
-  const TExecSummary& exec_summary(ScopedSpinLock* lock) const {
-    lock->AcquireLock(&exec_summary_lock_);
+  // Returns the exec summary. The exec summary lock must already have been taken.
+  // The caller must not block while holding the lock.
+  const TExecSummary& exec_summary() const {
+    exec_summary_lock_.DCheckLocked();
     return exec_summary_;
   }
+
+  SpinLock* GetExecSummaryLock() const { return &exec_summary_lock_; }
 
  private:
   class BackendExecState;

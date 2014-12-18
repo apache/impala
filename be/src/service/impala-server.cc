@@ -457,8 +457,8 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, TExecSummary* res
     if (exec_state != NULL) {
       lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
       if (exec_state->coord() != NULL) {
-        ScopedSpinLock lock;
-        *result = exec_state->coord()->exec_summary(&lock);
+        ScopedSpinLock lock(exec_state->coord()->GetExecSummaryLock());
+        *result = exec_state->coord()->exec_summary();
         return Status::OK;
       }
     }
@@ -522,8 +522,8 @@ void ImpalaServer::ArchiveQuery(const QueryExecState& query) {
   if (FLAGS_query_log_size == 0) return;
   QueryStateRecord record(query, true, encoded_profile_str);
   if (query.coord() != NULL) {
-    ScopedSpinLock lock;
-    record.exec_summary = query.coord()->exec_summary(&lock);
+    ScopedSpinLock lock(query.coord()->GetExecSummaryLock());
+    record.exec_summary = query.coord()->exec_summary();
   }
   {
     lock_guard<mutex> l(query_log_lock_);
@@ -727,8 +727,8 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
   if (exec_state->coord() != NULL) {
     string exec_summary;
     {
-      ScopedSpinLock lock;
-      const TExecSummary& summary = exec_state->coord()->exec_summary(&lock);
+      ScopedSpinLock lock(exec_state->coord()->GetExecSummaryLock());
+      const TExecSummary& summary = exec_state->coord()->exec_summary();
       exec_summary = PrintExecSummary(summary);
     }
     exec_state->summary_profile()->AddInfoString("ExecSummary", exec_summary);
