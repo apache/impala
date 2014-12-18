@@ -899,7 +899,7 @@ Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
       // If another tuple is successfully read, it means that there are still values
       // in the file.
       HdfsParquetScanner::BaseColumnReader* reader = column_readers_[0];
-      DCHECK(reader->stream_ != NULL);
+      DCHECK_NOTNULL(reader->stream_);
       ErrorMsg msg(TErrorCode::PARQUET_GROUP_ROW_COUNT_OVERFLOW,
           reader->stream_->filename(), row_group_idx,
           expected_rows_in_group);

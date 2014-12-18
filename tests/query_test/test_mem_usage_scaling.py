@@ -75,18 +75,17 @@ class TestExprMemUsage(ImpalaTestSuite):
       "select count(*) from lineitem where lower(l_comment) = 'hello'", exec_options,
       table_format=vector.get_value('table_format'))
 
-
-class TestMemLimitError(ImpalaTestSuite):
-  # Different values of mem limits and minimum mem limit the queries are expected to run
-  # without problem.
-  MEM_IN_MB = [100, 120, 150, 380, 640, 660, 960, 980, 1000, 1050]
-  MIN_MEM_FOR_TPCH_Q1 = 145
-  MIN_MEM_FOR_TPCH_Q4 = 150
-  MIN_MEM_FOR_TPCH_Q9 = 650
-  MIN_MEM_FOR_TPCH_Q18 = 1050
-  MIN_MEM_FOR_TPCH_Q20 = 375
-  MIN_MEM_FOR_TPCH_Q21 = 975
+class TestTpchMemLimitError(ImpalaTestSuite):
   EXPECTED_ERROR_MSG = "Memory limit exceeded"
+
+  # The mem limits that will be used.
+  MEM_IN_MB = [100, 150, 180, 420, 700, 780, 960, 980, 1050, 1100]
+
+  # Different values of mem limits and minimum mem limit (in MBs) each query is expected
+  # to run without problem. Those values were determined by manual testing.
+  MIN_MEM_FOR_TPCH = { 'Q1' : 145, 'Q2' : 105, 'Q3' : 645, 'Q4' : 150, 'Q5' : 375,\
+                       'Q6' : 25, 'Q7' : 685, 'Q8' : 740, 'Q9' : 650, 'Q18' : 1050,\
+                       'Q20' : 375, 'Q21' : 975}
 
   @classmethod
   def get_workload(self):
@@ -94,17 +93,17 @@ class TestMemLimitError(ImpalaTestSuite):
 
   @classmethod
   def add_test_dimensions(cls):
-    super(TestMemLimitError, cls).add_test_dimensions()
+    super(TestTpchMemLimitError, cls).add_test_dimensions()
 
     cls.TestMatrix.add_dimension(
-      TestDimension('mem_limit', *TestMemLimitError.MEM_IN_MB))
+      TestDimension('mem_limit', *TestTpchMemLimitError.MEM_IN_MB))
 
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format in ['parquet'])
 
   @classmethod
   def setup_class(cls):
-    super(TestMemLimitError, cls).setup_class()
+    super(TestTpchMemLimitError, cls).setup_class()
     cls.client.execute('compute stats tpch_parquet.lineitem');
     cls.client.execute('compute stats tpch_parquet.orders');
     cls.client.execute('compute stats tpch_parquet.customer');
@@ -112,10 +111,15 @@ class TestMemLimitError(ImpalaTestSuite):
     cls.client.execute('compute stats tpch_parquet.supplier');
     cls.client.execute('compute stats tpch_parquet.partsupp');
     cls.client.execute('compute stats tpch_parquet.nation');
+    cls.client.execute('compute stats tpch_parquet.region');
 
   def low_memory_limit_test(self, vector, tpch_query, limit):
     mem = vector.get_value('mem_limit')
-    # If memory limit larger than the minimum threshold, then it is not expected to fail
+    # Mem consumption can be +-30MBs, depending on how many scanner threads are
+    # running. Adding this extra mem in order to reduce false negatives in the tests.
+    limit = limit + 30
+
+    # If memory limit larger than the minimum threshold, then it is not expected to fail.
     expects_error = mem < limit;
     new_vector = copy(vector)
     new_vector.get_value('exec_option')['mem_limit'] = str(mem) + "m"
@@ -124,22 +128,40 @@ class TestMemLimitError(ImpalaTestSuite):
     except ImpalaBeeswaxException as e:
       if (expects_error == 0):
         raise
-      assert TestMemLimitError.EXPECTED_ERROR_MSG in str(e)
+      assert TestTpchMemLimitError.EXPECTED_ERROR_MSG in str(e)
 
   def test_low_mem_limit_q1(self, vector):
-    self.low_memory_limit_test(vector, 'tpch-q1', self.MIN_MEM_FOR_TPCH_Q1);
+    self.low_memory_limit_test(vector, 'tpch-q1', self.MIN_MEM_FOR_TPCH['Q1']);
+
+  def test_low_mem_limit_q2(self, vector):
+    self.low_memory_limit_test(vector, 'tpch-q2', self.MIN_MEM_FOR_TPCH['Q2']);
+
+  def test_low_mem_limit_q3(self, vector):
+    self.low_memory_limit_test(vector, 'tpch-q3', self.MIN_MEM_FOR_TPCH['Q3']);
 
   def test_low_mem_limit_q4(self, vector):
-    self.low_memory_limit_test(vector, 'tpch-q4', self.MIN_MEM_FOR_TPCH_Q4);
+    self.low_memory_limit_test(vector, 'tpch-q4', self.MIN_MEM_FOR_TPCH['Q4']);
+
+  def test_low_mem_limit_q5(self, vector):
+    self.low_memory_limit_test(vector, 'tpch-q5', self.MIN_MEM_FOR_TPCH['Q5']);
+
+  def test_low_mem_limit_q6(self, vector):
+    self.low_memory_limit_test(vector, 'tpch-q6', self.MIN_MEM_FOR_TPCH['Q6']);
+
+  def test_low_mem_limit_q7(self, vector):
+    self.low_memory_limit_test(vector, 'tpch-q7', self.MIN_MEM_FOR_TPCH['Q7']);
+
+  def test_low_mem_limit_q8(self, vector):
+    self.low_memory_limit_test(vector, 'tpch-q8', self.MIN_MEM_FOR_TPCH['Q8']);
 
   def test_low_mem_limit_q9(self, vector):
-    self.low_memory_limit_test(vector, 'tpch-q9', self.MIN_MEM_FOR_TPCH_Q9);
+    self.low_memory_limit_test(vector, 'tpch-q9', self.MIN_MEM_FOR_TPCH['Q9']);
 
   def test_low_mem_limit_q18(self, vector):
-    self.low_memory_limit_test(vector, 'tpch-q18', self.MIN_MEM_FOR_TPCH_Q18);
+    self.low_memory_limit_test(vector, 'tpch-q18', self.MIN_MEM_FOR_TPCH['Q18']);
 
   def test_low_mem_limit_q20(self, vector):
-    self.low_memory_limit_test(vector, 'tpch-q20', self.MIN_MEM_FOR_TPCH_Q20);
+    self.low_memory_limit_test(vector, 'tpch-q20', self.MIN_MEM_FOR_TPCH['Q20']);
 
   def test_low_mem_limit_q21(self, vector):
-    self.low_memory_limit_test(vector, 'tpch-q21', self.MIN_MEM_FOR_TPCH_Q21);
+    self.low_memory_limit_test(vector, 'tpch-q21', self.MIN_MEM_FOR_TPCH['Q21']);
