@@ -65,9 +65,9 @@ class TestImpalaShellInteractive(object):
     """Test escaping quotes"""
     # test escaped quotes outside of quotes
     result = run_impala_shell_interactive("select \\'bc';")
-    assert "could not match input" in result.stderr
+    assert "Unexpected character" in result.stderr
     result = run_impala_shell_interactive("select \\\"bc\";")
-    assert "could not match input" in result.stderr
+    assert "Unexpected character" in result.stderr
     # test escaped quotes within quotes
     result = run_impala_shell_interactive("select 'ab\\'c';")
     assert "Fetched 1 row(s)" in result.stderr

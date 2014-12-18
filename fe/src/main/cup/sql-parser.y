@@ -254,8 +254,8 @@ terminal
   KW_UNION, KW_UPDATE_FN, KW_USE, KW_USING,
   KW_VALUES, KW_VARCHAR, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
 
-terminal COLON, COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET, RBRACKET,
-  DIVIDE, MOD, ADD, SUBTRACT;
+terminal COLON, SEMICOLON, COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET,
+  RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
 terminal String IDENT;
@@ -266,6 +266,7 @@ terminal BigDecimal INTEGER_LITERAL;
 terminal BigDecimal DECIMAL_LITERAL;
 terminal String STRING_LITERAL;
 terminal String UNMATCHED_STRING_LITERAL;
+terminal String UNEXPECTED_CHAR;
 
 nonterminal StatementBase stmt;
 // Single select statement.
@@ -552,6 +553,8 @@ stmt ::=
   {: RESULT = grant_privilege; :}
   | revoke_privilege_stmt:revoke_privilege
   {: RESULT = revoke_privilege; :}
+  | stmt:s SEMICOLON
+  {: RESULT = s; :}
   ;
 
 load_stmt ::=

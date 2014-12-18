@@ -83,7 +83,7 @@ public class ParserTest {
     Object result = null; // Save this object to make debugging easier
     try {
       result = parser.parse().value;
-    } catch (java.lang.Exception e) {
+    } catch (Exception e) {
       if (expectedErrorString != null) {
         String errorString = parser.getErrorMsg(stmt);
         assertTrue(errorString.startsWith(expectedErrorString));
@@ -91,24 +91,6 @@ public class ParserTest {
       return;
     }
     fail("Stmt didn't result in parsing error: " + stmt);
-  }
-
-  /**
-   * Asserts if stmt scans fine.
-   * @param stmt
-   */
-  public void ScannerError(String stmt) {
-    SqlScanner input = new SqlScanner(new StringReader(stmt));
-    SqlParser parser = new SqlParser(input);
-    try {
-      parser.parse();
-    } catch (java.lang.Exception e) {
-      fail("Stmt didn't result in scanning error but a parsing error instead: " + stmt);
-    } catch (java.lang.Error e) {
-      // Exception message is always 'failure occurred on input'.
-      return;
-    }
-    fail("Stmt didn't result in scanning or parsing error: " + stmt);
   }
 
   /**
@@ -1027,7 +1009,18 @@ public class ParserTest {
     // escaping non-escape chars should scan ok and result in the character itself
     testStringLiteral("\\a\\b\\c\\d\\1\\2\\3\\$\\&\\*");
     // Single backslash is a scanner error.
-    ScannerError("select \"\\\" from t");
+    ParserError("select \"\\\" from t",
+        "Syntax error in line 1:\n" +
+            "select \"\\\" from t\n" +
+            "        ^\n" +
+            "Encountered: Unexpected character");
+    // Unsupported character
+    ParserError("@",
+        "Syntax error in line 1:\n" +
+        "@\n" +
+        "^\n" +
+        "Encountered: Unexpected character");
+    ParsesOk("SELECT '@'");
   }
 
   // test string literal s with single and double quotes
@@ -2888,5 +2881,28 @@ public class ParserTest {
     ParsesOk("DROP INCREMENTAL STATS functional.alltypes PARTITION(month=10, year=2010)");
     ParserError("DROP INCREMENTAL STATS functional.alltypes PARTITION(month, year)");
     ParserError("DROP INCREMENTAL STATS functional.alltypes");
+  }
+
+  @Test
+  public void TestSemiColon() {
+    ParserError(";", "Syntax error");
+    ParsesOk("SELECT 1;");
+    ParsesOk(" SELECT 1 ; ");
+    ParsesOk("  SELECT  1  ;  ");
+    ParserError("SELECT 1; SELECT 2;",
+        "Syntax error in line 1:\n" +
+        "SELECT 1; SELECT 2;\n" +
+        "          ^\n" +
+        "Encountered: SELECT\n" +
+        "Expected");
+    ParsesOk("SELECT 1;;;");
+    ParsesOk("SELECT 1 FROM functional.alltypestiny WHERE 1 = (SELECT 1);");
+    ParserError("SELECT 1 FROM functional.alltypestiny WHERE 1 = (SELECT 1;)",
+        "Syntax error");
+    ParserError("SELECT 1 FROM functional.alltypestiny WHERE 1 = (SELECT 1;);",
+        "Syntax error");
+    ParsesOk("CREATE TABLE functional.test_table (col INT);");
+    ParsesOk("DESCRIBE functional.alltypes;");
+    ParsesOk("SET num_nodes=1;");
   }
 }
