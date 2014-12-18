@@ -21,8 +21,6 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
-#include <boost/thread/locks.hpp>
-#include <boost/thread/mutex.hpp>
 #include <vector>
 #include <string>
 // stringstream is a typedef, so can't forward declare it.
@@ -199,7 +197,7 @@ class RuntimeState {
   }
 
   Status query_status() {
-    boost::lock_guard<boost::mutex> l(query_status_lock_);
+    ScopedSpinLock l(&query_status_lock_);
     return query_status_;
   };
 
@@ -212,7 +210,7 @@ class RuntimeState {
 
   // Returns true if the error log has not reached max_errors_.
   bool LogHasSpace() {
-    boost::lock_guard<boost::mutex> l(error_log_lock_);
+    ScopedSpinLock l(&error_log_lock_);
     return error_log_.size() < query_options().max_errors;
   }
 
@@ -233,7 +231,7 @@ class RuntimeState {
   void GetUnreportedErrors(std::vector<std::string>* new_errors);
 
   // Returns a string representation of the file_errors_.
-  std::string FileErrors() const;
+  std::string FileErrors();
 
   bool is_cancelled() const { return is_cancelled_; }
   void set_is_cancelled(bool v) { is_cancelled_ = v; }
@@ -251,7 +249,7 @@ class RuntimeState {
 
   // Sets query_status_ with err_msg if no error has been set yet.
   void set_query_status(const std::string& err_msg) {
-    boost::lock_guard<boost::mutex> l(query_status_lock_);
+    ScopedSpinLock l(&query_status_lock_);
     if (!query_status_.ok()) return;
     query_status_ = Status(err_msg);
   }
@@ -286,7 +284,7 @@ class RuntimeState {
   boost::scoped_ptr<ObjectPool> obj_pool_;
 
   // Lock protecting error_log_ and unreported_error_idx_
-  boost::mutex error_log_lock_;
+  SpinLock error_log_lock_;
 
   // Logs error messages.
   std::vector<std::string> error_log_;
@@ -295,7 +293,7 @@ class RuntimeState {
   int unreported_error_idx_;
 
   // Lock protecting file_errors_
-  mutable boost::mutex file_errors_lock_;
+  SpinLock file_errors_lock_;
 
   // Stores the number of parse errors per file.
   std::vector<std::pair<std::string, int> > file_errors_;
@@ -352,7 +350,7 @@ class RuntimeState {
   // Non-OK if an error has occurred and query execution should abort. Used only for
   // asynchronously reporting such errors (e.g., when a UDF reports an error), so this
   // will not necessarily be set in all error cases.
-  boost::mutex query_status_lock_;
+  SpinLock query_status_lock_;
   Status query_status_;
 
   // Query-wide resource manager for resource expansion etc. Not owned by us; owned by the
