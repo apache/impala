@@ -29,17 +29,21 @@ fi
 export IMPALA_HOME=$ROOT
 . "$ROOT"/bin/impala-config.sh > /dev/null 2>&1
 
+# Defaults that are only changable via the commandline.
 CLEAN_ACTION=1
 TESTDATA_ACTION=0
 TESTS_ACTION=1
 FORMAT_CLUSTER=0
 FORMAT_METASTORE=0
-TARGET_BUILD_TYPE=Debug
-EXPLORATION_STRATEGY=core
 IMPALA_KERBERIZE=0
 SNAPSHOT_FILE=
 METASTORE_SNAPSHOT_FILE=
 MAKE_IMPALA_ARGS=""
+
+# Defaults that can be picked up from the environment, but are overridable through the
+# commandline.
+: ${EXPLORATION_STRATEGY:=core}
+: ${TARGET_BUILD_TYPE:=Debug}
 
 # Exit on reference to uninitialized variable
 set -u
@@ -342,15 +346,18 @@ if [ $TESTDATA_ACTION -eq 1 ]; then
   # Create testdata.
   $IMPALA_HOME/bin/create_testdata.sh
   cd $ROOT
-  # We have three conditions.
-  # - A testdata and metastore snapshot exists.
-  # - Only the testdata snapshot exists.
-  # - Neither of the them exist.
+  # We have 4 cases:
+  # - test-warehouse and metastore snapshots exists.
+  # - Only the test-warehouse snapshot exists.
+  # - Only the metastore snapshot exists.
+  # - Neither of them exist.
   CREATE_LOAD_DATA_ARGS=""
-  if [ $SNAPSHOT_FILE ] && [ $METASTORE_SNAPSHOT_FILE ]; then
+  if [[ $SNAPSHOT_FILE  && $METASTORE_SNAPSHOT_FILE ]]; then
     CREATE_LOAD_DATA_ARGS="-snapshot_file ${SNAPSHOT_FILE} -skip_metadata_load"
-  elif [ $SNAPSHOT_FILE ] && [ -n $METASTORE_SNAPSHOT_FILE ]; then
+  elif [[ $SNAPSHOT_FILE && -n $METASTORE_SNAPSHOT_FILE ]]; then
     CREATE_LOAD_DATA_ARGS="-snapshot_file ${SNAPSHOT_FILE}"
+  elif [[ -n $SNAPSHOT_FILE && $METASTORE_SNAPSHOT_FILE ]]; then
+    CREATE_LOAD_DATA_ARGS="-skip_metadata_load -skip_snapshot_load"
   fi
   yes | ${IMPALA_HOME}/testdata/bin/create-load-data.sh ${CREATE_LOAD_DATA_ARGS}
 fi

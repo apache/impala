@@ -274,7 +274,7 @@ function build-and-copy-hive-udfs {
   mvn clean package
   popd
   # Copy the test UDF/UDA libraries into HDFS
-  ${IMPALA_HOME}/testdata/bin/copy-udfs-udas.sh
+  ${IMPALA_HOME}/testdata/bin/copy-udfs-udas.sh -build
 }
 
 function copy-and-load-ext-data-source {
