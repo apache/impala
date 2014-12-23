@@ -694,13 +694,13 @@ public class PlannerTest {
     runPlannerTestFile("tpch-all");
   }
 
-  /* Commented out until the test file if fixed.
   @Test
   public void testTpcds() {
-    // Join order has been optimized for Impala. Uses ss_date as partition key.
+    // Uses ss_sold_date_sk as the partition key of store_sales to allow static partition
+    // pruning. The original predicates were rephrased in terms of the ss_sold_date_sk
+    // partition key, with the query semantics identical to the original queries.
     runPlannerTestFile("tpcds-all", "tpcds");
   }
-  */
 
   @Test
   public void testSmallQueryOptimization() {
