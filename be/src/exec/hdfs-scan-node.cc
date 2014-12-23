@@ -121,7 +121,7 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
     RETURN_IF_ERROR(BaseSequenceScanner::IssueInitialRanges(this,
         per_type_files_[THdfsFileFormat::AVRO]));
     RETURN_IF_ERROR(HdfsParquetScanner::IssueInitialRanges(this,
-          per_type_files_[THdfsFileFormat::PARQUET]));
+        per_type_files_[THdfsFileFormat::PARQUET]));
     if (progress_.done()) SetDone();
   }
 
@@ -137,23 +137,21 @@ Status HdfsScanNode::GetNextInternal(
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
 
-  {
-    unique_lock<mutex> l(lock_);
-    if (ReachedLimit() || !status_.ok()) {
-      *eos = true;
-      return status_;
-    }
+  if (ReachedLimit()) {
+    // LIMIT 0 case.  Other limit values handled below.
+    DCHECK_EQ(limit_, 0);
+    *eos = true;
+    return Status::OK;
   }
   *eos = false;
-
   RowBatch* materialized_batch = materialized_row_batches_->GetBatch();
   if (materialized_batch != NULL) {
     num_owned_io_buffers_ -= materialized_batch->num_io_buffers();
     row_batch->AcquireState(materialized_batch);
-    // Update the number of materialized rows instead of when they are materialized.
+    // Update the number of materialized rows now instead of when they are materialized.
     // This means that scanners might process and queue up more rows than are necessary
     // for the limit case but we want to avoid the synchronized writes to
-    // num_rows_returned_
+    // num_rows_returned_.
     num_rows_returned_ += row_batch->num_rows();
     COUNTER_SET(rows_returned_counter_, num_rows_returned_);
 
@@ -170,9 +168,11 @@ Status HdfsScanNode::GetNextInternal(
     delete materialized_batch;
     return Status::OK;
   }
-
+  // The RowBatchQueue was shutdown either because all scan ranges are complete or a
+  // scanner thread encountered an error.  Check status_ to distinguish those cases.
   *eos = true;
-  return Status::OK;
+  unique_lock<mutex> l(lock_);
+  return status_;
 }
 
 DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(const char* file, int64_t len,
@@ -886,6 +886,8 @@ void HdfsScanNode::ScannerThread() {
           DCHECK(done_);
           break;
         }
+        // Set status_ before calling SetDone() (which shuts down the RowBatchQueue),
+        // to ensure that GetNextInternal() notices the error status.
         status_ = status;
       }
 
