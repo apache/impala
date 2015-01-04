@@ -1238,7 +1238,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   public void TestFixedPointArithmeticOps() throws AnalysisException {
     // negative tests, no floating point types allowed
     AnalysisError("select ~float_col from functional.alltypes",
-        "Bitwise operations only allowed on integer types");
+        "'~' operation only allowed on integer types");
+    AnalysisError("select float_col! from functional.alltypes",
+        "'!' operation only allowed on integer types");
     AnalysisError("select float_col ^ int_col from functional.alltypes",
         "Invalid non-integer argument to operation '^'");
     AnalysisError("select float_col & int_col from functional.alltypes",
@@ -1963,7 +1965,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalysisError("select d1 ^ d1 from functional.decimal_tbl",
         "Invalid non-integer argument to operation '^': d1 ^ d1");
     AnalysisError("select ~d1 from functional.decimal_tbl",
-        "Bitwise operations only allowed on integer types: ~d1");
+        "'~' operation only allowed on integer types: ~d1");
+    AnalysisError("select d1! from functional.decimal_tbl",
+        "'!' operation only allowed on integer types: d1!");
 
     AnalyzesOk("select d3 = d4 from functional.decimal_tbl");
     AnalyzesOk("select d5 != d1 from functional.decimal_tbl");

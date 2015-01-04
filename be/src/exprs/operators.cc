@@ -17,6 +17,11 @@
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
 
+#include <boost/cstdint.hpp>
+#include <gutil/strings/substitute.h>
+
+using strings::Substitute;
+
 #define BINARY_OP_FN(NAME, TYPE, OP) \
   TYPE Operators::NAME##_##TYPE##_##TYPE(\
       FunctionContext* c, const TYPE& v1, const TYPE& v2) {\
@@ -35,6 +40,18 @@
   TYPE Operators::Bitnot_##TYPE(FunctionContext* c, const TYPE& v) {\
     if (v.is_null) return TYPE::null();\
     return TYPE(~v.val);\
+  }
+
+// Return infinity if overflow.
+#define FACTORIAL_FN(TYPE)\
+  BigIntVal Operators::Factorial_##TYPE(FunctionContext* c, const TYPE& v) {\
+    if (v.is_null) return BigIntVal::null();\
+    int64_t fact = ComputeFactorial(v.val); \
+    if (fact < 0) { \
+      c->SetError(Substitute("factorial $0! too large for BIGINT", v.val).c_str()); \
+      return BigIntVal::null(); \
+    } \
+    return BigIntVal(fact); \
   }
 
 #define BINARY_PREDICATE_NUMERIC_FN(NAME, TYPE, OP) \
@@ -116,6 +133,49 @@ BITNOT_FN(TinyIntVal);
 BITNOT_FN(SmallIntVal);
 BITNOT_FN(IntVal);
 BITNOT_FN(BigIntVal);
+
+static const int64_t FACTORIAL_MAX = 20;
+static const int64_t FACTORIAL_LOOKUP[] = {
+    1LL, // 0!
+    1LL, // 1!
+    2LL, // 2!
+    6LL, // 3!
+    24LL, // 4!
+    120LL, // 5!
+    720LL, // 6!
+    5040LL, // 7!
+    40320LL, // 8!
+    362880LL, // 9!
+    3628800LL, // 10!
+    39916800LL, // 11!
+    479001600LL, // 12!
+    6227020800LL, // 13!
+    87178291200LL, // 14!
+    1307674368000LL, // 15!
+    20922789888000LL, // 16!
+    355687428096000LL, // 17!
+    6402373705728000LL, // 18!
+    121645100408832000LL, // 19!
+    2432902008176640000LL, // 20!
+};
+
+// Compute factorial - return -1 if out of range
+// Factorial of any number <= 1 returns 1
+static int64_t ComputeFactorial(int64_t n) {
+  // Check range based on arg: 20! < 2^63 -1 < 21!
+  if (n > FACTORIAL_MAX) {
+    return -1;
+  } else if (n < 0) {
+    return 1;
+  }
+
+  return FACTORIAL_LOOKUP[n];
+}
+
+FACTORIAL_FN(TinyIntVal);
+FACTORIAL_FN(SmallIntVal);
+FACTORIAL_FN(IntVal);
+FACTORIAL_FN(BigIntVal);
 
 BINARY_PREDICATE_ALL_TYPES(Eq, ==);
 BINARY_PREDICATE_ALL_TYPES(Ne, !=);

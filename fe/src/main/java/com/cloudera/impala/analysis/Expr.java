@@ -414,6 +414,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       throws AnalysisException {
     Preconditions.checkState(this instanceof ArithmeticExpr ||
         this instanceof BinaryPredicate);
+    if (children_.size() == 1) return; // Do not attempt to convert for unary ops
     Preconditions.checkState(children_.size() == 2);
     Type t0 = getChild(0).getType();
     Type t1 = getChild(1).getType();

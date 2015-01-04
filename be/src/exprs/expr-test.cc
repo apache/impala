@@ -771,6 +771,31 @@ class ExprTest : public testing::Test {
     TestIsNull("~NULL", TYPE_INT);
   }
 
+  // Test factorial operator.
+  void TestFactorialArithmeticOp() {
+    // Basic exprs
+    TestValue("4!", TYPE_BIGINT, 24);
+    TestValue("0!", TYPE_BIGINT, 1);
+    TestValue("-20!", TYPE_BIGINT, 1);
+    TestIsNull("NULL!", TYPE_BIGINT);
+    TestValue("20!", TYPE_BIGINT, 2432902008176640000); // Largest valid value
+    // TestError("21!"); // TODO - Overflow - disabled due to IMPALA-1746
+
+    // Compound exprs
+    TestValue("4 + (3!)", TYPE_BIGINT, 10);
+    // TestValue("5 + 3!", TYPE_BIGINT, 11); disabled b/c IMPALA-2149
+    TestValue("4! + 3", TYPE_BIGINT, 27);
+    TestValue("-1!", TYPE_BIGINT, 1); // Prefix takes precedence
+
+    // ! = should not be parsed as not equal operator
+    TestValue("4! = 25", TYPE_BOOLEAN, false);
+
+    // != should be parsed as a single token to avoid wacky behavior
+    TestValue("1 != 1", TYPE_BOOLEAN, false);
+
+    // Check factorial function exists as alias
+    TestValue("factorial(3!)", TYPE_BIGINT, 720);
+  }
   // Test casting stmt to all types.  Expected result is val.
   template<typename T>
   void TestCast(const string& stmt, T val, bool timestamp_out_of_range = false) {
@@ -1052,6 +1077,9 @@ TEST_F(ExprTest, ArithmeticExprs) {
 
   // Test all arithmetic exprs with only NULL operands.
   TestNullOperandsArithmeticOps();
+
+  // Test behavior of factorial operator.
+  TestFactorialArithmeticOp();
 }
 
 TEST_F(ExprTest, DecimalArithmeticExprs) {

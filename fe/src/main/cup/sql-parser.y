@@ -258,7 +258,8 @@ terminal
 terminal COLON, SEMICOLON, COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET,
   RBRACKET, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
-terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
+terminal EQUAL, NOT, NOTEQUAL, LESSTHAN, GREATERTHAN;
+terminal FACTORIAL; // Placeholder terminal for postfix factorial operator
 terminal String IDENT;
 terminal String EMPTY_IDENT;
 terminal String NUMERIC_OVERFLOW;
@@ -452,10 +453,11 @@ precedence left KW_AND;
 precedence right KW_NOT, NOT;
 precedence left KW_BETWEEN, KW_IN, KW_IS, KW_EXISTS;
 precedence left KW_LIKE, KW_RLIKE, KW_REGEXP;
-precedence left EQUAL, LESSTHAN, GREATERTHAN;
+precedence left EQUAL, NOTEQUAL, LESSTHAN, GREATERTHAN;
 precedence left ADD, SUBTRACT;
 precedence left STAR, DIVIDE, MOD, KW_DIV;
 precedence left BITAND, BITOR, BITXOR, BITNOT;
+precedence left FACTORIAL;
 precedence left KW_ORDER, KW_BY, KW_LIMIT;
 precedence left LPAREN, RPAREN;
 // Support chaining of timestamp arithmetic exprs.
@@ -2227,6 +2229,9 @@ arithmetic_expr ::=
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.BITXOR, e1, e2); :}
   | BITNOT expr:e
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.BITNOT, e, null); :}
+  | expr:e NOT
+  {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.FACTORIAL, e, null); :}
+  %prec FACTORIAL
   ;
 
 // We use IDENT for the temporal unit to avoid making DAY, YEAR, etc. keywords.
@@ -2341,7 +2346,9 @@ predicate ::=
 comparison_predicate ::=
   expr:e1 EQUAL expr:e2
   {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.EQ, e1, e2); :}
-  | expr:e1 NOT EQUAL expr:e2
+  | expr:e1 NOTEQUAL expr:e2 // single != token
+  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, e1, e2); :}
+  | expr:e1 NOT EQUAL expr:e2 // separate ! and = tokens
   {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, e1, e2); :}
   | expr:e1 LESSTHAN GREATERTHAN expr:e2
   {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, e1, e2); :}

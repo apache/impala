@@ -27,29 +27,48 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class ArithmeticExpr extends Expr {
+  enum OperatorPosition {
+    BINARY_INFIX,
+    UNARY_PREFIX,
+    UNARY_POSTFIX,
+  }
+
   enum Operator {
-    MULTIPLY("*", "multiply"),
-    DIVIDE("/", "divide"),
-    MOD("%", "mod"),
-    INT_DIVIDE("DIV", "int_divide"),
-    ADD("+", "add"),
-    SUBTRACT("-", "subtract"),
-    BITAND("&", "bitand"),
-    BITOR("|", "bitor"),
-    BITXOR("^", "bitxor"),
-    BITNOT("~", "bitnot");
+    MULTIPLY("*", "multiply", OperatorPosition.BINARY_INFIX),
+    DIVIDE("/", "divide", OperatorPosition.BINARY_INFIX),
+    MOD("%", "mod", OperatorPosition.BINARY_INFIX),
+    INT_DIVIDE("DIV", "int_divide", OperatorPosition.BINARY_INFIX),
+    ADD("+", "add", OperatorPosition.BINARY_INFIX),
+    SUBTRACT("-", "subtract", OperatorPosition.BINARY_INFIX),
+    BITAND("&", "bitand", OperatorPosition.BINARY_INFIX),
+    BITOR("|", "bitor", OperatorPosition.BINARY_INFIX),
+    BITXOR("^", "bitxor", OperatorPosition.BINARY_INFIX),
+    BITNOT("~", "bitnot", OperatorPosition.UNARY_PREFIX),
+    FACTORIAL("!", "factorial", OperatorPosition.UNARY_POSTFIX);
 
     private final String description_;
     private final String name_;
+    private final OperatorPosition pos_;
 
-    private Operator(String description, String name) {
+    private Operator(String description, String name, OperatorPosition pos) {
       this.description_ = description;
       this.name_ = name;
+      this.pos_ = pos;
     }
 
     @Override
     public String toString() { return description_; }
     public String getName() { return name_; }
+    public OperatorPosition getPos() { return pos_; }
+
+    public boolean isUnary() {
+      return pos_ == OperatorPosition.UNARY_PREFIX ||
+             pos_ == OperatorPosition.UNARY_POSTFIX;
+    }
+
+    public boolean isBinary() {
+      return pos_ == OperatorPosition.BINARY_INFIX;
+    }
   }
 
   private final Operator op_;
@@ -61,8 +80,8 @@ public class ArithmeticExpr extends Expr {
     this.op_ = op;
     Preconditions.checkNotNull(e1);
     children_.add(e1);
-    Preconditions.checkArgument(op == Operator.BITNOT && e2 == null
-        || op != Operator.BITNOT && e2 != null);
+    Preconditions.checkArgument((op.isUnary() && e2 == null) ||
+        (op.isBinary() && e2 != null));
     if (e2 != null) children_.add(e2);
   }
 
@@ -92,7 +111,7 @@ public class ArithmeticExpr extends Expr {
         Lists.<Type>newArrayList(Type.DECIMAL, Type.DECIMAL),
         Type.DECIMAL));
 
-    // MOD() is registered as a builtin, see impala_functions.py
+    // MOD() and FACTORIAL() are registered as builtins, see impala_functions.py
     for (Type t: Type.getIntegerTypes()) {
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
           Operator.INT_DIVIDE.getName(), Lists.newArrayList(t, t), t));
@@ -118,7 +137,12 @@ public class ArithmeticExpr extends Expr {
   @Override
   public String toSqlImpl() {
     if (children_.size() == 1) {
-      return op_.toString() + getChild(0).toSql();
+      if (op_.getPos() == OperatorPosition.UNARY_PREFIX) {
+        return op_.toString() + getChild(0).toSql();
+      } else {
+        assert(op_.getPos() == OperatorPosition.UNARY_POSTFIX);
+        return getChild(0).toSql() + op_.toString();
+      }
     } else {
       Preconditions.checkState(children_.size() == 2);
       return getChild(0).toSql() + " " + op_.toString() + " " + getChild(1).toSql();
@@ -161,27 +185,15 @@ public class ArithmeticExpr extends Expr {
       }
     }
 
-    Type t0 = getChild(0).getType();
-    // bitnot is the only unary op, deal with it here
-    if (op_ == Operator.BITNOT) {
-      // Special case ~NULL to resolve to TYPE_INT.
-      if (!t0.isNull() && !t0.isIntegerType()) {
-        throw new AnalysisException("Bitwise operations only allowed on integer " +
-            "types: " + toSql());
-      }
-      if (t0.isNull()) castChild(0, Type.INT);
-      fn_ = getBuiltinFunction(analyzer, op_.getName(), collectChildReturnTypes(),
-          CompareMode.IS_SUPERTYPE_OF);
-      Preconditions.checkNotNull(fn_);
-      castForFunctionCall(false);
-      type_ = fn_.getReturnType();
-      return;
-    }
-
-    Preconditions.checkState(children_.size() == 2); // only bitnot is unary
     convertNumericLiteralsFromDecimal(analyzer);
-    t0 = getChild(0).getType();
-    Type t1 = getChild(1).getType();
+    Type t0 = getChild(0).getType();
+    Type t1 = null;
+    if (op_.isUnary()) {
+      Preconditions.checkState(children_.size() == 1);
+    } else if (op_.isBinary()) {
+      Preconditions.checkState(children_.size() == 2);
+      t1 = getChild(1).getType();
+    }
 
     String fnName = op_.getName();
     switch (op_) {
@@ -211,7 +223,25 @@ public class ArithmeticExpr extends Expr {
         if (type_.isNull()) type_ = Type.INT;
         Preconditions.checkState(type_.isIntegerType());
         break;
-
+      case BITNOT:
+      case FACTORIAL:
+        if (!t0.isNull() && !t0.isIntegerType()) {
+          throw new AnalysisException("'" + op_.toString() + "'" +
+              " operation only allowed on integer types: " + toSql());
+        }
+        // Special-case NULL to resolve to the appropriate type.
+        if (op_ == Operator.BITNOT) {
+          if (t0.isNull()) castChild(0, Type.INT);
+        } else {
+          assert(op_ == Operator.FACTORIAL);
+          if (t0.isNull()) castChild(0, Type.BIGINT);
+        }
+        fn_ = getBuiltinFunction(analyzer, op_.getName(), collectChildReturnTypes(),
+            CompareMode.IS_SUPERTYPE_OF);
+        Preconditions.checkNotNull(fn_);
+        castForFunctionCall(false);
+        type_ = fn_.getReturnType();
+        return;
       default:
         // the programmer forgot to deal with a case
         Preconditions.checkState(false,

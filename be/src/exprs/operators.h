@@ -29,6 +29,11 @@ class Operators {
   static IntVal Bitnot_IntVal(FunctionContext*, const IntVal&);
   static BigIntVal Bitnot_BigIntVal(FunctionContext*, const BigIntVal&);
 
+  static BigIntVal Factorial_TinyIntVal(FunctionContext*, const TinyIntVal&);
+  static BigIntVal Factorial_SmallIntVal(FunctionContext*, const SmallIntVal&);
+  static BigIntVal Factorial_IntVal(FunctionContext*, const IntVal&);
+  static BigIntVal Factorial_BigIntVal(FunctionContext*, const BigIntVal&);
+
   static TinyIntVal Add_TinyIntVal_TinyIntVal(
       FunctionContext*, const TinyIntVal&, const TinyIntVal&);
   static SmallIntVal Add_SmallIntVal_SmallIntVal(

@@ -340,6 +340,9 @@ EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
 "'" { return newToken(SqlParserSymbols.UNMATCHED_STRING_LITERAL, null); }
 "`" { return newToken(SqlParserSymbols.UNMATCHED_STRING_LITERAL, null); }
 
+// double-character tokens
+"!=" { return newToken(SqlParserSymbols.NOTEQUAL, null); }
+
 // The rules for IntegerLiteral and DecimalLiteral are the same, but it is useful
 // to distinguish them, e.g., so the Parser can use integer literals without analysis.
 {IntegerLiteral} {

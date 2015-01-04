@@ -1864,3 +1864,20 @@ where regexp_replace(x, y, z) = 'cde'
 AnalysisException: Error evaluating "regexp_replace('abc', '*', 'def') = 'cde'"
 CAUSED BY: InternalException: Could not compile regexp pattern: *
 Error: no argument for repetition operator: *
+====
+---- QUERY
+# Test for factorial operator
+select distinct int_col, int_col! from functional.alltypes order by 1
+---- RESULTS
+0,1
+1,1
+2,2
+3,6
+4,24
+5,120
+6,720
+7,5040
+8,40320
+9,362880
+---- TYPES
+INT,BIGINT

@@ -1045,18 +1045,23 @@ public class ParserTest {
     for (String lop: operands_) {
       for (String rop: operands_) {
         for (ArithmeticExpr.Operator op : ArithmeticExpr.Operator.values()) {
-          // Test BITNOT separately.
-          if (op == ArithmeticExpr.Operator.BITNOT) {
-            continue;
+          String expr = null;
+          switch (op.getPos()) {
+            case BINARY_INFIX:
+              expr = String.format("%s %s %s", lop, op.toString(), rop);
+              break;
+            case UNARY_POSTFIX:
+              expr = String.format("%s %s", lop, op.toString());
+              break;
+            case UNARY_PREFIX:
+              expr = String.format("%s %s", op.toString(), lop);
+              break;
+            default:
+              fail("Unknown operator kind: " + op.getPos());
           }
-          String expr = String.format("%s %s %s", lop, op.toString(), rop);
           ParsesOk(String.format("select %s from t where %s", expr, expr));
         }
       }
-      // Test BITNOT.
-      String bitNotExpr = String.format("%s %s",
-          ArithmeticExpr.Operator.BITNOT.toString(), lop);
-      ParsesOk(String.format("select %s from t where %s", bitNotExpr, bitNotExpr));
     }
     ParserError("select (i + 5)(1 - i) from t");
     ParserError("select %a from t");
@@ -1066,6 +1071,42 @@ public class ParserTest {
     ParserError("select |a from t");
     ParserError("select ^a from t");
     ParserError("select a ~ a from t");
+  }
+
+  @Test
+  public void TestFactorialPrecedenceAssociativity() {
+    // Test factorial precedence relative to other arithmetic operators.
+    // Should be parsed as 3 + (3!)
+    // TODO: disabled b/c IMPALA-2149 - low precedence of prefix ! prevents this from
+    // parsing in the expected way
+    SelectStmt stmt = (SelectStmt) ParsesOk("SELECT 3 + 3!");
+    Expr e = stmt.getSelectList().getItems().get(0).getExpr();
+    assertTrue(e instanceof ArithmeticExpr);
+    // ArithmeticExpr ae = (ArithmeticExpr) e;
+    // assertEquals("Expected ! to bind more tightly than +",
+    //              ArithmeticExpr.Operator.ADD, ae.getOp());
+    // assertEquals(2, ae.getChildren().size());
+    // assertTrue(ae.getChild(1) instanceof ArithmeticExpr);
+    // assertEquals(ArithmeticExpr.Operator.FACTORIAL,
+    //              ((ArithmeticExpr)ae.getChild(1)).getOp());
+
+    // Test factorial associativity.
+    stmt = (SelectStmt) ParsesOk("SELECT 3! = 4");
+    // Should be parsed as (3!) = (4)
+    e = stmt.getSelectList().getItems().get(0).getExpr();
+    assertTrue(e instanceof BinaryPredicate);
+    BinaryPredicate bp = (BinaryPredicate) e;
+    assertEquals(BinaryPredicate.Operator.EQ, bp.getOp());
+    assertEquals(2, bp.getChildren().size());
+
+    // Test != not broken
+    stmt = (SelectStmt) ParsesOk("SELECT 3 != 4");
+    // Should be parsed as (3) != (4)
+    e = stmt.getSelectList().getItems().get(0).getExpr();
+    assertTrue(e instanceof BinaryPredicate);
+    bp = (BinaryPredicate) e;
+    assertEquals(BinaryPredicate.Operator.NE, bp.getOp());
+    assertEquals(2, bp.getChildren().size());
   }
 
   /**
