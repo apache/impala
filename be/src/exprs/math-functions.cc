@@ -76,11 +76,17 @@ ONE_ARG_MATH_FN(Sinh, DoubleVal, DoubleVal, sinh);
 ONE_ARG_MATH_FN(Sqrt, DoubleVal, DoubleVal, sqrt);
 ONE_ARG_MATH_FN(Ceil, BigIntVal, DoubleVal, ceil);
 ONE_ARG_MATH_FN(Floor, BigIntVal, DoubleVal, floor);
+ONE_ARG_MATH_FN(Truncate, BigIntVal, DoubleVal, trunc);
 ONE_ARG_MATH_FN(Ln, DoubleVal, DoubleVal, log);
 ONE_ARG_MATH_FN(Log10, DoubleVal, DoubleVal, log10);
 ONE_ARG_MATH_FN(Exp, DoubleVal, DoubleVal, exp);
 
 TWO_ARG_MATH_FN(Atan2, DoubleVal, DoubleVal, DoubleVal, atan2);
+
+DoubleVal MathFunctions::Cot(FunctionContext* ctx, const DoubleVal& v) {
+  if (v.is_null) return DoubleVal::null();
+  return DoubleVal(tan(M_PI_2 - v.val));
+}
 
 FloatVal MathFunctions::Sign(FunctionContext* ctx, const DoubleVal& v) {
   if (v.is_null) return FloatVal::null();

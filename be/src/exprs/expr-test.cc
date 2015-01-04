@@ -2348,6 +2348,8 @@ TEST_F(ExprTest, MathTrigonometricFunctions) {
   TestValue("sinh(-pi())", TYPE_DOUBLE, sinh(M_PI * -1.0));
   TestValue("atan2(1,0)", TYPE_DOUBLE, atan2(1,0));
   TestValue("atan2(-1,0)", TYPE_DOUBLE, atan2(-1,0));
+  TestValue("cot(pi() / 2.0)", TYPE_DOUBLE, tan(0.0));
+  TestValue("cot(pi())", TYPE_DOUBLE, tan(M_PI_2 - M_PI));
   // this gets a very very small number rather than 0.
   // TestValue("radians(0)", TYPE_DOUBLE, 0);
   TestValue("radians(180.0)", TYPE_DOUBLE, M_PI);
@@ -2361,6 +2363,7 @@ TEST_F(ExprTest, MathTrigonometricFunctions) {
   TestIsNull("acos(NULL)", TYPE_DOUBLE);
   TestIsNull("tan(NULL)", TYPE_DOUBLE);
   TestIsNull("atan(NULL)", TYPE_DOUBLE);
+  TestIsNull("cot(NULL)", TYPE_DOUBLE);
   TestIsNull("radians(NULL)", TYPE_DOUBLE);
   TestIsNull("degrees(NULL)", TYPE_DOUBLE);
 }
@@ -2791,6 +2794,8 @@ TEST_F(ExprTest, MathRoundingFunctions) {
   TestValue("ceiling(cast(-10.05 as double))", TYPE_BIGINT, -10);
   TestValue("floor(cast(0.1 as double))", TYPE_BIGINT, 0);
   TestValue("floor(cast(-10.007 as double))", TYPE_BIGINT, -11);
+  TestValue("truncate(cast(0.1 as double))", TYPE_BIGINT, 0);
+  TestValue("truncate(cast(-10.007 as double))", TYPE_BIGINT, -10);
 
   TestValue("round(cast(1.499999 as double))", TYPE_BIGINT, 1);
   TestValue("round(cast(1.5 as double))", TYPE_BIGINT, 2);
@@ -2816,6 +2821,7 @@ TEST_F(ExprTest, MathRoundingFunctions) {
   TestIsNull("ceil(cast(NULL as double))", TYPE_BIGINT);
   TestIsNull("ceiling(cast(NULL as double))", TYPE_BIGINT);
   TestIsNull("floor(cast(NULL as double))", TYPE_BIGINT);
+  TestIsNull("truncate(cast(NULL as double))", TYPE_BIGINT);
   TestIsNull("round(cast(NULL as double))", TYPE_BIGINT);
   TestIsNull("round(cast(NULL as double), 1)", TYPE_DOUBLE);
   TestIsNull("round(cast(3.14159265 as double), NULL)", TYPE_DOUBLE);

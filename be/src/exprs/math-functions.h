@@ -44,6 +44,7 @@ class MathFunctions {
   static DoubleVal Cos(FunctionContext*, const DoubleVal&);
   static DoubleVal Acos(FunctionContext*, const DoubleVal&);
   static DoubleVal Tan(FunctionContext*, const DoubleVal&);
+  static DoubleVal Cot(FunctionContext*, const DoubleVal&);
   static DoubleVal Atan(FunctionContext*, const DoubleVal&);
   static DoubleVal Atan2(FunctionContext*, const DoubleVal&, const DoubleVal&);
   static DoubleVal Cosh(FunctionContext*, const DoubleVal&);
@@ -53,6 +54,7 @@ class MathFunctions {
   static DoubleVal Exp(FunctionContext*, const DoubleVal&);
   static BigIntVal Ceil(FunctionContext*, const DoubleVal&);
   static BigIntVal Floor(FunctionContext*, const DoubleVal&);
+  static BigIntVal Truncate(FunctionContext*, const DoubleVal&);
   static DoubleVal Ln(FunctionContext*, const DoubleVal&);
   static DoubleVal Log10(FunctionContext*, const DoubleVal&);
   static FloatVal Sign(FunctionContext*, const DoubleVal&);
