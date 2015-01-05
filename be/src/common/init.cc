@@ -44,6 +44,10 @@ DECLARE_int32(logbufsecs);
 DECLARE_string(heap_profile_dir);
 DECLARE_bool(enable_process_lifetime_heap_profiling);
 
+DEFINE_int32(max_log_files, 10, "Maximum number of log files to retain per severity "
+    "level. The most recent log files are retained. If set to 0, all log files are "
+    "retained.");
+
 // tcmalloc will hold on to freed memory. We will periodically release the memory back
 // to the OS if the extra memory is too high. If the memory used by the application
 // is less than this fraction of the total reserved memory, free it back to the OS.
@@ -99,6 +103,9 @@ static void MaintenanceThread() {
 #endif
     // TODO: we should also update the process mem tracker with the reported JVM
     // mem usage.
+
+    // Check for log rotation in every interval of the maintenance thread
+    impala::CheckAndRotateLogFiles(FLAGS_max_log_files);
   }
 }
 
