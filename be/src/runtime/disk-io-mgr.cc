@@ -893,7 +893,13 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, RequestContext* reader
   }
 
   bool queue_full = buffer->scan_range_->EnqueueBuffer(buffer);
-  if (!buffer->eosr_) {
+  if (buffer->eosr_) {
+    // For cached buffers, we can't close the range until the cached buffer is returned.
+    // Close() is called from DiskIoMgr::ReturnBuffer().
+    if (buffer->scan_range_->cached_buffer_ == NULL) {
+      buffer->scan_range_->Close();
+    }
+  } else {
     if (queue_full) {
       reader->blocked_ranges_.Enqueue(buffer->scan_range_);
     } else {

@@ -261,6 +261,8 @@ Status DiskIoMgr::ScanRange::Open() {
     }
 
     if (hdfsSeek(reader_->hdfs_connection_, hdfs_file_, offset_) != 0) {
+      hdfsCloseFile(reader_->hdfs_connection_, hdfs_file_);
+      hdfs_file_ = NULL;
       string error_msg = GetHdfsErrorMsg("");
       stringstream ss;
       ss << "Error seeking to " << offset_ << " in file: " << file_ << " " << error_msg;
@@ -277,6 +279,8 @@ Status DiskIoMgr::ScanRange::Open() {
       return Status(ss.str());
     }
     if (fseek(local_file_, offset_, SEEK_SET) == -1) {
+      fclose(local_file_);
+      local_file_ = NULL;
       string error_msg = GetStrErrMsg();
       stringstream ss;
       ss << "Could not seek to " << offset_ << " for file: " << file_
