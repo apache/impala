@@ -538,10 +538,9 @@ public class HdfsTable extends Table {
       Column col = new Column(s.getName(), type, s.getComment(), pos);
       addColumn(col);
       ++pos;
-
-      // Load and set column stats in col.
-      loadColumnStats(col, client);
     }
+
+    loadAllColumnStats(client);
   }
 
   /**
@@ -1188,6 +1187,16 @@ public class HdfsTable extends Table {
         IOUtils.closeQuietly(urlStream);
       }
     }
+  }
+
+  @Override
+  protected List<String> getColumnNamesWithHmsStats() {
+    List<String> ret = Lists.newArrayList();
+    // Only non-partition columns have column stats in the HMS.
+    for (Column column: getColumns().subList(numClusteringCols_, getColumns().size())) {
+      ret.add(column.getName().toLowerCase());
+    }
+    return ret;
   }
 
   @Override

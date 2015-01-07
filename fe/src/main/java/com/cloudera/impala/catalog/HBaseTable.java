@@ -58,6 +58,7 @@ import com.cloudera.impala.thrift.TTableType;
 import com.cloudera.impala.util.StatsHelper;
 import com.cloudera.impala.util.TResultRowBuilder;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * Impala representation of HBase table metadata,
@@ -305,7 +306,7 @@ public class HBaseTable extends Table {
 
       // Populate tmp cols in the order they appear in the Hive metastore.
       // We will reorder the cols below.
-      List<HBaseColumn> tmpCols = new ArrayList<HBaseColumn>();
+      List<HBaseColumn> tmpCols = Lists.newArrayList();
       // Store the key column separately.
       // TODO: Change this to an ArrayList once we support composite row keys.
       HBaseColumn keyCol = null;
@@ -321,8 +322,6 @@ public class HBaseTable extends Table {
         HBaseColumn col = new HBaseColumn(s.getName(), hbaseColumnFamilies.get(i),
             hbaseColumnQualifiers.get(i), hbaseColumnBinaryEncodings.get(i),
             t, s.getComment(), -1);
-        // Load column stats from the Hive metastore into col.
-        loadColumnStats(col, client);
         if (col.getColumnFamily().equals(ROW_KEY_COLUMN_FAMILY)) {
           // Store the row key column separately from the rest
           keyCol = col;
@@ -354,6 +353,7 @@ public class HBaseTable extends Table {
       // since we don't support composite hbase rowkeys yet, all hbase tables have a
       // single clustering col
       numClusteringCols_ = 1;
+      loadAllColumnStats(client);
     } catch (Exception e) {
       throw new TableLoadingException("Failed to load metadata for HBase table: " +
           name_, e);

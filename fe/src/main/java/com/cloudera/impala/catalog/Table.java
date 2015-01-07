@@ -35,6 +35,8 @@ import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableStats;
+
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -129,37 +131,54 @@ public abstract class Table implements CatalogObject {
     if (ddlTime > lastDdlTime_) lastDdlTime_ = ddlTime;
   }
 
+  // Returns a list of all column names for this table which we expect to have column
+  // stats in the HMS. This exists because, when we request the column stats from HMS,
+  // including a column name that does not have stats causes the
+  // getTableColumnStatistics() to return nothing. For Hdfs tables, partition columns do
+  // not have column stats in the HMS, but HBase table clustering columns do have column
+  // stats. This method allows each table type to volunteer the set of columns we should
+  // ask the metastore for in loadAllColumnStats().
+  protected List<String> getColumnNamesWithHmsStats() {
+    List<String> ret = Lists.newArrayList();
+    for (String name: colsByName_.keySet()) ret.add(name);
+    return ret;
+  }
+
   /**
-   * Loads the column stats for col from the Hive Metastore.
-   * TODO: Load column stats in bulk using new getTableColumnStatistics API.
+   * Loads column statistics for all columns in this table from the Hive metastore. Any
+   * errors are logged and ignored, since the absence of column stats is not critical to
+   * the correctness of the system.
    */
-  protected void loadColumnStats(Column col, HiveMetaStoreClient client) {
-    List<ColumnStatisticsObj> colStats = Lists.newArrayList();
+  protected void loadAllColumnStats(HiveMetaStoreClient client) {
+    LOG.debug("Loading column stats for table: " + name_);
+    List<ColumnStatisticsObj> colStats;
+
+    // We need to only query those columns which may have stats; asking HMS for other
+    // columns causes loadAllColumnStats() to return nothing.
+    List<String> colNames = getColumnNamesWithHmsStats();
+
     try {
-      colStats = client.getTableColumnStatistics(db_.getName(), name_,
-          Lists.newArrayList(col.getName()));
+      colStats = client.getTableColumnStatistics(db_.getName(), name_, colNames);
     } catch (Exception e) {
-      // don't try to load stats for this column
+      LOG.warn("Could not load column statistics for: " + getFullName(), e);
       return;
     }
 
-    // we should never see more than one ColumnStatisticsObj here
-    if (colStats.size() != 1) return;
+    for (ColumnStatisticsObj stats: colStats) {
+      Column col = getColumn(stats.getColName());
+      Preconditions.checkNotNull(col);
+      if (!ColumnStats.isSupportedColType(col.getType())) {
+        LOG.warn(String.format("Statistics for %s, column %s are not supported as " +
+                "column has type %s", getFullName(), col.getName(), col.getType()));
+        continue;
+      }
 
-    if (!ColumnStats.isSupportedColType(col.getType())) {
-      LOG.warn(String.format("Column stats are available for table %s / " +
-          "column '%s', but Impala does not currently support column stats for this " +
-          "type of column (%s)",  name_, col.getName(), col.getType().toString()));
-      return;
-    }
-
-    // Update the column stats data
-    if (!col.updateStats(colStats.get(0).getStatsData())) {
-      LOG.warn(String.format("Applying the column stats update to table %s / " +
-          "column '%s' did not succeed because column type (%s) was not compatible " +
-          "with the column stats data. Performance may suffer until column stats are" +
-          " regenerated for this column.",
-          name_, col.getName(), col.getType().toString()));
+      if (!col.updateStats(stats.getStatsData())) {
+        LOG.warn(String.format("Failed to load column stats for %s, column %s. Stats " +
+            "may be incompatible with column type %s. Consider regenerating statistics " +
+            "for %s.", getFullName(), col.getName(), col.getType(), getFullName()));
+        continue;
+      }
     }
   }
 
