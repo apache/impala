@@ -31,7 +31,7 @@ class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
       cls.hdfs_client = get_hdfs_client_from_conf(hdfs_conf)
     else:
       host, port = pytest.config.option.namenode_http_address.split(":")
-      cls.hdfs_client = get_hdfs_client()
+      cls.hdfs_client = get_hdfs_client(host, port)
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--insert_inherit_permissions=true")

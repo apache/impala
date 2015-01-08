@@ -93,7 +93,7 @@ class ImpalaTestSuite(BaseTestSuite):
       cls.hdfs_client = get_hdfs_client_from_conf(HDFS_CONF)
     else:
       host, port = pytest.config.option.namenode_http_address.split(":")
-      cls.hdfs_client = get_hdfs_client()
+      cls.hdfs_client = get_hdfs_client(host, port)
 
   @classmethod
   def teardown_class(cls):
