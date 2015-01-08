@@ -16,6 +16,7 @@
 
 #include <sstream>
 #include <boost/algorithm/string/join.hpp>
+#include <boost/algorithm/string.hpp>
 
 using namespace std;
 using namespace boost;
@@ -126,6 +127,14 @@ impala::Status LlamaStatusToImpalaStatus(const TStatus& status,
   stringstream ss;
   ss << err_prefix << " " << join(status.error_msgs, ", ");
   return impala::Status(ss.str());
+}
+
+string GetShortName(const string& user) {
+  if (user.empty() || user[0] == '/' || user[0] == '@') return user;
+
+  vector<string> components;
+  split(components, user, is_any_of("/@"));
+  return components[0];
 }
 
 }

@@ -26,6 +26,7 @@
 #include "util/uid-util.h"
 #include "util/debug-util.h"
 #include "util/parse-util.h"
+#include "util/llama-util.h"
 
 using namespace std;
 using namespace boost;
@@ -165,7 +166,9 @@ void QuerySchedule::PrepareReservationRequest(const string& pool, const string& 
   reservation_request_.version = TResourceBrokerServiceVersion::V1;
   reservation_request_.queue = pool;
   reservation_request_.gang = true;
-  reservation_request_.user = user;
+  // Convert the user name to a short name (e.g. 'user1@domain' to 'user1') because
+  // Llama checks group membership based on the short name of the principal.
+  reservation_request_.user = llama::GetShortName(user);
 
   // Set optional request timeout from query options.
   if (query_options_.__isset.reservation_request_timeout) {

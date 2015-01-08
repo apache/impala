@@ -61,6 +61,10 @@ inline std::size_t hash_value(const llama::TUniqueId& id) {
   return seed;
 }
 
+// Get the short version of the user name (the user's name up to the first '/' or '@')
+// If neither are found (or are found at the beginning of the user name) return username.
+std::string GetShortName(const std::string& user);
+
 }
 
 #endif
