@@ -294,6 +294,7 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
 
   output_partition->tmp_hdfs_file = hdfsOpenFile(hdfs_connection_,
       tmp_hdfs_file_name_cstr, O_WRONLY, 0, 0, block_size);
+  VLOG_FILE << "hdfsOpenFile() file=" << tmp_hdfs_file_name_cstr;
   if (output_partition->tmp_hdfs_file == NULL) {
     return Status(GetHdfsErrorMsg("Failed to open HDFS file for writing: ",
         output_partition->current_file_name));
@@ -586,6 +587,7 @@ Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
 void HdfsTableSink::ClosePartitionFile(RuntimeState* state, OutputPartition* partition) {
   if (partition->tmp_hdfs_file == NULL) return;
   int hdfs_ret = hdfsCloseFile(hdfs_connection_, partition->tmp_hdfs_file);
+  VLOG_FILE << "hdfsCloseFile() file=" << partition->current_file_name;
   if (hdfs_ret != 0) {
     state->LogError(GetHdfsErrorMsg("Failed to close HDFS file: ",
         partition->current_file_name));

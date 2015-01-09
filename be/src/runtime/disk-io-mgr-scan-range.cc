@@ -256,12 +256,14 @@ Status DiskIoMgr::ScanRange::Open() {
     // TODO: is there much overhead opening hdfs files?  Should we try to preserve
     // the handle across multiple scan ranges of a file?
     hdfs_file_ = hdfsOpenFile(reader_->hdfs_connection_, file(), O_RDONLY, 0, 0, 0);
+    VLOG_FILE << "hdfsOpenFile() file=" << file();
     if (hdfs_file_ == NULL) {
       return Status(GetHdfsErrorMsg("Failed to open HDFS file ", file_));
     }
 
     if (hdfsSeek(reader_->hdfs_connection_, hdfs_file_, offset_) != 0) {
       hdfsCloseFile(reader_->hdfs_connection_, hdfs_file_);
+      VLOG_FILE << "hdfsCloseFile() (error) file=" << file();
       hdfs_file_ = NULL;
       string error_msg = GetHdfsErrorMsg("");
       stringstream ss;
@@ -324,6 +326,7 @@ void DiskIoMgr::ScanRange::Close() {
       cached_buffer_ = NULL;
     }
     hdfsCloseFile(reader_->hdfs_connection_, hdfs_file_);
+    VLOG_FILE << "hdfsCloseFile() file=" << file();
     hdfs_file_ = NULL;
   } else {
     if (local_file_ == NULL) return;
