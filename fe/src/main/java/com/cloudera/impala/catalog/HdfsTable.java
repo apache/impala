@@ -596,9 +596,9 @@ public class HdfsTable extends Table {
     // exist.
     addDefaultPartition(msTbl.getSd());
 
-    // We silently ignore cache directives that no longer exist in HDFS
-    isMarkedCached_ =
-        HdfsCachingUtil.getCacheDirectiveId(msTbl.getParameters()) != null;
+    // We silently ignore cache directives that no longer exist in HDFS, and remove
+    // non-existing cache directives from the parameters.
+    isMarkedCached_ = HdfsCachingUtil.validateCacheParams(msTbl.getParameters());
 
     if (msTbl.getPartitionKeysSize() == 0) {
       Preconditions.checkArgument(msPartitions == null || msPartitions.isEmpty());
@@ -725,8 +725,7 @@ public class HdfsTable extends Table {
     boolean isMarkedCached = isMarkedCached_;
     List<LiteralExpr> keyValues = Lists.newArrayList();
     if (msPartition != null) {
-      isMarkedCached =
-          HdfsCachingUtil.getCacheDirectiveId(msPartition.getParameters()) != null;
+      isMarkedCached = HdfsCachingUtil.validateCacheParams(msPartition.getParameters());
       // Load key values
       for (String partitionKey: msPartition.getValues()) {
         Type type = getColumns().get(keyValues.size()).getType();

@@ -1,0 +1,62 @@
+====
+---- QUERY
+# If the cache directive was deleted outside of Impala, the metadata
+# will not reflect this change until the table is reloaded.
+show table stats cachedb.cached_tbl_reload
+---- RESULTS
+-1,0,'0B','0B','8','TEXT','false'
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show table stats cachedb.cached_tbl_reload_part
+---- RESULTS
+'1',-1,0,'0B','0B','8','TEXT','false'
+'2',-1,0,'0B','0B','8','TEXT','false'
+'Total',-1,0,'0B',regex:.+B,'','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Inserting into now uncached partition will not fail, IMPALA-1632
+insert into cachedb.cached_tbl_reload_part partition (j) values (1, 1)
+====
+---- QUERY
+select * from cachedb.cached_tbl_reload_part
+---- RESULTS
+1,1
+---- TYPES
+INT, INT
+====
+---- QUERY
+invalidate metadata cachedb.cached_tbl_reload
+====
+---- QUERY
+invalidate metadata cachedb.cached_tbl_reload_part
+====
+---- QUERY
+# Once the metadata is updated, the table no longer appears as cached
+show table stats cachedb.cached_tbl_reload
+---- RESULTS
+-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false'
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# The parent test method modified the cached partitioned table so that
+# the cache directive information for the overall table and partition j=1
+# was deleted after reloading the table. Adding a new partition (j=3)
+# will result in adding an uncached partition.
+alter table cachedb.cached_tbl_reload_part add partition (j=3)
+====
+---- QUERY
+# Validate that new partition is uncached.
+show table stats cachedb.cached_tbl_reload_part
+---- RESULTS
+'1',-1,1,regex:.+B,'NOT CACHED','NOT CACHED','TEXT','false'
+'2',-1,0,'0B','0B','3','TEXT','false'
+'3',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false'
+'Total',-1,1,regex:.+B,regex:.+B,'','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+====

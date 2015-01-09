@@ -97,10 +97,15 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
         v.get_value('table_format').file_format == 'text' and \
         v.get_value('table_format').compression_codec == 'none')
 
+  def setup_method(self, method):
+    self.cleanup_db("cachedb")
+    self.client.execute("create database cachedb")
+
+  def teardown_method(self, method):
+    self.cleanup_db("cachedb")
+
   @pytest.mark.execute_serially
   def test_caching_ddl(self, vector):
-    self.client.execute("drop table if exists functional.cached_tbl_part")
-    self.client.execute("drop table if exists functional.cached_tbl_nopart")
 
     # Get the number of cache requests before starting the test
     num_entries_pre = get_num_cache_requests()
@@ -110,12 +115,63 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
     # In this case, 1 for each table + 7 more for each cached partition.
     assert num_entries_pre == get_num_cache_requests() - 8
 
-    self.client.execute("drop table functional.cached_tbl_part")
-    self.client.execute("drop table functional.cached_tbl_nopart")
+    self.client.execute("drop table cachedb.cached_tbl_part")
+    self.client.execute("drop table cachedb.cached_tbl_nopart")
 
     # Dropping the tables should cleanup cache entries leaving us with the same
     # total number of entries
     assert num_entries_pre == get_num_cache_requests()
+
+  @pytest.mark.execute_serially
+  def test_cache_reload_validation(self, vector):
+    """This is a set of tests asserting that cache directives modified
+       outside of Impala are picked up after reload, cf IMPALA-1645"""
+
+    num_entries_pre = get_num_cache_requests()
+    create_table = ("create table cachedb.cached_tbl_reload "
+        "(id int) cached in 'testPool' with replication = 8")
+    self.client.execute(create_table)
+
+    # Access the table once to load the metadata
+    self.client.execute("select count(*) from cachedb.cached_tbl_reload")
+
+    create_table = ("create table cachedb.cached_tbl_reload_part (i int) "
+        "partitioned by (j int) cached in 'testPool' with replication = 8")
+    self.client.execute(create_table)
+
+    # Add two partitions
+    self.client.execute("alter table cachedb.cached_tbl_reload_part add partition (j=1)")
+    self.client.execute("alter table cachedb.cached_tbl_reload_part add partition (j=2)")
+
+    assert num_entries_pre + 4 == get_num_cache_requests(), \
+      "Adding the tables should be reflected by the number of cache directives."
+
+    # Modify the cache directive outside of Impala and reload the table to verify
+    # that changes are visible
+    drop_cache_directives_for_path("/test-warehouse/cachedb.db/cached_tbl_reload")
+    drop_cache_directives_for_path("/test-warehouse/cachedb.db/cached_tbl_reload_part")
+    drop_cache_directives_for_path(
+        "/test-warehouse/cachedb.db/cached_tbl_reload_part/j=1")
+    change_cache_directive_repl_for_path(
+        "/test-warehouse/cachedb.db/cached_tbl_reload_part/j=2", 3)
+
+    self.run_test_case('QueryTest/hdfs-caching-validation', vector)
+
+def drop_cache_directives_for_path(path):
+  """Drop the cache directive for a given path"""
+  rc, stdout, stderr = exec_process("hdfs cacheadmin -removeDirectives -path %s" % path)
+  assert rc == 0, \
+      "Error removing cache directive for path %s (%s, %s)" % (path, stdout, stderr)
+
+def change_cache_directive_repl_for_path(path, repl):
+  """Drop the cache directive for a given path"""
+  rc, stdout, stderr = exec_process("hdfs cacheadmin -listDirectives -path %s" % path)
+  assert rc == 0
+  dirid = re.search('^\s+?(\d+)\s+?testPool\s+?.*?$', stdout, re.MULTILINE).group(1)
+  rc, stdout, stderr = exec_process(
+    "hdfs cacheadmin -modifyDirective -id %s -replication %s" % (dirid, repl))
+  assert rc == 0, \
+      "Error modifying cache directive for path %s (%s, %s)" % (path, stdout, stderr)
 
 def get_num_cache_requests():
   """Returns the number of outstanding cache requests"""

@@ -24,6 +24,7 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveEntry;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo;
 import org.apache.hadoop.hdfs.protocol.CacheDirectiveInfo.Expiration;
+import org.apache.hadoop.ipc.RemoteException;
 import org.apache.log4j.Logger;
 
 import com.cloudera.impala.analysis.TableName;
@@ -149,7 +150,8 @@ public class HdfsCachingUtil {
    * Given a cache directive ID, returns the pool the directive is cached in.
    * Returns null if no outstanding cache directive match this ID.
    */
-  public static String getCachePool(long directiveId) throws ImpalaRuntimeException {
+  public static String getCachePool(long directiveId)
+      throws ImpalaRuntimeException {
     CacheDirectiveEntry entry = getDirective(directiveId);
     return entry == null ? null : entry.getInfo().getPool();
   }
@@ -171,10 +173,7 @@ public class HdfsCachingUtil {
   public static Short getCachedCacheReplication(Map<String, String> params) {
     Preconditions.checkNotNull(params);
     String replication = params.get(CACHE_DIR_REPLICATION_PROP_NAME);
-    // For compatibility with tables created before allowing a custom replication factor
-    if (replication == null) {
-      return JniCatalogConstants.HDFS_DEFAULT_CACHE_REPLICATION_FACTOR;
-    }
+    Preconditions.checkNotNull(replication);
     try {
       return Short.parseShort(replication);
     } catch (NumberFormatException e) {
@@ -349,14 +348,13 @@ public class HdfsCachingUtil {
         .build();
     try {
       RemoteIterator<CacheDirectiveEntry> itr = dfs.listCacheDirectives(filter);
-      while (itr.hasNext()) {
-        CacheDirectiveEntry entry = itr.next();
-        if (entry.getInfo().getId() == directiveId) return entry;
-      }
+      if (itr.hasNext()) return itr.next();
     } catch (IOException e) {
+      // Handle connection issues with e.g. HDFS and possible not found errors
       throw new ImpalaRuntimeException(e.getMessage(), e);
     }
-    return null;
+    throw new ImpalaRuntimeException(
+        "HDFS cache directive filter returned empty result. This must not happen");
   }
 
   /**
@@ -407,7 +405,8 @@ public class HdfsCachingUtil {
    * Validates the properties of the chosen cache pool. Throws on error.
    */
   public static void validateCachePool(THdfsCachingOp op, Long directiveId,
-      TableName table, HdfsPartition partition) throws ImpalaRuntimeException {
+      TableName table, HdfsPartition partition)
+      throws ImpalaRuntimeException {
 
     CacheDirectiveEntry entry = getDirective(directiveId);
     Preconditions.checkNotNull(entry);
@@ -430,5 +429,48 @@ public class HdfsCachingUtil {
   public static void validateCachePool(THdfsCachingOp op, Long directiveId,
       TableName table) throws ImpalaRuntimeException {
     validateCachePool(op, directiveId, table, null);
+  }
+
+  /**
+   * Validates and returns true if a parameter map contains a cache directive ID and
+   * validates it against the NameNode to make sure it exists. If the cache
+   * directive ID does not exist, we remove the value from the parameter map,
+   * issue a log message and return false. As the value is not written back to the
+   * Hive MS from this method, the result will be only valid until the next metadata
+   * fetch. Lastly, we update the cache replication factor in the parameters with the
+   * value read from HDFS.
+   */
+  public static boolean validateCacheParams(Map<String, String> params) {
+    Long directiveId = getCacheDirectiveId(params);
+    if (directiveId == null) return false;
+
+    CacheDirectiveEntry entry = null;
+    try {
+      entry = getDirective(directiveId);
+    } catch (ImpalaRuntimeException e) {
+      if (e.getCause() != null && e.getCause() instanceof RemoteException) {
+        // This exception signals that the cache directive no longer exists.
+        LOG.error("Cache directive does not exist", e);
+        params.remove(CACHE_DIR_ID_PROP_NAME);
+        params.remove(CACHE_DIR_REPLICATION_PROP_NAME);
+      } else {
+        // This exception signals that there was a connection problem with HDFS.
+        LOG.error("IO Exception, possible connectivity issues with HDFS", e);
+      }
+      return false;
+    }
+    Preconditions.checkNotNull(entry);
+
+    // Update the cache replication factor with the correct value from HDFS
+    if (Short.parseShort(params.get(CACHE_DIR_REPLICATION_PROP_NAME)) != entry.getInfo()
+        .getReplication()) {
+      LOG.info("Replication factor for entry in HDFS differs from value in Hive MS: " +
+          entry.getInfo().getPath().toString() + " " +
+          entry.getInfo().getReplication().toString() + " != " +
+          params.get(CACHE_DIR_REPLICATION_PROP_NAME));
+    }
+    params.put(CACHE_DIR_REPLICATION_PROP_NAME,
+        String.valueOf(entry.getInfo().getReplication()));
+    return true;
   }
 }

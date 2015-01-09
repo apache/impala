@@ -1,9 +1,6 @@
 ====
 ---- QUERY
-drop table if exists cached_tbl_nopart;
-====
----- QUERY
-drop table if exists cached_tbl_part;
+use cachedb
 ====
 ---- QUERY
 create table cached_tbl_nopart (i int) cached in 'testPool'

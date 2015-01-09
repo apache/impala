@@ -2358,10 +2358,21 @@ public class CatalogOpExecutor {
     Long cacheDirId = HdfsCachingUtil.getCacheDirectiveId(
         table.getMetaStoreTable().getParameters());
     if (cacheDirId != null) {
-      cachePoolName = HdfsCachingUtil.getCachePool(cacheDirId);
-      cacheReplication = HdfsCachingUtil.getCacheReplication(cacheDirId);
-      Preconditions.checkNotNull(cacheReplication);
-      if (table.getNumClusteringCols() == 0) cacheDirIds.add(cacheDirId);
+      try {
+        cachePoolName = HdfsCachingUtil.getCachePool(cacheDirId);
+        cacheReplication = HdfsCachingUtil.getCacheReplication(cacheDirId);
+        Preconditions.checkNotNull(cacheReplication);
+        if (table.getNumClusteringCols() == 0) cacheDirIds.add(cacheDirId);
+      } catch (ImpalaRuntimeException e) {
+        // Catch the error so that the actual update to the catalog can progress,
+        // this resets caching for the table though
+        LOG.error(
+            String.format("Cache directive %d was not found, uncache the table %s.%s" +
+                "to remove this message.", cacheDirId, update.getDb_name(),
+                update.getTarget_table()));
+        cacheDirId = null;
+      }
+
     }
 
     TableName tblName = new TableName(table.getDb().getName(), table.getName());
