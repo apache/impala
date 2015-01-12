@@ -298,7 +298,7 @@ DataStreamRecvr::DataStreamRecvr(DataStreamMgr* stream_mgr, MemTracker* parent_t
 
   // Initialize the counters
   bytes_received_counter_ =
-      ADD_COUNTER(profile_, "BytesReceived", TCounterType::BYTES);
+      ADD_COUNTER(profile_, "BytesReceived", TUnit::BYTES);
   bytes_received_time_series_counter_ =
       ADD_TIME_SERIES_COUNTER(profile_, "BytesReceived", bytes_received_counter_);
   deserialize_row_batch_timer_ =

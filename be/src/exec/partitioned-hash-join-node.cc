@@ -148,21 +148,21 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
 
   partition_build_timer_ = ADD_TIMER(runtime_profile(), "BuildPartitionTime");
   num_hash_buckets_ =
-      ADD_COUNTER(runtime_profile(), "HashBuckets", TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile(), "HashBuckets", TUnit::UNIT);
   partitions_created_ =
-      ADD_COUNTER(runtime_profile(), "PartitionsCreated", TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile(), "PartitionsCreated", TUnit::UNIT);
   max_partition_level_ = runtime_profile()->AddHighWaterMarkCounter(
-      "MaxPartitionLevel", TCounterType::UNIT);
+      "MaxPartitionLevel", TUnit::UNIT);
   num_build_rows_partitioned_ =
-      ADD_COUNTER(runtime_profile(), "BuildRowsPartitioned", TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile(), "BuildRowsPartitioned", TUnit::UNIT);
   num_probe_rows_partitioned_ =
-      ADD_COUNTER(runtime_profile(), "ProbeRowsPartitioned", TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile(), "ProbeRowsPartitioned", TUnit::UNIT);
   num_repartitions_ =
-      ADD_COUNTER(runtime_profile(), "NumRepartitions", TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile(), "NumRepartitions", TUnit::UNIT);
   num_spilled_partitions_ =
-      ADD_COUNTER(runtime_profile(), "SpilledPartitions", TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile(), "SpilledPartitions", TUnit::UNIT);
   largest_partition_percent_ = runtime_profile()->AddHighWaterMarkCounter(
-      "LargestPartitionPercent", TCounterType::UNIT);
+      "LargestPartitionPercent", TUnit::UNIT);
 
   if (state->codegen_enabled()) {
     // Codegen for hashing rows

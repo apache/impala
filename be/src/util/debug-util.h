@@ -41,7 +41,7 @@ std::ostream& operator<<(std::ostream& os, const TUniqueId& id);
 std::ostream& operator<<(std::ostream& os, const THdfsFileFormat::type& type);
 std::ostream& operator<<(std::ostream& os, const THdfsCompression::type& type);
 std::ostream& operator<<(std::ostream& os, const TStmtType::type& type);
-std::ostream& operator<<(std::ostream& os, const TCounterType::type& type);
+std::ostream& operator<<(std::ostream& os, const TUnit::type& type);
 std::ostream& operator<<(std::ostream& os, const TMetricKind::type& type);
 std::ostream& operator<<(std::ostream& os, const beeswax::QueryState::type& type);
 std::ostream& operator<<(std::ostream& os, const parquet::Encoding::type& type);
@@ -62,7 +62,7 @@ std::string PrintQueryState(const beeswax::QueryState::type& type);
 std::string PrintEncoding(const parquet::Encoding::type& type);
 std::string PrintAsHex(const char* bytes, int64_t len);
 std::string PrintTMetricKind(const TMetricKind::type& type);
-std::string PrintTCounterType(const TCounterType::type& type);
+std::string PrintTUnit(const TUnit::type& type);
 
 // Parse 's' into a TUniqueId object.  The format of s needs to be the output format
 // from PrintId.  (<hi_part>:<low_part>)

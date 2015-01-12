@@ -111,19 +111,19 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
   get_results_timer_ = ADD_TIMER(runtime_profile(), "GetResultsTime");
   num_hash_buckets_ =
-      ADD_COUNTER(runtime_profile(), "HashBuckets", TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile(), "HashBuckets", TUnit::UNIT);
   partitions_created_ =
-      ADD_COUNTER(runtime_profile(), "PartitionsCreated", TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile(), "PartitionsCreated", TUnit::UNIT);
   max_partition_level_ = runtime_profile()->AddHighWaterMarkCounter(
-      "MaxPartitionLevel", TCounterType::UNIT);
+      "MaxPartitionLevel", TUnit::UNIT);
   num_row_repartitioned_ =
-      ADD_COUNTER(runtime_profile(), "RowsRepartitioned", TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile(), "RowsRepartitioned", TUnit::UNIT);
   num_repartitions_ =
-      ADD_COUNTER(runtime_profile(), "NumRepartitions", TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile(), "NumRepartitions", TUnit::UNIT);
   num_spilled_partitions_ =
-      ADD_COUNTER(runtime_profile(), "SpilledPartitions", TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile(), "SpilledPartitions", TUnit::UNIT);
   largest_partition_percent_ = runtime_profile()->AddHighWaterMarkCounter(
-      "LargestPartitionPercent", TCounterType::UNIT);
+      "LargestPartitionPercent", TUnit::UNIT);
 
   intermediate_tuple_desc_ =
       state->desc_tbl().GetTupleDescriptor(intermediate_tuple_id_);

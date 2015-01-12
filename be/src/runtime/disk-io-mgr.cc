@@ -216,8 +216,8 @@ DiskIoMgr::DiskIoMgr() :
     min_buffer_size_(FLAGS_min_buffer_size),
     cached_read_options_(NULL),
     shut_down_(false),
-    total_bytes_read_counter_(TCounterType::BYTES),
-    read_timer_(TCounterType::TIME_NS) {
+    total_bytes_read_counter_(TUnit::BYTES),
+    read_timer_(TUnit::TIME_NS) {
   int64_t max_buffer_size_scaled = BitUtil::Ceil(max_buffer_size_, min_buffer_size_);
   free_buffers_.resize(BitUtil::Log2(max_buffer_size_scaled) + 1);
   int num_disks = FLAGS_num_disks;
@@ -233,8 +233,8 @@ DiskIoMgr::DiskIoMgr(int num_disks, int threads_per_disk, int min_buffer_size,
     min_buffer_size_(min_buffer_size),
     cached_read_options_(NULL),
     shut_down_(false),
-    total_bytes_read_counter_(TCounterType::BYTES),
-    read_timer_(TCounterType::TIME_NS) {
+    total_bytes_read_counter_(TUnit::BYTES),
+    read_timer_(TUnit::TIME_NS) {
   int64_t max_buffer_size_scaled = BitUtil::Ceil(max_buffer_size_, min_buffer_size_);
   free_buffers_.resize(BitUtil::Log2(max_buffer_size_scaled) + 1);
   if (num_disks == 0) num_disks = DiskInfo::num_disks();

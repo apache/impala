@@ -131,14 +131,14 @@ Status ExecNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::PREPARE, state));
   DCHECK(runtime_profile_.get() != NULL);
   rows_returned_counter_ =
-      ADD_COUNTER(runtime_profile_, "RowsReturned", TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile_, "RowsReturned", TUnit::UNIT);
   mem_tracker_.reset(new MemTracker(
       runtime_profile_.get(), -1, -1, runtime_profile_->name(),
       state->instance_mem_tracker()));
   expr_mem_tracker_.reset(new MemTracker(-1, -1, "Exprs", mem_tracker_.get(), false));
 
   rows_returned_rate_ = runtime_profile()->AddDerivedCounter(
-      ROW_THROUGHPUT_COUNTER, TCounterType::UNIT_PER_SECOND,
+      ROW_THROUGHPUT_COUNTER, TUnit::UNIT_PER_SECOND,
       bind<int64_t>(&RuntimeProfile::UnitsPerSecond, rows_returned_counter_,
         runtime_profile()->total_time_counter()));
 

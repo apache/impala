@@ -217,9 +217,9 @@ Statestore::Statestore(MetricGroup* metrics)
   topic_size_metric_ = metrics->AddGauge(STATESTORE_TOTAL_TOPIC_SIZE_BYTES, 0L);
 
   topic_update_duration_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>(STATESTORE_UPDATE_DURATION, TCounterType::TIME_S));
+      new StatsMetric<double>(STATESTORE_UPDATE_DURATION, TUnit::TIME_S));
   keepalive_duration_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>(STATESTORE_KEEPALIVE_DURATION, TCounterType::TIME_S));
+      new StatsMetric<double>(STATESTORE_KEEPALIVE_DURATION, TUnit::TIME_S));
 
   client_cache_->InitMetrics(metrics, "subscriber");
 }
@@ -263,14 +263,14 @@ void Statestore::TopicsHandler(const Webserver::ArgumentMap& args,
 
     int64_t key_size = topic.second.total_key_size_bytes();
     int64_t value_size = topic.second.total_value_size_bytes();
-    Value key_size_json(PrettyPrinter::Print(key_size, TCounterType::BYTES).c_str(),
+    Value key_size_json(PrettyPrinter::Print(key_size, TUnit::BYTES).c_str(),
         document->GetAllocator());
     topic_json.AddMember("key_size", key_size_json, document->GetAllocator());
-    Value value_size_json(PrettyPrinter::Print(value_size, TCounterType::BYTES).c_str(),
+    Value value_size_json(PrettyPrinter::Print(value_size, TUnit::BYTES).c_str(),
         document->GetAllocator());
     topic_json.AddMember("value_size", value_size_json, document->GetAllocator());
     Value total_size_json(
-        PrettyPrinter::Print(key_size + value_size, TCounterType::BYTES).c_str(),
+        PrettyPrinter::Print(key_size + value_size, TUnit::BYTES).c_str(),
         document->GetAllocator());
     topic_json.AddMember("total_size", total_size_json, document->GetAllocator());
     topics.PushBack(topic_json, document->GetAllocator());
@@ -495,7 +495,7 @@ void Statestore::GatherTopicUpdates(const Subscriber& subscriber,
             topic.total_key_size_bytes() + topic.total_value_size_bytes();
         VLOG_QUERY << "Preparing initial " << topic_delta.topic_name
                    << " topic update for " << subscriber.id() << ". Size = "
-                   << PrettyPrinter::Print(topic_size, TCounterType::BYTES);
+                   << PrettyPrinter::Print(topic_size, TUnit::BYTES);
       }
 
       TopicUpdateLog::const_iterator next_update =

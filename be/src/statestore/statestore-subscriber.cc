@@ -107,13 +107,13 @@ StatestoreSubscriber::StatestoreSubscriber(const std::string& subscriber_id,
       "statestore-subscriber.last-recovery-time", "N/A");
   topic_update_interval_metric_ = metrics->RegisterMetric(
       new StatsMetric<double>("statestore-subscriber.topic-update-interval-time",
-          TCounterType::TIME_S));
+          TUnit::TIME_S));
   topic_update_duration_metric_ = metrics->RegisterMetric(
       new StatsMetric<double>("statestore-subscriber.topic-update-duration",
-          TCounterType::TIME_S));
+          TUnit::TIME_S));
   keepalive_interval_metric_ = metrics->RegisterMetric(
       new StatsMetric<double>("statestore-subscriber.keepalive-interval-time",
-          TCounterType::TIME_S));
+          TUnit::TIME_S));
 
   registration_id_metric_ = metrics->AddProperty<string>(
       "statestore-subscriber.registration-id", "N/A",
@@ -132,7 +132,7 @@ Status StatestoreSubscriber::AddTopic(const Statestore::TopicId& topic_id,
   if (cb->processing_time_metric == NULL) {
     const string& metric_name = Substitute(CALLBACK_METRIC_PATTERN, topic_id);
     cb->processing_time_metric = metrics_->RegisterMetric(
-        new StatsMetric<double>(metric_name, TCounterType::TIME_S));
+        new StatsMetric<double>(metric_name, TUnit::TIME_S));
   }
   topic_registrations_[topic_id] = is_transient;
   return Status::OK;

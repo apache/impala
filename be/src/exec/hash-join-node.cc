@@ -81,9 +81,9 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
 
   build_buckets_counter_ =
-      ADD_COUNTER(runtime_profile(), "BuildBuckets", TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile(), "BuildBuckets", TUnit::UNIT);
   hash_tbl_load_factor_counter_ =
-      ADD_COUNTER(runtime_profile(), "LoadFactor", TCounterType::DOUBLE_VALUE);
+      ADD_COUNTER(runtime_profile(), "LoadFactor", TUnit::DOUBLE_VALUE);
 
   // build and probe exprs are evaluated in the context of the rows produced by our
   // right and left children, respectively

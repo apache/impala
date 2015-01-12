@@ -81,11 +81,11 @@ void FlagsHandler(const Webserver::ArgumentMap& args, Document* document) {
 void MemUsageHandler(MemTracker* mem_tracker, const Webserver::ArgumentMap& args,
     Document* document) {
   DCHECK(mem_tracker != NULL);
-  Value mem_limit(PrettyPrinter::Print(mem_tracker->limit(), TCounterType::BYTES).c_str(),
+  Value mem_limit(PrettyPrinter::Print(mem_tracker->limit(), TUnit::BYTES).c_str(),
       document->GetAllocator());
   document->AddMember("mem_limit", mem_limit, document->GetAllocator());
   Value consumption(
-      PrettyPrinter::Print(mem_tracker->consumption(), TCounterType::BYTES).c_str(),
+      PrettyPrinter::Print(mem_tracker->consumption(), TUnit::BYTES).c_str(),
       document->GetAllocator());
   document->AddMember("consumption", consumption, document->GetAllocator());
 

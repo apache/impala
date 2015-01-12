@@ -75,7 +75,7 @@ Status BaseSequenceScanner::Prepare(ScannerContext* context) {
   RETURN_IF_ERROR(HdfsScanner::Prepare(context));
   stream_->set_read_past_size_cb(bind(&BaseSequenceScanner::ReadPastSize, this, _1));
   bytes_skipped_counter_ = ADD_COUNTER(
-      scan_node_->runtime_profile(), "BytesSkipped", TCounterType::BYTES);
+      scan_node_->runtime_profile(), "BytesSkipped", TUnit::BYTES);
   return Status::OK;
 }
 

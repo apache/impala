@@ -409,7 +409,7 @@ class HdfsParquetScanner::BoolColumnReader : public HdfsParquetScanner::BaseColu
 Status HdfsParquetScanner::Prepare(ScannerContext* context) {
   RETURN_IF_ERROR(HdfsScanner::Prepare(context));
   num_cols_counter_ =
-      ADD_COUNTER(scan_node_->runtime_profile(), "NumColumns", TCounterType::UNIT);
+      ADD_COUNTER(scan_node_->runtime_profile(), "NumColumns", TUnit::UNIT);
 
   scan_node_->IncNumScannersCodegenDisabled();
   return Status::OK;
@@ -546,7 +546,7 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
         stringstream ss;
         ss << "ParquetScanner: could not read data page because page header exceeded "
            << "maximum size of "
-           << PrettyPrinter::Print(MAX_PAGE_HEADER_SIZE, TCounterType::BYTES);
+           << PrettyPrinter::Print(MAX_PAGE_HEADER_SIZE, TUnit::BYTES);
         status.AddErrorMsg(ss.str());
         return status;
       }

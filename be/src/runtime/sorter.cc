@@ -882,10 +882,10 @@ Status Sorter::Init() {
       block_mgr_->max_block_size(), sort_tuple_desc->byte_size(), state_));
   unsorted_run_ = obj_pool_.Add(new Run(this, sort_tuple_desc, true));
 
-  initial_runs_counter_ = ADD_COUNTER(profile_, "InitialRunsCreated", TCounterType::UNIT);
-  num_merges_counter_ = ADD_COUNTER(profile_, "TotalMergesPerformed", TCounterType::UNIT);
+  initial_runs_counter_ = ADD_COUNTER(profile_, "InitialRunsCreated", TUnit::UNIT);
+  num_merges_counter_ = ADD_COUNTER(profile_, "TotalMergesPerformed", TUnit::UNIT);
   in_mem_sort_timer_ = ADD_TIMER(profile_, "InMemorySortTime");
-  sorted_data_size_ = ADD_COUNTER(profile_, "SortDataSize", TCounterType::BYTES);
+  sorted_data_size_ = ADD_COUNTER(profile_, "SortDataSize", TUnit::BYTES);
 
   int min_blocks_required = Sorter::MinBuffersRequired(output_row_desc_);
   RETURN_IF_ERROR(block_mgr_->RegisterClient(min_blocks_required, mem_tracker_, state_,

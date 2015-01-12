@@ -23,13 +23,13 @@
 #include "util/debug-util.h"
 
 // This is a utility class that aggregates counters from the kernel.  These counters
-// come from different sources.  
+// come from different sources.
 //   - perf counter syscall (/usr/include/linux/perf_event.h")
 //   - /proc/self/io: io stats
 //   - /proc/self/status: memory stats
 // The complexity here is that all these sources have data in a different and not
 // easy to get at format.
-// 
+//
 // A typical usage pattern would be:
 //  PerfCounters counters;
 //  counters.AddDefaultCounters();
@@ -62,7 +62,7 @@ class PerfCounters {
 
     PERF_COUNTER_BYTES_READ,
     PERF_COUNTER_BYTES_WRITE,
-    PERF_COUNTER_DISK_READ,       
+    PERF_COUNTER_DISK_READ,
     PERF_COUNTER_DISK_WRITE,
   };
 
@@ -78,7 +78,7 @@ class PerfCounters {
   // Take a snapshot of all the counters and store it.  The caller can specify a name
   // for the snapshot.
   void Snapshot(const std::string& name = "");
-  
+
   // Returns the results of that snapshot
   const std::vector<int64_t>* counters(int snapshot) const;
 
@@ -105,16 +105,16 @@ class PerfCounters {
   bool GetProcSelfStatusCounters(std::vector<int64_t>& snapshot);
 
   enum DataSource {
-    SYS_PERF_COUNTER, 
+    SYS_PERF_COUNTER,
     PROC_SELF_IO,
     PROC_SELF_STATUS,
   };
-  
+
   struct CounterData {
     Counter counter;
     DataSource source;
-    TCounterType::type type;
-    
+    TUnit::type unit;
+
     // DataSource specific data.  This is used to pull the counter values.
     union {
       // For SYS_PERF_COUNTER. File descriptor where the counter value is stored.
@@ -134,7 +134,7 @@ class PerfCounters {
   // at the same time.  This is useful to better correlate counter values.
   int group_fd_;
 };
-  
+
 }
 
 #endif

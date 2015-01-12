@@ -51,7 +51,7 @@ TEST(CountersTest, Basic) {
   RuntimeProfile::Counter* counter_merged;
 
   // Updating/setting counter
-  counter_a = profile_a.AddCounter("A", TCounterType::UNIT);
+  counter_a = profile_a.AddCounter("A", TUnit::UNIT);
   EXPECT_TRUE(counter_a != NULL);
   counter_a->Add(10);
   counter_a->Add(-5);
@@ -59,7 +59,7 @@ TEST(CountersTest, Basic) {
   counter_a->Set(1L);
   EXPECT_EQ(counter_a->value(), 1);
 
-  counter_b = profile_a2.AddCounter("B", TCounterType::BYTES);
+  counter_b = profile_a2.AddCounter("B", TUnit::BYTES);
   EXPECT_TRUE(counter_b != NULL);
 
   // Serialize/deserialize
@@ -79,7 +79,7 @@ TEST(CountersTest, Basic) {
   averaged_profile.UpdateAverage(from_thrift);
   EXPECT_EQ(counter_merged->value(), 1);
 
-  counter_a = profile_a2.AddCounter("A", TCounterType::UNIT);
+  counter_a = profile_a2.AddCounter("A", TUnit::UNIT);
   counter_a->Set(3L);
   averaged_profile.UpdateAverage(&profile_a2);
   EXPECT_EQ(counter_merged->value(), 2);
@@ -122,13 +122,13 @@ TEST(CountersTest, MergeAndUpdate) {
 
   // Create parent level counters
   RuntimeProfile::Counter* parent1_shared =
-      profile1.AddCounter("Parent Shared", TCounterType::UNIT);
+      profile1.AddCounter("Parent Shared", TUnit::UNIT);
   RuntimeProfile::Counter* parent2_shared =
-      profile2.AddCounter("Parent Shared", TCounterType::UNIT);
+      profile2.AddCounter("Parent Shared", TUnit::UNIT);
   RuntimeProfile::Counter* parent1_only =
-      profile1.AddCounter("Parent 1 Only", TCounterType::UNIT);
+      profile1.AddCounter("Parent 1 Only", TUnit::UNIT);
   RuntimeProfile::Counter* parent2_only =
-      profile2.AddCounter("Parent 2 Only", TCounterType::UNIT);
+      profile2.AddCounter("Parent 2 Only", TUnit::UNIT);
   parent1_shared->Add(1);
   parent2_shared->Add(3);
   parent1_only->Add(2);
@@ -136,17 +136,17 @@ TEST(CountersTest, MergeAndUpdate) {
 
   // Create child level counters
   RuntimeProfile::Counter* p1_c1_shared =
-    p1_child1.AddCounter("Child1 Shared", TCounterType::UNIT);
+    p1_child1.AddCounter("Child1 Shared", TUnit::UNIT);
   RuntimeProfile::Counter* p1_c1_only =
-    p1_child1.AddCounter("Child1 Parent 1 Only", TCounterType::UNIT);
+    p1_child1.AddCounter("Child1 Parent 1 Only", TUnit::UNIT);
   RuntimeProfile::Counter* p1_c2 =
-    p1_child2.AddCounter("Child2", TCounterType::UNIT);
+    p1_child2.AddCounter("Child2", TUnit::UNIT);
   RuntimeProfile::Counter* p2_c1_shared =
-    p2_child1.AddCounter("Child1 Shared", TCounterType::UNIT);
+    p2_child1.AddCounter("Child1 Shared", TUnit::UNIT);
   RuntimeProfile::Counter* p2_c1_only =
-    p1_child1.AddCounter("Child1 Parent 2 Only", TCounterType::UNIT);
+    p1_child1.AddCounter("Child1 Parent 2 Only", TUnit::UNIT);
   RuntimeProfile::Counter* p2_c3 =
-    p2_child3.AddCounter("Child3", TCounterType::UNIT);
+    p2_child3.AddCounter("Child3", TUnit::UNIT);
   p1_c1_shared->Add(10);
   p1_c1_only->Add(50);
   p2_c1_shared->Add(20);
@@ -227,14 +227,14 @@ TEST(CountersTest, DerivedCounters) {
   ObjectPool pool;
   RuntimeProfile profile(&pool, "Profile");
   RuntimeProfile::Counter* bytes_counter =
-      profile.AddCounter("bytes", TCounterType::BYTES);
+      profile.AddCounter("bytes", TUnit::BYTES);
   RuntimeProfile::Counter* ticks_counter =
-      profile.AddCounter("ticks", TCounterType::TIME_NS);
+      profile.AddCounter("ticks", TUnit::TIME_NS);
   // set to 1 sec
   ticks_counter->Set(1000L * 1000L * 1000L);
 
   RuntimeProfile::DerivedCounter* throughput_counter =
-      profile.AddDerivedCounter("throughput", TCounterType::BYTES,
+      profile.AddDerivedCounter("throughput", TUnit::BYTES,
       bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_counter, ticks_counter));
 
   bytes_counter->Set(10L);
@@ -249,12 +249,12 @@ TEST(CountersTest, AverageSetCounters) {
   ObjectPool pool;
   RuntimeProfile profile(&pool, "Profile");
   RuntimeProfile::Counter* bytes_1_counter =
-      profile.AddCounter("bytes 1", TCounterType::BYTES);
+      profile.AddCounter("bytes 1", TUnit::BYTES);
   RuntimeProfile::Counter* bytes_2_counter =
-      profile.AddCounter("bytes 2", TCounterType::BYTES);
+      profile.AddCounter("bytes 2", TUnit::BYTES);
 
   bytes_1_counter->Set(10L);
-  RuntimeProfile::AveragedCounter bytes_avg(TCounterType::BYTES);
+  RuntimeProfile::AveragedCounter bytes_avg(TUnit::BYTES);
   bytes_avg.UpdateCounter(bytes_1_counter);
   // Avg of 10L
   EXPECT_EQ(bytes_avg.value(), 10L);
@@ -272,11 +272,11 @@ TEST(CountersTest, AverageSetCounters) {
   EXPECT_EQ(bytes_avg.value(), 25L);
 
   RuntimeProfile::Counter* double_1_counter =
-      profile.AddCounter("double 1", TCounterType::DOUBLE_VALUE);
+      profile.AddCounter("double 1", TUnit::DOUBLE_VALUE);
   RuntimeProfile::Counter* double_2_counter =
-      profile.AddCounter("double 2", TCounterType::DOUBLE_VALUE);
+      profile.AddCounter("double 2", TUnit::DOUBLE_VALUE);
   double_1_counter->Set(1.0f);
-  RuntimeProfile::AveragedCounter double_avg(TCounterType::DOUBLE_VALUE);
+  RuntimeProfile::AveragedCounter double_avg(TUnit::DOUBLE_VALUE);
   double_avg.UpdateCounter(double_1_counter);
   // Avg of 1.0f
   EXPECT_EQ(double_avg.double_value(), 1.0f);
@@ -340,11 +340,11 @@ TEST(CountersTest, RateCounters) {
   RuntimeProfile profile(&pool, "Profile");
 
   RuntimeProfile::Counter* bytes_counter =
-      profile.AddCounter("bytes", TCounterType::BYTES);
+      profile.AddCounter("bytes", TUnit::BYTES);
 
   RuntimeProfile::Counter* rate_counter =
       profile.AddRateCounter("RateCounter", bytes_counter);
-  EXPECT_TRUE(rate_counter->type() == TCounterType::BYTES_PER_SECOND);
+  EXPECT_TRUE(rate_counter->unit() == TUnit::BYTES_PER_SECOND);
 
   EXPECT_EQ(rate_counter->value(), 0);
   // set to 100MB.  Use bigger units to avoid truncating to 0 after divides.
@@ -377,15 +377,15 @@ TEST(CountersTest, BucketCounters) {
   RuntimeProfile profile(&pool, "Profile");
 
   RuntimeProfile::Counter* unit_counter =
-      profile.AddCounter("unit", TCounterType::UNIT);
+      profile.AddCounter("unit", TUnit::UNIT);
 
   // Set the unit to 1 before sampling
   unit_counter->Set(1L);
 
   // Create the bucket counters and start sampling
   vector<RuntimeProfile::Counter*> buckets;
-  buckets.push_back(pool.Add(new RuntimeProfile::Counter(TCounterType::DOUBLE_VALUE, 0)));
-  buckets.push_back(pool.Add(new RuntimeProfile::Counter(TCounterType::DOUBLE_VALUE, 0)));
+  buckets.push_back(pool.Add(new RuntimeProfile::Counter(TUnit::DOUBLE_VALUE, 0)));
+  buckets.push_back(pool.Add(new RuntimeProfile::Counter(TUnit::DOUBLE_VALUE, 0)));
   profile.RegisterBucketingCounters(unit_counter, &buckets);
 
   // Wait two seconds.

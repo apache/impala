@@ -91,9 +91,9 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
   get_results_timer_ = ADD_TIMER(runtime_profile(), "GetResultsTime");
   hash_table_buckets_counter_ =
-      ADD_COUNTER(runtime_profile(), "BuildBuckets", TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile(), "BuildBuckets", TUnit::UNIT);
   hash_table_load_factor_counter_ =
-      ADD_COUNTER(runtime_profile(), "LoadFactor", TCounterType::DOUBLE_VALUE);
+      ADD_COUNTER(runtime_profile(), "LoadFactor", TUnit::DOUBLE_VALUE);
 
   intermediate_tuple_desc_ =
       state->desc_tbl().GetTupleDescriptor(intermediate_tuple_id_);

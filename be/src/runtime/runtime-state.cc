@@ -175,7 +175,7 @@ Status RuntimeState::CreateBlockMgr() {
       query_options().max_block_mgr_memory > 0) {
     block_mgr_limit = query_options().max_block_mgr_memory;
     LOG(ERROR) << "Block mgr mem limit: "
-               << PrettyPrinter::Print(block_mgr_limit, TCounterType::BYTES);
+               << PrettyPrinter::Print(block_mgr_limit, TUnit::BYTES);
   }
 
   RETURN_IF_ERROR(BufferedBlockMgr::Create(this, query_mem_tracker(),
@@ -269,7 +269,7 @@ Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
   if (failed_allocation_size != 0) {
     DCHECK(tracker != NULL);
     ss << "  " << tracker->label() << " could not allocate "
-       << PrettyPrinter::Print(failed_allocation_size, TCounterType::BYTES)
+       << PrettyPrinter::Print(failed_allocation_size, TUnit::BYTES)
        << " without exceeding limit."
        << endl;
   }

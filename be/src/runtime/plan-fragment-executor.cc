@@ -137,7 +137,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
       runtime_state_->query_options().mem_limit > 0) {
     bytes_limit = runtime_state_->query_options().mem_limit;
     VLOG_QUERY << "Using query memory limit from query options: "
-               << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
+               << PrettyPrinter::Print(bytes_limit, TUnit::BYTES);
   }
 
   int64_t rm_reservation_size_bytes = -1;
@@ -156,7 +156,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
       rm_reservation_size_bytes = bytes_limit;
     }
     VLOG_QUERY << "Using RM reservation memory limit from resource reservation: "
-               << PrettyPrinter::Print(rm_reservation_size_bytes, TCounterType::BYTES);
+               << PrettyPrinter::Print(rm_reservation_size_bytes, TUnit::BYTES);
   }
 
   DCHECK(!params.request_pool.empty());
@@ -175,11 +175,11 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
       bind<int64_t>(mem_fn(&ThreadResourceMgr::ResourcePool::num_threads),
           runtime_state_->resource_pool()));
   mem_usage_sampled_counter_ = profile()->AddTimeSeriesCounter("MemoryUsage",
-      TCounterType::BYTES,
+      TUnit::BYTES,
       bind<int64_t>(mem_fn(&MemTracker::consumption),
           runtime_state_->instance_mem_tracker()));
   thread_usage_sampled_counter_ = profile()->AddTimeSeriesCounter("ThreadUsage",
-      TCounterType::UNIT,
+      TUnit::UNIT,
       bind<int64_t>(mem_fn(&ThreadResourceMgr::ResourcePool::num_threads),
           runtime_state_->resource_pool()));
 
@@ -255,9 +255,9 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   // set up profile counters
   profile()->AddChild(plan_->runtime_profile());
   rows_produced_counter_ =
-      ADD_COUNTER(profile(), "RowsProduced", TCounterType::UNIT);
+      ADD_COUNTER(profile(), "RowsProduced", TUnit::UNIT);
   per_host_mem_usage_ =
-      ADD_COUNTER(profile(), PER_HOST_PEAK_MEM_COUNTER, TCounterType::BYTES);
+      ADD_COUNTER(profile(), PER_HOST_PEAK_MEM_COUNTER, TUnit::BYTES);
 
   row_batch_.reset(new RowBatch(plan_->row_desc(), runtime_state_->batch_size(),
         runtime_state_->instance_mem_tracker()));

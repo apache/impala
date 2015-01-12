@@ -314,7 +314,7 @@ void DiskIoMgr::ScanRange::Close() {
             int remote_bytes = stats->totalBytesRead - stats->totalLocalBytesRead;
             reader_->unexpected_remote_bytes_ += remote_bytes;
             VLOG_FILE << "Unexpected remote HDFS read of "
-                      << PrettyPrinter::Print(remote_bytes, TCounterType::BYTES)
+                      << PrettyPrinter::Print(remote_bytes, TUnit::BYTES)
                       << " for file '" << file_ << "'";
           }
         }

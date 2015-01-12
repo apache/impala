@@ -55,7 +55,7 @@ class TcmallocMetric : public UIntGauge {
   class PhysicalBytesMetric : public UIntGauge {
    public:
     PhysicalBytesMetric(const std::string& key)
-        : UIntGauge(key, TCounterType::BYTES) { }
+        : UIntGauge(key, TUnit::BYTES) { }
 
    private:
     virtual void CalculateValue() {
@@ -66,7 +66,7 @@ class TcmallocMetric : public UIntGauge {
   static PhysicalBytesMetric* PHYSICAL_BYTES_RESERVED;
 
   TcmallocMetric(const std::string& key, const std::string& tcmalloc_var)
-      : UIntGauge(key, TCounterType::BYTES), tcmalloc_var_(tcmalloc_var) { }
+      : UIntGauge(key, TUnit::BYTES), tcmalloc_var_(tcmalloc_var) { }
 
  private:
   // Name of the tcmalloc property this metric should fetch.

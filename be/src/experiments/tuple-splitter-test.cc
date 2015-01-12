@@ -96,11 +96,11 @@ class DataPartitioner {
     size_ = size;
     hash_offset_ = hash_offset;
 
-    bytes_allocated_ = ADD_COUNTER(profile, "BytesAllocated", TCounterType::BYTES);
-    bytes_copied_ = ADD_COUNTER(profile, "BytesCopied", TCounterType::BYTES);
-    add_time_ = ADD_COUNTER(profile, "AddTime", TCounterType::CPU_TICKS);
-    split_time_ = ADD_COUNTER(profile, "SplitTime", TCounterType::CPU_TICKS);
-    splits_ = ADD_COUNTER(profile, "Splits", TCounterType::UNIT);
+    bytes_allocated_ = ADD_COUNTER(profile, "BytesAllocated", TUnit::BYTES);
+    bytes_copied_ = ADD_COUNTER(profile, "BytesCopied", TUnit::BYTES);
+    add_time_ = ADD_COUNTER(profile, "AddTime", TUnit::CPU_TICKS);
+    split_time_ = ADD_COUNTER(profile, "SplitTime", TUnit::CPU_TICKS);
+    splits_ = ADD_COUNTER(profile, "Splits", TUnit::UNIT);
 
     // Max of tuple size and cache line
     int min_size_per_partition = max(size, 64);

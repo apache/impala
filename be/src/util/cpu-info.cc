@@ -158,9 +158,9 @@ string CpuInfo::DebugString() {
   stream << "Cpu Info:" << endl
          << "  Model: " << model_name_ << endl
          << "  Cores: " << num_cores_ << endl
-         << "  L1 Cache: " << PrettyPrinter::Print(L1, TCounterType::BYTES) << endl
-         << "  L2 Cache: " << PrettyPrinter::Print(L2, TCounterType::BYTES) << endl
-         << "  L3 Cache: " << PrettyPrinter::Print(L3, TCounterType::BYTES) << endl
+         << "  L1 Cache: " << PrettyPrinter::Print(L1, TUnit::BYTES) << endl
+         << "  L2 Cache: " << PrettyPrinter::Print(L2, TUnit::BYTES) << endl
+         << "  L3 Cache: " << PrettyPrinter::Print(L3, TUnit::BYTES) << endl
          << "  Hardware Supports:" << endl;
   for (int i = 0; i < num_flags; ++i) {
     if (IsSupported(flag_mappings[i].flag)) {

@@ -30,7 +30,7 @@ namespace impala {
 // applicable operator<<.
 class PrettyPrinter {
  public:
-  static std::string Print(bool value, TCounterType::type ignored, bool verbose = false) {
+  static std::string Print(bool value, TUnit::type ignored, bool verbose = false) {
     std::stringstream ss;
     ss << std::boolalpha << value;
     return ss.str();
@@ -42,16 +42,16 @@ class PrettyPrinter {
   // types where this is applicable.
   template<typename T>
   static ENABLE_IF_ARITHMETIC(T, std::string)
-  Print(T value, TCounterType::type type, bool verbose = false) {
+  Print(T value, TUnit::type unit, bool verbose = false) {
     std::stringstream ss;
     ss.flags(std::ios::fixed);
-    switch (type) {
-      case TCounterType::NONE: {
+    switch (unit) {
+      case TUnit::NONE: {
         ss << value;
         return ss.str();
       }
 
-      case TCounterType::UNIT: {
+      case TUnit::UNIT: {
         std::string unit;
         double output = GetUnit(value, &unit);
         if (unit.empty()) {
@@ -63,7 +63,7 @@ class PrettyPrinter {
         break;
       }
 
-      case TCounterType::UNIT_PER_SECOND: {
+      case TUnit::UNIT_PER_SECOND: {
         std::string unit;
         double output = GetUnit(value, &unit);
         if (output == 0) {
@@ -74,7 +74,7 @@ class PrettyPrinter {
         break;
       }
 
-      case TCounterType::CPU_TICKS: {
+      case TUnit::CPU_TICKS: {
         if (value < CpuInfo::cycles_per_ms()) {
           ss << std::setprecision(PRECISION) << (value / 1000.) << "K clock cycles";
         } else {
@@ -84,7 +84,7 @@ class PrettyPrinter {
         break;
       }
 
-      case TCounterType::TIME_NS: {
+      case TUnit::TIME_NS: {
         if (value >= BILLION) {
           // If the time is over a second, print it up to ms.
           value /= MILLION;
@@ -102,17 +102,17 @@ class PrettyPrinter {
         break;
       }
 
-      case TCounterType::TIME_MS: {
+      case TUnit::TIME_MS: {
         PrintTimeMs(value, &ss);
         break;
       }
 
-      case TCounterType::TIME_S: {
+      case TUnit::TIME_S: {
         PrintTimeMs(value * 1000, &ss);
         break;
       }
 
-      case TCounterType::BYTES: {
+      case TUnit::BYTES: {
         std::string unit;
         double output = GetByteUnit(value, &unit);
         if (output == 0) {
@@ -124,7 +124,7 @@ class PrettyPrinter {
         break;
       }
 
-      case TCounterType::BYTES_PER_SECOND: {
+      case TUnit::BYTES_PER_SECOND: {
         std::string unit;
         double output = GetByteUnit(value, &unit);
         ss << std::setprecision(PRECISION) << output << " " << unit << "/sec";
@@ -132,14 +132,14 @@ class PrettyPrinter {
       }
 
       // TODO: Remove DOUBLE_VALUE. IMPALA-1649
-      case TCounterType::DOUBLE_VALUE: {
+      case TUnit::DOUBLE_VALUE: {
         double output = *reinterpret_cast<double*>(&value);
         ss << std::setprecision(PRECISION) << output << " ";
         break;
       }
 
       default:
-        DCHECK(false) << "Unsupported TCounterType: " << value;
+        DCHECK(false) << "Unsupported TUnit: " << value;
         break;
     }
     return ss.str();
@@ -151,7 +151,7 @@ class PrettyPrinter {
   // here.
   template<typename T>
   static ENABLE_IF_NOT_ARITHMETIC(T, std::string)
-  Print(const T& value, TCounterType::type type) {
+  Print(const T& value, TUnit::type unit) {
     std::stringstream ss;
     ss << std::boolalpha << value;
     return ss.str();
@@ -159,12 +159,12 @@ class PrettyPrinter {
 
   // Utility method to print an iterable type to a stringstream like [v1, v2, v3]
   template <typename I>
-  static void PrintStringList(const I& iterable, TCounterType::type type,
+  static void PrintStringList(const I& iterable, TUnit::type unit,
       std::stringstream* out) {
     std::vector<std::string> strings;
     for (typename I::const_iterator it = iterable.begin(); it != iterable.end(); ++it) {
       std::stringstream ss;
-      ss << PrettyPrinter::Print(*it, type);
+      ss << PrettyPrinter::Print(*it, unit);
       strings.push_back(ss.str());
     }
 
@@ -173,7 +173,7 @@ class PrettyPrinter {
 
   // Convenience method
   static std::string PrintBytes(int64_t value) {
-    return PrettyPrinter::Print(value, TCounterType::BYTES);
+    return PrettyPrinter::Print(value, TUnit::BYTES);
   }
 
  private:

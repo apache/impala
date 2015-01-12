@@ -180,7 +180,7 @@ Status BufferedTupleStream::NewBlockForWrite(int min_size, bool* got_block) {
   if (min_size > block_mgr_->max_block_size()) {
     return Status(Substitute("Cannot process row that is bigger than the IO size "
           "(row_size=$0). To run this query, increase the IO size (--read_size option).",
-          PrettyPrinter::Print(min_size, TCounterType::BYTES)));
+          PrettyPrinter::Print(min_size, TUnit::BYTES)));
   }
 
   BufferedBlockMgr::Block* unpin_block = write_block_;

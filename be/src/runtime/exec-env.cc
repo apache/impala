@@ -303,9 +303,9 @@ Status ExecEnv::StartServices() {
       FLAGS_num_threads_per_core * FLAGS_num_cores;
   if (bytes_limit < min_requirement) {
     LOG(WARNING) << "Memory limit "
-                 << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES)
+                 << PrettyPrinter::Print(bytes_limit, TUnit::BYTES)
                  << " does not meet minimal memory requirement of "
-                 << PrettyPrinter::Print(min_requirement, TCounterType::BYTES);
+                 << PrettyPrinter::Print(min_requirement, TUnit::BYTES);
   }
 
   metrics_->Init(enable_webserver_ ? webserver_.get() : NULL);
@@ -333,12 +333,12 @@ Status ExecEnv::StartServices() {
 
   if (bytes_limit > MemInfo::physical_mem()) {
     LOG(WARNING) << "Memory limit "
-                 << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES)
+                 << PrettyPrinter::Print(bytes_limit, TUnit::BYTES)
                  << " exceeds physical memory of "
-                 << PrettyPrinter::Print(MemInfo::physical_mem(), TCounterType::BYTES);
+                 << PrettyPrinter::Print(MemInfo::physical_mem(), TUnit::BYTES);
   }
   LOG(INFO) << "Using global memory limit: "
-            << PrettyPrinter::Print(bytes_limit, TCounterType::BYTES);
+            << PrettyPrinter::Print(bytes_limit, TUnit::BYTES);
 
   RETURN_IF_ERROR(disk_io_mgr_->Init(mem_tracker_.get()));
 

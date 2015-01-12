@@ -44,12 +44,12 @@ namespace impala {
 #define MACRO_CONCAT(x, y) CONCAT_IMPL(x, y)
 
 #if ENABLE_COUNTERS
-  #define ADD_COUNTER(profile, name, type) (profile)->AddCounter(name, type)
+  #define ADD_COUNTER(profile, name, unit) (profile)->AddCounter(name, unit)
   #define ADD_TIME_SERIES_COUNTER(profile, name, src_counter) \
       (profile)->AddTimeSeriesCounter(name, src_counter)
-  #define ADD_TIMER(profile, name) (profile)->AddCounter(name, TCounterType::TIME_NS)
+  #define ADD_TIMER(profile, name) (profile)->AddCounter(name, TUnit::TIME_NS)
   #define ADD_CHILD_TIMER(profile, name, parent) \
-      (profile)->AddCounter(name, TCounterType::TIME_NS, parent)
+      (profile)->AddCounter(name, TUnit::TIME_NS, parent)
   #define SCOPED_TIMER(c) \
       ScopedTimer<MonotonicStopWatch> MACRO_CONCAT(SCOPED_TIMER, __COUNTER__)(c)
   #define COUNTER_ADD(c, v) (c)->Add(v)
@@ -59,7 +59,7 @@ namespace impala {
     ThreadCounterMeasurement \
       MACRO_CONCAT(SCOPED_THREAD_COUNTER_MEASUREMENT, __COUNTER__)(c)
 #else
-  #define ADD_COUNTER(profile, name, type) NULL
+  #define ADD_COUNTER(profile, name, unit) NULL
   #define ADD_TIME_SERIES_COUNTER(profile, name, src_counter) NULL
   #define ADD_TIMER(profile, name) NULL
   #define ADD_CHILD_TIMER(profile, name, parent) NULL
@@ -84,9 +84,9 @@ class RuntimeProfile {
  public:
   class Counter {
    public:
-    Counter(TCounterType::type type, int64_t value = 0) :
+    Counter(TUnit::type unit, int64_t value = 0) :
       value_(value),
-      type_(type) {
+      unit_(unit) {
     }
     virtual ~Counter(){}
 
@@ -111,20 +111,20 @@ class RuntimeProfile {
       return *reinterpret_cast<const double*>(&value_);
     }
 
-    TCounterType::type type() const { return type_; }
+    TUnit::type unit() const { return unit_; }
 
    protected:
     friend class RuntimeProfile;
 
     AtomicInt<int64_t> value_;
-    TCounterType::type type_;
+    TUnit::type unit_;
   };
 
   // A counter that keeps track of the highest value seen (reporting that
   // as value()) and the current value.
   class HighWaterMarkCounter : public Counter {
    public:
-    HighWaterMarkCounter(TCounterType::type type) : Counter(type) {}
+    HighWaterMarkCounter(TUnit::type unit) : Counter(unit) {}
 
     virtual void Add(int64_t delta) {
       int64_t new_val = current_value_.UpdateAndFetch(delta);
@@ -160,12 +160,12 @@ class RuntimeProfile {
 
   typedef boost::function<int64_t ()> DerivedCounterFunction;
 
-  // A DerivedCounter also has a name and type, but the value is computed.
+  // A DerivedCounter also has a name and unit, but the value is computed.
   // Do not call Set() and Add().
   class DerivedCounter : public Counter {
    public:
-    DerivedCounter(TCounterType::type type, const DerivedCounterFunction& counter_fn)
-      : Counter(type),
+    DerivedCounter(TUnit::type unit, const DerivedCounterFunction& counter_fn)
+      : Counter(unit),
         counter_fn_(counter_fn) {}
 
     virtual int64_t value() const {
@@ -182,8 +182,8 @@ class RuntimeProfile {
   // Set() and Add() should not be called.
   class AveragedCounter : public Counter {
    public:
-    AveragedCounter(TCounterType::type type)
-     : Counter(type),
+    AveragedCounter(TUnit::type unit)
+     : Counter(unit),
        current_double_sum_(0.0),
        current_int_sum_(0) {
     }
@@ -193,7 +193,7 @@ class RuntimeProfile {
     // No locks are obtained within this class because UpdateCounter() is called from
     // UpdateAverage(), which obtains locks on the entire counter map in a profile.
     void UpdateCounter(Counter* new_counter) {
-      DCHECK_EQ(new_counter->type_, type_);
+      DCHECK_EQ(new_counter->unit_, unit_);
       boost::unordered_map<Counter*, int64_t>::iterator it =
           counter_value_map_.find(new_counter);
       int64_t old_val = 0;
@@ -204,7 +204,7 @@ class RuntimeProfile {
         counter_value_map_[new_counter] = new_counter->value();
       }
 
-      if (type_ == TCounterType::DOUBLE_VALUE) {
+      if (unit_ == TUnit::DOUBLE_VALUE) {
         double old_double_val = *reinterpret_cast<double*>(&old_val);
         current_double_sum_ += (new_counter->double_value() - old_double_val);
         double result_val = current_double_sum_ / (double) counter_value_map_.size();
@@ -234,7 +234,7 @@ class RuntimeProfile {
     boost::unordered_map<Counter*, int64_t> counter_value_map_;
 
     // Current sums of values from counter_value_map_. Only one of these is used,
-    // depending on the type of the counter. current_double_sum_ is used for
+    // depending on the unit of the counter. current_double_sum_ is used for
     // DOUBLE_VALUE, current_int_sum_ otherwise.
     double current_double_sum_;
     int64_t current_int_sum_;
@@ -328,22 +328,22 @@ class RuntimeProfile {
    private:
     friend class RuntimeProfile;
 
-    TimeSeriesCounter(const std::string& name, TCounterType::type type,
+    TimeSeriesCounter(const std::string& name, TUnit::type unit,
         DerivedCounterFunction fn)
-      : name_(name), type_(type), sample_fn_(fn) {
+      : name_(name), unit_(unit), sample_fn_(fn) {
     }
 
     // Construct a time series object from existing sample data. This counter
     // is then read-only (i.e. there is no sample function).
-    TimeSeriesCounter(const std::string& name, TCounterType::type type, int period,
+    TimeSeriesCounter(const std::string& name, TUnit::type unit, int period,
         const std::vector<int64_t>& values)
-      : name_(name), type_(type), sample_fn_(NULL), samples_(period, values) {
+      : name_(name), unit_(unit), sample_fn_(NULL), samples_(period, values) {
     }
 
     void ToThrift(TTimeSeriesCounter* counter);
 
     std::string name_;
-    TCounterType::type type_;
+    TUnit::type unit_;
     DerivedCounterFunction sample_fn_;
     StreamingCounterSampler samples_;
   };
@@ -351,7 +351,7 @@ class RuntimeProfile {
   // Create a runtime profile object with 'name'.  Counters and merged profile are
   // allocated from pool.
   // If is_averaged_profile is true, the counters in this profile will be derived averages
-  // (of type AveragedCounter) from other profiles, so the counter map will be left empty
+  // (of unit AveragedCounter) from other profiles, so the counter map will be left empty
   // Otherwise, the counter map is initialized with a single entry for TotalTime.
   RuntimeProfile(ObjectPool* pool, const std::string& name,
       bool is_averaged_profile = false);
@@ -395,25 +395,25 @@ class RuntimeProfile {
   // TODO: Event sequences are ignored
   void Update(const TRuntimeProfileTree& thrift_profile);
 
-  // Add a counter with 'name'/'type'.  Returns a counter object that the caller can
+  // Add a counter with 'name'/'unit'.  Returns a counter object that the caller can
   // update.  The counter is owned by the RuntimeProfile object.
   // If parent_counter_name is a non-empty string, the counter is added as a child of
   // parent_counter_name.
   // If the counter already exists, the existing counter object is returned.
-  Counter* AddCounter(const std::string& name, TCounterType::type type,
+  Counter* AddCounter(const std::string& name, TUnit::type unit,
       const std::string& parent_counter_name = "");
 
   // Adds a high water mark counter to the runtime profile. Otherwise, same behavior
   // as AddCounter()
   HighWaterMarkCounter* AddHighWaterMarkCounter(const std::string& name,
-      TCounterType::type type, const std::string& parent_counter_name = "");
+      TUnit::type unit, const std::string& parent_counter_name = "");
 
-  // Add a derived counter with 'name'/'type'. The counter is owned by the
+  // Add a derived counter with 'name'/'unit'. The counter is owned by the
   // RuntimeProfile object.
   // If parent_counter_name is a non-empty string, the counter is added as a child of
   // parent_counter_name.
   // Returns NULL if the counter already exists.
-  DerivedCounter* AddDerivedCounter(const std::string& name, TCounterType::type type,
+  DerivedCounter* AddDerivedCounter(const std::string& name, TUnit::type unit,
       const DerivedCounterFunction& counter_fn,
       const std::string& parent_counter_name = "");
 
@@ -505,9 +505,9 @@ class RuntimeProfile {
   Counter* AddRateCounter(const std::string& name, Counter* src_counter);
 
   // Same as 'AddRateCounter' above except values are taken by calling fn.
-  // The resulting counter will be of 'type'.
+  // The resulting counter will be of 'unit'.
   Counter* AddRateCounter(const std::string& name, DerivedCounterFunction fn,
-      TCounterType::type type);
+      TUnit::type unit);
 
   // Add a sampling counter to the current profile based on src_counter with name.
   // The sampling counter is updated periodically based on the src counter by averaging
@@ -529,7 +529,7 @@ class RuntimeProfile {
   // contains a number of samples that are collected periodically by calling sample_fn().
   // Note: these counters don't get merged (to make average profiles)
   TimeSeriesCounter* AddTimeSeriesCounter(const std::string& name,
-      TCounterType::type type, DerivedCounterFunction sample_fn);
+      TUnit::type unit, DerivedCounterFunction sample_fn);
 
   // Create a time series counter that samples the source counter. Sampling begins
   // immediately.
@@ -556,7 +556,7 @@ class RuntimeProfile {
   int64_t metadata_;
 
   // True if this profile is an average derived from other profiles.
-  // All counters in this profile must be of type AveragedCounter.
+  // All counters in this profile must be of unit AveragedCounter.
   bool is_averaged_profile_;
 
   // Map from counter names to counters.  The profile owns the memory for the
@@ -704,7 +704,7 @@ class ScopedTimer {
   ScopedTimer(RuntimeProfile::Counter* counter) :
     counter_(counter) {
     if (counter == NULL) return;
-    DCHECK(counter->type() == TCounterType::TIME_NS);
+    DCHECK(counter->unit() == TUnit::TIME_NS);
     sw_.Start();
   }
 

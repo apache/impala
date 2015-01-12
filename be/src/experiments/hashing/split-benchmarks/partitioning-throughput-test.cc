@@ -100,7 +100,7 @@ class PartitioningThroughputTest  {
 #endif
     }
     watch.Stop();
-    LOG(ERROR) << PrettyPrinter::Print(watch.Ticks(), TCounterType::CPU_TICKS);;
+    LOG(ERROR) << PrettyPrinter::Print(watch.Ticks(), TUnit::CPU_TICKS);;
     free(tuples);
     // Note: destructors not called.
     free(buffers_);
@@ -117,7 +117,7 @@ class PartitioningThroughputTest  {
       buffer[i] = constant;
     }
     watch.Stop();
-    LOG(ERROR) << PrettyPrinter::Print(watch.Ticks(), TCounterType::CPU_TICKS);;
+    LOG(ERROR) << PrettyPrinter::Print(watch.Ticks(), TUnit::CPU_TICKS);;
     free(buffer);
   }
 

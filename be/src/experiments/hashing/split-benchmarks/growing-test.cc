@@ -67,8 +67,8 @@ class GrowingTest : public testing::Test {
       delta = static_cast<int64_t>(time) - static_cast<int64_t>(prev);
     }
     LOG(ERROR) << build_tuples << "\t"
-               << PrettyPrinter::Print(time, TCounterType::CPU_TICKS)
-               << "\t" << PrettyPrinter::Print(delta, TCounterType::CPU_TICKS);
+               << PrettyPrinter::Print(time, TUnit::CPU_TICKS)
+               << "\t" << PrettyPrinter::Print(delta, TUnit::CPU_TICKS);
     return time;
   }
 
@@ -78,7 +78,7 @@ class GrowingTest : public testing::Test {
   template <int buffer_size>
   inline static void Test() {
     LOG(ERROR) << "Buffer size " << HashStore<buffer_size>::BUFFER_SIZE << " tuples ("
-               << PrettyPrinter::Print(buffer_size, TCounterType::BYTES)
+               << PrettyPrinter::Print(buffer_size, TUnit::BYTES)
                << "):";
     LOG(ERROR) << "#BuildTuples\tTime\tdTime";
     uint64_t prev = 0;

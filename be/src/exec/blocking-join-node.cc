@@ -59,8 +59,8 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
   build_pool_.reset(new MemPool(mem_tracker()));
   build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
   probe_timer_ = ADD_TIMER(runtime_profile(), "ProbeTime");
-  build_row_counter_ = ADD_COUNTER(runtime_profile(), "BuildRows", TCounterType::UNIT);
-  probe_row_counter_ = ADD_COUNTER(runtime_profile(), "ProbeRows", TCounterType::UNIT);
+  build_row_counter_ = ADD_COUNTER(runtime_profile(), "BuildRows", TUnit::UNIT);
+  probe_row_counter_ = ADD_COUNTER(runtime_profile(), "ProbeRows", TUnit::UNIT);
 
   // Validate the row desc layout is what we expect because the current join
   // implementation relies on it to enable some optimizations.

@@ -396,18 +396,18 @@ Status DataStreamSender::Prepare(RuntimeState* state) {
       Expr::Prepare(partition_expr_ctxs_, state, row_desc_, mem_tracker_.get()));
 
   bytes_sent_counter_ =
-      ADD_COUNTER(profile(), "BytesSent", TCounterType::BYTES);
+      ADD_COUNTER(profile(), "BytesSent", TUnit::BYTES);
   uncompressed_bytes_counter_ =
-      ADD_COUNTER(profile(), "UncompressedRowBatchSize", TCounterType::BYTES);
+      ADD_COUNTER(profile(), "UncompressedRowBatchSize", TUnit::BYTES);
   serialize_batch_timer_ =
       ADD_TIMER(profile(), "SerializeBatchTime");
   thrift_transmit_timer_ = ADD_TIMER(profile(), "ThriftTransmitTime(*)");
   network_throughput_ =
-      profile()->AddDerivedCounter("NetworkThroughput(*)", TCounterType::BYTES_PER_SECOND,
+      profile()->AddDerivedCounter("NetworkThroughput(*)", TUnit::BYTES_PER_SECOND,
           bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_sent_counter_,
                         thrift_transmit_timer_));
   overall_throughput_ =
-      profile()->AddDerivedCounter("OverallThroughput", TCounterType::BYTES_PER_SECOND,
+      profile()->AddDerivedCounter("OverallThroughput", TUnit::BYTES_PER_SECOND,
            bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_sent_counter_,
                          profile()->total_time_counter()));
 

@@ -42,15 +42,15 @@ class DebugRuntimeProfile {
 
 #define DEBUG_SCOPED_TIMER(counter_name) \
   COUNTER_SCOPED_TIMER(DebugRuntimeProfile::profile().AddCounter(counter_name, \
-    TCounterType::CPU_TICKS))
+    TUnit::CPU_TICKS))
 
 #define DEBUG_COUNTER_ADD(counter_name, v) \
   COUNTER_ADD(DebugRuntimeProfile::profile().AddCounter(counter_name, \
-    TCounterType::UNIT), v)
+    TUnit::UNIT), v)
 
 #define DEBUG_COUNTER_SET(counter_name, v) \
   COUNTER_SET(DebugRuntimeProfile::profile().AddCounter(counter_name, \
-    TCounterType::UNIT), v)
+    TUnit::UNIT), v)
 
 #define PRETTY_PRINT_DEBUG_COUNTERS(ostream_ptr) \
   DebugRuntimeProfile::profile().PrettyPrint(ostream_ptr)

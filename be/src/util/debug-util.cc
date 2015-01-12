@@ -73,7 +73,7 @@ THRIFT_ENUM_OUTPUT_FN(Encoding);
 THRIFT_ENUM_OUTPUT_FN(CompressionCodec);
 THRIFT_ENUM_OUTPUT_FN(Type);
 THRIFT_ENUM_OUTPUT_FN(TMetricKind);
-THRIFT_ENUM_OUTPUT_FN(TCounterType);
+THRIFT_ENUM_OUTPUT_FN(TUnit);
 
 THRIFT_ENUM_PRINT_FN(TCatalogObjectType);
 THRIFT_ENUM_PRINT_FN(TDdlType);
@@ -83,7 +83,7 @@ THRIFT_ENUM_PRINT_FN(TStmtType);
 THRIFT_ENUM_PRINT_FN(QueryState);
 THRIFT_ENUM_PRINT_FN(Encoding);
 THRIFT_ENUM_PRINT_FN(TMetricKind);
-THRIFT_ENUM_PRINT_FN(TCounterType);
+THRIFT_ENUM_PRINT_FN(TUnit);
 
 
 ostream& operator<<(ostream& os, const TUniqueId& id) {

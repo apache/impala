@@ -116,7 +116,7 @@ void TimeParallelExecutors(int num_threads, int num_threads_per_executor,
   cout << (use_native_threads ? "(Native):" : "(Impala):")
        << "Time to start up " << num_threads << " * " << num_threads_per_executor << " = "
        << num_threads * num_threads_per_executor << " threads: "
-       << PrettyPrinter::Print(sw.ElapsedTime(), TCounterType::CPU_TICKS) << endl;
+       << PrettyPrinter::Print(sw.ElapsedTime(), TUnit::CPU_TICKS) << endl;
 }
 
 int main(int argc, char **argv) {
@@ -139,7 +139,7 @@ int main(int argc, char **argv) {
   total_time.Stop();
 
   cout << "Total time (Native): "
-       << PrettyPrinter::Print(total_time.ElapsedTime(), TCounterType::CPU_TICKS)
+       << PrettyPrinter::Print(total_time.ElapsedTime(), TUnit::CPU_TICKS)
        << endl << endl;
 
   // Measure how long it takes to start up a bunch of threads
@@ -155,12 +155,12 @@ int main(int argc, char **argv) {
   total_time_imp.Stop();
 
   cout << "Total time (IMPALA): "
-       << PrettyPrinter::Print(total_time_imp.ElapsedTime(), TCounterType::CPU_TICKS)
+       << PrettyPrinter::Print(total_time_imp.ElapsedTime(), TUnit::CPU_TICKS)
        << endl << endl;
 
   int64_t difference = total_time_imp.ElapsedTime() - total_time.ElapsedTime();
   cout << "Impala thread overhead: "
-       << PrettyPrinter::Print(difference, TCounterType::CPU_TICKS)
+       << PrettyPrinter::Print(difference, TUnit::CPU_TICKS)
        << ", which is " << (difference * 100.0 / total_time.ElapsedTime())
        << "%" << endl << endl;
 
@@ -180,7 +180,7 @@ int main(int argc, char **argv) {
 
   cout << "Total time (Native): "
        << PrettyPrinter::Print(total_time_parallel_native.ElapsedTime(),
-                               TCounterType::CPU_TICKS)
+                               TUnit::CPU_TICKS)
        << endl << endl;
 
   // Measure how long it takes to start up a bunch of threads
@@ -196,13 +196,13 @@ int main(int argc, char **argv) {
 
   cout << "Total time (IMPALA): "
        << PrettyPrinter::Print(total_time_parallel_impala.ElapsedTime(),
-                               TCounterType::CPU_TICKS)
+                               TUnit::CPU_TICKS)
        << endl;
 
   difference = total_time_parallel_impala.ElapsedTime()
       - total_time_parallel_native.ElapsedTime() ;
   cout << "Impala thread overhead: "
-       << PrettyPrinter::Print(difference, TCounterType::CPU_TICKS)
+       << PrettyPrinter::Print(difference, TUnit::CPU_TICKS)
        << ", which is " << (difference * 100.0 / total_time_parallel_native.ElapsedTime())
        << "%" << endl;
 

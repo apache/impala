@@ -50,7 +50,7 @@ TEST(MetricsTest, CounterMetrics) {
   AssertValue(int_counter, 3456, "3.46K");
 
   IntCounter* int_counter_with_units =
-      metrics.AddCounter("counter_with_units", 10L, TCounterType::BYTES);
+      metrics.AddCounter("counter_with_units", 10L, TUnit::BYTES);
   AssertValue(int_counter_with_units, 10, "10.00 B");
 }
 
@@ -66,7 +66,7 @@ TEST(MetricsTest, GaugeMetrics) {
   AssertValue(int_gauge, 3456, "3456");
 
   IntGauge* int_gauge_with_units =
-      metrics.AddGauge("gauge_with_units", 10L, TCounterType::TIME_S);
+      metrics.AddGauge("gauge_with_units", 10L, TUnit::TIME_S);
   AssertValue(int_gauge_with_units, 10, "10s000ms");
 }
 
@@ -115,7 +115,7 @@ TEST(MetricsTest, StatsMetrics) {
   // Uninitialised stats metrics don't print anything other than the count
   MetricGroup metrics("StatsMetrics");
   StatsMetric<double>* stats_metric = metrics.RegisterMetric(
-      new StatsMetric<double>("stats", TCounterType::UNIT));
+      new StatsMetric<double>("stats", TUnit::UNIT));
   EXPECT_EQ(stats_metric->ToHumanReadable(), "count: 0");
 
   stats_metric->Update(0.0);
@@ -126,7 +126,7 @@ TEST(MetricsTest, StatsMetrics) {
       "max: 2.000000, mean: 1.000000, stddev: 0.816497");
 
   StatsMetric<double>* stats_metric_with_units = metrics.RegisterMetric(
-      new StatsMetric<double>("stats_units", TCounterType::BYTES));
+      new StatsMetric<double>("stats_units", TUnit::BYTES));
   EXPECT_EQ(stats_metric_with_units->ToHumanReadable(), "count: 0");
 
   stats_metric_with_units->Update(0.0);
@@ -244,7 +244,7 @@ TEST(MetricsJsonTest, SetMetrics) {
 TEST(MetricsJsonTest, StatsMetrics) {
   MetricGroup metrics("StatsMetrics");
   StatsMetric<double>* metric =
-      metrics.RegisterMetric(new StatsMetric<double>("stats_metric", TCounterType::UNIT));
+      metrics.RegisterMetric(new StatsMetric<double>("stats_metric", TUnit::UNIT));
   metric->Update(10.0);
   metric->Update(20.0);
   Document document;
@@ -264,7 +264,7 @@ TEST(MetricsJsonTest, StatsMetrics) {
 
 TEST(MetricsJsonTest, UnitsAndDescription) {
   MetricGroup metrics("Units");
-  metrics.AddCounter("counter", 2048, TCounterType::BYTES, "description");
+  metrics.AddCounter("counter", 2048, TUnit::BYTES, "description");
   Document document;
   Value val;
   metrics.ToJson(true, &document, &val);
@@ -275,8 +275,8 @@ TEST(MetricsJsonTest, UnitsAndDescription) {
 
 TEST(MetricGroupTest, JsonTest) {
   MetricGroup metrics("JsonTest");
-  metrics.AddCounter("counter1", 2048, TCounterType::BYTES, "description");
-  metrics.AddCounter("counter2", 2048, TCounterType::BYTES, "description");
+  metrics.AddCounter("counter1", 2048, TUnit::BYTES, "description");
+  metrics.AddCounter("counter2", 2048, TUnit::BYTES, "description");
 
   metrics.GetChildGroup("child1");
   metrics.GetChildGroup("child2")->AddCounter("child_counter", 0);

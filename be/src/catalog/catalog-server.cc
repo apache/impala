@@ -150,7 +150,7 @@ CatalogServer::CatalogServer(MetricGroup* metrics)
     catalog_objects_min_version_(0L), catalog_objects_max_version_(0L) {
   topic_processing_time_metric_ = metrics_->RegisterMetric(
       new StatsMetric<double>(CATALOG_SERVER_TOPIC_PROCESSING_TIMES,
-          TCounterType::TIME_S));
+          TUnit::TIME_S));
 }
 
 

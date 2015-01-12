@@ -367,7 +367,7 @@ Status BufferedBlockMgr::MemLimitTooLowError(Client* client) {
   status.AddErrorMsg(Substitute("The memory limit is set too low initialize the"
       " spilling operator. The minimum required memory to spill this operator is $0.",
       PrettyPrinter::Print(client->num_reserved_buffers_ * max_block_size(),
-          TCounterType::BYTES)));
+          TUnit::BYTES)));
   VLOG_QUERY << "Query: " << query_id_ << " ran out of memory: " << endl
              << DebugInternal() << endl << client->DebugString() << endl
              << GetStackTrace();
@@ -1081,19 +1081,19 @@ void BufferedBlockMgr::Init(DiskIoMgr* io_mgr, RuntimeProfile* parent_profile,
   profile_.reset(new RuntimeProfile(&obj_pool_, "BlockMgr"));
   parent_profile->AddChild(profile_.get());
 
-  mem_limit_counter_ = ADD_COUNTER(profile_.get(), "MemoryLimit", TCounterType::BYTES);
+  mem_limit_counter_ = ADD_COUNTER(profile_.get(), "MemoryLimit", TUnit::BYTES);
   mem_limit_counter_->Set(mem_limit);
-  block_size_counter_ = ADD_COUNTER(profile_.get(), "MaxBlockSize", TCounterType::BYTES);
+  block_size_counter_ = ADD_COUNTER(profile_.get(), "MaxBlockSize", TUnit::BYTES);
   block_size_counter_->Set(max_block_size_);
   created_block_counter_ = ADD_COUNTER(
-      profile_.get(), "BlocksCreated", TCounterType::UNIT);
+      profile_.get(), "BlocksCreated", TUnit::UNIT);
   recycled_blocks_counter_ = ADD_COUNTER(
-      profile_.get(), "BlocksRecycled", TCounterType::UNIT);
+      profile_.get(), "BlocksRecycled", TUnit::UNIT);
   bytes_written_counter_ = ADD_COUNTER(
-      profile_.get(), "BytesWritten", TCounterType::BYTES);
+      profile_.get(), "BytesWritten", TUnit::BYTES);
   outstanding_writes_counter_ =
-      ADD_COUNTER(profile_.get(), "BlockWritesOutstanding", TCounterType::UNIT);
-  buffered_pin_counter_ = ADD_COUNTER(profile_.get(), "BufferedPins", TCounterType::UNIT);
+      ADD_COUNTER(profile_.get(), "BlockWritesOutstanding", TUnit::UNIT);
+  buffered_pin_counter_ = ADD_COUNTER(profile_.get(), "BufferedPins", TUnit::UNIT);
   disk_read_timer_ = ADD_TIMER(profile_.get(), "TotalReadBlockTime");
   buffer_wait_timer_ = ADD_TIMER(profile_.get(), "TotalBufferWaitTime");
   encryption_timer_ = ADD_TIMER(profile_.get(), "TotalEncryptionTime");

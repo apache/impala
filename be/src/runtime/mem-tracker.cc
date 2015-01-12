@@ -49,7 +49,7 @@ MemTracker::MemTracker(int64_t byte_limit, int64_t rm_reserved_limit, const stri
     label_(label),
     parent_(parent),
     consumption_(&local_counter_),
-    local_counter_(TCounterType::BYTES),
+    local_counter_(TUnit::BYTES),
     consumption_metric_(NULL),
     auto_unregister_(false),
     enable_logging_(false),
@@ -70,8 +70,8 @@ MemTracker::MemTracker(
     rm_reserved_limit_(rm_reserved_limit),
     label_(label),
     parent_(parent),
-    consumption_(profile->AddHighWaterMarkCounter(COUNTER_NAME, TCounterType::BYTES)),
-    local_counter_(TCounterType::BYTES),
+    consumption_(profile->AddHighWaterMarkCounter(COUNTER_NAME, TUnit::BYTES)),
+    local_counter_(TUnit::BYTES),
     consumption_metric_(NULL),
     auto_unregister_(false),
     enable_logging_(false),
@@ -92,7 +92,7 @@ MemTracker::MemTracker(UIntGauge* consumption_metric,
     label_(label),
     parent_(NULL),
     consumption_(&local_counter_),
-    local_counter_(TCounterType::BYTES),
+    local_counter_(TUnit::BYTES),
     consumption_metric_(consumption_metric),
     auto_unregister_(false),
     enable_logging_(false),
@@ -158,12 +158,12 @@ shared_ptr<MemTracker> MemTracker::GetQueryMemTracker(
   if (byte_limit != -1) {
     if (byte_limit > MemInfo::physical_mem()) {
       LOG(WARNING) << "Memory limit "
-                   << PrettyPrinter::Print(byte_limit, TCounterType::BYTES)
+                   << PrettyPrinter::Print(byte_limit, TUnit::BYTES)
                    << " exceeds physical memory of "
-                   << PrettyPrinter::Print(MemInfo::physical_mem(), TCounterType::BYTES);
+                   << PrettyPrinter::Print(MemInfo::physical_mem(), TUnit::BYTES);
     }
     VLOG_QUERY << "Using query memory limit: "
-               << PrettyPrinter::Print(byte_limit, TCounterType::BYTES);
+               << PrettyPrinter::Print(byte_limit, TUnit::BYTES);
   }
 
   lock_guard<mutex> l(static_mem_trackers_lock_);
@@ -201,14 +201,14 @@ MemTracker::~MemTracker() {
 
 void MemTracker::RegisterMetrics(MetricGroup* metrics, const string& prefix) {
   num_gcs_metric_ = metrics->AddCounter(
-      Substitute("$0.num-gcs", prefix), 0L, TCounterType::UNIT);
+      Substitute("$0.num-gcs", prefix), 0L, TUnit::UNIT);
 
   // TODO: Consider a total amount of bytes freed counter
   bytes_freed_by_last_gc_metric_ = metrics->AddGauge<int64_t>(
-      Substitute("$0.bytes-freed-by-last-gc", prefix), -1, TCounterType::BYTES);
+      Substitute("$0.bytes-freed-by-last-gc", prefix), -1, TUnit::BYTES);
 
   bytes_over_limit_metric_ = metrics->AddGauge<int64_t>(
-      Substitute("$0.bytes-over-limit", prefix), -1, TCounterType::BYTES);
+      Substitute("$0.bytes-over-limit", prefix), -1, TUnit::BYTES);
 }
 
 // Calling this on the query tracker results in output like:
@@ -229,8 +229,8 @@ string MemTracker::LogUsage(const string& prefix) const {
   stringstream ss;
   ss << prefix << label_ << ":";
   if (CheckLimitExceeded()) ss << " memory limit exceeded.";
-  if (limit_ > 0) ss << " Limit=" << PrettyPrinter::Print(limit_, TCounterType::BYTES);
-  ss << " Consumption=" << PrettyPrinter::Print(consumption(), TCounterType::BYTES);
+  if (limit_ > 0) ss << " Limit=" << PrettyPrinter::Print(limit_, TUnit::BYTES);
+  ss << " Consumption=" << PrettyPrinter::Print(consumption(), TUnit::BYTES);
 
   stringstream prefix_ss;
   prefix_ss << prefix << "  ";
@@ -308,7 +308,7 @@ bool MemTracker::ExpandRmReservation(int64_t bytes) {
   Status status = ExecEnv::GetInstance()->resource_broker()->Expand(exp, &response);
   if (!status.ok()) {
     LOG(INFO) << "Failed to expand memory limit by "
-              << PrettyPrinter::Print(bytes, TCounterType::BYTES) << ": "
+              << PrettyPrinter::Print(bytes, TUnit::BYTES) << ": "
               << status.GetErrorMsg();
     return false;
   }

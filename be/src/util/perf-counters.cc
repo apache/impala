@@ -178,9 +178,9 @@ bool PerfCounters::InitSysCounter(Counter counter) {
   data.fd = fd;
 
   if (counter == PERF_COUNTER_SW_CPU_CLOCK) {
-    data.type = TCounterType::TIME_NS;
+    data.type = TUnit::TIME_NS;
   } else {
-    data.type = TCounterType::UNIT;
+    data.type = TUnit::UNIT;
   }
   counters_.push_back(data);
   return true;
@@ -190,7 +190,7 @@ bool PerfCounters::InitProcSelfIOCounter(Counter counter) {
   CounterData data;
   data.counter = counter;
   data.source = PerfCounters::PROC_SELF_IO;
-  data.type = TCounterType::BYTES;
+  data.type = TUnit::BYTES;
 
   switch (counter) {
     case PerfCounters::PERF_COUNTER_BYTES_READ:
@@ -216,7 +216,7 @@ bool PerfCounters::InitProcSelfStatusCounter(Counter counter) {
   CounterData data;
   data.counter = counter;
   data.source = PerfCounters::PROC_SELF_STATUS;
-  data.type = TCounterType::BYTES;
+  data.type = TUnit::BYTES;
 
   switch (counter) {
     case PerfCounters::PERF_COUNTER_VM_USAGE:
@@ -240,7 +240,7 @@ bool PerfCounters::GetSysCounters(vector<int64_t>& buffer) {
     if (counters_[i].source == SYS_PERF_COUNTER) {
       int num_bytes = read(counters_[i].fd, &buffer[i], COUNTER_SIZE);
       if (num_bytes != COUNTER_SIZE) return false;
-      if (counters_[i].type == TCounterType::TIME_NS) {
+      if (counters_[i].type == TUnit::TIME_NS) {
         buffer[i] /= 1000000;
       }
     }

@@ -141,13 +141,13 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
       state->instance_mem_tracker()));
 
   partitions_created_counter_ =
-      ADD_COUNTER(profile(), "PartitionsCreated", TCounterType::UNIT);
+      ADD_COUNTER(profile(), "PartitionsCreated", TUnit::UNIT);
   files_created_counter_ =
-      ADD_COUNTER(profile(), "FilesCreated", TCounterType::UNIT);
+      ADD_COUNTER(profile(), "FilesCreated", TUnit::UNIT);
   rows_inserted_counter_ =
-      ADD_COUNTER(profile(), "RowsInserted", TCounterType::UNIT);
+      ADD_COUNTER(profile(), "RowsInserted", TUnit::UNIT);
   bytes_written_counter_ =
-      ADD_COUNTER(profile(), "BytesWritten", TCounterType::BYTES);
+      ADD_COUNTER(profile(), "BytesWritten", TUnit::BYTES);
   encode_timer_ = ADD_TIMER(profile(), "EncodeTimer");
   hdfs_write_timer_ = ADD_TIMER(profile(), "HdfsWriteTimer");
   compress_timer_ = ADD_TIMER(profile(), "CompressTimer");

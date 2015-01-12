@@ -49,11 +49,11 @@ Status ScanNode::Prepare(RuntimeState* state) {
   scanner_thread_counters_ =
       ADD_THREAD_COUNTERS(runtime_profile(), SCANNER_THREAD_COUNTERS_PREFIX);
   bytes_read_counter_ =
-      ADD_COUNTER(runtime_profile(), BYTES_READ_COUNTER, TCounterType::BYTES);
+      ADD_COUNTER(runtime_profile(), BYTES_READ_COUNTER, TUnit::BYTES);
   bytes_read_timeseries_counter_ = ADD_TIME_SERIES_COUNTER(runtime_profile(),
       BYTES_READ_COUNTER, bytes_read_counter_);
   rows_read_counter_ =
-      ADD_COUNTER(runtime_profile(), ROWS_READ_COUNTER, TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile(), ROWS_READ_COUNTER, TUnit::UNIT);
   total_throughput_counter_ = runtime_profile()->AddRateCounter(
       TOTAL_THROUGHPUT_COUNTER, bytes_read_counter_);
   materialize_tuple_timer_ = ADD_CHILD_TIMER(runtime_profile(), MATERIALIZE_TUPLE_TIMER,

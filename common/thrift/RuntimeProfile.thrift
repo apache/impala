@@ -15,24 +15,24 @@
 namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
-// Counter data types. 'Counter' is a legacy term - these units are used for all metric
-// types.
-enum TCounterType {
+// Metric and counter data types.
+enum TUnit {
+  // A dimensionless numerical quantity
   UNIT,
+  // Rate of a dimensionless numerical quantity
   UNIT_PER_SECOND,
   CPU_TICKS,
   BYTES
   BYTES_PER_SECOND,
   TIME_NS,
   DOUBLE_VALUE,
+  // No units at all, may not be a numerical quantity
   NONE,
   TIME_MS,
   TIME_S
 }
 
-// Type of the metric, that is a description of the kind of value that a metric
-// represents.
-// TODO: There's a better word for this than 'type'.
+// The kind of value that a metric represents.
 enum TMetricKind {
   // May go up or down over time
   GAUGE,
@@ -46,7 +46,7 @@ enum TMetricKind {
 // Counter data
 struct TCounter {
   1: required string name
-  2: required TCounterType type
+  2: required TUnit unit
   3: required i64 value
 }
 
@@ -66,7 +66,7 @@ struct TEventSequence {
 // This can be used to reconstruct a time line for a particular counter.
 struct TTimeSeriesCounter {
   1: required string name
-  2: required TCounterType type
+  2: required TUnit unit
 
   // Period of intervals in ms
   3: required i32 period_ms

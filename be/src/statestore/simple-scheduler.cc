@@ -568,11 +568,11 @@ Status SimpleScheduler::ComputeScanRangeAssignment(
 
   if (VLOG_FILE_IS_ON) {
     VLOG_FILE << "Total remote scan volume = " <<
-        PrettyPrinter::Print(remote_bytes, TCounterType::BYTES);
+        PrettyPrinter::Print(remote_bytes, TUnit::BYTES);
     VLOG_FILE << "Total local scan volume = " <<
-        PrettyPrinter::Print(local_bytes, TCounterType::BYTES);
+        PrettyPrinter::Print(local_bytes, TUnit::BYTES);
     VLOG_FILE << "Total cached scan volume = " <<
-        PrettyPrinter::Print(cached_bytes, TCounterType::BYTES);
+        PrettyPrinter::Print(cached_bytes, TUnit::BYTES);
     if (remote_hosts.size() > 0) {
       stringstream remote_node_log;
       remote_node_log << "Remote data node list: ";

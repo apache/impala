@@ -121,7 +121,7 @@ void* RpcEventHandler::getContext(const char* fn_name, void* server_context) {
       const string& time_metric_name =
           Substitute("rpc-method.$0.$1.call_duration", server_name_, descriptor->name);
       descriptor->time_stats = metrics_->RegisterMetric(
-          new StatsMetric<double>(time_metric_name, TCounterType::TIME_MS));
+          new StatsMetric<double>(time_metric_name, TUnit::TIME_MS));
       it = method_map_.insert(make_pair(descriptor->name, descriptor)).first;
     }
   }
@@ -141,7 +141,7 @@ void RpcEventHandler::postWrite(void* ctx, const char* fn_name, uint32_t bytes) 
   // TODO: bytes is always 0, how come?
   VLOG_RPC << "RPC call: " << server_name_ << ":" << call_name << " from "
            << rpc_ctx->cnxn_ctx->network_address << " took "
-           << PrettyPrinter::Print(elapsed_time * 1000L * 1000L, TCounterType::TIME_NS);
+           << PrettyPrinter::Print(elapsed_time * 1000L * 1000L, TUnit::TIME_NS);
   MethodDescriptor* descriptor = rpc_ctx->method_descriptor;
   delete rpc_ctx;
   --descriptor->num_in_flight;

@@ -70,14 +70,14 @@ void PrintExecSummary(const TExecSummary& exec_summary, int indent_level,
   vector<string> row;
   row.push_back(label_ss.str());
   row.push_back(lexical_cast<string>(node.exec_stats.size())); // Num instances
-  row.push_back(PrettyPrinter::Print(avg_time, TCounterType::TIME_NS));
-  row.push_back(PrettyPrinter::Print(max_stats.latency_ns, TCounterType::TIME_NS));
+  row.push_back(PrettyPrinter::Print(avg_time, TUnit::TIME_NS));
+  row.push_back(PrettyPrinter::Print(max_stats.latency_ns, TUnit::TIME_NS));
   row.push_back(PrettyPrinter::Print(
       node.is_broadcast ? max_stats.cardinality : agg_stats.cardinality,
-      TCounterType::UNIT));
-  row.push_back(PrettyPrinter::Print(est_stats.cardinality, TCounterType::UNIT));
-  row.push_back(PrettyPrinter::Print(max_stats.memory_used, TCounterType::BYTES));
-  row.push_back(PrettyPrinter::Print(est_stats.memory_used, TCounterType::BYTES));
+      TUnit::UNIT));
+  row.push_back(PrettyPrinter::Print(est_stats.cardinality, TUnit::UNIT));
+  row.push_back(PrettyPrinter::Print(max_stats.memory_used, TUnit::BYTES));
+  row.push_back(PrettyPrinter::Print(est_stats.memory_used, TUnit::BYTES));
   row.push_back(node.label_detail);
   result->push_back(row);
 

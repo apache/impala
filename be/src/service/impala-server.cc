@@ -688,7 +688,7 @@ Status ImpalaServer::SetQueryInflight(shared_ptr<SessionState> session_state,
     lock_guard<mutex> l2(query_expiration_lock_);
     VLOG_QUERY << "Query " << PrintId(query_id) << " has timeout of "
                << PrettyPrinter::Print(timeout_s * 1000L * 1000L * 1000L,
-                     TCounterType::TIME_NS);
+                     TUnit::TIME_NS);
     queries_by_timestamp_.insert(
         make_pair(ms_since_epoch() + (1000L * timeout_s), query_id));
   }
@@ -1477,7 +1477,7 @@ void ImpalaServer::ExpireQueries() {
           const string& err_msg = Substitute(
               "Query $0 expired due to client inactivity (timeout is $1)",
               PrintId(expiration_event->second),
-              PrettyPrinter::Print(timeout_s * 1000000000L, TCounterType::TIME_NS));
+              PrettyPrinter::Print(timeout_s * 1000000000L, TUnit::TIME_NS));
 
           cancellation_thread_pool_->Offer(
               CancellationWork(expiration_event->second, Status(err_msg), false));

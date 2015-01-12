@@ -56,9 +56,9 @@ RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name,
     name_(name),
     metadata_(-1),
     is_averaged_profile_(is_averaged_profile),
-    counter_total_time_(TCounterType::TIME_NS),
-    total_async_timer_(TCounterType::TIME_NS),
-    inactive_timer_(TCounterType::TIME_NS),
+    counter_total_time_(TUnit::TIME_NS),
+    total_async_timer_(TUnit::TIME_NS),
+    inactive_timer_(TUnit::TIME_NS),
     local_time_percent_(0),
     local_time_ns_(0) {
   Counter* total_time_counter;
@@ -69,9 +69,9 @@ RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name,
     total_async_timer = &total_async_timer_;
     inactive_timer = &inactive_timer_;
   } else {
-    total_time_counter = pool->Add(new AveragedCounter(TCounterType::TIME_NS));
-    total_async_timer = pool->Add(new AveragedCounter(TCounterType::TIME_NS));
-    inactive_timer = pool->Add(new AveragedCounter(TCounterType::TIME_NS));
+    total_time_counter = pool->Add(new AveragedCounter(TUnit::TIME_NS));
+    total_async_timer = pool->Add(new AveragedCounter(TUnit::TIME_NS));
+    inactive_timer = pool->Add(new AveragedCounter(TUnit::TIME_NS));
   }
   counter_map_[TOTAL_TIME_COUNTER_NAME] = total_time_counter;
   counter_map_[ASYNC_TIME_COUNTER_NAME] = total_async_timer;
@@ -119,7 +119,7 @@ RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
   for (int i = 0; i < node.counters.size(); ++i) {
     const TCounter& counter = node.counters[i];
     profile->counter_map_[counter.name] =
-      pool->Add(new Counter(counter.type, counter.value));
+      pool->Add(new Counter(counter.unit, counter.value));
   }
 
   if (node.__isset.event_sequences) {
@@ -132,7 +132,7 @@ RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
   if (node.__isset.time_series_counters) {
     BOOST_FOREACH(const TTimeSeriesCounter& val, node.time_series_counters) {
       profile->time_series_counter_map_[val.name] =
-          pool->Add(new TimeSeriesCounter(val.name, val.type, val.period_ms, val.values));
+          pool->Add(new TimeSeriesCounter(val.name, val.unit, val.period_ms, val.values));
     }
   }
 
@@ -170,10 +170,10 @@ void RuntimeProfile::UpdateAverage(RuntimeProfile* other) {
       // Get the counter with the same name in dst_iter (this->counter_map_)
       // Create one if it doesn't exist.
       if (dst_iter == counter_map_.end()) {
-        avg_counter = pool_->Add(new AveragedCounter(src_iter->second->type()));
+        avg_counter = pool_->Add(new AveragedCounter(src_iter->second->unit()));
         counter_map_[src_iter->first] = avg_counter;
       } else {
-        DCHECK(dst_iter->second->type() == src_iter->second->type());
+        DCHECK(dst_iter->second->unit() == src_iter->second->unit());
         avg_counter = static_cast<AveragedCounter*>(dst_iter->second);
       }
 
@@ -233,11 +233,11 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
       CounterMap::iterator j = counter_map_.find(tcounter.name);
       if (j == counter_map_.end()) {
         counter_map_[tcounter.name] =
-          pool_->Add(new Counter(tcounter.type, tcounter.value));
+          pool_->Add(new Counter(tcounter.unit, tcounter.value));
       } else {
-        if (j->second->type() != tcounter.type) {
+        if (j->second->unit() != tcounter.unit) {
           LOG(ERROR) << "Cannot update counters with the same name ("
-                     << j->first << ") but different types.";
+                     << j->first << ") but different units.";
         } else {
           j->second->Set(tcounter.value);
         }
@@ -282,7 +282,7 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
       TimeSeriesCounterMap::iterator it = time_series_counter_map_.find(c.name);
       if (it == time_series_counter_map_.end()) {
         time_series_counter_map_[c.name] =
-            pool_->Add(new TimeSeriesCounter(c.name, c.type, c.period_ms, c.values));
+            pool_->Add(new TimeSeriesCounter(c.name, c.unit, c.period_ms, c.values));
         it = time_series_counter_map_.find(c.name);
       } else {
         it->second->samples_.SetSamples(c.period_ms, c.values);
@@ -317,7 +317,7 @@ void RuntimeProfile::Divide(int n) {
   {
     lock_guard<mutex> l(counter_map_lock_);
     for (iter = counter_map_.begin(); iter != counter_map_.end(); ++iter) {
-      if (iter->second->type() == TCounterType::DOUBLE_VALUE) {
+      if (iter->second->unit() == TUnit::DOUBLE_VALUE) {
         iter->second->Set(iter->second->double_value() / n);
       } else {
         iter->second->value_ = iter->second->value() / n;
@@ -422,7 +422,7 @@ const string* RuntimeProfile::GetInfoString(const string& key) const {
 
 #define ADD_COUNTER_IMPL(NAME, T) \
   RuntimeProfile::T* RuntimeProfile::NAME(\
-      const string& name, TCounterType::type type, const string& parent_counter_name) {\
+      const string& name, TUnit::type unit, const string& parent_counter_name) {\
     DCHECK_EQ(is_averaged_profile_, false);\
     lock_guard<mutex> l(counter_map_lock_);\
     if (counter_map_.find(name) != counter_map_.end()) {\
@@ -430,7 +430,7 @@ const string* RuntimeProfile::GetInfoString(const string& key) const {
     }\
     DCHECK(parent_counter_name == ROOT_COUNTER ||\
         counter_map_.find(parent_counter_name) != counter_map_.end());\
-    T* counter = pool_->Add(new T(type));\
+    T* counter = pool_->Add(new T(unit));\
     counter_map_[name] = counter;\
     set<string>* child_counters =\
         FindOrInsert(&child_counter_map_, parent_counter_name, set<string>());\
@@ -442,12 +442,12 @@ ADD_COUNTER_IMPL(AddCounter, Counter);
 ADD_COUNTER_IMPL(AddHighWaterMarkCounter, HighWaterMarkCounter);
 
 RuntimeProfile::DerivedCounter* RuntimeProfile::AddDerivedCounter(
-    const string& name, TCounterType::type type,
+    const string& name, TUnit::type unit,
     const DerivedCounterFunction& counter_fn, const string& parent_counter_name) {
   DCHECK_EQ(is_averaged_profile_, false);
   lock_guard<mutex> l(counter_map_lock_);
   if (counter_map_.find(name) != counter_map_.end()) return NULL;
-  DerivedCounter* counter = pool_->Add(new DerivedCounter(type, counter_fn));
+  DerivedCounter* counter = pool_->Add(new DerivedCounter(unit, counter_fn));
   counter_map_[name] = counter;
   set<string>* child_counters =
       FindOrInsert(&child_counter_map_, parent_counter_name, set<string>());
@@ -458,15 +458,15 @@ RuntimeProfile::DerivedCounter* RuntimeProfile::AddDerivedCounter(
 RuntimeProfile::ThreadCounters* RuntimeProfile::AddThreadCounters(
     const string& prefix) {
   ThreadCounters* counter = pool_->Add(new ThreadCounters());
-  counter->total_time_ = AddCounter(prefix + THREAD_TOTAL_TIME, TCounterType::TIME_NS);
-  counter->user_time_ = AddCounter(prefix + THREAD_USER_TIME, TCounterType::TIME_NS,
+  counter->total_time_ = AddCounter(prefix + THREAD_TOTAL_TIME, TUnit::TIME_NS);
+  counter->user_time_ = AddCounter(prefix + THREAD_USER_TIME, TUnit::TIME_NS,
       prefix + THREAD_TOTAL_TIME);
-  counter->sys_time_ = AddCounter(prefix + THREAD_SYS_TIME, TCounterType::TIME_NS,
+  counter->sys_time_ = AddCounter(prefix + THREAD_SYS_TIME, TUnit::TIME_NS,
       prefix + THREAD_TOTAL_TIME);
   counter->voluntary_context_switches_ =
-      AddCounter(prefix + THREAD_VOLUNTARY_CONTEXT_SWITCHES, TCounterType::UNIT);
+      AddCounter(prefix + THREAD_VOLUNTARY_CONTEXT_SWITCHES, TUnit::UNIT);
   counter->involuntary_context_switches_ =
-      AddCounter(prefix + THREAD_INVOLUNTARY_CONTEXT_SWITCHES, TCounterType::UNIT);
+      AddCounter(prefix + THREAD_INVOLUNTARY_CONTEXT_SWITCHES, TUnit::UNIT);
   return counter;
 }
 
@@ -523,9 +523,9 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
   if (total_time->second->value() != 0) {
     stream << "(Total: "
            << PrettyPrinter::Print(total_time->second->value(),
-               total_time->second->type())
+               total_time->second->unit())
            << ", non-child: "
-           << PrettyPrinter::Print(local_time_ns_, TCounterType::TIME_NS)
+           << PrettyPrinter::Print(local_time_ns_, TUnit::TIME_NS)
            << ", % non-child: "
            << setprecision(2) << local_time_percent_
            << "%)";
@@ -552,7 +552,7 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
         const EventSequenceMap::value_type& event_sequence, event_sequence_map_) {
       stream << prefix << "  " << event_sequence.first << ": "
              << PrettyPrinter::Print(
-                 event_sequence.second->ElapsedTime(), TCounterType::TIME_NS)
+                 event_sequence.second->ElapsedTime(), TUnit::TIME_NS)
              << endl;
 
       int64_t last = 0L;
@@ -560,9 +560,9 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
       BOOST_FOREACH(const EventSequence::Event& event, events) {
         stream << prefix << "     - " << event.first << ": "
                << PrettyPrinter::Print(
-                   event.second, TCounterType::TIME_NS) << " ("
+                   event.second, TUnit::TIME_NS) << " ("
                << PrettyPrinter::Print(
-                   event.second - last, TCounterType::TIME_NS) << ")"
+                   event.second - last, TUnit::TIME_NS) << ")"
                << endl;
         last = event.second;
       }
@@ -579,10 +579,10 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
       const int64_t* samples = v.second->samples_.GetSamples(&num, &period, &lock);
       if (num > 0) {
         stream << prefix << "  " << v.first << "("
-               << PrettyPrinter::Print(period * 1000000L, TCounterType::TIME_NS)
+               << PrettyPrinter::Print(period * 1000000L, TUnit::TIME_NS)
                << "): ";
         for (int i = 0; i < num; ++i) {
-          stream << PrettyPrinter::Print(samples[i], v.second->type_);
+          stream << PrettyPrinter::Print(samples[i], v.second->unit_);
           if (i != num - 1) stream << ", ";
         }
         stream << endl;
@@ -668,7 +668,7 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
     TCounter counter;
     counter.name = iter->first;
     counter.value = iter->second->value();
-    counter.type = iter->second->type();
+    counter.unit = iter->second->unit();
     node.counters.push_back(counter);
   }
 
@@ -726,9 +726,9 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
 int64_t RuntimeProfile::UnitsPerSecond(
     const RuntimeProfile::Counter* total_counter,
     const RuntimeProfile::Counter* timer) {
-  DCHECK(total_counter->type() == TCounterType::BYTES ||
-         total_counter->type() == TCounterType::UNIT);
-  DCHECK(timer->type() == TCounterType::TIME_NS);
+  DCHECK(total_counter->unit() == TUnit::BYTES ||
+         total_counter->unit() == TUnit::UNIT);
+  DCHECK(timer->unit() == TUnit::TIME_NS);
 
   if (timer->value() == 0) return 0;
   double secs = static_cast<double>(timer->value()) / 1000.0 / 1000.0 / 1000.0;
@@ -745,27 +745,27 @@ int64_t RuntimeProfile::CounterSum(const vector<Counter*>* counters) {
 
 RuntimeProfile::Counter* RuntimeProfile::AddRateCounter(
     const string& name, Counter* src_counter) {
-  TCounterType::type dst_type;
-  switch (src_counter->type()) {
-    case TCounterType::BYTES:
-      dst_type = TCounterType::BYTES_PER_SECOND;
+  TUnit::type dst_unit;
+  switch (src_counter->unit()) {
+    case TUnit::BYTES:
+      dst_unit = TUnit::BYTES_PER_SECOND;
       break;
-    case TCounterType::UNIT:
-      dst_type = TCounterType::UNIT_PER_SECOND;
+    case TUnit::UNIT:
+      dst_unit = TUnit::UNIT_PER_SECOND;
       break;
     default:
-      DCHECK(false) << "Unsupported src counter type: " << src_counter->type();
+      DCHECK(false) << "Unsupported src counter unit: " << src_counter->unit();
       return NULL;
   }
-  Counter* dst_counter = AddCounter(name, dst_type);
+  Counter* dst_counter = AddCounter(name, dst_unit);
   PeriodicCounterUpdater::RegisterPeriodicCounter(src_counter, NULL, dst_counter,
       PeriodicCounterUpdater::RATE_COUNTER);
   return dst_counter;
 }
 
 RuntimeProfile::Counter* RuntimeProfile::AddRateCounter(
-    const string& name, DerivedCounterFunction fn, TCounterType::type dst_type) {
-  Counter* dst_counter = AddCounter(name, dst_type);
+    const string& name, DerivedCounterFunction fn, TUnit::type dst_unit) {
+  Counter* dst_counter = AddCounter(name, dst_unit);
   PeriodicCounterUpdater::RegisterPeriodicCounter(NULL, fn, dst_counter,
       PeriodicCounterUpdater::RATE_COUNTER);
   return dst_counter;
@@ -773,8 +773,8 @@ RuntimeProfile::Counter* RuntimeProfile::AddRateCounter(
 
 RuntimeProfile::Counter* RuntimeProfile::AddSamplingCounter(
     const string& name, Counter* src_counter) {
-  DCHECK(src_counter->type() == TCounterType::UNIT);
-  Counter* dst_counter = AddCounter(name, TCounterType::DOUBLE_VALUE);
+  DCHECK(src_counter->unit() == TUnit::UNIT);
+  Counter* dst_counter = AddCounter(name, TUnit::DOUBLE_VALUE);
   PeriodicCounterUpdater::RegisterPeriodicCounter(src_counter, NULL, dst_counter,
       PeriodicCounterUpdater::SAMPLING_COUNTER);
   return dst_counter;
@@ -782,7 +782,7 @@ RuntimeProfile::Counter* RuntimeProfile::AddSamplingCounter(
 
 RuntimeProfile::Counter* RuntimeProfile::AddSamplingCounter(
     const string& name, DerivedCounterFunction sample_fn) {
-  Counter* dst_counter = AddCounter(name, TCounterType::DOUBLE_VALUE);
+  Counter* dst_counter = AddCounter(name, TUnit::DOUBLE_VALUE);
   PeriodicCounterUpdater::RegisterPeriodicCounter(NULL, sample_fn, dst_counter,
       PeriodicCounterUpdater::SAMPLING_COUNTER);
   return dst_counter;
@@ -819,7 +819,7 @@ void RuntimeProfile::PrintChildCounters(const string& prefix,
       CounterMap::const_iterator iter = counter_map.find(child_counter);
       if (iter == counter_map.end()) continue;
       stream << prefix << "   - " << iter->first << ": "
-             << PrettyPrinter::Print(iter->second->value(), iter->second->type(), true)
+             << PrettyPrinter::Print(iter->second->value(), iter->second->unit(), true)
              << endl;
       RuntimeProfile::PrintChildCounters(prefix + "  ", child_counter, counter_map,
           child_counter_map, s);
@@ -828,13 +828,13 @@ void RuntimeProfile::PrintChildCounters(const string& prefix,
 }
 
 RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddTimeSeriesCounter(
-    const string& name, TCounterType::type type, DerivedCounterFunction fn) {
+    const string& name, TUnit::type unit, DerivedCounterFunction fn) {
   DCHECK(fn != NULL);
 
   lock_guard<mutex> l(time_series_counter_map_lock_);
   TimeSeriesCounterMap::iterator it = time_series_counter_map_.find(name);
   if (it != time_series_counter_map_.end()) return it->second;
-  TimeSeriesCounter* counter = pool_->Add(new TimeSeriesCounter(name, type, fn));
+  TimeSeriesCounter* counter = pool_->Add(new TimeSeriesCounter(name, unit, fn));
   time_series_counter_map_[name] = counter;
   PeriodicCounterUpdater::RegisterTimeSeriesCounter(counter);
   return counter;
@@ -843,13 +843,13 @@ RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddTimeSeriesCounter(
 RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddTimeSeriesCounter(
     const string& name, Counter* src_counter) {
   DCHECK(src_counter != NULL);
-  return AddTimeSeriesCounter(name, src_counter->type(),
+  return AddTimeSeriesCounter(name, src_counter->unit(),
       bind(&Counter::value, src_counter));
 }
 
 void RuntimeProfile::TimeSeriesCounter::ToThrift(TTimeSeriesCounter* counter) {
   counter->name = name_;
-  counter->type = type_;
+  counter->unit = unit_;
 
   int num, period;
   SpinLock* lock;

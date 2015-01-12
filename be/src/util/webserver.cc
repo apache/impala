@@ -390,7 +390,7 @@ int Webserver::BeginRequestCallback(struct sq_connection* connection,
   }
 
   VLOG(3) << "Rendering page " << request_info->uri << " took "
-          << PrettyPrinter::Print(sw.ElapsedTime(), TCounterType::CPU_TICKS);
+          << PrettyPrinter::Print(sw.ElapsedTime(), TUnit::CPU_TICKS);
 
   const string& str = output.str();
   const string& headers = BuildHeaderString(response, content_type);

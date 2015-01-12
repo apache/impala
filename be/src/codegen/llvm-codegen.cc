@@ -109,7 +109,7 @@ LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& name) :
 
   load_module_timer_ = ADD_TIMER(&profile_, "LoadTime");
   prepare_module_timer_ = ADD_TIMER(&profile_, "PrepareTime");
-  module_file_size_ = ADD_COUNTER(&profile_, "ModuleFileSize", TCounterType::BYTES);
+  module_file_size_ = ADD_COUNTER(&profile_, "ModuleFileSize", TUnit::BYTES);
   codegen_timer_ = ADD_TIMER(&profile_, "CodegenTime");
   optimization_timer_ = ADD_TIMER(&profile_, "OptimizationTime");
   compile_timer_ = ADD_TIMER(&profile_, "CompileTime");

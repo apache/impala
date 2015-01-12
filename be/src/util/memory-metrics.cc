@@ -57,7 +57,7 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
 }
 
 JvmMetric::JvmMetric(const string& key, const string& mempool_name, JvmMetricType type)
-    : IntGauge(key, TCounterType::BYTES) {
+    : IntGauge(key, TUnit::BYTES) {
   mempool_name_ = mempool_name;
   metric_type_ = type;
 

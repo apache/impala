@@ -85,7 +85,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       unknown_disk_id_warned_(false),
       initial_ranges_issued_(false),
       scanner_thread_bytes_required_(0),
-      disks_accessed_bitmap_(TCounterType::UNIT, 0),
+      disks_accessed_bitmap_(TUnit::UNIT, 0),
       done_(false),
       all_ranges_started_(false),
       counters_running_(false),
@@ -565,18 +565,18 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   // Initialize HdfsScanNode specific counters
   read_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HDFS_READ_TIMER);
   per_read_thread_throughput_counter_ = runtime_profile()->AddDerivedCounter(
-      PER_READ_THREAD_THROUGHPUT_COUNTER, TCounterType::BYTES_PER_SECOND,
+      PER_READ_THREAD_THROUGHPUT_COUNTER, TUnit::BYTES_PER_SECOND,
       bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_read_counter_, read_timer_));
   scan_ranges_complete_counter_ =
-      ADD_COUNTER(runtime_profile(), SCAN_RANGES_COMPLETE_COUNTER, TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile(), SCAN_RANGES_COMPLETE_COUNTER, TUnit::UNIT);
   if (DiskInfo::num_disks() < 64) {
     num_disks_accessed_counter_ =
-        ADD_COUNTER(runtime_profile(), NUM_DISKS_ACCESSED_COUNTER, TCounterType::UNIT);
+        ADD_COUNTER(runtime_profile(), NUM_DISKS_ACCESSED_COUNTER, TUnit::UNIT);
   } else {
     num_disks_accessed_counter_ = NULL;
   }
   num_scanner_threads_started_counter_ =
-      ADD_COUNTER(runtime_profile(), NUM_SCANNER_THREADS_STARTED, TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile(), NUM_SCANNER_THREADS_STARTED, TUnit::UNIT);
 
   runtime_state_->io_mgr()->set_bytes_read_counter(reader_context_, bytes_read_counter());
   runtime_state_->io_mgr()->set_read_timer(reader_context_, read_timer());
@@ -591,23 +591,23 @@ Status HdfsScanNode::Open(RuntimeState* state) {
       AVERAGE_HDFS_READ_THREAD_CONCURRENCY, &active_hdfs_read_thread_counter_);
 
   bytes_read_local_ = ADD_COUNTER(runtime_profile(), "BytesReadLocal",
-      TCounterType::BYTES);
+      TUnit::BYTES);
   bytes_read_short_circuit_ = ADD_COUNTER(runtime_profile(), "BytesReadShortCircuit",
-      TCounterType::BYTES);
+      TUnit::BYTES);
   bytes_read_dn_cache_ = ADD_COUNTER(runtime_profile(), "BytesReadDataNodeCache",
-      TCounterType::BYTES);
+      TUnit::BYTES);
   num_remote_ranges_ = ADD_COUNTER(runtime_profile(), "RemoteScanRanges",
-      TCounterType::UNIT);
+      TUnit::UNIT);
   unexpected_remote_bytes_ = ADD_COUNTER(runtime_profile(), "BytesReadRemoteUnexpected",
-      TCounterType::BYTES);
+      TUnit::BYTES);
 
   max_compressed_text_file_length_ = runtime_profile()->AddHighWaterMarkCounter(
-      "MaxCompressedTextFileLength", TCounterType::BYTES);
+      "MaxCompressedTextFileLength", TUnit::BYTES);
 
   // Create num_disks+1 bucket counters
   for (int i = 0; i < state->io_mgr()->num_disks() + 1; ++i) {
     hdfs_read_thread_concurrency_bucket_.push_back(
-        pool_->Add(new RuntimeProfile::Counter(TCounterType::DOUBLE_VALUE, 0)));
+        pool_->Add(new RuntimeProfile::Counter(TUnit::DOUBLE_VALUE, 0)));
   }
   runtime_profile()->RegisterBucketingCounters(&active_hdfs_read_thread_counter_,
       &hdfs_read_thread_concurrency_bucket_);
@@ -1079,6 +1079,6 @@ void HdfsScanNode::PrintHdfsSplitStats(const PerVolumnStats& per_volume_stats,
   for (PerVolumnStats::const_iterator i = per_volume_stats.begin();
        i != per_volume_stats.end(); ++i) {
      (*ss) << i->first << ":" << i->second.first << "/"
-         << PrettyPrinter::Print(i->second.second, TCounterType::BYTES) << " ";
+         << PrettyPrinter::Print(i->second.second, TUnit::BYTES) << " ";
   }
 }

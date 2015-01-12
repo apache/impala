@@ -65,7 +65,7 @@ class SetMetric : public Metric {
     rapidjson::Value metric_list(rapidjson::kArrayType);
     BOOST_FOREACH(const T& s, value_) {
       rapidjson::Value entry_value;
-      ToJsonValue(s, TCounterType::NONE, document, &entry_value);
+      ToJsonValue(s, TUnit::NONE, document, &entry_value);
       metric_list.PushBack(entry_value, document->GetAllocator());
     }
     container.AddMember("items", metric_list, document->GetAllocator());
@@ -76,7 +76,7 @@ class SetMetric : public Metric {
     rapidjson::Value metric_list(rapidjson::kArrayType);
     BOOST_FOREACH(const T& s, value_) {
       rapidjson::Value entry_value;
-      ToJsonValue(s, TCounterType::NONE, document, &entry_value);
+      ToJsonValue(s, TUnit::NONE, document, &entry_value);
       metric_list.PushBack(entry_value, document->GetAllocator());
     }
     document->AddMember(key_.c_str(), metric_list, document->GetAllocator());
@@ -85,7 +85,7 @@ class SetMetric : public Metric {
   virtual std::string ToHumanReadable() {
     std::stringstream out;
     PrettyPrinter::PrintStringList<std::set<T> >(
-        value_, TCounterType::NONE, &out);
+        value_, TUnit::NONE, &out);
     return out.str();
   }
 
@@ -106,7 +106,7 @@ class SetMetric : public Metric {
 template <typename T>
 class StatsMetric : public Metric {
  public:
-  StatsMetric(const std::string& key, const TCounterType::type unit,
+  StatsMetric(const std::string& key, const TUnit::type unit,
       const std::string& description = "") : Metric(key, description), unit_(unit) { }
 
   void Update(const T& value) {
@@ -119,7 +119,7 @@ class StatsMetric : public Metric {
     boost::lock_guard<boost::mutex> l(lock_);
     rapidjson::Value container(rapidjson::kObjectType);
     AddStandardFields(document, &container);
-    rapidjson::Value units(PrintTCounterType(unit_).c_str(), document->GetAllocator());
+    rapidjson::Value units(PrintTUnit(unit_).c_str(), document->GetAllocator());
     container.AddMember("units", units, document->GetAllocator());
 
     container.AddMember("count", boost::accumulators::count(acc_),
@@ -175,8 +175,8 @@ class StatsMetric : public Metric {
   }
 
  private:
-  // The type of the unit
-  TCounterType::type unit_;
+  // The units of the values captured in this metric, used when pretty-printing.
+  TUnit::type unit_;
 
   // Lock protecting the value and the accumulator_set
   boost::mutex lock_;

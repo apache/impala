@@ -72,7 +72,7 @@ string MemInfo::DebugString() {
   DCHECK(initialized_);
   stringstream stream;
   stream << "Physical Memory: "
-         << PrettyPrinter::Print(physical_mem_, TCounterType::BYTES)
+         << PrettyPrinter::Print(physical_mem_, TUnit::BYTES)
          << endl;
   return stream.str();
 }

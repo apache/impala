@@ -90,7 +90,7 @@ class Metric {
 
 // A SimpleMetric has a value which is a simple primitive type: e.g. integers, strings and
 // floats. It is parameterised not only by the type of its value, but by both the unit
-// (e.g. bytes/s), drawn from TCounterType and the 'kind' of the metric itself. The kind
+// (e.g. bytes/s), drawn from TUnit and the 'kind' of the metric itself. The kind
 // can be one of: 'gauge', which may increase or decrease over time, a 'counter' which is
 // increasing only over time, or a 'property' which is not numeric.
 //
@@ -102,12 +102,12 @@ class Metric {
 template<typename T, TMetricKind::type metric_kind=TMetricKind::GAUGE>
 class SimpleMetric : public Metric {
  public:
-  SimpleMetric(const std::string& key, const TCounterType::type unit,
+  SimpleMetric(const std::string& key, const TUnit::type unit,
       const T& initial_value, const std::string& description = "")
       : Metric(key, description), unit_(unit), value_(initial_value)
   { }
 
-  SimpleMetric(const std::string& key, const TCounterType::type unit,
+  SimpleMetric(const std::string& key, const TUnit::type unit,
       const std::string& description = "")
       : Metric(key, description), unit_(unit) { }
 
@@ -141,13 +141,13 @@ class SimpleMetric : public Metric {
     AddStandardFields(document, &container);
 
     rapidjson::Value metric_value;
-    ToJsonValue(value(), TCounterType::NONE, document, &metric_value);
+    ToJsonValue(value(), TUnit::NONE, document, &metric_value);
     container.AddMember("value", metric_value, document->GetAllocator());
 
     rapidjson::Value type_value(PrintTMetricKind(kind()).c_str(),
         document->GetAllocator());
     container.AddMember("kind", type_value, document->GetAllocator());
-    rapidjson::Value units(PrintTCounterType(unit()).c_str(), document->GetAllocator());
+    rapidjson::Value units(PrintTUnit(unit()).c_str(), document->GetAllocator());
     container.AddMember("units", units, document->GetAllocator());
     *val = container;
   }
@@ -158,11 +158,11 @@ class SimpleMetric : public Metric {
 
   virtual void ToLegacyJson(rapidjson::Document* document) {
     rapidjson::Value val;
-    ToJsonValue(value(), TCounterType::NONE, document, &val);
+    ToJsonValue(value(), TUnit::NONE, document, &val);
     document->AddMember(key_.c_str(), val, document->GetAllocator());
   }
 
-  const TCounterType::type unit() const { return unit_; }
+  const TUnit::type unit() const { return unit_; }
   const TMetricKind::type kind() const { return metric_kind; }
 
  protected:
@@ -174,7 +174,7 @@ class SimpleMetric : public Metric {
   virtual void CalculateValue() { }
 
   // Units of this metric
-  const TCounterType::type unit_;
+  const TUnit::type unit_;
 
   // Guards access to value_
   boost::mutex lock_;
@@ -220,7 +220,7 @@ class MetricGroup {
   // Create a gauge metric object with given key and initial value (owned by this object)
   template<typename T>
   SimpleMetric<T>* AddGauge(const std::string& key,
-      const T& value, const TCounterType::type unit = TCounterType::NONE,
+      const T& value, const TUnit::type unit = TUnit::NONE,
       const std::string& description = "") {
     return RegisterMetric(new SimpleMetric<T, TMetricKind::GAUGE>
         (key, unit, value, description));
@@ -231,12 +231,12 @@ class MetricGroup {
       const std::string& key, const T& value,
       const std::string& description = "") {
     return RegisterMetric(new SimpleMetric<T, TMetricKind::PROPERTY> (key,
-        TCounterType::NONE, value, description));
+        TUnit::NONE, value, description));
   }
 
   template<typename T>
   SimpleMetric<T, TMetricKind::COUNTER>* AddCounter(const std::string& key,
-      const T& value, const TCounterType::type unit = TCounterType::UNIT,
+      const T& value, const TUnit::type unit = TUnit::UNIT,
       const std::string& description = "") {
     return RegisterMetric(
         new SimpleMetric<T, TMetricKind::COUNTER>(key, unit, value, description));

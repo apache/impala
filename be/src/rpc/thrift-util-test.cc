@@ -35,7 +35,7 @@ TEST(ThriftUtil, SimpleSerializeDeserialize) {
 
     TCounter counter;
     counter.__set_name("Test");
-    counter.__set_type(TCounterType::UNIT);
+    counter.__set_unit(TUnit::UNIT);
     counter.__set_value(123);
 
     vector<uint8_t> msg;

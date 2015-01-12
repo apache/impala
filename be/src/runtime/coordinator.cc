@@ -386,7 +386,7 @@ Status Coordinator::Exec(QuerySchedule& schedule,
 
   query_events_->MarkEvent("Ready to start remote fragments");
   int backend_num = 0;
-  StatsMetric<double> latencies("fragment-latencies", TCounterType::TIME_NS);
+  StatsMetric<double> latencies("fragment-latencies", TUnit::TIME_NS);
   for (int fragment_idx = (has_coordinator_fragment ? 1 : 0);
        fragment_idx < request.fragments.size(); ++fragment_idx) {
     const FragmentExecParams& params = (*fragment_exec_params)[fragment_idx];
@@ -873,10 +873,10 @@ void Coordinator::PrintBackendInfo() {
     double mean = accumulators::mean(acc);
     double stddev = sqrt(accumulators::variance(acc));
     stringstream ss;
-    ss << " min: " << PrettyPrinter::Print(min, TCounterType::BYTES)
-      << ", max: " << PrettyPrinter::Print(max, TCounterType::BYTES)
-      << ", avg: " << PrettyPrinter::Print(mean, TCounterType::BYTES)
-      << ", stddev: " << PrettyPrinter::Print(stddev, TCounterType::BYTES);
+    ss << " min: " << PrettyPrinter::Print(min, TUnit::BYTES)
+      << ", max: " << PrettyPrinter::Print(max, TUnit::BYTES)
+      << ", avg: " << PrettyPrinter::Print(mean, TUnit::BYTES)
+      << ", stddev: " << PrettyPrinter::Print(stddev, TUnit::BYTES);
     fragment_profiles_[i].averaged_profile->AddInfoString("split sizes", ss.str());
 
     if (VLOG_FILE_IS_ON) {
@@ -886,7 +886,7 @@ void Coordinator::PrintBackendInfo() {
         if (exec_state->fragment_idx != i) continue;
         VLOG_FILE << "data volume for ipaddress " << exec_state << ": "
                   << PrettyPrinter::Print(
-                    exec_state->total_split_size, TCounterType::BYTES);
+                    exec_state->total_split_size, TUnit::BYTES);
       }
     }
   }
@@ -1012,13 +1012,13 @@ void Coordinator::CreateAggregateCounters(
       stringstream s;
       s << PrintPlanNodeType(node.node_type) << " (id="
         << node.node_id << ") Throughput";
-      query_profile_->AddDerivedCounter(s.str(), TCounterType::BYTES_PER_SECOND,
+      query_profile_->AddDerivedCounter(s.str(), TUnit::BYTES_PER_SECOND,
           bind<int64_t>(mem_fn(&Coordinator::ComputeTotalThroughput),
                         this, node.node_id));
       s.str("");
       s << PrintPlanNodeType(node.node_type) << " (id="
         << node.node_id << ") Completed scan ranges";
-      query_profile_->AddDerivedCounter(s.str(), TCounterType::UNIT,
+      query_profile_->AddDerivedCounter(s.str(), TUnit::UNIT,
           bind<int64_t>(mem_fn(&Coordinator::ComputeTotalScanRangesComplete),
                         this, node.node_id));
     }
@@ -1453,24 +1453,24 @@ void Coordinator::ReportQuerySummary() {
       stringstream times_label;
       times_label
         << "min:" << PrettyPrinter::Print(
-            accumulators::min(completion_times), TCounterType::TIME_NS)
+            accumulators::min(completion_times), TUnit::TIME_NS)
         << "  max:" << PrettyPrinter::Print(
-            accumulators::max(completion_times), TCounterType::TIME_NS)
+            accumulators::max(completion_times), TUnit::TIME_NS)
         << "  mean: " << PrettyPrinter::Print(
-            accumulators::mean(completion_times), TCounterType::TIME_NS)
+            accumulators::mean(completion_times), TUnit::TIME_NS)
         << "  stddev:" << PrettyPrinter::Print(
-            sqrt(accumulators::variance(completion_times)), TCounterType::TIME_NS);
+            sqrt(accumulators::variance(completion_times)), TUnit::TIME_NS);
 
       stringstream rates_label;
       rates_label
         << "min:" << PrettyPrinter::Print(
-            accumulators::min(rates), TCounterType::BYTES_PER_SECOND)
+            accumulators::min(rates), TUnit::BYTES_PER_SECOND)
         << "  max:" << PrettyPrinter::Print(
-            accumulators::max(rates), TCounterType::BYTES_PER_SECOND)
+            accumulators::max(rates), TUnit::BYTES_PER_SECOND)
         << "  mean:" << PrettyPrinter::Print(
-            accumulators::mean(rates), TCounterType::BYTES_PER_SECOND)
+            accumulators::mean(rates), TUnit::BYTES_PER_SECOND)
         << "  stddev:" << PrettyPrinter::Print(
-            sqrt(accumulators::variance(rates)), TCounterType::BYTES_PER_SECOND);
+            sqrt(accumulators::variance(rates)), TUnit::BYTES_PER_SECOND);
 
       fragment_profiles_[i].averaged_profile->AddInfoString(
           "completion times", times_label.str());
@@ -1509,7 +1509,7 @@ void Coordinator::ReportQuerySummary() {
     stringstream info;
     BOOST_FOREACH(PerNodePeakMemoryUsage::value_type entry, per_node_peak_mem_usage) {
       info << entry.first << "("
-           << PrettyPrinter::Print(entry.second, TCounterType::BYTES) << ") ";
+           << PrettyPrinter::Print(entry.second, TUnit::BYTES) << ") ";
     }
     query_profile_->AddInfoString("Per Node Peak Memory Usage", info.str());
   }

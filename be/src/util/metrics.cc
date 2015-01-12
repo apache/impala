@@ -36,7 +36,7 @@ using namespace strings;
 namespace impala {
 
 template <>
-void ToJsonValue<string>(const string& value, const TCounterType::type type,
+void ToJsonValue<string>(const string& value, const TUnit::type unit,
     Document* document, Value* out_val) {
   Value val(value.c_str(), document->GetAllocator());
   *out_val = val;

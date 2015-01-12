@@ -79,8 +79,8 @@ class ScanNode : public ExecNode {
   ScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
     : ExecNode(pool, tnode, descs),
       scan_range_params_(NULL),
-      active_scanner_thread_counter_(TCounterType::UNIT, 0),
-      active_hdfs_read_thread_counter_(TCounterType::UNIT, 0) {}
+      active_scanner_thread_counter_(TUnit::UNIT, 0),
+      active_hdfs_read_thread_counter_(TUnit::UNIT, 0) {}
 
   virtual Status Prepare(RuntimeState* state);
 

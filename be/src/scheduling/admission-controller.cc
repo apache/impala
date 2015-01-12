@@ -155,9 +155,9 @@ static string DebugPoolStats(const string& pool_name,
     ss << "num_running=" << total_stats->num_running << ", ";
     ss << "num_queued=" << total_stats->num_queued << ", ";
     ss << "mem_usage=" <<
-        PrettyPrinter::Print(total_stats->mem_usage, TCounterType::BYTES) << ", ";
+        PrettyPrinter::Print(total_stats->mem_usage, TUnit::BYTES) << ", ";
     ss << "mem_estimate=" <<
-        PrettyPrinter::Print(total_stats->mem_estimate, TCounterType::BYTES);
+        PrettyPrinter::Print(total_stats->mem_estimate, TUnit::BYTES);
     ss << ")";
   }
   if (local_stats != NULL) {
@@ -165,9 +165,9 @@ static string DebugPoolStats(const string& pool_name,
     ss << "num_running=" << local_stats->num_running << ", ";
     ss << "num_queued=" << local_stats->num_queued << ", ";
     ss << "mem_usage=" <<
-        PrettyPrinter::Print(local_stats->mem_usage, TCounterType::BYTES) << ", ";
+        PrettyPrinter::Print(local_stats->mem_usage, TUnit::BYTES) << ", ";
     ss << "mem_estimate=" <<
-        PrettyPrinter::Print(local_stats->mem_estimate, TCounterType::BYTES);
+        PrettyPrinter::Print(local_stats->mem_estimate, TUnit::BYTES);
     ss << ")";
   }
   return ss.str();
@@ -231,9 +231,9 @@ Status AdmissionController::CanAdmitRequest(const string& pool_name,
         true);
   } else if (mem_limit >= 0 && cluster_estimated_memory >= mem_limit) {
     return Status(Substitute(QUEUED_MEM_LIMIT,
-        PrettyPrinter::Print(query_total_estimated_mem, TCounterType::BYTES),
-        PrettyPrinter::Print(current_cluster_estimate_mem, TCounterType::BYTES),
-        PrettyPrinter::Print(mem_limit, TCounterType::BYTES)), true);
+        PrettyPrinter::Print(query_total_estimated_mem, TUnit::BYTES),
+        PrettyPrinter::Print(current_cluster_estimate_mem, TUnit::BYTES),
+        PrettyPrinter::Print(mem_limit, TUnit::BYTES)), true);
   } else if (!admit_from_queue && total_stats.num_queued > 0) {
     return Status(Substitute(QUEUED_QUEUE_NOT_EMPTY, total_stats.num_queued), true);
   }
@@ -252,8 +252,8 @@ Status AdmissionController::RejectRequest(const string& pool_name,
     reject_reason = REASON_DISABLED_MEM_LIMIT;
   } else if (mem_limit > 0 && expected_mem_usage >= mem_limit) {
     reject_reason = Substitute(REASON_REQ_OVER_MEM_LIMIT,
-        PrettyPrinter::Print(expected_mem_usage, TCounterType::BYTES),
-        PrettyPrinter::Print(mem_limit, TCounterType::BYTES));
+        PrettyPrinter::Print(expected_mem_usage, TUnit::BYTES),
+        PrettyPrinter::Print(mem_limit, TUnit::BYTES));
   } else if (total_stats->num_queued >= max_queued) {
     reject_reason = Substitute(REASON_QUEUE_FULL, max_queued, total_stats->num_queued);
   } else {
@@ -287,9 +287,9 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
     VLOG_QUERY << "Schedule for id=" << schedule->query_id()
                << " in pool_name=" << pool_name << " PoolConfig(max_requests="
                << max_requests << " max_queued=" << max_queued
-               << " mem_limit=" << PrettyPrinter::Print(mem_limit, TCounterType::BYTES)
+               << " mem_limit=" << PrettyPrinter::Print(mem_limit, TUnit::BYTES)
                << ") query cluster_mem_estimate="
-               << PrettyPrinter::Print(cluster_mem_estimate, TCounterType::BYTES);
+               << PrettyPrinter::Print(cluster_mem_estimate, TUnit::BYTES);
     VLOG_QUERY << "Stats: " << DebugPoolStats(pool_name, total_stats, local_stats);
 
     admitStatus = CanAdmitRequest(pool_name, max_requests, mem_limit, *schedule, false);
