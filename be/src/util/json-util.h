@@ -37,13 +37,13 @@ ToJsonValue(const T& value, const TCounterType::type type, rapidjson::Document* 
 
 // Specialisation for std::string which requires explicit use of 'document's allocator to
 // copy into out_val.
-template<>
+template <>
 void ToJsonValue<std::string>(const std::string& value, const TCounterType::type type,
     rapidjson::Document* document, rapidjson::Value* out_val);
 
 // Does pretty-printing if 'value' is numeric, and type is not NONE, otherwise constructs
 // a json object containing 'value' as a literal.
-template<typename T>
+template <typename T>
 ENABLE_IF_ARITHMETIC(T, void)
 ToJsonValue(const T& value, const TCounterType::type type, rapidjson::Document* document,
     rapidjson::Value* out_val) {

@@ -33,11 +33,15 @@ using namespace boost::algorithm;
 using namespace rapidjson;
 using namespace strings;
 
-template<>
-void ToJsonValue<std::string>(const std::string& value, const TCounterType::type type,
+namespace impala {
+
+template <>
+void ToJsonValue<string>(const string& value, const TCounterType::type type,
     Document* document, Value* out_val) {
   Value val(value.c_str(), document->GetAllocator());
   *out_val = val;
+}
+
 }
 
 void Metric::AddStandardFields(Document* document, Value* val) {
