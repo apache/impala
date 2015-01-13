@@ -18,6 +18,7 @@
 
 #include <gtest/gtest.h>
 #include <boost/scoped_ptr.hpp>
+#include <limits>
 
 #include "util/jni-util.h"
 #include "util/thread.h"
@@ -85,13 +86,13 @@ TEST(MetricsTest, PropertyMetrics) {
 
 TEST(MetricsTest, NonFiniteValues) {
   MetricGroup metrics("NanValues");
-  DoubleGauge* gauge = metrics.AddGauge("inf_value", 1.0 / 0);
-  AssertValue(gauge, 1.0 / 0.0, "inf");
-  gauge->set_value(0.0 / 0.0);
+  double inf = numeric_limits<double>::infinity();
+  DoubleGauge* gauge = metrics.AddGauge("inf_value", inf);
+  AssertValue(gauge, inf, "inf");
+  double nan = numeric_limits<double>::quiet_NaN();
+  gauge->set_value(nan);
   EXPECT_TRUE(isnan(gauge->value()));
-  // 0.0 / 0.0 can either be nan or -nan (compiler dependant)
-  EXPECT_TRUE(gauge->ToHumanReadable() == "-nan" ||
-      gauge->ToHumanReadable() == "nan");
+  EXPECT_TRUE(gauge->ToHumanReadable() == "nan");
 }
 
 TEST(MetricsTest, SetMetrics) {
@@ -134,7 +135,6 @@ TEST(MetricsTest, StatsMetrics) {
 
   EXPECT_EQ(stats_metric_with_units->ToHumanReadable(), "count: 3, last: 2.00 B, min: 0, "
       "max: 2.00 B, mean: 1.00 B, stddev: 0.82 B");
-
 }
 
 TEST(MetricsTest, MemMetric) {
