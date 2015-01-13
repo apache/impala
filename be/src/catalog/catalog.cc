@@ -25,7 +25,7 @@
 using namespace std;
 using namespace impala;
 
-DEFINE_bool(load_catalog_in_background, true,
+DEFINE_bool(load_catalog_in_background, false,
     "If true, loads catalog metadata in the background. If false, metadata is loaded "
     "lazily (on access).");
 DEFINE_int32(num_metadata_loading_threads, 16,
