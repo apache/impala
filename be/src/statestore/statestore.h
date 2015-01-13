@@ -47,7 +47,7 @@ class Status;
 //
 // Topics are subscribed to by subscribers, which are remote clients of the statestore
 // which express an interest in some set of Topics. The statestore sends topic updates to
-// subscribers via periodic 'update' messages, and also sends periodic 'keep-alive'
+// subscribers via periodic 'update' messages, and also sends periodic 'heartbeat'
 // messages, which are used to detect the liveness of a subscriber.
 //
 // In response to 'update' messages, subscribers, send topic updates to the statestore to
@@ -65,7 +65,7 @@ class Status;
 // A subscriber may have marked some updates that it made as 'transient', which implies
 // that those entries should be deleted once the subscriber is no longer connected (this
 // is judged by the statestore's failure-detector, which will mark a subscriber as failed
-// when it has not responded to a number of successive keep-alive messages). Transience
+// when it has not responded to a number of successive heartbeat messages). Transience
 // is tracked per-topic-per-subscriber, so two different subscribers may treat the same
 // topic differently wrt to the transience of their updates.
 //
@@ -363,7 +363,7 @@ class Statestore {
   typedef std::pair<int64_t, SubscriberId> ScheduledSubscriberUpdate;
 
   // The statestore has two pools of threads that send messages to subscribers
-  // one-by-one. One pool deals with 'keep-alive' messages that update failure detection
+  // one-by-one. One pool deals with 'heartbeat' messages that update failure detection
   // state, and the other pool sends 'topic update' messages which contain the
   // actual topic data that a subscriber does not yet have.
   //
@@ -380,8 +380,8 @@ class Statestore {
   // blocking when threads are occupied sending messages to slow subscribers
   // (subscribers are not guaranteed to be in the queue in next-update order).
   //
-  // Delays for keep-alive messages can result in the subscriber that is kept waiting
-  // assuming that the statestore has failed. Correct configuration of keep-alive message
+  // Delays for heartbeat messages can result in the subscriber that is kept waiting
+  // assuming that the statestore has failed. Correct configuration of heartbeat message
   // frequency and subscriber timeout is therefore very important, and depends upon the
   // cluster size. See --statestore_heartbeat_frequency_ms and
   // --statestore_subscriber_timeout_seconds. We expect that the provided defaults will
@@ -392,7 +392,7 @@ class Statestore {
   // subscriber runs slow for any reason).
   ThreadPool<ScheduledSubscriberUpdate> subscriber_topic_update_threadpool_;
 
-  ThreadPool<ScheduledSubscriberUpdate> subscriber_keepalive_threadpool_;
+  ThreadPool<ScheduledSubscriberUpdate> subscriber_heartbeat_threadpool_;
 
   // Cache of subscriber clients. Only one client per subscriber should be used, but the
   // cache helps with the client lifecycle on failure.
@@ -402,7 +402,7 @@ class Statestore {
   boost::shared_ptr<StatestoreServiceIf> thrift_iface_;
 
   // Failure detector for subscribers. If a subscriber misses a configurable number of
-  // consecutive keep-alive messages, it is considered failed and a) its transient topic
+  // consecutive heartbeat messages, it is considered failed and a) its transient topic
   // entries are removed and b) its entry in the subscriber map is erased.
   boost::scoped_ptr<MissedHeartbeatFailureDetector> failure_detector_;
 
@@ -420,19 +420,19 @@ class Statestore {
   // cost as well as the subscriber-side processing time.
   StatsMetric<double>* topic_update_duration_metric_;
 
-  // Same as above, but for SendKeepAlive() RPCs.
-  StatsMetric<double>* keepalive_duration_metric_;
+  // Same as above, but for SendHeartbeat() RPCs.
+  StatsMetric<double>* heartbeat_duration_metric_;
 
   // Utility method to add an update to the given thread pool, and to fail if the thread
   // pool is already at capacity.
   Status OfferUpdate(const ScheduledSubscriberUpdate& update,
       ThreadPool<ScheduledSubscriberUpdate>* thread_pool);
 
-  // Sends either a keep-alive or topic update message to the subscriber in 'update' at
-  // the closest possible time to the first member of 'update'.  If is_keepalive is true,
-  // sends a keep-alive update, otherwise the set of pending topic updates is sent. Once
+  // Sends either a heartbeat or topic update message to the subscriber in 'update' at the
+  // closest possible time to the first member of 'update'.  If is_heartbeat is true,
+  // sends a heartbeat update, otherwise the set of pending topic updates is sent. Once
   // complete, the next update is scheduled and added to the appropriate queue.
-  void DoSubscriberUpdate(bool is_keepalive, int thread_id,
+  void DoSubscriberUpdate(bool is_heartbeat, int thread_id,
       const ScheduledSubscriberUpdate& update);
 
   // Does the work of updating a single subscriber, by calling UpdateState() on the client
@@ -442,14 +442,14 @@ class Statestore {
   //
   // The subscriber may indicated that it skipped processing the message, either because
   // it was not ready to do so or because it was busy. In that case, the UpdateState() RPC
-  // will return OK (since there was no error) and the output parameter update_skipped
-  // is set to true. Otherwise, any updates returned by the subscriber are applied to
-  // their target topics.
+  // will return OK (since there was no error) and the output parameter update_skipped is
+  // set to true. Otherwise, any updates returned by the subscriber are applied to their
+  // target topics.
   Status SendTopicUpdate(Subscriber* subscriber, bool* update_skipped);
 
-  // Sends a keep-alive message to subscriber. Returns false if there was some error
+  // Sends a heartbeat message to subscriber. Returns false if there was some error
   // performing the RPC.
-  Status SendKeepAlive(Subscriber* subscriber);
+  Status SendHeartbeat(Subscriber* subscriber);
 
   // Unregister a subscriber, removing all of its transient entries and evicting it from
   // the subscriber map. Callers must hold subscribers_lock_ prior to calling this method.

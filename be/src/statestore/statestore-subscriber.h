@@ -45,7 +45,7 @@ typedef ClientCache<StatestoreServiceClient> StatestoreClientCache;
 // of topic update messages. These messages contain updates from the statestore to a list
 // of 'topics' that the subscriber is interested in; in response the subscriber sends a
 // list of changes that it wishes to make to a topic. The statestore also sends more
-// frequent 'keep alive' messages that confirm the connection between statestore and
+// frequent 'heartbeat' messages that confirm the connection between statestore and
 // subscriber is still active.
 //
 // Clients of the subscriber register topics of interest, and a function to call once an
@@ -136,7 +136,7 @@ class StatestoreSubscriber {
   // Container for the heartbeat server.
   boost::shared_ptr<ThriftServer> heartbeat_server_;
 
-  // Failure detector that tracks keep-alive messages from the statestore.
+  // Failure detector that tracks heartbeat messages from the statestore.
   boost::scoped_ptr<impala::TimeoutFailureDetector> failure_detector_;
 
   // Thread in which RecoveryModeChecker runs.
@@ -215,11 +215,11 @@ class StatestoreSubscriber {
   // the statestore (that is, to call all callbacks)
   StatsMetric<double>* topic_update_duration_metric_;
 
-  // Tracks the time between keepalive mesages
-  MonotonicStopWatch keepalive_interval_timer_;
+  // Tracks the time between heartbeat mesages
+  MonotonicStopWatch heartbeat_interval_timer_;
 
-  // Accumulated statistics on the frequency of keepalive messages
-  StatsMetric<double>* keepalive_interval_metric_;
+  // Accumulated statistics on the frequency of heartbeat messages
+  StatsMetric<double>* heartbeat_interval_metric_;
 
   // Current registration ID, in string form.
   StringProperty* registration_id_metric_;
@@ -250,11 +250,11 @@ class StatestoreSubscriber {
       const TUniqueId& registration_id,
       std::vector<TTopicDelta>* subscriber_topic_updates, bool* skipped);
 
-  // Called when the statestore sends a keep-alive message. Updates the failure detector.
-  void KeepAlive(const TUniqueId& registration_id);
+  // Called when the statestore sends a heartbeat message. Updates the failure detector.
+  void Heartbeat(const TUniqueId& registration_id);
 
   // Run in a separate thread. In a loop, check failure_detector_ to see if the statestore
-  // is still sending keep-alive messages. If not, enter 'recovery mode' where a
+  // is still sending heartbeat messages. If not, enter 'recovery mode' where a
   // reconnection is repeatedly attempted. Once reconnected, all existing subscriptions
   // and services are reregistered and normal operation resumes.
   //

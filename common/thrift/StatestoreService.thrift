@@ -168,11 +168,11 @@ struct TUpdateStateResponse {
   3: optional bool skipped;
 }
 
-struct TKeepAliveRequest {
+struct THeartbeatRequest {
   1: optional Types.TUniqueId registration_id;
 }
 
-struct TKeepAliveResponse {
+struct THeartbeatResponse {
 
 }
 
@@ -189,6 +189,6 @@ service StatestoreSubscriber {
   // delta update will be based off of the version the subscriber requested.
   TUpdateStateResponse UpdateState(1: TUpdateStateRequest params);
 
-  // Called when the statestore sends a keep-alive heartbeat.
-  TKeepAliveResponse KeepAlive(1: TKeepAliveRequest params);
+  // Called when the statestore sends a heartbeat.
+  THeartbeatResponse Heartbeat(1: THeartbeatRequest params);
 }
