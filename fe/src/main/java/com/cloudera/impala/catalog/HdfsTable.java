@@ -1012,7 +1012,7 @@ public class HdfsTable extends Table {
           for (Column parsedCol: avroTypeList) {
             FieldSchema fs = new FieldSchema();
             fs.setName(parsedCol.getName());
-            String avroType = parsedCol.getType().toString();
+            String avroType = parsedCol.getType().toSql();
             if (avroType.toLowerCase().equals("string") && canFallBack) {
               fs.setType(sdTypes.get(i).getType());
             } else {
