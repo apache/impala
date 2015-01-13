@@ -135,7 +135,7 @@ inline void ValidateTimestamp(TimestampValue& tv, string& fmt, string& val,
     int frac) {
   boost::gregorian::date not_a_date;
   boost::gregorian::date cust_date = tv.date();
-  boost::posix_time::time_duration cust_time = tv.time_of_day();
+  boost::posix_time::time_duration cust_time = tv.time();
   EXPECT_NE(not_a_date, cust_date) << fmt_val;
   EXPECT_NE(not_a_date_time, cust_time) << fmt_val;
   EXPECT_EQ(year, cust_date.year()) << fmt_val;
@@ -211,7 +211,7 @@ void TestTimestampTokens(vector<TimestampToken>* toks, int year, int month,
         EXPECT_GT(actual_len, 0) << fmt_val;
         EXPECT_LE(actual_len, dt_ctx.fmt_len) << fmt_val;
         string buff_str(buff);
-        EXPECT_EQ(buff_str, val) << fmt_val <<  " " << buff_str;        
+        EXPECT_EQ(buff_str, val) << fmt_val <<  " " << buff_str;
         fmt.clear();
         val.clear();
       }
@@ -231,11 +231,11 @@ TEST(TimestampTest, Basic) {
   EXPECT_EQ(v1.date().year(), 2012);
   EXPECT_EQ(v1.date().month(), 1);
   EXPECT_EQ(v1.date().day(), 20);
-  EXPECT_EQ(v1.time_of_day().hours(), 1);
-  EXPECT_EQ(v1.time_of_day().minutes(), 10);
-  EXPECT_EQ(v1.time_of_day().seconds(), 1);
-  EXPECT_EQ(v1.time_of_day().fractional_seconds(), 0);
-  EXPECT_EQ(v2.time_of_day().fractional_seconds(), 123456789);
+  EXPECT_EQ(v1.time().hours(), 1);
+  EXPECT_EQ(v1.time().minutes(), 10);
+  EXPECT_EQ(v1.time().seconds(), 1);
+  EXPECT_EQ(v1.time().fractional_seconds(), 0);
+  EXPECT_EQ(v2.time().fractional_seconds(), 123456789);
 
   EXPECT_NE(v1, v2);
   EXPECT_EQ(v2, v3);
@@ -258,17 +258,17 @@ TEST(TimestampTest, Basic) {
   EXPECT_EQ(v4.date().year(), 2012);
   EXPECT_EQ(v4.date().month(), 1);
   EXPECT_EQ(v4.date().day(), 20);
-  EXPECT_EQ(v4.time_of_day().hours(), 1);
-  EXPECT_EQ(v4.time_of_day().minutes(), 10);
-  EXPECT_EQ(v4.time_of_day().seconds(), 1);
-  EXPECT_EQ(v4.time_of_day().fractional_seconds(), 0);
+  EXPECT_EQ(v4.time().hours(), 1);
+  EXPECT_EQ(v4.time().minutes(), 10);
+  EXPECT_EQ(v4.time().seconds(), 1);
+  EXPECT_EQ(v4.time().fractional_seconds(), 0);
   EXPECT_EQ(v5.date().year(), 1990);
   EXPECT_EQ(v5.date().month(), 10);
   EXPECT_EQ(v5.date().day(), 20);
-  EXPECT_EQ(v5.time_of_day().hours(), 10);
-  EXPECT_EQ(v5.time_of_day().minutes(), 10);
-  EXPECT_EQ(v5.time_of_day().seconds(), 10);
-  EXPECT_EQ(v5.time_of_day().fractional_seconds(), 123456789);
+  EXPECT_EQ(v5.time().hours(), 10);
+  EXPECT_EQ(v5.time().minutes(), 10);
+  EXPECT_EQ(v5.time().seconds(), 10);
+  EXPECT_EQ(v5.time().fractional_seconds(), 123456789);
 
   // Test Dates and Times as timestamps.
   char d1[] = "2012-01-20";
@@ -281,7 +281,7 @@ TEST(TimestampTest, Basic) {
   EXPECT_LE(dv1, v1);
   EXPECT_GT(v1, dv1);
   EXPECT_GE(v1, dv1);
-  EXPECT_NE(dv2, s2);
+  EXPECT_NE(dv2, v2);
 
   EXPECT_EQ(dv1.date().year(), 2012);
   EXPECT_EQ(dv1.date().month(), 1);
@@ -295,11 +295,11 @@ TEST(TimestampTest, Basic) {
   EXPECT_NE(tv1, tv2);
   EXPECT_NE(tv1, v2);
 
-  EXPECT_EQ(tv1.time_of_day().hours(), 10);
-  EXPECT_EQ(tv1.time_of_day().minutes(), 11);
-  EXPECT_EQ(tv1.time_of_day().seconds(), 12);
-  EXPECT_EQ(tv1.time_of_day().fractional_seconds(), 123456789);
-  EXPECT_EQ(tv2.time_of_day().fractional_seconds(), 0);
+  EXPECT_EQ(tv1.time().hours(), 10);
+  EXPECT_EQ(tv1.time().minutes(), 11);
+  EXPECT_EQ(tv1.time().seconds(), 12);
+  EXPECT_EQ(tv1.time().fractional_seconds(), 123456789);
+  EXPECT_EQ(tv2.time().fractional_seconds(), 0);
 
   // Test variable fraction lengths
   const char* FRACTION_MAX_STR = "123456789";
@@ -320,15 +320,15 @@ TEST(TimestampTest, Basic) {
         EXPECT_EQ(tv_frac.date().month(), 12);
         EXPECT_EQ(tv_frac.date().day(), 10);
       }
-      EXPECT_EQ(tv_frac.time_of_day().hours(), 12);
-      EXPECT_EQ(tv_frac.time_of_day().minutes(), 4);
-      EXPECT_EQ(tv_frac.time_of_day().seconds(), 17);
+      EXPECT_EQ(tv_frac.time().hours(), 12);
+      EXPECT_EQ(tv_frac.time().minutes(), 4);
+      EXPECT_EQ(tv_frac.time().seconds(), 17);
       StringParser::ParseResult status;
       int32_t fraction =
           StringParser::StringToInt<int32_t>(FRACTION_MAX_STR, fraction_len, &status);
       EXPECT_TRUE(StringParser::PARSE_SUCCESS == status);
       for (int i = fraction_len; i < 9; ++i) fraction *= 10;
-      EXPECT_EQ(tv_frac.time_of_day().fractional_seconds(), fraction);
+      EXPECT_EQ(tv_frac.time().fractional_seconds(), fraction);
       --fraction_len;
     }
   }
@@ -339,43 +339,43 @@ TEST(TimestampTest, Basic) {
   boost::gregorian::date not_a_date;
 
   EXPECT_EQ(bv1.date(), not_a_date);
-  EXPECT_EQ(bv1.time_of_day(), not_a_date_time);
+  EXPECT_EQ(bv1.time(), not_a_date_time);
 
   char b2[] = "1991-10-10 99:10:10.123456789";
   TimestampValue bv2(b2, strlen(b2));
 
-  EXPECT_EQ(bv2.time_of_day(), not_a_date_time);
+  EXPECT_EQ(bv2.time(), not_a_date_time);
   EXPECT_EQ(bv2.date(), not_a_date);
 
   char b3[] = "1990-10- 10:10:10.123456789";
   TimestampValue bv3(b3, strlen(b3));
 
   EXPECT_EQ(bv3.date(), not_a_date);
-  EXPECT_EQ(bv3.time_of_day(), not_a_date_time);
+  EXPECT_EQ(bv3.time(), not_a_date_time);
 
   char b4[] = "10:1010.123456789";
   TimestampValue bv4(b4, strlen(b4));
 
   EXPECT_EQ(bv4.date(), not_a_date);
-  EXPECT_EQ(bv4.time_of_day(), not_a_date_time);
+  EXPECT_EQ(bv4.time(), not_a_date_time);
 
   char b5[] = "10:11:12.123456 1991-10-10";
   TimestampValue bv5(b5, strlen(b5));
 
   EXPECT_EQ(bv5.date(), not_a_date);
-  EXPECT_EQ(bv5.time_of_day(), not_a_date_time);
+  EXPECT_EQ(bv5.time(), not_a_date_time);
 
   char b6[] = "2012-01-20 01:10:00.123.466";
   TimestampValue bv6(b6, strlen(b6));
 
   EXPECT_EQ(bv6.date(), not_a_date);
-  EXPECT_EQ(bv6.time_of_day(), not_a_date_time);
+  EXPECT_EQ(bv6.time(), not_a_date_time);
 
   char b7[] = "2012-01-20 01:10:00.123 477 ";
   TimestampValue bv7(b7, strlen(b7));
 
   EXPECT_EQ(bv7.date(), not_a_date);
-  EXPECT_EQ(bv7.time_of_day(), not_a_date_time);
+  EXPECT_EQ(bv7.time(), not_a_date_time);
 
   // Test custom formats by generating all permutations of tokens to check parsing and
   // formatting is behaving correctly (position of tokens should be irrelevant). Note
@@ -474,7 +474,7 @@ TEST(TimestampTest, Basic) {
     }
     TimestampValue cust_tv(test_case.str, strlen(test_case.str), dt_ctx);
     boost::gregorian::date cust_date = cust_tv.date();
-    boost::posix_time::time_duration cust_time = cust_tv.time_of_day();
+    boost::posix_time::time_duration cust_time = cust_tv.time();
     if (test_case.str_should_fail) {
       EXPECT_EQ(not_a_date, cust_date) << "TC: " << i;
       EXPECT_EQ(cust_time, not_a_date_time) << "TC: " << i;
@@ -542,7 +542,7 @@ TEST(TimestampTest, Basic) {
       ASSERT_TRUE(TimestampParser::ParseFormatTokens(&dt_ctx))  << "TC: " << i;
       TimestampValue cust_tv(test_case.ts);
       EXPECT_NE(cust_tv.date(), not_a_date) << "TC: " << i;
-      EXPECT_NE(cust_tv.time_of_day(), not_a_date_time) << "TC: " << i;
+      EXPECT_NE(cust_tv.time(), not_a_date_time) << "TC: " << i;
       EXPECT_GE(dt_ctx.fmt_out_len, dt_ctx.fmt_len);
       int buff_len = dt_ctx.fmt_out_len + 1;
       char buff[buff_len];

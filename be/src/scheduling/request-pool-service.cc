@@ -141,10 +141,10 @@ Status RequestPoolService::ResolveRequestPool(const string& requested_pool_name,
   params.__set_user(user);
   params.__set_requested_pool(requested_pool_name);
 
-  int64_t start_time = ms_since_epoch();
+  int64_t start_time = MonotonicMillis();
   Status status = JniUtil::CallJniMethod(request_pool_service_, resolve_request_pool_id_,
       params, resolved_pool);
-  resolve_pool_ms_metric_->Update(ms_since_epoch() - start_time);
+  resolve_pool_ms_metric_->Update(MonotonicMillis() - start_time);
   return status;
 }
 

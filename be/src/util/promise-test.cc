@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "util/promise.h"
-
-#include <gtest/gtest.h>
 #include <boost/thread.hpp>
-#include <sys/resource.h>
+#include <gtest/gtest.h>
 #include <runtime/timestamp-value.h>
+#include <sys/resource.h>
+
+#include "util/promise.h"
+#include "util/time.h"
 
 using namespace boost;
 using namespace std;
@@ -62,12 +63,12 @@ TEST(PromiseTest, TimeoutTest) {
 
   // Test that the promise times out properly.
   int64_t start_time, end_time;
-  start_time = TimestampValue::local_time_micros().time_of_day().total_milliseconds();
+  start_time = MonotonicMillis();
   timed_out = false;
   Promise<int64_t> timedout_promise;
   timedout_promise.Get(1000, &timed_out);
   DCHECK_EQ(timed_out, true);
-  end_time = TimestampValue::local_time_micros().time_of_day().total_milliseconds();
+  end_time = MonotonicMillis();
   DCHECK_GE(end_time - start_time, 1000);
 }
 

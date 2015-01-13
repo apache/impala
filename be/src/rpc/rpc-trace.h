@@ -84,7 +84,7 @@ class RpcEventHandler : public apache::thrift::TProcessorEventHandler {
 
   // Created per-Rpc invocation
   struct InvocationContext {
-    // Timestamp, in ms, since epoch when this call started.
+    // Monotonic milliseconds (typically boot time) when the call started.
     const int64_t start_time_ms;
 
     // Per-connection information, owned by ThriftServer. The lifetime of this struct is

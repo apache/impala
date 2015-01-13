@@ -75,7 +75,7 @@ ImpalaServer::QueryExecState::QueryExecState(
     num_rows_fetched_(0),
     frontend_(frontend),
     parent_server_(server),
-    start_time_(TimestampValue::local_time_micros()) {
+    start_time_(TimestampValue::LocalTime()) {
   row_materialization_timer_ = ADD_TIMER(&server_profile_, "RowMaterializationTimer");
   client_wait_timer_ = ADD_TIMER(&server_profile_, "ClientFetchWaitTimer");
   query_events_ = summary_profile_.AddEventSequence("Query Timeline");
@@ -482,7 +482,7 @@ void ImpalaServer::QueryExecState::Done() {
   // is destroyed).
   BlockOnWait();
   unique_lock<mutex> l(lock_);
-  end_time_ = TimestampValue::local_time_micros();
+  end_time_ = TimestampValue::LocalTime();
   summary_profile_.AddInfoString("End Time", end_time().DebugString());
   summary_profile_.AddInfoString("Query State", PrintQueryState(query_state_));
   query_events_->MarkEvent("Unregister query");
@@ -923,7 +923,7 @@ void ImpalaServer::QueryExecState::SetCreateTableAsSelectResultSet() {
 void ImpalaServer::QueryExecState::MarkInactive() {
   client_wait_sw_.Start();
   lock_guard<mutex> l(expiration_data_lock_);
-  last_active_time_ = ms_since_epoch();
+  last_active_time_ = UnixMillis();
   DCHECK(ref_count_ > 0) << "Invalid MarkInactive()";
   --ref_count_;
 }
@@ -933,7 +933,7 @@ void ImpalaServer::QueryExecState::MarkActive() {
   int64_t elapsed_time = client_wait_sw_.ElapsedTime();
   client_wait_timer_->Set(elapsed_time);
   lock_guard<mutex> l(expiration_data_lock_);
-  last_active_time_ = ms_since_epoch();
+  last_active_time_ = UnixMillis();
   ++ref_count_;
 }
 

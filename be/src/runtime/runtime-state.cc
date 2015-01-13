@@ -184,10 +184,6 @@ Status RuntimeState::CreateBlockMgr() {
   return Status::OK;
 }
 
-void RuntimeState::set_now(const TimestampValue* now) {
-  now_.reset(new TimestampValue(*now));
-}
-
 Status RuntimeState::CreateCodegen() {
   if (codegen_.get() != NULL) return Status::OK;
   RETURN_IF_ERROR(LlvmCodeGen::LoadImpalaIR(obj_pool_.get(), &codegen_));

@@ -178,6 +178,15 @@ StringVal CastFunctions::CastToChar(FunctionContext* ctx, const StringVal& val) 
   return sv;
 }
 
+// The macro below isn't used because there is no TimestampValue to bool
+// operator. The operator was purposely omitted to avoid inadvertent conversions.
+BooleanVal CastFunctions::CastToBooleanVal(
+    FunctionContext* ctx, const TimestampVal& val) {
+  if (val.is_null) return BooleanVal::null();
+  TimestampValue tv = TimestampValue::FromTimestampVal(val);
+  return BooleanVal(static_cast<time_t>(tv));
+}
+
 #define CAST_FROM_TIMESTAMP(to_type) \
   to_type CastFunctions::CastTo##to_type( \
       FunctionContext* ctx, const TimestampVal& val) { \
@@ -186,7 +195,6 @@ StringVal CastFunctions::CastToChar(FunctionContext* ctx, const StringVal& val) 
     return to_type(tv); \
   }
 
-CAST_FROM_TIMESTAMP(BooleanVal);
 CAST_FROM_TIMESTAMP(TinyIntVal);
 CAST_FROM_TIMESTAMP(SmallIntVal);
 CAST_FROM_TIMESTAMP(IntVal);
@@ -217,7 +225,7 @@ TimestampVal CastFunctions::CastToTimestampVal(FunctionContext* ctx,
   if (val.is_null) return TimestampVal::null();
   TimestampValue timestamp_value(reinterpret_cast<char*>(val.ptr), val.len);
   // Return null if 'val' did not parse
-  if (timestamp_value.NotADateTime()) return TimestampVal::null();
+  if (!timestamp_value.HasDateOrTime()) return TimestampVal::null();
   TimestampVal result;
   timestamp_value.ToTimestampVal(&result);
   return result;

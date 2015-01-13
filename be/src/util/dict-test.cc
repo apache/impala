@@ -84,9 +84,9 @@ TEST(DictTest, TestStrings) {
 }
 
 TEST(DictTest, TestTimestamps) {
-  TimestampValue tv1("2011-01-01 09:01:01");
-  TimestampValue tv2("2012-01-01 09:01:01");
-  TimestampValue tv3("2011-01-01 09:01:02");
+  TimestampValue tv1("2011-01-01 09:01:01", 19);
+  TimestampValue tv2("2012-01-01 09:01:01", 19);
+  TimestampValue tv3("2011-01-01 09:01:02", 19);
 
   vector<TimestampValue> values;
   values.push_back(tv1);

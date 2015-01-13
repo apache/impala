@@ -338,7 +338,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
     if (pool_metrics != NULL) pool_metrics->local_queued->Increment(1L);
   }
 
-  int64_t wait_start_ms = ms_since_epoch();
+  int64_t wait_start_ms = MonotonicMillis();
   int64_t queue_wait_timeout_ms = max(0L, FLAGS_queue_wait_timeout_ms);
   // We just call Get() to block until the result is set or it times out. Note that we
   // don't hold the admission_ctrl_lock_ while we wait on this promise so we need to
@@ -347,7 +347,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
   // TODO: handle cancellation
   bool timed_out;
   queue_node.is_admitted.Get(queue_wait_timeout_ms, &timed_out);
-  int64_t wait_time_ms = ms_since_epoch() - wait_start_ms;
+  int64_t wait_time_ms = MonotonicMillis() - wait_start_ms;
 
   // Take the lock in order to check the result of is_admitted as there could be a race
   // with the timeout. If the Get() timed out, then we need to dequeue the request.

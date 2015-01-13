@@ -15,9 +15,11 @@
 #ifndef IMPALA_UTIL_PROMISE_H
 #define IMPALA_UTIL_PROMISE_H
 
+#include <boost/thread.hpp>
+
 #include "common/logging.h"
 #include "runtime/timestamp-value.h"
-#include <boost/thread.hpp>
+#include "util/time.h"
 
 namespace impala {
 
@@ -70,16 +72,17 @@ class Promise {
   // timed_out: Indicates whether Get() returned due to timeout. Must be non-NULL.
   const T& Get(int64_t timeout_millis, bool* timed_out) {
     DCHECK_GT(timeout_millis, 0);
+    int64_t timeout_micros = timeout_millis * 1000;
     DCHECK(timed_out != NULL);
     boost::unique_lock<boost::mutex> l(val_lock_);
     int64_t start;
     int64_t now;
-    now = start = TimestampValue::local_time_micros().time_of_day().total_milliseconds();
-    while (!val_is_set_ && (now - start) < timeout_millis) {
-      boost::posix_time::milliseconds wait_time =
-          boost::posix_time::milliseconds(std::max(1L, timeout_millis - (now - start)));
+    now = start = MonotonicMicros();
+    while (!val_is_set_ && (now - start) < timeout_micros) {
+      boost::posix_time::microseconds wait_time =
+          boost::posix_time::microseconds(std::max(1L, timeout_micros - (now - start)));
       val_set_cond_.timed_wait(l, wait_time);
-      now = TimestampValue::local_time_micros().time_of_day().total_milliseconds();
+      now = MonotonicMicros();
     }
     *timed_out = !val_is_set_;
     return val_;

@@ -59,7 +59,7 @@ void TimestampFunctions::UnixAndFromUnixPrepare(FunctionContext* context,
   if (context->IsArgConstant(1)) {
     StringVal fmt_val = *reinterpret_cast<StringVal*>(context->GetConstantArg(1));
     const StringValue& fmt_ref = StringValue::FromStringVal(fmt_val);
-    if (fmt_val.is_null || fmt_ref.len <= 0) {
+    if (fmt_val.is_null || fmt_ref.len == 0) {
       TimestampFunctions::ReportBadFormat(context, fmt_val, true);
       return;
     }
@@ -91,20 +91,20 @@ void TimestampFunctions::UnixAndFromUnixClose(FunctionContext* context,
 template <class TIME>
 StringVal TimestampFunctions::FromUnix(FunctionContext* context, const TIME& intp) {
   if (intp.is_null) return StringVal::null();
-  TimestampValue t(boost::posix_time::from_time_t(intp.val));
+  TimestampValue t(intp.val);
   return AnyValUtil::FromString(context, lexical_cast<string>(t));
 }
 
 template <class TIME>
 StringVal TimestampFunctions::FromUnix(FunctionContext* context, const TIME& intp,
     const StringVal& fmt) {
-  if (fmt.is_null || fmt.len <= 0) {
+  if (fmt.is_null || fmt.len == 0) {
     TimestampFunctions::ReportBadFormat(context, fmt, false);
     return StringVal::null();
   }
   if (intp.is_null) return StringVal::null();
 
-  TimestampValue t(boost::posix_time::from_time_t(intp.val));
+  TimestampValue t(intp.val);
   void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
   DateTimeFormatContext* dt_ctx = reinterpret_cast<DateTimeFormatContext*>(state);
   if (!context->IsArgConstant(1)) {
@@ -124,69 +124,55 @@ StringVal TimestampFunctions::FromUnix(FunctionContext* context, const TIME& int
 
 IntVal TimestampFunctions::Unix(FunctionContext* context, const StringVal& string_val,
     const StringVal& fmt) {
-  if (fmt.is_null || fmt.len <= 0) {
+  if (fmt.is_null || fmt.len == 0) {
     TimestampFunctions::ReportBadFormat(context, fmt, false);
     return IntVal::null();
   }
-  if(string_val.is_null || string_val.len <= 0) return IntVal::null();
+  if (string_val.is_null || string_val.len == 0) return IntVal::null();
 
   void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
   DateTimeFormatContext* dt_ctx = reinterpret_cast<DateTimeFormatContext*>(state);
-
   if (!context->IsArgConstant(1)) {
      dt_ctx->Reset(reinterpret_cast<const char*>(fmt.ptr), fmt.len);
-     if (!TimestampParser::ParseFormatTokens(dt_ctx)){
+     if (!TimestampParser::ParseFormatTokens(dt_ctx)) {
        ReportBadFormat(context, fmt, false);
        return IntVal::null();
      }
   }
 
-  TimestampValue default_tv;
-  TimestampValue* tv = &default_tv;
-  default_tv = TimestampValue(
+  TimestampValue tv = TimestampValue(
       reinterpret_cast<const char*>(string_val.ptr), string_val.len, *dt_ctx);
-  if (tv->date().is_special()) return IntVal::null();
-  ptime temp;
-  tv->ToPtime(&temp);
-  return IntVal(to_time_t(temp));
+  if (!tv.HasDate()) return IntVal::null();
+  return IntVal(static_cast<time_t>(tv));
 }
 
 IntVal TimestampFunctions::Unix(FunctionContext* context, const TimestampVal& ts_val) {
   if (ts_val.is_null) return IntVal::null();
-  const TimestampValue& ts_value_ref = TimestampValue::FromTimestampVal(ts_val);
-  if (ts_value_ref.get_date().is_special()) return IntVal::null();
-  ptime temp;
-  ts_value_ref.ToPtime(&temp);
-  return IntVal(to_time_t(temp));
+  const TimestampValue& tv = TimestampValue::FromTimestampVal(ts_val);
+  if (!tv.HasDate()) return IntVal::null();
+  return IntVal(static_cast<time_t>(tv));
 }
 
 IntVal TimestampFunctions::Unix(FunctionContext* context) {
-  TimestampValue default_tv;
-  TimestampValue* tv = &default_tv;
-  default_tv = TimestampValue(context->impl()->state()->now());
-  if (tv->date().is_special()) return IntVal::null();
-  ptime temp;
-  tv->ToPtime(&temp);
-  return IntVal(to_time_t(temp));
+  if (!context->impl()->state()->now()->HasDate()) return IntVal::null();
+  return IntVal(static_cast<time_t>(*context->impl()->state()->now()));
 }
 
 IntVal TimestampFunctions::UnixFromString(FunctionContext* context, const StringVal& sv) {
   if (sv.is_null) return IntVal::null();
   TimestampValue tv(reinterpret_cast<const char *>(sv.ptr), sv.len);
-  if (tv.date().is_special()) return IntVal::null();
-  ptime temp;
-  tv.ToPtime(&temp);
-  return IntVal(to_time_t(temp));
+  if (!tv.HasDate()) return IntVal::null();
+  return IntVal(static_cast<time_t>(tv));
 }
 
 void TimestampFunctions::ReportBadFormat(FunctionContext* context,
     const StringVal& format, bool is_error) {
   stringstream ss;
   const StringValue& fmt = StringValue::FromStringVal(format);
-  if (format.is_null || format.len <= 0) {
-    ss << "Bad date/time coversion format: format string is NULL or has 0 length";
+  if (format.is_null || format.len == 0) {
+    ss << "Bad date/time conversion format: format string is NULL or has 0 length";
   } else {
-    ss << "Bad date/time coversion format: " << fmt.DebugString();
+    ss << "Bad date/time conversion format: " << fmt.DebugString();
   }
   if (is_error) {
     context->SetError(ss.str().c_str());
@@ -213,76 +199,76 @@ StringVal TimestampFunctions::DayName(FunctionContext* context, const TimestampV
 IntVal TimestampFunctions::Year(FunctionContext* context, const TimestampVal& ts_val) {
   if (ts_val.is_null) return IntVal::null();
   const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
-  if (ts_value.get_date().is_special()) return IntVal::null();
-  return IntVal(ts_value.get_date().year());
+  if (!ts_value.HasDate()) return IntVal::null();
+  return IntVal(ts_value.date().year());
 }
 
 
 IntVal TimestampFunctions::Month(FunctionContext* context, const TimestampVal& ts_val) {
   if (ts_val.is_null) return IntVal::null();
   const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
-  if (ts_value.get_date().is_special()) return IntVal::null();
-  return IntVal(ts_value.get_date().month());
+  if (!ts_value.HasDate()) return IntVal::null();
+  return IntVal(ts_value.date().month());
 }
 
 
 IntVal TimestampFunctions::DayOfWeek(FunctionContext* context,
     const TimestampVal& ts_val) {
   if (ts_val.is_null) return IntVal::null();
-  const TimestampValue ts_value_ref = TimestampValue::FromTimestampVal(ts_val);
-  if (ts_value_ref.get_date().is_special()) return IntVal::null();
+  const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
+  if (!ts_value.HasDate()) return IntVal::null();
   // Sql has the result in [1,7] where 1 = Sunday. Boost has 0 = Sunday.
-  return IntVal(ts_value_ref.get_date().day_of_week() + 1);
+  return IntVal(ts_value.date().day_of_week() + 1);
 }
 
 IntVal TimestampFunctions::DayOfMonth(FunctionContext* context,
     const TimestampVal& ts_val) {
   if (ts_val.is_null) return IntVal::null();
   const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
-  if (ts_value.get_date().is_special()) return IntVal::null();
-  return IntVal(ts_value.get_date().day());
+  if (!ts_value.HasDate()) return IntVal::null();
+  return IntVal(ts_value.date().day());
 }
 
 IntVal TimestampFunctions::DayOfYear(FunctionContext* context,
     const TimestampVal& ts_val) {
   if (ts_val.is_null) return IntVal::null();
   const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
-  if (ts_value.get_date().is_special()) return IntVal::null();
-  return IntVal(ts_value.get_date().day_of_year());
+  if (!ts_value.HasDate()) return IntVal::null();
+  return IntVal(ts_value.date().day_of_year());
 }
 
 IntVal TimestampFunctions::WeekOfYear(FunctionContext* context,
     const TimestampVal& ts_val) {
   if (ts_val.is_null) return IntVal::null();
   const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
-  if (ts_value.get_date().is_special()) return IntVal::null();
-  return IntVal(ts_value.get_date().week_number());
+  if (!ts_value.HasDate()) return IntVal::null();
+  return IntVal(ts_value.date().week_number());
 }
 
 IntVal TimestampFunctions::Hour(FunctionContext* context, const TimestampVal& ts_val) {
   if (ts_val.is_null) return IntVal::null();
   const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
-  if (ts_value.get_time().is_special()) return IntVal::null();
-  return IntVal(ts_value.get_time().hours());
+  if (!ts_value.HasTime()) return IntVal::null();
+  return IntVal(ts_value.time().hours());
 }
 
 IntVal TimestampFunctions::Minute(FunctionContext* context, const TimestampVal& ts_val) {
   if (ts_val.is_null) return IntVal::null();
   const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
-  if (ts_value.get_time().is_special()) return IntVal::null();
-  return IntVal(ts_value.get_time().minutes());
+  if (!ts_value.HasTime()) return IntVal::null();
+  return IntVal(ts_value.time().minutes());
 }
 
 IntVal TimestampFunctions::Second(FunctionContext* context, const TimestampVal& ts_val) {
   if (ts_val.is_null) return IntVal::null();
   const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
-  if (ts_value.get_time().is_special()) return IntVal::null();
-  return IntVal(ts_value.get_time().seconds());
+  if (!ts_value.HasTime()) return IntVal::null();
+  return IntVal(ts_value.time().seconds());
 }
 
 TimestampVal TimestampFunctions::Now(FunctionContext* context) {
   const TimestampValue* now = context->impl()->state()->now();
-  if (now->NotADateTime()) return TimestampVal::null();
+  if (!now->HasDateOrTime()) return TimestampVal::null();
   TimestampVal return_val;
   now->ToTimestampVal(&return_val);
   return return_val;
@@ -292,7 +278,7 @@ StringVal TimestampFunctions::ToDate(FunctionContext* context,
     const TimestampVal& ts_val) {
   if (ts_val.is_null) return StringVal::null();
   const TimestampValue ts_value = TimestampValue::FromTimestampVal(ts_val);
-  string result = to_iso_extended_string(ts_value.get_date());
+  string result = to_iso_extended_string(ts_value.date());
   return AnyValUtil::FromString(context, result);
 }
 
@@ -302,14 +288,13 @@ TimestampVal TimestampFunctions::DateAddSub(FunctionContext* context,
   if (ts_val.is_null || count.is_null) return TimestampVal::null();
   const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
 
-  if (ts_value.get_date().is_special()) return TimestampVal::null();
+  if (!ts_value.HasDate()) return TimestampVal::null();
   UNIT unit(count.val);
   TimestampValue value;
   try {
     // Adding/subtracting boost::gregorian::dates can throw (via constructing a new date)
     value = TimestampValue(
-        (ISADD ? ts_value.get_date() + unit : ts_value.get_date() - unit),
-        ts_value.get_time());
+        (ISADD ? ts_value.date() + unit : ts_value.date() - unit), ts_value.time());
   } catch (const std::exception& e) {
     context->AddWarning(Substitute("Cannot $0 date interval $1: $2",
         ISADD ? "add" : "subtract", count.val, e.what()).c_str());
@@ -325,9 +310,9 @@ TimestampVal TimestampFunctions::TimeAddSub(FunctionContext * context,
     const TimestampVal& ts_val, const VALTYPE& count) {
   if (ts_val.is_null || count.is_null) return TimestampVal::null();
   const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
-  if (ts_value.get_date().is_special()) return TimestampVal::null();
+  if (!ts_value.HasDate()) return TimestampVal::null();
   UNIT unit(count.val);
-  ptime p(ts_value.get_date(), ts_value.get_time());
+  ptime p(ts_value.date(), ts_value.time());
   TimestampValue value(ISADD ? p + unit : p - unit);
   TimestampVal return_val;
   value.ToTimestampVal(&return_val);
@@ -340,10 +325,10 @@ IntVal TimestampFunctions::DateDiff(FunctionContext* context,
   if (ts_val1.is_null || ts_val2.is_null) return IntVal::null();
   const TimestampValue& ts_value1 = TimestampValue::FromTimestampVal(ts_val1);
   const TimestampValue& ts_value2 = TimestampValue::FromTimestampVal(ts_val2);
-  if (ts_value1.get_date().is_special() || ts_value2.get_date().is_special()) {
+  if (!ts_value1.HasDate() || !ts_value2.HasDate()) {
     return IntVal::null();
   }
-  return IntVal((ts_value1.get_date() - ts_value2.get_date()).days());
+  return IntVal((ts_value1.date() - ts_value2.date()).days());
 }
 
 // This function uses inline asm functions, which we believe to be from the boost library.
@@ -353,7 +338,7 @@ TimestampVal TimestampFunctions::FromUtc(FunctionContext* context,
     const TimestampVal& ts_val, const StringVal& tz_string_val) {
   if (ts_val.is_null || tz_string_val.is_null) return TimestampVal::null();
   const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
-  if (ts_value.NotADateTime()) return TimestampVal::null();
+  if (!ts_value.HasDateOrTime()) return TimestampVal::null();
 
   const StringValue& tz_string_value = StringValue::FromStringVal(tz_string_val);
   time_zone_ptr timezone =
@@ -382,7 +367,7 @@ TimestampVal TimestampFunctions::ToUtc(FunctionContext* context,
     const TimestampVal& ts_val, const StringVal& tz_string_val) {
   if (ts_val.is_null || tz_string_val.is_null) return TimestampVal::null();
   const TimestampValue& ts_value = TimestampValue::FromTimestampVal(ts_val);
-  if (ts_value.NotADateTime()) return TimestampVal::null();
+  if (!ts_value.HasDateOrTime()) return TimestampVal::null();
 
   const StringValue& tz_string_value = StringValue::FromStringVal(tz_string_val);
   time_zone_ptr timezone =
@@ -395,7 +380,7 @@ TimestampVal TimestampFunctions::ToUtc(FunctionContext* context,
     return ts_val;
   }
 
-  local_date_time lt(ts_value.get_date(), ts_value.get_time(),
+  local_date_time lt(ts_value.date(), ts_value.time(),
       timezone, local_date_time::NOT_DATE_TIME_ON_ERROR);
   TimestampValue return_value(lt.utc_time());
   TimestampVal return_val;
@@ -439,9 +424,8 @@ TimezoneDatabase::~TimezoneDatabase() { }
 
 time_zone_ptr TimezoneDatabase::FindTimezone(const string& tz, const TimestampValue& tv) {
   // The backing database does not capture some subtleties, there are special cases
-  if ((tv.get_date().year() > 2011
-       || (tv.get_date().year() == 2011 && tv.get_date().month() >= 4))
-      && (iequals("Europe/Moscow", tz) || iequals("Moscow", tz) || iequals("MSK", tz))) {
+  if ((tv.date().year() > 2011 || (tv.date().year() == 2011 && tv.date().month() >= 4)) &&
+      (iequals("Europe/Moscow", tz) || iequals("Moscow", tz) || iequals("MSK", tz))) {
     // We transition in April 2011 from using the tz_database_ to a custom rule
     // Russia stopped using daylight savings in 2011, the tz_database_ is
     // set up assuming Russia uses daylight saving every year.

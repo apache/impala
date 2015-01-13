@@ -872,7 +872,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     boost::lock_guard<boost::mutex> l(session->lock);
     DCHECK_GT(session->ref_count, 0);
     --session->ref_count;
-    session->last_accessed_ms = ms_since_epoch();
+    session->last_accessed_ms = UnixMillis();
   }
 
   // protects query_locations_. Must always be taken after

@@ -22,7 +22,7 @@ using namespace boost::gregorian;
 namespace impala {
 
 const char* TimestampValue::LLVM_CLASS_NAME = "class.impala::TimestampValue";
-const double TimestampValue::FRACTIONAL = 0.000000001;
+const double TimestampValue::ONE_BILLIONTH = 0.000000001;
 
 time_t to_time_t(ptime t) {
   if (t == not_a_date_time) {
@@ -35,16 +35,16 @@ time_t to_time_t(ptime t) {
 }
 
 TimestampValue::TimestampValue(const char* str, int len) {
-  TimestampParser::Parse(str, len, &date_, &time_of_day_);
+  TimestampParser::Parse(str, len, &date_, &time_);
 }
 
 TimestampValue::TimestampValue(const char* str, int len,
     const DateTimeFormatContext& dt_ctx) {
-  TimestampParser::Parse(str, len, dt_ctx, &date_, &time_of_day_);
+  TimestampParser::Parse(str, len, dt_ctx, &date_, &time_);
 }
 
 int TimestampValue::Format(const DateTimeFormatContext& dt_ctx, int len, char* buff) {
-  return TimestampParser::Format(dt_ctx, date_, time_of_day_, len, buff);
+  return TimestampParser::Format(dt_ctx, date_, time_, len, buff);
 }
 
 ostream& operator<<(ostream& os, const TimestampValue& timestamp_value) {

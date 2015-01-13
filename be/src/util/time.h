@@ -15,34 +15,46 @@
 #ifndef IMPALA_UTIL_TIME_H
 #define IMPALA_UTIL_TIME_H
 
-#include <boost/date_time/posix_time/posix_time.hpp>
+#include <stdint.h>
+#include <time.h>
 
-// Utilities for dealing with millisecond timestamps without the complexity of
-// TimestampValue or the boost time libraries. The emphasis is on simplicity for the
-// common case. As soon as you have a more sophisticated requirement, move on to using
-// boost::posix_time or similar.
+// Utilities for collecting timings.
 namespace impala {
 
-// Returns the time since the Unix epoch according to the local clock. Convenient for
-// monotonic increasing timestamps that don't reset overnight (unlike
-// posix_time::local_time()).
-inline boost::posix_time::time_duration time_since_epoch() {
-  static const boost::posix_time::ptime EPOCH =
-    boost::posix_time::time_from_string("1970-01-01 00:00:00.000");
-  return boost::posix_time::microsec_clock::local_time() - EPOCH;
+// Returns a value representing a point in time with microsecond accuracy that is
+// unaffected by daylight savings or manual adjustments to the system clock. This should
+// not be assumed to be a Unix time. Typically the value corresponds to elapsed time
+// since the system booted. See UnixMillis() below if you need to send a time to a
+// different host.
+inline int64_t MonotonicMicros() {  // 63 bits ~= 5K years uptime
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  return now.tv_sec * 1000000 + now.tv_nsec / 1000;
 }
 
-// Returns the number of milliseconds that have passed since the local-time epoch.
-// Calling this method is roughly 1.33x more costly than calling local_time() directly, as
-// you might expect. A performance advantage may be accrued by this method when doing a
-// lot of arithmetic on the timestamp (e.g. for computing next wakeup times for a thread)
-// since those computations are done over the raw int64_t type rather than the structure
-// time_duration.
-inline int64_t ms_since_epoch() {
-  return time_since_epoch().total_milliseconds();
+inline int64_t MonotonicMillis() {
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  return now.tv_sec * 1000 + now.tv_nsec / 1000000;
 }
 
-// Sleeps the current thread for at least duration_ms.
+inline int64_t MonotonicSeconds() {
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  return now.tv_sec;
+}
+
+// Returns the number of milliseconds that have passed since the Unix epoch. This is
+// affected by manual changes to the system clock but is more suitable for use across
+// a cluster. For more accurate timings on the local host use the monotonic functions
+// above.
+inline int64_t UnixMillis() {
+  struct timespec now;
+  clock_gettime(CLOCK_REALTIME, &now);
+  return now.tv_sec * 1000 + now.tv_nsec / 1000000;
+}
+
+// Sleeps the current thread for at least duration_ms milliseconds.
 void SleepForMs(const int64_t duration_ms);
 
 }

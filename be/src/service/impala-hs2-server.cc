@@ -580,10 +580,10 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   // TODO: Fix duplication of code between here and ConnectionStart().
   shared_ptr<SessionState> state(new SessionState());
   state->closed = false;
-  state->start_time = TimestampValue::local_time();
+  state->start_time = TimestampValue::LocalTime();
   state->session_type = TSessionType::HIVESERVER2;
   state->network_address = ThriftServer::GetThreadConnectionContext()->network_address;
-  state->last_accessed_ms = ms_since_epoch();
+  state->last_accessed_ms = UnixMillis();
   state->hs2_version = min(MAX_SUPPORTED_HS2_VERSION, request.client_protocol);
 
   // If the username was set by a lower-level transport, use it.

@@ -19,6 +19,7 @@
 #include <string.h>
 #include <string>
 
+#include "common/logging.h"
 #include "udf/udf.h"
 #include "util/hash-util.h"
 #include "runtime/types.h"
@@ -36,7 +37,9 @@ struct StringValue {
   char* ptr;
   int len;
 
-  StringValue(char* ptr, int len): ptr(ptr), len(len) {}
+  StringValue(char* ptr, int len): ptr(ptr), len(len) {
+    DCHECK_GE(len, 0);
+  }
   StringValue(): ptr(NULL), len(0) {}
 
   // Construct a StringValue from 's'.  's' must be valid for as long as

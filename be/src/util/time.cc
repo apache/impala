@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <unistd.h>
+
 #include "util/time.h"
 
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/thread/thread.hpp>
-
 using namespace impala;
-using namespace boost;
 
 void impala::SleepForMs(const int64_t duration_ms) {
   // TODO: Replace with sleep_for when we upgrade to recent boost / C++11?

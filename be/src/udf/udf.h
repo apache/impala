@@ -16,6 +16,7 @@
 #ifndef IMPALA_UDF_UDF_H
 #define IMPALA_UDF_UDF_H
 
+#include <assert.h>
 #include <boost/cstdint.hpp>
 #include <string.h>
 
@@ -523,7 +524,10 @@ struct StringVal : public AnyVal {
 
   // Construct a StringVal from ptr/len. Note: this does not make a copy of ptr
   // so the buffer must exist as long as this StringVal does.
-  StringVal(uint8_t* ptr = NULL, int len = 0) : len(len), ptr(ptr) {}
+  StringVal(uint8_t* ptr = NULL, int len = 0) : len(len), ptr(ptr) {
+    assert(len >= 0);
+  };
+
 
   // Construct a StringVal from NULL-terminated c-string. Note: this does not make a
   // copy of ptr so the underlying string must exist as long as this StringVal does.

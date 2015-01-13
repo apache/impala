@@ -18,6 +18,7 @@
 import logging
 import os
 import pprint
+import pwd
 import pytest
 import grp
 from getpass import getuser
@@ -153,8 +154,9 @@ class ImpalaTestSuite(BaseTestSuite):
     table_format_info = vector.get_value('table_format')
     exec_options = vector.get_value('exec_option')
 
-    # Resolve the current user's group name.
-    group_name = grp.getgrnam(getuser()).gr_name
+    # Resolve the current user's primary group name.
+    group_id = pwd.getpwnam(getuser()).pw_gid
+    group_name = grp.getgrgid(group_id).gr_name
 
     target_impalad_clients = list()
     if multiple_impalad:

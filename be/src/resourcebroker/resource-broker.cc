@@ -208,7 +208,7 @@ Status ResourceBroker::RegisterWithLlama() {
 
   // Start time that this thread attempted registration. Used to limit the time that a
   // query will wait for re-registration with the Llama to succeed.
-  int64_t start = TimestampValue::local_time_micros().time_of_day().total_seconds();
+  int64_t start = MonotonicSeconds();
   lock_guard<mutex> l(llama_registration_lock_);
   if (llama_handle_ != current_llama_handle) return Status::OK;
 
@@ -216,7 +216,7 @@ Status ResourceBroker::RegisterWithLlama() {
   active_llama_handle_metric_->set_value("none");
 
   int llama_addr_idx = (active_llama_addr_idx_ + 1) % llama_addresses_.size();
-  int64_t now = TimestampValue::local_time_micros().time_of_day().total_seconds();
+  int64_t now = MonotonicSeconds();
   while (FLAGS_llama_registration_timeout_secs == -1 ||
       (now - start) < FLAGS_llama_registration_timeout_secs) {
     // Connect to the Llama at llama_address.
@@ -272,7 +272,7 @@ Status ResourceBroker::RegisterWithLlama() {
               << FLAGS_llama_registration_wait_secs << "s.";
     // Sleep to give Llama time to recover/failover before the next attempt.
     SleepForMs(FLAGS_llama_registration_wait_secs * 1000);
-    now = TimestampValue::local_time_micros().time_of_day().total_seconds();
+    now = MonotonicSeconds();
   }
   DCHECK(FLAGS_llama_registration_timeout_secs != -1);
   if ((now - start) >= FLAGS_llama_registration_timeout_secs) {

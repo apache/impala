@@ -75,8 +75,8 @@ TEST(SessionTest, TestExpiry) {
     hs2_clients[i]->iface()->OpenSession(response, request);
   }
 
-  int64_t start = ms_since_epoch();
-  while (expired_metric->value() != 10 && ms_since_epoch() - start < 5000) {
+  int64_t start = UnixMillis();
+  while (expired_metric->value() != 10 && UnixMillis() - start < 5000) {
     SleepForMs(100);
   }
 

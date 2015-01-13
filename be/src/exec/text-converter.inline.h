@@ -117,7 +117,7 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
     case TYPE_TIMESTAMP: {
       TimestampValue* ts_slot = reinterpret_cast<TimestampValue*>(slot);
       *ts_slot = TimestampValue(data, len);
-      if (ts_slot->NotADateTime()) {
+      if (!ts_slot->HasDateOrTime()) {
         parse_result = StringParser::PARSE_FAILURE;
       }
       break;

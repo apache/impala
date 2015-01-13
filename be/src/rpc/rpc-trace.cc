@@ -128,7 +128,7 @@ void* RpcEventHandler::getContext(const char* fn_name, void* server_context) {
   ++(it->second->num_in_flight);
   // TODO: Consider pooling these
   InvocationContext* ctxt_ptr =
-      new InvocationContext(ms_since_epoch(), cnxn_ctx, it->second);
+      new InvocationContext(MonotonicMillis(), cnxn_ctx, it->second);
   VLOG_RPC << "RPC call: " << string(fn_name) << "(from "
            << ctxt_ptr->cnxn_ctx->network_address << ")";
   return reinterpret_cast<void*>(ctxt_ptr);
@@ -136,7 +136,7 @@ void* RpcEventHandler::getContext(const char* fn_name, void* server_context) {
 
 void RpcEventHandler::postWrite(void* ctx, const char* fn_name, uint32_t bytes) {
   InvocationContext* rpc_ctx = reinterpret_cast<InvocationContext*>(ctx);
-  int64_t elapsed_time = ms_since_epoch() - rpc_ctx->start_time_ms;
+  int64_t elapsed_time = MonotonicMillis() - rpc_ctx->start_time_ms;
   const string& call_name = string(fn_name);
   // TODO: bytes is always 0, how come?
   VLOG_RPC << "RPC call: " << server_name_ << ":" << call_name << " from "

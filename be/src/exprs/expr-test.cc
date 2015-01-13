@@ -267,7 +267,7 @@ class ExprTest : public testing::Test {
   void TestValidTimestampValue(const string& expr) {
     TimestampValue* result;
     GetValue(expr, TYPE_TIMESTAMP, reinterpret_cast<void**>(&result));
-    EXPECT_FALSE(result->NotADateTime());
+    EXPECT_TRUE(result->HasDateOrTime());
   }
 
   // Decimals don't work with TestValue.

@@ -268,7 +268,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   // Initialize impalad metrics
   ImpaladMetrics::CreateMetrics(exec_env->metrics()->GetChildGroup("impala-server"));
   ImpaladMetrics::IMPALA_SERVER_START_TIME->set_value(
-      TimestampValue::local_time().DebugString());
+      TimestampValue::LocalTime().DebugString());
 
   // Register the membership callback if required
   if (exec_env->subscriber() != NULL) {
@@ -317,7 +317,7 @@ Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_sta
 
   writer.StartObject();
   // Each log entry is a timestamp mapped to a JSON object
-  ss << ms_since_epoch();
+  ss << UnixMillis();
   writer.String(ss.str().c_str());
   writer.StartObject();
   writer.String("query_id");
@@ -507,9 +507,8 @@ void ImpalaServer::ArchiveQuery(const QueryExecState& query) {
   // If there was an error initialising archival (e.g. directory is not writeable),
   // FLAGS_log_query_to_file will have been set to false
   if (FLAGS_log_query_to_file) {
-    int64_t timestamp = time_since_epoch().total_milliseconds();
     stringstream ss;
-    ss << timestamp << " " << query.query_id() << " " << encoded_profile_str;
+    ss << UnixMillis() << " " << query.query_id() << " " << encoded_profile_str;
     Status status = profile_logger_->AppendEntry(ss.str());
     if (!status.ok()) {
       LOG_EVERY_N(WARNING, 1000) << "Could not write to profile log file file ("
@@ -630,7 +629,7 @@ Status ImpalaServer::ExecuteInternal(
 
 void ImpalaServer::PrepareQueryContext(TQueryCtx* query_ctx) {
   query_ctx->__set_pid(getpid());
-  query_ctx->__set_now_string(TimestampValue::local_time_micros().DebugString());
+  query_ctx->__set_now_string(TimestampValue::LocalTime().DebugString());
   query_ctx->__set_coord_address(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
 
   // Creating a random_generator every time is not free, but
@@ -692,7 +691,7 @@ Status ImpalaServer::SetQueryInflight(shared_ptr<SessionState> session_state,
                << PrettyPrinter::Print(timeout_s * 1000L * 1000L * 1000L,
                      TUnit::TIME_NS);
     queries_by_timestamp_.insert(
-        make_pair(ms_since_epoch() + (1000L * timeout_s), query_id));
+        make_pair(UnixMillis() + (1000L * timeout_s), query_id));
   }
   return Status::OK;
 }
@@ -1327,8 +1326,8 @@ void ImpalaServer::ConnectionStart(
     shared_ptr<SessionState> session_state;
     session_state.reset(new SessionState);
     session_state->closed = false;
-    session_state->start_time = TimestampValue::local_time();
-    session_state->last_accessed_ms = ms_since_epoch();
+    session_state->start_time = TimestampValue::LocalTime();
+    session_state->last_accessed_ms = UnixMillis();
     session_state->database = "default";
     session_state->session_type = TSessionType::BEESWAX;
     session_state->network_address = connection_context.network_address;
@@ -1381,7 +1380,7 @@ void ImpalaServer::ExpireSessions() {
     // and this method picking it up is equal to the size of this sleep.
     SleepForMs(FLAGS_idle_session_timeout * 500);
     lock_guard<mutex> l(session_state_map_lock_);
-    int64_t now = ms_since_epoch();
+    int64_t now = UnixMillis();
     VLOG(3) << "Session expiration thread waking up";
     // TODO: If holding session_state_map_lock_ for the duration of this loop is too
     // expensive, consider a priority queue.
@@ -1434,7 +1433,7 @@ void ImpalaServer::ExpireQueries() {
     {
       lock_guard<mutex> l(query_expiration_lock_);
       ExpirationQueue::iterator expiration_event = queries_by_timestamp_.begin();
-      now = ms_since_epoch();
+      now = UnixMillis();
       while (expiration_event != queries_by_timestamp_.end()) {
         // If the last-observed expiration time for this query is still in the future, we
         // know that the true expiration time will be at least that far off. So we can
@@ -1475,7 +1474,7 @@ void ImpalaServer::ExpireQueries() {
           // Otherwise time to expire this query
           VLOG_QUERY << "Expiring query due to client inactivity: "
                      << expiration_event->second << ", last activity was at: "
-                     << TimestampValue(query_state->last_active(), 0).DebugString();
+                     << TimestampValue(query_state->last_active()).DebugString();
           const string& err_msg = Substitute(
               "Query $0 expired due to client inactivity (timeout is $1)",
               PrintId(expiration_event->second),

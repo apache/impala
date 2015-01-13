@@ -603,10 +603,10 @@ void Statestore::DoSubscriberUpdate(bool is_heartbeat, int thread_id,
   const string hb_type = is_heartbeat ? "heartbeat" : "topic update";
   if (update_deadline != 0L) {
     // Wait until deadline.
-    int64_t diff_ms = update_deadline - ms_since_epoch();
+    int64_t diff_ms = update_deadline - UnixMillis();
     while (diff_ms > 0) {
       SleepForMs(diff_ms);
-      diff_ms = update_deadline - ms_since_epoch();
+      diff_ms = update_deadline - UnixMillis();
     }
     diff_ms = abs(diff_ms);
     VLOG(3) << "Sending " << hb_type << " message to: " << update.second
@@ -644,7 +644,7 @@ void Statestore::DoSubscriberUpdate(bool is_heartbeat, int thread_id,
   Status status;
   if (is_heartbeat) {
     status = SendHeartbeat(subscriber.get());
-    deadline_ms = ms_since_epoch() + FLAGS_statestore_heartbeat_frequency_ms;
+    deadline_ms = UnixMillis() + FLAGS_statestore_heartbeat_frequency_ms;
   } else {
     bool update_skipped;
     status = SendTopicUpdate(subscriber.get(), &update_skipped);
@@ -653,7 +653,7 @@ void Statestore::DoSubscriberUpdate(bool is_heartbeat, int thread_id,
     int64_t update_interval = update_skipped ?
         (2 * FLAGS_statestore_update_frequency_ms) :
         FLAGS_statestore_update_frequency_ms;
-    deadline_ms = ms_since_epoch() + update_interval;
+    deadline_ms = UnixMillis() + update_interval;
   }
 
   {

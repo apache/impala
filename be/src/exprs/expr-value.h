@@ -51,13 +51,13 @@ struct ExprValue {
       decimal16_val() {
   }
 
-  ExprValue(bool v): bool_val(v) {}
-  ExprValue(int8_t v): tinyint_val(v) {}
-  ExprValue(int16_t v): smallint_val(v) {}
-  ExprValue(int32_t v): int_val(v) {}
-  ExprValue(int64_t v): bigint_val(v) {}
-  ExprValue(float v): float_val(v) {}
-  ExprValue(double v): double_val(v) {}
+  ExprValue(bool v) : bool_val(v) {}
+  ExprValue(int8_t v) : tinyint_val(v) {}
+  ExprValue(int16_t v) : smallint_val(v) {}
+  ExprValue(int32_t v) : int_val(v) {}
+  ExprValue(int64_t v) : bigint_val(v) {}
+  ExprValue(float v) : float_val(v) {}
+  ExprValue(double v) : double_val(v) {}
   ExprValue(int64_t t, int64_t n) : timestamp_val(t, n) {}
 
   // c'tor for string values

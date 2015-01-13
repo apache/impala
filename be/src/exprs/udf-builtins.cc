@@ -174,7 +174,7 @@ TimestampValue TruncMonth(const date& orig_date) {
 
 // Same day of the week as the first day of the year
 TimestampValue TruncWW(const date& orig_date) {
-  const date& first_day_of_year = TruncYear(orig_date).get_date();
+  const date& first_day_of_year = TruncYear(orig_date).date();
   int target_week_day = first_day_of_year.day_of_week();
   date new_date = GoBackToWeekday(orig_date, target_week_day);
   time_duration new_time(0, 0, 0, 0);
@@ -183,7 +183,7 @@ TimestampValue TruncWW(const date& orig_date) {
 
 // Same day of the week as the first day of the month
 TimestampValue TruncW(const date& orig_date) {
-  const date& first_day_of_mon = TruncMonth(orig_date).get_date();
+  const date& first_day_of_mon = TruncMonth(orig_date).date();
   const date& new_date = GoBackToWeekday(orig_date, first_day_of_mon.day_of_week());
   time_duration new_time(0, 0, 0, 0);
   return TimestampValue(new_date, new_time);
@@ -218,8 +218,8 @@ TimestampVal UdfBuiltins::Trunc(FunctionContext* context, const TimestampVal& tv
     const StringVal &unit_str) {
   if (tv.is_null) return TimestampVal::null();
   const TimestampValue& ts = TimestampValue::FromTimestampVal(tv);
-  const date& orig_date = ts.get_date();
-  const time_duration& orig_time = ts.get_time();
+  const date& orig_date = ts.date();
+  const time_duration& orig_time = ts.time();
 
   // resolve trunc_unit using the prepared state if possible, o.w. parse now
   // TruncPrepare() can only parse trunc_unit if user passes it as a string literal
