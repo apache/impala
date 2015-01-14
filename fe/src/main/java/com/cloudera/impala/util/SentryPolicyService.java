@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.util;
 
-import java.io.IOException;
 import java.util.List;
 
 import org.apache.sentry.SentryUserException;
@@ -24,6 +23,7 @@ import org.apache.sentry.provider.db.service.thrift.SentryPolicyServiceClient;
 import org.apache.sentry.provider.db.service.thrift.TSentryGrantOption;
 import org.apache.sentry.provider.db.service.thrift.TSentryPrivilege;
 import org.apache.sentry.provider.db.service.thrift.TSentryRole;
+import org.apache.sentry.service.thrift.SentryServiceClientFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,8 +82,8 @@ public class SentryPolicyService {
     private SentryPolicyServiceClient createClient() throws InternalException {
       SentryPolicyServiceClient client;
       try {
-        client = new SentryPolicyServiceClient(config_.getConfig());
-      } catch (IOException e) {
+        client = SentryServiceClientFactory.create(config_.getConfig());
+      } catch (Exception e) {
         throw new InternalException("Error creating Sentry Service client: ", e);
       }
       return client;
