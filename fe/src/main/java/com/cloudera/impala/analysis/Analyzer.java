@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -28,6 +29,7 @@ import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.Path.PathType;
 import com.cloudera.impala.authorization.AuthorizationChecker;
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.AuthorizeableDb;
@@ -66,6 +68,7 @@ import com.cloudera.impala.util.DisjointSet;
 import com.cloudera.impala.util.EventSequence;
 import com.cloudera.impala.util.ListMap;
 import com.cloudera.impala.util.TSessionStateUtil;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.base.Strings;
@@ -151,6 +154,9 @@ public class Analyzer {
   public boolean hasPlanHints() { return globalState_.hasPlanHints; }
 
   // state shared between all objects of an Analyzer tree
+  // TODO: Many maps here contain properties about tuples, e.g., whether
+  // a tuple is outer/semi joined, etc. Remove the maps in favor of making
+  // them properties of the tuple descriptor itself.
   private static class GlobalState {
     // TODO: Consider adding an "exec-env"-like global singleton that contains the
     // catalog and authzConfig.
@@ -301,6 +307,9 @@ public class Analyzer {
   // checking (duplicate vs. ambiguous alias).
   private final Map<String, TupleDescriptor> aliasMap_ = Maps.newHashMap();
 
+  // Map from tuple id to its corresponding table ref.
+  private final Map<TupleId, TableRef> tableRefMap_ = Maps.newHashMap();
+
   // Set of lowercase ambiguous implicit table aliases.
   private final Set<String> ambiguousAliases_ = Sets.newHashSet();
 
@@ -369,6 +378,7 @@ public class Analyzer {
   }
 
   public Set<TableName> getMissingTbls() { return missingTbls_; }
+  public boolean hasMissingTbls() { return !missingTbls_.isEmpty(); }
   public boolean hasAncestors() { return !ancestors_.isEmpty(); }
   public Analyzer getParentAnalyzer() {
     return hasAncestors() ? ancestors_.get(0) : null;
@@ -415,18 +425,18 @@ public class Analyzer {
    * has already been registered for another table ref.
    */
   public TupleDescriptor registerTableRef(TableRef ref) throws AnalysisException {
-    // Alias is the explicit alias or the fully-qualified table name.
-    String alias = ref.getAlias().toLowerCase();
-    if (aliasMap_.containsKey(alias)) {
-      throw new AnalysisException("Duplicate table alias: '" + alias + "'");
+    String uniqueAlias = ref.getUniqueAlias();
+    if (aliasMap_.containsKey(uniqueAlias)) {
+      throw new AnalysisException("Duplicate table alias: '" + uniqueAlias + "'");
     }
 
     // If ref has no explicit alias, then the unqualified and the fully-qualified table
     // names are legal implicit aliases. Column references against unqualified implicit
     // aliases can be ambiguous, therefore, we register such ambiguous aliases here.
     String unqualifiedAlias = null;
-    if (!ref.hasExplicitAlias()) {
-      unqualifiedAlias = ref.getName().getTbl().toLowerCase();
+    String[] aliases = ref.getAliases();
+    if (aliases.length > 1) {
+      unqualifiedAlias = aliases[1];
       TupleDescriptor tupleDesc = aliasMap_.get(unqualifiedAlias);
       if (tupleDesc != null) {
         if (tupleDesc.hasExplicitAlias()) {
@@ -440,30 +450,29 @@ public class Analyzer {
 
     // Delegate creation of the tuple descriptor to the concrete table ref.
     TupleDescriptor result = ref.createTupleDescriptor(this);
-    result.setAlias(ref.getAlias(), ref.hasExplicitAlias());
-    // Register explicit or fully-qualified implicit alias.
-    aliasMap_.put(alias, result);
-    if (!ref.hasExplicitAlias()) {
-      // Register unqualified implicit alias.
-      Preconditions.checkNotNull(unqualifiedAlias);
-      aliasMap_.put(unqualifiedAlias, result);
+    result.setAliases(aliases, ref.hasExplicitAlias());
+    // Register all legal aliases.
+    for (String alias: aliases) {
+      aliasMap_.put(alias, result);
     }
+    tableRefMap_.put(result.getId(), ref);
     return result;
   }
 
   /**
-   * Resolves the given table ref into a corresponding BaseTableRef or ViewRef. Returns
-   * the new resolved table ref or the given table ref if it is already resolved.
+   * Resolves the given TableRef into a concrete BaseTableRef, ViewRef or
+   * CollectionTableRef. Returns the new resolved table ref or the given table
+   * ref if it is already resolved. Adds audit events and privilege requests for
+   * the database and/or table.
    */
   public TableRef resolveTableRef(TableRef tableRef) throws AnalysisException {
     // Return the table if it is already resolved.
     if (tableRef.isResolved()) return tableRef;
-    TableName tableName = tableRef.getName();
     // Try to find a matching local view.
-    if (!tableName.isFullyQualified()) {
+    if (tableRef.getPath().size() == 1) {
       // Searches the hierarchy of analyzers bottom-up for a registered local view with
       // a matching alias.
-      String viewAlias = tableName.getTbl().toLowerCase();
+      String viewAlias = tableRef.getPath().get(0).toLowerCase();
       Analyzer analyzer = this;
       do {
         View localView = analyzer.localViews_.get(viewAlias);
@@ -472,14 +481,20 @@ public class Analyzer {
       } while (analyzer != null);
     }
 
-    Table table = getTable(tableRef.getName(), tableRef.getPrivilegeRequirement());
-    if (table instanceof View) {
-      return new InlineViewRef((View) table, tableRef);
-    } else {
+    // Resolve the table ref's path and determine what resolved table ref
+    // to replace it with.
+    tableRef.analyze(this);
+    Path resolvedPath = tableRef.getResolvedPath();
+    if (resolvedPath.destTable() != null) {
+      Table table = resolvedPath.destTable();
+      Preconditions.checkNotNull(table);
+      if (table instanceof View) return new InlineViewRef((View) table, tableRef);
       // The table must be a base table.
       Preconditions.checkState(table instanceof HdfsTable ||
           table instanceof HBaseTable || table instanceof DataSourceTable);
-      return new BaseTableRef(tableRef, table);
+      return new BaseTableRef(tableRef, tableRef.getResolvedPath());
+    } else {
+      return new CollectionTableRef(tableRef, tableRef.getResolvedPath());
     }
   }
 
@@ -535,16 +550,15 @@ public class Analyzer {
   }
 
   /**
-   * Return descriptor of registered table/alias or null if no matching descriptor was
-   * found. Attempts to resolve name in the context of any of the registered tuples.
-   * Throws an analysis exception if name is unqualified and could match multiple
-   * registered descriptors (i.e., is ambiguous).
+   * Returns the descriptor of the given explicit or implicit table alias or null if no
+   * such alias has been registered.
+   * Throws an AnalysisException if the given table alias is ambiguous.
    */
-  public TupleDescriptor getDescriptor(TableName name) throws AnalysisException {
-    String lookupAlias = name.toString().toLowerCase();
-    if (!name.isFullyQualified() && ambiguousAliases_.contains(lookupAlias)) {
-      throw new AnalysisException(
-          "unqualified table alias '" + name.toString() + "' is ambiguous");
+  public TupleDescriptor getDescriptor(String tableAlias) throws AnalysisException {
+    String lookupAlias = tableAlias.toLowerCase();
+    if (ambiguousAliases_.contains(lookupAlias)) {
+      throw new AnalysisException(String.format(
+          "Unqualified table alias is ambiguous: '%s'", tableAlias));
     }
     return aliasMap_.get(lookupAlias);
   }
@@ -552,6 +566,8 @@ public class Analyzer {
   public TupleDescriptor getTupleDesc(TupleId id) {
     return globalState_.descTbl.getTupleDesc(id);
   }
+
+  public TableRef getTableRef(TupleId tid) { return tableRefMap_.get(tid); }
 
   /**
    * Given a "table alias"."column alias", return the SlotDescriptor
@@ -581,47 +597,218 @@ public class Analyzer {
   public boolean hasEmptySpjResultSet() { return hasEmptySpjResultSet_; }
 
   /**
-   * Checks that 'colName' references an existing column for a registered table alias;
-   * if alias is empty, tries to resolve the column name in the context of any of the
-   * registered tables. Creates and returns an empty SlotDescriptor if the
-   * column hasn't previously been registered, otherwise returns the existing
-   * descriptor.
+   * Resolves the given raw path according to the given path type, as follows:
+   * SLOT_REF and STAR: Resolves the path in the context of all registered tuple
+   * descriptors, considering qualified as well as unqualified matches.
+   * TABLE_REF: Resolves the path in the context of all registered tuple descriptors
+   * only considering qualified matches, as well as catalog tables/views.
+   *
+   * Path resolution:
+   * Regardless of the path type, a raw path can have multiple successful resolutions.
+   * A resolution is said to be 'successful' if all raw path elements can be mapped
+   * to a corresponding alias/table/column/field.
+   *
+   * Path legality:
+   * A successful resolution may be illegal with respect to the path type, e.g.,
+   * a SlotRef cannot reference intermediate collection types, etc.
+   *
+   * Path ambiguity:
+   * A raw path is ambiguous if it has multiple legal resolutions. Otherwise,
+   * the ambiguity is resolved in favor of the legal resolution.
+   *
+   * Returns the single legal path resolution if it exists.
+   * Throws if there was no legal resolution or if the path is ambiguous.
    */
-  public SlotDescriptor registerColumnRef(TableName tblName, String colName)
-      throws AnalysisException {
-    TupleDescriptor tupleDesc = null;
-    Column col = null;
-    boolean resolveInAncestors = isSubquery_ ? true : false;
-    if (tblName == null) {
-      // Resolve colName in the context of all registered tables.
-      tupleDesc = resolveColumnRef(colName, resolveInAncestors);
+  public Path resolvePath(List<String> rawPath, PathType pathType)
+      throws AnalysisException, TableLoadingException {
+    // We only allow correlated references in predicates of a subquery.
+    boolean resolveInAncestors = (pathType == PathType.SLOT_REF) ? isSubquery_: false;
+    // Convert all path elements to lower case.
+    ArrayList<String> lcRawPath = Lists.newArrayListWithCapacity(rawPath.size());
+    for (String s: rawPath) lcRawPath.add(s.toLowerCase());
+    return resolvePath(lcRawPath, pathType, resolveInAncestors);
+  }
+
+  private Path resolvePath(List<String> rawPath, PathType pathType,
+      boolean resolveInAncestors) throws AnalysisException, TableLoadingException {
+    // List of all candidate paths with different roots. Paths in this list are initially
+    // unresolved and may be illegal with respect to the pathType.
+    ArrayList<Path> candidates = Lists.newArrayList();
+
+    // Path rooted at a tuple desc with an explicit or implicit unqualified alias.
+    TupleDescriptor rootDesc = getDescriptor(rawPath.get(0));
+    if (rootDesc != null) {
+      candidates.add(new Path(rootDesc, rawPath.subList(1, rawPath.size())));
+    }
+
+    // Path rooted at a tuple desc with an implicit qualified alias.
+    if (rawPath.size() > 1) {
+      rootDesc = getDescriptor(rawPath.get(0) + "." + rawPath.get(1));
+      if (rootDesc != null) {
+        candidates.add(new Path(rootDesc, rawPath.subList(2, rawPath.size())));
+      }
+    }
+
+    LinkedList<String> errors = Lists.newLinkedList();
+    if (pathType == PathType.SLOT_REF || pathType == PathType.STAR) {
+      // Paths rooted at all of the unique registered tuple descriptors.
+      for (TableRef tblRef: tableRefMap_.values()) {
+        candidates.add(new Path(tblRef.getDesc(), rawPath));
+      }
     } else {
-      // Resolve colName in the context of a specific table.
-      tupleDesc = resolveColumnRef(tblName, colName, resolveInAncestors);
-    }
-    if (tupleDesc == null) {
-      throw new AnalysisException("couldn't resolve column reference: '" +
-          colName + "'");
+      // Always prefer table ref paths rooted at a registered tuples descriptor.
+      Preconditions.checkState(pathType == PathType.TABLE_REF);
+      Path result = resolvePaths(rawPath, candidates, pathType, errors);
+      if (result != null) return result;
+      candidates.clear();
+
+      // Add paths rooted at a table with an unqualified and fully-qualified table name.
+      int end = Math.min(2, rawPath.size());
+      for (int tblNameIdx = 0; tblNameIdx < end; ++tblNameIdx) {
+        String dbName = (tblNameIdx == 0) ? getDefaultDb() : rawPath.get(0);
+        String tblName = rawPath.get(tblNameIdx);
+        Table tbl = null;
+        try {
+          tbl = getTable(dbName, tblName);
+        } catch (AnalysisException e) {
+          if (hasMissingTbls()) throw e;
+          // Ignore other exceptions to allow path resolution to continue.
+        }
+        if (tbl != null) {
+          candidates.add(new Path(tbl, rawPath.subList(tblNameIdx + 1, rawPath.size())));
+        }
+      }
     }
 
-    // Forbid references to invisible tuples.
-    if (!isVisible(tupleDesc.getId())) {
-      throw new AnalysisException(String.format(
-          "Illegal column reference '%s' of semi-/anti-joined table '%s'",
-              colName, tupleDesc.getAlias()));
+    Path result = resolvePaths(rawPath, candidates, pathType, errors);
+    if (result == null && resolveInAncestors && hasAncestors()) {
+      result = getParentAnalyzer().resolvePath(rawPath, pathType, true);
+    }
+    if (result == null) {
+      Preconditions.checkState(!errors.isEmpty());
+      throw new AnalysisException(errors.getFirst());
+    }
+    return result;
+  }
+
+  /**
+   * Resolves the given paths and checks them for legality and ambiguity. Returns the
+   * single legal path resolution if it exists, null otherwise.
+   * Populates 'errors' with a a prioritized list of error messages starting with the
+   * most relevant one. The list contains at least one error message if null is returned.
+   */
+  private Path resolvePaths(List<String> rawPath, List<Path> paths, PathType pathType,
+      LinkedList<String> errors) {
+    // For generating error messages.
+    String pathTypeStr = null;
+    String pathStr = Joiner.on(".").join(rawPath);
+    if (pathType == PathType.SLOT_REF) {
+      pathTypeStr = "Column/field reference";
+    } else if (pathType == PathType.TABLE_REF) {
+      pathTypeStr = "Table reference";
+    } else {
+      pathTypeStr = "Star expression";
+      pathStr += ".*";
     }
 
-    col = tupleDesc.getTable().getColumn(colName);
-    Preconditions.checkNotNull(col);
+    List<Path> legalPaths = Lists.newArrayList();
+    for (Path p: paths) {
+      if (!p.resolve()) continue;
 
+      // Check legality of the resolved path.
+      if (p.getRootDesc() != null && !isVisible(p.getRootDesc().getId())) {
+        errors.addLast(String.format(
+            "Illegal %s '%s' of semi-/anti-joined table '%s'",
+            pathTypeStr.toLowerCase(), pathStr, p.getRootDesc().getAlias()));
+        continue;
+      }
+      switch (pathType) {
+        // Illegal cases:
+        // 1. Destination type is not a collection.
+        case TABLE_REF: {
+          if (!p.destType().isCollectionType()) {
+            errors.addFirst(String.format(
+                "Illegal table reference to non-collection type: '%s'\n" +
+                    "Path resolved to type: %s", pathStr, p.destType().toSql()));
+            continue;
+          }
+          break;
+        }
+        case SLOT_REF: {
+          // Illegal cases:
+          // 1. Path contains an intermediate collection reference.
+          // 2. Destination of the path is a catalog table or a registered alias.
+          if (p.hasNonDestCollection()) {
+            errors.addFirst(String.format(
+                "Illegal column/field reference '%s' with intermediate " +
+                "collection '%s' of type '%s'",
+                pathStr, p.getFirstCollectionName(),
+                p.getFirstCollectionType().toSql()));
+            continue;
+          }
+          // Error should be "Could not resolve...". No need to add it here explicitly.
+          if (p.getMatchedTypes().isEmpty()) continue;
+          break;
+        }
+        // Illegal cases:
+        // 1. Path contains an intermediate collection reference.
+        // 2. Destination type of the path is not a struct.
+        case STAR: {
+          if (p.hasNonDestCollection()) {
+            errors.addFirst(String.format(
+                "Illegal star expression '%s' with intermediate " +
+                "collection '%s' of type '%s'",
+                pathStr, p.getFirstCollectionName(),
+                p.getFirstCollectionType().toSql()));
+            continue;
+          }
+          if (!p.destType().isStructType()) {
+            errors.addFirst(String.format(
+                "Cannot expand star in '%s' because path '%s' resolved to type '%s'." +
+                "\nStar expansion is only valid for paths to a struct type.",
+                pathStr, Joiner.on(".").join(rawPath), p.destType().toSql()));
+            continue;
+          }
+          break;
+        }
+      }
+      legalPaths.add(p);
+    }
+
+    if (legalPaths.size() > 1) {
+      errors.addFirst(String.format("%s is ambiguous: '%s'",
+          pathTypeStr, pathStr));
+      return null;
+    }
+    if (legalPaths.isEmpty()) {
+      if (errors.isEmpty()) {
+        errors.addFirst(String.format("Could not resolve %s: '%s'",
+            pathTypeStr.toLowerCase(), pathStr));
+      }
+      return null;
+    }
+    return legalPaths.get(0);
+  }
+
+  /**
+   * Creates and returns an empty SlotDescriptor for the given Path if it hasn't
+   * previously been registered, otherwise returns the existing descriptor.
+   */
+  public SlotDescriptor registerSlotRef(Path slotPath) throws AnalysisException {
     // SlotRefs are registered against the tuple's explicit or fully-qualified
     // implicit alias.
-    String key = tupleDesc.getAlias() + "." + col.getName();
+    TupleDescriptor tupleDesc = slotPath.getRootDesc();
+    String slotLabel = Joiner.on(".").join(slotPath.getRawPath());
+    String key = tupleDesc.getAlias() + "." + slotLabel;
     SlotDescriptor result = slotRefMap_.get(key);
     if (result != null) return result;
     result = addSlotDescriptor(tupleDesc);
-    result.setColumn(col);
-    result.setLabel(col.getName());
+    Column col = slotPath.destColumn();
+    if (col != null) result.setColumn(col);
+    Preconditions.checkNotNull(slotPath.destType());
+    result.setType(slotPath.destType());
+    result.setPath(slotPath.getMatchedPositions());
+    result.setLabel(slotLabel);
     slotRefMap_.put(key, result);
     return result;
   }
@@ -646,98 +833,9 @@ public class Analyzer {
     result.setSourceExprs(srcSlotDesc.getSourceExprs());
     result.setLabel(srcSlotDesc.getLabel());
     result.setStats(srcSlotDesc.getStats());
-    if (srcSlotDesc.getColumn() != null) {
-      result.setColumn(srcSlotDesc.getColumn());
-    } else {
-      result.setType(srcSlotDesc.getType());
-    }
+    if (srcSlotDesc.getColumn() != null) result.setColumn(srcSlotDesc.getColumn());
+    result.setType(srcSlotDesc.getType());
     return result;
-  }
-
-  /**
-   * Resolve column name with table alias in the context of the registered tuple
-   * descriptor of table 'tblName'. If 'resolveInAncestors' is true, the resolution
-   * process will continue along the chain of ancestors until we either resolve the
-   * column name, throw an AnalysisException, or reach the root of the analyzers
-   * hierarchy. Otherwise, the resolution process will only consider the current
-   * analysis context.
-   */
-  private TupleDescriptor resolveColumnRef(TableName tblName,
-      String colName, boolean resolveInAncestors) throws AnalysisException {
-    Preconditions.checkNotNull(tblName);
-    String lookupAlias = tblName.toString().toLowerCase();
-    if (ambiguousAliases_.contains(lookupAlias)) {
-      Preconditions.checkState(!tblName.isFullyQualified());
-      throw new AnalysisException(
-          String.format("unqualified table alias '%s' in column " +
-            "reference '%s' is ambiguous", tblName.toString(),
-            tblName.toString() + "." + colName));
-    }
-
-    TupleDescriptor tupleDesc = aliasMap_.get(lookupAlias);
-    if (tupleDesc != null) {
-      Column col = tupleDesc.getTable().getColumn(colName);
-      if (col == null) {
-        throw new AnalysisException(
-            String.format("couldn't resolve column reference: '%s'",
-              tblName.toString() + "." + colName));
-      }
-    }
-
-    if (tupleDesc != null) return tupleDesc;
-    if (resolveInAncestors && !ancestors_.isEmpty()) {
-      // Resolve the column ref in an outer query block.
-      return ancestors_.get(0).resolveColumnRef(tblName, colName, resolveInAncestors);
-    }
-    // The column ref couldn't be resolved in the speficied table context.
-    throw new AnalysisException(
-        String.format("unknown table alias '%s' in column reference '%s'",
-          tblName.toString(), tblName.toString() + "." + colName));
-  }
-
-  /**
-   * Resolves column name in context of any of the registered tuple descriptors,
-   * preferring matches to visible tuples over invisible tuples. Returns the matching
-   * tuple descriptor or null if none could be found.
-   * Throws if multiple bindings to different tables exist. If 'resolveInAncestors'
-   * is true, the resolution process will continue along the chain of ancestors
-   * until we either resolve the column name, throw an AnalysisException, or reach
-   * the root of the analyzers hierarchy. Otherwise, the resolution process will only
-   * consider the current analysis context.
-   */
-  private TupleDescriptor resolveColumnRef(String colName,
-      boolean resolveInAncestors) throws AnalysisException {
-    TupleDescriptor result = null;
-    // We don't have a specific table context, so iterate through all of the
-    // entries in this analyzer's alias map.
-    for (Map.Entry<String, TupleDescriptor> entry: aliasMap_.entrySet()) {
-      TupleDescriptor tupleDesc = entry.getValue();
-      Column col = tupleDesc.getTable().getColumn(colName);
-      // Continue if this tuple doesn't have a column with colName.
-      if (col == null) continue;
-      // The same tuple descriptor may have been registered for multiple
-      // implicit aliases.
-      if (result == tupleDesc) continue;
-      if (result != null && isVisible(result.getId())) {
-        // Can only have ambiguity between visible tuples.
-        if (isVisible(tupleDesc.getId())) {
-          throw new AnalysisException(
-              "unqualified column reference '" + colName + "' is ambiguous");
-        }
-        // At this point result.getId() is visible but tupleDesc.getId() is invisible.
-        // Prefer visible tuples over invisible ones, and don't simply ignore invisible
-        // tuples for consistent error reporting.
-        continue;
-      }
-      result = tupleDesc;
-    }
-
-    if (result != null) return result;
-    if (resolveInAncestors && !ancestors_.isEmpty()) {
-      // Resolve the column ref in an outer query block.
-      return ancestors_.get(0).resolveColumnRef(colName, resolveInAncestors);
-    }
-    return null;
   }
 
   /**
@@ -1668,7 +1766,7 @@ public class Analyzer {
     return isFullOuterJoined(getTupleId(sid));
   }
 
-  private boolean isVisible(TupleId tid) {
+  public boolean isVisible(TupleId tid) {
     return tid == visibleSemiJoinedTupleId_ || !isSemiJoined(tid);
   }
 
@@ -1877,6 +1975,13 @@ public class Analyzer {
     globalState_.descTbl.markSlotsMaterialized(slotIds);
   }
 
+  public void materializeSlots(Expr e) {
+    List<SlotId> slotIds = Lists.newArrayList();
+    Preconditions.checkState(e.isAnalyzed_);
+    e.getIds(null, slotIds);
+    globalState_.descTbl.markSlotsMaterialized(slotIds);
+  }
+
 
   /**
    * Returns assignment-compatible type of expr.getType() and lastCompatibleType.
@@ -1888,14 +1993,15 @@ public class Analyzer {
    * but note that lastCompatibleExpr may not yet have lastCompatibleType,
    * because it was not cast yet.
    */
-  public Type getCompatibleType(Type lastCompatibleType, Expr lastCompatibleExpr,
-      Expr expr) throws AnalysisException {
+  public Type getCompatibleType(Type lastCompatibleType,
+      Expr lastCompatibleExpr, Expr expr)
+      throws AnalysisException {
     Type newCompatibleType;
     if (lastCompatibleType == null) {
       newCompatibleType = expr.getType();
     } else {
-      newCompatibleType =
-          Type.getAssignmentCompatibleType(lastCompatibleType, expr.getType());
+      newCompatibleType = Type.getAssignmentCompatibleType(
+          lastCompatibleType, expr.getType());
     }
     if (!newCompatibleType.isValid()) {
       throw new AnalysisException(String.format(
@@ -1990,14 +2096,47 @@ public class Analyzer {
   }
 
   /**
-   * Returns the Catalog Table object for the TableName at the given Privilege level.
-   * If the table has not yet been loaded in the local catalog cache, it will get
-   * added to the set of table names in "missingTbls_" and an AnalysisException will be
-   * thrown.
-   *
-   * If the table or the db does not exist in the Catalog, an AnalysisError is thrown.
-   * If addAccessEvent is true, this call will add a new entry to accessEvents if the
-   * catalog access was successful. If false, no accessEvent will be added.
+   * Returns the Catalog Table object for the given database and table name.
+   * Adds the table to this analyzer's "missingTbls_" and throws an AnalysisException if
+   * the table has not yet been loaded in the local catalog cache.
+   * Throws an AnalysisException if the table or the db does not exist in the Catalog.
+   * This function does not register authorization requests and does not log access events.
+   */
+  public Table getTable(String dbName, String tableName)
+      throws AnalysisException, TableLoadingException {
+    Table table = null;
+    try {
+      table = getCatalog().getTable(dbName, tableName);
+    } catch (DatabaseNotFoundException e) {
+      throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
+    } catch (CatalogException e) {
+      String errMsg = String.format("Failed to load metadata for table: %s", tableName);
+      // We don't want to log all AnalysisExceptions as ERROR, only failures due to
+      // TableLoadingExceptions.
+      LOG.error(String.format("%s\n%s", errMsg, e.getMessage()));
+      if (e instanceof TableLoadingException) throw (TableLoadingException) e;
+      throw new TableLoadingException(errMsg, e);
+    }
+    if (table == null) {
+      throw new AnalysisException(
+          TBL_DOES_NOT_EXIST_ERROR_MSG + dbName + "." + tableName);
+    }
+    if (!table.isLoaded()) {
+      missingTbls_.add(new TableName(table.getDb().getName(), table.getName()));
+      throw new AnalysisException(
+          "Table/view is missing metadata: " + table.getFullName());
+    }
+    return table;
+  }
+
+  /**
+   * Returns the Catalog Table object for the TableName.
+   * Adds the table to this analyzer's "missingTbls_" and throws an AnalysisException if
+   * the table has not yet been loaded in the local catalog cache.
+   * Throws an AnalysisException if the table or the db does not exist in the Catalog.
+   * Always registers a privilege request for the table at the given privilege level,
+   * regardless of the state of the table (i.e. whether it exists, is loaded, etc.).
+   * If addAccessEvent is true, adds an access event if the catalog access succeeded.
    */
   public Table getTable(TableName tableName, Privilege privilege, boolean addAccessEvent)
       throws AnalysisException {
@@ -2012,36 +2151,18 @@ public class Analyzer {
     // This may trigger a metadata load, in which case we want to return the errors as
     // AnalysisExceptions.
     try {
-      table = getCatalog().getTable(tableName.getDb(), tableName.getTbl());
-      if (table == null) {
-        throw new AnalysisException(TBL_DOES_NOT_EXIST_ERROR_MSG + tableName.toString());
-      }
-      if (!table.isLoaded()) {
-        missingTbls_.add(new TableName(table.getDb().getName(), table.getName()));
-        throw new AnalysisException(
-            "Table/view is missing metadata: " + table.getFullName());
-      }
-
-      if (addAccessEvent) {
-        // Add an audit event for this access
-        TCatalogObjectType objectType = TCatalogObjectType.TABLE;
-        if (table instanceof View) objectType = TCatalogObjectType.VIEW;
-        globalState_.accessEvents.add(new TAccessEvent(
-            tableName.toString(), objectType, privilege.toString()));
-      }
-    } catch (DatabaseNotFoundException e) {
-      throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + tableName.getDb());
+      table = getTable(tableName.getDb(), tableName.getTbl());
     } catch (TableLoadingException e) {
-      String errorMsg =
-          String.format("Failed to load metadata for table: %s", tableName.toString());
-      // We don't want to log all AnalysisExceptions as ERROR, only failures due to
-      // TableLoadingExceptions.
-      LOG.error(errorMsg + "\n" + e.getMessage());
-      throw new AnalysisException(errorMsg, e);
-    } catch (CatalogException e) {
-      throw new AnalysisException("Error loading table: " + tableName.toString(), e);
+      throw new AnalysisException(e.getMessage(), e);
     }
     Preconditions.checkNotNull(table);
+    if (addAccessEvent) {
+      // Add an audit event for this access
+      TCatalogObjectType objectType = TCatalogObjectType.TABLE;
+      if (table instanceof View) objectType = TCatalogObjectType.VIEW;
+      globalState_.accessEvents.add(new TAccessEvent(
+          tableName.toString(), objectType, privilege.toString()));
+    }
     return table;
   }
 
@@ -2064,6 +2185,9 @@ public class Analyzer {
    * and authorized post-analysis.
    *
    * If the database does not exist in the catalog an AnalysisError is thrown.
+   *
+   * If addAccessEvent is true, this call will add a new entry to accessEvents if the
+   * catalog access was successful. If false, no accessEvent will be added.
    */
   public Db getDb(String dbName, Privilege privilege) throws AnalysisException {
     return getDb(dbName, privilege, true);

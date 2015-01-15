@@ -21,43 +21,70 @@ import java.util.List;
 import java.util.Map;
 
 import com.cloudera.impala.catalog.ColumnStats;
+import com.cloudera.impala.catalog.StructType;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.thrift.TTupleDescriptor;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
+/**
+ * A collection of slots that are organized in a CPU-friendly memory layout. A slot is
+ * a typed placeholder for a single value operated on at runtime. A slot can be named or
+ * anonymous. A named slot corresponds directly to a column or field that can be directly
+ * referenced in a query by its name. An anonymous slot represents an intermediate value
+ * produced during query execution, e.g., aggregation output.
+ * A tuple descriptor has an associated type and a list of slots. Its type is a struct
+ * that contains as its fields the list of all named slots covered by this tuple.
+ * The list of slots tracks the named slots that are actually referenced in a query, as
+ * well as all anonymous slots. Although not required, a tuple descriptor typically
+ * only has named or anonymous slots and not a mix of both.
+ *
+ * For example, every table reference has a corresponding tuple descriptor. The columns
+ * of the table are represented by the tuple descriptor's type (struct type with one
+ * field per column). The list of slots tracks which of the table's columns are actually
+ * referenced. A similar explanation applies for collection references.
+ *
+ * A tuple descriptor may be materialized or non-materialized. A non-materialized tuple
+ * descriptor acts as a placeholder for 'virtual' table references such as inline views,
+ * and must not be materialized at runtime.
+ */
 public class TupleDescriptor {
   private final TupleId id_;
   private final String debugName_;  // debug-only
-  private final ArrayList<SlotDescriptor> slots_;
+  private final ArrayList<SlotDescriptor> slots_ = Lists.newArrayList();
 
-  // Underlying table, if there is one.
-  private Table table_;
+  // Resolved path to the collection corresponding to this tuple descriptor, if any,
+  // Only set for materialized tuples.
+  private Path path_;
 
-  // Explicit or fully-qualified implicit alias.
-  private String alias_;
+  // Type of this tuple descriptor. Used for slot/table resolution in analysis.
+  private StructType type_;
 
-  // True if alias_ is an explicit alias.
+  // All legal aliases of this tuple.
+  private String[] aliases_;
+
+  // If true, requires that aliases_.length() == 1. However, aliases_.length() == 1
+  // does not imply an explicit alias because nested collection refs have only a
+  // single implicit alias.
   private boolean hasExplicitAlias_;
 
-  // if false, this tuple doesn't need to be materialized
+  // If false, this tuple doesn't need to be materialized.
   private boolean isMaterialized_ = true;
+
+  // If true, computeMemLayout() has been called and we can't add any additional slots.
+  private boolean hasMemLayout_ = false;
 
   private int byteSize_;  // of all slots plus null indicators
   private int numNullBytes_;
-
-  // if true, computeMemLayout() has been called and we can't add any additional
-  // slots
-  private boolean hasMemLayout_ = false;
-
   private float avgSerializedSize_;  // in bytes; includes serialization overhead
 
-  TupleDescriptor(TupleId id, String debugName) {
+  public TupleDescriptor(TupleId id, String debugName) {
     id_ = id;
+    path_ = null;
     debugName_ = debugName;
-    slots_ = new ArrayList<SlotDescriptor>();
   }
 
   public void addSlot(SlotDescriptor desc) {
@@ -67,31 +94,47 @@ public class TupleDescriptor {
 
   public TupleId getId() { return id_; }
   public ArrayList<SlotDescriptor> getSlots() { return slots_; }
-  public Table getTable() { return table_; }
-  public TableName getTableName() {
-    if (table_ == null) return null;
-    return new TableName(
-        table_.getDb() != null ? table_.getDb().getName() : null, table_.getName());
+  public Table getTable() {
+    if (path_ == null) return null;
+    return path_.getRootTable();
   }
-  public void setTable(Table tbl) { table_ = tbl; }
+  public TableName getTableName() {
+    Table t = getTable();
+    return (t == null) ? null : t.getTableName();
+  }
+  public void setPath(Path p) {
+    Preconditions.checkNotNull(p);
+    Preconditions.checkState(p.isResolved());
+    Preconditions.checkState(p.destType().isCollectionType());
+    path_ = p;
+    if (p.destTable() != null) {
+      // Do not use Path.getTypeAsStruct() to only allow implicit path resolutions,
+      // because this tuple desc belongs to a base table ref.
+      type_ = (StructType) p.destTable().getType().getItemType();
+    } else {
+      // Also allow explicit path resolutions.
+      type_ = Path.getTypeAsStruct(p.destType());
+    }
+  }
+  public Path getPath() { return path_; }
+  public void setType(StructType type) { type_ = type; }
+  public StructType getType() { return type_; }
   public int getByteSize() { return byteSize_; }
   public float getAvgSerializedSize() { return avgSerializedSize_; }
   public boolean isMaterialized() { return isMaterialized_; }
   public void setIsMaterialized(boolean value) { isMaterialized_ = value; }
-  public String getAlias() { return alias_; }
-  public boolean hasExplicitAlias() { return hasExplicitAlias_; }
-  public void setAlias(String alias, boolean isExplicit) {
-    alias_ = alias;
-    hasExplicitAlias_ = isExplicit;
+  public void setAliases(String[] aliases, boolean hasExplicitAlias) {
+    aliases_ = aliases;
+    hasExplicitAlias_ = hasExplicitAlias;
   }
-
+  public boolean hasExplicitAlias() { return hasExplicitAlias_; }
+  public String getAlias() { return (aliases_ != null) ? aliases_[0] : null; }
   public TableName getAliasAsName() {
-    if (hasExplicitAlias_) return new TableName(null, alias_);
-    return getTableName();
+    return (aliases_ != null) ? new TableName(null, aliases_[0]) : null;
   }
 
   public String debugString() {
-    String tblStr = (table_ == null ? "null" : table_.getFullName());
+    String tblStr = (getTable() == null ? "null" : getTable().getFullName());
     List<String> slotStrings = Lists.newArrayList();
     for (SlotDescriptor slot : slots_) {
       slotStrings.add(slot.debugString());
@@ -118,9 +161,9 @@ public class TupleDescriptor {
   public TTupleDescriptor toThrift() {
     TTupleDescriptor ttupleDesc =
         new TTupleDescriptor(id_.asInt(), byteSize_, numNullBytes_);
-    // do not set the table id for virtual tables such as views and inline views
-    if (table_ != null && !table_.isVirtualTable()) {
-      ttupleDesc.setTableId(table_.getId().asInt());
+    // do not set the table id for views
+    if (getTable() != null && !(getTable() instanceof View)) {
+      ttupleDesc.setTableId(getTable().getId().asInt());
     }
     return ttupleDesc;
   }

@@ -14,11 +14,14 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.List;
+
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /**
  * Represents a table/view name that optionally includes its database (a fully qualified
@@ -83,6 +86,13 @@ public class TableName {
     } else {
       return db_ + "." + tbl_;
     }
+  }
+
+  public List<String> toPath() {
+    List<String> result = Lists.newArrayListWithCapacity(2);
+    if (db_ != null) result.add(db_);
+    result.add(tbl_);
+    return result;
   }
 
   public static TableName fromThrift(TTableName tableName) {

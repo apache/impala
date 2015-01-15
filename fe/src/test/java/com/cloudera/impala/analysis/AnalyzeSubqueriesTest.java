@@ -282,11 +282,12 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     // Reference a non-existing table in the subquery
     AnalysisError("select * from functional.alltypestiny t where id in " +
         "(select id from functional.alltypessmall s left outer join p on " +
-        "(s.int_col = p.int_col))", "Table does not exist: default.p");
+        "(s.int_col = p.int_col))",
+        "Could not resolve table reference: 'p'");
     // Reference a non-existing column from a table in the outer scope
     AnalysisError("select * from functional.alltypestiny t where id in " +
         "(select id from functional.alltypessmall s where s.int_col = t.bad_col)",
-        "couldn't resolve column reference: 't.bad_col'");
+        "Could not resolve column/field reference: 't.bad_col'");
 
     // Referencing the same table in the inner and the outer query block
     // No explicit alias
@@ -523,7 +524,7 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     // Subquery references an explicit alias from the outer block in the FROM
     // clause
     AnalysisError("select * from functional.alltypestiny t where " +
-        "exists (select * from t)", "Table does not exist: default.t");
+        "exists (select * from t)", "Could not resolve table reference: 't'");
     // Uncorrelated subquery with no FROM clause
     AnalyzesOk("select * from functional.alltypes where exists (select 1,2)");
     // EXISTS subquery in a binary predicate
@@ -698,13 +699,13 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     // Outer join with a table from the outer block using an explicit alias
     AnalysisError("select id from functional.alltypestiny t where int_col = " +
         "(select count(*) from functional.alltypessmall s left outer join t " +
-        "on (t.id = s.id))", "Table does not exist: default.t");
+        "on (t.id = s.id))", "Could not resolve table reference: 't'");
     AnalysisError("select id from functional.alltypestiny t where int_col = " +
         "(select count(*) from functional.alltypessmall s right outer join t " +
-        "on (t.id = s.id))", "Table does not exist: default.t");
+        "on (t.id = s.id))", "Could not resolve table reference: 't'");
     AnalysisError("select id from functional.alltypestiny t where int_col = " +
         "(select count(*) from functional.alltypessmall s full outer join t " +
-        "on (t.id = s.id))", "Table does not exist: default.t");
+        "on (t.id = s.id))", "Could not resolve table reference: 't'");
 
     // Multiple subqueries in a binary predicate
     AnalysisError("select * from functional.alltypestiny t where " +
@@ -870,6 +871,25 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
 
   @Test
   public void TestSubqueries() throws AnalysisException {
+    // Test resolution of column references inside subqueries.
+    // Correlated column references can be qualified or unqualified.
+    AnalyzesOk("select * from functional.jointbl t where exists " +
+        "(select id from functional.alltypes where id = test_id and id = t.test_id)");
+    // Correlated column references are invalid outside of WHERE and ON clauses.
+    AnalysisError("select * from functional.jointbl t where exists " +
+        "(select t.test_id = id from functional.alltypes)",
+        "Could not resolve column/field reference: 't.test_id'");
+    AnalysisError("select * from functional.jointbl t where test_zip in " +
+        "(select count(*) from functional.alltypes group by t.test_id)",
+        "Could not resolve column/field reference: 't.test_id'");
+    AnalysisError("select * from functional.jointbl t where exists " +
+        "(select 1 from functional.alltypes order by t.test_id limit 1)",
+        "Could not resolve column/field reference: 't.test_id'");
+    // Star exprs cannot reference an alias from a parent block.
+    AnalysisError("select * from functional.jointbl t where exists " +
+        "(select t.* from functional.alltypes)",
+        "Could not resolve star expression: 't.*'");
+
     // EXISTS, IN and aggregate subqueries
     AnalyzesOk("select * from functional.alltypes t where exists " +
         "(select * from functional.alltypesagg a where a.int_col = " +
@@ -949,14 +969,14 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     // Inner block references an inline view in the outer block
     AnalysisError("select id from (select * from functional.alltypestiny) t " +
         "where t.int_col = (select count(*) from t)",
-        "Table does not exist: default.t");
+        "Could not resolve table reference: 't'");
     AnalysisError("select id from (select * from functional.alltypestiny) t " +
         "where t.int_col = (select count(*) from t) and " +
         "t.string_col in (select string_col from t)",
-        "Table does not exist: default.t");
+        "Could not resolve table reference: 't'");
     AnalysisError("select id from (select * from functional.alltypestiny) t " +
         "where exists (select * from t, functional.alltypesagg p where " +
-        "t.id = p.id)", "Table does not exist: default.t");
+        "t.id = p.id)", "Could not resolve table reference: 't'");
 
     // Subquery referencing a view
     AnalyzesOk("select * from functional.alltypes a where exists " +

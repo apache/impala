@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.Set;
+
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
@@ -22,8 +24,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-
-import java.util.Set;
 
 /**
  * Representation of an EXTRACT(<Time Unit> FROM <Datetime Expr>) expression. EXTRACT(
@@ -62,6 +62,7 @@ public class ExtractFromExpr extends FunctionCallExpr {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    getFnName().analyze(analyzer);
     if (!getFnName().getFunction().equals("extract")) {
       throw new AnalysisException("Function " + getFnName().getFunction().toUpperCase()
           + " does not accept the keyword FROM.");

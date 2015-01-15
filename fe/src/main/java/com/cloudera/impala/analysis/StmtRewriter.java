@@ -542,7 +542,7 @@ public class StmtRewriter {
     ArrayList<SelectListItem> newItems = Lists.newArrayList();
     for (int i = 0; i < stmt.selectList_.getItems().size(); ++i) {
       SelectListItem item = stmt.selectList_.getItems().get(i);
-      if (!item.isStar() || item.getTblName() != null) {
+      if (!item.isStar() || item.getRawPath() != null) {
         newItems.add(item);
         continue;
       }
@@ -554,7 +554,8 @@ public class StmtRewriter {
             tableRef.getJoinOp() == JoinOperator.LEFT_ANTI_JOIN) {
           continue;
         }
-        newItems.add(SelectListItem.createStarItem(tableRef.getAliasAsName()));
+        newItems.add(SelectListItem.createStarItem(
+            Lists.newArrayList(tableRef.getUniqueAlias())));
       }
     }
     Preconditions.checkState(!newItems.isEmpty());
@@ -739,7 +740,7 @@ public class StmtRewriter {
       items.add(new SelectListItem(boundExpr, null));
       inlineView.getExplicitColLabels().add(colAlias);
       lhsExprs.add(boundExpr);
-      rhsExprs.add(new SlotRef(inlineView.getAliasAsName(), colAlias));
+      rhsExprs.add(new SlotRef(Lists.newArrayList(inlineView.getUniqueAlias(), colAlias)));
       if (groupByExprs != null) groupByExprs.add(boundExpr);
     }
 
@@ -812,8 +813,8 @@ public class StmtRewriter {
     Preconditions.checkState(exprWithSubquery.contains(Subquery.class));
     if (exprWithSubquery instanceof ExistsPredicate) return null;
     // Create a SlotRef from the first item of inlineView's select list
-    SlotRef slotRef = new SlotRef(new TableName(null, inlineView.getAlias()),
-        inlineView.getColLabels().get(0));
+    SlotRef slotRef = new SlotRef(Lists.newArrayList(
+        inlineView.getUniqueAlias(), inlineView.getColLabels().get(0)));
     slotRef.analyze(analyzer);
     Expr subquerySubstitute = slotRef;
     if (exprWithSubquery instanceof InPredicate) {

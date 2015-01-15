@@ -54,7 +54,7 @@ public class TypeDef implements ParseNode {
       analyzeStructType((StructType) type, analyzer);
     } else if (type.isArrayType()) {
       ArrayType arrayType = (ArrayType) type;
-      analyze(arrayType.getElementType(), analyzer);
+      analyze(arrayType.getItemType(), analyzer);
     } else {
       Preconditions.checkState(type.isMapType());
       analyzeMapType((MapType) type, analyzer);

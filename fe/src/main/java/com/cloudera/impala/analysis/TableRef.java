@@ -18,28 +18,47 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import com.cloudera.impala.analysis.Path.PathType;
 import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.TableLoadingException;
+import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.planner.PlanNode;
+import com.cloudera.impala.thrift.TAccessEvent;
+import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 /**
- * Superclass of all table references, including references to inline views, catalog or
- * local views, or base tables (Hdfs, HBase or DataSource tables). Contains the join
+ * Superclass of all table references, including references to views, base tables
+ * (Hdfs, HBase or DataSource tables), and nested collections. Contains the join
  * specification. An instance of a TableRef (and not a subclass thereof) represents
  * an unresolved table reference that must be resolved during analysis. All resolved
  * table references are subclasses of TableRef.
+ * TODO: Rename this class to CollectionRef and re-consider the naming of all subclasses.
  */
 public class TableRef implements ParseNode {
-  // Table or view name that is fully qualified in analyze().
-  // Equivalent to alias_ for local view refs.
-  protected TableName name_;
-  protected final String alias_;
+  // Path to a collection type. Not set for inline views.
+  protected List<String> rawPath_;
+
+  // Resolution of rawPath_ if applicable. Result of analysis.
+  protected Path resolvedPath_;
+
+  // Legal aliases of this table ref. Contains the explicit alias as its sole element if
+  // there is one. Otherwise, contains the two implicit aliases. Implicit aliases are set
+  // in the c'tor of the corresponding resolved table ref (subclasses of TableRef) during
+  // analysis. By convention, for table refs with multiple implicit aliases, aliases_[0]
+  // contains the fully-qualified implicit alias to ensure that aliases_[0] always
+  // uniquely identifies this table ref regardless of whether it has an explicit alias.
+  protected String[] aliases_;
+
+  // Indicates whether this table ref is given an explicit alias,
+  protected boolean hasExplicitAlias_;
 
   protected JoinOperator joinOp_;
   protected ArrayList<String> joinHints_;
@@ -63,10 +82,15 @@ public class TableRef implements ParseNode {
   // analysis output
   protected TupleDescriptor desc_;
 
-  public TableRef(TableName tableName, String alias) {
+  public TableRef(List<String> path, String alias) {
     super();
-    name_ = tableName;
-    alias_ = alias;
+    rawPath_ = path;
+    if (alias != null) {
+      aliases_ = new String[] { alias.toLowerCase() };
+      hasExplicitAlias_ = true;
+    } else {
+      hasExplicitAlias_ = false;
+    }
     isAnalyzed_ = false;
   }
 
@@ -75,30 +99,79 @@ public class TableRef implements ParseNode {
    */
   protected TableRef(TableRef other) {
     super();
-    this.name_ = other.name_;
-    this.alias_ = other.alias_;
+    Preconditions.checkNotNull(other);
+    this.rawPath_ = other.rawPath_;
+    this.resolvedPath_ = other.resolvedPath_;
+    this.aliases_ = other.aliases_;
+    this.hasExplicitAlias_ = other.hasExplicitAlias_;
     this.joinOp_ = other.joinOp_;
     this.joinHints_ =
         (other.joinHints_ != null) ? Lists.newArrayList(other.joinHints_) : null;
     this.usingColNames_ =
         (other.usingColNames_ != null) ? Lists.newArrayList(other.usingColNames_) : null;
     this.onClause_ = (other.onClause_ != null) ? other.onClause_.clone().reset() : null;
-    isAnalyzed_ = false;
+    this.isAnalyzed_ = false;
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    throw new AnalysisException("Unresolved table reference: " + tableRefToSql());
+    try {
+      resolvedPath_ = analyzer.resolvePath(rawPath_, PathType.TABLE_REF);
+    } catch (AnalysisException e) {
+      if (!analyzer.hasMissingTbls()) {
+        // Register privilege requests to prefer reporting an authorization error over
+        // an analysis error. We should not accidentally reveal the non-existence of a
+        // table/database if the user is not authorized.
+        if (rawPath_.size() > 1) {
+          analyzer.registerPrivReq(new PrivilegeRequestBuilder()
+              .onTable(rawPath_.get(0), rawPath_.get(1))
+              .allOf(getPrivilegeRequirement()).toRequest());
+        }
+        analyzer.registerPrivReq(new PrivilegeRequestBuilder()
+            .onTable(analyzer.getDefaultDb(), rawPath_.get(0))
+            .allOf(getPrivilegeRequirement()).toRequest());
+      }
+      throw e;
+    } catch (TableLoadingException e) {
+      throw new AnalysisException(String.format(
+          "Failed to load metadata for table: '%s'", Joiner.on(".").join(rawPath_)), e);
+    }
+
+    if (resolvedPath_.getRootTable() != null) {
+      // Add access event for auditing.
+      Table table = resolvedPath_.getRootTable();
+      if (table instanceof View) {
+        View view = (View) table;
+        if (!view.isLocalView()) {
+          analyzer.addAccessEvent(new TAccessEvent(
+              table.getFullName(), TCatalogObjectType.VIEW,
+              getPrivilegeRequirement().toString()));
+        }
+      } else {
+        analyzer.addAccessEvent(new TAccessEvent(
+            table.getFullName(), TCatalogObjectType.TABLE,
+            getPrivilegeRequirement().toString()));
+      }
+
+      // Add privilege requests for authorization.
+      TableName tableName = table.getTableName();
+      analyzer.registerPrivReq(new PrivilegeRequestBuilder()
+          .onTable(tableName.getDb(), tableName.getTbl())
+          .allOf(getPrivilegeRequirement()).toRequest());
+    }
   }
 
   /**
-   * Creates and returns a empty TupleDescriptor registered with the analyzer. The
-   * returned tuple descriptor must have its source table set via descTbl.setTable()).
+   * Creates and returns a empty TupleDescriptor registered with the analyzer
+   * based on the resolvedPath_.
    * This method is called from the analyzer when registering this table reference.
    */
   public TupleDescriptor createTupleDescriptor(Analyzer analyzer)
       throws AnalysisException {
-    throw new AnalysisException("Unresolved table reference: " + tableRefToSql());
+    TupleDescriptor result = analyzer.getDescTbl().createTupleDescriptor(
+        getClass().getSimpleName() + " " + getUniqueAlias());
+    result.setPath(resolvedPath_);
+    return result;
   }
 
   /**
@@ -117,38 +190,49 @@ public class TableRef implements ParseNode {
     return (joinOp_ == null ? JoinOperator.INNER_JOIN : joinOp_);
   }
 
-  public TableName getName() { return name_; }
+  /**
+   * Returns true if the path of this table ref is is rooted at a
+   * registered parent ref.
+   */
+  public boolean isChildRef() { return false; }
+
+  public List<String> getPath() { return rawPath_; }
+  public Path getResolvedPath() { return resolvedPath_; }
 
   /**
-   * Replaces name_ with the fully-qualified table name.
+   * Returns all legal aliases of this table ref.
    */
-  protected void setFullyQualifiedTableName(Analyzer analyzer) {
-    name_ = analyzer.getFqTableName(name_);
-  }
+  public String[] getAliases() { return aliases_; }
+
+  /**
+   * Returns the explicit alias or the fully-qualified implicit alias. The returned alias
+   * is guaranteed to be unique (i.e., column/field references against the alias cannot
+   * be ambiguous).
+   */
+  public String getUniqueAlias() { return aliases_[0]; }
 
   /**
    * Returns true if this table ref has an explicit alias.
+   * Note that getAliases().length() == 1 does not imply an explicit alias because
+   * nested collection refs have only a single implicit alias.
    */
-  public boolean hasExplicitAlias() { return alias_ != null; }
+  public boolean hasExplicitAlias() { return hasExplicitAlias_; }
 
   /**
-   * Return alias by which this table is referenced in select block.
+   * Returns the explicit alias if this table ref has one, null otherwise.
    */
-  public String getAlias() {
-    if (alias_ == null) return name_.toString().toLowerCase();
-    return alias_;
+  public String getExplicitAlias() {
+    if (hasExplicitAlias()) return getUniqueAlias();
+    return null;
   }
 
-  public TableName getAliasAsName() {
-    if (alias_ != null) return new TableName(null, alias_);
-    return name_;
+  public Table getTable() {
+    Preconditions.checkNotNull(resolvedPath_);
+    return resolvedPath_.getRootTable();
   }
-
   public ArrayList<String> getJoinHints() { return joinHints_; }
   public Expr getOnClause() { return onClause_; }
   public List<String> getUsingClause() { return usingColNames_; }
-  public String getExplicitAlias() { return alias_; }
-  public Table getTable() { return getDesc().getTable(); }
   public void setJoinOp(JoinOperator op) { this.joinOp_ = op; }
   public void setOnClause(Expr e) { this.onClause_ = e; }
   public void setUsingClause(List<String> colNames) { this.usingColNames_ = colNames; }
@@ -267,39 +351,39 @@ public class TableRef implements ParseNode {
       for (String colName: usingColNames_) {
         // check whether colName exists both for our table and the one
         // to the left of us
-        if (leftTblRef_.getDesc().getTable().getColumn(colName) == null) {
+        Path leftColPath = new Path(leftTblRef_.getDesc(),
+            Lists.newArrayList(colName.toLowerCase()));
+        if (!leftColPath.resolve()) {
           throw new AnalysisException(
               "unknown column " + colName + " for alias "
-              + leftTblRef_.getAlias() + " (in \"" + this.toSql() + "\")");
+              + leftTblRef_.getUniqueAlias() + " (in \"" + this.toSql() + "\")");
         }
-        if (desc_.getTable().getColumn(colName) == null) {
+        Path rightColPath = new Path(desc_,
+            Lists.newArrayList(colName.toLowerCase()));
+        if (!rightColPath.resolve()) {
           throw new AnalysisException(
               "unknown column " + colName + " for alias "
-              + getAlias() + " (in \"" + this.toSql() + "\")");
+              + getUniqueAlias() + " (in \"" + this.toSql() + "\")");
         }
 
         // create predicate "<left>.colName = <right>.colName"
         BinaryPredicate eqPred =
             new BinaryPredicate(BinaryPredicate.Operator.EQ,
-              new SlotRef(leftTblRef_.getAliasAsName(), colName),
-              new SlotRef(getAliasAsName(), colName));
+              new SlotRef(Path.createRawPath(leftTblRef_.getUniqueAlias(), colName)),
+              new SlotRef(Path.createRawPath(getUniqueAlias(), colName)));
         onClause_ = CompoundPredicate.createConjunction(eqPred, onClause_);
       }
     }
 
     // at this point, both 'this' and leftTblRef have been analyzed and registered;
     // register the tuple ids of the TableRefs on the nullable side of an outer join
-    boolean lhsIsNullable = false;
-    boolean rhsIsNullable = false;
     if (joinOp_ == JoinOperator.LEFT_OUTER_JOIN
         || joinOp_ == JoinOperator.FULL_OUTER_JOIN) {
       analyzer.registerOuterJoinedTids(getId().asList(), this);
-      rhsIsNullable = true;
     }
     if (joinOp_ == JoinOperator.RIGHT_OUTER_JOIN
         || joinOp_ == JoinOperator.FULL_OUTER_JOIN) {
       analyzer.registerOuterJoinedTids(leftTblRef_.getAllTupleIds(), this);
-      lhsIsNullable = true;
     }
     // register the tuple ids of a full outer join
     if (joinOp_ == JoinOperator.FULL_OUTER_JOIN) {
@@ -348,7 +432,8 @@ public class TableRef implements ParseNode {
         onClauseTupleIds.addAll(tupleIds);
       }
       onClauseTupleIds_.addAll(onClauseTupleIds);
-    } else if (getJoinOp().isOuterJoin() || getJoinOp().isSemiJoin()) {
+    } else if (!isChildRef()
+        && (getJoinOp().isOuterJoin() || getJoinOp().isSemiJoin())) {
       throw new AnalysisException(joinOp_.toString() + " requires an ON or USING clause.");
     }
   }
@@ -381,11 +466,12 @@ public class TableRef implements ParseNode {
   }
 
   protected String tableRefToSql() {
-    // Enclose the alias in quotes if Hive cannot parse it without quotes.
-    // This is needed for view compatibility between Impala and Hive.
     String aliasSql = null;
-    if (alias_ != null) aliasSql = ToSqlUtils.getIdentSql(alias_);
-    return name_.toSql() + ((aliasSql != null) ? " " + aliasSql : "");
+    String alias = getExplicitAlias();
+    if (alias != null) aliasSql = ToSqlUtils.getIdentSql(alias);
+    List<String> path = rawPath_;
+    if (resolvedPath_ != null) path = resolvedPath_.getFullyQualifiedRawPath();
+    return ToSqlUtils.getPathSql(path) + ((aliasSql != null) ? " " + aliasSql : "");
   }
 
   @Override

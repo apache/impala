@@ -37,7 +37,4 @@ public class MapType extends Type {
     keyType_.toThrift(container);
     valueType_.toThrift(container);
   }
-
-  @Override
-  public boolean matchesType(Type t) { return false; }
 }

@@ -238,7 +238,7 @@ public class DataSourceScanNode extends ScanNode {
       TColumnValue val = literalToColumnValue(literalExpr);
       if (val == null) return false; // false if unsupported type, e.g.
 
-      TColumnDesc col = new TColumnDesc().setName(slotRef.getColumnName())
+      TColumnDesc col = new TColumnDesc().setName(slotRef.getMatchedPath())
           .setType(slotRef.getType().toThrift());
       predicates.add(new TBinaryPredicate().setCol(col).setOp(op).setValue(val));
       return true;

@@ -17,11 +17,19 @@ package com.cloudera.impala.analysis;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Date;
-import java.util.TreeSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
+
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.Id;
@@ -34,14 +42,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.json.simple.JSONObject;
-import org.json.simple.JSONArray;
-import org.json.simple.JSONValue;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
 
 /**
  * Represents a vertex in the column lineage graph. A Vertex may correspond to a base
@@ -143,6 +143,7 @@ final class MultiEdge {
     edgeType_ = type;
   }
 
+  @Override
   public String toString() {
     StringBuilder builder = new StringBuilder();
     Joiner joiner = Joiner.on(",");

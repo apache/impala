@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
@@ -43,7 +44,7 @@ public class ShowCreateTableStmt extends StatementBase {
       tableName_ = new TableName(analyzer.getDefaultDb(), tableName_.getTbl());
     }
     Table table = analyzer.getTable(tableName_, Privilege.VIEW_METADATA);
-    if (table.isVirtualTable()) {
+    if (table instanceof View) {
       throw new AnalysisException("SHOW CREATE TABLE not supported on VIEW: " +
           tableName_.toString());
     }

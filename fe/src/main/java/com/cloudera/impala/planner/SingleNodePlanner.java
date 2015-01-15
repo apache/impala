@@ -274,14 +274,14 @@ public class SingleNodePlanner {
         // use 0 for the size to avoid it becoming the leftmost input
         // TODO: Consider raw size of scanned partitions in the absence of stats.
         candidates.add(new Pair(ref, new Long(0)));
-        LOG.trace("candidate " + ref.getAlias() + ": 0");
+        LOG.trace("candidate " + ref.getUniqueAlias() + ": 0");
         continue;
       }
       Preconditions.checkNotNull(ref.getDesc());
       long materializedSize =
           (long) Math.ceil(plan.getAvgRowSize() * (double) plan.getCardinality());
       candidates.add(new Pair(ref, new Long(materializedSize)));
-      LOG.trace("candidate " + ref.getAlias() + ": " + Long.toString(materializedSize));
+      LOG.trace("candidate " + ref.getUniqueAlias() + ": " + Long.toString(materializedSize));
     }
     if (candidates.isEmpty()) return null;
 
@@ -311,7 +311,7 @@ public class SingleNodePlanner {
       Analyzer analyzer, TableRef leftmostRef, List<Pair<TableRef, PlanNode>> refPlans)
       throws ImpalaException {
 
-    LOG.trace("createJoinPlan: " + leftmostRef.getAlias());
+    LOG.trace("createJoinPlan: " + leftmostRef.getUniqueAlias());
     // the refs that have yet to be joined
     List<Pair<TableRef, PlanNode>> remainingRefs = Lists.newArrayList();
     PlanNode root = null;  // root of accumulated join plan
@@ -350,7 +350,7 @@ public class SingleNodePlanner {
       Pair<TableRef, PlanNode> minEntry = null;
       for (Pair<TableRef, PlanNode> entry: remainingRefs) {
         TableRef ref = entry.first;
-        LOG.trace(Integer.toString(i) + " considering ref " + ref.getAlias());
+        LOG.trace(Integer.toString(i) + " considering ref " + ref.getUniqueAlias());
 
         // Determine whether we can or must consider this join at this point in the plan.
         // Place outer/semi joins at a fixed position in the plan tree (IMPALA-860),
@@ -441,7 +441,7 @@ public class SingleNodePlanner {
       long lhsCardinality = root.getCardinality();
       long rhsCardinality = minEntry.second.getCardinality();
       numOps += lhsCardinality + rhsCardinality;
-      LOG.debug(Integer.toString(i) + " chose " + minEntry.first.getAlias()
+      LOG.debug(Integer.toString(i) + " chose " + minEntry.first.getUniqueAlias()
           + " #lhs=" + Long.toString(lhsCardinality)
           + " #rhs=" + Long.toString(rhsCardinality)
           + " #ops=" + Long.toString(numOps));
@@ -1019,7 +1019,7 @@ public class SingleNodePlanner {
             String.format("%s join with '%s' without equi-join " +
             "conjuncts is not supported.",
             tblRef.getJoinOp().isOuterJoin() ? "Outer" : "Semi",
-            innerRef.getAliasAsName()));
+            innerRef.getUniqueAlias()));
       }
       CrossJoinNode result = new CrossJoinNode(outer, inner);
       result.init(analyzer);

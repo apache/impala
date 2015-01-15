@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
@@ -24,11 +23,16 @@ import com.google.common.base.Preconditions;
  * of a SelectStmt.
  */
 public class BaseTableRef extends TableRef {
-  private final Table table_;
-
-  public BaseTableRef(TableRef tableRef, Table table) {
+  public BaseTableRef(TableRef tableRef, Path resolvedPath) {
     super(tableRef);
-    table_ = table;
+    resolvedPath_ = resolvedPath;
+    Preconditions.checkState(resolvedPath_.isResolved());
+    Preconditions.checkNotNull(resolvedPath_.getRootTable());
+    // Set implicit aliases if no explicit one was given.
+    if (hasExplicitAlias()) return;
+    aliases_ = new String[] {
+        getTable().getTableName().toString().toLowerCase(),
+        getTable().getName().toLowerCase() };
   }
 
   /**
@@ -36,7 +40,6 @@ public class BaseTableRef extends TableRef {
    */
   private BaseTableRef(BaseTableRef other) {
     super(other);
-    table_ = other.table_;
   }
 
   /**
@@ -45,21 +48,23 @@ public class BaseTableRef extends TableRef {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkNotNull(getPrivilegeRequirement());
-    setFullyQualifiedTableName(analyzer);
     desc_ = analyzer.registerTableRef(this);
-    isAnalyzed_ = true;  // true that we have assigned desc
+    isAnalyzed_ = true;
     analyzeJoin(analyzer);
   }
 
   @Override
-  public TupleDescriptor createTupleDescriptor(Analyzer analyzer)
-      throws AnalysisException {
-    TupleDescriptor result = analyzer.getDescTbl().createTupleDescriptor("basetbl");
-    result.setTable(table_);
-    return result;
+  protected String tableRefToSql() {
+    // Enclose the alias in quotes if Hive cannot parse it without quotes.
+    // This is needed for view compatibility between Impala and Hive.
+    String aliasSql = null;
+    String alias = getExplicitAlias();
+    if (alias != null) aliasSql = ToSqlUtils.getIdentSql(alias);
+    return getTable().getTableName().toSql() +
+        ((aliasSql != null) ? " " + aliasSql : "");
   }
 
+  public String debugString() { return tableRefToSql(); }
   @Override
   public TableRef clone() { return new BaseTableRef(this); }
-  public String debugString() { return tableRefToSql(); }
 }

@@ -75,7 +75,7 @@ public class FunctionCallExpr extends Expr {
    */
   public static Expr createExpr(FunctionName fnName, FunctionParams params) {
     FunctionCallExpr functionCallExpr = new FunctionCallExpr(fnName, params);
-    if (fnName.getFunction().equals("decode")
+    if (fnName.getFnNamePath().get(0).equals("decode")
         && (fnName.getDb() == null) || Catalog.BUILTINS_DB.equals(fnName.getDb())) {
       // If someone created the DECODE function before it became a builtin, they can
       // continue to use it by the fully qualified name.
@@ -229,7 +229,7 @@ public class FunctionCallExpr extends Expr {
   // TODO: should we bother to do this? We could also improve the general
   // error messages. For example, listing the alternatives.
   protected String getFunctionNotFoundError(Type[] argTypes) {
-    if (fnName_.isBuiltin_) {
+    if (fnName_.isBuiltin()) {
       // Some custom error message for builtins
       if (params_.isStar()) {
         return "'*' can only be used in conjunction with COUNT";
@@ -365,7 +365,7 @@ public class FunctionCallExpr extends Expr {
     Type[] argTypes = collectChildReturnTypes();
 
     // User needs DB access.
-    Db db = analyzer.getDb(fnName_.getDb(), Privilege.VIEW_METADATA);
+    Db db = analyzer.getDb(fnName_.getDb(), Privilege.VIEW_METADATA, true);
     if (!db.containsFunction(fnName_.getFunction())) {
       throw new AnalysisException(fnName_ + "() unknown");
     }

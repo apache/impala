@@ -203,11 +203,8 @@ public abstract class QueryStmt extends StatementBase {
       SlotDescriptor origSlotDesc = origSlotRef.getDesc();
       SlotDescriptor materializedDesc = analyzer.addSlotDescriptor(sortTupleDesc);
       Column origColumn = origSlotDesc.getColumn();
-      if (origColumn != null) {
-        materializedDesc.setColumn(origColumn);
-      } else {
-        materializedDesc.setType(origSlotDesc.getType());
-      }
+      if (origColumn != null) materializedDesc.setColumn(origColumn);
+      materializedDesc.setType(origSlotDesc.getType());
       materializedDesc.setLabel(origSlotDesc.getLabel());
       materializedDesc.setSourceExprs(origSlotDesc.getSourceExprs());
       materializedDesc.setStats(ColumnStats.fromExpr(origSlotRef));

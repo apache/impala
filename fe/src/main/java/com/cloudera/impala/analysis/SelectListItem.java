@@ -14,42 +14,58 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.List;
+
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 
 class SelectListItem {
   private final Expr expr_;
   private String alias_;
 
-  // for "[name.]*"
-  private final TableName tblName_;
+  // for "[path.]*" (excludes trailing '*')
+  private final List<String> rawPath_;
   private final boolean isStar_;
 
   public SelectListItem(Expr expr, String alias) {
     super();
     Preconditions.checkNotNull(expr);
-    this.expr_ = expr;
-    this.alias_ = alias;
-    this.tblName_ = null;
-    this.isStar_ = false;
+    expr_ = expr;
+    alias_ = alias;
+    isStar_ = false;
+    rawPath_ = null;
   }
 
-  // select list item corresponding to "[[db.]tbl.]*"
-  static public SelectListItem createStarItem(TableName tblName) {
-    return new SelectListItem(tblName);
+  // select list item corresponding to path_to_struct.*
+  static public SelectListItem createStarItem(List<String> rawPath) {
+    return new SelectListItem(rawPath);
   }
 
-  private SelectListItem(TableName tblName) {
+  private SelectListItem(List<String> path) {
     super();
-    this.expr_ = null;
-    this.tblName_ = tblName;
-    this.isStar_ = true;
+    expr_ = null;
+    isStar_ = true;
+    rawPath_ = path;
   }
 
-  public boolean isStar() { return isStar_; }
-  public TableName getTblName() { return tblName_; }
   public Expr getExpr() { return expr_; }
+  public boolean isStar() { return isStar_; }
   public String getAlias() { return alias_; }
   public void setAlias(String alias) { alias_ = alias; }
+  public List<String> getRawPath() { return rawPath_; }
+
+  @Override
+  public String toString() {
+    if (!isStar_) {
+      Preconditions.checkNotNull(expr_);
+      return expr_.toSql() + ((alias_ != null) ? " " + alias_ : "");
+    } else if (rawPath_ != null) {
+      Preconditions.checkState(isStar_);
+      return Joiner.on(".").join(rawPath_) + ".*";
+    } else {
+      return "*";
+    }
+  }
 
   public String toSql() {
     if (!isStar_) {
@@ -59,8 +75,15 @@ class SelectListItem {
       String aliasSql = null;
       if (alias_ != null) aliasSql = ToSqlUtils.getIdentSql(alias_);
       return expr_.toSql() + ((aliasSql != null) ? " " + aliasSql : "");
-    } else if (tblName_ != null) {
-      return tblName_.toString() + ".*" + ((alias_ != null) ? " " + alias_ : "");
+    } else if (rawPath_ != null) {
+      Preconditions.checkState(isStar_);
+      StringBuilder result = new StringBuilder();
+      for (String p: rawPath_) {
+        if (result.length() > 0) result.append(".");
+        result.append(ToSqlUtils.getIdentSql(p.toLowerCase()));
+      }
+      result.append(".*");
+      return result.toString();
     } else {
       return "*";
     }
@@ -82,7 +105,7 @@ class SelectListItem {
     if (alias_ != null) return alias_.toLowerCase();
     if (expr_ instanceof SlotRef) {
       SlotRef slotRef = (SlotRef) expr_;
-      return slotRef.getColumnName().toLowerCase();
+      return slotRef.getMatchedPath().toLowerCase();
     }
     // Optionally return auto-generated column label.
     if (useHiveColLabels) return "_c" + selectListPos;
@@ -96,7 +119,7 @@ class SelectListItem {
 
   @Override
   public SelectListItem clone() {
-    if (isStar_) return createStarItem(tblName_);
+    if (isStar_) return createStarItem(rawPath_);
     return new SelectListItem(expr_.clone().reset(), alias_);
   }
 

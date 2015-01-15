@@ -246,6 +246,13 @@ public class AuthorizationTest {
   }
 
   @Test
+  public void TestFix() throws AnalysisException {
+    AuthzError("select * from functional.complex_view_sub",
+        "User '%s' does not have privileges to execute 'SELECT' on: " +
+        "functional.complex_view_sub");
+  }
+
+  @Test
   public void TestSentryService() throws ImpalaException {
     SentryPolicyService sentryService =
         new SentryPolicyService(authzConfig_.getSentryConfig());
@@ -824,7 +831,7 @@ public class AuthorizationTest {
   }
 
   @Test
-  public void AlterTable() throws AnalysisException, AuthorizationException {
+  public void TestAlterTable() throws AnalysisException, AuthorizationException {
     // User has permissions to modify tables.
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes ADD COLUMNS (c1 int)");
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes REPLACE COLUMNS (c1 int)");

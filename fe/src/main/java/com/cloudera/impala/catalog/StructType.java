@@ -21,11 +21,15 @@ public class StructType extends Type {
 
   public StructType(ArrayList<StructField> fields) {
     Preconditions.checkNotNull(fields);
-    Preconditions.checkState(!fields.isEmpty());
     fields_ = fields;
-    for (StructField field : fields_) {
-      fieldMap_.put(field.getName().toLowerCase(), field);
+    for (int i = 0; i < fields_.size(); ++i) {
+      fields_.get(i).setPosition(i);
+      fieldMap_.put(fields_.get(i).getName().toLowerCase(), fields_.get(i));
     }
+  }
+
+  public StructType() {
+    fields_ = Lists.newArrayList();
   }
 
   @Override
@@ -37,10 +41,28 @@ public class StructType extends Type {
     return String.format("STRUCT<%s>", Joiner.on(",").join(fieldsSql));
   }
 
+  public void addField(StructField field) {
+    field.setPosition(fields_.size());
+    fields_.add(field);
+    fieldMap_.put(field.getName().toLowerCase(), field);
+  }
+
   public ArrayList<StructField> getFields() { return fields_; }
 
   public StructField getField(String fieldName) {
     return fieldMap_.get(fieldName.toLowerCase());
+  }
+
+  public void clearFields() {
+    fields_.clear();
+    fieldMap_.clear();
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (!(other instanceof StructType)) return false;
+    StructType otherStructType = (StructType) other;
+    return otherStructType.getFields().equals(fields_);
   }
 
   @Override
@@ -55,7 +77,4 @@ public class StructType extends Type {
       field.toThrift(container, node);
     }
   }
-
-  @Override
-  public boolean matchesType(Type t) { return false; }
 }

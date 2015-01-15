@@ -562,8 +562,8 @@ public class InsertStmt extends StatementBase {
     // We don't allow casting to a lower precision type.
     Type colType = column.getType();
     Type exprType = expr.getType();
-    // Trivially compatible.
-    if (colType.equals(exprType)) return expr;
+    // Trivially compatible, unless the type is complex.
+    if (colType.equals(exprType) && !colType.isComplexType()) return expr;
 
     Type compatibleType =
         Type.getAssignmentCompatibleType(colType, exprType);
@@ -573,7 +573,8 @@ public class InsertStmt extends StatementBase {
           String.format(
             "Target table '%s' is incompatible with SELECT / PARTITION expressions.\n" +
             "Expression '%s' (type: %s) is not compatible with column '%s' (type: %s)",
-            targetTableName_, expr.toSql(), exprType, column.getName(), colType));
+            targetTableName_, expr.toSql(), exprType.toSql(), column.getName(),
+            colType.toSql()));
     }
     // Loss of precision when inserting into the table.
     if (!compatibleType.equals(colType) && !compatibleType.isNull()) {
@@ -581,8 +582,8 @@ public class InsertStmt extends StatementBase {
           String.format("Possible loss of precision for target table '%s'.\n" +
                         "Expression '%s' (type: %s) would need to be cast to %s" +
                         " for column '%s'",
-                        targetTableName_, expr.toSql(), exprType, colType,
-                        column.getName()));
+                        targetTableName_, expr.toSql(), exprType.toSql(),
+                        colType.toSql(), column.getName()));
     }
     // Add a cast to the selectListExpr to the higher type.
     return expr.castTo(compatibleType);

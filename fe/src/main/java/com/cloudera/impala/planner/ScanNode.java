@@ -89,7 +89,7 @@ abstract public class ScanNode extends PlanNode {
     // Column stats.
     List<String> columnsMissingStats = Lists.newArrayList();
     for (SlotDescriptor slot: desc_.getSlots()) {
-      if (!slot.getStats().hasStats()) {
+      if (!slot.getStats().hasStats() && slot.getColumn() != null) {
         columnsMissingStats.add(slot.getColumn().getName());
       }
     }

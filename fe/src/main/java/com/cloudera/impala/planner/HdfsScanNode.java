@@ -461,7 +461,7 @@ public class HdfsScanNode extends ScanNode {
     // start with creating a collection of partition filters for the applicable conjuncts
     List<SlotId> partitionSlots = Lists.newArrayList();
     for (SlotDescriptor slotDesc: descTbl.getTupleDesc(tupleIds_.get(0)).getSlots()) {
-      Preconditions.checkState(slotDesc.getColumn() != null);
+      if (slotDesc.getColumn() == null) continue;
       if (slotDesc.getColumn().getPosition() < tbl_.getNumClusteringCols()) {
         partitionSlots.add(slotDesc.getId());
       }
@@ -629,12 +629,15 @@ public class HdfsScanNode extends ScanNode {
   @Override
   protected String getDisplayLabelDetail() {
     HdfsTable table = (HdfsTable) desc_.getTable();
-    String result = table.getFullName();
-    if (!table.getFullName().equalsIgnoreCase(desc_.getAlias()) &&
-        !table.getName().equalsIgnoreCase(desc_.getAlias())) {
-      result = result + " " + desc_.getAlias();
+    List<String> path = Lists.newArrayList();
+    path.add(table.getDb().getName());
+    path.add(table.getName());
+    Preconditions.checkNotNull(desc_.getPath());
+    if (desc_.hasExplicitAlias()) {
+      return desc_.getPath().toString() + " " + desc_.getAlias();
+    } else {
+      return desc_.getPath().toString();
     }
-    return result;
   }
 
   @Override
@@ -696,7 +699,8 @@ public class HdfsScanNode extends ScanNode {
       // Parquet files are equal to the number of non-partition columns scanned.
       perHostScanRanges = 0;
       for (SlotDescriptor slot: desc_.getSlots()) {
-        if (slot.getColumn().getPosition() >= table.getNumClusteringCols()) {
+        if (slot.getColumn() == null ||
+            slot.getColumn().getPosition() >= table.getNumClusteringCols()) {
           ++perHostScanRanges;
         }
       }

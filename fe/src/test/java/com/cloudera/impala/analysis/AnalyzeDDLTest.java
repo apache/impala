@@ -567,11 +567,11 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // View-definition statement fails to analyze. Database does not exist.
     AnalysisError("alter view functional.alltypes_view as " +
         "select * from baddb.alltypesagg",
-        "Database does not exist: baddb");
+        "Could not resolve table reference: 'baddb.alltypesagg'");
     // View-definition statement fails to analyze. Table does not exist.
     AnalysisError("alter view functional.alltypes_view as " +
         "select * from functional.badtable",
-        "Table does not exist: functional.badtable");
+        "Could not resolve table reference: 'functional.badtable'");
     // Duplicate column name.
     AnalysisError("alter view functional.alltypes_view as " +
         "select * from functional.alltypessmall a inner join " +
@@ -929,7 +929,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     // Analysis errors in the SELECT statement
     AnalysisError("create table newtbl as select * from tbl_does_not_exist",
-        "Table does not exist: default.tbl_does_not_exist");
+        "Could not resolve table reference: 'tbl_does_not_exist'");
     AnalysisError("create table newtbl as select 1 as c1, 2 as c1",
         "Duplicate column name: c1");
 
@@ -1360,10 +1360,6 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "from functional.alltypes");
     AnalyzesOk("create view functional.foo (a, b) as select int_col x, double_col y " +
         "from functional.alltypes");
-    // View can have complex-typed columns.
-    AnalyzesOk("create view functional.foo (a, b, c) as " +
-        "select int_array_col, int_map_col, int_struct_col " +
-        "from functional.allcomplextypes");
 
     // Creating a view on a view is ok (alltypes_view is a view on alltypes).
     AnalyzesOk("create view foo as select * from functional.alltypes_view");
@@ -1383,6 +1379,11 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Test different query-statement types as view definition.
     AnalyzesOk("create view foo (a, b) as values(1, 'a'), (2, 'b')");
     AnalyzesOk("create view foo (a, b) as select 1, 'a' union all select 2, 'b'");
+
+    // View with a subquery
+    AnalyzesOk("create view test_view_with_subquery as " +
+        "select * from functional.alltypestiny t where exists " +
+        "(select * from functional.alltypessmall s where s.id = t.id)");
 
     // Mismatching number of columns in column definition and view-definition statement.
     AnalysisError("create view foo (a) as select int_col, string_col " +
@@ -1423,21 +1424,25 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Source database does not exist,
     AnalysisError("create view foo as " +
         "select * from wrongdb.alltypessmall ",
-        "Database does not exist: wrongdb");
+        "Could not resolve table reference: 'wrongdb.alltypessmall'");
     // Source table does not exist,
     AnalysisError("create view foo as " +
         "select * from wrongdb.alltypessmall ",
-        "Database does not exist: wrongdb");
+        "Could not resolve table reference: 'wrongdb.alltypessmall'");
     // Analysis error in view-definition statement.
     AnalysisError("create view foo as " +
         "select int_col from functional.alltypessmall union all " +
         "select string_col from functional.alltypes",
         "Incompatible return types 'INT' and 'STRING' of exprs " +
         "'int_col' and 'string_col'.");
-    // View with a subquery
-    AnalyzesOk("create view test_view_with_subquery as " +
-        "select * from functional.alltypestiny t where exists " +
-        "(select * from functional.alltypessmall s where s.id = t.id)");
+
+    // View cannot have complex-typed columns because complex-typed exprs are
+    // not supported in the select list.
+    AnalysisError("create view functional.foo (a, b, c) as " +
+        "select int_array_col, int_map_col, int_struct_col " +
+        "from functional.allcomplextypes",
+        "Expr 'int_array_col' in select list returns a complex type 'ARRAY<INT>'.\n" +
+        "Only scalar types are allowed in the select list.");
   }
 
   @Test
@@ -1624,6 +1629,18 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Function names must be all alphanumeric or underscore. Invalid name: abc-d");
     AnalysisError("create function baddb.f() RETURNS int" + udfSuffix,
         "Database does not exist: baddb");
+    AnalysisError("create function a.b.c() RETURNS int" + udfSuffix,
+        "Invalid function name: 'a.b.c'. Expected [dbname].funcname.");
+    AnalysisError("create function a.b.c.d(smallint) RETURNS int" + udfSuffix,
+        "Invalid function name: 'a.b.c.d'. Expected [dbname].funcname.");
+
+    // Try creating functions with unsupported return/arg types.
+    AnalysisError("create function f() RETURNS array<int>" + udfSuffix,
+        "Type 'ARRAY<INT>' is not supported in UDFs/UDAs.");
+    AnalysisError("create function f(map<string,int>) RETURNS int" + udfSuffix,
+        "Type 'MAP<STRING,INT>' is not supported in UDFs/UDAs.");
+    AnalysisError("create function f() RETURNS struct<f:int>" + udfSuffix,
+        "Type 'STRUCT<f:INT>' is not supported in UDFs/UDAs.");
 
     // Try creating functions with unsupported return/arg types.
     AnalysisError("create function f() RETURNS array<int>" + udfSuffix,

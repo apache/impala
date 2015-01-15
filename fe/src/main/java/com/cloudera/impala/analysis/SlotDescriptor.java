@@ -14,20 +14,24 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.List;
 import java.util.Collections;
+import java.util.List;
+
+import jline.internal.Preconditions;
 
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.thrift.TSlotDescriptor;
+import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.collect.Lists;
-import com.google.common.base.Preconditions;
 
 public class SlotDescriptor {
   private final SlotId id_;
   private final TupleDescriptor parent_;
+  // Path of slot relative to parent_. Only set for slots that represent a column/field.
+  private List<Integer> path_;
   private Type type_;
   private Column column_;  // underlying column, if there is one
   private String label_; // for SlotRef.toSql() in absence of column name
@@ -84,13 +88,11 @@ public class SlotDescriptor {
   }
   public SlotId getId() { return id_; }
   public TupleDescriptor getParent() { return parent_; }
+  public void setPath(List<Integer> path) { path_ = path; }
   public Type getType() { return type_; }
-  public void setType(Type type) { this.type_ = type; }
+  public void setType(Type type) { type_ = type; }
   public Column getColumn() { return column_; }
-  public void setColumn(Column column) {
-    this.column_ = column;
-    this.type_ = column.getType();
-  }
+  public void setColumn(Column column) { column_ = column; }
   public boolean isMaterialized() { return isMaterialized_; }
   public void setIsMaterialized(boolean value) { isMaterialized_ = value; }
   public boolean getIsNullable() { return isNullable_; }
@@ -119,21 +121,34 @@ public class SlotDescriptor {
     return stats_;
   }
 
+  /**
+   * Assembles the absolute physical path to this slot starting from the schema root.
+   */
+  public List<Integer> getAbsolutePath() {
+    Preconditions.checkNotNull(parent_);
+    if (parent_.getPath() == null) return Collections.emptyList();
+    List<Integer> result = Lists.newArrayList(parent_.getPath().getAbsolutePath());
+    result.addAll(path_);
+    return result;
+  }
+
   public TSlotDescriptor toThrift() {
-    List<Integer> columnPath = Lists.newArrayList();
-    if (column_ != null) columnPath.add(column_.getPosition());
-    return new TSlotDescriptor(
+    List<Integer> slotPath = getAbsolutePath();
+    TSlotDescriptor result = new TSlotDescriptor(
         id_.asInt(), parent_.getId().asInt(), type_.toThrift(),
-        columnPath, byteOffset_, nullIndicatorByte_, nullIndicatorBit_,
+        slotPath, byteOffset_, nullIndicatorByte_, nullIndicatorBit_,
         slotIdx_, isMaterialized_);
+    return result;
   }
 
   public String debugString() {
     String colStr = (column_ == null ? "null" : column_.getName());
     String typeStr = (type_ == null ? "null" : type_.toString());
+    String pathStr = (path_ == null) ? "null" : Joiner.on(".").join(path_);
     return Objects.toStringHelper(this)
         .add("id", id_.asInt())
         .add("col", colStr)
+        .add("path", pathStr)
         .add("type", typeStr)
         .add("materialized", isMaterialized_)
         .add("byteSize", byteSize_)

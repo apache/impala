@@ -432,7 +432,7 @@ public class UnionStmt extends QueryStmt {
 
       // Add to aliasSMap so that column refs in "order by" can be resolved.
       if (orderByElements_ != null) {
-        SlotRef aliasRef = new SlotRef(null, getColLabels().get(i));
+        SlotRef aliasRef = new SlotRef(getColLabels().get(i));
         if (aliasSmap_.containsMappingFor(aliasRef)) {
           ambiguousAliasList_.add(aliasRef);
         } else {

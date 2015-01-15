@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.List;
 import java.util.Set;
 
 import junit.framework.Assert;
@@ -31,7 +30,6 @@ import com.cloudera.impala.testutil.ImpaladTestCatalog;
 import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 /**
@@ -61,6 +59,18 @@ public class AuditingTest extends AnalyzerTest {
         "select a.* from (select * from functional.alltypesagg) a");
     Assert.assertEquals(accessEvents, Sets.newHashSet(
         new TAccessEvent("functional.alltypesagg", TCatalogObjectType.TABLE, "SELECT")));
+
+    // Select from collection table references.
+    accessEvents = AnalyzeAccessEvents(
+        "select item from functional.allcomplextypes.int_array_col");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(
+        new TAccessEvent("functional.allcomplextypes",
+            TCatalogObjectType.TABLE, "SELECT")));
+    accessEvents = AnalyzeAccessEvents(
+        "select item from functional.allcomplextypes a, a.int_array_col");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(
+        new TAccessEvent("functional.allcomplextypes",
+            TCatalogObjectType.TABLE, "SELECT")));
   }
 
   @Test

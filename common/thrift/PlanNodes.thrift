@@ -39,7 +39,7 @@ enum TPlanNodeType {
   SELECT_NODE,
   CROSS_JOIN_NODE,
   DATA_SOURCE_NODE,
-  ANALYTIC_EVAL_NODE
+  ANALYTIC_EVAL_NODE,
 }
 
 // phases of an execution node
@@ -327,7 +327,7 @@ struct TExchangeNode {
   // The ExchangeNode's input rows form a prefix of the output rows it produces;
   // this describes the composition of that prefix
   1: required list<Types.TTupleId> input_row_tuples
- // For a merging exchange, the sort information.
+  // For a merging exchange, the sort information.
   2: optional TSortInfo sort_info
   // This is the number of rows to skip before returning results
   3: optional i64 offset

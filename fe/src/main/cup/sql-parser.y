@@ -331,7 +331,8 @@ nonterminal LiteralExpr literal;
 nonterminal CaseExpr case_expr;
 nonterminal ArrayList<CaseWhenClause> case_when_clause_list;
 nonterminal FunctionParams function_params;
-nonterminal SlotRef column_ref;
+nonterminal ArrayList<String> dotted_path;
+nonterminal SlotRef slot_ref;
 nonterminal ArrayList<TableRef> from_clause, table_ref_list;
 nonterminal WithClause opt_with_clause;
 nonterminal ArrayList<View> with_view_def_list;
@@ -1763,13 +1764,9 @@ alias_clause ::=
 
 star_expr ::=
   STAR
-  // table_name DOT STAR doesn't work because of a reduce-reduce conflict
-  // on IDENT [DOT]
   {: RESULT = SelectListItem.createStarItem(null); :}
-  | IDENT:tbl DOT STAR
-  {: RESULT = SelectListItem.createStarItem(new TableName(null, tbl)); :}
-  | IDENT:db DOT IDENT:tbl DOT STAR
-  {: RESULT = SelectListItem.createStarItem(new TableName(db, tbl)); :}
+  | dotted_path:path DOT STAR
+  {: RESULT = SelectListItem.createStarItem(path); :}
   ;
 
 table_name ::=
@@ -1780,10 +1777,9 @@ table_name ::=
   ;
 
 function_name ::=
-  IDENT:fn
-  {: RESULT = new FunctionName(null, fn); :}
-  | IDENT:db DOT IDENT:fn
-  {: RESULT = new FunctionName(db, fn); :}
+  // Use 'dotted_path' to avoid a reduce/reduce with slot_ref.
+  dotted_path:path
+  {: RESULT = new FunctionName(path); :}
   ;
 
 from_clause ::=
@@ -1840,10 +1836,10 @@ table_ref_list ::=
   ;
 
 table_ref ::=
-  table_name:name alias_clause:alias
-  {: RESULT = new TableRef(name, alias); :}
-  | table_name:name
-  {: RESULT = new TableRef(name, null); :}
+  dotted_path:path
+  {: RESULT = new TableRef(path, null); :}
+  | dotted_path:path alias_clause:alias
+  {: RESULT = new TableRef(path, alias); :}
   | LPAREN query_stmt:query RPAREN alias_clause:alias
   {: RESULT = new InlineViewRef(alias, query); :}
   ;
@@ -2107,7 +2103,7 @@ non_pred_expr ::=
   {: RESULT = c; :}
   | case_expr:c
   {: RESULT = c; :}
-  | column_ref:c
+  | slot_ref:c
   {: RESULT = c; :}
   | timestamp_arithmetic_expr:e
   {: RESULT = e; :}
@@ -2239,10 +2235,10 @@ timestamp_arithmetic_expr ::=
   // Set precedence to KW_INTERVAL (which is higher than ADD) for chaining.
   %prec KW_INTERVAL
   // Timestamp arithmetic expr that looks like a function call.
-  // We use func_arg_list instead of expr to avoid a shift/reduce conflict with
-  // func_arg_list on COMMA, and report an error if the list contains more than one expr.
+  // We use expr_list instead of expr to avoid a shift/reduce conflict with
+  // expr_list on COMMA, and report an error if the list contains more than one expr.
   // Although we don't want to accept function names as the expr, we can't parse it
-  // it as just an IDENT due to the precedence conflict with function_name.
+  // as just an IDENT due to the precedence conflict with function_name.
   | function_name:functionName LPAREN expr_list:l COMMA
     KW_INTERVAL expr:v IDENT:u RPAREN
   {:
@@ -2250,11 +2246,12 @@ timestamp_arithmetic_expr ::=
       // Report parsing failure on keyword interval.
       parser.parseError("interval", SqlParserSymbols.KW_INTERVAL);
     }
-    if (functionName.getDb() != null) {
-      // This function should not fully qualified
+    ArrayList<String> fnNamePath = functionName.getFnNamePath();
+    if (fnNamePath.size() > 1) {
+      // This production should not accept fully qualified function names
       throw new Exception("interval should not be qualified by database name");
     }
-    RESULT = new TimestampArithmeticExpr(functionName.getFunction(), l.get(0), v, u);
+    RESULT = new TimestampArithmeticExpr(fnNamePath.get(0), l.get(0), v, u);
   :}
   ;
 
@@ -2404,14 +2401,23 @@ compound_predicate ::=
   {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT, e, null); :}
   ;
 
-column_ref ::=
-  IDENT:col
-  {: RESULT = new SlotRef(null, col); :}
-  // table_name:tblName DOT IDENT:col causes reduce/reduce conflicts
-  | IDENT:tbl DOT IDENT:col
-  {: RESULT = new SlotRef(new TableName(null, tbl), col); :}
-  | IDENT:db DOT IDENT:tbl DOT IDENT:col
-  {: RESULT = new SlotRef(new TableName(db, tbl), col); :}
+slot_ref ::=
+  dotted_path:path
+  {: RESULT = new SlotRef(path); :}
+  ;
+
+dotted_path ::=
+  IDENT:ident
+  {:
+    ArrayList<String> list = new ArrayList<String>();
+    list.add(ident);
+    RESULT = list;
+  :}
+  | dotted_path:list DOT IDENT:ident
+  {:
+    list.add(ident);
+    RESULT = list;
+  :}
   ;
 
 type_def ::=

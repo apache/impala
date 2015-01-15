@@ -14,29 +14,45 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.ArrayList;
+
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TFunctionName;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 
 /**
  * Class to represent a function name. Function names are specified as
  * db.function_name.
  */
 public class FunctionName {
+  // Only set for parsed function names.
+  private final ArrayList<String> fnNamePath_;
+
+  // Set/validated during analysis.
   private String db_;
-  private final String fn_;
-  boolean isBuiltin_;
+  private String fn_;
+  private boolean isBuiltin_ = false;
+  private boolean isAnalyzed_ = false;
+
+  /**
+   * C'tor for parsed function names. The function names could be invalid. The validity
+   * is checked during analysis.
+   */
+  public FunctionName(ArrayList<String> fnNamePath) {
+    fnNamePath_ = fnNamePath;
+  }
 
   public FunctionName(String dbName, String fn) {
-    db_ = dbName;
+    db_ = (dbName != null) ? dbName.toLowerCase() : null;
     fn_ = fn.toLowerCase();
-    if (db_ != null) db_ = db_.toLowerCase();
+    fnNamePath_ = null;
   }
 
   public FunctionName(String fn) {
-    db_ = null;
-    fn_ = fn.toLowerCase();
+    this(null, fn);
   }
 
   @Override
@@ -51,26 +67,24 @@ public class FunctionName {
     return fn_.equalsIgnoreCase(o.fn_);
   }
 
-  public FunctionName(TFunctionName thriftName) {
-    db_ = thriftName.db_name.toLowerCase();
-    fn_ = thriftName.function_name.toLowerCase();
-  }
-
   public String getDb() { return db_; }
   public String getFunction() { return fn_; }
   public boolean isFullyQualified() { return db_ != null; }
   public boolean isBuiltin() { return isBuiltin_; }
+  public ArrayList<String> getFnNamePath() { return fnNamePath_; }
 
   @Override
   public String toString() {
+    // The fnNamePath_ is not always set.
+    if (!isAnalyzed_ && fnNamePath_ != null) return Joiner.on(".").join(fnNamePath_);
     if (db_ == null || isBuiltin_) return fn_;
     return db_ + "." + fn_;
   }
 
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (fn_.length() == 0) {
-      throw new AnalysisException("Function name can not be empty.");
-    }
+    if (isAnalyzed_) return;
+    analyzeFnNamePath();
+    if (fn_.isEmpty()) throw new AnalysisException("Function name cannot be empty.");
     for (int i = 0; i < fn_.length(); ++i) {
       if (!isValidCharacter(fn_.charAt(i))) {
         throw new AnalysisException(
@@ -96,6 +110,22 @@ public class FunctionName {
       }
     } else {
       isBuiltin_ = db_.equals(Catalog.BUILTINS_DB);
+    }
+    isAnalyzed_ = true;
+  }
+
+  private void analyzeFnNamePath() throws AnalysisException {
+    if (fnNamePath_ == null) return;
+    if (fnNamePath_.size() > 2 || fnNamePath_.isEmpty()) {
+      throw new AnalysisException(
+          String.format("Invalid function name: '%s'. Expected [dbname].funcname.",
+              Joiner.on(".").join(fnNamePath_)));
+    } else if (fnNamePath_.size() > 1) {
+      db_ = fnNamePath_.get(0);
+      fn_ = fnNamePath_.get(1).toLowerCase();
+    } else {
+      Preconditions.checkState(fnNamePath_.size() == 1);
+      fn_ = fnNamePath_.get(0).toLowerCase();
     }
   }
 

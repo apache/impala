@@ -24,8 +24,9 @@ import com.cloudera.impala.thrift.TTypeNode;
  */
 public class StructField {
   protected final String name_;
-  protected Type type_;
-  protected String comment_;
+  protected final Type type_;
+  protected final String comment_;
+  protected int position_;  // in struct
 
   public StructField(String name, Type type, String comment) {
     name_ = name;
@@ -33,9 +34,15 @@ public class StructField {
     comment_ = comment;
   }
 
+  public StructField(String name, Type type) {
+    this(name, type, null);
+  }
+
   public String getComment() { return comment_; }
   public String getName() { return name_; }
   public Type getType() { return type_; }
+  public int getPosition() { return position_; }
+  public void setPosition(int position) { position_ = position; }
 
   public String toSql() {
     StringBuilder sb = new StringBuilder(name_);
@@ -50,5 +57,12 @@ public class StructField {
     if (comment_ != null) field.setComment(comment_);
     node.struct_fields.add(field);
     type_.toThrift(container);
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    if (!(other instanceof StructField)) return false;
+    StructField otherStructField = (StructField) other;
+    return otherStructField.name_.equals(name_) && otherStructField.type_.equals(type_);
   }
 }

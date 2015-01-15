@@ -93,6 +93,15 @@ public class ToSqlUtils {
     return ident;
   }
 
+  public static String getPathSql(List<String> path) {
+    StringBuilder result = new StringBuilder();
+    for (String p: path) {
+      if (result.length() > 0) result.append(".");
+      result.append(getIdentSql(p));
+    }
+    return result.toString();
+  }
+
   /**
    * Returns the "CREATE TABLE" SQL string corresponding to the given CreateTableStmt.
    * statement.

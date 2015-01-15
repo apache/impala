@@ -18,6 +18,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
 import java.lang.reflect.Field;
+import java.util.List;
+
+import junit.framework.Assert;
 
 import org.junit.Test;
 
@@ -25,15 +28,668 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarType;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
 public class AnalyzeStmtsTest extends AnalyzerTest {
 
+  /**
+   * Tests analyzing the given collection table reference and field assumed to be in
+   * functional.allcomplextypes, including different combinations of
+   * implicit/explicit aliases of the parent and collection table.
+   */
+  private void testCollectionTableRefs(String collectionTable, String collectionField) {
+    TableName tbl = new TableName("functional", "allcomplextypes");
+
+    // Collection table uses unqualified implicit alias of parent table.
+    TblsAnalyzeOk(String.format("select %s from $TBL, allcomplextypes.%s",
+        collectionField, collectionTable), tbl);
+    // Collection table uses fully qualified implicit alias of parent table.
+    TblsAnalyzeOk(String.format("select %s from $TBL, functional.allcomplextypes.%s",
+        collectionField, collectionTable), tbl);
+    // Collection table uses explicit alias of parent table.
+    TblsAnalyzeOk(String.format("select %s from $TBL a, a.%s",
+        collectionField, collectionTable), tbl);
+
+    // Parent/collection/collection join.
+    TblsAnalyzeOk(String.format("select b.%s from $TBL a, a.%s b, a.int_map_col c",
+        collectionField, collectionTable), tbl);
+    TblsAnalyzeOk(String.format("select c.%s from $TBL a, a.int_array_col b, a.%s c",
+        collectionField, collectionTable), tbl);
+
+    // Test join types. Parent/collection joins do not require an ON or USING clause.
+    for (JoinOperator joinOp: JoinOperator.values()) {
+      if (joinOp.isNullAwareLeftAntiJoin()) continue;
+      TblsAnalyzeOk(String.format("select 1 from $TBL %s allcomplextypes.%s",
+          joinOp, collectionTable), tbl);
+      TblsAnalyzeOk(String.format("select 1 from $TBL a %s a.%s",
+          joinOp, collectionTable), tbl);
+    }
+
+    // Legal, but not a parent/collection join.
+    TblsAnalyzeOk(String.format("select %s from $TBL a, functional.allcomplextypes.%s",
+        collectionField, collectionTable), tbl);
+    TblsAnalyzeOk(String.format("select %s from $TBL.%s, functional.allcomplextypes",
+        collectionField, collectionTable), tbl);
+    TblsAnalyzeOk(String.format("select %s from functional.allcomplextypes a, $TBL.%s",
+        collectionField, collectionTable), tbl);
+    TblsAnalyzeOk(String.format("select %s from functional.allcomplextypes.%s, $TBL",
+        collectionField, collectionTable), tbl);
+    // Non parent/collection outer or semi  joins require an ON or USING clause.
+    for (JoinOperator joinOp: JoinOperator.values()) {
+      if (joinOp.isNullAwareLeftAntiJoin()
+          || joinOp.isCrossJoin()
+          || joinOp.isInnerJoin()) {
+        continue;
+      }
+      AnalysisError(String.format(
+          "select 1 from functional.allcomplextypes.%s %s functional.allcomplextypes",
+          collectionTable, joinOp),
+          String.format("%s requires an ON or USING clause", joinOp));
+    }
+
+    // Duplicate explicit alias.
+    TblsAnalysisError(String.format("select %s from $TBL a, a.%s a",
+        collectionField, collectionTable), tbl,
+        "Duplicate table alias: 'a'");
+    TblsAnalysisError(String.format("select %s from $TBL a, a.%s b, a.%s b",
+        collectionField, collectionTable, collectionTable), tbl,
+        "Duplicate table alias: 'b'");
+    // Duplicate implicit alias.
+    String[] childTblPath = collectionTable.split("\\.");
+    String childTblAlias = childTblPath[childTblPath.length - 1];
+    TblsAnalysisError(String.format("select %s from $TBL a, a.%s, a.%s",
+        collectionField, collectionTable, collectionTable), tbl,
+        String.format("Duplicate table alias: '%s'", childTblAlias));
+    TblsAnalysisError(String.format(
+        "select 1 from $TBL, allcomplextypes.%s, functional.allcomplextypes.%s",
+        collectionTable, collectionTable), tbl,
+        String.format("Duplicate table alias: '%s'", childTblAlias));
+    // Duplicate implicit/explicit alias.
+    TblsAnalysisError(String.format(
+        "select %s from $TBL, functional.allcomplextypes.%s allcomplextypes",
+        collectionField, collectionTable), tbl,
+        "Duplicate table alias: 'allcomplextypes'");
+
+    // Parent/collection join requires the child to use an alias of the parent.
+    AnalysisError(String.format(
+        "select %s from allcomplextypes, %s", collectionField, collectionTable),
+        createAnalyzer("functional"),
+        String.format("Could not resolve table reference: '%s'", collectionTable));
+    AnalysisError(String.format(
+        "select %s from functional.allcomplextypes, %s",
+        collectionField, collectionTable),
+        String.format("Could not resolve table reference: '%s'", collectionTable));
+
+    // Ambiguous collection table ref.
+    AnalysisError(String.format(
+        "select %s from functional.allcomplextypes, " +
+        "functional_parquet.allcomplextypes, allcomplextypes.%s",
+        collectionField, collectionTable),
+        "Unqualified table alias is ambiguous: 'allcomplextypes'");
+  }
+
+  private boolean isCollectionTableRef(String tableName) {
+    return tableName.split("\\.").length > 0;
+  }
+
+  /**
+   * Test accessing all table/column combinations in the select list of a query
+   * using implicit and explicit table aliases. The given tables are expected to
+   * be unqualified and present in the 'functional' database.
+   */
+  private void testAllTableAliases(String[] tables, String[] columns)
+      throws AnalysisException {
+    for (String tbl: tables) {
+      TableName tblName = new TableName("functional", tbl);
+      String uqAlias = tbl.substring(tbl.lastIndexOf(".") + 1);
+      String fqAlias = "functional." + tbl;
+      // True if 'tbl' refers to a collection, false otherwise. A value of false implies
+      // the table must be a base table or view.
+      boolean isCollectionTblRef = isCollectionTableRef(tbl);
+      for (String col: columns) {
+        // Test implicit table aliases with unqualified and fully-qualified table names.
+        TblsAnalyzeOk(String.format("select %s from $TBL", col), tblName);
+        TblsAnalyzeOk(String.format("select %s.%s from $TBL", uqAlias, col), tblName);
+        // Only references to base tables/views have a fully-qualified implicit alias.
+        if (!isCollectionTblRef) {
+          TblsAnalyzeOk(String.format("select %s.%s from $TBL", fqAlias, col), tblName);
+        }
+
+        // Explicit table alias.
+        TblsAnalyzeOk(String.format("select %s from $TBL a", col), tblName);
+        TblsAnalyzeOk(String.format("select a.%s from $TBL a", col), tblName);
+
+        String errRefStr = "column/field reference";
+        if (col.endsWith("*")) errRefStr = "star expression";
+        // Explicit table alias must be used.
+        TblsAnalysisError(String.format("select %s.%s from $TBL a",
+            uqAlias, col, tbl), tblName,
+            String.format("Could not resolve %s: '%s.%s'",
+            errRefStr, uqAlias, col));
+        TblsAnalysisError(String.format("select %s.%s from $TBL a",
+            fqAlias, col, tbl), tblName,
+            String.format("Could not resolve %s: '%s.%s'",
+            errRefStr, fqAlias, col));
+      }
+    }
+
+    // Test that multiple implicit fully-qualified aliases work.
+    for (String t1: tables) {
+      for (String t2: tables) {
+        if (t1.equals(t2)) continue;
+        // Collection tables do not have a fully-qualified implicit alias.
+        if (isCollectionTableRef(t1) && isCollectionTableRef(t2)) continue;
+        for (String col: columns) {
+          AnalyzesOk(String.format(
+              "select functional.%s.%s, functional.%s.%s " +
+                  "from functional.%s, functional.%s", t1, col, t2, col, t1, t2));
+        }
+      }
+    }
+
+    String col = columns[0];
+    for (String tbl: tables) {
+      TableName tblName = new TableName("functional", tbl);
+      // Make sure a column reference requires an existing table alias.
+      TblsAnalysisError("select alltypessmall.int_col from $TBL", tblName,
+          "Could not resolve column/field reference: 'alltypessmall.int_col'");
+      // Duplicate explicit alias.
+      TblsAnalysisError(
+          String.format("select a.%s from $TBL a, functional.testtbl a", col),
+          tblName, "Duplicate table alias");
+      // Duplicate implicit alias.
+      TblsAnalysisError(String.format("select %s from $TBL, $TBL", col), tblName,
+          "Duplicate table alias");
+      // Duplicate implicit/explicit alias.
+      String uqAlias = tbl.substring(tbl.lastIndexOf(".") + 1);
+      TblsAnalysisError(String.format(
+          "select %s.%s from $TBL, functional.testtbl %s", tbl, col, uqAlias), tblName,
+          "Duplicate table alias");
+    }
+  }
+
+  @Test
+  public void TestCollectionTableRefs() throws AnalysisException {
+    // Test ARRAY type referenced as a table.
+    testAllTableAliases(new String[] {
+        "allcomplextypes.int_array_col"},
+        new String[] {Path.ARRAY_POS_FIELD_NAME, Path.ARRAY_ITEM_FIELD_NAME, "*"});
+    testAllTableAliases(new String[] {
+        "allcomplextypes.struct_array_col"},
+        new String[] {"f1", "f2", "*"});
+
+    // Test MAP type referenced as a table.
+    testAllTableAliases(new String[] {
+        "allcomplextypes.int_map_col"},
+        new String[] {Path.MAP_KEY_FIELD_NAME, Path.MAP_VALUE_FIELD_NAME, "*"});
+    testAllTableAliases(new String[] {
+        "allcomplextypes.struct_map_col"},
+        new String[] {Path.MAP_KEY_FIELD_NAME, "f1", "f2", "*"});
+
+    // Test complex table ref path with structs and multiple collections.
+    testAllTableAliases(new String[] {
+        "allcomplextypes.complex_nested_struct_col.f2.f12"},
+        new String[] {Path.MAP_KEY_FIELD_NAME, "f21", "*"});
+
+    // Test resolution of collection table refs.
+    testCollectionTableRefs("int_array_col", Path.ARRAY_POS_FIELD_NAME);
+    testCollectionTableRefs("int_array_col", Path.ARRAY_ITEM_FIELD_NAME);
+    testCollectionTableRefs("int_map_col", Path.MAP_KEY_FIELD_NAME);
+    testCollectionTableRefs("complex_nested_struct_col.f2.f12", "f21");
+
+    // Path resolution error is reported before duplicate alias.
+    AnalysisError("select 1 from functional.allcomplextypes a, a",
+        "Illegal table reference to non-collection type: 'a'");
+
+    // Invalid reference to non-collection type.
+    AnalysisError("select 1 from functional.allcomplextypes.int_struct_col",
+        "Illegal table reference to non-collection type: " +
+         "'functional.allcomplextypes.int_struct_col'\n" +
+        "Path resolved to type: STRUCT<f1:INT,f2:INT>");
+    AnalysisError("select 1 from functional.allcomplextypes a, a.int_struct_col",
+        "Illegal table reference to non-collection type: 'a.int_struct_col'\n" +
+        "Path resolved to type: STRUCT<f1:INT,f2:INT>");
+    AnalysisError("select 1 from functional.allcomplextypes.int_array_col.item",
+        "Illegal table reference to non-collection type: " +
+        "'functional.allcomplextypes.int_array_col.item'\n" +
+        "Path resolved to type: INT");
+    AnalysisError("select 1 from functional.allcomplextypes.int_array_col a, a.pos",
+        "Illegal table reference to non-collection type: 'a.pos'\n" +
+        "Path resolved to type: BIGINT");
+    AnalysisError("select 1 from functional.allcomplextypes.int_map_col.key",
+        "Illegal table reference to non-collection type: " +
+        "'functional.allcomplextypes.int_map_col.key'\n" +
+        "Path resolved to type: STRING");
+    AnalysisError("select 1 from functional.allcomplextypes.int_map_col a, a.key",
+        "Illegal table reference to non-collection type: 'a.key'\n" +
+        "Path resolved to type: STRING");
+
+    // Test that parent/collection joins without an ON clause analyze ok.
+    for (JoinOperator joinOp: JoinOperator.values()) {
+      if (joinOp.isNullAwareLeftAntiJoin()) continue;
+      AnalyzesOk(String.format(
+          "select 1 from functional.allcomplextypes a %s a.int_array_col b", joinOp));
+      AnalyzesOk(String.format(
+          "select 1 from functional.allcomplextypes a %s a.struct_array_col b", joinOp));
+      AnalyzesOk(String.format(
+          "select 1 from functional.allcomplextypes a %s a.int_map_col b", joinOp));
+      AnalyzesOk(String.format(
+          "select 1 from functional.allcomplextypes a %s a.struct_map_col", joinOp));
+    }
+  }
+
+  @Test
+  public void TestCatalogTableRefs() throws AnalysisException {
+    String[] tables = new String[] { "alltypes", "alltypes_view" };
+    String[] columns = new String[] { "int_col", "*" };
+    testAllTableAliases(tables, columns);
+
+    // Unqualified '*' is not ambiguous.
+    AnalyzesOk("select * from functional.alltypes " +
+        "cross join functional_parquet.alltypes");
+
+    // Ambiguous unqualified column reference.
+    AnalysisError("select int_col from functional.alltypes " +
+        "cross join functional_parquet.alltypes",
+        "Column/field reference is ambiguous: 'int_col'");
+    // Ambiguous implicit unqualified table alias.
+    AnalysisError("select alltypes.int_col from functional.alltypes " +
+        "cross join functional_parquet.alltypes",
+        "Unqualified table alias is ambiguous: 'alltypes'");
+    AnalysisError("select alltypes.* from functional.alltypes " +
+        "cross join functional_parquet.alltypes",
+        "Unqualified table alias is ambiguous: 'alltypes'");
+
+    // Mixing unqualified and fully-qualified table refs without explicit aliases is an
+    // error because we'd expect a consistent result if we created a view of this stmt
+    // (table names are fully qualified during view creation).
+    AnalysisError("select alltypes.smallint_col, functional.alltypes.int_col " +
+        "from alltypes inner join functional.alltypes " +
+        "on (alltypes.id = functional.alltypes.id)",
+        createAnalyzer("functional"),
+        "Duplicate table alias: 'functional.alltypes'");
+  }
+
+  /**
+   * Helper function that returns a list of integers used to improve readability
+   * in the path-related tests below.
+   */
+  private List<Integer> path(Integer... p) { return Lists.newArrayList(p); }
+
+  /**
+   * Checks that the given SQL analyzes ok, and asserts that the last result expr in the
+   * parsed SelectStmt is a SlotRef whose absolute physical path is identical to the
+   * given expected one. Intentionally allows multiple result exprs to be analyzed to
+   * test absolute path caching, though only the last path is validated.
+   */
+  private void testSlotRefPath(String sql, List<Integer> expectedPhysPath) {
+    SelectStmt stmt = (SelectStmt) AnalyzesOk(sql);
+    Expr e = stmt.getResultExprs().get(stmt.getResultExprs().size() - 1);
+    Preconditions.checkState(e instanceof SlotRef);
+    SlotRef slotRef = (SlotRef) e;
+    List<Integer> actualPhysPath = slotRef.getDesc().getAbsolutePath();
+    Assert.assertTrue(String.format("Expected path: %s\nActual path:%s",
+        expectedPhysPath, actualPhysPath),
+        actualPhysPath.equals(expectedPhysPath));
+  }
+
+  /**
+   * Checks that the given SQL analyzes ok, and asserts that all result exprs in the
+   * parsed SelectStmt are SlotRefs and that the absolute physical path of result expr at
+   * position i matches expectedPhysPaths[i].
+   */
+  private void testStarPath(String sql, List<Integer>... expectedPhysPaths) {
+    SelectStmt stmt = (SelectStmt) AnalyzesOk(sql);
+    List<List<Integer>> actualPaths = Lists.newArrayList();
+    for (int i = 0; i < stmt.getResultExprs().size(); ++i) {
+      Expr e = stmt.getResultExprs().get(i);
+      Preconditions.checkState(e instanceof SlotRef);
+      SlotRef slotRef = (SlotRef) e;
+      actualPaths.add(slotRef.getDesc().getAbsolutePath());
+    }
+    List<List<Integer>> expectedPaths = Lists.newArrayList(expectedPhysPaths);
+    Assert.assertTrue(String.format("Expected paths: %s\nActual paths:%s",
+        expectedPaths, actualPaths),
+        actualPaths.equals(expectedPaths));
+  }
+
+  /**
+   * Checks that the given SQL analyzes ok, and asserts that the last table ref in the
+   * parsed SelectStmt has an absolute physical path identical to the given expected one.
+   */
+  private void testTableRefPath(String sql, List<Integer> expectedPhysPath) {
+    SelectStmt stmt = (SelectStmt) AnalyzesOk(sql);
+    TableRef lastTblRef = stmt.getTableRefs().get(stmt.getTableRefs().size() - 1);
+    List<Integer> actualPhysPath = lastTblRef.getDesc().getPath().getAbsolutePath();
+    Assert.assertTrue(String.format("Expected path: %s\nActual path:%s",
+        expectedPhysPath, actualPhysPath),
+        actualPhysPath.equals(expectedPhysPath));
+  }
+
+  @SuppressWarnings("unchecked")
+  @Test
+  public void TestImplicitAndExplicitPaths() {
+    // Check that there are no implicit field names for base tables.
+    String[] implicitFieldNames = new String[] {Path.ARRAY_POS_FIELD_NAME,
+        Path.ARRAY_ITEM_FIELD_NAME, Path.MAP_KEY_FIELD_NAME, Path.MAP_VALUE_FIELD_NAME};
+    for (String field: implicitFieldNames) {
+      AnalysisError(String.format("select %s from functional.alltypes", field),
+          String.format("Could not resolve column/field reference: '%s'", field));
+    }
+
+    addTestDb("d");
+
+    // Test array of scalars. Only explicit paths make sense.
+    addTestTable("create table d.t1 (c array<int>)");
+    testSlotRefPath("select item from d.t1.c", path(0, 0));
+    testSlotRefPath("select pos from d.t1.c", path(0, 1));
+    AnalysisError("select item.item from d.t1.c",
+        "Could not resolve column/field reference: 'item.item'");
+    AnalysisError("select item.pos from d.t1.c",
+        "Could not resolve column/field reference: 'item.pos'");
+    // Test star expansion.
+    testStarPath("select * from d.t1.c", path(0, 0));
+    testStarPath("select c.* from d.t1.c", path(0, 0));
+
+    // Array of structs. No name conflicts with implicit fields. Both implicit and
+    // explicit paths are allowed.
+    addTestTable("create table d.t2 (c array<struct<f:int>>)");
+    testSlotRefPath("select f from d.t2.c", path(0, 0, 0));
+    testSlotRefPath("select item.f from d.t2.c", path(0, 0, 0));
+    testSlotRefPath("select pos from d.t2.c", path(0, 1));
+    AnalysisError("select item from d.t2.c",
+        "Expr 'item' in select list returns a complex type 'STRUCT<f:INT>'.\n" +
+        "Only scalar types are allowed in the select list.");
+    AnalysisError("select item.pos from d.t2.c",
+        "Could not resolve column/field reference: 'item.pos'");
+    // Test star expansion.
+    testStarPath("select * from d.t2.c", path(0, 0, 0));
+    testStarPath("select c.* from d.t2.c", path(0, 0, 0));
+
+    // Array of structs with name conflicts. Both implicit and explicit
+    // paths are allowed.
+    addTestTable("create table d.t3 (c array<struct<f:int,item:int,pos:int>>)");
+    testSlotRefPath("select f from d.t3.c", path(0, 0, 0));
+    testSlotRefPath("select item.f from d.t3.c", path(0, 0, 0));
+    testSlotRefPath("select item.item from d.t3.c", path(0, 0, 1));
+    testSlotRefPath("select item.pos from d.t3.c", path(0, 0, 2));
+    testSlotRefPath("select pos from d.t3.c", path(0, 1));
+    AnalysisError("select item from d.t3.c",
+        "Expr 'item' in select list returns a complex type " +
+        "'STRUCT<f:INT,item:INT,pos:INT>'.\n" +
+        "Only scalar types are allowed in the select list.");
+    // Test star expansion.
+    testStarPath("select * from d.t3.c", path(0, 0, 0), path(0, 0, 1), path(0, 0, 2));
+    testStarPath("select c.* from d.t3.c", path(0, 0, 0), path(0, 0, 1), path(0, 0, 2));
+
+    // Map with a scalar key and value. Only implicit paths make sense.
+    addTestTable("create table d.t4 (c map<int,string>)");
+    testSlotRefPath("select key from d.t4.c", path(0, 0));
+    testSlotRefPath("select value from d.t4.c", path(0, 1));
+    AnalysisError("select value.value from d.t4.c",
+        "Could not resolve column/field reference: 'value.value'");
+    // Test star expansion.
+    testStarPath("select * from d.t4.c", path(0, 0), path(0, 1));
+    testStarPath("select c.* from d.t4.c", path(0, 0), path(0, 1));
+
+    // Map with a scalar key and struct value. No name conflicts. Both implicit and
+    // explicit paths are allowed.
+    addTestTable("create table d.t5 (c map<int,struct<f:int>>)");
+    testSlotRefPath("select key from d.t5.c", path(0, 0));
+    testSlotRefPath("select f from d.t5.c", path(0, 1, 0));
+    testSlotRefPath("select value.f from d.t5.c", path(0, 1, 0));
+    AnalysisError("select value.value from d.t5.c",
+        "Could not resolve column/field reference: 'value.value'");
+    AnalysisError("select value from d.t5.c",
+        "Expr 'value' in select list returns a complex type " +
+        "'STRUCT<f:INT>'.\n" +
+        "Only scalar types are allowed in the select list.");
+    // Test star expansion.
+    testStarPath("select * from d.t5.c", path(0, 0), path(0, 1, 0));
+    testStarPath("select c.* from d.t5.c", path(0, 0), path(0, 1, 0));
+
+    // Map with a scalar key and struct value with name conflicts. Both implicit and
+    // explicit paths are allowed.
+    addTestTable("create table d.t6 (c map<int,struct<f:int,key:int,value:int>>)");
+    testSlotRefPath("select key from d.t6.c", path(0, 0));
+    testSlotRefPath("select f from d.t6.c", path(0, 1, 0));
+    testSlotRefPath("select value.f from d.t6.c", path(0, 1, 0));
+    testSlotRefPath("select value.key from d.t6.c", path(0, 1, 1));
+    testSlotRefPath("select value.value from d.t6.c", path(0, 1, 2));
+    AnalysisError("select value from d.t6.c",
+        "Expr 'value' in select list returns a complex type " +
+        "'STRUCT<f:INT,key:INT,value:INT>'.\n" +
+        "Only scalar types are allowed in the select list.");
+    // Test star expansion.
+    testStarPath("select * from d.t6.c",
+        path(0, 0), path(0, 1, 0), path(0, 1, 1), path(0, 1, 2));
+    testStarPath("select c.* from d.t6.c",
+        path(0, 0), path(0, 1, 0), path(0, 1, 1), path(0, 1, 2));
+
+    // Test implicit/explicit paths on a complicated schema.
+    addTestTable("create table d.t7 (" +
+        "c1 int, " +
+        "c2 decimal(10, 4), " +
+        "c3 array<struct<a1:array<int>,a2:array<struct<x:int,y:int,a3:array<int>>>>>, " +
+        "c4 bigint, " +
+        "c5 map<int,struct<m1:map<int,string>," +
+        "                  m2:map<int,struct<x:int,y:int,m3:map<int,int>>>>>)");
+
+    // Test paths with c3.
+    testTableRefPath("select 1 from d.t7.c3.a1", path(2, 0, 0));
+    testTableRefPath("select 1 from d.t7.c3.item.a1", path(2, 0, 0));
+    testSlotRefPath("select item from d.t7.c3.a1", path(2, 0, 0, 0));
+    testSlotRefPath("select item from d.t7.c3.item.a1", path(2, 0, 0, 0));
+    testTableRefPath("select 1 from d.t7.c3.a2", path(2, 0, 1));
+    testTableRefPath("select 1 from d.t7.c3.item.a2", path(2, 0, 1));
+    testSlotRefPath("select x from d.t7.c3.a2", path(2, 0, 1, 0, 0));
+    testSlotRefPath("select x from d.t7.c3.item.a2", path(2, 0, 1, 0, 0));
+    testTableRefPath("select 1 from d.t7.c3.a2.a3", path(2, 0, 1, 0, 2));
+    testTableRefPath("select 1 from d.t7.c3.item.a2.item.a3", path(2, 0, 1, 0, 2));
+    testSlotRefPath("select item from d.t7.c3.a2.a3", path(2, 0, 1, 0, 2, 0));
+    testSlotRefPath("select item from d.t7.c3.item.a2.item.a3", path(2, 0, 1, 0, 2, 0));
+    // Test path assembly with multiple tuple descriptors.
+    testTableRefPath("select 1 from d.t7, t7.c3, c3.a2, a2.a3", path(2, 0, 1, 0, 2));
+    testTableRefPath("select 1 from d.t7, t7.c3, c3.item.a2, a2.item.a3",
+        path(2, 0, 1, 0, 2));
+    testSlotRefPath("select y from d.t7, t7.c3, c3.a2, a2.a3", path(2, 0, 1, 0, 1));
+    testSlotRefPath("select y, x from d.t7, t7.c3, c3.a2, a2.a3", path(2, 0, 1, 0, 0));
+    testSlotRefPath("select x, y from d.t7, t7.c3.item.a2, a2.a3", path(2, 0, 1, 0, 1));
+    testSlotRefPath("select a1.item from d.t7, t7.c3, c3.a1, c3.a2, a2.a3",
+        path(2, 0, 0, 0));
+
+    // Test paths with c5.
+    testTableRefPath("select 1 from d.t7.c5.m1", path(4, 1, 0));
+    testTableRefPath("select 1 from d.t7.c5.value.m1", path(4, 1, 0));
+    testSlotRefPath("select key from d.t7.c5.m1", path(4, 1, 0, 0));
+    testSlotRefPath("select key from d.t7.c5.value.m1", path(4, 1, 0, 0));
+    testSlotRefPath("select value from d.t7.c5.m1", path(4, 1, 0, 1));
+    testSlotRefPath("select value from d.t7.c5.value.m1", path(4, 1, 0, 1));
+    testTableRefPath("select 1 from d.t7.c5.m2", path(4, 1, 1));
+    testTableRefPath("select 1 from d.t7.c5.value.m2", path(4, 1, 1));
+    testSlotRefPath("select key from d.t7.c5.m2", path(4, 1, 1, 0));
+    testSlotRefPath("select key from d.t7.c5.value.m2", path(4, 1, 1, 0));
+    testSlotRefPath("select x from d.t7.c5.m2", path(4, 1, 1, 1, 0));
+    testSlotRefPath("select x from d.t7.c5.value.m2", path(4, 1, 1, 1, 0));
+    testTableRefPath("select 1 from d.t7.c5.m2.m3", path(4, 1, 1, 1, 2));
+    testTableRefPath("select 1 from d.t7.c5.value.m2.value.m3", path(4, 1, 1, 1, 2));
+    testSlotRefPath("select key from d.t7.c5.m2.m3", path(4, 1, 1, 1, 2, 0));
+    testSlotRefPath("select key from d.t7.c5.value.m2.value.m3", path(4, 1, 1, 1, 2, 0));
+    testSlotRefPath("select value from d.t7.c5.m2.m3", path(4, 1, 1, 1, 2, 1));
+    testSlotRefPath("select value from d.t7.c5.value.m2.value.m3",
+        path(4, 1, 1, 1, 2, 1));
+    // Test path assembly with multiple tuple descriptors.
+    testTableRefPath("select 1 from d.t7, t7.c5, c5.m2, m2.m3", path(4, 1, 1, 1, 2));
+    testTableRefPath("select 1 from d.t7, t7.c5, c5.value.m2, m2.value.m3",
+        path(4, 1, 1, 1, 2));
+    testSlotRefPath("select y from d.t7, t7.c5, c5.m2, m2.m3",
+        path(4, 1, 1, 1, 1));
+    testSlotRefPath("select y, x from d.t7, t7.c5, c5.m2, m2.m3",
+        path(4, 1, 1, 1, 0));
+    testSlotRefPath("select x, y from d.t7, t7.c5.value.m2, m2.m3",
+        path(4, 1, 1, 1, 1));
+    testSlotRefPath("select m1.key from d.t7, t7.c5, c5.m1, c5.m2, m2.m3",
+        path(4, 1, 0, 0));
+  }
+
+  @Test
+  public void TestStructFields() throws AnalysisException {
+    String[] tables = new String[] { "allcomplextypes" };
+    String[] columns = new String[] { "id", "int_struct_col.f1",
+        "nested_struct_col.f2.f12.f21" };
+    testAllTableAliases(tables, columns);
+
+    // Unknown struct fields.
+    AnalysisError("select nested_struct_col.badfield from functional.allcomplextypes",
+        "Could not resolve column/field reference: 'nested_struct_col.badfield'");
+    AnalysisError("select nested_struct_col.f2.badfield from functional.allcomplextypes",
+        "Could not resolve column/field reference: 'nested_struct_col.f2.badfield'");
+    AnalysisError("select nested_struct_col.badfield.f2 from functional.allcomplextypes",
+        "Could not resolve column/field reference: 'nested_struct_col.badfield.f2'");
+
+    // Illegal intermediate reference to collection type.
+    AnalysisError("select int_array_col.item from functional.allcomplextypes",
+        "Illegal column/field reference 'int_array_col.item' with intermediate " +
+        "collection 'int_array_col' of type 'ARRAY<INT>'");
+    AnalysisError("select struct_array_col.f1 from functional.allcomplextypes",
+        "Illegal column/field reference 'struct_array_col.f1' with intermediate " +
+        "collection 'struct_array_col' of type 'ARRAY<STRUCT<f1:BIGINT,f2:STRING>>'");
+    AnalysisError("select int_map_col.key from functional.allcomplextypes",
+        "Illegal column/field reference 'int_map_col.key' with intermediate " +
+        "collection 'int_map_col' of type 'MAP<STRING,INT>'");
+    AnalysisError("select struct_map_col.f1 from functional.allcomplextypes",
+        "Illegal column/field reference 'struct_map_col.f1' with intermediate " +
+        "collection 'struct_map_col' of type 'MAP<STRING,STRUCT<f1:BIGINT,f2:STRING>>'");
+    AnalysisError(
+        "select complex_nested_struct_col.f2.f11 from functional.allcomplextypes",
+        "Illegal column/field reference 'complex_nested_struct_col.f2.f11' with " +
+        "intermediate collection 'f2' of type " +
+        "'ARRAY<STRUCT<f11:BIGINT,f12:MAP<STRING,STRUCT<f21:BIGINT>>>>'");
+    AnalysisError(
+        "select complex_nested_struct_col.f2.f11 from functional.allcomplextypes",
+        "Illegal column/field reference 'complex_nested_struct_col.f2.f11' with " +
+        "intermediate collection 'f2' of type " +
+        "'ARRAY<STRUCT<f11:BIGINT,f12:MAP<STRING,STRUCT<f21:BIGINT>>>>'");
+  }
+
+  @Test
+  public void TestSlotRefPathAmbiguity() {
+    addTestDb("a");
+    addTestTable("create table a.a (a struct<a:struct<a:int>>)");
+
+    // Slot path is not ambiguous.
+    AnalyzesOk("select a.a.a.a.a from a.a");
+    AnalyzesOk("select t.a.a.a from a.a t");
+
+    // Slot path is not ambiguous but resolves to a struct.
+    AnalysisError("select a from a.a",
+        "Expr 'a' in select list returns a complex type 'STRUCT<a:STRUCT<a:INT>>'.\n" +
+        "Only scalar types are allowed in the select list.");
+    AnalysisError("select t.a from a.a t",
+        "Expr 't.a' in select list returns a complex type 'STRUCT<a:STRUCT<a:INT>>'.\n" +
+        "Only scalar types are allowed in the select list.");
+    AnalysisError("select t.a.a from a.a t",
+        "Expr 't.a.a' in select list returns a complex type 'STRUCT<a:INT>'.\n" +
+        "Only scalar types are allowed in the select list.");
+
+    // Slot paths are ambiguous. A slot path can legally resolve to a non-scalar type,
+    // even though we currently do not support non-scalar SlotRefs in the select list
+    // or in any exprs.
+    AnalysisError("select a.a from a.a",
+        "Column/field reference is ambiguous: 'a.a'");
+    AnalysisError("select a.a.a from a.a",
+        "Column/field reference is ambiguous: 'a.a.a'");
+    AnalysisError("select a.a.a.a from a.a",
+        "Column/field reference is ambiguous: 'a.a.a.a'");
+
+    // Cannot resolve slot paths.
+    AnalysisError("select a.a.a.a.a.a from a.a",
+        "Could not resolve column/field reference: 'a.a.a.a.a.a'");
+    AnalysisError("select t.a.a.a.a from a.a t",
+        "Could not resolve column/field reference: 't.a.a.a.a'");
+
+    // Paths resolve to an existing implicit table alias
+    // (the unqualified path resolution would be illegal).
+    addTestTable("create table a.array_test (a array<int>)");
+    addTestTable("create table a.map_test (a map<int, int>)");
+    AnalyzesOk("select a.item from a.array_test t, t.a");
+    AnalyzesOk("select a.key, a.value from a.map_test t, t.a");
+  }
+
+  @Test
+  public void TestStarPathAmbiguity() {
+    addTestDb("a");
+    addTestTable("create table a.a (a struct<a:struct<a:int>>)");
+
+    // Star path is not ambiguous.
+    AnalyzesOk("select a.a.a.a.* from a.a");
+    AnalyzesOk("select t.a.a.* from a.a t");
+
+    // Not ambiguous, but illegal.
+    AnalysisError("select a.a.a.a.a.* from a.a",
+        "Cannot expand star in 'a.a.a.a.a.*' because path 'a.a.a.a.a' " +
+        "resolved to type 'INT'.");
+    AnalysisError("select t.a.a.a.* from a.a t",
+        "Cannot expand star in 't.a.a.a.*' because path 't.a.a.a' " +
+        "resolved to type 'INT'.");
+    AnalysisError("select t.* from a.a t",
+        "Expr 't.a' in select list returns a complex type 'STRUCT<a:STRUCT<a:INT>>'.\n" +
+        "Only scalar types are allowed in the select list.");
+
+    // Star paths are ambiguous.
+    AnalysisError("select a.* from a.a",
+        "Star expression is ambiguous: 'a.*'");
+    AnalysisError("select a.a.* from a.a",
+        "Star expression is ambiguous: 'a.a.*'");
+    AnalysisError("select a.a.a.* from a.a",
+        "Star expression is ambiguous: 'a.a.a.*'");
+
+    // Cannot resolve star paths.
+    AnalysisError("select a.a.a.a.a.a.* from a.a",
+        "Could not resolve star expression: 'a.a.a.a.a.a.*'");
+    AnalysisError("select t.a.a.a.a.* from a.a t",
+        "Could not resolve star expression: 't.a.a.a.a.*'");
+
+    // Paths resolve to an existing implicit table alias
+    // (the unqualified path resolution would be illegal).
+    addTestTable("create table a.array_test (a array<int>)");
+    addTestTable("create table a.map_test (a map<int, int>)");
+    AnalyzesOk("select a.* from a.array_test t, t.a");
+    AnalyzesOk("select a.* from a.map_test t, t.a");
+  }
+
+  @Test
+  public void TestTableRefPathAmbiguity() {
+    addTestDb("a");
+    addTestTable("create table a.a (a array<struct<a:array<int>>>)");
+
+    // Table paths are not ambiguous.
+    AnalyzesOk("select 1 from a.a");
+    AnalyzesOk("select 1 from a.a.a");
+    AnalyzesOk("select 1 from a.a.a.a");
+    AnalyzesOk("select 1 from a", createAnalyzer("a"));
+    AnalyzesOk("select 1 from a.a.a.a", createAnalyzer("a"));
+
+    // Table paths are ambiguous.
+    AnalysisError("select 1 from a.a", createAnalyzer("a"),
+        "Table reference is ambiguous: 'a.a'");
+    AnalysisError("select 1 from a.a.a", createAnalyzer("a"),
+        "Table reference is ambiguous: 'a.a.a'");
+
+    // Ambiguous reference to registered table aliases.
+    addTestTable("create table a.t1 (x array<struct<y:array<int>>>)");
+    addTestTable("create table a.t2 (y array<int>)");
+    AnalysisError("select 1 from a.t1 a, a.t2 `a.x`, a.x.y",
+        "Table reference is ambiguous: 'a.x.y'");
+  }
+
   @Test
   public void TestFromClause() throws AnalysisException {
     AnalyzesOk("select int_col from functional.alltypes");
-    AnalysisError("select int_col from badtbl", "Table does not exist: default.badtbl");
+    AnalysisError("select int_col from badtbl",
+        "Could not resolve table reference: 'badtbl'");
 
     // case-insensitive
     AnalyzesOk("SELECT INT_COL FROM FUNCTIONAL.ALLTYPES");
@@ -46,111 +702,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   }
 
   @Test
-  public void TestTableAliases() throws AnalysisException {
-    String[] tables = new String[] { "alltypes", "alltypes_view" };
-    String[] columns = new String[] { "int_col", "*" };
-
-    for (String tbl: tables) {
-      for (String col: columns) {
-        // Test implicit table aliases with unqualified table/view name.
-        AnalyzesOk(String.format("select %s from %s", col, tbl),
-            createAnalyzer("functional"));
-        AnalyzesOk(String.format("select %s.%s from %s", tbl, col, tbl),
-            createAnalyzer("functional"));
-        AnalyzesOk(String.format("select functional.%s.%s from %s", tbl, col, tbl),
-            createAnalyzer("functional"));
-
-        // Test implicit table aliases with fully-qualified table/view name.
-        AnalyzesOk(String.format("select %s from functional.%s", col, tbl));
-        AnalyzesOk(String.format("select %s.%s from functional.%s", tbl, col, tbl));
-        AnalyzesOk(String.format("select functional.%s.%s from functional.%s",
-            tbl, col, tbl));
-
-        // Explicit table alias.
-        AnalyzesOk(String.format("select %s from functional.%s a", col, tbl));
-        AnalyzesOk(String.format("select a.%s from functional.%s a", col, tbl));
-        // Explicit table alias must be used.
-        AnalysisError(String.format("select %s.%s from functional.%s a", tbl, col, tbl),
-            String.format("unknown table alias '%s'", tbl));
-        AnalysisError(String.format("select functional.%s.%s from functional.%s a",
-            tbl, col, tbl),
-            String.format("unknown table alias 'functional.%s'", tbl));
-      }
-    }
-
-    for (String t1: tables) {
-      for (String t2: tables) {
-        if (t1 == t2) continue;
-        for (String col: columns) {
-          // Multiple implicit fully-qualified aliases work.
-          AnalyzesOk(String.format(
-              "select functional.%s.%s, functional.%s.%s " +
-                  "from functional.%s, functional.%s", t1, col, t2, col, t1, t2));
-        }
-      }
-    }
-
-    for (String tbl: tables) {
-      // Duplicate explicit alias.
-      AnalysisError(String.format(
-          "select a.int_col, a.id from %s a, testtbl a", tbl),
-          createAnalyzer("functional"),
-          "Duplicate table alias");
-      AnalysisError(String.format(
-          "select a.int_col, a.id from functional.%s a, functional.testtbl a", tbl),
-          "Duplicate table alias");
-      // Duplicate implicit alias.
-      AnalysisError(String.format(
-          "select int_col from %s, %s", tbl, tbl),
-          createAnalyzer("functional"),
-          "Duplicate table alias");
-      AnalysisError(String.format(
-          "select int_col from functional.%s, functional.%s", tbl, tbl),
-          "Duplicate table alias");
-      // Duplicate implicit/explicit alias.
-      AnalysisError(String.format(
-          "select %s.int_col from %s, testtbl %s", tbl, tbl, tbl, tbl),
-          createAnalyzer("functional"),
-          "Duplicate table alias");
-      AnalysisError(String.format(
-          "select %s.int_col from functional.%s, functional.testtbl %s", tbl, tbl, tbl),
-          "Duplicate table alias");
-    }
-
-    // Unqualified '*' is not ambiguous.
-    AnalyzesOk("select * from functional.alltypes " +
-        "cross join functional_parquet.alltypes");
-
-    // Ambiguous unqualified column reference.
-    AnalysisError("select int_col from functional.alltypes " +
-        "cross join functional_parquet.alltypes",
-        "unqualified column reference 'int_col' is ambiguous");
-    // Ambiguous implicit unqualified table alias.
-    AnalysisError("select alltypes.int_col from functional.alltypes " +
-        "cross join functional_parquet.alltypes",
-        "unqualified table alias 'alltypes' in column reference 'alltypes.int_col' " +
-        "is ambiguous");
-    AnalysisError("select alltypes.* from functional.alltypes " +
-        "cross join functional_parquet.alltypes",
-        "unqualified table alias 'alltypes' is ambiguous");
-
-    // Mixing unqualified and fully-qualified table refs without explicit aliases is an
-    // error because we'd expect a consistent result if we created a view of this stmt
-    // (table names are fully qualified during view creation -> duplicate table alias).
-    AnalysisError("select alltypes.smallint_col, functional.alltypes.int_col " +
-            "from alltypes inner join functional.alltypes " +
-            "on (alltypes.id = functional.alltypes.id)",
-        createAnalyzer("functional"),
-        "Duplicate table alias: 'functional.alltypes'");
-  }
-
-  @Test
   public void TestNoFromClause() throws AnalysisException {
     AnalyzesOk("select 'test'");
     AnalyzesOk("select 1 + 1, -128, 'two', 1.28");
     AnalyzesOk("select -1, 1 - 1, 10 - -1, 1 - - - 1");
     AnalyzesOk("select -1.0, 1.0 - 1.0, 10.0 - -1.0, 1.0 - - - 1.0");
-    AnalysisError("select a + 1", "couldn't resolve column reference: 'a'");
+    AnalysisError("select a + 1", "Could not resolve column/field reference: 'a'");
     // Test predicates in select list.
     AnalyzesOk("select true");
     AnalyzesOk("select false");
@@ -175,12 +732,30 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select functional.alltypes.*, functional_seq.alltypes.* " +
         "from functional.alltypes, functional_seq.alltypes");
     AnalyzesOk("select * from functional.alltypes, functional_seq.alltypes");
+    // expand '*' on a struct-typed column
+    AnalyzesOk("select int_struct_col.* from functional.allcomplextypes");
+    AnalyzesOk("select a.int_struct_col.* from functional.allcomplextypes a");
+    AnalyzesOk("select allcomplextypes.int_struct_col.* from functional.allcomplextypes");
+    AnalyzesOk("select functional.allcomplextypes.int_struct_col.* " +
+        "from functional.allcomplextypes");
 
     // '*' without from clause has no meaning.
     AnalysisError("select *", "'*' expression in select list requires FROM clause.");
     AnalysisError("select 1, *, 2+4",
         "'*' expression in select list requires FROM clause.");
-    AnalysisError("select a.*", "unknown table alias 'a'");
+    AnalysisError("select a.*", "Could not resolve star expression: 'a.*'");
+
+    // invalid star expansions
+    AnalysisError("select functional.* from functional.alltypes",
+        "Could not resolve star expression: 'functional.*'");
+    AnalysisError("select int_col.* from functional.alltypes",
+        "Cannot expand star in 'int_col.*' because " +
+        "path 'int_col' resolved to type 'INT'.\n" +
+        "Star expansion is only valid for paths to a struct type.");
+    AnalysisError("select complex_struct_col.f2.* from functional.allcomplextypes",
+        "Cannot expand star in 'complex_struct_col.f2.*' because " +
+        "path 'complex_struct_col.f2' resolved to type 'ARRAY<INT>'.\n" +
+        "Star expansion is only valid for paths to a struct type.");
 
     for (String joinType: new String[] { "left semi join", "left anti join" }) {
       // ignore semi-/anti-joined tables in unqualified '*' expansion
@@ -193,7 +768,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       // cannot expand '*" for a semi-/anti-joined table
       AnalysisError(String.format("select a.*, b.* from functional.alltypes a " +
           "%s functional.alltypes b on (a.id = b.id)", joinType),
-          "'*' expression cannot reference semi-/anti-joined table 'b'");
+          "Illegal star expression 'b.*' of semi-/anti-joined table 'b'");
     }
     for (String joinType: new String[] { "right semi join", "right anti join" }) {
       // ignore semi-/anti-joined tables in unqualified '*' expansion
@@ -206,42 +781,54 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       // cannot expand '*" for a semi-/anti-joined table
       AnalysisError(String.format("select a.*, b.* from functional.alltypes a " +
           "%s functional.alltypes b on (a.id = b.id)", joinType),
-          "'*' expression cannot reference semi-/anti-joined table 'a'");
+          "Illegal star expression 'a.*' of semi-/anti-joined table 'a'");
     }
   }
 
   /**
-   * The root stmt may not return a complex-typed value directly because we'd need to
-   * serialize it in a meaningful way. We allow complex types in the select list for
-   * non-root stmts to support views.
+   * Test that complex types are not allowed in the select list.
    */
   @Test
   public void TestComplexTypesInSelectList() {
-    // Legal complex-types result exprs in views.
-    AnalyzesOk("with t as (select * from functional.allcomplextypes) " +
-        "select t.id from t");
-    AnalyzesOk("select t.id " +
-        "from (select * from functional.allcomplextypes) t");
-    AnalyzesOk("select id from functional.allcomplextypes_view");
-    // Illegal complex-typed result expr in root stmt.
+    // Illegal complex-typed expr in select list.
     AnalysisError("select int_struct_col from functional.allcomplextypes",
-        "Expr 'int_struct_col' in select list of root statement returns " +
-        "a complex type 'STRUCT<f1:INT,f2:INT>'.\n" +
-        "Only scalar types are allowed in the select list of the root statement.");
-    AnalysisError("select int_array_col from functional.allcomplextypes_view",
-        "Expr 'int_array_col' in select list of root statement returns a " +
-        "complex type 'ARRAY<INT>'.\n" +
-        "Only scalar types are allowed in the select list of the root statement.");
-    // Legal star expansion adds illegal complex-typed result expr in root stmt.
+        "Expr 'int_struct_col' in select list returns a " +
+        "complex type 'STRUCT<f1:INT,f2:INT>'.\n" +
+        "Only scalar types are allowed in the select list.");
+    // Illegal complex-typed expr in a union.
+    AnalysisError("select int_struct_col from functional.allcomplextypes " +
+        "union all select int_struct_col from functional.allcomplextypes",
+        "Expr 'int_struct_col' in select list returns a " +
+        "complex type 'STRUCT<f1:INT,f2:INT>'.\n" +
+        "Only scalar types are allowed in the select list.");
+    // Illegal complex-typed expr inside inline view.
+    AnalysisError("select 1 from " +
+        "(select int_struct_col from functional.allcomplextypes) v",
+        "Expr 'int_struct_col' in select list returns a " +
+        "complex type 'STRUCT<f1:INT,f2:INT>'.\n" +
+        "Only scalar types are allowed in the select list.");
+    // Illegal complex-typed expr in an insert.
+    AnalysisError("insert into functional.allcomplextypes " +
+        "select int_struct_col from functional.allcomplextypes",
+        "Expr 'int_struct_col' in select list returns a " +
+        "complex type 'STRUCT<f1:INT,f2:INT>'.\n" +
+        "Only scalar types are allowed in the select list.");
+    // Illegal complex-typed expr in a CTAS.
+    AnalysisError("create table new_tbl as " +
+        "select int_struct_col from functional.allcomplextypes",
+        "Expr 'int_struct_col' in select list returns a " +
+        "complex type 'STRUCT<f1:INT,f2:INT>'.\n" +
+        "Only scalar types are allowed in the select list.");
+    // Legal star expansion adds illegal complex-typed expr.
     AnalysisError("select * from functional.allcomplextypes " +
         "cross join functional_parquet.alltypes",
-        "Expr 'functional.allcomplextypes.int_array_col' in select list of " +
-        "root statement returns a complex type 'ARRAY<INT>'.\n" +
-        "Only scalar types are allowed in the select list of the root statement.");
-    AnalysisError("select * from functional.allcomplextypes_view ",
-        "Expr 'functional.allcomplextypes_view.int_array_col' in select list " +
-        "of root statement returns a complex type 'ARRAY<INT>'.\n" +
-        "Only scalar types are allowed in the select list of the root statement.");
+        "Expr 'functional.allcomplextypes.int_array_col' in select list returns a " +
+        "complex type 'ARRAY<INT>'.\n" +
+        "Only scalar types are allowed in the select list.");
+    AnalysisError("select complex_struct_col.* from functional.allcomplextypes",
+        "Expr 'functional.allcomplextypes.complex_struct_col.f2' in select list " +
+        "returns a complex type 'ARRAY<INT>'.\n" +
+        "Only scalar types are allowed in the select list.");
   }
 
   @Test
@@ -266,7 +853,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select t1 c from " +
         "(select c t1 from (select id c from functional_hbase.alltypessmall) t1) a");
     AnalysisError("select id from (select id+2 from functional_hbase.alltypessmall) a",
-        "couldn't resolve column reference: 'id'");
+        "Could not resolve column/field reference: 'id'");
     AnalyzesOk("select a.* from (select id+2 from functional_hbase.alltypessmall) a");
 
     // join test
@@ -275,7 +862,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select a.x from (select count(id) x from functional.AllTypes) a");
     AnalyzesOk("select a.* from (select count(id) from functional.AllTypes) a");
     AnalysisError("select a.id from (select id y from functional_hbase.alltypessmall) a",
-        "couldn't resolve column reference: 'a.id'");
+        "Could not resolve column/field reference: 'a.id'");
     AnalyzesOk("select * from (select * from functional.AllTypes) a where year = 2009");
     AnalyzesOk("select * from (select * from functional.alltypesagg) a right outer join" +
         "             (select * from functional.alltypessmall) b using (id, int_col) " +
@@ -337,7 +924,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "(select int_col from functional.alltypes " +
         " union all " +
         " select tinyint_col from functional.alltypessmall) a",
-        "couldn't resolve column reference: 'tinyint_col'");
+        "Could not resolve column/field reference: 'tinyint_col'");
 
     // negative aggregate test
     AnalysisError("select * from " +
@@ -418,13 +1005,13 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "(select int_col + 6, id from functional.alltypes) b " +
         "on (a.id = b.id)",
         createAnalyzerUsingHiveColLabels(),
-        "unqualified column reference '_c0' is ambiguous");
+        "Column/field reference is ambiguous: '_c0'");
     // auto-generated column doesn't exist
     AnalysisError("select _c0, a, _c2, _c3 from " +
         "(select int_col * 1, int_col as a, int_col, !bool_col, concat(string_col) " +
         "from functional.alltypes) t",
         createAnalyzerUsingHiveColLabels(),
-        "couldn't resolve column reference: '_c2'");
+        "Could not resolve column/field reference: '_c2'");
 
     // Regression test for IMPALA-984.
     AnalyzesOk("SELECT 1 " +
@@ -488,23 +1075,23 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError(
         "select a.int_col from functional.alltypes a " +
         "join functional.alltypes b on (a.int_col = b.badcol)",
-        "couldn't resolve column reference: 'b.badcol'");
+        "Could not resolve column/field reference: 'b.badcol'");
     // ambiguous col ref
     AnalysisError(
         "select a.int_col from functional.alltypes a " +
         "join functional.alltypes b on (int_col = int_col)",
-        "unqualified column reference 'int_col' is ambiguous");
+        "Column/field reference is ambiguous: 'int_col'");
     // unknown alias
     AnalysisError(
         "select a.int_col from functional.alltypes a join functional.alltypes b on " +
         "(a.int_col = badalias.int_col)",
-        "unknown table alias 'badalias' in column reference 'badalias.int_col'");
+        "Could not resolve column/field reference: 'badalias.int_col'");
     // incompatible comparison
     AnalysisError(
         "select a.int_col from functional.alltypes a join " +
         "functional.alltypes b on a.bool_col = b.string_col",
-        "operands of type BOOLEAN and STRING are not comparable: "
-            + "a.bool_col = b.string_col");
+        "operands of type BOOLEAN and STRING are not comparable: " +
+        "a.bool_col = b.string_col");
     AnalyzesOk(
     "select a.int_col, b.int_col, c.int_col " +
         "from functional.alltypes a join functional.alltypes b on " +
@@ -520,7 +1107,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "join functional.alltypes c on " +
         "(b.int_col = c.int_col and b.string_col = c.string_col " +
         "and b.bool_col = c.bool_col)",
-        "unknown table alias 'c' in column reference 'c.int_col'");
+        "Could not resolve column/field reference: 'c.int_col'");
 
     // outer joins require ON/USING clause
     AnalyzesOk("select * from functional.alltypes a left outer join " +
@@ -589,13 +1176,13 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "%s functional.alltypes b on (a.id = b.id)", joinType));
       AnalysisError(String.format("select * from functional.alltypes a " +
           "%s functional.alltypes b on (a.id = b.id and a.int_col = int_col)", joinType),
-          "unqualified column reference 'int_col' is ambiguous");
+          "Column/field reference is ambiguous: 'int_col'");
       // flip 'a' and 'b' aliases to test the unqualified column resolution logic
       AnalyzesOk(String.format("select int_col from functional.alltypes b " +
           "%s functional.alltypes a on (b.id = a.id)", joinType));
       AnalysisError(String.format("select * from functional.alltypes b " +
           "%s functional.alltypes a on (b.id = a.id and b.int_col = int_col)", joinType),
-          "unqualified column reference 'int_col' is ambiguous");
+          "Column/field reference is ambiguous: 'int_col'");
       // unqualified column reference that matches two semi-/anti-joined tables
       // is not ambiguous outside of On-clause
       AnalyzesOk(String.format("select int_col from functional.alltypes c " +
@@ -607,51 +1194,56 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       AnalysisError(String.format("select int_col from functional.alltypes c " +
           "%s functional.alltypes b on (c.id = b.id) " +
           "%s functional.jointbl a on (test_id = b.id)", joinType, joinType),
-          "Illegal column reference 'id' of semi-/anti-joined table 'b'");
+          "Illegal column/field reference 'b.id' of semi-/anti-joined table 'b'");
       // must not reference semi/anti-joined alias outside of join clause
       AnalysisError(String.format("select a.id, b.id from functional.alltypes a " +
           "%s functional.alltypes b on (a.id = b.id)", joinType),
-          "Illegal column reference 'id' of semi-/anti-joined table 'b'");
+          "Illegal column/field reference 'b.id' of semi-/anti-joined table 'b'");
       AnalysisError(String.format("select a.id from functional.alltypes a " +
           "%s (select * from functional.alltypes) b " +
           "on (a.id = b.id) where b.int_col > 10", joinType),
-          "Illegal column reference 'int_col' of semi-/anti-joined table 'b'");
+          "Illegal column/field reference 'b.int_col' of semi-/anti-joined table 'b'");
       AnalysisError(String.format("select a.id from functional.alltypes a " +
           "%s functional.alltypes b on (a.id = b.id) group by b.bool_col", joinType),
-          "Illegal column reference 'bool_col' of semi-/anti-joined table 'b'");
+          "Illegal column/field reference 'b.bool_col' of semi-/anti-joined table 'b'");
       AnalysisError(String.format("select a.id from functional.alltypes a " +
           "%s (select * from functional.alltypes) b " +
           "on (a.id = b.id) order by b.string_col", joinType),
-          "Illegal column reference 'string_col' of semi-/anti-joined table 'b'");
+          "Illegal column/field reference 'b.string_col' of " +
+          "semi-/anti-joined table 'b'");
       // column of semi/anti-joined table is not visible in other On-clause
       AnalysisError(String.format("select a.id from functional.alltypes a " +
           "%s functional.alltypes b on (a.id = b.id)" +
           "left outer join functional.testtbl c on (b.id = c.id)", joinType),
-          "Illegal column reference 'id' of semi-/anti-joined table 'b'");
+          "Illegal column/field reference 'b.id' of semi-/anti-joined table 'b'");
       // column of semi/anti-joined table is not visible in other On-clause
       AnalysisError(String.format("select a.id from functional.alltypes a " +
           "%s functional.alltypes b on (a.id = b.id)" +
           "%s functional.testtbl c on (b.id = c.id)", joinType, joinType),
-          "Illegal column reference 'id' of semi-/anti-joined table 'b'");
+          "Illegal column/field reference 'b.id' of semi-/anti-joined table 'b'");
       // using clause always refers to lhs/rhs table
       AnalysisError(String.format("select a.id from functional.alltypes a " +
           "%s functional.alltypes b using(id) " +
           "%s functional.alltypes c using(int_col)", joinType, joinType),
-          "Illegal column reference 'int_col' of semi-/anti-joined table 'b'");
+          "Illegal column/field reference 'b.int_col' of semi-/anti-joined table 'b'");
       // unqualified column reference is ambiguous in the On-clause of a semi/anti join
       AnalysisError(String.format("select * from functional.alltypes a " +
           "%s functional.alltypes b on (a.id = b.id and a.int_col = int_col)", joinType),
-          "unqualified column reference 'int_col' is ambiguous");
+          "Column/field reference is ambiguous: 'int_col'");
       // illegal unqualified column reference against semi/anti-joined table
       AnalysisError(String.format("select test_id from functional.alltypes a " +
           "%s functional.jointbl b on (a.id = b.alltypes_id)", joinType),
-          "Illegal column reference 'test_id' of semi-/anti-joined table 'b'");
+          "Illegal column/field reference 'test_id' of semi-/anti-joined table 'b'");
       // unqualified table ref is ambiguous even if semi/anti-joined
       AnalysisError(String.format("select alltypes.int_col from functional.alltypes " +
           "%s functional_parquet.alltypes " +
           "on (functional.alltypes.id = functional_parquet.alltypes.id)", joinType),
-          "unqualified table alias 'alltypes' in column reference 'alltypes.int_col' " +
-          "is ambiguous");
+          "Unqualified table alias is ambiguous: 'alltypes'");
+      // illegal collection table reference through semi/anti joined table
+      AnalysisError(String.format("select 1 from functional.allcomplextypes a " +
+          "%s functional.allcomplextypes b on (a.id = b.id) " +
+          "inner join b.int_array_col", joinType),
+          "Illegal table reference 'b.int_array_col' of semi-/anti-joined table 'b'");
     }
 
     // Test right semi joins. Do not combine these with the left semi join tests above
@@ -671,13 +1263,13 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
           "%s functional.alltypes b on (a.id = b.id)", joinType));
       AnalysisError(String.format("select * from functional.alltypes a " +
           "%s functional.alltypes b on (a.id = b.id and a.int_col = int_col)", joinType),
-          "unqualified column reference 'int_col' is ambiguous");
+          "Column/field reference is ambiguous: 'int_col'");
       // flip 'a' and 'b' aliases to test the unqualified column resolution logic
       AnalyzesOk(String.format("select int_col from functional.alltypes b " +
           "%s functional.alltypes a on (b.id = a.id)", joinType));
       AnalysisError(String.format("select * from functional.alltypes b " +
           "%s functional.alltypes a on (b.id = a.id and b.int_col = int_col)", joinType),
-          "unqualified column reference 'int_col' is ambiguous");
+          "Column/field reference is ambiguous: 'int_col'");
       // unqualified column reference that matches two semi-/anti-joined tables
       // is not ambiguous outside of On-clause
       AnalyzesOk(String.format("select int_col from functional.jointbl c " +
@@ -689,51 +1281,56 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
       AnalysisError(String.format("select int_col from functional.jointbl c " +
           "%s functional.alltypes b on (test_id = a.id) " +
           "%s functional.alltypes a on (c.id = b.id)", joinType, joinType),
-          "unknown table alias 'a' in column reference 'a.id'");
+          "Could not resolve column/field reference: 'a.id'");
       // must not reference semi/anti-joined alias outside of join clause
       AnalysisError(String.format("select a.id, b.id from functional.alltypes a " +
           "%s functional.alltypes b on (a.id = b.id)", joinType),
-          "Illegal column reference 'id' of semi-/anti-joined table 'a'");
+          "Illegal column/field reference 'a.id' of semi-/anti-joined table 'a'");
       AnalysisError(String.format("select b.id from functional.alltypes a " +
           "%s (select * from functional.alltypes) b " +
           "on (a.id = b.id) where a.int_col > 10", joinType),
-          "Illegal column reference 'int_col' of semi-/anti-joined table 'a'");
+          "Illegal column/field reference 'a.int_col' of semi-/anti-joined table 'a'");
       AnalysisError(String.format("select b.id from functional.alltypes a " +
           "%s functional.alltypes b on (a.id = b.id) group by a.bool_col", joinType),
-          "Illegal column reference 'bool_col' of semi-/anti-joined table 'a'");
+          "Illegal column/field reference 'a.bool_col' of semi-/anti-joined table 'a'");
       AnalysisError(String.format("select b.id from functional.alltypes a " +
           "%s (select * from functional.alltypes) b " +
           "on (a.id = b.id) order by a.string_col", joinType),
-          "Illegal column reference 'string_col' of semi-/anti-joined table 'a'");
+          "Illegal column/field reference 'a.string_col' of " +
+          "semi-/anti-joined table 'a'");
       // column of semi/anti-joined table is not visible in other On-clause
       AnalysisError(String.format("select b.id from functional.alltypes a " +
           "%s functional.alltypes b on (a.id = b.id)" +
           "left outer join functional.testtbl c on (a.id = c.id)", joinType),
-          "Illegal column reference 'id' of semi-/anti-joined table 'a'");
+          "Illegal column/field reference 'a.id' of semi-/anti-joined table 'a'");
       // column of semi/anti-joined table is not visible in other On-clause
       AnalysisError(String.format("select b.id from functional.alltypes a " +
           "%s functional.alltypes b on (a.id = b.id)" +
           "%s functional.testtbl c on (a.id = c.id)", joinType, joinType),
-          "Illegal column reference 'id' of semi-/anti-joined table 'a'");
+          "Illegal column/field reference 'a.id' of semi-/anti-joined table 'a'");
       // using clause always refers to lhs/rhs table
       AnalysisError(String.format("select b.id from functional.alltypes a " +
           "%s functional.alltypes b using(id) " +
           "%s functional.alltypes c using(int_col)", joinType, joinType),
-          "Illegal column reference 'id' of semi-/anti-joined table 'b'");
+          "Illegal column/field reference 'b.id' of semi-/anti-joined table 'b'");
       // unqualified column reference is ambiguous in the On-clause of a semi/anti join
       AnalysisError(String.format("select * from functional.alltypes a " +
           "%s functional.alltypes b on (a.id = b.id and a.int_col = int_col)", joinType),
-          "unqualified column reference 'int_col' is ambiguous");
+          "Column/field reference is ambiguous: 'int_col'");
       // illegal unqualified column reference against semi/anti-joined table
       AnalysisError(String.format("select test_id from functional.jointbl a " +
           "%s functional.alltypes b on (a.alltypes_id = b.id)", joinType),
-          "Illegal column reference 'test_id' of semi-/anti-joined table 'a'");
+          "Illegal column/field reference 'test_id' of semi-/anti-joined table 'a'");
       // unqualified table ref is ambiguous even if semi/anti-joined
       AnalysisError(String.format("select alltypes.int_col from functional.alltypes " +
           "%s functional_parquet.alltypes " +
           "on (functional.alltypes.id = functional_parquet.alltypes.id)", joinType),
-          "unqualified table alias 'alltypes' in column reference 'alltypes.int_col' " +
-          "is ambiguous");
+          "Unqualified table alias is ambiguous: 'alltypes'");
+      // illegal collection table reference through semi/anti joined table
+      AnalysisError(String.format("select 1 from functional.allcomplextypes a " +
+          "%s functional.allcomplextypes b on (a.id = b.id) " +
+          "inner join a.int_array_col", joinType),
+          "Illegal table reference 'a.int_array_col' of semi-/anti-joined table 'a'");
     }
   }
 
@@ -877,7 +1474,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   public void TestWhereClause() throws AnalysisException {
     AnalyzesOk("select zip, name from functional.testtbl where id > 15");
     AnalysisError("select zip, name from functional.testtbl where badcol > 15",
-        "couldn't resolve column reference");
+        "Could not resolve column/field reference: 'badcol'");
     AnalyzesOk("select * from functional.testtbl where true");
     AnalysisError("select * from functional.testtbl where count(*) > 0",
         "aggregate function not allowed in WHERE clause");
@@ -1483,15 +2080,15 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // Order by references an invalid column
     AnalysisError("(select smallint_col from functional.alltypes) " +
         "union (select int_col from functional.alltypessmall) order by int_col",
-        "couldn't resolve column reference: 'int_col'");
+        "Could not resolve column/field reference: 'int_col'");
     // Make sure table aliases aren't visible across union operands.
     AnalysisError("select a.smallint_col from functional.alltypes a " +
         "union select a.int_col from functional.alltypessmall",
-        "unknown table alias 'a' in column reference 'a.int_col'");
+        "Could not resolve column/field reference: 'a.int_col'");
 
     // Regression test for IMPALA-1128, union of decimal and an int type that converts
     // to the identical decimal.
-    AnalyzesOk("select CAST(1 AS BIGINT) UNION SELECT CAST(1 AS DECIMAL(19, 0))");
+    AnalyzesOk("select cast(1 as bigint) union select cast(1 as decimal(19, 0))");
   }
 
   @Test
@@ -1540,9 +2137,9 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("values(sum(1), 'a', 1.0)",
         "aggregation without a FROM clause is not allowed");
     AnalysisError("values(1, id, 2)",
-        "couldn't resolve column reference: 'id'");
+        "Could not resolve column/field reference: 'id'");
     AnalysisError("values((1 as x, 'a' as y), (2, 'b')) order by c limit 1",
-        "couldn't resolve column reference: 'c'");
+        "Could not resolve column/field reference: 'c'");
     AnalysisError("values((1, 2), (3, 4, 5))",
         "Operands have unequal number of columns:\n" +
         "'(1, 2)' has 2 column(s)\n" +
@@ -1715,7 +2312,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "Duplicate table alias: 't1'");
     // If one was given, we must use the explicit alias for column references.
     AnalysisError("with t1 as (select 'a' x) select t1.x from t1 as t2",
-        "unknown table alias 't1' in column reference 't1.x'");
+        "Could not resolve column/field reference: 't1.x'");
     // WITH-clause tables cannot be inserted into.
     AnalysisError("with t1 as (select 'a' x) insert into t1 values('b' x)",
         "Table does not exist: default.t1");
@@ -1724,37 +2321,37 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("with alltypes_view as (select int_col x from alltypes_view) " +
         "select x from alltypes_view",
         createAnalyzer("functional"));
-    // The inner 't' get resolved to a non-existent base table.
+    // The inner 't' is resolved to a non-existent base table.
     AnalysisError("with t as (select int_col x, bigint_col y from t1) " +
         "select x, y from t",
-        "Table does not exist: default.t1");
+        "Could not resolve table reference: 't1'");
     AnalysisError("with t as (select 1 as x, 2 as y union all select * from t) " +
         "select x, y from t",
-        "Table does not exist: default.t");
+        "Could not resolve table reference: 't'");
     AnalysisError("with t as (select a.* from (select * from t) as a) " +
         "select x, y from t",
-        "Table does not exist: default.t");
+        "Could not resolve table reference: 't'");
     // The inner 't1' in a nested WITH clause gets resolved to a non-existent base table.
     AnalysisError("with t1 as (with t2 as (select * from t1) select * from t2) " +
         "select * from t1 ",
-        "Table does not exist: default.t1");
+        "Could not resolve table reference: 't1'");
     AnalysisError("with t1 as " +
         "(select * from (with t2 as (select * from t1) select * from t2) t3) " +
         "select * from t1",
-        "Table does not exist: default.t1");
+        "Could not resolve table reference: 't1'");
     // The inner 't1' in the gets resolved to a non-existent base table.
     AnalysisError("with t1 as " +
         "(with t2 as (select * from t1) select * from t2 union all select * from t2)" +
         "select * from t1",
-        "Table does not exist: default.t1");
+        "Could not resolve table reference: 't1'");
     AnalysisError("with t1 as " +
         "(select 'x', 'y' union all (with t2 as (select * from t1) select * from t2))" +
         "select * from t1",
-        "Table does not exist: default.t1");
+        "Could not resolve table reference: 't1'");
     // The 't2' inside 't1's definition gets resolved to a non-existent base table.
     AnalysisError("with t1 as (select int_col x, bigint_col y from t2), " +
         "t2 as (select int_col x, bigint_col y from t1) select x, y from t1",
-        "Table does not exist: default.t2");
+        "Could not resolve table reference: 't2'");
 
     // WITH clause with subqueries
     AnalyzesOk("with t as (select * from functional.alltypesagg where id in " +
@@ -1841,7 +2438,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "Duplicate table alias: 'functional.alltypes_view_sub'");
     // Column names were redefined in view.
     AnalysisError("select int_col from functional.alltypes_view_sub",
-        "couldn't resolve column reference: 'int_col'");
+        "Could not resolve column/field reference: 'int_col'");
   }
 
   @Test
@@ -2465,14 +3062,14 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
    * number of members should be updated to make the test pass.
    */
   @Test
-  public void cloneTest() {
+  public void TestClone() {
     testNumberOfMembers(QueryStmt.class, 10);
     testNumberOfMembers(UnionStmt.class, 8);
     testNumberOfMembers(ValuesStmt.class, 0);
 
     // Also check TableRefs.
-    testNumberOfMembers(TableRef.class, 12);
-    testNumberOfMembers(BaseTableRef.class, 1);
+    testNumberOfMembers(TableRef.class, 14);
+    testNumberOfMembers(BaseTableRef.class, 0);
     testNumberOfMembers(InlineViewRef.class, 8);
   }
 

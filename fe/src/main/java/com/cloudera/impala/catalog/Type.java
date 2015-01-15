@@ -187,8 +187,16 @@ public abstract class Type {
 
   public PrimitiveType getPrimitiveType() { return PrimitiveType.INVALID_TYPE; }
 
-  // TODO: Handle complex types properly. Some instances may be fixed length.
-  public int getSlotSize() { return -1; }
+  /**
+   * Returns the size in bytes of the fixed-length portion that a slot of this type
+   * occupies in a tuple.
+   */
+  public int getSlotSize() {
+    // 8-byte pointer and 4-byte length indicator (12 bytes total).
+    // Aligning to 8 bytes so 16 total.
+    if (isCollectionType()) return 16;
+    throw new IllegalStateException("getSlotSize() not implemented for type " + toSql());
+  }
 
   public TColumnType toThrift() {
     TColumnType container = new TColumnType();
@@ -204,9 +212,10 @@ public abstract class Type {
 
   /**
    * Returns true if this type is equal to t, or if t is a wildcard variant of this
-   * type (only applicable to DECIMAL).
+   * type. Subclasses should override this as appropriate. The default implementation
+   * here is to avoid special-casing logic in callers for concrete types.
    */
-  public abstract boolean matchesType(Type t);
+  public boolean matchesType(Type t) { return false; }
 
   /**
    * Gets the ColumnType from the given FieldSchema by using Impala's SqlParser.

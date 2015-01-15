@@ -555,19 +555,6 @@ delimited fields terminated by ','  escaped by '\\'
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
-functional
----- COLUMNS
--- For testing ambiguous path resolution
-id int
-functional struct<functional: struct<functional: int>>
----- ROW_FORMAT
-delimited fields terminated by ','  escaped by '\\'
----- DEPENDENT_LOAD
----- LOAD
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
 testtbl
 ---- COLUMNS
 id bigint
@@ -743,15 +730,6 @@ alltypes_view
 ---- CREATE
 CREATE VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name}
 AS SELECT * FROM {db_name}{db_suffix}.alltypes;
----- LOAD
-====
----- DATASET
-functional
----- BASE_TABLE_NAME
-allcomplextypes_view
----- CREATE
-CREATE VIEW IF NOT EXISTS {db_name}{db_suffix}.{table_name}
-AS SELECT * FROM {db_name}{db_suffix}.allcomplextypes;
 ---- LOAD
 ====
 ---- DATASET

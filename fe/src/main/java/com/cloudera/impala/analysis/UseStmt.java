@@ -40,7 +40,7 @@ public class UseStmt extends StatementBase {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (!database_.equalsIgnoreCase(Catalog.DEFAULT_DB)) {
       // USE <default> should always be allowed.
-      analyzer.getDb(database_, Privilege.ANY);
+      analyzer.getDb(database_, Privilege.ANY, true);
     }
   }
 

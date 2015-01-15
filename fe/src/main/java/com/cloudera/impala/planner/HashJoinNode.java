@@ -219,7 +219,7 @@ public class HashJoinNode extends PlanNode {
    * - # rows in Customers == # of distinct values for Customers.id
    * - the output cardinality of the join would be F.cardinality * 0.2
    */
-  private long getJoinCardinality() {
+  private long getJoinCardinality(Analyzer analyzer) {
     Preconditions.checkState(
         joinOp_ == JoinOperator.INNER_JOIN || joinOp_.isOuterJoin());
     long maxNumDistinct = 0;
@@ -362,7 +362,7 @@ public class HashJoinNode extends PlanNode {
     if (joinOp_.isSemiJoin()) {
       cardinality_ = getSemiJoinCardinality();
     } else {
-      cardinality_ = getJoinCardinality();
+      cardinality_ = getJoinCardinality(analyzer);
     }
 
     // Impose lower/upper bounds on the cardinality based on the join type.

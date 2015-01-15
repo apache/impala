@@ -24,19 +24,20 @@ struct TSlotDescriptor {
   2: required Types.TTupleId parent
   3: required Types.TColumnType slotType
 
-  // The column path defines this slot's column in the originating table, which is
-  // possibly nested in one or more other columns. Each list element in the path is an
-  // index. The first element is an index into the top-level table schema. Each subsequent
-  // element (if any) is an index into the previous column's nested types. Note that this
-  // means an element refering to a scalar-type column must be the last element in the
-  // path, although the path could end with a nested-type column as well.
+  // Absolute path into the table schema pointing to the column/field materialized into
+  // this slot. Contains only a single element for slots that do not materialize a
+  // table column/field, e.g., slots materializing an aggregation result.
+  // columnPath[i] is the the ordinal position of the column/field of the table schema
+  // at level i. For example, columnPos[0] is an ordinal into the list of table columns,
+  // columnPos[1] is an ordinal into the list of fields of the complex-typed column at
+  // position columnPos[0], etc.
   4: required list<i32> columnPath
 
   5: required i32 byteOffset  // into tuple
   6: required i32 nullIndicatorByte
   7: required i32 nullIndicatorBit
-  9: required i32 slotIdx
-  10: required bool isMaterialized
+  8: required i32 slotIdx
+  9: required bool isMaterialized
 }
 
 // "Union" of all table types.

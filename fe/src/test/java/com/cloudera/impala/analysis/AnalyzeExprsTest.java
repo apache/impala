@@ -1410,6 +1410,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         "Cannot pass 'DISTINCT' to scalar function.");
     AnalysisError("select * from functional.alltypes where pi(*) = 5",
         "Cannot pass '*' to scalar function.");
+    // Invalid function name.
+    AnalysisError("select a.b.sin()",
+        "Invalid function name: 'a.b.sin'. Expected [dbname].funcname");
 
     // Call function that only accepts decimal
     AnalyzesOk("select precision(1)");

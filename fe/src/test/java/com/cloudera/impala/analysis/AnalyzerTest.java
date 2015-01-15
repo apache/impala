@@ -25,6 +25,7 @@ import java.util.Map;
 
 import junit.framework.Assert;
 
+import org.junit.After;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,11 +33,15 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.catalog.AggregateFunction;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
+import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.testutil.ImpaladTestCatalog;
@@ -51,6 +56,10 @@ import com.google.common.collect.Lists;
 public class AnalyzerTest {
   protected final static Logger LOG = LoggerFactory.getLogger(AnalyzerTest.class);
   protected static ImpaladCatalog catalog_ = new ImpaladTestCatalog();
+
+  // Test-local list of test databases and tables. These are cleaned up in @After.
+  protected final List<Db> testDbs_ = Lists.newArrayList();
+  protected final List<Table> testTables_ = Lists.newArrayList();
 
   protected Analyzer analyzer_;
 
@@ -121,6 +130,62 @@ public class AnalyzerTest {
     FunctionName fnName = new FunctionName("default", name);
     catalog_.addFunction(
         new AggregateFunction(fnName, Lists.newArrayList(argTypes), retType, false));
+  }
+
+  /**
+   * Add a new dummy database with the given name to the catalog.
+   * Returns the new dummy database.
+   * The database is registered in testDbs_ and removed in the @After method.
+   */
+  protected Db addTestDb(String dbName) {
+    Db db = catalog_.getDb(dbName);
+    Preconditions.checkState(db == null, "Test db must not already exist.");
+    db = new Db(dbName, catalog_);
+    catalog_.addDb(db);
+    testDbs_.add(db);
+    return db;
+  }
+
+  protected void clearTestDbs() {
+    for (Db testDb: testDbs_) {
+      catalog_.removeDb(testDb.getName());
+    }
+  }
+
+  /**
+   * Add a new dummy table to the catalog based on the given CREATE TABLE sql.
+   * The dummy table only has the column definitions and no other metadata.
+   * Returns the new dummy table.
+   * The test tables are registered in testTables_ and removed in the @After method.
+   */
+  protected Table addTestTable(String createTableSql) {
+    CreateTableStmt createTableStmt = (CreateTableStmt) AnalyzesOk(createTableSql);
+    // Currently does not support partitioned tables.
+    Preconditions.checkState(createTableStmt.getPartitionColumnDefs().isEmpty());
+    Db db = catalog_.getDb(createTableStmt.getDb());
+    Preconditions.checkNotNull(db, "Test tables must be created in an existing db.");
+    HdfsTable dummyTable = new HdfsTable(null, null, db, createTableStmt.getTbl(),
+        createTableStmt.getOwner());
+    List<ColumnDef> columnDefs = createTableStmt.getColumnDefs();
+    for (int i = 0; i < columnDefs.size(); ++i) {
+      ColumnDef colDef = columnDefs.get(i);
+      dummyTable.addColumn(new Column(colDef.getColName(), colDef.getType(), i));
+    }
+    db.addTable(dummyTable);
+    testTables_.add(dummyTable);
+    return dummyTable;
+  }
+
+  protected void clearTestTables() {
+    for (Table testTable: testTables_) {
+      testTable.getDb().removeTable(testTable.getName());
+    }
+  }
+
+  @After
+  public void tearDown() {
+    clearTestTables();
+    clearTestDbs();
   }
 
   /**
@@ -278,6 +343,41 @@ public class AnalyzerTest {
       return;
     }
     fail("Stmt didn't result in analysis error: " + stmt);
+  }
+
+  /**
+   * Generates and analyzes two variants of the given query by replacing all occurrences
+   * of "$TBL" in the query string with the unqualified and fully-qualified version of
+   * the given table name. The unqualified variant is analyzed using an analyzer that has
+   * tbl's db set as the default database.
+   * Example:
+   * query = "select id from $TBL, $TBL"
+   * tbl = "functional.alltypes"
+   * Variants generated and analyzed:
+   * select id from alltypes, alltypes (default db is "functional")
+   * select id from functional.alltypes, functional.alltypes (default db is "default")
+   */
+  protected void TblsAnalyzeOk(String query, TableName tbl) {
+    Preconditions.checkState(tbl.isFullyQualified());
+    Preconditions.checkState(query.contains("$TBL"));
+    String uqQuery = query.replace("$TBL", tbl.getTbl());
+    AnalyzesOk(uqQuery, createAnalyzer(tbl.getDb()));
+    String fqQuery = query.replace("$TBL", tbl.toString());
+    AnalyzesOk(fqQuery);
+  }
+
+  /**
+   * Same as TblsAnalyzeOk(), except that analysis of all variants is expected
+   * to fail with the given error message.
+   */
+  protected void TblsAnalysisError(String query, TableName tbl,
+      String expectedError) {
+    Preconditions.checkState(tbl.isFullyQualified());
+    Preconditions.checkState(query.contains("$TBL"));
+    String uqQuery = query.replace("$TBL", tbl.getTbl());
+    AnalysisError(uqQuery, createAnalyzer(tbl.getDb()), expectedError);
+    String fqQuery = query.replace("$TBL", tbl.toString());
+    AnalysisError(fqQuery, expectedError);
   }
 
   /**
@@ -462,7 +562,7 @@ public class AnalyzerTest {
         "Unsupported type 'BINARY' in 'bin_col'.");
     // Unsupported partition-column type.
     AnalysisError("select * from functional.unsupported_partition_types",
-        "Failed to load metadata for table: functional.unsupported_partition_types");
+        "Failed to load metadata for table: 'functional.unsupported_partition_types'");
 
     // Try with hbase
     AnalyzesOk("describe functional_hbase.allcomplextypes");
@@ -476,7 +576,7 @@ public class AnalyzerTest {
   @Test
   public void TestUnsupportedSerde() {
     AnalysisError("select * from functional.bad_serde",
-                  "Failed to load metadata for table: functional.bad_serde");
+        "Failed to load metadata for table: 'functional.bad_serde'");
   }
 
   @Test
@@ -513,7 +613,7 @@ public class AnalyzerTest {
     // Analysis error from explain query
     AnalysisError("explain " +
         "select id from (select id+2 from functional_hbase.alltypessmall) a",
-        "couldn't resolve column reference: 'id'");
+        "Could not resolve column/field reference: 'id'");
 
     // Positive test for explain query
     AnalyzesOk("explain select * from functional.AllTypes");

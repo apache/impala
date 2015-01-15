@@ -20,6 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.thrift.TDescriptorTable;
 import com.google.common.base.Preconditions;
@@ -154,12 +155,8 @@ public class DescriptorTable {
       // in the descriptor table just for type checking, which we need to skip
       if (tupleDesc.isMaterialized()) {
         result.addToTupleDescriptors(tupleDesc.toThrift());
-        // views and inline views have a materialized tuple if they are defined by a
-        // constant select. they do not require or produce a thrift table descriptor.
         Table table = tupleDesc.getTable();
-        if (table != null && !table.isVirtualTable()) {
-          referencedTbls.add(table);
-        }
+        if (table != null && !(table instanceof View)) referencedTbls.add(table);
         for (SlotDescriptor slotD: tupleDesc.getSlots()) {
           result.addToSlotDescriptors(slotD.toThrift());
         }

@@ -151,8 +151,6 @@ public class View extends Table {
     throw new IllegalStateException("Cannot call getNumNodes() on a view.");
   }
 
-  @Override
-  public boolean isVirtualTable() { return true; }
   public boolean isLocalView() { return isLocalView_; }
 
   @Override

@@ -35,7 +35,6 @@ import com.cloudera.impala.thrift.TColumn;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableStats;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -74,10 +73,13 @@ public abstract class Table implements CatalogObject {
 
   // colsByPos[i] refers to the ith column in the table. The first numClusteringCols are
   // the clustering columns.
-  private final ArrayList<Column> colsByPos_;
+  private final ArrayList<Column> colsByPos_ = Lists.newArrayList();
 
   // map from lowercase column name to Column object.
-  private final Map<String, Column> colsByName_;
+  private final Map<String, Column> colsByName_ = Maps.newHashMap();
+
+  // Type of this table (array of struct) that mirrors the columns. Useful for analysis.
+  protected final ArrayType type_ = new ArrayType(new StructType());
 
   // The lastDdlTime for this table; -1 if not set
   protected long lastDdlTime_;
@@ -93,8 +95,6 @@ public abstract class Table implements CatalogObject {
     db_ = db;
     name_ = name.toLowerCase();
     owner_ = owner;
-    colsByPos_ = Lists.newArrayList();
-    colsByName_ = Maps.newHashMap();
     lastDdlTime_ = (msTable_ != null) ?
         CatalogServiceCatalog.getLastDdlTime(msTable_) : -1;
   }
@@ -114,11 +114,14 @@ public abstract class Table implements CatalogObject {
   public void addColumn(Column col) {
     colsByPos_.add(col);
     colsByName_.put(col.getName().toLowerCase(), col);
+    ((StructType) type_.getItemType()).addField(
+        new StructField(col.getName(), col.getType(), col.getComment()));
   }
 
   public void clearColumns() {
     colsByPos_.clear();
     colsByName_.clear();
+    ((StructType) type_.getItemType()).clearFields();
   }
 
   /**
@@ -252,6 +255,8 @@ public abstract class Table implements CatalogObject {
       Column col = Column.fromThrift(columns.get(i));
       colsByPos_.add(col.getPosition(), col);
       colsByName_.put(col.getName().toLowerCase(), col);
+      ((StructType) type_.getItemType()).addField(
+          new StructField(col.getName(), col.getType(), col.getComment()));
       fields_.add(new FieldSchema(col.getName(),
         col.getType().toString().toLowerCase(), col.getComment()));
     }
@@ -333,18 +338,13 @@ public abstract class Table implements CatalogObject {
      return type;
    }
 
-  /**
-   * Returns true if this table is not a base table that stores data (e.g., a view).
-   * Virtual tables should not be added to the descriptor table sent to the BE, i.e.,
-   * toThrift() should not work on virtual tables.
-   */
-  public boolean isVirtualTable() { return false; }
   public Db getDb() { return db_; }
   public String getName() { return name_; }
   public String getFullName() { return (db_ != null ? db_.getName() + "." : "") + name_; }
   public TableName getTableName() {
     return new TableName(db_ != null ? db_.getName() : null, name_);
   }
+
   public String getOwner() { return owner_; }
   public ArrayList<Column> getColumns() { return colsByPos_; }
 
@@ -402,6 +402,7 @@ public abstract class Table implements CatalogObject {
   public int getNumClusteringCols() { return numClusteringCols_; }
   public TableId getId() { return id_; }
   public long getNumRows() { return numRows_; }
+  public ArrayType getType() { return type_; }
 
   @Override
   public long getCatalogVersion() { return catalogVersion_; }

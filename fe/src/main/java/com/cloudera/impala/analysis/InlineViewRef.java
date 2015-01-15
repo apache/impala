@@ -15,18 +15,20 @@
 package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnStats;
-import com.cloudera.impala.catalog.InlineView;
+import com.cloudera.impala.catalog.StructField;
+import com.cloudera.impala.catalog.StructType;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * An inline view is a query statement with an alias. Inline views can be parsed directly
@@ -79,10 +81,15 @@ public class InlineViewRef extends TableRef {
    * C'tor for creating inline views that replace a local or catalog view ref.
    */
   public InlineViewRef(View view, TableRef origTblRef) {
-    super(view.getTableName(), origTblRef.getExplicitAlias());
+    super(view.getTableName().toPath(), origTblRef.getExplicitAlias());
     queryStmt_ = view.getQueryStmt().clone();
     view_ = view;
     setJoinAttrs(origTblRef);
+    // Set implicit aliases if no explicit one was given.
+    if (hasExplicitAlias()) return;
+    aliases_ = new String[] {
+        view_.getTableName().toString().toLowerCase(), view_.getName().toLowerCase()
+    };
   }
 
   /**
@@ -158,9 +165,11 @@ public class InlineViewRef extends TableRef {
     // TODO: relax this a bit by allowing propagation out of the inline view (but
     // not into it)
     for (int i = 0; i < getColLabels().size(); ++i) {
-      String colName = getColLabels().get(i);
+      String colName = getColLabels().get(i).toLowerCase();
       Expr colExpr = queryStmt_.getResultExprs().get(i);
-      SlotDescriptor slotDesc = analyzer.registerColumnRef(getAliasAsName(), colName);
+      Path p = new Path(desc_, Lists.newArrayList(colName));
+      Preconditions.checkState(p.resolve());
+      SlotDescriptor slotDesc = analyzer.registerSlotRef(p);
       slotDesc.setSourceExpr(colExpr);
       slotDesc.setStats(ColumnStats.fromExpr(colExpr));
       SlotRef slotRef = new SlotRef(slotDesc);
@@ -170,8 +179,8 @@ public class InlineViewRef extends TableRef {
         analyzer.createAuxEquivPredicate(new SlotRef(slotDesc), colExpr.clone());
       }
     }
-    LOG.trace("inline view " + getAlias() + " smap: " + smap_.debugString());
-    LOG.trace("inline view " + getAlias() + " baseTblSmap: " +
+    LOG.trace("inline view " + getUniqueAlias() + " smap: " + smap_.debugString());
+    LOG.trace("inline view " + getUniqueAlias() + " baseTblSmap: " +
         baseTblSmap_.debugString());
 
     // Now do the remaining join analysis
@@ -193,35 +202,35 @@ public class InlineViewRef extends TableRef {
   }
 
   /**
-   * Create a non-materialized tuple descriptor in descTbl for this inline view.
+   * Create and register a non-materialized tuple descriptor for this inline view.
    * This method is called from the analyzer when registering this inline view.
+   * Create a non-materialized tuple descriptor for this inline view.
    */
   @Override
   public TupleDescriptor createTupleDescriptor(Analyzer analyzer)
       throws AnalysisException {
-    InlineView inlineView =
-        (view_ != null) ? new InlineView(view_) : new InlineView(alias_);
-    for (int i = 0; i < getColLabels().size(); ++i) {
+    int numColLabels = getColLabels().size();
+    Preconditions.checkState(numColLabels > 0);
+    HashSet<String> uniqueColAliases = Sets.newHashSetWithExpectedSize(numColLabels);
+    ArrayList<StructField> fields = Lists.newArrayListWithCapacity(numColLabels);
+    for (int i = 0; i < numColLabels; ++i) {
       // inline view select statement has been analyzed. Col label should be filled.
       Expr selectItemExpr = queryStmt_.getResultExprs().get(i);
-      String colAlias = getColLabels().get(i);
+      String colAlias = getColLabels().get(i).toLowerCase();
 
       // inline view col cannot have duplicate name
-      if (inlineView.getColumn(colAlias) != null) {
+      if (!uniqueColAliases.add(colAlias)) {
         throw new AnalysisException("duplicated inline view column alias: '" +
-            colAlias + "'" + " in inline view " + "'" + alias_ + "'");
+            colAlias + "'" + " in inline view " + "'" + getUniqueAlias() + "'");
       }
-
-      // create a column and add it to the inline view
-      Column col = new Column(colAlias, selectItemExpr.getType(), i);
-      inlineView.addColumn(col);
+      fields.add(new StructField(colAlias, selectItemExpr.getType(), null));
     }
 
-    // Create the non-materialized tuple and set the fake table in it.
-    TupleDescriptor result =
-        analyzer.getDescTbl().createTupleDescriptor("inl-view-" + alias_);
+    // Create the non-materialized tuple and set its type.
+    TupleDescriptor result = analyzer.getDescTbl().createTupleDescriptor(
+        getClass().getSimpleName() + " " + getUniqueAlias());
     result.setIsMaterialized(false);
-    result.setTable(inlineView);
+    result.setType(new StructType(fields));
     return result;
   }
 
@@ -256,9 +265,7 @@ public class InlineViewRef extends TableRef {
   public List<String> getExplicitColLabels() { return explicitColLabels_; }
 
   public List<String> getColLabels() {
-    if (explicitColLabels_ != null) {
-      return explicitColLabels_;
-    }
+    if (explicitColLabels_ != null) return explicitColLabels_;
     return queryStmt_.getColLabels();
   }
 
@@ -269,7 +276,9 @@ public class InlineViewRef extends TableRef {
   protected String tableRefToSql() {
     // Enclose the alias in quotes if Hive cannot parse it without quotes.
     // This is needed for view compatibility between Impala and Hive.
-    String aliasSql = (alias_ == null) ? null : ToSqlUtils.getIdentSql(alias_);
+    String aliasSql = null;
+    String alias = getExplicitAlias();
+    if (alias != null) aliasSql = ToSqlUtils.getIdentSql(alias);
     if (view_ != null) {
       return view_.getTableName().toSql() + (aliasSql == null ? "" : " " + aliasSql);
     }

@@ -15,13 +15,19 @@
 package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.Path.PathType;
 import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.StructField;
+import com.cloudera.impala.catalog.StructType;
+import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ColumnAliasGenerator;
 import com.cloudera.impala.common.TableAliasGenerator;
@@ -167,11 +173,11 @@ public class SelectStmt extends QueryStmt {
     for (int i = 0; i < selectList_.getItems().size(); ++i) {
       SelectListItem item = selectList_.getItems().get(i);
       if (item.isStar()) {
-        TableName tblName = item.getTblName();
-        if (tblName == null) {
-          expandStar(analyzer);
+        if (item.getRawPath() != null) {
+          Path resolvedPath = analyzeStarPath(item.getRawPath(), analyzer);
+          expandStar(resolvedPath, analyzer);
         } else {
-          expandStar(analyzer, tblName);
+          expandStar(analyzer);
         }
       } else {
         // Analyze the resultExpr before generating a label to ensure enforcement
@@ -183,7 +189,7 @@ public class SelectStmt extends QueryStmt {
         }
         resultExprs_.add(item.getExpr());
         String label = item.toColumnLabel(i, analyzer.useHiveColLabels());
-        SlotRef aliasRef = new SlotRef(null, label);
+        SlotRef aliasRef = new SlotRef(label);
         Expr existingAliasExpr = aliasSmap_.get(aliasRef);
         if (existingAliasExpr != null && !existingAliasExpr.equals(item.getExpr())) {
           // If we have already seen this alias, it refers to more than one column and
@@ -194,14 +200,13 @@ public class SelectStmt extends QueryStmt {
         colLabels_.add(label);
       }
     }
-    // The root stmt may not return a complex-typed value directly because we'd need to
-    // serialize it in a meaningful way. We allow complex types in the select list for
-    // non-root stmts to support views.
+    // Complex types are currently not supported in the select list because we'd need
+    // to serialize them in a meaningful way.
     for (Expr expr: resultExprs_) {
-      if (expr.getType().isComplexType() && analyzer.isRootAnalyzer()) {
+      if (expr.getType().isComplexType()) {
         throw new AnalysisException(String.format(
-            "Expr '%s' in select list of root statement returns a complex type '%s'.\n" +
-            "Only scalar types are allowed in the select list of the root statement.",
+            "Expr '%s' in select list returns a complex type '%s'.\n" +
+            "Only scalar types are allowed in the select list.",
             expr.toSql(), expr.getType().toSql()));
       }
     }
@@ -354,6 +359,24 @@ public class SelectStmt extends QueryStmt {
   }
 
   /**
+   * Resolves the given raw path as a STAR path and checks its legality.
+   * Returns the resolved legal path, or throws if the raw path could not
+   * be resolved or is an illegal star path.
+   */
+  private Path analyzeStarPath(List<String> rawPath, Analyzer analyzer)
+      throws AnalysisException {
+    Path resolvedPath = null;
+    try {
+      resolvedPath = analyzer.resolvePath(rawPath, PathType.STAR);
+    } catch (TableLoadingException e) {
+      // Should never happen because we only check registered table aliases.
+      Preconditions.checkState(false);
+    }
+    Preconditions.checkNotNull(resolvedPath);
+    return resolvedPath;
+  }
+
+  /**
    * Expand "*" select list item, ignoring semi-joined tables.
    */
   private void expandStar(Analyzer analyzer) throws AnalysisException {
@@ -363,40 +386,78 @@ public class SelectStmt extends QueryStmt {
     // expand in From clause order
     for (TableRef tableRef: tableRefs_) {
       if (analyzer.isSemiJoined(tableRef.getId())) continue;
-      expandStar(analyzer, tableRef.getAliasAsName(), tableRef.getDesc());
+      Path resolvedPath = new Path(tableRef.getDesc(), Collections.<String>emptyList());
+      Preconditions.checkState(resolvedPath.resolve());
+      expandStar(resolvedPath, analyzer);
     }
   }
 
   /**
-   * Expand "<tbl>.*" select list item.
+   * Expand "path.*" from a resolved path.
    */
-  private void expandStar(Analyzer analyzer, TableName tblName)
+  private void expandStar(Path resolvedPath, Analyzer analyzer)
       throws AnalysisException {
-    TupleDescriptor tupleDesc = analyzer.getDescriptor(tblName);
-    if (tupleDesc == null) {
-      throw new AnalysisException("unknown table alias '" + tblName.toString() + "'");
+    Preconditions.checkState(resolvedPath.isResolved());
+    if (resolvedPath.destTupleDesc() != null &&
+        resolvedPath.destTupleDesc().getTable() != null &&
+        resolvedPath.destTupleDesc().getPath().getMatchedTypes().isEmpty()) {
+      // The resolved path targets a registered tuple descriptor of a catalog
+      // table. Expand the '*' based on the Hive-column order.
+      TupleDescriptor tupleDesc = resolvedPath.destTupleDesc();
+      Table table = tupleDesc.getTable();
+      for (Column c: table.getColumnsInHiveOrder()) {
+        addStarResultExpr(resolvedPath, analyzer, c.getName());
+      }
+    } else {
+      // The resolved path does not target the descriptor of a catalog table.
+      // Expand '*' based on the destination type of the resolved path.
+      Preconditions.checkState(resolvedPath.destType().isStructType());
+      StructType structType = (StructType) resolvedPath.destType();
+      Preconditions.checkNotNull(structType);
+
+      // Star expansion for references to nested collections.
+      // Collection Type                    Star Expansion
+      // array<int>                     --> item
+      // array<struct<f1,f2,...,fn>>    --> f1, f2, ..., fn
+      // map<int,int>                   --> key, value
+      // map<int,struct<f1,f2,...,fn>>  --> key, f1, f2, ..., fn
+      if (structType instanceof CollectionStructType) {
+        CollectionStructType cst = (CollectionStructType) structType;
+        if (cst.isMapStruct()) {
+          addStarResultExpr(resolvedPath, analyzer, Path.MAP_KEY_FIELD_NAME);
+        }
+        if (cst.getOptionalField().getType().isStructType()) {
+          structType = (StructType) cst.getOptionalField().getType();
+          for (StructField f: structType.getFields()) {
+            addStarResultExpr(
+                resolvedPath, analyzer, cst.getOptionalField().getName(), f.getName());
+          }
+        } else if (cst.isMapStruct()) {
+          addStarResultExpr(resolvedPath, analyzer, Path.MAP_VALUE_FIELD_NAME);
+        } else {
+          addStarResultExpr(resolvedPath, analyzer, Path.ARRAY_ITEM_FIELD_NAME);
+        }
+      } else {
+        // Default star expansion.
+        for (StructField f: structType.getFields()) {
+          addStarResultExpr(resolvedPath, analyzer, f.getName());
+        }
+      }
     }
-    if (analyzer.isSemiJoined(tupleDesc.getId())) {
-      throw new AnalysisException(String.format(
-          "'*' expression cannot reference semi-/anti-joined table '%s'",
-          tblName.toString()));
-    }
-    expandStar(analyzer, tblName, tupleDesc);
   }
 
   /**
-   * Expand "*" for a particular tuple descriptor by appending analyzed slot refs for
-   * each column to selectListExprs.
+   * Helper function used during star expansion to add a single result expr
+   * based on a given raw path to be resolved relative to an existing path.
    */
-  private void expandStar(Analyzer analyzer, TableName tblName, TupleDescriptor desc)
-      throws AnalysisException {
-    Preconditions.checkState(!analyzer.isSemiJoined(desc.getId()));
-    for (Column col: desc.getTable().getColumnsInHiveOrder()) {
-      SlotRef slotRef = new SlotRef(tblName, col.getName());
-      slotRef.analyze(analyzer);
-      resultExprs_.add(slotRef);
-      colLabels_.add(col.getName().toLowerCase());
-    }
+  private void addStarResultExpr(Path resolvedPath, Analyzer analyzer,
+      String... relRawPath) throws AnalysisException {
+    Path p = Path.createRelPath(resolvedPath, relRawPath);
+    Preconditions.checkState(p.resolve());
+    SlotRef slotRef = new SlotRef(p);
+    slotRef.analyze(analyzer);
+    resultExprs_.add(slotRef);
+    colLabels_.add(relRawPath[relRawPath.length - 1]);
   }
 
   /**
@@ -615,6 +676,7 @@ public class SelectStmt extends QueryStmt {
       }
     }
   }
+
 
   /**
    * Create a map from COUNT([ALL]) -> zeroifnull(COUNT([ALL])) if

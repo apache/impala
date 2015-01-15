@@ -48,6 +48,7 @@ public class ParserTest {
       result = parser.parse().value;
     } catch (Exception e) {
       System.err.println(parser.getErrorMsg(stmt));
+      e.printStackTrace();
       fail("\n" + parser.getErrorMsg(stmt));
     }
     assertNotNull(result);
@@ -138,9 +139,17 @@ public class ParserTest {
       ParsesOk("select a 'x', b as 'y', c 'z' from tbl".replace('\'', quote));
       ParsesOk(
           "select a 'x', b as 'y', sum(x) over () 'z' from tbl".replace('\'', quote));
+      ParsesOk("select a.b 'x' from tbl".replace('\'', quote));
+      ParsesOk("select a.b as 'x' from tbl".replace('\'', quote));
+      ParsesOk("select a.b.c.d 'x' from tbl".replace('\'', quote));
+      ParsesOk("select a.b.c.d as 'x' from tbl".replace('\'', quote));
       // Table aliases.
       ParsesOk("select a from tbl 'b'".replace('\'', quote));
       ParsesOk("select a from tbl as 'b'".replace('\'', quote));
+      ParsesOk("select a from db.tbl 'b'".replace('\'', quote));
+      ParsesOk("select a from db.tbl as 'b'".replace('\'', quote));
+      ParsesOk("select a from db.tbl.col 'b'".replace('\'', quote));
+      ParsesOk("select a from db.tbl.col as 'b'".replace('\'', quote));
       ParsesOk("select a from (select * from tbl) 'b'".replace('\'', quote));
       ParsesOk("select a from (select * from tbl) as 'b'".replace('\'', quote));
       ParsesOk("select a from (select * from tbl b) as 'b'".replace('\'', quote));
@@ -156,7 +165,7 @@ public class ParserTest {
     ParsesOk("select * from tbl");
     ParsesOk("select tbl.* from tbl");
     ParsesOk("select db.tbl.* from tbl");
-    ParserError("select bla.db.tbl.* from tbl");
+    ParsesOk("select db.tbl.struct_col.* from tbl");
     ParserError("select * + 5 from tbl");
     ParserError("select (*) from tbl");
     ParserError("select *.id from tbl");
@@ -423,60 +432,44 @@ public class ParserTest {
 
   @Test
   public void TestFromClause() {
-    ParsesOk("select * from src src1 " +
-        "left outer join src src2 on " +
-        "  src1.key = src2.key and src1.key < 10 and src2.key > 10 " +
-        "right outer join src src3 on " +
-        "  src2.key = src3.key and src3.key < 10 " +
-        "full outer join src src3 on " +
-        "  src2.key = src3.key and src3.key < 10 " +
-        "left semi join src src3 on " +
-        "  src2.key = src3.key and src3.key < 10 " +
-        "left anti join src src3 on " +
-        "  src2.key = src3.key and src3.key < 10 " +
-        "right semi join src src3 on " +
-        "  src2.key = src3.key and src3.key < 10 " +
-        "right anti join src src3 on " +
-        "  src2.key = src3.key and src3.key < 10 " +
-        "join src src3 on " +
-        "  src2.key = src3.key and src3.key < 10 " +
-        "inner join src src3 on " +
-        "  src2.key = src3.key and src3.key < 10 " +
-        "where src2.bla = src3.bla " +
-        "order by src1.key, src1.value, src2.key, src2.value, src3.key, src3.value");
-    ParsesOk("select * from src src1 " +
-        "left outer join src src2 on " +
-        "  (src1.key = src2.key and src1.key < 10 and src2.key > 10) " +
-        "right outer join src src3 on " +
-        "  (src2.key = src3.key and src3.key < 10) " +
-        "full outer join src src3 on " +
-        "  (src2.key = src3.key and src3.key < 10) " +
-        "left semi join src src3 on " +
-        "  (src2.key = src3.key and src3.key < 10) " +
-        "left anti join src src3 on " +
-        "  src2.key = src3.key and src3.key < 10 " +
-        "right semi join src src3 on " +
-        "  (src2.key = src3.key and src3.key < 10) " +
-        "right anti join src src3 on " +
-        "  src2.key = src3.key and src3.key < 10 " +
-        "join src src3 on " +
-        "  (src2.key = src3.key and src3.key < 10) " +
-        "inner join src src3 on " +
-        "  (src2.key = src3.key and src3.key < 10) " +
-        "where src2.bla = src3.bla " +
-        "order by src1.key, src1.value, src2.key, src2.value, src3.key, src3.value");
-    ParsesOk("select * from src src1 " +
-        "left outer join src src2 using (a, b, c) " +
-        "right outer join src src3 using (d, e, f) " +
-        "full outer join src src3 using (d, e, f) " +
-        "left semi join src src3 using (d, e, f) " +
-        "left anti join src src3 using (d, e, f) " +
-        "right semi join src src3 using (d, e, f) " +
-        "right anti join src src3 using (d, e, f) " +
-        "join src src3 using (d, e, f) " +
-        "inner join src src3 using (d, e, f) " +
-        "where src2.bla = src3.bla " +
-        "order by src1.key, src1.value, src2.key, src2.value, src3.key, src3.value");
+    String tblRefs[] = new String[] { "tbl", "db.tbl", "db.tbl.col", "db.tbl.col.fld" };
+    for (String tbl: tblRefs) {
+      ParsesOk(
+          ("select * from $TBL src1 " +
+           "left outer join $TBL src2 on " +
+           "  src1.key = src2.key and src1.key < 10 and src2.key > 10 " +
+           "right outer join $TBL src3 on " +
+           "  src2.key = src3.key and src3.key < 10 " +
+           "full outer join $TBL src3 on " +
+           "  src2.key = src3.key and src3.key < 10 " +
+           "left semi join $TBL src3 on " +
+           "  src2.key = src3.key and src3.key < 10 " +
+           "left anti join $TBL src3 on " +
+           "  src2.key = src3.key and src3.key < 10 " +
+           "right semi join $TBL src3 on " +
+           "  src2.key = src3.key and src3.key < 10 " +
+           "right anti join $TBL src3 on " +
+           "  src2.key = src3.key and src3.key < 10 " +
+           "join $TBL src3 on " +
+           "  src2.key = src3.key and src3.key < 10 " +
+           "inner join $TBL src3 on " +
+           "  src2.key = src3.key and src3.key < 10 ").replace("$TBL", tbl));
+      ParsesOk(
+          ("select * from $TBL src1 " +
+           "left outer join $TBL src2 using (a, b, c) " +
+           "right outer join $TBL src3 using (d, e, f) " +
+           "full outer join $TBL src4 using (d, e, f) " +
+           "left semi join $TBL src5 using (d, e, f) " +
+           "left anti join $TBL src6 using (d, e, f) " +
+           "right semi join $TBL src7 using (d, e, f) " +
+           "right anti join $TBL src8 using (d, e, f) " +
+           "join $TBL src9 using (d, e, f) " +
+           "inner join $TBL src10 using (d, e, f) ").replace("$TBL", tbl));
+
+      // Test cross joins
+      ParsesOk("select * from $TBL cross join $TBL".replace("$TBL", tbl));
+    }
+
     // Test NULLs in on clause.
     ParsesOk("select * from src src1 " +
         "left outer join src src2 on NULL " +
@@ -493,11 +486,15 @@ public class ParserTest {
     // Arbitrary exprs in on clause parse ok.
     ParsesOk("select * from src src1 join src src2 on ('a')");
     ParsesOk("select * from src src1 join src src2 on (f(a, b))");
-    ParserError("select * from src src1 join src src2 using (1)");
     ParserError("select * from src src1 " +
         "left outer join src src2 on (src1.key = src2.key and)");
-    // Test cross joins
-    ParsesOk("select * from a cross join b");
+
+    // Using clause requires SlotRef.
+    ParserError("select * from src src1 join src src2 using (1)");
+    ParserError("select * from src src1 join src src2 using (f(id))");
+    // Using clause required parenthesis.
+    ParserError("select * from src src1 join src src2 using id");
+
     // Cross joins do not accept on/using
     ParserError("select * from a cross join b on (a.id = b.id)");
     ParserError("select * from a cross join b using (id)");
@@ -1369,7 +1366,7 @@ public class ParserTest {
     ParsesOk("select a from t where b > 5");
     ParsesOk("select a.b from a where b > 5");
     ParsesOk("select a.b.c from a.b where b > 5");
-    ParserError("select a.b.c.d from a.b where b > 5");
+    ParsesOk("select a.b.c.d from a.b where b > 5");
   }
 
   /**
@@ -1645,9 +1642,10 @@ public class ParserTest {
 
     // Bad function name
     ParserError("CREATE FUNCTION User.() RETURNS INT LOCATION 'a'");
-    ParserError("CREATE FUNCTION A.B.C.D.Foo() RETURNS INT LOCATION 'a'");
     ParserError("CREATE FUNCTION User.Foo.() RETURNS INT LOCATION 'a'");
     ParserError("CREATE FUNCTION User..Foo() RETURNS INT LOCATION 'a'");
+    // Bad function name that parses but won't analyze.
+    ParsesOk("CREATE FUNCTION A.B.C.D.Foo() RETURNS INT LOCATION 'a'");
 
     // Missing location
     ParserError("CREATE FUNCTION FOO() RETURNS INT");
@@ -2329,7 +2327,6 @@ public class ParserTest {
     ParserError("DROP FUNCTION Foo..(INT) RETURNS INT");
     ParserError("DROP FUNCTION Foo(NULL) RETURNS INT");
     ParserError("DROP FUNCTION Foo(INT) RETURNS NULL");
-    ParserError("DROP FUNCTION IF EXISTS Foo.A.Foo(INT)");
     ParserError("DROP BLAH FUNCTION IF EXISTS Foo.A.Foo(INT)");
     ParserError("DROP FUNCTION IF EXISTS Foo(...)");
   }
