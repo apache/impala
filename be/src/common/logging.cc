@@ -65,13 +65,14 @@ void impala::InitGoogleLoggingSafe(const char* arg) {
     FLAGS_log_dir = "/tmp";
   }
 
+  // Don't double log to stderr on any threshold.
+  FLAGS_stderrthreshold = google::FATAL + 1;
+
   if (FLAGS_redirect_stdout_stderr && !TestInfo::is_test()) {
     // We will be redirecting stdout/stderr to INFO/LOG so override any glog settings
     // that log to stdout/stderr...
     FLAGS_logtostderr = false;
     FLAGS_alsologtostderr = false;
-    // Don't log to stderr on any threshold.
-    FLAGS_stderrthreshold = google::FATAL + 1;
   }
 
   if (!FLAGS_logtostderr) {
