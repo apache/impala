@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <string>
 #include <map>
 #include <math.h>
+#include <string>
+#include <time.h>
 
 #include <boost/assign/list_of.hpp>
+#include <boost/date_time/c_local_time_adjustor.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/unordered_map.hpp>
@@ -36,6 +39,7 @@
 #include "rpc/thrift-server.h"
 #include "runtime/raw-value.h"
 #include "runtime/string-value.h"
+#include "runtime/timestamp-value.h"
 #include "service/fe-support.h"
 #include "service/impala-server.h"
 #include "testutil/impalad-query-executor.h"
@@ -49,12 +53,15 @@ DECLARE_int32(beeswax_port);
 DECLARE_string(impalad);
 DECLARE_bool(abort_on_config_error);
 DECLARE_bool(disable_optimization_passes);
+DECLARE_bool(use_utc_for_unix_timestamp_conversions);
 
 using namespace impala;
 using namespace llvm;
 using namespace std;
 using namespace boost;
 using namespace boost::assign;
+using namespace boost::date_time;
+using namespace boost::posix_time;
 using namespace Apache::Hadoop::Hive;
 
 namespace impala {
@@ -92,6 +99,42 @@ string LiteralToString<double, double>(double val) {
      << " as double)";
   return ss.str();
 }
+
+// Override the time zone for the duration of the scope. The time zone is overridden
+// using an environment variable there is no risk of making a permanent system change
+// and no special permissions are needed. This is not thread-safe.
+class ScopedTimeZoneOverride {
+ public:
+  ScopedTimeZoneOverride(string time_zone) {
+    original_time_zone_ = getenv("TZ");
+    setenv("TZ", time_zone.c_str(), /*overwrite*/ true);
+    tzset();
+  }
+
+  ~ScopedTimeZoneOverride() {
+    if (original_time_zone_ == NULL) {
+      unsetenv("TZ");
+    } else {
+      setenv("TZ", original_time_zone_, /*overwrite*/ true);
+    }
+    tzset();
+  }
+
+ private:
+  char* original_time_zone_;
+};
+
+// Enable FLAGS_use_local_tz_for_unix_timestamp_conversions for the duration of the scope.
+class ScopedLocalUnixTimestampConversionOverride {
+ public:
+  ScopedLocalUnixTimestampConversionOverride() {
+    FLAGS_use_local_tz_for_unix_timestamp_conversions = true;
+  }
+
+  ~ScopedLocalUnixTimestampConversionOverride() {
+    FLAGS_use_local_tz_for_unix_timestamp_conversions = false;
+  }
+};
 
 class ExprTest : public testing::Test {
  protected:
@@ -258,10 +301,16 @@ class ExprTest : public testing::Test {
 
   // We can't put this into TestValue() because GTest can't resolve
   // the ambiguity in TimestampValue::operator==, even with the appropriate casts.
-  void TestTimestampValue(const string& expr, const TimestampValue& expected_result) {
+  void TestTimestampValue(const string& expr, const TimestampValue& expected_result,
+      const int64_t tolerance_in_seconds = 0) {
     TimestampValue* result;
     GetValue(expr, TYPE_TIMESTAMP, reinterpret_cast<void**>(&result));
-    EXPECT_EQ(*result, expected_result);
+    if (tolerance_in_seconds == 0) {
+      EXPECT_EQ(*result, expected_result);
+    } else {
+      int64_t delta = abs(result->ToUnixTime() - expected_result.ToUnixTime());
+      EXPECT_LE(delta, tolerance_in_seconds);
+    }
   }
 
   // Tests whether the returned TimestampValue is valid.
@@ -270,6 +319,39 @@ class ExprTest : public testing::Test {
     TimestampValue* result;
     GetValue(expr, TYPE_TIMESTAMP, reinterpret_cast<void**>(&result));
     EXPECT_TRUE(result->HasDateOrTime());
+  }
+
+  // Test conversions of Timestamps to and from string/int with values related to the
+  // Unix epoch. The caller should set the current time zone before calling.
+  // 'unix_time_at_local_epoch' should be the expected value of the Unix time when it
+  // was 1970-01-01 in the current time zone. 'local_time_at_unix_epoch' should be the
+  // local time at the Unix epoch (1970-01-01 UTC).
+  void TestTimestampUnixEpochConversions(int64_t unix_time_at_local_epoch,
+      string local_time_at_unix_epoch) {
+    TestValue("unix_timestamp(cast('" + local_time_at_unix_epoch + "' as timestamp))",
+        TYPE_BIGINT, 0);
+    TestValue("unix_timestamp('" + local_time_at_unix_epoch + "')", TYPE_BIGINT, 0);
+    TestValue("unix_timestamp('" + local_time_at_unix_epoch +
+        "', 'yyyy-MM-dd HH:mm:ss')", TYPE_BIGINT, 0);
+    TestValue("unix_timestamp('1970-01-01', 'yyyy-MM-dd')", TYPE_BIGINT,
+        unix_time_at_local_epoch);
+    TestValue("unix_timestamp('1970-01-01 10:10:10', 'yyyy-MM-dd')", TYPE_BIGINT,
+        unix_time_at_local_epoch);
+    TestValue("unix_timestamp('" + local_time_at_unix_epoch
+        + " extra text', 'yyyy-MM-dd HH:mm:ss')", TYPE_BIGINT, 0);
+    TestStringValue("cast(cast(0 as timestamp) as string)", local_time_at_unix_epoch);
+    TestStringValue("cast(cast(0 as timestamp) as string)", local_time_at_unix_epoch);
+    TestStringValue("from_unixtime(0)", local_time_at_unix_epoch);
+    TestStringValue("from_unixtime(cast(0 as bigint))", local_time_at_unix_epoch);
+    TestIsNull("from_unixtime(NULL)", TYPE_STRING);
+    TestStringValue("from_unixtime(0, 'yyyy-MM-dd HH:mm:ss')",
+        local_time_at_unix_epoch);
+    TestStringValue("from_unixtime(cast(0 as bigint), 'yyyy-MM-dd HH:mm:ss')",
+        local_time_at_unix_epoch);
+    TestStringValue("from_unixtime(" + lexical_cast<string>(unix_time_at_local_epoch)
+        + ", 'yyyy-MM-dd')", "1970-01-01");
+    TestStringValue("from_unixtime(cast(" + lexical_cast<string>(unix_time_at_local_epoch)
+        + " as bigint), 'yyyy-MM-dd')", "1970-01-01");
   }
 
   // Decimals don't work with TestValue.
@@ -703,8 +785,7 @@ class ExprTest : public testing::Test {
     TestValue("cast(" + stmt + " as real)", TYPE_DOUBLE, static_cast<double>(val));
     TestStringValue("cast(" + stmt + " as string)", lexical_cast<string>(val));
     if (!timestamp_out_of_range) {
-      TestStringValue("cast(cast(" + stmt + " as timestamp) as string)",
-                      lexical_cast<string>(TimestampValue(val)));
+      TestTimestampValue("cast(" + stmt + " as timestamp)", TimestampValue(val));
     } else {
       TestIsNull("cast(" + stmt + " as timestamp)", TYPE_TIMESTAMP);
     }
@@ -2922,18 +3003,8 @@ TEST_F(ExprTest, TimestampFunctions) {
       "as timestamp), " + max_long + ") as string)",
       "2001-01-01 00:00:00");
 
-  TestValue("unix_timestamp(cast('1970-01-01 00:00:00' as timestamp))", TYPE_BIGINT, 0);
-  TestValue("unix_timestamp('1970-01-01 00:00:00')", TYPE_BIGINT, 0);
-  TestValue("unix_timestamp('1970-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')", TYPE_BIGINT,
-      0);
-  TestValue("unix_timestamp('1970-01-01', 'yyyy-MM-dd')", TYPE_BIGINT, 0);
-  TestValue("unix_timestamp('1970-01-01 10:10:10', 'yyyy-MM-dd')", TYPE_BIGINT, 0);
-  TestValue("unix_timestamp('1970-01-01 00:00:00 extra text', 'yyyy-MM-dd HH:mm:ss')",
-      TYPE_BIGINT, 0);
-  TestIsNull("unix_timestamp(NULL)", TYPE_BIGINT);
-  TestIsNull("unix_timestamp('00:00:00')", TYPE_BIGINT);
-  TestIsNull("unix_timestamp(NULL, 'yyyy-MM-dd')", TYPE_BIGINT);
-  TestIsNull("unix_timestamp('00:00:00', 'yyyy-MM-dd HH:mm:ss')", TYPE_BIGINT);
+  // Test Unix epoch conversions.
+  TestTimestampUnixEpochConversions(0, "1970-01-01 00:00:00");
 
   // Regression tests for IMPALA-1579, Unix times should be BIGINTs instead of INTs.
   TestValue("unix_timestamp('2038-01-19 03:14:07')", TYPE_BIGINT, 2147483647);
@@ -2943,15 +3014,35 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestValue("unix_timestamp(cast('2038-01-19 03:14:08' as timestamp))", TYPE_BIGINT,
       2147483648);
 
-  TestStringValue("cast(cast(0 as timestamp) as string)", "1970-01-01 00:00:00");
-  TestStringValue("from_unixtime(0)", "1970-01-01 00:00:00");
-  TestStringValue("from_unixtime(cast(0 as bigint))", "1970-01-01 00:00:00");
-  TestIsNull("from_unixtime(NULL)", TYPE_STRING);
-  TestStringValue("from_unixtime(0, 'yyyy-MM-dd HH:mm:ss')", "1970-01-01 00:00:00");
-  TestStringValue("from_unixtime(cast(0 as bigint), 'yyyy-MM-dd HH:mm:ss')",
-      "1970-01-01 00:00:00");
-  TestStringValue("from_unixtime(0, 'yyyy-MM-dd')", "1970-01-01");
-  TestStringValue("from_unixtime(cast(0 as bigint), 'yyyy-MM-dd')", "1970-01-01");
+
+  // Test Unix epoch conversions again but now converting into local timestamp values.
+  {
+    ScopedLocalUnixTimestampConversionOverride use_local;
+    // Determine what the local time would have been when it was 1970-01-01 GMT
+    ptime local_time_at_epoch = c_local_adjustor<ptime>::utc_to_local(from_time_t(0));
+    // ... and as an Impala compatible string.
+    string local_time_at_epoch_as_str = to_iso_extended_string(local_time_at_epoch.date())
+        + " " + to_simple_string(local_time_at_epoch.time_of_day());
+    // Determine what the Unix timestamp would have been when it was 1970-01-01 in the
+    // local time zone.
+    int64_t unix_time_at_local_epoch =
+        (from_time_t(0) - local_time_at_epoch).total_seconds();
+    TestTimestampUnixEpochConversions(unix_time_at_local_epoch,
+        local_time_at_epoch_as_str);
+
+    // Check that daylight savings calculation is done.
+    {
+      ScopedTimeZoneOverride time_zone("PST8PDT");
+      TestValue("unix_timestamp('2015-01-01')", TYPE_BIGINT, 1420099200);   // PST applies
+      TestValue("unix_timestamp('2015-07-01')", TYPE_BIGINT, 1435734000);   // PDT applies
+    }
+    {
+      ScopedTimeZoneOverride time_zone("EST5EDT");
+      TestValue("unix_timestamp('2015-01-01')", TYPE_BIGINT, 1420088400);   // EST applies
+      TestValue("unix_timestamp('2015-07-01')", TYPE_BIGINT, 1435723200);   // EDT applies
+    }
+  }
+
   TestIsNull("from_unixtime(NULL, 'yyyy-MM-dd')", TYPE_STRING);
   TestStringValue("from_unixtime(unix_timestamp('1999-01-01 10:10:10'), \
       'yyyy-MM-dd')", "1999-01-01");
@@ -3072,6 +3163,40 @@ TEST_F(ExprTest, TimestampFunctions) {
       TYPE_TIMESTAMP);
   TestIsNull("from_utc_timestamp(NULL, NULL)", TYPE_TIMESTAMP);
 
+  // Tests from Hive. When casting from timestamp to numeric, timestamps are considered
+  // to be local values.
+  {
+    ScopedLocalUnixTimestampConversionOverride use_local;
+    ScopedTimeZoneOverride time_zone("PST8PDT");
+    TestValue("cast(cast('2011-01-01 01:01:01' as timestamp) as boolean)", TYPE_BOOLEAN,
+        true);
+    TestValue("cast(cast('2011-01-01 01:01:01' as timestamp) as tinyint)", TYPE_TINYINT,
+        77);
+    TestValue("cast(cast('2011-01-01 01:01:01' as timestamp) as smallint)", TYPE_SMALLINT,
+        -4787);
+    TestValue("cast(cast('2011-01-01 01:01:01' as timestamp) as int)", TYPE_INT,
+        1293872461);
+    TestValue("cast(cast('2011-01-01 01:01:01' as timestamp) as bigint)", TYPE_BIGINT,
+        1293872461);
+    // We have some rounding errors going backend to front, so do it as a string.
+    TestStringValue("cast(cast(cast('2011-01-01 01:01:01' as timestamp) as float)"
+        " as string)", "1.29387251e+09");
+    TestValue("cast(cast('2011-01-01 01:01:01' as timestamp) as double)", TYPE_DOUBLE,
+        1.293872461E9);
+    TestValue("cast(cast('2011-01-01 01:01:01.1' as timestamp) as double)", TYPE_DOUBLE,
+        1.2938724611E9);
+    TestValue("cast(cast('2011-01-01 01:01:01.0001' as timestamp) as double)",
+        TYPE_DOUBLE, 1.2938724610001E9);
+    // We get some decimal-binary skew here
+    TestStringValue("cast(cast(1.3041352164485E9 as timestamp) as string)",
+        "2011-04-29 20:46:56.448499917");
+    // NULL arguments.
+    TestIsNull("from_utc_timestamp(NULL, 'PST')", TYPE_TIMESTAMP);
+    TestIsNull("from_utc_timestamp(cast('2011-01-01 01:01:01.1' as timestamp), NULL)",
+        TYPE_TIMESTAMP);
+    TestIsNull("from_utc_timestamp(NULL, NULL)", TYPE_TIMESTAMP);
+  }
+
   // Hive silently ignores bad timezones.  We log a problem.
   TestStringValue(
       "cast(from_utc_timestamp("
@@ -3087,6 +3212,31 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestValidTimestampValue("current_timestamp()");
   TestValidTimestampValue("cast(unix_timestamp() as timestamp)");
 
+  // Test that the epoch is reasonable. Allow a few seconds to compensate for execution
+  // time.
+  int tolerance_in_seconds = 5;
+  time_t unix_time = (posix_time::microsec_clock::local_time() - from_time_t(0))
+      .total_seconds();
+  stringstream expr_sql;
+  expr_sql << "unix_timestamp() between " << unix_time - tolerance_in_seconds
+      << " and " << unix_time + tolerance_in_seconds;
+  TestValue(expr_sql.str(), TYPE_BOOLEAN, true);
+  {
+    ScopedLocalUnixTimestampConversionOverride use_local;
+    unix_time = time(NULL);
+    expr_sql.str("");
+    expr_sql << "unix_timestamp() between " << unix_time - tolerance_in_seconds
+        << " and " << unix_time + tolerance_in_seconds;
+    TestValue(expr_sql.str(), TYPE_BOOLEAN, true);
+  }
+  // Test that the other current time functions are also reasonable.
+  ptime local_time = c_local_adjustor<ptime>::utc_to_local(from_time_t(unix_time));
+  TestTimestampValue("now()", TimestampValue(local_time), tolerance_in_seconds);
+  TestTimestampValue("current_timestamp()", TimestampValue(local_time),
+      tolerance_in_seconds);
+  TestTimestampValue("cast(unix_timestamp() as timestamp)", TimestampValue(local_time),
+      tolerance_in_seconds);
+
   // Test alias
   TestValue("now() = current_timestamp()", TYPE_BOOLEAN, true);
 
@@ -3095,6 +3245,8 @@ TEST_F(ExprTest, TimestampFunctions) {
       0);
   TestValue("unix_timestamp('01,Jan,1970,00,00,00', 'dd,MMM,yyyy,HH,mm,ss')", TYPE_BIGINT,
       0);
+  // This time format is misleading because a trailing Z means UTC but a timestamp can
+  // have no time zone association. unix_timestamp() expects inputs to be in local time.
   TestValue<int64_t>("unix_timestamp('1983-08-05T05:00:00.000Z', "
       "'yyyy-MM-ddTHH:mm:ss.SSSZ')", TYPE_BIGINT, 428907600);
 
@@ -3336,8 +3488,10 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestStringValue(
         "cast(trunc(cast('2012-09-10 07:59:59' as timestamp), 'MI') as string)",
           "2012-09-10 07:59:00");
-  TestNonOkStatus("cast(trunc(cast('2012-09-10 07:59:59' as timestamp), 'MIN') as string)");
-  TestNonOkStatus("cast(trunc(cast('2012-09-10 07:59:59' as timestamp), 'XXYYZZ') as string)");
+  TestNonOkStatus(
+      "cast(trunc(cast('2012-09-10 07:59:59' as timestamp), 'MIN') as string)");
+  TestNonOkStatus(
+      "cast(trunc(cast('2012-09-10 07:59:59' as timestamp), 'XXYYZZ') as string)");
 
   // Extract as a regular function
   TestValue("extract(cast('2006-05-12 18:27:28.12345' as timestamp), 'YEAR')",

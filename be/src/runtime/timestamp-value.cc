@@ -19,6 +19,11 @@ using namespace boost;
 using namespace boost::posix_time;
 using namespace boost::gregorian;
 
+DEFINE_bool(use_local_tz_for_unix_timestamp_conversions, false,
+    "When true, TIMESTAMPs are interpreted in the local time zone when converting to "
+    "and from Unix times. When false, TIMESTAMPs are interpreted in the UTC time zone. "
+    "Set to true for Hive compatibility.");
+
 namespace impala {
 
 const char* TimestampValue::LLVM_CLASS_NAME = "class.impala::TimestampValue";

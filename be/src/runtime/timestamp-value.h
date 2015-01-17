@@ -21,10 +21,16 @@
 
 #include <boost/cstdint.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <gflags/gflags.h>
 
 #include "runtime/timestamp-parse-util.h"
 #include "udf/udf.h"
 #include "util/hash-util.h"
+
+// Users who want a fix for IMPALA-97 (to be Hive compatible) can enable this flag.
+// The flag is disabled by default but should be flipped with the next release that
+// accepts breaking-changes.
+DECLARE_bool(use_local_tz_for_unix_timestamp_conversions);
 
 namespace impala {
 
@@ -72,8 +78,8 @@ class TimestampValue {
   TimestampValue(const char* str, int len, const DateTimeFormatContext& dt_ctx);
 
   // Unix time (seconds since 1970-01-01 UTC by definition) constructors.
-  // TODO: When IMPALA-1435 is fixed, construct a local time to be consistent with
-  //       FROM_UNIXTIME() and related functions.
+  // Conversion to local time will be done if
+  // FLAGS_use_local_tz_for_unix_timestamp_conversions is true.
   template <typename Number>
   explicit TimestampValue(Number unix_time) {
     *this = UnixTimeToPtime(unix_time);
@@ -149,14 +155,21 @@ class TimestampValue {
   // Returns the number of characters copied in to the buffer (minus the terminator)
   int Format(const DateTimeFormatContext& dt_ctx, int len, char* buff);
 
-  // Returns the Unix time (seconds since the Unix epoch) representation. The
-  // TimestampValue instance this function is called upon should represent a UTC time
-  // before the call.
+  // Returns the Unix time (seconds since the Unix epoch) representation. The time
+  // zone interpretation of the TimestampValue instance is determined by
+  // FLAGS_use_local_tz_for_unix_timestamp_conversions. If the flag is true, the
+  // instance is interpreted as a local value. If the flag is false, UTC is assumed.
+  // In either case, the caller should ensure that the TimestampValue instance is a
+  // valid date before the call.
   time_t ToUnixTime() const {
     DCHECK(HasDate());
     const boost::posix_time::ptime temp(date_, time_);
     tm temp_tm = boost::posix_time::to_tm(temp);
-    return timegm(&temp_tm);
+    if (FLAGS_use_local_tz_for_unix_timestamp_conversions) {
+      return mktime(&temp_tm);
+    } else {
+      return timegm(&temp_tm);
+    }
   }
 
   double ToSubsecondUnixTime() const {
@@ -232,14 +245,24 @@ class TimestampValue {
   // 4 -bytes - stores the date as a day
   boost::gregorian::date date_;
 
-  // Return a ptime representation of the given Unix time (seconds since 1970 UTC), no
-  // time zone conversion is done so the resulting ptime is in UTC.
+  // Return a ptime representation of the given Unix time (seconds since the Unix epoch).
+  // The time zone of the resulting ptime is determined by
+  // FLAGS_use_local_tz_for_unix_timestamp_conversions. If the flag is true, the value
+  // will be in the local time zone. If the flag is false, the value will be in UTC.
   boost::posix_time::ptime UnixTimeToPtime(time_t unix_time) const {
     // Unix times are represented internally in boost as 32 bit ints which limits the
     // range of dates to 1901-2038 (https://svn.boost.org/trac/boost/ticket/3109), so
     // libc functions will be used instead.
     tm temp_tm;
-    gmtime_r(&unix_time, &temp_tm);
+    if (FLAGS_use_local_tz_for_unix_timestamp_conversions) {
+      if (UNLIKELY(localtime_r(&unix_time, &temp_tm) == NULL)) {
+        return boost::posix_time::ptime(boost::posix_time::not_a_date_time);
+      }
+    } else {
+      if (UNLIKELY(gmtime_r(&unix_time, &temp_tm) == NULL)) {
+        return boost::posix_time::ptime(boost::posix_time::not_a_date_time);
+      }
+    }
     try {
       return boost::posix_time::ptime_from_tm(temp_tm);
     } catch (std::exception& e) {
