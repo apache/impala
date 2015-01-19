@@ -176,7 +176,7 @@ class TSaslTransport : public TVirtualTransport<TSaslTransport> {
 
   /**
    * Read a complete Thrift SASL message.
-   * 
+   *
    * @return The SASL status and payload from this message.
    *    Is valid only to till the next call.
    * @throws TTransportException
@@ -204,7 +204,7 @@ class TSaslTransport : public TVirtualTransport<TSaslTransport> {
 
   /**
    * Write the given integer as 4 bytes to the underlying transport.
-   * 
+   *
    * @param length
    *          The length prefix of the next SASL message to write.
    * @throws TTransportException
@@ -212,6 +212,10 @@ class TSaslTransport : public TVirtualTransport<TSaslTransport> {
    */
   void writeLength(uint32_t length);
   virtual void handleSaslStartMessage() = 0;
+
+  // If memBuf_ is filled with bytes that are already read, and has crossed a size
+  // threshold (see implementation for exact value), resize the buffer to a default value.
+  void shrinkBuffer();
 };
 
 }}} // apache::thrift::transport

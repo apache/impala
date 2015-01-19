@@ -19,6 +19,7 @@
  */
 
 #include "config.h"
+
 #ifdef HAVE_SASL_SASL_H
 #include <stdint.h>
 #include <sstream>
@@ -30,11 +31,14 @@
 
 using namespace std;
 
+// Default size, in bytes, for the memory buffer used to stage reads.
+const int32_t DEFAULT_MEM_BUF_SIZE = 32 * 1024;
+
 namespace apache { namespace thrift { namespace transport {
 
   TSaslTransport::TSaslTransport(boost::shared_ptr<TTransport> transport)
       : transport_(transport),
-        memBuf_(new TMemoryBuffer()),
+        memBuf_(new TMemoryBuffer(DEFAULT_MEM_BUF_SIZE)),
         shouldWrap_(false),
         isClient_(false) {
   }
@@ -142,9 +146,34 @@ namespace apache { namespace thrift { namespace transport {
     return static_cast<uint32_t>(len);
   }
 
+  void TSaslTransport::shrinkBuffer() {
+    // readEnd() returns the number of bytes already read, i.e. the number of 'junk' bytes
+    // taking up space at the front of the memory buffer.
+    uint32_t read_end = memBuf_->readEnd();
+
+    // If the size of the junk space at the beginning of the buffer is too large, and
+    // there's no data left in the buffer to read (number of bytes read == number of bytes
+    // written), then shrink the buffer back to the default. We don't want to do this on
+    // every read that exhausts the buffer, since the layer above often reads in small
+    // chunks, which is why we only resize if there's too much junk. The write and read
+    // pointers will eventually catch up after every RPC, so we will always take this path
+    // eventually once the buffer becomes sufficiently full.
+    //
+    // readEnd() may reset the write / read pointers (but only once if there's no
+    // intervening read or write between calls), so needs to be called a second time to
+    // get their current position.
+    if (read_end > DEFAULT_MEM_BUF_SIZE && memBuf_->writeEnd() == memBuf_->readEnd()) {
+      memBuf_->resetBuffer(DEFAULT_MEM_BUF_SIZE);
+    }
+  }
+
   uint32_t TSaslTransport::read(uint8_t* buf, uint32_t len) {
     uint32_t read_bytes = memBuf_->read(buf, len);
-    if (read_bytes > 0) return read_bytes;
+
+    if (read_bytes > 0) {
+      shrinkBuffer();
+      return read_bytes;
+    }
 
     // if there's not enough data in cache, read from underlying transport
     uint32_t dataLength = readLength();
@@ -164,14 +193,17 @@ namespace apache { namespace thrift { namespace transport {
     // We will consume all the data, no need to put it in the memory buffer.
     if (len == dataLength) {
       memcpy(buf, tmpBuf, len);
-      delete tmpBuf;
+      delete[] tmpBuf;
       return len;
     }
 
     memBuf_->write(tmpBuf, dataLength);
     memBuf_->flush();
-    delete tmpBuf;
-    return memBuf_->read(buf, len);
+    delete[] tmpBuf;
+
+    uint32_t ret = memBuf_->read(buf, len);
+    shrinkBuffer();
+    return ret;
   }
 
   void TSaslTransport::writeLength(uint32_t length) {
