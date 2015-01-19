@@ -14,11 +14,15 @@
 
 package com.cloudera.impala.planner;
 
-import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeTrue;
+
+import java.net.URI;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 
 import com.cloudera.impala.planner.PlannerTestBase;
@@ -27,20 +31,52 @@ import com.cloudera.impala.planner.PlannerTestBase;
 // are run only when test.fs.s3a.name is set in the configuration.
 public class S3PlannerTest extends PlannerTestBase {
   // Set to the s3a bucket URI when running on S3. e.g. s3a://bucket/
-  public static final String TEST_FS_S3A_NAME = "test.fs.s3a.name";
+  private static final String TEST_FS_S3A_NAME = "test.fs.s3a.name";
 
+  // The path that will replace the value of TEST_FS_S3A_NAME in file paths.
+  private static final Path S3A_CANONICAL_BUCKET = new Path("s3a://bucket");
+
+  // The Hadoop configuration.
   private final Configuration CONF = new Configuration();
 
-  private boolean isRunningOnS3() {
-    String fsName = CONF.getTrimmed(TEST_FS_S3A_NAME);
-    return !StringUtils.isEmpty(fsName);
+  // The value of the TEST_FS_S3A_NAME property.
+  private Path fsName;
+
+  /**
+   * Config property test.fs.s3a.name must be set to the S3 scheme and bucket when
+   * running on S3, and otherwise unset.  If it is not set, then skip this test.
+   * Also remember the scheme://bucket for later.
+   */
+  @Before
+  public void setUpTest() {
+    String fsNameStr = CONF.getTrimmed(TEST_FS_S3A_NAME);
+    // Skip if the config property was not set. i.e. not running against S3.
+    assumeTrue(!StringUtils.isEmpty(fsNameStr));
+    fsName = new Path(fsNameStr);
   }
 
+  /**
+   * Remove any non-constant components of the given file path.  For S3, the
+   * actual bucket name, which will be unique to the tester's setup, needs to
+   * be replaced with a fixed bucket name.
+   */
+  @Override
+  protected Path cleanseFilePath(Path path) {
+    path = super.cleanseFilePath(path);
+    URI fsURI = fsName.toUri();
+    URI pathURI = path.toUri();
+    Assert.assertTrue("error: " + path + " is not on filesystem " + fsName,
+        fsURI.getScheme().equals(pathURI.getScheme()) &&
+        fsURI.getAuthority().equals(pathURI.getAuthority()));
+    return Path.mergePaths(S3A_CANONICAL_BUCKET, path);
+  }
+
+  /**
+   * Verify that S3 scan ranges are generated correctly.
+   */
   @Test
-  public void testNothing() {
-    assumeTrue(isRunningOnS3());
-    // TDOD: Add S3 scan range test.
-    fail("Shouldn't get here since " + TEST_FS_S3A_NAME + " not set.");
+  public void testS3ScanRanges() {
+    runPlannerTestFile("s3");
   }
 
 }

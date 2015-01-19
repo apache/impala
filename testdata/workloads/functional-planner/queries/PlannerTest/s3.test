@@ -1,0 +1,177 @@
+# Test S3 scan ranges for various file formats.  Splittable formats
+# should be split according to the default s3a block size (32 MB).
+
+select * from tpch.lineitem
+---- PLAN
+00:SCAN HDFS [tpch.lineitem]
+   partitions=1/1 files=1 size=718.94MB
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 100663296:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 134217728:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 167772160:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 201326592:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 234881024:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 268435456:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 301989888:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 335544320:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 369098752:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 402653184:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 436207616:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 469762048:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 503316480:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 536870912:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 570425344:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 603979776:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 637534208:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 671088640:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 67108864:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 704643072:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+====
+select * from tpch_avro.lineitem
+---- PLAN
+00:SCAN HDFS [tpch_avro.lineitem]
+   partitions=1/1 files=6 size=685.57MB
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000000_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000000_0 100663296:27325232
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000000_0 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000000_0 67108864:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000001_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000001_0 100663296:27323995
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000001_0 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000001_0 67108864:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000002_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000002_0 100663296:27323828
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000002_0 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000002_0 67108864:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000003_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000003_0 100663296:27325310
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000003_0 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000003_0 67108864:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000004_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000004_0 100663296:27323665
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000004_0 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000004_0 67108864:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000005_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000005_0 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro/000005_0 67108864:11821290
+====
+select * from tpch_avro_snap.lineitem
+---- PLAN
+00:SCAN HDFS [tpch_avro_snap.lineitem]
+   partitions=1/1 files=6 size=330.89MB
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro_snap/000000_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro_snap/000000_0 33554432:28588375
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro_snap/000001_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro_snap/000001_0 33554432:28139597
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro_snap/000002_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro_snap/000002_0 33554432:28126848
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro_snap/000003_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro_snap/000003_0 33554432:28135517
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro_snap/000004_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro_snap/000004_0 33554432:28145969
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro_snap/000005_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_avro_snap/000005_0 33554432:4496528
+====
+select * from tpch_parquet.lineitem
+---- PLAN
+00:SCAN HDFS [tpch_parquet.lineitem]
+   partitions=1/1 files=3 size=195.85MB
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_parquet/<UID>_data.0.parq 0:59082180
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_parquet/<UID>_data.0.parq 0:72995555
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_parquet/<UID>_data.0.parq 0:73288878
+====
+select * from tpch_rc.lineitem
+---- PLAN
+00:SCAN HDFS [tpch_rc.lineitem]
+   partitions=1/1 files=6 size=654.51MB
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000000_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000000_0 100663296:21444769
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000000_0 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000000_0 67108864:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000001_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000001_0 100663296:21545768
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000001_0 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000001_0 67108864:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000002_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000002_0 100663296:21544537
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000002_0 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000002_0 67108864:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000003_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000003_0 100663296:21544773
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000003_0 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000003_0 67108864:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000004_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000004_0 100663296:21541721
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000004_0 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000004_0 67108864:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000005_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000005_0 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_rc/000005_0 67108864:8257238
+====
+select * from tpch_seq_gzip.lineitem
+---- PLAN
+00:SCAN HDFS [tpch_seq_gzip.lineitem]
+   partitions=1/1 files=6 size=224.42MB
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_gzip/000000_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_gzip/000000_0 33554432:8554516
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_gzip/000001_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_gzip/000001_0 33554432:8297137
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_gzip/000002_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_gzip/000002_0 33554432:8289544
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_gzip/000003_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_gzip/000003_0 33554432:8294985
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_gzip/000004_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_gzip/000004_0 33554432:8301217
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_gzip/000005_0 0:25810286
+====
+select * from tpch_seq_snap.lineitem
+---- PLAN
+00:SCAN HDFS [tpch_seq_snap.lineitem]
+   partitions=1/1 files=6 size=381.50MB
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_snap/000000_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_snap/000000_0 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_snap/000000_0 67108864:4487188
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_snap/000001_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_snap/000001_0 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_snap/000001_0 67108864:4029028
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_snap/000002_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_snap/000002_0 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_snap/000002_0 67108864:4008023
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_snap/000003_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_snap/000003_0 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_snap/000003_0 67108864:4018021
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_snap/000004_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_snap/000004_0 33554432:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_snap/000004_0 67108864:4065377
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_snap/000005_0 0:33554432
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_seq_snap/000005_0 33554432:10329674
+====
+select * from tpch_text_gzip.lineitem
+---- PLAN
+00:SCAN HDFS [tpch_text_gzip.lineitem]
+   partitions=1/1 files=6 size=210.45MB
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_text_gzip/000000_0.gz 0:39542232
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_text_gzip/000001_0.gz 0:39234091
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_text_gzip/000002_0.gz 0:39227896
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_text_gzip/000003_0.gz 0:39234185
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_text_gzip/000004_0.gz 0:39238580
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_text_gzip/000005_0.gz 0:24197569
+====

@@ -24,7 +24,11 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3.S3FileSystem;
+import org.apache.hadoop.fs.s3a.S3AFileSystem;
+import org.apache.hadoop.fs.s3native.NativeS3FileSystem;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.log4j.Logger;
 
@@ -200,11 +204,28 @@ public class FileSystemUtil {
   }
 
   /**
+   * Returns true if the filesystem might override getFileBlockLocations().
+   */
+  public static boolean hasGetFileBlockLocations(FileSystem fs) {
+    // Common case.
+    if (isDistributedFileSystem(fs)) return true;
+    // Blacklist FileSystems that are known to not implement getFileBlockLocations().
+    return !(fs instanceof S3AFileSystem || fs instanceof NativeS3FileSystem ||
+        fs instanceof S3FileSystem || fs instanceof LocalFileSystem);
+  }
+
+  /**
+   * Returns true iff the filesystem is a DistributedFileSystem.
+   */
+  public static boolean isDistributedFileSystem(FileSystem fs) {
+    return fs instanceof DistributedFileSystem;
+  }
+
+  /**
    * Return true iff path is on a DFS filesystem.
    */
   public static boolean isDistributedFileSystem(Path path) throws IOException {
-    FileSystem fs = path.getFileSystem(CONF);
-    return fs instanceof DistributedFileSystem;
+    return isDistributedFileSystem(path.getFileSystem(CONF));
   }
 
   public static DistributedFileSystem getDistributedFileSystem(Path path)

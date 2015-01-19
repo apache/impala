@@ -70,4 +70,8 @@ bool IsDfsPath(const char* path) {
   return strncmp(path, "hdfs://", 7) == 0 || strstr(path, ":/") == NULL;
 }
 
+bool IsS3APath(const char* path) {
+  return strncmp(path, "s3a://", 6) == 0;
+}
+
 }

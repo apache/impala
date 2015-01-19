@@ -193,4 +193,22 @@ public enum HdfsFileFormat {
     }
   }
 
+  /**
+   * Returns true if this file format with the given compression format is splittable.
+   */
+  public boolean isSplittable(HdfsCompression compression) {
+    switch (this) {
+      case TEXT:
+        return compression == HdfsCompression.NONE;
+      case RC_FILE:
+      case SEQUENCE_FILE:
+      case AVRO:
+        return true;
+      case PARQUET:
+        return false;
+      default:
+        throw new RuntimeException("Unknown HdfsFormat: "
+            + this + " - should never happen!");
+    }
+  }
 }

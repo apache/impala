@@ -105,6 +105,14 @@ public class HdfsTable extends Table {
   // Number of times to retry fetching the partitions from the HMS should an error occur.
   private final static int NUM_PARTITION_FETCH_RETRIES = 5;
 
+  // An invalid network address, which will always be treated as remote.
+  private final static TNetworkAddress REMOTE_NETWORK_ADDRESS =
+      new TNetworkAddress("remote*addr", 0);
+
+  // Minimum block size in bytes allowed for synthetic file blocks (other than the last
+  // block, which may be shorter).
+  private final static long MIN_SYNTHETIC_BLOCK_SIZE = 1024 * 1024;
+
   // string to indicate NULL. set in load() from table properties
   private String nullColumnValue_;
 
@@ -262,12 +270,16 @@ public class HdfsTable extends Table {
    * call to DFS.
    */
   private void loadBlockMetadata(FileSystem fs, FileStatus file, FileDescriptor fd,
-      Map<FsKey, FileBlocksInfo> perFsFileBlocks) {
+      HdfsFileFormat fileFormat, Map<FsKey, FileBlocksInfo> perFsFileBlocks) {
     Preconditions.checkNotNull(fd);
     Preconditions.checkNotNull(perFsFileBlocks);
     Preconditions.checkArgument(!file.isDirectory());
     LOG.debug("load block md for " + name_ + " file " + fd.getFileName());
 
+    if (!FileSystemUtil.hasGetFileBlockLocations(fs)) {
+      synthesizeBlockMetadata(fs, fd, fileFormat);
+      return;
+    }
     try {
       BlockLocation[] locations = fs.getFileBlockLocations(file, 0, file.getLen());
       Preconditions.checkNotNull(locations);
@@ -312,6 +324,34 @@ public class HdfsTable extends Table {
   }
 
   /**
+   * For filesystems that don't override getFileBlockLocations, synthesize file blocks
+   * by manually splitting the file range into fixed-size blocks.  That way, scan
+   * ranges can be derived from file blocks as usual.  All synthesized blocks are given
+   * an invalid network address so that the scheduler will treat them as remote.
+   */
+  private void synthesizeBlockMetadata(FileSystem fs, FileDescriptor fd,
+      HdfsFileFormat fileFormat) {
+    long start = 0;
+    long remaining = fd.getFileLength();
+    // Workaround HADOOP-11584 by using the filesystem default block size rather than
+    // the block size from the FileStatus.
+    // TODO: after HADOOP-11584 is resolved, get the block size from the FileStatus.
+    long blockSize = fs.getDefaultBlockSize();
+    if (blockSize < MIN_SYNTHETIC_BLOCK_SIZE) blockSize = MIN_SYNTHETIC_BLOCK_SIZE;
+    if (!fileFormat.isSplittable(HdfsCompression.fromFileName(fd.getFileName()))) {
+      blockSize = remaining;
+    }
+    while (remaining > 0) {
+      long len = Math.min(remaining, blockSize);
+      List<BlockReplica> replicas = Lists.newArrayList(
+          new BlockReplica(hostIndex_.getIndex(REMOTE_NETWORK_ADDRESS), false));
+      fd.addFileBlock(new FileBlock(start, len, replicas));
+      remaining -= len;
+      start += len;
+    }
+  }
+
+  /**
    * Populates disk/volume ID metadata inside the newly created THdfsFileBlocks.
    * perFsFileBlocks maps from each filesystem to a FileBLocksInfo.  The first list
    * contains the newly created THdfsFileBlocks and the second contains the
@@ -323,6 +363,8 @@ public class HdfsTable extends Table {
     // for all the blocks.
     for (FsKey fsKey: perFsFileBlocks.keySet()) {
       FileSystem fs = fsKey.filesystem;
+      // Only DistributedFileSystem has getFileBlockStorageLocations().  It's not even
+      // part of the FileSystem interface, so we'll need to downcast.
       if (!(fs instanceof DistributedFileSystem)) continue;
 
       LOG.trace("Loading disk ids for: " + getFullName() + ". nodes: " + getNumNodes() +
@@ -792,7 +834,8 @@ public class HdfsTable extends Table {
             // all the blocks of each filesystem will be loaded by loadDiskIds().
             fd = new FileDescriptor(fileName, fileStatus.getLen(),
                 fileStatus.getModificationTime());
-            loadBlockMetadata(fs, fileStatus, fd, perFsFileBlocks);
+            loadBlockMetadata(fs, fileStatus, fd, fileFormatDescriptor.getFileFormat(),
+                perFsFileBlocks);
           }
 
           List<FileDescriptor> fds = fileDescMap_.get(partitionDir);

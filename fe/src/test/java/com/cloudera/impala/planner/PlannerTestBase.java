@@ -25,6 +25,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.hadoop.fs.Path;
 import org.junit.AfterClass;
@@ -225,6 +227,7 @@ public class PlannerTestBase {
           THdfsFileSplit split = locations.scan_range.getHdfs_file_split();
           THdfsPartition partition = findPartition(entry.getKey(), split);
           Path filePath = new Path(partition.getLocation(), split.file_name);
+          filePath = cleanseFilePath(filePath);
           result.append("HDFS SPLIT " + filePath.toString() + " "
               + Long.toString(split.offset) + ":" + Long.toString(split.length));
         }
@@ -250,6 +253,20 @@ public class PlannerTestBase {
       }
     }
     return result;
+  }
+
+  /**
+   * Normalize components of the given file path, removing any environment- or test-run
+   * dependent components.  For example, substitutes the unique id portion of Impala
+   * generated file names with a fixed literal.  Subclasses should override to do
+   * filesystem specific cleansing.
+   */
+  protected Path cleanseFilePath(Path path) {
+    String fileName = path.getName();
+    Pattern pattern = Pattern.compile("\\w{16}-\\w{16}_\\d+_data");
+    Matcher matcher = pattern.matcher(fileName);
+    fileName = matcher.replaceFirst("<UID>_data");
+    return new Path(path.getParent(), fileName);
   }
 
   /**
