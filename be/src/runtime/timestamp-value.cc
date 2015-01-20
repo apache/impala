@@ -24,16 +24,6 @@ namespace impala {
 const char* TimestampValue::LLVM_CLASS_NAME = "class.impala::TimestampValue";
 const double TimestampValue::ONE_BILLIONTH = 0.000000001;
 
-time_t to_time_t(ptime t) {
-  if (t == not_a_date_time) {
-    return 0;
-  }
-  ptime epoch(date(1970, 1, 1));
-  time_duration::sec_type x = (t - epoch).total_seconds();
-
-  return time_t(x);
-}
-
 TimestampValue::TimestampValue(const char* str, int len) {
   TimestampParser::Parse(str, len, &date_, &time_);
 }

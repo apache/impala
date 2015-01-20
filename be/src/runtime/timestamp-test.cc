@@ -27,6 +27,7 @@ using namespace std;
 using namespace boost;
 using namespace boost::assign;
 using namespace boost::gregorian;
+using namespace boost::posix_time;
 
 namespace impala {
 
@@ -535,24 +536,55 @@ TEST(TimestampTest, Basic) {
     (TimestampFormatTC(1382337792, "dddddd/dd/dd", "000021/21/21"))
     // Test just formatting time tokens on a ts value generated from a date
     (TimestampFormatTC(965779200, "HH:mm:ss", "00:00:00"));
-    // Loop through format test cases
-    for (int i = 0; i < fmt_test_cases.size(); ++i) {
-      TimestampFormatTC test_case = fmt_test_cases[i];
-      DateTimeFormatContext dt_ctx(test_case.fmt, strlen(test_case.fmt));
-      ASSERT_TRUE(TimestampParser::ParseFormatTokens(&dt_ctx))  << "TC: " << i;
-      TimestampValue cust_tv(test_case.ts);
-      EXPECT_NE(cust_tv.date(), not_a_date) << "TC: " << i;
-      EXPECT_NE(cust_tv.time(), not_a_date_time) << "TC: " << i;
-      EXPECT_GE(dt_ctx.fmt_out_len, dt_ctx.fmt_len);
-      int buff_len = dt_ctx.fmt_out_len + 1;
-      char buff[buff_len];
-      int actual_len = cust_tv.Format(dt_ctx, buff_len, buff);
-      EXPECT_GT(actual_len, 0) << "TC: " << i;
-      EXPECT_LE(actual_len, dt_ctx.fmt_out_len) << "TC: " << i;
-      EXPECT_EQ(string(buff, actual_len),
-          string(test_case.str, strlen(test_case.str))) << "TC: " << i;
-    }
+  // Loop through format test cases
+  for (int i = 0; i < fmt_test_cases.size(); ++i) {
+    TimestampFormatTC test_case = fmt_test_cases[i];
+    DateTimeFormatContext dt_ctx(test_case.fmt, strlen(test_case.fmt));
+    ASSERT_TRUE(TimestampParser::ParseFormatTokens(&dt_ctx))  << "TC: " << i;
+    TimestampValue cust_tv(test_case.ts);
+    EXPECT_NE(cust_tv.date(), not_a_date) << "TC: " << i;
+    EXPECT_NE(cust_tv.time(), not_a_date_time) << "TC: " << i;
+    EXPECT_GE(dt_ctx.fmt_out_len, dt_ctx.fmt_len);
+    int buff_len = dt_ctx.fmt_out_len + 1;
+    char buff[buff_len];
+    int actual_len = cust_tv.Format(dt_ctx, buff_len, buff);
+    EXPECT_GT(actual_len, 0) << "TC: " << i;
+    EXPECT_LE(actual_len, dt_ctx.fmt_out_len) << "TC: " << i;
+    EXPECT_EQ(string(buff, actual_len),
+        string(test_case.str, strlen(test_case.str))) << "TC: " << i;
   }
+  // Test edge cases
+  TimestampValue min_date = TimestampValue("1400-01-01", 10);
+  EXPECT_TRUE(min_date.HasDate());
+  EXPECT_TRUE(min_date.HasTime());
+  EXPECT_EQ(-17987443200, min_date.ToUnixTime());
+  EXPECT_EQ("1400-01-01 00:00:00", TimestampValue(-17987443200).DebugString());
+  TimestampValue too_early(-17987443201);
+  EXPECT_FALSE(too_early.HasDate());
+  EXPECT_FALSE(too_early.HasTime());
+  // Apparently 5 digit years don't parse (at least by default) but can be printed.
+  // Boost's documented says the max year supported is 9,999 but 10K seems to be
+  // the actual limit.
+  TimestampValue max_date =
+      TimestampValue(date(10000, Dec, 31), time_duration(23, 59, 59));
+  EXPECT_TRUE(max_date.HasDate());
+  EXPECT_TRUE(max_date.HasTime());
+  EXPECT_EQ(253433923199, max_date.ToUnixTime());
+  EXPECT_EQ("10000-12-31 23:59:59", TimestampValue(253433923199).DebugString());
+  TimestampValue too_late(253433923200);
+  EXPECT_FALSE(too_late.HasDate());
+  EXPECT_FALSE(too_late.HasTime());
+
+  // Regression tests for IMPALA-1676, Unix times overflow int32 during year 2038
+  EXPECT_EQ("2038-01-19 03:14:08", TimestampValue(2147483648).DebugString());
+  EXPECT_EQ("2038-01-19 03:14:09", TimestampValue(2147483649).DebugString());
+
+  // Test Unix time as a float
+  EXPECT_EQ(1382337792.07,
+      TimestampValue("2013-10-21 06:43:12.07", 22).ToSubsecondUnixTime());
+  EXPECT_EQ("1970-01-01 00:00:00.008000000", TimestampValue(0.008).DebugString());
+}
+
 }
 
 int main(int argc, char **argv) {

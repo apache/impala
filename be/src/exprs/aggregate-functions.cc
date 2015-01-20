@@ -182,7 +182,7 @@ void AggregateFunctions::TimestampAvgUpdate(FunctionContext* ctx,
   DCHECK(dst->ptr != NULL);
   DCHECK_EQ(sizeof(AvgState), dst->len);
   AvgState* avg = reinterpret_cast<AvgState*>(dst->ptr);
-  double val = TimestampValue::FromTimestampVal(src);
+  double val = TimestampValue::FromTimestampVal(src).ToSubsecondUnixTime();
   avg->sum += val;
   ++avg->count;
 }
@@ -193,7 +193,7 @@ void AggregateFunctions::TimestampAvgRemove(FunctionContext* ctx,
   DCHECK(dst->ptr != NULL);
   DCHECK_EQ(sizeof(AvgState), dst->len);
   AvgState* avg = reinterpret_cast<AvgState*>(dst->ptr);
-  double val = TimestampValue::FromTimestampVal(src);
+  double val = TimestampValue::FromTimestampVal(src).ToSubsecondUnixTime();
   avg->sum -= val;
   --avg->count;
   DCHECK_GE(avg->count, 0);

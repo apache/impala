@@ -143,26 +143,26 @@ IntVal TimestampFunctions::Unix(FunctionContext* context, const StringVal& strin
   TimestampValue tv = TimestampValue(
       reinterpret_cast<const char*>(string_val.ptr), string_val.len, *dt_ctx);
   if (!tv.HasDate()) return IntVal::null();
-  return IntVal(static_cast<time_t>(tv));
+  return IntVal(tv.ToUnixTime());
 }
 
 IntVal TimestampFunctions::Unix(FunctionContext* context, const TimestampVal& ts_val) {
   if (ts_val.is_null) return IntVal::null();
   const TimestampValue& tv = TimestampValue::FromTimestampVal(ts_val);
   if (!tv.HasDate()) return IntVal::null();
-  return IntVal(static_cast<time_t>(tv));
+  return IntVal(tv.ToUnixTime());
 }
 
 IntVal TimestampFunctions::Unix(FunctionContext* context) {
   if (!context->impl()->state()->now()->HasDate()) return IntVal::null();
-  return IntVal(static_cast<time_t>(*context->impl()->state()->now()));
+  return IntVal(context->impl()->state()->now()->ToUnixTime());
 }
 
 IntVal TimestampFunctions::UnixFromString(FunctionContext* context, const StringVal& sv) {
   if (sv.is_null) return IntVal::null();
   TimestampValue tv(reinterpret_cast<const char *>(sv.ptr), sv.len);
   if (!tv.HasDate()) return IntVal::null();
-  return IntVal(static_cast<time_t>(tv));
+  return IntVal(tv.ToUnixTime());
 }
 
 void TimestampFunctions::ReportBadFormat(FunctionContext* context,

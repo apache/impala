@@ -16,17 +16,17 @@
 #ifndef IMPALA_RUNTIME_TIMESTAMP_VALUE_H
 #define IMPALA_RUNTIME_TIMESTAMP_VALUE_H
 
-#include <string>
 #include <ctime>
+#include <string>
+
 #include <boost/cstdint.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+
 #include "runtime/timestamp-parse-util.h"
 #include "udf/udf.h"
 #include "util/hash-util.h"
 
 namespace impala {
-
-time_t to_time_t(boost::posix_time::ptime t);
 
 // Represents either a (1) date and time, (2) a date with an undefined time, or (3)
 // a time with an undefined date. In all cases, times have up to nanosecond resolution
@@ -72,23 +72,23 @@ class TimestampValue {
   TimestampValue(const char* str, int len, const DateTimeFormatContext& dt_ctx);
 
   // Unix time (seconds since 1970-01-01 UTC by definition) constructors.
-  // TODO: Construct a local time to be consistent with FROM_UNIXTIME() and related
-  //       functions.
+  // TODO: When IMPALA-1435 is fixed, construct a local time to be consistent with
+  //       FROM_UNIXTIME() and related functions.
   template <typename Number>
   explicit TimestampValue(Number unix_time) {
-    *this = boost::posix_time::from_time_t(unix_time);
+    *this = UnixTimeToPtime(unix_time);
   }
 
   TimestampValue(int64_t unix_time, int64_t nanos) {
-    boost::posix_time::ptime temp = boost::posix_time::from_time_t(unix_time);
+    boost::posix_time::ptime temp = UnixTimeToPtime(unix_time);
     temp += boost::posix_time::nanoseconds(nanos);
     *this = temp;
   }
 
   explicit TimestampValue(double unix_time) {
-    int64_t i = unix_time;
-    boost::posix_time::ptime temp = boost::posix_time::from_time_t(i);
-    temp += boost::posix_time::nanoseconds((unix_time - i) / ONE_BILLIONTH);
+    const time_t unix_time_whole = unix_time;
+    boost::posix_time::ptime temp = UnixTimeToPtime(unix_time_whole);
+    temp += boost::posix_time::nanoseconds((unix_time - unix_time_whole) / ONE_BILLIONTH);
     *this = temp;
   }
 
@@ -100,14 +100,20 @@ class TimestampValue {
     return TimestampValue(boost::posix_time::microsec_clock::local_time());
   }
 
+  // Returns a TimestampValue converted from a TimestampVal. The caller must ensure
+  // the TimestampVal does not represent a NULL.
   static TimestampValue FromTimestampVal(const impala_udf::TimestampVal& udf_value) {
+    DCHECK(!udf_value.is_null);
     TimestampValue value;
     memcpy(&value.date_, &udf_value.date, sizeof(value.date_));
     memcpy(&value.time_, &udf_value.time_of_day, sizeof(value.time_));
     return value;
   }
 
+  // Returns a TimestampVal representation in the output variable. The caller must ensure
+  // the TimestampValue instance has a valid date or time before calling.
   void ToTimestampVal(impala_udf::TimestampVal* tv) const {
+    DCHECK(HasDateOrTime());
     memcpy(&tv->date, &date_, sizeof(date_));
     memcpy(&tv->time_of_day, &time_, sizeof(time_));
     tv->is_null = false;
@@ -142,6 +148,24 @@ class TimestampValue {
   // Returns the number of characters copied in to the buffer (minus the terminator)
   int Format(const DateTimeFormatContext& dt_ctx, int len, char* buff);
 
+  // Returns the Unix time (seconds since the Unix epoch) representation. The
+  // TimestampValue instance this function is called upon should represent a UTC time
+  // before the call.
+  time_t ToUnixTime() const {
+    DCHECK(HasDate());
+    const boost::posix_time::ptime temp(date_, time_);
+    tm temp_tm = boost::posix_time::to_tm(temp);
+    return timegm(&temp_tm);
+  }
+
+  double ToSubsecondUnixTime() const {
+    double temp = ToUnixTime();
+    if (LIKELY(HasTime())) {
+      temp += time_.fractional_seconds() * ONE_BILLIONTH;
+    }
+    return temp;
+  }
+
   void set_date(const boost::gregorian::date d) { date_ = d; }
   void set_time(const boost::posix_time::time_duration t) { time_ = t; }
   const boost::gregorian::date& date() const { return date_; }
@@ -174,50 +198,6 @@ class TimestampValue {
     return *this > other || *this == other;
   }
 
-  // TODO: If the Unix time constructors convert from local time, these should
-  // convert too.
-  operator int8_t() const {
-    boost::posix_time::ptime temp;
-    this->ToPtime(&temp);
-    return static_cast<char>(to_time_t(temp));
-  }
-
-  operator int16_t() const {
-    boost::posix_time::ptime temp;
-    this->ToPtime(&temp);
-    return static_cast<int16_t>(to_time_t(temp));
-  }
-
-  operator int32_t() const {
-    boost::posix_time::ptime temp;
-    this->ToPtime(&temp);
-    return static_cast<int32_t>(to_time_t(temp));
-  }
-
-  operator int64_t() const {
-    boost::posix_time::ptime temp;
-    this->ToPtime(&temp);
-    return static_cast<int64_t>(to_time_t(temp));
-  }
-
-  operator float() const {
-    boost::posix_time::ptime temp;
-    this->ToPtime(&temp);
-    // TODO: What should happen when either the date or time component is missing? This
-    // looks broken when time_ is "special".
-    return static_cast<float>(to_time_t(temp)) +
-        static_cast<float>(time_.fractional_seconds() * ONE_BILLIONTH);
-  }
-
-  operator double() const {
-    boost::posix_time::ptime temp;
-    this->ToPtime(&temp);
-    // TODO: What should happen when either the date or time component is missing? This
-    // looks broken when time_ is "special".
-    return static_cast<double>(to_time_t(temp)) +
-        static_cast<double>(time_.fractional_seconds() * ONE_BILLIONTH);
-  }
-
   static size_t Size() {
     return sizeof(boost::posix_time::time_duration) + sizeof(boost::gregorian::date);
   }
@@ -246,6 +226,21 @@ class TimestampValue {
 
   // 4 -bytes - stores the date as a day
   boost::gregorian::date date_;
+
+  // Return a ptime representation of the given Unix time (seconds since 1970 UTC), no
+  // time zone conversion is done so the resulting ptime is in UTC.
+  boost::posix_time::ptime UnixTimeToPtime(time_t unix_time) const {
+    // Unix times are represented internally in boost as 32 bit ints which limits the
+    // range of dates to 1901-2038 (https://svn.boost.org/trac/boost/ticket/3109), so
+    // libc functions will be used instead.
+    tm temp_tm;
+    gmtime_r(&unix_time, &temp_tm);
+    try {
+      return boost::posix_time::ptime_from_tm(temp_tm);
+    } catch (std::exception& e) {
+      return boost::posix_time::ptime(boost::posix_time::not_a_date_time);
+    }
+  }
 };
 
 // This function must be called 'hash_value' to be picked up by boost.

@@ -14,33 +14,34 @@
 
 #include <string>
 #include <math.h>
-#include <gtest/gtest.h>
+
 #include <boost/assign/list_of.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/unordered_map.hpp>
+#include <gtest/gtest.h>
 
+#include "codegen/llvm-codegen.h"
 #include "common/init.h"
 #include "common/object-pool.h"
-#include "runtime/raw-value.h"
-#include "runtime/string-value.h"
-#include "gen-cpp/Exprs_types.h"
 #include "exprs/expr-context.h"
 #include "exprs/is-null-predicate.h"
 #include "exprs/like-predicate.h"
 #include "exprs/literal.h"
 #include "exprs/null-literal.h"
-#include "codegen/llvm-codegen.h"
+#include "gen-cpp/Exprs_types.h"
+#include "gen-cpp/hive_metastore_types.h"
+#include "rpc/thrift-client.h"
+#include "rpc/thrift-server.h"
+#include "runtime/raw-value.h"
+#include "runtime/string-value.h"
+#include "service/fe-support.h"
+#include "service/impala-server.h"
+#include "testutil/impalad-query-executor.h"
+#include "testutil/in-process-servers.h"
 #include "util/debug-util.h"
 #include "util/string-parser.h"
 #include "util/test-info.h"
-#include "rpc/thrift-server.h"
-#include "rpc/thrift-client.h"
-#include "testutil/in-process-servers.h"
-#include "testutil/impalad-query-executor.h"
-#include "service/impala-server.h"
-#include "service/fe-support.h"
-#include "gen-cpp/hive_metastore_types.h"
 
 DECLARE_int32(be_port);
 DECLARE_int32(beeswax_port);
@@ -289,6 +290,8 @@ class ExprTest : public testing::Test {
     GetValue(expr, expr_type, &result);
 
     string expected_str;
+    float expected_float;
+    double expected_double;
     switch (expr_type.type) {
       case TYPE_BOOLEAN:
         EXPECT_EQ(*reinterpret_cast<bool*>(result), expected_result) << expr;
@@ -308,12 +311,15 @@ class ExprTest : public testing::Test {
       case TYPE_FLOAT:
         // Converting the float back from a string is inaccurate so convert
         // the expected result to a string.
-        RawValue::PrintValue(reinterpret_cast<const void*>(&expected_result),
+        // In case the expected_result was passed in as an int or double, convert it.
+        expected_float = static_cast<float>(expected_result);
+        RawValue::PrintValue(reinterpret_cast<const void*>(&expected_float),
                              TYPE_FLOAT, -1, &expected_str);
         EXPECT_EQ(*reinterpret_cast<string*>(result), expected_str) << expr;
         break;
       case TYPE_DOUBLE:
-        RawValue::PrintValue(reinterpret_cast<const void*>(&expected_result),
+        expected_double = static_cast<double>(expected_result);
+        RawValue::PrintValue(reinterpret_cast<const void*>(&expected_double),
                              TYPE_DOUBLE, -1, &expected_str);
         EXPECT_EQ(*reinterpret_cast<string*>(result), expected_str) << expr;
         break;
@@ -1049,6 +1055,41 @@ TEST_F(ExprTest, CastExprs) {
   // From Timestamp to Timestamp
   TestStringValue("cast(cast(cast('2012-01-01 09:10:11.123456789' as timestamp) as"
       " timestamp) as string)", "2012-01-01 09:10:11.123456789");
+
+
+  // Timestamp <--> Int
+  TestIsNull("cast(cast('09:10:11.000000' as timestamp) as int)", TYPE_INT);
+  TestValue("cast(cast('2000-01-01' as timestamp) as int)", TYPE_INT, 946684800);
+  // Check that casting to a TINYINT gives the same result as if the Unix time were
+  // cast instead.
+  TestValue("cast(cast('2000-01-01' as timestamp) as tinyint)", TYPE_TINYINT, -128);
+  TestValue("cast(946684800 as tinyint)", TYPE_TINYINT, -128);
+  TestValue("cast(cast('2000-01-01 09:10:11.000000' as timestamp) as int)", TYPE_INT,
+      946717811);
+  TestTimestampValue("cast(946717811 as timestamp)",
+      TimestampValue("2000-01-01 09:10:11", 19));
+  TestValue("cast(cast('1400-01-01' as timestamp) as bigint)", TYPE_BIGINT, -17987443200);
+  TestTimestampValue("cast(-17987443200 as timestamp)", TimestampValue("1400-01-01", 10));
+  TestIsNull("cast(-17987443201 as timestamp)", TYPE_TIMESTAMP);
+  // Timestamp <--> Float
+  TestIsNull("cast(cast('09:10:11.000000' as timestamp) as float)", TYPE_FLOAT);
+  TestValue("cast(cast('2000-01-01' as timestamp) as double)", TYPE_DOUBLE, 946684800);
+  TestValue("cast(cast('2000-01-01' as timestamp) as float)", TYPE_FLOAT, 946684800);
+  TestValue("cast(cast('2000-01-01 09:10:11.720000' as timestamp) as double)",
+      TYPE_DOUBLE, 946717811.72);
+  TestTimestampValue("cast(cast(946717811.033 as double) as timestamp)",
+      TimestampValue("2000-01-01 09:10:11.032999992", 29));
+  TestValue("cast(cast('1400-01-01' as timestamp) as double)", TYPE_DOUBLE,
+      -17987443200);
+  TestIsNull("cast(cast(-17987443201.03 as double) as timestamp)", TYPE_TIMESTAMP);
+  // Use 4 digit years otherwise string parsing will fail.
+  TestValue("cast(cast('9999-12-31 23:59:59' as timestamp) + interval 1 year as bigint)",
+      TYPE_BIGINT, 253433923199);
+  TestTimestampValue("cast(253433923199 as timestamp) - interval 1 year",
+      TimestampValue("9999-12-31 23:59:59", 19));
+  TestIsNull("cast(253433923200 as timestamp)", TYPE_TIMESTAMP);
+  TestIsNull("cast(cast(null as bigint) as timestamp)", TYPE_TIMESTAMP);
+  TestIsNull("cast(cast(null as timestamp) as bigint)", TYPE_BIGINT);
 
 #if 0
   // Test overflow.  TODO: Hive casting rules are very weird here also.  It seems for
@@ -2619,11 +2660,17 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestStringValue("cast(date_sub(cast('2012-01-01 09:10:11.123456789' "
       "as timestamp), interval cast(10 as bigint) years) as string)",
       "2002-01-01 09:10:11.123456789");
-  // These return NULL because year is out of range (IMPALA-1493)
+  // These return NULL because year is out of range (IMPALA-1493). If very large
+  // intervals are used the results will be incorrect due to using boost (IMPALA-1675
+  // still unresolved).
   TestIsNull(
       "CAST('2005-10-11 00:00:00' AS TIMESTAMP) - INTERVAL 718 YEAR", TYPE_TIMESTAMP);
   TestIsNull(
       "CAST('2005-10-11 00:00:00' AS TIMESTAMP) + INTERVAL -718 YEAR", TYPE_TIMESTAMP);
+  TestIsNull(
+      "CAST('2005-10-11 00:00:00' AS TIMESTAMP) + INTERVAL 9718 YEAR", TYPE_TIMESTAMP);
+  TestIsNull(
+      "CAST('2005-10-11 00:00:00' AS TIMESTAMP) - INTERVAL -9718 YEAR", TYPE_TIMESTAMP);
   // Add/sub months.
   TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
       "as timestamp), interval 13 months) as string)",
@@ -2851,6 +2898,11 @@ TEST_F(ExprTest, TimestampFunctions) {
       cast('2012-12-22' as timestamp))", TYPE_INT, -366);
   TestValue("datediff(cast('2012-12-22' as timestamp), \
       cast('2011-12-22 09:10:11.12345678' as timestamp))", TYPE_INT, 366);
+
+  TestIsNull("cast('24:59:59' as timestamp)", TYPE_TIMESTAMP);
+  TestIsNull("cast('10000-12-31' as timestamp)", TYPE_TIMESTAMP);
+  TestIsNull("cast('10000-12-31 23:59:59' as timestamp)", TYPE_TIMESTAMP);
+  TestIsNull("cast('2000-12-31 24:59:59' as timestamp)", TYPE_TIMESTAMP);
 
   TestIsNull("year(cast('09:10:11.000000' as timestamp))", TYPE_INT);
   TestIsNull("month(cast('09:10:11.000000' as timestamp))", TYPE_INT);
