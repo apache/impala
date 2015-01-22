@@ -18,3 +18,7 @@ Populated with:
 hive> set parquet.block.size=500;
 hive> INSERT INTO TABLE tbl
       SELECT l_comment FROM tpch.lineitem LIMIT 1000;
+
+alltypesagg_hive_13_1.parquet:
+Generated with parquet-mr version 1.5.0-cdh5.4.0-SNAPSHOT
+hive> create table alltypesagg_hive_13_1 stored as parquet as select * from alltypesagg;

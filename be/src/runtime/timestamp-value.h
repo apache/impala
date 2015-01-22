@@ -126,6 +126,7 @@ class TimestampValue {
   bool HasDate() const { return !date_.is_special(); }
   bool HasTime() const { return !time_.is_special(); }
   bool HasDateOrTime() const { return HasDate() || HasTime(); }
+  bool HasDateAndTime() const { return HasDate() && HasTime(); }
 
   std::string DebugString() const {
     std::stringstream ss;
@@ -165,6 +166,10 @@ class TimestampValue {
     }
     return temp;
   }
+
+  // Converts from UTC to local time in-place. The caller must ensure the TimestampValue
+  // this function is called upon has both a valid date and time.
+  void UtcToLocal();
 
   void set_date(const boost::gregorian::date d) { date_ = d; }
   void set_time(const boost::posix_time::time_duration t) { time_ = t; }

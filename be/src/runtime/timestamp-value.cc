@@ -37,6 +37,27 @@ int TimestampValue::Format(const DateTimeFormatContext& dt_ctx, int len, char* b
   return TimestampParser::Format(dt_ctx, date_, time_, len, buff);
 }
 
+void TimestampValue::UtcToLocal() {
+  DCHECK(HasDateAndTime());
+  try {
+    tm temp_tm = to_tm(ptime(date_, time_));  // will throw if date/time is invalid
+    time_t utc = timegm(&temp_tm);
+    if (UNLIKELY(NULL == localtime_r(&utc, &temp_tm))) {
+      *this = ptime(not_a_date_time);
+      return;
+    }
+    // Unlikely but a time zone conversion may push the value over the min/max
+    // boundary resulting in an exception.
+    ptime local = ptime_from_tm(temp_tm);
+    // Neither time_t nor struct tm allow fractional seconds so they have to be handled
+    // separately.
+    local += nanoseconds(time_.fractional_seconds());
+    *this = local;
+  } catch (std::exception& from_boost) {
+    *this = ptime(not_a_date_time);
+  }
+}
+
 ostream& operator<<(ostream& os, const TimestampValue& timestamp_value) {
   return os << timestamp_value.DebugString();
 }

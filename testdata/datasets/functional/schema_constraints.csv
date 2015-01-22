@@ -39,6 +39,7 @@ table_name:bad_parquet, constraint:restrict_to, table_format:parquet/none/none
 table_name:bad_metadata_len, constraint:restrict_to, table_format:parquet/none/none
 table_name:bad_dict_page_offset, constraint:restrict_to, table_format:parquet/none/none
 table_name:bad_compressed_size, constraint:restrict_to, table_format:parquet/none/none
+table_name:alltypesagg_hive_13_1, constraint:restrict_to, table_format:parquet/none/none
 
 # TODO: Support Avro. Data loading currently fails for Avro because complex types
 # cannot be converted to the corresponding Avro types yet.
@@ -75,7 +76,7 @@ table_name:complex_view, constraint:restrict_to, table_format:seq/snap/block
 table_name:view_view, constraint:restrict_to, table_format:text/none/none
 table_name:view_view, constraint:restrict_to, table_format:seq/snap/block
 
-# liketbl and tblwithraggedcolumns all have 
+# liketbl and tblwithraggedcolumns all have
 # NULLs in primary key columns. hbase does not support
 # writing NULLs to primary key columns.
 table_name:liketbl, constraint:exclude, table_format:hbase/none/none
@@ -93,8 +94,8 @@ table_name:overflow, constraint:exclude, table_format:hbase/none/none
 # seem to like this.
 table_name:widerow, constraint:exclude, table_format:hbase/none/none
 
-# nullformat_custom is used in null-insert tests, which user insert overwrite, 
-# which is not supported in hbase. The schema is also specified in HIVE_CREATE 
+# nullformat_custom is used in null-insert tests, which user insert overwrite,
+# which is not supported in hbase. The schema is also specified in HIVE_CREATE
 # with no corresponding LOAD statement.
 table_name:nullformat_custom, constraint:exclude, table_format:hbase/none/none
 table_name:unsupported_types, constraint:exclude, table_format:hbase/none/none

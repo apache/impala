@@ -14,9 +14,11 @@
 
 #include "exec/hdfs-parquet-scanner.h"
 
-#include <boost/algorithm/string.hpp>
-#include <gutil/strings/substitute.h>
 #include <limits> // for std::numeric_limits
+
+#include <boost/algorithm/string.hpp>
+#include <gflags/gflags.h>
+#include <gutil/strings/substitute.h>
 
 #include "common/object-pool.h"
 #include "exec/hdfs-scan-node.h"
@@ -45,6 +47,11 @@ using namespace boost;
 using namespace boost::algorithm;
 using namespace impala;
 using namespace strings;
+
+// Provide a workaround for IMPALA-1658.
+DEFINE_bool(convert_legacy_hive_parquet_utc_timestamps, false,
+    "When true, TIMESTAMPs read from files written by Parquet-MR (used by Hive) will "
+    "be converted from UTC to local time. Writes are unaffected.");
 
 // Max data page header size in bytes. This is an estimate and only needs to be an upper
 // bound. It is theoretically possible to have a page header of any size due to string
@@ -276,7 +283,12 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
     } else {
       fixed_len_size_ = -1;
     }
-    needs_conversion_ = desc_->type().type == TYPE_CHAR;
+    needs_conversion_ = desc_->type().type == TYPE_CHAR ||
+        // TODO: Add logic to detect file versions that have unconverted TIMESTAMP
+        // values. Currently all versions have converted values.
+        (FLAGS_convert_legacy_hive_parquet_utc_timestamps &&
+        desc_->type().type == TYPE_TIMESTAMP &&
+        parent->file_version_.application == "parquet-mr");
   }
 
  protected:
@@ -332,7 +344,7 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
   }
 
   // Converts and writes src into dst based on desc_->type()
-  void ConvertSlot(const T* src, void* dst, MemPool* pool) {
+  void ConvertSlot(const T* src, T* dst, MemPool* pool) {
     DCHECK(false);
   }
 
@@ -357,7 +369,7 @@ void HdfsParquetScanner::ColumnReader<StringValue>::CopySlot(
 
 template<>
 void HdfsParquetScanner::ColumnReader<StringValue>::ConvertSlot(
-    const StringValue* src, void* dst, MemPool* pool) {
+    const StringValue* src, StringValue* dst, MemPool* pool) {
   DCHECK(desc_->type().type == TYPE_CHAR);
   int len = desc_->type().len;
   StringValue sv;
@@ -371,9 +383,17 @@ void HdfsParquetScanner::ColumnReader<StringValue>::ConvertSlot(
   memcpy(sv.ptr, src->ptr, unpadded_len);
   StringValue::PadWithSpaces(sv.ptr, len, unpadded_len);
 
-  if (desc_->type().IsVarLen()) *reinterpret_cast<StringValue*>(dst) = sv;
+  if (desc_->type().IsVarLen()) *dst = sv;
 }
 
+template<>
+void HdfsParquetScanner::ColumnReader<TimestampValue>::ConvertSlot(
+    const TimestampValue* src, TimestampValue* dst, MemPool* pool) {
+  // Conversion should only happen when this flag is enabled.
+  DCHECK(FLAGS_convert_legacy_hive_parquet_utc_timestamps);
+  *dst = *src;
+  if (dst->HasDateAndTime()) dst->UtcToLocal();
+}
 
 class HdfsParquetScanner::BoolColumnReader : public HdfsParquetScanner::BaseColumnReader {
  public:

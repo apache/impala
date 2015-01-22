@@ -1277,6 +1277,31 @@ bad_parquet
 field STRING
 ====
 ---- DATASET
+-- IMPALA-1658: Timestamps written by Hive are local-to-UTC adjusted.
+functional
+---- BASE_TABLE_NAME
+alltypesagg_hive_13_1
+---- COLUMNS
+id int
+bool_col boolean
+tinyint_col tinyint
+smallint_col smallint
+int_col int
+bigint_col bigint
+float_col float
+double_col double
+date_string_col string
+string_col string
+timestamp_col timestamp
+year int
+month int
+day int
+---- LOAD
+`hadoop fs -mkdir /test-warehouse/alltypesagg_hive_13_1_parquet && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/alltypesagg_hive_13_1.parquet \
+/test-warehouse/alltypesagg_hive_13_1_parquet/
+====
+---- DATASET
 -- Parquet file with invalid metadata size in the file footer.
 functional
 ---- BASE_TABLE_NAME
