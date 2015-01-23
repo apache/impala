@@ -233,7 +233,7 @@ public class Analyzer {
 
     // accesses to catalog objects
     // TODO: This can be inferred from privilegeReqs. They should be coalesced.
-    public List<TAccessEvent> accessEvents = Lists.newArrayList();
+    public Set<TAccessEvent> accessEvents = Sets.newHashSet();
 
     // Tracks all warnings (e.g. non-fatal errors) that were generated during analysis.
     // These are passed to the backend and eventually propagated to the shell. Maps from
@@ -1971,7 +1971,7 @@ public class Analyzer {
    * accesses that failed due to AuthorizationExceptions. In general, if analysis
    * fails for any reason this list may be incomplete.
    */
-  public List<TAccessEvent> getAccessEvents() { return globalState_.accessEvents; }
+  public Set<TAccessEvent> getAccessEvents() { return globalState_.accessEvents; }
   public void addAccessEvent(TAccessEvent event) {
     globalState_.accessEvents.add(event);
   }

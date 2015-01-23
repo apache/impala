@@ -101,6 +101,10 @@ bool TUniqueId::operator<(const TUniqueId& that) const {
   return (hi < that.hi) || (hi == that.hi &&  lo < that.lo);
 }
 
+bool TAccessEvent::operator<(const TAccessEvent& that) const {
+  return this->name < that.name;
+}
+
 static void ThriftOutputFunction(const char* output) {
   VLOG_QUERY << output;
 }
