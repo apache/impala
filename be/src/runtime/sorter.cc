@@ -221,10 +221,11 @@ class Sorter::TupleSorter {
    public:
     TupleIterator(TupleSorter* parent, int64_t index)
       : parent_(parent),
-        index_(index) {
+        index_(index),
+        current_tuple_(NULL) {
       DCHECK_GE(index, 0);
       DCHECK_LE(index, parent_->run_->num_tuples_);
-      // If the run is empty, only index_ is initialized.
+      // If the run is empty, only index_ and current_tuple_ are initialized.
       if (parent_->run_->num_tuples_ == 0) return;
       // If the iterator is initialized to past the end, set up buffer_start_ and
       // block_index_ as if it pointing to the last tuple. Add tuple_size_ bytes to
@@ -315,15 +316,15 @@ class Sorter::TupleSorter {
   // Perform an insertion sort for rows in the range [first, last) in a run.
   void InsertionSort(const TupleIterator& first, const TupleIterator& last);
 
-  // Partitions the sequence of tuples in the range [first, last) in a run into two
-  // groups around the pivot tuple - i.e. tuples in first group are <= the pivot, and
-  // tuples in the second group are >= pivot. Tuples are swapped in place to create the
-  // groups and the index to the first element in the second group is returned.
+  // Partitions the sequence of tuples in the range [first, last) in a run into two groups
+  // around the pivot tuple - i.e. tuples in first group are <= the pivot, and tuples in
+  // the second group are >= pivot. Tuples are swapped in place to create the groups and
+  // the index to the first element in the second group is returned.
   // Checks state_->is_cancelled() and returns early with an invalid result if true.
   TupleIterator Partition(TupleIterator first, TupleIterator last, Tuple* pivot);
 
-  // Performs a quicksort of rows in the range [first, last).
-  // followed by insertion sort for smaller groups of elements.
+  // Performs a quicksort of rows in the range [first, last) followed by insertion sort
+  // for smaller groups of elements.
   // Checks state_->is_cancelled() and returns early if true.
   void SortHelper(TupleIterator first, TupleIterator last);
 
@@ -846,7 +847,8 @@ void Sorter::TupleSorter::SortHelper(TupleIterator first, TupleIterator last) {
   // Use insertion sort for smaller sequences.
   while (last.index_ - first.index_ > INSERTION_THRESHOLD) {
     TupleIterator iter(this, first.index_ + (last.index_ - first.index_)/2);
-    // Parititon() splits the tuples in [first, last) into two groups (<= pivot
+    DCHECK_NOTNULL(iter.current_tuple_);
+    // Partition() splits the tuples in [first, last) into two groups (<= pivot
     // and >= pivot) in-place. 'cut' is the index of the first tuple in the second group.
     TupleIterator cut = Partition(first, last,
         reinterpret_cast<Tuple*>(iter.current_tuple_));

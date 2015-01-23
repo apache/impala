@@ -506,8 +506,8 @@ Status HdfsParquetTableWriter::BaseColumnWriter::Flush(int64_t* file_pos,
     }
 
     // Write data page header
-    uint8_t* buffer;
-    uint32_t len;
+    uint8_t* buffer = NULL;
+    uint32_t len = 0;
     RETURN_IF_ERROR(
         parent_->thrift_serializer_->Serialize(&page.header, &len, &buffer));
     RETURN_IF_ERROR(parent_->Write(buffer, len));
@@ -961,8 +961,8 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
     // Metadata for this column is complete, write it out to file.  The column metadata
     // goes at the end so that when we have collocated files, the column data can be
     // written without buffering.
-    uint32_t len;
-    uint8_t* buffer;
+    uint8_t* buffer = NULL;
+    uint32_t len = 0;
     RETURN_IF_ERROR(
         thrift_serializer_->Serialize(&current_row_group_->columns[i], &len, &buffer));
     RETURN_IF_ERROR(Write(buffer, len));

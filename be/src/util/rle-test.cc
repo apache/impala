@@ -69,14 +69,14 @@ TEST(BitArray, TestBool) {
   // Use the reader and validate
   BitReader reader(buffer, len);
   for (int i = 0; i < 8; ++i) {
-    bool val;
+    bool val = false;
     bool result = reader.GetValue(1, &val);
     EXPECT_TRUE(result);
     EXPECT_EQ(val, i % 2);
   }
 
   for (int i = 0; i < 8; ++i) {
-    bool val;
+    bool val = false;
     bool result = reader.GetValue(1, &val);
     EXPECT_TRUE(result);
     switch (i) {

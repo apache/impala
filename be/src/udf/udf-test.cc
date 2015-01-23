@@ -50,7 +50,7 @@ StringVal UpperUdf(FunctionContext* context, const StringVal& input) {
 FloatVal Min3(FunctionContext* context, const FloatVal& f1,
     const FloatVal& f2, const FloatVal& f3) {
   bool is_null = true;
-  float v;
+  float v = 0;
   if (!f1.is_null) {
     if (is_null) {
       v = f1.val;

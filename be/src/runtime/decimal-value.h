@@ -243,7 +243,7 @@ class DecimalValue {
       return DecimalValue<RESULT_T>();
     }
     *is_nan = false;
-    RESULT_T x;
+    RESULT_T x = 0;
     RESULT_T y = 1; // Initialize y to avoid mod by 0.
     *overflow |= AdjustToSameScale(*this, this_type, other, other_type, &x, &y);
     return DecimalValue<RESULT_T>(x % y);

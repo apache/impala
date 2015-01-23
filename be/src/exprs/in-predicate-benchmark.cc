@@ -158,6 +158,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "exprs/in-predicate.h"
+#include "exprs/in-predicate-ir.cc"
 
 #include "udf/udf-test-harness.h"
 #include "util/benchmark.h"

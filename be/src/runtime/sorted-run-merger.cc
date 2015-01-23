@@ -130,7 +130,7 @@ Status SortedRunMerger::Prepare(const vector<RunBatchSupplier>& input_runs) {
   min_heap_.reserve(input_runs.size());
   BOOST_FOREACH(const RunBatchSupplier& input_run, input_runs) {
     BatchedRowSupplier* new_elem = pool_.Add(new BatchedRowSupplier(this, input_run));
-    bool empty;
+    bool empty = false;
     RETURN_IF_ERROR(new_elem->Init(&empty));
     if (!empty) min_heap_.push_back(new_elem);
   }
@@ -166,7 +166,7 @@ Status SortedRunMerger::GetNext(RowBatch* output_batch, bool* eos) {
 
     output_batch->CommitLastRow();
 
-    bool min_run_complete;
+    bool min_run_complete = false;
     // Advance to the next element in min. output_batch is supplied to transfer
     // resource ownership if the input batch in min is exhausted.
     RETURN_IF_ERROR(min->Next(deep_copy_input_ ? NULL : output_batch,
