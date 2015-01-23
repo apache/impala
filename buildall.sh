@@ -93,6 +93,9 @@ do
     -asan)
       TARGET_BUILD_TYPE=ADDRESS_SANITIZER
       ;;
+    -release)
+      TARGET_BUILD_TYPE=Release
+      ;;
     -testpairwise)
       EXPLORATION_STRATEGY=pairwise
       ;;
