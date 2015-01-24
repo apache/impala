@@ -594,6 +594,8 @@ Status ImpalaServer::ExecuteInternal(
     RETURN_IF_ERROR((*exec_state)->UpdateQueryStatus(
         exec_env_->frontend()->GetExecRequest(query_ctx, &result)));
     (*exec_state)->query_events()->MarkEvent("Planning finished");
+    (*exec_state)->summary_profile()->AddEventSequence(
+        result.timeline.name, result.timeline);
     if (result.__isset.result_set_metadata) {
       (*exec_state)->set_result_metadata(result.result_set_metadata);
     }

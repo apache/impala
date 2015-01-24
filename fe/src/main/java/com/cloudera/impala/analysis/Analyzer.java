@@ -65,6 +65,7 @@ import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.util.DisjointSet;
 import com.cloudera.impala.util.ListMap;
 import com.cloudera.impala.util.TSessionStateUtil;
+import com.cloudera.impala.util.EventSequence;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.base.Strings;
@@ -265,6 +266,10 @@ public class Analyzer {
     // Bidirectional map between Integer index and TNetworkAddress.
     // Decreases the size of the scan range locations.
     private final ListMap<TNetworkAddress> hostIndex = new ListMap<TNetworkAddress>();
+
+    // Timeline of important events in the planning process, used for debugging /
+    // profiling
+    private final EventSequence timeline = new EventSequence("Planner Timeline");
 
     public GlobalState(ImpaladCatalog catalog, TQueryCtx queryCtx,
         AuthorizationConfig authzConfig) {
@@ -2148,6 +2153,8 @@ public class Analyzer {
   public boolean hasValueTransfer(SlotId a, SlotId b) {
     return globalState_.valueTransferGraph.hasValueTransfer(a, b);
   }
+
+  public EventSequence getTimeline() { return globalState_.timeline; }
 
   /**
    * Assign all remaining unassigned slots to their own equivalence classes.

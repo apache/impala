@@ -438,6 +438,7 @@ class RuntimeProfile {
   // which case it is returned.
   // TODO: EventSequences are not merged by Merge() or Update()
   EventSequence* AddEventSequence(const std::string& key);
+  EventSequence* AddEventSequence(const std::string& key, const TEventSequence& from);
 
   // Returns event sequence with the provided name if it exists, otherwise NULL.
   EventSequence* GetEventSequence(const std::string& name) const;

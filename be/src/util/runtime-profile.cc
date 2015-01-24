@@ -550,21 +550,25 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
     lock_guard<mutex> l(event_sequence_lock_);
     BOOST_FOREACH(
         const EventSequenceMap::value_type& event_sequence, event_sequence_map_) {
+      // If the stopwatch has never been started (e.g. because this sequence came from
+      // Thrift), look for the last element to tell us the total runtime. For
+      // currently-updating sequences, it's better to use the stopwatch value because that
+      // updates continuously.
+      int64_t last = event_sequence.second->ElapsedTime();
+      event_sequence.second->GetEvents(&events);
+      if (last == 0 && events.size() > 0) last = events.back().second;
       stream << prefix << "  " << event_sequence.first << ": "
-             << PrettyPrinter::Print(
-                 event_sequence.second->ElapsedTime(), TUnit::TIME_NS)
+             << PrettyPrinter::Print(last, TUnit::TIME_NS)
              << endl;
 
-      int64_t last = 0L;
+      int64_t prev = 0L;
       event_sequence.second->GetEvents(&events);
       BOOST_FOREACH(const EventSequence::Event& event, events) {
         stream << prefix << "     - " << event.first << ": "
-               << PrettyPrinter::Print(
-                   event.second, TUnit::TIME_NS) << " ("
-               << PrettyPrinter::Print(
-                   event.second - last, TUnit::TIME_NS) << ")"
+               << PrettyPrinter::Print(event.second, TUnit::TIME_NS) << " ("
+               << PrettyPrinter::Print(event.second - prev, TUnit::TIME_NS) << ")"
                << endl;
-        last = event.second;
+        prev = event.second;
       }
     }
   }
@@ -804,6 +808,17 @@ RuntimeProfile::EventSequence* RuntimeProfile::AddEventSequence(const string& na
   if (timer_it != event_sequence_map_.end()) return timer_it->second;
 
   EventSequence* timer = pool_->Add(new EventSequence());
+  event_sequence_map_[name] = timer;
+  return timer;
+}
+
+RuntimeProfile::EventSequence* RuntimeProfile::AddEventSequence(const string& name,
+    const TEventSequence& from) {
+  lock_guard<mutex> l(event_sequence_lock_);
+  EventSequenceMap::iterator timer_it = event_sequence_map_.find(name);
+  if (timer_it != event_sequence_map_.end()) return timer_it->second;
+
+  EventSequence* timer = pool_->Add(new EventSequence(from.timestamps, from.labels));
   event_sequence_map_[name] = timer;
   return timer;
 }

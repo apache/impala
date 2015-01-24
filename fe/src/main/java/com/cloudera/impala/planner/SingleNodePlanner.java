@@ -100,6 +100,7 @@ public class SingleNodePlanner {
     QueryStmt queryStmt = ctx_.getQueryStmt();
     Analyzer analyzer = ctx_.getRootAnalyzer();
     analyzer.computeEquivClasses();
+    analyzer.getTimeline().markEvent("Equivalence classes computed");
 
     // Mark slots referenced by output exprs as materialized, prior to generating the
     // plan tree.

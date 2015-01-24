@@ -19,6 +19,7 @@ include "Types.thrift"
 include "ImpalaInternalService.thrift"
 include "PlanNodes.thrift"
 include "Planner.thrift"
+include "RuntimeProfile.thrift"
 include "Descriptors.thrift"
 include "Data.thrift"
 include "Results.thrift"
@@ -503,6 +504,9 @@ struct TExecRequest {
 
   // Set iff stmt_type is SET
   10: optional TSetQueryOptionRequest set_query_option_request
+
+  // Timeline of planner's operation, for profiling
+  11: optional RuntimeProfile.TEventSequence timeline
 }
 
 // Parameters to FeSupport.cacheJar().

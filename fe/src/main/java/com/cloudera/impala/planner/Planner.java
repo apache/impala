@@ -42,6 +42,7 @@ public class Planner {
     SingleNodePlanner singleNodePlanner = new SingleNodePlanner(ctx_);
     DistributedPlanner distributedPlanner = new DistributedPlanner(ctx_);
     PlanNode singleNodePlan = singleNodePlanner.createSingleNodePlan();
+    ctx_.getRootAnalyzer().getTimeline().markEvent("Single node plan created");
     ArrayList<PlanFragment> fragments = null;
 
     // Determine the maximum number of rows processed by any node in the plan tree
@@ -101,6 +102,7 @@ public class Planner {
     }
 
     Collections.reverse(fragments);
+    ctx_.getRootAnalyzer().getTimeline().markEvent("Distributed plan created");
     return fragments;
   }
 

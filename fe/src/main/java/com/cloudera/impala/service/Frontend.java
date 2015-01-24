@@ -122,6 +122,7 @@ import com.cloudera.impala.thrift.TStmtType;
 import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheResponse;
+import com.cloudera.impala.util.EventSequence;
 import com.cloudera.impala.util.PatternMatcher;
 import com.cloudera.impala.util.TResultRowBuilder;
 import com.cloudera.impala.util.TSessionStateUtil;
@@ -797,8 +798,9 @@ public class Frontend {
       throws ImpalaException {
     // Analyze the statement
     AnalysisContext.AnalysisResult analysisResult = analyzeStmt(queryCtx);
+    EventSequence timeline = analysisResult.getAnalyzer().getTimeline();
+    timeline.markEvent("Analysis finished");
     Preconditions.checkNotNull(analysisResult.getStmt());
-
     TExecRequest result = new TExecRequest();
     result.setQuery_options(queryCtx.request.getQuery_options());
     result.setAccess_events(analysisResult.getAccessEvents());
@@ -834,6 +836,7 @@ public class Frontend {
     LOG.debug("create plan");
     Planner planner = new Planner(analysisResult, queryCtx);
     ArrayList<PlanFragment> fragments = planner.createPlan();
+
     List<ScanNode> scanNodes = Lists.newArrayList();
     // map from fragment to its index in queryExecRequest.fragments; needed for
     // queryExecRequest.dest_fragment_idx
@@ -959,6 +962,9 @@ public class Frontend {
         queryExecRequest.setFinalize_params(finalizeParams);
       }
     }
+
+    timeline.markEvent("Planning finished");
+    result.setTimeline(analysisResult.getAnalyzer().getTimeline().toThrift());
     return result;
   }
 
