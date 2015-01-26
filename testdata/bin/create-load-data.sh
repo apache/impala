@@ -170,8 +170,9 @@ function load-aux-workloads {
 
 function copy-auth-policy {
   echo COPYING AUTHORIZATION POLICY FILE
-  hadoop fs -rm -f /test-warehouse/authz-policy.ini
-  hadoop fs -put ${IMPALA_HOME}/fe/src/test/resources/authz-policy.ini /test-warehouse/
+  hadoop fs -rm -f ${FILESYSTEM_PREFIX}/test-warehouse/authz-policy.ini
+  hadoop fs -put ${IMPALA_HOME}/fe/src/test/resources/authz-policy.ini \
+      ${FILESYSTEM_PREFIX}/test-warehouse/
 }
 
 function copy-and-load-dependent-tables {
@@ -291,7 +292,6 @@ function copy-and-load-ext-data-source {
 # Enable debug logging.
 set -x
 
-
 # For kerberized clusters, use kerberos
 if ${CLUSTER_DIR}/admin is_kerberized; then
   LOAD_DATA_ARGS="${LOAD_DATA_ARGS} --use_kerberos --principal=${MINIKDC_PRINC_HIVE}"
@@ -313,21 +313,24 @@ if [ $SKIP_METADATA_LOAD -eq 0 ]; then
   load-custom-data
   ${IMPALA_HOME}/testdata/bin/create-table-many-blocks.sh -p 1234 -b 1
   build-and-copy-hive-udfs
-else
+elif [ "${TARGET_FILESYSTEM}" = "hdfs" ];  then
   echo "Skipped loading the metadata. Loading HBase."
   load-data "functional-query" "core" "hbase/none"
 fi
 
-
 # Configure alltypes_seq as a read-only table. This is required for fe tests.
-hadoop fs -chmod -R 444 /test-warehouse/alltypes_seq/year=2009/month=1
-hadoop fs -chmod -R 444 /test-warehouse/alltypes_seq/year=2009/month=3
-cache-test-tables
-copy-and-load-ext-data-source
-# The tests need the built hive-udfs jar on the local fs
-build-and-copy-hive-udfs
-${IMPALA_HOME}/testdata/bin/split-hbase.sh > /dev/null 2>&1
-create-internal-hbase-table
+hadoop fs -chmod -R 444 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=1
+hadoop fs -chmod -R 444 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=3
+if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
+  # Caching tables in s3 returns an IllegalArgumentException, see IMPALA-1714
+  cache-test-tables
+  build-and-copy-hive-udfs
+  # TODO: Modify the .sql file that creates the table to take an alternative location into
+  # account.
+  copy-and-load-ext-data-source
+  ${IMPALA_HOME}/testdata/bin/split-hbase.sh > /dev/null 2>&1
+  create-internal-hbase-table
+fi
 # TODO: Investigate why all stats are not preserved. Theorectically, we only need to
 # recompute stats for HBase.
 ${IMPALA_HOME}/testdata/bin/compute-table-stats.sh

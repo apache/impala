@@ -10,8 +10,10 @@ set -u
 python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_names=functional\
     --table_names="alltypes,alltypesagg,alltypesaggmultifilesnopart,alltypesaggnonulls,
     alltypessmall,alltypestiny,jointbl,dimtbl"
-python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_name=functional_hbase\
-    --table_names="alltypessmall,stringids"
+if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
+  python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_name=functional_hbase\
+      --table_names="alltypessmall,stringids"
+fi
 python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_names=tpch \
     --table_names=customer,lineitem,nation,orders,part,partsupp,region,supplier
 python ${IMPALA_HOME}/tests/util/compute_table_stats.py --db_names=tpcds

@@ -16,9 +16,6 @@
 # Loads a hive metastore snapshot file to re-create its postgres database.
 # A metastore snapshot file is produced as an artifact of a successful
 # full data load build.
-#
-# NOTE: Running this script will remove your existing test-warehouse directory. Be sure
-# to backup any data you need before running this script.
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 
 # Always run in Debug mode.
@@ -35,6 +32,11 @@ if [ ! -f ${SNAPSHOT_FILE} ]; then
   exit 1
 fi
 
+# Copy the snapshot time to a temporary location
+TMP_SNAPSHOT_FILE=/tmp/tmp-hive-metastore-snapshot.txt
+rm -f ${TMP_SNAPSHOT_FILE}
+cp ${SNAPSHOT_FILE} ${TMP_SNAPSHOT_FILE}
+
 # The snapshot file has jenkins as the default user, search and replace with the current
 # user (this is only useful for local environments).
 # TODO: While this is safe at the moment, there is no guarentee that it will remain so.
@@ -42,17 +44,21 @@ fi
 # to do the transformation.
 if [ ${USER} != "jenkins" ]; then
   echo "Searching and replacing jenkins with ${USER}"
-  sed -i "s/jenkins/${USER}/g" ${SNAPSHOT_FILE}
+  sed -i "s/jenkins/${USER}/g" ${TMP_SNAPSHOT_FILE}
 fi
 
-# Fail if any of these actions don't succeed.
-set -e
+if [ "${TARGET_FILESYSTEM}" == "s3" ]; then
+  echo "Changing table metadata to point to ${FILESYSTEM_PREFIX}"
+  sed -i "s|hdfs://localhost:20500|${FILESYSTEM_PREFIX}|g" ${TMP_SNAPSHOT_FILE}
+fi
 
 # Drop and re-create the hive metastore database
 dropdb -U hiveuser hive_impala
+# Fail if any of these actions don't succeed.
+set -e
 createdb -U hiveuser hive_impala
 # Copy the contents of the SNAPSHOT_FILE
-psql -U hiveuser hive_impala < ${SNAPSHOT_FILE} > /dev/null 2>&1
+psql -U hiveuser hive_impala < ${TMP_SNAPSHOT_FILE} > /dev/null 2>&1
 # Two tables (tpch.nation and functional.alltypestiny) have cache_directive_id set in
 # their metadata. These directives are now stale, and will cause any query that attempts
 # to cache the data in the tables to fail.

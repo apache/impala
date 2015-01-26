@@ -18,8 +18,8 @@
 
 export JAVA_HOME=${JAVA_HOME:-/usr/java/default}
 if [ ! -d $JAVA_HOME ] ; then
-    echo "Error! JAVA_HOME must be set to the location of your JDK!"
-    exit 1
+    echo "JAVA_HOME must be set to the location of your JDK!"
+    return 1
 fi
 
 if [ -z $IMPALA_HOME ]; then
@@ -55,6 +55,39 @@ export CDH_MAJOR_VERSION=5
 export HADOOP_LZO=${HADOOP_LZO-~/hadoop-lzo}
 export IMPALA_LZO=${IMPALA_LZO-~/Impala-lzo}
 export IMPALA_AUX_TEST_HOME=${IMPALA_AUX_TEST_HOME-~/impala-auxiliary-tests}
+export TARGET_FILESYSTEM=${TARGET_FILESYSTEM-"hdfs"}
+export FILESYSTEM_PREFIX=${FILESYSTEM_PREFIX-""}
+export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY-"DummySecretAccessKey"}
+export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID-"DummyAccessKeyId"}
+
+# The target filesystem should be one of hdfs or s3
+if [[ "${TARGET_FILESYSTEM}" != "hdfs" && "${TARGET_FILESYSTEM}" != "s3" ]]; then
+  echo "Unsupported filesystem '$TARGET_FILESYSTEM', valid values are: ('hdfs', 's3')"
+  return 1
+elif [ "${TARGET_FILESYSTEM}" = "s3" ]; then
+  # Basic error checking
+  if [[ "${AWS_ACCESS_KEY_ID}" = "DummyAccessKeyId" ||\
+        "${AWS_SECRET_ACCESS_KEY}" = "DummySecretAccessKey" ]]; then
+    echo "Both AWS_ACCESS_KEY_ID and AWS_SECRET_KEY_ID
+      need to be assigned valid values and belong to the owner of the s3
+      bucket in order to access the file system"
+    return 1
+  fi
+  # Check if the s3 bucket is NULL.
+  if [[ "${S3_BUCKET}" = "" ]]; then
+    echo "The ${S3_BUCKET} cannot be an empty string for s3"
+    return 1
+  fi
+  aws s3 ls "s3://${S3_BUCKET}/" 1>/dev/null
+  if [ $? != 0 ]; then
+    echo "Access to ${S3_BUCKET} failed."
+    return 1
+  fi
+  # At this point, we've verified that:
+  #   - All the required environment variables are set.
+  #   - We are able to talk to the s3 bucket with the credentials provided.
+  export FILESYSTEM_PREFIX="s3a://${S3_BUCKET}"
+fi
 
 # Directory where local cluster logs will go when running tests or loading data
 export IMPALA_TEST_CLUSTER_LOG_DIR=${IMPALA_HOME}/cluster_logs
@@ -102,6 +135,7 @@ export PATH=$IMPALA_HOME/bin:$PATH
 
 export HADOOP_HOME=$IMPALA_HOME/thirdparty/hadoop-${IMPALA_HADOOP_VERSION}/
 export HADOOP_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
+export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:$HADOOP_HOME/share/hadoop/tools/lib/*
 export MINI_DFS_BASE_DATA_DIR=$IMPALA_HOME/cdh-${CDH_MAJOR_VERSION}-hdfs-data
 export PATH=$HADOOP_HOME/bin:$PATH
 

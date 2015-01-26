@@ -27,7 +27,11 @@ if [ ! -z "${MINIKDC_REALM}" ]; then
 fi
 
 export IMPALA_HOME=$ROOT
-. "$ROOT"/bin/impala-config.sh > /dev/null 2>&1
+. "$ROOT"/bin/impala-config.sh
+if [ $? = 1 ]; then
+  echo "Bad configuration, aborting buildall."
+  exit 1
+fi
 
 # Defaults that are only changable via the commandline.
 CLEAN_ACTION=1
@@ -192,6 +196,12 @@ done
 # re-sourcing impala-config.
 if [ ${IMPALA_KERBERIZE} -eq 0 ]; then
   NEEDS_RE_SOURCE_NOTE=0
+fi
+
+# Loading on s3 won't work is the metastore snapshot is not provided.
+if [[ ! -n $METASTORE_SNAPSHOT_FILE && "${TARGET_FILESYSTEM}" = "s3" ]]; then
+  echo "The metastore snapshot is required for loading data into s3"
+  exit 1
 fi
 
 # Sanity check that thirdparty is built.

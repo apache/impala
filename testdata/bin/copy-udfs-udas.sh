@@ -45,24 +45,27 @@ fi
 #   impala-hive-udfs.jar
 #   test-udfs.ll
 #   udf/uda samples (.so/.ll)
-hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/libTestUdas.so /test-warehouse
-hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/libTestUdfs.so /test-warehouse
+hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/libTestUdas.so\
+    ${FILESYSTEM_PREFIX}/test-warehouse
 hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/libTestUdfs.so\
-    /test-warehouse/libTestUdfs.SO
-hadoop fs -mkdir -p /test-warehouse/udf_test
+    ${FILESYSTEM_PREFIX}/test-warehouse
 hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/libTestUdfs.so\
-    /test-warehouse/udf_test/libTestUdfs.so
+    ${FILESYSTEM_PREFIX}/test-warehouse/libTestUdfs.SO
+hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}/test-warehouse/udf_test
+hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/libTestUdfs.so\
+    ${FILESYSTEM_PREFIX}/test-warehouse/udf_test/libTestUdfs.so
 hadoop fs -put -f ${HIVE_HOME}/lib/hive-exec-${IMPALA_HIVE_VERSION}.jar\
-  /test-warehouse/hive-exec.jar
+  ${FILESYSTEM_PREFIX}/test-warehouse/hive-exec.jar
 hadoop fs -put -f ${IMPALA_HOME}/tests/test-hive-udfs/target/test-hive-udfs-1.0.jar\
-    /test-warehouse/impala-hive-udfs.jar
-hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/test-udfs.ll /test-warehouse
+    ${FILESYSTEM_PREFIX}/test-warehouse/impala-hive-udfs.jar
+hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/testutil/test-udfs.ll\
+    ${FILESYSTEM_PREFIX}/test-warehouse
 hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/udf_samples/libudfsample.so\
-    /test-warehouse
+    ${FILESYSTEM_PREFIX}/test-warehouse
 hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/udf_samples/udf-sample.ll\
-    /test-warehouse
+    ${FILESYSTEM_PREFIX}/test-warehouse
 hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/udf_samples/libudasample.so\
-    /test-warehouse
+    ${FILESYSTEM_PREFIX}/test-warehouse
 hadoop fs -put -f ${IMPALA_HOME}/be/build/debug/udf_samples/uda-sample.ll\
-    /test-warehouse
+    ${FILESYSTEM_PREFIX}/test-warehouse
 echo "Done copying udf/uda libraries."

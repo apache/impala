@@ -21,12 +21,13 @@
 # to backup any data you need before running this script.
 
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
-TEST_WAREHOUSE_HDFS_DIR=/test-warehouse
 
 if [[ ! $1 ]]; then
   echo "Usage: load-test-warehouse-snapshot.sh [test-warehouse-SNAPSHOT.tar.gz]"
   exit 1
 fi
+
+TEST_WAREHOUSE_DIR="/test-warehouse"
 
 set -u
 SNAPSHOT_FILE=$1
@@ -35,26 +36,32 @@ if [ ! -f ${SNAPSHOT_FILE} ]; then
   exit 1
 fi
 
-echo "Your existing HDFS warehouse directory (${TEST_WAREHOUSE_HDFS_DIR}) will be"\
-     "removed."
+echo "Your existing ${TARGET_FILESYSTEM} warehouse directory " \
+     "(${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}) will be removed."
 read -p "Continue (y/n)? "
 if [[ "$REPLY" =~ ^[Yy]$ ]]; then
   # Create a new warehouse directory. If one already exist, remove it first.
-  hadoop fs -test -d ${TEST_WAREHOUSE_HDFS_DIR}
-  if [ $? -eq 0 ]; then
-    echo "Removing existing test-warehouse directory"
-    hadoop fs -rm -r ${TEST_WAREHOUSE_HDFS_DIR}
+  if [ "${TARGET_FILESYSTEM}" = 'hdfs' ]; then
+    hadoop fs -test -d ${TEST_WAREHOUSE_DIR}
+    if [ $? -eq 0 ]; then
+      echo "Removing existing test-warehouse directory"
+      hadoop fs -rm -r ${TEST_WAREHOUSE_DIR}
+    fi
+    echo "Creating test-warehouse directory"
+    hadoop fs -mkdir ${TEST_WAREHOUSE_DIR}
+  elif [ "${TARGET_FILESYSTEM}" = "s3" ]; then
+    # TODO: The aws cli emits a lot of spew, redirect /dev/null once it's deemed stable.
+    aws s3 rm --recursive s3://${S3_BUCKET}${TEST_WAREHOUSE_DIR}
+    if [ $? != 0 ]; then
+      echo "Deleting pre-existing data in s3 failed, aborting."
+    fi
   fi
-  echo "Creating test-warehouse directory"
-  hadoop fs -mkdir ${TEST_WAREHOUSE_HDFS_DIR}
 else
   echo -e "\nAborting."
   exit 1
 fi
 
 set -e
-echo "Loading hive builtins"
-${IMPALA_HOME}/testdata/bin/load-hive-builtins.sh
 
 echo "Loading snapshot file: ${SNAPSHOT_FILE}"
 SNAPSHOT_STAGING_DIR=`dirname ${SNAPSHOT_FILE}`/hdfs-staging-tmp
@@ -69,12 +76,25 @@ if [ ! -f ${SNAPSHOT_STAGING_DIR}/test-warehouse/githash.txt ]; then
   exit 1
 fi
 
-echo "Copying data to HDFS"
-hadoop fs -put ${SNAPSHOT_STAGING_DIR}/test-warehouse/* ${TEST_WAREHOUSE_HDFS_DIR}
 
-echo "Cleaning up external hbase tables"
+echo "Copying data to ${TARGET_FILESYSTEM}"
+if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
+  # hive does not yet work well with s3, so we won't need hive builtins.
+  echo "Loading hive builtins"
+  ${IMPALA_HOME}/testdata/bin/load-hive-builtins.sh
+  hadoop fs -put ${SNAPSHOT_STAGING_DIR}${TEST_WAREHOUSE_DIR}/* ${TEST_WAREHOUSE_DIR}
+elif [ "${TARGET_FILESYSTEM}" = "s3" ]; then
+  # TODO: The aws cli emits a lot of spew, redirect /dev/null once it's deemed stable.
+  aws s3 cp --recursive ${SNAPSHOT_STAGING_DIR}${TEST_WAREHOUSE_DIR} \
+      s3://${S3_BUCKET}${TEST_WAREHOUSE_DIR}
+  if [ $? != 0 ]; then
+    echo "Copying the test-warehouse to s3 failed, aborting."
+  fi
+fi
+
 ${IMPALA_HOME}/bin/create_testdata.sh
-hadoop fs -rm -r -f ${TEST_WAREHOUSE_HDFS_DIR}/functional_hbase.db
+echo "Cleaning up external hbase tables"
+hadoop fs -rm -r -f ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}/functional_hbase.db
 
 echo "Cleaning up workspace"
 rm -rf ${SNAPSHOT_STAGING_DIR}

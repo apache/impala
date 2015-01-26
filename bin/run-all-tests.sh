@@ -71,11 +71,13 @@ mkdir -p ${LOG_DIR}
 # Enable core dumps
 ulimit -c unlimited
 
-echo "Split and assign HBase regions"
-# To properly test HBase integeration, HBase regions are split and assigned by this
-# script. Restarting HBase will change the region server assignment. Run split-hbase.sh
-# before running any test.
-${IMPALA_HOME}/testdata/bin/split-hbase.sh > /dev/null 2>&1
+if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
+  echo "Split and assign HBase regions"
+  # To properly test HBase integeration, HBase regions are split and assigned by this
+  # script. Restarting HBase will change the region server assignment. Run split-hbase.sh
+  # before running any test.
+  ${IMPALA_HOME}/testdata/bin/split-hbase.sh > /dev/null 2>&1
+fi
 
 for i in $(seq 1 $NUM_ITERATIONS)
 do
