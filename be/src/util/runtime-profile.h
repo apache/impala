@@ -18,7 +18,6 @@
 
 #include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
-#include <boost/thread/mutex.hpp>
 #include <boost/unordered_map.hpp>
 #include <iostream>
 #include <sys/time.h>
@@ -280,37 +279,37 @@ class RuntimeProfile {
     /// Starts the timer without resetting it.
     void Start() { sw_.Start(); }
 
-    /// Stores an event in sequence with the given label and the
-    /// current time (relative to the first time Start() was called) as
-    /// the timestamp.
+    /// Stores an event in sequence with the given label and the current time
+    /// (relative to the first time Start() was called) as the timestamp.
     void MarkEvent(const std::string& label) {
-      boost::lock_guard<boost::mutex> event_lock(lock_);
-      events_.push_back(make_pair(label, sw_.ElapsedTime()));
+      Event event = make_pair(label, sw_.ElapsedTime());
+      boost::lock_guard<SpinLock> event_lock(lock_);
+      events_.push_back(event);
     }
 
     int64_t ElapsedTime() { return sw_.ElapsedTime(); }
 
-    /// An Event is a <label, timestamp> pair
+    /// An Event is a <label, timestamp> pair.
     typedef std::pair<std::string, int64_t> Event;
 
-    /// An EventList is a sequence of Events, in increasing timestamp order
+    /// An EventList is a sequence of Events, in increasing timestamp order.
     typedef std::vector<Event> EventList;
 
     /// Copies the member events_ into the supplied vector 'events'.
     /// The supplied vector 'events' is cleared before this.
     void GetEvents(std::vector<Event>* events) {
       events->clear();
-      boost::lock_guard<boost::mutex> event_lock(lock_);
+      boost::lock_guard<SpinLock> event_lock(lock_);
       events->insert(events->end(), events_.begin(), events_.end());
     }
 
     void ToThrift(TEventSequence* seq) const;
 
    private:
-    /// Protect access to events_
-    boost::mutex lock_;
+    /// Protect access to events_.
+    SpinLock lock_;
 
-    /// Stored in increasing time order
+    /// Stored in increasing time order.
     EventList events_;
 
     /// Timer which allows events to be timestamped when they are recorded.
@@ -352,9 +351,10 @@ class RuntimeProfile {
 
   /// Create a runtime profile object with 'name'.  Counters and merged profile are
   /// allocated from pool.
-  /// If is_averaged_profile is true, the counters in this profile will be derived averages
-  /// (of unit AveragedCounter) from other profiles, so the counter map will be left empty
-  /// Otherwise, the counter map is initialized with a single entry for TotalTime.
+  /// If is_averaged_profile is true, the counters in this profile will be derived
+  /// averages (of unit AveragedCounter) from other profiles, so the counter map will
+  /// be left empty Otherwise, the counter map is initialized with a single entry for
+  /// TotalTime.
   RuntimeProfile(ObjectPool* pool, const std::string& name,
       bool is_averaged_profile = false);
 
@@ -378,7 +378,7 @@ class RuntimeProfile {
   /// invalidate pointers to profiles.
   template <class Compare>
   void SortChildren(const Compare& cmp) {
-    boost::lock_guard<boost::mutex> l(children_lock_);
+    boost::lock_guard<SpinLock> l(children_lock_);
     std::sort(children_.begin(), children_.end(), cmp);
   }
 
@@ -575,36 +575,43 @@ class RuntimeProfile {
   /// A set of bucket counters registered in this runtime profile.
   std::set<std::vector<Counter*>* > bucketing_counters_;
 
-  /// protects counter_map_, counter_child_map_ and bucketing_counters_
-  mutable boost::mutex counter_map_lock_;
+  /// Protects counter_map_, counter_child_map_ and bucketing_counters_.
+  mutable SpinLock counter_map_lock_;
 
   /// Child profiles.  Does not own memory.
   /// We record children in both a map (to facilitate updates) and a vector
   /// (to print things in the order they were registered)
   typedef std::map<std::string, RuntimeProfile*> ChildMap;
   ChildMap child_map_;
-  /// vector of (profile, indentation flag)
+
+  /// Vector of (profile, indentation flag).
   typedef std::vector<std::pair<RuntimeProfile*, bool> > ChildVector;
   ChildVector children_;
-  mutable boost::mutex children_lock_;  // protects child_map_ and children_
+
+  /// Protects child_map_ and children_.
+  mutable SpinLock children_lock_;
 
   typedef std::map<std::string, std::string> InfoStrings;
   InfoStrings info_strings_;
 
-  /// Keeps track of the order in which InfoStrings are displayed when printed
+  /// Keeps track of the order in which InfoStrings are displayed when printed.
   typedef std::vector<std::string> InfoStringsDisplayOrder;
   InfoStringsDisplayOrder info_strings_display_order_;
 
-  /// Protects info_strings_ and info_strings_display_order_
-  mutable boost::mutex info_strings_lock_;
+  /// Protects info_strings_ and info_strings_display_order_.
+  mutable SpinLock info_strings_lock_;
 
   typedef std::map<std::string, EventSequence*> EventSequenceMap;
   EventSequenceMap event_sequence_map_;
-  mutable boost::mutex event_sequence_lock_;
+
+  /// Protects event_sequence_map_.
+  mutable SpinLock event_sequence_lock_;
 
   typedef std::map<std::string, TimeSeriesCounter*> TimeSeriesCounterMap;
   TimeSeriesCounterMap time_series_counter_map_;
-  mutable boost::mutex time_series_counter_map_lock_;
+
+  /// Protects time_series_counter_map_.
+  mutable SpinLock time_series_counter_map_lock_;
 
   Counter counter_total_time_;
 

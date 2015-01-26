@@ -156,8 +156,8 @@ void RuntimeProfile::UpdateAverage(RuntimeProfile* other) {
   {
     CounterMap::iterator dst_iter;
     CounterMap::const_iterator src_iter;
-    lock_guard<mutex> l(counter_map_lock_);
-    lock_guard<mutex> m(other->counter_map_lock_);
+    lock_guard<SpinLock> l(counter_map_lock_);
+    lock_guard<SpinLock> m(other->counter_map_lock_);
     for (src_iter = other->counter_map_.begin();
          src_iter != other->counter_map_.end(); ++src_iter) {
 
@@ -177,10 +177,10 @@ void RuntimeProfile::UpdateAverage(RuntimeProfile* other) {
         DCHECK(dst_iter->second->unit() == src_iter->second->unit());
         avg_counter = static_cast<AveragedCounter*>(dst_iter->second);
       }
-
       avg_counter->UpdateCounter(src_iter->second);
     }
 
+    // TODO: Can we unlock the counter_map_lock_ here?
     ChildCounterMap::const_iterator child_counter_src_itr;
     for (child_counter_src_itr = other->child_counter_map_.begin();
          child_counter_src_itr != other->child_counter_map_.end();
@@ -193,8 +193,8 @@ void RuntimeProfile::UpdateAverage(RuntimeProfile* other) {
   }
 
   {
-    lock_guard<mutex> l(children_lock_);
-    lock_guard<mutex> m(other->children_lock_);
+    lock_guard<SpinLock> l(children_lock_);
+    lock_guard<SpinLock> m(other->children_lock_);
     // Recursively merge children with matching names
     for (int i = 0; i < other->children_.size(); ++i) {
       RuntimeProfile* other_child = other->children_[i].first;
@@ -226,9 +226,9 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
   DCHECK_LT(*idx, nodes.size());
   const TRuntimeProfileNode& node = nodes[*idx];
   {
-    lock_guard<mutex> l(counter_map_lock_);
-    // update this level
+    // Update this level.
     map<string, Counter*>::iterator dst_iter;
+    lock_guard<SpinLock> l(counter_map_lock_);
     for (int i = 0; i < node.counters.size(); ++i) {
       const TCounter& tcounter = node.counters[i];
       CounterMap::iterator j = counter_map_.find(tcounter.name);
@@ -257,8 +257,8 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
   }
 
   {
-    lock_guard<mutex> l(info_strings_lock_);
     const InfoStrings& info_strings = node.info_strings;
+    lock_guard<SpinLock> l(info_strings_lock_);
     BOOST_FOREACH(const string& key, node.info_strings_display_order) {
       // Look for existing info strings and update in place. If there
       // are new strings, add them to the end of the display order.
@@ -277,7 +277,7 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
   }
 
   {
-    lock_guard<mutex> l(time_series_counter_map_lock_);
+    lock_guard<SpinLock> l(time_series_counter_map_lock_);
     for (int i = 0; i < node.time_series_counters.size(); ++i) {
       const TTimeSeriesCounter& c = node.time_series_counters[i];
       TimeSeriesCounterMap::iterator it = time_series_counter_map_.find(c.name);
@@ -293,8 +293,8 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
 
   ++*idx;
   {
-    lock_guard<mutex> l(children_lock_);
-    // update children with matching names; create new ones if they don't match
+    lock_guard<SpinLock> l(children_lock_);
+    // Update children with matching names; create new ones if they don't match.
     for (int i = 0; i < node.num_children; ++i) {
       const TRuntimeProfileNode& tchild = nodes[*idx];
       ChildMap::iterator j = child_map_.find(tchild.name);
@@ -316,7 +316,7 @@ void RuntimeProfile::Divide(int n) {
   DCHECK_GT(n, 0);
   map<string, Counter*>::iterator iter;
   {
-    lock_guard<mutex> l(counter_map_lock_);
+    lock_guard<SpinLock> l(counter_map_lock_);
     for (iter = counter_map_.begin(); iter != counter_map_.end(); ++iter) {
       if (iter->second->unit() == TUnit::DOUBLE_VALUE) {
         iter->second->Set(iter->second->double_value() / n);
@@ -326,7 +326,7 @@ void RuntimeProfile::Divide(int n) {
     }
   }
   {
-    lock_guard<mutex> l(children_lock_);
+    lock_guard<SpinLock> l(children_lock_);
     for (ChildMap::iterator i = child_map_.begin(); i != child_map_.end(); ++i) {
       i->second->Divide(n);
     }
@@ -342,7 +342,7 @@ void RuntimeProfile::ComputeTimeInProfile(int64_t total) {
 
   // Add all the total times in all the children
   int64_t total_child_time = 0;
-  lock_guard<mutex> l(children_lock_);
+  lock_guard<SpinLock> l(children_lock_);
   for (int i = 0; i < children_.size(); ++i) {
     total_child_time += children_[i].first->total_time_counter()->value();
   }
@@ -367,7 +367,7 @@ void RuntimeProfile::ComputeTimeInProfile(int64_t total) {
 
 void RuntimeProfile::AddChild(RuntimeProfile* child, bool indent, RuntimeProfile* loc) {
   DCHECK(child != NULL);
-  lock_guard<mutex> l(children_lock_);
+  lock_guard<SpinLock> l(children_lock_);
   if (child_map_.count(child->name_) > 0) {
     // This child has already been added, so do nothing.
     // Otherwise, the map and vector will be out of sync.
@@ -389,14 +389,14 @@ void RuntimeProfile::AddChild(RuntimeProfile* child, bool indent, RuntimeProfile
 
 void RuntimeProfile::GetChildren(vector<RuntimeProfile*>* children) {
   children->clear();
-  lock_guard<mutex> l(children_lock_);
+  lock_guard<SpinLock> l(children_lock_);
   for (ChildMap::iterator i = child_map_.begin(); i != child_map_.end(); ++i) {
     children->push_back(i->second);
   }
 }
 
 void RuntimeProfile::GetAllChildren(vector<RuntimeProfile*>* children) {
-  lock_guard<mutex> l(children_lock_);
+  lock_guard<SpinLock> l(children_lock_);
   for (ChildMap::iterator i = child_map_.begin(); i != child_map_.end(); ++i) {
     children->push_back(i->second);
     i->second->GetAllChildren(children);
@@ -406,7 +406,7 @@ void RuntimeProfile::GetAllChildren(vector<RuntimeProfile*>* children) {
 void RuntimeProfile::AddInfoString(const string& key, const string& value) {
   // Values may contain sensitive data, such as a query.
   const string& info = RedactCopy(value);
-  lock_guard<mutex> l(info_strings_lock_);
+  lock_guard<SpinLock> l(info_strings_lock_);
   InfoStrings::iterator it = info_strings_.find(key);
   if (it == info_strings_.end()) {
     info_strings_.insert(make_pair(key, info));
@@ -417,7 +417,7 @@ void RuntimeProfile::AddInfoString(const string& key, const string& value) {
 }
 
 const string* RuntimeProfile::GetInfoString(const string& key) const {
-  lock_guard<mutex> l(info_strings_lock_);
+  lock_guard<SpinLock> l(info_strings_lock_);
   InfoStrings::const_iterator it = info_strings_.find(key);
   if (it == info_strings_.end()) return NULL;
   return &it->second;
@@ -427,12 +427,12 @@ const string* RuntimeProfile::GetInfoString(const string& key) const {
   RuntimeProfile::T* RuntimeProfile::NAME(\
       const string& name, TUnit::type unit, const string& parent_counter_name) {\
     DCHECK_EQ(is_averaged_profile_, false);\
-    lock_guard<mutex> l(counter_map_lock_);\
+    lock_guard<SpinLock> l(counter_map_lock_);\
     if (counter_map_.find(name) != counter_map_.end()) {\
       return reinterpret_cast<T*>(counter_map_[name]);\
     }\
     DCHECK(parent_counter_name == ROOT_COUNTER ||\
-        counter_map_.find(parent_counter_name) != counter_map_.end());\
+           counter_map_.find(parent_counter_name) != counter_map_.end()); \
     T* counter = pool_->Add(new T(unit));\
     counter_map_[name] = counter;\
     set<string>* child_counters =\
@@ -448,7 +448,7 @@ RuntimeProfile::DerivedCounter* RuntimeProfile::AddDerivedCounter(
     const string& name, TUnit::type unit,
     const DerivedCounterFunction& counter_fn, const string& parent_counter_name) {
   DCHECK_EQ(is_averaged_profile_, false);
-  lock_guard<mutex> l(counter_map_lock_);
+  lock_guard<SpinLock> l(counter_map_lock_);
   if (counter_map_.find(name) != counter_map_.end()) return NULL;
   DerivedCounter* counter = pool_->Add(new DerivedCounter(unit, counter_fn));
   counter_map_[name] = counter;
@@ -474,7 +474,7 @@ RuntimeProfile::ThreadCounters* RuntimeProfile::AddThreadCounters(
 }
 
 RuntimeProfile::Counter* RuntimeProfile::GetCounter(const string& name) {
-  lock_guard<mutex> l(counter_map_lock_);
+  lock_guard<SpinLock> l(counter_map_lock_);
   if (counter_map_.find(name) != counter_map_.end()) {
     return counter_map_[name];
   }
@@ -485,7 +485,7 @@ void RuntimeProfile::GetCounters(const string& name, vector<Counter*>* counters)
   Counter* c = GetCounter(name);
   if (c != NULL) counters->push_back(c);
 
-  lock_guard<mutex> l(children_lock_);
+  lock_guard<SpinLock> l(children_lock_);
   for (int i = 0; i < children_.size(); ++i) {
     children_[i].first->GetCounters(name, counters);
   }
@@ -493,7 +493,7 @@ void RuntimeProfile::GetCounters(const string& name, vector<Counter*>* counters)
 
 RuntimeProfile::EventSequence* RuntimeProfile::GetEventSequence(const string& name) const
 {
-  lock_guard<mutex> l(event_sequence_lock_);
+  lock_guard<SpinLock> l(event_sequence_lock_);
   EventSequenceMap::const_iterator it = event_sequence_map_.find(name);
   if (it == event_sequence_map_.end()) return NULL;
   return it->second;
@@ -507,12 +507,12 @@ RuntimeProfile::EventSequence* RuntimeProfile::GetEventSequence(const string& na
 void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
   ostream& stream = *s;
 
-  // create copy of counter_map_ and child_counter_map_ so we don't need to hold lock
-  // while we call value() on the counters (some of those might be DerivedCounters)
+  // Create copy of counter_map_ and child_counter_map_ so we don't need to hold lock
+  // while we call value() on the counters (some of those might be DerivedCounters).
   CounterMap counter_map;
   ChildCounterMap child_counter_map;
   {
-    lock_guard<mutex> l(counter_map_lock_);
+    lock_guard<SpinLock> l(counter_map_lock_);
     counter_map = counter_map_;
     child_counter_map = child_counter_map_;
   }
@@ -536,7 +536,7 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
   stream << endl;
 
   {
-    lock_guard<mutex> l(info_strings_lock_);
+    lock_guard<SpinLock> l(info_strings_lock_);
     BOOST_FOREACH(const string& key, info_strings_display_order_) {
       stream << prefix << "  " << key << ": " << info_strings_.find(key)->second << endl;
     }
@@ -550,7 +550,7 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
     //     - Event 3: 2s410ms (121.138ms)
     // The times in parentheses are the time elapsed since the last event.
     vector<EventSequence::Event> events;
-    lock_guard<mutex> l(event_sequence_lock_);
+    lock_guard<SpinLock> l(event_sequence_lock_);
     BOOST_FOREACH(
         const EventSequenceMap::value_type& event_sequence, event_sequence_map_) {
       // If the stopwatch has never been started (e.g. because this sequence came from
@@ -579,10 +579,10 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
   {
     // Print all time series counters as following:
     // <Name> (<period>): <val1>, <val2>, <etc>
-    lock_guard<mutex> l(time_series_counter_map_lock_);
+    SpinLock* lock;
+    int num, period;
+    lock_guard<SpinLock> l(time_series_counter_map_lock_);
     BOOST_FOREACH(const TimeSeriesCounterMap::value_type& v, time_series_counter_map_) {
-      SpinLock* lock;
-      int num, period;
       const int64_t* samples = v.second->samples_.GetSamples(&num, &period, &lock);
       if (num > 0) {
         stream << prefix << "  " << v.first << "("
@@ -601,11 +601,11 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
   RuntimeProfile::PrintChildCounters(
       prefix, ROOT_COUNTER, counter_map, child_counter_map, s);
 
-  // create copy of children_ so we don't need to hold lock while we call
-  // PrettyPrint() on the children
+  // Create copy of children_ so we don't need to hold lock while we call
+  // PrettyPrint() on the children.
   ChildVector children;
   {
-    lock_guard<mutex> l(children_lock_);
+    lock_guard<SpinLock> l(children_lock_);
     children = children_;
   }
   for (int i = 0; i < children.size(); ++i) {
@@ -666,7 +666,7 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
 
   CounterMap counter_map;
   {
-    lock_guard<mutex> l(counter_map_lock_);
+    lock_guard<SpinLock> l(counter_map_lock_);
     counter_map = counter_map_;
     node.child_counters_map = child_counter_map_;
   }
@@ -680,14 +680,14 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
   }
 
   {
-    lock_guard<mutex> l(info_strings_lock_);
+    lock_guard<SpinLock> l(info_strings_lock_);
     node.info_strings = info_strings_;
     node.info_strings_display_order = info_strings_display_order_;
   }
 
   {
     vector<EventSequence::Event> events;
-    lock_guard<mutex> l(event_sequence_lock_);
+    lock_guard<SpinLock> l(event_sequence_lock_);
     if (event_sequence_map_.size() != 0) {
       node.__set_event_sequences(vector<TEventSequence>());
       node.event_sequences.resize(event_sequence_map_.size());
@@ -705,7 +705,7 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
   }
 
   {
-    lock_guard<mutex> l(time_series_counter_map_lock_);
+    lock_guard<SpinLock> l(time_series_counter_map_lock_);
     if (time_series_counter_map_.size() != 0) {
       node.__set_time_series_counters(vector<TTimeSeriesCounter>());
       node.time_series_counters.resize(time_series_counter_map_.size());
@@ -719,7 +719,7 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
 
   ChildVector children;
   {
-    lock_guard<mutex> l(children_lock_);
+    lock_guard<SpinLock> l(children_lock_);
     children = children_;
   }
   for (int i = 0; i < children.size(); ++i) {
@@ -798,15 +798,14 @@ RuntimeProfile::Counter* RuntimeProfile::AddSamplingCounter(
 void RuntimeProfile::RegisterBucketingCounters(Counter* src_counter,
     vector<Counter*>* buckets) {
   {
-    lock_guard<mutex> l(counter_map_lock_);
+    lock_guard<SpinLock> l(counter_map_lock_);
     bucketing_counters_.insert(buckets);
   }
-
   PeriodicCounterUpdater::RegisterBucketingCounters(src_counter, buckets);
 }
 
 RuntimeProfile::EventSequence* RuntimeProfile::AddEventSequence(const string& name) {
-  lock_guard<mutex> l(event_sequence_lock_);
+  lock_guard<SpinLock> l(event_sequence_lock_);
   EventSequenceMap::iterator timer_it = event_sequence_map_.find(name);
   if (timer_it != event_sequence_map_.end()) return timer_it->second;
 
@@ -817,7 +816,7 @@ RuntimeProfile::EventSequence* RuntimeProfile::AddEventSequence(const string& na
 
 RuntimeProfile::EventSequence* RuntimeProfile::AddEventSequence(const string& name,
     const TEventSequence& from) {
-  lock_guard<mutex> l(event_sequence_lock_);
+  lock_guard<SpinLock> l(event_sequence_lock_);
   EventSequenceMap::iterator timer_it = event_sequence_map_.find(name);
   if (timer_it != event_sequence_map_.end()) return timer_it->second;
 
@@ -848,12 +847,14 @@ void RuntimeProfile::PrintChildCounters(const string& prefix,
 RuntimeProfile::TimeSeriesCounter* RuntimeProfile::AddTimeSeriesCounter(
     const string& name, TUnit::type unit, DerivedCounterFunction fn) {
   DCHECK(fn != NULL);
-
-  lock_guard<mutex> l(time_series_counter_map_lock_);
-  TimeSeriesCounterMap::iterator it = time_series_counter_map_.find(name);
-  if (it != time_series_counter_map_.end()) return it->second;
-  TimeSeriesCounter* counter = pool_->Add(new TimeSeriesCounter(name, unit, fn));
-  time_series_counter_map_[name] = counter;
+  TimeSeriesCounter* counter = NULL;
+  {
+    lock_guard<SpinLock> l(time_series_counter_map_lock_);
+    TimeSeriesCounterMap::iterator it = time_series_counter_map_.find(name);
+    if (it != time_series_counter_map_.end()) return it->second;
+    counter = pool_->Add(new TimeSeriesCounter(name, unit, fn));
+    time_series_counter_map_[name] = counter;
+  }
   PeriodicCounterUpdater::RegisterTimeSeriesCounter(counter);
   return counter;
 }
