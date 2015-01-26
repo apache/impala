@@ -71,7 +71,7 @@ string TypeToString(PrimitiveType t) {
   switch (t) {
     case INVALID_TYPE: return "INVALID";
     case TYPE_NULL: return "NULL";
-    case TYPE_BOOLEAN: return "BOOL";
+    case TYPE_BOOLEAN: return "BOOLEAN";
     case TYPE_TINYINT: return "TINYINT";
     case TYPE_SMALLINT: return "SMALLINT";
     case TYPE_INT: return "INT";

@@ -52,6 +52,11 @@ class UtilityFunctions {
   // Implementation of the current_database() function. Returns the current default
   // database from the parent session of this query.
   static StringVal CurrentDatabase(FunctionContext* ctx);
+
+  // Implementation of the typeOf() function. Returns the type of the input
+  // expression. input_val is not used and it is kept here in order to let
+  // the compiler generate the corresponding fully-qualified function name.
+  template <typename T> static StringVal TypeOf(FunctionContext* ctx, const T& input_val);
 };
 
 }

@@ -14,6 +14,8 @@
 
 #include "exprs/utility-functions.h"
 
+#include <gutil/strings/substitute.h>
+
 #include "exprs/anyval-util.h"
 #include "runtime/runtime-state.h"
 #include "udf/udf-internal.h"
@@ -21,6 +23,7 @@
 #include "util/time.h"
 
 using namespace std;
+using namespace strings;
 
 namespace impala {
 
@@ -101,5 +104,45 @@ StringVal UtilityFunctions::CurrentDatabase(FunctionContext* ctx) {
   return (database.len > 0) ? database : StringVal::null();
 }
 
+template<typename T>
+StringVal UtilityFunctions::TypeOf(FunctionContext* ctx, const T& /*input_vall*/) {
+  FunctionContext::TypeDesc type_desc = *(ctx->GetArgType(0));
+  ColumnType column_type = AnyValUtil::TypeDescToColumnType(type_desc);
+  const string& type_string = TypeToString(column_type.type);
 
+  switch(column_type.type) {
+    // Show the precision and scale of DECIMAL type.
+    case TYPE_DECIMAL:
+      return AnyValUtil::FromString(ctx, Substitute("$0($1,$2)", type_string,
+          type_desc.precision, type_desc.scale));
+    // Show length of CHAR and VARCHAR.
+    case TYPE_CHAR:
+    case TYPE_VARCHAR:
+      return AnyValUtil::FromString(ctx, Substitute("$0($1)", type_string,
+          type_desc.len));
+    default:
+      return AnyValUtil::FromString(ctx, type_string);
+  }
+}
+
+template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx,
+    const BooleanVal& input_val);
+template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx,
+    const TinyIntVal& input_val);
+template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx,
+    const SmallIntVal& input_val);
+template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx,
+    const IntVal& input_val);
+template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx,
+    const BigIntVal& input_val);
+template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx,
+    const FloatVal& input_val);
+template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx,
+    const DoubleVal& input_val);
+template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx,
+    const StringVal& input_val);
+template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx,
+    const TimestampVal& input_val);
+template StringVal UtilityFunctions::TypeOf(FunctionContext* ctx,
+    const DecimalVal& input_val);
 }

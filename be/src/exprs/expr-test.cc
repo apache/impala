@@ -1998,6 +1998,37 @@ TEST_F(ExprTest, UtilityFunctions) {
   TestValue("sleep(100)", TYPE_BOOLEAN, true);
   TestIsNull("sleep(NULL)", TYPE_BOOLEAN);
 
+  // Test typeOf
+  TestStringValue("typeOf(!true)", "BOOLEAN");
+  TestStringValue("typeOf(1)", "TINYINT");
+  TestStringValue("typeOf(0)", "TINYINT");
+  TestStringValue("typeOf(-1)", "TINYINT");
+  TestStringValue("typeOf(128)", "SMALLINT");
+  TestStringValue("typeOf(32768)", "INT");
+  TestStringValue("typeOf(2147483648)", "BIGINT");
+  TestStringValue("typeOf(4294967296)", "BIGINT");
+  TestStringValue("typeOf(-4294967296)", "BIGINT");
+  TestStringValue("typeOf(9223372036854775807)", "BIGINT");
+  TestStringValue("typeOf(-9223372036854775808)", "BIGINT");
+  TestStringValue("typeOf(cast(10 as FLOAT))", "FLOAT");
+  TestStringValue("typeOf(cast(10 as DOUBLE))", "DOUBLE");
+  TestStringValue("typeOf(current_database())", "STRING");
+  TestStringValue("typeOf(now())", "TIMESTAMP");
+  TestStringValue("typeOf(cast(10 as DECIMAL))", "DECIMAL(9,0)");
+  TestStringValue("typeOf(0.0)", "DECIMAL(1,1)");
+  TestStringValue("typeOf(3.14)", "DECIMAL(3,2)");
+  TestStringValue("typeOf(-1.23)", "DECIMAL(3,2)");
+  TestStringValue("typeOf(cast(NULL as STRING))", "STRING");
+  TestStringValue("typeOf(\"\")", "STRING");
+  TestStringValue("typeOf(NULL)", "BOOLEAN");
+  TestStringValue("typeOf(34 < NULL)", "BOOLEAN");
+  TestStringValue("typeOf(cast('a' as CHAR(2)))", "CHAR(2)");
+  TestStringValue("typeOf(cast('abcdef' as CHAR(4)))", "CHAR(4)");
+  TestStringValue("typeOf(cast('a' as VARCHAR(2)))", "VARCHAR(2)");
+  TestStringValue("typeOf(cast('abcdef' as VARCHAR(4)))", "VARCHAR(4)");
+  TestStringValue("typeOf(cast(NULL as CHAR(2)))", "CHAR(2)");
+  TestStringValue("typeOf(cast(NULL as VARCHAR(4)))", "VARCHAR(4)");
+
   // Test fnv_hash
   string s("hello world");
   uint64_t expected = HashUtil::FnvHash64(s.data(), s.size(), HashUtil::FNV_SEED);
