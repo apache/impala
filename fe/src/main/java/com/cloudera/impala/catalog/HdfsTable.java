@@ -203,6 +203,21 @@ public class HdfsTable extends Table {
     public String toString() { return filesystem.getUri().toString(); }
   }
 
+  // Keeps track of newly added THdfsFileBlock metadata and its corresponding
+  // BlockLocation.  For each i, blocks.get(i) corresponds to locations.get(i).  Once
+  // all the new file blocks are collected, the disk volume IDs are retrieved in one
+  // batched DFS call.
+  private static class FileBlocksInfo {
+    final List<THdfsFileBlock> blocks = Lists.newArrayList();
+    final List<BlockLocation> locations = Lists.newArrayList();
+
+    public void addBlocks(List<THdfsFileBlock> b, List<BlockLocation> l) {
+      Preconditions.checkState(b.size() == l.size());
+      blocks.addAll(b);
+      locations.addAll(l);
+    }
+  }
+
   static {
     SUPPORTS_VOLUME_ID =
         CONF.getBoolean(DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED,
@@ -241,141 +256,119 @@ public class HdfsTable extends Table {
   public boolean spansMultipleFileSystems() { return multipleFileSystems_; }
 
   /**
-   * Loads the file block metadata for the given collection of FileDescriptors.  The
-   * FileDescriptors are passed as a tree, where the first level is indexed by
-   * filesystem, the second level is indexed by partition location, and the leaves are
-   * the list of files that exist under each directory.
+   * Queries the filesystem to load the file block metadata (e.g. DFS blocks) for the
+   * given file.  Adds the newly created block metadata and block location to the
+   * perFsFileBlocks, so that the disk IDs for each block can be retrieved with one
+   * call to DFS.
    */
-  private void loadBlockMd(Map<FsKey, Map<String, List<FileDescriptor>>> perFsFileDescs)
-      throws RuntimeException {
-    Preconditions.checkNotNull(perFsFileDescs);
-    LOG.debug("load block md for " + name_);
+  private void loadBlockMetadata(FileSystem fs, FileStatus file, FileDescriptor fd,
+      Map<FsKey, FileBlocksInfo> perFsFileBlocks) {
+    Preconditions.checkNotNull(fd);
+    Preconditions.checkNotNull(perFsFileBlocks);
+    Preconditions.checkArgument(!file.isDirectory());
+    LOG.debug("load block md for " + name_ + " file " + fd.getFileName());
 
-    for (FsKey fsEntry: perFsFileDescs.keySet()) {
-      FileSystem fs = fsEntry.filesystem;
-      // Store all BlockLocations so they can be reused when loading the disk IDs.
-      List<BlockLocation> blockLocations = Lists.newArrayList();
-      int numCachedBlocks = 0;
-      Map<String, List<FileDescriptor>> partitionToFds = perFsFileDescs.get(fsEntry);
-      Preconditions.checkNotNull(partitionToFds);
-      // loop over all files and record their block metadata, minus volume ids
-      for (String partitionDir: partitionToFds.keySet()) {
-        Path partDirPath = new Path(partitionDir);
-        for (FileDescriptor fileDescriptor: partitionToFds.get(partitionDir)) {
-          Path p = new Path(partDirPath, fileDescriptor.getFileName());
-          try {
-            FileStatus fileStatus = fs.getFileStatus(p);
-            // fileDescriptors should not contain directories.
-            Preconditions.checkArgument(!fileStatus.isDirectory());
-            BlockLocation[] locations = fs.getFileBlockLocations(fileStatus, 0,
-                fileStatus.getLen());
-            Preconditions.checkNotNull(locations);
-            blockLocations.addAll(Arrays.asList(locations));
+    try {
+      BlockLocation[] locations = fs.getFileBlockLocations(file, 0, file.getLen());
+      Preconditions.checkNotNull(locations);
 
-            // Loop over all blocks in the file.
-            for (BlockLocation block: locations) {
-              Preconditions.checkNotNull(block);
-              // Get the location of all block replicas in ip:port format.
-              String[] blockHostPorts = block.getNames();
+      // Loop over all blocks in the file.
+      for (BlockLocation loc: locations) {
+        Preconditions.checkNotNull(loc);
+        // Get the location of all block replicas in ip:port format.
+        String[] blockHostPorts = loc.getNames();
+        // Get the hostnames for all block replicas. Used to resolve which hosts
+        // contain cached data. The results are returned in the same order as
+        // block.getNames() so it allows us to match a host specified as ip:port to
+        // corresponding hostname using the same array index.
+        String[] blockHostNames = loc.getHosts();
+        Preconditions.checkState(blockHostNames.length == blockHostPorts.length);
+        // Get the hostnames that contain cached replicas of this block.
+        Set<String> cachedHosts =
+            Sets.newHashSet(Arrays.asList(loc.getCachedHosts()));
+        Preconditions.checkState(cachedHosts.size() <= blockHostNames.length);
 
-              // Get the hostnames for all block replicas. Used to resolve which hosts
-              // contain cached data. The results are returned in the same order as
-              // block.getNames() so it allows us to match a host specified as ip:port
-              // to corresponding hostname using the same array index.
-              String[] blockHostNames = block.getHosts();
-              Preconditions.checkState(blockHostNames.length == blockHostPorts.length);
-
-              // Get the hostnames that contain cached replicas of this block.
-              Set<String> cachedHosts =
-                  Sets.newHashSet(Arrays.asList(block.getCachedHosts()));
-              Preconditions.checkState(cachedHosts.size() <= blockHostNames.length);
-
-              // Now enumerate all replicas of the block, adding any unknown hosts
-              // to hostMap_/hostList_. The host ID (index in to the hostList_) for each
-              // replica is stored in replicaHostIdxs.
-              List<BlockReplica> blockReplicas =
-                  new ArrayList<BlockReplica>(blockHostPorts.length);
-              for (int i = 0; i < blockHostPorts.length; ++i) {
-                TNetworkAddress networkAddress =
-                    BlockReplica.parseLocation(blockHostPorts[i]);
-                Preconditions.checkState(networkAddress != null);
-                blockReplicas.add(
-                    new BlockReplica(hostIndex_.getIndex(networkAddress),
-                        cachedHosts.contains(blockHostNames[i])));
-              }
-              FileBlock fileBlock =
-                  new FileBlock(block.getOffset(), block.getLength(), blockReplicas);
-              fileDescriptor.addFileBlock(fileBlock);
-              if (fileBlock.isCached()) ++numCachedBlocks;
-            }
-          } catch (IOException e) {
-            throw new RuntimeException("couldn't determine block locations for path '"
-                + p + "':\n" + e.getMessage(), e);
-          }
+        // Now enumerate all replicas of the block, adding any unknown hosts
+        // to hostMap_/hostList_. The host ID (index in to the hostList_) for each
+        // replica is stored in replicaHostIdxs.
+        List<BlockReplica> replicas = Lists.newArrayListWithExpectedSize(
+            blockHostPorts.length);
+        for (int i = 0; i < blockHostPorts.length; ++i) {
+          TNetworkAddress networkAddress = BlockReplica.parseLocation(blockHostPorts[i]);
+          Preconditions.checkState(networkAddress != null);
+          replicas.add(new BlockReplica(hostIndex_.getIndex(networkAddress),
+              cachedHosts.contains(blockHostNames[i])));
         }
+        fd.addFileBlock(new FileBlock(loc.getOffset(), loc.getLength(), replicas));
       }
-      LOG.trace("Table: " + getFullName() + " on filesystem " + fsEntry + " contains " +
-          numCachedBlocks + "/" + blockLocations.size() + " cached blocks.");
-
-      if (SUPPORTS_VOLUME_ID && fs instanceof DistributedFileSystem) {
-        LOG.trace("loading disk ids for: " + getFullName() +
-            ". nodes: " + getNumNodes() + ". filesystem: " + fsEntry);
-        loadDiskIds((DistributedFileSystem)fs, blockLocations, partitionToFds);
-        LOG.trace("completed load of disk ids for: " + getFullName());
-      }
+      // Remember the THdfsFileBlocks and corresponding BlockLocations.  Once all the
+      // blocks are collected, the disk IDs will be queried in one batch per filesystem.
+      addPerFsFileBlocks(perFsFileBlocks, fs, fd.getFileBlocks(),
+          Arrays.asList(locations));
+    } catch (IOException e) {
+      throw new RuntimeException("couldn't determine block locations for path '" +
+          file.getPath() + "':\n" + e.getMessage(), e);
     }
   }
 
   /**
-   * Populates disk/volume ID metadata inside FileDescriptors given a list of
-   * BlockLocations. The FileDescriptors are passed as a Map of parent directory
-   * (partition location) to list of files (FileDescriptors) under that directory.
+   * Populates disk/volume ID metadata inside the newly created THdfsFileBlocks.
+   * perFsFileBlocks maps from each filesystem to a FileBLocksInfo.  The first list
+   * contains the newly created THdfsFileBlocks and the second contains the
+   * corresponding BlockLocations.
    */
-  private void loadDiskIds(DistributedFileSystem dfs, List<BlockLocation> blockLocations,
-      Map<String, List<FileDescriptor>> fileDescriptors) {
-    // BlockStorageLocations for all the blocks
-    // block described by blockMetadataList[i] is located at locations[i]
-    BlockStorageLocation[] locations = null;
-    try {
-      // Get the BlockStorageLocations for all the blocks
-      locations = dfs.getFileBlockStorageLocations(blockLocations);
-    } catch (IOException e) {
-      LOG.error("Couldn't determine block storage locations:\n" + e.getMessage());
-      return;
-    }
+  private void loadDiskIds(Map<FsKey, FileBlocksInfo> perFsFileBlocks) {
+    if (!SUPPORTS_VOLUME_ID) return;
+    // Loop over each filesystem.  If the filesystem is DFS, retrieve the volume IDs
+    // for all the blocks.
+    for (FsKey fsKey: perFsFileBlocks.keySet()) {
+      FileSystem fs = fsKey.filesystem;
+      if (!(fs instanceof DistributedFileSystem)) continue;
 
-    if (locations == null || locations.length == 0) {
-      LOG.warn("Attempted to get block locations but the call returned nulls");
-      return;
-    }
-
-    if (locations.length != blockLocations.size()) {
-      // blocks and locations don't match up
-      LOG.error("Number of block locations not equal to number of blocks: "
-          + "#locations=" + Long.toString(locations.length)
-          + " #blocks=" + Long.toString(blockLocations.size()));
-      return;
-    }
-
-    int locationsIdx = 0;
-    int unknownDiskIdCount = 0;
-    for (String parentPath: fileDescriptors.keySet()) {
-      for (FileDescriptor fileDescriptor: fileDescriptors.get(parentPath)) {
-        for (THdfsFileBlock blockMd: fileDescriptor.getFileBlocks()) {
-          VolumeId[] volumeIds = locations[locationsIdx++].getVolumeIds();
-          // Convert opaque VolumeId to 0 based ids.
-          // TODO: the diskId should be eventually retrievable from Hdfs when
-          // the community agrees this API is useful.
-          int[] diskIds = new int[volumeIds.length];
-          for (int i = 0; i < volumeIds.length; ++i) {
-            diskIds[i] = getDiskId(volumeIds[i]);
-            if (diskIds[i] < 0) ++unknownDiskIdCount;
-          }
-          FileBlock.setDiskIds(diskIds, blockMd);
+      LOG.trace("Loading disk ids for: " + getFullName() + ". nodes: " + getNumNodes() +
+          ". filesystem: " + fsKey);
+      DistributedFileSystem dfs = (DistributedFileSystem)fs;
+      FileBlocksInfo blockLists = perFsFileBlocks.get(fsKey);
+      Preconditions.checkNotNull(blockLists);
+      BlockStorageLocation[] storageLocs = null;
+      try {
+        // Get the BlockStorageLocations for all the blocks
+        storageLocs = dfs.getFileBlockStorageLocations(blockLists.locations);
+      } catch (IOException e) {
+        LOG.error("Couldn't determine block storage locations for filesystem " +
+            fs + ":\n" + e.getMessage());
+        continue;
+      }
+      if (storageLocs == null || storageLocs.length == 0) {
+        LOG.warn("Attempted to get block locations for filesystem " + fs +
+            " but the call returned no results");
+        continue;
+      }
+      if (storageLocs.length != blockLists.locations.size()) {
+        // Block locations and storage locations didn't match up.
+        LOG.error("Number of block storage locations not equal to number of blocks: "
+            + "#storage locations=" + Long.toString(storageLocs.length)
+            + " #blocks=" + Long.toString(blockLists.locations.size()));
+        continue;
+      }
+      long unknownDiskIdCount = 0;
+      // Attach volume IDs given by the storage location to the corresponding
+      // THdfsFileBlocks.
+      for (int locIdx = 0; locIdx < storageLocs.length; ++locIdx) {
+        VolumeId[] volumeIds = storageLocs[locIdx].getVolumeIds();
+        THdfsFileBlock block = blockLists.blocks.get(locIdx);
+        // Convert opaque VolumeId to 0 based ids.
+        // TODO: the diskId should be eventually retrievable from Hdfs when the
+        // community agrees this API is useful.
+        int[] diskIds = new int[volumeIds.length];
+        for (int i = 0; i < volumeIds.length; ++i) {
+          diskIds[i] = getDiskId(volumeIds[i]);
+          if (diskIds[i] < 0) ++unknownDiskIdCount;
         }
+        FileBlock.setDiskIds(diskIds, block);
       }
       if (unknownDiskIdCount > 0) {
-        LOG.warn("unknown disk id count " + unknownDiskIdCount);
+        LOG.warn("Unknown disk id count for filesystem " + fs + ":" + unknownDiskIdCount);
       }
     }
   }
@@ -592,11 +585,11 @@ public class HdfsTable extends Table {
     partitions_.clear();
     hdfsBaseDir_ = msTbl.getSd().getLocation();
 
-    // Map of filesystem to parent path to a list of new/modified
-    // FileDescriptors. FileDescriptors in this Map will have their block location
-    // information (re)loaded. This is used to speed up the incremental refresh of a
-    // table's metadata by skipping unmodified, previously loaded FileDescriptors.
-    Map<FsKey, Map<String, List<FileDescriptor>>> fileDescsToLoad = Maps.newHashMap();
+    // Map of filesystem to the file blocks for new/modified FileDescriptors. Blocks in
+    // this map will have their disk volume IDs information (re)loaded. This is used to
+    // speed up the incremental refresh of a table's metadata by skipping unmodified,
+    // previously loaded blocks.
+    Map<FsKey, FileBlocksInfo> blocksToLoad = Maps.newHashMap();
 
     // INSERT statements need to refer to this if they try to write to new partitions
     // Scans don't refer to this because by definition all partitions they refer to
@@ -614,7 +607,7 @@ public class HdfsTable extends Table {
       // partition, so add a single partition with no keys which will get all the
       // files in the table's root directory.
       HdfsPartition part = createPartition(msTbl.getSd(), null, oldFileDescMap,
-          fileDescsToLoad);
+          blocksToLoad);
       addPartition(part);
       if (isMarkedCached_) part.markCached();
       Path location = new Path(hdfsBaseDir_);
@@ -625,7 +618,7 @@ public class HdfsTable extends Table {
     } else {
       for (org.apache.hadoop.hive.metastore.api.Partition msPartition: msPartitions) {
         HdfsPartition partition = createPartition(msPartition.getSd(), msPartition,
-            oldFileDescMap, fileDescsToLoad);
+            oldFileDescMap, blocksToLoad);
         addPartition(partition);
         // If the partition is null, its HDFS path does not exist, and it was not added to
         // this table's partition list. Skip the partition.
@@ -644,7 +637,7 @@ public class HdfsTable extends Table {
         }
       }
     }
-    loadBlockMd(fileDescsToLoad);
+    loadDiskIds(blocksToLoad);
   }
 
   /**
@@ -692,10 +685,10 @@ public class HdfsTable extends Table {
   public HdfsPartition createPartition(StorageDescriptor storageDescriptor,
       org.apache.hadoop.hive.metastore.api.Partition msPartition)
       throws CatalogException {
-    Map<FsKey, Map<String, List<FileDescriptor>>> fileDescsToLoad = Maps.newHashMap();
+    Map<FsKey, FileBlocksInfo> blocksToLoad = Maps.newHashMap();
     HdfsPartition hdfsPartition = createPartition(storageDescriptor, msPartition,
-        fileDescMap_, fileDescsToLoad);
-    loadBlockMd(fileDescsToLoad);
+        fileDescMap_, blocksToLoad);
+    loadDiskIds(blocksToLoad);
     return hdfsPartition;
   }
 
@@ -721,7 +714,7 @@ public class HdfsTable extends Table {
   private HdfsPartition createPartition(StorageDescriptor storageDescriptor,
       org.apache.hadoop.hive.metastore.api.Partition msPartition,
       Map<String, List<FileDescriptor>> oldFileDescMap,
-      Map<FsKey, Map<String, List<FileDescriptor>>> perFsFileDescMap)
+      Map<FsKey, FileBlocksInfo> perFsFileBlocks)
       throws CatalogException {
     HdfsStorageDescriptor fileFormatDescriptor =
         HdfsStorageDescriptor.fromStorageDescriptor(this.name_, storageDescriptor);
@@ -795,11 +788,12 @@ public class HdfsTable extends Table {
           // value can be reused.
           if (fd == null || isMarkedCached || fd.getFileLength() != fileStatus.getLen()
               || fd.getModificationTime() != fileStatus.getModificationTime()) {
-            // Create a new file descriptor, the block metadata will be populated by
-            // loadBlockMd.
+            // Create a new file descriptor and load the file block metadata,
+            // collecting the block metadata into perFsFileBlocks.  The disk IDs for
+            // all the blocks of each filesystem will be loaded by loadDiskIds().
             fd = new FileDescriptor(fileName, fileStatus.getLen(),
                 fileStatus.getModificationTime());
-            addPerFsFileDesc(perFsFileDescMap, fs, partitionDir, fd);
+            loadBlockMetadata(fs, fileStatus, fd, perFsFileBlocks);
           }
 
           List<FileDescriptor> fds = fileDescMap_.get(partitionDir);
@@ -825,23 +819,18 @@ public class HdfsTable extends Table {
   }
 
   /**
-   * Add the appropriate nodes to the filesystem -> partition directory -> file
-   * descriptors tree, given fs, partitionDir and fd.
+   * Add the given THdfsFileBlocks and BlockLocations to the FileBlockInfo for the
+   * given filesystem.
    */
-  private void addPerFsFileDesc(Map<FsKey, Map<String, List<FileDescriptor>>> root,
-      FileSystem fs, String partitionDir, FileDescriptor fd) {
-    FsKey fsEntry = new FsKey(fs);
-    Map<String, List<FileDescriptor>> dirToFdList = root.get(fsEntry);
-    if (dirToFdList == null) {
-      dirToFdList = Maps.newHashMap();
-      root.put(fsEntry, dirToFdList);
+  private void addPerFsFileBlocks(Map<FsKey, FileBlocksInfo> fsToBlocks, FileSystem fs,
+      List<THdfsFileBlock> blocks, List<BlockLocation> locations) {
+    FsKey fsKey = new FsKey(fs);
+    FileBlocksInfo infos = fsToBlocks.get(fsKey);
+    if (infos == null) {
+      infos = new FileBlocksInfo();
+      fsToBlocks.put(fsKey, infos);
     }
-    List<FileDescriptor> fds = dirToFdList.get(partitionDir);
-    if (fds == null) {
-      fds = Lists.newArrayList();
-      dirToFdList.put(partitionDir, fds);
-    }
-    fds.add(fd);
+    infos.addBlocks(blocks, locations);
   }
 
   /**
