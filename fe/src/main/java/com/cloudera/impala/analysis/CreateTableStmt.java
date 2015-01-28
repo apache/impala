@@ -271,9 +271,9 @@ public class CreateTableStmt extends StatementBase {
     String avroSchema = null;
     try {
       avroSchema = HdfsTable.getAvroSchema(schemaSearchLocations,
-          dbName_ + "." + tableName_.getTbl(), true);
+          dbName_ + "." + tableName_.getTbl());
     } catch (TableLoadingException e) {
-      throw new AnalysisException("Error loading Avro schema: " + e.getMessage(), e);
+      throw new AnalysisException(e.getMessage(), e);
     }
 
     if (Strings.isNullOrEmpty(avroSchema)) {

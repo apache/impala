@@ -980,7 +980,7 @@ public class HdfsTable extends Table {
         schemaSearchLocations.add(getMetaStoreTable().getParameters());
 
         avroSchema_ =
-            HdfsTable.getAvroSchema(schemaSearchLocations, getFullName(), true);
+            HdfsTable.getAvroSchema(schemaSearchLocations, getFullName());
         String serdeLib = msTbl.getSd().getSerdeInfo().getSerializationLib();
         if (serdeLib == null ||
             serdeLib.equals("org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe")) {
@@ -1115,17 +1115,16 @@ public class HdfsTable extends Table {
 
   /**
    * Gets an Avro table's JSON schema from the list of given table property search
-   * locations. The schema may be specified as a string literal or provided as an
-   * HDFS/http URL that points to the schema. This function does not perform any
-   * validation on the returned string (e.g., it may not be a valid schema).
-   * If downloadSchema is true and the schema was found to be specified as a SCHEMA_URL,
-   * this function will attempt to download the schema from the given URL. Otherwise,
-   * only the the URL string will be returned.
-   * Throws a TableLoadingException if no schema is found or if there was any error
-   * extracting the schema.
+   * locations. The schema may be specified as a string literal or provided as a
+   * Hadoop FileSystem or http URL that points to the schema. This function does not
+   * perform any validation on the returned string (e.g., it may not be a valid
+   * schema).  If the schema was found to be specified as a SCHEMA_URL, this function
+   * will attempt to download the schema from the given URL.  Throws a
+   * TableLoadingException if no schema is found or if there was any error extracting
+   * the schema.
    */
   public static String getAvroSchema(List<Map<String, String>> schemaSearchLocations,
-      String tableName, boolean downloadSchema) throws TableLoadingException {
+      String tableName) throws TableLoadingException {
     String url = null;
     // Search all locations and break out on the first valid schema found.
     for (Map<String, String> schemaLocation: schemaSearchLocations) {
@@ -1140,42 +1139,43 @@ public class HdfsTable extends Table {
         break;
       }
     }
-
     if (url == null || url.equals(AvroSerdeUtils.SCHEMA_NONE)) {
       throw new TableLoadingException(String.format("No Avro schema provided in " +
           "SERDEPROPERTIES or TBLPROPERTIES for table: %s ", tableName));
     }
-
-    if (!url.toLowerCase().startsWith("hdfs://") &&
-        !url.toLowerCase().startsWith("http://")) {
-      throw new TableLoadingException("avro.schema.url must be of form " +
-          "\"http://path/to/schema/file\" or " +
-          "\"hdfs://namenode:port/path/to/schema/file\", got " + url);
-    }
-    return downloadSchema ? loadAvroSchemaFromUrl(url) : url;
-  }
-
-  private static String loadAvroSchemaFromUrl(String url)
-      throws TableLoadingException {
-    if (url.toLowerCase().startsWith("hdfs://")) {
-      try {
-        return FileSystemUtil.readFile(new Path(url));
-      } catch (IOException e) {
-        throw new TableLoadingException(
-            "Problem reading Avro schema at: " + url, e);
-      }
-    } else {
-      Preconditions.checkState(url.toLowerCase().startsWith("http://"));
+    String schema = null;
+    if (url.toLowerCase().startsWith("http://")) {
       InputStream urlStream = null;
       try {
         urlStream = new URL(url).openStream();
-        return IOUtils.toString(urlStream);
+        schema = IOUtils.toString(urlStream);
       } catch (IOException e) {
         throw new TableLoadingException("Problem reading Avro schema from: " + url, e);
       } finally {
         IOUtils.closeQuietly(urlStream);
       }
+    } else {
+      Path path = new Path(url);
+      FileSystem fs = null;
+      try {
+        fs = path.getFileSystem(FileSystemUtil.getConfiguration());
+      } catch (Exception e) {
+        throw new TableLoadingException(String.format(
+            "Invalid avro.schema.url: %s. %s", path, e.getMessage()));
+      }
+      StringBuilder errorMsg = new StringBuilder();
+      if (!FileSystemUtil.isPathReachable(path, fs, errorMsg)) {
+        throw new TableLoadingException(String.format(
+            "Invalid avro.schema.url: %s. %s", path, errorMsg));
+      }
+      try {
+        schema = FileSystemUtil.readFile(path);
+      } catch (IOException e) {
+        throw new TableLoadingException(
+            "Problem reading Avro schema at: " + url, e);
+      }
     }
+    return schema;
   }
 
   @Override

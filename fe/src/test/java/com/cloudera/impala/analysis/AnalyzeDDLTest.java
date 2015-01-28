@@ -1237,19 +1237,26 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     // No Avro schema specified for Avro format table.
     AnalysisError("create table foo_avro (i int) stored as avro",
-        "Error loading Avro schema: No Avro schema provided in SERDEPROPERTIES or " +
-        "TBLPROPERTIES for table: default.foo_avro");
+        "No Avro schema provided in SERDEPROPERTIES or TBLPROPERTIES for table: " +
+        "default.foo_avro");
     AnalysisError("create table foo_avro (i int) stored as avro tblproperties ('a'='b')",
-        "Error loading Avro schema: No Avro schema provided in SERDEPROPERTIES or " +
-        "TBLPROPERTIES for table: default.foo_avro");
+        "No Avro schema provided in SERDEPROPERTIES or TBLPROPERTIES for table: " +
+        "default.foo_avro");
     AnalysisError("create table foo_avro stored as avro tblproperties ('a'='b')",
-        "Error loading Avro schema: No Avro schema provided in SERDEPROPERTIES or " +
-        "TBLPROPERTIES for table: default.foo_avro");
+        "No Avro schema provided in SERDEPROPERTIES or TBLPROPERTIES for table: "+
+        "default.foo_avro");
+
     // Invalid schema URL
     AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
-        "('avro.schema.url'='schema.avsc')", "Error loading Avro schema: " +
-        "avro.schema.url must be of form \"http://path/to/schema/file\" or " +
-        "\"hdfs://namenode:port/path/to/schema/file\", got schema.avsc");
+        "('avro.schema.url'='schema.avsc')",
+        "Invalid avro.schema.url: schema.avsc. Path does not exist.");
+    AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
+        "('avro.schema.url'='hdfs://invalid*host/schema.avsc')",
+        "Invalid avro.schema.url: hdfs://invalid*host/schema.avsc. " +
+        "Incomplete HDFS URI, no host: hdfs://invalid*host/schema.avsc");
+    AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
+        "('avro.schema.url'='foo://bar/schema.avsc')",
+        "Invalid avro.schema.url: foo://bar/schema.avsc. No FileSystem for scheme: foo");
 
     // Decimal parsing
     AnalyzesOk("create table foo_avro (i int) stored as avro tblproperties " +
