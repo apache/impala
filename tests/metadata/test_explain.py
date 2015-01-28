@@ -85,3 +85,44 @@ class TestExplain(ImpalaTestSuite):
         query_options={'explain_level':3})
     check_cardinality(result.data, '7300')
 
+class TestExplainEmptyPartition(ImpalaTestSuite):
+  TEST_DB_NAME = "imp_1708"
+
+  def setup_method(self, method):
+    self.cleanup_db(self.TEST_DB_NAME)
+    self.execute_query("create database if not exists %s" % (self.TEST_DB_NAME))
+
+  def teardown_method(self, method):
+    self.cleanup_db(self.TEST_DB_NAME)
+
+  def test_non_empty_partition_0_rows(self):
+    """Regression test for IMPALA-1708: if a partition has 0 rows but > 0 files after
+    COMPUTE STATS, don't warn the user about missing stats. The files are probably
+    corrupted, or used for something else."""
+    self.client.execute("SET EXPLAIN_LEVEL=3")
+    self.client.execute(
+      "CREATE TABLE %s.empty_partition (col int) partitioned by (p int)" %
+      self.TEST_DB_NAME);
+    self.client.execute(
+      "ALTER TABLE %s.empty_partition ADD PARTITION (p=NULL)" % self.TEST_DB_NAME)
+    # Put an empty file in the partition so we have > 0 files, but 0 rows
+    self.hdfs_client.create_file(
+      "test-warehouse/%s.db/empty_partition/p=__HIVE_DEFAULT_PARTITION__/empty" %
+      self.TEST_DB_NAME, "")
+    self.client.execute("REFRESH %s.empty_partition" % self.TEST_DB_NAME)
+    self.client.execute("COMPUTE STATS %s.empty_partition" % self.TEST_DB_NAME)
+    assert "NULL\t0\t1" in str(
+      self.client.execute("SHOW PARTITIONS %s.empty_partition" % self.TEST_DB_NAME))
+    assert "missing relevant table and/or column statistics" not in str(
+      self.client.execute("EXPLAIN SELECT * FROM %s.empty_partition" % self.TEST_DB_NAME))
+
+    # Now add a partition with some data (so it gets selected into the scan), to check
+    # that its lack of stats is correctly identified
+    self.client.execute(
+      "ALTER TABLE %s.empty_partition ADD PARTITION (p=1)" % self.TEST_DB_NAME)
+    self.hdfs_client.create_file("test-warehouse/%s.db/empty_partition/p=1/rows" %
+                                 self.TEST_DB_NAME, "1")
+    self.client.execute("REFRESH %s.empty_partition" % self.TEST_DB_NAME)
+    explain_result = str(
+      self.client.execute("EXPLAIN SELECT * FROM %s.empty_partition" % self.TEST_DB_NAME))
+    assert "missing relevant table and/or column statistics" in explain_result

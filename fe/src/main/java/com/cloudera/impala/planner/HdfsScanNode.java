@@ -579,6 +579,7 @@ public class HdfsScanNode extends ScanNode {
   public void computeStats(Analyzer analyzer) {
     super.computeStats(analyzer);
     LOG.debug("collecting partitions for table " + tbl_.getName());
+    numPartitionsMissingStats_ = 0;
     if (tbl_.getPartitions().isEmpty()) {
       cardinality_ = tbl_.getNumRows();
     } else {
@@ -589,7 +590,7 @@ public class HdfsScanNode extends ScanNode {
       for (HdfsPartition p: partitions_) {
         // ignore partitions with missing stats in the hope they don't matter
         // enough to change the planning outcome
-        if (p.getNumRows() > 0) {
+        if (p.getNumRows() > -1) {
           cardinality_ = addCardinalities(cardinality_, p.getNumRows());
           hasValidPartitionCardinality = true;
         } else {
