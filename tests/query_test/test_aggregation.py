@@ -107,3 +107,9 @@ class TestAggregationQueries(ImpalaTestSuite):
     if vector.get_value('table_format').file_format == 'hbase':
       pytest.xfail(reason="IMPALA-283 - select count(*) produces inconsistent results")
     self.run_test_case('QueryTest/aggregation', vector)
+
+  def test_distinct(self, vector):
+    if vector.get_value('table_format').file_format == 'hbase':
+      pytest.xfail("HBase returns columns in alphabetical order for select distinct *, "
+                   "making the result verication to fail.")
+    self.run_test_case('QueryTest/distinct', vector)

@@ -36,12 +36,6 @@ class TestQueries(ImpalaTestSuite):
   def get_workload(cls):
     return 'functional-query'
 
-  def test_distinct(self, vector):
-    if vector.get_value('table_format').file_format == 'hbase':
-      pytest.xfail("HBase returns columns in alphabetical order for select distinct *, "
-                    "making result verication fail.")
-    self.run_test_case('QueryTest/distinct', vector)
-
   def test_exprs(self, vector):
     # TODO: Enable some of these tests for Avro if possible
     # Don't attempt to evaluate timestamp expressions with Avro tables (which)
