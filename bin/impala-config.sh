@@ -152,6 +152,8 @@ export HIVE_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
 ### any jars in AUX_CLASSPATH. (Or a list of jars in HIVE_AUX_JARS_PATH.)
 export HIVE_AUX_JARS_PATH=${IMPALA_FE_DIR}/target
 export AUX_CLASSPATH=$HADOOP_LZO/build/hadoop-lzo-0.4.15.jar
+### Tell hive not to use jline
+export HADOOP_USER_CLASSPATH_FIRST=true
 
 export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-${IMPALA_HBASE_VERSION}/
 export PATH=$HBASE_HOME/bin:$PATH
