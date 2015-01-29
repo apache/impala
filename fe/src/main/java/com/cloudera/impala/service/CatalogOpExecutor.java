@@ -357,6 +357,9 @@ public class CatalogOpExecutor {
               params.getSet_cached_params());
         }
         break;
+      case RECOVER_PARTITIONS:
+        alterTableRecoverPartitions(TableName.fromThrift(params.getTable_name()));
+        break;
       default:
         throw new UnsupportedOperationException(
             "Unknown ALTER TABLE operation type: " + params.getAlter_type());
@@ -1353,8 +1356,6 @@ public class CatalogOpExecutor {
   private Table alterTableAddPartition(TableName tableName,
       List<TPartitionKeyValue> partitionSpec, boolean ifNotExists, String location,
       THdfsCachingOp cacheOp) throws ImpalaException {
-    org.apache.hadoop.hive.metastore.api.Partition partition =
-        new org.apache.hadoop.hive.metastore.api.Partition();
     if (ifNotExists && catalog_.containsHdfsPartition(tableName.getDb(),
         tableName.getTbl(), partitionSpec)) {
       LOG.debug(String.format("Skipping partition creation because (%s) already exists" +
@@ -1362,30 +1363,17 @@ public class CatalogOpExecutor {
       return null;
     }
 
+    org.apache.hadoop.hive.metastore.api.Partition partition = null;
     Table result = null;
     List<Long> cacheIds = null;
     synchronized (metastoreDdlLock_) {
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
-      partition.setDbName(tableName.getDb());
-      partition.setTableName(tableName.getTbl());
-
       Long parentTblCacheDirId =
           HdfsCachingUtil.getCacheDirectiveId(msTbl.getParameters());
 
-      List<String> values = Lists.newArrayList();
-      // Need to add in the values in the same order they are defined in the table.
-      for (FieldSchema fs: msTbl.getPartitionKeys()) {
-        for (TPartitionKeyValue kv: partitionSpec) {
-          if (fs.getName().toLowerCase().equals(kv.getName().toLowerCase())) {
-            values.add(kv.getValue());
-          }
-        }
-      }
-      partition.setValues(values);
-      StorageDescriptor sd = msTbl.getSd().deepCopy();
-      sd.setLocation(location);
-      partition.setSd(sd);
       MetaStoreClient msClient = catalog_.getMetaStoreClient();
+      partition = createHmsPartition(partitionSpec, msTbl, tableName, location);
+
       try {
         // Add the new partition.
         partition = msClient.getHiveClient().add_partition(partition);
@@ -1885,6 +1873,122 @@ public class CatalogOpExecutor {
         partition.markDirty();
       }
     }
+  }
+
+  /**
+   * Recover partitions of specified table.
+   * Add partitions to metastore which exist in HDFS but not in metastore.
+   */
+  private void alterTableRecoverPartitions(TableName tableName)
+      throws ImpalaException {
+    Table table = getExistingTable(tableName.getDb(), tableName.getTbl());
+    if (!(table instanceof HdfsTable)) {
+      throw new CatalogException("Table " + tableName + " is not an HDFS table");
+    }
+
+    HdfsTable hdfsTable = (HdfsTable)table;
+    List<List<String>> partitionsNotInHms = hdfsTable.getPathsWithoutPartitions();
+    if (partitionsNotInHms.isEmpty()) return;
+
+    List<Partition> hmsPartitions = Lists.newArrayList();
+    org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
+    for (List<String> partitionSpecValues: partitionsNotInHms) {
+      hmsPartitions.add(createHmsPartitionFromValues(
+          partitionSpecValues, msTbl, tableName, null));
+    }
+
+    synchronized (metastoreDdlLock_) {
+      String cachePoolName = null;
+      Short replication = null;
+      List<Long> cacheIds = Lists.newArrayList();
+      Long parentTblCacheDirId =
+          HdfsCachingUtil.getCacheDirectiveId(msTbl.getParameters());
+      if (parentTblCacheDirId != null) {
+        // Inherit the HDFS cache value from the parent table.
+        cachePoolName = HdfsCachingUtil.getCachePool(parentTblCacheDirId);
+        Preconditions.checkNotNull(cachePoolName);
+        replication = HdfsCachingUtil.getCacheReplication(parentTblCacheDirId);
+        Preconditions.checkNotNull(replication);
+      }
+
+      // Add partitions to metastore.
+      MetaStoreClient msClient = catalog_.getMetaStoreClient();
+      try {
+        // ifNotExists and needResults are true.
+        hmsPartitions = msClient.getHiveClient().add_partitions(hmsPartitions,
+            true, true);
+
+        for (Partition partition: hmsPartitions) {
+          // Create and add the HdfsPartition. Return the table object with an updated
+          // catalog version.
+          addHdfsPartition(tableName, partition);
+        }
+
+        // Handle HDFS cache.
+        if (cachePoolName != null) {
+          for (Partition partition: hmsPartitions) {
+            long id = HdfsCachingUtil.submitCachePartitionDirective(partition,
+                cachePoolName, replication);
+            cacheIds.add(id);
+          }
+          // Update the partition metadata to include the cache directive id.
+          msClient.getHiveClient().alter_partitions(tableName.getDb(),
+              tableName.getTbl(), hmsPartitions);
+        }
+
+        updateLastDdlTime(msTbl, msClient);
+      } catch (AlreadyExistsException e) {
+        // This may happen when another client of HMS has added the partitions.
+        LOG.debug(String.format("Ignoring '%s' when adding partition to %s.", e,
+            tableName));
+      } catch (TException e) {
+        throw new ImpalaRuntimeException(
+            String.format(HMS_RPC_ERROR_FORMAT_STR, "add_partition"), e);
+      } finally {
+        msClient.release();
+      }
+
+      if (!cacheIds.isEmpty()) {
+        catalog_.watchCacheDirs(cacheIds, tableName.toThrift());
+      }
+    }
+  }
+
+  /**
+   * Create a new HMS Partition.
+   */
+  private static Partition createHmsPartition(List<TPartitionKeyValue> partitionSpec,
+      org.apache.hadoop.hive.metastore.api.Table msTbl, TableName tableName,
+      String location) {
+    List<String> values = Lists.newArrayList();
+    // Need to add in the values in the same order they are defined in the table.
+    for (FieldSchema fs: msTbl.getPartitionKeys()) {
+      for (TPartitionKeyValue kv: partitionSpec) {
+        if (fs.getName().toLowerCase().equals(kv.getName().toLowerCase())) {
+          values.add(kv.getValue());
+        }
+      }
+    }
+    return createHmsPartitionFromValues(values, msTbl, tableName, location);
+  }
+
+  /**
+   * Create a new HMS Partition from partition values.
+   */
+  private static Partition createHmsPartitionFromValues(List<String> partitionSpecValues,
+      org.apache.hadoop.hive.metastore.api.Table msTbl, TableName tableName,
+      String location) {
+    // Create HMS Partition.
+    org.apache.hadoop.hive.metastore.api.Partition partition =
+        new org.apache.hadoop.hive.metastore.api.Partition();
+    partition.setDbName(tableName.getDb());
+    partition.setTableName(tableName.getTbl());
+    partition.setValues(partitionSpecValues);
+    StorageDescriptor sd = msTbl.getSd().deepCopy();
+    sd.setLocation(location);
+    partition.setSd(sd);
+
+    return partition;
   }
 
   /**

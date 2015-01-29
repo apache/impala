@@ -53,12 +53,14 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.NullLiteral;
+import com.cloudera.impala.analysis.NumericLiteral;
 import com.cloudera.impala.analysis.PartitionKeyValue;
 import com.cloudera.impala.catalog.HdfsPartition.BlockReplica;
 import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
@@ -1350,6 +1352,136 @@ public class HdfsTable extends Table {
     }
     Preconditions.checkNotNull(majorityFormat);
     return majorityFormat;
+  }
+
+  /**
+   * Returns the HDFS paths corresponding to HdfsTable partitions that don't exist in
+   * the metastore. An HDFS path is represented as a list of strings values, one per
+   * partition key column.
+   */
+  public List<List<String>> getPathsWithoutPartitions() throws CatalogException {
+    List<List<LiteralExpr>> existingPartitions = new ArrayList<List<LiteralExpr>>();
+    // Get the list of partition values of existing partitions in metastore.
+    for (HdfsPartition partition: partitions_) {
+      if (partition.isDefaultPartition()) continue;
+      existingPartitions.add(partition.getPartitionValues());
+    }
+
+    List<String> partitionKeys = Lists.newArrayList();
+    for (int i = 0; i < numClusteringCols_; ++i) {
+      partitionKeys.add(getColumns().get(i).getName());
+    }
+    Path basePath = new Path(hdfsBaseDir_);
+    List<List<String>> partitionsNotInHms = new ArrayList<List<String>>();
+    try {
+      getAllPartitionsNotInHms(basePath, partitionKeys, existingPartitions,
+          partitionsNotInHms);
+    } catch (Exception e) {
+      throw new CatalogException(String.format("Failed to recover partitions for %s " +
+          "with exception:%s.", getFullName(), e));
+    }
+    return partitionsNotInHms;
+  }
+
+  /**
+   * Returns all partitions which match the partition keys directory structure and pass
+   * type compatibility check. Also these partitions are not already part of the table.
+   */
+  private void getAllPartitionsNotInHms(Path path, List<String> partitionKeys,
+      List<List<LiteralExpr>> existingPartitions,
+      List<List<String>> partitionsNotInHms) throws IOException {
+    FileSystem fs = path.getFileSystem(CONF);
+    // Check whether the base directory exists.
+    if (!fs.exists(path)) return;
+
+    List<String> partitionValues = Lists.newArrayList();
+    List<LiteralExpr> partitionExprs = Lists.newArrayList();
+    getAllPartitionsNotInHms(path, partitionKeys, 0, fs, partitionValues,
+        partitionExprs, existingPartitions, partitionsNotInHms);
+  }
+
+  /**
+   * Returns all partitions which match the partition keys directory structure and pass
+   * the type compatibility check.
+   *
+   * path e.g. c1=1/c2=2/c3=3
+   * partitionKeys The ordered partition keys. e.g.("c1", "c2", "c3")
+   * depth The start position in partitionKeys to match the path name.
+   * partitionValues The partition values used to create a partition.
+   * partitionExprs The list of LiteralExprs which is used to avoid duplicate partitions.
+   * E.g. Having /c1=0001 and /c1=01, we should make sure only one partition
+   * will be added.
+   * existingPartitions All partitions which exist in metastore or newly added.
+   * partitionsNotInHms Contains all the recovered partitions.
+   */
+  private void getAllPartitionsNotInHms(Path path, List<String> partitionKeys,
+      int depth, FileSystem fs, List<String> partitionValues,
+      List<LiteralExpr> partitionExprs, List<List<LiteralExpr>> existingPartitions,
+      List<List<String>> partitionsNotInHms) throws IOException {
+    if (depth == partitionKeys.size()) {
+      if (existingPartitions.contains(partitionExprs)) {
+        LOG.trace(String.format("Skip recovery of path '%s' because it already exists " +
+            "in metastore", path.toString()));
+      } else {
+        partitionsNotInHms.add(partitionValues);
+        existingPartitions.add(partitionExprs);
+      }
+      return;
+    }
+
+    FileStatus[] statuses = fs.listStatus(path);
+    for (FileStatus status: statuses) {
+      if (!status.isDirectory()) continue;
+      Pair<String, LiteralExpr> keyValues =
+          getTypeCompatibleValue(status.getPath(), partitionKeys.get(depth));
+      if (keyValues == null) continue;
+
+      List<String> currentPartitionValues = Lists.newArrayList(partitionValues);
+      List<LiteralExpr> currentPartitionExprs = Lists.newArrayList(partitionExprs);
+      currentPartitionValues.add(keyValues.first);
+      currentPartitionExprs.add(keyValues.second);
+      getAllPartitionsNotInHms(status.getPath(), partitionKeys, depth + 1, fs,
+          currentPartitionValues, currentPartitionExprs,
+          existingPartitions, partitionsNotInHms);
+    }
+  }
+
+  /**
+   * Checks that the last component of 'path' is of the form "<partitionkey>=<v>"
+   * where 'v' is a type-compatible value from the domain of the 'partitionKey' column.
+   * If not, returns null, otherwise returns a Pair instance, the first element is the
+   * original value, the second element is the LiteralExpr created from the original
+   * value.
+   */
+  private Pair<String, LiteralExpr> getTypeCompatibleValue(Path path, String partitionKey) {
+    String partName[] = path.getName().split("=");
+    if (partName.length != 2 || !partName[0].equals(partitionKey)) return null;
+
+    // Check Type compatibility for Partition value.
+    Column column = getColumn(partName[0]);
+    Preconditions.checkNotNull(column);
+    Type type = column.getType();
+    LiteralExpr expr = null;
+    if (!partName[1].equals(getNullPartitionKeyValue())) {
+      try {
+        expr = LiteralExpr.create(partName[1], type);
+        // Skip large value which exceeds the MAX VALUE of specified Type.
+        if (expr instanceof NumericLiteral) {
+          if (NumericLiteral.isOverflow(((NumericLiteral)expr).getValue(), type)) {
+            LOG.warn(String.format("Skip the overflow value (%s) for Type (%s).",
+                partName[1], type.toSql()));
+            return null;
+          }
+        }
+      } catch (Exception ex) {
+        LOG.debug(String.format("Invalid partition value (%s) for Type (%s).",
+            partName[1], type.toSql()));
+        return null;
+      }
+    } else {
+      expr = new NullLiteral();
+    }
+    return new Pair<String, LiteralExpr>(partName[1], expr);
   }
 
   /**

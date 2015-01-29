@@ -274,4 +274,35 @@ public class NumericLiteral extends LiteralExpr {
 
   @Override
   public Expr clone() { return new NumericLiteral(this); }
+
+  /**
+   * Check overflow.
+   */
+  public static boolean isOverflow(BigDecimal value, Type type)
+      throws AnalysisException {
+    switch (type.getPrimitiveType()) {
+      case TINYINT:
+        return (value.compareTo(BigDecimal.valueOf(Byte.MAX_VALUE)) > 0 ||
+            value.compareTo(BigDecimal.valueOf(Byte.MIN_VALUE)) < 0);
+      case SMALLINT:
+        return (value.compareTo(BigDecimal.valueOf(Short.MAX_VALUE)) > 0 ||
+            value.compareTo(BigDecimal.valueOf(Short.MIN_VALUE)) < 0);
+      case INT:
+        return (value.compareTo(BigDecimal.valueOf(Integer.MAX_VALUE)) > 0 ||
+            value.compareTo(BigDecimal.valueOf(Integer.MIN_VALUE)) < 0);
+      case BIGINT:
+        return (value.compareTo(BigDecimal.valueOf(Long.MAX_VALUE)) > 0 ||
+            value.compareTo(BigDecimal.valueOf(Long.MIN_VALUE)) < 0);
+      case FLOAT:
+        return (value.compareTo(BigDecimal.valueOf(Float.MAX_VALUE)) > 0 ||
+            value.compareTo(BigDecimal.valueOf(Float.MIN_VALUE)) < 0);
+      case DOUBLE:
+        return (value.compareTo(BigDecimal.valueOf(Double.MAX_VALUE)) > 0 ||
+            value.compareTo(BigDecimal.valueOf(Double.MIN_VALUE)) < 0);
+      case DECIMAL:
+        return (TypesUtil.computeDecimalType(value) == null);
+      default:
+        throw new AnalysisException("Overflow check on " + type + " isn't supported.");
+    }
+  }
 }

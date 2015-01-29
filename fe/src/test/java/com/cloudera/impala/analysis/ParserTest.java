@@ -1937,6 +1937,19 @@ public class ParserTest {
   }
 
   @Test
+  public void TestAlterTableRecoverPartitions() {
+    ParsesOk("ALTER TABLE TestDb.Foo RECOVER PARTITIONS");
+    ParsesOk("ALTER TABLE Foo RECOVER PARTITIONS");
+
+    ParserError("ALTER TABLE Foo RECOVER PARTITIONS ()");
+    ParserError("ALTER TABLE Foo RECOVER PARTITIONS (i=1)");
+    ParserError("ALTER TABLE RECOVER");
+    ParserError("ALTER TABLE RECOVER PARTITIONS");
+    ParserError("ALTER TABLE Foo RECOVER");
+    ParserError("ALTER TABLE Foo RECOVER PARTITION");
+  }
+
+  @Test
   public void TestCreateTable() {
     // Support unqualified and fully-qualified table names
     ParsesOk("CREATE TABLE Foo (i int)");

@@ -66,6 +66,7 @@ enum TAlterTableType {
   // Used internally by the COMPUTE STATS DDL command.
   UPDATE_STATS,
   SET_CACHED,
+  RECOVER_PARTITIONS,
 }
 
 // Parameters of CREATE DATABASE commands

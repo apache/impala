@@ -865,6 +865,7 @@ public class AuthorizationTest {
         "SET LOCATION 'hdfs://localhost:20500/test-warehouse/new_table'");
 
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes SET CACHED IN 'testPool'");
+    AuthzOk("ALTER TABLE functional_seq_snap.alltypes RECOVER PARTITIONS");
 
 
     // Alter table and set location to a path the user does not have access to.
@@ -904,6 +905,8 @@ public class AuthorizationTest {
     AuthzError("ALTER TABLE functional.alltypes set cached in 'testPool'",
         "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
     AuthzError("ALTER TABLE functional.alltypes set uncached",
+        "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
+    AuthzError("ALTER TABLE functional.alltypes recover partitions",
         "User '%s' does not have privileges to execute 'ALTER' on: functional.alltypes");
 
     // Trying to ALTER TABLE a view does not reveal any privileged information.

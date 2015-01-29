@@ -537,6 +537,22 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestAlterTableRecoverPartitions() throws CatalogException {
+    AnalyzesOk("alter table functional.alltypes recover partitions");
+    AnalysisError("alter table baddb.alltypes recover partitions",
+        "Database does not exist: baddb");
+    AnalysisError("alter table functional.badtbl recover partitions",
+        "Table does not exist: functional.badtbl");
+    AnalysisError("alter table functional.alltypesnopart recover partitions",
+        "Table is not partitioned: functional.alltypesnopart");
+    AnalysisError("alter table functional.view_view recover partitions",
+        "ALTER TABLE not allowed on a view: functional.view_view");
+    AnalysisError("alter table functional_hbase.alltypes recover partitions",
+        "ALTER TABLE RECOVER PARTITIONS must target an HDFS table: " +
+        "functional_hbase.alltypes");
+  }
+
+  @Test
   public void TestAlterView() {
     // View-definition references a table.
     AnalyzesOk("alter view functional.alltypes_view as " +
