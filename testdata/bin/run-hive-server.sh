@@ -43,5 +43,3 @@ hive --service hiveserver2 > ${LOGDIR}/hive-server2.out 2>&1 &
 # Wait for the HiveServer2 service to come up because callers of this script
 # may rely on it being available.
 python ${CLUSTER_BIN}/wait-for-hiveserver2.py --transport=${HIVES2_TRANSPORT}
-
-$IMPALA_HOME/testdata/bin/avoid_hive_replication_bug.sh
