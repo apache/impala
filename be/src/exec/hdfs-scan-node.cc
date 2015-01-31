@@ -746,12 +746,19 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
   //  2. Don't start up if all the ranges have been taken by another thread.
   //  3. Don't start up if the number of ranges left is less than the number of
   //     active scanner threads.
-  //  4. Don't start up a ScannerThread if materialized_row_batches_ is full since
+  //  4. Don't start up if no initial ranges have been issued (see IMPALA-1722).
+  //  5. Don't start up a ScannerThread if materialized_row_batches_ is full since
   //     we are not scanner bound.
-  //  5. Don't start up a thread if there isn't enough memory left to run it.
-  //  6. Don't start up if there are no thread tokens.
-  //  7. Don't start up if we are running too many threads for our vcore allocation
+  //  6. Don't start up a thread if there isn't enough memory left to run it.
+  //  7. Don't start up if there are no thread tokens.
+  //  8. Don't start up if we are running too many threads for our vcore allocation
   //  (unless the thread is reserved, in which case it has to run).
+
+  // Case 4. We have not issued the initial ranges so don't start a scanner thread.
+  // Issuing ranges will call this function and we'll start the scanner threads then.
+  // TODO: It would be good to have a test case for that.
+  if (!initial_ranges_issued_) return;
+
   bool started_scanner = false;
   while (true) {
     // The lock must be given up between loops in order to give writers to done_,
@@ -759,24 +766,24 @@ void HdfsScanNode::ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool)
     // TODO: This still leans heavily on starvation-free locks, come up with a more
     // correct way to communicate between this method and ScannerThreadHelper
     unique_lock<mutex> lock(lock_);
-    // Cases 1, 2, 3
+    // Cases 1, 2, 3.
     if (done_ || all_ranges_started_ ||
       active_scanner_thread_counter_.value() >= progress_.remaining()) {
       break;
     }
 
-    // Cases 4 and 5
+    // Cases 5 and 6.
     if (active_scanner_thread_counter_.value() > 0 &&
         (materialized_row_batches_->GetSize() >= max_materialized_row_batches_ ||
          !EnoughMemoryForScannerThread(true))) {
       break;
     }
 
-    // Case 6
+    // Case 7.
     bool is_reserved = false;
     if (!pool->TryAcquireThreadToken(&is_reserved)) break;
 
-    // Case 7
+    // Case 8.
     if (!is_reserved) {
       if (runtime_state_->query_resource_mgr() != NULL &&
           runtime_state_->query_resource_mgr()->IsVcoreOverSubscribed()) {
@@ -844,13 +851,13 @@ void HdfsScanNode::ScannerThread() {
           reinterpret_cast<ScanRangeMetadata*>(scan_range->meta_data());
       int64_t partition_id = metadata->partition_id;
       HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
-      DCHECK(partition != NULL);
+      DCHECK_NOTNULL(partition);
 
       ScannerContext* context = runtime_state_->obj_pool()->Add(
           new ScannerContext(runtime_state_, this, partition, scan_range));
       Status scanner_status;
       HdfsScanner* scanner = CreateAndPrepareScanner(partition, context, &scanner_status);
-      if (!scanner_status.ok() || scanner == NULL) {
+      if (VLOG_QUERY_IS_ON && (!scanner_status.ok() || scanner == NULL)) {
         stringstream ss;
         ss << "Error preparing text scanner for scan range " << scan_range->file() <<
             "(" << scan_range->offset() << ":" << scan_range->len() << ").";
@@ -859,25 +866,22 @@ void HdfsScanNode::ScannerThread() {
       }
 
       status = scanner->ProcessSplit();
-      if (!status.ok()) {
+      if (VLOG_QUERY_IS_ON && !status.ok() && !runtime_state_->error_log().empty()) {
         // This thread hit an error, record it and bail
         // TODO: better way to report errors?  Maybe via the thrift interface?
-        if (VLOG_QUERY_IS_ON && !runtime_state_->error_log().empty()) {
-          stringstream ss;
-          ss << "Scan node (id=" << id() << ") ran into a parse error for scan range "
-             << scan_range->file() << "(" << scan_range->offset() << ":"
-             << scan_range->len() << ").";
-          if (partition->file_format() != THdfsFileFormat::PARQUET) {
-            // Parquet doesn't read the range end to end so the current offset
-            // isn't useful.
-            // TODO: make sure the parquet reader is outputting as much diagnostic
-            // information as possible.
-            ScannerContext::Stream* stream = context->GetStream();
-            ss << "  Processed " << stream->total_bytes_returned() << " bytes.";
-          }
-          ss << endl << runtime_state_->ErrorLog();
-          VLOG_QUERY << ss.str();
+        stringstream ss;
+        ss << "Scan node (id=" << id() << ") ran into a parse error for scan range "
+           << scan_range->file() << "(" << scan_range->offset() << ":"
+           << scan_range->len() << ").";
+        if (partition->file_format() != THdfsFileFormat::PARQUET) {
+          // Parquet doesn't read the range end to end so the current offset isn't useful.
+          // TODO: make sure the parquet reader is outputting as much diagnostic
+          // information as possible.
+          ScannerContext::Stream* stream = context->GetStream();
+          ss << " Processed " << stream->total_bytes_returned() << " bytes.";
         }
+        ss << endl << runtime_state_->ErrorLog();
+        VLOG_QUERY << ss.str();
       }
       scanner->Close();
     }
@@ -912,10 +916,11 @@ void HdfsScanNode::ScannerThread() {
     }
 
     if (scan_range == NULL && num_unqueued_files == 0) {
+      // TODO: Based on the usage pattern of all_ranges_started_, it looks like it is not
+      // needed to acquire the lock in x86.
       unique_lock<mutex> l(lock_);
-      // All ranges have been queued and GetNextRange() returned NULL. This
-      // means that every range is either done or being processed by
-      // another thread.
+      // All ranges have been queued and GetNextRange() returned NULL. This means that
+      // every range is either done or being processed by another thread.
       all_ranges_started_ = true;
       break;
     }

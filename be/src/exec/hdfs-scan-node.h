@@ -298,8 +298,9 @@ class HdfsScanNode : public ScanNode {
   typedef std::map<THdfsFileFormat::type, std::vector<HdfsFileDesc*> > FileFormatsMap;
   FileFormatsMap per_type_files_;
 
-  // Set to true when the initial scan ranges are issued to the IoMgr. This happens
-  // on the first call to GetNext().
+  // Set to true when the initial scan ranges are issued to the IoMgr. This happens on the
+  // first call to GetNext(). The token manager, in a different thread, will read this
+  // variable.
   bool initial_ranges_issued_;
 
   // The estimated memory required to start up a new scanner thread. If the memory
@@ -409,9 +410,8 @@ class HdfsScanNode : public ScanNode {
   // This should not be explicitly set. Instead, call SetDone().
   bool done_;
 
-  // Set to true if all ranges have started. Some of the ranges may still be in
-  // flight being processed by scanner threads, but no new ScannerThreads
-  // should be started.
+  // Set to true if all ranges have started. Some of the ranges may still be in flight
+  // being processed by scanner threads, but no new ScannerThreads should be started.
   bool all_ranges_started_;
 
   // Pool for allocating some amounts of memory that is shared between scanners.
@@ -425,7 +425,7 @@ class HdfsScanNode : public ScanNode {
 
   // Mapping of file formats (file type, compression type) to the number of
   // splits of that type and the lock protecting it.
-  // This lock cannot be taken together with any other locks except lock_.
+  // This lock cannot be taken together with any other lock except lock_.
   SpinLock file_type_counts_lock_;
   typedef std::map<
       std::pair<THdfsFileFormat::type, THdfsCompression::type>, int> FileTypeCountsMap;

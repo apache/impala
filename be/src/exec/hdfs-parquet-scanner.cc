@@ -903,7 +903,6 @@ Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
 
 Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
   *eosr = false;
-
   uint8_t* buffer;
   int64_t len;
 
@@ -915,19 +914,17 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
 
   // Make sure footer has enough bytes to contain the required information.
   if (remaining_bytes_buffered < 0) {
-    stringstream ss;
-    ss << "File " << stream_->filename() << " is invalid.  Missing metadata.";
-    return Status(ss.str());
+    return Status(Substitute("File $0 is invalid.  Missing metadata.",
+        stream_->filename()));
   }
 
   // Validate magic file bytes are correct
   uint8_t* magic_number_ptr = buffer + len - sizeof(PARQUET_VERSION_NUMBER);
   if (memcmp(magic_number_ptr,
       PARQUET_VERSION_NUMBER, sizeof(PARQUET_VERSION_NUMBER) != 0)) {
-    stringstream ss;
-    ss << "File " << stream_->filename() << " is invalid.  Invalid file footer: "
-        << string((char*)magic_number_ptr, sizeof(PARQUET_VERSION_NUMBER));
-    return Status(ss.str());
+    return Status(Substitute("File $0 is invalid.  Invalid file footer: $1",
+        stream_->filename(),
+        string((char*)magic_number_ptr, sizeof(PARQUET_VERSION_NUMBER))));
   }
 
   // The size of the metadata is encoded as a 4 byte little endian value before
@@ -952,11 +949,9 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
       sizeof(int32_t) - sizeof(PARQUET_VERSION_NUMBER) - metadata_size;
     int64_t metadata_bytes_to_read = metadata_size;
     if (metadata_start < 0) {
-      stringstream ss;
-      ss << "File " << stream_->filename() << " is invalid. Invalid metadata size "
-         << "in file footer: " << metadata_size << " bytes. File size: "
-         << file_desc->file_length << " bytes.";
-      return Status(ss.str());
+      return Status(Substitute("File $0 is invalid. Invalid metadata size in file "
+          "footer: $1 bytes. File size: $2 bytes.", stream_->filename(), metadata_size,
+          file_desc->file_length));
     }
     // IoMgr can only do a fixed size Read(). The metadata could be larger
     // so we stitch it here.
@@ -990,11 +985,10 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
   Status status =
       DeserializeThriftMsg(metadata_ptr, &metadata_size, true, &file_metadata_);
   if (!status.ok()) {
-    stringstream ss;
-    ss << "File " << stream_->filename() << " has invalid file metadata at file offset "
-        << (metadata_size + sizeof(PARQUET_VERSION_NUMBER) + sizeof(uint32_t)) << ". "
-        << "Error = " << status.GetErrorMsg();
-    return Status(ss.str());
+    return Status(Substitute("File $0 has invalid file metadata at file offset $1. "
+        "Error = $2.", stream_->filename(),
+        metadata_size + sizeof(PARQUET_VERSION_NUMBER) + sizeof(uint32_t),
+        status.GetErrorMsg()));
   }
 
   RETURN_IF_ERROR(ValidateFileMetadata());
@@ -1030,11 +1024,9 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
   }
 
   if (file_metadata_.row_groups.empty()) {
-    stringstream ss;
-    ss << "Invalid file. This file: " << stream_->filename() << " has no row groups";
-    return Status(ss.str());
+    return Status(Substitute("Invalid file. This file: $0 has no row groups",
+                             stream_->filename()));
   }
-
   return Status::OK;
 }
 
@@ -1054,7 +1046,6 @@ Status HdfsParquetScanner::CreateColumnReaders() {
       template_tuple_->SetNull(slot_desc->null_indicator_offset());
       continue;
     }
-
     column_readers_.push_back(CreateReader(slot_desc, col_idx));
   }
   return Status::OK;

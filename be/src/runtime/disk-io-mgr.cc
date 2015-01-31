@@ -491,11 +491,10 @@ Status DiskIoMgr::AddScanRanges(RequestContext* reader,
 // for eos and error cases. If there isn't already a cached scan range or a scan
 // range prepared by the disk threads, the caller waits on the disk threads.
 Status DiskIoMgr::GetNextRange(RequestContext* reader, ScanRange** range) {
-  DCHECK(reader != NULL);
-  DCHECK(range != NULL);
+  DCHECK_NOTNULL(reader);
+  DCHECK_NOTNULL(range);
   *range = NULL;
-
-  Status status;
+  Status status = Status::OK;
 
   unique_lock<mutex> reader_lock(reader->lock_);
   DCHECK(reader->Validate()) << endl << reader->DebugString();
@@ -532,7 +531,7 @@ Status DiskIoMgr::GetNextRange(RequestContext* reader, ScanRange** range) {
       reader->ready_to_start_ranges_cv_.wait(reader_lock);
     } else {
       *range = reader->ready_to_start_ranges_.Dequeue();
-      DCHECK(*range != NULL);
+      DCHECK_NOTNULL(*range);
       int disk_id = (*range)->disk_id();
       DCHECK_EQ(*range, reader->disk_states_[disk_id].next_scan_range_to_start());
       // Set this to NULL, the next time this disk runs for this reader, it will
@@ -542,21 +541,18 @@ Status DiskIoMgr::GetNextRange(RequestContext* reader, ScanRange** range) {
       break;
     }
   }
-
   return status;
 }
 
 Status DiskIoMgr::Read(RequestContext* reader,
     ScanRange* range, BufferDescriptor** buffer) {
-  DCHECK(range != NULL);
-  DCHECK(buffer != NULL);
+  DCHECK_NOTNULL(range);
+  DCHECK_NOTNULL(buffer);
   *buffer = NULL;
 
   if (range->len() > max_buffer_size_) {
-    stringstream ss;
-    ss << "Cannot perform sync read larger than " << max_buffer_size_
-       << ". Request was " << range->len();
-    return Status(ss.str());
+    return Status(Substitute("Cannot perform sync read larger than $0. Request was $1",
+                             max_buffer_size_, range->len()));
   }
 
   vector<DiskIoMgr::ScanRange*> ranges;
@@ -569,7 +565,7 @@ Status DiskIoMgr::Read(RequestContext* reader,
 }
 
 void DiskIoMgr::ReturnBuffer(BufferDescriptor* buffer_desc) {
-  DCHECK(buffer_desc != NULL);
+  DCHECK_NOTNULL(buffer_desc);
   if (!buffer_desc->status_.ok()) DCHECK(buffer_desc->buffer_ == NULL);
 
   RequestContext* reader = buffer_desc->reader_;
