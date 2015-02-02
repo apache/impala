@@ -80,6 +80,9 @@ abstract public class ScanNode extends PlanNode {
     } else {
       output.append(prefix + "table stats: " + desc_.getTable().getNumRows() +
           " rows total");
+      if (numPartitionsMissingStats_ > 0) {
+        output.append(" (" + numPartitionsMissingStats_ + " partition(s) missing stats)");
+      }
     }
     output.append("\n");
 

@@ -126,3 +126,5 @@ class TestExplainEmptyPartition(ImpalaTestSuite):
     explain_result = str(
       self.client.execute("EXPLAIN SELECT * FROM %s.empty_partition" % self.TEST_DB_NAME))
     assert "missing relevant table and/or column statistics" in explain_result
+    # Also test IMPALA-1530 - adding the number of partitions missing stats
+    assert "1 partition(s) missing stats" in explain_result
