@@ -77,7 +77,19 @@ public class ToSqlUtils {
       // Ignore exception and just quote the identifier to be safe.
     }
     boolean isImpalaKeyword = SqlScanner.isKeyword(ident.toUpperCase());
-    if (hiveNeedsQuotes || isImpalaKeyword) return "`" + ident + "`";
+    // Impala's scanner recognizes the ".123" portion of "db.123_tbl" as a decimal,
+    // so while the quoting is not necessary for the given identifier itself, the quotes
+    // are needed if this identifier will be preceded by a ".".
+    boolean startsWithNumber = false;
+    if (!hiveNeedsQuotes && !isImpalaKeyword) {
+      try {
+        Integer.parseInt(ident.substring(0, 1));
+        startsWithNumber = true;
+      } catch (NumberFormatException e) {
+        // Ignore exception, identifier does not start with number.
+      }
+    }
+    if (hiveNeedsQuotes || isImpalaKeyword || startsWithNumber) return "`" + ident + "`";
     return ident;
   }
 

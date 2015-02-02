@@ -908,3 +908,23 @@ show table stats compute_stats_db.empty_partitioned
 ---- TYPES
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
 ====
+---- QUERY
+# IMPALA-1614 Verify that COMPUTE STATS works on a table whose name starts with numbers.
+create table compute_stats_db.`123_table` (i int, 1p int) partitioned by (2j int);
+alter table compute_stats_db.`123_table` add partition (2j=1);
+====
+---- QUERY
+compute stats compute_stats_db.`123_table`
+---- RESULTS
+'Updated 1 partition(s) and 2 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.`123_table`
+---- RESULTS
+'1',0,0,'0B','NOT CACHED','NOT CACHED','TEXT','false'
+'Total',0,0,'0B','0B','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+====
