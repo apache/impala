@@ -69,6 +69,8 @@ if [[ $SKIP_METADATA_LOAD -eq 0  && "$SNAPSHOT_FILE" = "" ]]; then
   ${IMPALA_HOME}/testdata/bin/load-hive-builtins.sh
   echo "Generating HBase data"
   ${IMPALA_HOME}/testdata/bin/create-hbase.sh &> ${DATA_LOADING_LOG_DIR}/create-hbase.log
+  echo "Creating /test-warehouse HDFS directory"
+  hadoop fs -mkdir /test-warehouse
 elif [ $SKIP_SNAPSHOT_LOAD -eq 0 ]; then
   echo Loading hdfs data from snapshot: $SNAPSHOT_FILE
   ${IMPALA_HOME}/testdata/bin/load-test-warehouse-snapshot.sh "$SNAPSHOT_FILE"
