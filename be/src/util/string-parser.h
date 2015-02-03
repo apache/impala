@@ -309,7 +309,8 @@ class StringParser {
   // To avoid inaccurate conversions this function falls back to strtod for
   // scientific notation.
   // Return PARSE_FAILURE on leading whitespace. Trailing whitespace is allowed.
-  // TOOD: Investigate using intrinsics to speed up the slow strtod path.
+  // TODO: Investigate using intrinsics to speed up the slow strtod path.
+  // TODO: there are other possible optimizations, see IMPALA-1729
   template <typename T>
   static inline T StringToFloatInternal(const char* s, int len, ParseResult* result) {
     if (UNLIKELY(len <= 0)) {
@@ -324,16 +325,29 @@ class StringParser {
     double divide = 1;
     bool decimal = false;
     int64_t remainder = 0;
+    // The number of significant figures we've encountered so far (i.e., digits excluding
+    // leading 0s). This technically shouldn't count trailing 0s either, but for us it
+    // doesn't matter if we count them based on the implementation below.
+    int sig_figs = 0;
     switch (*s) {
-    case '-': negative = true;
-    case '+': i = 1;
+      case '-': negative = true;
+      case '+': i = 1;
     }
     int first = i;
     for (; i < len; ++i) {
       if (LIKELY(s[i] >= '0' && s[i] <= '9')) {
+        if (s[i] != '0' || sig_figs > 0) ++sig_figs;
         if (decimal) {
-          remainder = remainder * 10 + s[i] - '0';
-          divide *= 10;
+          // According to the IEEE floating-point spec, a double has up to 15-17
+          // significant decimal digits (see
+          // http://en.wikipedia.org/wiki/Double-precision_floating-point_format). We stop
+          // processing digits after we've already seen at least 18 sig figs to avoid
+          // overflowing 'remainder' (we stop after 18 instead of 17 to get the rounding
+          // right).
+          if (sig_figs <= 18) {
+            remainder = remainder * 10 + s[i] - '0';
+            divide *= 10;
+          }
         } else {
           val = val * 10 + s[i] - '0';
         }
