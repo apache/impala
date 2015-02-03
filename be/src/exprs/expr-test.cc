@@ -3810,6 +3810,118 @@ TEST_F(ExprTest, ConditionalFunctions) {
   TestIsNull("decode(NULL, 1, 2)", TYPE_TINYINT);
 }
 
+TEST_F(ExprTest, ConditionalFunctionIsTrue) {
+  TestValue("istrue(cast(false as boolean))", TYPE_BOOLEAN, false);
+  TestValue("istrue(cast(true as boolean))", TYPE_BOOLEAN, true);
+  TestValue("istrue(cast(NULL as boolean))", TYPE_BOOLEAN, false);
+  TestValue("istrue(cast(0 as boolean))", TYPE_BOOLEAN, false);
+  TestValue("istrue(cast(5 as boolean))", TYPE_BOOLEAN, true);
+  TestValue("istrue(cast(-5 as boolean))", TYPE_BOOLEAN, true);
+  TestValue("istrue(cast(0.0 as boolean))", TYPE_BOOLEAN, false);
+  TestValue("istrue(cast(5.0 as boolean))", TYPE_BOOLEAN, true);
+  TestValue("istrue(cast(-5.0 as boolean))", TYPE_BOOLEAN, true);
+
+  TestError("istrue(0)");
+  TestError("istrue(5)");
+  TestError("istrue(-5)");
+  TestError("istrue(0.0)");
+  TestError("istrue(5.0)");
+  TestError("istrue(-5.0)");
+  TestError("istrue(\"\")");
+  TestError("istrue(\"abc\")");
+  TestError("istrue(cast('2012-01-01 09:10:11.123456789' as timestamp))");
+
+  TestError("istrue(999999999999999999999999999999999999999)");
+  TestError("istrue(-99999999999999999999999999999999999999)");
+  TestError("istrue(99999999999999999999999999999999999999.9)");
+  TestError("istrue(-9999999999999999999999999999999999999.9)");
+}
+
+TEST_F(ExprTest, ConditionalFunctionIsFalse) {
+  TestValue("isfalse(cast(false as boolean))", TYPE_BOOLEAN, true);
+  TestValue("isfalse(cast(true as boolean))", TYPE_BOOLEAN, false);
+  TestValue("isfalse(cast(NULL as boolean))", TYPE_BOOLEAN, false);
+  // The output of cast(0 as boolean) is false.
+  TestValue("isfalse(cast(0 as boolean))", TYPE_BOOLEAN, true);
+  TestValue("isfalse(cast(5 as boolean))", TYPE_BOOLEAN, false);
+  TestValue("isfalse(cast(-5 as boolean))", TYPE_BOOLEAN, false);
+  // The output of cast(0.0 as boolean) is false.
+  TestValue("isfalse(cast(0.0 as boolean))", TYPE_BOOLEAN, true);
+  TestValue("isfalse(cast(5.0 as boolean))", TYPE_BOOLEAN, false);
+  TestValue("isfalse(cast(-5.0 as boolean))", TYPE_BOOLEAN, false);
+
+  TestError("isfalse(0)");
+  TestError("isfalse(5)");
+  TestError("isfalse(-5)");
+  TestError("isfalse(0.0)");
+  TestError("isfalse(5.0)");
+  TestError("isfalse(-5.0)");
+  TestError("isfalse(\"\")");
+  TestError("isfalse(\"abc\")");
+  TestError("isfalse(cast('2012-01-01 09:10:11.123456789' as timestamp))");
+
+  TestError("isfalse(999999999999999999999999999999999999999)");
+  TestError("isfalse(-99999999999999999999999999999999999999)");
+  TestError("isfalse(99999999999999999999999999999999999999.9)");
+  TestError("isfalse(-9999999999999999999999999999999999999.9)");
+}
+
+TEST_F(ExprTest, ConditionalFunctionIsNotTrue) {
+  TestValue("isnottrue(cast(false as boolean))", TYPE_BOOLEAN, true);
+  TestValue("isnottrue(cast(true as boolean))", TYPE_BOOLEAN, false);
+  TestValue("isnottrue(cast(NULL as boolean))", TYPE_BOOLEAN, true);
+  // The output of cast(0 as boolean) is false.
+  TestValue("isnottrue(cast(0 as boolean))", TYPE_BOOLEAN, true);
+  TestValue("isnottrue(cast(5 as boolean))", TYPE_BOOLEAN, false);
+  TestValue("isnottrue(cast(-5 as boolean))", TYPE_BOOLEAN, false);
+  // The output of cast(0.0 as boolean) is false.
+  TestValue("isnottrue(cast(0.0 as boolean))", TYPE_BOOLEAN, true);
+  TestValue("isnottrue(cast(5.0 as boolean))", TYPE_BOOLEAN, false);
+  TestValue("isnottrue(cast(-5.0 as boolean))", TYPE_BOOLEAN, false);
+
+  TestError("isnottrue(0)");
+  TestError("isnottrue(5)");
+  TestError("isnottrue(-5)");
+  TestError("isnottrue(0.0)");
+  TestError("isnottrue(5.0)");
+  TestError("isnottrue(-5.0)");
+  TestError("isnottrue(\"\")");
+  TestError("isnottrue(\"abc\")");
+  TestError("isnottrue(cast('2012-01-01 09:10:11.123456789' as timestamp))");
+
+  TestError("isnottrue(999999999999999999999999999999999999999)");
+  TestError("isnottrue(-99999999999999999999999999999999999999)");
+  TestError("isnottrue(99999999999999999999999999999999999999.9)");
+  TestError("isnottrue(-9999999999999999999999999999999999999.9)");
+}
+
+TEST_F(ExprTest, ConditionalFunctionIsNotFalse) {
+  TestValue("isnotfalse(cast(false as boolean))", TYPE_BOOLEAN, false);
+  TestValue("isnotfalse(cast(true as boolean))", TYPE_BOOLEAN, true);
+  TestValue("isnotfalse(cast(NULL as boolean))", TYPE_BOOLEAN, true);
+  TestValue("isnotfalse(cast(0 as boolean))", TYPE_BOOLEAN, false);
+  TestValue("isnotfalse(cast(5 as boolean))", TYPE_BOOLEAN, true);
+  TestValue("isnotfalse(cast(-5 as boolean))", TYPE_BOOLEAN, true);
+  TestValue("isnotfalse(cast(0.0 as boolean))", TYPE_BOOLEAN, false);
+  TestValue("isnotfalse(cast(5.0 as boolean))", TYPE_BOOLEAN, true);
+  TestValue("isnotfalse(cast(-5.0 as boolean))", TYPE_BOOLEAN, true);
+
+  TestError("isnotfalse(0)");
+  TestError("isnotfalse(5)");
+  TestError("isnotfalse(-5)");
+  TestError("isnotfalse(0.0)");
+  TestError("isnotfalse(5.0)");
+  TestError("isnotfalse(-5.0)");
+  TestError("isnotfalse(\"\")");
+  TestError("isnotfalse(\"abc\")");
+  TestError("isnotfalse(cast('2012-01-01 09:10:11.123456789' as timestamp))");
+
+  TestError("isnotfalse(999999999999999999999999999999999999999)");
+  TestError("isnotfalse(-99999999999999999999999999999999999999)");
+  TestError("isnotfalse(99999999999999999999999999999999999999.9)");
+  TestError("isnotfalse(-9999999999999999999999999999999999999.9)");
+}
+
 // Validates that Expr::ComputeResultsLayout() for 'exprs' is correct.
 //   - expected_byte_size: total byte size to store all results for exprs
 //   - expected_var_begin: byte offset where variable length types begin
@@ -4510,6 +4622,146 @@ TEST_F(ExprTest, DecimalOverflowCasts) {
   // Tests converting a non-trivial empty string to a decimal (IMPALA-1566).
   TestDecimalValue("cast(regexp_replace('','a','b') as decimal(15,2))",
       Decimal8Value(0), ColumnType::CreateDecimalType(15,2));
+}
+
+TEST_F(ExprTest, NullValueFunction) {
+  TestValue("nullvalue(cast(NULL as boolean))", TYPE_BOOLEAN, true);
+  TestValue("nullvalue(cast(0 as boolean))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(5 as boolean))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(-5 as boolean))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(NULL as int))", TYPE_BOOLEAN, true);
+
+  TestValue("nullvalue(cast(0 as int))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(5 as int))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(-5 as int))", TYPE_BOOLEAN, false);
+
+  TestValue("nullvalue(cast(NULL as tinyint))", TYPE_BOOLEAN, true);
+  TestValue("nullvalue(cast(0 as tinyint))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(5 as tinyint))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(-5 as tinyint))", TYPE_BOOLEAN, false);
+
+  TestValue("nullvalue(cast(NULL as smallint))", TYPE_BOOLEAN, true);
+  TestValue("nullvalue(cast(0 as smallint))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(5 as smallint))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(-5 as smallint))", TYPE_BOOLEAN, false);
+
+  TestValue("nullvalue(cast(NULL as bigint))", TYPE_BOOLEAN, true);
+  TestValue("nullvalue(cast(0 as bigint))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(5 as bigint))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(-5 as bigint))", TYPE_BOOLEAN, false);
+
+  TestValue("nullvalue(cast(NULL as float))", TYPE_BOOLEAN, true);
+  TestValue("nullvalue(cast(0 as float))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(5.0 as float))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(-5.0 as float))", TYPE_BOOLEAN, false);
+
+  TestValue("nullvalue(cast(NULL as double))", TYPE_BOOLEAN, true);
+  TestValue("nullvalue(cast(0.0 as double))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(5.0 as double))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(-5.0 as double))", TYPE_BOOLEAN, false);
+
+  TestValue("nullvalue(cast(NULL as decimal(38,0)))", TYPE_BOOLEAN, true);
+  TestValue("nullvalue(cast(0 as decimal(38,0)))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(5 as decimal(38,0)))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(-5 as decimal(38,0)))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(0.0 as decimal(38,38)))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(0.1 as decimal(38,38)))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(-0.1 as decimal(38,38)))", TYPE_BOOLEAN, false);
+
+  TestValue("nullvalue(cast(NULL as string))", TYPE_BOOLEAN, true);
+  TestValue("nullvalue(cast('0' as string))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast('5' as string))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast('-5' as string))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(\"abc\" as string))", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(cast(\"\" as string))", TYPE_BOOLEAN, false);
+
+  TestValue("nullvalue(cast(NULL as timestamp))", TYPE_BOOLEAN, true);
+  TestValue("nullvalue(cast('2012-01-01 09:10:11.123456789' as timestamp))",
+      TYPE_BOOLEAN, false);
+
+  TestValue("nullvalue(0)", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(-5)", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(5)", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(0.0)", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(-1.2345)", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(1.2345)", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(\"\")", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(\"abc\")", TYPE_BOOLEAN, false);
+
+  TestValue("nullvalue(99999999999999999999999999999999999)", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(-99999999999999999999999999999999999)", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(99999999999999999999999999999999999.9)", TYPE_BOOLEAN, false);
+  TestValue("nullvalue(-99999999999999999999999999999999999.9)", TYPE_BOOLEAN, false);
+}
+
+TEST_F(ExprTest, NonNullValueFunction) {
+  TestValue("nonnullvalue(cast(NULL as boolean))", TYPE_BOOLEAN, false);
+  TestValue("nonnullvalue(cast(0 as boolean))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(5 as boolean))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(-5 as boolean))", TYPE_BOOLEAN, true);
+
+  TestValue("nonnullvalue(cast(NULL as int))", TYPE_BOOLEAN, false);
+  TestValue("nonnullvalue(cast(0 as int))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(5 as int))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(-5 as int))", TYPE_BOOLEAN, true);
+
+  TestValue("nonnullvalue(cast(NULL as tinyint))", TYPE_BOOLEAN, false);
+  TestValue("nonnullvalue(cast(0 as tinyint))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(5 as tinyint))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(-5 as tinyint))", TYPE_BOOLEAN, true);
+
+  TestValue("nonnullvalue(cast(NULL as smallint))", TYPE_BOOLEAN, false);
+  TestValue("nonnullvalue(cast(0 as smallint))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(5 as smallint))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(-5 as smallint))", TYPE_BOOLEAN, true);
+
+  TestValue("nonnullvalue(cast(NULL as bigint))", TYPE_BOOLEAN, false);
+  TestValue("nonnullvalue(cast(0 as bigint))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(5 as bigint))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(-5 as bigint))", TYPE_BOOLEAN, true);
+
+  TestValue("nonnullvalue(cast(NULL as float))", TYPE_BOOLEAN, false);
+  TestValue("nonnullvalue(cast(0 as float))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(5.0 as float))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(-5.0 as float))", TYPE_BOOLEAN, true);
+
+  TestValue("nonnullvalue(cast(NULL as double))", TYPE_BOOLEAN, false);
+  TestValue("nonnullvalue(cast(0.0 as double))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(5.0 as double))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(-5.0 as double))", TYPE_BOOLEAN, true);
+
+  TestValue("nonnullvalue(cast(NULL as decimal(38,0)))", TYPE_BOOLEAN, false);
+  TestValue("nonnullvalue(cast(0 as decimal(38,0)))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(5 as decimal(38,0)))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(-5 as decimal(38,0)))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(0.0 as decimal(38,38)))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(0.1 as decimal(38,38)))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(-0.1 as decimal(38,38)))", TYPE_BOOLEAN, true);
+
+  TestValue("nonnullvalue(cast(NULL as string))", TYPE_BOOLEAN, false);
+  TestValue("nonnullvalue(cast('0' as string))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast('5' as string))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast('-5' as string))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(\"abc\" as string))", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(cast(\"\" as string))", TYPE_BOOLEAN, true);
+
+  TestValue("nonnullvalue(cast(NULL as timestamp))", TYPE_BOOLEAN, false);
+  TestValue("nonnullvalue(cast('2012-01-01 09:10:11.123456789' as timestamp))",
+      TYPE_BOOLEAN, true);
+
+  TestValue("nonnullvalue(0)", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(-5)", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(5)", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(0.0)", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(-1.2345)", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(1.2345)", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(\"\")", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(\"abc\")", TYPE_BOOLEAN, true);
+
+  TestValue("nonnullvalue(99999999999999999999999999999999999)", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(-99999999999999999999999999999999999)", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(99999999999999999999999999999999999.9)", TYPE_BOOLEAN, true);
+  TestValue("nonnullvalue(-99999999999999999999999999999999999.9)", TYPE_BOOLEAN, true);
 }
 
 TEST_F(ExprTest, UdfInterfaceBuiltins) {

@@ -479,6 +479,11 @@ functions = [
   [['coalesce'], 'TIMESTAMP', ['TIMESTAMP', '...'], ''],
   [['coalesce'], 'DECIMAL', ['DECIMAL', '...'], ''],
 
+  [['istrue'], 'BOOLEAN', ['BOOLEAN'], 'impala::ConditionalFunctions::IsTrue'],
+  [['isnottrue'], 'BOOLEAN', ['BOOLEAN'], 'impala::ConditionalFunctions::IsNotTrue'],
+  [['isfalse'], 'BOOLEAN', ['BOOLEAN'], 'impala::ConditionalFunctions::IsFalse'],
+  [['isnotfalse'], 'BOOLEAN', ['BOOLEAN'], 'impala::ConditionalFunctions::IsNotFalse'],
+
   # Utility functions
   [['current_database'], 'STRING', [], 'impala::UtilityFunctions::CurrentDatabase'],
   [['user'], 'STRING', [], 'impala::UtilityFunctions::User'],
@@ -515,4 +520,27 @@ functions = [
    '_ZN6impala16UtilityFunctions16FnvHashTimestampEPN10impala_udf15FunctionContextERKNS1_12TimestampValE'],
   [['fnv_hash'], 'BIGINT', ['DECIMAL'],
    '_ZN6impala16UtilityFunctions14FnvHashDecimalEPN10impala_udf15FunctionContextERKNS1_10DecimalValE'],
+
+  # (Non)NullValue functions
+  [['nullvalue'], 'BOOLEAN', ['BOOLEAN'], '_ZN6impala15IsNullPredicate6IsNullIN10impala_udf10BooleanValEEES3_PNS2_15FunctionContextERKT_'],
+  [['nullvalue'], 'BOOLEAN', ['TINYINT'], '_ZN6impala15IsNullPredicate6IsNullIN10impala_udf10TinyIntValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
+  [['nullvalue'], 'BOOLEAN', ['SMALLINT'], '_ZN6impala15IsNullPredicate6IsNullIN10impala_udf11SmallIntValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
+  [['nullvalue'], 'BOOLEAN', ['INT'], '_ZN6impala15IsNullPredicate6IsNullIN10impala_udf6IntValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
+  [['nullvalue'], 'BOOLEAN', ['BIGINT'], '_ZN6impala15IsNullPredicate6IsNullIN10impala_udf9BigIntValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
+  [['nullvalue'], 'BOOLEAN', ['FLOAT'], '_ZN6impala15IsNullPredicate6IsNullIN10impala_udf8FloatValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
+  [['nullvalue'], 'BOOLEAN', ['DOUBLE'], '_ZN6impala15IsNullPredicate6IsNullIN10impala_udf9DoubleValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
+  [['nullvalue'], 'BOOLEAN', ['STRING'], '_ZN6impala15IsNullPredicate6IsNullIN10impala_udf9StringValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
+  [['nullvalue'], 'BOOLEAN', ['TIMESTAMP'], '_ZN6impala15IsNullPredicate6IsNullIN10impala_udf12TimestampValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
+  [['nullvalue'], 'BOOLEAN', ['DECIMAL'], '_ZN6impala15IsNullPredicate6IsNullIN10impala_udf10DecimalValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
+
+  [['nonnullvalue'], 'BOOLEAN', ['BOOLEAN'], '_ZN6impala15IsNullPredicate9IsNotNullIN10impala_udf10BooleanValEEES3_PNS2_15FunctionContextERKT_'],
+  [['nonnullvalue'], 'BOOLEAN', ['TINYINT'], '_ZN6impala15IsNullPredicate9IsNotNullIN10impala_udf10TinyIntValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
+  [['nonnullvalue'], 'BOOLEAN', ['SMALLINT'], '_ZN6impala15IsNullPredicate9IsNotNullIN10impala_udf11SmallIntValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
+  [['nonnullvalue'], 'BOOLEAN', ['INT'], '_ZN6impala15IsNullPredicate9IsNotNullIN10impala_udf6IntValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
+  [['nonnullvalue'], 'BOOLEAN', ['BIGINT'], '_ZN6impala15IsNullPredicate9IsNotNullIN10impala_udf9BigIntValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
+  [['nonnullvalue'], 'BOOLEAN', ['FLOAT'], '_ZN6impala15IsNullPredicate9IsNotNullIN10impala_udf8FloatValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
+  [['nonnullvalue'], 'BOOLEAN', ['DOUBLE'], '_ZN6impala15IsNullPredicate9IsNotNullIN10impala_udf9DoubleValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
+  [['nonnullvalue'], 'BOOLEAN', ['STRING'], '_ZN6impala15IsNullPredicate9IsNotNullIN10impala_udf9StringValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
+  [['nonnullvalue'], 'BOOLEAN', ['TIMESTAMP'], '_ZN6impala15IsNullPredicate9IsNotNullIN10impala_udf12TimestampValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
+  [['nonnullvalue'], 'BOOLEAN', ['DECIMAL'], '_ZN6impala15IsNullPredicate9IsNotNullIN10impala_udf10DecimalValEEENS2_10BooleanValEPNS2_15FunctionContextERKT_'],
 ]

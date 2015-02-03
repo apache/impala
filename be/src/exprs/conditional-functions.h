@@ -45,6 +45,13 @@ class ConditionalFunctions {
   static FloatVal ZeroIfNull(FunctionContext* context, const FloatVal& val);
   static DoubleVal ZeroIfNull(FunctionContext* context, const DoubleVal& val);
   static DecimalVal ZeroIfNull(FunctionContext* context, const DecimalVal& val);
+
+  // Functions IsFalse and IsTrue return false when the input is NULL.
+  // Functions IsNotFalse and IsNotTrue return true when the input is NULL.
+  static BooleanVal IsFalse(FunctionContext* ctx, const BooleanVal& val);
+  static BooleanVal IsNotFalse(FunctionContext* ctx, const BooleanVal& val);
+  static BooleanVal IsTrue(FunctionContext* ctx, const BooleanVal& val);
+  static BooleanVal IsNotTrue(FunctionContext* ctx, const BooleanVal& val);
 };
 
 // The following conditional functions require separate Expr classes to take advantage of
