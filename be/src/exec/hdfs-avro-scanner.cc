@@ -239,7 +239,7 @@ Status HdfsAvroScanner::ResolveSchemas(const avro_schema_t& table_schema,
     stringstream ss;
     ss << "The table has " << num_cols << " non-partition columns "
        << "but the table's Avro schema has " << num_table_fields << " fields.";
-    state_->LogError(ss.str());
+    state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
   }
   if (num_table_fields <= max_materialized_col_idx) {
     return Status("Cannot read column that doesn't appear in table schema");
@@ -706,7 +706,7 @@ Function* HdfsAvroScanner::CodegenMaterializeTuple(HdfsScanNode* node,
   if (error != 0) {
     stringstream ss;
     ss << "Failed to parse table schema: " << avro_strerror();
-    node->runtime_state()->LogError(ss.str());
+    node->runtime_state()->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
     return NULL;
   }
   int num_fields = avro_schema_record_size(table_schema.get());

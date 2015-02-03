@@ -266,7 +266,7 @@ Status ResourceBroker::RegisterWithLlama() {
     // Cycle through the list of Llama addresses for Llama failover.
     llama_addr_idx = (llama_addr_idx + 1) % llama_addresses_.size();
     LOG(INFO) << "Failed to connect to Llama at " << llama_address << "." << endl
-              << "Error: " << client_status.GetErrorMsg() << endl
+              << "Error: " << client_status.GetDetail() << endl
               << "Retrying to connect to Llama at "
               << llama_addresses_[llama_addr_idx] << " in "
               << FLAGS_llama_registration_wait_secs << "s.";

@@ -17,6 +17,7 @@
 
 #include "common/logging.h"
 #include <boost/algorithm/string/join.hpp>
+#include <gutil/strings/substitute.h>
 
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
@@ -65,7 +66,6 @@ namespace impala {
 RuntimeState::RuntimeState(const TPlanFragmentInstanceCtx& fragment_instance_ctx,
     const string& cgroup, ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
-    unreported_error_idx_(0),
     fragment_instance_ctx_(fragment_instance_ctx),
     now_(new TimestampValue(fragment_instance_ctx_.query_ctx.now_string.c_str(),
         fragment_instance_ctx_.query_ctx.now_string.size())),
@@ -76,12 +76,11 @@ RuntimeState::RuntimeState(const TPlanFragmentInstanceCtx& fragment_instance_ctx
     query_resource_mgr_(NULL),
     root_node_id_(-1) {
   Status status = Init(exec_env);
-  DCHECK(status.ok()) << status.GetErrorMsg();
+  DCHECK(status.ok()) << status.GetDetail();
 }
 
 RuntimeState::RuntimeState(const TQueryCtx& query_ctx)
   : obj_pool_(new ObjectPool()),
-    unreported_error_idx_(0),
     now_(new TimestampValue(query_ctx.now_string.c_str(),
         query_ctx.now_string.size())),
     exec_env_(ExecEnv::GetInstance()),
@@ -125,6 +124,10 @@ Status RuntimeState::Init(ExecEnv* exec_env) {
   exec_env_ = exec_env;
   TQueryOptions& query_options =
       fragment_instance_ctx_.query_ctx.request.query_options;
+
+  // max_errors does not indicate how many errors in total have been recorded, but rather
+  // how many are distinct. It is defined as the sum of the number of generic errors and
+  // the number of distinct other errors.
   if (query_options.max_errors <= 0) {
     // TODO: fix linker error and uncomment this
     //query_options_.max_errors = FLAGS_max_errors;
@@ -201,7 +204,7 @@ bool RuntimeState::ErrorLogIsEmpty() {
 
 string RuntimeState::ErrorLog() {
   ScopedSpinLock l(&error_log_lock_);
-  return join(error_log_, "\n");
+  return PrintErrorMapToString(error_log_);
 }
 
 string RuntimeState::FileErrors() {
@@ -220,32 +223,26 @@ void RuntimeState::ReportFileErrors(const std::string& file_name, int num_errors
   file_errors_.push_back(make_pair(file_name, num_errors));
 }
 
-bool RuntimeState::LogError(const string& error) {
+bool RuntimeState::LogError(const ErrorMsg& message) {
   ScopedSpinLock l(&error_log_lock_);
-  if (error_log_.size() < query_options().max_errors) {
-    VLOG_QUERY << "Error from query " << query_id() << ": " << error;
-    error_log_.push_back(error);
+  // All errors go to the log, unreported_error_count_ is counted independently of the size of the
+  // error_log to account for errors that were already reported to the coordninator
+  VLOG_QUERY << "Error from query " << query_id() << ": " << message.msg();
+  if (ErrorCount(error_log_) < query_options().max_errors) {
+    AppendError(&error_log_, message);
     return true;
   }
   return false;
 }
 
-void RuntimeState::LogError(const Status& status) {
-  if (status.ok()) return;
-  // Don't log cancelled or mem limit exceeded to the log.
-  // For cancelled, he error message is not useful ("Cancelled") and can happen due to
-  // a limit clause.
-  // For mem limit exceeded, the query will report it via SetMemLimitExceeded which
-  // makes the status error message redundant.
-  if (status.IsCancelled() || status.IsMemLimitExceeded()) return;
-  LogError(status.GetErrorMsg());
-}
-
-void RuntimeState::GetUnreportedErrors(vector<string>* new_errors) {
+void RuntimeState::GetUnreportedErrors(ErrorLogMap* new_errors) {
   ScopedSpinLock l(&error_log_lock_);
-  if (unreported_error_idx_ < error_log_.size()) {
-    new_errors->assign(error_log_.begin() + unreported_error_idx_, error_log_.end());
-    unreported_error_idx_ = error_log_.size();
+  *new_errors = error_log_;
+  // Reset the map, but keep all already reported keys so that we do not
+  // report the same errors multiple times.
+  BOOST_FOREACH(ErrorLogMap::value_type v, error_log_) {
+    v.second.messages.clear();
+    v.second.count = 0;
   }
 }
 
@@ -277,11 +274,12 @@ Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
   } else {
     ss << query_mem_tracker_->LogUsage();
   }
-  LogError(ss.str());
+  LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
   // Add warning about missing stats.
   if (query_ctx().__isset.tables_missing_stats
       && !query_ctx().tables_missing_stats.empty()) {
-    LogError(GetTablesMissingStatsWarning(query_ctx().tables_missing_stats));
+    LogError(ErrorMsg(TErrorCode::GENERAL,
+        GetTablesMissingStatsWarning(query_ctx().tables_missing_stats)));
   }
   DCHECK(query_status_.IsMemLimitExceeded());
   return query_status_;

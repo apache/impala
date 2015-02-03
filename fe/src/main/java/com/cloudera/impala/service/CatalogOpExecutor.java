@@ -112,6 +112,7 @@ import com.cloudera.impala.thrift.TDropDbParams;
 import com.cloudera.impala.thrift.TDropFunctionParams;
 import com.cloudera.impala.thrift.TDropStatsParams;
 import com.cloudera.impala.thrift.TDropTableOrViewParams;
+import com.cloudera.impala.thrift.TErrorCode;
 import com.cloudera.impala.thrift.TGrantRevokePrivParams;
 import com.cloudera.impala.thrift.TGrantRevokeRoleParams;
 import com.cloudera.impala.thrift.THdfsCachingOp;
@@ -125,7 +126,6 @@ import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TStatus;
-import com.cloudera.impala.thrift.TStatusCode;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TTableStats;
@@ -254,7 +254,7 @@ public class CatalogOpExecutor {
     // At this point, the operation is considered successful. If any errors occurred
     // during execution, this function will throw an exception and the CatalogServer
     // will handle setting a bad status code.
-    response.getResult().setStatus(new TStatus(TStatusCode.OK, new ArrayList<String>()));
+    response.getResult().setStatus(new TStatus(TErrorCode.OK, new ArrayList<String>()));
     return response;
   }
 
@@ -2361,7 +2361,7 @@ public class CatalogOpExecutor {
       resp.result.setVersion(catalog_.getCatalogVersion());
     }
     resp.getResult().setStatus(
-        new TStatus(TStatusCode.OK, new ArrayList<String>()));
+        new TStatus(TErrorCode.OK, new ArrayList<String>()));
     return resp;
   }
 
@@ -2489,7 +2489,7 @@ public class CatalogOpExecutor {
     response.setResult(new TCatalogUpdateResult());
     response.getResult().setCatalog_service_id(JniCatalog.getServiceId());
     response.getResult().setStatus(
-        new TStatus(TStatusCode.OK, new ArrayList<String>()));
+        new TStatus(TErrorCode.OK, new ArrayList<String>()));
     // Perform an incremental refresh to load new/modified partitions and files.
     Table refreshedTbl = catalog_.reloadTable(tblName.toThrift());
     response.getResult().setUpdated_catalog_object(TableToTCatalogObject(refreshedTbl));

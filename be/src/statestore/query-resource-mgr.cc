@@ -192,7 +192,7 @@ void QueryResourceMgr::AcquireVcoreResources(
     if (!status.ok()) {
       VLOG_QUERY << "Could not expand CPU resources for query " << PrintId(query_id_)
                  << ", reservation: " << PrintId(reservation_id_) << ". Error was: "
-                 << status.GetErrorMsg();
+                 << status.GetDetail();
       // Sleep to avoid flooding the resource broker, particularly if requests are being
       // rejected quickly (and therefore we stay oversubscribed)
       // TODO: configurable timeout

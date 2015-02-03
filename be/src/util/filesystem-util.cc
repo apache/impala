@@ -40,8 +40,8 @@ Status FileSystemUtil::CreateDirectories(const vector<string>& directories) {
     try {
       boost::filesystem::create_directory(directories[i]);
     } catch (exception& e) {
-      return Status(TStatusCode::RUNTIME_ERROR, Substitute(
-          "Encountered error creating directory $0: $1", directories[i], e.what()));
+      return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(
+          "Encountered error creating directory $0: $1", directories[i], e.what())));
     }
   }
 
@@ -53,8 +53,8 @@ Status FileSystemUtil::RemovePaths(const vector<string>& directories) {
     try {
         boost::filesystem::remove_all(directories[i]);
     } catch (exception& e) {
-      return Status(TStatusCode::RUNTIME_ERROR, Substitute(
-          "Encountered error removing directory $0: $1", directories[i], e.what()));
+      return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(
+          "Encountered error removing directory $0: $1", directories[i], e.what())));
     }
   }
 
@@ -65,16 +65,16 @@ Status FileSystemUtil::CreateFile(const string& file_path) {
   int fd = creat(file_path.c_str(), S_IRUSR | S_IWUSR);
 
   if (fd < 0) {
-    return Status(TStatusCode::RUNTIME_ERROR,
+    return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
         Substitute("Create file $0 failed with errno=$1 description=$2",
-            file_path.c_str(), errno, GetStrErrMsg()));
+            file_path.c_str(), errno, GetStrErrMsg())));
   }
 
   int success = close(fd);
   if (success < 0) {
-    return Status(TStatusCode::RUNTIME_ERROR,
+    return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
         Substitute("Close file $0 failed with errno=$1 description=$2",
-            file_path.c_str(), errno, GetStrErrMsg()));
+            file_path.c_str(), errno, GetStrErrMsg())));
   }
 
   return Status::OK;
@@ -83,9 +83,9 @@ Status FileSystemUtil::CreateFile(const string& file_path) {
 Status FileSystemUtil::ResizeFile(const string& file_path, int64_t trunc_len) {
   int success = truncate(file_path.c_str(), trunc_len);
   if (success != 0) {
-    return Status(TStatusCode::RUNTIME_ERROR, Substitute(
+    return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(
         "Truncate file $0 to length $1 failed with errno $2 ($3)",
-        file_path, trunc_len, errno, GetStrErrMsg()));
+        file_path, trunc_len, errno, GetStrErrMsg())));
   }
 
   return Status::OK;
@@ -94,17 +94,17 @@ Status FileSystemUtil::ResizeFile(const string& file_path, int64_t trunc_len) {
 Status FileSystemUtil::VerifyIsDirectory(const string& directory_path) {
   try {
     if (!boost::filesystem::exists(directory_path)) {
-      return Status(TStatusCode::RUNTIME_ERROR, Substitute(
-          "Directory path $0 does not exist", directory_path));
+      return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(
+          "Directory path $0 does not exist", directory_path)));
     }
   } catch (exception& e) {
-    return Status(TStatusCode::RUNTIME_ERROR, Substitute(
+    return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(
         "Encountered exception while verifying existence of directory path $0: $1",
-        directory_path, e.what()));
+        directory_path, e.what())));
   }
   if (!boost::filesystem::is_directory(directory_path)) {
-    return Status(TStatusCode::RUNTIME_ERROR, Substitute(
-        "Path $0 is not a directory", directory_path));
+    return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(
+        "Path $0 is not a directory", directory_path)));
   }
   return Status::OK;
 }
@@ -115,9 +115,9 @@ Status FileSystemUtil::GetSpaceAvailable(const string& directory_path,
     boost::filesystem::space_info info = boost::filesystem::space(directory_path);
     *available_bytes = info.available;
   } catch (exception& e) {
-    return Status(TStatusCode::RUNTIME_ERROR, Substitute(
+    return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(
         "Encountered exception while checking available space for path $0: $1",
-        directory_path, e.what()));
+        directory_path, e.what())));
   }
 
   return Status::OK;

@@ -121,7 +121,7 @@ void TestBoostIntHash(int batch, void* d) {
     for (int j = 0; j < rows; ++j) {
       size_t h = HashUtil::FNV_SEED;
       for (int k = 0; k < cols; ++k) {
-        size_t hash_value = hash<int32_t>().operator()(values[k]);
+        size_t hash_value = boost::hash<int32_t>().operator()(values[k]);
         hash_combine(h, hash_value);
       }
       data->results[j] = h;
@@ -210,15 +210,15 @@ void TestBoostMixedHash(int batch, void* d) {
     for (int j = 0; j < rows; ++j) {
       size_t h = HashUtil::FNV_SEED;
 
-      size_t hash_value = hash<int8_t>().operator()(*reinterpret_cast<int8_t*>(values));
+      size_t hash_value = boost::hash<int8_t>().operator()(*reinterpret_cast<int8_t*>(values));
       hash_combine(h, hash_value);
       values += sizeof(int8_t);
 
-      hash_value = hash<int32_t>().operator()(*reinterpret_cast<int32_t*>(values));
+      hash_value = boost::hash<int32_t>().operator()(*reinterpret_cast<int32_t*>(values));
       hash_combine(h, hash_value);
       values += sizeof(int32_t);
 
-      hash_value = hash<int64_t>().operator()(*reinterpret_cast<int64_t*>(values));
+      hash_value = boost::hash<int64_t>().operator()(*reinterpret_cast<int64_t*>(values));
       hash_combine(h, hash_value);
       values += sizeof(int64_t);
 
@@ -380,7 +380,7 @@ int main(int argc, char **argv) {
 
   status = codegen->FinalizeModule();
   if (!status.ok()) {
-    cout << "Could not compile module: " << status.GetErrorMsg();
+    cout << "Could not compile module: " << status.GetDetail();
     return -1;
   }
 

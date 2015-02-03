@@ -241,7 +241,7 @@ void ThreadMgr::ThreadGroupUrlCallback(const Webserver::ArgumentMap& args,
       Status status = GetThreadStats(thread.second.thread_id(), &stats);
       if (!status.ok()) {
         LOG_EVERY_N(INFO, 100) << "Could not get per-thread statistics: "
-                               << status.GetErrorMsg();
+                               << status.GetDetail();
       } else {
         val.AddMember("user_ns", static_cast<double>(stats.user_ns) / 1e9,
             document->GetAllocator());

@@ -95,7 +95,7 @@ then
     then
         CMAKE_ARGS="${CMAKE_ARGS} -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}"
     fi
-    cmake . ${CMAKE_ARGS}
+    cmake . ${CMAKE_ARGS} -DCMAKE_EXPORT_COMPILE_COMMANDS=On
 fi
 
 if [ $CLEAN -eq 1 ]

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <boost/foreach.hpp>
 #include <boost/algorithm/string/join.hpp>
 
 #include "common/status.h"
@@ -27,110 +28,165 @@ namespace impala {
 // glog functions which also rely on static initializations.
 // TODO: is there a more controlled way to do this.
 const Status Status::OK;
-const Status Status::CANCELLED(TStatusCode::CANCELLED, "Cancelled", true);
+
+const Status Status::CANCELLED(ErrorMsg::Init(TErrorCode::CANCELLED, "Cancelled"));
+
 const Status Status::MEM_LIMIT_EXCEEDED(
-    TStatusCode::MEM_LIMIT_EXCEEDED, "Memory limit exceeded", true);
-const Status Status::DEPRECATED_RPC(TStatusCode::NOT_IMPLEMENTED_ERROR,
-    "Deprecated RPC; please update your client", true);
+    ErrorMsg::Init(TErrorCode::MEM_LIMIT_EXCEEDED, "Memory limit exceeded"));
 
-Status::ErrorDetail::ErrorDetail(const TStatus& status)
-  : error_code(status.status_code),
-    error_msgs(status.error_msgs) {
-  DCHECK_NE(error_code, TStatusCode::OK);
+const Status Status::DEPRECATED_RPC(ErrorMsg::Init(TErrorCode::NOT_IMPLEMENTED_ERROR,
+    "Deprecated RPC; please update your client"));
+
+Status::Status(TErrorCode::type code)
+    : msg_(new ErrorMsg(code)) {
+  VLOG(1) << msg_->msg() << endl << GetStackTrace();
 }
 
-Status::Status(const string& error_msg, bool quiet)
-  : error_detail_(new ErrorDetail(TStatusCode::INTERNAL_ERROR, error_msg)) {
-  if (!quiet) VLOG(1) << error_msg << endl << GetStackTrace();
+Status::Status(TErrorCode::type code, const ArgType& arg0)
+    : msg_(new ErrorMsg(code, arg0)) {
+  VLOG(1) << msg_->msg() << endl << GetStackTrace();
 }
+
+Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1)
+    : msg_(new ErrorMsg(code, arg0, arg1)) {
+  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+}
+
+Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
+    const ArgType& arg2)
+    : msg_(new ErrorMsg(code, arg0, arg1, arg2)) {
+  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+}
+Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
+    const ArgType& arg2, const ArgType& arg3)
+    : msg_(new ErrorMsg(code, arg0, arg1, arg2, arg3)) {
+  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+}
+
+Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
+    const ArgType& arg2, const ArgType& arg3, const ArgType& arg4)
+    : msg_(new ErrorMsg(code, arg0, arg1, arg2, arg3, arg4)) {
+  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+}
+
+Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
+    const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
+    const ArgType& arg5)
+    : msg_(new ErrorMsg(code, arg0, arg1, arg2, arg3, arg4, arg5)) {
+  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+}
+
+Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
+    const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
+    const ArgType& arg5, const ArgType& arg6)
+    : msg_(new ErrorMsg(code, arg0, arg1, arg2, arg3, arg4, arg5, arg6)) {
+  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+}
+
+Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
+    const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
+    const ArgType& arg5, const ArgType& arg6, const ArgType& arg7)
+    : msg_(new ErrorMsg(code, arg0, arg1, arg2, arg3, arg4, arg5, arg6,
+    arg7)) {
+  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+}
+
+Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
+    const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
+    const ArgType& arg5, const ArgType& arg6, const ArgType& arg7,
+    const ArgType& arg8)
+    : msg_(new ErrorMsg(code, arg0, arg1, arg2, arg3, arg4, arg5, arg6,
+     arg7, arg8)) {
+  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+}
+
+Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
+    const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
+    const ArgType& arg5, const ArgType& arg6, const ArgType& arg7,
+    const ArgType& arg8, const ArgType& arg9)
+    : msg_(new ErrorMsg(code, arg0, arg1, arg2, arg3, arg4, arg5, arg6,
+    arg7, arg8, arg9)) {
+  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+}
+
+
+Status::Status(const string& error_msg)
+  : msg_(new ErrorMsg(TErrorCode::GENERAL, error_msg)) {
+  VLOG(1) << error_msg << endl << GetStackTrace();
+}
+
+Status::Status(const ErrorMsg& message)
+  : msg_(new ErrorMsg(message)) { }
 
 Status::Status(const TStatus& status)
-  : error_detail_(
-      status.status_code == TStatusCode::OK
-        ? NULL
-        : new ErrorDetail(status)) {
-}
+  : msg_(status.status_code == TErrorCode::OK
+      ? NULL : new ErrorMsg(status.status_code, status.error_msgs)) { }
 
 Status& Status::operator=(const TStatus& status) {
-  delete error_detail_;
-  if (status.status_code == TStatusCode::OK) {
-    error_detail_ = NULL;
+  delete msg_;
+  if (status.status_code == TErrorCode::OK) {
+    msg_ = NULL;
   } else {
-    error_detail_ = new ErrorDetail(status);
+    msg_ = new ErrorMsg(status.status_code, status.error_msgs);
   }
   return *this;
 }
 
 Status::Status(const apache::hive::service::cli::thrift::TStatus& hs2_status)
-  : error_detail_(
+  : msg_(
       hs2_status.statusCode
         == apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS ? NULL
-          : new ErrorDetail(
-              static_cast<TStatusCode::type>(hs2_status.statusCode),
+          : new ErrorMsg(
+              static_cast<TErrorCode::type>(hs2_status.statusCode),
               hs2_status.errorMessage)) {
 }
 
 Status& Status::operator=(
     const apache::hive::service::cli::thrift::TStatus& hs2_status) {
-  delete error_detail_;
+  delete msg_;
   if (hs2_status.statusCode
         == apache::hive::service::cli::thrift::TStatusCode::SUCCESS_STATUS) {
-    error_detail_ = NULL;
+    msg_ = NULL;
   } else {
-    error_detail_ = new ErrorDetail(
-        static_cast<TStatusCode::type>(hs2_status.statusCode), hs2_status.errorMessage);
+    msg_ = new ErrorMsg(
+        static_cast<TErrorCode::type>(hs2_status.statusCode), hs2_status.errorMessage);
   }
   return *this;
 }
 
-void Status::AddErrorMsg(TStatusCode::type code, const std::string& msg) {
-  if (error_detail_ == NULL) {
-    error_detail_ = new ErrorDetail(code, msg);
-  } else {
-    error_detail_->error_msgs.push_back(msg);
-  }
+void Status::AddDetail(const std::string& msg) {
+  DCHECK_NOTNULL(msg_);
+  msg_->AddDetail(msg);
   VLOG(2) << msg;
 }
 
-void Status::AddErrorMsg(const std::string& msg) {
-  AddErrorMsg(TStatusCode::INTERNAL_ERROR, msg);
-}
-
-void Status::AddError(const Status& status) {
+void Status::MergeStatus(const Status& status) {
   if (status.ok()) return;
-  AddErrorMsg(status.code(), status.GetErrorMsg());
-}
-
-void Status::GetErrorMsgs(vector<string>* msgs) const {
-  msgs->clear();
-  if (error_detail_ != NULL) {
-    *msgs = error_detail_->error_msgs;
+  if (msg_ == NULL) {
+    msg_ = new ErrorMsg(*status.msg_);
+  } else {
+    msg_->AddDetail(status.msg().msg());
+    BOOST_FOREACH(const string& s, status.msg_->details()) {
+      msg_->AddDetail(s);
+    }
   }
 }
 
-void Status::GetErrorMsg(string* msg) const {
-  msg->clear();
-  if (error_detail_ != NULL) {
-    *msg = join(error_detail_->error_msgs, "\n");
-  }
-}
-
-string Status::GetErrorMsg() const {
-  string msg;
-  GetErrorMsg(&msg);
-  return msg;
+const string Status::GetDetail() const {
+  return msg_ != NULL ? msg_->GetFullMessageDetails() : "";
 }
 
 void Status::ToThrift(TStatus* status) const {
   status->error_msgs.clear();
-  if (error_detail_ == NULL) {
-    status->status_code = TStatusCode::OK;
+  if (msg_ == NULL) {
+    status->status_code = TErrorCode::OK;
   } else {
-    status->status_code = error_detail_->error_code;
-    for (int i = 0; i < error_detail_->error_msgs.size(); ++i) {
-      status->error_msgs.push_back(error_detail_->error_msgs[i]);
+    status->status_code = msg_->error();
+    status->error_msgs.push_back(msg_->msg());
+    BOOST_FOREACH(const string& s, msg_->details()) {
+      status->error_msgs.push_back(s);
     }
-    status->__isset.error_msgs = !error_detail_->error_msgs.empty();
+    status->__isset.error_msgs = true;
   }
 }
 

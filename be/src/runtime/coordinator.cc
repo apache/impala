@@ -50,6 +50,7 @@
 #include "exec/scan-node.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
+#include "util/error-util.h"
 #include "util/hdfs-bulk-ops.h"
 #include "util/hdfs-util.h"
 #include "util/llama-util.h"
@@ -125,7 +126,7 @@ class Coordinator::BackendExecState {
   bool done;  // if true, execution terminated; do not cancel in that case
   bool profile_created;  // true after the first call to profile->Update()
   RuntimeProfile* profile;  // owned by obj_pool()
-  std::vector<std::string> error_log; // errors reported by this backend
+  ErrorLogMap error_log; // errors reported by this backend
 
   // Total scan ranges complete across all scan nodes
   int64_t total_ranges_complete;
@@ -1173,7 +1174,7 @@ void Coordinator::CancelRemoteFragments() {
         VLOG_RPC << "Retrying CancelPlanFragment: " << e.what();
         Status status = backend_client.Reopen();
         if (!status.ok()) {
-          exec_state->status.AddError(status);
+          exec_state->status.MergeStatus(status);
           continue;
         }
         backend_client->CancelPlanFragment(res, params);
@@ -1184,11 +1185,11 @@ void Coordinator::CancelRemoteFragments() {
           << " instance_id=" << exec_state->fragment_instance_id
           << " failed: " << e.what();
       // make a note of the error status, but keep on cancelling the other fragments
-      exec_state->status.AddErrorMsg(msg.str());
+      exec_state->status.AddDetail(msg.str());
       continue;
     }
-    if (res.status.status_code != TStatusCode::OK) {
-      exec_state->status.AddErrorMsg(algorithm::join(res.status.error_msgs, "; "));
+    if (res.status.status_code != TErrorCode::OK) {
+      exec_state->status.AddDetail(algorithm::join(res.status.error_msgs, "; "));
     }
   }
 
@@ -1201,7 +1202,7 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
             << " status=" << params.status.status_code
             << " done=" << (params.done ? "true" : "false");
   if (params.backend_num >= backend_exec_states_.size()) {
-    return Status(TStatusCode::INTERNAL_ERROR, "unknown backend number");
+    return Status(TErrorCode::INTERNAL_ERROR, "unknown backend number");
   }
   BackendExecState* exec_state = backend_exec_states_[params.backend_num];
 
@@ -1241,11 +1242,13 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
     }
     exec_state->profile_created = true;
 
+    // Log messages aggregated by type
     if (params.__isset.error_log && params.error_log.size() > 0) {
-      exec_state->error_log.insert(exec_state->error_log.end(), params.error_log.begin(),
-          params.error_log.end());
+      // Append the log messages from each update with the global state of the query
+      // execution
+      MergeErrorMaps(&exec_state->error_log, params.error_log);
       VLOG_FILE << "instance_id=" << exec_state->fragment_instance_id
-                << " error log: " << join(exec_state->error_log, "\n");
+                << " error log: " << PrintErrorMapToString(exec_state->error_log);
     }
     progress_.Update(exec_state->UpdateNumScanRangesCompleted());
   }
@@ -1516,20 +1519,21 @@ void Coordinator::ReportQuerySummary() {
 }
 
 string Coordinator::GetErrorLog() {
-  stringstream ss;
-  lock_guard<mutex> l(lock_);
-  if (executor_.get() != NULL && executor_->runtime_state() != NULL &&
-      !executor_->runtime_state()->ErrorLogIsEmpty()) {
-    ss << executor_->runtime_state()->ErrorLog() << "\n";
+  ErrorLogMap merged;
+  {
+    lock_guard<mutex> l(lock_);
+    if (executor_.get() != NULL && executor_->runtime_state() != NULL &&
+        !executor_->runtime_state()->ErrorLogIsEmpty()) {
+      MergeErrorMaps(&merged, executor_->runtime_state()->error_log());
+    }
   }
   for (int i = 0; i < backend_exec_states_.size(); ++i) {
     lock_guard<mutex> l(backend_exec_states_[i]->lock);
     if (backend_exec_states_[i]->error_log.size() > 0) {
-      ss << "Backend " << i << ":"
-         << join(backend_exec_states_[i]->error_log, "\n") << "\n";
+      MergeErrorMaps(&merged, backend_exec_states_[i]->error_log);
     }
   }
-  return ss.str();
+  return PrintErrorMapToString(merged);
 }
 
 void Coordinator::SetExecPlanFragmentParams(

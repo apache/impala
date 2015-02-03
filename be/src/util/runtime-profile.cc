@@ -630,7 +630,7 @@ void RuntimeProfile::SerializeToArchiveString(stringstream* out) const {
   // easy to compress.
   scoped_ptr<Codec> compressor;
   status = Codec::CreateCompressor(NULL, false, THdfsCompression::DEFAULT, &compressor);
-  DCHECK(status.ok()) << status.GetErrorMsg();
+  DCHECK(status.ok()) << status.GetDetail();
   if (!status.ok()) return;
 
   vector<uint8_t> compressed_buffer;

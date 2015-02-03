@@ -527,7 +527,7 @@ Status HdfsRCFileScanner::ProcessRange() {
           if (state_->LogHasSpace()) {
             stringstream ss;
             ss << "file: " << stream_->filename();
-            state_->LogError(ss.str());
+            state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
           }
           if (state_->abort_on_error()) {
             state_->ReportFileErrors(stream_->filename(), 1);

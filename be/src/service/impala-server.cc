@@ -218,7 +218,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
 
   Status status = exec_env_->frontend()->ValidateSettings();
   if (!status.ok()) {
-    LOG(ERROR) << status.GetErrorMsg();
+    LOG(ERROR) << status.GetDetail();
     if (FLAGS_abort_on_config_error) {
       LOG(ERROR) << "Aborting Impala Server startup due to improper configuration";
       exit(1);
@@ -227,7 +227,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
 
   status = TmpFileMgr::Init();
   if (!status.ok()) {
-    LOG(ERROR) << status.GetErrorMsg();
+    LOG(ERROR) << status.GetDetail();
     if (FLAGS_abort_on_config_error) {
       LOG(ERROR) << "Aborting Impala Server startup due to improperly "
                  << "configured scratch directories.";
@@ -330,7 +330,7 @@ Status ImpalaServer::LogLineageRecord(const TExecRequest& request) {
   if (!request.query_exec_request.__isset.lineage_graph) return Status::OK;
   Status status = lineage_logger_->AppendEntry(request.query_exec_request.lineage_graph);
   if (!status.ok()) {
-    LOG(ERROR) << "Unable to record query lineage record: " << status.GetErrorMsg();
+    LOG(ERROR) << "Unable to record query lineage record: " << status.GetDetail();
     if (FLAGS_abort_on_failed_lineage_event) {
       LOG(ERROR) << "Shutting down Impala Server due to abort_on_failed_lineage_event=true";
       exit(1);
@@ -376,7 +376,7 @@ Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_sta
   writer.String("authorization_failure");
   writer.Bool(Frontend::IsAuthorizationError(exec_state.query_status()));
   writer.String("status");
-  writer.String(exec_state.query_status().GetErrorMsg().c_str());
+  writer.String(exec_state.query_status().GetDetail().c_str());
   writer.String("user");
   writer.String(exec_state.effective_user().c_str());
   writer.String("impersonator");
@@ -422,7 +422,7 @@ Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_sta
   writer.EndObject();
   Status status = audit_event_logger_->AppendEntry(buffer.GetString());
   if (!status.ok()) {
-    LOG(ERROR) << "Unable to record audit event record: " << status.GetErrorMsg();
+    LOG(ERROR) << "Unable to record audit event record: " << status.GetDetail();
     if (FLAGS_abort_on_failed_audit_event) {
       LOG(ERROR) << "Shutting down Impala Server due to abort_on_failed_audit_event=true";
       exit(1);
@@ -540,7 +540,7 @@ void ImpalaServer::AuditEventLoggerFlushThread() {
     sleep(5);
     Status status = audit_event_logger_->Flush();
     if (!status.ok()) {
-      LOG(ERROR) << "Error flushing audit event log: " << status.GetErrorMsg();
+      LOG(ERROR) << "Error flushing audit event log: " << status.GetDetail();
       if (FLAGS_abort_on_failed_audit_event) {
         LOG(ERROR) << "Shutting down Impala Server due to "
                    << "abort_on_failed_audit_event=true";
@@ -555,7 +555,7 @@ void ImpalaServer::LineageLoggerFlushThread() {
     sleep(5);
     Status status = lineage_logger_->Flush();
     if (!status.ok()) {
-      LOG(ERROR) << "Error flushing lineage event log: " << status.GetErrorMsg();
+      LOG(ERROR) << "Error flushing lineage event log: " << status.GetDetail();
       if (FLAGS_abort_on_failed_lineage_event) {
         LOG(ERROR) << "Shutting down Impala Server due to "
                    << "abort_on_failed_lineage_event=true";
@@ -577,7 +577,7 @@ void ImpalaServer::ArchiveQuery(const QueryExecState& query) {
     if (!status.ok()) {
       LOG_EVERY_N(WARNING, 1000) << "Could not write to profile log file file ("
                                  << google::COUNTER << " attempts failed): "
-                                 << status.GetErrorMsg();
+                                 << status.GetDetail();
       LOG_EVERY_N(WARNING, 1000)
           << "Disable query logging with --log_query_to_file=false";
     }
@@ -684,7 +684,7 @@ Status ImpalaServer::ExecuteInternal(
   if (result.stmt_type == TStmtType::DDL) {
     Status status = UpdateCatalogMetrics();
     if (!status.ok()) {
-      VLOG_QUERY << "Couldn't update catalog metrics: " << status.GetErrorMsg();
+      VLOG_QUERY << "Couldn't update catalog metrics: " << status.GetDetail();
     }
   }
 
@@ -732,7 +732,7 @@ Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
       // (query_id is globally unique)
       stringstream ss;
       ss << "query id " << PrintId(query_id) << " already exists";
-      return Status(TStatusCode::INTERNAL_ERROR, ss.str());
+      return Status(ErrorMsg(TErrorCode::INTERNAL_ERROR, ss.str()));
     }
     query_exec_state_map_.insert(make_pair(query_id, exec_state));
   }
@@ -894,7 +894,7 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
         session_state->inflight_queries.end());
   }
   // Unregister all open queries from this session.
-  Status status("Session closed", true);
+  Status status("Session closed");
   BOOST_FOREACH(const TUniqueId& query_id, inflight_queries) {
     UnregisterQuery(query_id, false, &status);
   }
@@ -942,7 +942,7 @@ void ImpalaServer::ReportExecStatus(
   // (which we have occasionally seen). Consider keeping query exec states around for a
   // little longer (until all reports have been received).
   if (exec_state.get() == NULL) {
-    return_val.status.__set_status_code(TStatusCode::INTERNAL_ERROR);
+    return_val.status.__set_status_code(TErrorCode::INTERNAL_ERROR);
     const string& err = Substitute("ReportExecStatus(): Received report for unknown "
         "query ID (probably closed or cancelled). (query_id: $0, backend: $1, instance:"
         " $2 done: $3)", PrintId(params.query_id), params.backend_num,
@@ -986,7 +986,7 @@ void ImpalaServer::InitializeConfigVariables() {
   if (!status.ok()) {
     // Log error and exit if the default query options are invalid.
     LOG(ERROR) << "Invalid default query options. Please check -default_query_options.\n"
-               << status.GetErrorMsg();
+               << status.GetDetail();
     exit(1);
   }
   LOG(INFO) << "Default query options:" << ThriftDebugString(default_query_options_);
@@ -1033,7 +1033,7 @@ void ImpalaServer::CancelFromThreadPool(uint32_t thread_id,
         &cancellation_work.cause());
     if (!status.ok()) {
       VLOG_QUERY << "Query cancellation (" << cancellation_work.query_id()
-                 << ") did not succeed: " << status.GetErrorMsg();
+                 << ") did not succeed: " << status.GetDetail();
     }
   }
 }
@@ -1095,7 +1095,7 @@ void ImpalaServer::CatalogUpdateCallback(
       Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
           item.value.data()), &len, FLAGS_compact_catalog_topic, &catalog_object);
       if (!status.ok()) {
-        LOG(ERROR) << "Error deserializing item: " << status.GetErrorMsg();
+        LOG(ERROR) << "Error deserializing item: " << status.GetDetail();
         continue;
       }
       if (catalog_object.type == TCatalogObjectType::CATALOG) {
@@ -1130,7 +1130,7 @@ void ImpalaServer::CatalogUpdateCallback(
       Status status = TCatalogObjectFromEntryKey(key, &catalog_object);
       if (!status.ok()) {
         LOG(ERROR) << "Error parsing catalog topic entry deletion key: " << key << " "
-                   << "Error: " << status.GetErrorMsg();
+                   << "Error: " << status.GetDetail();
         continue;
       }
       update_req.removed_objects.push_back(catalog_object);
@@ -1158,7 +1158,7 @@ void ImpalaServer::CatalogUpdateCallback(
     Status s = exec_env_->frontend()->UpdateCatalogCache(update_req, &resp);
     if (!s.ok()) {
       LOG(ERROR) << "There was an error processing the impalad catalog update. Requesting"
-                 << " a full topic update to recover: " << s.GetErrorMsg();
+                 << " a full topic update to recover: " << s.GetDetail();
       subscriber_topic_updates->push_back(TTopicDelta());
       TTopicDelta& update = subscriber_topic_updates->back();
       update.topic_name = CatalogServer::IMPALA_CATALOG_TOPIC;
@@ -1218,7 +1218,7 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
      // Apply the changes to the local catalog cache.
     TUpdateCatalogCacheResponse resp;
     Status status = exec_env_->frontend()->UpdateCatalogCache(update_req, &resp);
-    if (!status.ok()) LOG(ERROR) << status.GetErrorMsg();
+    if (!status.ok()) LOG(ERROR) << status.GetDetail();
     RETURN_IF_ERROR(status);
     if (!wait_for_all_subscribers) return Status::OK;
   }
@@ -1445,7 +1445,7 @@ void ImpalaServer::ConnectionEnd(
     Status status = CloseSessionInternal(session_id, true);
     if (!status.ok()) {
       LOG(WARNING) << "Error closing session " << session_id << ": "
-                   << status.GetErrorMsg();
+                   << status.GetDetail();
     }
   }
   connection_to_sessions_map_.erase(it);

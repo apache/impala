@@ -27,10 +27,10 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import com.cloudera.impala.common.ByteUnits;
+import com.cloudera.impala.thrift.TErrorCode;
 import com.cloudera.impala.thrift.TPoolConfigResult;
 import com.cloudera.impala.thrift.TResolveRequestPoolParams;
 import com.cloudera.impala.thrift.TResolveRequestPoolResult;
-import com.cloudera.impala.thrift.TStatusCode;
 import com.google.common.collect.Iterables;
 import com.google.common.io.Files;
 
@@ -129,12 +129,12 @@ public class TestRequestPoolService {
     createPoolService(ALLOCATION_FILE, LLAMA_CONFIG_FILE);
     TResolveRequestPoolResult result = poolService_.resolveRequestPool(
         new TResolveRequestPoolParams("userA@abc.com", "root.queueA"));
-    Assert.assertEquals(TStatusCode.OK, result.getStatus().getStatus_code());
+    Assert.assertEquals(TErrorCode.OK, result.getStatus().getStatus_code());
     Assert.assertEquals("root.queueA", result.getResolved_pool());
 
     result = poolService_.resolveRequestPool(
         new TResolveRequestPoolParams("userA/a.qualified.domain@abc.com", "root.queueA"));
-    Assert.assertEquals(TStatusCode.OK, result.getStatus().getStatus_code());
+    Assert.assertEquals(TErrorCode.OK, result.getStatus().getStatus_code());
     Assert.assertEquals("root.queueA", result.getResolved_pool());
   }
 
@@ -146,7 +146,7 @@ public class TestRequestPoolService {
         new TResolveRequestPoolParams("userA", "root.NOT_A_POOL"));
     Assert.assertEquals(false, result.isSetResolved_pool());
     Assert.assertEquals(false, result.isSetHas_access());
-    Assert.assertEquals(TStatusCode.INTERNAL_ERROR, result.getStatus().getStatus_code());
+    Assert.assertEquals(TErrorCode.INTERNAL_ERROR, result.getStatus().getStatus_code());
 
     String expectedMessage = "Failed to resolve user 'userA' to a pool while " +
     "evaluating the 'primaryGroup' or 'secondaryGroup' queue placement rules because " +

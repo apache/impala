@@ -148,9 +148,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
     // have a reservation larger than the hard limit. Clamp reservation bytes limit to the
     // hard limit (if it exists).
     if (rm_reservation_size_bytes > bytes_limit && bytes_limit != -1) {
-      runtime_state_->LogError(Substitute("Reserved resource size ($0) is larger than "
-          "query mem limit ($1), and will be restricted to $1. Configure the reservation "
-          "size by setting RM_INITIAL_MEM.",
+      runtime_state_->LogError(ErrorMsg(TErrorCode::FRAGMENT_EXECUTOR,
           PrettyPrinter::PrintBytes(rm_reservation_size_bytes),
           PrettyPrinter::PrintBytes(bytes_limit)));
       rm_reservation_size_bytes = bytes_limit;
@@ -275,8 +273,8 @@ void PlanFragmentExecutor::OptimizeLlvmModule() {
   status = codegen->FinalizeModule();
   if (!status.ok()) {
     stringstream ss;
-    ss << "Error with codegen for this query: " << status.GetErrorMsg();
-    runtime_state_->LogError(ss.str());
+    ss << "Error with codegen for this query: " << status.GetDetail();
+    runtime_state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
   }
 }
 
@@ -321,7 +319,7 @@ Status PlanFragmentExecutor::Open() {
     // Log error message in addition to returning in Status. Queries that do not
     // fetch results (e.g. insert) may not receive the message directly and can
     // only retrieve the log.
-    runtime_state_->LogError(status.GetErrorMsg());
+    runtime_state_->LogError(status.msg());
   }
   UpdateStatus(status);
   return status;

@@ -75,7 +75,7 @@ using namespace beeswax;
   do {                                                          \
     Status __status__ = (stmt);                                 \
     if (UNLIKELY(!__status__.ok())) {                           \
-      RaiseBeeswaxException(__status__.GetErrorMsg(), ex_type); \
+      RaiseBeeswaxException(__status__.GetDetail(), ex_type);   \
     }                                                           \
   } while (false)
 
@@ -193,7 +193,7 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
   Status status = SetQueryInflight(session, exec_state);
   if (!status.ok()) {
     UnregisterQuery(exec_state->query_id(), false, &status);
-    RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
+    RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
   TUniqueIdToQueryHandle(exec_state->query_id(), &query_handle);
 }
@@ -231,14 +231,14 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
   Status status = SetQueryInflight(session, exec_state);
   if (!status.ok()) {
     UnregisterQuery(exec_state->query_id(), false, &status);
-    RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
+    RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
   // block until results are ready
   exec_state->Wait();
   status = exec_state->query_status();
   if (!status.ok()) {
     UnregisterQuery(exec_state->query_id(), false, &status);
-    RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
+    RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
 
   exec_state->UpdateQueryState(QueryState::FINISHED);
@@ -289,7 +289,7 @@ void ImpalaServer::fetch(Results& query_results, const QueryHandle& query_handle
            << " has_more=" << (query_results.has_more ? "true" : "false");
   if (!status.ok()) {
     UnregisterQuery(query_id, false, &status);
-    RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
+    RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
 }
 
@@ -401,7 +401,7 @@ void ImpalaServer::get_log(string& log, const LogContextId& context) {
   stringstream error_log_ss;
   // If the query status is !ok, include the status error message at the top of the log.
   if (!exec_state->query_status().ok()) {
-    error_log_ss << exec_state->query_status().GetErrorMsg() << "\n";
+    error_log_ss << exec_state->query_status().GetDetail() << "\n";
   }
 
   // Add warnings from analysis
@@ -440,7 +440,7 @@ void ImpalaServer::Cancel(impala::TStatus& tstatus,
   TUniqueId query_id;
   QueryHandleToTUniqueId(query_handle, &query_id);
   RAISE_IF_ERROR(CancelInternal(query_id, true), SQLSTATE_GENERAL_ERROR);
-  tstatus.status_code = TStatusCode::OK;
+  tstatus.status_code = TErrorCode::OK;
 }
 
 void ImpalaServer::CloseInsert(TInsertResult& insert_result,
@@ -454,7 +454,7 @@ void ImpalaServer::CloseInsert(TInsertResult& insert_result,
 
   Status status = CloseInsertInternal(query_id, &insert_result);
   if (!status.ok()) {
-    RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
+    RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
   }
 }
 
@@ -472,7 +472,7 @@ void ImpalaServer::GetRuntimeProfile(string& profile_output, const QueryHandle& 
   stringstream ss;
   Status status = GetRuntimeProfileStr(query_id, false, &ss);
   if (!status.ok()) {
-    ss << "GetRuntimeProfile error: " << status.GetErrorMsg();
+    ss << "GetRuntimeProfile error: " << status.GetDetail();
     RaiseBeeswaxException(ss.str(), SQLSTATE_GENERAL_ERROR);
   }
   profile_output = ss.str();
@@ -487,7 +487,7 @@ void ImpalaServer::GetExecSummary(impala::TExecSummary& result,
   QueryHandleToTUniqueId(handle, &query_id);
   VLOG_RPC << "GetExecSummary(): query_id=" << PrintId(query_id);
   Status status = GetExecSummary(query_id, &result);
-  if (!status.ok()) RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
+  if (!status.ok()) RaiseBeeswaxException(status.GetDetail(), SQLSTATE_GENERAL_ERROR);
 }
 
 void ImpalaServer::PingImpalaService(TPingImpalaServiceResp& return_val) {

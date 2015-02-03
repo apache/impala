@@ -154,7 +154,7 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
         params.location, type, &dummy_local_path);
     if (!status.ok()) {
       result->__set_result_code(TSymbolLookupResultCode::BINARY_NOT_FOUND);
-      result->__set_error_msg(status.GetErrorMsg());
+      result->__set_error_msg(status.GetDetail());
       return;
     }
   }
@@ -163,7 +163,7 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
   // Set 'quiet' to true so we don't flood the log with unfound builtin symbols on
   // startup.
   Status status =
-      LibCache::instance()->CheckSymbolExists(params.location, type, params.symbol, true);
+      LibCache::instance()->CheckSymbolExists(params.location, type, params.symbol);
   if (status.ok()) {
     result->__set_result_code(TSymbolLookupResultCode::SYMBOL_FOUND);
     result->__set_symbol(params.symbol);
@@ -180,7 +180,7 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
     stringstream ss;
     ss << "Could not find symbol '" << params.symbol << "' in: " << params.location;
     result->__set_error_msg(ss.str());
-    VLOG(1) << ss.str() << endl << status.GetErrorMsg();
+    VLOG(1) << ss.str() << endl << status.GetDetail();
     return;
   }
 
@@ -287,10 +287,10 @@ Java_com_cloudera_impala_service_FeSupport_NativePrioritizeLoad(
   TPrioritizeLoadResponse result;
   Status status = catalog_op_executor.PrioritizeLoad(request, &result);
   if (!status.ok()) {
-    LOG(ERROR) << status.GetErrorMsg();
+    LOG(ERROR) << status.GetDetail();
     // Create a new Status, copy in this error, then update the result.
     Status catalog_service_status(result.status);
-    catalog_service_status.AddError(status);
+    catalog_service_status.MergeStatus(status);
     status.ToThrift(&result.status);
   }
 

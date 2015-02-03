@@ -107,7 +107,7 @@ Status BaseSequenceScanner::ProcessSplit() {
     Status status = ReadFileHeader();
     if (!status.ok()) {
       if (state_->abort_on_error()) return status;
-      state_->LogError(status);
+      state_->LogError(status.msg());
       // We need to complete the ranges for this file.
       CloseFileRanges(stream_->filename());
       return Status::OK;
@@ -144,15 +144,12 @@ Status BaseSequenceScanner::ProcessSplit() {
     if (status.IsCancelled() || status.IsMemLimitExceeded()) return status;
 
     // Log error from file format parsing.
-    stringstream ss;
-    ss << "Problem parsing file " << stream_->filename() << " at ";
-    if (stream_->eof()) {
-      ss << "end of file";
-    } else {
-      ss << "offset " << stream_->file_offset();
-    }
-    ss << ": " << status.GetErrorMsg();
-    state_->LogError(ss.str());
+    state_->LogError(ErrorMsg(TErrorCode::SEQUENCE_SCANNER_PARSE_ERROR,
+        stream_->filename(), stream_->file_offset(),
+        (stream_->eof() ? "(EOF)" : "")));
+
+    // Make sure errors specified in the status are logged as well
+    state_->LogError(status.msg());
 
     // If abort on error then return, otherwise try to recover.
     if (state_->abort_on_error()) return status;

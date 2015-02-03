@@ -220,7 +220,7 @@ Status Frontend::LoadData(const TLoadDataReq& request, TLoadDataResp* response) 
 }
 
 bool Frontend::IsAuthorizationError(const Status& status) {
-  return !status.ok() && status.GetErrorMsg().find("AuthorizationException") == 0;
+  return !status.ok() && status.GetDetail().find("AuthorizationException") == 0;
 }
 
 Status Frontend::SetCatalogInitialized() {

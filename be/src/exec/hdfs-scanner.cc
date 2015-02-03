@@ -465,8 +465,8 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
           conjunct_ctxs[conjunct_idx]->root()->GetCodegendComputeFn(state, &conjunct_fn);
       if (!status.ok()) {
         stringstream ss;
-        ss << "Failed to codegen conjunct: " << status.GetErrorMsg();
-        state->LogError(ss.str());
+        ss << "Failed to codegen conjunct: " << status.GetDetail();
+        state->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
         fn->eraseFromParent();
         return NULL;
       }
@@ -558,7 +558,7 @@ bool HdfsScanner::ReportTupleParseError(FieldLocation* fields, uint8_t* errors,
     stringstream ss;
     ss << "file: " << stream_->filename() << endl << "record: ";
     LogRowParseError(row_idx, &ss);
-    state_->LogError(ss.str());
+    state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
   }
 
   ++num_errors_in_file_;
@@ -586,7 +586,10 @@ void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc,
        << desc->col_pos() - scan_node_->num_partition_keys()
        << " TO " << desc->type()
        << " (Data is: " << string(data,len) << ")";
-    if (state_->LogHasSpace()) state_->LogError(ss.str());
+    if (state_->LogHasSpace()) {
+      state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
+    }
+
     if (state_->abort_on_error() && parse_status_.ok()) parse_status_ = Status(ss.str());
   }
 }

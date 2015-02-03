@@ -39,7 +39,7 @@ import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TScalarType;
 import com.cloudera.impala.thrift.TStatus;
-import com.cloudera.impala.thrift.TStatusCode;
+import com.cloudera.impala.thrift.TErrorCode;
 import com.cloudera.impala.thrift.TTypeNodeType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
@@ -61,7 +61,7 @@ public class AllTypesDataSource implements ExternalDataSource {
   private static final int BATCH_SIZE_INCREMENT = 100;
 
   private static final TStatus STATUS_OK =
-      new TStatus(TStatusCode.OK, Lists.<String>newArrayList());
+      new TStatus(TErrorCode.OK, Lists.<String>newArrayList());
 
   private int currRow_;
   private boolean eos_;

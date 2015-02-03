@@ -401,9 +401,9 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
         new_tuple->MaterializeExprs<has_var_len_data>(input_row, *sort_tuple_desc_,
             sorter_->sort_tuple_slot_expr_ctxs_, NULL, &var_values, &total_var_len);
         if (total_var_len > sorter_->block_mgr_->max_block_size()) {
-          return Status(TStatusCode::INTERNAL_ERROR, Substitute(
+          return Status(ErrorMsg(TErrorCode::INTERNAL_ERROR, Substitute(
               "Variable length data in a single tuple larger than block size $0 > $1",
-              total_var_len, sorter_->block_mgr_->max_block_size()));
+              total_var_len, sorter_->block_mgr_->max_block_size())));
         }
       } else {
         memcpy(new_tuple, input_row->GetTuple(0), sort_tuple_size_);

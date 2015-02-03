@@ -26,7 +26,7 @@ import com.cloudera.impala.extdatasource.thrift.TRowBatch;
 import com.cloudera.impala.extdatasource.v1.ExternalDataSource;
 import com.cloudera.impala.thrift.TColumnData;
 import com.cloudera.impala.thrift.TStatus;
-import com.cloudera.impala.thrift.TStatusCode;
+import com.cloudera.impala.thrift.TErrorCode;
 import com.google.common.collect.Lists;
 
 /**
@@ -34,7 +34,7 @@ import com.google.common.collect.Lists;
  */
 public class EchoDataSource implements ExternalDataSource {
   private static final TStatus STATUS_OK =
-      new TStatus(TStatusCode.OK, Lists.<String>newArrayList());
+      new TStatus(TErrorCode.OK, Lists.<String>newArrayList());
 
   private String initString_;
 

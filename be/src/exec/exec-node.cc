@@ -371,7 +371,9 @@ void ExecNode::InitRuntimeProfile(const string& name) {
 Status ExecNode::ExecDebugAction(TExecNodePhase::type phase, RuntimeState* state) {
   DCHECK(phase != TExecNodePhase::INVALID);
   if (debug_phase_ != phase) return Status::OK;
-  if (debug_action_ == TDebugAction::FAIL) return Status(TStatusCode::INTERNAL_ERROR);
+  if (debug_action_ == TDebugAction::FAIL) {
+    return Status(TErrorCode::INTERNAL_ERROR, "Debug Action: FAIL");
+  }
   if (debug_action_ == TDebugAction::WAIT) {
     while (!state->is_cancelled()) {
       sleep(1);
@@ -447,7 +449,7 @@ Function* ExecNode::CodegenEvalConjuncts(
     Status status =
         conjunct_ctxs[i]->root()->GetCodegendComputeFn(state, &conjunct_fns[i]);
     if (!status.ok()) {
-      VLOG_QUERY << "Could not codegen EvalConjuncts: " << status.GetErrorMsg();
+      VLOG_QUERY << "Could not codegen EvalConjuncts: " << status.GetDetail();
       return NULL;
     }
   }

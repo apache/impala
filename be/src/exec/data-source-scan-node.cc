@@ -350,7 +350,7 @@ void DataSourceScanNode::Close(RuntimeState* state) {
   params.__set_scan_handle(scan_handle_);
   TCloseResult result;
   Status status = data_source_executor_->Close(params, &result);
-  state->LogError(status); // logs the error if status != OK
+  if (!status.ok()) state->LogError(status.msg());
   ExecNode::Close(state);
 }
 

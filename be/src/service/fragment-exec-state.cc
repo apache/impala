@@ -64,7 +64,7 @@ void FragmentMgr::FragmentExecState::ReportStatusCb(
   if (!coord_status.ok()) {
     stringstream s;
     s << "couldn't get a client for " << coord_address();
-    UpdateStatus(Status(TStatusCode::INTERNAL_ERROR, s.str()));
+    UpdateStatus(Status(ErrorMsg(TErrorCode::INTERNAL_ERROR, s.str())));
     return;
   }
 
@@ -120,7 +120,7 @@ void FragmentMgr::FragmentExecState::ReportStatusCb(
     stringstream msg;
     msg << "ReportExecStatus() to " << coord_address() << " failed:\n" << e.what();
     VLOG_QUERY << msg.str();
-    rpc_status = Status(TStatusCode::INTERNAL_ERROR, msg.str());
+    rpc_status = Status(ErrorMsg(TErrorCode::INTERNAL_ERROR, msg.str()));
   }
 
   if (!rpc_status.ok()) {

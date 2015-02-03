@@ -41,7 +41,7 @@ class DiskIoMgrTest : public testing::Test {
   void WriteValidateCallback(int num_writes, DiskIoMgr::WriteRange** written_range,
       DiskIoMgr* io_mgr, DiskIoMgr::RequestContext* reader, int32_t* data,
       Status expected_status, const Status& status) {
-    if (expected_status.code() == TStatusCode::CANCELLED) {
+    if (expected_status.code() == TErrorCode::CANCELLED) {
       EXPECT_TRUE(status.ok() || status.IsCancelled());
     } else {
       EXPECT_TRUE(status.code() == expected_status.code());
@@ -242,7 +242,7 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
   DiskIoMgr::WriteRange::WriteDoneCallback callback =
       bind(mem_fn(&DiskIoMgrTest::WriteValidateCallback), this, 2,
           new_range, (DiskIoMgr*)NULL, (DiskIoMgr::RequestContext*)NULL,
-          data, Status(TStatusCode::RUNTIME_ERROR), _1);
+          data, Status(TErrorCode::RUNTIME_ERROR, "Test Failure"), _1);
   *new_range = pool_->Add(new DiskIoMgr::WriteRange(tmp_file, rand(), 0, callback));
 
   (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
@@ -260,7 +260,7 @@ TEST_F(DiskIoMgrTest, InvalidWrite) {
   new_range = pool_->Add(new DiskIoMgr::WriteRange*);
   callback = bind(mem_fn(&DiskIoMgrTest::WriteValidateCallback), this, 2,
       new_range, (DiskIoMgr*)NULL, (DiskIoMgr::RequestContext*)NULL,
-      data, Status(TStatusCode::RUNTIME_ERROR), _1);
+      data, Status(TErrorCode::RUNTIME_ERROR, "Test Failure"), _1);
 
   *new_range = pool_->Add(new DiskIoMgr::WriteRange(tmp_file, -1, 0, callback));
   (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));

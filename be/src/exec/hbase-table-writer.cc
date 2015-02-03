@@ -274,8 +274,8 @@ void HBaseTableWriter::Close(RuntimeState* state) {
   Status status = CleanUpJni();
   if (!status.ok()) {
     stringstream ss;
-    ss << "HBaseTableWriter::Close ran into an issue: " << status.GetErrorMsg();
-    state->LogError(ss.str());
+    ss << "HBaseTableWriter::Close ran into an issue: " << status.GetDetail();
+    state->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
   }
 }
 

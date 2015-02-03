@@ -21,6 +21,7 @@
 #include <gutil/strings/substitute.h>
 
 #include "common/object-pool.h"
+#include "common/logging.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/scanner-context.inline.h"
 #include "exec/read-write-util.h"
@@ -37,6 +38,7 @@
 #include "util/bit-util.h"
 #include "util/decompress.h"
 #include "util/debug-util.h"
+#include "util/error-util.h"
 #include "util/dict-encoding.h"
 #include "util/rle-encoding.h"
 #include "util/runtime-profile.h"
@@ -62,6 +64,20 @@ const int MAX_PAGE_HEADER_SIZE = 8 * 1024 * 1024;
 // upper bound.
 const int MAX_DICT_HEADER_SIZE = 100;
 
+#define LOG_OR_ABORT(error_msg, runtime_state)                          \
+  if (runtime_state->abort_on_error()) {                                \
+    return Status(error_msg);                                           \
+  } else {                                                              \
+    runtime_state->LogError(error_msg);                                 \
+    return Status::OK;                                                  \
+  }
+
+#define LOG_OR_RETURN_ON_ERROR(error_msg, runtime_state)                \
+  if (runtime_state->abort_on_error()) {                                \
+    return Status(error_msg.msg());                                     \
+  }                                                                     \
+  runtime_state->LogError(error_msg);
+
 Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     const std::vector<HdfsFileDesc*>& files) {
   vector<DiskIoMgr::ScanRange*> footer_ranges;
@@ -76,10 +92,8 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
       if (split->offset() != 0) {
         // We are expecting each file to be one hdfs block (so all the scan range offsets
         // should be 0).  This is not incorrect but we will issue a warning.
-        stringstream ss;
-        ss << "Parquet file should not be split into multiple hdfs-blocks."
-           << " file=" << files[i]->filename;
-        scan_node->runtime_state()->LogError(ss.str());
+        scan_node->runtime_state()->LogError(
+            ErrorMsg(TErrorCode::PARQUET_MULTIPLE_BLOCKS, files[i]->filename));
         // We assign the entire file to one scan range, so mark all but one split
         // (i.e. the first split) as complete
         scan_node->RangeComplete(THdfsFileFormat::PARQUET, THdfsCompression::NONE);
@@ -536,16 +550,10 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
     RETURN_IF_ERROR(stream_->GetBuffer(true, &buffer, &buffer_size));
     if (buffer_size == 0) {
       DCHECK(stream_->eosr());
-      stringstream ss;
-      ss << "Column metadata states there are " << metadata_->num_values
-         << " values, but only read " << num_values_read_ << " values from column "
-         << (slot_desc()->col_pos() - parent_->scan_node_->num_partition_keys());
-      if (parent_->scan_node_->runtime_state()->abort_on_error()) {
-        return Status(ss.str());
-      } else {
-        parent_->scan_node_->runtime_state()->LogError(ss.str());
-        return Status::OK;
-      }
+      ErrorMsg msg(TErrorCode::PARQUET_COLUMN_METADATA_INVALID,
+         metadata_->num_values, num_values_read_,
+         slot_desc()->col_pos() - parent_->scan_node_->num_partition_keys());
+      LOG_OR_ABORT(msg, parent_->scan_node_->runtime_state());
     }
 
     // We don't know the actual header size until the thrift object is deserialized.  Loop
@@ -554,7 +562,7 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
     while (true) {
       header_size = buffer_size;
       status = DeserializeThriftMsg(
-          buffer, &header_size, true, &current_page_header_, true);
+          buffer, &header_size, true, &current_page_header_);
       if (status.ok()) break;
 
       if (buffer_size >= MAX_PAGE_HEADER_SIZE) {
@@ -562,7 +570,7 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
         ss << "ParquetScanner: could not read data page because page header exceeded "
            << "maximum size of "
            << PrettyPrinter::Print(MAX_PAGE_HEADER_SIZE, TUnit::BYTES);
-        status.AddErrorMsg(ss.str());
+        status.AddDetail(ss.str());
         return status;
       }
 
@@ -578,14 +586,9 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
       DCHECK(status.ok());
 
       if (buffer_size == new_buffer_size) {
-        DCHECK(new_buffer_size != 0);
-        string msg = "ParquetScanner: reached EOF while deserializing data page header.";
-        if (parent_->scan_node_->runtime_state()->abort_on_error()) {
-          return Status(msg);
-        } else {
-          parent_->scan_node_->runtime_state()->LogError(msg);
-          return Status::OK;
-        }
+        DCHECK_NE(new_buffer_size, 0);
+        ErrorMsg msg(TErrorCode::PARQUET_HEADER_EOF);
+        LOG_OR_ABORT(msg, parent_->scan_node_->runtime_state());
       }
       DCHECK_GT(new_buffer_size, buffer_size);
       buffer_size = new_buffer_size;
@@ -827,7 +830,7 @@ Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
             // For correctly formed files, this should be the first column we
             // are reading.
             DCHECK(c == 0 || !parse_status_.ok())
-              << "c=" << c << " " << parse_status_.GetErrorMsg();;
+              << "c=" << c << " " << parse_status_.GetDetail();;
             COUNTER_ADD(scan_node_->rows_read_counter(), i);
             RETURN_IF_ERROR(CommitRows(num_to_commit));
 
@@ -837,16 +840,12 @@ Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
             rows_read += i;
             if (rows_read != expected_rows_in_group) {
               HdfsParquetScanner::BaseColumnReader* reader = column_readers_[c];
-              DCHECK(reader->stream_ != NULL);
-              stringstream ss;
-              ss << "Metadata states that in group " << reader->stream_->filename()
-                 << "[" << row_group_idx << "] there are " << expected_rows_in_group
-                 << " rows, but only " << rows_read << " rows were read.";
-              if (scan_node_->runtime_state()->abort_on_error()) {
-                return Status(ss.str());
-              } else {
-                scan_node_->runtime_state()->LogError(ss.str());
-              }
+              DCHECK_NOTNULL(reader->stream_);
+
+              ErrorMsg msg(TErrorCode::PARQUET_GROUP_ROW_COUNT_ERROR,
+                 reader->stream_->filename(), row_group_idx,
+                 expected_rows_in_group, rows_read);
+              LOG_OR_RETURN_ON_ERROR(msg, scan_node_->runtime_state());
             }
             return parse_status_;
           }
@@ -901,15 +900,10 @@ Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
       // in the file.
       HdfsParquetScanner::BaseColumnReader* reader = column_readers_[0];
       DCHECK(reader->stream_ != NULL);
-      stringstream ss;
-      ss << "Metadata states that in group " << reader->stream_->filename() << "["
-         << row_group_idx << "] there are " << expected_rows_in_group << " rows, but"
-         << " there is at least one more row in the file.";
-      if (scan_node_->runtime_state()->abort_on_error()) {
-        return Status(ss.str());
-      } else {
-        scan_node_->runtime_state()->LogError(ss.str());
-      }
+      ErrorMsg msg(TErrorCode::PARQUET_GROUP_ROW_COUNT_OVERFLOW,
+          reader->stream_->filename(), row_group_idx,
+          expected_rows_in_group);
+      LOG_OR_RETURN_ON_ERROR(msg, scan_node_->runtime_state());
     }
   }
 
@@ -1005,7 +999,7 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
     return Status(Substitute("File $0 has invalid file metadata at file offset $1. "
         "Error = $2.", stream_->filename(),
         metadata_size + sizeof(PARQUET_VERSION_NUMBER) + sizeof(uint32_t),
-        status.GetErrorMsg()));
+        status.GetDetail()));
   }
 
   RETURN_IF_ERROR(ValidateFileMetadata());
@@ -1189,7 +1183,7 @@ Status HdfsParquetScanner::CreateSchemaTree(
     int* col_idx, HdfsParquetScanner::SchemaNode* node) const {
   if (*idx >= schema.size()) {
     return Status(Substitute("File $0 corrupt: could not reconstruct schema tree from "
-        "flattened schema in file metadata"), stream_->filename());
+            "flattened schema in file metadata", stream_->filename()));
   }
   node->element = &schema[*idx];
   ++(*idx);
@@ -1390,42 +1384,32 @@ Status HdfsParquetScanner::ValidateColumn(
 
     // The other decimal metadata should be there but we don't need it.
     if (!schema_element.__isset.precision) {
-      stringstream ss;
-      ss << "File '" << metadata_range_->file() << "' column '" << schema_element.name
-         << "' does not have the precision set.";
-      if (state_->abort_on_error()) return Status(ss.str());
-      state_->LogError(ss.str());
+      ErrorMsg msg(TErrorCode::PARQUET_MISSING_PRECISION,
+          metadata_range_->file(), schema_element.name);
+      LOG_OR_RETURN_ON_ERROR(msg, state_);
     } else {
       if (schema_element.precision != slot_desc->type().precision) {
         // TODO: we could allow a mismatch and do a conversion at this step.
-        stringstream ss;
-        ss << "File '" << metadata_range_->file() << "' column '" << schema_element.name
-          << "' has a precision that does not match the table metadata precision."
-          << " File metadata precision: " << schema_element.precision
-          << " Table metadata precision: " << slot_desc->type().precision;
-        if (state_->abort_on_error()) return Status(ss.str());
-        state_->LogError(ss.str());
+        ErrorMsg msg(TErrorCode::PARQUET_WRONG_PRECISION,
+            metadata_range_->file(), schema_element.name,
+            schema_element.precision, slot_desc->type().precision);
+        LOG_OR_RETURN_ON_ERROR(msg, state_);
       }
     }
 
     if (!is_converted_type_decimal) {
       // TODO: is this validation useful? It is not required at all to read the data and
       // might only serve to reject otherwise perfectly readable files.
-      stringstream ss;
-      ss << "File '" << metadata_range_->file() << "' column '" << schema_element.name
-         << "' does not have converted type set to DECIMAL.";
-      if (state_->abort_on_error()) return Status(ss.str());
-      state_->LogError(ss.str());
+      ErrorMsg msg(TErrorCode::PARQUET_BAD_CONVERTED_TYPE,
+          metadata_range_->file(), schema_element.name);
+      LOG_OR_RETURN_ON_ERROR(msg, state_);
     }
   } else if (schema_element.__isset.scale || schema_element.__isset.precision ||
       is_converted_type_decimal) {
-    stringstream ss;
-    ss << "File '" << metadata_range_->file() << "' column '" << schema_element.name
-       << "' contains decimal data but the table metadata has type " << slot_desc->type();
-    if (state_->abort_on_error()) return Status(ss.str());
-    state_->LogError(ss.str());
+    ErrorMsg msg(TErrorCode::PARQUET_INCOMPATIBLE_DECIMAL,
+        metadata_range_->file(), schema_element.name, slot_desc->type().DebugString());
+    LOG_OR_RETURN_ON_ERROR(msg, state_);
   }
-
   return Status::OK;
 }
 

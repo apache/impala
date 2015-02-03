@@ -300,7 +300,7 @@ class SimpleTupleStreamTest : public testing::Test {
   void TestValues(int num_batches, RowDescriptor* desc, bool gen_null) {
     BufferedTupleStream stream(runtime_state_.get(), *desc, block_mgr_.get(), client_);
     Status status = stream.Init();
-    ASSERT_TRUE(status.ok()) << status.GetErrorMsg();
+    ASSERT_TRUE(status.ok()) << status.GetDetail();
     status = stream.UnpinStream();
     ASSERT_TRUE(status.ok());
 

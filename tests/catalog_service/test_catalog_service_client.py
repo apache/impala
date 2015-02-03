@@ -24,7 +24,8 @@ from tests.common.impala_cluster import ImpalaCluster
 
 from CatalogService import CatalogService
 from CatalogService.CatalogService import TGetFunctionsRequest, TGetFunctionsResponse
-from Status.ttypes import TStatus, TStatusCode
+from ErrorCodes.ttypes import TErrorCode
+from Status.ttypes import TStatus
 from thrift.transport.TSocket import TSocket
 from thrift.protocol import TBinaryProtocol
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
@@ -72,7 +73,7 @@ class TestCatalogServiceClient(ImpalaTestSuite):
     request = TGetFunctionsRequest()
     request.db_name = self.TEST_DB
     response = catalog_client.GetFunctions(request)
-    assert response.status.status_code == TStatusCode.OK
+    assert response.status.status_code == TErrorCode.OK
     assert len(response.functions) == 0
 
     # Add a function and make sure it shows up.
@@ -94,7 +95,7 @@ class TestCatalogServiceClient(ImpalaTestSuite):
         "LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn'" % self.TEST_DB)
     response = catalog_client.GetFunctions(request)
     LOG.debug(response)
-    assert response.status.status_code == TStatusCode.OK
+    assert response.status.status_code == TErrorCode.OK
     assert len(response.functions) == 2
 
     functions = [fn for fn in response.functions]
@@ -111,7 +112,7 @@ class TestCatalogServiceClient(ImpalaTestSuite):
         "CATION '/test-warehouse/libTestUdas.so' UPDATE_FN='TwoArgUpdate'" % self.TEST_DB)
     response = catalog_client.GetFunctions(request)
     LOG.debug(response)
-    assert response.status.status_code == TStatusCode.OK
+    assert response.status.status_code == TErrorCode.OK
     assert len(response.functions) == 3
     functions = [fn for fn in response.functions if fn.aggregate_fn is not None]
     # Should be only 1 aggregate function
@@ -121,11 +122,11 @@ class TestCatalogServiceClient(ImpalaTestSuite):
     request.db_name = self.TEST_DB + "_does_not_exist"
     response = catalog_client.GetFunctions(request)
     LOG.debug(response)
-    assert response.status.status_code == TStatusCode.INTERNAL_ERROR
+    assert response.status.status_code == TErrorCode.GENERAL
     assert 'Database does not exist: ' in str(response.status)
 
     request = TGetFunctionsRequest()
     response = catalog_client.GetFunctions(request)
     LOG.debug(response)
-    assert response.status.status_code == TStatusCode.INTERNAL_ERROR
+    assert response.status.status_code == TErrorCode.GENERAL
     assert 'Database name must be set' in str(response.status)

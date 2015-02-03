@@ -136,11 +136,13 @@ set(PYTHON_ARGS ${THRIFT_INCLUDE_DIR_OPTION} -r --gen py -o ${PYTHON_OUTPUT_DIR}
 set (EXT_DATA_SRC_FILES
   ExternalDataSource.thrift
   Data.thrift
+  ErrorCodes.thrift
   Status.thrift
   Types.thrift
 )
 
 set (SRC_FILES
+  ErrorCodes.thrift
   beeswax.thrift
   CatalogInternalService.thrift
   CatalogObjects.thrift
@@ -170,6 +172,9 @@ set (SRC_FILES
   ${EXT_DATA_SRC_FILES}
 )
 
+add_custom_command(OUTPUT ErrorCodes.thrift
+  COMMAND python generate_error_codes.py
+  DEPENDS generate_error_codes.py)
 
 # Create a build command for each of the thrift src files and generate
 # a list of files they produce

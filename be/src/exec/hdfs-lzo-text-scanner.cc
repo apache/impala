@@ -70,7 +70,7 @@ Status HdfsLzoTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
         stringstream ss;
         ss << "Error loading impala-lzo library. Check that the impala-lzo library "
            << "is at version " << IMPALA_BUILD_VERSION;
-        library_load_status_.AddErrorMsg(ss.str());
+        library_load_status_.AddDetail(ss.str());
         return library_load_status_;
       }
     } else {

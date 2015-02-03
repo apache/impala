@@ -98,6 +98,7 @@ import com.cloudera.impala.thrift.TDdlExecRequest;
 import com.cloudera.impala.thrift.TDdlType;
 import com.cloudera.impala.thrift.TDescribeTableOutputStyle;
 import com.cloudera.impala.thrift.TDescribeTableResult;
+import com.cloudera.impala.thrift.TErrorCode;
 import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExplainResult;
@@ -116,7 +117,6 @@ import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TStatus;
-import com.cloudera.impala.thrift.TStatusCode;
 import com.cloudera.impala.thrift.TStmtType;
 import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
@@ -710,7 +710,7 @@ public class Frontend {
     LOG.info(String.format("Requesting prioritized load of table(s): %s",
         Joiner.on(", ").join(missingTbls)));
     TStatus status = FeSupport.PrioritizeLoad(missingTbls);
-    if (status.getStatus_code() != TStatusCode.OK) {
+    if (status.getStatus_code() != TErrorCode.OK) {
       throw new InternalException("Error requesting prioritized load: " +
           Joiner.on("\n").join(status.getError_msgs()));
     }

@@ -159,7 +159,8 @@ class Coordinator {
   // Must only be called after Wait()
   bool PrepareCatalogUpdate(TUpdateCatalogRequest* catalog_update);
 
-  // Return error log for coord and all the fragments
+  // Return error log for coord and all the fragments. The error messages from the
+  // individual backends are merged into a single output to retain readability.
   std::string GetErrorLog();
 
   const ProgressUpdater& progress() { return progress_; }

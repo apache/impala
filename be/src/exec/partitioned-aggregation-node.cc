@@ -708,10 +708,8 @@ void PartitionedAggregationNode::DebugString(int indentation_level,
 Status PartitionedAggregationNode::CreateHashPartitions(int level) {
   if (level >= MAX_PARTITION_DEPTH) {
     Status status = Status::MEM_LIMIT_EXCEEDED;
-    status.AddErrorMsg(Substitute("Cannot perform aggregation at hash aggregation node"
-        " with id $0. The input data was partitioned the maximum number of $1 times."
-        " This could mean there is significant skew in the data or the memory limit is"
-        " set too low.", id_, MAX_PARTITION_DEPTH));
+    status.SetErrorMsg(ErrorMsg(TErrorCode::PARTITIONED_AGG_MAX_PARTITION_DEPTH,
+        id_, MAX_PARTITION_DEPTH));
     state_->SetMemLimitExceeded();
     return status;
   }
@@ -806,7 +804,7 @@ Status PartitionedAggregationNode::NextPartition() {
           "more rows than the input";
       if (num_input_rows == largest_partition) {
         Status status = Status::MEM_LIMIT_EXCEEDED;
-        status.AddErrorMsg(Substitute("Cannot perform aggregation at node with id $0. "
+        status.AddDetail(Substitute("Cannot perform aggregation at node with id $0. "
             "Repartitioning did not reduce the size of a spilled partition. "
             "Repartitioning level $1. Number of rows $2.",
             id_, partition->level + 1, num_input_rows));
@@ -869,8 +867,8 @@ Status PartitionedAggregationNode::SpillPartition(Partition* curr_partition,
       }
       if (!got_buffer) {
         Status status = Status::MEM_LIMIT_EXCEEDED;
-        status.AddErrorMsg("Not enough memory to get the minimum required buffers for "
-                           "aggregation.");
+        status.AddDetail("Not enough memory to get the minimum required buffers for "
+            "aggregation.");
         return status;
       }
     }
@@ -1052,7 +1050,7 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
   Function* agg_expr_fn;
   Status status = input_expr->GetCodegendComputeFn(state_, &agg_expr_fn);
   if (!status.ok()) {
-    VLOG_QUERY << "Could not codegen UpdateSlot(): " << status.GetErrorMsg();
+    VLOG_QUERY << "Could not codegen UpdateSlot(): " << status.GetDetail();
     return NULL;
   }
   DCHECK(agg_expr_fn != NULL);

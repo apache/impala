@@ -12,21 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+include "ErrorCodes.thrift"
+
 namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
-enum TStatusCode {
-  OK,
-  CANCELLED,
-  ANALYSIS_ERROR,
-  NOT_IMPLEMENTED_ERROR,
-  RUNTIME_ERROR,
-  MEM_LIMIT_EXCEEDED,
-  INTERNAL_ERROR,
-  RECOVERABLE_ERROR
-}
-
 struct TStatus {
-  1: required TStatusCode status_code
+  1: required ErrorCodes.TErrorCode status_code
   2: list<string> error_msgs
 }

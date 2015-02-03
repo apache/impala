@@ -206,7 +206,7 @@ Status StatestoreSubscriber::Start() {
       is_registered_ = true;
       LOG(INFO) << "statestore registration successful";
     } else {
-      LOG(INFO) << "statestore registration unsuccessful: " << status.GetErrorMsg();
+      LOG(INFO) << "statestore registration unsuccessful: " << status.GetDetail();
     }
   }
 
@@ -249,7 +249,7 @@ void StatestoreSubscriber::RecoveryModeChecker() {
         } else {
           // Don't exit recovery mode, continue
           LOG(WARNING) << "Failed to re-register with statestore: "
-                       << status.GetErrorMsg();
+                       << status.GetDetail();
           SleepForMs(SLEEP_INTERVAL_MS);
         }
         last_recovery_duration_metric_->set_value(
@@ -292,7 +292,7 @@ void StatestoreSubscriber::Heartbeat(const TUniqueId& registration_id) {
         heartbeat_interval_timer_.Reset() / (1000.0 * 1000.0 * 1000.0));
     failure_detector_->UpdateHeartbeat(STATESTORE_ID, true);
   } else {
-    VLOG_RPC << "Heartbeat: " << status.GetErrorMsg();
+    VLOG_RPC << "Heartbeat: " << status.GetDetail();
   }
 }
 

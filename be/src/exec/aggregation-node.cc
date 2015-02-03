@@ -509,7 +509,7 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(
   Function* agg_expr_fn;
   Status status = input_expr->GetCodegendComputeFn(state, &agg_expr_fn);
   if (!status.ok()) {
-    VLOG_QUERY << "Could not codegen UpdateSlot(): " << status.GetErrorMsg();
+    VLOG_QUERY << "Could not codegen UpdateSlot(): " << status.GetDetail();
     return NULL;
   }
   DCHECK(agg_expr_fn != NULL);

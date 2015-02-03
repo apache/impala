@@ -512,7 +512,7 @@ Function* HashTableCtx::CodegenEvalRow(RuntimeState* state, bool build) {
     Function* expr_fn;
     Status status = ctxs[i]->root()->GetCodegendComputeFn(state, &expr_fn);
     if (!status.ok()) {
-      VLOG_QUERY << "Problem with CodegenEvalRow: " << status.GetErrorMsg();
+      VLOG_QUERY << "Problem with CodegenEvalRow: " << status.GetDetail();
       fn->eraseFromParent(); // deletes function
       return NULL;
     }
@@ -800,7 +800,7 @@ Function* HashTableCtx::CodegenEquals(RuntimeState* state) {
     Function* expr_fn;
     Status status = build_expr_ctxs_[i]->root()->GetCodegendComputeFn(state, &expr_fn);
     if (!status.ok()) {
-      VLOG_QUERY << "Problem with CodegenEquals: " << status.GetErrorMsg();
+      VLOG_QUERY << "Problem with CodegenEquals: " << status.GetDetail();
       fn->eraseFromParent(); // deletes function
       return NULL;
     }

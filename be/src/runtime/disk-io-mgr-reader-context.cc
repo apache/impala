@@ -178,7 +178,7 @@ string DiskIoMgr::RequestContext::DebugString() const {
   if (state_ == RequestContext::Cancelled) ss << "Cancelled";
   if (state_ == RequestContext::Active) ss << "Active";
   if (state_ != RequestContext::Inactive) {
-    ss << " status_=" << (status_.ok() ? "OK" : status_.GetErrorMsg())
+    ss << " status_=" << (status_.ok() ? "OK" : status_.GetDetail())
        << " #ready_buffers=" << num_ready_buffers_
        << " #used_buffers=" << num_used_buffers_
        << " #num_buffers_in_reader=" << num_buffers_in_reader_

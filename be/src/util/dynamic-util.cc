@@ -23,13 +23,13 @@ using namespace std;
 
 namespace impala {
 
-Status DynamicLookup(void* handle, const char* symbol, void** fn_ptr, bool quiet) {
+Status DynamicLookup(void* handle, const char* symbol, void** fn_ptr) {
   *(void **) (fn_ptr) = dlsym(handle, symbol);
   char* error = dlerror();
   if (error != NULL) {
     stringstream ss;
     ss << "Unable to find " << symbol << "\ndlerror: " << error;
-    return Status(ss.str(), quiet);
+    return Status(ss.str());
   }
   return Status::OK;
 }

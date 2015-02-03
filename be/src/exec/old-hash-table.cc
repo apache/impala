@@ -24,6 +24,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
 #include "util/debug-util.h"
+#include "util/error-util.h"
 #include "util/impalad-metrics.h"
 
 using namespace impala;
@@ -284,8 +285,8 @@ Function* OldHashTable::CodegenEvalTupleRow(RuntimeState* state, bool build) {
       Status status = ctxs[i]->root()->GetCodegendComputeFn(state, &expr_fn);
       if (!status.ok()) {
         stringstream ss;
-        ss << "Problem with codegen: " << status.GetErrorMsg();
-        state->LogError(ss.str());
+        ss << "Problem with codegen: " << status.GetDetail();
+        state->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
         fn->eraseFromParent(); // deletes function
         return NULL;
       }
@@ -593,8 +594,8 @@ Function* OldHashTable::CodegenEquals(RuntimeState* state) {
       Status status = build_expr_ctxs_[i]->root()->GetCodegendComputeFn(state, &expr_fn);
       if (!status.ok()) {
         stringstream ss;
-        ss << "Problem with codegen: " << status.GetErrorMsg();
-        state->LogError(ss.str());
+        ss << "Problem with codegen: " << status.GetDetail();
+        state->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
         fn->eraseFromParent(); // deletes function
         return NULL;
       }

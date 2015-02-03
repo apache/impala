@@ -115,11 +115,11 @@ Status ExternalDataSourceExecutor::Close(const TCloseParams& params,
   JNIEnv* env = getJNIEnv();
   if (executor_ != NULL) {
     env->DeleteGlobalRef(executor_);
-    status.AddError(JniUtil::GetJniExceptionMsg(env)); // no-op if Status == OK
+    status.MergeStatus(JniUtil::GetJniExceptionMsg(env)); // no-op if Status == OK
   }
   if (executor_class_ != NULL) {
     env->DeleteGlobalRef(executor_class_);
-    status.AddError(JniUtil::GetJniExceptionMsg(env));
+    status.MergeStatus(JniUtil::GetJniExceptionMsg(env));
   }
   is_initialized_ = false;
   return status;

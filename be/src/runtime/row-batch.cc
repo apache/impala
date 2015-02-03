@@ -76,7 +76,7 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
     scoped_ptr<Codec> decompressor;
     Status status = Codec::CreateDecompressor(NULL, false, input_batch.compression_type,
         &decompressor);
-    DCHECK(status.ok()) << status.GetErrorMsg();
+    DCHECK(status.ok()) << status.GetDetail();
 
     int64_t uncompressed_size = input_batch.uncompressed_size;
     DCHECK_NE(uncompressed_size, -1) << "RowBatch decompression failed";
@@ -187,7 +187,7 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
     scoped_ptr<Codec> compressor;
     Status status = Codec::CreateCompressor(NULL, false, THdfsCompression::LZ4,
                                             &compressor);
-    DCHECK(status.ok()) << status.GetErrorMsg();
+    DCHECK(status.ok()) << status.GetDetail();
 
     int64_t compressed_size = compressor->MaxOutputLen(size);
     if (compression_scratch_.size() < compressed_size) {

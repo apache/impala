@@ -118,7 +118,7 @@ class RuntimeState {
   }
   const TimestampValue* now() const { return now_.get(); }
   void set_now(const TimestampValue* now);
-  const std::vector<std::string>& error_log() const { return error_log_; }
+  const ErrorLogMap& error_log() const { return error_log_; }
   const std::vector<std::pair<std::string, int> >& file_errors() const {
     return file_errors_;
   }
@@ -201,12 +201,11 @@ class RuntimeState {
     return query_status_;
   };
 
-  // Appends error to the error_log_ if there is space. Returns true if there was space
-  // and the error was logged.
-  bool LogError(const std::string& error);
-
-  // If !status.ok(), appends the error to the error_log_
-  void LogError(const Status& status);
+  // Log an error that will be sent back to the coordinator based on an instance of the
+  // ErrorMsg class. The runtime state aggregates log messages based on type with one
+  // exception: messages with the GENERAL type are not aggregated but are kept
+  // individually.
+  bool LogError(const ErrorMsg& msg);
 
   // Returns true if the error log has not reached max_errors_.
   bool LogHasSpace() {
@@ -226,9 +225,9 @@ class RuntimeState {
   // Returns the error log lines as a string joined with '\n'.
   std::string ErrorLog();
 
-  // Append all error_log_[unreported_error_idx_+] to new_errors and set
-  // unreported_error_idx_ to errors_log_.size()
-  void GetUnreportedErrors(std::vector<std::string>* new_errors);
+  // Append all accumulated errors since the last call to this function to new_errors to
+  // be sent back to the coordinator
+  void GetUnreportedErrors(ErrorLogMap* new_errors);
 
   // Returns a string representation of the file_errors_.
   std::string FileErrors();
@@ -287,10 +286,7 @@ class RuntimeState {
   SpinLock error_log_lock_;
 
   // Logs error messages.
-  std::vector<std::string> error_log_;
-
-  // error_log_[unreported_error_idx_+] has been not reported to the coordinator.
-  int unreported_error_idx_;
+  ErrorLogMap error_log_;
 
   // Lock protecting file_errors_
   SpinLock file_errors_lock_;
@@ -387,7 +383,7 @@ class RuntimeState {
 
 #define RETURN_IF_CANCELLED(state) \
   do { \
-    if (UNLIKELY((state)->is_cancelled())) return Status(TStatusCode::CANCELLED); \
+    if (UNLIKELY((state)->is_cancelled())) return Status::CANCELLED; \
   } while (false)
 
 }

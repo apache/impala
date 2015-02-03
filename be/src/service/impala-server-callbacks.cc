@@ -140,14 +140,14 @@ void ImpalaServer::CancelQueryUrlCallback(const Webserver::ArgumentMap& args,
   TUniqueId unique_id;
   Status status = ParseQueryId(args, &unique_id);
   if (!status.ok()) {
-    Value error(status.GetErrorMsg().c_str(), document->GetAllocator());
+    Value error(status.GetDetail().c_str(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
     return;
   }
   Status cause("Cancelled from Impala's debug web interface");
   status = UnregisterQuery(unique_id, true, &cause);
   if (!status.ok()) {
-    Value error(status.GetErrorMsg().c_str(), document->GetAllocator());
+    Value error(status.GetDetail().c_str(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
     return;
   }
@@ -160,7 +160,7 @@ void ImpalaServer::QueryProfileUrlCallback(const Webserver::ArgumentMap& args,
   TUniqueId unique_id;
   Status parse_status = ParseQueryId(args, &unique_id);
   if (!parse_status.ok()) {
-    Value error(parse_status.GetErrorMsg().c_str(), document->GetAllocator());
+    Value error(parse_status.GetDetail().c_str(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
     return;
   }
@@ -168,7 +168,7 @@ void ImpalaServer::QueryProfileUrlCallback(const Webserver::ArgumentMap& args,
   stringstream ss;
   Status status = GetRuntimeProfileStr(unique_id, false, &ss);
   if (!status.ok()) {
-    Value error(status.GetErrorMsg().c_str(), document->GetAllocator());
+    Value error(status.GetDetail().c_str(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
     return;
   }
@@ -186,11 +186,11 @@ void ImpalaServer::QueryProfileEncodedUrlCallback(const Webserver::ArgumentMap& 
   stringstream ss;
   Status status = ParseQueryId(args, &unique_id);
   if (!status.ok()) {
-    ss << status.GetErrorMsg();
+    ss << status.GetDetail();
   } else {
     Status status = GetRuntimeProfileStr(unique_id, true, &ss);
     if (!status.ok()) {
-      ss.str(Substitute("Could not obtain runtime profile: $0", status.GetErrorMsg()));
+      ss.str(Substitute("Could not obtain runtime profile: $0", status.GetDetail()));
     }
   }
 
@@ -364,7 +364,7 @@ void ImpalaServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,
   TGetDbsResult get_dbs_result;
   Status status = exec_env_->frontend()->GetDbNames(NULL, NULL, &get_dbs_result);
   if (!status.ok()) {
-    Value error(status.GetErrorMsg().c_str(), document->GetAllocator());
+    Value error(status.GetDetail().c_str(), document->GetAllocator());
     document->AddMember("error", error, document->GetAllocator());
     return;
   }
@@ -379,7 +379,7 @@ void ImpalaServer::CatalogUrlCallback(const Webserver::ArgumentMap& args,
     Status status =
         exec_env_->frontend()->GetTableNames(db, NULL, NULL, &get_table_results);
     if (!status.ok()) {
-      Value error(status.GetErrorMsg().c_str(), document->GetAllocator());
+      Value error(status.GetDetail().c_str(), document->GetAllocator());
       database.AddMember("error", error, document->GetAllocator());
       continue;
     }
@@ -419,7 +419,7 @@ void ImpalaServer::CatalogObjectsUrlCallback(const Webserver::ArgumentMap& args,
       Value debug_string(ThriftDebugString(result).c_str(), document->GetAllocator());
       document->AddMember("thrift_string", debug_string, document->GetAllocator());
     } else {
-      Value error(status.GetErrorMsg().c_str(), document->GetAllocator());
+      Value error(status.GetDetail().c_str(), document->GetAllocator());
       document->AddMember("error", error, document->GetAllocator());
     }
   } else {
@@ -552,7 +552,7 @@ void ImpalaServer::QuerySummaryCallback(bool include_json_plan, bool include_sum
   Status status = ParseQueryId(args, &query_id);
   if (!status.ok()) {
     // Redact the error message, it may contain part or all of the query.
-    Value json_error(RedactCopy(status.GetErrorMsg()).c_str(), document->GetAllocator());
+    Value json_error(RedactCopy(status.GetDetail()).c_str(), document->GetAllocator());
     document->AddMember("error", json_error, document->GetAllocator());
     return;
   }
@@ -626,7 +626,7 @@ void ImpalaServer::QuerySummaryCallback(bool include_json_plan, bool include_sum
 
   // Redact the error in case the query is contained in the error message.
   Value json_status(query_status.ok() ? "OK" :
-      RedactCopy(query_status.GetErrorMsg()).c_str(), document->GetAllocator());
+      RedactCopy(query_status.GetDetail()).c_str(), document->GetAllocator());
   document->AddMember("status", json_status, document->GetAllocator());
   Value json_id(PrintId(query_id).c_str(), document->GetAllocator());
   document->AddMember("query_id", json_id, document->GetAllocator());

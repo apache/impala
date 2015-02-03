@@ -19,6 +19,10 @@
 #include <assert.h>
 #include <gutil/port.h> // for aligned_malloc
 
+#ifndef IMPALA_UDF_SDK_BUILD
+#include "util/error-util.h"
+#endif
+
 // Be careful what this includes since this needs to be linked into the UDF's
 // binary. For example, it would be unfortunate if they had a random dependency
 // on libhdfs.
@@ -350,8 +354,12 @@ bool FunctionContext::AddWarning(const char* warning_msg) {
     // TODO: somehow print the full error log in the shell? This is a problem for any
     // function using LogError() during close.
     LOG(WARNING) << ss.str();
-#endif
+    return impl_->state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
+#else
+    // In case of the SDK build, we simply, forward this call to a dummy method
     return impl_->state_->LogError(ss.str());
+#endif
+
   } else {
     cerr << ss.str() << endl;
     return true;

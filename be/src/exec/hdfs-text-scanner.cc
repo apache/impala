@@ -99,7 +99,7 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
               ss << "For better performance, snappy, gzip and bzip-compressed files "
                  << "should not be split into multiple hdfs-blocks. file="
                  << files[i]->filename << " offset " << split->offset();
-              scan_node->runtime_state()->LogError(ss.str());
+              scan_node->runtime_state()->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
               warning_written = true;
             }
             // We assign the entire file to one scan range, so mark all but one split
@@ -269,8 +269,10 @@ Status HdfsTextScanner::FinishScanRange() {
       if (!status.ok()) {
         stringstream ss;
         ss << "Read failed while trying to finish scan range: " << stream_->filename()
-           << ":" << stream_->file_offset() << endl << status.GetErrorMsg();
-        if (state_->LogHasSpace()) state_->LogError(ss.str());
+           << ":" << stream_->file_offset() << endl << status.GetDetail();
+        if (state_->LogHasSpace()) {
+          state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
+        }
         if (state_->abort_on_error()) return Status(ss.str());
       } else if (!partial_tuple_empty_ || !boundary_column_.Empty() ||
           !boundary_row_.Empty()) {
@@ -500,7 +502,9 @@ Status HdfsTextScanner::FillByteBufferGzip(bool* eosr) {
       stringstream ss;
       ss << "Unexpected end of gzip stream before end of file: ";
       ss << stream_->filename();
-      if (state_->LogHasSpace()) state_->LogError(ss.str());
+      if (state_->LogHasSpace()) {
+        state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
+      }
       if (state_->abort_on_error()) parse_status_ = Status(ss.str());
       RETURN_IF_ERROR(parse_status_);
     }
@@ -670,7 +674,7 @@ int HdfsTextScanner::WriteFields(MemPool* pool, TupleRow* tuple_row,
           stringstream ss;
           ss << "file: " << stream_->filename() << endl << "record: ";
           LogRowParseError(0, &ss);
-          state_->LogError(ss.str());
+          state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
         }
         if (state_->abort_on_error()) parse_status_ = Status(state_->ErrorLog());
         if (!parse_status_.ok()) return 0;

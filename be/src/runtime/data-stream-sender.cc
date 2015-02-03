@@ -214,7 +214,7 @@ void DataStreamSender::Channel::TransmitDataHelper(const TRowBatch* batch) {
       }
     }
 
-    if (res.status.status_code != TStatusCode::OK) {
+    if (res.status.status_code != TErrorCode::OK) {
       rpc_status_ = res.status;
     } else {
       num_data_bytes_sent_ += RowBatch::GetBatchSize(*batch);
@@ -275,7 +275,7 @@ Status DataStreamSender::Channel::SendCurrentBatch() {
 Status DataStreamSender::Channel::GetSendStatus() {
   WaitForRpc();
   if (!rpc_status_.ok()) {
-    LOG(ERROR) << "channel send status: " << rpc_status_.GetErrorMsg();
+    LOG(ERROR) << "channel send status: " << rpc_status_.GetDetail();
   }
   return rpc_status_;
 }
@@ -325,7 +325,8 @@ Status DataStreamSender::Channel::CloseInternal() {
 }
 
 void DataStreamSender::Channel::Close(RuntimeState* state) {
-  state->LogError(CloseInternal());
+  Status s = CloseInternal();
+  if (!s.ok()) state->LogError(s.msg());
   rpc_thread_.DrainAndShutdown();
   batch_.reset();
 }

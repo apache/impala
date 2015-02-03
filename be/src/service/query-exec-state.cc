@@ -493,7 +493,7 @@ void ImpalaServer::QueryExecState::Done() {
     Status status = exec_env_->scheduler()->Release(schedule_.get());
     if (!status.ok()) {
       LOG(WARNING) << "Failed to release resources of query " << schedule_->query_id()
-            << " because of error: " << status.GetErrorMsg();
+            << " because of error: " << status.GetDetail();
     }
   }
 
@@ -591,15 +591,15 @@ Status ImpalaServer::QueryExecState::FetchRows(const int32_t max_rows,
 Status ImpalaServer::QueryExecState::RestartFetch() {
   // No result caching for this query. Restart is invalid.
   if (result_cache_max_size_ <= 0) {
-    return Status(TStatusCode::RECOVERABLE_ERROR,
-        "Restarting of fetch requires enabling of query result caching.");
+    return Status(ErrorMsg(TErrorCode::RECOVERABLE_ERROR,
+        "Restarting of fetch requires enabling of query result caching."));
   }
   // The cache overflowed on a previous fetch.
   if (result_cache_.get() == NULL) {
     stringstream ss;
     ss << "The query result cache exceeded its limit of " << result_cache_max_size_
        << " rows. Restarting the fetch is not possible.";
-    return Status(TStatusCode::RECOVERABLE_ERROR, ss.str());
+    return Status(ErrorMsg(TErrorCode::RECOVERABLE_ERROR, ss.str()));
   }
   // Reset fetch state to start over.
   eos_ = false;
@@ -617,7 +617,7 @@ Status ImpalaServer::QueryExecState::UpdateQueryStatus(const Status& status) {
   if (!status.ok() && query_status_.ok()) {
     query_state_ = QueryState::EXCEPTION;
     query_status_ = status;
-    summary_profile_.AddInfoString("Query Status", query_status_.GetErrorMsg());
+    summary_profile_.AddInfoString("Query Status", query_status_.GetDetail());
   }
 
   return status;
@@ -828,7 +828,7 @@ Status ImpalaServer::QueryExecState::UpdateCatalog() {
       }
 
       Status status(resp.result.status);
-      if (!status.ok()) LOG(ERROR) << "ERROR Finalizing DML: " << status.GetErrorMsg();
+      if (!status.ok()) LOG(ERROR) << "ERROR Finalizing DML: " << status.GetDetail();
       RETURN_IF_ERROR(status);
       RETURN_IF_ERROR(parent_server_->ProcessCatalogUpdateResult(resp.result,
           exec_request_.query_options.sync_ddl));

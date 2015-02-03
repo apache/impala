@@ -39,8 +39,8 @@ import com.cloudera.impala.extdatasource.thrift.TOpenResult;
 import com.cloudera.impala.extdatasource.thrift.TPrepareParams;
 import com.cloudera.impala.extdatasource.thrift.TPrepareResult;
 import com.cloudera.impala.extdatasource.v1.ExternalDataSource;
+import com.cloudera.impala.thrift.TErrorCode;
 import com.cloudera.impala.thrift.TStatus;
-import com.cloudera.impala.thrift.TStatusCode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -158,7 +158,7 @@ public class ExternalDataSourceExecutor {
         jarPath_, className_, apiVersion_.name(), opName,
         exceptionMessage);
     LOG.error(errorMessage, e); // Logs the stack
-    return new TStatus(TStatusCode.RUNTIME_ERROR, Lists.newArrayList(errorMessage));
+    return new TStatus(TErrorCode.RUNTIME_ERROR, Lists.newArrayList(errorMessage));
   }
 
   public TPrepareResult prepare(TPrepareParams params) {

@@ -39,12 +39,12 @@ import com.cloudera.impala.common.ByteUnits;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.JniUtil;
+import com.cloudera.impala.thrift.TErrorCode;
 import com.cloudera.impala.thrift.TPoolConfigParams;
 import com.cloudera.impala.thrift.TPoolConfigResult;
 import com.cloudera.impala.thrift.TResolveRequestPoolParams;
 import com.cloudera.impala.thrift.TResolveRequestPoolResult;
 import com.cloudera.impala.thrift.TStatus;
-import com.cloudera.impala.thrift.TStatusCode;
 import com.cloudera.impala.util.FileWatchService.FileChangeListener;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -296,16 +296,16 @@ public class RequestPoolService {
       if (errorMessage == null) {
         // This occurs when assignToPool returns null (not an error), i.e. if the pool
         // cannot be resolved according to the policy.
-        result.setStatus(new TStatus(TStatusCode.OK, Lists.<String>newArrayList()));
+        result.setStatus(new TStatus(TErrorCode.OK, Lists.<String>newArrayList()));
       } else {
         // If Yarn throws an exception, return an error status.
         result.setStatus(
-            new TStatus(TStatusCode.INTERNAL_ERROR, Lists.newArrayList(errorMessage)));
+            new TStatus(TErrorCode.INTERNAL_ERROR, Lists.newArrayList(errorMessage)));
       }
     } else {
       result.setResolved_pool(pool);
       result.setHas_access(hasAccess(pool, user));
-      result.setStatus(new TStatus(TStatusCode.OK, Lists.<String>newArrayList()));
+      result.setStatus(new TStatus(TErrorCode.OK, Lists.<String>newArrayList()));
     }
     return result;
   }

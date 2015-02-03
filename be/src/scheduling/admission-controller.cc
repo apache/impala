@@ -203,7 +203,7 @@ Status AdmissionController::Init(StatestoreSubscriber* subscriber) {
     bind<void>(mem_fn(&AdmissionController::UpdatePoolStats), this, _1, _2);
   Status status = subscriber->AddTopic(IMPALA_REQUEST_QUEUE_TOPIC, true, cb);
   if (!status.ok()) {
-    status.AddErrorMsg("AdmissionController failed to register request queue topic");
+    status.AddDetail("AdmissionController failed to register request queue topic");
   }
   return status;
 }
@@ -227,15 +227,14 @@ Status AdmissionController::CanAdmitRequest(const string& pool_name,
   //  (b) Request will go over the mem limit
   //  (c) This is not admitting from the queue and there are already queued requests
   if (max_requests >= 0 && total_stats.num_running >= max_requests) {
-    return Status(Substitute(QUEUED_NUM_RUNNING, total_stats.num_running, max_requests),
-        true);
+    return Status(Substitute(QUEUED_NUM_RUNNING, total_stats.num_running, max_requests));
   } else if (mem_limit >= 0 && cluster_estimated_memory >= mem_limit) {
     return Status(Substitute(QUEUED_MEM_LIMIT,
         PrettyPrinter::Print(query_total_estimated_mem, TUnit::BYTES),
         PrettyPrinter::Print(current_cluster_estimate_mem, TUnit::BYTES),
-        PrettyPrinter::Print(mem_limit, TUnit::BYTES)), true);
+        PrettyPrinter::Print(mem_limit, TUnit::BYTES)));
   } else if (!admit_from_queue && total_stats.num_queued > 0) {
-    return Status(Substitute(QUEUED_QUEUE_NOT_EMPTY, total_stats.num_queued), true);
+    return Status(Substitute(QUEUED_QUEUE_NOT_EMPTY, total_stats.num_queued));
   }
   return Status::OK;
 }
@@ -376,7 +375,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
       --total_stats->num_queued;
       if (pool_metrics != NULL) pool_metrics->local_timed_out->Increment(1L);
       return Status(Substitute(STATUS_TIME_OUT, queue_wait_timeout_ms,
-            admitStatus.GetErrorMsg()));
+            admitStatus.GetDetail()));
     }
     // The dequeue thread updates the stats (to avoid a race condition) so we do
     // not change them here.
@@ -579,7 +578,7 @@ void AdmissionController::AddPoolUpdates(vector<TTopicDelta>* topic_updates) {
     topic_item.key = MakePoolTopicKey(pool_name, backend_id_);
     Status status = thrift_serializer_.Serialize(&pool_stats, &topic_item.value);
     if (!status.ok()) {
-      LOG(WARNING) << "Failed to serialize query pool stats: " << status.GetErrorMsg();
+      LOG(WARNING) << "Failed to serialize query pool stats: " << status.GetDetail();
       topic_updates->pop_back();
     }
     PoolMetrics* pool_metrics = GetPoolMetrics(pool_name);
@@ -657,7 +656,7 @@ void AdmissionController::DequeueLoop() {
             schedule, true);
         if (!admitStatus.ok()) {
           VLOG_RPC << "Could not dequeue query id=" << queue_node->schedule.query_id()
-                   << " reason: " << admitStatus.GetErrorMsg();
+                   << " reason: " << admitStatus.GetDetail();
           break;
         }
         queue.Dequeue();

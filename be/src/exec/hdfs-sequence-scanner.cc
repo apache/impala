@@ -185,7 +185,7 @@ Status HdfsSequenceScanner::ProcessBlockCompressedScanRange() {
         ss << "Expecting sync indicator (-1) at file offset "
            << (stream_->file_offset() - sizeof(int)) << ".  "
            << "Sync indicator found " << sync_indicator << ".";
-        state_->LogError(ss.str());
+        state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
       }
       return Status("Bad sync hash");
     }
@@ -452,7 +452,7 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
       stringstream ss;
       ss << "Bad compressed block record count: "
          << num_buffered_records_in_compressed_block_;
-      state_->LogError(ss.str());
+      state_->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
     }
     return Status("bad record count");
   }

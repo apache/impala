@@ -20,7 +20,8 @@ from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
 from ExecStats.ttypes import TExecStats
 from ImpalaService import ImpalaService
-from Status.ttypes import TStatus, TStatusCode
+from ErrorCodes.ttypes import TErrorCode
+from Status.ttypes import TStatus
 from thrift.protocol import TBinaryProtocol
 from thrift_sasl import TSaslClientTransport
 from thrift.transport.TSocket import TSocket
@@ -392,7 +393,7 @@ class ImpalaClient(object):
       # the TStatus return value. For now, just print any error(s) that were encountered
       # and validate the result of the operation was a success.
       if ret is not None and isinstance(ret, TStatus):
-        if ret.status_code != TStatusCode.OK:
+        if ret.status_code != TErrorCode.OK:
           if ret.error_msgs:
             raise RPCException ('RPC Error: %s' % '\n'.join(ret.error_msgs))
           status = RpcStatus.ERROR

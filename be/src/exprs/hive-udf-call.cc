@@ -131,7 +131,7 @@ AnyVal* HiveUdfCall::Evaluate(ExprContext* ctx, TupleRow* row) {
     if (!jni_ctx->warning_logged) {
       stringstream ss;
       ss << "Hive UDF path=" << fn_.hdfs_location << " class=" << fn_.scalar_fn.symbol
-        << " failed due to: " << status.GetErrorMsg();
+        << " failed due to: " << status.GetDetail();
       fn_ctx->AddWarning(ss.str().c_str());
       jni_ctx->warning_logged = true;
     }
@@ -241,7 +241,7 @@ void HiveUdfCall::Close(RuntimeState* state, ExprContext* ctx,
       env->DeleteGlobalRef(jni_ctx->executor);
       // Clear any exceptions. Not much we can do about them here.
       Status status = JniUtil::GetJniExceptionMsg(env);
-      if (!status.ok()) VLOG_QUERY << status.GetErrorMsg();
+      if (!status.ok()) VLOG_QUERY << status.GetDetail();
     }
     delete[] jni_ctx->input_values_buffer;
     delete[] jni_ctx->input_nulls_buffer;

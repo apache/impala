@@ -220,7 +220,7 @@ class ExprTest : public testing::Test {
       ASSERT_FALSE(status.ok()) << "Expected error\nstmt: " << stmt;
       return;
     }
-    ASSERT_TRUE(status.ok()) << "stmt: " << stmt << "\nerror: " << status.GetErrorMsg();
+    ASSERT_TRUE(status.ok()) << "stmt: " << stmt << "\nerror: " << status.GetDetail();
     string result_row;
     ASSERT_TRUE(executor_->FetchResult(&result_row).ok()) << expr;
     EXPECT_EQ(TypeToOdbcString(expr_type.type), result_types[0].type) << expr;

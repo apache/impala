@@ -19,24 +19,60 @@
 #include <string>
 #include <vector>
 
+#include <boost/lexical_cast.hpp>
+
 #include "common/logging.h"
 #include "common/compiler-util.h"
 #include "gen-cpp/Status_types.h"  // for TStatus
+#include "gen-cpp/ErrorCodes_types.h"  // for TErrorCode
 #include "gen-cpp/TCLIService_types.h" // for HS2 TStatus
+#include "util/error-util.h" // for ErrorMessage
+
+#define STATUS_API_VERSION 2
 
 namespace impala {
 
 // Status is used as a function return type to indicate success, failure or cancellation
 // of the function. In case of successful completion, it only occupies sizeof(void*)
-// statically allocated memory. In the error case, it records a stack of error messages.
+// statically allocated memory and therefore no more members should be added to this
+// class.
 //
-// example:
+// A Status may either be OK (represented by the singleton Status::OK), or it may
+// represent an error condition. In the latter case, a Status has both an error code,
+// which belongs to the TErrorCode enum, and an error string, which may be presented to
+// clients or logged to disk.
+//
+// An error Status may also have one or more optional 'detail' strings which provide
+// further context. These strings are intended for internal consumption only - and
+// therefore will not be sent to clients.
+//
+// The state associated with an error Status is encapsulated in an ErrorMsg instance to
+// ensure that the size of Status is kept very small, as it is passed around on the stack
+// as a return value. See ErrorMsg for more details on how error strings are constructed.
+//
+// Example Usage:
 // Status fnB(int x) {
+//
+//   // Status as return value
 //   Status status = fnA(x);
 //   if (!status.ok()) {
-//     status.AddErrorMsg("fnA(x) went wrong");
+//     status.AddDetail("fnA(x) went wrong");
 //     return status;
 //   }
+//
+//   int r = Read(fid);
+//   // Attaches an ErrorMsg with type GENERAL to the status
+//   if (r == -1) return Status("String Constructor");
+//
+//   int x = MoreRead(x);
+//   if (x == 4711) {
+//     // Specific error messages with one param
+//     Status s = Status(ERROR_4711_HAS_NO_BLOCKS, x);
+//     // Optional detail
+//     s.AddDetail("rotation-disk-broken due to weather");
+//   }
+//
+//   return Status::OK;
 // }
 //
 // TODO: macros:
@@ -45,7 +81,9 @@ namespace impala {
 
 class Status {
  public:
-  Status(): error_detail_(NULL) {}
+  typedef strings::internal::SubstituteArg ArgType;
+
+  Status(): msg_(NULL) {}
 
   static const Status OK;
   static const Status CANCELLED;
@@ -54,91 +92,122 @@ class Status {
 
   // copy c'tor makes copy of error detail so Status can be returned by value
   Status(const Status& status)
-    : error_detail_(
-        status.error_detail_ != NULL
-          ? new ErrorDetail(*status.error_detail_)
-          : NULL) {
-  }
+    : msg_(status.msg_ != NULL ? new ErrorMsg(*status.msg_) : NULL) { }
 
-  // c'tor for error case - is this useful for anything other than CANCELLED?
-  Status(TStatusCode::type code)
-    : error_detail_(new ErrorDetail(code)) {
-  }
+  // Status using only the error code as a parameter. This can be used for error messages
+  // that don't take format parameters.
+  Status(TErrorCode::type code);
 
-  // c'tor for error case
-  Status(TStatusCode::type code, const std::string& error_msg, bool quiet=false)
-    : error_detail_(new ErrorDetail(code, error_msg)) {
-    if (!quiet) VLOG(2) << error_msg;
-  }
+  // These constructors are used if the caller wants to indicate a non-successful
+  // execution and supply a client-facing error message. This is the preferred way of
+  // instantiating a non-successful Status.
+  Status(TErrorCode::type error, const ArgType& arg0);
+  Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1);
+  Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
+      const ArgType& arg2);
+  Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
+      const ArgType& arg2, const ArgType& arg3);
+  Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4);
+  Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
+      const ArgType& arg5);
+  Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
+      const ArgType& arg5, const ArgType& arg6);
+  Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
+      const ArgType& arg5, const ArgType& arg6, const ArgType& arg7);
+  Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
+      const ArgType& arg5, const ArgType& arg6, const ArgType& arg7,
+      const ArgType& arg8);
+  Status(TErrorCode::type error, const ArgType& arg0, const ArgType& arg1,
+      const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
+      const ArgType& arg5, const ArgType& arg6, const ArgType& arg7,
+      const ArgType& arg8, const ArgType& arg9);
 
-  // c'tor for internal error
-  Status(const std::string& error_msg, bool quiet=false);
+  // Used when the ErrorMsg is created as an intermediate value that is either passed to
+  // the Status or to the RuntimeState.
+  Status(const ErrorMsg& e);
+
+  // This constructor creates a Status with a default error code of GENERAL and is not
+  // intended for statuses that might be client-visible.
+  // TODO: deprecate
+  Status(const std::string& error_msg);
 
   ~Status() {
-    if (error_detail_ != NULL) delete error_detail_;
+    if (msg_ != NULL) delete msg_;
   }
 
   // same as copy c'tor
   Status& operator=(const Status& status) {
-    delete error_detail_;
-    if (LIKELY(status.error_detail_ == NULL)) {
-      error_detail_ = NULL;
+    delete msg_;
+    if (LIKELY(status.msg_ == NULL)) {
+      msg_ = NULL;
     } else {
-      error_detail_ = new ErrorDetail(*status.error_detail_);
+      msg_ = new ErrorMsg(*status.msg_);
     }
     return *this;
   }
 
   // "Copy" c'tor from TStatus.
+  // Retains the TErrorCode value and the message
   Status(const TStatus& status);
 
   // same as previous c'tor
+  // Retains the TErrorCode value and the message
   Status& operator=(const TStatus& status);
 
   // "Copy c'tor from HS2 TStatus.
+  // Retains the TErrorCode value and the message
   Status(const apache::hive::service::cli::thrift::TStatus& hs2_status);
 
   // same as previous c'tor
+  // Retains the TErrorCode value and the message
   Status& operator=(const apache::hive::service::cli::thrift::TStatus& hs2_status);
 
-  // assign from stringstream
-  Status& operator=(const std::stringstream& stream);
-
-  bool ok() const { return error_detail_ == NULL; }
+  bool ok() const { return msg_ == NULL; }
 
   bool IsCancelled() const {
-    return error_detail_ != NULL
-        && error_detail_->error_code == TStatusCode::CANCELLED;
+    return msg_ != NULL && msg_->error() == TErrorCode::CANCELLED;
   }
 
   bool IsMemLimitExceeded() const {
-    return error_detail_ != NULL
-        && error_detail_->error_code == TStatusCode::MEM_LIMIT_EXCEEDED;
+    return msg_ != NULL
+        && msg_->error() == TErrorCode::MEM_LIMIT_EXCEEDED;
   }
 
   bool IsRecoverableError() const {
-    return error_detail_ != NULL
-        && error_detail_->error_code == TStatusCode::RECOVERABLE_ERROR;
+    return msg_ != NULL
+        && msg_->error() == TErrorCode::RECOVERABLE_ERROR;
   }
 
-  // Add an error message and set the code if no code has been set yet.
-  // If a code has already been set, 'code' is ignored.
-  void AddErrorMsg(TStatusCode::type code, const std::string& msg);
+  // Returns the error message associated with a non-successful status.
+  const ErrorMsg& msg() const {
+    DCHECK_NOTNULL(msg_);
+    return *msg_;
+  }
 
-  // Add an error message and set the code to INTERNAL_ERROR if no code has been
-  // set yet. If a code has already been set, it is left unchanged.
-  void AddErrorMsg(const std::string& msg);
+  // Sets the ErrorMessage on the detail of the status. Calling this method is only valid
+  // if an error was reported.
+  // TODO: deprecate, error should be immutable
+  void SetErrorMsg(const ErrorMsg& m) {
+    DCHECK_NOTNULL(msg_);
+    delete msg_;
+    msg_ = new ErrorMsg(m);
+  }
+
+  // Add a detail string. Calling this method is only defined on a non-OK message
+  void AddDetail(const std::string& msg);
 
   // Does nothing if status.ok().
-  // Otherwise: if 'this' is an error status, adds the error msg from 'status;
+  // Otherwise: if 'this' is an error status, adds the error msg from 'status';
   // otherwise assigns 'status'.
-  void AddError(const Status& status);
+  void MergeStatus(const Status& status);
 
-  // Return all accumulated error msgs.
-  void GetErrorMsgs(std::vector<std::string>* msgs) const;
-
-  // Convert into TStatus. Call this if 'status_container' contains an optional
-  // TStatus field named 'status'. This also sets __isset.status.
+  // Convert into TStatus. Call this if 'status_container' contains an optional TStatus
+  // field named 'status'. This also sets status_container->__isset.status.
   template <typename T> void SetTStatus(T* status_container) const {
     ToThrift(&status_container->status);
     status_container->__isset.status = true;
@@ -147,28 +216,20 @@ class Status {
   // Convert into TStatus.
   void ToThrift(TStatus* status) const;
 
-  // Return all accumulated error msgs in a single string.
-  void GetErrorMsg(std::string* msg) const;
+  // Returns the formatted message of the error message and the individual details of the
+  // additional messages as a single string. This should only be called internally and not
+  // to report an error back to the client.
+  const std::string GetDetail() const;
 
-  std::string GetErrorMsg() const;
-
-  TStatusCode::type code() const {
-    return error_detail_ == NULL ? TStatusCode::OK : error_detail_->error_code;
+  TErrorCode::type code() const {
+    return msg_ == NULL ? TErrorCode::OK : msg_->error();
   }
 
  private:
-  struct ErrorDetail {
-    TStatusCode::type error_code;  // anything other than OK
-    std::vector<std::string> error_msgs;
 
-    ErrorDetail(const TStatus& status);
-    ErrorDetail(TStatusCode::type code)
-      : error_code(code) {}
-    ErrorDetail(TStatusCode::type code, const std::string& msg)
-      : error_code(code), error_msgs(1, msg) {}
-  };
-
-  ErrorDetail* error_detail_;
+  // Status uses a naked pointer to ensure the size of an instance on the stack is only
+  // the sizeof(ErrorMsg*). Every Status owns its ErrorMsg instance.
+  ErrorMsg* msg_;
 };
 
 // some generally useful macros
@@ -182,9 +243,7 @@ class Status {
   do { \
     Status __status__ = (stmt); \
     if (UNLIKELY(!__status__.ok())) { \
-      std::string msg; \
-      __status__.GetErrorMsg(&msg); \
-      EXIT_WITH_ERROR(msg); \
+      EXIT_WITH_ERROR(__status__.GetDetail()); \
     } \
   } while (false)
 

@@ -127,11 +127,11 @@ LibCache::LibCacheEntry::~LibCacheEntry() {
 }
 
 Status LibCache::GetSoFunctionPtr(const string& hdfs_lib_file, const string& symbol,
-                                  void** fn_ptr, LibCacheEntry** ent, bool quiet) {
+                                  void** fn_ptr, LibCacheEntry** ent) {
   if (hdfs_lib_file.empty()) {
     // Just loading a function ptr in the current process. No need to take any locks.
     DCHECK(current_process_handle_ != NULL);
-    RETURN_IF_ERROR(DynamicLookup(current_process_handle_, symbol.c_str(), fn_ptr, quiet));
+    RETURN_IF_ERROR(DynamicLookup(current_process_handle_, symbol.c_str(), fn_ptr));
     return Status::OK;
   }
 
@@ -153,7 +153,7 @@ Status LibCache::GetSoFunctionPtr(const string& hdfs_lib_file, const string& sym
     *fn_ptr = it->second;
   } else {
     RETURN_IF_ERROR(
-        DynamicLookup(entry->shared_object_handle, symbol.c_str(), fn_ptr, quiet));
+        DynamicLookup(entry->shared_object_handle, symbol.c_str(), fn_ptr));
     entry->symbol_cache[symbol] = *fn_ptr;
   }
 
@@ -189,10 +189,10 @@ Status LibCache::GetLocalLibPath(const string& hdfs_lib_file, LibType type,
 }
 
 Status LibCache::CheckSymbolExists(const string& hdfs_lib_file, LibType type,
-                                   const string& symbol, bool quiet) {
+                                   const string& symbol) {
   if (type == TYPE_SO) {
     void* dummy_ptr = NULL;
-    return GetSoFunctionPtr(hdfs_lib_file, symbol, &dummy_ptr, NULL, quiet);
+    return GetSoFunctionPtr(hdfs_lib_file, symbol, &dummy_ptr, NULL);
   } else if (type == TYPE_IR) {
     unique_lock<mutex> lock;
     LibCacheEntry* entry = NULL;
@@ -203,7 +203,7 @@ Status LibCache::CheckSymbolExists(const string& hdfs_lib_file, LibType type,
       stringstream ss;
       ss << "Symbol '" << symbol << "' does not exist in module: " << hdfs_lib_file
          << " (local path: " << entry->local_path << ")";
-      return Status(ss.str(), quiet);
+      return Status(ss.str());
     }
     return Status::OK;
   } else if (type == TYPE_JAR) {

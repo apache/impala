@@ -140,7 +140,7 @@ void HBaseScanNode::WriteTextSlot(
           << ":" << qualifier << ": "
           << "'" << string(reinterpret_cast<char*>(value), value_length) << "' TO "
           << slot->type();
-      state->LogError(ss.str());
+      state->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
     }
   }
 }
@@ -244,7 +244,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
         int key_length;
         hbase_scanner_->GetRowKey(env, &key, &key_length);
         ss << "row key: " << string(reinterpret_cast<const char*>(key), key_length);
-        state->LogError(ss.str());
+        state->LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
       }
       if (state->abort_on_error()) {
         state->ReportFileErrors(table_name_, 1);

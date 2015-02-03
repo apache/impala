@@ -42,6 +42,7 @@ import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TCacheJarResult;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TDataSourceScanNode;
+import com.cloudera.impala.thrift.TErrorCode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TPlanNode;
@@ -51,7 +52,6 @@ import com.cloudera.impala.thrift.TScanRange;
 import com.cloudera.impala.thrift.TScanRangeLocation;
 import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.cloudera.impala.thrift.TStatus;
-import com.cloudera.impala.thrift.TStatusCode;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -158,7 +158,7 @@ public class DataSourceScanNode extends ScanNode {
     String hdfsLocation = table_.getDataSource().getHdfs_location();
     TCacheJarResult cacheResult = FeSupport.CacheJar(hdfsLocation);
     TStatus cacheJarStatus = cacheResult.getStatus();
-    if (cacheJarStatus.getStatus_code() != TStatusCode.OK) {
+    if (cacheJarStatus.getStatus_code() != TErrorCode.OK) {
       throw new InternalException(String.format(
           "Unable to cache data source library at location '%s'. Check that the file " +
           "exists and is readable. Message: %s",
@@ -184,7 +184,7 @@ public class DataSourceScanNode extends ScanNode {
           "Error calling prepare() on data source %s",
           DataSource.debugString(table_.getDataSource())), e);
     }
-    if (prepareStatus.getStatus_code() != TStatusCode.OK) {
+    if (prepareStatus.getStatus_code() != TErrorCode.OK) {
       throw new InternalException(String.format(
           "Data source %s returned an error from prepare(): %s",
           DataSource.debugString(table_.getDataSource()),

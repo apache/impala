@@ -1037,16 +1037,16 @@ void DiskIoMgr::Write(RequestContext* writer_context, WriteRange* write_range) {
   FILE* file_handle = fopen(write_range->file(), "rb+");
   Status ret_status;
   if (file_handle == NULL) {
-    ret_status = Status(TStatusCode::RUNTIME_ERROR,
+    ret_status = Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
         Substitute("fopen($0, \"rb+\") failed with errno=$1 description=$2",
-            write_range->file_, errno, GetStrErrMsg()));
+            write_range->file_, errno, GetStrErrMsg())));
   } else {
     ret_status = WriteRangeHelper(file_handle, write_range);
 
     int success = fclose(file_handle);
     if (ret_status.ok() && success != 0) {
-      ret_status = Status(TStatusCode::RUNTIME_ERROR, Substitute("fclose($0) failed",
-          write_range->file_));
+      ret_status = Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute("fclose($0) failed",
+          write_range->file_)));
     }
   }
 
@@ -1061,24 +1061,24 @@ Status DiskIoMgr::WriteRangeHelper(FILE* file_handle, WriteRange* write_range) {
     success = posix_fallocate(file_desc, write_range->offset(), write_range->len_);
   }
   if (success != 0) {
-    return Status(TStatusCode::RUNTIME_ERROR,
+    return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
         Substitute("posix_fallocate($0, $1, $2) failed for file $3"
             " with returnval=$4 description=$5", file_desc, write_range->offset(),
-            write_range->len_, write_range->file_, success, GetStrErrMsg()));
+            write_range->len_, write_range->file_, success, GetStrErrMsg())));
   }
   // Seek to the correct offset and perform the write.
   success = fseek(file_handle, write_range->offset(), SEEK_SET);
   if (success != 0) {
-    return Status(TStatusCode::RUNTIME_ERROR,
+    return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
         Substitute("fseek($0, $1, SEEK_SET) failed with errno=$2 description=$3",
-            write_range->file_, write_range->offset(), errno, GetStrErrMsg()));
+        write_range->file_, write_range->offset(), errno, GetStrErrMsg())));
   }
 
   int64_t bytes_written = fwrite(write_range->data_, 1, write_range->len_, file_handle);
   if (bytes_written < write_range->len_) {
-    return Status(TStatusCode::RUNTIME_ERROR,
+    return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
         Substitute("fwrite(buffer, 1, $0, $1) failed with errno=$2 description=$3",
-            write_range->len_, write_range->file_, errno, GetStrErrMsg()));
+        write_range->len_, write_range->file_, errno, GetStrErrMsg())));
   }
   if (ImpaladMetrics::IO_MGR_BYTES_WRITTEN != NULL) {
     ImpaladMetrics::IO_MGR_BYTES_WRITTEN->Increment(write_range->len_);

@@ -664,7 +664,7 @@ void Statestore::DoSubscriberUpdate(bool is_heartbeat, int thread_id,
     if (it == subscribers_.end()) return;
     if (!status.ok()) {
       LOG(INFO) << "Unable to send " << hb_type << " message to subscriber "
-                << update.second << ", received error " << status.GetErrorMsg();
+                << update.second << ", received error " << status.GetDetail();
     }
 
     const string& registration_id = PrintId(subscriber->registration_id());

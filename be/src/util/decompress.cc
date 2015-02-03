@@ -311,10 +311,8 @@ static Status SnappyBlockDecompress(int64_t input_len, const uint8_t* input,
     if (uncompressed_block_len > Codec::MAX_BLOCK_SIZE) {
       if (uncompressed_total_len == 0) {
         // TODO: is this check really robust?
-        stringstream ss;
-        ss << "Decompressor: block size is too big.  Data is likely corrupt. "
-           << "Size: " << uncompressed_block_len;
-        return Status(ss.str());
+        return Status(TErrorCode::SNAPPY_DECOMPRESS_INVALID_BLOCK_SIZE,
+            uncompressed_block_len);
       }
       break;
     }
@@ -332,8 +330,7 @@ static Status SnappyBlockDecompress(int64_t input_len, const uint8_t* input,
 
       if (compressed_len == 0 || compressed_len > input_len) {
         if (uncompressed_total_len == 0) {
-          return Status(
-              "Decompressor: invalid compressed length.  Data is likely corrupt.");
+          return Status(TErrorCode::SNAPPY_DECOMPRESS_INVALID_COMPRESSED_LENGTH);
         }
         input_len = 0;
         break;
@@ -344,7 +341,7 @@ static Status SnappyBlockDecompress(int64_t input_len, const uint8_t* input,
       if (!snappy::GetUncompressedLength(reinterpret_cast<const char*>(input),
             input_len, &uncompressed_len)) {
         if (uncompressed_total_len == 0) {
-          return Status("Snappy: GetUncompressedLength failed");
+          return Status(TErrorCode::SNAPPY_DECOMPRESS_UNCOMPRESSED_LENGTH_FAILED);
         }
         input_len = 0;
         break;
@@ -355,7 +352,7 @@ static Status SnappyBlockDecompress(int64_t input_len, const uint8_t* input,
         // Decompress this snappy block
         if (!snappy::RawUncompress(reinterpret_cast<const char*>(input),
               compressed_len, output)) {
-          return Status("SnappyBlock: RawUncompress failed");
+          return Status(TErrorCode::SNAPPY_DECOMPRESS_RAW_UNCOMPRESS_FAILED);
         }
         output += uncompressed_len;
       }
@@ -370,7 +367,7 @@ static Status SnappyBlockDecompress(int64_t input_len, const uint8_t* input,
   if (size_only) {
     *output_len = uncompressed_total_len;
   } else if (*output_len != uncompressed_total_len) {
-    return Status("Snappy: Decompressed size is not correct.");
+    return Status(TErrorCode::SNAPPY_DECOMPRESS_DECOMPRESS_SIZE_INCORRECT);
   }
   return Status::OK;
 }

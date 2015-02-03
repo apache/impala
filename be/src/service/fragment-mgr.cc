@@ -118,8 +118,8 @@ void FragmentMgr::CancelPlanFragment(TCancelPlanFragmentResult& return_val,
   shared_ptr<FragmentExecState> exec_state =
       GetFragmentExecState(params.fragment_instance_id);
   if (exec_state.get() == NULL) {
-    Status status(TStatusCode::INTERNAL_ERROR, Substitute("Unknown fragment id: $0",
-        lexical_cast<string>(params.fragment_instance_id)));
+    Status status(ErrorMsg(TErrorCode::INTERNAL_ERROR, Substitute("Unknown fragment id: $0",
+        lexical_cast<string>(params.fragment_instance_id))));
     status.SetTStatus(&return_val);
     return;
   }

@@ -309,7 +309,7 @@ bool MemTracker::ExpandRmReservation(int64_t bytes) {
   if (!status.ok()) {
     LOG(INFO) << "Failed to expand memory limit by "
               << PrettyPrinter::Print(bytes, TUnit::BYTES) << ": "
-              << status.GetErrorMsg();
+              << status.GetDetail();
     return false;
   }
 

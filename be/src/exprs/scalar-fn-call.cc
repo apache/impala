@@ -101,14 +101,13 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
     if (!status.ok()) {
       if (fn_.binary_type == TFunctionBinaryType::BUILTIN) {
         // Builtins symbols should exist unless there is a version mismatch.
-        status.AddErrorMsg(Substitute(
-            "Builtin '$0' with symbol '$1' does not exist. Verify that all your impalads "
-            "are the same version.", fn_.name.function_name, fn_.scalar_fn.symbol));
+        status.SetErrorMsg(ErrorMsg(TErrorCode::MISSING_BUILTIN,
+            fn_.name.function_name, fn_.scalar_fn.symbol));
         return status;
       } else {
         DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::NATIVE);
         return Status(Substitute("Problem loading UDF '$0':\n$1",
-            fn_.name.function_name, status.GetErrorMsg()));
+            fn_.name.function_name, status.GetDetail()));
         return status;
       }
     }
@@ -397,11 +396,8 @@ Status ScalarFnCall::GetUdf(RuntimeState* state, llvm::Function** udf) {
         fn_.hdfs_location, fn_.scalar_fn.symbol, &fn_ptr, &cache_entry_);
     if (!status.ok() && fn_.binary_type == TFunctionBinaryType::BUILTIN) {
       // Builtins symbols should exist unless there is a version mismatch.
-      stringstream ss;
-      ss << "Builtin '" << fn_.name.function_name << "' with symbol '"
-         << fn_.scalar_fn.symbol << "' does not exist. "
-         << "Verify that all your impalads are the same version.";
-      status.AddErrorMsg(ss.str());
+      status.AddDetail(ErrorMsg(TErrorCode::MISSING_BUILTIN,
+              fn_.name.function_name, fn_.scalar_fn.symbol).msg());
     }
     RETURN_IF_ERROR(status);
     DCHECK(fn_ptr != NULL);
