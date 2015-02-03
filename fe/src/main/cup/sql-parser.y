@@ -236,7 +236,8 @@ terminal
   KW_COLUMNS, KW_COMMENT, KW_COMPUTE, KW_CREATE, KW_CROSS, KW_CURRENT, KW_DATA,
   KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DELIMITED, KW_DESC,
   KW_DESCRIBE, KW_DISTINCT, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED,
-  KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL, KW_FALSE, KW_FIELDS, KW_FILEFORMAT, KW_FINALIZE_FN,
+  KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL, KW_FALSE, KW_FIELDS,
+  KW_FILEFORMAT, KW_FILES, KW_FINALIZE_FN,
   KW_FIRST, KW_FLOAT, KW_FOLLOWING, KW_FOR, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL,
   KW_FUNCTION, KW_FUNCTIONS, KW_GRANT, KW_GROUP, KW_HAVING, KW_IF, KW_IN, KW_INCREMENTAL,
   KW_INIT_FN, KW_INNER, KW_INPATH, KW_INSERT, KW_INT, KW_INTERMEDIATE, KW_INTERVAL,
@@ -290,6 +291,7 @@ nonterminal ShowDbsStmt show_dbs_stmt;
 nonterminal ShowPartitionsStmt show_partitions_stmt;
 nonterminal ShowStatsStmt show_stats_stmt;
 nonterminal String show_pattern;
+nonterminal ShowFilesStmt show_files_stmt;
 nonterminal DescribeStmt describe_stmt;
 nonterminal ShowCreateTableStmt show_create_tbl_stmt;
 nonterminal TDescribeTableOutputStyle describe_output_style;
@@ -493,6 +495,8 @@ stmt ::=
   {: RESULT = show_data_srcs; :}
   | show_create_tbl_stmt:show_create_tbl
   {: RESULT = show_create_tbl; :}
+  | show_files_stmt:show_files
+  {: RESULT = show_files; :}
   | describe_stmt:describe
   {: RESULT = describe; :}
   | alter_tbl_stmt:alter_tbl
@@ -1656,6 +1660,11 @@ show_pattern ::=
 show_create_tbl_stmt ::=
   KW_SHOW KW_CREATE KW_TABLE table_name:table
   {: RESULT = new ShowCreateTableStmt(table); :}
+  ;
+
+show_files_stmt ::=
+  KW_SHOW KW_FILES KW_IN table_name:table opt_partition_spec:partition
+  {: RESULT = new ShowFilesStmt(table, partition); :}
   ;
 
 describe_stmt ::=

@@ -116,6 +116,7 @@ import com.cloudera.impala.thrift.TResetMetadataRequest;
 import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TResultSetMetadata;
+import com.cloudera.impala.thrift.TShowFilesParams;
 import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TStmtType;
 import com.cloudera.impala.thrift.TTableName;
@@ -271,6 +272,10 @@ public class Frontend {
       ddl.setShow_create_table_params(analysis.getShowCreateTableStmt().toThrift());
       metadata.setColumns(Arrays.asList(
           new TColumn("result", Type.STRING.toThrift())));
+    } else if (analysis.isShowFilesStmt()) {
+      ddl.op_type = TCatalogOpType.SHOW_FILES;
+      ddl.setShow_files_params(analysis.getShowFilesStmt().toThrift());
+      metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isDescribeStmt()) {
       ddl.op_type = TCatalogOpType.DESCRIBE;
       ddl.setDescribe_table_params(analysis.getDescribeStmt().toThrift());
@@ -1033,6 +1038,21 @@ public class Frontend {
       }
       default:
         throw new NotImplementedException(request.opcode + " has not been implemented.");
+    }
+  }
+
+  /**
+   * Returns all files info of a table or partition.
+   */
+  public TResultSet getTableFiles(TShowFilesParams request)
+      throws ImpalaException{
+    Table table = impaladCatalog_.getTable(request.getTable_name().getDb_name(),
+        request.getTable_name().getTable_name());
+    if (table instanceof HdfsTable) {
+      return ((HdfsTable) table).getFiles(request.getPartition_spec());
+    } else {
+      throw new InternalException("SHOW FILES only supports Hdfs table. " +
+          "Unsupported table class: " + table.getClass());
     }
   }
 }

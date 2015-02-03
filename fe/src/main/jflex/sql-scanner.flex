@@ -103,6 +103,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("false", new Integer(SqlParserSymbols.KW_FALSE));
     keywordMap.put("fields", new Integer(SqlParserSymbols.KW_FIELDS));
     keywordMap.put("fileformat", new Integer(SqlParserSymbols.KW_FILEFORMAT));
+    keywordMap.put("files", new Integer(SqlParserSymbols.KW_FILES));
     keywordMap.put("finalize_fn", new Integer(SqlParserSymbols.KW_FINALIZE_FN));
     keywordMap.put("first", new Integer(SqlParserSymbols.KW_FIRST));
     keywordMap.put("float", new Integer(SqlParserSymbols.KW_FLOAT));

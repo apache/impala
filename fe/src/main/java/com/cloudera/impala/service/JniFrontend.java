@@ -78,6 +78,7 @@ import com.cloudera.impala.thrift.TLogLevel;
 import com.cloudera.impala.thrift.TMetadataOpRequest;
 import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.thrift.TResultSet;
+import com.cloudera.impala.thrift.TShowFilesParams;
 import com.cloudera.impala.thrift.TShowGrantRoleParams;
 import com.cloudera.impala.thrift.TShowRolesParams;
 import com.cloudera.impala.thrift.TShowRolesResult;
@@ -216,6 +217,25 @@ public class JniFrontend {
 
     TGetTablesResult result = new TGetTablesResult();
     result.setTables(tables);
+
+    TSerializer serializer = new TSerializer(protocolFactory_);
+    try {
+      return serializer.serialize(result);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  /**
+   * Returns files info of a table or partition.
+   * The argument is a serialized TShowFilesParams object.
+   * The return type is a serialised TResultSet object.
+   * @see Frontend#getTableFiles
+   */
+  public byte[] getTableFiles(byte[] thriftShowFilesParams) throws ImpalaException {
+    TShowFilesParams params = new TShowFilesParams();
+    JniUtil.deserializeThrift(protocolFactory_, params, thriftShowFilesParams);
+    TResultSet result = frontend_.getTableFiles(params);
 
     TSerializer serializer = new TSerializer(protocolFactory_);
     try {

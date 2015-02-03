@@ -1119,6 +1119,19 @@ public class AuthorizationTest {
       AuthzError(String.format("show %s functional_rc.alltypes", qual),
           "User '%s' does not have privileges to access: functional_rc.alltypes");
     }
+
+    // Show files
+    String[] partitions = new String[] { "", "partition(month=10, year=2010)" };
+    for (String partition: partitions) {
+      AuthzOk(String.format("show files in functional.alltypes %s", partition));
+      // User does not have access to db/table.
+      AuthzError(String.format("show files in nodb.tbl %s", partition),
+          "User '%s' does not have privileges to access: nodb.tbl");
+      AuthzError(String.format("show files in functional.badtbl %s", partition),
+          "User '%s' does not have privileges to access: functional.badtbl");
+      AuthzError(String.format("show files in functional_rc.alltypes %s", partition),
+          "User '%s' does not have privileges to access: functional_rc.alltypes");
+    }
   }
 
   @Test

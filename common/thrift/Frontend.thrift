@@ -185,6 +185,15 @@ struct TShowTablesParams {
   2: optional string show_pattern
 }
 
+// Parameters for SHOW FILES commands
+struct TShowFilesParams {
+  1: required CatalogObjects.TTableName table_name
+
+  // An optional partition spec. Set if this operation should apply to a specific
+  // partition rather than the base table.
+  2: optional list<CatalogObjects.TPartitionKeyValue> partition_spec
+}
+
 // Parameters for SHOW [CURRENT] ROLES and SHOW ROLE GRANT GROUP <groupName> commands
 struct TShowRolesParams {
   // The effective user who submitted this request.
@@ -373,6 +382,7 @@ enum TCatalogOpType {
   SHOW_DATA_SRCS,
   SHOW_ROLES,
   SHOW_GRANT_ROLE,
+  SHOW_FILES,
 }
 
 // TODO: Combine SHOW requests with a single struct that contains a field
@@ -418,6 +428,9 @@ struct TCatalogOpRequest {
 
   // Parameters for SHOW CREATE TABLE
   10: optional CatalogObjects.TTableName show_create_table_params
+
+  // Parameters for SHOW FILES
+  14: optional TShowFilesParams show_files_params
 }
 
 // Parameters for the SET query option command

@@ -320,6 +320,14 @@ Status ImpalaServer::QueryExecState::ExecLocalCatalogOp(
       SetResultSet(vector<string>(1, response));
       return Status::OK;
     }
+    case TCatalogOpType::SHOW_FILES: {
+      TResultSet response;
+      RETURN_IF_ERROR(frontend_->GetTableFiles(catalog_op.show_files_params, &response));
+      // Set the result set and its schema from the response.
+      request_result_set_.reset(new vector<TResultRow>(response.rows));
+      result_metadata_ = response.schema;
+      return Status::OK;
+    }
     default: {
       stringstream ss;
       ss << "Unexpected TCatalogOpType: " << catalog_op.op_type;

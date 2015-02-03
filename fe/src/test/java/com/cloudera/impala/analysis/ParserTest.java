@@ -1539,6 +1539,12 @@ public class ParserTest {
     ParsesOk("SHOW PARTITIONS db.tbl");
     ParsesOk("SHOW PARTITIONS `db`.`tbl`");
 
+    // Show files of table
+    ParsesOk("SHOW FILES IN tbl");
+    ParsesOk("SHOW FILES IN db.tbl");
+    ParsesOk("SHOW FILES IN `db`.`tbl`");
+    ParsesOk("SHOW FILES IN db.tbl PARTITION(x='a',y='b')");
+
     // Missing arguments
     ParserError("SHOW");
     // Malformed pattern (no quotes)
@@ -1555,6 +1561,10 @@ public class ParserTest {
     ParserError("SHOW COLUMN STATS");
     // String literal not accepted.
     ParserError("SHOW TABLE STATS 'strlit'");
+    // Missing table.
+    ParserError("SHOW FILES IN");
+    // Invalid partition.
+    ParserError("SHOW FILES IN db.tbl PARTITION(p)");
   }
 
   @Test

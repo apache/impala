@@ -2000,6 +2000,39 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestShowFiles() throws AnalysisException {
+    // Test empty table
+    AnalyzesOk(String.format("show files in functional.emptytable"));
+
+    String[] partitions = new String[] { "", "partition(month=10, year=2010)" };
+    for (String partition: partitions) {
+      AnalyzesOk(String.format("show files in functional.alltypes %s", partition));
+      // Database/table doesn't exist.
+      AnalysisError(String.format("show files in baddb.alltypes %s", partition),
+          "Database does not exist: baddb");
+      AnalysisError(String.format("show files in functional.badtbl %s", partition),
+          "Table does not exist: functional.badtbl");
+      // Cannot show files on a non hdfs table.
+      AnalysisError(String.format("show files in functional.alltypes_view %s",
+          partition),
+          "SHOW FILES not applicable to a non hdfs table: functional.alltypes_view");
+    }
+
+    // Not a partition column.
+    AnalysisError("show files in functional.alltypes partition(year=2010,int_col=1)",
+        "Column 'int_col' is not a partition column in table: functional.alltypes");
+    // Not a valid column.
+    AnalysisError("show files in functional.alltypes partition(year=2010,day=1)",
+        "Partition column 'day' not found in table: functional.alltypes");
+    // Table is not partitioned.
+    AnalysisError("show files in functional.tinyinttable partition(int_col=1)",
+        "Table is not partitioned: functional.tinyinttable");
+    // Partition spec does not exist
+    AnalysisError("show files in functional.alltypes partition(year=2010,month=NULL)",
+        "Partition spec does not exist: (year=2010, month=NULL)");
+  }
+
+  @Test
   public void TestShowStats() throws AnalysisException {
     String[] statsQuals = new String[] {"table", "column"};
     for (String qual : statsQuals) {

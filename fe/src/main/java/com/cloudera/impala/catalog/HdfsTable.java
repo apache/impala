@@ -59,6 +59,7 @@ import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
+import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TCatalogObjectType;
@@ -68,6 +69,7 @@ import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.THdfsTable;
 import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TPartitionKeyValue;
+import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TResultSet;
 import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TTable;
@@ -80,6 +82,7 @@ import com.cloudera.impala.util.ListMap;
 import com.cloudera.impala.util.MetaStoreUtil;
 import com.cloudera.impala.util.TAccessLevelUtil;
 import com.cloudera.impala.util.TResultRowBuilder;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -1436,6 +1439,41 @@ public class HdfsTable extends Table {
       rowBuilder.add(numRows_).add(numHdfsFiles_).addBytes(totalHdfsBytes_)
           .addBytes(totalCachedBytes).add("").add("").add("");
       result.addToRows(rowBuilder.get());
+    }
+    return result;
+  }
+
+  /**
+   * Returns files info for the given dbname/tableName and partition spec.
+   * Returns files info for all partitions if partition spec is null.
+   */
+  public TResultSet getFiles(List<TPartitionKeyValue> partitionSpec) throws CatalogException {
+    TResultSet result = new TResultSet();
+    TResultSetMetadata resultSchema = new TResultSetMetadata();
+    result.setSchema(resultSchema);
+    resultSchema.addToColumns(new TColumn("path", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("size", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("partition", Type.STRING.toThrift()));
+    result.setRows(Lists.<TResultRow>newArrayList());
+
+    List<HdfsPartition> partitions = null;
+    if (partitionSpec == null) {
+      partitions = partitions_;
+    } else {
+      // Get the HdfsPartition object for the given partition spec.
+      HdfsPartition partition = getPartitionFromThriftPartitionSpec(partitionSpec);
+      Preconditions.checkState(partition != null);
+      partitions = Lists.newArrayList(partition);
+    }
+
+    for (HdfsPartition p: partitions) {
+      for (FileDescriptor fd: p.getFileDescriptors()) {
+        TResultRowBuilder rowBuilder = new TResultRowBuilder();
+        rowBuilder.add(p.getLocation() + "/" + fd.getFileName());
+        rowBuilder.add(PrintUtils.printBytes(fd.getFileLength()));
+        rowBuilder.add(p.getPartitionName());
+        result.addToRows(rowBuilder.get());
+      }
     }
     return result;
   }

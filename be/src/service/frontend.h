@@ -149,6 +149,9 @@ class Frontend {
   // server.
   Status SetCatalogInitialized();
 
+  // Call FE to get files info for a table or partition.
+  Status GetTableFiles(const TShowFilesParams& params, TResultSet* result);
+
  private:
   // Descriptor of Java Frontend class itself, used to create a new instance.
   jclass fe_class_;
@@ -173,6 +176,7 @@ class Frontend {
   jmethodID exec_hs2_metadata_op_id_; // JniFrontend.execHiveServer2MetadataOp
   jmethodID load_table_data_id_; // JniFrontend.loadTableData
   jmethodID set_catalog_initialized_id_; // JniFrontend.setCatalogInitialized
+  jmethodID get_table_files_id_; // JniFrontend.getTableFiles
   jmethodID fe_ctor_;
 };
 
