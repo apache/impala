@@ -22,6 +22,7 @@
 #include "common/init.h"
 #include "service/fe-support.h"
 #include "util/mem-info.h"
+#include "util/process-state-info.h"
 #include "util/test-info.h"
 
 using namespace std;
@@ -33,6 +34,13 @@ TEST(MemInfo, Basic) {
   ASSERT_LT(MemInfo::vm_overcommit(), 3);
   ASSERT_GE(MemInfo::vm_overcommit(), 0);
   ASSERT_GT(MemInfo::commit_limit(), 0);
+}
+
+TEST(ProcessStateInfo, Basic) {
+  ProcessStateInfo process_state_info;
+  ASSERT_GE(process_state_info.GetBytes("io/read_bytes"), 0);
+  ASSERT_GE(process_state_info.GetInt("sched/prio"), 0);
+  ASSERT_GE(process_state_info.GetInt("status/Threads"), 0);
 }
 
 }

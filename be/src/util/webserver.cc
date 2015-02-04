@@ -36,6 +36,7 @@
 #include "util/disk-info.h"
 #include "util/mem-info.h"
 #include "util/os-info.h"
+#include "util/process-state-info.h"
 #include "util/url-coding.h"
 #include "util/debug-util.h"
 #include "util/pretty-printer.h"
@@ -159,7 +160,10 @@ void Webserver::RootHandler(const ArgumentMap& args, Document* document) {
   document->AddMember("disk_info", disk_info, document->GetAllocator());
   Value os_info(OsInfo::DebugString().c_str(), document->GetAllocator());
   document->AddMember("os_info", os_info, document->GetAllocator());
-  document->AddMember("pid", getpid(), document->GetAllocator());
+  Value process_state_info(ProcessStateInfo().DebugString().c_str(),
+    document->GetAllocator());
+  document->AddMember("process_state_info", process_state_info,
+    document->GetAllocator());
 }
 
 void Webserver::ErrorHandler(const ArgumentMap& args, Document* document) {
