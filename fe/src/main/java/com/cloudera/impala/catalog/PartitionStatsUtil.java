@@ -79,14 +79,13 @@ public class PartitionStatsUtil {
   }
 
   /**
-   * Serialises a TPartitionStats object to a MetaStore partition object, for later
-   * persistence to the HMS itself.
+   * Serialises a TPartitionStats object to a partition.
    */
   public static void partStatsToParameters(TPartitionStats partStats,
-      org.apache.hadoop.hive.metastore.api.Partition msPartition) {
+      HdfsPartition partition) {
     // null stats means logically delete the stats from this partition
     if (partStats == null) {
-      deletePartStats(msPartition);
+      deletePartStats(partition);
       return;
     }
 
@@ -105,10 +104,10 @@ public class PartitionStatsUtil {
       byte[] serialized = serializer.serialize(partStats);
       String base64 = new String(Base64.encodeBase64(serialized));
       List<String> chunks = chunkStringForHms(base64, HMS_MAX_CHUNKLEN);
-      msPartition.putToParameters(INTERMEDIATE_STATS_NUM_CHUNKS,
+      partition.putToParameters(INTERMEDIATE_STATS_NUM_CHUNKS,
           Integer.toString(chunks.size()));
       for (int i = 0; i < chunks.size(); ++i) {
-        msPartition.putToParameters(INTERMEDIATE_STATS_CHUNK_PREFIX + i, chunks.get(i));
+        partition.putToParameters(INTERMEDIATE_STATS_CHUNK_PREFIX + i, chunks.get(i));
       }
     } catch (TException e) {
       LOG.info("Error saving partition stats: ", e);
@@ -116,10 +115,9 @@ public class PartitionStatsUtil {
     }
   }
 
-  public static void deletePartStats(
-      org.apache.hadoop.hive.metastore.api.Partition msPartition) {
-    msPartition.putToParameters(INTERMEDIATE_STATS_NUM_CHUNKS, "0");
-    for (Iterator<String> it = msPartition.getParameters().keySet().iterator();
+  public static void deletePartStats(HdfsPartition partition) {
+    partition.putToParameters(INTERMEDIATE_STATS_NUM_CHUNKS, "0");
+    for (Iterator<String> it = partition.getParameters().keySet().iterator();
          it.hasNext(); ) {
       if (it.next().startsWith(INTERMEDIATE_STATS_CHUNK_PREFIX)) {
         it.remove();

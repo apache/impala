@@ -216,7 +216,7 @@ public class CatalogObjectToFromThriftTest {
 
     // Create a dummy partition with an invalid decimal type.
     try {
-      HdfsPartition dummyPart = new HdfsPartition(hdfsTable, part.getMetaStorePartition(),
+      HdfsPartition dummyPart = new HdfsPartition(hdfsTable, part.toHmsPartition(),
         Lists.newArrayList(LiteralExpr.create("1.1", ScalarType.createDecimalType(1, 0)),
             LiteralExpr.create("1.1", ScalarType.createDecimalType(1, 0))),
         null, Lists.<HdfsPartition.FileDescriptor>newArrayList(),

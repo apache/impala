@@ -105,6 +105,14 @@ public enum HdfsFileFormat {
     throw new IllegalArgumentException(className);
   }
 
+  public String toJavaClassName() {
+    for (Map.Entry<String, HdfsFileFormat> e: VALID_FORMATS.entrySet()) {
+      if (e.getValue().equals(this)) return e.getKey();
+    }
+
+    throw new IllegalArgumentException(this.toString());
+  }
+
   public static HdfsFileFormat fromThrift(THdfsFileFormat thriftFormat) {
     switch (thriftFormat) {
       case RC_FILE: return HdfsFileFormat.RC_FILE;

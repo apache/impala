@@ -62,7 +62,7 @@ public class HdfsStorageDescriptor {
 
   private final static Logger LOG = LoggerFactory.getLogger(HdfsStorageDescriptor.class);
 
-  private final HdfsFileFormat fileFormat_;
+  private HdfsFileFormat fileFormat_;
   private final byte lineDelim_;
   private final byte fieldDelim_;
   private final byte collectionDelim_;
@@ -70,6 +70,10 @@ public class HdfsStorageDescriptor {
   private final byte escapeChar_;
   private final byte quoteChar_;
   private final int blockSize_;
+
+  public void setFileFormat(HdfsFileFormat fileFormat) {
+    fileFormat_ = fileFormat;
+  }
 
   /**
    * Returns a map from delimiter key to a single delimiter character,

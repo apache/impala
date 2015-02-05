@@ -447,6 +447,8 @@ public class HdfsTable extends Table {
    */
   public String getLocation() { return super.getMetaStoreTable().getSd().getLocation(); }
 
+  public List<FieldSchema> getFieldSchemas() { return fields_; }
+
   // True if Impala has HDFS write permissions on the hdfsBaseDir (for an unpartitioned
   // table) or if Impala has write permissions on all partition directories (for
   // a partitioned table).
@@ -1099,13 +1101,13 @@ public class HdfsTable extends Table {
         // Get all the partitions from the cached entry that have not been modified.
         for (HdfsPartition cachedPart: cachedHdfsTableEntry.getPartitions()) {
           // Skip the default partition and any partitions that have been modified.
-          if (cachedPart.isDirty() || cachedPart.getMetaStorePartition() == null ||
-              cachedPart.getId() == DEFAULT_PARTITION_ID) {
+          if (cachedPart.isDirty() || cachedPart.isDefaultPartition()) {
             continue;
           }
+
           org.apache.hadoop.hive.metastore.api.Partition cachedMsPart =
-              cachedPart.getMetaStorePartition();
-          Preconditions.checkNotNull(cachedMsPart);
+              cachedPart.toHmsPartition();
+          if (cachedMsPart == null) continue;
 
           // This is a partition we already know about and it hasn't been modified.
           // No need to reload the metadata.
@@ -1412,7 +1414,7 @@ public class HdfsTable extends Table {
         Short rep = HdfsCachingUtil.getCachedCacheReplication(
             numClusteringCols_ == 0 ?
             p.getTable().getMetaStoreTable().getParameters() :
-            p.getHmsParameters());
+            p.getParameters());
         rowBuilder.add(rep.toString());
       }
       rowBuilder.add(p.getInputFormatDescriptor().getFileFormat().toString());

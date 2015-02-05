@@ -331,7 +331,6 @@ public class ComputeStatsStmt extends StatementBase {
             validPartStats_.add(partStats);
           }
         }
-
         if (expectedPartitions_.size() == hdfsTable.getPartitions().size() - 1) {
           expectedPartitions_.clear();
           expectAllPartitions_ = true;

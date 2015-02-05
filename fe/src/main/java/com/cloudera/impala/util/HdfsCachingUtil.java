@@ -82,13 +82,26 @@ public class HdfsCachingUtil {
   }
 
   /**
-   * Caches the location of the given Hive Metastore Partition and updates the
+   * Caches the location of the given partition and updates the
    * partitions's properties with the submitted cache directive ID. The caller is
    * responsible for not caching the same partition twice, as HDFS will create a second
    * cache directive even if it is similar to an already existing one.
    *
    * Returns the ID of the submitted cache directive and throws if there is an error
    * submitting the directive.
+   */
+  public static long submitCachePartitionDirective(HdfsPartition part,
+      String poolName, short replication) throws ImpalaRuntimeException {
+    long id = HdfsCachingUtil.submitDirective(new Path(part.getLocation()),
+        poolName, replication);
+    part.putToParameters(CACHE_DIR_ID_PROP_NAME, Long.toString(id));
+    part.putToParameters(CACHE_DIR_REPLICATION_PROP_NAME, Long.toString(replication));
+    return id;
+  }
+
+  /**
+   * Convenience method for working directly on a metastore partition. See
+   * submitCachePartitionDirective(HdfsPartition, String, short) for more details.
    */
   public static long submitCachePartitionDirective(
       org.apache.hadoop.hive.metastore.api.Partition part,
@@ -120,8 +133,7 @@ public class HdfsCachingUtil {
    * data. Also updates the partition's metadata to remove the cache directive ID.
    * No-op if the table is not cached.
    */
-  public static void uncachePartition(
-      org.apache.hadoop.hive.metastore.api.Partition part) throws ImpalaException {
+  public static void uncachePartition(HdfsPartition part) throws ImpalaException {
     Preconditions.checkNotNull(part);
     Long id = getCacheDirectiveId(part.getParameters());
     if (id == null) return;
@@ -286,11 +298,10 @@ public class HdfsCachingUtil {
    * Update cache directive for a partition and update the metastore parameters.
    * Returns the cache directive ID
    */
-  public static long modifyCacheDirective(Long id,
-      org.apache.hadoop.hive.metastore.api.Partition part,
-      String poolName, short replication) throws ImpalaRuntimeException {
+  public static long modifyCacheDirective(Long id, HdfsPartition part, String poolName,
+      short replication) throws ImpalaRuntimeException {
     Preconditions.checkNotNull(id);
-    HdfsCachingUtil.modifyCacheDirective(id, new Path(part.getSd().getLocation()),
+    HdfsCachingUtil.modifyCacheDirective(id, new Path(part.getLocation()),
         poolName, replication);
     part.putToParameters(CACHE_DIR_ID_PROP_NAME, Long.toString(id));
     part.putToParameters(CACHE_DIR_REPLICATION_PROP_NAME, Long.toString(replication));

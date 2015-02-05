@@ -58,6 +58,7 @@ import com.cloudera.impala.catalog.DataSource;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.HBaseTable;
+import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.HiveStorageDescriptorFactory;
@@ -431,15 +432,12 @@ public class CatalogOpExecutor {
     // the results to the metastore.
     org.apache.hadoop.hive.metastore.api.Table msTbl =
         table.getMetaStoreTable().deepCopy();
-    List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions =
-        Lists.newArrayList();
+    List<HdfsPartition> partitions = Lists.newArrayList();
     if (table instanceof HdfsTable) {
-      // Fill the msPartitions from the the cached metadata.
+      // Build a list of non-default partitions to update.
       HdfsTable hdfsTable = (HdfsTable) table;
       for (HdfsPartition p: hdfsTable.getPartitions()) {
-        if (p.getMetaStorePartition() != null) {
-          msPartitions.add(p.getMetaStorePartition());
-        }
+        if (!p.isDefaultPartition()) partitions.add(p);
       }
     }
 
@@ -447,37 +445,36 @@ public class CatalogOpExecutor {
     int numTargetedPartitions;
     int numUpdatedColumns = 0;
     try {
-        // Update the table and partition row counts based on the query results.
-        List<org.apache.hadoop.hive.metastore.api.Partition> modifiedParts =
-            Lists.newArrayList();
-        numTargetedPartitions = updateTableStats(table, params, msTbl, msPartitions,
-            modifiedParts);
+      // Update the table and partition row counts based on the query results.
+      List<HdfsPartition> modifiedParts = Lists.newArrayList();
+      numTargetedPartitions = updateTableStats(table, params, msTbl, partitions,
+          modifiedParts);
 
-        ColumnStatistics colStats = null;
-        if (params.isSetColumn_stats()) {
-          // Create Hive column stats from the query results.
-          colStats = createHiveColStats(params.getColumn_stats(), table);
-          numUpdatedColumns = colStats.getStatsObjSize();
-        }
+      ColumnStatistics colStats = null;
+      if (params.isSetColumn_stats()) {
+        // Create Hive column stats from the query results.
+        colStats = createHiveColStats(params.getColumn_stats(), table);
+        numUpdatedColumns = colStats.getStatsObjSize();
+      }
 
-        // Update all partitions.
-        bulkAlterPartitions(table.getDb().getName(), table.getName(), modifiedParts);
+      // Update all partitions.
+      bulkAlterPartitions(table.getDb().getName(), table.getName(), modifiedParts);
 
-        synchronized (metastoreDdlLock_) {
-          if (numUpdatedColumns > 0) {
-            Preconditions.checkNotNull(colStats);
-            // Update column stats.
-            try {
-              msClient.getHiveClient().updateTableColumnStatistics(colStats);
-            } catch (Exception e) {
-              throw new ImpalaRuntimeException(String.format(HMS_RPC_ERROR_FORMAT_STR,
-                  "updateTableColumnStatistics"), e);
-            }
+      synchronized (metastoreDdlLock_) {
+        if (numUpdatedColumns > 0) {
+          Preconditions.checkNotNull(colStats);
+          // Update column stats.
+          try {
+            msClient.getHiveClient().updateTableColumnStatistics(colStats);
+          } catch (Exception e) {
+            throw new ImpalaRuntimeException(String.format(HMS_RPC_ERROR_FORMAT_STR,
+                    "updateTableColumnStatistics"), e);
           }
-          // Update the table stats. Apply the table alteration last to ensure the
-          // lastDdlTime is as accurate as possible.
-          applyAlterTable(msTbl);
         }
+        // Update the table stats. Apply the table alteration last to ensure the
+        // lastDdlTime is as accurate as possible.
+        applyAlterTable(msTbl);
+      }
     } finally {
       msClient.release();
     }
@@ -507,34 +504,19 @@ public class CatalogOpExecutor {
    */
   private int updateTableStats(Table table, TAlterTableUpdateStatsParams params,
       org.apache.hadoop.hive.metastore.api.Table msTbl,
-      List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions,
-      List<org.apache.hadoop.hive.metastore.api.Partition> modifiedParts)
+      List<HdfsPartition> partitions, List<HdfsPartition> modifiedParts)
       throws ImpalaException {
     Preconditions.checkState(params.isSetPartition_stats());
     Preconditions.checkState(params.isSetTable_stats());
     // Update the partitions' ROW_COUNT parameter.
     int numTargetedPartitions = 0;
-    for (org.apache.hadoop.hive.metastore.api.Partition msPartition: msPartitions) {
-      List<String> partitionValues = Lists.newArrayList(msPartition.getValues());
-
-      // The backend will return NULL literals as the string "NULL". Hive's partition
-      // object will store them as an arbitrary string (usually
-      // "__HIVE_NULL_PARTITION_KEY__"). To make sure we can get the right partition, we
-      // need to rewrite the list of partition values.
-      if (table instanceof HdfsTable) {
-        String nullValue = ((HdfsTable)table).getNullPartitionKeyValue();
-        partitionValues.clear();
-        for (String s: msPartition.getValues()) {
-          if (s.equals(nullValue)) {
-            partitionValues.add("NULL");
-          } else {
-            partitionValues.add(s);
-          }
-        }
-      }
+    for (HdfsPartition partition: partitions) {
+      // NULL keys are returned as 'NULL' in the partition_stats map, so don't substitute
+      // this partition's keys with Hive's replacement value.
+      List<String> partitionValues = partition.getPartitionValuesAsStrings(false);
       TPartitionStats partitionStats = params.partition_stats.get(partitionValues);
-      TPartitionStats existingPartStats = PartitionStatsUtil.partStatsFromParameters(
-          msPartition.getParameters());
+      TPartitionStats existingPartStats =
+          PartitionStatsUtil.partStatsFromParameters(partition.getParameters());
 
       if (partitionStats == null) {
         // No stats were collected for this partition. This means that it was not included
@@ -554,30 +536,30 @@ public class CatalogOpExecutor {
 
       long numRows = partitionStats.stats.num_rows;
       LOG.debug(String.format("Updating stats for partition %s: numRows=%s",
-          Joiner.on(",").join(msPartition.getValues()), numRows));
+              partition.getValuesAsString(), numRows));
 
       boolean updatedPartition = false;
       // Update the partition stats if: either there are no existing stats for this
       // partition, or they're different.
       if (existingPartStats == null || !existingPartStats.equals(partitionStats)) {
-        PartitionStatsUtil.partStatsToParameters(partitionStats, msPartition);
+        PartitionStatsUtil.partStatsToParameters(partitionStats, partition);
         updatedPartition = true;
       }
 
       String existingRowCount =
-          msPartition.getParameters().get(StatsSetupConst.ROW_COUNT);
+          partition.getParameters().get(StatsSetupConst.ROW_COUNT);
       String newRowCount = String.valueOf(numRows);
       // Update table stats
       if (existingRowCount == null || !existingRowCount.equals(newRowCount)) {
         // The existing row count value wasn't set or has changed.
-        msPartition.putToParameters(StatsSetupConst.ROW_COUNT, newRowCount);
-        msPartition.putToParameters(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK,
+        partition.putToParameters(StatsSetupConst.ROW_COUNT, newRowCount);
+        partition.putToParameters(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK,
             StatsSetupConst.TRUE);
         updatedPartition = true;
       }
       if (updatedPartition) {
         ++numTargetedPartitions;
-        modifiedParts.add(msPartition);
+        modifiedParts.add(partition);
       }
     }
 
@@ -823,14 +805,11 @@ public class CatalogOpExecutor {
 
       if (partition.getPartitionStats() != null)  {
         synchronized (metastoreDdlLock_) {
-          org.apache.hadoop.hive.metastore.api.Partition msPartition =
-              partition.getMetaStorePartition();
-          Preconditions.checkNotNull(msPartition);
-          PartitionStatsUtil.deletePartStats(msPartition);
+          PartitionStatsUtil.deletePartStats(partition);
           // Remove the ROW_COUNT parameter if it has been set.
-          msPartition.getParameters().remove(StatsSetupConst.ROW_COUNT);
+          partition.getParameters().remove(StatsSetupConst.ROW_COUNT);
           try {
-            applyAlterPartition(table.getTableName(), msPartition);
+            applyAlterPartition(table.getTableName(), partition);
           } finally {
             partition.markDirty();
           }
@@ -906,8 +885,7 @@ public class CatalogOpExecutor {
     Preconditions.checkNotNull(hdfsTable);
 
     // List of partitions that were modified as part of this operation.
-    List<org.apache.hadoop.hive.metastore.api.Partition> modifiedParts =
-        Lists.newArrayList();
+    List<HdfsPartition> modifiedParts = Lists.newArrayList();
     for (HdfsPartition part: hdfsTable.getPartitions()) {
       boolean isModified = false;
       // The default partition is an Impala-internal abstraction and is not
@@ -915,20 +893,17 @@ public class CatalogOpExecutor {
       if (part.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
         continue;
       }
-      org.apache.hadoop.hive.metastore.api.Partition msPart =
-          part.getMetaStorePartition();
-      Preconditions.checkNotNull(msPart);
       if (part.getPartitionStats() != null) {
-        PartitionStatsUtil.deletePartStats(msPart);
+        PartitionStatsUtil.deletePartStats(part);
         isModified = true;
       }
 
       // Remove the ROW_COUNT parameter if it has been set.
-      if (msPart.getParameters().remove(StatsSetupConst.ROW_COUNT) != null) {
+      if (part.getParameters().remove(StatsSetupConst.ROW_COUNT) != null) {
         isModified = true;
       }
 
-      if (isModified) modifiedParts.add(msPart);
+      if (isModified) modifiedParts.add(part);
     }
 
     bulkAlterPartitions(table.getDb().getName(), table.getName(), modifiedParts);
@@ -1021,7 +996,7 @@ public class CatalogOpExecutor {
             for (HdfsPartition partition: hdfsTable.getPartitions()) {
               if (partition.isMarkedCached()) {
                 try {
-                  HdfsCachingUtil.uncachePartition(partition.getMetaStorePartition());
+                  HdfsCachingUtil.uncachePartition(partition);
                 } catch (Exception e) {
                   LOG.error("Unable to uncache partition: " +
                       partition.getPartitionName(), e);
@@ -1417,10 +1392,10 @@ public class CatalogOpExecutor {
         msClient.release();
       }
     }
-    // Create and add the HdfsPartition. Return the table object with an updated catalog
-    // version.
-    result = addHdfsPartition(tableName, partition);
     if (cacheIds != null) catalog_.watchCacheDirs(cacheIds, tableName.toThrift());
+    // Return the table object with an updated catalog version after creating the
+    // partition.
+    result = addHdfsPartition(tableName, partition);
     return result;
   }
 
@@ -1460,7 +1435,7 @@ public class CatalogOpExecutor {
             tableName.getTbl(), values);
         updateLastDdlTime(msTbl, msClient);
         if (part.isMarkedCached()) {
-          HdfsCachingUtil.uncachePartition(part.getMetaStorePartition());
+          HdfsCachingUtil.uncachePartition(part);
         }
       } catch (NoSuchObjectException e) {
         if (!ifExists) {
@@ -1599,12 +1574,10 @@ public class CatalogOpExecutor {
       synchronized (metastoreDdlLock_) {
         HdfsPartition partition = catalog_.getHdfsPartition(
             tableName.getDb(), tableName.getTbl(), partitionSpec);
-        org.apache.hadoop.hive.metastore.api.Partition msPartition =
-            partition.getMetaStorePartition();
-        Preconditions.checkNotNull(msPartition);
-        setStorageDescriptorFileFormat(msPartition.getSd(), fileFormat);
+        Preconditions.checkNotNull(partition);
+        partition.setFileFormat(HdfsFileFormat.fromThrift(fileFormat));
         try {
-          applyAlterPartition(tableName, msPartition);
+          applyAlterPartition(tableName, partition);
         } finally {
           partition.markDirty();
         }
@@ -1641,12 +1614,9 @@ public class CatalogOpExecutor {
       synchronized (metastoreDdlLock_) {
         HdfsPartition partition = catalog_.getHdfsPartition(
             tableName.getDb(), tableName.getTbl(), partitionSpec);
-        org.apache.hadoop.hive.metastore.api.Partition msPartition =
-            partition.getMetaStorePartition();
-        Preconditions.checkNotNull(msPartition);
-        msPartition.getSd().setLocation(location);
+        partition.setLocation(location);
         try {
-          applyAlterPartition(tableName, msPartition);
+          applyAlterPartition(tableName, partition);
         } finally {
           partition.markDirty();
         }
@@ -1667,22 +1637,19 @@ public class CatalogOpExecutor {
         // Alter partition params.
         HdfsPartition partition = catalog_.getHdfsPartition(
             tableName.getDb(), tableName.getTbl(), params.getPartition_spec());
-        org.apache.hadoop.hive.metastore.api.Partition msPartition =
-            partition.getMetaStorePartition();
-        Preconditions.checkNotNull(msPartition);
         switch (params.getTarget()) {
           case TBL_PROPERTY:
-            msPartition.getParameters().putAll(properties);
+            partition.getParameters().putAll(properties);
             break;
           case SERDE_PROPERTY:
-            msPartition.getSd().getSerdeInfo().getParameters().putAll(properties);
+            partition.getSerdeInfo().getParameters().putAll(properties);
             break;
           default:
             throw new UnsupportedOperationException(
                 "Unknown target TTablePropertyType: " + params.getTarget());
         }
         try {
-          applyAlterPartition(tableName, msPartition);
+          applyAlterPartition(tableName, partition);
         } finally {
           partition.markDirty();
         }
@@ -1755,25 +1722,21 @@ public class CatalogOpExecutor {
           if (partition.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
             continue;
           }
-          org.apache.hadoop.hive.metastore.api.Partition msPart =
-              partition.getMetaStorePartition();
-          Preconditions.checkNotNull(msPart);
-
           // Only issue cache directives if the data is uncached or the cache directive
           // needs to be updated
           if (!partition.isMarkedCached() ||
-              HdfsCachingUtil.isUpdateOp(cacheOp, msPart.getParameters())) {
-
+              HdfsCachingUtil.isUpdateOp(cacheOp, partition.getParameters())) {
             try {
               // If the partition was already cached, update the directive otherwise
               // issue new cache directive
               if (!partition.isMarkedCached()) {
                 cacheDirIds.add(HdfsCachingUtil.submitCachePartitionDirective(
-                    msPart, cacheOp.getCache_pool_name(), cacheReplication));
+                    partition, cacheOp.getCache_pool_name(), cacheReplication));
               } else {
-                Long directiveId = HdfsCachingUtil.getCacheDirectiveId(msPart.getParameters());
-                cacheDirIds.add(HdfsCachingUtil.modifyCacheDirective(
-                    directiveId, msPart, cacheOp.getCache_pool_name(), cacheReplication));
+                Long directiveId =
+                    HdfsCachingUtil.getCacheDirectiveId(partition.getParameters());
+                cacheDirIds.add(HdfsCachingUtil.modifyCacheDirective(directiveId,
+                    partition, cacheOp.getCache_pool_name(), cacheReplication));
               }
             } catch (ImpalaRuntimeException e) {
               if (partition.isMarkedCached()) {
@@ -1787,7 +1750,7 @@ public class CatalogOpExecutor {
 
             // Update the partition metadata.
             try {
-              applyAlterPartition(tableName, msPart);
+              applyAlterPartition(tableName, partition);
             } finally {
               partition.markDirty();
             }
@@ -1810,13 +1773,10 @@ public class CatalogOpExecutor {
           if (partition.getId() == ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID) {
             continue;
           }
-          org.apache.hadoop.hive.metastore.api.Partition msPart =
-              partition.getMetaStorePartition();
-          Preconditions.checkNotNull(msPart);
           if (partition.isMarkedCached()) {
-            HdfsCachingUtil.uncachePartition(msPart);
+            HdfsCachingUtil.uncachePartition(partition);
             try {
-              applyAlterPartition(tableName, msPart);
+              applyAlterPartition(tableName, partition);
             } finally {
               partition.markDirty();
             }
@@ -1845,24 +1805,21 @@ public class CatalogOpExecutor {
       // Alter partition params.
       HdfsPartition partition = catalog_.getHdfsPartition(
           tableName.getDb(), tableName.getTbl(), params.getPartition_spec());
-      org.apache.hadoop.hive.metastore.api.Partition msPartition =
-          partition.getMetaStorePartition();
-      Preconditions.checkNotNull(msPartition);
       if (cacheOp.isSet_cached()) {
 
         // The directive is null if the partition is not cached
         Long directiveId = HdfsCachingUtil.getCacheDirectiveId(
-            msPartition.getParameters());
+            partition.getParameters());
         short replication = HdfsCachingUtil.getReplicationOrDefault(cacheOp);
         List<Long> cacheDirs = Lists.newArrayList();
 
         if (directiveId == null) {
-          cacheDirs.add(HdfsCachingUtil.submitCachePartitionDirective(msPartition,
+          cacheDirs.add(HdfsCachingUtil.submitCachePartitionDirective(partition,
               cacheOp.getCache_pool_name(), replication));
         } else {
-          if (HdfsCachingUtil.isUpdateOp(cacheOp, msPartition.getParameters())) {
+          if (HdfsCachingUtil.isUpdateOp(cacheOp, partition.getParameters())) {
             HdfsCachingUtil.validateCachePool(cacheOp, directiveId, tableName, partition);
-            cacheDirs.add(HdfsCachingUtil.modifyCacheDirective(directiveId, msPartition,
+            cacheDirs.add(HdfsCachingUtil.modifyCacheDirective(directiveId, partition,
                 cacheOp.getCache_pool_name(), replication));
           }
         }
@@ -1876,10 +1833,10 @@ public class CatalogOpExecutor {
       } else {
         // Partition is not cached, just return.
         if (!partition.isMarkedCached()) return;
-        HdfsCachingUtil.uncachePartition(msPartition);
+        HdfsCachingUtil.uncachePartition(partition);
       }
       try {
-        applyAlterPartition(tableName, msPartition);
+        applyAlterPartition(tableName, partition);
       } finally {
         partition.markDirty();
       }
@@ -1915,13 +1872,12 @@ public class CatalogOpExecutor {
     }
   }
 
-  private void applyAlterPartition(TableName tableName,
-      org.apache.hadoop.hive.metastore.api.Partition msPartition)
+  private void applyAlterPartition(TableName tableName, HdfsPartition partition)
       throws ImpalaException {
     MetaStoreClient msClient = catalog_.getMetaStoreClient();
     try {
       msClient.getHiveClient().alter_partition(
-          tableName.getDb(), tableName.getTbl(), msPartition);
+          tableName.getDb(), tableName.getTbl(), partition.toHmsPartition());
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
       updateLastDdlTime(msTbl, msClient);
     } catch (TException e) {
@@ -2064,23 +2020,27 @@ public class CatalogOpExecutor {
    * timeouts.
    */
   private void bulkAlterPartitions(String dbName, String tableName,
-      List<org.apache.hadoop.hive.metastore.api.Partition> modifiedParts)
-      throws ImpalaRuntimeException {
+      List<HdfsPartition> modifiedParts) throws ImpalaRuntimeException {
     MetaStoreClient msClient = null;
+    List<org.apache.hadoop.hive.metastore.api.Partition> hmsPartitions =
+        Lists.newArrayList();
+    for (HdfsPartition p: modifiedParts) {
+      org.apache.hadoop.hive.metastore.api.Partition msPart = p.toHmsPartition();
+      if (msPart != null) hmsPartitions.add(msPart);
+    }
+    if (hmsPartitions.size() == 0) return;
     try {
       msClient = catalog_.getMetaStoreClient();
 
       // Apply the updates in batches of 'MAX_PARTITION_UPDATES_PER_RPC'.
-      for (int i = 0; i < modifiedParts.size(); i += MAX_PARTITION_UPDATES_PER_RPC) {
+      for (int i = 0; i < hmsPartitions.size(); i += MAX_PARTITION_UPDATES_PER_RPC) {
         int numPartitionsToUpdate =
-            Math.min(i + MAX_PARTITION_UPDATES_PER_RPC, modifiedParts.size());
-        List<org.apache.hadoop.hive.metastore.api.Partition> partsToUpdate =
-            modifiedParts.subList(i, numPartitionsToUpdate);
-
+            Math.min(i + MAX_PARTITION_UPDATES_PER_RPC, hmsPartitions.size());
         synchronized (metastoreDdlLock_) {
           try {
             // Alter partitions in bulk.
-            msClient.getHiveClient().alter_partitions(dbName, tableName, partsToUpdate);
+            msClient.getHiveClient().alter_partitions(dbName, tableName,
+                hmsPartitions.subList(i, numPartitionsToUpdate));
           } catch (TException e) {
             throw new ImpalaRuntimeException(
                 String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_partitions"), e);
@@ -2443,7 +2403,7 @@ public class CatalogOpExecutor {
           // cache directive so the TableLoadingMgr can perform an async refresh once
           // all data becomes cached.
           cacheDirIds.add(HdfsCachingUtil.getCacheDirectiveId(
-              partition.getMetaStorePartition().getParameters()));
+              partition.getParameters()));
         }
         if (partsToCreate.size() == 0) break;
       }
