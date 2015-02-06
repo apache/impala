@@ -57,6 +57,7 @@ add_library(Util
 # TODO: not supported on RHEL 5
 #  perf-counters.cc
   progress-updater.cc
+  redactor.cc
   runtime-profile.cc
   simple-logger.cc
   symbols-util.cc
@@ -113,3 +114,6 @@ ADD_BE_TEST(symbols-util-test)
 #ADD_BE_TEST(perf-counters-test)
 ADD_BE_TEST(webserver-test)
 ADD_BE_TEST(pretty-printer-test)
+ADD_BE_TEST(redactor-config-parser-test)
+ADD_BE_TEST(redactor-test)
+ADD_BE_TEST(redactor-unconfigured-test)
