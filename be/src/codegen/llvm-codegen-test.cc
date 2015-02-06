@@ -53,7 +53,7 @@ class LlvmCodeGenTest : public testing:: Test {
   // Wrapper to call private test-only methods on LlvmCodeGen object
   static Status LoadFromFile(ObjectPool* pool, const string& filename, 
       scoped_ptr<LlvmCodeGen>* codegen) {
-    return LlvmCodeGen::LoadFromFile(pool, filename, codegen);
+    return LlvmCodeGen::LoadFromFile(pool, filename, "test", codegen);
   }
 
   static LlvmCodeGen* CreateCodegen(ObjectPool* pool) {
@@ -278,7 +278,7 @@ TEST_F(LlvmCodeGenTest, StringValue) {
   ObjectPool pool;
   
   scoped_ptr<LlvmCodeGen> codegen;
-  Status status = LlvmCodeGen::LoadImpalaIR(&pool, &codegen);
+  Status status = LlvmCodeGen::LoadImpalaIR(&pool, "test", &codegen);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(codegen.get() != NULL);
 
@@ -320,7 +320,7 @@ TEST_F(LlvmCodeGenTest, MemcpyTest) {
   ObjectPool pool;
   
   scoped_ptr<LlvmCodeGen> codegen;
-  Status status = LlvmCodeGen::LoadImpalaIR(&pool, &codegen);
+  Status status = LlvmCodeGen::LoadImpalaIR(&pool, "test", &codegen);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(codegen.get() != NULL);
 
@@ -362,7 +362,7 @@ TEST_F(LlvmCodeGenTest, HashTest) {
   const char* data2 = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
   scoped_ptr<LlvmCodeGen> codegen;
-  Status status = LlvmCodeGen::LoadImpalaIR(&pool, &codegen);
+  Status status = LlvmCodeGen::LoadImpalaIR(&pool, "test", &codegen);
   ASSERT_TRUE(status.ok());
   ASSERT_TRUE(codegen.get() != NULL);
   

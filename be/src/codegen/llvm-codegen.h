@@ -117,13 +117,15 @@ class LlvmCodeGen {
   static void InitializeLlvm(bool load_backend = false);
 
   // Loads and parses the precompiled impala IR module
-  // codegen will contain the created object on success.
-  static Status LoadImpalaIR(ObjectPool*, boost::scoped_ptr<LlvmCodeGen>* codegen);
+  // 'codegen' will contain the created object on success.
+  // 'id' is used for outputting the IR module for debugging.
+  static Status LoadImpalaIR(
+      ObjectPool*, const std::string& id, boost::scoped_ptr<LlvmCodeGen>* codegen);
 
   // Load a pre-compiled IR module from 'file'.  This creates a top level
   // codegen object.
   // codegen will contain the created object on success.
-  static Status LoadFromFile(ObjectPool*, const std::string& file,
+  static Status LoadFromFile(ObjectPool*, const std::string& file, const std::string& id,
       boost::scoped_ptr<LlvmCodeGen>* codegen);
 
   // Removes all jit compiled dynamically linked functions from the process.
@@ -421,10 +423,8 @@ class LlvmCodeGen {
   friend class LlvmCodeGenTest;
   friend class SubExprElimination;
 
-  // Top level codegen object.  'module_name' is only used for debugging when
-  // outputting the IR.  module's loaded from disk will be named as the file
-  // path.
-  LlvmCodeGen(ObjectPool* pool, const std::string& module_name);
+  // Top level codegen object.  'module_id' is used for debugging when outputting the IR.
+  LlvmCodeGen(ObjectPool* pool, const std::string& module_id);
 
   // Initializes the jitter and execution engine.
   Status Init();
@@ -450,8 +450,8 @@ class LlvmCodeGen {
   // Clears generated hash fns.  This is only used for testing.
   void ClearHashFns();
 
-  // Name of the JIT module.  Useful for debugging.
-  std::string name_;
+  // ID used for debugging (can be e.g. the fragment instance ID)
+  std::string id_;
 
   // Codegen counters
   RuntimeProfile profile_;

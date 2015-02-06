@@ -186,7 +186,9 @@ Status RuntimeState::CreateBlockMgr() {
 
 Status RuntimeState::CreateCodegen() {
   if (codegen_.get() != NULL) return Status::OK;
-  RETURN_IF_ERROR(LlvmCodeGen::LoadImpalaIR(obj_pool_.get(), &codegen_));
+  // TODO: add the fragment ID to the codegen ID as well
+  RETURN_IF_ERROR(LlvmCodeGen::LoadImpalaIR(
+      obj_pool_.get(), PrintId(fragment_instance_id()), &codegen_));
   codegen_->EnableOptimizations(true);
   profile_.AddChild(codegen_->runtime_profile());
   return Status::OK;

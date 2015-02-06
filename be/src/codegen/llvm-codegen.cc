@@ -62,10 +62,10 @@ DEFINE_bool(print_llvm_ir_instruction_count, false,
 DEFINE_bool(disable_optimization_passes, false,
     "if true, disables llvm optimization passes (used for testing)");
 DEFINE_bool(dump_ir, false, "if true, output IR after optimization passes");
-DEFINE_string(unopt_module, "",
-    "if set, saves the unoptimized generated IR to the specified file.");
-DEFINE_string(opt_module, "",
-    "if set, saves the optimized generated IR to the specified file.");
+DEFINE_string(unopt_module_dir, "",
+    "if set, saves unoptimized generated IR modules to the specified directory.");
+DEFINE_string(opt_module_dir, "",
+    "if set, saves optimized generated IR modules to the specified directory.");
 DECLARE_string(local_library_dir);
 
 namespace impala {
@@ -94,8 +94,8 @@ void LlvmCodeGen::InitializeLlvm(bool load_backend) {
   }
 }
 
-LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& name) :
-  name_(name),
+LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& id) :
+  id_(id),
   profile_(pool, "CodeGen"),
   optimizations_enabled_(false),
   is_corrupt_(false),
@@ -118,8 +118,8 @@ LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& name) :
 }
 
 Status LlvmCodeGen::LoadFromFile(ObjectPool* pool,
-    const string& file, scoped_ptr<LlvmCodeGen>* codegen) {
-  codegen->reset(new LlvmCodeGen(pool, ""));
+    const string& file, const string& id, scoped_ptr<LlvmCodeGen>* codegen) {
+  codegen->reset(new LlvmCodeGen(pool, id));
   SCOPED_TIMER((*codegen)->profile_.total_time_counter());
 
   Module* loaded_module;
@@ -175,7 +175,8 @@ Status LlvmCodeGen::LinkModule(const string& file) {
   return Status::OK;
 }
 
-Status LlvmCodeGen::LoadImpalaIR(ObjectPool* pool, scoped_ptr<LlvmCodeGen>* codegen_ret) {
+Status LlvmCodeGen::LoadImpalaIR(
+    ObjectPool* pool, const string& id, scoped_ptr<LlvmCodeGen>* codegen_ret) {
   // Load the statically cross compiled file.  We cannot load an ll file with sse
   // instructions on a machine without sse support (the load fails, doesn't matter
   // if those instructions end up getting run or not).
@@ -185,7 +186,7 @@ Status LlvmCodeGen::LoadImpalaIR(ObjectPool* pool, scoped_ptr<LlvmCodeGen>* code
   } else {
     PathBuilder::GetFullPath("llvm-ir/impala-no-sse.ll", &module_file);
   }
-  RETURN_IF_ERROR(LoadFromFile(pool, module_file, codegen_ret));
+  RETURN_IF_ERROR(LoadFromFile(pool, module_file, id, codegen_ret));
   LlvmCodeGen* codegen = codegen_ret->get();
 
   // Parse module for cross compiled functions and types
@@ -248,7 +249,7 @@ Status LlvmCodeGen::LoadImpalaIR(ObjectPool* pool, scoped_ptr<LlvmCodeGen>* code
 
 Status LlvmCodeGen::Init() {
   if (module_ == NULL) {
-    module_ = new Module(name_, context());
+    module_ = new Module(id_, context());
   }
   llvm::CodeGenOpt::Level opt_level = CodeGenOpt::Aggressive;
 #ifndef NDEBUG
@@ -600,10 +601,11 @@ Status LlvmCodeGen::FinalizeModule() {
   DCHECK(!is_compiled_);
   is_compiled_ = true;
 
-  if (FLAGS_unopt_module.size() != 0) {
-    fstream f(FLAGS_unopt_module.c_str(), fstream::out | fstream::trunc);
+  if (FLAGS_unopt_module_dir.size() != 0) {
+    string path = FLAGS_unopt_module_dir + "/" + id_ + "_unopt.ll";
+    fstream f(path.c_str(), fstream::out | fstream::trunc);
     if (f.fail()) {
-      LOG(ERROR) << "Could not save IR to: " << FLAGS_unopt_module;
+      LOG(ERROR) << "Could not save IR to: " << path;
     } else {
       f << GetIR(true);
       f.close();
@@ -626,10 +628,11 @@ Status LlvmCodeGen::FinalizeModule() {
     *fns_to_jit_compile_[i].second = JitFunction(fns_to_jit_compile_[i].first);
   }
 
-  if (FLAGS_opt_module.size() != 0) {
-    fstream f(FLAGS_opt_module.c_str(), fstream::out | fstream::trunc);
+  if (FLAGS_opt_module_dir.size() != 0) {
+    string path = FLAGS_opt_module_dir + "/" + id_ + "_opt.ll";
+    fstream f(path.c_str(), fstream::out | fstream::trunc);
     if (f.fail()) {
-      LOG(ERROR) << "Could not save IR to: " << FLAGS_opt_module;
+      LOG(ERROR) << "Could not save IR to: " << path;
     } else {
       f << GetIR(true);
       f.close();

@@ -363,7 +363,7 @@ int main(int argc, char **argv) {
 
   Status status;
   scoped_ptr<LlvmCodeGen> codegen;
-  status = LlvmCodeGen::LoadImpalaIR(&obj_pool, &codegen);
+  status = LlvmCodeGen::LoadImpalaIR(&obj_pool, "test", &codegen);
   if (!status.ok()) {
     cout << "Could not start codegen.";
     return -1;
