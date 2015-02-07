@@ -46,14 +46,14 @@ class TimestampFunctions {
       FunctionContext::FunctionStateScope scope);
 
   // Parses 'string_val' based on the format 'fmt'.
-  static IntVal Unix(FunctionContext* context, const StringVal& string_val,
+  static BigIntVal Unix(FunctionContext* context, const StringVal& string_val,
       const StringVal& fmt);
   // Converts 'tv_val' to a unix time_t
-  static IntVal Unix(FunctionContext* context, const TimestampVal& tv_val);
+  static BigIntVal Unix(FunctionContext* context, const TimestampVal& tv_val);
   // Returns the current time.
-  static IntVal Unix(FunctionContext* context);
+  static BigIntVal Unix(FunctionContext* context);
 
-  static IntVal UnixFromString(FunctionContext* context, const StringVal& sv);
+  static BigIntVal UnixFromString(FunctionContext* context, const StringVal& sv);
 
   // Return a timestamp string from a unix time_t
   // Optional second argument is the format of the string.

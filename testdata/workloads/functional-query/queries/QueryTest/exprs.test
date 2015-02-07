@@ -1692,7 +1692,7 @@ select unix_timestamp(tmp.val, tmp.fmt) from (values
 34304461
 68439783
 ---- TYPES
-int
+bigint
 ====
 ---- QUERY
 select from_unixtime(tmp.val, tmp.fmt) from (values

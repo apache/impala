@@ -107,7 +107,7 @@ functions = [
     '_ZN6impala11UdfBuiltins9VectorGetEPN10impala_udf15FunctionContextERKNS1_9BigIntValERKNS1_9StringValE'],
 
   # Timestamp functions
-  [['unix_timestamp'], 'INT', ['STRING'], '_ZN6impala18TimestampFunctions14UnixFromStringEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
+  [['unix_timestamp'], 'BIGINT', ['STRING'], '_ZN6impala18TimestampFunctions14UnixFromStringEPN10impala_udf15FunctionContextERKNS1_9StringValE'],
   [['year'], 'INT', ['TIMESTAMP'], '_ZN6impala18TimestampFunctions4YearEPN10impala_udf15FunctionContextERKNS1_12TimestampValE'],
   [['month'], 'INT', ['TIMESTAMP'], '_ZN6impala18TimestampFunctions5MonthEPN10impala_udf15FunctionContextERKNS1_12TimestampValE'],
   [['dayofweek'], 'INT', ['TIMESTAMP'], '_ZN6impala18TimestampFunctions9DayOfWeekEPN10impala_udf15FunctionContextERKNS1_12TimestampValE'],
@@ -200,9 +200,9 @@ functions = [
   [['nanoseconds_sub'], 'TIMESTAMP', ['TIMESTAMP', 'BIGINT'],
       '_ZN6impala18TimestampFunctions10TimeAddSubILb0EN10impala_udf9BigIntValEN5boost9date_time18subsecond_durationINS4_10posix_time13time_durationELl1000000000EEEEENS2_12TimestampValEPNS2_15FunctionContextERKSA_RKT0_'],
   [['datediff'], 'INT', ['TIMESTAMP', 'TIMESTAMP'], '_ZN6impala18TimestampFunctions8DateDiffEPN10impala_udf15FunctionContextERKNS1_12TimestampValES6_'],
-   [['unix_timestamp'], 'INT', [], '_ZN6impala18TimestampFunctions4UnixEPN10impala_udf15FunctionContextE'],
-  [['unix_timestamp'], 'INT', ['TIMESTAMP'], '_ZN6impala18TimestampFunctions4UnixEPN10impala_udf15FunctionContextERKNS1_12TimestampValE'],
-  [['unix_timestamp'], 'INT', ['STRING', 'STRING'], '_ZN6impala18TimestampFunctions4UnixEPN10impala_udf15FunctionContextERKNS1_9StringValES6_',
+   [['unix_timestamp'], 'BIGINT', [], '_ZN6impala18TimestampFunctions4UnixEPN10impala_udf15FunctionContextE'],
+  [['unix_timestamp'], 'BIGINT', ['TIMESTAMP'], '_ZN6impala18TimestampFunctions4UnixEPN10impala_udf15FunctionContextERKNS1_12TimestampValE'],
+  [['unix_timestamp'], 'BIGINT', ['STRING', 'STRING'], '_ZN6impala18TimestampFunctions4UnixEPN10impala_udf15FunctionContextERKNS1_9StringValES6_',
           '_ZN6impala18TimestampFunctions22UnixAndFromUnixPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE',
           '_ZN6impala18TimestampFunctions20UnixAndFromUnixCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE'],
   [['from_unixtime'], 'STRING', ['INT'],
