@@ -39,12 +39,11 @@ export TARGET_FILESYSTEM=${TARGET_FILESYSTEM-"hdfs"}
 export FILESYSTEM_PREFIX=${FILESYSTEM_PREFIX-""}
 export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY-"DummySecretAccessKey"}
 export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID-"DummyAccessKeyId"}
+export S3_BUCKET=${S3_BUCKET-""}
+export HDFS_REPLICATION=${HDFS_REPLICATION-3}
+export ISILON_NAMENODE=${ISILON_NAMENODE-""}
 
-# The target filesystem should be one of hdfs or s3
-if [[ "${TARGET_FILESYSTEM}" != "hdfs" && "${TARGET_FILESYSTEM}" != "s3" ]]; then
-  echo "Unsupported filesystem '$TARGET_FILESYSTEM', valid values are: ('hdfs', 's3')"
-  return 1
-elif [ "${TARGET_FILESYSTEM}" = "s3" ]; then
+if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
   # Basic error checking
   if [[ "${AWS_ACCESS_KEY_ID}" = "DummyAccessKeyId" ||\
         "${AWS_SECRET_ACCESS_KEY}" = "DummySecretAccessKey" ]]; then
@@ -67,6 +66,20 @@ elif [ "${TARGET_FILESYSTEM}" = "s3" ]; then
   #   - All the required environment variables are set.
   #   - We are able to talk to the s3 bucket with the credentials provided.
   export FILESYSTEM_PREFIX="s3a://${S3_BUCKET}"
+elif [ "${TARGET_FILESYSTEM}" = "isilon" ]; then
+  if [ "${ISILON_NAMENODE}" = "" ]; then
+    echo "In order to access the Isilon filesystem, ISILON_NAMENODE"
+    echo "needs to be a non-empty and valid address."
+    return 1
+  fi
+  FILESYSTEM_PREFIX="hdfs://${ISILON_NAMENODE}:8020"
+  export FILESYSTEM_PREFIX
+  # isilon manages its own replication.
+  export HDFS_REPLICATION=1
+elif [ "${TARGET_FILESYSTEM}" != "hdfs" ]; then
+  echo "Unsupported filesystem '$TARGET_FILESYSTEM'"
+  echo "Valid values are: hdfs, isilon, s3"
+  return 1
 fi
 
 # Directory where local cluster logs will go when running tests or loading data

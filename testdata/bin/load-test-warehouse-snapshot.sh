@@ -41,20 +41,21 @@ echo "Your existing ${TARGET_FILESYSTEM} warehouse directory " \
 read -p "Continue (y/n)? "
 if [[ "$REPLY" =~ ^[Yy]$ ]]; then
   # Create a new warehouse directory. If one already exist, remove it first.
-  if [ "${TARGET_FILESYSTEM}" = 'hdfs' ]; then
-    hadoop fs -test -d ${TEST_WAREHOUSE_DIR}
-    if [ $? -eq 0 ]; then
-      echo "Removing existing test-warehouse directory"
-      hadoop fs -rm -r ${TEST_WAREHOUSE_DIR}
-    fi
-    echo "Creating test-warehouse directory"
-    hadoop fs -mkdir ${TEST_WAREHOUSE_DIR}
-  elif [ "${TARGET_FILESYSTEM}" = "s3" ]; then
+  if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
     # TODO: The aws cli emits a lot of spew, redirect /dev/null once it's deemed stable.
     aws s3 rm --recursive s3://${S3_BUCKET}${TEST_WAREHOUSE_DIR}
     if [ $? != 0 ]; then
       echo "Deleting pre-existing data in s3 failed, aborting."
     fi
+  else
+    # Either isilon or hdfs, no change in procedure.
+    hadoop fs -test -d ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
+    if [ $? -eq 0 ]; then
+      echo "Removing existing test-warehouse directory"
+      hadoop fs -rm -r ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
+    fi
+    echo "Creating test-warehouse directory"
+    hadoop fs -mkdir ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
   fi
 else
   echo -e "\nAborting."
@@ -77,19 +78,19 @@ if [ ! -f ${SNAPSHOT_STAGING_DIR}/test-warehouse/githash.txt ]; then
 fi
 
 
+echo "Loading hive builtins"
+${IMPALA_HOME}/testdata/bin/load-hive-builtins.sh
 echo "Copying data to ${TARGET_FILESYSTEM}"
-if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
+if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
   # hive does not yet work well with s3, so we won't need hive builtins.
-  echo "Loading hive builtins"
-  ${IMPALA_HOME}/testdata/bin/load-hive-builtins.sh
-  hadoop fs -put ${SNAPSHOT_STAGING_DIR}${TEST_WAREHOUSE_DIR}/* ${TEST_WAREHOUSE_DIR}
-elif [ "${TARGET_FILESYSTEM}" = "s3" ]; then
   # TODO: The aws cli emits a lot of spew, redirect /dev/null once it's deemed stable.
   aws s3 cp --recursive ${SNAPSHOT_STAGING_DIR}${TEST_WAREHOUSE_DIR} \
       s3://${S3_BUCKET}${TEST_WAREHOUSE_DIR}
   if [ $? != 0 ]; then
     echo "Copying the test-warehouse to s3 failed, aborting."
   fi
+else
+  hadoop fs -put ${SNAPSHOT_STAGING_DIR}${TEST_WAREHOUSE_DIR}/* ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
 fi
 
 ${IMPALA_HOME}/bin/create_testdata.sh

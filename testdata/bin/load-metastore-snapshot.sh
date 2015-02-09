@@ -47,7 +47,7 @@ if [ ${USER} != "jenkins" ]; then
   sed -i "s/jenkins/${USER}/g" ${TMP_SNAPSHOT_FILE}
 fi
 
-if [ "${TARGET_FILESYSTEM}" == "s3" ]; then
+if [[ "${TARGET_FILESYSTEM}" == "s3" || "${TARGET_FILESYSTEM}" = "isilon" ]]; then
   echo "Changing table metadata to point to ${FILESYSTEM_PREFIX}"
   sed -i "s|hdfs://localhost:20500|${FILESYSTEM_PREFIX}|g" ${TMP_SNAPSHOT_FILE}
 fi

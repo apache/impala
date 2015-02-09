@@ -198,11 +198,11 @@ if [ ${IMPALA_KERBERIZE} -eq 0 ]; then
   NEEDS_RE_SOURCE_NOTE=0
 fi
 
-if [[ "${TARGET_FILESYSTEM}" = "s3" && $TESTDATA_ACTION -eq 1 &&
-      ! -n $METASTORE_SNAPSHOT_FILE ]]
-then
-  # Loading on s3 won't work if the metastore snapshot is not provided.
-  echo "-metastore_snapshot_file <file> is required for loading data into s3"
+# Loading data on a filesystem other than fs.defaultFS is not supported.
+if [[ -z $METASTORE_SNAPSHOT_FILE && "${TARGET_FILESYSTEM}" != "hdfs" &&
+      $TESTDATA_ACTION -eq 1 ]]; then
+  echo "The metastore snapshot is required for loading data into ${TARGET_FILESYSTEM}"
+  echo "Use the -metastore_snapshot_file command line paramater."
   exit 1
 fi
 
@@ -271,7 +271,7 @@ then
 fi
 
 # Generate the Hadoop configs needed by Impala
-if [ $FORMAT_METASTORE -eq 1 ] && [ -n $METASTORE_SNAPSHOT_FILE ]; then
+if [[ $FORMAT_METASTORE -eq 1 && -z $METASTORE_SNAPSHOT_FILE ]]; then
   ${IMPALA_HOME}/bin/create-test-configuration.sh -create_metastore
 else
   ${IMPALA_HOME}/bin/create-test-configuration.sh
