@@ -34,7 +34,7 @@ namespace impala {
 // The rule format is JSON with the following structure:
 // {
 //   "version": 1,      # required int
-//   "rules": [         # required array, rule execution order may not be preserved
+//   "rules": [         # required array, rules are executed in order
 //     {
 //       "description": "", # optional, completely ignored
 //       "trigger": "find", # optional string, default = "", rule only goes into effect

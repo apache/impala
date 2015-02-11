@@ -16,7 +16,6 @@
 
 #include <cerrno>
 #include <cstring>  // strcmp
-#include <map>
 #include <ostream>
 #include <sstream>
 #include <sys/stat.h>
@@ -45,32 +44,31 @@ using strings::Substitute;
 
 typedef re2::RE2 Regex;
 
-// Stores the search/replace part of a redaction rule.
-struct PatternReplacement {
+struct Rule {
   // Standard constructor.
-  PatternReplacement(const string& search_regex, const string& replacement)
-      : search_pattern(search_regex),
+  Rule(const string& trigger, const string& search_regex, const string& replacement)
+      : trigger(trigger),
+        search_pattern(search_regex),
         replacement(replacement) {}
 
   // For use with vector.
-  PatternReplacement(const PatternReplacement& other)
-      : search_pattern(other.search_pattern.pattern()),
+  Rule(const Rule& other)
+      : trigger(other.trigger),
+        search_pattern(other.search_pattern.pattern()),
         replacement(other.replacement) {}
 
+  const string trigger;
   const Regex search_pattern;
   const string replacement;
 
   // For use with vector.
-  const PatternReplacement& operator=(const PatternReplacement& other) {
-    *this = PatternReplacement(other);
+  const Rule& operator=(const Rule& other) {
+    *this = Rule(other);
     return *this;
   }
 };
 
-typedef vector<PatternReplacement> Replacements;
-
-// Rules are grouped by trigger.
-typedef map<string, Replacements> Rules;
+typedef vector<Rule> Rules;
 
 // The actual rules in effect, if any.
 static Rules* g_rules;
@@ -148,22 +146,22 @@ class RulesParser {
   }
 
   // Parse a rule and populate g_rules.
-  void ParseRule(const Value& rule) {
+  void ParseRule(const Value& json_rule) {
     bool found_replace = false;
     string search_text, replace, trigger;
-    for (Value::ConstMemberIterator member = rule.MemberBegin();
-        member != rule.MemberEnd(); ++member) {
+    for (Value::ConstMemberIterator member = json_rule.MemberBegin();
+        member != json_rule.MemberEnd(); ++member) {
       if (strcmp("search", member->name.GetString()) == 0) {
-        if (!ReadRuleProperty("search", rule, &search_text)) return;
+        if (!ReadRuleProperty("search", json_rule, &search_text)) return;
         if (search_text.empty()) {
           AddRuleParseError() << "search property must be a non-empty regex";
           return;
         }
       } else if (strcmp("replace", member->name.GetString()) == 0) {
         found_replace = true;
-        if (!ReadRuleProperty("replace", rule, &replace)) return;
+        if (!ReadRuleProperty("replace", json_rule, &replace)) return;
       } else if (strcmp("trigger", member->name.GetString()) == 0) {
-        if (!ReadRuleProperty("trigger", rule, &trigger, /*required*/ false)) return;
+        if (!ReadRuleProperty("trigger", json_rule, &trigger, /*required*/ false)) return;
       } else if (strcmp("description", member->name.GetString()) == 0) {
         // Ignore, this property is for user documentation.
       } else {
@@ -179,13 +177,12 @@ class RulesParser {
       AddRuleParseError() << "a 'replace' property is required";
       return;
     }
-    PatternReplacement pattern_replacement(search_text, replace);
-    if (!pattern_replacement.search_pattern.ok()) {
-      AddRuleParseError() << "search regex is invalid; "
-                          << pattern_replacement.search_pattern.error();
+    Rule rule(trigger, search_text, replace);
+    if (!rule.search_pattern.ok()) {
+      AddRuleParseError() << "search regex is invalid; " << rule.search_pattern.error();
       return;
     }
-    (*g_rules)[trigger].push_back(pattern_replacement);
+    (*g_rules).push_back(rule);
   }
 
   // Parse a rule property that should have a string value. A true return value indicates
@@ -274,16 +271,9 @@ string SetRedactionRulesFromFile(const string& rules_file_path) {
 void Redact(string* value) {
   DCHECK(value != NULL);
   if (g_rules == NULL || g_rules->empty()) return;
-  for (Rules::const_iterator rule_it = g_rules->begin(); rule_it != g_rules->end();
-      ++rule_it) {
-    const string& trigger = rule_it->first;
-    if (value->find(trigger) == string::npos) continue;
-    const Replacements& replacements = rule_it->second;
-    for (Replacements::const_iterator replacement_it = replacements.begin();
-        replacement_it != replacements.end(); ++replacement_it) {
-      re2::RE2::GlobalReplace(
-          value, replacement_it->search_pattern, replacement_it->replacement);
-    }
+  for (Rules::const_iterator rule = g_rules->begin(); rule != g_rules->end(); ++rule) {
+    if (value->find(rule->trigger) == string::npos) continue;
+    re2::RE2::GlobalReplace(value, rule->search_pattern, rule->replacement);
   }
 }
 

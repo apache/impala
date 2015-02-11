@@ -69,10 +69,9 @@ TEST(RedactorTest, NoTrigger) {
   string error = SetRedactionRulesFromFile(rules_file.name());
   ASSERT_EQ("", error);
   ASSERT_EQ(1, g_rules->size());
-  ASSERT_EQ("", g_rules->begin()->first);
-  ASSERT_EQ(1, g_rules->begin()->second.size());
-  ASSERT_EQ("foo", g_rules->begin()->second.begin()->search_pattern.pattern());
-  ASSERT_EQ("bar", g_rules->begin()->second.begin()->replacement);
+  ASSERT_EQ("", g_rules->begin()->trigger);
+  ASSERT_EQ("foo", g_rules->begin()->search_pattern.pattern());
+  ASSERT_EQ("bar", g_rules->begin()->replacement);
   ASSERT_UNREDACTED("baz");
   ASSERT_REDACTED_EQ("foo", "bar");
   ASSERT_REDACTED_EQ("foo bar foo baz", "bar bar bar baz");
@@ -90,7 +89,7 @@ TEST(RedactorTest, Trigger) {
   string error = SetRedactionRulesFromFile(rules_file.name());
   ASSERT_EQ("", error);
   ASSERT_EQ(1, g_rules->size());
-  ASSERT_EQ("baz", g_rules->begin()->first);
+  ASSERT_EQ("baz", g_rules->begin()->trigger);
   ASSERT_UNREDACTED("foo");
   ASSERT_REDACTED_EQ("foo bar foo baz", "bar bar bar baz");
 }
@@ -122,10 +121,37 @@ TEST(RedactorTest, SingleTriggerMultiRule) {
       "}");
   string error = SetRedactionRulesFromFile(rules_file.name());
   ASSERT_EQ("", error);
-  ASSERT_EQ(1, g_rules->size());
-  ASSERT_EQ(2, (*g_rules)["baz"].size());
+  ASSERT_EQ(2, g_rules->size());
   ASSERT_UNREDACTED("foo33");
   ASSERT_REDACTED_EQ("foo foo baz!3", "bar bar baz!#");
+}
+
+TEST(RedactorTest, RuleOrder) {
+  TempRulesFile rules_file(
+      "{"
+      "  \"version\": 1,"
+      "  \"rules\": ["
+      "    {\"trigger\": \"barC\", \"search\": \".*\", \"replace\": \"Z\"},"
+      "    {\"search\": \"1\", \"replace\": \"2\"},"
+      "    {\"search\": \"1\", \"replace\": \"3\"},"
+      "    {\"trigger\": \"foo\", \"search\": \"2\", \"replace\": \"A\"},"
+      "    {\"trigger\": \"bar\", \"search\": \"2\", \"replace\": \"1\"},"
+      "    {\"search\": \"1\", \"replace\": \"4\"},"
+      "    {\"search\": \"1\", \"replace\": \"5\"},"
+      "    {\"trigger\": \"foo\", \"search\": \"A\", \"replace\": \"C\"},"
+      "    {\"trigger\": \"bar\", \"search\": \"5\", \"replace\": \"1\"},"
+      "    {\"trigger\": \"barC\", \"search\": \".*\", \"replace\": \"D\"}"
+      "  ]"
+      "}");
+  string error = SetRedactionRulesFromFile(rules_file.name());
+  ASSERT_EQ("", error);
+  ASSERT_EQ(10, g_rules->size());
+  ASSERT_UNREDACTED("foo");
+  ASSERT_REDACTED_EQ("1", "2");
+  ASSERT_REDACTED_EQ("foo1", "fooC");
+  ASSERT_REDACTED_EQ("bar1", "bar4");
+  ASSERT_REDACTED_EQ("bar5", "bar1");
+  ASSERT_REDACTED_EQ("foobar1", "D");
 }
 
 TEST(RedactorTest, InputSize) {
