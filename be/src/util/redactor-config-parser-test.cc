@@ -110,15 +110,22 @@ TEST(ParserTest, BadVersion) {
   string error = SetRedactionRulesFromFile(rules_file.name());
   ASSERT_ERROR_MESSAGE_CONTAINS(error, "only version 1");
 
-  rules_file.OverwriteContents(
-      "{"
-      "  \"version\": 1.0,"
-      "  \"rules\": ["
-      "    {\"search\": \"[0-9]\", \"replace\": \"#\"}"
-      "  ]"
-      "}");
-  error = SetRedactionRulesFromFile(rules_file.name());
-  ASSERT_ERROR_MESSAGE_CONTAINS(error, "must be an integer");
+  int bad_value_count = 6;
+  string bad_values[][2] = {
+    {"1.0", "Float"},
+    {"true", "Bool"},
+    {"false", "Bool"},
+    {"\"string\"", "String"},
+    {"[]", "Array"},
+    {"{}", "Object"},
+  };
+  ASSERT_EQ(sizeof(string) * bad_value_count * 2, sizeof(bad_values));
+  for (int i = 0; i < bad_value_count; ++i) {
+    rules_file.OverwriteContents(Substitute("{ \"version\": $0 }", bad_values[i][0]));
+    error = SetRedactionRulesFromFile(rules_file.name());
+    ASSERT_ERROR_MESSAGE_CONTAINS(
+        error, Substitute("must be an Integer but is a $0", bad_values[i][1]).c_str());
+  }
 
   rules_file.OverwriteContents(
       "{"

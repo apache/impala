@@ -75,6 +75,28 @@ typedef map<string, Replacements> Rules;
 // The actual rules in effect, if any.
 static Rules* g_rules;
 
+string NameOfTypeOfJsonValue(const Value& value) {
+  switch (value.GetType()) {
+    case rapidjson::kNullType:
+      return "Null";
+    case rapidjson::kFalseType:
+    case rapidjson::kTrueType:
+      return "Bool";
+    case rapidjson::kObjectType:
+      return "Object";
+    case rapidjson::kArrayType:
+      return "Array";
+    case rapidjson::kStringType:
+      return "String";
+    case rapidjson::kNumberType:
+      if (value.IsInt()) return "Integer";
+      if (value.IsDouble()) return "Float";
+    default:
+      DCHECK(false);
+      return "Unknown";
+  }
+}
+
 // This class will parse a version 1 rule file and populate g_rules.
 class RulesParser {
  public:
@@ -110,13 +132,15 @@ class RulesParser {
   // Parse an array of rules.
   void ParseRules(const Value& rules) {
     if (!rules.IsArray()) {
-      AddDocParseError() << "'rules' must be of type Array but is a " << rules.GetType();
+      AddDocParseError() << "'rules' must be of type Array but is a "
+                         << NameOfTypeOfJsonValue(rules);
       return;
     }
     for (rule_idx_ = 0; rule_idx_ < rules.Size(); ++rule_idx_) {
       const Value& rule = rules[rule_idx_];
       if (!rule.IsObject()) {
-        AddRuleParseError() << "rule should be a JSON Object but is a " << rule.GetType();
+        AddRuleParseError() << "rule should be a JSON Object but is a "
+                            << NameOfTypeOfJsonValue(rule);
         continue;
       }
       ParseRule(rule);
@@ -178,7 +202,7 @@ class RulesParser {
     }
     if (!json_value.IsString()) {
       AddRuleParseError() << name << " property must be of type String but is a "
-                          << json_value.GetType();
+                          << NameOfTypeOfJsonValue(json_value);
       return false;
     }
     *value = json_value.GetString();
@@ -236,7 +260,8 @@ string SetRedactionRulesFromFile(const string& rules_file_path) {
     return "Error parsing redaction rules; a document version is required.";
   }
   if (!version.IsInt()) {
-    return "Error parsing redaction rules; version must be an integer.";
+    return Substitute("Error parsing redaction rules; version must be an Integer but "
+        "is a $0", NameOfTypeOfJsonValue(version));
   }
   if (version.GetInt() != 1) {
     return "Error parsing redaction rules; only version 1 is supported.";
