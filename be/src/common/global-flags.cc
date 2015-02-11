@@ -61,3 +61,8 @@ DEFINE_bool(compact_catalog_topic, false, "If true, catalog updates sent via the
     "statestore are compacted before transmission. This saves network bandwidth at the"
     " cost of a small quantity of CPU time. Enable this option in cluster with large"
     " catalogs. It must be enabled on both the catalog service, and all Impala demons.");
+
+DEFINE_string(redaction_rules_file, "", "Absolute path to sensitive data redaction "
+    "rules. The rules will be applied to all log messages and query text shown in the "
+    "Web UI and audit records. Query results will not be affected. Refer to the "
+    "documentation for the rule file format.");

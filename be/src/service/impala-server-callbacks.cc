@@ -24,6 +24,7 @@
 
 #include "gen-cpp/beeswax_types.h"
 #include "thrift/protocol/TDebugProtocol.h"
+#include "util/redactor.h"
 #include "util/summary-util.h"
 #include "util/url-coding.h"
 
@@ -160,7 +161,8 @@ void ImpalaServer::QueryProfileUrlCallback(const Webserver::ArgumentMap& args,
     return;
   }
 
-  Value profile(ss.str().c_str(), document->GetAllocator());
+  // Redact profile string which contains the query string
+  Value profile(RedactCopy(ss.str()).c_str(), document->GetAllocator());
   document->AddMember("contents", profile, document->GetAllocator());
 }
 
@@ -203,7 +205,8 @@ void ImpalaServer::QueryStateToJson(const ImpalaServer::QueryStateRecord& record
   Value default_db(record.default_db.c_str(), document->GetAllocator());
   value->AddMember("default_db", default_db, document->GetAllocator());
 
-  Value stmt(record.stmt.c_str(), document->GetAllocator());
+  // Redact the query string
+  Value stmt(RedactCopy(record.stmt).c_str(), document->GetAllocator());
   value->AddMember("stmt", stmt, document->GetAllocator());
 
   Value stmt_type(_TStmtType_VALUES_TO_NAMES.find(record.stmt_type)->second,
@@ -417,7 +420,8 @@ void ImpalaServer::QuerySummaryCallback(const Webserver::ArgumentMap& args,
   TUniqueId query_id;
   Status status = ParseQueryId(args, &query_id);
   if (!status.ok()) {
-    Value json_error(status.GetErrorMsg().c_str(), document->GetAllocator());
+    // Redact the error message, it may contain part or all of the query.
+    Value json_error(RedactCopy(status.GetErrorMsg()).c_str(), document->GetAllocator());
     document->AddMember("error", json_error, document->GetAllocator());
     return;
   }
@@ -466,13 +470,16 @@ void ImpalaServer::QuerySummaryCallback(const Webserver::ArgumentMap& args,
   const string& printed_summary = PrintExecSummary(summary);
   Value json_summary(printed_summary.c_str(), document->GetAllocator());
   document->AddMember("summary", json_summary, document->GetAllocator());
-  Value json_stmt(stmt.c_str(), document->GetAllocator());
+  // Redact the query string.
+  Value json_stmt(RedactCopy(stmt).c_str(), document->GetAllocator());
   document->AddMember("stmt", json_stmt, document->GetAllocator());
-  Value json_plan(plan.c_str(), document->GetAllocator());
+  // Redact the plan in case it contains predicates.
+  Value json_plan(RedactCopy(plan).c_str(), document->GetAllocator());
   document->AddMember("plan", json_plan, document->GetAllocator());
 
-  Value json_status(query_status.ok() ? "OK" : query_status.GetErrorMsg().c_str(),
-      document->GetAllocator());
+  // Redact the error in case the query is contained in the error message.
+  Value json_status(query_status.ok() ? "OK" :
+      RedactCopy(query_status.GetErrorMsg()).c_str(), document->GetAllocator());
   document->AddMember("status", json_status, document->GetAllocator());
   Value json_id(PrintId(query_id).c_str(), document->GetAllocator());
   document->AddMember("query_id", json_id, document->GetAllocator());

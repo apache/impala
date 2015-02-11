@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "rules": [
+    {"search": "\\d", "replace": "X", "description": "manual testing rule"}
+  ]
+}

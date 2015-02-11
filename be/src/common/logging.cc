@@ -32,6 +32,7 @@
 
 #include "common/logging.h"
 #include "util/error-util.h"
+#include "util/redactor.h"
 #include "util/test-info.h"
 
 DEFINE_string(log_filename, "",
@@ -40,6 +41,8 @@ DEFINE_string(log_filename, "",
 DEFINE_bool(redirect_stdout_stderr, true,
     "If true, redirects stdout/stderr to INFO/ERROR log.");
 
+DECLARE_string(redaction_rules_file);
+
 bool logging_initialized = false;
 
 using namespace boost;
@@ -47,6 +50,12 @@ using namespace std;
 using namespace boost::uuids;
 
 mutex logging_mutex;
+
+void RedactGlogMessage(string* message, bool* changed) {
+  impala::Redact(message);
+  // TODO: Wire 'changed' through the redaction call
+  *changed = true;
+}
 
 void impala::InitGoogleLoggingSafe(const char* arg) {
   mutex::scoped_lock logging_lock(logging_mutex);
@@ -94,6 +103,10 @@ void impala::InitGoogleLoggingSafe(const char* arg) {
   }
 
   google::InitGoogleLogging(arg);
+  if (!FLAGS_redaction_rules_file.empty()) {
+    // This depends on a patched glog. The patch is at thirdparty/patches/glog.
+    google::InstallLogMessageListenerFunction(RedactGlogMessage);
+  }
 
   // Needs to be done after InitGoogleLogging
   if (FLAGS_log_filename.empty()) {

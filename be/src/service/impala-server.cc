@@ -62,6 +62,7 @@
 #include "util/impalad-metrics.h"
 #include "util/network-util.h"
 #include "util/parse-util.h"
+#include "util/redactor.h"
 #include "util/string-parser.h"
 #include "util/summary-util.h"
 #include "util/uid-util.h"
@@ -355,7 +356,9 @@ Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_sta
   writer.String(
       lexical_cast<string>(exec_state.session()->network_address).c_str());
   writer.String("sql_statement");
-  writer.String(replace_all_copy(exec_state.sql_stmt(), "\n", " ").c_str());
+  string stmt = replace_all_copy(exec_state.sql_stmt(), "\n", " ");
+  Redact(&stmt);
+  writer.String(stmt.c_str());
   writer.String("catalog_objects");
   writer.StartArray();
   BOOST_FOREACH(const TAccessEvent& event, request.access_events) {

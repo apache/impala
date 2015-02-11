@@ -184,9 +184,14 @@ class Status {
     if (UNLIKELY(!__status__.ok())) { \
       std::string msg; \
       __status__.GetErrorMsg(&msg); \
-      LOG(ERROR) << msg;            \
-      exit(1); \
+      EXIT_WITH_ERROR(msg); \
     } \
+  } while (false)
+
+#define EXIT_WITH_ERROR(msg) \
+  do { \
+    LOG(ERROR) << msg; \
+    exit(1); \
   } while (false)
 
 }

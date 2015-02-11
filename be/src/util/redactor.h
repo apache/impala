@@ -57,7 +57,7 @@ std::string SetRedactionRulesFromFile(const std::string& rules_file_path);
 void Redact(std::string* string);
 
 // Utility function to redacted a string without modifying the original.
-std::string RedactCopy(const std::string& original) {
+inline std::string RedactCopy(const std::string& original) {
   std::string temp(original);
   Redact(&temp);
   return temp;
