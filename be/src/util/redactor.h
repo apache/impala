@@ -36,12 +36,14 @@ namespace impala {
 //   "version": 1,      # required int
 //   "rules": [         # required array, rules are executed in order
 //     {
-//       "description": "", # optional, completely ignored
-//       "trigger": "find", # optional string, default = "", rule only goes into effect
-//                          #   if the string to be redacted contains this value. An
-//                          #   empty string matches everything.
-//       "search": "\\d",   # required string, regex to search for
-//       "replace": "#"     # required string, the replacement value for 'search'
+//       "description": "",     # optional, completely ignored
+//       "caseSensitive": true, # optional boolean, default = true, applies to both the
+//                              #   'trigger' and 'search'.
+//       "trigger": "find",     # optional string, default = "", rule only goes into
+//                              #   effect if the string to be redacted contains this
+//                              #   value. An empty string matches everything.
+//       "search": "\\d",       # required string, regex to search for
+//       "replace": "#"         # required string, the replacement value for 'search'
 //     },
 //     ...
 //   ]

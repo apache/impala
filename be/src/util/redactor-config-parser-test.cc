@@ -149,6 +149,18 @@ TEST(ParserTest, BadRegex) {
   ASSERT_ERROR_MESSAGE_CONTAINS(error, "missing ]");
 }
 
+TEST(ParserTest, BadCaseSensitivtyValue) {
+  TempRulesFile rules_file(
+      "{"
+      "  \"version\": 1,"
+      "  \"rules\": ["
+      "    {\"search\": \"[0-9\", \"replace\": \"#\", \"caseSensitive\": 1}"
+      "  ]"
+      "}");
+  string error = SetRedactionRulesFromFile(rules_file.name());
+  ASSERT_ERROR_MESSAGE_CONTAINS(error, "must be of type Bool");
+}
+
 }
 
 int main(int argc, char **argv) {

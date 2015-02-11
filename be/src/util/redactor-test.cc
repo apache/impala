@@ -110,6 +110,102 @@ TEST(RedactorTest, MultiTrigger) {
   ASSERT_REDACTED_EQ("foo foo baz!3", "bar bar baz!#");
 }
 
+TEST(RedactorTest, CaseSensitivityProperty) {
+  TempRulesFile rules_file(
+      "{"
+      "  \"version\": 1,"
+      "  \"rules\": ["
+      "    {\"search\": \"(C|d)+\", \"replace\": \"_\", \"caseSensitive\": false}"
+      "  ]"
+      "}");
+  string error = SetRedactionRulesFromFile(rules_file.name());
+  ASSERT_EQ("", error);
+  ASSERT_UNREDACTED("123");
+  ASSERT_REDACTED_EQ("abcD Cd c D d C", "ab_ _ _ _ _ _");
+
+  rules_file.OverwriteContents(
+      "{"
+      "  \"version\": 1,"
+      "  \"rules\": ["
+      "    {"
+      "      \"trigger\": \"BaZ\","
+      "      \"caseSensitive\": false,"
+      "      \"search\": \"bAz\","
+      "      \"replace\": \"bar\""
+      "    }"
+      "  ]"
+      "}");
+  error = SetRedactionRulesFromFile(rules_file.name());
+  ASSERT_EQ("", error);
+  ASSERT_REDACTED_EQ("bAz bar", "bar bar");
+  ASSERT_REDACTED_EQ("BAz bar", "bar bar");
+
+  rules_file.OverwriteContents(
+      "{"
+      "  \"version\": 1,"
+      "  \"rules\": ["
+      "    {"
+      "      \"trigger\": \"FOO\","
+      "      \"caseSensitive\": false,"
+      "      \"search\": \"foO\","
+      "      \"replace\": \"BAR\""
+      "    }"
+      "  ]"
+      "}");
+  error = SetRedactionRulesFromFile(rules_file.name());
+  ASSERT_EQ("", error);
+  ASSERT_REDACTED_EQ("fOO bar", "BAR bar");
+
+  rules_file.OverwriteContents(
+      "{"
+      "  \"version\": 1,"
+      "  \"rules\": ["
+      "    {\"search\": \"(Xy)+\", \"replace\": \"$\", \"caseSensitive\": true}"
+      "  ]"
+      "}");
+  error = SetRedactionRulesFromFile(rules_file.name());
+  ASSERT_EQ("", error);
+  ASSERT_UNREDACTED("xY");
+  ASSERT_REDACTED_EQ("Xy", "$");
+
+  rules_file.OverwriteContents(
+      "{"
+      "  \"version\": 1,"
+      "  \"rules\": ["
+      "    {"
+      "      \"trigger\": \"Sensitive\","
+      "      \"caseSensitive\": true,"
+      "      \"search\": \"SsS\","
+      "      \"replace\": \"sss\""
+      "    }"
+      "  ]"
+      "}");
+  error = SetRedactionRulesFromFile(rules_file.name());
+  ASSERT_EQ("", error);
+  ASSERT_UNREDACTED("SsS");
+  ASSERT_UNREDACTED("sensitive SsS");
+  ASSERT_UNREDACTED("Sensitive sss");
+  ASSERT_REDACTED_EQ("Sensitive SsS", "Sensitive sss");
+
+  rules_file.OverwriteContents(
+      "{"
+      "  \"version\": 1,"
+      "  \"rules\": ["
+      "    {"
+      "      \"trigger\": \"QQQ\","
+      "      \"search\": \"qQq\","
+      "      \"replace\": \"QqQ\""
+      "    }"
+      "  ]"
+      "}");
+  error = SetRedactionRulesFromFile(rules_file.name());
+  ASSERT_EQ("", error);
+  ASSERT_UNREDACTED("qQq");
+  ASSERT_UNREDACTED("QQQ");
+  ASSERT_UNREDACTED("QQq qQq");
+  ASSERT_REDACTED_EQ("QQQ qQq", "QQQ QqQ");
+}
+
 TEST(RedactorTest, SingleTriggerMultiRule) {
   TempRulesFile rules_file(
       "{"

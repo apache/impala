@@ -15,7 +15,7 @@
 #include "redactor.h"
 
 #include <cerrno>
-#include <cstring>  // strcmp
+#include <cstring>  // strcmp, strcasestr
 #include <ostream>
 #include <sstream>
 #include <sys/stat.h>
@@ -27,6 +27,7 @@
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/reader.h>
 #include <re2/re2.h>
+#include <re2/stringpiece.h>
 
 #include "common/logging.h"
 
@@ -45,27 +46,44 @@ using strings::Substitute;
 typedef re2::RE2 Regex;
 
 struct Rule {
-  // Standard constructor.
-  Rule(const string& trigger, const string& search_regex, const string& replacement)
-      : trigger(trigger),
-        search_pattern(search_regex),
-        replacement(replacement) {}
+  // Factory constructor. The factory pattern is used because constructing a
+  // case-insensitive Regex requires multiple lines and a Rule should be immutable so
+  // the Regex should be const. Const members must be initialized in the initialization
+  // list but multi-line statements cannot be used there. Keeping the Rule class
+  // immutable was preferred over having a direct constructor, though either should be
+  // fine.
+  static Rule Create(const string& trigger, const string& search_regex,
+      const string& replacement, bool case_sensitive) {
+    Regex::Options options;
+    options.set_case_sensitive(case_sensitive);
+    return Rule(trigger, Regex(search_regex, options), replacement);
+  }
 
   // For use with vector.
   Rule(const Rule& other)
       : trigger(other.trigger),
-        search_pattern(other.search_pattern.pattern()),
+        search_pattern(other.search_pattern.pattern(), other.search_pattern.options()),
         replacement(other.replacement) {}
 
   const string trigger;
   const Regex search_pattern;
   const string replacement;
 
+  bool case_sensitive() const { return search_pattern.options().case_sensitive(); }
+
   // For use with vector.
   const Rule& operator=(const Rule& other) {
     *this = Rule(other);
     return *this;
   }
+
+ private:
+  // For use with the factory constructor. The case-sensitivity option in
+  // 'regex_options' also applies to 'trigger'.
+  Rule(const string& trigger, const Regex& search_pattern, const string& replacement)
+      : trigger(trigger),
+        search_pattern(search_pattern.pattern(), search_pattern.options()),
+        replacement(replacement) {}
 };
 
 typedef vector<Rule> Rules;
@@ -148,6 +166,7 @@ class RulesParser {
   // Parse a rule and populate g_rules.
   void ParseRule(const Value& json_rule) {
     bool found_replace = false;
+    bool case_sensitive = true;
     string search_text, replace, trigger;
     for (Value::ConstMemberIterator member = json_rule.MemberBegin();
         member != json_rule.MemberEnd(); ++member) {
@@ -162,9 +181,13 @@ class RulesParser {
         if (!ReadRuleProperty("replace", json_rule, &replace)) return;
       } else if (strcmp("trigger", member->name.GetString()) == 0) {
         if (!ReadRuleProperty("trigger", json_rule, &trigger, /*required*/ false)) return;
+      } else if (strcmp("caseSensitive", member->name.GetString()) == 0) {
+        if (!ReadRuleProperty("caseSensitive", json_rule, &case_sensitive, false)) return;
       } else if (strcmp("description", member->name.GetString()) == 0) {
         // Ignore, this property is for user documentation.
       } else {
+        // Future properties may change the meaning of current properties so ignoring
+        // unknown properties is not safe.
         AddRuleParseError() << "unexpected property '" << member->name.GetString()
                             << "' must be removed";
         return;
@@ -177,7 +200,7 @@ class RulesParser {
       AddRuleParseError() << "a 'replace' property is required";
       return;
     }
-    Rule rule(trigger, search_text, replace);
+    const Rule& rule = Rule::Create(trigger, search_text, replace, case_sensitive);
     if (!rule.search_pattern.ok()) {
       AddRuleParseError() << "search regex is invalid; " << rule.search_pattern.error();
       return;
@@ -185,10 +208,11 @@ class RulesParser {
     (*g_rules).push_back(rule);
   }
 
-  // Parse a rule property that should have a string value. A true return value indicates
-  // success.
-  bool ReadRuleProperty(const string& name, const Value& rule,
-      string* value, bool required = true) {
+  // Reads a rule property of the given name and assigns the property value to the out
+  // parameter. A true return value indicates success.
+  template<typename T>
+  bool ReadRuleProperty(const string& name, const Value& rule, T* value,
+      bool required = true) {
     const Value& json_value = rule[name.c_str()];
     if (json_value.IsNull()) {
       if (required) {
@@ -197,14 +221,25 @@ class RulesParser {
       }
       return true;
     }
-    if (!json_value.IsString()) {
-      AddRuleParseError() << name << " property must be of type String but is a "
-                          << NameOfTypeOfJsonValue(json_value);
-      return false;
-    }
-    *value = json_value.GetString();
-    return true;
+    return ValidateTypeAndExtractValue(name, json_value, value);
   }
+
+// Extract a value stored in a rapidjson::Value and assign it to the out parameter.
+// The type will be validated before extraction. A true return value indicates success.
+// The name parameter is only used to generate an error message upon failure.
+#define EXTRACT_VALUE(json_type, cpp_type) \
+  bool ValidateTypeAndExtractValue(const string& name, const Value& json_value, \
+      cpp_type* value) { \
+    if (!json_value.Is ## json_type()) { \
+      AddRuleParseError() << name << " property must be of type " #json_type \
+                          << " but is a " << NameOfTypeOfJsonValue(json_value); \
+      return false; \
+    } \
+    *value = json_value.Get ## json_type(); \
+    return true; \
+  }
+EXTRACT_VALUE(String, string)
+EXTRACT_VALUE(Bool, bool)
 
   ostream& AddDocParseError() {
     if (error_message_.tellp()) error_message_ << endl;
@@ -272,7 +307,11 @@ void Redact(string* value) {
   DCHECK(value != NULL);
   if (g_rules == NULL || g_rules->empty()) return;
   for (Rules::const_iterator rule = g_rules->begin(); rule != g_rules->end(); ++rule) {
-    if (value->find(rule->trigger) == string::npos) continue;
+    if (rule->case_sensitive()) {
+      if (value->find(rule->trigger) == string::npos) continue;
+    } else {
+      if (strcasestr(value->c_str(), rule->trigger.c_str()) == NULL) continue;
+    }
     re2::RE2::GlobalReplace(value, rule->search_pattern, rule->replacement);
   }
 }
