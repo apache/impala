@@ -161,6 +161,21 @@ TEST(ParserTest, BadCaseSensitivtyValue) {
   ASSERT_ERROR_MESSAGE_CONTAINS(error, "must be of type Bool");
 }
 
+TEST(ParserTest, RuleNumberInErrorMessage) {
+  TempRulesFile rules_file(
+      "{"
+      "  \"version\": 1,"
+      "  \"rules\": ["
+      "    {\"search\": \"[0-9]\", \"replace\": \"#\"},"
+      "    {\"search\": \"[0-\", \"replace\": \"error\"},"
+      "    {\"search\": \"[A-Z]\", \"replace\": \"_\"}"
+      "  ]"
+      "}");
+  string error = SetRedactionRulesFromFile(rules_file.name());
+  ASSERT_ERROR_MESSAGE_CONTAINS(error,
+      "Error parsing redaction rule #2; search regex is invalid; missing ]");
+}
+
 }
 
 int main(int argc, char **argv) {

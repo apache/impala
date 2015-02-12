@@ -142,8 +142,10 @@ class RulesParser {
  private:
   ostringstream error_message_;
 
-  // The current index of the rule being parsed.
-  int rule_idx_;
+  // The current index of the rule being parsed. 'SizeType' avoids an ambiguity between
+  // json_value[int] (array) and json_value[const char*] (object), otherwise 0 could be
+  // a null pointer.
+  rapidjson::SizeType rule_idx_;
 
   // Parse an array of rules.
   void ParseRules(const Value& rules) {
