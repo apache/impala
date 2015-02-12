@@ -1048,11 +1048,8 @@ void HdfsScanNode::StopAndFinalizeCounters() {
     unexpected_remote_bytes_->Set(
         runtime_state_->io_mgr()->unexpected_remote_bytes(reader_context_));
 
-    if (unexpected_remote_bytes_->value() > 0) {
-      runtime_state_->LogError(Substitute(
-          "Block locality metadata for table '$0' may be stale. Consider running "
-          "\"INVALIDATE METADATA $0\".", hdfs_table_->name()));
-    }
+    // TODO: When we have confidence in unexpected_remote_bytes being accurate, add an
+    // actionable warning to user here. See IMPALA-1712 and related commits for details.
 
     ImpaladMetrics::IO_MGR_BYTES_READ->Increment(bytes_read_counter()->value());
     ImpaladMetrics::IO_MGR_LOCAL_BYTES_READ->Increment(
