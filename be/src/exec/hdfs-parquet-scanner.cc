@@ -776,8 +776,8 @@ Status HdfsParquetScanner::ProcessSplit() {
   stream_ = NULL;
   // We've processed the metadata and there are columns that need to be
   // materialized.
-  COUNTER_SET(num_cols_counter_, static_cast<int64_t>(column_readers_.size()));
   RETURN_IF_ERROR(CreateColumnReaders());
+  COUNTER_SET(num_cols_counter_, static_cast<int64_t>(column_readers_.size()));
 
   // Iterate through each row group in the file and read all the materialized columns
   // per row group.  Row groups are independent, so this this could be parallelized.
