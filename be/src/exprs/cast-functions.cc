@@ -27,6 +27,11 @@ using namespace impala;
 using namespace impala_udf;
 using namespace std;
 
+// The maximum number of characters need to represent a floating-point number (float or
+// double) as a string. 24 = 17 (maximum significant digits) + 1 (decimal point) + 1 ('E')
+// + 3 (exponent digits) + 2 (negative signs) (see http://stackoverflow.com/a/1701085)
+const int MAX_FLOAT_CHARS = 24;
+
 #define CAST_FUNCTION(from_type, to_type) \
   to_type CastFunctions::CastTo##to_type(FunctionContext* ctx, const from_type& val) { \
     if (val.is_null) return to_type::null(); \
@@ -114,20 +119,26 @@ CAST_TO_STRING(SmallIntVal);
 CAST_TO_STRING(IntVal);
 CAST_TO_STRING(BigIntVal);
 
-// Special case for float types to string that deals properly with nan
-// (lexical_cast<string>(nan) returns "-nan" which is nonsensical).
-#define CAST_FLOAT_TO_STRING(float_type) \
+#define CAST_FLOAT_TO_STRING(float_type, format) \
   StringVal CastFunctions::CastToStringVal(FunctionContext* ctx, const float_type& val) { \
     if (val.is_null) return StringVal::null(); \
+    /* val.val could be -nan, return "nan" instead */ \
     if (isnan(val.val)) return StringVal("nan"); \
-    ColumnType rtype = AnyValUtil::TypeDescToColumnType(ctx->GetReturnType()); \
-    StringVal sv = AnyValUtil::FromString(ctx, lexical_cast<string>(val.val)); \
-    AnyValUtil::TruncateIfNecessary(rtype, &sv); \
+    /* Add 1 to MAX_FLOAT_CHARS since snprintf adds a trailing '\0' */ \
+    StringVal sv(ctx, MAX_FLOAT_CHARS + 1); \
+    sv.len = snprintf(reinterpret_cast<char*>(sv.ptr), sv.len, format, val.val); \
+    DCHECK_GT(sv.len, 0); \
+    DCHECK_LE(sv.len, MAX_FLOAT_CHARS); \
+    ColumnType return_type = AnyValUtil::TypeDescToColumnType(ctx->GetReturnType()); \
+    AnyValUtil::TruncateIfNecessary(return_type, &sv); \
     return sv; \
   }
 
-CAST_FLOAT_TO_STRING(FloatVal);
-CAST_FLOAT_TO_STRING(DoubleVal);
+// Floats have up to 9 significant digits, doubles up to 17
+// (see http://en.wikipedia.org/wiki/Single-precision_floating-point_format
+// and http://en.wikipedia.org/wiki/Double-precision_floating-point_format)
+CAST_FLOAT_TO_STRING(FloatVal, "%.9g");
+CAST_FLOAT_TO_STRING(DoubleVal, "%.17g");
 
 // Special-case tinyint because boost thinks it's a char and handles it differently.
 // e.g. '0' is written as an empty string.

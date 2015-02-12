@@ -690,7 +690,7 @@ class ExprTest : public testing::Test {
 
   // Test casting stmt to all types.  Expected result is val.
   template<typename T>
-  void TestCast(const string& stmt, T val) {
+  void TestCast(const string& stmt, T val, bool timestamp_out_of_range = false) {
     TestValue("cast(" + stmt + " as boolean)", TYPE_BOOLEAN, static_cast<bool>(val));
     TestValue("cast(" + stmt + " as tinyint)", TYPE_TINYINT, static_cast<int8_t>(val));
     TestValue("cast(" + stmt + " as smallint)", TYPE_SMALLINT, static_cast<int16_t>(val));
@@ -701,15 +701,20 @@ class ExprTest : public testing::Test {
     TestValue("cast(" + stmt + " as double)", TYPE_DOUBLE, static_cast<double>(val));
     TestValue("cast(" + stmt + " as real)", TYPE_DOUBLE, static_cast<double>(val));
     TestStringValue("cast(" + stmt + " as string)", lexical_cast<string>(val));
-    TestStringValue("cast(cast(" + stmt + " as timestamp) as string)",
-                    lexical_cast<string>(TimestampValue(val)));
+    if (!timestamp_out_of_range) {
+      TestStringValue("cast(cast(" + stmt + " as timestamp) as string)",
+                      lexical_cast<string>(TimestampValue(val)));
+    } else {
+      TestIsNull("cast(" + stmt + " as timestamp)", TYPE_TIMESTAMP);
+    }
   }
 };
 
 // Test casting 'stmt' to each of the native types.  The result should be 'val'
 // 'stmt' is a partial stmt that could be of any valid type.
 template<>
-void ExprTest::TestCast(const string& stmt, const char* val) {
+void ExprTest::TestCast(const string& stmt, const char* val,
+                        bool timestamp_out_of_range) {
   try {
     int8_t val8 = static_cast<int8_t>(lexical_cast<int16_t>(val));
 #if 0
@@ -1040,11 +1045,39 @@ TEST_F(ExprTest, CastExprs) {
   TestCast("cast(0.0 as float)", 0.0f);
   TestCast("cast(5.0 as float)", 5.0f);
   TestCast("cast(-5.0 as float)", -5.0f);
+  TestCast("cast(0.1234567890123 as float)", 0.1234567890123f);
+  TestCast("cast(0.1234567890123 as float)", 0.123456791f); // same as above
+  TestCast("cast(0.00000000001234567890123 as float)", 0.00000000001234567890123f);
+  TestCast("cast(123456 as float)", 123456.0f);
+
+  // From http://en.wikipedia.org/wiki/Single-precision_floating-point_format
+  // Min positive normal value
+  TestCast("cast(1.1754944e-38 as float)", 1.1754944e-38f);
+  // Max representable value
+  TestCast("cast(3.4028234e38 as float)", 3.4028234e38f, true);
+
 
   // From Double
   TestCast("cast(0.0 as double)", 0.0);
   TestCast("cast(5.0 as double)", 5.0);
   TestCast("cast(-5.0 as double)", -5.0);
+  TestCast("cast(0.123e10 as double)", 0.123e10);
+  TestCast("cast(123.123e10 as double)", 123.123e10, true);
+  TestCast("cast(1.01234567890123456789 as double)", 1.01234567890123456789);
+  TestCast("cast(1.01234567890123456789 as double)", 1.0123456789012346); // same as above
+  TestCast("cast(0.01234567890123456789 as double)", 0.01234567890123456789);
+  TestCast("cast(0.1234567890123456789 as double)", 0.1234567890123456789);
+  TestCast("cast(-2.2250738585072020E-308 as double)", -2.2250738585072020e-308);
+
+  // From http://en.wikipedia.org/wiki/Double-precision_floating-point_format
+  // Min subnormal positive double
+  TestCast("cast(4.9406564584124654e-324 as double)", 4.9406564584124654e-324);
+  // Max subnormal double
+  TestCast("cast(2.2250738585072009e-308 as double)", 2.2250738585072009e-308);
+  // Min normal positive double
+  TestCast("cast(2.2250738585072014e-308 as double)", 2.2250738585072014e-308);
+  // Max Double
+  TestCast("cast(1.7976931348623157e+308 as double)", 1.7976931348623157e308, true);
 
   // From String
   TestCast("'0'", "0");
@@ -2137,6 +2170,8 @@ TEST_F(ExprTest, NonFiniteFloats) {
   // NaN != NaN, so we have to wrap the value in a string
   TestStringValue("CAST(CAST('nan' AS FLOAT) AS STRING)", string("nan"));
   TestStringValue("CAST(CAST('nan' AS DOUBLE) AS STRING)", string("nan"));
+  // 0/0 evalutes to -nan, test that we return "nan"
+  TestStringValue("CAST(0/0 AS STRING)", string("nan"));
 }
 
 TEST_F(ExprTest, MathTrigonometricFunctions) {
