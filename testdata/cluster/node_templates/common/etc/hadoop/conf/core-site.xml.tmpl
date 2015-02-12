@@ -56,6 +56,12 @@
     <value>${AWS_SECRET_ACCESS_KEY}</value>
   </property>
 
+  <!-- Location of the KMS key provider -->
+  <property>
+    <name>hadoop.security.key.provider.path</name>
+    <value>kms://http@127.0.0.1:16000/kms</value>
+  </property>
+
   <!-- BEGIN Kerberos settings -->
   <property>
     <name>hadoop.security.authentication</name>

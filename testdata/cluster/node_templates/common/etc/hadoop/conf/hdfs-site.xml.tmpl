@@ -101,6 +101,12 @@
     <value>true</value>
   </property>
 
+  <!-- Location of the KMS key provider -->
+  <property>
+    <name>dfs.encryption.key.provider.uri</name>
+    <value>kms://http@127.0.0.1:16000/kms</value>
+  </property>
+
   <!-- BEGIN Kerberos settings -->
   <!-- We use the MiniKdc; it generates a keytab and krb5.conf; we point
        everyone at that one keytab and go to town... -->

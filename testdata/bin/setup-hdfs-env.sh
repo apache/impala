@@ -2,6 +2,8 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #
 
+# Create a cache pool and encryption keys for tests
+
 PREVIOUS_PRINCIPAL=""
 CACHEADMIN_ARGS=""
 
@@ -13,11 +15,19 @@ if ${CLUSTER_DIR}/admin is_kerberized; then
     kinit -k -t ${KRB5_KTNAME} ${MINIKDC_PRINC_HDFS}
 fi
 
-# Make a pool and cache some of the tables in memory.
+hadoop key delete testkey1
+hadoop key delete testkey2
 hdfs cacheadmin -removePool testPool
 
-hdfs cacheadmin -addPool testPool ${CACHEADMIN_ARGS}
+# Create encryption keys for HDFS encryption tests. Keys are stored by the KMS.
+hadoop key create testkey1
 RV=$?
+hadoop key create testkey2
+if [ $RV -eq 0 ]; then RV=$?; fi
+
+# Create test cache pool
+hdfs cacheadmin -addPool testPool ${CACHEADMIN_ARGS}
+if [ $RV -eq 0 ]; then RV=$?; fi
 
 # Back to ourselves:
 if [ "${PREVIOUS_PRINCIPAL}" != "" ]; then

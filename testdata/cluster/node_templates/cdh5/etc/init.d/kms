@@ -1,0 +1,20 @@
+#/bin/bash
+
+DIR=$(dirname $0)
+
+. "$DIR/common"
+
+# Path to the file where the catalina server writes the PID
+export CATALINA_PID=$PID_DIR/kms
+export KMS_CONFIG="$HADOOP_CONF_DIR"
+
+function start {
+
+  if [[ -e "$CATALINA_PID" ]]; then
+    rm "$CATALINA_PID"
+  fi
+
+  $HADOOP_HOME/sbin/kms.sh start &> "$LOG_DIR/$(basename $0).out"
+}
+
+$1

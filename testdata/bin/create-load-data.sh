@@ -299,7 +299,7 @@ fi
 
 # Start Impala
 ${IMPALA_HOME}/bin/start-impala-cluster.py -s 3 --log_dir=${DATA_LOADING_LOG_DIR}
-${IMPALA_HOME}/testdata/bin/setup-hdfs-caching.sh
+${IMPALA_HOME}/testdata/bin/setup-hdfs-env.sh
 
 if [ $SKIP_METADATA_LOAD -eq 0 ]; then
   # load custom schems

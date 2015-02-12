@@ -48,7 +48,7 @@ export KILL_CLUSTER_MARKER=IBelongToTheMiniCluster
 
 SUPPORTED_SERVICES=(hdfs yarn)
 if [[ "$CDH_MAJOR_VERSION" -ge 5 ]]; then
-  SUPPORTED_SERVICES+=(llama)
+  SUPPORTED_SERVICES+=(llama kms)
 fi
 
 # All DataNodes and NodeManagers need a unique but fixed address. The IP is fixed at
@@ -63,7 +63,8 @@ NODEMANAGER_FREE_PORT_START=31100
 # existing cluster.
 export HDFS_WEBUI_PORT=5070   # changed from 50070 so it is not ephemeral
 export YARN_WEBUI_PORT=8088   # same as default
-export LLAMA_WEBUI_PORT=1501   # same as default
+export LLAMA_WEBUI_PORT=1501  # same as default
+export KMS_WEBUI_PORT=16000   # same as default
 
 # Empty dirs that should be included in the templates. Since git ignores empty dirs it is
 # easier to maintain them here.
@@ -213,7 +214,7 @@ function create_cluster {
     fi
     if [[ $NODE_IDX -gt 1 ]]; then
       # Remove master role scripts from slave nodes
-      rm -f "$NODE_DIR/etc/init.d/"{hdfs-namenode,yarn-resourcemanager,llama-application}
+      rm -f "$NODE_DIR/etc/init.d/"{hdfs-namenode,yarn-resourcemanager,llama-application,kms}
     fi
     for EMPTY_NODE_DIR in $EMPTY_NODE_DIRS; do
       mkdir -p "$NODE_DIR/$EMPTY_NODE_DIR"
