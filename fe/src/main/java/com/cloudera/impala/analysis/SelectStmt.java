@@ -149,7 +149,8 @@ public class SelectStmt extends QueryStmt {
     // Start out with table refs to establish aliases.
     TableRef leftTblRef = null;  // the one to the left of tblRef
     for (int i = 0; i < tableRefs_.size(); ++i) {
-      // Resolve and replace non-InlineViewRef table refs with a BaseTableRef or ViewRef.
+      // Resolve and replace non-InlineViewRef table refs with a BaseTableRef,
+      // CollectionTableRef or ViewRef.
       TableRef tblRef = tableRefs_.get(i);
       tblRef = analyzer.resolveTableRef(tblRef);
       Preconditions.checkNotNull(tblRef);
@@ -891,6 +892,18 @@ public class SelectStmt extends QueryStmt {
     analyticInfo_ = (other.analyticInfo_ != null) ? other.analyticInfo_.clone() : null;
     sqlString_ = (other.sqlString_ != null) ? new String(other.sqlString_) : null;
     baseTblSmap_ = other.baseTblSmap_.clone();
+  }
+
+  @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    for (TableRef tblRef: tableRefs_) {
+      if (tblRef instanceof InlineViewRef) {
+        InlineViewRef inlineViewRef = (InlineViewRef) tblRef;
+        inlineViewRef.getViewStmt().collectTableRefs(tblRefs);
+      } else {
+        tblRefs.add(tblRef);
+      }
+    }
   }
 
   @Override

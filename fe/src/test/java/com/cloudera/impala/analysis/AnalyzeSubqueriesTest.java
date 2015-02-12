@@ -525,7 +525,8 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     // Subquery references an explicit alias from the outer block in the FROM
     // clause
     AnalysisError("select * from functional.alltypestiny t where " +
-        "exists (select * from t)", "Could not resolve table reference: 't'");
+        "exists (select * from t)",
+        "Illegal table reference to non-collection type: 't'");
     // Uncorrelated subquery with no FROM clause
     AnalyzesOk("select * from functional.alltypes where exists (select 1,2)");
     // EXISTS subquery in a binary predicate
@@ -700,13 +701,13 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     // Outer join with a table from the outer block using an explicit alias
     AnalysisError("select id from functional.alltypestiny t where int_col = " +
         "(select count(*) from functional.alltypessmall s left outer join t " +
-        "on (t.id = s.id))", "Could not resolve table reference: 't'");
+        "on (t.id = s.id))", "Illegal table reference to non-collection type: 't'");
     AnalysisError("select id from functional.alltypestiny t where int_col = " +
         "(select count(*) from functional.alltypessmall s right outer join t " +
-        "on (t.id = s.id))", "Could not resolve table reference: 't'");
+        "on (t.id = s.id))", "Illegal table reference to non-collection type: 't'");
     AnalysisError("select id from functional.alltypestiny t where int_col = " +
         "(select count(*) from functional.alltypessmall s full outer join t " +
-        "on (t.id = s.id))", "Could not resolve table reference: 't'");
+        "on (t.id = s.id))", "Illegal table reference to non-collection type: 't'");
 
     // Multiple subqueries in a binary predicate
     AnalysisError("select * from functional.alltypestiny t where " +
@@ -891,6 +892,57 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "(select t.* from functional.alltypes)",
         "Could not resolve star expression: 't.*'");
 
+    // Test resolution of correlated table references inside subqueries. The testing
+    // here is rather basic, because the analysis goes through the same codepath
+    // as the analysis of correlated inline views, which are more thoroughly tested.
+    AnalyzesOk("select id from functional.allcomplextypes t " +
+        "where exists (select count(*) cnt from t.int_array_col where item > 0)");
+    AnalyzesOk("select id from functional.allcomplextypes t " +
+        "where id in (select item cnt from t.int_array_col)");
+    AnalyzesOk("select id from functional.allcomplextypes t " +
+        "where id < (select count(*) from t.int_array_col)");
+
+    // Test behavior of aliases in subqueries with correlated table references.
+    // Inner reference resolves to the base table, not the implicit parent alias.
+    AnalyzesOk("select id from functional.allcomplextypes t " +
+        "where exists (select id from functional.allcomplextypes)");
+    AnalyzesOk("select id from functional.allcomplextypes " +
+        "where id in (select id from functional.allcomplextypes)");
+    AnalyzesOk("select id from functional.allcomplextypes " +
+        "where id < (select count(1) cnt from allcomplextypes)",
+        createAnalyzer("functional"));
+    // Illegal correlated table references.
+    AnalysisError("select id from (select * from functional.alltypestiny) t " +
+        "where t.int_col = (select count(*) from t)",
+        "Illegal table reference to non-collection type: 't'");
+    AnalysisError("select id from (select * from functional.alltypestiny) t " +
+        "where t.int_col = (select count(*) from t) and " +
+        "t.string_col in (select string_col from t)",
+        "Illegal table reference to non-collection type: 't'");
+    AnalysisError("select id from (select * from functional.alltypestiny) t " +
+        "where exists (select * from t, functional.alltypesagg p where " +
+        "t.id = p.id)", "Illegal table reference to non-collection type: 't'");
+    AnalysisError("select id from functional.allcomplextypes " +
+        "where exists (select id from allcomplextypes)",
+        "Illegal table reference to non-collection type: 'allcomplextypes'");
+
+    // Un/correlated refs in a single nested query block.
+    AnalysisError("select id from functional.allcomplextypes t " +
+        "where exists (select item from functional.alltypes, t.int_array_col)",
+        "Nested query is illegal because it contains a table reference " +
+        "'t.int_array_col' correlated with an outer block as well as an " +
+        "uncorrelated one 'functional.alltypes':\n" +
+        "SELECT item FROM functional.alltypes, t.int_array_col");
+    // Correlated table ref has correlated inline view as parent.
+    // TOOD: Enable once we support complex-typed exprs in the select list.
+    //AnalysisError("select id from functional.allcomplextypes t " +
+    //    "where id in (select item from (select value arr from t.array_map_col) v1, " +
+    //    "(select item from v1.arr, functional.alltypestiny) v2)",
+    //    "Nested query is illegal because it contains a table reference " +
+    //    "'v1.arr' correlated with an outer block as well as an " +
+    //    "uncorrelated one 'functional.alltypestiny':\n" +
+    //    "SELECT item FROM v1.arr, functional.alltypestiny");
+
     // EXISTS, IN and aggregate subqueries
     AnalyzesOk("select * from functional.alltypes t where exists " +
         "(select * from functional.alltypesagg a where a.int_col = " +
@@ -966,18 +1018,6 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     AnalyzesOk("select id from functional.alltypestiny t where exists " +
         "(select * from (select id, int_col from functional.alltypesagg) a where " +
         "a.id < 10 and a.int_col = t.int_col)");
-
-    // Inner block references an inline view in the outer block
-    AnalysisError("select id from (select * from functional.alltypestiny) t " +
-        "where t.int_col = (select count(*) from t)",
-        "Could not resolve table reference: 't'");
-    AnalysisError("select id from (select * from functional.alltypestiny) t " +
-        "where t.int_col = (select count(*) from t) and " +
-        "t.string_col in (select string_col from t)",
-        "Could not resolve table reference: 't'");
-    AnalysisError("select id from (select * from functional.alltypestiny) t " +
-        "where exists (select * from t, functional.alltypesagg p where " +
-        "t.id = p.id)", "Could not resolve table reference: 't'");
 
     // Subquery referencing a view
     AnalyzesOk("select * from functional.alltypes a where exists " +

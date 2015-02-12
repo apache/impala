@@ -35,6 +35,9 @@ public class SlotDescriptor {
   private Path path_;
   private Type type_;
 
+  // Tuple descriptor for collection items. Only set if type_ is an array or map.
+  private TupleDescriptor itemTupleDesc_;
+
   // for SlotRef.toSql() in the absence of a path
   private String label_;
 
@@ -68,6 +71,7 @@ public class SlotDescriptor {
     id_ = id;
     parent_ = parent;
     type_ = src.type_;
+    itemTupleDesc_ = src.itemTupleDesc_;
     path_ = src.path_;
     label_ = src.label_;
     sourceExprs_ = src.sourceExprs_;
@@ -93,6 +97,8 @@ public class SlotDescriptor {
   public TupleDescriptor getParent() { return parent_; }
   public Type getType() { return type_; }
   public void setType(Type type) { type_ = type; }
+  public TupleDescriptor getItemTupleDesc() { return itemTupleDesc_; }
+  public void setItemTupleDesc(TupleDescriptor t) { itemTupleDesc_ = t; }
   public boolean isMaterialized() { return isMaterialized_; }
   public void setIsMaterialized(boolean value) { isMaterialized_ = value; }
   public boolean getIsNullable() { return isNullable_; }

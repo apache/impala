@@ -133,6 +133,11 @@ public class TupleDescriptor {
     return (aliases_ != null) ? new TableName(null, aliases_[0]) : null;
   }
 
+  public TupleDescriptor getRootDesc() {
+    if (path_ == null) return null;
+    return path_.getRootDesc();
+  }
+
   public String debugString() {
     String tblStr = (getTable() == null ? "null" : getTable().getFullName());
     List<String> slotStrings = Lists.newArrayList();

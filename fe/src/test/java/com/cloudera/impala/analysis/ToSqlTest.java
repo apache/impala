@@ -671,6 +671,39 @@ public class ToSqlTest extends AnalyzerTest {
         "(SELECT id, string_col FROM functional.alltypes) t1, " +
         "(SELECT id, float_col FROM functional.alltypes) t2 " +
         "WHERE t1.id = t2.id AND t1.string_col = 'abc' AND t2.float_col < 10");
+
+    // Test inline views with correlated table refs. Implicit alias only.
+    testToSql(
+        "select cnt from functional.allcomplextypes t, " +
+        "(select count(*) cnt from t.int_array_col) v",
+        "SELECT cnt FROM functional.allcomplextypes t, " +
+        "(SELECT count(*) cnt FROM t.int_array_col) v");
+    // Multiple correlated table refs. Explicit aliases.
+    testToSql(
+        "select avg from functional.allcomplextypes t, " +
+        "(select avg(a1.item) avg from t.int_array_col a1, t.int_array_col a2) v",
+        "SELECT avg FROM functional.allcomplextypes t, " +
+        "(SELECT avg(a1.item) avg FROM t.int_array_col a1, t.int_array_col a2) v");
+    // Correlated table ref has child ref itself. Mix of explicit and implicit aliases.
+    testToSql(
+        "select key, item from functional.allcomplextypes t, " +
+        "(select a1.key, value.item from t.array_map_col a1, a1.value) v",
+        "SELECT key, item FROM functional.allcomplextypes t, " +
+        "(SELECT a1.key, value.item FROM t.array_map_col a1, a1.value) v");
+    // Correlated table refs in a union.
+    testToSql(
+        "select item from functional.allcomplextypes t, " +
+        "(select * from t.int_array_col union all select * from t.int_array_col) v",
+        "SELECT item FROM functional.allcomplextypes t, " +
+        "(SELECT * FROM t.int_array_col UNION ALL SELECT * FROM t.int_array_col) v");
+    // Correlated inline view in WITH-clause.
+    testToSql(
+        "with w as (select c from functional.allcomplextypes t, " +
+        "(select count(a1.key) c from t.array_map_col a1) v1) " +
+        "select * from w",
+        "WITH w AS (SELECT c FROM functional.allcomplextypes t, " +
+        "(SELECT count(a1.key) c FROM t.array_map_col a1) v1) " +
+        "SELECT * FROM w");
   }
 
   /**

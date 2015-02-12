@@ -40,6 +40,25 @@ import com.google.common.collect.Sets;
  * specification. An instance of a TableRef (and not a subclass thereof) represents
  * an unresolved table reference that must be resolved during analysis. All resolved
  * table references are subclasses of TableRef.
+ *
+ * The analysis of table refs follows a two-step process:
+ *
+ * 1. Resolution: A table ref's path is resolved and then the generic TableRef is
+ * replaced by a concrete table ref (a BaseTableRef, CollectionTabeRef or ViewRef)
+ * in the originating stmt and that is given the resolved path. This step is driven by
+ * Analyzer.resolveTableRef() which calls into TableRef.analyze().
+ *
+ * 2. Analysis/registration: After resolution, the concrete table ref is analyzed
+ * to register a tuple descriptor for its resolved path and register other table-ref
+ * specific state with the analyzer (e.g., whether it is outer/semi joined, etc.).
+ *
+ * Therefore, subclasses of TableRef should never call the analyze() of its superclass.
+ *
+ * TODO for 2.3: The current TableRef class hierarchy and the related two-phase analysis
+ * feels convoluted and is hard to follow. We should reorganize the TableRef class
+ * structure for clarity of analysis and avoid a table ref 'switching genders' in between
+ * resolution and registration.
+ *
  * TODO for 2.3: Rename this class to CollectionRef and re-consider the naming and
  * structure of all subclasses.
  */
@@ -126,6 +145,10 @@ public class TableRef implements ParseNode {
     desc_ = other.desc_;
   }
 
+  /**
+   * Resolves this table ref's raw path and adds privilege requests and audit events
+   * for the referenced catalog entities.
+   */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     try {
@@ -204,10 +227,10 @@ public class TableRef implements ParseNode {
   }
 
   /**
-   * Returns true if the path of this table ref is is rooted at a
-   * registered parent ref.
+   * Returns true if this table ref has a resolved path that is rooted at a registered
+   * tuple descriptor, false otherwise.
    */
-  public boolean isChildRef() { return false; }
+  public boolean isRelativeRef() { return false; }
 
   public List<String> getPath() { return rawPath_; }
   public Path getResolvedPath() { return resolvedPath_; }
@@ -256,6 +279,11 @@ public class TableRef implements ParseNode {
   public boolean isPartitionedJoin() { return isPartitionedJoin_; }
   public List<TupleId> getOnClauseTupleIds() { return onClauseTupleIds_; }
   public boolean isResolved() { return !getClass().equals(TableRef.class); }
+
+  /**
+   * Indicates if this TableRef references another TableRef from an outer query block.
+   */
+  public boolean isCorrelated() { return false; }
 
   /**
    * This method should only be called after the TableRef has been analyzed.
@@ -445,9 +473,10 @@ public class TableRef implements ParseNode {
         onClauseTupleIds.addAll(tupleIds);
       }
       onClauseTupleIds_.addAll(onClauseTupleIds);
-    } else if (!isChildRef()
+    } else if (!isRelativeRef()
         && (getJoinOp().isOuterJoin() || getJoinOp().isSemiJoin())) {
-      throw new AnalysisException(joinOp_.toString() + " requires an ON or USING clause.");
+      throw new AnalysisException(
+          joinOp_.toString() + " requires an ON or USING clause.");
     }
   }
 

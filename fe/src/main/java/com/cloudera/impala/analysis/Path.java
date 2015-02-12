@@ -70,6 +70,21 @@ import com.google.common.collect.Lists;
  *   (same for unqualified versions item, item.item, pos, item.pos)
  *
  * Please refer to TestImplicitAndExplicitPaths() for analogous examples for maps.
+ *
+ *
+ * Uses of Paths and Terminology
+ *
+ * Uncorrelated References: Star exprs, SlotRefs and TableRefs that are rooted at a
+ * catalog Table or a registered TupleDescriptor in the same query block.
+ *
+ * Relative References: TableRefs that are rooted at a TupleDescriptor.
+ *
+ * Correlated References: SlotRefs and TableRefs that are rooted at a TupleDescriptor
+ * registered in an ancestor query block are called 'correlated'. All correlated
+ * references are relative, but not all relative references are correlated.
+ *
+ * A Path itself is never said to be un/correlated because it is intentionally unaware
+ * of the query block that it is used in.
  */
 public class Path {
   // Implicit field names of collections.

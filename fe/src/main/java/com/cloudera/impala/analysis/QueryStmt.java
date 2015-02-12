@@ -99,6 +99,52 @@ public abstract class QueryStmt extends StatementBase {
     if (hasWithClause()) withClause_.analyze(analyzer);
   }
 
+  /**
+   * Throws if this stmt contains an illegal mix of un/correlated table refs.
+   * A statement is illegal if it contains a TableRef correlated with a parent query
+   * block as well as a table ref with an absolute path (e.g. a BaseTabeRef). Such a
+   * statement would generate a Subplan containing a base table scan (very expensive),
+   * and should therefore be avoided.
+   *
+   * In other words, the following cases are legal:
+   * (1) only uncorrelated table refs
+   * (2) only correlated table refs
+   * (3) a mix of correlated table refs and table refs rooted at those refs
+   *     (the statement is 'self-contained' with respect to correlation)
+   */
+  public void checkCorrelatedTableRefs(Analyzer analyzer) throws AnalysisException {
+    List<TableRef> tblRefs = Lists.newArrayList();
+    collectTableRefs(tblRefs);
+
+    // First table ref that is correlated with a parent query block.
+    TableRef correlatedRef = null;
+    // First absolute table ref.
+    TableRef absoluteRef = null;
+    // Tuple ids of the tblRefs checked so far.
+    Set<TupleId> tblRefIds = Sets.newHashSet();
+    for (TableRef tblRef: tblRefs) {
+      if (absoluteRef == null && !tblRef.isRelativeRef()) absoluteRef = tblRef;
+      if (correlatedRef == null && tblRef.isCorrelated()) {
+        // Check if the correlated table ref is rooted at a tuple descriptor from within
+        // this query stmt. If so, the correlation is contained within this stmt
+        // and the table ref does not conflict with absolute refs.
+        CollectionTableRef t = (CollectionTableRef) tblRef;
+        Preconditions.checkNotNull(t.getResolvedPath().getRootDesc());
+        // This check relies on tblRefs being in depth-first order.
+        if (!tblRefIds.contains(t.getResolvedPath().getRootDesc().getId())) {
+          correlatedRef = tblRef;
+        }
+      }
+      if (correlatedRef != null && absoluteRef != null) {
+        throw new AnalysisException(String.format(
+            "Nested query is illegal because it contains a table reference '%s' " +
+            "correlated with an outer block as well as an uncorrelated one '%s':\n%s",
+            correlatedRef.tableRefToSql(), absoluteRef.tableRefToSql(), toSql()));
+      }
+      tblRefIds.add(tblRef.getId());
+    }
+  }
+
   private void analyzeLimit(Analyzer analyzer) throws AnalysisException {
     if (limitElement_.getOffsetExpr() != null && !hasOrderByClause()) {
       throw new AnalysisException("OFFSET requires an ORDER BY clause: " +
@@ -269,7 +315,13 @@ public abstract class QueryStmt extends StatementBase {
    */
   public abstract void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList);
 
-  public void setWithClause(WithClause withClause) { withClause_ = withClause; }
+  /**
+   * Returns all physical (non-inline-view) TableRefs of this statement and the nested
+   * statements of inline views. The returned TableRefs are in depth-first order.
+   */
+  public abstract void collectTableRefs(List<TableRef> tblRefs);
+
+  public void setWithClause(WithClause withClause) { this.withClause_ = withClause; }
   public boolean hasWithClause() { return withClause_ != null; }
   public WithClause getWithClause() { return withClause_; }
   public boolean hasOrderByClause() { return orderByElements_ != null; }

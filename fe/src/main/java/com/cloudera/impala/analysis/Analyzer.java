@@ -385,6 +385,17 @@ public class Analyzer {
   }
 
   /**
+   * Returns the analyzer that has an entry for the given tuple descriptor in its
+   * tableRefMap, or null if no such analyzer could be found. Searches the hierarchy
+   * of analyzers bottom-up.
+   */
+  public Analyzer findAnalyzer(TupleId tid) {
+    if (tableRefMap_.containsKey(tid)) return this;
+    if (hasAncestors()) return getParentAnalyzer().findAnalyzer(tid);
+    return null;
+  }
+
+  /**
    * Returns a list of each warning logged, indicating if it was logged more than once.
    */
   public List<String> getWarnings() {
@@ -622,7 +633,12 @@ public class Analyzer {
   public Path resolvePath(List<String> rawPath, PathType pathType)
       throws AnalysisException, TableLoadingException {
     // We only allow correlated references in predicates of a subquery.
-    boolean resolveInAncestors = (pathType == PathType.SLOT_REF) ? isSubquery_: false;
+    boolean resolveInAncestors = false;
+    if (pathType == PathType.TABLE_REF) {
+      resolveInAncestors = true;
+    } else if (pathType == PathType.SLOT_REF) {
+      resolveInAncestors = isSubquery_;
+    }
     // Convert all path elements to lower case.
     ArrayList<String> lcRawPath = Lists.newArrayListWithCapacity(rawPath.size());
     for (String s: rawPath) lcRawPath.add(s.toLowerCase());
@@ -828,6 +844,7 @@ public class Analyzer {
     result.setLabel(srcSlotDesc.getLabel());
     result.setStats(srcSlotDesc.getStats());
     result.setType(srcSlotDesc.getType());
+    result.setItemTupleDesc(srcSlotDesc.getItemTupleDesc());
     return result;
   }
 

@@ -14,8 +14,6 @@
 
 package com.cloudera.impala.catalog;
 
-import static com.cloudera.impala.thrift.ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -84,7 +82,6 @@ import com.cloudera.impala.util.ListMap;
 import com.cloudera.impala.util.MetaStoreUtil;
 import com.cloudera.impala.util.TAccessLevelUtil;
 import com.cloudera.impala.util.TResultRowBuilder;
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;

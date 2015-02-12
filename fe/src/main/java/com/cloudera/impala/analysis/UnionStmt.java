@@ -533,6 +533,13 @@ public class UnionStmt extends QueryStmt {
   }
 
   @Override
+  public void collectTableRefs(List<TableRef> tblRefs) {
+    for (UnionOperand op: operands_) {
+      op.getQueryStmt().collectTableRefs(tblRefs);
+    }
+  }
+
+  @Override
   public String toSql() {
     if (toSqlString_ != null) return toSqlString_;
     StringBuilder strBuilder = new StringBuilder();

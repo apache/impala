@@ -983,6 +983,29 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "functional.alltypes as t1 right join (select 1 as int_col from " +
         "functional.alltypestiny as t1) as t2 on t2.int_col = t1.int_col) " +
         "select * from with_1 limit 10");
+
+    // CTAS with a correlated inline view.
+    AnalyzesOk("create table test as select id, item " +
+        "from functional.allcomplextypes b, (select item from b.int_array_col) v1");
+    // Correlated inline view in WITH clause.
+    AnalyzesOk("create table test as " +
+        "with w as (select id, item from functional.allcomplextypes b, " +
+        "(select item from b.int_array_col) v1) select * from w");
+    // CTAS with illegal correlated inline views.
+    AnalysisError("create table test as select id, item " +
+        "from functional.allcomplextypes b, " +
+        "(select item from b.int_array_col, functional.alltypes) v1",
+        "Nested query is illegal because it contains a table reference " +
+        "'b.int_array_col' correlated with an outer block as well as an " +
+        "uncorrelated one 'functional.alltypes':\n" +
+        "SELECT item FROM b.int_array_col, functional.alltypes");
+    AnalysisError("create table test as " +
+        "with w as (select id, item from functional.allcomplextypes b, " +
+        "(select item from b.int_array_col, functional.alltypes) v1) select * from w",
+        "Nested query is illegal because it contains a table reference " +
+        "'b.int_array_col' correlated with an outer block as well as an " +
+        "uncorrelated one 'functional.alltypes':\n" +
+        "SELECT item FROM b.int_array_col, functional.alltypes");
   }
 
   @Test

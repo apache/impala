@@ -1034,6 +1034,132 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestCorrelatedInlineViews() {
+    // Basic inline view with a single correlated table ref.
+    AnalyzesOk("select cnt from functional.allcomplextypes t, " +
+        "(select count(*) cnt from t.int_array_col) v");
+    AnalyzesOk("select cnt from functional.allcomplextypes t, " +
+        "(select cnt from (select count(*) cnt from t.int_array_col) v1) v2");
+    AnalyzesOk("select item from functional.allcomplextypes t, " +
+        "(select item from t.array_map_col.value) v");
+    // Multiple nesting levels.
+    AnalyzesOk("select item from functional.allcomplextypes t, " +
+        "(select * from (select * from (select item from t.int_array_col) v1) v2) v3");
+    // Mixing correlated and uncorrelated inline views in the same select block works.
+    AnalyzesOk("select v.cnt from functional.allcomplextypes t1 " +
+        "join (select * from functional.alltypes) t2 on (t1.id = t2.id) " +
+        "cross join (select count(*) cnt from t1.int_map_col) v");
+    // Multiple correlated table refs.
+    AnalyzesOk("select avg from functional.allcomplextypes t, " +
+        "(select avg(a1.item) avg from t.int_array_col a1, t.int_array_col a2) v");
+    AnalyzesOk("select item, key, value from functional.allcomplextypes t, " +
+        "(select * from t.int_array_col, t.int_map_col) v");
+    // Correlated inline view inside uncorrelated inline view.
+    AnalyzesOk("select cnt from functional.alltypes t1 inner join " +
+        "(select id, cnt from functional.allcomplextypes t2, " +
+        "(select count(1) cnt from t2.int_array_col) v1) v2");
+    // Correlated table ref has child ref itself.
+    AnalyzesOk("select key, item from functional.allcomplextypes t, " +
+        "(select a1.key, a2.item from t.array_map_col a1, a1.value a2) v");
+    AnalyzesOk("select key, av from functional.allcomplextypes t, " +
+        "(select a1.key, av from t.array_map_col a1, " +
+        "(select avg(item) av from a1.value a2) v1) v2");
+    // TOOD: Enable once we support complex-typed exprs in the select list.
+    //AnalyzesOk("select key, av from functional.allcomplextypes t, " +
+    //    "(select a1.key, a1.value from t.array_map_col a1) v1, " +
+    //    "(select avg(item) av from v1.value) v2");
+    // Multiple correlated table refs with different parents.
+    AnalyzesOk("select t1.id, t2.id, cnt, av from functional.allcomplextypes t1 " +
+        "left outer join functional.allcomplextypes t2 on (t1.id = t2.id), " +
+        "(select count(*) cnt from t1.array_map_col) v1, " +
+        "(select avg(item) av from t2.int_array_col) v2");
+    // Correlated table refs in a union.
+    AnalyzesOk("select item from functional.allcomplextypes t, " +
+        "(select * from t.int_array_col union all select * from t.int_array_col) v");
+    AnalyzesOk("select item from functional.allcomplextypes t, " +
+        "(select item from t.int_array_col union distinct " +
+        "select value from t.int_map_col) v");
+    // Correlated inline view in WITH-clause.
+    AnalyzesOk("with w as (select item from functional.allcomplextypes t, " +
+        "(select item from t.int_array_col) v) " +
+        "select * from w");
+    AnalyzesOk("with w as (select key, av from functional.allcomplextypes t, " +
+        "(select a1.key, av from t.array_map_col a1, " +
+        "(select avg(item) av from a1.value a2) v1) v2) " +
+        "select * from w");
+    // TOOD: Enable once we support complex-typed exprs in the select list.
+    //AnalyzesOk("with w as (select key, av from functional.allcomplextypes t, " +
+    //    "(select a1.key, a1.value from t.array_map_col a1) v1, " +
+    //    "(select avg(item) av from v1.value) v2) " +
+    //    "select * from w");
+
+    // Test behavior of aliases in correlated inline views.
+    // Inner reference resolves to the base table, not the implicit parent alias.
+    AnalyzesOk("select cnt from functional.allcomplextypes t, " +
+        "(select count(1) cnt from functional.allcomplextypes) v");
+    AnalyzesOk("select cnt from functional.allcomplextypes, " +
+        "(select count(1) cnt from functional.allcomplextypes) v");
+    AnalyzesOk("select cnt from functional.allcomplextypes, " +
+        "(select count(1) cnt from allcomplextypes) v", createAnalyzer("functional"));
+    // Illegal correlated reference.
+    AnalysisError("select cnt from functional.allcomplextypes t, " +
+        "(select count(1) cnt from t) v",
+        "Illegal table reference to non-collection type: 't'");
+    AnalysisError("select cnt from functional.allcomplextypes, " +
+        "(select count(1) cnt from allcomplextypes) v",
+        "Illegal table reference to non-collection type: 'allcomplextypes'");
+
+    // Un/correlated refs in a single nested query block.
+    AnalysisError("select cnt from functional.allcomplextypes t, " +
+        "(select count(1) cnt from functional.alltypes, t.int_array_col) v",
+        "Nested query is illegal because it contains a table reference " +
+        "'t.int_array_col' correlated with an outer block as well as an " +
+        "uncorrelated one 'functional.alltypes':\n" +
+        "SELECT count(1) cnt FROM functional.alltypes, t.int_array_col");
+    AnalysisError("select cnt from functional.allcomplextypes t, " +
+        "(select count(1) cnt from t.int_array_col, functional.alltypes) v",
+        "Nested query is illegal because it contains a table reference " +
+        "'t.int_array_col' correlated with an outer block as well as an " +
+        "uncorrelated one 'functional.alltypes':\n" +
+        "SELECT count(1) cnt FROM t.int_array_col, functional.alltypes");
+    // Un/correlated refs across multiple nested query blocks.
+    AnalysisError("select cnt from functional.allcomplextypes t, " +
+        "(select * from functional.alltypes, " +
+        "(select count(1) cnt from t.int_array_col) v1) v2",
+        "Nested query is illegal because it contains a table reference " +
+        "'t.int_array_col' correlated with an outer block as well as an " +
+        "uncorrelated one 'functional.alltypes':\n" +
+        "SELECT * FROM functional.alltypes, (SELECT count(1) cnt " +
+        "FROM t.int_array_col) v1");
+    // TOOD: Enable once we support complex-typed exprs in the select list.
+    // Correlated table ref has correlated inline view as parent.
+    //AnalysisError("select cnt from functional.allcomplextypes t, " +
+    //    "(select value arr from t.array_map_col) v1, " +
+    //    "(select item from v1.arr, functional.alltypestiny) v2",
+    //    "Nested query is illegal because it contains a table reference " +
+    //    "'v1.arr' correlated with an outer block as well as an " +
+    //    "uncorrelated one 'functional.alltypestiny':\n" +
+    //    "SELECT item FROM v1.arr, functional.alltypestiny");
+    // Un/correlated refs in union operands.
+    AnalysisError("select cnt from functional.allcomplextypes t, " +
+        "(select bigint_col from functional.alltypes " +
+        "union select count(1) cnt from t.int_array_col) v1",
+        "Nested query is illegal because it contains a table reference " +
+        "'t.int_array_col' correlated with an outer block as well as an " +
+        "uncorrelated one 'functional.alltypes':\n" +
+        "SELECT bigint_col FROM functional.alltypes " +
+        "UNION SELECT count(1) cnt FROM t.int_array_col");
+    // Un/correlated refs in WITH-clause view.
+    AnalysisError("with w as (select cnt from functional.allcomplextypes t, " +
+        "(select count(1) cnt from t.int_array_col, functional.alltypes) v) " +
+        "select * from w",
+        "Nested query is illegal because it contains a table reference " +
+        "'t.int_array_col' correlated with an outer block as well as an " +
+        "uncorrelated one 'functional.alltypes':\n" +
+        "SELECT count(1) cnt FROM t.int_array_col, functional.alltypes");
+  }
+
+  @Test
   public void TestOnClause() throws AnalysisException {
     AnalyzesOk(
         "select a.int_col from functional.alltypes a " +
@@ -2570,6 +2696,26 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "Unable to INSERT into target table (functional_seq.alltypes) because Impala " +
         "does not have WRITE access to at least one HDFS path: " +
         "hdfs://localhost:20500/test-warehouse/alltypes_seq/year=2009/month=");
+
+    // Insert with a correlated inline view.
+    AnalyzesOk("insert into table functional.alltypessmall " +
+        "partition (year, month)" +
+        "select a.id, bool_col, tinyint_col, smallint_col, item, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col, a.year, " +
+        "b.month from functional.alltypes a, functional.allcomplextypes b, " +
+        "(select item from b.int_array_col) v1 " +
+        "where a.id = b.id");
+    AnalysisError("insert into table functional.alltypessmall " +
+        "partition (year, month)" +
+        "select a.id, a.bool_col, a.tinyint_col, a.smallint_col, item, a.bigint_col, " +
+        "a.float_col, a.double_col, a.date_string_col, a.string_col, a.timestamp_col, " +
+        "a.year, b.month from functional.alltypes a, functional.allcomplextypes b, " +
+        "(select item from b.int_array_col, functional.alltypestiny) v1 " +
+        "where a.id = b.id",
+        "Nested query is illegal because it contains a table reference " +
+        "'b.int_array_col' correlated with an outer block as well as an " +
+        "uncorrelated one 'functional.alltypestiny':\n" +
+        "SELECT item FROM b.int_array_col, functional.alltypestiny");
 
     // Test plan hints for partitioned Hdfs tables.
     AnalyzesOk("insert into functional.alltypessmall " +
