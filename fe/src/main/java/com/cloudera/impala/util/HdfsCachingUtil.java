@@ -173,7 +173,9 @@ public class HdfsCachingUtil {
   public static Short getCachedCacheReplication(Map<String, String> params) {
     Preconditions.checkNotNull(params);
     String replication = params.get(CACHE_DIR_REPLICATION_PROP_NAME);
-    Preconditions.checkNotNull(replication);
+    if (replication == null) {
+      return JniCatalogConstants.HDFS_DEFAULT_CACHE_REPLICATION_FACTOR;
+    }
     try {
       return Short.parseShort(replication);
     } catch (NumberFormatException e) {
@@ -461,9 +463,11 @@ public class HdfsCachingUtil {
     }
     Preconditions.checkNotNull(entry);
 
-    // Update the cache replication factor with the correct value from HDFS
-    if (Short.parseShort(params.get(CACHE_DIR_REPLICATION_PROP_NAME)) != entry.getInfo()
-        .getReplication()) {
+    // On the upgrade path the property might not exist, if it exists
+    // and is different from the one from the meta store, issue a warning.
+    String replicationFactor = params.get(CACHE_DIR_REPLICATION_PROP_NAME);
+    if (replicationFactor != null &&
+        Short.parseShort(replicationFactor) != entry.getInfo().getReplication()) {
       LOG.info("Replication factor for entry in HDFS differs from value in Hive MS: " +
           entry.getInfo().getPath().toString() + " " +
           entry.getInfo().getReplication().toString() + " != " +

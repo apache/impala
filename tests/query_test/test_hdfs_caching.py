@@ -155,6 +155,10 @@ class TestHdfsCachingDdl(ImpalaTestSuite):
     change_cache_directive_repl_for_path(
         "/test-warehouse/cachedb.db/cached_tbl_reload_part/j=2", 3)
 
+    # Create a bogus cached table abusing an existing cache directive ID, IMPALA-1750
+    dirid = get_cache_directive_for_path("/test-warehouse/cachedb.db/cached_tbl_reload_part/j=2")
+    self.client.execute(("create table cachedb.no_replication_factor (id int) " \
+                         "tblproperties(\"cache_directive_id\"=\"%s\")" % dirid))
     self.run_test_case('QueryTest/hdfs-caching-validation', vector)
 
 def drop_cache_directives_for_path(path):
@@ -163,11 +167,15 @@ def drop_cache_directives_for_path(path):
   assert rc == 0, \
       "Error removing cache directive for path %s (%s, %s)" % (path, stdout, stderr)
 
-def change_cache_directive_repl_for_path(path, repl):
-  """Drop the cache directive for a given path"""
+def get_cache_directive_for_path(path):
   rc, stdout, stderr = exec_process("hdfs cacheadmin -listDirectives -path %s" % path)
   assert rc == 0
   dirid = re.search('^\s+?(\d+)\s+?testPool\s+?.*?$', stdout, re.MULTILINE).group(1)
+  return dirid
+
+def change_cache_directive_repl_for_path(path, repl):
+  """Drop the cache directive for a given path"""
+  dirid = get_cache_directive_for_path(path)
   rc, stdout, stderr = exec_process(
     "hdfs cacheadmin -modifyDirective -id %s -replication %s" % (dirid, repl))
   assert rc == 0, \

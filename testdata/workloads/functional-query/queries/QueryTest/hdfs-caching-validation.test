@@ -35,6 +35,9 @@ invalidate metadata cachedb.cached_tbl_reload
 invalidate metadata cachedb.cached_tbl_reload_part
 ====
 ---- QUERY
+invalidate metadata cachedb.no_replication_factor
+====
+---- QUERY
 # Once the metadata is updated, the table no longer appears as cached
 show table stats cachedb.cached_tbl_reload
 ---- RESULTS
@@ -59,4 +62,15 @@ show table stats cachedb.cached_tbl_reload_part
 'Total',-1,1,regex:.+B,regex:.+B,'','',''
 ---- TYPES
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Insert into table without replication factor set in Hive MS, IMPALA-1750
+insert into cachedb.no_replication_factor values (1)
+====
+---- QUERY
+select * from cachedb.no_replication_factor
+---- RESULTS
+1
+---- TYPES
+INT
 ====
