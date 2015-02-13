@@ -17,15 +17,31 @@
 #include "common/names.h"
 
 using boost::date_time::not_a_date_time;
+using boost::gregorian::date;
+using boost::gregorian::date_duration;
 using boost::posix_time::nanoseconds;
 using boost::posix_time::ptime;
 using boost::posix_time::ptime_from_tm;
+using boost::posix_time::time_duration;
 using boost::posix_time::to_tm;
 
 DEFINE_bool(use_local_tz_for_unix_timestamp_conversions, false,
     "When true, TIMESTAMPs are interpreted in the local time zone when converting to "
     "and from Unix times. When false, TIMESTAMPs are interpreted in the UTC time zone. "
     "Set to true for Hive compatibility.");
+
+// Constants for use with Unix times. Leap-seconds do not apply.
+const int32_t SECONDS_IN_MINUTE = 60;
+const int32_t SECONDS_IN_HOUR = 60 * SECONDS_IN_MINUTE;
+const int32_t SECONDS_IN_DAY = 24 * SECONDS_IN_HOUR;
+
+// struct tm stores month/year data as an offset
+const unsigned short TM_YEAR_OFFSET = 1900;
+const unsigned short TM_MONTH_OFFSET = 1;
+
+// Boost stores dates as an uint32_t. Since subtraction is needed, convert to signed.
+const int64_t EPOCH_DAY_NUMBER =
+    static_cast<int64_t>(date(1970, boost::gregorian::Jan, 1).day_number());
 
 namespace impala {
 
@@ -47,20 +63,29 @@ int TimestampValue::Format(const DateTimeFormatContext& dt_ctx, int len, char* b
 
 void TimestampValue::UtcToLocal() {
   DCHECK(HasDateAndTime());
+  // Previously, conversion was done using boost functions but it was found to be
+  // too slow. Doing the conversion without function calls (which also avoids some
+  // unnecessary validations) the conversion only take half as long. Original:
+  // http://www.boost.org/doc/libs/1_55_0/boost/date_time/c_local_time_adjustor.hpp
   try {
-    tm temp_tm = to_tm(ptime(date_, time_));  // will throw if date/time is invalid
-    time_t utc = timegm(&temp_tm);
-    if (UNLIKELY(NULL == localtime_r(&utc, &temp_tm))) {
+    time_t utc =
+        (static_cast<int64_t>(date_.day_number()) - EPOCH_DAY_NUMBER) * SECONDS_IN_DAY +
+        time_.hours() * SECONDS_IN_HOUR +
+        time_.minutes() * SECONDS_IN_MINUTE +
+        time_.seconds();
+    tm temp;
+    if (UNLIKELY(NULL == localtime_r(&utc, &temp))) {
       *this = ptime(not_a_date_time);
       return;
     }
     // Unlikely but a time zone conversion may push the value over the min/max
     // boundary resulting in an exception.
-    ptime local = ptime_from_tm(temp_tm);
-    // Neither time_t nor struct tm allow fractional seconds so they have to be handled
-    // separately.
-    local += nanoseconds(time_.fractional_seconds());
-    *this = local;
+    date_ = boost::gregorian::date(
+        static_cast<unsigned short>(temp.tm_year + TM_YEAR_OFFSET),
+        static_cast<unsigned short>(temp.tm_mon + TM_MONTH_OFFSET),
+        static_cast<unsigned short>(temp.tm_mday));
+    time_ = time_duration(temp.tm_hour, temp.tm_min, temp.tm_sec,
+        time().fractional_seconds());
   } catch (std::exception& from_boost) {
     *this = ptime(not_a_date_time);
   }
