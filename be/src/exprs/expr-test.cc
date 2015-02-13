@@ -995,6 +995,36 @@ TEST_F(ExprTest, DecimalArithmeticExprs) {
                    Decimal4Value(12), ColumnType::CreateDecimalType(38, 1));
   TestDecimalValue("cast(1 as decimal(38,0)) / cast(.2 as decimal(38,1))",
                    Decimal4Value(50), ColumnType::CreateDecimalType(38, 1));
+
+  // Test mod() UDF
+  TestDecimalValue("mod(cast('1' as decimal(2,0)), cast('10' as decimal(2,0)))",
+      Decimal4Value(1), ColumnType::CreateDecimalType(2, 0));
+  TestDecimalValue("mod(cast('1.1' as decimal(2,1)), cast('1.0' as decimal(2,1)))",
+      Decimal4Value(1), ColumnType::CreateDecimalType(2,1));
+  TestDecimalValue("mod(cast('-1.23' as decimal(5,2)), cast('1.0' as decimal(5,2)))",
+      Decimal4Value(-23), ColumnType::CreateDecimalType(5,2));
+  TestDecimalValue("mod(cast('1' as decimal(12,0)), cast('10' as decimal(12,0)))",
+      Decimal8Value(1), ColumnType::CreateDecimalType(12, 0));
+  TestDecimalValue("mod(cast('1.1' as decimal(12,1)), cast('1.0' as decimal(12,1)))",
+      Decimal8Value(1), ColumnType::CreateDecimalType(12,1));
+  TestDecimalValue("mod(cast('-1.23' as decimal(12,2)), cast('1.0' as decimal(12,2)))",
+      Decimal8Value(-23), ColumnType::CreateDecimalType(12,2));
+  TestDecimalValue("mod(cast('1' as decimal(32,0)), cast('10' as decimal(32,0)))",
+      Decimal16Value(1), ColumnType::CreateDecimalType(32, 0));
+  TestDecimalValue("mod(cast('1.1' as decimal(32,1)), cast('1.0' as decimal(32,1)))",
+      Decimal16Value(1), ColumnType::CreateDecimalType(32,1));
+  TestDecimalValue("mod(cast('-1.23' as decimal(32,2)), cast('1.0' as decimal(32,2)))",
+      Decimal16Value(-23), ColumnType::CreateDecimalType(32,2));
+  TestIsNull("mod(cast(NULL as decimal(2,0)), cast('10' as decimal(2,0)))",
+      ColumnType::CreateDecimalType(2,0));
+  TestIsNull("mod(cast('10' as decimal(2,0)), cast(NULL as decimal(2,0)))",
+      ColumnType::CreateDecimalType(2,0));
+  TestIsNull("mod(cast('10' as decimal(2,0)), cast('0' as decimal(2,0)))",
+      ColumnType::CreateDecimalType(2,0));
+  TestIsNull("mod(cast('10' as decimal(2,0)), cast('0' as decimal(2,0)))",
+      ColumnType::CreateDecimalType(2,0));
+  TestIsNull("mod(cast(NULL as decimal(2,0)), NULL)",
+      ColumnType::CreateDecimalType(2,0));
 }
 
 // There are two tests of ranges, the second of which requires a cast
@@ -2399,6 +2429,29 @@ TEST_F(ExprTest, MathFunctions) {
   TestIsNull("fmod(cast(-12345.345 as double), 0)", TYPE_DOUBLE);
   TestIsNull("cast(-12345.345 as float) % cast(0 as float)", TYPE_FLOAT);
   TestIsNull("cast(-12345.345 as double) % 0", TYPE_DOUBLE);
+
+  // Test int param.
+  TestValue("mod(cast(10 as tinyint), cast(3 as tinyint))", TYPE_TINYINT, 10 % 3);
+  TestValue("mod(cast(10 as smallint), cast(3 as smallint))", TYPE_SMALLINT, 10 % 3);
+  TestValue("mod(cast(10 as int), cast(3 as int))", TYPE_INT, 10 % 3);
+  TestValue("mod(cast(10 as bigint), cast(3 as bigint))", TYPE_BIGINT, 10 % 3);
+  TestIsNull("mod(cast(123 as tinyint), 0)", TYPE_TINYINT);
+  TestIsNull("mod(cast(123 as smallint), 0)", TYPE_SMALLINT);
+  TestIsNull("mod(cast(123 as int), 0)", TYPE_INT);
+  TestIsNull("mod(cast(123 as bigint), 0)", TYPE_BIGINT);
+  TestIsNull("mod(cast(123 as tinyint), NULL)", TYPE_TINYINT);
+  TestIsNull("mod(cast(123 as smallint), NULL)", TYPE_SMALLINT);
+  TestIsNull("mod(cast(123 as int), NULL)", TYPE_INT);
+  TestIsNull("mod(cast(123 as bigint), NULL)", TYPE_BIGINT);
+  TestIsNull("mod(cast(NULL as int), NULL)", TYPE_INT);
+  // Test numeric param.
+  TestValue("mod(cast(12.3 as float), cast(4.0 as float))", TYPE_FLOAT, fmodf(12.3f, 4.0f));
+  TestValue("mod(cast(12.3 as double), cast(4.0 as double))", TYPE_DOUBLE, fmod(12.3, 4.0));
+  TestIsNull("mod(cast(12345.345 as float), cast(0 as float))", TYPE_FLOAT);
+  TestIsNull("mod(cast(12345.345 as double), cast(0 as double))", TYPE_DOUBLE);
+  TestIsNull("mod(cast(12345.345 as float), NULL)", TYPE_FLOAT);
+  TestIsNull("mod(cast(12345.345 as double), NULL)", TYPE_DOUBLE);
+  TestIsNull("mod(cast(NULL as float), NULL)", TYPE_FLOAT);
 
   // Test positive().
   TestValue("positive(cast(123 as tinyint))", TYPE_TINYINT, 123);

@@ -92,11 +92,10 @@ public class ArithmeticExpr extends Expr {
         Lists.<Type>newArrayList(Type.DECIMAL, Type.DECIMAL),
         Type.DECIMAL));
 
+    // MOD() is registered as a builtin, see impala_functions.py
     for (Type t: Type.getIntegerTypes()) {
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
           Operator.INT_DIVIDE.getName(), Lists.newArrayList(t, t), t));
-      db.addBuiltin(ScalarFunction.createBuiltinOperator(
-          Operator.MOD.getName(), Lists.newArrayList(t, t), t));
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
           Operator.BITAND.getName(), Lists.newArrayList(t, t), t));
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
@@ -106,9 +105,6 @@ public class ArithmeticExpr extends Expr {
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
           Operator.BITNOT.getName(), Lists.newArrayList(t), t));
     }
-    db.addBuiltin(ScalarFunction.createBuiltinOperator(
-        Operator.MOD.getName(), Lists.<Type>newArrayList(
-            Type.DECIMAL, Type.DECIMAL), Type.DECIMAL));
   }
 
   @Override
@@ -228,14 +224,6 @@ public class ArithmeticExpr extends Expr {
     if (!(type_.isDecimal() && t1.isDecimal())) castChild(1, type_);
     t0 = getChild(0).getType();
     t1 = getChild(1).getType();
-
-    // Use MATH_MOD function operator for floating-point modulo.
-    // TODO remove this when we have operators implemented using the UDF interface
-    // and we can resolve this just using function overloading.
-    if ((t0.isFloatingPointType() || t1.isFloatingPointType()) &&
-        op_ == ArithmeticExpr.Operator.MOD) {
-      fnName = "fmod";
-    }
 
     fn_ = getBuiltinFunction(analyzer, fnName, collectChildReturnTypes(),
         CompareMode.IS_IDENTICAL);
