@@ -649,6 +649,8 @@ public class CatalogOpExecutor {
         // currently does not rely on them.
         colStatsData.setDoubleStats(new DoubleColumnStatsData(numNulls, ndvs));
         break;
+      case CHAR:
+      case VARCHAR:
       case STRING:
         long maxStrLen = colStats.getMax_size();
         double avgStrLen = colStats.getAvg_size();

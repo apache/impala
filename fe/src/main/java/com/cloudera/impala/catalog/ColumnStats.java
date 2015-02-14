@@ -43,8 +43,9 @@ public class ColumnStats {
   private final static Set<PrimitiveType> SUPPORTED_COL_TYPES = Sets.newHashSet(
       PrimitiveType.BIGINT, PrimitiveType.BINARY, PrimitiveType.BOOLEAN,
       PrimitiveType.DOUBLE, PrimitiveType.FLOAT, PrimitiveType.INT,
-      PrimitiveType.SMALLINT, PrimitiveType.STRING, PrimitiveType.TIMESTAMP,
-      PrimitiveType.TINYINT, PrimitiveType.DECIMAL);
+      PrimitiveType.SMALLINT, PrimitiveType.CHAR, PrimitiveType.VARCHAR,
+      PrimitiveType.STRING, PrimitiveType.TIMESTAMP, PrimitiveType.TINYINT,
+      PrimitiveType.DECIMAL);
 
   // in bytes: excludes serialization overhead
   private double avgSize_;
@@ -175,6 +176,8 @@ public class ColumnStats {
           numNulls_ = doubleStats.getNumNulls();
         }
         break;
+      case CHAR:
+      case VARCHAR:
       case STRING:
         isCompatible = statsData.isSetStringStats();
         if (isCompatible) {

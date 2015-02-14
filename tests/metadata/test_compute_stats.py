@@ -46,6 +46,7 @@ class TestComputeStats(ImpalaTestSuite):
     self.cleanup_db(self.TEST_DB_NAME)
     self.cleanup_db(self.TEST_ALIASING_DB_NAME)
 
+  @pytest.mark.execute_serially
   def test_compute_stats(self, vector):
     self.run_test_case('QueryTest/compute-stats', vector)
     # Test compute stats on decimal columns separately so we can vary between CDH4/5
@@ -55,5 +56,7 @@ class TestComputeStats(ImpalaTestSuite):
     if self.exploration_strategy() != 'exhaustive': return
     self.run_test_case('QueryTest/compute-stats-many-partitions', vector)
 
+  @pytest.mark.execute_serially
   def test_compute_stats_incremental(self, vector):
     self.run_test_case('QueryTest/compute-stats-incremental', vector)
+
