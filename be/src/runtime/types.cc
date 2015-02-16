@@ -16,6 +16,8 @@
 #include <ostream>
 #include <sstream>
 
+#include "gen-cpp/TCLIService_constants.h"
+
 using namespace std;
 using namespace apache::hive::service::cli::thrift;
 
@@ -115,81 +117,76 @@ string TypeToOdbcString(PrimitiveType t) {
 }
 
 TTypeEntry ColumnType::ToHs2Type() const {
-  TTypeEntry result;
-  result.__isset.primitiveEntry = true;
-
+  TPrimitiveTypeEntry type_entry;
   switch (type) {
     // Map NULL_TYPE to BOOLEAN, otherwise Hive's JDBC driver won't
     // work for queries like "SELECT NULL" (IMPALA-914).
     case TYPE_NULL:
-      result.primitiveEntry.type = TTypeId::BOOLEAN_TYPE;
+      type_entry.__set_type(TTypeId::BOOLEAN_TYPE);
       break;
     case TYPE_BOOLEAN:
-      result.primitiveEntry.type = TTypeId::BOOLEAN_TYPE;
+      type_entry.__set_type(TTypeId::BOOLEAN_TYPE);
       break;
     case TYPE_TINYINT:
-      result.primitiveEntry.type = TTypeId::TINYINT_TYPE;
+      type_entry.__set_type(TTypeId::TINYINT_TYPE);
       break;
     case TYPE_SMALLINT:
-      result.primitiveEntry.type = TTypeId::SMALLINT_TYPE;
+      type_entry.__set_type(TTypeId::SMALLINT_TYPE);
       break;
     case TYPE_INT:
-      result.primitiveEntry.type = TTypeId::INT_TYPE;
+      type_entry.__set_type(TTypeId::INT_TYPE);
       break;
     case TYPE_BIGINT:
-      result.primitiveEntry.type = TTypeId::BIGINT_TYPE;
+      type_entry.__set_type(TTypeId::BIGINT_TYPE);
       break;
     case TYPE_FLOAT:
-      result.primitiveEntry.type = TTypeId::FLOAT_TYPE;
+      type_entry.__set_type(TTypeId::FLOAT_TYPE);
       break;
     case TYPE_DOUBLE:
-      result.primitiveEntry.type = TTypeId::DOUBLE_TYPE;
+      type_entry.__set_type(TTypeId::DOUBLE_TYPE);
       break;
     case TYPE_TIMESTAMP:
-      result.primitiveEntry.type = TTypeId::TIMESTAMP_TYPE;
+      type_entry.__set_type(TTypeId::TIMESTAMP_TYPE);
       break;
     case TYPE_STRING:
-    case TYPE_VARCHAR:
-      result.primitiveEntry.type = TTypeId::STRING_TYPE;
+      type_entry.__set_type(TTypeId::STRING_TYPE);
       break;
     case TYPE_BINARY:
-      result.primitiveEntry.type = TTypeId::BINARY_TYPE;
+      type_entry.__set_type(TTypeId::BINARY_TYPE);
       break;
     case TYPE_DECIMAL: {
-      result.primitiveEntry.type = TTypeId::DECIMAL_TYPE;
-
       TTypeQualifierValue tprecision;
-      tprecision.i32Value = precision;
-      tprecision.__isset.i32Value = true;
-
+      tprecision.__set_i32Value(precision);
       TTypeQualifierValue tscale;
-      tscale.i32Value = scale;
-      tscale.__isset.i32Value = true;
+      tscale.__set_i32Value(scale);
 
-      result.primitiveEntry.__isset.typeQualifiers = true;
-      // Note: these constants need to match what is the thrift file but the
-      // generated cpp doesn't seem to include the constants.
-      result.primitiveEntry.typeQualifiers.qualifiers["precision"] = tprecision;
-      result.primitiveEntry.typeQualifiers.qualifiers["scale"] = tscale;
+      TTypeQualifiers type_quals;
+      type_quals.qualifiers[g_TCLIService_constants.PRECISION] = tprecision;
+      type_quals.qualifiers[g_TCLIService_constants.SCALE] = tscale;
+      type_entry.__set_typeQualifiers(type_quals);
+      type_entry.__set_type(TTypeId::DECIMAL_TYPE);
       break;
     }
-    case TYPE_CHAR: {
-      result.primitiveEntry.type = TTypeId::CHAR_TYPE;
-
+    case TYPE_CHAR:
+    case TYPE_VARCHAR: {
       TTypeQualifierValue tmax_len;
-      tmax_len.i32Value = len;
-      tmax_len.__isset.i32Value = true;
+      tmax_len.__set_i32Value(len);
 
-      result.primitiveEntry.__isset.typeQualifiers = true;
-      result.primitiveEntry.typeQualifiers.qualifiers["characterMaximumLength"] =
-          tmax_len;
+      TTypeQualifiers type_quals;
+      type_quals.qualifiers[g_TCLIService_constants.CHARACTER_MAXIMUM_LENGTH] = tmax_len;
+      type_entry.__set_typeQualifiers(type_quals);
+      type_entry.__set_type(
+          (type == TYPE_CHAR) ? TTypeId::CHAR_TYPE : TTypeId::VARCHAR_TYPE);
       break;
     }
     default:
       // HiveServer2 does not have a type for invalid, date and datetime.
       DCHECK(false) << "bad TypeToTValueType() type: " << DebugString();
-      result.primitiveEntry.type = TTypeId::STRING_TYPE;
+      type_entry.__set_type(TTypeId::STRING_TYPE);
   };
+
+  TTypeEntry result;
+  result.__set_primitiveEntry(type_entry);
   return result;
 }
 

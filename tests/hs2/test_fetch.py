@@ -17,24 +17,34 @@
 import pytest
 import re
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session
-from TCLIService import TCLIService
+from TCLIService import TCLIService, constants
+from TCLIService.ttypes import TTypeId
 
 # Simple test to make sure all the HS2 types are supported for both the row and
 # column-oriented versions of the HS2 protocol.
 class TestFetch(HS2TestSuite):
-  def __verify_result_precision_scale(self, t, precision, scale):
-    # This should be DECIMAL_TYPE but how do I get that in python
-    assert t.typeDesc.types[0].primitiveEntry.type == 15
-    p = t.typeDesc.types[0].primitiveEntry.typeQualifiers.qualifiers['precision']
-    s = t.typeDesc.types[0].primitiveEntry.typeQualifiers.qualifiers['scale']
+  def __verify_primitive_type(self, expected_type, hs2_type):
+    assert hs2_type.typeDesc.types[0].primitiveEntry.type == expected_type
+
+  def __verify_char_max_len(self, t, max_len):
+    l = t.typeDesc.types[0].primitiveEntry.typeQualifiers.qualifiers\
+      [constants.CHARACTER_MAXIMUM_LENGTH]
+    assert l.i32Value == max_len
+
+  def __verify_decimal_precision_scale(self, hs2_type, precision, scale):
+    p = hs2_type.typeDesc.types[0].primitiveEntry.typeQualifiers.qualifiers\
+      [constants.PRECISION]
+    s = hs2_type.typeDesc.types[0].primitiveEntry.typeQualifiers.qualifiers\
+      [constants.SCALE]
     assert p.i32Value == precision
     assert s.i32Value == scale
 
   @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V1)
-  def test_alltypes_v1(self):
+  def test_result_metadata_v1(self):
     execute_statement_req = TCLIService.TExecuteStatementReq()
     execute_statement_req.sessionHandle = self.session_handle
 
+    # Verify all primitive types in the alltypes table.
     execute_statement_req.statement =\
         "SELECT * FROM functional.alltypessmall ORDER BY id LIMIT 1"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
@@ -42,8 +52,25 @@ class TestFetch(HS2TestSuite):
     results = self.fetch(execute_statement_resp.operationHandle,
                 TCLIService.TFetchOrientation.FETCH_NEXT, 1, 1)
     assert len(results.results.rows) == 1
+    metadata_resp = self.result_metadata(execute_statement_resp.operationHandle)
+    column_types = metadata_resp.schema.columns
+    assert len(column_types) == 13
+    self.__verify_primitive_type(TTypeId.INT_TYPE, column_types[0])
+    self.__verify_primitive_type(TTypeId.BOOLEAN_TYPE, column_types[1])
+    self.__verify_primitive_type(TTypeId.TINYINT_TYPE, column_types[2])
+    self.__verify_primitive_type(TTypeId.SMALLINT_TYPE, column_types[3])
+    self.__verify_primitive_type(TTypeId.INT_TYPE, column_types[4])
+    self.__verify_primitive_type(TTypeId.BIGINT_TYPE, column_types[5])
+    self.__verify_primitive_type(TTypeId.FLOAT_TYPE, column_types[6])
+    self.__verify_primitive_type(TTypeId.DOUBLE_TYPE, column_types[7])
+    self.__verify_primitive_type(TTypeId.STRING_TYPE, column_types[8])
+    self.__verify_primitive_type(TTypeId.STRING_TYPE, column_types[9])
+    self.__verify_primitive_type(TTypeId.TIMESTAMP_TYPE, column_types[10])
+    self.__verify_primitive_type(TTypeId.INT_TYPE, column_types[11])
+    self.__verify_primitive_type(TTypeId.INT_TYPE, column_types[12])
     self.close(execute_statement_resp.operationHandle)
 
+    # Verify the result metadata for the DECIMAL type.
     execute_statement_req.statement =\
         "SELECT d1,d5 FROM functional.decimal_tbl ORDER BY d1 LIMIT 1"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
@@ -51,15 +78,34 @@ class TestFetch(HS2TestSuite):
     results = self.fetch(execute_statement_resp.operationHandle,
                 TCLIService.TFetchOrientation.FETCH_NEXT, 1, 1)
     assert len(results.results.rows) == 1
-
     # Verify the result schema is what we expect. The result has 2 columns, the
     # first is decimal(9,0) and the second is decimal(10,5)
     metadata_resp = self.result_metadata(execute_statement_resp.operationHandle)
     column_types = metadata_resp.schema.columns
     assert len(column_types) == 2
-    self.__verify_result_precision_scale(column_types[0], 9, 0)
-    self.__verify_result_precision_scale(column_types[1], 10, 5)
+    self.__verify_primitive_type(TTypeId.DECIMAL_TYPE, column_types[0])
+    self.__verify_decimal_precision_scale(column_types[0], 9, 0)
+    self.__verify_primitive_type(TTypeId.DECIMAL_TYPE, column_types[1])
+    self.__verify_decimal_precision_scale(column_types[1], 10, 5)
+    self.close(execute_statement_resp.operationHandle)
 
+    # Verify the result metadata for the CHAR/VARCHAR types.
+    execute_statement_req.statement =\
+        "SELECT * FROM functional.chars_tiny ORDER BY cs LIMIT 1"
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    HS2TestSuite.check_response(execute_statement_resp)
+    results = self.fetch(execute_statement_resp.operationHandle,
+                TCLIService.TFetchOrientation.FETCH_NEXT, 1, 1)
+    assert len(results.results.rows) == 1
+    metadata_resp = self.result_metadata(execute_statement_resp.operationHandle)
+    column_types = metadata_resp.schema.columns
+    assert len(column_types) == 3
+    self.__verify_primitive_type(TTypeId.CHAR_TYPE, column_types[0])
+    self.__verify_char_max_len(column_types[0], 5)
+    self.__verify_primitive_type(TTypeId.CHAR_TYPE, column_types[1])
+    self.__verify_char_max_len(column_types[1], 140)
+    self.__verify_primitive_type(TTypeId.VARCHAR_TYPE, column_types[2])
+    self.__verify_char_max_len(column_types[2], 32)
     self.close(execute_statement_resp.operationHandle)
 
   def __query_and_fetch(self, query):
@@ -197,7 +243,7 @@ class TestFetch(HS2TestSuite):
     get_result_metadata_resp = \
         self.hs2_client.GetResultSetMetadata(get_result_metadata_req)
     col = get_result_metadata_resp.schema.columns[0]
-    assert col.typeDesc.types[0].primitiveEntry.type == TCLIService.TTypeId.BOOLEAN_TYPE
+    assert col.typeDesc.types[0].primitiveEntry.type == TTypeId.BOOLEAN_TYPE
 
     # Check that the actual type is boolean
     fetch_results_req = TCLIService.TFetchResultsReq()
