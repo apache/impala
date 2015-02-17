@@ -1,0 +1,14 @@
+====
+---- QUERY
+# limit 0 on hbase table
+select * from alltypessmall where string_col = '4' limit 0
+---- RESULTS
+---- TYPES
+int, bigint, boolean, string, double, float, int, int, smallint, string, timestamp, tinyint, int
+====
+---- QUERY
+# limit 0 with arithmetic expr
+select * from alltypessmall where string_col = '4' limit 3 % 3
+---- RESULTS
+---- TYPES
+int, bigint, boolean, string, double, float, int, int, smallint, string, timestamp, tinyint, int

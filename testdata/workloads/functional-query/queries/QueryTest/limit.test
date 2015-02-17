@@ -7,20 +7,6 @@ select * from alltypesagg where day = 1 limit 0
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int, int
 ====
 ---- QUERY
-# limit 0 on hbase table
-select * from functional_hbase.alltypessmall where string_col = '4' limit 0
----- RESULTS
----- TYPES
-int, bigint, boolean, string, double, float, int, int, smallint, string, timestamp, tinyint, int
-====
----- QUERY
-# limit 0 with arithmetic expr
-select * from functional_hbase.alltypessmall where string_col = '4' limit 3 % 3
----- RESULTS
----- TYPES
-int, bigint, boolean, string, double, float, int, int, smallint, string, timestamp, tinyint, int
-====
----- QUERY
 # limit 0 on complex subquery join
 select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col
 from (

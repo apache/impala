@@ -1187,35 +1187,6 @@ values((1+8, 2, 5.0, 'a'), (2, 3, 6.0, 'b'), (3, 4, 7.0, 'c')) order by 1 desc l
 SMALLINT, TINYINT, DECIMAL, STRING
 ====
 ---- QUERY
-# multiple levels of aggregation in a subquery
-# Taken from subquery.test
-select c1, c3, m2
-from (
-       select c1, c3, max(c2) m2
-       from (
-              select c1, c2, c3
-              from (
-                     select int_col c1, tinyint_col c2, max(id) c3
-                     from functional_hbase.alltypessmall
-                     group by 1, 2
-                     order by 1,2
-                     limit 5
-                   ) x
-             ) x2
-       group by c1, c3
-       limit 10
-     ) t
-where c1 > 0
-order by 2, 1 desc
-limit 3
----- RESULTS
-1,96,1
-2,97,2
-3,98,3
----- TYPES
-int, int, tinyint
-====
----- QUERY
 # Basic test with a single with-clause view that references a virtual view.
 # Taken from with-clause.test
 with t as (select abc x, xyz y from functional.complex_view)

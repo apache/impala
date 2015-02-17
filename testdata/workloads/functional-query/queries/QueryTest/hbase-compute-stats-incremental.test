@@ -1,0 +1,7 @@
+====
+---- QUERY
+compute incremental stats alltypes;
+---- RESULTS
+'Updated 1 partition(s) and 13 column(s).'
+---- TYPES
+STRING

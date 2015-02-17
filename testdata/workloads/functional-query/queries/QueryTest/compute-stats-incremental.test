@@ -342,13 +342,6 @@ show table stats compute_stats_db.incremental_string_part_value;
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
-compute incremental stats functional_hbase.alltypes;
----- RESULTS
-'Updated 1 partition(s) and 13 column(s).'
----- TYPES
-STRING
-====
----- QUERY
 # Check that dropping a column still allows stats to be computed
 create table compute_stats_db.incremental_drop_column (a int, b int, c int)
 partitioned by (d int);

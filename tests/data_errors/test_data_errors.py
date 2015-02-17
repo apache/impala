@@ -74,7 +74,7 @@ class TestHBaseDataErrors(TestDataErrors):
   def add_test_dimensions(cls):
     super(TestHBaseDataErrors, cls).add_test_dimensions()
 
-    # Only run on delimited text with no compression.
+    # Only run on hbase.
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'hbase' and\
         v.get_value('table_format').compression_codec == 'none')

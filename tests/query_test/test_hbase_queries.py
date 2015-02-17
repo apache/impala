@@ -30,6 +30,15 @@ class TestHBaseQueries(ImpalaTestSuite):
   def test_hbase_subquery(self, vector):
     self.run_test_case('QueryTest/hbase-subquery', vector)
 
+  def test_hbase_inline_views(self, vector):
+    self.run_test_case('QueryTest/hbase-inline-view', vector)
+
+  def test_hbase_top_n(self, vector):
+    self.run_test_case('QueryTest/hbase-top-n', vector)
+
+  def test_hbase_limits(self, vector):
+    self.run_test_case('QueryTest/hbase-limit', vector)
+
   @pytest.mark.execute_serially
   def test_hbase_inserts(self, vector):
     self.run_test_case('QueryTest/hbase-inserts', vector)

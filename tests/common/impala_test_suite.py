@@ -52,6 +52,7 @@ IMPALAD_HS2_HOST_PORT =\
 HIVE_HS2_HOST_PORT = pytest.config.option.hive_server2
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 HDFS_CONF = HdfsConfig(pytest.config.option.minicluster_xml_conf)
+TARGET_FILESYSTEM = os.getenv("TARGET_FILESYSTEM") or "hdfs"
 
 # Base class for Impala tests. All impala test cases should inherit from this class
 class ImpalaTestSuite(BaseTestSuite):
@@ -400,9 +401,16 @@ class ImpalaTestSuite(BaseTestSuite):
       for tf in pytest.config.option.table_formats.split(','):
         dataset = get_dataset_from_workload(cls.get_workload())
         table_formats.append(TableFormatInfo.create_from_string(dataset, tf))
-      return TestDimension('table_format', *table_formats)
+      tf_dimensions = TestDimension('table_format', *table_formats)
     else:
-      return load_table_info_dimension(cls.get_workload(), exploration_strategy)
+      tf_dimensions = load_table_info_dimension(cls.get_workload(), exploration_strategy)
+    # If the filesystem is either isilon or s3, we don't need the hbase dimension.
+    if TARGET_FILESYSTEM.lower() in ['s3', 'isilon']:
+      for tf_dimension in tf_dimensions:
+        if tf_dimension.value.file_format == "hbase":
+          tf_dimensions.remove(tf_dimension)
+          break
+    return tf_dimensions
 
   @classmethod
   def __create_exec_option_dimension(cls):
