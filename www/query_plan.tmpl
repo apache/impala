@@ -1,0 +1,168 @@
+<!--
+Copyright 2012- Cloudera Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+{{> www/common-header.tmpl }}
+
+</div>
+
+<div class="container" style="width:1200px;margin:0 auto;">
+
+<style id="css">
+.node rect {
+  stroke: #333;
+  fill: #fff;
+}
+
+.edgePath path {
+  stroke: #333;
+  fill: #333;
+  stroke-width: 1.5px;
+}
+</style>
+
+{{> www/query_detail_tabs.tmpl }}
+
+<h3>Plan</h3>
+
+<svg style="border: 1px solid darkgray" width=1200 height=600 class="panel"><g/></svg>
+
+{{> www/common-footer.tmpl }}
+
+<script src="www/d3.v3.min.js" charset="utf-8"></script>
+<script src="www/dagre-d3.min.js"></script>
+
+<!-- Builds and then renders a plan graph using Dagre / D3. The JSON for the current query
+is retrieved by an HTTP call, and then the graph of nodes and edges is built by walking
+over each plan fragment in turn. Plan fragments are connected wherever a node has a
+data_stream_target attribute. -->
+
+<script>
+document.getElementById("plan-tab").className = "active";
+
+var g = new dagreD3.graphlib.Graph().setGraph({rankDir: "BT"});
+
+var svg = d3.select("svg");
+var inner = svg.select("g");
+
+// Set up zoom support
+var zoom = d3.behavior.zoom().on("zoom", function() {
+  inner.attr("transform", "translate(" + d3.event.translate + ")" +
+             "scale(" + d3.event.scale + ")");
+});
+svg.call(zoom);
+
+// Set of colours to use, with the same colour used for every node in the same plan
+// fragment.
+var colours = ["#A9A9A9", "#FF8C00", "#8A2BE2", "#A52A2A", "#00008B", "#006400",
+               "#228B22", "#4B0082", "#DAA520", "#008B8B", "#000000", "#DC143C"]
+
+// Recursively build a list of edges and states that comprise the plan graph
+function build(node, parent, edges, states, colour_idx) {
+  states.push({ "name": node["label"],
+                "detail": node["label_detail"],
+                "num_instances": node["num_instances"],
+                "num_active": node["num_active"],
+                "max_time": node["max_time"],
+                "avg_time": node["avg_time"],
+                "style": "fill: " + colours[colour_idx]});
+  if (parent != null) {
+    edges.push({ start: node["label"], end: parent,
+                 style: { label: "" + node["output_card"] }});
+  }
+  // Add an inter-fragment edge. We use a red dashed line to show that rows are crossing
+  // the fragment boundary.
+  if (node["data_stream_target"]) {
+    edges.push({ "start": node["label"],
+                 "end": node["data_stream_target"],
+                 "style": { label: "" + node["output_card"],
+                            style: "stroke: #f66; stroke-dasharray: 5, 5;"}});
+  }
+  for (var i = 0; i < node["children"].length; ++i) {
+    build(node["children"][i], node["label"], edges, states, colour_idx);
+  }
+}
+
+var is_first = true;
+function renderGraph(ignored_arg) {
+  if (req.status != 200) return;
+  var json = JSON.parse(req.responseText);
+  var plan = json["plan_json"];
+
+  var states = []
+  var edges = []
+  var colour_idx = 0;
+
+  plan["plan_nodes"].forEach(function(parent) {
+    build(parent, null, edges, states, colour_idx);
+    // Pick a new colour for each plan fragment
+    colour_idx = (colour_idx + 1) % colours.length;
+  });
+  states.forEach(function(state) {
+    // Build the label for the node from the name and the detail
+    var html = "<span>" + state.name + "</span><br/>";
+    html += "<span>" + state.detail + "</span><br/>";
+    html += "<span>" + state.num_instances + " instance";
+    if (state.num_instances > 1) {
+      html += "s";
+    }
+    html += "</span><br/>";
+    html += "<span>Max: " + state.max_time + ", avg: " + state.avg_time + "</span>";
+    g.setNode(state.name, { "label": html,
+                            "labelType": "html",
+                            "style": state.style }); });
+
+  edges.forEach(function(edge) {
+    g.setEdge(edge.start, edge.end, edge.style);
+  });
+
+  g.nodes().forEach(function(v) {
+    var node = g.node(v);
+    node.rx = node.ry = 5;
+  });
+
+  // Create the renderer
+  var render = new dagreD3.render();
+
+  // Run the renderer. This is what draws the final graph.
+  render(inner, g);
+
+  // Center the graph, but only the first time through (so as to not lose user zooms).
+  if (is_first) {
+    var initialScale = 0.75;
+    zoom.translate([(svg.attr("width") - g.graph().width * initialScale) / 2, 20])
+      .scale(initialScale)
+      .event(svg);
+    svg.attr('height', Math.max(g.graph().height * initialScale + 40, 600));
+    is_first = false;
+  }
+
+}
+
+// Called periodically, fetches the plan JSON from Impala and passes it to renderGraph()
+// for display.
+function refresh() {
+  req = new XMLHttpRequest();
+  req.onload = renderGraph;
+  req.open("GET", "/query_plan?query_id={{query_id}}&json", true);
+  req.send();
+}
+
+// Force one refresh before starting the timer.
+refresh();
+
+setInterval(refresh, 1000);
+
+</script>

@@ -422,7 +422,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
       rapidjson::Document* document);
 
   // Json callback for /query_profile. Expects query_id as an argument, produces Json with
-  // 'profile' set to the profile string.
+  // 'profile' set to the profile string, and 'query_id' set to the query ID.
   void QueryProfileUrlCallback(const Webserver::ArgumentMap& args,
       rapidjson::Document* document);
 
@@ -434,8 +434,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   //   "id": <...>,
   //   "state": "FINISHED"
   // }
-  void QuerySummaryCallback(const Webserver::ArgumentMap& args,
-      rapidjson::Document* document);
+  // If include_plan_json is true, 'plan_json' will be set to a JSON representation of the
+  // query plan. If include_summary is true, 'summary' will be a text rendering of the
+  // query summary.
+  void QuerySummaryCallback(bool include_plan_json, bool include_summary,
+      const Webserver::ArgumentMap& args, rapidjson::Document* document);
 
   // Webserver callback. Cancels an in-flight query and writes the result to 'contents'.
   void CancelQueryUrlCallback(const Webserver::ArgumentMap& args,
@@ -575,6 +578,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     TExecSummary exec_summary;
 
     Status query_status;
+
+    // Save the query plan fragments so that the plan tree can be rendered on the debug
+    // webpages.
+    vector<TPlanFragment> fragments;
 
     // Initialise from an exec_state. If copy_profile is true, print the query
     // profile to a string and copy that into this.profile (which is expensive),

@@ -28,11 +28,10 @@ line parameter.</p>
     <th>Statement</th>
     <th>Query Type</th>
     <th>Start Time</th>
-    <th>Backend Progress</th>
+    <th>Scan Progress</th>
     <th>State</th>
     <th># rows fetched</th>
-    <th>Profile</th>
-    <th>Summary</th>
+    <th>Details</th>
     <th>Action</th>
   </tr>
 {{#in_flight_queries}}
@@ -45,8 +44,7 @@ line parameter.</p>
     <td>{{progress}}</td>
     <td>{{state}}</td>
     <td>{{rows_fetched}}</td>
-    <td><a href='/query_profile?query_id={{query_id}}'>Profile</a></td>
-    <td><a href='/query_summary?query_id={{query_id}}'>Summary</a></td>
+    <td><a href='/query_plan?query_id={{query_id}}'>Details</a></td>
     <td><a href='/cancel_query?query_id={{query_id}}'>Cancel</a></td>
   </tr>
 {{/in_flight_queries}}
@@ -62,11 +60,10 @@ line parameter.</p>
     <th>Query Type</th>
     <th>Start Time</th>
     <th>End Time</th>
-    <th>Backend Progress</th>
+    <th>Scan Progress</th>
     <th>State</th>
     <th># rows fetched</th>
-    <th>Profile</th>
-    <th>Summary</th>
+    <th>Details</th>
   </tr>
 {{#completed_queries}}
   <tr>
@@ -79,8 +76,7 @@ line parameter.</p>
     <td>{{progress}}</td>
     <td>{{state}}</td>
     <td>{{rows_fetched}}</td>
-    <td><a href='/query_profile?query_id={{query_id}}'>Profile</a></td>
-    <td><a href='/query_summary?query_id={{query_id}}'>Summary</a></td>
+    <td><a href='/query_plan?query_id={{query_id}}'>Details</a></td>
   </tr>
 {{/completed_queries}}
 </table>

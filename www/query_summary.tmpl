@@ -16,14 +16,8 @@ limitations under the License.
 
 {{> www/common-header.tmpl }}
 
-<!-- Enable the 'highlight' library, which does syntax highlighting of query
-     statements -->
-<link rel="stylesheet" href="www/highlight/styles/default.css">
-<script src="www/highlight/highlight.pack.js"></script>
-<script>hljs.initHighlightingOnLoad();</script>
+{{> www/query_detail_tabs.tmpl }}
 
-<h3>Query <tt>{{query_id}}</tt></h3>
-<h4><em>Status:</em> <span id="status">{{status}}</span></h4>
 <div>
   <label>
     <input type="checkbox" checked="true" id="toggle" onClick="toggleRefresh()"/>
@@ -31,14 +25,11 @@ limitations under the License.
   </label>  Last updated: <span id="last-updated"></span>
 </div>
 
-<pre><code>{{stmt}}</code></pre>
-
 <h3>Exec Summary</h3>
 <pre id="summary">{{summary}}</pre>
-<h3>Plan</h3>
-<pre>{{plan}}</pre>
 
 <script>
+document.getElementById("summary-tab").className = "active";
 
 // Periodically refreshes the summary details
 function refresh() {
@@ -61,7 +52,7 @@ function refresh() {
 }
 
 document.getElementById("last-updated").textContent = new Date();
-intervalId = setInterval(refresh, 1000);
+var intervalId = setInterval(refresh, 1000);
 
 function toggleRefresh() {
   if (document.getElementById("toggle").checked == true) {
@@ -72,7 +63,6 @@ function toggleRefresh() {
     document.getElementById("refresh_on").textContent = "Auto-refresh off";
   }
 }
-
 </script>
 
 {{> www/common-footer.tmpl}}

@@ -445,4 +445,3 @@ Status DiskIoMgr::ScanRange::ReadFromCache(bool* read_succeeded) {
   ++reader_->num_used_buffers_;
   return Status::OK;
 }
-

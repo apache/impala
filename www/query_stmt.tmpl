@@ -1,0 +1,37 @@
+{{?__raw__}}{{{profile}}}{{/__raw__}}
+
+{{^__raw__}}
+
+<!--
+Copyright 2012- Cloudera Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+{{> www/common-header.tmpl }}
+
+{{> www/query_detail_tabs.tmpl }}
+
+<!-- Enable the 'highlight' library, which does syntax highlighting of query
+     statements -->
+<link rel="stylesheet" href="www/highlight/styles/default.css">
+<script src="www/highlight/highlight.pack.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+
+{{?stmt}}<pre><code>{{stmt}}</code></pre>{{/stmt}}
+
+<script>
+document.getElementById("stmt-tab").className = "active";
+</script>
+{{> www/common-footer.tmpl }}
+
+{{/__raw__}}

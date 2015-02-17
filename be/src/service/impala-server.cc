@@ -1312,6 +1312,9 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
       encoded_profile_str = encoded_profile;
     }
   }
+
+  // Save the query fragments so that the plan can be visualised.
+  fragments = exec_state.exec_request().query_exec_request.fragments;
 }
 
 bool ImpalaServer::QueryStateRecord::operator() (

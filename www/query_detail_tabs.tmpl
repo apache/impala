@@ -1,0 +1,10 @@
+<h3>Query <tt>{{query_id}}</tt></h3>
+{{?status}}<h4><em>Status:</em> <span id="status">{{status}}</span></h4>{{/status}}
+
+<ul class="nav nav-tabs">
+  <li id="plan-tab" role="presentation"><a href="/query_plan?query_id={{query_id}}">Plan</a></li>
+  <li id="stmt-tab" role="presentation"><a href="/query_stmt?query_id={{query_id}}">Query</a></li>
+  <li id="plan-text-tab" role="presentation"><a href="/query_plan_text?query_id={{query_id}}">Text plan</a></li>
+  <li id="summary-tab" role="presentation"><a href="/query_summary?query_id={{query_id}}">Summary</a></li>
+  <li id="profile-tab" role="presentation"><a href="/query_profile?query_id={{query_id}}">Profile</a></li>
+</ul>
