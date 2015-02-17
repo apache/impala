@@ -703,3 +703,51 @@ SELECT COUNT(*), COUNT(DISTINCT string2) FROM imp1016Large
 ---- TYPES
 bigint,bigint
 ====
+---- QUERY
+# Tests that renaming a table with column stats across databases
+# preserves table and column stats, and allows the renamed table
+# to be dropped (IMPALA-1711/HIVE-9720).
+create table alter_table_test_db.mv (x int, y string);
+insert into alter_table_test_db.mv values(1, 'a'), (2, 'b'), (NULL, NULL);
+compute stats alter_table_test_db.mv;
+alter table alter_table_test_db.mv rename to alter_table_test_db2.mv2;
+invalidate metadata alter_table_test_db2.mv2
+---- RESULTS
+====
+---- QUERY
+show tables in alter_table_test_db like '%mv%'
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+show tables in alter_table_test_db2 like '%mv%'
+---- RESULTS
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats alter_table_test_db2.mv2
+---- RESULTS
+3,1,'14B','NOT CACHED','NOT CACHED','TEXT','false'
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show column stats alter_table_test_db2.mv2
+---- RESULTS
+'x','INT',2,-1,4,4
+'y','STRING',2,-1,1,1
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+====
+---- QUERY
+drop table alter_table_test_db2.mv2
+---- RESULTS
+====
+---- QUERY
+show tables in alter_table_test_db2 like '%mv%'
+---- RESULTS
+---- TYPES
+STRING
+====

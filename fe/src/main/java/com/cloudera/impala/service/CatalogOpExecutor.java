@@ -153,7 +153,9 @@ public class CatalogOpExecutor {
 
   private final CatalogServiceCatalog catalog_;
 
-  // Lock used to synchronize metastore CREATE/DROP/ALTER TABLE/DATABASE requests.
+  // Lock used to ensure that in-place modifications to cached table/db objects in
+  // catalog_ and the corresponding RPC to apply the change in the HMS are atomic.
+  // Such modifications are done for CREATE/DROP/ALTER TABLE/DATABASE requests.
   private final Object metastoreDdlLock_ = new Object();
   private static final Logger LOG = Logger.getLogger(CatalogOpExecutor.class);
 
@@ -1503,8 +1505,10 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Renames an existing table or view. After renaming the table/view,
-   * its metadata is marked as invalid and will be reloaded on the next access.
+   * Renames an existing table or view. Saves, drops and restores the column stats for
+   * tables renamed across databases to work around HIVE-9720/IMPALA-1711.
+   * After renaming the table/view, its metadata is marked as invalid and will be
+   * reloaded on the next access.
    */
   private void alterTableOrViewRename(TableName tableName, TableName newTableName,
       TDdlExecResponse response)
@@ -1513,10 +1517,45 @@ public class CatalogOpExecutor {
       org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tableName);
       msTbl.setDbName(newTableName.getDb());
       msTbl.setTableName(newTableName.getTbl());
+
       MetaStoreClient msClient = catalog_.getMetaStoreClient();
       try {
+        // Workaround for HIVE-9720/IMPALA-1711: When renaming a table with column stats
+        // across databases, we save, drop and restore the column stats because the HMS
+        // does not properly move them to the new table via alteration. The following
+        // block needs to be protected by the metastoreDdlLock_ to avoid conflicts with
+        // concurrent DDL on this same table (e.g., drop+add table with same db/name).
+        ColumnStatistics hmsColStats = null;
+        if (!msTbl.getTableType().equalsIgnoreCase(TableType.VIRTUAL_VIEW.toString()) &&
+            !tableName.getDb().equalsIgnoreCase(newTableName.getDb())) {
+          Table oldTbl = getExistingTable(tableName.getDb(), tableName.getTbl());
+          Map<String, TColumnStats> colStats = Maps.newHashMap();
+          for (Column c: oldTbl.getColumns()) {
+            colStats.put(c.getName(), c.getStats().toThrift());
+          }
+          hmsColStats = createHiveColStats(colStats, oldTbl);
+          // Set the new db/table.
+          hmsColStats.setStatsDesc(
+              new ColumnStatisticsDesc(true, newTableName.getDb(), newTableName.getTbl()));
+
+          LOG.trace(String.format("Dropping column stats for table %s being " +
+              "renamed to %s to workaround HIVE-9720.",
+              tableName.toString(), newTableName.toString()));
+          // Delete all column stats of the original table from the HMS.
+          msClient.getHiveClient().deleteTableColumnStatistics(
+              tableName.getDb(), tableName.getTbl(), null);
+        }
+
+        // Perform the table rename in any case.
         msClient.getHiveClient().alter_table(
             tableName.getDb(), tableName.getTbl(), msTbl);
+
+        if (hmsColStats != null) {
+          LOG.trace(String.format("Restoring column stats for table %s being " +
+              "renamed to %s to workaround HIVE-9720.",
+              tableName.toString(), newTableName.toString()));
+          msClient.getHiveClient().updateTableColumnStatistics(hmsColStats);
+        }
       } catch (TException e) {
         throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "alter_table"), e);
