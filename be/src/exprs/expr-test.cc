@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <string>
+#include <map>
 #include <math.h>
 
 #include <boost/assign/list_of.hpp>
@@ -94,10 +95,11 @@ string LiteralToString<double, double>(double val) {
 
 class ExprTest : public testing::Test {
  protected:
-  // Maps from enum value of primitive integer type to
-  // the minimum value that is outside of the next smaller-resolution type.
-  // For example the value for type TYPE_SMALLINT is numeric_limits<int8_t>::max()+1.
-  typedef unordered_map<int, int64_t> IntValMap;
+  // Maps from enum value of primitive integer type to the minimum value that is
+  // outside of the next smaller-resolution type. For example the value for type
+  // TYPE_SMALLINT is numeric_limits<int8_t>::max()+1. There is a GREATEST test in
+  // the MathFunctions tests that requires this to be an ordered map.
+  typedef map<int, int64_t> IntValMap;
   IntValMap min_int_values_;
 
   // Maps from primitive float type to smallest positive value that is larger
@@ -105,11 +107,10 @@ class ExprTest : public testing::Test {
   typedef unordered_map<int, double> FloatValMap;
   FloatValMap min_float_values_;
 
-  // Maps from enum value of primitive type to
-  // a string representation of a default value for testing.
-  // For int and float types the strings represent
-  // the corresponding min values (in the maps above).
-  // For non-numeric types the default values are listed below.
+  // Maps from enum value of primitive type to a string representation of a default
+  // value for testing. For int and float types the strings represent the corresponding
+  // min values (in the maps above). For non-numeric types the default values are listed
+  // below.
   unordered_map<int, string> default_type_strs_;
   string default_bool_str_;
   string default_string_str_;
@@ -939,7 +940,7 @@ TEST_F(ExprTest, ArithmeticExprs) {
       min_int_values_[TYPE_BIGINT], TYPE_BIGINT);
 
   // Test behavior of INT_DIVIDE and MOD with zero as second argument.
-  unordered_map<int, int64_t>::iterator int_iter;
+  IntValMap::iterator int_iter;
   for(int_iter = min_int_values_.begin(); int_iter != min_int_values_.end();
       ++int_iter) {
     string& val = default_type_strs_[int_iter->first];
@@ -1365,7 +1366,7 @@ TEST_F(ExprTest, BetweenPredicate) {
 // Tests with NULLs are in the FE QueryTest.
 TEST_F(ExprTest, InPredicate) {
   // Test integers.
-  unordered_map<int, int64_t>::iterator int_iter;
+  IntValMap::iterator int_iter;
   for(int_iter = min_int_values_.begin(); int_iter != min_int_values_.end();
       ++int_iter) {
     string& val = default_type_strs_[int_iter->first];
@@ -2141,7 +2142,7 @@ TEST_F(ExprTest, UtilityFunctions) {
   expected = HashUtil::FnvHash64(s.data(), s.size(), HashUtil::FNV_SEED);
   TestValue("fnv_hash('')", TYPE_BIGINT, expected);
 
-  unordered_map<int, int64_t>::iterator int_iter;
+  IntValMap::iterator int_iter;
   for(int_iter = min_int_values_.begin(); int_iter != min_int_values_.end();
       ++int_iter) {
     ColumnType t = ColumnType(static_cast<PrimitiveType>(int_iter->first));
@@ -2518,7 +2519,7 @@ TEST_F(ExprTest, MathFunctions) {
     string val_str = lexical_cast<string>(entry.second);
     val_list.append(", " + val_str);
     PrimitiveType t = static_cast<PrimitiveType>(entry.first);
-    // TestValue<int64_t>("least(" + val_list + ")", t, 0);
+    TestValue<int64_t>("least(" + val_list + ")", t, 0);
   }
   // Test double type.
   TestValue<double>("least(0.0, cast(-2.0 as double), 1.0)", TYPE_DOUBLE, -2.0f);
@@ -2567,13 +2568,14 @@ TEST_F(ExprTest, MathFunctions) {
   TestValue("greatest(0, -2, 1)", TYPE_TINYINT, 1);
   TestValue<float>("greatest(cast(2.0 as float), 2.0, 1.0, 1.0)", TYPE_FLOAT, 2.0f);
   TestValue<float>("greatest(cast(0.0 as float), -2.0, 1.0)", TYPE_FLOAT, 1.0f);
-  // Test all int types.
+  // Test all int types. A list of values will be built, each iteration adds a bigger
+  // value. This requires min_int_values_ to be an ordered map.
   val_list = "0";
   BOOST_FOREACH(IntValMap::value_type& entry, min_int_values_) {
     string val_str = lexical_cast<string>(entry.second);
     val_list.append(", " + val_str);
     PrimitiveType t = static_cast<PrimitiveType>(entry.first);
-    // TestValue<int64_t>("greatest(" + val_list + ")", t, entry.second);
+    TestValue<int64_t>("greatest(" + val_list + ")", t, entry.second);
   }
   // Test double type.
   TestValue<double>("greatest(cast(0.0 as float), cast(-2.0 as double), 1.0)",
@@ -3560,7 +3562,7 @@ TEST_F(ExprTest, ConditionalFunctions) {
 
   // Test all int types in then and else exprs.
   // Also tests implicit casting in all exprs.
-  unordered_map<int, int64_t>::iterator int_iter;
+  IntValMap::iterator int_iter;
   for (int_iter = min_int_values_.begin(); int_iter != min_int_values_.end();
       ++int_iter) {
     PrimitiveType t = static_cast<PrimitiveType>(int_iter->first);
