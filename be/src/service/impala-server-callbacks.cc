@@ -448,7 +448,7 @@ void PlanToJsonHelper(const map<TPlanNodeId, TPlanNodeExecSummary>& summaries,
     int64_t total_time = 0;
     BOOST_FOREACH(const TExecStats& stat, summary->second.exec_stats) {
       if (summary->second.is_broadcast) {
-        // Avoid multiple-cardinalitying for recipients of broadcasts.
+        // Avoid multiple-counting for recipients of broadcasts.
         cardinality = ::max(cardinality, stat.cardinality);
       } else {
         cardinality += stat.cardinality;
@@ -464,8 +464,9 @@ void PlanToJsonHelper(const map<TPlanNodeId, TPlanNodeExecSummary>& summaries,
     }
 
     const string& max_time_str = PrettyPrinter::Print(max_time, TUnit::TIME_NS);
-    Value max_time_val(max_time_str.c_str(), document->GetAllocator());
-    value->AddMember("max_time", max_time_val, document->GetAllocator());
+    Value max_time_str_json(max_time_str.c_str(), document->GetAllocator());
+    value->AddMember("max_time", max_time_str_json, document->GetAllocator());
+    value->AddMember("max_time_val", max_time, document->GetAllocator());
 
     // Round to the nearest ns, to workaround a bug in pretty-printing a fraction of a
     // ns. See IMPALA-1800.
@@ -473,8 +474,8 @@ void PlanToJsonHelper(const map<TPlanNodeId, TPlanNodeExecSummary>& summaries,
         // A bug may occasionally cause 1-instance nodes to appear to have 0 instances.
         total_time / ::max(static_cast<int>(summary->second.exec_stats.size()), 1),
         TUnit::TIME_NS);
-    Value avg_time_val(avg_time_str.c_str(), document->GetAllocator());
-    value->AddMember("avg_time", avg_time_val, document->GetAllocator());
+    Value avg_time_str_json(avg_time_str.c_str(), document->GetAllocator());
+    value->AddMember("avg_time", avg_time_str_json, document->GetAllocator());
   }
 
   int num_children = (*it)->num_children;
