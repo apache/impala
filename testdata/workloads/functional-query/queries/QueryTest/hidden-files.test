@@ -1,0 +1,19 @@
+====
+---- QUERY
+show partitions hidden_files_db.hf
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS
+---- RESULTS
+'2010','1',-1,1,'20.36KB','NOT CACHED','NOT CACHED','TEXT','false'
+'2010','2',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false'
+'Total','',-1,1,'20.36KB','0B','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+select count(*) from hidden_files_db.hf
+---- RESULTS
+310
+---- TYPES
+BIGINT
+====

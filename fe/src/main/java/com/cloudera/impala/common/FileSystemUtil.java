@@ -199,8 +199,12 @@ public class FileSystemUtil {
   }
 
   public static boolean isHiddenFile(String fileName) {
-    // Hidden files start with . or _
-    return fileName.startsWith(".") || fileName.startsWith("_");
+    // Hidden files start with '.' or '_'. The '.copying' suffix is used by some
+    // filesystem utilities (e.g. hdfs put) as a temporary destination when copying
+    // files. The '.tmp' suffix is Flume's default for temporary files.
+    String lcFileName = fileName.toLowerCase();
+    return lcFileName.startsWith(".") || lcFileName.startsWith("_") ||
+        lcFileName.endsWith(".copying") || lcFileName.endsWith(".tmp");
   }
 
   /**
