@@ -377,7 +377,7 @@ Status DiskIoMgr::ScanRange::Read(char* buffer, int64_t* bytes_read, bool* eosr)
       if (last_read == -1) {
         return Status(GetHdfsErrorMsg("Error reading from HDFS file: ", file_));
       } else if (last_read == 0) {
-        // No more bytes in the file.  The scan range went past the end
+        // No more bytes in the file. The scan range went past the end.
         *eosr = true;
         break;
       }

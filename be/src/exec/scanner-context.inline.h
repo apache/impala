@@ -159,10 +159,6 @@ inline bool ScannerContext::Stream::ReadZLong(int64_t* value, Status* status) {
   return true;
 }
 
-inline bool ScannerContext::Stream::eof() const {
-  return file_offset() == file_desc_->file_length;
-}
-
 #undef RETURN_IF_FALSE
 
 #endif

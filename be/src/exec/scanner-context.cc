@@ -59,6 +59,7 @@ ScannerContext::Stream* ScannerContext::AddStream(DiskIoMgr::ScanRange* range) {
   Stream* stream = state_->obj_pool()->Add(new Stream(this));
   stream->scan_range_ = range;
   stream->file_desc_ = scan_node_->GetFileDesc(stream->filename());
+  stream->file_len_ = stream->file_desc_->file_length;
   stream->total_bytes_returned_ = 0;
   stream->io_buffer_pos_ = NULL;
   stream->io_buffer_ = NULL;
@@ -157,6 +158,12 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
   ++parent_->scan_node_->num_owned_io_buffers_;
   io_buffer_pos_ = reinterpret_cast<uint8_t*>(io_buffer_->buffer());
   io_buffer_bytes_left_ = io_buffer_->len();
+  if (io_buffer_->len() == 0) {
+    file_len_ = file_offset() + boundary_buffer_bytes_left_;
+    VLOG_FILE << "Unexpectedly read 0 bytes from file=" << filename() << " table="
+              << parent_->scan_node_->hdfs_table()->name()
+              << ". Setting expected file length=" << file_len_;
+  }
   return Status::OK;
 }
 

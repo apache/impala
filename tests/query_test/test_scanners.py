@@ -10,6 +10,7 @@
 import logging
 import pytest
 from copy import deepcopy
+from subprocess import call
 
 from testdata.common import widetable
 from tests.common.test_vector import *
@@ -218,3 +219,58 @@ class TestScanRangeLengths(ImpalaTestSuite):
     vector.get_value('exec_option')['max_scan_range_length'] =\
         vector.get_value('max_scan_range_length')
     self.run_test_case('QueryTest/hdfs-tiny-scan', vector)
+
+class TestScanTruncatedFiles(ImpalaTestSuite):
+  TEST_DB = 'test_truncated_file'
+
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestScanTruncatedFiles, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+
+    # This test takes about a minute to complete due to the Hive commands that are
+    # executed. To cut down on runtime, limit the test to exhaustive exploration
+    # strategy.
+    # TODO: Test other file formats
+    if cls.exploration_strategy() == 'exhaustive':
+      cls.TestMatrix.add_constraint(lambda v:\
+          v.get_value('table_format').file_format == 'text' and\
+          v.get_value('table_format').compression_codec == 'none')
+    else:
+      cls.TestMatrix.add_constraint(lambda v: False)
+
+  def setup_method(self, method):
+    self.cleanup_db(TestScanTruncatedFiles.TEST_DB)
+    self.client.execute("create database %s" % TestScanTruncatedFiles.TEST_DB)
+
+  def teardown_method(self, method):
+    self.cleanup_db(TestScanTruncatedFiles.TEST_DB)
+
+  def test_scan_truncated_file_empty(self, vector):
+    self.scan_truncated_file(0)
+
+  def test_scan_truncated_file(self, vector):
+    self.scan_truncated_file(10)
+
+  def scan_truncated_file(self, num_rows):
+    db_name = TestScanTruncatedFiles.TEST_DB
+    tbl_name = "tbl"
+    self.execute_query("use %s" % db_name)
+    self.execute_query("create table %s (s string)" % tbl_name)
+    call(["hive", "-e", "INSERT OVERWRITE TABLE %s.%s SELECT string_col from "\
+        "functional.alltypes" % (db_name, tbl_name)])
+
+    # Update the Impala metadata
+    self.execute_query("refresh %s" % tbl_name)
+
+    # Insert overwrite with a truncated file
+    call(["hive", "-e", "INSERT OVERWRITE TABLE %s.%s SELECT string_col from "\
+        "functional.alltypes limit %s" % (db_name, tbl_name, num_rows)])
+
+    result = self.execute_query("select count(*) from %s" % tbl_name)
+    assert(len(result.data) == 1)
+    assert(result.data[0] == str(num_rows))

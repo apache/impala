@@ -108,11 +108,12 @@ class ScannerContext {
     // Return the number of bytes left in the range for this stream.
     int64_t bytes_left() { return scan_range_->len() - total_bytes_returned_; }
 
-    // If true, all bytes in this scan range have been returned
-    bool eosr() const { return total_bytes_returned_ >= scan_range_->len(); }
+    // If true, all bytes in this scan range have been returned or we have reached eof
+    // (the scan range could be longer than the file).
+    bool eosr() const { return total_bytes_returned_ >= scan_range_->len() || eof(); }
 
     // If true, the stream has reached the end of the file.
-    bool eof() const;
+    bool eof() const { return file_offset() == file_len_; }
 
     const char* filename() { return scan_range_->file(); }
     const DiskIoMgr::ScanRange* scan_range() { return scan_range_; }
@@ -170,6 +171,10 @@ class ScannerContext {
 
     // Total number of bytes returned from GetBytes()
     int64_t total_bytes_returned_;
+
+    // File length. Initialized with file_desc_->file_length but updated if eof is found
+    // earlier, i.e. the file was truncated.
+    int64_t file_len_;
 
     ReadPastSizeCallback read_past_size_cb_;
 
