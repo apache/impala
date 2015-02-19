@@ -95,7 +95,8 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
     // TODO: This parameter has an U-shaped effect on performance: increasing the value
     // would first improves performance, but further increasing would degrade performance.
     // Investigate and tune this.
-    max_materialized_row_batches_ = 10 * DiskInfo::num_disks();
+    max_materialized_row_batches_ =
+        10 * (DiskInfo::num_disks() + DiskIoMgr::REMOTE_NUM_DISKS);
   }
   materialized_row_batches_.reset(new RowBatchQueue(max_materialized_row_batches_));
 }
@@ -187,15 +188,7 @@ DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(
   DCHECK_GE(len, 0);
   DCHECK_LE(offset + len, GetFileDesc(file)->file_length)
       << "Scan range beyond end of file (offset=" << offset << ", len=" << len << ")";
-  if (disk_id == -1) {
-    // disk id is unknown, assign it a random one.
-    static int next_disk_id = 0;
-    disk_id = next_disk_id++;
-  }
-
-  // TODO: we need to parse the config for the number of dirs configured for this
-  // data node.
-  disk_id %= runtime_state_->io_mgr()->num_disks();
+  disk_id = runtime_state_->io_mgr()->AssignQueue(file, disk_id, expected_local);
 
   ScanRangeMetadata* metadata =
       runtime_state_->obj_pool()->Add(new ScanRangeMetadata(partition_id));
@@ -401,7 +394,9 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
       file_desc = file_desc_it->second;
     }
 
-    if ((*scan_range_params_)[i].volume_id == -1) {
+    bool expected_local = (*scan_range_params_)[i].__isset.is_remote &&
+        !(*scan_range_params_)[i].is_remote;
+    if (expected_local && (*scan_range_params_)[i].volume_id == -1) {
       if (!unknown_disk_id_warned_) {
         AddRuntimeExecOption("Missing Volume Id");
         runtime_state()->LogError(
@@ -413,8 +408,6 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
     }
 
     bool try_cache = (*scan_range_params_)[i].is_cached;
-    bool expected_local = (*scan_range_params_)[i].__isset.is_remote &&
-                          !(*scan_range_params_)[i].is_remote;
     if (runtime_state_->query_options().disable_cached_reads) {
       DCHECK(!try_cache) << "Params should not have had this set.";
     }
@@ -604,8 +597,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   max_compressed_text_file_length_ = runtime_profile()->AddHighWaterMarkCounter(
       "MaxCompressedTextFileLength", TUnit::BYTES);
 
-  // Create num_disks+1 bucket counters
-  for (int i = 0; i < state->io_mgr()->num_disks() + 1; ++i) {
+  for (int i = 0; i < state->io_mgr()->num_total_disks() + 1; ++i) {
     hdfs_read_thread_concurrency_bucket_.push_back(
         pool_->Add(new RuntimeProfile::Counter(TUnit::DOUBLE_VALUE, 0)));
   }

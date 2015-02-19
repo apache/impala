@@ -39,13 +39,14 @@ namespace impala {
 
 class MemTracker;
 
-// Manager object that schedules IO for all queries on all disks. Each query maps
-// to one or more RequestContext objects, each of which has its own queue of scan ranges
-// and/or write ranges.
+// Manager object that schedules IO for all queries on all disks and remote filesystems
+// (such as S3). Each query maps to one or more RequestContext objects, each of which
+// has its own queue of scan ranges and/or write ranges.
+//
 // The API splits up requesting scan/write ranges (non-blocking) and reading the data
 // (blocking). The DiskIoMgr has worker threads that will read from and write to
-// disk/hdfs, allowing interleaving of IO and CPU. This allows us to keep all disks
-// and all cores as busy as possible.
+// disk/hdfs/remote-filesystems, allowing interleaving of IO and CPU. This allows us to
+// keep all disks and all cores as busy as possible.
 //
 // All public APIs are thread-safe. It is not valid to call any of the APIs after
 // UnregisterContext() returns.
@@ -160,6 +161,15 @@ class MemTracker;
 // With cached scan ranges, we cannot close the scan range until the cached buffer
 // is returned (HDFS does not allow this). We therefore need to defer the close until
 // the cached buffer is returned (BufferDescriptor::Return()).
+//
+// Remote filesystem support (e.g. S3):
+// Remote filesystems are modeled as "remote disks". That is, there is a seperate disk
+// queue for each supported remote filesystem type. In order to maximize throughput,
+// multiple connections are opened in parallel by having multiple threads running per
+// queue. Also note that reading from a remote filesystem service can be more CPU
+// intensive than local disk/hdfs because of non-direct I/O and SSL processing, and can
+// be CPU bottlenecked especially if not enough I/O threads for these queues are
+// started.
 //
 // TODO: IoMgr should be able to request additional scan ranges from the coordinator
 // to help deal with stragglers.
@@ -333,6 +343,9 @@ class DiskIoMgr {
     // Validates the internal state of this range. lock_ must be taken
     // before calling this.
     bool Validate();
+
+    // Maximum length in bytes for hdfsRead() calls.
+    int64_t MaxReadChunkSize() const;
 
     // Opens the file for this range. This function only modifies state in this range.
     Status Open();
@@ -534,6 +547,12 @@ class DiskIoMgr {
   // range *cannot* have already been added via AddScanRanges.
   Status Read(RequestContext* reader, ScanRange* range, BufferDescriptor** buffer);
 
+  // Determine which disk queue this file should be assigned to.  Returns an index into
+  // disk_queues_.  The disk_id is the volume ID for the local disk that holds the
+  // files, or -1 if unknown.  Flag expected_local is true iff this impalad is
+  // co-located with the datanode for this file.
+  int AssignQueue(const char* file, int disk_id, bool expected_local);
+
   // TODO: The functions below can be moved to RequestContext.
   // Returns the current status of the context.
   Status context_status(RequestContext* context) const;
@@ -561,8 +580,17 @@ class DiskIoMgr {
   // Returns the maximum read buffer size
   int max_read_buffer_size() const { return max_buffer_size_; }
 
-  // Returns the number of disks on the system
-  int num_disks() const { return disk_queues_.size(); }
+  // Returns the total number of disk queues (both local and remote).
+  int num_total_disks() const { return disk_queues_.size(); }
+
+  // Returns the total number of remote "disk" queues.
+  int num_remote_disks() const { return REMOTE_NUM_DISKS; }
+
+  // Returns the number of local disks attached to the system.
+  int num_local_disks() const { return num_total_disks() - num_remote_disks(); }
+
+  // The disk ID (and therefore disk_queues_ index) used for S3 accesses.
+  int RemoteS3DiskId() const { return num_local_disks() + REMOTE_S3_DISK_OFFSET; }
 
   // Returns the number of allocated buffers.
   int num_allocated_buffers() const { return num_allocated_buffers_; }
@@ -580,6 +608,13 @@ class DiskIoMgr {
   // Default ready buffer queue capacity. This constant doesn't matter too much
   // since the system dynamically adjusts.
   static const int DEFAULT_QUEUE_CAPACITY;
+
+  // "Disk" queue offsets for remote accesses.  Offset 0 corresponds to
+  // disk ID (i.e. disk_queue_ index) of num_local_disks().
+  enum {
+    REMOTE_S3_DISK_OFFSET = 0,
+    REMOTE_NUM_DISKS
+  };
 
  private:
   friend class BufferDescriptor;
@@ -651,8 +686,9 @@ class DiskIoMgr {
   // Total number of buffers in readers
   AtomicInt<int> num_buffers_in_readers_;
 
-  // Per disk queues. This is static and created once at Init() time.
-  // One queue is allocated for each disk on the system and indexed by disk id
+  // Per disk queues. This is static and created once at Init() time.  One queue is
+  // allocated for each local disk on the system and for each remote filesystem type.
+  // It is indexed by disk id.
   std::vector<DiskQueue*> disk_queues_;
 
   // Returns the index into free_buffers_ for a given buffer size

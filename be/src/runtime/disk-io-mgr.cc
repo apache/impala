@@ -14,6 +14,7 @@
 
 #include "runtime/disk-io-mgr.h"
 #include "runtime/disk-io-mgr-internal.h"
+#include "util/hdfs-util.h"
 
 #include <gutil/strings/substitute.h>
 #include <boost/algorithm/string.hpp>
@@ -28,13 +29,18 @@ using namespace strings;
 // Control the number of disks on the machine.  If 0, this comes from the system
 // settings.
 DEFINE_int32(num_disks, 0, "Number of disks on data node.");
-// Default IoMgr configs.
+// Default IoMgr configs:
 // The maximum number of the threads per disk is also the max queue depth per disk.
+DEFINE_int32(num_threads_per_disk, 0, "number of threads per disk");
+// The maximum number of S3 I/O threads. The default value of 16 was chosen emperically
+// to maximize S3 throughput. Maximum throughput is achieved with multiple connections
+// open to S3 and use of multiple CPU cores since S3 reads are relatively compute
+// expensive (SSL and JNI buffer overheads).
+DEFINE_int32(num_s3_io_threads, 16, "number of S3 I/O threads");
 // The read size is the size of the reads sent to hdfs/os.
 // There is a trade off of latency and throughout, trying to keep disks busy but
 // not introduce seeks.  The literature seems to agree that with 8 MB reads, random
 // io and sequential io perform similarly.
-DEFINE_int32(num_threads_per_disk, 0, "number of threads per disk");
 DEFINE_int32(read_size, 8 * 1024 * 1024, "Read Size (in bytes)");
 DEFINE_int32(min_buffer_size, 1024, "The minimum read buffer size (in bytes)");
 
@@ -80,7 +86,7 @@ class DiskIoMgr::RequestContextCache {
       inactive_contexts_.pop_front();
       return reader;
     } else {
-      RequestContext* reader = new RequestContext(io_mgr_, io_mgr_->num_disks());
+      RequestContext* reader = new RequestContext(io_mgr_, io_mgr_->num_total_disks());
       all_contexts_.push_back(reader);
       return reader;
     }
@@ -220,13 +226,12 @@ DiskIoMgr::DiskIoMgr() :
     read_timer_(TUnit::TIME_NS) {
   int64_t max_buffer_size_scaled = BitUtil::Ceil(max_buffer_size_, min_buffer_size_);
   free_buffers_.resize(BitUtil::Log2(max_buffer_size_scaled) + 1);
-  int num_disks = FLAGS_num_disks;
-  if (num_disks == 0) num_disks = DiskInfo::num_disks();
-  disk_queues_.resize(num_disks);
+  int num_local_disks = FLAGS_num_disks == 0 ? DiskInfo::num_disks() : FLAGS_num_disks;
+  disk_queues_.resize(num_local_disks + REMOTE_NUM_DISKS);
   CheckSseSupport();
 }
 
-DiskIoMgr::DiskIoMgr(int num_disks, int threads_per_disk, int min_buffer_size,
+DiskIoMgr::DiskIoMgr(int num_local_disks, int threads_per_disk, int min_buffer_size,
                      int max_buffer_size) :
     num_threads_per_disk_(threads_per_disk),
     max_buffer_size_(max_buffer_size),
@@ -237,8 +242,8 @@ DiskIoMgr::DiskIoMgr(int num_disks, int threads_per_disk, int min_buffer_size,
     read_timer_(TUnit::TIME_NS) {
   int64_t max_buffer_size_scaled = BitUtil::Ceil(max_buffer_size_, min_buffer_size_);
   free_buffers_.resize(BitUtil::Log2(max_buffer_size_scaled) + 1);
-  if (num_disks == 0) num_disks = DiskInfo::num_disks();
-  disk_queues_.resize(num_disks);
+  if (num_local_disks == 0) num_local_disks = DiskInfo::num_disks();
+  disk_queues_.resize(num_local_disks + REMOTE_NUM_DISKS);
   CheckSseSupport();
 }
 
@@ -297,13 +302,15 @@ Status DiskIoMgr::Init(MemTracker* process_mem_tracker) {
 
   for (int i = 0; i < disk_queues_.size(); ++i) {
     disk_queues_[i] = new DiskQueue(i);
-    int num_threads_per_disk = num_threads_per_disk_;
-    if (num_threads_per_disk == 0) {
-      if (DiskInfo::is_rotational(i)) {
-        num_threads_per_disk = THREADS_PER_ROTATIONAL_DISK;
-      } else {
-        num_threads_per_disk = THREADS_PER_FLASH_DISK;
-      }
+    int num_threads_per_disk;
+    if (i == RemoteS3DiskId()) {
+      num_threads_per_disk = FLAGS_num_s3_io_threads;
+    } else if (num_threads_per_disk_ != 0) {
+      num_threads_per_disk = num_threads_per_disk_;
+    } else if (DiskInfo::is_rotational(i)) {
+      num_threads_per_disk = THREADS_PER_ROTATIONAL_DISK;
+    } else {
+      num_threads_per_disk = THREADS_PER_FLASH_DISK;
     }
     for (int j = 0; j < num_threads_per_disk; ++j) {
       stringstream ss;
@@ -1099,4 +1106,20 @@ Status DiskIoMgr::AddWriteRange(RequestContext* writer, WriteRange* write_range)
 
   writer->AddRequestRange(write_range, false);
   return Status::OK;
+}
+
+int DiskIoMgr::AssignQueue(const char* file, int disk_id, bool expected_local) {
+  // TODO: add a queue for remote HDFS accesses.
+  if (IsS3APath(file)) {
+    DCHECK(!expected_local);
+    return RemoteS3DiskId();
+  }
+  if (disk_id == -1) {
+    // disk id is unknown, assign it a random one.
+    static int next_disk_id = 0;
+    disk_id = next_disk_id++;
+  }
+  // TODO: we need to parse the config for the number of dirs configured for this
+  // data node.
+  return disk_id % num_local_disks();
 }

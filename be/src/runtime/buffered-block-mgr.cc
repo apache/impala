@@ -648,9 +648,9 @@ Status BufferedBlockMgr::WriteUnpinnedBlock(Block* block) {
     if (disk_id < 0) {
       // Assign a valid disk id to the write range if the tmp file was not assigned one.
       static unsigned int next_disk_id = 0;
-      disk_id = (++next_disk_id) % io_mgr_->num_disks();
+      disk_id = ++next_disk_id;
     }
-    disk_id %= io_mgr_->num_disks();
+    disk_id %= io_mgr_->num_local_disks();
     DiskIoMgr::WriteRange::WriteDoneCallback callback =
         bind(mem_fn(&BufferedBlockMgr::WriteComplete), this, block, _1);
     block->write_range_ = obj_pool_.Add(new DiskIoMgr::WriteRange(

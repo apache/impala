@@ -339,6 +339,20 @@ void DiskIoMgr::ScanRange::Close() {
   }
 }
 
+int64_t DiskIoMgr::ScanRange::MaxReadChunkSize() const {
+  // S3 InputStreams don't support DIRECT_READ (i.e. java.nio.ByteBuffer read()
+  // interface).  So, hdfsRead() needs to allocate a Java byte[] and copy the data out.
+  // Profiles show that both the JNI array allocation and the memcpy adds much more
+  // overhead for larger buffers, so limit the size of each read request.  128K was
+  // chosen empirically by trying values between 4K and 8M and optimizing for lower CPU
+  // utilization and higher S3 througput.
+  if (disk_id_ == io_mgr_->RemoteS3DiskId()) {
+    DCHECK(IsS3APath(file()));
+    return 128 * 1024;
+  }
+  return numeric_limits<int64_t>::max();
+}
+
 // TODO: how do we best use the disk here.  e.g. is it good to break up a
 // 1MB read into 8 128K reads?
 // TODO: look at linux disk scheduling
@@ -348,15 +362,18 @@ Status DiskIoMgr::ScanRange::Read(char* buffer, int64_t* bytes_read, bool* eosr)
 
   *eosr = false;
   *bytes_read = 0;
+  // hdfsRead() length argument is an int.  Since max_buffer_size_ type is no bigger
+  // than an int, this min() will ensure that we don't overflow the length argument.
+  DCHECK_LE(sizeof(io_mgr_->max_buffer_size_), sizeof(int));
   int bytes_to_read =
       min(static_cast<int64_t>(io_mgr_->max_buffer_size_), len_ - bytes_read_);
 
   if (fs_ != NULL) {
-    DCHECK(hdfs_file_ != NULL);
-    // TODO: why is this loop necessary? Can hdfs reads come up short?
+    DCHECK_NOTNULL(hdfs_file_);
+    int64_t max_chunk_size = MaxReadChunkSize();
     while (*bytes_read < bytes_to_read) {
-      int last_read = hdfsRead(fs_, hdfs_file_, buffer + *bytes_read,
-          bytes_to_read - *bytes_read);
+      int chunk_size = min(bytes_to_read - *bytes_read, max_chunk_size);
+      int last_read = hdfsRead(fs_, hdfs_file_, buffer + *bytes_read, chunk_size);
       if (last_read == -1) {
         return Status(GetHdfsErrorMsg("Error reading from HDFS file: ", file_));
       } else if (last_read == 0) {
