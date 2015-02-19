@@ -30,6 +30,7 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/lib-cache.h"
 #include "runtime/client-cache.h"
+#include "service/impala-server.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
 #include "util/dynamic-util.h"
@@ -299,6 +300,19 @@ Java_com_cloudera_impala_service_FeSupport_NativePrioritizeLoad(
   return result_bytes;
 }
 
+extern "C"
+JNIEXPORT jbyteArray JNICALL
+Java_com_cloudera_impala_service_FeSupport_NativeGetStartupOptions(JNIEnv* env,
+    jclass caller_class) {
+  TStartupOptions options;
+  ExecEnv* exec_env = ExecEnv::GetInstance();
+  ImpalaServer* impala_server = exec_env->impala_server();
+  options.__set_compute_lineage(impala_server->IsLineageLoggingEnabled());
+  jbyteArray result_bytes = NULL;
+  THROW_IF_ERROR_RET(SerializeThriftMsg(env, &options, &result_bytes), env,
+                     JniUtil::internal_exc_class(), result_bytes);
+  return result_bytes;
+}
 
 namespace impala {
 
@@ -322,6 +336,10 @@ static JNINativeMethod native_methods[] = {
   {
     (char*)"NativePrioritizeLoad", (char*)"([B)[B",
     (void*)::Java_com_cloudera_impala_service_FeSupport_NativePrioritizeLoad
+  },
+  {
+    (char*)"NativeGetStartupOptions", (char*)"()[B",
+    (void*)::Java_com_cloudera_impala_service_FeSupport_NativeGetStartupOptions
   },
 };
 

@@ -231,3 +231,4 @@ Status Frontend::SetCatalogInitialized() {
   RETURN_ERROR_IF_EXC(jni_env);
   return Status::OK;
 }
+

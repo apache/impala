@@ -14,21 +14,41 @@
 
 package com.cloudera.impala.common;
 
+import java.lang.System;
+
+import com.cloudera.impala.thrift.TStartupOptions;
+import com.cloudera.impala.service.FeSupport;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Contains runtime-specific parameters such as the number of CPU cores. Currently only
  * used in Plan cost estimation. The static RuntimeEnv members can be set so that tests
  * can rely on a machine-independent RuntimeEnv.
  */
 public class RuntimeEnv {
+  private final static Logger LOG = LoggerFactory.getLogger(RuntimeEnv.class);
+
   public static RuntimeEnv INSTANCE = new RuntimeEnv();
 
   private int numCores_;
+
+  // Indicates if column lineage information should be computed for each query.
+  private boolean computeLineage_;
 
   // Indicates whether this is an environment for testing.
   private boolean isTestEnv_;
 
   public RuntimeEnv() {
     reset();
+    try {
+      TStartupOptions opts = FeSupport.GetStartupOptions();
+      computeLineage_ = opts.compute_lineage;
+    } catch (InternalException e) {
+      LOG.error("Error retrieving BE startup options. Shutting down JVM");
+      System.exit(1);
+    }
   }
 
   /**
@@ -42,5 +62,6 @@ public class RuntimeEnv {
   public void setNumCores(int numCores) { this.numCores_ = numCores; }
   public void setTestEnv(boolean v) { isTestEnv_ = v; }
   public boolean isTestEnv() { return isTestEnv_; }
+  public boolean computeLineage() { return computeLineage_; }
 
 }

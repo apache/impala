@@ -23,7 +23,7 @@ import com.google.common.collect.Lists;
 /**
  * Integer ids that cannot accidentally be compared with ints.
  */
-public class Id<IdType extends Id<IdType>> {
+public class Id<IdType extends Id<IdType>> implements Comparable<Id<IdType>> {
   static protected int INVALID_ID = -1;
   protected final int id_;
 
@@ -50,6 +50,11 @@ public class Id<IdType extends Id<IdType>> {
     // only ids of the same subclass are comparable
     if (obj.getClass() != this.getClass()) return false;
     return ((Id)obj).id_ == id_;
+  }
+
+  @Override
+  public int compareTo(Id<IdType> cmp) {
+    return id_ - cmp.id_;
   }
 
   public ArrayList<IdType> asList() {

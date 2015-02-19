@@ -445,8 +445,9 @@ public class UnionStmt extends QueryStmt {
       // don't do that if the operand computes analytic exprs
       // (see Planner.createInlineViewPlan() for the reasoning)
       for (UnionOperand op: operands_) {
-        if (op.hasAnalyticExprs()) continue;
         Expr resultExpr = op.getQueryStmt().getBaseTblResultExprs().get(i);
+        slotDesc.addSourceExpr(resultExpr);
+        if (op.hasAnalyticExprs()) continue;
         SlotRef slotRef = resultExpr.unwrapSlotRef(true);
         if (slotRef == null) continue;
         analyzer.registerValueTransfer(outputSlotRef.getSlotId(), slotRef.getSlotId());

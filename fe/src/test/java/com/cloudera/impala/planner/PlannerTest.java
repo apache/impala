@@ -143,6 +143,11 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testLineage() {
+    runPlannerTestFile("lineage");
+  }
+
+  @Test
   public void testDdl() {
     runPlannerTestFile("ddl");
   }

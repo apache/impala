@@ -912,6 +912,11 @@ public class Frontend {
     queryExecRequest.setQuery_plan(explainString.toString());
     queryExecRequest.setDesc_tbl(analysisResult.getAnalyzer().getDescTbl().toThrift());
 
+    String jsonLineageGraph = analysisResult.getJsonLineageGraph();
+    if (jsonLineageGraph != null && !jsonLineageGraph.isEmpty()) {
+      queryExecRequest.setLineage_graph(jsonLineageGraph);
+    }
+
     if (analysisResult.isExplainStmt()) {
       // Return the EXPLAIN request
       createExplainRequest(explainString.toString(), result);

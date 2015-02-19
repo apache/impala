@@ -65,7 +65,8 @@ public class TestFileParser {
     PARTITIONS,
     SETUP,
     ERRORS,
-    SCANRANGELOCATIONS;
+    SCANRANGELOCATIONS,
+    LINEAGE;
 
     // Return header line for this section
     public String getHeader() {
@@ -177,7 +178,8 @@ public class TestFileParser {
      */
     public boolean isValid() {
       return !getQuery().isEmpty() && (!getSectionContents(Section.PLAN).isEmpty() ||
-          !getSectionContents(Section.DISTRIBUTEDPLAN).isEmpty());
+          !getSectionContents(Section.DISTRIBUTEDPLAN).isEmpty() ||
+          !getSectionContents(Section.LINEAGE).isEmpty());
     }
   }
 

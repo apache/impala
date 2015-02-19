@@ -209,6 +209,7 @@ public abstract class QueryStmt extends StatementBase {
         materializedDesc.setType(origSlotDesc.getType());
       }
       materializedDesc.setLabel(origSlotDesc.getLabel());
+      materializedDesc.setSourceExprs(origSlotDesc.getSourceExprs());
       materializedDesc.setStats(ColumnStats.fromExpr(origSlotRef));
       SlotRef cloneRef = new SlotRef(materializedDesc);
       substOrderBy.put(origSlotRef, cloneRef);

@@ -159,6 +159,7 @@ public class Analyzer {
     public final AuthorizationConfig authzConfig;
     public final DescriptorTable descTbl = new DescriptorTable();
     public final IdGenerator<ExprId> conjunctIdGenerator = ExprId.createGenerator();
+    public final ColumnLineageGraph lineageGraph;
 
     // True if we are analyzing an explain request. Should be set before starting
     // analysis.
@@ -276,6 +277,7 @@ public class Analyzer {
       this.catalog = catalog;
       this.queryCtx = queryCtx;
       this.authzConfig = authzConfig;
+      this.lineageGraph = new ColumnLineageGraph();
     }
   };
 
@@ -641,6 +643,7 @@ public class Analyzer {
       TupleDescriptor tupleDesc) {
     SlotDescriptor result = globalState_.descTbl.addSlotDescriptor(tupleDesc);
     globalState_.blockBySlot.put(result.getId(), this);
+    result.setSourceExprs(srcSlotDesc.getSourceExprs());
     result.setLabel(srcSlotDesc.getLabel());
     result.setStats(srcSlotDesc.getStats());
     if (srcSlotDesc.getColumn() != null) {
@@ -1966,6 +1969,11 @@ public class Analyzer {
   public TQueryCtx getQueryCtx() { return globalState_.queryCtx; }
   public AuthorizationConfig getAuthzConfig() { return globalState_.authzConfig; }
   public ListMap<TNetworkAddress> getHostIndex() { return globalState_.hostIndex; }
+  public ColumnLineageGraph getColumnLineageGraph() { return globalState_.lineageGraph; }
+  public String getSerializedLineageGraph() {
+    Preconditions.checkNotNull(globalState_.lineageGraph);
+    return globalState_.lineageGraph.toJson();
+  }
 
   public ImmutableList<PrivilegeRequest> getPrivilegeReqs() {
     return ImmutableList.copyOf(globalState_.privilegeReqs);
@@ -2140,6 +2148,9 @@ public class Analyzer {
 
   public List<Expr> getConjuncts() {
     return new ArrayList<Expr>(globalState_.conjuncts.values());
+  }
+  public Expr getConjunct(ExprId exprId) {
+    return globalState_.conjuncts.get(exprId);
   }
 
   public int incrementCallDepth() { return ++callDepth_; }

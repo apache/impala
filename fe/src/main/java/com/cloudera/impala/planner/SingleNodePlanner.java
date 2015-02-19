@@ -649,6 +649,7 @@ public class SingleNodePlanner {
     for (int i = 0; i < resultExprs.size(); ++i) {
       SlotDescriptor slotDesc = analyzer.addSlotDescriptor(tupleDesc);
       slotDesc.setLabel(colLabels.get(i));
+      slotDesc.setSourceExpr(resultExprs.get(i));
       slotDesc.setType(resultExprs.get(i).getType());
       slotDesc.setStats(ColumnStats.fromExpr(resultExprs.get(i)));
       slotDesc.setIsMaterialized(true);

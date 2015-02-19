@@ -98,6 +98,7 @@ public abstract class AggregateInfoBase {
       Expr expr = exprs.get(i);
       SlotDescriptor slotDesc = analyzer.addSlotDescriptor(result);
       slotDesc.setLabel(expr.toSql());
+      slotDesc.setSourceExpr(expr);
       slotDesc.setStats(ColumnStats.fromExpr(expr));
       Preconditions.checkState(expr.getType().isValid());
       slotDesc.setType(expr.getType());
@@ -114,8 +115,10 @@ public abstract class AggregateInfoBase {
         FunctionCallExpr aggExpr = (FunctionCallExpr)expr;
         if (aggExpr.isMergeAggFn()) {
           slotDesc.setLabel(aggExpr.getChild(0).toSql());
+          slotDesc.setSourceExpr(aggExpr.getChild(0));
         } else {
           slotDesc.setLabel(aggExpr.toSql());
+          slotDesc.setSourceExpr(aggExpr);
         }
 
         // count(*) is non-nullable.

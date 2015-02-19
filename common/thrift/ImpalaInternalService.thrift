@@ -146,6 +146,9 @@ struct TClientRequest {
 
   // query options
   2: required TQueryOptions query_options
+
+  // Redacted SQL stmt
+  3: optional string redacted_stmt
 }
 
 // Context of this query, including the client request, session state and

@@ -171,6 +171,7 @@ public class InlineViewRef extends TableRef {
       String colName = getColLabels().get(i);
       Expr colExpr = queryStmt_.getResultExprs().get(i);
       SlotDescriptor slotDesc = analyzer.registerColumnRef(getAliasAsName(), colName);
+      slotDesc.setSourceExpr(colExpr);
       slotDesc.setStats(ColumnStats.fromExpr(colExpr));
       SlotRef slotRef = new SlotRef(slotDesc);
       smap_.put(slotRef, colExpr);

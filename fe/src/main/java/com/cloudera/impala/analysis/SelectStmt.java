@@ -249,6 +249,16 @@ public class SelectStmt extends QueryStmt {
       analyzer.setHasEmptyResultSet();
     }
 
+    ColumnLineageGraph graph = analyzer.getColumnLineageGraph();
+    if (aggInfo_ != null && !aggInfo_.getAggregateExprs().isEmpty()) {
+      graph.addDependencyPredicates(aggInfo_.getGroupingExprs());
+    }
+    if (sortInfo_ != null && hasLimit()) {
+      // When there is a LIMIT clause in conjunction with an ORDER BY, the ordering exprs
+      // must be added in the column lineage graph.
+      graph.addDependencyPredicates(sortInfo_.getOrderingExprs());
+    }
+
     if (aggInfo_ != null) LOG.debug("post-analysis " + aggInfo_.debugString());
   }
 
@@ -693,7 +703,8 @@ public class SelectStmt extends QueryStmt {
 
     // change select list and ordering exprs to point to analytic output. We need
     // to reanalyze the exprs at this point.
-    resultExprs_ = Expr.substituteList(resultExprs_, analyticInfo_.getSmap(), analyzer, false);
+    resultExprs_ = Expr.substituteList(resultExprs_, analyticInfo_.getSmap(), analyzer,
+        false);
     LOG.trace("post-analytic selectListExprs: " + Expr.debugString(resultExprs_));
     if (sortInfo_ != null) {
       sortInfo_.substituteOrderingExprs(analyticInfo_.getSmap(), analyzer);

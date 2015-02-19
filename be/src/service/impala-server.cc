@@ -114,6 +114,14 @@ DEFINE_string(audit_event_log_dir, "", "The directory in which audit event log f
 DEFINE_bool(abort_on_failed_audit_event, true, "Shutdown Impala if there is a problem "
     "recording an audit event.");
 
+DEFINE_int32(max_lineage_log_file_size, 5000, "The maximum size (in queries) of "
+    "the lineage event log file before a new one is created (if lineage logging is "
+    "enabled)");
+DEFINE_string(lineage_event_log_dir, "", "The directory in which lineage event log "
+    "files are written. Setting this flag with enable lineage logging.");
+DEFINE_bool(abort_on_failed_lineage_event, true, "Shutdown Impala if there is a problem "
+    "recording a lineage record.");
+
 DEFINE_string(profile_log_dir, "", "The directory in which profile log files are"
     " written. If blank, defaults to <log_file_dir>/profiles");
 DEFINE_int32(max_profile_log_file_size, 5000, "The maximum size (in queries) of the "
@@ -149,11 +157,12 @@ DECLARE_bool(compact_catalog_topic);
 
 namespace impala {
 
-// Prefix of profile and event log filenames. The version number is
+// Prefix of profile, event and lineage log filenames. The version number is
 // internal, and does not correspond to an Impala release - it should
 // be changed only when the file format changes.
 const string PROFILE_LOG_FILE_PREFIX = "impala_profile_log_1.0-";
 const string AUDIT_EVENT_LOG_FILE_PREFIX = "impala_audit_event_log_1.0-";
+const string LINEAGE_LOG_FILE_PREFIX = "impala_lineage_log_1.0-";
 
 const uint32_t MAX_CANCELLATION_QUEUE_SIZE = 65536;
 
@@ -237,6 +246,12 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     exit(1);
   }
 
+  if (!InitLineageLogging().ok()) {
+    LOG(ERROR) << "Aborting Impala Server startup due to failure initializing "
+               << "lineage logging";
+    exit(1);
+  }
+
   if (!FLAGS_authorized_proxy_user_config.empty()) {
     // Parse the proxy user configuration using the format:
     // <proxy user>=<comma separated list of users they are allowed to delegate>
@@ -308,6 +323,37 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   }
 
   exec_env_->SetImpalaServer(this);
+}
+
+Status ImpalaServer::LogLineageRecord(const TExecRequest& request) {
+  if (!request.__isset.query_exec_request) return Status::OK;
+  if (!request.query_exec_request.__isset.lineage_graph) return Status::OK;
+  Status status = lineage_logger_->AppendEntry(request.query_exec_request.lineage_graph);
+  if (!status.ok()) {
+    LOG(ERROR) << "Unable to record query lineage record: " << status.GetErrorMsg();
+    if (FLAGS_abort_on_failed_lineage_event) {
+      LOG(ERROR) << "Shutting down Impala Server due to abort_on_failed_lineage_event=true";
+      exit(1);
+    }
+  }
+  return status;
+}
+
+bool ImpalaServer::IsLineageLoggingEnabled() {
+  return !FLAGS_lineage_event_log_dir.empty();
+}
+
+Status ImpalaServer::InitLineageLogging() {
+  if (!IsLineageLoggingEnabled()) {
+    LOG(INFO) << "Lineage logging is disabled";
+    return Status::OK;
+  }
+  lineage_logger_.reset(new SimpleLogger(FLAGS_lineage_event_log_dir,
+      LINEAGE_LOG_FILE_PREFIX, FLAGS_max_lineage_log_file_size));
+  RETURN_IF_ERROR(lineage_logger_->Init());
+  lineage_logger_flush_thread_.reset(new Thread("impala-server",
+        "lineage-log-flush", &ImpalaServer::LineageLoggerFlushThread, this));
+  return Status::OK;
 }
 
 Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_state,
@@ -504,6 +550,21 @@ void ImpalaServer::AuditEventLoggerFlushThread() {
   }
 }
 
+void ImpalaServer::LineageLoggerFlushThread() {
+  while (true) {
+    sleep(5);
+    Status status = lineage_logger_->Flush();
+    if (!status.ok()) {
+      LOG(ERROR) << "Error flushing lineage event log: " << status.GetErrorMsg();
+      if (FLAGS_abort_on_failed_lineage_event) {
+        LOG(ERROR) << "Shutting down Impala Server due to "
+                   << "abort_on_failed_lineage_event=true";
+        exit(1);
+      }
+    }
+  }
+}
+
 void ImpalaServer::ArchiveQuery(const QueryExecState& query) {
   const string& encoded_profile_str = query.profile().SerializeToArchiveString();
 
@@ -549,6 +610,12 @@ Status ImpalaServer::Execute(TQueryCtx* query_ctx,
   PrepareQueryContext(query_ctx);
   bool registered_exec_state;
   ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES->Increment(1L);
+
+  // Redact the SQL stmt and update the query context
+  string stmt = replace_all_copy(query_ctx->request.stmt, "\n", " ");
+  Redact(&stmt);
+  query_ctx->request.__set_redacted_stmt((const string) stmt);
+
   Status status = ExecuteInternal(*query_ctx, session_state, &registered_exec_state,
       exec_state);
   if (!status.ok() && registered_exec_state) {
@@ -606,6 +673,10 @@ Status ImpalaServer::ExecuteInternal(
 
   if (IsAuditEventLoggingEnabled()) {
     LogAuditRecord(*(exec_state->get()), result);
+  }
+
+  if (IsLineageLoggingEnabled()) {
+    LogLineageRecord(result);
   }
 
   // start execution of query; also starts fragment status reports

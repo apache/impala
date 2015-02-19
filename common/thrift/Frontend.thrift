@@ -355,6 +355,9 @@ struct TQueryExecRequest {
 
   // List of replica hosts.  Used by the host_idx field of TScanRangeLocation.
   12: required list<Types.TNetworkAddress> host_list
+
+  // Column lineage graph serialized into JSON
+  13: optional string lineage_graph
 }
 
 enum TCatalogOpType {
@@ -660,4 +663,9 @@ struct TGetHadoopConfigResponse {
 
 struct TGetAllHadoopConfigsResponse {
   1: optional map<string, string> configs;
+}
+
+// BE startup options
+struct TStartupOptions {
+  1: optional bool compute_lineage
 }

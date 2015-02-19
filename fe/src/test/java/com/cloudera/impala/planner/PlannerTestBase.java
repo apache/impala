@@ -36,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
+import com.cloudera.impala.analysis.ColumnLineageGraph;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
@@ -357,6 +358,7 @@ public class PlannerTestBase {
     // single-node plan and scan range locations
     testSingleNodePlan(testCase, queryCtx, errorLog, actualOutput);
     testDistributedPlan(testCase, queryCtx, errorLog, actualOutput);
+    testColumnLineageOutput(testCase, queryCtx, errorLog, actualOutput);
   }
 
   /**
@@ -465,6 +467,62 @@ public class PlannerTestBase {
     }
   }
 
+  private void testColumnLineageOutput(TestCase testCase, TQueryCtx queryCtx,
+      StringBuilder errorLog, StringBuilder actualOutput) throws CatalogException {
+    ArrayList<String> expectedLineage = testCase.getSectionContents(Section.LINEAGE);
+    if (expectedLineage == null || expectedLineage.isEmpty()) return;
+    String query = testCase.getQuery();
+    queryCtx.request.getQuery_options().setNum_nodes(1);
+    queryCtx.request.setStmt(query);
+    StringBuilder explainBuilder = new StringBuilder();
+    TExecRequest execRequest = null;
+    String lineageGraph = null;
+    try {
+      execRequest = frontend_.createExecRequest(queryCtx, explainBuilder);
+      lineageGraph = execRequest.query_exec_request.lineage_graph;
+    } catch (ImpalaException e) {
+      if (e instanceof AnalysisException) {
+        e.printStackTrace();
+        errorLog.append(
+            "query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
+        return;
+      } else if (e instanceof InternalException) {
+        errorLog.append(
+            "query:\n" + query + "\ninternal error: " + e.getMessage() + "\n");
+        return;
+      } if (e instanceof NotImplementedException) {
+        handleNotImplException(query, "", errorLog, actualOutput, e);
+      } else if (e instanceof CatalogException) {
+        throw (CatalogException) e;
+      } else {
+        errorLog.append(
+            "query:\n" + query + "\nunhandled exception: " + e.getMessage() + "\n");
+      }
+    }
+    LOG.info("lineage graph: " + lineageGraph);
+    ArrayList<String> expected =
+        testCase.getSectionContents(Section.LINEAGE);
+    if (expected.size() > 0 && lineageGraph != null) {
+      String serializedGraph = Joiner.on("\n").join(expected);
+      ColumnLineageGraph expectedGraph =
+          ColumnLineageGraph.createFromJSON(serializedGraph);
+      ColumnLineageGraph outputGraph =
+          ColumnLineageGraph.createFromJSON(lineageGraph);
+      if (expectedGraph == null || outputGraph == null ||
+          !outputGraph.equals(expectedGraph)) {
+        StringBuilder lineageError = new StringBuilder();
+        lineageError.append("section " + Section.LINEAGE + " of query:\n"
+            + query + "\n");
+        lineageError.append("Output:\n");
+        lineageError.append(lineageGraph + "\n");
+        lineageError.append("Expected:\n");
+        lineageError.append(serializedGraph + "\n");
+        errorLog.append(lineageError.toString());
+      }
+      actualOutput.append(Section.LINEAGE.getHeader());
+      actualOutput.append(TestUtils.prettyPrintJson(lineageGraph) + "\n");
+    }
+  }
 
   /**
   * Produces distributed plan for testCase and compares actual plan with expected plan.

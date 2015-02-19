@@ -6,6 +6,16 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Scanner;
+import java.util.Map;
+import java.io.StringWriter;
+import java.io.StringReader;
+
+import javax.json.Json;
+import javax.json.stream.JsonGenerator;
+import javax.json.JsonReader;
+import javax.json.JsonObject;
+import javax.json.JsonWriter;
+import javax.json.JsonWriterFactory;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +28,8 @@ import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TSessionState;
 import com.cloudera.impala.thrift.TSessionType;
 import com.cloudera.impala.thrift.TUniqueId;
+
+import com.google.common.collect.Maps;
 
 public class TestUtils {
   private final static Logger LOG = LoggerFactory.getLogger(TestUtils.class);
@@ -201,4 +213,27 @@ public class TestUtils {
     return queryCtx;
   }
 
+  /**
+   * Pretty print a JSON string.
+   */
+  public static String prettyPrintJson(String json) {
+    StringWriter sw = new StringWriter();
+    JsonWriter jsonWriter = null;
+    try {
+      JsonReader jr = Json.createReader(new StringReader(json));
+      JsonObject jobj = jr.readObject();
+      Map<String, Object> properties = Maps.newHashMap();
+      properties.put(JsonGenerator.PRETTY_PRINTING, true);
+      JsonWriterFactory writerFactory = Json.createWriterFactory(properties);
+      jsonWriter = writerFactory.createWriter(sw);
+      jsonWriter.writeObject(jobj);
+    } catch (Exception e) {
+      LOG.error(String.format("Error pretty printing JSON string %s: %s", json,
+        e.getMessage()));
+      return "";
+    } finally {
+      if (jsonWriter != null) jsonWriter.close();
+    }
+    return sw.toString();
+  }
 }

@@ -15,6 +15,7 @@
 package com.cloudera.impala.analysis;
 
 import java.util.List;
+import java.util.Collections;
 
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnStats;
@@ -22,13 +23,17 @@ import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.thrift.TSlotDescriptor;
 import com.google.common.base.Objects;
 import com.google.common.collect.Lists;
+import com.google.common.base.Preconditions;
 
 public class SlotDescriptor {
   private final SlotId id_;
   private final TupleDescriptor parent_;
   private Type type_;
   private Column column_;  // underlying column, if there is one
-  private String label_;  // for SlotRef.toSql() in absence of column name
+  private String label_; // for SlotRef.toSql() in absence of column name
+  // Expr(s) materialized into this slot; multiple exprs for unions. Should be empty if
+  // column_ is set.
+  private List<Expr> sourceExprs_ = Lists.newArrayList();
 
   // if false, this slot doesn't need to be materialized in parent tuple
   // (and physical layout parameters are invalid)
@@ -58,6 +63,7 @@ public class SlotDescriptor {
     type_ = src.type_;
     column_ = src.column_;
     label_ = src.label_;
+    sourceExprs_ = src.sourceExprs_;
     isMaterialized_ = src.isMaterialized_;
     isNullable_ = src.isNullable_;
     byteSize_ = src.byteSize_;
@@ -95,7 +101,11 @@ public class SlotDescriptor {
   public void setByteOffset(int byteOffset) { this.byteOffset_ = byteOffset; }
   public void setSlotIdx(int slotIdx) { this.slotIdx_ = slotIdx; }
   public String getLabel() { return label_; }
-  public void setLabel(String label) { this.label_ = label; }
+  public void setLabel(String label) { label_ = label; }
+  public void setSourceExprs(List<Expr> exprs) { sourceExprs_ = exprs; }
+  public void setSourceExpr(Expr expr) { sourceExprs_ = Collections.singletonList(expr); }
+  public void addSourceExpr(Expr expr) { sourceExprs_.add(expr); }
+  public List<Expr> getSourceExprs() { return sourceExprs_; }
   public void setStats(ColumnStats stats) { this.stats_ = stats; }
 
   public ColumnStats getStats() {

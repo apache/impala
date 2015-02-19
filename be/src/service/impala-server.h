@@ -241,6 +241,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     return is_offline_;
   }
 
+  // Returns true if lineage logging is enabled, false otherwise.
+  bool IsLineageLoggingEnabled();
+
  private:
   friend class ChildQuery;
 
@@ -503,6 +506,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // from being written. If an error is returned, impalad startup will be aborted.
   Status InitAuditEventLogging();
 
+  // Checks settings for lineage logging, including whether the output
+  // directory exists and is writeable, and initialises the first log file.
+  // Returns OK unless there is some problem preventing lineage log files
+  // from being written. If an error is returned, impalad startup will be aborted.
+  Status InitLineageLogging();
+
   // Initializes a logging directory, creating the directory if it does not already
   // exist. If there is any error creating the directory an error will be returned.
   static Status InitLoggingDir(const std::string& log_dir);
@@ -516,7 +525,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Runs once every 5s to flush the audit log file to disk.
   void AuditEventLoggerFlushThread();
 
+  // Runs once every 5s to flush the lineage log file to disk.
+  void LineageLoggerFlushThread();
+
   Status LogAuditRecord(const QueryExecState& exec_state, const TExecRequest& request);
+
+  Status LogLineageRecord(const TExecRequest& request);
 
   // Copies a query's state into the query log. Called immediately prior to a
   // QueryExecState's deletion. Also writes the query profile to the profile log on disk.
@@ -716,11 +730,18 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // "<current timestamp>" : { JSON object }
   boost::scoped_ptr<SimpleLogger> audit_event_logger_;
 
+  // Logger for writing lineage events, one per line with the format:
+  // { JSON object }
+  boost::scoped_ptr<SimpleLogger> lineage_logger_;
+
   // If profile logging is enabled, wakes once every 5s to flush query profiles to disk
   boost::scoped_ptr<Thread> profile_log_file_flush_thread_;
 
   // If audit event logging is enabled, wakes once every 5s to flush audit events to disk
   boost::scoped_ptr<Thread> audit_event_logger_flush_thread_;
+
+  // If lineage logging is enabled, wakes once every 5s to flush lineage events to disk
+  boost::scoped_ptr<Thread> lineage_logger_flush_thread_;
 
   // global, per-server state
   ExecEnv* exec_env_;  // not owned

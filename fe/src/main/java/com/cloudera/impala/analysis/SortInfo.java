@@ -51,6 +51,10 @@ public class SortInfo {
       TupleDescriptor tupleDesc, List<Expr> tupleSlotExprs) {
     sortTupleDesc_ = tupleDesc;
     sortTupleSlotExprs_ = tupleSlotExprs;
+    for (int i = 0; i < sortTupleDesc_.getSlots().size(); ++i) {
+      SlotDescriptor slotDesc = sortTupleDesc_.getSlots().get(i);
+      slotDesc.setSourceExpr(sortTupleSlotExprs_.get(i));
+    }
   }
   public List<Expr> getOrderingExprs() { return orderingExprs_; }
   public List<Boolean> getIsAscOrder() { return isAscOrder_; }

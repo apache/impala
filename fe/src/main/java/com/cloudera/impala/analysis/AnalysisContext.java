@@ -267,6 +267,7 @@ public class AnalysisContext {
     public boolean requiresRewrite() {
       return analyzer_.containsSubquery() && !(stmt_ instanceof CreateViewStmt);
     }
+    public String getJsonLineageGraph() { return analyzer_.getSerializedLineageGraph(); }
   }
 
   /**
