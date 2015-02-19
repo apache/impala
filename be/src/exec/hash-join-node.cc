@@ -48,6 +48,7 @@ HashJoinNode::HashJoinNode(
   DCHECK_NE(join_op_, TJoinOp::LEFT_ANTI_JOIN);
   DCHECK_NE(join_op_, TJoinOp::RIGHT_SEMI_JOIN);
   DCHECK_NE(join_op_, TJoinOp::RIGHT_ANTI_JOIN);
+  DCHECK_NE(join_op_, TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN);
 
   match_all_probe_ =
     (join_op_ == TJoinOp::LEFT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN);

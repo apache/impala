@@ -276,6 +276,7 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       if (tnode.hash_join_node.join_op == TJoinOp::LEFT_ANTI_JOIN ||
           tnode.hash_join_node.join_op == TJoinOp::RIGHT_SEMI_JOIN ||
           tnode.hash_join_node.join_op == TJoinOp::RIGHT_ANTI_JOIN ||
+          tnode.hash_join_node.join_op == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN ||
           FLAGS_enable_partitioned_hash_join) {
         *node = pool->Add(new PartitionedHashJoinNode(pool, tnode, descs));
       } else {
