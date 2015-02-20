@@ -76,7 +76,6 @@ import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.Type;
@@ -506,9 +505,9 @@ public class Frontend {
     Path sourcePath = new Path(request.source_path);
     int filesLoaded = 0;
     if (fs.isDirectory(sourcePath)) {
-      filesLoaded = FileSystemUtil.moveAllVisibleFiles(sourcePath, tmpDestPath);
+      filesLoaded = FileSystemUtil.relocateAllVisibleFiles(sourcePath, tmpDestPath);
     } else {
-      FileSystemUtil.moveFile(sourcePath, tmpDestPath, true);
+      FileSystemUtil.relocateFile(sourcePath, tmpDestPath, true);
       filesLoaded = 1;
     }
 
@@ -518,7 +517,7 @@ public class Frontend {
     }
 
     // Move the files from the temporary location to the final destination.
-    FileSystemUtil.moveAllVisibleFiles(tmpDestPath, destPath);
+    FileSystemUtil.relocateAllVisibleFiles(tmpDestPath, destPath);
     // Cleanup the tmp directory.
     fs.delete(tmpDestPath, true);
     TLoadDataResp response = new TLoadDataResp();
