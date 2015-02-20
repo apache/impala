@@ -177,7 +177,7 @@ Examples of common tasks:
   ./buildall.sh -snapshot_file <file>
 
   # Build, load the hive metastore and the hdfs snapshot, run tests
-  ./buildall.sh -snapshot_file <file> -hive_metastore_snapshot <file>
+  ./buildall.sh -snapshot_file <file> -metastore_snapshot_file <file>
 
   # Build, generate, and incrementally load test data without formatting the mini-cluster
   # (reuses existing data in HDFS if it exists). Can be faster than loading from a
@@ -198,9 +198,11 @@ if [ ${IMPALA_KERBERIZE} -eq 0 ]; then
   NEEDS_RE_SOURCE_NOTE=0
 fi
 
-# Loading on s3 won't work is the metastore snapshot is not provided.
-if [[ ! -n $METASTORE_SNAPSHOT_FILE && "${TARGET_FILESYSTEM}" = "s3" ]]; then
-  echo "The metastore snapshot is required for loading data into s3"
+if [[ "${TARGET_FILESYSTEM}" = "s3" && $TESTDATA_ACTION -eq 1 &&
+      ! -n $METASTORE_SNAPSHOT_FILE ]]
+then
+  # Loading on s3 won't work if the metastore snapshot is not provided.
+  echo "-metastore_snapshot_file <file> is required for loading data into s3"
   exit 1
 fi
 
