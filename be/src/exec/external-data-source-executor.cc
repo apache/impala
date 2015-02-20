@@ -46,13 +46,19 @@ Status ExternalDataSourceExecutor::Init(const string& jar_path,
     {"close", "([B)[B", &close_id_}};
 
   JNIEnv* jni_env = getJNIEnv();
-  external_data_source_executor_class_ =
-    jni_env->FindClass("com/cloudera/impala/extdatasource/ExternalDataSourceExecutor");
+
+  // Add a scoped cleanup jni reference object. This cleans up local refs made below.
+  JniLocalFrame jni_frame;
+  RETURN_IF_ERROR(jni_frame.push(jni_env));
+
+  jclass cl = jni_env->FindClass(
+      "com/cloudera/impala/extdatasource/ExternalDataSourceExecutor");
+  RETURN_ERROR_IF_EXC(jni_env);
+  executor_class_ = reinterpret_cast<jclass>(jni_env->NewGlobalRef(cl));
   RETURN_ERROR_IF_EXC(jni_env);
   uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
   for (int i = 0; i < num_methods; ++i) {
-    RETURN_IF_ERROR(JniUtil::LoadJniMethod(jni_env, external_data_source_executor_class_,
-        &(methods[i])));
+    RETURN_IF_ERROR(JniUtil::LoadJniMethod(jni_env, executor_class_, &(methods[i])));
   }
 
   jstring jar_path_jstr = jni_env->NewStringUTF(local_jar_path.c_str());
@@ -62,12 +68,10 @@ Status ExternalDataSourceExecutor::Init(const string& jar_path,
   jstring api_version_jstr = jni_env->NewStringUTF(api_version.c_str());
   RETURN_ERROR_IF_EXC(jni_env);
 
-  jobject external_data_source_executor = jni_env->NewObject(
-      external_data_source_executor_class_, ctor_, jar_path_jstr, class_name_jstr,
-      api_version_jstr);
+  jobject local_exec = jni_env->NewObject(executor_class_, ctor_, jar_path_jstr,
+      class_name_jstr, api_version_jstr);
   RETURN_ERROR_IF_EXC(jni_env);
-  RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, external_data_source_executor,
-      &external_data_source_executor_));
+  executor_ = jni_env->NewGlobalRef(local_exec);
   RETURN_ERROR_IF_EXC(jni_env);
   is_initialized_ = true;
   return Status::OK;
@@ -94,23 +98,29 @@ Status CallJniMethod(const jobject& obj, const jmethodID& method, const T& arg,
 
 Status ExternalDataSourceExecutor::Open(const TOpenParams& params, TOpenResult* result) {
   DCHECK(is_initialized_);
-  return CallJniMethod(external_data_source_executor_, open_id_, params, result);
+  return CallJniMethod(executor_, open_id_, params, result);
 }
 
 Status ExternalDataSourceExecutor::GetNext(const TGetNextParams& params,
     TGetNextResult* result) {
   DCHECK(is_initialized_);
-  return CallJniMethod(external_data_source_executor_, get_next_id_, params, result);
+  return CallJniMethod(executor_, get_next_id_, params, result);
 }
 
 Status ExternalDataSourceExecutor::Close(const TCloseParams& params,
     TCloseResult* result) {
   DCHECK(is_initialized_);
-  Status status = CallJniMethod(external_data_source_executor_, close_id_, params,
+  Status status = CallJniMethod(executor_, close_id_, params,
       result);
   JNIEnv* env = getJNIEnv();
-  env->DeleteGlobalRef(external_data_source_executor_);
-  status.AddError(JniUtil::GetJniExceptionMsg(env)); // no-op if Status == OK
+  if (executor_ != NULL) {
+    env->DeleteGlobalRef(executor_);
+    status.AddError(JniUtil::GetJniExceptionMsg(env)); // no-op if Status == OK
+  }
+  if (executor_class_ != NULL) {
+    env->DeleteGlobalRef(executor_class_);
+    status.AddError(JniUtil::GetJniExceptionMsg(env));
+  }
   is_initialized_ = false;
   return status;
 }

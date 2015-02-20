@@ -29,7 +29,10 @@ namespace impala {
 // that the initialization can return an error status if an error occurs.
 class ExternalDataSourceExecutor {
  public:
-  ExternalDataSourceExecutor() : is_initialized_(false) { };
+  ExternalDataSourceExecutor()
+      : is_initialized_(false), executor_class_(NULL), executor_(NULL) {
+  };
+
   virtual ~ExternalDataSourceExecutor();
 
   // Initialize the data source library. jar_path is the HDFS location of the jar
@@ -55,10 +58,11 @@ class ExternalDataSourceExecutor {
  private:
   bool is_initialized_; // Set true in Init() to ensure the class is initialized.
 
-  // Descriptor of Java ExternalDataSourceExecutor class, used to create a new instance.
-  jclass external_data_source_executor_class_;
+  // Class reference for com.cloudera.impala.extdatasource.ExternalDataSourceExecutor
+  jclass executor_class_;
+
   // Instance of com.cloudera.impala.extdatasource.ExternalDataSourceExecutor
-  jobject external_data_source_executor_;
+  jobject executor_;
   jmethodID ctor_;
   jmethodID open_id_;  // ExternalDataSourceExecutor.open()
   jmethodID get_next_id_;  // ExternalDataSourceExecutor.getNext()
