@@ -2,11 +2,13 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Functional tests for LOAD DATA statements.
 
+import os
 import pytest
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from subprocess import call
 
+@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestLoadData(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

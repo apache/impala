@@ -3,6 +3,7 @@
 # Injects failures  at specific locations in each of the plan nodes. Currently supports
 # two types of failures - cancellation of the query and a failure test hook.
 #
+import os
 import pytest
 import re
 from copy import copy
@@ -36,6 +37,7 @@ order by int_sum
 # a similar pattern as test_cancellation.py
 QUERY_TYPE = ["SELECT"]
 
+@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestFailpoints(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):
@@ -58,6 +60,10 @@ class TestFailpoints(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestFailpoints, cls).add_test_dimensions()
+    # Executing an explain on the the test query will fail in an enviornment where hbase
+    # tables don't exist (s3). Since this happens before the tests are run, the skipif
+    # marker won't catch it. If 's3' is detected as a file system, return immedietely.
+    if os.getenv("TARGET_FILESYSTEM") == "s3": return
     node_id_map = TestFailpoints.parse_plan_nodes_from_explain_output(QUERY, "functional")
     assert node_id_map
     cls.TestMatrix.add_dimension(TestDimension('location', *FAILPOINT_LOCATION))

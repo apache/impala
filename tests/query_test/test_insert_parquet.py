@@ -3,6 +3,7 @@
 # Targeted Impala insert tests
 #
 import logging
+import os
 import pytest
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
@@ -15,7 +16,7 @@ PARQUET_CODECS = ['none', 'snappy']
 # TODO: these tests take a while so we don't want to go through too many sizes but
 # we should in more exhaustive testing
 PARQUET_FILE_SIZES = [0, 32 * 1024 * 1024]
-
+@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestInsertParquetQueries(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -53,6 +54,7 @@ class TestInsertParquetQueries(ImpalaTestSuite):
         vector.get_value('compression_codec')
     self.run_test_case('insert_parquet', vector, multiple_impalad=True)
 
+@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestInsertParquetInvalidCodec(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -81,6 +83,8 @@ class TestInsertParquetInvalidCodec(ImpalaTestSuite):
     self.run_test_case('QueryTest/insert_parquet_invalid_codec', vector,\
                        multiple_impalad=True)
 
+
+@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestInsertParquetVerifySize(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

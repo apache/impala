@@ -59,6 +59,7 @@ class TestPartitioning(ImpalaTestSuite):
     self.run_test_case('QueryTest/partition-col-types', vector,
         use_db='hdfs_partitioning')
 
+  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
   @pytest.mark.execute_serially
   def test_boolean_partitions(self, vector):
     # This test takes about a minute to complete due to the Hive commands that are

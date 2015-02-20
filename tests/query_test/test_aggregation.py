@@ -3,6 +3,7 @@
 # Validates all aggregate functions across all datatypes
 #
 import logging
+import os
 import pytest
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -94,6 +95,7 @@ class TestAggregationQueries(ImpalaTestSuite):
     if cls.exploration_strategy() == 'core':
       cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
+  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
   @pytest.mark.execute_serially
   def test_non_codegen_tinyint_grouping(self, vector):
     # Regression for IMPALA-901. The test includes an INSERT statement, so can only be run

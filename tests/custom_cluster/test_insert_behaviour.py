@@ -13,11 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
+import os
 import pytest
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.util.hdfs_util import HdfsConfig, get_hdfs_client, get_hdfs_client_from_conf
 
+
+@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
   def check_partition_perms(self, part, perms):
     ls = self.hdfs_client.get_file_dir_status(

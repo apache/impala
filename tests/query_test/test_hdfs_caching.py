@@ -3,6 +3,7 @@
 # Validates limit on scan nodes
 #
 import logging
+import os
 import pytest
 from copy import copy
 from subprocess import call
@@ -14,6 +15,7 @@ from tests.common.test_dimensions import create_exec_option_dimension
 from tests.util.shell_util import exec_process
 
 # End to end test that hdfs caching is working.
+@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestHdfsCaching(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -83,6 +85,7 @@ class TestHdfsCaching(ImpalaTestSuite):
       result = self.execute_query(query_string)
       assert(len(result.data) == 2)
 
+@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestHdfsCachingDdl(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

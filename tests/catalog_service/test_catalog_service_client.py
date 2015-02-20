@@ -32,6 +32,7 @@ from tests.util.thrift_util import create_transport
 
 LOG = logging.getLogger('test_catalog_service_client')
 
+@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestCatalogServiceClient(ImpalaTestSuite):
   TEST_DB = 'catalog_service_client_test_db'
 

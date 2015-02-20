@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import pytest
 import re
 import uuid
@@ -28,6 +29,7 @@ TEST_IDS = xrange(0, 10)
 
 # Simple stress test for DDL operations. Attempts to create, cache,
 # uncache, then drop many different tables in parallel.
+@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestDdlStress(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

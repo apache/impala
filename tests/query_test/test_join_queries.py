@@ -3,6 +3,7 @@
 # Targeted tests for Impala joins
 #
 import logging
+import os
 import pytest
 from copy import copy
 from tests.common.test_vector import *
@@ -34,6 +35,7 @@ class TestJoinQueries(ImpalaTestSuite):
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('QueryTest/joins', new_vector)
 
+  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
   def test_joins_against_hbase(self, vector):
     new_vector = copy(vector)
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
@@ -44,6 +46,7 @@ class TestJoinQueries(ImpalaTestSuite):
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('QueryTest/outer-joins', new_vector)
 
+@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestSemiJoinQueries(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):

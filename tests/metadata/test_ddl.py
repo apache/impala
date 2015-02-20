@@ -82,6 +82,7 @@ class TestDdlStatements(ImpalaTestSuite):
     self.hdfs_client.delete_file_dir("test-warehouse/t1_tmp1/", recursive=True)
     self.hdfs_client.delete_file_dir("test-warehouse/t_part_tmp/", recursive=True)
 
+  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
   @pytest.mark.execute_serially
   def test_drop_cleans_hdfs_dirs(self):
     self.hdfs_client.delete_file_dir("test-warehouse/ddl_test_db.db/", recursive=True)
@@ -105,6 +106,7 @@ class TestDdlStatements(ImpalaTestSuite):
     self.client.execute("drop database ddl_test_db")
     assert not self.hdfs_client.exists("test-warehouse/ddl_test_db.db/")
 
+  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
   @pytest.mark.execute_serially
   def test_create(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
@@ -124,6 +126,7 @@ class TestDdlStatements(ImpalaTestSuite):
     self.client.execute('drop database ddl_test_db')
     assert 'ddl_test_db' not in self.client.execute("show databases").data
 
+  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
   @pytest.mark.execute_serially
   def test_alter_table(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
@@ -145,12 +148,14 @@ class TestDdlStatements(ImpalaTestSuite):
     self.run_test_case('QueryTest/views-ddl', vector, use_db='ddl_test_db',
         multiple_impalad=self.__use_multiple_impalad(vector))
 
+  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
   @pytest.mark.execute_serially
   def test_functions_ddl(self, vector):
     self.__create_db_synced('function_ddl_test', vector)
     self.run_test_case('QueryTest/functions-ddl', vector, use_db='function_ddl_test',
         multiple_impalad=self.__use_multiple_impalad(vector))
 
+  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
   @pytest.mark.execute_serially
   def test_create_drop_function(self, vector):
     # This will create, run, and drop the same function repeatedly, exercising the
@@ -162,6 +167,7 @@ class TestDdlStatements(ImpalaTestSuite):
     self.create_drop_ddl(vector, "udf_test", [create_fn_stmt], [drop_fn_stmt],
         select_stmt)
 
+  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
   @pytest.mark.execute_serially
   def test_create_drop_data_src(self, vector):
     # This will create, run, and drop the same data source repeatedly, exercising

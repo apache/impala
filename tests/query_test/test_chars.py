@@ -2,11 +2,13 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #
 import logging
+import os
 import pytest
 from copy import copy
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 
+@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestStringQueries(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):
@@ -68,6 +70,7 @@ class TestStringQueries(ImpalaTestSuite):
   def test_varchar(self, vector):
     self.run_test_case('QueryTest/chars', vector)
 
+@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestCharFormats(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):

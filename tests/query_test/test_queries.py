@@ -4,6 +4,7 @@
 #
 import copy
 import logging
+import os
 import pytest
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import ImpalaTestSuite
@@ -156,7 +157,6 @@ class TestQueriesTextTables(ImpalaTestSuite):
   def test_mixed_format(self, vector):
     self.run_test_case('QueryTest/mixed-format', vector)
 
+  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
   def test_values(self, vector):
     self.run_test_case('QueryTest/values', vector)
-
-

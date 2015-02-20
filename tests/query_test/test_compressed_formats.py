@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
+import os
 import pytest
 from os.path import join
 from subprocess import call
@@ -102,6 +103,7 @@ class TestCompressedFormats(ImpalaTestSuite):
       call(["hive", "-e", drop_cmd]);
 
 
+@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestTableWriters(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):

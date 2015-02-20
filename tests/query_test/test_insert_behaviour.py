@@ -14,13 +14,15 @@
 # limitations under the License.
 #
 
-from tests.common.impala_test_suite import ImpalaTestSuite
-import time
-import pytest
 import getpass
 import grp
+import os
 import pwd
+import pytest
+import time
+from tests.common.impala_test_suite import ImpalaTestSuite
 
+@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestInsertBehaviour(ImpalaTestSuite):
   """Tests for INSERT behaviour that isn't covered by checking query results"""
 
