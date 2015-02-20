@@ -804,19 +804,20 @@ public class JniFrontend {
   }
 
   /**
-   * Return an empty string if the FileSystem configured in CONF refers to a
-   * DistributedFileSystem (the only one supported by Impala) and Impala can list the root
-   * directory "/". Otherwise, return an error string describing the issues.
+   * Return an empty string if the default FileSystem configured in CONF refers to a
+   * DistributedFileSystem and Impala can list the root directory "/". Otherwise,
+   * return an error string describing the issues.
    */
   private String checkFileSystem(Configuration conf) {
     try {
       FileSystem fs = FileSystem.get(CONF);
       if (!(fs instanceof DistributedFileSystem)) {
-        return "Unsupported filesystem. Impala only supports DistributedFileSystem " +
-            "but the configured filesystem is: " + fs.getClass().getSimpleName() + "." +
+        return "Unsupported default filesystem. The default filesystem must be " +
+            "a DistributedFileSystem but the configured default filesystem is " +
+            fs.getClass().getSimpleName() + ". " +
             CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY +
-            "(" + CONF.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) + ")" +
-            " might be set incorrectly";
+            " (" + CONF.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) + ")" +
+            " might be set incorrectly.";
       }
     } catch (IOException e) {
       return "couldn't retrieve FileSystem:\n" + e.getMessage();
