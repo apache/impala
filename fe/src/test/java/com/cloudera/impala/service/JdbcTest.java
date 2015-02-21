@@ -147,14 +147,14 @@ public class JdbcTest {
     int ordinalPos = rs.getInt("ORDINAL_POSITION");
     assertEquals("Incorrect column name", "string_col", columnname);
     assertEquals("Incorrect ordinal position", 12, ordinalPos);
-    assertEquals("Incorrect type", java.sql.Types.VARCHAR, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type", Types.VARCHAR, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
     rs.close();
 
     // validate bool_col
     rs = con_.getMetaData().getColumns(null, "functional", "alltypessmall", "bool_col");
     assertTrue(rs.next());
-    assertEquals("Incorrect type", java.sql.Types.BOOLEAN, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type", Types.BOOLEAN, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
     rs.close();
 
@@ -162,7 +162,10 @@ public class JdbcTest {
     rs = con_.getMetaData().getColumns(null, "functional", "alltypessmall",
         "tinyint_col");
     assertTrue(rs.next());
-    assertEquals("Incorrect type", java.sql.Types.TINYINT, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type", Types.TINYINT, rs.getInt("DATA_TYPE"));
+    assertEquals(3, rs.getInt("COLUMN_SIZE"));
+    assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(10, rs.getInt("NUM_PREC_RADIX"));
     assertFalse(rs.next());
     rs.close();
 
@@ -170,14 +173,20 @@ public class JdbcTest {
     rs = con_.getMetaData().getColumns(null, "functional", "alltypessmall",
         "smallint_col");
     assertTrue(rs.next());
-    assertEquals("Incorrect type", java.sql.Types.SMALLINT, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type", Types.SMALLINT, rs.getInt("DATA_TYPE"));
+    assertEquals(5, rs.getInt("COLUMN_SIZE"));
+    assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(10, rs.getInt("NUM_PREC_RADIX"));
     assertFalse(rs.next());
     rs.close();
 
     // validate int_col
     rs = con_.getMetaData().getColumns(null, "functional", "alltypessmall", "int_col");
     assertTrue(rs.next());
-    assertEquals("Incorrect type", java.sql.Types.INTEGER, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type", Types.INTEGER, rs.getInt("DATA_TYPE"));
+    assertEquals(10, rs.getInt("COLUMN_SIZE"));
+    assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(10, rs.getInt("NUM_PREC_RADIX"));
     assertFalse(rs.next());
     rs.close();
 
@@ -185,14 +194,20 @@ public class JdbcTest {
     rs = con_.getMetaData().getColumns(null, "functional", "alltypessmall",
         "bigint_col");
     assertTrue(rs.next());
-    assertEquals("Incorrect type", java.sql.Types.BIGINT, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type", Types.BIGINT, rs.getInt("DATA_TYPE"));
+    assertEquals(19, rs.getInt("COLUMN_SIZE"));
+    assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(10, rs.getInt("NUM_PREC_RADIX"));
     assertFalse(rs.next());
     rs.close();
 
     // validate float_col
     rs = con_.getMetaData().getColumns(null, "functional", "alltypessmall", "float_col");
     assertTrue(rs.next());
-    assertEquals("Incorrect type", java.sql.Types.FLOAT, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type", Types.FLOAT, rs.getInt("DATA_TYPE"));
+    assertEquals(7, rs.getInt("COLUMN_SIZE"));
+    assertEquals(7, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(10, rs.getInt("NUM_PREC_RADIX"));
     assertFalse(rs.next());
     rs.close();
 
@@ -200,7 +215,10 @@ public class JdbcTest {
     rs = con_.getMetaData().getColumns(null, "functional", "alltypessmall",
         "double_col");
     assertTrue(rs.next());
-    assertEquals("Incorrect type", java.sql.Types.DOUBLE, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type", Types.DOUBLE, rs.getInt("DATA_TYPE"));
+    assertEquals(15, rs.getInt("COLUMN_SIZE"));
+    assertEquals(15, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(10, rs.getInt("NUM_PREC_RADIX"));
     assertFalse(rs.next());
     rs.close();
 
@@ -208,7 +226,11 @@ public class JdbcTest {
     rs = con_.getMetaData().getColumns(null, "functional", "alltypessmall",
         "timestamp_col");
     assertTrue(rs.next());
-    assertEquals("Incorrect type", java.sql.Types.TIMESTAMP, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type", Types.TIMESTAMP, rs.getInt("DATA_TYPE"));
+    assertEquals(29, rs.getInt("COLUMN_SIZE"));
+    assertEquals(9, rs.getInt("DECIMAL_DIGITS"));
+    // Use getString() to check the value is null (and not 0).
+    assertEquals(null, rs.getString("NUM_PREC_RADIX"));
     assertFalse(rs.next());
     rs.close();
 
@@ -220,6 +242,55 @@ public class JdbcTest {
     }
     assertEquals(13, numCols);
     rs.close();
+
+    // validate DECIMAL columns
+    rs = con_.getMetaData().getColumns(null, "functional", "decimal_tbl", null);
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.DECIMAL, rs.getInt("DATA_TYPE"));
+    assertEquals(9, rs.getInt("COLUMN_SIZE"));
+    assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(10, rs.getInt("NUM_PREC_RADIX"));
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.DECIMAL, rs.getInt("DATA_TYPE"));
+    assertEquals(10, rs.getInt("COLUMN_SIZE"));
+    assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(10, rs.getInt("NUM_PREC_RADIX"));
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.DECIMAL, rs.getInt("DATA_TYPE"));
+    assertEquals(20, rs.getInt("COLUMN_SIZE"));
+    assertEquals(10, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(10, rs.getInt("NUM_PREC_RADIX"));
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.DECIMAL, rs.getInt("DATA_TYPE"));
+    assertEquals(38, rs.getInt("COLUMN_SIZE"));
+    assertEquals(38, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(10, rs.getInt("NUM_PREC_RADIX"));
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.DECIMAL, rs.getInt("DATA_TYPE"));
+    assertEquals(10, rs.getInt("COLUMN_SIZE"));
+    assertEquals(5, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(10, rs.getInt("NUM_PREC_RADIX"));
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.DECIMAL, rs.getInt("DATA_TYPE"));
+    assertEquals(9, rs.getInt("COLUMN_SIZE"));
+    assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(10, rs.getInt("NUM_PREC_RADIX"));
+    assertFalse(rs.next());
+    rs.close();
+
+    // validate CHAR/VARCHAR columns
+    rs = con_.getMetaData().getColumns(null, "functional", "chars_tiny", null);
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.CHAR, rs.getInt("DATA_TYPE"));
+    assertEquals(5, rs.getInt("COLUMN_SIZE"));
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.CHAR, rs.getInt("DATA_TYPE"));
+    assertEquals(140, rs.getInt("COLUMN_SIZE"));
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.VARCHAR, rs.getInt("DATA_TYPE"));
+    assertEquals(32, rs.getInt("COLUMN_SIZE"));
+    assertFalse(rs.next());
+    rs.close();
   }
 
   @Test
@@ -227,10 +298,32 @@ public class JdbcTest {
     // Table has 5 decimal columns
     ResultSet rs = con_.createStatement().executeQuery(
         "select * from functional.decimal_tbl");
-    assertEquals(rs.getMetaData().getColumnCount(), 6);
-    for (int i = 1; i <= 6; ++i) {
-      assertEquals(rs.getMetaData().getColumnType(i), Types.DECIMAL);
-    }
+
+    assertEquals(rs.getMetaData().getColumnType(1), Types.DECIMAL);
+    assertEquals(rs.getMetaData().getPrecision(1), 9);
+    assertEquals(rs.getMetaData().getScale(1), 0);
+
+    assertEquals(rs.getMetaData().getColumnType(2), Types.DECIMAL);
+    assertEquals(rs.getMetaData().getPrecision(2), 10);
+    assertEquals(rs.getMetaData().getScale(2), 0);
+
+    assertEquals(rs.getMetaData().getColumnType(3), Types.DECIMAL);
+    assertEquals(rs.getMetaData().getPrecision(3), 20);
+    assertEquals(rs.getMetaData().getScale(3), 10);
+
+    assertEquals(rs.getMetaData().getColumnType(4), Types.DECIMAL);
+    assertEquals(rs.getMetaData().getPrecision(4), 38);
+    assertEquals(rs.getMetaData().getScale(4), 38);
+
+    assertEquals(rs.getMetaData().getColumnType(5), Types.DECIMAL);
+    assertEquals(rs.getMetaData().getPrecision(5), 10);
+    assertEquals(rs.getMetaData().getScale(5), 5);
+
+    assertEquals(rs.getMetaData().getColumnType(6), Types.DECIMAL);
+    assertEquals(rs.getMetaData().getPrecision(6), 9);
+    assertEquals(rs.getMetaData().getScale(6), 0);
+
+    rs.close();
   }
 
   /**

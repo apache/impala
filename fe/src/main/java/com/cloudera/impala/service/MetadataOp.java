@@ -291,7 +291,7 @@ public class MetadataOp {
           if (!table.isLoaded()) {
             result.missingTbls.add(new TableName(dbName, tabName));
           } else {
-            for (Column column: table.getColumns()) {
+            for (Column column: table.getColumnsInHiveOrder()) {
               String colName = column.getName();
               if (!columnPattern.matches(colName)) continue;
               columns.add(column);

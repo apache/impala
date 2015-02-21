@@ -385,7 +385,10 @@ public abstract class Type {
       case STRING:
         return Integer.MAX_VALUE;
       case TIMESTAMP:
-        return 30;
+        return 29;
+      case CHAR:
+      case VARCHAR:
+        return t.getLength();
       default:
         return null;
     }
@@ -412,6 +415,8 @@ public abstract class Type {
         return 7;
       case DOUBLE:
         return 15;
+      case DECIMAL:
+        return t.decimalPrecision();
       default:
         return null;
     }
@@ -420,6 +425,8 @@ public abstract class Type {
   /**
    * JDBC data type description
    * Returns the number of fractional digits for this type, or null if not applicable.
+   * For timestamp/time types, returns the number of digits in the fractional seconds
+   * component.
    */
   public Integer getDecimalDigits() {
     if (!isScalarType()) return null;
@@ -435,6 +442,10 @@ public abstract class Type {
         return 7;
       case DOUBLE:
         return 15;
+      case TIMESTAMP:
+        return 9;
+      case DECIMAL:
+        return t.decimalScale();
       default:
         return null;
     }
@@ -442,7 +453,15 @@ public abstract class Type {
 
   /**
    * JDBC data type description
-   * Returns the radix for this type (typically either 2 or 10) or null if not applicable.
+   * For numeric data types, either 10 or 2. If it is 10, the values in COLUMN_SIZE
+   * and DECIMAL_DIGITS give the number of decimal digits allowed for the column.
+   * For example, a DECIMAL(12,5) column would return a NUM_PREC_RADIX of 10,
+   * a COLUMN_SIZE of 12, and a DECIMAL_DIGITS of 5; a FLOAT column could return
+   * a NUM_PREC_RADIX of 10, a COLUMN_SIZE of 15, and a DECIMAL_DIGITS of NULL.
+   * If it is 2, the values in COLUMN_SIZE and DECIMAL_DIGITS give the number of bits
+   * allowed in the column. For example, a FLOAT column could return a RADIX of 2,
+   * a COLUMN_SIZE of 53, and a DECIMAL_DIGITS of NULL. NULL is returned for data
+   * types where NUM_PREC_RADIX is not applicable.
    */
   public Integer getNumPrecRadix() {
     if (!isScalarType()) return null;
@@ -452,10 +471,10 @@ public abstract class Type {
       case SMALLINT:
       case INT:
       case BIGINT:
-        return 10;
       case FLOAT:
       case DOUBLE:
-        return 2;
+      case DECIMAL:
+        return 10;
       default:
         // everything else (including boolean and string) is null
         return null;
@@ -483,6 +502,8 @@ public abstract class Type {
       case DOUBLE: return java.sql.Types.DOUBLE;
       case TIMESTAMP: return java.sql.Types.TIMESTAMP;
       case STRING: return java.sql.Types.VARCHAR;
+      case CHAR: return java.sql.Types.CHAR;
+      case VARCHAR: return java.sql.Types.VARCHAR;
       case BINARY: return java.sql.Types.BINARY;
       case DECIMAL: return java.sql.Types.DECIMAL;
       default:
