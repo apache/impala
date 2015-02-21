@@ -288,10 +288,36 @@ Status ExecEnv::StartServices() {
   }
 
   // Initialize global memory limit.
+  // Depending on the system configuration, we will have to calculate the process
+  // memory limit either based on the available physical memory, or if overcommitting
+  // is turned off, we use the memory commit limit from /proc/meminfo (see
+  // IMPALA-1690).
+  // --mem_limit="" means no memory limit
   int64_t bytes_limit = 0;
   bool is_percent;
-  // --mem_limit="" means no memory limit
-  bytes_limit = ParseUtil::ParseMemSpec(FLAGS_mem_limit, &is_percent);
+
+  if (MemInfo::vm_overcommit() == 2 &&
+      MemInfo::commit_limit() < MemInfo::physical_mem()) {
+    bytes_limit = ParseUtil::ParseMemSpec(FLAGS_mem_limit, &is_percent,
+        MemInfo::commit_limit());
+    // There might be the case of misconfiguration, when on a system swap is disabled
+    // and overcommitting is turned off the actual usable memory is less than the
+    // available physical memory.
+    LOG(WARNING) << "This system shows a discrepancy between the available "
+                 << "memory and the memory commit limit allowed by the "
+                 << "operating system. ( Mem: " << MemInfo::physical_mem()
+                 << "<=> CommitLimit: "
+                 << MemInfo::commit_limit() << "). "
+                 << "Impala will adhere to the smaller value by setting the "
+                 << "process memory limit to " << bytes_limit << " "
+                 << "Please verify the system configuration. Specifically, "
+                 << "/proc/sys/vm/overcommit_memory and "
+                 << "/proc/sys/vm/overcommit_ratio.";
+  } else {
+    bytes_limit = ParseUtil::ParseMemSpec(FLAGS_mem_limit, &is_percent,
+        MemInfo::physical_mem());
+  }
+
   if (bytes_limit < 0) {
     return Status("Failed to parse mem limit from '" + FLAGS_mem_limit + "'.");
   }

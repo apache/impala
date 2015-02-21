@@ -20,6 +20,7 @@
 #include "common/logging.h"
 #include "rpc/thrift-util.h"
 #include "util/jni-util.h"
+#include "util/mem-info.h"
 #include "util/parse-util.h"
 #include "util/time.h"
 
@@ -79,7 +80,7 @@ RequestPoolService::RequestPoolService(MetricGroup* metrics) :
     default_pool_only_ = true;
     bool is_percent; // not used
     int64_t bytes_limit = ParseUtil::ParseMemSpec(FLAGS_default_pool_mem_limit,
-        &is_percent);
+        &is_percent, MemInfo::physical_mem());
     // -1 indicates an error occurred
     if (bytes_limit < 0) {
       LOG(ERROR) << "Unable to parse default pool mem limit from '"

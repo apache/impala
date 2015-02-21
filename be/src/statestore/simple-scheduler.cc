@@ -39,6 +39,7 @@
 #include "util/debug-util.h"
 #include "util/error-util.h"
 #include "util/llama-util.h"
+#include "util/mem-info.h"
 #include "util/parse-util.h"
 #include "gen-cpp/ResourceBrokerService_types.h"
 
@@ -113,7 +114,7 @@ SimpleScheduler::SimpleScheduler(StatestoreSubscriber* subscriber,
     }
     bool is_percent;
     int64_t mem_bytes =
-        ParseUtil::ParseMemSpec(FLAGS_rm_default_memory, &is_percent);
+        ParseUtil::ParseMemSpec(FLAGS_rm_default_memory, &is_percent, MemInfo::physical_mem());
     if (mem_bytes <= 1024 * 1024) {
       LOG(ERROR) << "Bad value for --rm_default_memory (must be larger than 1M):"
                  << FLAGS_rm_default_memory;

@@ -15,6 +15,7 @@
 #include "service/query-options.h"
 
 #include "util/debug-util.h"
+#include "util/mem-info.h"
 #include "util/parse-util.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 
@@ -32,7 +33,7 @@ using namespace strings;
 // int.
 static Status ParseMemValue(const string& value, const string& key, int64_t* result) {
   bool is_percent;
-  *result = ParseUtil::ParseMemSpec(value, &is_percent);
+  *result = ParseUtil::ParseMemSpec(value, &is_percent, MemInfo::physical_mem());
   if (*result < 0) {
     return Status("Failed to parse " + key + " from '" + value + "'.");
   }

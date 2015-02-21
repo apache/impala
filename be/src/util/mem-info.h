@@ -38,11 +38,39 @@ class MemInfo {
     return physical_mem_;
   }
 
+  // Returns the systems memory overcommit settings, typically the values are 0,1, and 2
+  static int32_t vm_overcommit() {
+    DCHECK(initialized_);
+    return vm_overcommit_;
+  }
+
+  // Returns the systems memory commit limit. This value is only of importance if the
+  // memory overcommit setting is set to 2.
+  static int64_t commit_limit() {
+    DCHECK(initialized_);
+    return commit_limit_;
+  }
+
   static std::string DebugString();
 
  private:
+
+  static void ParseOvercommit();
+
   static bool initialized_;
   static int64_t physical_mem_;
+
+  // See https://www.kernel.org/doc/Documentation/filesystems/proc.txt for more details on
+  // the specific meaning of the below variables and
+  // https://www.kernel.org/doc/Documentation/vm/overcommit-accounting for more details on
+  // overcommit accounting.
+
+  // Indicating the kernel overcommit settings
+  //(e.g. heuristic based / always / strict)
+  static int32_t vm_overcommit_;
+
+  // If overcommit is turned off the maximum allocatable memory
+  static int64_t commit_limit_;
 };
 
 }

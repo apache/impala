@@ -20,7 +20,8 @@ using namespace std;
 
 namespace impala {
 
-int64_t ParseUtil::ParseMemSpec(const string& mem_spec_str, bool* is_percent) {
+int64_t ParseUtil::ParseMemSpec(const string& mem_spec_str, bool* is_percent,
+    int64_t relative_reference) {
   if (mem_spec_str.empty()) return 0;
 
   *is_percent = false;
@@ -70,9 +71,9 @@ int64_t ParseUtil::ParseMemSpec(const string& mem_spec_str, bool* is_percent) {
     int64_t limit_val = StringParser::StringToInt<int64_t>(mem_spec_str.data(),
         number_str_len, &result);
     if (result != StringParser::PARSE_SUCCESS) return -1;
+
     if (*is_percent) {
-      bytes =
-          (static_cast<double>(limit_val) / 100.0) * MemInfo::physical_mem();
+      bytes = (static_cast<double>(limit_val) / 100.0) * relative_reference;
     } else {
       bytes = limit_val;
     }

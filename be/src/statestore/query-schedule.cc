@@ -117,7 +117,7 @@ int64_t QuerySchedule::GetPerHostMemoryEstimate() const {
   } else if (FLAGS_rm_always_use_defaults) {
     bool ignored;
     per_host_mem = ParseUtil::ParseMemSpec(FLAGS_rm_default_memory,
-        &ignored);
+        &ignored, 0);
   } else if (has_query_option) {
     per_host_mem = query_option_memory_limit;
   } else if (has_estimate) {
@@ -126,7 +126,7 @@ int64_t QuerySchedule::GetPerHostMemoryEstimate() const {
     // If no estimate or query option, use the server-side limits anyhow.
     bool ignored;
     per_host_mem = ParseUtil::ParseMemSpec(FLAGS_rm_default_memory,
-        &ignored);
+        &ignored, 0);
   }
   // Cap the memory estimate at the amount of physical memory available. The user's
   // provided value or the estimate from planning can each be unreasonable.
