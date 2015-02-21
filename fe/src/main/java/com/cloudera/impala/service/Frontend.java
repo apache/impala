@@ -31,8 +31,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
 import org.apache.hive.service.cli.thrift.TGetFunctionsReq;
 import org.apache.hive.service.cli.thrift.TGetSchemasReq;
@@ -497,7 +497,7 @@ public class Frontend {
     }
 
     Path destPath = new Path(destPathString);
-    DistributedFileSystem dfs = FileSystemUtil.getDistributedFileSystem(destPath);
+    FileSystem fs = destPath.getFileSystem(FileSystemUtil.getConfiguration());
 
     // Create a temporary directory within the final destination directory to stage the
     // file move.
@@ -505,7 +505,7 @@ public class Frontend {
 
     Path sourcePath = new Path(request.source_path);
     int filesLoaded = 0;
-    if (dfs.isDirectory(sourcePath)) {
+    if (fs.isDirectory(sourcePath)) {
       filesLoaded = FileSystemUtil.moveAllVisibleFiles(sourcePath, tmpDestPath);
     } else {
       FileSystemUtil.moveFile(sourcePath, tmpDestPath, true);
@@ -520,7 +520,7 @@ public class Frontend {
     // Move the files from the temporary location to the final destination.
     FileSystemUtil.moveAllVisibleFiles(tmpDestPath, destPath);
     // Cleanup the tmp directory.
-    dfs.delete(tmpDestPath, true);
+    fs.delete(tmpDestPath, true);
     TLoadDataResp response = new TLoadDataResp();
     TColumnValue col = new TColumnValue();
     String loadMsg = String.format(
