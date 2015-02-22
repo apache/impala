@@ -102,12 +102,8 @@ class ImpalaTestSuite(BaseTestSuite):
     # Create a connection to Impala.
     cls.client = cls.create_impala_client(IMPALAD)
 
-    cls.impalad_test_service = ImpaladService(IMPALAD.split(':')[0])
-    if pytest.config.option.namenode_http_address is None:
-      cls.hdfs_client = get_hdfs_client_from_conf(HDFS_CONF)
-    else:
-      host, port = pytest.config.option.namenode_http_address.split(":")
-      cls.hdfs_client = get_hdfs_client(host, port)
+    cls.impalad_test_service = cls.create_impala_service()
+    cls.hdfs_client = cls.create_hdfs_client()
 
   @classmethod
   def teardown_class(cls):
@@ -125,6 +121,18 @@ class ImpalaTestSuite(BaseTestSuite):
         use_kerberos=pytest.config.option.use_kerberos)
     client.connect()
     return client
+
+  @classmethod
+  def create_impala_service(cls, host_port=IMPALAD):
+    return ImpaladService(IMPALAD.split(':')[0])
+
+  @classmethod
+  def create_hdfs_client(cls):
+    if pytest.config.option.namenode_http_address is None:
+      return get_hdfs_client_from_conf(HDFS_CONF)
+    else:
+      host, port = pytest.config.option.namenode_http_address.split(":")
+      return get_hdfs_client(host, port, "dev")
 
   @classmethod
   def cleanup_db(self, db_name, sync_ddl=1):
@@ -314,10 +322,11 @@ class ImpalaTestSuite(BaseTestSuite):
       return function(*args, **kwargs)
     return wrapper
 
+  @classmethod
   @execute_wrapper
-  def execute_query_expect_success(self, impalad_client, query, query_options=None):
+  def execute_query_expect_success(cls, impalad_client, query, query_options=None):
     """Executes a query and asserts if the query fails"""
-    result = self.__execute_query(impalad_client, query, query_options)
+    result = cls.__execute_query(impalad_client, query, query_options)
     assert result.success
     return result
 
@@ -398,7 +407,8 @@ class ImpalaTestSuite(BaseTestSuite):
     for partition in self.hive_client.get_partition_names(db_name, table_name, 0):
       self.hive_client.drop_partition_by_name(db_name, table_name, partition, True)
 
-  def __execute_query(self, impalad_client, query, query_options=None, user=None):
+  @classmethod
+  def __execute_query(cls, impalad_client, query, query_options=None, user=None):
     """Executes the given query against the specified Impalad"""
     if query_options is not None: impalad_client.set_configuration(query_options)
     return impalad_client.execute(query, user=user)

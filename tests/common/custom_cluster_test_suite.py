@@ -92,11 +92,12 @@ class CustomClusterTestSuite(ImpalaTestSuite):
     sleep(2)
 
   @classmethod
-  def _start_impala_cluster(cls, options):
-    logdir = os.getenv('LOG_DIR', "/tmp/")
+  def _start_impala_cluster(cls, options, log_dir=os.getenv('LOG_DIR', "/tmp/"),
+      cluster_size=CLUSTER_SIZE, log_level=1):
     cmd = [os.path.join(IMPALA_HOME, 'bin/start-impala-cluster.py'),
-           '--cluster_size=%d' % CLUSTER_SIZE,
-           '--log_dir=%s' % logdir]
+           '--cluster_size=%d' % cluster_size,
+           '--log_dir=%s' % log_dir,
+           '--log_level=%s' % log_level]
     call(cmd + options)
     cls.cluster = ImpalaCluster()
     statestored = cls.cluster.statestored
