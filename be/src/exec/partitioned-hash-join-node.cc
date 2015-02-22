@@ -311,6 +311,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
   HashTableCtx* ctx = parent_->ht_ctx_.get();
   // TODO: move the batch and indices as members to avoid reallocating.
   vector<BufferedTupleStream::RowIdx> indices;
+  uint32_t seed0 = ctx->seed(0);
 
   // Allocate the partition-local hash table. Initialize the number of buckets
   // based on the number of build rows (the number of rows is known at this point).
@@ -325,6 +326,7 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
       level_ == 0, 1 << (32 - NUM_PARTITIONING_BITS), estimated_num_buckets));
   if (!hash_tbl_->Init()) goto not_built;
 
+  if (AddProbeFilters) DCHECK_EQ(level_, 0) << "Should not add filters if repartitioning";
   while (!eos) {
     RETURN_IF_ERROR(build_rows_->GetNext(&batch, &eos, &indices));
     DCHECK_EQ(batch.num_rows(), indices.size());
@@ -333,28 +335,25 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
       TupleRow* row = batch.GetRow(i);
       uint32_t hash = 0;
       if (!ctx->EvalAndHashBuild(row, &hash)) continue;
-      // TODO: If we are going to AddProbeFilters we should do it here.
       if (UNLIKELY(!hash_tbl_->Insert(ctx, indices[i], row, hash))) goto not_built;
+      if (AddProbeFilters) {
+        // Update the probe filters for this row.
+        for (int j = 0; j < parent_->probe_filters_.size(); ++j) {
+          if (parent_->probe_filters_[j].second == NULL) continue;
+          void* e = parent_->build_expr_ctxs_[j]->GetValue(row);
+          uint32_t h = RawValue::GetHashValue(e,
+              parent_->build_expr_ctxs_[j]->root()->type(), seed0);
+          parent_->probe_filters_[j].second->Set<true>(h, true);
+        }
+      }
     }
     batch.Reset();
   }
-
-  // If we got here, the hash table fit in memory and is built.
+  // The hash table fits in memory and is built.
   DCHECK(*built);
   DCHECK_NOTNULL(hash_tbl_.get());
   is_spilled_ = false;
   COUNTER_ADD(parent_->num_hash_buckets_, hash_tbl_->num_buckets());
-
-  // TODO: We build the filters after we constructed the hash table.  This is what the
-  // old (HashJoinNode) code was doing.  We can do better, because now we know a priori
-  // whether we are going to add probe filter or not. For example, we can be building
-  // the filters while we are streaming the rows from the batch, and not at the end after
-  // the HT has been built.
-  if (AddProbeFilters) {
-    DCHECK_EQ(level_, 0) << "Should not add filters if repartitioning";
-    hash_tbl_->UpdateProbeFilters(ctx, parent_->probe_filters_);
-  }
-
   return Status::OK;
 
 not_built:
@@ -379,6 +378,7 @@ bool PartitionedHashJoinNode::AllocateProbeFilters(RuntimeState* state) {
   probe_filters_.resize(probe_expr_ctxs_.size());
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
     if (probe_expr_ctxs_[i]->root()->is_slotref()) {
+      // TODO: Enable probe filters not only for "naked" slotrefs.
       probe_filters_[i].first =
           reinterpret_cast<SlotRef*>(probe_expr_ctxs_[i]->root())->slot_id();
       probe_filters_[i].second = new Bitmap(state->slot_filter_bitmap_size());
@@ -408,10 +408,9 @@ bool PartitionedHashJoinNode::AttachProbeFilters(RuntimeState* state) {
   } else {
     // Make sure there are no memory leaks.
     for (int i = 0; i < probe_filters_.size(); ++i) {
-      if (probe_filters_[i].second != NULL) {
-        delete probe_filters_[i].second;
-        probe_filters_[i].second = NULL;
-      }
+      if (probe_filters_[i].second == NULL) continue;
+      delete probe_filters_[i].second;
+      probe_filters_[i].second = NULL;
     }
     return false;
   }

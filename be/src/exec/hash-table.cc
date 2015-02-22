@@ -249,28 +249,6 @@ void HashTable::Close() {
   }
 }
 
-void HashTable::UpdateProbeFilters(HashTableCtx* ht_ctx,
-    vector<pair<SlotId, Bitmap*> >& bitmaps) {
-  DCHECK_NOTNULL(ht_ctx);
-  // For the bitmap filters, always use the initial seed. The other parts of the plan
-  // tree (e.g. the scan node) relies on this.
-  uint32_t seed = ht_ctx->seeds_[0];
-
-  // Walk the build table and update the bitmap for each probe side slot.
-  HashTable::Iterator iter = Begin(ht_ctx);
-  while (iter != End()) {
-    TupleRow* row = iter.GetRow();
-    for (int i = 0; i < ht_ctx->build_expr_ctxs_.size(); ++i) {
-      if (bitmaps[i].second == NULL) continue;
-      void* e = ht_ctx->build_expr_ctxs_[i]->GetValue(row);
-      uint32_t h =
-          RawValue::GetHashValue(e, ht_ctx->build_expr_ctxs_[i]->root()->type(), seed);
-      bitmaps[i].second->Set<true>(h, true);
-    }
-    iter.Next<false>(ht_ctx);
-  }
-}
-
 bool HashTable::ResizeBuckets(int64_t num_buckets) {
   DCHECK_EQ((num_buckets & (num_buckets-1)), 0)
       << "num_buckets=" << num_buckets << " must be a power of 2";

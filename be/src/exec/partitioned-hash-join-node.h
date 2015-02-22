@@ -281,12 +281,12 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   RuntimeState* runtime_state_;
 
-  // our equi-join predicates "<lhs> = <rhs>" are separated into
+  // Our equi-join predicates "<lhs> = <rhs>" are separated into
   // build_expr_ctxs_ (over child(1)) and probe_expr_ctxs_ (over child(0))
   std::vector<ExprContext*> probe_expr_ctxs_;
   std::vector<ExprContext*> build_expr_ctxs_;
 
-  // non-equi-join conjuncts from the JOIN clause
+  // Non-equi-join conjuncts from the JOIN clause.
   std::vector<ExprContext*> other_join_conjunct_ctxs_;
 
   // If true, the partitions in hash_partitions_ are using small buffers.

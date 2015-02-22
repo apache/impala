@@ -107,6 +107,7 @@ class HashTableCtx {
 
   void set_level(int level);
   int level() const { return level_; }
+  uint32_t seed(int level) { return seeds_.at(level); }
 
   // Returns the results of the exprs at 'expr_idx' evaluated over the last row
   // processed.
@@ -337,13 +338,6 @@ class HashTable {
 
   // Returns the number of bytes allocated to the hash table
   int64_t byte_size() const { return total_data_page_size_; }
-
-  // Can be called after all insert calls to update the bitmap filters for the probe
-  // side values. The bitmap filters are similar to Bloom filters in that they have no
-  // false negatives but they will have false positives.
-  // These filters are not added to the runtime state.
-  void UpdateProbeFilters(HashTableCtx* ht_ctx,
-      std::vector<std::pair<SlotId, Bitmap*> >& bitmaps);
 
   // Returns an iterator at the beginning of the hash table.  Advancing this iterator
   // will traverse all elements.
