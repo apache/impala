@@ -103,9 +103,8 @@ class BlockingJoinNode : public ExecNode {
   // A NULL ptr for first_left_child_row indicates the left child eos.
   virtual Status InitGetNext(TupleRow* first_left_child_row) = 0;
 
-  // We parallelize building the build-side with Open'ing the
-  // left child. If, for example, the left child is another
-  // join node, it can start to build its own build-side at the
+  // We parallelize building the build-side with Open'ing the left child. If, for example,
+  // the left child is another join node, it can start to build its own build-side at the
   // same time.
   virtual Status ConstructBuildSide(RuntimeState* state) = 0;
 

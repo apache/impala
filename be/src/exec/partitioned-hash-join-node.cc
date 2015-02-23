@@ -1124,7 +1124,6 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
     hash_tbls_[i] = hash_partitions_[i]->hash_tbl();
   }
-
   return Status::OK;
 }
 

@@ -112,10 +112,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   // Number of initial partitions to create. Must be a power of two.
   // TODO: this is set to a lower than actual value for testing.
-  static const int PARTITION_FANOUT = 32;
+  static const int PARTITION_FANOUT = 16;
 
   // Needs to be the log(PARTITION_FANOUT)
-  static const int NUM_PARTITIONING_BITS = 5;
+  static const int NUM_PARTITIONING_BITS = 4;
 
   // Maximum number of times we will repartition. The maximum build table we
   // can process is:
@@ -375,7 +375,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
     Status BuildHashTable(RuntimeState* state, bool* built, const bool add_probe_filters);
 
     // Spills this partition, cleaning up and unpinning blocks.
-    // If unpin_all_build is true, the build stream is completely unpinned, otherwise,
+    // If 'unpin_all_build' is true, the build stream is completely unpinned, otherwise,
     // it is unpinned with one buffer remaining.
     Status Spill(bool unpin_all_build);
 
