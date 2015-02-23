@@ -55,8 +55,9 @@ std::string SetRedactionRulesFromFile(const std::string& rules_file_path);
 
 // Applies the redaction rules to the given string in-place. If no redaction rules
 // are set, nothing will be done. This is thread-safe as long as multiple calls are
-// not made with the same input string.
-void Redact(std::string* string);
+// not made with the same input string. If the 'changed' argument is not null, it will
+// be set to true if redaction modified 'string'.
+void Redact(std::string* string, bool* changed = NULL);
 
 // Utility function to redacted a string without modifying the original.
 inline std::string RedactCopy(const std::string& original) {

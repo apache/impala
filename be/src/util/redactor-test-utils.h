@@ -86,6 +86,13 @@ void AssertRedactedEquals(const char* message, const char* expected) {
   std::string temp(message);
   Redact(&temp);
   ASSERT_EQ(expected, temp);
+
+  // Test the signature with the 'changed' argument.
+  temp = string(message);
+  bool changed;
+  Redact(&temp, &changed);
+  ASSERT_EQ(expected, temp);
+  ASSERT_EQ(temp == message, !changed);
 }
 
 void AssertUnredacted(const char* message) {

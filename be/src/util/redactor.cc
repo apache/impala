@@ -305,7 +305,7 @@ string SetRedactionRulesFromFile(const string& rules_file_path) {
   return rules_parser.Parse(rules_doc);
 }
 
-void Redact(string* value) {
+void Redact(string* value, bool* changed) {
   DCHECK(value != NULL);
   if (g_rules == NULL || g_rules->empty()) return;
   for (Rules::const_iterator rule = g_rules->begin(); rule != g_rules->end(); ++rule) {
@@ -314,7 +314,9 @@ void Redact(string* value) {
     } else {
       if (strcasestr(value->c_str(), rule->trigger.c_str()) == NULL) continue;
     }
-    re2::RE2::GlobalReplace(value, rule->search_pattern, rule->replacement);
+    int replacement_count = re2::RE2::GlobalReplace(
+        value, rule->search_pattern, rule->replacement);
+    if (changed != NULL && !*changed) *changed = replacement_count;
   }
 }
 
