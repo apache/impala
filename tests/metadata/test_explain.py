@@ -95,6 +95,7 @@ class TestExplainEmptyPartition(ImpalaTestSuite):
   def teardown_method(self, method):
     self.cleanup_db(self.TEST_DB_NAME)
 
+  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
   def test_non_empty_partition_0_rows(self):
     """Regression test for IMPALA-1708: if a partition has 0 rows but > 0 files after
     COMPUTE STATS, don't warn the user about missing stats. The files are probably

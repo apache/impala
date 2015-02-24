@@ -2,6 +2,8 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Tests query cancellation using the ImpalaService.Cancel API
 #
+
+import os
 import pytest
 import threading
 from random import choice
@@ -156,6 +158,7 @@ class TestCancellationSerial(TestCancellation):
       cls.TestMatrix.add_constraint(lambda v: v.get_value('query') == choice(QUERIES))
 
   @pytest.mark.execute_serially
+  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
   def test_cancel_insert(self, vector):
     self.execute_cancel_test(vector)
     metric_verifier = MetricVerifier(self.impalad_test_service)

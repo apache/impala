@@ -346,7 +346,7 @@ fi
 #
 # Don't try to run tests without data!
 #
-TESTWH_ITEMS=`hadoop fs -ls /test-warehouse 2> /dev/null | \
+TESTWH_ITEMS=`hadoop fs -ls ${FILESYSTEM_PREFIX}/test-warehouse 2> /dev/null | \
     grep test-warehouse |wc -l`
 if [ ${TESTS_ACTION} -eq 1 -a \
      ${TESTDATA_ACTION} -eq 0 -a \
