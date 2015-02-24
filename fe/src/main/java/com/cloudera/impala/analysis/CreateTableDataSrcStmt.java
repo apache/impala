@@ -43,9 +43,9 @@ import org.apache.hadoop.fs.permission.FsAction;
  */
 public class CreateTableDataSrcStmt extends CreateTableStmt {
 
-  public CreateTableDataSrcStmt(TableName tableName, List<ColumnDesc> columnDefs,
+  public CreateTableDataSrcStmt(TableName tableName, List<ColumnDef> columnDefs,
       String dataSourceName, String initString, String comment, boolean ifNotExists) {
-    super(tableName, columnDefs, Lists.<ColumnDesc>newArrayList(), false, comment,
+    super(tableName, columnDefs, Lists.<ColumnDef>newArrayList(), false, comment,
         RowFormat.DEFAULT_ROW_FORMAT, THdfsFileFormat.TEXT, null, null, ifNotExists,
         createInitialTableProperties(dataSourceName, initString),
         Maps.<String, String>newHashMap());
@@ -73,7 +73,7 @@ public class CreateTableDataSrcStmt extends CreateTableStmt {
       throw new AnalysisException("Data source does not exist: " + dataSourceName);
     }
 
-    for (ColumnDesc col: getColumnDefs()) {
+    for (ColumnDef col: getColumnDefs()) {
       if (!DataSourceTable.isSupportedColumnType(col.getType())) {
         throw new AnalysisException("Tables produced by an external data source do " +
             "not support the column type: " + col.getType());

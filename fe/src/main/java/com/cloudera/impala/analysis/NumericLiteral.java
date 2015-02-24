@@ -201,7 +201,6 @@ public class NumericLiteral extends LiteralExpr {
         }
       }
     }
-    type_.analyze();
     isAnalyzed_ = true;
   }
 
@@ -235,7 +234,7 @@ public class NumericLiteral extends LiteralExpr {
       Preconditions.checkState(value_.scale() <= decimalType.decimalScale());
       int valLeftDigits = value_.precision() - value_.scale();
       int typeLeftDigits = decimalType.decimalPrecision() - decimalType.decimalScale();
-      if (typeLeftDigits < valLeftDigits) return new CastExpr(targetType, this, true);
+      if (typeLeftDigits < valLeftDigits) return new CastExpr(targetType, this);
     }
     type_ = targetType;
     return this;

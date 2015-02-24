@@ -23,7 +23,7 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import com.cloudera.impala.analysis.CreateTableStmt;
 import com.cloudera.impala.analysis.SqlParser;
 import com.cloudera.impala.analysis.SqlScanner;
-import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.analysis.TypeDef;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TPrimitiveType;
@@ -40,9 +40,6 @@ import com.google.common.collect.Lists;
  * as abstract methods that subclasses must implement.
  */
 public abstract class Type {
-  // If true, this type has been analyzed.
-  protected boolean isAnalyzed_;
-
   // Static constant types for scalar types that don't require additional information.
   public static final ScalarType INVALID = new ScalarType(PrimitiveType.INVALID_TYPE);
   public static final ScalarType NULL = new ScalarType(PrimitiveType.NULL_TYPE);
@@ -112,8 +109,6 @@ public abstract class Type {
   public static ArrayList<ScalarType> getSupportedTypes() {
     return supportedTypes;
   }
-
-  public abstract void analyze() throws AnalysisException;
 
   /**
    * The output of this is stored directly in the hive metastore as the column type.
@@ -244,7 +239,8 @@ public abstract class Type {
     } catch (Exception e) {
       return null;
     }
-    return createTableStmt.getColumnDefs().get(0).getType();
+    TypeDef typeDef = createTableStmt.getColumnDefs().get(0).getTypeDef();
+    return typeDef.getType();
   }
 
   /**

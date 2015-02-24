@@ -98,7 +98,6 @@ public class SlotRef extends Expr {
       // HMS string.
       throw new AnalysisException("Unsupported type in '" + toSql() + "'.");
     }
-    type_.analyze();
     numDistinctValues_ = desc_.getStats().getNumDistinctValues();
     if (type_.isBoolean()) selectivity_ = DEFAULT_SELECTIVITY;
     isAnalyzed_ = true;

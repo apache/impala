@@ -94,7 +94,6 @@ public class Subquery extends Expr {
     if (!((SelectStmt)stmt_).returnsSingleRow()) type_ = new ArrayType(type_);
 
     Preconditions.checkNotNull(type_);
-    type_.analyze();
     isAnalyzed_ = true;
   }
 

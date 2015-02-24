@@ -1,7 +1,20 @@
+// Copyright 2012 Cloudera Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package com.cloudera.impala.catalog;
 
 import com.cloudera.impala.analysis.TypesUtil;
-import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TScalarType;
 import com.cloudera.impala.thrift.TTypeNode;
@@ -105,7 +118,6 @@ public class ScalarType extends Type {
     ScalarType type = new ScalarType(PrimitiveType.DECIMAL);
     type.precision_ = Math.min(precision, MAX_PRECISION);
     type.scale_ = Math.min(type.precision_, scale);
-    type.isAnalyzed_ = true;
     return type;
   }
 
@@ -118,54 +130,6 @@ public class ScalarType extends Type {
 
   public static ScalarType createVarcharType() {
     return DEFAULT_VARCHAR;
-  }
-
-  @Override
-  public void analyze() throws AnalysisException {
-    if (isAnalyzed_) return;
-    Preconditions.checkState(type_ != PrimitiveType.INVALID_TYPE);
-    switch (type_) {
-      case CHAR:
-      case VARCHAR: {
-        String name;
-        int maxLen;
-        if (type_ == PrimitiveType.VARCHAR) {
-          name = "Varchar";
-          maxLen = MAX_VARCHAR_LENGTH;
-        } else if (type_ == PrimitiveType.CHAR) {
-          name = "Char";
-          maxLen = MAX_CHAR_LENGTH;
-        } else {
-          Preconditions.checkState(false);
-          return;
-        }
-
-        if (len_ <= 0) {
-          throw new AnalysisException(name +
-              " size must be > 0. Size is too small: " + len_ + ".");
-        }
-        if (len_ > maxLen) {
-          throw new AnalysisException(name +
-              " size must be <= " + maxLen + ". Size is too large: " + len_ + ".");
-        }
-        break;
-      }
-      case DECIMAL: {
-        if (precision_ > MAX_PRECISION) {
-          throw new AnalysisException(
-              "Decimal precision must be <= " + MAX_PRECISION + ".");
-        }
-        if (precision_ == 0) {
-          throw new AnalysisException("Decimal precision must be greater than 0.");
-        }
-        if (scale_ > precision_) {
-          throw new AnalysisException("Decimal scale (" + scale_ + ") must be <= " +
-              "precision (" + precision_ + ").");
-        }
-      }
-      default: break;
-    }
-    isAnalyzed_ = true;
   }
 
   @Override

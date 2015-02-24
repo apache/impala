@@ -1,6 +1,5 @@
 package com.cloudera.impala.catalog;
 
-import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TTypeNode;
 import com.cloudera.impala.thrift.TTypeNodeType;
@@ -13,16 +12,11 @@ public class ArrayType extends Type {
   private final Type elementType_;
 
   public ArrayType(Type elementType) {
+    Preconditions.checkNotNull(elementType);
     elementType_ = elementType;
   }
 
-  @Override
-  public void analyze() throws AnalysisException {
-    if (isAnalyzed_) return;
-    Preconditions.checkNotNull(elementType_);
-    elementType_.analyze();
-    isAnalyzed_ = true;
-  }
+  public Type getElementType() { return elementType_; }
 
   @Override
   public String toSql() {

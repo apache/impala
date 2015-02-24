@@ -14,8 +14,12 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 
+import jline.internal.Preconditions;
+
+import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.catalog.Type;
@@ -27,9 +31,6 @@ import com.cloudera.impala.thrift.TSymbolType;
  * Represents a CREATE FUNCTION statement.
  */
 public class CreateUdfStmt extends CreateFunctionStmtBase {
-  // Same as super.fn_. Typed here for convenience.
-  private final ScalarFunction udf_;
-
   /**
    * Builds a CREATE FUNCTION statement
    * @param fnName - Name of the function
@@ -41,73 +42,75 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
    *        validated in analyze()
    */
   public CreateUdfStmt(FunctionName fnName, FunctionArgs args,
-      Type retType, HdfsUri location, boolean ifNotExists,
+      TypeDef retTypeDef, HdfsUri location, boolean ifNotExists,
       HashMap<CreateFunctionStmtBase.OptArg, String> optArgs) {
-    super(new ScalarFunction(fnName, args, retType), location, ifNotExists, optArgs);
-    udf_ = (ScalarFunction)fn_;
+    super(fnName, args, retTypeDef, location, ifNotExists, optArgs);
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
+    Preconditions.checkNotNull(fn_);
+    Preconditions.checkNotNull(fn_ instanceof ScalarFunction);
+    ScalarFunction udf = (ScalarFunction) fn_;
 
-    if (udf_.getBinaryType() == TFunctionBinaryType.HIVE) {
-      if (!udf_.getReturnType().isScalarType()) {
+    if (udf.getBinaryType() == TFunctionBinaryType.HIVE) {
+      if (!udf.getReturnType().isScalarType()) {
         throw new AnalysisException("Non-scalar return types not supported: "
-            + udf_.getReturnType().toSql());
+            + udf.getReturnType().toSql());
       }
-      if (udf_.getReturnType().isTimestamp()) {
+      if (udf.getReturnType().isTimestamp()) {
         throw new AnalysisException(
             "Hive UDFs that use TIMESTAMP are not yet supported.");
       }
-      if (udf_.getReturnType().isDecimal()) {
+      if (udf.getReturnType().isDecimal()) {
         throw new AnalysisException(
             "Hive UDFs that use DECIMAL are not yet supported.");
       }
-      for (int i = 0; i < udf_.getNumArgs(); ++i) {
-        if (!udf_.getArgs()[i].isScalarType()) {
+      for (int i = 0; i < udf.getNumArgs(); ++i) {
+        if (!udf.getArgs()[i].isScalarType()) {
           throw new AnalysisException("Non-scalar argument types not supported: "
-              + udf_.getArgs()[i].toSql());
+              + udf.getArgs()[i].toSql());
         }
-        if (udf_.getArgs()[i].isTimestamp()) {
+        if (udf.getArgs()[i].isTimestamp()) {
           throw new AnalysisException(
               "Hive UDFs that use TIMESTAMP are not yet supported.");
         }
-        if (udf_.getArgs()[i].isDecimal()) {
+        if (udf.getArgs()[i].isDecimal()) {
           throw new AnalysisException(
               "Hive UDFs that use DECIMAL are not yet supported.");
         }
       }
     }
 
-    if (udf_.getReturnType().getPrimitiveType() == PrimitiveType.CHAR) {
+    if (udf.getReturnType().getPrimitiveType() == PrimitiveType.CHAR) {
       throw new AnalysisException("UDFs that use CHAR are not yet supported.");
     }
-    if (udf_.getReturnType().getPrimitiveType() == PrimitiveType.VARCHAR) {
+    if (udf.getReturnType().getPrimitiveType() == PrimitiveType.VARCHAR) {
       throw new AnalysisException("UDFs that use VARCHAR are not yet supported.");
     }
-    for (int i = 0; i < udf_.getNumArgs(); ++i) {
-      if (udf_.getArgs()[i].getPrimitiveType() == PrimitiveType.CHAR) {
+    for (int i = 0; i < udf.getNumArgs(); ++i) {
+      if (udf.getArgs()[i].getPrimitiveType() == PrimitiveType.CHAR) {
         throw new AnalysisException("UDFs that use CHAR are not yet supported.");
       }
-      if (udf_.getArgs()[i].getPrimitiveType() == PrimitiveType.VARCHAR) {
+      if (udf.getArgs()[i].getPrimitiveType() == PrimitiveType.VARCHAR) {
         throw new AnalysisException("UDFs that use VARCHAR are not yet supported.");
       }
     }
 
     // Check the user provided symbol exists
-    udf_.setSymbolName(udf_.lookupSymbol(
+    udf.setSymbolName(udf.lookupSymbol(
         checkAndGetOptArg(OptArg.SYMBOL), TSymbolType.UDF_EVALUATE, null,
-        udf_.hasVarArgs(), udf_.getArgs()));
+        udf.hasVarArgs(), udf.getArgs()));
 
     // Set optional Prepare/Close functions
     String prepareFn = optArgs_.get(OptArg.PREPARE_FN);
     if (prepareFn != null) {
-      udf_.setPrepareFnSymbol(udf_.lookupSymbol(prepareFn, TSymbolType.UDF_PREPARE));
+      udf.setPrepareFnSymbol(udf.lookupSymbol(prepareFn, TSymbolType.UDF_PREPARE));
     }
     String closeFn = optArgs_.get(OptArg.CLOSE_FN);
     if (closeFn != null) {
-      udf_.setCloseFnSymbol(udf_.lookupSymbol(closeFn, TSymbolType.UDF_CLOSE));
+      udf.setCloseFnSymbol(udf.lookupSymbol(closeFn, TSymbolType.UDF_CLOSE));
     }
 
     // Udfs should not set any of these
@@ -120,11 +123,17 @@ public class CreateUdfStmt extends CreateFunctionStmtBase {
     StringBuilder sb = new StringBuilder("CREATE ");
     sb.append("FUNCTION ");
     if (ifNotExists_) sb.append("IF NOT EXISTS ");
-    sb.append(udf_.signatureString())
-      .append(" RETURNS ").append(udf_.getReturnType())
-      .append(" LOCATION ").append(udf_.getLocation())
-      .append(" SYMBOL=").append(udf_.getSymbolName());
+    sb.append(udf.signatureString())
+      .append(" RETURNS ").append(udf.getReturnType())
+      .append(" LOCATION ").append(udf.getLocation())
+      .append(" SYMBOL=").append(udf.getSymbolName());
     if (getComment() != null) sb.append(" COMMENT = '" + getComment() + "'");
     sqlString_ = sb.toString();
+  }
+
+  @Override
+  protected Function createFunction(FunctionName fnName, ArrayList<Type> argTypes, Type retType,
+      boolean hasVarArgs) {
+    return new ScalarFunction(fnName, argTypes, retType, hasVarArgs);
   }
 }

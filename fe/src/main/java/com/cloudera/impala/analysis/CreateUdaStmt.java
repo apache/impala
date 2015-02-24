@@ -14,9 +14,11 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 
 import com.cloudera.impala.catalog.AggregateFunction;
+import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
@@ -28,9 +30,7 @@ import com.google.common.base.Preconditions;
  * Represents a CREATE AGGREGATE FUNCTION statement.
  */
 public class CreateUdaStmt extends CreateFunctionStmtBase {
-  // Same as super.fn_. Typed here for convenience.
-  private final AggregateFunction uda_;
-  private Type intermediateType_;
+  private final TypeDef intermediateTypeDef_;
 
   /**
    * Builds a CREATE AGGREGATE FUNCTION statement
@@ -44,12 +44,11 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
    *        validated in analyze()
    */
   public CreateUdaStmt(FunctionName fnSymbol, FunctionArgs args,
-      Type retType, Type intermediateType,
+      TypeDef retTypeDef, TypeDef intermediateTypeDef,
       HdfsUri location, boolean ifNotExists,
       HashMap<CreateFunctionStmtBase.OptArg, String> optArgs) {
-    super(new AggregateFunction(fnSymbol, args, retType), location, ifNotExists, optArgs);
-    uda_ = (AggregateFunction)super.fn_;
-    intermediateType_ = intermediateType;
+    super(fnSymbol, args, retTypeDef, location, ifNotExists, optArgs);
+    intermediateTypeDef_ = intermediateTypeDef;
   }
 
   private void reportCouldNotInferSymbol(String function) throws AnalysisException {
@@ -62,7 +61,6 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
   // function must contain "update" or "Update" and we switch that out with 'defaultSymbol'.
   // Returns null if no symbol was found.
   private String getSymbolSymbol(OptArg arg, String defaultSymbol) {
-    Preconditions.checkState(uda_.getUpdateFnSymbol() != null);
     // First lookup if the user explicitly set it.
     if (optArgs_.get(arg) != null) return optArgs_.get(arg);
     // Try to match it from Update
@@ -85,18 +83,21 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
+    Preconditions.checkNotNull(fn_);
+    Preconditions.checkState(fn_ instanceof AggregateFunction);
+    AggregateFunction uda = (AggregateFunction) fn_;
 
-    if (uda_.getNumArgs() == 0) {
+    if (uda.getNumArgs() == 0) {
       throw new AnalysisException("UDAs must take at least one argument.");
     }
 
-    if (uda_.getBinaryType() == TFunctionBinaryType.HIVE) {
+    if (uda.getBinaryType() == TFunctionBinaryType.HIVE) {
       throw new AnalysisException("Java UDAs are not supported.");
     }
 
     // TODO: these are temporarily restrictions since the BE cannot yet
     // execute them.
-    if (uda_.getBinaryType() == TFunctionBinaryType.IR) {
+    if (uda.getBinaryType() == TFunctionBinaryType.IR) {
       throw new AnalysisException("IR UDAs are not yet supported.");
     }
     if (fn_.hasVarArgs()) {
@@ -107,36 +108,38 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
           "UDAs with more than 8 arguments are not yet supported.");
     }
 
-    if (uda_.getReturnType().getPrimitiveType() == PrimitiveType.CHAR) {
+    if (uda.getReturnType().getPrimitiveType() == PrimitiveType.CHAR) {
       throw new AnalysisException("UDAs with CHAR return type are not yet supported.");
     }
-    if (uda_.getReturnType().getPrimitiveType() == PrimitiveType.VARCHAR) {
+    if (uda.getReturnType().getPrimitiveType() == PrimitiveType.VARCHAR) {
       throw new AnalysisException("UDAs with VARCHAR return type are not yet supported.");
     }
-    for (int i = 0; i < uda_.getNumArgs(); ++i) {
-      if (uda_.getArgs()[i].getPrimitiveType() == PrimitiveType.CHAR) {
+    for (int i = 0; i < uda.getNumArgs(); ++i) {
+      if (uda.getArgs()[i].getPrimitiveType() == PrimitiveType.CHAR) {
         throw new AnalysisException("UDAs with CHAR arguments are not yet supported.");
       }
-      if (uda_.getArgs()[i].getPrimitiveType() == PrimitiveType.VARCHAR) {
+      if (uda.getArgs()[i].getPrimitiveType() == PrimitiveType.VARCHAR) {
         throw new AnalysisException("UDAs with VARCHAR arguments are not yet supported.");
       }
     }
 
-    if (intermediateType_ == null) {
-      intermediateType_ = uda_.getReturnType();
+    Type intermediateType = null;
+    if (intermediateTypeDef_ == null) {
+      intermediateType = uda.getReturnType();
     } else {
-      intermediateType_.analyze();
+      intermediateTypeDef_.analyze(analyzer);
+      intermediateType = intermediateTypeDef_.getType();
     }
-    uda_.setIntermediateType(intermediateType_);
+    uda.setIntermediateType(intermediateType);
 
     // TODO: this is a temporary restriction. Remove when we can support
     // different intermediate types.
-    if (!intermediateType_.equals(fn_.getReturnType())) {
+    if (!intermediateType.equals(fn_.getReturnType())) {
       StringBuilder error = new StringBuilder();
       error.append("UDAs with an intermediate type, ")
-           .append(intermediateType_.toString())
+           .append(intermediateType.toSql())
            .append(", that is different from the return type, ")
-           .append(fn_.getReturnType().toString())
+           .append(fn_.getReturnType().toSql())
            .append(", are currently not supported.");
       throw new AnalysisException(error.toString());
     }
@@ -147,78 +150,86 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
     checkOptArgNotSet(OptArg.CLOSE_FN);
 
     // The user must provide the symbol for Update.
-    uda_.setUpdateFnSymbol(uda_.lookupSymbol(
-        checkAndGetOptArg(OptArg.UPDATE_FN), TSymbolType.UDF_EVALUATE, intermediateType_,
-        uda_.hasVarArgs(), uda_.getArgs()));
+    uda.setUpdateFnSymbol(uda.lookupSymbol(
+        checkAndGetOptArg(OptArg.UPDATE_FN), TSymbolType.UDF_EVALUATE, intermediateType,
+        uda.hasVarArgs(), uda.getArgs()));
 
     // If the ddl did not specify the init/serialize/merge/finalize function
     // Symbols, guess them based on the update fn Symbol.
-    uda_.setInitFnSymbol(getSymbolSymbol(OptArg.INIT_FN, "init"));
-    uda_.setSerializeFnSymbol(getSymbolSymbol(OptArg.SERIALIZE_FN, "serialize"));
-    uda_.setMergeFnSymbol(getSymbolSymbol(OptArg.MERGE_FN, "merge"));
-    uda_.setFinalizeFnSymbol(getSymbolSymbol(OptArg.FINALIZE_FN, "finalize"));
+    Preconditions.checkNotNull(uda.getUpdateFnSymbol());
+    uda.setInitFnSymbol(getSymbolSymbol(OptArg.INIT_FN, "init"));
+    uda.setSerializeFnSymbol(getSymbolSymbol(OptArg.SERIALIZE_FN, "serialize"));
+    uda.setMergeFnSymbol(getSymbolSymbol(OptArg.MERGE_FN, "merge"));
+    uda.setFinalizeFnSymbol(getSymbolSymbol(OptArg.FINALIZE_FN, "finalize"));
 
     // Init and merge are required.
-    if (uda_.getInitFnSymbol() == null) reportCouldNotInferSymbol("init");
-    if (uda_.getMergeFnSymbol() == null) reportCouldNotInferSymbol("merge");
+    if (uda.getInitFnSymbol() == null) reportCouldNotInferSymbol("init");
+    if (uda.getMergeFnSymbol() == null) reportCouldNotInferSymbol("merge");
 
     // Validate that all set symbols exist.
-    uda_.setInitFnSymbol(uda_.lookupSymbol(uda_.getInitFnSymbol(),
-        TSymbolType.UDF_EVALUATE, intermediateType_, false));
-    uda_.setMergeFnSymbol(uda_.lookupSymbol(uda_.getMergeFnSymbol(),
-        TSymbolType.UDF_EVALUATE, intermediateType_, false, intermediateType_));
-    if (uda_.getSerializeFnSymbol() != null) {
+    uda.setInitFnSymbol(uda.lookupSymbol(uda.getInitFnSymbol(),
+        TSymbolType.UDF_EVALUATE, intermediateType, false));
+    uda.setMergeFnSymbol(uda.lookupSymbol(uda.getMergeFnSymbol(),
+        TSymbolType.UDF_EVALUATE, intermediateType, false, intermediateType));
+    if (uda.getSerializeFnSymbol() != null) {
       try {
-        uda_.setSerializeFnSymbol(uda_.lookupSymbol(uda_.getSerializeFnSymbol(),
-            TSymbolType.UDF_EVALUATE, null, false, intermediateType_));
+        uda.setSerializeFnSymbol(uda.lookupSymbol(uda.getSerializeFnSymbol(),
+            TSymbolType.UDF_EVALUATE, null, false, intermediateType));
       } catch (AnalysisException e) {
         if (optArgs_.get(OptArg.SERIALIZE_FN) != null) {
           throw e;
         } else {
           // Ignore, these symbols are optional.
-          uda_.setSerializeFnSymbol(null);
+          uda.setSerializeFnSymbol(null);
         }
       }
     }
-    if (uda_.getFinalizeFnSymbol() != null) {
+    if (uda.getFinalizeFnSymbol() != null) {
       try {
-        uda_.setFinalizeFnSymbol(uda_.lookupSymbol(
-            uda_.getFinalizeFnSymbol(), TSymbolType.UDF_EVALUATE, null, false,
-            intermediateType_));
+        uda.setFinalizeFnSymbol(uda.lookupSymbol(
+            uda.getFinalizeFnSymbol(), TSymbolType.UDF_EVALUATE, null, false,
+            intermediateType));
       } catch (AnalysisException e) {
         if (optArgs_.get(OptArg.FINALIZE_FN) != null) {
           throw e;
         } else {
           // Ignore, these symbols are optional.
-          uda_.setFinalizeFnSymbol(null);
+          uda.setFinalizeFnSymbol(null);
         }
       }
     }
 
     // If the intermediate type is not the return type, then finalize is
     // required.
-    if (!intermediateType_.equals(fn_.getReturnType()) &&
-        uda_.getFinalizeFnSymbol() == null) {
+    if (!intermediateType.equals(fn_.getReturnType()) &&
+        uda.getFinalizeFnSymbol() == null) {
       throw new AnalysisException("Finalize() is required for this UDA.");
     }
 
     StringBuilder sb = new StringBuilder("CREATE ");
     sb.append("AGGREGATE FUNCTION ");
     if (ifNotExists_) sb.append("IF NOT EXISTS ");
-    sb.append(uda_.signatureString())
-      .append(" RETURNS ").append(uda_.getReturnType())
-      .append(" INTERMEDIATE ").append(uda_.getIntermediateType())
-      .append(" LOCATION ").append(uda_.getLocation())
-      .append(" UPDATE_FN=").append(uda_.getUpdateFnSymbol())
-      .append(" INIT_FN=").append(uda_.getInitFnSymbol())
-      .append(" MERGE_FN=").append(uda_.getMergeFnSymbol());
-    if (uda_.getSerializeFnSymbol() != null) {
-      sb.append(" SERIALIZE_FN=").append(uda_.getSerializeFnSymbol());
+    sb.append(uda.signatureString())
+      .append(" RETURNS ").append(uda.getReturnType())
+      .append(" INTERMEDIATE ").append(uda.getIntermediateType())
+      .append(" LOCATION ").append(uda.getLocation())
+      .append(" UPDATE_FN=").append(uda.getUpdateFnSymbol())
+      .append(" INIT_FN=").append(uda.getInitFnSymbol())
+      .append(" MERGE_FN=").append(uda.getMergeFnSymbol());
+    if (uda.getSerializeFnSymbol() != null) {
+      sb.append(" SERIALIZE_FN=").append(uda.getSerializeFnSymbol());
     }
-    if (uda_.getFinalizeFnSymbol() != null) {
-      sb.append(" FINALIZE_FN=").append(uda_.getFinalizeFnSymbol());
+    if (uda.getFinalizeFnSymbol() != null) {
+      sb.append(" FINALIZE_FN=").append(uda.getFinalizeFnSymbol());
     }
     if (getComment() != null) sb.append(" COMMENT = '" + getComment() + "'");
     sqlString_ = sb.toString();
+  }
+
+  @Override
+  protected Function createFunction(FunctionName fnName, ArrayList<Type> argTypes,
+      Type retType, boolean hasVarArgs) {
+    return new AggregateFunction(fnName_, args_.getArgTypes(), retTypeDef_.getType(),
+        args_.hasVarArgs());
   }
 }

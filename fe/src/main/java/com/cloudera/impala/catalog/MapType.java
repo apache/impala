@@ -1,6 +1,5 @@
 package com.cloudera.impala.catalog;
 
-import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TTypeNode;
 import com.cloudera.impala.thrift.TTypeNodeType;
@@ -14,23 +13,14 @@ public class MapType extends Type {
   private final Type valueType_;
 
   public MapType(Type keyType, Type valueType) {
+    Preconditions.checkNotNull(keyType);
+    Preconditions.checkNotNull(valueType);
     keyType_ = keyType;
     valueType_ = valueType;
   }
 
-  @Override
-  public void analyze() throws AnalysisException {
-    if (isAnalyzed_) return;
-    Preconditions.checkNotNull(keyType_);
-    Preconditions.checkNotNull(valueType_);
-    keyType_.analyze();
-    if (keyType_.isComplexType()) {
-      throw new AnalysisException(
-          "Map type cannot have a complex-typed key: " + toSql());
-    }
-    valueType_.analyze();
-    isAnalyzed_ = true;
-  }
+  public Type getKeyType() { return keyType_; }
+  public Type getValueType() { return valueType_; }
 
   @Override
   public String toSql() {

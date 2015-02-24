@@ -99,11 +99,11 @@ public class ToSqlUtils {
    */
   public static String getCreateTableSql(CreateTableStmt stmt) {
     ArrayList<String> colsSql = Lists.newArrayList();
-    for (ColumnDesc col: stmt.getColumnDefs()) {
+    for (ColumnDef col: stmt.getColumnDefs()) {
       colsSql.add(col.toString());
     }
     ArrayList<String> partitionColsSql = Lists.newArrayList();
-    for (ColumnDesc col: stmt.getPartitionColumnDefs()) {
+    for (ColumnDef col: stmt.getPartitionColumnDefs()) {
       partitionColsSql.add(col.toString());
     }
     // TODO: Pass the correct compression, if applicable.

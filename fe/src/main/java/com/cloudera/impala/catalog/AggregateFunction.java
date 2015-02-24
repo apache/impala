@@ -14,9 +14,9 @@
 
 package com.cloudera.impala.catalog;
 
+import java.util.ArrayList;
 import java.util.List;
 
-import com.cloudera.impala.analysis.FunctionArgs;
 import com.cloudera.impala.analysis.FunctionName;
 import com.cloudera.impala.analysis.HdfsUri;
 import com.cloudera.impala.thrift.TAggregateFunction;
@@ -66,8 +66,9 @@ public class AggregateFunction extends Function {
   // empty input in BE).
   private boolean returnsNonNullOnEmpty_;
 
-  public AggregateFunction(FunctionName fnName, FunctionArgs args, Type retType) {
-    super(fnName, args.argTypes, retType, args.hasVarArgs);
+  public AggregateFunction(FunctionName fnName, ArrayList<Type> argTypes, Type retType,
+      boolean hasVarArgs) {
+    super(fnName, argTypes, retType, hasVarArgs);
   }
 
   public AggregateFunction(FunctionName fnName, List<Type> argTypes,

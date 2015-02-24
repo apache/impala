@@ -242,7 +242,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     }
 
     AnalysisError("select cast(1 as decimal(0, 1))",
-        "Decimal precision must be greater than 0.");
+        "Decimal precision must be > 0: 0");
   }
 
   /**
@@ -337,13 +337,13 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     testExprCast("cast('Hello' as VARCHAR(5))", ScalarType.createVarcharType(3));
 
     AnalysisError("select cast('foo' as varchar(0))",
-        "Varchar size must be > 0. Size is too small: 0.");
+        "Varchar size must be > 0: 0");
     AnalysisError("select cast('foo' as varchar(65356))",
-        "Varchar size must be <= 65355. Size is too large: 65356.");
+        "Varchar size must be <= 65355: 65356");
     AnalysisError("select cast('foo' as char(0))",
-        "Char size must be > 0. Size is too small: 0.");
+        "Char size must be > 0: 0");
     AnalysisError("select cast('foo' as char(256))",
-        "Char size must be <= 255. Size is too large: 256.");
+        "Char size must be <= 255: 256");
 
     testExprCast("'Hello'", ScalarType.createCharType(5));
     testExprCast("cast('Hello' as CHAR(5))", ScalarType.STRING);
@@ -1972,11 +1972,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     AnalyzesOk("select cast(1 as decimal(38, 38))");
 
     AnalysisError("select cast(1 as decimal(0))",
-        "Decimal precision must be greater than 0.");
+        "Decimal precision must be > 0: 0");
     AnalysisError("select cast(1 as decimal(39))",
-        "Decimal precision must be <= 38.");
+        "Decimal precision must be <= 38: 39");
     AnalysisError("select cast(1 as decimal(1, 2))",
-        "Decimal scale (2) must be <= precision (1).");
+        "Decimal scale (2) must be <= precision (1)");
   }
 
   @Test

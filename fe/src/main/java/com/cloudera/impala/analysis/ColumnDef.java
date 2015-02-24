@@ -19,6 +19,7 @@ import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TColumn;
+import com.google.common.base.Preconditions;
 
 /**
  * Represents a column definition in a CREATE/ALTER TABLE/VIEW statement.
@@ -28,20 +29,24 @@ import com.cloudera.impala.thrift.TColumn;
  * Since a column definition refers a column stored in the Metastore, the column name
  * must be valid according to the Metastore's rules (see @MetaStoreUtils).
  */
-public class ColumnDesc {
+public class ColumnDef {
   private final String colName_;
   private final String comment_;
-  // Required in CREATE/ALTER TABLE stmts. Set to NULL in CREATE/ALTER VIEW stmts.
+
+  // Required in CREATE/ALTER TABLE stmts. Set to NULL in CREATE/ALTER VIEW stmts,
+  // for which we setType() after analyzing the defining view definition stmt.
+  private final TypeDef typeDef_;
   private Type type_;
 
-  public ColumnDesc(String colName, Type type, String comment) {
+  public ColumnDef(String colName, TypeDef typeDef, String comment) {
     colName_ = colName;
-    type_ = type;
+    typeDef_ = typeDef;
     comment_ = comment;
   }
 
   public void setType(Type type) { type_ = type; }
   public Type getType() { return type_; }
+  public TypeDef getTypeDef() { return typeDef_; }
   public String getColName() { return colName_; }
   public String getComment() { return comment_; }
 
@@ -50,20 +55,28 @@ public class ColumnDesc {
     if (!MetaStoreUtils.validateName(colName_)) {
       throw new AnalysisException("Invalid column/field name: " + colName_);
     }
-    type_.analyze();
+    if (typeDef_ != null) {
+      typeDef_.analyze(null);
+      type_ = typeDef_.getType();
+    }
+    Preconditions.checkNotNull(type_);
+    Preconditions.checkState(type_.isValid());
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder(colName_);
-    if (type_ != null) sb.append(" " + type_.toString());
+    if (type_ != null) {
+      sb.append(" " + type_.toString());
+    } else {
+      sb.append(" " + typeDef_.toString());
+    }
     if (comment_ != null) sb.append(String.format(" COMMENT '%s'", comment_));
     return sb.toString();
   }
 
   public TColumn toThrift() {
-    TColumn col = new TColumn(
-        new TColumn(getColName(), type_.toThrift()));
+    TColumn col = new TColumn(new TColumn(getColName(), type_.toThrift()));
     col.setComment(getComment());
     return col;
   }

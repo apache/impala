@@ -1009,17 +1009,17 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create table new_table (i int) PARTITIONED BY (d decimal(3,1))");
     AnalyzesOk("create table new_table(d1 decimal, d2 decimal(10), d3 decimal(5, 2))");
     AnalysisError("create table new_table (i int) PARTITIONED BY (d decimal(40,1))",
-        "Decimal precision must be <= 38.");
+        "Decimal precision must be <= 38: 40");
 
     AnalyzesOk("create table new_table(s1 varchar(1), s2 varchar(32672))");
     AnalysisError("create table new_table(s1 varchar(0))",
-        "Varchar size must be > 0. Size is too small: 0.");
+        "Varchar size must be > 0: 0");
     AnalysisError("create table new_table(s1 varchar(65356))",
-        "Varchar size must be <= 65355. Size is too large: 65356.");
+        "Varchar size must be <= 65355: 65356");
     AnalysisError("create table new_table(s1 char(0))",
-        "Char size must be > 0. Size is too small: 0.");
+        "Char size must be > 0: 0");
     AnalysisError("create table new_table(s1 Char(256))",
-        "Char size must be <= 255. Size is too large: 256.");
+        "Char size must be <= 255: 256");
     AnalyzesOk("create table new_table (i int) PARTITIONED BY (s varchar(3))");
     AnalyzesOk("create table functional.new_table (c char(250))");
     AnalyzesOk("create table new_table (i int) PARTITIONED BY (c char(3))");
@@ -1482,7 +1482,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "'/test-warehouse/hive-exec.jar' SYMBOL='a'");
 
     // Test hive UDFs for unsupported types
-    AnalysisError("create function foo() RETURNS timestamp LOCATION '/a.jar'",
+    AnalysisError("create function foo() RETURNS timestamp LOCATION '/test-warehouse/hive-exec.jar' SYMBOL='a'",
         "Hive UDFs that use TIMESTAMP are not yet supported.");
     AnalysisError("create function foo(timestamp) RETURNS int LOCATION '/a.jar'",
         "Hive UDFs that use TIMESTAMP are not yet supported.");
@@ -1511,9 +1511,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalyzesOk("create function foo() RETURNS decimal(38,10)" + udfSuffix);
     AnalyzesOk("create function foo(Decimal, decimal(10, 2)) RETURNS int" + udfSuffix);
     AnalysisError("create function foo() RETURNS decimal(100)" + udfSuffix,
-        "Decimal precision must be <= 38.");
+        "Decimal precision must be <= 38: 100");
     AnalysisError("create function foo(Decimal(2, 3)) RETURNS int" + udfSuffix,
-        "Decimal scale (3) must be <= precision (2).");
+        "Decimal scale (3) must be <= precision (2)");
 
     // Varargs
     AnalyzesOk("create function foo(INT...) RETURNS int" + udfSuffix);
@@ -1773,7 +1773,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "return type, INT, are currently not supported.");
     AnalysisError("create aggregate function foo(int) RETURNS int " +
         "INTERMEDIATE decimal(40)" + loc + "UPDATE_FN='AggUpdate'",
-        "Decimal precision must be <= 38.");
+        "Decimal precision must be <= 38: 40");
     //AnalyzesOk("create aggregate function foo(int) RETURNS int " +
     //    "INTERMEDIATE CHAR(10)" + loc + "UPDATE_FN='AggUpdate'");
     //AnalysisError("create aggregate function foo(int) RETURNS int " +
@@ -1791,7 +1791,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Invalid char(0) type.
     AnalysisError("create aggregate function foo(int) RETURNS int " +
         "INTERMEDIATE CHAR(0) LOCATION '/foo.so' UPDATE_FN='b'",
-        "Char size must be > 0. Size is too small: 0.");
+        "Char size must be > 0: 0");
     AnalysisError("create aggregate function foo() RETURNS int" + loc,
         "UDAs must take at least one argument.");
     AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
@@ -1928,11 +1928,11 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     TypeDefsAnalyzeOk("DECIMAL(38, 38)");
 
     TypeDefAnalysisError("DECIMAL(1, 10)",
-        "Decimal scale (10) must be <= precision (1).");
+        "Decimal scale (10) must be <= precision (1)");
     TypeDefAnalysisError("DECIMAL(0, 0)",
-        "Decimal precision must be greater than 0.");
+        "Decimal precision must be > 0: 0");
     TypeDefAnalysisError("DECIMAL(39, 0)",
-        "Decimal precision must be <= 38.");
+        "Decimal precision must be <= 38");
 
     // Test complex types.
     TypeDefsAnalyzeOk("ARRAY<BIGINT>");

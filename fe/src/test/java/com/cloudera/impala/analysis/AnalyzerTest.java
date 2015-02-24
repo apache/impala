@@ -119,8 +119,8 @@ public class AnalyzerTest {
 
   protected void addTestUda(String name, Type retType, Type... argTypes) {
     FunctionName fnName = new FunctionName("default", name);
-    catalog_.addFunction(new AggregateFunction(fnName,
-        new FunctionArgs(Lists.newArrayList(argTypes), false), retType));
+    catalog_.addFunction(
+        new AggregateFunction(fnName, Lists.newArrayList(argTypes), retType, false));
   }
 
   /**

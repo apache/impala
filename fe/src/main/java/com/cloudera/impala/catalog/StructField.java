@@ -14,9 +14,6 @@
 
 package com.cloudera.impala.catalog;
 
-import org.apache.hadoop.hive.metastore.MetaStoreUtils;
-
-import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TStructField;
 import com.cloudera.impala.thrift.TTypeNode;
@@ -34,14 +31,6 @@ public class StructField {
     name_ = name;
     type_ = type;
     comment_ = comment;
-  }
-
-  public void analyze() throws AnalysisException {
-    // Check whether the column name meets the Metastore's requirements.
-    if (!MetaStoreUtils.validateName(name_)) {
-      throw new AnalysisException("Invalid struct field name: " + name_);
-    }
-    type_.analyze();
   }
 
   public String getComment() { return comment_; }

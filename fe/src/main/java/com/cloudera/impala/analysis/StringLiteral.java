@@ -101,7 +101,7 @@ public class StringLiteral extends LiteralExpr {
       return convertToNumber();
     } else if (targetType.isDateType()) {
       // Let the BE do the cast so it is in Boost format
-      return new CastExpr(targetType, this, true);
+      return new CastExpr(targetType, this);
     }
     return this;
   }

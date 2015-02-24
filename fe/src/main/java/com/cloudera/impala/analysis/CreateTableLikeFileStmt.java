@@ -22,8 +22,8 @@ import java.util.Map;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-
 import org.apache.hadoop.fs.permission.FsAction;
+
 import parquet.hadoop.ParquetFileReader;
 import parquet.hadoop.metadata.ParquetMetadata;
 import parquet.schema.OriginalType;
@@ -52,12 +52,12 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
   private final THdfsFileFormat schemaFileFormat_;
 
   public CreateTableLikeFileStmt(TableName tableName, THdfsFileFormat schemaFileFormat,
-      HdfsUri schemaLocation, List<ColumnDesc> partitionColumnDescs,
+      HdfsUri schemaLocation, List<ColumnDef> partitionColumnDescs,
       boolean isExternal, String comment, RowFormat rowFormat,
       THdfsFileFormat fileFormat, HdfsUri location, HdfsCachingOp cachingOp,
       boolean ifNotExists, Map<String, String> tblProperties,
       Map<String, String> serdeProperties) {
-    super(tableName, new ArrayList<ColumnDesc>(), partitionColumnDescs,
+    super(tableName, new ArrayList<ColumnDef>(), partitionColumnDescs,
         isExternal, comment, rowFormat,
         fileFormat, location, cachingOp, ifNotExists, tblProperties, serdeProperties);
     schemaLocation_ = schemaLocation;
@@ -168,11 +168,11 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
    * This fails with an analysis exception if any errors occur reading the file,
    * parsing the parquet schema, or if the parquet types cannot be represented in Impala.
    */
-  private static List<ColumnDesc> extractParquetSchema(HdfsUri location)
+  private static List<ColumnDef> extractParquetSchema(HdfsUri location)
       throws AnalysisException {
     parquet.schema.MessageType parquetSchema = loadParquetSchema(location.getPath());
     List<parquet.schema.Type> fields = parquetSchema.getFields();
-    List<ColumnDesc> schema = new ArrayList<ColumnDesc>();
+    List<ColumnDef> schema = new ArrayList<ColumnDef>();
 
     for (parquet.schema.Type field: fields) {
       Type type = null;
@@ -187,7 +187,8 @@ public class CreateTableLikeFileStmt extends CreateTableStmt {
       }
 
       String colName = field.getName();
-      schema.add(new ColumnDesc(colName, type, "inferred from: " + field.toString()));
+      schema.add(new ColumnDef(colName, new TypeDef(type),
+          "inferred from: " + field.toString()));
     }
     return schema;
   }

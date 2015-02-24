@@ -28,16 +28,20 @@ import com.cloudera.impala.thrift.TDropFunctionParams;
  * by adding a DropStatementBase class.
  */
 public class DropFunctionStmt extends StatementBase {
-  private final Function desc_;
+  private final FunctionName fnName_;
+  private final FunctionArgs fnArgs_;
   private final boolean ifExists_;
+
+  // Set in analyze().
+  private Function desc_;
 
   /**
    * Constructor for building the drop statement. If ifExists is true, an error will not
    * be thrown if the function does not exist.
    */
   public DropFunctionStmt(FunctionName fnName, FunctionArgs fnArgs, boolean ifExists) {
-    desc_ = new Function(
-        fnName, fnArgs.argTypes, Type.INVALID, fnArgs.hasVarArgs);
+    fnName_ = fnName;
+    fnArgs_ = fnArgs;
     ifExists_ = ifExists;
   }
 
@@ -64,7 +68,11 @@ public class DropFunctionStmt extends StatementBase {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    desc_.getFunctionName().analyze(analyzer);
+    fnName_.analyze(analyzer);
+    fnArgs_.analyze(analyzer);
+
+    desc_ = new Function(fnName_, fnArgs_.getArgTypes(), Type.INVALID,
+        fnArgs_.hasVarArgs());
 
     // For now, if authorization is enabled, the user needs ALL on the server
     // to drop functions.
