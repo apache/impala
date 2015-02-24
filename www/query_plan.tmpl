@@ -77,10 +77,12 @@ function build(node, parent, edges, states, colour_idx) {
                 "num_active": node["num_active"],
                 "max_time": node["max_time"],
                 "avg_time": node["avg_time"],
+                "is_broadcast": node["is_broadcast"],
                 "style": "fill: " + colours[colour_idx]});
   if (parent != null) {
+    var label_val = "" + node["output_card"];
     edges.push({ start: node["label"], end: parent,
-                 style: { label: "" + node["output_card"] }});
+                 style: { label: label_val }});
   }
   // Add an inter-fragment edge. We use a red dashed line to show that rows are crossing
   // the fragment boundary.
@@ -110,6 +112,9 @@ function renderGraph(ignored_arg) {
     // Pick a new colour for each plan fragment
     colour_idx = (colour_idx + 1) % colours.length;
   });
+
+  // Keep a map of names to states for use when processing edges.
+  var states_by_name = { }
   states.forEach(function(state) {
     // Build the label for the node from the name and the detail
     var html = "<span>" + state.name + "</span><br/>";
@@ -122,9 +127,14 @@ function renderGraph(ignored_arg) {
     html += "<span>Max: " + state.max_time + ", avg: " + state.avg_time + "</span>";
     g.setNode(state.name, { "label": html,
                             "labelType": "html",
-                            "style": state.style }); });
+                            "style": state.style });
+    states_by_name[state.name] = state;
+  });
 
   edges.forEach(function(edge) {
+    // Impala marks 'broadcast' as a property of the receiver, not the sender. We use
+    // '(BCAST)' to denote that a node is duplicating its output to all receivers.
+    if (states_by_name[edge.end].is_broadcast) edge.style.label += " \n(BCAST)";
     g.setEdge(edge.start, edge.end, edge.style);
   });
 

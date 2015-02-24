@@ -443,17 +443,25 @@ void PlanToJsonHelper(const map<TPlanNodeId, TPlanNodeExecSummary>& summaries,
   TPlanNodeId id = (*it)->node_id;
   map<TPlanNodeId, TPlanNodeExecSummary>::const_iterator summary = summaries.find(id);
   if (summary != summaries.end()) {
-    int64_t count = 0;
+    int64_t cardinality = 0;
     int64_t max_time = 0L;
     int64_t total_time = 0;
     BOOST_FOREACH(const TExecStats& stat, summary->second.exec_stats) {
-      count += stat.cardinality;
+      if (summary->second.is_broadcast) {
+        // Avoid multiple-cardinalitying for recipients of broadcasts.
+        cardinality = ::max(cardinality, stat.cardinality);
+      } else {
+        cardinality += stat.cardinality;
+      }
       total_time += stat.latency_ns;
       max_time = ::max(max_time, stat.latency_ns);
     }
-    value->AddMember("output_card", count, document->GetAllocator());
+    value->AddMember("output_card", cardinality, document->GetAllocator());
     value->AddMember("num_instances", summary->second.exec_stats.size(),
         document->GetAllocator());
+    if (summary->second.is_broadcast) {
+      value->AddMember("is_broadcast", true, document->GetAllocator());
+    }
 
     const string& max_time_str = PrettyPrinter::Print(max_time, TUnit::TIME_NS);
     Value max_time_val(max_time_str.c_str(), document->GetAllocator());
