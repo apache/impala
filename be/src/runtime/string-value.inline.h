@@ -20,9 +20,7 @@
 
 #include <cstring>
 #include "util/cpu-info.h"
-#ifdef __SSE4_2__
 #include "util/sse-util.h"
-#endif
 
 namespace impala {
 
@@ -38,14 +36,12 @@ namespace impala {
 //   - len: min(n1, n2) - this can be more cheaply passed in by the caller
 static inline int StringCompare(const char* s1, int n1, const char* s2, int n2, int len) {
   DCHECK_EQ(len, std::min(n1, n2));
-#ifdef __SSE4_2__
   if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
     while (len >= SSEUtil::CHARS_PER_128_BIT_REGISTER) {
       __m128i xmm0 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s1));
       __m128i xmm1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s2));
-      int chars_match = _mm_cmpestri(xmm0, SSEUtil::CHARS_PER_128_BIT_REGISTER,
-                                     xmm1, SSEUtil::CHARS_PER_128_BIT_REGISTER,
-                                     SSEUtil::STRCMP_MODE);
+      int chars_match = SSE4_cmpestri(xmm0, SSEUtil::CHARS_PER_128_BIT_REGISTER,
+          xmm1, SSEUtil::CHARS_PER_128_BIT_REGISTER, SSEUtil::STRCMP_MODE);
       if (chars_match != SSEUtil::CHARS_PER_128_BIT_REGISTER) {
         return s1[chars_match] - s2[chars_match];
       }
@@ -54,7 +50,6 @@ static inline int StringCompare(const char* s1, int n1, const char* s2, int n2, 
       s2 += SSEUtil::CHARS_PER_128_BIT_REGISTER;
     }
   }
-#endif
   // TODO: for some reason memcmp is way slower than strncmp (2.5x)  why?
   int result = strncmp(s1, s2, len);
   if (result != 0) return result;

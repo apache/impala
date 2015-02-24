@@ -16,36 +16,33 @@
 #ifndef IMPALA_UTIL_SSE_UTIL_H
 #define IMPALA_UTIL_SSE_UTIL_H
 
-#include <nmmintrin.h>
-#include <smmintrin.h>
+#include <emmintrin.h>
 
 namespace impala {
 
-// This class contains constants useful for text processing with SSE4.2
-// intrinsics.
+// This class contains constants useful for text processing with SSE4.2 intrinsics.
 namespace SSEUtil {
-  // Number of characters that fit in 64/128 bit register.
-  // SSE provides instructions for loading 64 or 128 bits into a register
-  // at a time.
+  // Number of characters that fit in 64/128 bit register.  SSE provides instructions
+  // for loading 64 or 128 bits into a register at a time.
   static const int CHARS_PER_64_BIT_REGISTER = 8;
   static const int CHARS_PER_128_BIT_REGISTER = 16;
 
-  // SSE4.2 adds instructions for textprocessing.  The instructions accept
-  // a flag to control what text operation to do.
-  //   - SIDD_CMP_EQUAL_ANY ~ strchr 
-  //   - SIDD_CMP_EQUAL_EACH ~ strcmp
-  //   - SIDD_UBYTE_OPS - 8 bit chars (as opposed to 16 bit)
-  //   - SIDD_NEGATIVE_POLARITY - toggles whether to set result to 1 or 0 when a
-  //     match is found.
-  
-  // In this mode, sse text processing functions will return a mask of all the characters that 
-  // matched
-  static const int STRCHR_MODE = _SIDD_CMP_EQUAL_ANY | _SIDD_UBYTE_OPS;
+  // SSE4.2 adds instructions for text processing.  The instructions have a control
+  // byte that determines some of functionality of the instruction.  (Equivalent to
+  // GCC's _SIDD_CMP_EQUAL_ANY, etc).
+  static const int PCMPSTR_EQUAL_ANY    = 0x00; // strchr
+  static const int PCMPSTR_EQUAL_EACH   = 0x08; // strcmp
+  static const int PCMPSTR_UBYTE_OPS    = 0x00; // unsigned char (8-bits, rather than 16)
+  static const int PCMPSTR_NEG_POLARITY = 0x10; // see Intel SDM chapter 4.1.4.
 
-  // In this mode, sse text processing functions will return the number of bytes that match 
-  // consecutively from the beginning. 
-  static const int STRCMP_MODE = _SIDD_CMP_EQUAL_EACH | _SIDD_UBYTE_OPS 
-    | _SIDD_NEGATIVE_POLARITY;
+  // In this mode, SSE text processing functions will return a mask of all the
+  // characters that matched.
+  static const int STRCHR_MODE = PCMPSTR_EQUAL_ANY | PCMPSTR_UBYTE_OPS;
+
+  // In this mode, SSE text processing functions will return the number of bytes that match
+  // consecutively from the beginning.
+  static const int STRCMP_MODE = PCMPSTR_EQUAL_EACH | PCMPSTR_UBYTE_OPS |
+      PCMPSTR_NEG_POLARITY;
 
   // Precomputed mask values up to 16 bits.
   static const int SSE_BITMASK[CHARS_PER_128_BIT_REGISTER] = {
@@ -67,6 +64,106 @@ namespace SSEUtil {
     1 << 15,
   };
 }
+
+// Define the SSE 4.2 intrinsics.  The caller must first verify at runtime (or codegen
+// IR load time) that the processor supports SSE 4.2 before calling these.  These are
+// defined outside the namespace because the IR w/ SSE 4.2 case needs to use macros.
+#ifndef IR_COMPILE
+// When compiling to native code (i.e. not IR), we cannot use the -msse4.2 compiler
+// flag.  Otherwise, the compiler will emit SSE 4.2 instructions outside of the runtime
+// SSE 4.2 checks and Impala will crash on CPUs that don't support SSE 4.2
+// (IMPALA-1399/1646).  The compiler intrinsics cannot be used without -msse4.2, so we
+// define our own implementations of the intrinsics instead.
+
+// The PCMPxSTRy instructions require that the control byte 'mode' be encoded as an
+// immediate.  So, those need to be always inlined in order to always propagate the
+// mode constant into the inline asm.
+#define SSE_ALWAYS_INLINE inline __attribute__ ((__always_inline__))
+
+static SSE_ALWAYS_INLINE __m128i SSE4_cmpestrm(
+    __m128i str1, int len1, __m128i str2, int len2, const int mode) {
+  // Use asm reg rather than Yz output constraint to workaround LLVM bug 13199 -
+  // clang doesn't support Y-prefixed asm constraints.
+  register __m128i result asm("xmm0");
+  __asm__("pcmpestrm %5, %2, %1"
+      : "=x"(result) : "x"(str1), "xm"(str2), "a"(len1), "d"(len2), "K"(mode) : "cc");
+  return result;
+}
+
+static SSE_ALWAYS_INLINE int SSE4_cmpestri(
+    __m128i str1, int len1, __m128i str2, int len2, const int mode) {
+  int result;
+  __asm__("pcmpestri %5, %2, %1"
+      : "=c"(result) : "x"(str1), "xm"(str2), "a"(len1), "d"(len2), "K"(mode) : "cc");
+  return result;
+}
+
+static inline uint32_t SSE4_crc32_u8(uint32_t crc, uint8_t v) {
+  __asm__("crc32b %1, %0" : "+r"(crc) : "rm"(v));
+  return crc;
+}
+
+static inline uint32_t SSE4_crc32_u32(uint32_t crc, uint32_t v) {
+  __asm__("crc32l %1, %0" : "+r"(crc) : "rm"(v));
+  return crc;
+}
+
+static inline int64_t POPCNT_popcnt_u64(uint64_t a) {
+  int64_t result;
+  __asm__("popcntq %1, %0" : "=r"(result) : "mr"(a) : "cc");
+  return result;
+}
+
+#undef SSE_ALWAYS_INLINE
+
+#elif defined(__SSE4_2__) // IR_COMPILE for SSE 4.2.
+// When cross-compiling to IR, we cannot use inline asm because LLVM JIT does not
+// support it.  However, the cross-compiled IR is compiled twice: with and without
+// -msse4.2.  When -msse4.2 is enabled in the cross-compile, we can just use the
+// compiler intrinsics.
+
+#include <smmintrin.h>
+
+#define SSE4_cmpestrm _mm_cmpestrm
+#define SSE4_cmpestri _mm_cmpestri
+#define SSE4_crc32_u8 _mm_crc32_u8
+#define SSE4_crc32_u32 _mm_crc32_u32
+#define POPCNT_popcnt_u64 _mm_popcnt_u64
+
+#else  // IR_COMPILE without SSE 4.2.
+// When cross-compiling to IR without SSE 4.2 support (i.e. no -msse4.2), we cannot use
+// SSE 4.2 instructions.  Otherwise, the IR loading will fail on CPUs that don't
+// support SSE 4.2.  However, because the caller isn't allowed to call these routines
+// on CPUs that lack SSE 4.2 anyway, we can implement stubs for this case.
+
+static inline __m128i SSE4_cmpestrm(
+    __m128i str1, int len1, __m128i str2, int len2, const int mode) {
+  DCHECK(false) << "CPU doesn't support SSE 4.2";
+  return (__m128i) { 0 };
+}
+
+static inline int SSE4_cmpestri(
+    __m128i str1, int len1, __m128i str2, int len2, const int mode) {
+  DCHECK(false) << "CPU doesn't support SSE 4.2";
+  return 0;
+}
+
+static inline uint32_t SSE4_crc32_u8(uint32_t crc, uint8_t v) {
+  DCHECK(false) << "CPU doesn't support SSE 4.2";
+  return 0;
+}
+
+static inline uint32_t SSE4_crc32_u32(uint32_t crc, uint32_t v) {
+  DCHECK(false) << "CPU doesn't support SSE 4.2";
+  return 0;
+}
+
+static inline int64_t POPCNT_popcnt_u64(uint64_t a) {
+  DCHECK(false) << "CPU doesn't support SSE 4.2";
+  return 0;
+}
+
+#endif
 
 }
 

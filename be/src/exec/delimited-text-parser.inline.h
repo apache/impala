@@ -18,6 +18,7 @@
 
 #include "delimited-text-parser.h"
 #include "util/cpu-info.h"
+#include "util/sse-util.h"
 
 namespace impala {
 
@@ -49,7 +50,7 @@ inline void ProcessEscapeMask(uint16_t escape_mask, bool* last_char_is_escape,
 }
 
 template <bool process_escapes>
-inline void DelimitedTextParser::AddColumn(int len, char** next_column_start, 
+inline void DelimitedTextParser::AddColumn(int len, char** next_column_start,
     int* num_fields, FieldLocation* field_locations) {
   if (ReturnCurrentColumn()) {
     // Found a column that needs to be parsed, write the start/len to 'field_locations'
@@ -60,7 +61,7 @@ inline void DelimitedTextParser::AddColumn(int len, char** next_column_start,
       field_locations[*num_fields].len = len;
     }
     ++(*num_fields);
-  } 
+  }
   if (process_escapes) current_column_has_escape_ = false;
   *next_column_start += len + 1;
   ++column_idx_;
@@ -94,9 +95,9 @@ void inline DelimitedTextParser:: FillColumns(int len, char** last_column,
 //  Haystack = 'asdfghjklhjbdwwc' (the raw string)
 //  Result   = '1010000000011001'
 template <bool process_escapes>
-inline void DelimitedTextParser::ParseSse(int max_tuples, 
-    int64_t* remaining_len, char** byte_buffer_ptr, 
-    char** row_end_locations, 
+inline void DelimitedTextParser::ParseSse(int max_tuples,
+    int64_t* remaining_len, char** byte_buffer_ptr,
+    char** row_end_locations,
     FieldLocation* field_locations,
     int* num_tuples, int* num_fields, char** next_column_start) {
   DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
@@ -110,7 +111,7 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
   //  5. If there are escape characters, fix up the matching masked bits in the
   //        field/tuple mask
   //  6. Go through the mask bit by bit and write the parsed data.
-  
+
   // xmm registers:
   //  - xmm_buffer: the register holding the current (16 chars) we're working on from the
   //        file
@@ -131,19 +132,16 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
     // can contain non-zero values.
     // _mm_extract_epi16 will extract 16 bits out of the xmm register.  The second
     // parameter specifies which 16 bits to extract (0 for the lowest 16 bits).
-    xmm_delim_mask =
-        _mm_cmpestrm(xmm_delim_search_, num_delims_,
-                     xmm_buffer, SSEUtil::CHARS_PER_128_BIT_REGISTER,
-                     SSEUtil::STRCHR_MODE);
+    xmm_delim_mask = SSE4_cmpestrm(xmm_delim_search_, num_delims_, xmm_buffer,
+        SSEUtil::CHARS_PER_128_BIT_REGISTER, SSEUtil::STRCHR_MODE);
     uint16_t delim_mask = _mm_extract_epi16(xmm_delim_mask, 0);
 
     uint16_t escape_mask = 0;
     // If the table does not use escape characters, skip processing for it.
     if (process_escapes) {
       DCHECK(escape_char_ != '\0');
-      xmm_escape_mask = _mm_cmpestrm(xmm_escape_search_, 1,
-                                     xmm_buffer, SSEUtil::CHARS_PER_128_BIT_REGISTER,
-                                     SSEUtil::STRCHR_MODE);
+      xmm_escape_mask = SSE4_cmpestrm(xmm_escape_search_, 1,
+          xmm_buffer, SSEUtil::CHARS_PER_128_BIT_REGISTER, SSEUtil::STRCHR_MODE);
       escape_mask = _mm_extract_epi16(xmm_escape_mask, 0);
       ProcessEscapeMask(escape_mask, &last_char_is_escape_, &delim_mask);
     }
@@ -199,7 +197,7 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
           if (last_row_delim_offset_ == *remaining_len) last_row_delim_offset_ = 0;
           return;
         }
-      } 
+      }
     }
 
     if (process_escapes) {
@@ -228,19 +226,16 @@ inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* b
       // Load the next 16 bytes into the xmm register
       xmm_buffer = _mm_loadu_si128(reinterpret_cast<__m128i*>(buffer));
 
-      xmm_delim_mask =
-          _mm_cmpestrm(xmm_delim_search_, num_delims_,
-                       xmm_buffer, SSEUtil::CHARS_PER_128_BIT_REGISTER,
-                       SSEUtil::STRCHR_MODE);
+      xmm_delim_mask = SSE4_cmpestrm(xmm_delim_search_, num_delims_, xmm_buffer,
+          SSEUtil::CHARS_PER_128_BIT_REGISTER, SSEUtil::STRCHR_MODE);
       uint16_t delim_mask = _mm_extract_epi16(xmm_delim_mask, 0);
 
       uint16_t escape_mask = 0;
       // If the table does not use escape characters, skip processing for it.
       if (process_escapes) {
         DCHECK(escape_char_ != '\0');
-        xmm_escape_mask = _mm_cmpestrm(xmm_escape_search_, 1,
-                                       xmm_buffer, SSEUtil::CHARS_PER_128_BIT_REGISTER,
-                                      SSEUtil::STRCHR_MODE);
+        xmm_escape_mask = SSE4_cmpestrm(xmm_escape_search_, 1, xmm_buffer,
+            SSEUtil::CHARS_PER_128_BIT_REGISTER, SSEUtil::STRCHR_MODE);
         escape_mask = _mm_extract_epi16(xmm_escape_mask, 0);
         ProcessEscapeMask(escape_mask, &last_char_is_escape_, &delim_mask);
       }
@@ -253,21 +248,21 @@ inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* b
         int n = ffs(delim_mask) - 1;
         DCHECK_GE(n, 0);
         DCHECK_LT(n, 16);
-      
+
         if (process_escapes) {
           // Determine if there was an escape character between [last_col_idx, n]
           bool escaped = (escape_mask & low_mask_[last_col_idx] & high_mask_[n]) != 0;
           current_column_has_escape_ |= escaped;
           last_col_idx = n;
         }
-        
+
         // clear current bit
         delim_mask &= ~(SSEUtil::SSE_BITMASK[n]);
 
         AddColumn<process_escapes>(buffer + n - next_column_start,
             &next_column_start, num_fields, field_locations);
       }
-    
+
       if (process_escapes) {
         // Determine if there was an escape character between (last_col_idx, 15)
         bool unprocessed_escape = escape_mask & low_mask_[last_col_idx] & high_mask_[15];
@@ -278,7 +273,7 @@ inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* b
       buffer += SSEUtil::CHARS_PER_128_BIT_REGISTER;
     }
   }
-  
+
   while (remaining_len > 0) {
     if (*buffer == escape_char_) {
       current_column_has_escape_ = true;
@@ -286,7 +281,7 @@ inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* b
     } else {
       last_char_is_escape_ = false;
     }
-    
+
     if (!last_char_is_escape_ && 
           (*buffer == field_delim_ || *buffer == collection_item_delim_)) {
       AddColumn<process_escapes>(buffer - next_column_start,

@@ -19,21 +19,14 @@
 #include "common/logging.h"
 #include "common/compiler-util.h"
 
-// For cross compiling with clang, we need to be able to generate an IR file with
-// no sse instructions.  Attempting to load a precompiled IR file that contains
-// unsupported instructions causes llvm to fail.  We need to use #defines to control
-// the code that is built and the runtime checks to control what code is run.
-#ifdef __SSE4_2__
-#include <nmmintrin.h>
-#endif
 #include "util/cpu-info.h"
+#include "util/sse-util.h"
 
 namespace impala {
 
 // Utility class to compute hash values.
 class HashUtil {
  public:
-#ifdef __SSE4_2__
   // Compute the Crc32 hash for data using SSE4 instructions.  The input hash parameter is
   // the current hash/seed value.
   // This should only be called if SSE is supported.
@@ -48,13 +41,13 @@ class HashUtil {
 
     const uint32_t* p = reinterpret_cast<const uint32_t*>(data);
     while (words--) {
-      hash = _mm_crc32_u32(hash, *p);
+      hash = SSE4_crc32_u32(hash, *p);
       ++p;
     }
 
     const uint8_t* s = reinterpret_cast<const uint8_t*>(p);
     while (bytes--) {
-      hash = _mm_crc32_u8(hash, *s);
+      hash = SSE4_crc32_u8(hash, *s);
       ++s;
     }
 
@@ -63,7 +56,6 @@ class HashUtil {
     hash = (hash << 16) | (hash >> 16);
     return hash;
   }
-#endif
 
   static const uint64_t MURMUR_PRIME = 0xc6a4a7935bd1e995;
   static const int MURMUR_R = 47;
@@ -141,15 +133,11 @@ class HashUtil {
   // Seed values for different steps of the query execution should use different seeds
   // to prevent accidental key collisions. (See IMPALA-219 for more details).
   static uint32_t Hash(const void* data, int32_t bytes, uint32_t seed) {
-#ifdef __SSE4_2__
     if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
       return CrcHash(data, bytes, seed);
     } else {
       return MurmurHash2_64(data, bytes, seed);
     }
-#else
-    return MurmurHash2_64(data, bytes, seed);
-#endif
   }
 
 };

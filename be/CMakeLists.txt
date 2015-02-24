@@ -26,7 +26,6 @@ enable_testing()
 PROJECT(ASSEMBLER)
 
 # compiler flags that are common across debug/release builds
-#  - msse4.2: Enable sse4.2 compiler intrinsics.
 #  - Wall: Enable all warnings.
 #  - Wno-sign-compare: suppress warnings for comparison between signed and unsigned
 #    integers
@@ -36,7 +35,7 @@ PROJECT(ASSEMBLER)
 #  - Wno-deprecated: gutil contains deprecated headers
 #  - pthread: enable multithreaded malloc
 #  - DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG: enable nanosecond precision for boost
-SET(CXX_COMMON_FLAGS "-msse4.2 -Wall -Wno-sign-compare -Wno-unknown-pragmas -pthread")
+SET(CXX_COMMON_FLAGS "-Wall -Wno-sign-compare -Wno-unknown-pragmas -pthread")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fno-strict-aliasing")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated -Wno-unused-local-typedefs")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
