@@ -11,6 +11,7 @@ from sqlparse.pipeline import Pipeline
 from sqlparse.tokens import (Comment, Comparison, Keyword, Name, Punctuation,
                              String, Whitespace)
 from sqlparse.utils import memoize_generator
+from sqlparse.utils import split_unquoted_newlines
 
 
 # --------------------------
@@ -44,6 +45,27 @@ class IdentifierCaseFilter(_CaseFilter):
         for ttype, value in stream:
             if ttype in self.ttype and not value.strip()[0] == '"':
                 value = self.convert(value)
+            yield ttype, value
+
+
+class TruncateStringFilter:
+
+    def __init__(self, width, char):
+        self.width = max(width, 1)
+        self.char = unicode(char)
+
+    def process(self, stack, stream):
+        for ttype, value in stream:
+            if ttype is T.Literal.String.Single:
+                if value[:2] == '\'\'':
+                    inner = value[2:-2]
+                    quote = u'\'\''
+                else:
+                    inner = value[1:-1]
+                    quote = u'\''
+                if len(inner) > self.width:
+                    value = u''.join((quote, inner[:self.width], self.char,
+                                      quote))
             yield ttype, value
 
 
@@ -224,6 +246,20 @@ class StripWhitespaceFilter:
                     token.value = ' '
             last_was_ws = token.is_whitespace()
 
+    def _stripws_identifierlist(self, tlist):
+        # Removes newlines before commas, see issue140
+        last_nl = None
+        for token in tlist.tokens[:]:
+            if (token.ttype is T.Punctuation
+                and token.value == ','
+                and last_nl is not None):
+                tlist.tokens.remove(last_nl)
+            if token.is_whitespace():
+                last_nl = token
+            else:
+                last_nl = None
+        return self._stripws_default(tlist)
+
     def _stripws_parenthesis(self, tlist):
         if tlist.tokens[1].is_whitespace():
             tlist.tokens.pop(1)
@@ -250,10 +286,17 @@ class ReindentFilter:
         self._curr_stmt = None
         self._last_stmt = None
 
+    def _flatten_up_to_token(self, token):
+        """Yields all tokens up to token plus the next one."""
+        # helper for _get_offset
+        iterator = self._curr_stmt.flatten()
+        for t in iterator:
+            yield t
+            if t == token:
+                raise StopIteration
+
     def _get_offset(self, token):
-        all_ = list(self._curr_stmt.flatten())
-        idx = all_.index(token)
-        raw = ''.join(unicode(x) for x in all_[:idx + 1])
+        raw = ''.join(map(unicode, self._flatten_up_to_token(token)))
         line = raw.splitlines()[-1]
         # Now take current offset into account and return relative offset.
         full_offset = len(line) - len(self.char * (self.width * self.indent))
@@ -271,9 +314,9 @@ class ReindentFilter:
         return sql.Token(T.Whitespace, ws)
 
     def _split_kwds(self, tlist):
-        split_words = ('FROM', 'JOIN$', 'AND', 'OR',
+        split_words = ('FROM', 'STRAIGHT_JOIN$', 'JOIN$', 'AND', 'OR',
                        'GROUP', 'ORDER', 'UNION', 'VALUES',
-                       'SET', 'BETWEEN')
+                       'SET', 'BETWEEN', 'EXCEPT')
 
         def _next_token(i):
             t = tlist.token_next_match(i, T.Keyword, split_words,
@@ -323,7 +366,10 @@ class ReindentFilter:
 
     def _process_where(self, tlist):
         token = tlist.token_next_match(0, T.Keyword, 'WHERE')
-        tlist.insert_before(token, self.nl())
+        try:
+            tlist.insert_before(token, self.nl())
+        except ValueError:  # issue121, errors in statement
+            pass
         self.indent += 1
         self._process_default(tlist)
         self.indent -= 1
@@ -347,7 +393,12 @@ class ReindentFilter:
         identifiers = list(tlist.get_identifiers())
         if len(identifiers) > 1 and not tlist.within(sql.Function):
             first = list(identifiers[0].flatten())[0]
-            num_offset = self._get_offset(first) - len(first.value)
+            if self.char == '\t':
+                # when using tabs we don't count the actual word length
+                # in spaces.
+                num_offset = 1
+            else:
+                num_offset = self._get_offset(first) - len(first.value)
             self.offset += num_offset
             for token in identifiers[1:]:
                 tlist.insert_before(token, self.nl())
@@ -506,10 +557,8 @@ class SerializerUnicode:
 
     def process(self, stack, stmt):
         raw = unicode(stmt)
-        add_nl = raw.endswith('\n')
-        res = '\n'.join(line.rstrip() for line in raw.splitlines())
-        if add_nl:
-            res += '\n'
+        lines = split_unquoted_newlines(raw)
+        res = '\n'.join(line.rstrip() for line in lines)
         return res
 
 

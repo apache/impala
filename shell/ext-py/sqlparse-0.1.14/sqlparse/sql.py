@@ -376,9 +376,9 @@ class TokenList(Token):
         """Inserts *token* before *where*."""
         self.tokens.insert(self.token_index(where), token)
 
-    def insert_after(self, where, token):
+    def insert_after(self, where, token, skip_ws=True):
         """Inserts *token* after *where*."""
-        next_token = self.token_next(where)
+        next_token = self.token_next(where, skip_ws=skip_ws)
         if next_token is None:
             self.tokens.append(token)
         else:
@@ -546,6 +546,14 @@ class Comparison(TokenList):
     """A comparison used for example in WHERE clauses."""
     __slots__ = ('value', 'ttype', 'tokens')
 
+    @property
+    def left(self):
+        return self.tokens[0]
+
+    @property
+    def right(self):
+        return self.tokens[-1]
+
 
 class Comment(TokenList):
     """A comment."""
@@ -618,4 +626,14 @@ class Function(TokenList):
         for t in parenthesis.tokens:
             if isinstance(t, IdentifierList):
                 return t.get_identifiers()
+            elif isinstance(t, Identifier) or \
+                isinstance(t, Function) or \
+                t.ttype in T.Literal:
+                return [t,]
         return []
+
+
+class Begin(TokenList):
+    """A BEGIN/END block."""
+
+    __slots__ = ('value', 'ttype', 'tokens')

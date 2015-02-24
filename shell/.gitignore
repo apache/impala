@@ -5,6 +5,6 @@ ext-py/sasl-0.1.1/sasl.egg-info/
 ext-py/prettytable-0.7.1/dist/
 ext-py/prettytable-0.7.1/build
 ext-py/prettytable-0.7.1/prettytable.egg-info
-ext-py/sqlparse-0.1.7/dist/
-ext-py/sqlparse-0.1.7/build/
-ext-py/sqlparse-0.1.7/sqlparse.egg-info/
+ext-py/sqlparse-0.1.14/dist/
+ext-py/sqlparse-0.1.14/build/
+ext-py/sqlparse-0.1.14/sqlparse.egg-info/

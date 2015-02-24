@@ -161,9 +161,6 @@ class Lexer(object):
     stripnl = False
     tabsize = 0
     flags = re.IGNORECASE | re.UNICODE
-    DEFAULT_BUFSIZE = 4096
-    MAX_BUFSIZE = 2 ** 31
-    bufsize = DEFAULT_BUFSIZE
 
     tokens = {
         'root': [
@@ -171,7 +168,7 @@ class Lexer(object):
             # $ matches *before* newline, therefore we have two patterns
             # to match Comment.Single
             (r'--.*?$', tokens.Comment.Single),
-            (r'(\r|\n|\r\n)', tokens.Newline),
+            (r'(\r\n|\r|\n)', tokens.Newline),
             (r'\s+', tokens.Whitespace),
             (r'/\*', tokens.Comment.Multiline, 'multiline-comments'),
             (r':=', tokens.Assignment),
@@ -182,24 +179,27 @@ class Lexer(object):
             (r"´(´´|[^´])*´", tokens.Name),
             (r'\$([^\W\d]\w*)?\$', tokens.Name.Builtin),
             (r'\?{1}', tokens.Name.Placeholder),
-            (r'[$:?%]\w+', tokens.Name.Placeholder),
+            (r'%\(\w+\)s', tokens.Name.Placeholder),
+            (r'%s', tokens.Name.Placeholder),
+            (r'[$:?]\w+', tokens.Name.Placeholder),
             # FIXME(andi): VALUES shouldn't be listed here
             # see https://github.com/andialbrecht/sqlparse/pull/64
             (r'VALUES', tokens.Keyword),
             (r'@[^\W\d_]\w+', tokens.Name),
             (r'[^\W\d_]\w*(?=[.(])', tokens.Name),  # see issue39
             (r'[-]?0x[0-9a-fA-F]+', tokens.Number.Hexadecimal),
+            (r'[-]?[0-9]*(\.[0-9]+)?[eE][-]?[0-9]+', tokens.Number.Float),
             (r'[-]?[0-9]*\.[0-9]+', tokens.Number.Float),
             (r'[-]?[0-9]+', tokens.Number.Integer),
             # TODO: Backslash escapes?
-            (r"(''|'.*?[^\\]')", tokens.String.Single),
+            (r"'(''|\\'|[^'])*'", tokens.String.Single),
             # not a real string literal in ANSI SQL:
             (r'(""|".*?[^\\]")', tokens.String.Symbol),
             (r'(\[.*[^\]]\])', tokens.Name),
-            (r'(LEFT |RIGHT )?(INNER |OUTER )?JOIN\b', tokens.Keyword),
-            (r'END( IF| LOOP)?\b', tokens.Keyword),
+            (r'((LEFT\s+|RIGHT\s+|FULL\s+)?(INNER\s+|OUTER\s+|STRAIGHT\s+)?|(CROSS\s+|NATURAL\s+)?)?JOIN\b', tokens.Keyword),
+            (r'END(\s+IF|\s+LOOP)?\b', tokens.Keyword),
             (r'NOT NULL\b', tokens.Keyword),
-            (r'CREATE( OR REPLACE)?\b', tokens.Keyword.DDL),
+            (r'CREATE(\s+OR\s+REPLACE)?\b', tokens.Keyword.DDL),
             (r'(?<=\.)[^\W\d_]\w*', tokens.Name),
             (r'[^\W\d_]\w*', is_keyword),
             (r'[;:()\[\],\.]', tokens.Punctuation),
@@ -210,7 +210,7 @@ class Lexer(object):
             (r'/\*', tokens.Comment.Multiline, 'multiline-comments'),
             (r'\*/', tokens.Comment.Multiline, '#pop'),
             (r'[^/\*]+', tokens.Comment.Multiline),
-            (r'[/*]', tokens.Comment.Multiline)
+            (r'[/*]', tokens.Comment.Multiline),
         ]}
 
     def __init__(self):
@@ -284,18 +284,13 @@ class Lexer(object):
         statetokens = tokendefs[statestack[-1]]
         known_names = {}
 
-        text = stream.read(self.bufsize)
-        hasmore = len(text) == self.bufsize
+        text = stream.read()
         text = self._decode(text)
 
         while 1:
             for rexmatch, action, new_state in statetokens:
                 m = rexmatch(text, pos)
                 if m:
-                    if hasmore and m.end() == len(text):
-                        # Since this is end, token may be truncated
-                        continue
-
                     # print rex.pattern
                     value = m.group()
                     if value in known_names:
@@ -328,20 +323,8 @@ class Lexer(object):
                         else:
                             assert False, "wrong state def: %r" % new_state
                         statetokens = tokendefs[statestack[-1]]
-                    # reset bufsize
-                    self.bufsize = self.DEFAULT_BUFSIZE
                     break
             else:
-                if hasmore:
-                    # we have no match, increase bufsize to parse lengthy
-                    # tokens faster (see #86).
-                    self.bufsize = min(self.bufsize * 2, self.MAX_BUFSIZE)
-                    buf = stream.read(self.bufsize)
-                    hasmore = len(buf) == self.bufsize
-                    text = text[pos:] + self._decode(buf)
-                    pos = 0
-                    continue
-
                 try:
                     if text[pos] == '\n':
                         # at EOL, reset state to "root"

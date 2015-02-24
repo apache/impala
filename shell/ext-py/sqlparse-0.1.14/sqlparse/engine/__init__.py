@@ -48,25 +48,16 @@ class FilterStack(object):
             splitter = StatementFilter()
             stream = splitter.process(self, stream)
 
-        # import StripCommentsFilter in the run() method to avoid a circular dependency.
-        # For stripping comments, the only grouping method we want to invoke is
-        # grouping.group(), this considerably improves performance.
-        strip_comments_only = False
-        if self.stmtprocess and len(self.stmtprocess) == 1:
-          from sqlparse.filters import StripCommentsFilter
-          strip_comments_only = isinstance(self.stmtprocess[0], StripCommentsFilter)
-
         if self._grouping:
+
             def _group(stream):
                 for stmt in stream:
-                    if strip_comments_only:
-                        grouping.group_comments(stmt)
-                    else:
-                        grouping.group(stmt)
+                    grouping.group(stmt)
                     yield stmt
             stream = _group(stream)
 
         if self.stmtprocess:
+
             def _run1(stream):
                 ret = []
                 for stmt in stream:

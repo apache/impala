@@ -6,7 +6,7 @@
 """Parse SQL statements."""
 
 
-__version__ = '0.1.7'
+__version__ = '0.1.14'
 
 
 # Setup namespace
@@ -67,7 +67,7 @@ def split(sql, encoding=None):
     """
     stack = engine.FilterStack()
     stack.split_statements = True
-    return [unicode(stmt) for stmt in stack.run(sql, encoding)]
+    return [unicode(stmt).strip() for stmt in stack.run(sql, encoding)]
 
 
 from sqlparse.engine.filter import StatementFilter

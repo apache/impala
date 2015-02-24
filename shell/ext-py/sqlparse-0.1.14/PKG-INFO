@@ -1,6 +1,6 @@
 Metadata-Version: 1.1
 Name: sqlparse
-Version: 0.1.7
+Version: 0.1.14
 Summary: Non-validating SQL parser
 Home-page: https://github.com/andialbrecht/sqlparse
 Author: Andi Albrecht

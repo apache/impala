@@ -4,6 +4,8 @@ Created on 17/05/2012
 @author: piranna
 '''
 
+import re
+
 try:
     from collections import OrderedDict
 except ImportError:
@@ -94,3 +96,42 @@ def memoize_generator(func):
                 yield item
 
     return wrapped_func
+
+
+# This regular expression replaces the home-cooked parser that was here before.
+# It is much faster, but requires an extra post-processing step to get the
+# desired results (that are compatible with what you would expect from the
+# str.splitlines() method).
+#
+# It matches groups of characters: newlines, quoted strings, or unquoted text,
+# and splits on that basis. The post-processing step puts those back together
+# into the actual lines of SQL.
+SPLIT_REGEX = re.compile(r"""
+(
+ (?:                     # Start of non-capturing group
+  (?:\r\n|\r|\n)      |  # Match any single newline, or
+  [^\r\n'"]+          |  # Match any character series without quotes or
+                         # newlines, or
+  "(?:[^"\\]|\\.)*"   |  # Match double-quoted strings, or
+  '(?:[^'\\]|\\.)*'      # Match single quoted strings
+ )
+)
+""", re.VERBOSE)
+
+LINE_MATCH = re.compile(r'(\r\n|\r|\n)')
+
+def split_unquoted_newlines(text):
+    """Split a string on all unquoted newlines.
+
+    Unlike str.splitlines(), this will ignore CR/LF/CR+LF if the requisite
+    character is inside of a string."""
+    lines = SPLIT_REGEX.split(text)
+    outputlines = ['']
+    for line in lines:
+        if not line:
+            continue
+        elif LINE_MATCH.match(line):
+            outputlines.append('')
+        else:
+            outputlines[-1] += line
+    return outputlines
