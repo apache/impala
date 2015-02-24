@@ -50,6 +50,12 @@ DEFINE_int32(max_log_files, 10, "Maximum number of log files to retain per sever
     "level. The most recent log files are retained. If set to 0, all log files are "
     "retained.");
 
+// Defined by glog. This allows users to specify the log level using a glob. For
+// example -vmodule=*scanner*=3 would enable full logging for scanners. If redaction
+// is enabled, this option won't be allowed because some logging dumps table data
+// in ways the authors of redaction rules can't anticipate.
+DECLARE_string(vmodule);
+
 // tcmalloc will hold on to freed memory. We will periodically release the memory back
 // to the OS if the extra memory is too high. If the memory used by the application
 // is less than this fraction of the total reserved memory, free it back to the OS.
@@ -131,6 +137,11 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
   google::SetVersionString(impala::GetBuildVersion());
   google::ParseCommandLineFlags(&argc, &argv, true);
   if (!FLAGS_redaction_rules_file.empty()) {
+    if (VLOG_ROW_IS_ON || !FLAGS_vmodule.empty()) {
+      EXIT_WITH_ERROR("Redaction cannot be used in combination with log level 3 or "
+          "higher or the -vmodule option because these log levels may log data in "
+          "ways redaction rules may not anticipate.");
+    }
     const string& error_message = SetRedactionRulesFromFile(FLAGS_redaction_rules_file);
     if (!error_message.empty()) EXIT_WITH_ERROR(error_message);
   }
