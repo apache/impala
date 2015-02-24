@@ -363,6 +363,12 @@ not_built:
     hash_tbl_->Close();
     hash_tbl_.reset();
   }
+  if (parent_->can_add_probe_filters_) {
+    // Disabling probe filter push down because not all rows will be included in the
+    // probe filter due to a spilled partition.
+    parent_->can_add_probe_filters_ = false;
+    VLOG(2) << "Disabling probe filter push down because a partition will spill.";
+  }
   return Status::OK;
 }
 
@@ -386,6 +392,7 @@ bool PartitionedHashJoinNode::AllocateProbeFilters(RuntimeState* state) {
 bool PartitionedHashJoinNode::AttachProbeFilters(RuntimeState* state) {
   if (can_add_probe_filters_) {
     // Add all the bitmaps to the runtime state.
+    AddRuntimeExecOption("Build-Side Filter Pushed Down");
     bool acquired_ownership = false;
     for (int i = 0; i < probe_filters_.size(); ++i) {
       if (probe_filters_[i].second == NULL) continue;
@@ -496,7 +503,7 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
 
   DCHECK(hash_partitions_.empty());
   if (input_partition_ != NULL) {
-    DCHECK(input_partition_->build_rows() != NULL);
+    DCHECK_NOTNULL(input_partition_->build_rows());
     DCHECK_EQ(input_partition_->build_rows()->blocks_pinned(), 0) << NodeDebugString();
     RETURN_IF_ERROR(input_partition_->build_rows()->PrepareForRead());
   }
@@ -1027,7 +1034,6 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
 
   // Decide whether probe filters will be built.
   if (input_partition_ == NULL && can_add_probe_filters_) {
-    // TODO: Should we just give up in case we have any spilled partition?
     uint64_t num_build_rows = 0;
     BOOST_FOREACH(Partition* partition, hash_partitions_) {
       const uint64_t partition_num_rows = partition->build_rows()->num_rows();
@@ -1036,10 +1042,8 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
     // TODO: Using this simple heuristic where we compare the number of build rows
     // to the size of the slot filter bitmap. This is essentially not a Bloom filter
     // but a 1-1 filter, and probably it is missing oportunities. Should revisit.
-    can_add_probe_filters_ = (num_build_rows < state->slot_filter_bitmap_size());
-    if (can_add_probe_filters_) {
-      AddRuntimeExecOption("Build-Side Filter Pushed Down");
-    } else {
+    if (num_build_rows >= state->slot_filter_bitmap_size()) {
+      can_add_probe_filters_ = false;
       VLOG(2) << "Disabling probe filter push down because build side is too large: "
               << num_build_rows;
     }
@@ -1060,12 +1064,9 @@ Status PartitionedHashJoinNode::BuildHashTables(RuntimeState* state) {
       bool built = false;
       DCHECK(partition->build_rows()->is_pinned());
       RETURN_IF_ERROR(partition->BuildHashTable(state, &built, can_add_probe_filters_));
-      if (!built) {
-        // We did not have enough memory to build this hash table. We need to
-        // 1) spill this partition (clean up the hash table, unpin build)
-        // 2) get an IO buffer for the probe stream for this partition.
-        RETURN_IF_ERROR(partition->Spill(true));
-      }
+      // If we did not have enough memory to build this hash table, we need to spill this
+      // partition (clean up the hash table, unpin build).
+      if (!built) RETURN_IF_ERROR(partition->Spill(true));
     }
   }
 

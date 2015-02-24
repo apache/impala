@@ -79,9 +79,11 @@ class TestExprMemUsage(ImpalaTestSuite):
 class TestMemLimitError(ImpalaTestSuite):
   # Different values of mem limits and minimum mem limit the queries are expected to run
   # without problem.
-  MEM_IN_MB = [20, 50, 100, 115, 120, 125, 140, 145, 150]
+  MEM_IN_MB = [50, 100, 120, 140, 145, 150, 1290, 1295, 1300, 1320, 1920, 1925]
   MIN_MEM_FOR_TPCH_Q1 = 145
   MIN_MEM_FOR_TPCH_Q4 = 150
+  MIN_MEM_FOR_TPCH_Q9 = 1320
+  MIN_MEM_FOR_TPCH_Q21 = 1925
   EXPECTED_ERROR_MSG = "Memory limit exceeded"
 
   @classmethod
@@ -103,33 +105,32 @@ class TestMemLimitError(ImpalaTestSuite):
     super(TestMemLimitError, cls).setup_class()
     cls.client.execute('compute stats tpch_parquet.lineitem');
     cls.client.execute('compute stats tpch_parquet.orders');
+    cls.client.execute('compute stats tpch_parquet.part');
+    cls.client.execute('compute stats tpch_parquet.supplier');
+    cls.client.execute('compute stats tpch_parquet.partsupp');
+    cls.client.execute('compute stats tpch_parquet.nation');
+
+  def low_memory_limit_test(self, vector, tpch_query, limit):
+    mem = vector.get_value('mem_limit')
+    # If memory limit larger than the minimum threshold, then it is not expected to fail
+    expects_error = mem < limit;
+    new_vector = copy(vector)
+    new_vector.get_value('exec_option')['mem_limit'] = str(mem) + "m"
+    try:
+      self.run_test_case(tpch_query, new_vector)
+    except ImpalaBeeswaxException as e:
+      if (expects_error == 0):
+        raise
+      assert TestMemLimitError.EXPECTED_ERROR_MSG in str(e)
 
   def test_low_mem_limit_q1(self, vector):
-    mem = vector.get_value('mem_limit')
-    # If memory limit larger than the minimum threshold, then it is not expected to fail
-    expects_error = mem < TestMemLimitError.MIN_MEM_FOR_TPCH_Q1;
-    new_vector = copy(vector)
-    new_vector.get_value('exec_option')['mem_limit'] = str(mem) + "m"
-    try:
-      self.run_test_case('tpch-q1', new_vector)
-    except ImpalaBeeswaxException as e:
-      if (expects_error == 0):
-        raise
-      if (TestMemLimitError.EXPECTED_ERROR_MSG in str(e)):
-        print str(e)
-      assert TestMemLimitError.EXPECTED_ERROR_MSG in str(e)
+    self.low_memory_limit_test(vector, 'tpch-q1', self.MIN_MEM_FOR_TPCH_Q1);
 
   def test_low_mem_limit_q4(self, vector):
-    mem = vector.get_value('mem_limit')
-    # If memory limit larger than the minimum threshold, then it is not expected to fail
-    expects_error = mem < TestMemLimitError.MIN_MEM_FOR_TPCH_Q4;
-    new_vector = copy(vector)
-    new_vector.get_value('exec_option')['mem_limit'] = str(mem) + "m"
-    try:
-      self.run_test_case('tpch-q4', new_vector)
-    except ImpalaBeeswaxException as e:
-      if (expects_error == 0):
-        raise
-      if (TestMemLimitError.EXPECTED_ERROR_MSG in str(e)):
-        print str(e)
-      assert TestMemLimitError.EXPECTED_ERROR_MSG in str(e)
+    self.low_memory_limit_test(vector, 'tpch-q4', self.MIN_MEM_FOR_TPCH_Q4);
+
+  def test_low_mem_limit_q9(self, vector):
+    self.low_memory_limit_test(vector, 'tpch-q9', self.MIN_MEM_FOR_TPCH_Q9);
+
+  def test_low_mem_limit_q21(self, vector):
+    self.low_memory_limit_test(vector, 'tpch-q21', self.MIN_MEM_FOR_TPCH_Q21);
