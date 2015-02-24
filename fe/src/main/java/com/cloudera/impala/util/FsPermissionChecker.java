@@ -156,24 +156,41 @@ public class FsPermissionChecker {
     /**
      * Returns true if ACLs allow 'action', false if they explicitly disallow 'action',
      * and 'null' if no ACLs are available.
+     * See http://users.suse.com/~agruen/acl/linux-acls/online for more details about
+     * acl access check algorithm.
      */
     private Boolean checkAcls(FsAction action) {
       // ACLs may not be enabled, so we need this ternary logic. If no ACLs are available,
       // returning null causes us to fall back to standard ugo permissions.
       if (aclStatus_ == null) return null;
 
+      // Remember if there is an applicable ACL entry, including owner user, named user,
+      // owning group, named group.
+      boolean foundMatch = false;
       for (AclEntryType t: ACL_TYPE_PRIORITY) {
         for (AclEntry e: entriesByTypes_.get(t)) {
+          if (t == AclEntryType.OTHER) {
+            // Processed all ACL entries except the OTHER entry.
+            // If found applicable ACL entries but none of them contain requested
+            // permission, deny access. Otherwise check OTHER entry.
+            return foundMatch ? false : e.getPermission().implies(action);
+          }
           // If there is an applicable mask, 'action' is allowed iff both the mask and
           // the underlying ACL permit it.
-          if (shouldApplyMask(e)) {
-            return mask_.getPermission().implies(action) &&
-                e.getPermission().implies(action);
+          if (e.getPermission().implies(action)) {
+            if (shouldApplyMask(e)) {
+              if (mask_.getPermission().implies(action)) return true;
+            } else {
+              return true;
+            }
           }
-          return e.getPermission().implies(action);
+          // User ACL entry has priority, no need to continue check.
+          if (t == AclEntryType.USER) return false;
+
+          foundMatch = true;
         }
       }
-      return null;
+      return false;
     }
 
     /**

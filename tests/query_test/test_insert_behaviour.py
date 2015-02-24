@@ -211,7 +211,7 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
     self.hdfs_client.setacl(TBL_PATH, "user::rwx,group::r-x,other::rwx")
     self.execute_query_expect_success(self.client,
                                       "REFRESH functional.insert_acl_permissions")
-    # Should be unwritable because 'other' ACLs don't allow writes
+    # Should be writable because 'other' ACLs allow writes
     self.execute_query_expect_success(self.client, INSERT_QUERY)
 
   def test_insert_acl_permissions(self):
@@ -393,3 +393,36 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
     new_ls = self.hdfs_client.list_dir(partition_path)
     assert len(new_ls['FileStatuses']['FileStatus']) == 1
     assert new_ls['FileStatuses'] == ls['FileStatuses']
+
+  def test_multiple_group_acls(self):
+    """Test that INSERT correctly respects multiple group ACLs"""
+    TBL = "functional.insert_group_acl_permissions"
+    TBL_PATH = "test-warehouse/functional.db/insert_group_acl_permissions"
+    INSERT_QUERY = "INSERT INTO %s VALUES(1)" % TBL
+
+    self.execute_query_expect_success(self.client, "DROP TABLE IF EXISTS " + TBL)
+    self.execute_query_expect_success(self.client, "CREATE TABLE %s (col int)" % TBL)
+
+    USER = getpass.getuser()
+    TEST_USER = "test_user"
+    # Get the list of all groups of USER except the user's owning group.
+    OWNINGROUP = grp.getgrgid(pwd.getpwnam(USER).pw_gid).gr_name
+    GROUPS = [g.gr_name for g in grp.getgrall() if USER in g.gr_mem]
+    if (len(GROUPS) < 1):
+      pytest.xfail(reason="Cannot run test, user belongs to only one group.")
+
+    # First, change the owner to someone other than user who runs impala service
+    self.hdfs_client.chown(TBL_PATH, "another_user", OWNINGROUP)
+
+    # Set two group ACLs, one contains requested permission, the other doesn't.
+    self.hdfs_client.setacl(TBL_PATH,
+        "user::r-x,user:{0}:r-x,group::---,group:{1}:rwx,other::r-x"
+            .format(TEST_USER, GROUPS[0]))
+    self.execute_query_expect_success(self.client, "REFRESH " + TBL)
+    self.execute_query_expect_success(self.client, INSERT_QUERY)
+
+    # Two group ACLs but with mask to deny the permission.
+    self.hdfs_client.setacl(TBL_PATH,
+        "user::r-x,group::r--,group:{0}:rwx,mask::r-x,other::---".format(GROUPS[0]))
+    self.execute_query_expect_success(self.client, "REFRESH " + TBL)
+    self.execute_query_expect_failure(self.client, INSERT_QUERY)
