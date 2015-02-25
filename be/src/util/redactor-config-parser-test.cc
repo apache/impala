@@ -14,8 +14,6 @@
 
 #include "redactor.cc"
 
-#include <cstdio>  // tmpnam
-
 #include <gtest/gtest.h>
 
 #include "redactor-test-utils.h"
@@ -25,8 +23,9 @@ namespace impala {
 using std::string;
 
 TEST(ParserTest, FileNotFound) {
-  string non_existant_path = tmpnam(NULL);
-  string error = SetRedactionRulesFromFile(non_existant_path);
+  TempRulesFile rules_file("");
+  rules_file.Delete();
+  string error = SetRedactionRulesFromFile(rules_file.name());
   ASSERT_ERROR_MESSAGE_CONTAINS(error, "No such file");
 }
 

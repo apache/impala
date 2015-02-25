@@ -28,15 +28,34 @@ namespace impala {
 // upon test completion.
 class TempRulesFile {
  public:
-  TempRulesFile(const std::string& contents) {
-    name_ = tmpnam(NULL);
+  TempRulesFile(const std::string& contents)
+    : name_("/tmp/rules_XXXXXX"),
+      deleted_(false) {
+    int fd = mkstemp(&name_[0]);
+    if (fd == -1) {
+      std::cout << "Error creating temp file; " << strerror(errno) << std::endl;
+      abort();
+    }
+    if (close(fd) != 0) {
+      std::cout << "Error closing temp file; " << strerror(errno) << std::endl;
+      abort();
+    }
     OverwriteContents(contents);
   }
 
-  ~TempRulesFile() { remove(name_); }
+  ~TempRulesFile() { Delete(); }
+
+  void Delete() {
+    if (deleted_) return;
+    deleted_ = true;
+    if (remove(name()) != 0) {
+      std::cout << "Error deleting temp file; " << strerror(errno) << std::endl;
+      abort();
+    }
+  }
 
   void OverwriteContents(const std::string& contents) {
-    FILE* handle = fopen(name_, "w");
+    FILE* handle = fopen(name(), "w");
     if (handle == NULL) {
       std::cout << "Error creating temp file; " << strerror(errno) << std::endl;
       abort();
@@ -54,10 +73,11 @@ class TempRulesFile {
   }
 
   // Returns the absolute path to the file.
-  const char* name() const { return name_; }
+  const char* name() const { return name_.c_str(); }
 
  private:
-  const char* name_;
+  string name_;
+  bool deleted_;
 };
 
 unsigned int RandSeed() {
