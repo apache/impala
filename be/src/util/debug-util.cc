@@ -205,6 +205,18 @@ string PrintBatch(RowBatch* batch) {
   return out.str();
 }
 
+string PrintPath(const vector<int>& path) {
+  stringstream ss;
+  ss << "[";
+  if (path.size() > 0) ss << path[0];
+  for (int i = 1; i < path.size(); ++i) {
+    ss << " ";
+    ss << path[i];
+  }
+  ss << "]";
+  return ss.str();
+}
+
 string GetBuildVersion(bool compact) {
   stringstream ss;
   ss << IMPALA_BUILD_VERSION

@@ -54,10 +54,6 @@ HBaseScanNode::HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode,
 HBaseScanNode::~HBaseScanNode() {
 }
 
-bool HBaseScanNode::CmpColPos(const SlotDescriptor* a, const SlotDescriptor* b) {
-  return a->col_pos() < b->col_pos();
-}
-
 Status HBaseScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ScanNode::Prepare(state));
   read_timer_ = ADD_TIMER(runtime_profile(), TOTAL_HBASE_READ_TIMER);
@@ -86,7 +82,8 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
       sorted_non_key_slots_.push_back(slots[i]);
     }
   }
-  sort(sorted_non_key_slots_.begin(), sorted_non_key_slots_.end(), CmpColPos);
+  sort(sorted_non_key_slots_.begin(), sorted_non_key_slots_.end(),
+      SlotDescriptor::ColPathLessThan);
 
   // Create list of family/qualifier pointers in same sort order as sorted_non_key_slots_.
   const HBaseTableDescriptor* hbase_table =

@@ -119,14 +119,11 @@ class HdfsScanNode : public ScanNode {
   // Currently this is always 0.
   int tuple_idx() const { return 0; }
 
-  // Returns number of partition keys in the schema, including non-materialized slots
+  // Returns number of partition keys in the table, including non-materialized slots
   int num_partition_keys() const { return hdfs_table_->num_clustering_cols(); }
 
   // Returns number of materialized partition key slots
   int num_materialized_partition_keys() const { return partition_key_slots_.size(); }
-
-  // Number of columns, including partition keys
-  int num_cols() const { return hdfs_table_->num_cols(); }
 
   const TupleDescriptor* tuple_desc() { return tuple_desc_; }
 
@@ -146,10 +143,12 @@ class HdfsScanNode : public ScanNode {
   // The returned contexts must be closed by the caller.
   Status GetConjunctCtxs(std::vector<ExprContext*>* ctxs);
 
-  // Returns index into materialized_slots with 'col_idx'.  Returns SKIP_COLUMN if
-  // that column is not materialized.
-  int GetMaterializedSlotIdx(int col_idx) const {
-    return column_idx_to_materialized_slot_idx_[col_idx];
+  // Returns index into materialized_slots with 'path'.  Returns SKIP_COLUMN if
+  // that path is not materialized.
+  int GetMaterializedSlotIdx(const std::vector<int>& path) const {
+    PathToSlotIdxMap::const_iterator result = path_to_materialized_slot_idx_.find(path);
+    if (result == path_to_materialized_slot_idx_.end()) return SKIP_COLUMN;
+    return result->second;
   }
 
   // The result array is of length num_cols(). The i-th element is true iff column i
@@ -324,10 +323,9 @@ class HdfsScanNode : public ScanNode {
   // safely evaluated in parallel.
   std::vector<ExprContext*> conjunct_ctxs_;
 
-  // Vector containing indices into materialized_slots_.  The vector is indexed by
-  // the slot_desc's col_pos.  Non-materialized slots and partition key slots will
-  // have SKIP_COLUMN as its entry.
-  std::vector<int> column_idx_to_materialized_slot_idx_;
+  // Maps from a slot's path to its index into materialized_slots_.
+  typedef boost::unordered_map<std::vector<int>, int> PathToSlotIdxMap;
+  PathToSlotIdxMap path_to_materialized_slot_idx_;
 
   // is_materialized_col_[i] = <true i-th column should be materialized, false otherwise>
   // for 0 <= i < total # columns

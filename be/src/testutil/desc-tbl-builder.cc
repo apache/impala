@@ -39,7 +39,7 @@ static TSlotDescriptor MakeSlotDescriptor(int id, int parent_id, const ColumnTyp
   slot_desc.__set_id(id);
   slot_desc.__set_parent(parent_id);
   slot_desc.__set_slotType(type.ToThrift());
-  slot_desc.__set_columnPos(slot_idx);
+  slot_desc.__set_columnPath(vector<int>(1, slot_idx));
   slot_desc.__set_byteOffset(byte_offset);
   slot_desc.__set_nullIndicatorByte(null_byte);
   slot_desc.__set_nullIndicatorBit(null_bit);

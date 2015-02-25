@@ -314,45 +314,32 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   hdfs_table_ = static_cast<const HdfsTableDescriptor*>(tuple_desc_->table_desc());
   scan_node_pool_.reset(new MemPool(mem_tracker()));
 
-  // Create mapping from column index in table to slot index in output tuple.
-  // First, initialize all columns to SKIP_COLUMN.
-  int num_cols = hdfs_table_->num_cols();
-  column_idx_to_materialized_slot_idx_.resize(num_cols);
-  for (int i = 0; i < num_cols; ++i) {
-    column_idx_to_materialized_slot_idx_[i] = SKIP_COLUMN;
-  }
-
-  // Next, collect all materialized (partition key and not) slots
-  vector<SlotDescriptor*> all_materialized_slots;
-  all_materialized_slots.resize(num_cols);
+  // Gather materialized partition-key slots and non-partition slots.
   const vector<SlotDescriptor*>& slots = tuple_desc_->slots();
   for (size_t i = 0; i < slots.size(); ++i) {
     if (!slots[i]->is_materialized()) continue;
-    int col_idx = slots[i]->col_pos();
-    DCHECK_LT(col_idx, column_idx_to_materialized_slot_idx_.size());
-    DCHECK_EQ(column_idx_to_materialized_slot_idx_[col_idx], SKIP_COLUMN);
-    all_materialized_slots[col_idx] = slots[i];
-  }
-
-  // Finally, populate materialized_slots_ and partition_key_slots_ in the order that
-  // the slots appear in the file.
-  int num_partition_keys = hdfs_table_->num_clustering_cols();
-  for (int i = 0; i < num_cols; ++i) {
-    SlotDescriptor* slot_desc = all_materialized_slots[i];
-    if (slot_desc == NULL) continue;
-    if (hdfs_table_->IsClusteringCol(slot_desc)) {
-      partition_key_slots_.push_back(slot_desc);
+    if (hdfs_table_->IsClusteringCol(slots[i])) {
+      partition_key_slots_.push_back(slots[i]);
     } else {
-      DCHECK_GE(i, num_partition_keys);
-      column_idx_to_materialized_slot_idx_[i] = materialized_slots_.size();
-      materialized_slots_.push_back(slot_desc);
+      materialized_slots_.push_back(slots[i]);
     }
   }
 
+  // Order the materialized slots such that for schemaless file formats (e.g. text) the
+  // order corresponds to the physical order in files. For formats where the file schema
+  // is independent of the table schema (e.g. Avro, Parquet), this step is not necessary.
+  sort(materialized_slots_.begin(), materialized_slots_.end(),
+      SlotDescriptor::ColPathLessThan);
+
+  // Populate mapping from slot path to index into materialized_slots_.
+  for (int i = 0; i < materialized_slots_.size(); ++i) {
+    path_to_materialized_slot_idx_[materialized_slots_[i]->col_path()] = i;
+  }
+
   // Initialize is_materialized_col_
-  is_materialized_col_.resize(num_cols);
-  for (int i = 0; i < num_cols; ++i) {
-    is_materialized_col_[i] = column_idx_to_materialized_slot_idx_[i] != SKIP_COLUMN;
+  is_materialized_col_.resize(hdfs_table_->num_cols());
+  for (int i = 0; i < hdfs_table_->num_cols(); ++i) {
+    is_materialized_col_[i] = GetMaterializedSlotIdx(vector<int>(1, i)) != SKIP_COLUMN;
   }
 
   HdfsFsCache::HdfsFsMap fs_cache;
@@ -970,7 +957,7 @@ void HdfsScanNode::ComputeSlotMaterializationOrder(vector<int>* order) const {
     int num_slots = conjuncts[conjunct_idx]->root()->GetSlotIds(&slot_ids);
     for (int j = 0; j < num_slots; ++j) {
       SlotDescriptor* slot_desc = desc_tbl.GetSlotDescriptor(slot_ids[j]);
-      int slot_idx = GetMaterializedSlotIdx(slot_desc->col_pos());
+      int slot_idx = GetMaterializedSlotIdx(slot_desc->col_path());
       // slot_idx == -1 means this was a partition key slot which is always
       // materialized before any slots.
       if (slot_idx == -1) continue;

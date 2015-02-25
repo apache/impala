@@ -23,8 +23,15 @@ struct TSlotDescriptor {
   1: required Types.TSlotId id
   2: required Types.TTupleId parent
   3: required Types.TColumnType slotType
-  // TODO: Make this a list of positions to support SlotRefs into struct fields.
-  4: required i32 columnPos   // in originating table
+
+  // The column path defines this slot's column in the originating table, which is
+  // possibly nested in one or more other columns. Each list element in the path is an
+  // index. The first element is an index into the top-level table schema. Each subsequent
+  // element (if any) is an index into the previous column's nested types. Note that this
+  // means an element refering to a scalar-type column must be the last element in the
+  // path, although the path could end with a nested-type column as well.
+  4: required list<i32> columnPath
+
   5: required i32 byteOffset  // into tuple
   6: required i32 nullIndicatorByte
   7: required i32 nullIndicatorBit

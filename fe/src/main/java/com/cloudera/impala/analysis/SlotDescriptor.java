@@ -14,11 +14,14 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.List;
+
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.thrift.TSlotDescriptor;
 import com.google.common.base.Objects;
+import com.google.common.collect.Lists;
 
 public class SlotDescriptor {
   private final SlotId id_;
@@ -107,10 +110,11 @@ public class SlotDescriptor {
   }
 
   public TSlotDescriptor toThrift() {
+    List<Integer> columnPath = Lists.newArrayList();
+    if (column_ != null) columnPath.add(column_.getPosition());
     return new TSlotDescriptor(
         id_.asInt(), parent_.getId().asInt(), type_.toThrift(),
-        ((column_ != null) ? column_.getPosition() : -1),
-        byteOffset_, nullIndicatorByte_, nullIndicatorBit_,
+        columnPath, byteOffset_, nullIndicatorByte_, nullIndicatorBit_,
         slotIdx_, isMaterialized_);
   }
 

@@ -79,7 +79,10 @@ class SlotDescriptor {
   TupleId parent() const { return parent_; }
   // Returns the column index of this slot, including partition keys.
   // (e.g., col_pos - num_partition_keys = the table column this slot corresponds to)
-  int col_pos() const { return col_pos_; }
+  // TODO: This function should eventually be replaced by col_path(). It is currently
+  // convenient for table formats for which we only support flat data.
+  int col_pos() const { return col_path_[0]; }
+  const std::vector<int>& col_path() const { return col_path_; }
   // Returns the field index in the generated llvm struct for this slot's tuple
   int field_idx() const { return field_idx_; }
   int tuple_offset() const { return tuple_offset_; }
@@ -89,6 +92,14 @@ class SlotDescriptor {
   bool is_materialized() const { return is_materialized_; }
   bool is_nullable() const { return null_indicator_offset_.bit_mask != 0; }
   int slot_size() const { return slot_size_; }
+
+  // Comparison function for ordering slot descriptors by their col_path_.
+  // Returns true if 'a' comes before 'b'.
+  // Orders the paths as in a depth-first traversal of the schema tree, as follows:
+  // - for each level i in min(a.path.size, b.path.size),
+  //   order the paths ascending by col_path_[i]
+  // - in case of ties, the path with smaller size comes first
+  static bool ColPathLessThan(const SlotDescriptor* a, const SlotDescriptor* b);
 
   std::string DebugString() const;
 
@@ -107,7 +118,7 @@ class SlotDescriptor {
   const SlotId id_;
   const ColumnType type_;
   const TupleId parent_;
-  const int col_pos_;
+  const std::vector<int> col_path_;
   const int tuple_offset_;
   const NullIndicatorOffset null_indicator_offset_;
 
@@ -145,7 +156,8 @@ class TableDescriptor {
   // The first num_clustering_cols_ columns by position are clustering
   // columns.
   bool IsClusteringCol(const SlotDescriptor* slot_desc) const {
-    return slot_desc->col_pos() < num_clustering_cols_;
+    return slot_desc->col_path().size() == 1 &&
+        slot_desc->col_path()[0] < num_clustering_cols_;
   }
 
   const std::string& name() const { return name_; }

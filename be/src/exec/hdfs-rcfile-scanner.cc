@@ -88,12 +88,13 @@ Status HdfsRCFileScanner::InitNewRange() {
   // Allocate the buffers for the key information that is used to read and decode
   // the column data.
   columns_.resize(reinterpret_cast<RcFileHeader*>(header_)->num_cols);
-  int num_table_cols = scan_node_->num_cols() - scan_node_->num_partition_keys();
+  int num_table_cols =
+      scan_node_->hdfs_table()->num_cols() - scan_node_->num_partition_keys();
   for (int i = 0; i < columns_.size(); ++i) {
     if (i < num_table_cols) {
       int col_idx = i + scan_node_->num_partition_keys();
-      columns_[i].materialize_column =
-          scan_node_->GetMaterializedSlotIdx(col_idx) != HdfsScanNode::SKIP_COLUMN;
+      columns_[i].materialize_column = scan_node_->GetMaterializedSlotIdx(
+          vector<int>(1, col_idx)) != HdfsScanNode::SKIP_COLUMN;
     } else {
       // Treat columns not found in table metadata as extra unmaterialized columns
       columns_[i].materialize_column = false;

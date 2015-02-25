@@ -50,7 +50,7 @@ SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc)
   : id_(tdesc.id),
     type_(tdesc.slotType),
     parent_(tdesc.parent),
-    col_pos_(tdesc.columnPos),
+    col_path_(tdesc.columnPath),
     tuple_offset_(tdesc.byteOffset),
     null_indicator_offset_(tdesc.nullIndicatorByte, tdesc.nullIndicatorBit),
     slot_idx_(tdesc.slotIdx),
@@ -62,11 +62,26 @@ SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc)
     set_null_fn_(NULL) {
 }
 
+bool SlotDescriptor::ColPathLessThan(const SlotDescriptor* a, const SlotDescriptor* b) {
+  int common_levels = min(a->col_path().size(), b->col_path().size());
+  for (int i = 0; i < common_levels; ++i) {
+    if (a->col_path()[i] == b->col_path()[i]) continue;
+    return a->col_path()[i] < b->col_path()[i];
+  }
+  return a->col_path().size() < b->col_path().size();
+}
+
 string SlotDescriptor::DebugString() const {
   stringstream out;
   out << "Slot(id=" << id_ << " type=" << type_.DebugString()
-      << " col=" << col_pos_ << " offset=" << tuple_offset_
-      << " null=" << null_indicator_offset_.DebugString()
+      << " col_path=[";
+  if (col_path_.size() > 0) out << col_path_[0];
+  for (int i = 1; i < col_path_.size(); ++i) {
+    out << ",";
+    out << col_path_[i];
+  }
+  out << "]"
+      << " offset=" << tuple_offset_ << " null=" << null_indicator_offset_.DebugString()
       << " slot_idx=" << slot_idx_ << " field_idx=" << field_idx_
       << ")";
   return out.str();

@@ -86,6 +86,28 @@ class HdfsParquetScanner : public HdfsScanner {
   };
 
  private:
+  // Internal representation of a column schema (including nested-type columns).
+  struct SchemaNode {
+    // The corresponding schema element defined in the file metadata
+    const parquet::SchemaElement* element;
+
+    // The index into the RowGroup::columns list if this column is materialized in the
+    // file (i.e. it's a scalar type). -1 for nested types.
+    int col_idx;
+
+    // The maximum definition level of this column, i.e., the definition level that
+    // corresponds to a non-NULL value. Valid values are >= 0.
+    int max_def_level;
+
+    // Any nested schema nodes. Empty for non-nested types.
+    std::vector<SchemaNode> children;
+
+    SlotDescriptor* slot_desc;
+
+    SchemaNode() : col_idx(-1), max_def_level(-1), slot_desc(NULL) { }
+    std::string DebugString(int indent = 0) const;
+  };
+
   // Size of the file footer.  This is a guess.  If this value is too little, we will
   // need to issue another read.
   static const int FOOTER_SIZE = 100 * 1024;
@@ -107,6 +129,9 @@ class HdfsParquetScanner : public HdfsScanner {
 
   // Version of the application that wrote this file.
   FileVersion file_version_;
+
+  // The root schema node for this file
+  SchemaNode schema_;
 
   // Scan range for the metadata.
   const DiskIoMgr::ScanRange* metadata_range_;
@@ -140,10 +165,9 @@ class HdfsParquetScanner : public HdfsScanner {
   // are extra in the table schema, we return NULLs for those columns.
   Status CreateColumnReaders();
 
-  // Creates a reader for slot_desc. The reader is added to the runtime state's object
-  // pool.
-  // file_idx is the ordinal of the column in the parquet file.
-  BaseColumnReader* CreateReader(SlotDescriptor* slot_desc, int file_idx);
+  // Creates a reader for node. node must refer to a non-nested column and node.slot_desc
+  // must be non-NULL. The reader is added to the runtime state's object pool.
+  BaseColumnReader* CreateReader(const SchemaNode& node);
 
   // Walks file_metadata_ and initiates reading the materialized columns.  This
   // initializes column_readers_ and issues the reads for the columns.
@@ -152,12 +176,22 @@ class HdfsParquetScanner : public HdfsScanner {
   // Validates the file metadata
   Status ValidateFileMetadata();
 
-  // Validates the column metadata at 'col_idx' to make sure this column is supported
-  // (e.g. encoding, type, etc) and matches the type for slot_desc.
-  Status ValidateColumn(const SlotDescriptor* slot_desc, int col_idx);
+  // Validates the column metadata to make sure this column is supported (e.g. encoding,
+  // type, etc) and matches the type of col_reader's slot desc.
+  Status ValidateColumn(const BaseColumnReader& col_reader, int row_group_idx);
 
   // Part of the HdfsScanner interface, not used in Parquet.
   Status InitNewRange() { return Status::OK; };
+
+  // Unflattens the schema metadata from a Parquet file metadata and converts it to our
+  // SchemaNode representation. Returns the result in 'n' unless an error status is
+  // returned. Does not set the slot_desc field of any SchemaNode.
+  Status CreateSchemaTree(const std::vector<parquet::SchemaElement>& schema,
+      SchemaNode* node) const;
+
+  // Recursive implementation used internally by the above CreateSchemaTree() function.
+  Status CreateSchemaTree(const std::vector<parquet::SchemaElement>& schema,
+      int max_def_level, int* idx, int* col_idx, SchemaNode* node) const;
 };
 
 } // namespace impala
