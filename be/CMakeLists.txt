@@ -231,9 +231,9 @@ set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
   ThriftSaslTransport
   ${JAVA_JVM_LIBRARY}
   ${HDFS_LIBS}
+  gutil
   glogstatic
   gflagsstatic
-  gutil
   pprofstatic
   ${LIBZ}
   ${LIBBZ2}
