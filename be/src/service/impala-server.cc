@@ -1074,7 +1074,7 @@ void ImpalaServer::TransmitData(
   VLOG_ROW << "TransmitData(): instance_id=" << params.dest_fragment_instance_id
            << " node_id=" << params.dest_node_id
            << " #rows=" << params.row_batch.num_rows
-           << "sender_id=" << params.sender_id
+           << " sender_id=" << params.sender_id
            << " eos=" << (params.eos ? "true" : "false");
   // TODO: fix Thrift so we can simply take ownership of thrift_batch instead
   // of having to copy its data

@@ -55,6 +55,7 @@ using namespace apache::thrift::protocol;
 
 DEFINE_int32(port, 20001, "port on which to run Impala test backend");
 DECLARE_string(principal);
+DECLARE_int32(datastream_timeout_ms);
 
 // We reserve contiguous memory for senders in SetUp. If a test uses more
 // senders, a DCHECK will fail and you should increase this value.
@@ -106,6 +107,9 @@ class DataStreamTest : public testing::Test {
     // Initialize Mem trackers for use by the data stream receiver.
     exec_env_.InitForFeTests();
     runtime_state_.InitMemTrackers(TUniqueId(), NULL, -1);
+
+    // Stop tests that rely on mismatched sender / receiver pairs timing out.
+    FLAGS_datastream_timeout_ms = 250;
   }
 
   virtual void SetUp() {
@@ -115,7 +119,7 @@ class DataStreamTest : public testing::Test {
 
     next_instance_id_.lo = 0;
     next_instance_id_.hi = 0;
-    stream_mgr_ = new DataStreamMgr();
+    stream_mgr_ = new DataStreamMgr(new MetricGroup(""));
 
     broadcast_sink_.dest_node_id = DEST_NODE_ID;
     broadcast_sink_.output_partition.type = TPartitionType::UNPARTITIONED;

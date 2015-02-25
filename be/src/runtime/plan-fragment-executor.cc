@@ -372,8 +372,7 @@ Status PlanFragmentExecutor::OpenInternal() {
 }
 
 void PlanFragmentExecutor::ReportProfile() {
-  VLOG_FILE << "ReportProfile(): instance_id="
-      << runtime_state_->fragment_instance_id();
+  VLOG_FILE << "ReportProfile(): instance_id=" << runtime_state_->fragment_instance_id();
   DCHECK(!report_status_cb_.empty());
   unique_lock<mutex> l(report_thread_lock_);
   // tell Open() that we started

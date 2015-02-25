@@ -1441,6 +1441,36 @@
     "label": "Active scratch directories list",
     "units": "NONE",
     "kind": "SET",
-    "key": "tmp-file-mgr.active-scratch-dirs.list"
+      "key": "tmp-file-mgr.active-scratch-dirs.list"
+  },
+  {
+    "description": "Number of senders waiting for receiving fragment to initialize",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Number of senders waiting for receiving fragment to initialize.",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "senders-blocked-on-recvr-creation"
+  },
+  {
+    "description": "Total number of senders that have been blocked waiting for receiving fragment to initialize.",
+    "contexts": [
+        "IMPALAD"
+    ],
+    "label": "Total senders waiting for receiving fragment to initialize",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "total-senders-blocked-on-recvr-creation"
+  },
+  {
+    "description": "Total number of senders that timed-out waiting for receiving fragment to initialize.",
+    "contexts": [
+       "IMPALAD"
+    ],
+    "label": "Total senders timed-out waiting for receiving fragment to initialize",
+    "units": "NONE",
+    "kind": "COUNTER",
+    "key": "total-senders-timedout-waiting-for-recvr-creation"
   }
 ]

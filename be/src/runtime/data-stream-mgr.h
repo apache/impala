@@ -22,6 +22,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
 
 #include "common/status.h"
 #include "common/object-pool.h"
@@ -50,12 +51,19 @@ class TRowBatch;
 /// DataStreamMgr also allows asynchronous cancellation of streams via Cancel()
 /// which unblocks all DataStreamRecvr::GetBatch() calls that are made on behalf
 /// of the cancelled fragment id.
-//
+///
+/// Exposes three metrics:
+///  'senders-blocked-on-recvr-creation' - currently blocked senders.
+///  'total-senders-blocked-on-recvr-creation' - total number of blocked senders over
+///  time.
+///  'total-senders-timedout-waiting-for-recvr-creation' - total number of senders that
+///  timed-out while waiting for a receiver.
+///
 /// TODO: The recv buffers used in DataStreamRecvr should count against
 /// per-query memory limits.
 class DataStreamMgr {
  public:
-  DataStreamMgr() {}
+  DataStreamMgr(MetricGroup* metrics);
 
   /// Create a receiver for a specific fragment_instance_id/node_id destination;
   /// If is_merging is true, the receiver maintains a separate queue of incoming row
@@ -93,8 +101,20 @@ class DataStreamMgr {
  private:
   friend class DataStreamRecvr;
 
+  /// Owned by the metric group passed into the constructor
+  MetricGroup* metrics_;
+
+  /// Current number of senders waiting for a receiver to register
+  IntGauge* num_senders_waiting_;
+
+  /// Total number of senders that have ever waited for a receiver to register
+  IntCounter* total_senders_waited_;
+
+  /// Total number of senders that timed-out waiting for a receiver to register
+  IntCounter* num_senders_timedout_;
+
   /// protects all fields below
-  boost::mutex lock_;
+  SpinLock lock_;
 
   /// map from hash value of fragment instance id/node id pair to stream receivers;
   /// Ownership of the stream revcr is shared between this instance and the caller of
@@ -102,13 +122,15 @@ class DataStreamMgr {
   /// we don't want to create a map<pair<TUniqueId, PlanNodeId>, DataStreamRecvr*>,
   /// because that requires a bunch of copying of ids for lookup
   typedef boost::unordered_multimap<uint32_t,
-      boost::shared_ptr<DataStreamRecvr> > StreamMap;
-  StreamMap receiver_map_;
+      boost::shared_ptr<DataStreamRecvr> > RecvrMap;
+  RecvrMap receiver_map_;
 
-  /// less-than ordering for pair<TUniqueId, PlanNodeId>
+  /// (Fragment instance id, Plan node id) pair that uniquely identifies a stream.
+  typedef std::pair<impala::TUniqueId, PlanNodeId> RecvrId;
+
+  /// Less-than ordering for RecvrIds.
   struct ComparisonOp {
-    bool operator()(const std::pair<impala::TUniqueId, PlanNodeId>& a,
-                    const std::pair<impala::TUniqueId, PlanNodeId>& b) {
+    bool operator()(const RecvrId& a, const RecvrId& b) {
       if (a.first.hi < b.first.hi) {
         return true;
       } else if (a.first.hi > b.first.hi) {
@@ -122,21 +144,82 @@ class DataStreamMgr {
     }
   };
 
-  /// ordered set of registered streams' fragment instance id/node id
-  typedef std::set<std::pair<TUniqueId, PlanNodeId>, ComparisonOp > FragmentStreamSet;
-  FragmentStreamSet fragment_stream_set_;
+  /// Ordered set of receiver IDs so that we can easily find all receivers for a given
+  /// fragment (by starting at (fragment instance id, 0) and iterating until the fragment
+  /// instance id changes), which is required for cancellation of an entire fragment.
+  ///
+  /// There is one entry in fragment_recvr_set_ for every entry in receiver_map_.
+  typedef std::set<RecvrId, ComparisonOp> FragmentRecvrSet;
+  FragmentRecvrSet fragment_recvr_set_;
 
-  /// Return the receiver for given fragment_instance_id/node_id,
-  /// or NULL if not found. If 'acquire_lock' is false, assumes lock_ is already being
-  /// held and won't try to acquire it.
-  boost::shared_ptr<DataStreamRecvr> FindRecvr(
-      const TUniqueId& fragment_instance_id, PlanNodeId node_id,
-      bool acquire_lock = true);
+  /// Return the receiver for given fragment_instance_id/node_id, or NULL if not found. If
+  /// 'acquire_lock' is false, assumes lock_ is already being held and won't try to
+  /// acquire it.
+  boost::shared_ptr<DataStreamRecvr> FindRecvr(const TUniqueId& fragment_instance_id,
+      PlanNodeId node_id, bool acquire_lock = true);
+
+  /// Calls FindRecvr(), but if NULL is returned, wait for up to 60s for the receiver to
+  /// be registered.  Senders may initialise and start sending row batches before a
+  /// receiver is ready. To accommodate this, we allow senders to establish a rendezvous
+  /// between them and the receiver. When the receiver arrives, it triggers the
+  /// rendezvous, and all waiting senders can proceed. A sender that waits for too long
+  /// (60s by default) will eventually time out and abort.
+  boost::shared_ptr<DataStreamRecvr> FindRecvrOrWait(
+      const TUniqueId& fragment_instance_id, PlanNodeId node_id);
 
   /// Remove receiver block for fragment_instance_id/node_id from the map.
   Status DeregisterRecvr(const TUniqueId& fragment_instance_id, PlanNodeId node_id);
 
   inline uint32_t GetHashValue(const TUniqueId& fragment_instance_id, PlanNodeId node_id);
+
+  /// The coordination primitive used to signal the arrival of a waited-for receiver
+  typedef Promise<boost::shared_ptr<DataStreamRecvr> > RendezvousPromise;
+
+  /// A reference-counted promise-wrapper used to coordinate between senders and
+  /// receivers. The ref_count field tracks the number of senders waiting for the arrival
+  /// of a particular receiver. When ref_count returns to 0, the last sender has ceased
+  /// waiting (either because of a timeout, or because the receiver arrived), and the
+  /// rendezvous can be torn down.
+  ///
+  /// Access is only thread-safe when lock_ is held.
+  struct RefCountedPromise {
+    uint32_t ref_count;
+
+    // Without a conveniently copyable smart ptr, we keep a raw pointer to the promise and
+    // are careful to delete it when ref_count becomes 0.
+    RendezvousPromise* promise;
+
+    void IncRefCount() { ++ref_count; }
+
+    uint32_t DecRefCount() {
+      if (--ref_count == 0) delete promise;
+      return ref_count;
+    }
+
+    RefCountedPromise() : ref_count(0), promise(new RendezvousPromise()) { }
+  };
+
+  /// Map from stream (which identifies a receiver) to a (count, promise) pair that gives
+  /// the number of senders waiting as well as a shared promise whose value is Set() with
+  /// a pointer to the receiver when the receiver arrives. The count is used to detect
+  /// when no receivers are waiting, to initiate clean-up after the fact.
+  ///
+  /// If pending_rendezvous_[X] exists, then receiver_map_[hash(X)] and
+  /// fragment_recvr_set_[X] may exist (and vice versa), as entries are removed from
+  /// pending_rendezvous_ some time after the rendezvous is triggered by the arrival of a
+  /// matching receiver.
+  typedef boost::unordered_map<RecvrId, RefCountedPromise> RendezvousMap;
+  RendezvousMap pending_rendezvous_;
+
+  /// Map from the time, in ms, that a stream should be evicted from closed_stream_cache
+  /// to its RecvrId. Used to evict old streams from cache efficiently.
+  typedef std::map<int64_t, RecvrId> ClosedStreamMap;
+  ClosedStreamMap closed_stream_expirations_;
+
+  /// Cache of recently closed RecvrIds. Used to allow straggling senders to fail fast by
+  /// checking this cache, rather than waiting for the missed-receiver timeout to elapse
+  /// in FindRecvrOrWait().
+  boost::unordered_set<RecvrId> closed_stream_cache_;
 };
 
 }
