@@ -33,6 +33,8 @@ const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES =
     "impala-server.num-queries";
 const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS =
     "impala-server.num-fragments";
+const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT =
+    "impala-server.num-fragments-in-flight";
 const char* ImpaladMetricKeys::TOTAL_SCAN_RANGES_PROCESSED =
     "impala-server.scan-ranges.total";
 const char* ImpaladMetricKeys::NUM_SCAN_RANGES_MISSING_VOLUME_ID =
@@ -101,6 +103,7 @@ const char* ImpaladMetricKeys::DDL_DURATIONS =
 // Counters
 IntGauge* ImpaladMetrics::HASH_TABLE_TOTAL_BYTES = NULL;
 IntCounter* ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS = NULL;
+IntGauge* ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT = NULL;
 IntCounter* ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES = NULL;
 IntCounter* ImpaladMetrics::NUM_QUERIES_EXPIRED = NULL;
 IntCounter* ImpaladMetrics::NUM_QUERIES_SPILLED = NULL;
@@ -162,6 +165,8 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
       ImpaladMetricKeys::NUM_QUERIES_SPILLED, 0);
   IMPALA_SERVER_NUM_FRAGMENTS = m->AddCounter<int64_t>(
       ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS, 0);
+  IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT = m->AddGauge(
+      ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT, 0L);
   IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS = m->AddGauge<int64_t>(
       ImpaladMetricKeys::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS, 0);
   IMPALA_SERVER_NUM_OPEN_BEESWAX_SESSIONS = m->AddGauge<int64_t>(

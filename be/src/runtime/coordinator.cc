@@ -1141,25 +1141,34 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
   TExecPlanFragmentResult thrift_result;
   Status rpc_status = backend_client.DoRpc(&ImpalaInternalServiceClient::ExecPlanFragment,
       *exec_state->rpc_params, &thrift_result);
+
+  const string ERR_TEMPLATE = "ExecPlanRequest rpc query_id=$0 instance_id=$1 failed: $2";
+
   if (!rpc_status.ok()) {
-    stringstream msg;
-    msg << "ExecPlanRequest rpc query_id=" << query_id_
-        << " instance_id=" << exec_state->fragment_instance_id
-        << " failed: " << rpc_status.msg().msg();
-    VLOG_QUERY << msg.str();
-    exec_state->status = Status(msg.str());
-    return status;
+    const string& err_msg = Substitute(ERR_TEMPLATE, PrintId(query_id()),
+        PrintId(exec_state->fragment_instance_id), rpc_status.msg().msg());
+    VLOG_QUERY << err_msg;
+    exec_state->status = Status(err_msg);
+    return exec_state->status;
   }
 
   // rpc_params are not needed beyond this point, set the pointer to NULL.
   // Memory is freed in Coordinator::Exec().
   exec_state->rpc_params = NULL;
 
-  exec_state->status = thrift_result.status;
-  if (exec_state->status.ok()) {
-    exec_state->initiated = true;
-    exec_state->stopwatch.Start();
+  Status exec_plan_status = Status(thrift_result.status);
+  if (!exec_plan_status.ok()) {
+    const string& err_msg = Substitute(ERR_TEMPLATE, PrintId(query_id()),
+        PrintId(exec_state->fragment_instance_id),
+        exec_plan_status.msg().GetFullMessageDetails());
+    VLOG_QUERY << err_msg;
+    exec_state->status = Status(err_msg);
+    return exec_state->status;
   }
+
+  exec_state->status = Status::OK();
+  exec_state->initiated = true;
+  exec_state->stopwatch.Start();
   return exec_state->status;
 }
 

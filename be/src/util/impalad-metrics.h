@@ -43,6 +43,9 @@ class ImpaladMetricKeys {
   /// queries
   static const char* IMPALA_SERVER_NUM_FRAGMENTS;
 
+  /// Number of fragments currently running on this server.
+  static const char* IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT;
+
   /// Number of open HiveServer2 sessions
   static const char* IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS;
 
@@ -147,6 +150,7 @@ class ImpaladMetrics {
   // Counters
   static IntGauge* HASH_TABLE_TOTAL_BYTES;
   static IntCounter* IMPALA_SERVER_NUM_FRAGMENTS;
+  static IntGauge* IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT;
   static IntCounter* IMPALA_SERVER_NUM_QUERIES;
   static IntCounter* NUM_QUERIES_EXPIRED;
   static IntCounter* NUM_QUERIES_SPILLED;

@@ -390,7 +390,7 @@
     "key": "impala-server.num-files-open-for-insert"
   },
   {
-    "description": "The total number of query fragments processed over the life of the process",
+    "description": "The total number of query fragments processed over the life of the process.",
     "contexts": [
       "IMPALAD"
     ],
@@ -398,6 +398,16 @@
     "units": "UNIT",
     "kind": "COUNTER",
     "key": "impala-server.num-fragments"
+  },
+  {
+    "description": "The number of query fragments currently executing.",
+    "contexts": [
+        "IMPALAD"
+    ],
+    "label": "Query Fragments",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "key": "impala-server.num-fragments-in-flight"
   },
   {
     "description": "The number of open Beeswax sessions.",
@@ -1441,7 +1451,7 @@
     "label": "Active scratch directories list",
     "units": "NONE",
     "kind": "SET",
-      "key": "tmp-file-mgr.active-scratch-dirs.list"
+    "key": "tmp-file-mgr.active-scratch-dirs.list"
   },
   {
     "description": "Number of senders waiting for receiving fragment to initialize",

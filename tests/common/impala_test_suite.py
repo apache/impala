@@ -132,8 +132,9 @@ class ImpalaTestSuite(BaseTestSuite):
     return client
 
   @classmethod
-  def create_impala_service(cls, host_port=IMPALAD):
-    return ImpaladService(IMPALAD.split(':')[0])
+  def create_impala_service(cls, host_port=IMPALAD, webserver_port=25000):
+    host, port = host_port.split(':')
+    return ImpaladService(host, beeswax_port=port, webserver_port=webserver_port)
 
   @classmethod
   def create_hdfs_client(cls):

@@ -38,68 +38,63 @@ Status FragmentMgr::ExecPlanFragment(const TExecPlanFragmentParams& exec_params)
              << " coord=" << exec_params.fragment_instance_ctx.query_ctx.coord_address
              << " backend#=" << exec_params.fragment_instance_ctx.backend_num;
 
-  if (!exec_params.fragment.__isset.output_sink) {
-    return Status("missing sink in plan fragment");
-  }
-
   // Preparing and opening the fragment creates a thread and consumes a non-trivial
   // amount of memory. If we are already starved for memory, cancel the fragment as
   // early as possible to avoid digging the hole deeper.
   if (ExecEnv::GetInstance()->process_mem_tracker()->LimitExceeded()) {
     Status status = Status::MemLimitExceeded();
     status.AddDetail(Substitute("Instance $0 of plan fragment $1 of query $2 could not "
-          "start because the backend Impala daemon is over its memory limit",
-          PrintId(exec_params.fragment_instance_ctx.fragment_instance_id),
-          exec_params.fragment.display_name,
-          PrintId(exec_params.fragment_instance_ctx.query_ctx.query_id)));
+            "start because the backend Impala daemon is over its memory limit",
+            PrintId(exec_params.fragment_instance_ctx.fragment_instance_id),
+            exec_params.fragment.display_name,
+            PrintId(exec_params.fragment_instance_ctx.query_ctx.query_id)));
     return status;
   }
 
-  shared_ptr<FragmentExecState> exec_state(
-      new FragmentExecState(exec_params.fragment_instance_ctx, ExecEnv::GetInstance()));
-  // Call Prepare() now, before registering the exec state, to avoid calling
-  // exec_state->Cancel().
-  // We might get an async cancellation, and the executor requires that Cancel() not
-  // be called before Prepare() returns.
-  RETURN_IF_ERROR(exec_state->Prepare(exec_params));
+  // Remote fragments must always have a sink. Remove when IMPALA-2905 is resolved.
+  DCHECK(exec_params.fragment.__isset.output_sink);
 
+  shared_ptr<FragmentExecState> exec_state(
+      new FragmentExecState(exec_params, ExecEnv::GetInstance()));
+
+  // Register exec_state before this RPC returns so that async Cancel() calls (which can
+  // only happen after this RPC returns) can always find this fragment.
   {
-    lock_guard<mutex> l(fragment_exec_state_map_lock_);
-    // register exec_state before starting exec thread
+    lock_guard<SpinLock> l(fragment_exec_state_map_lock_);
     fragment_exec_state_map_.insert(
-        make_pair(exec_params.fragment_instance_ctx.fragment_instance_id, exec_state));
+        make_pair(exec_state->fragment_instance_id(), exec_state));
   }
 
-  // execute plan fragment in new thread
-  // TODO: manage threads via global thread pool
-  exec_state->set_exec_thread(new Thread("impala-server", "exec-plan-fragment",
-      &FragmentMgr::FragmentExecThread, this, exec_state.get()));
+  ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->Increment(1L);
+  ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS->Increment(1L);
+
+  // Execute plan fragment in new thread.
+  // TODO: manage threads via global thread pool?
+  const TUniqueId& fragment_id = exec_state->fragment_instance_id();
+  exec_state->set_exec_thread(new Thread("fragment-mgr",
+      Substitute("exec-plan-fragment-$0", PrintId(fragment_id)),
+          &FragmentMgr::FragmentThread, this, fragment_id));
 
   return Status::OK();
 }
 
-void FragmentMgr::FragmentExecThread(FragmentExecState* exec_state) {
-  ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS->Increment(1L);
-  exec_state->Exec();
-  // we're done with this plan fragment
+void FragmentMgr::FragmentThread(TUniqueId fragment_instance_id) {
+  shared_ptr<FragmentExecState> exec_state = GetFragmentExecState(fragment_instance_id);
+  if (exec_state.get() == NULL) return;
+  Status status = exec_state->Prepare();
+  if (status.ok()) exec_state->Exec();
 
-  // The last reference to the FragmentExecState is in the map. We don't
-  // want the destructor to be called while the fragment_exec_state_map_lock_
-  // is taken so we'll first grab a reference here before removing the entry
-  // from the map.
-  shared_ptr<FragmentExecState> exec_state_reference;
+  // We're done with this plan fragment
   {
-    lock_guard<mutex> l(fragment_exec_state_map_lock_);
-    FragmentExecStateMap::iterator i =
-        fragment_exec_state_map_.find(exec_state->fragment_instance_id());
-    if (i != fragment_exec_state_map_.end()) {
-      exec_state_reference = i->second;
-      fragment_exec_state_map_.erase(i);
-    } else {
-      LOG(ERROR) << "missing entry in fragment exec state map: instance_id="
-                 << exec_state->fragment_instance_id();
-    }
+    lock_guard<SpinLock> l(fragment_exec_state_map_lock_);
+    size_t num_erased =
+        fragment_exec_state_map_.erase(exec_state->fragment_instance_id());
+    DCHECK_EQ(num_erased, 1);
   }
+  // TODO: this might be imprecise, if another client of FragmentMgr has a reference to
+  // the fragment exec state.
+  ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS_IN_FLIGHT->Increment(-1L);
+
 #ifndef ADDRESS_SANITIZER
   // tcmalloc and address sanitizer can not be used together
   if (FLAGS_log_mem_usage_interval > 0) {
@@ -116,13 +111,12 @@ void FragmentMgr::FragmentExecThread(FragmentExecState* exec_state) {
 
 shared_ptr<FragmentMgr::FragmentExecState> FragmentMgr::GetFragmentExecState(
     const TUniqueId& fragment_instance_id) {
-  lock_guard<mutex> l(fragment_exec_state_map_lock_);
-  FragmentExecStateMap::iterator i = fragment_exec_state_map_.find(fragment_instance_id);
-  if (i == fragment_exec_state_map_.end()) {
-    return shared_ptr<FragmentExecState>();
-  } else {
-    return i->second;
-  }
+  lock_guard<SpinLock> l(fragment_exec_state_map_lock_);
+  FragmentExecStateMap::const_iterator i =
+      fragment_exec_state_map_.find(fragment_instance_id);
+  if (i == fragment_exec_state_map_.end()) return shared_ptr<FragmentExecState>();
+
+  return i->second;
 }
 
 void FragmentMgr::CancelPlanFragment(TCancelPlanFragmentResult& return_val,

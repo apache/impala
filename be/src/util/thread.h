@@ -30,12 +30,12 @@ class MetricGroup;
 class Webserver;
 class CgroupsMgr;
 
-/// Thin wrapper around boost::thread that can register itself with the singleton ThreadMgr
-/// (a private class implemented in thread.cc entirely, which tracks all live threads so
-/// that they may be monitored via the debug webpages). This class has a limited subset of
-/// boost::thread's API. Construction is almost the same, but clients must supply a
-/// category and a name for each thread so that they can be identified in the debug web
-/// UI. Otherwise, Join() is the only supported method from boost::thread.
+/// Thin wrapper around boost::thread that can register itself with the singleton
+/// ThreadMgr (a private class implemented in thread.cc entirely, which tracks all live
+/// threads so that they may be monitored via the debug webpages). This class has a
+/// limited subset of boost::thread's API. Construction is almost the same, but clients
+/// must supply a category and a name for each thread so that they can be identified in
+/// the debug web UI. Otherwise, Join() is the only supported method from boost::thread.
 //
 /// Each Thread object knows its operating system thread ID (tid), which can be used to
 /// attach debuggers to specific threads, to retrieve resource-usage statistics from the
@@ -108,9 +108,9 @@ class Thread {
   static const int64_t INVALID_THREAD_ID = -1;
 
  private:
-  /// To distinguish between a thread ID that can't be determined, and one that hasn't been
-  /// assigned. Since tid_ is set in the constructor, this value will never be seen by
-  /// clients of this class.
+  /// To distinguish between a thread ID that can't be determined, and one that hasn't
+  /// been assigned. Since tid_ is set in the constructor, this value will never be seen
+  /// by clients of this class.
   static const int64_t UNINITIALISED_THREAD_ID = -2;
 
   /// Function object that wraps the user-supplied function to run in a separate thread.
@@ -134,24 +134,24 @@ class Thread {
   void StartThread(const ThreadFunctor& functor);
 
   /// Wrapper for the user-supplied function. Always invoked from thread_. Executes the
-  /// method in functor_, but before doing so registers with the global ThreadMgr and reads
-  /// the thread's system TID. After the method terminates, it is unregistered.
+  /// method in functor_, but before doing so registers with the global ThreadMgr and
+  /// reads the thread's system TID. After the method terminates, it is unregistered.
   //
   /// SuperviseThread() notifies StartThread() when thread initialisation is completed via
   /// the promise parameter, which is set to the new thread's system ID. After this point,
-  /// it is no longer safe for SuperviseThread() to refer to parameters passed by reference
-  /// or pointer to this method, because of a wrinkle in the lifecycle of boost threads: if
-  /// the thread object representing a thread should be destroyed, the actual
+  /// it is no longer safe for SuperviseThread() to refer to parameters passed by
+  /// reference or pointer to this method, because of a wrinkle in the lifecycle of boost
+  /// threads: if the thread object representing a thread should be destroyed, the actual
   /// operating-system thread continues to run (the thread is detached, not
-  /// terminated). Therefore it's not safe to make reference to the Thread object or any of
-  /// its members in SuperviseThread() after it notifies the caller via thread_started that
-  /// initialisation is completed.  An alternative is to join() in the destructor of
+  /// terminated). Therefore it's not safe to make reference to the Thread object or any
+  /// of its members in SuperviseThread() after it notifies the caller via thread_started
+  /// that initialisation is completed.  An alternative is to join() in the destructor of
   /// Thread, but that's not the same semantics as boost::thread, which we are trying to
   /// emulate here.
   //
   /// As a result, the 'functor' parameter is deliberately copied into this method, since
-  /// it is used after the notification completes.h The tid parameter is written to exactly
-  /// once before SuperviseThread() notifies the caller.
+  /// it is used after the notification completes.h The tid parameter is written to
+  /// exactly once before SuperviseThread() notifies the caller.
   static void SuperviseThread(const std::string& name, const std::string& category,
       ThreadFunctor functor, Promise<int64_t>* thread_started);
 };
@@ -200,7 +200,7 @@ class ThreadGroup {
 /// Initialises the threading subsystem. Must be called before a Thread is created.
 void InitThreading();
 
-/// Registers /threadsz with the debug webserver, and creates thread-tracking metrics under
+/// Registers /threadz with the debug webserver, and creates thread-tracking metrics under
 /// the "thread-manager." prefix
 Status StartThreadInstrumentation(MetricGroup* metrics, Webserver* webserver);
 }

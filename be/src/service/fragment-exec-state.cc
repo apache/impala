@@ -19,10 +19,12 @@
 #include "codegen/llvm-codegen.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "rpc/thrift-util.h"
+#include "gutil/strings/substitute.h"
 
 #include "common/names.h"
 
 using namespace apache::thrift;
+using namespace strings;
 using namespace impala;
 
 Status FragmentMgr::FragmentExecState::UpdateStatus(const Status& status) {
@@ -38,11 +40,10 @@ Status FragmentMgr::FragmentExecState::Cancel() {
   return Status::OK();
 }
 
-Status FragmentMgr::FragmentExecState::Prepare(
-    const TExecPlanFragmentParams& exec_params) {
-  exec_params_ = exec_params;
-  RETURN_IF_ERROR(executor_.Prepare(exec_params));
-  return Status::OK();
+Status FragmentMgr::FragmentExecState::Prepare() {
+  Status status = executor_.Prepare(exec_params_);
+  if (!status.ok()) ReportStatusCb(status, NULL, true);
+  return status;
 }
 
 void FragmentMgr::FragmentExecState::Exec() {
@@ -76,28 +77,33 @@ void FragmentMgr::FragmentExecState::ReportStatusCb(
   params.__set_fragment_instance_id(fragment_instance_ctx_.fragment_instance_id);
   exec_status.SetTStatus(&params);
   params.__set_done(done);
-  profile->ToThrift(&params.profile);
-  params.__isset.profile = true;
 
-  RuntimeState* runtime_state = executor_.runtime_state();
-  DCHECK(runtime_state != NULL);
-  // Only send updates to insert status if fragment is finished, the coordinator
-  // waits until query execution is done to use them anyhow.
-  if (done) {
-    TInsertExecStatus insert_status;
-
-    if (runtime_state->hdfs_files_to_move()->size() > 0) {
-      insert_status.__set_files_to_move(*runtime_state->hdfs_files_to_move());
-    }
-    if (runtime_state->per_partition_status()->size() > 0) {
-      insert_status.__set_per_partition_status(*runtime_state->per_partition_status());
-    }
-
-    params.__set_insert_exec_status(insert_status);
+  if (profile != NULL) {
+    profile->ToThrift(&params.profile);
+    params.__isset.profile = true;
   }
 
-  // Send new errors to coordinator
-  runtime_state->GetUnreportedErrors(&(params.error_log));
+  RuntimeState* runtime_state = executor_.runtime_state();
+  // If executor_ did not successfully prepare, runtime state may not have been set.
+  if (runtime_state != NULL) {
+    // Only send updates to insert status if fragment is finished, the coordinator
+    // waits until query execution is done to use them anyhow.
+    if (done) {
+      TInsertExecStatus insert_status;
+
+      if (runtime_state->hdfs_files_to_move()->size() > 0) {
+        insert_status.__set_files_to_move(*runtime_state->hdfs_files_to_move());
+      }
+      if (runtime_state->per_partition_status()->size() > 0) {
+        insert_status.__set_per_partition_status(*runtime_state->per_partition_status());
+      }
+
+      params.__set_insert_exec_status(insert_status);
+    }
+
+    // Send new errors to coordinator
+    runtime_state->GetUnreportedErrors(&(params.error_log));
+  }
   params.__isset.error_log = (params.error_log.size() > 0);
 
   TReportExecStatusResult res;
@@ -106,7 +112,7 @@ void FragmentMgr::FragmentExecState::ReportStatusCb(
   if (rpc_status.ok()) rpc_status = Status(res.status);
   if (!rpc_status.ok()) {
     UpdateStatus(rpc_status);
-    // we need to cancel the execution of this fragment
+    // TODO: Do we really need to cancel?
     executor_.Cancel();
   }
 }
