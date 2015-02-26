@@ -8,3 +8,9 @@ ext-py/prettytable-0.7.1/prettytable.egg-info
 ext-py/sqlparse-0.1.14/dist/
 ext-py/sqlparse-0.1.14/build/
 ext-py/sqlparse-0.1.14/sqlparse.egg-info/
+
+# This file is used by buildall.sh to find files that need to be removed during the
+# clean phase. Previous version of deps should be kept here for cleaning otherwise they
+# may cause a build failure. Also the ignore path must be changed to the root folder
+# so "git clean -Xdf" will work.
+ext-py/sqlparse-0.1.7/
