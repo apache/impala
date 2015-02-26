@@ -73,7 +73,7 @@ void FragmentMgr::FragmentExecState::ReportStatusCb(
   TReportExecStatusParams params;
   params.protocol_version = ImpalaInternalServiceVersion::V1;
   params.__set_query_id(fragment_instance_ctx_.query_ctx.query_id);
-  params.__set_backend_num(fragment_instance_ctx_.backend_num);
+  params.__set_fragment_instance_idx(fragment_instance_ctx_.fragment_instance_idx);
   params.__set_fragment_instance_id(fragment_instance_ctx_.fragment_instance_id);
   exec_status.SetTStatus(&params);
   params.__set_done(done);

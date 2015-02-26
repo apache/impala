@@ -323,8 +323,9 @@ class MetricGroup {
   ChildGroupMap children_;
 
   /// Webserver callback for /metrics. Produces a tree of JSON values, each representing a
-  /// metric group, and each including a list of metrics, and a list of immediate children.
-  /// If args contains a paramater 'metric', only the json for that metric is returned.
+  /// metric group, and each including a list of metrics, and a list of immediate
+  /// children.  If args contains a paramater 'metric', only the json for that metric is
+  /// returned.
   void TemplateCallback(const Webserver::ArgumentMap& args,
       rapidjson::Document* document);
 
@@ -344,6 +345,8 @@ typedef class SimpleMetric<int64_t, TMetricKind::COUNTER> IntCounter;
 typedef class SimpleMetric<bool, TMetricKind::PROPERTY> BooleanProperty;
 typedef class SimpleMetric<std::string, TMetricKind::PROPERTY> StringProperty;
 
+TMetricDef MakeTMetricDef(const std::string& key, TMetricKind::type kind,
+    TUnit::type unit);
 }
 
 #endif // IMPALA_UTIL_METRICS_H

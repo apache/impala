@@ -50,6 +50,7 @@
 #include "exec/data-sink.h"
 #include "exec/scan-node.h"
 #include "util/container-util.h"
+#include "util/counting-barrier.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
 #include "util/hdfs-bulk-ops.h"
@@ -88,123 +89,186 @@ namespace impala {
 // container for debug options in TPlanFragmentExecParams (debug_node, debug_action,
 // debug_phase)
 struct DebugOptions {
-  int backend_num;
+  int fragment_instance_idx;
   int node_id;
   TDebugAction::type action;
   TExecNodePhase::type phase;  // INVALID: debug options invalid
 
   DebugOptions()
-    : backend_num(-1), node_id(-1), action(TDebugAction::WAIT),
+    : fragment_instance_idx(-1), node_id(-1), action(TDebugAction::WAIT),
       phase(TExecNodePhase::INVALID) {}
+
+  // If these debug options apply to the candidate fragment instance, returns true
+  // otherwise returns false.
+  bool IsApplicable(int candidate_fragment_instance_idx) {
+    if (phase == TExecNodePhase::INVALID) return false;
+    return (fragment_instance_idx == -1 ||
+        fragment_instance_idx == candidate_fragment_instance_idx);
+  }
 };
 
-// Execution state of a particular fragment.
-// Concurrent accesses:
-// - GetNodeThroughput() called when coordinator's profile is printed
-// - updates through UpdateFragmentExecStatus()
-class Coordinator::BackendExecState {
+/// Execution state of a particular fragment instance.
+///
+/// Concurrent accesses:
+/// - GetNodeThroughput() called when coordinator's profile is printed
+/// - updates through UpdateFragmentExecStatus()
+class Coordinator::FragmentInstanceState {
  public:
-  TUniqueId fragment_instance_id;
-  MonotonicStopWatch stopwatch;  // wall clock timer for this fragment
-  const TNetworkAddress backend_address;  // of ImpalaInternalService
-  int64_t total_split_size;  // summed up across all splits; in bytes
-
-  // Created in Coordinator::Exec() and destroyed after call to
-  // ParallelExecutor::Exec() to release the memory.
-  TExecPlanFragmentParams* rpc_params;
-
-  // Fragment idx for this ExecState
-  int fragment_idx;
-
-  // The 0-based instance idx.
-  int instance_idx;
-
-  // protects fields below
-  // lock ordering: Coordinator::lock_ can only get obtained *prior*
-  // to lock
-  boost::mutex lock;
-
-  // if the status indicates an error status, execution of this fragment
-  // has either been aborted by the remote backend (which then reported the error)
-  // or cancellation has been initiated; either way, execution must not be cancelled
-  Status status;
-
-  bool initiated; // if true, TPlanExecRequest rpc has been sent
-  bool done;  // if true, execution terminated; do not cancel in that case
-  bool profile_created;  // true after the first call to profile->Update()
-  RuntimeProfile* profile;  // owned by obj_pool()
-  ErrorLogMap error_log; // errors reported by this backend
-
-  // Total scan ranges complete across all scan nodes
-  int64_t total_ranges_complete;
-
-  FragmentInstanceCounters aggregate_counters;
-
-  BackendExecState(QuerySchedule& schedule, Coordinator* coord,
-      const TNetworkAddress& coord_address,
-      int backend_num, const TPlanFragment& fragment, int fragment_idx,
-      const FragmentExecParams& params, int instance_idx,
-      DebugOptions* debug_options, ObjectPool* obj_pool,
-      TExecPlanFragmentParams* plan_fragment_params)
-    : fragment_instance_id(params.instance_ids[instance_idx]),
-      backend_address(params.hosts[instance_idx]),
-      total_split_size(0),
-      rpc_params(plan_fragment_params),
-      fragment_idx(fragment_idx),
-      instance_idx(instance_idx),
-      initiated(false),
-      done(false),
-      profile_created(false),
-      total_ranges_complete(0) {
-    stringstream ss;
-    ss << "Instance " << PrintId(fragment_instance_id)
-       << " (host=" << backend_address << ")";
-    profile = obj_pool->Add(new RuntimeProfile(obj_pool, ss.str()));
-
-    if (debug_options != NULL) {
-      rpc_params->params.__set_debug_node_id(debug_options->node_id);
-      rpc_params->params.__set_debug_action(debug_options->action);
-      rpc_params->params.__set_debug_phase(debug_options->phase);
-    }
-    ComputeTotalSplitSize();
+  FragmentInstanceState(int fragment_instance_idx, int fragment_idx,
+      const FragmentExecParams* params, int instance_idx, ObjectPool* obj_pool)
+    : fragment_instance_idx_(fragment_instance_idx),
+      fragment_instance_id_(params->instance_ids[instance_idx]),
+      impalad_address_(params->hosts[instance_idx]),
+      total_split_size_(0),
+      fragment_idx_(fragment_idx),
+      instance_idx_(instance_idx),
+      rpc_sent_(false),
+      done_(false),
+      profile_created_(false),
+      total_ranges_complete_(0),
+      rpc_latency_(0) {
+    const string& profile_name = Substitute("Instance $0 (host=$1)",
+        PrintId(fragment_instance_id_), lexical_cast<string>(impalad_address_));
+    profile_ = obj_pool->Add(new RuntimeProfile(obj_pool, profile_name));
   }
 
-  // Computes sum of split sizes of leftmost scan. Call only after setting
-  // exec_params.
-  void ComputeTotalSplitSize();
+  /// Called to set the initial status of the fragment instance after the
+  /// ExecRemoteFragment() RPC has returned.
+  void SetInitialStatus(const Status& status) {
+    DCHECK(!rpc_sent_);
+    status_ = status;
+    if (!status_.ok()) return;
+    rpc_sent_ = true;
+    stopwatch_.Start();
+  }
 
-  // Return value of throughput counter for given plan_node_id, or 0 if that node
-  // doesn't exist.
-  // Thread-safe.
+  /// Computes sum of split sizes of leftmost scan.
+  void ComputeTotalSplitSize(const PerNodeScanRanges& per_node_scan_ranges);
+
+  /// Return value of throughput counter for given plan_node_id, or 0 if that node doesn't
+  /// exist. Thread-safe, and takes lock() internally.
   int64_t GetNodeThroughput(int plan_node_id);
 
-  // Return number of completed scan ranges for plan_node_id, or 0 if that node
-  // doesn't exist.
-  // Thread-safe.
+  /// Return number of completed scan ranges for plan_node_id, or 0 if that node doesn't
+  /// exist. Thread-safe, and takes lock() internally.
   int64_t GetNumScanRangesCompleted(int plan_node_id);
 
-  // Updates the total number of scan ranges complete for this fragment.  Returns
-  // the delta since the last time this was called.
-  // lock must be taken before calling this.
+  /// Updates the total number of scan ranges complete for this fragment. Returns the
+  /// delta since the last time this was called. Not thread-safe without lock() being
+  /// acquired by the caller.
   int64_t UpdateNumScanRangesCompleted();
+
+  // The following getters do not require lock() to be held.
+  const TUniqueId& fragment_instance_id() const { return fragment_instance_id_; }
+  MonotonicStopWatch* stopwatch() { return &stopwatch_; }
+  const TNetworkAddress& impalad_address() const { return impalad_address_; }
+  int64_t total_split_size() const { return total_split_size_; }
+  bool done() const { return done_; }
+  int fragment_idx() const { return fragment_idx_; }
+  int instance_idx() const { return instance_idx_; }
+  bool rpc_sent() const { return rpc_sent_; }
+  int64_t rpc_latency() const { return rpc_latency_; }
+
+  // Getters below must be accessed with lock() held
+  RuntimeProfile* profile() { return profile_; }
+  FragmentInstanceCounters* aggregate_counters() { return &aggregate_counters_; }
+  ErrorLogMap* error_log() { return &error_log_; }
+  Status* status() { return &status_; }
+
+  mutex* lock() { return &lock_; }
+
+  void SetStatus(const Status& status) { status_ = status; }
+  void SetDone(bool done) { done_ = done; }
+
+  /// Registers that the fragment instance's profile has been created and initially
+  /// populated. Returns whether the profile had already been initialised so that callers
+  /// can tell if they are the first to do so. Not thread-safe.
+  bool SetProfileCreated() {
+    bool cur = profile_created_;
+    profile_created_ = true;
+    return cur;
+  }
+
+  void SetRpcLatency(int64_t millis) {
+    DCHECK_EQ(rpc_latency_, 0);
+    rpc_latency_ = millis;
+  }
+
+ private:
+  /// Integer index (into fragment_instance_states_ in the coordinator) of the backend
+  /// that this fragment is running on.
+  int fragment_instance_idx_;
+
+  /// The unique ID of this instance of this fragment (there may be many instance of the
+  /// same fragment, but this ID uniquely identifies this FragmentInstanceState).
+  TUniqueId fragment_instance_id_;
+
+  /// Wall clock timer for this fragment.
+  MonotonicStopWatch stopwatch_;
+
+  /// Address of ImpalaInternalService this fragment is running on.
+  const TNetworkAddress impalad_address_;
+
+  /// Summed across all splits; in bytes.
+  int64_t total_split_size_;
+
+  /// Fragment idx for this ExecState
+  int fragment_idx_;
+
+  /// The 0-based instance idx.
+  int instance_idx_;
+
+  /// Protects fields below. Can be held while doing an RPC, so SpinLock is a bad idea.
+  /// lock ordering: Coordinator::lock_ must only be obtained *prior* to lock_
+  mutex lock_;
+
+  /// If the status indicates an error status, execution of this fragment has either been
+  /// aborted by the remote impalad (which then reported the error) or cancellation has
+  /// been initiated; either way, execution must not be cancelled
+  Status status_;
+
+  /// If true, ExecPlanFragment() rpc has been sent.
+  bool rpc_sent_;
+
+  /// If true, execution terminated; do not cancel in that case.
+  bool done_;
+
+  /// True after the first call to profile->Update()
+  bool profile_created_;
+
+  /// Owned by coordinator object pool provided in the c'tor
+  RuntimeProfile* profile_;
+
+  /// Errors reported by this fragment instance.
+  ErrorLogMap error_log_;
+
+  /// Total scan ranges complete across all scan nodes.
+  int64_t total_ranges_complete_;
+
+  /// Summary counters aggregated across the duration of execution.
+  FragmentInstanceCounters aggregate_counters_;
+
+  /// Time, in ms, that it took to execute the ExecRemoteFragment() RPC.
+  int64_t rpc_latency_;
 };
 
-void Coordinator::BackendExecState::ComputeTotalSplitSize() {
-  const PerNodeScanRanges& per_node_scan_ranges = rpc_params->params.per_node_scan_ranges;
-  total_split_size = 0;
+void Coordinator::FragmentInstanceState::ComputeTotalSplitSize(
+    const PerNodeScanRanges& per_node_scan_ranges) {
+  total_split_size_ = 0;
+
   BOOST_FOREACH(const PerNodeScanRanges::value_type& entry, per_node_scan_ranges) {
     BOOST_FOREACH(const TScanRangeParams& scan_range_params, entry.second) {
       if (!scan_range_params.scan_range.__isset.hdfs_file_split) continue;
-      total_split_size += scan_range_params.scan_range.hdfs_file_split.length;
+      total_split_size_ += scan_range_params.scan_range.hdfs_file_split.length;
     }
   }
 }
 
-int64_t Coordinator::BackendExecState::GetNodeThroughput(int plan_node_id) {
+int64_t Coordinator::FragmentInstanceState::GetNodeThroughput(int plan_node_id) {
   RuntimeProfile::Counter* counter = NULL;
   {
-    lock_guard<mutex> l(lock);
-    CounterMap& throughput_counters = aggregate_counters.throughput_counters;
+    lock_guard<mutex> l(lock_);
+    CounterMap& throughput_counters = aggregate_counters_.throughput_counters;
     CounterMap::iterator i = throughput_counters.find(plan_node_id);
     if (i == throughput_counters.end()) return 0;
     counter = i->second;
@@ -214,11 +278,11 @@ int64_t Coordinator::BackendExecState::GetNodeThroughput(int plan_node_id) {
   return counter->value();
 }
 
-int64_t Coordinator::BackendExecState::GetNumScanRangesCompleted(int plan_node_id) {
+int64_t Coordinator::FragmentInstanceState::GetNumScanRangesCompleted(int plan_node_id) {
   RuntimeProfile::Counter* counter = NULL;
   {
-    lock_guard<mutex> l(lock);
-    CounterMap& ranges_complete = aggregate_counters.scan_ranges_complete_counters;
+    lock_guard<mutex> l(lock_);
+    CounterMap& ranges_complete = aggregate_counters_.scan_ranges_complete_counters;
     CounterMap::iterator i = ranges_complete.find(plan_node_id);
     if (i == ranges_complete.end()) return 0;
     counter = i->second;
@@ -228,14 +292,14 @@ int64_t Coordinator::BackendExecState::GetNumScanRangesCompleted(int plan_node_i
   return counter->value();
 }
 
-int64_t Coordinator::BackendExecState::UpdateNumScanRangesCompleted() {
+int64_t Coordinator::FragmentInstanceState::UpdateNumScanRangesCompleted() {
   int64_t total = 0;
-  CounterMap& complete = aggregate_counters.scan_ranges_complete_counters;
+  CounterMap& complete = aggregate_counters_.scan_ranges_complete_counters;
   for (CounterMap::iterator i = complete.begin(); i != complete.end(); ++i) {
     total += i->second->value();
   }
-  int64_t delta = total - total_ranges_complete;
-  total_ranges_complete = total;
+  int64_t delta = total - total_ranges_complete_;
+  total_ranges_complete_ = total;
   DCHECK_GE(delta, 0);
   return delta;
 }
@@ -246,7 +310,7 @@ Coordinator::Coordinator(ExecEnv* exec_env, RuntimeProfile::EventSequence* event
     returned_all_results_(false),
     executor_(NULL), // Set in Prepare()
     query_mem_tracker_(), // Set in Exec()
-    num_remaining_backends_(0),
+    num_remaining_fragment_instances_(0),
     obj_pool_(new ObjectPool()),
     query_events_(events) {
 }
@@ -289,12 +353,12 @@ static void ProcessQueryOptions(
   split(components, query_options.debug_action, is_any_of(":"), token_compress_on);
   if (components.size() < 3 || components.size() > 4) return;
   if (components.size() == 3) {
-    debug_options->backend_num = -1;
+    debug_options->fragment_instance_idx = -1;
     debug_options->node_id = atoi(components[0].c_str());
     debug_options->phase = GetExecNodePhase(components[1]);
     debug_options->action = GetDebugAction(components[2]);
   } else {
-    debug_options->backend_num = atoi(components[0].c_str());
+    debug_options->fragment_instance_idx = atoi(components[0].c_str());
     debug_options->node_id = atoi(components[1].c_str());
     debug_options->phase = GetExecNodePhase(components[2]);
     debug_options->action = GetDebugAction(components[3]);
@@ -310,9 +374,7 @@ Status Coordinator::Exec(QuerySchedule& schedule,
   const TQueryExecRequest& request = schedule.request();
   DCHECK_GT(request.fragments.size(), 0);
   needs_finalization_ = request.__isset.finalize_params;
-  if (needs_finalization_) {
-    finalize_params_ = request.finalize_params;
-  }
+  if (needs_finalization_) finalize_params_ = request.finalize_params;
 
   VLOG_QUERY << "Exec() query_id=" << schedule.query_id();
   stmt_type_ = request.stmt_type;
@@ -326,12 +388,11 @@ Status Coordinator::Exec(QuerySchedule& schedule,
 
   SCOPED_TIMER(query_profile_->total_time_counter());
 
-  vector<FragmentExecParams>* fragment_exec_params = schedule.exec_params();
-  TNetworkAddress coord = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
+  const TNetworkAddress& coord = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
 
   // to keep things simple, make async Cancel() calls wait until plan fragment
   // execution has been initiated, otherwise we might try to cancel fragment
-  // execution at backends where it hasn't even started
+  // execution at Impala daemons where it hasn't even started
   lock_guard<mutex> l(lock_);
 
   // we run the root fragment ourselves if it is unpartitioned
@@ -341,14 +402,15 @@ Status Coordinator::Exec(QuerySchedule& schedule,
   if (has_coordinator_fragment) {
     executor_.reset(new PlanFragmentExecutor(
             exec_env_, PlanFragmentExecutor::ReportStatusCallback()));
-    // If a coordinator fragment is requested (for most queries this
-    // will be the case, the exception is parallel INSERT queries), start
-    // this before starting any more plan fragments in backend threads,
-    // otherwise they start sending data before the local exchange node
-    // had a chance to register with the stream mgr.
+    // If a coordinator fragment is requested (for most queries this will be the case, the
+    // exception is parallel INSERT queries), start this before starting any more plan
+    // fragments, otherwise they start sending data before the local exchange node had a
+    // chance to register with the stream mgr.
+    // TODO: This is no longer necessary (see IMPALA-1599). Consider starting all
+    // fragments in the same way with no coordinator special case.
     TExecPlanFragmentParams rpc_params;
-    SetExecPlanFragmentParams(schedule, 0, request.fragments[0], 0,
-        (*fragment_exec_params)[0], 0, coord, &rpc_params);
+    SetExecPlanFragmentParams(schedule, request.fragments[0],
+        (*schedule.exec_params())[0], 0, 0, 0, coord, &rpc_params);
     RETURN_IF_ERROR(executor_->Prepare(rpc_params));
 
     // Prepare output_expr_ctxs before optimizing the LLVM module. The other exprs of this
@@ -383,103 +445,93 @@ Status Coordinator::Exec(QuerySchedule& schedule,
   // Initialize the execution profile structures.
   InitExecProfile(request);
 
-  DebugOptions debug_options;
-  ProcessQueryOptions(schedule.query_options(), &debug_options);
-
-  // start fragment instances from left to right, so that receivers have
-  // Prepare()'d before senders start sending
-  backend_exec_states_.resize(schedule.num_backends());
-  num_remaining_backends_ = schedule.num_backends();
-  VLOG_QUERY << "starting " << schedule.num_backends()
-             << " backends for query " << query_id_;
-
-  query_events_->MarkEvent("Ready to start remote fragments");
-  int backend_num = 0;
-
-  // TODO: Add a runtime-profile stats mechanism so this doesn't need to create a
-  // non-registered TMetricDef.
-  TMetricDef md;
-  md.__set_key("fragment-latencies");
-  md.__set_units(TUnit::TIME_NS);
-  md.__set_kind(TMetricKind::STATS);
-  StatsMetric<double> latencies(md);
-
-  // TExecPlanFragmentParams can be arbitrarily large depending on number of tables &
-  // partitions in rpc_params->desc_tbl, to avoid memory pressure on the coordinator
-  // rpc_params is stored in rpc_params_pool which is cleared after
-  // ParallelExecutor::Exec as the rpc_params are no longer needed.
-  ObjectPool rpc_params_pool;
-
-  for (int fragment_idx = (has_coordinator_fragment ? 1 : 0);
-       fragment_idx < request.fragments.size(); ++fragment_idx) {
-    const FragmentExecParams& params = (*fragment_exec_params)[fragment_idx];
-
-    // set up exec states
-    int num_hosts = params.hosts.size();
-    DCHECK_GT(num_hosts, 0);
-    for (int instance_idx = 0; instance_idx < num_hosts; ++instance_idx) {
-      DebugOptions* backend_debug_options =
-          (debug_options.phase != TExecNodePhase::INVALID
-            && (debug_options.backend_num == -1
-                || debug_options.backend_num == backend_num)
-            ? &debug_options
-            : NULL);
-
-      TExecPlanFragmentParams* rpc_params =
-          rpc_params_pool.Add(new TExecPlanFragmentParams());
-      SetExecPlanFragmentParams(schedule, backend_num,
-          request.fragments[fragment_idx], fragment_idx,params,instance_idx,
-          coord, rpc_params);
-
-      // TODO: pool of pre-formatted BackendExecStates?
-      BackendExecState* exec_state =
-          obj_pool()->Add(new BackendExecState(schedule, this, coord, backend_num,
-              request.fragments[fragment_idx], fragment_idx,
-              params, instance_idx, backend_debug_options, obj_pool(), rpc_params));
-      backend_exec_states_[backend_num] = exec_state;
-      ++backend_num;
-      VLOG(2) << "Exec(): starting instance: fragment_idx=" << fragment_idx
-              << " instance_id=" << params.instance_ids[instance_idx];
-    }
-    fragment_profiles_[fragment_idx].num_instances = num_hosts;
-
-    // Issue all rpcs in parallel
-    Status fragments_exec_status = ParallelExecutor::Exec(
-        bind<Status>(mem_fn(&Coordinator::ExecRemoteFragment), this, _1),
-        reinterpret_cast<void**>(&backend_exec_states_[backend_num - num_hosts]),
-        num_hosts, &latencies);
-
-    if (!fragments_exec_status.ok()) {
-      DCHECK(query_status_.ok());  // nobody should have been able to cancel
-      query_status_ = fragments_exec_status;
-      // tear down running fragments and return
-      CancelInternal();
-      return fragments_exec_status;
-    }
-    // Clear the ObjectPool as rpc_params are no longer needed
-    rpc_params_pool.Clear();
+  if (schedule.num_fragment_instances() > 0) {
+    RETURN_IF_ERROR(StartRemoteFragments(&schedule));
+    // If we have a coordinator fragment and remote fragments (the common case), release
+    // the thread token on the coordinator fragment. This fragment spends most of the time
+    // waiting and doing very little work. Holding on to the token causes underutilization
+    // of the machine. If there are 12 queries on this node, that's 12 tokens reserved for
+    // no reason.
+    if (has_coordinator_fragment) executor_->ReleaseThreadToken();
   }
 
-  query_events_->MarkEvent("Remote fragments started");
-  query_profile_->AddInfoString("Fragment start latencies",
-      latencies.ToHumanReadable());
+  PrintFragmentInstanceInfo();
 
-  // If we have a coordinator fragment and remote fragments (the common case),
-  // release the thread token on the coordinator fragment.  This fragment
-  // spends most of the time waiting and doing very little work.  Holding on to
-  // the token causes underutilization of the machine.  If there are 12 queries
-  // on this node, that's 12 tokens reserved for no reason.
-  if (has_coordinator_fragment && request.fragments.size() > 1) {
-    executor_->ReleaseThreadToken();
-  }
-
-  PrintBackendInfo();
-
-  stringstream ss;
-  ss << "Query " << query_id_;
-  progress_ = ProgressUpdater(ss.str(), schedule.num_scan_ranges());
+  const string& str = Substitute("Query $0", PrintId(query_id_));
+  progress_ = ProgressUpdater(str, schedule.num_scan_ranges());
 
   return Status::OK();
+}
+
+Status Coordinator::StartRemoteFragments(QuerySchedule* schedule) {
+  int32_t num_fragment_instances = schedule->num_fragment_instances();
+  DCHECK_GT(num_fragment_instances , 0);
+  DebugOptions debug_options;
+  ProcessQueryOptions(schedule->query_options(), &debug_options);
+  const TQueryExecRequest& request = schedule->request();
+
+  fragment_instance_states_.resize(num_fragment_instances);
+  num_remaining_fragment_instances_ = num_fragment_instances;
+  VLOG_QUERY << "starting " << num_fragment_instances << " fragment instances for query "
+             << query_id_;
+
+  query_events_->MarkEvent(
+      Substitute("Ready to start $0 remote fragments", num_fragment_instances));
+
+  scoped_ptr<CountingBarrier> fragment_start_barrier(
+      new CountingBarrier(num_fragment_instances));
+  int fragment_instance_idx = 0;
+  bool has_coordinator_fragment =
+      request.fragments[0].partition.type == TPartitionType::UNPARTITIONED;
+  // Start one fragment instance per fragment per host (number of hosts running each
+  // fragment may not be constant).
+  for (int fragment_idx = (has_coordinator_fragment ? 1 : 0);
+       fragment_idx < request.fragments.size(); ++fragment_idx) {
+    const FragmentExecParams* params = &(*schedule->exec_params())[fragment_idx];
+    int num_hosts = params->hosts.size();
+    DCHECK_GT(num_hosts, 0);
+    fragment_profiles_[fragment_idx].num_instances = num_hosts;
+    // Start one fragment for every fragment_instance required by the schedule
+    for (int per_fragment_instance_idx = 0; per_fragment_instance_idx < num_hosts;
+         ++per_fragment_instance_idx) {
+      DebugOptions* fragment_instance_debug_options =
+          debug_options.IsApplicable(fragment_instance_idx) ? &debug_options : NULL;
+      exec_env_->fragment_exec_thread_pool()->Offer(
+          bind<void>(mem_fn(&Coordinator::ExecRemoteFragment), this,
+              params, // fragment_exec_params
+              &request.fragments[fragment_idx], // plan_fragment,
+              fragment_instance_debug_options,
+              schedule,
+              fragment_instance_idx++,
+              fragment_idx,
+              per_fragment_instance_idx,
+              fragment_start_barrier.get()));
+    }
+  }
+
+  fragment_start_barrier->Wait();
+  query_events_->MarkEvent(
+      Substitute("All $0 remote fragments started", fragment_instance_idx));
+
+  Status status = Status::OK();
+  const TMetricDef& def =
+      MakeTMetricDef("fragment-latencies", TMetricKind::HISTOGRAM, TUnit::TIME_MS);
+  HistogramMetric latencies(def, 20000, 3);
+  BOOST_FOREACH(FragmentInstanceState* exec_state, fragment_instance_states_) {
+    lock_guard<mutex> l(*exec_state->lock());
+    // Preserve the first non-OK status, if there is one
+    if (status.ok()) status = *exec_state->status();
+    latencies.Update(exec_state->rpc_latency());
+  }
+
+  query_profile_->AddInfoString("Fragment start latencies", latencies.ToHumanReadable());
+
+  if (!status.ok()) {
+    DCHECK(query_status_.ok()); // nobody should have been able to cancel
+    query_status_ = status;
+    CancelInternal();
+  }
+  return status;
 }
 
 Status Coordinator::GetStatus() {
@@ -785,9 +837,9 @@ Status Coordinator::FinalizeQuery() {
 
 Status Coordinator::WaitForAllBackends() {
   unique_lock<mutex> l(lock_);
-  while (num_remaining_backends_ > 0 && query_status_.ok()) {
+  while (num_remaining_fragment_instances_ > 0 && query_status_.ok()) {
     VLOG_QUERY << "Coordinator waiting for backends to finish, "
-               << num_remaining_backends_ << " remaining";
+               << num_remaining_fragment_instances_ << " remaining";
     backend_completion_cv_.wait(l);
   }
   if (query_status_.ok()) {
@@ -930,11 +982,11 @@ void Coordinator::ValidateCollectionSlots(RowBatch* batch) {
   }
 }
 
-void Coordinator::PrintBackendInfo() {
-  for (int i = 0; i < backend_exec_states_.size(); ++i) {
+void Coordinator::PrintFragmentInstanceInfo() {
+  for (int i = 0; i < fragment_instance_states_.size(); ++i) {
     SummaryStats& acc =
-        fragment_profiles_[backend_exec_states_[i]->fragment_idx].bytes_assigned;
-    acc(backend_exec_states_[i]->total_split_size);
+        fragment_profiles_[fragment_instance_states_[i]->fragment_idx()].bytes_assigned;
+    acc(fragment_instance_states_[i]->total_split_size());
   }
 
   for (int i = (executor_.get() == NULL ? 0 : 1); i < fragment_profiles_.size(); ++i) {
@@ -952,12 +1004,11 @@ void Coordinator::PrintBackendInfo() {
 
     if (VLOG_FILE_IS_ON) {
       VLOG_FILE << "Byte split for fragment " << i << " " << ss.str();
-      for (int j = 0; j < backend_exec_states_.size(); ++j) {
-        BackendExecState* exec_state = backend_exec_states_[j];
-        if (exec_state->fragment_idx != i) continue;
+      for (int j = 0; j < fragment_instance_states_.size(); ++j) {
+        FragmentInstanceState* exec_state = fragment_instance_states_[j];
+        if (exec_state->fragment_idx() != i) continue;
         VLOG_FILE << "data volume for ipaddress " << exec_state << ": "
-                  << PrettyPrinter::Print(
-                    exec_state->total_split_size, TUnit::BYTES);
+                  << PrettyPrinter::Print(exec_state->total_split_size(), TUnit::BYTES);
       }
     }
   }
@@ -1098,8 +1149,8 @@ void Coordinator::CreateAggregateCounters(
 
 int64_t Coordinator::ComputeTotalThroughput(int node_id) {
   int64_t value = 0;
-  for (int i = 0; i < backend_exec_states_.size(); ++i) {
-    BackendExecState* exec_state = backend_exec_states_[i];
+  for (int i = 0; i < fragment_instance_states_.size(); ++i) {
+    FragmentInstanceState* exec_state = fragment_instance_states_[i];
     value += exec_state->GetNodeThroughput(node_id);
   }
   // Add up the local fragment throughput counter
@@ -1113,8 +1164,8 @@ int64_t Coordinator::ComputeTotalThroughput(int node_id) {
 
 int64_t Coordinator::ComputeTotalScanRangesComplete(int node_id) {
   int64_t value = 0;
-  for (int i = 0; i < backend_exec_states_.size(); ++i) {
-    BackendExecState* exec_state = backend_exec_states_[i];
+  for (int i = 0; i < fragment_instance_states_.size(); ++i) {
+    FragmentInstanceState* exec_state = fragment_instance_states_[i];
     value += exec_state->GetNumScanRangesCompleted(node_id);
   }
   // Add up the local fragment throughput counter
@@ -1126,50 +1177,69 @@ int64_t Coordinator::ComputeTotalScanRangesComplete(int node_id) {
   return value;
 }
 
-Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
-  BackendExecState* exec_state = reinterpret_cast<BackendExecState*>(exec_state_arg);
+void Coordinator::ExecRemoteFragment(const FragmentExecParams* fragment_exec_params,
+    const TPlanFragment* plan_fragment, DebugOptions* debug_options,
+    QuerySchedule* schedule, int fragment_instance_idx, int fragment_idx,
+    int per_fragment_instance_idx, CountingBarrier* fragment_start_barrier) {
+  TExecPlanFragmentParams rpc_params;
+  SetExecPlanFragmentParams(*schedule, *plan_fragment, *fragment_exec_params,
+      fragment_instance_idx, fragment_idx, per_fragment_instance_idx,
+      MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port), &rpc_params);
+  if (debug_options != NULL) {
+    rpc_params.params.__set_debug_node_id(debug_options->node_id);
+    rpc_params.params.__set_debug_action(debug_options->action);
+    rpc_params.params.__set_debug_phase(debug_options->phase);
+  }
+  FragmentInstanceState* exec_state = obj_pool()->Add(
+      new FragmentInstanceState(fragment_instance_idx, fragment_idx, fragment_exec_params,
+          per_fragment_instance_idx, obj_pool()));
+  exec_state->ComputeTotalSplitSize(rpc_params.params.per_node_scan_ranges);
+  fragment_instance_states_[fragment_instance_idx] = exec_state;
   VLOG_FILE << "making rpc: ExecPlanFragment query_id=" << query_id_
-            << " instance_id=" << exec_state->fragment_instance_id
-            << " host=" << exec_state->backend_address;
-  lock_guard<mutex> l(exec_state->lock);
+            << " instance_id=" << exec_state->fragment_instance_id()
+            << " host=" << exec_state->impalad_address();
 
-  Status status;
-  ImpalaInternalServiceConnection backend_client(
-      exec_env_->impalad_client_cache(), exec_state->backend_address, &status);
-  RETURN_IF_ERROR(status);
+  // Guard against concurrent UpdateExecStatus() that may arrive after RPC returns.
+  lock_guard<mutex> l(*exec_state->lock());
+  int64_t start = MonotonicMillis();
+
+  Status client_connect_status;
+  ImpalaInternalServiceConnection backend_client(exec_env_->impalad_client_cache(),
+      exec_state->impalad_address(), &client_connect_status);
+  if (!client_connect_status.ok()) {
+    exec_state->SetInitialStatus(client_connect_status);
+    return;
+  }
 
   TExecPlanFragmentResult thrift_result;
   Status rpc_status = backend_client.DoRpc(&ImpalaInternalServiceClient::ExecPlanFragment,
-      *exec_state->rpc_params, &thrift_result);
+      rpc_params, &thrift_result);
+
+  exec_state->SetRpcLatency(MonotonicMillis() - start);
+  fragment_start_barrier->Notify();
 
   const string ERR_TEMPLATE = "ExecPlanRequest rpc query_id=$0 instance_id=$1 failed: $2";
 
   if (!rpc_status.ok()) {
     const string& err_msg = Substitute(ERR_TEMPLATE, PrintId(query_id()),
-        PrintId(exec_state->fragment_instance_id), rpc_status.msg().msg());
+        PrintId(exec_state->fragment_instance_id()), rpc_status.msg().msg());
     VLOG_QUERY << err_msg;
-    exec_state->status = Status(err_msg);
-    return exec_state->status;
+    exec_state->SetInitialStatus(Status(err_msg));
+    return;
   }
-
-  // rpc_params are not needed beyond this point, set the pointer to NULL.
-  // Memory is freed in Coordinator::Exec().
-  exec_state->rpc_params = NULL;
 
   Status exec_plan_status = Status(thrift_result.status);
   if (!exec_plan_status.ok()) {
     const string& err_msg = Substitute(ERR_TEMPLATE, PrintId(query_id()),
-        PrintId(exec_state->fragment_instance_id),
+        PrintId(exec_state->fragment_instance_id()),
         exec_plan_status.msg().GetFullMessageDetails());
     VLOG_QUERY << err_msg;
-    exec_state->status = Status(err_msg);
-    return exec_state->status;
+    exec_state->SetInitialStatus(Status(err_msg));
+    return;
   }
 
-  exec_state->status = Status::OK();
-  exec_state->initiated = true;
-  exec_state->stopwatch.Start();
-  return exec_state->status;
+  exec_state->SetInitialStatus(Status::OK());
+  return;
 }
 
 void Coordinator::Cancel(const Status* cause) {
@@ -1195,61 +1265,59 @@ void Coordinator::CancelInternal() {
 }
 
 void Coordinator::CancelRemoteFragments() {
-  for (int i = 0; i < backend_exec_states_.size(); ++i) {
-    BackendExecState* exec_state = backend_exec_states_[i];
+  for (int i = 0; i < fragment_instance_states_.size(); ++i) {
+    FragmentInstanceState* exec_state = fragment_instance_states_[i];
 
     // If a fragment failed before we finished issuing all remote fragments,
     // this function will have been called before we finished populating
-    // backend_exec_states_. Skip any such uninitialized exec states.
+    // fragment_instance_states_. Skip any such uninitialized exec states.
     if (exec_state == NULL) continue;
 
     // lock each exec_state individually to synchronize correctly with
     // UpdateFragmentExecStatus() (which doesn't get the global lock_
     // to set its status)
-    lock_guard<mutex> l(exec_state->lock);
+    lock_guard<mutex> l(*exec_state->lock());
 
     // no need to cancel if we already know it terminated w/ an error status
-    if (!exec_state->status.ok()) continue;
+    if (!exec_state->status()->ok()) continue;
 
     // Nothing to cancel if the exec rpc was not sent
-    if (!exec_state->initiated) continue;
+    if (!exec_state->rpc_sent()) continue;
 
     // don't cancel if it already finished
-    if (exec_state->done) continue;
+    if (exec_state->done()) continue;
 
     // set an error status to make sure we only cancel this once
-    exec_state->status = Status::CANCELLED;
+    exec_state->SetStatus(Status::CANCELLED);
 
     // if we get an error while trying to get a connection to the backend,
     // keep going
     Status status;
     ImpalaInternalServiceConnection backend_client(
-        exec_env_->impalad_client_cache(), exec_state->backend_address, &status);
-    if (!status.ok()) {
-      continue;
-    }
+        exec_env_->impalad_client_cache(), exec_state->impalad_address(), &status);
+    if (!status.ok()) continue;
 
     TCancelPlanFragmentParams params;
     params.protocol_version = ImpalaInternalServiceVersion::V1;
-    params.__set_fragment_instance_id(exec_state->fragment_instance_id);
+    params.__set_fragment_instance_id(exec_state->fragment_instance_id());
     TCancelPlanFragmentResult res;
     VLOG_QUERY << "sending CancelPlanFragment rpc for instance_id="
-               << exec_state->fragment_instance_id << " backend="
-               << exec_state->backend_address;
+               << exec_state->fragment_instance_id() << " backend="
+               << exec_state->impalad_address();
     Status rpc_status = backend_client.DoRpc(
         &ImpalaInternalServiceClient::CancelPlanFragment, params, &res);
     if (!rpc_status.ok()) {
-      exec_state->status.MergeStatus(rpc_status);
+      exec_state->status()->MergeStatus(rpc_status);
       stringstream msg;
       msg << "CancelPlanFragment rpc query_id=" << query_id_
-          << " instance_id=" << exec_state->fragment_instance_id
+          << " instance_id=" << exec_state->fragment_instance_id()
           << " failed: " << rpc_status.msg().msg();
       // make a note of the error status, but keep on cancelling the other fragments
-      exec_state->status.AddDetail(msg.str());
+      exec_state->status()->AddDetail(msg.str());
       continue;
     }
     if (res.status.status_code != TErrorCode::OK) {
-      exec_state->status.AddDetail(join(res.status.error_msgs, "; "));
+      exec_state->status()->AddDetail(join(res.status.error_msgs, "; "));
     }
   }
 
@@ -1261,24 +1329,27 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
   VLOG_FILE << "UpdateFragmentExecStatus() query_id=" << query_id_
             << " status=" << params.status.status_code
             << " done=" << (params.done ? "true" : "false");
-  if (params.backend_num >= backend_exec_states_.size()) {
-    return Status(TErrorCode::INTERNAL_ERROR, "unknown backend number");
+  uint32_t fragment_instance_idx = params.fragment_instance_idx;
+  if (fragment_instance_idx >= fragment_instance_states_.size()) {
+    return Status(TErrorCode::INTERNAL_ERROR,
+        Substitute("Unknown fragment instance index $0 (max known: $1)",
+            fragment_instance_idx, fragment_instance_states_.size() - 1));
   }
-  BackendExecState* exec_state = backend_exec_states_[params.backend_num];
+  FragmentInstanceState* exec_state = fragment_instance_states_[fragment_instance_idx];
 
   const TRuntimeProfileTree& cumulative_profile = params.profile;
   Status status(params.status);
   {
-    lock_guard<mutex> l(exec_state->lock);
+    lock_guard<mutex> l(*exec_state->lock());
     if (!status.ok()) {
       // During query cancellation, exec_state is set to CANCELLED. However, we might
       // process a non-error message from a fragment executor that is sent
       // before query cancellation is invoked. Make sure we don't go from error status to
       // OK.
-      exec_state->status = status;
+      exec_state->SetStatus(status);
     }
-    exec_state->done = params.done;
-    if (exec_state->status.ok()) {
+    exec_state->SetDone(params.done);
+    if (exec_state->status()->ok()) {
       // We can't update this backend's profile if ReportQuerySummary() is running,
       // because it depends on all profiles not changing during its execution (when it
       // calls SortChildren()). ReportQuerySummary() only gets called after
@@ -1289,26 +1360,25 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
       // statuses to cancelled.
       // TODO: We're losing this profile information. Call ReportQuerySummary only after
       // all backends have completed.
-      exec_state->profile->Update(cumulative_profile);
+      exec_state->profile()->Update(cumulative_profile);
 
       // Update the average profile for the fragment corresponding to this instance.
-      exec_state->profile->ComputeTimeInProfile();
+      exec_state->profile()->ComputeTimeInProfile();
       UpdateAverageProfile(exec_state);
-      UpdateExecSummary(exec_state->fragment_idx, exec_state->instance_idx,
-          exec_state->profile);
+      UpdateExecSummary(exec_state->fragment_idx(), exec_state->instance_idx(),
+          exec_state->profile());
     }
-    if (!exec_state->profile_created) {
-      CollectScanNodeCounters(exec_state->profile, &exec_state->aggregate_counters);
+    if (!exec_state->SetProfileCreated()) {
+      CollectScanNodeCounters(exec_state->profile(), exec_state->aggregate_counters());
     }
-    exec_state->profile_created = true;
 
     // Log messages aggregated by type
     if (params.__isset.error_log && params.error_log.size() > 0) {
       // Append the log messages from each update with the global state of the query
       // execution
-      MergeErrorMaps(&exec_state->error_log, params.error_log);
-      VLOG_FILE << "instance_id=" << exec_state->fragment_instance_id
-                << " error log: " << PrintErrorMapToString(exec_state->error_log);
+      MergeErrorMaps(exec_state->error_log(), params.error_log);
+      VLOG_FILE << "instance_id=" << exec_state->fragment_instance_id()
+                << " error log: " << PrintErrorMapToString(*exec_state->error_log());
     }
     progress_.Update(exec_state->UpdateNumScanRangesCompleted());
   }
@@ -1332,9 +1402,9 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
 
   if (VLOG_FILE_IS_ON) {
     stringstream s;
-    exec_state->profile->PrettyPrint(&s);
+    exec_state->profile()->PrettyPrint(&s);
     VLOG_FILE << "profile for query_id=" << query_id_
-               << " instance_id=" << exec_state->fragment_instance_id
+              << " instance_id=" << exec_state->fragment_instance_id()
                << "\n" << s.str();
   }
   // also print the cumulative profile
@@ -1348,34 +1418,35 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
 
   // for now, abort the query if we see any error except if the error is cancelled
   // and returned_all_results_ is true.
-  // (UpdateStatus() initiates cancellation, if it hasn't already been initiated)
+  // (UpdateStatus() initiates cancellation, if it hasn't already been)
   if (!(returned_all_results_ && status.IsCancelled()) && !status.ok()) {
-    UpdateStatus(status, exec_state->fragment_instance_id,
-        TNetworkAddressToString(exec_state->backend_address));
+    UpdateStatus(status, exec_state->fragment_instance_id(),
+        TNetworkAddressToString(exec_state->impalad_address()));
     return Status::OK();
   }
 
   if (params.done) {
     lock_guard<mutex> l(lock_);
-    exec_state->stopwatch.Stop();
-    DCHECK_GT(num_remaining_backends_, 0);
-    VLOG_QUERY << "Backend " << params.backend_num << " on host "
-               << exec_state->backend_address << " completed, "
-               << num_remaining_backends_ - 1 << " remaining: query_id=" << query_id_;
-    if (VLOG_QUERY_IS_ON && num_remaining_backends_ > 1) {
+    exec_state->stopwatch()->Stop();
+    DCHECK_GT(num_remaining_fragment_instances_, 0);
+    VLOG_QUERY << "Backend " << params.fragment_instance_idx << " on host "
+               << exec_state->impalad_address() << " completed, "
+               << num_remaining_fragment_instances_ - 1 << " remaining: query_id="
+               << query_id_;
+    if (VLOG_QUERY_IS_ON && num_remaining_fragment_instances_ > 1) {
       // print host/port info for the first backend that's still in progress as a
       // debugging aid for backend deadlocks
-      for (int i = 0; i < backend_exec_states_.size(); ++i) {
-        BackendExecState* exec_state = backend_exec_states_[i];
-        lock_guard<mutex> l2(exec_state->lock);
-        if (!exec_state->done) {
+      for (int i = 0; i < fragment_instance_states_.size(); ++i) {
+        FragmentInstanceState* exec_state = fragment_instance_states_[i];
+        lock_guard<mutex> l2(*exec_state->lock());
+        if (!exec_state->done()) {
           VLOG_QUERY << "query_id=" << query_id_ << ": first in-progress backend: "
-                     << exec_state->backend_address;
+                     << exec_state->impalad_address();
           break;
         }
       }
     }
-    if (--num_remaining_backends_ == 0) {
+    if (--num_remaining_fragment_instances_ == 0) {
       backend_completion_cv_.notify_all();
     }
   }
@@ -1419,33 +1490,34 @@ typedef struct {
 } InstanceComparator;
 
 // Update fragment average profile information from a backend execution state.
-void Coordinator::UpdateAverageProfile(BackendExecState* backend_exec_state) {
-  int fragment_idx = backend_exec_state->fragment_idx;
+void Coordinator::UpdateAverageProfile(FragmentInstanceState* fragment_instance_state) {
+  int fragment_idx = fragment_instance_state->fragment_idx();
   DCHECK_GE(fragment_idx, 0);
   DCHECK_LT(fragment_idx, fragment_profiles_.size());
   PerFragmentProfileData& data = fragment_profiles_[fragment_idx];
 
   // No locks are taken since UpdateAverage() and AddChild() take their own locks
-  data.averaged_profile->UpdateAverage(backend_exec_state->profile);
-  data.root_profile->AddChild(backend_exec_state->profile);
+  data.averaged_profile->UpdateAverage(fragment_instance_state->profile());
+  data.root_profile->AddChild(fragment_instance_state->profile());
 }
 
 // Compute fragment summary information from a backend execution state.
-void Coordinator::ComputeFragmentSummaryStats(BackendExecState* backend_exec_state) {
-  int fragment_idx = backend_exec_state->fragment_idx;
+void Coordinator::ComputeFragmentSummaryStats(
+    FragmentInstanceState* fragment_instance_state) {
+  int fragment_idx = fragment_instance_state->fragment_idx();
   DCHECK_GE(fragment_idx, 0);
   DCHECK_LT(fragment_idx, fragment_profiles_.size());
   PerFragmentProfileData& data = fragment_profiles_[fragment_idx];
 
-  int64_t completion_time = backend_exec_state->stopwatch.ElapsedTime();
+  int64_t completion_time = fragment_instance_state->stopwatch()->ElapsedTime();
   data.completion_times(completion_time);
-  data.rates(backend_exec_state->total_split_size / (completion_time / 1000.0
+  data.rates(fragment_instance_state->total_split_size() / (completion_time / 1000.0
     / 1000.0 / 1000.0));
 
   // Add the child in case it has not been added previously
   // via UpdateAverageProfile(). AddChild() will do nothing if the child
   // already exists.
-  data.root_profile->AddChild(backend_exec_state->profile);
+  data.root_profile->AddChild(fragment_instance_state->profile());
 }
 
 void Coordinator::UpdateExecSummary(int fragment_idx, int instance_idx,
@@ -1498,14 +1570,15 @@ void Coordinator::ReportQuerySummary() {
     UpdateExecSummary(0, 0, executor_->profile());
   }
 
-  if (!backend_exec_states_.empty()) {
+  if (!fragment_instance_states_.empty()) {
     // Average all remote fragments for each fragment.
-    for (int i = 0; i < backend_exec_states_.size(); ++i) {
-      backend_exec_states_[i]->profile->ComputeTimeInProfile();
-      UpdateAverageProfile(backend_exec_states_[i]);
-      ComputeFragmentSummaryStats(backend_exec_states_[i]);
-      UpdateExecSummary(backend_exec_states_[i]->fragment_idx,
-          backend_exec_states_[i]->instance_idx, backend_exec_states_[i]->profile);
+    for (int i = 0; i < fragment_instance_states_.size(); ++i) {
+      fragment_instance_states_[i]->profile()->ComputeTimeInProfile();
+      UpdateAverageProfile(fragment_instance_states_[i]);
+      ComputeFragmentSummaryStats(fragment_instance_states_[i]);
+      UpdateExecSummary(fragment_instance_states_[i]->fragment_idx(),
+          fragment_instance_states_[i]->instance_idx(),
+          fragment_instance_states_[i]->profile());
     }
 
     InstanceComparator comparator;
@@ -1550,7 +1623,7 @@ void Coordinator::ReportQuerySummary() {
     typedef unordered_map<TNetworkAddress, int64_t> PerNodePeakMemoryUsage;
     PerNodePeakMemoryUsage per_node_peak_mem_usage;
     if (executor_.get() != NULL) {
-      // Coordinator fragment is not included in backend_exec_states_.
+      // Coordinator fragment is not included in fragment_instance_states_.
       RuntimeProfile::Counter* mem_usage_counter =
           executor_->profile()->GetCounter(
               PlanFragmentExecutor::PER_HOST_PEAK_MEM_COUNTER);
@@ -1559,15 +1632,15 @@ void Coordinator::ReportQuerySummary() {
         per_node_peak_mem_usage[coord] = mem_usage_counter->value();
       }
     }
-    for (int i = 0; i < backend_exec_states_.size(); ++i) {
+    for (int i = 0; i < fragment_instance_states_.size(); ++i) {
       int64_t initial_usage = 0;
       int64_t* mem_usage = FindOrInsert(&per_node_peak_mem_usage,
-          backend_exec_states_[i]->backend_address, initial_usage);
+          fragment_instance_states_[i]->impalad_address(), initial_usage);
       RuntimeProfile::Counter* mem_usage_counter =
-          backend_exec_states_[i]->profile->GetCounter(
+          fragment_instance_states_[i]->profile()->GetCounter(
               PlanFragmentExecutor::PER_HOST_PEAK_MEM_COUNTER);
       if (mem_usage_counter != NULL && mem_usage_counter->value() > *mem_usage) {
-        per_node_peak_mem_usage[backend_exec_states_[i]->backend_address] =
+        per_node_peak_mem_usage[fragment_instance_states_[i]->impalad_address()] =
             mem_usage_counter->value();
       }
     }
@@ -1589,24 +1662,24 @@ string Coordinator::GetErrorLog() {
       MergeErrorMaps(&merged, executor_->runtime_state()->error_log());
     }
   }
-  for (int i = 0; i < backend_exec_states_.size(); ++i) {
-    lock_guard<mutex> l(backend_exec_states_[i]->lock);
-    if (backend_exec_states_[i]->error_log.size() > 0) {
-      MergeErrorMaps(&merged, backend_exec_states_[i]->error_log);
+  for (int i = 0; i < fragment_instance_states_.size(); ++i) {
+    lock_guard<mutex> l(*fragment_instance_states_[i]->lock());
+    if (fragment_instance_states_[i]->error_log()->size() > 0) {
+      MergeErrorMaps(&merged, *fragment_instance_states_[i]->error_log());
     }
   }
   return PrintErrorMapToString(merged);
 }
 
-void Coordinator::SetExecPlanFragmentParams(
-    QuerySchedule& schedule, int backend_num, const TPlanFragment& fragment,
-    int fragment_idx, const FragmentExecParams& params, int instance_idx,
+void Coordinator::SetExecPlanFragmentParams(QuerySchedule& schedule,
+    const TPlanFragment& fragment, const FragmentExecParams& params,
+    int fragment_instance_idx, int fragment_idx,  int per_fragment_instance_idx,
     const TNetworkAddress& coord, TExecPlanFragmentParams* rpc_params) {
   rpc_params->__set_protocol_version(ImpalaInternalServiceVersion::V1);
   rpc_params->__set_fragment(fragment);
   SetExecPlanDescriptorTable(fragment, rpc_params);
 
-  TNetworkAddress exec_host = params.hosts[instance_idx];
+  TNetworkAddress exec_host = params.hosts[per_fragment_instance_idx];
   if (schedule.HasReservation()) {
     // The reservation has already have been validated at this point.
     TNetworkAddress resource_hostport;
@@ -1631,14 +1704,14 @@ void Coordinator::SetExecPlanFragmentParams(
   rpc_params->params.__set_per_node_scan_ranges(scan_ranges);
   rpc_params->params.__set_per_exch_num_senders(params.per_exch_num_senders);
   rpc_params->params.__set_destinations(params.destinations);
-  rpc_params->params.__set_sender_id(params.sender_id_base + instance_idx);
+  rpc_params->params.__set_sender_id(params.sender_id_base + per_fragment_instance_idx);
   rpc_params->__isset.params = true;
   rpc_params->fragment_instance_ctx.__set_query_ctx(query_ctx_);
   rpc_params->fragment_instance_ctx.fragment_instance_id =
-      params.instance_ids[instance_idx];
-  rpc_params->fragment_instance_ctx.fragment_instance_idx = instance_idx;
+      params.instance_ids[per_fragment_instance_idx];
+  rpc_params->fragment_instance_ctx.per_fragment_instance_idx = per_fragment_instance_idx;
   rpc_params->fragment_instance_ctx.num_fragment_instances = params.instance_ids.size();
-  rpc_params->fragment_instance_ctx.backend_num = backend_num;
+  rpc_params->fragment_instance_ctx.fragment_instance_idx = fragment_instance_idx;
   rpc_params->__isset.fragment_instance_ctx = true;
 }
 

@@ -36,7 +36,8 @@ Status FragmentMgr::ExecPlanFragment(const TExecPlanFragmentParams& exec_params)
   VLOG_QUERY << "ExecPlanFragment() instance_id="
              << exec_params.fragment_instance_ctx.fragment_instance_id
              << " coord=" << exec_params.fragment_instance_ctx.query_ctx.coord_address
-             << " backend#=" << exec_params.fragment_instance_ctx.backend_num;
+             << " fragment instance#="
+             << exec_params.fragment_instance_ctx.fragment_instance_idx;
 
   // Preparing and opening the fragment creates a thread and consumes a non-trivial
   // amount of memory. If we are already starved for memory, cancel the fragment as

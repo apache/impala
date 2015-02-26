@@ -23,6 +23,7 @@
 #include "common/logging.h"
 #include "resourcebroker/resource-broker.h"
 #include "runtime/client-cache.h"
+#include "runtime/coordinator.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/disk-io-mgr.h"
 #include "runtime/hbase-table-factory.h"
@@ -48,6 +49,7 @@
 #include "util/cgroups-mgr.h"
 #include "util/memory-metrics.h"
 #include "util/pretty-printer.h"
+#include "util/thread-pool.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/CatalogService.h"
 
@@ -121,6 +123,9 @@ DEFINE_int32(resource_broker_recv_timeout, 0, "Time to wait, in ms, "
     "for the underlying socket of an RPC to Llama to successfully receive data. "
     "A setting of 0 means the socket will wait indefinitely.");
 
+DEFINE_int32(coordinator_rpc_threads, 12, "(Advanced) Number of threads available to "
+    "start fragments on remote Impala daemons.");
+
 DECLARE_string(ssl_client_ca_certificate);
 
 // The key for a variable set in Impala's test environment only, to allow the
@@ -152,6 +157,9 @@ ExecEnv::ExecEnv()
     tmp_file_mgr_(new TmpFileMgr),
     request_pool_service_(new RequestPoolService(metrics_.get())),
     frontend_(new Frontend()),
+    fragment_exec_thread_pool_(
+        new CallableThreadPool("coordinator-fragment-rpc", "worker",
+            FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
     enable_webserver_(FLAGS_enable_webserver),
     tz_database_(TimezoneDatabase()),
     is_fe_tests_(false),
@@ -202,6 +210,9 @@ ExecEnv::ExecEnv(const string& hostname, int backend_port, int subscriber_port,
         CreateHdfsOpThreadPool("hdfs-worker-pool", FLAGS_num_hdfs_worker_threads, 1024)),
     tmp_file_mgr_(new TmpFileMgr),
     frontend_(new Frontend()),
+    fragment_exec_thread_pool_(
+        new CallableThreadPool("coordinator-fragment-rpc", "worker",
+            FLAGS_coordinator_rpc_threads, numeric_limits<int32_t>::max())),
     enable_webserver_(FLAGS_enable_webserver && webserver_port > 0),
     tz_database_(TimezoneDatabase()),
     is_fe_tests_(false),

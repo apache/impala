@@ -55,7 +55,7 @@ class ThreadPool {
 
   /// Destructor ensures that all threads are terminated before this object is freed
   /// (otherwise they may continue to run and reference member variables)
-  ~ThreadPool() {
+  virtual ~ThreadPool() {
     Shutdown();
     Join();
   }
@@ -159,6 +159,22 @@ class ThreadPool {
   /// Signalled when the queue becomes empty
   boost::condition_variable empty_cv_;
 };
+
+/// Utility thread-pool that accepts callable work items, and simply invokes them.
+class CallableThreadPool : public ThreadPool<boost::function<void()> > {
+ public:
+  CallableThreadPool(const std::string& group, const std::string& thread_prefix,
+      uint32_t num_threads, uint32_t queue_size) :
+      ThreadPool<boost::function<void()> >(
+          group, thread_prefix, num_threads, queue_size, &CallableThreadPool::Worker) {
+  }
+
+ private:
+  static void Worker(int thread_id, const boost::function<void()>& f) {
+    f();
+  }
+};
+
 
 }
 

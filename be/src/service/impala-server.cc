@@ -1044,7 +1044,7 @@ Status ImpalaServer::GetSessionState(const TUniqueId& session_id,
 void ImpalaServer::ReportExecStatus(
     TReportExecStatusResult& return_val, const TReportExecStatusParams& params) {
   VLOG_FILE << "ReportExecStatus() query_id=" << params.query_id
-            << " backend#=" << params.backend_num
+            << " fragment instance#=" << params.fragment_instance_idx
             << " instance_id=" << params.fragment_instance_id
             << " done=" << (params.done ? "true" : "false");
   // TODO: implement something more efficient here, we're currently
@@ -1060,8 +1060,9 @@ void ImpalaServer::ReportExecStatus(
     return_val.status.__set_status_code(TErrorCode::INTERNAL_ERROR);
     const string& err = Substitute("ReportExecStatus(): Received report for unknown "
         "query ID (probably closed or cancelled). (query_id: $0, backend: $1, instance:"
-        " $2 done: $3)", PrintId(params.query_id), params.backend_num,
-        PrintId(params.fragment_instance_id), params.done);
+        " $2 done: $3)", PrintId(params.query_id),
+        params.fragment_instance_idx, PrintId(params.fragment_instance_id),
+        params.done);
     return_val.status.error_msgs.push_back(err);
     VLOG_QUERY << err;
     return;

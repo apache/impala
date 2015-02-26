@@ -227,13 +227,13 @@ struct TPlanFragmentInstanceCtx {
   2: required Types.TUniqueId fragment_instance_id
 
   // ordinal of this fragment instance, range [0, num_fragment_instances)
-  3: required i32 fragment_instance_idx
+  3: required i32 per_fragment_instance_idx
 
   // total number of instances of this fragment
   4: required i32 num_fragment_instances
 
-  // backend number assigned by coord to identify backend
-  5: required i32 backend_num
+  // Index of this fragment instance across all combined instances in this query.
+  5: required i32 fragment_instance_idx
 }
 
 // A scan range plus the parameters needed to execute that scan.
@@ -380,7 +380,7 @@ struct TReportExecStatusParams {
 
   // passed into ExecPlanFragment() as TPlanFragmentInstanceCtx.backend_num
   // required in V1
-  3: optional i32 backend_num
+  3: optional i32 fragment_instance_idx
 
   // required in V1
   4: optional Types.TUniqueId fragment_instance_id

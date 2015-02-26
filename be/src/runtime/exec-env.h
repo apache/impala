@@ -44,6 +44,7 @@ class ThreadResourceMgr;
 class CgroupsManager;
 class ImpalaServer;
 class RequestPoolService;
+class FragmentMgr;
 class Frontend;
 class TmpFileMgr;
 
@@ -89,6 +90,9 @@ class ExecEnv {
   CgroupsMgr* cgroups_mgr() { return cgroups_mgr_.get(); }
   HdfsOpThreadPool* hdfs_op_thread_pool() { return hdfs_op_thread_pool_.get(); }
   TmpFileMgr* tmp_file_mgr() { return tmp_file_mgr_.get(); }
+  CallableThreadPool* fragment_exec_thread_pool() {
+    return fragment_exec_thread_pool_.get();
+  }
   ImpalaServer* impala_server() { return impala_server_; }
   Frontend* frontend() { return frontend_.get(); };
 
@@ -135,6 +139,7 @@ class ExecEnv {
   boost::scoped_ptr<TmpFileMgr> tmp_file_mgr_;
   boost::scoped_ptr<RequestPoolService> request_pool_service_;
   boost::scoped_ptr<Frontend> frontend_;
+  boost::scoped_ptr<CallableThreadPool> fragment_exec_thread_pool_;
 
   /// Not owned by this class
   ImpalaServer* impala_server_;

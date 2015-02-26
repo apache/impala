@@ -35,6 +35,7 @@
 #include "common/status.h"
 #include "common/global-types.h"
 #include "util/progress-updater.h"
+#include "util/histogram-metric.h"
 #include "util/runtime-profile.h"
 #include "runtime/runtime-state.h"
 #include "scheduling/simple-scheduler.h"
@@ -43,8 +44,10 @@
 
 namespace impala {
 
+class CountingBarrier;
 class DataStreamMgr;
 class DataSink;
+class DebugOptions;
 class RowBatch;
 class RowDescriptor;
 class PlanFragmentExecutor;
@@ -108,7 +111,7 @@ class Coordinator {
   /// Returns tuples from the coordinator fragment. Any returned tuples are valid until
   /// the next GetNext() call. If *batch is NULL, execution has completed and GetNext()
   /// must not be called again.
-  /// GetNext() will not set *batch=NULL until all backends have
+  /// GetNext() will not set *batch=NULL until all fragment instances have
   /// either completed or have failed.
   /// It is safe to call GetNext() even in the case where there is no coordinator fragment
   /// (distributed INSERT).
@@ -160,7 +163,7 @@ class Coordinator {
   bool PrepareCatalogUpdate(TUpdateCatalogRequest* catalog_update);
 
   /// Return error log for coord and all the fragments. The error messages from the
-  /// individual backends are merged into a single output to retain readability.
+  /// individual fragment instances are merged into a single output to retain readability.
   std::string GetErrorLog();
 
   const ProgressUpdater& progress() { return progress_; }
@@ -178,7 +181,7 @@ class Coordinator {
   SpinLock& GetExecSummaryLock() const { return exec_summary_lock_; }
 
  private:
-  class BackendExecState;
+  class FragmentInstanceState;
 
   /// Typedef for boost utility to compute averaged stats
   /// TODO: including the median doesn't compile, looks like some includes are missing
@@ -212,8 +215,8 @@ class Coordinator {
     CounterMap scan_ranges_complete_counters;
   };
 
-  /// BackendExecStates owned by obj_pool()
-  std::vector<BackendExecState*> backend_exec_states_;
+  /// FragmentInstanceState owned by obj_pool()
+  std::vector<FragmentInstanceState*> fragment_instance_states_;
 
   /// True if the query needs a post-execution step to tidy up
   bool needs_finalization_;
@@ -274,21 +277,21 @@ class Coordinator {
 
   /// Count of the number of backends for which done != true. When this
   /// hits 0, any Wait()'ing thread is notified
-  int num_remaining_backends_;
+  int num_remaining_fragment_instances_;
 
   /// The following two structures, partition_row_counts_ and files_to_move_ are filled in
   /// as the query completes, and track the results of INSERT queries that alter the
-  /// structure of tables. They are either the union of the reports from all backends, or
-  /// taken from the coordinator fragment: only one of the two can legitimately produce
-  /// updates.
+  /// structure of tables. They are either the union of the reports from all fragment
+  /// instances, or taken from the coordinator fragment: only one of the two can
+  /// legitimately produce updates.
 
-  /// The set of partitions that have been written to or updated by all backends, along
-  /// with statistics such as the number of rows written (may be 0). For unpartitioned
-  /// tables, the empty string denotes the entire table.
+  /// The set of partitions that have been written to or updated by all fragment
+  /// instances, along with statistics such as the number of rows written (may be 0). For
+  /// unpartitioned tables, the empty string denotes the entire table.
   PartitionStatusMap per_partition_status_;
 
-  /// The set of files to move after an INSERT query has run, in (src, dest) form. An empty
-  /// string for the destination means that a file is to be deleted.
+  /// The set of files to move after an INSERT query has run, in (src, dest) form. An
+  /// empty string for the destination means that a file is to be deleted.
   FileMoveMap files_to_move_;
 
   /// Object pool owned by the coordinator. Any executor will have its own pool.
@@ -347,26 +350,30 @@ class Coordinator {
   RuntimeProfile::Counter* finalization_timer_;
 
   /// Fill in rpc_params based on parameters.
-  void SetExecPlanFragmentParams(QuerySchedule& schedule,
-      int backend_num, const TPlanFragment& fragment,
-      int fragment_idx, const FragmentExecParams& params, int instance_idx,
-      const TNetworkAddress& coord, TExecPlanFragmentParams* rpc_params);
+  /// 'fragment_instance_idx' is the 0-based query-wide ordinal of the fragment instance.
+  /// 'fragment_idx' is the 0-based query-wide ordinal of the fragment of which it is an
+  /// instance.
+  /// 'per_fragment_instance_idx' is the 0-based ordinal of this particular fragment
+  /// instance within its fragment.
+  void SetExecPlanFragmentParams(QuerySchedule& schedule, const TPlanFragment& fragment,
+      const FragmentExecParams& params, int fragment_instance_idx, int fragment_idx,
+      int per_fragment_instance_idx, const TNetworkAddress& coord,
+      TExecPlanFragmentParams* rpc_params);
 
-  /// Wrapper for ExecPlanFragment() rpc.  This function will be called in parallel
-  /// from multiple threads.
-  /// Obtains exec_state->lock prior to making rpc, so that it serializes
-  /// correctly with UpdateFragmentExecStatus().
-  /// exec_state contains all information needed to issue the rpc.
-  /// 'coordinator' will always be an instance to this class and 'exec_state' will
-  /// always be an instance of BackendExecState.
-  Status ExecRemoteFragment(void* exec_state);
+  /// Wrapper for ExecPlanFragment() RPC. This function will be called in parallel from
+  /// multiple threads. Creates a new FragmentInstanceState and registers it in
+  /// fragment_instance_states_, then calls RPC to issue fragment on remote impalad.
+  void ExecRemoteFragment(const FragmentExecParams* fragment_exec_params,
+      const TPlanFragment* plan_fragment, DebugOptions* debug_options,
+      QuerySchedule* schedule, int fragment_instance_idx, int fragment_idx,
+      int per_fragment_instance_idx, CountingBarrier* fragment_start_barrier);
 
   /// Determine fragment number, given fragment id.
   int GetFragmentNum(const TUniqueId& fragment_id);
 
   /// Print hdfs split size stats to VLOG_QUERY and details to VLOG_FILE
   /// Attaches split size summary to the appropriate runtime profile
-  void PrintBackendInfo();
+  void PrintFragmentInstanceInfo();
 
   /// Create aggregate counters for all scan nodes in any of the fragments
   void CreateAggregateCounters(const std::vector<TPlanFragment>& fragments);
@@ -375,12 +382,12 @@ class Coordinator {
   /// Assumes lock protecting profile and result is held.
   void CollectScanNodeCounters(RuntimeProfile*, FragmentInstanceCounters* result);
 
-  /// Derived counter function: aggregates throughput for node_id across all backends
-  /// (id needs to be for a ScanNode)
+  /// Derived counter function: aggregates throughput for node_id across all fragment
+  /// instances (id needs to be for a ScanNode).
   int64_t ComputeTotalThroughput(int node_id);
 
   /// Derived counter function: aggregates total completed scan ranges for node_id
-  /// across all backends(id needs to be for a ScanNode)
+  /// across all fragment instances (id needs to be for a ScanNode).
   int64_t ComputeTotalScanRangesComplete(int node_id);
 
   /// Runs cancel logic. Assumes that lock_ is held.
@@ -399,16 +406,16 @@ class Coordinator {
   Status UpdateStatus(const Status& status, const TUniqueId& failed_fragment,
       const std::string& instance_hostname);
 
-  /// Returns only when either all backends have reported success or the query is in
-  /// error. Returns the status of the query.
+  /// Returns only when either all fragment instances have reported success or the query
+  /// is in error. Returns the status of the query.
   /// It is safe to call this concurrently, but any calls must be made only after Exec().
   /// WaitForAllBackends may be called before Wait(), but note that Wait() guarantees
   /// that any coordinator fragment has finished, which this method does not.
   Status WaitForAllBackends();
 
-  /// Perform any post-query cleanup required. Called by Wait() only after all backends
-  /// have returned, or if the query has failed, in which case it only cleans up temporary
-  /// data rather than finishing the INSERT in flight.
+  /// Perform any post-query cleanup required. Called by Wait() only after all fragment
+  /// instances have returned, or if the query has failed, in which case it only cleans up
+  /// temporary data rather than finishing the INSERT in flight.
   Status FinalizeQuery();
 
   /// Moves all temporary staging files to their final destinations.
@@ -418,17 +425,17 @@ class Coordinator {
   /// called before RPCs to start remote fragments.
   void InitExecProfile(const TQueryExecRequest& request);
 
-  /// Update fragment profile information from a backend exec state.
+  /// Update fragment profile information from a fragment instance state.
   /// This is called repeatedly from UpdateFragmentExecStatus(),
   /// and also at the end of the query from ReportQuerySummary().
   /// This method calls UpdateAverage() and AddChild(), which obtain their own locks
-  /// on the backend state.
-  void UpdateAverageProfile(BackendExecState* backend_exec_state);
+  /// on the instance state.
+  void UpdateAverageProfile(FragmentInstanceState* fragment_instance_state);
 
   /// Compute the summary stats (completion_time and rates)
   /// for an individual fragment_profile_ based on the specified backed_exec_state.
   /// Called only from ReportQuerySummary() below.
-  void ComputeFragmentSummaryStats(BackendExecState* backend_exec_state);
+  void ComputeFragmentSummaryStats(FragmentInstanceState* fragment_instance_state);
 
   /// Outputs aggregate query profile summary.  This is assumed to be called at the end of
   /// a query -- remote fragments' profiles must not be updated while this is running.
@@ -438,15 +445,16 @@ class Coordinator {
   /// query is done.
   void UpdateExecSummary(int fragment_idx, int instance_idx, RuntimeProfile* profile);
 
-  /// Determines what the permissions of directories created by INSERT statements should be
-  /// if permission inheritance is enabled. Populates a map from all prefixes of path_str
-  /// (including the full path itself) which is a path in Hdfs, to pairs (does_not_exist,
-  /// permissions), where does_not_exist is true if the path does not exist in Hdfs. If
-  /// does_not_exist is true, permissions is set to the permissions of the most immediate
-  /// ancestor of the path that does exist, i.e. the permissions that the path should
-  /// inherit when created. Otherwise permissions is set to the actual permissions of the
-  /// path. The PermissionCache argument is also used to cache the output across repeated
-  /// calls, to avoid repeatedly calling hdfsGetPathInfo() on the same path.
+  /// Determines what the permissions of directories created by INSERT statements should
+  /// be if permission inheritance is enabled. Populates a map from all prefixes of
+  /// path_str (including the full path itself) which is a path in Hdfs, to pairs
+  /// (does_not_exist, permissions), where does_not_exist is true if the path does not
+  /// exist in Hdfs. If does_not_exist is true, permissions is set to the permissions of
+  /// the most immediate ancestor of the path that does exist, i.e. the permissions that
+  /// the path should inherit when created. Otherwise permissions is set to the actual
+  /// permissions of the path. The PermissionCache argument is also used to cache the
+  /// output across repeated calls, to avoid repeatedly calling hdfsGetPathInfo() on the
+  /// same path.
   typedef boost::unordered_map<std::string, std::pair<bool, short> > PermissionCache;
   void PopulatePathPermissionCache(hdfsFS fs, const std::string& path_str,
       PermissionCache* permissions_cache);
@@ -457,6 +465,11 @@ class Coordinator {
   /// We will then need a different mechanism to assert the correct behavior of the
   /// SubplanNode with respect to setting collection-slots to NULL.
   void ValidateCollectionSlots(RowBatch* batch);
+
+  /// Starts all remote fragments contained in the schedule by issuing RPCs in parallel,
+  /// and then waiting for all of the RPCs to complete. Returns an error if there was any
+  /// error starting the fragments.
+  Status StartRemoteFragments(QuerySchedule* schedule);
 };
 
 }

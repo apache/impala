@@ -162,7 +162,7 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   // Evaluate and materialize the const expr lists exactly once.
   while (const_result_expr_idx_ < const_result_expr_ctx_lists_.size()) {
     // Only evaluate the const expr lists by the first fragment instance.
-    if (state->fragment_ctx().fragment_instance_idx == 0) {
+    if (state->fragment_ctx().per_fragment_instance_idx == 0) {
       // Materialize expr results into row_batch.
       RETURN_IF_ERROR(EvalAndMaterializeExprs(
           const_result_expr_ctx_lists_[const_result_expr_idx_], true, &tuple,

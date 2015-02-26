@@ -148,7 +148,7 @@ class SimpleScheduler : public Scheduler {
   /// Initialisation metric
   BooleanProperty* initialised_;
   /// Current number of backends
-  IntGauge* num_backends_metric_;
+  IntGauge* num_fragment_instances_metric_;
 
   /// Counts the number of UpdateMembership invocations, to help throttle the logging.
   uint32_t update_count_;

@@ -98,12 +98,14 @@ class QuerySchedule {
 
   /// Helper methods used by scheduler to populate this QuerySchedule.
   void AddScanRanges(int64_t delta) { num_scan_ranges_ += delta; }
-  void set_num_backends(int64_t num_backends) { num_backends_ = num_backends; }
+  void set_num_fragment_instances(int64_t num_fragment_instances) {
+    num_fragment_instances_ = num_fragment_instances;
+  }
   void set_num_hosts(int64_t num_hosts) {
     DCHECK_GT(num_hosts, 0);
     num_hosts_ = num_hosts;
   }
-  int64_t num_backends() const { return num_backends_; }
+  int64_t num_fragment_instances() const { return num_fragment_instances_; }
   int64_t num_hosts() const { return num_hosts_; }
   int64_t num_scan_ranges() const { return num_scan_ranges_; }
   int32_t GetFragmentIdx(PlanNodeId id) const { return plan_node_to_fragment_idx_[id]; }
@@ -148,7 +150,7 @@ class QuerySchedule {
   boost::unordered_set<TNetworkAddress> unique_hosts_;
 
   /// Number of backends executing plan fragments on behalf of this query.
-  int64_t num_backends_;
+  int64_t num_fragment_instances_;
 
   /// Total number of hosts. Used to compute the total cluster estimated memory
   /// in GetClusterMemoryEstimate().

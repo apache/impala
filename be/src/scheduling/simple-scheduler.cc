@@ -205,7 +205,7 @@ Status SimpleScheduler::Init() {
     total_assignments_ = metrics_->AddCounter<int64_t>(ASSIGNMENTS_KEY, 0);
     total_local_assignments_ = metrics_->AddCounter<int64_t>(LOCAL_ASSIGNMENTS_KEY, 0);
     initialised_ = metrics_->AddProperty(SCHEDULER_INIT_KEY, true);
-    num_backends_metric_ = metrics_->AddGauge<int64_t>(
+    num_fragment_instances_metric_ = metrics_->AddGauge<int64_t>(
         NUM_BACKENDS_KEY, backend_map_.size());
   }
 
@@ -358,7 +358,9 @@ void SimpleScheduler::UpdateMembership(
       update.topic_name = IMPALA_MEMBERSHIP_TOPIC;
       update.topic_deletions.push_back(backend_id_);
     }
-    if (metrics_ != NULL) num_backends_metric_->set_value(current_membership_.size());
+    if (metrics_ != NULL) {
+      num_fragment_instances_metric_->set_value(current_membership_.size());
+    }
   }
 }
 
@@ -637,10 +639,10 @@ void SimpleScheduler::ComputeFragmentExecParams(const TQueryExecRequest& exec_re
     QuerySchedule* schedule) {
   vector<FragmentExecParams>* fragment_exec_params = schedule->exec_params();
   // assign instance ids
-  int64_t num_backends = 0;
+  int64_t num_fragment_instances = 0;
   BOOST_FOREACH(FragmentExecParams& params, *fragment_exec_params) {
     for (int j = 0; j < params.hosts.size(); ++j) {
-      int instance_num = num_backends + j;
+      int instance_num = num_fragment_instances + j;
       // we add instance_num to query_id.lo to create a globally-unique instance id
       TUniqueId instance_id;
       instance_id.hi = schedule->query_id().hi;
@@ -649,13 +651,13 @@ void SimpleScheduler::ComputeFragmentExecParams(const TQueryExecRequest& exec_re
       instance_id.lo = schedule->query_id().lo + instance_num + 1;
       params.instance_ids.push_back(instance_id);
     }
-    num_backends += params.hosts.size();
+    num_fragment_instances += params.hosts.size();
   }
   if (exec_request.fragments[0].partition.type == TPartitionType::UNPARTITIONED) {
     // the root fragment is executed directly by the coordinator
-    --num_backends;
+    --num_fragment_instances;
   }
-  schedule->set_num_backends(num_backends);
+  schedule->set_num_fragment_instances(num_fragment_instances);
 
   // compute destinations and # senders per exchange node
   // (the root fragment doesn't have a destination)
@@ -895,7 +897,7 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
   schedule->set_request_pool(pool);
   // Statestore topic may not have been updated yet if this is soon after startup, but
   // there is always at least this backend.
-  schedule->set_num_hosts(max<int64_t>(num_backends_metric_->value(), 1));
+  schedule->set_num_hosts(max<int64_t>(num_fragment_instances_metric_->value(), 1));
 
   if (!FLAGS_disable_admission_control) {
     RETURN_IF_ERROR(admission_controller_->AdmitQuery(schedule));

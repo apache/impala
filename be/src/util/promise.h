@@ -21,6 +21,7 @@
 #include "common/logging.h"
 #include "runtime/timestamp-value.h"
 #include "util/time.h"
+#include "common/atomic.h"
 
 namespace impala {
 

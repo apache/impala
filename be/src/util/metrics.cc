@@ -210,3 +210,12 @@ string MetricGroup::DebugString() {
   document.Accept(writer);
   return strbuf.GetString();
 }
+
+TMetricDef impala::MakeTMetricDef(const string& key, TMetricKind::type kind,
+    TUnit::type unit) {
+  TMetricDef ret;
+  ret.__set_key(key);
+  ret.__set_kind(kind);
+  ret.__set_units(unit);
+  return ret;
+}
