@@ -123,19 +123,16 @@ BufferedBlockMgr::Block::Block(BufferedBlockMgr* block_mgr)
 
 Status BufferedBlockMgr::Block::Pin(bool* pinned, Block* release_block, bool unpin) {
   RETURN_IF_ERROR(block_mgr_->PinBlock(this, pinned, release_block, unpin));
-  DCHECK(Validate()) << endl << DebugString();
   return Status::OK;
 }
 
 Status BufferedBlockMgr::Block::Unpin() {
   RETURN_IF_ERROR(block_mgr_->UnpinBlock(this));
-  DCHECK(Validate()) << endl << DebugString();
   return Status::OK;
 }
 
 Status BufferedBlockMgr::Block::Delete() {
   RETURN_IF_ERROR(block_mgr_->DeleteBlock(this));
-  DCHECK(Validate()) << endl << DebugString();
   return Status::OK;
 }
 
@@ -472,9 +469,7 @@ BufferedBlockMgr::~BufferedBlockMgr() {
     query_to_block_mgrs_.erase(query_id_);
   }
 
-  if (io_request_context_ != NULL) {
-    io_mgr_->UnregisterContext(io_request_context_);
-  }
+  if (io_request_context_ != NULL) io_mgr_->UnregisterContext(io_request_context_);
 
   // Grab this lock to synchronize with io threads in WriteComplete(). We need those
   // to finish to ensure that memory buffers remain valid for any in-progress writes.
@@ -596,6 +591,7 @@ Status BufferedBlockMgr::UnpinBlock(Block* block) {
   DCHECK(!block->is_deleted_) << "Unpin for deleted block.";
 
   lock_guard<mutex> unpinned_lock(lock_);
+  DCHECK(block->Validate()) << endl << block->DebugString();
   if (!block->is_pinned_) return Status::OK;
   DCHECK(Validate()) << endl << DebugInternal();
   DCHECK_EQ(block->buffer_desc_->len, max_block_size_) << "Can only unpin io blocks.";
@@ -611,6 +607,7 @@ Status BufferedBlockMgr::UnpinBlock(Block* block) {
   --total_pinned_buffers_;
   RETURN_IF_ERROR(WriteUnpinnedBlocks());
   DCHECK(Validate()) << endl << DebugInternal();
+  DCHECK(block->Validate()) << endl << block->DebugString();
   return Status::OK;
 }
 
@@ -766,6 +763,7 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
 
   if (block->in_write_) {
     // If a write is still pending, return. Cleanup will be done in WriteComplete().
+    DCHECK(block->Validate()) << endl << block->DebugString();
     return Status::OK;
   }
 
@@ -782,6 +780,7 @@ Status BufferedBlockMgr::DeleteBlock(Block* block) {
     block->buffer_desc_ = NULL;
   }
   ReturnUnusedBlock(block);
+  DCHECK(block->Validate()) << endl << block->DebugString();
   DCHECK(Validate()) << endl << DebugInternal();
   return Status::OK;
 }
@@ -802,7 +801,6 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
 
   *in_mem = false;
   unique_lock<mutex> l(lock_);
-
   DCHECK(!block->is_pinned_ && !block->is_deleted_)
       << "FindBufferForBlock() " << endl << block->DebugString();
   DCHECK(Validate()) << endl << DebugInternal();
@@ -866,7 +864,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
       return status;
     }
 
-    DCHECK(buffer_desc != NULL);
+    DCHECK_NOTNULL(buffer_desc);
     if (buffer_desc->block != NULL) {
       // This buffer was assigned to a block but now we are reusing it. Reset the
       // previous block->buffer link.

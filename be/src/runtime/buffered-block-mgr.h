@@ -162,7 +162,7 @@ class BufferedBlockMgr {
 
     // Return the number of remaining bytes that can be allocated in this block.
     int BytesRemaining() const {
-      DCHECK(buffer_desc_ != NULL);
+      DCHECK_NOTNULL(buffer_desc_);
       return buffer_desc_->len - valid_data_len_;
     }
 
@@ -209,7 +209,8 @@ class BufferedBlockMgr {
     // Initialize the state of a block and set the number of bytes allocated to 0.
     void Init();
 
-    // Debug helper method to validate the state of a block.
+    // Debug helper method to validate the state of a block. block_mgr_ lock must already
+    // be taken.
     bool Validate() const;
 
     // Pointer to the buffer associated with the block. NULL if the block is not in
