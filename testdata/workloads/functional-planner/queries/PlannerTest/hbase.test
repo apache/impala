@@ -12,9 +12,9 @@ where id < 5
    predicates: id < 5
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE port=60201 <unbounded>:3
-  HBASE KEYRANGE port=60202 3:7
-  HBASE KEYRANGE port=60203 7:<unbounded>
+  HBASE KEYRANGE port=16201 <unbounded>:3
+  HBASE KEYRANGE port=16202 3:7
+  HBASE KEYRANGE port=16203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -32,7 +32,7 @@ and tinyint_col = 5
    predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE port=60202 5:5\0
+  HBASE KEYRANGE port=16202 5:5\0
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -50,8 +50,8 @@ and tinyint_col = 5
    predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE port=60202 5\0:7
-  HBASE KEYRANGE port=60203 7:<unbounded>
+  HBASE KEYRANGE port=16202 5\0:7
+  HBASE KEYRANGE port=16203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -68,8 +68,8 @@ and tinyint_col = 5
    predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE port=60202 5:7
-  HBASE KEYRANGE port=60203 7:<unbounded>
+  HBASE KEYRANGE port=16202 5:7
+  HBASE KEYRANGE port=16203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -86,8 +86,8 @@ and tinyint_col = 5
    predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE port=60201 <unbounded>:3
-  HBASE KEYRANGE port=60202 3:5
+  HBASE KEYRANGE port=16201 <unbounded>:3
+  HBASE KEYRANGE port=16202 3:5
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -113,7 +113,7 @@ and tinyint_col = 5
    predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE port=60202 4\0:5
+  HBASE KEYRANGE port=16202 4\0:5
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -132,7 +132,7 @@ and tinyint_col = 5
    predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE port=60202 4:5
+  HBASE KEYRANGE port=16202 4:5
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -151,7 +151,7 @@ and tinyint_col = 5
    predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE port=60202 4\0:5\0
+  HBASE KEYRANGE port=16202 4\0:5\0
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -170,7 +170,7 @@ and tinyint_col = 5
    predicates: tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE port=60202 4:5\0
+  HBASE KEYRANGE port=16202 4:5\0
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -319,7 +319,7 @@ where string_col = '4' and tinyint_col = 5 and id >= '4' and id <= '5'
    predicates: string_col = '4', tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE port=60202 4:5\0
+  HBASE KEYRANGE port=16202 4:5\0
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -363,7 +363,7 @@ where string_col = '4' and tinyint_col = 5
    predicates: string_col = '4', tinyint_col = 5
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE port=60202 4:5\0
+  HBASE KEYRANGE port=16202 4:5\0
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |
@@ -440,9 +440,9 @@ where bigint_col is not null and bool_col = true
    predicates: bigint_col IS NOT NULL, bool_col = TRUE
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HBASE KEYRANGE port=60201 <unbounded>:3
-  HBASE KEYRANGE port=60202 3:7
-  HBASE KEYRANGE port=60203 7:<unbounded>
+  HBASE KEYRANGE port=16201 <unbounded>:3
+  HBASE KEYRANGE port=16202 3:7
+  HBASE KEYRANGE port=16203 7:<unbounded>
 ---- DISTRIBUTEDPLAN
 01:EXCHANGE [UNPARTITIONED]
 |

@@ -298,7 +298,7 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 NODE 1:
-  HBASE KEYRANGE port=60202 5:5\0
+  HBASE KEYRANGE port=16202 5:5\0
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
