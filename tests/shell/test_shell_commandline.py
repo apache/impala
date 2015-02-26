@@ -75,6 +75,12 @@ class TestImpalaShell(object):
     run_impala_shell_cmd(args)
 
   @pytest.mark.execute_serially
+  def test_multiple_queries_with_escaped_backslash(self):
+    # Regression test for string containing an escaped backslash. This relies on the
+    # patch at thirdparty/patches/sqlparse/0001-....patch.
+    run_impala_shell_cmd(r'''-q "select '\\\\'; select '\\'';" -B''')
+
+  @pytest.mark.execute_serially
   def test_default_db(self):
     args = '-d %s -q "describe %s" --quiet' % (TEST_DB, TEST_TBL)
     run_impala_shell_cmd(args)
