@@ -42,7 +42,18 @@ static uint32_t SEED_PRIMES[] = {
   1431655781,
   1183186591,
   622729787,
+  472882027,
   338294347,
+  275604541,
+  41161739,
+  29999999,
+  27475109,
+  611603,
+  16313357,
+  11380003,
+  21261403,
+  33393119,
+  101
 };
 
 // Put a non-zero constant in the result location for NULL.
@@ -59,10 +70,10 @@ static int64_t NULL_VALUE[] = { HashUtil::FNV_SEED, HashUtil::FNV_SEED,
                                 HashUtil::FNV_SEED, HashUtil::FNV_SEED,
                                 HashUtil::FNV_SEED, HashUtil::FNV_SEED };
 
-// The first NUM_SMALL_BLOCKS of nodes_ are made of blocks less than the io size to
-// reduce the memory footprint of small queries.
-static const int64_t INITIAL_DATA_PAGE_SIZES[] =
-    { 64 * 1024, 512 * 1024 };
+// The first NUM_SMALL_BLOCKS of nodes_ are made of blocks less than the IO size (of 8MB)
+// to reduce the memory footprint of small queries. In particular, we always first use a
+// 64KB and a 512KB block before starting using IO-sized blocks.
+static const int64_t INITIAL_DATA_PAGE_SIZES[] = { 64 * 1024, 512 * 1024 };
 static const int NUM_SMALL_DATA_PAGES = sizeof(INITIAL_DATA_PAGE_SIZES) / sizeof(int64_t);
 
 HashTableCtx::HashTableCtx(const vector<ExprContext*>& build_expr_ctxs,
@@ -175,15 +186,14 @@ bool HashTableCtx::Equals(TupleRow* build_row) {
 const float HashTable::MAX_BUCKET_OCCUPANCY_FRACTION = 0.75f;
 
 HashTable::HashTable(RuntimeState* state, BufferedBlockMgr::Client* client,
-    int num_build_tuples, BufferedTupleStream* stream, bool use_initial_small_pages,
-    int64_t max_num_buckets, int64_t num_buckets)
+    int num_build_tuples, BufferedTupleStream* stream, int64_t max_num_buckets,
+    int64_t num_buckets)
   : state_(state),
     block_mgr_client_(client),
     tuple_stream_(stream),
     data_page_pool_(NULL),
     num_build_tuples_(num_build_tuples),
     stores_tuples_(num_build_tuples == 1),
-    use_initial_small_pages_(use_initial_small_pages),
     max_num_buckets_(max_num_buckets),
     num_filled_buckets_(0),
     num_nodes_(0),
@@ -196,7 +206,7 @@ HashTable::HashTable(RuntimeState* state, BufferedBlockMgr::Client* client,
     has_matches_(false) {
   DCHECK_EQ((num_buckets & (num_buckets-1)), 0) << "num_buckets must be a power of 2";
   DCHECK_GT(num_buckets, 0) << "num_buckets must be larger than 0";
-  if (!stores_tuples_) DCHECK_NOTNULL(stream);
+  DCHECK(stores_tuples_ || stream != NULL);
 }
 
 HashTable::HashTable(MemPool* pool, int num_buckets)
@@ -206,7 +216,6 @@ HashTable::HashTable(MemPool* pool, int num_buckets)
     data_page_pool_(pool),
     num_build_tuples_(1),
     stores_tuples_(true),
-    use_initial_small_pages_(false),
     max_num_buckets_(-1),
     num_filled_buckets_(0),
     num_nodes_(0),
@@ -315,20 +324,20 @@ bool HashTable::GrowNodeArray() {
   int64_t page_size = 0;
   if (block_mgr_client_ != NULL) {
     page_size = state_->block_mgr()->max_block_size();;
-    if (use_initial_small_pages_ && data_pages_.size() < NUM_SMALL_DATA_PAGES) {
+    if (data_pages_.size() < NUM_SMALL_DATA_PAGES) {
       page_size = min(page_size, INITIAL_DATA_PAGE_SIZES[data_pages_.size()]);
     }
     BufferedBlockMgr::Block* block = NULL;
     Status status = state_->block_mgr()->GetNewBlock(
         block_mgr_client_, NULL, &block, page_size);
-    if (!status.ok()) DCHECK(block == NULL);
+    DCHECK(status.ok() || block == NULL);
     if (block == NULL) return false;
     data_pages_.push_back(block);
     next_node_ = block->Allocate<Node>(page_size);
     ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(page_size);
   } else {
     // Only used for testing.
-    DCHECK(data_page_pool_ != NULL);
+    DCHECK_NOTNULL(data_page_pool_);
     page_size = TEST_PAGE_SIZE;
     next_node_ = reinterpret_cast<Node*>(data_page_pool_->Allocate(page_size));
     if (data_page_pool_->mem_tracker()->LimitExceeded()) return false;

@@ -113,19 +113,20 @@ class PartitionedAggregationNode : public ExecNode {
   // Number of initial partitions to create. Must be a power of 2.
   static const int PARTITION_FANOUT = 16;
 
-  // Needs to be the log(PARTITION_FANOUT)
+  // Needs to be the log(PARTITION_FANOUT).
   // We use the upper bits to pick the partition and lower bits in the HT.
   // TODO: different hash functions here too? We don't need that many bits to pick
   // the partition so this might be okay.
   static const int NUM_PARTITIONING_BITS = 4;
 
   // Maximum number of times we will repartition. The maximum build table we can process
-  // is: MEM_LIMIT * (PARTITION_FANOUT ^ MAX_PARTITION_DEPTH). With a (low) 1GB limit and
-  // 64 fanout, we can support 256TB build tables in the case where there is no skew.  In
-  // the case where there is skew, repartitioning is unlikely to help (assuming a
+  // (if we have enough scratch disk space) in case there is no skew is:
+  //  MEM_LIMIT * (PARTITION_FANOUT ^ MAX_PARTITION_DEPTH).
+  // In the case where there is skew, repartitioning is unlikely to help (assuming a
   // reasonable hash function).
+  // Note that we need to have at least as many SEED_PRIMES in HashTableCtx.
   // TODO: we can revisit and try harder to explicitly detect skew.
-  static const int MAX_PARTITION_DEPTH = 4;
+  static const int MAX_PARTITION_DEPTH = 16;
 
   // Tuple into which Update()/Merge()/Serialize() results are stored.
   TupleId intermediate_tuple_id_;
@@ -351,9 +352,14 @@ class PartitionedAggregationNode : public ExecNode {
   template<bool AGGREGATED_ROWS>
   Status ProcessStream(BufferedTupleStream* input_stream);
 
-  // Initializes hash_partitions_. Level is the level for the partitions to create.
-  // Also sets ht_ctx_'s level to level.
+  // Initializes hash_partitions_. 'level' is the level for the partitions to create.
+  // Also sets ht_ctx_'s level to 'level'.
   Status CreateHashPartitions(int level);
+
+  // Iterates over all the partitions in hash_partitions_ and returns the number of rows
+  // of the largest spilled partition (in terms of number of aggregated and unaggregated
+  // rows).
+  int64_t LargestSpilledPartition() const;
 
   // Prepares the next partition to return results from. On return, this function
   // initializes output_iterator_ and output_partition_. This either removes

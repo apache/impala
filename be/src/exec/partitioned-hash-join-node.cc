@@ -319,11 +319,12 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
   // upside in the common case (few/no duplicates) is large and the downside
   // when there are is low (a bit more memory; the bucket memory is small compared
   // to the memory needed for all the build side allocations).
+  // We always start with small pages in the hash table.
   int64_t estimated_num_buckets =
       HashTable::EstimatedNumBuckets(build_rows()->num_rows());
   hash_tbl_.reset(new HashTable(state, parent_->block_mgr_client_,
       parent_->child(1)->row_desc().tuple_descriptors().size(), build_rows(),
-      level_ == 0, 1 << (32 - NUM_PARTITIONING_BITS), estimated_num_buckets));
+      1 << (32 - NUM_PARTITIONING_BITS), estimated_num_buckets));
   if (!hash_tbl_->Init()) goto not_built;
 
   if (AddProbeFilters) DCHECK_EQ(level_, 0) << "Should not add filters if repartitioning";
@@ -512,13 +513,13 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
         new Partition(state, this, level, using_small_buffers_)));
     RETURN_IF_ERROR(hash_partitions_[i]->build_rows()->Init(runtime_profile()));
 
-    // Initialize a buffer for the probe here to make sure why have it if we
-    // need it. While this is not strictly necessary (there are some cases where we
-    // won't need this buffer), the benefit is low. Not grabbing this buffer means
-    // there is an additional buffer that could be used for the build side. However
-    // since this is only one buffer, there is only a small range of build input
-    // sizes where this is beneficial (an IO buffer size). It makes the logic
-    // much more complex to enable this optimization.
+    // Initialize a buffer for the probe here to make sure why have it if we need it.
+    // While this is not strictly necessary (there are some cases where we won't need this
+    // buffer), the benefit is low. Not grabbing this buffer means there is an additional
+    // buffer that could be used for the build side. However since this is only one
+    // buffer, there is only a small range of build input sizes where this is beneficial
+    // (an IO buffer size). It makes the logic much more complex to enable this
+    // optimization.
     RETURN_IF_ERROR(hash_partitions_[i]->probe_rows()->Init(runtime_profile(), false));
   }
   COUNTER_ADD(partitions_created_, PARTITION_FANOUT);
@@ -678,7 +679,22 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
     DCHECK(input_partition_->is_spilled());
     input_partition_->Spill(false);
     ht_ctx_->set_level(input_partition_->level_ + 1);
+    int64_t num_input_rows = input_partition_->build_rows()->num_rows();
     RETURN_IF_ERROR(ProcessBuildInput(state, input_partition_->level_ + 1));
+
+    // Check if there was any reduction in the size of partitions after repartitioning.
+    int64_t largest_partition = LargestSpilledPartition();
+    DCHECK_GE(num_input_rows, largest_partition) << "Cannot have a partition with "
+        "more rows than the input";
+    if (num_input_rows == largest_partition) {
+      Status status = Status::MEM_LIMIT_EXCEEDED;
+      status.AddErrorMsg(Substitute("Cannot perform hash join at node with id $0. "
+          "Repartitioning did not reduce the size of a spilled partition. "
+          "Repartitioning level $1. Number of rows $2.",
+          id_, input_partition_->level_ + 1, num_input_rows));
+      state->SetMemLimitExceeded();
+      return status;
+    }
     UpdateState(REPARTITIONING);
   } else {
     DCHECK(hash_partitions_.empty());
@@ -695,6 +711,18 @@ Status PartitionedHashJoinNode::PrepareNextPartition(RuntimeState* state) {
   COUNTER_ADD(num_repartitions_, 1);
   COUNTER_ADD(num_probe_rows_partitioned_, input_partition_->probe_rows()->num_rows());
   return Status::OK;
+}
+
+int64_t PartitionedHashJoinNode::LargestSpilledPartition() const {
+  int64_t max_rows = 0;
+  for (int i = 0; i < hash_partitions_.size(); ++i) {
+    Partition* partition = hash_partitions_[i];
+    if (partition->is_spilled()) {
+      int64_t rows = partition->build_rows()->num_rows();
+      if (rows > max_rows) max_rows = rows;
+    }
+  }
+  return max_rows;
 }
 
 Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch,

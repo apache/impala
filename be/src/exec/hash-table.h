@@ -61,7 +61,7 @@ class HashTable;
 //
 // The hash table does not support removes. The hash table is not thread safe.
 //
-// The implementation is based on the boost multiset.  The hashtable is implemented by
+// The implementation is based on the boost multiset.  The hash table is implemented by
 // two data structures: a vector of buckets and a vector of nodes.  Inserted values
 // are stored as nodes (in the order they are inserted).  The buckets (indexed by the
 // mod of the hash) contain pointers to the node vector.  Nodes that fall in the same
@@ -74,6 +74,8 @@ class HashTable;
 // Due to the doubling nature of the buckets, we require that the number of buckets is a
 // power of 2. This allows us to determine if a node needs to move by simply checking a
 // single bit, and further allows us to initially hash nodes using a bitmask.
+// The first NUM_SMALL_BLOCKS of nodes_ are made of blocks less than the IO size (of 8MB)
+// to reduce the memory footprint of small queries.
 //
 // TODO: this is not a fancy hash table in terms of memory access patterns (cuckoo-hashing
 // or something that spills to disk). We will likely want to invest more time into this.
@@ -263,8 +265,6 @@ class HashTable {
   //  - tuple_stream: the tuple stream which contains the tuple rows index by the
   //    hash table. Can be NULL if the rows contain only a single tuple, in which
   //    the 'tuple_stream' is unused.
-  //  - use_initial_small_pages: if true the first fixed N data_pages_ will be smaller
-  //    than the io buffer size.
   //  - max_num_buckets: the maximum number of buckets that can be stored. If we
   //    try to grow the number of buckets to a larger number, the inserts will fail.
   //    -1, if it unlimited.
@@ -272,8 +272,7 @@ class HashTable {
   //    should be initialized with.
   HashTable(RuntimeState* state, BufferedBlockMgr::Client* client,
       int num_build_tuples, BufferedTupleStream* tuple_stream,
-      bool use_initial_small_pages, int64_t max_num_buckets,
-      int64_t initial_num_buckets = 1024);
+      int64_t max_num_buckets, int64_t initial_num_buckets = 1024);
 
   // Ctor used only for testing. Memory is allocated from the pool instead of the
   // block mgr.
@@ -526,9 +525,6 @@ class HashTable {
   // TODO: these constants are an ideal candidate to be removed with codegen.
   // TODO: ..or with template-ization
   const bool stores_tuples_;
-
-  // If true use small pages for the first few allocated data pages.
-  const bool use_initial_small_pages_;
 
   const int64_t max_num_buckets_;
 

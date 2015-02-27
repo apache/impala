@@ -124,8 +124,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // there is no skew.
   // In the case where there is skew, repartitioning is unlikely to help (assuming a
   // reasonable hash function).
+  // Note that we need to have at least as many SEED_PRIMES in HashTableCtx.
   // TODO: we can revisit and try harder to explicitly detect skew.
-  static const int MAX_PARTITION_DEPTH = 4;
+  static const int MAX_PARTITION_DEPTH = 16;
 
   // Maximum number of build tables that can be in memory at any time. This is in
   // addition to the memory constraints and is used for testing to trigger code paths
@@ -154,7 +155,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // Partitions the entire build input (either from child(1) or input_partition_) into
   // hash_partitions_. When this call returns, hash_partitions_ is ready to consume
   // the probe input.
-  // level is the level new partitions (in hash_partitions_) should be created with.
+  // 'level' is the level new partitions (in hash_partitions_) should be created with.
   Status ProcessBuildInput(RuntimeState* state, int level);
 
   // Reads the rows in build_batch and partitions them in hash_partitions_.
@@ -237,6 +238,10 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   // hash table. If it does not, meaning we need to repartition, this function will
   // initialize hash_partitions_.
   Status PrepareNextPartition(RuntimeState*);
+
+  // Iterates over all the partitions in hash_partitions_ and returns the number of rows
+  // of the largest partition (in terms of number of aggregated and unaggregated rows).
+  int64_t LargestSpilledPartition() const;
 
   // Prepares for probing the next batch.
   void ResetForProbe();

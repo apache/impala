@@ -173,8 +173,7 @@ class BufferedTupleStream {
   // If profile is non-NULL, counters are created.
   Status Init(RuntimeProfile* profile = NULL, bool pinned = true);
 
-  // Must be called for streams using small buffers to switch to IO-sized
-  // buffers.
+  // Must be called for streams using small buffers to switch to IO-sized buffers.
   // TODO: this does not seem like the best mechanism.
   Status SwitchToIoBuffers(bool* got_buffer);
 

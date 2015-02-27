@@ -61,23 +61,25 @@ class RuntimeState;
 //    to a different block.
 //
 // The Client API is as follows:
-// GetNewBlock() returns a new pinned block.
+//  GetNewBlock() returns a new pinned block.
+//  Close() frees all memory and disk space and is called when a query is closed or
+//   cancelled. Close() is idempotent.
+
+//
 // A Block supports the following operations
-// Pin(): Pins a block to a buffer in memory, and reads its contents from disk if
+//  Pin(): Pins a block to a buffer in memory, and reads its contents from disk if
 //   necessary. If there are no free buffers, waits for a buffer to become available.
 //   Invoked before the contents of a block are read or written. The block
 //   will be maintained in memory until Unpin() is called.
-// Unpin(): Invoked to indicate the block is not in active use. The block is added to a
+//  Unpin(): Invoked to indicate the block is not in active use. The block is added to a
 //   list of unpinned blocks. Unpinned blocks are only written when the number of free
 //   blocks falls below the 'block_write_threshold'.
-// Delete(): Invoked to deallocate a block. The buffer associated with the block is
+//  Delete(): Invoked to deallocate a block. The buffer associated with the block is
 //   immediately released and its on-disk location (if any) reused.
-//
-// Close() frees all memory and disk space and is called when a query is closed or
-// cancelled. Close() is idempotent.
 //
 // The block manager is thread safe with the following caveat:
 //   A single block cannot be pinned and used simultaneously by multiple clients.
+//
 // TODO: When a block is read from disk, data is copied from the IOMgr buffer to the
 // block manager's buffer. This should be avoided in the common case where these buffers
 // are of the same size.

@@ -156,6 +156,56 @@ class HashTableTest : public testing::Test {
       }
     }
   }
+
+  void ScanTestImpl(int initial_size, int rows_to_insert, int additional_rows) {
+    int total_rows = rows_to_insert + additional_rows;
+    int target_size = BitUtil::NextPowerOfTwo(initial_size);
+    HashTable hash_table(&mem_pool_, target_size);
+    HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 0, 1);
+
+    // Add 1 row with val 1, 2 with val 2, etc
+    vector<TupleRow*> build_rows;
+    ProbeTestData probe_rows[total_rows];
+    probe_rows[0].probe_row = CreateTupleRow(0);
+    uint32_t hash = 0;
+    for (int val = 1; val <= rows_to_insert; ++val) {
+      probe_rows[val].probe_row = CreateTupleRow(val);
+      for (int i = 0; i < val; ++i) {
+        TupleRow* row = CreateTupleRow(val);
+        if (!ht_ctx.EvalAndHashBuild(row, &hash)) continue;
+        hash_table.Insert(&ht_ctx, row->GetTuple(0), hash);
+        build_rows.push_back(row);
+        probe_rows[val].expected_build_rows.push_back(row);
+      }
+    }
+
+    // Add some more probe rows that aren't there.
+    for (int val = rows_to_insert; val < rows_to_insert + additional_rows; ++val) {
+      probe_rows[val].probe_row = CreateTupleRow(val);
+    }
+
+    // Test that all the builds were found.
+    ProbeTest(&hash_table, &ht_ctx, probe_rows, total_rows, true);
+
+    // Resize and try again.
+    target_size = BitUtil::NextPowerOfTwo(2 * total_rows);
+    ResizeTable(&hash_table, target_size);
+    EXPECT_EQ(hash_table.num_buckets(), target_size);
+    ProbeTest(&hash_table, &ht_ctx, probe_rows, total_rows, true);
+
+    target_size = BitUtil::NextPowerOfTwo(total_rows + 1);
+    ResizeTable(&hash_table, target_size);
+    EXPECT_EQ(hash_table.num_buckets(), target_size);
+    ProbeTest(&hash_table, &ht_ctx, probe_rows, total_rows, true);
+
+    target_size = BitUtil::NextPowerOfTwo(total_rows / 2);
+    ResizeTable(&hash_table, target_size);
+    EXPECT_EQ(hash_table.num_buckets(), target_size);
+    ProbeTest(&hash_table, &ht_ctx, probe_rows, total_rows, true);
+
+    hash_table.Close();
+    mem_pool_.FreeAll();
+  }
 };
 
 TEST_F(HashTableTest, SetupTest) {
@@ -242,50 +292,11 @@ TEST_F(HashTableTest, BasicTest) {
   mem_pool_.FreeAll();
 }
 
-// This tests makes sure we can scan ranges of buckets
+// This test makes sure we can scan ranges of buckets.
 TEST_F(HashTableTest, ScanTest) {
-  HashTable hash_table(&mem_pool_);
-  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 0, 1);
-
-  // Add 1 row with val 1, 2 with val 2, etc
-  vector<TupleRow*> build_rows;
-  ProbeTestData probe_rows[15];
-  probe_rows[0].probe_row = CreateTupleRow(0);
-  uint32_t hash = 0;
-  for (int val = 1; val <= 10; ++val) {
-    probe_rows[val].probe_row = CreateTupleRow(val);
-    for (int i = 0; i < val; ++i) {
-      TupleRow* row = CreateTupleRow(val);
-      if (!ht_ctx.EvalAndHashBuild(row, &hash)) continue;
-      hash_table.Insert(&ht_ctx, row->GetTuple(0), hash);
-      build_rows.push_back(row);
-      probe_rows[val].expected_build_rows.push_back(row);
-    }
-  }
-
-  // Add some more probe rows that aren't there
-  for (int val = 11; val < 15; ++val) {
-    probe_rows[val].probe_row = CreateTupleRow(val);
-  }
-
-  // Test that all the builds were found
-  ProbeTest(&hash_table, &ht_ctx, probe_rows, 15, true);
-
-  // Resize and try again
-  ResizeTable(&hash_table, 128);
-  EXPECT_EQ(hash_table.num_buckets(), 128);
-  ProbeTest(&hash_table, &ht_ctx, probe_rows, 15, true);
-
-  ResizeTable(&hash_table, 16);
-  EXPECT_EQ(hash_table.num_buckets(), 16);
-  ProbeTest(&hash_table, &ht_ctx, probe_rows, 15, true);
-
-  ResizeTable(&hash_table, 2);
-  EXPECT_EQ(hash_table.num_buckets(), 2);
-  ProbeTest(&hash_table, &ht_ctx, probe_rows, 15, true);
-
-  hash_table.Close();
-  mem_pool_.FreeAll();
+  ScanTestImpl(1024, 10, 5);
+  ScanTestImpl(1024, 1000, 5);
+  ScanTestImpl(1024, 1000, 500);
 }
 
 // This test continues adding to the hash table to trigger the resize code paths
