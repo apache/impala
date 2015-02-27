@@ -73,12 +73,6 @@ public class NullLiteral extends LiteralExpr {
   }
 
   @Override
-  public int compareTo(LiteralExpr o) {
-    if (!(o instanceof NullLiteral)) return -1;
-    return 0;
-  }
-
-  @Override
   public Expr clone() { return new NullLiteral(this); }
 
   @Override

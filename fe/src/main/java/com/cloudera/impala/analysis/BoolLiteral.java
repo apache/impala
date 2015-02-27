@@ -92,7 +92,8 @@ public class BoolLiteral extends LiteralExpr {
 
   @Override
   public int compareTo(LiteralExpr o) {
-    if (!(o instanceof BoolLiteral)) return -1;
+    int ret = super.compareTo(o);
+    if (ret != 0) return ret;
     BoolLiteral other = (BoolLiteral) o;
     if (value_ && !other.getValue()) return 1;
     if (!value_ && other.getValue()) return -1;

@@ -49,6 +49,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.annotations.VisibleForTesting;
 
 /**
  * Query-relevant information for one table partition. Partitions are comparable
@@ -695,10 +696,16 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
    */
   @Override
   public int compareTo(HdfsPartition o) {
-    int sizeDiff = partitionKeyValues_.size() - o.getPartitionValues().size();
+    return comparePartitionKeyValues(partitionKeyValues_, o.getPartitionValues());
+  }
+
+  @VisibleForTesting
+  public static int comparePartitionKeyValues(List<LiteralExpr> lhs,
+      List<LiteralExpr> rhs) {
+    int sizeDiff = lhs.size() - rhs.size();
     if (sizeDiff != 0) return sizeDiff;
-    for (int i = 0; i < partitionKeyValues_.size(); ++i) {
-      int cmp = partitionKeyValues_.get(i).compareTo(o.getPartitionValues().get(i));
+    for(int i = 0; i < lhs.size(); ++i) {
+      int cmp = lhs.get(i).compareTo(rhs.get(i));
       if (cmp != 0) return cmp;
     }
     return 0;

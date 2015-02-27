@@ -227,7 +227,8 @@ public class NumericLiteral extends LiteralExpr {
 
   @Override
   public int compareTo(LiteralExpr o) {
-    if (!(o instanceof NumericLiteral)) return -1;
+    int ret = super.compareTo(o);
+    if (ret != 0) return ret;
     NumericLiteral other = (NumericLiteral) o;
     return value_.compareTo(other.value_);
   }
