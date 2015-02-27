@@ -53,6 +53,7 @@ HIVE_HS2_HOST_PORT = pytest.config.option.hive_server2
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 HDFS_CONF = HdfsConfig(pytest.config.option.minicluster_xml_conf)
 TARGET_FILESYSTEM = os.getenv("TARGET_FILESYSTEM") or "hdfs"
+IMPALA_HOME = os.getenv("IMPALA_HOME")
 
 # Base class for Impala tests. All impala test cases should inherit from this class
 class ImpalaTestSuite(BaseTestSuite):
@@ -184,8 +185,9 @@ class ImpalaTestSuite(BaseTestSuite):
         self.execute_test_case_setup(test_section['SETUP'], table_format_info)
 
       # TODO: support running query tests against different scale factors
-      query = QueryTestSectionReader.build_query(test_section['QUERY'].replace(
-          '$GROUP_NAME', group_name))
+      query = QueryTestSectionReader.build_query(test_section['QUERY']
+          .replace('$GROUP_NAME', group_name)
+          .replace('$IMPALA_HOME', IMPALA_HOME))
 
       if 'QUERY_NAME' in test_section:
         LOG.info('Query Name: \n%s\n' % test_section['QUERY_NAME'])

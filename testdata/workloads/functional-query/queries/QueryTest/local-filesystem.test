@@ -1,0 +1,36 @@
+====
+---- QUERY
+drop table if exists local_fs_db.tbl
+---- RESULTS
+====
+---- QUERY
+create external table local_fs_db.tbl
+(c0 string, c1 string, c2 string, c3 int, c4 int, c5 int)
+row format delimited fields terminated by ','
+location 'file://$IMPALA_HOME/testdata/data/local_tbl'
+---- RESULTS
+====
+---- QUERY
+describe local_fs_db.tbl
+---- RESULTS
+'c0','string',''
+'c1','string',''
+'c2','string',''
+'c3','int',''
+'c4','int',''
+'c5','int',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+select * from local_fs_db.tbl
+---- RESULTS
+'a','b','c',1,2,3
+'x','y','z',9,8,7
+---- TYPES
+STRING, STRING, STRING, INT, INT, INT
+====
+---- QUERY
+drop table local_fs_db.tbl
+---- RESULTS
+====

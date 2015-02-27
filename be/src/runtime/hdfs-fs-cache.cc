@@ -41,8 +41,13 @@ Status HdfsFsCache::GetConnection(const string& path, hdfsFS* fs,
   string namenode;
   size_t n = path.find("://");
   if (n == string::npos) {
-    // Path is not qualified, so use the default FS.
-    namenode = "default";
+    if (path.compare(0, string::npos, "file:/", 6)) {
+      // Hadoop Path routines strip out consecutive /'s, so recognize 'file:/blah'.
+      namenode = "file:///";
+    } else {
+      // Path is not qualified, so use the default FS.
+      namenode = "default";
+    }
   } else {
     // Path is qualified, i.e. "scheme://authority/path/to/file".  Extract
     // "scheme://authority/".
