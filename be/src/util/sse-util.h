@@ -75,6 +75,12 @@ namespace SSEUtil {
 // (IMPALA-1399/1646).  The compiler intrinsics cannot be used without -msse4.2, so we
 // define our own implementations of the intrinsics instead.
 
+#if defined(__SSE4_1__) || defined(__POPCNT__)
+// Impala native code should not be compiled with -msse4.1 or higher until the minimum
+// CPU requirement is raised to at least the targeted instruction set.
+#error "Do not compile with -msse4.1 or higher."
+#endif
+
 // The PCMPxSTRy instructions require that the control byte 'mode' be encoded as an
 // immediate.  So, those need to be always inlined in order to always propagate the
 // mode constant into the inline asm.
