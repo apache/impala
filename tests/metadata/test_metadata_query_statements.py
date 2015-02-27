@@ -4,14 +4,15 @@
 import logging
 import os
 import pytest
-from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from subprocess import call
-from tests.common.test_vector import *
+from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import *
+from tests.common.skip import IS_S3
+from tests.common.test_vector import *
 
 # TODO: For these tests to pass, all table metadata must be created exhaustively.
 # the tests should be modified to remove that requirement.
-@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+@pytest.mark.skipif(IS_S3, reason="Disabled on s3")
 class TestMetadataQueryStatements(ImpalaTestSuite):
 
   CREATE_DATA_SRC_STMT = ("CREATE DATA SOURCE %s "

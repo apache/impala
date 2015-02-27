@@ -6,13 +6,17 @@ import pytest
 import sys
 import time
 from subprocess import call
+from tests.common.skip import IS_S3, skip_if_s3_insert
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
+from tests.util.filesystem_utils import WAREHOUSE
 
 DB_NAME = "metastore_update"
 TABLE_NAME = "ddltime_test"
-FULL_NAME = "%s.%s" % (DB_NAME, TABLE_NAME)  
+FULL_NAME = "%s.%s" % (DB_NAME, TABLE_NAME)
 HIVE_LAST_DDL_TIME_PARAM_KEY = "transient_lastDdlTime"
+TBL_LOC = "%s/t_part_tmp" % WAREHOUSE
+DB_LOC = "%s/%s" % (WAREHOUSE, DB_NAME)
 
 # Checks that ALTER and INSERT statements update the last DDL time of the modified table.
 class TestLastDdlTimeUpdate(ImpalaTestSuite):
@@ -29,7 +33,7 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none')
 
-    if cls.exploration_strategy() == 'core':
+    if cls.exploration_strategy() == 'core' and not IS_S3:
       # Don't run on core.  This test is very slow and we are unlikely
       # to regress here.
       cls.TestMatrix.add_constraint(lambda v: False)
@@ -37,14 +41,15 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
   def __cleanup(self):
     self.execute_query("drop table if exists %s" % FULL_NAME)
     self.execute_query("drop database if exists %s" % DB_NAME)
-    call(["hadoop", "fs", "-rm", "-r", "-f", "/test-warehouse/t_part_tmp"], shell=False)
+    call(["hadoop", "fs", "-rm", "-r", "-f", TBL_LOC], shell=False)
 
   def setup_method(self, method):
     self.__cleanup()
-    self.execute_query("create database if not exists %s" % DB_NAME)
+    self.execute_query("create database if not exists %s LOCATION '%s'" % (DB_NAME,
+      DB_LOC))
     self.execute_query("create external table if not exists %s "
-                       "(i int) partitioned by (j int, s string) "
-                       "location '/test-warehouse/t_part_tmp'" % FULL_NAME)
+                       "(i int) partitioned by (j int, s string)"
+                       % FULL_NAME)
 
   def teardown_method(self, method):
     self.__cleanup()
@@ -57,17 +62,18 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
                   "partition (j=1, s='2012')" % FULL_NAME, False)
     self.run_test("alter table %s drop partition (j=1, s='2012')" % FULL_NAME, True)
     self.run_test("alter table %s drop if exists "
-                  "partition (j=2, s='2012')" % FULL_NAME, False)    
+                  "partition (j=2, s='2012')" % FULL_NAME, False)
     # rename columns
     self.run_test("alter table %s change column i k int" % FULL_NAME, True)
     self.run_test("alter table %s change column k i int" % FULL_NAME, True)
     # change location of table
     self.run_test("alter table %s set location "
-                  "'/test-warehouse/t_part_tmp'" % FULL_NAME, True)
+                  "'%s'" % (FULL_NAME, TBL_LOC), True)
     # change format of table
     self.run_test("alter table %s set fileformat textfile" % FULL_NAME, True)
 
   @pytest.mark.execute_serially
+  @skip_if_s3_insert
   def test_insert(self, vector):
     # static partition insert
     self.run_test("insert into %s partition(j=1, s='2012') "
@@ -77,7 +83,7 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
                   "select 10, 2, '2013'" % FULL_NAME, True)
     # dynamic partition insert changing no partitions (empty input)
     self.run_test("insert into %s partition(j, s) "
-                  "select * from (select 10 as i, 2 as j, '2013' as s) as t " 
+                  "select * from (select 10 as i, 2 as j, '2013' as s) as t "
                   "where t.i < 10" % FULL_NAME, False)
     # dynamic partition insert modifying an existing partition
     self.run_test("insert into %s partition(j, s) "
@@ -95,11 +101,11 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
     table = self.hive_client.get_table(DB_NAME, TABLE_NAME)
     assert table is not None
     beforeDdlTime = table.parameters[HIVE_LAST_DDL_TIME_PARAM_KEY]
-    
+
     # Sleep for 2s to make sure the new ddlTime is strictly greater than the old one.
     # Hive uses a seconds granularity on the last ddl time.
     time.sleep (2)
- 
+
     result = self.execute_query(query)
 
     # Get last ddl time after executing query .

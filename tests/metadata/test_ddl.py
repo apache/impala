@@ -107,7 +107,7 @@ class TestDdlStatements(ImpalaTestSuite):
     self.client.execute("drop database ddl_test_db")
     assert not self.hdfs_client.exists("test-warehouse/ddl_test_db.db/")
 
-  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+  @pytest.mark.skipif(IS_S3, reason="Disabled on s3")
   @pytest.mark.execute_serially
   def test_create(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False

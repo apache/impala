@@ -28,10 +28,12 @@ from thrift.transport.TTransport import TBufferedTransport
 from thrift.protocol import TBinaryProtocol
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT
+from tests.common.skip import IS_S3
 from tests.hs2.hs2_test_suite import operation_id_to_query_id
+from tests.util.filesystem_utils import WAREHOUSE
 
+AUTH_POLICY_FILE = "%s/authz-policy.ini" % WAREHOUSE
 
-@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestAuthorization(CustomClusterTestSuite):
   AUDIT_LOG_DIR = tempfile.mkdtemp(dir=os.getenv('LOG_DIR'))
 
@@ -50,9 +52,10 @@ class TestAuthorization(CustomClusterTestSuite):
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--server_name=server1\
-      --authorization_policy_file=/test-warehouse/authz-policy.ini\
-      --authorization_policy_provider_class=%s" %
-      "org.apache.sentry.provider.file.LocalGroupResourceAuthorizationProvider")
+      --authorization_policy_file=%s\
+      --authorization_policy_provider_class=%s" %\
+      (AUTH_POLICY_FILE,
+       "org.apache.sentry.provider.file.LocalGroupResourceAuthorizationProvider"))
   def test_custom_authorization_provider(self):
     from tests.hs2.test_hs2 import TestHS2
     open_session_req = TCLIService.TOpenSessionReq()
@@ -78,11 +81,12 @@ class TestAuthorization(CustomClusterTestSuite):
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     TestHS2.check_response(execute_statement_resp)
 
+  @pytest.mark.skipif(IS_S3, reason="Disabled on S3")
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--server_name=server1\
-      --authorization_policy_file=/test-warehouse/authz-policy.ini\
+      --authorization_policy_file=%s\
       --authorized_proxy_user_config=hue=%s\
-      --audit_event_log_dir=%s" % (getuser(), AUDIT_LOG_DIR))
+      --audit_event_log_dir=%s" % (AUTH_POLICY_FILE, getuser(), AUDIT_LOG_DIR))
   def test_impersonation(self):
     """End-to-end impersonation + authorization test. Expects authorization to be
     configured before running this test"""

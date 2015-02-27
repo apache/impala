@@ -17,6 +17,7 @@ import logging
 import pytest
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
+from tests.common.skip import skip_if_s3_load_data
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.util.shell_util import exec_process
 
@@ -26,15 +27,15 @@ TEST_DB = 'test_encryption_db'
 PYWEBHDFS_TMP_DIR = 'tmp/test_encryption_load_data'
 TMP_DIR = '/%s' % (PYWEBHDFS_TMP_DIR)
 
-''' Tests LOAD DATA commands work between HDFS encryption zones.
-    A test directory is created with data to be loaded into a test table.
-    The test directory and/or the table directory are created as encryption
-    zones with different keys, and the LOAD DATA command is executed. The
-    tests operate on both partitioned and non-partitioned tables.
-'''
-@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3",
-    reason="S3 doesn't support LOAD DATA or encryption zones")
+@skip_if_s3_load_data
 class TestHdfsEncryption(ImpalaTestSuite):
+  ''' Tests LOAD DATA commands work between HDFS encryption zones.
+
+      A test directory is created with data to be loaded into a test table.
+      The test directory and/or the table directory are created as encryption
+      zones with different keys, and the LOAD DATA command is executed. The
+      tests operate on both partitioned and non-partitioned tables.
+  '''
   @classmethod
   def get_workload(self):
     return 'functional-query'
