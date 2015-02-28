@@ -545,8 +545,15 @@ Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
   int64_t last_window_tuple_idx = -1;
   for (int i = 0; i < curr_child_batch_->num_rows(); ++i, ++stream_idx) {
     TupleRow* row = curr_child_batch_->GetRow(i);
-    child_tuple_cmp_row_->SetTuple(0, prev_input_row_->GetTuple(0));
-    child_tuple_cmp_row_->SetTuple(1, row->GetTuple(0));
+    if (partition_by_eq_expr_ctx_ != NULL || order_by_eq_expr_ctx_ != NULL) {
+      // Only set the tuples in child_tuple_cmp_row_ if there are partition exprs or
+      // order by exprs that require comparing the current and previous rows. If there
+      // aren't partition or order by exprs (i.e. empty OVER() clause), there was no sort
+      // and there could be nullable tuples (whereas the sort node does not produce
+      // them), see IMPALA-1562.
+      child_tuple_cmp_row_->SetTuple(0, prev_input_row_->GetTuple(0));
+      child_tuple_cmp_row_->SetTuple(1, row->GetTuple(0));
+    }
     TryRemoveRowsBeforeWindow(stream_idx);
 
     // Every row is compared against the previous row to determine if (a) the row

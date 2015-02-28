@@ -1068,3 +1068,14 @@ NULL
 ---- TYPES
 SMALLINT
 ====
+---- QUERY
+# IMPALA-1562: AnalyticEvalNode not properly handling nullable tuple
+select max(t3.c1) from
+(select min(t2.string_col) over () c1
+ from alltypesagg t1
+ left join alltypes t2 on t2.string_col = t1.string_col ) t3
+---- RESULTS
+'0'
+---- TYPES
+STRING
+====
