@@ -127,7 +127,7 @@ public class Planner {
       } else {
         graph.computeLineageGraph(resultExprs, ctx_.getRootAnalyzer());
       }
-      LOG.debug("lineage: " + graph.debugString());
+      LOG.trace("lineage: " + graph.debugString());
       ctx_.getRootAnalyzer().getTimeline().markEvent("Lineage info computed");
     }
 
