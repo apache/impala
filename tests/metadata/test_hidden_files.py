@@ -8,6 +8,7 @@ from subprocess import check_call
 TEST_DB = 'hidden_files_db'
 TEST_TBL = 'hf'
 
+@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestHiddenFiles(ImpalaTestSuite):
   """
   Tests that files with special prefixes/suffixes are considered 'hidden' when

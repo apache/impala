@@ -5,7 +5,7 @@ use alter_table_test_db
 ====
 ---- QUERY
 # First create an unpartitioned table
-create external table t1 (i int) location '/test-warehouse/t1_tmp1'
+create external table t1 (i int) location '$FILESYSTEM_PREFIX/test-warehouse/t1_tmp1'
 ---- RESULTS
 ====
 ---- QUERY
@@ -195,7 +195,7 @@ bigint,string,int,int
 ====
 ---- QUERY
 # change the location to point to some data
-alter table jointbl_test set location '/test-warehouse/jointbl'
+alter table jointbl_test set location '$FILESYSTEM_PREFIX/test-warehouse/jointbl'
 ---- RESULTS
 ====
 ---- QUERY
@@ -210,7 +210,7 @@ bigint,string,int,int
 ====
 ---- QUERY
 # change the location to point to some data in another file format
-alter table jointbl_test set location '/test-warehouse/jointbl_seq'
+alter table jointbl_test set location '$FILESYSTEM_PREFIX/test-warehouse/jointbl_seq'
 ---- RESULTS
 ====
 ---- QUERY
@@ -232,7 +232,7 @@ bigint,string,int,int
 # Create a partitioned table. Specify the location so we know what dirs need
 # to be cleaned after the test finishes executing.
 create external table t_part (i int) partitioned by (j int, s string)
-location '/test-warehouse/t_part_tmp'
+location '$FILESYSTEM_PREFIX/test-warehouse/t_part_tmp'
 ---- RESULTS
 ====
 ---- QUERY
@@ -255,14 +255,14 @@ alter table t_part add partition (j=1, s=substring('foo2013bar', 4, 8))
 # Add another partition that points to the same location as another partition.
 # This will cause the data to be read twice, but shouldn't result in an error.
 alter table t_part add partition (j=100, s='same_location')
-location '/test-warehouse/t_part_tmp/j=1/s=2012'
+location '$FILESYSTEM_PREFIX/test-warehouse/t_part_tmp/j=1/s=2012'
 ---- RESULTS
 ====
 ---- QUERY
 # Add another partition that points to an existing data location that does not
 # follow the key=value directory structure.
 alter table t_part add partition (j=101, s='different_part_dir')
-location '/test-warehouse/part_data/'
+location '$FILESYSTEM_PREFIX/test-warehouse/part_data/'
 ---- RESULTS
 ====
 ---- QUERY
@@ -506,7 +506,7 @@ int
 ---- QUERY
 # Point one partition at some data (file format does not match table)
 alter table alltypes_test partition(month=4, year=2009)
-set location '/test-warehouse/alltypes_seq_snap/year=2009/month=4'
+set location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_seq_snap/year=2009/month=4'
 ---- RESULTS
 ====
 ---- QUERY
@@ -535,7 +535,7 @@ int,bigint
 # Point the other partition at some more data. This time in a different
 # file format.
 alter table alltypes_test partition(month=cast(1+4 as int), year=cast(100*20+9 as int))
-set location '/test-warehouse/alltypes_rc/year=2009/month=5'
+set location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_rc/year=2009/month=5'
 ---- RESULTS
 ====
 ---- QUERY

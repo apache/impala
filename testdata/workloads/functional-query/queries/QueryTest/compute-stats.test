@@ -553,7 +553,7 @@ STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 create table compute_stats_db.avro_impala_alltypes_no_coldefs
 partitioned by (year int, month int)
 with serdeproperties
-('avro.schema.url'='hdfs:///test-warehouse/avro_schemas/functional/alltypes.json')
+('avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/avro_schemas/functional/alltypes.json')
 stored as avro;
 ====
 ---- QUERY
@@ -602,7 +602,7 @@ bigint_col bigint, float_col float, double_col double, date_string_col string,
 string_col string, timestamp_col timestamp)
 partitioned by (year int, month int)
 with serdeproperties
-('avro.schema.url'='hdfs:///test-warehouse/avro_schemas/functional/alltypes.json')
+('avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/avro_schemas/functional/alltypes.json')
 stored as avro;
 ====
 ---- QUERY
@@ -651,7 +651,7 @@ bigint_col bigint, float_col float, double_col bigint, date_string_col string,
 string_col string, timestamp_col timestamp)
 partitioned by (year int, month int)
 with serdeproperties
-('avro.schema.url'='hdfs:///test-warehouse/avro_schemas/functional/alltypes.json')
+('avro.schema.url'='$FILESYSTEM_PREFIX/test-warehouse/avro_schemas/functional/alltypes.json')
 stored as avro;
 ====
 ---- QUERY

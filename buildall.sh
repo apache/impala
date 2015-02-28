@@ -224,7 +224,8 @@ fi
 # Stop any running Impala services.
 ${IMPALA_HOME}/bin/start-impala-cluster.py --kill --force
 
-if [[ $CLEAN_ACTION -eq 1 || $FORMAT_METASTORE -eq 1 || $FORMAT_CLUSTER -eq 1 ]]
+if [[ $CLEAN_ACTION -eq 1 || $FORMAT_METASTORE -eq 1 || $FORMAT_CLUSTER -eq 1 ||
+      -n $METASTORE_SNAPSHOT_FILE ]]
 then
   # Kill any processes that may be accessing postgres metastore. To be safe, this is done
   # before we make any changes to the config files.

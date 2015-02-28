@@ -29,43 +29,43 @@ STRING, STRING
 ---- QUERY
 # Add them and test function overloading and scoping.
 create function default.fn() RETURNS int
-LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
 ====
 ---- QUERY
 create function function_ddl_test.fn() RETURNS int
-LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
 ====
 ---- QUERY
 create function function_ddl_test.fn(int) RETURNS double
-LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
 ====
 ---- QUERY
 create function function_ddl_test.fn(int, string) RETURNS int
-LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
 ====
 ---- QUERY
 create function function_ddl_test.fn(string, int) RETURNS int
-LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn'
 ====
 ---- QUERY
 create function function_ddl_test.fn2(int) RETURNS int
-LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn2'
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn2'
 ====
 ---- QUERY
 create function function_ddl_test.fn2(int, string) RETURNS int
-LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn2'
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='Fn2'
 ====
 ---- QUERY
 create function function_ddl_test.fn_var_arg(int...) RETURNS int
-LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='VarSum'
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' SYMBOL='VarSum'
 ====
 ---- QUERY
 create aggregate function function_ddl_test.agg_fn(int) RETURNS bigint
-LOCATION '/test-warehouse/libudasample.so' UPDATE_FN='CountUpdate'
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libudasample.so' UPDATE_FN='CountUpdate'
 ====
 ---- QUERY
 create aggregate function function_ddl_test.agg_fn(int, string) RETURNS int
-LOCATION '/test-warehouse/libTestUdas.so' UPDATE_FN='TwoArgUpdate'
+LOCATION '$FILESYSTEM_PREFIX/test-warehouse/libTestUdas.so' UPDATE_FN='TwoArgUpdate'
 ====
 ---- QUERY
 show functions in default

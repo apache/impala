@@ -6,9 +6,10 @@ import os
 import pytest
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
+from tests.common.skip import *
 from subprocess import call
 
-@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+@skip_if_s3_load_data
 class TestLoadData(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

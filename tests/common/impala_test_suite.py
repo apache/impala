@@ -52,8 +52,19 @@ IMPALAD_HS2_HOST_PORT =\
 HIVE_HS2_HOST_PORT = pytest.config.option.hive_server2
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 HDFS_CONF = HdfsConfig(pytest.config.option.minicluster_xml_conf)
+CORE_CONF = HdfsConfig(os.path.join(os.environ['HADOOP_CONF_DIR'], "core-site.xml"))
 TARGET_FILESYSTEM = os.getenv("TARGET_FILESYSTEM") or "hdfs"
 IMPALA_HOME = os.getenv("IMPALA_HOME")
+# FILESYSTEM_PREFIX is the path prefix that should be used in queries.  When running
+# the tests against the default filesystem (fs.defaultFS), FILESYSTEM_PREFIX is the
+# empty string.  When running against a secondary filesystem, it will be the scheme
+# and authority porotion of the qualified path.
+FILESYSTEM_PREFIX = os.getenv("FILESYSTEM_PREFIX")
+# NAMENODE is the path prefix that should be used in results, since paths that come
+# out of Impala have been qualified.  When running against the default filesystem,
+# this will be the same as fs.defaultFS.  When running against a secondary filesystem,
+# this will be the same as FILESYSTEM_PREFIX.
+NAMENODE = FILESYSTEM_PREFIX or CORE_CONF.get('fs.defaultFS')
 
 # Base class for Impala tests. All impala test cases should inherit from this class
 class ImpalaTestSuite(BaseTestSuite):
@@ -187,7 +198,8 @@ class ImpalaTestSuite(BaseTestSuite):
       # TODO: support running query tests against different scale factors
       query = QueryTestSectionReader.build_query(test_section['QUERY']
           .replace('$GROUP_NAME', group_name)
-          .replace('$IMPALA_HOME', IMPALA_HOME))
+          .replace('$IMPALA_HOME', IMPALA_HOME)
+          .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX))
 
       if 'QUERY_NAME' in test_section:
         LOG.info('Query Name: \n%s\n' % test_section['QUERY_NAME'])
@@ -220,10 +232,16 @@ class ImpalaTestSuite(BaseTestSuite):
 
       # Decode the results read back if the data is stored with a specific encoding.
       if encoding: result.data = [row.decode(encoding) for row in result.data]
-
+      # Replace $NAMENODE in the expected results with the actual namenode URI.
+      if 'RESULTS' in test_section:
+        test_section['RESULTS'] = test_section['RESULTS'].replace('$NAMENODE', NAMENODE);
       verify_raw_results(test_section, result,
                          vector.get_value('table_format').file_format,
                          pytest.config.option.update_results)
+      # If --update_results, then replace references to the namenode URI with $NAMENODE.
+      if pytest.config.option.update_results and 'RESULTS' in test_section:
+        test_section['RESULTS'] = test_section['RESULTS'].replace(NAMENODE, '$NAMENODE')
+
     if pytest.config.option.update_results:
       output_file = os.path.join('/tmp', test_file_name.replace('/','_') + ".test")
       write_test_file(output_file, sections, encoding=encoding)

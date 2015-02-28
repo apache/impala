@@ -12,10 +12,11 @@ from tests.common.impala_test_suite import *
 from tests.common.test_vector import *
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.test_dimensions import create_exec_option_dimension
+from tests.common.skip import *
 from tests.util.shell_util import exec_process
 
 # End to end test that hdfs caching is working.
-@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+@skip_if_s3_caching # S3: missing coverage: verify SET CACHED gives error
 class TestHdfsCaching(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -85,7 +86,7 @@ class TestHdfsCaching(ImpalaTestSuite):
       result = self.execute_query(query_string)
       assert(len(result.data) == 2)
 
-@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+@skip_if_s3_caching
 class TestHdfsCachingDdl(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

@@ -12,14 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
+
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_uncompressed_text_dimension
+from tests.common.skip import *
 
 # Tests the COMPUTE STATS command for gathering table and column stats.
 # TODO: Merge this test file with test_col_stats.py
-@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+@skip_if_s3_insert # S3: missing coverage: compute stats
 class TestComputeStats(ImpalaTestSuite):
   TEST_DB_NAME = "compute_stats_db"
   TEST_ALIASING_DB_NAME = "parquet"

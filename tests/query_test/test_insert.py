@@ -10,11 +10,12 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_exec_option_dimension
+from tests.common.skip import *
 
 # TODO: Add Gzip back.  IMPALA-424
 PARQUET_CODECS = ['none', 'snappy']
 
-@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+@skip_if_s3_insert
 class TestInsertQueries(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -125,7 +126,7 @@ class TestInsertWideTable(ImpalaTestSuite):
     actual = QueryTestResult(parse_result_rows(result), types, labels, order_matters=False)
     assert expected == actual
 
-@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+@skip_if_s3_insert
 class TestInsertPartKey(ImpalaTestSuite):
   """Regression test for IMPALA-875"""
   @classmethod
@@ -151,7 +152,7 @@ class TestInsertPartKey(ImpalaTestSuite):
     self.run_test_case('QueryTest/insert_part_key', vector,
         multiple_impalad=vector.get_value('exec_option')['sync_ddl'] == 1)
 
-@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+@skip_if_s3_insert
 class TestInsertNullQueries(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

@@ -23,6 +23,7 @@ from subprocess import call
 from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_test_suite import *
+from tests.common.skip import *
 
 # Validates DDL statements (create, drop)
 class TestDdlStatements(ImpalaTestSuite):
@@ -82,7 +83,7 @@ class TestDdlStatements(ImpalaTestSuite):
     self.hdfs_client.delete_file_dir("test-warehouse/t1_tmp1/", recursive=True)
     self.hdfs_client.delete_file_dir("test-warehouse/t_part_tmp/", recursive=True)
 
-  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+  @skip_if_s3_hdfs_client # S3: missing coverage: drop table/database
   @pytest.mark.execute_serially
   def test_drop_cleans_hdfs_dirs(self):
     self.hdfs_client.delete_file_dir("test-warehouse/ddl_test_db.db/", recursive=True)
@@ -126,7 +127,8 @@ class TestDdlStatements(ImpalaTestSuite):
     self.client.execute('drop database ddl_test_db')
     assert 'ddl_test_db' not in self.client.execute("show databases").data
 
-  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+  # TODO: don't use hdfs_client
+  @skip_if_s3_insert # S3: missing coverage: alter table
   @pytest.mark.execute_serially
   def test_alter_table(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
@@ -148,14 +150,16 @@ class TestDdlStatements(ImpalaTestSuite):
     self.run_test_case('QueryTest/views-ddl', vector, use_db='ddl_test_db',
         multiple_impalad=self.__use_multiple_impalad(vector))
 
-  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+  # TODO: fix copy-udfs-udas to secondary filesystem and enable this test
+  @skip_if_s3_udfs # S3: missing coverage: udas
   @pytest.mark.execute_serially
   def test_functions_ddl(self, vector):
     self.__create_db_synced('function_ddl_test', vector)
     self.run_test_case('QueryTest/functions-ddl', vector, use_db='function_ddl_test',
         multiple_impalad=self.__use_multiple_impalad(vector))
 
-  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+  # TODO: fix copy-udfs-udas to secondary filesystem and enable this test
+  @skip_if_s3_udfs # S3: missing coverage: drop function
   @pytest.mark.execute_serially
   def test_create_drop_function(self, vector):
     # This will create, run, and drop the same function repeatedly, exercising the
@@ -167,7 +171,8 @@ class TestDdlStatements(ImpalaTestSuite):
     self.create_drop_ddl(vector, "udf_test", [create_fn_stmt], [drop_fn_stmt],
         select_stmt)
 
-  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+  # TODO: fix copy-and-load-ext-data-source to secondary filesystem and enable this test
+  @skip_if_s3_datasrc # S3: missing coverage: data sources
   @pytest.mark.execute_serially
   def test_create_drop_data_src(self, vector):
     # This will create, run, and drop the same data source repeatedly, exercising
@@ -295,6 +300,9 @@ class TestDdlStatements(ImpalaTestSuite):
     """
     cls.client.execute('use default')
     cls.client.set_configuration({'sync_ddl': 1})
+    # TODO: once S3 supports INSERT, set location to
+    # $FILESYSTEM_PREFIX/test-warehouse/ when $FILESYSTEM_PREFIX is
+    # not empty
     cls.client.execute('create database %s' % db_name)
     cls.client.set_configuration(vector.get_value('exec_option'))
 

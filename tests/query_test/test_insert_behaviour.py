@@ -21,8 +21,9 @@ import pwd
 import pytest
 import time
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import *
 
-@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+@skip_if_s3_insert
 class TestInsertBehaviour(ImpalaTestSuite):
   """Tests for INSERT behaviour that isn't covered by checking query results"""
 
