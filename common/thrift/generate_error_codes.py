@@ -167,7 +167,8 @@ target_file = "ErrorCodes.thrift"
 # Check uniqueness of error constants and numeric codes
 check_duplicates(error_codes)
 
-with open(target_file, "w+") as fid:
+fid = open(target_file, "w+")
+try:
   fid.write(preamble)
   fid.write("""\nenum TErrorCode {\n""")
   fid.write(",\n".join(map(lambda x: "  %s" % x[0], error_codes)))
@@ -176,5 +177,7 @@ with open(target_file, "w+") as fid:
   fid.write("const list<string> TErrorMessage = [\n")
   fid.write(",\n".join(map(lambda x: "  // %s\n  \"%s\"" %(x[0], x[2]), error_codes)))
   fid.write("\n]")
+finally:
+  fid.close()
 
 print("%s created." % target_file)
