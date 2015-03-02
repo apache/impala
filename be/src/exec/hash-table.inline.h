@@ -51,7 +51,6 @@ inline HashTable::Iterator HashTable::Find(HashTableCtx* ht_ctx, uint32_t hash) 
 }
 
 inline HashTable::Iterator HashTable::Begin(HashTableCtx* ctx) {
-  DCHECK_NE(num_buckets_, 0);
   int64_t bucket_idx = -1;
   Bucket* bucket = NextBucket(&bucket_idx);
   if (bucket != NULL) return Iterator(this, ctx, bucket_idx, bucket->node, 0);

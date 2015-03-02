@@ -83,9 +83,9 @@ class TestTpchMemLimitError(ImpalaTestSuite):
 
   # Different values of mem limits and minimum mem limit (in MBs) each query is expected
   # to run without problem. Those values were determined by manual testing.
-  MIN_MEM_FOR_TPCH = { 'Q1' : 145, 'Q2' : 105, 'Q3' : 645, 'Q4' : 150, 'Q5' : 375,\
-                       'Q6' : 25, 'Q7' : 685, 'Q8' : 740, 'Q9' : 650, 'Q18' : 1050,\
-                       'Q20' : 375, 'Q21' : 975}
+  MIN_MEM_FOR_TPCH = { 'Q1' : 145, 'Q2' : 105, 'Q3' : 645, 'Q4' : 160, 'Q5' : 375,\
+                       'Q6' : 25, 'Q7' : 685, 'Q8' : 740, 'Q9' : 650, 'Q18' : 1100,\
+                       'Q20' : 420, 'Q21' : 975}
 
   @classmethod
   def get_workload(self):

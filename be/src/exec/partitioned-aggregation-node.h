@@ -381,7 +381,7 @@ class PartitionedAggregationNode : public ExecNode {
   // repartitioned. Used for diagnostics.
   Status MoveHashPartitions(int64_t input_rows);
 
-  // Calls finalizes on all tuples starting at it.
+  // Calls finalizes on all tuples starting at 'it'.
   void CleanupHashTbl(const std::vector<impala_udf::FunctionContext*>& fn_ctxs,
       HashTable::Iterator it);
 
