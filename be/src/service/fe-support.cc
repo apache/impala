@@ -163,7 +163,7 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
   // Set 'quiet' to true so we don't flood the log with unfound builtin symbols on
   // startup.
   Status status =
-      LibCache::instance()->CheckSymbolExists(params.location, type, params.symbol);
+      LibCache::instance()->CheckSymbolExists(params.location, type, params.symbol, true);
   if (status.ok()) {
     result->__set_result_code(TSymbolLookupResultCode::SYMBOL_FOUND);
     result->__set_symbol(params.symbol);

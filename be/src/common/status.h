@@ -78,7 +78,6 @@ namespace impala {
 // TODO: macros:
 // RETURN_IF_ERROR(status) << "msg"
 // MAKE_ERROR() << "msg"
-
 class Status {
  public:
   typedef strings::internal::SubstituteArg ArgType;
@@ -135,6 +134,9 @@ class Status {
   // intended for statuses that might be client-visible.
   // TODO: deprecate
   Status(const std::string& error_msg);
+
+  // Create a status instance that represents an expected error and will not be logged
+  static Status Expected(const std::string& error_msg);
 
   ~Status() {
     if (msg_ != NULL) delete msg_;
@@ -226,6 +228,10 @@ class Status {
   }
 
  private:
+
+  // Silent general error, this cannot be used with typed error messages as it would defy
+  // the cause of a useful error message.
+  Status(bool silent, const std::string& error_msg);
 
   // Status uses a naked pointer to ensure the size of an instance on the stack is only
   // the sizeof(ErrorMsg*). Every Status owns its ErrorMsg instance.

@@ -227,14 +227,15 @@ Status AdmissionController::CanAdmitRequest(const string& pool_name,
   //  (b) Request will go over the mem limit
   //  (c) This is not admitting from the queue and there are already queued requests
   if (max_requests >= 0 && total_stats.num_running >= max_requests) {
-    return Status(Substitute(QUEUED_NUM_RUNNING, total_stats.num_running, max_requests));
+    return Status::Expected(Substitute(QUEUED_NUM_RUNNING, total_stats.num_running,
+        max_requests));
   } else if (mem_limit >= 0 && cluster_estimated_memory >= mem_limit) {
-    return Status(Substitute(QUEUED_MEM_LIMIT,
+    return Status::Expected(Substitute(QUEUED_MEM_LIMIT,
         PrettyPrinter::Print(query_total_estimated_mem, TUnit::BYTES),
         PrettyPrinter::Print(current_cluster_estimate_mem, TUnit::BYTES),
         PrettyPrinter::Print(mem_limit, TUnit::BYTES)));
   } else if (!admit_from_queue && total_stats.num_queued > 0) {
-    return Status(Substitute(QUEUED_QUEUE_NOT_EMPTY, total_stats.num_queued));
+    return Status::Expected(Substitute(QUEUED_QUEUE_NOT_EMPTY, total_stats.num_queued));
   }
   return Status::OK;
 }

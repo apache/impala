@@ -39,48 +39,48 @@ const Status Status::DEPRECATED_RPC(ErrorMsg::Init(TErrorCode::NOT_IMPLEMENTED_E
 
 Status::Status(TErrorCode::type code)
     : msg_(new ErrorMsg(code)) {
-  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+  VLOG(1) << msg_->msg() << "\n" << GetStackTrace();
 }
 
 Status::Status(TErrorCode::type code, const ArgType& arg0)
     : msg_(new ErrorMsg(code, arg0)) {
-  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+  VLOG(1) << msg_->msg() << "\n" << GetStackTrace();
 }
 
 Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1)
     : msg_(new ErrorMsg(code, arg0, arg1)) {
-  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+  VLOG(1) << msg_->msg() << "\n" << GetStackTrace();
 }
 
 Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
     const ArgType& arg2)
     : msg_(new ErrorMsg(code, arg0, arg1, arg2)) {
-  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+  VLOG(1) << msg_->msg() << "\n" << GetStackTrace();
 }
 Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
     const ArgType& arg2, const ArgType& arg3)
     : msg_(new ErrorMsg(code, arg0, arg1, arg2, arg3)) {
-  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+  VLOG(1) << msg_->msg() << "\n" << GetStackTrace();
 }
 
 Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
     const ArgType& arg2, const ArgType& arg3, const ArgType& arg4)
     : msg_(new ErrorMsg(code, arg0, arg1, arg2, arg3, arg4)) {
-  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+  VLOG(1) << msg_->msg() << "\n" << GetStackTrace();
 }
 
 Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
     const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
     const ArgType& arg5)
     : msg_(new ErrorMsg(code, arg0, arg1, arg2, arg3, arg4, arg5)) {
-  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+  VLOG(1) << msg_->msg() << "\n" << GetStackTrace();
 }
 
 Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
     const ArgType& arg2, const ArgType& arg3, const ArgType& arg4,
     const ArgType& arg5, const ArgType& arg6)
     : msg_(new ErrorMsg(code, arg0, arg1, arg2, arg3, arg4, arg5, arg6)) {
-  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+  VLOG(1) << msg_->msg() << "\n" << GetStackTrace();
 }
 
 Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
@@ -88,7 +88,7 @@ Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
     const ArgType& arg5, const ArgType& arg6, const ArgType& arg7)
     : msg_(new ErrorMsg(code, arg0, arg1, arg2, arg3, arg4, arg5, arg6,
     arg7)) {
-  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+  VLOG(1) << msg_->msg() << "\n" << GetStackTrace();
 }
 
 Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
@@ -97,7 +97,7 @@ Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
     const ArgType& arg8)
     : msg_(new ErrorMsg(code, arg0, arg1, arg2, arg3, arg4, arg5, arg6,
      arg7, arg8)) {
-  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+  VLOG(1) << msg_->msg() << "\n" << GetStackTrace();
 }
 
 Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
@@ -106,13 +106,19 @@ Status::Status(TErrorCode::type code, const ArgType& arg0, const ArgType& arg1,
     const ArgType& arg8, const ArgType& arg9)
     : msg_(new ErrorMsg(code, arg0, arg1, arg2, arg3, arg4, arg5, arg6,
     arg7, arg8, arg9)) {
-  VLOG(1) << msg_->msg() << endl << GetStackTrace();
+  VLOG(1) << msg_->msg() << "\n" << GetStackTrace();
 }
-
 
 Status::Status(const string& error_msg)
   : msg_(new ErrorMsg(TErrorCode::GENERAL, error_msg)) {
-  VLOG(1) << error_msg << endl << GetStackTrace();
+  VLOG(1) << msg_->msg() << "\n" << GetStackTrace();
+}
+
+Status::Status(bool quiet, const string& error_msg)
+  : msg_(new ErrorMsg(TErrorCode::GENERAL, error_msg)) {
+  if (!quiet) {
+    VLOG(1) << msg_->msg() << "\n" << GetStackTrace();
+  }
 }
 
 Status::Status(const ErrorMsg& message)
@@ -152,6 +158,10 @@ Status& Status::operator=(
         static_cast<TErrorCode::type>(hs2_status.statusCode), hs2_status.errorMessage);
   }
   return *this;
+}
+
+Status Status::Expected(const std::string& error_msg) {
+  return Status(true, error_msg);
 }
 
 void Status::AddDetail(const std::string& msg) {

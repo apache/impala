@@ -127,11 +127,11 @@ LibCache::LibCacheEntry::~LibCacheEntry() {
 }
 
 Status LibCache::GetSoFunctionPtr(const string& hdfs_lib_file, const string& symbol,
-                                  void** fn_ptr, LibCacheEntry** ent) {
+    void** fn_ptr, LibCacheEntry** ent, bool quiet) {
   if (hdfs_lib_file.empty()) {
     // Just loading a function ptr in the current process. No need to take any locks.
     DCHECK(current_process_handle_ != NULL);
-    RETURN_IF_ERROR(DynamicLookup(current_process_handle_, symbol.c_str(), fn_ptr));
+    RETURN_IF_ERROR(DynamicLookup(current_process_handle_, symbol.c_str(), fn_ptr, quiet));
     return Status::OK;
   }
 
@@ -153,7 +153,7 @@ Status LibCache::GetSoFunctionPtr(const string& hdfs_lib_file, const string& sym
     *fn_ptr = it->second;
   } else {
     RETURN_IF_ERROR(
-        DynamicLookup(entry->shared_object_handle, symbol.c_str(), fn_ptr));
+        DynamicLookup(entry->shared_object_handle, symbol.c_str(), fn_ptr, quiet));
     entry->symbol_cache[symbol] = *fn_ptr;
   }
 
@@ -189,10 +189,10 @@ Status LibCache::GetLocalLibPath(const string& hdfs_lib_file, LibType type,
 }
 
 Status LibCache::CheckSymbolExists(const string& hdfs_lib_file, LibType type,
-                                   const string& symbol) {
+    const string& symbol, bool quiet) {
   if (type == TYPE_SO) {
     void* dummy_ptr = NULL;
-    return GetSoFunctionPtr(hdfs_lib_file, symbol, &dummy_ptr, NULL);
+    return GetSoFunctionPtr(hdfs_lib_file, symbol, &dummy_ptr, NULL, quiet);
   } else if (type == TYPE_IR) {
     unique_lock<mutex> lock;
     LibCacheEntry* entry = NULL;
@@ -203,7 +203,7 @@ Status LibCache::CheckSymbolExists(const string& hdfs_lib_file, LibType type,
       stringstream ss;
       ss << "Symbol '" << symbol << "' does not exist in module: " << hdfs_lib_file
          << " (local path: " << entry->local_path << ")";
-      return Status(ss.str());
+      return quiet ? Status::Expected(ss.str()) : Status(ss.str());
     }
     return Status::OK;
   } else if (type == TYPE_JAR) {
