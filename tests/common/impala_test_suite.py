@@ -220,7 +220,12 @@ class ImpalaTestSuite(BaseTestSuite):
           result = self.__execute_query(target_impalad_client, query, user=user)
       except Exception as e:
         if 'CATCH' in test_section:
-          assert test_section['CATCH'].strip() in str(e)
+          # In error messages, some paths are always qualified and some are not.
+          # So, allow both $NAMENODE and $FILESYSTEM_PREFIX to be used in CATCH.
+          expected_str = test_section['CATCH'].strip() \
+              .replace('$FILESYSTEM_PREFIX', FILESYSTEM_PREFIX) \
+              .replace('$NAMENODE', NAMENODE)
+          assert expected_str in str(e)
           continue
         raise
 

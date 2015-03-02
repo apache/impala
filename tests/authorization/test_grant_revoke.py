@@ -24,6 +24,7 @@ from os import getenv
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_uncompressed_text_dimension
+from tests.common.skip import IS_S3
 from tests.util.test_file_parser import QueryTestSectionReader
 
 SENTRY_CONFIG_FILE = getenv('IMPALA_HOME') + '/fe/src/test/resources/sentry-site.xml'
@@ -75,4 +76,7 @@ class TestGrantRevoke(CustomClusterTestSuite, ImpalaTestSuite):
       impalad_args="--server_name=server1",
       catalogd_args="--sentry_config=" + SENTRY_CONFIG_FILE)
   def test_grant_revoke(self, vector):
-    self.run_test_case('QueryTest/grant_revoke', vector, use_db="default")
+    if IS_S3:
+      self.run_test_case('QueryTest/grant_revoke_no_insert', vector, use_db="default")
+    else:
+      self.run_test_case('QueryTest/grant_revoke', vector, use_db="default")

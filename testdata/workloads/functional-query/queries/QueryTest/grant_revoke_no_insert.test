@@ -241,16 +241,12 @@ scope, database, table, uri, privilege, grant_option, create_time
 STRING, STRING, STRING, STRING, STRING, BOOLEAN, STRING
 ====
 ---- QUERY
+# Attempt to INSERT to S3 will give an error about inserting to non-HDFS filesystem.
+# When INSERT to S3 is supported, this subtest will fail and we can remove this test file
+# and alawys use the normal grant_revoke.test.
 insert overwrite grant_rev_db.test_tbl1 select 1
----- RESULTS
-: 1
-====
----- QUERY
-select * from grant_rev_db.test_tbl1
----- RESULTS
-1
----- TYPES
-INT
+---- CATCH
+Unable to INSERT into target table (grant_rev_db.test_tbl1) because $NAMENODE/test-warehouse/grant_rev_db.db/test_tbl1 is not an HDFS filesystem.
 ====
 ---- USER
 test_user
