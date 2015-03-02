@@ -22,6 +22,8 @@ from tests.util.shell_util import exec_process
 from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_test_suite import *
+from tests.common.skip import *
+from tests.util.filesystem_utils import WAREHOUSE
 
 # Tests specific to partition metadata.
 # TODO: Split up the DDL tests and move some of the partition-specific tests
@@ -51,13 +53,14 @@ class TestPartitionMetadata(ImpalaTestSuite):
   def teardown_method(self, method):
     self.cleanup_db(self.TEST_DB)
 
+  @skip_if_s3_insert # S3: missing coverage: partition DDL
   @pytest.mark.execute_serially
   def test_multiple_partitions_same_location(self, vector):
     """Regression test for IMPALA-597. Verifies Impala is able to properly read
     tables that have multiple partitions pointing to the same location.
     """
     self.client.execute("use %s" % self.TEST_DB)
-    location = '/test-warehouse/%s' % self.TEST_TBL
+    location = '%s/%s' % (WAREHOUSE, self.TEST_TBL)
     # Cleanup any existing data in the table directory.
     self.hdfs_client.delete_file_dir(location[1:], recursive=True)
     # Create the table

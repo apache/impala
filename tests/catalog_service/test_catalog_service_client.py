@@ -29,11 +29,11 @@ from Status.ttypes import TStatus
 from thrift.transport.TSocket import TSocket
 from thrift.protocol import TBinaryProtocol
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
+from tests.util.filesystem_utils import WAREHOUSE
 from tests.util.thrift_util import create_transport
 
 LOG = logging.getLogger('test_catalog_service_client')
 
-@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestCatalogServiceClient(ImpalaTestSuite):
   TEST_DB = 'catalog_service_client_test_db'
 
@@ -53,7 +53,8 @@ class TestCatalogServiceClient(ImpalaTestSuite):
 
   def setup_method(self, method):
     self.cleanup_db(self.TEST_DB)
-    self.client.execute('create database %s' % self.TEST_DB)
+    self.client.execute("create database %s location '%s/%s.db'" %
+                        (self.TEST_DB, WAREHOUSE, self.TEST_DB))
 
   def teardown_method(self, method):
     self.cleanup_db(self.TEST_DB)
@@ -78,7 +79,7 @@ class TestCatalogServiceClient(ImpalaTestSuite):
 
     # Add a function and make sure it shows up.
     self.client.execute("create function %s.fn() RETURNS int "\
-        "LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn'" % self.TEST_DB)
+        "LOCATION '%s/libTestUdfs.so' SYMBOL='Fn'" % (self.TEST_DB, WAREHOUSE))
 
     response = catalog_client.GetFunctions(request)
     LOG.debug(response)
@@ -92,7 +93,7 @@ class TestCatalogServiceClient(ImpalaTestSuite):
 
     # Add another scalar function with overloaded parameters ensure it shows up.
     self.client.execute("create function %s.fn(int) RETURNS double "\
-        "LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Fn'" % self.TEST_DB)
+        "LOCATION '%s/libTestUdfs.so' SYMBOL='Fn'" % (self.TEST_DB, WAREHOUSE))
     response = catalog_client.GetFunctions(request)
     LOG.debug(response)
     assert response.status.status_code == TErrorCode.OK
@@ -108,8 +109,9 @@ class TestCatalogServiceClient(ImpalaTestSuite):
     assert functions[1].signature == 'fn(INT)'
 
     # Verify aggregate functions can also be retrieved
-    self.client.execute("create aggregate function %s.agg_fn(int, string) RETURNS int LO"\
-        "CATION '/test-warehouse/libTestUdas.so' UPDATE_FN='TwoArgUpdate'" % self.TEST_DB)
+    self.client.execute("create aggregate function %s.agg_fn(int, string) RETURNS int "\
+        "LOCATION '%s/libTestUdas.so' UPDATE_FN='TwoArgUpdate'" %
+        (self.TEST_DB, WAREHOUSE))
     response = catalog_client.GetFunctions(request)
     LOG.debug(response)
     assert response.status.status_code == TErrorCode.OK

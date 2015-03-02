@@ -16,6 +16,7 @@ from testdata.common import widetable
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.util.test_file_parser import *
+from tests.util.filesystem_utils import WAREHOUSE
 from tests.common.test_dimensions import create_single_exec_option_dimension
 
 class TestScannersAllTableFormats(ImpalaTestSuite):
@@ -245,7 +246,9 @@ class TestScanTruncatedFiles(ImpalaTestSuite):
 
   def setup_method(self, method):
     self.cleanup_db(TestScanTruncatedFiles.TEST_DB)
-    self.client.execute("create database %s" % TestScanTruncatedFiles.TEST_DB)
+    self.client.execute("create database %s location '%s/%s.db'" %
+        (TestScanTruncatedFiles.TEST_DB, WAREHOUSE,
+        TestScanTruncatedFiles.TEST_DB))
 
   def teardown_method(self, method):
     self.cleanup_db(TestScanTruncatedFiles.TEST_DB)

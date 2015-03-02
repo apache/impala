@@ -20,6 +20,7 @@ import uuid
 from subprocess import call
 from tests.common.test_vector import TestDimension
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.skip import *
 
 # Number of tables to create per thread
 NUM_TBLS_PER_THREAD = 10
@@ -29,7 +30,6 @@ TEST_IDS = xrange(0, 10)
 
 # Simple stress test for DDL operations. Attempts to create, cache,
 # uncache, then drop many different tables in parallel.
-@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
 class TestDdlStress(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -45,6 +45,7 @@ class TestDdlStress(ImpalaTestSuite):
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none')
 
+  @skip_if_s3_caching
   @pytest.mark.stress
   def test_create_cache_many_tables(self, vector):
     self.client.set_configuration(vector.get_value('exec_option'))

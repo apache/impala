@@ -22,6 +22,7 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_test_suite import *
+from tests.common.skip import *
 
 # Tests to validate HDFS partitioning.
 class TestPartitioning(ImpalaTestSuite):
@@ -59,7 +60,7 @@ class TestPartitioning(ImpalaTestSuite):
     self.run_test_case('QueryTest/partition-col-types', vector,
         use_db='hdfs_partitioning')
 
-  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+  @skip_if_s3_hive
   @pytest.mark.execute_serially
   def test_boolean_partitions(self, vector):
     # This test takes about a minute to complete due to the Hive commands that are

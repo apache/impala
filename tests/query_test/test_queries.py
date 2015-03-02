@@ -6,11 +6,12 @@ import copy
 import logging
 import os
 import pytest
-from tests.common.test_vector import *
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.common.test_vector import *
 from tests.common.test_dimensions import create_uncompressed_text_dimension
-from tests.util.test_file_parser import QueryTestSectionReader
 from tests.common.test_dimensions import create_exec_option_dimension
+from tests.common.skip import *
+from tests.util.test_file_parser import QueryTestSectionReader
 
 class TestQueries(ImpalaTestSuite):
   @classmethod
@@ -157,6 +158,6 @@ class TestQueriesTextTables(ImpalaTestSuite):
   def test_mixed_format(self, vector):
     self.run_test_case('QueryTest/mixed-format', vector)
 
-  @pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+  @skip_if_s3_insert
   def test_values(self, vector):
     self.run_test_case('QueryTest/values', vector)

@@ -17,6 +17,7 @@ import shlex
 from subprocess import call
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
+from tests.util.filesystem_utils import WAREHOUSE
 
 # The purpose of the show create table tests are to ensure that the "SHOW CREATE TABLE"
 # output can actually be used to recreate the table. A test consists of a table
@@ -48,7 +49,8 @@ class TestShowCreateTable(ImpalaTestSuite):
   def setup_method(self, method):
     """ cleanup and create a fresh test database """
     self.cleanup_db(self.TEST_DB_NAME)
-    self.execute_query("create database %s" % (self.TEST_DB_NAME))
+    self.execute_query("create database %s location '%s/%s.db'" %
+                       (self.TEST_DB_NAME, WAREHOUSE, self.TEST_DB_NAME))
 
   def teardown_method(self, method):
     self.cleanup_db(self.TEST_DB_NAME)

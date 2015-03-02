@@ -7,6 +7,7 @@ from os.path import join
 from subprocess import call
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
+from tests.common.skip import *
 
 # (file extension, table suffix) pairs
 compression_formats = [
@@ -103,7 +104,7 @@ class TestCompressedFormats(ImpalaTestSuite):
       call(["hive", "-e", drop_cmd]);
 
 
-@pytest.mark.skipif(os.getenv("TARGET_FILESYSTEM") == "s3", reason="Disabled on s3")
+@skip_if_s3_insert
 class TestTableWriters(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):
