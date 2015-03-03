@@ -199,11 +199,13 @@ class TestParquet(ImpalaTestSuite):
   def test_parquet(self, vector):
     self.run_test_case('QueryTest/parquet', vector)
 
-# We use very small scan ranges to exercise corner cases in the HDFS scanner more
+# We use various scan ranges to exercise corner cases in the HDFS scanner more
 # thoroughly. In particular, it will exercise:
-# 1. scan range with no tuple
-# 2. tuple that span across multiple scan ranges
-MAX_SCAN_RANGE_LENGTHS = [1, 2, 5]
+# 1. default scan range
+# 2. scan range with no tuple
+# 3. tuple that span across multiple scan ranges
+# 4. scan range length = 16 for ParseSse() execution path
+MAX_SCAN_RANGE_LENGTHS = [0, 1, 2, 5, 16, 17, 32]
 
 class TestScanRangeLengths(ImpalaTestSuite):
   @classmethod
@@ -220,6 +222,41 @@ class TestScanRangeLengths(ImpalaTestSuite):
     vector.get_value('exec_option')['max_scan_range_length'] =\
         vector.get_value('max_scan_range_length')
     self.run_test_case('QueryTest/hdfs-tiny-scan', vector)
+
+# More tests for text scanner
+# 1. Test file that ends w/o tuple delimiter
+# 2. Test file with escape character
+class TestTextScanRangeLengths(ImpalaTestSuite):
+  ESCAPE_TABLE_LIST = ["testescape_16_lf", "testescape_16_crlf",
+      "testescape_17_lf", "testescape_17_crlf",
+      "testescape_32_lf", "testescape_32_crlf"]
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestTextScanRangeLengths, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(
+        TestDimension('max_scan_range_length', *MAX_SCAN_RANGE_LENGTHS))
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').file_format == 'text' and\
+        v.get_value('table_format').compression_codec == 'none')
+
+  def test_text_scanner(self, vector):
+    vector.get_value('exec_option')['max_scan_range_length'] =\
+        vector.get_value('max_scan_range_length')
+    self.run_test_case('QueryTest/hdfs-text-scan', vector)
+
+    # Test various escape char cases. We have to check the count(*) result against
+    # the count(col) result because if the scan range is split right after the escape
+    # char, the escape char has no effect because we cannot scan backwards to the
+    # previous scan range.
+    for t in self.ESCAPE_TABLE_LIST:
+      expected_result = self.client.execute("select count(col) from " + t)
+      result = self.client.execute("select count(*) from " + t)
+      assert result.data == expected_result.data
 
 @pytest.mark.execute_serially
 class TestScanTruncatedFiles(ImpalaTestSuite):

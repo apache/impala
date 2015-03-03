@@ -145,6 +145,7 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
     DCHECK_GE(read_past_buffer_size, 0);
     if (read_past_buffer_size == 0) {
       io_buffer_bytes_left_ = 0;
+      // TODO: We are leaving io_buffer_ = NULL, revisit.
       return Status::OK;
     }
     DiskIoMgr::ScanRange* range = parent_->scan_node_->AllocateScanRange(

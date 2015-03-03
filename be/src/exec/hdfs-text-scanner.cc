@@ -259,7 +259,9 @@ Status HdfsTextScanner::FinishScanRange() {
     byte_buffer_read_size_ = 0;
 
     // If compressed text, then there is nothing more to be read.
-    if (decompressor_.get() == NULL) {
+    // TODO: calling FillByteBuffer() at eof() can cause
+    // ScannerContext::Stream::GetNextBuffer to DCHECK. Fix this.
+    if (decompressor_.get() == NULL && !stream_->eof()) {
       status = FillByteBuffer(&eosr, NEXT_BLOCK_READ_SIZE);
     }
 
@@ -294,6 +296,12 @@ Status HdfsTextScanner::FinishScanRange() {
         DCHECK_GE(num_tuples, 0);
         COUNTER_ADD(scan_node_->rows_read_counter(), num_tuples);
         RETURN_IF_ERROR(CommitRows(num_tuples));
+      } else if (delimited_text_parser_->HasUnfinishedTuple() &&
+          scan_node_->materialized_slots().empty()) {
+        // If no fields are materialized we do not update partial_tuple_empty_,
+        // boundary_column_, or boundary_row_. However, we still need to handle the case
+        // of partial tuple due to missing tuple delimiter at the end of file.
+        RETURN_IF_ERROR(CommitRows(1));
       }
       break;
     }

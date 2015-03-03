@@ -119,3 +119,12 @@ table_name:invalid_decimal_part_tbl2, constraint:restrict_to, table_format:text/
 table_name:invalid_decimal_part_tbl3, constraint:restrict_to, table_format:text/none/none
 
 table_name:avro_decimal_tbl, constraint:restrict_to, table_format:avro/snap/block
+
+# testescape tables are used for testing text scanner delimiter handling
+table_name:table_no_newline, constraint:restrict_to, table_format:text/none/none
+table_name:testescape_16_lf, constraint:restrict_to, table_format:text/none/none
+table_name:testescape_16_crlf, constraint:restrict_to, table_format:text/none/none
+table_name:testescape_17_lf, constraint:restrict_to, table_format:text/none/none
+table_name:testescape_17_crlf, constraint:restrict_to, table_format:text/none/none
+table_name:testescape_32_lf, constraint:restrict_to, table_format:text/none/none
+table_name:testescape_32_crlf, constraint:restrict_to, table_format:text/none/none

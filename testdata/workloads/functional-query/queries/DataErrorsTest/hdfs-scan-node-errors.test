@@ -76,7 +76,16 @@ select count(*) from functional_text_lzo.bad_text_lzo
 ---- ERRORS
 Blocksize: 536870911 is greater than LZO_MAX_BLOCK_SIZE: 67108864
 ---- RESULTS
-5140
+5141
+---- TYPES
+bigint
+====
+---- QUERY
+select count(field) from functional_text_lzo.bad_text_lzo
+---- ERRORS
+Blocksize: 536870911 is greater than LZO_MAX_BLOCK_SIZE: 67108864
+---- RESULTS
+5141
 ---- TYPES
 bigint
 ====

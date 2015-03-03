@@ -1470,3 +1470,100 @@ value DECIMAL(5,2)
 LOAD DATA LOCAL INPATH '${{env:IMPALA_HOME}}/testdata/data/avro_decimal_tbl.avro'
 OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+table_no_newline
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+id INT, col_1 BOOLEAN, col_2 DOUBLE, col_3 TIMESTAMP)
+row format delimited fields terminated by ','
+LOCATION '/test-warehouse/{table_name}';
+---- LOAD
+`hadoop fs -mkdir -p /test-warehouse/table_no_newline && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/table_no_newline.csv /test-warehouse/table_no_newline
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+testescape_16_lf
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  col string)
+row format delimited fields terminated by ','  escaped by '\\'
+LOCATION '/test-warehouse/{table_name}';
+---- LOAD
+`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_16_lf' --file_len 16 --only_newline && \
+hadoop fs -mkdir -p /test-warehouse/testescape_16_lf && \
+hadoop fs -put -f /tmp/testescape_16_lf/* /test-warehouse/testescape_16_lf/
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+testescape_16_crlf
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  col string)
+row format delimited fields terminated by ','  escaped by '\\'
+LOCATION '/test-warehouse/{table_name}';
+---- LOAD
+`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_16_crlf' --file_len 16 && \
+hadoop fs -mkdir -p /test-warehouse/testescape_16_crlf && \
+hadoop fs -put -f /tmp/testescape_16_crlf/* /test-warehouse/testescape_16_crlf/
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+testescape_17_lf
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  col string)
+row format delimited fields terminated by ','  escaped by '\\'
+LOCATION '/test-warehouse/{table_name}';
+---- LOAD
+`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_17_lf' --file_len 17 --only_newline && \
+hadoop fs -mkdir -p /test-warehouse/testescape_17_lf && \
+hadoop fs -put -f /tmp/testescape_17_lf/* /test-warehouse/testescape_17_lf/
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+testescape_17_crlf
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  col string)
+row format delimited fields terminated by ','  escaped by '\\'
+LOCATION '/test-warehouse/{table_name}';
+---- LOAD
+`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_17_crlf' --file_len 17 && \
+hadoop fs -mkdir -p /test-warehouse/testescape_17_crlf && \
+hadoop fs -put -f /tmp/testescape_17_crlf/* /test-warehouse/testescape_17_crlf/
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+testescape_32_lf
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  col string)
+row format delimited fields terminated by ','  escaped by '\\'
+LOCATION '/test-warehouse/{table_name}';
+---- LOAD
+`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_32_lf' --file_len 32 --only_newline && \
+hadoop fs -mkdir -p /test-warehouse/testescape_32_lf && \
+hadoop fs -put -f /tmp/testescape_32_lf/* /test-warehouse/testescape_32_lf/
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+testescape_32_crlf
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+  col string)
+row format delimited fields terminated by ','  escaped by '\\'
+LOCATION '/test-warehouse/{table_name}';
+---- LOAD
+`${IMPALA_HOME}/testdata/common/text_delims_table.py --table_dir '/tmp/testescape_32_crlf' --file_len 32 && \
+hadoop fs -mkdir -p /test-warehouse/testescape_32_crlf && \
+hadoop fs -put -f /tmp/testescape_32_crlf/* /test-warehouse/testescape_32_crlf/
+====

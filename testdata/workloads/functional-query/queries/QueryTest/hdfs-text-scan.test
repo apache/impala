@@ -1,0 +1,14 @@
+---- QUERY
+select count(*) from functional.table_no_newline
+---- RESULTS
+5
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(col_3) from functional.table_no_newline
+---- RESULTS
+5
+---- TYPES
+BIGINT
+====

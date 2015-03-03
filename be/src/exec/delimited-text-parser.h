@@ -113,8 +113,12 @@ class DelimitedTextParser {
   // by the number fields added.
   // field_locations will be updated with the start and length of the fields.
   template <bool process_escapes>
-  void FillColumns(int len, char** last_column, 
+  void FillColumns(int len, char** last_column,
                    int* num_fields, impala::FieldLocation* field_locations);
+
+  // Return true if we have not seen a tuple delimiter for the current tuple being
+  // parsed (i.e., the last byte read was not a tuple delimiter).
+  bool HasUnfinishedTuple() { return unfinished_tuple_; }
 
  private:
   // Initialize the parser state.
@@ -134,8 +138,8 @@ class DelimitedTextParser {
   void AddColumn(int len, char** next_column_start, int* num_fields,
                  FieldLocation* field_locations);
 
-  // Helper routine to parse delimited text using SSE instructions.  
-  // Identical arguments as ParseFieldLocations. 
+  // Helper routine to parse delimited text using SSE instructions.
+  // Identical arguments as ParseFieldLocations.
   // If the template argument, 'process_escapes' is true, this function will handle
   // escapes, otherwise, it will assume the text is unescaped.  By using templates,
   // we can special case the un-escaped path for better performance.  The unescaped
@@ -180,7 +184,7 @@ class DelimitedTextParser {
   // Whether or not the previous character was the escape character
   bool last_char_is_escape_;
 
-  // Used for special processing of \r.  
+  // Used for special processing of \r.
   // This will be the offset of the last instance of \r from the end of the
   // current buffer being searched unless the last row delimiter was not a \r in which
   // case it will be -1.  If the last character in a buffer is \r then the value
@@ -188,7 +192,7 @@ class DelimitedTextParser {
   // then it is set to be one more than the size of the buffer so that if the buffer
   // starts with \n it is processed as \r\n.
   int32_t last_row_delim_offset_;
-  
+
   // Precomputed masks to process escape characters
   uint16_t low_mask_[16];
   uint16_t high_mask_[16];
@@ -205,6 +209,9 @@ class DelimitedTextParser {
 
   // Index to keep track of the current column in the current file
   int column_idx_;
+
+  // True if the last tuple is unfinished (not ended with tuple delimiter).
+  bool unfinished_tuple_;
 };
 
 }// namespace impala

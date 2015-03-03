@@ -146,6 +146,11 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
       ProcessEscapeMask(escape_mask, &last_char_is_escape_, &delim_mask);
     }
 
+    char* last_char = *byte_buffer_ptr + 15;
+    bool last_char_is_unescaped_delim = delim_mask >> 15;
+    unfinished_tuple_ = !(last_char_is_unescaped_delim &&
+        (*last_char == tuple_delim_ || (tuple_delim_ == '\n' && *last_char == '\r')));
+
     int last_col_idx = 0;
     // Process all non-zero bits in the delim_mask from lsb->msb.  If a bit
     // is set, the character in that spot is either a field or tuple delimiter.
@@ -220,7 +225,6 @@ inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* b
 
   column_idx_ = num_partition_keys_;
   current_column_has_escape_ = false;
-
   if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
     while (LIKELY(remaining_len >= SSEUtil::CHARS_PER_128_BIT_REGISTER)) {
       // Load the next 16 bytes into the xmm register
@@ -282,7 +286,7 @@ inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* b
       last_char_is_escape_ = false;
     }
 
-    if (!last_char_is_escape_ && 
+    if (!last_char_is_escape_ &&
           (*buffer == field_delim_ || *buffer == collection_item_delim_)) {
       AddColumn<process_escapes>(buffer - next_column_start,
           &next_column_start, num_fields, field_locations);
@@ -291,7 +295,7 @@ inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* b
     --remaining_len;
     ++buffer;
   }
-    
+
   // Last column does not have a delimiter after it.  Add that column and also
   // pad with empty cols if the input is ragged.
   FillColumns<process_escapes>(buffer - next_column_start,
