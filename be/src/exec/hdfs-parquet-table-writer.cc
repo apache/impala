@@ -90,18 +90,18 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   // expr - the expression to generate output values for this column.
   BaseColumnWriter(HdfsParquetTableWriter* parent, ExprContext* expr_ctx,
       const THdfsCompression::type& codec)
-    : parent_(parent), expr_ctx_(expr_ctx),
-      codec_(codec), current_page_(NULL), num_values_(0),
+    : parent_(parent), expr_ctx_(expr_ctx), codec_(codec),
+      page_size_(DEFAULT_DATA_PAGE_SIZE), current_page_(NULL), num_values_(0),
       total_compressed_byte_size_(0),
       total_uncompressed_byte_size_(0),
       dict_encoder_base_(NULL),
-      def_levels_(NULL) {
+      def_levels_(NULL),
+      values_buffer_len_(DEFAULT_DATA_PAGE_SIZE) {
     Codec::CreateCompressor(NULL, false, codec, &compressor_);
 
     def_levels_ = parent_->state_->obj_pool()->Add(
-        new RleEncoder(parent_->reusable_col_mem_pool_->Allocate(DATA_PAGE_SIZE),
-                       DATA_PAGE_SIZE, 1));
-    values_buffer_len_ = DATA_PAGE_SIZE;
+        new RleEncoder(parent_->reusable_col_mem_pool_->Allocate(DEFAULT_DATA_PAGE_SIZE),
+                       DEFAULT_DATA_PAGE_SIZE, 1));
     values_buffer_ = parent_->reusable_col_mem_pool_->Allocate(values_buffer_len_);
   }
 
@@ -205,6 +205,13 @@ class HdfsParquetTableWriter::BaseColumnWriter {
   // so this number can be less than pages_.size()
   int num_data_pages_;
 
+  // Size of newly created pages. Defaults to DEFAULT_DATA_PAGE_SIZE and is increased
+  // when pages are not big enough. This only happens when there are enough unique values
+  // such that we switch from PLAIN_DICTIONARY to PLAIN encoding and then have very
+  // large values (i.e. greater than DEFAULT_DATA_PAGE_SIZE).
+  // TODO: Consider removing and only creating a single large page as necessary.
+  int64_t page_size_;
+
   DataPage* current_page_;
   int64_t num_values_; // Total number of values across all pages, including NULLs.
   int64_t total_compressed_byte_size_;
@@ -254,7 +261,7 @@ class HdfsParquetTableWriter::ColumnWriter :
       if (UNLIKELY(num_values_since_dict_size_check_ >=
                    DICTIONARY_DATA_PAGE_SIZE_CHECK_PERIOD)) {
         num_values_since_dict_size_check_ = 0;
-        if (dict_encoder_->EstimatedDataEncodedSize() >= DATA_PAGE_SIZE) return false;
+        if (dict_encoder_->EstimatedDataEncodedSize() >= page_size_) return false;
       }
       ++num_values_since_dict_size_check_;
       *bytes_needed = dict_encoder_->Put(*CastValue(value));
@@ -270,7 +277,7 @@ class HdfsParquetTableWriter::ColumnWriter :
       T* v = CastValue(value);
       *bytes_needed = encoded_value_size_ < 0 ?
           ParquetPlainEncoder::ByteSize<T>(*v) : encoded_value_size_;
-      if (current_page_->header.uncompressed_page_size + *bytes_needed > DATA_PAGE_SIZE) {
+      if (current_page_->header.uncompressed_page_size + *bytes_needed > page_size_) {
         return false;
       }
       uint8_t* dst_ptr = values_buffer_ + current_page_->header.uncompressed_page_size;
@@ -383,17 +390,24 @@ inline Status HdfsParquetTableWriter::BaseColumnWriter::AppendRow(TupleRow* row)
     int64_t bytes_needed = 0;
     if (EncodeValue(value, &bytes_needed)) break;
 
-    // Check how much space it is needed to write this value. If that is larger than the
-    // page size then throw error instead of using/allocating a new page.
-    // TODO: Add a test case with a very large value.
-    if (UNLIKELY(bytes_needed > DATA_PAGE_SIZE)) {
-      stringstream ss;
-      ss << "Cannot write value that needs " << bytes_needed << " bytes to a Parquet "
-         << "data page of size " << DATA_PAGE_SIZE << ".";
-      return Status(ss.str());
-    }
     // Value didn't fit on page, try again on a new page.
     FinalizeCurrentPage();
+
+    // Check how much space it is needed to write this value. If that is larger than the
+    // page size then increase page size and try again.
+    if (UNLIKELY(bytes_needed > page_size_)) {
+      page_size_ = bytes_needed;
+      if (page_size_ > MAX_DATA_PAGE_SIZE) {
+        stringstream ss;
+        ss << "Cannot write value of size "
+           << PrettyPrinter::Print(bytes_needed, TUnit::BYTES) << " bytes to a Parquet "
+           << "data page that exceeds the max page limit "
+           << PrettyPrinter::Print(MAX_DATA_PAGE_SIZE , TUnit::BYTES) << ".";
+        return Status(ss.str());
+      }
+      values_buffer_len_ = page_size_;
+      values_buffer_ = parent_->reusable_col_mem_pool_->Allocate(values_buffer_len_);
+    }
     NewPage();
   }
   ++current_page_->header.data_page_header.num_values;
@@ -515,9 +529,7 @@ void HdfsParquetTableWriter::BaseColumnWriter::FinalizeCurrentPage() {
   // around a parquet MR bug (see IMPALA-759 for more details).
   if (current_page_->num_non_null == 0) current_encoding_ = Encoding::PLAIN;
 
-  if (current_encoding_ == Encoding::PLAIN_DICTIONARY) {
-    WriteDictDataPage();
-  }
+  if (current_encoding_ == Encoding::PLAIN_DICTIONARY) WriteDictDataPage();
 
   PageHeader& header = current_page_->header;
   header.data_page_header.encoding = current_encoding_;
@@ -780,7 +792,7 @@ Status HdfsParquetTableWriter::AddRowGroup() {
 
 int64_t HdfsParquetTableWriter::MinBlockSize() const {
   // See file_size_limit_ calculation in InitNewFile().
-  return 3 * DATA_PAGE_SIZE * columns_.size();
+  return 3 * DEFAULT_DATA_PAGE_SIZE * columns_.size();
 }
 
 uint64_t HdfsParquetTableWriter::default_block_size() const {
@@ -821,10 +833,11 @@ Status HdfsParquetTableWriter::InitNewFile() {
   // With arbitrary encoding schemes, it is  not possible to know if appending
   // a new row will push us over the limit until after encoding it.  Rolling back
   // a row can be tricky as well so instead we will stop the file when it is
-  // 2 * DATA_PAGE_SIZE * num_cols short of the limit. e.g. 50 cols with 8K data
+  // 2 * DEFAULT_DATA_PAGE_SIZE * num_cols short of the limit. e.g. 50 cols with 8K data
   // pages, means we stop 800KB shy of the limit.
   // Data pages calculate their size precisely when they are complete so having
-  // a two page buffer guarantees we will never go over.
+  // a two page buffer guarantees we will never go over (unless there are huge values
+  // that require increasing the page size).
   // TODO: this should be made dynamic based on the size of rows seen so far.
   // This would for example, let us account for very long string columns.
   if (file_size_limit_ < MinBlockSize()) {
@@ -834,8 +847,8 @@ Status HdfsParquetTableWriter::InitNewFile() {
        << "PARQUET_FILE_SIZE to at least " << MinBlockSize() << ".";
     return Status(ss.str());
   }
-  file_size_limit_ -= 2 * DATA_PAGE_SIZE * columns_.size();
-  DCHECK_GE(file_size_limit_, DATA_PAGE_SIZE * columns_.size());
+  file_size_limit_ -= 2 * DEFAULT_DATA_PAGE_SIZE * columns_.size();
+  DCHECK_GE(file_size_limit_, DEFAULT_DATA_PAGE_SIZE * columns_.size());
   file_pos_ = 0;
   row_count_ = 0;
   file_size_estimate_ = 0;

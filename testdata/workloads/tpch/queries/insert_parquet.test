@@ -52,3 +52,25 @@ bigint
 ---- RESULTS
 1482071
 ====
+---- QUERY
+# Test to verify that huge (larger than 64k) values can be written, see IMPALA-1705
+create table if not exists test_insert_huge_vals (s string) stored as parquet;
+insert overwrite table test_insert_huge_vals
+  select cast(l_orderkey as string) from tpch.lineitem
+  union select group_concat(concat(s_name, s_address, s_phone)) from tpch.supplier
+  union select group_concat(concat(s_name, s_address, s_phone, s_name)) from tpch.supplier
+---- RESULTS
+: 1500002
+====
+---- QUERY
+# Verify the values written to test_insert_huge_vals were as expected by counting
+# the results of an inner join of that table with the same query used in the insert.
+select count(*) from
+  (select cast(l_orderkey as string) s from tpch.lineitem union
+   select group_concat(concat(s_name, s_address, s_phone)) from tpch.supplier union
+   select group_concat(concat(s_name, s_address, s_phone, s_name)) from tpch.supplier
+  ) t1
+join test_insert_huge_vals t2 on t1.s = t2.s;
+---- RESULTS
+1500002
+====

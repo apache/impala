@@ -80,7 +80,11 @@ class HdfsParquetTableWriter : public HdfsTableWriter {
 
  private:
   // Default data page size. In bytes.
-  static const int DATA_PAGE_SIZE = 64 * 1024;
+  static const int DEFAULT_DATA_PAGE_SIZE = 64 * 1024;
+
+  // Max data page size. In bytes.
+  // TODO: May need to be increased after addressing IMPALA-1619.
+  static const int64_t MAX_DATA_PAGE_SIZE = 1024 * 1024 * 1024;
 
   // Default hdfs block size. In bytes.
   static const int HDFS_BLOCK_SIZE = 256 * 1024 * 1024;
