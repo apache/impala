@@ -474,13 +474,15 @@ public class AnalyticExpr extends Expr {
         if (window_.getRightBoundary().getType() == BoundaryType.PRECEDING) {
           // The number of rows preceding for the end bound determines the number of
           // rows at the beginning of each partition that should have a NULL value.
-          paramExprs.add(window_.getRightBoundary().getExpr());
+          paramExprs.add(new NumericLiteral(window_.getRightBoundary().getOffsetValue(),
+              Type.BIGINT));
         } else {
           // -1 indicates that no NULL values are inserted even though we set the end
           // bound to the start bound (which is PRECEDING) below; this is different from
           // the default behavior of windows with an end bound PRECEDING.
           paramExprs.add(new NumericLiteral(BigInteger.valueOf(-1), Type.BIGINT));
         }
+
         window_ = new AnalyticWindow(window_.getType(),
             new Boundary(BoundaryType.UNBOUNDED_PRECEDING, null),
             window_.getLeftBoundary());
@@ -490,6 +492,7 @@ public class AnalyticExpr extends Expr {
       }
       fnCall_.setIsAnalyticFnCall(true);
       fnCall_.analyzeNoThrow(analyzer);
+      type_ = fnCall_.getReturnType();
       analyticFnName = getFnCall().getFnName();
     }
 

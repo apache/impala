@@ -121,6 +121,7 @@ public class AnalyticWindow {
 
     public BoundaryType getType() { return type_; }
     public Expr getExpr() { return expr_; }
+    public BigDecimal getOffsetValue() { return offsetValue_; }
 
     public Boundary(BoundaryType type, Expr e) {
       this(type, e, null);

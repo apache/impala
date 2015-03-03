@@ -78,18 +78,21 @@ public class NumericLiteral extends LiteralExpr {
 
   /**
    * The versions of the ctor that take types assume the type is correct
-   * and the NumericLiteral is created as analyzed with that type.
+   * and the NumericLiteral is created as analyzed with that type. The specified
+   * type is preserved across substitutions and re-analysis.
    */
   public NumericLiteral(BigInteger value, Type type) {
     isAnalyzed_ = true;
     value_ = new BigDecimal(value);
     type_ = type;
+    explicitlyCast_ = true;
   }
 
   public NumericLiteral(BigDecimal value, Type type) {
     isAnalyzed_ = true;
     value_ = value;
     type_ = type;
+    explicitlyCast_ = true;
   }
 
   /**
