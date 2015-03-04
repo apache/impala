@@ -1082,22 +1082,18 @@ STRING
 ---- QUERY
 # IMPALA-1559: FIRST_VALUE rewrite function intermediate type not matching slot type
 select
-first_value(c3) over (order by c3 rows between 92 preceding and current row),
-first_value(c2) over (order by c3 rows between 92 preceding and 1 preceding),
-first_value(-32.9) over (order by c3 rows between 92 preceding and unbounded following),
-first_value(1.1) over (order by c3 rows between 92 preceding and 1 preceding)
-from decimal_tiny where c3 = 0.0
+first_value(-32.9) over (order by id rows between 92 preceding and unbounded following),
+first_value(1.1) over (order by id rows between 92 preceding and 1 preceding)
+from alltypestiny
 ---- RESULTS
-0.0,NULL,-32.9,NULL
-0.0,100.00000,-32.9,1.1
-0.0,100.00000,-32.9,1.1
-0.0,100.00000,-32.9,1.1
-0.0,100.00000,-32.9,1.1
-0.0,100.00000,-32.9,1.1
-0.0,100.00000,-32.9,1.1
-0.0,100.00000,-32.9,1.1
-0.0,100.00000,-32.9,1.1
-0.0,100.00000,-32.9,1.1
+-32.9,NULL
+-32.9,1.1
+-32.9,1.1
+-32.9,1.1
+-32.9,1.1
+-32.9,1.1
+-32.9,1.1
+-32.9,1.1
 ---- TYPES
-DECIMAL, DECIMAL, DECIMAL, DECIMAL
+DECIMAL, DECIMAL
 ====

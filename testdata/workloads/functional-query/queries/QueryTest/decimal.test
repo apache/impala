@@ -290,6 +290,26 @@ from decimal_tiny where c2 < 112
 DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL, DECIMAL
 ====
 ---- QUERY
+# IMPALA-1559: FIRST_VALUE rewrite function intermediate type not matching slot type
+select
+first_value(c3) over (order by c3 rows between 92 preceding and current row),
+first_value(c2) over (order by c3 rows between 92 preceding and 1 preceding)
+from decimal_tiny where c3 = 0.0
+---- RESULTS
+0.0,NULL
+0.0,100.00000
+0.0,100.00000
+0.0,100.00000
+0.0,100.00000
+0.0,100.00000
+0.0,100.00000
+0.0,100.00000
+0.0,100.00000
+0.0,100.00000
+---- TYPES
+DECIMAL, DECIMAL
+====
+---- QUERY
 select histogram(d1) from decimal_tbl;
 ---- RESULTS
 '1234, 2345, 12345, 12345, 132842'
