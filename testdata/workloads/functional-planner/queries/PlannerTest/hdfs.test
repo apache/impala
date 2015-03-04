@@ -499,3 +499,26 @@ select * from functional.alltypesagg t1 where day not in (10, null)
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=0/11 files=0 size=0B
 ====
+# Partition pruning when a binary predicate contains a constant expression (IMPALA-1636)
+select * from functional.alltypesagg t1
+where t1.day = instr("this is a test", "this") or t1.year = year(now()) + 100
+---- PLAN
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=1/11 files=1 size=73.39KB
+====
+# Partition pruning when there is a constant expression in the IN predicate values
+# (IMPALA-1636)
+select * from functional.alltypesagg t1
+where t1.day in (1, cast(2.0 as INT), year(now()) + 100)
+---- PLAN
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=2/11 files=2 size=147.87KB
+====
+# Partition pruning where a compound predicate contains a constant and a non-constant
+# expression (IMPALA-1636)
+select * from functional.alltypesagg t1
+where -t1.day in(-1 - 1) or cast(t1.day as string) like '%1%'
+---- PLAN
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=3/11 files=3 size=222.34KB
+====

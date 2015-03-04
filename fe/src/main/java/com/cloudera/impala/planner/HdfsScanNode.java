@@ -26,11 +26,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.BinaryPredicate.Operator;
 import com.cloudera.impala.analysis.CompoundPredicate;
 import com.cloudera.impala.analysis.DescriptorTable;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.InPredicate;
 import com.cloudera.impala.analysis.IsNullPredicate;
 import com.cloudera.impala.analysis.LiteralExpr;
@@ -44,6 +46,7 @@ import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.PrintUtils;
@@ -209,41 +212,31 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Check if the PrimitiveType of an Expr is the same as the
-   * PrimitiveType of a SlotRef's column.
-   */
-  private boolean hasIdenticalType(SlotRef slot, Expr literal) {
-    Preconditions.checkNotNull(slot);
-    Preconditions.checkNotNull(literal);
-    Column slotCol = slot.getDesc().getColumn();
-    PrimitiveType slotType = slotCol.getType().getPrimitiveType();
-    PrimitiveType literalType = literal.getType().getPrimitiveType();
-    return slotType == literalType ? true : false;
-  }
-
-  /**
    * Recursive function that checks if a given partition expr can be evaluated
-   * directly from the partition key values.
+   * directly from the partition key values. If 'expr' contains any constant expressions,
+   * they are evaluated in the BE and are replaced by their corresponding results, as
+   * LiteralExprs.
    */
-  private boolean canEvalUsingPartitionMd(Expr expr) {
+  private boolean canEvalUsingPartitionMd(Expr expr, Analyzer analyzer) {
     Preconditions.checkNotNull(expr);
     if (expr instanceof BinaryPredicate) {
+      // Evaluate any constant expression in the BE
+      try {
+        expr.foldConstantChildren(analyzer);
+      } catch (AnalysisException e) {
+        LOG.error("Error evaluating constant expressions in the BE: " + e.getMessage());
+        return false;
+      }
       BinaryPredicate bp = (BinaryPredicate)expr;
       SlotRef slot = bp.getBoundSlot();
       if (slot == null) return false;
       Expr bindingExpr = bp.getSlotBinding(slot.getSlotId());
-      if (bindingExpr == null || !(bindingExpr.isLiteral())) return false;
-      // Make sure the SlotRef column and the LiteralExpr have the same
-      // PrimitiveType. If not, the expr needs to be evaluated in the BE.
-      //
-      // TODO: If a cast is required to do the map lookup with a
-      // literal, execute the cast expr in the BE and then do the lookup instead
-      // of disabling this predicate altogether.
-      return hasIdenticalType(slot, bindingExpr);
+      if (bindingExpr == null || !bindingExpr.isLiteral()) return false;
+      return true;
     } else if (expr instanceof CompoundPredicate) {
-      boolean res = canEvalUsingPartitionMd(expr.getChild(0));
+      boolean res = canEvalUsingPartitionMd(expr.getChild(0), analyzer);
       if (expr.getChild(1) != null) {
-        res &= canEvalUsingPartitionMd(expr.getChild(1));
+        res &= canEvalUsingPartitionMd(expr.getChild(1), analyzer);
       }
       return res;
     } else if (expr instanceof IsNullPredicate) {
@@ -251,19 +244,18 @@ public class HdfsScanNode extends ScanNode {
       IsNullPredicate nullPredicate = (IsNullPredicate)expr;
       return nullPredicate.getBoundSlot() != null;
     } else if (expr instanceof InPredicate) {
+      // Evaluate any constant expressions in the BE
+      try {
+        expr.foldConstantChildren(analyzer);
+      } catch (AnalysisException e) {
+        LOG.error("Error evaluating constant expressions in the BE: " + e.getMessage());
+        return false;
+      }
       // Check for SlotRef [NOT] IN (Literal, ... Literal) case
       SlotRef slot = ((InPredicate)expr).getBoundSlot();
       if (slot == null) return false;
-
       for (int i = 1; i < expr.getChildren().size(); ++i) {
-        Expr rhs = expr.getChild(i);
-        if (!(rhs.isLiteral())) {
-          return false;
-        } else {
-          // Make sure the SlotRef column and the LiteralExpr have the same
-          // PrimitiveType. If not, the expr needs to be evaluated in the BE.
-          if (!hasIdenticalType(slot, rhs)) return false;
-        }
+        if (!(expr.getChild(i).isLiteral())) return false;
       }
       return true;
     }
@@ -490,8 +482,14 @@ public class HdfsScanNode extends ScanNode {
     while (it.hasNext()) {
       Expr conjunct = it.next();
       if (conjunct.isBoundBySlotIds(partitionSlots)) {
-        if (canEvalUsingPartitionMd(conjunct)) {
-          simpleFilterConjuncts.add(Expr.pushNegationToOperands(conjunct));
+        // Check if the conjunct can be evaluated from the partition metadata.
+        // canEvalUsingPartitionMd() operates on a cloned conjunct which may get
+        // modified if it contains constant expressions. If the cloned conjunct
+        // cannot be evaluated from the partition metadata, the original unmodified
+        // conjuct is evaluated in the BE.
+        Expr clonedConjunct = conjunct.clone();
+        if (canEvalUsingPartitionMd(clonedConjunct, analyzer)) {
+          simpleFilterConjuncts.add(Expr.pushNegationToOperands(clonedConjunct));
         } else {
           partitionFilters.add(new HdfsPartitionFilter(conjunct, tbl_, analyzer));
         }

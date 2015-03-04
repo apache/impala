@@ -212,7 +212,7 @@ clp=cast('0123456789012345678901234567890123456789012345678901234567890123456789
 vcp=cast('myvar' as varchar(32))) select cast('val' as varchar(32));
 ====
 ---- QUERY
-select csp, clp, vcp from char_parts where csp = cast('foo' as char(3))
+select csp, clp, vcp from char_parts where csp = cast('foo' as char(5))
 ---- TYPES
 char, char, string
 ---- RESULTS

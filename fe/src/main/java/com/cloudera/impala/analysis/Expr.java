@@ -1120,4 +1120,29 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     Preconditions.checkState(subqueries.size() == 1);
     return subqueries.get(0);
   }
+
+  /**
+   * Evaluate in the BE the children of 'this' that are constant expressions and
+   * substitute them with the evaluation result as LiteralExprs. Modifies 'this'
+   * in place and does not re-analyze it. Hence, it is not safe to evaluate the
+   * modified expr in the BE as the resolved fn_ may be incorrect given the new
+   * arguments.
+   *
+   * Throws an AnalysisException if the evaluation fails in the BE.
+   *
+   * TODO: Used only during partition pruning. Convert it to a generic constant
+   * expression folding function to be used during the analysis.
+   */
+  public void foldConstantChildren(Analyzer analyzer) throws AnalysisException {
+    Preconditions.checkState(isAnalyzed_);
+    Preconditions.checkNotNull(analyzer);
+    for (int i = 0; i < children_.size(); ++i) {
+      Expr child = getChild(i);
+      if (child.isLiteral() || !child.isConstant()) continue;
+      LiteralExpr literalExpr = LiteralExpr.create(child, analyzer.getQueryCtx());
+      Preconditions.checkNotNull(literalExpr);
+      setChild(i, literalExpr);
+    }
+    isAnalyzed_ = false;
+  }
 }
