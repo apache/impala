@@ -93,7 +93,7 @@ show table stats compute_stats_db.alltypes_incremental;
 '2010','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
 '2010','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
 '2010','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','12',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
+'2010','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
 'Total','',7300,24,'586.84KB','0B','','',''
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING,STRING, STRING
@@ -202,7 +202,7 @@ show table stats compute_stats_db.alltypes_incremental;
 '2009','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
 '2009','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
 '2009','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','1',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
+'2010','1',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
 '2010','2',280,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','true'
 '2010','3',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
 '2010','4',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'

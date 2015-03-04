@@ -806,8 +806,6 @@ public class CatalogOpExecutor {
       if (partition.getPartitionStats() != null)  {
         synchronized (metastoreDdlLock_) {
           PartitionStatsUtil.deletePartStats(partition);
-          // Remove the ROW_COUNT parameter if it has been set.
-          partition.getParameters().remove(StatsSetupConst.ROW_COUNT);
           try {
             applyAlterPartition(table.getTableName(), partition);
           } finally {
