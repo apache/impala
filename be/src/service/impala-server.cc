@@ -160,7 +160,12 @@ namespace impala {
 // Prefix of profile, event and lineage log filenames. The version number is
 // internal, and does not correspond to an Impala release - it should
 // be changed only when the file format changes.
-const string PROFILE_LOG_FILE_PREFIX = "impala_profile_log_1.0-";
+//
+// In the 1.0 version of the profile log, the timestamp at the beginning of each entry
+// was relative to the local time zone. In log version 1.1, this was changed to be
+// relative to UTC. The same time zone change was made for the audit log, but the
+// version was kept at 1.0 because there is no known consumer of the timestamp.
+const string PROFILE_LOG_FILE_PREFIX = "impala_profile_log_1.1-";
 const string AUDIT_EVENT_LOG_FILE_PREFIX = "impala_audit_event_log_1.0-";
 const string LINEAGE_LOG_FILE_PREFIX = "impala_lineage_log_1.0-";
 
