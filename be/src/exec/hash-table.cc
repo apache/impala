@@ -53,7 +53,8 @@ static uint32_t SEED_PRIMES[] = {
   11380003,
   21261403,
   33393119,
-  101
+  101,
+  71043403
 };
 
 // Put a non-zero constant in the result location for NULL.
@@ -96,7 +97,7 @@ HashTableCtx::HashTableCtx(const vector<ExprContext*>& build_expr_ctxs,
 
   // Populate the seeds to use for all the levels. TODO: revisit how we generate these.
   DCHECK_GE(max_levels, 0);
-  DCHECK_LE(max_levels, sizeof(SEED_PRIMES) / sizeof(SEED_PRIMES[0]));
+  DCHECK_LT(max_levels, sizeof(SEED_PRIMES) / sizeof(SEED_PRIMES[0]));
   DCHECK_NE(initial_seed, 0);
   seeds_.resize(max_levels + 1);
   seeds_[0] = initial_seed;
