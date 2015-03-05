@@ -197,7 +197,6 @@ class SimpleScheduler : public Scheduler {
   // "backends": [
   //     "henry-metrics-pkg-cdh5.ent.cloudera.com:22000"
   //              ],
-  // "num_backends": 1
   void BackendsUrlCallback(const Webserver::ArgumentMap& args,
       rapidjson::Document* document);
 

@@ -204,7 +204,8 @@ Statestore::Statestore(MetricGroup* metrics)
     client_cache_(new ClientCache<StatestoreSubscriberClient>()),
     thrift_iface_(new StatestoreThriftIf(this)),
     failure_detector_(new MissedHeartbeatFailureDetector(
-        FLAGS_statestore_max_missed_heartbeats, FLAGS_statestore_max_missed_heartbeats / 2)) {
+        FLAGS_statestore_max_missed_heartbeats,
+        FLAGS_statestore_max_missed_heartbeats / 2)) {
 
   DCHECK(metrics != NULL);
   num_subscribers_metric_ =

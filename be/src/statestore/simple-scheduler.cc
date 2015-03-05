@@ -260,7 +260,6 @@ void SimpleScheduler::BackendsUrlCallback(const Webserver::ArgumentMap& args,
   }
 
   document->AddMember("backends", backends_list, document->GetAllocator());
-  document->AddMember("num_backends", backends.size(), document->GetAllocator());
 }
 
 void SimpleScheduler::UpdateMembership(
