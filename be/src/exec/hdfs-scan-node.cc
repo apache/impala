@@ -74,6 +74,9 @@ const int SCANNER_THREAD_MEM_USAGE = 32 * 1024 * 1024;
 // estimate scanner thread memory usage.
 const int COMPRESSED_TEXT_COMPRESSION_RATIO = 11;
 
+// Determines how many unexpected remote bytes trigger an error in the runtime state
+const int UNEXPECTED_REMOTE_BYTES_WARN_THRESHOLD = 64 * 1024 * 1024;
+
 HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
                            const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
@@ -1025,8 +1028,14 @@ void HdfsScanNode::StopAndFinalizeCounters() {
     unexpected_remote_bytes_->Set(
         runtime_state_->io_mgr()->unexpected_remote_bytes(reader_context_));
 
-    // TODO: When we have confidence in unexpected_remote_bytes being accurate, add an
-    // actionable warning to user here. See IMPALA-1712 and related commits for details.
+    if (unexpected_remote_bytes_->value() >= UNEXPECTED_REMOTE_BYTES_WARN_THRESHOLD) {
+      runtime_state_->LogError(ErrorMsg(TErrorCode::GENERAL, Substitute(
+          "Read $0 of data across network that was expected to be local. "
+          "Block locality metadata for table '$1.$2' may be stale. Consider running "
+          "\"INVALIDATE METADATA `$1`.`$2`\".",
+          PrettyPrinter::Print(unexpected_remote_bytes_->value(), TUnit::BYTES),
+          hdfs_table_->database(), hdfs_table_->name())));
+    }
 
     ImpaladMetrics::IO_MGR_BYTES_READ->Increment(bytes_read_counter()->value());
     ImpaladMetrics::IO_MGR_LOCAL_BYTES_READ->Increment(

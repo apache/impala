@@ -156,9 +156,11 @@ void DiskIoMgr::RequestContext::Reset(MemTracker* tracker) {
   num_ready_buffers_ = 0;
   total_range_queue_capacity_ = 0;
   num_finished_ranges_ = 0;
+  num_remote_ranges_ = 0;
   bytes_read_local_ = 0;
   bytes_read_short_circuit_ = 0;
   bytes_read_dn_cache_ = 0;
+  unexpected_remote_bytes_ = 0;
   initial_queue_capacity_ = DiskIoMgr::DEFAULT_QUEUE_CAPACITY;
 
   DCHECK(ready_to_start_ranges_.empty());
