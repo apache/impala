@@ -181,7 +181,7 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
   IO_MGR_SHORT_CIRCUIT_BYTES_READ = m->AddGauge<int64_t>(
       ImpaladMetricKeys::IO_MGR_SHORT_CIRCUIT_BYTES_READ, 0L, TUnit::BYTES);
   IO_MGR_BYTES_WRITTEN = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::IO_MGR_BYTES_WRITTEN, 0L);
+      ImpaladMetricKeys::IO_MGR_BYTES_WRITTEN, 0L, TUnit::BYTES);
 
   // Initialize catalog metrics
   CATALOG_NUM_DBS = m->AddGauge<int64_t>(
