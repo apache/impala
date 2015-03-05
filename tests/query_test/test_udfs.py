@@ -7,9 +7,9 @@ from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.impala_cluster import ImpalaCluster
 from tests.common.skip import *
+from tests.util.filesystem_utils import get_fs_path
 from subprocess import call
 
-@skip_if_s3_udfs # S3: missing coverage: UDFs
 class TestUdfs(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):
@@ -30,20 +30,25 @@ class TestUdfs(ImpalaTestSuite):
     database = 'native_function_test'
 
     self.__load_functions(
-      self.create_udfs_template, vector, database, '/test-warehouse/libTestUdfs.so')
+      self.create_udfs_template, vector, database,
+      get_fs_path('/test-warehouse/libTestUdfs.so'))
     self.__load_functions(
-      self.create_udas_template, vector, database, '/test-warehouse/libudasample.so')
+      self.create_udas_template, vector, database,
+      get_fs_path('/test-warehouse/libudasample.so'))
 
     self.run_test_case('QueryTest/udf', vector, use_db=database)
-    self.run_test_case('QueryTest/udf-init-close', vector, use_db=database)
+    if not IS_S3: # S3 doesn't support INSERT
+      self.run_test_case('QueryTest/udf-init-close', vector, use_db=database)
     self.run_test_case('QueryTest/uda', vector, use_db=database)
 
   def test_ir_functions(self, vector):
     database = 'ir_function_test'
     self.__load_functions(
-      self.create_udfs_template, vector, database, '/test-warehouse/test-udfs.ll')
+      self.create_udfs_template, vector, database,
+      get_fs_path('/test-warehouse/test-udfs.ll'))
     self.run_test_case('QueryTest/udf', vector, use_db=database)
-    self.run_test_case('QueryTest/udf-init-close', vector, use_db=database)
+    if not IS_S3: # S3 doesn't support INSERT
+      self.run_test_case('QueryTest/udf-init-close', vector, use_db=database)
 
   def test_udf_errors(self, vector):
     self.run_test_case('QueryTest/udf-errors', vector)
@@ -67,8 +72,8 @@ class TestUdfs(ImpalaTestSuite):
 
 
   def test_hive_udfs(self, vector):
-    self.client.execute('create database if not exists udf_test')
-    self.client.execute('create database if not exists uda_test')
+    #self.client.execute('create database if not exists udf_test')
+    #self.client.execute('create database if not exists uda_test')
     self.run_test_case('QueryTest/load-hive-udfs', vector)
     self.run_test_case('QueryTest/hive-udf', vector)
 
@@ -85,7 +90,7 @@ class TestUdfs(ImpalaTestSuite):
         'testdata/udfs/impala-hive-udfs.jar')
     new_udf = os.path.join(os.environ['IMPALA_HOME'],
         'tests/test-hive-udfs/target/test-hive-udfs-1.0.jar')
-    udf_dst = '/test-warehouse/impala-hive-udfs2.jar'
+    udf_dst = get_fs_path('/test-warehouse/impala-hive-udfs2.jar')
 
     drop_fn_stmt = 'drop function if exists default.udf_update_test_drop()'
     create_fn_stmt = "create function default.udf_update_test_drop() returns string "\
@@ -115,7 +120,7 @@ class TestUdfs(ImpalaTestSuite):
         'testdata/udfs/impala-hive-udfs.jar')
     new_udf = os.path.join(os.environ['IMPALA_HOME'],
         'tests/test-hive-udfs/target/test-hive-udfs-1.0.jar')
-    udf_dst = '/test-warehouse/impala-hive-udfs3.jar'
+    udf_dst = get_fs_path('/test-warehouse/impala-hive-udfs3.jar')
     old_function_name = "udf_update_test_create1"
     new_function_name = "udf_update_test_create2"
 
@@ -151,7 +156,8 @@ class TestUdfs(ImpalaTestSuite):
   def test_drop_function_while_running(self, vector):
     self.client.execute("drop function if exists default.drop_while_running(BIGINT)")
     self.client.execute("create function default.drop_while_running(BIGINT) returns "\
-        "BIGINT LOCATION '/test-warehouse/libTestUdfs.so' SYMBOL='Identity'")
+        "BIGINT LOCATION '%s' SYMBOL='Identity'" %
+        get_fs_path('/test-warehouse/libTestUdfs.so'))
     query = \
         "select default.drop_while_running(l_orderkey) from tpch.lineitem limit 10000";
 

@@ -21,73 +21,74 @@ drop function if exists udf_test.identity(timestamp);
 
 drop function if exists udf_test.throws_exception();
 
-create database if not exists udf_test;
+create database if not exists udf_test
+location '$FILESYSTEM_PREFIX/test-warehouse/udf_test.db';
 
 create function udf_test.hive_pi() returns double
-location '/test-warehouse/hive-exec.jar'
+location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFPI';
 
 create function udf_test.hive_round(double) returns double
-location '/test-warehouse/hive-exec.jar'
+location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFRound';
 
 create function udf_test.hive_floor(double) returns bigint
-location '/test-warehouse/hive-exec.jar'
+location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFFloor';
 
 create function udf_test.hive_mod(int, int) returns int
-location '/test-warehouse/hive-exec.jar'
+location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFPosMod';
 
 create function udf_test.hive_bin(bigint) returns string
-location '/test-warehouse/hive-exec.jar'
+location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFBin';
 
 create function udf_test.hive_lower(string) returns string
-location '/test-warehouse/hive-exec.jar'
+location '$FILESYSTEM_PREFIX/test-warehouse/hive-exec.jar'
 symbol='org.apache.hadoop.hive.ql.udf.UDFLower';
 
 create function udf_test.identity(boolean) returns boolean
-location '/test-warehouse/impala-hive-udfs.jar'
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='com.cloudera.impala.TestUdf';
 
 create function udf_test.identity(tinyint) returns tinyint
-location '/test-warehouse/impala-hive-udfs.jar'
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='com.cloudera.impala.TestUdf';
 
 create function udf_test.identity(smallint) returns smallint
-location '/test-warehouse/impala-hive-udfs.jar'
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='com.cloudera.impala.TestUdf';
 
 create function udf_test.identity(int) returns int
-location '/test-warehouse/impala-hive-udfs.jar'
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='com.cloudera.impala.TestUdf';
 
 create function udf_test.identity(bigint) returns bigint
-location '/test-warehouse/impala-hive-udfs.jar'
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='com.cloudera.impala.TestUdf';
 
 create function udf_test.identity(float) returns float
-location '/test-warehouse/impala-hive-udfs.jar'
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='com.cloudera.impala.TestUdf';
 
 create function udf_test.identity(double) returns double
-location '/test-warehouse/impala-hive-udfs.jar'
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='com.cloudera.impala.TestUdf';
 
 create function udf_test.identity(string) returns string
-location '/test-warehouse/impala-hive-udfs.jar'
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='com.cloudera.impala.TestUdf';
 
 create function udf_test.identity(string, string) returns string
-location '/test-warehouse/impala-hive-udfs.jar'
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='com.cloudera.impala.TestUdf';
 
 create function udf_test.identity(string, string, string) returns string
-location '/test-warehouse/impala-hive-udfs.jar'
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='com.cloudera.impala.TestUdf';
 
 create function udf_test.throws_exception() returns boolean
-location '/test-warehouse/impala-hive-udfs.jar'
+location '$FILESYSTEM_PREFIX/test-warehouse/impala-hive-udfs.jar'
 symbol='com.cloudera.impala.TestUdfException';
 ====

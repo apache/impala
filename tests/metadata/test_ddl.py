@@ -24,6 +24,7 @@ from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_test_suite import *
 from tests.common.skip import *
+from tests.util.filesystem_utils import WAREHOUSE
 
 # Validates DDL statements (create, drop)
 class TestDdlStatements(ImpalaTestSuite):
@@ -107,7 +108,7 @@ class TestDdlStatements(ImpalaTestSuite):
     self.client.execute("drop database ddl_test_db")
     assert not self.hdfs_client.exists("test-warehouse/ddl_test_db.db/")
 
-  @pytest.mark.skipif(IS_S3, reason="Disabled on s3")
+  @skip_if_s3_insert
   @pytest.mark.execute_serially
   def test_create(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
@@ -120,7 +121,12 @@ class TestDdlStatements(ImpalaTestSuite):
     """Verifies the catalog gets updated properly when dropping objects with sync_ddl
     enabled"""
     self.client.set_configuration({'sync_ddl': 0})
-    self.client.execute('create database ddl_test_db')
+    if IS_DEFAULT_FS:
+      self.client.execute('create database ddl_test_db')
+    else:
+      self.client.execute("create database ddl_test_db location "
+                          "'%s/ddl_test_db.db'" % WAREHOUSE)
+
     self.client.set_configuration({'sync_ddl': 1})
     # Drop the database immediately after creation (within a statestore heartbeat) and
     # verify the catalog gets updated properly.
@@ -150,37 +156,31 @@ class TestDdlStatements(ImpalaTestSuite):
     self.run_test_case('QueryTest/views-ddl', vector, use_db='ddl_test_db',
         multiple_impalad=self.__use_multiple_impalad(vector))
 
-  # TODO: fix copy-udfs-udas to secondary filesystem and enable this test
-  @skip_if_s3_udfs # S3: missing coverage: udas
   @pytest.mark.execute_serially
   def test_functions_ddl(self, vector):
     self.__create_db_synced('function_ddl_test', vector)
     self.run_test_case('QueryTest/functions-ddl', vector, use_db='function_ddl_test',
         multiple_impalad=self.__use_multiple_impalad(vector))
 
-  # TODO: fix copy-udfs-udas to secondary filesystem and enable this test
-  @skip_if_s3_udfs # S3: missing coverage: drop function
   @pytest.mark.execute_serially
   def test_create_drop_function(self, vector):
     # This will create, run, and drop the same function repeatedly, exercising the
     # lib cache mechanism.
-    create_fn_stmt = """create function f() returns int
-        location '/test-warehouse/libTestUdfs.so' symbol='NoArgs'"""
-    select_stmt = """select f() from functional.alltypes limit 10"""
+    create_fn_stmt = ("create function f() returns int "
+                      "location '%s/libTestUdfs.so' symbol='NoArgs'" % WAREHOUSE)
+    select_stmt = "select f() from functional.alltypes limit 10"
     drop_fn_stmt = "drop function %s f()"
     self.create_drop_ddl(vector, "udf_test", [create_fn_stmt], [drop_fn_stmt],
         select_stmt)
 
-  # TODO: fix copy-and-load-ext-data-source to secondary filesystem and enable this test
-  @skip_if_s3_datasrc # S3: missing coverage: data sources
   @pytest.mark.execute_serially
   def test_create_drop_data_src(self, vector):
     # This will create, run, and drop the same data source repeatedly, exercising
     # the lib cache mechanism.
-    create_ds_stmt = """CREATE DATA SOURCE test_data_src
-        LOCATION '/test-warehouse/data-sources/test-data-source.jar'
-        CLASS 'com.cloudera.impala.extdatasource.AllTypesDataSource'
-        API_VERSION 'V1'"""
+    create_ds_stmt = ("CREATE DATA SOURCE test_data_src "
+        "LOCATION '%s/data-sources/test-data-source.jar' "
+        "CLASS 'com.cloudera.impala.extdatasource.AllTypesDataSource' "
+        "API_VERSION 'V1'" % WAREHOUSE)
     create_tbl_stmt = """CREATE TABLE data_src_tbl (x int)
         PRODUCED BY DATA SOURCE test_data_src"""
     drop_ds_stmt = "drop data source %s test_data_src"
@@ -300,10 +300,11 @@ class TestDdlStatements(ImpalaTestSuite):
     """
     cls.client.execute('use default')
     cls.client.set_configuration({'sync_ddl': 1})
-    # TODO: once S3 supports INSERT, set location to
-    # $FILESYSTEM_PREFIX/test-warehouse/ when $FILESYSTEM_PREFIX is
-    # not empty
-    cls.client.execute('create database %s' % db_name)
+    if IS_DEFAULT_FS:
+      cls.client.execute("create database %s" % db_name)
+    else:
+      cls.client.execute("create database %s location "
+                         "'%s/%s.db'" % (db_name, WAREHOUSE, db_name))
     cls.client.set_configuration(vector.get_value('exec_option'))
 
   def __get_tbl_properties(self, table_name):

@@ -312,19 +312,18 @@ if [ $SKIP_METADATA_LOAD -eq 0 ]; then
   copy-and-load-dependent-tables
   load-custom-data
   ${IMPALA_HOME}/testdata/bin/create-table-many-blocks.sh -p 1234 -b 1
-  build-and-copy-hive-udfs
 elif [ "${TARGET_FILESYSTEM}" = "hdfs" ];  then
   echo "Skipped loading the metadata. Loading HBase."
   load-data "functional-query" "core" "hbase/none"
 fi
 
+build-and-copy-hive-udfs
 # Configure alltypes_seq as a read-only table. This is required for fe tests.
 hadoop fs -chmod -R 444 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=1
 hadoop fs -chmod -R 444 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=3
 if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
   # Caching tables in s3 returns an IllegalArgumentException, see IMPALA-1714
   cache-test-tables
-  build-and-copy-hive-udfs
   # TODO: Modify the .sql file that creates the table to take an alternative location into
   # account.
   copy-and-load-ext-data-source

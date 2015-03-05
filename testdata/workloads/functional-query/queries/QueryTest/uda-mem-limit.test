@@ -6,7 +6,7 @@ use native_function_test;
 drop function if exists agg_memtest(bigint);
 
 create aggregate function agg_memtest(bigint) returns bigint
-location '/test-warehouse/libTestUdas.so' update_fn='MemTestUpdate';
+location '$FILESYSTEM_PREFIX/test-warehouse/libTestUdas.so' update_fn='MemTestUpdate';
 
 select agg_memtest(bigint_col * 10 * 1024 * 1024) from functional.alltypes;
 ====

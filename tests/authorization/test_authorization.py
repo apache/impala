@@ -81,7 +81,6 @@ class TestAuthorization(CustomClusterTestSuite):
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     TestHS2.check_response(execute_statement_resp)
 
-  @pytest.mark.skipif(IS_S3, reason="Disabled on S3")
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--server_name=server1\
       --authorization_policy_file=%s\
