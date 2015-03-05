@@ -1,0 +1,305 @@
+====
+---- QUERY
+# Verify various CREATE TABLE for unpartitioned tables on non-default
+# filesystem (e.g. S3A).
+create external table tinytable_like like functional.tinytable
+location '$FILESYSTEM_PREFIX/test-warehouse/tinytable'
+---- RESULTS
+====
+---- QUERY
+select * from tinytable_like
+---- RESULTS
+'aaaaaaa','bbbbbbb'
+'ccccc','dddd'
+'eeeeeeee','f'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+compute stats tinytable_like
+---- RESULTS
+'Updated 1 partition(s) and 2 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats tinytable_like
+---- RESULTS
+3,1,'38B','NOT CACHED','NOT CACHED','TEXT','false'
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+# Verify INSERT into non-hdfs table is disallowed.
+insert into tinytable_like select * from functional.tinytable
+---- CATCH
+Unable to INSERT into target table (multi_fs_db.tinytable_like) because $NAMENODE/test-warehouse/tinytable is not an HDFS filesystem.
+====
+---- QUERY
+create external table tinytable_copy (a string, b string)
+row format delimited fields terminated by ','
+location '$FILESYSTEM_PREFIX/test-warehouse/tinytable'
+---- RESULTS
+====
+---- QUERY
+select * from tinytable_copy
+---- RESULTS
+'aaaaaaa','bbbbbbb'
+'ccccc','dddd'
+'eeeeeeee','f'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+# Verify CREATE TABLE for partitioned table on default filesystem.
+create external table alltypes like functional_parquet.alltypes
+---- RESULTS
+====
+---- QUERY
+select * from alltypes
+---- RESULTS
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+====
+---- QUERY
+# Verify ADD PARTITION for non-default filesystem.
+alter table alltypes add partition(year=2009, month=1)
+location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_parquet/year=2009/month=1'
+---- RESULTS
+====
+---- QUERY
+alter table alltypes add partition(year=2009, month=2)
+location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_parquet/year=2009/month=2'
+---- RESULTS
+====
+---- QUERY
+alter table alltypes add partition(year=2010, month=1)
+location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_parquet/year=2010/month=1'
+---- RESULTS
+====
+---- QUERY
+alter table alltypes add partition(year=2010, month=2)
+location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_parquet/year=2010/month=2'
+---- RESULTS
+====
+---- QUERY
+select * from alltypes where id%100=0 order by id
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+100,true,0,0,0,0,0,0,'01/11/09','0',2009-01-11 01:40:04.500000000,2009,1
+200,true,0,0,0,0,0,0,'01/21/09','0',2009-01-21 03:20:09,2009,1
+300,true,0,0,0,0,0,0,'01/31/09','0',2009-01-31 05:00:13.500000000,2009,1
+400,true,0,0,0,0,0,0,'02/10/09','0',2009-02-10 01:30:04.500000000,2009,2
+500,true,0,0,0,0,0,0,'02/20/09','0',2009-02-20 03:10:08.550000000,2009,2
+3700,true,0,0,0,0,0,0,'01/06/10','0',2010-01-06 00:50:02.250000000,2010,1
+3800,true,0,0,0,0,0,0,'01/16/10','0',2010-01-16 02:30:06.750000000,2010,1
+3900,true,0,0,0,0,0,0,'01/26/10','0',2010-01-26 04:10:11.250000000,2010,1
+4000,true,0,0,0,0,0,0,'02/05/10','0',2010-02-05 00:40:01.800000000,2010,2
+4100,true,0,0,0,0,0,0,'02/15/10','0',2010-02-15 02:20:06.300000000,2010,2
+4200,true,0,0,0,0,0,0,'02/25/10','0',2010-02-25 04:00:10.800000000,2010,2
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+====
+---- QUERY
+# Verify INSERT into table with partitions on a different filesystem than the table's
+# base directory is disallowed.
+insert into alltypes select * from functional.alltypes
+---- CATCH
+Unable to INSERT into target table (multi_fs_db.alltypes) because the table spans multiple filesystems.
+====
+---- QUERY
+# Verify DROP PARTITION for non-default filesystem.
+alter table alltypes drop partition(year=2010, month=1)
+---- RESULTS
+====
+---- QUERY
+alter table alltypes drop partition(year=2010, month=2)
+---- RESULTS
+====
+---- QUERY
+select * from alltypes where id%100=0 order by id
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+100,true,0,0,0,0,0,0,'01/11/09','0',2009-01-11 01:40:04.500000000,2009,1
+200,true,0,0,0,0,0,0,'01/21/09','0',2009-01-21 03:20:09,2009,1
+300,true,0,0,0,0,0,0,'01/31/09','0',2009-01-31 05:00:13.500000000,2009,1
+400,true,0,0,0,0,0,0,'02/10/09','0',2009-02-10 01:30:04.500000000,2009,2
+500,true,0,0,0,0,0,0,'02/20/09','0',2009-02-20 03:10:08.550000000,2009,2
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+====
+---- QUERY
+# Verify tables with partitions that span multiple filesystems.
+# Note: intentionally not using $FILESYSTEM_PREFIX so that the partition points
+# to the default filesystem.
+alter table alltypes add partition(year=2010, month=3)
+location '/test-warehouse/multi_fs_db.db/alltypes_parquet/year=2010/month=3'
+---- RESULTS
+====
+---- QUERY
+# Note: intentionally not using $FILESYSTEM_PREFIX so that the partition points
+# to the default filesystem.
+alter table alltypes add partition(year=2010, month=4)
+location '/test-warehouse/multi_fs_db.db/alltypes_parquet/year=2010/month=4'
+---- RESULTS
+====
+---- QUERY
+select * from alltypes where id%100=0 order by id
+---- RESULTS
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00,2009,1
+100,true,0,0,0,0,0,0,'01/11/09','0',2009-01-11 01:40:04.500000000,2009,1
+200,true,0,0,0,0,0,0,'01/21/09','0',2009-01-21 03:20:09,2009,1
+300,true,0,0,0,0,0,0,'01/31/09','0',2009-01-31 05:00:13.500000000,2009,1
+400,true,0,0,0,0,0,0,'02/10/09','0',2009-02-10 01:30:04.500000000,2009,2
+500,true,0,0,0,0,0,0,'02/20/09','0',2009-02-20 03:10:08.550000000,2009,2
+4300,true,0,0,0,0,0,0,'03/07/10','0',2010-03-07 01:00:02.700000000,2010,3
+4400,true,0,0,0,0,0,0,'03/17/10','0',2010-03-17 01:40:07.200000000,2010,3
+4500,true,0,0,0,0,0,0,'03/27/10','0',2010-03-27 03:20:11.700000000,2010,3
+4600,true,0,0,0,0,0,0,'04/06/10','0',2010-04-06 00:50:02.250000000,2010,4
+4700,true,0,0,0,0,0,0,'04/16/10','0',2010-04-16 02:30:06.750000000,2010,4
+4800,true,0,0,0,0,0,0,'04/26/10','0',2010-04-26 04:10:11.250000000,2010,4
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+====
+---- QUERY
+compute stats alltypes
+---- RESULTS
+'Updated 4 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats alltypes
+---- RESULTS
+'2009','1',310,1,'6.61KB','NOT CACHED','NOT CACHED','PARQUET','false'
+'2009','2',280,1,'6.15KB','NOT CACHED','NOT CACHED','PARQUET','false'
+'2010','3',310,1,'6.63KB','NOT CACHED','NOT CACHED','PARQUET','false'
+'2010','4',300,1,'6.48KB','NOT CACHED','NOT CACHED','PARQUET','false'
+'Total','',1200,4,'25.87KB','0B','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+drop table alltypes
+---- RESULTS
+====
+---- QUERY
+# Verify CREATE TABLE for partitioned table on non-default filesystem.
+create external table alltypes like functional_parquet.alltypes
+location '$FILESYSTEM_PREFIX/test-warehouse/multi_fs_db.db/alltypes'
+---- RESULTS
+====
+---- QUERY
+select * from alltypes
+---- RESULTS
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+====
+---- QUERY
+# Verify tables with partitions that span multiple filesystems, split on the other partition.
+# Note: intentionally not using $FILESYSTEM_PREFIX so that the partition points
+# to the default filesystem.
+alter table alltypes add partition(year=2009, month=5)
+location '/test-warehouse/multi_fs_db.db/alltypes_parquet/year=2009/month=5'
+---- RESULTS
+====
+---- QUERY
+alter table alltypes add partition(year=2009, month=6)
+location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_parquet/year=2009/month=6'
+---- RESULTS
+====
+---- QUERY
+# Note: intentionally not using $FILESYSTEM_PREFIX so that the partition points
+# to the default filesystem.
+alter table alltypes add partition(year=2010, month=5)
+location '/test-warehouse/multi_fs_db.db/alltypes_parquet/year=2010/month=5'
+---- RESULTS
+====
+---- QUERY
+# This partition directory was dropped earlier, so this also verifies the partition
+# directory was not deleted.
+alter table alltypes add partition(year=2010, month=2)
+location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_parquet/year=2010/month=2'
+---- RESULTS
+====
+---- QUERY
+select * from alltypes where id%100=0 order by id
+---- RESULTS
+1200,true,0,0,0,0,0,0,'05/01/09','0',2009-05-01 00:00:00,2009,5
+1300,true,0,0,0,0,0,0,'05/11/09','0',2009-05-11 01:40:04.500000000,2009,5
+1400,true,0,0,0,0,0,0,'05/21/09','0',2009-05-21 03:20:09,2009,5
+1500,true,0,0,0,0,0,0,'05/31/09','0',2009-05-31 05:00:13.500000000,2009,5
+1600,true,0,0,0,0,0,0,'06/10/09','0',2009-06-10 01:30:04.500000000,2009,6
+1700,true,0,0,0,0,0,0,'06/20/09','0',2009-06-20 03:10:08.550000000,2009,6
+1800,true,0,0,0,0,0,0,'06/30/09','0',2009-06-30 04:50:13.500000000,2009,6
+4000,true,0,0,0,0,0,0,'02/05/10','0',2010-02-05 00:40:01.800000000,2010,2
+4100,true,0,0,0,0,0,0,'02/15/10','0',2010-02-15 02:20:06.300000000,2010,2
+4200,true,0,0,0,0,0,0,'02/25/10','0',2010-02-25 04:00:10.800000000,2010,2
+4900,true,0,0,0,0,0,0,'05/06/10','0',2010-05-06 00:50:02.250000000,2010,5
+5000,true,0,0,0,0,0,0,'05/16/10','0',2010-05-16 02:30:06.750000000,2010,5
+5100,true,0,0,0,0,0,0,'05/26/10','0',2010-05-26 04:10:11.250000000,2010,5
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+====
+---- QUERY
+# Verify INSERT into table with partitions on a different filesystems is disallowed.
+insert into alltypes select * from functional.alltypes
+---- CATCH
+Unable to INSERT into target table (multi_fs_db.alltypes) because the table spans multiple filesystems.
+====
+---- QUERY
+compute stats alltypes
+---- RESULTS
+'Updated 4 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats alltypes
+---- RESULTS
+'2009','5',310,1,'6.61KB','NOT CACHED','NOT CACHED','PARQUET','false'
+'2009','6',300,1,'6.48KB','NOT CACHED','NOT CACHED','PARQUET','false'
+'2010','2',280,1,'6.15KB','NOT CACHED','NOT CACHED','PARQUET','false'
+'2010','5',310,1,'6.61KB','NOT CACHED','NOT CACHED','PARQUET','false'
+'Total','',1200,4,'25.85KB','0B','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+drop table alltypes
+---- RESULTS
+====
+---- QUERY
+# Create a table on the default filesystem (note: database location was on defaultFS).
+create table ids as select id from functional.alltypes
+where id = 13 or id = 1533 or id = 2571 or id = 3125 or id = 4862
+---- RESULTS
+'Inserted 5 row(s)'
+---- TYPES
+STRING
+====
+---- QUERY
+select id from ids order by id
+---- RESULTS
+13
+1533
+2571
+3125
+4862
+---- TYPES
+INT
+====
+---- QUERY
+# Join between default (HDFS) and non-default filesystem (e.g. S3A) table.
+select ids.id, date_string_col from functional_seq_record_bzip.alltypes, ids
+where alltypes.id = ids.id
+order by id
+---- RESULTS
+13,'01/02/09'
+1533,'06/03/09'
+2571,'09/15/09'
+3125,'11/09/09'
+4862,'05/02/10'
+---- TYPES
+INT, STRING
+====
