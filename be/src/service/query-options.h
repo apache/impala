@@ -24,7 +24,7 @@
 
 namespace impala {
 
-struct TQueryOptions;
+class TQueryOptions;
 
 // Converts a TQueryOptions struct into a map of key, value pairs
 void TQueryOptionsToMap(const TQueryOptions& query_options,

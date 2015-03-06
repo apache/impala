@@ -165,7 +165,7 @@ class HashTableTest : public testing::Test {
 
     // Add 1 row with val 1, 2 with val 2, etc
     vector<TupleRow*> build_rows;
-    ProbeTestData probe_rows[total_rows];
+    ProbeTestData* probe_rows = new ProbeTestData[total_rows];
     probe_rows[0].probe_row = CreateTupleRow(0);
     uint32_t hash = 0;
     for (int val = 1; val <= rows_to_insert; ++val) {
@@ -203,6 +203,7 @@ class HashTableTest : public testing::Test {
     EXPECT_EQ(hash_table.num_buckets(), target_size);
     ProbeTest(&hash_table, &ht_ctx, probe_rows, total_rows, true);
 
+    delete [] probe_rows;
     hash_table.Close();
     mem_pool_.FreeAll();
   }

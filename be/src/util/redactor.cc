@@ -56,7 +56,8 @@ struct Rule {
       const string& replacement, bool case_sensitive) {
     Regex::Options options;
     options.set_case_sensitive(case_sensitive);
-    return Rule(trigger, Regex(search_regex, options), replacement);
+    Regex re(search_regex, options);
+    return Rule(trigger, re, replacement);
   }
 
   // For use with vector.
