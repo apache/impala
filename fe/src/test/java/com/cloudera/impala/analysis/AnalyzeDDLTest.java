@@ -655,14 +655,6 @@ public class AnalyzeDDLTest extends AnalyzerTest {
             "column 'col1' of type 'string' does not match the Avro-schema column " +
             "'boolean1' of type 'BOOLEAN' at position '0'.\nPlease re-create the table " +
             "with column definitions, e.g., using the result of 'SHOW CREATE TABLE'");
-    // No column definitions were given at all. This case is broken in Hive (HIVE-6308),
-    // but works when such a table is created through Impala.
-    AnalysisError("compute stats functional_avro_snap.alltypes_no_coldef",
-        "Cannot COMPUTE STATS on Avro table 'alltypes_no_coldef' because its column " +
-            "definitions do not match those in the Avro schema.\nMissing column " +
-            "definition corresponding to Avro-schema column 'id' of type 'INT' at " +
-            "position '0'.\nPlease re-create the table with column definitions, e.g., " +
-            "using the result of 'SHOW CREATE TABLE'");
   }
 
   @Test
