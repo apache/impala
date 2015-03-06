@@ -43,6 +43,12 @@ class RpcEventHandlerManager {
   //  ] }
   void JsonCallback(const Webserver::ArgumentMap& args, Document* document);
 
+  // Resets method statistics. Takes two optional arguments: 'server' and 'method'. If
+  // neither are specified, all server statistics are reset. If only the former is
+  // specified, all statistics for that server are reset. If both arguments are present,
+  // resets the statistics for a single method only. Produces no JSON output.
+  void ResetCallback(const Webserver::ArgumentMap& args, Document* document);
+
  private:
   // Protects event_handlers_
   mutex lock_;
@@ -64,6 +70,10 @@ void impala::InitRpcEventTracing(Webserver* webserver) {
     Webserver::UrlCallback json = bind<void>(
         mem_fn(&RpcEventHandlerManager::JsonCallback), handler_manager.get(), _1, _2);
     webserver->RegisterUrlCallback("/rpcz", "rpcz.tmpl", json);
+
+    Webserver::UrlCallback reset = bind<void>(
+        mem_fn(&RpcEventHandlerManager::ResetCallback), handler_manager.get(), _1, _2);
+    webserver->RegisterUrlCallback("/rpcz_reset", "", reset, reset);
   }
 }
 
@@ -85,6 +95,41 @@ void RpcEventHandlerManager::JsonCallback(const Webserver::ArgumentMap& args,
   document->AddMember("servers", servers, document->GetAllocator());
 }
 
+void RpcEventHandlerManager::ResetCallback(const Webserver::ArgumentMap& args,
+    Document* document) {
+  Webserver::ArgumentMap::const_iterator server_it = args.find("server");
+  bool reset_all_servers = (server_it == args.end());
+  Webserver::ArgumentMap::const_iterator method_it = args.find("method");
+  bool reset_all_in_server = (method_it == args.end());
+  lock_guard<mutex> l(lock_);
+  BOOST_FOREACH(RpcEventHandler* handler, event_handlers_) {
+    if (reset_all_servers || handler->server_name() == server_it->second) {
+      if (reset_all_in_server) {
+        handler->ResetAll();
+      } else {
+        handler->Reset(method_it->second);
+      }
+      if (!reset_all_servers) return;
+    }
+  }
+}
+
+void RpcEventHandler::Reset(const string& method_name) {
+  lock_guard<mutex> l(method_map_lock_);
+  MethodMap::iterator it = method_map_.find(method_name);
+  if (it == method_map_.end()) return;
+  it->second->time_stats->Reset();
+  it->second->num_in_flight = 0L;
+}
+
+void RpcEventHandler::ResetAll() {
+  lock_guard<mutex> l(method_map_lock_);
+  BOOST_FOREACH(const MethodMap::value_type& method, method_map_) {
+    method.second->time_stats->Reset();
+    method.second->num_in_flight = 0L;
+  }
+}
+
 RpcEventHandler::RpcEventHandler(const string& server_name, MetricGroup* metrics) :
     server_name_(server_name), metrics_(metrics) {
   if (handler_manager.get() != NULL) handler_manager->RegisterEventHandler(this);
@@ -103,6 +148,8 @@ void RpcEventHandler::ToJson(Value* server, Document* document) {
     Value summary(human_readable.c_str(), document->GetAllocator());
     method.AddMember("summary", summary, document->GetAllocator());
     method.AddMember("in_flight", rpc.second->num_in_flight, document->GetAllocator());
+    Value server_name(server_name_.c_str(), document->GetAllocator());
+    method.AddMember("server_name", server_name, document->GetAllocator());
     methods.PushBack(method, document->GetAllocator());
   }
   server->AddMember("methods", methods, document->GetAllocator());

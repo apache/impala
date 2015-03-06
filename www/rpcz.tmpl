@@ -15,23 +15,125 @@ limitations under the License.
 -->
 {{> www/common-header.tmpl }}
 
-{{#servers}}
-<h3>{{name}}</h3>
+<h2>RPC durations
+  <button class="btn btn-warning btn-xs" onClick="reset_all();">
+    Reset all
+  </button>
+</h2>
 
-<table class='table table-hover table-bordered'>
-<tr>
-  <th>Method</th>
-  <th>Duration summary</th>
-  <th>In Flight</th>
-</tr>
-{{#methods}}
-<tr>
-  <td>{{name}}</td>
-  <td>{{summary}}</td>
-  <td>{{in_flight}}</td>
-</tr>
-{{/methods}}
+<p class="lead">This page shows the durations of all RPCs served by this
+ <samp>{{__common__.process-name}}</samp> process.
+</p>
+
+<label>
+  <input type="checkbox" checked="true" id="toggle" onClick="toggleRefresh()"/>
+  <span id="refresh_on">Auto-refresh on</span>
+</label>  Last updated: <span id="last-updated"></span>
+
+{{#servers}}
+
+<h3><samp>{{name}} </samp>
+  <button class="btn btn-warning btn-xs" onClick="reset_server('{{name}}');">
+    Reset stats
+  </button>
+</h3>
+
+<table class='table table-hover table-bordered' id='{{name}}'>
+  <tr>
+    <th>Method</th>
+    <th>Duration summary</th>
+    <th>In Flight</th>
+    <th></th>
+  </tr>
+  {{#methods}}
+  <tr>
+    <td><samp>{{name}}</samp></td>
+    <td>{{summary}}</td>
+    <td>{{in_flight}}</td>
+    <td align="center">
+      <button class="btn btn-warning btn-xs"
+              onClick="reset_method('{{server_name}}', '{{name}}');">
+        Reset
+      </button>
+    </td>
+  </tr>
+  {{/methods}}
 </table>
 {{/servers}}
+
+<script>
+function reset_all() {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', "/rpcz_reset", true);
+  xhr.send();
+}
+
+function reset_method(server, method) {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', "/rpcz_reset?server=" + server + "&method=" + method, true);
+  xhr.send();
+}
+
+function reset_server(server) {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', "/rpcz_reset?server=" + server, true);
+  xhr.send();
+}
+
+function refresh() {
+  var xhr = new XMLHttpRequest();
+  xhr.responseType = 'text';
+  xhr.timeout = 60000;
+  xhr.onload = function(ignored_arg) {
+    if (xhr.status != 200) {
+      return;
+    }
+    var blob = xhr.response;
+    json = JSON.parse(blob);
+    for (var i = 0; i < json["servers"].length; ++i) {
+      var tbl_json = json["servers"][i];
+      var table = document.getElementById(tbl_json["name"]);
+      if (!table) continue;
+      // Delete all existing rows, stopping at 1 to save the header
+      for (var j = table.rows.length - 1; j >= 1; --j) {
+        table.deleteRow(j);
+      }
+      tbl_json["methods"].forEach(function(method) {
+        var row = table.insertRow();
+        row.insertCell().innerHTML = "<samp>" + method.name + "</samp>";
+        row.insertCell().innerHTML = method.summary;
+        row.insertCell().innerHTML = method.in_flight;
+        var reset_cell = row.insertCell();
+        reset_cell.align = "center";
+        var button = document.createElement("button");
+        button.className = "btn btn-warning btn-xs";
+        button.appendChild(document.createTextNode("Reset"));
+        button.onclick = function() { reset_method(method.server_name, method.name); }
+
+        reset_cell.appendChild(button);
+      });
+    }
+
+    document.getElementById("last-updated").textContent = new Date();
+  }
+
+  xhr.ontimeout = function(){ }
+  xhr.open('GET', "/rpcz?json", true);
+  xhr.send();
+}
+
+document.getElementById("last-updated").textContent = new Date();
+var intervalId = setInterval(refresh, 1000);
+
+function toggleRefresh() {
+  if (document.getElementById("toggle").checked == true) {
+    intervalId = setInterval(refresh, 1000);
+    document.getElementById("refresh_on").textContent = "Auto-refresh on";
+  } else {
+    clearInterval(intervalId);
+    document.getElementById("refresh_on").textContent = "Auto-refresh off";
+  }
+}
+</script>
 
 {{> www/common-footer.tmpl }}

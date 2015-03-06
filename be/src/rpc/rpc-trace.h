@@ -66,6 +66,14 @@ class RpcEventHandler : public apache::thrift::TProcessorEventHandler {
   // }
   void ToJson(rapidjson::Value* server, rapidjson::Document* document);
 
+  // Resets the statistics for a single method
+  void Reset(const std::string& method_name);
+
+  // Resets the statistics for all methods
+  void ResetAll();
+
+  std::string server_name() const { return server_name_; }
+
  private:
   // Per-method descriptor
   struct MethodDescriptor {

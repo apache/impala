@@ -115,6 +115,11 @@ class StatsMetric : public Metric {
     acc_(value);
   }
 
+  void Reset() {
+    boost::lock_guard<boost::mutex> l(lock_);
+    acc_ = Accumulator();
+  }
+
   virtual void ToJson(rapidjson::Document* document, rapidjson::Value* val) {
     boost::lock_guard<boost::mutex> l(lock_);
     rapidjson::Value container(rapidjson::kObjectType);
@@ -185,12 +190,13 @@ class StatsMetric : public Metric {
   T value_;
 
   // The set of accumulators that update the statistics on each Update()
-  boost::accumulators::accumulator_set<T,
+  typedef boost::accumulators::accumulator_set<T,
       boost::accumulators::features<boost::accumulators::tag::mean,
                                     boost::accumulators::tag::count,
                                     boost::accumulators::tag::min,
                                     boost::accumulators::tag::max,
-                                    boost::accumulators::tag::variance> > acc_;
+                                    boost::accumulators::tag::variance> > Accumulator;
+  Accumulator acc_;
 
 };
 
