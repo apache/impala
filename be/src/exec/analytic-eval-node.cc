@@ -206,28 +206,10 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
 
   // Initialize state for the first partition.
   InitNextPartition(0);
-
-  // Fetch the first input batch so that some prev_input_row_ can be set here to avoid
-  // special casing in GetNext().
   prev_child_batch_.reset(new RowBatch(child(0)->row_desc(), state->batch_size(),
       mem_tracker()));
   curr_child_batch_.reset(new RowBatch(child(0)->row_desc(), state->batch_size(),
       mem_tracker()));
-  while (!input_eos_ && prev_input_row_ == NULL) {
-    RETURN_IF_ERROR(child(0)->GetNext(state, curr_child_batch_.get(), &input_eos_));
-    if (curr_child_batch_->num_rows() > 0) {
-      prev_input_row_ = curr_child_batch_->GetRow(0);
-      ProcessChildBatches(state);
-    } else {
-      // Empty batch, still need to reset.
-      curr_child_batch_->Reset();
-    }
-  }
-  if (prev_input_row_ == NULL) {
-    DCHECK(input_eos_);
-    // Delete curr_child_batch_ to indicate there is no batch to process in GetNext()
-    curr_child_batch_.reset();
-  }
   return Status::OK;
 }
 
@@ -319,6 +301,37 @@ string AnalyticEvalNode::DebugStateString(bool detailed = false) const {
     }
   }
   return ss.str();
+}
+
+inline Status AnalyticEvalNode::AddRow(int64_t stream_idx, TupleRow* row) {
+  if (fn_scope_ != ROWS || !window_.__isset.window_start ||
+      stream_idx - rows_start_offset_ >= curr_partition_idx_) {
+    VLOG_ROW << id() << " Update idx=" << stream_idx;
+    AggFnEvaluator::Add(evaluators_, fn_ctxs_, row, curr_tuple_);
+    if (window_.__isset.window_start) {
+      VLOG_ROW << id() << " Adding tuple to window at idx=" << stream_idx;
+      Tuple* tuple = row->GetTuple(0)->DeepCopy(*child_tuple_desc_,
+          curr_tuple_pool_.get());
+      window_tuples_.push_back(pair<int64_t, Tuple*>(stream_idx, tuple));
+    }
+  }
+
+  // Buffer the entire input row to be returned later with the analytic eval results.
+  if (UNLIKELY(!input_stream_->AddRow(row))) {
+    // AddRow returns false if an error occurs (available via status()) or there is
+    // not enough memory (status() is OK). If there isn't enough memory, we unpin
+    // the stream and continue writing/reading in unpinned mode.
+    // TODO: Consider re-pinning later if the output stream is fully consumed.
+    RETURN_IF_ERROR(input_stream_->status());
+    RETURN_IF_ERROR(input_stream_->UnpinStream());
+    VLOG_FILE << id() << " Unpin input stream while adding row idx=" << stream_idx;
+    if (!input_stream_->AddRow(row)) {
+      // Rows should be added in unpinned mode unless an error occurs.
+      RETURN_IF_ERROR(input_stream_->status());
+      DCHECK(false);
+    }
+  }
+  return Status::OK;
 }
 
 void AnalyticEvalNode::AddResultTuple(int64_t stream_idx) {
@@ -510,23 +523,21 @@ Status AnalyticEvalNode::ProcessChildBatches(RuntimeState* state) {
   // Consume child batches until eos or there are enough rows to return more than an
   // output batch. Ensuring there is at least one more row left after returning results
   // allows us to simplify the logic dealing with last_result_idx_ and result_tuples_.
-  while (curr_child_batch_.get() != NULL &&
-      NumOutputRowsReady() < state->batch_size() + 1) {
+  while (!input_eos_ && NumOutputRowsReady() < state->batch_size() + 1) {
     RETURN_IF_CANCELLED(state);
+    RETURN_IF_ERROR(child(0)->GetNext(state, curr_child_batch_.get(), &input_eos_));
     RETURN_IF_ERROR(QueryMaintenance(state));
+
     RETURN_IF_ERROR(ProcessChildBatch(state));
     // TODO: DCHECK that the size of result_tuples_ is bounded. It shouldn't be larger
     // than 2x the batch size unless the end bound has an offset preceding, in which
     // case it may be slightly larger (proportional to the offset but still bounded).
-    if (input_eos_) {
-      // Already processed the last child batch. Clean up and break.
-      curr_child_batch_.reset();
-      prev_child_batch_.reset();
-      break;
-    }
     prev_child_batch_->Reset();
     prev_child_batch_.swap(curr_child_batch_);
-    RETURN_IF_ERROR(child(0)->GetNext(state, curr_child_batch_.get(), &input_eos_));
+  }
+  if (input_eos_) {
+    curr_child_batch_.reset();
+    prev_child_batch_.reset();
   }
   return Status::OK;
 }
@@ -537,14 +548,27 @@ Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
             << " input batch size:" << curr_child_batch_->num_rows()
             << " tuple pool size:" << curr_tuple_pool_->total_allocated_bytes();
   SCOPED_TIMER(evaluation_timer_);
+
   // BufferedTupleStream::num_rows() returns the total number of rows that have been
   // inserted into the stream (it does not decrease when we read rows), so the index of
   // the next input row that will be inserted will be the current size of the stream.
   int64_t stream_idx = input_stream_->num_rows();
-  // Stores the stream_idx of the row that was last inserted into window_tuples_.
-  int64_t last_window_tuple_idx = -1;
-  for (int i = 0; i < curr_child_batch_->num_rows(); ++i, ++stream_idx) {
-    TupleRow* row = curr_child_batch_->GetRow(i);
+
+  // The very first row in the stream is handled specially because there is no previous
+  // row to compare and we cannot rely on PrevRowCompare() returning true even for the
+  // same row pointers if there are NaN values.
+  int batch_idx = 0;
+  if (UNLIKELY(stream_idx == 0 && curr_child_batch_->num_rows() > 0)) {
+    TupleRow* row = curr_child_batch_->GetRow(0);
+    RETURN_IF_ERROR(AddRow(0, row));
+    TryAddResultTupleForCurrRow(0, row);
+    prev_input_row_ = row;
+    ++batch_idx;
+    ++stream_idx;
+  }
+
+  for (; batch_idx < curr_child_batch_->num_rows(); ++batch_idx, ++stream_idx) {
+    TupleRow* row = curr_child_batch_->GetRow(batch_idx);
     if (partition_by_eq_expr_ctx_ != NULL || order_by_eq_expr_ctx_ != NULL) {
       // Only set the tuples in child_tuple_cmp_row_ if there are partition exprs or
       // order by exprs that require comparing the current and previous rows. If there
@@ -574,39 +598,16 @@ Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
     if (next_partition) InitNextPartition(stream_idx);
 
     // The evaluators_ are updated with the current row.
-    if (fn_scope_ != ROWS || !window_.__isset.window_start ||
-        stream_idx - rows_start_offset_ >= curr_partition_idx_) {
-      VLOG_ROW << id() << " Update idx=" << stream_idx;
-      AggFnEvaluator::Add(evaluators_, fn_ctxs_, row, curr_tuple_);
-      if (window_.__isset.window_start) {
-        VLOG_ROW << id() << " Adding tuple to window at idx=" << stream_idx;
-        Tuple* tuple = row->GetTuple(0)->DeepCopy(*child_tuple_desc_,
-            curr_tuple_pool_.get());
-        window_tuples_.push_back(pair<int64_t, Tuple*>(stream_idx, tuple));
-        last_window_tuple_idx = stream_idx;
-      }
-    }
+    RETURN_IF_ERROR(AddRow(stream_idx, row));
 
     TryAddResultTupleForCurrRow(stream_idx, row);
-    // Buffer the entire input row to be returned later with the analytic eval results.
-    if (UNLIKELY(!input_stream_->AddRow(row))) {
-      // AddRow returns false if an error occurs (available via status()) or there is
-      // not enough memory (status() is OK). If there isn't enough memory, we unpin
-      // the stream and continue writing/reading in unpinned mode.
-      // TODO: Consider re-pinning later if the output stream is fully consumed.
-      RETURN_IF_ERROR(input_stream_->status());
-      RETURN_IF_ERROR(input_stream_->UnpinStream());
-      VLOG_FILE << id() << " Unpin input stream while adding row idx=" << stream_idx;
-      if (!input_stream_->AddRow(row)) {
-        // Rows should be added in unpinned mode unless an error occurs.
-        RETURN_IF_ERROR(input_stream_->status());
-        DCHECK(false);
-      }
-    }
     prev_input_row_ = row;
   }
-  // We need to add the results for the last row(s).
-  if (input_eos_) TryAddRemainingResults(stream_idx, curr_partition_idx_);
+
+  if (UNLIKELY(input_eos_ && stream_idx > curr_partition_idx_)) {
+    // We need to add the results for the last row(s).
+    TryAddRemainingResults(stream_idx, curr_partition_idx_);
+  }
 
   // Transfer resources to prev_tuple_pool_ when enough resources have accumulated
   // and the prev_tuple_pool_ has already been transfered to an output batch.
@@ -614,7 +615,11 @@ Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
       (prev_pool_last_result_idx_ == -1 || prev_pool_last_window_idx_ == -1)) {
     prev_tuple_pool_->AcquireData(curr_tuple_pool_.get(), false);
     prev_pool_last_result_idx_ = last_result_idx_;
-    prev_pool_last_window_idx_ = last_window_tuple_idx;
+    if (window_tuples_.size() > 0) {
+      prev_pool_last_window_idx_ = window_tuples_.back().first;
+    } else {
+      prev_pool_last_window_idx_ = -1;
+    }
     VLOG_FILE << id() << " Transfer resources from curr to prev pool at idx: "
               << stream_idx << ", stores tuples with last result idx: "
               << prev_pool_last_result_idx_ << " last window idx: "

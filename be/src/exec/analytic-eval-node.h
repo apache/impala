@@ -123,6 +123,9 @@ class AnalyticEvalNode : public ExecNode {
   // results (from result_tuples_) set as the last tuple.
   Status GetNextOutputBatch(RuntimeState* state, RowBatch* row_batch, bool* eos);
 
+  // Adds the row to the evaluators and the tuple stream.
+  Status AddRow(int64_t stream_idx, TupleRow* row);
+
   // Determines if there is a window ending at the previous row, and if so, calls
   // AddResultTuple() with the index of the previous row in input_stream_. next_partition
   // indicates if the current row is the start of a new partition. stream_idx is the

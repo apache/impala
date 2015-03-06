@@ -1025,6 +1025,29 @@ WHERE EXISTS
 ---- TYPES
 DOUBLE
 ====
+---- QUERY
+# IMPALA-1808: handle partition/order by exprs with NaN
+select id / int_col,
+count(*) over (partition by id / int_col order by id),
+count(*) over (order by id / int_col),
+count(*) over (order by id / int_col rows between 100 preceding and 90 preceding),
+count(*) over (order by id / int_col rows between 2 preceding and 1 preceding),
+count(*) over (order by id / int_col rows between 1 preceding and 1 following),
+count(*) over (order by id / int_col rows between 1 following and 2 following),
+count(*) over (order by id / int_col rows between 90 following and 100 following)
+from alltypestiny
+---- RESULTS
+NaN,1,1,0,0,2,2,0
+1,1,2,0,1,3,2,0
+3,1,3,0,2,3,2,0
+5,1,4,0,2,3,2,0
+7,1,5,0,2,3,2,0
+Infinity,1,8,0,2,3,2,0
+Infinity,2,8,0,2,3,1,0
+Infinity,3,8,0,2,2,0,0
+---- TYPES
+DOUBLE, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT
+====
 ----QUERY
 # IMPALA-1483: Check that TupleIsNullPredicates referring to the logical
 # analytic output are substituted with TupleIsNullPredicates referring to
