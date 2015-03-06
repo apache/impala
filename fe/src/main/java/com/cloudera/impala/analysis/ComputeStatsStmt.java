@@ -23,16 +23,15 @@ import org.apache.log4j.Logger;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HBaseTable;
-import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.HdfsPartition;
-import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TComputeStatsParams;
-import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TPartitionStats;
+import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -86,14 +85,14 @@ public class ComputeStatsStmt extends StatementBase {
 
   // The list of valid partition statistics that can be used in an incremental computation
   // without themselves being recomputed. Populated in analyze().
-  private List<TPartitionStats> validPartStats_ = Lists.newArrayList();
+  private final List<TPartitionStats> validPartStats_ = Lists.newArrayList();
 
   // For incremental computations, the list of partitions (identified by list of partition
   // column values) that we expect to receive results for. Used to ensure that even empty
   // partitions emit results.
   // TODO: Consider using partition IDs (and adding them to the child queries with a
   // PARTITION_ID() builtin)
-  private List<List<String>> expectedPartitions_ = Lists.newArrayList();
+  private final List<List<String>> expectedPartitions_ = Lists.newArrayList();
 
   // If non-null, the partition that an incremental computation might apply to. Must be
   // null if this is a non-incremental computation.

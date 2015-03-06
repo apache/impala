@@ -858,3 +858,30 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 ---- TYPES
 STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 ====
+---- QUERY
+# Test that compute stats on a Hive-created Avro table without column defs
+# works (HIVE-6308, IMPALA-867).
+create table compute_stats_db.alltypes_no_coldef like functional_avro_snap.alltypes_no_coldef;
+compute stats compute_stats_db.alltypes_no_coldef
+---- RESULTS
+'Updated 1 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show column stats compute_stats_db.alltypes_no_coldef
+---- RESULTS
+'id','INT',0,-1,4,4
+'bool_col','BOOLEAN',2,-1,1,1
+'tinyint_col','INT',0,-1,4,4
+'smallint_col','INT',0,-1,4,4
+'int_col','INT',0,-1,4,4
+'bigint_col','BIGINT',0,-1,8,8
+'float_col','FLOAT',0,-1,4,4
+'double_col','DOUBLE',0,-1,8,8
+'date_string_col','STRING',0,-1,0,0
+'string_col','STRING',0,-1,0,0
+'timestamp_col','STRING',0,-1,0,0
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+====

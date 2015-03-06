@@ -652,7 +652,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Extra column definition is ok because the schema mismatch is resolved
     // in the CREATE TABLE.
     AnalyzesOk("compute stats functional_avro_snap.alltypes_extra_coldef");
-    // Mismatched column name (tables were created by Hive).
+    // No column definitions are ok.
+    AnalyzesOk("compute stats functional_avro_snap.alltypes_no_coldef");
+    // Mismatched column name (table was created by Hive).
     AnalysisError("compute stats functional_avro_snap.schema_resolution_test",
         "Cannot COMPUTE STATS on Avro table 'schema_resolution_test' because its " +
             "column definitions do not match those in the Avro schema.\nDefinition of " +
