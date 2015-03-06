@@ -304,6 +304,8 @@ class RuntimeProfile {
       events->insert(events->end(), events_.begin(), events_.end());
     }
 
+    void ToThrift(TEventSequence* seq) const;
+
    private:
     // Protect access to events_
     boost::mutex lock_;

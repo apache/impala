@@ -882,4 +882,11 @@ string RuntimeProfile::TimeSeriesCounter::DebugString() const {
   return ss.str();
 }
 
+void RuntimeProfile::EventSequence::ToThrift(TEventSequence* seq) const {
+  BOOST_FOREACH(const EventSequence::Event& ev, events_) {
+    seq->labels.push_back(ev.first);
+    seq->timestamps.push_back(ev.second);
+  }
+}
+
 }

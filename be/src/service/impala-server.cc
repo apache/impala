@@ -1378,6 +1378,8 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
   num_rows_fetched = exec_state.num_rows_fetched();
   query_status = exec_state.query_status();
 
+  exec_state.query_events()->ToThrift(&event_sequence);
+
   if (copy_profile) {
     stringstream ss;
     exec_state.profile().PrettyPrint(&ss);

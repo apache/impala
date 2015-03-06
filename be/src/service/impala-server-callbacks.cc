@@ -257,6 +257,12 @@ void ImpalaServer::QueryStateToJson(const ImpalaServer::QueryStateRecord& record
 
   Value query_id(PrintId(record.id).c_str(), document->GetAllocator());
   value->AddMember("query_id", query_id, document->GetAllocator());
+
+  if (record.event_sequence.labels.size() > 0) {
+    Value last_event(record.event_sequence.labels.back().c_str(),
+        document->GetAllocator());
+    value->AddMember("last_event", last_event, document->GetAllocator());
+  }
 }
 
 void ImpalaServer::QueryStateUrlCallback(const Webserver::ArgumentMap& args,

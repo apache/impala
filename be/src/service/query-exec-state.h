@@ -188,7 +188,7 @@ class ImpalaServer::QueryExecState {
     return ref_count_ > 0;
   }
 
-  RuntimeProfile::EventSequence* query_events() { return query_events_; }
+  RuntimeProfile::EventSequence* query_events() const { return query_events_; }
   RuntimeProfile* summary_profile() { return &summary_profile_; }
 
  private:

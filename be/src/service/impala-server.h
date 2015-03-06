@@ -593,6 +593,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
     Status query_status;
 
+    // Timeline of important query events
+    TEventSequence event_sequence;
+
     // Save the query plan fragments so that the plan tree can be rendered on the debug
     // webpages.
     vector<TPlanFragment> fragments;
