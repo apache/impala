@@ -73,7 +73,7 @@ void impala::InitRpcEventTracing(Webserver* webserver) {
 
     Webserver::UrlCallback reset = bind<void>(
         mem_fn(&RpcEventHandlerManager::ResetCallback), handler_manager.get(), _1, _2);
-    webserver->RegisterUrlCallback("/rpcz_reset", "", reset, reset);
+    webserver->RegisterUrlCallback("/rpcz_reset", "", reset, false);
   }
 }
 
