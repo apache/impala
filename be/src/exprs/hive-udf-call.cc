@@ -53,12 +53,16 @@ struct JniContext {
 
   AnyVal* output_anyval;
 
-  JniContext() {
-    executor = NULL;
-    input_values_buffer = NULL;
-    input_nulls_buffer = NULL;
-    output_value_buffer = NULL;
-    warning_logged = false;
+  JniContext()
+    : cl(NULL),
+      executor(NULL),
+      evalute_id(NULL),
+      close_id(NULL),
+      input_values_buffer(NULL),
+      input_nulls_buffer(NULL),
+      output_value_buffer(NULL),
+      warning_logged(false),
+      output_anyval(NULL) {
   }
 };
 
@@ -243,11 +247,22 @@ void HiveUdfCall::Close(RuntimeState* state, ExprContext* ctx,
       Status status = JniUtil::GetJniExceptionMsg(env);
       if (!status.ok()) VLOG_QUERY << status.GetDetail();
     }
-    delete[] jni_ctx->input_values_buffer;
-    delete[] jni_ctx->input_nulls_buffer;
-    delete[] jni_ctx->output_value_buffer;
-
-    delete jni_ctx->output_anyval;
+    if (jni_ctx->input_values_buffer != NULL) {
+      delete[] jni_ctx->input_values_buffer;
+      jni_ctx->input_values_buffer = NULL;
+    }
+    if (jni_ctx->input_nulls_buffer != NULL) {
+      delete[] jni_ctx->input_nulls_buffer;
+      jni_ctx->input_nulls_buffer = NULL;
+    }
+    if (jni_ctx->output_value_buffer != NULL) {
+      delete[] jni_ctx->output_value_buffer;
+      jni_ctx->output_value_buffer = NULL;
+    }
+    if (jni_ctx->output_anyval != NULL) {
+      delete jni_ctx->output_anyval;
+      jni_ctx->output_anyval = NULL;
+    }
   } else {
     DCHECK(!ctx->opened_);
   }

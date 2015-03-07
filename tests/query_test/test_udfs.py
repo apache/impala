@@ -48,6 +48,24 @@ class TestUdfs(ImpalaTestSuite):
   def test_udf_errors(self, vector):
     self.run_test_case('QueryTest/udf-errors', vector)
 
+  def test_udf_invalid_symbol(self, vector):
+    """ IMPALA-1642: Impala crashes if the symbol for a Hive UDF doesn't exist
+        Crashing is non-deterministic so we run the UDF several times."""
+    drop_fn_stmt = "drop function if exists default.fn_invalid_symbol(STRING)"
+    create_fn_stmt = "create function default.fn_invalid_symbol(STRING) returns "\
+          "STRING LOCATION '/test-warehouse/impala-hive-udfs.jar' SYMBOL='not.a.Symbol'"
+    query = "select default.fn_invalid_symbol('test')"
+
+    self.client.execute(drop_fn_stmt)
+    try:
+      self.client.execute(create_fn_stmt)
+      for _ in xrange(5):
+        ex = self.execute_query_expect_failure(self.client, query)
+        assert "Unable to find class" in str(ex)
+    finally:
+      self.client.execute(drop_fn_stmt)
+
+
   def test_hive_udfs(self, vector):
     self.client.execute('create database if not exists udf_test')
     self.client.execute('create database if not exists uda_test')
