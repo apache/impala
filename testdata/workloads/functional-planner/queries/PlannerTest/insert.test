@@ -94,27 +94,27 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 ====
 # insert into fully dynamic partitions. The source table has no stats and the insert
 # statement has a partition clause, so hash partition before the sink.
-insert into table functional.alltypessmall
-partition (year, month)
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
-float_col, double_col, date_string_col, string_col, timestamp_col, int_col, int_col
-from functional_seq_snap.alltypes
-where year=2009 and month>10
----- PLAN
-WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(int_col,int_col)]
-|  partitions=unavailable
-|
-00:SCAN HDFS [functional_seq_snap.alltypes]
-   partitions=2/24 files=2 size=11.40KB
----- DISTRIBUTEDPLAN
-WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(int_col,int_col)]
-|  partitions=unavailable
-|
-01:EXCHANGE [HASH(int_col,int_col)]
-|
-00:SCAN HDFS [functional_seq_snap.alltypes]
-   partitions=2/24 files=2 size=11.40KB
-====
+#insert into table functional.alltypessmall
+#partition (year, month)
+#select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
+#float_col, double_col, date_string_col, string_col, timestamp_col, int_col, int_col
+#from functional_seq_snap.alltypes
+#where year=2009 and month>10
+#---- PLAN
+#WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(int_col,int_col)]
+#|  partitions=unavailable
+#|
+#00:SCAN HDFS [functional_seq_snap.alltypes]
+#   partitions=2/24 files=2 size=11.40KB
+#---- DISTRIBUTEDPLAN
+#WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(int_col,int_col)]
+#|  partitions=unavailable
+#|
+#01:EXCHANGE [HASH(int_col,int_col)]
+#|
+#00:SCAN HDFS [functional_seq_snap.alltypes]
+#   partitions=2/24 files=2 size=11.40KB
+#====
 # insert into fully dynamic partitions;
 # partitioned output doesn't require repartitioning
 insert into table functional.alltypessmall
