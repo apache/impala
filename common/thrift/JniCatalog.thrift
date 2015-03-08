@@ -37,6 +37,7 @@ enum TDdlType {
   COMPUTE_STATS,
   DROP_DATABASE,
   DROP_TABLE,
+  TRUNCATE_TABLE,
   DROP_VIEW,
   DROP_FUNCTION,
   CREATE_DATA_SOURCE,
@@ -494,6 +495,12 @@ struct TDropTableOrViewParams {
 
   // If true, no error is raised if the target table/view does not exist
   2: required bool if_exists
+}
+
+// Parameters of TRUNCATE commands
+struct TTruncateParams {
+  // Fully qualified name of table to truncate
+  1: required CatalogObjects.TTableName table_name
 }
 
 // Parameters of DROP FUNCTION commands

@@ -100,6 +100,7 @@ public class AnalysisContext {
     public boolean isGrantRevokePrivStmt() {
       return stmt_ instanceof GrantRevokePrivStmt;
     }
+    public boolean isTruncateStmt() { return stmt_ instanceof TruncateStmt; }
 
     public boolean isCatalogOp() {
       return isUseStmt() || isViewMetadataStmt() || isDdlStmt();
@@ -112,7 +113,7 @@ public class AnalysisContext {
           isAlterViewStmt() || isComputeStatsStmt() || isCreateUdfStmt() ||
           isCreateUdaStmt() || isDropFunctionStmt() || isCreateTableAsSelectStmt() ||
           isCreateDataSrcStmt() || isDropDataSrcStmt() || isDropStatsStmt() ||
-          isCreateDropRoleStmt() || isGrantRevokeStmt();
+          isCreateDropRoleStmt() || isGrantRevokeStmt() || isTruncateStmt();
     }
 
     private boolean isViewMetadataStmt() {
@@ -191,6 +192,11 @@ public class AnalysisContext {
     public DropTableOrViewStmt getDropTableOrViewStmt() {
       Preconditions.checkState(isDropTableOrViewStmt());
       return (DropTableOrViewStmt) stmt_;
+    }
+
+    public TruncateStmt getTruncateStmt() {
+      Preconditions.checkState(isTruncateStmt());
+      return (TruncateStmt) stmt_;
     }
 
     public DropFunctionStmt getDropFunctionStmt() {

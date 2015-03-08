@@ -831,6 +831,22 @@ public class AuthorizationTest {
   }
 
   @Test
+  public void TestTruncate() throws AuthorizationException, AnalysisException {
+    AuthzOk("truncate table functional_parquet.alltypes");
+
+    // User doesn't have INSERT permissions in the target table.
+    AuthzError("truncate table functional.alltypesagg",
+        "User '%s' does not have privileges to execute 'INSERT' on: " +
+        "functional.alltypesagg");
+
+    // User doesn't have INSERT permissions in the target view.
+    // Truncating a view is not allowed.
+    AuthzError("truncate table functional.alltypes_view",
+        "User '%s' does not have privileges to execute 'INSERT' on: " +
+        "functional.alltypes_view");
+  }
+
+  @Test
   public void TestAlterTable() throws AnalysisException, AuthorizationException {
     // User has permissions to modify tables.
     AuthzOk("ALTER TABLE functional_seq_snap.alltypes ADD COLUMNS (c1 int)");

@@ -58,6 +58,7 @@ import com.cloudera.impala.analysis.ShowFunctionsStmt;
 import com.cloudera.impala.analysis.ShowGrantRoleStmt;
 import com.cloudera.impala.analysis.ShowRolesStmt;
 import com.cloudera.impala.analysis.TableName;
+import com.cloudera.impala.analysis.TruncateStmt;
 import com.cloudera.impala.authorization.AuthorizationChecker;
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
@@ -378,6 +379,14 @@ public class Frontend {
       DropTableOrViewStmt stmt = analysis.getDropTableOrViewStmt();
       req.setDdl_type(stmt.isDropTable() ? TDdlType.DROP_TABLE : TDdlType.DROP_VIEW);
       req.setDrop_table_or_view_params(stmt.toThrift());
+      ddl.setDdl_params(req);
+      metadata.setColumns(Collections.<TColumn>emptyList());
+    } else if (analysis.isTruncateStmt()) {
+      ddl.op_type = TCatalogOpType.DDL;
+      TDdlExecRequest req = new TDdlExecRequest();
+      TruncateStmt stmt = analysis.getTruncateStmt();
+      req.setDdl_type(TDdlType.TRUNCATE_TABLE);
+      req.setTruncate_params(stmt.toThrift());
       ddl.setDdl_params(req);
       metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isDropFunctionStmt()) {

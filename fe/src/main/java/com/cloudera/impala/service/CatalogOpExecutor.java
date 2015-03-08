@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.service;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -26,6 +27,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.TableType;
@@ -77,6 +79,7 @@ import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.TableNotFoundException;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.View;
+import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.cloudera.impala.common.InternalException;
@@ -134,6 +137,7 @@ import com.cloudera.impala.thrift.TStatus;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TTableStats;
+import com.cloudera.impala.thrift.TTruncateParams;
 import com.cloudera.impala.thrift.TUpdateCatalogRequest;
 import com.cloudera.impala.thrift.TUpdateCatalogResponse;
 import com.cloudera.impala.util.HdfsCachingUtil;
@@ -223,6 +227,9 @@ public class CatalogOpExecutor {
       case DROP_TABLE:
       case DROP_VIEW:
         dropTableOrView(ddlRequest.getDrop_table_or_view_params(), response);
+        break;
+      case TRUNCATE_TABLE:
+        truncateTable(ddlRequest.getTruncate_params(), response);
         break;
       case DROP_FUNCTION:
         dropFunction(ddlRequest.getDrop_fn_params(), response);
@@ -1012,6 +1019,46 @@ public class CatalogOpExecutor {
     removedObject.getTable().setDb_name(tableName.getDb());
     removedObject.setCatalog_version(resp.result.getVersion());
     resp.result.setRemoved_catalog_object(removedObject);
+  }
+
+  /**
+   * Truncate a table by deleting all files in its partition directories, and dropping
+   * all column and table statistics.
+   * TODO truncate specified partitions.
+   */
+  private void truncateTable(TTruncateParams params, TDdlExecResponse resp)
+      throws ImpalaException {
+    synchronized (metastoreDdlLock_) {
+      TTableName tblName = params.getTable_name();
+      try {
+        Table table = getExistingTable(tblName.getDb_name(), tblName.getTable_name());
+        Preconditions.checkNotNull(table);
+        if (!(table instanceof HdfsTable)) {
+          throw new CatalogException(
+              String.format("TRUNCATE TABLE not supported on non-HDFS table: %s",
+              table.getFullName()));
+        }
+
+        HdfsTable hdfsTable = (HdfsTable)table;
+        for (HdfsPartition part: hdfsTable.getPartitions()) {
+          if (part.isDefaultPartition()) continue;
+          FileSystemUtil.deleteAllVisibleFiles(new Path(part.getLocation()));
+        }
+
+        dropColumnStats(table);
+        dropTableStats(table);
+      } catch (Exception e) {
+        String fqName = tblName.db_name + "." + tblName.table_name;
+        throw new CatalogException(String.format("Failed to truncate table: %s.\n" +
+            "Table may be in a partially truncated state.", fqName), e);
+      }
+    }
+
+    // Reload the table to pick up on the now empty directories.
+    Table refreshedTbl = catalog_.reloadTable(params.getTable_name());
+    resp.getResult().setUpdated_catalog_object(TableToTCatalogObject(refreshedTbl));
+    resp.getResult().setVersion(
+        resp.getResult().getUpdated_catalog_object().getCatalog_version());
   }
 
   private void dropFunction(TDropFunctionParams params, TDdlExecResponse resp)

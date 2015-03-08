@@ -2332,6 +2332,20 @@ public class ParserTest {
   }
 
   @Test
+  public void TestTruncateTable() {
+    ParsesOk("TRUNCATE TABLE Foo");
+    ParsesOk("TRUNCATE TABLE Foo.Bar");
+    ParsesOk("TRUNCATE Foo");
+    ParsesOk("TRUNCATE Foo.Bar");
+
+    ParserError("TRUNCATE");
+    ParserError("TRUNCATE TABLE");
+    ParserError("TRUNCATE TBL Foo");
+    ParserError("TRUNCATE VIEW Foo");
+    ParserError("TRUNCATE DATABASE Foo");
+  }
+
+  @Test
   public void TestLoadData() {
     ParsesOk("LOAD DATA INPATH '/a/b' INTO TABLE Foo");
     ParsesOk("LOAD DATA INPATH '/a/b' INTO TABLE Foo.Bar");
@@ -2470,8 +2484,8 @@ public class ParserTest {
         "^\n" +
         "Encountered: IDENTIFIER\n" +
         "Expected: ALTER, COMPUTE, CREATE, DESCRIBE, DROP, EXPLAIN, GRANT, " +
-        "INSERT, INVALIDATE, LOAD, REFRESH, REVOKE, SELECT, SET, SHOW, USE, " +
-        "VALUES, WITH\n");
+        "INSERT, INVALIDATE, LOAD, REFRESH, REVOKE, SELECT, SET, SHOW, TRUNCATE, " +
+        "USE, VALUES, WITH\n");
 
     // missing select list
     ParserError("select from t",
@@ -2481,7 +2495,7 @@ public class ParserTest {
         "Encountered: FROM\n" +
         "Expected: ALL, CASE, CAST, DISTINCT, EXISTS, " +
         "FALSE, IF, INTERVAL, NOT, NULL, " +
-        "STRAIGHT_JOIN, TRUE, IDENTIFIER\n");
+        "STRAIGHT_JOIN, TRUNCATE, TRUE, IDENTIFIER\n");
 
     // missing from
     ParserError("select c, b, c where a = 5",
@@ -2507,7 +2521,7 @@ public class ParserTest {
         "                           ^\n" +
         "Encountered: EOF\n" +
         "Expected: CASE, CAST, EXISTS, FALSE, " +
-        "IF, INTERVAL, NOT, NULL, TRUE, IDENTIFIER\n");
+        "IF, INTERVAL, NOT, NULL, TRUNCATE, TRUE, IDENTIFIER\n");
 
     // missing predicate in where clause (group by)
     ParserError("select c, b, c from t where group by a, b",
@@ -2516,7 +2530,7 @@ public class ParserTest {
         "                            ^\n" +
         "Encountered: GROUP\n" +
         "Expected: CASE, CAST, EXISTS, FALSE, " +
-        "IF, INTERVAL, NOT, NULL, TRUE, IDENTIFIER\n");
+        "IF, INTERVAL, NOT, NULL, TRUNCATE, TRUE, IDENTIFIER\n");
 
     // unmatched string literal starting with "
     ParserError("select c, \"b, c from t",
@@ -2577,7 +2591,7 @@ public class ParserTest {
         "                             ^\n" +
         "Encountered: COMMA\n" +
         "Expected: CASE, CAST, EXISTS, FALSE, " +
-        "IF, INTERVAL, NOT, NULL, TRUE, IDENTIFIER\n");
+        "IF, INTERVAL, NOT, NULL, TRUNCATE, TRUE, IDENTIFIER\n");
 
     // Parsing identifiers that have different names printed as EXPECTED
     ParserError("DROP DATA SRC foo",

@@ -204,6 +204,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("tinyint", new Integer(SqlParserSymbols.KW_TINYINT));
     keywordMap.put("to", new Integer(SqlParserSymbols.KW_TO));
     keywordMap.put("true", new Integer(SqlParserSymbols.KW_TRUE));
+    keywordMap.put("truncate", new Integer(SqlParserSymbols.KW_TRUNCATE));
     keywordMap.put("unbounded", new Integer(SqlParserSymbols.KW_UNBOUNDED));
     keywordMap.put("uncached", new Integer(SqlParserSymbols.KW_UNCACHED));
     keywordMap.put("union", new Integer(SqlParserSymbols.KW_UNION));

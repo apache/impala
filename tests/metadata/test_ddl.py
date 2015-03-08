@@ -29,7 +29,7 @@ from tests.util.filesystem_utils import WAREHOUSE, IS_DEFAULT_FS
 # Validates DDL statements (create, drop)
 class TestDdlStatements(ImpalaTestSuite):
   TEST_DBS = ['ddl_test_db', 'alter_table_test_db', 'alter_table_test_db2',
-              'function_ddl_test', 'udf_test', 'data_src_test']
+              'function_ddl_test', 'udf_test', 'data_src_test', 'truncate_table_test_db']
 
   @classmethod
   def get_workload(self):
@@ -107,6 +107,56 @@ class TestDdlStatements(ImpalaTestSuite):
     # Dropping the db removes the db's directory
     self.client.execute("drop database ddl_test_db")
     assert not self.hdfs_client.exists("test-warehouse/ddl_test_db.db/")
+
+  @SkipIfS3.insert # S3: missing coverage: truncate table
+  @pytest.mark.execute_serially
+  def test_truncate_cleans_hdfs_files(self):
+    self.hdfs_client.delete_file_dir("test-warehouse/truncate_table_test_db.db/",
+        recursive=True)
+    assert not self.hdfs_client.exists("test-warehouse/truncate_table_test_db.db/")
+
+    self.client.execute('create database truncate_table_test_db')
+    # Verify the db directory exists
+    assert self.hdfs_client.exists("test-warehouse/truncate_table_test_db.db/")
+
+    self.client.execute("create table truncate_table_test_db.t1(i int)")
+    # Verify the table directory exists
+    assert self.hdfs_client.exists("test-warehouse/truncate_table_test_db.db/t1/")
+
+    # Should have created one file in the table's dir
+    self.client.execute("insert into truncate_table_test_db.t1 values (1)")
+    ls = self.hdfs_client.list_dir("test-warehouse/truncate_table_test_db.db/t1/")
+    assert len(ls['FileStatuses']['FileStatus']) == 2
+
+    # Truncating the table removes the data files and preserves the table's directory
+    self.client.execute("truncate table truncate_table_test_db.t1")
+    ls = self.hdfs_client.list_dir("test-warehouse/truncate_table_test_db.db/t1/")
+    assert len(ls['FileStatuses']['FileStatus']) == 1
+
+    self.client.execute(
+        "create table truncate_table_test_db.t2(i int) partitioned by (p int)")
+    # Verify the table directory exists
+    assert self.hdfs_client.exists("test-warehouse/truncate_table_test_db.db/t2/")
+
+    # Should have created the partition dir, which should contain exactly one file
+    self.client.execute(
+        "insert into truncate_table_test_db.t2 partition(p=1) values (1)")
+    ls = self.hdfs_client.list_dir("test-warehouse/truncate_table_test_db.db/t2/p=1")
+    assert len(ls['FileStatuses']['FileStatus']) == 1
+
+    # Truncating the table removes the data files and preserves the partition's directory
+    self.client.execute("truncate table truncate_table_test_db.t2")
+    assert self.hdfs_client.exists("test-warehouse/truncate_table_test_db.db/t2/p=1")
+    ls = self.hdfs_client.list_dir("test-warehouse/truncate_table_test_db.db/t2/p=1")
+    assert len(ls['FileStatuses']['FileStatus']) == 0
+
+  @SkipIfS3.insert # S3: missing coverage: truncate table
+  @pytest.mark.execute_serially
+  def test_truncate_table(self, vector):
+    vector.get_value('exec_option')['abort_on_error'] = False
+    self.__create_db_synced('truncate_table_test_db', vector)
+    self.run_test_case('QueryTest/truncate-table', vector, use_db='truncate_table_test_db',
+        multiple_impalad=self.__use_multiple_impalad(vector))
 
   @SkipIfS3.insert
   @pytest.mark.execute_serially

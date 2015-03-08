@@ -250,8 +250,8 @@ terminal
   KW_ROLES, KW_ROW, KW_ROWS, KW_SCHEMA, KW_SCHEMAS, KW_SELECT, KW_SEMI, KW_SEQUENCEFILE,
   KW_SERDEPROPERTIES, KW_SERIALIZE_FN, KW_SET, KW_SHOW, KW_SMALLINT, KW_STORED,
   KW_STRAIGHT_JOIN, KW_STRING, KW_STRUCT, KW_SYMBOL, KW_TABLE, KW_TABLES,
-  KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE, KW_THEN,
-  KW_TIMESTAMP, KW_TINYINT, KW_STATS, KW_TO, KW_TRUE, KW_UNBOUNDED, KW_UNCACHED,
+  KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP,
+  KW_TINYINT, KW_TRUNCATE, KW_STATS, KW_TO, KW_TRUE, KW_UNBOUNDED, KW_UNCACHED,
   KW_UNION, KW_UPDATE_FN, KW_USE, KW_USING,
   KW_VALUES, KW_VARCHAR, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
 
@@ -296,6 +296,7 @@ nonterminal DescribeStmt describe_stmt;
 nonterminal ShowCreateTableStmt show_create_tbl_stmt;
 nonterminal TDescribeTableOutputStyle describe_output_style;
 nonterminal LoadDataStmt load_stmt;
+nonterminal TruncateStmt truncate_stmt;
 nonterminal ResetMetadataStmt reset_metadata_stmt;
 // List of select blocks connected by UNION operators, with order by or limit.
 nonterminal QueryStmt union_with_order_by_or_limit;
@@ -541,6 +542,8 @@ stmt ::=
   {: RESULT = explain; :}
   | load_stmt: load
   {: RESULT = load; :}
+  | truncate_stmt: truncate
+  {: RESULT = truncate; :}
   | reset_metadata_stmt: reset_metadata
   {: RESULT = reset_metadata; :}
   | set_stmt:set
@@ -567,6 +570,13 @@ load_stmt ::=
   KW_LOAD KW_DATA KW_INPATH STRING_LITERAL:path overwrite_val:overwrite KW_INTO KW_TABLE
   table_name:table opt_partition_spec:partition
   {: RESULT = new LoadDataStmt(table, new HdfsUri(path), overwrite, partition); :}
+  ;
+
+truncate_stmt ::=
+  KW_TRUNCATE KW_TABLE table_name:tbl_name
+  {: RESULT = new TruncateStmt(tbl_name); :}
+  | KW_TRUNCATE table_name:tbl_name
+  {: RESULT = new TruncateStmt(tbl_name); :}
   ;
 
 overwrite_val ::=
@@ -2096,9 +2106,11 @@ non_pred_expr ::=
   {: RESULT = e; :}
   | analytic_expr:e
   {: RESULT = e; :}
-  /* Since "IF" is a keyword, need to special case this function */
+  /* Since "IF", "TRUNCATE" are keywords, need to special case these functions */
   | KW_IF LPAREN expr_list:exprs RPAREN
   {: RESULT = new FunctionCallExpr("if", exprs); :}
+  | KW_TRUNCATE LPAREN expr_list:exprs RPAREN
+  {: RESULT = new FunctionCallExpr("truncate", exprs); :}
   | cast_expr:c
   {: RESULT = c; :}
   | case_expr:c

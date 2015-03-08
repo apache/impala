@@ -769,6 +769,27 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestTruncate() throws AnalysisException {
+    AnalyzesOk("truncate table functional.alltypes");
+    AnalyzesOk("truncate functional.alltypes");
+
+    // If the database does not exist, an analysis error should be thrown
+    AnalysisError("truncate table db_does_not_exist.alltypes",
+        "Database does not exist: db_does_not_exist");
+    // Invalid name reports non-existence instead of invalidity.
+    AnalysisError("truncate table functional.`%^&`",
+        "Table does not exist: functional.%^&");
+
+    // If the database exists but the table doesn't, an analysis error should be thrown.
+    AnalysisError("truncate table functional.badtable",
+        "Table does not exist: functional.badtable");
+
+    // Cannot truncate a non hdfs table.
+    AnalysisError("truncate table functional.alltypes_view",
+        "TRUNCATE TABLE not supported on non-HDFS table: functional.alltypes_view");
+  }
+
+  @Test
   public void TestCreateDataSource() {
     final String DATA_SOURCE_NAME = "TestDataSource1";
     final DataSource DATA_SOURCE = new DataSource(DATA_SOURCE_NAME, "/foo.jar",

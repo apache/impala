@@ -92,6 +92,9 @@ struct TDdlExecRequest {
   // Parameters for DROP TABLE/VIEW
   11: optional JniCatalog.TDropTableOrViewParams drop_table_or_view_params
 
+  // Parameters for TRUNCATE TABLE
+  21: optional JniCatalog.TTruncateParams truncate_params
+
   // Parameters for DROP FUNCTION
   12: optional JniCatalog.TDropFunctionParams drop_fn_params
 
