@@ -24,7 +24,7 @@ set -e
 
 # Allow picking up strategy from environment
 : ${EXPLORATION_STRATEGY:=core}
-NUM_ITERATIONS=1
+: ${NUM_TEST_ITERATIONS:=1}
 KERB_ARGS=""
 
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
@@ -54,7 +54,7 @@ do
       EXPLORATION_STRATEGY=$OPTARG
       ;;
     n)
-      NUM_ITERATIONS=$OPTARG
+      NUM_TEST_ITERATIONS=$OPTARG
       ;;
     ?)
       echo "run-all-tests.sh [-e <exploration_strategy>] [-n <num_iters>]"
@@ -79,7 +79,7 @@ if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
   ${IMPALA_HOME}/testdata/bin/split-hbase.sh > /dev/null 2>&1
 fi
 
-for i in $(seq 1 $NUM_ITERATIONS)
+for i in $(seq 1 $NUM_TEST_ITERATIONS)
 do
   # Preemptively force kill impalads and the statestore to clean up any running instances.
   # The BE unit tests cannot run when impalads are started.
