@@ -68,13 +68,11 @@ class TestFetchFirst(HS2TestSuite):
     else:
       assert cached_bytes == 0
 
-  @pytest.mark.xfail(run=False, reason="IMPALA-1264")
   @pytest.mark.execute_serially
   @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6)
   def test_query_stmts_v6(self):
     self.run_query_stmts_test();
 
-  @pytest.mark.xfail(run=False, reason="IMPALA-1264")
   @pytest.mark.execute_serially
   @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V1)
   def test_query_stmts_v1(self):
@@ -162,8 +160,8 @@ class TestFetchFirst(HS2TestSuite):
                     "Restarting the fetch is not possible")
     self.__verify_num_cached_rows(0)
     # This fetch should succeed but return 0 rows because the stream is eos.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_NEXT, 10, 0)
+    self.fetch_at_most(execute_statement_resp.operationHandle,
+                       TCLIService.TFetchOrientation.FETCH_NEXT, 10, 0)
     self.__verify_num_cached_rows(0)
     self.close(execute_statement_resp.operationHandle)
 
@@ -184,12 +182,12 @@ class TestFetchFirst(HS2TestSuite):
     self.__verify_num_cached_rows(12)
     # Restart the fetch asking for 40 rows. We expect 30 results returned and that the
     # cache is exhausted.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_FIRST, 40, 30)
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_FIRST, 40, 30)
     self.__verify_num_cached_rows(0)
     # Fetch next should succeed and return 0 rows (eos).
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_NEXT, 7, 0)
+    self.fetch_at_most(execute_statement_resp.operationHandle,
+                       TCLIService.TFetchOrientation.FETCH_NEXT, 7, 0)
     self.__verify_num_cached_rows(0)
     # Since the cache is exhausted, FETCH_FIRST will fail.
     self.fetch_fail(execute_statement_resp.operationHandle,
@@ -219,8 +217,8 @@ class TestFetchFirst(HS2TestSuite):
                     "Restarting the fetch is not possible")
     self.__verify_num_cached_rows(0)
     # Resuming FETCH_NEXT should succeed. There are 12 remaining rows to fetch.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_NEXT, 100, 12)
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_NEXT, 100, 12)
     self.__verify_num_cached_rows(0)
     self.close(execute_statement_resp.operationHandle)
 
@@ -240,12 +238,12 @@ class TestFetchFirst(HS2TestSuite):
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     for i in xrange(0, 3):
       # Fetch some rows. Expect to get 0 rows.
-      self.fetch(execute_statement_resp.operationHandle,
-                 TCLIService.TFetchOrientation.FETCH_NEXT, i * 10, 0)
+      self.fetch_at_most(execute_statement_resp.operationHandle,
+                         TCLIService.TFetchOrientation.FETCH_NEXT, i * 10, 0)
       self.__verify_num_cached_rows(0)
       # Fetch some rows with FETCH_FIRST. Expect to get 0 rows.
-      self.fetch(execute_statement_resp.operationHandle,
-                 TCLIService.TFetchOrientation.FETCH_FIRST, i * 10, 0)
+      self.fetch_at_most(execute_statement_resp.operationHandle,
+                         TCLIService.TFetchOrientation.FETCH_FIRST, i * 10, 0)
       self.__verify_num_cached_rows(0)
     self.close(execute_statement_resp.operationHandle)
 
@@ -254,17 +252,17 @@ class TestFetchFirst(HS2TestSuite):
     execute_statement_req.statement = "SELECT 1, 1.0, 'a', trim('abc'), NULL"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     # Fetch 100 rows with FETCH_FIRST. Expect to get 1 row.
-    self.fetch(execute_statement_resp.operationHandle,
-              TCLIService.TFetchOrientation.FETCH_FIRST, 100, 1)
+    self.fetch_at_most(execute_statement_resp.operationHandle,
+                       TCLIService.TFetchOrientation.FETCH_FIRST, 100, 1)
     self.__verify_num_cached_rows(1)
     for i in xrange(0, 3):
       # Fetch some rows with FETCH_FIRST. Expect to get 1 row.
-      self.fetch(execute_statement_resp.operationHandle,
-                 TCLIService.TFetchOrientation.FETCH_FIRST, i * 10, 1)
+      self.fetch_at_most(execute_statement_resp.operationHandle,
+                         TCLIService.TFetchOrientation.FETCH_FIRST, i * 10, 1)
       self.__verify_num_cached_rows(1)
-      # Fetch some more rows. Expect to get 1 row.
-      self.fetch(execute_statement_resp.operationHandle,
-                 TCLIService.TFetchOrientation.FETCH_NEXT, i * 10, 0)
+      # Fetch some more rows. Expect to get 0 rows.
+      self.fetch_at_most(execute_statement_resp.operationHandle,
+                         TCLIService.TFetchOrientation.FETCH_NEXT, i * 10, 0)
       self.__verify_num_cached_rows(1)
     self.close(execute_statement_resp.operationHandle)
 
@@ -297,8 +295,8 @@ class TestFetchFirst(HS2TestSuite):
         expected_num_rows = 5
       if i == 4:
         expected_num_rows = 0
-      self.fetch(execute_statement_resp.operationHandle,
-                 TCLIService.TFetchOrientation.FETCH_NEXT, 10, expected_num_rows)
+      self.fetch_until(execute_statement_resp.operationHandle,
+                       TCLIService.TFetchOrientation.FETCH_NEXT, 10, expected_num_rows)
       # Fetch 10 rows with the FETCH_FIRST orientation, expecting an error.
       # After a failed FETCH_FIRST, the client can still resume FETCH_NEXT.
       self.fetch_fail(execute_statement_resp.operationHandle,
@@ -314,8 +312,8 @@ class TestFetchFirst(HS2TestSuite):
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     HS2TestSuite.check_response(execute_statement_resp)
     for _ in xrange(1, 5):
-      self.fetch(execute_statement_resp.operationHandle,
-                 TCLIService.TFetchOrientation.FETCH_FIRST, 30, 25)
+      self.fetch_until(execute_statement_resp.operationHandle,
+                       TCLIService.TFetchOrientation.FETCH_FIRST, 30, 25)
     # The results of non-query stmts are not counted as 'cached'.
     self.__verify_num_cached_rows(0)
 
@@ -326,20 +324,20 @@ class TestFetchFirst(HS2TestSuite):
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     HS2TestSuite.check_response(execute_statement_resp)
     # Fetch 10 rows.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_NEXT, 10)
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_NEXT, 10)
     # Restart the fetch asking for 20 rows.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_FIRST, 20)
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_FIRST, 20)
     # FETCH_NEXT asking for 100 rows. There are only 5 remaining rows.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_NEXT, 100, 5)
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_NEXT, 100, 5)
     # Restart the fetch asking for 10 rows.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_FIRST, 5)
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_FIRST, 5)
     # FETCH_NEXT asking for 100 rows. There are only 20 remaining rows.
-    self.fetch(execute_statement_resp.operationHandle,
-               TCLIService.TFetchOrientation.FETCH_NEXT, 100, 20)
+    self.fetch_until(execute_statement_resp.operationHandle,
+                     TCLIService.TFetchOrientation.FETCH_NEXT, 100, 20)
 
   @pytest.mark.execute_serially
   @needs_session

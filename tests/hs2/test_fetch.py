@@ -49,8 +49,8 @@ class TestFetch(HS2TestSuite):
         "SELECT * FROM functional.alltypessmall ORDER BY id LIMIT 1"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     HS2TestSuite.check_response(execute_statement_resp)
-    results = self.fetch(execute_statement_resp.operationHandle,
-                TCLIService.TFetchOrientation.FETCH_NEXT, 1, 1)
+    results = self.fetch_at_most(execute_statement_resp.operationHandle,
+                                 TCLIService.TFetchOrientation.FETCH_NEXT, 1, 1)
     assert len(results.results.rows) == 1
     metadata_resp = self.result_metadata(execute_statement_resp.operationHandle)
     column_types = metadata_resp.schema.columns
@@ -75,8 +75,8 @@ class TestFetch(HS2TestSuite):
         "SELECT d1,d5 FROM functional.decimal_tbl ORDER BY d1 LIMIT 1"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     HS2TestSuite.check_response(execute_statement_resp)
-    results = self.fetch(execute_statement_resp.operationHandle,
-                TCLIService.TFetchOrientation.FETCH_NEXT, 1, 1)
+    results = self.fetch_at_most(execute_statement_resp.operationHandle,
+                                 TCLIService.TFetchOrientation.FETCH_NEXT, 1, 1)
     assert len(results.results.rows) == 1
     # Verify the result schema is what we expect. The result has 2 columns, the
     # first is decimal(9,0) and the second is decimal(10,5)
@@ -94,8 +94,8 @@ class TestFetch(HS2TestSuite):
         "SELECT * FROM functional.chars_tiny ORDER BY cs LIMIT 1"
     execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
     HS2TestSuite.check_response(execute_statement_resp)
-    results = self.fetch(execute_statement_resp.operationHandle,
-                TCLIService.TFetchOrientation.FETCH_NEXT, 1, 1)
+    results = self.fetch_at_most(execute_statement_resp.operationHandle,
+                                 TCLIService.TFetchOrientation.FETCH_NEXT, 1, 1)
     assert len(results.results.rows) == 1
     metadata_resp = self.result_metadata(execute_statement_resp.operationHandle)
     column_types = metadata_resp.schema.columns

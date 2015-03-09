@@ -104,11 +104,14 @@ class HS2TestSuite(ImpalaTestSuite):
 
     assert False
 
-  def fetch(self, handle, orientation, size, expected_num_rows = None):
+  def fetch_at_most(self, handle, orientation, size, expected_num_rows = None):
     """Fetches at most size number of rows from the query identified by the given
-    operation handle. Uses the given fetch orientation. Asserts that the fetch returns
-    a success status, and that the number of rows returned is equal to size, or
-    equal to the given expected_num_rows (if one was given)."""
+    operation handle. Uses the given fetch orientation. Asserts that the fetch returns a
+    success status, and that the number of rows returned is equal to given
+    expected_num_rows (if given). It is only safe for expected_num_rows to be 0 or 1:
+    Impala does not guarantee that a larger result set will be returned in one go. Use
+    fetch_until() for repeated fetches."""
+    assert expected_num_rows is None or expected_num_rows in (0, 1)
     fetch_results_req = TCLIService.TFetchResultsReq()
     fetch_results_req.operationHandle = handle
     fetch_results_req.orientation = orientation
@@ -117,32 +120,36 @@ class HS2TestSuite(ImpalaTestSuite):
     HS2TestSuite.check_response(fetch_results_resp)
     num_rows = size
     if expected_num_rows is not None:
-      num_rows = expected_num_rows
-    assert self.get_num_rows(fetch_results_resp.results) == num_rows
+      assert self.get_num_rows(fetch_results_resp.results) == expected_num_rows
     return fetch_results_resp
 
-  def fetch_until(self, handle, orientation, size):
+  def fetch_until(self, handle, orientation, size, expected_num_rows = None):
     """Tries to fetch exactly 'size' rows from the given query handle, with the given
-    fetch orientation. If fewer rows than 'size' are returned by the first fetch, repeated
-    fetches are issued until either 0 rows are returned, or the number of rows fetched is
-    equal to 'size'"""
+    fetch orientation, by repeatedly issuing fetch(size - num rows already fetched)
+    calls. Returns fewer than 'size' rows if either a fetch() returns 0 rows (indicating
+    EOS) or 'expected_num_rows' rows are returned. If 'expected_num_rows' is set to None,
+    it defaults to 'size', so that the effect is to both ask for and expect the same
+    number of rows."""
+    assert expected_num_rows is None or (size >= expected_num_rows)
     fetch_results_req = TCLIService.TFetchResultsReq()
     fetch_results_req.operationHandle = handle
     fetch_results_req.orientation = orientation
     fetch_results_req.maxRows = size
     fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
     HS2TestSuite.check_response(fetch_results_resp)
-    num_rows = size
     num_rows_fetched = self.get_num_rows(fetch_results_resp.results)
-    while num_rows_fetched < size:
+    if expected_num_rows is None: expected_num_rows = size
+    while num_rows_fetched < expected_num_rows:
+      # Always try to fetch at most 'size'
       fetch_results_req.maxRows = size - num_rows_fetched
+      fetch_results_req.orientation = TCLIService.TFetchOrientation.FETCH_NEXT
       fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
       HS2TestSuite.check_response(fetch_results_resp)
       last_fetch_size = self.get_num_rows(fetch_results_resp.results)
       assert last_fetch_size > 0
       num_rows_fetched += last_fetch_size
 
-    assert num_rows_fetched == size
+    assert num_rows_fetched == expected_num_rows
 
   def fetch_fail(self, handle, orientation, expected_error_prefix):
     """Attempts to fetch rows from the query identified by the given operation handle.
