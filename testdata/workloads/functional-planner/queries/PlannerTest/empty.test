@@ -250,3 +250,31 @@ select MIN(int_col) OVER () FROM functional.alltypes limit 0
 ---- PLAN
 00:EMPTYSET
 ====
+# IMPALA-1860: INSERT/CTAS should evaluate and apply constant predicates.
+insert into functional.alltypes partition(year, month)
+select * from functional.alltypes where 1 = 0
+---- PLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
+|  partitions=24
+|
+00:EMPTYSET
+====
+# IMPALA-1860: INSERT/CTAS should evaluate and apply constant predicates.
+with t as (select * from functional.alltypes where coalesce(NULL) > 10)
+insert into functional.alltypes partition(year, month)
+select * from t
+---- PLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(functional.alltypes.year,functional.alltypes.month)]
+|  partitions=24
+|
+00:EMPTYSET
+====
+# IMPALA-1860: INSERT/CTAS should evaluate and apply constant predicates.
+create table test_1860 as
+select * from (select 1 from functional.alltypes limit 0) v
+---- PLAN
+WRITE TO HDFS [default.test_1860, OVERWRITE=false]
+|  partitions=1
+|
+00:EMPTYSET
+====
