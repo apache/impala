@@ -218,6 +218,25 @@ public class NumericLiteral extends LiteralExpr {
   @Override
   protected Expr uncheckedCastTo(Type targetType) throws AnalysisException {
     Preconditions.checkState(targetType.isNumericType());
+    // Implicit casting to decimals allows truncating digits from the left of the
+    // decimal point (see TypesUtil). A literal that is implicitly cast to a decimal
+    // with truncation is wrapped into a CastExpr so the BE can evaluate it and report
+    // a warning. This behavior is consistent with casting/overflow of non-constant
+    // exprs that return decimal.
+    // IMPALA-1837: Without the CastExpr wrapping, such literals can exceed the max
+    // expected byte size sent to the BE in toThrift().
+    if (targetType.isDecimal()) {
+      ScalarType decimalType = (ScalarType) targetType;
+      // analyze() ensures that value_ never exceeds the maximum scale and precision.
+      Preconditions.checkState(isAnalyzed_);
+      // Sanity check that our implicit casting does not allow a reduced precision or
+      // truncating values from the right of the decimal point.
+      Preconditions.checkState(value_.precision() <= decimalType.decimalPrecision());
+      Preconditions.checkState(value_.scale() <= decimalType.decimalScale());
+      int valLeftDigits = value_.precision() - value_.scale();
+      int typeLeftDigits = decimalType.decimalPrecision() - decimalType.decimalScale();
+      if (typeLeftDigits < valLeftDigits) return new CastExpr(targetType, this, true);
+    }
     type_ = targetType;
     return this;
   }

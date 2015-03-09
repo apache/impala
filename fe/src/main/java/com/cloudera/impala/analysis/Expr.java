@@ -954,10 +954,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * Checks validity of cast, and
-   * calls uncheckedCastTo() to
-   * create a cast expression that casts
-   * this to a specific type.
+   * Casts this expr to a specific target type. It checks the validity of the cast and
+   * calls uncheckedCastTo().
    * @param targetType
    *          type to be cast to
    * @return cast expression, or converted literal,
