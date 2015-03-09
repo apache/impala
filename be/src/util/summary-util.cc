@@ -19,6 +19,7 @@
 
 #include "common/logging.h"
 #include "util/pretty-printer.h"
+#include "util/redactor.h"
 #include "util/table-printer.h"
 
 using namespace boost;
@@ -78,7 +79,8 @@ void PrintExecSummary(const TExecSummary& exec_summary, int indent_level,
   row.push_back(PrettyPrinter::Print(est_stats.cardinality, TUnit::UNIT));
   row.push_back(PrettyPrinter::Print(max_stats.memory_used, TUnit::BYTES));
   row.push_back(PrettyPrinter::Print(est_stats.memory_used, TUnit::BYTES));
-  row.push_back(node.label_detail);
+  // Node "details" may contain exprs which should be redacted.
+  row.push_back(RedactCopy(node.label_detail));
   result->push_back(row);
 
   map<int, int>::const_iterator child_fragment_idx_it =

@@ -14,21 +14,23 @@
 
 #include "util/runtime-profile.h"
 
-#include "common/object-pool.h"
-#include "util/compress.h"
-#include "util/cpu-info.h"
-#include "util/debug-util.h"
-#include "rpc/thrift-util.h"
-#include "util/url-coding.h"
-#include "util/container-util.h"
-#include "util/periodic-counter-updater.h"
-
 #include <iomanip>
 #include <iostream>
+
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/thread.hpp>
+
+#include "common/object-pool.h"
+#include "rpc/thrift-util.h"
+#include "util/compress.h"
+#include "util/container-util.h"
+#include "util/cpu-info.h"
+#include "util/debug-util.h"
+#include "util/periodic-counter-updater.h"
+#include "util/redactor.h"
+#include "util/url-coding.h"
 
 using namespace boost;
 using namespace std;
@@ -403,13 +405,15 @@ void RuntimeProfile::GetAllChildren(vector<RuntimeProfile*>* children) {
 }
 
 void RuntimeProfile::AddInfoString(const string& key, const string& value) {
+  // Values may contain sensitive data, such as a query.
+  const string& info = RedactCopy(value);
   lock_guard<mutex> l(info_strings_lock_);
   InfoStrings::iterator it = info_strings_.find(key);
   if (it == info_strings_.end()) {
-    info_strings_.insert(make_pair(key, value));
+    info_strings_.insert(make_pair(key, info));
     info_strings_display_order_.push_back(key);
   } else {
-    it->second = value;
+    it->second = info;
   }
 }
 

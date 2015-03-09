@@ -72,7 +72,7 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
     # for deleting self.tmp_dir after tests pass.
     pass
 
-  def start_cluster_using_rules(self, redaction_rules):
+  def start_cluster_using_rules(self, redaction_rules, log_level=2, vmodule=""):
     '''Start Impala with a custom log dir and redaction rules.'''
     self.tmp_dir = make_tmp_dir()
     os.chmod(self.tmp_dir, 0o777)
@@ -88,10 +88,11 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
     self._start_impala_cluster(
         ["""--impalad_args='-audit_event_log_dir=%s
                             -profile_log_dir=%s
-                            -redaction_rules_file=%s'"""
-            % (self.audit_dir, self.profile_dir, self.rules_file)],
+                            -redaction_rules_file=%s
+                            -vmodule=%s'"""
+            % (self.audit_dir, self.profile_dir, self.rules_file, vmodule)],
         log_dir=self.log_dir,
-        log_level=2)
+        log_level=log_level)
     self.client = self.create_impala_client()
 
   def find_last_query_id(self):
@@ -107,6 +108,17 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
       if match:
         return match.group(1)
     raise Exception('Unable to find any query id')
+
+  def assert_server_fails_to_start(self, rules, start_options, expected_error_message):
+    try:
+      self.start_cluster_using_rules(rules, **start_options)
+      self.fail('Cluster should not have started but did')
+    except Exception:
+      if self.cluster.impalads:
+        raise Exception("No impalads should have started")
+    with open(os.path.join(self.log_dir, 'impalad-error.log')) as file:
+      result = self.grep_file(file, expected_error_message)
+    assert result, 'The expected error message was not found'
 
   def assert_log_redaction(self, unredacted_value, redacted_value, expect_audit=True):
     '''Asserts that the 'unredacted_value' is not present but the 'redacted_value' is.'''
@@ -126,10 +138,12 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
     # The web ui should not show the unredacted value.
     for page in ('queries', 'query_stmt', 'query_plan_text', 'query_summary',
         'query_profile', 'query_plan'):
-      url = page + '?query_id=' + query_id
-      results = self.grep_file(impala_service.open_debug_webpage(url), unredacted_value)
-      assert not results, "Web page %s should not contain '%s' but does" \
-          % (url, unredacted_value)
+      for response_format in ('html', 'json'):
+        # The 'html' param is actually ignored by the server.
+        url = page + '?query_id=' + query_id + "&" + response_format
+        results = self.grep_file(impala_service.open_debug_webpage(url), unredacted_value)
+        assert not results, "Web page %s should not contain '%s' but does" \
+            % (url, unredacted_value)
     # But the redacted value should be shown.
     self.assert_web_ui_contains(query_id, redacted_value)
 
@@ -184,20 +198,43 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
 
   @pytest.mark.execute_serially
   def test_bad_rules(self):
-    try:
-      self.start_cluster_using_rules('{ "version": 100 }')
-      self.fail('Cluster should not have started but did')
-    except Exception as e:
-      if 'live-backends did not reach value' not in str(e):
-        raise
-    with open(os.path.join(self.log_dir, 'impalad-error.log')) as file:
-      result = self.grep_file(file,
+    '''Check that the server fails to start if the redaction rules are bad.'''
+    startup_options = dict()
+    self.assert_server_fails_to_start('{ "version": 100 }', startup_options,
         'Error parsing redaction rules; only version 1 is supported')
-    assert result, 'The expected error message was not found'
-
     # Since the tests passed, the log dir shouldn't be of interest and can be deleted.
     shutil.rmtree(self.tmp_dir)
 
+  @pytest.mark.execute_serially
+  def test_very_verbose_logging(self):
+    '''Check that the server fails to start if logging is configured at a level that
+       could dump table data. Row logging would be enabled with "-v=3" or could be
+       enabled  with the -vmodule option. In either case the server should not start.
+    '''
+    rules = r"""
+        {
+          "version": 1,
+          "rules": [
+            {
+              "description": "Don't show emails",
+              "caseSensitive": false,
+              "search": "[a-z]+@[a-z]+.[a-z]{3}",
+              "replace": "*email*"
+            }
+          ]
+        }"""
+    error_message = "Redaction cannot be used in combination with log level 3 or " \
+        "higher or the -vmodule option"
+    self.assert_server_fails_to_start(rules, {"log_level": 3}, error_message)
+    # Since the tests passed, the log dir shouldn't be of interest and can be deleted.
+    shutil.rmtree(self.tmp_dir)
+
+    self.assert_server_fails_to_start(rules, {"vmodule": "foo"}, error_message)
+    shutil.rmtree(self.tmp_dir)
+
+    self.assert_server_fails_to_start(
+        rules, {"log_level": 3, "vmodule": "foo"}, error_message)
+    shutil.rmtree(self.tmp_dir)
 
   @pytest.mark.execute_serially
   def test_unredacted(self):
@@ -249,8 +286,10 @@ class TestRedaction(CustomClusterTestSuite, unittest.TestCase):
         ]
       }""")
     email = 'FOO@bar.com'
+    # GROUP BY an expr containing the email so the expr will also be shown in the exec
+    # node summary, ie HASH(string_col = ...).
     self.execute_query_expect_success(self.client,
-        "SELECT COUNT(*) FROM functional.alltypes WHERE string_col = '%s'" % email)
+        "SELECT string_col = '%s', COUNT(*) FROM functional.alltypes GROUP BY 1" % email)
 
     # The email should be replaced with '*email*'.
     self.assert_web_ui_redaction(self.find_last_query_id(), email, "*email*")

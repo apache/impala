@@ -173,8 +173,7 @@ void ImpalaServer::QueryProfileUrlCallback(const Webserver::ArgumentMap& args,
     return;
   }
 
-  // Redact profile string which contains the query string
-  Value profile(RedactCopy(ss.str()).c_str(), document->GetAllocator());
+  Value profile(ss.str().c_str(), document->GetAllocator());
   document->AddMember("profile", profile, document->GetAllocator());
   document->AddMember("query_id", args.find("query_id")->second.c_str(),
       document->GetAllocator());
@@ -444,7 +443,9 @@ void PlanToJsonHelper(const map<TPlanNodeId, TPlanNodeExecSummary>& summaries,
     vector<TPlanNode>::const_iterator* it, rapidjson::Document* document, Value* value) {
   Value children(kArrayType);
   value->AddMember("label", (*it)->label.c_str(), document->GetAllocator());
-  value->AddMember("label_detail", (*it)->label_detail.c_str(), document->GetAllocator());
+  // Node "details" may contain exprs which should be redacted.
+  Value label_detail(RedactCopy((*it)->label_detail).c_str(), document->GetAllocator());
+  value->AddMember("label_detail", label_detail, document->GetAllocator());
 
   TPlanNodeId id = (*it)->node_id;
   map<TPlanNodeId, TPlanNodeExecSummary>::const_iterator summary = summaries.find(id);
