@@ -1,7 +1,6 @@
 ====
 ---- QUERY
-## TODO: IMPALA-1502: The following tests are currently broken. We weren't running
-##       them by mistake for some time and no longer work.
+## TODO: IMPALA-1862: Invalid bool value not reported as a scanner error
 ##
 ## TODO: the error info should be sufficient to pin point the data location: filename and
 ## offset
@@ -9,7 +8,6 @@
 ## implemented).
 #select id, bool_col, tinyint_col, smallint_col from alltypeserror
 #---- ERRORS
-#
 #Error converting column: 3 TO SMALLINT (Data is: abc3)
 #file: hdfs://regex:.$
 #record: 23,false,3,abc3,3,30,3.000000,30.300000,03/01/09,3,2020-10-10 60:10:10.123
@@ -23,7 +21,7 @@
 #Error converting column: 2 TO TINYINT (Data is: xyz5)
 #file: hdfs://regex:.$
 #record: 15,false,xyz5,5,5,50,5.000000,50.500000,02/01/09,5,0009-01-01 00:00:00
-#Error converting column: 1 TO BOOL (Data is: errfalse)
+#Error converting column: 1 TO BOOLEAN (Data is: errfalse)
 #file: hdfs://regex:.$
 #record: 1,errfalse,,1,1,10,1.000000,10.100000,01/01/09,1,1999-10-10
 #Error converting column: 2 TO TINYINT (Data is: err2)
@@ -32,7 +30,7 @@
 #Error converting column: 3 TO SMALLINT (Data is: err3)
 #file: hdfs://regex:.$
 #record: 3,false,3,err3,,30,3.000000,30.300000,01/01/09,3,2002-14-10 00:00:00
-#Error converting column: 1 TO BOOL (Data is: errtrue)
+#Error converting column: 1 TO BOOLEAN (Data is: errtrue)
 #Error converting column: 2 TO TINYINT (Data is: err9)
 #Error converting column: 3 TO SMALLINT (Data is: err9)
 #file: hdfs://regex:.$
@@ -74,15 +72,15 @@
 #int, boolean, tinyint, smallint
 #====
 #---- QUERY
-#select count(*) from functional_text_lzo.bad_text_lzo
-#---- ERRORS
-#Blocksize: 536870911 is greater than LZO_MAX_BLOCK_SIZE: 67108864
-#---- RESULTS
-#5140
-#---- TYPES
-#bigint
-#====
-#---- QUERY
+select count(*) from functional_text_lzo.bad_text_lzo
+---- ERRORS
+Blocksize: 536870911 is greater than LZO_MAX_BLOCK_SIZE: 67108864
+---- RESULTS
+5140
+---- TYPES
+bigint
+====
+---- QUERY
 select * from alltypeserrornonulls
 ---- ERRORS
 
@@ -115,7 +113,7 @@ record: 17,false,7,7,7,70,7.000000,xyz70.700000,02/01/09,7,2012-03-22 11:20:01.1
 Error converting column: 10 TO TIMESTAMP (Data is: 123456)
 file: hdfs://regex:.$
 record: 0,true,0,0,0,0,0.000000,0.000000,01/01/09,0,123456
-Error converting column: 1 TO BOOL (Data is: errfalse)
+Error converting column: 1 TO BOOLEAN (Data is: errfalse)
 Error converting column: 10 TO TIMESTAMP (Data is: 1990-00-01 10:10:10)
 file: hdfs://regex:.$
 record: 1,errfalse,1,1,1,10,1.000000,10.100000,01/01/09,1,1990-00-01 10:10:10
@@ -137,7 +135,7 @@ record: 6,true,6,6,6,60,err6.000000,60.600000,01/01/09,6,2012-03-22 11:20:01.123
 Error converting column: 7 TO DOUBLE (Data is: err70.700000)
 file: hdfs://regex:.$
 record: 7,false,7,7,7,70,7.000000,err70.700000,01/01/09,7,2012-03-22 11:20:01.123
-Error converting column: 1 TO BOOL (Data is: errtrue)
+Error converting column: 1 TO BOOLEAN (Data is: errtrue)
 Error converting column: 2 TO TINYINT (Data is: err9)
 Error converting column: 3 TO SMALLINT (Data is: err9)
 Error converting column: 4 TO INT (Data is: err9)

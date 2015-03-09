@@ -26,7 +26,7 @@ using namespace impala;
 // This function will output tuples to the row batch from parsed field locations.
 // The fields locations should be aligned to the start of the tuple (field at 0 is
 // the first materialized slot).
-// This function takes more arguments that is strictly necessary (they could be
+// This function takes more arguments than are strictly necessary (they could be
 // computed inside this function) but this is done to minimize the clang dependencies,
 // specifically, calling function on the scan node.
 int HdfsScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int row_size, 

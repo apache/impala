@@ -36,6 +36,7 @@ skip_if_s3_udfs = pytest.mark.skipif(IS_S3, reason="udas/udfs not copied to S3")
 skip_if_s3_datasrc = pytest.mark.skipif(IS_S3, reason="data sources not copied to S3")
 skip_if_s3_hdfs_client = pytest.mark.skipif(IS_S3, reason="hdfs_client doesn't work with S3")
 skip_if_s3_hbase = pytest.mark.skipif(IS_S3, reason="HBase not started with S3")
+skip_if_s3_qualified_path = pytest.mark.skipif(IS_S3, reason="Tests rely on HDFS qualified paths, IMPALA-1872")
 
 # Some tests require a non-default filesystem to be present.
 skip_if_default_fs = pytest.mark.skipif(IS_DEFAULT_FS, reason="Non-default filesystem needed")

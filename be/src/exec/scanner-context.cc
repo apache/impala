@@ -286,13 +286,13 @@ Status ScannerContext::Stream::ReportIncompleteRead(int64_t length, int64_t byte
   stringstream ss;
   ss << "Tried to read " << length << " bytes but could only read "
      << bytes_read << " bytes. This may indicate data file corruption. "
-     << "(file: " << filename() << ", byte offset: " << file_offset() << ")";
+     << "(file " << filename() << ", byte offset: " << file_offset() << ")";
   return Status(ss.str());
 }
 
 Status ScannerContext::Stream::ReportInvalidRead(int64_t length) {
   stringstream ss;
   ss << "Invalid read of " << length << " bytes. This may indicate data file corruption. "
-     << "(file: " << filename() << ", byte offset: " << file_offset() << ")";
+     << "(file " << filename() << ", byte offset: " << file_offset() << ")";
   return Status(ss.str());
 }
