@@ -113,7 +113,7 @@ BIGINT
 ====
 ---- QUERY
 SELECT COUNT(*) FROM functional.alltypesagg t1 LEFT ANTI JOIN functional.alltypes t2
-ON t2.tinyint_col = t1.tinyint_col and t1.day = 1;
+ON t2.tinyint_col = t1.tinyint_col and t1.day = 1
 ---- RESULTS
 10100
 ---- TYPES
@@ -121,7 +121,7 @@ BIGINT
 ====
 ---- QUERY
 SELECT COUNT(*) FROM functional.alltypesagg t1 LEFT ANTI JOIN functional.alltypes t2
-ON t2.tinyint_col = t1.tinyint_col and t2.month = 1;
+ON t2.tinyint_col = t1.tinyint_col and t2.month = 1
 ---- RESULTS
 2000
 ====
@@ -194,7 +194,7 @@ NULL,NULL,30
 INT, INT, INT
 ====
 ---- QUERY
-# Testing right semi joins
+# Testing right semi join
 select b.* FROM functional.SemiJoinTblA a
 right semi join functional.SemiJoinTblB b on a.b = b.b
 ---- RESULTS
@@ -203,6 +203,43 @@ right semi join functional.SemiJoinTblB b on a.b = b.b
 1,2,5
 ---- TYPES
 INT, INT, INT
+====
+---- QUERY
+# Testing right semi join with duplicates
+SELECT b.int_col
+FROM functional.tinyinttable a RIGHT SEMI JOIN functional.tinyinttable b
+ON a.int_col % 2 = b.int_col % 2
+---- RESULTS
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+---- TYPES
+INT
+====
+---- QUERY
+# Testing right semi join with duplicates and other conjuncts
+SELECT b.int_col
+FROM functional.tinyinttable a RIGHT SEMI JOIN functional.tinyinttable b
+ON a.int_col % 2 = b.int_col % 2 AND a.int_col + b.int_col > 9
+---- RESULTS
+1
+2
+3
+4
+5
+6
+7
+8
+9
+---- TYPES
+INT
 ====
 ---- QUERY
 # Testing right anti joins
@@ -215,6 +252,16 @@ right anti join functional.SemiJoinTblB b on a.b = b.b
 3,NULL,NULL
 ---- TYPES
 INT, INT, INT
+====
+---- QUERY
+# Testing right anti join with duplicates and other conjuncts
+SELECT b.int_col
+FROM functional.tinyinttable a RIGHT ANTI JOIN functional.tinyinttable b
+ON a.int_col % 2 = b.int_col % 2 AND a.int_col + b.int_col > 9
+---- RESULTS
+0
+---- TYPES
+INT
 ====
 ---- QUERY
 # Anti joins have a uni-directional value transfer (IMPALA-1249).
