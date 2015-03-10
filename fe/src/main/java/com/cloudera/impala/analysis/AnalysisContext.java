@@ -271,7 +271,8 @@ public class AnalysisContext {
     public Analyzer getAnalyzer() { return analyzer_; }
     public Set<TAccessEvent> getAccessEvents() { return analyzer_.getAccessEvents(); }
     public boolean requiresRewrite() {
-      return analyzer_.containsSubquery() && !(stmt_ instanceof CreateViewStmt);
+      return analyzer_.containsSubquery() && !(stmt_ instanceof CreateViewStmt)
+          && !(stmt_ instanceof AlterViewStmt);
     }
     public String getJsonLineageGraph() { return analyzer_.getSerializedLineageGraph(); }
   }

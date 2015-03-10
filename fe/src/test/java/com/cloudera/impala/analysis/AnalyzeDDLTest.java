@@ -580,6 +580,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Invalid column name.
     AnalysisError("alter view functional.alltypes_view as select 'abc' as `???`",
         "Invalid column/field name: ???");
+    // Change the view definition to contain a subquery (IMPALA-1797)
+    AnalyzesOk("alter view functional.alltypes_view as " +
+        "select * from functional.alltypestiny where id in " +
+        "(select id from functional.alltypessmall where int_col = 1)");
   }
 
   @Test
