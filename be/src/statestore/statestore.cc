@@ -51,6 +51,25 @@ DEFINE_int32(statestore_heartbeat_frequency_ms, 1000, "(Advanced) Frequency (in 
 
 DEFINE_int32(state_store_port, 24000, "port where StatestoreService is running");
 
+DEFINE_int32(statestore_heartbeat_tcp_timeout_seconds, 3, "(Advanced) The time after "
+    "which a heartbeat RPC to a subscriber will timeout. This setting protects against "
+    "badly hung machines that are not able to respond to the heartbeat RPC in short "
+    "order");
+
+// If this value is set too low, it's possible that UpdateState() might timeout during a
+// working invocation, and only a restart of the statestore with a change in value would
+// allow progress to be made. If set too high, a hung subscriber will waste an update
+// thread for much longer than it needs to. We choose 5 minutes as a safe default because
+// large catalogs can take a very long time to process, but rarely more than a minute. The
+// loss of a single thread for five minutes should usually be invisible to the user; if
+// there is a correlated set of machine hangs that exhausts most threads the cluster can
+// already be said to be in a bad state. Note that the heartbeat mechanism will still
+// evict those subscribers, so many queries will continue to operate.
+DEFINE_int32(statestore_update_tcp_timeout_seconds, 300, "(Advanced) The time after "
+    "which an update RPC to a subscriber will timeout. This setting protects against "
+    "badly hung machines that are not able to respond to the update RPC in short "
+    "order.");
+
 // Metric keys
 // TODO: Replace 'backend' with 'subscriber' when we can coordinate a change with CM
 const string STATESTORE_LIVE_SUBSCRIBERS = "statestore.live-backends";
@@ -201,7 +220,12 @@ Statestore::Statestore(MetricGroup* metrics)
         FLAGS_statestore_num_heartbeat_threads,
         STATESTORE_MAX_SUBSCRIBERS,
         bind<void>(mem_fn(&Statestore::DoSubscriberUpdate), this, true, _1, _2)),
-    client_cache_(new ClientCache<StatestoreSubscriberClient>()),
+    update_state_client_cache_(new ClientCache<StatestoreSubscriberClient>(1, 0,
+        FLAGS_statestore_update_tcp_timeout_seconds * 1000,
+        FLAGS_statestore_update_tcp_timeout_seconds * 1000)),
+    heartbeat_client_cache_(new ClientCache<StatestoreSubscriberClient>(1, 0,
+        FLAGS_statestore_heartbeat_tcp_timeout_seconds * 1000,
+        FLAGS_statestore_heartbeat_tcp_timeout_seconds * 1000)),
     thrift_iface_(new StatestoreThriftIf(this)),
     failure_detector_(new MissedHeartbeatFailureDetector(
         FLAGS_statestore_max_missed_heartbeats,
@@ -222,7 +246,8 @@ Statestore::Statestore(MetricGroup* metrics)
   heartbeat_duration_metric_ = metrics->RegisterMetric(
       new StatsMetric<double>(STATESTORE_HEARTBEAT_DURATION, TUnit::TIME_S));
 
-  client_cache_->InitMetrics(metrics, "subscriber");
+  update_state_client_cache_->InitMetrics(metrics, "subscriber-update-state");
+  heartbeat_client_cache_->InitMetrics(metrics, "subscriber-heartbeat");
 }
 
 void Statestore::RegisterWebpages(Webserver* webserver) {
@@ -232,7 +257,7 @@ void Statestore::RegisterWebpages(Webserver* webserver) {
       topics_callback);
 
   Webserver::UrlCallback subscribers_callback =
-      bind<void>(mem_fn(&Statestore::SubscribersHandler), this, _1, _2);
+      bind<void>(&Statestore::SubscribersHandler, this, _1, _2);
   webserver->RegisterUrlCallback("/subscribers", "statestore_subscribers.tmpl",
       subscribers_callback);
 }
@@ -387,24 +412,13 @@ Status Statestore::SendTopicUpdate(Subscriber* subscriber, bool* update_skipped)
 
   // Second: try and send it
   Status status;
-  StatestoreSubscriberConnection client(client_cache_.get(),
+  StatestoreSubscriberConnection client(update_state_client_cache_.get(),
       subscriber->network_address(), &status);
   RETURN_IF_ERROR(status);
 
   TUpdateStateResponse response;
-
-  // TODO: Rework the client-cache API so that this dance isn't necessary.
-  try {
-    client->UpdateState(response, update_state_request);
-  } catch (const TException& e) {
-    // Client may have been closed due to a failure
-    RETURN_IF_ERROR(client.Reopen());
-    try {
-      client->UpdateState(response, update_state_request);
-    } catch (const TException& e) {
-      return Status(e.what());
-    }
-  }
+  RETURN_IF_ERROR(client.DoRpc(
+      &StatestoreSubscriberClient::UpdateState, update_state_request, response));
 
   status = Status(response.status);
   if (!status.ok()) {
@@ -575,25 +589,15 @@ Status Statestore::SendHeartbeat(Subscriber* subscriber) {
   sw.Start();
 
   Status status;
-  StatestoreSubscriberConnection client(client_cache_.get(),
+  StatestoreSubscriberConnection client(heartbeat_client_cache_.get(),
       subscriber->network_address(), &status);
   RETURN_IF_ERROR(status);
 
   THeartbeatRequest request;
   THeartbeatResponse response;
   request.__set_registration_id(subscriber->registration_id());
-  try {
-    client->Heartbeat(response, request);
-  } catch (const TException& e) {
-    // Client may have been closed due to a failure
-    RETURN_IF_ERROR(client.Reopen());
-    try {
-      client->Heartbeat(response, request);
-    } catch (const TException& e) {
-      return Status(e.what());
-    }
-  }
-
+  RETURN_IF_ERROR(
+      client.DoRpc(&StatestoreSubscriberClient::Heartbeat, request, response));
   heartbeat_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
   return Status::OK;
 }
@@ -645,10 +649,25 @@ void Statestore::DoSubscriberUpdate(bool is_heartbeat, int thread_id,
   Status status;
   if (is_heartbeat) {
     status = SendHeartbeat(subscriber.get());
+    if (status.code() == TErrorCode::RPC_TIMEOUT) {
+      // Rewrite status to make it more useful, while preserving the stack
+      status.SetErrorMsg(ErrorMsg(TErrorCode::RPC_TIMEOUT, Substitute(
+          "Subscriber $0 ($1) timed-out during heartbeat RPC. Timeout is $2s.",
+          subscriber->id(), lexical_cast<string>(subscriber->network_address()),
+          FLAGS_statestore_heartbeat_tcp_timeout_seconds)));
+    }
+
     deadline_ms = UnixMillis() + FLAGS_statestore_heartbeat_frequency_ms;
   } else {
     bool update_skipped;
     status = SendTopicUpdate(subscriber.get(), &update_skipped);
+    if (status.code() == TErrorCode::RPC_TIMEOUT) {
+      // Rewrite status to make it more useful, while preserving the stack
+      status.SetErrorMsg(ErrorMsg(TErrorCode::RPC_TIMEOUT, Substitute(
+          "Subscriber $0 ($1) timed-out during topic-update RPC. Timeout is $2s.",
+          subscriber->id(), lexical_cast<string>(subscriber->network_address()),
+          FLAGS_statestore_update_tcp_timeout_seconds)));
+    }
     // If the subscriber responded that it skipped the last update sent, we assume that
     // it was busy doing something else, and back off slightly before sending another.
     int64_t update_interval = update_skipped ?
@@ -665,7 +684,7 @@ void Statestore::DoSubscriberUpdate(bool is_heartbeat, int thread_id,
     if (it == subscribers_.end()) return;
     if (!status.ok()) {
       LOG(INFO) << "Unable to send " << hb_type << " message to subscriber "
-                << update.second << ", received error " << status.GetDetail();
+                << update.second << ", received error: " << status.GetDetail();
     }
 
     const string& registration_id = PrintId(subscriber->registration_id());
@@ -700,7 +719,8 @@ void Statestore::UnregisterSubscriber(Subscriber* subscriber) {
   }
 
   // Close all active clients so that the next attempt to use them causes a Reopen()
-  client_cache_->CloseConnections(subscriber->network_address());
+  update_state_client_cache_->CloseConnections(subscriber->network_address());
+  heartbeat_client_cache_->CloseConnections(subscriber->network_address());
 
   // Prevent the failure detector from growing without bound
   failure_detector_->EvictPeer(PrintId(subscriber->registration_id()));

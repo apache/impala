@@ -115,6 +115,9 @@ error_codes = (
 
   ("MISSING_BUILTIN", 30, "Builtin '$0' with symbol '$1' does not exist. "
    "Verify that all your impalads are the same version."),
+
+  ("RPC_GENERAL_ERROR", 31, "RPC Error: $0"),
+  ("RPC_TIMEOUT", 32, "RPC timed out"),
 )
 
 import sys

@@ -24,6 +24,7 @@
 
 #include "util/metrics.h"
 #include "rpc/thrift-client.h"
+#include "rpc/thrift-util.h"
 
 #include "common/status.h"
 
@@ -199,6 +200,9 @@ class ClientCache;
 //     }
 //   }
 // ('client' is released back to cache upon destruction.)
+//
+// New clients should use DoRpc(), particularly if they wish to detect and handle
+// timeouts.
 template<class T>
 class ClientConnection {
  public:
@@ -218,8 +222,38 @@ class ClientConnection {
     return client_cache_->ReopenClient(&client_);
   }
 
-  T* operator->() const {
-    return client_;
+  T* operator->() const { return client_; }
+
+  // Perform an RPC call f(request, response), with some failure handling in case the TCP
+  // connection underpinning this client has been closed unexpectedly. Note that this can
+  // lead to f() being called twice, as this method may retry f() once, depending on the
+  // error received from the first attempt. TODO: Detect already-closed cnxns and only
+  // retry in that case.
+  //
+  // Returns RPC_TIMEOUT if a timeout occurred, and RPC_GENERAL_ERROR if the RPC could not
+  // be completed for any other reason (except for an unexpectedly closed cnxn, see
+  // TODO). Application-level failures should be signalled through the response type.
+  //
+  // TODO: Use TTransportException::TTransportExceptionType to distinguish between failure
+  // modes.
+  template <class F, class Request, class Response>
+  Status DoRpc(const F& f, const Request& request, Response& response) {
+    try {
+      (client_->*f)(response, request);
+    } catch (const apache::thrift::TException& e) {
+      if (IsTimeoutTException(e)) return Status(TErrorCode::RPC_TIMEOUT);
+
+      // Client may have unexpectedly been closed, so re-open and retry.
+      // TODO: ThriftClient should return proper error codes.
+      RETURN_IF_ERROR(Reopen());
+      try {
+        (client_->*f)(response, request);
+      } catch (apache::thrift::TException& e) {
+        // By this point the RPC really has failed.
+        return Status(TErrorCode::RPC_GENERAL_ERROR, e.what());
+      }
+    }
+    return Status::OK;
   }
 
  private:
