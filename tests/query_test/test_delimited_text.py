@@ -8,6 +8,7 @@ from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.test_dimensions import create_uncompressed_text_dimension
 
+
 class TestDelimitedText(ImpalaTestSuite):
   """
   Tests delimited text files with different tuple delimiters, field delimiters

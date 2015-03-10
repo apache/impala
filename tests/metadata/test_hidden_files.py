@@ -88,7 +88,8 @@ class TestHiddenFiles(ImpalaTestSuite):
     self.client.execute("invalidate metadata %s.%s" % (TEST_DB, TEST_TBL))
     self.run_test_case('QueryTest/hidden-files', vector)
 
-  @pytest.mark.execute_serially
+  # This test runs on one dimension. Therefore, running in it parallel is safe, given no
+  # other method in this test class is run.
   def test_hidden_files_refresh(self, vector):
     """Tests that an incremental refresh ignores hidden files."""
     self.client.execute("refresh %s.%s" % (TEST_DB, TEST_TBL))

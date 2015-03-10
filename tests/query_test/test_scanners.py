@@ -221,6 +221,7 @@ class TestScanRangeLengths(ImpalaTestSuite):
         vector.get_value('max_scan_range_length')
     self.run_test_case('QueryTest/hdfs-tiny-scan', vector)
 
+@pytest.mark.execute_serially
 class TestScanTruncatedFiles(ImpalaTestSuite):
   TEST_DB = 'test_truncated_file'
 

@@ -27,7 +27,9 @@ TEST_DB = 'test_encryption_db'
 PYWEBHDFS_TMP_DIR = 'tmp/test_encryption_load_data'
 TMP_DIR = '/%s' % (PYWEBHDFS_TMP_DIR)
 
+
 @skip_if_s3_load_data
+@pytest.mark.execute_serially
 class TestHdfsEncryption(ImpalaTestSuite):
   ''' Tests LOAD DATA commands work between HDFS encryption zones.
 

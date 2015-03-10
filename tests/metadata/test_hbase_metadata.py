@@ -18,6 +18,7 @@ from tests.common.test_dimensions import create_uncompressed_text_dimension
 
 # Tests the COMPUTE STATS command for gathering table and column stats.
 # TODO: Merge this test file with test_col_stats.py
+@pytest.mark.execute_serially
 class TestHbaseMetadata(ImpalaTestSuite):
   TEST_DB_NAME = "compute_stats_db_hbase"
 
