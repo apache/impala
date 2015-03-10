@@ -805,6 +805,9 @@ public class DistributedPlanner {
 
       node.unsetNeedsFinalize();
       node.setIntermediateTuple();
+      // Any limit should be placed in the final merge aggregation node
+      long limit = node.getLimit();
+      node.unsetLimit();
       mergeFragment = createParentFragment(mergeFragment, DataPartition.UNPARTITIONED);
       mergeAggInfo = node.getAggInfo().getMergeAggInfo();
       mergeAggNode =
@@ -813,6 +816,7 @@ public class DistributedPlanner {
       // Transfer having predicates. If hasGrouping == true, the predicates should
       // instead be evaluated by the 2nd phase agg (the predicates are already there).
       node.transferConjuncts(mergeAggNode);
+      mergeAggNode.setLimit(limit);
       mergeFragment.addPlanRoot(mergeAggNode);
     }
     return mergeFragment;

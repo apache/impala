@@ -252,13 +252,12 @@ limit 10
 ---- DISTRIBUTEDPLAN
 08:AGGREGATE [FINALIZE]
 |  output: count:merge(int_col)
+|  limit: 10
 |
 07:EXCHANGE [UNPARTITIONED]
-|  limit: 10
 |
 04:AGGREGATE
 |  output: count(int_col)
-|  limit: 10
 |
 06:AGGREGATE
 |  group by: int_col
@@ -351,13 +350,12 @@ limit 10
 ---- DISTRIBUTEDPLAN
 08:AGGREGATE [FINALIZE]
 |  output: count:merge(int_col), count:merge(smallint_col)
+|  limit: 10
 |
 07:EXCHANGE [UNPARTITIONED]
-|  limit: 10
 |
 04:AGGREGATE
 |  output: count(int_col), count:merge(smallint_col)
-|  limit: 10
 |
 06:AGGREGATE
 |  output: count:merge(smallint_col)
@@ -544,4 +542,72 @@ select count(*) from
 |
 01:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
+====
+# test that limits are applied at the top-level merge aggregation node for non-grouping
+# distinct aggregation (IMPALA-1802)
+select * from (
+  select count(distinct cnt) from
+    (select count(distinct t1.id) as cnt
+     from functional.alltypesagg t1 join functional.alltypestiny t2 on t1.id = t2.id
+     limit 10) t
+  limit 2) v
+limit 1
+---- PLAN
+06:AGGREGATE [FINALIZE]
+|  output: count(cnt)
+|  limit: 1
+|
+05:AGGREGATE
+|  group by: count(t1.id)
+|
+04:AGGREGATE [FINALIZE]
+|  output: count(t1.id)
+|  limit: 10
+|
+03:AGGREGATE
+|  group by: t1.id
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|
+|--01:SCAN HDFS [functional.alltypestiny t2]
+|     partitions=4/4 files=4 size=460B
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
+06:AGGREGATE [FINALIZE]
+|  output: count(cnt)
+|  limit: 1
+|
+05:AGGREGATE
+|  group by: count(t1.id)
+|
+11:AGGREGATE [FINALIZE]
+|  output: count:merge(t1.id)
+|  limit: 10
+|
+10:EXCHANGE [UNPARTITIONED]
+|
+04:AGGREGATE
+|  output: count(t1.id)
+|
+09:AGGREGATE
+|  group by: t1.id
+|
+08:EXCHANGE [HASH(t1.id)]
+|
+03:AGGREGATE
+|  group by: t1.id
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: t1.id = t2.id
+|
+|--07:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypestiny t2]
+|     partitions=4/4 files=4 size=460B
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
 ====
