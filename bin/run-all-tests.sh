@@ -109,11 +109,11 @@ do
       ${EE_TEST_FILES} #${KERB_ARGS}
   fi
 
+  pushd $IMPALA_FE_DIR
   if [[ "$FE_TEST" = true ]]; then
     # Run JUnit frontend tests
     # Requires a running impalad cluster because some tests (such as DataErrorTest and
     # JdbcTest) queries against an impala cluster.
-    cd $IMPALA_FE_DIR
     mvn test
   fi
 
@@ -124,6 +124,7 @@ do
       --catalogd_args=--load_catalog_in_background=false
     mvn test -Dtest=JdbcTest
   fi
+  popd
 
   if [[ "$CLUSTER_TEST" = true ]]; then
     # Run the custom-cluster tests after all other tests, since they will restart the
