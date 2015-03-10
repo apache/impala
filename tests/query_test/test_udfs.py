@@ -57,8 +57,9 @@ class TestUdfs(ImpalaTestSuite):
     """ IMPALA-1642: Impala crashes if the symbol for a Hive UDF doesn't exist
         Crashing is non-deterministic so we run the UDF several times."""
     drop_fn_stmt = "drop function if exists default.fn_invalid_symbol(STRING)"
-    create_fn_stmt = "create function default.fn_invalid_symbol(STRING) returns "\
-          "STRING LOCATION '/test-warehouse/impala-hive-udfs.jar' SYMBOL='not.a.Symbol'"
+    create_fn_stmt = ("create function default.fn_invalid_symbol(STRING) returns "
+        "STRING LOCATION '%s' SYMBOL='not.a.Symbol'" %
+        get_fs_path('/test-warehouse/impala-hive-udfs.jar'))
     query = "select default.fn_invalid_symbol('test')"
 
     self.client.execute(drop_fn_stmt)
