@@ -27,6 +27,15 @@ using namespace strings;
 
 namespace impala {
 
+// Number of pinned blocks required for a merge.
+const int BLOCKS_REQUIRED_FOR_MERGE = 3;
+
+// Error message when pinning fixed or variable length blocks failed.
+// TODO: Add the node id that iniated the sort
+const string PIN_FAILED_ERROR_MSG = "Failed to pin block for $0-length data needed "
+    "for sorting. Reducing query concurrency or increasing the memory available to "
+    "Impala may help running this query.";
+
 // A run is a sequence of blocks containing tuples that are or will eventually be in
 // sorted order.
 // A run may maintain two sequences of blocks - one containing the tuples themselves,
@@ -536,31 +545,25 @@ Status Sorter::Run::PrepareRead() {
   // and the individual blocks do not need to be pinned.
   if (is_pinned_) return Status::OK;
 
+  // Attempt to pin the first fixed and var-length blocks. In either case, pinning may
+  // fail if the number of reserved blocks is oversubscribed, see IMPALA-1590.
   if (fixed_len_blocks_.size() > 0) {
     bool pinned = false;
     RETURN_IF_ERROR(fixed_len_blocks_[0]->Pin(&pinned));
-    DCHECK(pinned);
+    if (!pinned) {
+      Status status = Status::MEM_LIMIT_EXCEEDED;
+      status.AddDetail(Substitute(PIN_FAILED_ERROR_MSG, "fixed"));
+      return status;
+    }
   }
 
   if (has_var_len_slots_ && var_len_blocks_.size() > 0) {
     bool pinned = false;
     RETURN_IF_ERROR(var_len_blocks_[0]->Pin(&pinned));
     if (!pinned) {
-      // IMPALA-1590: If the number of var-len blocks is larger than the number of
-      // reserved blocks, then Pin() may fail, probably due to OOM because of
-      // concurrent queries.
-      int min_blocks_required = Sorter::MinBuffersRequired(sorter_->output_row_desc_);
-      if (var_len_blocks_.size() <= min_blocks_required) {
-        DCHECK(false) << " Var-len blocks: " << var_len_blocks_.size()
-                      << " Reserved " << min_blocks_required;
-      } else {
-        Status status = Status::MEM_LIMIT_EXCEEDED;
-        status.AddDetail(Substitute("Failed to pin block for variable length data needed "
-            "for sorting (reserved: $0, needed: $1). Reducing query concurrency or "
-            "increasing the memory available to Impala may help running this query.",
-            min_blocks_required, var_len_blocks_.size()));
-        return status;
-      }
+      Status status = Status::MEM_LIMIT_EXCEEDED;
+      status.AddDetail(Substitute(PIN_FAILED_ERROR_MSG, "variable"));
+      return status;
     }
   }
   return Status::OK;
@@ -901,7 +904,12 @@ Status Sorter::Init() {
   in_mem_sort_timer_ = ADD_TIMER(profile_, "InMemorySortTime");
   sorted_data_size_ = ADD_COUNTER(profile_, "SortDataSize", TUnit::BYTES);
 
-  int min_blocks_required = Sorter::MinBuffersRequired(output_row_desc_);
+  int min_blocks_required = BLOCKS_REQUIRED_FOR_MERGE;
+  // Fixed and var-length blocks are separate, so we need BLOCKS_REQUIRED_FOR_MERGE
+  // blocks for both if there is var-length data.
+  if (output_row_desc_->tuple_descriptors()[0]->string_slots().size() > 0) {
+    min_blocks_required *= 2;
+  }
   RETURN_IF_ERROR(block_mgr_->RegisterClient(min_blocks_required, mem_tracker_, state_,
       &block_mgr_client_));
 
@@ -1041,14 +1049,6 @@ uint64_t Sorter::EstimateMergeMem(uint64_t available_blocks,
   uint64_t output_batch_mem = RowBatch::AT_CAPACITY_MEM_USAGE;
 
   return input_batch_mem + output_batch_mem;
-}
-
-uint32_t Sorter::MinBuffersRequired(RowDescriptor* row_desc) {
-  bool has_var_len_slots = row_desc->tuple_descriptors()[0]->string_slots().size() > 0;
-  int blocks_per_run = has_var_len_slots ? 2 : 1;
-  // An intermediate merge requires at least 2 input runs and 1 output runs to be
-  // processed at a time.
-  return blocks_per_run * 3;
 }
 
 Status Sorter::MergeIntermediateRuns() {

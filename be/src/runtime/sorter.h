@@ -119,10 +119,6 @@ class Sorter {
   static uint64_t EstimateMergeMem(uint64_t available_blocks, RowDescriptor* row_desc,
       int merge_batch_size);
 
-  // Returns the minimum number of buffers that must be simultaneously pinned for a sort.
-  // This is equal to the min number of buffers required for an intermediate merge.
-  static uint32_t MinBuffersRequired(RowDescriptor* row_desc);
-
  private:
   class Run;
   class TupleSorter;
