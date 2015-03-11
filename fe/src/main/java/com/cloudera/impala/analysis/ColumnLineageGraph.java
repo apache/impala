@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.Id;
 import com.cloudera.impala.common.IdGenerator;
@@ -221,7 +220,7 @@ public class ColumnLineageGraph {
 
   private final List<MultiEdge> edges_ = Lists.newArrayList();
 
-  // Timestamp (in msecs since epoch) this query was submitted for execution.
+  // Timestamp in seconds since epoch (GMT) this query was submitted for execution.
   private long timestamp_;
 
   // Map of Vertex labels to Vertex objects.
@@ -316,13 +315,13 @@ public class ColumnLineageGraph {
       queryStr_ = queryCtx.request.stmt;
     }
     Preconditions.checkNotNull(queryStr_);
-    SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
+    SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     try {
-      timestamp_ = df.parse(queryCtx.now_string).getTime();
+      timestamp_ = df.parse(queryCtx.now_string).getTime() / 1000;
     } catch (java.text.ParseException e) {
       LOG.error("Error parsing timestamp value: " + queryCtx.now_string +
           " " + e.getMessage());
-      timestamp_ = new Date().getTime();
+      timestamp_ = new Date().getTime() / 1000;
     }
     descTbl_ = analyzer.getDescTbl();
     user_ = analyzer.getUser().getName();
