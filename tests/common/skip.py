@@ -21,6 +21,8 @@
 import os
 import pytest
 
+from functools import partial
+
 # TODO: move these to filesystem_utils.py
 IS_DEFAULT_FS = not os.getenv("FILESYSTEM_PREFIX")
 IS_S3 = os.getenv("TARGET_FILESYSTEM") == "s3"
@@ -30,6 +32,7 @@ skip_if_s3_insert = pytest.mark.skipif(IS_S3, reason="INSERT not implemented for
 skip_if_s3_load_data = pytest.mark.skipif(IS_S3, reason="LOAD DATA not implemented for S3")
 skip_if_s3_caching = pytest.mark.skipif(IS_S3, reason="SET CACHED not implemented for S3")
 skip_if_s3_hive = pytest.mark.skipif(IS_S3, reason="Hive doesn't work with S3")
+skip_if_s3_jira = partial(pytest.mark.skipif, IS_S3)
 
 # These ones need test infra work to re-enable.
 skip_if_s3_udfs = pytest.mark.skipif(IS_S3, reason="udas/udfs not copied to S3")
