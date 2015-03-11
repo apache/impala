@@ -522,7 +522,7 @@ class BufferedBlockMgr {
 
   // Number of outstanding writes (Writes issued but not completed).
   // This does not include client-local writes.
-  int num_outstanding_writes_;
+  int non_local_outstanding_writes_;
 
   // Signal availability of free buffers.
   boost::condition_variable buffer_available_cv_;
@@ -587,16 +587,16 @@ class BufferedBlockMgr {
   // Time spent waiting for a free buffer.
   RuntimeProfile::Counter* buffer_wait_timer_;
 
-  // Number of bytes written to disk (includes writes still queued in the IO manager)
+  // Number of bytes written to disk (includes writes still queued in the IO manager).
   RuntimeProfile::Counter* bytes_written_counter_;
 
-  // Number of writes outstanding (issued but not completed)
+  // Number of writes outstanding (issued but not completed).
   RuntimeProfile::Counter* outstanding_writes_counter_;
 
-  // Time spent in disk spill encryption and decryption
+  // Time spent in disk spill encryption and decryption.
   RuntimeProfile::Counter* encryption_timer_;
 
-  // Time spent in disk spill integrity generation and checking
+  // Time spent in disk spill integrity generation and checking.
   RuntimeProfile::Counter* integrity_check_timer_;
 
   // Number of writes issued.

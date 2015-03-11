@@ -190,7 +190,7 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, int64_t block_size)
     initialized_(false),
     unfullfilled_reserved_buffers_(0),
     total_pinned_buffers_(0),
-    num_outstanding_writes_(0),
+    non_local_outstanding_writes_(0),
     io_mgr_(state->io_mgr()),
     is_cancelled_(false),
     writes_issued_(0),
@@ -228,7 +228,7 @@ int64_t BufferedBlockMgr::available_buffers(Client* client) const {
 
 int64_t BufferedBlockMgr::remaining_unreserved_buffers() const {
   int64_t num_buffers = free_io_buffers_.size() +
-      unpinned_blocks_.size() + num_outstanding_writes_;
+      unpinned_blocks_.size() + non_local_outstanding_writes_;
   num_buffers += mem_tracker_->SpareCapacity() / max_block_size();
   num_buffers -= unfullfilled_reserved_buffers_;
   return num_buffers;
@@ -332,7 +332,12 @@ bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
     delete[] buffer_desc->buffer;
     ++buffers_acquired;
   } while (buffers_acquired != buffers_needed);
-  WriteUnpinnedBlocks();
+
+  Status status = WriteUnpinnedBlocks();
+  if (!status.ok()) {
+    client->state_->LogError(status.msg());
+    return false;
+  }
 
   client->num_tmp_reserved_buffers_ -= buffers_acquired;
   unfullfilled_reserved_buffers_ -= buffers_acquired;
@@ -475,6 +480,10 @@ BufferedBlockMgr::~BufferedBlockMgr() {
   // Grab this lock to synchronize with io threads in WriteComplete(). We need those
   // to finish to ensure that memory buffers remain valid for any in-progress writes.
   lock_guard<mutex> lock(lock_);
+  // If there are any outstanding writes and we are here it means that when the
+  // WriteComplete() callback gets executed it is going to access invalid memory.
+  // See IMPALA-1890.
+  DCHECK_EQ(non_local_outstanding_writes_, 0) << endl << DebugInternal();
   // Delete tmp files.
   BOOST_FOREACH(TmpFileMgr::File& file, tmp_files_) {
     file.Remove();
@@ -589,10 +598,10 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
   } while (!io_mgr_buffer->eosr());
   DCHECK_EQ(offset, block->write_range_->len());
 
-  // Verify integrity first, because the hash was generated from encrypted data
+  // Verify integrity first, because the hash was generated from encrypted data.
   if (check_integrity_) RETURN_IF_ERROR(VerifyHash(block));
 
-  // Decryption is done in-place, since the buffer can't be accessed by anyone else
+  // Decryption is done in-place, since the buffer can't be accessed by anyone else.
   if (encryption_) RETURN_IF_ERROR(Decrypt(block));
 
   return DeleteOrUnpinBlock(release_block, unpin);
@@ -627,13 +636,13 @@ Status BufferedBlockMgr::WriteUnpinnedBlocks() {
   if (disable_spill_) return Status::OK;
 
   // Assumes block manager lock is already taken.
-  while (num_outstanding_writes_ + free_io_buffers_.size() < block_write_threshold_ &&
-         !unpinned_blocks_.empty()) {
+  while (non_local_outstanding_writes_ + free_io_buffers_.size() < block_write_threshold_
+         && !unpinned_blocks_.empty()) {
     // Pop a block from the back of the list (LIFO).
     Block* write_block = unpinned_blocks_.PopBack();
     write_block->client_local_ = false;
     RETURN_IF_ERROR(WriteUnpinnedBlock(write_block));
-    ++num_outstanding_writes_;
+    ++non_local_outstanding_writes_;
   }
   DCHECK(Validate()) << endl << DebugInternal();
   return Status::OK;
@@ -695,32 +704,26 @@ Status BufferedBlockMgr::WriteUnpinnedBlock(Block* block) {
 }
 
 void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
-  outstanding_writes_counter_->Add(-1);
   lock_guard<mutex> lock(lock_);
+  outstanding_writes_counter_->Add(-1);
   DCHECK(Validate()) << endl << DebugInternal();
   DCHECK(block->in_write_) << "WriteComplete() for block not in write."
                            << endl << block->DebugString();
   if (!block->client_local_) {
-    DCHECK_GT(num_outstanding_writes_, 0) << block->DebugString();
-    --num_outstanding_writes_;
+    DCHECK_GT(non_local_outstanding_writes_, 0) << block->DebugString();
+    --non_local_outstanding_writes_;
   }
   block->in_write_ = false;
-  if (encryption_) {
-    // Explicitly release our temporarily allocated buffer here so that it doesn't
-    // hang around needlessly.
-    EncryptDone(block);
-  }
-  if (is_cancelled_) return;
-  // Check for an error. Set cancelled and wake up waiting threads if an error occurred.
+
+  // Explicitly release our temporarily allocated buffer here so that it doesn't
+  // hang around needlessly.
+  if (encryption_) EncryptDone(block);
+
+  if (is_cancelled_) goto cancel_and_wake_waiters;
   if (!write_status.ok()) {
+    VLOG_QUERY << "Query: " << query_id_ << " write complete callback with error.";
     block->client_->state_->LogError(write_status.msg());
-    is_cancelled_ = true;
-    if (block->client_local_) {
-      block->write_complete_cv_.notify_one();
-    } else {
-      buffer_available_cv_.notify_all();
-    }
-    return;
+    goto cancel_and_wake_waiters;
   }
 
   // If the block was re-pinned when it was in the IOMgr queue, don't free it.
@@ -728,8 +731,13 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
     // The number of outstanding writes has decreased but the number of free buffers
     // hasn't.
     DCHECK(!block->client_local_)
-        << "Client should be waiting, No one should have pinned this block.";
-    WriteUnpinnedBlocks();
+        << "Client should be waiting. No one should have pinned this block.";
+    Status status = WriteUnpinnedBlocks();
+    if (!status.ok()) {
+      VLOG_QUERY << "Query: " << query_id_ << " error while writing unpinned blocks.";
+      block->client_->state_->LogError(status.msg());
+      goto cancel_and_wake_waiters;
+    }
     DCHECK(Validate()) << endl << DebugInternal();
     return;
   }
@@ -751,6 +759,13 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
   }
   DCHECK(Validate()) << endl << DebugInternal();
   buffer_available_cv_.notify_one();
+  return;
+
+cancel_and_wake_waiters:
+  // Set cancelled and wake up waiting threads if an error occurred.
+  is_cancelled_ = true;
+  if (block->client_local_) block->write_complete_cv_.notify_one();
+  buffer_available_cv_.notify_all();
 }
 
 Status BufferedBlockMgr::DeleteBlock(Block* block) {
@@ -929,7 +944,7 @@ Status BufferedBlockMgr::FindBuffer(unique_lock<mutex>& lock,
           "resources. Compute stats on these tables, hint the plan or disable this "
           "behavior via query options to enable spilling.");
     }
-    if (unpinned_blocks_.empty() && num_outstanding_writes_ == 0) return Status::OK;
+    if (unpinned_blocks_.empty() && non_local_outstanding_writes_ == 0) return Status::OK;
 
     // Third, this block needs to use a buffer that was unpinned from another block.
     // Get a free buffer from the front of the queue and assign it to the block.
@@ -937,6 +952,7 @@ Status BufferedBlockMgr::FindBuffer(unique_lock<mutex>& lock,
       SCOPED_TIMER(buffer_wait_timer_);
       // Try to evict unpinned blocks before waiting.
       RETURN_IF_ERROR(WriteUnpinnedBlocks());
+      DCHECK_GT(non_local_outstanding_writes_, 0) << endl << DebugInternal();
       buffer_available_cv_.wait(lock);
       if (is_cancelled_) return Status::CANCELLED;
     } while (free_io_buffers_.empty());
@@ -1038,7 +1054,8 @@ bool BufferedBlockMgr::Validate() const {
   // Check if we're writing blocks when the number of free buffers falls below
   // threshold. We don't write blocks after cancellation.
   if (!is_cancelled_ && !unpinned_blocks_.empty() && !disable_spill_ &&
-      (free_io_buffers_.size() + num_outstanding_writes_ < block_write_threshold_)) {
+      (free_io_buffers_.size() + non_local_outstanding_writes_ <
+       block_write_threshold_)) {
     LOG(ERROR) << "Missed writing unpinned blocks";
     return false;
   }
