@@ -149,8 +149,10 @@ public class Planner {
           request.per_host_vcores));
       hasHeader = true;
     }
-    // Append warning about tables missing stats.
-    if (request.query_ctx.isSetTables_missing_stats() &&
+    // Append warning about tables missing stats except for child queries of
+    // 'compute stats'. The parent_query_id is only set for compute stats child queries.
+    if (!request.query_ctx.isSetParent_query_id() &&
+        request.query_ctx.isSetTables_missing_stats() &&
         !request.query_ctx.getTables_missing_stats().isEmpty()) {
       List<String> tableNames = Lists.newArrayList();
       for (TTableName tableName: request.query_ctx.getTables_missing_stats()) {

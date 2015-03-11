@@ -361,7 +361,8 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
     ss << query_exec_request.per_host_vcores;
     summary_profile_.AddInfoString(PER_HOST_VCORES_KEY, ss.str());
   }
-  if (query_exec_request.query_ctx.__isset.tables_missing_stats &&
+  if (!query_exec_request.query_ctx.__isset.parent_query_id &&
+      query_exec_request.query_ctx.__isset.tables_missing_stats &&
       !query_exec_request.query_ctx.tables_missing_stats.empty()) {
     stringstream ss;
     const vector<TTableName>& tbls = query_exec_request.query_ctx.tables_missing_stats;

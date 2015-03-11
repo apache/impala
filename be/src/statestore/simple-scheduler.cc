@@ -880,7 +880,8 @@ Status SimpleScheduler::Schedule(Coordinator* coord, QuerySchedule* schedule) {
     if (!status.ok()) {
       // Warn about missing table and/or column stats if necessary.
       const TQueryCtx& query_ctx = schedule->request().query_ctx;
-      if(query_ctx.__isset.tables_missing_stats &&
+      if(!query_ctx.__isset.parent_query_id &&
+          query_ctx.__isset.tables_missing_stats &&
           !query_ctx.tables_missing_stats.empty()) {
         status.AddDetail(GetTablesMissingStatsWarning(query_ctx.tables_missing_stats));
       }

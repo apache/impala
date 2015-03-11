@@ -275,9 +275,10 @@ Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
     ss << query_mem_tracker_->LogUsage();
   }
   LogError(ErrorMsg(TErrorCode::GENERAL, ss.str()));
-  // Add warning about missing stats.
-  if (query_ctx().__isset.tables_missing_stats
-      && !query_ctx().tables_missing_stats.empty()) {
+  // Add warning about missing stats except for compute stats child queries.
+  if (!query_ctx().__isset.parent_query_id &&
+      query_ctx().__isset.tables_missing_stats &&
+      !query_ctx().tables_missing_stats.empty()) {
     LogError(ErrorMsg(TErrorCode::GENERAL,
         GetTablesMissingStatsWarning(query_ctx().tables_missing_stats)));
   }
