@@ -985,7 +985,6 @@ Status Sorter::InputDone() {
     // Create the final merger.
     CreateMerger(sorted_runs_.size());
   }
-
   return Status::OK;
 }
 
@@ -999,7 +998,6 @@ Status Sorter::GetNext(RowBatch* output_batch, bool* eos) {
     // In this case, rows are deep copied into output_batch.
     RETURN_IF_ERROR(merger_->GetNext(output_batch, eos));
   }
-
   return Status::OK;
 }
 
