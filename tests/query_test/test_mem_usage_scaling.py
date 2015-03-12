@@ -103,18 +103,6 @@ class TestTpchMemLimitError(ImpalaTestSuite):
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format in ['parquet'])
 
-  @classmethod
-  def setup_class(cls):
-    super(TestTpchMemLimitError, cls).setup_class()
-    cls.client.execute('compute stats tpch_parquet.lineitem');
-    cls.client.execute('compute stats tpch_parquet.orders');
-    cls.client.execute('compute stats tpch_parquet.customer');
-    cls.client.execute('compute stats tpch_parquet.part');
-    cls.client.execute('compute stats tpch_parquet.supplier');
-    cls.client.execute('compute stats tpch_parquet.partsupp');
-    cls.client.execute('compute stats tpch_parquet.nation');
-    cls.client.execute('compute stats tpch_parquet.region');
-
   def low_memory_limit_test(self, vector, tpch_query, limit):
     mem = vector.get_value('mem_limit')
     # Mem consumption can be +-30MBs, depending on how many scanner threads are
