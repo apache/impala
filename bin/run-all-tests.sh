@@ -99,6 +99,15 @@ do
   ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1\
       --table_format=text/none --exec_options="disable_codegen:False" ${KERB_ARGS}
 
+  if [[ "$FE_TEST" = true ]]; then
+    # Run JUnit frontend tests
+    # Requires a running impalad cluster because some tests (such as DataErrorTest and
+    # JdbcTest) queries against an impala cluster.
+    pushd ${IMPALA_FE_DIR}
+    mvn test
+    popd
+  fi
+
   if [[ "$EE_TEST" = true ]]; then
     # Run end-to-end tests. The EXPLORATION_STRATEGY parameter should only apply to the
     # functional-query workload because the larger datasets (ex. tpch) are not generated
@@ -109,22 +118,16 @@ do
       ${EE_TEST_FILES} #${KERB_ARGS}
   fi
 
-  pushd $IMPALA_FE_DIR
-  if [[ "$FE_TEST" = true ]]; then
-    # Run JUnit frontend tests
-    # Requires a running impalad cluster because some tests (such as DataErrorTest and
-    # JdbcTest) queries against an impala cluster.
-    mvn test
-  fi
 
   if [[ "$JDBC_TEST" = true ]]; then
     # Run the JDBC tests with background loading disabled. This is interesting because
     # it requires loading missing table metadata.
     ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} --cluster_size=3 \
       --catalogd_args=--load_catalog_in_background=false
+    pushd ${IMPALA_FE_DIR}
     mvn test -Dtest=JdbcTest
+    popd
   fi
-  popd
 
   if [[ "$CLUSTER_TEST" = true ]]; then
     # Run the custom-cluster tests after all other tests, since they will restart the
