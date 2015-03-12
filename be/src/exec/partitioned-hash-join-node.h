@@ -138,14 +138,14 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   /// Append the row to stream. In the common case, the row is just in memory. If we
   /// run out of memory, this will spill a partition and try to add the row again.
-  /// returns true if the row was added and false otherwise. If false is returned,
-  /// status_ contains the error (doesn't return status because this is very perf
+  /// Returns true if the row was added and false otherwise. If false is returned,
+  /// *status contains the error (doesn't return status because this is very perf
   /// sensitive).
-  bool AppendRow(BufferedTupleStream* stream, TupleRow* row);
+  bool AppendRow(BufferedTupleStream* stream, TupleRow* row, Status* status);
 
   /// Slow path for AppendRow() above except the stream has failed to append the row.
   /// We need to find more memory by spilling.
-  bool AppendRowStreamFull(BufferedTupleStream* stream, TupleRow* row);
+  bool AppendRowStreamFull(BufferedTupleStream* stream, TupleRow* row, Status* status);
 
   /// Called when we need to free up memory by spilling a partition.
   /// This function walks hash_partitions_ and picks on to spill.
@@ -174,14 +174,14 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// probe_batch_ is entirely consumed.
   /// For RIGHT_ANTI_JOIN, all this function does is to mark whether each build row
   /// had a match.
-  /// Returns the number of rows added to out_batch; -1 on error (and status_ will be
+  /// Returns the number of rows added to out_batch; -1 on error (and *status will be
   /// set).
   template<int const JoinOp>
-  int ProcessProbeBatch(RowBatch* out_batch, HashTableCtx* ht_ctx);
+  int ProcessProbeBatch(RowBatch* out_batch, HashTableCtx* ht_ctx, Status* status);
 
   /// Wrapper that calls the templated version of ProcessProbeBatch() based on 'join_op'.
   int ProcessProbeBatch(
-      const TJoinOp::type join_op, RowBatch* out_batch, HashTableCtx* ht_ctx);
+  const TJoinOp::type join_op, RowBatch* out_batch, HashTableCtx* ht_ctx, Status* status);
 
   /// Sweep the hash_tbl_ of the partition that it is in the front of
   /// flush_build_partitions_, using hash_tbl_iterator_ and output any unmatched build
@@ -300,7 +300,14 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   /// State of the algorithm. Used just for debugging.
   State state_;
-  Status status_;
+
+  /// Codegen doesn't allow for automatic Status variables because then exception
+  /// handling code is needed to destruct the Status, and our function call substitution
+  /// doesn't know how to deal with the LLVM IR 'invoke' instruction. Workaround that by
+  /// placing the build-side status here so exceptions won't need to destruct it.
+  /// This status should used directly only by ProcesssBuildBatch().
+  /// TODO: fix IMPALA-1948 and remove this.
+  Status buildStatus_;
 
   /// Client to the buffered block mgr.
   BufferedBlockMgr::Client* block_mgr_client_;
@@ -425,7 +432,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   /// llvm function and signature for codegening probe batch.
   typedef int (*ProcessProbeBatchFn)(
-      PartitionedHashJoinNode*, RowBatch*, HashTableCtx*);
+      PartitionedHashJoinNode*, RowBatch*, HashTableCtx*, Status*);
   /// Jitted ProcessProbeBatch function pointer.  NULL if codegen is disabled.
   /// process_probe_batch_fn_level0_ uses CRC hashing when available and is used when the
   /// partition level is 0, otherwise process_probe_batch_fn_ uses murmur hash and is used

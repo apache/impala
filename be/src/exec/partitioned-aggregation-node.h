@@ -129,6 +129,13 @@ class PartitionedAggregationNode : public ExecNode {
   /// TODO: we can revisit and try harder to explicitly detect skew.
   static const int MAX_PARTITION_DEPTH = 16;
 
+  /// Codegen doesn't allow for automatic Status variables because then exception
+  /// handling code is needed to destruct the Status, and our function call substitution
+  /// doesn't know how to deal with the LLVM IR 'invoke' instruction. Workaround that by
+  /// placing the Status here so exceptions won't need to destruct it.
+  /// TODO: fix IMPALA-1948 and remove this.
+  Status processBatchStatus_;
+
   /// Tuple into which Update()/Merge()/Serialize() results are stored.
   TupleId intermediate_tuple_id_;
   TupleDescriptor* intermediate_tuple_desc_;
@@ -310,10 +317,11 @@ class PartitionedAggregationNode : public ExecNode {
   /// Aggregation expr slots are set to their initial values.
   /// Pool/Stream specify where the memory (tuple and var len slots) should be allocated
   /// from. Only one can be set.
-  /// Returns NULL if there was not enough memory to allocate the tuple.
+  /// Returns NULL if there was not enough memory to allocate the tuple or an error
+  /// occurred.  When returning NULL, sets *status.
   Tuple* ConstructIntermediateTuple(
       const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs,
-      MemPool* pool, BufferedTupleStream* stream);
+      MemPool* pool, BufferedTupleStream* stream, Status* status);
 
   /// Updates the given aggregation intermediate tuple with aggregation values computed
   /// over 'row' using 'agg_fn_ctxs'. Whether the agg fn evaluator calls Update() or

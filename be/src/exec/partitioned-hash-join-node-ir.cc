@@ -38,7 +38,7 @@ bool IR_NO_INLINE EvalOtherJoinConjuncts(
 // codegen.
 template<int const JoinOp>
 int PartitionedHashJoinNode::ProcessProbeBatch(
-    RowBatch* out_batch, HashTableCtx* ht_ctx) {
+    RowBatch* out_batch, HashTableCtx* ht_ctx, Status* status) {
   ExprContext* const* other_join_conjunct_ctxs = &other_join_conjunct_ctxs_[0];
   const int num_other_join_conjuncts = other_join_conjunct_ctxs_.size();
   ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
@@ -131,8 +131,7 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
         // predicates later.
         if (null_aware_partition_->build_rows()->num_rows() != 0) {
           if (num_other_join_conjuncts == 0) goto next_row;
-          if (!null_aware_partition_->probe_rows()->AddRow(current_probe_row_)) {
-            status_ = null_aware_partition_->probe_rows()->status();
+          if (!null_aware_partition_->probe_rows()->AddRow(current_probe_row_, status)) {
             return -1;
           }
           goto next_row;
@@ -189,8 +188,7 @@ next_row:
         // is a match, the row is skipped.
         if (!non_empty_build_) continue;
         if (num_other_join_conjuncts == 0) goto next_row;
-        if (UNLIKELY(!null_probe_rows_->AddRow(current_probe_row_))) {
-          status_ = null_probe_rows_->status();
+        if (UNLIKELY(!null_probe_rows_->AddRow(current_probe_row_, status))) {
           return -1;
         }
         matched_null_probe_.push_back(false);
@@ -210,8 +208,7 @@ next_row:
         // This partition is not in memory, spill the probe row and move to the next row.
         DCHECK(partition->is_spilled());
         DCHECK(partition->probe_rows() != NULL);
-        if (UNLIKELY(!AppendRow(partition->probe_rows(), current_probe_row_))) {
-          status_ = partition->probe_rows()->status();
+        if (UNLIKELY(!AppendRow(partition->probe_rows(), current_probe_row_, status))) {
           return -1;
         }
         goto next_row;
@@ -225,26 +222,27 @@ end:
 }
 
 int PartitionedHashJoinNode::ProcessProbeBatch(
-    const TJoinOp::type join_op, RowBatch* out_batch, HashTableCtx* ht_ctx) {
+    const TJoinOp::type join_op, RowBatch* out_batch, HashTableCtx* ht_ctx, Status* status) {
  switch (join_op) {
     case TJoinOp::INNER_JOIN:
-      return ProcessProbeBatch<TJoinOp::INNER_JOIN>(out_batch, ht_ctx);
+      return ProcessProbeBatch<TJoinOp::INNER_JOIN>(out_batch, ht_ctx, status);
     case TJoinOp::LEFT_OUTER_JOIN:
-      return ProcessProbeBatch<TJoinOp::LEFT_OUTER_JOIN>(out_batch, ht_ctx);
+      return ProcessProbeBatch<TJoinOp::LEFT_OUTER_JOIN>(out_batch, ht_ctx, status);
     case TJoinOp::LEFT_SEMI_JOIN:
-      return ProcessProbeBatch<TJoinOp::LEFT_SEMI_JOIN>(out_batch, ht_ctx);
+      return ProcessProbeBatch<TJoinOp::LEFT_SEMI_JOIN>(out_batch, ht_ctx, status);
     case TJoinOp::LEFT_ANTI_JOIN:
-      return ProcessProbeBatch<TJoinOp::LEFT_ANTI_JOIN>(out_batch, ht_ctx);
+      return ProcessProbeBatch<TJoinOp::LEFT_ANTI_JOIN>(out_batch, ht_ctx, status);
     case TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN:
-      return ProcessProbeBatch<TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN>(out_batch, ht_ctx);
+      return ProcessProbeBatch<TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN>(out_batch, ht_ctx,
+          status);
     case TJoinOp::RIGHT_OUTER_JOIN:
-      return ProcessProbeBatch<TJoinOp::RIGHT_OUTER_JOIN>(out_batch, ht_ctx);
+      return ProcessProbeBatch<TJoinOp::RIGHT_OUTER_JOIN>(out_batch, ht_ctx, status);
     case TJoinOp::RIGHT_SEMI_JOIN:
-      return ProcessProbeBatch<TJoinOp::RIGHT_SEMI_JOIN>(out_batch, ht_ctx);
+      return ProcessProbeBatch<TJoinOp::RIGHT_SEMI_JOIN>(out_batch, ht_ctx, status);
     case TJoinOp::RIGHT_ANTI_JOIN:
-      return ProcessProbeBatch<TJoinOp::RIGHT_ANTI_JOIN>(out_batch, ht_ctx);
+      return ProcessProbeBatch<TJoinOp::RIGHT_ANTI_JOIN>(out_batch, ht_ctx, status);
     case TJoinOp::FULL_OUTER_JOIN:
-      return ProcessProbeBatch<TJoinOp::FULL_OUTER_JOIN>(out_batch, ht_ctx);
+      return ProcessProbeBatch<TJoinOp::FULL_OUTER_JOIN>(out_batch, ht_ctx, status);
     default:
       DCHECK(false) << "Unknown join type";
       return -1;
@@ -253,6 +251,7 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
 
 Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch) {
   for (int i = 0; i < build_batch->num_rows(); ++i) {
+    DCHECK(buildStatus_.ok());
     TupleRow* build_row = build_batch->GetRow(i);
     uint32_t hash;
     if (!ht_ctx_->EvalAndHashBuild(build_row, &hash)) {
@@ -260,16 +259,16 @@ Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch) {
         // TODO: remove with codegen/template
         // If we are NULL aware and this build row has NULL in the eq join slot,
         // append it to the null_aware partition. We will need it later.
-        if (!null_aware_partition_->build_rows()->AddRow(build_row)) {
-          return null_aware_partition_->build_rows()->status();
+        if (!null_aware_partition_->build_rows()->AddRow(build_row, &buildStatus_)) {
+          return buildStatus_;
         }
       }
       continue;
     }
     const uint32_t partition_idx = hash >> (32 - NUM_PARTITIONING_BITS);
     Partition* partition = hash_partitions_[partition_idx];
-    const bool result = AppendRow(partition->build_rows(), build_row);
-    if (UNLIKELY(!result)) return status_;
+    const bool result = AppendRow(partition->build_rows(), build_row, &buildStatus_);
+    if (UNLIKELY(!result)) return buildStatus_;
   }
   return Status::OK;
 }

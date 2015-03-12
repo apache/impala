@@ -315,14 +315,16 @@ class SimpleTupleStreamTest : public testing::Test {
         DCHECK(false);
       }
       for (int j = 0; j < batch->num_rows(); ++j) {
-        bool b = stream.AddRow(batch->GetRow(j));
+        bool b = stream.AddRow(batch->GetRow(j), &status);
+        ASSERT_TRUE(status.ok());
         if (!b) {
           ASSERT_TRUE(stream.using_small_buffers());
           bool got_buffer;
           status = stream.SwitchToIoBuffers(&got_buffer);
           ASSERT_TRUE(status.ok());
           ASSERT_TRUE(got_buffer);
-          b = stream.AddRow(batch->GetRow(j));
+          b = stream.AddRow(batch->GetRow(j), &status);
+          ASSERT_TRUE(status.ok());
         }
         ASSERT_TRUE(b);
       }
@@ -361,8 +363,9 @@ class SimpleTupleStreamTest : public testing::Test {
       for (int i = 0; i < num_batches; ++i) {
         RowBatch* batch = CreateIntBatch(i * BATCH_SIZE, BATCH_SIZE, false);
         for (int j = 0; j < batch->num_rows(); ++j) {
-          bool b = stream.AddRow(batch->GetRow(j));
+          bool b = stream.AddRow(batch->GetRow(j), &status);
           ASSERT_TRUE(b);
+          ASSERT_TRUE(status.ok());
         }
         // Reset the batch to make sure the stream handles the memory correctly.
         batch->Reset();
@@ -537,7 +540,8 @@ TEST_F(SimpleTupleStreamTest, UnpinPin) {
     RowBatch* batch = CreateIntBatch(offset, BATCH_SIZE, false);
     int j = 0;
     for (; j < batch->num_rows(); ++j) {
-      full = !stream.AddRow(batch->GetRow(j));
+      full = !stream.AddRow(batch->GetRow(j), &status);
+      ASSERT_TRUE(status.ok());
       if (full) break;
     }
     offset += j;
@@ -578,8 +582,9 @@ TEST_F(SimpleTupleStreamTest, SmallBuffers) {
 
   RowBatch* batch = CreateIntBatch(0, 1024, false);
   for (int i = 0; i < batch->num_rows(); ++i) {
-    bool ret = stream.AddRow(batch->GetRow(i));
+    bool ret = stream.AddRow(batch->GetRow(i), &status);
     EXPECT_TRUE(ret);
+    ASSERT_TRUE(status.ok());
   }
   EXPECT_LT(stream.bytes_in_mem(false), buffer_size);
   EXPECT_LT(stream.byte_size(), buffer_size);
@@ -587,14 +592,16 @@ TEST_F(SimpleTupleStreamTest, SmallBuffers) {
   // 40 MB of ints
   batch = CreateIntBatch(0, 10 * 1024 * 1024, false);
   for (int i = 0; i < batch->num_rows(); ++i) {
-    bool ret = stream.AddRow(batch->GetRow(i));
+    bool ret = stream.AddRow(batch->GetRow(i), &status);
+    ASSERT_TRUE(status.ok());
     if (!ret) {
       ASSERT_TRUE(stream.using_small_buffers());
       bool got_buffer;
       status = stream.SwitchToIoBuffers(&got_buffer);
       ASSERT_TRUE(status.ok());
       ASSERT_TRUE(got_buffer);
-      ret = stream.AddRow(batch->GetRow(i));
+      ret = stream.AddRow(batch->GetRow(i), &status);
+      ASSERT_TRUE(status.ok());
     }
     ASSERT_TRUE(ret);
   }

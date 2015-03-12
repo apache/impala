@@ -177,15 +177,16 @@ class BufferedTupleStream {
   /// TODO: this does not seem like the best mechanism.
   Status SwitchToIoBuffers(bool* got_buffer);
 
-  /// Adds a single row to the stream. Returns false if an error occurred.
-  /// BufferedTupleStream will do a deep copy of the memory in the row.
-  /// *dst is the ptr to the memory (in the underlying block) that this row
-  /// was copied to.
-  bool AddRow(TupleRow* row, uint8_t** dst = NULL);
+  /// Adds a single row to the stream. Returns false and sets *status if an error
+  /// occurred.  BufferedTupleStream will do a deep copy of the memory in the row.  *dst
+  /// is the ptr to the memory (in the underlying block) that this row was copied to.
+  bool AddRow(TupleRow* row, Status* status, uint8_t** dst = NULL);
 
-  /// Allocates space to store a row of size 'size'. Returns NULL if there is
-  /// not enough memory. The returned memory is guaranteed to fit on one block.
-  uint8_t* AllocateRow(int size);
+  /// Allocates space to store a row of size 'size' and returns a pointer to the memory
+  /// when successful. Returns NULL if there is not enough memory or an error occurred.
+  /// When returning NULL, sets *status. The returned memory is guaranteed to fit on one
+  /// block.
+  uint8_t* AllocateRow(int size, Status* status);
 
   /// Populates 'row' with the row at 'idx'. The stream must be pinned. The row must have
   /// been allocated with the stream's row desc.
@@ -222,10 +223,6 @@ class BufferedTupleStream {
 
   /// Must be called once at the end to cleanup all resources. Idempotent.
   void Close();
-
-  /// Returns the status of the stream. We don't want to return a more costly Status
-  /// object on AddRow() which is way that API returns a bool.
-  Status status() const { return status_; }
 
   /// Number of rows in the stream.
   int64_t num_rows() const { return num_rows_; }
@@ -333,7 +330,6 @@ class BufferedTupleStream {
   int num_small_blocks_;
 
   bool closed_; // Used for debugging.
-  Status status_;
 
   /// Number of rows stored in the stream.
   int64_t num_rows_;

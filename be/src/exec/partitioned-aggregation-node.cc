@@ -183,7 +183,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
     // create single output tuple now; we need to output something
     // even if our input is empty
     singleton_output_tuple_ =
-        ConstructIntermediateTuple(agg_fn_ctxs_, mem_pool_.get(), NULL);
+        ConstructIntermediateTuple(agg_fn_ctxs_, mem_pool_.get(), NULL, NULL);
     singleton_output_tuple_returned_ = false;
   } else {
     ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_, true, true,
@@ -484,6 +484,7 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
     const vector<AggFnEvaluator*>& evaluators = parent->aggregate_evaluators_;;
 
     // Serialize and copy the spilled partition's stream into the new stream.
+    Status status = Status::OK;
     bool failed_to_add = false;
     BufferedTupleStream* new_stream = parent->serialize_stream_.get();
     HashTable::Iterator it = hash_tbl->Begin(parent->ht_ctx_.get());
@@ -491,7 +492,7 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
       Tuple* tuple = it.GetTuple();
       it.Next();
       AggFnEvaluator::Serialize(evaluators, agg_fn_ctxs, tuple);
-      if (UNLIKELY(!new_stream->AddRow(reinterpret_cast<TupleRow*>(&tuple)))) {
+      if (UNLIKELY(!new_stream->AddRow(reinterpret_cast<TupleRow*>(&tuple), &status))) {
         failed_to_add = true;
         break;
       }
@@ -500,7 +501,7 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
     if (intermediate_tuple != NULL) {
       AggFnEvaluator::Serialize(evaluators, agg_fn_ctxs, intermediate_tuple);
       if (!failed_to_add &&
-          !new_stream->AddRow(reinterpret_cast<TupleRow*>(&intermediate_tuple))) {
+          !new_stream->AddRow(reinterpret_cast<TupleRow*>(&intermediate_tuple), &status)) {
         failed_to_add = true;
       }
     }
@@ -513,9 +514,10 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
       hash_tbl->Close();
       hash_tbl.reset();
       aggregated_row_stream->Close();
-      RETURN_IF_ERROR(new_stream->status());
+      RETURN_IF_ERROR(status);
       return parent->state_->block_mgr()->MemLimitTooLowError(parent->block_mgr_client_);
     }
+    DCHECK(status.ok());
 
     aggregated_row_stream->Close();
     aggregated_row_stream.swap(parent->serialize_stream_);
@@ -590,15 +592,15 @@ void PartitionedAggregationNode::Partition::Close(bool finalize_rows) {
 
 Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
     const vector<FunctionContext*>& agg_fn_ctxs, MemPool* pool,
-    BufferedTupleStream* stream) {
-  DCHECK(stream == NULL || pool == NULL);
-  DCHECK(stream != NULL || pool != NULL);
+    BufferedTupleStream* stream, Status* status) {
 
   Tuple* intermediate_tuple = NULL;
   uint8_t* buffer = NULL;
   if (pool != NULL) {
+    DCHECK(stream == NULL && status == NULL);
     intermediate_tuple = Tuple::Create(intermediate_tuple_desc_->byte_size(), pool);
   } else {
+    DCHECK(stream != NULL && status != NULL);
     // Figure out how big it will be to copy the entire tuple. We need the tuple to end
     // up on one block in the stream.
     int size = intermediate_tuple_desc_->byte_size();
@@ -612,7 +614,7 @@ Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
         size += sv->len;
       }
     }
-    buffer = stream->AllocateRow(size);
+    buffer = stream->AllocateRow(size, status);
     if (buffer == NULL) return NULL;
     intermediate_tuple = reinterpret_cast<Tuple*>(buffer);
     // TODO: remove this. we shouldn't need to zero the entire tuple.

@@ -29,9 +29,9 @@ inline void PartitionedHashJoinNode::ResetForProbe() {
 }
 
 inline bool PartitionedHashJoinNode::AppendRow(BufferedTupleStream* stream,
-    TupleRow* row) {
-  if (LIKELY(stream->AddRow(row))) return true;
-  return AppendRowStreamFull(stream, row);
+    TupleRow* row, Status* status) {
+  if (LIKELY(stream->AddRow(row, status))) return true;
+  return AppendRowStreamFull(stream, row, status);
 }
 
 }

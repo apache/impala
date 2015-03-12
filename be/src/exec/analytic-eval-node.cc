@@ -316,22 +316,24 @@ inline Status AnalyticEvalNode::AddRow(int64_t stream_idx, TupleRow* row) {
     }
   }
 
+  Status status = Status::OK;
   // Buffer the entire input row to be returned later with the analytic eval results.
-  if (UNLIKELY(!input_stream_->AddRow(row))) {
+  if (UNLIKELY(!input_stream_->AddRow(row, &status))) {
     // AddRow returns false if an error occurs (available via status()) or there is
     // not enough memory (status() is OK). If there isn't enough memory, we unpin
     // the stream and continue writing/reading in unpinned mode.
     // TODO: Consider re-pinning later if the output stream is fully consumed.
-    RETURN_IF_ERROR(input_stream_->status());
+    RETURN_IF_ERROR(status);
     RETURN_IF_ERROR(input_stream_->UnpinStream());
     VLOG_FILE << id() << " Unpin input stream while adding row idx=" << stream_idx;
-    if (!input_stream_->AddRow(row)) {
+    if (!input_stream_->AddRow(row, &status)) {
       // Rows should be added in unpinned mode unless an error occurs.
-      RETURN_IF_ERROR(input_stream_->status());
+      RETURN_IF_ERROR(status);
       DCHECK(false);
     }
   }
-  return Status::OK;
+  DCHECK(status.ok());
+  return status;
 }
 
 void AnalyticEvalNode::AddResultTuple(int64_t stream_idx) {

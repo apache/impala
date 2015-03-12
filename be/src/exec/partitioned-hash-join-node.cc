@@ -425,21 +425,22 @@ bool PartitionedHashJoinNode::AttachProbeFilters(RuntimeState* state) {
 }
 
 bool PartitionedHashJoinNode::AppendRowStreamFull(BufferedTupleStream* stream,
-    TupleRow* row) {
-  status_ = stream->status();
-  if (!status_.ok()) return false;
+    TupleRow* row, Status* status) {
+  // TODO: should this (and other AddRow() status checks below) try to continue if
+  // status->IsMemLimitExceeded()?
+  if (!status->ok()) return false;
   if (using_small_buffers_) {
-    status_ = ReserveTupleStreamBlocks();
-    if (!status_.ok()) return false;
-    if (stream->AddRow(row)) return true;
+    *status = ReserveTupleStreamBlocks();
+    if (!status->ok()) return false;
+    if (stream->AddRow(row, status)) return true;
   }
 
   // We ran out of memory. Pick a partition to spill.
-  while (true) {
+  while (status->ok()) {
     Partition* spilled_partition;
-    status_ = SpillPartition(&spilled_partition);
-    if (!status_.ok()) return false;
-    if (stream->AddRow(row)) return true;
+    *status = SpillPartition(&spilled_partition);
+    if (!status->ok()) return false;
+    if (stream->AddRow(row, status)) return true;
     // Spilling one partition does not guarantee we can append a row now. Keep
     // spilling until we can append this row.
   }
@@ -745,7 +746,9 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
     *eos = false;
   }
 
+  Status status = Status::OK;
   while (true) {
+    DCHECK(status.ok());
     DCHECK_NE(state_, PARTITIONING_BUILD) << "Should not be in GetNext()";
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(QueryMaintenance(state));
@@ -796,19 +799,21 @@ Status PartitionedHashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch
       int rows_added = 0;
       SCOPED_TIMER(probe_timer_);
       if (process_probe_batch_fn_ == NULL || ht_ctx_->level() != 0) {
-        rows_added = ProcessProbeBatch(join_op_, out_batch, ht_ctx_.get());
+        rows_added = ProcessProbeBatch(join_op_, out_batch, ht_ctx_.get(), &status);
       } else {
         DCHECK_NOTNULL(process_probe_batch_fn_level0_);
         if (ht_ctx_->level() == 0) {
-          rows_added = process_probe_batch_fn_level0_(this, out_batch, ht_ctx_.get());
+          rows_added = process_probe_batch_fn_level0_(this, out_batch, ht_ctx_.get(),
+              &status);
         } else {
-          rows_added = process_probe_batch_fn_(this, out_batch, ht_ctx_.get());
+          rows_added = process_probe_batch_fn_(this, out_batch, ht_ctx_.get(), &status);
         }
       }
       if (UNLIKELY(rows_added < 0)) {
-        DCHECK(!status_.ok());
-        return status_;
+        DCHECK(!status.ok());
+        return status;
       }
+      DCHECK(status.ok());
       out_batch->CommitRows(rows_added);
       num_rows_returned_ += rows_added;
       COUNTER_SET(rows_returned_counter_, num_rows_returned_);
