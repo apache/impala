@@ -147,6 +147,8 @@ class ImpalaServer::QueryExecState {
   Coordinator* coord() const { return coord_.get(); }
   QuerySchedule* schedule() { return schedule_.get(); }
   int num_rows_fetched() const { return num_rows_fetched_; }
+  void set_fetched_rows() { fetched_rows_ = true; }
+  bool fetched_rows() const { return fetched_rows_; }
   bool returns_result_set() { return !result_metadata_.columns.empty(); }
   const TResultSetMetadata* result_metadata() { return &result_metadata_; }
   const TUniqueId& query_id() const { return query_ctx_.query_id; }
@@ -280,6 +282,10 @@ class ImpalaServer::QueryExecState {
   RowBatch* current_batch_; // the current row batch; only applicable if coord is set
   int current_batch_row_; // number of rows fetched within the current batch
   int num_rows_fetched_; // number of rows fetched by client for the entire query
+
+  // True if a fetch was attempted by a client, regardless of whether a result set
+  // (or error) was returned to the client.
+  bool fetched_rows_;
 
   // To get access to UpdateCatalog, LOAD, and DDL methods. Not owned.
   Frontend* frontend_;

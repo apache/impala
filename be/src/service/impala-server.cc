@@ -453,6 +453,47 @@ Status ImpalaServer::InitAuditEventLogging() {
   return Status::OK;
 }
 
+void ImpalaServer::LogQueryEvents(const QueryExecState& exec_state) {
+  Status status = exec_state.query_status();
+  bool log_events = true;
+  switch (exec_state.stmt_type()) {
+    case TStmtType::QUERY: {
+      // If the query didn't finish, log audit and lineage events only if the
+      // the client issued at least one fetch.
+      if (!status.ok() && !exec_state.fetched_rows()) log_events = false;
+      break;
+    }
+    case TStmtType::DML: {
+      if (!status.ok()) log_events = false;
+      break;
+    }
+    case TStmtType::DDL: {
+      if (exec_state.catalog_op_type() == TCatalogOpType::DDL) {
+        // For a DDL operation, log audit and lineage events only if the
+        // operation finished.
+        if (!status.ok()) log_events = false;
+      } else {
+        // This case covers local catalog operations such as SHOW and DESCRIBE.
+        if (!status.ok() && !exec_state.fetched_rows()) log_events = false;
+      }
+      break;
+    }
+    case TStmtType::EXPLAIN:
+    case TStmtType::LOAD:
+    case TStmtType::SET:
+    default:
+      break;
+  }
+  // Log audit events that are due to an AuthorizationException.
+  if (IsAuditEventLoggingEnabled() &&
+      (Frontend::IsAuthorizationError(exec_state.query_status()) || log_events)) {
+    LogAuditRecord(exec_state, exec_state.exec_request());
+  }
+  if (IsLineageLoggingEnabled() && log_events) {
+    LogLineageRecord(exec_state.exec_request());
+  }
+}
+
 Status ImpalaServer::InitProfileLogging() {
   if (!FLAGS_log_query_to_file) return Status::OK;
 
@@ -676,14 +717,6 @@ Status ImpalaServer::ExecuteInternal(
   }
   VLOG(2) << "Execution request: " << ThriftDebugString(result);
 
-  if (IsAuditEventLoggingEnabled()) {
-    LogAuditRecord(*(exec_state->get()), result);
-  }
-
-  if (IsLineageLoggingEnabled()) {
-    LogLineageRecord(result);
-  }
-
   // start execution of query; also starts fragment status reports
   RETURN_IF_ERROR((*exec_state)->Exec(&result));
   if (result.stmt_type == TStmtType::DDL) {
@@ -793,12 +826,8 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
     query_exec_state_map_.erase(entry);
   }
 
-  // Ignore all audit events except for those due to an AuthorizationException.
-  if (IsAuditEventLoggingEnabled() &&
-      Frontend::IsAuthorizationError(exec_state->query_status())) {
-    LogAuditRecord(*exec_state.get(), exec_state->exec_request());
-  }
   exec_state->Done();
+  LogQueryEvents(*exec_state.get());
 
   {
     lock_guard<mutex> l(exec_state->session()->lock);

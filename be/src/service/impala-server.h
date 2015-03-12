@@ -519,6 +519,13 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Returns true if audit event logging is enabled, false otherwise.
   bool IsAuditEventLoggingEnabled();
 
+  Status LogAuditRecord(const QueryExecState& exec_state, const TExecRequest& request);
+
+  Status LogLineageRecord(const TExecRequest& request);
+
+  // Log audit and column lineage events
+  void LogQueryEvents(const QueryExecState& exec_state);
+
   // Runs once every 5s to flush the profile log file to disk.
   void LogFileFlushThread();
 
@@ -527,10 +534,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Runs once every 5s to flush the lineage log file to disk.
   void LineageLoggerFlushThread();
-
-  Status LogAuditRecord(const QueryExecState& exec_state, const TExecRequest& request);
-
-  Status LogLineageRecord(const TExecRequest& request);
 
   // Copies a query's state into the query log. Called immediately prior to a
   // QueryExecState's deletion. Also writes the query profile to the profile log on disk.

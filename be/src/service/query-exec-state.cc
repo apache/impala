@@ -73,6 +73,7 @@ ImpalaServer::QueryExecState::QueryExecState(
     current_batch_(NULL),
     current_batch_row_(0),
     num_rows_fetched_(0),
+    fetched_rows_(false),
     frontend_(frontend),
     parent_server_(server),
     start_time_(TimestampValue::LocalTime()) {

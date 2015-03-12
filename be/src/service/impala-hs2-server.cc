@@ -498,6 +498,7 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size
 
   if (exec_state->num_rows_fetched() == 0) {
     exec_state->query_events()->MarkEvent("First row fetched");
+    exec_state->set_fetched_rows();
   }
 
   if (fetch_first) RETURN_IF_ERROR(exec_state->RestartFetch());
