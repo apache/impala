@@ -47,15 +47,17 @@ class FragmentMgr {
   void CancelPlanFragment(TCancelPlanFragmentResult& return_val,
       const TCancelPlanFragmentParams& params);
 
- private:
   class FragmentExecState;
 
+  // Returns a shared pointer to the FragmentExecState if one can be found for the
+  // given id. If the id is not found, the shared pointer will contain NULL.
+  boost::shared_ptr<FragmentExecState> GetFragmentExecState(
+      const TUniqueId& fragment_instance_id);
+
+ private:
   // Call exec_state->Exec(), and then removes exec_state from the fragment map. Run in
   // the fragment's execution thread.
   void FragmentExecThread(FragmentExecState* exec_state);
-
-  boost::shared_ptr<FragmentExecState> GetFragmentExecState(
-      const TUniqueId& fragment_instance_id);
 
   // protects fragment_exec_state_map_
   boost::mutex fragment_exec_state_map_lock_;
