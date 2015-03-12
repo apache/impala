@@ -161,17 +161,30 @@ class ImpalaBeeswaxClient(object):
     start = time.time()
     start_time = datetime.now()
     handle = self.__execute_query(query_string.strip(), user=user)
-    result = self.fetch_results(query_string, handle)
-    result.time_taken = time.time() - start
-    result.start_time = start_time
-    # Don't include the time it takes to get the runtime profile in the execution time
-    result.runtime_profile = self.get_runtime_profile(handle)
-    result.log = self.get_log(handle.log_context)
-    # Closing INSERT queries is done as part of fetching the results so don't close
-    # the handle twice.
-    if self.__get_query_type(query_string) != 'insert':
+    if self.__get_query_type(query_string) == 'insert':
+      # DML queries are finished by this point.
+      time_taken = time.time() - start
+
+      # fetch_results() will close the query after which there is no guarantee that
+      # profile and log will be available so fetch them first.
+      runtime_profile = self.get_runtime_profile(handle)
+      exec_summary = self.get_exec_summary(handle)
+      log = self.get_log(handle.log_context)
+
+      result = self.fetch_results(query_string, handle)
+      result.time_taken, result.start_time, result.runtime_profile, result.log = \
+          time_taken, start_time, runtime_profile, log
+      result.exec_summary = exec_summary
+    else:
+      # For SELECT queries, execution might still be ongoing. fetch_results() will block
+      # until the query is completed.
+      result = self.fetch_results(query_string, handle)
+      result.time_taken = time.time() - start
+      result.start_time = start_time
+      result.exec_summary = self.get_exec_summary(handle)
+      result.log = self.get_log(handle.log_context)
+      result.runtime_profile = self.get_runtime_profile(handle)
       self.close_query(handle)
-    result.exec_summary = self.get_exec_summary(handle)
     return result
 
   def get_exec_summary(self, handle):
