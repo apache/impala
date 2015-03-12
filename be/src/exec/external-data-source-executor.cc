@@ -18,9 +18,8 @@
 #include <string>
 
 #include "common/logging.h"
-#include "rpc/thrift-util.h"
+#include "rpc/jni-thrift-util.h"
 #include "runtime/lib-cache.h"
-#include "util/jni-util.h"
 #include "util/parse-util.h"
 
 using namespace std;
@@ -124,4 +123,3 @@ Status ExternalDataSourceExecutor::Close(const TCloseParams& params,
   is_initialized_ = false;
   return status;
 }
-

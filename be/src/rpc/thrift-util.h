@@ -25,7 +25,6 @@
 #include <thrift/transport/TBufferTransports.h>
 
 #include "common/status.h"
-#include "util/jni-util.h"
 
 namespace impala {
 
@@ -100,24 +99,6 @@ class ThriftDeserializer {
   boost::shared_ptr<apache::thrift::protocol::TProtocol> tproto_;
 };
 
-template <class T>
-Status SerializeThriftMsg(JNIEnv* env, T* msg, jbyteArray* serialized_msg) {
-  int buffer_size = 100 * 1024;  // start out with 100KB
-  ThriftSerializer serializer(false, buffer_size);
-
-  uint8_t* buffer = NULL;
-  uint32_t size = 0;
-  RETURN_IF_ERROR(serializer.Serialize<T>(msg, &size, &buffer));
-
-  // create jbyteArray given buffer
-  *serialized_msg = env->NewByteArray(size);
-  RETURN_ERROR_IF_EXC(env);
-  if (*serialized_msg == NULL) return Status("couldn't construct jbyteArray");
-  env->SetByteArrayRegion(*serialized_msg, 0, size, reinterpret_cast<jbyte*>(buffer));
-  RETURN_ERROR_IF_EXC(env);
-  return Status::OK;
-}
-
 // Utility to create a protocol (deserialization) object for 'mem'.
 boost::shared_ptr<apache::thrift::protocol::TProtocol>
 CreateDeserializeProtocol(
@@ -148,21 +129,6 @@ Status DeserializeThriftMsg(const uint8_t* buf, uint32_t* len, bool compact,
   }
   uint32_t bytes_left = tmem_transport->available_read();
   *len = *len - bytes_left;
-  return Status::OK;
-}
-
-template <class T>
-Status DeserializeThriftMsg(JNIEnv* env, jbyteArray serialized_msg, T* deserialized_msg) {
-  jboolean is_copy = false;
-  uint32_t buf_size = env->GetArrayLength(serialized_msg);
-  jbyte* buf = env->GetByteArrayElements(serialized_msg, &is_copy);
-
-  RETURN_IF_ERROR(DeserializeThriftMsg(
-      reinterpret_cast<uint8_t*>(buf), &buf_size, false, deserialized_msg));
-
-  // Return buffer back. JNI_ABORT indicates to not copy contents back to java
-  // side.
-  env->ReleaseByteArrayElements(serialized_msg, buf, JNI_ABORT);
   return Status::OK;
 }
 

@@ -21,11 +21,10 @@
 #include "codegen/llvm-codegen.h"
 #include "exprs/anyval-util.h"
 #include "exprs/expr-context.h"
-#include "rpc/thrift-util.h"
+#include "rpc/jni-thrift-util.h"
 #include "runtime/lib-cache.h"
 #include "runtime/runtime-state.h"
 #include "util/bit-util.h"
-#include "util/jni-util.h"
 
 #include "gen-cpp/Frontend_types.h"
 

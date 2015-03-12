@@ -18,7 +18,7 @@
 #include <string>
 
 #include "common/logging.h"
-#include "rpc/thrift-util.h"
+#include "rpc/jni-thrift-util.h"
 #include "util/jni-util.h"
 #include "util/logging-support.h"
 

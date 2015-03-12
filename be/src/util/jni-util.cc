@@ -18,7 +18,7 @@
 #include <sstream>
 
 #include "common/status.h"
-#include "rpc/thrift-util.h"
+#include "rpc/jni-thrift-util.h"
 
 using namespace std;
 

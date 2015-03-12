@@ -37,7 +37,7 @@
 #include "util/jni-util.h"
 #include "util/mem-info.h"
 #include "util/symbols-util.h"
-#include "rpc/thrift-util.h"
+#include "rpc/jni-thrift-util.h"
 #include "rpc/thrift-server.h"
 #include "util/debug-util.h"
 #include "gen-cpp/Data_types.h"

@@ -18,8 +18,7 @@
 #include <string>
 
 #include "common/logging.h"
-#include "rpc/thrift-util.h"
-#include "util/jni-util.h"
+#include "rpc/jni-thrift-util.h"
 #include "util/mem-info.h"
 #include "util/parse-util.h"
 #include "util/time.h"

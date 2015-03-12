@@ -10,8 +10,7 @@
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
-#include "util/jni-util.h"
-#include "rpc/thrift-util.h"
+#include "rpc/jni-thrift-util.h"
 
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
