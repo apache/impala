@@ -511,7 +511,12 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
         parent->block_mgr_client_,
         false, /* use small buffers */
         true   /* delete on read */));
-    RETURN_IF_ERROR(parent->serialize_stream_->Init(parent->runtime_profile(), false));
+    Status s = parent->serialize_stream_->Init(parent->runtime_profile(), false);
+    if (!s.ok()) {
+      hash_tbl->Close();
+      hash_tbl.reset();
+      return s;
+    }
     DCHECK(parent->serialize_stream_->has_write_block());
   }
 
