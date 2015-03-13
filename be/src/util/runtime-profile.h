@@ -726,10 +726,6 @@ class ScopedTimer {
     counter_ = NULL;
   }
 
-  // Immediately unset the pointer to the underlying counter so the counter will not
-  // be updated in the future.
-  void Cancel() { counter_ = NULL; }
-
   // Update counter when object is destroyed
   ~ScopedTimer() {
     sw_.Stop();

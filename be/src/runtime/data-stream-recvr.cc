@@ -148,7 +148,7 @@ void DataStreamRecvr::SenderQueue::AddBatch(const TRowBatch& thrift_batch) {
   COUNTER_ADD(recvr_->bytes_received_counter_, batch_size);
   DCHECK_GT(num_remaining_senders_, 0);
 
-  // If there's something in the queue and this batch will push us over the
+  // if there's something in the queue and this batch will push us over the
   // buffer limit we need to wait until the batch gets drained.
   // Note: It's important that we enqueue thrift_batch regardless of buffer limit if
   // the queue is currently empty. In the case of a merging receiver, batches are
@@ -156,8 +156,7 @@ void DataStreamRecvr::SenderQueue::AddBatch(const TRowBatch& thrift_batch) {
   // if the merger is waiting for data from an empty queue that cannot be filled because
   // the limit has been reached.
   while (!batch_queue_.empty() && recvr_->ExceedsLimit(batch_size) && !is_cancelled_) {
-    ScopedTimer<MonotonicStopWatch> buffer_full_total_timer(
-        recvr_->buffer_full_total_timer_);
+    SCOPED_TIMER(recvr_->buffer_full_total_timer_);
     VLOG_ROW << " wait removal: empty=" << (batch_queue_.empty() ? 1 : 0)
              << " #buffered=" << recvr_->num_buffered_bytes_
              << " batch_size=" << batch_size << "\n";
@@ -169,23 +168,14 @@ void DataStreamRecvr::SenderQueue::AddBatch(const TRowBatch& thrift_batch) {
     {
       try_mutex::scoped_try_lock timer_lock(recvr_->buffer_wall_timer_lock_);
       if (timer_lock) {
-        ScopedTimer<MonotonicStopWatch> buffer_full_wall_timer(
-            recvr_->buffer_full_wall_timer_);
+        SCOPED_TIMER(recvr_->buffer_full_wall_timer_);
         data_removal__cv_.wait(l);
-        // Cancellation may have occurred during wait(), which releases the lock. In that
-        // case the timer needs to be canceled as well to prevent an attempt to update
-        // the runtime profile. recvr_->buffer_full_wall_timer_ is owned by the profile
-        // which may have been destroyed as part of cancellation.
-        if (is_cancelled_) buffer_full_wall_timer.Cancel();
         got_timer_lock = true;
       } else {
         data_removal__cv_.wait(l);
         got_timer_lock = false;
       }
     }
-    // If canceled, also cancel the timer so it no longer references the counter from
-    // the runtime profile.
-    if (is_cancelled_) buffer_full_total_timer.Cancel();
     // If we had the timer lock, wake up another writer to make sure
     // that they (if no-one else) starts the timer. The guarantee is
     // that if no thread has the try_lock, the thread that we wake up
