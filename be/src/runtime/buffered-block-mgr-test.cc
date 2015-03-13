@@ -138,9 +138,11 @@ class BufferedBlockMgrTest : public ::testing::Test {
 
   // Test that randomly issues GetFreeBlock(), Pin(), Unpin(), Delete() and Close()
   // calls. All calls made are legal - error conditions are not expected until the
-  // first call to Close().  This is called 2 times with encryption+integrity on/off
-  void TestRandomInternal() {
-    const int num_buffers = 10;
+  // first call to Close().  This is called 2 times with encryption+integrity on/off.
+  // When executed in single-threaded mode 'tid' should be SINGLE_THREADED_TID.
+  static const int SINGLE_THREADED_TID = -1;
+  void TestRandomInternalImpl(BufferedBlockMgr* block_mgr, int num_buffers, int tid) {
+    DCHECK_NOTNULL(block_mgr);
     const int num_iterations = 100000;
     const int iters_before_close = num_iterations - 5000;
     bool close_called = false;
@@ -151,7 +153,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
 
     typedef enum { Pin, New, Unpin, Delete, Close } ApiFunction;
     ApiFunction api_function;
-    shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(num_buffers);
+
     BufferedBlockMgr::Client* client;
     Status status = block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client);
     EXPECT_TRUE(status.ok());
@@ -180,13 +182,13 @@ class BufferedBlockMgrTest : public ::testing::Test {
       }
 
       pair<BufferedBlockMgr::Block*, int32_t> block_data;
-      int rand_pick;
-      int32_t* data;
-      bool pinned;
+      int rand_pick = 0;
+      int32_t* data = NULL;
+      bool pinned = false;
       switch (api_function) {
         case New:
           status = block_mgr->GetNewBlock(client, NULL, &new_block);
-          if (close_called) {
+          if (close_called || (tid != SINGLE_THREADED_TID && status.IsCancelled())) {
             EXPECT_TRUE(new_block == NULL);
             EXPECT_TRUE(status.IsCancelled());
             continue;
@@ -203,9 +205,14 @@ class BufferedBlockMgrTest : public ::testing::Test {
           rand_pick = rand() % unpinned_blocks.size();
           block_data = unpinned_blocks[rand_pick];
           status = block_data.first->Pin(&pinned);
-          if (close_called) {
+          if (close_called || (tid != SINGLE_THREADED_TID && status.IsCancelled())) {
             EXPECT_TRUE(status.IsCancelled());
-            EXPECT_FALSE(pinned);
+            // In single-threaded runs the block should not have been pinned.
+            // In multi-threaded runs Pin() may return the block pinned but the status to
+            // be cancelled. In this case we could move the block from unpinned_blocks
+            // to pinned_blocks. We do not do that because after IsCancelled() no actual
+            // block operations should take place.
+            if (tid == SINGLE_THREADED_TID) EXPECT_FALSE(pinned);
             continue;
           }
           EXPECT_TRUE(status.ok());
@@ -222,7 +229,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
           rand_pick = rand() % pinned_blocks.size();
           block_data = pinned_blocks[rand_pick];
           status = block_data.first->Unpin();
-          if (close_called) {
+          if (close_called || (tid != SINGLE_THREADED_TID && status.IsCancelled())) {
             EXPECT_TRUE(status.IsCancelled());
             continue;
           }
@@ -239,7 +246,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
           rand_pick = rand() % pinned_blocks.size();
           block_data = pinned_blocks[rand_pick];
           status = block_data.first->Delete();
-          if (close_called) {
+          if (close_called || (tid != SINGLE_THREADED_TID && status.IsCancelled())) {
             EXPECT_TRUE(status.IsCancelled());
             continue;
           }
@@ -254,9 +261,31 @@ class BufferedBlockMgrTest : public ::testing::Test {
           break;
       } // end switch (apiFunction)
     } // end for ()
+  }
 
+  // Single-threaded execution of the TestRandomInternalImpl.
+  void TestRandomInternalSingle() {
+    const int num_buffers = 10;
+    shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(num_buffers);
+    TestRandomInternalImpl(block_mgr.get(), num_buffers, SINGLE_THREADED_TID);
     block_mgr.reset();
-    EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
+    EXPECT_EQ(block_mgr_parent_tracker_->consumption(), 0);
+  }
+
+  // Multi-threaded execution of the TestRandomInternalImpl.
+  void TestRandomInternalMulti(int num_threads) {
+    DCHECK_GT(num_threads, 0);
+    const int num_buffers = 10;
+    shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(num_buffers * num_threads);
+    thread_group workers;
+    for (int i = 0; i < num_threads; ++i) {
+      thread* t = new thread(bind(&BufferedBlockMgrTest::TestRandomInternalImpl, this,
+                                  block_mgr.get(), num_buffers, i));
+      workers.add_thread(t);
+    }
+    workers.join_all();
+    block_mgr.reset();
+    EXPECT_EQ(block_mgr_parent_tracker_->consumption(), 0);
   }
 
   scoped_ptr<ExecEnv> exec_env_;
@@ -271,7 +300,7 @@ TEST_F(BufferedBlockMgrTest, GetNewBlock) {
   BufferedBlockMgr::Client* client;
   Status status = block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client);
   EXPECT_TRUE(status.ok());
-  EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
+  EXPECT_EQ(block_mgr_parent_tracker_->consumption(), 0);
 
   // Allocate blocks until max_num_blocks, they should all succeed and memory
   // usage should go up.
@@ -792,15 +821,47 @@ TEST_F(BufferedBlockMgrTest, ClientOversubscription) {
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
 
-TEST_F(BufferedBlockMgrTest, Random_plain) {
+TEST_F(BufferedBlockMgrTest, SingleRandom_plain) {
   FLAGS_disk_spill_encryption = false;
-  TestRandomInternal();
+  TestRandomInternalSingle();
 }
 
-TEST_F(BufferedBlockMgrTest, Random_integ_enc) {
-  FLAGS_disk_spill_encryption = true;
-  TestRandomInternal();
+TEST_F(BufferedBlockMgrTest, Multi2Random_plain) {
+  FLAGS_disk_spill_encryption = false;
+  TestRandomInternalMulti(2);
 }
+
+TEST_F(BufferedBlockMgrTest, Multi4Random_plain) {
+  FLAGS_disk_spill_encryption = false;
+  TestRandomInternalMulti(4);
+}
+
+// TODO: Enable when we improve concurrency of block mgr.
+// TEST_F(BufferedBlockMgrTest, Multi8Random_plain) {
+//   FLAGS_disk_spill_encryption = false;
+//   TestRandomInternalMulti(8);
+// }
+
+TEST_F(BufferedBlockMgrTest, SingleRandom_encryption) {
+  FLAGS_disk_spill_encryption = true;
+  TestRandomInternalSingle();
+}
+
+TEST_F(BufferedBlockMgrTest, Multi2Random_encryption) {
+  FLAGS_disk_spill_encryption = true;
+  TestRandomInternalMulti(2);
+}
+
+TEST_F(BufferedBlockMgrTest, Multi4Random_encryption) {
+  FLAGS_disk_spill_encryption = true;
+  TestRandomInternalMulti(4);
+}
+
+// TODO: Enable when we improve concurrency of block mgr.
+// TEST_F(BufferedBlockMgrTest, Multi8Random_encryption) {
+//   FLAGS_disk_spill_encryption = true;
+//   TestRandomInternalMulti(8);
+// }
 
 }
 

@@ -65,10 +65,10 @@ struct BufferedBlockMgr::Client {
   // Tracker for this client. Can be NULL. Unowned.
   // If this is set, when the client gets a buffer, we update the consumption on this
   // tracker. However, we don't want to transfer the buffer from the block mgr to the
-  // client since (i.e. release from the block mgr), since the block mgr is where the
-  // block mem usage limit is enforced. Even when we give a buffer to a client, the
-  // buffer is still owned and counts against the block mgr tracker (i.e. there is a
-  // fixed pool of buffers regardless of if they are in the block mgr or the clients).
+  // client (i.e. release from the block mgr), since the block mgr is where the block
+  // mem usage limit is enforced. Even when we give a buffer to a client, the buffer
+  // is still owned and counts against the block mgr tracker (i.e. there is a fixed pool
+  // of buffers regardless of if they are in the block mgr or the clients).
   MemTracker* tracker_;
 
   // This is the common ancestor between the block mgr tracker and the client tracker.

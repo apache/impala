@@ -145,10 +145,9 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
 
-  // Kick-off the construction of the build-side table in a separate
-  // thread, so that the left child can do any initialisation in parallel.
-  // Only do this if we can get a thread token.  Otherwise, do this in the
-  // main thread
+  // Kick-off the construction of the build-side table in a separate thread, so that the
+  // left child can do any initialisation in parallel.
+  // Only do this if we can get a thread token.  Otherwise, do this in the main thread.
   Promise<Status> build_side_status;
   if (state->resource_pool()->TryAcquireThreadToken()) {
     AddRuntimeExecOption("Join Build-Side Prepared Asynchronously");

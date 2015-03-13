@@ -328,7 +328,7 @@ void ThreadGroup::JoinAll() {
 }
 
 Status ThreadGroup::SetCgroup(const string& cgroup) {
-  DCHECK(cgroups_mgr_ != NULL);
+  DCHECK_NOTNULL(cgroups_mgr_);
   cgroup_path_ = cgroup;
   // BOOST_FOREACH + ptr_vector + const are not compatible
   for (ptr_vector<Thread>::const_iterator it = threads_.begin();
