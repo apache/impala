@@ -578,7 +578,7 @@ public class HdfsTable extends Table {
       addColumn(col);
       ++pos;
     }
-
+    fields_ = fieldSchemas == null ? new ArrayList<FieldSchema>() : fieldSchemas;
     loadAllColumnStats(client);
   }
 

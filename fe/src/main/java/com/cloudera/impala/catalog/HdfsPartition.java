@@ -490,6 +490,7 @@ public class HdfsPartition implements Comparable<HdfsPartition> {
    */
   public org.apache.hadoop.hive.metastore.api.Partition toHmsPartition() {
     if (cachedMsPartitionDescriptor_ == null) return null;
+    Preconditions.checkNotNull(table_.getFieldSchemas());
     org.apache.hadoop.hive.metastore.api.StorageDescriptor storageDescriptor =
         new org.apache.hadoop.hive.metastore.api.StorageDescriptor(
             table_.getFieldSchemas(), location_,
