@@ -17,7 +17,6 @@ package com.cloudera.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.cloudera.impala.analysis.BinaryPredicate.Operator;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.catalog.PrimitiveType;
@@ -28,7 +27,6 @@ import com.cloudera.impala.common.Reference;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 
 /**
@@ -37,8 +35,10 @@ import com.google.common.collect.Lists;
  * of values (remaining children).
  */
 public class InPredicate extends Predicate {
-  private static final String IN = "in";
-  private static final String NOT_IN = "not_in";
+  private static final String IN_SET_LOOKUP = "in_set_lookup";
+  private static final String NOT_IN_SET_LOOKUP = "not_in_set_lookup";
+  private static final String IN_ITERATE= "in_iterate";
+  private static final String NOT_IN_ITERATE = "not_in_iterate";
   private final boolean isNotIn_;
 
   public boolean isNotIn() { return isNotIn_; }
@@ -51,10 +51,30 @@ public class InPredicate extends Predicate {
       // cast up to strings; meaning that "in" comparisons will not have CHAR comparison
       // semantics.
       if (t.getPrimitiveType() == PrimitiveType.CHAR) continue;
-      db.addBuiltin(ScalarFunction.createBuiltin(IN, "impala::InPredicate::In",
-          Lists.newArrayList(t, t), true, Type.BOOLEAN, false));
-      db.addBuiltin(ScalarFunction.createBuiltin(NOT_IN, "impala::InPredicate::NotIn",
-          Lists.newArrayList(t, t), true, Type.BOOLEAN, false));
+
+      String typeString = t.getPrimitiveType().toString().toLowerCase();
+      if (t.isScalarType(PrimitiveType.VARCHAR)) typeString = "string";
+
+      db.addBuiltin(ScalarFunction.createBuiltin(IN_ITERATE,
+          Lists.newArrayList(t, t), true, Type.BOOLEAN,
+          "impala::InPredicate::In_Iterate", null, null,  false));
+      db.addBuiltin(ScalarFunction.createBuiltin(NOT_IN_ITERATE,
+          Lists.newArrayList(t, t), true, Type.BOOLEAN,
+          "impala::InPredicate::NotIn_Iterate", null, null, false));
+
+      // SetLookup strategy NYI for Timestamps or Decimals
+      if (t.isTimestamp() || t.isDecimal()) continue;
+
+      String prepareFn = "impala::InPredicate::SetLookupPrepare_" + typeString;
+      String closeFn = "impala::InPredicate::SetLookupClose_" + typeString;
+
+      db.addBuiltin(ScalarFunction.createBuiltin(IN_SET_LOOKUP,
+          Lists.newArrayList(t, t), true, Type.BOOLEAN,
+          "impala::InPredicate::In_SetLookup", prepareFn, closeFn,  false));
+      db.addBuiltin(ScalarFunction.createBuiltin(NOT_IN_SET_LOOKUP,
+          Lists.newArrayList(t, t), true, Type.BOOLEAN,
+          "impala::InPredicate::NotIn_SetLookup", prepareFn, closeFn, false));
+
     }
   }
 
@@ -119,14 +139,35 @@ public class InPredicate extends Predicate {
         }
       }
 
+      // Choose SetLookup or Iterate strategy. SetLookup can be used if all the exprs in
+      // the IN list are constant, and is faster than iterating if the IN list is big
+      // enough.
+      boolean allConstant = true;
+      for (int i = 1; i < children_.size(); ++i) {
+        if (!children_.get(i).isConstant()) {
+          allConstant = false;
+          break;
+        }
+      }
+      boolean useSetLookup = allConstant;
+      // Threshold based on InPredicateBenchmark results
+      int setLookupThreshold = children_.get(0).getType().isStringType() ? 9 : 2;
+      if (children_.size() - 1 < setLookupThreshold) useSetLookup = false;
+      // NYI
+      if (getChild(0).type_.isTimestamp() || getChild(0).type_.isDecimal()) {
+        useSetLookup = false;
+      }
+
       // Only lookup fn_ if all subqueries have been rewritten. If the second child is a
       // subquery, it will have type ArrayType, which cannot be resolved to a builtin
       // function and will fail analysis.
       Type[] argTypes = {getChild(0).type_, getChild(1).type_};
-      if (isNotIn_) {
-        fn_ = getBuiltinFunction(analyzer, NOT_IN, argTypes, CompareMode.IS_SUPERTYPE_OF);
+      if (useSetLookup) {
+        fn_ = getBuiltinFunction(analyzer, isNotIn_ ? NOT_IN_SET_LOOKUP : IN_SET_LOOKUP,
+            argTypes, CompareMode.IS_SUPERTYPE_OF);
       } else {
-        fn_ = getBuiltinFunction(analyzer, IN, argTypes, CompareMode.IS_SUPERTYPE_OF);
+        fn_ = getBuiltinFunction(analyzer, isNotIn_ ? NOT_IN_ITERATE : IN_ITERATE,
+            argTypes, CompareMode.IS_SUPERTYPE_OF);
       }
       Preconditions.checkNotNull(fn_);
       Preconditions.checkState(fn_.getReturnType().isBoolean());

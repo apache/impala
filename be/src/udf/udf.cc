@@ -366,21 +366,6 @@ bool FunctionContext::AddWarning(const char* warning_msg) {
   }
 }
 
-void* FunctionContext::GetFunctionState(FunctionStateScope scope) const {
-  assert(!impl_->closed_);
-  switch (scope) {
-    case THREAD_LOCAL:
-      return impl_->thread_local_fn_state_;
-      break;
-    case FRAGMENT_LOCAL:
-      return impl_->fragment_local_fn_state_;
-      break;
-    default:
-      // TODO: signal error somehow
-      return NULL;
-  }
-}
-
 void FunctionContext::SetFunctionState(FunctionStateScope scope, void* ptr) {
   assert(!impl_->closed_);
   switch (scope) {

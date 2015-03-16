@@ -60,3 +60,5 @@ ADD_BE_TEST(expr-test)
 ADD_EXECUTABLE(aggregate-functions-test aggregate-functions-test.cc)
 TARGET_LINK_LIBRARIES(aggregate-functions-test ${UDF_TEST_LINK_LIBS})
 ADD_TEST(uda-test "${EXECUTABLE_OUTPUT_PATH}/aggregate-functions-test")
+
+ADD_BE_BENCHMARK(in-predicate-benchmark)

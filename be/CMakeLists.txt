@@ -188,7 +188,7 @@ set (IMPALA_LINK_LIBS
   Statestore
   TestUtil
   ThriftSaslTransport
-  # Udf or ImpalaUdf is added below to support the external udf library for tests
+  Udf
   Util
   Webserver
   -Wl,--end-group
@@ -213,6 +213,7 @@ if ("${BUILD_SHARED_LIBS}" STREQUAL "ON")
     ImpalaThrift
     GlobalFlags
     Common
+    Udf
     )
 endif ()
 
@@ -256,10 +257,9 @@ if (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} tcmallocstatic)
 endif()
 
-# Add ImpalaUdf for $UDF_TEST_LINK_LIBS and Udf for everything else
+# Replace Udf with ImpalaUdf for $UDF_TEST_LINK_LIBS
 set (UDF_TEST_LINK_LIBS ${IMPALA_LINK_LIBS} ImpalaUdf)
-set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} Udf)
-set (IMPALA_LINK_LIBS_NO_TCMALLOC ${IMPALA_LINK_LIBS_NO_TCMALLOC} Udf)
+list(REMOVE_ITEM UDF_TEST_LINK_LIBS Udf)
 
 # Link libs for test executables.  Although not all tests need all libs,
 # the build time for the tests is rather small and not worth the trouble.

@@ -70,12 +70,27 @@ public class ScalarFunction extends Function {
           fn.hasVarArgs(), fn.getArgs());
     } catch (AnalysisException e) {
       // This should never happen
-      Preconditions.checkState(false, "Builtin symbol '" + symbol + "'" + argTypes
-          + " not found!" + e.getStackTrace());
-      throw new RuntimeException("Builtin symbol not found!", e);
+      throw new RuntimeException("Builtin symbol '" + symbol + "'" + argTypes
+          + " not found!", e);
     }
-    fn.prepareFnSymbol_ = prepareFnSymbol;
-    fn.closeFnSymbol_ = closeFnSymbol;
+    if (prepareFnSymbol != null) {
+      try {
+        fn.prepareFnSymbol_ = fn.lookupSymbol(prepareFnSymbol, TSymbolType.UDF_PREPARE);
+      } catch (AnalysisException e) {
+        // This should never happen
+        throw new RuntimeException(
+            "Builtin symbol '" + prepareFnSymbol + "' not found!", e);
+      }
+    }
+    if (closeFnSymbol != null) {
+      try {
+        fn.closeFnSymbol_ = fn.lookupSymbol(closeFnSymbol, TSymbolType.UDF_CLOSE);
+      } catch (AnalysisException e) {
+        // This should never happen
+        throw new RuntimeException(
+            "Builtin symbol '" + closeFnSymbol + "' not found!", e);
+      }
+    }
     return fn;
   }
 

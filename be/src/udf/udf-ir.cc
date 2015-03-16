@@ -34,3 +34,18 @@ int FunctionContext::GetNumArgs() const {
 const FunctionContext::TypeDesc& FunctionContext::GetReturnType() const {
   return impl_->return_type_;
 }
+
+void* FunctionContext::GetFunctionState(FunctionStateScope scope) const {
+  assert(!impl_->closed_);
+  switch (scope) {
+    case THREAD_LOCAL:
+      return impl_->thread_local_fn_state_;
+      break;
+    case FRAGMENT_LOCAL:
+      return impl_->fragment_local_fn_state_;
+      break;
+    default:
+      // TODO: signal error somehow
+      return NULL;
+  }
+}

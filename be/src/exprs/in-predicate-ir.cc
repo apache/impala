@@ -17,9 +17,12 @@
 #include "exprs/in-predicate.h"
 #include "runtime/string-value.inline.h"
 
-using namespace impala;
 using namespace impala_udf;
+using namespace std;
 
+namespace impala {
+
+// Templated equality functions
 template<typename T>
 bool Equals(const T& x, const T& y) {
   return x.val == y.val;
@@ -42,110 +45,166 @@ template<> bool Equals(const DecimalVal& x, const DecimalVal& y) {
   return x == y;
 }
 
-template<typename T, bool not_in>
+// Templated getter functions for extracting 'SetType' values from AnyVals
+template<typename T, typename SetType>
+SetType GetVal(const T& x) {
+  DCHECK(!x.is_null);
+  return x.val;
+}
+
+template<> StringValue GetVal(const StringVal& x) {
+  DCHECK(!x.is_null);
+  return StringValue::FromStringVal(x);
+}
+
+template<> int GetVal(const TimestampVal& x) { // TODO
+  DCHECK(false) << "Should never be called";
+  return 0;
+}
+
+template<> int GetVal(const DecimalVal& x) { // TODO
+  DCHECK(false) << "Should never be called";
+  return 0;
+}
+
+template<typename T, typename SetType>
+void InPredicate::SetLookupPrepare(
+    FunctionContext* ctx, FunctionContext::FunctionStateScope scope) {
+  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
+
+  SetLookupState<SetType>* state = new SetLookupState<SetType>();
+  state->contains_null = false;
+  for (int i = 1; i < ctx->GetNumArgs(); ++i) {
+    DCHECK(ctx->IsArgConstant(i));
+    T* arg = reinterpret_cast<T*>(ctx->GetConstantArg(i));
+    if (arg->is_null) {
+      state->contains_null = true;
+    } else {
+      state->val_set.insert(GetVal<T, SetType>(*arg));
+    }
+  }
+  ctx->SetFunctionState(scope, state);
+}
+
+template<typename SetType>
+void InPredicate::SetLookupClose(
+    FunctionContext* ctx, FunctionContext::FunctionStateScope scope) {
+  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
+  SetLookupState<SetType>* state =
+      reinterpret_cast<SetLookupState<SetType>*>(ctx->GetFunctionState(scope));
+  delete state;
+}
+
+template<typename T, typename SetType, bool not_in, InPredicate::Strategy strategy>
 BooleanVal InPredicate::TemplatedIn(
-    FunctionContext* context, const T& val, int num_args, const T* args) {
+    FunctionContext* ctx, const T& val, int num_args, const T* args) {
   if (val.is_null) return BooleanVal::null();
+
+  BooleanVal found;
+  if (strategy == SET_LOOKUP) {
+    SetLookupState<SetType>* state = reinterpret_cast<SetLookupState<SetType>*>(
+        ctx->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
+    found = SetLookup(state, val);
+  } else {
+    DCHECK_EQ(strategy, ITERATE);
+    found = Iterate<T>(val, num_args, args);
+  }
+  if (found.is_null) return BooleanVal::null();
+  return BooleanVal(found.val ^ not_in);
+}
+
+template<typename T, typename SetType>
+BooleanVal InPredicate::SetLookup(
+    SetLookupState<SetType>* state, const T& v) {
+  DCHECK_NOTNULL(state);
+  bool found = state->val_set.find(GetVal<T, SetType>(v)) != state->val_set.end();
+  if (found) return BooleanVal(true);
+  if (state->contains_null) return BooleanVal::null();
+  return BooleanVal(false);
+}
+
+template<typename T>
+BooleanVal InPredicate::Iterate(const T& val, int num_args, const T* args) {
   bool found_null = false;
-  for (int32_t i = 0; i < num_args; ++i) {
+  for (int i = 0; i < num_args; ++i) {
     if (args[i].is_null) {
       found_null = true;
-      continue;
+    } else if (Equals(val, args[i])) {
+      return BooleanVal(true);
     }
-    if (Equals(val, args[i])) return BooleanVal(!not_in);
   }
   if (found_null) return BooleanVal::null();
-  return BooleanVal(not_in);
+  return BooleanVal(false);
 }
 
-// These wrappers are so we can use unmangled symbol names to register these functions
-// TODO: figure out how to mangle templated functions
-BooleanVal InPredicate::In(FunctionContext* context, const BooleanVal& val,
-                           int num_args, const BooleanVal* args) {
-  return TemplatedIn<BooleanVal, false>(context, val, num_args, args);
-}
-BooleanVal InPredicate::NotIn(FunctionContext* context, const BooleanVal& val,
-                              int num_args, const BooleanVal* args) {
-  return TemplatedIn<BooleanVal, true>(context, val, num_args, args);
+#define IN_FUNCTIONS(AnyValType, SetType, type_name) \
+  BooleanVal InPredicate::In_SetLookup( \
+      FunctionContext* context, const AnyValType& val, int num_args, \
+      const AnyValType* args) { \
+    return TemplatedIn<AnyValType, SetType, false, SET_LOOKUP>( \
+        context, val, num_args, args); \
+  } \
+\
+  BooleanVal InPredicate::NotIn_SetLookup( \
+      FunctionContext* context, const AnyValType& val, int num_args, \
+      const AnyValType* args) { \
+    return TemplatedIn<AnyValType, SetType, true, SET_LOOKUP>( \
+        context, val, num_args, args); \
+  } \
+\
+  BooleanVal InPredicate::In_Iterate( \
+      FunctionContext* context, const AnyValType& val, int num_args, \
+      const AnyValType* args) { \
+    return TemplatedIn<AnyValType, SetType, false, ITERATE>( \
+        context, val, num_args, args); \
+  } \
+\
+  BooleanVal InPredicate::NotIn_Iterate( \
+      FunctionContext* context, const AnyValType& val, int num_args, \
+      const AnyValType* args) { \
+    return TemplatedIn<AnyValType, SetType, true, ITERATE>( \
+        context, val, num_args, args); \
+  } \
+\
+  void InPredicate::SetLookupPrepare_##type_name( \
+      FunctionContext* ctx, FunctionContext::FunctionStateScope scope) { \
+    SetLookupPrepare<AnyValType, SetType>(ctx, scope); \
+  } \
+\
+  void InPredicate::SetLookupClose_##type_name( \
+      FunctionContext* ctx, FunctionContext::FunctionStateScope scope) { \
+    SetLookupClose<SetType>(ctx, scope); \
+  }
+
+IN_FUNCTIONS(BooleanVal, bool, boolean)
+IN_FUNCTIONS(TinyIntVal, int8_t, tinyint)
+IN_FUNCTIONS(SmallIntVal, int16_t, smallint)
+IN_FUNCTIONS(IntVal, int32_t, int)
+IN_FUNCTIONS(BigIntVal, int64_t, bigint)
+IN_FUNCTIONS(FloatVal, float, float)
+IN_FUNCTIONS(DoubleVal, double, double)
+IN_FUNCTIONS(StringVal, StringValue, string)
+
+// Passing int as the 'SetType' for TimestampVal and DecimalVal is arbitrary, since we
+// don't yet support sets for them yet.
+BooleanVal InPredicate::In_Iterate(FunctionContext* context, const TimestampVal& val,
+    int num_args, const TimestampVal* args) {
+  return TemplatedIn<TimestampVal, int, false, ITERATE>(context, val, num_args, args);
 }
 
-BooleanVal InPredicate::In(FunctionContext* context, const TinyIntVal& val,
-                           int num_args, const TinyIntVal* args) {
-  return TemplatedIn<TinyIntVal, false>(context, val, num_args, args);
-}
-BooleanVal InPredicate::NotIn(FunctionContext* context, const TinyIntVal& val,
-                              int num_args, const TinyIntVal* args) {
-  return TemplatedIn<TinyIntVal, true>(context, val, num_args, args);
+BooleanVal InPredicate::NotIn_Iterate(FunctionContext* context, const TimestampVal& val,
+    int num_args, const TimestampVal* args) {
+  return TemplatedIn<TimestampVal, int, true, ITERATE>(context, val, num_args, args);
 }
 
-BooleanVal InPredicate::In(FunctionContext* context, const SmallIntVal& val,
-                           int num_args, const SmallIntVal* args) {
-  return TemplatedIn<SmallIntVal, false>(context, val, num_args, args);
-}
-BooleanVal InPredicate::NotIn(FunctionContext* context, const SmallIntVal& val,
-                              int num_args, const SmallIntVal* args) {
-  return TemplatedIn<SmallIntVal, true>(context, val, num_args, args);
+BooleanVal InPredicate::In_Iterate(FunctionContext* context, const DecimalVal& val,
+    int num_args, const DecimalVal* args) {
+  return TemplatedIn<DecimalVal, int, false, ITERATE>(context, val, num_args, args);
 }
 
-BooleanVal InPredicate::In(FunctionContext* context, const IntVal& val,
-                           int num_args, const IntVal* args) {
-  return TemplatedIn<IntVal, false>(context, val, num_args, args);
-}
-BooleanVal InPredicate::NotIn(FunctionContext* context, const IntVal& val,
-                              int num_args, const IntVal* args) {
-  return TemplatedIn<IntVal, true>(context, val, num_args, args);
+BooleanVal InPredicate::NotIn_Iterate(FunctionContext* context, const DecimalVal& val,
+    int num_args, const DecimalVal* args) {
+  return TemplatedIn<DecimalVal, int, true, ITERATE>(context, val, num_args, args);
 }
 
-BooleanVal InPredicate::In(FunctionContext* context, const BigIntVal& val,
-                           int num_args, const BigIntVal* args) {
-  return TemplatedIn<BigIntVal, false>(context, val, num_args, args);
-}
-BooleanVal InPredicate::NotIn(FunctionContext* context, const BigIntVal& val,
-                              int num_args, const BigIntVal* args) {
-  return TemplatedIn<BigIntVal, true>(context, val, num_args, args);
-}
-
-BooleanVal InPredicate::In(FunctionContext* context, const FloatVal& val,
-                           int num_args, const FloatVal* args) {
-  return TemplatedIn<FloatVal, false>(context, val, num_args, args);
-}
-BooleanVal InPredicate::NotIn(FunctionContext* context, const FloatVal& val,
-                              int num_args, const FloatVal* args) {
-  return TemplatedIn<FloatVal, true>(context, val, num_args, args);
-}
-
-BooleanVal InPredicate::In(FunctionContext* context, const DoubleVal& val,
-                           int num_args, const DoubleVal* args) {
-  return TemplatedIn<DoubleVal, false>(context, val, num_args, args);
-}
-BooleanVal InPredicate::NotIn(FunctionContext* context, const DoubleVal& val,
-                              int num_args, const DoubleVal* args) {
-  return TemplatedIn<DoubleVal, true>(context, val, num_args, args);
-}
-
-BooleanVal InPredicate::In(FunctionContext* context, const StringVal& val,
-                           int num_args, const StringVal* args) {
-  return TemplatedIn<StringVal, false>(context, val, num_args, args);
-}
-BooleanVal InPredicate::NotIn(FunctionContext* context, const StringVal& val,
-                              int num_args, const StringVal* args) {
-  return TemplatedIn<StringVal, true>(context, val, num_args, args);
-}
-
-BooleanVal InPredicate::In(FunctionContext* context, const TimestampVal& val,
-                           int num_args, const TimestampVal* args) {
-  return TemplatedIn<TimestampVal, false>(context, val, num_args, args);
-}
-BooleanVal InPredicate::NotIn(FunctionContext* context, const TimestampVal& val,
-                              int num_args, const TimestampVal* args) {
-  return TemplatedIn<TimestampVal, true>(context, val, num_args, args);
-}
-
-BooleanVal InPredicate::In(FunctionContext* context, const DecimalVal& val,
-                           int num_args, const DecimalVal* args) {
-  return TemplatedIn<DecimalVal, false>(context, val, num_args, args);
-}
-BooleanVal InPredicate::NotIn(FunctionContext* context, const DecimalVal& val,
-                              int num_args, const DecimalVal* args) {
-  return TemplatedIn<DecimalVal, true>(context, val, num_args, args);
 }
