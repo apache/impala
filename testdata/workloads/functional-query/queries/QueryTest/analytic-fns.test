@@ -1120,3 +1120,29 @@ from alltypestiny
 ---- TYPES
 DECIMAL, DECIMAL
 ====
+---- QUERY
+# IMPALA-1888: FIRST_VALUE produces incorrect results when the window
+# completely precedes all rows in a partition.
+select id, date_string_col,
+first_value(id) over (partition by date_string_col order by id
+                      rows between 10 preceding and 3 preceding)
+from alltypes where id < 15 order by id
+---- RESULTS
+0,'01/01/09',NULL
+1,'01/01/09',NULL
+2,'01/01/09',NULL
+3,'01/01/09',0
+4,'01/01/09',0
+5,'01/01/09',0
+6,'01/01/09',0
+7,'01/01/09',0
+8,'01/01/09',0
+9,'01/01/09',0
+10,'01/02/09',NULL
+11,'01/02/09',NULL
+12,'01/02/09',NULL
+13,'01/02/09',10
+14,'01/02/09',10
+---- TYPES
+INT, STRING, INT
+====

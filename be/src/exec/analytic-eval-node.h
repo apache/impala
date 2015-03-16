@@ -235,14 +235,17 @@ class AnalyticEvalNode : public ExecNode {
   std::vector<impala_udf::FunctionContext*> fn_ctxs_;
 
   // Queue of tuples which are ready to be set in output rows, with the index into
-  // the input_stream_ stream of the last TupleRow that gets the Tuple. Pairs are
-  // pushed onto the queue in ProcessChildBatch() and dequeued in order in
-  // GetNextOutputBatch(). The size of result_tuples_ is limited by 2 times the
-  // row batch size because we only process input batches if there are not enough
-  // result tuples to produce a single batch of output rows. In the worst case there
-  // may be a single result tuple per output row and result_tuples_.size() may be one
-  // less than the row batch size, in which case we will process another input row batch
-  // (inserting one result tuple per input row) before returning a row batch.
+  // the input_stream_ stream of the last TupleRow that gets the Tuple, i.e. this is a
+  // sparse structure. For example, if result_tuples_ contains tuples with indexes x1 and
+  // x2 where x1 < x2, output rows with indexes in [0, x1] get the first result tuple and
+  // output rows with indexes in (x1, x2] get the second result tuple. Pairs are pushed
+  // onto the queue in ProcessChildBatch() and dequeued in order in GetNextOutputBatch().
+  // The size of result_tuples_ is limited by 2 times the row batch size because we only
+  // process input batches if there are not enough result tuples to produce a single
+  // batch of output rows. In the worst case there may be a single result tuple per
+  // output row and result_tuples_.size() may be one less than the row batch size, in
+  // which case we will process another input row batch (inserting one result tuple per
+  // input row) before returning a row batch.
   std::list<std::pair<int64_t, Tuple*> > result_tuples_;
 
   // Index in input_stream_ of the most recently added result tuple.
