@@ -370,9 +370,9 @@ if [ $TESTDATA_ACTION -eq 1 ]; then
   CREATE_LOAD_DATA_ARGS=""
   if [[ $SNAPSHOT_FILE  && $METASTORE_SNAPSHOT_FILE ]]; then
     CREATE_LOAD_DATA_ARGS="-snapshot_file ${SNAPSHOT_FILE} -skip_metadata_load"
-  elif [[ $SNAPSHOT_FILE && -n $METASTORE_SNAPSHOT_FILE ]]; then
+  elif [[ $SNAPSHOT_FILE && -z $METASTORE_SNAPSHOT_FILE ]]; then
     CREATE_LOAD_DATA_ARGS="-snapshot_file ${SNAPSHOT_FILE}"
-  elif [[ -n $SNAPSHOT_FILE && $METASTORE_SNAPSHOT_FILE ]]; then
+  elif [[ -z $SNAPSHOT_FILE && $METASTORE_SNAPSHOT_FILE ]]; then
     CREATE_LOAD_DATA_ARGS="-skip_metadata_load -skip_snapshot_load"
   fi
   yes | ${IMPALA_HOME}/testdata/bin/create-load-data.sh ${CREATE_LOAD_DATA_ARGS}
