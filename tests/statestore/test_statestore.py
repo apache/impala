@@ -1,25 +1,456 @@
 #!/usr/bin/env python
-# Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+# Copyright (c) 2015 Cloudera, Inc. All rights reserved.
 #
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import pytest
 import os
-from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.impala_cluster import Process
+import time
+import threading
+import socket
+import uuid
+import urllib2
+import json
 
-class SimpleSubscriberProcess(Process):
-  """Runs a subscriber binary that registers with the statestore and immediately exits,
-  indicating its sucesss in the exit code"""
-  def __init__(self):
-    binary_path = os.path.join(
-      os.environ['IMPALA_HOME'], "be/build/debug/statestore/statestore-test-client")
-    Process.__init__(self, [binary_path])
+from thrift.transport import TSocket
+from thrift.transport import TTransport
+from thrift.protocol import TBinaryProtocol
+from thrift.server.TServer import TServer
+from Types.ttypes import TNetworkAddress
 
-class TestStatestore(ImpalaTestSuite):
-  def test_subscriber_restart(self):
-    """Start several clients with the same subscriber ID to confirm that re-registration
-    after a process restart works correctly (see IMPALA-620)"""
-    s = SimpleSubscriberProcess()
-    for i in xrange(5):
-      s.start()
-      rc, _, _ = s.wait()
-      assert rc == 0
+import StatestoreService.StatestoreSubscriber as Subscriber
+import StatestoreService.StatestoreService as Statestore
+from StatestoreService.StatestoreSubscriber import TUpdateStateResponse
+from StatestoreService.StatestoreSubscriber import TTopicRegistration
+from ErrorCodes.ttypes import TErrorCode
+from Status.ttypes import TStatus
+
+# Tests for the statestore. The StatestoreSubscriber class is a skeleton implementation of
+# a Python-based statestore subscriber with additional hooks to allow testing. Each
+# StatestoreSubscriber runs its own server so that the statestore may contact it.
+#
+# All tests in this file may be run in parallel. They assume that a statestore instance is
+# already running, and is configured with out-of-the-box defaults (as is the case in our
+# usual test environment) which govern failure-detector timeouts etc.
+#
+# These tests do not yet provide sufficient coverage.
+#    If no topic entries, do the first and second subscribers always get a callback?
+#    Adding topic entries to non-existant topic
+#    Test for from_version and to_version behavior
+#    Test with many concurrent subscribers
+#    Test that only the subscribed-to topics are sent
+#    Test that topic deletions take effect correctly.
+
+
+def get_unused_port():
+  s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+  s.bind(('localhost', 0))
+  _, port = s.getsockname()
+  s.close()
+  return port
+
+
+def get_statestore_subscribers(host='localhost', port=25010):
+  response = urllib2.urlopen("http://{0}:{1}/subscribers?json".format(host, port))
+  page = response.read()
+  return json.loads(page)
+
+STATUS_OK = TStatus(TErrorCode.OK)
+DEFAULT_UPDATE_STATE_RESPONSE = TUpdateStateResponse(status=STATUS_OK, topic_updates=[],
+                                                     skipped=False)
+
+class KillableThreadedServer(TServer):
+  """Based on TServer.TThreadedServer, this server may be shutdown (by calling
+  shutdown()), after which no new connections may be made. Most of the implementation is
+  directly copied from Thrift."""
+  def __init__(self, *args, **kwargs):
+    TServer.__init__(self, *args)
+    self.daemon = kwargs.get("daemon", False)
+    self.port = kwargs.get("port")
+    self.is_shutdown = False
+    self.transports = set()
+
+  def shutdown(self):
+    self.is_shutdown = True
+    self.serverTransport.close()
+    for t in self.transports:
+      t.close()
+    self.wait_until_down()
+
+  def wait_until_up(self, num_tries=10):
+    for i in xrange(num_tries):
+      cnxn = TSocket.TSocket('localhost', self.port)
+      try:
+        cnxn.open()
+        return
+      except Exception, e:
+        if i == num_tries - 1: raise
+      time.sleep(0.1)
+
+  def wait_until_down(self, num_tries=10):
+    for i in xrange(num_tries):
+      cnxn = TSocket.TSocket('localhost', self.port)
+      try:
+        cnxn.open()
+        time.sleep(0.1)
+      except Exception, e:
+        return
+    raise Exception("Server did not stop")
+
+  def serve(self):
+    self.serverTransport.listen()
+    while not self.is_shutdown:
+      client = self.serverTransport.accept()
+      # Since accept() can take a while, check again if the server is shutdown to avoid
+      # starting an unnecessary thread.
+      if self.is_shutdown: return
+      t = threading.Thread(target=self.handle, args=(client,))
+      t.setDaemon(self.daemon)
+      t.start()
+
+  def handle(self, client):
+    itrans = self.inputTransportFactory.getTransport(client)
+    self.transports.add(itrans)
+    otrans = self.outputTransportFactory.getTransport(client)
+    iprot = self.inputProtocolFactory.getProtocol(itrans)
+    oprot = self.outputProtocolFactory.getProtocol(otrans)
+    try:
+      while not self.is_shutdown:
+        self.processor.process(iprot, oprot)
+    except TTransport.TTransportException, tx:
+      pass
+    except Exception, x:
+      print x
+
+    itrans.close()
+    otrans.close()
+    self.transports.remove(itrans)
+
+
+class StatestoreSubscriber(object):
+  """A bare-bones subscriber skeleton. Tests should create a new StatestoreSubscriber(),
+  call start() and then register(). The subscriber will run a Thrift server on an unused
+  port, and after registration the statestore will call Heartbeat() and UpdateState() via
+  RPC. Tests can provide callbacks to the constructor that will be called during those
+  RPCs, and this is the easiest way to check that the statestore protocol is being
+  correctly followed. Tests should use wait_for_* methods to confirm that some event (like
+  an RPC call) has happened asynchronously.
+
+  Since RPC callbacks will execute on a different thread from the main one, any assertions
+  there will not trigger a test failure without extra plumbing. What we do is simple: any
+  exceptions during an RPC are caught and stored, and the check_thread_exceptions() method
+  will re-raise them.
+
+  The methods that may be called by a test deliberately return 'self' to allow for
+  chaining, see test_failure_detected() for an example of how this makes the test flow
+  more readable."""
+  def __init__(self, port=None, heartbeat_cb=None, update_cb=None):
+    self.port = port if port else get_unused_port()
+    self.heartbeat_event, self.heartbeat_count = threading.Event(), 0
+    self.update_event, self.update_count = threading.Event(), 0
+    self.heartbeat_cb, self.update_cb = heartbeat_cb, update_cb
+    self.exception = None
+
+  def Heartbeat(self, args):
+    """Heartbeat RPC handler. Calls heartbeat callback if one exists."""
+    self.heartbeat_count += 1
+    response = Subscriber.THeartbeatResponse()
+    if self.heartbeat_cb is not None and self.exception is None:
+      try:
+        response = self.heartbeat_cb(self, args)
+      except Exception, e:
+        self.exception = e
+    self.heartbeat_event.set(); self.heartbeat_event.clear()
+    return response
+
+  def UpdateState(self, args):
+    """UpdateState RPC handler. Calls update callback if one exists."""
+    self.update_count += 1
+    response = DEFAULT_UPDATE_STATE_RESPONSE
+    if self.update_cb is not None and self.exception is None:
+      try:
+        response = self.update_cb(self, args)
+      except Exception, e:
+        self.exception = e
+    self.update_event.set(); self.update_event.clear()
+    return response
+
+  def __init_server(self):
+    processor = Subscriber.Processor(self)
+    transport = TSocket.TServerSocket(port=self.port)
+    tfactory = TTransport.TBufferedTransportFactory()
+    pfactory = TBinaryProtocol.TBinaryProtocolFactory()
+    self.server = KillableThreadedServer(processor, transport, tfactory, pfactory,
+                                         daemon=True, port=self.port)
+    self.server_thread = threading.Thread(target=self.server.serve)
+    self.server_thread.setDaemon(True)
+    self.server_thread.start()
+    self.server.wait_until_up()
+
+  def __init_client(self):
+    self.client_transport = \
+        TTransport.TBufferedTransport(TSocket.TSocket('localhost', 24000))
+    self.protocol = TBinaryProtocol.TBinaryProtocol(self.client_transport)
+    self.client = Statestore.Client(self.protocol)
+    self.client_transport.open()
+
+  def check_thread_exceptions(self):
+    """Checks if an exception was raised and stored in a callback thread"""
+    if self.exception is not None: raise self.exception
+
+  def kill(self):
+    """Closes both the server and client sockets, and waits for the server to become
+    unavailable"""
+    self.client_transport.close()
+    self.server.shutdown()
+    return self
+
+  def start(self):
+    """Starts a subscriber server, and opens a client to the statestore. Returns only when
+    the server is running."""
+    self.__init_server()
+    self.__init_client()
+    return self
+
+  def register(self, topics=None):
+    """Call the Register() RPC"""
+    self.subscriber_id = "python-test-client-%s" % uuid.uuid1()
+    if topics is None: topics = []
+    request = Subscriber.TRegisterSubscriberRequest(
+      topic_registrations=topics,
+      subscriber_location=TNetworkAddress("localhost", self.port),
+      subscriber_id=self.subscriber_id)
+    response = self.client.RegisterSubscriber(request)
+    if response.status.status_code == TErrorCode.OK:
+      self.registration_id = response.registration_id
+    else:
+      raise Exception("Registration failed: %s, %s" %
+                      (response.status.status_code,
+                       '\n'.join(response.status.error_msgs)))
+    return self
+
+  def wait_for_heartbeat(self, count=None):
+    """Waits for some number of heartbeats. If 'count' is provided, waits until the number
+    of heartbeats seen by this subscriber exceeds count, otherwise waits for one further
+    heartbeat."""
+    if count is not None and self.heartbeat_count >= count: return
+    if count is None: count = self.heartbeat_count
+    while count > self.heartbeat_count:
+      self.check_thread_exceptions()
+      last_count = self.heartbeat_count
+      self.heartbeat_event.wait(10)
+      if last_count == self.heartbeat_count:
+        raise Exception("Heartbeat not received within 10s (heartbeat count: %s)" %
+                        self.heartbeat_count)
+    self.check_thread_exceptions()
+    return self
+
+  def wait_for_update(self, count=None):
+    """Waits for some number of updates. If 'count' is provided, waits until the number
+    of updates seen by this subscriber exceeds count, otherwise waits for one further
+    update."""
+    if count is not None and self.update_count >= count: return
+    if count is None: count = self.update_count
+    while count > self.update_count:
+      self.check_thread_exceptions()
+      last_count = self.update_count
+      self.update_event.wait(10)
+      if last_count == self.update_count:
+        raise Exception("Update not received within 10s (update count: %s)" %
+                        self.update_count)
+    self.check_thread_exceptions()
+    return self
+
+  def wait_for_failure(self, timeout=20):
+    """Waits until this subscriber no longer appears in the statestore's subscriber
+    list. If 'timeout' seconds pass, throws an exception."""
+    start = time.time()
+    while time.time() - start < timeout:
+      subs = [s["id"] for s in get_statestore_subscribers()["subscribers"]]
+      if self.subscriber_id not in subs: return self
+      time.sleep(0.2)
+    raise Exception("Subscriber %s did not fail in %ss" % (self.subscriber_id, timeout))
+
+class TestStatestore():
+  def make_topic_update(self, topic_name, key_template="foo", value_template="bar",
+                        num_updates=1, deletions=None):
+    topic_entries = [
+      Subscriber.TTopicItem(key=key_template + str(x), value=value_template + str(x))
+      for x in xrange(num_updates)]
+    if deletions is None: deletions = []
+    return Subscriber.TTopicDelta(topic_name=topic_name,
+                                  topic_entries=topic_entries,
+                                  topic_deletions=deletions,
+                                  is_delta=False)
+
+  def test_registration_ids_different(self):
+    """Test that if a subscriber with the same id registers twice, the registration ID is
+    different"""
+    sub = StatestoreSubscriber()
+    sub.start().register()
+    old_reg_id = sub.registration_id
+    sub.register()
+    assert old_reg_id != sub.registration_id
+
+  def test_receive_heartbeats(self):
+    """Smoke test to confirm that heartbeats get sent to a correctly registered
+    subscriber"""
+    sub = StatestoreSubscriber()
+    sub.start().register().wait_for_heartbeat(5)
+
+  def test_receive_updates(self):
+    """Test that updates are correctly received when a subscriber alters a topic"""
+    topic_name = "topic_delta_%s" % uuid.uuid1()
+
+    def topic_update_correct(sub, args):
+      delta = self.make_topic_update(topic_name)
+      if sub.update_count == 1:
+        return TUpdateStateResponse(status=STATUS_OK, topic_updates=[delta],
+                                    skipped=False)
+      elif sub.update_count == 2:
+        assert len(args.topic_deltas) == 1
+        assert args.topic_deltas[topic_name].topic_entries == delta.topic_entries
+        assert args.topic_deltas[topic_name].topic_name == delta.topic_name
+        assert args.topic_deltas[topic_name].topic_deletions == delta.topic_deletions
+      elif sub.update_count == 3:
+        # After the content-bearing update was processed, the next delta should be empty
+        assert len(args.topic_deltas[topic_name].topic_entries) == 0
+        assert len(args.topic_deltas[topic_name].topic_deletions) == 0
+
+      return DEFAULT_UPDATE_STATE_RESPONSE
+
+    sub = StatestoreSubscriber(update_cb=topic_update_correct)
+    reg = TTopicRegistration(topic_name=topic_name, is_transient=False)
+    (
+      sub.start()
+         .register(topics=[reg])
+         .wait_for_update(3)
+    )
+
+  def test_update_is_delta(self):
+    """Test that the 'is_delta' flag is correctly set. The first update for a topic should
+    always not be a delta, and so should all subsequent updates until the subscriber says
+    it has not skipped the update."""
+    topic_name = "test_update_is_delta_%s" % uuid.uuid1()
+
+    def check_delta(sub, args):
+      if sub.update_count == 1:
+        assert args.topic_deltas[topic_name].is_delta == False
+        delta = self.make_topic_update(topic_name)
+        return TUpdateStateResponse(status=STATUS_OK, topic_updates=[delta],
+                                    skipped=False)
+      elif sub.update_count == 2:
+        assert args.topic_deltas[topic_name].is_delta == False
+      elif sub.update_count == 3:
+        assert args.topic_deltas[topic_name].is_delta == True
+        assert len(args.topic_deltas[topic_name].topic_entries) == 0
+        assert args.topic_deltas[topic_name].to_version == 1
+
+      return DEFAULT_UPDATE_STATE_RESPONSE
+
+    sub = StatestoreSubscriber(update_cb=check_delta)
+    reg = TTopicRegistration(topic_name=topic_name, is_transient=False)
+    (
+      sub.start()
+         .register(topics=[reg])
+         .wait_for_update(3)
+    )
+
+  def test_skipped(self):
+    """Test that skipping an update causes it to be resent"""
+    topic_name = "test_skipped_%s" % uuid.uuid1()
+
+    def check_skipped(sub, args):
+      if sub.update_count == 1:
+        update = self.make_topic_update(topic_name)
+        return TUpdateStateResponse(status=STATUS_OK, topic_updates=[update],
+                                    skipped=False)
+      # All subsequent updates: set skipped=True and expected the full topic to be resent
+      # every time
+      assert args.topic_deltas[topic_name].is_delta == False
+      assert len(args.topic_deltas[topic_name].topic_entries) == 1
+      return TUpdateStateResponse(status=STATUS_OK, skipped=True)
+
+    sub = StatestoreSubscriber(update_cb=check_skipped)
+    reg = TTopicRegistration(topic_name=topic_name, is_transient=False)
+    (
+      sub.start()
+         .register(topics=[reg])
+         .wait_for_update(3)
+    )
+
+  def test_failure_detected(self):
+    sub = StatestoreSubscriber()
+    (
+      sub.start()
+         .register()
+         .wait_for_update(1)
+         .kill()
+         .wait_for_failure()
+    )
+
+  def test_hung_heartbeat(self):
+    """Test for IMPALA-1712: If heartbeats hang (which we simulate by sleeping for five
+    minutes) the statestore should time them out every 3s and then eventually fail after
+    40s (10 times (3 + 1), where the 1 is the inter-heartbeat delay)"""
+    sub = StatestoreSubscriber(heartbeat_cb=lambda sub, args: time.sleep(300))
+    (
+      sub.start()
+         .register()
+         .wait_for_update(1)
+         .wait_for_failure(timeout=60)
+    )
+
+  def test_topic_persistence(self):
+    """Test that persistent topic entries survive subscriber failure, but transent topic
+    entries are erased when the associated subscriber fails"""
+    topic_id = str(uuid.uuid1())
+    persistent_topic_name = "test_topic_persistence_persistent_%s" % topic_id
+    transient_topic_name = "test_topic_persistence_transient_%s" % topic_id
+
+    def add_entries(sub, args):
+      if sub.update_count == 1:
+        updates = [self.make_topic_update(persistent_topic_name),
+                   self.make_topic_update(transient_topic_name)]
+        return TUpdateStateResponse(status=STATUS_OK, topic_updates=updates,
+                                    skipped=False)
+
+      return DEFAULT_UPDATE_STATE_RESPONSE
+
+    def check_entries(sub, args):
+      if sub.update_count == 1:
+        assert len(args.topic_deltas[transient_topic_name].topic_entries) == 0
+        assert len(args.topic_deltas[persistent_topic_name].topic_entries) == 1
+        # Statestore should not send deletions when the update is not a delta, see
+        # IMPALA-1891
+        # assert len(args.topic_deltas[transient_topic_name].topic_deletions) == 0
+      return DEFAULT_UPDATE_STATE_RESPONSE
+
+    reg = [TTopicRegistration(topic_name=persistent_topic_name, is_transient=False),
+           TTopicRegistration(topic_name=transient_topic_name, is_transient=True)]
+
+    sub = StatestoreSubscriber(update_cb=add_entries)
+    (
+      sub.start()
+         .register(topics=reg)
+         .wait_for_update(1)
+         .kill()
+         .wait_for_failure()
+    )
+
+    sub2 = StatestoreSubscriber(update_cb=check_entries)
+    (
+      sub2.start()
+          .register(topics=reg)
+          .wait_for_update(1)
+    )

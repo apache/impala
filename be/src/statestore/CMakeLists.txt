@@ -31,9 +31,5 @@ add_library(Statestore
 add_executable(statestored statestored-main.cc)
 target_link_libraries(statestored ${IMPALA_LINK_LIBS})
 
-# Binary used only for testing
-add_executable(statestore-test-client statestore-test-client.cc)
-target_link_libraries(statestore-test-client ${IMPALA_LINK_LIBS})
-
 ADD_BE_TEST(simple-scheduler-test)
 ADD_BE_TEST(statestore-test)
