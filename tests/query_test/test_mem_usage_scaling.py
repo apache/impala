@@ -20,7 +20,6 @@ from copy import copy
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
-from tests.common.skip import skip_if_s3_jira
 
 class TestQueryMemLimitScaling(ImpalaTestSuite):
   """Test class to do functional validation of per query memory limits. """
@@ -76,7 +75,6 @@ class TestExprMemUsage(ImpalaTestSuite):
       "select count(*) from lineitem where lower(l_comment) = 'hello'", exec_options,
       table_format=vector.get_value('table_format'))
 
-@skip_if_s3_jira(reason="IMPALA-1863")
 class TestTpchMemLimitError(ImpalaTestSuite):
   EXPECTED_ERROR_MSG = "Memory limit exceeded"
 

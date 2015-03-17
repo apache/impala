@@ -132,6 +132,12 @@ void BlockingJoinNode::BuildSideThread(RuntimeState* state, Promise<Status>* sta
     SCOPED_TIMER(runtime_profile()->total_async_timer());
     s = ConstructBuildSide(state);
   }
+  // IMPALA-1863: If the build-side thread failed, then we need to close the right
+  // (build-side) child to avoid a potential deadlock between fragment instances.  This
+  // is safe to do because while the build may have partially completed, it will not be
+  // probed.  BlockJoinNode::Open() will return failure as soon as child(0)->Open()
+  // completes.
+  if (!s.ok()) child(1)->Close(state);
   // Release the thread token as soon as possible (before the main thread joins
   // on it).  This way, if we had a chain of 10 joins using 1 additional thread,
   // we'd keep the additional thread busy the whole time.
@@ -145,31 +151,33 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
 
-  // Kick-off the construction of the build-side table in a separate thread, so that the
-  // left child can do any initialisation in parallel.
-  // Only do this if we can get a thread token.  Otherwise, do this in the main thread.
-  Promise<Status> build_side_status;
+  // If we can get a thread token, initiate the construction of the build-side table in
+  // a separate thread, so that the left child can do any initialisation in parallel.
+  // Otherwise, do this in the main thread.
   if (state->resource_pool()->TryAcquireThreadToken()) {
+    Promise<Status> build_side_status;
     AddRuntimeExecOption("Join Build-Side Prepared Asynchronously");
     Thread build_thread(node_name_, "build thread",
         bind(&BlockingJoinNode::BuildSideThread, this, state, &build_side_status));
     if (!state->cgroup().empty()) {
-      RETURN_IF_ERROR(state->exec_env()->cgroups_mgr()->AssignThreadToCgroup(
-          build_thread, state->cgroup()));
+      Status status = state->exec_env()->cgroups_mgr()->AssignThreadToCgroup(
+          build_thread, state->cgroup());
+      // If AssignThreadToCgroup() failed, we still need to wait for the build-side
+      // thread to complete before returning, so just log that error.
+      if (!status.ok()) state->LogError(status.msg());
     }
+    // Open the left child so that it may perform any initialisation in parallel.
+    // Don't exit even if we see an error, we still need to wait for the build thread
+    // to finish.
+    Status open_status = child(0)->Open(state);
+    // Blocks until ConstructBuildSide has returned, after which the build side structures
+    // are fully constructed.
+    RETURN_IF_ERROR(build_side_status.Get());
+    RETURN_IF_ERROR(open_status);
   } else {
-    build_side_status.Set(ConstructBuildSide(state));
+    RETURN_IF_ERROR(ConstructBuildSide(state));
+    RETURN_IF_ERROR(child(0)->Open(state));
   }
-
-  // Open the left child so that it may perform any initialisation in parallel.
-  // Don't exit even if we see an error, we still need to wait for the build thread
-  // to finish.
-  Status open_status = child(0)->Open(state);
-
-  // Blocks until ConstructBuildSide has returned, after which the build side structures
-  // are fully constructed.
-  RETURN_IF_ERROR(build_side_status.Get());
-  RETURN_IF_ERROR(open_status);
 
   // Seed left child in preparation for GetNext().
   while (true) {
