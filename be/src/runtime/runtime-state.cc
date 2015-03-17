@@ -262,11 +262,10 @@ Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
   stringstream ss;
   ss << "Memory Limit Exceeded\n";
   if (failed_allocation_size != 0) {
-    DCHECK(tracker != NULL);
+    DCHECK_NOTNULL(tracker);
     ss << "  " << tracker->label() << " could not allocate "
        << PrettyPrinter::Print(failed_allocation_size, TUnit::BYTES)
-       << " without exceeding limit."
-       << endl;
+       << " without exceeding limit." << endl;
   }
 
   if (exec_env_->process_mem_tracker()->LimitExceeded()) {

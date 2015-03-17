@@ -844,6 +844,12 @@ bool DiskIoMgr::GetNextRequestRange(DiskQueue* disk_queue, RequestRange** range,
 
 void DiskIoMgr::HandleWriteFinished(RequestContext* writer, WriteRange* write_range,
     const Status& write_status) {
+  // Execute the callback before decrementing the thread count. Otherwise CancelContext()
+  // that waits for the disk ref count to be 0 will return, creating a race, e.g.
+  // between BufferedBlockMgr::WriteComplete() and BufferedBlockMgr::~BufferedBlockMgr().
+  // See IMPALA-1890.
+  // The status of the write does not affect the status of the writer context.
+  write_range->callback_(write_status);
   {
     unique_lock<mutex> writer_lock(writer->lock_);
     DCHECK(writer->Validate()) << endl << writer->DebugString();
@@ -855,8 +861,6 @@ void DiskIoMgr::HandleWriteFinished(RequestContext* writer, WriteRange* write_ra
     }
     --state.num_remaining_ranges();
   }
-  // The status of the write does not affect the status of the writer context.
-  write_range->callback_(write_status);
 }
 
 void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, RequestContext* reader,

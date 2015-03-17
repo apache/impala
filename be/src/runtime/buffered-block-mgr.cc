@@ -361,7 +361,7 @@ void BufferedBlockMgr::Cancel() {
     if (is_cancelled_) return;
     is_cancelled_ = true;
   }
-  // Cancel to the underlying io mgr to unblock any waiting threads.
+  // Cancel the underlying io mgr to unblock any waiting threads.
   io_mgr_->CancelContext(io_request_context_);
 }
 
@@ -477,9 +477,6 @@ BufferedBlockMgr::~BufferedBlockMgr() {
 
   if (io_request_context_ != NULL) io_mgr_->UnregisterContext(io_request_context_);
 
-  // Grab this lock to synchronize with io threads in WriteComplete(). We need those
-  // to finish to ensure that memory buffers remain valid for any in-progress writes.
-  lock_guard<mutex> lock(lock_);
   // If there are any outstanding writes and we are here it means that when the
   // WriteComplete() callback gets executed it is going to access invalid memory.
   // See IMPALA-1890.
@@ -719,11 +716,12 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
   // hang around needlessly.
   if (encryption_) EncryptDone(block);
 
-  if (is_cancelled_) goto cancel_and_wake_waiters;
+  if (is_cancelled_ || block->client_->state_->is_cancelled()) goto cancel_and_notify;
+
   if (!write_status.ok()) {
     VLOG_QUERY << "Query: " << query_id_ << " write complete callback with error.";
     block->client_->state_->LogError(write_status.msg());
-    goto cancel_and_wake_waiters;
+    goto cancel_and_notify;
   }
 
   // If the block was re-pinned when it was in the IOMgr queue, don't free it.
@@ -736,7 +734,7 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
     if (!status.ok()) {
       VLOG_QUERY << "Query: " << query_id_ << " error while writing unpinned blocks.";
       block->client_->state_->LogError(status.msg());
-      goto cancel_and_wake_waiters;
+      goto cancel_and_notify;
     }
     DCHECK(Validate()) << endl << DebugInternal();
     return;
@@ -761,8 +759,8 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
   buffer_available_cv_.notify_one();
   return;
 
-cancel_and_wake_waiters:
-  // Set cancelled and wake up waiting threads if an error occurred.
+cancel_and_notify:
+  // Set cancelled and wake up all waiting threads if an error occurred.
   is_cancelled_ = true;
   if (block->client_local_) block->write_complete_cv_.notify_one();
   buffer_available_cv_.notify_all();
