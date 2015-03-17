@@ -479,7 +479,11 @@ public class PlannerTestBase {
     String lineageGraph = null;
     try {
       execRequest = frontend_.createExecRequest(queryCtx, explainBuilder);
-      lineageGraph = execRequest.query_exec_request.lineage_graph;
+      if (execRequest.isSetQuery_exec_request()) {
+        lineageGraph = execRequest.query_exec_request.lineage_graph;
+      } else if (execRequest.isSetCatalog_op_request()) {
+        lineageGraph = execRequest.catalog_op_request.lineage_graph;
+      }
     } catch (ImpalaException e) {
       if (e instanceof AnalysisException) {
         e.printStackTrace();

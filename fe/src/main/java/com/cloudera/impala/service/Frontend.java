@@ -813,7 +813,10 @@ public class Frontend {
     if (analysisResult.isCatalogOp()) {
       result.stmt_type = TStmtType.DDL;
       createCatalogOpRequest(analysisResult, result);
-
+      String jsonLineageGraph = analysisResult.getJsonLineageGraph();
+      if (jsonLineageGraph != null && !jsonLineageGraph.isEmpty()) {
+        result.catalog_op_request.setLineage_graph(jsonLineageGraph);
+      }
       // All DDL operations except for CTAS are done with analysis at this point.
       if (!analysisResult.isCreateTableAsSelectStmt()) return result;
     } else if (analysisResult.isLoadDataStmt()) {

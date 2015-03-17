@@ -9,7 +9,7 @@ select * from (
     "queryText":"select * from (\n  select tinyint_col + int_col x from functional.alltypes\n  union all\n  select sum(bigint_col) y from (select bigint_col from functional.alltypes) v1) v2",
     "hash":"25456c60a2e874a20732f42c7af27553",
     "user":"dimitris",
-    "timestamp":1425017160643,
+    "timestamp":1426633018,
     "edges":[
         {
             "sources":[
@@ -62,7 +62,7 @@ order by b.bigint_col limit 10
     "queryText":"select sum(a.tinyint_col) over (partition by a.smallint_col order by a.id),\n  count(b.string_col), b.timestamp_col\nfrom functional.alltypes a join functional.alltypessmall b on (a.id = b.id)\nwhere a.year = 2010 and b.float_col > 0\ngroup by a.tinyint_col, a.smallint_col, a.id, b.string_col, b.timestamp_col, b.bigint_col\nhaving count(a.int_col) > 10\norder by b.bigint_col limit 10",
     "hash":"e0309eeff9811f53c82657d62c1e04eb",
     "user":"dimitris",
-    "timestamp":1425017161244,
+    "timestamp":1426633019,
     "edges":[
         {
             "sources":[
@@ -198,7 +198,7 @@ create table t as select int_col, tinyint_col from functional.alltypes
     "queryText":"create table t as select int_col, tinyint_col from functional.alltypes",
     "hash":"f7666959b65ce1aa2a695ae90adb7c85",
     "user":"dimitris",
-    "timestamp":1425017161358,
+    "timestamp":1426633019,
     "edges":[
         {
             "sources":[
@@ -252,7 +252,7 @@ where a.year = 2009 and b.month = 2
     "queryText":"create table t as\nselect distinct a.int_col, a.string_col from functional.alltypes a\ninner join functional.alltypessmall b on (a.id = b.id)\nwhere a.year = 2009 and b.month = 2",
     "hash":"6d83126f8e34eec31ed4e111e1c32e78",
     "user":"dimitris",
-    "timestamp":1425017161433,
+    "timestamp":1426633019,
     "edges":[
         {
             "sources":[
@@ -339,7 +339,7 @@ select * from
     "queryText":"create table t as\nselect * from\n  (select * from\n     (select int_col from functional.alltypestiny limit 1) v1 ) v2",
     "hash":"f719f8eba46eda75e9cc560310885558",
     "user":"dimitris",
-    "timestamp":1425017161463,
+    "timestamp":1426633019,
     "edges":[
         {
             "sources":[
@@ -372,7 +372,7 @@ create table tm as select * from functional_hbase.alltypes limit 5
     "queryText":"create table tm as select * from functional_hbase.alltypes limit 5",
     "hash":"bedebc5bc72bbc6aec385c514944daae",
     "user":"dimitris",
-    "timestamp":1425017161536,
+    "timestamp":1426633019,
     "edges":[
         {
             "sources":[
@@ -636,7 +636,7 @@ functional_hbase.alltypes
     "queryText":"insert into\nfunctional_hbase.alltypes\n  values (1, 1, true, \"1999-12-01\", 2.0, 1.0, 1, 12, 2, \"abs\",\n  cast(now() as timestamp), 1, 1999)",
     "hash":"b923425ce9cc2d53d36523ec83971e67",
     "user":"dimitris",
-    "timestamp":1425017161963,
+    "timestamp":1426633019,
     "edges":[
         {
             "sources":[
@@ -820,7 +820,7 @@ from functional.alltypes
     "queryText":"insert into table functional.alltypesnopart (id, bool_col, timestamp_col)\nselect id, bool_col, timestamp_col\nfrom functional.alltypes",
     "hash":"b7b9474fc6b97f104bd031209438ee0e",
     "user":"dimitris",
-    "timestamp":1425017161976,
+    "timestamp":1426633019,
     "edges":[
         {
             "sources":[
@@ -998,7 +998,7 @@ where year=2009 and month=05
     "queryText":"insert into table functional.alltypessmall (smallint_col, int_col)\npartition (year=2009, month=04)\nselect smallint_col, int_col\nfrom functional.alltypes\nwhere year=2009 and month=05",
     "hash":"2ed3a6c784e1c0c7fcef226d71375180",
     "user":"dimitris",
-    "timestamp":1425017162045,
+    "timestamp":1426633019,
     "edges":[
         {
             "sources":[
@@ -1228,7 +1228,7 @@ where year=2009 and month>10
     "queryText":"insert into table functional.alltypessmall (id, string_col, int_col)\npartition (year, month)\nselect id, string_col, int_col, year, month\nfrom functional_seq_snap.alltypes\nwhere year=2009 and month>10",
     "hash":"39ac95ce0632ef1ee8b474be644971f3",
     "user":"dimitris",
-    "timestamp":1425017162055,
+    "timestamp":1426633019,
     "edges":[
         {
             "sources":[
@@ -1470,7 +1470,7 @@ having min(id) > 10
     "queryText":"insert into table functional.alltypessmall\npartition (year=2009, month)\nselect min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col),\nmin(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col),\nmin(timestamp_col), month\nfrom functional.alltypes\nwhere year=2009 and month>10\ngroup by month\nhaving min(id) > 10",
     "hash":"e6969c2cc67e9d6f3f985ddc6431f915",
     "user":"dimitris",
-    "timestamp":1425017162206,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -1756,7 +1756,7 @@ group by int_col, tinyint_col
     "queryText":"select\nmax(tinyint_col) over(partition by int_col)\nfrom functional.alltypes\ngroup by int_col, tinyint_col",
     "hash":"83c78528e6f5325c56a3f3521b08a78d",
     "user":"dimitris",
-    "timestamp":1425017162247,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -1802,7 +1802,7 @@ select int_col, rank() over(order by int_col) from functional.alltypesagg
     "queryText":"select int_col, rank() over(order by int_col) from functional.alltypesagg",
     "hash":"4f1ecaaed571d2ed9f09f091f399c311",
     "user":"dimitris",
-    "timestamp":1425017162262,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -1859,7 +1859,7 @@ order by a.tinyint_col, a.int_col
     "queryText":"select a.tinyint_col, a.int_col, count(a.double_col)\n  over(partition by a.tinyint_col order by a.int_col desc rows between 1 preceding and 1 following)\nfrom functional.alltypes a inner join functional.alltypessmall b on a.id = b.id\norder by a.tinyint_col, a.int_col",
     "hash":"b6e26c00b2ef17f0592ebadb0ecc21f6",
     "user":"dimitris",
-    "timestamp":1425017162341,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -1969,7 +1969,7 @@ order by 2, 3, 4
     "queryText":"with v2 as\n  (select\n   double_col,\n   count(int_col) over() a,\n   sum(int_col + bigint_col) over(partition by bool_col) b\n   from\n     (select * from functional.alltypes) v1)\nselect double_col, a, b, a + b, double_col + a from v2\norder by 2, 3, 4",
     "hash":"6bf993cea0d1ab9e613674ef178916c9",
     "user":"dimitris",
-    "timestamp":1425017162355,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -2100,7 +2100,7 @@ order by 2, 3, 4
     "queryText":"select double_col, a, b, a + b, double_col + a from\n  (select\n   double_col,\n   count(int_col) over() a,\n   sum(int_col + bigint_col) over(partition by bool_col) b\n   from\n     (select * from functional.alltypes) v1) v2\norder by 2, 3, 4",
     "hash":"811403c86e86fe630dea7bd0a6c89273",
     "user":"dimitris",
-    "timestamp":1425017162412,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -2233,7 +2233,7 @@ where b.month = 1
     "queryText":"select a.month, a.year, b.int_col, b.month\nfrom\n  (select year, month from functional.alltypes\n   union all\n   select year, month from functional.alltypes) a\n  inner join\n  functional.alltypessmall b\n  on (a.month = b.month)\nwhere b.month = 1",
     "hash":"e3000cd5edf2a02e1f5407810f3cc09a",
     "user":"dimitris",
-    "timestamp":1425017162434,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -2340,7 +2340,7 @@ where month = 1
     "queryText":"select t1.int_col, t2.month, t2.int_col + 1\nfrom (\n  select int_col, count(*)\n  from functional.alltypessmall\n  where month = 1\n  group by int_col\n  having count(*) > 1\n  order by count(*) desc limit 5\n  ) t1\njoin functional.alltypes t2 on (t1.int_col = t2.int_col)\nwhere month = 1",
     "hash":"3f1ecf7239e205342aee4979e7cb4877",
     "user":"dimitris",
-    "timestamp":1425017162442,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -2441,7 +2441,7 @@ and x.int_col + x.float_col + cast(c.string_col as float) < 1000
     "queryText":"select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col\nfrom functional.alltypessmall c\njoin (\n   select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,\n           a.int_col int_col, a.month month, b.float_col float_col, b.id id\n   from ( select * from functional.alltypesagg a where month=1 ) a\n   join functional.alltypessmall b on (a.smallint_col = b.id)\n ) x on (x.tinyint_col = c.id)\nwhere x.day=1\nand x.int_col > 899\nand x.float_col > 4.5\nand c.string_col < '7'\nand x.int_col + x.float_col + cast(c.string_col as float) < 1000",
     "hash":"4edf165aed5982ede63f7c91074f4b44",
     "user":"dimitris",
-    "timestamp":1425017162455,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -2617,7 +2617,7 @@ from
     "queryText":"select c1, c2, c3\nfrom\n  (select c1, c2, c3\n   from\n     (select int_col c1, sum(float_col) c2, min(float_col) c3\n      from functional_hbase.alltypessmall\n      group by 1) x\n    order by 2,3 desc\n    limit 5\n) y",
     "hash":"8b4d1ab11721d9ebdf26666d4195eb18",
     "user":"dimitris",
-    "timestamp":1425017162478,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -2710,7 +2710,7 @@ limit 0
     "queryText":"select c1, x2\nfrom (\n  select c1, min(c2) x2\n  from (\n    select c1, c2, c3\n    from (\n      select int_col c1, tinyint_col c2, min(float_col) c3\n      from functional_hbase.alltypessmall\n      group by 1, 2\n      order by 1,2\n      limit 1\n    ) x\n  ) x2\n  group by c1\n) y\norder by 2,1 desc\nlimit 0",
     "hash":"50d3b4f249f038b0711ea75c17640fc9",
     "user":"dimitris",
-    "timestamp":1425017162578,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -2773,7 +2773,7 @@ select int_col, string_col from functional.view_view
     "queryText":"select int_col, string_col from functional.view_view",
     "hash":"9073496459077de1332e5017977dedf5",
     "user":"dimitris",
-    "timestamp":1425017162589,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -2825,7 +2825,7 @@ where t.id < 10
     "queryText":"select t.id from (select id from functional.alltypes_view) t\nwhere t.id < 10",
     "hash":"8ba7998033f90e1e358f4fdc7ea4251b",
     "user":"dimitris",
-    "timestamp":1425017162640,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -2870,7 +2870,7 @@ where id in
     "queryText":"select string_col, float_col, bool_col\nfrom functional.alltypes\nwhere id in\n  (select id from functional.alltypesagg)",
     "hash":"e8ad1371d2a13e1ee9ec45689b62cdc9",
     "user":"dimitris",
-    "timestamp":1425017162663,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -2969,7 +2969,7 @@ and tinyint_col < 10
     "queryText":"select 1\nfrom functional.alltypesagg a\nwhere exists\n  (select id, count(int_col) over (partition by bool_col)\n   from functional.alltypestiny b\n   where a.tinyint_col = b.tinyint_col\n   group by id, int_col, bool_col)\nand tinyint_col < 10",
     "hash":"a7500c022d29c583c31b287868a848bf",
     "user":"dimitris",
-    "timestamp":1425017162673,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -3019,7 +3019,7 @@ and a.bigint_col > 10
     "queryText":"select int_col + 1, tinyint_col - 1\nfrom functional.alltypes a\nwhere a.int_col <\n  (select max(int_col) from functional.alltypesagg g where g.bool_col = true)\nand a.bigint_col > 10",
     "hash":"5e6227f323793ea4441e2a3119af2f09",
     "user":"dimitris",
-    "timestamp":1425017162693,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -3099,7 +3099,7 @@ with t as (select int_col x, bigint_col y from functional.alltypes) select x, y 
     "queryText":"with t as (select int_col x, bigint_col y from functional.alltypes) select x, y from t",
     "hash":"a7ab58d90540f28a8dfd69703632ad7a",
     "user":"dimitris",
-    "timestamp":1425017162707,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -3152,7 +3152,7 @@ select id, int_col, string_col, year, month from t1
     "queryText":"with t1 as (select * from functional.alltypestiny)\ninsert into functional.alltypesinsert (id, int_col, string_col) partition(year, month)\nselect id, int_col, string_col, year, month from t1",
     "hash":"0bc5b3e66cc72387f74893b1f1934946",
     "user":"dimitris",
-    "timestamp":1425017162712,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -3370,7 +3370,7 @@ from
     "queryText":"select lead(a) over (partition by b order by c)\nfrom\n  (select lead(id) over (partition by int_col order by bigint_col) as a,\n   max(id) over (partition by tinyint_col order by int_col) as b,\n   min(int_col) over (partition by string_col order by bool_col) as c\n   from functional.alltypes) v",
     "hash":"aa95e5e6f39fc80bb3c318a2515dc77d",
     "user":"dimitris",
-    "timestamp":1425017162737,
+    "timestamp":1426633020,
     "edges":[
         {
             "sources":[
@@ -3431,6 +3431,482 @@ from
             "id":6,
             "vertexType":"COLUMN",
             "vertexId":"functional.alltypes.bool_col"
+        }
+    ]
+}
+====
+# Create view statement (CDH-26149)
+create view test_view_lineage as select id from functional.alltypestiny
+---- LINEAGE
+{
+    "queryText":"create view test_view_lineage as select id from functional.alltypestiny",
+    "hash":"ff6b1ecb265afe4f03355a07238cfe37",
+    "user":"dimitris",
+    "timestamp":1426633020,
+    "edges":[
+        {
+            "sources":[
+                1
+            ],
+            "targets":[
+                0
+            ],
+            "edgeType":"PROJECTION"
+        }
+    ],
+    "vertices":[
+        {
+            "id":0,
+            "vertexType":"COLUMN",
+            "vertexId":"default.test_view_lineage.id"
+        },
+        {
+            "id":1,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypestiny.id"
+        }
+    ]
+}
+====
+# Create view with nested inline views (CDH-26149)
+create view test_view_lineage (a, b) as select c1, x2
+from (
+  select c1, min(c2) x2
+  from (
+    select c1, c2, c3
+    from (
+      select int_col c1, tinyint_col c2, min(float_col) c3
+      from functional_hbase.alltypessmall
+      group by 1, 2
+      order by 1,2
+      limit 1
+    ) x
+  ) x2
+  group by c1
+) y
+order by 2,1 desc
+limit 0
+---- LINEAGE
+{
+    "queryText":"create view test_view_lineage (a, b) as select c1, x2\nfrom (\n  select c1, min(c2) x2\n  from (\n    select c1, c2, c3\n    from (\n      select int_col c1, tinyint_col c2, min(float_col) c3\n      from functional_hbase.alltypessmall\n      group by 1, 2\n      order by 1,2\n      limit 1\n    ) x\n  ) x2\n  group by c1\n) y\norder by 2,1 desc\nlimit 0",
+    "hash":"b96adf892b897da1e562c5be98724fb5",
+    "user":"dimitris",
+    "timestamp":1426633020,
+    "edges":[
+        {
+            "sources":[
+                1
+            ],
+            "targets":[
+                0
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                3
+            ],
+            "targets":[
+                2
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                1,
+                3
+            ],
+            "targets":[
+                0,
+                2
+            ],
+            "edgeType":"PREDICATE"
+        }
+    ],
+    "vertices":[
+        {
+            "id":0,
+            "vertexType":"COLUMN",
+            "vertexId":"default.test_view_lineage.a"
+        },
+        {
+            "id":1,
+            "vertexType":"COLUMN",
+            "vertexId":"functional_hbase.alltypessmall.int_col"
+        },
+        {
+            "id":2,
+            "vertexType":"COLUMN",
+            "vertexId":"default.test_view_lineage.b"
+        },
+        {
+            "id":3,
+            "vertexType":"COLUMN",
+            "vertexId":"functional_hbase.alltypessmall.tinyint_col"
+        }
+    ]
+}
+====
+# Create view with complex select statement (CDH-26149)
+create view test_view_lineage (a1, a2, a3, a4, a5, a6, a7) as
+  select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col
+  from functional.alltypessmall c
+  join (
+     select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,
+           a.int_col int_col, a.month month, b.float_col float_col, b.id id
+     from ( select * from functional.alltypesagg a where month=1 ) a
+     join functional.alltypessmall b on (a.smallint_col = b.id)
+   ) x on (x.tinyint_col = c.id)
+  where x.day=1
+  and x.int_col > 899
+  and x.float_col > 4.5
+  and c.string_col < '7'
+  and x.int_col + x.float_col + cast(c.string_col as float) < 1000
+---- LINEAGE
+{
+    "queryText":"create view test_view_lineage (a1, a2, a3, a4, a5, a6, a7) as\n  select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col\n  from functional.alltypessmall c\n  join (\n     select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,\n           a.int_col int_col, a.month month, b.float_col float_col, b.id id\n     from ( select * from functional.alltypesagg a where month=1 ) a\n     join functional.alltypessmall b on (a.smallint_col = b.id)\n   ) x on (x.tinyint_col = c.id)\n  where x.day=1\n  and x.int_col > 899\n  and x.float_col > 4.5\n  and c.string_col < '7'\n  and x.int_col + x.float_col + cast(c.string_col as float) < 1000",
+    "hash":"ffbe643df8f26e92907fb45de1aeda36",
+    "user":"dimitris",
+    "timestamp":1426633020,
+    "edges":[
+        {
+            "sources":[
+                1
+            ],
+            "targets":[
+                0
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                3
+            ],
+            "targets":[
+                2
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                5
+            ],
+            "targets":[
+                4
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                3
+            ],
+            "targets":[
+                6
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                8
+            ],
+            "targets":[
+                7
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                10
+            ],
+            "targets":[
+                9
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                12
+            ],
+            "targets":[
+                11
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                1,
+                3,
+                5,
+                8,
+                10,
+                12,
+                13,
+                14
+            ],
+            "targets":[
+                0,
+                2,
+                4,
+                6,
+                7,
+                9,
+                11
+            ],
+            "edgeType":"PREDICATE"
+        }
+    ],
+    "vertices":[
+        {
+            "id":0,
+            "vertexType":"COLUMN",
+            "vertexId":"default.test_view_lineage.a1"
+        },
+        {
+            "id":1,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypesagg.smallint_col"
+        },
+        {
+            "id":2,
+            "vertexType":"COLUMN",
+            "vertexId":"default.test_view_lineage.a2"
+        },
+        {
+            "id":3,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypessmall.id"
+        },
+        {
+            "id":4,
+            "vertexType":"COLUMN",
+            "vertexId":"default.test_view_lineage.a3"
+        },
+        {
+            "id":5,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypesagg.tinyint_col"
+        },
+        {
+            "id":6,
+            "vertexType":"COLUMN",
+            "vertexId":"default.test_view_lineage.a4"
+        },
+        {
+            "id":7,
+            "vertexType":"COLUMN",
+            "vertexId":"default.test_view_lineage.a5"
+        },
+        {
+            "id":8,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypesagg.int_col"
+        },
+        {
+            "id":9,
+            "vertexType":"COLUMN",
+            "vertexId":"default.test_view_lineage.a6"
+        },
+        {
+            "id":10,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypessmall.float_col"
+        },
+        {
+            "id":11,
+            "vertexType":"COLUMN",
+            "vertexId":"default.test_view_lineage.a7"
+        },
+        {
+            "id":12,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypessmall.string_col"
+        },
+        {
+            "id":13,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypesagg.month"
+        },
+        {
+            "id":14,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypesagg.day"
+        }
+    ]
+}
+====
+# Create view with select statement containing an analytic function (CDH-26149)
+create view test_view_lineage as
+  select * from (
+    select sum(a.tinyint_col) over (partition by a.smallint_col order by a.id),
+      count(b.string_col), b.timestamp_col
+    from functional.alltypes a join functional.alltypessmall b on (a.id = b.id)
+    where a.year = 2010 and b.float_col > 0
+    group by a.tinyint_col, a.smallint_col, a.id, b.string_col, b.timestamp_col, b.bigint_col
+    having count(a.int_col) > 10
+    order by b.bigint_col limit 10) t
+---- LINEAGE
+{
+    "queryText":"create view test_view_lineage as\n  select * from (\n    select sum(a.tinyint_col) over (partition by a.smallint_col order by a.id),\n      count(b.string_col), b.timestamp_col\n    from functional.alltypes a join functional.alltypessmall b on (a.id = b.id)\n    where a.year = 2010 and b.float_col > 0\n    group by a.tinyint_col, a.smallint_col, a.id, b.string_col, b.timestamp_col, b.bigint_col\n    having count(a.int_col) > 10\n    order by b.bigint_col limit 10) t",
+    "hash":"d4b9e2d63548088f911816b2ae29d7c2",
+    "user":"dimitris",
+    "timestamp":1426633020,
+    "edges":[
+        {
+            "sources":[
+                1
+            ],
+            "targets":[
+                0
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                2,
+                3
+            ],
+            "targets":[
+                0
+            ],
+            "edgeType":"PREDICATE"
+        },
+        {
+            "sources":[
+                5
+            ],
+            "targets":[
+                4
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                7
+            ],
+            "targets":[
+                6
+            ],
+            "edgeType":"PROJECTION"
+        },
+        {
+            "sources":[
+                1,
+                2,
+                3,
+                5,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12
+            ],
+            "targets":[
+                0,
+                4,
+                6
+            ],
+            "edgeType":"PREDICATE"
+        }
+    ],
+    "vertices":[
+        {
+            "id":0,
+            "vertexType":"COLUMN",
+            "vertexId":"default.test_view_lineage._c0"
+        },
+        {
+            "id":1,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypes.tinyint_col"
+        },
+        {
+            "id":2,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypes.id"
+        },
+        {
+            "id":3,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypes.smallint_col"
+        },
+        {
+            "id":4,
+            "vertexType":"COLUMN",
+            "vertexId":"default.test_view_lineage._c1"
+        },
+        {
+            "id":5,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypessmall.string_col"
+        },
+        {
+            "id":6,
+            "vertexType":"COLUMN",
+            "vertexId":"default.test_view_lineage.timestamp_col"
+        },
+        {
+            "id":7,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypessmall.timestamp_col"
+        },
+        {
+            "id":8,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypessmall.id"
+        },
+        {
+            "id":9,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypessmall.float_col"
+        },
+        {
+            "id":10,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypes.int_col"
+        },
+        {
+            "id":11,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypessmall.bigint_col"
+        },
+        {
+            "id":12,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypes.year"
+        }
+    ]
+}
+====
+# Alter view statement (CDH-26149)
+alter view functional.alltypes_view as select id from functional.alltypestiny
+---- LINEAGE
+{
+    "queryText":"alter view functional.alltypes_view as select id from functional.alltypestiny",
+    "hash":"eae64e371c4b64db507f6ecf4220d9d2",
+    "user":"dimitris",
+    "timestamp":1426633020,
+    "edges":[
+        {
+            "sources":[
+                1
+            ],
+            "targets":[
+                0
+            ],
+            "edgeType":"PROJECTION"
+        }
+    ],
+    "vertices":[
+        {
+            "id":0,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypes_view.id"
+        },
+        {
+            "id":1,
+            "vertexType":"COLUMN",
+            "vertexId":"functional.alltypestiny.id"
         }
     ]
 }

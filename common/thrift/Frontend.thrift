@@ -431,6 +431,9 @@ struct TCatalogOpRequest {
 
   // Parameters for SHOW FILES
   14: optional TShowFilesParams show_files_params
+
+  // Column lineage graph serialized into JSON
+  15: optional string lineage_graph
 }
 
 // Parameters for the SET query option command

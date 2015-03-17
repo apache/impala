@@ -359,12 +359,10 @@ public class ColumnLineageGraph {
    * clause.
    */
   private void computeResultPredicateDependencies(Analyzer analyzer) {
-    Set<ExprId> assignedConjuncts = analyzer.getAssignedConjuncts();
-    for (ExprId exprId: assignedConjuncts) {
-      if (exprId == null) continue;
-      Expr conjunct = analyzer.getConjunct(exprId);
-      Preconditions.checkNotNull(conjunct);
-      resultDependencyPredicates_.add(conjunct);
+    List<Expr> conjuncts = analyzer.getConjuncts();
+    for (Expr expr: conjuncts) {
+      if (expr.isAuxExpr()) continue;
+      resultDependencyPredicates_.add(expr);
     }
     Set<String> predicateBaseCols = Sets.newHashSet();
     for (Expr expr: resultDependencyPredicates_) {

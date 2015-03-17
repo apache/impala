@@ -18,6 +18,8 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.RuntimeEnv;
+
 import com.google.common.base.Preconditions;
 
 /**
@@ -47,6 +49,9 @@ public class AlterViewStmt extends CreateOrAlterViewStmtBase {
     }
 
     createColumnAndViewDefs(analyzer);
+    if (RuntimeEnv.INSTANCE.computeLineage() || RuntimeEnv.INSTANCE.isTestEnv()) {
+      computeLineageGraph(analyzer);
+    }
   }
 
   @Override

@@ -25,10 +25,16 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Base class for CREATE VIEW and ALTER VIEW AS SELECT statements.
  */
 public abstract class CreateOrAlterViewStmtBase extends StatementBase {
+  private final static Logger LOG =
+      LoggerFactory.getLogger(CreateOrAlterViewStmtBase.class);
+
   protected final boolean ifNotExists_;
   protected final TableName tableName_;
   protected final ArrayList<ColumnDesc> columnDefs_;
@@ -142,6 +148,20 @@ public abstract class CreateOrAlterViewStmtBase extends StatementBase {
     // Do not use 'AS' for table aliases because Hive only accepts them without 'AS'.
     sb.append(String.format(" FROM (%s) %s", originalViewDef_, tableName_.getTbl()));
     inlineViewDef_ = sb.toString();
+  }
+
+  /**
+   * Computes the column lineage graph for a create/alter view statetement.
+   */
+  protected void computeLineageGraph(Analyzer analyzer) {
+    ColumnLineageGraph graph = analyzer.getColumnLineageGraph();
+    List<String> colDefs = Lists.newArrayList();
+    for (ColumnDesc colDesc: finalColDefs_) {
+      colDefs.add(dbName_ + "." + getTbl() + "." + colDesc.getColName());
+    }
+    graph.addTargetColumnLabels(colDefs);
+    graph.computeLineageGraph(viewDefStmt_.getResultExprs(), analyzer);
+    LOG.trace("lineage: " + graph.debugString());
   }
 
   public TCreateOrAlterViewParams toThrift() {

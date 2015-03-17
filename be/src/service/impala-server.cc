@@ -331,9 +331,21 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
 }
 
 Status ImpalaServer::LogLineageRecord(const TExecRequest& request) {
-  if (!request.__isset.query_exec_request) return Status::OK;
-  if (!request.query_exec_request.__isset.lineage_graph) return Status::OK;
-  Status status = lineage_logger_->AppendEntry(request.query_exec_request.lineage_graph);
+  if (!request.__isset.query_exec_request && !request.__isset.catalog_op_request) {
+    return Status::OK;
+  }
+  string lineage_graph;
+  if (request.__isset.query_exec_request &&
+      request.query_exec_request.__isset.lineage_graph) {
+    lineage_graph = request.query_exec_request.lineage_graph;
+  } else if (request.__isset.catalog_op_request &&
+      request.catalog_op_request.__isset.lineage_graph) {
+    lineage_graph = request.catalog_op_request.lineage_graph;
+  } else {
+    return Status::OK;
+  }
+  DCHECK(!lineage_graph.empty());
+  Status status = lineage_logger_->AppendEntry(lineage_graph);
   if (!status.ok()) {
     LOG(ERROR) << "Unable to record query lineage record: " << status.GetDetail();
     if (FLAGS_abort_on_failed_lineage_event) {
