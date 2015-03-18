@@ -942,11 +942,13 @@ Status BufferedBlockMgr::FindBuffer(unique_lock<mutex>& lock,
           "resources. Compute stats on these tables, hint the plan or disable this "
           "behavior via query options to enable spilling.");
     }
-    if (unpinned_blocks_.empty() && non_local_outstanding_writes_ == 0) return Status::OK;
 
     // Third, this block needs to use a buffer that was unpinned from another block.
     // Get a free buffer from the front of the queue and assign it to the block.
     do {
+      if (unpinned_blocks_.empty() && non_local_outstanding_writes_ == 0) {
+        return Status::OK;
+      }
       SCOPED_TIMER(buffer_wait_timer_);
       // Try to evict unpinned blocks before waiting.
       RETURN_IF_ERROR(WriteUnpinnedBlocks());
