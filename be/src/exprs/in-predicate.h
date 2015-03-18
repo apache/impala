@@ -274,9 +274,10 @@ class InPredicate : public Predicate {
   template<typename T, typename SetType>
   static BooleanVal SetLookup(SetLookupState<SetType>* state, const T& v);
 
-  // Iterates through each vararg looking for val.
+  // Iterates through each vararg looking for val. 'type' is the type of 'val' and 'args'.
   template<typename T>
-  static BooleanVal Iterate(const T& val, int num_args, const T* args);
+  static BooleanVal Iterate(
+      const FunctionContext::TypeDesc* type, const T& val, int num_args, const T* args);
 };
 
 }

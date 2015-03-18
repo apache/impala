@@ -883,6 +883,30 @@ where cast('2010-01-01 00:00:00' as timestamp) not in (timestamp_col)
 bigint
 ====
 ---- QUERY
+# Regression test for IMPALA-1810
+SELECT tinyint_col, id FROM alltypestiny t1 WHERE t1.tinyint_col IN (154.58, t1.id)
+---- RESULTS
+0,0
+1,1
+---- TYPES
+tinyint,int
+====
+---- QUERY
+# Regression test for IMPALA-1810
+SELECT month, t1.tinyint_col FROM alltypestiny t1
+WHERE t1.month NOT IN (355.8, t1.tinyint_col)
+---- RESULTS
+2,0
+2,1
+3,0
+3,1
+1,0
+4,0
+4,1
+---- TYPES
+int,tinyint
+====
+---- QUERY
 # CASE expr - Basic functionality
 select date_string_col, count(*) from alltypesagg where case date_string_col when "01/06/10" then (true)
 else (false) end group by 1

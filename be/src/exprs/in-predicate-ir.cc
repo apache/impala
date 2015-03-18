@@ -22,27 +22,44 @@ using namespace std;
 
 namespace impala {
 
-// Templated equality functions
+// Templated equality functions. These assume the input values are not NULL.
+
 template<typename T>
-bool Equals(const T& x, const T& y) {
+bool Equals(const FunctionContext::TypeDesc* type, const T& x, const T& y) {
+  DCHECK(!x.is_null);
+  DCHECK(!y.is_null);
   return x.val == y.val;
 }
 
-template<> bool Equals(const StringVal& x, const StringVal& y) {
+template<> bool Equals(
+    const FunctionContext::TypeDesc* type, const StringVal& x, const StringVal& y) {
+  DCHECK(!x.is_null);
+  DCHECK(!y.is_null);
   StringValue x_sv = StringValue::FromStringVal(x);
   StringValue y_sv = StringValue::FromStringVal(y);
   return x_sv == y_sv;
 }
 
-template<> bool Equals(const TimestampVal& x, const TimestampVal& y) {
+template<> bool Equals(
+    const FunctionContext::TypeDesc* type, const TimestampVal& x, const TimestampVal& y) {
+  DCHECK(!x.is_null);
+  DCHECK(!y.is_null);
   TimestampValue x_tv = TimestampValue::FromTimestampVal(x);
   TimestampValue y_tv = TimestampValue::FromTimestampVal(y);
   return x_tv == y_tv;
 }
 
-// TODO: take byte size into account
-template<> bool Equals(const DecimalVal& x, const DecimalVal& y) {
-  return x == y;
+template<> bool Equals(
+    const FunctionContext::TypeDesc* type, const DecimalVal& x, const DecimalVal& y) {
+  DCHECK(!x.is_null);
+  DCHECK(!y.is_null);
+  if (type->precision <= ColumnType::MAX_DECIMAL4_PRECISION) {
+    return x.val4 == y.val4;
+  } else if (type->precision <= ColumnType::MAX_DECIMAL8_PRECISION) {
+    return x.val8 == y.val8;
+  } else {
+    return x.val16 == y.val16;
+  }
 }
 
 // Templated getter functions for extracting 'SetType' values from AnyVals
@@ -104,10 +121,11 @@ BooleanVal InPredicate::TemplatedIn(
   if (strategy == SET_LOOKUP) {
     SetLookupState<SetType>* state = reinterpret_cast<SetLookupState<SetType>*>(
         ctx->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
+    DCHECK_NOTNULL(state);
     found = SetLookup(state, val);
   } else {
     DCHECK_EQ(strategy, ITERATE);
-    found = Iterate<T>(val, num_args, args);
+    found = Iterate<T>(ctx->GetArgType(0), val, num_args, args);
   }
   if (found.is_null) return BooleanVal::null();
   return BooleanVal(found.val ^ not_in);
@@ -124,12 +142,13 @@ BooleanVal InPredicate::SetLookup(
 }
 
 template<typename T>
-BooleanVal InPredicate::Iterate(const T& val, int num_args, const T* args) {
+BooleanVal InPredicate::Iterate(
+    const FunctionContext::TypeDesc* type, const T& val, int num_args, const T* args) {
   bool found_null = false;
   for (int i = 0; i < num_args; ++i) {
     if (args[i].is_null) {
       found_null = true;
-    } else if (Equals(val, args[i])) {
+    } else if (Equals(type, val, args[i])) {
       return BooleanVal(true);
     }
   }

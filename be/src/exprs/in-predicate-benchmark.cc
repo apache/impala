@@ -231,7 +231,7 @@ class InPredicateBenchmark {
     for (int i = 0; i < batch_size; ++i) {
       BOOST_FOREACH(const T& search_val, data->search_vals) {
         BooleanVal found = InPredicate::Iterate(
-            search_val, data->anyvals.size(), &data->anyvals[0]);
+            NULL, search_val, data->anyvals.size(), &data->anyvals[0]);
         if (found.val) ++data->total_found_iter;
         ++data->total_iter;
       }

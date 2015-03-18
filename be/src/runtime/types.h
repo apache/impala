@@ -71,6 +71,11 @@ struct ColumnType {
   static const int MAX_PRECISION = 38;
   static const int MAX_SCALE = MAX_PRECISION;
 
+  // The maximum precision representable by a 4-byte decimal (Decimal4Value)
+  static const int MAX_DECIMAL4_PRECISION = 9;
+  // The maximum precision representable by a 8-byte decimal (Decimal8Value)
+  static const int MAX_DECIMAL8_PRECISION = 18;
+
   ColumnType(PrimitiveType type = INVALID_TYPE)
     : type(type), len(-1), precision(-1), scale(-1) {
     DCHECK_NE(type, TYPE_CHAR);
@@ -219,8 +224,8 @@ struct ColumnType {
 
   static inline int GetDecimalByteSize(int precision) {
     DCHECK_GT(precision, 0);
-    if (precision <= 9) return 4;
-    if (precision <= 18) return 8;
+    if (precision <= MAX_DECIMAL4_PRECISION) return 4;
+    if (precision <= MAX_DECIMAL8_PRECISION) return 8;
     return 16;
   }
 
