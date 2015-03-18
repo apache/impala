@@ -1502,6 +1502,33 @@ TEST_F(ExprTest, InPredicate) {
       "cast('2011-11-23 09:11:12' as timestamp), "
       "cast('2011-11-24 09:12:13' as timestamp))", TYPE_BOOLEAN, true);
 
+  // Test decimals
+  vector<string> dec_strs; // Decimal of every physical type
+  dec_strs.push_back("cast(-1.23 as decimal(8,2))");
+  dec_strs.push_back("cast(-1.23 as decimal(9,2))");
+  dec_strs.push_back("cast(-1.23 as decimal(10,2))");
+  dec_strs.push_back("cast(-1.23 as decimal(17,2))");
+  dec_strs.push_back("cast(-1.23 as decimal(18,2))");
+  dec_strs.push_back("cast(-1.23 as decimal(19,2))");
+  dec_strs.push_back("cast(-1.23 as decimal(32,2))");
+  BOOST_FOREACH(const string& dec_str, dec_strs) {
+    TestValue(dec_str + "in (0)", TYPE_BOOLEAN, false);
+    TestValue(dec_str + "in (-1.23)", TYPE_BOOLEAN, true);
+    TestValue(dec_str + "in (-1.230)", TYPE_BOOLEAN, true);
+    TestValue(dec_str + "in (-1.23, 1)", TYPE_BOOLEAN, true);
+    TestValue(dec_str + "in (1, 1, 1, 1, 1, -1.23, 1, 1, 1, 1, 1, 1, -1.23)",
+              TYPE_BOOLEAN, true);
+    TestValue(dec_str + "in (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, -1.23)",
+              TYPE_BOOLEAN, true);
+    TestValue(dec_str + "in (1)", TYPE_BOOLEAN, false);
+    TestValue(dec_str + "in (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)", TYPE_BOOLEAN, false);
+    TestIsNull(dec_str + "in (NULL)", TYPE_BOOLEAN);
+    TestIsNull("NULL in (-1.23)", TYPE_BOOLEAN);
+    TestIsNull(dec_str + "in (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, NULL)", TYPE_BOOLEAN);
+    TestValue(dec_str + "in (1, 1, 1, 1, 1, NULL, 1, 1, 1, 1, 1, 1, -1.23)",
+              TYPE_BOOLEAN, true);
+  }
+
   // Test operator precedence.
   TestValue("5+1 in (3, 6, 10)", TYPE_BOOLEAN, true);
   TestValue("5+1 not in (3, 6, 10)", TYPE_BOOLEAN, false);

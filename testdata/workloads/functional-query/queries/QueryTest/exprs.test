@@ -907,6 +907,16 @@ WHERE t1.month NOT IN (355.8, t1.tinyint_col)
 int,tinyint
 ====
 ---- QUERY
+select month, tinyint_col, int_col, float_col FROM alltypestiny
+WHERE month IN (cast(tinyint_col as decimal(34,0)), int_col + 1, 12345, float_col)
+---- RESULTS
+2,1,1,1.1
+1,0,0,0
+1,1,1,1.1
+---- TYPES
+int,tinyint,int,float
+====
+---- QUERY
 # CASE expr - Basic functionality
 select date_string_col, count(*) from alltypesagg where case date_string_col when "01/06/10" then (true)
 else (false) end group by 1

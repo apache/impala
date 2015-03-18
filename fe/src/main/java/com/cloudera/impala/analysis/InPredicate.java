@@ -57,23 +57,20 @@ public class InPredicate extends Predicate {
 
       db.addBuiltin(ScalarFunction.createBuiltin(IN_ITERATE,
           Lists.newArrayList(t, t), true, Type.BOOLEAN,
-          "impala::InPredicate::In_Iterate", null, null,  false));
+          "impala::InPredicate::InIterate", null, null,  false));
       db.addBuiltin(ScalarFunction.createBuiltin(NOT_IN_ITERATE,
           Lists.newArrayList(t, t), true, Type.BOOLEAN,
-          "impala::InPredicate::NotIn_Iterate", null, null, false));
-
-      // SetLookup strategy NYI for Timestamps or Decimals
-      if (t.isTimestamp() || t.isDecimal()) continue;
+          "impala::InPredicate::NotInIterate", null, null, false));
 
       String prepareFn = "impala::InPredicate::SetLookupPrepare_" + typeString;
       String closeFn = "impala::InPredicate::SetLookupClose_" + typeString;
 
       db.addBuiltin(ScalarFunction.createBuiltin(IN_SET_LOOKUP,
           Lists.newArrayList(t, t), true, Type.BOOLEAN,
-          "impala::InPredicate::In_SetLookup", prepareFn, closeFn,  false));
+          "impala::InPredicate::InSetLookup", prepareFn, closeFn,  false));
       db.addBuiltin(ScalarFunction.createBuiltin(NOT_IN_SET_LOOKUP,
           Lists.newArrayList(t, t), true, Type.BOOLEAN,
-          "impala::InPredicate::NotIn_SetLookup", prepareFn, closeFn, false));
+          "impala::InPredicate::NotInSetLookup", prepareFn, closeFn, false));
 
     }
   }
@@ -132,7 +129,9 @@ public class InPredicate extends Predicate {
     } else {
       Preconditions.checkState(getChildren().size() >= 2);
       analyzer.castAllToCompatibleType(children_);
-      if (children_.get(0).getType().isNull()) {
+      Type childType = children_.get(0).getType();
+
+      if (childType.isNull()) {
         // Make sure the BE never sees TYPE_NULL by picking an arbitrary type
         for (int i = 0; i < children_.size(); ++i) {
           uncheckedCastChild(Type.BOOLEAN, i);
@@ -151,12 +150,8 @@ public class InPredicate extends Predicate {
       }
       boolean useSetLookup = allConstant;
       // Threshold based on InPredicateBenchmark results
-      int setLookupThreshold = children_.get(0).getType().isStringType() ? 9 : 2;
+      int setLookupThreshold = children_.get(0).getType().isStringType() ? 6 : 2;
       if (children_.size() - 1 < setLookupThreshold) useSetLookup = false;
-      // NYI
-      if (getChild(0).type_.isTimestamp() || getChild(0).type_.isDecimal()) {
-        useSetLookup = false;
-      }
 
       // Only lookup fn_ if all subqueries have been rewritten. If the second child is a
       // subquery, it will have type ArrayType, which cannot be resolved to a builtin
