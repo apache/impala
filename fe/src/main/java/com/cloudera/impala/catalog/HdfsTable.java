@@ -451,6 +451,9 @@ public class HdfsTable extends Table {
   public String getLocation() { return super.getMetaStoreTable().getSd().getLocation(); }
 
   public List<FieldSchema> getFieldSchemas() { return fields_; }
+  public List<FieldSchema> getNonPartitionFieldSchemas() {
+    return fields_.subList(getNumClusteringCols(), fields_.size());
+  }
 
   // True if Impala has HDFS write permissions on the hdfsBaseDir (for an unpartitioned
   // table) or if Impala has write permissions on all partition directories (for
