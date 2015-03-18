@@ -168,6 +168,7 @@ void ExecNode::Close(RuntimeState* state) {
   }
   Expr::Close(conjunct_ctxs_, state);
 
+  /* // Temporarily moving this check to the MemTracker destructor, see IMPALA-1863.
   if (mem_tracker() != NULL) {
     if (mem_tracker()->consumption() != 0) {
       LOG(WARNING) << "Query " << state->query_id() << " leaked memory." << endl
@@ -176,6 +177,7 @@ void ExecNode::Close(RuntimeState* state) {
           << "Leaked memory." << endl << state->instance_mem_tracker()->LogUsage();
     }
   }
+  */
 }
 
 void ExecNode::AddRuntimeExecOption(const string& str) {

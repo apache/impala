@@ -190,6 +190,7 @@ shared_ptr<MemTracker> MemTracker::GetQueryMemTracker(
 }
 
 MemTracker::~MemTracker() {
+  DCHECK_EQ(consumption(), 0) << "Leaked memory in " << this << endl << LogUsage();
   lock_guard<mutex> l(static_mem_trackers_lock_);
   if (auto_unregister_) UnregisterFromParent();
   // Erase the weak ptr reference from the map.
