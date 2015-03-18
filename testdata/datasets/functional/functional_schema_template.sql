@@ -1297,7 +1297,7 @@ year int
 month int
 day int
 ---- LOAD
-`hadoop fs -mkdir /test-warehouse/alltypesagg_hive_13_1_parquet && \
+`hadoop fs -mkdir -p /test-warehouse/alltypesagg_hive_13_1_parquet && \
 hadoop fs -put -f ${IMPALA_HOME}/testdata/data/alltypesagg_hive_13_1.parquet \
 /test-warehouse/alltypesagg_hive_13_1_parquet/
 ====
