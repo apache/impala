@@ -62,7 +62,6 @@ public abstract class Table implements CatalogObject {
   protected final String name_;
   protected final String owner_;
   protected TTableDescriptor tableDesc_;
-  protected List<FieldSchema> fields_;
   protected TAccessLevel accessLevel_ = TAccessLevel.READ_WRITE;
 
   // Number of clustering columns.
@@ -73,7 +72,7 @@ public abstract class Table implements CatalogObject {
 
   // colsByPos[i] refers to the ith column in the table. The first numClusteringCols are
   // the clustering columns.
-  private final ArrayList<Column> colsByPos_ = Lists.newArrayList();
+  protected final ArrayList<Column> colsByPos_ = Lists.newArrayList();
 
   // map from lowercase column name to Column object.
   private final Map<String, Column> colsByName_ = Maps.newHashMap();
@@ -248,7 +247,6 @@ public abstract class Table implements CatalogObject {
     columns.addAll(thriftTable.getClustering_columns());
     columns.addAll(thriftTable.getColumns());
 
-    fields_ = new ArrayList<FieldSchema>();
     colsByPos_.clear();
     colsByPos_.ensureCapacity(columns.size());
     for (int i = 0; i < columns.size(); ++i) {
@@ -257,8 +255,6 @@ public abstract class Table implements CatalogObject {
       colsByName_.put(col.getName().toLowerCase(), col);
       ((StructType) type_.getItemType()).addField(
           new StructField(col.getName(), col.getType(), col.getComment()));
-      fields_.add(new FieldSchema(col.getName(),
-        col.getType().toString().toLowerCase(), col.getComment()));
     }
 
     numClusteringCols_ = thriftTable.getClustering_columns().size();

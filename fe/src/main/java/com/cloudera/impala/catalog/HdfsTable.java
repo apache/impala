@@ -179,6 +179,11 @@ public class HdfsTable extends Table {
   // under which partition dirs are placed.
   protected String hdfsBaseDir_;
 
+  // List of FieldSchemas that correspond to the non-partition columns. Used when
+  // describing this table and its partitions to the HMS (e.g. as part of an alter table
+  // operation), when only non-partition columns are required.
+  private final List<FieldSchema> nonPartFieldSchemas_ = Lists.newArrayList();
+
   private final static Logger LOG = LoggerFactory.getLogger(HdfsTable.class);
 
   // Caching this configuration object makes calls to getFileSystem much quicker
@@ -450,10 +455,7 @@ public class HdfsTable extends Table {
    */
   public String getLocation() { return super.getMetaStoreTable().getSd().getLocation(); }
 
-  public List<FieldSchema> getFieldSchemas() { return fields_; }
-  public List<FieldSchema> getNonPartitionFieldSchemas() {
-    return fields_.subList(getNumClusteringCols(), fields_.size());
-  }
+  List<FieldSchema> getNonPartitionFieldSchemas() { return nonPartFieldSchemas_; }
 
   // True if Impala has HDFS write permissions on the hdfsBaseDir (for an unpartitioned
   // table) or if Impala has write permissions on all partition directories (for
@@ -560,13 +562,12 @@ public class HdfsTable extends Table {
   }
 
   /**
-   * Create columns corresponding to fieldSchemas, including column statistics.
-   * Throws a TableLoadingException if the metadata is incompatible with what we
-   * support.
+   * Create columns corresponding to fieldSchemas. Throws a TableLoadingException if the
+   * metadata is incompatible with what we support.
    */
-  private void loadColumns(List<FieldSchema> fieldSchemas, HiveMetaStoreClient client)
+  private void addColumnsFromFieldSchemas(List<FieldSchema> fieldSchemas)
       throws TableLoadingException {
-    int pos = 0;
+    int pos = colsByPos_.size();
     for (FieldSchema s: fieldSchemas) {
       Type type = parseColumnType(s);
       // Check if we support partitioning on columns of such a type.
@@ -581,8 +582,6 @@ public class HdfsTable extends Table {
       addColumn(col);
       ++pos;
     }
-    fields_ = fieldSchemas == null ? new ArrayList<FieldSchema>() : fieldSchemas;
-    loadAllColumnStats(client);
   }
 
   /**
@@ -1017,9 +1016,6 @@ public class HdfsTable extends Table {
           msTbl.getParameters().get(serdeConstants.SERIALIZATION_NULL_FORMAT);
       if (nullColumnValue_ == null) nullColumnValue_ = DEFAULT_NULL_COLUMN_VALUE;
 
-      // populate with both partition keys and regular columns
-      List<FieldSchema> partKeys = msTbl.getPartitionKeys();
-      List<FieldSchema> tblFields = Lists.newArrayList();
       String inputFormat = msTbl.getSd().getInputFormat();
       if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO) {
         // Look for the schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
@@ -1038,7 +1034,7 @@ public class HdfsTable extends Table {
           // indicates there is an issue with the table metadata since Avro table need a
           // non-native serde. Instead of failing to load the table, fall back to
           // using the fields from the storage descriptor (same as Hive).
-          tblFields.addAll(msTbl.getSd().getCols());
+          nonPartFieldSchemas_.addAll(msTbl.getSd().getCols());
         } else {
           // Load the fields from the Avro schema.
           // Since Avro does not include meta-data for CHAR or VARCHAR, an Avro type of
@@ -1058,20 +1054,21 @@ public class HdfsTable extends Table {
               fs.setType(avroType);
             }
             fs.setComment("from deserializer");
-            tblFields.add(fs);
+            nonPartFieldSchemas_.add(fs);
             i++;
           }
         }
       } else {
-        tblFields.addAll(msTbl.getSd().getCols());
+        nonPartFieldSchemas_.addAll(msTbl.getSd().getCols());
       }
-      List<FieldSchema> fieldSchemas = new ArrayList<FieldSchema>(
-          partKeys.size() + tblFields.size());
-      fieldSchemas.addAll(partKeys);
-      fieldSchemas.addAll(tblFields);
       // The number of clustering columns is the number of partition keys.
-      numClusteringCols_ = partKeys.size();
-      loadColumns(fieldSchemas, client);
+      numClusteringCols_ = msTbl.getPartitionKeys().size();
+
+      // Add all columns to the table. Ordering is important: partition columns first,
+      // then all other columns.
+      addColumnsFromFieldSchemas(msTbl.getPartitionKeys());
+      addColumnsFromFieldSchemas(nonPartFieldSchemas_);
+      loadAllColumnStats(client);
 
       // Collect the list of partitions to use for the table. Partitions may be reused
       // from the existing cached table entry (if one exists), read from the metastore,
