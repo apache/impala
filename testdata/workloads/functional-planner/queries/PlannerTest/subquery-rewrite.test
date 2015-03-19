@@ -613,12 +613,7 @@ select 1
 from functional.alltypestiny t
 where exists (select * from functional.alltypessmall limit 0)
 ---- PLAN
-02:CROSS JOIN [BROADCAST]
-|
-|--01:EMPTYSET
-|
-00:SCAN HDFS [functional.alltypestiny t]
-   partitions=4/4 files=4 size=460B
+00:EMPTYSET
 ====
 # Multiple nesting levels
 select count(*)
@@ -1418,4 +1413,87 @@ where
 |
 02:SCAN HDFS [functional.alltypesagg tt1]
    partitions=11/11 files=11 size=814.73KB
+====
+# Correlated EXISTS and NOT EXISTS subqueries with limit 0 and
+# aggregates. All predicates evaluate to FALSE. (IMPALA-1550)
+select 1
+from functional.alltypestiny t1
+where exists
+  (select id
+   from functional.alltypes t2
+   where t1.int_col = t2.int_col limit 0)
+and not exists
+  (select count(distinct int_col)
+   from functional.alltypesagg t3
+   where t1.id = t3.id)
+---- PLAN
+00:EMPTYSET
+====
+# Correlated EXISTS and NOT EXISTS subqueries with limit 0 and
+# aggregates. All predicates evaluate to TRUE. (IMPALA-1550)
+select 1
+from functional.alltypestiny t1
+where not exists
+  (select id
+   from functional.alltypes t2
+   where t1.int_col = t2.int_col limit 0)
+and exists
+  (select count(distinct int_col), sum(distinct int_col)
+   from functional.alltypesagg t3
+   where t1.id = t3.id)
+and not exists
+  (select sum(int_col)
+   from functional.alltypessmall t4
+   where t1.id = t4.id limit 0)
+and not exists
+  (select min(int_col)
+   from functional.alltypestiny t5
+   where t1.id = t5.id and false)
+---- PLAN
+00:SCAN HDFS [functional.alltypestiny t1]
+   partitions=4/4 files=4 size=460B
+====
+# Correlated EXISTS and NOT EXISTS subqueries with limit 0 and
+# aggregates. Some predicates evaluate to TRUE while others need to
+# be evaluated at run-time. (IMPALA-1550)
+select 1
+from functional.alltypestiny t1
+where not exists
+  (select id
+   from functional.alltypes t2
+   where t1.int_col = t2.int_col limit 0)
+and exists
+  (select distinct int_col
+   from functional.alltypesagg t3
+   where t3.id > 100 and t1.id = t3.id)
+and not exists
+  (select count(id)
+   from functional.alltypestiny t4
+   where t4.int_col = t1.tinyint_col
+   having count(id) > 200)
+---- PLAN
+06:HASH JOIN [LEFT ANTI JOIN]
+|  hash predicates: t1.tinyint_col = t4.int_col
+|
+|--04:AGGREGATE [FINALIZE]
+|  |  output: count(id)
+|  |  group by: t4.int_col
+|  |  having: count(id) > 200
+|  |
+|  03:SCAN HDFS [functional.alltypestiny t4]
+|     partitions=4/4 files=4 size=460B
+|
+05:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: t3.id = t1.id
+|
+|--00:SCAN HDFS [functional.alltypestiny t1]
+|     partitions=4/4 files=4 size=460B
+|     predicates: t1.id > 100
+|
+02:AGGREGATE [FINALIZE]
+|  group by: int_col, t3.id
+|
+01:SCAN HDFS [functional.alltypesagg t3]
+   partitions=11/11 files=11 size=814.73KB
+   predicates: t3.id > 100
 ====

@@ -235,6 +235,12 @@ public class AggregateInfo extends AggregateInfoBase {
     return outputToIntermediateTupleSmap_;
   }
 
+  public boolean hasAggregateExprs() {
+    return !aggregateExprs_.isEmpty() ||
+        (secondPhaseDistinctAggInfo_ != null &&
+         !secondPhaseDistinctAggInfo_.getAggregateExprs().isEmpty());
+  }
+
   /**
    * Return the tuple id produced in the final aggregation step.
    */

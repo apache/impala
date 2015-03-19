@@ -220,6 +220,18 @@ public class StmtRewriter {
             "expression: " + conjunct.toSql());
       }
 
+      if (conjunct instanceof ExistsPredicate) {
+        // Check if we can determine the result of an ExistsPredicate during analysis.
+        // If so, replace the predicate with a BoolLiteral predicate and remove it from
+        // the list of predicates to be rewritten.
+        BoolLiteral boolLiteral = replaceExistsPredicate((ExistsPredicate) conjunct);
+        if (boolLiteral != null) {
+          boolLiteral.analyze(analyzer);
+          smap.put(conjunct, boolLiteral);
+          continue;
+        }
+      }
+
       // Replace all the supported exprs with subqueries with true BoolLiterals
       // using an smap.
       BoolLiteral boolLiteral = new BoolLiteral(true);
@@ -239,6 +251,25 @@ public class StmtRewriter {
     }
     if (canEliminate(stmt.whereClause_)) stmt.whereClause_ = null;
     if (hasNewVisibleTuple) replaceUnqualifiedStarItems(stmt, numTableRefs);
+  }
+
+  /**
+   * Replace an ExistsPredicate that contains a subquery with a BoolLiteral if we
+   * can determine its result without evaluating it. Return null if the result of the
+   * ExistsPredicate can only be determined at run-time.
+   */
+  private static BoolLiteral replaceExistsPredicate(ExistsPredicate predicate) {
+    Subquery subquery = predicate.getSubquery();
+    Preconditions.checkNotNull(subquery);
+    SelectStmt subqueryStmt = (SelectStmt) subquery.getStatement();
+    BoolLiteral boolLiteral = null;
+    if (subqueryStmt.getAnalyzer().hasEmptyResultSet()) {
+      boolLiteral = new BoolLiteral(predicate.isNotExists());
+    } else if (subqueryStmt.hasAggInfo() && subqueryStmt.getAggInfo().hasAggregateExprs()
+          && !subqueryStmt.hasAnalyticInfo() && subqueryStmt.getHavingPred() == null) {
+      boolLiteral = new BoolLiteral(!predicate.isNotExists());
+    }
+    return boolLiteral;
   }
 
   /**
@@ -326,21 +357,22 @@ public class StmtRewriter {
       subqueryStmt.limitElement_ = null;
     }
 
+    if (expr instanceof ExistsPredicate) {
+      // For uncorrelated subqueries, we limit the number of rows returned by the
+      // subquery.
+      if (onClauseConjuncts.isEmpty()) subqueryStmt.setLimit(1);
+    }
+
     // Update the subquery's select list and/or its GROUP BY clause by adding
     // exprs from the extracted correlated predicates.
     boolean updateGroupBy = expr.getSubquery().isScalarSubquery() ||
-        (expr instanceof ExistsPredicate && subqueryStmt.hasAggInfo());
+        (expr instanceof ExistsPredicate &&
+         subqueryStmt.hasAggInfo() && !subqueryStmt.getSelectList().isDistinct());
     List<Expr> lhsExprs = Lists.newArrayList();
     List<Expr> rhsExprs = Lists.newArrayList();
     for (Expr conjunct: onClauseConjuncts) {
       updateInlineView(inlineView, conjunct, stmt.getTableRefIds(),
           lhsExprs, rhsExprs, updateGroupBy);
-    }
-
-    if (expr instanceof ExistsPredicate && onClauseConjuncts.isEmpty()) {
-      // For uncorrelated subqueries, we limit the number of rows returned by the
-      // subquery.
-      subqueryStmt.setLimit(1);
     }
 
     // Analyzing the inline view trigger reanalysis of the subquery's select statement.
@@ -713,7 +745,6 @@ public class StmtRewriter {
 
     // Update the subquery's select list.
     boolean isDistinct = stmt.selectList_.isDistinct();
-    Preconditions.checkState(!isDistinct);
     stmt.selectList_ = new SelectList(
         items, isDistinct, stmt.selectList_.getPlanHints());
     // Update subquery's GROUP BY clause
