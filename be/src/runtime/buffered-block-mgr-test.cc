@@ -248,9 +248,9 @@ class BufferedBlockMgrTest : public ::testing::Test {
           status = block_data.first->Delete();
           if (close_called || (tid != SINGLE_THREADED_TID && status.IsCancelled())) {
             EXPECT_TRUE(status.IsCancelled());
-            continue;
+          } else {
+            EXPECT_TRUE(status.ok());
           }
-          EXPECT_TRUE(status.ok());
           pinned_blocks[rand_pick] = pinned_blocks.back();
           pinned_blocks.pop_back();
           pinned_block_map[pinned_blocks[rand_pick].first] = rand_pick;

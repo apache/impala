@@ -472,11 +472,11 @@ class BufferedBlockMgr {
   // Issues the write for this block to the DiskIoMgr.
   Status WriteUnpinnedBlock(Block* block);
 
-  // Callback used by DiskIoMgr to indicate a block write has completed.
-  // 'write_status' is the status of the write. is_cancelled_ is set to true if
-  // 'write_status' is not Status::OK. Returns the block's buffer to the free buffers
-  // list if it is no longer pinned. Returns the block itself to the free blocks list
-  // if it has been deleted.
+  // Callback used by DiskIoMgr to indicate a block write has completed.  write_status
+  // is the status of the write. is_cancelled_ is set to true if write_status is not
+  // Status::OK or a re-issue of the write fails. Returns the block's buffer to the
+  // free buffers list if it is no longer pinned. Returns the block itself to the free
+  // blocks list if it has been deleted.
   void WriteComplete(Block* block, const Status& write_status);
 
   // Returns a deleted block to the list of free blocks. Assumes the block's buffer has
@@ -567,8 +567,9 @@ class BufferedBlockMgr {
   DiskIoMgr* io_mgr_;
   DiskIoMgr::RequestContext* io_request_context_;
 
-  // If true, the block manager is cancelled and all API calls return Status::CANCELLED.
-  // Set to true on Close() or if there was an error writing a block.
+  // If true, a disk write failed and all API calls return.
+  // Status::CANCELLED. Set to true if there was an error writing a block, or if
+  // WriteComplete() needed to reissue the write and that failed.
   bool is_cancelled_;
 
   // Counters and timers to track behavior.
