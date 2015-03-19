@@ -24,11 +24,10 @@
 // The arguments are pointers to prevent Clang from lowering the struct types
 // (e.g. IntVal={bool, i32} can be coerced to i64).
 void dummy(impala_udf::FunctionContext*, impala_udf::BooleanVal*, impala_udf::TinyIntVal*,
-           impala_udf::SmallIntVal*, impala_udf::IntVal*, impala_udf::BigIntVal*,
-           impala_udf::FloatVal*, impala_udf::DoubleVal*, impala_udf::StringVal*,
-           impala_udf::TimestampVal*, impala_udf::DecimalVal*, ExprContext*) { }
+    impala_udf::SmallIntVal*, impala_udf::IntVal*, impala_udf::BigIntVal*,
+    impala_udf::FloatVal*, impala_udf::DoubleVal*, impala_udf::StringVal*,
+    impala_udf::TimestampVal*, impala_udf::DecimalVal*, impala::ExprContext*) { }
 #endif
-
 
 // The following are compute functions that are cross-compiled to both native and IR
 // libraries. In the interpreted path, these functions are executed as-is from the native

@@ -17,6 +17,8 @@
 // Define the hashing functions for llvm.  They are not used by anything that is
 // cross compiled and without this, would get stripped by the clang optimizer.
 #ifdef IR_COMPILE
+using namespace impala;
+
 extern "C"
 uint32_t IrFnvHash(const void* data, int32_t bytes, uint32_t hash) {
   return HashUtil::FnvHash64to32(data, bytes, hash);
