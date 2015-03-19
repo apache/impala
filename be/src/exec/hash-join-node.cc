@@ -93,10 +93,12 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(
       Expr::Prepare(probe_expr_ctxs_, state, child(0)->row_desc(), expr_mem_tracker()));
 
-  // other_join_conjunct_ctxs_ are evaluated in the context of the rows produced by this
-  // node
+  // other_join_conjunct_ctxs_ are evaluated in the context of rows assembled from all
+  // build and probe tuples; full_row_desc is not necessarily the same as the output row
+  // desc, e.g., because semi joins only return the build xor probe tuples
+  RowDescriptor full_row_desc(child(0)->row_desc(), child(1)->row_desc());
   RETURN_IF_ERROR(Expr::Prepare(
-      other_join_conjunct_ctxs_, state, row_descriptor_, expr_mem_tracker()));
+      other_join_conjunct_ctxs_, state, full_row_desc, expr_mem_tracker()));
 
   // TODO: default buckets
   bool stores_nulls =
@@ -591,7 +593,7 @@ Function* HashJoinNode::CodegenProcessProbeBatch(RuntimeState* state, Function* 
 
   process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, false,
       create_output_row_fn, "CreateOutputRow", &replaced);
-  DCHECK_EQ(replaced, 2);
+  DCHECK_EQ(replaced, 3);
 
   process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, false,
       eval_conjuncts_fn, "EvalConjuncts", &replaced);
@@ -599,7 +601,7 @@ Function* HashJoinNode::CodegenProcessProbeBatch(RuntimeState* state, Function* 
 
   process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, false,
       eval_other_conjuncts_fn, "EvalOtherJoinConjuncts", &replaced);
-  DCHECK_EQ(replaced, 1);
+  DCHECK_EQ(replaced, 2);
 
   process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, false,
       equals_fn, "Equals", &replaced);

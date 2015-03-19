@@ -36,6 +36,20 @@ const char* OldHashTable::LLVM_CLASS_NAME = "class.impala::OldHashTable";
 const float OldHashTable::MAX_BUCKET_OCCUPANCY_FRACTION = 0.75f;
 static const int PAGE_SIZE = 8 * 1024 * 1024;
 
+// Put a non-zero constant in the result location for NULL.
+// We don't want(NULL, 1) to hash to the same as (0, 1).
+// This needs to be as big as the biggest primitive type since the bytes
+// get copied directly.
+// TODO find a better approach, since primitives like CHAR(N) can be up to 128 bytes
+static int64_t NULL_VALUE[] = { HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+                                HashUtil::FNV_SEED, HashUtil::FNV_SEED,
+                                HashUtil::FNV_SEED, HashUtil::FNV_SEED };
+
 OldHashTable::OldHashTable(RuntimeState* state, const vector<ExprContext*>& build_expr_ctxs,
     const vector<ExprContext*>& probe_expr_ctxs, int num_build_tuples, bool stores_nulls,
     bool finds_nulls, int32_t initial_seed, MemTracker* mem_tracker, bool stores_tuples,
@@ -91,12 +105,6 @@ void OldHashTable::Close() {
 
 bool OldHashTable::EvalRow(
     TupleRow* row, const vector<ExprContext*>& ctxs) {
-  // Put a non-zero constant in the result location for NULL.
-  // We don't want(NULL, 1) to hash to the same as (0, 1).
-  // This needs to be as big as the biggest primitive type since the bytes
-  // get copied directly.
-  int64_t null_value[] = { HashUtil::FNV_SEED, HashUtil::FNV_SEED };
-
   bool has_null = false;
   for (int i = 0; i < ctxs.size(); ++i) {
     void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
@@ -106,7 +114,7 @@ bool OldHashTable::EvalRow(
       if (!stores_nulls_) return true;
 
       expr_value_null_bits_[i] = true;
-      val = &null_value;
+      val = &NULL_VALUE;
       has_null = true;
     } else {
       expr_value_null_bits_[i] = false;
@@ -235,7 +243,7 @@ Function* OldHashTable::CodegenEvalTupleRow(RuntimeState* state, bool build) {
   const vector<ExprContext*>& ctxs = build ? build_expr_ctxs_ : probe_expr_ctxs_;
   for (int i = 0; i < ctxs.size(); ++i) {
     PrimitiveType type = ctxs[i]->root()->type().type;
-    if (type == TYPE_TIMESTAMP || type == TYPE_DECIMAL) return NULL;
+    if (type == TYPE_TIMESTAMP || type == TYPE_DECIMAL || type == TYPE_CHAR) return NULL;
   }
 
   LlvmCodeGen* codegen;
@@ -386,6 +394,11 @@ uint32_t OldHashTable::HashVariableLenRow() {
 // }
 // TODO: can this be cross-compiled?
 Function* OldHashTable::CodegenHashCurrentRow(RuntimeState* state) {
+  for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
+    // Disable codegen for CHAR
+    if (build_expr_ctxs_[i]->root()->type().type == TYPE_CHAR) return NULL;
+  }
+
   LlvmCodeGen* codegen;
   if (!state->GetCodegen(&codegen).ok()) return NULL;
 
@@ -560,6 +573,11 @@ bool OldHashTable::Equals(TupleRow* build_row) {
 //   ret i1 true
 // }
 Function* OldHashTable::CodegenEquals(RuntimeState* state) {
+  for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
+    // Disable codegen for CHAR
+    if (build_expr_ctxs_[i]->root()->type().type == TYPE_CHAR) return NULL;
+  }
+
   LlvmCodeGen* codegen;
   if (!state->GetCodegen(&codegen).ok()) return NULL;
   // Get types to generate function prototype

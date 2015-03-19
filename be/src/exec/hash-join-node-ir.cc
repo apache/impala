@@ -50,23 +50,35 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
   int probe_rows = probe_batch->num_rows();
 
   ExprContext* const* other_conjunct_ctxs = &other_join_conjunct_ctxs_[0];
-  int num_other_conjunct_ctxs = other_join_conjunct_ctxs_.size();
+  const int num_other_conjunct_ctxs = other_join_conjunct_ctxs_.size();
 
   ExprContext* const* conjunct_ctxs = &conjunct_ctxs_[0];
-  int num_conjunct_ctxs = conjunct_ctxs_.size();
+  const int num_conjunct_ctxs = conjunct_ctxs_.size();
 
   while (true) {
     // Create output row for each matching build row
     while (!hash_tbl_iterator_.AtEnd()) {
       TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
       hash_tbl_iterator_.Next<true>();
-      CreateOutputRow(out_row, current_probe_row_, matched_build_row);
 
-      if (!EvalOtherJoinConjuncts2(
+      if (join_op_ == TJoinOp::LEFT_SEMI_JOIN) {
+        // Evaluate the non-equi-join conjuncts against a temp row assembled from all
+        // build and probe tuples.
+        if (num_other_conjunct_ctxs > 0) {
+          CreateOutputRow(semi_join_staging_row_, current_probe_row_, matched_build_row);
+          if (!EvalOtherJoinConjuncts2(other_conjunct_ctxs, num_other_conjunct_ctxs,
+                semi_join_staging_row_)) {
+            continue;
+          }
+        }
+        out_batch->CopyRow(current_probe_row_, out_row);
+      } else {
+        CreateOutputRow(out_row, current_probe_row_, matched_build_row);
+        if (!EvalOtherJoinConjuncts2(
               other_conjunct_ctxs, num_other_conjunct_ctxs, out_row)) {
-        continue;
+          continue;
+        }
       }
-
       matched_probe_ = true;
 
       if (EvalConjuncts(conjunct_ctxs, num_conjunct_ctxs, out_row)) {
