@@ -10,7 +10,7 @@
 import logging
 import pytest
 from copy import deepcopy
-from subprocess import call
+from subprocess import call, check_call
 
 from testdata.common import widetable
 from tests.common.test_vector import *
@@ -18,6 +18,7 @@ from tests.common.impala_test_suite import *
 from tests.util.test_file_parser import *
 from tests.util.filesystem_utils import WAREHOUSE
 from tests.common.test_dimensions import create_single_exec_option_dimension
+from tests.common.skip import *
 
 class TestScannersAllTableFormats(ImpalaTestSuite):
   BATCH_SIZES = [0, 1, 16]
@@ -199,7 +200,123 @@ class TestParquet(ImpalaTestSuite):
   def test_parquet(self, vector):
     self.run_test_case('QueryTest/parquet', vector)
 
-# We use various scan ranges to exercise corner cases in the HDFS scanner more
+class TestParquetComplexTypes(ImpalaTestSuite):
+  COMPLEX_COLUMN_TABLE = "functional_parquet.nested_column_types"
+
+  @classmethod
+  def get_workload(cls):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestParquetComplexTypes, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(create_single_exec_option_dimension())
+    # Only run on delimited text with no compression.
+    cls.TestMatrix.add_dimension(create_parquet_dimension(cls.get_workload()))
+
+  # This tests we can read the scalar-typed columns from a Parquet table that also has
+  # complex-typed columns.
+  # TODO: remove this when we can read complex-typed columns (complex types testing should
+  # supercede this)
+  @skip_if_s3_hive
+  def test_complex_column_types(self, vector):
+    self.__drop_complex_column_table()
+
+    # Partitioned case
+    create_table_stmt = """
+      CREATE TABLE IF NOT EXISTS {0} (
+        a int,
+        b ARRAY<STRUCT<c:INT, d:STRING>>,
+        e MAP<STRING,INT>,
+        f string,
+        g ARRAY<INT>,
+        h STRUCT<i:DOUBLE>
+      ) PARTITIONED BY (p1 INT, p2 STRING)
+      STORED AS PARQUET;
+    """.format(self.COMPLEX_COLUMN_TABLE)
+
+    insert_stmt = """
+      INSERT OVERWRITE TABLE {0}
+      PARTITION (p1=1, p2="partition1")
+      SELECT 1, array(named_struct("c", 2, "d", "foo")), map("key1", 10, "key2", 20),
+        "bar", array(2,3,4,5), named_struct("i", 1.23)
+      FROM functional_parquet.tinytable limit 2;
+    """.format(self.COMPLEX_COLUMN_TABLE)
+
+    check_call(["hive", "-e", create_table_stmt])
+    check_call(["hive", "-e", insert_stmt])
+
+    self.execute_query("invalidate metadata %s" % self.COMPLEX_COLUMN_TABLE)
+
+    result = self.execute_query("select count(*) from %s" % self.COMPLEX_COLUMN_TABLE)
+    assert(len(result.data) == 1)
+    assert(result.data[0] == "2")
+
+    result = self.execute_query("select a from %s" % self.COMPLEX_COLUMN_TABLE)
+    assert(len(result.data) == 2)
+    assert(result.data[1] == "1")
+
+    result = self.execute_query(
+      "select p1, a from %s where p1 = 1" % self.COMPLEX_COLUMN_TABLE)
+    assert(len(result.data) == 2)
+    assert(result.data[1] == "1\t1")
+
+    result = self.execute_query("select f from %s" % self.COMPLEX_COLUMN_TABLE)
+    assert(len(result.data) == 2)
+    assert(result.data[1] == "bar")
+
+    result = self.execute_query(
+      "select p2, f from %s" % self.COMPLEX_COLUMN_TABLE)
+    assert(len(result.data) == 2)
+    assert(result.data[1] == "partition1\tbar")
+
+    # Unpartitioned case
+    self.__drop_complex_column_table()
+
+    create_table_stmt = """
+      CREATE TABLE IF NOT EXISTS {0} (
+        a int,
+        b ARRAY<STRUCT<c:INT, d:STRING>>,
+        e MAP<STRING,INT>,
+        f string,
+        g ARRAY<INT>,
+        h STRUCT<i:DOUBLE>
+      ) STORED AS PARQUET;
+    """.format(self.COMPLEX_COLUMN_TABLE)
+
+    insert_stmt = """
+      INSERT OVERWRITE TABLE {0}
+      SELECT 1, array(named_struct("c", 2, "d", "foo")), map("key1", 10, "key2", 20),
+        "bar", array(2,3,4,5), named_struct("i", 1.23)
+      FROM functional_parquet.tinytable limit 2;
+    """.format(self.COMPLEX_COLUMN_TABLE)
+
+    check_call(["hive", "-e", create_table_stmt])
+    check_call(["hive", "-e", insert_stmt])
+
+    self.execute_query("invalidate metadata %s" % self.COMPLEX_COLUMN_TABLE)
+
+    result = self.execute_query("select count(*) from %s" % self.COMPLEX_COLUMN_TABLE)
+    assert(len(result.data) == 1)
+    assert(result.data[0] == "2")
+
+    result = self.execute_query("select a from %s" % self.COMPLEX_COLUMN_TABLE)
+    assert(len(result.data) == 2)
+    assert(result.data[1] == "1")
+
+    result = self.execute_query("select f from %s" % self.COMPLEX_COLUMN_TABLE)
+    assert(len(result.data) == 2)
+    assert(result.data[1] == "bar")
+
+  @classmethod
+  def teardown_class(cls):
+    cls.__drop_complex_column_table()
+
+  @classmethod
+  def __drop_complex_column_table(cls):
+    cls.client.execute("drop table if exists %s" % cls.COMPLEX_COLUMN_TABLE)
+
+# We use various scan range lengths to exercise corner cases in the HDFS scanner more
 # thoroughly. In particular, it will exercise:
 # 1. default scan range
 # 2. scan range with no tuple
