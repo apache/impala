@@ -681,10 +681,12 @@ public class CatalogOpExecutor {
       db.setLocationUri(params.getLocation());
     }
     LOG.debug("Creating database " + dbName);
+    Db newDb = null;
     synchronized (metastoreDdlLock_) {
       MetaStoreClient msClient = catalog_.getMetaStoreClient();
       try {
         msClient.getHiveClient().createDatabase(db);
+        newDb = catalog_.addDb(dbName);
       } catch (AlreadyExistsException e) {
         if (!params.if_not_exists) {
           throw new ImpalaRuntimeException(
@@ -692,6 +694,7 @@ public class CatalogOpExecutor {
         }
         LOG.debug(String.format("Ignoring '%s' when creating database %s because " +
             "IF NOT EXISTS was specified.", e, dbName));
+        newDb = catalog_.getDb(dbName);
       } catch (TException e) {
         throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "createDatabase"), e);
@@ -699,7 +702,7 @@ public class CatalogOpExecutor {
         msClient.release();
       }
 
-      Db newDb = catalog_.addDb(dbName);
+      Preconditions.checkNotNull(newDb);
       TCatalogObject thriftDb = new TCatalogObject(TCatalogObjectType.DATABASE,
           Catalog.INITIAL_CATALOG_VERSION);
       thriftDb.setDb(newDb.toThrift());
