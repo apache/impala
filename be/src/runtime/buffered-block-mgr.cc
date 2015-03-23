@@ -755,7 +755,10 @@ void BufferedBlockMgr::WriteComplete(Block* block, const Status& write_status) {
       block->buffer_desc_ = NULL;
       ReturnUnusedBlock(block);
     }
-    buffer_available_cv_.notify_one();
+    // Multiple threads may be waiting for the same block in FindBuffer().  Wake them
+    // all up.  One thread will get this block, and the others will re-evaluate whether
+    // they should continue waiting and if another write needs to be initiated.
+    buffer_available_cv_.notify_all();
   }
   DCHECK(Validate()) << endl << DebugInternal();
 
