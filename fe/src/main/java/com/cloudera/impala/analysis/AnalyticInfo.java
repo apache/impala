@@ -37,6 +37,9 @@ public class AnalyticInfo extends AggregateInfoBase {
   // in this list.
   private final ArrayList<Expr> analyticExprs_;
 
+  // Intersection of the partition exps of all the analytic functions.
+  private final List<Expr> commonPartitionExprs_ = Lists.newArrayList();
+
   // map from analyticExprs_ to their corresponding analytic tuple slotrefs
   private final ExprSubstitutionMap analyticTupleSmap_ = new ExprSubstitutionMap();
 
@@ -47,10 +50,12 @@ public class AnalyticInfo extends AggregateInfoBase {
     for (Expr analyticExpr: analyticExprs) {
       aggregateExprs_.add(((AnalyticExpr) analyticExpr).getFnCall());
     }
+    computeCommonPartitionExprs();
   }
 
   public ArrayList<Expr> getAnalyticExprs() { return analyticExprs_; }
   public ExprSubstitutionMap getSmap() { return analyticTupleSmap_; }
+  public List<Expr> getCommonPartitionExprs() { return commonPartitionExprs_; }
 
   /**
    * Creates complete AnalyticInfo for analyticExprs, including tuple descriptors and
@@ -81,6 +86,24 @@ public class AnalyticInfo extends AggregateInfoBase {
     LOG.trace("analytictuplesmap=" + result.analyticTupleSmap_.debugString());
     LOG.trace("analytic info:\n" + result.debugString());
     return result;
+  }
+
+  /**
+   * Computes the intersection of the partition exprs of all the
+   * analytic functions.
+   */
+  private void computeCommonPartitionExprs() {
+    for (Expr analyticExpr: analyticExprs_) {
+      Preconditions.checkState(analyticExpr.isAnalyzed_);
+      List<Expr> partitionExprs = ((AnalyticExpr) analyticExpr).getPartitionExprs();
+      if (partitionExprs == null) continue;
+      if (commonPartitionExprs_.isEmpty()) {
+        commonPartitionExprs_.addAll(partitionExprs);
+      } else {
+        commonPartitionExprs_.retainAll(partitionExprs);
+        if (commonPartitionExprs_.isEmpty()) break;
+      }
+    }
   }
 
   /**

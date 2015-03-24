@@ -1759,3 +1759,206 @@ where year = 2009 and month = 1
 01:SCAN HDFS [functional.alltypes]
    partitions=2/24 files=2 size=38.07KB
 ====
+# Propagate a predicate on a partition key through an inline view that has an analytic
+# function. Predicates that are not compatible with analytic function's partition by
+# clause are not propagated (IMPALA-1900).
+select * from
+  (select id, int_col, year,
+   sum(int_col) over(partition by year order by id) as s
+   from functional.alltypes) v
+where year = 2009 and id = 1 and int_col < 10 and s = 4
+---- PLAN
+03:SELECT
+|  predicates: id = 1, int_col < 10, sum(int_col) = 4
+|
+02:ANALYTIC
+|  functions: sum(int_col)
+|  partition by: year
+|  order by: id ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+01:SORT
+|  order by: year ASC NULLS FIRST, id ASC
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=12/24 files=12 size=238.68KB
+====
+# Propagate predicates through an inline view that computes multiple analytic functions
+# (IMPALA-1900)
+select * from
+  (select year, tinyint_col,
+   last_value(int_col) over(partition by int_col, year order by id
+   rows between 1 preceding and 1 following),
+   last_value(tinyint_col) over(partition by id, year order by int_col
+   range between unbounded preceding and unbounded following),
+   sum(int_col) over(partition by year, tinyint_col),
+   avg(int_col) over(partition by tinyint_col, id, year order by bigint_col)
+   from functional.alltypes) v
+where year = 2009 and tinyint_col + 1 = 1
+---- PLAN
+09:SELECT
+|  predicates: tinyint_col + 1 = 1
+|
+08:ANALYTIC
+|  functions: sum(int_col)
+|  partition by: year, tinyint_col
+|
+07:SORT
+|  order by: year ASC NULLS FIRST, tinyint_col ASC NULLS FIRST
+|
+06:ANALYTIC
+|  functions: last_value(int_col)
+|  partition by: int_col, year
+|  order by: id ASC
+|  window: ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+|
+05:SORT
+|  order by: int_col ASC NULLS FIRST, year ASC NULLS FIRST, id ASC
+|
+04:ANALYTIC
+|  functions: avg(int_col)
+|  partition by: tinyint_col, id, year
+|  order by: bigint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+03:SORT
+|  order by: tinyint_col ASC NULLS FIRST, id ASC NULLS FIRST, year ASC NULLS FIRST, bigint_col ASC
+|
+02:ANALYTIC
+|  functions: last_value(tinyint_col)
+|  partition by: id, year
+|  order by: int_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+|
+01:SORT
+|  order by: id ASC NULLS FIRST, year ASC NULLS FIRST, int_col ASC
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=12/24 files=12 size=238.68KB
+====
+# Don't propagate predicates through an inline view with multiple analytic functions
+# if the predicates are not compatible with every analytic function's partition by
+# clause (IMPALA-1900)
+select * from
+  (select year, tinyint_col,
+   sum(int_col) over(partition by year, tinyint_col order by bigint_col),
+   avg(int_col) over(partition by year order by bigint_col),
+   lead(int_col) over(order by tinyint_col)
+   from functional.alltypes) v
+where year = 2009 and tinyint_col = 1
+---- PLAN
+07:SELECT
+|  predicates: year = 2009, tinyint_col = 1
+|
+06:ANALYTIC
+|  functions: lead(int_col, 1, NULL)
+|  order by: tinyint_col ASC
+|  window: ROWS BETWEEN UNBOUNDED PRECEDING AND 1 FOLLOWING
+|
+05:SORT
+|  order by: tinyint_col ASC
+|
+04:ANALYTIC
+|  functions: avg(int_col)
+|  partition by: year
+|  order by: bigint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+03:SORT
+|  order by: year ASC NULLS FIRST, bigint_col ASC
+|
+02:ANALYTIC
+|  functions: sum(int_col)
+|  partition by: year, tinyint_col
+|  order by: bigint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+01:SORT
+|  order by: year ASC NULLS FIRST, tinyint_col ASC NULLS FIRST, bigint_col ASC
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Propagate a predicate generated from equivalence classes
+# through an inline with an analytic function (IMPALA-1900)
+select * from
+  (select month, int_col, tinyint_col,
+   sum(id) over(partition by month, tinyint_col order by bigint_col)
+   from functional.alltypestiny where id = tinyint_col) v
+where month = int_col and int_col = 1 and tinyint_col = 1;
+---- PLAN
+03:SELECT
+|  predicates: month = int_col
+|
+02:ANALYTIC
+|  functions: sum(id)
+|  partition by: month, tinyint_col
+|  order by: bigint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+01:SORT
+|  order by: month ASC NULLS FIRST, tinyint_col ASC NULLS FIRST, bigint_col ASC
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=1/4 files=1 size=115B
+   predicates: id = tinyint_col, functional.alltypestiny.tinyint_col = 1, functional.alltypestiny.id = 1
+====
+# Don't propagate predicates through an inline view with an analytic
+# function that has a complex (non SlotRef) partition by clause for consistency with
+# the group by behavior (IMPALA-1900).
+# TODO: Enable predicate propagation through inline views with complex partition by
+# exprs.
+select * from
+  (select t1.tinyint_col as x, t2.int_col as y,
+   sum(t1.id) over(partition by t1.tinyint_col + 1, t2.int_col - 1 order by t1.bigint_col)
+   from functional.alltypes t1 inner join functional.alltypesagg t2
+   on t1.id = t2.id) v
+where v.x + v.y < 10
+---- PLAN
+05:SELECT
+|  predicates: tinyint_col + int_col < 10
+|
+04:ANALYTIC
+|  functions: sum(id)
+|  partition by: t1.tinyint_col + 1, t2.int_col - 1
+|  order by: bigint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+03:SORT
+|  order by: tinyint_col + 1 ASC NULLS FIRST, int_col - 1 ASC NULLS FIRST, bigint_col ASC
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: t1.id = t2.id
+|
+|--01:SCAN HDFS [functional.alltypesagg t2]
+|     partitions=11/11 files=11 size=814.73KB
+|
+00:SCAN HDFS [functional.alltypes t1]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Don't propagate a predicate through an inline view with an analytic function
+# when the select list items contain a complex (non SlotRef) expr on a partition by
+# expr (IMPALA-1900)
+# TODO: Enable migration of predicates into inline views with analytics if the predicate
+# is compatible with the analytics' partition by clause.
+select * from
+  (select int_col + 1 as x,
+   sum(id) over(partition by int_col order by bigint_col)
+   from functional.alltypestiny) v
+where x = 1
+---- PLAN
+03:SELECT
+|  predicates: int_col + 1 = 1
+|
+02:ANALYTIC
+|  functions: sum(id)
+|  partition by: int_col
+|  order by: bigint_col ASC
+|  window: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|
+01:SORT
+|  order by: int_col ASC NULLS FIRST, bigint_col ASC
+|
+00:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+====

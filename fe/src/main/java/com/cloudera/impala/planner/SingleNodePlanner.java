@@ -54,11 +54,6 @@ import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
-import com.cloudera.impala.common.PrintUtils;
-import com.cloudera.impala.thrift.TExplainLevel;
-import com.cloudera.impala.thrift.TQueryExecRequest;
-import com.cloudera.impala.thrift.TTableName;
-import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
@@ -686,74 +681,7 @@ public class SingleNodePlanner {
     // via the equality predicates created for the view's select list.
     // Include outer join conjuncts here as well because predicates from the
     // On-clause of an outer join may be pushed into the inline view as well.
-    //
-    // Limitations on predicate propagation into inline views:
-    // If the inline view computes analytic functions, we cannot push any
-    // predicate into the inline view tree (see IMPALA-1243). The reason is that
-    // analytic functions compute aggregates over their entire input, and applying
-    // filters from the enclosing scope *before* the aggregate computation would
-    // alter the results. This is unlike regular aggregate computation, which only
-    // makes the *output* of the computation visible to the enclosing scope, so that
-    // filters from the enclosing scope can be safely applied (to the grouping cols, say)
-    List<Expr> unassigned =
-        analyzer.getUnassignedConjuncts(inlineViewRef.getId().asList(), true);
-    boolean migrateConjuncts = !inlineViewRef.getViewStmt().hasLimit()
-        && !inlineViewRef.getViewStmt().hasOffset()
-        && (!(inlineViewRef.getViewStmt() instanceof SelectStmt)
-            || !((SelectStmt)(inlineViewRef.getViewStmt())).hasAnalyticInfo());
-    if (migrateConjuncts) {
-      // check if we can evaluate them
-      List<Expr> preds = Lists.newArrayList();
-      for (Expr e: unassigned) {
-        if (analyzer.canEvalPredicate(inlineViewRef.getId().asList(), e)) preds.add(e);
-      }
-      unassigned.removeAll(preds);
-
-      // Generate predicates to enforce equivalences among slots of the inline view
-      // tuple. These predicates are also migrated into the inline view.
-      analyzer.createEquivConjuncts(inlineViewRef.getId(), preds);
-
-      // create new predicates against the inline view's unresolved result exprs, not
-      // the resolved result exprs, in order to avoid skipping scopes (and ignoring
-      // limit clauses on the way)
-      List<Expr> viewPredicates =
-          Expr.substituteList(preds, inlineViewRef.getSmap(), analyzer, false);
-
-      // Remove unregistered predicates that reference the same slot on
-      // both sides (e.g. a = a). Such predicates have been generated from slot
-      // equivalences and may incorrectly reject rows with nulls (IMPALA-1412).
-      Predicate<Expr> isIdentityPredicate = new Predicate<Expr>() {
-        @Override
-        public boolean apply(Expr expr) {
-          if (!(expr instanceof BinaryPredicate)
-              || ((BinaryPredicate) expr).getOp() != BinaryPredicate.Operator.EQ) {
-            return false;
-          }
-          if (!expr.isRegisteredPredicate()
-              && expr.getChild(0) instanceof SlotRef
-              && expr.getChild(1) instanceof SlotRef
-              && (((SlotRef) expr.getChild(0)).getSlotId() ==
-                 ((SlotRef) expr.getChild(1)).getSlotId())) {
-            return true;
-          }
-          return false;
-        }
-      };
-      Iterables.removeIf(viewPredicates, isIdentityPredicate);
-
-      // "migrate" conjuncts_ by marking them as assigned and re-registering them with
-      // new ids.
-      // Mark pre-substitution conjuncts as assigned, since the ids of the new exprs may
-      // have changed.
-      analyzer.markConjunctsAssigned(preds);
-      inlineViewRef.getAnalyzer().registerConjuncts(viewPredicates);
-    }
-
-    // mark (fully resolve) slots referenced by remaining unassigned conjuncts_ as
-    // materialized
-    List<Expr> substUnassigned =
-        Expr.substituteList(unassigned, inlineViewRef.getBaseTblSmap(), analyzer, false);
-    analyzer.materializeSlots(substUnassigned);
+    migrateConjunctsToInlineView(analyzer, inlineViewRef);
 
     // Turn a constant select into a UnionNode that materializes the exprs.
     // TODO: unify this with createConstantSelectPlan(), this is basically the
@@ -794,12 +722,105 @@ public class SingleNodePlanner {
     // the result exprs set in the coordinator fragment.
     rootNode.setOutputSmap(ExprSubstitutionMap.compose(inlineViewRef.getBaseTblSmap(),
         rootNode.getOutputSmap(), analyzer));
-    // if the view has a limit we may have conjuncts_ from the enclosing scope left
-    if (!migrateConjuncts) {
+    // If the inline view has a LIMIT/OFFSET or unassigned conjuncts due to analytic
+    // functions, we may have conjuncts that need to be assigned to a SELECT node on
+    // top of the current plan root node.
+    //
+    // TODO: This check is also repeated in migrateConjunctsToInlineView() because we
+    // need to make sure that equivalences are not enforced multiple times. Consolidate
+    // the assignment of conjuncts and the enforcement of equivalences into a single
+    // place.
+    if (!canMigrateConjuncts(inlineViewRef)) {
       rootNode = addUnassignedConjuncts(
           analyzer, inlineViewRef.getDesc().getId().asList(), rootNode);
     }
     return rootNode;
+  }
+
+  /**
+   * Migrates unassigned conjuncts into an inline view. Conjuncts are not
+   * migrated into the inline view if the view has a LIMIT/OFFSET clause or if the
+   * view's stmt computes analytic functions (see IMPALA-1243/IMPALA-1900).
+   * The reason is that analytic functions compute aggregates over their entire input,
+   * and applying filters from the enclosing scope *before* the aggregate computation
+   * would alter the results. This is unlike regular aggregate computation, which only
+   * makes the *output* of the computation visible to the enclosing scope, so that
+   * filters from the enclosing scope can be safely applied (to the grouping cols, say).
+   */
+  public void migrateConjunctsToInlineView(Analyzer analyzer,
+      InlineViewRef inlineViewRef) {
+    List<Expr> unassignedConjuncts =
+        analyzer.getUnassignedConjuncts(inlineViewRef.getId().asList(), true);
+    if (!canMigrateConjuncts(inlineViewRef)) {
+      // mark (fully resolve) slots referenced by unassigned conjuncts as
+      // materialized
+      List<Expr> substUnassigned = Expr.substituteList(unassignedConjuncts,
+          inlineViewRef.getBaseTblSmap(), analyzer, false);
+      analyzer.materializeSlots(substUnassigned);
+      return;
+    }
+
+    List<Expr> preds = Lists.newArrayList();
+    for (Expr e: unassignedConjuncts) {
+      if (analyzer.canEvalPredicate(inlineViewRef.getId().asList(), e)) {
+        preds.add(e);
+      }
+    }
+    unassignedConjuncts.removeAll(preds);
+    // Generate predicates to enforce equivalences among slots of the inline view
+    // tuple. These predicates are also migrated into the inline view.
+    analyzer.createEquivConjuncts(inlineViewRef.getId(), preds);
+
+    // create new predicates against the inline view's unresolved result exprs, not
+    // the resolved result exprs, in order to avoid skipping scopes (and ignoring
+    // limit clauses on the way)
+    List<Expr> viewPredicates =
+        Expr.substituteList(preds, inlineViewRef.getSmap(), analyzer, false);
+
+    // Remove unregistered predicates that reference the same slot on
+    // both sides (e.g. a = a). Such predicates have been generated from slot
+    // equivalences and may incorrectly reject rows with nulls (IMPALA-1412).
+    Predicate<Expr> isIdentityPredicate = new Predicate<Expr>() {
+      @Override
+      public boolean apply(Expr expr) {
+        if (!(expr instanceof BinaryPredicate)
+            || ((BinaryPredicate) expr).getOp() != BinaryPredicate.Operator.EQ) {
+          return false;
+        }
+        if (!expr.isRegisteredPredicate()
+            && expr.getChild(0) instanceof SlotRef
+            && expr.getChild(1) instanceof SlotRef
+            && (((SlotRef) expr.getChild(0)).getSlotId() ==
+               ((SlotRef) expr.getChild(1)).getSlotId())) {
+          return true;
+        }
+        return false;
+      }
+    };
+    Iterables.removeIf(viewPredicates, isIdentityPredicate);
+
+    // "migrate" conjuncts_ by marking them as assigned and re-registering them with
+    // new ids.
+    // Mark pre-substitution conjuncts as assigned, since the ids of the new exprs may
+    // have changed.
+    analyzer.markConjunctsAssigned(preds);
+    inlineViewRef.getAnalyzer().registerConjuncts(viewPredicates);
+
+    // mark (fully resolve) slots referenced by remaining unassigned conjuncts as
+    // materialized
+    List<Expr> substUnassigned = Expr.substituteList(unassignedConjuncts,
+        inlineViewRef.getBaseTblSmap(), analyzer, false);
+    analyzer.materializeSlots(substUnassigned);
+  }
+
+  /**
+   * Checks if conjuncts can be migrated into an inline view.
+   */
+  private boolean canMigrateConjuncts(InlineViewRef inlineViewRef) {
+    return !inlineViewRef.getViewStmt().hasLimit()
+        && !inlineViewRef.getViewStmt().hasOffset()
+        && (!(inlineViewRef.getViewStmt() instanceof SelectStmt)
+            || !((SelectStmt) inlineViewRef.getViewStmt()).hasAnalyticInfo());
   }
 
   /**

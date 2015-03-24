@@ -32,7 +32,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 
-
 /**
  * An inline view is a query statement with an alias. Inline views can be parsed directly
  * from a query string or represent a reference to a local or catalog view.
@@ -161,12 +160,11 @@ public class InlineViewRef extends TableRef {
     // transfer graph through this inline view correctly (ie, predicates can get
     // propagated through the view);
     // if the view stmt contains analytic functions, we cannot propagate predicates
-    // into the view, because those extra filters would alter the results of the
-    // analytic functions (see IMPALA-1243)
+    // into the view, unless the predicates are compatible with the analytic
+    // function's partition by clause, because those extra filters
+    // would alter the results of the analytic functions (see IMPALA-1243)
     // TODO: relax this a bit by allowing propagation out of the inline view (but
     // not into it)
-    boolean createAuxPredicates = !(queryStmt_ instanceof SelectStmt)
-        || !(((SelectStmt) queryStmt_).hasAnalyticInfo());
     for (int i = 0; i < getColLabels().size(); ++i) {
       String colName = getColLabels().get(i);
       Expr colExpr = queryStmt_.getResultExprs().get(i);
@@ -176,8 +174,7 @@ public class InlineViewRef extends TableRef {
       SlotRef slotRef = new SlotRef(slotDesc);
       smap_.put(slotRef, colExpr);
       baseTblSmap_.put(slotRef, queryStmt_.getBaseTblResultExprs().get(i));
-
-      if (createAuxPredicates) {
+      if (createAuxPredicate(colExpr)) {
         analyzer.createAuxEquivPredicate(new SlotRef(slotDesc), colExpr.clone());
       }
     }
@@ -187,6 +184,20 @@ public class InlineViewRef extends TableRef {
 
     // Now do the remaining join analysis
     analyzeJoin(analyzer);
+  }
+
+  /**
+   * Checks if an auxiliary predicate should be created for an expr. Returns False if the
+   * inline view has a SELECT stmt with analytic functions and the expr is not in the
+   * common partition exprs of all the analytic functions computed by this inline view.
+   */
+  public boolean createAuxPredicate(Expr e) {
+    if (!(queryStmt_ instanceof SelectStmt)
+        || !((SelectStmt) queryStmt_).hasAnalyticInfo()) {
+      return true;
+    }
+    AnalyticInfo analyticInfo = ((SelectStmt) queryStmt_).getAnalyticInfo();
+    return analyticInfo.getCommonPartitionExprs().contains(e);
   }
 
   /**
