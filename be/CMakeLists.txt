@@ -26,33 +26,42 @@ enable_testing()
 PROJECT(ASSEMBLER)
 
 # compiler flags that are common across debug/release builds
-#  - Wall: Enable all warnings.
-#  - Wno-sign-compare: suppress warnings for comparison between signed and unsigned
+#  -Wall: Enable all warnings.
+#  -Wno-sign-compare: suppress warnings for comparison between signed and unsigned
 #    integers
 #   -fno-strict-aliasing: disable optimizations that assume strict aliasing. This
 #       is unsafe to do if the code uses casts (which we obviously do).
-#  - Wno-unknown-pragmas: suppress warnings for unknown (compiler specific) pragmas
-#  - Wno-deprecated: gutil contains deprecated headers
-#  - pthread: enable multithreaded malloc
-#  - DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG: enable nanosecond precision for boost
+#  -Wno-unknown-pragmas: suppress warnings for unknown (compiler specific) pragmas
+#  -Wno-deprecated: gutil contains deprecated headers
+#  -pthread: enable multithreaded malloc
+#  -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG: enable nanosecond precision for boost
 SET(CXX_COMMON_FLAGS "-Wall -Wno-sign-compare -Wno-unknown-pragmas -pthread")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fno-strict-aliasing")
-SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated -Wno-unused-local-typedefs")
+SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
 SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
 
+# For any clang builds (currently only ASAN):
+#   -Qunused-arguments: quiet warnings about unused arguments to clang because ccache
+#        makes extra calls to clang which may have extra includes (-I) that are unused.
+#   -fcolor-diagnostics: ensure clang generates colorized output, which is necessary
+#        when using ccache as clang thinks it is not called from a terminal.
+SET(CXX_CLANG_FLAGS "-Qunused-arguments -fcolor-diagnostics")
+# For any gcc builds:
+#   -g: Enable symbols for profiler tools
+#   -Wno-unused-local-typedefs: Do not warn for local typedefs that are unused.
+SET(CXX_GCC_FLAGS "-g -Wno-unused-local-typedefs")
+
 # compiler flags for different build types (run 'cmake -DCMAKE_BUILD_TYPE=<type> .')
-# For all builds:
 # For CMAKE_BUILD_TYPE=Debug
 #   -ggdb: Enable gdb debugging
 # For CMAKE_BUILD_TYPE=Release
 #   -O3: Enable all compiler optimizations
-#   -g: Enable symbols for profiler tools
 #   -DNDEBUG: Turn off dchecks/asserts/debug only code.
-SET(CXX_FLAGS_DEBUG "-g -ggdb")
-SET(CXX_FLAGS_RELEASE "-O3 -g -DNDEBUG")
+SET(CXX_FLAGS_DEBUG "${CXX_GCC_FLAGS} -ggdb")
+SET(CXX_FLAGS_RELEASE "${CXX_GCC_FLAGS} -O3 -DNDEBUG")
 SET(CXX_FLAGS_ADDRESS_SANITIZER
-    "-O1 -g -fsanitize=address -fno-omit-frame-pointer -DADDRESS_SANITIZER")
+  "${CXX_CLANG_FLAGS} -O1 -g -fsanitize=address -fno-omit-frame-pointer -DADDRESS_SANITIZER")
 
 # if no build build type is specified, default to debug builds
 if (NOT CMAKE_BUILD_TYPE)
@@ -84,6 +93,22 @@ endif ()
 SET(CMAKE_CXX_FLAGS "${CXX_COMMON_FLAGS} ${CMAKE_CXX_FLAGS}")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fverbose-asm")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LLVM_CFLAGS}")
+
+# Use ccache when found and not explicitly disabled by setting the DISABLE_CCACHE envvar.
+find_program(CCACHE ccache)
+if (CCACHE AND NOT DEFINED ENV{DISABLE_CCACHE})
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
+  if ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
+    # Need to set CCACHE_CPP so that ccache calls clang with the original source file for
+    # both preprocessing and compilation. Otherwise, ccache will use clang to preprocess
+    # the file and then call clang with the preprocessed output if not cached. However,
+    # the preprocessed output from clang may contain code (e.g. from macro expansions)
+    # that generates compilation warnings that would not be reported if compiling the
+    # original source directly with clang.
+    SET(ENV{CCACHE_CPP} YES)
+  endif()
+endif()
 
 # Thrift requires these definitions for some types that we use
 add_definitions(-DHAVE_INTTYPES_H -DHAVE_NETINET_IN_H -DHAVE_NETDB_H)
