@@ -274,12 +274,19 @@ void AggregationNode::Close(RuntimeState* state) {
   if (is_closed()) return;
 
   // Iterate through the remaining rows in the hash table and call Serialize/Finalize on
-  // them in order to free any memory allocated by UDAs
+  // them in order to free any memory allocated by UDAs. Finalize() requires a dst tuple
+  // but we don't actually need the result, so allocate a single dummy tuple to avoid
+  // accumulating memory.
+  Tuple* dummy_dst = NULL;
+  if (needs_finalize_) {
+    dummy_dst = Tuple::Create(output_tuple_desc_->byte_size(), tuple_pool_.get());
+  }
   while (!output_iterator_.AtEnd()) {
-    Tuple* intermediate_tuple = output_iterator_.GetTuple();
-    if (FinalizeTuple(intermediate_tuple, tuple_pool_.get()) != intermediate_tuple) {
-      // Avoid consuming excessive memory.
-      tuple_pool_->FreeAll();
+    Tuple* tuple = output_iterator_.GetTuple();
+    if (needs_finalize_) {
+      AggFnEvaluator::Finalize(aggregate_evaluators_, agg_fn_ctxs_, tuple, dummy_dst);
+    } else {
+      AggFnEvaluator::Serialize(aggregate_evaluators_, agg_fn_ctxs_, tuple);
     }
     output_iterator_.Next<false>();
   }
@@ -365,14 +372,10 @@ Tuple* AggregationNode::FinalizeTuple(Tuple* tuple, MemPool* pool) {
   if (needs_finalize_ && intermediate_tuple_id_ != output_tuple_id_) {
     dst = Tuple::Create(output_tuple_desc_->byte_size(), pool);
   }
-  for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
-    AggFnEvaluator* evaluator = aggregate_evaluators_[i];
-    FunctionContext* agg_fn_ctx = agg_fn_ctxs_[i];
-    if (needs_finalize_) {
-      evaluator->Finalize(agg_fn_ctx, tuple, dst);
-    } else {
-      evaluator->Serialize(agg_fn_ctx, tuple);
-    }
+  if (needs_finalize_) {
+    AggFnEvaluator::Finalize(aggregate_evaluators_, agg_fn_ctxs_, tuple, dst);
+  } else {
+    AggFnEvaluator::Serialize(aggregate_evaluators_, agg_fn_ctxs_, tuple);
   }
   // Copy grouping values from tuple to dst.
   // TODO: Codegen this.
