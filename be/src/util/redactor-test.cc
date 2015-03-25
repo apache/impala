@@ -326,6 +326,9 @@ TEST(RedactorTest, MultiThreaded) {
 }
 
 int main(int argc, char **argv) {
+  // Disabled under ASAN, see IMPALA-1918
+#ifndef ADDRESS_SANITIZER
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
+#endif
 }
