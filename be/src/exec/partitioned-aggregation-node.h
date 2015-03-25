@@ -327,11 +327,12 @@ class PartitionedAggregationNode : public ExecNode {
   // GetNext() using the agg fn evaluators' Serialize() or Finalize().
   // For the Finalize() case if the output tuple is different from the intermediate
   // tuple, then a new tuple is allocated from 'pool' to hold the final result.
-  // Returns the tuple holding the final aggregate values.
+  // Grouping values are copied into the output tuple and the the output tuple holding
+  // the finalized/serialized aggregate values is returned.
   // TODO: Coordinate the allocation of new tuples with the release of memory
   // so as not to make memory consumption blow up.
-  Tuple* FinalizeTuple(const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs,
-                       Tuple* tuple, MemPool* pool);
+  Tuple* GetOutputTuple(const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs,
+                        Tuple* tuple, MemPool* pool);
 
   // Do the aggregation for all tuple rows in the batch when there is no grouping.
   // The HashTableCtx argument is unused, but included so the signature matches that of

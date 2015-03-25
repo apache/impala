@@ -287,7 +287,7 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
     if (!singleton_output_tuple_returned_) {
       int row_idx = row_batch->AddRow();
       TupleRow* row = row_batch->GetRow(row_idx);
-      Tuple* output_tuple = FinalizeTuple(
+      Tuple* output_tuple = GetOutputTuple(
           agg_fn_ctxs_, singleton_output_tuple_, row_batch->tuple_data_pool());
       row->SetTuple(0, output_tuple);
       if (ExecNode::EvalConjuncts(ctxs, num_ctxs, row)) {
@@ -332,7 +332,7 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
     int row_idx = row_batch->AddRow();
     TupleRow* row = row_batch->GetRow(row_idx);
     Tuple* intermediate_tuple = output_iterator_.GetTuple();
-    Tuple* output_tuple = FinalizeTuple(
+    Tuple* output_tuple = GetOutputTuple(
         output_partition_->agg_fn_ctxs, intermediate_tuple, row_batch->tuple_data_pool());
     output_iterator_.Next();
     row->SetTuple(0, output_tuple);
@@ -351,10 +351,22 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
 void PartitionedAggregationNode::CleanupHashTbl(const vector<FunctionContext*>& ctxs,
     HashTable::Iterator it) {
   if (!needs_finalize_ && !needs_serialize_) return;
+
+  // Iterate through the remaining rows in the hash table and call Serialize/Finalize on
+  // them in order to free any memory allocated by UDAs. Finalize() requires a dst tuple
+  // but we don't actually need the result, so allocate a single dummy tuple to avoid
+  // accumulating memory.
+  Tuple* dummy_dst = NULL;
+  if (needs_finalize_) {
+    dummy_dst = Tuple::Create(output_tuple_desc_->byte_size(), mem_pool_.get());
+  }
   while (!it.AtEnd()) {
-    FinalizeTuple(ctxs, it.GetTuple(), mem_pool_.get());
-    // Avoid consuming excessive memory, so free whenever consumption is >1MB.
-    if (mem_pool_->total_allocated_bytes() > 1024 * 1024) mem_pool_->FreeAll();
+    Tuple* tuple = it.GetTuple();
+    if (needs_finalize_) {
+      AggFnEvaluator::Finalize(aggregate_evaluators_, agg_fn_ctxs_, tuple, dummy_dst);
+    } else {
+      AggFnEvaluator::Serialize(aggregate_evaluators_, agg_fn_ctxs_, tuple);
+    }
     it.Next();
   }
 }
@@ -364,7 +376,7 @@ void PartitionedAggregationNode::Close(RuntimeState* state) {
 
   if (!singleton_output_tuple_returned_) {
     DCHECK_EQ(agg_fn_ctxs_.size(), aggregate_evaluators_.size());
-    FinalizeTuple(agg_fn_ctxs_, singleton_output_tuple_, mem_pool_.get());
+    GetOutputTuple(agg_fn_ctxs_, singleton_output_tuple_, mem_pool_.get());
   }
 
   // Iterate through the remaining rows in the hash table and call Serialize/Finalize on
@@ -579,8 +591,7 @@ Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
   Tuple* intermediate_tuple = NULL;
   uint8_t* buffer = NULL;
   if (pool != NULL) {
-    intermediate_tuple = Tuple::Create(
-        intermediate_tuple_desc_->byte_size(), mem_pool_.get());
+    intermediate_tuple = Tuple::Create(intermediate_tuple_desc_->byte_size(), pool);
   } else {
     // Figure out how big it will be to copy the entire tuple. We need the tuple to end
     // up on one block in the stream.
@@ -668,7 +679,7 @@ void PartitionedAggregationNode::UpdateTuple(FunctionContext** agg_fn_ctxs,
   }
 }
 
-Tuple* PartitionedAggregationNode::FinalizeTuple(
+Tuple* PartitionedAggregationNode::GetOutputTuple(
     const vector<FunctionContext*>& agg_fn_ctxs, Tuple* tuple, MemPool* pool) {
   DCHECK(tuple != NULL || aggregate_evaluators_.empty()) << tuple;
   Tuple* dst = tuple;
