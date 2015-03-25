@@ -143,12 +143,16 @@ TEST(MetricsTest, MemMetric) {
   RegisterMemoryMetrics(&metrics, false);
   // Smoke test to confirm that tcmalloc metrics are returning reasonable values.
   UIntGauge* bytes_in_use =
-      metrics.FindMetricForTesting<UIntGauge> ("tcmalloc.bytes-in-use");
+      metrics.FindMetricForTesting<UIntGauge>("tcmalloc.bytes-in-use");
   DCHECK(bytes_in_use != NULL);
 
   uint64_t cur_in_use = bytes_in_use->value();
-  scoped_ptr<uint64_t> chunk(new uint64_t);
   EXPECT_GT(cur_in_use, 0);
+
+  // Allocate 10MB to increase the number of bytes used. TCMalloc may also give up some
+  // bytes during this allocation, so this allocation is deliberately large to ensure that
+  // the bytes used metric goes up net.
+  scoped_ptr<vector<uint64_t> > chunk(new vector<uint64_t>(10 * 1024 * 1024));
   EXPECT_GT(bytes_in_use->value(), cur_in_use);
 
   UIntGauge* total_bytes_reserved =
