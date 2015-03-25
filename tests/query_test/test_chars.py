@@ -7,10 +7,10 @@ import pytest
 from copy import copy
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
-from tests.common.skip import *
+from tests.common.skip import SkipIfS3
 from tests.util.filesystem_utils import WAREHOUSE
 
-@skip_if_s3_insert
+@SkipIfS3.insert
 class TestStringQueries(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):

@@ -8,7 +8,7 @@ import pytest
 from copy import copy
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
-from tests.common.skip import *
+from tests.common.skip import SkipIfS3
 
 class TestJoinQueries(ImpalaTestSuite):
   BATCH_SIZES = [0, 1]
@@ -36,7 +36,7 @@ class TestJoinQueries(ImpalaTestSuite):
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('QueryTest/joins', new_vector)
 
-  @skip_if_s3_hbase
+  @SkipIfS3.hbase
   def test_joins_against_hbase(self, vector):
     new_vector = copy(vector)
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
@@ -47,7 +47,7 @@ class TestJoinQueries(ImpalaTestSuite):
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('QueryTest/outer-joins', new_vector)
 
-@skip_if_s3_insert
+@SkipIfS3.insert
 class TestSemiJoinQueries(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):

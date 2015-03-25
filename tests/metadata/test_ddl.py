@@ -23,8 +23,8 @@ from subprocess import call
 from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_test_suite import *
-from tests.common.skip import *
-from tests.util.filesystem_utils import WAREHOUSE
+from tests.common.skip import SkipIfS3
+from tests.util.filesystem_utils import WAREHOUSE, IS_DEFAULT_FS
 
 # Validates DDL statements (create, drop)
 class TestDdlStatements(ImpalaTestSuite):
@@ -84,7 +84,7 @@ class TestDdlStatements(ImpalaTestSuite):
     self.hdfs_client.delete_file_dir("test-warehouse/t1_tmp1/", recursive=True)
     self.hdfs_client.delete_file_dir("test-warehouse/t_part_tmp/", recursive=True)
 
-  @skip_if_s3_hdfs_client # S3: missing coverage: drop table/database
+  @SkipIfS3.hdfs_client # S3: missing coverage: drop table/database
   @pytest.mark.execute_serially
   def test_drop_cleans_hdfs_dirs(self):
     self.hdfs_client.delete_file_dir("test-warehouse/ddl_test_db.db/", recursive=True)
@@ -108,7 +108,7 @@ class TestDdlStatements(ImpalaTestSuite):
     self.client.execute("drop database ddl_test_db")
     assert not self.hdfs_client.exists("test-warehouse/ddl_test_db.db/")
 
-  @skip_if_s3_insert
+  @SkipIfS3.insert
   @pytest.mark.execute_serially
   def test_create(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False
@@ -134,7 +134,7 @@ class TestDdlStatements(ImpalaTestSuite):
     assert 'ddl_test_db' not in self.client.execute("show databases").data
 
   # TODO: don't use hdfs_client
-  @skip_if_s3_insert # S3: missing coverage: alter table
+  @SkipIfS3.insert # S3: missing coverage: alter table
   @pytest.mark.execute_serially
   def test_alter_table(self, vector):
     vector.get_value('exec_option')['abort_on_error'] = False

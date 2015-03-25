@@ -4,8 +4,7 @@ import pytest
 from subprocess import check_call
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
-from tests.common.skip import IS_S3
-from tests.util.filesystem_utils import WAREHOUSE
+from tests.util.filesystem_utils import WAREHOUSE, IS_S3
 
 TEST_DB = 'hidden_files_db'
 TEST_TBL = 'hf'

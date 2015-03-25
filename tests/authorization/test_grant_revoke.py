@@ -24,7 +24,7 @@ from os import getenv
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_uncompressed_text_dimension
-from tests.common.skip import IS_S3
+from tests.util.filesystem_utils import IS_S3
 from tests.util.test_file_parser import QueryTestSectionReader
 
 SENTRY_CONFIG_FILE = getenv('IMPALA_HOME') + '/fe/src/test/resources/sentry-site.xml'

@@ -15,12 +15,12 @@
 #
 import os
 import pytest
+from tests.common.skip import SkipIfS3
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.common.skip import *
 from tests.util.hdfs_util import HdfsConfig, get_hdfs_client, get_hdfs_client_from_conf
 
 
-@skip_if_s3_insert
+@SkipIfS3.insert
 class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
   def check_partition_perms(self, part, perms):
     ls = self.hdfs_client.get_file_dir_status(

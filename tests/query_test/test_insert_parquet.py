@@ -8,7 +8,7 @@ import pytest
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_exec_option_dimension
-from tests.common.skip import *
+from tests.common.skip import SkipIfS3
 
 # TODO: Add Gzip back.  IMPALA-424
 PARQUET_CODECS = ['none', 'snappy']
@@ -17,7 +17,7 @@ PARQUET_CODECS = ['none', 'snappy']
 # TODO: these tests take a while so we don't want to go through too many sizes but
 # we should in more exhaustive testing
 PARQUET_FILE_SIZES = [0, 32 * 1024 * 1024]
-@skip_if_s3_insert
+@SkipIfS3.insert
 class TestInsertParquetQueries(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -55,7 +55,7 @@ class TestInsertParquetQueries(ImpalaTestSuite):
         vector.get_value('compression_codec')
     self.run_test_case('insert_parquet', vector, multiple_impalad=True)
 
-@skip_if_s3_insert
+@SkipIfS3.insert
 class TestInsertParquetInvalidCodec(ImpalaTestSuite):
   @classmethod
   def get_workload(self):
@@ -85,7 +85,7 @@ class TestInsertParquetInvalidCodec(ImpalaTestSuite):
                        multiple_impalad=True)
 
 
-@skip_if_s3_insert
+@SkipIfS3.insert
 class TestInsertParquetVerifySize(ImpalaTestSuite):
   @classmethod
   def get_workload(self):

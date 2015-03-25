@@ -28,7 +28,6 @@ from thrift.transport.TTransport import TBufferedTransport
 from thrift.protocol import TBinaryProtocol
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 from tests.common.impala_test_suite import IMPALAD_HS2_HOST_PORT
-from tests.common.skip import IS_S3
 from tests.hs2.hs2_test_suite import operation_id_to_query_id
 from tests.util.filesystem_utils import WAREHOUSE
 

@@ -6,8 +6,8 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.impala_cluster import ImpalaCluster
-from tests.common.skip import *
-from tests.util.filesystem_utils import get_fs_path
+from tests.common.skip import SkipIfS3
+from tests.util.filesystem_utils import get_fs_path, IS_S3
 from subprocess import call
 
 class TestUdfs(ImpalaTestSuite):

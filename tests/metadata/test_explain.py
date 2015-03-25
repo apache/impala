@@ -7,7 +7,7 @@ import pytest
 import re
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
-from tests.common.skip import *
+from tests.common.skip import SkipIfS3
 
 # Tests the different explain levels [0-3] on a few queries.
 # TODO: Clean up this test to use an explain level test dimension and appropriate
@@ -96,7 +96,7 @@ class TestExplainEmptyPartition(ImpalaTestSuite):
   def teardown_method(self, method):
     self.cleanup_db(self.TEST_DB_NAME)
 
-  @skip_if_s3_hdfs_client
+  @SkipIfS3.hdfs_client
   def test_non_empty_partition_0_rows(self):
     """Regression test for IMPALA-1708: if a partition has 0 rows but > 0 files after
     COMPUTE STATS, don't warn the user about missing stats. The files are probably

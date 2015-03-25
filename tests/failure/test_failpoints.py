@@ -12,7 +12,7 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import ImpalaTestSuite, ALL_NODES_ONLY, LOG
 from tests.common.test_vector import TestDimension
 from tests.common.test_dimensions import create_exec_option_dimension
-from tests.common.skip import *
+from tests.common.skip import SkipIfS3
 from tests.util.test_file_parser import QueryTestSectionReader
 from time import sleep
 
@@ -38,7 +38,7 @@ order by int_sum
 # a similar pattern as test_cancellation.py
 QUERY_TYPE = ["SELECT"]
 
-@skip_if_s3_hbase # S3: missing coverage: failures
+@SkipIfS3.hbase # S3: missing coverage: failures
 class TestFailpoints(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):

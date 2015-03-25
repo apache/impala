@@ -22,7 +22,7 @@ from tests.util.shell_util import exec_process
 from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_test_suite import *
-from tests.common.skip import *
+from tests.common.skip import SkipIfS3
 from tests.util.filesystem_utils import WAREHOUSE
 
 
@@ -55,7 +55,7 @@ class TestPartitionMetadata(ImpalaTestSuite):
   def teardown_method(self, method):
     self.cleanup_db(self.TEST_DB)
 
-  @skip_if_s3_insert # S3: missing coverage: partition DDL
+  @SkipIfS3.insert # S3: missing coverage: partition DDL
   def test_multiple_partitions_same_location(self, vector):
     """Regression test for IMPALA-597. Verifies Impala is able to properly read
     tables that have multiple partitions pointing to the same location.

@@ -21,9 +21,9 @@ import pwd
 import pytest
 import time
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import *
+from tests.common.skip import SkipIfS3
 
-@skip_if_s3_insert
+@SkipIfS3.insert
 class TestInsertBehaviour(ImpalaTestSuite):
   """Tests for INSERT behaviour that isn't covered by checking query results"""
 

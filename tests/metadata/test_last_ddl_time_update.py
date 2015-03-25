@@ -6,10 +6,10 @@ import pytest
 import sys
 import time
 from subprocess import call
-from tests.common.skip import IS_S3, skip_if_s3_insert
+from tests.common.skip import SkipIfS3
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
-from tests.util.filesystem_utils import WAREHOUSE
+from tests.util.filesystem_utils import WAREHOUSE, IS_S3
 
 DB_NAME = "metastore_update"
 TABLE_NAME = "ddltime_test"
@@ -73,7 +73,7 @@ class TestLastDdlTimeUpdate(ImpalaTestSuite):
     self.run_test("alter table %s set fileformat textfile" % FULL_NAME, True)
 
   @pytest.mark.execute_serially
-  @skip_if_s3_insert
+  @SkipIfS3.insert
   def test_insert(self, vector):
     # static partition insert
     self.run_test("insert into %s partition(j=1, s='2012') "

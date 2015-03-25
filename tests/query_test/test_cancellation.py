@@ -11,7 +11,7 @@ from time import sleep
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import TestDimension
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import *
+from tests.common.skip import SkipIfS3
 from tests.util.test_file_parser import QueryTestSectionReader
 from tests.verifiers.metric_verifier import MetricVerifier
 
@@ -158,7 +158,7 @@ class TestCancellationSerial(TestCancellation):
       cls.TestMatrix.add_constraint(lambda v: v.get_value('cancel_delay') in [3])
       cls.TestMatrix.add_constraint(lambda v: v.get_value('query') == choice(QUERIES))
 
-  @skip_if_s3_insert
+  @SkipIfS3.insert
   @pytest.mark.execute_serially
   def test_cancel_insert(self, vector):
     self.execute_cancel_test(vector)

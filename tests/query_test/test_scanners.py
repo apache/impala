@@ -18,7 +18,7 @@ from tests.common.impala_test_suite import *
 from tests.util.test_file_parser import *
 from tests.util.filesystem_utils import WAREHOUSE
 from tests.common.test_dimensions import create_single_exec_option_dimension
-from tests.common.skip import *
+from tests.common.skip import SkipIfS3
 
 class TestScannersAllTableFormats(ImpalaTestSuite):
   BATCH_SIZES = [0, 1, 16]
@@ -218,7 +218,7 @@ class TestParquetComplexTypes(ImpalaTestSuite):
   # complex-typed columns.
   # TODO: remove this when we can read complex-typed columns (complex types testing should
   # supercede this)
-  @skip_if_s3_hive
+  @SkipIfS3.hive
   def test_complex_column_types(self, vector):
     self.__drop_complex_column_table()
 

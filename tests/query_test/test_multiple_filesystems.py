@@ -6,10 +6,10 @@ import pytest
 from subprocess import check_call
 from tests.common.impala_test_suite import ImpalaTestSuite
 from tests.common.test_dimensions import create_single_exec_option_dimension
-from tests.common.skip import skip_if_default_fs
+from tests.common.skip import SkipIf
 from tests.util.filesystem_utils import get_fs_path
 
-@skip_if_default_fs # Run only when a non-default filesystem is available.
+@SkipIf.default_fs # Run only when a non-default filesystem is available.
 class TestMultipleFilesystems(ImpalaTestSuite):
   """
   Tests that tables and queries can span multiple filesystems.
