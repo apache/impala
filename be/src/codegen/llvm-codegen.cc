@@ -29,6 +29,7 @@
 #include <llvm/Linker.h>
 #include <llvm/PassManager.h>
 #include <llvm/Support/DynamicLibrary.h>
+#include <llvm/Support/Host.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/NoFolder.h>
 #include <llvm/Support/TargetRegistry.h>
@@ -258,8 +259,13 @@ Status LlvmCodeGen::Init() {
   // blows up the fe tests (which take ~10-20 ms each).
   opt_level = CodeGenOpt::None;
 #endif
-  execution_engine_.reset(
-      ExecutionEngine::createJIT(module_, &error_string_, NULL, opt_level));
+  EngineBuilder builder = EngineBuilder(module_).setOptLevel(opt_level);
+  //TODO Uncomment the below line as soon as we upgrade to LLVM 3.5 to enable SSE, if
+  // available. In LLVM 3.3 this is done automatically and cannot be enabled because
+  // for some reason SSE4 intrinsics selection will not work.
+  //builder.setMCPU(llvm::sys::getHostCPUName());
+  builder.setErrorStr(&error_string_);
+  execution_engine_.reset(builder.create());
   if (execution_engine_ == NULL) {
     // execution_engine_ will take ownership of the module if it is created
     delete module_;
@@ -743,7 +749,7 @@ void* LlvmCodeGen::JitFunction(Function* function) {
 
   // TODO: log a warning if the jitted function is too big (larger than I cache)
   void* jitted_function = execution_engine_->getPointerToFunction(function);
-  lock_guard<mutex> l(jitted_functions_lock_);
+  boost::lock_guard<mutex> l(jitted_functions_lock_);
   if (jitted_function != NULL) {
     jitted_functions_[function] = true;
   }
