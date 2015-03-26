@@ -2125,8 +2125,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
           String.format("Impala does not have READ_WRITE access to path '%s'",
               parentPath));
 
-      AnalyzesOk(String.format("alter table functional.insert_string_partitioned " +
-          "partition(s2=NULL) set location '%s/new_part_loc'", location),
+      AnalyzesOk(String.format("alter table functional.stringpartitionkey " +
+          "partition(string_col = 'partition1') set location '%s/new_part_loc'", location),
           String.format("Impala does not have READ_WRITE access to path '%s'",
               parentPath));
 
