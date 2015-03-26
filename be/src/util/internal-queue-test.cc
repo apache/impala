@@ -150,13 +150,12 @@ const int VALIDATE_INTERVAL = 10000;
 
 // CHECK() is not thread safe so return the result in *failed.
 void ProducerThread(InternalQueue<IntNode>* queue, int num_inserts,
-    vector<IntNode>& nodes, AtomicInt<int32_t>* counter, bool* failed) {
+    vector<IntNode>* nodes, AtomicInt<int32_t>* counter, bool* failed) {
   for (int i = 0; i < num_inserts && !*failed; ++i) {
     // Get the next index to queue.
     AtomicInt<int32_t> value = (*counter)++;
-    IntNode* node = &nodes[value];
-    node->value = value;
-    queue->Enqueue(node);
+    nodes->at(value).value = value;
+    queue->Enqueue(&nodes->at(value));
     if (i % VALIDATE_INTERVAL == 0) {
       if (!queue->Validate()) *failed = true;
     }
@@ -211,7 +210,7 @@ TEST(InternalQueue, TestSingleProducerSingleConsumer) {
 
   InternalQueue<IntNode> queue;
   bool failed = false;
-  ProducerThread(&queue, nodes.size(), nodes, &counter, &failed);
+  ProducerThread(&queue, nodes.size(), &nodes, &counter, &failed);
   ConsumerThread(&queue, nodes.size(), 1, &results, &failed);
   ASSERT_TRUE(!failed);
   ASSERT_TRUE(queue.empty());
@@ -219,7 +218,7 @@ TEST(InternalQueue, TestSingleProducerSingleConsumer) {
 
   counter = 0;
   results.clear();
-  thread producer_thread(ProducerThread, &queue, nodes.size(), nodes, &counter, &failed);
+  thread producer_thread(ProducerThread, &queue, nodes.size(), &nodes, &counter, &failed);
   thread consumer_thread(ConsumerThread, &queue, nodes.size(), 1, &results, &failed);
   producer_thread.join();
   consumer_thread.join();
@@ -265,7 +264,7 @@ TEST(InternalQueue, TestMultiProducerMultiConsumer) {
 
     for (int i = 0; i < num_producers; ++i) {
       producers.add_thread(
-          new thread(ProducerThread, &queue, num_per_producer, nodes, &counter, &failed));
+          new thread(ProducerThread, &queue, num_per_producer, &nodes, &counter, &failed));
     }
 
     for (int i = 0; i < NUM_CONSUMERS; ++i) {
