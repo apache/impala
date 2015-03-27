@@ -3,6 +3,7 @@
 .*.swp
 derby.log
 thirdparty
+compile_commands.json
 cscope.files
 cscope.out
 cscope.in.out
