@@ -294,6 +294,10 @@ class DiskIoMgr {
   // the IoMgr.
   class ScanRange : public RequestRange {
    public:
+
+    // If the mtime is set to NEVER_CACHE, the file handle should never be cached.
+    const static int64_t NEVER_CACHE = -1;
+
     // The initial queue capacity for this.  Specify -1 to use IoMgr default.
     ScanRange(int initial_capacity = -1);
 
@@ -303,7 +307,7 @@ class DiskIoMgr {
     // must fall within the file bounds (offset >= 0 and offset + len <= file_length).
     // Resets this scan range object with the scan range description.
     void Reset(hdfsFS fs, const char* file, int64_t len, int64_t offset, int disk_id,
-        bool try_cache, bool expected_local, void* metadata = NULL);
+        bool try_cache, bool expected_local, int64_t mtime, void* metadata = NULL);
 
     void* meta_data() const { return meta_data_; }
     bool try_cache() const { return try_cache_; }
@@ -325,6 +329,8 @@ class DiskIoMgr {
 
     // return a descriptive string for debug.
     std::string DebugString() const;
+
+    int64_t mtime() const { return mtime_; }
 
    private:
     friend class DiskIoMgr;
@@ -437,6 +443,9 @@ class DiskIoMgr {
 
     // If true, this scan range has been cancelled.
     bool is_cancelled_;
+
+    // Last modified time of the file associated with the scan range
+    int64_t mtime_;
   };
 
   // Used to specify data to be written to a file and offset.

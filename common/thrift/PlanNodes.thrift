@@ -84,6 +84,9 @@ struct THdfsFileSplit {
 
   // compression type of the hdfs file
   6: required CatalogObjects.THdfsCompression file_compression
+
+  // last modified time of the file
+  7: required i64 mtime
 }
 
 // key range for single THBaseScanNode

@@ -181,7 +181,7 @@ Status HdfsScanNode::GetNextInternal(
 
 DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(
     hdfsFS fs, const char* file, int64_t len, int64_t offset, int64_t partition_id,
-    int disk_id, bool try_cache, bool expected_local) {
+    int disk_id, bool try_cache, bool expected_local, int64_t mtime) {
   DCHECK_GE(disk_id, -1);
   // Require that the scan range is within [0, file_length). While this cannot be used
   // to guarantee safety (file_length metadata may be stale), it avoids different
@@ -197,7 +197,8 @@ DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(
       runtime_state_->obj_pool()->Add(new ScanRangeMetadata(partition_id));
   DiskIoMgr::ScanRange* range =
       runtime_state_->obj_pool()->Add(new DiskIoMgr::ScanRange());
-  range->Reset(fs, file, len, offset, disk_id, try_cache, expected_local, metadata);
+  range->Reset(fs, file, len, offset, disk_id, try_cache, expected_local,
+      mtime, metadata);
   return range;
 }
 
@@ -368,6 +369,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
       file_desc = runtime_state_->obj_pool()->Add(new HdfsFileDesc(native_file_path));
       file_descs_[native_file_path] = file_desc;
       file_desc->file_length = split.file_length;
+      file_desc->mtime = split.mtime;
       file_desc->file_compression = split.file_compression;
       RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
           native_file_path, &file_desc->fs, &fs_cache));
@@ -402,7 +404,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
     file_desc->splits.push_back(
         AllocateScanRange(file_desc->fs, file_desc->filename.c_str(), split.length,
             split.offset, split.partition_id, (*scan_range_params_)[i].volume_id,
-            try_cache, expected_local));
+            try_cache, expected_local, file_desc->mtime));
   }
 
   // Compute the minimum bytes required to start a new thread. This is based on the

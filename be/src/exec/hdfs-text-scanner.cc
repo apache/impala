@@ -115,7 +115,7 @@ Status HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
           DiskIoMgr::ScanRange* file_range = scan_node->AllocateScanRange(
               files[i]->fs, files[i]->filename.c_str(), files[i]->file_length, 0,
               metadata->partition_id, split->disk_id(), split->try_cache(),
-              split->expected_local());
+              split->expected_local(), files[i]->mtime);
           compressed_text_scan_ranges.push_back(file_range);
           scan_node->max_compressed_text_file_length()->Set(files[i]->file_length);
         }

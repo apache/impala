@@ -592,7 +592,8 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
   DiskIoMgr::ScanRange* scan_range =
       obj_pool_.Add(new DiskIoMgr::ScanRange());
   scan_range->Reset(NULL, block->write_range_->file(), block->write_range_->len(),
-      block->write_range_->offset(), block->write_range_->disk_id(), false, block);
+      block->write_range_->offset(), block->write_range_->disk_id(), false, block,
+      DiskIoMgr::ScanRange::NEVER_CACHE);
   vector<DiskIoMgr::ScanRange*> ranges(1, scan_range);
   RETURN_IF_ERROR(io_mgr_->AddScanRanges(io_request_context_, ranges, true));
 

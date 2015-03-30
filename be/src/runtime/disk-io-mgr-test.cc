@@ -15,6 +15,7 @@
 #include <sched.h>
 #include <boost/bind.hpp>
 #include <boost/thread/thread.hpp>
+#include <sys/stat.h>
 
 #include <gtest/gtest.h>
 
@@ -49,7 +50,7 @@ class DiskIoMgrTest : public testing::Test {
     if (status.ok()) {
       DiskIoMgr::ScanRange* scan_range = pool_->Add(new DiskIoMgr::ScanRange());
       scan_range->Reset(NULL, (*written_range)->file(), (*written_range)->len(),
-          (*written_range)->offset(), 0, false, false);
+          (*written_range)->offset(), 0, false, false, DiskIoMgr::ScanRange::NEVER_CACHE);
       ValidateSyncRead(io_mgr, reader, scan_range, reinterpret_cast<const char*>(data),
           sizeof(int32_t));
     }
@@ -149,9 +150,10 @@ class DiskIoMgrTest : public testing::Test {
   }
 
   DiskIoMgr::ScanRange* InitRange(int num_buffers, const char* file_path, int offset,
-      int len, int disk_id, void* meta_data = NULL, bool is_cached = false) {
+      int len, int disk_id, int64_t mtime, void* meta_data = NULL, bool is_cached = false) {
     DiskIoMgr::ScanRange* range = pool_->Add(new DiskIoMgr::ScanRange(num_buffers));
-    range->Reset(NULL, file_path, len, offset, disk_id, is_cached, meta_data);
+    range->Reset(NULL, file_path, len, offset, disk_id, is_cached, true, mtime, meta_data);
+    EXPECT_EQ(mtime, range->mtime());
     return range;
   }
 
@@ -350,6 +352,10 @@ TEST_F(DiskIoMgrTest, SingleReader) {
   int len = strlen(data);
   CreateTempFile(tmp_file, data);
 
+  // Get mtime for file
+  struct stat stat_val;
+  stat(tmp_file, &stat_val);
+
   int64_t iters = 0;
   for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
     for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
@@ -373,7 +379,8 @@ TEST_F(DiskIoMgrTest, SingleReader) {
           vector<DiskIoMgr::ScanRange*> ranges;
           for (int i = 0; i < len; ++i) {
             int disk_id = i % num_disks;
-            ranges.push_back(InitRange(num_buffers, tmp_file, 0, len, disk_id));
+            ranges.push_back(InitRange(num_buffers, tmp_file, 0, len, disk_id,
+                stat_val.st_mtime));
           }
           status = io_mgr.AddScanRanges(reader, ranges);
           ASSERT_TRUE(status.ok());
@@ -404,6 +411,10 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
   int len = strlen(data);
   CreateTempFile(tmp_file, data);
 
+  // Get mtime for file
+  struct stat stat_val;
+  stat(tmp_file, &stat_val);
+
   int64_t iters = 0;
   for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
     for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
@@ -428,9 +439,11 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
           int disk_id = i % num_disks;
           if (i > len / 2) {
             ranges_second_half.push_back(
-                InitRange(num_buffers, tmp_file, i, 1, disk_id));
+                InitRange(num_buffers, tmp_file, i, 1, disk_id,
+                stat_val.st_mtime));
           } else {
-            ranges_first_half.push_back(InitRange(num_buffers, tmp_file, i, 1, disk_id));
+            ranges_first_half.push_back(InitRange(num_buffers, tmp_file, i, 1, disk_id,
+                stat_val.st_mtime));
           }
         }
         AtomicInt<int> num_ranges_processed;
@@ -474,6 +487,10 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
   int len = strlen(data);
   CreateTempFile(tmp_file, data);
 
+  // Get mtime for file
+  struct stat stat_val;
+  stat(tmp_file, &stat_val);
+
   int64_t iters = 0;
   for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
     for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
@@ -493,7 +510,8 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
         status = io_mgr.RegisterContext(&reader, &reader_mem_tracker);
         ASSERT_TRUE(status.ok());
 
-        DiskIoMgr::ScanRange* complete_range = InitRange(1, tmp_file, 0, strlen(data), 0);
+        DiskIoMgr::ScanRange* complete_range = InitRange(1, tmp_file, 0, strlen(data), 0,
+            stat_val.st_mtime);
 
         // Issue some reads before the async ones are issued
         ValidateSyncRead(&io_mgr, reader, complete_range, data);
@@ -502,7 +520,8 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
         vector<DiskIoMgr::ScanRange*> ranges;
         for (int i = 0; i < len; ++i) {
           int disk_id = i % num_disks;
-          ranges.push_back(InitRange(num_buffers, tmp_file, 0, len, disk_id));
+          ranges.push_back(InitRange(num_buffers, tmp_file, 0, len, disk_id,
+              stat_val.st_mtime));
         }
         status = io_mgr.AddScanRanges(reader, ranges);
         ASSERT_TRUE(status.ok());
@@ -542,6 +561,10 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
   int len = strlen(data);
   CreateTempFile(tmp_file, data);
 
+  // Get mtime for file
+  struct stat stat_val;
+  stat(tmp_file, &stat_val);
+
   int64_t iters = 0;
   for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
     for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
@@ -563,7 +586,8 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
         vector<DiskIoMgr::ScanRange*> ranges;
         for (int i = 0; i < len; ++i) {
           int disk_id = i % num_disks;
-          ranges.push_back(InitRange(num_buffers, tmp_file, 0, len, disk_id));
+          ranges.push_back(InitRange(num_buffers, tmp_file, 0, len, disk_id,
+              stat_val.st_mtime));
         }
         status = io_mgr.AddScanRanges(reader, ranges);
         ASSERT_TRUE(status.ok());
@@ -604,6 +628,10 @@ TEST_F(DiskIoMgrTest, MemLimits) {
   int len = strlen(data);
   CreateTempFile(tmp_file, data);
 
+  // Get mtime for file
+  struct stat stat_val;
+  stat(tmp_file, &stat_val);
+
   const int num_buffers = 25;
   // Give the reader more buffers than the limit
   const int mem_limit_num_buffers = 2;
@@ -625,7 +653,8 @@ TEST_F(DiskIoMgrTest, MemLimits) {
 
     vector<DiskIoMgr::ScanRange*> ranges;
     for (int i = 0; i < num_buffers; ++i) {
-      ranges.push_back(InitRange(num_buffers, tmp_file, 0, len, 0));
+      ranges.push_back(InitRange(num_buffers, tmp_file, 0, len, 0,
+          stat_val.st_mtime));
     }
     status = io_mgr.AddScanRanges(reader, ranges);
     ASSERT_TRUE(status.ok());
@@ -680,6 +709,10 @@ TEST_F(DiskIoMgrTest, CachedReads) {
   int len = strlen(data);
   CreateTempFile(tmp_file, data);
 
+  // Get mtime for file
+  struct stat stat_val;
+  stat(tmp_file, &stat_val);
+
   const int num_disks = 2;
   const int num_buffers = 3;
 
@@ -697,7 +730,7 @@ TEST_F(DiskIoMgrTest, CachedReads) {
     ASSERT_TRUE(status.ok());
 
     DiskIoMgr::ScanRange* complete_range =
-        InitRange(1, tmp_file, 0, strlen(data), 0, NULL, true);
+        InitRange(1, tmp_file, 0, strlen(data), 0, stat_val.st_mtime, NULL, true);
 
     // Issue some reads before the async ones are issued
     ValidateSyncRead(&io_mgr, reader, complete_range, data);
@@ -706,7 +739,8 @@ TEST_F(DiskIoMgrTest, CachedReads) {
     vector<DiskIoMgr::ScanRange*> ranges;
     for (int i = 0; i < len; ++i) {
       int disk_id = i % num_disks;
-      ranges.push_back(InitRange(num_buffers, tmp_file, 0, len, disk_id, NULL, true));
+      ranges.push_back(InitRange(num_buffers, tmp_file, 0, len, disk_id,
+          stat_val.st_mtime, NULL, true));
     }
     status = io_mgr.AddScanRanges(reader, ranges);
     ASSERT_TRUE(status.ok());
@@ -753,6 +787,10 @@ TEST_F(DiskIoMgrTest, MultipleReaderWriter) {
     ASSERT_TRUE(false);
   }
 
+  // Get mtime for file
+  struct stat stat_val;
+  stat(file_name.c_str(), &stat_val);
+
   int64_t iters = 0;
   vector<DiskIoMgr::RequestContext*> contexts(num_contexts);
   Status status;
@@ -777,7 +815,7 @@ TEST_F(DiskIoMgrTest, MultipleReaderWriter) {
             int num_scan_ranges = min<int>(num_reads_queued, write_offset - read_offset);
             for (int i = 0; i < num_scan_ranges; ++i) {
               ranges.push_back(InitRange(1, file_name.c_str(), read_offset, 1,
-                  i % num_disks));
+                  i % num_disks, stat_val.st_mtime));
               threads.add_thread(new thread(ScanRangeThread, &io_mgr,
                   contexts[context_index],
                   reinterpret_cast<const char*>(data + (read_offset % strlen(data))), 1,
@@ -827,12 +865,14 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
   const int NUM_THREADS_PER_READER = 3;
 
   vector<string> file_names;
+  vector<int64_t> mtimes;
   vector<string> data;
   vector<DiskIoMgr::RequestContext*> readers;
   vector<char*> results;
 
   file_names.resize(NUM_READERS);
   readers.resize(NUM_READERS);
+  mtimes.resize(NUM_READERS);
   data.resize(NUM_READERS);
   results.resize(NUM_READERS);
 
@@ -850,6 +890,11 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
     ss << "/tmp/disk_io_mgr_test" << i << ".txt";
     file_names[i] = ss.str();
     CreateTempFile(ss.str().c_str(), data[i].c_str());
+
+    // Get mtime for file
+    struct stat stat_val;
+    stat(file_names[i].c_str(), &stat_val);
+    mtimes[i] = stat_val.st_mtime;
 
     results[i] = new char[DATA_LEN + 1];
     memset(results[i], 0, DATA_LEN + 1);
@@ -878,7 +923,8 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
             for (int j = 0; j < DATA_LEN; ++j) {
               int disk_id = j % num_disks;
               ranges.push_back(
-                  InitRange(num_buffers,file_names[i].c_str(), j, 1, disk_id));
+                  InitRange(num_buffers,file_names[i].c_str(), j, 1, disk_id,
+                  mtimes[i]));
             }
             status = io_mgr.AddScanRanges(readers[i], ranges);
             ASSERT_TRUE(status.ok());

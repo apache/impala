@@ -53,7 +53,7 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     // 1 queue for each NIC as well?
     DiskIoMgr::ScanRange* header_range = scan_node->AllocateScanRange(
         files[i]->fs, files[i]->filename.c_str(), header_size, 0, metadata->partition_id,
-        -1, false, false);
+        -1, false, false, files[i]->mtime);
     header_ranges.push_back(header_range);
   }
   RETURN_IF_ERROR(scan_node->AddDiskIoRanges(header_ranges));
