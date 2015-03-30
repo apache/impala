@@ -15,33 +15,33 @@ STRING
 ---- QUERY
 show table stats compute_stats_db.alltypes_incremental
 ---- RESULTS
-'2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','3',310,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','4',300,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','1',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','2',280,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','3',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','4',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'Total','',7300,24,'586.84KB','0B','','',''
+'2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','3',310,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','4',300,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','1',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','2',280,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','3',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','4',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'Total','',7300,24,'586.84KB','0B','','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.alltypes_incremental
@@ -70,33 +70,33 @@ drop incremental stats compute_stats_db.alltypes_incremental partition(year=2010
 ---- QUERY
 show table stats compute_stats_db.alltypes_incremental;
 ---- RESULTS
-'2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','3',310,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','4',300,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','1',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','2',280,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','3',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','4',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
-'Total','',7300,24,'586.84KB','0B','','',''
+'2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','3',310,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','4',300,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','1',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','2',280,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','3',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','4',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'Total','',7300,24,'586.84KB','0B','','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING,STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 compute incremental stats compute_stats_db.alltypes_incremental
@@ -108,33 +108,33 @@ STRING
 ---- QUERY
 show table stats compute_stats_db.alltypes_incremental;
 ---- RESULTS
-'2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','3',310,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','4',300,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','1',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','2',280,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','3',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','4',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'Total','',7300,24,'586.84KB','0B','','',''
+'2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','3',310,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','4',300,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','1',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','2',280,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','3',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','4',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'Total','',7300,24,'586.84KB','0B','','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.alltypes_incremental
@@ -171,10 +171,10 @@ STRING
 ---- QUERY
 show table stats compute_stats_db.incremental_empty_partitioned;
 ---- RESULTS
-'1',0,0,'0B','NOT CACHED','NOT CACHED','TEXT','true'
-'Total',0,0,'0B','0B','','',''
+'1',0,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'Total',0,0,'0B','0B','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 drop incremental stats compute_stats_db.alltypes_incremental partition(year=2010, month=1);
@@ -190,33 +190,33 @@ STRING
 ---- QUERY
 show table stats compute_stats_db.alltypes_incremental;
 ---- RESULTS
-'2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','3',310,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','4',300,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2009','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','1',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2010','2',280,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','3',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','4',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true'
-'2010','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true'
-'Total','',6990,24,'586.84KB','0B','','',''
+'2009','1',310,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','2',280,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','3',310,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','4',300,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2009','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','1',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','2',280,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','3',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','4',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','5',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','6',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','7',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','8',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','9',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','10',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','11',300,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2010','12',310,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'Total','',6990,24,'586.84KB','0B','','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING,STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.alltypes_incremental
@@ -244,33 +244,33 @@ STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
 drop stats compute_stats_db.alltypes_incremental;
 show table stats compute_stats_db.alltypes_incremental;
 ---- RESULTS
-'2009','1',-1,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2009','2',-1,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2009','3',-1,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2009','4',-1,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2009','5',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2009','6',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2009','7',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2009','8',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2009','9',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2009','10',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2009','11',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2009','12',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2010','1',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2010','2',-1,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2010','3',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2010','4',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2010','5',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2010','6',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2010','7',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2010','8',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2010','9',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2010','10',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2010','11',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false'
-'2010','12',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false'
-'Total','',-1,24,'586.84KB','0B','','',''
+'2009','1',-1,1,'24.56KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','2',-1,1,'22.27KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','3',-1,1,'24.67KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','4',-1,1,'24.06KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','5',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','6',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','7',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','8',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','9',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','10',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','11',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2009','12',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','1',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','2',-1,1,'22.54KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','3',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','4',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','5',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','6',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','7',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','8',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','9',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','10',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','11',-1,1,'24.16KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2010','12',-1,1,'24.97KB','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'Total','',-1,24,'586.84KB','0B','','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Test that many partition keys work correctly
@@ -283,10 +283,10 @@ partition(p1=1, p2=2, p3=3, p4=4, p5=5, p6=6) values(1);
 compute incremental stats compute_stats_db.incremental_many_part_keys;
 show table stats compute_stats_db.incremental_many_part_keys;
 ---- RESULTS
-'1','2','3','4','5','6',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true'
-'Total','','','','','',1,1,'2B','0B','','',''
+'1','2','3','4','5','6',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'Total','','','','','',1,1,'2B','0B','','','',''
 ---- TYPES
-STRING, STRING, STRING, STRING, STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, STRING, STRING, STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 create table compute_stats_db.incremental_null_part_key(col int) partitioned by (p int);
@@ -297,11 +297,11 @@ compute incremental stats compute_stats_db.incremental_null_part_key partition(p
 compute incremental stats compute_stats_db.incremental_null_part_key partition(p=NULL);
 show table stats compute_stats_db.incremental_null_part_key;
 ---- RESULTS
-'NULL',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true'
-'2',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true'
-'Total',2,2,'4B','0B','','',''
+'NULL',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'Total',2,2,'4B','0B','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Check that incremental stats queries handle partitions with keyword names
@@ -312,20 +312,20 @@ compute incremental stats compute_stats_db.incremental_keyword_part_key
 partition(`date`=1);
 show table stats compute_stats_db.incremental_keyword_part_key;
 ---- RESULTS
-'1',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true'
-'Total',1,1,'2B','0B','','',''
+'1',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'Total',1,1,'2B','0B','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 drop stats compute_stats_db.incremental_keyword_part_key;
 compute incremental stats compute_stats_db.incremental_keyword_part_key;
 show table stats compute_stats_db.incremental_keyword_part_key;
 ---- RESULTS
-'1',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true'
-'Total',1,1,'2B','0B','','',''
+'1',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'Total',1,1,'2B','0B','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 create table compute_stats_db.incremental_string_part_value(col int) partitioned by
@@ -336,10 +336,10 @@ compute incremental stats compute_stats_db.incremental_string_part_value
 partition(p="test_string");
 show table stats compute_stats_db.incremental_string_part_value;
 ---- RESULTS
-'test_string',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true'
-'Total',1,1,'2B','0B','','',''
+'test_string',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'Total',1,1,'2B','0B','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Check that dropping a column still allows stats to be computed
@@ -353,10 +353,10 @@ alter table compute_stats_db.incremental_drop_column drop column b;
 compute incremental stats compute_stats_db.incremental_drop_column;
 show table stats compute_stats_db.incremental_drop_column;
 ---- RESULTS
-'1',1,1,'6B','NOT CACHED','NOT CACHED','TEXT','true'
-'Total',1,1,'6B','0B','','',''
+'1',1,1,'6B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'Total',1,1,'6B','0B','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Check that adding a column invalidates all incremental stats
@@ -368,20 +368,20 @@ alter table compute_stats_db.incremental_add_column add columns (c int);
 compute incremental stats compute_stats_db.incremental_add_column;
 show table stats compute_stats_db.incremental_add_column;
 ---- RESULTS
-'1',2,2,'4B','NOT CACHED','NOT CACHED','TEXT','true'
-'2',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true'
-'Total',3,3,'6B','0B','','',''
+'1',2,2,'4B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'2',1,1,'2B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'Total',3,3,'6B','0B','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 create table compute_stats_db.incremental_no_partitions (col int) partitioned by (p int);
 compute incremental stats compute_stats_db.incremental_no_partitions;
 show table stats compute_stats_db.incremental_no_partitions;
 ---- RESULTS
-'Total',0,0,'0B','0B','','',''
+'Total',0,0,'0B','0B','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 create table compute_stats_db.incremental_not_partitioned (col int);
@@ -389,9 +389,9 @@ insert into compute_stats_db.incremental_not_partitioned values(1),(2);
 compute incremental stats compute_stats_db.incremental_not_partitioned;
 show table stats compute_stats_db.incremental_not_partitioned;
 ---- RESULTS
-2,1,'4B','NOT CACHED','NOT CACHED','TEXT','false'
+2,1,'4B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ====
 ---- QUERY

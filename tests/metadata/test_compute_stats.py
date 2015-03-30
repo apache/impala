@@ -62,4 +62,3 @@ class TestComputeStats(ImpalaTestSuite):
   @pytest.mark.execute_serially
   def test_compute_stats_incremental(self, vector):
     self.run_test_case('QueryTest/compute-stats-incremental', vector)
-

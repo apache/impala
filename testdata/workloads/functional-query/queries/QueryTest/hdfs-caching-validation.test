@@ -4,18 +4,18 @@
 # will not reflect this change until the table is reloaded.
 show table stats cachedb.cached_tbl_reload
 ---- RESULTS
--1,0,'0B','0B','8','TEXT','false'
+-1,0,'0B','0B','8','TEXT','false',regex:.*
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show table stats cachedb.cached_tbl_reload_part
 ---- RESULTS
-'1',-1,0,'0B','0B','8','TEXT','false'
-'2',-1,0,'0B','0B','8','TEXT','false'
-'Total',-1,0,'0B',regex:.+B,'','',''
+'1',-1,0,'0B','0B','8','TEXT','false',regex:.*
+'2',-1,0,'0B','0B','8','TEXT','false',regex:.*
+'Total',-1,0,'0B',regex:.+B,'','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Inserting into now uncached partition will not fail, IMPALA-1632
@@ -41,9 +41,9 @@ invalidate metadata cachedb.no_replication_factor
 # Once the metadata is updated, the table no longer appears as cached
 show table stats cachedb.cached_tbl_reload
 ---- RESULTS
--1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false'
+-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # The parent test method modified the cached partitioned table so that
@@ -56,12 +56,12 @@ alter table cachedb.cached_tbl_reload_part add partition (j=3)
 # Validate that new partition is uncached.
 show table stats cachedb.cached_tbl_reload_part
 ---- RESULTS
-'1',-1,1,regex:.+B,'NOT CACHED','NOT CACHED','TEXT','false'
-'2',-1,0,'0B','0B','3','TEXT','false'
-'3',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false'
-'Total',-1,1,regex:.+B,regex:.+B,'','',''
+'1',-1,1,regex:.+B,'NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'2',-1,0,'0B','0B','3','TEXT','false',regex:.*
+'3',-1,0,'0B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'Total',-1,1,regex:.+B,regex:.+B,'','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Insert into table without replication factor set in Hive MS, IMPALA-1750

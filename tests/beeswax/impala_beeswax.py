@@ -17,7 +17,6 @@ import shlex
 import traceback
 import getpass
 import re
-import prettytable
 
 from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState

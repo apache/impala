@@ -1378,6 +1378,7 @@ public class HdfsTable extends Table {
     resultSchema.addToColumns(new TColumn("Cache Replication", Type.STRING.toThrift()));
     resultSchema.addToColumns(new TColumn("Format", Type.STRING.toThrift()));
     resultSchema.addToColumns(new TColumn("Incremental stats", Type.STRING.toThrift()));
+    resultSchema.addToColumns(new TColumn("Location", Type.STRING.toThrift()));
 
     // Pretty print partitions and their stats.
     ArrayList<HdfsPartition> orderedPartitions = Lists.newArrayList(partitions_);
@@ -1426,6 +1427,7 @@ public class HdfsTable extends Table {
       rowBuilder.add(p.getInputFormatDescriptor().getFileFormat().toString());
 
       rowBuilder.add(String.valueOf(p.hasIncrementalStats()));
+      rowBuilder.add(p.getLocation());
       result.addToRows(rowBuilder.get());
     }
 
@@ -1440,7 +1442,7 @@ public class HdfsTable extends Table {
 
       // Total num rows, files, and bytes (leave format empty).
       rowBuilder.add(numRows_).add(numHdfsFiles_).addBytes(totalHdfsBytes_)
-          .addBytes(totalCachedBytes).add("").add("").add("");
+          .addBytes(totalCachedBytes).add("").add("").add("").add("");
       result.addToRows(rowBuilder.get());
     }
     return result;

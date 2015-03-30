@@ -13,12 +13,12 @@ compute stats compute_stats_db.decimal_tbl
 ---- QUERY
 show table stats compute_stats_db.decimal_tbl
 ---- LABELS
-d6, #Rows, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental Stats
+d6, #Rows, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental Stats, Location
 ---- RESULTS
-'1',5,1,'375B','NOT CACHED','NOT CACHED','TEXT','false'
-'Total',5,1,'375B','0B','','',''
+'1',5,1,'375B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
+'Total',5,1,'375B','0B','','','',''
 ---- TYPES
-STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.decimal_tbl
@@ -47,11 +47,11 @@ compute stats compute_stats_db.mixed_types
 ---- QUERY
 show table stats compute_stats_db.mixed_types
 ---- LABELS
-#Rows, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental Stats
+#Rows, #Files, Size, Bytes Cached, Cache Replication, Format, Incremental Stats, Location
 ---- RESULTS
-2,1,regex:.+B,'NOT CACHED','NOT CACHED','PARQUET','false'
+2,1,regex:.+B,'NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 show column stats compute_stats_db.mixed_types
