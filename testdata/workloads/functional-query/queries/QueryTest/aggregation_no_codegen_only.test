@@ -6,9 +6,10 @@ CREATE TABLE functional.imp_901 (col tinyint);
 # The second value is carefully chosen to be equal to (int8_t)HashUtil::FNV_SEED, which
 # causes the hash collision that caused the bug.
 INSERT INTO functional.imp_901 VALUES(-59), (NULL);
-SELECT col FROM functional.imp_901 GROUP BY 1;
+SELECT col FROM functional.imp_901 GROUP BY 1
 ---- TYPES
 tinyint
 ---- RESULTS
 NULL
 -59
+====

@@ -34,7 +34,7 @@ from (
 group by
   cntrycode
 order by
-  cntrycode;
+  cntrycode
 ---- RESULTS
 '13',888,6737713.99
 '17',861,6460573.72

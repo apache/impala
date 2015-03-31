@@ -112,12 +112,6 @@ class BufferedBlockMgrTest : public ::testing::Test {
     return tmp_dirs;
   }
 
-  static void GetFreeBlock(BufferedBlockMgr* block_mgr, BufferedBlockMgr::Client* client,
-      BufferedBlockMgr::Block** new_block, Promise<bool>* promise) {
-    block_mgr->GetNewBlock(client, NULL, new_block);
-    promise->Set(true);
-  }
-
   static void ValidateBlock(BufferedBlockMgr::Block* block, int32_t data) {
     EXPECT_TRUE(block->valid_data_len() == sizeof(int32_t));
     EXPECT_TRUE(*reinterpret_cast<int32_t*>(block->buffer()) == data);
@@ -282,8 +276,8 @@ class BufferedBlockMgrTest : public ::testing::Test {
   }
 
   // Test that randomly issues GetFreeBlock(), Pin(), Unpin(), Delete() and Close()
-  // calls. All calls made are legal - error conditions are not expected until the
-  // first call to Close().  This is called 2 times with encryption+integrity on/off.
+  // calls. All calls made are legal - error conditions are not expected until the first
+  // call to Close(). This is called 2 times with encryption+integrity on/off.
   // When executed in single-threaded mode 'tid' should be SINGLE_THREADED_TID.
   static const int SINGLE_THREADED_TID = -1;
   void TestRandomInternalImpl(BufferedBlockMgr* block_mgr, int num_buffers, int tid) {
@@ -710,8 +704,8 @@ TEST_F(BufferedBlockMgrTest, Close) {
 
   BufferedBlockMgr::Block* new_block;
   status = block_mgr->GetNewBlock(client, NULL, &new_block);
-  EXPECT_TRUE(new_block == NULL);
   EXPECT_TRUE(status.IsCancelled());
+  EXPECT_TRUE(new_block == NULL);
   status = blocks[0]->Unpin();
   EXPECT_TRUE(status.IsCancelled());
   bool pinned;
@@ -776,8 +770,8 @@ TEST_F(BufferedBlockMgrTest, WriteError) {
   }
   BufferedBlockMgr::Block* new_block;
   status = block_mgr->GetNewBlock(client, NULL, &new_block);
-  EXPECT_TRUE(new_block == NULL);
   EXPECT_TRUE(status.IsCancelled());
+  EXPECT_TRUE(new_block == NULL);
   block_mgr.reset();
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }

@@ -112,7 +112,7 @@ BIGINT, DOUBLE
 ====
 ---- QUERY
 set num_nodes=0;
-set max_block_mgr_memory=100m;
+set max_block_mgr_memory=40m;
 select count(l1.l_tax)
 from
 lineitem l1,
@@ -132,7 +132,7 @@ BIGINT
 ====
 ---- QUERY
 set num_nodes=0;
-set max_block_mgr_memory=45m;
+set max_block_mgr_memory=40m;
 select max(t1.total_count), max(t1.l_shipinstruct), max(t1.l_comment) from
 (select l_shipinstruct, l_comment, count(*) over () total_count from lineitem) t1
 ---- RESULTS
@@ -145,7 +145,7 @@ BIGINT, STRING, STRING
 set max_block_mgr_memory=10m;
 select a.int_col, count(*)
 from functional.alltypessmall a, functional.alltypessmall b, functional.alltypessmall c
-where a.id = b.id and b.id = c.id group by a.int_col;
+where a.id = b.id and b.id = c.id group by a.int_col
 ---- RESULTS
 0,12
 1,12
@@ -165,7 +165,7 @@ INT, BIGINT
 # and left outer joins were returning wrong results).
 # Q21 - Suppliers Who Kept Orders Waiting Query
 set num_nodes=0;
-set max_block_mgr_memory=100m;
+set max_block_mgr_memory=40m;
 select
   s_name,
   count(*) as numwait

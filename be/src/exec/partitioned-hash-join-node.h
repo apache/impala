@@ -95,7 +95,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   ///    PROBING_SPILLED_PARTITION/REPARTITIONING.
   /// The last two steps will switch back and forth as many times as we need to
   /// repartition.
-  enum State {
+  enum HashJoinState {
     /// Partitioning the build (right) child's input. Corresponds to mode 1 above but
     /// only when consuming from child(1).
     PARTITIONING_BUILD,
@@ -132,19 +132,21 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// TODO: we can revisit and try harder to explicitly detect skew.
   static const int MAX_PARTITION_DEPTH = 16;
 
-  /// Append the row to stream. In the common case, the row is just in memory. If we
-  /// run out of memory, this will spill a partition and try to add the row again.
+  /// Append the row to stream. In the common case, the row is just in memory and the
+  /// append succeeds. If the append fails, we fallback to the slower path of
+  /// AppendRowStreamFull().
   /// Returns true if the row was added and false otherwise. If false is returned,
   /// *status contains the error (doesn't return status because this is very perf
   /// sensitive).
   bool AppendRow(BufferedTupleStream* stream, TupleRow* row, Status* status);
 
-  /// Slow path for AppendRow() above except the stream has failed to append the row.
-  /// We need to find more memory by spilling.
+  /// Slow path for AppendRow() above. It is called when the stream has failed to append
+  /// the row. We need to find more memory by either switching to IO-buffers, in case the
+  /// stream still uses small buffers, or spilling a partition.
   bool AppendRowStreamFull(BufferedTupleStream* stream, TupleRow* row, Status* status);
 
   /// Called when we need to free up memory by spilling a partition.
-  /// This function walks hash_partitions_ and picks on to spill.
+  /// This function walks hash_partitions_ and picks one to spill.
   /// *spilled_partition is the partition that was spilled.
   /// Returns non-ok status if we couldn't spill a partition.
   Status SpillPartition(Partition** spilled_partition);
@@ -217,10 +219,6 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   ///    move the partition to spilled_partitions_.
   Status CleanUpHashPartitions(RowBatch* batch);
 
-  /// For each partition in hash partitions, reserves an IO sized block on both the
-  /// build and probe stream.
-  Status ReserveTupleStreamBlocks();
-
   /// Get the next row batch from the probe (left) side (child(0)). If we are done
   /// consuming the input, sets probe_batch_pos_ to -1, otherwise, sets it to 0.
   Status NextProbeRowBatch(RuntimeState*, RowBatch* out_batch);
@@ -273,7 +271,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   std::string PrintState() const;
 
   /// Updates state_ to 's', logging the transition.
-  void UpdateState(State s);
+  void UpdateState(HashJoinState s);
 
   std::string NodeDebugString() const;
 
@@ -348,11 +346,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
 
-  /// If true, the partitions in hash_partitions_ are using small buffers.
-  bool using_small_buffers_;
-
-  /// State of the algorithm. Used just for debugging.
-  State state_;
+  /// State of the partitioned hash join algorithm. Used just for debugging.
+  HashJoinState state_;
 
   /// Object pool that holds the Partition objects in hash_partitions_.
   boost::scoped_ptr<ObjectPool> partition_pool_;
@@ -423,8 +418,7 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   class Partition {
    public:
-    Partition(RuntimeState* state, PartitionedHashJoinNode* parent, int level,
-        bool use_small_buffers);
+    Partition(RuntimeState* state, PartitionedHashJoinNode* parent, int level);
     ~Partition();
 
     BufferedTupleStream* build_rows() { return build_rows_; }

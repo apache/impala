@@ -131,7 +131,8 @@ int PartitionedHashJoinNode::ProcessProbeBatch(
         // predicates later.
         if (null_aware_partition_->build_rows()->num_rows() != 0) {
           if (num_other_join_conjuncts == 0) goto next_row;
-          if (!null_aware_partition_->probe_rows()->AddRow(current_probe_row_, status)) {
+          if (UNLIKELY(!AppendRow(null_aware_partition_->probe_rows(),
+                                  current_probe_row_, status))) {
             return -1;
           }
           goto next_row;
@@ -188,7 +189,7 @@ next_row:
         // is a match, the row is skipped.
         if (!non_empty_build_) continue;
         if (num_other_join_conjuncts == 0) goto next_row;
-        if (UNLIKELY(!null_probe_rows_->AddRow(current_probe_row_, status))) {
+        if (UNLIKELY(!AppendRow(null_probe_rows_, current_probe_row_, status))) {
           return -1;
         }
         matched_null_probe_.push_back(false);
@@ -222,7 +223,8 @@ end:
 }
 
 int PartitionedHashJoinNode::ProcessProbeBatch(
-    const TJoinOp::type join_op, RowBatch* out_batch, HashTableCtx* ht_ctx, Status* status) {
+    const TJoinOp::type join_op, RowBatch* out_batch, HashTableCtx* ht_ctx,
+    Status* status) {
  switch (join_op) {
     case TJoinOp::INNER_JOIN:
       return ProcessProbeBatch<TJoinOp::INNER_JOIN>(out_batch, ht_ctx, status);
@@ -259,7 +261,8 @@ Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch) {
         // TODO: remove with codegen/template
         // If we are NULL aware and this build row has NULL in the eq join slot,
         // append it to the null_aware partition. We will need it later.
-        if (!null_aware_partition_->build_rows()->AddRow(build_row, &buildStatus_)) {
+        if (UNLIKELY(!AppendRow(null_aware_partition_->build_rows(),
+                                build_row, &buildStatus_))) {
           return buildStatus_;
         }
       }

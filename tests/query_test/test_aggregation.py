@@ -167,3 +167,20 @@ class TestAggregationQueries(ImpalaTestSuite):
     where int_col < 10"""
     result = self.execute_query(query, exec_option, table_format=table_format)
     assert(set((result.data)[0].split(" ")) == set(['1','2','3','4','5','6','7','8','9']))
+
+
+class TestTPCHAggregationQueries(ImpalaTestSuite):
+  # Uses the TPC-H dataset in order to have larger aggregations.
+
+  @classmethod
+  def get_workload(cls):
+    return 'tpch'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestTPCHAggregationQueries, cls).add_test_dimensions()
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').file_format in ['parquet'])
+
+  def test_tpch_aggregations(self, vector):
+    self.run_test_case('tpch-aggregations', vector)

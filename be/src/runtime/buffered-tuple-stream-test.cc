@@ -585,6 +585,7 @@ TEST_F(SimpleTupleStreamTest, SmallBuffers) {
   }
   EXPECT_LT(stream.bytes_in_mem(false), buffer_size);
   EXPECT_LT(stream.byte_size(), buffer_size);
+  ASSERT_TRUE(stream.using_small_buffers());
 
   // 40 MB of ints
   batch = CreateIntBatch(0, 10 * 1024 * 1024, false);
@@ -604,6 +605,8 @@ TEST_F(SimpleTupleStreamTest, SmallBuffers) {
   }
   EXPECT_EQ(stream.bytes_in_mem(false), buffer_size);
 
+  // TODO: Test for IMPALA-2330. In case SwitchToIoBuffers() fails to get buffer then
+  // using_small_buffers() should still return true.
   stream.Close();
 }
 

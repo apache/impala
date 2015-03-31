@@ -31,8 +31,9 @@ using namespace strings;
 
 // The first NUM_SMALL_BLOCKS of the tuple stream are made of blocks less than the
 // IO size. These blocks never spill.
-static const int64_t INITIAL_BLOCK_SIZES[] =
-    { 64 * 1024, 512 * 1024 };
+// TODO: Consider adding a 4MB in-memory buffer that would split the gap between the
+// 512KB in-memory buffer and the 8MB (IO-sized) spillable buffer.
+static const int64_t INITIAL_BLOCK_SIZES[] = { 64 * 1024, 512 * 1024 };
 static const int NUM_SMALL_BLOCKS = sizeof(INITIAL_BLOCK_SIZES) / sizeof(int64_t);
 
 string BufferedTupleStream::RowIdx::DebugString() const {
@@ -129,7 +130,7 @@ Status BufferedTupleStream::Init(int node_id, RuntimeProfile* profile, bool pinn
     use_small_buffers_ = false;
   }
 
-  bool got_block = false;
+  bool got_block;
   RETURN_IF_ERROR(NewBlockForWrite(fixed_tuple_row_size_, &got_block));
   if (!got_block) return block_mgr_->MemLimitTooLowError(block_mgr_client_, node_id);
   DCHECK(write_block_ != NULL);
@@ -144,7 +145,12 @@ Status BufferedTupleStream::SwitchToIoBuffers(bool* got_buffer) {
     return Status::OK();
   }
   use_small_buffers_ = false;
-  return NewBlockForWrite(block_mgr_->max_block_size(), got_buffer);
+  Status status = NewBlockForWrite(block_mgr_->max_block_size(), got_buffer);
+  // IMPALA-2330: Set the flag using small buffers back to false in case it failed to
+  // got a buffer.
+  DCHECK(status.ok() || !*got_buffer) << status.ok() << " " << *got_buffer;
+  use_small_buffers_ = !*got_buffer;
+  return status;
 }
 
 void BufferedTupleStream::Close() {
@@ -182,10 +188,11 @@ Status BufferedTupleStream::UnpinBlock(BufferedBlockMgr::Block* block) {
 
 Status BufferedTupleStream::NewBlockForWrite(int64_t min_size, bool* got_block) {
   DCHECK(!closed_);
+  *got_block = false;
   if (min_size > block_mgr_->max_block_size()) {
     return Status(Substitute("Cannot process row that is bigger than the IO size "
-          "(row_size=$0). To run this query, increase the IO size (--read_size option).",
-          PrettyPrinter::Print(min_size, TUnit::BYTES)));
+        "(row_size=$0). To run this query, increase the IO size (--read_size option).",
+        PrettyPrinter::Print(min_size, TUnit::BYTES)));
   }
 
   BufferedBlockMgr::Block* unpin_block = write_block_;
@@ -204,7 +211,7 @@ Status BufferedTupleStream::NewBlockForWrite(int64_t min_size, bool* got_block) 
       if (block_len < min_size) block_len = block_mgr_->max_block_size();
     }
     if (block_len == block_mgr_->max_block_size()) {
-      // Cannot switch to non small buffers automatically. Don't get a buffer.
+      // Do not switch to IO-buffers automatically. Do not get a buffer.
       *got_block = false;
       return Status::OK();
     }
@@ -377,9 +384,11 @@ Status BufferedTupleStream::PinStream(bool already_reserved, bool* pinned) {
       SCOPED_TIMER(pin_timer_);
       RETURN_IF_ERROR((*it)->Pin(pinned));
     }
-    VLOG_QUERY << "Should have been reserved." << endl
-               << block_mgr_->DebugString(block_mgr_client_);
-    if (!*pinned) return Status::OK();
+    if (!*pinned) {
+      VLOG_QUERY << "Should have been reserved." << endl
+                 << block_mgr_->DebugString(block_mgr_client_);
+      return Status::OK();
+    }
     ++num_pinned_;
     DCHECK_EQ(num_pinned_, NumPinned(blocks_));
   }

@@ -30,44 +30,44 @@ class TupleRow;
 
 /// Class that provides an abstraction for a stream of tuple rows. Rows can be
 /// added to the stream and returned. Rows are returned in the order they are added.
-//
+///
 /// The underlying memory management is done by the BufferedBlockMgr.
-//
-/// The tuple stream consists of a number of small (less than io sized blocks) before
-/// an arbitrary number of io sized blocks. The smaller blocks do not spill and are
+///
+/// The tuple stream consists of a number of small (less than IO-sized blocks) before
+/// an arbitrary number of IO-sized blocks. The smaller blocks do not spill and are
 /// there to lower the minimum buffering requirements. For example, an operator that
 /// needs to maintain 64 streams (1 buffer per partition) would need, by default,
 /// 64 * 8MB = 512MB of buffering. A query with 5 of these operators would require
-/// 2.56 GB just to run any query, regardless of how much of that is used. This is
+/// 2.56GB just to run, regardless of how much of that is used. This is
 /// problematic for small queries. Instead we will start with a fixed number of small
-/// buffers and only start using IO sized buffers when those fill up. The small buffers
-/// never spill.
-/// The stream will *not* automatically switch from using small buffers to io sized
-/// buffers.
-//
+/// buffers (currently 2 small buffers: one 64KB and one 512KB) and only start using IO
+/// sized buffers when those fill up. The small buffers never spill.
+/// The stream will *not* automatically switch from using small buffers to IO-sized
+/// buffers when all the small buffers for this stream have been used.
+///
 /// The BufferedTupleStream is *not* thread safe from the caller's point of view. It is
 /// expected that all the APIs are called from a single thread. Internally, the
 /// object is thread safe wrt to the underlying block mgr.
-//
+///
 /// Buffer management:
 /// The stream is either pinned or unpinned, set via PinStream() and UnpinStream().
 /// Blocks are optionally deleted as they are read, set with the delete_on_read c'tor
 /// parameter.
-//
+///
 /// Block layout:
 /// At the header of each block, starting at position 0, there is a bitstring with null
 /// indicators for all the tuples in each row in the block. Then there are the tuple rows.
 /// We further optimize the codepaths when we know that no tuple is nullable, indicated
 /// by 'nullable_tuple_'.
-//
+///
 /// Tuple row layout:
 /// Tuples are stored back to back. Each tuple starts with the fixed length portion,
 /// directly followed by the var len portion. (Fixed len and var len are interleaved).
-/// If any tuple in the row is nullable, then there is a bitstring of null tuple indicators
-/// at the header of the block. The order of bits in the null indicators bitstring
-/// corresponds to the order of tuples in the block. The NULL tuples are not stored in the
-/// body of the block, only as set bits in the null indicators bitsting.
-//
+/// If any tuple in the row is nullable, then there is a bitstring of null tuple
+/// indicators at the header of the block. The order of bits in the null indicators
+/// bitstring corresponds to the order of tuples in the block. The NULL tuples are not
+/// stored in the body of the block, only as set bits in the null indicators bitsting.
+///
 /// The behavior of reads and writes is as follows:
 /// Read:
 ///   1. Delete on read (delete_on_read_): Blocks are deleted as we go through the stream.
@@ -83,7 +83,7 @@ class TupleRow;
 ///   true, then two blocks need to be in memory).
 ///   2. Pinned: Blocks are left pinned. If we run out of blocks, the write will fail and
 ///   the caller needs to free memory from the underlying block mgr.
-//
+///
 /// TODO: we need to be able to do read ahead in the BufferedBlockMgr. It currently
 /// only has PinAllBlocks() which is blocking. We need a non-blocking version of this or
 /// some way to indicate a block will need to be pinned soon.
@@ -159,7 +159,7 @@ class BufferedTupleStream {
   /// block_mgr: Underlying block mgr that owns the data blocks.
   /// delete_on_read: Blocks are deleted after they are read.
   /// use_initial_small_buffers: If true, the initial N buffers allocated for the
-  /// tuple stream use smaller than io sized buffers.
+  /// tuple stream use smaller than IO-sized buffers.
   /// read_write: Stream allows interchanging read and write operations. Requires at
   /// least two blocks may be pinned.
   BufferedTupleStream(RuntimeState* state, const RowDescriptor& row_desc,
@@ -175,6 +175,8 @@ class BufferedTupleStream {
   Status Init(int node_id, RuntimeProfile* profile, bool pinned);
 
   /// Must be called for streams using small buffers to switch to IO-sized buffers.
+  /// If it fails to get a buffer (i.e. the switch fails) it resets the use_small_buffers_
+  /// back to false.
   /// TODO: this does not seem like the best mechanism.
   Status SwitchToIoBuffers(bool* got_buffer);
 
@@ -373,10 +375,10 @@ class BufferedTupleStream {
   /// Wrapper of the templated DeepCopyInternal() function.
   bool DeepCopy(TupleRow* row, uint8_t** dst);
 
-  /// Gets a new block from the block_mgr_, updating write_block_ and write_tuple_idx_, and
-  /// setting *got_block. If there are no blocks available, *got_block is set to false
-  /// and write_block_ is unchanged.
-  /// min_size is the minimum number of bytes required for this block.
+  /// Gets a new block from the block_mgr_, updating write_block_ and write_tuple_idx_,
+  /// and setting *got_block. If there are no blocks available, *got_block is set to
+  /// false and write_block_ is unchanged.
+  /// 'min_size' is the minimum number of bytes required for this block.
   Status NewBlockForWrite(int64_t min_size, bool* got_block);
 
   /// Reads the next block from the block_mgr_. This blocks if necessary.
@@ -386,7 +388,7 @@ class BufferedTupleStream {
   /// Returns the byte size of this row when encoded in a block.
   int64_t ComputeRowSize(TupleRow* row) const;
 
-  /// Unpins block if it is an io sized block and updates tracking stats.
+  /// Unpins block if it is an IO-sized block and updates tracking stats.
   Status UnpinBlock(BufferedBlockMgr::Block* block);
 
   /// Templated GetNext implementation.

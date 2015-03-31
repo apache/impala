@@ -1,0 +1,22 @@
+====
+---- QUERY
+# Regression test for IMPALA-2352. Small buffers of streams get full and we
+# can switch to IO-buffers without spilling.
+SELECT count(*) FROM
+(SELECT cast(l_orderkey as string) s FROM tpch.lineitem UNION
+ SELECT group_concat(concat(s_name, s_address, s_phone)) FROM tpch.supplier) v
+---- RESULTS
+1500001
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Large (more than 1 regular batches) distinct with multiple group by keys.
+SELECT COUNT(*) FROM
+(SELECT COUNT(DISTINCT p_partkey)
+ FROM part GROUP BY p_brand, p_type, p_size) v
+---- RESULTS
+123039
+---- TYPES
+BIGINT
+====

@@ -175,8 +175,8 @@ Status RuntimeState::CreateBlockMgr() {
   if (query_options().__isset.max_block_mgr_memory &&
       query_options().max_block_mgr_memory > 0) {
     block_mgr_limit = query_options().max_block_mgr_memory;
-    LOG(ERROR) << "Block mgr mem limit: "
-               << PrettyPrinter::Print(block_mgr_limit, TUnit::BYTES);
+    LOG(WARNING) << "Block mgr mem limit: "
+                 << PrettyPrinter::Print(block_mgr_limit, TUnit::BYTES);
   }
 
   RETURN_IF_ERROR(BufferedBlockMgr::Create(this, query_mem_tracker(),
@@ -223,8 +223,9 @@ void RuntimeState::ReportFileErrors(const std::string& file_name, int num_errors
 
 bool RuntimeState::LogError(const ErrorMsg& message, int vlog_level) {
   lock_guard<SpinLock> l(error_log_lock_);
-  // All errors go to the log, unreported_error_count_ is counted independently of the size of the
-  // error_log to account for errors that were already reported to the coordninator
+  // All errors go to the log, unreported_error_count_ is counted independently of the
+  // size of the error_log to account for errors that were already reported to the
+  // coordninator
   VLOG(vlog_level) << "Error from query " << query_id() << ": " << message.msg();
   if (ErrorCount(error_log_) < query_options().max_errors) {
     AppendError(&error_log_, message);

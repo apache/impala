@@ -36,7 +36,7 @@ where
   and s_nationkey = n_nationkey
   and n_name = 'CANADA'
 order by
-  s_name;
+  s_name
 ---- RESULTS
 'Supplier#000000020','iybAE,RmTymrZVYaFZva2SH,j'
 'Supplier#000000091','YV45D7TkfdQanOOZ7q9QxkyGUapU1oOWU6q3'

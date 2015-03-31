@@ -70,13 +70,13 @@ class SlotDescriptor;
 ///    all the memory for the result rows and the MemPool (2) is not used.
 /// 4) Unaggregated tuple stream. Stream to spill unaggregated rows.
 ///    Rows in this stream always have child(0)'s layout.
-//
+///
 /// Buffering: Each stream and hash table needs to maintain at least one buffer for
 /// some duration of the processing. To minimize the memory requirements of small queries
-/// (memory usage is less than one buffer per partition), the initial streams and
-/// hash tables will use smaller (less than io-sized) buffers. Once we spill, the streams
-/// and hash table will use io-sized buffers only.
-//
+/// (i.e. memory usage is less than one IO-buffer per partition), the streams and hash
+/// tables of each partition start using small (less than IO-sized) buffers, regardless
+/// of the level.
+///
 /// TODO: Buffer rows before probing into the hash table?
 /// TODO: After spilling, we can still maintain a very small hash table just to remove
 /// some number of rows (from likely going to disk).
@@ -243,9 +243,6 @@ class PartitionedAggregationNode : public ExecNode {
   Tuple* singleton_output_tuple_;
   bool singleton_output_tuple_returned_;
 
-  /// If true, the partitions in hash_partitions_ are using small buffers.
-  bool using_small_buffers_;
-
   /// Used for hash-related functionality, such as evaluating rows and calculating hashes.
   /// TODO: If we want to multi-thread then this context should be thread-local and not
   /// associated with the node.
@@ -268,6 +265,9 @@ class PartitionedAggregationNode : public ExecNode {
   /// END: Members that must be Reset()
   /////////////////////////////////////////
 
+  /// The hash table and streams (aggregated and unaggregated) for an individual
+  /// partition. The streams of each partition always (i.e. regardless of level)
+  /// initially use small buffers.
   struct Partition {
     Partition(PartitionedAggregationNode* parent, int level)
       : parent(parent), is_closed(false), level(level) {}
@@ -280,6 +280,10 @@ class PartitionedAggregationNode : public ExecNode {
 
     /// Initializes the hash table. Returns false on OOM.
     bool InitHashTable();
+
+    /// Called in case we need to serialize aggregated rows. This step effectively does
+    /// a merge aggregation in this node.
+    Status CleanUp(Tuple* intermediate_tuple);
 
     /// Closes this partition. If finalize_rows is true, this iterates over all rows
     /// in aggregated_row_stream and finalizes them (this is only used in the cancellation
@@ -334,7 +338,8 @@ class PartitionedAggregationNode : public ExecNode {
   /// Pool/Stream specify where the memory (tuple and var len slots) should be allocated
   /// from. Only one can be set.
   /// Returns NULL if there was not enough memory to allocate the tuple or an error
-  /// occurred. When returning NULL, sets *status.
+  /// occurred. When returning NULL, sets *status. If 'stream' is set and its small
+  /// buffers get full, it will attempt to switch to IO-buffers.
   Tuple* ConstructIntermediateTuple(
       const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs,
       MemPool* pool, BufferedTupleStream* stream, Status* status);

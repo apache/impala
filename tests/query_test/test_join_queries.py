@@ -61,9 +61,8 @@ class TestJoinQueries(ImpalaTestSuite):
     self.run_test_case('QueryTest/single-node-nlj-exhaustive', new_vector)
 
 class TestTPCHJoinQueries(ImpalaTestSuite):
-  # Uses the tpch dataset in order to have larger joins. Needed for example to test
+  # Uses the TPC-H dataset in order to have larger joins. Needed for example to test
   # the repartitioning codepaths.
-  BATCH_SIZES = [0, 1]
 
   @classmethod
   def get_workload(cls):

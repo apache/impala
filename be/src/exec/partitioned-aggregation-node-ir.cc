@@ -149,6 +149,7 @@ allocate_tuple:
     DCHECK(dst_stream != NULL);
     DCHECK(!dst_stream->is_pinned()) << AGGREGATED_ROWS;
     DCHECK(dst_stream->has_write_block()) << AGGREGATED_ROWS;
+    DCHECK(!dst_stream->using_small_buffers()) << AGGREGATED_ROWS;
     if (dst_stream->AddRow(row, &process_batch_status_)) continue;
     DCHECK(!process_batch_status_.ok()) << AGGREGATED_ROWS;
     return process_batch_status_;

@@ -1101,8 +1101,8 @@ void DiskIoMgr::Write(RequestContext* writer_context, WriteRange* write_range) {
 
     int success = fclose(file_handle);
     if (ret_status.ok() && success != 0) {
-      ret_status = Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute("fclose($0) failed",
-          write_range->file_)));
+      ret_status = Status(ErrorMsg(TErrorCode::RUNTIME_ERROR,
+          Substitute("fclose($0) failed", write_range->file_)));
     }
   }
 

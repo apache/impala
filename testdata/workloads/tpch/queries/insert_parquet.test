@@ -71,7 +71,7 @@ select count(*) from
    select group_concat(concat(s_name, s_address, s_phone)) from tpch.supplier union
    select group_concat(concat(s_name, s_address, s_phone, s_name)) from tpch.supplier
   ) t1
-join test_insert_huge_vals t2 on t1.s = t2.s;
+join test_insert_huge_vals t2 on t1.s = t2.s
 ---- RESULTS
 1500002
 ====
