@@ -86,31 +86,22 @@ class ValExpr(object):
     '''Evaluates to True if this expression is an aggregate function or contains an
        aggregate function.
     '''
-    if self.is_agg:
-      return True
-    return any(isinstance(arg, ValExpr) and arg.contains_agg for arg in self.args)
+    return self.is_agg or self.is_func and any(
+        isinstance(arg, ValExpr) and arg.contains_agg for arg in self.args)
 
   @property
   def contains_analytic(self):
     '''Evaluates to True if this expression is an analytic function or contains an
        analytic function.
     '''
-    if self.is_analytic:
-      return True
-    if self.is_func:
-      for arg in self.args:
-        if isinstance(arg, ValExpr) and arg.contains_analytic:
-          return True
+    return self.is_analytic or self.is_func and any(
+        isinstance(arg, ValExpr) and arg.contains_analytic for arg in self.args)
 
   @property
   def contains_subquery(self):
     '''Evaluates to True if this expression is a subquery or contains a subquery.'''
-    if self.is_subquery:
-      return True
-    if self.is_func:
-      for arg in self.args:
-        if isinstance(arg, ValExpr) and arg.contains_subquery:
-          return True
+    return self.is_subquery or self.is_func and any(
+        isinstance(arg, ValExpr) and arg.contains_subquery for arg in self.args)
 
   @property
   def is_col(self):

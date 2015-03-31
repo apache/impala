@@ -124,7 +124,7 @@ class SqlWriter(object):
 
   def _write_select_item(self, select_item):
     if select_item.alias:
-      return '{0} AS {1}'.format(self._write(select_item.val_expr), select_item.alias))
+      return '{0} AS {1}'.format(self._write(select_item.val_expr), select_item.alias)
     else:
       return self._write(select_item.val_expr)
 

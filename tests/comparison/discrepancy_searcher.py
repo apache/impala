@@ -171,10 +171,11 @@ class QueryResultComparator(object):
     return 0
 
   def vals_are_equal(self, left, right):
-    '''Compares if two values are equal in two cells.'''
+    '''Compares if two values are equal in two cells. Floats are considered equal if the
+    difference between them is very small.'''
     if left == right:
       return True
-    if isinstance(left, float) or isinstance(right, float):
+    if isinstance(left, float) and isinstance(right, float):
       return self.floats_are_equal(left, right)
     LOG.debug("Values differ, reference: %s (%s), test: %s (%s)",
         left, type(left),
@@ -258,7 +259,7 @@ class QueryExecutor(object):
       query_thread = Thread(
           target=self._fetch_sql_results,
           args=[query, cursor, sql_writer, log_file],
-          name='Query execution thread')
+          name='Query execution thread {0}'.format(current_thread().name))
       query_thread.daemon = True
       query_thread.sql = ''
       query_thread.data_set = None

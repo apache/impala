@@ -238,26 +238,6 @@ class DefaultProfile(object):
   def get_select_item_count(self):
     return self._choose_from_bounds('SELECT_ITEM_COUNT')
 
-  def split_select_item_count(self, total_count, require_aggregate):
-    '''Return a tuple of the number of (non-aggregate-non-analytic, aggregate, and
-       analytic) the SELECT clause should contain.
-    '''
-    weights = self.weights('SELECT_ITEM_CATEGORY')
-    if require_aggregate and not weights.get('AGG', 0):
-      raise Exception('Aggregate required but not enabled')
-    basic_count, agg_count, analytic_count = 0, 1 if require_aggregate else 0, 0
-    for _ in xrange(total_count - agg_count):
-      select_item_category = self._choose_from_weights(weights)
-      if select_item_category == 'BASIC':
-        basic_count += 1
-      elif select_item_category == 'AGG':
-        agg_count += 1
-      elif select_item_category == 'ANALYTIC':
-        analytic_count += 1
-      else:
-        raise Exception('Unexpected SELECT item category: %s' % select_item_category)
-    return basic_count, agg_count, analytic_count
-
   def choose_nested_expr_count(self):
     return self._choose_from_bounds('MAX_NESTED_EXPR_COUNT')
 

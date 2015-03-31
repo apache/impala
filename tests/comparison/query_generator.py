@@ -37,6 +37,7 @@ from tests.comparison.types import (
     Char,
     Boolean,
     Int,
+    Float,
     JOINABLE_TYPES,
     String,
     TYPES,
@@ -90,7 +91,7 @@ class QueryGenerator(object):
       select_item_data_types=None,
       required_select_item_type=None,
       required_table_expr_col_type=None,
-      create_aggregate=None,
+      require_aggregate=None,
       table_alias_prefix='t'):
     '''Create a random query using various language features.
 
@@ -120,7 +121,7 @@ class QueryGenerator(object):
        TableExprs used in the FROM clause will have a column of the given type. This
        can be used to unsure that a correlation condition can be made for a Subquery.
 
-       create_aggregate can be set to True or False to force or disable the creation
+       require_aggregate can be set to True or False to force or disable the creation
        of an aggregate query. This is used during Subquery creation where the context
        may require an aggregate or non-aggregate.
     '''
@@ -155,7 +156,7 @@ class QueryGenerator(object):
         from_clause.visible_table_exprs,
         select_item_data_types,
         required_select_item_type,
-        create_aggregate)
+        require_aggregate)
     query.select_clause = select_clause
 
     if self.profile.use_where_clause():
@@ -165,7 +166,7 @@ class QueryGenerator(object):
     # If agg and non-agg SELECT items are present then a GROUP BY is required otherwise
     # it's optional and is effectively a "SELECT DISTINCT".
     if (select_clause.agg_items and select_clause.basic_items) \
-        or (create_aggregate is None \
+        or (require_aggregate is None \
             and select_clause.basic_items \
             and self.profile.use_group_by_clause()):
       group_by_items = [item for item in select_clause.basic_items
@@ -241,8 +242,7 @@ class QueryGenerator(object):
       table_exprs,
       select_item_data_types,
       required_select_item_type,
-      create_aggregate):
-    # XXX: Prevent GROUP BY float_col, the groupings will differ across databases.
+      require_aggregate):
     if select_item_data_types:
       select_item_data_types = tuple(select_item_data_types)
     if select_item_data_types \
@@ -250,37 +250,51 @@ class QueryGenerator(object):
         and not issubclass(required_select_item_type, select_item_data_types):
       raise Exception('Required select item type is not in allowed types')
 
-    if select_item_data_types:
-      desired_item_count = len(select_item_data_types)
-    else:
+    # Generate column types for the select clause if not specified.
+    if not select_item_data_types:
+      select_item_data_types = []
       desired_item_count = self.profile.get_select_item_count()
+      if required_select_item_type:
+        select_item_data_types.append(required_select_item_type)
+      while len(select_item_data_types) < desired_item_count:
+        select_item_data_types.append(self.profile.choose_type(table_exprs.col_types))
+      shuffle(select_item_data_types)
+      select_item_data_types = tuple(select_item_data_types)
 
-    basic_count, agg_count, analytic_count = \
-        self.profile.split_select_item_count(desired_item_count, create_aggregate)
-
-    select_items = list()
-    for item_idx in xrange(desired_item_count):
-      if select_item_data_types:
-        col_type = select_item_data_types[item_idx]
-      else:
-        if desired_item_count - 1 == item_idx and required_select_item_type:
-          col_types = [required_select_item_type]
+    # We want to assign BASIC, AGG or ANALYTIC to each column. We want to prevent GROUP BY
+    # float_col, because the groupings will differ across databases because floats are
+    # approximate values.
+    column_categories = ['-' for _ in select_item_data_types]
+    if require_aggregate:
+      column_categories[randint(0, len(column_categories) - 1)] = 'AGG'
+    # Assign AGG randomly to some columns based on profile weights
+    for i in range(len(column_categories)):
+      if self.profile._choose_from_weights(
+          self.profile.weights('SELECT_ITEM_CATEGORY')) == 'AGG':
+        column_categories[i] = 'AGG'
+    agg_present = 'AGG' in column_categories
+    # Assign ANALYTIC and BASIC to some columns based on the profile weights.
+    for i in range(len(column_categories)):
+      if column_categories[i] == '-':
+        # If AGG column is present, BASIC can only be assigned to a column if it's not a
+        # Float.
+        if self.profile._choose_from_weights(
+            self.profile.weights('SELECT_ITEM_CATEGORY')) == 'BASIC' and not (
+            select_item_data_types[i] == Float and agg_present):
+          column_categories[i] = 'BASIC'
         else:
-          col_types = table_exprs.col_types
-        col_type = self.profile.choose_type(col_types)
-        if required_select_item_type and issubclass(col_type, required_select_item_type):
-          required_select_item_type = None
+          column_categories[i] = 'ANALYTIC'
 
-      category_idx = randint(0, basic_count + agg_count + analytic_count - 1)
-      if category_idx < basic_count:
-        select_items.append(self._create_basic_select_item(table_exprs, col_type))
-        basic_count -= 1
-      elif category_idx < basic_count + agg_count:
-        select_items.append(('AGG', col_type))
-        agg_count -= 1
+    select_items = []
+
+    for i, column_category in enumerate(column_categories):
+      if column_category == 'BASIC':
+        select_items.append(self._create_basic_select_item(
+          table_exprs, select_item_data_types[i]))
       else:
-        select_items.append(('ANALYTIC', col_type))
-        analytic_count -= 1
+        select_items.append((column_category, select_item_data_types[i]))
+
+    analytic_count = sum(1 for c in column_category if c == 'ANALYTIC')
 
     select_item_exprs = \
         ValExprList(item.val_expr for item in select_items if type(item) == SelectItem)
@@ -444,6 +458,7 @@ class QueryGenerator(object):
           use_agg_subquery = (usage[1] == 'AGG')
           use_correlated_subquery = (usage[2] == 'CORRELATED')
           if use_correlated_subquery:
+            # TODO: Sometimes this causes an exception because the list is empty
             join_expr_type = self.profile.choose_type(list(
                 self.current_query.from_clause.table_exprs.joinable_cols_by_type))
           else:
@@ -454,7 +469,7 @@ class QueryGenerator(object):
               table_exprs,
               select_item_data_types=select_item_data_types,
               required_table_expr_col_type=join_expr_type,
-              create_aggregate=use_agg_subquery,
+              require_aggregate=use_agg_subquery,
               # Don't use UNION + LIMIT; https://issues.cloudera.org/browse/IMPALA-1379
               allow_union_clause=(not signature_arg.is_subquery),
               table_alias_prefix=(table_alias_prefix +

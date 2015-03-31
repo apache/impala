@@ -814,7 +814,7 @@ class PostgresqlDbConnection(DbConnection):
 
   def get_sql_for_data_type(self, data_type):
     if issubclass(data_type, String):
-      return 'VARCHAR(%s)' % VarChar.MAX
+      return 'VARCHAR(%s)' % String.MAX
     return super(PostgresqlDbConnection, self).get_sql_for_data_type(data_type)
 
   #########################################
