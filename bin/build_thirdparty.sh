@@ -98,12 +98,9 @@ do
       exit 1
   esac
 done
-
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
-
 . "$bin"/impala-config.sh
-
 USE_PIC_LIB_PATH=${PIC_LIB_PATH:-}
 
 function build_preamble() {
@@ -122,11 +119,18 @@ function build_preamble() {
 # Build Sasl
 if [ $BUILD_ALL -eq 1 ] || [ $BUILD_SASL -eq 1 ]; then
   build_preamble $IMPALA_HOME/thirdparty/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION} Sasl
+
+  # Need to specify which libdb to use on certain OSes
+  LIBDB_DIR=""
+  if [[ -e "/usr/lib64/libdb4" && -e "/usr/include/libdb4" ]]; then
+    LIBDB_DIR="--with-bdb-libdir=/usr/lib64/libdb4 --with-bdb-incdir=/usr/include/libdb4"
+  fi
   # Disable everything except those protocols needed -- currently just Kerberos.
   # Sasl does not have a --with-pic configuration.
   CFLAGS="-fPIC -DPIC" CXXFLAGS="-fPIC -DPIC" ./configure \
     --disable-sql --disable-otp --disable-ldap --disable-digest --with-saslauthd=no \
-    --prefix=$IMPALA_CYRUS_SASL_INSTALL_DIR --enable-static --enable-staticdlopen
+    --prefix=$IMPALA_CYRUS_SASL_INSTALL_DIR --enable-static --enable-staticdlopen \
+    $LIBDB_DIR
   # the first time you do a make it fails, build again.
   (make || make)
   make install

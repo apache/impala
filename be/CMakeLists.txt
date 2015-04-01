@@ -175,6 +175,7 @@ set(CLANG_INCLUDE_FLAGS
   "-I${JAVA_INCLUDE_PATH}"
   "-I${JAVA_INCLUDE_PATH2}"
   "-I${RE2_INCLUDE_DIR}"
+  "-I${SASL_INCLUDE_DIR}"
 )
 
 # allow linking of static libs into dynamic lib
