@@ -59,7 +59,7 @@ class StreamingSampler {
   // TODO: we can make this more complex by taking a weighted average of samples
   // accumulated in a period.
   void AddSample(T sample, int ms) {
-    ScopedSpinLock l(&lock_);
+    boost::lock_guard<SpinLock> l(lock_);
     ++current_sample_count_;
     current_sample_sum_ += sample;
     current_sample_total_time_ += ms;
@@ -87,7 +87,7 @@ class StreamingSampler {
   // must unlock it.
   const T* GetSamples(int* num_samples, int* period, SpinLock** lock = NULL) const {
     if (lock != NULL) {
-      lock_.Lock();
+      lock_.lock();
       *lock = &lock_;
     }
     *num_samples = samples_collected_;
@@ -99,7 +99,7 @@ class StreamingSampler {
   void SetSamples(int period, const std::vector<T>& samples) {
     DCHECK_LE(samples.size(), MAX_SAMPLES);
 
-    ScopedSpinLock l(&lock_);
+    boost::lock_guard<SpinLock> l(lock_);
     period_ = period;
     samples_collected_ = samples.size();
     memcpy(samples_, &samples[0], sizeof(T) * samples_collected_);
@@ -109,7 +109,7 @@ class StreamingSampler {
   }
 
   std::string DebugString(const std::string& prefix="") const {
-    ScopedSpinLock l(&lock_);
+    boost::lock_guard<SpinLock> l(lock_);
     std::stringstream ss;
     ss << prefix << "Period = " << period_ << std::endl
        << prefix << "Num = " << samples_collected_ << std::endl
@@ -147,4 +147,3 @@ class StreamingSampler {
 }
 
 #endif
-

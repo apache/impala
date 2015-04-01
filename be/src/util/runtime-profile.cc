@@ -594,7 +594,7 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
         }
         stream << endl;
       }
-      lock->Unlock();
+      lock->unlock();
     }
   }
 
@@ -874,7 +874,7 @@ void RuntimeProfile::TimeSeriesCounter::ToThrift(TTimeSeriesCounter* counter) {
   const int64_t* samples = samples_.GetSamples(&num, &period, &lock);
   counter->values.resize(num);
   memcpy(&counter->values[0], samples, num * sizeof(int64_t));
-  lock->Unlock();
+  lock->unlock();
   counter->period_ms = period;
 }
 

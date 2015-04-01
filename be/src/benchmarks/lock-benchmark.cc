@@ -102,13 +102,13 @@ void AtomicProduceThread(int64_t n, int64_t* value) {
 
 void SpinLockConsumeThread(int64_t n, int64_t* value) {
   for (int64_t i = 0; i < n; ++i) {
-    ScopedSpinLock l(&spinlock_);
+    lock_guard<SpinLock> l(spinlock_);
     --(*value);
   }
 }
 void SpinLockProduceThread(int64_t n, int64_t* value) {
   for (int64_t i = 0; i < n; ++i) {
-    ScopedSpinLock l(&spinlock_);
+    lock_guard<SpinLock> l(spinlock_);
     ++(*value);
   }
 }

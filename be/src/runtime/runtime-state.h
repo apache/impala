@@ -197,7 +197,7 @@ class RuntimeState {
   }
 
   Status query_status() {
-    ScopedSpinLock l(&query_status_lock_);
+    boost::lock_guard<SpinLock> l(query_status_lock_);
     return query_status_;
   };
 
@@ -209,7 +209,7 @@ class RuntimeState {
 
   // Returns true if the error log has not reached max_errors_.
   bool LogHasSpace() {
-    ScopedSpinLock l(&error_log_lock_);
+    boost::lock_guard<SpinLock> l(error_log_lock_);
     return error_log_.size() < query_options().max_errors;
   }
 
@@ -248,7 +248,7 @@ class RuntimeState {
 
   // Sets query_status_ with err_msg if no error has been set yet.
   void set_query_status(const std::string& err_msg) {
-    ScopedSpinLock l(&query_status_lock_);
+    boost::lock_guard<SpinLock> l(query_status_lock_);
     if (!query_status_.ok()) return;
     query_status_ = Status(err_msg);
   }

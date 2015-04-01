@@ -73,7 +73,7 @@ ExecNode::RowBatchQueue::~RowBatchQueue() {
 
 void ExecNode::RowBatchQueue::AddBatch(RowBatch* batch) {
   if (!BlockingPut(batch)) {
-    ScopedSpinLock l(&lock_);
+    lock_guard<SpinLock> l(lock_);
     cleanup_queue_.push_back(batch);
   }
 }
@@ -93,7 +93,7 @@ int ExecNode::RowBatchQueue::Cleanup() {
     delete batch;
   }
 
-  ScopedSpinLock l(&lock_);
+  lock_guard<SpinLock> l(lock_);
   for (list<RowBatch*>::iterator it = cleanup_queue_.begin();
       it != cleanup_queue_.end(); ++it) {
     num_io_buffers += (*it)->num_io_buffers();

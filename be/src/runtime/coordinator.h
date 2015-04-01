@@ -175,7 +175,7 @@ class Coordinator {
     return exec_summary_;
   }
 
-  SpinLock* GetExecSummaryLock() const { return &exec_summary_lock_; }
+  SpinLock& GetExecSummaryLock() const { return exec_summary_lock_; }
 
  private:
   class BackendExecState;

@@ -202,7 +202,7 @@ Status BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
   DCHECK_NOTNULL(parent);
   block_mgr->reset();
   {
-    ScopedSpinLock lock(&static_block_mgrs_lock_);
+    lock_guard<SpinLock> lock(static_block_mgrs_lock_);
     BlockMgrsMap::iterator it = query_to_block_mgrs_.find(state->query_id());
     if (it != query_to_block_mgrs_.end()) *block_mgr = it->second.lock();
     if (*block_mgr == NULL) {
@@ -480,7 +480,7 @@ Status BufferedBlockMgr::TransferBuffer(Block* dst, Block* src, bool unpin) {
 
 BufferedBlockMgr::~BufferedBlockMgr() {
   {
-    ScopedSpinLock lock(&static_block_mgrs_lock_);
+    lock_guard<SpinLock> lock(static_block_mgrs_lock_);
     DCHECK(query_to_block_mgrs_.find(query_id_) != query_to_block_mgrs_.end());
     query_to_block_mgrs_.erase(query_id_);
   }

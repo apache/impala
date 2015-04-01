@@ -1373,7 +1373,7 @@ void Coordinator::UpdateExecSummary(int fragment_idx, int instance_idx,
   vector<RuntimeProfile*> children;
   profile->GetAllChildren(&children);
 
-  ScopedSpinLock l(&exec_summary_lock_);
+  lock_guard<SpinLock> l(exec_summary_lock_);
   for (int i = 0; i < children.size(); ++i) {
     int id = ExecNode::GetNodeIdFromProfile(children[i]);
     if (id == -1) continue;

@@ -596,7 +596,7 @@ void ImpalaServer::QuerySummaryCallback(bool include_json_plan, bool include_sum
       stmt = exec_state->sql_stmt();
       plan = exec_state->exec_request().query_exec_request.query_plan;
       if (include_json_plan || include_summary) {
-        ScopedSpinLock lock(exec_state->coord()->GetExecSummaryLock());
+        lock_guard<SpinLock> lock(exec_state->coord()->GetExecSummaryLock());
         summary = exec_state->coord()->exec_summary();
       }
       if (include_json_plan) {

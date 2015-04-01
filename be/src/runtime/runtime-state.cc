@@ -196,19 +196,19 @@ Status RuntimeState::CreateCodegen() {
 }
 
 bool RuntimeState::ErrorLogIsEmpty() {
-  ScopedSpinLock l(&error_log_lock_);
+  lock_guard<SpinLock> l(error_log_lock_);
   return (error_log_.size() == 0);
 }
 
 string RuntimeState::ErrorLog() {
-  ScopedSpinLock l(&error_log_lock_);
+  lock_guard<SpinLock> l(error_log_lock_);
   return PrintErrorMapToString(error_log_);
 }
 
 string RuntimeState::FileErrors() {
   stringstream out;
   {
-    ScopedSpinLock l(&file_errors_lock_);
+    lock_guard<SpinLock> l(file_errors_lock_);
     for (int i = 0; i < file_errors_.size(); ++i) {
       out << file_errors_[i].second << " errors in " << file_errors_[i].first << endl;
     }
@@ -217,12 +217,12 @@ string RuntimeState::FileErrors() {
 }
 
 void RuntimeState::ReportFileErrors(const std::string& file_name, int num_errors) {
-  ScopedSpinLock l(&file_errors_lock_);
+  lock_guard<SpinLock> l(file_errors_lock_);
   file_errors_.push_back(make_pair(file_name, num_errors));
 }
 
 bool RuntimeState::LogError(const ErrorMsg& message) {
-  ScopedSpinLock l(&error_log_lock_);
+  lock_guard<SpinLock> l(error_log_lock_);
   // All errors go to the log, unreported_error_count_ is counted independently of the size of the
   // error_log to account for errors that were already reported to the coordninator
   VLOG_QUERY << "Error from query " << query_id() << ": " << message.msg();
@@ -234,7 +234,7 @@ bool RuntimeState::LogError(const ErrorMsg& message) {
 }
 
 void RuntimeState::GetUnreportedErrors(ErrorLogMap* new_errors) {
-  ScopedSpinLock l(&error_log_lock_);
+  lock_guard<SpinLock> l(error_log_lock_);
   *new_errors = error_log_;
   // Reset the map, but keep all already reported keys so that we do not
   // report the same errors multiple times.
@@ -248,7 +248,7 @@ Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
     int64_t failed_allocation_size) {
   DCHECK_GE(failed_allocation_size, 0);
   {
-    ScopedSpinLock l(&query_status_lock_);
+    lock_guard<SpinLock> l(query_status_lock_);
     if (query_status_.ok()) {
       query_status_ = Status::MEM_LIMIT_EXCEEDED;
     } else {
@@ -287,7 +287,7 @@ Status RuntimeState::CheckQueryState() {
   // TODO: it would be nice if this also checked for cancellation, but doing so breaks
   // cases where we use Status::CANCELLED to indicate that the limit was reached.
   if (instance_mem_tracker_->AnyLimitExceeded()) return SetMemLimitExceeded();
-  ScopedSpinLock l(&query_status_lock_);
+  lock_guard<SpinLock> l(query_status_lock_);
   return query_status_;
 }
 
@@ -295,7 +295,7 @@ void RuntimeState::AddBitmapFilter(SlotId slot, Bitmap* bitmap,
     bool* acquired_ownership) {
   *acquired_ownership = false;
   if (bitmap != NULL) {
-    ScopedSpinLock l(&bitmap_lock_);
+    lock_guard<SpinLock> l(bitmap_lock_);
     if (slot_bitmap_filters_.find(slot) != slot_bitmap_filters_.end()) {
       Bitmap* existing_bitmap = slot_bitmap_filters_[slot];
       DCHECK_NOTNULL(existing_bitmap);

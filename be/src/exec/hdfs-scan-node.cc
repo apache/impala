@@ -934,7 +934,7 @@ void HdfsScanNode::RangeComplete(const THdfsFileFormat::type& file_type,
   progress_.Update(1);
 
   {
-    ScopedSpinLock l(&file_type_counts_lock_);
+    lock_guard<SpinLock> l(file_type_counts_lock_);
     for (int i = 0; i < compression_types.size(); ++i) {
       ++file_type_counts_[make_pair(file_type, compression_types[i])];
     }
@@ -1010,7 +1010,7 @@ void HdfsScanNode::StopAndFinalizeCounters() {
   if (!file_type_counts_.empty()) {
     stringstream ss;
     {
-      ScopedSpinLock l2(&file_type_counts_lock_);
+      lock_guard<SpinLock> l2(file_type_counts_lock_);
       for (FileTypeCountsMap::const_iterator it = file_type_counts_.begin();
           it != file_type_counts_.end(); ++it) {
         ss << it->first.first << "/" << it->first.second << ":" << it->second << " ";

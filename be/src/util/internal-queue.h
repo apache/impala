@@ -16,8 +16,11 @@
 #ifndef IMPALA_UTIL_INTERNAL_QUEUE_H
 #define IMPALA_UTIL_INTERNAL_QUEUE_H
 
+#include <boost/thread/locks.hpp>
+
 #include "common/atomic.h"
 #include "util/spinlock.h"
+
 
 namespace impala {
 
@@ -43,11 +46,11 @@ class InternalQueue {
 
     // Returns the Next/Prev node or NULL if this is the end/front.
     T* Next() const {
-      ScopedSpinLock lock(&parent_queue->lock_);
+      boost::lock_guard<SpinLock> lock(parent_queue->lock_);
       return reinterpret_cast<T*>(next);
     }
     T* Prev() const {
-      ScopedSpinLock lock(&parent_queue->lock_);
+      boost::lock_guard<SpinLock> lock(parent_queue->lock_);
       return reinterpret_cast<T*>(prev);
     }
 
@@ -65,7 +68,7 @@ class InternalQueue {
   // Returns the element at the head of the list without dequeuing or NULL
   // if the queue is empty. This is O(1).
   T* head() const {
-    ScopedSpinLock lock(&lock_);
+    boost::lock_guard<SpinLock> lock(lock_);
     if (empty()) return NULL;
     return reinterpret_cast<T*>(head_);
   }
@@ -73,7 +76,7 @@ class InternalQueue {
   // Returns the element at the end of the list without dequeuing or NULL
   // if the queue is empty. This is O(1).
   T* tail() {
-    ScopedSpinLock lock(&lock_);
+    boost::lock_guard<SpinLock> lock(lock_);
     if (empty()) return NULL;
     return reinterpret_cast<T*>(tail_);
   }
@@ -86,7 +89,7 @@ class InternalQueue {
     DCHECK(node->parent_queue == NULL);
     node->parent_queue = this;
     {
-      ScopedSpinLock lock(&lock_);
+      boost::lock_guard<SpinLock> lock(lock_);
       if (tail_ != NULL) tail_->next = node;
       node->prev = tail_;
       tail_ = node;
@@ -100,7 +103,7 @@ class InternalQueue {
   T* Dequeue() {
     Node* result = NULL;
     {
-      ScopedSpinLock lock(&lock_);
+      boost::lock_guard<SpinLock> lock(lock_);
       if (empty()) return NULL;
       --size_;
       result = head_;
@@ -122,7 +125,7 @@ class InternalQueue {
   T* PopBack() {
     Node* result = NULL;
     {
-      ScopedSpinLock lock(&lock_);
+      boost::lock_guard<SpinLock> lock(lock_);
       if (empty()) return NULL;
       --size_;
       result = tail_;
@@ -146,7 +149,7 @@ class InternalQueue {
     if (node->parent_queue == NULL) return;
     DCHECK(node->parent_queue == this);
     {
-      ScopedSpinLock lock(&lock_);
+      boost::lock_guard<SpinLock> lock(lock_);
       if (node->next == NULL && node->prev == NULL) {
         // Removing only node
         DCHECK(node == head_);
@@ -179,7 +182,7 @@ class InternalQueue {
 
   // Clears all elements in the list.
   void Clear() {
-    ScopedSpinLock lock(&lock_);
+    boost::lock_guard<SpinLock> lock(lock_);
     Node* cur = head_;
     while (cur != NULL) {
       Node* tmp = cur;
@@ -203,7 +206,7 @@ class InternalQueue {
   // Validates the internal structure of the list
   bool Validate() {
     int num_elements_found = 0;
-    ScopedSpinLock lock(&lock_);
+    boost::lock_guard<SpinLock> lock(lock_);
     if (head_ == NULL) {
       if (tail_ != NULL) return false;
       if (size() != 0) return false;
@@ -232,7 +235,7 @@ class InternalQueue {
     std::stringstream ss;
     ss << "(";
     {
-      ScopedSpinLock lock(&lock_);
+      boost::lock_guard<SpinLock> lock(lock_);
       Node* curr = head_;
       while (curr != NULL) {
         ss << (void*)curr;
