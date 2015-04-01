@@ -42,7 +42,10 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, HashTableCtx* h
   for (int partition_idx = 0; partition_idx < PARTITION_FANOUT; ++partition_idx) {
     Partition* dst_partition = hash_partitions_[partition_idx];
     while (!dst_partition->is_spilled()) {
-      if (dst_partition->hash_tbl->CheckAndResize(num_rows, ht_ctx)) break;
+      {
+        SCOPED_TIMER(ht_resize_timer_);
+        if (dst_partition->hash_tbl->CheckAndResize(num_rows, ht_ctx)) break;
+      }
       // There was not enough memory for the resize. Spill a partition and retry.
       RETURN_IF_ERROR(SpillPartition());
     }

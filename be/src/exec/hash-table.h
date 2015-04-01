@@ -408,12 +408,12 @@ class HashTable {
   // duplicates.
   int64_t CurrentMemSize() const;
 
-  // Calculates the fill factor if 'rows_to_add' additional buckets were to be filled,
-  // and resizes the hash table so that the projected fill factor is below the max fill
-  // factor.
-  // If it returns true, then it is guaranteed at least 'rows_to_add' rows can be inserted
-  // without need to resize.
-  bool CheckAndResize(uint64_t rows_to_add, HashTableCtx* ht_ctx);
+  // Calculates the fill factor if 'buckets_to_fill' additional buckets were to be
+  // filled and resizes the hash table so that the projected fill factor is below the
+  // max fill factor.
+  // If it returns true, then it is guaranteed at least 'rows_to_add' rows can be
+  // inserted without need to resize.
+  bool CheckAndResize(uint64_t buckets_to_fill, HashTableCtx* ht_ctx);
 
   // Returns the number of bytes allocated to the hash table
   int64_t byte_size() const { return total_data_page_size_; }

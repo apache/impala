@@ -205,6 +205,9 @@ class PartitionedAggregationNode : public ExecNode {
   // Time spent processing the child rows
   RuntimeProfile::Counter* build_timer_;
 
+  // Total time spent resizing hash tables.
+  RuntimeProfile::Counter* ht_resize_timer_;
+
   // Time spent returning the aggregated rows
   RuntimeProfile::Counter* get_results_timer_;
 

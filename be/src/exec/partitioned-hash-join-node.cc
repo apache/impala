@@ -47,6 +47,8 @@ PartitionedHashJoinNode::PartitionedHashJoinNode(
     using_small_buffers_(true),
     state_(PARTITIONING_BUILD),
     block_mgr_client_(NULL),
+    partition_build_timer_(NULL),
+    null_aware_eval_timer_(NULL),
     process_build_batch_fn_(NULL),
     process_build_batch_fn_level0_(NULL),
     process_probe_batch_fn_(NULL),
@@ -179,7 +181,6 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
       }
     }
   }
-
   return Status::OK;
 }
 
@@ -313,13 +314,12 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
   vector<BufferedTupleStream::RowIdx> indices;
   uint32_t seed0 = ctx->seed(0);
 
-  // Allocate the partition-local hash table. Initialize the number of buckets
-  // based on the number of build rows (the number of rows is known at this point).
-  // This assumes there are no duplicates which can be wrong. However, the
-  // upside in the common case (few/no duplicates) is large and the downside
-  // when there are is low (a bit more memory; the bucket memory is small compared
-  // to the memory needed for all the build side allocations).
-  // We always start with small pages in the hash table.
+  // Allocate the partition-local hash table. Initialize the number of buckets based on
+  // the number of build rows (the number of rows is known at this point). This assumes
+  // there are no duplicates which can be wrong. However, the upside in the common case
+  // (few/no duplicates) is large and the downside when there are is low (a bit more
+  // memory; the bucket memory is small compared to the memory needed for all the build
+  // side allocations). We always start with small pages in the hash table.
   int64_t estimated_num_buckets =
       HashTable::EstimateNumBuckets(build_rows()->num_rows());
   hash_tbl_.reset(new HashTable(state, parent_->block_mgr_client_,
@@ -331,11 +331,9 @@ Status PartitionedHashJoinNode::Partition::BuildHashTableInternal(
   while (!eos) {
     RETURN_IF_ERROR(build_rows_->GetNext(&batch, &eos, &indices));
     DCHECK_EQ(batch.num_rows(), indices.size());
-    SCOPED_TIMER(parent_->build_timer_);
-
     int num_rows = batch.num_rows();
-    DCHECK_LE(num_rows, hash_tbl_->EmptyBuckets()) << " hash table was not properly "
-        << " sized. Size=" << estimated_num_buckets;
+    DCHECK_LE(num_rows, hash_tbl_->EmptyBuckets());
+    SCOPED_TIMER(parent_->build_timer_);
     for (int i = 0; i < num_rows; ++i) {
       TupleRow* row = batch.GetRow(i);
       uint32_t hash = 0;

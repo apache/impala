@@ -69,6 +69,7 @@ PartitionedAggregationNode::PartitionedAggregationNode(
     output_partition_(NULL),
     process_row_batch_fn_(NULL),
     build_timer_(NULL),
+    ht_resize_timer_(NULL),
     get_results_timer_(NULL),
     num_hash_buckets_(NULL),
     partitions_created_(NULL),
@@ -109,6 +110,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   agg_fn_pool_.reset(new MemPool(expr_mem_tracker()));
 
   build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
+  ht_resize_timer_ = ADD_TIMER(runtime_profile(), "HTResizeTime");
   get_results_timer_ = ADD_TIMER(runtime_profile(), "GetResultsTime");
   num_hash_buckets_ =
       ADD_COUNTER(runtime_profile(), "HashBuckets", TUnit::UNIT);
@@ -263,7 +265,6 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
   if (!probe_expr_ctxs_.empty()) {
     RETURN_IF_ERROR(MoveHashPartitions(child(0)->rows_returned()));
   }
-
   return Status::OK;
 }
 

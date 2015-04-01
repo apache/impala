@@ -278,10 +278,10 @@ int64_t HashTable::CurrentMemSize() const {
   return num_buckets_ * sizeof(Bucket) + num_duplicate_nodes_ * sizeof(DuplicateNode);
 }
 
-bool HashTable::CheckAndResize(uint64_t rows_to_add, HashTableCtx* ht_ctx) {
+bool HashTable::CheckAndResize(uint64_t buckets_to_fill, HashTableCtx* ht_ctx) {
   uint64_t shift = 0;
-  while (static_cast<double>(num_filled_buckets_ + rows_to_add) >
-         (static_cast<double>(num_buckets_ << shift) * MAX_FILL_FACTOR)) {
+  while (num_filled_buckets_ + buckets_to_fill >
+         (num_buckets_ << shift) * MAX_FILL_FACTOR) {
     // TODO: next prime instead of double?
     ++shift;
   }

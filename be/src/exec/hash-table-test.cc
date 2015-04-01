@@ -312,8 +312,8 @@ class HashTableTest : public testing::Test {
     for (int i = 0; i < 20; ++i) {
       // Currently the mem used for the bucket is not being tracked by the mem tracker.
       // Thus the resize is expected to be successful.
-      // TODO: Keep track of the mem used for the buckets and test cases where we actually
-      // hit OOM.
+      // TODO: Keep track of the mem used for the buckets and test cases where we
+      // actually hit OOM.
       bool success = hash_table.CheckAndResize(num_to_add, &ht_ctx);
       EXPECT_TRUE(success) << " failed to resize: " << num_to_add;
       for (int j = 0; j < num_to_add; ++build_row_val, ++j) {
