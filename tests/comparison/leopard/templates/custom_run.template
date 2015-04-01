@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Query Generator Results</title>
+
+    <!-- Bootstrap -->
+    <link href="{{ url_for('static', filename=assets['bootstrap_css']) }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename=assets['favicon']) }}" rel="shortcut icon" />
+
+    <style>
+      .top-buffer { margin-top:75px; }
+    </style>
+
+  </head>
+  <body>
+
+    <div class="modal fade" id="success_modal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-body">
+            <p class="text-success">Added To Schedule</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal" id="close">Close</button>
+          </div>
+        </div><!-- /.modal-content -->
+      </div><!-- /.modal-dialog -->
+    </div><!-- /.modal -->
+
+    <div class="modal fade" id="fail_modal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-body">
+            <p class="text-success">Something went wrong!</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+          </div>
+        </div><!-- /.modal-content -->
+      </div><!-- /.modal-dialog -->
+    </div><!-- /.modal -->
+
+    <nav class="navbar navbar-default navbar-fixed-top" role="navigation">
+      <div class="container">
+        <a class="navbar-brand" href="/">Home</a>
+      </div>
+    </nav>
+
+    <div class="container">
+
+
+    <form id="custom_run_form" action="/start_run" method="post">
+      <div class="form-group">
+        <h3>
+          Bounds
+        </h3>
+        <div class="row">
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Max Nested Query Count
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <label>From</label>
+                  <br>
+                  <input type="text" class="form-control" name="max_nested_query_count_from" value="0">
+                  <label>To</label>
+                  <br>
+                  <input type="text" class="form-control" name="max_nested_query_count_to" value="2">
+              </div>
+            </div>
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  With Table Count
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <b>From</b>
+                  <br>
+                  <input type="text" class="form-control" name="with_table_count_from" value="1">
+                  <label>
+                    To
+                  </label>
+                  <input type="text" class="form-control" name="with_table_count_to" value="3">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Max Nested Expr Count
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <b>From</b>
+                  <br>
+                  <input type="text" class="form-control" name="max_nested_expr_count_from" value="0">
+                  <label>
+                    To
+                  </label>
+                  <input type="text" class="form-control" name="max_nested_expr_count_to" value="2">
+              </div>
+            </div>
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Table Count
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <b>From</b>
+                  <br>
+                  <input type="text" class="form-control" name="table_count_from" value="1">
+                  <label>
+                    To
+                  </label>
+                  <input type="text" class="form-control" name="table_count_to" value="2">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Select Item Count
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <b>From</b>
+                  <br>
+                  <input type="text" class="form-control" name="select_item_count_from" value="1">
+                  <label>
+                    To
+                  </label>
+                  <input type="text" class="form-control" name="select_item_count_to" value="5">
+              </div>
+            </div>
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Analytic Lead Lag Offset
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <b>From</b>
+                  <br>
+                  <input type="text" class="form-control" name="analytic_lead_lag_offset_from" value="1">
+                  <label>
+                    To
+                  </label>
+                  <input type="text" class="form-control" name="analytic_lead_lag_offset_to" value="100">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Analytic Window Offset
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <b>From</b>
+                  <br>
+                  <input type="text" class="form-control" name="analytic_window_offset_from" value="1">
+                  <label>
+                    To
+                  </label>
+                  <input type="text" class="form-control" name="analytic_window_offset_to" value="100">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+          </div>
+          <div class="col-md-4">
+          </div>
+        </div>
+        <h3>
+          Select Item Category
+        </h3>
+        <div class="row">
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Agg
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="select_agg" value="3">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Analytic
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="select_analytic" value="1">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Basic
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="select_basic" value="10">
+              </div>
+            </div>
+          </div>
+        </div>
+        <h3>
+          Types
+        </h3>
+        <div class="row">
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Boolean
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="types_boolean" value="1">
+              </div>
+            </div>
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Float
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="types_float" value="1">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Char
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="types_char" value="1">
+              </div>
+            </div>
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Int
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="types_int" value="10">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Decimal
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="types_decimal" value="1">
+              </div>
+            </div>
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Timestamp
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="types_timestamp" value="1">
+              </div>
+            </div>
+          </div>
+        </div>
+        <h3>
+          Join
+        </h3>
+        <div class="row">
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Inner
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="join_inner" value="90">
+              </div>
+            </div>
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Full Outer
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="join_full_outer" value="3">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Left
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="join_left" value="30">
+              </div>
+            </div>
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Cross
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="join_cross" value="1">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Right
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="join_right" value="10">
+              </div>
+            </div>
+          </div>
+        </div>
+        <h3>
+          Optional Query Clauses Probabilities
+        </h3>
+        <div class="row">
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  With
+                </h3>
+              </div>
+              <div class="panel-body">
+                <input type="text" class="form-control" name="optional_with" value="0.1">
+              </div>
+            </div>
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Group By
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="optional_group_by" value="0.1">
+              </div>
+            </div>
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Order By
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="optional_order_by" value="0.1">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  From
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="optional_from" value="1">
+              </div>
+            </div>
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Having
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="optional_having" value="0.25">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Where
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="optional_where" value="0.5">
+              </div>
+            </div>
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Union
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="optional_union" value="0.1">
+              </div>
+            </div>
+          </div>
+        </div>
+        <h3>
+          Optional Analytic Clauses Probabilities
+        </h3>
+        <div class="row">
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Partition By
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="optional_analytic_partition_by" value="0.5">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Order By
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="optional_analytic_order_by" value="0.5">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Window
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="optional_analytic_window" value="0.5">
+              </div>
+            </div>
+          </div>
+        </div>
+        <h3>
+          Misc Probabilities
+        </h3>
+        <div class="row">
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Inline View
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="misc_inline_view" value="0.1">
+              </div>
+            </div>
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Union All
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="misc_union_all" value="0.5">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Select Distinct
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="misc_select_distinct" value="0.1">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Scalar Subquery
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="misc_scalar_subquery" value="0.1">
+              </div>
+            </div>
+          </div>
+        </div>
+        <h3>
+          Analytic Designs
+        </h3>
+        <div class="row">
+          <div class="col-md-4">
+            <label class="checkbox">
+              <input type="checkbox" name="analytic_designs_top_level_no_limit" checked>
+              Top Level Query Without Limit
+            </label>
+          </div>
+          <div class="col-md-4">
+            <label class="checkbox">
+              <input type="checkbox" name="analytic_designs_deterministic_order_by" checked>
+              Deterministic Order By
+            </label>
+          </div>
+          <div class="col-md-4">
+            <label class="checkbox">
+              <input type="checkbox" name="analytic_designs_no_order_by" checked>
+              No Order By
+            </label>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-4">
+            <label class="checkbox">
+              <input type="checkbox" name="analytic_designs_only_select_item" checked>
+              Only Select Item
+            </label>
+          </div>
+          <div class="col-md-4">
+            <label class="checkbox">
+              <input type="checkbox" name="analytic_designs_unbounded_window" checked>
+              Unbounded Window
+            </label>
+          </div>
+          <div class="col-md-4">
+            <label class="checkbox">
+              <input type="checkbox" name="analytic_designs_rank_func" checked>
+              Rank Func
+            </label>
+          </div>
+        </div>
+        <h3>
+          Analytic Desings
+        </h3>
+        <div class="row">
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Run Name
+                </h3>
+              </div>
+              <div class="panel-body">
+                  <input type="text" class="form-control" name="run_name" value="custom_run">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Git Command
+                </h3>
+              </div>
+              <div class="panel-body">
+                <input type="text" class="form-control" name="git_command">
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="panel panel-primary">
+              <div class="panel-heading">
+                <h3 class="panel-title">
+                  Seconds To Run
+                </h3>
+              </div>
+              <div class="panel-body">
+                <input type="text" class="form-control" name="time_limit" value="10800">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-md-4">
+            <button type="submit" class="btn btn-lg btn-success btn-block">
+              Start Run
+            </button>
+          </div>
+          <div class="col-md-4">
+          </div>
+          <div class="col-md-4">
+          </div>
+        </div>
+      </div> <!-- form -->
+      </form>
+
+
+    </div><!-- /.container -->
+
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <!-- Include all compiled plugins (below), or include individual files as needed -->
+    <script src="{{ url_for('static', filename=assets['bootstrap_js']) }}"></script>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+
+    <script>
+      $('#collapse_overview').collapse('show');
+
+      $('#custom_run_form').submit(function(){
+          $.post($(this).attr('action'), $(this).serialize(), function(result){
+            if (result == 'success'){
+              $('#success_modal').modal('show');
+            } else {
+              $('#fail_modal').modal('show');
+            }
+          });
+          return false; // prevent default action
+      });
+
+      $('#close').click(function() {
+        window.location.replace("/");
+      });
+
+    </script>
+
+  </body>
+</html>

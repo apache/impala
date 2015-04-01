@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Query Generator Results</title>
+
+    <!-- Bootstrap -->
+    <link href="{{ url_for('static', filename=assets['bootstrap_css']) }}" rel="stylesheet">
+
+    <link href="{{ url_for('static', filename=assets['favicon']) }}" rel="shortcut icon" />
+
+  </head>
+  <body>
+
+    <nav class="navbar navbar-default navbar-fixed-top" role="navigation">
+      <div class="container">
+        <a class="navbar-brand" href="/">Home</a>
+        <a class="btn btn-success navbar-btn navbar-right" href="/custom_run">Custom Run</a>
+      </div>
+    </nav>
+
+    <div class="container">
+
+       <h3>Completed Runs</h3>
+       <table class="table table-hover">
+         <tr>
+           <th>Run Name</th>
+           <th>Num Queries</th>
+           <th>Crashes</th>
+           <th>Row Count Mismatches</th>
+           <th>Content Mismatches</th>
+         </tr>
+
+         {% for report_hash, report in reports %}
+         <tr>
+           <td><a href="/reports/{{report_hash}}">{{report.job_name}}</a></td>
+           <td>{{report.num_queries_executed}}</td>
+           <td>{{report.num_crashes}}</td>
+           <td>{{report.num_row_count_mismatch}}</td>
+           <td>{{report.num_mismatch}}</td>
+         </tr>
+         {% endfor %}
+       </table>
+
+       {% if schedule_items %}
+       <h3>Run Schdule</h3>
+       <table class="table table-hover">
+         <tr>
+           <th>Run Name</th>
+           <th>Git Command</th>
+           <th>Parent Run</th>
+         </tr>
+         {% for schedule_item in schedule_items %}
+         <tr>
+           <td>{{schedule_item.run_name}}</td>
+           <td>{{schedule_item.git_command}}</td>
+           <td>{{schedule_item.parent_job_name}}</td>
+         </tr>
+         {% endfor %}
+        </table>
+        {% endif %}
+
+    </div><!-- /.container -->
+
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></     script>
+    <!-- Include all compiled plugins (below), or include individual files as needed -->
+    <script src="{{ url_for('static', filename=assets['bootstrap_js']) }}"></script>
+
+  </body>
+</html>

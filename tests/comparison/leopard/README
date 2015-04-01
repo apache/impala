@@ -1,0 +1,21 @@
+This package runs the query generator continuously. Compares Impala and Postgres results
+for a randomly generated query and produces several reports per day. Reports are
+displayed on a web page which allows the user to conveniently examine the discovered
+issues. The user can also start a custom run against a private Impala branch using the
+web interface.
+
+Requirements:
+
+1) Docker -- A docker image with Impala and Postgres installed and functional database
+      loaded into Postgres.
+
+2) Fabric
+
+      sudo pip install fabric
+
+3) Flask
+
+      sudo pip install Flask
+
+To get started, run ./controller.py and ./front_end.py. Results and logs are saved to
+/tmp/query_gen

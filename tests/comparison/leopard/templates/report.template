@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Query Generator Results</title>
+
+
+    <!-- Bootstrap -->
+    <link href="{{ url_for('static', filename=assets['bootstrap_css']) }}" rel="stylesheet">
+
+    <link href="{{ url_for('static', filename=assets['hljs_css']) }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename=assets['favicon']) }}" rel="shortcut icon" />
+
+    <style>
+      .top-buffer { margin-top:75px; }
+    </style>
+
+  </head>
+  <body>
+
+    <div class="modal fade" id="success_modal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-body">
+            <p class="text-success">Added To Schedule</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+          </div>
+        </div><!-- /.modal-content -->
+      </div><!-- /.modal-dialog -->
+    </div><!-- /.modal -->
+
+    <div class="modal fade" id="fail_modal">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-body">
+            <p class="text-success">Something went wrong!</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+          </div>
+        </div><!-- /.modal-content -->
+      </div><!-- /.modal-dialog -->
+    </div><!-- /.modal -->
+
+    <nav class="navbar navbar-default navbar-fixed-top" role="navigation">
+      <div class="container">
+        <a class="navbar-brand" href="/">Home</a>
+          <form class="navbar-form navbar-right" id="rerun_form" action="/start_run" method="post">
+            <div class="form-group">
+              <input type="text" class="form-control" name="run_name" placeholder="Run Name">
+              <input type="text" class="form-control" name="git_command" placeholder="Git Command">
+              <input type="hidden" name="report_id" value="{{report.job_id}}">
+            </div>
+            <button type="submit" class="btn btn-success">
+              Rerun Failed Queries
+            </button>
+          </form>
+      </div>
+    </nav>
+
+    <div class="container">
+
+      <div class="row top-buffer">
+
+        <!-- Outer Accordion -->
+        <div class="panel-group" role="tablist" aria-multiselectable="true">
+
+          <!-- Overview Accordion -->
+          <div class="panel panel-default">
+            <div class="panel-heading" role="tab" id="heading_overview">
+              <h4 class="panel-title">
+                <a class="collapsed"
+                  data-toggle="collapse"
+                  data-parent="#accordion"
+                  href="#collapse_overview"
+                  aria-expanded="false"
+                  aria-controls="collapse_overview">
+                  Overview
+                </a>
+              </h4>
+            </div>
+            <div id="collapse_overview"
+              class="panel-collapse collapse in"
+              role="tabpanel"
+              aria-labelledby="heading_crashes">
+              <div class="panel-body">
+                <!-- inside overview -->
+                <div class="row">
+                  <div class="col-md-4"> <!-- Left Column -->
+                    <div class="panel panel-primary">
+                      <div class="panel-heading">
+                        <h3 class="panel-title">
+                          Queries Executed
+                        </h3>
+                      </div>
+                      <div class="panel-body">
+                        {{report.num_queries_executed}}
+                      </div>
+                    </div> <!-- panel -->
+                    <div class="panel panel-primary">
+                      <div class="panel-heading">
+                        <h3 class="panel-title">
+                          Run Time
+                        </h3>
+                      </div>
+                      <div class="panel-body">
+                        {{report.run_time_str}}
+                      </div>
+                    </div> <!-- panel -->
+                    <div class="panel panel-primary">
+                      <div class="panel-heading">
+                        <h3 class="panel-title">
+                          Git Hash
+                        </h3>
+                      </div>
+                      <div class="panel-body">
+                        {{report.git_hash}}
+                      </div>
+                    </div> <!-- panel -->
+                  </div>
+                  <div class="col-md-4"> <!-- Left Column -->
+                    <div class="panel panel-primary">
+                      <div class="panel-heading">
+                        <h3 class="panel-title">
+                          Job Name
+                        </h3>
+                      </div>
+                      <div class="panel-body">
+                        {{report.job_name}}
+                      </div>
+                    </div>
+                    <div class="panel panel-primary">
+                      <div class="panel-heading">
+                        <h3 class="panel-title">
+                          Crashes
+                        </h3>
+                      </div>
+                      <div class="panel-body">
+                        {{report.num_crashes}}
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-4"> <!-- Right Column -->
+                    <div class="panel panel-primary">
+                      <div class="panel-heading">
+                        <h3 class="panel-title">
+                          Row Count Mismatches
+                        </h3>
+                      </div>
+                      <div class="panel-body">
+                        {{report.num_row_count_mismatch}}
+                      </div>
+                    </div>
+                    <div class="panel panel-primary">
+                      <div class="panel-heading">
+                        <h3 class="panel-title">
+                          Content Mismatches
+                        </h3>
+                      </div>
+                      <div class="panel-body">
+                        {{report.num_mismatch}}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- End of inside overview -->
+              </div>
+            </div>
+          </div>
+          <!-- Crashes Accordion -->
+          <div class="panel panel-default">
+            <div class="panel-heading" role="tab" id="heading_crashes">
+              <h4 class="panel-title">
+                <a class="collapsed"
+                  data-toggle="collapse"
+                  data-parent="#accordion"
+                  href="#collapse_crashes"
+                  aria-expanded="false"
+                  aria-controls="collapse_crashes">
+                  Crashes
+                </a>
+              </h4>
+            </div>
+            <div id="collapse_crashes"
+              class="panel-collapse collapse"
+              role="tabpanel"
+              aria-labelledby="heading_crashes">
+              <div class="panel-body">
+                {% for id, title, crashes_list in outer_crashes_list %}
+                <!-- Crashes Accordion -->
+                <div class="panel panel-default">
+                  <div class="panel-heading" role="tab" id="heading{{id}}">
+                    <h4 class="panel-title">
+                      <a class="collapsed"
+                        data-toggle="collapse"
+                        data-parent="#accordion"
+                        href="#collapse{{id}}"
+                        aria-expanded="false"
+                        aria-controls="collapse{{id}}">
+                        {{title}}
+                      </a>
+                    </h4>
+                  </div>
+                  <div id="collapse{{id}}"
+                    class="panel-collapse collapse"
+                    role="tabpanel"
+                    aria-labelledby="heading{{id}}">
+                    <div class="panel-body">
+                      <!-- Inner Panel Body -> entire accordion should go here -->
+                      <div class="panel-group"
+                        id="accordion_crashes{{id}}"
+                        role="tablist"
+                        aria-multiselectable="true">
+                        {% for inner_id, inner_title, content in crashes_list %}
+                        <div class="panel panel-default">
+                          <div class="panel-heading" role="tab" id="heading{{inner_id}}">
+                            <h4 class="panel-title">
+                              <a data-toggle="collapse" data-parent="#accordion_crashes{{id}}" href="#collapse{{inner_id}}"
+                                aria-expanded="true" aria-controls="collapse{{inner_id}}">
+                                {{inner_title}}
+                              </a>
+                            </h4>
+                          </div>
+                          <div id="collapse{{inner_id}}" class="panel-collapse collapse"
+                            role="tabpanel" aria-labelledby="heading{{inner_id}}">
+                            <div class="panel-body">
+                              {{content}}
+                            </div>
+                          </div>
+                        </div>
+                        {% endfor %}
+                      </div>
+                      <!-- Inner Panel Body -->
+                    </div>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          <!-- Row Count Mismatch Accordion -->
+          <div class="panel panel-default">
+            <div class="panel-heading" role="tab" id="heading_mismatch">
+              <h4 class="panel-title">
+                <a class="collapsed"
+                  data-toggle="collapse"
+                  data-parent="#accordion"
+                  href="#collapse_mismatch"
+                  aria-expanded="false"
+                  aria-controls="collapse_mismatch">
+                  Row Count Mismatch
+                </a>
+              </h4>
+            </div>
+            <div id="collapse_mismatch"
+              class="panel-collapse collapse"
+              role="tabpanel"
+              aria-labelledby="heading_mismatch">
+              <div class="panel-body">
+                {% for id, title, content in row_count_list %}
+                <!-- Crashes Accordion -->
+                <div class="panel panel-default">
+                  <div class="panel-heading" role="tab" id="heading{{id}}">
+                    <h4 class="panel-title">
+                      <a class="collapsed"
+                        data-toggle="collapse"
+                        data-parent="#accordion"
+                        href="#collapse{{id}}"
+                        aria-expanded="false"
+                        aria-controls="collapse{{id}}">
+                        {{title}}
+                      </a>
+                    </h4>
+                  </div>
+                  <div id="collapse{{id}}"
+                    class="panel-collapse collapse"
+                    role="tabpanel"
+                    aria-labelledby="heading{{id}}">
+                    <div class="panel-body">
+                      {{content}}
+                    </div>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+
+          <!-- Content Mismatch Accordion -->
+          <div class="panel panel-default">
+            <div class="panel-heading" role="tab" id="heading_content_mismatch">
+              <h4 class="panel-title">
+                <a class="collapsed"
+                  data-toggle="collapse"
+                  data-parent="#accordion"
+                  href="#collapse_content_mismatch"
+                  aria-expanded="false"
+                  aria-controls="collapse_content_mismatch">
+                  Content Mismatch
+                </a>
+              </h4>
+            </div>
+            <div id="collapse_content_mismatch"
+              class="panel-collapse collapse"
+              role="tabpanel"
+              aria-labelledby="heading_content_mismatch">
+              <div class="panel-body">
+                {% for id, title, content in mismatch_list %}
+                <!-- Crashes Accordion -->
+                <div class="panel panel-default">
+                  <div class="panel-heading" role="tab" id="heading{{id}}">
+                    <h4 class="panel-title">
+                      <a class="collapsed"
+                        data-toggle="collapse"
+                        data-parent="#accordion"
+                        href="#collapse{{id}}"
+                        aria-expanded="false"
+                        aria-controls="collapse{{id}}">
+                        {{title}}
+                      </a>
+                    </h4>
+                  </div>
+                  <div id="collapse{{id}}"
+                    class="panel-collapse collapse"
+                    role="tabpanel"
+                    aria-labelledby="heading{{id}}">
+                    <div class="panel-body">
+                      {{content}}
+                    </div>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {% if parent_run_id %}
+        <ul class="list-group">
+          <li class="list-group-item list-group-item-heading">Parent Run</li>
+          <li class="list-group-item"><a href="/report/{{ report.parent_run_id }}">{{ report.parent_run_id }}</a></li>
+        </ul>
+        {% endif %}
+
+      </div>
+
+    </div><!-- /.container -->
+
+    <!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <!-- Include all compiled plugins (below), or include individual files as needed -->
+    <script src="{{ url_for('static', filename=assets['bootstrap_js']) }}"></script>
+    <script src="{{ url_for('static', filename=assets['hljs_js']) }}"></script>
+
+    <script>hljs.initHighlightingOnLoad();</script>
+
+    <script>
+      $('#rerun_form').submit(function(){
+          $.post($(this).attr('action'), $(this).serialize(), function(result){
+              if (result == 'success') {
+                $('#success_modal').modal('show');
+              } else {
+                $('#fail_modal').modal('show');
+              }
+          });
+          return false; // prevent default action
+      });
+
+    </script>
+
+  </body>
+</html>
