@@ -16,39 +16,19 @@
 # setup your environment. If $IMPALA_HOME is undefined
 # this script will set it to the current working directory.
 
-export JAVA_HOME=${JAVA_HOME:-/usr/java/default}
-if [ ! -d $JAVA_HOME ] ; then
-    echo "JAVA_HOME must be set to the location of your JDK!"
-    return 1
+export JAVA_HOME="${JAVA_HOME:-/usr/java/default}"
+if [ ! -d "$JAVA_HOME" ] ; then
+  echo "JAVA_HOME must be set to the location of your JDK!"
+  return 1
+fi
+export JAVA="$JAVA_HOME/bin/java"
+if [[ ! -e "$JAVA" ]]; then
+  echo "Could not find java binary at $JAVA" >&2
+  return 1
 fi
 
 if [ -z $IMPALA_HOME ]; then
-    this=${0/-/} # login-shells often have leading '-' chars
-    shell_exec=`basename $SHELL`
-    if [ "$this" = "$shell_exec" ]; then
-        # Assume we're already in IMPALA_HOME
-        interactive=1
-        export IMPALA_HOME=`pwd`
-    else
-        interactive=0
-        while [ -h "$this" ]; do
-            ls=`ls -ld "$this"`
-            link=`expr "$ls" : '.*-> \(.*\)$'`
-            if expr "$link" : '.*/.*' > /dev/null; then
-                this="$link"
-            else
-                this=`dirname "$this"`/"$link"
-            fi
-        done
-
-        # convert relative path to absolute path
-        bin=`dirname "$this"`
-        script=`basename "$this"`
-        bin=`cd "$bin"; pwd`
-        this="$bin/$script"
-
-        export IMPALA_HOME=`dirname "$bin"`
-    fi
+  export IMPALA_HOME=$(dirname $(cd $(dirname "${BASH_SOURCE[0]}") && pwd))
 fi
 
 export CDH_MAJOR_VERSION=5

@@ -14,4 +14,4 @@
 # limitations under the License.
 
 . ${IMPALA_HOME}/bin/set-classpath.sh
-java -cp $CLASSPATH com.cloudera.impala.testutil.ImpalaJdbcClient "$@"
+"$JAVA" -cp $CLASSPATH com.cloudera.impala.testutil.ImpalaJdbcClient "$@"

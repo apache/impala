@@ -17,7 +17,7 @@ export CLASSPATH=$IMPALA_HOME/testdata/target/impala-testdata-0.1-SNAPSHOT.jar:$
 RESULT=1
 RETRY_COUNT=0
 while [ $RESULT -ne 0 ] && [ $RETRY_COUNT -le 10 ]; do
-  java ${JAVA_KERBEROS_MAGIC} \
+  "$JAVA" ${JAVA_KERBEROS_MAGIC} \
      com.cloudera.impala.datagenerator.HBaseTestDataRegionAssigment \
      functional_hbase.alltypesagg functional_hbase.alltypessmall
   RESULT=$?

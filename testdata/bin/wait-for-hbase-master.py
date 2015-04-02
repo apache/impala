@@ -1,9 +1,10 @@
 # Copyright (c) Cloudera 2012.
 
 from subprocess import Popen, PIPE
-import time
+import os
 import re
 import sys
+import time
 
 now = time.time()
 TIMEOUT_SECONDS = 30.0
@@ -15,7 +16,7 @@ while time.time() - now < TIMEOUT_SECONDS:
   sys.stdout.write(".")
   sys.stdout.flush()
 
-  p = Popen(["java",
+  p = Popen([os.environ["JAVA"],
              ZK_CLASS,
              "-server",
              "localhost:2181",
