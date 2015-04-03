@@ -328,13 +328,3 @@ RIGHT ANTI JOIN functional.SemiJoinTblB b on v.b = b.b
 ---- TYPES
 INT, INT, INT
 ====
----- QUERY
-# Regression test for IMPALA-1488. Right joins should not spill any partitions
-# with hash tables with matches.
-SELECT COUNT(*) FROM tpch.lineitem l1 RIGHT OUTER JOIN tpch.lineitem l2
-ON l1.l_orderkey = l2.l_orderkey
----- RESULTS
-30012985
----- TYPES
-BIGINT
-====

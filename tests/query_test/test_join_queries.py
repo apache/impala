@@ -47,6 +47,37 @@ class TestJoinQueries(ImpalaTestSuite):
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('QueryTest/outer-joins', new_vector)
 
+class TestTPCHJoinQueries(ImpalaTestSuite):
+  # Uses the tpch dataset in order to have larger joins. Needed for example to test
+  # the repartitioning codepaths.
+  BATCH_SIZES = [0, 1]
+
+  @classmethod
+  def get_workload(cls):
+    return 'tpch'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestTPCHJoinQueries, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(
+        TestDimension('batch_size', *TestJoinQueries.BATCH_SIZES))
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('table_format').file_format in ['parquet'])
+
+    if cls.exploration_strategy() != 'exhaustive':
+      # Cut down on execution time when not running in exhaustive mode.
+      cls.TestMatrix.add_constraint(lambda v: v.get_value('batch_size') != 1)
+
+  @classmethod
+  def teardown_class(cls):
+    cls.client.execute('set mem_limit = 0');
+    super(TestTPCHJoinQueries, cls).teardown_class()
+
+  def test_outer_joins(self, vector):
+    new_vector = copy(vector)
+    new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
+    self.run_test_case('tpch-outer-joins', new_vector)
+
 @SkipIfS3.insert
 class TestSemiJoinQueries(ImpalaTestSuite):
   @classmethod

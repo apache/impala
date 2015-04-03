@@ -1,0 +1,23 @@
+====
+---- QUERY
+# Regression test for IMPALA-1488. Right joins should not spill any partitions
+# with hash tables with matches.
+SELECT COUNT(*) FROM lineitem l1 RIGHT OUTER JOIN lineitem l2
+ON l1.l_orderkey = l2.l_orderkey
+---- RESULTS
+30012985
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Regression test for IMPALA-1919. When spilled right joins and full outer joins
+# there is chance to call process batch while the out_batch is AtCapacity().
+SET mem_limit = 400m;
+SELECT COUNT(*) FROM lineitem l1 RIGHT OUTER JOIN lineitem l2
+ON l1.l_orderkey = l2.l_orderkey
+WHERE l2.l_linenumber % 2 = 0
+---- RESULTS
+13291122
+---- TYPES
+BIGINT
+====
