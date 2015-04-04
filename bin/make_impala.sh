@@ -121,7 +121,15 @@ then
   make -j${IMPALA_BUILD_THREADS:-4}
 else
   # TODO: is there a way to get CMake to do this?
-  make -j${IMPALA_BUILD_THREADS:-4} compile_to_ir_no_sse compile_to_ir_sse
   make -j${IMPALA_BUILD_THREADS:-4} impalad
   make -j${IMPALA_BUILD_THREADS:-4} statestored catalogd fesupport loggingsupport ImpalaUdf
+  # Don't execute these two commands in parallel because it might break the build as the
+  # dependency resolution of the targets does not happen independently but in parallel as
+  # well. If the targets are started sufficiently close together, the common dependencies
+  # might not be correctly built, as both targets will believe a target is built as soon
+  # as the target file exists. In the worst case, this will lead to corrupt built
+  # artifacts caused by missing or truncated object files.
+  # http://www.cmake.org/pipermail/cmake/2011-July/045256.html
+  make -j${IMPALA_BUILD_THREADS:-4} compile_to_ir_no_sse
+  make -j${IMPALA_BUILD_THREADS:-4} compile_to_ir_sse
 fi
