@@ -275,7 +275,7 @@ Status Webserver::Start() {
   UrlCallback default_callback =
       bind<void>(mem_fn(&Webserver::RootHandler), this, _1, _2);
 
-  RegisterUrlCallback("/", "root.tmpl", default_callback);
+  RegisterUrlCallback("/", "root.tmpl", default_callback, false);
 
   LOG(INFO) << "Webserver started";
   return Status::OK;
