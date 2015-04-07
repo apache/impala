@@ -143,6 +143,20 @@ public class HdfsCachingUtil {
   }
 
   /**
+   * Convenience method for working directly on a metastore partition. See
+   * uncachePartition(HdfsPartition) for more details.
+   */
+  public static void uncachePartition(
+    org.apache.hadoop.hive.metastore.api.Partition part) throws ImpalaException {
+    Preconditions.checkNotNull(part);
+    Long id = getCacheDirectiveId(part.getParameters());
+    if (id == null) return;
+    HdfsCachingUtil.removeDirective(id);
+    part.getParameters().remove(CACHE_DIR_ID_PROP_NAME);
+    part.getParameters().remove(CACHE_DIR_REPLICATION_PROP_NAME);
+  }
+
+  /**
    * Returns the cache directive ID from the given table/partition parameter
    * map. Returns null if the CACHE_DIR_ID_PROP_NAME key was not set or if
    * there was an error parsing the associated ID.

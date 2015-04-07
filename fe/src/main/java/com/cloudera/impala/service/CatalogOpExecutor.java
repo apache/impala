@@ -17,6 +17,7 @@ package com.cloudera.impala.service;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -26,6 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hive.common.StatsSetupConst;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
@@ -43,6 +45,8 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
+import org.apache.hadoop.hive.metastore.MetaStoreUtils;
+import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
@@ -160,17 +164,9 @@ public class CatalogOpExecutor {
   private final Object metastoreDdlLock_ = new Object();
   private static final Logger LOG = Logger.getLogger(CatalogOpExecutor.class);
 
-  // Only applies to partition updates after an INSERT for now.
-  private static final int NUM_CONCURRENT_METASTORE_OPERATIONS = 16;
-
   // The maximum number of partitions to update in one Hive Metastore RPC.
   // Used when persisting the results of COMPUTE STATS statements.
   private final static short MAX_PARTITION_UPDATES_PER_RPC = 500;
-
-  // Used to execute metastore updates in parallel. Currently only used for bulk
-  // partition creations.
-  private final ExecutorService executor_ =
-      Executors.newFixedThreadPool(NUM_CONCURRENT_METASTORE_OPERATIONS);
 
   public CatalogOpExecutor(CatalogServiceCatalog catalog) {
     catalog_ = catalog;
@@ -2174,81 +2170,6 @@ public class CatalogOpExecutor {
   }
 
   /**
-   * Creates a single partition in the metastore.
-   * TODO: Depending how often we do lots of metastore operations at once, might be worth
-   * making this reusable.
-   */
-  private class CreatePartitionRunnable implements Runnable {
-    private final TableName tblName_;
-    private final String partName_;
-    private final String cachePoolName_;
-    private final Short replication_;
-    private final AtomicBoolean partitionCreated_;
-    private final AtomicInteger numPartitions_;
-    private final SettableFuture<Void> allFinished_;
-    private final List<Long> cacheDirIds_;
-
-    /**
-     * Constructs a new operation to create a partition in dbName.tblName called
-     * partName. The supplied future is signaled if an error occurs, or if numPartitions
-     * is decremented to 0 after the partition creation has completed. If a partition is
-     * actually created, partitionCreated is set. If the parent table is marked as
-     * cached, cachePoolName be set to parent table pool.
-     * new partitions will attempt to be cached in cachePoolName. If cachePoolName is
-     * null it indicates the parent table was not cached. All new cache directive ids
-     * are stored in cacheDirIds.
-     */
-    public CreatePartitionRunnable(TableName tblName,
-        String partName, String cachePoolName, AtomicBoolean partitionCreated,
-        SettableFuture<Void> allFinished, AtomicInteger numPartitions,
-        List<Long> cacheDirIds, Short cacheReplication) {
-      tblName_ = tblName;
-      partName_ = partName;
-      cachePoolName_ = cachePoolName;
-      partitionCreated_ = partitionCreated;
-      allFinished_ = allFinished;
-      numPartitions_ = numPartitions;
-      cacheDirIds_ = cacheDirIds;
-      replication_ = cacheReplication;
-    }
-
-    public void run() {
-      // If there was an exception in another operation, abort
-      if (allFinished_.isDone()) return;
-      MetaStoreClient msClient = catalog_.getMetaStoreClient();
-      try {
-        LOG.debug("Creating partition: " + partName_ + " in table: " + tblName_);
-        org.apache.hadoop.hive.metastore.api.Partition part = msClient.getHiveClient()
-            .appendPartitionByName(tblName_.getDb(), tblName_.getTbl(), partName_);
-        if (cachePoolName_ != null) {
-          // Submit a new cache directive and update the partition metadata the
-          // directive id.
-          long id = HdfsCachingUtil.submitCachePartitionDirective(
-              part, cachePoolName_, replication_);
-          synchronized (cacheDirIds_) {
-            cacheDirIds_.add(id);
-          }
-          msClient.getHiveClient().alter_partition(tblName_.getDb(),
-              tblName_.getTbl(), part);
-        }
-        partitionCreated_.set(true);
-      } catch (AlreadyExistsException e) {
-        LOG.debug("Ignoring partition " + partName_ + ", since it already exists");
-        // Ignore since partition already exists.
-      } catch (Exception e) {
-        allFinished_.setException(e);
-      } finally {
-        msClient.release();
-      }
-
-      // If this is the last operation to complete, signal the future
-      if (numPartitions_.decrementAndGet() == 0) {
-        allFinished_.set(null);
-      }
-    }
-  }
-
-  /**
    * Executes a TResetMetadataRequest and returns the result as a
    * TResetMetadataResponse. Based on the request parameters, this operation
    * may do one of three things:
@@ -2378,8 +2299,7 @@ public class CatalogOpExecutor {
     }
 
     TableName tblName = new TableName(table.getDb().getName(), table.getName());
-    AtomicBoolean addedNewPartition = new AtomicBoolean(false);
-
+    List<String> errorMessages = Lists.newArrayList();
     if (table.getNumClusteringCols() > 0) {
       // Set of all partition names targeted by the insert that that need to be created
       // in the Metastore (partitions that do not currently exist in the catalog).
@@ -2410,37 +2330,87 @@ public class CatalogOpExecutor {
       }
 
       if (!partsToCreate.isEmpty()) {
-        SettableFuture<Void> allFinished = SettableFuture.create();
-        AtomicInteger numPartitions = new AtomicInteger(partsToCreate.size());
-        // Add all partitions to metastore.
-        for (String partName: partsToCreate) {
-          Preconditions.checkState(partName != null && !partName.isEmpty());
-          CreatePartitionRunnable rbl = new CreatePartitionRunnable(tblName, partName,
-              cachePoolName, addedNewPartition, allFinished, numPartitions,
-              cacheDirIds, cacheReplication);
-          executor_.execute(rbl);
-        }
-
+        MetaStoreClient msClient = catalog_.getMetaStoreClient();
         try {
-          // Will throw if any operation calls setException
-          allFinished.get();
+          org.apache.hadoop.hive.metastore.api.Table msTbl = getMetaStoreTable(tblName);
+          List<org.apache.hadoop.hive.metastore.api.Partition> hmsParts =
+              Lists.newArrayList();
+          HiveConf hiveConf = new HiveConf(this.getClass());
+          Warehouse warehouse = new Warehouse(hiveConf);
+          for (String partName: partsToCreate) {
+            org.apache.hadoop.hive.metastore.api.Partition partition =
+                new org.apache.hadoop.hive.metastore.api.Partition();
+            hmsParts.add(partition);
+
+            partition.setDbName(tblName.getDb());
+            partition.setTableName(tblName.getTbl());
+            partition.setValues(getPartValsFromName(msTbl, partName));
+            partition.setParameters(new HashMap<String, String>());
+            partition.setSd(msTbl.getSd().deepCopy());
+            partition.getSd().setSerdeInfo(msTbl.getSd().getSerdeInfo().deepCopy());
+            partition.getSd().setLocation(msTbl.getSd().getLocation() + "/" +
+                partName.substring(0, partName.length() - 1));
+            MetaStoreUtils.updatePartitionStatsFast(partition, warehouse);
+          }
+
+          // First add_partitions and then alter_partitions the successful ones with
+          // caching directives. The reason is that some partitions could have been
+          // added concurrently, and we want to avoid caching a partition twice and
+          // leaking a caching directive.
+          List<org.apache.hadoop.hive.metastore.api.Partition> addedHmsParts =
+              msClient.getHiveClient().add_partitions(hmsParts, true, true);
+
+          if (addedHmsParts.size() > 0) {
+            if (cachePoolName != null) {
+              List<org.apache.hadoop.hive.metastore.api.Partition> cachedHmsParts =
+                  Lists.newArrayList();
+              // Submit a new cache directive and update the partition metadata with
+              // the directive id.
+              for (org.apache.hadoop.hive.metastore.api.Partition part: addedHmsParts) {
+                try {
+                  cacheDirIds.add(HdfsCachingUtil.submitCachePartitionDirective(
+                      part, cachePoolName, cacheReplication));
+                  cachedHmsParts.add(part);
+                } catch (ImpalaRuntimeException e) {
+                  String msg = String.format("Partition %s.%s(%s): State: Not cached." +
+                      " Action: Cache manully via 'ALTER TABLE'.",
+                      part.getDbName(), part.getTableName(), part.getValues());
+                  LOG.error(msg, e);
+                  errorMessages.add(msg);
+                }
+              }
+              try {
+                msClient.getHiveClient().alter_partitions(tblName.getDb(),
+                    tblName.getTbl(), cachedHmsParts);
+              } catch (Exception e) {
+                LOG.error("Failed in alter_partitions: ", e);
+                // Try to uncache the partitions when the alteration in the HMS failed.
+                for (org.apache.hadoop.hive.metastore.api.Partition part:
+                    cachedHmsParts) {
+                  try {
+                    HdfsCachingUtil.uncachePartition(part);
+                  } catch (ImpalaException e1) {
+                    String msg = String.format(
+                        "Partition %s.%s(%s): State: Leaked caching directive. " +
+                        "Action: Manually uncache directory %s via hdfs cacheAdmin.",
+                        part.getDbName(), part.getTableName(), part.getValues(),
+                        part.getSd().getLocation());
+                    LOG.error(msg, e);
+                    errorMessages.add(msg);
+                  }
+                }
+              }
+            }
+            updateLastDdlTime(msTbl, msClient);
+          }
+        } catch (AlreadyExistsException e) {
+          throw new InternalException(
+              "AlreadyExistsException thrown although ifNotExists given", e);
         } catch (Exception e) {
-          throw new InternalException("Error updating metastore", e);
+          throw new InternalException("Error adding partitions", e);
+        } finally {
+          msClient.release();
         }
-      }
-    }
-    if (addedNewPartition.get()) {
-      MetaStoreClient msClient = catalog_.getMetaStoreClient();
-      try {
-        // Operate on a copy of msTbl to prevent our cached msTbl becoming inconsistent
-        // if the alteration fails in the metastore.
-        org.apache.hadoop.hive.metastore.api.Table msTbl =
-            table.getMetaStoreTable().deepCopy();
-        updateLastDdlTime(msTbl, msClient);
-      } catch (Exception e) {
-        throw new InternalException("Error updating lastDdlTime", e);
-      } finally {
-        msClient.release();
       }
     }
 
@@ -2449,14 +2419,38 @@ public class CatalogOpExecutor {
 
     response.setResult(new TCatalogUpdateResult());
     response.getResult().setCatalog_service_id(JniCatalog.getServiceId());
-    response.getResult().setStatus(
-        new TStatus(TErrorCode.OK, new ArrayList<String>()));
+    if (errorMessages.size() > 0) {
+      errorMessages.add("Please refer to the catalogd error log for details " +
+          "regarding the failed un/caching operations.");
+      response.getResult().setStatus(
+          new TStatus(TErrorCode.INTERNAL_ERROR, errorMessages));
+    } else {
+      response.getResult().setStatus(
+          new TStatus(TErrorCode.OK, new ArrayList<String>()));
+    }
     // Perform an incremental refresh to load new/modified partitions and files.
     Table refreshedTbl = catalog_.reloadTable(tblName.toThrift());
     response.getResult().setUpdated_catalog_object(TableToTCatalogObject(refreshedTbl));
     response.getResult().setVersion(
         response.getResult().getUpdated_catalog_object().getCatalog_version());
     return response;
+  }
+
+  private List<String> getPartValsFromName(org.apache.hadoop.hive.metastore.api.Table
+      msTbl, String partName) throws MetaException, CatalogException {
+    Preconditions.checkNotNull(msTbl);
+    LinkedHashMap<String, String> hm =
+        org.apache.hadoop.hive.metastore.Warehouse.makeSpecFromName(partName);
+    List<String> partVals = Lists.newArrayList();
+    for (FieldSchema field: msTbl.getPartitionKeys()) {
+      String key = field.getName();
+      String val = hm.get(key);
+      if (val == null) {
+        throw new CatalogException("Incomplete partition name - missing " + key);
+      }
+      partVals.add(val);
+    }
+    return partVals;
   }
 
   /**
