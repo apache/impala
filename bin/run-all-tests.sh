@@ -25,13 +25,13 @@ set -e
 # Allow picking up strategy from environment
 : ${EXPLORATION_STRATEGY:=core}
 : ${NUM_TEST_ITERATIONS:=1}
+: ${MAX_PYTEST_FAILURES:=10}
 KERB_ARGS=""
 
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 if ${CLUSTER_DIR}/admin is_kerberized; then
   KERB_ARGS="--use_kerberos"
 fi
-
 
 # Parametrized Test Options
 # Run FE Tests
@@ -81,13 +81,16 @@ fi
 
 for i in $(seq 1 $NUM_TEST_ITERATIONS)
 do
+  TEST_RET_CODE=0
   # Preemptively force kill impalads and the statestore to clean up any running instances.
   # The BE unit tests cannot run when impalads are started.
   ${IMPALA_HOME}/bin/start-impala-cluster.py --kill_only --force
 
   if [[ "$BE_TEST" = true ]]; then
     # Run backend tests.
-    ${IMPALA_HOME}/bin/run-backend-tests.sh
+    if ! ${IMPALA_HOME}/bin/run-backend-tests.sh; then
+      TEST_RET_CODE=1
+    fi
   fi
 
   # Increase the admission controller max_requests to prevent builds failing due to
@@ -96,15 +99,19 @@ do
       --impalad_args=--default_pool_max_requests=500
 
   # Run some queries using run-workload to verify run-workload has not been broken.
-  ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1\
-      --table_format=text/none --exec_options="disable_codegen:False" ${KERB_ARGS}
+  if ! ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1 \
+       --table_format=text/none --exec_options="disable_codegen:False" ${KERB_ARGS}; then
+    TEST_RET_CODE=1
+  fi
 
   if [[ "$FE_TEST" = true ]]; then
     # Run JUnit frontend tests
     # Requires a running impalad cluster because some tests (such as DataErrorTest and
     # JdbcTest) queries against an impala cluster.
     pushd ${IMPALA_FE_DIR}
-    mvn test
+    if ! mvn -fae test; then
+      TEST_RET_CODE=1
+    fi
     popd
   fi
 
@@ -113,11 +120,13 @@ do
     # functional-query workload because the larger datasets (ex. tpch) are not generated
     # in all table formats.
     # KERBEROS TODO - this will need to deal with ${KERB_ARGS}
-    ${IMPALA_HOME}/tests/run-tests.py -x --exploration_strategy=core \
-      --workload_exploration_strategy=functional-query:$EXPLORATION_STRATEGY \
-      ${EE_TEST_FILES} #${KERB_ARGS}
+    if ! ${IMPALA_HOME}/tests/run-tests.py --maxfail=${MAX_PYTEST_FAILURES} \
+         --exploration_strategy=core \
+         --workload_exploration_strategy=functional-query:$EXPLORATION_STRATEGY \
+         ${EE_TEST_FILES}; then #${KERB_ARGS};
+      TEST_RET_CODE=1
+    fi
   fi
-
 
   if [[ "$JDBC_TEST" = true ]]; then
     # Run the JDBC tests with background loading disabled. This is interesting because
@@ -125,7 +134,9 @@ do
     ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} --cluster_size=3 \
       --catalogd_args=--load_catalog_in_background=false
     pushd ${IMPALA_FE_DIR}
-    mvn test -Dtest=JdbcTest
+    if ! mvn test -Dtest=JdbcTest; then
+      TEST_RET_CODE=1
+    fi
     popd
   fi
 
@@ -133,11 +144,17 @@ do
     # Run the custom-cluster tests after all other tests, since they will restart the
     # cluster repeatedly and lose state.
     # TODO: Consider moving in to run-tests.py.
-    ${IMPALA_HOME}/tests/run-custom-cluster-tests.sh
+    if ! ${IMPALA_HOME}/tests/run-custom-cluster-tests.sh \
+         --maxfail=${MAX_PYTEST_FAILURES}; then
+      TEST_RET_CODE=1
+    fi
   fi
 
   # Finally, run the process failure tests.
   # Disabled temporarily until we figure out the proper timeouts required to make the test
   # succeed.
   # ${IMPALA_HOME}/tests/run-process-failure-tests.sh
+  if [ $TEST_RET_CODE == 1 ]; then
+    exit $TEST_RET_CODE
+  fi
 done

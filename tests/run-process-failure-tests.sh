@@ -22,11 +22,11 @@ set -u
 RESULTS_DIR=${IMPALA_HOME}/tests/results
 mkdir -p ${RESULTS_DIR}
 
-cd ${IMPALA_HOME}/tests
-. ${IMPALA_HOME}/bin/set-classpath.sh
+pushd ${IMPALA_HOME}/tests
+. ${IMPALA_HOME}/bin/set-classpath.sh &> /dev/null
 py.test experiments/test_process_failures.py \
     --junitxml="${RESULTS_DIR}/TEST-impala-proc-failure.xml" \
     --resultlog="${RESULTS_DIR}/TEST-impala-proc-failure.log" "$@"
 EXIT_CODE=$?
-cd ~
+popd
 exit $EXIT_CODE

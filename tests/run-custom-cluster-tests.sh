@@ -34,11 +34,11 @@ fi
 export LOG_DIR
 
 # KERBEROS TODO We'll want to pass kerberos status in here.
-cd ${IMPALA_HOME}/tests
-. ${IMPALA_HOME}/bin/set-classpath.sh
+pushd ${IMPALA_HOME}/tests
+. ${IMPALA_HOME}/bin/set-classpath.sh &> /dev/null
 py.test custom_cluster/ authorization/ ${AUX_CUSTOM_DIR} \
     --junitxml="${RESULTS_DIR}/TEST-impala-custom-cluster.xml" \
     --resultlog="${RESULTS_DIR}/TEST-impala-custom-cluster.log" "$@"
 EXIT_CODE=$?
-cd ~
+popd
 exit $EXIT_CODE
