@@ -1,0 +1,25 @@
+====
+---- QUERY: TPCH-Q17
+# Q17 - Small-Quantity-Order Revenue Query
+select
+  sum(l_extendedprice) / 7.0 as avg_yearly
+from
+  tpch_nested_parquet.customer.c_orders.o_lineitems l,
+  tpch_nested_parquet.part p
+where
+  p_partkey = l_partkey
+  and p_brand = 'Brand#23'
+  and p_container = 'MED BOX'
+  and l_quantity < (
+    select
+      0.2 * avg(l_quantity)
+    from
+      tpch_nested_parquet.customer.c_orders.o_lineitems l
+    where
+      l_partkey = p_partkey
+  )
+---- RESULTS
+348406.05
+---- TYPES
+decimal
+====

@@ -1,0 +1,21 @@
+====
+---- QUERY: TPCH-Q14
+# Q14 - Promotion Effect
+select
+  100.00 * sum(case
+    when p_type like 'PROMO%'
+    then l_extendedprice * (1 - l_discount)
+    else 0.0
+    end) / sum(l_extendedprice * (1 - l_discount)) as promo_revenue
+from
+  tpch_nested_parquet.customer.c_orders.o_lineitems l,
+  tpch_nested_parquet.part p
+where
+  l_partkey = p_partkey
+  and l_shipdate >= '1995-09-01'
+  and l_shipdate < '1995-10-01'
+---- RESULTS
+16.380778
+---- TYPES
+decimal
+====

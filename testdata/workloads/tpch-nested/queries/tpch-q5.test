@@ -1,0 +1,33 @@
+====
+---- QUERY: TPCH-Q5
+# Q5 - Local Supplier Volume Query
+select
+  n_name,
+  sum(l_extendedprice * (1 - l_discount)) as revenue
+from
+  tpch_nested_parquet.customer c,
+  c.c_orders o,
+  o.o_lineitems l,
+  tpch_nested_parquet.supplier s,
+  tpch_nested_parquet.region r,
+  r.r_nations n
+where
+  l_suppkey = s_suppkey
+  and c_nationkey = s_nationkey
+  and s_nationkey = n_nationkey
+  and r_name = 'ASIA'
+  and o_orderdate >= '1994-01-01'
+  and o_orderdate < '1995-01-01'
+group by
+  n_name
+order by
+  revenue desc
+---- RESULTS
+'INDONESIA',55502041.1697
+'VIETNAM',55295086.9967
+'CHINA',53724494.2566
+'INDIA',52035512.0002
+'JAPAN',45410175.6954
+---- TYPES
+string, decimal
+====

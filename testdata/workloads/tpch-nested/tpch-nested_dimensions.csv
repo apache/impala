@@ -1,0 +1,4 @@
+file_format: parquet
+dataset: tpch_nested
+compression_codec: none
+compression_type: none

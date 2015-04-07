@@ -1,0 +1,38 @@
+====
+---- QUERY: TPCH-Q3
+# Q3 - Shipping Priority Query
+select
+  o_orderkey,
+  sum(l_extendedprice * (1 - l_discount)) as revenue,
+  o_orderdate,
+  o_shippriority
+from
+  tpch_nested_parquet.customer c,
+  c.c_orders o,
+  o.o_lineitems l
+where
+  c_mktsegment = 'BUILDING'
+  and o_orderdate < '1995-03-15'
+  and l_shipdate > '1995-03-15'
+group by
+  o_orderkey,
+  o_orderdate,
+  o_shippriority
+order by
+  revenue desc,
+  o_orderdate
+limit 10
+---- RESULTS
+2456423,406181.0111,'1995-03-05',0
+3459808,405838.6989,'1995-03-04',0
+492164,390324.0610,'1995-02-19',0
+1188320,384537.9359,'1995-03-09',0
+2435712,378673.0558,'1995-02-26',0
+4878020,378376.7952,'1995-03-12',0
+5521732,375153.9215,'1995-03-13',0
+2628192,373133.3094,'1995-02-22',0
+993600,371407.4595,'1995-03-05',0
+2300070,367371.1452,'1995-03-13',0
+---- TYPES
+BIGINT, DECIMAL, STRING, INT
+====
