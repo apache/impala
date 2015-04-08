@@ -15,16 +15,18 @@ from __future__ import division
 
 import difflib
 import json
-import math
+import logging
 import os
-import re
 import prettytable
+import re
 from collections import defaultdict
 from datetime import date, datetime
 from optparse import OptionParser
+from perf_result_datastore import PerfResultDataStore
 from tests.util.calculation_util import (
     calculate_tval, calculate_avg, calculate_stddev, calculate_geomean)
-from time import gmtime, strftime
+
+LOG = logging.getLogger(__name__)
 
 # String constants
 AVG = 'avg'
@@ -92,6 +94,8 @@ parser.add_option("--build_version", dest="build_version", default='UNKNOWN',
 parser.add_option("--lab_run_info", dest="lab_run_info", default='UNKNOWN',
                  help="Information about the lab run (name/id) that published "\
                  "the results.")
+parser.add_option("--run_user_name", dest="run_user_name", default='anonymous',
+                 help="User name that this run is associated with in the perf database")
 parser.add_option("--tval_threshold", dest="tval_threshold", default=None,
                  type="float", help="The ttest t-value at which a performance change "\
                  "will be flagged as sigificant.")
@@ -117,12 +121,10 @@ parser.add_option("--is_official", dest="is_official", action="store_true",
                  default= False, help='Indicates this is an official perf run result')
 parser.add_option("--db_host", dest="db_host", default='localhost',
                  help="Machine hosting the database")
-parser.add_option("--db_name", dest="db_name", default='perf_results',
+parser.add_option("--db_port", dest="db_port", default='21050',
+                 help="Port on the machine hosting the database")
+parser.add_option("--db_name", dest="db_name", default='impala_perf_results',
                  help="Name of the perf database.")
-parser.add_option("--db_username", dest="db_username", default='hiveuser',
-                 help="Username used to connect to the database.")
-parser.add_option("--db_password", dest="db_password", default='password',
-                 help="Password used to connect to the the database.")
 options, args = parser.parse_args()
 
 def get_dict_from_json(filename):
@@ -358,7 +360,7 @@ class Report(object):
         try:
           save_runtime_diffs(results, ref_results, self.perf_change, self.is_regression)
         except Exception as e:
-          print 'Could not generate an html diff: %s' % e
+          LOG.error('Could not generate an html diff: {0}'.format(e))
 
     def __check_perf_change_significance(self, stat, ref_stat):
       absolute_difference = abs(ref_stat[AVG] - stat[AVG])
@@ -1050,59 +1052,35 @@ def build_summary_header(current_impala_version, ref_impala_version):
 def write_results_to_datastore(grouped):
   """ Saves results to a database """
 
-  from perf_result_datastore import PerfResultDataStore
-  print 'Saving perf results to database'
-  current_date = datetime.now()
-  data_store = PerfResultDataStore(host=options.db_host, username=options.db_username,
-      password=options.db_password, database_name=options.db_name)
+  LOG.info('Saving perf results to database')
+  run_date = str(datetime.now())
 
-  run_info_id = data_store.insert_run_info(options.lab_run_info)
-  for results in all_query_results(grouped):
-    first_query_result = results[RESULT_LIST][0]
-    executor_name = first_query_result[EXECUTOR_NAME]
-    workload = first_query_result[QUERY][WORKLOAD_NAME]
-    scale_factor = first_query_result[QUERY][SCALE_FACTOR]
-    query_name = first_query_result[QUERY][NAME]
-    query = first_query_result[QUERY][QUERY_STR]
-    file_format = first_query_result[QUERY][TEST_VECTOR][FILE_FORMAT]
-    compression_codec = first_query_result[QUERY][TEST_VECTOR][COMPRESSION_CODEC]
-    compression_type = first_query_result[QUERY][TEST_VECTOR][COMPRESSION_TYPE]
-    avg_time = results[AVG]
-    stddev = results[STDDEV]
-    num_clients = results[NUM_CLIENTS]
-    num_iterations = results[ITERATIONS]
-    runtime_profile = first_query_result[RUNTIME_PROFILE]
+  with PerfResultDataStore(
+      host=options.db_host,
+      port=options.db_port,
+      database_name=options.db_name) as data_store:
 
-    file_type_id = data_store.get_file_format_id(
-        file_format, compression_codec, compression_type)
-    if file_type_id is None:
-      print 'Skipping unkown file type: %s / %s' % (file_format, compression)
-      continue
+    for results in all_query_results(grouped):
+      for query_result in results[RESULT_LIST]:
 
-    workload_id = data_store.get_workload_id(workload, scale_factor)
-    if workload_id is None:
-      workload_id = data_store.insert_workload_info(workload, scale_factor)
-
-    query_id = data_store.get_query_id(query_name, query)
-    if query_id is None:
-      query_id = data_store.insert_query_info(query_name, query)
-
-    data_store.insert_execution_result(
-        query_id = query_id,
-        workload_id = workload_id,
-        file_type_id = file_type_id,
-        num_clients = num_clients,
-        cluster_name = options.cluster_name,
-        executor_name = executor_name,
-        avg_time = avg_time,
-        stddev = stddev,
-        run_date = current_date,
-        version = options.build_version,
-        notes = options.report_description,
-        run_info_id = run_info_id,
-        num_iterations = num_iterations,
-        runtime_profile = runtime_profile,
-        is_official = options.is_official)
+        data_store.insert_execution_result(
+             query_name=query_result[QUERY][NAME],
+             query_string=query_result[QUERY][QUERY_STR],
+             workload_name=query_result[QUERY][WORKLOAD_NAME],
+             scale_factor=query_result[QUERY][SCALE_FACTOR],
+             file_format=query_result[QUERY][TEST_VECTOR][FILE_FORMAT],
+             compression_codec=query_result[QUERY][TEST_VECTOR][COMPRESSION_CODEC],
+             compression_type=query_result[QUERY][TEST_VECTOR][COMPRESSION_TYPE],
+             num_clients=results[NUM_CLIENTS],
+             num_iterations=results[ITERATIONS],
+             cluster_name=options.cluster_name,
+             executor_name=query_result[EXECUTOR_NAME],
+             exec_time=query_result[TIME_TAKEN],
+             run_date=run_date,
+             version=options.build_version,
+             run_info=options.lab_run_info,
+             user_name=options.run_user_name,
+             runtime_profile=query_result[RUNTIME_PROFILE])
 
 if __name__ == "__main__":
   """Workflow:
@@ -1112,6 +1090,8 @@ if __name__ == "__main__":
   3. Construct a string with a an overview of workload runtime and detailed performance
      comparison for queries with significant performance change.
   """
+
+  logging.basicConfig(level=logging.DEBUG if options.verbose else logging.INFO)
 
   # Generate a dictionary based on the JSON file
   grouped = get_dict_from_json(options.result_file)
@@ -1123,7 +1103,7 @@ if __name__ == "__main__":
   except Exception as e:
     # If reference result file could not be read we can still continue. The result can
     # be saved to the performance database.
-    print 'Could not read reference result file: %s' % e
+    LOG.error('Could not read reference result file: {0}'.format(e))
     ref_grouped = None
 
   ref_impala_version = get_impala_version(ref_grouped) if ref_grouped else 'N/A'

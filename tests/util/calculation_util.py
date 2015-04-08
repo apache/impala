@@ -19,6 +19,8 @@
 # dependencies.
 
 import math
+import random
+import string
 
 def calculate_avg(values):
   return sum(values) / float(len(values))
@@ -59,3 +61,7 @@ def calculate_tval(avg, stddev, iters, ref_avg, ref_stddev, ref_iters):
   # t = (X1 - X2) / SEM
   sem = math.sqrt((math.pow(stddev, 2) / iters) + (math.pow(ref_stddev, 2) / ref_iters))
   return (avg - ref_avg) / sem
+
+def get_random_id(length):
+  return ''.join(
+      random.choice(string.ascii_uppercase + string.digits) for _ in range(length))
