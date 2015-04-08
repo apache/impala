@@ -36,3 +36,13 @@ SELECT * from bad_compressed_size
 ---- CATCH
 Column 0 has invalid column offsets (offset=4, size=1000000, file_size=245)
 ====
+---- QUERY
+# Parquet file with required fields.
+select * from kite_required_fields
+---- TYPES
+bigint,bigint,string,string,boolean,boolean,bigint,bigint,bigint,bigint
+---- RESULTS
+1,2,'foo','bar',true,false,1,2,3,4
+1,NULL,'foo','NULL',true,NULL,NULL,NULL,3,4
+100,NULL,'foooo','NULL',false,NULL,NULL,NULL,300,400
+====

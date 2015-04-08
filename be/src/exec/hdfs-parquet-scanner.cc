@@ -729,7 +729,7 @@ inline int HdfsParquetScanner::BaseColumnReader::ReadDefinitionLevel() {
   if (max_def_level() == 0) {
     // This column and any containing structs are required so there is nothing encoded for
     // the definition levels.
-    return 1;
+    return 0;
   }
 
   uint8_t definition_level;

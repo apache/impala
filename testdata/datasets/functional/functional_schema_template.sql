@@ -1316,6 +1316,28 @@ ${IMPALA_HOME}/testdata/data/bad_compressed_size.parquet \
 /test-warehouse/bad_compressed_size_parquet/
 ====
 ---- DATASET
+-- Parquet file with required columns written by Kite. Hive and Impala always write files
+-- with fields as optional.
+functional
+---- BASE_TABLE_NAME
+kite_required_fields
+---- COLUMNS
+req_int bigint
+opt_int bigint
+req_string string
+opt_string string
+req_bool boolean
+opt_bool boolean
+opt_int_2 bigint
+opt_int_3 bigint
+req_int_2 bigint
+req_int_3 bigint
+---- LOAD
+`hadoop fs -mkdir -p /test-warehouse/kite_required_fields_parquet && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/kite_required_fields.parquet \
+/test-warehouse/kite_required_fields_parquet/
+====
+---- DATASET
 functional
 ---- BASE_TABLE_NAME
 bad_serde
