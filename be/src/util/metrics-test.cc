@@ -176,6 +176,20 @@ TEST_F(MetricsTest, StatsMetrics) {
       "max: 2.00 B, mean: 1.00 B, stddev: 0.82 B");
 }
 
+TEST_F(MetricsTest, StatsMetricsSingle) {
+  MetricGroup metrics("StatsMetrics");
+  StatsMetric<int, StatsType::MAX | StatsType::MEAN>*
+      stats_metric =
+      StatsMetric<int, StatsType::MAX | StatsType::MEAN>::CreateAndRegister(&metrics,
+          "impala-server.io.mgr.cached-file-handles-hit-ratio");
+  EXPECT_EQ(stats_metric->ToHumanReadable(), "");
+  stats_metric->Update(3);
+  stats_metric->Update(10);
+  stats_metric->Update(2);
+
+  EXPECT_EQ(stats_metric->ToHumanReadable(), "last: 2, max: 10, mean: 5.000000");
+}
+
 TEST_F(MetricsTest, MemMetric) {
 #ifndef ADDRESS_SANITIZER
   MetricGroup metrics("MemMetrics");

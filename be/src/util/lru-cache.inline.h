@@ -28,7 +28,8 @@ FifoMultimap<Key, Value>::~FifoMultimap() {
 template <typename Key, typename Value>
 void FifoMultimap<Key, Value>::Put(const Key& k, const Value& v) {
   boost::lock_guard<SpinLock> g(lock_);
-  if (lru_list_.size() >= capacity_) EvictValue();
+  if (capacity_ <= 0) return;
+  if (size_ >= capacity_) EvictValue();
   const ValueType& kv_pair = std::make_pair(k, v);
   const typename MapType::value_type& val =
       std::make_pair(k, lru_list_.insert(lru_list_.end(), kv_pair));
@@ -41,6 +42,7 @@ void FifoMultimap<Key, Value>::Put(const Key& k, const Value& v) {
     // sequence of elements having the same key
     cache_.insert(it, val);
   }
+  ++size_;
 }
 
 template <typename Key, typename Value>
@@ -50,14 +52,16 @@ bool FifoMultimap<Key, Value>::Pop(const Key& k, Value* out) {
   typename MapType::iterator it = cache_.lower_bound(k);
   if (it == cache_.end() || it->first != k) return false;
   typename ListType::iterator lit = it->second;
-  cache_.erase(it);
   *out = lit->second;
   lru_list_.erase(lit);
+  cache_.erase(it);
+  --size_;
   return true;
 }
 
 template <typename Key, typename Value>
 void FifoMultimap<Key, Value>::EvictValue() {
+  DCHECK(!lru_list_.empty());
   typename ListType::iterator to_evict = lru_list_.begin();
   // Find all elements under this key, until C++11 the order of the elements is not
   // guaranteed.
@@ -72,8 +76,9 @@ void FifoMultimap<Key, Value>::EvictValue() {
     ++range.first;
   }
   DCHECK(range.first != range.second); // LCOV_EXCL_LINE
-  deleter_(&(*to_evict).second);
+  deleter_(&(to_evict->second));
   lru_list_.erase(to_evict);
+  --size_;
 }
 
 }

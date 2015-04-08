@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <fcntl.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <boost/filesystem.hpp>
 #include <gutil/strings/substitute.h>
@@ -123,6 +124,12 @@ Status FileSystemUtil::GetSpaceAvailable(const string& directory_path,
   }
 
   return Status::OK();
+}
+
+uint64_t FileSystemUtil::MaxNumFileHandles() {
+  struct rlimit data;
+if (getrlimit(RLIMIT_NOFILE, &data) == 0) return static_cast<uint64_t>(data.rlim_cur);
+  return 0ul;
 }
 
 } // namespace impala

@@ -17,6 +17,7 @@
 #define IMPALA_UTIL_IMPALAD_METRICS_H
 
 #include "util/metrics.h"
+#include "util/collection-metrics.h"
 
 namespace impala {
 
@@ -87,6 +88,21 @@ class ImpaladMetricKeys {
   /// Total number of bytes written to disk by the io mgr (for spilling)
   static const char* IO_MGR_BYTES_WRITTEN;
 
+  /// Number of unbuffered file handles cached by the io mgr
+  static const char* IO_MGR_NUM_CACHED_FILE_HANDLES;
+
+  /// Number of file handles that are open and not cached
+  static const char* IO_MGR_NUM_FILE_HANDLES_OUTSTANDING;
+
+  /// Hit ratio for the cached HDFS file handles
+  static const char* IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO;
+
+  /// Number of cache hits for cached HDFS file handles
+  static const char* IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT;
+
+  /// Number of cache misses for cached HDFS file handles
+  static const char* IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT;
+
   /// Number of DBs in the catalog
   static const char* CATALOG_NUM_DBS;
 
@@ -145,6 +161,10 @@ class ImpaladMetrics {
   static IntGauge* IO_MGR_NUM_BUFFERS;
   static IntGauge* IO_MGR_NUM_OPEN_FILES;
   static IntGauge* IO_MGR_NUM_UNUSED_BUFFERS;
+  static IntGauge* IO_MGR_NUM_CACHED_FILE_HANDLES;
+  static IntGauge* IO_MGR_NUM_FILE_HANDLES_OUTSTANDING;
+  static IntGauge* IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT;
+  static IntGauge* IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT;
   static IntGauge* IO_MGR_TOTAL_BYTES;
   static IntGauge* IO_MGR_BYTES_READ;
   static IntGauge* IO_MGR_LOCAL_BYTES_READ;
@@ -163,6 +183,9 @@ class ImpaladMetrics {
   // Histograms
   static HistogramMetric* QUERY_DURATIONS;
   static HistogramMetric* DDL_DURATIONS;
+
+  // Other
+  static StatsMetric<uint64_t, StatsType::MEAN>* IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO;
 
   // Creates and initializes all metrics above in 'm'.
   static void CreateMetrics(MetricGroup* m);

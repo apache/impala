@@ -104,13 +104,28 @@ class SetMetric : public Metric {
   std::set<T> value_;
 };
 
-/// Metric which accumulates min, max and mean of all values, plus a count of samples seen.
-/// Printed output looks like:
-/// name: count: 4, last: 0.0141, min: 4.546e-06, max: 0.0243, mean: 0.0336, stddev: 0.0336
-//
+/// Enum to define which statistic types are available in the StatsMetric
+struct StatsType {
+  enum type {
+    MIN = 1,
+    MAX = 2,
+    MEAN = 4,
+    STDDEV = 8,
+    COUNT = 16,
+    ALL = 31
+  };
+};
+
+/// Metric which accumulates min, max and mean of all values, plus a count of samples
+/// seen. The output can be controlled by passing a bitmask as a template parameter to
+/// indicate which values should be printed or returned as JSON.
+///
+/// Printed output looks like: name: count:
+/// 4, last: 0.0141, min: 4.546e-06, max: 0.0243, mean: 0.0336, stddev: 0.0336
+///
 /// After construction, all statistics are ill-defined, but count will be 0. The first call
 /// to Update() will initialise all stats.
-template <typename T>
+template <typename T, int StatsSelection=StatsType::ALL>
 class StatsMetric : public Metric {
  public:
   static StatsMetric* CreateAndRegister(MetricGroup* metrics, const std::string& key,
@@ -140,19 +155,33 @@ class StatsMetric : public Metric {
     rapidjson::Value units(PrintTUnit(unit_).c_str(), document->GetAllocator());
     container.AddMember("units", units, document->GetAllocator());
 
-    container.AddMember("count", boost::accumulators::count(acc_),
-        document->GetAllocator());
+    if (StatsSelection & StatsType::COUNT) {
+      container.AddMember("count", boost::accumulators::count(acc_),
+          document->GetAllocator());
+    }
 
     if (boost::accumulators::count(acc_) > 0) {
       container.AddMember("last", value_, document->GetAllocator());
-      container.AddMember("min", boost::accumulators::min(acc_),
+
+      if (StatsSelection & StatsType::MIN) {
+        container.AddMember("min", boost::accumulators::min(acc_),
+            document->GetAllocator());
+      }
+
+      if (StatsSelection & StatsType::MAX) {
+        container.AddMember("max", boost::accumulators::max(acc_),
+            document->GetAllocator());
+      }
+
+      if (StatsSelection & StatsType::MEAN) {
+        container.AddMember("mean", boost::accumulators::mean(acc_),
           document->GetAllocator());
-      container.AddMember("max", boost::accumulators::max(acc_),
-          document->GetAllocator());
-      container.AddMember("mean", boost::accumulators::mean(acc_),
-          document->GetAllocator());
-      container.AddMember("stddev", sqrt(boost::accumulators::variance(acc_)),
-          document->GetAllocator());
+      }
+
+      if (StatsSelection & StatsType::STDDEV) {
+        container.AddMember("stddev", sqrt(boost::accumulators::variance(acc_)),
+            document->GetAllocator());
+      }
     }
     *val = container;
   }
@@ -161,33 +190,62 @@ class StatsMetric : public Metric {
     std::stringstream ss;
     boost::lock_guard<boost::mutex> l(lock_);
     rapidjson::Value container(rapidjson::kObjectType);
-    container.AddMember("count", boost::accumulators::count(acc_),
-        document->GetAllocator());
+
+    if (StatsSelection & StatsType::COUNT) {
+      container.AddMember("count", boost::accumulators::count(acc_),
+          document->GetAllocator());
+    }
 
     if (boost::accumulators::count(acc_) > 0) {
       container.AddMember("last", value_, document->GetAllocator());
-      container.AddMember("min", boost::accumulators::min(acc_),
+      if (StatsSelection & StatsType::MIN) {
+        container.AddMember("min", boost::accumulators::min(acc_),
+            document->GetAllocator());
+      }
+
+      if (StatsSelection & StatsType::MAX) {
+        container.AddMember("max", boost::accumulators::max(acc_),
+            document->GetAllocator());
+      }
+
+      if (StatsSelection & StatsType::MEAN) {
+        container.AddMember("mean", boost::accumulators::mean(acc_),
           document->GetAllocator());
-      container.AddMember("max", boost::accumulators::max(acc_),
-          document->GetAllocator());
-      container.AddMember("mean", boost::accumulators::mean(acc_),
-          document->GetAllocator());
-      container.AddMember("stddev", sqrt(boost::accumulators::variance(acc_)),
-          document->GetAllocator());
+      }
+
+      if (StatsSelection & StatsType::STDDEV) {
+        container.AddMember("stddev", sqrt(boost::accumulators::variance(acc_)),
+            document->GetAllocator());
+      }
     }
     document->AddMember(key_.c_str(), container, document->GetAllocator());
   }
 
   virtual std::string ToHumanReadable() {
     std::stringstream out;
-    out << "count: " << boost::accumulators::count(acc_);
+    if (StatsSelection & StatsType::COUNT) {
+      out << "count: " << boost::accumulators::count(acc_);
+      if (boost::accumulators::count(acc_) > 0) out << ", ";
+    }
     if (boost::accumulators::count(acc_) > 0) {
-      out << ", last: " << PrettyPrinter::Print(value_, unit_)
-          << ", min: " << PrettyPrinter::Print(boost::accumulators::min(acc_), unit_)
-          << ", max: " << PrettyPrinter::Print(boost::accumulators::max(acc_), unit_)
-          << ", mean: " << PrettyPrinter::Print(boost::accumulators::mean(acc_), unit_)
-          << ", stddev: " << PrettyPrinter::Print(
-              sqrt(boost::accumulators::variance(acc_)), unit_);
+
+      out << "last: " << PrettyPrinter::Print(value_, unit_);
+      if (StatsSelection & StatsType::MIN) {
+        out << ", min: " << PrettyPrinter::Print(boost::accumulators::min(acc_), unit_);
+      }
+
+      if (StatsSelection & StatsType::MAX) {
+        out << ", max: " << PrettyPrinter::Print(boost::accumulators::max(acc_), unit_);
+      }
+
+      if (StatsSelection & StatsType::MEAN) {
+        out << ", mean: " << PrettyPrinter::Print(boost::accumulators::mean(acc_), unit_);
+      }
+
+      if (StatsSelection & StatsType::STDDEV) {
+        out << ", stddev: " << PrettyPrinter::Print(
+            sqrt(boost::accumulators::variance(acc_)), unit_);
+      }
     }
     return out.str();
   }

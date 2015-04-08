@@ -1352,5 +1352,55 @@
     "units": "TIME_MS",
     "kind": "HISTOGRAM",
     "key": "impala-server.ddl-durations-ms"
+  },
+  {
+    "description": "Number of currently cached HDFS file handles in the IO manager.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Number of cached HDFS file handles",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala-server.io.mgr.num-cached-file-handles"
+  },
+  {
+    "description": "Number of HDFS file handles that are currently in use by readers.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Number of outstanding HDFS file handles",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala-server.io.mgr.num-file-handles-outstanding"
+  },
+  {
+    "description": "HDFS file handle cache hit ratio, between 0 and 1, where 1 means all reads were served from cached file handles.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HDFS file handle cache hit ratio",
+    "units": "NONE",
+    "kind": "STATS",
+    "key": "impala-server.io.mgr.cached-file-handles-hit-ratio"
+  },
+  {
+    "description": "Number of cache hits for cached HDFS file handles",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HDFS cached file handles hit count",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala-server.io.mgr.cached-file-handles-hit-count"
+  },
+  {
+    "description": "Number of cache misses for cached HDFS file handles",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HDFS cached file handles miss count",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala-server.io.mgr.cached-file-handles-miss-count"
   }
 ]

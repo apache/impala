@@ -59,6 +59,16 @@ const char* ImpaladMetricKeys::IO_MGR_CACHED_BYTES_READ =
     "impala-server.io-mgr.cached-bytes-read";
 const char* ImpaladMetricKeys::IO_MGR_BYTES_WRITTEN =
     "impala-server.io-mgr.bytes-written";
+const char* ImpaladMetricKeys::IO_MGR_NUM_CACHED_FILE_HANDLES =
+    "impala-server.io.mgr.num-cached-file-handles";
+const char* ImpaladMetricKeys::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING =
+    "impala-server.io.mgr.num-file-handles-outstanding";
+const char* ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO =
+    "impala-server.io.mgr.cached-file-handles-hit-ratio";
+const char* ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT =
+    "impala-server.io.mgr.cached-file-handles-hit-count";
+const char* ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT =
+    "impala-server.io.mgr.cached-file-handles-miss-count";
 const char* ImpaladMetricKeys::CATALOG_NUM_DBS =
     "catalog.num-databases";
 const char* ImpaladMetricKeys::CATALOG_NUM_TABLES =
@@ -106,6 +116,10 @@ IntGauge* ImpaladMetrics::IMPALA_SERVER_NUM_OPEN_HS2_SESSIONS = NULL;
 IntGauge* ImpaladMetrics::IO_MGR_NUM_BUFFERS = NULL;
 IntGauge* ImpaladMetrics::IO_MGR_NUM_OPEN_FILES = NULL;
 IntGauge* ImpaladMetrics::IO_MGR_NUM_UNUSED_BUFFERS = NULL;
+IntGauge* ImpaladMetrics::IO_MGR_NUM_CACHED_FILE_HANDLES = NULL;
+IntGauge* ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING = NULL;
+IntGauge* ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT = NULL;
+IntGauge* ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT = NULL;
 IntGauge* ImpaladMetrics::IO_MGR_TOTAL_BYTES = NULL;
 IntGauge* ImpaladMetrics::IO_MGR_BYTES_READ = NULL;
 IntGauge* ImpaladMetrics::IO_MGR_LOCAL_BYTES_READ = NULL;
@@ -126,6 +140,10 @@ StringProperty* ImpaladMetrics::IMPALA_SERVER_VERSION = NULL;
 // Histograms
 HistogramMetric* ImpaladMetrics::QUERY_DURATIONS = NULL;
 HistogramMetric* ImpaladMetrics::DDL_DURATIONS = NULL;
+
+// Other
+StatsMetric<uint64_t, StatsType::MEAN>*
+ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO = NULL;
 
 void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
   // Initialize impalad metrics
@@ -178,6 +196,16 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
   IO_MGR_TOTAL_BYTES = m->AddGauge<int64_t>(ImpaladMetricKeys::IO_MGR_TOTAL_BYTES, 0L);
   IO_MGR_NUM_UNUSED_BUFFERS = m->AddGauge<int64_t>(
       ImpaladMetricKeys::IO_MGR_NUM_UNUSED_BUFFERS, 0L);
+  IO_MGR_NUM_CACHED_FILE_HANDLES = m->AddGauge<int64_t>(
+      ImpaladMetricKeys::IO_MGR_NUM_CACHED_FILE_HANDLES, 0L);
+  IO_MGR_NUM_FILE_HANDLES_OUTSTANDING = m->AddGauge<int64_t>(
+      ImpaladMetricKeys::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING, 0L);
+
+  IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT = m->AddGauge<int64_t>(
+      ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT, 0L);
+
+  IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT = m->AddGauge<int64_t>(
+      ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT, 0L);
 
   IO_MGR_BYTES_READ = m->AddGauge(ImpaladMetricKeys::IO_MGR_BYTES_READ, 0L);
   IO_MGR_LOCAL_BYTES_READ = m->AddGauge(
@@ -188,6 +216,10 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
       ImpaladMetricKeys::IO_MGR_SHORT_CIRCUIT_BYTES_READ, 0L);
   IO_MGR_BYTES_WRITTEN = m->AddGauge<int64_t>(
       ImpaladMetricKeys::IO_MGR_BYTES_WRITTEN, 0L);
+
+  IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO =
+      StatsMetric<uint64_t, StatsType::MEAN>::CreateAndRegister(m,
+      ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO);
 
   // Initialize catalog metrics
   CATALOG_NUM_DBS = m->AddGauge<int64_t>(ImpaladMetricKeys::CATALOG_NUM_DBS, 0L);

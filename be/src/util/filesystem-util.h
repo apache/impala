@@ -46,6 +46,10 @@ class FileSystemUtil {
   /// in 'available_bytes'
   static Status GetSpaceAvailable(const std::string& directory_path,
       uint64_t* available_bytes);
+
+  /// Returns the currently allowed maximum of possible file descriptors. In case of an
+  /// error returns 0.
+  static uint64_t MaxNumFileHandles();
 };
 
 }

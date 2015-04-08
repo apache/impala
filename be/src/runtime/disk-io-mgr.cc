@@ -53,6 +53,14 @@ DEFINE_int32(min_buffer_size, 1024, "The minimum read buffer size (in bytes)");
 DEFINE_int32(max_free_io_buffers, 128,
     "For each io buffer size, the maximum number of buffers the IoMgr will hold onto");
 
+// The number of cached file handles defines how much memory can be used per backend for
+// caching frequently used file handles. Currently, we assume that approximately 2kB data
+// are associated with a single file handle. 10k file handles will thus reserve ~20MB
+// data. The actual amount of memory that is associated with a file handle can be larger
+// or smaller, depending on the replication factor for this file or the path name.
+DEFINE_uint64(max_cached_file_handles, 10000, "Maximum number of HDFS file handles "
+    "that will be cached.");
+
 // Rotational disks should have 1 thread per disk to minimize seeks.  Non-rotational
 // don't have this penalty and benefit from multiple concurrent IO requests.
 static const int THREADS_PER_ROTATIONAL_DISK = 1;
@@ -64,6 +72,28 @@ static const int THREADS_PER_FLASH_DISK = 8;
 static const int LOW_MEMORY = 64 * 1024 * 1024;
 
 const int DiskIoMgr::DEFAULT_QUEUE_CAPACITY = 2;
+
+/// This method is used to clean up resources upon eviction of a cache file handle.
+void DiskIoMgr::HdfsCachedFileHandle::Release(DiskIoMgr::HdfsCachedFileHandle** h) {
+  ImpaladMetrics::IO_MGR_NUM_CACHED_FILE_HANDLES->Increment(-1L);
+  VLOG_FILE << "Cached file handle evicted, hdfsCloseFile() fid=" << (*h)->hdfs_file_;
+  delete (*h);
+}
+
+DiskIoMgr::HdfsCachedFileHandle::HdfsCachedFileHandle(const hdfsFS& fs, const char* fname,
+    int64_t mtime)
+    : fs_(fs), hdfs_file_(hdfsOpenFile(fs, fname, O_RDONLY, 0, 0, 0)), mtime_(mtime) {
+  VLOG_FILE << "hdfsOpenFile() file=" << fname << " fid=" << hdfs_file_;
+}
+
+DiskIoMgr::HdfsCachedFileHandle::~HdfsCachedFileHandle() {
+  if (hdfs_file_ != NULL && fs_ != NULL) {
+    VLOG_FILE << "hdfsCloseFile() fid=" << hdfs_file_;
+    hdfsCloseFile(fs_, hdfs_file_);
+  }
+  fs_ = NULL;
+  hdfs_file_ = NULL;
+}
 
 // This class provides a cache of RequestContext objects.  RequestContexts are recycled.
 // This is good for locality as well as lock contention.  The cache has the property that
@@ -228,7 +258,11 @@ DiskIoMgr::DiskIoMgr() :
     cached_read_options_(NULL),
     shut_down_(false),
     total_bytes_read_counter_(TUnit::BYTES),
-    read_timer_(TUnit::TIME_NS) {
+    read_timer_(TUnit::TIME_NS),
+    file_handle_cache_(
+        max(1024ul, min(FLAGS_max_cached_file_handles,
+                FileSystemUtil::MaxNumFileHandles())),
+        &HdfsCachedFileHandle::Release) {
   int64_t max_buffer_size_scaled = BitUtil::Ceil(max_buffer_size_, min_buffer_size_);
   free_buffers_.resize(BitUtil::Log2(max_buffer_size_scaled) + 1);
   int num_local_disks = FLAGS_num_disks == 0 ? DiskInfo::num_disks() : FLAGS_num_disks;
@@ -244,7 +278,8 @@ DiskIoMgr::DiskIoMgr(int num_local_disks, int threads_per_disk, int min_buffer_s
     cached_read_options_(NULL),
     shut_down_(false),
     total_bytes_read_counter_(TUnit::BYTES),
-    read_timer_(TUnit::TIME_NS) {
+    read_timer_(TUnit::TIME_NS),
+    file_handle_cache_(FLAGS_max_cached_file_handles, &HdfsCachedFileHandle::Release) {
   int64_t max_buffer_size_scaled = BitUtil::Ceil(max_buffer_size_, min_buffer_size_);
   free_buffers_.resize(BitUtil::Log2(max_buffer_size_scaled) + 1);
   if (num_local_disks == 0) num_local_disks = DiskInfo::num_disks();
@@ -1136,4 +1171,60 @@ int DiskIoMgr::AssignQueue(const char* file, int disk_id, bool expected_local) {
   // TODO: we need to parse the config for the number of dirs configured for this
   // data node.
   return disk_id % num_local_disks();
+}
+
+DiskIoMgr::HdfsCachedFileHandle* DiskIoMgr::OpenHdfsFile(const hdfsFS& fs,
+    const char* fname, int64_t mtime) {
+  HdfsCachedFileHandle* fh = NULL;
+
+  // Check if a cached file handle exists and validate the mtime, if the mtime of the
+  // cached handle is not matching the mtime of the requested file, reopen.
+  if (file_handle_cache_.Pop(fname, &fh)) {
+    ImpaladMetrics::IO_MGR_NUM_CACHED_FILE_HANDLES->Increment(-1L);
+    if (fh->mtime() == mtime) {
+      ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO->Update(1L);
+      ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT->Increment(1L);
+      ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING->Increment(1L);
+      return fh;
+    }
+    VLOG_FILE << "mtime mismatch, closing cached file handle. Closing file=" << fname;
+    delete fh;
+  }
+
+  // Update cache hit ratio
+  ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO->Update(0L);
+  ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT->Increment(1L);
+  fh = new HdfsCachedFileHandle(fs, fname, mtime);
+
+  // Check if the file handle was opened correctly
+  if (!fh->ok())  {
+    VLOG_FILE << "Opening the file " << fname << " failed.";
+    delete fh;
+    return NULL;
+  }
+
+  ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING->Increment(1L);
+  return fh;
+}
+
+void DiskIoMgr::CacheOrCloseFileHandle(const char* fname,
+    DiskIoMgr::HdfsCachedFileHandle* fid, bool close) {
+  ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING->Increment(-1L);
+  // Try to unbuffer the handle, on filesystems that do not support this call a non-zero
+  // return code indicates that the operation was not successful and thus the file is
+  // closed.
+  if (!close && hdfsUnbufferFile(fid->file()) == 0) {
+    // Clear read statistics before returning
+    hdfsFileClearReadStatistics(fid->file());
+    file_handle_cache_.Put(fname, fid);
+    ImpaladMetrics::IO_MGR_NUM_CACHED_FILE_HANDLES->Increment(1L);
+  } else {
+    if (close) {
+      VLOG_FILE << "Closing file=" << fname;
+    } else {
+      VLOG_FILE << "FS does not support file handle unbuffering, closing file="
+                << fname;
+    }
+    delete fid;
+  }
 }

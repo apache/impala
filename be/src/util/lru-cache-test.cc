@@ -42,6 +42,15 @@ TEST(FifoMultimap, Basic) {
   ASSERT_FALSE(c.Pop(0, &result));
 }
 
+TEST(FifoMultimap, Invalid) {
+  FifoMultimap<int, int> c(0);
+  int result;
+  ASSERT_EQ(0, c.capacity());
+  c.Put(0, 1);
+  ASSERT_EQ(0, c.size());
+  ASSERT_FALSE(c.Pop(99, &result));
+}
+
 TEST(FifoMultimap, Evict) {
   FifoMultimap<int, int> c(3);
   int result;
@@ -65,9 +74,11 @@ TEST(FifoMultimap, Large) {
     c.Put(i, i);
   }
   ASSERT_EQ(1000, c.size());
-  for (int i = 0; i < 1000; ++i) {
-    c.Pop(rand() % 1000, &result);
-    c.Put(rand() % 1000, i);
+  for (int i = 0; i < 2000; ++i) {
+    int key = rand();
+    c.Pop(key % 1000, &result);
+    ASSERT_EQ(999, c.size());
+    c.Put(key % 1000, i);
     ASSERT_EQ(1000, c.size());
   }
 }

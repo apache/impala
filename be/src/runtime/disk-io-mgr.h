@@ -18,6 +18,7 @@
 
 #include <list>
 #include <vector>
+
 #include <boost/scoped_ptr.hpp>
 #include <boost/unordered_set.hpp>
 #include <boost/thread/mutex.hpp>
@@ -32,6 +33,7 @@
 #include "util/bit-util.h"
 #include "util/error-util.h"
 #include "util/internal-queue.h"
+#include "util/lru-cache.h"
 #include "util/runtime-profile.h"
 #include "util/thread.h"
 
@@ -189,6 +191,35 @@ class DiskIoMgr {
  public:
   class RequestContext;
   class ScanRange;
+
+  /// This class is a small wrapper around the hdfsFile handle and the file system
+  /// instance which is needed to close the file handle in case of eviction. It
+  /// additionally encapsulates the last modified time of the associated file when it was
+  /// last opened.
+  class HdfsCachedFileHandle {
+   public:
+
+    /// Constructor will open the file
+    HdfsCachedFileHandle(const hdfsFS& fs, const char* fname, int64_t mtime);
+
+    /// Destructor will close the file handle
+    ~HdfsCachedFileHandle();
+
+    hdfsFile file() const { return hdfs_file_;  }
+
+    int64_t mtime() const { return mtime_; }
+
+    /// This method is called to release acquired resources by the cached handle when it is
+    /// evicted.
+    static void Release(HdfsCachedFileHandle** h);
+
+    bool ok() const { return hdfs_file_ != NULL; }
+
+   private:
+    hdfsFS fs_;
+    hdfsFile hdfs_file_;
+    int64_t mtime_;
+  };
 
   /// Buffer struct that is used by the caller and IoMgr to pass read buffers.
   /// It is is expected that only one thread has ownership of this object at a
@@ -391,9 +422,12 @@ class DiskIoMgr {
     RequestContext* reader_;
 
     /// File handle either to hdfs or local fs (FILE*)
+    ///
+    /// TODO: The pointer to HdfsCachedFileHandle is manually managed and should be
+    /// replaced by unique_ptr in C++11
     union {
       FILE* local_file_;
-      hdfsFile hdfs_file_;
+      HdfsCachedFileHandle* hdfs_file_;
     };
 
     /// If non-null, this is DN cached buffer. This means the cached read succeeded
@@ -617,6 +651,17 @@ class DiskIoMgr {
   /// for debugging.
   bool Validate() const;
 
+  /// Given a FS handle, name and last modified time of the file, tries to open that file
+  /// and return an instance of HdfsCachedFileHandle. In case of an error returns NULL.
+  HdfsCachedFileHandle* OpenHdfsFile(const hdfsFS& fs, const char* fname, int64_t mtime);
+
+  /// When the file handle is no longer in use by the scan range, return it and try to
+  /// unbuffer the handle. If unbuffering, closing sockets and dropping buffers in the
+  /// libhdfs client, is not supported, close the file handle. If the unbuffer operation is
+  /// supported, put the file handle together with the mtime in the LRU cache for later
+  /// reuse.
+  void CacheOrCloseFileHandle(const char* fname, HdfsCachedFileHandle* fid, bool close);
+
   /// Default ready buffer queue capacity. This constant doesn't matter too much
   /// since the system dynamically adjusts.
   static const int DEFAULT_QUEUE_CAPACITY;
@@ -703,6 +748,11 @@ class DiskIoMgr {
   /// allocated for each local disk on the system and for each remote filesystem type.
   /// It is indexed by disk id.
   std::vector<DiskQueue*> disk_queues_;
+
+  // Caching structure that maps file names to cached file handles. The cache has an upper
+  // limit of entries defined by FLAGS_max_cached_file_handles. Evicted cached file
+  // handles are closed.
+  FifoMultimap<std::string, HdfsCachedFileHandle*> file_handle_cache_;
 
   /// Returns the index into free_buffers_ for a given buffer size
   int free_buffers_idx(int64_t buffer_size);

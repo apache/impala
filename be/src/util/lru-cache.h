@@ -71,7 +71,7 @@ class FifoMultimap {
   /// in the FifoMultimap and a `deleter` function pointer that can be used to free resources
   /// when a value is evicted from the FifoMultimap.
   FifoMultimap(size_t capacity, const DeleterFn& deleter = &FifoMultimap::DummyDeleter)
-      : capacity_(capacity), deleter_(deleter) {}
+      : capacity_(capacity), deleter_(deleter), size_(0) {}
 
   /// Walk the list of elements and call the deleter function for each element.
   ~FifoMultimap();
@@ -120,6 +120,9 @@ class FifoMultimap {
   /// Underlying associative container, that maps a key to an entry in the recently used
   /// list. The iterator on the list is only invalidated if the key-value pair is removed.
   MapType cache_;
+
+  /// Number of elements stored in the cache.
+  size_t size_;
 
   /// Evicts the least recently added element from the cache. First, the element is
   /// removed from both internal collections and as a last step the `deleter_` function is
