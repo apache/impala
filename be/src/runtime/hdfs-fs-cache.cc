@@ -38,27 +38,11 @@ void HdfsFsCache::Init() {
 
 Status HdfsFsCache::GetConnection(const string& path, hdfsFS* fs,
     HdfsFsMap* local_cache) {
-  string namenode;
-  size_t n = path.find("://");
-  if (n == string::npos) {
-    if (path.compare(0, string::npos, "file:/", 6)) {
-      // Hadoop Path routines strip out consecutive /'s, so recognize 'file:/blah'.
-      namenode = "file:///";
-    } else {
-      // Path is not qualified, so use the default FS.
-      namenode = "default";
-    }
-  } else {
-    // Path is qualified, i.e. "scheme://authority/path/to/file".  Extract
-    // "scheme://authority/".
-    n = path.find('/', n + 3);
-    if (n == string::npos) {
-      return Status(Substitute("Path missing '/' after authority: $0", path));
-    }
-    // Include the trailling '/' for local filesystem case, i.e. "file:///".
-    namenode = path.substr(0, n + 1);
-  }
+  string err;
+  const string& namenode = GetNameNodeFromPath(path, &err);
+  if (!err.empty()) return Status(err);
   DCHECK(!namenode.empty());
+
   // First, check the local cache to avoid taking the global lock.
   if (local_cache != NULL) {
     HdfsFsMap::iterator local_iter = local_cache->find(namenode);
@@ -93,6 +77,36 @@ Status HdfsFsCache::GetConnection(const string& path, hdfsFS* fs,
 
 Status HdfsFsCache::GetLocalConnection(hdfsFS* fs) {
   return GetConnection("file:///", fs);
+}
+
+string HdfsFsCache::GetNameNodeFromPath(const string& path, string* err) {
+  string namenode;
+  const string local_fs("file:/");
+  size_t n = path.find("://");
+
+  err->clear();
+  if (n == string::npos) {
+    if (path.compare(0, local_fs.length(), local_fs) == 0) {
+      // Hadoop Path routines strip out consecutive /'s, so recognize 'file:/blah'.
+      namenode = "file:///";
+    } else {
+      // Path is not qualified, so use the default FS.
+      namenode = "default";
+    }
+  } else if (n == 0) {
+    *err = Substitute("Path missing scheme: $0", path);
+  } else {
+    // Path is qualified, i.e. "scheme://authority/path/to/file".  Extract
+    // "scheme://authority/".
+    n = path.find('/', n + 3);
+    if (n == string::npos) {
+      *err = Substitute("Path missing '/' after authority: $0", path);
+    } else {
+      // Include the trailing '/' for local filesystem case, i.e. "file:///".
+      namenode = path.substr(0, n + 1);
+    }
+  }
+  return namenode;
 }
 
 }

@@ -55,6 +55,10 @@ class HdfsFsCache {
   Status GetConnection(const std::string& path, hdfsFS* fs,
       HdfsFsMap* local_cache = NULL);
 
+  // Get NameNode info from path, set error message if path is not valid.
+  // Exposed as a static method for testing purpose.
+  static string GetNameNodeFromPath(const string& path, string* err);
+
  private:
   // Singleton instance. Instantiated in Init().
   static boost::scoped_ptr<HdfsFsCache> instance_;
