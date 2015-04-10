@@ -158,7 +158,7 @@ public class LoadDataStmt extends StatementBase {
         if (!checker.getPermissions(fs, source).checkPermissions(
             FsAction.READ_WRITE)) {
           throw new AnalysisException(String.format("Unable to LOAD DATA from %s " +
-              "because Impala does not have READ or WRITE permissions on this directory",
+              "because Impala does not have READ and WRITE permissions on this directory",
               source));
         }
       } else {
