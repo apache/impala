@@ -101,6 +101,19 @@ class QueryResultComparator(object):
           or 'Expressions in the PARTITION BY clause must not be consta' in error_message:
         # It's too much work to avoid this bug. Just ignore it if it comes up.
         known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1354')
+      elif 'GROUP BY expression must not contain aggregate functions' in error_message \
+          or 'select list expression not produced by aggregation output' in error_message:
+        known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1423')
+      elif ('max(' in error_message or 'min(' in error_message) \
+          and 'only supported with an UNBOUNDED PRECEDING start bound' in error_message:
+        # This analytic isn't supported and ignoring this here is much easier than not
+        # generating the query...
+        known_error = KnownError('MAX UNBOUNDED PRECISION')
+      elif 'IN and/or EXISTS subquery predicates are not supported in binary predicates' \
+          in error_message:
+        known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1418')
+      elif 'Unsupported predicate with subquery' in error_message:
+        known_error = KnownError('https://issues.cloudera.org/browse/IMPALA-1950')
       if known_error:
         comparison_result.exception = known_error
       else:
