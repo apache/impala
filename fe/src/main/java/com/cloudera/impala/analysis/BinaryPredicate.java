@@ -15,6 +15,7 @@
 package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -185,9 +186,18 @@ public class BinaryPredicate extends Predicate {
       throw new AnalysisException("Multiple subqueries are not supported in binary " +
           "predicates: " + toSql());
     }
-    if (contains(InPredicate.class) || contains(ExistsPredicate.class)) {
-      throw new AnalysisException("IN and/or EXISTS subquery predicates are not " +
+    if (contains(ExistsPredicate.class)) {
+      throw new AnalysisException("EXISTS subquery predicates are not " +
           "supported in binary predicates: " + toSql());
+    }
+
+    List<InPredicate> inPredicates = Lists.newArrayList();
+    collect(InPredicate.class, inPredicates);
+    for (InPredicate inPredicate: inPredicates) {
+      if (inPredicate.contains(Subquery.class)) {
+        throw new AnalysisException("IN subquery predicates are not supported in " +
+            "binary predicates: " + toSql());
+      }
     }
 
     // Don't perform any casting for predicates with subqueries here. Any casting

@@ -917,6 +917,21 @@ WHERE month IN (cast(tinyint_col as decimal(34,0)), int_col + 1, 12345, float_co
 int,tinyint,int,float
 ====
 ---- QUERY
+# Regression test for IMPALA-1949
+select bool_col = (tinyint_col in (1,2)) from alltypestiny
+---- RESULTS
+false
+false
+false
+false
+false
+false
+false
+false
+---- TYPES
+boolean
+====
+---- QUERY
 # CASE expr - Basic functionality
 select date_string_col, count(*) from alltypesagg where case date_string_col when "01/06/10" then (true)
 else (false) end group by 1

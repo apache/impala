@@ -383,6 +383,13 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
         "min(bigint_col) OVER (PARTITION BY bool_col) FROM " +
         "functional.alltypessmall t2 WHERE t1.id < t2.id");
 
+    // IN subquery in binary predicate
+    AnalysisError("select * from functional.alltypestiny where " +
+        "(tinyint_col in (1,2)) = (bool_col in (select bool_col from " +
+        "functional.alltypes))", "IN subquery predicates are not supported " +
+        "in binary predicates: (tinyint_col IN (1, 2)) = (bool_col IN (SELECT " +
+        "bool_col FROM functional.alltypes))");
+
     // Column labels may conflict after the rewrite as an inline view
     AnalyzesOk("select int_col from functional.alltypestiny where " +
         "int_col in (select 1 as int_col from functional.alltypesagg)");
@@ -522,7 +529,7 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     // EXISTS subquery in a binary predicate
     AnalysisError("select * from functional.alltypes where " +
         "if(exists(select * from functional.alltypesagg), 1, 0) = 1",
-        "IN and/or EXISTS subquery predicates are not supported in binary predicates: " +
+        "EXISTS subquery predicates are not supported in binary predicates: " +
         "if(EXISTS (SELECT * FROM functional.alltypesagg), 1, 0) = 1");
     // Correlated subquery with a LIMIT clause
     AnalyzesOk("select count(*) from functional.alltypes t where exists " +

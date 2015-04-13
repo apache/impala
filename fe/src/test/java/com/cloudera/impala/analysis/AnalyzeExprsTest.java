@@ -574,6 +574,12 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     // Test NULLs.
     AnalyzesOk("select * from functional.alltypes where " +
         "NULL in (NULL, NULL)");
+    // Test IN in binary predicates
+    AnalyzesOk("select bool_col = (int_col in (1,2)), " +
+        "case when tinyint_col in (10, NULL) then tinyint_col else NULL end " +
+        "from functional.alltypestiny where int_col > (bool_col in (false)) " +
+        "and (int_col in (1,2)) = (select min(bool_col) from functional.alltypes) " +
+        "and (int_col in (3,4)) = (tinyint_col in (4,5))");
     // Incompatible types.
     AnalysisError("select * from functional.alltypes where " +
         "string_col in (bool_col, double_col)",
