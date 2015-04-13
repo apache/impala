@@ -171,41 +171,43 @@ class QueryResultComparator(object):
       return round(data, self.DECIMAL_PLACES)
     return data
 
-  def row_sort_cmp(self, left_row, right_row):
+  def row_sort_cmp(self, ref_row, test_row):
     '''Comparison used for sorting. '''
-    for left, right in izip(left_row, right_row):
-      if left is None and right is not None:
+    for ref_val, test_val in izip(ref_row, test_row):
+      if ref_val is None and test_val is not None:
         return -1
-      if left is not None and right is None:
+      if ref_val is not None and test_val is None:
         return 1
-      result = cmp(left, right)
+      result = cmp(ref_val, test_val)
       if result:
         return result
     return 0
 
-  def vals_are_equal(self, left, right):
+  def vals_are_equal(self, ref, test):
     '''Compares if two values are equal in two cells. Floats are considered equal if the
     difference between them is very small.'''
-    if left == right:
+    if ref == test:
       return True
-    if isinstance(left, float) and isinstance(right, float):
-      return self.floats_are_equal(left, right)
+    # For some reason Postgresql will return Decimals when using some aggregate
+    # functions such as AVG().
+    if isinstance(ref, (float, Decimal)) and isinstance(test, float):
+      return self.floats_are_equal(ref, test)
     LOG.debug("Values differ, reference: %s (%s), test: %s (%s)",
-        left, type(left),
-        right, type(right))
+        ref, type(ref),
+        test, type(test))
     return False
 
-  def floats_are_equal(self, left, right):
+  def floats_are_equal(self, ref, test):
     '''Compare two floats.'''
-    left = round(left, self.DECIMAL_PLACES)
-    right = round(right, self.DECIMAL_PLACES)
-    diff = abs(left - right)
-    if left * right == 0:
+    ref = round(ref, self.DECIMAL_PLACES)
+    test = round(test, self.DECIMAL_PLACES)
+    diff = abs(ref - test)
+    if ref * test == 0:
       return diff < self.EPSILON
-    result = diff / (abs(left) + abs(right)) < self.EPSILON
+    result = diff / (abs(ref) + abs(test)) < self.EPSILON
     if not result:
       LOG.debug("Floats differ, diff: %s, |reference|: %s, |test|: %s",
-          diff, abs(left), abs(right))
+          diff, abs(ref), abs(test))
     return result
 
 
