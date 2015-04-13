@@ -42,10 +42,10 @@
 #include "util/string-parser.h"
 #include "gen-cpp/PlanNodes_types.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
 using namespace llvm;
-using namespace std;
 
 const char* FieldLocation::LLVM_CLASS_NAME = "struct.impala::FieldLocation";
 const char* HdfsScanner::LLVM_CLASS_NAME = "class.impala::HdfsScanner";
@@ -263,7 +263,7 @@ bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
 //   store { i8, %"struct.impala::StringValue" }* %tuple_ptr,
 //         { i8, %"struct.impala::StringValue" }** %1
 //   br label %parse
-// 
+//
 // parse:                                            ; preds = %entry
 //   %data_ptr = getelementptr %"struct.impala::FieldLocation"* %fields, i32 0, i32 0
 //   %len_ptr = getelementptr %"struct.impala::FieldLocation"* %fields, i32 0, i32 1
@@ -284,12 +284,12 @@ bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
 //   %6 = trunc i16 %5 to i8
 //   %val = trunc i8 %6 to i1
 //   br i1 %val, label %parse3, label %eval_fail
-// 
+//
 // parse3:                                           ; preds = %parse
 //   %7 = zext i1 %error_in_row2 to i8
 //   store i8 %7, i8* %error_in_row
 //   ret i1 true
-// 
+//
 // eval_fail:                                        ; preds = %parse
 //   ret i1 false
 // }
@@ -593,4 +593,3 @@ void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc,
     if (state_->abort_on_error() && parse_status_.ok()) parse_status_ = Status(ss.str());
   }
 }
-

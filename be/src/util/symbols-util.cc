@@ -18,9 +18,11 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/regex.hpp>
 
-using namespace boost;
+#include "common/names.h"
+
+using boost::algorithm::split_regex;
+using boost::regex;
 using namespace impala;
-using namespace std;
 
 // For the rules about gcc-compatible name mangling, see:
 // http://mentorembedded.github.io/cxx-abi/abi.html#mangling

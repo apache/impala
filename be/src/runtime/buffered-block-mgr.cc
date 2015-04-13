@@ -30,14 +30,12 @@
 
 #include <gutil/strings/substitute.h>
 
-using namespace boost;
-using namespace strings;   // for Substitute
-
 DEFINE_bool(disk_spill_encryption, false, "Set this to encrypt and perform an integrity "
   "check on all data spilled to disk during a query");
 
-using namespace std;
-using namespace strings;
+#include "common/names.h"
+
+using namespace strings;   // for Substitute
 
 namespace impala {
 

@@ -19,8 +19,7 @@
 
 #include "util/error-util.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

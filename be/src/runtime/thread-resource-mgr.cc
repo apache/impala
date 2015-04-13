@@ -22,9 +22,9 @@
 #include "common/logging.h"
 #include "util/cpu-info.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 // Controls the number of threads to run work per core.  It's common to pick 2x
 // or 3x the number of cores.  This keeps the cores busy without causing excessive
@@ -41,7 +41,7 @@ ThreadResourceMgr::ThreadResourceMgr(int threads_quota) {
   per_pool_quota_ = 0;
 }
 
-ThreadResourceMgr::ResourcePool::ResourcePool(ThreadResourceMgr* parent) 
+ThreadResourceMgr::ResourcePool::ResourcePool(ThreadResourceMgr* parent)
   : parent_(parent) {
 }
 
@@ -51,7 +51,7 @@ void ThreadResourceMgr::ResourcePool::Reset() {
   thread_available_fn_ = NULL;
   max_quota_ = INT_MAX;
 }
-  
+
 void ThreadResourceMgr::ResourcePool::ReserveOptionalTokens(int num) {
   DCHECK_GE(num, 0);
   num_reserved_optional_threads_ = num;
@@ -94,7 +94,7 @@ void ThreadResourceMgr::ResourcePool::SetThreadAvailableCb(ThreadAvailableCb fn)
 
 void ThreadResourceMgr::UpdatePoolQuotas(ResourcePool* new_pool) {
   if (pools_.empty()) return;
-  per_pool_quota_ = 
+  per_pool_quota_ =
       ceil(static_cast<double>(system_threads_quota_) / pools_.size());
   for (Pools::iterator it = pools_.begin(); it != pools_.end(); ++it) {
     ResourcePool* pool = *it;
@@ -105,4 +105,3 @@ void ThreadResourceMgr::UpdatePoolQuotas(ResourcePool* new_pool) {
     }
   }
 }
-

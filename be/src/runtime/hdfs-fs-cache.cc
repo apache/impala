@@ -23,8 +23,8 @@
 #include "util/hdfs-util.h"
 #include "util/test-info.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
+
 using namespace strings;
 
 namespace impala {

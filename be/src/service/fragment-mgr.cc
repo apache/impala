@@ -23,9 +23,9 @@
 #include "util/impalad-metrics.h"
 #include "util/uid-util.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace boost;
-using namespace std;
 using namespace strings;
 
 // TODO: this logging should go into a per query log.

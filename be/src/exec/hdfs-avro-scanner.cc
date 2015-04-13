@@ -29,12 +29,12 @@
 #include "util/decompress.h"
 #include "util/runtime-profile.h"
 
+#include "common/names.h"
+
 // Note: the Avro C++ library uses exceptions for error handling. Any Avro
 // function that may throw an exception must be placed in a try/catch block.
-
 using namespace impala;
 using namespace llvm;
-using namespace std;
 
 const char* HdfsAvroScanner::LLVM_CLASS_NAME = "class.impala::HdfsAvroScanner";
 const uint8_t HdfsAvroScanner::AVRO_VERSION_HEADER[4] = {'O', 'b', 'j', 1};

@@ -22,8 +22,9 @@
 #include "util/cpu-info.h"
 #include "util/string-parser.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 // Benchmark for doing atoi.  This benchmark compares various implementations
 // to convert string to int32s.  The data is mostly positive, relatively small
@@ -142,7 +143,7 @@ inline int32_t AtoiCased(char* s, int len) {
 
     switch(len) {
       case 5:
-        val = DIGIT(s[0])*10000 + DIGIT(s[1])*1000 + DIGIT(s[2])*100 + 
+        val = DIGIT(s[0])*10000 + DIGIT(s[1])*1000 + DIGIT(s[2])*100 +
               DIGIT(s[3])*10 + DIGIT(s[4]);
         break;
       case 4:
@@ -289,4 +290,3 @@ int main(int argc, char **argv) {
 
   return 0;
 }
-

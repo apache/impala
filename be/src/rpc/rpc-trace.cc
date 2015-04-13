@@ -24,10 +24,10 @@
 #include "util/time.h"
 #include "util/webserver.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace boost;
 using namespace rapidjson;
-using namespace std;
 using namespace strings;
 
 // Singleton class to keep track of all RpcEventHandlers, and to render them to a

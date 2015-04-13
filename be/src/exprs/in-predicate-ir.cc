@@ -19,8 +19,9 @@
 #include "exprs/anyval-util.h"
 #include "runtime/string-value.inline.h"
 
+#include "common/names.h"
+
 using namespace impala_udf;
-using namespace std;
 
 namespace impala {
 

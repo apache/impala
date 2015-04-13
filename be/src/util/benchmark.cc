@@ -21,7 +21,7 @@
 #include "util/debug-util.h"
 #include "util/stopwatch.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

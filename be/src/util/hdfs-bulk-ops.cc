@@ -21,9 +21,9 @@
 #include "util/error-util.h"
 #include "util/hdfs-util.h"
 
-using namespace std;
+#include "common/names.h"
+
 using namespace impala;
-using namespace boost;
 
 HdfsOp::HdfsOp(HdfsOpType op, const std::string& src, HdfsOperationSet* op_set)
     : op_(op), src_(src), op_set_(op_set) {

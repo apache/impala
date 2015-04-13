@@ -19,9 +19,12 @@
 #include "udf/uda-test-harness.h"
 #include "testutil/test-udas.h"
 
+#include "common/names.h"
+
+using std::min;
 using namespace impala;
 using namespace impala_udf;
-using namespace std;
+
 
 //-------------------------------- Count ------------------------------------
 // Example of implementing Count(int_col).

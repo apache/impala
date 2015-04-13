@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <string>
+#include <iostream>
+#include <jni.h>
 #include <sstream>
+#include <string>
 
 #include "common/logging.h"
 #include <boost/algorithm/string/join.hpp>
@@ -38,15 +40,11 @@
 #include "util/mem-info.h"
 #include "util/pretty-printer.h"
 
-#include <jni.h>
-#include <iostream>
+#include "common/names.h"
+
+using namespace llvm;
 
 DECLARE_int32(max_errors);
-
-using namespace boost;
-using namespace llvm;
-using namespace std;
-using namespace boost::algorithm;
 
 // The fraction of the query mem limit that is used for the block mgr. Operators
 // that accumulate memory all use the block mgr so the majority of the memory should

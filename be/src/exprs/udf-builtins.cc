@@ -25,10 +25,13 @@
 #include "runtime/timestamp-value.h"
 #include "util/bit-util.h"
 
+#include "common/names.h"
+
+using boost::gregorian::date;
+using boost::gregorian::date_duration;
+using boost::posix_time::ptime;
+using boost::posix_time::time_duration;
 using namespace impala;
-using namespace std;
-using namespace boost::gregorian;
-using namespace boost::posix_time;
 using namespace strings;
 
 DoubleVal UdfBuiltins::Abs(FunctionContext* context, const DoubleVal& v) {

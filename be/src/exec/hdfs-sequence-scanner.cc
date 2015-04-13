@@ -25,10 +25,10 @@
 #include "runtime/tuple-row.h"
 #include "util/codec.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
 using namespace llvm;
-using namespace std;
 
 const char* const HdfsSequenceScanner::SEQFILE_VALUE_CLASS_NAME =
     "org.apache.hadoop.io.Text";
@@ -495,4 +495,3 @@ void HdfsSequenceScanner::LogRowParseError(int row_idx, stringstream* ss) {
   *ss << string(reinterpret_cast<const char*>(record_locations_[row_idx].record),
                   record_locations_[row_idx].len);
 }
-

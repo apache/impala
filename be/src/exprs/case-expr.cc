@@ -23,8 +23,9 @@
 
 #include "gen-cpp/Exprs_types.h"
 
+#include "common/names.h"
+
 using namespace llvm;
-using namespace std;
 
 namespace impala {
 
@@ -92,13 +93,13 @@ string CaseExpr::DebugString() const {
 //                                    %"class.impala::TupleRow"* %row)
 //   %is_null = trunc i64 %case_val to i1
 //   br i1 %is_null, label %return_else_expr, label %eval_first_when_expr
-// 
+//
 // eval_first_when_expr:                             ; preds = %eval_case_expr
 //   %when_val = call i64 @Literal(%"class.impala::ExprContext"* %context,
 //                                 %"class.impala::TupleRow"* %row)
 //   %is_null1 = trunc i64 %when_val to i1
 //   br i1 %is_null1, label %return_else_expr, label %check_when_expr_block
-// 
+//
 // check_when_expr_block:                            ; preds = %eval_first_when_expr
 //   %0 = ashr i64 %when_val, 32
 //   %1 = trunc i64 %0 to i32
@@ -106,12 +107,12 @@ string CaseExpr::DebugString() const {
 //   %3 = trunc i64 %2 to i32
 //   %eq = icmp eq i32 %3, %1
 //   br i1 %eq, label %return_then_expr, label %return_else_expr
-// 
+//
 // return_then_expr:                                 ; preds = %check_when_expr_block
 //   %then_val = call i16 @Literal12(%"class.impala::ExprContext"* %context,
 //                                   %"class.impala::TupleRow"* %row)
 //   ret i16 %then_val
-// 
+//
 // return_else_expr:                                 ; preds = %check_when_expr_block, %eval_first_when_expr, %eval_case_expr
 //   %else_val = call i16 @Literal13(%"class.impala::ExprContext"* %context,
 //                                   %"class.impala::TupleRow"* %row)
@@ -126,13 +127,13 @@ string CaseExpr::DebugString() const {
 //                                    %"class.impala::TupleRow"* %row)
 //   %is_null = trunc i64 %case_val to i1
 //   br i1 %is_null, label %return_null, label %eval_first_when_expr
-// 
+//
 // eval_first_when_expr:                             ; preds = %eval_case_expr
 //   %when_val = call i64 @Literal(%"class.impala::ExprContext"* %context,
 //                                 %"class.impala::TupleRow"* %row)
 //   %is_null1 = trunc i64 %when_val to i1
 //   br i1 %is_null1, label %return_null, label %check_when_expr_block
-// 
+//
 // check_when_expr_block:                            ; preds = %eval_first_when_expr
 //   %0 = ashr i64 %when_val, 32
 //   %1 = trunc i64 %0 to i32
@@ -140,12 +141,12 @@ string CaseExpr::DebugString() const {
 //   %3 = trunc i64 %2 to i32
 //   %eq = icmp eq i32 %3, %1
 //   br i1 %eq, label %return_then_expr, label %return_null
-// 
+//
 // return_then_expr:                                 ; preds = %check_when_expr_block
 //   %then_val = call i16 @Literal12(%"class.impala::ExprContext"* %context,
 //                                   %"class.impala::TupleRow"* %row)
 //   ret i16 %then_val
-// 
+//
 // return_null:                                      ; preds = %check_when_expr_block, %eval_first_when_expr, %eval_case_expr
 //   ret i16 1
 // }
@@ -158,18 +159,18 @@ string CaseExpr::DebugString() const {
 //       %"class.impala::ExprContext"* %context, %"class.impala::TupleRow"* %row)
 //   %is_null = trunc i16 %when_val to i1
 //   br i1 %is_null, label %return_else_expr, label %check_when_expr_block
-// 
+//
 // check_when_expr_block:                            ; preds = %eval_first_when_expr
 //   %0 = ashr i16 %when_val, 8
 //   %1 = trunc i16 %0 to i8
 //   %val = trunc i8 %1 to i1
 //   br i1 %val, label %return_then_expr, label %return_else_expr
-// 
+//
 // return_then_expr:                                 ; preds = %check_when_expr_block
 //   %then_val = call i16 @Literal14(%"class.impala::ExprContext"* %context,
 //                                   %"class.impala::TupleRow"* %row)
 //   ret i16 %then_val
-// 
+//
 // return_else_expr:                                 ; preds = %check_when_expr_block, %eval_first_when_expr
 //   %else_val = call i16 @Literal15(%"class.impala::ExprContext"* %context,
 //                                   %"class.impala::TupleRow"* %row)

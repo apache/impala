@@ -22,7 +22,7 @@
 #include "runtime/string-value.inline.h"
 #include "runtime/timestamp-value.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

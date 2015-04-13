@@ -25,10 +25,9 @@
 #include "util/hdfs-util.h"
 #include "util/dynamic-util.h"
 
-using namespace boost;
-using namespace boost::algorithm;
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 DEFINE_bool(skip_lzo_version_check, false, "Disables checking the LZO library version "
             "against the running Impala version.");

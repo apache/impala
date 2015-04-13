@@ -20,9 +20,10 @@
 
 #include <gutil/strings/substitute.h>
 
+#include "common/names.h"
+
 using namespace apache::hive::service::cli;
 using namespace impala;
-using namespace std;
 using namespace strings;
 
 // Set the null indicator bit for row 'row_idx', assuming this will be called for

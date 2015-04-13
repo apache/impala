@@ -44,9 +44,11 @@
 #include "util/runtime-profile.h"
 #include "rpc/thrift-util.h"
 
-using namespace std;
-using namespace boost;
-using namespace boost::algorithm;
+#include "common/names.h"
+
+using boost::algorithm::is_any_of;
+using boost::algorithm::split;
+using boost::algorithm::token_compress_on;
 using namespace impala;
 using namespace strings;
 

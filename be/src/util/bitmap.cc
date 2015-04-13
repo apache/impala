@@ -16,8 +16,9 @@
 
 #include <sstream>
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 string Bitmap::DebugString(bool print_bits) {
   int64_t words = BitUtil::RoundUp(size_, 64) / 64;

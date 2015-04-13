@@ -20,7 +20,7 @@
 #include "runtime/raw-value.h"
 #include "gen-cpp/PlanNodes_types.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

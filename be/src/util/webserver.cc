@@ -43,9 +43,13 @@
 #include "util/stopwatch.h"
 #include "rpc/thrift-util.h"
 
-using namespace std;
-using namespace boost;
-using namespace boost::filesystem;
+#include "common/names.h"
+
+using boost::algorithm::is_any_of;
+using boost::algorithm::split;
+using boost::algorithm::to_lower;
+using boost::filesystem::exists;
+using boost::upgrade_to_unique_lock;
 using namespace google;
 using namespace strings;
 using namespace rapidjson;

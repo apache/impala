@@ -26,8 +26,7 @@
 #include "exprs/expr.h"
 #include "runtime/raw-value.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

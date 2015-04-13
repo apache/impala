@@ -14,9 +14,9 @@
 
 #include "runtime/disk-io-mgr-internal.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 void DiskIoMgr::RequestContext::Cancel(const Status& status) {
   DCHECK(!status.ok());

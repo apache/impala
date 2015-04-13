@@ -27,9 +27,13 @@
 #include "runtime/timestamp-value.h"
 #include "exprs/anyval-util.h"
 
-using namespace std;
-using namespace boost;
-using namespace boost::random;
+
+#include "common/names.h"
+
+using boost::uniform_int;
+using boost::ranlux64_3;
+using std::push_heap;
+using std::pop_heap;
 
 // TODO: this file should be cross compiled and then all of the builtin
 // aggregate functions will have a codegen enabled path. Then we can remove

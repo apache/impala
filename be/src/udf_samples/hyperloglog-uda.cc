@@ -19,7 +19,9 @@
 #include <iostream>
 #include "udf/udf.h"
 
-using namespace std;
+#include "common/names.h"
+
+using std::max;
 using namespace impala_udf;
 
 // This sample UDA implements the hyperloglog distinct estimate aggregate

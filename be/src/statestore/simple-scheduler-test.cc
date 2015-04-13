@@ -19,8 +19,8 @@
 #include "common/logging.h"
 #include "simple-scheduler.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
 
 DECLARE_string(pool_conf_file);

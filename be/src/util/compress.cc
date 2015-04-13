@@ -25,8 +25,9 @@
 #include <boost/crc.hpp>
 #include <gutil/strings/substitute.h>
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
+
+using boost::crc_32_type;
 using namespace impala;
 using namespace strings;
 

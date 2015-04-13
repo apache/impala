@@ -18,7 +18,7 @@
 #include "exec/delimited-text-parser.inline.h"
 #include "util/cpu-info.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

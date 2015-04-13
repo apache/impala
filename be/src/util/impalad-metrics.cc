@@ -16,7 +16,7 @@
 
 #include "util/debug-util.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

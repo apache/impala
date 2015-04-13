@@ -47,9 +47,9 @@
 #include "util/debug-util.h"
 #include "util/runtime-profile.h"
 
+#include "common/names.h"
+
 using namespace llvm;
-using namespace std;
-using namespace boost;
 
 // TODO: remove when we remove hash-join-node.cc and aggregation-node.cc
 DEFINE_bool(enable_partitioned_hash_join, true, "Enable partitioned hash join");

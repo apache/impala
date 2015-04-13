@@ -24,11 +24,11 @@
 #include "util/impalad-metrics.h"
 #include "util/time.h"
 
-using namespace apache::thrift;
+#include "common/names.h"
+
 using namespace apache::hive::service::cli::thrift;
-using namespace boost;
+using namespace apache::thrift;
 using namespace impala;
-using namespace std;
 
 DECLARE_int32(idle_session_timeout);
 DECLARE_int32(be_port);

@@ -27,9 +27,10 @@
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
 
+#include "common/names.h"
+
 using namespace impala;
 using namespace llvm;
-using namespace std;
 
 DEFINE_bool(enable_quadratic_probing, false, "Enable quadratic probing hash table");
 

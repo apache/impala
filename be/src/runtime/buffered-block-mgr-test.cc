@@ -38,9 +38,9 @@
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 
-using namespace boost;
-using namespace boost::filesystem;
-using namespace std;
+#include "common/names.h"
+
+using boost::filesystem::directory_iterator;
 
 // Note: This is the default scratch dir created by impala.
 // FLAGS_scratch_dirs + TmpFileMgr::TMP_SUB_DIR_NAME.

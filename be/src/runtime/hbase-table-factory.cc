@@ -19,8 +19,7 @@
 #include "runtime/hbase-table.h"
 #include "util/jni-util.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
 
 namespace impala {
 

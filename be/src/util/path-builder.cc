@@ -17,8 +17,9 @@
 #include <sstream>
 #include <stdlib.h>
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 const char* PathBuilder::impala_home_;
 
@@ -44,5 +45,3 @@ void PathBuilder::GetFullBuildPath(const string& path, string* full_path) {
 #endif
   *full_path = s.str();
 }
-
-

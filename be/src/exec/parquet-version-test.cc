@@ -19,7 +19,7 @@
 #include <gtest/gtest.h>
 #include "exec/hdfs-parquet-scanner.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

@@ -32,8 +32,7 @@
 #include "util/redactor.h"
 #include "util/url-coding.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

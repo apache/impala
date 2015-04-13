@@ -18,10 +18,12 @@
 
 #include "common/logging.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
 using namespace llvm;
-using namespace std;
+using std::make_pair;
+using std::max;
 
 const char* InstructionCounter::TOTAL_INSTS = "Total Instructions";
 const char* InstructionCounter::TOTAL_BLOCKS = "Total Blocks";

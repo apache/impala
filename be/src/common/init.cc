@@ -39,6 +39,8 @@
 #include "rpc/thrift-util.h"
 #include "util/thread.h"
 
+#include "common/names.h"
+
 DECLARE_string(hostname);
 DECLARE_string(redaction_rules_file);
 // TODO: renamed this to be more generic when we have a good CM release to do so.
@@ -61,7 +63,6 @@ DECLARE_string(vmodule);
 // is less than this fraction of the total reserved memory, free it back to the OS.
 static const float TCMALLOC_RELEASE_FREE_MEMORY_FRACTION = 0.5f;
 
-using namespace boost;
 using std::string;
 
 // Maintenance thread that runs periodically. It does a few things:

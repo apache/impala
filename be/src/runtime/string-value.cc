@@ -15,7 +15,7 @@
 #include "runtime/string-value.h"
 #include <cstring>
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

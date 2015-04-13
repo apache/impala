@@ -28,8 +28,7 @@
 
 #include "gen-cpp/Frontend_types.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
 
 const char* EXECUTOR_CLASS = "com/cloudera/impala/hive/executor/UdfExecutor";
 const char* EXECUTOR_CTOR_SIGNATURE ="([B)V";

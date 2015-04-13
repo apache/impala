@@ -24,10 +24,10 @@
 #include "text-converter.h"
 #include "util/string-parser.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
 using namespace llvm;
-using namespace std;
 
 TextConverter::TextConverter(char escape_char, const string& null_col_val,
     bool check_null)
@@ -260,4 +260,3 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
 
   return codegen->FinalizeFunction(fn);
 }
-

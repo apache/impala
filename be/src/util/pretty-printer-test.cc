@@ -19,8 +19,7 @@
 
 #include "util/pretty-printer.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
 
 namespace impala {
 

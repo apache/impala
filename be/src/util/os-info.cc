@@ -22,7 +22,7 @@
 
 #include <unistd.h>
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

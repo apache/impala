@@ -37,15 +37,15 @@
 #include "gen-cpp/ResourceBrokerService.h"
 #include "gen-cpp/Llama_types.h"
 
-using namespace std;
-using namespace impala;
-using namespace boost;
-using namespace boost::algorithm;
-using namespace boost::uuids;
-using namespace strings;
+#include "common/names.h"
 
+using boost::algorithm::join;
+using boost::algorithm::to_lower;
+using boost::uuids::random_generator;
 using namespace ::apache::thrift::server;
 using namespace ::apache::thrift;
+using namespace impala;
+using namespace strings;
 
 DECLARE_int64(llama_registration_timeout_secs);
 DECLARE_int64(llama_registration_wait_secs);

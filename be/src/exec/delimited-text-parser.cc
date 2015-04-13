@@ -17,8 +17,9 @@
 #include "exec/hdfs-scanner.h"
 #include "util/cpu-info.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 DelimitedTextParser::DelimitedTextParser(
     int num_cols, int num_partition_keys, const bool* is_materialized_col,
@@ -290,4 +291,3 @@ restart:
   }
   return tuple_start;
 }
-

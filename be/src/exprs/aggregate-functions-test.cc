@@ -28,11 +28,16 @@
 #include "udf/uda-test-harness.h"
 #include "util/decimal-util.h"
 
+#include "common/names.h"
+
+namespace tag = boost::accumulators::tag;
+using boost::accumulators::accumulator_set;
+using boost::accumulators::stats;
+using boost::accumulators::variance;
+using boost::algorithm::is_any_of;
+using boost::algorithm::trim;
 using namespace impala;
 using namespace impala_udf;
-using namespace std;
-using namespace boost;
-using namespace boost::accumulators;
 
 template <int RANGE_START, int RANGE_END>
 bool CheckAppxMedian(const IntVal& actual, const IntVal& expected) {

@@ -34,8 +34,7 @@
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
 
 const int BATCH_SIZE = 250;
 

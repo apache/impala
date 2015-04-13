@@ -15,7 +15,7 @@
 #include "util/url-parser.h"
 #include "runtime/string-value.inline.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

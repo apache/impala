@@ -17,9 +17,9 @@
 #include "service/query-exec-state.h"
 #include "util/debug-util.h"
 
-using namespace std;
+#include "common/names.h"
+
 using namespace impala;
-using namespace boost;
 using namespace apache::hive::service::cli::thrift;
 
 namespace impala {

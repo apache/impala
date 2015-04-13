@@ -27,8 +27,7 @@
 #include <hdfs.h>
 #include <stdlib.h>
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
 
 // Hdfs block size for compressed text.
 static const int64_t COMPRESSED_BLOCK_SIZE = 64 * 1024 * 1024;

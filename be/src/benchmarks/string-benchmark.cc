@@ -21,8 +21,9 @@
 #include "util/cpu-info.h"
 #include "util/hash-util.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 // Benchmark for testing internal representation of strings.  This is prototype
 // code and should eventually be merged into StringValue
@@ -77,7 +78,7 @@ struct CompactStringValue {
       is_inline_ = false;
     }
   }
-  
+
   const char* ptr() const {
     if (is_inline_) return inline_data_;
     return reinterpret_cast<const char*>(indirect_ptr_);
@@ -194,4 +195,3 @@ int main(int argc, char **argv) {
 
   return 0;
 }
-

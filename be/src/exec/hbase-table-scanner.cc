@@ -25,7 +25,8 @@
 #include "runtime/mem-pool.h"
 #include "runtime/tuple.h"
 
-using namespace std;
+#include "common/names.h"
+
 using namespace impala;
 
 jclass HBaseTableScanner::scan_cl_ = NULL;

@@ -24,7 +24,7 @@
 #include "util/rle-encoding.h"
 #include "util/bit-stream-utils.inline.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

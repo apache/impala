@@ -20,8 +20,9 @@
 #include "common/logging.h"
 #include "exprs/aggregate-functions.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 extern string EncodeNdv(const string& ndv, bool* is_encoded);
 extern string DecodeNdv(const string& ndv, bool is_encoded);

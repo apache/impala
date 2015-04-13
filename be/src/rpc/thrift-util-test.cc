@@ -22,7 +22,7 @@
 
 #include "gen-cpp/RuntimeProfile_types.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

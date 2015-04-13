@@ -27,9 +27,10 @@
 #include "util/error-util.h"
 #include "util/impalad-metrics.h"
 
+#include "common/names.h"
+
 using namespace impala;
 using namespace llvm;
-using namespace std;
 
 const char* OldHashTable::LLVM_CLASS_NAME = "class.impala::OldHashTable";
 

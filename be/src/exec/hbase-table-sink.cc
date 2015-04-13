@@ -21,7 +21,7 @@
 #include "exprs/expr-context.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

@@ -38,9 +38,9 @@ DECLARE_int32(hs2_port);
 DECLARE_string(principal);
 DECLARE_bool(use_statestore);
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
-using namespace boost;
 
 int main(int argc, char** argv) {
   InitCommonRuntime(argc, argv, true);

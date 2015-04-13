@@ -23,9 +23,9 @@
 #include "util/bit-util.h"
 #include "util/debug-util.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 using namespace strings;
 
 // The first NUM_SMALL_BLOCKS of the tuple stream are made of blocks less than the

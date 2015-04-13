@@ -48,10 +48,13 @@ DEFINE_bool(serialize_batch, false, "serialize and deserialize each returned row
 DEFINE_int32(status_report_interval, 5, "interval between profile reports; in seconds");
 DECLARE_bool(enable_rm);
 
-using namespace std;
-using namespace boost;
-using namespace strings;
+#include "common/names.h"
+
+namespace posix_time = boost::posix_time;
+using boost::get_system_time;
+using boost::system_time;
 using namespace apache::thrift;
+using namespace strings;
 
 namespace impala {
 

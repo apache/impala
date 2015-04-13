@@ -21,8 +21,7 @@
 
 #include "util/internal-queue.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

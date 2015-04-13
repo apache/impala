@@ -16,8 +16,9 @@
 
 #include "common/logging.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 DEFINE_int32(non_impala_java_vlog, 0, "(Advanced) The log level (equivalent to --v) for "
     "non-Impala Java classes (0: INFO, 1 and 2: DEBUG, 3: TRACE)");

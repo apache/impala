@@ -21,8 +21,7 @@
 #include "util/jni-util.h"
 #include "util/time.h"
 
-using namespace boost;
-using namespace boost::algorithm;
+using boost::algorithm::to_lower;
 using namespace impala;
 using namespace strings;
 

@@ -28,10 +28,13 @@
 
 DEFINE_string(scratch_dirs, "/tmp", "Writable scratch directories");
 
-using namespace boost;
-using namespace boost::filesystem;
-using namespace boost::uuids;
-using namespace std;
+#include "common/names.h"
+
+using boost::algorithm::is_any_of;
+using boost::algorithm::split;
+using boost::algorithm::token_compress_on;
+using boost::filesystem::path;
+using boost::uuids::random_generator;
 using namespace strings;
 
 namespace impala {

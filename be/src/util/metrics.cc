@@ -26,10 +26,9 @@
 #include "common/logging.h"
 #include "util/impalad-metrics.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
-using namespace boost;
-using namespace boost::algorithm;
 using namespace rapidjson;
 using namespace strings;
 

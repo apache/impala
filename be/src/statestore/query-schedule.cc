@@ -28,10 +28,10 @@
 #include "util/parse-util.h"
 #include "util/llama-util.h"
 
-using namespace std;
-using namespace boost;
-using namespace boost::algorithm;
-using namespace boost::uuids;
+#include "common/names.h"
+
+using boost::uuids::random_generator;
+using boost::uuids::uuid;
 using namespace impala;
 
 DEFINE_bool(rm_always_use_defaults, false, "If true, all queries use the same initial"

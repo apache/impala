@@ -24,9 +24,9 @@
 #include "util/runtime-profile.h"
 #include "gen-cpp/PlanNodes_types.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
-using namespace boost;
 
 DEFINE_int32(exchg_node_buffer_size_bytes, 1024 * 1024 * 10,
              "(Advanced) Maximum size of per-query receive-side buffer");

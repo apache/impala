@@ -24,12 +24,14 @@
 #include "gen-cpp/CatalogObjects_types.h"
 #include "gen-cpp/CatalogService_types.h"
 
-using namespace impala;
-using namespace std;
-using namespace boost;
+#include "common/names.h"
+
+using boost::bind;
+using boost::mem_fn;
 using namespace apache::thrift;
-using namespace strings;
+using namespace impala;
 using namespace rapidjson;
+using namespace strings;
 
 DEFINE_int32(catalog_service_port, 26000, "port where the CatalogService is running");
 DECLARE_string(state_store_host);

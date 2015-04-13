@@ -29,8 +29,7 @@
 #include "rpc/thrift-util.h"
 #include "gen-cpp/ImpalaInternalService.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
 using namespace apache::thrift;
 using namespace apache::thrift::server;
 using namespace apache::thrift::transport;

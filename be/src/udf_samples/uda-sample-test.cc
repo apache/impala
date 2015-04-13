@@ -17,9 +17,10 @@
 #include <udf/uda-test-harness.h>
 #include "uda-sample.h"
 
+#include "common/names.h"
+
 using namespace impala;
 using namespace impala_udf;
-using namespace std;
 
 bool TestCount() {
   // Use the UDA test harness to validate the COUNT UDA.

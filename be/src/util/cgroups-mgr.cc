@@ -20,10 +20,12 @@
 #include "util/debug-util.h"
 #include <gutil/strings/substitute.h>
 
+#include "common/names.h"
+
+using boost::filesystem::create_directory;
+using boost::filesystem::exists;
+using boost::filesystem::remove;
 using namespace impala;
-using namespace std;
-using namespace boost::filesystem;
-using namespace boost;
 using namespace strings;
 
 namespace impala {

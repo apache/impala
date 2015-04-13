@@ -18,8 +18,9 @@
 #include <iomanip>
 #include <sstream>
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 // Number of spaces to pad adjacent columns.
 const int COLUMN_PAD = 2;
@@ -74,7 +75,7 @@ string TablePrinter::ToString(const string& prefix) const {
   int total_width = 0;
   for (int i = 0; i < output_widths.size(); ++i) {
     if (max_output_width_ >= 0) {
-      output_widths[i] = min(output_widths[i], max_output_width_);
+      output_widths[i] = std::min(output_widths[i], max_output_width_);
     }
     output_widths[i] += COLUMN_PAD;
     total_width += output_widths[i];
@@ -101,4 +102,3 @@ string TablePrinter::ToString(const string& prefix) const {
 
   return ss.str();
 }
-

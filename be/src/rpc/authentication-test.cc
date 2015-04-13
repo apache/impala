@@ -29,7 +29,7 @@ DECLARE_string(principal);
 static const char *env_keytab = NULL;
 static const char *env_princ = NULL;
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

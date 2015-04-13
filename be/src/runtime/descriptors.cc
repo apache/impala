@@ -28,9 +28,10 @@
 #include "exprs/expr.h"
 #include "runtime/runtime-state.h"
 
+#include "common/names.h"
+
+using boost::algorithm::join;
 using namespace llvm;
-using namespace std;
-using namespace boost::algorithm;
 
 namespace impala {
 

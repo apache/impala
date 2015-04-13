@@ -22,8 +22,10 @@
 #include "runtime/decimal-value.h"
 #include "util/string-parser.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
+
+using std::max;
+using std::min;
 
 namespace impala {
 

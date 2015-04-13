@@ -28,12 +28,16 @@
 
 #include "common/logging.h"
 
+#include "common/names.h"
+
 DEFINE_bool(force_lowercase_usernames, false, "If true, all principals and usernames are"
     " mapped to lowercase shortnames before being passed to any components (Sentry, "
     "admission control) for authorization");
 
-using namespace std;
-using namespace boost;
+using boost::algorithm::is_any_of;
+using boost::algorithm::join;
+using boost::algorithm::split;
+using boost::algorithm::to_lower;
 
 namespace sasl {
 

@@ -20,7 +20,7 @@
 #include <ctype.h>
 #include <math.h>
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

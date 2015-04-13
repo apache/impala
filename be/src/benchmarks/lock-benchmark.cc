@@ -23,9 +23,10 @@
 #include "util/cpu-info.h"
 #include "util/spinlock.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
+
 
 // Benchmark for locking.
 // Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
@@ -35,27 +36,27 @@ using namespace std;
 //         Atomic 2-Total Threads               2.734            0.06009X
 //       SpinLock 2-Total Threads               2.245            0.04934X
 //          Boost 2-Total Threads              0.5453            0.01198X
-// 
+//
 //       Unlocked 6-Total Threads               61.16                  1X
 //         Atomic 6-Total Threads               2.875              0.047X
 //       SpinLock 6-Total Threads               1.368            0.02236X
 //          Boost 6-Total Threads              0.3173           0.005187X
-// 
+//
 //      Unlocked 10-Total Threads               52.18                  1X
 //        Atomic 10-Total Threads               2.061             0.0395X
 //      SpinLock 10-Total Threads               1.236            0.02369X
 //         Boost 10-Total Threads              0.3184           0.006101X
-// 
+//
 //      Unlocked 14-Total Threads               54.18                  1X
 //        Atomic 14-Total Threads               2.659            0.04907X
 //      SpinLock 14-Total Threads               1.274            0.02351X
 //         Boost 14-Total Threads              0.3252           0.006002X
-// 
+//
 //      Unlocked 18-Total Threads               53.36                  1X
 //        Atomic 18-Total Threads               1.952            0.03659X
 //      SpinLock 18-Total Threads               1.308            0.02452X
 //         Boost 18-Total Threads              0.3259           0.006109X
-// 
+//
 //      Unlocked 22-Total Threads               56.91                  1X
 //        Atomic 22-Total Threads               2.711            0.04764X
 //      SpinLock 22-Total Threads               1.311            0.02303X
@@ -67,10 +68,10 @@ struct TestData {
   int64_t num_consumes;
   int64_t value;
 };
-  
+
 mutex lock_;
 SpinLock spinlock_;
-  
+
 typedef function<void (int64_t, int64_t*)> Fn;
 
 void UnlockedConsumeThread(int64_t n, int64_t* value) {
@@ -173,7 +174,7 @@ int main(int argc, char **argv) {
 
   int64_t N = 10000L;
   const int max_producers = 12;
-  
+
   Benchmark suite("locking");
   TestData data[max_producers];
   for (int i = 0; i < max_producers; i += 2) {
@@ -193,11 +194,11 @@ int main(int argc, char **argv) {
     name.str("");
     name << "Atomic" << suffix.str();
     suite.AddBenchmark(name.str(), TestAtomic, &data[i], baseline);
-    
+
     name.str("");
     name << "SpinLock" << suffix.str();
     suite.AddBenchmark(name.str(), TestSpinLock, &data[i], baseline);
-    
+
     name.str("");
     name << "Boost" << suffix.str();
     suite.AddBenchmark(name.str(), TestBoost, &data[i], baseline);
@@ -206,4 +207,3 @@ int main(int argc, char **argv) {
 
   return 0;
 }
-

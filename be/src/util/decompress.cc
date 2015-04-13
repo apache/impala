@@ -25,8 +25,8 @@
 #include <snappy.h>
 #include <lz4.h>
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
 
 // Output buffer size for streaming gzip

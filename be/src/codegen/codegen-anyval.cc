@@ -14,10 +14,11 @@
 
 #include "codegen/codegen-anyval.h"
 
+#include "common/names.h"
+
 using namespace impala;
 using namespace impala_udf;
 using namespace llvm;
-using namespace std;
 
 const char* CodegenAnyVal::LLVM_BOOLEANVAL_NAME   = "struct.impala_udf::BooleanVal";
 const char* CodegenAnyVal::LLVM_TINYINTVAL_NAME   = "struct.impala_udf::TinyIntVal";

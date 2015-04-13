@@ -32,9 +32,9 @@
 #include "util/time.h"
 #include "util/debug-util.h"
 
-using namespace std;
-using namespace boost;
-using namespace boost::posix_time;
+#include "common/names.h"
+
+using boost::posix_time::seconds;
 using namespace apache::thrift;
 using namespace strings;
 

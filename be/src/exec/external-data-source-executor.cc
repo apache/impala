@@ -22,7 +22,8 @@
 #include "runtime/lib-cache.h"
 #include "util/parse-util.h"
 
-using namespace std;
+#include "common/names.h"
+
 using namespace impala;
 using namespace impala::extdatasource;
 

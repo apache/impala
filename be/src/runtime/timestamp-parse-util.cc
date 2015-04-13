@@ -15,7 +15,8 @@
 #include "runtime/timestamp-parse-util.h"
 #include <boost/assign/list_of.hpp>
 
-using namespace boost;
+namespace assign = boost::assign;
+using boost::unordered_map;
 
 namespace impala {
 

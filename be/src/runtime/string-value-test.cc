@@ -18,7 +18,7 @@
 #include "runtime/string-value.inline.h"
 #include "util/cpu-info.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

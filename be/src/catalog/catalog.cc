@@ -21,7 +21,8 @@
 #include "rpc/jni-thrift-util.h"
 #include "util/logging-support.h"
 
-using namespace std;
+#include "common/names.h"
+
 using namespace impala;
 
 DEFINE_bool(load_catalog_in_background, false,

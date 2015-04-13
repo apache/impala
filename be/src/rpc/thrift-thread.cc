@@ -17,9 +17,9 @@
 #include <boost/bind.hpp>
 #include <sstream>
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace boost;
-using namespace std;
 
 // Can't import the whole namespace, since impala::Thread will clash with atc::Thread
 namespace atc = apache::thrift::concurrency;

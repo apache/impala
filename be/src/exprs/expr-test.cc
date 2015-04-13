@@ -48,6 +48,8 @@
 #include "util/string-parser.h"
 #include "util/test-info.h"
 
+#include "common/names.h"
+
 DECLARE_int32(be_port);
 DECLARE_int32(beeswax_port);
 DECLARE_string(impalad);
@@ -55,14 +57,15 @@ DECLARE_bool(abort_on_config_error);
 DECLARE_bool(disable_optimization_passes);
 DECLARE_bool(use_utc_for_unix_timestamp_conversions);
 
+namespace posix_time = boost::posix_time;
+using boost::assign::list_of;
+using boost::bad_lexical_cast;
+using boost::date_time::c_local_adjustor;
+using boost::posix_time::from_time_t;
+using boost::posix_time::ptime;
+using namespace Apache::Hadoop::Hive;
 using namespace impala;
 using namespace llvm;
-using namespace std;
-using namespace boost;
-using namespace boost::assign;
-using namespace boost::date_time;
-using namespace boost::posix_time;
-using namespace Apache::Hadoop::Hive;
 
 namespace impala {
 ImpaladQueryExecutor* executor_;

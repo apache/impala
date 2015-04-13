@@ -20,8 +20,8 @@
 
 #include <boost/cstdint.hpp>
 #include "common/logging.h"
+#include "common/names.h"
 
-using namespace std;
 
 namespace impala {
 

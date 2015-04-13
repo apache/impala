@@ -18,7 +18,7 @@
 #include "runtime/mem-tracker.h"
 #include "util/metrics.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

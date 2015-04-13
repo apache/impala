@@ -16,9 +16,9 @@
 
 #include "util/time.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 static const float ABORT_CHANCE = .10f;
 static const int MIN_READ_LEN = 1;

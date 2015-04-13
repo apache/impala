@@ -36,10 +36,9 @@ DECLARE_int32(webserver_port);
 DECLARE_bool(enable_webserver);
 DECLARE_string(principal);
 
-using namespace std;
-using namespace boost;
-using namespace impala;
+#include "common/names.h"
 
+using namespace impala;
 using namespace apache::thrift;
 
 int main(int argc, char** argv) {

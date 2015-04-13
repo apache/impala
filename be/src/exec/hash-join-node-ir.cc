@@ -17,7 +17,8 @@
 #include "exec/old-hash-table.inline.h"
 #include "runtime/row-batch.h"
 
-using namespace std;
+#include "common/names.h"
+
 using namespace impala;
 
 // Functions in this file are cross compiled to IR with clang.

@@ -21,12 +21,15 @@
 #include "testutil/test-udfs.h"
 #include "udf/udf-test-harness.h"
 
-using namespace boost;
-using namespace boost::posix_time;
-using namespace boost::gregorian;
+#include "common/names.h"
+
+using boost::gregorian::date;
+using boost::posix_time::nanoseconds;
+using boost::posix_time::ptime;
+using boost::posix_time::to_iso_extended_string;
+using boost::posix_time::to_simple_string;
 using namespace impala;
 using namespace impala_udf;
-using namespace std;
 
 DoubleVal ZeroUdf(FunctionContext* context) {
   return DoubleVal(0);

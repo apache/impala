@@ -17,9 +17,10 @@
 #include <vector>
 #include "udf/udf-internal.h"
 
+#include "common/names.h"
+
 using namespace impala_udf;
 using namespace impala;
-using namespace std;
 
 FunctionContext* UdfTestHarness::CreateTestContext(
     const FunctionContext::TypeDesc& return_type,

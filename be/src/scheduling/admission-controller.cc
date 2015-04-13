@@ -28,8 +28,8 @@
 #include "util/time.h"
 #include "util/runtime-profile.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
+
 using namespace strings;
 
 DEFINE_int64(queue_wait_timeout_ms, 60 * 1000, "Maximum amount of time (in "

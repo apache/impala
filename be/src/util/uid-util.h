@@ -21,8 +21,7 @@
 
 #include "gen-cpp/Types_types.h"  // for TUniqueId
 #include "util/debug-util.h"
-
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 // This function must be called 'hash_value' to be picked up by boost.

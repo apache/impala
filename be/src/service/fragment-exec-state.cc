@@ -19,10 +19,10 @@
 #include "codegen/llvm-codegen.h"
 #include "rpc/thrift-util.h"
 
+#include "common/names.h"
+
 using namespace apache::thrift;
-using namespace boost;
 using namespace impala;
-using namespace std;
 
 Status FragmentMgr::FragmentExecState::UpdateStatus(const Status& status) {
   lock_guard<mutex> l(status_lock_);

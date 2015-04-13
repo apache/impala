@@ -20,7 +20,7 @@
 #include "codegen/llvm-codegen.h"
 #include "util/symbols-util.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

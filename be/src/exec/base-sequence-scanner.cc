@@ -22,9 +22,9 @@
 #include "runtime/string-search.h"
 #include "util/codec.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 const int BaseSequenceScanner::HEADER_SIZE = 1024;
 const int BaseSequenceScanner::SYNC_MARKER = -1;

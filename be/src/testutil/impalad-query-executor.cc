@@ -24,9 +24,10 @@
 DEFINE_string(impalad, "localhost:21000", "host:port of impalad process");
 DECLARE_int32(num_nodes);
 
-using namespace std;
-using namespace boost;
-using namespace boost::algorithm;
+#include "common/names.h"
+
+using boost::algorithm::is_any_of;
+using boost::algorithm::split;
 using namespace Apache::Hadoop::Hive;
 using namespace beeswax;
 

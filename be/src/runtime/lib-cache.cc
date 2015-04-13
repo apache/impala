@@ -27,8 +27,9 @@
 #include "util/path-builder.h"
 #include "util/test-info.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
+
+namespace filesystem = boost::filesystem;
 using namespace impala;
 
 DEFINE_string(local_library_dir, "/tmp",

@@ -23,7 +23,8 @@
 #include "util/parse-util.h"
 #include "util/time.h"
 
-using namespace std;
+#include "common/names.h"
+
 using namespace impala;
 
 DEFINE_string(fair_scheduler_allocation_path, "", "Path to the fair scheduler "

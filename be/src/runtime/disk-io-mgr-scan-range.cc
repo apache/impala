@@ -17,9 +17,9 @@
 #include "util/error-util.h"
 #include "util/hdfs-util.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 // A very large max value to prevent things from going out of control. Not
 // expected to ever hit this value (1GB of buffered data per range).

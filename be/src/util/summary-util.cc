@@ -22,9 +22,9 @@
 #include "util/redactor.h"
 #include "util/table-printer.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 // Helper function for PrintExecSummary() that walks the exec summary recursively.
 // Output for this node is appended to *result. Each value in *result should contain
@@ -43,7 +43,7 @@ void PrintExecSummary(const TExecSummary& exec_summary, int indent_level,
 
 #define COMPUTE_MAX_SUM_STATS(NAME)\
   agg_stats.NAME += node.exec_stats[i].NAME;\
-  max_stats.NAME = max(max_stats.NAME, node.exec_stats[i].NAME)
+  max_stats.NAME = std::max(max_stats.NAME, node.exec_stats[i].NAME)
 
   // Compute avg and max of each used stat (cpu_time_ns is unused in the summary output).
   for (int i = 0; i < node.exec_stats.size(); ++i) {

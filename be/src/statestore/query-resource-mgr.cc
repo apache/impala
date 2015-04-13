@@ -27,10 +27,11 @@
 #include "util/promise.h"
 #include "util/time.h"
 
-using namespace boost;
-using namespace boost::uuids;
+#include "common/names.h"
+
+using boost::uuids::random_generator;
+using boost::uuids::uuid;
 using namespace impala;
-using namespace std;
 using namespace strings;
 
 const int64_t DEFAULT_EXPANSION_REQUEST_TIMEOUT_MS = 5000;

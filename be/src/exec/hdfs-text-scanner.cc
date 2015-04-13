@@ -29,11 +29,12 @@
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 
-using namespace boost;
+#include "common/names.h"
+
+using boost::algorithm::ends_with;
+using boost::algorithm::to_lower;
 using namespace impala;
 using namespace llvm;
-using namespace std;
-
 
 DEFINE_bool(debug_disable_streaming_gzip, false, "Debug flag, will be removed. Disables "
     "streaming gzip decompression.");

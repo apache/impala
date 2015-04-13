@@ -25,7 +25,7 @@
 #include "runtime/timestamp-value.h"
 #include "util/dict-encoding.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

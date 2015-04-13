@@ -22,8 +22,7 @@
 #include "util/compress.h"
 #include "gen-cpp/Descriptors_types.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
 
 namespace impala {
 

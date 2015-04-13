@@ -24,11 +24,11 @@
 #include "common/logging.h"
 #include "util/webserver.h"
 
-using namespace std;
+#include "common/names.h"
+
 using namespace google;
 using namespace impala;
 using namespace rapidjson;
-using namespace boost;
 
 DECLARE_string(heap_profile_dir);
 

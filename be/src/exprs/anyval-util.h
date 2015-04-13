@@ -20,8 +20,9 @@
 #include "udf/udf-internal.h"
 #include "util/hash-util.h"
 
+#include "common/names.h"
+
 using namespace impala_udf;
-using namespace std;
 
 namespace impala {
 

@@ -16,9 +16,10 @@
 #include "runtime/runtime-state.h"
 #include "udf/udf.h"
 
+#include "common/names.h"
+
 using namespace impala;
 using namespace impala_udf;
-using namespace std;
 
 #define CONDITIONAL_CODEGEN_FN(expr_class) \
   Status expr_class::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) { \

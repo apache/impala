@@ -21,8 +21,10 @@
 #include <boost/lexical_cast.hpp>
 #include "util/string-parser.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
+
+using std::min;
+using std::numeric_limits;
 
 namespace impala {
 

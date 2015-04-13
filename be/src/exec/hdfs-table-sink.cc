@@ -41,9 +41,11 @@
 
 #include "gen-cpp/ImpalaInternalService_constants.h"
 
-using namespace std;
+#include "common/names.h"
+
+using boost::posix_time::microsec_clock;
+using boost::posix_time::ptime;
 using namespace strings;
-using namespace boost::posix_time;
 
 namespace impala {
 

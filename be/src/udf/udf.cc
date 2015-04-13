@@ -100,9 +100,10 @@ class RuntimeState {
 #include "runtime/runtime-state.h"
 #endif
 
+#include "common/names.h"
+
 using namespace impala;
 using namespace impala_udf;
-using namespace std;
 
 const char* FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME =
     "class.impala_udf::FunctionContext";

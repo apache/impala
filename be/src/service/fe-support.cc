@@ -43,9 +43,9 @@
 #include "gen-cpp/Data_types.h"
 #include "gen-cpp/Frontend_types.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
-using namespace boost;
 using namespace apache::thrift::server;
 
 // Called from the FE when it explicitly loads libfesupport.so for tests.

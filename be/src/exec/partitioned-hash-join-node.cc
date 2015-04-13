@@ -31,13 +31,13 @@
 
 #include "gen-cpp/PlanNodes_types.h"
 
+#include "common/names.h"
+
 DEFINE_bool(enable_phj_probe_side_filtering, true,
     "Enables pushing PHJ build side filters to probe side");
 
-using namespace boost;
 using namespace impala;
 using namespace llvm;
-using namespace std;
 using namespace strings;
 
 PartitionedHashJoinNode::PartitionedHashJoinNode(

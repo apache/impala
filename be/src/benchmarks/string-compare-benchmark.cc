@@ -20,8 +20,9 @@
 #include "util/cpu-info.h"
 #include "util/sse-util.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 // Original
 int StringCompare1(const char* s1, int n1, const char* s2, int n2, int len) {

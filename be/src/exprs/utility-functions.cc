@@ -22,7 +22,8 @@
 #include "util/debug-util.h"
 #include "util/time.h"
 
-using namespace std;
+#include "common/names.h"
+
 using namespace strings;
 
 namespace impala {

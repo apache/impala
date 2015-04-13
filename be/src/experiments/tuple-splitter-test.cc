@@ -33,8 +33,8 @@
 #define UNUSED_UPPER_BITS_MASK  0xFFFF000000000000
 #define POINTER_LOWER_BITS_MASK 0x0000FFFFFFFFFFFF
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
+
 using namespace impala;
 
 inline void Memcpy16(uint8_t* dst, uint8_t* src) {
@@ -440,4 +440,3 @@ int main(int argc, char **argv) {
   LOG(ERROR) << "Done.";
   return 0;
 }
-

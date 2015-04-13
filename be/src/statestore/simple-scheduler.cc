@@ -43,12 +43,12 @@
 #include "util/parse-util.h"
 #include "gen-cpp/ResourceBrokerService_types.h"
 
-using namespace std;
-using namespace boost;
-using namespace boost::algorithm;
+#include "common/names.h"
+
+using boost::algorithm::join;
 using namespace apache::thrift;
-using namespace strings;
 using namespace rapidjson;
+using namespace strings;
 
 DECLARE_int32(be_port);
 DECLARE_string(hostname);

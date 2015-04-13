@@ -17,9 +17,10 @@
 #include <udf/udf-test-harness.h>
 #include "udf-sample.h"
 
+#include "common/names.h"
+
 using namespace impala;
 using namespace impala_udf;
-using namespace std;
 
 int main(int argc, char** argv) {
   bool passed = true;

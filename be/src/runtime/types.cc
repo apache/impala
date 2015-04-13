@@ -18,7 +18,8 @@
 
 #include "gen-cpp/TCLIService_constants.h"
 
-using namespace std;
+#include "common/names.h"
+
 using namespace apache::hive::service::cli::thrift;
 
 namespace impala {

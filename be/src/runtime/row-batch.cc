@@ -25,8 +25,7 @@
 #include "util/decompress.h"
 #include "gen-cpp/Results_types.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

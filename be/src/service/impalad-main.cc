@@ -40,8 +40,9 @@
 #include "util/impalad-metrics.h"
 #include "util/thread.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 DECLARE_string(classpath);
 DECLARE_bool(use_statestore);

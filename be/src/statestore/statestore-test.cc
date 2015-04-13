@@ -19,8 +19,8 @@
 #include "util/metrics.h"
 #include "statestore/statestore-subscriber.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
+
 using namespace impala;
 
 DECLARE_int32(webserver_port);

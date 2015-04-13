@@ -51,14 +51,15 @@
 
 #include "gen-cpp/PlanNodes_types.h"
 
+#include "common/names.h"
+
 DEFINE_int32(max_row_batches, 0, "the maximum size of materialized_row_batches_");
 DECLARE_string(cgroup_hierarchy_path);
 DECLARE_bool(enable_rm);
 
-using namespace boost;
+namespace filesystem = boost::filesystem;
 using namespace impala;
 using namespace llvm;
-using namespace std;
 using namespace strings;
 
 const string HdfsScanNode::HDFS_SPLIT_STATS_DESC =

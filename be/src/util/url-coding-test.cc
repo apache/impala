@@ -20,7 +20,7 @@
 #include "common/logging.h"
 #include "util/url-coding.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

@@ -16,8 +16,7 @@
 
 #include <boost/bind.hpp>
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
 
 namespace impala {
 

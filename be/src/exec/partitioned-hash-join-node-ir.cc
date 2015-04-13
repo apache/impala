@@ -18,8 +18,9 @@
 #include "exec/hash-table.inline.h"
 #include "runtime/row-batch.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 // Wrapper around ExecNode's eval conjuncts with a different function name.
 // This lets us distinguish between the join conjuncts vs. non-join conjuncts

@@ -18,8 +18,7 @@
 #include "common/status.h"
 #include "util/debug-util.h"
 
-using namespace std;
-using namespace boost::algorithm;
+#include "common/names.h"
 
 namespace impala {
 

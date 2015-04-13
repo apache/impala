@@ -29,7 +29,7 @@
 #include <thrift/transport/TBufferTransports.h>
 #include "transport/TSaslTransport.h"
 
-using namespace std;
+#include "common/names.h"
 
 // Default size, in bytes, for the memory buffer used to stage reads.
 const int32_t DEFAULT_MEM_BUF_SIZE = 32 * 1024;

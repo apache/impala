@@ -21,13 +21,16 @@
 #include "runtime/timestamp-value.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
+#include "common/names.h"
 
+namespace gregorian = boost::gregorian;
+using boost::posix_time::duration_from_string;
+using boost::posix_time::hours;
+using boost::posix_time::nanoseconds;
+using boost::posix_time::time_duration;
+using boost::posix_time::to_iso_extended_string;
+using boost::posix_time::to_simple_string;
 using namespace impala;
-using namespace std;
-using namespace boost;
-using namespace boost::date_time;
-using namespace boost::posix_time;
-using namespace boost::gregorian;
 
 // Benchmark for parsing timestamps.
 // Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
@@ -36,7 +39,7 @@ using namespace boost::gregorian;
 //                BoostStringDate              0.6793                  1X
 //                      BoostDate              0.6583             0.9691X
 //                         Impala               28.75              42.32X
-// 
+//
 // ParseTimestamp:       Function                Rate          Comparison
 // ----------------------------------------------------------------------
 //                      BoostTime               0.455                  1X
@@ -70,7 +73,7 @@ void AddTestData(TestData* data, const string& input) {
 }
 
 void AddTestDataDates(TestData* data, int n, const string& startstr) {
-  gregorian::date start(from_string(startstr));
+  gregorian::date start(gregorian::from_string(startstr));
   for (int i = 0; i < n; ++i) {
     int val = rand();
     val %= 100;
@@ -83,7 +86,7 @@ void AddTestDataDates(TestData* data, int n, const string& startstr) {
 }
 
 void AddTestDataTimes(TestData* data, int n, const string& startstr) {
-  posix_time::time_duration start(posix_time::duration_from_string(startstr));
+  time_duration start(duration_from_string(startstr));
   for (int i = 0; i < n; ++i) {
     int val = rand();
     start += nanoseconds(val);
@@ -109,7 +112,7 @@ void TestBoostStringDate(int batch_size, void* d) {
   for (int i = 0; i < batch_size; ++i) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
-      data->result[j].set_date(from_string(data->memory[j]));
+      data->result[j].set_date(gregorian::from_string(data->memory[j]));
     }
   }
 }
@@ -120,7 +123,7 @@ void TestBoostDate(int batch_size, void* d) {
     int n = data->data.size();
     for (int j = 0; j < n; ++j) {
       string s(data->data[j].ptr, data->data[j].len);
-      data->result[j].set_date(from_string(s));
+      data->result[j].set_date(gregorian::from_string(s));
     }
   }
 }
@@ -153,15 +156,14 @@ int main(int argc, char **argv) {
   date_suite.AddBenchmark("BoostStringDate", TestBoostStringDate, &dates);
   date_suite.AddBenchmark("BoostDate", TestBoostDate, &dates);
   date_suite.AddBenchmark("Impala", TestImpalaDate, &dates);
-  
+
   Benchmark timestamp_suite("ParseTimestamp");
   timestamp_suite.AddBenchmark("BoostTime", TestBoostTime, &times);
   timestamp_suite.AddBenchmark("Impala", TestImpalaDate, &times);
-  
+
   cout << date_suite.Measure();
   cout << endl;
   cout << timestamp_suite.Measure();
 
   return 0;
 }
-

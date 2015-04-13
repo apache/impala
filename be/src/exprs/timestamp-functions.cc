@@ -33,12 +33,23 @@
 
 #define TIMEZONE_DATABASE "be/files/date_time_zonespec.csv"
 
-using namespace boost;
-using namespace boost::posix_time;
-using namespace boost::local_time;
-using namespace boost::gregorian;
+#include "common/names.h"
+
+using boost::algorithm::iequals;
+using boost::gregorian::days;
+using boost::gregorian::months;
+using boost::gregorian::weeks;
+using boost::gregorian::years;
+using boost::local_time::local_date_time;
+using boost::local_time::time_zone_ptr;
+using boost::posix_time::hours;
+using boost::posix_time::microseconds;
+using boost::posix_time::milliseconds;
+using boost::posix_time::minutes;
+using boost::posix_time::nanoseconds;
+using boost::posix_time::ptime;
+using boost::posix_time::seconds;
 using namespace impala_udf;
-using namespace std;
 using namespace strings;
 
 namespace impala {

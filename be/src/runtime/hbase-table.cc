@@ -19,8 +19,7 @@
 #include "runtime/runtime-state.h"
 #include "util/jni-util.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

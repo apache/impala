@@ -28,9 +28,9 @@
 #include "util/pprof-path-handlers.h"
 #include "util/webserver.h"
 
-using namespace std;
+#include "common/names.h"
+
 using namespace google;
-using namespace boost;
 using namespace impala;
 using namespace rapidjson;
 using namespace strings;

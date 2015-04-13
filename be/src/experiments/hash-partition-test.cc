@@ -8,8 +8,8 @@
 #include "util/hash-util.h"
 #include "util/cpu-info.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
+
 using namespace impala;
 
 // Test collision problem with multiple mod steps (IMPALA-219)
@@ -59,4 +59,3 @@ int main(int argc, char **argv) {
 
   return 0;
 }
-

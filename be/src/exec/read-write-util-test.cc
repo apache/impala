@@ -20,7 +20,7 @@
 #include "exec/read-write-util.h"
 #include "util/cpu-info.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

@@ -25,7 +25,7 @@
 #include "util/process-state-info.h"
 #include "util/test-info.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

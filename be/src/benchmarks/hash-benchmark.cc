@@ -28,10 +28,13 @@
 #include "util/cpu-info.h"
 #include "util/hash-util.h"
 
-using namespace boost;
+#include "common/names.h"
+
+using boost::hash_combine;
+using boost::hash_range;
 using namespace impala;
 using namespace llvm;
-using namespace std;
+
 
 // Benchmark tests for hashing tuples.  There are two sets of inputs
 // that are benchmarked.  The 'Int' set which consists of hashing tuples
@@ -437,4 +440,3 @@ int main(int argc, char **argv) {
 
   return 0;
 }
-

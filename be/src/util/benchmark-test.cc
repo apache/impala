@@ -20,7 +20,7 @@
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
 
-using namespace std;
+#include "common/names.h"
 
 // This is not much of a test but demonstrates how to use the Benchmark
 // utility.

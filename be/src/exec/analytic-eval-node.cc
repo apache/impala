@@ -21,7 +21,7 @@
 #include "runtime/runtime-state.h"
 #include "udf/udf-internal.h"
 
-using namespace std;
+#include "common/names.h"
 
 static const int MAX_TUPLE_POOL_SIZE = 8 * 1024 * 1024; // 8MB
 

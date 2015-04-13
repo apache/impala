@@ -18,8 +18,11 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string.hpp>
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
+
+using boost::algorithm::is_any_of;
+using boost::algorithm::join;
+using boost::algorithm::split;
 using namespace llama;
 
 namespace llama {

@@ -37,8 +37,9 @@
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
+
+using boost::condition_variable;
 using namespace apache::thrift;
 using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;

@@ -24,9 +24,14 @@
 #include <boost/algorithm/string.hpp>
 #include <gutil/strings/substitute.h>
 
-using namespace std;
+#include "common/names.h"
+
+using boost::algorithm::iequals;
+using boost::algorithm::is_any_of;
+using boost::algorithm::token_compress_on;
+using boost::algorithm::split;
+using boost::algorithm::trim;
 using namespace impala;
-using namespace boost;
 using namespace strings;
 
 // Utility method to wrap ParseUtil::ParseMemSpec() by returning a Status instead of an

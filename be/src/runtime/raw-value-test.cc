@@ -16,8 +16,9 @@
 #include <sstream>
 #include "runtime/raw-value.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 namespace impala {
 

@@ -22,6 +22,8 @@
 #include "util/bit-stream-utils.inline.h"
 #include "util/cpu-info.h"
 
+#include "common/names.h"
+
 // Benchmark to measure how quickly we can do bit encoding and decoding.
 
 // encode:               Function     Rate (iters/ms)          Comparison
@@ -94,7 +96,6 @@
 //    "BitWriter (8 byte) 16-Bit"                 133                  1X
 //             "BitWriter 16-Bit"               105.2             0.7907X
 
-using namespace std;
 using namespace impala;
 
 const int BUFFER_LEN = 64 * 4096;

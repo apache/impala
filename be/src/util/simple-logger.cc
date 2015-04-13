@@ -18,10 +18,14 @@
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/filesystem.hpp>
 
-using namespace std;
-using namespace boost;
-using namespace boost::filesystem;
-using namespace boost::posix_time;
+#include "common/names.h"
+
+using boost::filesystem::create_directory;
+using boost::filesystem::exists;
+using boost::filesystem::is_directory;
+using boost::posix_time::microsec_clock;
+using boost::posix_time::ptime;
+using boost::posix_time::time_from_string;
 using namespace impala;
 
 const ptime EPOCH = time_from_string("1970-01-01 00:00:00.000");
@@ -99,7 +103,7 @@ Status SimpleLogger::FlushInternal() {
     log_file_.flush();
     log_file_.close();
   }
-  log_file_.open(log_file_name_.c_str(), ios_base::app | ios_base::out);
+  log_file_.open(log_file_name_.c_str(), std::ios_base::app | std::ios_base::out);
   if (!log_file_.is_open()) return Status("Could not open log file: " + log_file_name_);
   return Status::OK;
 }

@@ -33,13 +33,13 @@
 
 #include <thrift/Thrift.h>
 
-using namespace std;
-using namespace boost;
-using namespace boost::uuids;
+#include "common/names.h"
+
+using boost::algorithm::join;
+using namespace apache::hive::service::cli::thrift;
+using namespace apache::thrift;
 using namespace beeswax;
 using namespace strings;
-using namespace apache::thrift;
-using namespace apache::hive::service::cli::thrift;
 
 DECLARE_int32(catalog_service_port);
 DECLARE_string(catalog_service_host);

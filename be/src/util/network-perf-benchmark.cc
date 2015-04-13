@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <iostream>
+
 #include <thrift/protocol/TBinaryProtocol.h>
 #include <thrift/protocol/TDebugProtocol.h>
 #include <thrift/transport/TSocket.h>
@@ -29,7 +31,7 @@
 #include "rpc/thrift-server.h"
 #include "rpc/thrift-thread.h"
 
-#include <iostream>
+#include "common/names.h"
 
 DEFINE_int32(port, 22222, "Port for NetworkTestService");
 DEFINE_int64(send_batch_size, 0, "Batch size (in bytes).  Data is split up into batches");
@@ -50,16 +52,18 @@ DEFINE_int64(send_batch_size, 0, "Batch size (in bytes).  Data is split up into 
 // For 'broadcast', the server should be started on all the machines and then the
 // broadcast is issued from one of them.
 
+using boost::algorithm::is_any_of;
+using boost::algorithm::token_compress_on;
+using boost::algorithm::split;
+
 using namespace apache::thrift;
 using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
 using namespace apache::thrift::server;
 using namespace apache::thrift::concurrency;
-using namespace boost;
-using namespace boost::algorithm;
 using namespace impala;
 using namespace impalatest;
-using namespace std;
+
 
 class TestServer : public NetworkTestServiceIf {
  public:

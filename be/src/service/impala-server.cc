@@ -73,14 +73,18 @@
 #include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/ImpalaInternalService.h"
 
-using namespace std;
-using namespace boost;
-using namespace boost::algorithm;
-using namespace boost::filesystem;
-using namespace boost::uuids;
+#include "common/names.h"
+
+using boost::adopt_lock_t;
+using boost::algorithm::is_any_of;
+using boost::algorithm::istarts_with;
+using boost::algorithm::replace_all_copy;
+using boost::algorithm::split;
+using boost::algorithm::token_compress_on;
+using boost::uuids::random_generator;
+using boost::uuids::uuid;
 using namespace apache::thrift;
 using namespace beeswax;
-using namespace boost::posix_time;
 using namespace strings;
 
 DECLARE_int32(be_port);

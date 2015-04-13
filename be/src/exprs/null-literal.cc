@@ -20,9 +20,10 @@
 #include "udf/udf.h"
 #include "gen-cpp/Exprs_types.h"
 
+#include "common/names.h"
+
 using namespace impala_udf;
 using namespace llvm;
-using namespace std;
 
 namespace impala {
 

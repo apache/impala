@@ -22,10 +22,7 @@
 #include "gutil/strings/substitute.h"
 #include "runtime/string-value.inline.h"
 
-using namespace boost;
-using namespace std;
-using namespace boost;
-using namespace std;
+#include "common/names.h"
 using namespace impala_udf;
 using namespace re2;
 

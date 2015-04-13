@@ -19,7 +19,7 @@
 #include "runtime/exec-env.h"
 #include "util/test-info.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

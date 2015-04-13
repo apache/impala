@@ -21,9 +21,10 @@
 #include "runtime/runtime-state.h"
 #include "udf/udf-internal.h"
 
+#include "common/names.h"
+
 using namespace impala;
 using namespace impala_udf;
-using namespace std;
 
 const char* ExprContext::LLVM_CLASS_NAME = "class.impala::ExprContext";
 

@@ -28,9 +28,10 @@
 #include "util/error-util.h"
 #include <util/string-parser.h>
 
-using namespace std;
-using namespace impala;
-using namespace boost;
+#include "common/names.h"
+
+using boost::algorithm::is_any_of;
+using boost::algorithm::split;
 
 namespace impala {
 

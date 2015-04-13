@@ -30,8 +30,10 @@
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/PlanNodes_types.h"
 
+#include "common/names.h"
+
+using std::priority_queue;
 using namespace impala;
-using namespace std;
 
 TopNNode::TopNNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),

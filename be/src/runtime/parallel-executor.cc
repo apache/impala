@@ -19,9 +19,9 @@
 #include "util/stopwatch.h"
 #include "util/thread.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 Status ParallelExecutor::Exec(Function function, void** args, int num_args,
     StatsMetric<double>* latencies) {

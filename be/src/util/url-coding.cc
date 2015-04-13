@@ -24,10 +24,14 @@
 
 #include "common/logging.h"
 
+#include "common/names.h"
+
+using boost::algorithm::is_any_of;
+using boost::archive::iterators::base64_from_binary;
+using boost::archive::iterators::binary_from_base64;
+using boost::archive::iterators::transform_width;
 using namespace impala;
-using namespace std;
-using namespace boost;
-using namespace boost::archive::iterators;
+using std::uppercase;
 
 namespace impala {
 
@@ -107,7 +111,7 @@ static inline void Base64Encode(const char* in, int in_len, stringstream* out) {
   typedef base64_from_binary<transform_width<const char*, 6, 8> > base64_encode;
   // Base64 encodes 8 byte chars as 6 bit values.
   stringstream::pos_type len_before = out->tellp();
-  copy(base64_encode(in), base64_encode(in + in_len), ostream_iterator<char>(*out));
+  copy(base64_encode(in), base64_encode(in + in_len), std::ostream_iterator<char>(*out));
   int bytes_written = out->tellp() - len_before;
   // Pad with = to make it valid base64 encoded string
   int num_pad = bytes_written % 4;

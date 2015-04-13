@@ -22,8 +22,9 @@
 #include "util/runtime-profile.h"
 #include "util/periodic-counter-updater.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
+
+using boost::condition_variable;
 
 namespace impala {
 

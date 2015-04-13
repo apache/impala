@@ -28,10 +28,10 @@
 #include "util/uid-util.h"
 #include "util/webserver.h"
 
-using namespace impala;
-using namespace std;
-using namespace boost;
+#include "common/names.h"
+
 using namespace apache::thrift;
+using namespace impala;
 using namespace rapidjson;
 using namespace strings;
 

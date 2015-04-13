@@ -27,8 +27,11 @@
 
 #include "util/pretty-printer.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
+
+using boost::algorithm::is_any_of;
+using boost::algorithm::split;
+using boost::algorithm::token_compress_on;
 
 namespace impala {
 

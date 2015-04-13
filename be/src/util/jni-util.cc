@@ -20,7 +20,7 @@
 #include "common/status.h"
 #include "rpc/jni-thrift-util.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

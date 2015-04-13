@@ -24,9 +24,9 @@
 #include "gen-cpp/CatalogObjects_types.h"
 #include "gen-cpp/CatalogObjects_constants.h"
 
-using namespace std;
-using namespace boost;
-using namespace boost::assign;
+#include "common/names.h"
+
+using boost::assign::map_list_of;
 using namespace impala;
 using namespace strings;
 

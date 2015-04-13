@@ -26,14 +26,14 @@
 
 #include "gen-cpp/PlanNodes_types.h"
 
+#include "common/names.h"
+
 DECLARE_string(cgroup_hierarchy_path);
 DEFINE_bool(enable_probe_side_filtering, true,
     "Enables pushing build side filters to probe side");
 
-using namespace boost;
 using namespace impala;
 using namespace llvm;
-using namespace std;
 
 const char* HashJoinNode::LLVM_CLASS_NAME = "class.impala::HashJoinNode";
 

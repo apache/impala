@@ -20,10 +20,11 @@
 #include <stdio.h>
 #include <sstream>
 
-DECLARE_bool(disable_mem_pools);
+#include "common/names.h"
 
-using namespace std;
 using namespace impala;
+
+DECLARE_bool(disable_mem_pools);
 
 const int MemPool::DEFAULT_INITIAL_CHUNK_SIZE;
 

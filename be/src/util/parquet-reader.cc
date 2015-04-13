@@ -34,15 +34,16 @@
 
 #include "util/rle-encoding.h"
 
+#include "common/names.h"
+
 DEFINE_string(file, "", "File to read");
 DEFINE_bool(output_page_header, false, "If true, output page headers to stderr.");
 
-using namespace boost;
-using namespace parquet;
-using namespace std;
-using namespace apache::thrift;
 using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
+using namespace apache::thrift;
+using namespace parquet;
+using std::min;
 
 // Some code is replicated to make this more stand-alone.
 const uint8_t PARQUET_VERSION_NUMBER[] = {'P', 'A', 'R', '1'};

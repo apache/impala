@@ -23,7 +23,7 @@
 #include "util/mem-info.h"
 #include "util/parse-util.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

@@ -21,8 +21,7 @@
 #include "common/logging.h"
 #include "util/thread-pool.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

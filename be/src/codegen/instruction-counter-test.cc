@@ -27,8 +27,7 @@
 #include "codegen/llvm-codegen.h"
 #include "codegen/instruction-counter.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
 using namespace llvm;
 
 namespace impala {

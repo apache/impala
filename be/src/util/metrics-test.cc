@@ -23,9 +23,9 @@
 #include "util/jni-util.h"
 #include "util/thread.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace rapidjson;
-using namespace std;
 
 namespace impala {
 

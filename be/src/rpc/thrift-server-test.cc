@@ -20,8 +20,9 @@
 #include "common/init.h"
 #include "service/fe-support.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 DECLARE_string(ssl_server_certificate);
 DECLARE_string(ssl_private_key);

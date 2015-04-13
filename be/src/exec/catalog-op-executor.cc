@@ -29,8 +29,7 @@
 #include <thrift/protocol/TDebugProtocol.h>
 #include <thrift/Thrift.h>
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
 using namespace impala;
 using namespace apache::hive::service::cli::thrift;
 using namespace apache::thrift;

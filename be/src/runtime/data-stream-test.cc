@@ -47,9 +47,7 @@
 
 #include <iostream>
 
-using namespace std;
-using namespace tr1;
-using namespace boost;
+#include "common/names.h"
 
 using namespace impala;
 using namespace apache::thrift;

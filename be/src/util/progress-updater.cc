@@ -17,16 +17,17 @@
 #include "common/logging.h"
 #include <sstream>
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 ProgressUpdater::ProgressUpdater(const string& label, int64_t total, int period) :
-  label_(label), logging_level_(2), total_(total), update_period_(period), 
+  label_(label), logging_level_(2), total_(total), update_period_(period),
   num_complete_(0), last_output_percentage_(0) {
 }
 
 ProgressUpdater::ProgressUpdater() :
-  logging_level_(2), total_(0), update_period_(0), 
+  logging_level_(2), total_(0), update_period_(0),
   num_complete_(0), last_output_percentage_(0) {
 }
 
@@ -37,13 +38,13 @@ void ProgressUpdater::Update(int64_t delta) {
   num_complete_ += delta;
 
   // Cache some shared variables to avoid locking.  It's possible the progress
-  // update is out of order (e.g. prints 1 out of 10 after 2 out of 10) 
+  // update is out of order (e.g. prints 1 out of 10 after 2 out of 10)
   double old_percentage = last_output_percentage_;
   int64_t num_complete = num_complete_;
-  
+
   if (num_complete >= total_) {
     // Always print the final 100% complete
-    VLOG(logging_level_) << label_ << " 100\% Complete (" 
+    VLOG(logging_level_) << label_ << " 100\% Complete ("
                          << num_complete << " out of " << total_ << ")";
     return;
   }

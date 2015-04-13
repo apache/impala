@@ -29,9 +29,11 @@
 #include "util/url-coding.h"
 #include "util/os-util.h"
 
-using namespace boost;
+#include "common/names.h"
+
+namespace this_thread = boost::this_thread;
+using boost::ptr_vector;
 using namespace rapidjson;
-using namespace std;
 
 namespace impala {
 
@@ -301,6 +303,7 @@ void Thread::SuperviseThread(const string& name, const string& category,
 
   // Use boost's get_id rather than the system thread ID as the unique key for this thread
   // since the latter is more prone to being recycled.
+
   thread_mgr_ref->AddThread(this_thread::get_id(), name_copy, category_copy, system_tid);
   thread_started->Set(system_tid);
 

@@ -17,7 +17,8 @@
 #include "util/string-parser.h"
 #include "runtime/string-value.inline.h"
 
-using namespace std;
+#include "common/names.h"
+
 using namespace impala;
 
 // Functions in this file are cross compiled to IR with clang.  These functions
@@ -29,10 +30,10 @@ using namespace impala;
 // This function takes more arguments than are strictly necessary (they could be
 // computed inside this function) but this is done to minimize the clang dependencies,
 // specifically, calling function on the scan node.
-int HdfsScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int row_size, 
-    FieldLocation* fields, int num_tuples, int max_added_tuples, 
+int HdfsScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int row_size,
+    FieldLocation* fields, int num_tuples, int max_added_tuples,
     int slots_per_tuple, int row_idx_start) {
-  
+
   DCHECK(tuple_ != NULL);
   uint8_t* tuple_row_mem = reinterpret_cast<uint8_t*>(tuple_row);
   uint8_t* tuple_mem = reinterpret_cast<uint8_t*>(tuple_);
@@ -63,7 +64,7 @@ int HdfsScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int row_
         return -1;
       }
     }
-    
+
     // Advance to the start of the next tuple
     fields += slots_per_tuple;
 
@@ -71,7 +72,7 @@ int HdfsScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int row_
       break;
     }
   }
-  
+
   return tuples_returned;
 }
 
@@ -125,4 +126,3 @@ bool IrGenericIsNullString(const char* s, int slen, const char* n, int nlen) {
   return s == NULL || (slen == nlen && StringCompare(s, slen, n, nlen, slen) == 0);
 }
 #endif
-

@@ -25,9 +25,9 @@
 #include <boost/foreach.hpp>
 #include <boost/bind.hpp>
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 // Benchmark for thread creation time using native threads and
 // Impala's Thread class.

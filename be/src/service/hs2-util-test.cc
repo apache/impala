@@ -19,8 +19,9 @@
 
 #include "service/hs2-util.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 // Test that a single byte can be stitched to an empty string at all offsets.
 TEST(StitchNullsTest, OneByteStitch) {

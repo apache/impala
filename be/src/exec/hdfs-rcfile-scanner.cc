@@ -33,8 +33,7 @@
 
 #include "gen-cpp/PlanNodes_types.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
 using namespace impala;
 
 const char* const HdfsRCFileScanner::RCFILE_KEY_CLASS_NAME =

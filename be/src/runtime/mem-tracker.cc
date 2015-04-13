@@ -26,8 +26,9 @@
 #include "util/pretty-printer.h"
 #include "util/uid-util.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
+
+using boost::algorithm::join;
 using namespace strings;
 
 namespace impala {

@@ -34,7 +34,7 @@
 #define BUFFER_SIZE 256
 #define PRETTY_PRINT_WIDTH 13
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

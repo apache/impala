@@ -32,9 +32,10 @@
 #include "util/dynamic-util.h"
 #include "util/symbols-util.h"
 
+#include "common/names.h"
+
 using namespace impala;
 using namespace impala_udf;
-using namespace std;
 using namespace strings;
 
 ScalarFnCall::ScalarFnCall(const TExprNode& node)

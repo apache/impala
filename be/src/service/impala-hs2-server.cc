@@ -40,13 +40,14 @@
 #include "util/impalad-metrics.h"
 #include "service/hs2-util.h"
 
-using namespace std;
-using namespace boost;
-using namespace boost::algorithm;
-using namespace boost::uuids;
-using namespace apache::thrift;
+#include "common/names.h"
+
+using boost::adopt_lock_t;
+using boost::algorithm::join;
+using boost::uuids::uuid;
 using namespace apache::hive::service::cli::thrift;
 using namespace apache::hive::service::cli;
+using namespace apache::thrift;
 using namespace beeswax; // Converting QueryState
 using namespace strings;
 

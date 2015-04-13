@@ -19,8 +19,7 @@
 #include "runtime/thread-resource-mgr.h"
 #include "util/cpu-info.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

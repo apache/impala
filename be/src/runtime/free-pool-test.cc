@@ -19,7 +19,7 @@
 #include "runtime/mem-pool.h"
 #include "runtime/mem-tracker.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

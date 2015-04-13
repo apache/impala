@@ -20,8 +20,7 @@
 #include "runtime/tuple-row.h"
 #include "util/runtime-profile.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

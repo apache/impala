@@ -25,9 +25,9 @@
 #include "runtime/tuple-row.h"
 #include "util/url-parser.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala_udf;
-using namespace std;
 
 // NOTE: be careful not to use string::append.  It is not performant.
 namespace impala {

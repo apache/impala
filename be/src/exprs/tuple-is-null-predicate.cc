@@ -18,7 +18,7 @@
 
 #include "gen-cpp/Exprs_types.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

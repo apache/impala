@@ -21,8 +21,9 @@
 #include "gen-cpp/Exprs_types.h"
 #include "runtime/runtime-state.h"
 
+#include "common/names.h"
+
 using namespace impala_udf;
-using namespace std;
 using namespace llvm;
 
 namespace impala {

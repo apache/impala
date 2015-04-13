@@ -36,8 +36,7 @@
 
 #include "gen-cpp/ImpalaService_types.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
 using namespace impala;
 using namespace parquet;
 using namespace apache::thrift;

@@ -27,8 +27,7 @@
 #include "runtime/data-stream-sender.h"
 #include "util/container-util.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
 
 namespace impala {
 

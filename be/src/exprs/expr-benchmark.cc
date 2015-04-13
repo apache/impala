@@ -28,10 +28,10 @@
 #include "common/status.h"
 #include "service/impala-server.h"
 
+#include "common/names.h"
+
 using namespace apache::thrift;
-using namespace boost;
 using namespace impala;
-using namespace std;
 
 // Utility class to take (ascii) sql and return the plan.  This does minimal
 // error handling.

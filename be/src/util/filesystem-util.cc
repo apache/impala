@@ -20,12 +20,14 @@
 #include "util/filesystem-util.h"
 #include "util/error-util.h"
 
-using namespace std;
+#include "common/names.h"
+
+using std::exception;
 using namespace strings;
+
 // boost::filesystem functions, which may throw exceptions, are used with their
 // fully-qualified names to explicitly distinguish them from unix system
 // functions that do not throw exceptions.
-
 namespace impala {
 
 Status FileSystemUtil::CreateDirectories(const vector<string>& directories) {

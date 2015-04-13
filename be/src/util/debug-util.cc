@@ -26,14 +26,17 @@
 #include "util/cpu-info.h"
 #include "util/string-parser.h"
 
-// For DumpStackTraceToString(). Silence warnings for repeated definitions of preprocessor
-// variables (these are also defined in gutil/port.h)
-#undef HAVE_ATTRIBUTE_NOINLINE
-#undef _XOPEN_SOURCE
-#include <glog/../utilities.h>
+// / WARNING this uses a private API of GLog: DumpStackTraceToString().
+namespace google {
+namespace glog_internal_namespace_ {
+extern void DumpStackTraceToString(std::string* s);
+}
+}
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
+
+using boost::char_separator;
+using boost::tokenizer;
 using namespace beeswax;
 using namespace parquet;
 

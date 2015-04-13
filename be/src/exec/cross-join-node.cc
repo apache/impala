@@ -25,10 +25,10 @@
 
 #include "gen-cpp/PlanNodes_types.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
 using namespace llvm;
-using namespace std;
 
 CrossJoinNode::CrossJoinNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)

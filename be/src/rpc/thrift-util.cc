@@ -45,13 +45,13 @@
 #include <thrift/protocol/TCompactProtocol.h>
 #pragma clang diagnostic pop
 
-using namespace std;
+#include "common/names.h"
+
 using namespace apache::thrift;
 using namespace apache::thrift::transport;
 using namespace apache::thrift::server;
 using namespace apache::thrift::protocol;
 using namespace apache::thrift::concurrency;
-using namespace boost;
 
 // Thrift defines operator< but does not implement it. This is a stub
 // implementation so we can link.

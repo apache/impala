@@ -22,13 +22,14 @@
 #include "util/cpu-info.h"
 #include "util/string-parser.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 // Benchmark for computing atof.  This benchmarks tests converting from
 // strings into floats on what we expect to be typical data.  The data
 // is mostly positive numbers with just a couple of them in scientific
-// notation.  
+// notation.
 //
 // Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
 // atof:                 Function                Rate          Comparison
@@ -129,4 +130,3 @@ int main(int argc, char **argv) {
 
   return 0;
 }
-

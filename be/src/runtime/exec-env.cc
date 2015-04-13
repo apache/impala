@@ -50,8 +50,12 @@
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/CatalogService.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
+
+using boost::algorithm::is_any_of;
+using boost::algorithm::split;
+using boost::algorithm::to_lower;
+using boost::algorithm::token_compress_on;
 using namespace strings;
 
 DEFINE_bool(use_statestore, true,

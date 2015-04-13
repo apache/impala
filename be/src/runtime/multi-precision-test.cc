@@ -19,8 +19,12 @@
 #include "common/logging.h"
 #include "runtime/multi-precision.h"
 
-using namespace boost::multiprecision;
-using namespace std;
+#include "common/names.h"
+
+using boost::multiprecision::cpp_dec_float_50;
+using std::max;
+using std::min;
+using std::numeric_limits;
 
 namespace impala {
 
@@ -137,4 +141,3 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-

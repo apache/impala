@@ -24,10 +24,9 @@
 #include "runtime/exec-env.h"
 #include "service/impala-server.h"
 
-using namespace apache::thrift;
+#include "common/names.h"
 
-using namespace std;
-using namespace boost;
+using namespace apache::thrift;
 using namespace impala;
 
 InProcessImpalaServer::InProcessImpalaServer(const string& hostname, int backend_port,

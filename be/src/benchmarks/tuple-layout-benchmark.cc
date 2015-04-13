@@ -20,8 +20,9 @@
 #include "util/cpu-info.h"
 #include "runtime/string-search.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 // Benchmark tests for padded & aligned vs unpadded tuple layouts.
 
@@ -75,11 +76,11 @@ struct TestData {
 };
 
 void InitTestData(TestData* data) {
-  data->unpadded_data = 
+  data->unpadded_data =
       (UnpaddedTupleStruct*)malloc(NUM_TUPLES * sizeof(UnpaddedTupleStruct));
-  data->padded_data = 
+  data->padded_data =
       (PaddedTupleStruct*)malloc(NUM_TUPLES * sizeof(PaddedTupleStruct));
-  data->impala_data = 
+  data->impala_data =
       (ImpalaTupleStruct*)malloc(NUM_TUPLES * sizeof(ImpalaTupleStruct));
   data->unaligned_data = (char*)malloc(NUM_TUPLES * PaddedTupleStruct::UnpaddedSize);
   data->rand_access_order.resize(NUM_TUPLES);
@@ -114,7 +115,7 @@ void InitTestData(TestData* data) {
     unpadded_ptr += 8;
   }
 
-  DCHECK_EQ(unpadded_ptr, 
+  DCHECK_EQ(unpadded_ptr,
       data->unaligned_data + NUM_TUPLES * PaddedTupleStruct::UnpaddedSize);
   random_shuffle(data->rand_access_order.begin(), data->rand_access_order.end());
 }
@@ -246,4 +247,3 @@ int main(int argc, char **argv) {
 
   return 0;
 }
-

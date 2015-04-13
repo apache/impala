@@ -23,11 +23,13 @@
 #include "runtime/timestamp-value.h"
 #include "util/string-parser.h"
 
-using namespace std;
-using namespace boost;
-using namespace boost::assign;
-using namespace boost::gregorian;
-using namespace boost::posix_time;
+#include "common/names.h"
+
+using boost::assign::list_of;
+using boost::date_time::Dec;
+using boost::date_time::not_a_date_time;
+using boost::gregorian::date;
+using boost::posix_time::time_duration;
 
 namespace impala {
 

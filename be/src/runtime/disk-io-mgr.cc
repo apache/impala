@@ -21,9 +21,9 @@
 
 DECLARE_bool(disable_mem_pools);
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 using namespace strings;
 
 // Control the number of disks on the machine.  If 0, this comes from the system

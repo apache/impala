@@ -23,8 +23,8 @@
 #include "runtime/mem-tracker.h"
 #include "runtime/string-value.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
+
 using namespace impala;
 
 // This test will generate 20 rows of data, in all the types supported by the
@@ -72,4 +72,3 @@ int main(int argc, char **argv) {
   cout << endl << "Done." << endl;
   return 0;
 }
-

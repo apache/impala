@@ -17,7 +17,8 @@
 
 #include "common/object-pool.h"
 
-using namespace std;
+#include "common/names.h"
+
 using namespace impala_udf;
 
 namespace impala {

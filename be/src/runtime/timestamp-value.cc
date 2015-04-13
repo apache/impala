@@ -14,10 +14,13 @@
 
 #include "runtime/timestamp-value.h"
 
-using namespace std;
-using namespace boost;
-using namespace boost::posix_time;
-using namespace boost::gregorian;
+#include "common/names.h"
+
+using boost::date_time::not_a_date_time;
+using boost::posix_time::nanoseconds;
+using boost::posix_time::ptime;
+using boost::posix_time::ptime_from_tm;
+using boost::posix_time::to_tm;
 
 DEFINE_bool(use_local_tz_for_unix_timestamp_conversions, false,
     "When true, TIMESTAMPs are interpreted in the local time zone when converting to "

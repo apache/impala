@@ -29,10 +29,11 @@
 
 #include <thrift/protocol/TDebugProtocol.h>
 
+#include "common/names.h"
+
 using namespace impala;
 using namespace impala_udf;
 using namespace llvm;
-using namespace std;
 
 // typedef for builtin aggregate functions. Unfortunately, these type defs don't
 // really work since the actual builtin is implemented not in terms of the base

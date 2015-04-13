@@ -29,7 +29,7 @@
 #include "util/runtime-profile.h"
 #include "testutil/desc-tbl-builder.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

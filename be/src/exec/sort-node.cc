@@ -18,7 +18,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/sorted-run-merger.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

@@ -22,8 +22,8 @@
 
 #include "util/time.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
+
 using namespace apache::thrift::transport;
 using namespace apache::thrift;
 using namespace strings;

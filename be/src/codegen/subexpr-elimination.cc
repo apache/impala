@@ -33,10 +33,10 @@
 #include "util/cpu-info.h"
 #include "util/path-builder.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
 using namespace llvm;
-using namespace std;
 
 SubExprElimination::SubExprElimination(LlvmCodeGen* codegen) :
     codegen_(codegen) {
@@ -206,4 +206,3 @@ bool SubExprElimination::Run(Function* fn) {
   codegen_->InlineCallSites(fn, false);
   return true;
 }
-

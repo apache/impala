@@ -20,8 +20,8 @@
 #include "runtime/parallel-executor.h"
 #include "util/thread.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
+
 using namespace impala;
 
 namespace impala {

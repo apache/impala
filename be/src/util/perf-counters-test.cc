@@ -20,7 +20,7 @@
 #include "util/disk-info.h"
 #include "util/perf-counters.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

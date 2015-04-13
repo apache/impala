@@ -16,7 +16,7 @@
 #include "util/mem-info.h"
 #include "util/string-parser.h"
 
-using namespace std;
+#include "common/names.h"
 
 namespace impala {
 

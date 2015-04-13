@@ -14,15 +14,15 @@
 
 #include "timestamp-functions.h"
 
-using namespace boost;
-using namespace boost::posix_time;
-using namespace boost::local_time;
-using namespace boost::gregorian;
-using namespace std;
+#include "common/names.h"
+
+using boost::local_time::tz_database;
+using boost::local_time::time_zone_ptr;
+using boost::local_time::posix_time_zone;
 
 namespace impala {
 
-local_time::tz_database TimezoneDatabase::tz_database_;
+tz_database TimezoneDatabase::tz_database_;
 vector<string> TimezoneDatabase::tz_region_list_;
 
 const time_zone_ptr TimezoneDatabase::TIMEZONE_MSK_2011_NODST(time_zone_ptr(

@@ -28,8 +28,7 @@
 #include "gen-cpp/PlanNodes_types.h"
 #include "exec/text-converter.inline.h"
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
 using namespace impala;
 
 HBaseScanNode::HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode,

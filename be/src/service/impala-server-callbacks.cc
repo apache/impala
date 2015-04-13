@@ -28,13 +28,14 @@
 #include "util/summary-util.h"
 #include "util/url-coding.h"
 
+#include "common/names.h"
+
+using boost::adopt_lock_t;
 using namespace apache::thrift;
-using namespace boost;
-using namespace std;
-using namespace impala;
 using namespace beeswax;
-using namespace strings;
+using namespace impala;
 using namespace rapidjson;
+using namespace strings;
 
 DECLARE_int32(query_log_size);
 

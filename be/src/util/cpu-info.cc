@@ -25,8 +25,11 @@
 
 #include "util/pretty-printer.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
+
+using boost::algorithm::contains;
+using boost::algorithm::trim;
+using std::max;
 
 DECLARE_bool(abort_on_config_error);
 DEFINE_int32(num_cores, 0, "(Advanced) If > 0, it sets the number of cores available to"

@@ -53,9 +53,10 @@
 #include "util/hdfs-util.h"
 #include "util/path-builder.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace llvm;
-using namespace std;
+using std::fstream;
 
 DEFINE_bool(print_llvm_ir_instruction_count, false,
     "if true, prints the instruction counts of all JIT'd functions");

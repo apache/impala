@@ -21,9 +21,9 @@
 #include "runtime/string-buffer.h"
 #include "util/debug-util.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 static const int64_t DEFAULT_READ_PAST_SIZE = 1024; // in bytes
 

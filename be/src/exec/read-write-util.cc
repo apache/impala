@@ -14,7 +14,8 @@
 
 #include "exec/read-write-util.h"
 
-using namespace std;
+#include "common/names.h"
+
 using namespace impala;
 
 // This function is not inlined because it can potentially cause LLVM to crash (see

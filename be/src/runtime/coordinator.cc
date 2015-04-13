@@ -64,12 +64,17 @@
 #include "gen-cpp/Partitions_types.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 
-using namespace std;
-using namespace boost;
-using namespace boost::accumulators;
-using namespace boost::filesystem;
+#include "common/names.h"
+
 using namespace apache::thrift;
 using namespace strings;
+namespace accumulators = boost::accumulators;
+using boost::algorithm::iequals;
+using boost::algorithm::is_any_of;
+using boost::algorithm::join;
+using boost::algorithm::token_compress_on;
+using boost::algorithm::split;
+using boost::filesystem::path;
 
 DECLARE_int32(be_port);
 DECLARE_string(hostname);
@@ -1189,7 +1194,7 @@ void Coordinator::CancelRemoteFragments() {
       continue;
     }
     if (res.status.status_code != TErrorCode::OK) {
-      exec_state->status.AddDetail(algorithm::join(res.status.error_msgs, "; "));
+      exec_state->status.AddDetail(join(res.status.error_msgs, "; "));
     }
   }
 

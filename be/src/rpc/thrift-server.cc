@@ -39,15 +39,18 @@
 #include "util/uid-util.h"
 #include <sstream>
 
-using namespace std;
-using namespace boost;
-using namespace boost::filesystem;
-using namespace boost::uuids;
-using namespace apache::thrift;
+#include "common/names.h"
+
+namespace posix_time = boost::posix_time;
+using boost::filesystem::exists;
+using boost::get_system_time;
+using boost::system_time;
+using boost::uuids::uuid;
 using namespace apache::thrift::concurrency;
 using namespace apache::thrift::protocol;
-using namespace apache::thrift::transport;
 using namespace apache::thrift::server;
+using namespace apache::thrift::transport;
+using namespace apache::thrift;
 
 DEFINE_int32(rpc_cnxn_attempts, 10, "Deprecated");
 DEFINE_int32(rpc_cnxn_retry_interval_ms, 2000, "Deprecated");

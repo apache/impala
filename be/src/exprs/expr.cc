@@ -62,9 +62,10 @@
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/ImpalaService_types.h"
 
+#include "common/names.h"
+
 using namespace impala;
 using namespace impala_udf;
-using namespace std;
 using namespace llvm;
 
 const char* Expr::LLVM_CLASS_NAME = "class.impala::Expr";

@@ -164,10 +164,10 @@
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
 using namespace impala_udf;
-using namespace std;
 using namespace strings;
 
 namespace impala {

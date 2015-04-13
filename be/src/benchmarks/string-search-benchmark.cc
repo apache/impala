@@ -20,11 +20,12 @@
 #include "runtime/string-search.h"
 #include "experiments/string-search-sse.h"
 
+#include "common/names.h"
+
 using namespace impala;
-using namespace std;
 
 // Benchmark tests for string search.  This is probably a science of its own
-// but we'll run some simple tests.  (We can't use libc strstr because our 
+// but we'll run some simple tests.  (We can't use libc strstr because our
 // strings are not null-terminated and also, it's not that fast).
 // Results:
 // String Search:        Function                Rate          Comparison
@@ -80,7 +81,7 @@ void TestImpalaNullTerminated(int batch_size, void* d) {
   for (int i = 0; i < batch_size; ++i) {
     data->matches = 0;
     for (int n = 0; n < data->needles.size(); ++n) {
-      // Exercise the null-terminated path.  
+      // Exercise the null-terminated path.
       StringSearchSSE needle(data->needles[n].ptr);
       for (int iters = 0; iters < 10; ++iters) {
         for (int h = 0; h < data->haystacks.size(); ++h) {
@@ -98,7 +99,7 @@ void TestImpalaNonNullTerminated(int batch_size, void* d) {
   for (int i = 0; i < batch_size; ++i) {
     data->matches = 0;
     for (int n = 0; n < data->needles.size(); ++n) {
-      // Exercise the non null-terminated path.  
+      // Exercise the non null-terminated path.
       StringSearchSSE needle(&(data->needles[n]));
       for (int iters = 0; iters < 10; ++iters) {
         for (int h = 0; h < data->haystacks.size(); ++h) {
@@ -113,14 +114,14 @@ void TestImpalaNonNullTerminated(int batch_size, void* d) {
 
 // This should be tailored to represent the data we expect.
 // Some algos are better suited for longer vs shorter needles, finding the string vs.
-// not finding the string, etc.  
+// not finding the string, etc.
 // For now, pick data that mimicks the grep data set.
 void InitTestData(TestData* data) {
-  vector<string> needles; 
+  vector<string> needles;
   vector<string> haystacks;
 
   needles.push_back("xyz");
-  
+
   // From a random password generator:
   // https://www.grc.com/passwords.htm
   haystacks.push_back("d1h2POju5AG3zCxiBNKBxdzLdW7VfPkgvHDRLK2o78pGu4eywZ5mmmsV1LscqIH");
@@ -173,4 +174,3 @@ int main(int argc, char **argv) {
 
   return 0;
 }
-

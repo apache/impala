@@ -27,12 +27,12 @@
 #include "gen-cpp/CatalogObjects_types.h"
 #include "exprs/aggregate-functions.h"
 
-using namespace boost;
+#include "common/names.h"
+
+using namespace apache::hive::service::cli::thrift;
 using namespace impala;
 using namespace impala_udf;
-using namespace std;
 using namespace strings;
-using namespace apache::hive::service::cli::thrift;
 
 // Finalize method for the NDV_NO_FINALIZE() UDA, which only copies the intermediate state
 // of the NDV computation into its output StringVal.

@@ -3,8 +3,11 @@
 #include <math.h>
 #include <iostream>
 
-using namespace std;
-using namespace boost;
+#include "common/names.h"
+
+using boost::minstd_rand;
+using boost::uniform_real;
+using boost::variate_generator;
 using namespace impala;
 
 DataProvider::DataProvider(MemPool* pool, RuntimeProfile* profile) :
@@ -147,4 +150,3 @@ void DataProvider::Print(ostream* stream, char* data, int rows) const {
     *stream << endl;
   }
 }
-

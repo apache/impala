@@ -25,10 +25,10 @@
 DECLARE_int32(webserver_port);
 DECLARE_string(webserver_password_file);
 
+#include "common/names.h"
+
+using boost::asio::ip::tcp;
 using namespace impala;
-using namespace std;
-using namespace boost;
-using namespace boost::asio::ip;
 using namespace rapidjson;
 using namespace strings;
 

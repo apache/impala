@@ -30,7 +30,8 @@
 #include "util/periodic-counter-updater.h"
 #include "util/runtime-profile.h"
 
-using namespace std;
+#include "common/names.h"
+
 using namespace strings;
 using namespace impala::extdatasource;
 

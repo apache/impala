@@ -27,8 +27,13 @@
 
 #include "util/debug-util.h"
 
-using namespace boost;
-using namespace std;
+#include "common/names.h"
+
+using boost::algorithm::is_any_of;
+using boost::algorithm::split;
+using boost::algorithm::token_compress_on;
+using boost::algorithm::trim;
+using boost::algorithm::trim_right_if;
 
 namespace impala {
 
@@ -38,7 +43,7 @@ map<dev_t, int> DiskInfo::device_id_to_disk_id_;
 map<string, int> DiskInfo::disk_name_to_disk_id_;
 int DiskInfo::num_datanode_dirs_;
 
-// Parses /proc/partitions to get the number of disks.  A bit of looking around 
+// Parses /proc/partitions to get the number of disks.  A bit of looking around
 // seems to indicate this as the best way to do this.
 // TODO: is there not something better than this?
 void DiskInfo::GetDeviceNames() {
@@ -57,7 +62,7 @@ void DiskInfo::GetDeviceNames() {
     if (fields.size() != 4) continue;
     string name = fields[3];
     if (name == "name") continue;
- 
+
     // Remove the partition# from the name.  e.g. sda2 --> sda
     trim_right_if(name, is_any_of("0123456789"));
 
@@ -125,7 +130,7 @@ string DiskInfo::DebugString() {
   stream << "Disk Info: " << endl;
   stream << "  Num disks " << num_disks() << ": " << endl;
   for (int i = 0; i < disks_.size(); ++i) {
-    stream << "    " << disks_[i].name 
+    stream << "    " << disks_[i].name
            << " (rotational=" << (disks_[i].is_rotational ? "true" : "false") << ")\n";
   }
   stream << endl;

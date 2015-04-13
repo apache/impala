@@ -20,6 +20,7 @@
 #include "util/cpu-info.h"
 
 #include "runtime/multi-precision.h"
+#include "common/names.h"
 
 // Benchmark to measure operations on different implementation of multi (i.e. > 8)
 // byte integers.
@@ -49,7 +50,9 @@
 //                          int64                2788              1.644X
 //                         double                4565              2.692X
 
-using namespace std;
+
+using std::max;
+using std::numeric_limits;
 using namespace impala;
 
 // Multi byte ints encoded using a big base.

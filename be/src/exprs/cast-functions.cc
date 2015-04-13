@@ -22,10 +22,10 @@
 #include "util/string-parser.h"
 #include "string-functions.h"
 
-using namespace boost;
+#include "common/names.h"
+
 using namespace impala;
 using namespace impala_udf;
-using namespace std;
 
 // The maximum number of characters need to represent a floating-point number (float or
 // double) as a string. 24 = 17 (maximum significant digits) + 1 (decimal point) + 1 ('E')

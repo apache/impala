@@ -47,12 +47,16 @@
 #include <sys/stat.h>     // for stat system call
 #include <unistd.h>       // for stat system call
 
+#include "common/names.h"
+
+using boost::algorithm::is_any_of;
+using boost::algorithm::replace_all;
+using boost::algorithm::split;
+using boost::mt19937;
+using boost::uniform_int;
 using namespace apache::thrift;
-using namespace std;
-using namespace strings;
-using namespace boost;
-using namespace boost::random;
 using namespace boost::filesystem;   // for is_regular()
+using namespace strings;
 
 DECLARE_string(keytab_file);
 DECLARE_string(principal);
