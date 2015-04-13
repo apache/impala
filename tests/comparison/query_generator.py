@@ -320,24 +320,30 @@ class QueryGenerator(object):
     # an item is a simple column reference, then it will only get an alias if there is a
     # conflict with another simple column ref. All other item types, such as functions
     # or constants, will always have an alias.
-    item_name_counts = defaultdict(int)
+    #
+    # item_names is the set of final names or aliases for each item in the SELECT list.
+    item_names = set()
     for item in select_items:
-      if item.alias or not item.val_expr.is_col:
+      if not item.alias and not item.val_expr.is_col:
         continue
-      if item.val_expr.name in item_name_counts:
+      if item.name in item_names:
         item.alias = '*CONFLICT*'
       else:
-        item_name_counts[item.val_expr.name] += 1
+        item_names.add(item.name)
+
+    # base_item_name_counts stores the number of conflicts that occurred for a name,
+    # and hence the number of name to skip forward to create a non-conflicting name.
+    base_item_name_counts = defaultdict(int)
     for item in select_items:
       if item.alias == '*CONFLICT*' or (not item.val_expr.is_col and not item.alias):
         # Use names close to the Impala functional test database so that bugs in
         # resolution will be more likely to surface.
-        alias = '%s_col' % item.type.__name__.lower()
-        if alias in item_name_counts:
-          item.alias = alias + '_%s' % (item_name_counts[alias] + 1)
-        else:
-          item.alias = alias
-        item_name_counts[alias] += 1
+        alias = base_alias = '%s_col' % item.type.__name__.lower()
+        while alias in item_names:
+          base_item_name_counts[base_alias] += 1
+          alias = base_alias + '_' + str(base_item_name_counts[base_alias])
+        item.alias = alias
+        item_names.add(alias)
     return SelectClause(select_items)
 
   def _create_basic_select_item(self, table_exprs, return_type):
