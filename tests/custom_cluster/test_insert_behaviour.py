@@ -15,17 +15,16 @@
 #
 import os
 import pytest
-from tests.common.skip import SkipIfS3
+from tests.common.skip import SkipIfS3, SkipIfIsilon
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
+from tests.util.filesystem_utils import WAREHOUSE
 from tests.util.hdfs_util import HdfsConfig, get_hdfs_client, get_hdfs_client_from_conf
 
+TEST_TBL = "insert_inherit_permission"
 
 @SkipIfS3.insert
+@SkipIfIsilon.jira(reason="CDH-27688")
 class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
-  def check_partition_perms(self, part, perms):
-    ls = self.hdfs_client.get_file_dir_status(
-      "test-warehouse/functional.db/insert_inherit_permission/%s" % part)
-    assert ls['FileStatus']['permission'] == perms
 
   @classmethod
   def setup_class(cls):
@@ -36,47 +35,71 @@ class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
       host, port = pytest.config.option.namenode_http_address.split(":")
       cls.hdfs_client = get_hdfs_client(host, port)
 
+  def _check_partition_perms(self, part, perms):
+    ls = self.hdfs_client.get_file_dir_status("test-warehouse/%s/%s" % (TEST_TBL, part))
+    assert ls['FileStatus']['permission'] == perms
+
+  def _get_impala_client(self):
+    impalad = self.cluster.get_any_impalad()
+    return impalad.service.create_beeswax_client()
+
+  def _create_test_tbl(self):
+    client = self._get_impala_client()
+    options = {'sync_ddl': '1'}
+    try:
+      self.execute_query_expect_success(client, "DROP TABLE IF EXISTS %s" % TEST_TBL,
+                                        query_options=options)
+      self.execute_query_expect_success(client,
+                                        "CREATE TABLE {0} (col int) PARTITIONED"
+                                        " BY (p1 int, p2 int, p3 int) location"
+                                        " '{1}/{0}'".format(TEST_TBL, WAREHOUSE),
+                                        query_options=options)
+      self.execute_query_expect_success(client, "ALTER TABLE %s"
+                                        " ADD PARTITION(p1=1, p2=1, p3=1)" % TEST_TBL,
+                                        query_options=options)
+    finally:
+      client.close()
+
+  def _drop_test_tbl(self):
+    client = self._get_impala_client()
+    self.execute_query_expect_success(client, "drop table if exists %s" % TEST_TBL)
+    client.close()
+
+  def setup_method(cls, method):
+    super(TestInsertBehaviourCustomCluster, cls).setup_method(method)
+    cls._create_test_tbl()
+
+  def teardown_method(cls, method):
+    cls._drop_test_tbl()
+    super(TestInsertBehaviourCustomCluster, cls).teardown_method(method)
+
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--insert_inherit_permissions=true")
   def test_insert_inherit_permission(self):
     """Create a table with three partition columns to test permission inheritance"""
-    impalad = self.cluster.get_any_impalad()
-    client = impalad.service.create_beeswax_client()
+    client = self._get_impala_client()
+    try:
+      self.hdfs_client.chmod("test-warehouse/%s/p1=1/" % TEST_TBL, "777")
 
-    self.execute_query_expect_success(client, "DROP TABLE IF EXISTS"
-                                      " functional.insert_inherit_permission")
-    self.execute_query_expect_success(client, "CREATE TABLE "
-                                      "functional.insert_inherit_permission (col int)"
-                                      " PARTITIONED BY (p1 int, p2 int, p3 int)")
+      # 1. INSERT that creates two new directories gets permissions from parent
+      self.execute_query_expect_success(client, "INSERT INTO %s"
+                                        " PARTITION(p1=1, p2=2, p3=2) VALUES(1)" % TEST_TBL)
+      self._check_partition_perms("p1=1/p2=2/", "777")
+      self._check_partition_perms("p1=1/p2=2/p3=2/", "777")
 
-    self.execute_query_expect_success(client, "ALTER TABLE "
-                                      "functional.insert_inherit_permission ADD PARTITION"
-                                      "(p1=1, p2=1, p3=1)")
-    self.hdfs_client.chmod(
-      "test-warehouse/functional.db/insert_inherit_permission/p1=1/", "777")
+      # 2. INSERT that creates one new directory gets permissions from parent
+      self.execute_query_expect_success(client, "INSERT INTO %s"
+                                        " PARTITION(p1=1, p2=2, p3=3) VALUES(1)" % TEST_TBL)
+      self._check_partition_perms("p1=1/p2=2/p3=3/", "777")
 
-    # 1. INSERT that creates two new directories gets permissions from parent
-    self.execute_query_expect_success(client, "INSERT INTO "
-                                      "functional.insert_inherit_permission "
-                                      "PARTITION(p1=1, p2=2, p3=2) VALUES(1)")
-    self.check_partition_perms("p1=1/p2=2/", "777")
-    self.check_partition_perms("p1=1/p2=2/p3=2/", "777")
-
-    # 2. INSERT that creates one new directory gets permissions from parent
-    self.execute_query_expect_success(client, "INSERT INTO "
-                                      "functional.insert_inherit_permission "
-                                      "PARTITION(p1=1, p2=2, p3=3) VALUES(1)")
-    self.check_partition_perms("p1=1/p2=2/p3=3/", "777")
-
-    # 3. INSERT that creates no new directories keeps standard permissions
-    self.hdfs_client.chmod(
-      "test-warehouse/functional.db/insert_inherit_permission/p1=1/p2=2", "644")
-    self.execute_query_expect_success(client, "INSERT INTO "
-                                      "functional.insert_inherit_permission "
-                                      "PARTITION(p1=1, p2=2, p3=3) VALUES(1)")
-    self.check_partition_perms("p1=1/p2=2/", "644")
-    self.check_partition_perms("p1=1/p2=2/p3=3/", "777")
-
+      # 3. INSERT that creates no new directories keeps standard permissions
+      self.hdfs_client.chmod("test-warehouse/%s/p1=1/p2=2" % TEST_TBL, "644")
+      self.execute_query_expect_success(client, "INSERT INTO %s"
+                                        " PARTITION(p1=1, p2=2, p3=3) VALUES(1)" % TEST_TBL)
+      self._check_partition_perms("p1=1/p2=2/", "644")
+      self._check_partition_perms("p1=1/p2=2/p3=3/", "777")
+    finally:
+      client.close()
 
   @pytest.mark.execute_serially
   @CustomClusterTestSuite.with_args("--insert_inherit_permissions=false")
@@ -84,25 +107,14 @@ class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
     """Check that turning off insert permission inheritance works correctly."""
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
+    try:
+      ls = self.hdfs_client.get_file_dir_status("test-warehouse/%s/p1=1/" % TEST_TBL)
+      default_perms = ls['FileStatus']['permission']
+      self.hdfs_client.chmod("test-warehouse/%s/p1=1/" % TEST_TBL, "777")
 
-    self.execute_query_expect_success(client, "DROP TABLE IF EXISTS"
-                                      " functional.insert_inherit_permission")
-    self.execute_query_expect_success(client, "CREATE TABLE "
-                                      "functional.insert_inherit_permission (col int)"
-                                      " PARTITIONED BY (p1 int, p2 int, p3 int)")
-
-    self.execute_query_expect_success(client, "ALTER TABLE "
-                                      "functional.insert_inherit_permission ADD PARTITION"
-                                      "(p1=1, p2=1, p3=1)")
-    ls = self.hdfs_client.get_file_dir_status(
-      "test-warehouse/functional.db/insert_inherit_permission/p1=1/")
-    default_perms = ls['FileStatus']['permission']
-
-    self.hdfs_client.chmod(
-      "test-warehouse/functional.db/insert_inherit_permission/p1=1/", "777")
-
-    self.execute_query_expect_success(client, "INSERT INTO "
-                                      "functional.insert_inherit_permission "
-                                      "PARTITION(p1=1, p2=3, p3=4) VALUES(1)")
-    # Would be 777 if inheritance was enabled
-    self.check_partition_perms("p1=1/p2=3/", default_perms)
+      self.execute_query_expect_success(client, "INSERT INTO %s"
+                                        " PARTITION(p1=1, p2=3, p3=4) VALUES(1)" % TEST_TBL)
+      # Would be 777 if inheritance was enabled
+      self._check_partition_perms("p1=1/p2=3/", default_perms)
+    finally:
+       client.close()

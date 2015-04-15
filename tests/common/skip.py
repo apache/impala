@@ -46,6 +46,19 @@ class SkipIf:
   default_fs = pytest.mark.skipif(IS_DEFAULT_FS, reason="Non-default filesystem needed")
   skip_hbase = pytest.mark.skipif(pytest.config.option.skip_hbase,
       reason="--skip_hbase argument specified")
+  not_default_fs = pytest.mark.skipif(not IS_DEFAULT_FS,
+      reason="Default filesystem needed")
+
 
 class SkipIfIsilon:
-  pass
+  caching = pytest.mark.skipif(IS_ISILON, reason="SET CACHED not implemented for Isilon")
+  hbase = pytest.mark.skipif(IS_ISILON, reason="HBase not tested with Isilon")
+  hive = pytest.mark.skipif(IS_ISILON, reason="Hive not tested with Isilon")
+  hdfs_acls = pytest.mark.skipif(IS_ISILON, reason="HDFS acls are not supported on Isilon")
+  hdfs_block_size = pytest.mark.skipif(IS_ISILON,
+      reason="Isilon uses its own block size")
+  hdfs_encryption = pytest.mark.skipif(IS_ISILON,
+      reason="HDFS encryption is not supported with Isilon")
+  untriaged = pytest.mark.skipif(IS_ISILON,
+      reason="This Isilon issue has yet to be triaged.")
+  jira = partial(pytest.mark.skipif, IS_ISILON)

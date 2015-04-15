@@ -54,7 +54,8 @@ bigint
 ====
 ---- QUERY
 # Test to verify that huge (larger than 64k) values can be written, see IMPALA-1705
-create table if not exists test_insert_huge_vals (s string) stored as parquet;
+create table if not exists test_insert_huge_vals (s string) stored as parquet
+location '$FILESYSTEM_PREFIX/test_insert_huge_vals';
 insert overwrite table test_insert_huge_vals
   select cast(l_orderkey as string) from tpch.lineitem
   union select group_concat(concat(s_name, s_address, s_phone)) from tpch.supplier

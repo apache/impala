@@ -17,7 +17,8 @@ from subprocess import call
 from tests.common.test_vector import *
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfS3
+from tests.common.skip import SkipIfS3, SkipIfIsilon
+from tests.util.filesystem_utils import WAREHOUSE
 
 # The purpose of view compatibility testing is to check whether views created in Hive
 # can be queried in Impala and vice versa. A test typically consists of
@@ -54,12 +55,14 @@ class TestViewCompatibility(ImpalaTestSuite):
   def setup_method(self, method):
     # cleanup and create a fresh test database
     self.cleanup_db(self.TEST_DB_NAME)
-    self.execute_query("create database %s" % (self.TEST_DB_NAME))
+    self.execute_query("create database %s location '%s/%s'" % (self.TEST_DB_NAME,
+      WAREHOUSE, self.TEST_DB_NAME))
 
   def teardown_method(self, method):
     self.cleanup_db(self.TEST_DB_NAME)
 
   @SkipIfS3.hive
+  @SkipIfIsilon.hive
   def test_view_compatibility(self, vector):
     self.__run_view_compat_test_case('QueryTest/views-compatibility', vector)
 

@@ -20,9 +20,11 @@ from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_exec_option_dimension
 from tests.common.skip import SkipIfS3
+from tests.util.filesystem_utils import WAREHOUSE
 
+TEST_TBL = 'read_only_tbl'
+TBL_LOC = '%s/%s' % (WAREHOUSE, TEST_TBL)
 
-TEST_DB = 'read_only_table_test_db'
 
 @SkipIfS3.insert
 class TestHdfsPermissions(ImpalaTestSuite):
@@ -37,47 +39,42 @@ class TestHdfsPermissions(ImpalaTestSuite):
     cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
 
   def setup_method(self, method):
-    self.__cleanup()
-    self.client.execute('create database if not exists %s' % TEST_DB)
+    self._cleanup()
 
   def teardown_method(self, method):
-    self.__cleanup()
+    self._cleanup()
 
-  def __cleanup(self):
-    self.client.execute('use default')
-    self.client.execute('drop table if exists %s.read_only_tbl' % TEST_DB)
-    self.client.execute('drop database if exists %s' % TEST_DB)
-    self.hdfs_client.delete_file_dir('test-warehouse/read-only-test', recursive=True)
+  def _cleanup(self):
+    self.client.execute('drop table if exists %s' % TEST_TBL)
+    self.hdfs_client.delete_file_dir('test-warehouse/%s' % TEST_TBL, recursive=True)
 
   def test_insert_into_read_only_table(self, vector):
-    self.client.execute('use %s' % TEST_DB)
-
     # Create a directory that is read-only
-    self.hdfs_client.make_dir('test-warehouse/read-only-test', permission=444)
-    self.client.execute('create external table read_only_tbl (i int) location '\
-        '\'/test-warehouse/read-only-test\'')
+    self.hdfs_client.make_dir('test-warehouse/%s' % TEST_TBL, permission=444)
+    self.client.execute("create external table %s (i int) location '%s'"
+        % (TEST_TBL, TBL_LOC))
     try:
-      self.client.execute('insert into table read_only_tbl select 1')
-      assert 0, 'Expected INSERT INTO read-only table to fail'
+      self.client.execute('insert into table %s select 1' % TEST_TBL)
+      assert False, 'Expected INSERT INTO read-only table to fail'
     except Exception, e:
       assert 'does not have WRITE access to at least one HDFS path: hdfs:' in str(e)
 
     # Should still be able to query this table without any errors.
-    assert '0' == self.execute_scalar('select count(*) from read_only_tbl')
+    assert self.execute_scalar('select count(*) from %s' % TEST_TBL) == "0"
 
     # Now re-create the directory with write privileges.
-    self.hdfs_client.delete_file_dir('test-warehouse/read-only-test', recursive=True)
-    self.hdfs_client.make_dir('test-warehouse/read-only-test', permission=777)
+    self.hdfs_client.delete_file_dir('test-warehouse/%s' % TEST_TBL, recursive=True)
+    self.hdfs_client.make_dir('test-warehouse/%s' % TEST_TBL, permission=777)
 
-    self.client.execute('refresh read_only_tbl')
-    self.client.execute('insert into table read_only_tbl select 1')
-    assert '1' == self.execute_scalar('select count(*) from read_only_tbl')
-    self.client.execute('drop table if exists read_only_tbl')
+    self.client.execute('refresh  %s' % TEST_TBL)
+    self.client.execute('insert into table %s select 1' % TEST_TBL)
+    assert self.execute_scalar('select count(*) from %s' % TEST_TBL) == "1"
+    self.client.execute('drop table if exists %s' % TEST_TBL)
 
     # Verify with a partitioned table
     try:
       self.client.execute('insert into table functional_seq.alltypes '\
           'partition(year, month) select * from functional.alltypes limit 0')
-      assert 0, 'Expected INSERT INTO read-only partition to fail'
+      assert False, 'Expected INSERT INTO read-only partition to fail'
     except Exception, e:
       assert 'does not have WRITE access to at least one HDFS path: hdfs:' in str(e)

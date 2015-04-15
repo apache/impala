@@ -6,7 +6,7 @@ DROP TABLE IF EXISTS functional.test_load;
 ====
 ---- QUERY
 CREATE TABLE functional.test_load like functional.alltypes
-location '/test-warehouse/test_load'
+location '$FILESYSTEM_PREFIX/test-warehouse/test_load'
 ---- RESULTS
 
 ====
@@ -45,7 +45,7 @@ select count(*) from functional.test_load where year=2010
 ====
 ---- QUERY
 # Load a specific data file.
-load data inpath '/tmp/load_data/1/100101.txt'
+load data inpath '$FILESYSTEM_PREFIX/tmp/load_data/1/100101.txt'
 into table functional.test_load partition(year=2010, month=1)
 ---- RESULTS
 'Loaded 1 file(s). Total files in destination location: 1'
@@ -61,7 +61,7 @@ BIGINT
 ====
 ---- QUERY
 # Load another data file with the same name (overwrite not specified)
-load data inpath '/tmp/load_data/2/100101.txt'
+load data inpath '$FILESYSTEM_PREFIX/tmp/load_data/2/100101.txt'
 into table functional.test_load partition(year=2010, month=1)
 ---- RESULTS
 'Loaded 1 file(s). Total files in destination location: 2'
@@ -77,7 +77,7 @@ BIGINT
 ====
 ---- QUERY
 # Load the file one more time, this time with overwrite.
-load data inpath '/tmp/load_data/3/100101.txt'
+load data inpath '$FILESYSTEM_PREFIX/tmp/load_data/3/100101.txt'
 overwrite into table functional.test_load partition(year=2010, month=1)
 ---- RESULTS
 'Loaded 1 file(s). Total files in destination location: 1'
@@ -106,7 +106,7 @@ DROP TABLE IF EXISTS functional.test_load_nopart;
 ====
 ---- QUERY
 create table functional.test_load_nopart like functional.alltypesnopart
-location '/test-warehouse/test_load_nopart'
+location '$FILESYSTEM_PREFIX/test-warehouse/test_load_nopart'
 ---- RESULTS
 
 ====
@@ -120,7 +120,7 @@ BIGINT
 ====
 ---- QUERY
 # Load a directory of file(s) into the table.
-load data inpath '/tmp/load_data/4/'
+load data inpath '$FILESYSTEM_PREFIX/tmp/load_data/4/'
 overwrite into table functional.test_load_nopart
 ---- RESULTS
 'Loaded 4 file(s). Total files in destination location: 4'
@@ -137,7 +137,7 @@ BIGINT
 ====
 ---- QUERY
 # Load more file(s) into the table without overwrite.
-load data inpath '/tmp/load_data/5/'
+load data inpath '$FILESYSTEM_PREFIX/tmp/load_data/5/'
 into table functional.test_load_nopart
 ---- RESULTS
 'Loaded 4 file(s). Total files in destination location: 8'
@@ -154,7 +154,7 @@ BIGINT
 ====
 ---- QUERY
 # Load a file from the partitioned table.
-load data inpath '/test-warehouse/test_load/year=2010/month=1/100101.txt'
+load data inpath '$FILESYSTEM_PREFIX/test-warehouse/test_load/year=2010/month=1/100101.txt'
 into table functional.test_load_nopart
 ---- RESULTS
 'Loaded 1 file(s). Total files in destination location: 9'
@@ -183,7 +183,7 @@ BIGINT
 ---- QUERY
 # Have the table load itself (with overwrite). Since the file(s) were moved from the dest
 # location there are actually no file(s) to overwrite.
-load data inpath '/test-warehouse/test_load_nopart/'
+load data inpath '$FILESYSTEM_PREFIX/test-warehouse/test_load_nopart/'
 overwrite into table functional.test_load_nopart
 ---- RESULTS
 'Loaded 9 file(s). Total files in destination location: 9'
@@ -200,7 +200,7 @@ BIGINT
 ====
 ---- QUERY
 # Have the table load itself (without overwrite)
-load data inpath '/test-warehouse/test_load_nopart/'
+load data inpath '$FILESYSTEM_PREFIX/test-warehouse/test_load_nopart/'
 into table functional.test_load_nopart
 ---- RESULTS
 'Loaded 9 file(s). Total files in destination location: 9'

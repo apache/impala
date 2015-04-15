@@ -8,7 +8,8 @@ import pytest
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_exec_option_dimension
-from tests.common.skip import SkipIfS3
+from tests.common.skip import SkipIfS3, SkipIfIsilon
+from tests.util.filesystem_utils import WAREHOUSE
 
 # TODO: Add Gzip back.  IMPALA-424
 PARQUET_CODECS = ['none', 'snappy']
@@ -109,15 +110,18 @@ class TestInsertParquetVerifySize(ImpalaTestSuite):
     super(TestInsertParquetVerifySize, cls).setup_class()
 
   @pytest.mark.execute_serially
+  @SkipIfIsilon.hdfs_block_size
   def test_insert_parquet_verify_size(self, vector):
-    # Test to verify that the result file size is close to what we expect.
-    DROP = "drop table if exists parquet_insert_size";
-    CREATE = "create table parquet_insert_size like tpch_parquet.orders stored as parquet"
-    QUERY = "insert overwrite parquet_insert_size select * from tpch.orders"
-    DIR = "test-warehouse/parquet_insert_size/"
+    # Test to verify that the result file size is close to what we expect.i
+    TBL = "parquet_insert_size"
+    DROP = "drop table if exists {0}".format(TBL)
+    CREATE = ("create table parquet_insert_size like tpch_parquet.orders"
+              " stored as parquet location '{0}/{1}'".format(WAREHOUSE, TBL))
+    QUERY = "insert overwrite {0} select * from tpch.orders".format(TBL)
+    DIR = "test-warehouse/{0}/".format(TBL)
     BLOCK_SIZE = 40 * 1024 * 1024
 
-    self.execute_query(DROP )
+    self.execute_query(DROP)
     self.execute_query(CREATE)
 
     vector.get_value('exec_option')['PARQUET_FILE_SIZE'] = BLOCK_SIZE

@@ -16,7 +16,7 @@
 # Utilities for supporting different filesystems.
 import os
 
-FILESYSTEM_PREFIX = os.getenv("FILESYSTEM_PREFIX")
+FILESYSTEM_PREFIX = os.getenv("FILESYSTEM_PREFIX") or str()
 FILESYSTEM = os.getenv("TARGET_FILESYSTEM")
 # This condition satisfies both the states where one can assume a default fs
 #   - The environment variable is set to an empty string.
@@ -24,6 +24,9 @@ FILESYSTEM = os.getenv("TARGET_FILESYSTEM")
 IS_DEFAULT_FS = not FILESYSTEM_PREFIX
 IS_S3 = FILESYSTEM == "s3"
 IS_ISILON = FILESYSTEM == "isilon"
+
+# Isilon specific values.
+ISILON_WEBHDFS_PORT = 8082
 
 def get_fs_path(path):
   return "%s%s" % (FILESYSTEM_PREFIX, path)

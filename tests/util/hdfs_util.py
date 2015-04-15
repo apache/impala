@@ -56,6 +56,29 @@ class PyWebHdfsClientWithChmod(PyWebHdfsClient):
       _raise_pywebhdfs_exception(response.status_code, response.text)
     return response.json()
 
+  def delete_file_dir(self, path, recursive=False):
+    """Deletes a file or a dir if it exists.
+
+    Overrides the superclass's method by providing delete if exists semantics. This takes
+    the burden of stat'ing the file away from the caller.
+    """
+    try:
+      self.get_file_dir_status(path)
+    except Exception as e:
+      return True
+    return super(PyWebHdfsClientWithChmod, self).delete_file_dir(path,
+        recursive=recursive)
+
+  def get_file_dir_status(self, path):
+    """Stats a file or a directoty in hdfs
+
+    The superclass expects paths without the leading '/'. This method strips it from the
+    path to make usage transparent to the caller.
+    """
+    path = path.lstrip('/')
+    return super(PyWebHdfsClientWithChmod, self).get_file_dir_status(path)
+
+
 class HdfsConfig(object):
   """Reads an XML configuration file (produced by a mini-cluster) into a dictionary
   accessible via get()"""
@@ -77,7 +100,7 @@ def get_hdfs_client_from_conf(conf):
   host, port = hostport.split(":")
   return get_hdfs_client(host=host, port=port)
 
-def __pyweb_hdfs_client_exists(self, path):
+def _pyweb_hdfs_client_exists(self, path):
   """The PyWebHdfsClient doesn't provide an API to cleanly detect if a file or directory
   exists. This method is bound to each client that is created so tests can simply call
   hdfs_client.exists('path') and get back a bool.
@@ -92,7 +115,7 @@ def get_hdfs_client(host, port, user_name=getpass.getuser()):
   """Returns a new HTTP client for an HDFS cluster using an explict host:port pair"""
   hdfs_client = PyWebHdfsClientWithChmod(host=host, port=port, user_name=user_name)
   # Bind our "exists" method to hdfs_client.exists
-  hdfs_client.exists = types.MethodType(__pyweb_hdfs_client_exists, hdfs_client)
+  hdfs_client.exists = types.MethodType(_pyweb_hdfs_client_exists, hdfs_client)
   return hdfs_client
 
 def get_default_hdfs_config():

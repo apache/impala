@@ -52,6 +52,11 @@ if [[ "$REPLY" =~ ^[Yy]$ ]]; then
     hadoop fs -test -d ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
     if [ $? -eq 0 ]; then
       echo "Removing existing test-warehouse directory"
+      # On Isilon, we run into undiagnosed permission issues. chmod the entire folder to
+      # 777 as a workaround.
+      if [ "${TARGET_FILESYSTEM}" = "isilon" ]; then
+        hadoop fs -chmod -R 777 ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
+      fi
       hadoop fs -rm -r ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
     fi
     echo "Creating test-warehouse directory"

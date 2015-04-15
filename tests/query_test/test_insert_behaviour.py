@@ -21,7 +21,8 @@ import pwd
 import pytest
 import time
 from tests.common.impala_test_suite import ImpalaTestSuite
-from tests.common.skip import SkipIfS3
+from tests.common.skip import SkipIfS3, SkipIfIsilon
+from tests.util.filesystem_utils import WAREHOUSE, IS_DEFAULT_FS, get_fs_path
 
 @SkipIfS3.insert
 class TestInsertBehaviour(ImpalaTestSuite):
@@ -33,7 +34,8 @@ class TestInsertBehaviour(ImpalaTestSuite):
     # cleanup and create a fresh test database
     if method.__name__ == "test_insert_select_with_empty_resultset":
       self.cleanup_db(self.TEST_DB_NAME)
-      self.execute_query("create database if not exists %s" % (self.TEST_DB_NAME))
+      self.execute_query("create database if not exists {0} location '{1}/{0}.db'"
+          .format(self.TEST_DB_NAME, WAREHOUSE))
 
   def teardown_method(self, method):
     if method.__name__ == "test_insert_select_with_empty_resultset":
@@ -41,71 +43,75 @@ class TestInsertBehaviour(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   def test_insert_removes_staging_files(self):
-    insert_staging_dir = \
-      "test-warehouse/functional.db/insert_overwrite_nopart/_impala_insert_staging"
+    TBL_NAME = "insert_overwrite_nopart"
+    insert_staging_dir = ("test-warehouse/functional.db/%s/"
+        "_impala_insert_staging" % TBL_NAME)
     self.hdfs_client.delete_file_dir(insert_staging_dir, recursive=True)
-    self.client.execute("""INSERT OVERWRITE
-functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""")
+    self.client.execute(("INSERT OVERWRITE functional.%s"
+        " SELECT int_col FROM functional.tinyinttable" % TBL_NAME))
     ls = self.hdfs_client.list_dir(insert_staging_dir)
     assert len(ls['FileStatuses']['FileStatus']) == 0
 
   @pytest.mark.execute_serially
   def test_insert_preserves_hidden_files(self):
     """Test that INSERT OVERWRITE preserves hidden files in the root table directory"""
-    table_dir = "test-warehouse/functional.db/insert_overwrite_nopart/"
+    TBL_NAME = "insert_overwrite_nopart"
+    table_dir = "test-warehouse/functional.db/%s/" % TBL_NAME
     hidden_file_locations = [".hidden", "_hidden"]
     dir_locations = ["dir", ".hidden_dir"]
-    for dir in dir_locations:
-      self.hdfs_client.make_dir(table_dir + dir)
-    for file in hidden_file_locations:
-      self.hdfs_client.create_file(table_dir + file, '', overwrite=True)
+    for dir_ in dir_locations:
+      self.hdfs_client.make_dir(table_dir + dir_)
+    for file_ in hidden_file_locations:
+      self.hdfs_client.create_file(table_dir + file_, '', overwrite=True)
 
-    self.client.execute("""INSERT OVERWRITE
-functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""")
+    self.client.execute(("INSERT OVERWRITE functional.%s"
+        " SELECT int_col FROM functional.tinyinttable" % TBL_NAME))
 
-    for file in hidden_file_locations:
+    for file_ in hidden_file_locations:
       try:
-        self.hdfs_client.get_file_dir_status(table_dir + file)
+        self.hdfs_client.get_file_dir_status(table_dir + file_)
       except:
         err_msg = "Hidden file '%s' was unexpectedly deleted by INSERT OVERWRITE"
-        pytest.fail(err_msg % (table_dir + file))
+        pytest.fail(err_msg % (table_dir + file_))
 
-    for dir in dir_locations:
+    for dir_ in dir_locations:
       try:
-        self.hdfs_client.get_file_dir_status(table_dir + file)
+        self.hdfs_client.get_file_dir_status(table_dir + file_)
       except:
         err_msg = "Directory '%s' was unexpectedly deleted by INSERT OVERWRITE"
-        pytest.fail(err_msg % (table_dir + dir))
+        pytest.fail(err_msg % (table_dir + dir_))
 
   @pytest.mark.execute_serially
   def test_insert_alter_partition_location(self):
     """Test that inserts after changing the location of a partition work correctly,
     including the creation of a non-existant partition dir"""
-    partition_dir = "tmp/test_insert_alter_partition_location"
+    PART_DIR = "tmp/test_insert_alter_partition_location"
+    QUALIFIED_PART_DIR = get_fs_path('/' + PART_DIR)
+    TBL_NAME = "functional.insert_alter_partition_location"
 
-    self.execute_query_expect_success(self.client, "DROP TABLE IF EXISTS "
-                                      "functional.insert_alter_partition_location")
-    self.hdfs_client.delete_file_dir(partition_dir, recursive=True)
+    self.execute_query_expect_success(self.client, "DROP TABLE IF EXISTS %s" % TBL_NAME)
+    self.hdfs_client.delete_file_dir(PART_DIR, recursive=True)
 
     self.execute_query_expect_success(self.client,
-"CREATE TABLE functional.insert_alter_partition_location (c int) PARTITIONED BY (p int)")
+        "CREATE TABLE  %s (c int) PARTITIONED BY (p int)" % TBL_NAME)
     self.execute_query_expect_success(self.client,
-"ALTER TABLE functional.insert_alter_partition_location ADD PARTITION(p=1)")
+        "ALTER TABLE %s ADD PARTITION(p=1)" % TBL_NAME)
     self.execute_query_expect_success(self.client,
-"ALTER TABLE functional.insert_alter_partition_location PARTITION(p=1) SET LOCATION '/%s'"
-      % partition_dir)
+        "ALTER TABLE %s PARTITION(p=1) SET LOCATION '%s'" %
+        (TBL_NAME, QUALIFIED_PART_DIR))
     self.execute_query_expect_success(self.client,
-"INSERT OVERWRITE functional.insert_alter_partition_location PARTITION(p=1) VALUES(1)")
+        "INSERT OVERWRITE %s PARTITION(p=1) VALUES(1)" % TBL_NAME)
 
     result = self.execute_query_expect_success(self.client,
-"SELECT COUNT(*) FROM functional.insert_alter_partition_location")
+        "SELECT COUNT(*) FROM %s" % TBL_NAME)
     assert int(result.get_data()) == 1
 
     # Should have created the partition dir, which should contain exactly one file (not in
     # a subdirectory)
-    ls = self.hdfs_client.list_dir(partition_dir)
+    ls = self.hdfs_client.list_dir(PART_DIR)
     assert len(ls['FileStatuses']['FileStatus']) == 1
 
+  @SkipIfIsilon.hdfs_acls
   @pytest.mark.xfail(run=False, reason="Fails intermittently on test clusters")
   @pytest.mark.execute_serially
   def test_insert_inherit_acls(self):
@@ -163,6 +169,7 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
                                       "PARTITION(p1=1, p2=2, p3=30) VALUES(1)")
     check_has_acls("p1=1/p2=2/p3=30", "default:group:new_leaf_group:-w-")
 
+  @SkipIfIsilon.hdfs_acls
   def test_insert_file_permissions(self):
     """Test that INSERT correctly respects file permission (minimum ACLs)"""
     TBL = "functional.insert_acl_permissions"
@@ -215,6 +222,7 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
     # Should be writable because 'other' ACLs allow writes
     self.execute_query_expect_success(self.client, INSERT_QUERY)
 
+  @SkipIfIsilon.hdfs_acls
   def test_insert_acl_permissions(self):
     """Test that INSERT correctly respects ACLs"""
     TBL = "functional.insert_acl_permissions"
@@ -297,6 +305,7 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
     # Should be writable because 'other' ACLs allow writes
     self.execute_query_expect_success(self.client, INSERT_QUERY)
 
+  @SkipIfIsilon.hdfs_acls
   def test_load_permissions(self):
     # We rely on test_insert_acl_permissions() to exhaustively check that ACL semantics
     # are correct. Here we just validate that LOADs can't be done when we cannot read from
@@ -356,7 +365,7 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
         self.hdfs_client.get_file_dir_status(path)
         if not should_exist:
           pytest.fail("file/dir '%s' unexpectedly exists" % path)
-      except:
+      except Exception, e:
         if should_exist:
           pytest.fail("file/dir '%s' does not exist" % path)
 
@@ -366,22 +375,21 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
     check_path_exists(table_path, False)
 
     table_name = self.TEST_DB_NAME + ".test_insert_empty_result"
-    self.execute_query_expect_success(self.client, "CREATE TABLE " \
-        + table_name + "(id INT, col INT) PARTITIONED BY (year INT, month INT)")
+    self.execute_query_expect_success(self.client, ("CREATE TABLE %s (id INT, col INT)"
+        " PARTITIONED BY (year INT, month INT)" % table_name))
     check_path_exists(table_path, True)
     check_path_exists(partition_path, False)
 
     # Run an insert/select stmt that returns an empty resultset.
-    insert_query = "INSERT INTO TABLE " + table_name + \
-        " PARTITION(year=2009, month=1) select 1, 1 from " + table_name + \
-        " LIMIT 0"
+    insert_query = ("INSERT INTO TABLE {0} PARTITION(year=2009, month=1)"
+        "select 1, 1 from {0} LIMIT 0".format(table_name))
     self.execute_query_expect_success(self.client, insert_query)
     # Partition directory should not be created
     check_path_exists(partition_path, False)
 
     # Insert one record
-    insert_query_one_row = "INSERT INTO TABLE " + table_name + \
-        " PARTITION(year=2009, month=1) values(2, 2)"
+    insert_query_one_row = ("INSERT INTO TABLE %s PARTITION(year=2009, month=1) "
+        "values(2, 2)" % table_name)
     self.execute_query_expect_success(self.client, insert_query_one_row)
     # Partition directory should be created with one data file
     check_path_exists(partition_path, True)
@@ -396,9 +404,8 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
     assert new_ls['FileStatuses'] == ls['FileStatuses']
 
     # Run an insert overwrite/select that returns an empty resultset
-    insert_query = "INSERT OVERWRITE " + table_name + \
-        " PARTITION(year=2009, month=1) select 1, 1 from " + table_name + \
-        " LIMIT 0"
+    insert_query = ("INSERT OVERWRITE {0} PARTITION(year=2009, month=1)"
+                    " select 1, 1 from  {0} LIMIT 0".format(table_name))
     self.execute_query_expect_success(self.client, insert_query)
     # Data file should be deleted
     new_ls2 = self.hdfs_client.list_dir(partition_path)
@@ -406,19 +413,21 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
     assert new_ls['FileStatuses'] != new_ls2['FileStatuses']
 
     # Test for IMPALA-2008 insert overwrite to an empty table with empty dataset
-    empty_target_table = self.TEST_DB_NAME + ".test_overwrite_with_empty_target"
-    self.execute_query_expect_success(self.client, "CREATE TABLE " \
-        + empty_target_table + "(id INT, col INT)")
-    insert_query = "INSERT OVERWRITE " + empty_target_table + \
-        " SELECT 1, 1 from " + empty_target_table + " LIMIT 0"
+    empty_target_tbl = "test_overwrite_with_empty_target"
+    create_table = "create table %s.%s (id INT, col INT)" % (self.TEST_DB_NAME,
+                                                             empty_target_tbl)
+    self.execute_query_expect_success(self.client, create_table)
+    insert_query = ("INSERT OVERWRITE {0}.{1} select 1, 1 from  {0}.{1} LIMIT 0"
+                    .format(self.TEST_DB_NAME, empty_target_tbl))
     self.execute_query_expect_success(self.client, insert_query)
 
     # Delete target table directory, query should fail with
     # "No such file or directory" error
-    target_table_path = db_path + "test_overwrite_with_empty_target"
+    target_table_path = "%s%s" % (db_path, empty_target_tbl)
     self.hdfs_client.delete_file_dir(target_table_path, recursive=True)
     self.execute_query_expect_failure(self.client, insert_query)
 
+  @SkipIfIsilon.hdfs_acls
   def test_multiple_group_acls(self):
     """Test that INSERT correctly respects multiple group ACLs"""
     TBL = "functional.insert_group_acl_permissions"

@@ -50,7 +50,8 @@ class TestPartitionMetadata(ImpalaTestSuite):
 
   def setup_method(self, method):
     self.cleanup_db(self.TEST_DB)
-    self.client.execute("create database %s" % self.TEST_DB)
+    ddl = "create database {0} location '{1}/{0}.db'".format(self.TEST_DB, WAREHOUSE)
+    self.client.execute(ddl)
 
   def teardown_method(self, method):
     self.cleanup_db(self.TEST_DB)
@@ -61,22 +62,23 @@ class TestPartitionMetadata(ImpalaTestSuite):
     tables that have multiple partitions pointing to the same location.
     """
     self.client.execute("use %s" % self.TEST_DB)
-    location = '%s/%s' % (WAREHOUSE, self.TEST_TBL)
+    impala_location = '%s/%s.db/%s' % (WAREHOUSE, self.TEST_DB, self.TEST_TBL)
+    hdfs_client_location = impala_location.split("/")[-1]
     # Cleanup any existing data in the table directory.
-    self.hdfs_client.delete_file_dir(location[1:], recursive=True)
+    self.hdfs_client.delete_file_dir(hdfs_client_location, recursive=True)
     # Create the table
-    self.client.execute("create table %s(i int) partitioned by(j int)"\
-        "location '%s'" % (self.TEST_TBL, location))
+    self.client.execute("create table {0}(i int) partitioned by(j int)"
+        "location '{1}/{2}.db/{0}'".format(self.TEST_TBL, WAREHOUSE, self.TEST_DB))
 
     # Point multiple partitions to the same location and use partition locations that
     # do not contain a key=value path.
-    self.hdfs_client.make_dir(location[1:] + '/p')
+    self.hdfs_client.make_dir(hdfs_client_location + '/p')
 
     # Point both partitions to the same location.
     self.client.execute("alter table %s add partition (j=1) location '%s/p'" %
-        (self.TEST_TBL, location))
+        (self.TEST_TBL, impala_location))
     self.client.execute("alter table %s add partition (j=2) location '%s/p'" %
-        (self.TEST_TBL, location))
+        (self.TEST_TBL, impala_location))
 
     # Insert some data.
     self.client.execute("insert into table %s partition(j=1) select 1" % self.TEST_TBL)

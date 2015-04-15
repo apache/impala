@@ -129,10 +129,11 @@ class ImpalaTestSuite(BaseTestSuite):
   @classmethod
   def create_hdfs_client(cls):
     if pytest.config.option.namenode_http_address is None:
-      return get_hdfs_client_from_conf(HDFS_CONF)
+      hdfs_client = get_hdfs_client_from_conf(HDFS_CONF)
     else:
       host, port = pytest.config.option.namenode_http_address.split(":")
-      return get_hdfs_client(host, port, "dev")
+      hdfs_client =  get_hdfs_client(host, port)
+    return hdfs_client
 
   @classmethod
   def cleanup_db(self, db_name, sync_ddl=1):

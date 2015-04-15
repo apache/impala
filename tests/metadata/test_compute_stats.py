@@ -16,11 +16,13 @@
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.test_dimensions import create_uncompressed_text_dimension
-from tests.common.skip import SkipIfS3
+from tests.common.skip import SkipIfS3, SkipIf
+from tests.util.filesystem_utils import WAREHOUSE
 
 # Tests the COMPUTE STATS command for gathering table and column stats.
 # TODO: Merge this test file with test_col_stats.py
 @SkipIfS3.insert # S3: missing coverage: compute stats
+@SkipIf.not_default_fs # Isilon: Missing coverage: compute stats
 class TestComputeStats(ImpalaTestSuite):
   TEST_DB_NAME = "compute_stats_db"
   TEST_ALIASING_DB_NAME = "parquet"
@@ -40,10 +42,12 @@ class TestComputeStats(ImpalaTestSuite):
   def setup_method(self, method):
     # cleanup and create a fresh test database
     self.cleanup_db(self.TEST_DB_NAME)
-    self.execute_query("create database %s" % (self.TEST_DB_NAME))
+    self.execute_query("create database {0} location '{1}/{0}.db'"
+        .format(self.TEST_DB_NAME, WAREHOUSE))
     # cleanup and create a fresh test database whose name is a keyword
     self.cleanup_db(self.TEST_ALIASING_DB_NAME)
-    self.execute_query("create database `%s`" % (self.TEST_ALIASING_DB_NAME))
+    self.execute_query("create database `{0}` location '{1}/{0}.db'"
+        .format(self.TEST_ALIASING_DB_NAME, WAREHOUSE))
 
   def teardown_method(self, method):
     self.cleanup_db(self.TEST_DB_NAME)

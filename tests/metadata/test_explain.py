@@ -8,6 +8,7 @@ import re
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.common.skip import SkipIfS3
+from tests.util.filesystem_utils import WAREHOUSE
 
 # Tests the different explain levels [0-3] on a few queries.
 # TODO: Clean up this test to use an explain level test dimension and appropriate
@@ -91,7 +92,8 @@ class TestExplainEmptyPartition(ImpalaTestSuite):
 
   def setup_method(self, method):
     self.cleanup_db(self.TEST_DB_NAME)
-    self.execute_query("create database if not exists %s" % (self.TEST_DB_NAME))
+    self.execute_query("create database if not exists {0} location '{1}/{0}.db'"
+        .format(self.TEST_DB_NAME, WAREHOUSE))
 
   def teardown_method(self, method):
     self.cleanup_db(self.TEST_DB_NAME)
@@ -103,8 +105,7 @@ class TestExplainEmptyPartition(ImpalaTestSuite):
     corrupted, or used for something else."""
     self.client.execute("SET EXPLAIN_LEVEL=3")
     self.client.execute(
-      "CREATE TABLE %s.empty_partition (col int) partitioned by (p int)" %
-      self.TEST_DB_NAME);
+      "CREATE TABLE %s.empty_partition (col int) partitioned by (p int)" % self.TEST_DB_NAME);
     self.client.execute(
       "ALTER TABLE %s.empty_partition ADD PARTITION (p=NULL)" % self.TEST_DB_NAME)
     # Put an empty file in the partition so we have > 0 files, but 0 rows
