@@ -186,6 +186,9 @@ set_target_properties(avro PROPERTIES IMPORTED_LOCATION "${AVRO_STATIC_LIB}")
 message(STATUS "Avro include dir: " ${AVRO_INCLUDE_DIR})
 message(STATUS "Avro static library: " ${AVRO_STATIC_LIB})
 
+# gutil can use GLOG
+add_definitions(-DKUDU_HEADERS_USE_GLOG)
+
 # Treat gutil just like an Impala native library (i.e., one built with CMake), so no need
 # for find_package()
 add_subdirectory($ENV{IMPALA_HOME}/thirdparty/gutil/)
