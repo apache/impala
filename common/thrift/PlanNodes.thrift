@@ -40,6 +40,7 @@ enum TPlanNodeType {
   CROSS_JOIN_NODE,
   DATA_SOURCE_NODE,
   ANALYTIC_EVAL_NODE,
+  KUDU_SCAN_NODE
 }
 
 // phases of an execution node
@@ -100,12 +101,19 @@ struct THBaseKeyRange {
   2: optional string stopKey
 }
 
+// Key range to query a Kudu table
+struct TKuduKeyRange {
+  1: optional binary startKey
+  2: optional binary stopKey
+}
+
 // Specification of an individual data range which is held in its entirety
 // by a storage server
 struct TScanRange {
   // one of these must be set for every TScanRange2
   1: optional THdfsFileSplit hdfs_file_split
   2: optional THBaseKeyRange hbase_key_range
+  3: optional TKuduKeyRange kudu_key_range
 }
 
 struct THdfsScanNode {
@@ -145,6 +153,10 @@ struct THBaseScanNode {
 
   // Suggested max value for "hbase.client.scan.setCaching"
   4: optional i32 suggested_max_caching
+}
+
+struct TKuduScanNode {
+  1: required Types.TTupleId tuple_id
 }
 
 struct TEqJoinCondition {
@@ -350,6 +362,7 @@ struct TPlanNode {
   // one field per PlanNode subclass
   8: optional THdfsScanNode hdfs_scan_node
   9: optional THBaseScanNode hbase_scan_node
+  20: optional TKuduScanNode kudu_scan_node
   10: optional TDataSourceScanNode data_source_node
   11: optional THashJoinNode hash_join_node
   12: optional TAggregationNode agg_node
