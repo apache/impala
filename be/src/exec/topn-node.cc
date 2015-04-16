@@ -126,6 +126,11 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   return Status::OK;
 }
 
+Status TopNNode::Reset(RuntimeState* state) {
+  DCHECK(false) << "NYI";
+  return Status("NYI");
+}
+
 void TopNNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (tuple_pool_.get() != NULL) tuple_pool_->FreeAll();

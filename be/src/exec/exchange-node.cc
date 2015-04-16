@@ -90,6 +90,11 @@ Status ExchangeNode::Open(RuntimeState* state) {
   return Status::OK;
 }
 
+Status ExchangeNode::Reset(RuntimeState* state) {
+  DCHECK(false) << "NYI";
+  return Status("NYI");
+}
+
 void ExchangeNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (is_merging_) sort_exec_exprs_.Close(state);

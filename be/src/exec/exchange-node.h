@@ -45,6 +45,7 @@ class ExchangeNode : public ExecNode {
   // Blocks until the first batch is available for consumption via GetNext().
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
+  virtual Status Reset(RuntimeState* state);
   virtual void Close(RuntimeState* state);
 
   // the number of senders needs to be set after the c'tor, because it's not

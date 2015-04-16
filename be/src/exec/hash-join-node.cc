@@ -137,6 +137,11 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   return Status::OK;
 }
 
+Status HashJoinNode::Reset(RuntimeState* state) {
+  DCHECK(false) << "NYI";
+  return Status("NYI");
+}
+
 void HashJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (hash_tbl_.get() != NULL) hash_tbl_->Close();

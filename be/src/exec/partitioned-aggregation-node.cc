@@ -372,6 +372,11 @@ void PartitionedAggregationNode::CleanupHashTbl(const vector<FunctionContext*>& 
   }
 }
 
+Status PartitionedAggregationNode::Reset(RuntimeState* state) {
+  DCHECK(false) << "NYI";
+  return Status("NYI");
+}
+
 void PartitionedAggregationNode::Close(RuntimeState* state) {
   if (is_closed()) return;
 

@@ -43,6 +43,9 @@ class HBaseScanNode : public ScanNode {
   // converting text data in HBase cells to binary data.
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
 
+  // NYI
+  virtual Status Reset(RuntimeState* state);
+
   // Close the hbase_scanner_, and report errors.
   virtual void Close(RuntimeState* state);
 

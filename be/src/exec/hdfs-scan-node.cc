@@ -613,6 +613,11 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   return Status::OK;
 }
 
+Status HdfsScanNode::Reset(RuntimeState* state) {
+  DCHECK(false) << "NYI";
+  return Status("NYI");
+}
+
 void HdfsScanNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   SetDone();

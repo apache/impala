@@ -184,6 +184,11 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   return Status::OK;
 }
 
+Status PartitionedHashJoinNode::Reset(RuntimeState* state) {
+  DCHECK(false) << "NYI";
+  return Status("NYI");
+}
+
 void PartitionedHashJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (ht_ctx_.get() != NULL) ht_ctx_->Close();

@@ -730,6 +730,11 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
   return Status::OK;
 }
 
+Status AnalyticEvalNode::Reset(RuntimeState* state) {
+  DCHECK(false) << "NYI";
+  return Status("NYI");
+}
+
 void AnalyticEvalNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (input_stream_.get() != NULL) input_stream_->Close();

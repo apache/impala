@@ -53,6 +53,10 @@ class BlockingJoinNode : public ExecNode {
   // (subclasses should implement InitGetNext()).
   virtual Status Open(RuntimeState* state);
 
+  // Subclasses should reset any state modified in Open() and GetNext() and then call
+  // BlockingJoinNode::Reset().
+  virtual Status Reset(RuntimeState* state);
+
   // Subclasses should close any other structures and then call
   // BlockingJoinNode::Close().
   virtual void Close(RuntimeState* state);

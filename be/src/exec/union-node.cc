@@ -178,6 +178,11 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   return Status::OK;
 }
 
+Status UnionNode::Reset(RuntimeState* state) {
+  DCHECK(false) << "NYI";
+  return Status("NYI");
+}
+
 void UnionNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   child_row_batch_.reset();

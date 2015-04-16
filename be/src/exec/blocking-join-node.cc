@@ -117,6 +117,14 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
   return Status::OK;
 }
 
+Status BlockingJoinNode::Reset(RuntimeState* state) {
+  eos_ = false;
+  probe_side_eos_ = false;
+  probe_batch_->Reset();
+  build_pool_->FreeAll();
+  return ExecNode::Reset(state);
+}
+
 void BlockingJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (build_pool_.get() != NULL) build_pool_->FreeAll();

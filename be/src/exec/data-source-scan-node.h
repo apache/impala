@@ -50,6 +50,9 @@ class DataSourceScanNode : public ScanNode {
   // Fill the next row batch, calls GetNext() on the external scanner.
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
 
+  // NYI
+  virtual Status Reset(RuntimeState* state);
+
   // Close the scanner, and report errors.
   virtual void Close(RuntimeState* state);
 
