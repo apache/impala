@@ -583,13 +583,6 @@ struct DecimalVal : public impala_udf::AnyVal {
     return result;
   }
 
-  bool operator==(const DecimalVal& other) const {
-    if (is_null != other.is_null) return false;
-    if (is_null) return true;
-    return val16 == other.val16;
-  }
-  bool operator!=(const DecimalVal& other) const { return !(*this == other); }
-
   DecimalVal& operator=(const DecimalVal& other) {
     // Depending on the compiler, the default assignment operator may require 16-byte
     // alignment of 'this' and 'other'. Cast to void* so the compiler doesn't change back

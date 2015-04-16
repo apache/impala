@@ -38,15 +38,17 @@ IS_NULL_COMPUTE_FUNCTION(StringVal);
 IS_NULL_COMPUTE_FUNCTION(TimestampVal);
 IS_NULL_COMPUTE_FUNCTION(DecimalVal);
 
-#define NULL_IF_COMPUTE_FUNCTION(type) \
-  type NullIfExpr::Get##type(ExprContext* context, TupleRow* row) { \
+#define NULL_IF_COMPUTE_FUNCTION(AnyValType) \
+  AnyValType NullIfExpr::Get##AnyValType(ExprContext* ctx, TupleRow* row) { \
     DCHECK_EQ(children_.size(), 2); \
-    type lhs_val = children_[0]->Get##type(context, row); \
+    AnyValType lhs_val = children_[0]->Get##AnyValType(ctx, row); \
     /* Short-circuit in case lhs_val is NULL. Can never be equal to RHS. */ \
-    if (lhs_val.is_null) return type::null(); \
+    if (lhs_val.is_null) return AnyValType::null(); \
     /* Get rhs and return NULL if lhs == rhs, lhs otherwise */ \
-    type rhs_val = children_[1]->Get##type(context, row); \
-    if (!rhs_val.is_null && lhs_val == rhs_val) return type::null(); \
+    AnyValType rhs_val = children_[1]->Get##AnyValType(ctx, row); \
+    if (!rhs_val.is_null && AnyValUtil::Equals(children_[0]->type(), lhs_val, rhs_val)) {\
+       return AnyValType::null(); \
+    } \
     return lhs_val; \
   }
 

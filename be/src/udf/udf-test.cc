@@ -220,24 +220,25 @@ TEST(UdfTest, TestDecimalVal) {
   DecimalVal null1 = DecimalVal::null();
   DecimalVal null2 = DecimalVal::null();
 
+  // TODO: replace these manual comparisons with a DecimalVal equality function
   // 1 != -1
-  EXPECT_NE(d1, d2);
-  EXPECT_NE(d3, d4);
-  EXPECT_NE(d5, d6);
+  EXPECT_NE(d1.val16, d2.val16);
+  EXPECT_NE(d3.val16, d4.val16);
+  EXPECT_NE(d5.val16, d6.val16);
 
   // 1 == 1
-  EXPECT_EQ(d1, d3);
-  EXPECT_EQ(d1, d5);
-  EXPECT_EQ(d3, d5);
+  EXPECT_EQ(d1.val16, d3.val16);
+  EXPECT_EQ(d1.val16, d5.val16);
+  EXPECT_EQ(d3.val16, d5.val16);
 
   // -1 == -1
-  EXPECT_EQ(d2, d4);
-  EXPECT_EQ(d2, d6);
-  EXPECT_EQ(d4, d6);
+  EXPECT_EQ(d2.val16, d4.val16);
+  EXPECT_EQ(d2.val16, d6.val16);
+  EXPECT_EQ(d4.val16, d6.val16);
 
   // nulls
-  EXPECT_EQ(null1, null2);
-  EXPECT_NE(null1, d1);
+  EXPECT_EQ(null1.is_null, null2.is_null);
+  EXPECT_NE(null1.is_null, d1.is_null);
 }
 
 TEST(UdfTest, TestVarArgs) {

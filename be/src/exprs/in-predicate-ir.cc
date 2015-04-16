@@ -15,52 +15,14 @@
 #include <sstream>
 
 #include "exprs/in-predicate.h"
+
+#include "exprs/anyval-util.h"
 #include "runtime/string-value.inline.h"
 
 using namespace impala_udf;
 using namespace std;
 
 namespace impala {
-
-// Templated equality functions. These assume the input values are not NULL.
-
-template<typename T>
-bool Equals(const FunctionContext::TypeDesc* type, const T& x, const T& y) {
-  DCHECK(!x.is_null);
-  DCHECK(!y.is_null);
-  return x.val == y.val;
-}
-
-template<> bool Equals(
-    const FunctionContext::TypeDesc* type, const StringVal& x, const StringVal& y) {
-  DCHECK(!x.is_null);
-  DCHECK(!y.is_null);
-  StringValue x_sv = StringValue::FromStringVal(x);
-  StringValue y_sv = StringValue::FromStringVal(y);
-  return x_sv == y_sv;
-}
-
-template<> bool Equals(
-    const FunctionContext::TypeDesc* type, const TimestampVal& x, const TimestampVal& y) {
-  DCHECK(!x.is_null);
-  DCHECK(!y.is_null);
-  TimestampValue x_tv = TimestampValue::FromTimestampVal(x);
-  TimestampValue y_tv = TimestampValue::FromTimestampVal(y);
-  return x_tv == y_tv;
-}
-
-template<> bool Equals(
-    const FunctionContext::TypeDesc* type, const DecimalVal& x, const DecimalVal& y) {
-  DCHECK(!x.is_null);
-  DCHECK(!y.is_null);
-  if (type->precision <= ColumnType::MAX_DECIMAL4_PRECISION) {
-    return x.val4 == y.val4;
-  } else if (type->precision <= ColumnType::MAX_DECIMAL8_PRECISION) {
-    return x.val8 == y.val8;
-  } else {
-    return x.val16 == y.val16;
-  }
-}
 
 // Templated getter functions for extracting 'SetType' values from AnyVals
 template<typename T, typename SetType>
@@ -156,7 +118,7 @@ BooleanVal InPredicate::Iterate(
   for (int i = 0; i < num_args; ++i) {
     if (args[i].is_null) {
       found_null = true;
-    } else if (Equals(type, val, args[i])) {
+    } else if (AnyValUtil::Equals(type, val, args[i])) {
       return BooleanVal(true);
     }
   }

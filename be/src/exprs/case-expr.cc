@@ -328,35 +328,35 @@ void CaseExpr::GetChildVal(int child_idx, ExprContext* ctx, TupleRow* row, AnyVa
 bool CaseExpr::AnyValEq(const ColumnType& type, const AnyVal* v1, const AnyVal* v2) {
   switch (type.type) {
     case TYPE_BOOLEAN:
-      return *reinterpret_cast<const BooleanVal*>(v1) ==
-             *reinterpret_cast<const BooleanVal*>(v2);
+      return AnyValUtil::Equals(type, *reinterpret_cast<const BooleanVal*>(v1),
+                                *reinterpret_cast<const BooleanVal*>(v2));
     case TYPE_TINYINT:
-      return *reinterpret_cast<const TinyIntVal*>(v1) ==
-             *reinterpret_cast<const TinyIntVal*>(v2);
+      return AnyValUtil::Equals(type, *reinterpret_cast<const TinyIntVal*>(v1),
+                                *reinterpret_cast<const TinyIntVal*>(v2));
     case TYPE_SMALLINT:
-      return *reinterpret_cast<const SmallIntVal*>(v1) ==
-             *reinterpret_cast<const SmallIntVal*>(v2);
+      return AnyValUtil::Equals(type, *reinterpret_cast<const SmallIntVal*>(v1),
+                                *reinterpret_cast<const SmallIntVal*>(v2));
     case TYPE_INT:
-      return *reinterpret_cast<const IntVal*>(v1) ==
-             *reinterpret_cast<const IntVal*>(v2);
+      return AnyValUtil::Equals(type, *reinterpret_cast<const IntVal*>(v1),
+                                *reinterpret_cast<const IntVal*>(v2));
     case TYPE_BIGINT:
-      return *reinterpret_cast<const BigIntVal*>(v1) ==
-             *reinterpret_cast<const BigIntVal*>(v2);
+      return AnyValUtil::Equals(type, *reinterpret_cast<const BigIntVal*>(v1),
+                                *reinterpret_cast<const BigIntVal*>(v2));
     case TYPE_FLOAT:
-      return *reinterpret_cast<const FloatVal*>(v1) ==
-             *reinterpret_cast<const FloatVal*>(v2);
+      return AnyValUtil::Equals(type, *reinterpret_cast<const FloatVal*>(v1),
+                                *reinterpret_cast<const FloatVal*>(v2));
     case TYPE_DOUBLE:
-      return *reinterpret_cast<const DoubleVal*>(v1) ==
-             *reinterpret_cast<const DoubleVal*>(v2);
+      return AnyValUtil::Equals(type, *reinterpret_cast<const DoubleVal*>(v1),
+                                *reinterpret_cast<const DoubleVal*>(v2));
     case TYPE_TIMESTAMP:
-      return *reinterpret_cast<const TimestampVal*>(v1) ==
-             *reinterpret_cast<const TimestampVal*>(v2);
+      return AnyValUtil::Equals(type, *reinterpret_cast<const TimestampVal*>(v1),
+                                *reinterpret_cast<const TimestampVal*>(v2));
     case TYPE_STRING:
-      return *reinterpret_cast<const StringVal*>(v1) ==
-             *reinterpret_cast<const StringVal*>(v2);
+      return AnyValUtil::Equals(type, *reinterpret_cast<const StringVal*>(v1),
+                                *reinterpret_cast<const StringVal*>(v2));
     case TYPE_DECIMAL:
-      return *reinterpret_cast<const DecimalVal*>(v1) ==
-             *reinterpret_cast<const DecimalVal*>(v2);
+      return AnyValUtil::Equals(type, *reinterpret_cast<const DecimalVal*>(v1),
+                                *reinterpret_cast<const DecimalVal*>(v2));
     default:
       DCHECK(false) << type;
       return false;

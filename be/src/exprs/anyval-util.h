@@ -139,6 +139,20 @@ class AnyValUtil {
     }
   }
 
+  // Templated equality functions. These assume the input values are not NULL.
+  template<typename T>
+  static inline bool Equals(const FunctionContext::TypeDesc* type, const T& x, const T& y) {
+    DCHECK_NOTNULL(type);
+    return Equals(TypeDescToColumnType(*type), x, y);
+  }
+
+  template<typename T>
+  static inline bool Equals(const ColumnType& type, const T& x, const T& y) {
+    DCHECK(!x.is_null);
+    DCHECK(!y.is_null);
+    return x.val == y.val;
+  }
+
   // Returns the byte size of *Val for type t.
   static int AnyValSize(const ColumnType& t) {
     switch (t.type) {
@@ -271,6 +285,37 @@ impala_udf::AnyVal* CreateAnyVal(ObjectPool* pool, const ColumnType& type);
 
 // Creates the corresponding AnyVal subclass for type. The object is owned by the caller.
 impala_udf::AnyVal* CreateAnyVal(const ColumnType& type);
+
+template<> inline bool AnyValUtil::Equals(
+    const ColumnType& type, const StringVal& x, const StringVal& y) {
+  DCHECK(!x.is_null);
+  DCHECK(!y.is_null);
+  StringValue x_sv = StringValue::FromStringVal(x);
+  StringValue y_sv = StringValue::FromStringVal(y);
+  return x_sv == y_sv;
+}
+
+template<> inline bool AnyValUtil::Equals(
+    const ColumnType& type, const TimestampVal& x, const TimestampVal& y) {
+  DCHECK(!x.is_null);
+  DCHECK(!y.is_null);
+  TimestampValue x_tv = TimestampValue::FromTimestampVal(x);
+  TimestampValue y_tv = TimestampValue::FromTimestampVal(y);
+  return x_tv == y_tv;
+}
+
+template<> inline bool AnyValUtil::Equals(
+    const ColumnType& type, const DecimalVal& x, const DecimalVal& y) {
+  DCHECK(!x.is_null);
+  DCHECK(!y.is_null);
+  if (type.precision <= ColumnType::MAX_DECIMAL4_PRECISION) {
+    return x.val4 == y.val4;
+  } else if (type.precision <= ColumnType::MAX_DECIMAL8_PRECISION) {
+    return x.val8 == y.val8;
+  } else {
+    return x.val16 == y.val16;
+  }
+}
 
 }
 
