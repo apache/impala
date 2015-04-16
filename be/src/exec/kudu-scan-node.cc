@@ -92,7 +92,7 @@ Status KuduScanNode::Prepare(RuntimeState* state) {
   }
 
   scanner_.reset(new KuduScanner(this, state, scan_ranges_));
-  return Status::OK;
+  return Status::OK();
 }
 
 Status KuduScanNode::Open(RuntimeState* state) {
@@ -104,15 +104,17 @@ Status KuduScanNode::Open(RuntimeState* state) {
   const KuduTableDescriptor* table_desc =
       static_cast<const KuduTableDescriptor*>(tuple_desc_->table_desc());
 
-  KUDU_RETURN_IF_ERROR(
-      kudu::client::KuduClientBuilder()
-          .add_master_server_addr(table_desc->kudu_master_address()).Build(&client_),
-              "Unable to create Kudu client");
+  kudu::client::KuduClientBuilder b;
+  BOOST_FOREACH(const string& address, table_desc->kudu_master_addresses()) {
+    b.add_master_server_addr(address);
+  }
+
+  KUDU_RETURN_IF_ERROR(b.Build(&client_), "Unable to create Kudu client");
 
   KUDU_RETURN_IF_ERROR(client_->OpenTable(table_desc->table_name(), &table_),
       "Unable to open Kudu table");
   RETURN_IF_ERROR(scanner_->Open(client_, table_));
-  return Status::OK;
+  return Status::OK();
 }
 
 
@@ -126,13 +128,13 @@ Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
 
   if (ReachedLimit()) {
     *eos = true;
-    return Status::OK;
+    return Status::OK();
   }
 
   // TODO a multi-threaded implementation will have more than one scanner, likely each
   // one managing their own row_batch and appending the batches to a blocking queue.
   RETURN_IF_ERROR(scanner_->GetNext(row_batch, eos));
-  return Status::OK;
+  return Status::OK();
 }
 
 void KuduScanNode::Close(RuntimeState* state) {

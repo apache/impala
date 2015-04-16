@@ -82,6 +82,7 @@ def is_valid_combination(vector):
         (vector[FILE_FORMAT_IDX] != 'seq' and vector[COMPRESSION_TYPE_IDX] == 'record') or
         (vector[FILE_FORMAT_IDX] == 'parquet' and vector[COMPRESSION_IDX] != 'none') or
         (vector[FILE_FORMAT_IDX] == 'hbase' and vector[COMPRESSION_IDX] != 'none') or
+        (vector[FILE_FORMAT_IDX] == 'kudu' and vector[COMPRESSION_IDX] != 'none') or
         (vector[FILE_FORMAT_IDX] == 'avro' and
          vector[COMPRESSION_IDX] not in ['none', 'snap', 'def']))
 

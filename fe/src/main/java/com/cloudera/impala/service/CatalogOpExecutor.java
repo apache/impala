@@ -22,15 +22,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
@@ -47,8 +45,6 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
-import org.apache.hadoop.hive.metastore.MetaStoreUtils;
-import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
@@ -61,6 +57,7 @@ import com.cloudera.impala.catalog.CatalogServiceCatalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnNotFoundException;
 import com.cloudera.impala.catalog.DataSource;
+import com.cloudera.impala.catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.HBaseTable;
@@ -80,6 +77,9 @@ import com.cloudera.impala.catalog.TableNotFoundException;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.FileSystemUtil;
+import com.cloudera.impala.catalog.delegates.DdlDelegate;
+import com.cloudera.impala.catalog.delegates.KuduDdlDelegate;
+import com.cloudera.impala.catalog.delegates.NoOpDelegate;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.cloudera.impala.common.InternalException;
@@ -146,7 +146,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.google.common.util.concurrent.SettableFuture;
 
 /**
  * Class used to execute Catalog Operations, including DDL and refresh/invalidate
@@ -171,6 +170,16 @@ public class CatalogOpExecutor {
   // The maximum number of partitions to update in one Hive Metastore RPC.
   // Used when persisting the results of COMPUTE STATS statements.
   private final static short MAX_PARTITION_UPDATES_PER_RPC = 500;
+
+  // List of DDL delegates to handle the storage specific portion of DDL requests.
+  private static final List<DdlDelegate> storageHandlers_ = Lists.newArrayList();
+
+  private static final DdlDelegate noOpDelegate_ = new NoOpDelegate();
+
+  // Static initializer to add handlers for different storage backends
+  static {
+    storageHandlers_.add(new KuduDdlDelegate());
+  }
 
   public CatalogOpExecutor(CatalogServiceCatalog catalog) {
     catalog_ = catalog;
@@ -268,6 +277,8 @@ public class CatalogOpExecutor {
    */
   private void alterTable(TAlterTableParams params, TDdlExecResponse response)
       throws ImpalaException {
+    TTableName table_name = params.getTable_name();
+
     switch (params.getAlter_type()) {
       case ADD_REPLACE_COLUMNS:
         TAlterTableAddReplaceColsParams addReplaceColParams =
@@ -972,6 +983,17 @@ public class CatalogOpExecutor {
 
     TCatalogObject removedObject = new TCatalogObject();
     synchronized (metastoreDdlLock_) {
+
+      // Forward the DDL oeration to the specified storage backend.
+      try {
+        org.apache.hadoop.hive.metastore.api.Table msTbl = getExistingTable(
+            tableName.getDb(), tableName.getTbl()).getMetaStoreTable();
+        DdlDelegate handler = findDdlDelegate(msTbl);
+        handler.dropTable(msTbl);
+      } catch (TableNotFoundException | DatabaseNotFoundException e) {
+        // Do nothing
+      }
+
       MetaStoreClient msClient = catalog_.getMetaStoreClient();
       try {
         msClient.getHiveClient().dropTable(
@@ -1221,6 +1243,7 @@ public class CatalogOpExecutor {
       throws ImpalaException {
     MetaStoreClient msClient = catalog_.getMetaStoreClient();
     synchronized (metastoreDdlLock_) {
+
       try {
         msClient.getHiveClient().createTable(newTable);
         // If this table should be cached, and the table location was not specified by
@@ -1242,9 +1265,26 @@ public class CatalogOpExecutor {
       } catch (TException e) {
         throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "createTable"), e);
-      }
-        finally {
+      } finally {
         msClient.release();
+      }
+
+      // Forward the opeation to a specific storage backend. If the operation fails,
+      // delete the just created hive table to avoid inconsistencies.
+      try {
+        findDdlDelegate(newTable).createTable(newTable);
+      } catch (ImpalaRuntimeException e) {
+        MetaStoreClient c = catalog_.getMetaStoreClient();
+        try {
+          c.getHiveClient().dropTable(newTable.getDbName(), newTable.getTableName(),
+              false, ifNotExists);
+        } catch (Exception hE) {
+          throw new ImpalaRuntimeException(String.format(HMS_RPC_ERROR_FORMAT_STR,
+              "dropTable"), hE);
+        } finally {
+          c.release();
+        }
+        throw e;
       }
     }
 
@@ -1264,6 +1304,17 @@ public class CatalogOpExecutor {
     response.result.setVersion(
         response.result.getUpdated_catalog_object().getCatalog_version());
     return true;
+  }
+
+  /**
+   * Find the supported DDL handler for the table in the list. If no handler is available
+   * for the table, returns a NoOpDelegate.
+   */
+  private DdlDelegate findDdlDelegate(org.apache.hadoop.hive.metastore.api.Table tab) {
+    for (DdlDelegate ddlDelegate: storageHandlers_) {
+      if (ddlDelegate.canHandle(tab)) return ddlDelegate;
+    }
+    return noOpDelegate_;
   }
 
   /**

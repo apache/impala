@@ -57,6 +57,7 @@ import com.cloudera.impala.thrift.THdfsFileSplit;
 import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.THdfsScanNode;
 import com.cloudera.impala.thrift.THdfsTable;
+import com.cloudera.impala.thrift.TKuduKeyRange;
 import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TPlanFragment;
 import com.cloudera.impala.thrift.TPlanNode;
@@ -249,6 +250,21 @@ public class PlannerTestBase {
             result.append("<unbounded>");
           }
         }
+
+        if (locations.scan_range.isSetKudu_key_range()) {
+          TKuduKeyRange kr = locations.scan_range.getKudu_key_range();
+          Integer hostIdx = locations.locations.get(0).host_idx;
+          TNetworkAddress networkAddress = execRequest.getHost_list().get(hostIdx);
+          result.append("KUDU KEYRANGE ");
+          // TODO Enable the lines below once we have better testing for
+          //      non-local key-ranges
+          //result.append("host=" + networkAddress.hostname + ":" +
+          //    networkAddress.port + " ");
+          result.append(Arrays.toString(kr.getStartKey()));
+          result.append(":");
+          result.append(Arrays.toString(kr.getStopKey()));
+        }
+
         result.append("\n");
       }
     }
@@ -319,7 +335,7 @@ public class PlannerTestBase {
     return a;
   }
 
-  private TQueryOptions defaultQueryOptions() {
+  protected TQueryOptions defaultQueryOptions() {
     TQueryOptions options = new TQueryOptions();
     options.setExplain_level(TExplainLevel.STANDARD);
     options.setAllow_unsupported_formats(true);

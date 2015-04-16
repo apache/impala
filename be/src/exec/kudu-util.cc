@@ -130,7 +130,7 @@ Status KuduSchemaFromTupleDescriptor(const TupleDescriptor& tuple_desc,
   }
 
   schema->Reset(kudu_cols, key_cols.size());
-  return Status::OK;
+  return Status::OK();
 }
 
 void LogKuduMessage(kudu::KuduLogSeverity severity, const char* filename,

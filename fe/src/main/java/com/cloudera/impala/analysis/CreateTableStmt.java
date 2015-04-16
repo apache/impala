@@ -25,6 +25,7 @@ import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HdfsStorageDescriptor;
 import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.KuduTable;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.common.AnalysisException;
@@ -224,6 +225,33 @@ public class CreateTableStmt extends StatementBase {
         columnDefs_.clear();
         columnDefs_.addAll(newColumnDefs);
         analyzeColumnDefs(analyzer);
+      }
+    }
+
+    // Validate that Kudu table is correctly specified.
+    if (getTblProperties() != null && KuduTable.KUDU_STORAGE_HANDLER.equals(
+        getTblProperties().get(KuduTable.KEY_STORAGE_HANDLER))) {
+      if (!KuduTable.validTable(getTblProperties())) {
+        throw new AnalysisException("Kudu table is missing parameters " +
+            String.format(
+            "in table properties. Please verify if %s, %s, and %s are present.",
+            KuduTable.KEY_TABLE_NAME, KuduTable.KEY_MASTER_ADDRESSES,
+            KuduTable.KEY_KEY_COLUMNS));
+      }
+
+      List<String> prop_keys = Lists.newArrayList(KuduTable.KEY_KEY_COLUMNS,
+          KuduTable.KEY_MASTER_ADDRESSES, KuduTable.KEY_TABLE_NAME);
+      for (String k : prop_keys) {
+        if (!getTblProperties().containsKey(k) ||
+            getTblProperties().get(k).length() == 0) {
+          throw new AnalysisException(String.format("Table property %s cannot be " +
+              "empty for Kudu table.", k));
+        }
+      }
+
+      // Kudu table cannot be a cached table
+      if (cachingOp_ != null) {
+        throw new AnalysisException("A Kudu table cannot be cached in HDFS.");
       }
     }
 

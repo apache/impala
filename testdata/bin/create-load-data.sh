@@ -312,6 +312,10 @@ if [ $SKIP_METADATA_LOAD -eq 0 ]; then
   load-custom-schemas
   # load functional/tpcds/tpch
   load-data "functional-query" "exhaustive"
+
+  # TODO KUDU remove this once inserts are working
+  python -u ${IMPALA_HOME}/bin/load-data.py -w functional-query -e exhaustive --table_formats=kudu/none/none
+
   load-data "tpch" "core"
   load-data "tpcds" "core"
   load-aux-workloads

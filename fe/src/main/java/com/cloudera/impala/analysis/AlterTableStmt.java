@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.catalog.DataSourceTable;
+import com.cloudera.impala.catalog.KuduTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
@@ -66,6 +67,12 @@ public abstract class AlterTableStmt extends StatementBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     table_ = analyzer.getTable(tableName_, Privilege.ALTER);
+
+    if (table_ instanceof KuduTable) {
+      throw new AnalysisException(String.format(
+          "ALTER TABLE not allowed on Kudu table: %s", table_.getFullName()));
+    }
+
     if (table_ instanceof View) {
       throw new AnalysisException(String.format(
           "ALTER TABLE not allowed on a view: %s", table_.getFullName()));

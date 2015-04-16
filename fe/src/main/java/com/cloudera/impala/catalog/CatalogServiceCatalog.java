@@ -139,7 +139,15 @@ public class CatalogServiceCatalog extends Catalog {
    * Reads the current set of cache pools from HDFS and updates the catalog.
    * Called periodically by the cachePoolReader_.
    */
-  private class CachePoolReader implements Runnable {
+  protected class CachePoolReader implements Runnable {
+
+    /**
+     * This constructor is needed to create a non-threaded execution of the class.
+     */
+    public CachePoolReader() {
+      super();
+    }
+
     public void run() {
       LOG.trace("Reloading cache pool names from HDFS");
       // Map of cache pool name to CachePoolInfo. Stored in a map to allow Set operations

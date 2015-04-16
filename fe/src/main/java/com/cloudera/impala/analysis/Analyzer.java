@@ -47,6 +47,7 @@ import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.ImpaladCatalog;
+import com.cloudera.impala.catalog.KuduTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TableLoadingException;
 import com.cloudera.impala.catalog.Type;
@@ -491,7 +492,9 @@ public class Analyzer {
       if (table instanceof View) return new InlineViewRef((View) table, tableRef);
       // The table must be a base table.
       Preconditions.checkState(table instanceof HdfsTable ||
-          table instanceof HBaseTable || table instanceof DataSourceTable);
+          table instanceof KuduTable ||
+          table instanceof HBaseTable ||
+          table instanceof DataSourceTable);
       return new BaseTableRef(tableRef, tableRef.getResolvedPath());
     } else {
       return new CollectionTableRef(tableRef, tableRef.getResolvedPath());

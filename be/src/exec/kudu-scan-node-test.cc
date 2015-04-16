@@ -209,7 +209,7 @@ class KuduScanNodeTest : public testing::Test {
 
     TKuduTable t_kudu_table;
     t_kudu_table.__set_table_name(kudu_test_helper_.table_name());
-    t_kudu_table.__set_master_address("0.0.0.0:7051");
+    t_kudu_table.__set_master_addresses(vector<string>(1, "0.0.0.0:7051"));
     t_kudu_table.__set_key_columns(boost::assign::list_of("key"));
 
     TTableDescriptor t_tbl_desc;
@@ -335,4 +335,3 @@ int main(int argc, char** argv) {
   impala::LlvmCodeGen::InitializeLlvm();
   return RUN_ALL_TESTS();
 }
-

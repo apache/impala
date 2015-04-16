@@ -48,7 +48,7 @@ namespace {
 // of the range the scanner is supposed to scan.
 Status SetupScanRangePredicate(const TKuduKeyRange& key_range,
     kudu::client::KuduScanner* scanner) {
-  if (key_range.startKey.empty() && key_range.stopKey.empty()) return Status::OK;
+  if (key_range.startKey.empty() && key_range.stopKey.empty()) return Status::OK();
 
   if (!key_range.startKey.empty()) {
     KUDU_RETURN_IF_ERROR(scanner->AddLowerBoundRaw(key_range.startKey),
@@ -59,7 +59,7 @@ Status SetupScanRangePredicate(const TKuduKeyRange& key_range,
         "adding scan range upper bound");
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 } // anonymous namespace
@@ -98,7 +98,7 @@ Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
     if (CurrentBlockHasMoreRows()) {
       bool batch_done = false;
       RETURN_IF_ERROR(DecodeRowsIntoRowBatch(row_batch, &tuple, &batch_done));
-      if (batch_done) return Status::OK;
+      if (batch_done) return Status::OK();
     }
 
     // If the current scanner has more blocks, fetch them.
@@ -118,15 +118,15 @@ Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
 
     // No more rows, blocks or scanners, we're done.
     *eos = true;
-    return Status::OK;
+    return Status::OK();
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status KuduScanner::Close() {
   scanner_->Close();
-  return Status::OK;
+  return Status::OK();
 }
 
 Status KuduScanner::GetNextScanner()  {
@@ -146,7 +146,7 @@ Status KuduScanner::GetNextScanner()  {
       kudu::client::KuduScanner::READ_AT_SNAPSHOT), "Unable to set snapshot read mode.");
 
   KUDU_RETURN_IF_ERROR(scanner_->Open(), "Unable to open scanner");
-  return Status::OK;
+  return Status::OK();
 }
 
 void KuduScanner::CloseCurrentScanner() {
@@ -205,7 +205,7 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
   }
 
   COUNTER_ADD(scan_node_->rows_returned_counter_, num_rows_returned);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status KuduScanner::KuduRowToImpalaTuple(const KuduRowResult& row,
@@ -255,7 +255,7 @@ Status KuduScanner::KuduRowToImpalaTuple(const KuduRowResult& row,
             TypeToString(info->type().type));
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 
@@ -265,7 +265,7 @@ Status KuduScanner::GetNextBlock() {
   KUDU_RETURN_IF_ERROR(scanner_->NextBatch(&cur_rows_), "Unable to advance iterator");
   scan_node_->kudu_round_trips_->Add(1);
   rows_scanned_current_block_ = 0;
-  return Status::OK;
+  return Status::OK();
 }
 
 }  // namespace impala

@@ -1,0 +1,26 @@
+---- QUERY
+select * from functional_kudu.liketbl
+---- PLAN
+00:SCAN KUDU [functional_kudu.liketbl]
+---- SCANRANGELOCATIONS
+NODE 0:
+  KUDU KEYRANGE []:[]
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN KUDU [functional_kudu.liketbl]
+====
+---- QUERY
+select * from functional_kudu.liketbl where str_col = '10'
+---- PLAN
+00:SCAN KUDU [functional_kudu.liketbl]
+  predicates: str_col = '10'
+---- SCANRANGELOCATIONS
+NODE 0:
+  KUDU KEYRANGE []:[]
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN KUDU [functional_kudu.liketbl]
+  predicates: str_col = '10'
+====

@@ -202,8 +202,10 @@ def build_table_template(file_format, columns, partition_columns, row_format,
     row_format_stmt = str()
     tblproperties = ("TBLPROPERTIES ('storage_handler'="
        "'com.cloudera.kudu.hive.KuduStorageHandler', "
-       "'kudu.master_address'='{0}:{1}', "
-       "'kudu.table_name'='{2}')").format(kudu_master, kudu_master_port, table_name)
+       "'kudu.master_addresses'='{0}:{1}', "
+       "'kudu.key_columns'='{3}',"
+       "'kudu.table_name'='{2}')").format(kudu_master, kudu_master_port, table_name,
+                                          columns.split("\n")[0].split(" ")[0])
 
   # Note: columns are ignored but allowed if a custom serde is specified
   # (e.g. Avro)

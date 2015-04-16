@@ -1180,6 +1180,77 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   }
 
   @Test
+  public void TestAlterKuduTable() {
+    // Alter table is not supported and should fail
+    AnalysisError("ALTER TABLE functional_kudu.liketbl ADD COLUMNS (other int)",
+        "ALTER TABLE not allowed on Kudu table: functional_kudu.liketbl");
+  }
+
+  @Test
+  public void TestCreateKuduTable() {
+    // Create Kudu Table with all required properties
+    AnalyzesOk("create table tab (x int) tblproperties (" +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+        "'kudu.table_name'='tab'," +
+        "'kudu.master_addresses' = '127.0.0.1:8080, 127.0.0.1:8081', " +
+        "'kudu.key_columns' = 'a,b,c'" +
+        ")");
+
+    // Check that all properties are present
+    AnalysisError("create table tab (x int) tblproperties (" +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+        "'kudu.master_addresses' = '127.0.0.1:8080', " +
+        "'kudu.key_columns' = 'a,b,c'" +
+        ")",
+        "Kudu table is missing parameters in table properties. Please verify " +
+        "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
+        "present.");
+
+    AnalysisError("create table tab (x int) tblproperties (" +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+        "'kudu.table_name'='tab'," +
+        "'kudu.key_columns' = 'a,b,c'"
+        +")",
+        "Kudu table is missing parameters in table properties. Please verify " +
+        "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
+        "present.");
+
+    AnalysisError("create table tab (x int) tblproperties (" +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+        "'kudu.table_name'='tab'," +
+        "'kudu.master_addresses' = '127.0.0.1:8080'" +
+        ")",
+        "Kudu table is missing parameters in table properties. Please verify " +
+        "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
+        "present.");
+
+    // Check that properties are not empty
+    AnalysisError("create table tab (x int) tblproperties (" +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+        "'kudu.table_name'=''," +
+        "'kudu.master_addresses' = '127.0.0.1:8080', " +
+        "'kudu.key_columns' = 'a,b,c'" +
+        ")",
+        "Table property kudu.table_name cannot be empty for Kudu table.");
+
+    AnalysisError("create table tab (x int) tblproperties (" +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+        "'kudu.table_name'='asd'," +
+        "'kudu.master_addresses' = '', " +
+        "'kudu.key_columns' = 'a,b,c'" +
+        ")",
+        "Table property kudu.master_addresses cannot be empty for Kudu table.");
+
+    // Don't allow caching
+    AnalysisError("create table tab (x int) cached in 'testPool' tblproperties (" +
+        "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
+        "'kudu.table_name'='tab'," +
+        "'kudu.master_addresses' = '127.0.0.1:8080', " +
+        "'kudu.key_columns' = 'a,b,c'" +
+        ")", "A Kudu table cannot be cached in HDFS.");
+  }
+
+  @Test
   public void TestCreateAvroTest() {
     String alltypesSchemaLoc =
         "hdfs:///test-warehouse/avro_schemas/functional/alltypes.json";

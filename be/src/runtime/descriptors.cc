@@ -234,14 +234,14 @@ string HBaseTableDescriptor::DebugString() const {
 KuduTableDescriptor::KuduTableDescriptor(const TTableDescriptor& tdesc)
   : TableDescriptor(tdesc),
     table_name_(tdesc.kuduTable.table_name),
-    master_address_(tdesc.kuduTable.master_address),
-    key_columns_(tdesc.kuduTable.key_columns) {
+    key_columns_(tdesc.kuduTable.key_columns),
+    master_addresses_(tdesc.kuduTable.master_addresses) {
 }
 
 string KuduTableDescriptor::DebugString() const {
   stringstream out;
   out << "KuduTable(" << TableDescriptor::DebugString() << " table=" << table_name_;
-  out << " master_addr=" << master_address_;
+  out << " master_addrs=[" <<   join(master_addresses_, ",") << "]";
   out << " key_columns=[";
   out << join(key_columns_, ":");
   out << "]";
