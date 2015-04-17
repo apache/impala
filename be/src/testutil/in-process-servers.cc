@@ -26,6 +26,9 @@
 
 #include "common/names.h"
 
+DECLARE_string(ssl_server_certificate);
+DECLARE_string(ssl_private_key);
+
 using namespace apache::thrift;
 using namespace impala;
 
@@ -97,6 +100,11 @@ Status InProcessStatestore::Start() {
 
   statestore_server_.reset(new ThriftServer("StatestoreService", processor,
       statestore_port_, NULL, metrics_.get(), 5));
+  if (!FLAGS_ssl_server_certificate.empty()) {
+    LOG(INFO) << "Enabling SSL for Statestore";
+    EXIT_IF_ERROR(statestore_server_->EnableSsl(
+        FLAGS_ssl_server_certificate, FLAGS_ssl_private_key));
+  }
   statestore_main_loop_.reset(
       new Thread("statestore", "main-loop", &Statestore::MainLoop, statestore_.get()));
 

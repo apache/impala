@@ -254,9 +254,10 @@ class ClientCache {
  public:
   typedef ThriftClient<T> Client;
 
-  ClientCache(const std::string& service_name = "") : client_cache_helper_(1, 0, 0, 0) {
+  ClientCache(const std::string& service_name = "", bool enable_ssl = false)
+      : client_cache_helper_(1, 0, 0, 0) {
     client_factory_ = boost::bind<ThriftClientImpl*>(
-        boost::mem_fn(&ClientCache::MakeClient), this, _1, _2, service_name);
+        boost::mem_fn(&ClientCache::MakeClient), this, _1, _2, service_name, enable_ssl);
   }
 
   /// Create a ClientCache where connections are tried num_tries times, with a pause of
@@ -264,11 +265,11 @@ class ClientCache {
   /// each connection can also be set. If num_tries == 0, retry connections indefinitely.
   /// A send/receive timeout of 0 means there is no timeout.
   ClientCache(uint32_t num_tries, uint64_t wait_ms, int32_t send_timeout_ms = 0,
-      int32_t recv_timeout_ms = 0, const std::string& service_name = "")
+      int32_t recv_timeout_ms = 0, const std::string& service_name = "",
+      bool enable_ssl = false)
       : client_cache_helper_(num_tries, wait_ms, send_timeout_ms, recv_timeout_ms) {
-    client_factory_ =
-        boost::bind<ThriftClientImpl*>(
-            boost::mem_fn(&ClientCache::MakeClient), this, _1, _2, service_name);
+    client_factory_ = boost::bind<ThriftClientImpl*>(
+        boost::mem_fn(&ClientCache::MakeClient), this, _1, _2, service_name, enable_ssl);
   }
 
   /// Close all clients connected to the supplied address, (e.g., in
@@ -331,8 +332,9 @@ class ClientCache {
 
   /// Factory method to produce a new ThriftClient<T> for the wrapped cache
   ThriftClientImpl* MakeClient(const TNetworkAddress& address, ClientKey* client_key,
-      const std::string service_name) {
-    Client* client = new Client(address.hostname, address.port, service_name);
+      const std::string service_name, bool enable_ssl) {
+    Client* client = new Client(address.hostname, address.port, service_name, NULL,
+        enable_ssl);
     *client_key = reinterpret_cast<ClientKey>(client->iface());
     return client;
   }

@@ -40,6 +40,8 @@ DECLARE_int32(catalog_service_port);
 DECLARE_int32(webserver_port);
 DECLARE_bool(enable_webserver);
 DECLARE_int32(state_store_subscriber_port);
+DECLARE_string(ssl_server_certificate);
+DECLARE_string(ssl_private_key);
 
 #include "common/names.h"
 
@@ -80,6 +82,11 @@ int main(int argc, char** argv) {
 
   ThriftServer* server = new ThriftServer("CatalogService", processor,
       FLAGS_catalog_service_port, NULL, metrics.get(), 5);
+  if (!FLAGS_ssl_server_certificate.empty()) {
+    LOG(INFO) << "Enabling SSL for CatalogService";
+    EXIT_IF_ERROR(server->EnableSsl(
+        FLAGS_ssl_server_certificate, FLAGS_ssl_private_key));
+  }
   EXIT_IF_ERROR(server->Start());
   LOG(INFO) << "CatalogService started on port: " << FLAGS_catalog_service_port;
   server->Join();

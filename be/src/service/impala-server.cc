@@ -1734,6 +1734,11 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
 
     *be_server = new ThriftServer("backend", be_processor, be_port, NULL,
         exec_env->metrics(), FLAGS_be_service_threads);
+    if (!FLAGS_ssl_server_certificate.empty()) {
+      LOG(INFO) << "Enabling SSL for backend";
+      RETURN_IF_ERROR((*be_server)->EnableSsl(
+              FLAGS_ssl_server_certificate, FLAGS_ssl_private_key));
+    }
 
     LOG(INFO) << "ImpalaInternalService listening on " << be_port;
   }

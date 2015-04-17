@@ -35,6 +35,8 @@ DECLARE_int32(state_store_port);
 DECLARE_int32(webserver_port);
 DECLARE_bool(enable_webserver);
 DECLARE_string(principal);
+DECLARE_string(ssl_server_certificate);
+DECLARE_string(ssl_private_key);
 
 #include "common/names.h"
 
@@ -75,6 +77,11 @@ int main(int argc, char** argv) {
 
   ThriftServer* server = new ThriftServer("StatestoreService", processor,
       FLAGS_state_store_port, NULL, metrics.get(), 5);
+  if (!FLAGS_ssl_server_certificate.empty()) {
+    LOG(INFO) << "Enabling SSL for Statestore";
+    EXIT_IF_ERROR(server->EnableSsl(
+        FLAGS_ssl_server_certificate, FLAGS_ssl_private_key));
+  }
   EXIT_IF_ERROR(server->Start());
 
   statestore.MainLoop();

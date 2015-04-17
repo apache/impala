@@ -126,8 +126,13 @@ ThriftClient<InterfaceType>::ThriftClient(const std::string& ipaddress, int port
     : ThriftClientImpl(ipaddress, port, ssl),
       iface_(new InterfaceType(protocol_)),
       auth_provider_(auth_provider) {
-
-  transport_.reset(new apache::thrift::transport::TBufferedTransport(socket_));
+  // Below is one line of code in ThriftClientImpl::Close(),
+  // if (transport_.get != NULL && transport_->isOpen()) transport_->close();
+  // Here transport_->isOpen() will call socker_->isOpen(), when socket_ is NULL,
+  // it will crash
+  if (socket_ != NULL) {
+    transport_.reset(new apache::thrift::transport::TBufferedTransport(socket_));
+  }
 
   if (auth_provider_ == NULL) {
     auth_provider_ = AuthManager::GetInstance()->GetInternalAuthProvider();

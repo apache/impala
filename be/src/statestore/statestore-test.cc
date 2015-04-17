@@ -23,6 +23,10 @@
 
 using namespace impala;
 
+DECLARE_string(ssl_server_certificate);
+DECLARE_string(ssl_private_key);
+DECLARE_string(ssl_client_ca_certificate);
+
 DECLARE_int32(webserver_port);
 DECLARE_int32(state_store_port);
 
@@ -51,6 +55,38 @@ TEST(StatestoreTest, SmokeTest) {
       MakeNetworkAddress("localhost", FLAGS_state_store_port), new MetricGroup(""));
   ASSERT_FALSE(sub_will_not_start->Start().ok());
 
+}
+
+TEST(StatestoreSslTest, SmokeTest) {
+  string impala_home(getenv("IMPALA_HOME"));
+  stringstream server_cert;
+  server_cert << impala_home << "/be/src/testutil/server-cert.pem";
+  FLAGS_ssl_server_certificate = server_cert.str();
+  FLAGS_ssl_client_ca_certificate = server_cert.str();
+  stringstream server_key;
+  server_key << impala_home << "/be/src/testutil/server-key.pem";
+  FLAGS_ssl_private_key = server_key.str();
+
+  // Change the ports, otherwise it will conflict with above test.
+  FLAGS_state_store_port = 24001;
+  FLAGS_webserver_port = 25001;
+
+  InProcessStatestore* statestore =
+      new InProcessStatestore(FLAGS_state_store_port, FLAGS_webserver_port);
+  ASSERT_TRUE(statestore->Start().ok());
+
+  StatestoreSubscriber* sub_will_start = new StatestoreSubscriber("sub1",
+      MakeNetworkAddress("localhost", 23456),
+      MakeNetworkAddress("localhost", FLAGS_state_store_port), new MetricGroup(""));
+  ASSERT_TRUE(sub_will_start->Start().ok());
+
+  stringstream invalid_server_cert;
+  invalid_server_cert << impala_home << "/be/src/testutil/invalid-server-cert.pem";
+  FLAGS_ssl_client_ca_certificate = invalid_server_cert.str();
+  StatestoreSubscriber* sub_will_not_start = new StatestoreSubscriber("sub2",
+      MakeNetworkAddress("localhost", 23457),
+      MakeNetworkAddress("localhost", FLAGS_state_store_port), new MetricGroup(""));
+  ASSERT_FALSE(sub_will_not_start->Start().ok());
 }
 
 }
