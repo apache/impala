@@ -22,7 +22,6 @@ import re
 from collections import defaultdict
 from datetime import date, datetime
 from optparse import OptionParser
-from perf_result_datastore import PerfResultDataStore
 from tests.util.calculation_util import (
     calculate_tval, calculate_avg, calculate_stddev, calculate_geomean)
 
@@ -1051,6 +1050,8 @@ def build_summary_header(current_impala_version, ref_impala_version):
 
 def write_results_to_datastore(grouped):
   """ Saves results to a database """
+
+  from perf_result_datastore import PerfResultDataStore
 
   LOG.info('Saving perf results to database')
   run_date = str(datetime.now())
