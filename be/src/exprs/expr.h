@@ -17,19 +17,19 @@
 //
 /// Compute function: The function that, given a row, performs the computation of an expr
 /// and produces a scalar result. This function evaluates the necessary child arguments by
-/// calling their compute functions, then performs whatever computation is necessary on the
-/// arguments (e.g. calling a UDF with the child arguments). All compute functions take
-/// arguments (ExprContext*, TupleRow*). The return type is a *Val (i.e. a subclass of
-/// AnyVal). Thus, a single expression will implement a compute function for every return
-/// type it supports.
+/// calling their compute functions, then performs whatever computation is necessary on
+/// the arguments (e.g. calling a UDF with the child arguments). All compute functions
+/// take arguments (ExprContext*, TupleRow*). The return type is a *Val (i.e. a subclass
+/// of AnyVal). Thus, a single expression will implement a compute function for every
+/// return type it supports.
 //
 /// UDX: user-defined X. E.g., user-defined function, user-defined aggregate. Something
 /// that is written by an external user.
 //
-/// Scalar function call: An expr that returns a single scalar value and can be implemented
-/// using the UDF interface. Note that this includes builtins, which although not being
-/// user-defined still use the same interface as UDFs (i.e., they are implemented as
-/// functions with signature "*Val (FunctionContext*, *Val, *Val...)").
+/// Scalar function call: An expr that returns a single scalar value and can be
+/// implemented using the UDF interface. Note that this includes builtins, which although
+/// not being user-defined still use the same interface as UDFs (i.e., they are
+/// implemented as functions with signature "*Val (FunctionContext*, *Val, *Val...)").
 //
 /// Aggregate function call: a UDA or builtin aggregate function.
 //
@@ -41,18 +41,18 @@
 /// will be a single function. These functions are generally cross-compiled to both native
 /// and IR libraries. In the interpreted path, the native compute functions are run as-is.
 //
-/// For the codegen path, Expr defines a virtual method GetCodegendComputeFn() that returns
-/// the Function* of the expr's compute function. Note that we do not need a separate
-/// GetCodegendComputeFn() for each type.
+/// For the codegen path, Expr defines a virtual method GetCodegendComputeFn() that
+/// returns the Function* of the expr's compute function. Note that we do not need a
+/// separate GetCodegendComputeFn() for each type.
 //
 /// Only short-circuited operators (e.g. &&, ||) and other special functions like literals
 /// must implement custom Get*Val() compute functions. Scalar function calls use the
 /// generic compute functions implemented by ScalarFnCall(). For cross-compiled compute
 /// functions, GetCodegendComputeFn() can use ReplaceChildCallsComputeFn(), which takes a
 /// cross-compiled IR Get*Val() function, pulls out any calls to the children's Get*Val()
-/// functions (which we identify via the Get*Val() static wrappers), and replaces them with
-/// the codegen'd version of that function. This allows us to write a single function for
-/// both the interpreted and codegen paths.
+/// functions (which we identify via the Get*Val() static wrappers), and replaces them
+/// with the codegen'd version of that function. This allows us to write a single function
+/// for both the interpreted and codegen paths.
 //
 /// --- Expr users (e.g. exec nodes):
 //

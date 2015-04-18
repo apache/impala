@@ -54,13 +54,18 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
     : scan_node_(scan_node),
       state_(state),
       context_(NULL),
+      stream_(NULL),
+      template_tuple_(NULL),
       tuple_byte_size_(scan_node->tuple_desc()->byte_size()),
       tuple_(NULL),
       batch_(NULL),
+      tuple_mem_(NULL),
       num_errors_in_file_(0),
       num_null_bytes_(scan_node->tuple_desc()->num_null_bytes()),
+      parse_status_(Status::OK()),
       decompression_type_(THdfsCompression::NONE),
       data_buffer_pool_(new MemPool(scan_node->mem_tracker())),
+      decompress_timer_(NULL),
       write_tuples_fn_(NULL) {
 }
 
@@ -71,7 +76,10 @@ HdfsScanner::~HdfsScanner() {
 Status HdfsScanner::Prepare(ScannerContext* context) {
   context_ = context;
   stream_ = context->GetStream();
-  RETURN_IF_ERROR(scan_node_->GetConjunctCtxs(&conjunct_ctxs_));
+  // The cloned contexts must be closed by the caller.
+  RETURN_IF_ERROR(Expr::Clone(scan_node_->conjunct_ctxs(),
+      scan_node_->runtime_state(), &scanner_conjunct_ctxs_));
+
   template_tuple_ = scan_node_->InitTemplateTuple(
       state_, context_->partition_descriptor()->partition_key_value_ctxs());
   StartNewRowBatch();
@@ -81,7 +89,7 @@ Status HdfsScanner::Prepare(ScannerContext* context) {
 
 void HdfsScanner::Close() {
   if (decompressor_.get() != NULL) decompressor_->Close();
-  Expr::Close(conjunct_ctxs_, state_);
+  Expr::Close(scanner_conjunct_ctxs_, state_);
 }
 
 Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
@@ -138,7 +146,7 @@ Status HdfsScanner::CommitRows(int num_rows) {
   if (context_->cancelled()) return Status::CANCELLED;
   RETURN_IF_ERROR(state_->CheckQueryState());
   // Free local expr allocations for this thread
-  ExprContext::FreeLocalAllocations(conjunct_ctxs_);
+  ExprContext::FreeLocalAllocations(scanner_conjunct_ctxs_);
   return Status::OK();
 }
 

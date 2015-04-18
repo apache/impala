@@ -151,7 +151,7 @@ class HdfsScanner {
 
   /// ExprContext for each conjunct. Each scanner has its own ExprContexts so the
   /// conjuncts can be safely evaluated in parallel.
-  std::vector<ExprContext*> conjunct_ctxs_;
+  std::vector<ExprContext*> scanner_conjunct_ctxs_;
 
   /// A partially materialized tuple with only partition key slots set.
   /// The non-partition key slots are set to NULL.  The template tuple
@@ -245,9 +245,9 @@ class HdfsScanner {
   Status CommitRows(int num_rows);
 
   /// Attach all remaining resources from context_ to batch_ and send batch_ to the scan
-  /// node. This must be called after all rows have been committed and no further resources
-  /// are needed from context_ (in practice this will happen in each scanner subclass's
-  /// Close() implementation).
+  /// node. This must be called after all rows have been committed and no further
+  /// resources are needed from context_ (in practice this will happen in each scanner
+  /// subclass's Close() implementation).
   void AddFinalRowBatch();
 
   /// Release all memory in 'pool' to batch_. If commit_batch is true, the row batch
@@ -264,7 +264,8 @@ class HdfsScanner {
   /// This must always be inlined so we can correctly replace the call to
   /// ExecNode::EvalConjuncts() during codegen.
   bool IR_ALWAYS_INLINE EvalConjuncts(TupleRow* row)  {
-    return ExecNode::EvalConjuncts(&conjunct_ctxs_[0], conjunct_ctxs_.size(), row);
+    return ExecNode::EvalConjuncts(&scanner_conjunct_ctxs_[0],
+                                   scanner_conjunct_ctxs_.size(), row);
   }
 
   /// Utility method to write out tuples when there are no materialized
@@ -370,8 +371,9 @@ class HdfsScanner {
     return reinterpret_cast<TupleRow*>(mem + batch_->row_byte_size());
   }
 
-  /// Simple wrapper around conjunct_ctxs_. Used in the codegen'd version of
-  /// WriteCompleteTuple() because it's easier than writing IR to access conjunct_ctxs_.
+  /// Simple wrapper around scanner_conjunct_ctxs_. Used in the codegen'd version of
+  /// WriteCompleteTuple() because it's easier than writing IR to access
+  /// scanner_conjunct_ctxs_.
   ExprContext* GetConjunctCtx(int idx) const;
 };
 

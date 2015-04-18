@@ -69,7 +69,8 @@ struct HdfsFileDesc {
   /// Splits (i.e. raw byte ranges) for this file, assigned to this scan node.
   std::vector<DiskIoMgr::ScanRange*> splits;
   HdfsFileDesc(const std::string& filename)
-      : filename(filename), file_length(0), mtime(0), file_compression(THdfsCompression::NONE) {
+    : filename(filename), file_length(0), mtime(0),
+      file_compression(THdfsCompression::NONE) {
   }
 };
 
@@ -143,10 +144,6 @@ class HdfsScanNode : public ScanNode {
 
   const static int SKIP_COLUMN = -1;
 
-  /// Creates a clone of conjunct_ctxs_. 'ctxs' should be non-NULL and empty.
-  /// The returned contexts must be closed by the caller.
-  Status GetConjunctCtxs(std::vector<ExprContext*>* ctxs);
-
   /// Returns index into materialized_slots with 'path'.  Returns SKIP_COLUMN if
   /// that path is not materialized.
   int GetMaterializedSlotIdx(const std::vector<int>& path) const {
@@ -179,11 +176,11 @@ class HdfsScanNode : public ScanNode {
   void AddMaterializedRowBatch(RowBatch* row_batch);
 
   /// Allocate a new scan range object, stored in the runtime state's object pool.  For
-  /// scan ranges that correspond to the original hdfs splits, the partition id must be set
-  /// to the range's partition id. For other ranges (e.g. columns in parquet, read past
-  /// buffers), the partition_id is unused. expected_local should be true if this scan
-  /// range is not expected to require a remote read. The range must fall within the file
-  /// bounds.  That is, the offset must be >= 0, and offset + len <= file_length.
+  /// scan ranges that correspond to the original hdfs splits, the partition id must be
+  /// set to the range's partition id. For other ranges (e.g. columns in parquet, read
+  /// past buffers), the partition_id is unused. expected_local should be true if this
+  /// scan range is not expected to require a remote read. The range must fall within
+  /// the file bounds. That is, the offset must be >= 0, and offset + len <= file_length.
   /// This is thread safe.
   DiskIoMgr::ScanRange* AllocateScanRange(
       hdfsFS fs, const char* file, int64_t len, int64_t offset, int64_t partition_id,
@@ -268,10 +265,6 @@ class HdfsScanNode : public ScanNode {
  private:
   friend class ScannerContext;
 
-  /// Cache of the plan node.  This is needed to be able to create a copy of
-  /// the conjuncts per scanner since our Exprs are not thread safe.
-  boost::scoped_ptr<TPlanNode> thrift_plan_node_;
-
   RuntimeState* runtime_state_;
 
   /// Tuple id resolved in Prepare() to set tuple_desc_;
@@ -302,9 +295,9 @@ class HdfsScanNode : public ScanNode {
   typedef std::map<THdfsFileFormat::type, std::vector<HdfsFileDesc*> > FileFormatsMap;
   FileFormatsMap per_type_files_;
 
-  /// Set to true when the initial scan ranges are issued to the IoMgr. This happens on the
-  /// first call to GetNext(). The token manager, in a different thread, will read this
-  /// variable.
+  /// Set to true when the initial scan ranges are issued to the IoMgr. This happens on
+  /// the first call to GetNext(). The token manager, in a different thread, will read
+  /// this variable.
   bool initial_ranges_issued_;
 
   /// The estimated memory required to start up a new scanner thread. If the memory
@@ -323,10 +316,6 @@ class HdfsScanNode : public ScanNode {
   /// Per scanner type codegen'd fn.
   typedef std::map<THdfsFileFormat::type, void*> CodegendFnMap;
   CodegendFnMap codegend_fn_map_;
-
-  /// Contexts for each conjunct. These are cloned by the scanners so conjuncts can be
-  /// safely evaluated in parallel.
-  std::vector<ExprContext*> conjunct_ctxs_;
 
   /// Maps from a slot's path to its index into materialized_slots_.
   typedef boost::unordered_map<std::vector<int>, int> PathToSlotIdxMap;
@@ -380,8 +369,8 @@ class HdfsScanNode : public ScanNode {
   AtomicInt<int> num_scanners_codegen_enabled_;
   AtomicInt<int> num_scanners_codegen_disabled_;
 
-  /// The size of the largest compressed text file to be scanned. This is used to estimate
-  /// scanner thread memory usage.
+  /// The size of the largest compressed text file to be scanned. This is used to
+  /// estimate scanner thread memory usage.
   RuntimeProfile::HighWaterMarkCounter* max_compressed_text_file_length_;
 
   /// Disk accessed bitmap

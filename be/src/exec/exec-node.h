@@ -154,8 +154,8 @@ class ExecNode {
   /// Output parameters:
   ///   out: Stream to accumulate debug string.
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
-  const std::vector<ExprContext*>& conjunct_ctxs() const { return conjunct_ctxs_; }
 
+  const std::vector<ExprContext*>& conjunct_ctxs() const { return conjunct_ctxs_; }
   int id() const { return id_; }
   TPlanNodeType::type type() const { return type_; }
   const RowDescriptor& row_desc() const { return row_descriptor_; }
@@ -211,7 +211,9 @@ class ExecNode {
     std::list<RowBatch*> cleanup_queue_;
   };
 
-  int id_;  // unique w/in single plan tree
+  /// Unique within a single plan tree.
+  int id_;
+
   TPlanNodeType::type type_;
   ObjectPool* pool_;
   std::vector<ExprContext*> conjunct_ctxs_;

@@ -81,15 +81,21 @@ const int UNEXPECTED_REMOTE_BYTES_WARN_THRESHOLD = 64 * 1024 * 1024;
 HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
                            const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
-      thrift_plan_node_(new TPlanNode(tnode)),
       runtime_state_(NULL),
       tuple_id_(tnode.hdfs_scan_node.tuple_id),
       reader_context_(NULL),
       tuple_desc_(NULL),
+      hdfs_table_(NULL),
       unknown_disk_id_warned_(false),
       initial_ranges_issued_(false),
       scanner_thread_bytes_required_(0),
+      max_compressed_text_file_length_(NULL),
       disks_accessed_bitmap_(TUnit::UNIT, 0),
+      bytes_read_local_(NULL),
+      bytes_read_short_circuit_(NULL),
+      bytes_read_dn_cache_(NULL),
+      num_remote_ranges_(NULL),
+      unexpected_remote_bytes_(NULL),
       done_(false),
       all_ranges_started_(false),
       counters_running_(false),
@@ -97,7 +103,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
   max_materialized_row_batches_ = FLAGS_max_row_batches;
   if (max_materialized_row_batches_ <= 0) {
     // TODO: This parameter has an U-shaped effect on performance: increasing the value
-    // would first improves performance, but further increasing would degrade performance.
+    // would first improve performance, but further increasing would degrade performance.
     // Investigate and tune this.
     max_materialized_row_batches_ =
         10 * (DiskInfo::num_disks() + DiskIoMgr::REMOTE_NUM_DISKS);
@@ -461,13 +467,6 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   PrintHdfsSplitStats(per_volume_stats, &str);
   runtime_profile()->AddInfoString(HDFS_SPLIT_STATS_DESC, str.str());
 
-  // Initialize conjunct exprs
-  RETURN_IF_ERROR(Expr::CreateExprTrees(
-      runtime_state_->obj_pool(), thrift_plan_node_->conjuncts, &conjunct_ctxs_));
-  RETURN_IF_ERROR(
-      Expr::Prepare(conjunct_ctxs_, runtime_state_, row_desc(), expr_mem_tracker()));
-  AddExprCtxsToFree(conjunct_ctxs_);
-
   for (int format = THdfsFileFormat::TEXT;
        format <= THdfsFileFormat::PARQUET; ++format) {
     vector<HdfsFileDesc*>& file_descs =
@@ -545,9 +544,6 @@ Status HdfsScanNode::Open(RuntimeState* state) {
                                    << "\n" << PrintThrift(state->fragment_params());
     RETURN_IF_ERROR(partition_desc->OpenExprs(state));
   }
-
-  // Open all conjuncts
-  Expr::Open(conjunct_ctxs_, state);
 
   RETURN_IF_ERROR(runtime_state_->io_mgr()->RegisterContext(
       &reader_context_, mem_tracker()));
@@ -657,9 +653,6 @@ void HdfsScanNode::Close(RuntimeState* state) {
 
   if (scan_node_pool_.get() != NULL) scan_node_pool_->FreeAll();
 
-  // Close all conjuncts
-  Expr::Close(conjunct_ctxs_, state);
-
   // Close all the partitions scanned by the scan node
   BOOST_FOREACH(const int64_t& partition_id, partition_ids_) {
     HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
@@ -668,7 +661,6 @@ void HdfsScanNode::Close(RuntimeState* state) {
                                    << "\n" << PrintThrift(state->fragment_params());
     partition_desc->CloseExprs(state);
   }
-
   ScanNode::Close(state);
 }
 
@@ -684,10 +676,6 @@ Status HdfsScanNode::AddDiskIoRanges(const vector<DiskIoMgr::ScanRange*>& ranges
 
 void HdfsScanNode::AddMaterializedRowBatch(RowBatch* row_batch) {
   materialized_row_batches_->AddBatch(row_batch);
-}
-
-Status HdfsScanNode::GetConjunctCtxs(vector<ExprContext*>* ctxs) {
-  return Expr::Clone(conjunct_ctxs_, runtime_state_, ctxs);
 }
 
 // For controlling the amount of memory used for scanners, we approximate the

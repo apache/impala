@@ -77,7 +77,7 @@ int HdfsScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int row_
 }
 
 ExprContext* HdfsScanner::GetConjunctCtx (int idx) const {
-  return conjunct_ctxs_[idx];
+  return scanner_conjunct_ctxs_[idx];
 }
 
 // Define the string parsing functions for llvm.  Stamp out the templated functions
