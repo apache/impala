@@ -15,6 +15,7 @@
 #include "common/logging.h"
 
 #include <boost/foreach.hpp>
+#include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>

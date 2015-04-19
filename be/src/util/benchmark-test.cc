@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <gtest/gtest.h>
+
 #include "common/object-pool.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
@@ -47,7 +48,7 @@ void TestFunction(int batch_size, void* d) {
   }
 }
 
-TEST(BenchmarkTest, Basic) { 
+TEST(BenchmarkTest, Basic) {
   MemcpyData data;
   data.src = reinterpret_cast<char*>(malloc(128));
   data.dst = reinterpret_cast<char*>(malloc(128));
@@ -74,4 +75,3 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
-

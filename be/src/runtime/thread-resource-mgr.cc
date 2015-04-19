@@ -17,6 +17,7 @@
 #include <vector>
 
 #include <boost/algorithm/string.hpp>
+#include <boost/thread/locks.hpp>
 #include <gflags/gflags.h>
 
 #include "common/logging.h"

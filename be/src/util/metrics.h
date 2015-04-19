@@ -22,6 +22,7 @@
 #include <boost/foreach.hpp>
 #include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
 
 #include "common/logging.h"

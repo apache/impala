@@ -30,11 +30,11 @@ namespace impala {
 //  string result = suite.Measure();
 class Benchmark {
  public:
-  // Name of the microbenchmark.  This is outputted in the result.  
+  // Name of the microbenchmark.  This is outputted in the result.
   Benchmark(const std::string& name);
 
   // Function to benchmark.  The function should run iters time (to minimize function
-  // call overhead).  The second argument is opaque and is whatever data the test 
+  // call overhead).  The second argument is opaque and is whatever data the test
   // function needs to execute.
   typedef void (*BenchmarkFunction)(int iters, void*);
 
@@ -66,7 +66,7 @@ class Benchmark {
 
   struct BenchmarkResult {
     std::string name;
-    BenchmarkFunction fn; 
+    BenchmarkFunction fn;
     void* args;
     double rate;
     int baseline_idx;
@@ -75,7 +75,7 @@ class Benchmark {
   std::string name_;
   std::vector<BenchmarkResult> benchmarks_;
 };
-  
+
 }
 
 #endif

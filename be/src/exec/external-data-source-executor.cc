@@ -14,6 +14,7 @@
 
 #include "exec/external-data-source-executor.h"
 
+#include <boost/thread.hpp>
 #include <list>
 #include <string>
 
