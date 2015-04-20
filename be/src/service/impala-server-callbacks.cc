@@ -233,6 +233,14 @@ void ImpalaServer::QueryStateToJson(const ImpalaServer::QueryStateRecord& record
   Value end_time(record.end_time.DebugString().c_str(), document->GetAllocator());
   value->AddMember("end_time", end_time, document->GetAllocator());
 
+  const TimestampValue& end_timestamp =
+      record.end_time.HasDate() ? record.end_time : TimestampValue::LocalTime();
+  double duration =
+      end_timestamp.ToSubsecondUnixTime() - record.start_time.ToSubsecondUnixTime();
+  const string& printed_duration = PrettyPrinter::Print(duration, TUnit::TIME_S);
+  Value val_duration(printed_duration.c_str(), document->GetAllocator());
+  value->AddMember("duration", val_duration, document->GetAllocator());
+
   string progress = "N/A";
   if (record.has_coord) {
     stringstream ss;
