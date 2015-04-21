@@ -231,7 +231,7 @@ class Status {
 
   // Silent general error, this cannot be used with typed error messages as it would defy
   // the cause of a useful error message.
-  Status(bool silent, const std::string& error_msg);
+  Status(const std::string& error_msg, bool silent);
 
   // Status uses a naked pointer to ensure the size of an instance on the stack is only
   // the sizeof(ErrorMsg*). Every Status owns its ErrorMsg instance.

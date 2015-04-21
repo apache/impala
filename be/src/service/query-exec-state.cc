@@ -830,12 +830,8 @@ Status ImpalaServer::QueryExecState::UpdateCatalog() {
 
       VLOG_QUERY << "Executing FinalizeDml() using CatalogService";
       TUpdateCatalogResponse resp;
-      try {
-        client->UpdateCatalog(resp, catalog_update);
-      } catch (const TException& e) {
-        RETURN_IF_ERROR(client.Reopen());
-        client->UpdateCatalog(resp, catalog_update);
-      }
+      RETURN_IF_ERROR(
+          client.DoRpc(&CatalogServiceClient::UpdateCatalog, catalog_update, &resp));
 
       Status status(resp.result.status);
       if (!status.ok()) LOG(ERROR) << "ERROR Finalizing DML: " << status.GetDetail();

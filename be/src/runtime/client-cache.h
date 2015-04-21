@@ -186,23 +186,8 @@ class ClientCacheHelper {
 template<class T>
 class ClientCache;
 
-// A scoped client connection to help manage clients from a client cache.
-//
-// Example:
-//   {
-//     ImpalaInternalServiceConnection client(cache, address, &status);
-//     try {
-//       client->TransmitData(...);
-//     } catch (const TException& e) {
-//       // Retry
-//       RETURN_IF_ERROR(client.Reopen());
-//       client->TransmitData(...);
-//     }
-//   }
-// ('client' is released back to cache upon destruction.)
-//
-// New clients should use DoRpc(), particularly if they wish to detect and handle
-// timeouts.
+// A scoped client connection to help manage clients from a client cache. Clients of this
+// class should use DoRpc() to actually make RPC calls.
 template<class T>
 class ClientConnection {
  public:
@@ -237,9 +222,10 @@ class ClientConnection {
   // TODO: Use TTransportException::TTransportExceptionType to distinguish between failure
   // modes.
   template <class F, class Request, class Response>
-  Status DoRpc(const F& f, const Request& request, Response& response) {
+  Status DoRpc(const F& f, const Request& request, Response* response) {
+    DCHECK(response != NULL);
     try {
-      (client_->*f)(response, request);
+      (client_->*f)(*response, request);
     } catch (const apache::thrift::TException& e) {
       if (IsTimeoutTException(e)) return Status(TErrorCode::RPC_TIMEOUT);
 
@@ -247,7 +233,7 @@ class ClientConnection {
       // TODO: ThriftClient should return proper error codes.
       RETURN_IF_ERROR(Reopen());
       try {
-        (client_->*f)(response, request);
+        (client_->*f)(*response, request);
       } catch (apache::thrift::TException& e) {
         // By this point the RPC really has failed.
         return Status(TErrorCode::RPC_GENERAL_ERROR, e.what());

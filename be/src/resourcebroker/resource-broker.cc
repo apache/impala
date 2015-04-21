@@ -240,18 +240,9 @@ Status ResourceBroker::RegisterWithLlama() {
       request.__set_notification_callback_service(callback_address);
       llama::TLlamaAMRegisterResponse response;
       LOG(INFO) << "Registering Resource Broker with Llama at " << llama_address;
-      bool rpc_success = false;
-      try {
-        llama_client->Register(response, request);
-        rpc_success = true;
-      } catch (const TException& e) {
-        client_status = llama_client.Reopen();
-        if (client_status.ok()) {
-          llama_client->Register(response, request);
-          rpc_success = true;
-        }
-      }
-      if (rpc_success) {
+      Status rpc_status =
+          llama_client.DoRpc(&llama::LlamaAMServiceClient::Register, request, &response);
+      if (rpc_status.ok()) {
         // TODO: Is there a period where an inactive Llama may respond to RPCs?
         // If so, then we need to keep cycling through Llamas here and not
         // return an error.

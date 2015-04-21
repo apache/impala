@@ -418,7 +418,7 @@ Status Statestore::SendTopicUpdate(Subscriber* subscriber, bool* update_skipped)
 
   TUpdateStateResponse response;
   RETURN_IF_ERROR(client.DoRpc(
-      &StatestoreSubscriberClient::UpdateState, update_state_request, response));
+      &StatestoreSubscriberClient::UpdateState, update_state_request, &response));
 
   status = Status(response.status);
   if (!status.ok()) {
@@ -597,7 +597,7 @@ Status Statestore::SendHeartbeat(Subscriber* subscriber) {
   THeartbeatResponse response;
   request.__set_registration_id(subscriber->registration_id());
   RETURN_IF_ERROR(
-      client.DoRpc(&StatestoreSubscriberClient::Heartbeat, request, response));
+      client.DoRpc(&StatestoreSubscriberClient::Heartbeat, request, &response));
 
   heartbeat_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
   return Status::OK;

@@ -28,11 +28,13 @@
 
 #include <thrift/protocol/TDebugProtocol.h>
 #include <thrift/Thrift.h>
+#include <gutil/strings/substitute.h>
 
 #include "common/names.h"
 using namespace impala;
 using namespace apache::hive::service::cli::thrift;
 using namespace apache::thrift;
+using strings::Substitute;
 
 DECLARE_int32(catalog_service_port);
 DECLARE_string(catalog_service_host);
@@ -52,12 +54,8 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
       DCHECK(request.ddl_params.ddl_type != TDdlType::COMPUTE_STATS);
 
       exec_response_.reset(new TDdlExecResponse());
-      try {
-        client->ExecDdl(*exec_response_.get(), request.ddl_params);
-      } catch (const TException& e) {
-        RETURN_IF_ERROR(client.Reopen());
-        client->ExecDdl(*exec_response_.get(), request.ddl_params);
-      }
+      RETURN_IF_ERROR(client.DoRpc(&CatalogServiceClient::ExecDdl, request.ddl_params,
+          exec_response_.get()));
       catalog_update_result_.reset(
           new TCatalogUpdateResult(exec_response_.get()->result));
       Status status(exec_response_->result.status);
@@ -72,20 +70,14 @@ Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
     }
     case TCatalogOpType::RESET_METADATA: {
       TResetMetadataResponse response;
-      try {
-        client->ResetMetadata(response, request.reset_metadata_params);
-      } catch (const TException& e) {
-        RETURN_IF_ERROR(client.Reopen());
-        client->ResetMetadata(response, request.reset_metadata_params);
-      }
+      RETURN_IF_ERROR(client.DoRpc(&CatalogServiceClient::ResetMetadata,
+          request.reset_metadata_params, &response));
       catalog_update_result_.reset(new TCatalogUpdateResult(response.result));
       return Status(response.result.status);
     }
     default: {
-      stringstream ss;
-      ss << "TCatalogOpType: " << request.op_type << " does not support execution "
-         << "against the CatalogService.";
-      return Status(ss.str());
+      return Status(Substitute("TCatalogOpType: $0 does not support execution against the"
+          " CatalogService", request.op_type));
     }
   }
 }
@@ -262,12 +254,8 @@ Status CatalogOpExecutor::GetCatalogObject(const TCatalogObject& object_desc,
   request.__set_object_desc(object_desc);
 
   TGetCatalogObjectResponse response;
-  try {
-    client->GetCatalogObject(response, request);
-  } catch (const TException& e) {
-    RETURN_IF_ERROR(client.Reopen());
-    client->GetCatalogObject(response, request);
-  }
+  RETURN_IF_ERROR(
+      client.DoRpc(&CatalogServiceClient::GetCatalogObject, request, &response));
   *result = response.catalog_object;
   return Status::OK;
 }
@@ -279,12 +267,7 @@ Status CatalogOpExecutor::PrioritizeLoad(const TPrioritizeLoadRequest& req,
   Status status;
   CatalogServiceConnection client(env_->catalogd_client_cache(), address, &status);
   RETURN_IF_ERROR(status);
-  try {
-    client->PrioritizeLoad(*result, req);
-  } catch (const TException& e) {
-    RETURN_IF_ERROR(client.Reopen());
-    client->PrioritizeLoad(*result, req);
-  }
+  RETURN_IF_ERROR(client.DoRpc(&CatalogServiceClient::PrioritizeLoad, req, result));
   return Status::OK;
 }
 
@@ -295,11 +278,6 @@ Status CatalogOpExecutor::SentryAdminCheck(const TSentryAdminCheckRequest& req) 
   CatalogServiceConnection client(env_->catalogd_client_cache(), address, &cnxn_status);
   RETURN_IF_ERROR(cnxn_status);
   TSentryAdminCheckResponse resp;
-  try {
-    client->SentryAdminCheck(resp, req);
-  } catch (const TException& e) {
-    RETURN_IF_ERROR(client.Reopen());
-    client->SentryAdminCheck(resp, req);
-  }
+  RETURN_IF_ERROR(client.DoRpc(&CatalogServiceClient::SentryAdminCheck, req, &resp));
   return Status(resp.status);
 }

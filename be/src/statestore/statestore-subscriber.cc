@@ -155,17 +155,8 @@ Status StatestoreSubscriber::Register() {
   request.subscriber_location = heartbeat_address_;
   request.subscriber_id = subscriber_id_;
   TRegisterSubscriberResponse response;
-  try {
-    client->RegisterSubscriber(response, request);
-  } catch (const TException& e) {
-    // Client may have been closed due to a failure
-    RETURN_IF_ERROR(client.Reopen());
-    try {
-      client->RegisterSubscriber(response, request);
-    } catch (const TException& e) {
-      return Status(e.what());
-    }
-  }
+  RETURN_IF_ERROR(
+      client.DoRpc(&StatestoreServiceClient::RegisterSubscriber, request, &response));
   Status status = Status(response.status);
   if (status.ok()) connected_to_statestore_metric_->set_value(true);
   if (response.__isset.registration_id) {

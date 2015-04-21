@@ -17,6 +17,7 @@
 #include <sstream>
 
 #include "codegen/llvm-codegen.h"
+#include "gen-cpp/ImpalaInternalService.h"
 #include "rpc/thrift-util.h"
 
 #include "common/names.h"
@@ -100,32 +101,12 @@ void FragmentMgr::FragmentExecState::ReportStatusCb(
   params.__isset.error_log = (params.error_log.size() > 0);
 
   TReportExecStatusResult res;
-  Status rpc_status;
-  try {
-    try {
-      coord->ReportExecStatus(res, params);
-    } catch (const TException& e) {
-      VLOG_RPC << "Retrying ReportExecStatus: " << e.what();
-      rpc_status = coord.Reopen();
-      if (!rpc_status.ok()) {
-        // we need to cancel the execution of this fragment
-        UpdateStatus(rpc_status);
-        executor_.Cancel();
-        return;
-      }
-      coord->ReportExecStatus(res, params);
-    }
-    rpc_status = Status(res.status);
-  } catch (TException& e) {
-    stringstream msg;
-    msg << "ReportExecStatus() to " << coord_address() << " failed:\n" << e.what();
-    VLOG_QUERY << msg.str();
-    rpc_status = Status(ErrorMsg(TErrorCode::INTERNAL_ERROR, msg.str()));
-  }
-
+  Status rpc_status =
+      coord.DoRpc(&ImpalaInternalServiceClient::ReportExecStatus, params, &res);
+  if (rpc_status.ok()) rpc_status = Status(res.status);
   if (!rpc_status.ok()) {
-    // we need to cancel the execution of this fragment
     UpdateStatus(rpc_status);
+    // we need to cancel the execution of this fragment
     executor_.Cancel();
   }
 }

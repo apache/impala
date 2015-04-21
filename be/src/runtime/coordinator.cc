@@ -1074,32 +1074,18 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
   RETURN_IF_ERROR(status);
 
   TExecPlanFragmentResult thrift_result;
-  try {
-    try {
-      backend_client->ExecPlanFragment(thrift_result, exec_state->rpc_params);
-    } catch (const TException& e) {
-      // If a backend has stopped and restarted (without the failure detector
-      // picking it up) an existing backend client may still think it is
-      // connected. To avoid failing the first query after every failure, catch
-      // the first failure and force a reopen of the transport.
-      // TODO: Improve client-cache so that we don't need to do this.
-      VLOG_RPC << "Retrying ExecPlanFragment: " << e.what();
-      Status status = backend_client.Reopen();
-      if (!status.ok()) {
-        exec_state->status = status;
-        return status;
-      }
-      backend_client->ExecPlanFragment(thrift_result, exec_state->rpc_params);
-    }
-  } catch (const TException& e) {
+  Status rpc_status = backend_client.DoRpc(&ImpalaInternalServiceClient::ExecPlanFragment,
+      exec_state->rpc_params, &thrift_result);
+  if (!rpc_status.ok()) {
     stringstream msg;
     msg << "ExecPlanRequest rpc query_id=" << query_id_
         << " instance_id=" << exec_state->fragment_instance_id
-        << " failed: " << e.what();
+        << " failed: " << rpc_status.msg().msg();
     VLOG_QUERY << msg.str();
     exec_state->status = Status(msg.str());
-    return exec_state->status;
+    return status;
   }
+
   exec_state->status = thrift_result.status;
   if (exec_state->status.ok()) {
     exec_state->initiated = true;
@@ -1169,26 +1155,17 @@ void Coordinator::CancelRemoteFragments() {
     params.protocol_version = ImpalaInternalServiceVersion::V1;
     params.__set_fragment_instance_id(exec_state->fragment_instance_id);
     TCancelPlanFragmentResult res;
-    try {
-      VLOG_QUERY << "sending CancelPlanFragment rpc for instance_id="
-                 << exec_state->fragment_instance_id << " backend="
-                 << exec_state->backend_address;
-      try {
-        backend_client->CancelPlanFragment(res, params);
-      } catch (const TException& e) {
-        VLOG_RPC << "Retrying CancelPlanFragment: " << e.what();
-        Status status = backend_client.Reopen();
-        if (!status.ok()) {
-          exec_state->status.MergeStatus(status);
-          continue;
-        }
-        backend_client->CancelPlanFragment(res, params);
-      }
-    } catch (const TException& e) {
+    VLOG_QUERY << "sending CancelPlanFragment rpc for instance_id="
+               << exec_state->fragment_instance_id << " backend="
+               << exec_state->backend_address;
+    Status rpc_status = backend_client.DoRpc(
+        &ImpalaInternalServiceClient::CancelPlanFragment, params, &res);
+    if (!rpc_status.ok()) {
+      exec_state->status.MergeStatus(rpc_status);
       stringstream msg;
       msg << "CancelPlanFragment rpc query_id=" << query_id_
           << " instance_id=" << exec_state->fragment_instance_id
-          << " failed: " << e.what();
+          << " failed: " << rpc_status.msg().msg();
       // make a note of the error status, but keep on cancelling the other fragments
       exec_state->status.AddDetail(msg.str());
       continue;

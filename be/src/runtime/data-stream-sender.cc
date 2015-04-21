@@ -185,48 +185,34 @@ void DataStreamSender::Channel::TransmitData(int thread_id, const TRowBatch* bat
 
 void DataStreamSender::Channel::TransmitDataHelper(const TRowBatch* batch) {
   DCHECK(batch != NULL);
-  try {
-    VLOG_ROW << "Channel::TransmitData() instance_id=" << fragment_instance_id_
-             << " dest_node=" << dest_node_id_
-             << " #rows=" << batch->num_rows;
-    TTransmitDataParams params;
-    params.protocol_version = ImpalaInternalServiceVersion::V1;
-    params.__set_dest_fragment_instance_id(fragment_instance_id_);
-    params.__set_dest_node_id(dest_node_id_);
-    params.__set_row_batch(*batch);  // yet another copy
-    params.__set_eos(false);
-    params.__set_sender_id(parent_->sender_id_);
+  VLOG_ROW << "Channel::TransmitData() instance_id=" << fragment_instance_id_
+           << " dest_node=" << dest_node_id_
+           << " #rows=" << batch->num_rows;
+  TTransmitDataParams params;
+  params.protocol_version = ImpalaInternalServiceVersion::V1;
+  params.__set_dest_fragment_instance_id(fragment_instance_id_);
+  params.__set_dest_node_id(dest_node_id_);
+  params.__set_row_batch(*batch);  // yet another copy
+  params.__set_eos(false);
+  params.__set_sender_id(parent_->sender_id_);
 
-    ImpalaInternalServiceConnection client(client_cache_, address_, &rpc_status_);
+  ImpalaInternalServiceConnection client(client_cache_, address_, &rpc_status_);
+  if (!rpc_status_.ok()) return;
+
+  TTransmitDataResult res;
+  {
+    SCOPED_TIMER(parent_->thrift_transmit_timer_);
+    rpc_status_ =
+        client.DoRpc(&ImpalaInternalServiceClient::TransmitData, params, &res);
     if (!rpc_status_.ok()) return;
+  }
 
-    TTransmitDataResult res;
-    {
-      SCOPED_TIMER(parent_->thrift_transmit_timer_);
-      try {
-        client->TransmitData(res, params);
-      } catch (const TException& e) {
-        VLOG_RPC << "Retrying TransmitData: " << e.what();
-        rpc_status_ = client.Reopen();
-        if (!rpc_status_.ok()) {
-          return;
-        }
-        client->TransmitData(res, params);
-      }
-    }
-
-    if (res.status.status_code != TErrorCode::OK) {
-      rpc_status_ = res.status;
-    } else {
-      num_data_bytes_sent_ += RowBatch::GetBatchSize(*batch);
-      VLOG_ROW << "incremented #data_bytes_sent="
-               << num_data_bytes_sent_;
-    }
-  } catch (TException& e) {
-    stringstream msg;
-    msg << "TransmitData() to " << address_ << " failed:\n" << e.what();
-    rpc_status_ = Status(msg.str());
-    return;
+  if (res.status.status_code != TErrorCode::OK) {
+    rpc_status_ = res.status;
+  } else {
+    num_data_bytes_sent_ += RowBatch::GetBatchSize(*batch);
+    VLOG_ROW << "incremented #data_bytes_sent="
+             << num_data_bytes_sent_;
   }
 }
 
@@ -297,32 +283,21 @@ Status DataStreamSender::Channel::CloseInternal() {
   if (!status.ok()) {
     return status;
   }
-  try {
-    TTransmitDataParams params;
-    params.protocol_version = ImpalaInternalServiceVersion::V1;
-    params.__set_dest_fragment_instance_id(fragment_instance_id_);
-    params.__set_dest_node_id(dest_node_id_);
-    params.__set_sender_id(parent_->sender_id_);
-    params.__set_eos(true);
-    TTransmitDataResult res;
-    VLOG_RPC << "calling TransmitData to close channel";
-    try {
-      client->TransmitData(res, params);
-    } catch (const TException& e) {
-      VLOG_RPC << "Retrying TransmitData: " << e.what();
-      rpc_status_ = client.Reopen();
-      if (!rpc_status_.ok()) {
-        return rpc_status_;
-      }
-      client->TransmitData(res, params);
-    }
-    return Status(res.status);
-  } catch (TException& e) {
+  TTransmitDataParams params;
+  params.protocol_version = ImpalaInternalServiceVersion::V1;
+  params.__set_dest_fragment_instance_id(fragment_instance_id_);
+  params.__set_dest_node_id(dest_node_id_);
+  params.__set_sender_id(parent_->sender_id_);
+  params.__set_eos(true);
+  TTransmitDataResult res;
+  VLOG_RPC << "calling TransmitData to close channel";
+  rpc_status_ = client.DoRpc(&ImpalaInternalServiceClient::TransmitData, params, &res);
+  if (!rpc_status_.ok()) {
     stringstream msg;
-    msg << "CloseChannel() to " << address_ << " failed:\n" << e.what();
-    return Status(msg.str());
+    msg << "CloseChannel() to " << address_ << " failed:\n" << rpc_status_.msg().msg();
+    return Status(rpc_status_.code(), msg.str());
   }
-  return Status::OK;
+  return Status(res.status);
 }
 
 void DataStreamSender::Channel::Close(RuntimeState* state) {

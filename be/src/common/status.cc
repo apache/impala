@@ -113,9 +113,9 @@ Status::Status(const string& error_msg)
   VLOG(1) << msg_->msg() << "\n" << GetStackTrace();
 }
 
-Status::Status(bool quiet, const string& error_msg)
+Status::Status(const string& error_msg, bool silent)
   : msg_(new ErrorMsg(TErrorCode::GENERAL, error_msg)) {
-  if (!quiet) {
+  if (!silent) {
     VLOG(1) << msg_->msg() << "\n" << GetStackTrace();
   }
 }
@@ -160,7 +160,7 @@ Status& Status::operator=(
 }
 
 Status Status::Expected(const std::string& error_msg) {
-  return Status(true, error_msg);
+  return Status(error_msg, true);
 }
 
 void Status::AddDetail(const std::string& msg) {
