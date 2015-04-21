@@ -278,3 +278,44 @@ WRITE TO HDFS [default.test_1860, OVERWRITE=false]
 |
 00:EMPTYSET
 ====
+# IMPALA-1960: Exprs in the aggregation that reference slots from an inline view when
+# the select stmt has an empty select-project-join portion.
+select sum(T.id), count(T.int_col)
+from
+  (select id, int_col, bigint_col from functional.alltypestiny) T
+where false
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: sum(id), count(int_col)
+|
+00:EMPTYSET
+====
+# IMPALA-1960: Exprs in the aggregation that reference slots from an inline view when
+# the select stmt has an empty select-project-join portion.
+select sum(T1.id + T2.int_col)
+from
+  (select id, bigint_col from functional.alltypestiny) T1 inner join
+  (select id, int_col from functional.alltypestiny) T2 on (T1.id = T2.id)
+where T1.bigint_col < 10 and 1 > 1
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: sum(id + int_col)
+|
+00:EMPTYSET
+====
+# IMPALA-1960: Exprs in the aggregation that reference slots from an inline view when
+# the select stmt has an empty select-project-join portion.
+select count(distinct T1.int_col)
+from
+  (select id, int_col from functional.alltypestiny) T1 inner join
+  functional.alltypessmall T2 on T1.id = T2.id
+where T2.bigint_col < 10 and false
+---- PLAN
+02:AGGREGATE [FINALIZE]
+|  output: count(T1.int_col)
+|
+01:AGGREGATE
+|  group by: int_col
+|
+00:EMPTYSET
+====

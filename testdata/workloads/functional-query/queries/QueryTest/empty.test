@@ -117,3 +117,15 @@ WHERE (-339.22) IN (-922.68, -254.84)
 ---- TYPES
 INT
 ====
+---- QUERY
+# IMPALA-1960: Exprs in the aggregation that reference slots from an inline view when
+# the select stmt has an empty select-project-join portion.
+select sum(T.id), count(T.int_col)
+from
+  (select id, int_col, bigint_col from functional.alltypestiny) T
+where false
+---- RESULTS
+NULL,0
+---- TYPES
+BIGINT, BIGINT
+====

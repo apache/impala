@@ -487,12 +487,6 @@ public class SingleNodePlanner {
       return createConstantSelectPlan(selectStmt, analyzer);
     }
 
-    // collect output tuples of subtrees
-    ArrayList<TupleId> rowTuples = Lists.newArrayList();
-    for (TableRef tblRef: selectStmt.getTableRefs()) {
-      rowTuples.addAll(tblRef.getMaterializedTupleIds());
-    }
-
     // Slot materialization:
     // We need to mark all slots as materialized that are needed during the execution
     // of selectStmt, and we need to do that prior to creating plans for the TableRefs
@@ -507,11 +501,20 @@ public class SingleNodePlanner {
     //   process repeats itself.
     selectStmt.materializeRequiredSlots(analyzer);
 
-    // return a plan that feeds the aggregation of selectStmt with an empty set,
-    // if the selectStmt's select-project-join portion returns an empty result set
+    ArrayList<TupleId> rowTuples = Lists.newArrayList();
+    // collect output tuples of subtrees
+    for (TableRef tblRef: selectStmt.getTableRefs()) {
+      rowTuples.addAll(tblRef.getMaterializedTupleIds());
+    }
+
+    // If the selectStmt's select-project-join portion returns an empty result set
+    // create a plan that feeds the aggregation of selectStmt with an empty set.
+    // Make sure the slots of the aggregation exprs and the tuples that they reference
+    // are materialized (see IMPALA-1960).
     if (analyzer.hasEmptySpjResultSet()) {
       PlanNode emptySetNode = new EmptySetNode(ctx_.getNextNodeId(), rowTuples);
       emptySetNode.init(analyzer);
+      emptySetNode.setOutputSmap(selectStmt.getBaseTblSmap());
       return createAggregationPlan(selectStmt, analyzer, emptySetNode);
     }
 
