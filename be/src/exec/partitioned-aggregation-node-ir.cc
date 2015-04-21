@@ -26,7 +26,7 @@ Status PartitionedAggregationNode::ProcessBatchNoGrouping(
   for (int i = 0; i < batch->num_rows(); ++i) {
     UpdateTuple(&agg_fn_ctxs_[0], singleton_output_tuple_, batch->GetRow(i));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 template<bool AGGREGATED_ROWS>
@@ -153,7 +153,7 @@ allocate_tuple:
     return processBatchStatus_;
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status PartitionedAggregationNode::ProcessBatch_false(

@@ -87,7 +87,7 @@ Status DataSourceScanNode::Prepare(RuntimeState* state) {
     materialized_slots_.push_back(slot);
     cols_next_val_idx_.push_back(0);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status DataSourceScanNode::Open(RuntimeState* state) {
@@ -123,7 +123,7 @@ Status DataSourceScanNode::Open(RuntimeState* state) {
 }
 
 Status DataSourceScanNode::ValidateRowBatchSize() {
-  if (!input_batch_->__isset.rows) return Status::OK;
+  if (!input_batch_->__isset.rows) return Status::OK();
   const vector<TColumnData>& cols = input_batch_->rows.cols;
   if (materialized_slots_.size() != cols.size()) {
     return Status(Substitute(ERROR_NUM_COLUMNS, materialized_slots_.size(), cols.size()));
@@ -139,7 +139,7 @@ Status DataSourceScanNode::ValidateRowBatchSize() {
     if (num_rows_ < 0) num_rows_ = col_data.is_null.size();
     if (num_rows_ != col_data.is_null.size()) return Status(ERROR_MISMATCHED_COL_SIZES);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status DataSourceScanNode::GetNextInputBatch() {
@@ -160,7 +160,7 @@ Status DataSourceScanNode::GetNextInputBatch() {
       << "data source.";
     input_batch_->eos = true;
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 // Sets the decimal value in the slot. Inline method to avoid nested switch statements.
@@ -188,7 +188,7 @@ inline Status SetDecimalVal(const ColumnType& type, char* bytes, int len,
     }
     default: DCHECK(false);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status DataSourceScanNode::MaterializeNextRow(MemPool* tuple_pool) {
@@ -287,7 +287,7 @@ Status DataSourceScanNode::MaterializeNextRow(MemPool* tuple_pool) {
         DCHECK(false);
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
@@ -296,7 +296,7 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   if (ReachedLimit()) {
     *eos = true;
-    return Status::OK;
+    return Status::OK();
   }
   *eos = false;
 
@@ -332,7 +332,7 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
 
       if (ReachedLimit() || row_batch->AtCapacity() || input_batch_->eos) {
         *eos = ReachedLimit() || input_batch_->eos;
-        return Status::OK;
+        return Status::OK();
       }
     }
 

@@ -37,19 +37,19 @@ namespace impala {
 /// statically allocated memory and therefore no more members should be added to this
 /// class.
 //
-/// A Status may either be OK (represented by the singleton Status::OK), or it may
-/// represent an error condition. In the latter case, a Status has both an error code,
-/// which belongs to the TErrorCode enum, and an error string, which may be presented to
-/// clients or logged to disk.
-//
+/// A Status may either be OK (represented by passing a default constructed Status
+/// instance, created via Status::OK()), or it may represent an error condition. In the
+/// latter case, a Status has both an error code, which belongs to the TErrorCode enum, and
+/// an error string, which may be presented to clients or logged to disk.
+///
 /// An error Status may also have one or more optional 'detail' strings which provide
 /// further context. These strings are intended for internal consumption only - and
 /// therefore will not be sent to clients.
-//
+///
 /// The state associated with an error Status is encapsulated in an ErrorMsg instance to
 /// ensure that the size of Status is kept very small, as it is passed around on the stack
 /// as a return value. See ErrorMsg for more details on how error strings are constructed.
-//
+///
 /// Example Usage:
 /// Status fnB(int x) {
 //
@@ -71,10 +71,10 @@ namespace impala {
 ///     // Optional detail
 ///     s.AddDetail("rotation-disk-broken due to weather");
 ///   }
-//
-///   return Status::OK;
+///
+///   return Status::OK();
 /// }
-//
+///
 /// TODO: macros:
 /// RETURN_IF_ERROR(status) << "msg"
 /// MAKE_ERROR() << "msg"
@@ -84,7 +84,9 @@ class Status {
 
   Status(): msg_(NULL) {}
 
-  static const Status OK;
+  // Return a default constructed Status instance in the OK case.
+  inline static Status OK() { return Status(); }
+
   static const Status CANCELLED;
   static const Status MEM_LIMIT_EXCEEDED;
   static const Status DEPRECATED_RPC;

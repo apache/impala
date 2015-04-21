@@ -102,7 +102,7 @@ Status CompoundPredicate::CodegenComputeFn(
     bool and_fn, RuntimeState* state, Function** fn) {
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
-    return Status::OK;
+    return Status::OK();
   }
 
   DCHECK_EQ(GetNumChildren(), 2);
@@ -221,5 +221,5 @@ Status CompoundPredicate::CodegenComputeFn(
   *fn = codegen->FinalizeFunction(function);
   DCHECK(*fn != NULL);
   ir_compute_fn_ = *fn;
-  return Status::OK;
+  return Status::OK();
 }

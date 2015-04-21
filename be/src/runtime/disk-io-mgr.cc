@@ -180,7 +180,7 @@ void DiskIoMgr::BufferDescriptor::Reset(RequestContext* reader,
   buffer_len_ = buffer_len;
   len_ = 0;
   eosr_ = false;
-  status_ = Status::OK;
+  status_ = Status::OK();
   mem_tracker_ = NULL;
 }
 
@@ -337,7 +337,7 @@ Status DiskIoMgr::Init(MemTracker* process_mem_tracker) {
   ret = hadoopRzOptionsSetByteBufferPool(cached_read_options_, NULL);
   DCHECK_EQ(ret, 0);
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status DiskIoMgr::RegisterContext(RequestContext** request_context,
@@ -345,7 +345,7 @@ Status DiskIoMgr::RegisterContext(RequestContext** request_context,
   DCHECK(request_context_cache_.get() != NULL) << "Must call Init() first.";
   *request_context = request_context_cache_->GetNewContext();
   (*request_context)->Reset(mem_tracker);
-  return Status::OK;
+  return Status::OK();
 }
 
 void DiskIoMgr::UnregisterContext(RequestContext* reader) {
@@ -456,12 +456,12 @@ Status DiskIoMgr::ValidateScanRange(ScanRange* range) {
     DCHECK(false) << ss.str();
     return Status(ss.str());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status DiskIoMgr::AddScanRanges(RequestContext* reader,
     const vector<ScanRange*>& ranges, bool schedule_immediately) {
-  if (ranges.empty()) return Status::OK;
+  if (ranges.empty()) return Status::OK();
 
   // Validate and initialize all ranges
   for (int i = 0; i < ranges.size(); ++i) {
@@ -499,7 +499,7 @@ Status DiskIoMgr::AddScanRanges(RequestContext* reader,
   }
   DCHECK(reader->Validate()) << endl << reader->DebugString();
 
-  return Status::OK;
+  return Status::OK();
 }
 
 // This function returns the next scan range the reader should work on, checking
@@ -509,7 +509,7 @@ Status DiskIoMgr::GetNextRange(RequestContext* reader, ScanRange** range) {
   DCHECK_NOTNULL(reader);
   DCHECK_NOTNULL(range);
   *range = NULL;
-  Status status = Status::OK;
+  Status status = Status::OK();
 
   unique_lock<mutex> reader_lock(reader->lock_);
   DCHECK(reader->Validate()) << endl << reader->DebugString();
@@ -533,7 +533,7 @@ Status DiskIoMgr::GetNextRange(RequestContext* reader, ScanRange** range) {
       DCHECK((*range)->try_cache_);
       bool cached_read_succeeded;
       RETURN_IF_ERROR((*range)->ReadFromCache(&cached_read_succeeded));
-      if (cached_read_succeeded) return Status::OK;
+      if (cached_read_succeeded) return Status::OK();
 
       // This range ended up not being cached. Loop again and pick up a new range.
       reader->AddRequestRange(*range, false);
@@ -576,7 +576,7 @@ Status DiskIoMgr::Read(RequestContext* reader,
   RETURN_IF_ERROR(range->GetNext(buffer));
   DCHECK((*buffer) != NULL);
   DCHECK((*buffer)->eosr());
-  return Status::OK;
+  return Status::OK();
 }
 
 void DiskIoMgr::ReturnBuffer(BufferDescriptor* buffer_desc) {
@@ -1096,7 +1096,7 @@ Status DiskIoMgr::WriteRangeHelper(FILE* file_handle, WriteRange* write_range) {
     ImpaladMetrics::IO_MGR_BYTES_WRITTEN->Increment(write_range->len_);
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 int DiskIoMgr::free_buffers_idx(int64_t buffer_size) {
@@ -1117,7 +1117,7 @@ Status DiskIoMgr::AddWriteRange(RequestContext* writer, WriteRange* write_range)
   }
 
   writer->AddRequestRange(write_range, false);
-  return Status::OK;
+  return Status::OK();
 }
 
 int DiskIoMgr::AssignQueue(const char* file, int disk_id, bool expected_local) {

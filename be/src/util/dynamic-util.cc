@@ -31,7 +31,7 @@ Status DynamicLookup(void* handle, const char* symbol, void** fn_ptr, bool quiet
     ss << "Unable to find " << symbol << "\ndlerror: " << error;
     return quiet ? Status::Expected(ss.str()) : Status(ss.str());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status DynamicOpen(const char* library, void** handle) {
@@ -52,7 +52,7 @@ Status DynamicOpen(const char* library, void** handle) {
     ss << "Unable to load " << library << "\ndlerror: " << dlerror();
     return Status(ss.str());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void DynamicClose(void* handle) {

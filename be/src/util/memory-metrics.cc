@@ -59,7 +59,7 @@ Status impala::RegisterMemoryMetrics(MetricGroup* metrics, bool register_jvm_met
   if (register_jvm_metrics) {
     RETURN_IF_ERROR(JvmMetric::InitMetrics(metrics->GetChildGroup("jvm")));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 JvmMetric* JvmMetric::CreateAndRegister(MetricGroup* metrics, const string& key,
@@ -100,7 +100,7 @@ Status JvmMetric::InitMetrics(MetricGroup* metrics) {
         PEAK_INIT);
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 void JvmMetric::CalculateValue() {

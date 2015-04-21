@@ -62,7 +62,7 @@ Status FragmentMgr::ExecPlanFragment(const TExecPlanFragmentParams& exec_params)
   exec_state->set_exec_thread(new Thread("impala-server", "exec-plan-fragment",
       &FragmentMgr::FragmentExecThread, this, exec_state.get()));
 
-  return Status::OK;
+  return Status::OK();
 }
 
 void FragmentMgr::FragmentExecThread(FragmentExecState* exec_state) {

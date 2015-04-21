@@ -81,7 +81,7 @@ Status Catalog::GetCatalogVersion(long* version) {
   JniLocalFrame jni_frame;
   RETURN_IF_ERROR(jni_frame.push(jni_env));
   *version = jni_env->CallLongMethod(catalog_, get_catalog_version_id_);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Catalog::GetAllCatalogObjects(long from_version,
@@ -96,7 +96,7 @@ Status Catalog::GetAllCatalogObjects(long from_version,
       requested_from_version));
   RETURN_ERROR_IF_EXC(jni_env);
   RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, resp));
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Catalog::ExecDdl(const TDdlExecRequest& req, TDdlExecResponse* resp) {

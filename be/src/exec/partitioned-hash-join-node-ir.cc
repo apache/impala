@@ -270,5 +270,5 @@ Status PartitionedHashJoinNode::ProcessBuildBatch(RowBatch* build_batch) {
     const bool result = AppendRow(partition->build_rows(), build_row, &buildStatus_);
     if (UNLIKELY(!result)) return buildStatus_;
   }
-  return Status::OK;
+  return Status::OK();
 }

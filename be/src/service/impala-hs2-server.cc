@@ -142,7 +142,7 @@ class ImpalaServer::HS2ColumnarResultSet : public ImpalaServer::QueryResultSet {
           &(result_set_->columns[i]));
     }
     ++num_rows_;
-    return Status::OK;
+    return Status::OK();
   }
 
   // Add a row from a TResultRow
@@ -154,7 +154,7 @@ class ImpalaServer::HS2ColumnarResultSet : public ImpalaServer::QueryResultSet {
           &(result_set_->columns[i]));
     }
     ++num_rows_;
-    return Status::OK;
+    return Status::OK();
   }
 
   // Copy all columns starting at 'start_idx' and proceeding for a maximum of 'num_rows'
@@ -333,7 +333,7 @@ class ImpalaServer::HS2RowOrientedResultSet : public ImpalaServer::QueryResultSe
       ExprValueToHS2TColumnValue(col_values[i],
           metadata_.columns[i].columnType, &(trow.colVals[i]));
     }
-    return Status::OK;
+    return Status::OK();
   }
 
   // Convert TResultRow to HS2 TRow and store it in TRowSet.
@@ -347,7 +347,7 @@ class ImpalaServer::HS2RowOrientedResultSet : public ImpalaServer::QueryResultSe
       TColumnValueToHS2TColumnValue(row.colVals[i], metadata_.columns[i].columnType,
           &(trow.colVals[i]));
     }
-    return Status::OK;
+    return Status::OK();
   }
 
   virtual int AddRows(const QueryResultSet* other, int start_idx, int num_rows) {
@@ -516,7 +516,7 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id, int32_t fetch_size
   RETURN_IF_ERROR(exec_state->FetchRows(fetch_size, result_set.get()));
   fetch_results->__isset.results = true;
   fetch_results->__set_hasMoreRows(!exec_state->eos());
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ImpalaServer::TExecuteStatementReqToTQueryContext(
@@ -552,7 +552,7 @@ Status ImpalaServer::TExecuteStatementReqToTQueryContext(
     VLOG_QUERY << "TClientRequest.queryOptions: "
                << ThriftDebugString(query_ctx->request.query_options);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 // HiveServer2 API

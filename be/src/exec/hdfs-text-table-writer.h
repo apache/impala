@@ -49,7 +49,7 @@ class HdfsTextTableWriter : public HdfsTableWriter {
 
   virtual Status Init();
   virtual Status Finalize();
-  virtual Status InitNewFile() { return Status::OK; }
+  virtual Status InitNewFile() { return Status::OK(); }
   virtual void Close();
   virtual uint64_t default_block_size() const;
   virtual std::string file_extension() const;

@@ -50,12 +50,12 @@ ExchangeNode::ExchangeNode(
 
 Status ExchangeNode::Init(const TPlanNode& tnode) {
   RETURN_IF_ERROR(ExecNode::Init(tnode));
-  if (!is_merging_) return Status::OK;
+  if (!is_merging_) return Status::OK();
 
   RETURN_IF_ERROR(sort_exec_exprs_.Init(tnode.exchange_node.sort_info, pool_));
   is_asc_order_ = tnode.exchange_node.sort_info.is_asc_order;
   nulls_first_ = tnode.exchange_node.sort_info.nulls_first;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ExchangeNode::Prepare(RuntimeState* state) {
@@ -71,7 +71,7 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
         state, row_descriptor_, row_descriptor_, expr_mem_tracker()));
     AddExprCtxsToFree(sort_exec_exprs_);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ExchangeNode::Open(RuntimeState* state) {
@@ -87,7 +87,7 @@ Status ExchangeNode::Open(RuntimeState* state) {
   } else {
     RETURN_IF_ERROR(FillInputRowBatch(state));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ExchangeNode::Reset(RuntimeState* state) {
@@ -123,7 +123,7 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
   if (ReachedLimit()) {
     stream_recvr_->TransferAllResources(output_batch);
     *eos = true;
-    return Status::OK;
+    return Status::OK();
   } else {
     *eos = false;
   }
@@ -156,16 +156,16 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
       if (ReachedLimit()) {
         stream_recvr_->TransferAllResources(output_batch);
         *eos = true;
-        return Status::OK;
+        return Status::OK();
       }
-      if (output_batch->AtCapacity()) return Status::OK;
+      if (output_batch->AtCapacity()) return Status::OK();
     }
 
     // we need more rows
     stream_recvr_->TransferAllResources(output_batch);
     RETURN_IF_ERROR(FillInputRowBatch(state));
     *eos = (input_batch_ == NULL);
-    if (*eos) return Status::OK;
+    if (*eos) return Status::OK();
     next_row_idx_ = 0;
     DCHECK(input_batch_->row_desc().IsPrefixOf(output_batch->row_desc()));
   }
@@ -201,7 +201,7 @@ Status ExchangeNode::GetNextMerging(RuntimeState* state, RowBatch* output_batch,
   if (*eos) stream_recvr_->TransferAllResources(output_batch);
 
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-  return Status::OK;
+  return Status::OK();
 }
 
 void ExchangeNode::DebugString(int indentation_level, stringstream* out) const {

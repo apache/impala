@@ -45,7 +45,7 @@ static Status ParseMemValue(const string& value, const string& key, int64_t* res
   if (is_percent) {
     return Status("Invalid " + key + " with percent '" + value + "'.");
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 // Returns the TImpalaQueryOptions enum for the given "key". Input is case insensitive.
@@ -341,11 +341,11 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status impala::ParseQueryOptions(const string& options, TQueryOptions* query_options) {
-  if (options.length() == 0) return Status::OK;
+  if (options.length() == 0) return Status::OK();
   vector<string> kv_pairs;
   split(kv_pairs, options, is_any_of(","), token_compress_on);
   BOOST_FOREACH(string& kv_string, kv_pairs) {
@@ -359,5 +359,5 @@ Status impala::ParseQueryOptions(const string& options, TQueryOptions* query_opt
     }
     RETURN_IF_ERROR(SetQueryOption(key_value[0], key_value[1], query_options));
   }
-  return Status::OK;
+  return Status::OK();
 }

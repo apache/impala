@@ -71,7 +71,7 @@ const int MAX_DICT_HEADER_SIZE = 100;
     return Status(error_msg);                                           \
   } else {                                                              \
     runtime_state->LogError(error_msg);                                 \
-    return Status::OK;                                                  \
+    return Status::OK();                                                  \
   }
 
 #define LOG_OR_RETURN_ON_ERROR(error_msg, runtime_state)                \
@@ -125,7 +125,7 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
   // Issue the footer ranges for all files. The same thread that processes the footer
   // will assemble the rows for this file, so mark these files added completely.
   RETURN_IF_ERROR(scan_node->AddDiskIoRanges(footer_ranges, files.size()));
-  return Status::OK;
+  return Status::OK();
 }
 
 namespace impala {
@@ -164,7 +164,7 @@ class HdfsParquetScanner::BaseColumnReader {
       RETURN_IF_ERROR(Codec::CreateDecompressor(
           NULL, false, PARQUET_TO_IMPALA_CODEC[metadata_->codec], &decompressor_));
     }
-    return Status::OK;
+    return Status::OK();
   }
 
   // Called once when the scanner is complete for final cleanup.
@@ -351,7 +351,7 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
         bitmap_filter_rows_rejected_ < rows_returned_ * .1) {
       bitmap_filter_ = NULL;
     }
-    return Status::OK;
+    return Status::OK();
   }
 
   virtual bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_failed)  {
@@ -449,7 +449,7 @@ class HdfsParquetScanner::BoolColumnReader : public HdfsParquetScanner::BaseColu
   virtual Status InitDataPage(uint8_t* data, int size) {
     // Initialize bool decoder
     bool_values_ = BitReader(data, size);
-    return Status::OK;
+    return Status::OK();
   }
 
   virtual bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_failed)  {
@@ -470,7 +470,7 @@ Status HdfsParquetScanner::Prepare(ScannerContext* context) {
       ADD_COUNTER(scan_node_->runtime_profile(), "NumColumns", TUnit::UNIT);
 
   scan_node_->IncNumScannersCodegenDisabled();
-  return Status::OK;
+  return Status::OK();
 }
 
 void HdfsParquetScanner::Close() {
@@ -724,7 +724,7 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
     break;
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsParquetScanner::BaseColumnReader::InitLevelDecoders(
@@ -758,7 +758,7 @@ Status HdfsParquetScanner::BaseColumnReader::InitLevelDecoders(
   DCHECK_GT(num_bytes, 0);
   *data += num_bytes;
   *data_size -= num_bytes;
-  return Status::OK;
+  return Status::OK();
 }
 
 // TODO More codegen here as well.
@@ -830,7 +830,7 @@ Status HdfsParquetScanner::ProcessSplit() {
   // First process the file metadata in the footer
   bool eosr;
   RETURN_IF_ERROR(ProcessFooter(&eosr));
-  if (eosr) return Status::OK;
+  if (eosr) return Status::OK();
 
   // We've processed the metadata and there are columns that need to be materialized.
   RETURN_IF_ERROR(CreateColumnReaders());
@@ -857,7 +857,7 @@ Status HdfsParquetScanner::ProcessSplit() {
     RETURN_IF_ERROR(AssembleRows(i));
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 // TODO: this needs to be codegen'd.  The ReadValue function needs to be codegen'd,
@@ -1088,18 +1088,18 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
     }
 
     *eosr = true;
-    return Status::OK;
+    return Status::OK();
   } else if (file_metadata_.num_rows == 0) {
     // Empty file
     *eosr = true;
-    return Status::OK;
+    return Status::OK();
   }
 
   if (file_metadata_.row_groups.empty()) {
     return Status(Substitute("Invalid file. This file: $0 has no row groups",
                              stream_->filename()));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsParquetScanner::CreateColumnReaders() {
@@ -1142,7 +1142,7 @@ Status HdfsParquetScanner::CreateColumnReaders() {
 
     column_readers_.push_back(CreateReader(*node));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsParquetScanner::InitColumns(int row_group_idx) {
@@ -1226,7 +1226,7 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
   RETURN_IF_ERROR(scan_node_->runtime_state()->io_mgr()->AddScanRanges(
       scan_node_->reader_context(), col_ranges, true));
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsParquetScanner::CreateSchemaTree(const vector<parquet::SchemaElement>& schema,
@@ -1271,7 +1271,7 @@ Status HdfsParquetScanner::CreateSchemaTree(
     RETURN_IF_ERROR(CreateSchemaTree(
         schema, max_def_level, max_rep_level, idx, col_idx, &node->children[i]));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 HdfsParquetScanner::FileVersion::FileVersion(const string& created_by) {
@@ -1334,7 +1334,7 @@ Status HdfsParquetScanner::ValidateFileMetadata() {
   if (file_metadata_.__isset.created_by) {
     file_version_ = FileVersion(file_metadata_.created_by);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 bool IsEncodingSupported(parquet::Encoding::type e) {
@@ -1476,7 +1476,7 @@ Status HdfsParquetScanner::ValidateColumn(
         metadata_range_->file(), schema_element.name, slot_desc->type().DebugString());
     LOG_OR_RETURN_ON_ERROR(msg, state_);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 string PrintRepetitionType(const parquet::FieldRepetitionType::type& t) {

@@ -79,7 +79,7 @@ Status AggregationNode::Init(const TPlanNode& tnode) {
         pool_, tnode.agg_node.aggregate_functions[i], &evaluator));
     aggregate_evaluators_.push_back(evaluator);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status AggregationNode::Prepare(RuntimeState* state) {
@@ -168,7 +168,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
       }
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status AggregationNode::Open(RuntimeState* state) {
@@ -224,7 +224,7 @@ Status AggregationNode::Open(RuntimeState* state) {
   child(0)->Close(state);
   VLOG_FILE << "aggregated " << num_input_rows << " input rows into "
             << hash_tbl_->size() << " output rows";
-  return Status::OK;
+  return Status::OK();
 }
 
 Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
@@ -236,7 +236,7 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
 
   if (ReachedLimit()) {
     *eos = true;
-    return Status::OK;
+    return Status::OK();
   }
   *eos = false;
   ExprContext** ctxs = &conjunct_ctxs_[0];
@@ -267,7 +267,7 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
   }
   *eos = output_iterator_.AtEnd() || ReachedLimit();
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status AggregationNode::Reset(RuntimeState* state) {

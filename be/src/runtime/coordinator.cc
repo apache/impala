@@ -460,7 +460,7 @@ Status Coordinator::Exec(QuerySchedule& schedule,
   ss << "Query " << query_id_;
   progress_ = ProgressUpdater(ss.str(), schedule.num_scan_ranges());
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Coordinator::GetStatus() {
@@ -722,7 +722,7 @@ Status Coordinator::FinalizeSuccessfulInsert() {
     }
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Coordinator::FinalizeQuery() {
@@ -770,9 +770,9 @@ Status Coordinator::WaitForAllBackends() {
 Status Coordinator::Wait() {
   lock_guard<mutex> l(wait_lock_);
   SCOPED_TIMER(query_profile_->total_time_counter());
-  if (has_called_wait_) return Status::OK;
+  if (has_called_wait_) return Status::OK();
   has_called_wait_ = true;
-  Status return_status = Status::OK;
+  Status return_status = Status::OK();
   if (executor_.get() != NULL) {
     // Open() may block
     return_status = UpdateStatus(executor_->Open(), NULL);
@@ -869,7 +869,7 @@ Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
       ReportQuerySummary();
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void Coordinator::PrintBackendInfo() {
@@ -1280,7 +1280,7 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
   // (UpdateStatus() initiates cancellation, if it hasn't already been initiated)
   if (!(returned_all_results_ && status.IsCancelled()) && !status.ok()) {
     UpdateStatus(status, &exec_state->fragment_instance_id);
-    return Status::OK;
+    return Status::OK();
   }
 
   if (params.done) {
@@ -1307,7 +1307,7 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
     }
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 const RowDescriptor& Coordinator::row_desc() const {

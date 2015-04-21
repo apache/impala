@@ -345,7 +345,7 @@ Status Statestore::OfferUpdate(const ScheduledSubscriberUpdate& update,
     return Status(ss.str());
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
@@ -392,7 +392,7 @@ Status Statestore::RegisterSubscriber(const SubscriberId& subscriber_id,
 
   LOG(INFO) << "Subscriber '" << subscriber_id << "' registered (registration id: "
             << PrintId(*registration_id) << ")";
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Statestore::SendTopicUpdate(Subscriber* subscriber, bool* update_skipped) {
@@ -431,7 +431,7 @@ Status Statestore::SendTopicUpdate(Subscriber* subscriber, bool* update_skipped)
     // - subscribers can decide what they do with any update - so, return OK and set
     // update_skipped so the caller can compensate.
     topic_update_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
-    return Status::OK;
+    return Status::OK();
   }
 
   // At this point the updates are assumed to have been successfully processed by the
@@ -477,7 +477,7 @@ Status Statestore::SendTopicUpdate(Subscriber* subscriber, bool* update_skipped)
     }
   }
   topic_update_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
-  return Status::OK;
+  return Status::OK();
 }
 
 void Statestore::GatherTopicUpdates(const Subscriber& subscriber,
@@ -599,7 +599,7 @@ Status Statestore::SendHeartbeat(Subscriber* subscriber) {
       client.DoRpc(&StatestoreSubscriberClient::Heartbeat, request, &response));
 
   heartbeat_duration_metric_->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
-  return Status::OK;
+  return Status::OK();
 }
 
 void Statestore::DoSubscriberUpdate(bool is_heartbeat, int thread_id,
@@ -741,5 +741,5 @@ void Statestore::UnregisterSubscriber(Subscriber* subscriber) {
 
 Status Statestore::MainLoop() {
   subscriber_topic_update_threadpool_.Join();
-  return Status::OK;
+  return Status::OK();
 }

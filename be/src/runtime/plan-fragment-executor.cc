@@ -264,7 +264,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
         runtime_state_->instance_mem_tracker()));
   VLOG(2) << "plan_root=\n" << plan_->DebugString();
   prepared_ = true;
-  return Status::OK;
+  return Status::OK();
 }
 
 void PlanFragmentExecutor::OptimizeLlvmModule() {
@@ -334,7 +334,7 @@ Status PlanFragmentExecutor::OpenInternal() {
     RETURN_IF_ERROR(plan_->Open(runtime_state_.get()));
   }
 
-  if (sink_.get() == NULL) return Status::OK;
+  if (sink_.get() == NULL) return Status::OK();
 
   RETURN_IF_ERROR(sink_->Open(runtime_state_.get()));
 
@@ -368,7 +368,7 @@ Status PlanFragmentExecutor::OpenInternal() {
   done_ = true;
 
   FragmentComplete();
-  return Status::OK;
+  return Status::OK();
 }
 
 void PlanFragmentExecutor::ReportProfile() {
@@ -471,7 +471,7 @@ Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
 Status PlanFragmentExecutor::GetNextInternal(RowBatch** batch) {
   if (done_) {
     *batch = NULL;
-    return Status::OK;
+    return Status::OK();
   }
 
   while (!done_) {
@@ -486,7 +486,7 @@ Status PlanFragmentExecutor::GetNextInternal(RowBatch** batch) {
     }
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 void PlanFragmentExecutor::FragmentComplete() {

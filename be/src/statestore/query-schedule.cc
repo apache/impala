@@ -238,7 +238,7 @@ Status QuerySchedule::ValidateReservation() {
     ss << "]";
     return Status(ss.str());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 }

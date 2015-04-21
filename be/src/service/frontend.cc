@@ -200,7 +200,7 @@ Status Frontend::ValidateSettings() {
   if (ss.str().size() > 0) {
     return Status(ss.str());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Frontend::ExecHiveServer2MetadataOp(const TMetadataOpRequest& request,
@@ -231,7 +231,7 @@ Status Frontend::SetCatalogInitialized() {
   RETURN_IF_ERROR(jni_frame.push(jni_env));
   jni_env->CallObjectMethod(fe_, set_catalog_initialized_id_);
   RETURN_ERROR_IF_EXC(jni_env);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Frontend::GetTableFiles(const TShowFilesParams& params, TResultSet* result) {

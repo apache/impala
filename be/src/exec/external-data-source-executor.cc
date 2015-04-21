@@ -79,7 +79,7 @@ class ExternalDataSourceExecutor::JniState {
         "external-data-source.class-cache.hits", 0);
     num_class_cache_misses_ = metrics->AddCounter<int64_t>(
         "external-data-source.class-cache.misses", 0);
-    return Status::OK;
+    return Status::OK();
   }
 
 
@@ -96,7 +96,7 @@ class ExternalDataSourceExecutor::JniState {
         get_num_cache_misses_id_);
     RETURN_ERROR_IF_EXC(env);
     num_class_cache_misses_->set_value(num_cache_misses);
-    return Status::OK;
+    return Status::OK();
   }
 
   /// Class reference for com.cloudera.impala.extdatasource.ExternalDataSourceExecutor
@@ -125,7 +125,7 @@ Status ExternalDataSourceExecutor::InitJNI(MetricGroup* metrics) {
   JniState& s = JniState::GetInstance();
   RETURN_IF_ERROR(s.Init(metrics));
   RETURN_IF_ERROR(s.UpdateClassCacheMetrics());
-  return Status::OK;
+  return Status::OK();
 }
 
 ExternalDataSourceExecutor::~ExternalDataSourceExecutor() {
@@ -162,7 +162,7 @@ Status ExternalDataSourceExecutor::Init(const string& jar_path,
   RETURN_ERROR_IF_EXC(jni_env);
   RETURN_IF_ERROR(s.UpdateClassCacheMetrics());
   is_initialized_ = true;
-  return Status::OK;
+  return Status::OK();
 }
 
 // JniUtil::CallJniMethod() does not compile when the template parameters are in
@@ -181,7 +181,7 @@ Status CallJniMethod(const jobject& obj, const jmethodID& method, const T& arg,
       jni_env->CallObjectMethod(obj, method, request_bytes));
   RETURN_ERROR_IF_EXC(jni_env);
   RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, response));
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ExternalDataSourceExecutor::Open(const TOpenParams& params, TOpenResult* result) {

@@ -64,7 +64,7 @@ class BzipDecompressor : public Codec {
   friend class Codec;
   BzipDecompressor(MemPool* mem_pool, bool reuse_buffer);
 
-  virtual Status Init() { return Status::OK; }
+  virtual Status Init() { return Status::OK(); }
 };
 
 class SnappyDecompressor : public Codec {
@@ -82,7 +82,7 @@ class SnappyDecompressor : public Codec {
  private:
   friend class Codec;
   SnappyDecompressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
-  virtual Status Init() { return Status::OK; }
+  virtual Status Init() { return Status::OK(); }
 };
 
 /// Lz4 is a compression codec with similar compression ratios as snappy but much faster
@@ -99,7 +99,7 @@ class Lz4Decompressor : public Codec {
  private:
   friend class Codec;
   Lz4Decompressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
-  virtual Status Init() { return Status::OK; }
+  virtual Status Init() { return Status::OK(); }
 };
 
 class SnappyBlockDecompressor : public Codec {
@@ -113,7 +113,7 @@ class SnappyBlockDecompressor : public Codec {
  private:
   friend class Codec;
   SnappyBlockDecompressor(MemPool* mem_pool, bool reuse_buffer);
-  virtual Status Init() { return Status::OK; }
+  virtual Status Init() { return Status::OK(); }
 };
 
 }

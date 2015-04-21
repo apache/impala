@@ -116,7 +116,7 @@ class ImpalaServer::AsciiQueryResultSet : public ImpalaServer::QueryResultSet {
           scales[i], &out_stream);
     }
     result_set_->push_back(out_stream.str());
-    return Status::OK;
+    return Status::OK();
   }
 
   // Convert TResultRow to ASCII using "\t" as column delimiter and store it in this
@@ -132,7 +132,7 @@ class ImpalaServer::AsciiQueryResultSet : public ImpalaServer::QueryResultSet {
       out_stream << row.colVals[i];
     }
     result_set_->push_back(out_stream.str());
-    return Status::OK;
+    return Status::OK();
   }
 
   virtual int AddRows(const QueryResultSet* other, int start_idx, int num_rows) {
@@ -538,7 +538,7 @@ Status ImpalaServer::QueryToTQueryContext(const Query& query,
                << ThriftDebugString(query_ctx->request.query_options);
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 inline void ImpalaServer::TUniqueIdToQueryHandle(const TUniqueId& query_id,

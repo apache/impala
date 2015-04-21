@@ -98,7 +98,7 @@ Status TmpFileMgr::GetFile(int tmp_device_id, const TUniqueId& query_id,
   new_file_path /= file_name.str();
 
   *new_file = new File(new_file_path.string());
-  return Status::OK;
+  return Status::OK();
 }
 
 TmpFileMgr::File::File(const string& path)
@@ -126,12 +126,12 @@ Status TmpFileMgr::File::AllocateSpace(int64_t write_size, int64_t* offset) {
   }
 
   DCHECK_GE(current_size_, current_offset_);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status TmpFileMgr::File::Remove() {
   if (current_size_ > 0) FileSystemUtil::RemovePaths(vector<string>(1, path_));
-  return Status::OK;
+  return Status::OK();
 }
 
 } //namespace impala

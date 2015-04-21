@@ -204,7 +204,7 @@ TEST_F(DiskIoMgrTest, SingleWriter) {
         DiskIoMgr::WriteRange** new_range = pool_->Add(new DiskIoMgr::WriteRange*);
         DiskIoMgr::WriteRange::WriteDoneCallback callback =
             bind(mem_fn(&DiskIoMgrTest::WriteValidateCallback), this, num_ranges,
-                new_range, read_io_mgr.get(), reader, data, Status::OK, _1);
+                new_range, read_io_mgr.get(), reader, data, Status::OK(), _1);
         *new_range = pool_->Add(new DiskIoMgr::WriteRange(tmp_file, cur_offset,
             num_ranges % num_disks, callback));
         (*new_range)->SetData(reinterpret_cast<uint8_t*>(data), sizeof(int32_t));
@@ -310,7 +310,7 @@ TEST_F(DiskIoMgrTest, SingleWriterCancel) {
       status = io_mgr.Init(&mem_tracker);
       DiskIoMgr::RequestContext* writer;
       io_mgr.RegisterContext(&writer, &mem_tracker);
-      Status validate_status = Status::OK;
+      Status validate_status = Status::OK();
       for (int i = 0; i < num_ranges; ++i) {
         if (i == num_ranges_before_cancel) {
           io_mgr.CancelContext(writer);
@@ -390,7 +390,7 @@ TEST_F(DiskIoMgrTest, SingleReader) {
           thread_group threads;
           for (int i = 0; i < num_read_threads; ++i) {
             threads.add_thread(new thread(ScanRangeThread, &io_mgr, reader, data,
-                len, Status::OK, 0, &num_ranges_processed));
+                len, Status::OK(), 0, &num_ranges_processed));
           }
           threads.join_all();
 
@@ -454,7 +454,7 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
         ASSERT_TRUE(status.ok());
 
         // Read a couple of them
-        ScanRangeThread(&io_mgr, reader, data, strlen(data), Status::OK, 2,
+        ScanRangeThread(&io_mgr, reader, data, strlen(data), Status::OK(), 2,
             &num_ranges_processed);
 
         // Issue second half
@@ -531,7 +531,7 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
         thread_group threads;
         for (int i = 0; i < 5; ++i) {
           threads.add_thread(new thread(ScanRangeThread, &io_mgr, reader, data,
-              strlen(data), Status::OK, 0, &num_ranges_processed));
+              strlen(data), Status::OK(), 0, &num_ranges_processed));
         }
 
         // Issue some more sync ranges
@@ -597,7 +597,7 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
         int num_succesful_ranges = ranges.size() / 2;
         // Read half the ranges
         for (int i = 0; i < num_succesful_ranges; ++i) {
-          ScanRangeThread(&io_mgr, reader, data, strlen(data), Status::OK, 1,
+          ScanRangeThread(&io_mgr, reader, data, strlen(data), Status::OK(), 1,
               &num_ranges_processed);
         }
         EXPECT_EQ(num_ranges_processed, num_succesful_ranges);
@@ -750,7 +750,7 @@ TEST_F(DiskIoMgrTest, CachedReads) {
     thread_group threads;
     for (int i = 0; i < 5; ++i) {
       threads.add_thread(new thread(ScanRangeThread, &io_mgr, reader, data,
-          strlen(data), Status::OK, 0, &num_ranges_processed));
+          strlen(data), Status::OK(), 0, &num_ranges_processed));
     }
 
     // Issue some more sync ranges
@@ -820,7 +820,7 @@ TEST_F(DiskIoMgrTest, MultipleReaderWriter) {
               threads.add_thread(new thread(ScanRangeThread, &io_mgr,
                   contexts[context_index],
                   reinterpret_cast<const char*>(data + (read_offset % strlen(data))), 1,
-                  Status::OK, num_scan_ranges, &num_ranges_processed));
+                  Status::OK(), num_scan_ranges, &num_ranges_processed));
               ++read_offset;
             }
 
@@ -936,7 +936,7 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
           for (int i = 0; i < NUM_READERS; ++i) {
             for (int j = 0; j < NUM_THREADS_PER_READER; ++j) {
               threads.add_thread(new thread(ScanRangeThread, &io_mgr, readers[i],
-                  data[i].c_str(), data[i].size(), Status::OK, 0,
+                  data[i].c_str(), data[i].size(), Status::OK(), 0,
                   &num_ranges_processed));
             }
           }

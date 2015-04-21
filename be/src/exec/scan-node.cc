@@ -57,7 +57,7 @@ Status ScanNode::Prepare(RuntimeState* state) {
       TOTAL_THROUGHPUT_COUNTER, bytes_read_counter_);
   materialize_tuple_timer_ = ADD_CHILD_TIMER(runtime_profile(), MATERIALIZE_TUPLE_TIMER,
       SCANNER_THREAD_TOTAL_WALLCLOCK_TIME);
-  return Status::OK;
+  return Status::OK();
 }
 
 }

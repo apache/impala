@@ -149,7 +149,7 @@ Status ThriftServer::ThriftServerEventProcessor::StartAndWaitForServer() {
     LOG(ERROR) << ss.str();
     return Status(ss.str());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void ThriftServer::ThriftServerEventProcessor::Supervise() {
@@ -317,10 +317,10 @@ Status ThriftServer::CreateSocket(shared_ptr<TServerTransport>* socket) {
       err_msg << "Could not create SSL socket: " << e.what();
       return Status(err_msg.str());
     }
-    return Status::OK;
+    return Status::OK();
   } else {
     socket->reset(new TServerSocket(port_));
-    return Status::OK;
+    return Status::OK();
   }
 }
 
@@ -345,7 +345,7 @@ Status ThriftServer::EnableSsl(const string& certificate, const string& private_
   ssl_enabled_ = true;
   certificate_path_ = certificate;
   private_key_path_ = private_key;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ThriftServer::Start() {
@@ -390,7 +390,7 @@ Status ThriftServer::Start() {
   LOG(INFO) << "ThriftServer '" << name_ << "' started on port: " << port_
             << (ssl_enabled() ? "s" : "");
   DCHECK(started_);
-  return Status::OK;
+  return Status::OK();
 }
 
 void ThriftServer::Join() {

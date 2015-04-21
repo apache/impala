@@ -130,7 +130,7 @@ Status QueryResourceMgr::CreateExpansionRequest(int64_t memory_mb, int64_t vcore
   request->__set_reservation_id(reservation_id_);
   request->__set_request_timeout(DEFAULT_EXPANSION_REQUEST_TIMEOUT_MS);
 
-  return Status::OK;
+  return Status::OK();
 }
 
 bool QueryResourceMgr::AboveVcoreSubscriptionThreshold() {

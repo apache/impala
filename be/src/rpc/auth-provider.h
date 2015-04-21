@@ -158,7 +158,7 @@ class NoAuthProvider : public AuthProvider {
  public:
   NoAuthProvider() { }
 
-  virtual Status Start() { return Status::OK; }
+  virtual Status Start() { return Status::OK(); }
 
   virtual Status GetServerTransportFactory(
       boost::shared_ptr<apache::thrift::transport::TTransportFactory>* factory);

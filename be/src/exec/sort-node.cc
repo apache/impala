@@ -36,7 +36,7 @@ Status SortNode::Init(const TPlanNode& tnode) {
   RETURN_IF_ERROR(sort_exec_exprs_.Init(tnode.sort_node.sort_info, pool_));
   is_asc_order_ = tnode.sort_node.sort_info.is_asc_order;
   nulls_first_ = tnode.sort_node.sort_info.nulls_first;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status SortNode::Prepare(RuntimeState* state) {
@@ -45,7 +45,7 @@ Status SortNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(sort_exec_exprs_.Prepare(
       state, child(0)->row_desc(), row_descriptor_, expr_mem_tracker()));
   AddExprCtxsToFree(sort_exec_exprs_);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status SortNode::Open(RuntimeState* state) {
@@ -72,7 +72,7 @@ Status SortNode::Open(RuntimeState* state) {
 
   // The child can be closed at this point.
   child(0)->Close(state);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status SortNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
@@ -83,7 +83,7 @@ Status SortNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 
   if (ReachedLimit()) {
     *eos = true;
-    return Status::OK;
+    return Status::OK();
   } else {
     *eos = false;
   }
@@ -112,7 +112,7 @@ Status SortNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status SortNode::Reset(RuntimeState* state) {
@@ -152,7 +152,7 @@ Status SortNode::SortInput(RuntimeState* state) {
   } while(!eos);
 
   RETURN_IF_ERROR(sorter_->InputDone());
-  return Status::OK;
+  return Status::OK();
 }
 
 }

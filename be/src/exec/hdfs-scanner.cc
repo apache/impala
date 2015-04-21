@@ -76,7 +76,7 @@ Status HdfsScanner::Prepare(ScannerContext* context) {
       state_, context_->partition_descriptor()->partition_key_value_ctxs());
   StartNewRowBatch();
   decompress_timer_ = ADD_TIMER(scan_node_->runtime_profile(), "DecompressionTime");
-  return Status::OK;
+  return Status::OK();
 }
 
 void HdfsScanner::Close() {
@@ -91,18 +91,18 @@ Status HdfsScanner::InitializeWriteTuplesFn(HdfsPartitionDescriptor* partition,
     // Cannot use codegen if there are strings slots and we need to
     // compact (i.e. copy) the data.
     scan_node_->IncNumScannersCodegenDisabled();
-    return Status::OK;
+    return Status::OK();
   }
 
   write_tuples_fn_ = reinterpret_cast<WriteTuplesFn>(scan_node_->GetCodegenFn(type));
   if (write_tuples_fn_ == NULL) {
     scan_node_->IncNumScannersCodegenDisabled();
-    return Status::OK;
+    return Status::OK();
   }
   VLOG(2) << scanner_name << "(node_id=" << scan_node_->id()
           << ") using llvm codegend functions.";
   scan_node_->IncNumScannersCodegenEnabled();
-  return Status::OK;
+  return Status::OK();
 }
 
 void HdfsScanner::StartNewRowBatch() {
@@ -139,7 +139,7 @@ Status HdfsScanner::CommitRows(int num_rows) {
   RETURN_IF_ERROR(state_->CheckQueryState());
   // Free local expr allocations for this thread
   ExprContext::FreeLocalAllocations(conjunct_ctxs_);
-  return Status::OK;
+  return Status::OK();
 }
 
 void HdfsScanner::AddFinalRowBatch() {
@@ -527,7 +527,7 @@ Status HdfsScanner::UpdateDecompressor(const THdfsCompression::type& compression
     }
     decompression_type_ = compression;
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsScanner::UpdateDecompressor(const string& codec) {
@@ -540,7 +540,7 @@ Status HdfsScanner::UpdateDecompressor(const string& codec) {
     return Status(ss.str());
   }
   RETURN_IF_ERROR(UpdateDecompressor(type->second));
-  return Status::OK;
+  return Status::OK();
 }
 
 bool HdfsScanner::ReportTupleParseError(FieldLocation* fields, uint8_t* errors,

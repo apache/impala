@@ -50,7 +50,7 @@ Status TopNNode::Init(const TPlanNode& tnode) {
   DCHECK_EQ(conjunct_ctxs_.size(), 0)
       << "TopNNode should never have predicates to evaluate.";
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status TopNNode::Prepare(RuntimeState* state) {
@@ -64,7 +64,7 @@ Status TopNNode::Prepare(RuntimeState* state) {
   // Allocate memory for a temporary tuple.
   tmp_tuple_ = reinterpret_cast<Tuple*>(
       tuple_pool_->Allocate(materialized_tuple_desc_->byte_size()));
-  return Status::OK;
+  return Status::OK();
 }
 
 Status TopNNode::Open(RuntimeState* state) {
@@ -100,7 +100,7 @@ Status TopNNode::Open(RuntimeState* state) {
   DCHECK_LE(priority_queue_->size(), limit_ + offset_);
   PrepareForOutput();
   child(0)->Close(state);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
@@ -125,7 +125,7 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   }
   *eos = get_next_iter_ == sorted_top_n_.end();
-  return Status::OK;
+  return Status::OK();
 }
 
 Status TopNNode::Reset(RuntimeState* state) {

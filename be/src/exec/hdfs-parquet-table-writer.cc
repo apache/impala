@@ -410,7 +410,7 @@ inline Status HdfsParquetTableWriter::BaseColumnWriter::AppendRow(TupleRow* row)
     NewPage();
   }
   ++current_page_->header.data_page_header.num_values;
-  return Status::OK;
+  return Status::OK();
 }
 
 inline void HdfsParquetTableWriter::BaseColumnWriter::WriteDictDataPage() {
@@ -435,7 +435,7 @@ Status HdfsParquetTableWriter::BaseColumnWriter::Flush(int64_t* file_pos,
     // This column/file is empty
     *first_data_page = *file_pos;
     *first_dictionary_page = -1;
-    return Status::OK;
+    return Status::OK();
   }
 
   FinalizeCurrentPage();
@@ -516,7 +516,7 @@ Status HdfsParquetTableWriter::BaseColumnWriter::Flush(int64_t* file_pos,
     RETURN_IF_ERROR(parent_->Write(page.data, page.header.compressed_page_size));
     *file_pos += page.header.compressed_page_size;
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void HdfsParquetTableWriter::BaseColumnWriter::FinalizeCurrentPage() {
@@ -727,7 +727,7 @@ Status HdfsParquetTableWriter::Init() {
     columns_[i]->Reset();
   }
   RETURN_IF_ERROR(CreateSchema());
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsParquetTableWriter::CreateSchema() {
@@ -760,7 +760,7 @@ Status HdfsParquetTableWriter::CreateSchema() {
     }
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsParquetTableWriter::AddRowGroup() {
@@ -786,7 +786,7 @@ Status HdfsParquetTableWriter::AddRowGroup() {
     current_row_group_->columns[i].__set_meta_data(metadata);
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 int64_t HdfsParquetTableWriter::MinBlockSize() const {
@@ -856,7 +856,7 @@ Status HdfsParquetTableWriter::InitNewFile() {
   RETURN_IF_ERROR(AddRowGroup());
   RETURN_IF_ERROR(WriteFileHeader());
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsParquetTableWriter::AppendRowBatch(RowBatch* batch,
@@ -884,14 +884,14 @@ Status HdfsParquetTableWriter::AppendRowBatch(RowBatch* batch,
     if (file_size_estimate_ > file_size_limit_) {
       // This file is full.  We need a new file.
       *new_file = true;
-      return Status::OK;
+      return Status::OK();
     }
   }
 
   // Reset the row_idx_ when we exhaust the batch.  We can exit before exhausting
   // the batch if we run out of file space and will continue from the last index.
   row_idx_ = 0;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsParquetTableWriter::Finalize() {
@@ -904,7 +904,7 @@ Status HdfsParquetTableWriter::Finalize() {
   RETURN_IF_ERROR(WriteFileFooter());
   stats_.__set_parquet_stats(parquet_stats_);
   COUNTER_ADD(parent_->rows_inserted_counter(), row_count_);
-  return Status::OK;
+  return Status::OK();
 }
 
 void HdfsParquetTableWriter::Close() {
@@ -922,11 +922,11 @@ Status HdfsParquetTableWriter::WriteFileHeader() {
   RETURN_IF_ERROR(Write(PARQUET_VERSION_NUMBER, sizeof(PARQUET_VERSION_NUMBER)));
   file_pos_ += sizeof(PARQUET_VERSION_NUMBER);
   file_size_estimate_ += sizeof(PARQUET_VERSION_NUMBER);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
-  if (current_row_group_ == NULL) return Status::OK;
+  if (current_row_group_ == NULL) return Status::OK();
 
   int num_clustering_cols = table_desc_->num_clustering_cols();
   for (int i = 0; i < columns_.size(); ++i) {
@@ -971,7 +971,7 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
   }
 
   current_row_group_ = NULL;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsParquetTableWriter::WriteFileFooter() {
@@ -985,6 +985,6 @@ Status HdfsParquetTableWriter::WriteFileFooter() {
   // Write footer
   RETURN_IF_ERROR(Write<uint32_t>(file_metadata_len));
   RETURN_IF_ERROR(Write(PARQUET_VERSION_NUMBER, sizeof(PARQUET_VERSION_NUMBER)));
-  return Status::OK;
+  return Status::OK();
 }
 

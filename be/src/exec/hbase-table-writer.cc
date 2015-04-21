@@ -83,7 +83,7 @@ Status HBaseTableWriter::Init(RuntimeState* state) {
     qual_arrays_.push_back(reinterpret_cast<jbyteArray>(global_ref));
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HBaseTableWriter::InitJNI() {
@@ -106,7 +106,7 @@ Status HBaseTableWriter::InitJNI() {
   list_add_id_ = env->GetMethodID(list_cl_, "add", "(Ljava/lang/Object;)Z");
   RETURN_ERROR_IF_EXC(env);
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HBaseTableWriter::AppendRowBatch(RowBatch* batch) {
@@ -114,7 +114,7 @@ Status HBaseTableWriter::AppendRowBatch(RowBatch* batch) {
   if (env == NULL) return Status("Error getting JNIEnv.");
 
   int limit = batch->num_rows();
-  if (limit == 0) return Status::OK;
+  if (limit == 0) return Status::OK();
   int num_cols = table_desc_->num_cols();
   DCHECK_GE(num_cols, 2);
 
@@ -193,7 +193,7 @@ Status HBaseTableWriter::AppendRowBatch(RowBatch* batch) {
   env->DeleteGlobalRef(put_list_);
   RETURN_ERROR_IF_EXC(env);
   put_list_ = NULL;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HBaseTableWriter::CleanUpJni() {
@@ -213,7 +213,7 @@ Status HBaseTableWriter::CleanUpJni() {
     env->DeleteGlobalRef(reinterpret_cast<jobject>(ref));
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HBaseTableWriter::CreatePutList(JNIEnv* env, int num_puts) {
@@ -223,7 +223,7 @@ Status HBaseTableWriter::CreatePutList(JNIEnv* env, int num_puts) {
 
   RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, local_put_list, &put_list_));
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HBaseTableWriter::CreatePut(JNIEnv* env, const void* rk, int rk_len,
@@ -242,7 +242,7 @@ Status HBaseTableWriter::CreatePut(JNIEnv* env, const void* rk, int rk_len,
   env->DeleteLocalRef(rk_array);
   RETURN_ERROR_IF_EXC(env);
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HBaseTableWriter::CreateByteArray(JNIEnv* env, const string& s,
@@ -257,7 +257,7 @@ Status HBaseTableWriter::CreateByteArray(JNIEnv* env, const void* data, int data
   RETURN_ERROR_IF_EXC(env);
   env->SetByteArrayRegion((*j_array), 0, data_len, reinterpret_cast<const jbyte*>(data));
   RETURN_ERROR_IF_EXC(env);
-  return Status::OK;
+  return Status::OK();
 }
 
 void HBaseTableWriter::Close(RuntimeState* state) {

@@ -58,11 +58,11 @@ Status ImpaladQueryExecutor::Setup() {
 
   RETURN_IF_ERROR(client_->Open());
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ImpaladQueryExecutor::Close() {
-  if (!query_in_progress_) return Status::OK;
+  if (!query_in_progress_) return Status::OK();
   try {
     client_->iface()->close(query_handle_);
   } catch (BeeswaxException& e) {
@@ -71,7 +71,7 @@ Status ImpaladQueryExecutor::Close() {
     return Status(ss.str());
   }
   query_in_progress_ = false;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ImpaladQueryExecutor::Exec(
@@ -99,11 +99,11 @@ Status ImpaladQueryExecutor::Exec(
   current_row_ = 0;
   query_in_progress_ = true;
   if (col_schema != NULL) *col_schema = resultsMetadata.schema.fieldSchemas;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ImpaladQueryExecutor::FetchResult(RowBatch** batch) {
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ImpaladQueryExecutor::FetchResult(string* row) {
@@ -129,7 +129,7 @@ Status ImpaladQueryExecutor::FetchResult(string* row) {
     eos_ = true;
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ImpaladQueryExecutor::FetchResult(vector<void*>* row) {
@@ -157,7 +157,7 @@ Status ImpaladQueryExecutor::Explain(const string& query_string, string* explain
     ss << e.SQLState << ": " << e.message;
     return Status(ss.str());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 RuntimeProfile* ImpaladQueryExecutor::query_profile() {

@@ -146,7 +146,7 @@ Status HdfsScanNode::GetNextInternal(
     // LIMIT 0 case.  Other limit values handled below.
     DCHECK_EQ(limit_, 0);
     *eos = true;
-    return Status::OK;
+    return Status::OK();
   }
   *eos = false;
   RowBatch* materialized_batch = materialized_row_batches_->GetBatch();
@@ -171,7 +171,7 @@ Status HdfsScanNode::GetNextInternal(
     }
     DCHECK_EQ(materialized_batch->num_io_buffers(), 0);
     delete materialized_batch;
-    return Status::OK;
+    return Status::OK();
   }
   // The RowBatchQueue was shutdown either because all scan ranges are complete or a
   // scanner thread encountered an error.  Check status_ to distinguish those cases.
@@ -502,7 +502,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
     }
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 // This function initiates the connection to hdfs and starts up the initial scanner
@@ -530,7 +530,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 
   if (file_descs_.empty()) {
     SetDone();
-    return Status::OK;
+    return Status::OK();
   }
 
   // Open all the partition exprs used by the scan node
@@ -604,14 +604,14 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 
   if (total_splits == 0) {
     SetDone();
-    return Status::OK;
+    return Status::OK();
   }
 
   stringstream ss;
   ss << "Splits complete (node=" << id() << "):";
   progress_ = ProgressUpdater(ss.str(), total_splits);
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsScanNode::Reset(RuntimeState* state) {
@@ -671,7 +671,7 @@ Status HdfsScanNode::AddDiskIoRanges(const vector<DiskIoMgr::ScanRange*>& ranges
   num_unqueued_files_ -= num_files_queued;
   DCHECK_GE(num_unqueued_files_, 0);
   ThreadTokenAvailableCb(runtime_state_->resource_pool());
-  return Status::OK;
+  return Status::OK();
 }
 
 void HdfsScanNode::AddMaterializedRowBatch(RowBatch* row_batch) {

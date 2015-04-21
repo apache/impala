@@ -356,7 +356,7 @@ string Literal::DebugString() const {
 Status Literal::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
-    return Status::OK;
+    return Status::OK();
   }
 
   DCHECK_EQ(GetNumChildren(), 0);
@@ -421,7 +421,7 @@ Status Literal::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
   builder.CreateRet(v.value());
   *fn = codegen->FinalizeFunction(*fn);
   ir_compute_fn_ = *fn;
-  return Status::OK;
+  return Status::OK();
 }
 
 }

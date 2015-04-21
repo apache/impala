@@ -55,7 +55,7 @@ Status GzipCompressor::Init() {
     return Status("zlib deflateInit failed: " +  string(stream_.msg));
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 int64_t GzipCompressor::MaxOutputLen(int64_t input_len, const uint8_t* input) {
@@ -104,7 +104,7 @@ Status GzipCompressor::Compress(int64_t input_length, const uint8_t* input,
   if (deflateReset(&stream_) != Z_OK) {
     return Status("zlib deflateReset failed: " + string(stream_.msg));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status GzipCompressor::ProcessBlock(bool output_preallocated,
@@ -125,7 +125,7 @@ Status GzipCompressor::ProcessBlock(bool output_preallocated,
   }
 
   RETURN_IF_ERROR(Compress(input_length, input, output_length, *output));
-  return Status::OK;
+  return Status::OK();
 }
 
 BzipCompressor::BzipCompressor(MemPool* mem_pool, bool reuse_buffer)
@@ -181,7 +181,7 @@ Status BzipCompressor::ProcessBlock(bool output_preallocated, int64_t input_leng
   *output = out_buffer_;
   *output_length = outlen;
   memory_pool_->AcquireData(temp_memory_pool_.get(), false);
-  return Status::OK;
+  return Status::OK();
 }
 
 // Currently this is only use for testing of the decompressor.
@@ -235,7 +235,7 @@ Status SnappyBlockCompressor::ProcessBlock(bool output_preallocated,
 
   *output = out_buffer_;
   *output_length = outp - out_buffer_;
-  return Status::OK;
+  return Status::OK();
 }
 
 SnappyCompressor::SnappyCompressor(MemPool* mem_pool, bool reuse_buffer)
@@ -267,7 +267,7 @@ Status SnappyCompressor::ProcessBlock(bool output_preallocated, int64_t input_le
       static_cast<size_t>(input_length),
       reinterpret_cast<char*>(*output), &out_len);
   *output_length = out_len;
-  return Status::OK;
+  return Status::OK();
 }
 
 uint32_t SnappyCompressor::ComputeChecksum(int64_t input_len, const uint8_t* input) {
@@ -289,8 +289,8 @@ int64_t Lz4Compressor::MaxOutputLen(int64_t input_len, const uint8_t* input) {
 Status Lz4Compressor::ProcessBlock(bool output_preallocated, int64_t input_length,
     const uint8_t* input, int64_t* output_length, uint8_t** output) {
   CHECK(output_preallocated) << "Output was not allocated for Lz4 Codec";
-  if (input_length == 0) return Status::OK;
+  if (input_length == 0) return Status::OK();
   *output_length = LZ4_compress(reinterpret_cast<const char*>(input),
                        reinterpret_cast<char*>(*output), input_length);
-  return Status::OK;
+  return Status::OK();
 }

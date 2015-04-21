@@ -39,7 +39,7 @@ Status JniLocalFrame::push(JNIEnv* env, int max_local_ref) {
     return Status("failed to push frame");
   }
   env_ = env;
-  return Status::OK;
+  return Status::OK();
 }
 
 bool JniUtil::ClassExists(JNIEnv* env, const char* class_str) {
@@ -61,14 +61,14 @@ Status JniUtil::GetGlobalClassRef(JNIEnv* env, const char* class_str, jclass* cl
       reinterpret_cast<jobject*>(class_ref)));
   env->DeleteLocalRef(local_cl);
   RETURN_ERROR_IF_EXC(env);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status JniUtil::LocalToGlobalRef(JNIEnv* env, jobject local_ref, jobject* global_ref) {
   *global_ref = env->NewGlobalRef(local_ref);
   RETURN_ERROR_IF_EXC(env);
   global_refs_.push_back(*global_ref);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status JniUtil::Init() {
@@ -134,7 +134,7 @@ Status JniUtil::Init() {
   }
 
 
-  return Status::OK;
+  return Status::OK();
 }
 
 void JniUtil::InitLibhdfs() {
@@ -155,12 +155,12 @@ Status JniUtil::Cleanup() {
     env->DeleteGlobalRef(*it);
   }
   global_refs_.clear();
-  return Status::OK;
+  return Status::OK();
 }
 
 Status JniUtil::GetJniExceptionMsg(JNIEnv* env, bool log_stack, const string& prefix) {
   jthrowable exc = (env)->ExceptionOccurred();
-  if (exc == NULL) return Status::OK;
+  if (exc == NULL) return Status::OK();
   env->ExceptionClear();
   DCHECK(throwable_to_string_id() != NULL);
   jstring msg = (jstring) env->CallStaticObjectMethod(jni_util_class(),
@@ -195,7 +195,7 @@ Status JniUtil::LoadJniMethod(JNIEnv* env, const jclass& jni_class,
   (*descriptor->method_id) = env->GetMethodID(jni_class,
       descriptor->name.c_str(), descriptor->signature.c_str());
   RETURN_ERROR_IF_EXC(env);
-  return Status::OK;
+  return Status::OK();
 }
 
 }

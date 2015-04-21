@@ -143,7 +143,7 @@ Status TCatalogObjectFromObjectName(const TCatalogObjectType::type& object_type,
       error_msg << "Unexpected object type: " << object_type;
       return Status(error_msg.str());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 string TCatalogObjectToEntryKey(const TCatalogObject& catalog_object) {

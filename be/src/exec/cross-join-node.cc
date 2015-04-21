@@ -39,7 +39,7 @@ Status CrossJoinNode::Prepare(RuntimeState* state) {
   DCHECK(join_op_ == TJoinOp::CROSS_JOIN);
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
   build_batch_pool_.reset(new ObjectPool());
-  return Status::OK;
+  return Status::OK();
 }
 
 Status CrossJoinNode::Reset(RuntimeState* state) {
@@ -74,12 +74,12 @@ Status CrossJoinNode::ConstructBuildSide(RuntimeState* state) {
         static_cast<int64_t>(build_batches_.total_num_rows()));
     if (eos) break;
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status CrossJoinNode::InitGetNext(TupleRow* first_left_row) {
   current_build_row_ = build_batches_.Iterator();
-  return Status::OK;
+  return Status::OK();
 }
 
 Status CrossJoinNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* eos) {
@@ -87,7 +87,7 @@ Status CrossJoinNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool*
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   if (ReachedLimit() || eos_) {
     *eos = true;
-    return Status::OK;
+    return Status::OK();
   }
   *eos = false;
 
@@ -127,7 +127,7 @@ Status CrossJoinNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool*
     }
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 string CrossJoinNode::BuildListDebugString() {

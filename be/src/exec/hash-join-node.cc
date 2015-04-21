@@ -74,7 +74,7 @@ Status HashJoinNode::Init(const TPlanNode& tnode) {
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(pool_, tnode.hash_join_node.other_join_conjuncts,
                             &other_join_conjunct_ctxs_));
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HashJoinNode::Prepare(RuntimeState* state) {
@@ -113,7 +113,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
 
     // Codegen for hashing rows
     Function* hash_fn = hash_tbl_->CodegenHashCurrentRow(state);
-    if (hash_fn == NULL) return Status::OK;
+    if (hash_fn == NULL) return Status::OK();
 
     // Codegen for build path
     codegen_process_build_batch_fn_ = CodegenProcessBuildBatch(state, hash_fn);
@@ -134,7 +134,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
     }
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HashJoinNode::Reset(RuntimeState* state) {
@@ -202,7 +202,7 @@ Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
               << hash_tbl_->size();
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HashJoinNode::InitGetNext(TupleRow* first_probe_row) {
@@ -212,7 +212,7 @@ Status HashJoinNode::InitGetNext(TupleRow* first_probe_row) {
     matched_probe_ = false;
     hash_tbl_iterator_ = hash_tbl_->Find(first_probe_row);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos) {
@@ -222,7 +222,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
   RETURN_IF_ERROR(QueryMaintenance(state));
   if (ReachedLimit()) {
     *eos = true;
-    return Status::OK;
+    return Status::OK();
   }
   *eos = false;
 
@@ -230,7 +230,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
   if (!match_all_build_) {
     if (eos_) {
       *eos = true;
-      return Status::OK;
+      return Status::OK();
     }
     return LeftJoinGetNext(state, out_batch, eos);
   }
@@ -277,7 +277,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
         COUNTER_SET(rows_returned_counter_, num_rows_returned_);
         if (out_batch->AtCapacity() || ReachedLimit()) {
           *eos = ReachedLimit();
-          return Status::OK;
+          return Status::OK();
         }
       }
     }
@@ -296,7 +296,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
         matched_probe_ = true;
         if (out_batch->AtCapacity() || ReachedLimit()) {
           *eos = ReachedLimit();
-          return Status::OK;
+          return Status::OK();
         }
       }
     }
@@ -305,7 +305,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       // pass on resources, out_batch might still need them
       probe_batch_->TransferResourceOwnership(out_batch);
       probe_batch_pos_ = 0;
-      if (out_batch->AtCapacity()) return Status::OK;
+      if (out_batch->AtCapacity()) return Status::OK();
       // get new probe batch
       if (!probe_side_eos_) {
         while (true) {
@@ -320,7 +320,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
               eos_ = true;
               break;
             }
-            if (out_batch->AtCapacity()) return Status::OK;
+            if (out_batch->AtCapacity()) return Status::OK();
             continue;
           } else {
             COUNTER_ADD(probe_row_counter_, probe_batch_->num_rows());
@@ -365,14 +365,14 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
         COUNTER_SET(rows_returned_counter_, num_rows_returned_);
         if (ReachedLimit()) {
           *eos = true;
-          return Status::OK;
+          return Status::OK();
         }
       }
     }
     // we're done if there are no more rows left to check
     *eos = hash_tbl_iterator_.AtEnd();
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
@@ -418,7 +418,7 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
     }
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 void HashJoinNode::AddToDebugString(int indentation_level, stringstream* out) const {

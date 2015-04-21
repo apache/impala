@@ -78,7 +78,7 @@ class BzipCompressor : public Codec {
  private:
   friend class Codec;
   BzipCompressor(MemPool* mem_pool, bool reuse_buffer);
-  virtual Status Init() { return Status::OK; }
+  virtual Status Init() { return Status::OK(); }
 };
 
 class SnappyBlockCompressor : public Codec {
@@ -92,7 +92,7 @@ class SnappyBlockCompressor : public Codec {
  private:
   friend class Codec;
   SnappyBlockCompressor(MemPool* mem_pool, bool reuse_buffer);
-  virtual Status Init() { return Status::OK; }
+  virtual Status Init() { return Status::OK(); }
 };
 
 class SnappyCompressor : public Codec {
@@ -111,7 +111,7 @@ class SnappyCompressor : public Codec {
  private:
   friend class Codec;
   SnappyCompressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
-  virtual Status Init() { return Status::OK; }
+  virtual Status Init() { return Status::OK(); }
 };
 
 /// Lz4 is a compression codec with similar compression ratios as snappy
@@ -129,7 +129,7 @@ class Lz4Compressor : public Codec {
  private:
   friend class Codec;
   Lz4Compressor(MemPool* mem_pool = NULL, bool reuse_buffer = false);
-  virtual Status Init() { return Status::OK; }
+  virtual Status Init() { return Status::OK(); }
 };
 
 }

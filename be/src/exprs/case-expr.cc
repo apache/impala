@@ -47,7 +47,7 @@ Status CaseExpr::Prepare(RuntimeState* state, const RowDescriptor& desc,
                          ExprContext* ctx) {
   RETURN_IF_ERROR(Expr::Prepare(state, desc, ctx));
   RegisterFunctionContext(ctx, state);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status CaseExpr::Open(RuntimeState* state, ExprContext* ctx,
@@ -64,7 +64,7 @@ Status CaseExpr::Open(RuntimeState* state, ExprContext* ctx,
     case_state->case_val = CreateAnyVal(state->obj_pool(), TYPE_BOOLEAN);
     case_state->when_val = CreateAnyVal(state->obj_pool(), children_[0]->type());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void CaseExpr::Close(RuntimeState* state, ExprContext* ctx,
@@ -179,7 +179,7 @@ string CaseExpr::DebugString() const {
 Status CaseExpr::GetCodegendComputeFn(RuntimeState* state, Function** fn) {
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
-    return Status::OK;
+    return Status::OK();
   }
 
   const int num_children = GetNumChildren();
@@ -284,7 +284,7 @@ Status CaseExpr::GetCodegendComputeFn(RuntimeState* state, Function** fn) {
   *fn = codegen->FinalizeFunction(function);
   DCHECK(*fn != NULL);
   ir_compute_fn_ = *fn;
-  return Status::OK;
+  return Status::OK();
 }
 
 void CaseExpr::GetChildVal(int child_idx, ExprContext* ctx, TupleRow* row, AnyVal* dst) {

@@ -35,14 +35,14 @@ Status FragmentMgr::FragmentExecState::Cancel() {
   lock_guard<mutex> l(status_lock_);
   RETURN_IF_ERROR(exec_status_);
   executor_.Cancel();
-  return Status::OK;
+  return Status::OK();
 }
 
 Status FragmentMgr::FragmentExecState::Prepare(
     const TExecPlanFragmentParams& exec_params) {
   exec_params_ = exec_params;
   RETURN_IF_ERROR(executor_.Prepare(exec_params));
-  return Status::OK;
+  return Status::OK();
 }
 
 void FragmentMgr::FragmentExecState::Exec() {

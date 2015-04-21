@@ -98,10 +98,10 @@ Status DataStreamMgr::AddData(
     // in acquiring lock_.
     // TODO: Rethink the lifecycle of DataStreamRecvr to distinguish
     // errors from receiver-initiated teardowns.
-    return Status::OK;
+    return Status::OK();
   }
   recvr->AddBatch(thrift_batch, sender_id);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status DataStreamMgr::CloseSender(const TUniqueId& fragment_instance_id,
@@ -117,10 +117,10 @@ Status DataStreamMgr::CloseSender(const TUniqueId& fragment_instance_id,
     // in acquiring lock_.
     // TODO: Rethink the lifecycle of DataStreamRecvr to distinguish
     // errors from receiver-initiated teardowns.
-    return Status::OK;
+    return Status::OK();
   }
   recvr->RemoveSender(sender_id);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status DataStreamMgr::DeregisterRecvr(
@@ -140,7 +140,7 @@ Status DataStreamMgr::DeregisterRecvr(
       fragment_stream_set_.erase(make_pair(recvr->fragment_instance_id(),
           recvr->dest_node_id()));
       receiver_map_.erase(range.first);
-      return Status::OK;
+      return Status::OK();
     }
     ++range.first;
   }

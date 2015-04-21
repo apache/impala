@@ -236,7 +236,7 @@ class JniUtil {
     RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &arg, &request_bytes));
     jni_env->CallObjectMethod(obj, method, request_bytes);
     RETURN_ERROR_IF_EXC(jni_env);
-    return Status::OK;
+    return Status::OK();
   }
 
   template <typename R>
@@ -248,7 +248,7 @@ class JniUtil {
         jni_env->CallObjectMethod(obj, method));
     RETURN_ERROR_IF_EXC(jni_env);
     RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, response));
-    return Status::OK;
+    return Status::OK();
   }
 
   template <typename T, typename R>
@@ -263,7 +263,7 @@ class JniUtil {
         jni_env->CallObjectMethod(obj, method, request_bytes));
     RETURN_ERROR_IF_EXC(jni_env);
     RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, response));
-    return Status::OK;
+    return Status::OK();
   }
 
   template <typename T>
@@ -283,7 +283,7 @@ class JniUtil {
     *response = str;
     jni_env->ReleaseStringUTFChars(java_response_string, str);
     RETURN_ERROR_IF_EXC(jni_env);
-    return Status::OK;
+    return Status::OK();
   }
 
  private:

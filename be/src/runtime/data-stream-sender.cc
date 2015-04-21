@@ -153,7 +153,7 @@ Status DataStreamSender::Channel::Init(RuntimeState* state) {
   // TODO: figure out how to size batch_
   int capacity = max(1, buffer_size_ / max(row_desc_.GetRowSize(), 1));
   batch_.reset(new RowBatch(row_desc_, capacity, parent_->mem_tracker_.get()));
-  return Status::OK;
+  return Status::OK();
 }
 
 Status DataStreamSender::Channel::SendBatch(TRowBatch* batch) {
@@ -169,7 +169,7 @@ Status DataStreamSender::Channel::SendBatch(TRowBatch* batch) {
     unique_lock<mutex> l(rpc_thread_lock_);
     rpc_in_flight_ = false;
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void DataStreamSender::Channel::TransmitData(int thread_id, const TRowBatch* batch) {
@@ -246,7 +246,7 @@ Status DataStreamSender::Channel::AddRow(TupleRow* row) {
     }
   }
   batch_->CommitLastRow();
-  return Status::OK;
+  return Status::OK();
 }
 
 Status DataStreamSender::Channel::SendCurrentBatch() {
@@ -256,7 +256,7 @@ Status DataStreamSender::Channel::SendCurrentBatch() {
   parent_->SerializeBatch(batch_.get(), &thrift_batch_);
   batch_->Reset();
   RETURN_IF_ERROR(SendBatch(&thrift_batch_));
-  return Status::OK;
+  return Status::OK();
 }
 
 Status DataStreamSender::Channel::GetSendStatus() {
@@ -391,7 +391,7 @@ Status DataStreamSender::Prepare(RuntimeState* state) {
   for (int i = 0; i < channels_.size(); ++i) {
     RETURN_IF_ERROR(channels_[i]->Init(state));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status DataStreamSender::Open(RuntimeState* state) {
@@ -404,7 +404,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   RETURN_IF_ERROR(state->CheckQueryState());
   DCHECK(!closed_);
 
-  if (batch->num_rows() == 0) return Status::OK;
+  if (batch->num_rows() == 0) return Status::OK();
   if (broadcast_ || channels_.size() == 1) {
     // current_thrift_batch_ is *not* the one that was written by the last call
     // to Serialize()
@@ -444,7 +444,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
       RETURN_IF_ERROR(channels_[hash_val % num_channels]->AddRow(row));
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void DataStreamSender::Close(RuntimeState* state) {

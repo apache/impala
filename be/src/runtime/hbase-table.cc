@@ -86,7 +86,7 @@ Status HBaseTable::Init() {
 
   // Make sure the GC doesn't remove the HTable until told to.
   RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, local_htable, &htable_));
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HBaseTable::InitJNI() {
@@ -126,7 +126,7 @@ Status HBaseTable::InitJNI() {
       "(Ljava/util/List;)V");
   RETURN_ERROR_IF_EXC(env);
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HBaseTable::GetResultScanner(const jobject& scan,
@@ -137,7 +137,7 @@ Status HBaseTable::GetResultScanner(const jobject& scan,
   (*result_scanner) = env->CallObjectMethod(htable_,
       htable_get_scanner_id_, scan);
   RETURN_ERROR_IF_EXC(env);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HBaseTable::Put(const jobject& puts_list) {
@@ -148,7 +148,7 @@ Status HBaseTable::Put(const jobject& puts_list) {
   RETURN_ERROR_IF_EXC(env);
 
   // TODO(eclark): FlushCommits
-  return Status::OK;
+  return Status::OK();
 }
 
 }  // namespace impala

@@ -77,7 +77,7 @@ Status HttpGet(const string& host, const int32_t& port, const string& url_path,
     }
 
     (*out) << request_stream.rdbuf();
-    return Status::OK;
+    return Status::OK();
   } catch (const std::exception& e){
     return Status(e.what());
   }

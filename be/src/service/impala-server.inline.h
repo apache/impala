@@ -34,7 +34,7 @@ inline Status ImpalaServer::THandleIdentifierToTUniqueId(
   memcpy(&(secret->hi), handle.secret.c_str(), 8);
   memcpy(&(secret->lo), handle.secret.c_str() + 8, 8);
 
-  return Status::OK;
+  return Status::OK();
 }
 
 inline void ImpalaServer::TUniqueIdToTHandleIdentifier(

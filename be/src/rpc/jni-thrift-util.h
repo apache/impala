@@ -38,7 +38,7 @@ Status SerializeThriftMsg(JNIEnv* env, T* msg, jbyteArray* serialized_msg) {
   if (*serialized_msg == NULL) return Status("couldn't construct jbyteArray");
   env->SetByteArrayRegion(*serialized_msg, 0, size, reinterpret_cast<jbyte*>(buffer));
   RETURN_ERROR_IF_EXC(env);
-  return Status::OK;
+  return Status::OK();
 }
 
 template <class T>
@@ -53,7 +53,7 @@ Status DeserializeThriftMsg(JNIEnv* env, jbyteArray serialized_msg, T* deseriali
   /// Return buffer back. JNI_ABORT indicates to not copy contents back to java
   /// side.
   env->ReleaseByteArrayElements(serialized_msg, buf, JNI_ABORT);
-  return Status::OK;
+  return Status::OK();
 }
 
 }

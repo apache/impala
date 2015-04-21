@@ -133,7 +133,7 @@ Status Expr::CreateExprTree(ObjectPool* pool, const TExpr& texpr, ExprContext** 
   // input is empty
   if (texpr.nodes.size() == 0) {
     *ctx = NULL;
-    return Status::OK;
+    return Status::OK();
   }
   int node_idx = 0;
   Expr* e;
@@ -157,7 +157,7 @@ Status Expr::CreateExprTrees(ObjectPool* pool, const vector<TExpr>& texprs,
     RETURN_IF_ERROR(CreateExprTree(pool, texprs[i], &ctx));
     ctxs->push_back(ctx);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Expr::CreateTreeFromThrift(ObjectPool* pool, const vector<TExprNode>& nodes,
@@ -187,7 +187,7 @@ Status Expr::CreateTreeFromThrift(ObjectPool* pool, const vector<TExprNode>& nod
       return Status("Failed to reconstruct expression tree from thrift.");
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** expr) {
@@ -198,13 +198,13 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
     case TExprNodeType::STRING_LITERAL:
     case TExprNodeType::DECIMAL_LITERAL:
       *expr = pool->Add(new Literal(texpr_node));
-      return Status::OK;
+      return Status::OK();
     case TExprNodeType::CASE_EXPR:
       if (!texpr_node.__isset.case_expr) {
         return Status("Case expression not set in thrift node");
       }
       *expr = pool->Add(new CaseExpr(texpr_node));
-      return Status::OK;
+      return Status::OK();
     case TExprNodeType::COMPOUND_PRED:
       if (texpr_node.fn.name.function_name == "and") {
         *expr = pool->Add(new AndPredicate(texpr_node));
@@ -214,19 +214,19 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
         DCHECK_EQ(texpr_node.fn.name.function_name, "not");
         *expr = pool->Add(new ScalarFnCall(texpr_node));
       }
-      return Status::OK;
+      return Status::OK();
     case TExprNodeType::NULL_LITERAL:
       *expr = pool->Add(new NullLiteral(texpr_node));
-      return Status::OK;
+      return Status::OK();
     case TExprNodeType::SLOT_REF:
       if (!texpr_node.__isset.slot_ref) {
         return Status("Slot reference not set in thrift node");
       }
       *expr = pool->Add(new SlotRef(texpr_node));
-      return Status::OK;
+      return Status::OK();
     case TExprNodeType::TUPLE_IS_NULL_PRED:
       *expr = pool->Add(new TupleIsNullPredicate(texpr_node));
-      return Status::OK;
+      return Status::OK();
     case TExprNodeType::FUNCTION_CALL:
       if (!texpr_node.__isset.fn) {
         return Status("Function not set in thrift node");
@@ -249,7 +249,7 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       } else {
         *expr = pool->Add(new ScalarFnCall(texpr_node));
       }
-      return Status::OK;
+      return Status::OK();
     default:
       stringstream os;
       os << "Unknown expr node type: " << texpr_node.node_type;
@@ -347,7 +347,7 @@ Status Expr::Prepare(const vector<ExprContext*>& ctxs, RuntimeState* state,
   for (int i = 0; i < ctxs.size(); ++i) {
     RETURN_IF_ERROR(ctxs[i]->Prepare(state, row_desc, tracker));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc,
@@ -356,14 +356,14 @@ Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc,
   for (int i = 0; i < children_.size(); ++i) {
     RETURN_IF_ERROR(children_[i]->Prepare(state, row_desc, context));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Expr::Open(const vector<ExprContext*>& ctxs, RuntimeState* state) {
   for (int i = 0; i < ctxs.size(); ++i) {
     RETURN_IF_ERROR(ctxs[i]->Open(state));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Expr::Open(RuntimeState* state, ExprContext* context,
@@ -371,7 +371,7 @@ Status Expr::Open(RuntimeState* state, ExprContext* context,
   for (int i = 0; i < children_.size(); ++i) {
     RETURN_IF_ERROR(children_[i]->Open(state, context, scope));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Expr::Clone(const vector<ExprContext*>& ctxs, RuntimeState* state,
@@ -382,7 +382,7 @@ Status Expr::Clone(const vector<ExprContext*>& ctxs, RuntimeState* state,
   for (int i = 0; i < ctxs.size(); ++i) {
     RETURN_IF_ERROR(ctxs[i]->Clone(state, &(*new_ctxs)[i]));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 string Expr::DebugString() const {
@@ -612,7 +612,7 @@ int Expr::InlineConstants(LlvmCodeGen* codegen, Function* fn) {
 Status Expr::GetCodegendComputeFnWrapper(RuntimeState* state, Function** fn) {
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
-    return Status::OK;
+    return Status::OK();
   }
   LlvmCodeGen* codegen;
   RETURN_IF_ERROR(state->GetCodegen(&codegen));
@@ -632,7 +632,7 @@ Status Expr::GetCodegendComputeFnWrapper(RuntimeState* state, Function** fn) {
   builder.CreateRet(ret);
   ir_compute_fn_ = codegen->FinalizeFunction(ir_compute_fn_);
   *fn = ir_compute_fn_;
-  return Status::OK;
+  return Status::OK();
 }
 
 // At least one of these should always be subclassed.

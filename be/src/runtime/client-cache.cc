@@ -55,14 +55,14 @@ Status ClientCacheHelper::GetClient(const TNetworkAddress& address,
       VLOG(2) << "GetClient(): returning cached client for " << address;
       host_cache->clients.pop_front();
       if (metrics_enabled_) clients_in_use_metric_->Increment(1);
-      return Status::OK;
+      return Status::OK();
     }
   }
 
   // Only get here if host_cache->clients.empty(). No need for the lock.
   RETURN_IF_ERROR(CreateClient(address, factory_method, client_key));
   if (metrics_enabled_) clients_in_use_metric_->Increment(1);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ClientCacheHelper::ReopenClient(ClientFactory factory_method,
@@ -121,7 +121,7 @@ Status ClientCacheHelper::CreateClient(const TNetworkAddress& address,
   }
 
   if (metrics_enabled_) total_clients_metric_->Increment(1);
-  return Status::OK;
+  return Status::OK();
 }
 
 void ClientCacheHelper::ReleaseClient(ClientKey* client_key) {

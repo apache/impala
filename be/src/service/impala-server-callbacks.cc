@@ -131,7 +131,7 @@ static Status ParseQueryId(const Webserver::ArgumentMap& args, TUniqueId* id) {
   if (it == args.end()) {
     return Status("No 'query_id' argument found");
   } else {
-    if (ParseId(it->second, id)) return Status::OK;
+    if (ParseId(it->second, id)) return Status::OK();
     return Status(Substitute("Could not parse 'query_id' argument: $0", it->second));
   }
 }

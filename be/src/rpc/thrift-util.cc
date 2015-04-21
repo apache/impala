@@ -128,7 +128,7 @@ Status WaitForServer(const string& host, int port, int num_retries,
       socket.setConnTimeout(500);
       socket.open();
       socket.close();
-      return Status::OK;
+      return Status::OK();
     } catch (const TException& e) {
       VLOG_QUERY << "Connection failed: " << e.what();
     }

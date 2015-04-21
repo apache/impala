@@ -45,10 +45,10 @@ class SortedRunMerger::BatchedRowSupplier {
     RETURN_IF_ERROR(sorted_run_(&input_row_batch_));
     if (input_row_batch_ == NULL) {
       *done = true;
-      return Status::OK;
+      return Status::OK();
     }
     RETURN_IF_ERROR(Next(NULL, done));
-    return Status::OK;
+    return Status::OK();
   }
 
   // Increment the current row index. If the current input batch is exhausted fetch the
@@ -69,7 +69,7 @@ class SortedRunMerger::BatchedRowSupplier {
       *done = input_row_batch_ == NULL;
       input_row_batch_index_ = 0;
     }
-    return Status::OK;
+    return Status::OK();
   }
 
   TupleRow* current_row() const {
@@ -140,14 +140,14 @@ Status SortedRunMerger::Prepare(const vector<RunBatchSupplier>& input_runs) {
     Heapify(i);
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status SortedRunMerger::GetNext(RowBatch* output_batch, bool* eos) {
   ScopedTimer<MonotonicStopWatch> timer(get_next_timer_);
   if (min_heap_.empty()) {
     *eos = true;
-    return Status::OK;
+    return Status::OK();
   }
 
   while (!output_batch->AtCapacity()) {
@@ -181,7 +181,7 @@ Status SortedRunMerger::GetNext(RowBatch* output_batch, bool* eos) {
   }
 
   *eos = min_heap_.empty();
-  return Status::OK;
+  return Status::OK();
 }
 
 }

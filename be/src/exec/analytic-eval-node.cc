@@ -118,7 +118,7 @@ Status AnalyticEvalNode::Init(const TPlanNode& tnode) {
     RETURN_IF_ERROR(Expr::CreateExprTree(pool_, analytic_node.order_by_eq,
           &order_by_eq_expr_ctx_));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status AnalyticEvalNode::Prepare(RuntimeState* state) {
@@ -160,7 +160,7 @@ Status AnalyticEvalNode::Prepare(RuntimeState* state) {
   }
   child_tuple_cmp_row_ = reinterpret_cast<TupleRow*>(
       mem_pool_->Allocate(sizeof(Tuple*) * 2));
-  return Status::OK;
+  return Status::OK();
 }
 
 Status AnalyticEvalNode::Open(RuntimeState* state) {
@@ -210,7 +210,7 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
       mem_tracker()));
   curr_child_batch_.reset(new RowBatch(child(0)->row_desc(), state->batch_size(),
       mem_tracker()));
-  return Status::OK;
+  return Status::OK();
 }
 
 string DebugWindowBoundString(const TAnalyticWindowBoundary& b) {
@@ -316,7 +316,7 @@ inline Status AnalyticEvalNode::AddRow(int64_t stream_idx, TupleRow* row) {
     }
   }
 
-  Status status = Status::OK;
+  Status status = Status::OK();
   // Buffer the entire input row to be returned later with the analytic eval results.
   if (UNLIKELY(!input_stream_->AddRow(row, &status))) {
     // AddRow returns false if an error occurs (available via status()) or there is
@@ -544,7 +544,7 @@ Status AnalyticEvalNode::ProcessChildBatches(RuntimeState* state) {
     curr_child_batch_.reset();
     prev_child_batch_.reset();
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
@@ -630,7 +630,7 @@ Status AnalyticEvalNode::ProcessChildBatch(RuntimeState* state) {
               << prev_pool_last_result_idx_ << " last window idx: "
               << prev_pool_last_window_idx_;
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status AnalyticEvalNode::GetNextOutputBatch(RuntimeState* state, RowBatch* output_batch,
@@ -640,7 +640,7 @@ Status AnalyticEvalNode::GetNextOutputBatch(RuntimeState* state, RowBatch* outpu
             << " tuple pool size:" << curr_tuple_pool_->total_allocated_bytes();
   if (input_stream_->rows_returned() == input_stream_->num_rows()) {
     *eos = true;
-    return Status::OK;
+    return Status::OK();
   }
 
   const int num_child_tuples = child(0)->row_desc().tuple_descriptors().size();
@@ -675,7 +675,7 @@ Status AnalyticEvalNode::GetNextOutputBatch(RuntimeState* state, RowBatch* outpu
   }
   input_batch.TransferResourceOwnership(output_batch);
   if (ReachedLimit()) *eos = true;
-  return Status::OK;
+  return Status::OK();
 }
 
 inline int64_t AnalyticEvalNode::NumOutputRowsReady() const {
@@ -704,7 +704,7 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
 
   if (ReachedLimit()) {
     *eos = true;
-    return Status::OK;
+    return Status::OK();
   } else {
     *eos = false;
   }
@@ -729,7 +729,7 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
   }
 
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status AnalyticEvalNode::Reset(RuntimeState* state) {

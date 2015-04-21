@@ -111,7 +111,7 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
       sr.set_stop_key(key_range.stopKey);
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HBaseScanNode::Open(RuntimeState* state) {
@@ -122,7 +122,7 @@ Status HBaseScanNode::Open(RuntimeState* state) {
   JNIEnv* env = getJNIEnv();
 
   // No need to initialize hbase_scanner_ if there are no scan ranges.
-  if (scan_range_vector_.size() == 0) return Status::OK;
+  if (scan_range_vector_.size() == 0) return Status::OK();
   return hbase_scanner_->StartScan(env, tuple_desc_, scan_range_vector_, filters_);
 }
 
@@ -156,7 +156,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
 
   if (scan_range_vector_.empty() || ReachedLimit()) {
     *eos = true;
-    return Status::OK;
+    return Status::OK();
   }
   *eos = false;
 
@@ -178,7 +178,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
       // next GetNext() call
       row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), !ReachedLimit());
       *eos = ReachedLimit();
-      return Status::OK;
+      return Status::OK();
     }
     RETURN_IF_ERROR(hbase_scanner_->Next(env, &has_next));
     if (!has_next) {
@@ -189,7 +189,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
       }
       row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), false);
       *eos = true;
-      return Status::OK;
+      return Status::OK();
     }
 
     int row_idx = row_batch->AddRow();
@@ -266,7 +266,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
     COUNTER_ADD(rows_read_counter_, 1);
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HBaseScanNode::Reset(RuntimeState* state) {

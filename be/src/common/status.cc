@@ -26,8 +26,6 @@ namespace impala {
 // functions these constructors call.  In particular, we cannot call
 // glog functions which also rely on static initializations.
 // TODO: is there a more controlled way to do this.
-const Status Status::OK;
-
 const Status Status::CANCELLED(ErrorMsg::Init(TErrorCode::CANCELLED, "Cancelled"));
 
 const Status Status::MEM_LIMIT_EXCEEDED(

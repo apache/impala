@@ -170,7 +170,7 @@ Status HiveUdfCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc,
   // Register FunctionContext in ExprContext
   RegisterFunctionContext(ctx, state);
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HiveUdfCall::Open(RuntimeState* state, ExprContext* ctx,
@@ -226,7 +226,7 @@ Status HiveUdfCall::Open(RuntimeState* state, ExprContext* ctx,
 
   jni_ctx->output_anyval = CreateAnyVal(type_);
 
-  return Status::OK;
+  return Status::OK();
 }
 
 void HiveUdfCall::Close(RuntimeState* state, ExprContext* ctx,

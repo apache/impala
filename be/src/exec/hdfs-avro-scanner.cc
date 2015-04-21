@@ -119,7 +119,7 @@ Status HdfsAvroScanner::ReadFileHeader() {
   memcpy(header_->sync, sync, SYNC_HASH_SIZE);
 
   header_->header_size = stream_->total_bytes_returned() - SYNC_HASH_SIZE;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsAvroScanner::ParseMetadata() {
@@ -207,7 +207,7 @@ Status HdfsAvroScanner::ParseMetadata() {
   if (avro_header_->schema.empty()) {
     return Status("Schema not found in file header metadata");
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 // Schema resolution is performed by first iterating through the file schema's fields to
@@ -377,7 +377,7 @@ Status HdfsAvroScanner::ResolveSchemas(const avro_schema_t& table_schema,
         DCHECK(false);
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 HdfsAvroScanner::SchemaElement HdfsAvroScanner::ConvertSchema(
@@ -448,37 +448,37 @@ HdfsAvroScanner::SchemaElement HdfsAvroScanner::ConvertSchema(
            << " Table metadata precision: " << slot_desc->type().precision;
         return Status(ss.str());
       }
-      return Status::OK;
+      return Status::OK();
     case AVRO_NULL:
       // All Impala types are nullable
-      return Status::OK;
+      return Status::OK();
     case AVRO_STRING:
     case AVRO_BYTES:
-      if (slot_desc->type().IsStringType()) return Status::OK;
+      if (slot_desc->type().IsStringType()) return Status::OK();
       break;
     case AVRO_INT32:
-      if (slot_desc->type().type == TYPE_INT) return Status::OK;
+      if (slot_desc->type().type == TYPE_INT) return Status::OK();
       // Type promotion
-      if (slot_desc->type().type == TYPE_BIGINT) return Status::OK;
-      if (slot_desc->type().type == TYPE_FLOAT) return Status::OK;
-      if (slot_desc->type().type == TYPE_DOUBLE) return Status::OK;
+      if (slot_desc->type().type == TYPE_BIGINT) return Status::OK();
+      if (slot_desc->type().type == TYPE_FLOAT) return Status::OK();
+      if (slot_desc->type().type == TYPE_DOUBLE) return Status::OK();
       break;
     case AVRO_INT64:
-      if (slot_desc->type().type == TYPE_BIGINT) return Status::OK;
+      if (slot_desc->type().type == TYPE_BIGINT) return Status::OK();
       // Type promotion
-      if (slot_desc->type().type == TYPE_FLOAT) return Status::OK;
-      if (slot_desc->type().type == TYPE_DOUBLE) return Status::OK;
+      if (slot_desc->type().type == TYPE_FLOAT) return Status::OK();
+      if (slot_desc->type().type == TYPE_DOUBLE) return Status::OK();
       break;
     case AVRO_FLOAT:
-      if (slot_desc->type().type == TYPE_FLOAT) return Status::OK;
+      if (slot_desc->type().type == TYPE_FLOAT) return Status::OK();
       // Type promotion
-      if (slot_desc->type().type == TYPE_DOUBLE) return Status::OK;
+      if (slot_desc->type().type == TYPE_DOUBLE) return Status::OK();
       break;
     case AVRO_DOUBLE:
-      if (slot_desc->type().type == TYPE_DOUBLE) return Status::OK;
+      if (slot_desc->type().type == TYPE_DOUBLE) return Status::OK();
       break;
     case AVRO_BOOLEAN:
-      if (slot_desc->type().type == TYPE_BOOLEAN) return Status::OK;
+      if (slot_desc->type().type == TYPE_BOOLEAN) return Status::OK();
       break;
     default:
       break;
@@ -511,7 +511,7 @@ Status HdfsAvroScanner::InitNewRange() {
     scan_node_->IncNumScannersCodegenEnabled();
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsAvroScanner::ProcessRange() {
@@ -570,7 +570,7 @@ Status HdfsAvroScanner::ProcessRange() {
       num_records -= max_tuples;
       COUNTER_ADD(scan_node_->rows_read_counter(), max_tuples);
 
-      if (scan_node_->ReachedLimit()) return Status::OK;
+      if (scan_node_->ReachedLimit()) return Status::OK();
     }
 
     if (decompressor_.get() != NULL && !decompressor_->reuse_output_buffer()) {
@@ -579,7 +579,7 @@ Status HdfsAvroScanner::ProcessRange() {
     RETURN_IF_ERROR(ReadSync());
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 void HdfsAvroScanner::MaterializeTuple(MemPool* pool, uint8_t** data, Tuple* tuple) {

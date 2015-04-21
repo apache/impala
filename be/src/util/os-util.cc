@@ -86,7 +86,7 @@ Status impala::GetThreadStats(int64_t tid, ThreadStats* stats) {
     stats->iowait_ns = tmp * (1e9 / TICKS_PER_SEC);
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 bool impala::RunShellProcess(const string& cmd, string* msg) {

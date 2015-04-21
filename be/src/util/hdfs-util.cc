@@ -35,7 +35,7 @@ Status GetFileSize(const hdfsFS& connection, const char* filename, int64_t* file
   if (info == NULL) return Status(GetHdfsErrorMsg("Failed to get file info ", filename));
   *filesize = info->mSize;
   hdfsFreeFileInfo(info, 1);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status GetLastModificationTime(const hdfsFS& connection, const char* filename,
@@ -44,7 +44,7 @@ Status GetLastModificationTime(const hdfsFS& connection, const char* filename,
   if (info == NULL) return Status(GetHdfsErrorMsg("Failed to get file info ", filename));
   *last_mod_time = info->mLastMod;
   hdfsFreeFileInfo(info, 1);
-  return Status::OK;
+  return Status::OK();
 }
 
 bool IsHiddenFile(const string& filename) {
@@ -60,7 +60,7 @@ Status CopyHdfsFile(const hdfsFS& src_conn, const string& src_path,
     ss << "Failed to copy " << src_path << " to " << dst_path << ": " << error_msg;
     return Status(ss.str());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 bool IsDfsPath(const char* path) {

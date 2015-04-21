@@ -146,7 +146,7 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
     if (read_past_buffer_size == 0) {
       io_buffer_bytes_left_ = 0;
       // TODO: We are leaving io_buffer_ = NULL, revisit.
-      return Status::OK;
+      return Status::OK();
     }
     DiskIoMgr::ScanRange* range = parent_->scan_node_->AllocateScanRange(
         scan_range_->fs(), filename(), read_past_buffer_size, offset, -1,
@@ -165,13 +165,13 @@ Status ScannerContext::Stream::GetNextBuffer(int64_t read_past_size) {
               << parent_->scan_node_->hdfs_table()->name()
               << ". Setting expected file length=" << file_len_;
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ScannerContext::Stream::GetBuffer(bool peek, uint8_t** out_buffer, int64_t* len) {
   *out_buffer = NULL;
   *len = 0;
-  if (eosr()) return Status::OK;
+  if (eosr()) return Status::OK();
 
   if (parent_->cancelled()) {
     DCHECK(*out_buffer == NULL);
@@ -190,7 +190,7 @@ Status ScannerContext::Stream::GetBuffer(bool peek, uint8_t** out_buffer, int64_
       boundary_buffer_bytes_left_ -= *len;
       total_bytes_returned_ += *len;
     }
-    return Status::OK;
+    return Status::OK();
   }
 
   if (io_buffer_bytes_left_ == 0) {
@@ -210,7 +210,7 @@ Status ScannerContext::Stream::GetBuffer(bool peek, uint8_t** out_buffer, int64_
     total_bytes_returned_ += *len;
   }
   DCHECK_GE(bytes_left(), 0);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ScannerContext::Stream::GetBytesInternal(int64_t requested_len,
@@ -276,7 +276,7 @@ Status ScannerContext::Stream::GetBytesInternal(int64_t requested_len,
     }
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 bool ScannerContext::cancelled() const {

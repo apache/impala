@@ -89,7 +89,7 @@ Status PartitionedAggregationNode::Init(const TPlanNode& tnode) {
         pool_, tnode.agg_node.aggregate_functions[i], &evaluator));
     aggregate_evaluators_.push_back(evaluator);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
@@ -203,7 +203,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
       AddRuntimeExecOption("Codegen Enabled");
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status PartitionedAggregationNode::Open(RuntimeState* state) {
@@ -265,7 +265,7 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
   if (!probe_expr_ctxs_.empty()) {
     RETURN_IF_ERROR(MoveHashPartitions(child(0)->rows_returned()));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status PartitionedAggregationNode::GetNext(RuntimeState* state,
@@ -277,7 +277,7 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
 
   if (ReachedLimit()) {
     *eos = true;
-    return Status::OK;
+    return Status::OK();
   }
 
   ExprContext** ctxs = &conjunct_ctxs_[0];
@@ -299,7 +299,7 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
     }
     *eos = true;
     COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-    return Status::OK;
+    return Status::OK();
   }
 
   if (output_iterator_.AtEnd()) {
@@ -311,7 +311,7 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
     if (aggregated_partitions_.empty() && spilled_partitions_.empty()) {
       // No more partitions, all done.
       *eos = true;
-      return Status::OK;
+      return Status::OK();
     }
     // Process next partition.
     RETURN_IF_ERROR(NextPartition());
@@ -346,7 +346,7 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   *eos = ReachedLimit();
   if (output_iterator_.AtEnd()) row_batch->MarkNeedToReturn();
-  return Status::OK;
+  return Status::OK();
 }
 
 void PartitionedAggregationNode::CleanupHashTbl(const vector<FunctionContext*>& ctxs,
@@ -448,7 +448,7 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
   // This stream is only used to spill, no need to ever have this pinned.
   RETURN_IF_ERROR(unaggregated_row_stream->Init(parent->runtime_profile(), false));
   DCHECK(unaggregated_row_stream->has_write_block());
-  return Status::OK;
+  return Status::OK();
 }
 
 bool PartitionedAggregationNode::Partition::InitHashTable() {
@@ -484,7 +484,7 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
     const vector<AggFnEvaluator*>& evaluators = parent->aggregate_evaluators_;;
 
     // Serialize and copy the spilled partition's stream into the new stream.
-    Status status = Status::OK;
+    Status status = Status::OK();
     bool failed_to_add = false;
     BufferedTupleStream* new_stream = parent->serialize_stream_.get();
     HashTable::Iterator it = hash_tbl->Begin(parent->ht_ctx_.get());
@@ -566,7 +566,7 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
            aggregated_row_stream->num_rows() > 0));
   DCHECK(!(unaggregated_row_stream->using_small_buffers() &&
            unaggregated_row_stream->num_rows() > 0));
-  return Status::OK;
+  return Status::OK();
 }
 
 void PartitionedAggregationNode::Partition::Close(bool finalize_rows) {
@@ -754,7 +754,7 @@ Status PartitionedAggregationNode::CreateHashPartitions(int level) {
   }
   COUNTER_ADD(partitions_created_, PARTITION_FANOUT);
   COUNTER_SET(max_partition_level_, level);
-  return Status::OK;
+  return Status::OK();
 }
 
 int64_t PartitionedAggregationNode::LargestSpilledPartition() const {
@@ -844,7 +844,7 @@ Status PartitionedAggregationNode::NextPartition() {
   output_partition_ = partition;
   output_iterator_ = output_partition_->hash_tbl->Begin(ht_ctx_.get());
   COUNTER_ADD(num_hash_buckets_, output_partition_->hash_tbl->num_buckets());
-  return Status::OK;
+  return Status::OK();
 }
 
 template<bool AGGREGATED_ROWS>
@@ -868,7 +868,7 @@ Status PartitionedAggregationNode::ProcessStream(BufferedTupleStream* input_stre
     } while (!eos);
   }
   input_stream->Close();
-  return Status::OK;
+  return Status::OK();
 }
 
 Status PartitionedAggregationNode::SpillPartition(Partition* curr_partition,
@@ -918,7 +918,7 @@ Status PartitionedAggregationNode::SpillPartition(Partition* curr_partition,
   Partition* spilled_partition = hash_partitions_[partition_idx];
   RETURN_IF_ERROR(spilled_partition->Spill(
       spilled_partition == curr_partition ? intermediate_tuple : NULL));
-  return Status::OK;
+  return Status::OK();
 }
 
 Status PartitionedAggregationNode::MoveHashPartitions(int64_t num_input_rows) {
@@ -964,7 +964,7 @@ Status PartitionedAggregationNode::MoveHashPartitions(int64_t num_input_rows) {
   }
   VLOG(2) << ss.str();
   hash_partitions_.clear();
-  return Status::OK;
+  return Status::OK();
 }
 
 Status PartitionedAggregationNode::QueryMaintenance(RuntimeState* state) {

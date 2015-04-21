@@ -62,7 +62,7 @@ Status HdfsRCFileScanner::Prepare(ScannerContext* context) {
   text_converter_.reset(
       new TextConverter(0, scan_node_->hdfs_table()->null_column_value()));
   scan_node_->IncNumScannersCodegenDisabled();
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsRCFileScanner::InitNewRange() {
@@ -101,7 +101,7 @@ Status HdfsRCFileScanner::InitNewRange() {
   }
 
   // TODO: Initialize codegen fn here
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsRCFileScanner::ReadFileHeader() {
@@ -191,7 +191,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
   memcpy(header_->sync, sync, SYNC_HASH_SIZE);
 
   header_->header_size = stream_->total_bytes_returned() - SYNC_HASH_SIZE;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsRCFileScanner::ReadNumColumnsMetadata() {
@@ -221,7 +221,7 @@ Status HdfsRCFileScanner::ReadNumColumnsMetadata() {
       rc_header->num_cols = num_cols;
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 BaseSequenceScanner::FileHeader* HdfsRCFileScanner::AllocateFileHeader() {
@@ -272,7 +272,7 @@ Status HdfsRCFileScanner::ReadRowGroup() {
     }
     RETURN_IF_ERROR(ReadColumnBuffers());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsRCFileScanner::ReadRowGroupHeader() {
@@ -302,7 +302,7 @@ Status HdfsRCFileScanner::ReadRowGroupHeader() {
        << " at offset: " << position;
     return Status(ss.str());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsRCFileScanner::ReadKeyBuffers() {
@@ -338,7 +338,7 @@ Status HdfsRCFileScanner::ReadKeyBuffers() {
   }
   DCHECK_EQ(key_buf_ptr, key_buffer + key_length_);
 
-  return Status::OK;
+  return Status::OK();
 }
 
 void HdfsRCFileScanner::GetCurrentKeyBuffer(int col_idx, bool skip_col_data,
@@ -394,7 +394,7 @@ inline Status HdfsRCFileScanner::NextField(int col_idx) {
       col_info.current_field_len = length;
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 inline Status HdfsRCFileScanner::NextRow() {
@@ -407,7 +407,7 @@ inline Status HdfsRCFileScanner::NextRow() {
     }
   }
   ++row_pos_;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsRCFileScanner::ReadColumnBuffers() {
@@ -445,7 +445,7 @@ Status HdfsRCFileScanner::ReadColumnBuffers() {
           uncompressed_data, column.buffer_len);
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsRCFileScanner::ProcessRange() {
@@ -544,11 +544,11 @@ Status HdfsRCFileScanner::ProcessRange() {
       }
       COUNTER_ADD(scan_node_->rows_read_counter(), max_tuples);
       RETURN_IF_ERROR(CommitRows(num_to_commit));
-      if (scan_node_->ReachedLimit()) return Status::OK;
+      if (scan_node_->ReachedLimit()) return Status::OK();
     }
 
     // RCFiles don't end with syncs
-    if (stream_->eof()) return Status::OK;
+    if (stream_->eof()) return Status::OK();
 
     // Check for sync by looking for the marker that precedes syncs.
     int marker;
@@ -558,7 +558,7 @@ Status HdfsRCFileScanner::ProcessRange() {
       RETURN_IF_ERROR(ReadSync());
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void HdfsRCFileScanner::DebugString(int indentation_level, stringstream* out) const {

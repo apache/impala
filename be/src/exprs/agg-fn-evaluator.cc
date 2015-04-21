@@ -79,7 +79,7 @@ Status AggFnEvaluator::Create(ObjectPool* pool, const TExpr& desc,
         pool, desc.nodes, NULL, &node_idx, &expr, &ctx));
     (*result)->input_expr_ctxs_.push_back(ctx);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 AggFnEvaluator::AggFnEvaluator(const TExprNode& desc, bool is_analytic_fn)
@@ -208,7 +208,7 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
        AnyValUtil::ColumnTypeToTypeDesc(output_slot_desc_->type());
   *agg_fn_ctx = FunctionContextImpl::CreateContext(
       state, agg_fn_pool, intermediate_type, output_type, arg_types);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status AggFnEvaluator::Open(RuntimeState* state, FunctionContext* agg_fn_ctx) {
@@ -221,7 +221,7 @@ Status AggFnEvaluator::Open(RuntimeState* state, FunctionContext* agg_fn_ctx) {
     constant_args[i] = input_expr_ctxs_[i]->root()->GetConstVal(input_expr_ctxs_[i]);
   }
   agg_fn_ctx->impl()->SetConstantArgs(constant_args);
-  return Status::OK;
+  return Status::OK();
 }
 
 void AggFnEvaluator::Close(RuntimeState* state) {

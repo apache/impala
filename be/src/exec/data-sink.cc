@@ -84,7 +84,7 @@ Status DataSink::CreateDataSink(ObjectPool* pool,
       error_msg << str << " not implemented.";
       return Status(error_msg.str());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void DataSink::MergeInsertStats(const TInsertStats& src_stats,
@@ -136,7 +136,7 @@ string DataSink::OutputInsertStats(const PartitionStatusMap& stats,
 Status DataSink::Prepare(RuntimeState* state) {
   expr_mem_tracker_.reset(
       new MemTracker(-1, -1, "Data sink", state->instance_mem_tracker(), false));
-  return Status::OK;
+  return Status::OK();
 }
 
 }  // namespace impala

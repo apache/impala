@@ -52,7 +52,7 @@ Status UnionNode::Init(const TPlanNode& tnode) {
     RETURN_IF_ERROR(Expr::CreateExprTrees(pool_, result_texpr_lists[i], &ctxs));
     result_expr_ctx_lists_.push_back(ctxs);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status UnionNode::Prepare(RuntimeState* state) {
@@ -82,7 +82,7 @@ Status UnionNode::Prepare(RuntimeState* state) {
     AddExprCtxsToFree(result_expr_ctx_lists_[i]);
     DCHECK_EQ(result_expr_ctx_lists_[i].size(), materialized_slots_.size());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status UnionNode::Open(RuntimeState* state) {
@@ -101,7 +101,7 @@ Status UnionNode::Open(RuntimeState* state) {
   // available for clients to fetch after this Open() has succeeded.
   if (!children_.empty()) RETURN_IF_ERROR(OpenCurrentChild(state));
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status UnionNode::OpenCurrentChild(RuntimeState* state) {
@@ -113,7 +113,7 @@ Status UnionNode::OpenCurrentChild(RuntimeState* state) {
   RETURN_IF_ERROR(child(child_idx_)->GetNext(state, child_row_batch_.get(),
       &child_eos_));
   child_row_idx_ = 0;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
@@ -139,7 +139,7 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
       if (EvalAndMaterializeExprs(
               result_expr_ctx_lists_[child_idx_], false, &tuple, row_batch)) {
         *eos = ReachedLimit();
-        return Status::OK;
+        return Status::OK();
       }
 
       // Fetch new batch if one is available, otherwise move on to next child.
@@ -171,11 +171,11 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     }
     ++const_result_expr_idx_;
     *eos = ReachedLimit();
-    if (*eos || row_batch->AtCapacity()) return Status::OK;
+    if (*eos || row_batch->AtCapacity()) return Status::OK();
   }
 
   *eos = true;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status UnionNode::Reset(RuntimeState* state) {

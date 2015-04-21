@@ -47,7 +47,7 @@ Status GetHostname(string* hostname) {
     return Status(ss.str());
   }
   *hostname = string(name);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HostnameToIpAddrs(const string& name, vector<string>* addresses) {
@@ -79,7 +79,7 @@ Status HostnameToIpAddrs(const string& name, vector<string>* addresses) {
   }
 
   freeaddrinfo(addr_info);
-  return Status::OK;
+  return Status::OK();
 }
 
 bool FindFirstNonLocalhost(const vector<string>& addresses, string* addr) {

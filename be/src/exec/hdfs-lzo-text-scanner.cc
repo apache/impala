@@ -107,7 +107,7 @@ Status HdfsLzoTextScanner::LoadLzoLibrary() {
   DCHECK(CreateLzoTextScanner != NULL);
   DCHECK(LzoIssueInitialRanges != NULL);
   LOG(INFO) << "Loaded impala-lzo library: " << LIB_IMPALA_LZO;
-  return Status::OK;
+  return Status::OK();
 }
 
 }

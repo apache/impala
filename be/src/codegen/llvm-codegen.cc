@@ -156,12 +156,12 @@ Status LlvmCodeGen::LoadModule(LlvmCodeGen* codegen, const string& file,
     ss << "Could not parse module " << file << ": " << error;
     return Status(ss.str());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 // TODO: Create separate counters/timers (file size, load time) for each module linked
 Status LlvmCodeGen::LinkModule(const string& file) {
-  if (linked_modules_.find(file) != linked_modules_.end()) return Status::OK;
+  if (linked_modules_.find(file) != linked_modules_.end()) return Status::OK();
 
   SCOPED_TIMER(profile_.total_time_counter());
   Module* new_module;
@@ -175,7 +175,7 @@ Status LlvmCodeGen::LinkModule(const string& file) {
     return Status(ss.str());
   }
   linked_modules_.insert(file);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status LlvmCodeGen::LoadImpalaIR(
@@ -247,7 +247,7 @@ Status LlvmCodeGen::LoadImpalaIR(
     return Status(ss.str());
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status LlvmCodeGen::Init() {
@@ -283,7 +283,7 @@ Status LlvmCodeGen::Init() {
 
   RETURN_IF_ERROR(LoadIntrinsics());
 
-  return Status::OK;
+  return Status::OK();
 }
 
 LlvmCodeGen::~LlvmCodeGen() {
@@ -656,7 +656,7 @@ Status LlvmCodeGen::FinalizeModule() {
     }
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 void LlvmCodeGen::OptimizeModule() {
@@ -937,7 +937,7 @@ Status LlvmCodeGen::LoadIntrinsics() {
     llvm_intrinsics_[id] = fn;
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 void LlvmCodeGen::CodegenMemcpy(LlvmBuilder* builder, Value* dst, Value* src, int size) {

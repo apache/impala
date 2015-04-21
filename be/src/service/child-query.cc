@@ -178,7 +178,7 @@ void ChildQuery::Cancel() {
 
 Status ChildQuery::IsCancelled() {
   lock_guard<mutex> l(lock_);
-  if (!is_cancelled_) return Status::OK;
+  if (!is_cancelled_) return Status::OK();
   return Status::CANCELLED;
 }
 

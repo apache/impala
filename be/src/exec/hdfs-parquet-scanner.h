@@ -184,7 +184,7 @@ class HdfsParquetScanner : public HdfsScanner {
   Status ValidateColumn(const BaseColumnReader& col_reader, int row_group_idx);
 
   /// Part of the HdfsScanner interface, not used in Parquet.
-  Status InitNewRange() { return Status::OK; };
+  Status InitNewRange() { return Status::OK(); };
 
   /// Unflattens the schema metadata from a Parquet file metadata and converts it to our
   /// SchemaNode representation. Returns the result in 'n' unless an error status is

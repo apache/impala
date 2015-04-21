@@ -172,7 +172,7 @@ Status ThreadMgr::StartInstrumentation(MetricGroup* metrics, Webserver* webserve
   webserver->RegisterUrlCallback("/thread-group", "thread-group.tmpl",
       overview_callback, false);
 
-  return Status::OK;
+  return Status::OK();
 }
 
 void ThreadMgr::AddThread(const thread::id& thread, const string& name,
@@ -321,7 +321,7 @@ Status ThreadGroup::AddThread(Thread* thread) {
     DCHECK(cgroups_mgr_ != NULL);
     RETURN_IF_ERROR(cgroups_mgr_->AssignThreadToCgroup(*thread, cgroup_path_));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void ThreadGroup::JoinAll() {
@@ -338,7 +338,7 @@ Status ThreadGroup::SetCgroup(const string& cgroup) {
        it != threads_.end(); ++it) {
     RETURN_IF_ERROR(cgroups_mgr_->AssignThreadToCgroup(*it, cgroup));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 }

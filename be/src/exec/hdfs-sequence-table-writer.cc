@@ -84,7 +84,7 @@ Status HdfsSequenceTableWriter::Init() {
   neg1_sync_marker_ = string(reinterpret_cast<char*>(sync_neg1), 20);
   sync_marker_ = uuid;
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsSequenceTableWriter::AppendRowBatch(RowBatch* batch,
@@ -123,7 +123,7 @@ Status HdfsSequenceTableWriter::AppendRowBatch(RowBatch* batch,
 
   if (out_.Size() >= approx_block_size_) Flush();
   *new_file = false;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsSequenceTableWriter::WriteFileHeader() {
@@ -157,7 +157,7 @@ Status HdfsSequenceTableWriter::WriteFileHeader() {
   string text = out_.String();
   RETURN_IF_ERROR(Write(reinterpret_cast<const uint8_t*>(text.c_str()), text.size()));
   out_.Clear();
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsSequenceTableWriter::WriteCompressedBlock() {
@@ -190,7 +190,7 @@ Status HdfsSequenceTableWriter::WriteCompressedBlock() {
   RETURN_IF_ERROR(Write(reinterpret_cast<const uint8_t*>(head.data()),
                         head.size()));
   RETURN_IF_ERROR(Write(output, output_length));
-  return Status::OK;
+  return Status::OK();
 }
 
 inline void HdfsSequenceTableWriter::WriteEscapedString(const StringValue* str_val,
@@ -239,7 +239,7 @@ inline Status HdfsSequenceTableWriter::ConsumeRow(TupleRow* row) {
     EncodeRow(row, &row_buf_);
     out_.WriteVLong(row_buf_.Size());
     out_.WriteBytes(row_buf_.Size(), row_buf_.String().data());
-    return Status::OK;
+    return Status::OK();
   }
 
   EncodeRow(row, &row_buf_);
@@ -285,11 +285,11 @@ inline Status HdfsSequenceTableWriter::ConsumeRow(TupleRow* row) {
 
   // write out the value (possibly compressed)
   out_.WriteBytes(value_length, value_bytes);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsSequenceTableWriter::Flush() {
-  if (unflushed_rows_ == 0) return Status::OK;
+  if (unflushed_rows_ == 0) return Status::OK();
 
   SCOPED_TIMER(parent_->hdfs_write_timer());
 
@@ -302,7 +302,7 @@ Status HdfsSequenceTableWriter::Flush() {
   }
   out_.Clear();
   unflushed_rows_ = 0;
-  return Status::OK;
+  return Status::OK();
 }
 
 } // namespace impala

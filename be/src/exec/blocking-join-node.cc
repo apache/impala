@@ -44,7 +44,7 @@ BlockingJoinNode::BlockingJoinNode(const string& node_name, const TJoinOp::type 
 
 Status BlockingJoinNode::Init(const TPlanNode& tnode) {
   RETURN_IF_ERROR(ExecNode::Init(tnode));
-  return Status::OK;
+  return Status::OK();
 }
 
 BlockingJoinNode::~BlockingJoinNode() {
@@ -114,7 +114,7 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
 
   probe_batch_.reset(
       new RowBatch(child(0)->row_desc(), state->batch_size(), mem_tracker()));
-  return Status::OK;
+  return Status::OK();
 }
 
 Status BlockingJoinNode::Reset(RuntimeState* state) {
@@ -206,7 +206,7 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
       break;
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void BlockingJoinNode::DebugString(int indentation_level, stringstream* out) const {

@@ -50,7 +50,7 @@ Status GzipDecompressor::Init() {
     return Status("zlib inflateInit failed: " +  string(stream_.msg));
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 int64_t GzipDecompressor::MaxOutputLen(int64_t input_len, const uint8_t* input) {
@@ -112,7 +112,7 @@ Status GzipDecompressor::ProcessBlockStreaming(int64_t input_length, const uint8
       return Status("zlib inflateReset failed: " + string(stream_.msg));
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status GzipDecompressor::ProcessBlock(bool output_preallocated, int64_t input_length,
@@ -122,7 +122,7 @@ Status GzipDecompressor::ProcessBlock(bool output_preallocated, int64_t input_le
     // (inflate() will return Z_STREAM_ERROR). We don't consider this an error, so bail
     // early if no output is expected. Note that we don't signal an error if the input
     // actually contains compressed data.
-    return Status::OK;
+    return Status::OK();
   }
 
   bool use_temp = false;
@@ -203,7 +203,7 @@ Status GzipDecompressor::ProcessBlock(bool output_preallocated, int64_t input_le
   // we're interested in the number of bytes used.
   *output_length = *output_length - stream_.avail_out;
   if (use_temp) memory_pool_->AcquireData(temp_memory_pool_.get(), reuse_buffer_);
-  return Status::OK;
+  return Status::OK();
 }
 
 BzipDecompressor::BzipDecompressor(MemPool* mem_pool, bool reuse_buffer)
@@ -218,7 +218,7 @@ Status BzipDecompressor::ProcessBlock(bool output_preallocated, int64_t input_le
     const uint8_t* input, int64_t* output_length, uint8_t** output) {
   if (output_preallocated && *output_length == 0) {
     // Same problem as zlib library, see comment in GzipDecompressor::ProcessBlock()
-    return Status::OK;
+    return Status::OK();
   }
 
   bool use_temp = false;
@@ -267,7 +267,7 @@ Status BzipDecompressor::ProcessBlock(bool output_preallocated, int64_t input_le
   *output = out_buffer_;
   *output_length = outlen;
   if (use_temp) memory_pool_->AcquireData(temp_memory_pool_.get(), reuse_buffer_);
-  return Status::OK;
+  return Status::OK();
 }
 
 
@@ -369,7 +369,7 @@ static Status SnappyBlockDecompress(int64_t input_len, const uint8_t* input,
   } else if (*output_len != uncompressed_total_len) {
     return Status(TErrorCode::SNAPPY_DECOMPRESS_DECOMPRESS_SIZE_INCORRECT);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status SnappyBlockDecompressor::ProcessBlock(bool output_preallocated, int64_t input_len,
@@ -396,7 +396,7 @@ Status SnappyBlockDecompressor::ProcessBlock(bool output_preallocated, int64_t i
 
   char* out_ptr = reinterpret_cast<char*>(*output);
   RETURN_IF_ERROR(SnappyBlockDecompress(input_len, input, false, output_len, out_ptr));
-  return Status::OK;
+  return Status::OK();
 }
 
 SnappyDecompressor::SnappyDecompressor(MemPool* mem_pool, bool reuse_buffer)
@@ -434,7 +434,7 @@ Status SnappyDecompressor::ProcessBlock(bool output_preallocated, int64_t input_
     return Status("Snappy: RawUncompress failed");
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Lz4Decompressor::Lz4Decompressor(MemPool* mem_pool, bool reuse_buffer)
@@ -450,11 +450,11 @@ Status Lz4Decompressor::ProcessBlock(bool output_preallocated, int64_t input_len
     const uint8_t* input, int64_t* output_length, uint8_t** output) {
   DCHECK(output_preallocated) << "Lz4 Codec implementation must have allocated output";
   // LZ4_uncompress will cause a segmentation fault if passed a NULL output.
-  if(*output_length == 0) return Status::OK;
+  if(*output_length == 0) return Status::OK();
   if (LZ4_uncompress(reinterpret_cast<const char*>(input),
           reinterpret_cast<char*>(*output), *output_length) != input_length) {
     return Status("Lz4: uncompress failed");
   }
 
-  return Status::OK;
+  return Status::OK();
 }

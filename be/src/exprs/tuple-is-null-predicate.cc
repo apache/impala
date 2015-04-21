@@ -54,7 +54,7 @@ Status TupleIsNullPredicate::Prepare(RuntimeState* state, const RowDescriptor& r
     }
     if (row_desc.TupleIsNullable(tuple_idx)) tuple_idxs_.push_back(tuple_idx);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status TupleIsNullPredicate::GetCodegendComputeFn(RuntimeState* state,

@@ -47,7 +47,7 @@ Status CgroupsMgr::Init(const string& cgroups_hierarchy_path,
   staging_cgroup_ = staging_cgroup;
   // Set up the staging cgroup for Impala to retire execution threads into.
   RETURN_IF_ERROR(CreateCgroup(staging_cgroup, true));
-  return Status::OK;
+  return Status::OK();
 }
 
 string CgroupsMgr::UniqueIdToCgroup(const string& unique_id) const {
@@ -76,7 +76,7 @@ Status CgroupsMgr::CreateCgroup(const string& cgroup, bool if_not_exists) const 
     err_msg << "Failed to create CGroup at path " << cgroup_path << ". " << e.what();
     return Status(err_msg.str());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status CgroupsMgr::DropCgroup(const string& cgroup, bool if_exists) const {
@@ -94,7 +94,7 @@ Status CgroupsMgr::DropCgroup(const string& cgroup, bool if_exists) const {
     err_msg << "Failed to drop CGroup at path " << cgroup_path << ". " << e.what();
     return Status(err_msg.str());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status CgroupsMgr::SetCpuShares(const string& cgroup, int32_t num_shares) {
@@ -113,7 +113,7 @@ Status CgroupsMgr::SetCpuShares(const string& cgroup, int32_t num_shares) {
 
   LOG(INFO) << "Setting CPU shares of CGroup " << cgroup_path << " to " << num_shares;
   cpu_shares << num_shares << endl;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status CgroupsMgr::GetCgroupPaths(const std::string& cgroup,
@@ -135,7 +135,7 @@ Status CgroupsMgr::GetCgroupPaths(const std::string& cgroup,
     err_msg << "CGroup " << *cgroup_path << " does not have a /tasks file";
     return Status(err_msg.str());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status CgroupsMgr::AssignThreadToCgroup(const Thread& thread,
@@ -154,7 +154,7 @@ Status CgroupsMgr::AssignThreadToCgroup(const Thread& thread,
 
   VLOG_ROW << "Thread " << thread.tid() << " moved to CGroup " << cgroup_path;
   tasks.close();
-  return Status::OK;
+  return Status::OK();
 }
 
 Status CgroupsMgr::RelocateThreads(const string& src_cgroup,
@@ -191,12 +191,12 @@ Status CgroupsMgr::RelocateThreads(const string& src_cgroup,
              << " to " << dst_tasks_path;
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status CgroupsMgr::RegisterFragment(const TUniqueId& fragment_instance_id,
     const string& cgroup, bool* is_first) {
-  if (cgroup.empty() || cgroups_hierarchy_path_.empty()) return Status::OK;
+  if (cgroup.empty() || cgroups_hierarchy_path_.empty()) return Status::OK();
 
   LOG(INFO) << "Registering fragment " << PrintId(fragment_instance_id)
             << " with CGroup " << cgroups_hierarchy_path_ << "/" << cgroup;
@@ -208,12 +208,12 @@ Status CgroupsMgr::RegisterFragment(const TUniqueId& fragment_instance_id,
   } else {
     *is_first = false;
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status CgroupsMgr::UnregisterFragment(const TUniqueId& fragment_instance_id,
     const string& cgroup) {
-  if (cgroup.empty() || cgroups_hierarchy_path_.empty()) return Status::OK;
+  if (cgroup.empty() || cgroups_hierarchy_path_.empty()) return Status::OK();
 
   LOG(INFO) << "Unregistering fragment " << PrintId(fragment_instance_id)
             << " from CGroup " << cgroups_hierarchy_path_ << "/" << cgroup;
@@ -229,7 +229,7 @@ Status CgroupsMgr::UnregisterFragment(const TUniqueId& fragment_instance_id,
     active_cgroups_metric_->Increment(-1);
     active_cgroups_.erase(entry);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 }

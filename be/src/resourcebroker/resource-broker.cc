@@ -163,7 +163,7 @@ Status ResourceBroker::Init() {
   llama_client_id_ = uuid_generator();
   RETURN_IF_ERROR(RegisterWithLlama());
   RETURN_IF_ERROR(RefreshLlamaNodes());
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ResourceBroker::RegisterWithLlama() {
@@ -175,7 +175,7 @@ Status ResourceBroker::RegisterWithLlama() {
   // query will wait for re-registration with the Llama to succeed.
   int64_t start = MonotonicSeconds();
   lock_guard<mutex> l(llama_registration_lock_);
-  if (llama_handle_ != current_llama_handle) return Status::OK;
+  if (llama_handle_ != current_llama_handle) return Status::OK();
 
   active_llama_metric_->set_value("none");
   active_llama_handle_metric_->set_value("none");
@@ -245,7 +245,7 @@ Status ResourceBroker::RegisterWithLlama() {
   active_llama_addr_idx_ = llama_addr_idx;
   active_llama_metric_->set_value(lexical_cast<string>(llama_addresses_[llama_addr_idx]));
   active_llama_handle_metric_->set_value(lexical_cast<string>(llama_handle_));
-  return Status::OK;
+  return Status::OK();
 }
 
 bool ResourceBroker::LlamaHasRestarted(const llama::TStatus& status) const {
@@ -349,7 +349,7 @@ Status ResourceBroker::LlamaRpc(LlamaReqType* request, LlamaRespType* response,
         "Request aborted after $0 attempts due to connectivity issues with Llama.",
         FLAGS_llama_max_request_attempts));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 template <typename LlamaReqType, typename LlamaRespType>
@@ -528,7 +528,7 @@ Status ResourceBroker::Expand(const TResourceBrokerExpansionRequest& request,
 
   VLOG_QUERY << "Fulfilled expansion for id: " << ll_response.expansion_id;
   expansion_requests_fulfilled_metric_->Increment(1);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ResourceBroker::Reserve(const TResourceBrokerReservationRequest& request,
@@ -595,7 +595,7 @@ Status ResourceBroker::Reserve(const TResourceBrokerReservationRequest& request,
   response->__set_reservation_id(reservation_id);
   VLOG_QUERY << "Fulfilled reservation with id: " << pending_request->reservation_id();
   reservation_requests_fulfilled_metric_->Increment(1);
-  return Status::OK;
+  return Status::OK();
 }
 
 void ResourceBroker::ClearRequests(const TUniqueId& reservation_id,
@@ -650,7 +650,7 @@ Status ResourceBroker::Release(const TResourceBrokerReleaseRequest& request,
     allocated_requests_.erase(reservation_id);
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 void ResourceBroker::AMNotification(const llama::TLlamaAMNotificationRequest& request,
@@ -738,7 +738,7 @@ Status ResourceBroker::RefreshLlamaNodes() {
   RETURN_IF_ERROR(LlamaStatusToImpalaStatus(llama_response.status));
   llama_nodes_ = llama_response.nodes;
   LOG(INFO) << "Llama Nodes [" << join(llama_nodes_, ", ") << "]";
-  return Status::OK;
+  return Status::OK();
 }
 
 bool ResourceBroker::GetQueryResourceMgr(const TUniqueId& query_id,

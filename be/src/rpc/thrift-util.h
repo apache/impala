@@ -51,7 +51,7 @@ class ThriftSerializer {
     RETURN_IF_ERROR(Serialize<T>(obj, &len, &buffer));
     result->resize(len);
     memcpy(&((*result)[0]), buffer, len);
-    return Status::OK;
+    return Status::OK();
   }
 
   /// Serialize obj into a memory buffer.  The result is returned in buffer/len.  The
@@ -68,7 +68,7 @@ class ThriftSerializer {
       return Status(msg.str());
     }
     mem_buffer_->getBuffer(buffer, len);
-    return Status::OK;
+    return Status::OK();
   }
 
   template <class T>
@@ -82,7 +82,7 @@ class ThriftSerializer {
       return Status(msg.str());
     }
     *result = mem_buffer_->getBufferAsString();
-    return Status::OK;
+    return Status::OK();
   }
 
  private:
@@ -129,7 +129,7 @@ Status DeserializeThriftMsg(const uint8_t* buf, uint32_t* len, bool compact,
   }
   uint32_t bytes_left = tmem_transport->available_read();
   *len = *len - bytes_left;
-  return Status::OK;
+  return Status::OK();
 }
 
 /// Redirects all Thrift logging to VLOG(1)

@@ -135,7 +135,7 @@ Status RequestPoolService::ResolveRequestPool(const string& requested_pool_name,
   if (default_pool_only_) {
     resolved_pool->__set_resolved_pool(DEFAULT_POOL_NAME);
     resolved_pool->__set_has_access(true);
-    return Status::OK;
+    return Status::OK();
   }
 
   TResolveRequestPoolParams params;
@@ -157,7 +157,7 @@ Status RequestPoolService::GetPoolConfig(const string& pool_name,
     pool_config->__set_mem_limit(
         FLAGS_disable_pool_mem_limits ? -1 : default_pool_mem_limit_);
     pool_config->__set_max_queued(FLAGS_default_pool_max_queued);
-    return Status::OK;
+    return Status::OK();
   }
 
   TPoolConfigParams params;
@@ -166,5 +166,5 @@ Status RequestPoolService::GetPoolConfig(const string& pool_name,
         request_pool_service_, get_pool_config_id_, params, pool_config));
   if (FLAGS_disable_pool_max_requests) pool_config->__set_max_requests(-1);
   if (FLAGS_disable_pool_mem_limits) pool_config->__set_mem_limit(-1);
-  return Status::OK;
+  return Status::OK();
 }

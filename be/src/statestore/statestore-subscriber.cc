@@ -129,7 +129,7 @@ Status StatestoreSubscriber::AddTopic(const Statestore::TopicId& topic_id,
         CALLBACK_METRIC_PATTERN, topic_id);
   }
   topic_registrations_[topic_id] = is_transient;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status StatestoreSubscriber::Register() {
@@ -267,7 +267,7 @@ Status StatestoreSubscriber::CheckRegistrationId(const TUniqueId& registration_i
     }
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 void StatestoreSubscriber::Heartbeat(const TUniqueId& registration_id) {
@@ -352,7 +352,7 @@ Status StatestoreSubscriber::UpdateState(const TopicDeltaMap& incoming_topic_del
   } else {
     *skipped = true;
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 

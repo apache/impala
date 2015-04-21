@@ -365,7 +365,7 @@ Status Sorter::Run::Init() {
     }
   }
   if (!is_sorted_) sorter_->initial_runs_counter_->Add(1);
-  return Status::OK;
+  return Status::OK();
 }
 
 template <bool has_var_len_data>
@@ -432,7 +432,7 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
             // There was not enough space in the last var-len block for this tuple, and
             // the run could not be extended. Return the fixed-len allocation and exit.
             cur_fixed_len_block->ReturnAllocation(sort_tuple_size_);
-            return Status::OK;
+            return Status::OK();
           }
         }
 
@@ -458,11 +458,11 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
       if (added) {
         cur_fixed_len_block = fixed_len_blocks_.back();
       } else {
-        return Status::OK;
+        return Status::OK();
       }
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void Sorter::Run::DeleteAllBlocks() {
@@ -529,7 +529,7 @@ Status Sorter::Run::UnpinAllBlocks() {
   // needed.
   var_len_copy_block_ = NULL;
   is_pinned_ = false;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Sorter::Run::PrepareRead() {
@@ -544,7 +544,7 @@ Status Sorter::Run::PrepareRead() {
 
   // If the run is pinned, merge is not invoked, so buffered_batch_ is not needed
   // and the individual blocks do not need to be pinned.
-  if (is_pinned_) return Status::OK;
+  if (is_pinned_) return Status::OK();
 
   // Attempt to pin the first fixed and var-length blocks. In either case, pinning may
   // fail if the number of reserved blocks is oversubscribed, see IMPALA-1590.
@@ -567,7 +567,7 @@ Status Sorter::Run::PrepareRead() {
       return status;
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Sorter::Run::GetNextBatch(RowBatch** output_batch) {
@@ -602,7 +602,7 @@ Status Sorter::Run::GetNextBatch(RowBatch** output_batch) {
 
   // *output_batch == NULL indicates eos.
   *output_batch = buffered_batch_.get();
-  return Status::OK;
+  return Status::OK();
 }
 
 template <bool convert_offset_to_ptr>
@@ -610,7 +610,7 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
   if (fixed_len_blocks_index_ == fixed_len_blocks_.size()) {
     *eos = true;
     DCHECK_EQ(num_tuples_returned_, num_tuples_);
-    return Status::OK;
+    return Status::OK();
   } else {
     *eos = false;
   }
@@ -696,7 +696,7 @@ Status Sorter::Run::GetNext(RowBatch* output_batch, bool* eos) {
     fixed_len_block_offset_ = 0;
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 void Sorter::Run::CollectNonNullVarSlots(Tuple* src,
@@ -733,7 +733,7 @@ Status Sorter::Run::TryAddBlock(vector<BufferedBlockMgr::Block*>* block_sequence
   } else {
     *added = false;
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void Sorter::Run::CopyVarLenData(char* dest, const vector<StringValue*>& var_values) {
@@ -917,7 +917,7 @@ Status Sorter::Init() {
 
   DCHECK_NOTNULL(unsorted_run_);
   RETURN_IF_ERROR(unsorted_run_->Init());
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Sorter::AddBatch(RowBatch* batch) {
@@ -943,7 +943,7 @@ Status Sorter::AddBatch(RowBatch* batch) {
       unsorted_run_->Init();
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Sorter::InputDone() {
@@ -987,7 +987,7 @@ Status Sorter::InputDone() {
     // Create the final merger.
     CreateMerger(sorted_runs_.size());
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Sorter::GetNext(RowBatch* output_batch, bool* eos) {
@@ -1000,7 +1000,7 @@ Status Sorter::GetNext(RowBatch* output_batch, bool* eos) {
     // In this case, rows are deep copied into output_batch.
     RETURN_IF_ERROR(merger_->GetNext(output_batch, eos));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Sorter::SortRun() {
@@ -1032,7 +1032,7 @@ Status Sorter::SortRun() {
   }
   sorted_runs_.push_back(unsorted_run_);
   unsorted_run_ = NULL;
-  return Status::OK;
+  return Status::OK();
 }
 
 uint64_t Sorter::EstimateMergeMem(uint64_t available_blocks,
@@ -1117,7 +1117,7 @@ Status Sorter::MergeIntermediateRuns() {
     sorted_runs_.push_back(merged_run);
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Sorter::CreateMerger(int num_runs) {
@@ -1145,7 +1145,7 @@ Status Sorter::CreateMerger(int num_runs) {
   RETURN_IF_ERROR(merger_->Prepare(merge_runs));
 
   num_merges_counter_->Add(1);
-  return Status::OK;
+  return Status::OK();
 }
 
 } // namespace impala

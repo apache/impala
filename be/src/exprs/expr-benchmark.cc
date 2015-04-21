@@ -69,7 +69,7 @@ class Planner {
         jni_env->CallObjectMethod(fe_, create_exec_request_id_, request_bytes));
     RETURN_ERROR_IF_EXC(jni_env);
     RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, result));
-    return Status::OK;
+    return Status::OK();
   }
 
  private:
@@ -97,7 +97,7 @@ static Status PrepareSelectList(const TExecRequest& request, ExprContext** ctx) 
   DCHECK_EQ(texprs.size(), 1);
   RETURN_IF_ERROR(Expr::CreateExprTree(&pool, texprs[0], ctx));
   RETURN_IF_ERROR((*ctx)->Prepare(NULL, RowDescriptor(), &tracker));
-  return Status::OK;
+  return Status::OK();
 }
 
 // TODO: handle codegen.  Codegen needs a new driver that is also codegen'd.

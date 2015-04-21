@@ -142,7 +142,7 @@ Status ScalarFnCall::Prepare(RuntimeState* state, const RowDescriptor& desc,
         reinterpret_cast<void**>(&close_fn_)));
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ScalarFnCall::Open(RuntimeState* state, ExprContext* ctx,
@@ -192,7 +192,7 @@ Status ScalarFnCall::Open(RuntimeState* state, ExprContext* ctx,
     }
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 void ScalarFnCall::Close(RuntimeState* state, ExprContext* context,
@@ -243,7 +243,7 @@ bool ScalarFnCall::IsConstant() const {
 Status ScalarFnCall::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
-    return Status::OK;
+    return Status::OK();
   }
   for (int i = 0; i < GetNumChildren(); ++i) {
     if (children_[i]->type().type == TYPE_CHAR) {
@@ -372,7 +372,7 @@ Status ScalarFnCall::GetCodegendComputeFn(RuntimeState* state, llvm::Function** 
   *fn = codegen->FinalizeFunction(*fn);
   DCHECK(*fn != NULL);
   ir_compute_fn_ = *fn;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ScalarFnCall::GetUdf(RuntimeState* state, llvm::Function** udf) {
@@ -479,7 +479,7 @@ Status ScalarFnCall::GetUdf(RuntimeState* state, llvm::Function** udf) {
           TErrorCode::UDF_VERIFY_FAILED, fn_.scalar_fn.symbol, fn_.hdfs_location);
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ScalarFnCall::GetFunction(RuntimeState* state, const string& symbol, void** fn) {
@@ -499,7 +499,7 @@ Status ScalarFnCall::GetFunction(RuntimeState* state, const string& symbol, void
       return Status(ss.str());
     }
     codegen->AddFunctionToJit(ir_fn, fn);
-    return Status::OK;
+    return Status::OK();
   }
 }
 

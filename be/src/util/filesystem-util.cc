@@ -47,7 +47,7 @@ Status FileSystemUtil::CreateDirectories(const vector<string>& directories) {
     }
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status FileSystemUtil::RemovePaths(const vector<string>& directories) {
@@ -60,7 +60,7 @@ Status FileSystemUtil::RemovePaths(const vector<string>& directories) {
     }
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status FileSystemUtil::CreateFile(const string& file_path) {
@@ -79,7 +79,7 @@ Status FileSystemUtil::CreateFile(const string& file_path) {
             file_path.c_str(), errno, GetStrErrMsg())));
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status FileSystemUtil::ResizeFile(const string& file_path, int64_t trunc_len) {
@@ -90,7 +90,7 @@ Status FileSystemUtil::ResizeFile(const string& file_path, int64_t trunc_len) {
         file_path, trunc_len, errno, GetStrErrMsg())));
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status FileSystemUtil::VerifyIsDirectory(const string& directory_path) {
@@ -108,7 +108,7 @@ Status FileSystemUtil::VerifyIsDirectory(const string& directory_path) {
     return Status(ErrorMsg(TErrorCode::RUNTIME_ERROR, Substitute(
         "Path $0 is not a directory", directory_path)));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status FileSystemUtil::GetSpaceAvailable(const string& directory_path,
@@ -122,7 +122,7 @@ Status FileSystemUtil::GetSpaceAvailable(const string& directory_path,
         directory_path, e.what())));
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 } // namespace impala

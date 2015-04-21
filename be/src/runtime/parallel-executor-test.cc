@@ -41,7 +41,7 @@ class ParallelExecutorTest {
       }
     }
 
-    return Status::OK;
+    return Status::OK();
   }
 
   ParallelExecutorTest(int num_updates) {

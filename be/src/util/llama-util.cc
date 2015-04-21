@@ -126,7 +126,7 @@ impala::TNetworkAddress& operator<<(impala::TNetworkAddress& dest,
 
 impala::Status LlamaStatusToImpalaStatus(const TStatus& status,
     const string& err_prefix) {
-  if (status.status_code == TStatusCode::OK) return impala::Status::OK;
+  if (status.status_code == TStatusCode::OK) return impala::Status::OK();
   stringstream ss;
   ss << err_prefix << " " << join(status.error_msgs, ", ");
   return impala::Status(ss.str());

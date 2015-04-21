@@ -82,7 +82,7 @@ Status HdfsSequenceScanner::InitNewRange() {
   // Initialize codegen fn
   RETURN_IF_ERROR(InitializeWriteTuplesFn(hdfs_partition,
       THdfsFileFormat::SEQUENCE_FILE, "HdfsSequenceScanner"));
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsSequenceScanner::Prepare(ScannerContext* context) {
@@ -93,7 +93,7 @@ Status HdfsSequenceScanner::Prepare(ScannerContext* context) {
   // TODO: This should probably be based on L2/L3 cache sizes (as should the batch size)
   record_locations_.resize(state_->batch_size());
   field_locations_.resize(state_->batch_size() * scan_node_->materialized_slots().size());
-  return Status::OK;
+  return Status::OK();
 }
 
 BaseSequenceScanner::FileHeader* HdfsSequenceScanner::AllocateFileHeader() {
@@ -144,7 +144,7 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
     RETURN_IF_FALSE(
         stream_->ReadBytes(*record_len, record_ptr, &parse_status_));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 // Process block compressed sequence files.  This is the most used sequence file
@@ -162,7 +162,7 @@ Status HdfsSequenceScanner::ProcessBlockCompressedScanRange() {
   DCHECK(header_->is_compressed);
 
   while (!finished()) {
-    if (scan_node_->ReachedLimit()) return Status::OK;
+    if (scan_node_->ReachedLimit()) return Status::OK();
 
     // Step 1
     RETURN_IF_ERROR(ReadCompressedBlock());
@@ -174,7 +174,7 @@ Status HdfsSequenceScanner::ProcessBlockCompressedScanRange() {
     }
 
     // SequenceFiles don't end with syncs
-    if (stream_->eof()) return Status::OK;
+    if (stream_->eof()) return Status::OK();
 
     // Step 3
     int sync_indicator;
@@ -192,7 +192,7 @@ Status HdfsSequenceScanner::ProcessBlockCompressedScanRange() {
     RETURN_IF_ERROR(ReadSync());
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsSequenceScanner::ProcessDecompressedBlock() {
@@ -207,7 +207,7 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
     num_to_process = WriteEmptyTuples(context_, tuple_row, num_to_process);
     COUNTER_ADD(scan_node_->rows_read_counter(), num_to_process);
     RETURN_IF_ERROR(CommitRows(num_to_process));
-    return Status::OK;
+    return Status::OK();
   }
 
   // Parse record starts and lengths
@@ -265,7 +265,7 @@ Status HdfsSequenceScanner::ProcessDecompressedBlock() {
   if (tuples_returned == -1) return parse_status_;
   COUNTER_ADD(scan_node_->rows_read_counter(), num_to_process);
   RETURN_IF_ERROR(CommitRows(tuples_returned));
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsSequenceScanner::ProcessRange() {
@@ -328,7 +328,7 @@ Status HdfsSequenceScanner::ProcessRange() {
     if (scan_node_->ReachedLimit()) break;
 
     // Sequence files don't end with syncs
-    if (stream_->eof()) return Status::OK;
+    if (stream_->eof()) return Status::OK();
 
     // Check for sync by looking for the marker that precedes syncs.
     int marker;
@@ -339,7 +339,7 @@ Status HdfsSequenceScanner::ProcessRange() {
     }
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsSequenceScanner::ReadFileHeader() {
@@ -413,7 +413,7 @@ Status HdfsSequenceScanner::ReadFileHeader() {
     // all other formats do not
     header_->header_size -= SYNC_HASH_SIZE;
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsSequenceScanner::ReadBlockHeader() {
@@ -435,7 +435,7 @@ Status HdfsSequenceScanner::ReadBlockHeader() {
     return Status(ss.str());
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsSequenceScanner::ReadCompressedBlock() {
@@ -487,7 +487,7 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
     next_record_in_compressed_block_ = unparsed_data_buffer_;
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 void HdfsSequenceScanner::LogRowParseError(int row_idx, stringstream* ss) {

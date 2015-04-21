@@ -63,7 +63,7 @@ SlotRef::SlotRef(const ColumnType& type, int offset)
 Status SlotRef::Prepare(RuntimeState* state, const RowDescriptor& row_desc,
                         ExprContext* context) {
   DCHECK_EQ(children_.size(), 0);
-  if (slot_id_ == -1) return Status::OK;
+  if (slot_id_ == -1) return Status::OK();
 
   const SlotDescriptor* slot_desc  = state->desc_tbl().GetSlotDescriptor(slot_id_);
   if (slot_desc == NULL) {
@@ -92,7 +92,7 @@ Status SlotRef::Prepare(RuntimeState* state, const RowDescriptor& row_desc,
   tuple_is_nullable_ = row_desc.TupleIsNullable(tuple_idx_);
   slot_offset_ = slot_desc->tuple_offset();
   null_indicator_offset_ = slot_desc->null_indicator_offset();
-  return Status::OK;
+  return Status::OK();
 }
 
 int SlotRef::GetSlotIds(vector<SlotId>* slot_ids) const {
@@ -158,7 +158,7 @@ Status SlotRef::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
   }
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
-    return Status::OK;
+    return Status::OK();
   }
 
   DCHECK_EQ(GetNumChildren(), 0);
@@ -178,7 +178,7 @@ Status SlotRef::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
   Function* ir_compute_fn_ = codegen->GetRegisteredExprFn(unique_slot_id);
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
-    return Status::OK;
+    return Status::OK();
   }
 
   LLVMContext& context = codegen->context();
@@ -364,7 +364,7 @@ Status SlotRef::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
   *fn = codegen->FinalizeFunction(*fn);
   codegen->RegisterExprFn(unique_slot_id, *fn);
   ir_compute_fn_ = *fn;
-  return Status::OK;
+  return Status::OK();
 }
 
 BooleanVal SlotRef::GetBooleanVal(ExprContext* context, TupleRow* row) {

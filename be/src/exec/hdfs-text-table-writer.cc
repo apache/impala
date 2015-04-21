@@ -76,7 +76,7 @@ Status HdfsTextTableWriter::Init() {
     flush_size_ = HDFS_FLUSH_WRITE_SIZE;
   }
   parent_->mem_tracker()->Consume(flush_size_);
-  return Status::OK;
+  return Status::OK();
 }
 
 void HdfsTextTableWriter::Close() {
@@ -156,7 +156,7 @@ Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
     *new_file = compressor_.get() != NULL;
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsTextTableWriter::Finalize() {
@@ -188,7 +188,7 @@ Status HdfsTextTableWriter::Flush() {
     RETURN_IF_ERROR(Write(data, len));
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 inline void HdfsTextTableWriter::PrintEscaped(const StringValue* str_val) {

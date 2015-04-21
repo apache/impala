@@ -101,7 +101,7 @@ Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
     RETURN_IF_ERROR(partition->PrepareExprs(state));
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsTableSink::Prepare(RuntimeState* state) {
@@ -154,7 +154,7 @@ Status HdfsTableSink::Prepare(RuntimeState* state) {
   hdfs_write_timer_ = ADD_TIMER(profile(), "HdfsWriteTimer");
   compress_timer_ = ADD_TIMER(profile(), "CompressTimer");
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsTableSink::Open(RuntimeState* state) {
@@ -234,7 +234,7 @@ Status HdfsTableSink::Open(RuntimeState* state) {
   if (default_partition_ == NULL) {
     return Status("No default partition found for HdfsTextTableSink");
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void HdfsTableSink::BuildHdfsFileNames(
@@ -387,7 +387,7 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
 
   // It is incorrect to initialize a writer if there are no rows to feed it. The writer
   // could incorrectly create an empty file or empty partition.
-  if (has_empty_input_batch_) return Status::OK;
+  if (has_empty_input_batch_) return Status::OK();
 
   switch (partition_descriptor.file_format()) {
     case THdfsFileFormat::TEXT:
@@ -489,7 +489,7 @@ inline Status HdfsTableSink::GetOutputPartition(
     // Use existing output_partition partition.
     *partition_pair = &existing_partition->second;
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
@@ -559,12 +559,12 @@ Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
       RETURN_IF_ERROR(FinalizePartitionFile(state, cur_partition->second.first));
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
                                             OutputPartition* partition) {
-  if (partition->tmp_hdfs_file == NULL && !overwrite_) return Status::OK;
+  if (partition->tmp_hdfs_file == NULL && !overwrite_) return Status::OK();
   SCOPED_TIMER(ADD_TIMER(profile(), "FinalizePartitionFileTimer"));
 
   // OutputPartition writer could be NULL if there is no row to output.
@@ -583,7 +583,7 @@ Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
   }
 
   ClosePartitionFile(state, partition);
-  return Status::OK;
+  return Status::OK();
 }
 
 void HdfsTableSink::ClosePartitionFile(RuntimeState* state, OutputPartition* partition) {
@@ -637,7 +637,7 @@ Status HdfsTableSink::GetFileBlockSize(OutputPartition* output_partition, int64_
   *size = info->mBlockSize;
   hdfsFreeFileInfo(info, 1);
 
-  return Status::OK;
+  return Status::OK();
 }
 
 string HdfsTableSink::DebugString() const {

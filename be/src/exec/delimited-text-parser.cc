@@ -119,7 +119,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
     }
   }
 
-  if (*num_tuples == max_tuples) return Status::OK;
+  if (*num_tuples == max_tuples) return Status::OK();
 
   // Handle the remaining characters
   while (remaining_len > 0) {
@@ -163,7 +163,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
         ++*byte_buffer_ptr;
         --remaining_len;
         if (last_row_delim_offset_ == remaining_len) last_row_delim_offset_ = 0;
-        return Status::OK;
+        return Status::OK();
       }
     } else if (new_col) {
       AddColumn<true>(*byte_buffer_ptr - *next_column_start,
@@ -185,7 +185,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
     ++(*num_tuples);
     unfinished_tuple_ = false;
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 // Find the first instance of the tuple delimiter.  This will

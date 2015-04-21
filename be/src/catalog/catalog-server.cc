@@ -186,7 +186,7 @@ Status CatalogServer::Start() {
     lock_guard<mutex> l(catalog_lock_);
     catalog_update_cv_.notify_one();
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void CatalogServer::RegisterWebpages(Webserver* webserver) {

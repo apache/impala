@@ -115,7 +115,7 @@ Status LibCache::InitInternal() {
   }
   DCHECK(current_process_handle_ != NULL)
       << "We should always be able to get current process handle.";
-  return Status::OK;
+  return Status::OK();
 }
 
 LibCache::LibCacheEntry::~LibCacheEntry() {
@@ -133,7 +133,7 @@ Status LibCache::GetSoFunctionPtr(const string& hdfs_lib_file, const string& sym
     // Just loading a function ptr in the current process. No need to take any locks.
     DCHECK(current_process_handle_ != NULL);
     RETURN_IF_ERROR(DynamicLookup(current_process_handle_, symbol.c_str(), fn_ptr, quiet));
-    return Status::OK;
+    return Status::OK();
   }
 
   LibCacheEntry* entry = NULL;
@@ -164,7 +164,7 @@ Status LibCache::GetSoFunctionPtr(const string& hdfs_lib_file, const string& sym
     *ent = entry;
     ++(*ent)->use_count;
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void LibCache::DecrementUseCount(LibCacheEntry* entry) {
@@ -186,7 +186,7 @@ Status LibCache::GetLocalLibPath(const string& hdfs_lib_file, LibType type,
   DCHECK(entry != NULL);
   DCHECK_EQ(entry->type, type);
   *local_path = entry->local_path;
-  return Status::OK;
+  return Status::OK();
 }
 
 Status LibCache::CheckSymbolExists(const string& hdfs_lib_file, LibType type,
@@ -206,7 +206,7 @@ Status LibCache::CheckSymbolExists(const string& hdfs_lib_file, LibType type,
          << " (local path: " << entry->local_path << ")";
       return quiet ? Status::Expected(ss.str()) : Status(ss.str());
     }
-    return Status::OK;
+    return Status::OK();
   } else if (type == TYPE_JAR) {
     // TODO: figure out how to inspect contents of jars
     unique_lock<mutex> lock;
@@ -352,7 +352,7 @@ Status LibCache::GetCacheEntryInternal(const string& hdfs_lib_file, LibType type
     RETURN_IF_ERROR((*entry)->copy_file_status);
     DCHECK_EQ((*entry)->type, type);
     DCHECK(!(*entry)->local_path.empty());
-    return Status::OK;
+    return Status::OK();
   }
 
   // Entry didn't exist. Add the entry then release lock_ (so other libraries
@@ -408,7 +408,7 @@ Status LibCache::GetCacheEntryInternal(const string& hdfs_lib_file, LibType type
     // Nothing to do.
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 string LibCache::MakeLocalPath(const string& hdfs_path, const string& local_dir) {

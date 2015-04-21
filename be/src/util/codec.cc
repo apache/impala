@@ -60,7 +60,7 @@ Status Codec::GetHadoopCodecClassName(THdfsCompression::type type, string* out_n
   BOOST_FOREACH(const CodecMap::value_type& codec, CODEC_MAP) {
     if (codec.second == type) {
       out_name->assign(codec.first);
-      return Status::OK;
+      return Status::OK();
     }
   }
   return Status(Substitute("Unsupported codec for given file type: $0",
@@ -76,7 +76,7 @@ Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse, const string& code
 
   RETURN_IF_ERROR(
       CreateCompressor(mem_pool, reuse, type->second, compressor));
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse,
@@ -84,7 +84,7 @@ Status Codec::CreateCompressor(MemPool* mem_pool, bool reuse,
   switch (format) {
     case THdfsCompression::NONE:
       compressor->reset(NULL);
-      return Status::OK;
+      return Status::OK();
     case THdfsCompression::GZIP:
       compressor->reset(new GzipCompressor(GzipCompressor::GZIP, mem_pool, reuse));
       break;
@@ -124,7 +124,7 @@ Status Codec::CreateDecompressor(MemPool* mem_pool, bool reuse, const string& co
 
   RETURN_IF_ERROR(
       CreateDecompressor(mem_pool, reuse, type->second, decompressor));
-  return Status::OK;
+  return Status::OK();
 }
 
 Status Codec::CreateDecompressor(MemPool* mem_pool, bool reuse,
@@ -132,7 +132,7 @@ Status Codec::CreateDecompressor(MemPool* mem_pool, bool reuse,
   switch (format) {
     case THdfsCompression::NONE:
       decompressor->reset(NULL);
-      return Status::OK;
+      return Status::OK();
     case THdfsCompression::DEFAULT:
     case THdfsCompression::GZIP:
       decompressor->reset(new GzipDecompressor(mem_pool, reuse, false));
@@ -192,5 +192,5 @@ Status Codec::ProcessBlock32(bool output_preallocated, int input_length,
         output_len64));;
   }
   *output_length = static_cast<int32_t>(output_len64);
-  return Status::OK;
+  return Status::OK();
 }

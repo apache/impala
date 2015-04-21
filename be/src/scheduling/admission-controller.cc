@@ -237,7 +237,7 @@ Status AdmissionController::CanAdmitRequest(const string& pool_name,
   } else if (!admit_from_queue && total_stats.num_queued > 0) {
     return Status::Expected(Substitute(QUEUED_QUEUE_NOT_EMPTY, total_stats.num_queued));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status AdmissionController::RejectRequest(const string& pool_name,
@@ -257,7 +257,7 @@ Status AdmissionController::RejectRequest(const string& pool_name,
   } else if (total_stats->num_queued >= max_queued) {
     reject_reason = Substitute(REASON_QUEUE_FULL, max_queued, total_stats->num_queued);
   } else {
-    return Status::OK; // Not rejected
+    return Status::OK(); // Not rejected
   }
   return Status(Substitute(STATUS_REJECTED, pool_name, reject_reason));
 }
@@ -314,7 +314,7 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
       }
       VLOG_QUERY << "Admitted query id=" << schedule->query_id();
       VLOG_RPC << "Final: " << DebugPoolStats(pool_name, total_stats, local_stats);
-      return Status::OK;
+      return Status::OK();
     }
 
     Status rejectStatus = RejectRequest(pool_name, max_requests, mem_limit, max_queued,
@@ -388,12 +388,12 @@ Status AdmissionController::AdmitQuery(QuerySchedule* schedule) {
     if (pool_metrics != NULL) pool_metrics->local_admitted->Increment(1L);
     VLOG_QUERY << "Admitted queued query id=" << schedule->query_id();
     VLOG_RPC << "Final: " << DebugPoolStats(pool_name, total_stats, local_stats);
-    return Status::OK;
+    return Status::OK();
   }
 }
 
 Status AdmissionController::ReleaseQuery(QuerySchedule* schedule) {
-  if (!schedule->is_admitted()) return Status::OK; // No-op if query was not admitted
+  if (!schedule->is_admitted()) return Status::OK(); // No-op if query was not admitted
   const string& pool_name = schedule->request_pool();
   {
     lock_guard<mutex> lock(admission_ctrl_lock_);
@@ -418,7 +418,7 @@ Status AdmissionController::ReleaseQuery(QuerySchedule* schedule) {
              << DebugPoolStats(pool_name, total_stats, local_stats);
   }
   dequeue_cv_.notify_one();
-  return Status::OK;
+  return Status::OK();
 }
 
 // Statestore subscriber callback for IMPALA_REQUEST_QUEUE_TOPIC. First, add any local

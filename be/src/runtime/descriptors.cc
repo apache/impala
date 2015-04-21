@@ -141,11 +141,11 @@ Status HdfsPartitionDescriptor::PrepareExprs(RuntimeState* state) {
     RETURN_IF_ERROR(Expr::Prepare(partition_key_value_ctxs_, state, RowDescriptor(),
                                   state->instance_mem_tracker()));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsPartitionDescriptor::OpenExprs(RuntimeState* state) {
-  if (exprs_opened_) return Status::OK;
+  if (exprs_opened_) return Status::OK();
   exprs_opened_ = true;
   return Expr::Open(partition_key_value_ctxs_, state);
 }
@@ -426,7 +426,7 @@ Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tb
     }
     entry->second->AddSlot(slot_d);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 TableDescriptor* DescriptorTbl::GetTableDescriptor(TableId id) const {

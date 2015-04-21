@@ -45,7 +45,7 @@ Status HBaseTableSink::PrepareExprs(RuntimeState* state) {
   // Prepare the exprs to run.
   RETURN_IF_ERROR(
       Expr::Prepare(output_expr_ctxs_, state, row_desc_, expr_mem_tracker_.get()));
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HBaseTableSink::Prepare(RuntimeState* state) {
@@ -74,7 +74,7 @@ Status HBaseTableSink::Prepare(RuntimeState* state) {
   root_status.__set_id(-1L);
   state->per_partition_status()->insert(make_pair(ROOT_PARTITION_KEY, root_status));
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HBaseTableSink::Open(RuntimeState* state) {
@@ -89,7 +89,7 @@ Status HBaseTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   RETURN_IF_ERROR(hbase_table_writer_->AppendRowBatch(batch));
   (*state->per_partition_status())[ROOT_PARTITION_KEY].num_appended_rows +=
       batch->num_rows();
-  return Status::OK;
+  return Status::OK();
 }
 
 void HBaseTableSink::Close(RuntimeState* state) {

@@ -42,7 +42,7 @@ Status ThriftClientImpl::Open() {
     return Status(Substitute("Couldn't open transport for $0 ($1)",
         lexical_cast<string>(address_), e.what()));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ThriftClientImpl::OpenWithRetry(uint32_t num_tries, uint64_t wait_ms) {
@@ -99,7 +99,7 @@ Status ThriftClientImpl::CreateSocket() {
     }
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 }

@@ -87,7 +87,7 @@ Status HBaseTableFactory::Init() {
   RETURN_ERROR_IF_EXC(env);
 
   RETURN_IF_ERROR(HBaseTable::InitJNI());
-  return Status::OK;
+  return Status::OK();
 }
 
 HBaseTableFactory::~HBaseTableFactory() {
@@ -108,7 +108,7 @@ Status HBaseTableFactory::GetTable(const string& table_name,
                                    scoped_ptr<HBaseTable>* hbase_table) {
   hbase_table->reset(new HBaseTable(table_name, conf_, executor_));
   RETURN_IF_ERROR((*hbase_table)->Init());
-  return Status::OK;
+  return Status::OK();
 }
 
 }  // namespace impala

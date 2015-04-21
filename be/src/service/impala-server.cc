@@ -350,7 +350,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
 
 Status ImpalaServer::LogLineageRecord(const TExecRequest& request) {
   if (!request.__isset.query_exec_request && !request.__isset.catalog_op_request) {
-    return Status::OK;
+    return Status::OK();
   }
   string lineage_graph;
   if (request.__isset.query_exec_request &&
@@ -360,7 +360,7 @@ Status ImpalaServer::LogLineageRecord(const TExecRequest& request) {
       request.catalog_op_request.__isset.lineage_graph) {
     lineage_graph = request.catalog_op_request.lineage_graph;
   } else {
-    return Status::OK;
+    return Status::OK();
   }
   DCHECK(!lineage_graph.empty());
   Status status = lineage_logger_->AppendEntry(lineage_graph);
@@ -381,14 +381,14 @@ bool ImpalaServer::IsLineageLoggingEnabled() {
 Status ImpalaServer::InitLineageLogging() {
   if (!IsLineageLoggingEnabled()) {
     LOG(INFO) << "Lineage logging is disabled";
-    return Status::OK;
+    return Status::OK();
   }
   lineage_logger_.reset(new SimpleLogger(FLAGS_lineage_event_log_dir,
       LINEAGE_LOG_FILE_PREFIX, FLAGS_max_lineage_log_file_size));
   RETURN_IF_ERROR(lineage_logger_->Init());
   lineage_logger_flush_thread_.reset(new Thread("impala-server",
         "lineage-log-flush", &ImpalaServer::LineageLoggerFlushThread, this));
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ImpalaServer::LogAuditRecord(const ImpalaServer::QueryExecState& exec_state,
@@ -473,14 +473,14 @@ bool ImpalaServer::IsAuditEventLoggingEnabled() {
 Status ImpalaServer::InitAuditEventLogging() {
   if (!IsAuditEventLoggingEnabled()) {
     LOG(INFO) << "Event logging is disabled";
-    return Status::OK;
+    return Status::OK();
   }
   audit_event_logger_.reset(new SimpleLogger(FLAGS_audit_event_log_dir,
      AUDIT_EVENT_LOG_FILE_PREFIX, FLAGS_max_audit_event_log_file_size));
   RETURN_IF_ERROR(audit_event_logger_->Init());
   audit_event_logger_flush_thread_.reset(new Thread("impala-server",
         "audit-event-log-flush", &ImpalaServer::AuditEventLoggerFlushThread, this));
-  return Status::OK;
+  return Status::OK();
 }
 
 void ImpalaServer::LogQueryEvents(const QueryExecState& exec_state) {
@@ -525,7 +525,7 @@ void ImpalaServer::LogQueryEvents(const QueryExecState& exec_state) {
 }
 
 Status ImpalaServer::InitProfileLogging() {
-  if (!FLAGS_log_query_to_file) return Status::OK;
+  if (!FLAGS_log_query_to_file) return Status::OK();
 
   if (FLAGS_profile_log_dir.empty()) {
     stringstream ss;
@@ -538,7 +538,7 @@ Status ImpalaServer::InitProfileLogging() {
   profile_log_file_flush_thread_.reset(new Thread("impala-server", "log-flush-thread",
       &ImpalaServer::LogFileFlushThread, this));
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
@@ -554,7 +554,7 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
       } else {
         exec_state->second->profile().PrettyPrint(output);
       }
-      return Status::OK;
+      return Status::OK();
     }
   }
 
@@ -573,7 +573,7 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
       (*output) << query_record->second->profile_str;
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, TExecSummary* result) {
@@ -585,7 +585,7 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, TExecSummary* res
       if (exec_state->coord() != NULL) {
         lock_guard<SpinLock> lock(exec_state->coord()->GetExecSummaryLock());
         *result = exec_state->coord()->exec_summary();
-        return Status::OK;
+        return Status::OK();
       }
     }
   }
@@ -601,7 +601,7 @@ Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, TExecSummary* res
     }
     *result = query_record->second->exec_summary;
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void ImpalaServer::LogFileFlushThread() {
@@ -766,7 +766,7 @@ Status ImpalaServer::ExecuteInternal(
       }
     }
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void ImpalaServer::PrepareQueryContext(TQueryCtx* query_ctx) {
@@ -804,7 +804,7 @@ Status ImpalaServer::RegisterQuery(shared_ptr<SessionState> session_state,
     }
     query_exec_state_map_.insert(make_pair(query_id, exec_state));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ImpalaServer::SetQueryInflight(shared_ptr<SessionState> session_state,
@@ -835,7 +835,7 @@ Status ImpalaServer::SetQueryInflight(shared_ptr<SessionState> session_state,
     queries_by_timestamp_.insert(
         make_pair(UnixMillis() + (1000L * timeout_s), query_id));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_inflight,
@@ -890,7 +890,7 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
     }
   }
   ArchiveQuery(*exec_state);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ImpalaServer::UpdateCatalogMetrics() {
@@ -904,7 +904,7 @@ Status ImpalaServer::UpdateCatalogMetrics() {
     ImpaladMetrics::CATALOG_NUM_TABLES->Increment(table_names.tables.size());
   }
 
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ImpalaServer::CancelInternal(const TUniqueId& query_id, bool check_inflight,
@@ -922,7 +922,7 @@ Status ImpalaServer::CancelInternal(const TUniqueId& query_id, bool check_inflig
   }
   // TODO: can we call Coordinator::Cancel() here while holding lock?
   exec_state->Cancel(cause);
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
@@ -934,7 +934,7 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
     SessionStateMap::iterator entry = session_state_map_.find(session_id);
     if (entry == session_state_map_.end()) {
       if (ignore_if_absent) {
-        return Status::OK;
+        return Status::OK();
       } else {
         return Status("Invalid session ID");
       }
@@ -962,7 +962,7 @@ Status ImpalaServer::CloseSessionInternal(const TUniqueId& session_id,
   BOOST_FOREACH(const TUniqueId& query_id, inflight_queries) {
     UnregisterQuery(query_id, false, &status);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status ImpalaServer::GetSessionState(const TUniqueId& session_id,
@@ -986,7 +986,7 @@ Status ImpalaServer::GetSessionState(const TUniqueId& session_id,
       ++i->second->ref_count;
     }
     *session_state = i->second;
-    return Status::OK;
+    return Status::OK();
   }
 }
 
@@ -1131,7 +1131,7 @@ Status ImpalaServer::AuthorizeProxyUser(const string& user, const string& do_as_
       authorized_proxy_user_config_.find(short_user);
   if (proxy_user != authorized_proxy_user_config_.end()) {
     BOOST_FOREACH(const string& user, proxy_user->second) {
-      if (user == "*" || user == do_as_user) return Status::OK;
+      if (user == "*" || user == do_as_user) return Status::OK();
     }
   }
   return Status(error_msg.str());
@@ -1284,7 +1284,7 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
     Status status = exec_env_->frontend()->UpdateCatalogCache(update_req, &resp);
     if (!status.ok()) LOG(ERROR) << status.GetDetail();
     RETURN_IF_ERROR(status);
-    if (!wait_for_all_subscribers) return Status::OK;
+    if (!wait_for_all_subscribers) return Status::OK();
   }
 
   unique_lock<mutex> unique_lock(catalog_version_lock_);
@@ -1300,7 +1300,7 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
     catalog_version_update_cv_.wait(unique_lock);
   }
 
-  if (!wait_for_all_subscribers) return Status::OK;
+  if (!wait_for_all_subscribers) return Status::OK();
 
   // Now wait for this update to be propagated to all catalog topic subscribers.
   // If we make it here it implies the first condition was met (the update was processed
@@ -1314,7 +1314,7 @@ Status ImpalaServer::ProcessCatalogUpdateResult(
          catalog_update_info_.catalog_service_id == catalog_service_id) {
     catalog_version_update_cv_.wait(unique_lock);
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 void ImpalaServer::MembershipCallback(
@@ -1709,7 +1709,7 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
   }
   if (impala_server != NULL) *impala_server = handler.get();
 
-  return Status::OK;
+  return Status::OK();
 }
 
 bool ImpalaServer::GetSessionIdForQuery(const TUniqueId& query_id,

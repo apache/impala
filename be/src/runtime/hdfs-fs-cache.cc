@@ -48,7 +48,7 @@ Status HdfsFsCache::GetConnection(const string& path, hdfsFS* fs,
     HdfsFsMap::iterator local_iter = local_cache->find(namenode);
     if (local_iter != local_cache->end()) {
       *fs = local_iter->second;
-      return Status::OK;
+      return Status::OK();
     }
   }
   // Otherwise, check the global cache.
@@ -72,7 +72,7 @@ Status HdfsFsCache::GetConnection(const string& path, hdfsFS* fs,
   if (local_cache != NULL) {
     local_cache->insert(make_pair(namenode, *fs));
   }
-  return Status::OK;
+  return Status::OK();
 }
 
 Status HdfsFsCache::GetLocalConnection(hdfsFS* fs) {
