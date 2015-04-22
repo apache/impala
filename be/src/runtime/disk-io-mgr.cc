@@ -32,6 +32,11 @@ DEFINE_int32(num_disks, 0, "Number of disks on data node.");
 // Default IoMgr configs:
 // The maximum number of the threads per disk is also the max queue depth per disk.
 DEFINE_int32(num_threads_per_disk, 0, "number of threads per disk");
+// The maximum number of remote HDFS I/O threads.  HDFS access that are expected to be
+// remote are placed on a separate remote disk queue.  This is the queue depth for that
+// queue.  If 0, then the remote queue is not used and instead ranges are round-robined
+// across the local disk queues.
+DEFINE_int32(num_remote_hdfs_io_threads, 8, "number of remote HDFS I/O threads");
 // The maximum number of S3 I/O threads. The default value of 16 was chosen emperically
 // to maximize S3 throughput. Maximum throughput is achieved with multiple connections
 // open to S3 and use of multiple CPU cores since S3 reads are relatively compute
@@ -303,7 +308,9 @@ Status DiskIoMgr::Init(MemTracker* process_mem_tracker) {
   for (int i = 0; i < disk_queues_.size(); ++i) {
     disk_queues_[i] = new DiskQueue(i);
     int num_threads_per_disk;
-    if (i == RemoteS3DiskId()) {
+    if (i == RemoteDfsDiskId()) {
+      num_threads_per_disk = FLAGS_num_remote_hdfs_io_threads;
+    } else if (i == RemoteS3DiskId()) {
       num_threads_per_disk = FLAGS_num_s3_io_threads;
     } else if (num_threads_per_disk_ != 0) {
       num_threads_per_disk = num_threads_per_disk_;
@@ -1114,11 +1121,13 @@ Status DiskIoMgr::AddWriteRange(RequestContext* writer, WriteRange* write_range)
 }
 
 int DiskIoMgr::AssignQueue(const char* file, int disk_id, bool expected_local) {
-  // TODO: add a queue for remote HDFS accesses.
-  if (IsS3APath(file)) {
-    DCHECK(!expected_local);
-    return RemoteS3DiskId();
+  // If it's a remote range, check for an appropriate remote disk queue.
+  if (!expected_local) {
+    if (IsDfsPath(file) && FLAGS_num_remote_hdfs_io_threads > 0) return RemoteDfsDiskId();
+    if (IsS3APath(file)) return RemoteS3DiskId();
   }
+  // Assign to a local disk queue.
+  DCHECK(!IsS3APath(file)); // S3 is always remote.
   if (disk_id == -1) {
     // disk id is unknown, assign it a random one.
     static int next_disk_id = 0;

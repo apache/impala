@@ -598,6 +598,9 @@ class DiskIoMgr {
   /// Returns the number of local disks attached to the system.
   int num_local_disks() const { return num_total_disks() - num_remote_disks(); }
 
+  /// The disk ID (and therefore disk_queues_ index) used for DFS accesses.
+  int RemoteDfsDiskId() const { return num_local_disks() + REMOTE_DFS_DISK_OFFSET; }
+
   /// The disk ID (and therefore disk_queues_ index) used for S3 accesses.
   int RemoteS3DiskId() const { return num_local_disks() + REMOTE_S3_DISK_OFFSET; }
 
@@ -621,7 +624,8 @@ class DiskIoMgr {
   /// "Disk" queue offsets for remote accesses.  Offset 0 corresponds to
   /// disk ID (i.e. disk_queue_ index) of num_local_disks().
   enum {
-    REMOTE_S3_DISK_OFFSET = 0,
+    REMOTE_DFS_DISK_OFFSET = 0,
+    REMOTE_S3_DISK_OFFSET,
     REMOTE_NUM_DISKS
   };
 
