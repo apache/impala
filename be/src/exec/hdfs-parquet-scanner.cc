@@ -90,12 +90,18 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
       // Since Parquet scanners always read entire files, only read a file if we're
       // assigned the first split to avoid reading multi-block files with multiple
       // scanners.
-      // We only process the split that starts at offset 0.
       if (split->offset() != 0) {
-        // We are expecting each file to be one hdfs block (so all the scan range offsets
-        // should be 0).  This is not incorrect but we will issue a warning.
-        scan_node->runtime_state()->LogError(
-            ErrorMsg(TErrorCode::PARQUET_MULTIPLE_BLOCKS, files[i]->filename));
+        // We are expecting each file to be one hdfs block (so all the scan range
+        // offsets should be 0).  Having multiple blocks is not incorrect but is
+        // nonoptimal so issue a warning.  However, if there is no impalad co-located
+        // with the datanode holding the block (i.e. split->expected_local() is false),
+        // then this may indicate a pseudo-HDFS system like Isilon where HDFS blocks
+        // aren't meaningful from a locality standpoint.  In that case, the warning is
+        // spurious so suppress it.
+        if (split->expected_local()) {
+          scan_node->runtime_state()->LogError(
+              ErrorMsg(TErrorCode::PARQUET_MULTIPLE_BLOCKS, files[i]->filename));
+        }
         // We assign the entire file to one scan range, so mark all but one split
         // (i.e. the first split) as complete
         scan_node->RangeComplete(THdfsFileFormat::PARQUET, THdfsCompression::NONE);
