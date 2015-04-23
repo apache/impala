@@ -1,0 +1,1316 @@
+[
+  {
+    "description": "Resource Pool $0 Cluster In Queue",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Cluster In Queue",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "admission-controller.$0.cluster-in-queue"
+  },
+  {
+    "description": "Resource Pool $0 Cluster Mem Estimate",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Cluster Mem Estimate",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "admission-controller.$0.cluster-mem-estimate"
+  },
+  {
+    "description": "Resource Pool $0 Cluster Mem Usage",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Cluster Mem Usage",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "admission-controller.$0.cluster-mem-usage"
+  },
+  {
+    "description": "Resource Pool $0 Cluster Num Running",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Cluster Num Running",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "admission-controller.$0.cluster-num-running"
+  },
+  {
+    "description": "Resource Pool $0 Local Admitted",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Local Admitted",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "admission-controller.$0.local-admitted"
+  },
+  {
+    "description": "Resource Pool $0 Local Completed",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Local Completed",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "admission-controller.$0.local-completed"
+  },
+  {
+    "description": "Resource Pool $0 Local Dequeued",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Local Dequeued",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "admission-controller.$0.local-dequeued"
+  },
+  {
+    "description": "Resource Pool $0 Local In Queue",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Local In Queue",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "admission-controller.$0.local-in-queue"
+  },
+  {
+    "description": "Resource Pool $0 Local Mem Estimate",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Local Mem Estimate",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "admission-controller.$0.local-mem-estimate"
+  },
+  {
+    "description": "Resource Pool $0 Local Mem Usage",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Local Mem Usage",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "admission-controller.$0.local-mem-usage"
+  },
+  {
+    "description": "Resource Pool $0 Local Num Running",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Local Num Running",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "admission-controller.$0.local-num-running"
+  },
+  {
+    "description": "Resource Pool $0 Local Queued",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Local Queued",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "admission-controller.$0.local-queued"
+  },
+  {
+    "description": "Resource Pool $0 Local Rejected",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Local Rejected",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "admission-controller.$0.local-rejected"
+  },
+  {
+    "description": "Resource Pool $0 Local Time In Queue Ms",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Local Time In Queue Ms",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "admission-controller.$0.local-time-in-queue-ms"
+  },
+  {
+    "description": "Resource Pool $0 Local Timed Out",
+    "contexts": [
+      "RESOURCE_POOL"
+    ],
+    "label": "Resource Pool $0 Local Timed Out",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "admission-controller.$0.local-timed-out"
+  },
+  {
+    "description": "Catalog Server Topic Processing Time",
+    "contexts": [
+      "CATALOGD"
+    ],
+    "label": "Catalog Server Topic Processing Time",
+    "units": "TIME_S",
+    "kind": "STATS",
+    "key": "catalog-server.topic-processing-time-s"
+  },
+  {
+    "description": "The number of databases in the catalog.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Databases",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.num-databases"
+  },
+  {
+    "description": "The number of tables in the catalog.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Tables",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.num-tables"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Catalog Ready",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "catalog.ready"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Catalog Server Client Cache Clients In Use",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.server.client-cache.clients-in-use"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Catalog Server Client Cache Total Clients",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "catalog.server.client-cache.total-clients"
+  },
+  {
+    "description": "catalogd build version",
+    "contexts": [
+      "CATALOGD"
+    ],
+    "label": "Catalog Version",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "catalog.version"
+  },
+  {
+    "description": "The number of cgroups currently registered with the Cgroups Manager",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Cgroups Manager Active Cgroups",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "key": "cgroups-mgr.active-cgroups"
+  },
+  {
+    "description": "The number of active Impala Backend clients. These clients are for communication with other Impala Daemons.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Backend Active Clients",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala-server.backends.client-cache.clients-in-use"
+  },
+  {
+    "description": "The total number of Impala Backend clients in this Impala Daemon's client cache. These clients are for communication with other Impala Daemons.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Backend Total Clients",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala-server.backends.client-cache.total-clients"
+  },
+  {
+    "description": "The current size of all allocated hash tables.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Hash Tables Size",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "impala-server.hash-table.total-bytes"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Bytes Read",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "impala-server.io-mgr.bytes-read"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Bytes Written",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "impala-server.io-mgr.bytes-written"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Cached Bytes Read",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "impala-server.io-mgr.cached-bytes-read"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Local Bytes Read",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "impala-server.io-mgr.local-bytes-read"
+  },
+  {
+    "description": "The number of allocated IO buffers. IO buffers are shared by all queries.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "IO Buffers",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala-server.io-mgr.num-buffers"
+  },
+  {
+    "description": "The current number of files opened by the IO Manager",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Open Files",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala-server.io-mgr.num-open-files"
+  },
+  {
+    "description": "The number of unused IO buffers. IO buffers are shared by all queries.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Unused IO Buffers",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala-server.io-mgr.num-unused-buffers"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Io Mgr Short Circuit Bytes Read",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "impala-server.io-mgr.short-circuit-bytes-read"
+  },
+  {
+    "description": "Number of bytes used by IO buffers (used and unused).",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "IO Buffers Total Size",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "impala-server.io-mgr.total-bytes"
+  },
+  {
+    "description": "The current size of the memory pool shared by all queries",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Memory Pool Size",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "impala-server.mem-pool.total-bytes"
+  },
+  {
+    "description": "The number of HDFS files currently open for writing.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Files Open For Insert",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala-server.num-files-open-for-insert"
+  },
+  {
+    "description": "The total number of query fragments processed over the life of the process",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Query Fragments",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.num-fragments"
+  },
+  {
+    "description": "The number of open Beeswax sessions.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Beeswax Sessions",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala-server.num-open-beeswax-sessions"
+  },
+  {
+    "description": "The number of open HiveServer2 sessions.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HiveServer2 Sessions",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala-server.num-open-hiveserver2-sessions"
+  },
+  {
+    "description": "The total number of queries processed over the life of the process",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Queries",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.num-queries"
+  },
+  {
+    "description": "Number of queries expired due to inactivity.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Queries Expired",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.num-queries-expired"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Num Queries Spilled",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.num-queries-spilled"
+  },
+  {
+    "description": "Number of sessions expired due to inactivity.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Sessions Expired",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.num-sessions-expired"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Ready",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "impala-server.ready"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Resultset Cache Total Bytes",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala-server.resultset-cache.total-bytes"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Resultset Cache Total Num Rows",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala-server.resultset-cache.total-num-rows"
+  },
+  {
+    "description": "The total number of scan ranges read over the life of the process that did not have volume metadata",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Scan Ranges Missing Volume Information",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.scan-ranges.num-missing-volume-id"
+  },
+  {
+    "description": "The total number of scan ranges read over the life of the process",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Scan Ranges",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala-server.scan-ranges.total"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Start Time",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "impala-server.start-time"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Server Version",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "impala-server.version"
+  },
+  {
+    "description": "The number of active connections to the Llama Callback Service.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Llama Callback Service Active Connections",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.llama-callback.connections-in-use"
+  },
+  {
+    "description": "The total number of connections made to the Llama Callback Service over its lifetime.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Llama Callback Service Total Connections",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.thrift-server.llama-callback.total-connections"
+  },
+  {
+    "description": "The number of active catalog service connections to this Catalog Server.",
+    "contexts": [
+      "CATALOGD"
+    ],
+    "label": "Catalog Service Active Connections",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.CatalogService.connections-in-use"
+  },
+  {
+    "description": "The total number of connections made to this Catalog Server's catalog service  over its lifetime.",
+    "contexts": [
+      "CATALOGD"
+    ],
+    "label": "Catalog Service Total Connections",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.thrift-server.CatalogService.total-connections"
+  },
+  {
+    "description": "The number of active connections to this StateStore's StateStore service.",
+    "contexts": [
+      "STATESTORED"
+    ],
+    "label": "StateStore Service Active Connections",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.StatestoreService.connections-in-use"
+  },
+  {
+    "description": "The total number of connections made to this StateStore's StateStore service over its lifetime.",
+    "contexts": [
+      "STATESTORED"
+    ],
+    "label": "StateStore Service Connections",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.thrift-server.StatestoreService.total-connections"
+  },
+  {
+    "description": "The number of active Impala Backend client connections to this Impala Daemon.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Backend Server Active Connections",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.backend.connections-in-use"
+  },
+  {
+    "description": "The total number of Impala Backend client connections made to this Impala Daemon over its lifetime.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Impala Backend Server Connections",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.thrift-server.backend.total-connections"
+  },
+  {
+    "description": "The number of active Beeswax API connections to this Impala Daemon.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Beeswax API Active Connections",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.beeswax-frontend.connections-in-use"
+  },
+  {
+    "description": "The total number of Beeswax API connections made to this Impala Daemon over its lifetime.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Beeswax API Total Connections",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.thrift-server.beeswax-frontend.total-connections"
+  },
+  {
+    "description": "The number of active HiveServer2 API connections to this Impala Daemon.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HiveServer2 API Active Connections",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "impala.thrift-server.hiveserver2-frontend.connections-in-use"
+  },
+  {
+    "description": "The total number of HiveServer2 API connections made to this Impala Daemon over its lifetime.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "HiveServer2 API Total Connections",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "impala.thrift-server.hiveserver2-frontend.total-connections"
+  },
+  {
+    "description": "The amount of memory freed by the last memory tracker garbage collection.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "MemTracker Bytes Freed By Last Garbage Collection",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "mem-tracker.process.bytes-freed-by-last-gc"
+  },
+  {
+    "description": "The amount of memory by which the process was over its memory limit the last time the memory limit was encountered.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "MemTracker Bytes Over Limit",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "mem-tracker.process.bytes-over-limit"
+  },
+  {
+    "description": "The total number of garbage collections performed by the memory tracker over the life of the process.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "MemTracker Garbage Collections",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "mem-tracker.process.num-gcs"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Request Pool Service Resolve Pool Duration Ms",
+    "units": "TIME_MS",
+    "kind": "STATS",
+    "key": "request-pool-service.resolve-pool-duration-ms"
+  },
+  {
+    "key": "resource-broker.active-llama",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Active Llama",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "description": ""
+  },
+  {
+    "key": "resource-broker.active-llama-handle",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Active Llama Handle",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "description": ""
+  },
+  {
+    "key": "resource-broker.expansion-request-response-time",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Expansion Request Response Time",
+    "units": "TIME_S",
+    "kind": "STATS",
+    "description": "The time, in seconds, that a expansion request takes to be fulfilled by Llama"
+  },
+  {
+    "key": "resource-broker.expansion-request-rpc-time",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Expansion Request Rpc Time",
+    "units": "TIME_S",
+    "kind": "STATS",
+    "description": "The time, in seconds, that a Reserve() RPC takes to Llama"
+  },
+  {
+    "key": "resource-broker.expansion-requests-failed",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Expansion Requests Failed",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "description": "The number of expansion requests made by this Impala daemon to Llama which failed"
+  },
+  {
+    "key": "resource-broker.expansion-requests-fulfilled",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Expansion Requests Fulfilled",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "description": "The number of expansion requests made by this Impala daemon to Llama which succeeded"
+  },
+  {
+    "key": "resource-broker.expansion-requests-rejected",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Expansion Requests Rejected",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "description": "The number of expansion requests made by this Impala daemon to Llama which were rejected"
+  },
+  {
+    "key": "resource-broker.expansion-requests-timedout",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Expansion Requests Timedout",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "description": "The number of expansion requests made by this Impala daemon to Llama which timed out"
+  },
+  {
+    "key": "resource-broker.expansion-requests-total",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Expansion Requests Total",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "description": "The total number of expansion requests made by this Impala daemon to Llama"
+  },
+  {
+    "key": "resource-broker.memory-resources-in-use",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Memory Resources In Use",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "description": "The total number of bytes currently allocated to this Impala daemon by Llama"
+  },
+  {
+    "key": "resource-broker.requests-released",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Requests Released",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "description": "The number of resource-release requests received from Llama"
+  },
+  {
+    "key": "resource-broker.reservation-request-response-time",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Reservation Request Response Time",
+    "units": "TIME_S",
+    "kind": "STATS",
+    "description": "The time, in seconds, that a reservation request takes to be fulfilled by Llama"
+  },
+  {
+    "key": "resource-broker.reservation-request-rpc-time",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Reservation Request Rpc Time",
+    "units": "TIME_S",
+    "kind": "STATS",
+    "description": "The time, in seconds, that a Reserve() RPC takes to Llama"
+  },
+  {
+    "key": "resource-broker.reservation-requests-failed",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Reservation Requests Failed",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "description": "The number of reservation requests made by this Impala daemon to Llama which failed"
+  },
+  {
+    "key": "resource-broker.reservation-requests-fulfilled",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Reservation Requests Fulfilled",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "description": "The number of reservation requests made by this Impala daemon to Llama which succeeded"
+  },
+  {
+    "key": "resource-broker.reservation-requests-rejected",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Reservation Requests Rejected",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "description": "The number of reservation requests made by this Impala daemon to Llama which were rejected"
+  },
+  {
+    "key": "resource-broker.reservation-requests-timedout",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Reservation Requests Timedout",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "description": "The number of reservation requests made by this Impala daemon to Llama which timed out"
+  },
+  {
+    "key": "resource-broker.reservation-requests-total",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Reservation Requests Total",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "description": "The total number of reservation requests made by this Impala daemon to Llama"
+  },
+  {
+    "key": "resource-broker.vcpu-resources-in-use",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Vcpu Resources In Use",
+    "units": "UNIT",
+    "kind": "GAUGE",
+    "description": "The total number of vcpus currently allocated to this Impala daemon by Llama"
+  },
+  {
+    "description": "Duration (ms) of RPC calls to $0",
+    "contexts": [
+      "CATALOGD",
+      "STATESTORED",
+      "IMPALAD"
+    ],
+    "label": "$0 RPC Call Duration",
+    "units": "TIME_MS",
+    "kind": "STATS",
+    "key": "rpc-method.$0.call_duration"
+  },
+  {
+    "description": "The number of assignments",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Assignments",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "simple-scheduler.assignments.total"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Simple Scheduler Initialized",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "simple-scheduler.initialized"
+  },
+  {
+    "description": "Number of assignments operating on local data",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Local Assignments",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "simple-scheduler.local-assignments.total"
+  },
+  {
+    "description": "The number of backend connections from this Impala Daemon to other Impala Daemons.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Backend Connections",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "simple-scheduler.num-backends"
+  },
+  {
+    "description": "Whether the Impala Daemon considers itself connected to the StateStore.",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "StateStore Connectivity",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "statestore-subscriber.connected"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "Statestore Subscriber Heartbeat Interval Time",
+    "units": "TIME_S",
+    "kind": "STATS",
+    "key": "statestore-subscriber.heartbeat-interval-time"
+  },
+  {
+    "description": "The amount of time the StateStore subscriber took to recover the connection the last time it was lost.",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "StateStore Subscriber Last Recovery Duration",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "statestore-subscriber.last-recovery-duration"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "Statestore Subscriber Last Recovery Time",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "statestore-subscriber.last-recovery-time"
+  },
+  {
+    "description": "The most recent registration ID for this subscriber with the statestore. Set to 'N/A' if no registration has been completed",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "Statestore Subscriber Registration Id",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "statestore-subscriber.registration-id"
+  },
+  {
+    "description": "The number of active StateStore subscriber clients in this Impala Daemon's client cache. These clients are for communication from this role to the StateStore.",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "StateStore Subscriber Active Clients",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "statestore-subscriber.statestore.client-cache.clients-in-use"
+  },
+  {
+    "description": "The total number of StateStore subscriber clients in this Impala Daemon's client cache. These clients are for communication from this role to the StateStore.",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "StateStore Subscriber Total Clients",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "statestore-subscriber.statestore.client-cache.total-clients"
+  },
+  {
+    "description": "Statestore Subscriber Topic $0 Processing Time",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "Statestore Subscriber Topic $0 Processing Time",
+    "units": "TIME_S",
+    "kind": "STATS",
+    "key": "statestore-subscriber.topic-$0.processing-time-s"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "Statestore Subscriber Topic Update Duration",
+    "units": "TIME_S",
+    "kind": "STATS",
+    "key": "statestore-subscriber.topic-update-duration"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "Statestore Subscriber Topic Update Interval Time",
+    "units": "TIME_S",
+    "kind": "STATS",
+    "key": "statestore-subscriber.topic-update-interval-time"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "STATESTORED"
+    ],
+    "label": "Statestore Heartbeat Durations",
+    "units": "TIME_S",
+    "kind": "STATS",
+    "key": "statestore.heartbeat-durations"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "STATESTORED"
+    ],
+    "label": "Statestore Live Backends",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "statestore.live-backends"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "STATESTORED"
+    ],
+    "label": "Statestore Live Backends List",
+    "units": "NONE",
+    "kind": "SET",
+    "key": "statestore.live-backends.list"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "STATESTORED"
+    ],
+    "label": "Statestore Topic Update Durations",
+    "units": "TIME_S",
+    "kind": "STATS",
+    "key": "statestore.topic-update-durations"
+  },
+  {
+    "description": "The sum of the size of all keys for all topics tracked by the StateStore.",
+    "contexts": [
+      "STATESTORED"
+    ],
+    "label": "Topic Key Size",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "statestore.total-key-size-bytes"
+  },
+  {
+    "description": "The sum of the size of all keys and all values for all topics tracked by the StateStore.",
+    "contexts": [
+      "STATESTORED"
+    ],
+    "label": "Topic Size",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "statestore.total-topic-size-bytes"
+  },
+  {
+    "description": "The sum of the size of all values for all topics tracked by the StateStore.",
+    "contexts": [
+      "STATESTORED"
+    ],
+    "label": "Topic Value Size",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "statestore.total-value-size-bytes"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "STATESTORED"
+    ],
+    "label": "Statestore Version",
+    "units": "NONE",
+    "kind": "PROPERTY",
+    "key": "statestore.version"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "STATESTORED"
+    ],
+    "label": "Subscriber Heartbeat Client Cache Clients In Use",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "subscriber-heartbeat.client-cache.clients-in-use"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "STATESTORED"
+    ],
+    "label": "Subscriber Heartbeat Client Cache Total Clients",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "subscriber-heartbeat.client-cache.total-clients"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "STATESTORED"
+    ],
+    "label": "Subscriber Update State Client Cache Clients In Use",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "subscriber-update-state.client-cache.clients-in-use"
+  },
+  {
+    "description": "",
+    "contexts": [
+      "STATESTORED"
+    ],
+    "label": "Subscriber Update State Client Cache Total Clients",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "subscriber-update-state.client-cache.total-clients"
+  },
+  {
+    "description": "Number of bytes used by the application. This will not typically match the memory use reported by the OS, because it does not include TCMalloc overhead or memory fragmentation.",
+    "contexts": [
+      "STATESTORED",
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "TCMalloc Bytes in Use",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "tcmalloc.bytes-in-use"
+  },
+  {
+    "description": "Number of bytes in free, mapped pages in page heap. These bytes can be used to fulfill allocation requests. They always count towards virtual memory usage, and unless the underlying memory is swapped out by the OS, they also count towards physical memory usage.",
+    "contexts": [
+      "STATESTORED",
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "TCMalloc Pageheap Free",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "tcmalloc.pageheap-free-bytes"
+  },
+  {
+    "description": "Number of bytes in free, unmapped pages in page heap. These are bytes that have been released back to the OS, possibly by one of the MallocExtension \"Release\" calls. They can be used to fulfill allocation requests, but typically incur a page fault. They always count towards virtual memory usage, and depending on the OS, typically do not count towards physical memory usage.",
+    "contexts": [
+      "STATESTORED",
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "TCMalloc Pageheap Unmapped",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "tcmalloc.pageheap-unmapped-bytes"
+  },
+  {
+    "description": "Derived metric computing the amount of physical memory (in bytes) used by the process, including that actually in use and free bytes reserved by tcmalloc. Does not include the tcmalloc metadata.",
+    "contexts": [
+      "STATESTORED",
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "TCMalloc Physical Bytes Reserved",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "tcmalloc.physical-bytes-reserved"
+  },
+  {
+    "description": "Bytes of system memory reserved by TCMalloc.",
+    "contexts": [
+      "STATESTORED",
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "TCMalloc Total Bytes Reserved",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "tcmalloc.total-bytes-reserved"
+  },
+  {
+    "description": "The number of running threads in this process.",
+    "contexts": [
+      "STATESTORED",
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "Running Threads",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "thread-manager.running-threads"
+  },
+  {
+    "description": "Threads created over the lifetime of the process.",
+    "contexts": [
+      "STATESTORED",
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "Threads Created",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "thread-manager.total-threads-created"
+  },
+  {
+    "description": "Jvm $0 Committed Usage Bytes",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "Jvm $0 Committed Usage Bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "jvm.$0.committed-usage-bytes"
+  },
+  {
+    "description": "Jvm $0 Current Usage Bytes",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "Jvm $0 Current Usage Bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "jvm.$0.current-usage-bytes"
+  },
+  {
+    "description": "Jvm $0 Init Usage Bytes",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "Jvm $0 Init Usage Bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "jvm.$0.init-usage-bytes"
+  },
+  {
+    "description": "Jvm $0 Max Usage Bytes",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "Jvm $0 Max Usage Bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "jvm.$0.max-usage-bytes"
+  },
+  {
+    "description": "Jvm $0 Peak Committed Usage Bytes",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "Jvm $0 Peak Committed Usage Bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "jvm.$0.peak-committed-usage-bytes"
+  },
+  {
+    "description": "Jvm $0 Peak Current Usage Bytes",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "Jvm $0 Peak Current Usage Bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "jvm.$0.peak-current-usage-bytes"
+  },
+  {
+    "description": "Jvm $0 Peak Init Usage Bytes",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "Jvm $0 Peak Init Usage Bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "jvm.$0.peak-init-usage-bytes"
+  },
+  {
+    "description": "Jvm $0 Peak Max Usage Bytes",
+    "contexts": [
+      "CATALOGD",
+      "IMPALAD"
+    ],
+    "label": "Jvm $0 Peak Max Usage Bytes",
+    "units": "BYTES",
+    "kind": "GAUGE",
+    "key": "jvm.$0.peak-max-usage-bytes"
+  }
+]

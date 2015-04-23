@@ -15,38 +15,12 @@
 namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
-// Metric and counter data types.
-enum TUnit {
-  // A dimensionless numerical quantity
-  UNIT,
-  // Rate of a dimensionless numerical quantity
-  UNIT_PER_SECOND,
-  CPU_TICKS,
-  BYTES
-  BYTES_PER_SECOND,
-  TIME_NS,
-  DOUBLE_VALUE,
-  // No units at all, may not be a numerical quantity
-  NONE,
-  TIME_MS,
-  TIME_S
-}
-
-// The kind of value that a metric represents.
-enum TMetricKind {
-  // May go up or down over time
-  GAUGE,
-  // A strictly increasing value
-  COUNTER,
-  // Fixed; will never change
-  PROPERTY
-  // TODO: Stats metrics etc. should be here when we implement Metric::ToThrift()
-}
+include "Metrics.thrift"
 
 // Counter data
 struct TCounter {
   1: required string name
-  2: required TUnit unit
+  2: required Metrics.TUnit unit
   3: required i64 value
 }
 
@@ -66,7 +40,7 @@ struct TEventSequence {
 // This can be used to reconstruct a time line for a particular counter.
 struct TTimeSeriesCounter {
   1: required string name
-  2: required TUnit unit
+  2: required Metrics.TUnit unit
 
   // Period of intervals in ms
   3: required i32 period_ms

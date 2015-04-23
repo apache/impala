@@ -54,8 +54,7 @@ class TcmallocMetric : public UIntGauge {
   /// include the tcmalloc metadata.
   class PhysicalBytesMetric : public UIntGauge {
    public:
-    PhysicalBytesMetric(const std::string& key)
-        : UIntGauge(key, TUnit::BYTES) { }
+    PhysicalBytesMetric(const TMetricDef& def) : UIntGauge(def, 0) { }
 
    private:
     virtual void CalculateValue() {
@@ -65,12 +64,15 @@ class TcmallocMetric : public UIntGauge {
 
   static PhysicalBytesMetric* PHYSICAL_BYTES_RESERVED;
 
-  TcmallocMetric(const std::string& key, const std::string& tcmalloc_var)
-      : UIntGauge(key, TUnit::BYTES), tcmalloc_var_(tcmalloc_var) { }
+  static TcmallocMetric* CreateAndRegister(MetricGroup* metrics, const std::string& key,
+      const std::string& tcmalloc_var);
 
  private:
   /// Name of the tcmalloc property this metric should fetch.
   const std::string tcmalloc_var_;
+
+  TcmallocMetric(const TMetricDef& def, const std::string& tcmalloc_var)
+      : UIntGauge(def, 0), tcmalloc_var_(tcmalloc_var) { }
 
   virtual void CalculateValue() {
     MallocExtension::instance()->GetNumericProperty(tcmalloc_var_.c_str(), &value_);
@@ -105,8 +107,11 @@ class JvmMetric : public IntGauge {
     PEAK_CURRENT
   };
 
+  static JvmMetric* CreateAndRegister(MetricGroup* metrics, const std::string& key,
+      const std::string& pool_name, JvmMetric::JvmMetricType type);
+
   /// Private constructor to ensure only InitMetrics() can create JvmMetrics.
-  JvmMetric(const std::string& key, const std::string& mempool_name, JvmMetricType type);
+  JvmMetric(const TMetricDef& def, const std::string& mempool_name, JvmMetricType type);
 
   /// The name of the memory pool, defined by the Jvm.
   std::string mempool_name_;

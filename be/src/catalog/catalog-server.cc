@@ -150,11 +150,9 @@ CatalogServer::CatalogServer(MetricGroup* metrics)
     thrift_serializer_(FLAGS_compact_catalog_topic), metrics_(metrics),
     topic_updates_ready_(false), last_sent_catalog_version_(0L),
     catalog_objects_min_version_(0L), catalog_objects_max_version_(0L) {
-  topic_processing_time_metric_ = metrics_->RegisterMetric(
-      new StatsMetric<double>(CATALOG_SERVER_TOPIC_PROCESSING_TIMES,
-          TUnit::TIME_S));
+  topic_processing_time_metric_ = StatsMetric<double>::CreateAndRegister(metrics,
+      CATALOG_SERVER_TOPIC_PROCESSING_TIMES);
 }
-
 
 Status CatalogServer::Start() {
   TNetworkAddress subscriber_address =

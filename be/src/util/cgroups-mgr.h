@@ -149,7 +149,7 @@ class CgroupsMgr {
       std::string* cgroup_path, std::string* tasks_path) const;
 
   /// Number of currently active Impala-managed cgroups.
-  IntCounter* active_cgroups_metric_;
+  IntGauge* active_cgroups_metric_;
 
   /// Root of the CPU cgroup hierarchy. Created cgroups are placed directly under it.
   std::string cgroups_hierarchy_path_;

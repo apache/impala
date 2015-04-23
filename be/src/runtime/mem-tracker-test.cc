@@ -49,7 +49,11 @@ TEST(MemTestTest, SingleTrackerWithLimit) {
 }
 
 TEST(MemTestTest, ConsumptionMetric) {
-  UIntGauge metric("test", TUnit::BYTES, 0);
+  TMetricDef md;
+  md.__set_key("test");
+  md.__set_units(TUnit::BYTES);
+  md.__set_kind(TMetricKind::GAUGE);
+  UIntGauge metric(md, 0);
   EXPECT_EQ(metric.value(), 0);
 
   MemTracker t(&metric, 100, -1, "");

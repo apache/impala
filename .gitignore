@@ -37,6 +37,3 @@ tests/test-hive-udfs/target/
 cdh-*-hdfs-data/
 avro_schemas/
 cluster_logs/
-
-# This file is auto-generated in the build process
-common/thrift/ErrorCodes.thrift

@@ -161,6 +161,8 @@ set (SRC_FILES
   Llama.thrift
   Logging.thrift
   NetworkTest.thrift
+  MetricDefs.thrift
+  Metrics.thrift
   PlanNodes.thrift
   Planner.thrift
   Partitions.thrift
@@ -175,6 +177,10 @@ set (SRC_FILES
 add_custom_command(OUTPUT ErrorCodes.thrift
   COMMAND python generate_error_codes.py
   DEPENDS generate_error_codes.py)
+
+add_custom_command(OUTPUT MetricDefs.thrift
+  COMMAND python generate_metrics.py
+  DEPENDS generate_metrics.py metrics.json)
 
 # Create a build command for each of the thrift src files and generate
 # a list of files they produce

@@ -105,20 +105,15 @@ StatestoreSubscriber::StatestoreSubscriber(const std::string& subscriber_id,
       "statestore-subscriber.last-recovery-duration", 0.0);
   last_recovery_time_metric_ = metrics_->AddProperty<string>(
       "statestore-subscriber.last-recovery-time", "N/A");
-  topic_update_interval_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>("statestore-subscriber.topic-update-interval-time",
-          TUnit::TIME_S));
-  topic_update_duration_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>("statestore-subscriber.topic-update-duration",
-          TUnit::TIME_S));
-  heartbeat_interval_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>("statestore-subscriber.heartbeat-interval-time",
-          TUnit::TIME_S));
+  topic_update_interval_metric_ = StatsMetric<double>::CreateAndRegister(metrics,
+      "statestore-subscriber.topic-update-interval-time");
+  topic_update_duration_metric_ = StatsMetric<double>::CreateAndRegister(metrics,
+      "statestore-subscriber.topic-update-duration");
+  heartbeat_interval_metric_ = StatsMetric<double>::CreateAndRegister(metrics,
+      "statestore-subscriber.heartbeat-interval-time");
 
   registration_id_metric_ = metrics->AddProperty<string>(
-      "statestore-subscriber.registration-id", "N/A",
-      "The most recent registration ID for this subscriber with the statestore. Set to "
-      "'N/A' if no registration has been completed");
+      "statestore-subscriber.registration-id", "N/A");
 
   client_cache_->InitMetrics(metrics, "statestore-subscriber.statestore");
 }
@@ -130,9 +125,8 @@ Status StatestoreSubscriber::AddTopic(const Statestore::TopicId& topic_id,
   Callbacks* cb = &(update_callbacks_[topic_id]);
   cb->callbacks.push_back(callback);
   if (cb->processing_time_metric == NULL) {
-    const string& metric_name = Substitute(CALLBACK_METRIC_PATTERN, topic_id);
-    cb->processing_time_metric = metrics_->RegisterMetric(
-        new StatsMetric<double>(metric_name, TUnit::TIME_S));
+    cb->processing_time_metric = StatsMetric<double>::CreateAndRegister(metrics_,
+        CALLBACK_METRIC_PATTERN, topic_id);
   }
   topic_registrations_[topic_id] = is_transient;
   return Status::OK;

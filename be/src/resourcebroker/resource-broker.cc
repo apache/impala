@@ -106,77 +106,42 @@ ResourceBroker::ResourceBroker(const vector<TNetworkAddress>& llama_addresses,
   active_llama_handle_metric_ = metrics->AddProperty<string>(
       "resource-broker.active-llama-handle", "none");
 
-  reservation_rpc_time_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>("resource-broker.reservation-request-rpc-time",
-          TUnit::TIME_S, "The time, in seconds, that a Reserve() RPC takes to "
-          "Llama"));
-  reservation_response_time_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>("resource-broker.reservation-request-response-time",
-          TUnit::TIME_S, "The time, in seconds, that a reservation request takes "
-          "to be fulfilled by Llama"));
+  reservation_rpc_time_metric_ = StatsMetric<double>::CreateAndRegister(metrics,
+      "resource-broker.reservation-request-rpc-time");
+  reservation_response_time_metric_ = StatsMetric<double>::CreateAndRegister(metrics,
+      "resource-broker.reservation-request-response-time");
   reservation_requests_total_metric_ = metrics->AddCounter<int64_t>(
-      "resource-broker.reservation-requests-total", 0, TUnit::UNIT,
-      "The total number of reservation requests made by this Impala daemon to Llama");
+      "resource-broker.reservation-requests-total", 0);
   reservation_requests_fulfilled_metric_ = metrics->AddCounter<int64_t>(
-      "resource-broker.reservation-requests-fulfilled", 0, TUnit::UNIT,
-      "The number of reservation requests made by this Impala daemon to Llama "
-      "which succeeded");
+      "resource-broker.reservation-requests-fulfilled", 0);
   reservation_requests_failed_metric_ = metrics->AddCounter<int64_t>(
-      "resource-broker.reservation-requests-failed", 0, TUnit::UNIT,
-      "The number of reservation requests made by this Impala daemon to Llama which "
-      "failed");
+      "resource-broker.reservation-requests-failed", 0);
   reservation_requests_rejected_metric_ = metrics->AddCounter<int64_t>(
-      "resource-broker.reservation-requests-rejected", 0, TUnit::UNIT,
-      "The number of reservation requests made by this Impala daemon to Llama "
-      "which were rejected");
+      "resource-broker.reservation-requests-rejected", 0);
   reservation_requests_timedout_metric_ = metrics->AddCounter<int64_t>(
-      "resource-broker.reservation-requests-timedout", 0, TUnit::UNIT,
-      "The number of reservation requests made by this Impala daemon to Llama "
-      "which timed out");
+      "resource-broker.reservation-requests-timedout", 0);
 
-  expansion_rpc_time_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>("resource-broker.expansion-request-rpc-time",
-          TUnit::TIME_S,
-          "The time, in seconds, that a Reserve() RPC takes to Llama"));
-  expansion_response_time_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>("resource-broker.expansion-request-response-time",
-          TUnit::TIME_S, "The time, in seconds, that a expansion request takes "
-          "to be fulfilled by Llama"));
+  expansion_rpc_time_metric_ = StatsMetric<double>::CreateAndRegister(metrics,
+      "resource-broker.expansion-request-rpc-time");
+  expansion_response_time_metric_ = StatsMetric<double>::CreateAndRegister(metrics,
+      "resource-broker.expansion-request-response-time");
   expansion_requests_total_metric_ = metrics->AddCounter<int64_t>(
-      "resource-broker.expansion-requests-total", 0, TUnit::UNIT,
-      "The total number of expansion requests made by this Impala daemon to Llama");
+      "resource-broker.expansion-requests-total", 0);
   expansion_requests_fulfilled_metric_ = metrics->AddCounter<int64_t>(
-      "resource-broker.expansion-requests-fulfilled", 0, TUnit::UNIT,
-      "The number of expansion requests made by this Impala daemon to Llama "
-      "which succeeded");
+      "resource-broker.expansion-requests-fulfilled", 0);
   expansion_requests_failed_metric_ = metrics->AddCounter<int64_t>(
-      "resource-broker.expansion-requests-failed", 0, TUnit::UNIT,
-      "The number of expansion requests made by this Impala daemon to Llama which "
-      "failed");
+      "resource-broker.expansion-requests-failed", 0);
   expansion_requests_rejected_metric_ = metrics->AddCounter<int64_t>(
-      "resource-broker.expansion-requests-rejected", 0, TUnit::UNIT,
-      "The number of expansion requests made by this Impala daemon to Llama "
-      "which were rejected");
+      "resource-broker.expansion-requests-rejected", 0);
   expansion_requests_timedout_metric_ = metrics->AddCounter<int64_t>(
-      "resource-broker.expansion-requests-timedout", 0, TUnit::UNIT,
-      "The number of expansion requests made by this Impala daemon to Llama "
-      "which timed out");
+      "resource-broker.expansion-requests-timedout", 0);
 
   requests_released_metric_ = metrics->AddCounter<int64_t>(
-      "resource-broker.requests-released", 0, TUnit::UNIT,
-      "The number of resource-release requests received from Llama");
-
+      "resource-broker.requests-released", 0);
   allocated_memory_metric_ = metrics->AddGauge<uint64_t>(
-      "resource-broker.memory-resources-in-use", 0L, TUnit::BYTES, "The total"
-      " number of bytes currently allocated to this Impala daemon by Llama");
-
+      "resource-broker.memory-resources-in-use", 0L);
   allocated_vcpus_metric_ = metrics->AddGauge<uint64_t>(
-      "resource-broker.vcpu-resources-in-use", 0, TUnit::UNIT, "The total number "
-      "of vcpus currently allocated to this Impala daemon by Llama");
-
-  requests_released_metric_ = metrics->AddCounter<int64_t>(
-      "resource-broker.requests-released", 0, TUnit::UNIT, "The total number of "
-      "resource allocations released by this Impala daemon");
+      "resource-broker.vcpu-resources-in-use", 0);
 }
 
 Status ResourceBroker::Init() {

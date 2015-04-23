@@ -65,6 +65,10 @@ set(SRC_FILES
   JniCatalog_constants.cpp
   JniCatalog_types.cpp
   Logging_types.cpp
+  Metrics_constants.cpp
+  Metrics_types.cpp
+  MetricDefs_constants.cpp
+  MetricDefs_types.cpp
   NetworkTest_constants.cpp
   NetworkTest_types.cpp
   NetworkTestService.cpp

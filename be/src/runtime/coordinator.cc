@@ -392,7 +392,14 @@ Status Coordinator::Exec(QuerySchedule& schedule,
 
   query_events_->MarkEvent("Ready to start remote fragments");
   int backend_num = 0;
-  StatsMetric<double> latencies("fragment-latencies", TUnit::TIME_NS);
+
+  // TODO: Add a runtime-profile stats mechanism so this doesn't need to create a
+  // non-registered TMetricDef.
+  TMetricDef md;
+  md.__set_key("fragment-latencies");
+  md.__set_units(TUnit::TIME_NS);
+  md.__set_kind(TMetricKind::STATS);
+  StatsMetric<double> latencies(md);
   for (int fragment_idx = (has_coordinator_fragment ? 1 : 0);
        fragment_idx < request.fragments.size(); ++fragment_idx) {
     const FragmentExecParams& params = (*fragment_exec_params)[fragment_idx];

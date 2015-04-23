@@ -19,6 +19,7 @@
 #include <gtest/gtest.h>
 #include <boost/scoped_ptr.hpp>
 #include <limits>
+#include <map>
 
 #include "util/jni-util.h"
 #include "util/thread.h"
@@ -38,8 +39,37 @@ void AssertValue(M* metric, const T& value,
   }
 }
 
-TEST(MetricsTest, CounterMetrics) {
+class MetricsTest : public testing::Test {
+ public:
+  void ResetMetricDefs() {
+    MetricDefs::GetInstance()->metric_defs_ = g_MetricDefs_constants;
+  }
+
+  virtual void SetUp() {
+    ResetMetricDefs();
+  }
+
+  virtual void TearDown() {
+    ResetMetricDefs();
+  }
+
+  void AddMetricDef(const string& key, const TMetricKind::type kind,
+      const TUnit::type units, const string& desc = "") {
+    map<string, TMetricDef>& defs = MetricDefs::GetInstance()->metric_defs_.TMetricDefs;
+    EXPECT_EQ(defs.end(), defs.find(key));
+
+    TMetricDef def;
+    def.__set_key(key);
+    def.__set_kind(kind);
+    def.__set_units(units);
+    def.__set_description(desc);
+    defs.insert(pair<string, TMetricDef>(key, def));
+  }
+};
+
+TEST_F(MetricsTest, CounterMetrics) {
   MetricGroup metrics("CounterMetrics");
+  AddMetricDef("counter", TMetricKind::COUNTER, TUnit::UNIT);
   IntCounter* int_counter = metrics.AddCounter("counter", 0L);
   AssertValue(int_counter, 0, "0");
   int_counter->Increment(1);
@@ -49,13 +79,15 @@ TEST(MetricsTest, CounterMetrics) {
   int_counter->set_value(3456);
   AssertValue(int_counter, 3456, "3.46K");
 
+  AddMetricDef("counter_with_units", TMetricKind::COUNTER, TUnit::BYTES);
   IntCounter* int_counter_with_units =
-      metrics.AddCounter("counter_with_units", 10L, TUnit::BYTES);
+      metrics.AddCounter("counter_with_units", 10L);
   AssertValue(int_counter_with_units, 10, "10.00 B");
 }
 
-TEST(MetricsTest, GaugeMetrics) {
+TEST_F(MetricsTest, GaugeMetrics) {
   MetricGroup metrics("GaugeMetrics");
+  AddMetricDef("gauge", TMetricKind::GAUGE, TUnit::NONE);
   IntGauge* int_gauge = metrics.AddGauge("gauge", 0L);
   AssertValue(int_gauge, 0, "0");
   int_gauge->Increment(-1);
@@ -65,18 +97,21 @@ TEST(MetricsTest, GaugeMetrics) {
   int_gauge->set_value(3456);
   AssertValue(int_gauge, 3456, "3456");
 
+  AddMetricDef("gauge_with_units", TMetricKind::GAUGE, TUnit::TIME_S);
   IntGauge* int_gauge_with_units =
-      metrics.AddGauge("gauge_with_units", 10L, TUnit::TIME_S);
+      metrics.AddGauge("gauge_with_units", 10L);
   AssertValue(int_gauge_with_units, 10, "10s000ms");
 }
 
-TEST(MetricsTest, PropertyMetrics) {
+TEST_F(MetricsTest, PropertyMetrics) {
   MetricGroup metrics("PropertyMetrics");
+  AddMetricDef("bool_property", TMetricKind::PROPERTY, TUnit::NONE);
   BooleanProperty* bool_property = metrics.AddProperty("bool_property", false);
   AssertValue(bool_property, false, "false");
   bool_property->set_value(true);
   AssertValue(bool_property, true, "true");
 
+  AddMetricDef("string_property", TMetricKind::PROPERTY, TUnit::NONE);
   StringProperty* string_property = metrics.AddProperty("string_property",
       string("string1"));
   AssertValue(string_property, "string1", "string1");
@@ -84,8 +119,9 @@ TEST(MetricsTest, PropertyMetrics) {
   AssertValue(string_property, "string2", "string2");
 }
 
-TEST(MetricsTest, NonFiniteValues) {
+TEST_F(MetricsTest, NonFiniteValues) {
   MetricGroup metrics("NanValues");
+  AddMetricDef("inf_value", TMetricKind::GAUGE, TUnit::NONE);
   double inf = numeric_limits<double>::infinity();
   DoubleGauge* gauge = metrics.AddGauge("inf_value", inf);
   AssertValue(gauge, inf, "inf");
@@ -95,12 +131,13 @@ TEST(MetricsTest, NonFiniteValues) {
   EXPECT_TRUE(gauge->ToHumanReadable() == "nan");
 }
 
-TEST(MetricsTest, SetMetrics) {
+TEST_F(MetricsTest, SetMetrics) {
   MetricGroup metrics("SetMetrics");
   set<int> item_set;
   item_set.insert(4); item_set.insert(5); item_set.insert(6);
-  SetMetric<int>* set_metric =
-      metrics.RegisterMetric(new SetMetric<int>("set", item_set));
+  AddMetricDef("set", TMetricKind::SET, TUnit::NONE);
+  SetMetric<int>* set_metric = SetMetric<int>::CreateAndRegister(&metrics, "set",
+      item_set);
   EXPECT_EQ(set_metric->ToHumanReadable(), "[4, 5, 6]");
 
   set_metric->Add(7);
@@ -111,11 +148,12 @@ TEST(MetricsTest, SetMetrics) {
   EXPECT_EQ(set_metric->ToHumanReadable(), "[5, 6, 7]");
 }
 
-TEST(MetricsTest, StatsMetrics) {
+TEST_F(MetricsTest, StatsMetrics) {
   // Uninitialised stats metrics don't print anything other than the count
   MetricGroup metrics("StatsMetrics");
-  StatsMetric<double>* stats_metric = metrics.RegisterMetric(
-      new StatsMetric<double>("stats", TUnit::UNIT));
+  AddMetricDef("stats", TMetricKind::STATS, TUnit::NONE);
+  StatsMetric<double>* stats_metric = StatsMetric<double>::CreateAndRegister(&metrics,
+      "stats");
   EXPECT_EQ(stats_metric->ToHumanReadable(), "count: 0");
 
   stats_metric->Update(0.0);
@@ -125,8 +163,9 @@ TEST(MetricsTest, StatsMetrics) {
   EXPECT_EQ(stats_metric->ToHumanReadable(), "count: 3, last: 2.000000, min: 0.000000, "
       "max: 2.000000, mean: 1.000000, stddev: 0.816497");
 
-  StatsMetric<double>* stats_metric_with_units = metrics.RegisterMetric(
-      new StatsMetric<double>("stats_units", TUnit::BYTES));
+  AddMetricDef("stats_units", TMetricKind::STATS, TUnit::BYTES);
+  StatsMetric<double>* stats_metric_with_units =
+      StatsMetric<double>::CreateAndRegister(&metrics, "stats_units");
   EXPECT_EQ(stats_metric_with_units->ToHumanReadable(), "count: 0");
 
   stats_metric_with_units->Update(0.0);
@@ -137,7 +176,7 @@ TEST(MetricsTest, StatsMetrics) {
       "max: 2.00 B, mean: 1.00 B, stddev: 0.82 B");
 }
 
-TEST(MetricsTest, MemMetric) {
+TEST_F(MetricsTest, MemMetric) {
 #ifndef ADDRESS_SANITIZER
   MetricGroup metrics("MemMetrics");
   RegisterMemoryMetrics(&metrics, false);
@@ -170,7 +209,7 @@ TEST(MetricsTest, MemMetric) {
 #endif
 }
 
-TEST(MetricsTest, JvmMetrics) {
+TEST_F(MetricsTest, JvmMetrics) {
   MetricGroup metrics("JvmMetrics");
   RegisterMemoryMetrics(&metrics, true);
   UIntGauge* jvm_total_used =
@@ -194,19 +233,21 @@ void AssertJson(const Value& val, const string& name, const string& value,
   if (!units.empty()) EXPECT_EQ(val["units"].GetString(), units);
 }
 
-TEST(MetricsJsonTest, Counters) {
+TEST_F(MetricsTest, CountersJson) {
   MetricGroup metrics("CounterMetrics");
+  AddMetricDef("counter", TMetricKind::COUNTER, TUnit::UNIT, "description");
   metrics.AddCounter("counter", 0L);
   Document document;
   Value val;
   metrics.ToJson(true, &document, &val);
   const Value& counter_val = val["metrics"][0u];
-  AssertJson(counter_val, "counter", "0", "", "COUNTER", "UNIT");
+  AssertJson(counter_val, "counter", "0", "description", "COUNTER", "UNIT");
   EXPECT_EQ(counter_val["value"].GetInt(), 0);
 }
 
-TEST(MetricsJsonTest, Gauges) {
+TEST_F(MetricsTest, GaugesJson) {
   MetricGroup metrics("GaugeMetrics");
+  AddMetricDef("gauge", TMetricKind::GAUGE, TUnit::NONE);
   metrics.AddGauge("gauge", 10L);
   Document document;
   Value val;
@@ -215,8 +256,9 @@ TEST(MetricsJsonTest, Gauges) {
   EXPECT_EQ(val["metrics"][0u]["value"].GetInt(), 10);
 }
 
-TEST(MetricsJsonTest, Properties) {
+TEST_F(MetricsTest, PropertiesJson) {
   MetricGroup metrics("Properties");
+  AddMetricDef("property", TMetricKind::PROPERTY, TUnit::NONE);
   metrics.AddProperty("property", string("my value"));
   Document document;
   Value val;
@@ -226,11 +268,12 @@ TEST(MetricsJsonTest, Properties) {
   EXPECT_EQ(string(val["metrics"][0u]["value"].GetString()), "my value");
 }
 
-TEST(MetricsJsonTest, SetMetrics) {
+TEST_F(MetricsTest, SetMetricsJson) {
   MetricGroup metrics("SetMetrics");
   set<int> item_set;
   item_set.insert(4); item_set.insert(5); item_set.insert(6);
-  metrics.RegisterMetric(new SetMetric<int>("set", item_set));
+  AddMetricDef("set", TMetricKind::SET, TUnit::NONE);
+  SetMetric<int>::CreateAndRegister(&metrics, "set", item_set);
 
   Document document;
   Value val;
@@ -245,10 +288,11 @@ TEST(MetricsJsonTest, SetMetrics) {
   AssertJson(set_val, "set", "[4, 5, 6]", "");
 }
 
-TEST(MetricsJsonTest, StatsMetrics) {
+TEST_F(MetricsTest, StatsMetricsJson) {
   MetricGroup metrics("StatsMetrics");
-  StatsMetric<double>* metric =
-      metrics.RegisterMetric(new StatsMetric<double>("stats_metric", TUnit::UNIT));
+  AddMetricDef("stats_metric", TMetricKind::STATS, TUnit::UNIT);
+  StatsMetric<double>* metric = StatsMetric<double>::CreateAndRegister(&metrics,
+      "stats_metric");
   metric->Update(10.0);
   metric->Update(20.0);
   Document document;
@@ -266,9 +310,10 @@ TEST(MetricsJsonTest, StatsMetrics) {
   EXPECT_EQ(stats_val["stddev"].GetDouble(), 5.0);
 }
 
-TEST(MetricsJsonTest, UnitsAndDescription) {
+TEST_F(MetricsTest, UnitsAndDescriptionJson) {
   MetricGroup metrics("Units");
-  metrics.AddCounter("counter", 2048, TUnit::BYTES, "description");
+  AddMetricDef("counter", TMetricKind::COUNTER, TUnit::BYTES, "description");
+  metrics.AddCounter("counter", 2048);
   Document document;
   Value val;
   metrics.ToJson(true, &document, &val);
@@ -277,12 +322,15 @@ TEST(MetricsJsonTest, UnitsAndDescription) {
   EXPECT_EQ(counter_val["value"].GetInt(), 2048);
 }
 
-TEST(MetricGroupTest, JsonTest) {
+TEST_F(MetricsTest, MetricGroupJson) {
   MetricGroup metrics("JsonTest");
-  metrics.AddCounter("counter1", 2048, TUnit::BYTES, "description");
-  metrics.AddCounter("counter2", 2048, TUnit::BYTES, "description");
+  AddMetricDef("counter1", TMetricKind::COUNTER, TUnit::BYTES, "description");
+  AddMetricDef("counter2", TMetricKind::COUNTER, TUnit::BYTES, "description");
+  metrics.AddCounter("counter1", 2048);
+  metrics.AddCounter("counter2", 2048);
 
   metrics.GetChildGroup("child1");
+  AddMetricDef("child_counter", TMetricKind::COUNTER, TUnit::BYTES, "description");
   metrics.GetChildGroup("child2")->AddCounter("child_counter", 0);
 
   IntCounter* counter = metrics.FindMetricForTesting<IntCounter>(string("child_counter"));

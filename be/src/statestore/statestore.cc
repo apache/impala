@@ -234,17 +234,16 @@ Statestore::Statestore(MetricGroup* metrics)
   DCHECK(metrics != NULL);
   num_subscribers_metric_ =
       metrics->AddGauge(STATESTORE_LIVE_SUBSCRIBERS, 0L);
-  subscriber_set_metric_ =
-      metrics->RegisterMetric(new SetMetric<string>(STATESTORE_LIVE_SUBSCRIBERS_LIST,
-                                                    set<string>()));
+  subscriber_set_metric_ = SetMetric<string>::CreateAndRegister(metrics,
+      STATESTORE_LIVE_SUBSCRIBERS_LIST, set<string>());
   key_size_metric_ = metrics->AddGauge(STATESTORE_TOTAL_KEY_SIZE_BYTES, 0L);
   value_size_metric_ = metrics->AddGauge(STATESTORE_TOTAL_VALUE_SIZE_BYTES, 0L);
   topic_size_metric_ = metrics->AddGauge(STATESTORE_TOTAL_TOPIC_SIZE_BYTES, 0L);
 
-  topic_update_duration_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>(STATESTORE_UPDATE_DURATION, TUnit::TIME_S));
-  heartbeat_duration_metric_ = metrics->RegisterMetric(
-      new StatsMetric<double>(STATESTORE_HEARTBEAT_DURATION, TUnit::TIME_S));
+  topic_update_duration_metric_ =
+      StatsMetric<double>::CreateAndRegister(metrics, STATESTORE_UPDATE_DURATION);
+  heartbeat_duration_metric_ =
+      StatsMetric<double>::CreateAndRegister(metrics, STATESTORE_HEARTBEAT_DURATION);
 
   update_state_client_cache_->InitMetrics(metrics, "subscriber-update-state");
   heartbeat_client_cache_->InitMetrics(metrics, "subscriber-heartbeat");

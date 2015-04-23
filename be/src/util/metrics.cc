@@ -52,7 +52,30 @@ void Metric::AddStandardFields(Document* document, Value* val) {
   val->AddMember("human_readable", metric_value, document->GetAllocator());
 }
 
-MetricGroup::MetricGroup(const std::string& name)
+MetricDefs* MetricDefs::GetInstance() {
+  // Note that this is not thread-safe in C++03 (but will be in C++11 see
+  // http://stackoverflow.com/a/19907903/132034). We don't bother with the double-check
+  // locking pattern because it introduces complexity whereas a race is very unlikely
+  // and it doesn't matter if we construct two instances since MetricDefsConstants is
+  // just a constant map.
+  static MetricDefs instance;
+  return &instance;
+}
+
+TMetricDef MetricDefs::Get(const string& key, const string& arg) {
+  MetricDefs* inst = GetInstance();
+  map<string, TMetricDef>::iterator it = inst->metric_defs_.TMetricDefs.find(key);
+  if (it == inst->metric_defs_.TMetricDefs.end()) {
+    DCHECK(false) << "Could not find metric definition for key=" << key << " arg=" << arg;
+    return TMetricDef();
+  }
+  TMetricDef md = it->second;
+  md.__set_key(Substitute(md.key, arg));
+  md.__set_description(Substitute(md.description, arg));
+  return md;
+}
+
+MetricGroup::MetricGroup(const string& name)
     : obj_pool_(new ObjectPool()), name_(name) { }
 
 Status MetricGroup::Init(Webserver* webserver) {
@@ -166,7 +189,7 @@ void MetricGroup::ToJson(bool include_children, Document* document, Value* out_v
   *out_val = container;
 }
 
-MetricGroup* MetricGroup::GetChildGroup(const std::string& name) {
+MetricGroup* MetricGroup::GetChildGroup(const string& name) {
   lock_guard<mutex> l(lock_);
   ChildGroupMap::iterator it = children_.find(name);
   if (it != children_.end()) return it->second;

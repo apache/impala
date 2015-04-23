@@ -67,8 +67,8 @@ const string RESOLVE_POOL_METRIC_NAME = "request-pool-service.resolve-pool-durat
 RequestPoolService::RequestPoolService(MetricGroup* metrics) :
     metrics_(metrics), resolve_pool_ms_metric_(NULL) {
   DCHECK(metrics_ != NULL);
-  resolve_pool_ms_metric_ = metrics_->RegisterMetric(
-      new StatsMetric<double>(RESOLVE_POOL_METRIC_NAME, TUnit::TIME_MS));
+  resolve_pool_ms_metric_ =
+      StatsMetric<double>::CreateAndRegister(metrics_, RESOLVE_POOL_METRIC_NAME);
 
   if (FLAGS_fair_scheduler_allocation_path.empty() &&
       FLAGS_llama_site_path.empty()) {

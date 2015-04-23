@@ -30,6 +30,9 @@ using namespace impala;
 using namespace rapidjson;
 using namespace strings;
 
+// Metric key format for rpc call duration metrics.
+const string RPC_TIME_STATS_METRIC_KEY = "rpc-method.$0.call_duration";
+
 // Singleton class to keep track of all RpcEventHandlers, and to render them to a
 // web-based summary page.
 class RpcEventHandlerManager {
@@ -165,10 +168,9 @@ void* RpcEventHandler::getContext(const char* fn_name, void* server_context) {
     if (it == method_map_.end()) {
       MethodDescriptor* descriptor = new MethodDescriptor();
       descriptor->name = fn_name;
-      const string& time_metric_name =
-          Substitute("rpc-method.$0.$1.call_duration", server_name_, descriptor->name);
-      descriptor->time_stats = metrics_->RegisterMetric(
-          new StatsMetric<double>(time_metric_name, TUnit::TIME_MS));
+      const string& rpc_name = Substitute("$0.$1", server_name_, descriptor->name);
+      descriptor->time_stats = StatsMetric<double>::CreateAndRegister(metrics_,
+          RPC_TIME_STATS_METRIC_KEY, rpc_name);
       it = method_map_.insert(make_pair(descriptor->name, descriptor)).first;
     }
   }

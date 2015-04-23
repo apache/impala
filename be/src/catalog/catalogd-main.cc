@@ -67,8 +67,7 @@ int main(int argc, char** argv) {
   StartThreadInstrumentation(metrics.get(), webserver.get());
 
   InitRpcEventTracing(webserver.get());
-  metrics->AddProperty<string>("catalog.version", GetVersionString(true),
-      "catalogd build version");
+  metrics->AddProperty<string>("catalog.version", GetVersionString(true));
 
   CatalogServer catalog_server(metrics.get());
   EXIT_IF_ERROR(catalog_server.Start());

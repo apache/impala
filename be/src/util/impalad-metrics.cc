@@ -154,9 +154,9 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
 
   // Initialize memory usage metrics
   MEM_POOL_TOTAL_BYTES = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::MEM_POOL_TOTAL_BYTES, 0L, TUnit::BYTES);
+      ImpaladMetricKeys::MEM_POOL_TOTAL_BYTES, 0L);
   HASH_TABLE_TOTAL_BYTES = m->AddGauge(
-      ImpaladMetricKeys::HASH_TABLE_TOTAL_BYTES, 0L, TUnit::BYTES);
+      ImpaladMetricKeys::HASH_TABLE_TOTAL_BYTES, 0L);
 
   // Initialize insert metrics
   NUM_FILES_OPEN_FOR_INSERT = m->AddGauge<int64_t>(
@@ -165,31 +165,25 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
   // Initialize IO mgr metrics
   IO_MGR_NUM_OPEN_FILES = m->AddGauge<int64_t>(
       ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES, 0L);
-  IO_MGR_NUM_BUFFERS = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::IO_MGR_NUM_BUFFERS, 0L);
-  IO_MGR_TOTAL_BYTES = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::IO_MGR_TOTAL_BYTES, 0L, TUnit::BYTES);
+  IO_MGR_NUM_BUFFERS = m->AddGauge<int64_t>(ImpaladMetricKeys::IO_MGR_NUM_BUFFERS, 0L);
+  IO_MGR_TOTAL_BYTES = m->AddGauge<int64_t>(ImpaladMetricKeys::IO_MGR_TOTAL_BYTES, 0L);
   IO_MGR_NUM_UNUSED_BUFFERS = m->AddGauge<int64_t>(
       ImpaladMetricKeys::IO_MGR_NUM_UNUSED_BUFFERS, 0L);
 
-  IO_MGR_BYTES_READ = m->AddGauge(
-      ImpaladMetricKeys::IO_MGR_BYTES_READ, 0L, TUnit::BYTES);
+  IO_MGR_BYTES_READ = m->AddGauge(ImpaladMetricKeys::IO_MGR_BYTES_READ, 0L);
   IO_MGR_LOCAL_BYTES_READ = m->AddGauge(
-      ImpaladMetricKeys::IO_MGR_LOCAL_BYTES_READ, 0L, TUnit::BYTES);
+      ImpaladMetricKeys::IO_MGR_LOCAL_BYTES_READ, 0L);
   IO_MGR_CACHED_BYTES_READ = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::IO_MGR_CACHED_BYTES_READ, 0L, TUnit::BYTES);
+      ImpaladMetricKeys::IO_MGR_CACHED_BYTES_READ, 0L);
   IO_MGR_SHORT_CIRCUIT_BYTES_READ = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::IO_MGR_SHORT_CIRCUIT_BYTES_READ, 0L, TUnit::BYTES);
+      ImpaladMetricKeys::IO_MGR_SHORT_CIRCUIT_BYTES_READ, 0L);
   IO_MGR_BYTES_WRITTEN = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::IO_MGR_BYTES_WRITTEN, 0L, TUnit::BYTES);
+      ImpaladMetricKeys::IO_MGR_BYTES_WRITTEN, 0L);
 
   // Initialize catalog metrics
-  CATALOG_NUM_DBS = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::CATALOG_NUM_DBS, 0L);
-  CATALOG_NUM_TABLES = m->AddGauge<int64_t>(
-      ImpaladMetricKeys::CATALOG_NUM_TABLES, 0L);
-  CATALOG_READY = m->AddProperty<bool>(
-      ImpaladMetricKeys::CATALOG_READY, false);
+  CATALOG_NUM_DBS = m->AddGauge<int64_t>(ImpaladMetricKeys::CATALOG_NUM_DBS, 0L);
+  CATALOG_NUM_TABLES = m->AddGauge<int64_t>(ImpaladMetricKeys::CATALOG_NUM_TABLES, 0L);
+  CATALOG_READY = m->AddProperty<bool>(ImpaladMetricKeys::CATALOG_READY, false);
 }
 
 }

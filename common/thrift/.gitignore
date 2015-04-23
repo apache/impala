@@ -1,1 +1,3 @@
 Opcodes.thrift
+ErrorCodes.thrift
+MetricDefs.thrift

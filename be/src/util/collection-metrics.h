@@ -42,8 +42,15 @@ namespace impala {
 template <typename T>
 class SetMetric : public Metric {
  public:
-  SetMetric(const std::string& key, const std::set<T>& value,
-      const std::string& description = "") : Metric(key, description), value_(value) { }
+  static SetMetric* CreateAndRegister(MetricGroup* metrics, const std::string& key,
+      const std::set<T>& value) {
+    return metrics->RegisterMetric(new SetMetric(MetricDefs::Get(key), value));
+  }
+
+  SetMetric(const TMetricDef& def, const std::set<T>& value)
+    : Metric(def), value_(value) {
+    DCHECK_EQ(def.kind, TMetricKind::SET);
+  }
 
   /// Put an item in this set.
   void Add(const T& item) {
@@ -106,8 +113,14 @@ class SetMetric : public Metric {
 template <typename T>
 class StatsMetric : public Metric {
  public:
-  StatsMetric(const std::string& key, const TUnit::type unit,
-      const std::string& description = "") : Metric(key, description), unit_(unit) { }
+  static StatsMetric* CreateAndRegister(MetricGroup* metrics, const std::string& key,
+      const std::string& arg = "") {
+    return metrics->RegisterMetric(new StatsMetric(MetricDefs::Get(key, arg)));
+  }
+
+  StatsMetric(const TMetricDef& def) : Metric(def), unit_(def.units) {
+    DCHECK_EQ(def.kind, TMetricKind::STATS);
+  }
 
   void Update(const T& value) {
     boost::lock_guard<boost::mutex> l(lock_);
