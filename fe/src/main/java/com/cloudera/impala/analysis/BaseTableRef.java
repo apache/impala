@@ -23,9 +23,8 @@ import com.google.common.base.Preconditions;
  * of a SelectStmt.
  */
 public class BaseTableRef extends TableRef {
-  public BaseTableRef(TableRef tableRef, Path resolvedPath) {
+  public BaseTableRef(TableRef tableRef) {
     super(tableRef);
-    resolvedPath_ = resolvedPath;
     Preconditions.checkState(resolvedPath_.isResolved());
     Preconditions.checkNotNull(resolvedPath_.getRootTable());
     // Set implicit aliases if no explicit one was given.
@@ -66,5 +65,5 @@ public class BaseTableRef extends TableRef {
 
   public String debugString() { return tableRefToSql(); }
   @Override
-  public TableRef clone() { return new BaseTableRef(this); }
+  protected TableRef clone() { return new BaseTableRef(this); }
 }

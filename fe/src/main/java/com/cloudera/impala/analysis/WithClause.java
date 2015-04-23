@@ -43,23 +43,18 @@ import com.google.common.collect.Lists;
  * Views defined within the same WITH-clause may not use the same alias.
  */
 public class WithClause implements ParseNode {
+  /////////////////////////////////////////
+  // BEGIN: Members that need to be reset()
+
   private final ArrayList<View> views_;
+
+  // END: Members that need to be reset()
+  /////////////////////////////////////////
 
   public WithClause(ArrayList<View> views) {
     Preconditions.checkNotNull(views);
     Preconditions.checkState(!views.isEmpty());
     views_ = views;
-  }
-
-  /**
-   * Copy c'tor.
-   */
-  public WithClause(WithClause other) {
-    Preconditions.checkNotNull(other);
-    views_ = Lists.newArrayList();
-    for (View view: other.views_) {
-      views_.add(new View(view.getName(), view.getQueryStmt().clone()));
-    }
   }
 
   /**
@@ -100,6 +95,21 @@ public class WithClause implements ParseNode {
         analyzer.getMissingTbls().addAll(withClauseAnalyzer.getMissingTbls());
       }
     }
+  }
+
+  /**
+   * C'tor for cloning.
+   */
+  private WithClause(WithClause other) {
+    Preconditions.checkNotNull(other);
+    views_ = Lists.newArrayList();
+    for (View view: other.views_) {
+      views_.add(new View(view.getName(), view.getQueryStmt().clone()));
+    }
+  }
+
+  public void reset() {
+    for (View view: views_) view.getQueryStmt().reset();
   }
 
   @Override

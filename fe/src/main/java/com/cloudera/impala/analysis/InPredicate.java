@@ -205,7 +205,7 @@ public class InPredicate extends Predicate {
     return strBuilder.toString();
   }
 
-  /*
+  /**
    * If predicate is of the form "<SlotRef> [NOT] IN", returns the
    * SlotRef.
    */

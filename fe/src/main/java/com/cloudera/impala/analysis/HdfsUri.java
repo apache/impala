@@ -28,7 +28,7 @@ import com.cloudera.impala.common.FileSystemUtil;
 import com.cloudera.impala.util.FsPermissionChecker;
 import com.google.common.base.Preconditions;
 
-/*
+/**
  * Represents a Hadoop FileSystem URI in a SQL statement.
  */
 public class HdfsUri {

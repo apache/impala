@@ -61,7 +61,7 @@ public class Subquery extends Expr {
   public Subquery(Subquery other) {
     super(other);
     stmt_ = other.stmt_.clone();
-    isAnalyzed_ = false;
+    analyzer_ = other.analyzer_;
   }
 
   /**

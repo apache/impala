@@ -45,6 +45,9 @@ import com.google.common.collect.Sets;
 public class SelectStmt extends QueryStmt {
   private final static Logger LOG = LoggerFactory.getLogger(SelectStmt.class);
 
+  /////////////////////////////////////////
+  // BEGIN: Members that need to be reset()
+
   protected SelectList selectList_;
   protected final ArrayList<String> colLabels_; // lower case column labels
   protected final List<TableRef> tableRefs_;
@@ -69,25 +72,25 @@ public class SelectStmt extends QueryStmt {
   // directly
   private ExprSubstitutionMap baseTblSmap_ = new ExprSubstitutionMap();
 
+  // END: Members that need to be reset()
+  /////////////////////////////////////////
+
   SelectStmt(SelectList selectList,
              List<TableRef> tableRefList,
              Expr wherePredicate, ArrayList<Expr> groupingExprs,
              Expr havingPredicate, ArrayList<OrderByElement> orderByElements,
              LimitElement limitElement) {
     super(orderByElements, limitElement);
-    this.selectList_ = selectList;
+    selectList_ = selectList;
     if (tableRefList == null) {
-      this.tableRefs_ = Lists.newArrayList();
+      tableRefs_ = Lists.newArrayList();
     } else {
-      this.tableRefs_ = tableRefList;
+      tableRefs_ = tableRefList;
     }
-    this.whereClause_ = wherePredicate;
-    this.groupingExprs_ = groupingExprs;
-    this.havingClause_ = havingPredicate;
-    this.colLabels_ = Lists.newArrayList();
-    this.havingPred_ = null;
-    this.aggInfo_ = null;
-    this.sortInfo_ = null;
+    whereClause_ = wherePredicate;
+    groupingExprs_ = groupingExprs;
+    havingClause_ = havingPredicate;
+    colLabels_ = Lists.newArrayList();
     // Set left table refs to ensure correct toSql() before analysis.
     for (int i = 1; i < tableRefs_.size(); ++i) {
       tableRefs_.get(i).setLeftTblRef(tableRefs_.get(i - 1));
@@ -140,6 +143,7 @@ public class SelectStmt extends QueryStmt {
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (isAnalyzed()) return;
     super.analyze(analyzer);
 
     // Start out with table refs to establish aliases.
@@ -871,25 +875,53 @@ public class SelectStmt extends QueryStmt {
     }
   }
 
-  private ArrayList<TableRef> cloneTableRefs() {
-    ArrayList<TableRef> clone = Lists.newArrayList();
-    for (TableRef tblRef: tableRefs_) {
-      clone.add(tblRef.clone());
-    }
-    return clone;
+  /**
+   * C'tor for cloning.
+   */
+  private SelectStmt(SelectStmt other) {
+    super(other);
+    selectList_ = other.selectList_.clone();
+    tableRefs_ = TableRef.cloneTableRefList(other.tableRefs_);
+    whereClause_ = (other.whereClause_ != null) ? other.whereClause_.clone() : null;
+    groupingExprs_ =
+        (other.groupingExprs_ != null) ? Expr.cloneList(other.groupingExprs_) : null;
+    havingClause_ = (other.havingClause_ != null) ? other.havingClause_.clone() : null;
+    colLabels_ = Lists.newArrayList(other.colLabels_);
+    aggInfo_ = (other.aggInfo_ != null) ? other.aggInfo_.clone() : null;
+    analyticInfo_ = (other.analyticInfo_ != null) ? other.analyticInfo_.clone() : null;
+    sqlString_ = (other.sqlString_ != null) ? new String(other.sqlString_) : null;
+    baseTblSmap_ = other.baseTblSmap_.clone();
   }
 
   @Override
-  public QueryStmt clone() {
-    SelectStmt selectClone = new SelectStmt(selectList_.clone(), cloneTableRefs(),
-        (whereClause_ != null) ? whereClause_.clone().reset() : null,
-        (groupingExprs_ != null) ? Expr.resetList(Expr.cloneList(groupingExprs_)) : null,
-        (havingClause_ != null) ? havingClause_.clone().reset() : null,
-        cloneOrderByElements(),
-        (limitElement_ != null) ? limitElement_.clone() : null);
-    selectClone.setWithClause(cloneWithClause());
-    return selectClone;
+  public void reset() {
+    super.reset();
+    selectList_.reset();
+    colLabels_.clear();
+    for (int i = 0; i < tableRefs_.size(); ++i) {
+      TableRef origTblRef = tableRefs_.get(i);
+      if (origTblRef.isResolved() && !(origTblRef instanceof InlineViewRef)) {
+        // Replace resolved table refs with unresolved ones.
+        TableRef newTblRef = new TableRef(origTblRef);
+        // Use the fully qualified raw path to preserve the original resolution.
+        // Otherwise, non-fully qualified paths might incorrectly match a local view.
+        // TODO for 2.3: This full qualification preserves analysis state which is
+        // contraty to the intended semantics of reset(). We could address this issue by
+        // changing the WITH-clause analysis to register local views that have
+        // fully-qualified table refs, and then remove the full qualification here.
+        newTblRef.rawPath_ = origTblRef.getResolvedPath().getFullyQualifiedRawPath();
+        tableRefs_.set(i, newTblRef);
+      }
+      tableRefs_.get(i).reset();
+    }
+    baseTblSmap_.clear();
+    if (whereClause_ != null) whereClause_.reset();
+    if (groupingExprs_ != null) Expr.resetList(groupingExprs_);
+    if (havingClause_ != null) havingClause_.reset();
   }
+
+  @Override
+  public SelectStmt clone() { return new SelectStmt(this); }
 
   /**
    * Check if the stmt returns a single row. This can happen

@@ -46,14 +46,8 @@ import com.google.common.collect.Sets;
 public class InsertStmt extends StatementBase {
   private final static Logger LOG = LoggerFactory.getLogger(InsertStmt.class);
 
-  // List of inline views that may be referenced in queryStmt.
-  private final WithClause withClause_;
-
   // Target table name as seen by the parser
   private final TableName originalTableName_;
-
-  // Target table into which to insert. May be qualified by analyze()
-  private TableName targetTableName_;
 
   // Differentiates between INSERT INTO and INSERT OVERWRITE.
   private final boolean overwrite_;
@@ -65,30 +59,9 @@ public class InsertStmt extends StatementBase {
   // User-supplied hints to control hash partitioning before the table sink in the plan.
   private final List<String> planHints_;
 
-  // Select or union whose results are to be inserted. If null, will be set after
-  // analysis.
-  private QueryStmt queryStmt_;
-
   // False if the original insert statement had a query statement, true if we need to
-  // auto-generate one (for insert into tbl();) during analysis.
+  // auto-generate one (for insert into tbl()) during analysis.
   private final boolean needsGeneratedQueryStatement_;
-
-  // Set in analyze(). Contains metadata of target table to determine type of sink.
-  private Table table_;
-
-  // Set in analyze(). Exprs corresponding to the partitionKeyValues,
-  private final List<Expr> partitionKeyExprs_ = new ArrayList<Expr>();
-
-  // True to force re-partitioning before the table sink, false to prevent it. Set in
-  // analyze() based on planHints_. Null if no explicit hint was given (the planner
-  // should decide whether to re-partition or not).
-  private Boolean isRepartition_ = null;
-
-  // Output expressions that produce the final results to write to the target table. May
-  // include casts, and NullLiterals where an output column isn't explicitly mentioned.
-  // Set in prepareExpressions(). The i'th expr produces the i'th column of the target
-  // table.
-  private final ArrayList<Expr> resultExprs_ = new ArrayList<Expr>();
 
   // The column permutation is specified by writing INSERT INTO tbl(col3, col1, col2...)
   //
@@ -110,6 +83,39 @@ public class InsertStmt extends StatementBase {
   // clause, where the static value is specified.
   private final List<String> columnPermutation_;
 
+  /////////////////////////////////////////
+  // BEGIN: Members that need to be reset()
+
+  // List of inline views that may be referenced in queryStmt.
+  private final WithClause withClause_;
+
+  // Target table into which to insert. May be qualified by analyze()
+  private TableName targetTableName_;
+
+  // Select or union whose results are to be inserted. If null, will be set after
+  // analysis.
+  private QueryStmt queryStmt_;
+
+  // Set in analyze(). Contains metadata of target table to determine type of sink.
+  private Table table_;
+
+  // Set in analyze(). Exprs corresponding to the partitionKeyValues,
+  private final List<Expr> partitionKeyExprs_ = new ArrayList<Expr>();
+
+  // True to force re-partitioning before the table sink, false to prevent it. Set in
+  // analyze() based on planHints_. Null if no explicit hint was given (the planner
+  // should decide whether to re-partition or not).
+  private Boolean isRepartition_ = null;
+
+  // Output expressions that produce the final results to write to the target table. May
+  // include casts, and NullLiterals where an output column isn't explicitly mentioned.
+  // Set in prepareExpressions(). The i'th expr produces the i'th column of the target
+  // table.
+  private final ArrayList<Expr> resultExprs_ = new ArrayList<Expr>();
+
+  // END: Members that need to be reset()
+  /////////////////////////////////////////
+
   public InsertStmt(WithClause withClause, TableName targetTable, boolean overwrite,
       List<PartitionKeyValue> partitionKeyValues, List<String> planHints,
       QueryStmt queryStmt, List<String> columnPermutation) {
@@ -128,10 +134,11 @@ public class InsertStmt extends StatementBase {
   /**
    * C'tor used in clone().
    */
-  public InsertStmt(InsertStmt other) {
+  private InsertStmt(InsertStmt other) {
+    super(other);
     withClause_ = other.withClause_ != null ? other.withClause_.clone() : null;
     targetTableName_ = other.targetTableName_;
-    originalTableName_ = other.targetTableName_;
+    originalTableName_ = other.originalTableName_;
     overwrite_ = other.overwrite_;
     partitionKeyValues_ = other.partitionKeyValues_;
     planHints_ = other.planHints_;
@@ -142,11 +149,24 @@ public class InsertStmt extends StatementBase {
   }
 
   @Override
+  public void reset() {
+    super.reset();
+    if (withClause_ != null) withClause_.reset();
+    targetTableName_ = originalTableName_;
+    queryStmt_.reset();
+    table_ = null;
+    partitionKeyExprs_.clear();
+    isRepartition_ = null;
+    resultExprs_.clear();
+  }
+
+  @Override
   public InsertStmt clone() { return new InsertStmt(this); }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (isExplain_) analyzer.setIsExplain();
+    if (isAnalyzed()) return;
+    super.analyze(analyzer);
     try {
       if (withClause_ != null) withClause_.analyze(analyzer);
     } catch (AnalysisException e) {
@@ -162,14 +182,8 @@ public class InsertStmt extends StatementBase {
         // views and to ignore irrelevant ORDER BYs.
         Analyzer queryStmtAnalyzer = new Analyzer(analyzer);
         queryStmt_.analyze(queryStmtAnalyzer);
-
-        if (analyzer.containsSubquery()) {
-          StmtRewriter.rewriteQueryStatement(queryStmt_, queryStmtAnalyzer);
-          queryStmt_ = queryStmt_.clone();
-          queryStmtAnalyzer = new Analyzer(analyzer);
-          queryStmt_.analyze(queryStmtAnalyzer);
-        }
-
+        // Subqueries need to be rewritten by the StmtRewriter first.
+        if (analyzer.containsSubquery()) return;
         selectListExprs = Expr.cloneList(queryStmt_.getBaseTblResultExprs());
       } catch (AnalysisException e) {
         if (analyzer.getMissingTbls().isEmpty()) throw e;

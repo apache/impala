@@ -40,14 +40,12 @@ import com.google.common.collect.Sets;
  * specification. An instance of a TableRef (and not a subclass thereof) represents
  * an unresolved table reference that must be resolved during analysis. All resolved
  * table references are subclasses of TableRef.
- * TODO: Rename this class to CollectionRef and re-consider the naming of all subclasses.
+ * TODO for 2.3: Rename this class to CollectionRef and re-consider the naming and
+ * structure of all subclasses.
  */
 public class TableRef implements ParseNode {
   // Path to a collection type. Not set for inline views.
   protected List<String> rawPath_;
-
-  // Resolution of rawPath_ if applicable. Result of analysis.
-  protected Path resolvedPath_;
 
   // Legal aliases of this table ref. Contains the explicit alias as its sole element if
   // there is one. Otherwise, contains the two implicit aliases. Implicit aliases are set
@@ -62,8 +60,15 @@ public class TableRef implements ParseNode {
 
   protected JoinOperator joinOp_;
   protected ArrayList<String> joinHints_;
-  protected Expr onClause_;
   protected List<String> usingColNames_;
+
+  /////////////////////////////////////////
+  // BEGIN: Members that need to be reset()
+
+  // Resolution of rawPath_ if applicable. Result of analysis.
+  protected Path resolvedPath_;
+
+  protected Expr onClause_;
 
   // set after analyzeJoinHints(); true if explicitly set via hints
   private boolean isBroadcastJoin_;
@@ -82,6 +87,9 @@ public class TableRef implements ParseNode {
   // analysis output
   protected TupleDescriptor desc_;
 
+  // END: Members that need to be reset()
+  /////////////////////////////////////////
+
   public TableRef(List<String> path, String alias) {
     super();
     rawPath_ = path;
@@ -98,19 +106,24 @@ public class TableRef implements ParseNode {
    * C'tor for cloning.
    */
   protected TableRef(TableRef other) {
-    super();
-    Preconditions.checkNotNull(other);
-    this.rawPath_ = other.rawPath_;
-    this.resolvedPath_ = other.resolvedPath_;
-    this.aliases_ = other.aliases_;
-    this.hasExplicitAlias_ = other.hasExplicitAlias_;
-    this.joinOp_ = other.joinOp_;
-    this.joinHints_ =
+    rawPath_ = other.rawPath_;
+    resolvedPath_ = other.resolvedPath_;
+    aliases_ = other.aliases_;
+    hasExplicitAlias_ = other.hasExplicitAlias_;
+    joinOp_ = other.joinOp_;
+    joinHints_ =
         (other.joinHints_ != null) ? Lists.newArrayList(other.joinHints_) : null;
-    this.usingColNames_ =
+    onClause_ = (other.onClause_ != null) ? other.onClause_.clone() : null;
+    usingColNames_ =
         (other.usingColNames_ != null) ? Lists.newArrayList(other.usingColNames_) : null;
-    this.onClause_ = (other.onClause_ != null) ? other.onClause_.clone().reset() : null;
-    this.isAnalyzed_ = false;
+    isBroadcastJoin_ = other.isBroadcastJoin_;
+    isPartitionedJoin_ = other.isPartitionedJoin_;
+    // The table ref links are created at the statement level, so cloning a set of linked
+    // table refs is the responsibility of the statement.
+    leftTblRef_ = null;
+    isAnalyzed_ = other.isAnalyzed_;
+    onClauseTupleIds_ = Lists.newArrayList(other.onClauseTupleIds_);
+    desc_ = other.desc_;
   }
 
   @Override
@@ -498,6 +511,51 @@ public class TableRef implements ParseNode {
    */
   public Privilege getPrivilegeRequirement() { return Privilege.SELECT; }
 
+  /**
+   * Returns a deep clone of this table ref without also cloning the chain of table refs.
+   * Sets leftTblRef_ in the returned clone to null.
+   */
   @Override
-  public TableRef clone() { return new TableRef(this); }
+  protected TableRef clone() { return new TableRef(this); }
+
+  /**
+   * Deep copies the given list of table refs and returns the clones in a new list.
+   * The linking structure in the original table refs is preserved in the clones,
+   * i.e., if the table refs were originally linked, then the corresponding clones
+   * are linked in the same way. Similarly, if the original table refs were not linked
+   * then the clones are also not linked.
+   * Assumes that the given table refs are self-contained with respect to linking, i.e.,
+   * that no table ref links to another table ref not in the list.
+   */
+  public static List<TableRef> cloneTableRefList(List<TableRef> tblRefs) {
+    List<TableRef> clonedTblRefs = Lists.newArrayListWithCapacity(tblRefs.size());
+    TableRef leftTblRef = null;
+    for (TableRef tblRef: tblRefs) {
+      TableRef tblRefClone = tblRef.clone();
+      clonedTblRefs.add(tblRefClone);
+      if (tblRef.leftTblRef_ != null) {
+        Preconditions.checkState(tblRefs.contains(tblRef.leftTblRef_));
+        tblRefClone.leftTblRef_ = leftTblRef;
+      }
+      leftTblRef = tblRefClone;
+    }
+    return clonedTblRefs;
+  }
+
+  public void reset() {
+    isAnalyzed_ = false;
+    resolvedPath_ = null;
+    if (usingColNames_ != null) {
+      // The using col names are converted into an on-clause predicate during analysis,
+      // so unset the on-clause here.
+      onClause_ = null;
+    } else if (onClause_ != null) {
+      onClause_.reset();
+    }
+    isBroadcastJoin_ = false;
+    isPartitionedJoin_ = false;
+    leftTblRef_ = null;
+    onClauseTupleIds_.clear();
+    desc_ = null;
+  }
 }

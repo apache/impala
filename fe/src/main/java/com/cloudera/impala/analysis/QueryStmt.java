@@ -39,6 +39,9 @@ import com.google.common.collect.Sets;
  *
  */
 public abstract class QueryStmt extends StatementBase {
+  /////////////////////////////////////////
+  // BEGIN: Members that need to be reset()
+
   protected WithClause withClause_;
 
   protected ArrayList<OrderByElement> orderByElements_;
@@ -59,7 +62,7 @@ public abstract class QueryStmt extends StatementBase {
    * Map of expression substitutions for replacing aliases
    * in "order by" or "group by" clauses with their corresponding result expr.
    */
-  protected final ExprSubstitutionMap aliasSmap_ = new ExprSubstitutionMap();
+  protected final ExprSubstitutionMap aliasSmap_;
 
   /**
    * Select list item alias does not have to be unique.
@@ -67,7 +70,7 @@ public abstract class QueryStmt extends StatementBase {
    *   select int_col a, string_col a from alltypessmall;
    * Both columns are using the same alias "a".
    */
-  protected final ArrayList<Expr> ambiguousAliasList_ = Lists.newArrayList();
+  protected final ArrayList<Expr> ambiguousAliasList_;
 
   protected SortInfo sortInfo_;
 
@@ -77,21 +80,21 @@ public abstract class QueryStmt extends StatementBase {
   // is well-formed.
   protected boolean evaluateOrderBy_;
 
-  // Analyzer that was used to analyze this query statement.
-  protected Analyzer analyzer_;
-
-  public Analyzer getAnalyzer() { return analyzer_; }
+  /////////////////////////////////////////
+  // END: Members that need to be reset()
 
   QueryStmt(ArrayList<OrderByElement> orderByElements, LimitElement limitElement) {
     orderByElements_ = orderByElements;
     sortInfo_ = null;
     limitElement_ = limitElement == null ? new LimitElement(null, null) : limitElement;
+    aliasSmap_ = new ExprSubstitutionMap();
+    ambiguousAliasList_ = Lists.newArrayList();
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (isAnalyzed()) return;
     super.analyze(analyzer);
-    this.analyzer_ = analyzer;
     analyzeLimit(analyzer);
     if (hasWithClause()) withClause_.analyze(analyzer);
   }
@@ -266,7 +269,7 @@ public abstract class QueryStmt extends StatementBase {
    */
   public abstract void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList);
 
-  public void setWithClause(WithClause withClause) { this.withClause_ = withClause; }
+  public void setWithClause(WithClause withClause) { withClause_ = withClause; }
   public boolean hasWithClause() { return withClause_ != null; }
   public WithClause getWithClause() { return withClause_; }
   public boolean hasOrderByClause() { return orderByElements_ != null; }
@@ -309,11 +312,47 @@ public abstract class QueryStmt extends StatementBase {
   }
 
   public ArrayList<OrderByElement> cloneOrderByElements() {
-    return orderByElements_ != null ? Lists.newArrayList(orderByElements_) : null;
+    if (orderByElements_ == null) return null;
+    ArrayList<OrderByElement> result =
+        Lists.newArrayListWithCapacity(orderByElements_.size());
+    for (OrderByElement o: orderByElements_) result.add(o.clone());
+    return result;
   }
 
   public WithClause cloneWithClause() {
     return withClause_ != null ? withClause_.clone() : null;
+  }
+
+  /**
+   * C'tor for cloning.
+   */
+  protected QueryStmt(QueryStmt other) {
+    super(other);
+    withClause_ = other.cloneWithClause();
+    orderByElements_ = other.cloneOrderByElements();
+    limitElement_ = other.limitElement_.clone();
+    resultExprs_ = Expr.cloneList(other.resultExprs_);
+    baseTblResultExprs_ = Expr.cloneList(other.baseTblResultExprs_);
+    aliasSmap_ = other.aliasSmap_.clone();
+    ambiguousAliasList_ = Expr.cloneList(other.ambiguousAliasList_);
+    sortInfo_ = (other.sortInfo_ != null) ? other.sortInfo_.clone() : null;
+    analyzer_ = other.analyzer_;
+    evaluateOrderBy_ = other.evaluateOrderBy_;
+  }
+
+  @Override
+  public void reset() {
+    super.reset();
+    if (orderByElements_ != null) {
+      for (OrderByElement o: orderByElements_) o.getExpr().reset();
+    }
+    limitElement_.reset();
+    resultExprs_.clear();
+    baseTblResultExprs_.clear();
+    aliasSmap_.clear();
+    ambiguousAliasList_.clear();
+    sortInfo_ = null;
+    evaluateOrderBy_ = false;
   }
 
   @Override

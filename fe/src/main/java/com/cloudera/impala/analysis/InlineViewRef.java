@@ -41,6 +41,15 @@ public class InlineViewRef extends TableRef {
   // Null for inline views parsed directly from a query string.
   private final View view_;
 
+  // If not null, these will serve as the column labels for the inline view. This provides
+  // a layer of separation between column labels visible from outside the inline view
+  // and column labels used in the query definition. Either all or none of the column
+  // labels must be overridden.
+  private List<String> explicitColLabels_;
+
+  /////////////////////////////////////////
+  // BEGIN: Members that need to be reset()
+
   // The select or union statement of the inline view
   protected QueryStmt queryStmt_;
 
@@ -51,16 +60,13 @@ public class InlineViewRef extends TableRef {
   protected final ArrayList<TupleId> materializedTupleIds_ = Lists.newArrayList();
 
   // Map inline view's output slots to the corresponding resultExpr of queryStmt.
-  protected final ExprSubstitutionMap smap_ = new ExprSubstitutionMap();
+  protected final ExprSubstitutionMap smap_;
 
   // Map inline view's output slots to the corresponding baseTblResultExpr of queryStmt.
-  protected final ExprSubstitutionMap baseTblSmap_ = new ExprSubstitutionMap();
+  protected final ExprSubstitutionMap baseTblSmap_;
 
-  // If not null, these will serve as the column labels for the inline view. This provides
-  // a layer of separation between column labels visible from outside the inline view
-  // and column labels used in the query definition. Either all or none of the column
-  // labels must be overridden.
-  private List<String> explicitColLabels_;
+  // END: Members that need to be reset()
+  /////////////////////////////////////////
 
   /**
    * C'tor for creating inline views parsed directly from the a query string.
@@ -70,6 +76,8 @@ public class InlineViewRef extends TableRef {
     Preconditions.checkNotNull(queryStmt);
     queryStmt_ = queryStmt;
     view_ = null;
+    smap_ = new ExprSubstitutionMap();
+    baseTblSmap_ = new ExprSubstitutionMap();
   }
 
   public InlineViewRef(String alias, QueryStmt queryStmt, List<String> colLabels) {
@@ -83,7 +91,11 @@ public class InlineViewRef extends TableRef {
   public InlineViewRef(View view, TableRef origTblRef) {
     super(view.getTableName().toPath(), origTblRef.getExplicitAlias());
     queryStmt_ = view.getQueryStmt().clone();
+    queryStmt_.reset();
+    if (view.isLocalView()) queryStmt_.reset();
     view_ = view;
+    smap_ = new ExprSubstitutionMap();
+    baseTblSmap_ = new ExprSubstitutionMap();
     setJoinAttrs(origTblRef);
     // Set implicit aliases if no explicit one was given.
     if (hasExplicitAlias()) return;
@@ -98,9 +110,15 @@ public class InlineViewRef extends TableRef {
   public InlineViewRef(InlineViewRef other) {
     super(other);
     Preconditions.checkNotNull(other.queryStmt_);
-    queryStmt_ = other.queryStmt_.clone();
     view_ = other.view_;
-    explicitColLabels_ = other.explicitColLabels_;
+    queryStmt_ = other.queryStmt_.clone();
+    inlineViewAnalyzer_ = other.inlineViewAnalyzer_;
+    if (other.explicitColLabels_ != null) {
+      explicitColLabels_ = Lists.newArrayList(other.explicitColLabels_);
+    }
+    materializedTupleIds_.addAll(other.materializedTupleIds_);
+    smap_ = other.smap_.clone();
+    baseTblSmap_ = other.baseTblSmap_.clone();
   }
 
   /**
@@ -111,6 +129,8 @@ public class InlineViewRef extends TableRef {
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (isAnalyzed_) return;
+
     // Analyze the inline view query statement with its own analyzer
     inlineViewAnalyzer_ = new Analyzer(analyzer);
 
@@ -270,7 +290,17 @@ public class InlineViewRef extends TableRef {
   }
 
   @Override
-  public TableRef clone() { return new InlineViewRef(this); }
+  protected TableRef clone() { return new InlineViewRef(this); }
+
+  @Override
+  public void reset() {
+    super.reset();
+    queryStmt_.reset();
+    inlineViewAnalyzer_ = null;
+    materializedTupleIds_.clear();
+    smap_.clear();
+    baseTblSmap_.clear();
+  }
 
   @Override
   protected String tableRefToSql() {

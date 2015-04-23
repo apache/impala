@@ -20,14 +20,12 @@ public interface ParseNode {
 
   /**
    * Perform semantic analysis of node and all of its children.
-   * Throws exception if any errors found.
-   * @param analyzer
-   * @throws AnalysisException
+   * Throws exception if any semantic errors were found.
    */
   public void analyze(Analyzer analyzer) throws AnalysisException;
 
   /**
-   * @return SQL syntax corresponding to this node.
+   * Returns the SQL string corresponding to this node.
    */
   public String toSql();
 }

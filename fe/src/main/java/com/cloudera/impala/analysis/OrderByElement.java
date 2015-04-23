@@ -37,9 +37,22 @@ public class OrderByElement {
    */
   public OrderByElement(Expr expr, boolean isAsc, Boolean nullsFirstParam) {
     super();
-    this.expr_ = expr;
-    this.isAsc_ = isAsc;
-    this.nullsFirstParam_ = nullsFirstParam;
+    expr_ = expr;
+    isAsc_ = isAsc;
+    nullsFirstParam_ = nullsFirstParam;
+  }
+
+  /**
+   * C'tor for cloning.
+   */
+  private OrderByElement(OrderByElement other) {
+    expr_ = other.expr_.clone();
+    isAsc_ = other.isAsc_;
+    if (other.nullsFirstParam_ != null) {
+      nullsFirstParam_ = new Boolean(other.nullsFirstParam_.booleanValue());
+    } else {
+      nullsFirstParam_ = null;
+    }
   }
 
   public Expr getExpr() { return expr_; }
@@ -82,13 +95,7 @@ public class OrderByElement {
   }
 
   @Override
-  public OrderByElement clone() {
-    OrderByElement clone = new OrderByElement(
-        expr_.clone(), isAsc_,
-        nullsFirstParam_ != null ? new Boolean(nullsFirstParam_.booleanValue()) : null);
-    return clone;
-  }
-
+  public OrderByElement clone() { return new OrderByElement(this); }
 
   /**
    * Compute nullsFirst.

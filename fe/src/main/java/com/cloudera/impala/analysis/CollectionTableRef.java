@@ -22,18 +22,23 @@ import com.google.common.base.Preconditions;
  * flattening during execution.
  */
 public class CollectionTableRef extends TableRef {
+  /////////////////////////////////////////
+  // BEGIN: Members that need to be reset()
+
   // Expr that returns the referenced collection. Typically a SlotRef into the
   // parent scan's tuple. Result of analysis. Fully resolved against base tables.
   private Expr collectionExpr_;
+
+  // END: Members that need to be reset()
+  /////////////////////////////////////////
 
   /**
    * Create a CollectionTableRef for the given collection type from the original
    * unresolved table ref. Sets the explicit alias and the join-related attributes
    * of the new collection table ref from the unresolved table ref.
    */
-  public CollectionTableRef(TableRef tableRef, Path resolvedPath) {
+  public CollectionTableRef(TableRef tableRef) {
     super(tableRef);
-    resolvedPath_ = resolvedPath;
     // Use the last path element as an implicit alias if no explicit alias was given.
     if (hasExplicitAlias()) return;
     String implicitAlias = rawPath_.get(rawPath_.size() - 1).toLowerCase();
@@ -51,6 +56,7 @@ public class CollectionTableRef extends TableRef {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (isAnalyzed_) return;
     Preconditions.checkNotNull(getPrivilegeRequirement());
     desc_ = analyzer.registerTableRef(this);
     if (resolvedPath_.getRootDesc() != null) {
@@ -72,5 +78,11 @@ public class CollectionTableRef extends TableRef {
   public Expr getCollectionExpr() { return collectionExpr_; }
 
   @Override
-  public TableRef clone() { return new CollectionTableRef(this); }
+  protected CollectionTableRef clone() { return new CollectionTableRef(this); }
+
+  @Override
+  public void reset() {
+    super.reset();
+    collectionExpr_ = null;
+  }
 }

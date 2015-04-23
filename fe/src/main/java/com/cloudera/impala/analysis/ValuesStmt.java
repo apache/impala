@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 /**
  * Representation of a values() statement with a list of constant-expression lists.
@@ -34,6 +33,11 @@ public class ValuesStmt extends UnionStmt {
     super(operands, orderByElements, limitElement);
   }
 
+  /**
+   * C'tor for cloning.
+   */
+  private ValuesStmt(ValuesStmt other) { super(other); }
+
   @Override
   protected String queryStmtToSql(QueryStmt queryStmt) {
     StringBuilder strBuilder = new StringBuilder();
@@ -46,12 +50,10 @@ public class ValuesStmt extends UnionStmt {
   @Override
   public String toSql() {
     StringBuilder strBuilder = new StringBuilder();
-
     if (withClause_ != null) {
       strBuilder.append(withClause_.toSql());
       strBuilder.append(" ");
     }
-
     Preconditions.checkState(operands_.size() > 0);
     strBuilder.append("VALUES(");
     for (int i = 0; i < operands_.size(); ++i) {
@@ -73,14 +75,5 @@ public class ValuesStmt extends UnionStmt {
   }
 
   @Override
-  public QueryStmt clone() {
-    List<UnionOperand> operandClones = Lists.newArrayList();
-    for (UnionOperand operand: operands_) {
-      operandClones.add(operand.clone());
-    }
-    ValuesStmt valuesClone = new ValuesStmt(operandClones, cloneOrderByElements(),
-        limitElement_ == null ? null : limitElement_.clone());
-    valuesClone.setWithClause(cloneWithClause());
-    return valuesClone;
-  }
+  public ValuesStmt clone() { return new ValuesStmt(this); }
 }

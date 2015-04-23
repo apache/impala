@@ -120,7 +120,7 @@ class SelectListItem {
   @Override
   public SelectListItem clone() {
     if (isStar_) return createStarItem(rawPath_);
-    return new SelectListItem(expr_.clone().reset(), alias_);
+    return new SelectListItem(expr_.clone(), alias_);
   }
 
 }

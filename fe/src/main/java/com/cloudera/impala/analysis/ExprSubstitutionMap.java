@@ -151,4 +151,9 @@ public final class ExprSubstitutionMap {
     lhs_.clear();
     rhs_.clear();
   }
+
+  @Override
+  public ExprSubstitutionMap clone() {
+    return new ExprSubstitutionMap(Expr.cloneList(lhs_), Expr.cloneList(rhs_));
+  }
 }

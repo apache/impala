@@ -48,44 +48,54 @@ public class UnionStmt extends QueryStmt {
    * of the union operator (null for the first queryStmt).
    */
   public static class UnionOperand {
+    // Qualifier as seen by the parser. Null for the first operand.
+    private final Qualifier originalQualifier_;
+
+    /////////////////////////////////////////
+    // BEGIN: Members that need to be reset()
+
     private final QueryStmt queryStmt_;
-    // Null for the first operand.
+
+    // Effective qualifier. Possibly different from parsedQualifier_ due
+    // to DISTINCT propagation.
     private Qualifier qualifier_;
 
     // Analyzer used for this operand. Set in analyze().
     // We must preserve the conjuncts registered in the analyzer for partition pruning.
     private Analyzer analyzer_;
 
-    // map from UnionStmts result slots to our resultExprs; useful during plan generation
-    private final ExprSubstitutionMap smap_ = new ExprSubstitutionMap();
+    // Map from UnionStmt's result slots to our resultExprs. Used during plan generation.
+    private final ExprSubstitutionMap smap_;
 
-    // set if this operand is guaranteed to return an empty result set;
-    // used in planning when assigning conjuncts
+    // Set if this operand is guaranteed to return an empty result set.
+    // Used in planning when assigning conjuncts
     private boolean isDropped_ = false;
 
+    // END: Members that need to be reset()
+    /////////////////////////////////////////
+
     public UnionOperand(QueryStmt queryStmt, Qualifier qualifier) {
-      this.queryStmt_ = queryStmt;
-      this.qualifier_ = qualifier;
+      queryStmt_ = queryStmt;
+      originalQualifier_ = qualifier;
+      qualifier_ = qualifier;
+      smap_ = new ExprSubstitutionMap();
     }
 
     public void analyze(Analyzer parent) throws AnalysisException {
+      if (isAnalyzed()) return;
       analyzer_ = new Analyzer(parent);
       queryStmt_.analyze(analyzer_);
     }
 
+    public boolean isAnalyzed() { return analyzer_ != null; }
     public QueryStmt getQueryStmt() { return queryStmt_; }
     public Qualifier getQualifier() { return qualifier_; }
     // Used for propagating DISTINCT.
-    public void setQualifier(Qualifier qualifier) { this.qualifier_ = qualifier; }
+    public void setQualifier(Qualifier qualifier) { qualifier_ = qualifier; }
     public Analyzer getAnalyzer() { return analyzer_; }
     public ExprSubstitutionMap getSmap() { return smap_; }
     public void drop() { isDropped_ = true; }
     public boolean isDropped() { return isDropped_; }
-
-    @Override
-    public UnionOperand clone() {
-      return new UnionOperand(queryStmt_.clone(), qualifier_);
-    }
 
     public boolean hasAnalyticExprs() {
       if (queryStmt_ instanceof SelectStmt) {
@@ -95,7 +105,33 @@ public class UnionStmt extends QueryStmt {
         return ((UnionStmt) queryStmt_).hasAnalyticExprs();
       }
     }
+
+    /**
+     * C'tor for cloning.
+     */
+    private UnionOperand(UnionOperand other) {
+      queryStmt_ = other.queryStmt_.clone();
+      originalQualifier_ = other.originalQualifier_;
+      qualifier_ = other.qualifier_;
+      analyzer_ = other.analyzer_;
+      smap_ = other.smap_.clone();
+      isDropped_ = other.isDropped_;
+    }
+
+    public void reset() {
+      queryStmt_.reset();
+      qualifier_ = originalQualifier_;
+      analyzer_ = null;
+      smap_.clear();
+      isDropped_ = false;
+    }
+
+    @Override
+    public UnionOperand clone() { return new UnionOperand(this); }
   }
+
+  /////////////////////////////////////////
+  // BEGIN: Members that need to be reset()
 
   // before analysis, this contains the list of union operands derived verbatim
   // from the query;
@@ -122,10 +158,37 @@ public class UnionStmt extends QueryStmt {
   // true if any of the operands_ references an AnalyticExpr
   private boolean hasAnalyticExprs_ = false;
 
+  // END: Members that need to be reset()
+  /////////////////////////////////////////
+
   public UnionStmt(List<UnionOperand> operands,
       ArrayList<OrderByElement> orderByElements, LimitElement limitElement) {
     super(orderByElements, limitElement);
-    this.operands_ = operands;
+    operands_ = operands;
+  }
+
+  /**
+   * C'tor for cloning.
+   */
+  protected UnionStmt(UnionStmt other) {
+    super(other.cloneOrderByElements(),
+        (other.limitElement_ == null) ? null : other.limitElement_.clone());
+    operands_ = Lists.newArrayList();
+    if (analyzer_ != null) {
+      for (UnionOperand o: other.distinctOperands_) distinctOperands_.add(o.clone());
+      for (UnionOperand o: other.allOperands_) allOperands_.add(o.clone());
+      operands_.addAll(distinctOperands_);
+      operands_.addAll(allOperands_);
+    } else {
+      for (UnionOperand operand: other.operands_) operands_.add(operand.clone());
+    }
+    analyzer_ = other.analyzer_;
+    distinctAggInfo_ =
+        (other.distinctAggInfo_ != null) ? other.distinctAggInfo_.clone() : null;
+    tupleId_ = other.tupleId_;
+    toSqlString_ = (other.toSqlString_ != null) ? new String(other.toSqlString_) : null;
+    hasAnalyticExprs_ = other.hasAnalyticExprs_;
+    withClause_ = (other.withClause_ != null) ? other.withClause_.clone() : null;
   }
 
   public List<UnionOperand> getOperands() { return operands_; }
@@ -147,6 +210,7 @@ public class UnionStmt extends QueryStmt {
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (isAnalyzed()) return;
     try {
       super.analyze(analyzer);
     } catch (AnalysisException e) {
@@ -526,15 +590,17 @@ public class UnionStmt extends QueryStmt {
   }
 
   @Override
-  public QueryStmt clone() {
-    List<UnionOperand> operandClones = Lists.newArrayList();
-    for (UnionOperand operand: operands_) {
-      operandClones.add(operand.clone());
-    }
-    UnionStmt unionClone = new UnionStmt(operandClones, cloneOrderByElements(),
-        limitElement_ == null ? null : limitElement_.clone());
-    unionClone.setWithClause(cloneWithClause());
-    unionClone.hasAnalyticExprs_ = hasAnalyticExprs_;
-    return unionClone;
+  public UnionStmt clone() { return new UnionStmt(this); }
+
+  @Override
+  public void reset() {
+    super.reset();
+    for (UnionOperand op: operands_) op.reset();
+    distinctOperands_.clear();
+    allOperands_.clear();
+    distinctAggInfo_ = null;
+    tupleId_ = null;
+    toSqlString_ = null;
+    hasAnalyticExprs_ = false;
   }
 }

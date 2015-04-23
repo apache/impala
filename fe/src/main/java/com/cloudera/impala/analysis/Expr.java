@@ -795,9 +795,9 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Create a deep copy of 'l'. The elements of the returned list are of the same
    * type as the input list.
    */
-  public static <C extends Expr> ArrayList<C> cloneList(Iterable<C> l) {
+  public static <C extends Expr> ArrayList<C> cloneList(List<C> l) {
     Preconditions.checkNotNull(l);
-    ArrayList<C> result = new ArrayList<C>();
+    ArrayList<C> result = new ArrayList<C>(l.size());
     for (Expr element: l) {
       result.add((C) element.clone());
     }

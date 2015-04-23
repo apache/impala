@@ -33,7 +33,15 @@ import com.google.common.base.Preconditions;
  */
 public class CreateTableAsSelectStmt extends StatementBase {
   private final CreateTableStmt createStmt_;
+
+  /////////////////////////////////////////
+  // BEGIN: Members that need to be reset()
+
   private final InsertStmt insertStmt_;
+
+  // END: Members that need to be reset()
+  /////////////////////////////////////////
+
   private final static EnumSet<THdfsFileFormat> SUPPORTED_INSERT_FORMATS =
       EnumSet.of(THdfsFileFormat.PARQUET, THdfsFileFormat.TEXT);
 
@@ -43,8 +51,8 @@ public class CreateTableAsSelectStmt extends StatementBase {
   public CreateTableAsSelectStmt(CreateTableStmt createStmt, QueryStmt queryStmt) {
     Preconditions.checkNotNull(queryStmt);
     Preconditions.checkNotNull(createStmt);
-    this.createStmt_ = createStmt;
-    this.insertStmt_ = new InsertStmt(null, createStmt.getTblName(), false,
+    createStmt_ = createStmt;
+    insertStmt_ = new InsertStmt(null, createStmt.getTblName(), false,
         null, null, queryStmt, null);
   }
 
@@ -56,6 +64,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (isAnalyzed()) return;
     super.analyze(analyzer);
 
     // The analysis for CTAS happens in two phases - the first phase happens before
@@ -70,19 +79,8 @@ public class CreateTableAsSelectStmt extends StatementBase {
       Analyzer tmpAnalyzer = new Analyzer(dummyRootAnalyzer);
       tmpAnalyzer.setUseHiveColLabels(true);
       tmpQueryStmt.analyze(tmpAnalyzer);
-      if (analyzer.containsSubquery()) {
-        // The select statement of this CTAS is nested. Rewrite the
-        // statement to unnest all subqueries and re-analyze using a new analyzer.
-        StmtRewriter.rewriteQueryStatement(tmpQueryStmt, tmpAnalyzer);
-        // Update the insert statement with the unanalyzed rewritten select stmt.
-        insertStmt_.setQueryStmt(tmpQueryStmt.clone());
-
-        // Re-analyze the select statement of the CTAS.
-        tmpQueryStmt = insertStmt_.getQueryStmt().clone();
-        tmpAnalyzer = new Analyzer(dummyRootAnalyzer);
-        tmpAnalyzer.setUseHiveColLabels(true);
-        tmpQueryStmt.analyze(tmpAnalyzer);
-      }
+      // Subqueries need to be rewritten by the StmtRewriter first.
+      if (analyzer.containsSubquery()) return;
     } finally {
       // Record missing tables in the original analyzer.
       analyzer.getMissingTbls().addAll(dummyRootAnalyzer.getMissingTbls());
@@ -90,6 +88,7 @@ public class CreateTableAsSelectStmt extends StatementBase {
 
     // Add the columns from the select statement to the create statement.
     int colCnt = tmpQueryStmt.getColLabels().size();
+    createStmt_.getColumnDefs().clear();
     for (int i = 0; i < colCnt; ++i) {
       ColumnDef colDef = new ColumnDef(
           tmpQueryStmt.getColLabels().get(i), null, null);
@@ -156,5 +155,11 @@ public class CreateTableAsSelectStmt extends StatementBase {
 
     // Finally, run analysis on the insert statement.
     insertStmt_.analyze(analyzer);
+  }
+
+  @Override
+  public void reset() {
+    super.reset();
+    insertStmt_.reset();
   }
 }

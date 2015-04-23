@@ -40,38 +40,34 @@ public class StmtRewriter {
    */
   public static StatementBase rewrite(AnalysisResult analysisResult)
       throws AnalysisException {
-    StatementBase rewrittenStmt = null;
-    if (analysisResult.getStmt() instanceof QueryStmt) {
-      QueryStmt analyzedStmt = (QueryStmt)analysisResult.getStmt();
-      rewriteQueryStatement(analyzedStmt, analysisResult.getAnalyzer());
-      rewrittenStmt = analyzedStmt.clone();
-    } else if (analysisResult.getStmt() instanceof InsertStmt) {
-      // For an InsertStmt, rewrites are performed during its analysis.
-      // Clone the insert stmt to reset its analysis state.
-      rewrittenStmt = ((InsertStmt)analysisResult.getStmt()).clone();
-    } else if (analysisResult.getStmt() instanceof CreateTableAsSelectStmt) {
-      // For a CTAS, rewrites are performed during its analysis.
-      CreateTableAsSelectStmt ctasStmt =
-          (CreateTableAsSelectStmt)analysisResult.getStmt();
-      // Create a new CTAS from the original create statement and the
-      // rewritten insert statement.
-      Preconditions.checkNotNull(analysisResult.getTmpCreateTableStmt());
-      rewrittenStmt = new CreateTableAsSelectStmt(analysisResult.getTmpCreateTableStmt(),
-          ctasStmt.getQueryStmt().clone());
+    // Analyzed stmt that contains a query statement with subqueries to be rewritten.
+    StatementBase stmt = analysisResult.getStmt();
+    Preconditions.checkState(stmt.isAnalyzed());
+    // Analyzed query statement to be rewritten.
+    QueryStmt queryStmt = null;
+    if (stmt instanceof QueryStmt) {
+      queryStmt = (QueryStmt) analysisResult.getStmt();
+    } else if (stmt instanceof InsertStmt) {
+      queryStmt = ((InsertStmt) analysisResult.getStmt()).getQueryStmt();
+    } else if (stmt instanceof CreateTableAsSelectStmt) {
+      queryStmt = ((CreateTableAsSelectStmt) analysisResult.getStmt()).getQueryStmt();
     } else {
       throw new AnalysisException("Unsupported statement containing subqueries: " +
-          analysisResult.getStmt().toSql());
+          stmt.toSql());
     }
-    return rewrittenStmt;
+    rewriteQueryStatement(queryStmt, queryStmt.getAnalyzer());
+    stmt.reset();
+    return stmt;
   }
 
   /**
-   *  Calls the appropriate rewrite method based on the specific type of query stmt. See
-   *  rewriteSelectStatement() and rewriteUnionStatement() documentation.
+   * Calls the appropriate rewrite method based on the specific type of query stmt. See
+   * rewriteSelectStatement() and rewriteUnionStatement() documentation.
    */
   public static void rewriteQueryStatement(QueryStmt stmt, Analyzer analyzer)
       throws AnalysisException {
     Preconditions.checkNotNull(stmt);
+    Preconditions.checkNotNull(stmt.isAnalyzed());
     if (stmt instanceof SelectStmt) {
       rewriteSelectStatement((SelectStmt)stmt, analyzer);
     } else if (stmt instanceof UnionStmt) {
@@ -94,8 +90,6 @@ public class StmtRewriter {
       if (!(tblRef instanceof InlineViewRef)) continue;
       InlineViewRef inlineViewRef = (InlineViewRef)tblRef;
       rewriteQueryStatement(inlineViewRef.getViewStmt(), inlineViewRef.getAnalyzer());
-      // Reset the state of the underlying stmt since it was rewritten
-      inlineViewRef.setRewrittenViewStmt(inlineViewRef.getViewStmt().clone());
     }
     // Rewrite all the subqueries in the WHERE clause.
     if (stmt.hasWhereClause()) {
@@ -299,7 +293,9 @@ public class StmtRewriter {
     rewriteSelectStatement((SelectStmt) subquery.getStatement(), subquery.getAnalyzer());
     // Create a new Subquery with the rewritten stmt and use a substitution map
     // to replace the original subquery from the expr.
-    Subquery newSubquery = new Subquery(subquery.getStatement().clone());
+    QueryStmt rewrittenStmt = subquery.getStatement().clone();
+    rewrittenStmt.reset();
+    Subquery newSubquery = new Subquery(rewrittenStmt);
     newSubquery.analyze(analyzer);
     ExprSubstitutionMap smap = new ExprSubstitutionMap();
     smap.put(subquery, newSubquery);
@@ -354,7 +350,7 @@ public class StmtRewriter {
       // For correlated subqueries that are eligible for rewrite by transforming
       // into a join, a LIMIT clause has no effect on the results, so we can
       // safely remove it.
-      subqueryStmt.limitElement_ = null;
+      subqueryStmt.limitElement_ = new LimitElement(null, null);
     }
 
     if (expr instanceof ExistsPredicate) {
@@ -375,10 +371,10 @@ public class StmtRewriter {
           lhsExprs, rhsExprs, updateGroupBy);
     }
 
-    // Analyzing the inline view trigger reanalysis of the subquery's select statement.
+    // Analyzing the inline view triggers reanalysis of the subquery's select statement.
     // However the statement is already analyzed and since statement analysis is not
-    // idempotent, the analysis needs to be reset (by a call to clone()).
-    inlineView = (InlineViewRef)inlineView.clone();
+    // idempotent, the analysis needs to be reset.
+    inlineView.reset();
     inlineView.analyze(analyzer);
     inlineView.setLeftTblRef(stmt.tableRefs_.get(stmt.tableRefs_.size() - 1));
     stmt.tableRefs_.add(inlineView);

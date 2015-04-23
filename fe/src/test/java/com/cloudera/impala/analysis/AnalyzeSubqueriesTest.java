@@ -21,6 +21,7 @@ import com.cloudera.impala.common.AnalysisException;
 
 public class AnalyzeSubqueriesTest extends AnalyzerTest {
   private static String cmpOperators[] = {"=", "!=", "<=", ">=", ">", "<"};
+
   @Test
   public void TestInSubqueries() throws AnalysisException {
     String colNames[] = {"bool_col", "tinyint_col", "smallint_col", "int_col",
@@ -984,6 +985,10 @@ public class AnalyzeSubqueriesTest extends AnalyzerTest {
     // Same view referenced in both the inner and outer block
     AnalyzesOk("select * from functional.alltypes_view a where exists " +
         "(select * from functional.alltypes_view b where a.id = b.id)");
+
+    // Subquery with collection table ref.
+    AnalyzesOk("select int_col from functional.alltypes where int_col < " +
+        "(select count(a.item) from functional.allcomplextypes t, t.int_array_col a)");
 
     // Union query with subqueries
     AnalyzesOk("select * from functional.alltypes where id = " +

@@ -94,7 +94,7 @@ public class AggregateInfo extends AggregateInfoBase {
 
   // Map from slots of outputTupleSmap_ to the corresponding slot in
   // intermediateTupleSmap_.
-  protected final ExprSubstitutionMap outputToIntermediateTupleSmap_ =
+  protected ExprSubstitutionMap outputToIntermediateTupleSmap_ =
       new ExprSubstitutionMap();
 
   // if set, a subset of groupingExprs_; set and used during planning
@@ -105,6 +105,29 @@ public class AggregateInfo extends AggregateInfoBase {
       ArrayList<FunctionCallExpr> aggExprs, AggPhase aggPhase)  {
     super(groupingExprs, aggExprs);
     aggPhase_ = aggPhase;
+  }
+
+  /**
+   * C'tor for cloning.
+   */
+  private AggregateInfo(AggregateInfo other) {
+    super(other);
+    if (other.mergeAggInfo_ != null) {
+      mergeAggInfo_ = other.mergeAggInfo_.clone();
+    }
+    if (other.secondPhaseDistinctAggInfo_ != null) {
+      secondPhaseDistinctAggInfo_ = other.secondPhaseDistinctAggInfo_.clone();
+    }
+    aggPhase_ = other.aggPhase_;
+    outputTupleSmap_ = other.outputTupleSmap_.clone();
+    if (other.requiresIntermediateTuple()) {
+      intermediateTupleSmap_ = other.intermediateTupleSmap_.clone();
+    } else {
+      Preconditions.checkState(other.intermediateTupleDesc_ == other.outputTupleDesc_);
+      intermediateTupleSmap_ = outputTupleSmap_;
+    }
+    partitionExprs_ =
+        (other.partitionExprs_ != null) ? Expr.cloneList(other.partitionExprs_) : null;
   }
 
   public List<Expr> getPartitionExprs() { return partitionExprs_; }
@@ -355,7 +378,6 @@ public class AggregateInfo extends AggregateInfoBase {
     mergeAggInfo_.outputTupleDesc_ = outputTupleDesc_;
     mergeAggInfo_.intermediateTupleSmap_ = intermediateTupleSmap_;
     mergeAggInfo_.outputTupleSmap_ = outputTupleSmap_;
-    mergeAggInfo_.mergeAggInfo_ = mergeAggInfo_;
     mergeAggInfo_.materializedSlots_ = materializedSlots_;
   }
 
@@ -649,7 +671,7 @@ public class AggregateInfo extends AggregateInfoBase {
         .add("intermediate_smap", intermediateTupleSmap_.debugString())
         .add("output_smap", outputTupleSmap_.debugString())
         .toString());
-    if (mergeAggInfo_ != this) {
+    if (mergeAggInfo_ != this && mergeAggInfo_ != null) {
       out.append("\nmergeAggInfo:\n" + mergeAggInfo_.debugString());
     }
     if (secondPhaseDistinctAggInfo_ != null) {
@@ -661,4 +683,7 @@ public class AggregateInfo extends AggregateInfoBase {
 
   @Override
   protected String tupleDebugName() { return "agg-tuple"; }
+
+  @Override
+  public AggregateInfo clone() { return new AggregateInfo(this); }
 }

@@ -38,10 +38,10 @@ public class AnalyticInfo extends AggregateInfoBase {
   private final ArrayList<Expr> analyticExprs_;
 
   // Intersection of the partition exps of all the analytic functions.
-  private final List<Expr> commonPartitionExprs_ = Lists.newArrayList();
+  private final List<Expr> commonPartitionExprs_;
 
   // map from analyticExprs_ to their corresponding analytic tuple slotrefs
-  private final ExprSubstitutionMap analyticTupleSmap_ = new ExprSubstitutionMap();
+  private final ExprSubstitutionMap analyticTupleSmap_;
 
   private AnalyticInfo(ArrayList<Expr> analyticExprs) {
     super(new ArrayList<Expr>(), new ArrayList<FunctionCallExpr>());
@@ -50,7 +50,19 @@ public class AnalyticInfo extends AggregateInfoBase {
     for (Expr analyticExpr: analyticExprs) {
       aggregateExprs_.add(((AnalyticExpr) analyticExpr).getFnCall());
     }
-    computeCommonPartitionExprs();
+    analyticTupleSmap_ = new ExprSubstitutionMap();
+    commonPartitionExprs_ = computeCommonPartitionExprs();
+  }
+
+  /**
+   * C'tor for cloning.
+   */
+  private AnalyticInfo(AnalyticInfo other) {
+    super(other);
+    analyticExprs_ =
+        (other.analyticExprs_ != null) ? Expr.cloneList(other.analyticExprs_) : null;
+    analyticTupleSmap_ = other.analyticTupleSmap_.clone();
+    commonPartitionExprs_ = Expr.cloneList(other.commonPartitionExprs_);
   }
 
   public ArrayList<Expr> getAnalyticExprs() { return analyticExprs_; }
@@ -89,21 +101,23 @@ public class AnalyticInfo extends AggregateInfoBase {
   }
 
   /**
-   * Computes the intersection of the partition exprs of all the
+   * Returns the intersection of the partition exprs of all the
    * analytic functions.
    */
-  private void computeCommonPartitionExprs() {
+  private List<Expr> computeCommonPartitionExprs() {
+    List<Expr> result = Lists.newArrayList();
     for (Expr analyticExpr: analyticExprs_) {
       Preconditions.checkState(analyticExpr.isAnalyzed_);
       List<Expr> partitionExprs = ((AnalyticExpr) analyticExpr).getPartitionExprs();
       if (partitionExprs == null) continue;
-      if (commonPartitionExprs_.isEmpty()) {
-        commonPartitionExprs_.addAll(partitionExprs);
+      if (result.isEmpty()) {
+        result.addAll(partitionExprs);
       } else {
-        commonPartitionExprs_.retainAll(partitionExprs);
-        if (commonPartitionExprs_.isEmpty()) break;
+        result.retainAll(partitionExprs);
+        if (result.isEmpty()) break;
       }
     }
+    return result;
   }
 
   /**
@@ -174,5 +188,9 @@ public class AnalyticInfo extends AggregateInfoBase {
     return out.toString();
   }
 
+  @Override
   protected String tupleDebugName() { return "analytic-tuple"; }
+
+  @Override
+  public AnalyticInfo clone() { return new AnalyticInfo(this); }
 }

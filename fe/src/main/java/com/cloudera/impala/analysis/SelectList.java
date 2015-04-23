@@ -23,21 +23,28 @@ import com.google.common.collect.Lists;
  */
 public class SelectList {
   private List<String> planHints_;
-  private final List<SelectListItem> items_;
   private boolean isDistinct_;
+
+  /////////////////////////////////////////
+  // BEGIN: Members that need to be reset()
+
+  private final List<SelectListItem> items_;
 
   // Set in analyzePlanHints() based on planHints_.
   private boolean isStraightJoin_;
 
+  // END: Members that need to be reset()
+  /////////////////////////////////////////
+
   public SelectList(List<SelectListItem> items) {
-    items_ = items;
     isDistinct_ = false;
+    items_ = items;
     isStraightJoin_ = false;
   }
 
   public SelectList() {
-    items_ = Lists.newArrayList();
     isDistinct_ = false;
+    items_ = Lists.newArrayList();
     isStraightJoin_ = false;
   }
 
@@ -84,4 +91,11 @@ public class SelectList {
 
   @Override
   public SelectList clone() { return new SelectList(this); }
+
+  public void reset() {
+    for (SelectListItem item: items_) {
+      if (!item.isStar()) item.getExpr().reset();
+    }
+    isStraightJoin_ = false;
+  }
 }

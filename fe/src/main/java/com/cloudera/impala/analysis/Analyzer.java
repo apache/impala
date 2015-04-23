@@ -492,9 +492,9 @@ public class Analyzer {
       // The table must be a base table.
       Preconditions.checkState(table instanceof HdfsTable ||
           table instanceof HBaseTable || table instanceof DataSourceTable);
-      return new BaseTableRef(tableRef, tableRef.getResolvedPath());
+      return new BaseTableRef(tableRef);
     } else {
-      return new CollectionTableRef(tableRef, tableRef.getResolvedPath());
+      return new CollectionTableRef(tableRef);
     }
   }
 

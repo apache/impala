@@ -24,11 +24,17 @@ import com.google.common.base.Preconditions;
  * Combination of limit and offset expressions.
  */
 class LimitElement {
+  /////////////////////////////////////////
+  // BEGIN: Members that need to be reset()
+
   private final Expr limitExpr_;
   private final Expr offsetExpr_;
   private long limit_;
   private long offset_;
   private boolean isAnalyzed_;
+
+  // END: Members that need to be reset()
+  /////////////////////////////////////////
 
   /**
    * Constructs the LimitElement.
@@ -47,8 +53,8 @@ class LimitElement {
    * Copy c'tor used in clone().
    */
   protected LimitElement(LimitElement other) {
-    limitExpr_ = (other.limitExpr_ == null) ? null : other.limitExpr_.clone().reset();
-    offsetExpr_ = (other.offsetExpr_ == null) ? null : other.offsetExpr_.clone().reset();
+    limitExpr_ = (other.limitExpr_ != null) ? other.limitExpr_.clone() : null;
+    offsetExpr_ = (other.offsetExpr_ != null) ? other.offsetExpr_.clone() : null;
     limit_ = other.limit_;
     offset_ = other.offset_;
     isAnalyzed_ = other.isAnalyzed_;
@@ -163,4 +169,12 @@ class LimitElement {
 
   @Override
   public LimitElement clone() { return new LimitElement(this); }
+
+  public void reset() {
+    isAnalyzed_ = false;
+    limit_ = -1;
+    offset_ = 0;
+    if (limitExpr_ != null) limitExpr_.reset();
+    if (offsetExpr_ != null) offsetExpr_.reset();
+  }
 }

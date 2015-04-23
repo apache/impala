@@ -2366,6 +2366,11 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "and not exists (select * from functional.alltypesagg b where b.id = 1 " +
         "and b.int_col = a.int_col)) select * from t");
 
+    // WITH clause with a collection table ref.
+    AnalyzesOk(
+        "with w as (select t.id, a.item from functional.allcomplextypes t, " +
+        "t.int_array_col a) select * from w");
+
     // Deeply nested WITH clauses (see IMPALA-1106)
     AnalyzesOk("with with_1 as (select 1 as int_col_1), with_2 as " +
         "(select 1 as int_col_1 from (with with_3 as (select 1 as int_col_1 from " +
@@ -3063,7 +3068,7 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
    */
   @Test
   public void TestClone() {
-    testNumberOfMembers(QueryStmt.class, 10);
+    testNumberOfMembers(QueryStmt.class, 9);
     testNumberOfMembers(UnionStmt.class, 8);
     testNumberOfMembers(ValuesStmt.class, 0);
 

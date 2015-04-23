@@ -63,6 +63,19 @@ public abstract class AggregateInfoBase {
   }
 
   /**
+   * C'tor for cloning.
+   */
+  protected AggregateInfoBase(AggregateInfoBase other) {
+    groupingExprs_ =
+        (other.groupingExprs_ != null) ? Expr.cloneList(other.groupingExprs_) : null;
+    aggregateExprs_ =
+        (other.aggregateExprs_ != null) ? Expr.cloneList(other.aggregateExprs_) : null;
+    intermediateTupleDesc_ = other.intermediateTupleDesc_;
+    outputTupleDesc_ = other.outputTupleDesc_;
+    materializedSlots_ = Lists.newArrayList(other.materializedSlots_);
+  }
+
+  /**
    * Creates the intermediate and output tuple descriptors. If no agg expr has an
    * intermediate type different from its output type, then only the output tuple
    * descriptor is created and the intermediate tuple is set to the output tuple.

@@ -47,6 +47,19 @@ public class SortInfo {
     nullsFirstParams_ = nullsFirstParams;
   }
 
+  /**
+   * C'tor for cloning.
+   */
+  private SortInfo(SortInfo other) {
+    orderingExprs_ = Expr.cloneList(other.orderingExprs_);
+    isAscOrder_ = Lists.newArrayList(other.isAscOrder_);
+    nullsFirstParams_ = Lists.newArrayList(other.nullsFirstParams_);
+    sortTupleDesc_ = other.sortTupleDesc_;
+    if (other.sortTupleSlotExprs_ != null) {
+      sortTupleSlotExprs_ = Expr.cloneList(other.sortTupleSlotExprs_);
+    }
+  }
+
   public void setMaterializedTupleInfo(
       TupleDescriptor tupleDesc, List<Expr> tupleSlotExprs) {
     sortTupleDesc_ = tupleDesc;
@@ -109,4 +122,7 @@ public class SortInfo {
       Preconditions.checkState(orderingExpr.isBound(sortTupleDesc_.getId()));
     }
   }
+
+  @Override
+  public SortInfo clone() { return new SortInfo(this); }
 }

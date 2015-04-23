@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.analysis;
 
+import org.apache.commons.lang.NotImplementedException;
+
 import com.cloudera.impala.common.AnalysisException;
 
 /**
@@ -23,6 +25,25 @@ abstract class StatementBase implements ParseNode {
   // True if this Stmt is the top level of an explain stmt.
   protected boolean isExplain_ = false;
 
+  /////////////////////////////////////////
+  // BEGIN: Members that need to be reset()
+
+  // Analyzer that was used to analyze this statement.
+  protected Analyzer analyzer_;
+
+  // END: Members that need to be reset()
+  /////////////////////////////////////////
+
+  protected StatementBase() { }
+
+  /**
+   * C'tor for cloning.
+   */
+  protected StatementBase(StatementBase other) {
+    analyzer_ = other.analyzer_;
+    isExplain_ = other.isExplain_;
+  }
+
   /**
    * Analyzes the statement and throws an AnalysisException if analysis fails. A failure
    * could be due to a problem with the statement or because one or more tables/views
@@ -31,14 +52,52 @@ abstract class StatementBase implements ParseNode {
    * tables/views get collected in the Analyzer before failing analyze().
    */
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (isAnalyzed()) return;
     if (isExplain_) analyzer.setIsExplain();
+    analyzer_ = analyzer;
   }
 
-  /**
-   * Print SQL syntax corresponding to this node.
-   * @see com.cloudera.impala.parser.ParseNode#toSql()
-   */
+  public Analyzer getAnalyzer() { return analyzer_; }
+  public boolean isAnalyzed() { return analyzer_ != null; }
+
   public String toSql() { return ""; }
   public void setIsExplain() { isExplain_ = true; }
   public boolean isExplain() { return isExplain_; }
+
+  /**
+   * Returns a deep copy of this node including its analysis state. Some members such as
+   * tuple and slot descriptors are generally not deep copied to avoid potential
+   * confusion of having multiple descriptor instances with the same id, although
+   * they should be unique in the descriptor table.
+   * TODO for 2.3: Consider also cloning table and slot descriptors for clarity,
+   * or otherwise make changes to more provide clearly defined clone() semantics.
+   */
+  @Override
+  public StatementBase clone() {
+    throw new NotImplementedException(
+        "Clone() not implemented for " + getClass().getSimpleName());
+  }
+
+  /**
+   * Resets the internal analysis state of this node.
+   * For easier maintenance, class members that need to be reset are grouped into
+   * a 'section' clearly indicated by comments as follows:
+   *
+   * class SomeStmt extends StatementBase {
+   *   ...
+   *   /////////////////////////////////////////
+   *   // BEGIN: Members that need to be reset()
+   *
+   *   <member declarations>
+   *
+   *   // END: Members that need to be reset()
+   *   /////////////////////////////////////////
+   *   ...
+   * }
+   *
+   * In general, members that are set or modified during analyze() must be reset().
+   * TODO: Introduce this same convention for Exprs, possibly by moving clone()/reset()
+   * into the ParseNode interface for clarity.
+   */
+  public void reset() { analyzer_ = null; }
 }
