@@ -133,3 +133,5 @@ table_name:testescape_32_crlf, constraint:restrict_to, table_format:text/none/no
 
 # alltimezones is used to verify that impala properly deals with timezones
 table_name:alltimezones, constraint:restrict_to, table_format:text/none/none
+
+table_name:liketbl, constraint:only, table_format:kudu/none/none

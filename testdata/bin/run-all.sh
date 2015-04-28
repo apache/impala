@@ -55,3 +55,7 @@ $IMPALA_HOME/testdata/bin/run-hive-server.sh 2>&1 | \
 echo " --> Starting the Sentry Policy Server"
 $IMPALA_HOME/testdata/bin/run-sentry-service.sh > \
     ${IMPALA_TEST_CLUSTER_LOG_DIR}/run-sentry-service.log 2>&1
+
+echo " --> Starting Kudu"
+$IMPALA_HOME/testdata/bin/run-kudu.sh > \
+    ${IMPALA_TEST_CLUSTER_LOG_DIR}/run-kudu.log 2>&1

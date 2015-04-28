@@ -14,7 +14,7 @@ WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 # of what specific table format to target along with the exec options (num_nodes, etc)
 # to use when running the query.
 class TableFormatInfo(object):
-  KNOWN_FILE_FORMATS = ['text', 'seq', 'rc', 'parquet', 'avro', 'hbase']
+  KNOWN_FILE_FORMATS = ['text', 'seq', 'rc', 'parquet', 'avro', 'hbase', 'kudu']
   KNOWN_COMPRESSION_CODECS = ['none', 'snap', 'gzip', 'bzip', 'def', 'lzo']
   KNOWN_COMPRESSION_TYPES = ['none', 'block', 'record']
 
@@ -182,4 +182,3 @@ def is_supported_insert_format(table_format):
   # Returns true if the given table_format is a supported Impala INSERT format
   return table_format.compression_codec == 'none' and\
       table_format.file_format in ['text', 'parquet']
-

@@ -35,6 +35,12 @@ if [ -z $IMPALA_HOME ]; then
   fi
 fi
 
+# Set a default value for Kudu binary distribution, this is temporary only
+# TODO: replace with packaged path once beta is there
+export KUDU_BIN_HOME=${KUDU_BIN_HOME:-"$IMPALA_HOME/../kudu-bin"}
+export KUDU_MASTER=${KUDU_MASTER:-"127.0.0.1"}
+export KUDU_MASTER_PORT=${KUDU_MASTER_PORT:-"7051"}
+
 export CDH_MAJOR_VERSION=5
 export HADOOP_LZO=${HADOOP_LZO-~/hadoop-lzo}
 export IMPALA_LZO=${IMPALA_LZO-~/Impala-lzo}
