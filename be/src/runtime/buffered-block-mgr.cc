@@ -1109,15 +1109,10 @@ void BufferedBlockMgr::Init(DiskIoMgr* io_mgr, RuntimeProfile* parent_profile,
 
   io_mgr->RegisterContext(&io_request_context_);
   if (encryption_) {
-    static bool openssl_loaded = false;
-    if (!openssl_loaded) {
-      // These are idempotent, so no threading worries.
-      OpenSSL_add_all_algorithms();
-      ERR_load_crypto_strings();
-      openssl_loaded = true;
-    }
     // Seed the random number generator
-    // TODO: try non-blocking read from /dev/random and add that, too.
+    // TODO: Try non-blocking read from /dev/random and add that, too.
+    // TODO: We don't need to re-seed every BufferedBlockMgr::Init. Consider doing this
+    // every X iterations.
     RAND_load_file("/dev/urandom", 4096);
   }
 

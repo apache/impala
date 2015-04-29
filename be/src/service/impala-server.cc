@@ -27,6 +27,8 @@
 #include <boost/lexical_cast.hpp>
 #include <google/malloc_extension.h>
 #include <gutil/strings/substitute.h>
+#include <openssl/evp.h>
+#include <openssl/err.h>
 #include <rapidjson/rapidjson.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
@@ -92,6 +94,7 @@ DECLARE_string(nn);
 DECLARE_int32(nn_port);
 DECLARE_string(authorized_proxy_user_config);
 DECLARE_bool(abort_on_config_error);
+DECLARE_bool(disk_spill_encryption);
 
 DEFINE_int32(beeswax_port, 21000, "port on which Beeswax client requests are served");
 DEFINE_int32(hs2_port, 21050, "port on which HiveServer2 client requests are served");
@@ -286,6 +289,14 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
         authorized_proxy_user_config_.insert(make_pair(proxy_user, allowed_users));
       }
     }
+  }
+
+  if (FLAGS_disk_spill_encryption) {
+    // Initialize OpenSSL for spilling encryption. This is not thread-safe so we
+    // initialize it once on startup.
+    // TODO: Set OpenSSL callbacks to provide locking to make the library thread-safe.
+    OpenSSL_add_all_algorithms();
+    ERR_load_crypto_strings();
   }
 
   RegisterWebserverCallbacks(exec_env->webserver());
