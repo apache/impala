@@ -30,6 +30,7 @@ import com.cloudera.impala.analysis.AnalyticInfo;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BaseTableRef;
 import com.cloudera.impala.analysis.BinaryPredicate;
+import com.cloudera.impala.analysis.CollectionTableRef;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.ExprId;
 import com.cloudera.impala.analysis.ExprSubstitutionMap;
@@ -1073,18 +1074,18 @@ public class SingleNodePlanner {
   }
 
   /**
-   * Create a tree of PlanNodes for the given tblRef, which can be a BaseTableRef or a
-   * InlineViewRef
+   * Create a tree of PlanNodes for the given tblRef, which can be a BaseTableRef,
+   * CollectionTableRef or an InlineViewRef.
    */
   private PlanNode createTableRefNode(Analyzer analyzer, TableRef tblRef)
       throws ImpalaException {
-    if (tblRef instanceof BaseTableRef) {
+    if (tblRef instanceof BaseTableRef || tblRef instanceof CollectionTableRef) {
       return createScanNode(analyzer, tblRef);
-    }
-    if (tblRef instanceof InlineViewRef) {
+    } else if (tblRef instanceof InlineViewRef) {
       return createInlineViewPlan(analyzer, (InlineViewRef) tblRef);
     }
-    throw new InternalException("unknown TableRef node");
+    throw new InternalException(
+        "Unknown TableRef node: " + tblRef.getClass().getSimpleName());
   }
 
   /**

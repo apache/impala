@@ -1,0 +1,48 @@
+# Scan of a nested array of scalars.
+select * from functional.allcomplextypes.int_array_col
+where item > 10
+---- PLAN
+00:SCAN HDFS [functional.allcomplextypes.int_array_col]
+   partitions=0/0 files=0 size=0B
+   predicates: item > 10
+====
+# Scan of a nested map with scalar key and value.
+select * from functional.allcomplextypes.int_map_col
+where key = 'test' and value < 10
+---- PLAN
+00:SCAN HDFS [functional.allcomplextypes.int_map_col]
+   partitions=0/0 files=0 size=0B
+   predicates: key = 'test', value < 10
+====
+# Scan of a deeply nested collection.
+select count(f21) from functional.allcomplextypes.complex_nested_struct_col.f2.f12
+where key = 'test'
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: count(f21)
+|
+00:SCAN HDFS [functional.allcomplextypes.complex_nested_struct_col.f2.f12]
+   partitions=0/0 files=0 size=0B
+   predicates: key = 'test'
+====
+# Join on two nested collections with structs.
+select count(*) from
+functional.allcomplextypes.struct_array_col a
+inner join functional.allcomplextypes.struct_map_col b
+on (a.f1 = b.f1)
+where a.f2 = 'test_a' and b.f2 = 'test_b'
+---- PLAN
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: a.f1 = b.f1
+|
+|--01:SCAN HDFS [functional.allcomplextypes.struct_map_col b]
+|     partitions=0/0 files=0 size=0B
+|     predicates: b.f2 = 'test_b'
+|
+00:SCAN HDFS [functional.allcomplextypes.struct_array_col a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.f2 = 'test_a'
+====

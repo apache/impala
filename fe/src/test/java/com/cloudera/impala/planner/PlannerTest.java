@@ -67,6 +67,11 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testNestedCollections() {
+    runPlannerTestFile("nested-collections");
+  }
+
+  @Test
   public void testJoins() {
     runPlannerTestFile("joins");
   }

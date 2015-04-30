@@ -64,6 +64,11 @@ struct TTupleDescriptor {
   2: required i32 byteSize
   3: required i32 numNullBytes
   4: optional Types.TTableId tableId
+
+  // Absolute path into the table schema pointing to the collection whose fields
+  // are materialized into this tuple. Non-empty if this tuple belongs to a
+  // nested collection, empty otherwise.
+  5: optional list<i32> tuplePath
 }
 
 struct TDescriptorTable {

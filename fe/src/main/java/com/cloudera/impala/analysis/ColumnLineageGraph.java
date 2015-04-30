@@ -397,7 +397,8 @@ public class ColumnLineageGraph {
     for (SlotId slotId: slotIds) {
       SlotDescriptor slotDesc = descTbl_.getSlotDesc(slotId);
       List<Expr> sourceExprs = slotDesc.getSourceExprs();
-      if (sourceExprs.isEmpty()) {
+      // TODO: Add lineage support for nested types.
+      if (sourceExprs.isEmpty() && slotDesc.getColumn() != null) {
         // slot should correspond to a materialized base table column
         Preconditions.checkState(slotDesc.getParent().isMaterialized()
             && slotDesc.getParent().getTable() != null
