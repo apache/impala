@@ -17,8 +17,8 @@
 #include <gutil/strings/substitute.h>
 
 #include "runtime/hdfs-fs-cache.h"
+#include "common/names.h"
 
-using namespace std;
 using namespace strings;
 
 namespace impala {
