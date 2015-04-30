@@ -22,11 +22,7 @@
 
 #include "common/logging.h"
 #include "runtime/decimal-value.h"
-
-// Our own definition of "isspace" that optimize on the ' ' branch.
-#define IS_SPACE(c) \
-  (LIKELY((c) == ' ') || \
-   UNLIKELY((c) == '\t' || (c) == '\n' || (c) == '\v' || (c) == '\f' || (c) == '\r'))
+#include "util/decimal-util.h"
 
 namespace impala {
 
@@ -106,83 +102,129 @@ class StringParser {
     return StringToDecimal<T>(reinterpret_cast<const char*>(s), len, type, result);
   }
 
-  // Parses a decimal from s, storing the result in *v.
   template <typename T>
   static inline DecimalValue<T> StringToDecimal(const char* s, int len,
       const ColumnType& type, StringParser::ParseResult* result) {
-    bool negative = false;
+    // Special cases:
+    //   1) '' == Fail, an empty string fails to parse.
+    //   2) '   #   ' == #, leading and trailing white space is ignored.
+    //   3) '.' == 0, a single dot parses as zero (for consistency with other types).
+    //   4) '#.' == '#', a trailing dot is ignored.
 
-    while (len > 0 && IS_SPACE(*s)) {
+    // Ignore leading and trailing spaces.
+    while (len > 0 && IsWhitespace(*s)) {
       ++s;
       --len;
     }
+    while (len > 0 && IsWhitespace(s[len - 1])) {
+      --len;
+    }
 
+    bool is_negative = false;
     if (len > 0) {
       switch (*s) {
         case '-':
-          negative = true;
+          is_negative = true;
         case '+':
           ++s;
           --len;
       }
     }
 
-    // Removing leading 0's.
-    while (len > 0 && *s == '0') {
+    // Ignore leading zeros.
+    bool found_value = false;
+    while (len > 0 && UNLIKELY(*s == '0')) {
+      found_value = true;
       ++s;
       --len;
     }
 
-    T decimal = 0;
-    int digits_before = 0;
-    int digits_after = 0;
-    bool dot_found = false;
-    bool underflow = false;
-
-    for (int i = 0; i < len; ++i) {
-      if (LIKELY(s[i] >= '0' && s[i] <= '9')) {
-        T digit = s[i] - '0';
-        if (dot_found) {
-          if (digits_after < type.scale) {
-            ++digits_after;
-            decimal = decimal * 10 + digit;
-          } else {
-            underflow = true;
-          }
-        } else {
-          ++digits_before;
-          decimal = decimal * 10 + digit;
-        }
-      } else if (s[i] == '.') {
-        dot_found = true;
-      } else {
-        if (!StringParser::isAllWhitespace(s + i, len - i)) {
-          *result = StringParser::PARSE_FAILURE;
-          return DecimalValue<T>();
-        }
-        break;
+    // Ignore leading zeros even after a dot. This allows for differetiating between
+    // cases like 0.01e2, which would fit in a DECIMAL(1, 0), and 0.10e2, which would
+    // overflow.
+    int scale = 0;
+    int found_dot = 0;
+    if (len > 0 && *s == '.') {
+      found_dot = 1;
+      ++s;
+      --len;
+      while (len > 0 && UNLIKELY(*s == '0')) {
+        found_value = true;
+        ++scale;
+        ++s;
+        --len;
       }
     }
 
-    // TODO: consider making the Int parsing keep track of digits as well.
-    // It makes the overflow case much easier to think about.
-    if (UNLIKELY(digits_before > type.precision - type.scale)) {
-      *result = StringParser::PARSE_OVERFLOW;
-      return DecimalValue<T>();
+    int precision = 0;
+    bool found_exponent = false;
+    int8_t exponent = 0;
+    T value = 0;
+    for (int i = 0; i < len; ++i) {
+      const char& c = s[i];
+      if (LIKELY('0' <= c && c <= '9')) {
+        found_value = true;
+        // Ignore digits once the type's precision limit is reached. This avoids
+        // overflowing the underlying storage while handling a string like
+        // 10000000000e-10 into a DECIMAL(1, 0). Adjustments for ignored digits and
+        // an exponent will be made later.
+        if (LIKELY(type.precision > precision)) {
+          value = (value * 10) + (c - '0');  // Benchmarks are faster with parenthesis...
+        }
+        DCHECK(value >= 0);  // For some reason DCHECK_GE doesn't work with int128_t.
+        ++precision;
+        scale += found_dot;
+      } else if (c == '.' && LIKELY(!found_dot)) {
+        found_dot = 1;
+      } else if ((c == 'e' || c == 'E') && LIKELY(!found_exponent)) {
+        found_exponent = true;
+        exponent = StringToIntInternal<int8_t>(s + i + 1, len - i - 1, result);
+        if (UNLIKELY(*result != StringParser::PARSE_SUCCESS)) return DecimalValue<T>(0);
+        break;
+      } else {
+        *result = StringParser::PARSE_FAILURE;
+        return DecimalValue<T>(0);
+      }
     }
 
-    // Pad the decimal out with 0's. e.g. scale of 3 for the string
-    // "1.1" should pad it out by 100 (as if the string was "1.100"
-    if (digits_after < type.scale) {
-      decimal *= DecimalUtil::GetScaleMultiplier<T>(type.scale - digits_after);
-    }
-
-    if (underflow) {
-      *result = StringParser::PARSE_UNDERFLOW;
+    // Find the number of truncated digits before adjusting the precision for an exponent.
+    int truncated_digit_count = precision - type.precision;
+    if (exponent > scale) {
+      // Ex: 0.1e3 (which at this point would have precision == 1 and scale == 1), the
+      //     scale must be set to 0 and the value set to 100 which means a precision of 3.
+      precision += exponent - scale;
+      value *= DecimalUtil::GetScaleMultiplier<T>(exponent - scale);
+      scale = 0;
     } else {
-      *result = StringParser::PARSE_SUCCESS;
+      // Ex: 100e-4, the scale must be set to 4 but no adjustment to the value is needed,
+      //     the precision must also be set to 4 but that will be done below for the
+      //     non-exponent case anyways.
+      scale -= exponent;
     }
-    return DecimalValue<T>(negative ? -decimal : decimal);
+    // Ex: 0.001, at this point would have precision 1 and scale 3 since leading zeros
+    //     were ignored during previous parsing.
+    if (scale > precision) precision = scale;
+
+    // Microbenchmarks show that beyond this point, returning on parse failure is slower
+    // than just letting the function run out.
+    *result = StringParser::PARSE_SUCCESS;
+    if (UNLIKELY(precision - scale > type.precision - type.scale)) {
+      *result = StringParser::PARSE_OVERFLOW;
+    } else if (UNLIKELY(scale > type.scale)) {
+      *result = StringParser::PARSE_UNDERFLOW;
+      int shift = scale - type.scale;
+      if (truncated_digit_count > 0) shift -= truncated_digit_count;
+      if (shift > 0) value /= DecimalUtil::GetScaleMultiplier<T>(shift);
+      DCHECK(value >= 0);
+    } else if (UNLIKELY(!found_value && !found_dot)) {
+      *result = StringParser::PARSE_FAILURE;
+    }
+
+    if (type.scale > scale) {
+      value *= DecimalUtil::GetScaleMultiplier<T>(type.scale - scale);
+    }
+
+    return DecimalValue<T>(is_negative ? -value : value);
   }
 
  private:
@@ -229,7 +271,7 @@ class StringParser {
         }
         val = val * 10 + digit;
       } else {
-        if ((UNLIKELY(i == first || !isAllWhitespace(s + i, len - i)))) {
+        if ((UNLIKELY(i == first || !IsAllWhitespace(s + i, len - i)))) {
           // Reject the string because either the first char was not a digit,
           // or the remaining chars are not all whitespace
           *result = PARSE_FAILURE;
@@ -278,7 +320,7 @@ class StringParser {
       } else if (s[i] >= 'A' && s[i] <= 'Z') {
         digit = (s[i] - 'A' + 10);
       } else {
-        if ((UNLIKELY(i == first || !isAllWhitespace(s + i, len - i)))) {
+        if ((UNLIKELY(i == first || !IsAllWhitespace(s + i, len - i)))) {
           // Reject the string because either the first char was not an alpha/digit,
           // or the remaining chars are not all whitespace
           *result = PARSE_FAILURE;
@@ -379,7 +421,7 @@ class StringParser {
           return 0;
         }
       } else {
-        if ((UNLIKELY(i == first || !isAllWhitespace(s + i, len - i)))) {
+        if ((UNLIKELY(i == first || !IsAllWhitespace(s + i, len - i)))) {
           // Reject the string because either the first char was not a digit, "," or "e",
           // or the remaining chars are not all whitespace
           *result = PARSE_FAILURE;
@@ -405,7 +447,7 @@ class StringParser {
       if (s_end != c_str + len - negative) {
         // skip trailing whitespace
         int trailing_len = len - negative - (int)(s_end - c_str);
-        if (UNLIKELY(!isAllWhitespace(s_end, trailing_len))) {
+        if (UNLIKELY(!IsAllWhitespace(s_end, trailing_len))) {
           *result = PARSE_FAILURE;
           return val;
         }
@@ -429,13 +471,13 @@ class StringParser {
       bool match = (s[1] == 'r' || s[1] == 'R') &&
                    (s[2] == 'u' || s[2] == 'U') &&
                    (s[3] == 'e' || s[3] == 'E');
-      if (match && LIKELY(isAllWhitespace(s+4, len-4))) return true;
+      if (match && LIKELY(IsAllWhitespace(s+4, len-4))) return true;
     } else if (len >= 5 && (s[0] == 'f' || s[0] == 'F')) {
       bool match = (s[1] == 'a' || s[1] == 'A') &&
                    (s[2] == 'l' || s[2] == 'L') &&
                    (s[3] == 's' || s[3] == 'S') &&
                    (s[4] == 'e' || s[4] == 'E');
-      if (match && LIKELY(isAllWhitespace(s+5, len-5))) return false;
+      if (match && LIKELY(IsAllWhitespace(s+5, len-5))) return false;
     }
     *result = PARSE_FAILURE;
     return false;
@@ -444,14 +486,14 @@ class StringParser {
   // Returns the position of the first non-whitespace character in s.
   static inline int SkipLeadingWhitespace(const char* s, int len) {
     int i = 0;
-    while(i < len && IS_SPACE(s[i])) ++i;
+    while(i < len && IsWhitespace(s[i])) ++i;
     return i;
   }
 
   // Returns true if s only contains whitespace.
-  static inline bool isAllWhitespace(const char* s, int len) {
+  static inline bool IsAllWhitespace(const char* s, int len) {
     for (int i = 0; i < len; ++i) {
-      if (!IS_SPACE(s[i])) return false;
+      if (!LIKELY(IsWhitespace(s[i]))) return false;
     }
     return true;
   }
@@ -486,7 +528,7 @@ class StringParser {
         T digit = s[i] - '0';
         val = val * 10 + digit;
       } else {
-        if ((UNLIKELY(!isAllWhitespace(s + i, len - i)))) {
+        if ((UNLIKELY(!IsAllWhitespace(s + i, len - i)))) {
           *result = PARSE_FAILURE;
           return 0;
         }
@@ -496,6 +538,11 @@ class StringParser {
     }
     *result = PARSE_SUCCESS;
     return val;
+  }
+
+  static inline bool IsWhitespace(const char& c) {
+    return c == ' ' || UNLIKELY(c == '\t' || c == '\n' || c == '\v' || c == '\f'
+        || c == '\r');
   }
 };
 

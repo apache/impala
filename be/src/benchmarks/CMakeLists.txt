@@ -21,6 +21,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/benchmarks")
 
 ADD_BE_BENCHMARK(parse-timestamp-benchmark)
 ADD_BE_BENCHMARK(string-search-benchmark)
+ADD_BE_BENCHMARK(atod-benchmark)
 ADD_BE_BENCHMARK(atof-benchmark)
 ADD_BE_BENCHMARK(atoi-benchmark)
 ADD_BE_BENCHMARK(lock-benchmark)

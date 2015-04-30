@@ -46,7 +46,7 @@ void VerifyParse(const string& s, const ColumnType& t,
   StringParser::ParseResult parse_result;
   DecimalValue<T> val = StringParser::StringToDecimal<T>(
       s.c_str(), s.size(), t, &parse_result);
-  EXPECT_EQ(parse_result, expected_result);
+  EXPECT_EQ(expected_result, parse_result) << "Failed test string: " << s;
   if (expected_result == StringParser::PARSE_SUCCESS ||
       expected_result == StringParser::PARSE_UNDERFLOW) {
     VerifyEquals(expected_val, val);
@@ -189,12 +189,33 @@ TEST(StringToDecimal, Basic) {
   ColumnType t3 = ColumnType::CreateDecimalType(2, 0);
   ColumnType t4 = ColumnType::CreateDecimalType(10, 5);
 
+  StringToAllDecimals("       1234", t1, 1234, StringParser::PARSE_SUCCESS);
+  StringToAllDecimals("", t1, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("   ", t1, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals(" 0 0 ", t1, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("0 0", t1, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("++0", t1, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("--0", t1, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("..0", t1, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("0..", t1, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals(".0.", t1, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("0.0.", t1, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("0-", t1, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("0+", t1, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("X", t1, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("+", t3, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("-", t3, 0, StringParser::PARSE_FAILURE);
+
   StringToAllDecimals("1234", t1, 1234, StringParser::PARSE_SUCCESS);
   StringToAllDecimals("1234", t2, 123400, StringParser::PARSE_SUCCESS);
   StringToAllDecimals("-1234", t2, -123400, StringParser::PARSE_SUCCESS);
   StringToAllDecimals("123", t3, 123, StringParser::PARSE_OVERFLOW);
   StringToAllDecimals("  12  ", t3, 12, StringParser::PARSE_SUCCESS);
   StringToAllDecimals("000", t3, 0, StringParser::PARSE_SUCCESS);
+  StringToAllDecimals(" . ", t3, 0, StringParser::PARSE_SUCCESS);
+  StringToAllDecimals("-.", t3, 0, StringParser::PARSE_SUCCESS);
+  StringToAllDecimals("1.", t3, 1, StringParser::PARSE_SUCCESS);
+  StringToAllDecimals(".1", t2, 10, StringParser::PARSE_SUCCESS);
   StringToAllDecimals("00012.3", t2, 1230, StringParser::PARSE_SUCCESS);
   StringToAllDecimals("-00012.3", t2, -1230, StringParser::PARSE_SUCCESS);
 
@@ -204,6 +225,34 @@ TEST(StringToDecimal, Basic) {
   StringToAllDecimals(" 123.4 ", t4, 12340000, StringParser::PARSE_SUCCESS);
   StringToAllDecimals("-123.45", t4, -12345000, StringParser::PARSE_SUCCESS);
   StringToAllDecimals("-123.456", t2, -12345, StringParser::PARSE_UNDERFLOW);
+
+  StringToAllDecimals("e", t3, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("E", t3, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("+E", t3, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals(".E", t3, 0, StringParser::PARSE_FAILURE);
+  StringToAllDecimals(" 0 e 0 ", t1, 100, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("0e 0", t1, 100, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("0e1.0", t1, 100, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("0e1.", t1, 100, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("0e.1", t1, 100, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("0ee0", t1, 100, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("e1", t1, 100, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("1e", t1, 100, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("1.1.0e0", t1, 100, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("1e1.0", t1, 100, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("1..1e1", t1, 100, StringParser::PARSE_FAILURE);
+  StringToAllDecimals("1e9999999999999999999", t1, 100, StringParser::PARSE_OVERFLOW);
+
+  StringToAllDecimals(" 1e0 ", t2, 100, StringParser::PARSE_SUCCESS);
+  StringToAllDecimals("-1e0", t2, -100, StringParser::PARSE_SUCCESS);
+  StringToAllDecimals("1e-0", t2, 100, StringParser::PARSE_SUCCESS);
+  StringToAllDecimals(" 1e2 ", t2, 10000, StringParser::PARSE_SUCCESS);
+  StringToAllDecimals("-1e-2", t2, -1, StringParser::PARSE_SUCCESS);
+  StringToAllDecimals(".011e3 ", t3, 11, StringParser::PARSE_SUCCESS);
+  StringToAllDecimals(".00011e5 ", t3, 11, StringParser::PARSE_SUCCESS);
+  StringToAllDecimals("110e-1 ", t3, 11, StringParser::PARSE_UNDERFLOW);
+  StringToAllDecimals("1.10e1 ", t3, 11, StringParser::PARSE_UNDERFLOW);
+  StringToAllDecimals("1.10e3 ", t3, 11, StringParser::PARSE_OVERFLOW);
 }
 
 TEST(StringToDecimal, LargeDecimals) {
@@ -291,6 +340,12 @@ TEST(StringToDecimal, LargeDecimals) {
   VerifyParse("99999999999999999999999999999999999999",
       ColumnType::CreateDecimalType(38, 0),
       Decimal16Value(result), StringParser::PARSE_SUCCESS);
+  VerifyParse("99999999999999999999999999999999999999e1",
+      ColumnType::CreateDecimalType(38, 0),
+      Decimal16Value(result), StringParser::PARSE_OVERFLOW);
+  VerifyParse("999999999999999999999999999999999999990e-1",
+      ColumnType::CreateDecimalType(38, 0),
+      Decimal16Value(result), StringParser::PARSE_UNDERFLOW);
   VerifyParse("999999999999999999999999999999999.99999",
       ColumnType::CreateDecimalType(38, 5),
       Decimal16Value(result), StringParser::PARSE_SUCCESS);
@@ -306,6 +361,16 @@ TEST(StringToDecimal, LargeDecimals) {
   VerifyParse("-.99999999999999999999999999999999999999",
       ColumnType::CreateDecimalType(38, 38),
       Decimal16Value(-result), StringParser::PARSE_SUCCESS);
+  VerifyParse("-.99999999999999999999999999999999999999e1",
+      ColumnType::CreateDecimalType(38, 38),
+      Decimal16Value(-result), StringParser::PARSE_OVERFLOW);
+  VerifyParse("-.999999999999999999999999999999999999990e-1",
+      ColumnType::CreateDecimalType(38, 38),
+      Decimal16Value(-result / 10), StringParser::PARSE_UNDERFLOW);
+  VerifyParse("-.999999999999999999999999999999999999990000000000000000e-20",
+      ColumnType::CreateDecimalType(38, 38),
+      Decimal16Value(-result / DecimalUtil::GetScaleMultiplier<int128_t>(20)),
+      StringParser::PARSE_UNDERFLOW);
   VerifyParse("100000000000000000000000000000000000000",
       ColumnType::CreateDecimalType(38, 0),
       Decimal16Value(0), StringParser::PARSE_OVERFLOW);

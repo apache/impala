@@ -4650,8 +4650,8 @@ TEST_F(ExprTest, DecimalOverflowCasts) {
       ColumnType::CreateDecimalType(29, 1));
 
   // Tests converting a non-trivial empty string to a decimal (IMPALA-1566).
-  TestDecimalValue("cast(regexp_replace('','a','b') as decimal(15,2))",
-      Decimal8Value(0), ColumnType::CreateDecimalType(15,2));
+  TestIsNull("cast(regexp_replace('','a','b') as decimal(15,2))",
+      ColumnType::CreateDecimalType(15,2));
 }
 
 TEST_F(ExprTest, NullValueFunction) {
