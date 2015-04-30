@@ -17,24 +17,27 @@ package com.cloudera.impala.analysis;
 import java.util.Collections;
 import java.util.List;
 
-import jline.internal.Preconditions;
-
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.thrift.TSlotDescriptor;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class SlotDescriptor {
   private final SlotId id_;
   private final TupleDescriptor parent_;
-  // Path of slot relative to parent_. Only set for slots that represent a column/field.
-  private List<Integer> path_;
+
+  // Resolved path to the column/field corresponding to this slot descriptor, if any,
+  // Only set for slots that represent a column/field.
+  private Path path_;
   private Type type_;
-  private Column column_;  // underlying column, if there is one
-  private String label_; // for SlotRef.toSql() in absence of column name
+
+  // for SlotRef.toSql() in the absence of a path
+  private String label_;
+
   // Expr(s) materialized into this slot; multiple exprs for unions. Should be empty if
   // column_ is set.
   private List<Expr> sourceExprs_ = Lists.newArrayList();
@@ -65,7 +68,7 @@ public class SlotDescriptor {
     id_ = id;
     parent_ = parent;
     type_ = src.type_;
-    column_ = src.column_;
+    path_ = src.path_;
     label_ = src.label_;
     sourceExprs_ = src.sourceExprs_;
     isMaterialized_ = src.isMaterialized_;
@@ -88,11 +91,8 @@ public class SlotDescriptor {
   }
   public SlotId getId() { return id_; }
   public TupleDescriptor getParent() { return parent_; }
-  public void setPath(List<Integer> path) { path_ = path; }
   public Type getType() { return type_; }
   public void setType(Type type) { type_ = type; }
-  public Column getColumn() { return column_; }
-  public void setColumn(Column column) { column_ = column; }
   public boolean isMaterialized() { return isMaterialized_; }
   public void setIsMaterialized(boolean value) { isMaterialized_ = value; }
   public boolean getIsNullable() { return isNullable_; }
@@ -110,10 +110,27 @@ public class SlotDescriptor {
   public List<Expr> getSourceExprs() { return sourceExprs_; }
   public void setStats(ColumnStats stats) { this.stats_ = stats; }
 
+  public void setPath(Path path) {
+    Preconditions.checkNotNull(path);
+    Preconditions.checkNotNull(path.getRootDesc());
+    Preconditions.checkState(path.getRootDesc() == parent_);
+    path_ = path;
+    type_ = path_.destType();
+    label_ = Joiner.on(".").join(path.getRawPath());
+  }
+
+  public Path getPath() { return path_; }
+
+  public Column getColumn() {
+    if (path_ == null) return null;
+    return path_.destColumn();
+  }
+
   public ColumnStats getStats() {
     if (stats_ == null) {
-      if (column_ != null) {
-        stats_ = column_.getStats();
+      Column c = getColumn();
+      if (c != null) {
+        stats_ = c.getStats();
       } else {
         stats_ = new ColumnStats(type_);
       }
@@ -126,10 +143,12 @@ public class SlotDescriptor {
    */
   public List<Integer> getAbsolutePath() {
     Preconditions.checkNotNull(parent_);
-    if (parent_.getPath() == null) return Collections.emptyList();
-    List<Integer> result = Lists.newArrayList(parent_.getPath().getAbsolutePath());
-    result.addAll(path_);
-    return result;
+    // A slot descriptor typically only has a path if the parent also has one.
+    // However, we sometimes materialize inline-view tuples when generating plan trees
+    // with EmptySetNode portions. In that case, a slot descriptor could have a non-empty
+    // path pointing into the inline-view tuple (which has no path).
+    if (path_ == null || parent_.getPath() == null) return Collections.emptyList();
+    return Lists.newArrayList(path_.getAbsolutePath());
   }
 
   public TSlotDescriptor toThrift() {
@@ -142,12 +161,10 @@ public class SlotDescriptor {
   }
 
   public String debugString() {
-    String colStr = (column_ == null ? "null" : column_.getName());
+    String pathStr = (path_ == null) ? "null" : path_.toString();
     String typeStr = (type_ == null ? "null" : type_.toString());
-    String pathStr = (path_ == null) ? "null" : Joiner.on(".").join(path_);
     return Objects.toStringHelper(this)
         .add("id", id_.asInt())
-        .add("col", colStr)
         .add("path", pathStr)
         .add("type", typeStr)
         .add("materialized", isMaterialized_)

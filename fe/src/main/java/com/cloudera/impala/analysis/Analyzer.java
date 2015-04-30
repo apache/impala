@@ -798,18 +798,12 @@ public class Analyzer {
     // SlotRefs are registered against the tuple's explicit or fully-qualified
     // implicit alias.
     TupleDescriptor tupleDesc = slotPath.getRootDesc();
-    String slotLabel = Joiner.on(".").join(slotPath.getRawPath());
-    String key = tupleDesc.getAlias() + "." + slotLabel;
+    String key = slotPath.toString();
     SlotDescriptor result = slotRefMap_.get(key);
     if (result != null) return result;
     result = addSlotDescriptor(tupleDesc);
-    Column col = slotPath.destColumn();
-    if (col != null) result.setColumn(col);
-    Preconditions.checkNotNull(slotPath.destType());
-    result.setType(slotPath.destType());
-    result.setPath(slotPath.getMatchedPositions());
-    result.setLabel(slotLabel);
-    slotRefMap_.put(key, result);
+    result.setPath(slotPath);
+    slotRefMap_.put(slotPath.toString(), result);
     return result;
   }
 
@@ -824,7 +818,7 @@ public class Analyzer {
 
   /**
    * Adds a new slot descriptor in tupleDesc that is identical to srcSlotDesc
-   * except for the slot id.
+   * except for the path and slot id.
    */
   public SlotDescriptor copySlotDescriptor(SlotDescriptor srcSlotDesc,
       TupleDescriptor tupleDesc) {
@@ -833,7 +827,6 @@ public class Analyzer {
     result.setSourceExprs(srcSlotDesc.getSourceExprs());
     result.setLabel(srcSlotDesc.getLabel());
     result.setStats(srcSlotDesc.getStats());
-    if (srcSlotDesc.getColumn() != null) result.setColumn(srcSlotDesc.getColumn());
     result.setType(srcSlotDesc.getType());
     return result;
   }

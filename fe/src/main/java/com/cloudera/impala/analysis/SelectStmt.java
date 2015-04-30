@@ -454,7 +454,8 @@ public class SelectStmt extends QueryStmt {
       String... relRawPath) throws AnalysisException {
     Path p = Path.createRelPath(resolvedPath, relRawPath);
     Preconditions.checkState(p.resolve());
-    SlotRef slotRef = new SlotRef(p);
+    SlotDescriptor slotDesc = analyzer.registerSlotRef(p);
+    SlotRef slotRef = new SlotRef(slotDesc);
     slotRef.analyze(analyzer);
     resultExprs_.add(slotRef);
     colLabels_.add(relRawPath[relRawPath.length - 1]);

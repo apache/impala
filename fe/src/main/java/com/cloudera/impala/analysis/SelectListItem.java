@@ -105,7 +105,7 @@ class SelectListItem {
     if (alias_ != null) return alias_.toLowerCase();
     if (expr_ instanceof SlotRef) {
       SlotRef slotRef = (SlotRef) expr_;
-      return slotRef.getMatchedPath().toLowerCase();
+      return Joiner.on(".").join(slotRef.getResolvedPath().getRawPath());
     }
     // Optionally return auto-generated column label.
     if (useHiveColLabels) return "_c" + selectListPos;

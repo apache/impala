@@ -39,48 +39,33 @@ public class SlotRef extends Expr {
   private final String label_;  // printed in toSql()
 
   // Results of analysis.
-  private Path resolvedPath_;
-  // Dot-separated path to a column or struct field; excludes db and table
-  private String matchedPath_;
   private SlotDescriptor desc_;
 
   public SlotRef(ArrayList<String> rawPath) {
     super();
     rawPath_ = rawPath;
-    matchedPath_ = null;
     label_ = ToSqlUtils.getPathSql(rawPath_);
   }
 
   /**
-   * C'tor for a SlotRef on a resolved path.
+   * C'tor for a "dummy" SlotRef used in substitution maps.
    */
-  public SlotRef(Path resolvedPath) {
-    super();
-    Preconditions.checkState(resolvedPath.isResolved());
-    rawPath_ = resolvedPath.getFullyQualifiedRawPath();
-    matchedPath_ = null;
-    label_ = ToSqlUtils.getPathSql(rawPath_);
-    resolvedPath_ = resolvedPath;
-  }
-
-  // C'tor for a "dummy" SlotRef used in substitution maps.
   public SlotRef(String alias) {
     super();
     rawPath_ = null;
-    matchedPath_ = alias;
+    // Relies on the label_ being compared in equals().
     label_ = ToSqlUtils.getIdentSql(alias.toLowerCase());
   }
 
-  // C'tor for a "pre-analyzed" ref to a slot.
+  /**
+   * C'tor for a "pre-analyzed" ref to a slot.
+   */
   public SlotRef(SlotDescriptor desc) {
     super();
-    rawPath_ = null;
-    // TODO: Add support for referencing a field within a complex type, possibly
-    // by introducing a desc.getPath().
-    if (desc.getColumn() != null) {
-      matchedPath_ = desc.getColumn().getName();
+    if (desc.getPath() != null) {
+      rawPath_ = desc.getPath().getRawPath();
     } else {
-      matchedPath_ = null;
+      rawPath_ = null;
     }
     isAnalyzed_ = true;
     desc_ = desc;
@@ -97,8 +82,6 @@ public class SlotRef extends Expr {
     super(other);
     rawPath_ = other.rawPath_;
     label_ = other.label_;
-    resolvedPath_ = other.resolvedPath_;
-    matchedPath_ = other.matchedPath_;
     desc_ = other.desc_;
     type_ = other.type_;
     isAnalyzed_ = other.isAnalyzed_;
@@ -108,18 +91,15 @@ public class SlotRef extends Expr {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
     super.analyze(analyzer);
-
-    if (resolvedPath_ == null) {
-      try {
-        resolvedPath_ = analyzer.resolvePath(rawPath_, PathType.SLOT_REF);
-      } catch (TableLoadingException e) {
-        // Should never happen because we only check registered table aliases.
-        Preconditions.checkState(false);
-      }
+    Path resolvedPath = null;
+    try {
+      resolvedPath = analyzer.resolvePath(rawPath_, PathType.SLOT_REF);
+    } catch (TableLoadingException e) {
+      // Should never happen because we only check registered table aliases.
+      Preconditions.checkState(false);
     }
-    Preconditions.checkNotNull(resolvedPath_);
-    matchedPath_ = Joiner.on(".").join(resolvedPath_.getRawPath());
-    desc_ = analyzer.registerSlotRef(resolvedPath_);
+    Preconditions.checkNotNull(resolvedPath);
+    desc_ = analyzer.registerSlotRef(resolvedPath);
     type_ = desc_.getType();
     if (!type_.isSupported()) {
       throw new AnalysisException("Unsupported type '"
@@ -150,7 +130,7 @@ public class SlotRef extends Expr {
 
   public Path getResolvedPath() {
     Preconditions.checkState(isAnalyzed_);
-    return resolvedPath_;
+    return desc_.getPath();
   }
 
   @Override
@@ -181,7 +161,6 @@ public class SlotRef extends Expr {
   public String debugString() {
     Objects.ToStringHelper toStrHelper = Objects.toStringHelper(this);
     if (rawPath_ != null) toStrHelper.add("path", Joiner.on('.').join(rawPath_));
-    toStrHelper.add("colName", matchedPath_);
     toStrHelper.add("type", type_.toSql());
     String idStr = (desc_ == null ? "null" : Integer.toString(desc_.getId().asInt()));
     toStrHelper.add("id", idStr);
@@ -202,9 +181,6 @@ public class SlotRef extends Expr {
     // (regardless of how the ref was constructed)
     if (desc_ != null && other.desc_ != null) {
       return desc_.getId().equals(other.desc_.getId());
-    }
-    if (matchedPath_ != null && other.matchedPath_ != null) {
-      return matchedPath_.equals(other.matchedPath_);
     }
     if ((label_ == null) != (other.label_ == null)) return false;
     if (!label_.equalsIgnoreCase(other.label_)) return false;
@@ -253,13 +229,5 @@ public class SlotRef extends Expr {
     } else {
       return super.uncheckedCastTo(targetType);
     }
-  }
-
-  public String getMatchedPath() { return matchedPath_; }
-
-  @Override
-  public void resetAnalysisState() {
-    super.resetAnalysisState();
-    resolvedPath_ = null;
   }
 }

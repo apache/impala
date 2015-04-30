@@ -238,8 +238,9 @@ public class DataSourceScanNode extends ScanNode {
       TColumnValue val = literalToColumnValue(literalExpr);
       if (val == null) return false; // false if unsupported type, e.g.
 
-      TColumnDesc col = new TColumnDesc().setName(slotRef.getMatchedPath())
-          .setType(slotRef.getType().toThrift());
+      String colName = Joiner.on(".").join(slotRef.getResolvedPath().getRawPath());
+      TColumnDesc col = new TColumnDesc().setName(colName).setType(
+          slotRef.getType().toThrift());
       predicates.add(new TBinaryPredicate().setCol(col).setOp(op).setValue(val));
       return true;
     } else if (conjunct instanceof CompoundPredicate) {

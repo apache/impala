@@ -19,8 +19,6 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Set;
 
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
@@ -201,13 +199,8 @@ public abstract class QueryStmt extends StatementBase {
     ExprSubstitutionMap substOrderBy = new ExprSubstitutionMap();
     for (SlotRef origSlotRef: sourceSlots) {
       SlotDescriptor origSlotDesc = origSlotRef.getDesc();
-      SlotDescriptor materializedDesc = analyzer.addSlotDescriptor(sortTupleDesc);
-      Column origColumn = origSlotDesc.getColumn();
-      if (origColumn != null) materializedDesc.setColumn(origColumn);
-      materializedDesc.setType(origSlotDesc.getType());
-      materializedDesc.setLabel(origSlotDesc.getLabel());
-      materializedDesc.setSourceExprs(origSlotDesc.getSourceExprs());
-      materializedDesc.setStats(ColumnStats.fromExpr(origSlotRef));
+      SlotDescriptor materializedDesc =
+          analyzer.copySlotDescriptor(origSlotDesc, sortTupleDesc);
       SlotRef cloneRef = new SlotRef(materializedDesc);
       substOrderBy.put(origSlotRef, cloneRef);
       analyzer.createAuxEquivPredicate(cloneRef, origSlotRef);
