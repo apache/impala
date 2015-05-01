@@ -278,7 +278,10 @@ Status HdfsTextScanner::FinishScanRange() {
         }
         if (state_->abort_on_error()) return Status(ss.str());
       } else if (!partial_tuple_empty_ || !boundary_column_.Empty() ||
-          !boundary_row_.Empty()) {
+          !boundary_row_.Empty() ||
+          (delimited_text_parser_->HasUnfinishedTuple() &&
+              (!scan_node_->materialized_slots().empty() ||
+                  scan_node_->num_materialized_partition_keys() > 0))) {
         // Missing columns or row delimiter at end of the file is ok, fill the row in.
         char* col = boundary_column_.str().ptr;
         int num_fields = 0;
@@ -297,8 +300,9 @@ Status HdfsTextScanner::FinishScanRange() {
         DCHECK_GE(num_tuples, 0);
         COUNTER_ADD(scan_node_->rows_read_counter(), num_tuples);
         RETURN_IF_ERROR(CommitRows(num_tuples));
-      } else if (delimited_text_parser_->HasUnfinishedTuple() &&
-          scan_node_->materialized_slots().empty()) {
+      } else if (delimited_text_parser_->HasUnfinishedTuple()) {
+        DCHECK(scan_node_->materialized_slots().empty());
+        DCHECK_EQ(scan_node_->num_materialized_partition_keys(), 0);
         // If no fields are materialized we do not update partial_tuple_empty_,
         // boundary_column_, or boundary_row_. However, we still need to handle the case
         // of partial tuple due to missing tuple delimiter at the end of file.

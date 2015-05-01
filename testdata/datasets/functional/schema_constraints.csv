@@ -122,6 +122,7 @@ table_name:avro_decimal_tbl, constraint:restrict_to, table_format:avro/snap/bloc
 
 # testescape tables are used for testing text scanner delimiter handling
 table_name:table_no_newline, constraint:restrict_to, table_format:text/none/none
+table_name:table_no_newline_part, constraint:restrict_to, table_format:text/none/none
 table_name:testescape_16_lf, constraint:restrict_to, table_format:text/none/none
 table_name:testescape_16_crlf, constraint:restrict_to, table_format:text/none/none
 table_name:testescape_17_lf, constraint:restrict_to, table_format:text/none/none

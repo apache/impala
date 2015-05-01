@@ -12,3 +12,62 @@ select count(col_3) from functional.table_no_newline
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+select count(*) from functional.table_no_newline_part
+---- RESULTS
+11
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(year) from functional.table_no_newline_part
+---- RESULTS
+11
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(year) from functional.table_no_newline_part where year=2015
+---- RESULTS
+6
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(col_3) from functional.table_no_newline_part where year=2015
+---- RESULTS
+3
+---- TYPES
+BIGINT
+====
+---- QUERY
+select distinct year from functional.table_no_newline_part order by year
+---- RESULTS
+2010
+2015
+---- TYPES
+INT
+====
+---- QUERY
+select count(id), count(col_1), count(col_2), count(col_3), count(year), count(month) from functional.table_no_newline_part
+---- RESULTS
+10,10,9,8,11,11
+---- TYPES
+BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT
+====
+---- QUERY
+select year, count(*) from functional.table_no_newline_part group by year order by year
+---- RESULTS
+2010,5
+2015,6
+---- TYPES
+INT,BIGINT
+====
+---- QUERY
+select year, count(col_3) from functional.table_no_newline_part group by year order by year
+---- RESULTS
+2010,5
+2015,3
+---- TYPES
+INT,BIGINT
+====

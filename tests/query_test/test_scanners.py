@@ -364,6 +364,10 @@ class TestTextScanRangeLengths(ImpalaTestSuite):
   def test_text_scanner(self, vector):
     vector.get_value('exec_option')['max_scan_range_length'] =\
         vector.get_value('max_scan_range_length')
+    self.execute_query_expect_success(self.client, "drop stats "
+        "functional.table_no_newline_part")
+    self.execute_query_expect_success(self.client, "compute stats "
+        "functional.table_no_newline_part")
     self.run_test_case('QueryTest/hdfs-text-scan', vector)
 
     # Test various escape char cases. We have to check the count(*) result against
