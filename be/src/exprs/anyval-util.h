@@ -28,7 +28,7 @@ namespace impala {
 
 class ObjectPool;
 
-// Utilities for AnyVals
+/// Utilities for AnyVals
 class AnyValUtil {
  public:
   static uint32_t Hash(const BooleanVal& v, const FunctionContext::TypeDesc&, int seed) {
@@ -140,7 +140,7 @@ class AnyValUtil {
     }
   }
 
-  // Templated equality functions. These assume the input values are not NULL.
+  /// Templated equality functions. These assume the input values are not NULL.
   template<typename T>
   static inline bool Equals(const FunctionContext::TypeDesc* type, const T& x, const T& y) {
     DCHECK_NOTNULL(type);
@@ -154,7 +154,7 @@ class AnyValUtil {
     return x.val == y.val;
   }
 
-  // Returns the byte size of *Val for type t.
+  /// Returns the byte size of *Val for type t.
   static int AnyValSize(const ColumnType& t) {
     switch (t.type) {
       case TYPE_BOOLEAN: return sizeof(BooleanVal);
@@ -201,7 +201,7 @@ class AnyValUtil {
   static FunctionContext::TypeDesc ColumnTypeToTypeDesc(const ColumnType& type);
   static ColumnType TypeDescToColumnType(const FunctionContext::TypeDesc& type);
 
-  // Utility to put val into an AnyVal struct
+  /// Utility to put val into an AnyVal struct
   static void SetAnyVal(const void* slot, const ColumnType& type, AnyVal* dst) {
     if (slot == NULL) {
       dst->is_null = true;
@@ -281,10 +281,10 @@ class AnyValUtil {
   }
 };
 
-// Creates the corresponding AnyVal subclass for type. The object is added to the pool.
+/// Creates the corresponding AnyVal subclass for type. The object is added to the pool.
 impala_udf::AnyVal* CreateAnyVal(ObjectPool* pool, const ColumnType& type);
 
-// Creates the corresponding AnyVal subclass for type. The object is owned by the caller.
+/// Creates the corresponding AnyVal subclass for type. The object is owned by the caller.
 impala_udf::AnyVal* CreateAnyVal(const ColumnType& type);
 
 template<> inline bool AnyValUtil::Equals(

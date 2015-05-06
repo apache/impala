@@ -31,7 +31,7 @@ class RE2;
 
 namespace impala {
 
-// This class handles the Like, Regexp, and Rlike predicates and uses the udf interface.
+/// This class handles the Like, Regexp, and Rlike predicates and uses the udf interface.
 class LikePredicate: public Predicate {
  public:
   ~LikePredicate();
@@ -47,30 +47,30 @@ class LikePredicate: public Predicate {
   struct LikePredicateState {
     char escape_char_;
 
-    // This is the function, set in the prepare function, that will be used to determine
-    // the value of the predicate. It will be set depending on whether the expression is a
-    // LIKE, RLIKE or REGEXP predicate, whether the pattern is a constant arguement
-    // and whether the pattern has any constant substrings. If the pattern is not a
-    // constant arguement, none of the following fields can be set because we cannot know
-    // the format of the pattern in the prepare function and must deal with each pattern
-    // seperately.
+    /// This is the function, set in the prepare function, that will be used to determine
+    /// the value of the predicate. It will be set depending on whether the expression is a
+    /// LIKE, RLIKE or REGEXP predicate, whether the pattern is a constant arguement
+    /// and whether the pattern has any constant substrings. If the pattern is not a
+    /// constant arguement, none of the following fields can be set because we cannot know
+    /// the format of the pattern in the prepare function and must deal with each pattern
+    /// seperately.
     LikePredicateFunction function_;
 
-    // Holds the string the StringValue points to and is set any time StringValue is used.
+    /// Holds the string the StringValue points to and is set any time StringValue is used.
     std::string search_string_;
 
-    // Used for LIKE predicates if the pattern is a constant arguement, and is either a
-    // constant string or has a constant string at the beginning or end of the pattern.
-    // This will be set in order to check for that pattern in the corresponding part of
-    // the string.
+    /// Used for LIKE predicates if the pattern is a constant arguement, and is either a
+    /// constant string or has a constant string at the beginning or end of the pattern.
+    /// This will be set in order to check for that pattern in the corresponding part of
+    /// the string.
     StringValue search_string_sv_;
 
-    // Used for LIKE predicates if the pattern is a constant arguement and has a constant
-    // string in the middle of it. This will be use in order to check for the substring
-    // in the value.
+    /// Used for LIKE predicates if the pattern is a constant arguement and has a constant
+    /// string in the middle of it. This will be use in order to check for the substring
+    /// in the value.
     StringSearch substring_pattern_;
 
-    // Used for RLIKE and REGEXP predicates if the pattern is a constant aruement.
+    /// Used for RLIKE and REGEXP predicates if the pattern is a constant aruement.
     boost::scoped_ptr<re2::RE2> regex_;
 
     LikePredicateState() : escape_char_('\\') {
@@ -109,19 +109,19 @@ class LikePredicate: public Predicate {
   static impala_udf::BooleanVal LikeFn(impala_udf::FunctionContext* context,
       const impala_udf::StringVal& val, const impala_udf::StringVal& pattern);
 
-  // Handling of like predicates that map to strstr
+  /// Handling of like predicates that map to strstr
   static impala_udf::BooleanVal ConstantSubstringFn(impala_udf::FunctionContext* context,
       const impala_udf::StringVal& val, const impala_udf::StringVal& pattern);
 
-  // Handling of like predicates that can be implemented using strncmp
+  /// Handling of like predicates that can be implemented using strncmp
   static impala_udf::BooleanVal ConstantStartsWithFn(impala_udf::FunctionContext* context,
       const impala_udf::StringVal& val, const impala_udf::StringVal& pattern);
 
-  // Handling of like predicates that can be implemented using strncmp
+  /// Handling of like predicates that can be implemented using strncmp
   static impala_udf::BooleanVal ConstantEndsWithFn(impala_udf::FunctionContext* context,
       const impala_udf::StringVal& val, const impala_udf::StringVal& pattern);
 
-  // Handling of like predicates that can be implemented using strcmp
+  /// Handling of like predicates that can be implemented using strcmp
   static impala_udf::BooleanVal ConstantEqualsFn(impala_udf::FunctionContext* context,
       const impala_udf::StringVal& val, const impala_udf::StringVal& pattern);
 
@@ -136,8 +136,8 @@ class LikePredicate: public Predicate {
       const impala_udf::StringVal& val, const impala_udf::StringVal& pattern,
       bool is_like_pattern);
 
-  // Convert a LIKE pattern (with embedded % and _) into the corresponding
-  // regular expression pattern. Escaped chars are copied verbatim.
+  /// Convert a LIKE pattern (with embedded % and _) into the corresponding
+  /// regular expression pattern. Escaped chars are copied verbatim.
   static void ConvertLikePattern(impala_udf::FunctionContext* context,
       const impala_udf::StringVal& pattern, std::string* re_pattern);
 };

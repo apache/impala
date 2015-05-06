@@ -28,34 +28,34 @@ class TupleRow;
 
 class UtilityFunctions {
  public:
-  // Implementations of the FnvHash function. Returns the Fowler-Noll-Vo hash of the
-  // input as an int64_t.
+  /// Implementations of the FnvHash function. Returns the Fowler-Noll-Vo hash of the
+  /// input as an int64_t.
   template <typename T> static BigIntVal FnvHash(FunctionContext* ctx, const T& input_val);
   static BigIntVal FnvHashString(FunctionContext* ctx, const StringVal& input_val);
   static BigIntVal FnvHashTimestamp(FunctionContext* ctx, const TimestampVal& input_val);
   static BigIntVal FnvHashDecimal(FunctionContext* ctx, const DecimalVal& input_val);
 
-  // Implementation of the user() function. Returns the username of the user who executed
-  // this function.
+  /// Implementation of the user() function. Returns the username of the user who executed
+  /// this function.
   static StringVal User(FunctionContext* ctx);
 
-  // Implementation of the version() function. Returns the version string.
+  /// Implementation of the version() function. Returns the version string.
   static StringVal Version(FunctionContext* ctx);
 
-  // Implementation of the pid() function. Returns the pid of the impalad that initiated
-  // this query.
+  /// Implementation of the pid() function. Returns the pid of the impalad that initiated
+  /// this query.
   static IntVal Pid(FunctionContext* ctx);
 
-  // Testing function that sleeps for the specified number of milliseconds. Returns true.
+  /// Testing function that sleeps for the specified number of milliseconds. Returns true.
   static BooleanVal Sleep(FunctionContext* ctx, const IntVal& milliseconds);
 
-  // Implementation of the current_database() function. Returns the current default
-  // database from the parent session of this query.
+  /// Implementation of the current_database() function. Returns the current default
+  /// database from the parent session of this query.
   static StringVal CurrentDatabase(FunctionContext* ctx);
 
-  // Implementation of the typeOf() function. Returns the type of the input
-  // expression. input_val is not used and it is kept here in order to let
-  // the compiler generate the corresponding fully-qualified function name.
+  /// Implementation of the typeOf() function. Returns the type of the input
+  /// expression. input_val is not used and it is kept here in order to let
+  /// the compiler generate the corresponding fully-qualified function name.
   template <typename T> static StringVal TypeOf(FunctionContext* ctx, const T& input_val);
 };
 

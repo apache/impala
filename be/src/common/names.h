@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// The motivation for the using declarations below is to allow accessing the most relevant
-// and most frequently used library classes without having to explicitly pull them into
-// the global namespace. The goal is that when readers sees a usage of vector (etc.) without
-// any further specialization they can rely on the fact that it will be a std::vector.
+/// The motivation for the using declarations below is to allow accessing the most relevant
+/// and most frequently used library classes without having to explicitly pull them into
+/// the global namespace. The goal is that when readers sees a usage of vector (etc.) without
+/// any further specialization they can rely on the fact that it will be a std::vector.
 //
-// Instead of actually including the header files for the symbols, this file only checks
-// if certain include guards are defined before applying the using declaration. This makes sure
-// that including this file has no impact on the compile time.
+/// Instead of actually including the header files for the symbols, this file only checks
+/// if certain include guards are defined before applying the using declaration. This makes sure
+/// that including this file has no impact on the compile time.
 //
-// Please make sure that this file is included last in the cc file's include list to make
-// sure that all relevant include guards are defined.
+/// Please make sure that this file is included last in the cc file's include list to make
+/// sure that all relevant include guards are defined.
 //
-// The content of this file is manually curated and should only be changed on rare
-// occasions.
+/// The content of this file is manually curated and should only be changed on rare
+/// occasions.
 #include <boost/version.hpp>
 
 #ifdef _GLIBCXX_VECTOR
@@ -120,12 +120,12 @@ using boost::shared_mutex;
 #endif
 
 
-// In older versions of boost, when including mutex.hpp, it would include locks.hpp that
-// would in turn provide lock_guard<>. In more recent versions, including mutex.hpp would
-// include lock_types.hpp that does not provide lock_guard<>. This check verifies if boost
-// locks have been included and makes sure to only include lock_guard if the provided lock
-// implementations were not included using lock_types.hpp (for older boost versions) or if
-// lock_guard.hpp was explicitly included.
+/// In older versions of boost, when including mutex.hpp, it would include locks.hpp that
+/// would in turn provide lock_guard<>. In more recent versions, including mutex.hpp would
+/// include lock_types.hpp that does not provide lock_guard<>. This check verifies if boost
+/// locks have been included and makes sure to only include lock_guard if the provided lock
+/// implementations were not included using lock_types.hpp (for older boost versions) or if
+/// lock_guard.hpp was explicitly included.
 #if (defined(BOOST_THREAD_LOCKS_HPP) && BOOST_VERSION < 105300)  || defined(BOOST_THREAD_LOCK_GUARD_HPP)
 using boost::lock_guard;
 #endif

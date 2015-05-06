@@ -20,10 +20,10 @@
 
 namespace impala {
 
-// Populates the supplied TAlterTableUpdateStatsParams argument with per-column statistics
-// that are computed by aggregating the per-partition results from the COMPUTE STATS child
-// queries, contained in the 'rowset', and any pre-existing per-partition measurements,
-// contained in 'existing_part_stats'. The schema for 'rowset' is in 'col_stats_schema'.
+/// Populates the supplied TAlterTableUpdateStatsParams argument with per-column statistics
+/// that are computed by aggregating the per-partition results from the COMPUTE STATS child
+/// queries, contained in the 'rowset', and any pre-existing per-partition measurements,
+/// contained in 'existing_part_stats'. The schema for 'rowset' is in 'col_stats_schema'.
 void FinalizePartitionedColumnStats(
     const apache::hive::service::cli::thrift::TTableSchema& col_stats_schema,
     const std::vector<TPartitionStats>& existing_part_stats,

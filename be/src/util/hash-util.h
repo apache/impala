@@ -24,16 +24,16 @@
 
 namespace impala {
 
-// Utility class to compute hash values.
+/// Utility class to compute hash values.
 class HashUtil {
  public:
-  // Compute the Crc32 hash for data using SSE4 instructions.  The input hash parameter is
-  // the current hash/seed value.
-  // This should only be called if SSE is supported.
-  // This is ~4x faster than Fnv/Boost Hash.
-  // NOTE: Any changes made to this function need to be reflected in Codegen::GetHashFn.
-  // TODO: crc32 hashes with different seeds do not result in different hash functions.
-  // The resulting hashes are correlated.
+  /// Compute the Crc32 hash for data using SSE4 instructions.  The input hash parameter is
+  /// the current hash/seed value.
+  /// This should only be called if SSE is supported.
+  /// This is ~4x faster than Fnv/Boost Hash.
+  /// NOTE: Any changes made to this function need to be reflected in Codegen::GetHashFn.
+  /// TODO: crc32 hashes with different seeds do not result in different hash functions.
+  /// The resulting hashes are correlated.
   static uint32_t CrcHash(const void* data, int32_t bytes, uint32_t hash) {
     DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
     uint32_t words = bytes / sizeof(uint32_t);
@@ -60,7 +60,7 @@ class HashUtil {
   static const uint64_t MURMUR_PRIME = 0xc6a4a7935bd1e995;
   static const int MURMUR_R = 47;
 
-  // Murmur2 hash implementation returning 64-bit hashes.
+  /// Murmur2 hash implementation returning 64-bit hashes.
   static uint64_t MurmurHash2_64(const void* input, int len, uint64_t seed) {
     uint64_t h = seed ^ (len * MURMUR_PRIME);
 
@@ -94,21 +94,21 @@ class HashUtil {
     return h;
   }
 
-  // default values recommended by http://isthe.com/chongo/tech/comp/fnv/
+  /// default values recommended by http://isthe.com/chongo/tech/comp/fnv/
   static const uint32_t FNV_PRIME = 0x01000193; //   16777619
   static const uint32_t FNV_SEED = 0x811C9DC5; // 2166136261
   static const uint64_t FNV64_PRIME = 1099511628211UL;
   static const uint64_t FNV64_SEED = 14695981039346656037UL;
 
-  // Implementation of the Fowler–Noll–Vo hash function. This is not as performant
-  // as boost's hash on int types (2x slower) but has bit entropy.
-  // For ints, boost just returns the value of the int which can be pathological.
-  // For example, if the data is <1000, 2000, 3000, 4000, ..> and then the mod of 1000
-  // is taken on the hash, all values will collide to the same bucket.
-  // For string values, Fnv is slightly faster than boost.
-  // IMPORTANT: FNV hash suffers from poor diffusion of the least significant bit,
-  // which can lead to poor results when input bytes are duplicated.
-  // See FnvHash64to32() for how this can be mitigated.
+  /// Implementation of the Fowler–Noll–Vo hash function. This is not as performant
+  /// as boost's hash on int types (2x slower) but has bit entropy.
+  /// For ints, boost just returns the value of the int which can be pathological.
+  /// For example, if the data is <1000, 2000, 3000, 4000, ..> and then the mod of 1000
+  /// is taken on the hash, all values will collide to the same bucket.
+  /// For string values, Fnv is slightly faster than boost.
+  /// IMPORTANT: FNV hash suffers from poor diffusion of the least significant bit,
+  /// which can lead to poor results when input bytes are duplicated.
+  /// See FnvHash64to32() for how this can be mitigated.
   static uint64_t FnvHash64(const void* data, int32_t bytes, uint64_t hash) {
     const uint8_t* ptr = reinterpret_cast<const uint8_t*>(data);
     while (bytes--) {
@@ -118,20 +118,20 @@ class HashUtil {
     return hash;
   }
 
-  // Return a 32-bit hash computed by invoking FNV-64 and folding the result to 32-bits.
-  // This technique is recommended instead of FNV-32 since the LSB of an FNV hash is the
-  // XOR of the LSBs of its input bytes, leading to poor results for duplicate inputs.
-  // The input seed 'hash' is duplicated so the top half of the seed is not all zero.
+  /// Return a 32-bit hash computed by invoking FNV-64 and folding the result to 32-bits.
+  /// This technique is recommended instead of FNV-32 since the LSB of an FNV hash is the
+  /// XOR of the LSBs of its input bytes, leading to poor results for duplicate inputs.
+  /// The input seed 'hash' is duplicated so the top half of the seed is not all zero.
   static uint32_t FnvHash64to32(const void* data, int32_t bytes, uint32_t hash) {
     uint64_t hash_u64 = hash | ((uint64_t)hash << 32);
     hash_u64 = FnvHash64(data, bytes, hash_u64);
     return (hash_u64 >> 32) ^ (hash_u64 & 0xFFFFFFFF);
   }
 
-  // Computes the hash value for data.  Will call either CrcHash or MurmurHash depending on
-  // hardware capabilities.
-  // Seed values for different steps of the query execution should use different seeds
-  // to prevent accidental key collisions. (See IMPALA-219 for more details).
+  /// Computes the hash value for data.  Will call either CrcHash or MurmurHash depending on
+  /// hardware capabilities.
+  /// Seed values for different steps of the query execution should use different seeds
+  /// to prevent accidental key collisions. (See IMPALA-219 for more details).
   static uint32_t Hash(const void* data, int32_t bytes, uint32_t seed) {
     if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
       return CrcHash(data, bytes, seed);

@@ -23,54 +23,54 @@
 
 namespace impala {
 
-// Used by the SimpleScheduler and AdmissionController to resolve users to pools and to
-// get per-pool configurations for admission control. If fair scheduler allocation and
-// Llama configuration files are available, then they are used via the Java-side
-// RequestPoolService class. Otherwise, a default pool is always returned with pool
-// limits configurable via gflags. A single instance of RequestPoolService is created and
-// it lives the lifetime of the process.
+/// Used by the SimpleScheduler and AdmissionController to resolve users to pools and to
+/// get per-pool configurations for admission control. If fair scheduler allocation and
+/// Llama configuration files are available, then they are used via the Java-side
+/// RequestPoolService class. Otherwise, a default pool is always returned with pool
+/// limits configurable via gflags. A single instance of RequestPoolService is created and
+/// it lives the lifetime of the process.
 class RequestPoolService {
  public:
-  // Initializes the JNI method stubs if configuration files are specified. If any
-  // method can't be found, or if there is any further error, the constructor will
-  // terminate the process.
+  /// Initializes the JNI method stubs if configuration files are specified. If any
+  /// method can't be found, or if there is any further error, the constructor will
+  /// terminate the process.
   RequestPoolService(MetricGroup* metrics);
 
-  // Resolves the user and user-provided pool name to the pool returned by the placement
-  // policy and whether or not the user is authorized. If default_pool_only_ is true,
-  // then this will always return the default pool and will always be authorized, i.e.
-  // pool and user are ignored.
+  /// Resolves the user and user-provided pool name to the pool returned by the placement
+  /// policy and whether or not the user is authorized. If default_pool_only_ is true,
+  /// then this will always return the default pool and will always be authorized, i.e.
+  /// pool and user are ignored.
   Status ResolveRequestPool(const std::string& requested_pool_name,
       const std::string& user, TResolveRequestPoolResult* resolved_pool);
 
-  // Gets the pool configuration values for the specified pool. If default_pool_only_ is
-  // true, then the returned values are always the default pool values, i.e. pool is
-  // ignored.
+  /// Gets the pool configuration values for the specified pool. If default_pool_only_ is
+  /// true, then the returned values are always the default pool values, i.e. pool is
+  /// ignored.
   Status GetPoolConfig(const std::string& pool_name, TPoolConfigResult* pool_config);
 
  private:
-  // Metrics subsystem access
+  /// Metrics subsystem access
   MetricGroup* metrics_;
 
-  // Metric measuring the time ResolveRequestPool() takes, in milliseconds.
+  /// Metric measuring the time ResolveRequestPool() takes, in milliseconds.
   StatsMetric<double>* resolve_pool_ms_metric_;
 
-  // True if the pool configuration files are not provided. ResolveRequestPool() will
-  // always return the default-pool and GetPoolConfig() will always return the limits
-  // specified by the default pool gflags, which are unlimited unless specified via
-  // the 'default_pool_max_XXX' flags (see the flag definitions in
-  // request-pool-service.cc).
+  /// True if the pool configuration files are not provided. ResolveRequestPool() will
+  /// always return the default-pool and GetPoolConfig() will always return the limits
+  /// specified by the default pool gflags, which are unlimited unless specified via
+  /// the 'default_pool_max_XXX' flags (see the flag definitions in
+  /// request-pool-service.cc).
   bool default_pool_only_;
 
-  // Mem limit (in bytes) of the default pool. Only used if default_pool_only_ is true.
-  // Set in the constructor by parsing the 'default_pool_mem_limit' gflag using
-  // ParseUtil::ParseMemSpec().
+  /// Mem limit (in bytes) of the default pool. Only used if default_pool_only_ is true.
+  /// Set in the constructor by parsing the 'default_pool_mem_limit' gflag using
+  /// ParseUtil::ParseMemSpec().
   int64_t default_pool_mem_limit_;
 
-  // The following members are not initialized if default_pool_only_ is true.
-  // Descriptor of Java RequestPoolService class itself, used to create a new instance.
+  /// The following members are not initialized if default_pool_only_ is true.
+  /// Descriptor of Java RequestPoolService class itself, used to create a new instance.
   jclass request_pool_service_class_;
-  // Instance of com.cloudera.impala.util.RequestPoolService
+  /// Instance of com.cloudera.impala.util.RequestPoolService
   jobject request_pool_service_;
   jmethodID resolve_request_pool_id_;  // RequestPoolService.resolveRequestPool()
   jmethodID get_pool_config_id_;  // RequestPoolService.getPoolConfig()

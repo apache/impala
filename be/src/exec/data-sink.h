@@ -35,51 +35,51 @@ class TPlanExecParams;
 class TPlanFragmentExecParams;
 class RowDescriptor;
 
-// Superclass of all data sinks.
+/// Superclass of all data sinks.
 class DataSink {
  public:
   DataSink() : closed_(false) { }
   virtual ~DataSink() {}
 
-  // Setup. Call before Send(), Open(), or Close().
-  // Subclasses must call DataSink::Prepare().
+  /// Setup. Call before Send(), Open(), or Close().
+  /// Subclasses must call DataSink::Prepare().
   virtual Status Prepare(RuntimeState* state);
 
-  // Call before Send() or Close().
+  /// Call before Send() or Close().
   virtual Status Open(RuntimeState* state) = 0;
 
-  // Send a row batch into this sink.
-  // eos should be true when the last batch is passed to Send()
+  /// Send a row batch into this sink.
+  /// eos should be true when the last batch is passed to Send()
   virtual Status Send(RuntimeState* state, RowBatch* batch, bool eos) = 0;
 
-  // Releases all resources that were allocated in Prepare()/Send().
-  // Further Send() calls are illegal after calling Close().
-  // It must be okay to call this multiple times. Subsequent calls should
-  // be ignored.
+  /// Releases all resources that were allocated in Prepare()/Send().
+  /// Further Send() calls are illegal after calling Close().
+  /// It must be okay to call this multiple times. Subsequent calls should
+  /// be ignored.
   virtual void Close(RuntimeState* state) = 0;
 
-  // Creates a new data sink from thrift_sink. A pointer to the
-  // new sink is written to *sink, and is owned by the caller.
+  /// Creates a new data sink from thrift_sink. A pointer to the
+  /// new sink is written to *sink, and is owned by the caller.
   static Status CreateDataSink(ObjectPool* pool,
     const TDataSink& thrift_sink, const std::vector<TExpr>& output_exprs,
     const TPlanFragmentExecParams& params,
     const RowDescriptor& row_desc, boost::scoped_ptr<DataSink>* sink);
 
-  // Returns the runtime profile for the sink.
+  /// Returns the runtime profile for the sink.
   virtual RuntimeProfile* profile() = 0;
 
-  // Merges one update to the insert stats for a partition. dst_stats will have the
-  // combined stats of src_stats and dst_stats after this method returns.
+  /// Merges one update to the insert stats for a partition. dst_stats will have the
+  /// combined stats of src_stats and dst_stats after this method returns.
   static void MergeInsertStats(const TInsertStats& src_stats,
       TInsertStats* dst_stats);
 
-  // Outputs the insert stats contained in the map of insert partition updates to a string
+  /// Outputs the insert stats contained in the map of insert partition updates to a string
   static std::string OutputInsertStats(const PartitionStatusMap& stats,
       const std::string& prefix = "");
 
  protected:
-  // Set to true after Close() has been called. Subclasses should check and set this in
-  // Close().
+  /// Set to true after Close() has been called. Subclasses should check and set this in
+  /// Close().
   bool closed_;
 
   boost::scoped_ptr<MemTracker> expr_mem_tracker_;

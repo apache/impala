@@ -19,13 +19,13 @@
 
 namespace impala {
 
-// InitFeSupport registers native functions with JNI. When the java
-// function FeSupport.EvalPredicate is called within Impalad, the native
-// implementation FeSupport_EvalPredicateImpl already exists in Impalad binary.
-// In order to expose JNI functions from Impalad binary, we need to "register
-// native functions". See this link:
-//     http://java.sun.com/docs/books/jni/html/other.html#29535
-// for details.
+/// InitFeSupport registers native functions with JNI. When the java
+/// function FeSupport.EvalPredicate is called within Impalad, the native
+/// implementation FeSupport_EvalPredicateImpl already exists in Impalad binary.
+/// In order to expose JNI functions from Impalad binary, we need to "register
+/// native functions". See this link:
+///     http://java.sun.com/docs/books/jni/html/other.html#29535
+/// for details.
 void InitFeSupport();
 
 }

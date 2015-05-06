@@ -48,66 +48,66 @@ class Tuple;
 class TPlanNode;
 class TScanRange;
 
-// Maintains per file information for files assigned to this scan node.  This includes
-// all the splits for the file. Note that it is not thread-safe.
+/// Maintains per file information for files assigned to this scan node.  This includes
+/// all the splits for the file. Note that it is not thread-safe.
 struct HdfsFileDesc {
-  // Connection to the filesystem containing the file.
+  /// Connection to the filesystem containing the file.
   hdfsFS fs;
 
-  // File name including the path.
+  /// File name including the path.
   std::string filename;
 
-  // Length of the file. This is not related to which parts of the file have been
-  // assigned to this node.
+  /// Length of the file. This is not related to which parts of the file have been
+  /// assigned to this node.
   int64_t file_length;
 
-  // Last modified time
+  /// Last modified time
   int64_t mtime;
 
   THdfsCompression::type file_compression;
 
-  // Splits (i.e. raw byte ranges) for this file, assigned to this scan node.
+  /// Splits (i.e. raw byte ranges) for this file, assigned to this scan node.
   std::vector<DiskIoMgr::ScanRange*> splits;
   HdfsFileDesc(const std::string& filename)
       : filename(filename), file_length(0), mtime(0), file_compression(THdfsCompression::NONE) {
   }
 };
 
-// Struct for additional metadata for scan ranges. This contains the partition id
-// that this scan range is for.
+/// Struct for additional metadata for scan ranges. This contains the partition id
+/// that this scan range is for.
 struct ScanRangeMetadata {
-  // The partition id that this range is part of.
+  /// The partition id that this range is part of.
   int64_t partition_id;
 
   ScanRangeMetadata(int64_t partition_id)
     : partition_id(partition_id) { }
 };
 
-// A ScanNode implementation that is used for all tables read directly from
-// HDFS-serialised data.
-// A HdfsScanNode spawns multiple scanner threads to process the bytes in
-// parallel.  There is a handshake between the scan node and the scanners
-// to get all the splits queued and bytes processed.
-// 1. The scan node initially calls the Scanner with a list of files and splits
-//    for that scanner/file format.
-// 2. The scanner issues the initial byte ranges for each of those files.  For text
-//    this is simply the entire range but for rc files, this would just be the header
-//    byte range.  The scan node doesn't care either way.
-// 3. The scan node spins up a number of scanner threads. Each of those threads
-//    pulls the next scan range to work on from the IoMgr and then processes the
-//    range end to end.
-// 4. The scanner processes the buffers, issuing more scan ranges if necessary.
-// 5. The scanner finishes the scan range and informs the scan node so it can track
-//    end of stream.
-// TODO: this class allocates a bunch of small utility objects that should be
-// recycled.
+/// A ScanNode implementation that is used for all tables read directly from
+/// HDFS-serialised data.
+/// A HdfsScanNode spawns multiple scanner threads to process the bytes in
+/// parallel.  There is a handshake between the scan node and the scanners
+/// to get all the splits queued and bytes processed.
+/// 1. The scan node initially calls the Scanner with a list of files and splits
+///    for that scanner/file format.
+/// 2. The scanner issues the initial byte ranges for each of those files.  For text
+///    this is simply the entire range but for rc files, this would just be the header
+///    byte range.  The scan node doesn't care either way.
+/// 3. The scan node spins up a number of scanner threads. Each of those threads
+///    pulls the next scan range to work on from the IoMgr and then processes the
+///    range end to end.
+/// 4. The scanner processes the buffers, issuing more scan ranges if necessary.
+/// 5. The scanner finishes the scan range and informs the scan node so it can track
+///    end of stream.
+/// TODO: this class allocates a bunch of small utility objects that should be
+/// recycled.
 class HdfsScanNode : public ScanNode {
  public:
   HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
   ~HdfsScanNode();
 
-  // ExecNode methods
+  /// ExecNode methods
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
@@ -119,14 +119,14 @@ class HdfsScanNode : public ScanNode {
   const std::vector<SlotDescriptor*>& materialized_slots()
       const { return materialized_slots_; }
 
-  // Returns the tuple idx into the row for this scan node to output to.
-  // Currently this is always 0.
+  /// Returns the tuple idx into the row for this scan node to output to.
+  /// Currently this is always 0.
   int tuple_idx() const { return 0; }
 
-  // Returns number of partition keys in the table, including non-materialized slots
+  /// Returns number of partition keys in the table, including non-materialized slots
   int num_partition_keys() const { return hdfs_table_->num_clustering_cols(); }
 
-  // Returns number of materialized partition key slots
+  /// Returns number of materialized partition key slots
   int num_materialized_partition_keys() const { return partition_key_slots_.size(); }
 
   const TupleDescriptor* tuple_desc() { return tuple_desc_; }
@@ -143,26 +143,26 @@ class HdfsScanNode : public ScanNode {
 
   const static int SKIP_COLUMN = -1;
 
-  // Creates a clone of conjunct_ctxs_. 'ctxs' should be non-NULL and empty.
-  // The returned contexts must be closed by the caller.
+  /// Creates a clone of conjunct_ctxs_. 'ctxs' should be non-NULL and empty.
+  /// The returned contexts must be closed by the caller.
   Status GetConjunctCtxs(std::vector<ExprContext*>* ctxs);
 
-  // Returns index into materialized_slots with 'path'.  Returns SKIP_COLUMN if
-  // that path is not materialized.
+  /// Returns index into materialized_slots with 'path'.  Returns SKIP_COLUMN if
+  /// that path is not materialized.
   int GetMaterializedSlotIdx(const std::vector<int>& path) const {
     PathToSlotIdxMap::const_iterator result = path_to_materialized_slot_idx_.find(path);
     if (result == path_to_materialized_slot_idx_.end()) return SKIP_COLUMN;
     return result->second;
   }
 
-  // The result array is of length num_cols(). The i-th element is true iff column i
-  // should be materialized.
+  /// The result array is of length num_cols(). The i-th element is true iff column i
+  /// should be materialized.
   const bool* is_materialized_col() {
     return reinterpret_cast<const bool*>(&is_materialized_col_[0]);
   }
 
-  // Returns the per format codegen'd function.  Scanners call this to get the
-  // codegen'd function to use.  Returns NULL if codegen should not be used.
+  /// Returns the per format codegen'd function.  Scanners call this to get the
+  /// codegen'd function to use.  Returns NULL if codegen should not be used.
   void* GetCodegenFn(THdfsFileFormat::type);
 
   inline void IncNumScannersCodegenEnabled() {
@@ -173,310 +173,310 @@ class HdfsScanNode : public ScanNode {
     ++num_scanners_codegen_disabled_;
   }
 
-  // Adds a materialized row batch for the scan node.  This is called from scanner
-  // threads.
-  // This function will block if materialized_row_batches_ is full.
+  /// Adds a materialized row batch for the scan node.  This is called from scanner
+  /// threads.
+  /// This function will block if materialized_row_batches_ is full.
   void AddMaterializedRowBatch(RowBatch* row_batch);
 
-  // Allocate a new scan range object, stored in the runtime state's object pool.  For
-  // scan ranges that correspond to the original hdfs splits, the partition id must be set
-  // to the range's partition id. For other ranges (e.g. columns in parquet, read past
-  // buffers), the partition_id is unused. expected_local should be true if this scan
-  // range is not expected to require a remote read. The range must fall within the file
-  // bounds.  That is, the offset must be >= 0, and offset + len <= file_length.
-  // This is thread safe.
+  /// Allocate a new scan range object, stored in the runtime state's object pool.  For
+  /// scan ranges that correspond to the original hdfs splits, the partition id must be set
+  /// to the range's partition id. For other ranges (e.g. columns in parquet, read past
+  /// buffers), the partition_id is unused. expected_local should be true if this scan
+  /// range is not expected to require a remote read. The range must fall within the file
+  /// bounds.  That is, the offset must be >= 0, and offset + len <= file_length.
+  /// This is thread safe.
   DiskIoMgr::ScanRange* AllocateScanRange(
       hdfsFS fs, const char* file, int64_t len, int64_t offset, int64_t partition_id,
       int disk_id, bool try_cache, bool expected_local, int64_t mtime);
 
-  // Adds ranges to the io mgr queue and starts up new scanner threads if possible.
+  /// Adds ranges to the io mgr queue and starts up new scanner threads if possible.
   Status AddDiskIoRanges(const std::vector<DiskIoMgr::ScanRange*>& ranges);
 
-  // Adds all splits for file_desc to the io mgr queue.
+  /// Adds all splits for file_desc to the io mgr queue.
   Status AddDiskIoRanges(const HdfsFileDesc* file_desc);
 
-  // Indicates that this file_desc's scan ranges have all been issued to the IoMgr.
-  // For each file, the scanner must call MarkFileDescIssued() or AddDiskIoRanges().
-  // Issuing ranges happens asynchronously. For many of the file formats we synchronously
-  // issue the file header/footer in Open() but the rest of the splits for the file are
-  // issued asynchronously.
+  /// Indicates that this file_desc's scan ranges have all been issued to the IoMgr.
+  /// For each file, the scanner must call MarkFileDescIssued() or AddDiskIoRanges().
+  /// Issuing ranges happens asynchronously. For many of the file formats we synchronously
+  /// issue the file header/footer in Open() but the rest of the splits for the file are
+  /// issued asynchronously.
   void MarkFileDescIssued(const HdfsFileDesc* file_desc);
 
-  // Allocates and initialises template_tuple_ with any values from
-  // the partition columns for the current scan range
-  // Returns NULL if there are no materialized partition keys.
-  // TODO: cache the tuple template in the partition object.
+  /// Allocates and initialises template_tuple_ with any values from
+  /// the partition columns for the current scan range
+  /// Returns NULL if there are no materialized partition keys.
+  /// TODO: cache the tuple template in the partition object.
   Tuple* InitTemplateTuple(RuntimeState* state,
                            const std::vector<ExprContext*>& value_ctxs);
 
-  // Allocates and return an empty template tuple (i.e. with no values filled in).
-  // Scanners can use this method to initialize a template tuple even if there are no
-  // materialized partition keys (e.g. to hold Avro default values).
+  /// Allocates and return an empty template tuple (i.e. with no values filled in).
+  /// Scanners can use this method to initialize a template tuple even if there are no
+  /// materialized partition keys (e.g. to hold Avro default values).
   Tuple* InitEmptyTemplateTuple();
 
-  // Acquires all allocations from pool into scan_node_pool_. Thread-safe.
+  /// Acquires all allocations from pool into scan_node_pool_. Thread-safe.
   void TransferToScanNodePool(MemPool* pool);
 
-  // Returns the file desc for 'filename'.  Returns NULL if filename is invalid.
+  /// Returns the file desc for 'filename'.  Returns NULL if filename is invalid.
   HdfsFileDesc* GetFileDesc(const std::string& filename);
 
-  // Gets scanner specific metadata for 'filename'.  Scanners can use this to store
-  // file header information.
-  // Returns NULL if there is no metadata.
-  // This is thread safe.
+  /// Gets scanner specific metadata for 'filename'.  Scanners can use this to store
+  /// file header information.
+  /// Returns NULL if there is no metadata.
+  /// This is thread safe.
   void* GetFileMetadata(const std::string& filename);
 
-  // Sets the scanner specific metadata for 'filename'.
-  // This is thread safe.
+  /// Sets the scanner specific metadata for 'filename'.
+  /// This is thread safe.
   void SetFileMetadata(const std::string& filename, void* metadata);
 
-  // Called by the scanner when a range is complete.  Used to trigger done_ and
-  // to log progress.  This *must* only be called after the scanner has completely
-  // finished the scan range (i.e. context->Flush()).
+  /// Called by the scanner when a range is complete.  Used to trigger done_ and
+  /// to log progress.  This *must* only be called after the scanner has completely
+  /// finished the scan range (i.e. context->Flush()).
   void RangeComplete(const THdfsFileFormat::type& file_type,
       const THdfsCompression::type& compression_type);
-  // Same as above except for when multiple compression codecs were used
-  // in the file. The metrics are incremented for each compression_type.
+  /// Same as above except for when multiple compression codecs were used
+  /// in the file. The metrics are incremented for each compression_type.
   void RangeComplete(const THdfsFileFormat::type& file_type,
       const std::vector<THdfsCompression::type>& compression_type);
 
-  // Utility function to compute the order in which to materialize slots to allow  for
-  // computing conjuncts as slots get materialized (on partial tuples).
-  // 'order' will contain for each slot, the first conjunct it is associated with.
-  // e.g. order[2] = 1 indicates materialized_slots[2] must be materialized before
-  // evaluating conjuncts[1].  Slots that are not referenced by any conjuncts will have
-  // order set to conjuncts.size()
+  /// Utility function to compute the order in which to materialize slots to allow  for
+  /// computing conjuncts as slots get materialized (on partial tuples).
+  /// 'order' will contain for each slot, the first conjunct it is associated with.
+  /// e.g. order[2] = 1 indicates materialized_slots[2] must be materialized before
+  /// evaluating conjuncts[1].  Slots that are not referenced by any conjuncts will have
+  /// order set to conjuncts.size()
   void ComputeSlotMaterializationOrder(std::vector<int>* order) const;
 
-  // map from volume id to <number of split, per volume split lengths>
+  /// map from volume id to <number of split, per volume split lengths>
   typedef boost::unordered_map<int32_t, std::pair<int, int64_t> > PerVolumnStats;
 
-  // Update the per volume stats with the given scan range params list
+  /// Update the per volume stats with the given scan range params list
   static void UpdateHdfsSplitStats(
       const std::vector<TScanRangeParams>& scan_range_params_list,
       PerVolumnStats* per_volume_stats);
 
-  // Output the per_volume_stats to stringstream. The output format is a list of:
-  // <volume id>:<# splits>/<per volume split lengths>
+  /// Output the per_volume_stats to stringstream. The output format is a list of:
+  /// <volume id>:<# splits>/<per volume split lengths>
   static void PrintHdfsSplitStats(const PerVolumnStats& per_volume_stats,
       std::stringstream* ss);
 
-  // Description string for the per volume stats output.
+  /// Description string for the per volume stats output.
   static const std::string HDFS_SPLIT_STATS_DESC;
 
  private:
   friend class ScannerContext;
 
-  // Cache of the plan node.  This is needed to be able to create a copy of
-  // the conjuncts per scanner since our Exprs are not thread safe.
+  /// Cache of the plan node.  This is needed to be able to create a copy of
+  /// the conjuncts per scanner since our Exprs are not thread safe.
   boost::scoped_ptr<TPlanNode> thrift_plan_node_;
 
   RuntimeState* runtime_state_;
 
-  // Tuple id resolved in Prepare() to set tuple_desc_;
+  /// Tuple id resolved in Prepare() to set tuple_desc_;
   const int tuple_id_;
 
-  // RequestContext object to use with the disk-io-mgr for reads.
+  /// RequestContext object to use with the disk-io-mgr for reads.
   DiskIoMgr::RequestContext* reader_context_;
 
-  // Descriptor for tuples this scan node constructs
+  /// Descriptor for tuples this scan node constructs
   const TupleDescriptor* tuple_desc_;
 
-  // Descriptor for the hdfs table, including partition and format metadata.
-  // Set in Prepare, owned by RuntimeState
+  /// Descriptor for the hdfs table, including partition and format metadata.
+  /// Set in Prepare, owned by RuntimeState
   const HdfsTableDescriptor* hdfs_table_;
 
-  // If true, the warning that some disk ids are unknown was logged.  Only log
-  // this once per scan node since it can be noisy.
+  /// If true, the warning that some disk ids are unknown was logged.  Only log
+  /// this once per scan node since it can be noisy.
   bool unknown_disk_id_warned_;
 
-  // Partitions scanned by this scan node.
+  /// Partitions scanned by this scan node.
   boost::unordered_set<int64_t> partition_ids_;
 
-  // File path => file descriptor (which includes the file's splits)
+  /// File path => file descriptor (which includes the file's splits)
   typedef std::map<std::string, HdfsFileDesc*> FileDescMap;
   FileDescMap file_descs_;
 
-  // File format => file descriptors.
+  /// File format => file descriptors.
   typedef std::map<THdfsFileFormat::type, std::vector<HdfsFileDesc*> > FileFormatsMap;
   FileFormatsMap per_type_files_;
 
-  // Set to true when the initial scan ranges are issued to the IoMgr. This happens on the
-  // first call to GetNext(). The token manager, in a different thread, will read this
-  // variable.
+  /// Set to true when the initial scan ranges are issued to the IoMgr. This happens on the
+  /// first call to GetNext(). The token manager, in a different thread, will read this
+  /// variable.
   bool initial_ranges_issued_;
 
-  // The estimated memory required to start up a new scanner thread. If the memory
-  // left (due to limits) is less than this value, we won't start up optional
-  // scanner threads.
+  /// The estimated memory required to start up a new scanner thread. If the memory
+  /// left (due to limits) is less than this value, we won't start up optional
+  /// scanner threads.
   int64_t scanner_thread_bytes_required_;
 
-  // Number of files that have not been issued from the scanners.
+  /// Number of files that have not been issued from the scanners.
   AtomicInt<int> num_unqueued_files_;
 
-  // Map of HdfsScanner objects to file types.  Only one scanner object will be
-  // created for each file type.  Objects stored in runtime_state's pool.
+  /// Map of HdfsScanner objects to file types.  Only one scanner object will be
+  /// created for each file type.  Objects stored in runtime_state's pool.
   typedef std::map<THdfsFileFormat::type, HdfsScanner*> ScannerMap;
   ScannerMap scanner_map_;
 
-  // Per scanner type codegen'd fn.
+  /// Per scanner type codegen'd fn.
   typedef std::map<THdfsFileFormat::type, void*> CodegendFnMap;
   CodegendFnMap codegend_fn_map_;
 
-  // Contexts for each conjunct. These are cloned by the scanners so conjuncts can be
-  // safely evaluated in parallel.
+  /// Contexts for each conjunct. These are cloned by the scanners so conjuncts can be
+  /// safely evaluated in parallel.
   std::vector<ExprContext*> conjunct_ctxs_;
 
-  // Maps from a slot's path to its index into materialized_slots_.
+  /// Maps from a slot's path to its index into materialized_slots_.
   typedef boost::unordered_map<std::vector<int>, int> PathToSlotIdxMap;
   PathToSlotIdxMap path_to_materialized_slot_idx_;
 
-  // is_materialized_col_[i] = <true i-th column should be materialized, false otherwise>
-  // for 0 <= i < total # columns
+  /// is_materialized_col_[i] = <true i-th column should be materialized, false otherwise>
+  /// for 0 <= i < total # columns
   //
-  // This should be a vector<bool>, but bool vectors are special-cased and not stored
-  // internally as arrays, so instead we store as chars and cast to bools as needed
+  /// This should be a vector<bool>, but bool vectors are special-cased and not stored
+  /// internally as arrays, so instead we store as chars and cast to bools as needed
   std::vector<char> is_materialized_col_;
 
-  // Vector containing slot descriptors for all materialized non-partition key
-  // slots.  These descriptors are sorted in order of increasing col_pos
-  // TODO: Put this (with associated fields and logic) on ScanNode or ExecNode
+  /// Vector containing slot descriptors for all materialized non-partition key
+  /// slots.  These descriptors are sorted in order of increasing col_pos
+  /// TODO: Put this (with associated fields and logic) on ScanNode or ExecNode
   std::vector<SlotDescriptor*> materialized_slots_;
 
-  // Vector containing slot descriptors for all materialized partition key slots
-  // These descriptors are sorted in order of increasing col_pos
+  /// Vector containing slot descriptors for all materialized partition key slots
+  /// These descriptors are sorted in order of increasing col_pos
   std::vector<SlotDescriptor*> partition_key_slots_;
 
-  // Keeps track of total splits and the number finished.
+  /// Keeps track of total splits and the number finished.
   ProgressUpdater progress_;
 
-  // Scanner specific per file metadata (e.g. header information) and associated lock.
-  // This lock cannot be taken together with any other locks except lock_.
+  /// Scanner specific per file metadata (e.g. header information) and associated lock.
+  /// This lock cannot be taken together with any other locks except lock_.
   boost::mutex metadata_lock_;
   std::map<std::string, void*> per_file_metadata_;
 
-  // Thread group for all scanner worker threads
+  /// Thread group for all scanner worker threads
   ThreadGroup scanner_threads_;
 
-  // Outgoing row batches queue. Row batches are produced asynchronously by the scanner
-  // threads and consumed by the main thread.
+  /// Outgoing row batches queue. Row batches are produced asynchronously by the scanner
+  /// threads and consumed by the main thread.
   boost::scoped_ptr<RowBatchQueue> materialized_row_batches_;
 
-  // Maximum size of materialized_row_batches_.
+  /// Maximum size of materialized_row_batches_.
   int max_materialized_row_batches_;
 
-  // This is the number of io buffers that are owned by the scan node and the scanners.
-  // This is used just to help debug leaked io buffers to determine if the leak is
-  // happening in the scanners vs other parts of the execution.
+  /// This is the number of io buffers that are owned by the scan node and the scanners.
+  /// This is used just to help debug leaked io buffers to determine if the leak is
+  /// happening in the scanners vs other parts of the execution.
   AtomicInt<int> num_owned_io_buffers_;
 
-  // The number of times a token was offered but no scanner threads started.
-  // This is used for diagnostics only.
+  /// The number of times a token was offered but no scanner threads started.
+  /// This is used for diagnostics only.
   AtomicInt<int> num_skipped_tokens_;
 
-  // Counters which track the number of scanners that have codegen enabled for the
-  // materialize and conjuncts evaluation code paths.
+  /// Counters which track the number of scanners that have codegen enabled for the
+  /// materialize and conjuncts evaluation code paths.
   AtomicInt<int> num_scanners_codegen_enabled_;
   AtomicInt<int> num_scanners_codegen_disabled_;
 
-  // The size of the largest compressed text file to be scanned. This is used to estimate
-  // scanner thread memory usage.
+  /// The size of the largest compressed text file to be scanned. This is used to estimate
+  /// scanner thread memory usage.
   RuntimeProfile::HighWaterMarkCounter* max_compressed_text_file_length_;
 
-  // Disk accessed bitmap
+  /// Disk accessed bitmap
   RuntimeProfile::Counter disks_accessed_bitmap_;
 
-  // Total number of bytes read locally
+  /// Total number of bytes read locally
   RuntimeProfile::Counter* bytes_read_local_;
 
-  // Total number of bytes read via short circuit read
+  /// Total number of bytes read via short circuit read
   RuntimeProfile::Counter* bytes_read_short_circuit_;
 
-  // Total number of bytes read from data node cache
+  /// Total number of bytes read from data node cache
   RuntimeProfile::Counter* bytes_read_dn_cache_;
 
-  // Total number of remote scan ranges
+  /// Total number of remote scan ranges
   RuntimeProfile::Counter* num_remote_ranges_;
 
-  // Total number of bytes read remotely that were expected to be local
+  /// Total number of bytes read remotely that were expected to be local
   RuntimeProfile::Counter* unexpected_remote_bytes_;
 
-  // Lock protects access between scanner thread and main query thread (the one calling
-  // GetNext()) for all fields below.  If this lock and any other locks needs to be taken
-  // together, this lock must be taken first.
+  /// Lock protects access between scanner thread and main query thread (the one calling
+  /// GetNext()) for all fields below.  If this lock and any other locks needs to be taken
+  /// together, this lock must be taken first.
   boost::mutex lock_;
 
-  // Flag signaling that all scanner threads are done.  This could be because they
-  // are finished, an error/cancellation occurred, or the limit was reached.
-  // Setting this to true triggers the scanner threads to clean up.
-  // This should not be explicitly set. Instead, call SetDone().
+  /// Flag signaling that all scanner threads are done.  This could be because they
+  /// are finished, an error/cancellation occurred, or the limit was reached.
+  /// Setting this to true triggers the scanner threads to clean up.
+  /// This should not be explicitly set. Instead, call SetDone().
   bool done_;
 
-  // Set to true if all ranges have started. Some of the ranges may still be in flight
-  // being processed by scanner threads, but no new ScannerThreads should be started.
+  /// Set to true if all ranges have started. Some of the ranges may still be in flight
+  /// being processed by scanner threads, but no new ScannerThreads should be started.
   bool all_ranges_started_;
 
-  // Pool for allocating some amounts of memory that is shared between scanners.
-  // e.g. partition key tuple and their string buffers
+  /// Pool for allocating some amounts of memory that is shared between scanners.
+  /// e.g. partition key tuple and their string buffers
   boost::scoped_ptr<MemPool> scan_node_pool_;
 
-  // Status of failed operations.  This is set in the ScannerThreads
-  // Returned in GetNext() if an error occurred.  An non-ok status triggers cleanup
-  // scanner threads.
+  /// Status of failed operations.  This is set in the ScannerThreads
+  /// Returned in GetNext() if an error occurred.  An non-ok status triggers cleanup
+  /// scanner threads.
   Status status_;
 
-  // Mapping of file formats (file type, compression type) to the number of
-  // splits of that type and the lock protecting it.
-  // This lock cannot be taken together with any other lock except lock_.
+  /// Mapping of file formats (file type, compression type) to the number of
+  /// splits of that type and the lock protecting it.
+  /// This lock cannot be taken together with any other lock except lock_.
   SpinLock file_type_counts_lock_;
   typedef std::map<
       std::pair<THdfsFileFormat::type, THdfsCompression::type>, int> FileTypeCountsMap;
   FileTypeCountsMap file_type_counts_;
 
-  // If true, counters are actively running and need to be reported in the runtime
-  // profile.
+  /// If true, counters are actively running and need to be reported in the runtime
+  /// profile.
   bool counters_running_;
 
-  // The id of the callback added to the query resource manager when RM is enabled. Used
-  // to remove the callback before this scan node is destroyed.
+  /// The id of the callback added to the query resource manager when RM is enabled. Used
+  /// to remove the callback before this scan node is destroyed.
   int32_t rm_callback_id_;
 
-  // Called when scanner threads are available for this scan node. This will
-  // try to spin up as many scanner threads as the quota allows.
-  // This is also called whenever a new range is added to the IoMgr to 'pull'
-  // thread tokens if they are available.
+  /// Called when scanner threads are available for this scan node. This will
+  /// try to spin up as many scanner threads as the quota allows.
+  /// This is also called whenever a new range is added to the IoMgr to 'pull'
+  /// thread tokens if they are available.
   void ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool);
 
-  // Create and prepare new scanner for this partition type.
-  // If the scanner cannot be created, return NULL.
+  /// Create and prepare new scanner for this partition type.
+  /// If the scanner cannot be created, return NULL.
   HdfsScanner* CreateAndPrepareScanner(HdfsPartitionDescriptor* partition_desc,
       ScannerContext* context, Status* status);
 
-  // Main function for scanner thread. This thread pulls the next range to be
-  // processed from the IoMgr and then processes the entire range end to end.
-  // This thread terminates when all scan ranges are complete or an error occurred.
+  /// Main function for scanner thread. This thread pulls the next range to be
+  /// processed from the IoMgr and then processes the entire range end to end.
+  /// This thread terminates when all scan ranges are complete or an error occurred.
   void ScannerThread();
 
-  // Returns true if there is enough memory (against the mem tracker limits) to
-  // have a scanner thread.
-  // If new_thread is true, the calculation is for starting a new scanner thread.
-  // If false, it determines whether there's adequate memory for the existing
-  // set of scanner threads.
-  // lock_ must be taken before calling this.
+  /// Returns true if there is enough memory (against the mem tracker limits) to
+  /// have a scanner thread.
+  /// If new_thread is true, the calculation is for starting a new scanner thread.
+  /// If false, it determines whether there's adequate memory for the existing
+  /// set of scanner threads.
+  /// lock_ must be taken before calling this.
   bool EnoughMemoryForScannerThread(bool new_thread);
 
-  // Checks for eos conditions and returns batches from materialized_row_batches_.
+  /// Checks for eos conditions and returns batches from materialized_row_batches_.
   Status GetNextInternal(RuntimeState* state, RowBatch* row_batch, bool* eos);
 
-  // sets done_ to true and triggers threads to cleanup. Cannot be calld with
-  // any locks taken. Calling it repeatedly ignores subsequent calls.
+  /// sets done_ to true and triggers threads to cleanup. Cannot be calld with
+  /// any locks taken. Calling it repeatedly ignores subsequent calls.
   void SetDone();
 
-  // Stops periodic counters and aggregates counter values for the entire scan node.
-  // This should be called as soon as the scan node is complete to get the most accurate
-  // counter values.
-  // This can be called multiple times, subsequent calls will be ignored.
-  // This must be called on Close() to unregister counters.
+  /// Stops periodic counters and aggregates counter values for the entire scan node.
+  /// This should be called as soon as the scan node is complete to get the most accurate
+  /// counter values.
+  /// This can be called multiple times, subsequent calls will be ignored.
+  /// This must be called on Close() to unregister counters.
   void StopAndFinalizeCounters();
 };
 

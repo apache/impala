@@ -24,11 +24,11 @@
 
 namespace impala_udf {
 
-// Utility class to help test UDAs. This can be used to test the correctness of the
-// UDA, simulating multiple possible distributed execution setups.
-// For example, the harness will run in the UDA in single node mode (so merge and
-// serialize are unused), single level merge and multi-level merge.
-// The test application is responsible for providing the data and expected result.
+/// Utility class to help test UDAs. This can be used to test the correctness of the
+/// UDA, simulating multiple possible distributed execution setups.
+/// For example, the harness will run in the UDA in single node mode (so merge and
+/// serialize are unused), single level merge and multi-level merge.
+/// The test application is responsible for providing the data and expected result.
 class UdaTestHarnessUtil {
  public:
   template<typename T>
@@ -38,12 +38,12 @@ class UdaTestHarnessUtil {
 
   template<typename T>
   static void FreeIntermediate(FunctionContext* context, const T& v) {
-    // No-op
+    /// No-op
     return;
   }
 
-  // Copy src value into context, returning the new copy. This simulates
-  // copying the bytes between nodes.
+  /// Copy src value into context, returning the new copy. This simulates
+  /// copying the bytes between nodes.
   template<typename T>
   static T CopyIntermediate(FunctionContext* context, int byte_size, const T& src) {
     return src;
@@ -70,7 +70,7 @@ BufferVal UdaTestHarnessUtil::CopyIntermediate(
   return v;
 }
 
-// Returns false if there is an error set in the context.
+/// Returns false if there is an error set in the context.
 template<typename RESULT, typename INTERMEDIATE>
 bool UdaTestHarnessBase<RESULT, INTERMEDIATE>::CheckContext(FunctionContext* context) {
   if (context->has_error()) {
@@ -89,7 +89,7 @@ bool UdaTestHarnessBase<RESULT, INTERMEDIATE>::CheckResult(
   return result_comparator_fn_(x, y);
 }
 
-// Runs the UDA in all the modes, validating the result is 'expected' each time.
+/// Runs the UDA in all the modes, validating the result is 'expected' each time.
 template<typename RESULT, typename INTERMEDIATE>
 bool UdaTestHarnessBase<RESULT, INTERMEDIATE>::Execute(
     const RESULT& expected, UdaExecutionMode mode) {
@@ -344,7 +344,7 @@ void UdaTestHarness<RESULT, INTERMEDIATE, INPUT>::Update(
   update_fn_(context, *input_[idx], dst);
 }
 
-// Runs the UDA in all the modes, validating the result is 'expected' each time.
+/// Runs the UDA in all the modes, validating the result is 'expected' each time.
 template<typename RESULT, typename INTERMEDIATE, typename INPUT1, typename INPUT2>
 bool UdaTestHarness2<RESULT, INTERMEDIATE, INPUT1, INPUT2>::Execute(
     const std::vector<INPUT1>& values1, const std::vector<INPUT2>& values2,
@@ -422,4 +422,3 @@ void UdaTestHarness4<RESULT, INTERMEDIATE, INPUT1, INPUT2, INPUT3, INPUT4>::Upda
 }
 
 #endif
-

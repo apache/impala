@@ -22,14 +22,14 @@
 
 namespace impala {
 
-// Runtime counters have a two-phase lifecycle - creation and update. This is not
-// convenient for debugging where we would like to add and remove counters with a minimum
-// of boilerplate. This header adds a global debug runtime profile, and macros to
-// update-or-create counters in one line of code. Counters created this way are not
-// intended to remain in the code; they are a tool for identifying hotspots without having
-// to run a full profiler.
-// The AddCounter call adds some more overhead to each macro, and therefore they  
-// should not be used where minimal impact on performance is needed. 
+/// Runtime counters have a two-phase lifecycle - creation and update. This is not
+/// convenient for debugging where we would like to add and remove counters with a minimum
+/// of boilerplate. This header adds a global debug runtime profile, and macros to
+/// update-or-create counters in one line of code. Counters created this way are not
+/// intended to remain in the code; they are a tool for identifying hotspots without having
+/// to run a full profiler.
+/// The AddCounter call adds some more overhead to each macro, and therefore they
+/// should not be used where minimal impact on performance is needed.
 class DebugRuntimeProfile {
  public:
   static RuntimeProfile& profile() {

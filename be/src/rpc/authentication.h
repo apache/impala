@@ -29,33 +29,33 @@ using namespace ::apache::thrift::transport;
 
 namespace impala {
 
-// System-wide authentication manager responsible for initialising authentication systems,
-// including Sasl and Kerberos, and for providing auth-enabled Thrift structures to
-// servers and clients.
+/// System-wide authentication manager responsible for initialising authentication systems,
+/// including Sasl and Kerberos, and for providing auth-enabled Thrift structures to
+/// servers and clients.
 class AuthManager {
  public:
   static AuthManager* GetInstance() { return AuthManager::auth_manager_; };
 
-  // Set up internal and external AuthProvider classes.  This does a bunch of flag
-  // checking and calls each AuthProvider->Start().
+  /// Set up internal and external AuthProvider classes.  This does a bunch of flag
+  /// checking and calls each AuthProvider->Start().
   Status Init();
 
-  // Returns the authentication provider to use for "external" communication
-  // such as the impala shell, jdbc, odbc, etc. This only applies to the server
-  // side of a connection; the client side of said connection is never an
-  // internal process.
+  /// Returns the authentication provider to use for "external" communication
+  /// such as the impala shell, jdbc, odbc, etc. This only applies to the server
+  /// side of a connection; the client side of said connection is never an
+  /// internal process.
   AuthProvider* GetExternalAuthProvider();
 
-  // Returns the authentication provider to use for internal daemon <-> daemon
-  // connections.  This goes for both the client and server sides.  An example
-  // connection this applies to would be backend <-> statestore.
+  /// Returns the authentication provider to use for internal daemon <-> daemon
+  /// connections.  This goes for both the client and server sides.  An example
+  /// connection this applies to would be backend <-> statestore.
   AuthProvider* GetInternalAuthProvider();
 
  private:
   static AuthManager* auth_manager_;
 
-  // These are provided for convenience, so that demon<->demon and client<->demon services
-  // don't have to check the auth flags to figure out which auth provider to use.
+  /// These are provided for convenience, so that demon<->demon and client<->demon services
+  /// don't have to check the auth flags to figure out which auth provider to use.
   boost::scoped_ptr<AuthProvider> internal_auth_provider_;
   boost::scoped_ptr<AuthProvider> external_auth_provider_;
 };

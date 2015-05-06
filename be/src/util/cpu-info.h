@@ -23,10 +23,10 @@
 
 namespace impala {
 
-// CpuInfo is an interface to query for cpu information at runtime.  The caller can
-// ask for the sizes of the caches and what hardware features are supported.
-// On Linux, this information is pulled from a couple of sys files (/proc/cpuinfo and 
-// /sys/devices)
+/// CpuInfo is an interface to query for cpu information at runtime.  The caller can
+/// ask for the sizes of the caches and what hardware features are supported.
+/// On Linux, this information is pulled from a couple of sys files (/proc/cpuinfo and
+/// /sys/devices)
 class CpuInfo {
  public:
   static const int64_t SSSE3   = (1 << 1);
@@ -34,55 +34,55 @@ class CpuInfo {
   static const int64_t SSE4_2  = (1 << 3);
   static const int64_t POPCNT  = (1 << 4);
 
-  // Cache enums for L1 (data), L2 and L3 
+  /// Cache enums for L1 (data), L2 and L3
   enum CacheLevel {
     L1_CACHE = 0,
     L2_CACHE = 1,
     L3_CACHE = 2,
   };
 
-  // Initialize CpuInfo.
+  /// Initialize CpuInfo.
   static void Init();
 
-  // Determine if the CPU meets the minimum CPU requirements and if not, issue an error
-  // and terminate.
+  /// Determine if the CPU meets the minimum CPU requirements and if not, issue an error
+  /// and terminate.
   static void VerifyCpuRequirements();
 
-  // Returns all the flags for this cpu
+  /// Returns all the flags for this cpu
   static int64_t hardware_flags() {
     DCHECK(initialized_);
     return hardware_flags_;
   }
   
-  // Returns whether of not the cpu supports this flag
+  /// Returns whether of not the cpu supports this flag
   inline static bool IsSupported(long flag) {
     DCHECK(initialized_);
     return (hardware_flags_ & flag) != 0;
   }
 
-  // Toggle a hardware feature on and off.  It is not valid to turn on a feature
-  // that the underlying hardware cannot support. This is useful for testing.
+  /// Toggle a hardware feature on and off.  It is not valid to turn on a feature
+  /// that the underlying hardware cannot support. This is useful for testing.
   static void EnableFeature(long flag, bool enable);
 
-  // Returns the size of the cache in KB at this cache level
+  /// Returns the size of the cache in KB at this cache level
   static long CacheSize(CacheLevel level) {
     DCHECK(initialized_);
     return cache_sizes_[level];
   }
 
-  // Returns the number of cpu cycles per millisecond
+  /// Returns the number of cpu cycles per millisecond
   static int64_t cycles_per_ms() {
     DCHECK(initialized_);
     return cycles_per_ms_;
   }
 
-  // Returns the number of cores (including hyper-threaded) on this machine.
+  /// Returns the number of cores (including hyper-threaded) on this machine.
   static int num_cores() { 
     DCHECK(initialized_);
     return num_cores_; 
   }
 
-  // Returns the model name of the cpu (e.g. Intel i7-2600)
+  /// Returns the model name of the cpu (e.g. Intel i7-2600)
   static std::string model_name() { 
     DCHECK(initialized_);
     return model_name_;

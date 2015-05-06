@@ -28,12 +28,12 @@
 
 namespace impala {
 
-// The InstructionCounter class handles visiting through the instructions in a block,
-// function or module. It holds all of the categories as well as the top level counters
-// such as the total number of instructions.
+/// The InstructionCounter class handles visiting through the instructions in a block,
+/// function or module. It holds all of the categories as well as the top level counters
+/// such as the total number of instructions.
 class InstructionCounter {
  public:
-  // String constants for instruction count names.
+  /// String constants for instruction count names.
   static const char* TOTAL_INSTS;
   static const char* TOTAL_BLOCKS;
   static const char* TOTAL_FUNCTIONS;
@@ -45,36 +45,36 @@ class InstructionCounter {
 
   InstructionCounter();
 
-  // Visits each Function in Module M.
+  /// Visits each Function in Module M.
   void visit(const llvm::Module& M);
 
-  // Increments "Total Functions" InstructionCounter and visits each BasicBlock in F.
+  /// Increments "Total Functions" InstructionCounter and visits each BasicBlock in F.
   void visit(const llvm::Function &F);
 
-  // Increments "Total Blocks" InstructionCounter and visits each Instruction in BB.
+  /// Increments "Total Blocks" InstructionCounter and visits each Instruction in BB.
   void visit(const llvm::BasicBlock &BB);
 
-  // Increments "Total Instructions" and whichever instruction count I is delegated to in
-  // this functions switch statement.
+  /// Increments "Total Instructions" and whichever instruction count I is delegated to in
+  /// this functions switch statement.
   void visit(const llvm::Instruction &I);
 
-  // Prints a single counter described by name and count
+  /// Prints a single counter described by name and count
   void PrintCounter(const char* name, int count, int max_count_len,
       std::stringstream* stream) const;
 
-  // Prints all counters
+  /// Prints all counters
   std::string PrintCounters() const;
 
-  // Return count of counter described by name
+  /// Return count of counter described by name
   int GetCount(const char* name);
 
-  // Set all counts to 0.
+  /// Set all counts to 0.
   void ResetCount();
 
  private:
   typedef std::map<std::string, int> CounterMap;
 
-  // Allows for easy visitation of iterators.
+  /// Allows for easy visitation of iterators.
   template<class Iterator>
   void visit(Iterator start, Iterator end) {
     while (start != end) {
@@ -82,10 +82,10 @@ class InstructionCounter {
     }
   }
 
-  // Increment InstructionCount with name_ equal to name argument.
+  /// Increment InstructionCount with name_ equal to name argument.
   void IncrementCount(const char* name);
 
-  // This maps instruction names to their respective count.
+  /// This maps instruction names to their respective count.
   CounterMap counters_;
 };
 

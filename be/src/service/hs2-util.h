@@ -17,27 +17,27 @@
 
 namespace impala {
 
-// Utility methods for converting from Impala (either an Expr result or a TColumnValue) to
-// Hive types (either a thrift::TColumnValue (V1->V5) or a TColumn (V6->).
+/// Utility methods for converting from Impala (either an Expr result or a TColumnValue) to
+/// Hive types (either a thrift::TColumnValue (V1->V5) or a TColumn (V6->).
 
-// For V6->
+/// For V6->
 void TColumnValueToHS2TColumn(const TColumnValue& col_val, const TColumnType& type,
     uint32_t row_idx, apache::hive::service::cli::thrift::TColumn* column);
 
-// For V6->
+/// For V6->
 void ExprValueToHS2TColumn(const void* value, const TColumnType& type,
     uint32_t row_idx, apache::hive::service::cli::thrift::TColumn* column);
 
-// For V1->V5
+/// For V1->V5
 void TColumnValueToHS2TColumnValue(const TColumnValue& col_val, const TColumnType& type,
     apache::hive::service::cli::thrift::TColumnValue* hs2_col_val);
 
-// For V1->V5
+/// For V1->V5
 void ExprValueToHS2TColumnValue(const void* value, const TColumnType& type,
     apache::hive::service::cli::thrift::TColumnValue* hs2_col_val);
 
-// Combine two null columns by appending 'from' to 'to', starting at 'num_rows_before' in
-// 'from', 'start_idx' in 'to', and proceeding for 'num_rows_added' rows.
+/// Combine two null columns by appending 'from' to 'to', starting at 'num_rows_before' in
+/// 'from', 'start_idx' in 'to', and proceeding for 'num_rows_added' rows.
 void StitchNulls(uint32_t num_rows_before, uint32_t num_rows_added, uint32_t start_idx,
     const std::string& from, std::string* to);
 

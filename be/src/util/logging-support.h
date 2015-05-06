@@ -20,12 +20,12 @@
 
 namespace impala {
 
-// InitLoggingSupport registers the native logging functions with JNI. This allows
-// the Java log4j log messages to be forwarded to Glog.
+/// InitLoggingSupport registers the native logging functions with JNI. This allows
+/// the Java log4j log messages to be forwarded to Glog.
 void InitJvmLoggingSupport();
 
-// Helper function to convert a command line logging flag value (input as an int) to the
-// matching TLogLevel enum value.
+/// Helper function to convert a command line logging flag value (input as an int) to the
+/// matching TLogLevel enum value.
 TLogLevel::type FlagToTLogLevel(int flag);
 }
 #endif

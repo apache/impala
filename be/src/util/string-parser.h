@@ -26,26 +26,26 @@
 
 namespace impala {
 
-// Utility functions for doing atoi/atof on non-null terminated strings.  On micro
-// benchmarks, this is significantly faster than libc (atoi/strtol and atof/strtod).
+/// Utility functions for doing atoi/atof on non-null terminated strings.  On micro
+/// benchmarks, this is significantly faster than libc (atoi/strtol and atof/strtod).
 //
-// Strings with leading and trailing whitespaces are accepted.
-// Branching is heavily optimized for the non-whitespace successful case.
-// All the StringTo* functions first parse the input string assuming it has no leading
-// whitespace. If that first attempt was unsuccessful, these functions retry the parsing
-// after removing whitespace. Therefore, strings with whitespace take a perf hit on
-// branch mis-prediction.
+/// Strings with leading and trailing whitespaces are accepted.
+/// Branching is heavily optimized for the non-whitespace successful case.
+/// All the StringTo* functions first parse the input string assuming it has no leading
+/// whitespace. If that first attempt was unsuccessful, these functions retry the parsing
+/// after removing whitespace. Therefore, strings with whitespace take a perf hit on
+/// branch mis-prediction.
 //
-// For overflows, we are following the mysql behavior, to cap values at the max/min value
-// for that data type.  This is different from hive, which returns NULL for overflow
-// slots for int types and inf/-inf for float types.
+/// For overflows, we are following the mysql behavior, to cap values at the max/min value
+/// for that data type.  This is different from hive, which returns NULL for overflow
+/// slots for int types and inf/-inf for float types.
 //
-// Things we tried that did not work:
-//  - lookup table for converting character to digit
-// Improvements (TODO):
-//  - Validate input using _sidd_compare_ranges
-//  - Since we know the length, we can parallelize this: i.e. result = 100*s[0] +
-//    10*s[1] + s[2]
+/// Things we tried that did not work:
+///  - lookup table for converting character to digit
+/// Improvements (TODO):
+///  - Validate input using _sidd_compare_ranges
+///  - Since we know the length, we can parallelize this: i.e. result = 100*s[0] +
+///    10*s[1] + s[2]
 class StringParser {
  public:
   enum ParseResult {
@@ -64,7 +64,7 @@ class StringParser {
     return StringToIntInternal<T>(s + i, len - i, result);
   }
 
-  // Convert a string s representing a number in given base into a decimal number.
+  /// Convert a string s representing a number in given base into a decimal number.
   template <typename T>
   static inline T StringToInt(const char* s, int len, int base, ParseResult* result) {
     T ans = StringToIntInternal<T>(s, len, base, result);
@@ -83,7 +83,7 @@ class StringParser {
     return StringToFloatInternal<T>(s + i, len - i, result);
   }
 
-  // Parses a string for 'true' or 'false', case insensitive.
+  /// Parses a string for 'true' or 'false', case insensitive.
   static inline bool StringToBool(const char* s, int len, ParseResult* result) {
     bool ans = StringToBoolInternal(s, len, result);
     if (LIKELY(*result == PARSE_SUCCESS)) return ans;
@@ -92,10 +92,10 @@ class StringParser {
     return StringToBoolInternal(s + i, len - i, result);
   }
 
-  // Parses a decimal from s, returning the result.
-  // The parse status is returned in *result.
-  // On overflow or invalid values, the return value is undefined.
-  // On underflow, the truncated value is returned.
+  /// Parses a decimal from s, returning the result.
+  /// The parse status is returned in *result.
+  /// On overflow or invalid values, the return value is undefined.
+  /// On underflow, the truncated value is returned.
   template <typename T>
   static inline DecimalValue<T> StringToDecimal(const uint8_t* s, int len,
       const ColumnType& type, StringParser::ParseResult* result) {
@@ -228,10 +228,10 @@ class StringParser {
   }
 
  private:
-  // This is considerably faster than glibc's implementation.
-  // In the case of overflow, the max/min value for the data type will be returned.
-  // Assumes s represents a decimal number.
-  // Return PARSE_FAILURE on leading whitespace. Trailing whitespace is allowed.
+  /// This is considerably faster than glibc's implementation.
+  /// In the case of overflow, the max/min value for the data type will be returned.
+  /// Assumes s represents a decimal number.
+  /// Return PARSE_FAILURE on leading whitespace. Trailing whitespace is allowed.
   template <typename T>
   static inline T StringToIntInternal(const char* s, int len, ParseResult* result) {
     if (UNLIKELY(len <= 0)) {
@@ -286,8 +286,8 @@ class StringParser {
     return static_cast<T>(negative ? -val : val);
   }
 
-  // Convert a string s representing a number in given base into a decimal number.
-  // Return PARSE_FAILURE on leading whitespace. Trailing whitespace is allowed.
+  /// Convert a string s representing a number in given base into a decimal number.
+  /// Return PARSE_FAILURE on leading whitespace. Trailing whitespace is allowed.
   template <typename T>
   static inline T StringToIntInternal(const char* s, int len, int base,
                                       ParseResult* result) {
@@ -345,14 +345,14 @@ class StringParser {
     return static_cast<T>(negative ? -val : val);
   }
 
-  // This is considerably faster than glibc's implementation (>100x why???)
-  // No special case handling needs to be done for overflows, the floating point spec
-  // already does it and will cap the values to -inf/inf
-  // To avoid inaccurate conversions this function falls back to strtod for
-  // scientific notation.
-  // Return PARSE_FAILURE on leading whitespace. Trailing whitespace is allowed.
-  // TODO: Investigate using intrinsics to speed up the slow strtod path.
-  // TODO: there are other possible optimizations, see IMPALA-1729
+  /// This is considerably faster than glibc's implementation (>100x why???)
+  /// No special case handling needs to be done for overflows, the floating point spec
+  /// already does it and will cap the values to -inf/inf
+  /// To avoid inaccurate conversions this function falls back to strtod for
+  /// scientific notation.
+  /// Return PARSE_FAILURE on leading whitespace. Trailing whitespace is allowed.
+  /// TODO: Investigate using intrinsics to speed up the slow strtod path.
+  /// TODO: there are other possible optimizations, see IMPALA-1729
   template <typename T>
   static inline T StringToFloatInternal(const char* s, int len, ParseResult* result) {
     if (UNLIKELY(len <= 0)) {
@@ -463,8 +463,8 @@ class StringParser {
     return (T)(negative ? -val : val);
   }
 
-  // Parses a string for 'true' or 'false', case insensitive.
-  // Return PARSE_FAILURE on leading whitespace. Trailing whitespace is allowed.
+  /// Parses a string for 'true' or 'false', case insensitive.
+  /// Return PARSE_FAILURE on leading whitespace. Trailing whitespace is allowed.
   static inline bool StringToBoolInternal(const char* s, int len, ParseResult* result) {
     *result = PARSE_SUCCESS;
     if (len >= 4 && (s[0] == 't' || s[0] == 'T')) {
@@ -483,14 +483,14 @@ class StringParser {
     return false;
   }
 
-  // Returns the position of the first non-whitespace character in s.
+  /// Returns the position of the first non-whitespace character in s.
   static inline int SkipLeadingWhitespace(const char* s, int len) {
     int i = 0;
     while(i < len && IsWhitespace(s[i])) ++i;
     return i;
   }
 
-  // Returns true if s only contains whitespace.
+  /// Returns true if s only contains whitespace.
   static inline bool IsAllWhitespace(const char* s, int len) {
     for (int i = 0; i < len; ++i) {
       if (!LIKELY(IsWhitespace(s[i]))) return false;
@@ -501,14 +501,14 @@ class StringParser {
   template<typename T>
   class StringParseTraits {
    public:
-    // Returns the maximum ascii string length for this type.
-    // e.g. the max/min int8_t has 3 characters.
+    /// Returns the maximum ascii string length for this type.
+    /// e.g. the max/min int8_t has 3 characters.
     static int max_ascii_len();
   };
 
-  // Converts an ascii string to an integer of type T assuming it cannot overflow
-  // and the number is positive. Leading whitespace is not allowed. Trailing whitespace
-  // will be skipped.
+  /// Converts an ascii string to an integer of type T assuming it cannot overflow
+  /// and the number is positive. Leading whitespace is not allowed. Trailing whitespace
+  /// will be skipped.
   template <typename T>
   static inline T StringToIntNoOverflow(const char* s, int len, ParseResult* result) {
     T val = 0;

@@ -24,16 +24,16 @@
 
 namespace impala {
 
-// Compare two strings using sse4.2 intrinsics if they are available. This code assumes
-// that the trivial cases are already handled (i.e. one string is empty).
-// Returns:
-//   < 0 if s1 < s2
-//   0 if s1 == s2
-//   > 0 if s1 > s2
-// The SSE code path is just under 2x faster than the non-sse code path.
-//   - s1/n1: ptr/len for the first string
-//   - s2/n2: ptr/len for the second string
-//   - len: min(n1, n2) - this can be more cheaply passed in by the caller
+/// Compare two strings using sse4.2 intrinsics if they are available. This code assumes
+/// that the trivial cases are already handled (i.e. one string is empty).
+/// Returns:
+///   < 0 if s1 < s2
+///   0 if s1 == s2
+///   > 0 if s1 > s2
+/// The SSE code path is just under 2x faster than the non-sse code path.
+///   - s1/n1: ptr/len for the first string
+///   - s2/n2: ptr/len for the second string
+///   - len: min(n1, n2) - this can be more cheaply passed in by the caller
 static inline int StringCompare(const char* s1, int n1, const char* s2, int n2, int len) {
   DCHECK_EQ(len, std::min(n1, n2));
   if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {

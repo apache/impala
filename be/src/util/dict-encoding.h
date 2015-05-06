@@ -29,56 +29,56 @@
 
 namespace impala {
 
-// See the dictionary encoding section of https://github.com/Parquet/parquet-format.
-// This class supports dictionary encoding of all Impala types.
-// The encoding supports streaming encoding. Values are encoded as they are added while
-// the dictionary is being constructed. At any time, the buffered values can be
-// written out with the current dictionary size. More values can then be added to
-// the encoder, including new dictionary entries.
-// TODO: if the dictionary was made to be ordered, the dictionary would compress better.
-// Add this to the spec as future improvement.
+/// See the dictionary encoding section of https://github.com/Parquet/parquet-format.
+/// This class supports dictionary encoding of all Impala types.
+/// The encoding supports streaming encoding. Values are encoded as they are added while
+/// the dictionary is being constructed. At any time, the buffered values can be
+/// written out with the current dictionary size. More values can then be added to
+/// the encoder, including new dictionary entries.
+/// TODO: if the dictionary was made to be ordered, the dictionary would compress better.
+/// Add this to the spec as future improvement.
 
-// Base class for encoders. This is convenient so users can have a type that
-// abstracts over the actual dictionary type.
-// Note: it does not provide a virtual Put(). Users are expected to know the subclass
-// type when using Put().
-// TODO: once we can easily remove virtual calls with codegen, this interface can
-// rely less on templating and be easier to follow. The type should be passed in
-// as an argument rather than template argument.
+/// Base class for encoders. This is convenient so users can have a type that
+/// abstracts over the actual dictionary type.
+/// Note: it does not provide a virtual Put(). Users are expected to know the subclass
+/// type when using Put().
+/// TODO: once we can easily remove virtual calls with codegen, this interface can
+/// rely less on templating and be easier to follow. The type should be passed in
+/// as an argument rather than template argument.
 class DictEncoderBase {
  public:
   virtual ~DictEncoderBase() {
     DCHECK(buffered_indices_.empty());
   }
 
-  // Writes out the encoded dictionary to buffer. buffer must be preallocated to
-  // dict_encoded_size() bytes.
+  /// Writes out the encoded dictionary to buffer. buffer must be preallocated to
+  /// dict_encoded_size() bytes.
   virtual void WriteDict(uint8_t* buffer) = 0;
 
-  // The number of entries in the dictionary.
+  /// The number of entries in the dictionary.
   virtual int num_entries() const = 0;
 
-  // Clears all the indices (but leaves the dictionary).
+  /// Clears all the indices (but leaves the dictionary).
   void ClearIndices() { buffered_indices_.clear(); }
 
-  // Returns a conservative estimate of the number of bytes needed to encode the buffered
-  // indices. Used to size the buffer passed to WriteData().
+  /// Returns a conservative estimate of the number of bytes needed to encode the buffered
+  /// indices. Used to size the buffer passed to WriteData().
   int EstimatedDataEncodedSize() {
     return 1 + RleEncoder::MaxBufferSize(bit_width(), buffered_indices_.size());
   }
 
-  // The minimum bit width required to encode the currently buffered indices.
+  /// The minimum bit width required to encode the currently buffered indices.
   int bit_width() const {
     if (UNLIKELY(num_entries() == 0)) return 0;
     if (UNLIKELY(num_entries() == 1)) return 1;
     return BitUtil::Log2(num_entries());
   }
 
-  // Writes out any buffered indices to buffer preceded by the bit width of this data.
-  // Returns the number of bytes written.
-  // If the supplied buffer is not big enough, returns -1.
-  // buffer must be preallocated with buffer_len bytes. Use EstimatedDataEncodedSize()
-  // to size buffer.
+  /// Writes out any buffered indices to buffer preceded by the bit width of this data.
+  /// Returns the number of bytes written.
+  /// If the supplied buffer is not big enough, returns -1.
+  /// buffer must be preallocated with buffer_len bytes. Use EstimatedDataEncodedSize()
+  /// to size buffer.
   int WriteData(uint8_t* buffer, int buffer_len);
 
   int dict_encoded_size() { return dict_encoded_size_; }
@@ -88,13 +88,13 @@ class DictEncoderBase {
     : dict_encoded_size_(0), pool_(pool) {
   }
 
-  // Indices that have not yet be written out by WriteData().
+  /// Indices that have not yet be written out by WriteData().
   std::vector<int> buffered_indices_;
 
-  // The number of bytes needed to encode the dictionary.
+  /// The number of bytes needed to encode the dictionary.
   int dict_encoded_size_;
 
-  // Pool to store StringValue data. Not owned.
+  /// Pool to store StringValue data. Not owned.
   MemPool* pool_;
 };
 
@@ -105,11 +105,11 @@ class DictEncoder : public DictEncoderBase {
       DictEncoderBase(pool), buckets_(HASH_TABLE_SIZE, Node::INVALID_INDEX),
       encoded_value_size_(encoded_value_size) { }
 
-  // Encode value. Returns the number of bytes added to the dictionary page length
-  // (will be 0 if this value is already in the dictionary) or -1 if the dictionary is
-  // full (in which case the caller should give up on dictionary encoding). Note that
-  // this does not actually write any data, just buffers the value's index to be
-  // written later.
+  /// Encode value. Returns the number of bytes added to the dictionary page length
+  /// (will be 0 if this value is already in the dictionary) or -1 if the dictionary is
+  /// full (in which case the caller should give up on dictionary encoding). Note that
+  /// this does not actually write any data, just buffers the value's index to be
+  /// written later.
   int Put(const T& value);
 
   virtual void WriteDict(uint8_t* buffer);
@@ -117,55 +117,55 @@ class DictEncoder : public DictEncoderBase {
   virtual int num_entries() const { return nodes_.size(); }
 
  private:
-  // Size of the table. Must be a power of 2.
+  /// Size of the table. Must be a power of 2.
   enum { HASH_TABLE_SIZE = 1 << 16 };
 
-  // Dictates an upper bound on the capacity of the hash table.
+  /// Dictates an upper bound on the capacity of the hash table.
   typedef uint16_t NodeIndex;
 
-  // Hash table mapping value to dictionary index (i.e. the number used to encode this
-  // value in the data). Each table entry is a index into the nodes_ vector (giving the
-  // first node of a chain for this bucket) or Node::INVALID_INDEX for an empty bucket.
+  /// Hash table mapping value to dictionary index (i.e. the number used to encode this
+  /// value in the data). Each table entry is a index into the nodes_ vector (giving the
+  /// first node of a chain for this bucket) or Node::INVALID_INDEX for an empty bucket.
   std::vector<NodeIndex> buckets_;
 
-  // Node in the chained hash table.
+  /// Node in the chained hash table.
   struct Node {
     Node(const T& v, const NodeIndex& n) : value(v), next(n) { }
 
-    // The dictionary value.
+    /// The dictionary value.
     T value;
 
-    // Index into nodes_ for the next Node in the chain. INVALID_INDEX indicates end.
+    /// Index into nodes_ for the next Node in the chain. INVALID_INDEX indicates end.
     NodeIndex next;
 
-    // The maximum number of values in the dictionary.  Chosen to be around 60% of
-    // HASH_TABLE_SIZE to limit the expected length of the chains.
+    /// The maximum number of values in the dictionary.  Chosen to be around 60% of
+    /// HASH_TABLE_SIZE to limit the expected length of the chains.
     enum { INVALID_INDEX = 40000 };
   };
 
-  // The nodes of the hash table. Ordered by dictionary index (and so also represents
-  // the reverse mapping from encoded index to value).
+  /// The nodes of the hash table. Ordered by dictionary index (and so also represents
+  /// the reverse mapping from encoded index to value).
   std::vector<Node> nodes_;
 
-  // Size of each encoded dictionary value. -1 for variable-length types.
+  /// Size of each encoded dictionary value. -1 for variable-length types.
   int encoded_value_size_;
 
-  // Hash function for mapping a value to a bucket.
+  /// Hash function for mapping a value to a bucket.
   inline uint32_t Hash(const T& value) const;
 
-  // Adds value to the hash table and updates dict_encoded_size_. Returns the
-  // number of bytes added to dict_encoded_size_.
-  // bucket gives a pointer to the location (i.e. chain) to add the value
-  // so that the hash for value doesn't need to be recomputed.
+  /// Adds value to the hash table and updates dict_encoded_size_. Returns the
+  /// number of bytes added to dict_encoded_size_.
+  /// bucket gives a pointer to the location (i.e. chain) to add the value
+  /// so that the hash for value doesn't need to be recomputed.
   int AddToTable(const T& value, NodeIndex* bucket);
 };
 
-// Decoder class for dictionary encoded data. This class does not allocate any
-// buffers. The input buffers (dictionary buffer and RLE buffer) must be maintained
-// by the caller and valid as long as this object is.
+/// Decoder class for dictionary encoded data. This class does not allocate any
+/// buffers. The input buffers (dictionary buffer and RLE buffer) must be maintained
+/// by the caller and valid as long as this object is.
 class DictDecoderBase {
  public:
-  // The rle encoded indices into the dictionary.
+  /// The rle encoded indices into the dictionary.
   void SetData(uint8_t* buffer, int buffer_len) {
     DCHECK_GT(buffer_len, 0);
     uint8_t bit_width = *buffer;
@@ -186,19 +186,19 @@ class DictDecoderBase {
 template<typename T>
 class DictDecoder : public DictDecoderBase {
  public:
-  // The input buffer containing the dictionary.  'dict_len' is the byte length
-  // of dict_buffer.
-  // For string data, the decoder returns StringValues with data directly from
-  // dict_buffer (i.e. no copies).
-  // fixed_len_size is the size that must be passed to decode fixed-length
-  // dictionary values (values stored using FIXED_LEN_BYTE_ARRAY).
+  /// The input buffer containing the dictionary.  'dict_len' is the byte length
+  /// of dict_buffer.
+  /// For string data, the decoder returns StringValues with data directly from
+  /// dict_buffer (i.e. no copies).
+  /// fixed_len_size is the size that must be passed to decode fixed-length
+  /// dictionary values (values stored using FIXED_LEN_BYTE_ARRAY).
   DictDecoder(uint8_t* dict_buffer, int dict_len, int fixed_len_size);
 
   virtual int num_entries() const { return dict_.size(); }
 
-  // Returns the next value.  Returns false if the data is invalid.
-  // For StringValues, this does not make a copy of the data.  Instead,
-  // the string data is from the dictionary buffer passed into the c'tor.
+  /// Returns the next value.  Returns false if the data is invalid.
+  /// For StringValues, this does not make a copy of the data.  Instead,
+  /// the string data is from the dictionary buffer passed into the c'tor.
   bool GetValue(T* value);
 
  private:

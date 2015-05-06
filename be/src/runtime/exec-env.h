@@ -46,10 +46,10 @@ class ImpalaServer;
 class RequestPoolService;
 class Frontend;
 
-// Execution environment for queries/plan fragments.
-// Contains all required global structures, and handles to
-// singleton services. Clients must call StartServices exactly
-// once to properly initialise service state.
+/// Execution environment for queries/plan fragments.
+/// Contains all required global structures, and handles to
+/// singleton services. Clients must call StartServices exactly
+/// once to properly initialise service state.
 class ExecEnv {
  public:
   ExecEnv();
@@ -57,13 +57,13 @@ class ExecEnv {
   ExecEnv(const std::string& hostname, int backend_port, int subscriber_port,
           int webserver_port, const std::string& statestore_host, int statestore_port);
 
-  // Returns the first created exec env instance. In a normal impalad, this is
-  // the only instance. In test setups with multiple ExecEnv's per process,
-  // we return the first instance.
+  /// Returns the first created exec env instance. In a normal impalad, this is
+  /// the only instance. In test setups with multiple ExecEnv's per process,
+  /// we return the first instance.
   static ExecEnv* GetInstance() { return exec_env_; }
 
-  // Empty destructor because the compiler-generated one requires full
-  // declarations for classes in scoped_ptrs.
+  /// Empty destructor because the compiler-generated one requires full
+  /// declarations for classes in scoped_ptrs.
   virtual ~ExecEnv();
 
   void SetImpalaServer(ImpalaServer* server) { impala_server_ = server; }
@@ -98,24 +98,24 @@ class ExecEnv {
 
   const TNetworkAddress& backend_address() const { return backend_address_; }
 
-  // Starts any dependent services in their correct order
+  /// Starts any dependent services in their correct order
   virtual Status StartServices();
 
-  // Initializes the exec env for running FE tests.
+  /// Initializes the exec env for running FE tests.
   Status InitForFeTests();
 
-  // Returns true if this environment was created from the FE tests. This makes the
-  // environment special since the JVM is started first and libraries are loaded
-  // differently.
+  /// Returns true if this environment was created from the FE tests. This makes the
+  /// environment special since the JVM is started first and libraries are loaded
+  /// differently.
   bool is_fe_tests() { return is_fe_tests_; }
 
-  // Returns true if the Llama in use is pseudo-distributed, used for development
-  // purposes. The pseudo-distributed version has special requirements for specifying
-  // resource locations.
+  /// Returns true if the Llama in use is pseudo-distributed, used for development
+  /// purposes. The pseudo-distributed version has special requirements for specifying
+  /// resource locations.
   bool is_pseudo_distributed_llama() { return is_pseudo_distributed_llama_; }
 
  protected:
-  // Leave protected so that subclasses can override
+  /// Leave protected so that subclasses can override
   boost::scoped_ptr<DataStreamMgr> stream_mgr_;
   boost::scoped_ptr<ResourceBroker> resource_broker_;
   boost::scoped_ptr<Scheduler> scheduler_;
@@ -133,7 +133,7 @@ class ExecEnv {
   boost::scoped_ptr<RequestPoolService> request_pool_service_;
   boost::scoped_ptr<Frontend> frontend_;
 
-  // Not owned by this class
+  /// Not owned by this class
   ImpalaServer* impala_server_;
 
   bool enable_webserver_;
@@ -143,15 +143,15 @@ class ExecEnv {
   TimezoneDatabase tz_database_;
   bool is_fe_tests_;
 
-  // Address of the Impala backend server instance
+  /// Address of the Impala backend server instance
   TNetworkAddress backend_address_;
 
-  // True if the cluster has set 'yarn.scheduler.include-port-in-node-name' to true,
-  // indicating that this cluster is pseudo-distributed. Should not be true in real
-  // deployments.
+  /// True if the cluster has set 'yarn.scheduler.include-port-in-node-name' to true,
+  /// indicating that this cluster is pseudo-distributed. Should not be true in real
+  /// deployments.
   bool is_pseudo_distributed_llama_;
 
-  // Initialise cgroups manager, detect test RM environment and init resource broker.
+  /// Initialise cgroups manager, detect test RM environment and init resource broker.
   void InitRm();
 };
 

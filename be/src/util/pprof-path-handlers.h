@@ -18,7 +18,7 @@
 namespace impala {
 class Webserver;
 
-// Adds set of path handlers to support pprof profiling of a remote server.
+/// Adds set of path handlers to support pprof profiling of a remote server.
 void AddPprofUrlCallbacks(Webserver* webserver);
 }
 

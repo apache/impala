@@ -26,83 +26,83 @@ namespace impala {
 
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return false
 
-// Class for reading and writing various data types.
-// Note: be very careful using *signed* ints.  Casting from a signed int to
-// an unsigned is not a problem.  However, bit shifts will do sign extension
-// on unsigned ints, which is rarely the right thing to do for byte level
-// operations.
+/// Class for reading and writing various data types.
+/// Note: be very careful using *signed* ints.  Casting from a signed int to
+/// an unsigned is not a problem.  However, bit shifts will do sign extension
+/// on unsigned ints, which is rarely the right thing to do for byte level
+/// operations.
 class ReadWriteUtil {
  public:
-  // Maximum length for Writeable VInt
+  /// Maximum length for Writeable VInt
   static const int MAX_VINT_LEN = 9;
 
-  // Maximum lengths for Zigzag encodings.
+  /// Maximum lengths for Zigzag encodings.
   const static int MAX_ZINT_LEN = 5;
   const static int MAX_ZLONG_LEN = 10;
 
-  // Put a zigzag encoded integer into a buffer and return its length.
+  /// Put a zigzag encoded integer into a buffer and return its length.
   static int PutZInt(int32_t integer, uint8_t* buf);
 
-  // Put a zigzag encoded long integer into a buffer and return its length.
+  /// Put a zigzag encoded long integer into a buffer and return its length.
   static int PutZLong(int64_t longint, uint8_t* buf);
 
-  // Get a big endian integer from a buffer.  The buffer does not have to be word aligned.
+  /// Get a big endian integer from a buffer.  The buffer does not have to be word aligned.
   template<typename T>
   static T GetInt(const uint8_t* buffer);
 
-  // Get a variable-length Long or int value from a byte buffer.
-  // Returns the length of the long/int
-  // If the size byte is corrupted then return -1;
+  /// Get a variable-length Long or int value from a byte buffer.
+  /// Returns the length of the long/int
+  /// If the size byte is corrupted then return -1;
   static int GetVLong(uint8_t* buf, int64_t* vlong);
   static int GetVInt(uint8_t* buf, int32_t* vint);
 
-  // Writes a variable-length Long or int value to a byte buffer.
-  // Returns the number of bytes written
+  /// Writes a variable-length Long or int value to a byte buffer.
+  /// Returns the number of bytes written
   static int64_t PutVLong(int64_t val, uint8_t* buf);
   static int64_t PutVInt(int32_t val, uint8_t* buf);
 
-  // returns size of the encoded long value, not including the 1 byte for length
+  /// returns size of the encoded long value, not including the 1 byte for length
   static int VLongRequiredBytes(int64_t val);
 
-  // Read a variable-length Long value from a byte buffer starting at the specified
-  // byte offset.
+  /// Read a variable-length Long value from a byte buffer starting at the specified
+  /// byte offset.
   static int GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong);
 
-  // Put an Integer into a buffer in big endian order.  The buffer must be big
-  // enough.
+  /// Put an Integer into a buffer in big endian order.  The buffer must be big
+  /// enough.
   static void PutInt(uint8_t* buf, uint16_t integer);
   static void PutInt(uint8_t* buf, uint32_t integer);
   static void PutInt(uint8_t* buf, uint64_t integer);
 
-  // Dump the first length bytes of buf to a Hex string.
+  /// Dump the first length bytes of buf to a Hex string.
   static std::string HexDump(const uint8_t* buf, int64_t length);
   static std::string HexDump(const char* buf, int64_t length);
 
-  // Determines the sign of a VInt/VLong from the first byte.
+  /// Determines the sign of a VInt/VLong from the first byte.
   static bool IsNegativeVInt(int8_t byte);
 
-  // Determines the total length in bytes of a Writable VInt/VLong from the first byte.
+  /// Determines the total length in bytes of a Writable VInt/VLong from the first byte.
   static int DecodeVIntSize(int8_t byte);
 
-  // Read a zig-zag encoded long. This is the integer encoding defined by google.com
-  // protocol-buffers: https://developers.google.com/protocol-buffers/docs/encoding
-  // *buf is incremented past the encoded long.
+  /// Read a zig-zag encoded long. This is the integer encoding defined by google.com
+  /// protocol-buffers: https://developers.google.com/protocol-buffers/docs/encoding
+  /// *buf is incremented past the encoded long.
   static int64_t ReadZLong(uint8_t** buf);
 
-  // Read a zig-zag encoded int.
+  /// Read a zig-zag encoded int.
   static int32_t ReadZInt(uint8_t** buf);
 
-  // The following methods read data from a buffer without assuming the buffer is long
-  // enough. If the buffer isn't long enough or another error occurs, they return false
-  // and update the status with the error. Otherwise they return true. buffer is advanced
-  // past the data read and buf_len is decremented appropriately.
+  /// The following methods read data from a buffer without assuming the buffer is long
+  /// enough. If the buffer isn't long enough or another error occurs, they return false
+  /// and update the status with the error. Otherwise they return true. buffer is advanced
+  /// past the data read and buf_len is decremented appropriately.
 
-  // Read a native type T (e.g. bool, float) directly into output (i.e. input is cast
-  // directly to T and incremented by sizeof(T)).
+  /// Read a native type T (e.g. bool, float) directly into output (i.e. input is cast
+  /// directly to T and incremented by sizeof(T)).
   template <class T>
   static bool Read(uint8_t** buf, int* buf_len, T* val, Status* status);
 
-  // Skip the next num_bytes bytes.
+  /// Skip the next num_bytes bytes.
   static bool SkipBytes(uint8_t** buf, int* buf_len, int num_bytes, Status* status);
 };
 

@@ -30,14 +30,14 @@
 
 namespace impala {
 
-// Class to write RowBatches to an HBase table using the java HTable client.
-// This class should only be called from a single sink and should not be
-// shared.
-// Sample usage (Must happen in order):
-//    HBaseTableWriter::InitJni();
-//    writer = new HBaseTableWriter(state, table_desc_, output_exprs_);
-//    writer.Init(state);
-//    writer.AppendRowBatch(batch);
+/// Class to write RowBatches to an HBase table using the java HTable client.
+/// This class should only be called from a single sink and should not be
+/// shared.
+/// Sample usage (Must happen in order):
+///    HBaseTableWriter::InitJni();
+///    writer = new HBaseTableWriter(state, table_desc_, output_exprs_);
+///    writer.Init(state);
+///    writer.AppendRowBatch(batch);
 class HBaseTableWriter {
  public:
   HBaseTableWriter(HBaseTableDescriptor* table_desc,
@@ -45,80 +45,80 @@ class HBaseTableWriter {
                    RuntimeProfile* profile);
   Status AppendRowBatch(RowBatch* batch);
 
-  // Calls to Close release the HBaseTable.
+  /// Calls to Close release the HBaseTable.
   void Close(RuntimeState* state);
 
-  // Create all needed java side objects.
-  // This call may cause connections to HBase and Zookeeper to be created.
+  /// Create all needed java side objects.
+  /// This call may cause connections to HBase and Zookeeper to be created.
   Status Init(RuntimeState* state);
 
-  // Grab all of the Java classes needed to get data into and out of HBase.
+  /// Grab all of the Java classes needed to get data into and out of HBase.
   static Status InitJNI();
 
  private:
-  // Methods used to create JNI objects.
-  // Create a Put using the supplied row key
+  /// Methods used to create JNI objects.
+  /// Create a Put using the supplied row key
   Status CreatePut(JNIEnv* env, const void* rk, int rk_len, jobject* put);
 
-  // Create a byte array containing the string's chars.
+  /// Create a byte array containing the string's chars.
   Status CreateByteArray(JNIEnv* env, const std::string& s,
                          jbyteArray* j_array);
 
-  // Create a byte array containing the input bytes.
+  /// Create a byte array containing the input bytes.
   Status CreateByteArray(JNIEnv* env, const void* data, int data_len,
                          jbyteArray* j_array);
 
-  // Create an ArrayList<Put> to be passed to put.put(list);
-  // Should be used like:
-  //    CreatePutList(env, limit);
+  /// Create an ArrayList<Put> to be passed to put.put(list);
+  /// Should be used like:
+  ///    CreatePutList(env, limit);
   Status CreatePutList(JNIEnv* env, int num_puts);
 
-  // Clean up the jni global ref in put_list_, allowing the jni to garbage
-  // collect all of the puts that are created by a writer.
+  /// Clean up the jni global ref in put_list_, allowing the jni to garbage
+  /// collect all of the puts that are created by a writer.
   Status CleanUpJni();
 
-  // Owned by RuntimeState not by this object
+  /// Owned by RuntimeState not by this object
   HBaseTableDescriptor* table_desc_;
 
-  // The wrapper around a Java HTable.
-  // This instance is owned by this object and must be cleaned
-  // up using close before the table can be discarded.
+  /// The wrapper around a Java HTable.
+  /// This instance is owned by this object and must be cleaned
+  /// up using close before the table can be discarded.
   boost::scoped_ptr<HBaseTable> table_;
 
-  // The expressions that are run to create tuples to be written to hbase.
+  /// The expressions that are run to create tuples to be written to hbase.
   const std::vector<ExprContext*> output_expr_ctxs_;
 
-  // output_exprs_byte_sizes_[i] is the byte size of output_expr_ctxs_[i]->root()'s type.
+  /// output_exprs_byte_sizes_[i] is the byte size of output_expr_ctxs_[i]->root()'s type.
   std::vector<int> output_exprs_byte_sizes_;
 
-  // jni ArrayList<Put>
+  /// jni ArrayList<Put>
   jobject put_list_;
 
-  // org.apache.hadoop.hbase.client.Put
+  /// org.apache.hadoop.hbase.client.Put
   static jclass put_cl_;
 
-  // new Put(byte[])
+  /// new Put(byte[])
   static jmethodID put_ctor_;
 
-  // Put#add(byte[], byte[], byte[])
+  /// Put#add(byte[], byte[], byte[])
   static jmethodID put_add_id_;
 
-  // java.util.ArrayList
+  /// java.util.ArrayList
   static jclass list_cl_;
 
-  // new ArrayList<V>(starting_capacity)
+  /// new ArrayList<V>(starting_capacity)
   static jmethodID list_ctor_;
 
-  // ArrayList#add(V);
+  /// ArrayList#add(V);
   static jmethodID list_add_id_;
 
-  // cf_arrays_[i-1] is the column family jbyteArray for column i.
+  /// cf_arrays_[i-1] is the column family jbyteArray for column i.
   std::vector<jbyteArray> cf_arrays_;
 
-  // qual_arrays_[i-1] is the column family qualifier jbyteArray for column i.
+  /// qual_arrays_[i-1] is the column family qualifier jbyteArray for column i.
   std::vector<jbyteArray> qual_arrays_;
 
-  // Parent table sink's profile
+  /// Parent table sink's profile
   RuntimeProfile* runtime_profile_;
   RuntimeProfile::Counter* encoding_timer_;
   RuntimeProfile::Counter* htable_put_timer_;

@@ -65,22 +65,22 @@ std::string PrintTMetricKind(const TMetricKind::type& type);
 std::string PrintTUnit(const TUnit::type& type);
 std::string PrintPath(const std::vector<int>& path);
 
-// Parse 's' into a TUniqueId object.  The format of s needs to be the output format
-// from PrintId.  (<hi_part>:<low_part>)
-// Returns true if parse succeeded.
+/// Parse 's' into a TUniqueId object.  The format of s needs to be the output format
+/// from PrintId.  (<hi_part>:<low_part>)
+/// Returns true if parse succeeded.
 bool ParseId(const std::string& s, TUniqueId* id);
 
-// Returns a string "<product version number> (build <build hash>)"
-// If compact == false, this string is appended: "\nBuilt on <build time>"
-// This is used to set gflags build version
+/// Returns a string "<product version number> (build <build hash>)"
+/// If compact == false, this string is appended: "\nBuilt on <build time>"
+/// This is used to set gflags build version
 std::string GetBuildVersion(bool compact = false);
 
-// Returns "<program short name> version <GetBuildVersion(compact)>"
+/// Returns "<program short name> version <GetBuildVersion(compact)>"
 std::string GetVersionString(bool compact = false);
 
-// Returns the stack trace as a string from the current location.
-// Note: there is a libc bug that causes this not to work on 64 bit machines
-// for recursive calls.
+/// Returns the stack trace as a string from the current location.
+/// Note: there is a libc bug that causes this not to work on 64 bit machines
+/// for recursive calls.
 std::string GetStackTrace();
 
 }

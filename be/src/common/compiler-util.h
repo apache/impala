@@ -16,11 +16,11 @@
 #ifndef IMPALA_COMMON_COMPILER_UTIL_H
 #define IMPALA_COMMON_COMPILER_UTIL_H
 
-// Compiler hint that this branch is likely or unlikely to
-// be taken. Take from the "What all programmers should know
-// about memory" paper.
-// example: if (LIKELY(size > 0)) { ... }
-// example: if (UNLIKELY(!status.ok())) { ... }
+/// Compiler hint that this branch is likely or unlikely to
+/// be taken. Take from the "What all programmers should know
+/// about memory" paper.
+/// example: if (LIKELY(size > 0)) { ... }
+/// example: if (UNLIKELY(!status.ok())) { ... }
 #ifdef LIKELY 
 #undef LIKELY
 #endif

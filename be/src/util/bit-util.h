@@ -24,29 +24,29 @@
 
 namespace impala {
 
-// Utility class to do standard bit tricks
-// TODO: is this in boost or something else like that?
+/// Utility class to do standard bit tricks
+/// TODO: is this in boost or something else like that?
 class BitUtil {
  public:
-  // Returns the ceil of value/divisor
+  /// Returns the ceil of value/divisor
   static inline int Ceil(int value, int divisor) {
     return value / divisor + (value % divisor != 0);
   }
 
-  // Returns 'value' rounded up to the nearest multiple of 'factor'
+  /// Returns 'value' rounded up to the nearest multiple of 'factor'
   static inline int RoundUp(int value, int factor) {
     return (value + (factor - 1)) / factor * factor;
   }
 
-  // Returns 'value' rounded down to the nearest multiple of 'factor'
+  /// Returns 'value' rounded down to the nearest multiple of 'factor'
   static inline int RoundDown(int value, int factor) {
     return (value / factor) * factor;
   }
 
-  // Returns the smallest power of two that contains v. Taken from
-  // http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
-  // TODO: Pick a better name, as it is not clear what happens when the input is
-  // already a power of two.
+  /// Returns the smallest power of two that contains v. Taken from
+  /// http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
+  /// TODO: Pick a better name, as it is not clear what happens when the input is
+  /// already a power of two.
   static inline int64_t NextPowerOfTwo(int64_t v) {
     --v;
     v |= v >> 1;
@@ -59,8 +59,8 @@ class BitUtil {
     return v;
   }
 
-  // Returns 'value' rounded up to the nearest multiple of 'factor' when factor is
-  // a power of two
+  /// Returns 'value' rounded up to the nearest multiple of 'factor' when factor is
+  /// a power of two
   static inline int RoundUpToPowerOf2(int value, int factor) {
     DCHECK((factor > 0) && ((factor & (factor - 1)) == 0));
     return (value + (factor - 1)) & ~(factor - 1);
@@ -71,48 +71,48 @@ class BitUtil {
     return value & ~(factor - 1);
   }
 
-  // Specialized round up and down functions for frequently used factors,
-  // like 8 (bits->bytes), 32 (bits->i32), and 64 (bits->i64).
-  // Returns the rounded up number of bytes that fit the number of bits.
+  /// Specialized round up and down functions for frequently used factors,
+  /// like 8 (bits->bytes), 32 (bits->i32), and 64 (bits->i64).
+  /// Returns the rounded up number of bytes that fit the number of bits.
   static inline uint32_t RoundUpNumBytes(uint32_t bits) {
     return (bits + 7) >> 3;
   }
 
-  // Returns the rounded down number of bytes that fit the number of bits.
+  /// Returns the rounded down number of bytes that fit the number of bits.
   static inline uint32_t RoundDownNumBytes(uint32_t bits) {
     return bits >> 3;
   }
 
-  // Returns the rounded up to 32 multiple. Used for conversions of bits to i32.
+  /// Returns the rounded up to 32 multiple. Used for conversions of bits to i32.
   static inline uint32_t RoundUpNumi32(uint32_t bits) {
     return (bits + 31) >> 5;
   }
 
-  // Returns the rounded up 32 multiple.
+  /// Returns the rounded up 32 multiple.
   static inline uint32_t RoundDownNumi32(uint32_t bits) {
     return bits >> 5;
   }
 
-  // Returns the rounded up to 64 multiple. Used for conversions of bits to i64.
+  /// Returns the rounded up to 64 multiple. Used for conversions of bits to i64.
   static inline uint32_t RoundUpNumi64(uint32_t bits) {
     return (bits + 63) >> 6;
   }
 
-  // Returns the rounded down to 64 multiple.
+  /// Returns the rounded down to 64 multiple.
   static inline uint32_t RoundDownNumi64(uint32_t bits) {
     return bits >> 6;
   }
 
-  // Non hw accelerated pop count.
-  // TODO: we don't use this in any perf sensitive code paths currently.  There
-  // might be a much faster way to implement this.
+  /// Non hw accelerated pop count.
+  /// TODO: we don't use this in any perf sensitive code paths currently.  There
+  /// might be a much faster way to implement this.
   static inline int PopcountNoHw(uint64_t x) {
     int count = 0;
     for (; x != 0; ++count) x &= x-1;
     return count;
   }
 
-  // Returns the number of set bits in x
+  /// Returns the number of set bits in x
   static inline int Popcount(uint64_t x) {
     if (LIKELY(CpuInfo::IsSupported(CpuInfo::POPCNT))) {
       return POPCNT_popcnt_u64(x);
@@ -121,7 +121,7 @@ class BitUtil {
     }
   }
 
-  // Returns the 'num_bits' least-significant bits of 'v'.
+  /// Returns the 'num_bits' least-significant bits of 'v'.
   static inline uint64_t TrailingBits(uint64_t v, int num_bits) {
     if (UNLIKELY(num_bits == 0)) return 0;
     if (UNLIKELY(num_bits >= 64)) return v;
@@ -129,9 +129,9 @@ class BitUtil {
     return (v << n) >> n;
   }
 
-  // Returns ceil(log2(x)).
-  // TODO: this could be faster if we use __builtin_clz.  Fix this if this ever shows up
-  // in a hot path.
+  /// Returns ceil(log2(x)).
+  /// TODO: this could be faster if we use __builtin_clz.  Fix this if this ever shows up
+  /// in a hot path.
   static inline int Log2(uint64_t x) {
     DCHECK_GT(x, 0);
     if (x == 1) return 0;
@@ -145,7 +145,7 @@ class BitUtil {
     return result;
   }
 
-  // Swaps the byte order (i.e. endianess)
+  /// Swaps the byte order (i.e. endianess)
   static inline int64_t ByteSwap(int64_t value) {
     return __builtin_bswap64(value);
   }
@@ -165,7 +165,7 @@ class BitUtil {
     return static_cast<uint16_t>(ByteSwap(static_cast<int16_t>(value)));
   }
 
-  // Write the swapped bytes into dst. Src and st cannot overlap.
+  /// Write the swapped bytes into dst. Src and st cannot overlap.
   static inline void ByteSwap(void* dst, const void* src, int len) {
     switch (len) {
       case 1:
@@ -193,8 +193,8 @@ class BitUtil {
     }
   }
 
-  // Converts to big endian format (if not already in big endian) from the
-  // machine's native endian format.
+  /// Converts to big endian format (if not already in big endian) from the
+  /// machine's native endian format.
 #if __BYTE_ORDER == __LITTLE_ENDIAN
   static inline int64_t  ToBigEndian(int64_t value)  { return ByteSwap(value); }
   static inline uint64_t ToBigEndian(uint64_t value) { return ByteSwap(value); }
@@ -211,7 +211,7 @@ class BitUtil {
   static inline uint16_t ToBigEndian(uint16_t val) { return val; }
 #endif
 
-  // Converts from big endian format to the machine's native endian format.
+  /// Converts from big endian format to the machine's native endian format.
 #if __BYTE_ORDER == __LITTLE_ENDIAN
   static inline int64_t  FromBigEndian(int64_t value)  { return ByteSwap(value); }
   static inline uint64_t FromBigEndian(uint64_t value) { return ByteSwap(value); }

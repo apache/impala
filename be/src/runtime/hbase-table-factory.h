@@ -24,34 +24,34 @@
 
 namespace impala {
 
-// A (process-wide) factory of HTable java objects.
-// This object keeps java objects around to ease creation of HTables
-// that share a pool of threads and connections.
-// TODO: Consider writing factory in Java to save JNI logic (and to avoid
-// having to mark objects as global refs)
-// TODO: Implement a cache to avoid creating more HTables than necessary
-// TODO: Add metrics to track the number of tables outstanding
+/// A (process-wide) factory of HTable java objects.
+/// This object keeps java objects around to ease creation of HTables
+/// that share a pool of threads and connections.
+/// TODO: Consider writing factory in Java to save JNI logic (and to avoid
+/// having to mark objects as global refs)
+/// TODO: Implement a cache to avoid creating more HTables than necessary
+/// TODO: Add metrics to track the number of tables outstanding
 class HBaseTableFactory {
  public:
   ~HBaseTableFactory();
 
-  // JNI setup. Create global references to classes,
-  // and find method ids.
+  /// JNI setup. Create global references to classes,
+  /// and find method ids.
   static Status Init();
 
-  // create an HTable java object for the given table name.
-  // The new htable is returned in global_htable
-  // It is the caller's responsibility to close the HBaseTable using
-  // HBaseTable#Close().
+  /// create an HTable java object for the given table name.
+  /// The new htable is returned in global_htable
+  /// It is the caller's responsibility to close the HBaseTable using
+  /// HBaseTable#Close().
   Status GetTable(const std::string& table_name,
                   boost::scoped_ptr<HBaseTable>* hbase_table);
 
  private:
-  // ExecutorService class and methods.
+  /// ExecutorService class and methods.
   static jclass executor_cl_;
   static jmethodID executor_shutdown_id_;
 
-  // Configuration and executor jobject's. Initialized in Init().
+  /// Configuration and executor jobject's. Initialized in Init().
   static jobject conf_;
   static jobject executor_;
 };

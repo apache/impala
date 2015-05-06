@@ -34,7 +34,7 @@ class CompoundPredicate: public Predicate {
   Status CodegenComputeFn(bool and_fn, RuntimeState* state, llvm::Function** fn);
 };
 
-// Expr for evaluating and (&&) operators
+/// Expr for evaluating and (&&) operators
 class AndPredicate: public CompoundPredicate {
  public:
   virtual impala_udf::BooleanVal GetBooleanVal(ExprContext* context, TupleRow*);
@@ -57,7 +57,7 @@ class AndPredicate: public CompoundPredicate {
   friend class OpcodeRegistry;
 };
 
-// Expr for evaluating or (||) operators
+/// Expr for evaluating or (||) operators
 class OrPredicate: public CompoundPredicate {
  public:
   virtual impala_udf::BooleanVal GetBooleanVal(ExprContext* context, TupleRow*);

@@ -24,46 +24,46 @@
 
 namespace impala {
 
-// Manages execution of individual plan fragments, which are typically run as a result of
-// ExecPlanFragment() RPCs that arrive via the internal Impala interface.
+/// Manages execution of individual plan fragments, which are typically run as a result of
+/// ExecPlanFragment() RPCs that arrive via the internal Impala interface.
 //
-// A fragment is started in ExecPlanFragment(), which starts a thread which runs
-// FragmentExecThread() asynchronously and returns. After this point a fragment may
-// terminate either by cancellation via CancelPlanFragment(), or when FragmentExecThread()
-// returns.
+/// A fragment is started in ExecPlanFragment(), which starts a thread which runs
+/// FragmentExecThread() asynchronously and returns. After this point a fragment may
+/// terminate either by cancellation via CancelPlanFragment(), or when FragmentExecThread()
+/// returns.
 //
-// TODO: Remove Thrift args from methods where it would improve readability;
-// ImpalaInternalService can take care of translation to / from Thrift, as it already does
-// for ExecPlanFragment()'s return value.
+/// TODO: Remove Thrift args from methods where it would improve readability;
+/// ImpalaInternalService can take care of translation to / from Thrift, as it already does
+/// for ExecPlanFragment()'s return value.
 class FragmentMgr {
  public:
-  // Registers a new FragmentExecState, Prepare()'s it, and launches the thread that runs
-  // FragmentExecThread() before returning. Returns OK if there was no error, otherwise
-  // returns an error if the fragment is malformed (e.g. no sink), or if there is an error
-  // during Prepare().
+  /// Registers a new FragmentExecState, Prepare()'s it, and launches the thread that runs
+  /// FragmentExecThread() before returning. Returns OK if there was no error, otherwise
+  /// returns an error if the fragment is malformed (e.g. no sink), or if there is an error
+  /// during Prepare().
   Status ExecPlanFragment(const TExecPlanFragmentParams& params);
 
-  // Cancels a plan fragment that is running asynchronously.
+  /// Cancels a plan fragment that is running asynchronously.
   void CancelPlanFragment(TCancelPlanFragmentResult& return_val,
       const TCancelPlanFragmentParams& params);
 
   class FragmentExecState;
 
-  // Returns a shared pointer to the FragmentExecState if one can be found for the
-  // given id. If the id is not found, the shared pointer will contain NULL.
+  /// Returns a shared pointer to the FragmentExecState if one can be found for the
+  /// given id. If the id is not found, the shared pointer will contain NULL.
   boost::shared_ptr<FragmentExecState> GetFragmentExecState(
       const TUniqueId& fragment_instance_id);
 
  private:
-  // Call exec_state->Exec(), and then removes exec_state from the fragment map. Run in
-  // the fragment's execution thread.
+  /// Call exec_state->Exec(), and then removes exec_state from the fragment map. Run in
+  /// the fragment's execution thread.
   void FragmentExecThread(FragmentExecState* exec_state);
 
-  // protects fragment_exec_state_map_
+  /// protects fragment_exec_state_map_
   boost::mutex fragment_exec_state_map_lock_;
 
-  // map from fragment id to exec state; FragmentExecState is owned by us and
-  // referenced as a shared_ptr to allow asynchronous calls to CancelPlanFragment()
+  /// map from fragment id to exec state; FragmentExecState is owned by us and
+  /// referenced as a shared_ptr to allow asynchronous calls to CancelPlanFragment()
   typedef boost::unordered_map<TUniqueId, boost::shared_ptr<FragmentExecState> >
   FragmentExecStateMap;
   FragmentExecStateMap fragment_exec_state_map_;

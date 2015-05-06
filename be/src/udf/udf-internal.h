@@ -22,8 +22,8 @@
 #include <string.h>
 #include <vector>
 
-// Be very careful when adding Impala includes in this file. We don't want to pull
-// in unnecessary dependencies for the development libs.
+/// Be very careful when adding Impala includes in this file. We don't want to pull
+/// in unnecessary dependencies for the development libs.
 #include "udf/udf.h"
 
 namespace impala {
@@ -32,19 +32,19 @@ class FreePool;
 class MemPool;
 class RuntimeState;
 
-// This class actually implements the interface of FunctionContext. This is split to
-// hide the details from the external header.
-// Note: The actual user code does not include this file.
+/// This class actually implements the interface of FunctionContext. This is split to
+/// hide the details from the external header.
+/// Note: The actual user code does not include this file.
 class FunctionContextImpl {
  public:
-  // Create a FunctionContext for a UDF. Caller is responsible for deleting it.
+  /// Create a FunctionContext for a UDF. Caller is responsible for deleting it.
   static impala_udf::FunctionContext* CreateContext(RuntimeState* state, MemPool* pool,
       const impala_udf::FunctionContext::TypeDesc& return_type,
       const std::vector<impala_udf::FunctionContext::TypeDesc>& arg_types,
       int varargs_buffer_size = 0, bool debug = false);
 
-  // Create a FunctionContext for a UDA. Identical to the UDF version except for the
-  // intermediate type. Caller is responsible for deleting it.
+  /// Create a FunctionContext for a UDA. Identical to the UDF version except for the
+  /// intermediate type. Caller is responsible for deleting it.
   static impala_udf::FunctionContext* CreateContext(RuntimeState* state, MemPool* pool,
       const impala_udf::FunctionContext::TypeDesc& intermediate_type,
       const impala_udf::FunctionContext::TypeDesc& return_type,
@@ -53,27 +53,27 @@ class FunctionContextImpl {
 
   FunctionContextImpl(impala_udf::FunctionContext* parent);
 
-  // Checks for any outstanding memory allocations. If there is unfreed memory, adds a
-  // warning and frees the allocations. Note that local allocations are freed with the
-  // MemPool backing pool_.
+  /// Checks for any outstanding memory allocations. If there is unfreed memory, adds a
+  /// warning and frees the allocations. Note that local allocations are freed with the
+  /// MemPool backing pool_.
   void Close();
 
-  // Returns a new FunctionContext with the same constant args, fragment-local state, and
-  // debug flag as this FunctionContext. The caller is responsible for calling delete on
-  // it.
+  /// Returns a new FunctionContext with the same constant args, fragment-local state, and
+  /// debug flag as this FunctionContext. The caller is responsible for calling delete on
+  /// it.
   impala_udf::FunctionContext* Clone(MemPool* pool);
 
-  // Allocates a buffer of 'byte_size' with "local" memory management. These
-  // allocations are not freed one by one but freed as a pool by FreeLocalAllocations()
-  // This is used where the lifetime of the allocation is clear.
-  // For UDFs, the allocations can be freed at the row level.
-  // TODO: free them at the batch level and save some copies?
+  /// Allocates a buffer of 'byte_size' with "local" memory management. These
+  /// allocations are not freed one by one but freed as a pool by FreeLocalAllocations()
+  /// This is used where the lifetime of the allocation is clear.
+  /// For UDFs, the allocations can be freed at the row level.
+  /// TODO: free them at the batch level and save some copies?
   uint8_t* AllocateLocal(int byte_size);
 
-  // Frees all allocations returned by AllocateLocal().
+  /// Frees all allocations returned by AllocateLocal().
   void FreeLocalAllocations();
 
-  // Sets constant_args_. The AnyVal* values are owned by the caller.
+  /// Sets constant_args_. The AnyVal* values are owned by the caller.
   void SetConstantArgs(const std::vector<impala_udf::AnyVal*>& constant_args);
 
   uint8_t* varargs_buffer() { return varargs_buffer_; }
@@ -97,76 +97,76 @@ class FunctionContextImpl {
  private:
   friend class impala_udf::FunctionContext;
 
-  // Preallocated buffer for storing varargs (if the function has any). Allocated and
-  // owned by this object, but populated by an Expr function.
+  /// Preallocated buffer for storing varargs (if the function has any). Allocated and
+  /// owned by this object, but populated by an Expr function.
   //
-  // This is the first field in the class so it's easy to access in codegen'd functions.
-  // Don't move it or add fields above unless you know what you're doing.
+  /// This is the first field in the class so it's easy to access in codegen'd functions.
+  /// Don't move it or add fields above unless you know what you're doing.
   uint8_t* varargs_buffer_;
   int varargs_buffer_size_;
 
-  // Parent context object. Not owned
+  /// Parent context object. Not owned
   impala_udf::FunctionContext* context_;
 
-  // Pool to service allocations from.
+  /// Pool to service allocations from.
   FreePool* pool_;
 
-  // We use the query's runtime state to report errors and warnings. NULL for test
-  // contexts.
+  /// We use the query's runtime state to report errors and warnings. NULL for test
+  /// contexts.
   RuntimeState* state_;
 
-  // If true, indicates this is a debug context which will do additional validation.
+  /// If true, indicates this is a debug context which will do additional validation.
   bool debug_;
 
   impala_udf::FunctionContext::ImpalaVersion version_;
 
-  // Empty if there's no error
+  /// Empty if there's no error
   std::string error_msg_;
 
-  // The number of warnings reported.
+  /// The number of warnings reported.
   int64_t num_warnings_;
 
-  // The number of calls to Update()/Remove().
+  /// The number of calls to Update()/Remove().
   int64_t num_updates_;
   int64_t num_removes_;
 
-  // Allocations made and still owned by the user function. Only used if debug_ is true
-  // because it is very expensive to maintain.
+  /// Allocations made and still owned by the user function. Only used if debug_ is true
+  /// because it is very expensive to maintain.
   std::map<uint8_t*, int> allocations_;
-  // Allocations owned by Impala.
+  /// Allocations owned by Impala.
   std::vector<uint8_t*> local_allocations_;
 
-  // The function state accessed via FunctionContext::Get/SetFunctionState()
+  /// The function state accessed via FunctionContext::Get/SetFunctionState()
   void* thread_local_fn_state_;
   void* fragment_local_fn_state_;
 
-  // The number of bytes allocated externally by the user function. In some cases,
-  // it is too inconvenient to use the Allocate()/Free() APIs in the FunctionContext,
-  // particularly for existing codebases (e.g. they use std::vector). Instead, they'll
-  // have to track those allocations manually.
+  /// The number of bytes allocated externally by the user function. In some cases,
+  /// it is too inconvenient to use the Allocate()/Free() APIs in the FunctionContext,
+  /// particularly for existing codebases (e.g. they use std::vector). Instead, they'll
+  /// have to track those allocations manually.
   int64_t external_bytes_tracked_;
 
-  // Type descriptor for the intermediate type of a UDA. Set to INVALID_TYPE for UDFs.
+  /// Type descriptor for the intermediate type of a UDA. Set to INVALID_TYPE for UDFs.
   impala_udf::FunctionContext::TypeDesc intermediate_type_;
 
-  // Type descriptor for the return type of the function.
+  /// Type descriptor for the return type of the function.
   impala_udf::FunctionContext::TypeDesc return_type_;
 
-  // Type descriptors for each argument of the function.
+  /// Type descriptors for each argument of the function.
   std::vector<impala_udf::FunctionContext::TypeDesc> arg_types_;
 
-  // Contains an AnyVal* for each argument of the function. If the AnyVal* is NULL,
-  // indicates that the corresponding argument is non-constant. Otherwise contains the
-  // value of the argument.
+  /// Contains an AnyVal* for each argument of the function. If the AnyVal* is NULL,
+  /// indicates that the corresponding argument is non-constant. Otherwise contains the
+  /// value of the argument.
   std::vector<impala_udf::AnyVal*> constant_args_;
 
-  // Used by ScalarFnCall to store the arguments when running without codegen. Allows us
-  // to pass AnyVal* arguments to the scalar function directly, rather than codegening a
-  // call that passes the correct AnyVal subclass pointer type. Note that this is only
-  // used for non-variadic arguments; varargs are always stored in varargs_buffer_.
+  /// Used by ScalarFnCall to store the arguments when running without codegen. Allows us
+  /// to pass AnyVal* arguments to the scalar function directly, rather than codegening a
+  /// call that passes the correct AnyVal subclass pointer type. Note that this is only
+  /// used for non-variadic arguments; varargs are always stored in varargs_buffer_.
   std::vector<impala_udf::AnyVal*> staging_input_vals_;
 
-  // Indicates whether this context has been closed. Used for verification/debugging.
+  /// Indicates whether this context has been closed. Used for verification/debugging.
   bool closed_;
 };
 

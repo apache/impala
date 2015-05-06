@@ -24,8 +24,8 @@
 
 namespace impala {
 
-// Utility class for creating a redaction config file that will be automatically deleted
-// upon test completion.
+/// Utility class for creating a redaction config file that will be automatically deleted
+/// upon test completion.
 class TempRulesFile {
  public:
   TempRulesFile(const std::string& contents)
@@ -72,7 +72,7 @@ class TempRulesFile {
     }
   }
 
-  // Returns the absolute path to the file.
+  /// Returns the absolute path to the file.
   const char* name() const { return name_.c_str(); }
 
  private:
@@ -86,7 +86,7 @@ unsigned int RandSeed() {
   return now.tv_nsec + pthread_self();
 }
 
-// Randomly fills the contents of 'string' up to the given length.
+/// Randomly fills the contents of 'string' up to the given length.
 void RandomlyFillString(char* string, const int length) {
   ASSERT_GT(length, 0);
   unsigned int rand_seed = RandSeed();
@@ -107,7 +107,7 @@ void AssertRedactedEquals(const char* message, const char* expected) {
   Redact(&temp);
   ASSERT_EQ(expected, temp);
 
-  // Test the signature with the 'changed' argument.
+  /// Test the signature with the 'changed' argument.
   temp = string(message);
   bool changed;
   Redact(&temp, &changed);
@@ -119,10 +119,10 @@ void AssertUnredacted(const char* message) {
   AssertRedactedEquals(message, message);
 }
 
-// Putting these assertion utilities above into functions messes up failure messages
-// such that failures appear to be coming from this file instead of from the file
-// that called the utility assertion. Using a "SCOPED_TRACE" adds the location of the
-// caller to the error message.
+/// Putting these assertion utilities above into functions messes up failure messages
+/// such that failures appear to be coming from this file instead of from the file
+/// that called the utility assertion. Using a "SCOPED_TRACE" adds the location of the
+/// caller to the error message.
 #define SCOPED_ASSERT(assertion) { \
     SCOPED_TRACE(""); \
     assertion; \

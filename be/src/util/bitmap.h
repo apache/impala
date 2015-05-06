@@ -20,12 +20,12 @@
 
 namespace impala {
 
-// Bitmap vector utility class.
-// TODO: investigate perf.
-//  - Precomputed bitmap
-//  - Explicit Set/Unset() apis
-//  - Bigger words
-//  - size bitmap to Mersenne prime.
+/// Bitmap vector utility class.
+/// TODO: investigate perf.
+///  - Precomputed bitmap
+///  - Explicit Set/Unset() apis
+///  - Bigger words
+///  - size bitmap to Mersenne prime.
 class Bitmap {
  public:
   Bitmap(int64_t num_bits) {
@@ -33,8 +33,8 @@ class Bitmap {
     size_ = num_bits;
   }
 
-  // Sets the bit at 'bit_index' to v. If mod is true, this
-  // function will first mod the bit_index by the bitmap size.
+  /// Sets the bit at 'bit_index' to v. If mod is true, this
+  /// function will first mod the bit_index by the bitmap size.
   template<bool mod>
   void Set(int64_t bit_index, bool v) {
     if (mod) bit_index %= size();
@@ -48,8 +48,8 @@ class Bitmap {
     }
   }
 
-  // Returns true if the bit at 'bit_index' is set. If mod is true, this
-  // function will first mod the bit_index by the bitmap size.
+  /// Returns true if the bit at 'bit_index' is set. If mod is true, this
+  /// function will first mod the bit_index by the bitmap size.
   template<bool mod>
   bool Get(int64_t bit_index) const {
     if (mod) bit_index %= size();
@@ -59,7 +59,7 @@ class Bitmap {
     return (buffer_[word_index] & (1 << bit_index)) != 0;
   }
 
-  // Bitwise ANDs the src bitmap into this one.
+  /// Bitwise ANDs the src bitmap into this one.
   void And(const Bitmap* src) {
     DCHECK_EQ(size(), src->size());
     for (int i = 0; i < buffer_.size(); ++i) {
@@ -67,7 +67,7 @@ class Bitmap {
     }
   }
 
-  // Bitwise ORs the src bitmap into this one.
+  /// Bitwise ORs the src bitmap into this one.
   void Or(const Bitmap* src) {
     DCHECK_EQ(size(), src->size());
     for (int i = 0; i < buffer_.size(); ++i) {
@@ -81,7 +81,7 @@ class Bitmap {
 
   int64_t size() const { return size_; }
 
-  // If 'print_bits' prints 0/1 per bit, otherwise it prints the int64_t value.
+  /// If 'print_bits' prints 0/1 per bit, otherwise it prints the int64_t value.
   std::string DebugString(bool print_bits);
 
  private:

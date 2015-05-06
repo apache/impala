@@ -25,27 +25,27 @@ namespace impala {
 
 class RuntimeState;
 
-// Class to wrap JNI calls into HTable.
+/// Class to wrap JNI calls into HTable.
 class HBaseTable {
  public:
   HBaseTable(const std::string& table_name, jobject& conf, jobject& executor);
   ~HBaseTable();
 
-  // Close and release the HTable wrapped by this class.
+  /// Close and release the HTable wrapped by this class.
   void Close(RuntimeState* state);
 
-  // Create all needed java side objects.
-  // This call can cause connections to HBase and Zookeeper to be created.
+  /// Create all needed java side objects.
+  /// This call can cause connections to HBase and Zookeeper to be created.
   Status Init();
 
-  // From a java Scan object get a result scanner that will iterate over
-  // KeyValues from HBase.
+  /// From a java Scan object get a result scanner that will iterate over
+  /// KeyValues from HBase.
   Status GetResultScanner(const jobject& scan, jobject* result_scanner);
 
-  // Send an list of puts to hbase through an HTable.
+  /// Send an list of puts to hbase through an HTable.
   Status Put(const jobject& puts_list);
 
-  // Call this to initialize the HBase HTable jni references
+  /// Call this to initialize the HBase HTable jni references
   static Status InitJNI();
 
  private:
@@ -54,25 +54,25 @@ class HBaseTable {
   jobject executor_;
   jobject htable_;
 
-  // org.apache.hadoop.hbase.client.HTable
+  /// org.apache.hadoop.hbase.client.HTable
   static jclass htable_cl_;
 
-  // new HTable(Configuration, ExecutorService)
+  /// new HTable(Configuration, ExecutorService)
   static jmethodID htable_ctor_;
 
-  // htable.close()
+  /// htable.close()
   static jmethodID htable_close_id_;
 
-  // htable.getScannerId(Scan)
+  /// htable.getScannerId(Scan)
   static jmethodID htable_get_scanner_id_;
 
-  // htable.put(List<Put> puts
+  /// htable.put(List<Put> puts
   static jmethodID htable_put_id_;
 
-  // Bytes class and static methods
+  /// Bytes class and static methods
   static jclass bytes_cl_;
 
-  // Bytes.toBytes(String)
+  /// Bytes.toBytes(String)
   static jmethodID bytes_to_bytes_id_;
 };
 

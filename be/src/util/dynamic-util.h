@@ -19,20 +19,20 @@
 
 namespace impala {
 
-// Look up symbols in a dynamically linked library.
-// handle -- handle to the library. NULL if loading from the current process.
-// symbol -- symbol to lookup.
-// fn_ptr -- pointer tor retun addres of function.
-// quiet -- silence the error
+/// Look up symbols in a dynamically linked library.
+/// handle -- handle to the library. NULL if loading from the current process.
+/// symbol -- symbol to lookup.
+/// fn_ptr -- pointer tor retun addres of function.
+/// quiet -- silence the error
 Status DynamicLookup(void* handle, const char* symbol, void** fn_ptr, bool quiet=false);
 
-// Open a dynamicly loaded library.
-// library -- name of the library.  The default paths will be searched.
-//            library can be NULL to get the handle for the current process.
-// handle -- returned handle to the library.
+/// Open a dynamicly loaded library.
+/// library -- name of the library.  The default paths will be searched.
+///            library can be NULL to get the handle for the current process.
+/// handle -- returned handle to the library.
 Status DynamicOpen(const char* library, void** handle);
 
-// Closes the handle.
+/// Closes the handle.
 void DynamicClose(void* handle);
 
 }

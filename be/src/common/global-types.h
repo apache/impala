@@ -13,13 +13,13 @@
 // limitations under the License.
 
 //
-// This file contains type definitions that are used throughout the code base.
+/// This file contains type definitions that are used throughout the code base.
 
 namespace impala {
 
-// for now, these are simply ints; if we find we need to generate ids in the
-// backend, we can also introduce separate classes for these to make them
-// assignment-incompatible
+/// for now, these are simply ints; if we find we need to generate ids in the
+/// backend, we can also introduce separate classes for these to make them
+/// assignment-incompatible
 typedef int TupleId;
 typedef int SlotId;
 typedef int TableId;

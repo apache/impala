@@ -34,7 +34,7 @@ namespace impala {
 
 class RowBatch;
 
-// Query execution against running impalad process.
+/// Query execution against running impalad process.
 class ImpaladQueryExecutor {
  public:
   ImpaladQueryExecutor();
@@ -42,41 +42,41 @@ class ImpaladQueryExecutor {
 
   Status Setup();
 
-  // Start running query. Call this prior to FetchResult().
-  // If 'col_types' is non-NULL, returns the types of the select list items.
+  /// Start running query. Call this prior to FetchResult().
+  /// If 'col_types' is non-NULL, returns the types of the select list items.
   Status Exec(const std::string& query_string,
       std::vector<Apache::Hadoop::Hive::FieldSchema>* col_types);
 
-  // Return the explain plan for the query
+  /// Return the explain plan for the query
   Status Explain(const std::string& query_string, std::string* explain_plan);
 
-  // Returns result batch in 'batch'. The returned rows are the output rows of
-  // the execution tree. In other words, they do *not* reflect the query's
-  // select list exprs, ie, don't call this if the query
-  // doesn't have a FROM clause, this function will not return any result rows for
-  // that case.
-  // Sets 'batch' to NULL if no more data. Batch is owned by ImpaladQueryExecutor
-  // and must not be deallocated.
+  /// Returns result batch in 'batch'. The returned rows are the output rows of
+  /// the execution tree. In other words, they do *not* reflect the query's
+  /// select list exprs, ie, don't call this if the query
+  /// doesn't have a FROM clause, this function will not return any result rows for
+  /// that case.
+  /// Sets 'batch' to NULL if no more data. Batch is owned by ImpaladQueryExecutor
+  /// and must not be deallocated.
   Status FetchResult(RowBatch** batch);
 
-  // Return single row as comma-separated list of values.
-  // Indicates end-of-stream by setting 'row' to the empty string.
-  // Returns OK if successful, otherwise error.
+  /// Return single row as comma-separated list of values.
+  /// Indicates end-of-stream by setting 'row' to the empty string.
+  /// Returns OK if successful, otherwise error.
   Status FetchResult(std::string* row);
 
-  // Return single row as vector of raw values.
-  // Indicates end-of-stream by returning empty 'row'.
-  // Returns OK if successful, otherwise error.
+  /// Return single row as vector of raw values.
+  /// Indicates end-of-stream by returning empty 'row'.
+  /// Returns OK if successful, otherwise error.
   Status FetchResult(std::vector<void*>* row);
 
-  // Returns the error log lines in executor_'s runtime state as a string joined
-  // with '\n'.
+  /// Returns the error log lines in executor_'s runtime state as a string joined
+  /// with '\n'.
   std::string ErrorString() const;
 
-  // Returns a string representation of the file_errors_.
+  /// Returns a string representation of the file_errors_.
   std::string FileErrors() const;
 
-  // Returns the counters for the entire query
+  /// Returns the counters for the entire query
   RuntimeProfile* query_profile();
 
   bool eos() { return eos_; }
@@ -86,13 +86,13 @@ class ImpaladQueryExecutor {
   }
 
  private:
-  // fe service-related
+  /// fe service-related
   boost::scoped_ptr<ThriftClient<ImpalaServiceClient> > client_;
 
-  // Execution options
+  /// Execution options
   std::vector<std::string> exec_options_;
 
-  // Beeswax query handle and result
+  /// Beeswax query handle and result
   beeswax::QueryHandle query_handle_;
   beeswax::Results query_results_;
   beeswax::QueryExplanation query_explanation_;
@@ -101,7 +101,7 @@ class ImpaladQueryExecutor {
   int current_row_;
   bool eos_;
 
-  // call beeswax.close() for current query, if one in progress
+  /// call beeswax.close() for current query, if one in progress
   Status Close();
 };
 

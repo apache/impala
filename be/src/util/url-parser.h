@@ -21,26 +21,26 @@
 
 namespace impala {
 
-// TODO: For now, our parse_url may not behave exactly like Hive
-// when given malformed URLs.
-// If necessary, we can closely follow Java's URL implementation
-// to behave exactly like Hive.
+/// TODO: For now, our parse_url may not behave exactly like Hive
+/// when given malformed URLs.
+/// If necessary, we can closely follow Java's URL implementation
+/// to behave exactly like Hive.
 
-// Example for explaining URL parts:
-// http://user:pass@example.com:80/docs/books/tutorial/index.html?name=networking#DOWNLOADING
-// PROTOCOL = http
-// AUTHORITY = example.com:80
-// HOST = example.com
-// PATH = /docs/books/tutorial/index.html
-// QUERY = name=networking
-// FILENAME = /docs/books/tutorial/index.html?name=networking
-// REF = DOWNLOADING
-// USERINFO = user:pass
-// More details on what exactly the URL parts mean can be found here:
-// http://docs.oracle.com/javase/tutorial/networking/urls/urlInfo.html
+/// Example for explaining URL parts:
+/// http://user:pass@example.com:80/docs/books/tutorial/index.html?name=networking#DOWNLOADING
+/// PROTOCOL = http
+/// AUTHORITY = example.com:80
+/// HOST = example.com
+/// PATH = /docs/books/tutorial/index.html
+/// QUERY = name=networking
+/// FILENAME = /docs/books/tutorial/index.html?name=networking
+/// REF = DOWNLOADING
+/// USERINFO = user:pass
+/// More details on what exactly the URL parts mean can be found here:
+/// http://docs.oracle.com/javase/tutorial/networking/urls/urlInfo.html
 class UrlParser {
  public:
-  // Parts of a URL that can be requested.
+  /// Parts of a URL that can be requested.
   enum UrlPart {
     INVALID,
     AUTHORITY,
@@ -53,20 +53,20 @@ class UrlParser {
     USERINFO
   };
 
-  // Tries to parse the part from url. Places the result in result.
-  // Returns false if the URL is malformed or if part is invalid. True otherwise.
-  // If false is returned the contents of results are undefined.
+  /// Tries to parse the part from url. Places the result in result.
+  /// Returns false if the URL is malformed or if part is invalid. True otherwise.
+  /// If false is returned the contents of results are undefined.
   static bool ParseUrl(const StringValue& url, UrlPart part, StringValue* result);
 
-  // Tries to parse key from url. Places the result in result.
-  // Returns false if the URL is malformed or if part is invalid. True otherwise.
-  // If false is returned the contents of results are undefined.
+  /// Tries to parse key from url. Places the result in result.
+  /// Returns false if the URL is malformed or if part is invalid. True otherwise.
+  /// If false is returned the contents of results are undefined.
   static bool ParseUrlKey(const StringValue& url, UrlPart part, const StringValue& key,
       StringValue* result);
 
-  // Compares part against url_authority, url_file, url_host, etc.,
-  // and returns the corresponding enum.
-  // If part did not match any of the url part constants, returns INVALID.
+  /// Compares part against url_authority, url_file, url_host, etc.,
+  /// and returns the corresponding enum.
+  /// If part did not match any of the url part constants, returns INVALID.
   static UrlPart GetUrlPart(const StringValue& part);
 
  private:

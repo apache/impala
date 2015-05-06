@@ -22,16 +22,16 @@
 
 namespace impala {
 
-// An append-only buffer to stage output from file writers. The buffer is backed
-// by a stringstream and uses the ReadWriteUtil to encode data. Append
-// operations will never fail, and will grow the backing buffer using
-// stringstream semantics. Each write function returns the number of bytes written
+/// An append-only buffer to stage output from file writers. The buffer is backed
+/// by a stringstream and uses the ReadWriteUtil to encode data. Append
+/// operations will never fail, and will grow the backing buffer using
+/// stringstream semantics. Each write function returns the number of bytes written
 class WriteStream {
  public:
 
   WriteStream() : len_(0) { };
 
-  // Writes bytes to the buffer, returns the number of bytes written
+  /// Writes bytes to the buffer, returns the number of bytes written
   inline int WriteBytes(int length, const uint8_t* buf);
   inline int WriteBytes(int length, const char* buf);
 
@@ -41,22 +41,22 @@ class WriteStream {
   inline int WriteByte(char val);
   inline int WriteVLong(int64_t val);
   inline int WriteBoolean(bool val);
-  // Writes a zig-zag encoded integer
+  /// Writes a zig-zag encoded integer
   inline int WriteZInt(int32_t val);
   inline int WriteZLong(int64_t val);
-  // Writes the length as a VLong follows by the byte string
+  /// Writes the length as a VLong follows by the byte string
   inline int WriteText(int32_t len, const uint8_t* buf);
-  // Writes an empty string to the buffer (encoded as 1 byte)
+  /// Writes an empty string to the buffer (encoded as 1 byte)
   inline int WriteEmptyText();
 
   inline void Clear();
   inline size_t Size();
 
-  // returns the contents of this stream as a string
+  /// returns the contents of this stream as a string
   inline std::string String();
 
  private:
-  // TODO consider making this like the parquet writer to avoid extra copy
+  /// TODO consider making this like the parquet writer to avoid extra copy
   std::stringstream buffer_;
   uint64_t len_;
 };

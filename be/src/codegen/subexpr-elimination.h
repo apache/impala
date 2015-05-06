@@ -21,17 +21,17 @@
 
 namespace impala {
 
-// Optimization pass to remove redundant exprs.
-// TODO: make this into a llvm function pass (i.e. implement FunctionPass interface).
+/// Optimization pass to remove redundant exprs.
+/// TODO: make this into a llvm function pass (i.e. implement FunctionPass interface).
 class SubExprElimination {
  public:
   SubExprElimination(LlvmCodeGen* codegen);
 
-  // Perform subexpr elimination on function.
+  /// Perform subexpr elimination on function.
   bool Run(llvm::Function* function);
 
  private:
-  // Parent codegen object.
+  /// Parent codegen object.
   LlvmCodeGen* codegen_;
 };
 

@@ -35,12 +35,12 @@ namespace impala {
 class RowBatch;
 class TupleRow;
 
-// Node for cross joins.
-// Iterates over the left child rows and then the right child rows and, for
-// each combination, writes the output row if the conjuncts are satisfied. The
-// build batches are kept in a list that is fully constructed from the right child in
-// ConstructBuildSide() (called by BlockingJoinNode::Open()) while rows are fetched from
-// the left child as necessary in GetNext().
+/// Node for cross joins.
+/// Iterates over the left child rows and then the right child rows and, for
+/// each combination, writes the output row if the conjuncts are satisfied. The
+/// build batches are kept in a list that is fully constructed from the right child in
+/// ConstructBuildSide() (called by BlockingJoinNode::Open()) while rows are fetched from
+/// the left child as necessary in GetNext().
 class CrossJoinNode : public BlockingJoinNode {
  public:
   CrossJoinNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
@@ -55,22 +55,22 @@ class CrossJoinNode : public BlockingJoinNode {
   virtual Status ConstructBuildSide(RuntimeState* state);
 
  private:
-  // Object pool for build RowBatches, stores all BuildBatches in build_rows_
+  /// Object pool for build RowBatches, stores all BuildBatches in build_rows_
   boost::scoped_ptr<ObjectPool> build_batch_pool_;
-  // List of build batches, constructed in Prepare()
+  /// List of build batches, constructed in Prepare()
   RowBatchList build_batches_;
   RowBatchList::TupleRowIterator current_build_row_;
 
-  // Processes a batch from the left child.
-  //  output_batch: the batch for resulting tuple rows
-  //  batch: the batch from the left child to process.  This function can be called to
-  //    continue processing a batch in the middle
-  //  max_added_rows: maximum rows that can be added to output_batch
-  // return the number of rows added to output_batch
+  /// Processes a batch from the left child.
+  ///  output_batch: the batch for resulting tuple rows
+  ///  batch: the batch from the left child to process.  This function can be called to
+  ///    continue processing a batch in the middle
+  ///  max_added_rows: maximum rows that can be added to output_batch
+  /// return the number of rows added to output_batch
   int ProcessLeftChildBatch(RowBatch* output_batch, RowBatch* batch, int max_added_rows);
 
-  // Returns a debug string for build_rows_. This is used for debugging during the
-  // build list construction and before doing the join.
+  /// Returns a debug string for build_rows_. This is used for debugging during the
+  /// build list construction and before doing the join.
   std::string BuildListDebugString();
 };
 

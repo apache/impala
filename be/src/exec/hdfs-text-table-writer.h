@@ -35,8 +35,8 @@ struct StringValue;
 class TupleDescriptor;
 class TupleRow;
 
-// The writer consumes all rows passed to it and writes the evaluated output_exprs_
-// as delimited text into Hdfs files.
+/// The writer consumes all rows passed to it and writes the evaluated output_exprs_
+/// as delimited text into Hdfs files.
 class HdfsTextTableWriter : public HdfsTableWriter {
  public:
   HdfsTextTableWriter(HdfsTableSink* parent,
@@ -54,45 +54,45 @@ class HdfsTextTableWriter : public HdfsTableWriter {
   virtual uint64_t default_block_size() const;
   virtual std::string file_extension() const;
 
-  // Appends delimited string representation of the rows in the batch to output partition.
-  // The resulting output is buffered until HDFS_FLUSH_WRITE_SIZE before being written
-  // to HDFS.
+  /// Appends delimited string representation of the rows in the batch to output partition.
+  /// The resulting output is buffered until HDFS_FLUSH_WRITE_SIZE before being written
+  /// to HDFS.
   Status AppendRowBatch(RowBatch* current_row,
                         const std::vector<int32_t>& row_group_indices, bool* new_file);
 
  private:
-  // Escapes occurrences of field_delim_ and escape_char_ with escape_char_ and
-  // writes the escaped result into rowbatch_stringstream_. Neither Hive nor Impala
-  // support escaping tuple_delim_.
+  /// Escapes occurrences of field_delim_ and escape_char_ with escape_char_ and
+  /// writes the escaped result into rowbatch_stringstream_. Neither Hive nor Impala
+  /// support escaping tuple_delim_.
   inline void PrintEscaped(const StringValue* str_val);
 
-  // Writes the buffered data in rowbatch_stringstream_ to HDFS, applying
-  // compression if necessary.
+  /// Writes the buffered data in rowbatch_stringstream_ to HDFS, applying
+  /// compression if necessary.
   Status Flush();
 
-  // Character delimiting tuples.
+  /// Character delimiting tuples.
   char tuple_delim_;
 
-  // Character delimiting fields (to become slots).
+  /// Character delimiting fields (to become slots).
   char field_delim_;
 
-  // Escape character.
+  /// Escape character.
   char escape_char_;
 
-  // Size in rowbatch_stringstream_ before we call flush.
+  /// Size in rowbatch_stringstream_ before we call flush.
   int64_t flush_size_;
 
-  // Stringstream to buffer output.  The stream is cleared between HDFS
-  // Write calls to allow for the internal buffers to be reused.
+  /// Stringstream to buffer output.  The stream is cleared between HDFS
+  /// Write calls to allow for the internal buffers to be reused.
   std::stringstream rowbatch_stringstream_;
 
-  // Compression codec.
+  /// Compression codec.
   THdfsCompression::type codec_;
 
-  // Compressor if compression is enabled.
+  /// Compressor if compression is enabled.
   boost::scoped_ptr<Codec> compressor_;
 
-  // Memory pool to use with compressor_.
+  /// Memory pool to use with compressor_.
   boost::scoped_ptr<MemPool> mem_pool_;
 };
 

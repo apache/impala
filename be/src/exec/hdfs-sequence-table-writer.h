@@ -33,8 +33,8 @@ class RuntimeState;
 struct StringValue;
 struct OutputPartition;
 
-// Consumes rows and outputs the rows into a sequence file in HDFS
-// Output is buffered to fill sequence file blocks.
+/// Consumes rows and outputs the rows into a sequence file in HDFS
+/// Output is buffered to fill sequence file blocks.
 class HdfsSequenceTableWriter : public HdfsTableWriter {
  public:
   HdfsSequenceTableWriter(HdfsTableSink* parent,
@@ -52,74 +52,74 @@ class HdfsSequenceTableWriter : public HdfsTableWriter {
   virtual uint64_t default_block_size() const { return 0; }
   virtual std::string file_extension() const { return "seq"; }
 
-  // Outputs the given rows into an HDFS sequence file. The rows are buffered
-  // to fill a sequence file block.
+  /// Outputs the given rows into an HDFS sequence file. The rows are buffered
+  /// to fill a sequence file block.
   virtual Status AppendRowBatch(RowBatch* rows,
                                 const std::vector<int32_t>& row_group_indices,
                                 bool* new_file);
 
  private:
-  // processes a single row, delegates to Compress or NoCompress ConsumeRow().
+  /// processes a single row, delegates to Compress or NoCompress ConsumeRow().
   inline Status ConsumeRow(TupleRow* row);
 
-  // writes the SEQ file header to HDFS
+  /// writes the SEQ file header to HDFS
   Status WriteFileHeader();
 
-  // writes the contents of out_ as a single compressed block
+  /// writes the contents of out_ as a single compressed block
   Status WriteCompressedBlock();
 
-  // writes the tuple row to the given buffer; separates fields by field_delim_,
-  // escapes string.
+  /// writes the tuple row to the given buffer; separates fields by field_delim_,
+  /// escapes string.
   inline void EncodeRow(TupleRow* row, WriteStream* buf);
 
-  // writes the str_val to the buffer, escaping special characters
+  /// writes the str_val to the buffer, escaping special characters
   inline void WriteEscapedString(const StringValue* str_val, WriteStream* buf);
 
-  // flushes the output -- clearing out_ and writing to HDFS
-  // if compress_flag_, will write contents of out_ as a single compressed block
+  /// flushes the output -- clearing out_ and writing to HDFS
+  /// if compress_flag_, will write contents of out_ as a single compressed block
   Status Flush();
 
-  // desired size of each block (bytes); actual block size will vary +/- the
-  // size of a row; this is before compression is applied.
+  /// desired size of each block (bytes); actual block size will vary +/- the
+  /// size of a row; this is before compression is applied.
   uint64_t approx_block_size_;
 
-  // buffer which holds accumulated output
+  /// buffer which holds accumulated output
   WriteStream out_;
 
-  // Temporary Buffer for a single row
+  /// Temporary Buffer for a single row
   WriteStream row_buf_;
 
-  // memory pool used by codec to allocate output buffer
+  /// memory pool used by codec to allocate output buffer
   MemPool* mem_pool_;
 
-  // true if compression is enabled
+  /// true if compression is enabled
   bool compress_flag_;
 
-  // number of rows consumed since last flush
+  /// number of rows consumed since last flush
   uint64_t unflushed_rows_;
 
-  // name of codec, only set if compress_flag_
+  /// name of codec, only set if compress_flag_
   std::string codec_name_;
-  // the codec for compressing, only set if compress_flag_
+  /// the codec for compressing, only set if compress_flag_
   boost::scoped_ptr<Codec> compressor_;
 
-  // true if compression is applied on each record individually
+  /// true if compression is applied on each record individually
   bool record_compression_;
 
-  // Character delimiting fields
+  /// Character delimiting fields
   char field_delim_;
 
-  // Escape character for text encoding
+  /// Escape character for text encoding
   char escape_char_;
 
-  // 16 byte sync marker (a uuid)
+  /// 16 byte sync marker (a uuid)
   std::string sync_marker_;
-  // A -1 infront of the sync marker, used in decompressed formats
+  /// A -1 infront of the sync marker, used in decompressed formats
   std::string neg1_sync_marker_;
 
-  // Name of java class to use when reading the values
+  /// Name of java class to use when reading the values
   static const char* VALUE_CLASS_NAME;
-  // Magic characters used to identify the file type
+  /// Magic characters used to identify the file type
   static uint8_t SEQ6_CODE[4];
 };
 

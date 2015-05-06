@@ -32,18 +32,18 @@ class TColumnValue;
 class TNetworkAddress;
 class ThriftServer;
 
-// Utility class to serialize thrift objects to a binary format.  This object
-// should be reused if possible to reuse the underlying memory.
-// Note: thrift will encode NULLs into the serialized buffer so it is not valid
-// to treat it as a string.
+/// Utility class to serialize thrift objects to a binary format.  This object
+/// should be reused if possible to reuse the underlying memory.
+/// Note: thrift will encode NULLs into the serialized buffer so it is not valid
+/// to treat it as a string.
 class ThriftSerializer {
  public:
-  // If compact, the objects will be serialized using the Compact Protocol.  Otherwise,
-  // we'll use the binary protocol.
-  // Note: the deserializer must be matching.
+  /// If compact, the objects will be serialized using the Compact Protocol.  Otherwise,
+  /// we'll use the binary protocol.
+  /// Note: the deserializer must be matching.
   ThriftSerializer(bool compact, int initial_buffer_size = 1024);
 
-  // Serializes obj into result.  Result will contain a copy of the memory.
+  /// Serializes obj into result.  Result will contain a copy of the memory.
   template <class T>
   Status Serialize(T* obj, std::vector<uint8_t>* result) {
     uint32_t len = 0;
@@ -54,9 +54,9 @@ class ThriftSerializer {
     return Status::OK;
   }
 
-  // Serialize obj into a memory buffer.  The result is returned in buffer/len.  The
-  // memory returned is owned by this object and will be invalid when another object
-  // is serialized.
+  /// Serialize obj into a memory buffer.  The result is returned in buffer/len.  The
+  /// memory returned is owned by this object and will be invalid when another object
+  /// is serialized.
   template <class T>
   Status Serialize(T* obj, uint32_t* len, uint8_t** buffer) {
     try {
@@ -99,20 +99,20 @@ class ThriftDeserializer {
   boost::shared_ptr<apache::thrift::protocol::TProtocol> tproto_;
 };
 
-// Utility to create a protocol (deserialization) object for 'mem'.
+/// Utility to create a protocol (deserialization) object for 'mem'.
 boost::shared_ptr<apache::thrift::protocol::TProtocol>
 CreateDeserializeProtocol(
     boost::shared_ptr<apache::thrift::transport::TMemoryBuffer> mem, bool compact);
 
-// Deserialize a thrift message from buf/len.  buf/len must at least contain
-// all the bytes needed to store the thrift message.  On return, len will be
-// set to the actual length of the header.
+/// Deserialize a thrift message from buf/len.  buf/len must at least contain
+/// all the bytes needed to store the thrift message.  On return, len will be
+/// set to the actual length of the header.
 template <class T>
 Status DeserializeThriftMsg(const uint8_t* buf, uint32_t* len, bool compact,
     T* deserialized_msg) {
-  // Deserialize msg bytes into c++ thrift msg using memory
-  // transport. TMemoryBuffer is not const-safe, although we use it in
-  // a const-safe way, so we have to explicitly cast away the const.
+  /// Deserialize msg bytes into c++ thrift msg using memory
+  /// transport. TMemoryBuffer is not const-safe, although we use it in
+  /// a const-safe way, so we have to explicitly cast away the const.
   boost::shared_ptr<apache::thrift::transport::TMemoryBuffer> tmem_transport(
       new apache::thrift::transport::TMemoryBuffer(const_cast<uint8_t*>(buf), *len));
   boost::shared_ptr<apache::thrift::protocol::TProtocol> tproto =
@@ -124,7 +124,7 @@ Status DeserializeThriftMsg(const uint8_t* buf, uint32_t* len, bool compact,
     msg << "couldn't deserialize thrift msg:\n" << e.what();
     return Status(msg.str());
   } catch (...) {
-    // TODO: Find the right exception for 0 bytes
+    /// TODO: Find the right exception for 0 bytes
     return Status("Unknown exception");
   }
   uint32_t bytes_left = tmem_transport->available_read();
@@ -132,26 +132,26 @@ Status DeserializeThriftMsg(const uint8_t* buf, uint32_t* len, bool compact,
   return Status::OK;
 }
 
-// Redirects all Thrift logging to VLOG(1)
+/// Redirects all Thrift logging to VLOG(1)
 void InitThriftLogging();
 
-// Wait for a server that is running locally to start accepting
-// connections, up to a maximum timeout
+/// Wait for a server that is running locally to start accepting
+/// connections, up to a maximum timeout
 Status WaitForLocalServer(const ThriftServer& server, int num_retries,
    int retry_interval_ms);
 
-// Wait for a server to start accepting connections, up to a maximum timeout
+/// Wait for a server to start accepting connections, up to a maximum timeout
 Status WaitForServer(const std::string& host, int port, int num_retries,
    int retry_interval_ms);
 
-// Print a TColumnValue. If null, print "NULL".
+/// Print a TColumnValue. If null, print "NULL".
 std::ostream& operator<<(std::ostream& out, const TColumnValue& colval);
 
-// Compares two TNetworkAddresses alphanumerically by their host:port
-// string representation
+/// Compares two TNetworkAddresses alphanumerically by their host:port
+/// string representation
 bool TNetworkAddressComparator(const TNetworkAddress& a, const TNetworkAddress& b);
 
-// Returns true if the TException corresponds to a TCP socket recv or send timeout.
+/// Returns true if the TException corresponds to a TCP socket recv or send timeout.
 bool IsTimeoutTException(const apache::thrift::TException& e);
 
 }

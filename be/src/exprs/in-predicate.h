@@ -22,26 +22,26 @@
 
 namespace impala {
 
-// Predicate for evaluating expressions of the form "val [NOT] IN (x1, x2, x3...)".
+/// Predicate for evaluating expressions of the form "val [NOT] IN (x1, x2, x3...)".
 //
-// There are two strategies for evaluating the IN predicate:
+/// There are two strategies for evaluating the IN predicate:
 //
-// 1) SET_LOOKUP: This strategy is for when all the values in the IN list are constant. In
-//    the prepare function, we create a set of the constant values from the IN list, and
-//    use this set to lookup a given 'val'.
+/// 1) SET_LOOKUP: This strategy is for when all the values in the IN list are constant. In
+///    the prepare function, we create a set of the constant values from the IN list, and
+///    use this set to lookup a given 'val'.
 //
-// 2) ITERATE: This is the fallback strategy for when their are non-constant IN list
-//    values, or very few values in the IN list. We simply iterate through every
-//    expression and compare it to val. This strategy has no prepare function.
+/// 2) ITERATE: This is the fallback strategy for when their are non-constant IN list
+///    values, or very few values in the IN list. We simply iterate through every
+///    expression and compare it to val. This strategy has no prepare function.
 //
-// The FE chooses which strategy we should use by choosing the appropriate function (e.g.,
-// InIterate() or InSetLookup()). If it chooses SET_LOOKUP, it also sets the appropriate
-// SetLookupPrepare and SetLookupClose functions.
+/// The FE chooses which strategy we should use by choosing the appropriate function (e.g.,
+/// InIterate() or InSetLookup()). If it chooses SET_LOOKUP, it also sets the appropriate
+/// SetLookupPrepare and SetLookupClose functions.
 //
-// TODO: the set lookup logic is not yet implemented for TimestampVals or DecimalVals
+/// TODO: the set lookup logic is not yet implemented for TimestampVals or DecimalVals
 class InPredicate : public Predicate {
  public:
-  // Functions for every type
+  /// Functions for every type
   static impala_udf::BooleanVal InIterate(
       impala_udf::FunctionContext* context, const impala_udf::BooleanVal& val,
       int num_args, const impala_udf::BooleanVal* args);
@@ -266,33 +266,33 @@ class InPredicate : public Predicate {
   friend class InPredicateBenchmark;
 
   enum Strategy {
-    // Indicates we should use SetLookUp().
+    /// Indicates we should use SetLookUp().
     SET_LOOKUP,
-    // Indicates we should use Iterate().
+    /// Indicates we should use Iterate().
     ITERATE
   };
 
   template<typename SetType>
   struct SetLookupState {
-    // If true, there is at least one NULL constant in the IN list.
+    /// If true, there is at least one NULL constant in the IN list.
     bool contains_null;
 
-    // The set of all non-NULL constant values in the IN list.
-    // Note: boost::unordered_set and std::binary_search performed worse based on the
-    // in-predicate-benchmark
+    /// The set of all non-NULL constant values in the IN list.
+    /// Note: boost::unordered_set and std::binary_search performed worse based on the
+    /// in-predicate-benchmark
     std::set<SetType> val_set;
 
-    // The type of the arguments
+    /// The type of the arguments
     const FunctionContext::TypeDesc* type;
   };
 
-  // The templated function that provides the implementation for all the In() and NotIn()
-  // functions.
+  /// The templated function that provides the implementation for all the In() and NotIn()
+  /// functions.
   template<typename T, typename SetType, bool not_in, Strategy strategy>
   static inline impala_udf::BooleanVal TemplatedIn(
       impala_udf::FunctionContext* context, const T& val, int num_args, const T* args);
 
-  // Initializes an SetLookupState in ctx.
+  /// Initializes an SetLookupState in ctx.
   template<typename T, typename SetType>
   static void SetLookupPrepare(
       FunctionContext* ctx, FunctionContext::FunctionStateScope scope);
@@ -301,11 +301,11 @@ class InPredicate : public Predicate {
   static void SetLookupClose(
       FunctionContext* ctx, FunctionContext::FunctionStateScope scope);
 
-  // Looks up v in state->val_set.
+  /// Looks up v in state->val_set.
   template<typename T, typename SetType>
   static BooleanVal SetLookup(SetLookupState<SetType>* state, const T& v);
 
-  // Iterates through each vararg looking for val. 'type' is the type of 'val' and 'args'.
+  /// Iterates through each vararg looking for val. 'type' is the type of 'val' and 'args'.
   template<typename T>
   static BooleanVal Iterate(
       const FunctionContext::TypeDesc* type, const T& val, int num_args, const T* args);

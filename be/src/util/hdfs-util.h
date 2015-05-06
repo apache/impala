@@ -22,29 +22,29 @@
 
 namespace impala {
 
-// Utility function to get error messages from HDFS. This function takes prefix/file and
-// appends errno to it. Note: any stdlib function can reset errno, this should be called
-// immediately following the failed call into libhdfs.
+/// Utility function to get error messages from HDFS. This function takes prefix/file and
+/// appends errno to it. Note: any stdlib function can reset errno, this should be called
+/// immediately following the failed call into libhdfs.
 std::string GetHdfsErrorMsg(const std::string& prefix, const std::string& file = "");
 
-// Return the size, in bytes, of a file from the hdfs connection.
+/// Return the size, in bytes, of a file from the hdfs connection.
 Status GetFileSize(const hdfsFS& connection, const char* filename, int64_t* filesize);
 
-// Returns the last modification time of 'filename' in seconds.
-// This should not be called in a fast path (e.g., running a UDF).
+/// Returns the last modification time of 'filename' in seconds.
+/// This should not be called in a fast path (e.g., running a UDF).
 Status GetLastModificationTime(const hdfsFS& connection, const char* filename,
                                time_t* last_mod_time);
 
 bool IsHiddenFile(const std::string& filename);
 
-// Copy the file at 'src_path' from 'src_conn' to 'dst_path' in 'dst_conn'.
+/// Copy the file at 'src_path' from 'src_conn' to 'dst_path' in 'dst_conn'.
 Status CopyHdfsFile(const hdfsFS& src_conn, const std::string& src_path,
                     const hdfsFS& dst_conn, const std::string& dst_path);
 
-// Returns true iff the path refers to a location on an HDFS filesystem.
+/// Returns true iff the path refers to a location on an HDFS filesystem.
 bool IsDfsPath(const char* path);
 
-// Returns true iff the path refers to a location on an S3A filesystem.
+/// Returns true iff the path refers to a location on an S3A filesystem.
 bool IsS3APath(const char* path);
 }
 #endif // IMPALA_UTIL_HDFS_UTIL_H

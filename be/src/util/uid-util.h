@@ -24,7 +24,7 @@
 #include "common/names.h"
 
 namespace impala {
-// This function must be called 'hash_value' to be picked up by boost.
+/// This function must be called 'hash_value' to be picked up by boost.
 inline std::size_t hash_value(const impala::TUniqueId& id) {
   std::size_t seed = 0;
   boost::hash_combine(seed, id.lo);
@@ -32,8 +32,8 @@ inline std::size_t hash_value(const impala::TUniqueId& id) {
   return seed;
 }
 
-// Templated so that this method is not namespace-specific (since we also call this on
-// llama::TUniqueId)
+/// Templated so that this method is not namespace-specific (since we also call this on
+/// llama::TUniqueId)
 template <typename T>
 inline void UUIDToTUniqueId(const boost::uuids::uuid& uuid, T* unique_id) {
   memcpy(&(unique_id->hi), &uuid.data[0], 8);
@@ -48,7 +48,7 @@ inline T CastTUniqueId(const F& from) {
   return to;
 }
 
-// generates a 16 byte UUID
+/// generates a 16 byte UUID
 inline string GenerateUUIDString() {
   boost::uuids::basic_random_generator<boost::mt19937> gen;
   boost::uuids::uuid u = gen();
@@ -56,7 +56,7 @@ inline string GenerateUUIDString() {
   return uuid;
 }
 
-// generates a 16 byte UUID
+/// generates a 16 byte UUID
 inline TUniqueId GenerateUUID() {
   const string& u = GenerateUUIDString();
   TUniqueId uid;

@@ -42,12 +42,12 @@ class GzipDecompressor : public Codec {
   virtual Status Init();
   std::string DebugStreamState() const;
 
-  // If set assume deflate format, otherwise zlib or gzip
+  /// If set assume deflate format, otherwise zlib or gzip
   bool is_deflate_;
 
   z_stream stream_;
 
-  // These are magic numbers from zlib.h.  Not clear why they are not defined there.
+  /// These are magic numbers from zlib.h.  Not clear why they are not defined there.
   const static int WINDOW_BITS = 15;    // Maximum window size
   const static int DETECT_CODEC = 32;   // Determine if this is libz or gzip from header.
 };
@@ -69,8 +69,8 @@ class BzipDecompressor : public Codec {
 
 class SnappyDecompressor : public Codec {
  public:
-  // Snappy-compressed data block includes trailing 4-byte checksum. Decompressor
-  // doesn't expect this.
+  /// Snappy-compressed data block includes trailing 4-byte checksum. Decompressor
+  /// doesn't expect this.
   static const uint TRAILING_CHECKSUM_LEN = 4;
 
   virtual ~SnappyDecompressor() { }
@@ -85,9 +85,9 @@ class SnappyDecompressor : public Codec {
   virtual Status Init() { return Status::OK; }
 };
 
-// Lz4 is a compression codec with similar compression ratios as snappy but much faster
-// decompression. This decompressor is not able to decompress unless the output buffer
-// is allocated and will cause an error if asked to do so.
+/// Lz4 is a compression codec with similar compression ratios as snappy but much faster
+/// decompression. This decompressor is not able to decompress unless the output buffer
+/// is allocated and will cause an error if asked to do so.
 class Lz4Decompressor : public Codec {
  public:
   virtual ~Lz4Decompressor() { }

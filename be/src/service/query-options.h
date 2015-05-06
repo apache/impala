@@ -20,24 +20,24 @@
 
 #include "common/status.h"
 
-// Utility methods to process per-query options
+/// Utility methods to process per-query options
 
 namespace impala {
 
 class TQueryOptions;
 
-// Converts a TQueryOptions struct into a map of key, value pairs
+/// Converts a TQueryOptions struct into a map of key, value pairs
 void TQueryOptionsToMap(const TQueryOptions& query_options,
     std::map<std::string, std::string>* configuration);
 
-// Set the key/value pair in TQueryOptions. It will override existing setting in
-// query_options.
+/// Set the key/value pair in TQueryOptions. It will override existing setting in
+/// query_options.
 Status SetQueryOption(const std::string& key, const std::string& value,
     TQueryOptions* query_options);
 
-// Parse a "," separated key=value pair of query options and set it in 'query_options'.
-// If the same query option is specified more than once, the last one wins.
-// Return an error if the input is invalid (bad format or invalid query option).
+/// Parse a "," separated key=value pair of query options and set it in 'query_options'.
+/// If the same query option is specified more than once, the last one wins.
+/// Return an error if the input is invalid (bad format or invalid query option).
 Status ParseQueryOptions(const std::string& options, TQueryOptions* query_options);
 
 }

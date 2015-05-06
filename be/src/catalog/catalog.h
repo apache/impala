@@ -24,81 +24,81 @@
 
 namespace impala {
 
-// The Catalog is a proxy for the Java-side JniCatalog class. The interface is a set of
-// wrapper functions for methods called over JNI.
+/// The Catalog is a proxy for the Java-side JniCatalog class. The interface is a set of
+/// wrapper functions for methods called over JNI.
 class Catalog {
  public:
-  // Does all the work of initialising the JNI method stubs. If any method can't be found,
-  // or if there is any further exception, the constructor will terminate the process.
+  /// Does all the work of initialising the JNI method stubs. If any method can't be found,
+  /// or if there is any further exception, the constructor will terminate the process.
   Catalog();
 
-  // Executes the given TDdlExecRequest and returns a response with details on the
-  // result of the operation. Returns OK if the operation was successful,
-  // otherwise a Status object with information on the error will be returned.
+  /// Executes the given TDdlExecRequest and returns a response with details on the
+  /// result of the operation. Returns OK if the operation was successful,
+  /// otherwise a Status object with information on the error will be returned.
   Status ExecDdl(const TDdlExecRequest& req, TDdlExecResponse* resp);
 
-  // Executes the given TUpdateCatalogRequest and returns a response with details on
-  // the result of the operation. Returns OK if the operation was successful,
-  // otherwise a Status object with information on the error will be returned.
+  /// Executes the given TUpdateCatalogRequest and returns a response with details on
+  /// the result of the operation. Returns OK if the operation was successful,
+  /// otherwise a Status object with information on the error will be returned.
   Status UpdateCatalog(const TUpdateCatalogRequest& req,
       TUpdateCatalogResponse* resp);
 
-  // Resets the metadata of a single table or the entire catalog, based on the
-  // given TResetMetadataRequest. Returns OK if the operation was successful, otherwise
-  // a Status object with information on the error will be returned.
+  /// Resets the metadata of a single table or the entire catalog, based on the
+  /// given TResetMetadataRequest. Returns OK if the operation was successful, otherwise
+  /// a Status object with information on the error will be returned.
   Status ResetMetadata(const TResetMetadataRequest& req, TResetMetadataResponse* resp);
 
-  // Queries the catalog to get the current version and sets the 'version' output
-  // parameter to this value. Returns OK if the operation was successful, otherwise a
-  // Status object with information on the error will be returned.
+  /// Queries the catalog to get the current version and sets the 'version' output
+  /// parameter to this value. Returns OK if the operation was successful, otherwise a
+  /// Status object with information on the error will be returned.
   Status GetCatalogVersion(long* version);
 
-  // Gets all Catalog objects and the metadata that is applicable for the given request.
-  // Always returns all object names that exist in the Catalog, but allows for extended
-  // metadata for objects that were modified after the specified version.
-  // Returns OK if the operation was successful, otherwise a Status object with
-  // information on the error will be returned.
+  /// Gets all Catalog objects and the metadata that is applicable for the given request.
+  /// Always returns all object names that exist in the Catalog, but allows for extended
+  /// metadata for objects that were modified after the specified version.
+  /// Returns OK if the operation was successful, otherwise a Status object with
+  /// information on the error will be returned.
   Status GetAllCatalogObjects(long from_version, TGetAllCatalogObjectsResponse* resp);
 
-  // Gets the Thrift representation of a Catalog object. The request is a TCatalogObject
-  // which has the desired TCatalogObjectType and name properly set.
-  // Returns OK if the operation was successful, otherwise a Status object with
-  // information on the error will be returned.
+  /// Gets the Thrift representation of a Catalog object. The request is a TCatalogObject
+  /// which has the desired TCatalogObjectType and name properly set.
+  /// Returns OK if the operation was successful, otherwise a Status object with
+  /// information on the error will be returned.
   Status GetCatalogObject(const TCatalogObject& request, TCatalogObject* response);
 
-  // Return all databases matching the optional argument 'pattern'.
-  // If pattern is NULL, match all databases otherwise match only those databases that
-  // match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
-  // and each pN may contain wildcards denoted by '*' which match all strings.
-  // TODO: GetDbNames() and GetTableNames() can probably be scraped in favor of
-  // GetAllCatalogObjects(). Consider removing them and moving everything to use
-  // that.
+  /// Return all databases matching the optional argument 'pattern'.
+  /// If pattern is NULL, match all databases otherwise match only those databases that
+  /// match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
+  /// and each pN may contain wildcards denoted by '*' which match all strings.
+  /// TODO: GetDbNames() and GetTableNames() can probably be scraped in favor of
+  /// GetAllCatalogObjects(). Consider removing them and moving everything to use
+  /// that.
   Status GetDbNames(const std::string* pattern, TGetDbsResult* table_names);
 
-  // Returns all matching table names, per Hive's "SHOW TABLES <pattern>". Each
-  // table name returned is unqualified.
-  // If pattern is NULL, match all tables otherwise match only those tables that
-  // match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
-  // and each pN may contain wildcards denoted by '*' which match all strings.
+  /// Returns all matching table names, per Hive's "SHOW TABLES <pattern>". Each
+  /// table name returned is unqualified.
+  /// If pattern is NULL, match all tables otherwise match only those tables that
+  /// match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
+  /// and each pN may contain wildcards denoted by '*' which match all strings.
   Status GetTableNames(const std::string& db, const std::string* pattern,
       TGetTablesResult* table_names);
 
-  // Gets all functions in the catalog matching the parameters in the given
-  // TFunctionsRequest.
+  /// Gets all functions in the catalog matching the parameters in the given
+  /// TFunctionsRequest.
   Status GetFunctions(const TGetFunctionsRequest& request,
       TGetFunctionsResponse *response);
 
-  // Prioritizes the loading of metadata for the catalog objects specified in the
-  // TPrioritizeLoadRequest.
+  /// Prioritizes the loading of metadata for the catalog objects specified in the
+  /// TPrioritizeLoadRequest.
   Status PrioritizeLoad(const TPrioritizeLoadRequest& req);
 
-  // Checks whether the requesting user has admin privileges on the Sentry Service and
-  // returns OK if they do. Returns a bad status if the user is not an admin or if there
-  // was an error executing the request.
+  /// Checks whether the requesting user has admin privileges on the Sentry Service and
+  /// returns OK if they do. Returns a bad status if the user is not an admin or if there
+  /// was an error executing the request.
   Status SentryAdminCheck(const TSentryAdminCheckRequest& req);
 
  private:
-  // Descriptor of Java Catalog class itself, used to create a new instance.
+  /// Descriptor of Java Catalog class itself, used to create a new instance.
   jclass catalog_class_;
 
   jobject catalog_;  // instance of com.cloudera.impala.service.JniCatalog

@@ -20,29 +20,29 @@
 #include <boost/type_traits/is_float.hpp>
 #include <boost/utility/enable_if.hpp>
 
-// The ENABLE_IF_* macros are used to 'enable' - i.e. to make available to the compiler -
-// a method only if a type parameter belongs to the set described by each macro. Each
-// macro takes the return type of the method as an argument (a requirement of the
-// underlying type trait template that implements this logic).
-// Usage:
-// template <typename T> ENABLE_IF_ARITHMETIC(T, T) foo(T arg) { return arg + 2; }
+/// The ENABLE_IF_* macros are used to 'enable' - i.e. to make available to the compiler -
+/// a method only if a type parameter belongs to the set described by each macro. Each
+/// macro takes the return type of the method as an argument (a requirement of the
+/// underlying type trait template that implements this logic).
+/// Usage:
+/// template <typename T> ENABLE_IF_ARITHMETIC(T, T) foo(T arg) { return arg + 2; }
 
-// Enables a method only if 'type_param' is arithmetic, that is an integral type or a
-// floating-point type
+/// Enables a method only if 'type_param' is arithmetic, that is an integral type or a
+/// floating-point type
 #define ENABLE_IF_ARITHMETIC(type_param, return_type) \
   typename boost::enable_if_c<boost::is_arithmetic<type_param>::value, return_type>::type
 
-// Enables a method only if 'type_param' is not arithmetic, that is neither an integral
-// type or a floating-point type
+/// Enables a method only if 'type_param' is not arithmetic, that is neither an integral
+/// type or a floating-point type
 #define ENABLE_IF_NOT_ARITHMETIC(type_param, return_type) \
   typename boost::enable_if_c<!boost::is_arithmetic<type_param>::value, return_type>::type
 
-// Enables a method only if 'type_param' is integral, i.e. some variant of int or long
+/// Enables a method only if 'type_param' is integral, i.e. some variant of int or long
 #define ENABLE_IF_INTEGRAL(type_param, return_type) \
   typename boost::enable_if_c<boost::is_integral<type_param>::value, return_type>::type
 
-// Enables a method only if 'type_param' is a floating point type, i.e. some variant of
-// float or double.
+/// Enables a method only if 'type_param' is a floating point type, i.e. some variant of
+/// float or double.
 #define ENABLE_IF_FLOAT(type_param, return_type) \
   typename boost::enable_if_c<!boost::is_integral<type_param>::value, return_type>::type
 

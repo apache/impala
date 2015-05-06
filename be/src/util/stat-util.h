@@ -22,7 +22,7 @@ namespace impala {
 
 class StatUtil {
  public:
-  // Computes mean and standard deviation
+  /// Computes mean and standard deviation
   template <typename T>
   static void ComputeMeanStddev(const T* values, int N, double* mean, double* stddev) {
     *mean = 0;

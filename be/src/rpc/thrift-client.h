@@ -38,7 +38,7 @@ DECLARE_string(principal);
 DECLARE_string(hostname);
 
 namespace impala {
-// Super class for templatized thrift clients.
+/// Super class for templatized thrift clients.
 class ThriftClientImpl {
  public:
   ~ThriftClientImpl() {
@@ -47,21 +47,21 @@ class ThriftClientImpl {
 
   const TNetworkAddress& address() const { return address_; }
 
-  // Open the connection to the remote server. May be called repeatedly, is idempotent
-  // unless there is a failure to connect.
+  /// Open the connection to the remote server. May be called repeatedly, is idempotent
+  /// unless there is a failure to connect.
   Status Open();
 
-  // Retry the Open num_retries time waiting wait_ms milliseconds between retries.
-  // If num_retries == 0, the connection is retried indefinitely.
+  /// Retry the Open num_retries time waiting wait_ms milliseconds between retries.
+  /// If num_retries == 0, the connection is retried indefinitely.
   Status OpenWithRetry(uint32_t num_retries, uint64_t wait_ms);
 
-  // Close the connection with the remote server. May be called repeatedly.
+  /// Close the connection with the remote server. May be called repeatedly.
   void Close();
 
-  // Set receive timeout on the underlying TSocket.
+  /// Set receive timeout on the underlying TSocket.
   void setRecvTimeout(int32_t ms) { socket_->setRecvTimeout(ms); }
 
-  // Set send timeout on the underlying TSocket.
+  /// Set send timeout on the underlying TSocket.
   void setSendTimeout(int32_t ms) { socket_->setSendTimeout(ms); }
 
  protected:
@@ -70,47 +70,47 @@ class ThriftClientImpl {
     socket_create_status_ = CreateSocket();
   }
 
-  // Create a new socket without opening it. Returns an error if the socket could not
-  // be created.
+  /// Create a new socket without opening it. Returns an error if the socket could not
+  /// be created.
   Status CreateSocket();
 
-  // Address of the server this client communicates with.
+  /// Address of the server this client communicates with.
   TNetworkAddress address_;
 
-  // True if ssl encryption is enabled on this connection.
+  /// True if ssl encryption is enabled on this connection.
   bool ssl_;
 
   Status socket_create_status_;
 
-  // Sasl Client object.  Contains client kerberos identification data.
-  // Will be NULL if kerberos is not being used.
+  /// Sasl Client object.  Contains client kerberos identification data.
+  /// Will be NULL if kerberos is not being used.
   boost::shared_ptr<sasl::TSasl> sasl_client_;
 
-  // All shared pointers, because Thrift requires them to be
+  /// All shared pointers, because Thrift requires them to be
   boost::shared_ptr<apache::thrift::transport::TSocket> socket_;
   boost::shared_ptr<apache::thrift::transport::TTransport> transport_;
   boost::shared_ptr<apache::thrift::protocol::TBinaryProtocol> protocol_;
 };
 
 
-// Utility client to a Thrift server. The parameter type is the Thrift interface type that
-// the server implements.
-// TODO: Consider a builder class to make constructing this class easier.
+/// Utility client to a Thrift server. The parameter type is the Thrift interface type that
+/// the server implements.
+/// TODO: Consider a builder class to make constructing this class easier.
 template <class InterfaceType>
 class ThriftClient : public ThriftClientImpl {
  public:
-  // Creates, but does not connect, a new ThriftClient for a remote server.
-  //  - ipaddress: address of remote server
-  //  - port: port on which remote service runs
-  //  - service_name: If set, the target service to connect to.
-  //  - auth_provider: Authentication scheme to use. If NULL, use the global default
-  //    client<->demon authentication scheme.
-  //  - ssl: if true, SSL is enabled on this connection
+  /// Creates, but does not connect, a new ThriftClient for a remote server.
+  ///  - ipaddress: address of remote server
+  ///  - port: port on which remote service runs
+  ///  - service_name: If set, the target service to connect to.
+  ///  - auth_provider: Authentication scheme to use. If NULL, use the global default
+  ///    client<->demon authentication scheme.
+  ///  - ssl: if true, SSL is enabled on this connection
   ThriftClient(const std::string& ipaddress, int port,
       const std::string& service_name = "", AuthProvider* auth_provider = NULL,
       bool ssl = false);
 
-  // Returns the object used to actually make RPCs against the remote server
+  /// Returns the object used to actually make RPCs against the remote server
   InterfaceType* iface() { return iface_.get(); }
 
  private:

@@ -34,24 +34,24 @@
 
 namespace impala {
 
-// Collection metrics are those whose values have more structure than simple
-// scalar types. Therefore they need specialised ToJson() methods, and
-// typically a specialised API for updating the values they contain.
+/// Collection metrics are those whose values have more structure than simple
+/// scalar types. Therefore they need specialised ToJson() methods, and
+/// typically a specialised API for updating the values they contain.
 
-// Metric whose value is a set of items
+/// Metric whose value is a set of items
 template <typename T>
 class SetMetric : public Metric {
  public:
   SetMetric(const std::string& key, const std::set<T>& value,
       const std::string& description = "") : Metric(key, description), value_(value) { }
 
-  // Put an item in this set.
+  /// Put an item in this set.
   void Add(const T& item) {
     boost::lock_guard<boost::mutex> l(lock_);
     value_.insert(item);
   }
 
-  // Remove an item from this set by value.
+  /// Remove an item from this set by value.
   void Remove(const T& item) {
     boost::lock_guard<boost::mutex> l(lock_);
     value_.erase(item);
@@ -90,19 +90,19 @@ class SetMetric : public Metric {
   }
 
  private:
-  // Lock protecting the set
+  /// Lock protecting the set
   boost::mutex lock_;
 
-  // The set of items
+  /// The set of items
   std::set<T> value_;
 };
 
-// Metric which accumulates min, max and mean of all values, plus a count of samples seen.
-// Printed output looks like:
-// name: count: 4, last: 0.0141, min: 4.546e-06, max: 0.0243, mean: 0.0336, stddev: 0.0336
+/// Metric which accumulates min, max and mean of all values, plus a count of samples seen.
+/// Printed output looks like:
+/// name: count: 4, last: 0.0141, min: 4.546e-06, max: 0.0243, mean: 0.0336, stddev: 0.0336
 //
-// After construction, all statistics are ill-defined, but count will be 0. The first call
-// to Update() will initialise all stats.
+/// After construction, all statistics are ill-defined, but count will be 0. The first call
+/// to Update() will initialise all stats.
 template <typename T>
 class StatsMetric : public Metric {
  public:
@@ -180,16 +180,16 @@ class StatsMetric : public Metric {
   }
 
  private:
-  // The units of the values captured in this metric, used when pretty-printing.
+  /// The units of the values captured in this metric, used when pretty-printing.
   TUnit::type unit_;
 
-  // Lock protecting the value and the accumulator_set
+  /// Lock protecting the value and the accumulator_set
   boost::mutex lock_;
 
-  // The last value
+  /// The last value
   T value_;
 
-  // The set of accumulators that update the statistics on each Update()
+  /// The set of accumulators that update the statistics on each Update()
   typedef boost::accumulators::accumulator_set<T,
       boost::accumulators::features<boost::accumulators::tag::mean,
                                     boost::accumulators::tag::count,

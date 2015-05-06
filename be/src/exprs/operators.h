@@ -21,7 +21,7 @@ using namespace impala_udf;
 
 namespace impala {
 
-// Operators written against the UDF interface.
+/// Operators written against the UDF interface.
 class Operators {
  public:
   static TinyIntVal Bitnot_TinyIntVal(FunctionContext*, const TinyIntVal&);

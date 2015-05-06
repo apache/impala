@@ -24,8 +24,8 @@
 
 namespace impala {
 
-// Proxies Thrift RPC requests onto their implementing objects for the
-// ImpalaInternalService service.
+/// Proxies Thrift RPC requests onto their implementing objects for the
+/// ImpalaInternalService service.
 class ImpalaInternalService : public ImpalaInternalServiceIf {
  public:
   ImpalaInternalService(const boost::shared_ptr<ImpalaServer>& impala_server,
@@ -53,18 +53,18 @@ class ImpalaInternalService : public ImpalaInternalServiceIf {
     // destroyed unti TransmitData() completes. Otherwise if query cancellation happens
     // while TransmitData() is running, TransmitData() could end up with the last
     // shared_ptr to a DataStreamRecvr. When the DataStreamRecvr is destroyed it expects
-    // the fragment which owns it to still be around. Even if no fragment is found
-    // call TransmitData() to set the return_val.
+    // the fragment which owns it to still be around. Even if no fragment is found call
+    // TransmitData() to set the return_val.
     boost::shared_ptr<FragmentMgr::FragmentExecState> fragment_exec_state
         = fragment_mgr_->GetFragmentExecState(params.dest_fragment_instance_id);
     impala_server_->TransmitData(return_val, params);
   }
 
  private:
-  // Manages fragment reporting and data transmission
+  /// Manages fragment reporting and data transmission
   boost::shared_ptr<ImpalaServer> impala_server_;
 
-  // Manages fragment execution
+  /// Manages fragment execution
   boost::shared_ptr<FragmentMgr> fragment_mgr_;
 };
 

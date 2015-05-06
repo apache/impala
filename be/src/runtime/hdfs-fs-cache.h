@@ -26,41 +26,41 @@
 
 namespace impala {
 
-// A (process-wide) cache of hdfsFS objects.
-// These connections are shared across all threads and kept open until the process
-// terminates.
+/// A (process-wide) cache of hdfsFS objects.
+/// These connections are shared across all threads and kept open until the process
+/// terminates.
 //
-// These connections are leaked, i.e. we never call hdfsDisconnect(). Calls to
-// hdfsDisconnect() by individual threads would terminate all other connections handed
-// out via hdfsConnect() to the same URI, and there is no simple, safe way to call
-// hdfsDisconnect() when process terminates (the proper solution is likely to create a
-// signal handler to detect when the process is killed, but we would still leak when
-// impalad crashes).
+/// These connections are leaked, i.e. we never call hdfsDisconnect(). Calls to
+/// hdfsDisconnect() by individual threads would terminate all other connections handed
+/// out via hdfsConnect() to the same URI, and there is no simple, safe way to call
+/// hdfsDisconnect() when process terminates (the proper solution is likely to create a
+/// signal handler to detect when the process is killed, but we would still leak when
+/// impalad crashes).
 class HdfsFsCache {
  public:
   typedef boost::unordered_map<std::string, hdfsFS> HdfsFsMap;
 
   static HdfsFsCache* instance() { return HdfsFsCache::instance_.get(); }
 
-  // Initializes the cache. Must be called before any other APIs.
+  /// Initializes the cache. Must be called before any other APIs.
   static void Init();
 
-  // Get connection to the local filesystem.
+  /// Get connection to the local filesystem.
   Status GetLocalConnection(hdfsFS* fs);
 
-  // Get connection to specific fs by specifying a path.  Optionally, a local cache can
-  // be provided so that the process-wide lock can be avoided on subsequent calls for
-  // the same filesystem.  The caller is responsible for synchronizing the local cache
-  // (e.g. by passing a thread-local cache).
+  /// Get connection to specific fs by specifying a path.  Optionally, a local cache can
+  /// be provided so that the process-wide lock can be avoided on subsequent calls for
+  /// the same filesystem.  The caller is responsible for synchronizing the local cache
+  /// (e.g. by passing a thread-local cache).
   Status GetConnection(const std::string& path, hdfsFS* fs,
       HdfsFsMap* local_cache = NULL);
 
-  // Get NameNode info from path, set error message if path is not valid.
-  // Exposed as a static method for testing purpose.
+  /// Get NameNode info from path, set error message if path is not valid.
+  /// Exposed as a static method for testing purpose.
   static string GetNameNodeFromPath(const string& path, string* err);
 
  private:
-  // Singleton instance. Instantiated in Init().
+  /// Singleton instance. Instantiated in Init().
   static boost::scoped_ptr<HdfsFsCache> instance_;
 
   boost::mutex lock_;  // protects fs_map_

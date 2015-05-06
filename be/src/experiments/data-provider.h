@@ -20,16 +20,16 @@
 #include "runtime/string-value.h"
 #include "util/runtime-profile.h"
 
-// This is a test utility class that can generate data that is similar to the tuple
-// data we use.
-// It can accept columns descriptions and generates rows (in batches) with an iterator
-// interface.
+/// This is a test utility class that can generate data that is similar to the tuple
+/// data we use.
+/// It can accept columns descriptions and generates rows (in batches) with an iterator
+/// interface.
 //
-// See data-provider-test.cc on how to use this.
+/// See data-provider-test.cc on how to use this.
 //
-// TODO: provide a way to have better control over the pool strings are allocated to
-// TODO: provide a way to control data skew.  This is pretty easy with the boost rand
-// classes.
+/// TODO: provide a way to have better control over the pool strings are allocated to
+/// TODO: provide a way to control data skew.  This is pretty easy with the boost rand
+/// classes.
 class DataProvider {
  public:
   struct Value {
@@ -45,7 +45,7 @@ class DataProvider {
     impala::StringValue s;
   };
 
-  // How the data should be generated.
+  /// How the data should be generated.
   enum DataGen {
     UNIFORM_RANDOM,
     SEQUENTIAL,
@@ -53,15 +53,15 @@ class DataProvider {
 
   class ColDesc {
    public:
-    // Create a column desc with min/max range and the data gen type
+    /// Create a column desc with min/max range and the data gen type
     template<typename T>
     static ColDesc Create(const T& min, const T& max, DataGen gen = UNIFORM_RANDOM);
 
    private:
     friend class DataProvider;
 
-    // Generates a column value between [min,max) for this column.
-    // d is a random value between [0,1] and i is the row index.
+    /// Generates a column value between [min,max) for this column.
+    /// d is a random value between [0,1] and i is the row index.
     template<typename T>
     T Generate(double d, int i) const;
 
@@ -71,7 +71,7 @@ class DataProvider {
       this->bytes = bytes;
     }
 
-    // Default generator - used for int and float types
+    /// Default generator - used for int and float types
     template<typename T>
     T Generate(double d, int i, T min, T max) const {
       switch (gen_type) {
@@ -89,32 +89,32 @@ class DataProvider {
     int bytes;
   };
 
-  // Create a data provider object with a pool for allocating memory and a
-  // profile to collect metrics.
+  /// Create a data provider object with a pool for allocating memory and a
+  /// profile to collect metrics.
   DataProvider(impala::MemPool* pool, impala::RuntimeProfile* profile);
 
-  // Reset the generator with the column description.
-  //  - num_rows: total rows to generate
-  //  - batch_size: size of generated batches from NextBatch
-  // Data returned via previous NextBatch calls is no longer valid
+  /// Reset the generator with the column description.
+  ///  - num_rows: total rows to generate
+  ///  - batch_size: size of generated batches from NextBatch
+  /// Data returned via previous NextBatch calls is no longer valid
   void Reset(int num_rows, int batch_size, const std::vector<ColDesc>& columns);
 
-  // Sets the seed to use for randomly generated data.  The default generator will
-  // use seed(0)
+  /// Sets the seed to use for randomly generated data.  The default generator will
+  /// use seed(0)
   void SetSeed(int seed);
 
-  // The size of a row (tuple size)
+  /// The size of a row (tuple size)
   int row_size() const { return row_size_; }
 
-  // The total number of rows that will be generated
+  /// The total number of rows that will be generated
   int total_rows() const { return num_rows_; }
 
-  // Generated the next batch, returning a pointer to the start of the batch
-  // and the number of rows generated.
-  // Returns NULL/0 when the generator is done.
+  /// Generated the next batch, returning a pointer to the start of the batch
+  /// and the number of rows generated.
+  /// Returns NULL/0 when the generator is done.
   void* NextBatch(int* rows_returned);
 
-  // Print the row data in csv format.
+  /// Print the row data in csv format.
   void Print(std::ostream*, char* data, int num_rows) const;
 
  private:

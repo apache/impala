@@ -33,26 +33,26 @@ class HdfsTableSink;
 struct StringValue;
 struct OutputPartition;
 
-// Consumes rows and outputs the rows into an Avro file in HDFS
-// Each Avro file contains a block of records (rows). The file metadata specifies the
-// schema of the records in addition to the name of the codec, if any, used to compress
-// blocks. The structure is:
-//   [ Metadata ]
-//   [ Sync Marker ]
-//   [ Data Block ]
-//     ...
-//   [ Data Block ]
+/// Consumes rows and outputs the rows into an Avro file in HDFS
+/// Each Avro file contains a block of records (rows). The file metadata specifies the
+/// schema of the records in addition to the name of the codec, if any, used to compress
+/// blocks. The structure is:
+///   [ Metadata ]
+///   [ Sync Marker ]
+///   [ Data Block ]
+///     ...
+///   [ Data Block ]
 //
-// Each Data Block consists of:
-//   [ Number of Rows in Block ]
-//   [ Size of serialized objects, after compression ]
-//   [ Serialized objects, compressed ]
-//   [ Sync Marker ]
+/// Each Data Block consists of:
+///   [ Number of Rows in Block ]
+///   [ Size of serialized objects, after compression ]
+///   [ Serialized objects, compressed ]
+///   [ Sync Marker ]
 //
-// If compression is used, each block is compressed individually. The block size defaults
-// to about 64KB before compression.
-// This writer implements the Avro 1.7.7 spec:
-// http://avro.apache.org/docs/1.7.7/spec.html
+/// If compression is used, each block is compressed individually. The block size defaults
+/// to about 64KB before compression.
+/// This writer implements the Avro 1.7.7 spec:
+/// http://avro.apache.org/docs/1.7.7/spec.html
 class HdfsAvroTableWriter : public HdfsTableWriter {
  public:
   HdfsAvroTableWriter(HdfsTableSink* parent,
@@ -70,46 +70,46 @@ class HdfsAvroTableWriter : public HdfsTableWriter {
   virtual uint64_t default_block_size() const { return 0; }
   virtual std::string file_extension() const { return "avro"; }
 
-  // Outputs the given rows into an HDFS sequence file. The rows are buffered
-  // to fill a sequence file block.
+  /// Outputs the given rows into an HDFS sequence file. The rows are buffered
+  /// to fill a sequence file block.
   virtual Status AppendRowBatch(RowBatch* rows,
                                 const std::vector<int32_t>& row_group_indices,
                                 bool* new_file);
 
  private:
-  // Processes a single row, appending to out_
+  /// Processes a single row, appending to out_
   void ConsumeRow(TupleRow* row);
 
-  // Adds an encoded field to out_
+  /// Adds an encoded field to out_
   inline void AppendField(const ColumnType& type, const void* value);
 
-  // Writes the Avro file header to HDFS
+  /// Writes the Avro file header to HDFS
   Status WriteFileHeader();
 
-  // Writes the contents of out_ to HDFS as a single Avro file block.
-  // Returns an error if write to HDFS fails.
+  /// Writes the contents of out_ to HDFS as a single Avro file block.
+  /// Returns an error if write to HDFS fails.
   Status Flush();
 
-  // Buffer which holds accumulated output
+  /// Buffer which holds accumulated output
   WriteStream out_;
 
-  // Memory pool used by codec to allocate output buffer.
-  // Owned by this class. Initialized using parent's memtracker.
+  /// Memory pool used by codec to allocate output buffer.
+  /// Owned by this class. Initialized using parent's memtracker.
   boost::scoped_ptr<MemPool> mem_pool_;
 
-  // Number of rows consumed since last flush
+  /// Number of rows consumed since last flush
   uint64_t unflushed_rows_;
 
-  // Name of codec, only set if codec_type_ != NONE
+  /// Name of codec, only set if codec_type_ != NONE
   std::string codec_name_;
 
-  // Type of the codec, will be NONE if no compression is used
+  /// Type of the codec, will be NONE if no compression is used
   THdfsCompression::type codec_type_;
 
-  // The codec for compressing, only set if codec_type_ != NONE
+  /// The codec for compressing, only set if codec_type_ != NONE
   boost::scoped_ptr<Codec> compressor_;
 
-  // 16 byte sync marker (a uuid)
+  /// 16 byte sync marker (a uuid)
   std::string sync_marker_;
 };
 

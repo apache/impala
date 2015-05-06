@@ -63,11 +63,11 @@ class CaseExpr: public Expr {
   const bool has_case_expr_;
   const bool has_else_expr_;
 
-  // Populates 'dst' with the result of calling the appropriate Get*Val() function on the
-  // specified child expr.
+  /// Populates 'dst' with the result of calling the appropriate Get*Val() function on the
+  /// specified child expr.
   void GetChildVal(int child_idx, ExprContext* ctx, TupleRow* row, AnyVal* dst);
 
-  // Return true iff *v1 == *v2. v1 and v2 should both be of the specified type.
+  /// Return true iff *v1 == *v2. v1 and v2 should both be of the specified type.
   bool AnyValEq(const ColumnType& type, const AnyVal* v1, const AnyVal* v2);
 };
 

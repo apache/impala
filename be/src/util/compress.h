@@ -16,7 +16,7 @@
 #ifndef IMPALA_UTIL_COMPRESS_H
 #define IMPALA_UTIL_COMPRESS_H
 
-// We need zlib.h here to declare stream_ below.
+/// We need zlib.h here to declare stream_ below.
 #include <zlib.h>
 
 #include "util/codec.h"
@@ -25,13 +25,13 @@
 
 namespace impala {
 
-// Different compression classes.  The classes all expose the same API and
-// abstracts the underlying calls to the compression libraries.
-// TODO: reconsider the abstracted API
+/// Different compression classes.  The classes all expose the same API and
+/// abstracts the underlying calls to the compression libraries.
+/// TODO: reconsider the abstracted API
 
 class GzipCompressor : public Codec {
  public:
-  // Compression formats supported by the zlib library
+  /// Compression formats supported by the zlib library
   enum Format {
     ZLIB,
     DEFLATE,
@@ -52,17 +52,17 @@ class GzipCompressor : public Codec {
 
   Format format_;
 
-  // Structure used to communicate with the library.
+  /// Structure used to communicate with the library.
   z_stream stream_;
 
-  // These are magic numbers from zlib.h.  Not clear why they are not defined there.
+  /// These are magic numbers from zlib.h.  Not clear why they are not defined there.
   const static int WINDOW_BITS = 15;    // Maximum window size
   const static int GZIP_CODEC = 16;     // Output Gzip.
 
-  // Compresses 'input' into 'output'.  Output must be preallocated and
-  // at least big enough.
-  // *output_length should be called with the length of the output buffer and on return
-  // is the length of the output.
+  /// Compresses 'input' into 'output'.  Output must be preallocated and
+  /// at least big enough.
+  /// *output_length should be called with the length of the output buffer and on return
+  /// is the length of the output.
   Status Compress(int64_t input_length, const uint8_t* input,
       int64_t* output_length, uint8_t* output);
 };
@@ -103,9 +103,9 @@ class SnappyCompressor : public Codec {
       const uint8_t* input, int64_t* output_length, uint8_t** output);
   virtual std::string file_extension() const { return "snappy"; }
 
-  // Computes the crc checksum that snappy expects when used in a framing format.
-  // This checksum needs to come after the compressed data.
-  // http://code.google.com/p/snappy/source/browse/trunk/framing_format.txt
+  /// Computes the crc checksum that snappy expects when used in a framing format.
+  /// This checksum needs to come after the compressed data.
+  /// http://code.google.com/p/snappy/source/browse/trunk/framing_format.txt
   static uint32_t ComputeChecksum(int64_t input_len, const uint8_t* input);
 
  private:
@@ -114,10 +114,10 @@ class SnappyCompressor : public Codec {
   virtual Status Init() { return Status::OK; }
 };
 
-// Lz4 is a compression codec with similar compression ratios as snappy
-// but much faster decompression. This compressor is not able to compress
-// unless the output buffer is allocated and will cause an error if
-// asked to do so.
+/// Lz4 is a compression codec with similar compression ratios as snappy
+/// but much faster decompression. This compressor is not able to compress
+/// unless the output buffer is allocated and will cause an error if
+/// asked to do so.
 class Lz4Compressor : public Codec {
  public:
   virtual ~Lz4Compressor() { }

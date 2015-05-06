@@ -26,11 +26,11 @@ namespace impala {
 
 class TupleRowComparator {
  public:
-  // Compares two TupleRows based on a set of exprs, in order.
-  // We use is_asc to determine, for each expr, if it should be ascending or descending
-  // sort order.
-  // We use nulls_first to determine, for each expr, if nulls should come before
-  // or after all other values.
+  /// Compares two TupleRows based on a set of exprs, in order.
+  /// We use is_asc to determine, for each expr, if it should be ascending or descending
+  /// sort order.
+  /// We use nulls_first to determine, for each expr, if nulls should come before
+  /// or after all other values.
   TupleRowComparator(
       const std::vector<ExprContext*>& key_expr_ctxs_lhs,
       const std::vector<ExprContext*>& key_expr_ctxs_rhs,
@@ -59,9 +59,9 @@ class TupleRowComparator {
     DCHECK_EQ(key_expr_ctxs_lhs.size(), key_expr_ctxs_rhs.size());
   }
 
-  // Returns a negative value if lhs is less than rhs, a positive value if lhs is greater
-  // than rhs, or 0 if they are equal. All exprs (key_exprs_lhs_ and key_exprs_rhs_)
-  // must have been prepared and opened before calling this.
+  /// Returns a negative value if lhs is less than rhs, a positive value if lhs is greater
+  /// than rhs, or 0 if they are equal. All exprs (key_exprs_lhs_ and key_exprs_rhs_)
+  /// must have been prepared and opened before calling this.
   int Compare(TupleRow* lhs, TupleRow* rhs) const {
     for (int i = 0; i < key_expr_ctxs_lhs_.size(); ++i) {
       void* lhs_value = key_expr_ctxs_lhs_[i]->GetValue(lhs);
@@ -72,7 +72,7 @@ class TupleRowComparator {
       if (lhs_value == NULL && rhs_value != NULL) return nulls_first_[i];
       if (lhs_value != NULL && rhs_value == NULL) return -nulls_first_[i];
 
-      int result = RawValue::Compare(lhs_value, rhs_value, 
+      int result = RawValue::Compare(lhs_value, rhs_value,
                                      key_expr_ctxs_lhs_[i]->root()->type());
       if (!is_asc_[i]) result = -result;
       if (result != 0) return result;
@@ -81,9 +81,9 @@ class TupleRowComparator {
     return 0; // fully equivalent key
   }
 
-  // Returns true if lhs is strictly less than rhs.
-  // All exprs (key_exprs_lhs_ and key_exprs_rhs_) must have been prepared and opened
-  // before calling this.
+  /// Returns true if lhs is strictly less than rhs.
+  /// All exprs (key_exprs_lhs_ and key_exprs_rhs_) must have been prepared and opened
+  /// before calling this.
   bool operator() (TupleRow* lhs, TupleRow* rhs) const {
     int result = Compare(lhs, rhs);
     if (result < 0) return true;
@@ -103,7 +103,7 @@ class TupleRowComparator {
   std::vector<int8_t> nulls_first_;
 };
 
-// Compares the equality of two Tuples, going slot by slot.
+/// Compares the equality of two Tuples, going slot by slot.
 struct TupleEqualityChecker {
   TupleDescriptor* tuple_desc_;
 
@@ -137,7 +137,7 @@ struct TupleEqualityChecker {
   }
 };
 
-// Compares the equality of two TupleRows, going tuple by tuple.
+/// Compares the equality of two TupleRows, going tuple by tuple.
 struct RowEqualityChecker {
   std::vector<TupleEqualityChecker> tuple_checkers_;
 
@@ -162,4 +162,3 @@ struct RowEqualityChecker {
 }
 
 #endif
-

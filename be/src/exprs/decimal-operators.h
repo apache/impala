@@ -28,8 +28,8 @@ class Expr;
 struct ExprValue;
 class TupleRow;
 
-// Implementation of the decimal operators. These include the cast,
-// arithmetic and binary operators.
+/// Implementation of the decimal operators. These include the cast,
+/// arithmetic and binary operators.
 class DecimalOperators {
  public:
   static DecimalVal CastToDecimalVal(FunctionContext*, const DecimalVal&);
@@ -76,60 +76,60 @@ class DecimalOperators {
   static BooleanVal Lt_DecimalVal_DecimalVal(
       FunctionContext*, const DecimalVal&, const DecimalVal&);
 
-  // The rounding rule when converting decimals. These only apply going from a higher
-  // scale to a lower one.
+  /// The rounding rule when converting decimals. These only apply going from a higher
+  /// scale to a lower one.
   enum DecimalRoundOp {
-    // Additional digits are dropped.
+    /// Additional digits are dropped.
     TRUNCATE,
 
-    // Returns largest value not greater than the value. (digits are dropped for
-    // positive values and rounded away from zero for negative values)
+    /// Returns largest value not greater than the value. (digits are dropped for
+    /// positive values and rounded away from zero for negative values)
     FLOOR,
 
-    // Returns smallest value not smaller than the value. (rounded away from zero
-    // for positive values and extra digits dropped for negative values)
+    /// Returns smallest value not smaller than the value. (rounded away from zero
+    /// for positive values and extra digits dropped for negative values)
     CEIL,
 
-    // Rounded towards zero if the extra digits are less than .5 and away from
-    // zero otherwise.
+    /// Rounded towards zero if the extra digits are less than .5 and away from
+    /// zero otherwise.
     ROUND
   };
 
-  // Evaluates a round from 'val' and returns the result, using the rounding rule of
-  // 'type'.
+  /// Evaluates a round from 'val' and returns the result, using the rounding rule of
+  /// 'type'.
   static DecimalVal RoundDecimal(
       FunctionContext* context, const DecimalVal& val, const ColumnType& val_type,
       const ColumnType& output_type, const DecimalRoundOp& op);
 
-  // Same as above but infers 'val_type' from the first argument type and 'output_type'
-  // from the return type according to 'context'.
+  /// Same as above but infers 'val_type' from the first argument type and 'output_type'
+  /// from the return type according to 'context'.
   static DecimalVal RoundDecimal(
       FunctionContext* context, const DecimalVal& val, const DecimalRoundOp& op);
 
-  // Handles the case of rounding to a negative scale. This means rounding to a digit
-  // before the decimal point.
-  // rounding_scale is the number of digits before the decimal to round to.
-  // TODO: can this code be reorganized to combine the two version of RoundDecimal()?
-  // The implementation is similar but not quite the same.
-  // This code is, in general, harder to read because there are multiple input/output
-  // types to handle and all combinations are valid. Another option might be to use
-  // templates to generate each pair:
-  //   Decimal4Value Round(const Decimal4Value&);
-  //   Decimal8Value Round(const Decimal4Value&);
-  //   Decimal4Value Round(const Decimal8Value&);
-  //   etc.
+  /// Handles the case of rounding to a negative scale. This means rounding to a digit
+  /// before the decimal point.
+  /// rounding_scale is the number of digits before the decimal to round to.
+  /// TODO: can this code be reorganized to combine the two version of RoundDecimal()?
+  /// The implementation is similar but not quite the same.
+  /// This code is, in general, harder to read because there are multiple input/output
+  /// types to handle and all combinations are valid. Another option might be to use
+  /// templates to generate each pair:
+  ///   Decimal4Value Round(const Decimal4Value&);
+  ///   Decimal8Value Round(const Decimal4Value&);
+  ///   Decimal4Value Round(const Decimal8Value&);
+  ///   etc.
   static DecimalVal RoundDecimalNegativeScale(
       FunctionContext* context, const DecimalVal& val, const ColumnType& val_type,
       const ColumnType& output_type, const DecimalRoundOp& op, int64_t rounding_scale);
 
  private:
-  // Converts 'val' to a DecimalVal according to 'type'. 'type' must be a decimal type.
+  /// Converts 'val' to a DecimalVal according to 'type'. 'type' must be a decimal type.
   static DecimalVal IntToDecimalVal(
       FunctionContext* context, const ColumnType& type, int64_t val);
   static DecimalVal FloatToDecimalVal(
       FunctionContext* context, const ColumnType& type, double val);
 
-  // Returns the value of 'val' scaled to 'output_type'.
+  /// Returns the value of 'val' scaled to 'output_type'.
   static DecimalVal ScaleDecimalValue(
       FunctionContext* context, const Decimal4Value& val, const ColumnType& val_type,
       const ColumnType& output_type);
@@ -140,9 +140,9 @@ class DecimalOperators {
       FunctionContext* context, const Decimal16Value& val, const ColumnType& val_type,
       const ColumnType& output_type);
 
-  // Returns the delta that needs to be added when the source decimal is rounded to
-  // target scale. Returns 0, if no rounding is necessary, or -1/1 if rounding
-  // is required.
+  /// Returns the delta that needs to be added when the source decimal is rounded to
+  /// target scale. Returns 0, if no rounding is necessary, or -1/1 if rounding
+  /// is required.
   template <typename T>
   static T RoundDelta(const DecimalValue<T>& v, int src_scale, int target_scale,
       const DecimalRoundOp& op) {

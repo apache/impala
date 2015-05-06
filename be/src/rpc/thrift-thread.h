@@ -15,11 +15,11 @@
 #ifndef IMPALA_RPC_THRIFT_THREAD_H
 #define IMPALA_RPC_THRIFT_THREAD_H
 
-// This is required for thrift's Thread.h to compile. Thrift also includes an experimental
-// Boost-based thread implementation that is enabled by #define USE_BOOST_THREAD. It is
-// important that USE_BOOST_THREAD is defined if and only if it was defined when compiling
-// Thrift itself, as it causes the size of id_t to change, which will cause crashes if
-// it's different sizes in Impala and in Thrift.
+/// This is required for thrift's Thread.h to compile. Thrift also includes an experimental
+/// Boost-based thread implementation that is enabled by #define USE_BOOST_THREAD. It is
+/// important that USE_BOOST_THREAD is defined if and only if it was defined when compiling
+/// Thrift itself, as it causes the size of id_t to change, which will cause crashes if
+/// it's different sizes in Impala and in Thrift.
 #define HAVE_PTHREAD_H
 
 #include <thrift/concurrency/Thread.h>
@@ -28,77 +28,77 @@
 #include "util/thread.h"
 #include "util/promise.h"
 
-// This file adds an implementation of Thrift's ThreadFactory and Thread that uses
-// Impala's Thread wrapper class, so that all threads are accounted for by Impala's
-// ThreadManager.
+/// This file adds an implementation of Thrift's ThreadFactory and Thread that uses
+/// Impala's Thread wrapper class, so that all threads are accounted for by Impala's
+/// ThreadManager.
 namespace impala {
 
-// The ThriftThreadFactory is responsible for creating new ThriftThreads to run server
-// tasks on.
+/// The ThriftThreadFactory is responsible for creating new ThriftThreads to run server
+/// tasks on.
 class ThriftThreadFactory : public apache::thrift::concurrency::ThreadFactory {
  public:
-  // Group is the thread group for new threads to be assigned to, and prefix is the
-  // per-thread prefix (threads are named "prefix-<count_>-<tid>").
+  /// Group is the thread group for new threads to be assigned to, and prefix is the
+  /// per-thread prefix (threads are named "prefix-<count_>-<tid>").
   ThriftThreadFactory(const std::string& group, const std::string& prefix)
       : group_(group), prefix_(prefix), count_(0) { }
 
-  // (From ThreadFactory) - creates a new ThriftThread to run the supplied Runnable.
+  /// (From ThreadFactory) - creates a new ThriftThread to run the supplied Runnable.
   virtual boost::shared_ptr<apache::thrift::concurrency::Thread> newThread(
       boost::shared_ptr<apache::thrift::concurrency::Runnable> runnable) const;
 
-  // (From ThreadFactory) - returns the *current* thread ID, i.e. the ID of the executing
-  // thread (which may not have been created by this factory).
+  /// (From ThreadFactory) - returns the *current* thread ID, i.e. the ID of the executing
+  /// thread (which may not have been created by this factory).
   virtual apache::thrift::concurrency::Thread::id_t getCurrentThreadId() const;
 
  private:
-  // Group name for the Impala ThreadManager
+  /// Group name for the Impala ThreadManager
   std::string group_;
 
-  // Thread name prefix for the Impala ThreadManager
+  /// Thread name prefix for the Impala ThreadManager
   std::string prefix_;
 
-  // Marked mutable because we want to increment it inside newThread, which for some
-  // reason is const.
+  /// Marked mutable because we want to increment it inside newThread, which for some
+  /// reason is const.
   mutable int64_t count_;
 };
 
-// A ThriftThread is a Thrift-compatible wrapper for Impala's Thread class, so that all
-// server threads are registered with the global ThreadManager.
+/// A ThriftThread is a Thrift-compatible wrapper for Impala's Thread class, so that all
+/// server threads are registered with the global ThreadManager.
 class ThriftThread : public apache::thrift::concurrency::Thread {
  public:
   ThriftThread(const std::string& group, const std::string& name,
       boost::shared_ptr<apache::thrift::concurrency::Runnable> runnable);
 
-  // (From Thread) - starts execution of the runnable in a separate thread, returning once
-  // execution has begun.
+  /// (From Thread) - starts execution of the runnable in a separate thread, returning once
+  /// execution has begun.
   virtual void start();
 
-  // Joins the separate thread
+  /// Joins the separate thread
   virtual void join();
 
-  // Returns the Thrift thread ID of the execution thread
+  /// Returns the Thrift thread ID of the execution thread
   virtual id_t getId();
 
   virtual ~ThriftThread() { }
 
  private:
-  // Method executed on impala_thread_. Runs the Runnable once promise has been set to the
-  // current thread ID. The runnable parameter is a shared_ptr so that is always valid
-  // even after the ThriftThread may have been terminated.
+  /// Method executed on impala_thread_. Runs the Runnable once promise has been set to the
+  /// current thread ID. The runnable parameter is a shared_ptr so that is always valid
+  /// even after the ThriftThread may have been terminated.
   void RunRunnable(boost::shared_ptr<apache::thrift::concurrency::Runnable> runnable,
       Promise<apache::thrift::concurrency::Thread::id_t>* promise);
 
-  // Impala thread that runs the runnable and registers itself with the global
-  // ThreadManager.
+  /// Impala thread that runs the runnable and registers itself with the global
+  /// ThreadManager.
   boost::scoped_ptr<impala::Thread> impala_thread_;
 
-  // Thrift thread ID, set by RunRunnable.
+  /// Thrift thread ID, set by RunRunnable.
   apache::thrift::concurrency::Thread::id_t tid_;
 
-  // Group name for the Impala ThreadManager
+  /// Group name for the Impala ThreadManager
   std::string group_;
 
-  // Individual thread name for the Impala ThreadManager
+  /// Individual thread name for the Impala ThreadManager
   std::string name_;
 };
 

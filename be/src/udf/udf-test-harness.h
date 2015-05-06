@@ -26,39 +26,39 @@
 
 namespace impala_udf {
 
-// Utility class to help test UDFs.
+/// Utility class to help test UDFs.
 class UdfTestHarness {
  public:
-  // Create a test FunctionContext object. 'arg_types' should contain a TypeDesc for each
-  // argument of the UDF not including the FunctionContext*. The caller is responsible
-  // for calling delete on it. This context has additional debugging validation enabled.
+  /// Create a test FunctionContext object. 'arg_types' should contain a TypeDesc for each
+  /// argument of the UDF not including the FunctionContext*. The caller is responsible
+  /// for calling delete on it. This context has additional debugging validation enabled.
   static FunctionContext* CreateTestContext(const FunctionContext::TypeDesc& return_type,
       const std::vector<FunctionContext::TypeDesc>& arg_types);
 
-  // Use with test contexts to test use of IsArgConstant() and GetConstantArg().
-  // constant_args should contain an AnyVal* for each argument of the UDF not including
-  // the FunctionContext*; constant_args[i] corresponds to the i-th argument.
-  // Non-constant arguments should be set to NULL, and constant arguments should be set
-  // to the constant value.
+  /// Use with test contexts to test use of IsArgConstant() and GetConstantArg().
+  /// constant_args should contain an AnyVal* for each argument of the UDF not including
+  /// the FunctionContext*; constant_args[i] corresponds to the i-th argument.
+  /// Non-constant arguments should be set to NULL, and constant arguments should be set
+  /// to the constant value.
   //
-  // The AnyVal* values are owned by the caller.
+  /// The AnyVal* values are owned by the caller.
   //
-  // Can only be called on contexts created by CreateTestContext().
+  /// Can only be called on contexts created by CreateTestContext().
   static void SetConstantArgs(
       FunctionContext* context, const std::vector<AnyVal*>& constant_args);
 
-  // Test contexts should be closed in order to check for UDF memory leaks. Leaks cause
-  // the error to be set on context.
+  /// Test contexts should be closed in order to check for UDF memory leaks. Leaks cause
+  /// the error to be set on context.
   static void CloseContext(FunctionContext* context);
 
-  // Template function to execute a UDF and validate the result. They should be
-  // used like:
-  // ValidateUdf(udf_fn, arg1, arg2, ..., expected_result);
-  // Only functions with up to 8 arguments are supported
+  /// Template function to execute a UDF and validate the result. They should be
+  /// used like:
+  /// ValidateUdf(udf_fn, arg1, arg2, ..., expected_result);
+  /// Only functions with up to 8 arguments are supported
   //
-  // For variable argument udfs, the variable arguments should be passed as
-  // a std::vector:
-  //   ValidateUdf(udf_fn, arg1, arg2, const vector<arg3>& args, expected_result);
+  /// For variable argument udfs, the variable arguments should be passed as
+  /// a std::vector:
+  ///   ValidateUdf(udf_fn, arg1, arg2, const vector<arg3>& args, expected_result);
   template<typename RET>
   static bool ValidateUdf(boost::function<RET(FunctionContext*)> fn,
       const RET& expected, UdfPrepare init_fn = NULL, UdfClose close_fn = NULL,
@@ -319,4 +319,3 @@ class UdfTestHarness {
 }
 
 #endif
-

@@ -41,9 +41,9 @@ enum PrimitiveType {
   TYPE_BINARY,      // Not implemented
   TYPE_DECIMAL,
 
-  // This is minimally supported currently. It can't be returned to the user or
-  // parsed from scan nodes. It can be returned from exprs and must be consumable
-  // by exprs.
+  /// This is minimally supported currently. It can't be returned to the user or
+  /// parsed from scan nodes. It can be returned from exprs and must be consumable
+  /// by exprs.
   TYPE_CHAR,
   TYPE_VARCHAR
 };
@@ -53,27 +53,27 @@ TPrimitiveType::type ToThrift(PrimitiveType ptype);
 std::string TypeToString(PrimitiveType t);
 std::string TypeToOdbcString(PrimitiveType t);
 
-// Wrapper struct to describe a type. Includes the enum and, optionally,
-// size information.
-// TODO: Rename to ScalarType and mirror FE type hierarchy after the expr refactoring.
+/// Wrapper struct to describe a type. Includes the enum and, optionally,
+/// size information.
+/// TODO: Rename to ScalarType and mirror FE type hierarchy after the expr refactoring.
 struct ColumnType {
   PrimitiveType type;
-  // Only set if type == TYPE_CHAR or type == TYPE_VARCHAR
+  /// Only set if type == TYPE_CHAR or type == TYPE_VARCHAR
   int len;
   static const int MAX_VARCHAR_LENGTH = 65355;
   static const int MAX_CHAR_LENGTH = 255;
   static const int MAX_CHAR_INLINE_LENGTH = 128;
 
-  // Only set if type == TYPE_DECIMAL
+  /// Only set if type == TYPE_DECIMAL
   int precision, scale;
 
-  // Must be kept in sync with FE's max precision/scale.
+  /// Must be kept in sync with FE's max precision/scale.
   static const int MAX_PRECISION = 38;
   static const int MAX_SCALE = MAX_PRECISION;
 
-  // The maximum precision representable by a 4-byte decimal (Decimal4Value)
+  /// The maximum precision representable by a 4-byte decimal (Decimal4Value)
   static const int MAX_DECIMAL4_PRECISION = 9;
-  // The maximum precision representable by a 8-byte decimal (Decimal8Value)
+  /// The maximum precision representable by a 8-byte decimal (Decimal8Value)
   static const int MAX_DECIMAL8_PRECISION = 18;
 
   ColumnType(PrimitiveType type = INVALID_TYPE)
@@ -174,7 +174,7 @@ struct ColumnType {
         (type == TYPE_CHAR && len > MAX_CHAR_INLINE_LENGTH);
   }
 
-  // Returns the byte size of this type.  Returns 0 for variable length types.
+  /// Returns the byte size of this type.  Returns 0 for variable length types.
   inline int GetByteSize() const {
     switch (type) {
       case TYPE_STRING:
@@ -208,7 +208,7 @@ struct ColumnType {
     return 0;
   }
 
-  // Returns the size of a slot for this type.
+  /// Returns the size of a slot for this type.
   inline int GetSlotSize() const {
     switch (type) {
       case TYPE_STRING:

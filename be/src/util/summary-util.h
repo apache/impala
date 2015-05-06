@@ -19,7 +19,7 @@
 
 namespace impala {
 
-// Print the exec summary as a formatted table.
+/// Print the exec summary as a formatted table.
 std::string PrintExecSummary(const TExecSummary& exec_summary);
 
 }

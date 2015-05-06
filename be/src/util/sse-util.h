@@ -20,31 +20,31 @@
 
 namespace impala {
 
-// This class contains constants useful for text processing with SSE4.2 intrinsics.
+/// This class contains constants useful for text processing with SSE4.2 intrinsics.
 namespace SSEUtil {
-  // Number of characters that fit in 64/128 bit register.  SSE provides instructions
-  // for loading 64 or 128 bits into a register at a time.
+  /// Number of characters that fit in 64/128 bit register.  SSE provides instructions
+  /// for loading 64 or 128 bits into a register at a time.
   static const int CHARS_PER_64_BIT_REGISTER = 8;
   static const int CHARS_PER_128_BIT_REGISTER = 16;
 
-  // SSE4.2 adds instructions for text processing.  The instructions have a control
-  // byte that determines some of functionality of the instruction.  (Equivalent to
-  // GCC's _SIDD_CMP_EQUAL_ANY, etc).
+  /// SSE4.2 adds instructions for text processing.  The instructions have a control
+  /// byte that determines some of functionality of the instruction.  (Equivalent to
+  /// GCC's _SIDD_CMP_EQUAL_ANY, etc).
   static const int PCMPSTR_EQUAL_ANY    = 0x00; // strchr
   static const int PCMPSTR_EQUAL_EACH   = 0x08; // strcmp
   static const int PCMPSTR_UBYTE_OPS    = 0x00; // unsigned char (8-bits, rather than 16)
   static const int PCMPSTR_NEG_POLARITY = 0x10; // see Intel SDM chapter 4.1.4.
 
-  // In this mode, SSE text processing functions will return a mask of all the
-  // characters that matched.
+  /// In this mode, SSE text processing functions will return a mask of all the
+  /// characters that matched.
   static const int STRCHR_MODE = PCMPSTR_EQUAL_ANY | PCMPSTR_UBYTE_OPS;
 
-  // In this mode, SSE text processing functions will return the number of bytes that match
-  // consecutively from the beginning.
+  /// In this mode, SSE text processing functions will return the number of bytes that match
+  /// consecutively from the beginning.
   static const int STRCMP_MODE = PCMPSTR_EQUAL_EACH | PCMPSTR_UBYTE_OPS |
       PCMPSTR_NEG_POLARITY;
 
-  // Precomputed mask values up to 16 bits.
+  /// Precomputed mask values up to 16 bits.
   static const int SSE_BITMASK[CHARS_PER_128_BIT_REGISTER] = {
     1 << 0,
     1 << 1,
@@ -65,31 +65,31 @@ namespace SSEUtil {
   };
 }
 
-// Define the SSE 4.2 intrinsics.  The caller must first verify at runtime (or codegen
-// IR load time) that the processor supports SSE 4.2 before calling these.  These are
-// defined outside the namespace because the IR w/ SSE 4.2 case needs to use macros.
+/// Define the SSE 4.2 intrinsics.  The caller must first verify at runtime (or codegen
+/// IR load time) that the processor supports SSE 4.2 before calling these.  These are
+/// defined outside the namespace because the IR w/ SSE 4.2 case needs to use macros.
 #ifndef IR_COMPILE
-// When compiling to native code (i.e. not IR), we cannot use the -msse4.2 compiler
-// flag.  Otherwise, the compiler will emit SSE 4.2 instructions outside of the runtime
-// SSE 4.2 checks and Impala will crash on CPUs that don't support SSE 4.2
-// (IMPALA-1399/1646).  The compiler intrinsics cannot be used without -msse4.2, so we
-// define our own implementations of the intrinsics instead.
+/// When compiling to native code (i.e. not IR), we cannot use the -msse4.2 compiler
+/// flag.  Otherwise, the compiler will emit SSE 4.2 instructions outside of the runtime
+/// SSE 4.2 checks and Impala will crash on CPUs that don't support SSE 4.2
+/// (IMPALA-1399/1646).  The compiler intrinsics cannot be used without -msse4.2, so we
+/// define our own implementations of the intrinsics instead.
 
 #if defined(__SSE4_1__) || defined(__POPCNT__)
-// Impala native code should not be compiled with -msse4.1 or higher until the minimum
-// CPU requirement is raised to at least the targeted instruction set.
+/// Impala native code should not be compiled with -msse4.1 or higher until the minimum
+/// CPU requirement is raised to at least the targeted instruction set.
 #error "Do not compile with -msse4.1 or higher."
 #endif
 
-// The PCMPxSTRy instructions require that the control byte 'mode' be encoded as an
-// immediate.  So, those need to be always inlined in order to always propagate the
-// mode constant into the inline asm.
+/// The PCMPxSTRy instructions require that the control byte 'mode' be encoded as an
+/// immediate.  So, those need to be always inlined in order to always propagate the
+/// mode constant into the inline asm.
 #define SSE_ALWAYS_INLINE inline __attribute__ ((__always_inline__))
 
 static SSE_ALWAYS_INLINE __m128i SSE4_cmpestrm(
     __m128i str1, int len1, __m128i str2, int len2, const int mode) {
-  // Use asm reg rather than Yz output constraint to workaround LLVM bug 13199 -
-  // clang doesn't support Y-prefixed asm constraints.
+  /// Use asm reg rather than Yz output constraint to workaround LLVM bug 13199 -
+  /// clang doesn't support Y-prefixed asm constraints.
   register __m128i result asm("xmm0");
   __asm__("pcmpestrm %5, %2, %1"
       : "=x"(result) : "x"(str1), "xm"(str2), "a"(len1), "d"(len2), "K"(mode) : "cc");
@@ -123,10 +123,10 @@ static inline int64_t POPCNT_popcnt_u64(uint64_t a) {
 #undef SSE_ALWAYS_INLINE
 
 #elif defined(__SSE4_2__) // IR_COMPILE for SSE 4.2.
-// When cross-compiling to IR, we cannot use inline asm because LLVM JIT does not
-// support it.  However, the cross-compiled IR is compiled twice: with and without
-// -msse4.2.  When -msse4.2 is enabled in the cross-compile, we can just use the
-// compiler intrinsics.
+/// When cross-compiling to IR, we cannot use inline asm because LLVM JIT does not
+/// support it.  However, the cross-compiled IR is compiled twice: with and without
+/// -msse4.2.  When -msse4.2 is enabled in the cross-compile, we can just use the
+/// compiler intrinsics.
 
 #include <smmintrin.h>
 
@@ -137,10 +137,10 @@ static inline int64_t POPCNT_popcnt_u64(uint64_t a) {
 #define POPCNT_popcnt_u64 _mm_popcnt_u64
 
 #else  // IR_COMPILE without SSE 4.2.
-// When cross-compiling to IR without SSE 4.2 support (i.e. no -msse4.2), we cannot use
-// SSE 4.2 instructions.  Otherwise, the IR loading will fail on CPUs that don't
-// support SSE 4.2.  However, because the caller isn't allowed to call these routines
-// on CPUs that lack SSE 4.2 anyway, we can implement stubs for this case.
+/// When cross-compiling to IR without SSE 4.2 support (i.e. no -msse4.2), we cannot use
+/// SSE 4.2 instructions.  Otherwise, the IR loading will fail on CPUs that don't
+/// support SSE 4.2.  However, because the caller isn't allowed to call these routines
+/// on CPUs that lack SSE 4.2 anyway, we can implement stubs for this case.
 
 static inline __m128i SSE4_cmpestrm(
     __m128i str1, int len1, __m128i str2, int len2, const int mode) {

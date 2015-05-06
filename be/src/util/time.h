@@ -18,14 +18,14 @@
 #include <stdint.h>
 #include <time.h>
 
-// Utilities for collecting timings.
+/// Utilities for collecting timings.
 namespace impala {
 
-// Returns a value representing a point in time with microsecond accuracy that is
-// unaffected by daylight savings or manual adjustments to the system clock. This should
-// not be assumed to be a Unix time. Typically the value corresponds to elapsed time
-// since the system booted. See UnixMillis() below if you need to send a time to a
-// different host.
+/// Returns a value representing a point in time with microsecond accuracy that is
+/// unaffected by daylight savings or manual adjustments to the system clock. This should
+/// not be assumed to be a Unix time. Typically the value corresponds to elapsed time
+/// since the system booted. See UnixMillis() below if you need to send a time to a
+/// different host.
 inline int64_t MonotonicMicros() {  // 63 bits ~= 5K years uptime
   struct timespec now;
   clock_gettime(CLOCK_MONOTONIC, &now);
@@ -44,17 +44,17 @@ inline int64_t MonotonicSeconds() {
   return now.tv_sec;
 }
 
-// Returns the number of milliseconds that have passed since the Unix epoch. This is
-// affected by manual changes to the system clock but is more suitable for use across
-// a cluster. For more accurate timings on the local host use the monotonic functions
-// above.
+/// Returns the number of milliseconds that have passed since the Unix epoch. This is
+/// affected by manual changes to the system clock but is more suitable for use across
+/// a cluster. For more accurate timings on the local host use the monotonic functions
+/// above.
 inline int64_t UnixMillis() {
   struct timespec now;
   clock_gettime(CLOCK_REALTIME, &now);
   return now.tv_sec * 1000 + now.tv_nsec / 1000000;
 }
 
-// Sleeps the current thread for at least duration_ms milliseconds.
+/// Sleeps the current thread for at least duration_ms milliseconds.
 void SleepForMs(const int64_t duration_ms);
 
 }

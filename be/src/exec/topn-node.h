@@ -30,11 +30,11 @@ class MemPool;
 class RuntimeState;
 class Tuple;
 
-// Node for in-memory TopN (ORDER BY ... LIMIT)
-// This handles the case where the result fits in memory.
-// This node will materialize its input rows into a new tuple using the expressions
-// in sort_tuple_slot_exprs_ in its sort_exec_exprs_ member.
-// TopN is implemented by storing rows in a priority queue.
+/// Node for in-memory TopN (ORDER BY ... LIMIT)
+/// This handles the case where the result fits in memory.
+/// This node will materialize its input rows into a new tuple using the expressions
+/// in sort_tuple_slot_exprs_ in its sort_exec_exprs_ member.
+/// TopN is implemented by storing rows in a priority queue.
 class TopNNode : public ExecNode {
  public:
   TopNNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
@@ -53,44 +53,44 @@ class TopNNode : public ExecNode {
 
   friend class TupleLessThan;
 
-  // Inserts a tuple row into the priority queue if it's in the TopN.  Creates a deep
-  // copy of tuple_row, which it stores in tuple_pool_.
+  /// Inserts a tuple row into the priority queue if it's in the TopN.  Creates a deep
+  /// copy of tuple_row, which it stores in tuple_pool_.
   void InsertTupleRow(TupleRow* tuple_row);
 
-  // Flatten and reverse the priority queue.
+  /// Flatten and reverse the priority queue.
   void PrepareForOutput();
 
-  // Number of rows to skip.
+  /// Number of rows to skip.
   int64_t offset_;
   int64_t num_rows_skipped_;
 
-  // sort_exec_exprs_ contains the ordering expressions used for tuple comparison and
-  // the materialization exprs for the output tuple.
+  /// sort_exec_exprs_ contains the ordering expressions used for tuple comparison and
+  /// the materialization exprs for the output tuple.
   SortExecExprs sort_exec_exprs_;
   std::vector<bool> is_asc_order_;
   std::vector<bool> nulls_first_;
-  // Cached descriptor for the materialized tuple. Assigned in Prepare().
+  /// Cached descriptor for the materialized tuple. Assigned in Prepare().
   TupleDescriptor* materialized_tuple_desc_;
 
   boost::scoped_ptr<TupleRowComparator> tuple_row_less_than_;
 
-  // The priority queue will never have more elements in it than the LIMIT + OFFSET.
-  // The stl priority queue doesn't support a max size, so to get that functionality,
-  // the order of the queue is the opposite of what the ORDER BY clause specifies, such
-  // that the top of the queue is the last sorted element.
+  /// The priority queue will never have more elements in it than the LIMIT + OFFSET.
+  /// The stl priority queue doesn't support a max size, so to get that functionality,
+  /// the order of the queue is the opposite of what the ORDER BY clause specifies, such
+  /// that the top of the queue is the last sorted element.
   boost::scoped_ptr<
       std::priority_queue<Tuple*, std::vector<Tuple*>, TupleRowComparator> >
           priority_queue_;
 
-  // After computing the TopN in the priority_queue, pop them and put them in this vector
+  /// After computing the TopN in the priority_queue, pop them and put them in this vector
   std::vector<Tuple*> sorted_top_n_;
   std::vector<Tuple*>::iterator get_next_iter_;
 
-  // Stores everything referenced in priority_queue_
+  /// Stores everything referenced in priority_queue_
   boost::scoped_ptr<MemPool> tuple_pool_;
-  // Tuple allocated once from tuple_pool_ and reused in InsertTupleRow to
-  // materialize input tuples if necessary. After materialization, tmp_tuple_ may be
-  // copied into the the tuple pool and inserted into the priority queue.
+  /// Tuple allocated once from tuple_pool_ and reused in InsertTupleRow to
+  /// materialize input tuples if necessary. After materialization, tmp_tuple_ may be
+  /// copied into the the tuple pool and inserted into the priority queue.
   Tuple* tmp_tuple_;
 };
 

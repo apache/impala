@@ -26,8 +26,8 @@
 
 namespace impala {
 
-// Methods for printing numeric values with optional units, or other types with an
-// applicable operator<<.
+/// Methods for printing numeric values with optional units, or other types with an
+/// applicable operator<<.
 class PrettyPrinter {
  public:
   static std::string Print(bool value, TUnit::type ignored, bool verbose = false) {
@@ -36,10 +36,10 @@ class PrettyPrinter {
     return ss.str();
   }
 
-  // Prints the 'value' in a human friendly format depending on the data type.
-  // i.e. for bytes: 3145728 -> 3MB
-  // If verbose is true, this also prints the raw value (before unit conversion) for
-  // types where this is applicable.
+  /// Prints the 'value' in a human friendly format depending on the data type.
+  /// i.e. for bytes: 3145728 -> 3MB
+  /// If verbose is true, this also prints the raw value (before unit conversion) for
+  /// types where this is applicable.
   template<typename T>
   static ENABLE_IF_ARITHMETIC(T, std::string)
   Print(T value, TUnit::type unit, bool verbose = false) {
@@ -86,15 +86,15 @@ class PrettyPrinter {
 
       case TUnit::TIME_NS: {
         if (value >= BILLION) {
-          // If the time is over a second, print it up to ms.
+          /// If the time is over a second, print it up to ms.
           value /= MILLION;
           PrintTimeMs(value, &ss);
         } else if (value >= MILLION) {
-          // if the time is over a ms, print it up to microsecond in the unit of ms.
+          /// if the time is over a ms, print it up to microsecond in the unit of ms.
           value /= 1000;
           ss << value / 1000 << "." << Mod(value, 1000) << "ms";
         } else if (value > 1000) {
-          // if the time is over a microsecond, print it using unit microsecond
+          /// if the time is over a microsecond, print it using unit microsecond
           ss << value / 1000 << "." << Mod(value, 1000) << "us";
         } else {
           ss << value << "ns";
@@ -131,7 +131,7 @@ class PrettyPrinter {
         break;
       }
 
-      // TODO: Remove DOUBLE_VALUE. IMPALA-1649
+      /// TODO: Remove DOUBLE_VALUE. IMPALA-1649
       case TUnit::DOUBLE_VALUE: {
         double output = *reinterpret_cast<double*>(&value);
         ss << std::setprecision(PRECISION) << output << " ";
@@ -145,10 +145,10 @@ class PrettyPrinter {
     return ss.str();
   }
 
-  // For non-arithmetics, just write the value as a string and return it.
+  /// For non-arithmetics, just write the value as a string and return it.
   //
-  // TODO: There's no good is_string equivalent, so there's a needless copy for strings
-  // here.
+  /// TODO: There's no good is_string equivalent, so there's a needless copy for strings
+  /// here.
   template<typename T>
   static ENABLE_IF_NOT_ARITHMETIC(T, std::string)
   Print(const T& value, TUnit::type unit) {
@@ -157,7 +157,7 @@ class PrettyPrinter {
     return ss.str();
   }
 
-  // Utility method to print an iterable type to a stringstream like [v1, v2, v3]
+  /// Utility method to print an iterable type to a stringstream like [v1, v2, v3]
   template <typename I>
   static void PrintStringList(const I& iterable, TUnit::type unit,
       std::stringstream* out) {
@@ -171,7 +171,7 @@ class PrettyPrinter {
     (*out) <<"[" << boost::algorithm::join(strings, ", ") << "]";
   }
 
-  // Convenience method
+  /// Convenience method
   static std::string PrintBytes(int64_t value) {
     return PrettyPrinter::Print(value, TUnit::BYTES);
   }
@@ -227,7 +227,7 @@ class PrettyPrinter {
     }
   }
 
-  // Utility to perform integer modulo if T is integral, otherwise to use fmod().
+  /// Utility to perform integer modulo if T is integral, otherwise to use fmod().
   template <typename T>
   static ENABLE_IF_INTEGRAL(T, int64_t) Mod(const T& value, const int modulus) {
     return value % modulus;
@@ -238,7 +238,7 @@ class PrettyPrinter {
     return fmod(value, 1. * modulus);
   }
 
-  // Print the value (time in ms) to ss
+  /// Print the value (time in ms) to ss
   template <typename T>
   static void PrintTimeMs(T value, std::stringstream* ss) {
     DCHECK_GE(value, static_cast<T>(0));

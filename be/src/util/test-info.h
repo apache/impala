@@ -17,8 +17,8 @@
 
 namespace impala {
 
-// Provides global access to whether this binary is running as part of the tests
-// (i.e., without a full BE).
+/// Provides global access to whether this binary is running as part of the tests
+/// (i.e., without a full BE).
 class TestInfo {
  public:
   enum Mode {
@@ -27,7 +27,7 @@ class TestInfo {
     FE_TEST,
   };
 
-  // Called in InitCommonRuntime().
+  /// Called in InitCommonRuntime().
   static void Init(Mode mode) { mode_ = mode; }
 
   static bool is_fe_test() { return mode_ == FE_TEST; }

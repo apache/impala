@@ -21,7 +21,7 @@
 
 namespace impala {
 
-// The materialized value returned by ExprContext::GetValue().
+/// The materialized value returned by ExprContext::GetValue().
 struct ExprValue {
   bool bool_val;
   int8_t tinyint_val;
@@ -60,14 +60,14 @@ struct ExprValue {
   ExprValue(double v) : double_val(v) {}
   ExprValue(int64_t t, int64_t n) : timestamp_val(t, n) {}
 
-  // c'tor for string values
+  /// c'tor for string values
   ExprValue(const std::string& str)
     : string_data(str) {
     string_val.ptr = const_cast<char*>(string_data.data());
     string_val.len = string_data.size();
   }
 
-  // Sets the value for type to '0' and returns a pointer to the data
+  /// Sets the value for type to '0' and returns a pointer to the data
   void* SetToZero(const ColumnType& type) {
     switch (type.type) {
       case TYPE_NULL:
@@ -99,7 +99,7 @@ struct ExprValue {
     }
   }
 
-  // Sets the value for type to min and returns a pointer to the data
+  /// Sets the value for type to min and returns a pointer to the data
   void* SetToMin(const ColumnType& type) {
     switch (type.type) {
       case TYPE_NULL:
@@ -133,7 +133,7 @@ struct ExprValue {
     }
   }
 
-  // Sets the value for type to max and returns a pointer to the data
+  /// Sets the value for type to max and returns a pointer to the data
   void* SetToMax(const ColumnType& type) {
     switch (type.type) {
       case TYPE_NULL:

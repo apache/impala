@@ -48,21 +48,21 @@ class Tuple;
 class TupleRow;
 class TExprNode;
 
-// This class evaluates aggregate functions. Aggregate functions can either be
-// builtins or external UDAs. For both of types types, they can either use codegen
-// or not.
+/// This class evaluates aggregate functions. Aggregate functions can either be
+/// builtins or external UDAs. For both of types types, they can either use codegen
+/// or not.
 //
-// This class provides an interface that's 1:1 with the UDA interface and serves
-// as glue code between the TupleRow/Tuple signature used by the AggregationNode
-// and the AnyVal signature of the UDA interface. It handles evaluating input
-// slots from TupleRows and aggregating the result to the result tuple.
+/// This class provides an interface that's 1:1 with the UDA interface and serves
+/// as glue code between the TupleRow/Tuple signature used by the AggregationNode
+/// and the AnyVal signature of the UDA interface. It handles evaluating input
+/// slots from TupleRows and aggregating the result to the result tuple.
 //
-// This class is not threadsafe. However, it can be used for multiple interleaved
-// evaluations of the aggregation function by using multiple FunctionContexts.
+/// This class is not threadsafe. However, it can be used for multiple interleaved
+/// evaluations of the aggregation function by using multiple FunctionContexts.
 class AggFnEvaluator {
  public:
-  // TODO: The aggregation node has custom codegen paths for a few of the builtins.
-  // That logic needs to be removed. For now, add some enums for those builtins.
+  /// TODO: The aggregation node has custom codegen paths for a few of the builtins.
+  /// That logic needs to be removed. For now, add some enums for those builtins.
   enum AggregationOp {
     COUNT,
     MIN,
@@ -73,26 +73,26 @@ class AggFnEvaluator {
     OTHER,
   };
 
-  // Creates an AggFnEvaluator object from desc. The object is added to 'pool'
-  // and returned in *result. This constructs the input Expr trees for
-  // this aggregate function as specified in desc. The result is returned in
-  // *result.
+  /// Creates an AggFnEvaluator object from desc. The object is added to 'pool'
+  /// and returned in *result. This constructs the input Expr trees for
+  /// this aggregate function as specified in desc. The result is returned in
+  /// *result.
   static Status Create(ObjectPool* pool, const TExpr& desc, AggFnEvaluator** result);
 
-  // Creates an AggFnEvaluator object from desc. If is_analytic_fn, the evaluator is
-  // prepared for analytic function evaluation.
-  // TODO: Avoid parameter for analytic fns, should this be added to TAggregateExpr?
+  /// Creates an AggFnEvaluator object from desc. If is_analytic_fn, the evaluator is
+  /// prepared for analytic function evaluation.
+  /// TODO: Avoid parameter for analytic fns, should this be added to TAggregateExpr?
   static Status Create(ObjectPool* pool, const TExpr& desc, bool is_analytic_fn,
       AggFnEvaluator** result);
 
-  // Initializes the agg expr. 'desc' must be the row descriptor for the input TupleRow.
-  // It is used to get the input values in the Update() and Merge() functions.
-  // 'intermediate_slot_desc' is the slot into which this evaluator should write the
-  // results of Update()/Merge()/Serialize().
-  // 'output_slot_desc' is the slot into which this evaluator should write the results
-  // of Finalize()
-  // 'agg_fn_ctx' will be initialized for the agg function using 'agg_fn_pool'. Caller
-  // is responsible for closing and deleting 'agg_fn_ctx'.
+  /// Initializes the agg expr. 'desc' must be the row descriptor for the input TupleRow.
+  /// It is used to get the input values in the Update() and Merge() functions.
+  /// 'intermediate_slot_desc' is the slot into which this evaluator should write the
+  /// results of Update()/Merge()/Serialize().
+  /// 'output_slot_desc' is the slot into which this evaluator should write the results
+  /// of Finalize()
+  /// 'agg_fn_ctx' will be initialized for the agg function using 'agg_fn_pool'. Caller
+  /// is responsible for closing and deleting 'agg_fn_ctx'.
   Status Prepare(RuntimeState* state, const RowDescriptor& desc,
       const SlotDescriptor* intermediate_slot_desc,
       const SlotDescriptor* output_slot_desc,
@@ -100,9 +100,9 @@ class AggFnEvaluator {
 
   ~AggFnEvaluator();
 
-  // 'agg_fn_ctx' may be cloned after calling Open(). Note that closing all
-  // FunctionContexts, including the original one returned by Prepare(), is the
-  // responsibility of the caller.
+  /// 'agg_fn_ctx' may be cloned after calling Open(). Note that closing all
+  /// FunctionContexts, including the original one returned by Prepare(), is the
+  /// responsibility of the caller.
   Status Open(RuntimeState* state, FunctionContext* agg_fn_ctx);
 
   void Close(RuntimeState* state);
@@ -122,33 +122,33 @@ class AggFnEvaluator {
   static std::string DebugString(const std::vector<AggFnEvaluator*>& exprs);
   std::string DebugString() const;
 
-  // Functions for different phases of the aggregation.
+  /// Functions for different phases of the aggregation.
   void Init(FunctionContext* agg_fn_ctx, Tuple* dst);
 
-  // Updates the intermediate state dst based on adding the input src row. This can be
-  // called either to drive the UDA's Update() or Merge() function depending on
-  // is_merge_. That is, from the caller, it doesn't mater.
+  /// Updates the intermediate state dst based on adding the input src row. This can be
+  /// called either to drive the UDA's Update() or Merge() function depending on
+  /// is_merge_. That is, from the caller, it doesn't mater.
   void Add(FunctionContext* agg_fn_ctx, TupleRow* src, Tuple* dst);
 
-  // Updates the intermediate state dst to remove the input src row, i.e. undoes
-  // Add(src, dst). Only used internally for analytic fn builtins.
+  /// Updates the intermediate state dst to remove the input src row, i.e. undoes
+  /// Add(src, dst). Only used internally for analytic fn builtins.
   void Remove(FunctionContext* agg_fn_ctx, TupleRow* src, Tuple* dst);
 
-  // Explicitly does a merge, even if this evalutor is not marked as merging.
-  // This is used by the partitioned agg node when it needs to merge spill results.
-  // In the non-spilling case, this node would normally not merge.
+  /// Explicitly does a merge, even if this evalutor is not marked as merging.
+  /// This is used by the partitioned agg node when it needs to merge spill results.
+  /// In the non-spilling case, this node would normally not merge.
   void Merge(FunctionContext* agg_fn_ctx, Tuple* src, Tuple* dst);
 
   void Serialize(FunctionContext* agg_fn_ctx, Tuple* dst);
   void Finalize(FunctionContext* agg_fn_ctx, Tuple* src, Tuple* dst);
 
-  // Puts the finalized value from Tuple* src in Tuple* dst just as Finalize() does.
-  // However, unlike Finalize(), GetValue() does not clean up state in src. GetValue()
-  // can be called repeatedly with the same src. Only used internally for analytic fn
-  // builtins.
+  /// Puts the finalized value from Tuple* src in Tuple* dst just as Finalize() does.
+  /// However, unlike Finalize(), GetValue() does not clean up state in src. GetValue()
+  /// can be called repeatedly with the same src. Only used internally for analytic fn
+  /// builtins.
   void GetValue(FunctionContext* agg_fn_ctx, Tuple* src, Tuple* dst);
 
-  // Helper functions for calling the above functions on many evaluators.
+  /// Helper functions for calling the above functions on many evaluators.
   static void Init(const std::vector<AggFnEvaluator*>& evaluators,
       const std::vector<FunctionContext*>& fn_ctxs, Tuple* dst);
   static void Add(const std::vector<AggFnEvaluator*>& evaluators,
@@ -162,46 +162,46 @@ class AggFnEvaluator {
   static void Finalize(const std::vector<AggFnEvaluator*>& evaluators,
       const std::vector<FunctionContext*>& fn_ctxs, Tuple* src, Tuple* dst);
 
-  // TODO: implement codegen path. These functions would return IR functions with
-  // the same signature as the interpreted ones above.
-  // Function* GetIrInitFn();
-  // Function* GetIrAddFn();
-  // Function* GetIrRemoveFn();
-  // Function* GetIrSerializeFn();
-  // Function* GetIrGetValueFn();
-  // Function* GetIrFinalizeFn();
+  /// TODO: implement codegen path. These functions would return IR functions with
+  /// the same signature as the interpreted ones above.
+  /// Function* GetIrInitFn();
+  /// Function* GetIrAddFn();
+  /// Function* GetIrRemoveFn();
+  /// Function* GetIrSerializeFn();
+  /// Function* GetIrGetValueFn();
+  /// Function* GetIrFinalizeFn();
 
  private:
   const TFunction fn_;
-  // Indicates whether to Update() or Merge()
+  /// Indicates whether to Update() or Merge()
   const bool is_merge_;
-  // Indicates which functions must be loaded.
+  /// Indicates which functions must be loaded.
   const bool is_analytic_fn_;
 
-  // Slot into which Update()/Merge()/Serialize() write their result. Not owned.
+  /// Slot into which Update()/Merge()/Serialize() write their result. Not owned.
   const SlotDescriptor* intermediate_slot_desc_;
 
-  // Slot into which Finalize() results are written. Not owned. Identical to
-  // intermediate_slot_desc_ if this agg fn has the same intermediate and output type.
+  /// Slot into which Finalize() results are written. Not owned. Identical to
+  /// intermediate_slot_desc_ if this agg fn has the same intermediate and output type.
   const SlotDescriptor* output_slot_desc_;
 
   std::vector<ExprContext*> input_expr_ctxs_;
 
-  // The enum for some of the builtins that still require special cased logic.
+  /// The enum for some of the builtins that still require special cased logic.
   AggregationOp agg_op_;
 
-  // Created to a subclass of AnyVal for type(). We use this to convert values
-  // from the UDA interface to the Expr interface.
-  // These objects are allocated in the runtime state's object pool.
-  // TODO: this is awful, remove this when exprs are updated.
+  /// Created to a subclass of AnyVal for type(). We use this to convert values
+  /// from the UDA interface to the Expr interface.
+  /// These objects are allocated in the runtime state's object pool.
+  /// TODO: this is awful, remove this when exprs are updated.
   std::vector<impala_udf::AnyVal*> staging_input_vals_;
   impala_udf::AnyVal* staging_intermediate_val_;
   impala_udf::AnyVal* staging_merge_input_val_;
 
-  // Cache entry for the library containing the function ptrs.
+  /// Cache entry for the library containing the function ptrs.
   LibCache::LibCacheEntry* cache_entry_;
 
-  // Function ptrs for the different phases of the aggregate function.
+  /// Function ptrs for the different phases of the aggregate function.
   void* init_fn_;
   void* update_fn_;
   void* remove_fn_;
@@ -210,27 +210,27 @@ class AggFnEvaluator {
   void* get_value_fn_;
   void* finalize_fn_;
 
-  // Use Create() instead.
+  /// Use Create() instead.
   AggFnEvaluator(const TExprNode& desc, bool is_analytic_fn);
 
-  // TODO: these functions below are not extensible and we need to use codegen to
-  // generate the calls into the UDA functions (like for UDFs).
-  // Remove these functions when this is supported.
+  /// TODO: these functions below are not extensible and we need to use codegen to
+  /// generate the calls into the UDA functions (like for UDFs).
+  /// Remove these functions when this is supported.
 
-  // Sets up the arguments to call fn. This converts from the agg-expr signature,
-  // taking TupleRow to the UDA signature taking AnvVals by populating the staging
-  // AnyVals.
-  // fn must be a function that implement's the UDA Update() signature.
+  /// Sets up the arguments to call fn. This converts from the agg-expr signature,
+  /// taking TupleRow to the UDA signature taking AnvVals by populating the staging
+  /// AnyVals.
+  /// fn must be a function that implement's the UDA Update() signature.
   void Update(FunctionContext* agg_fn_ctx, TupleRow* row, Tuple* dst, void* fn);
 
-  // Sets up the arguments to call fn. This converts from the agg-expr signature,
-  // taking TupleRow to the UDA signature taking AnvVals. Writes the serialize/finalize
-  // result to the given destination slot/tuple. The fn can be NULL to indicate the src
-  // value should simply be written into the destination.
+  /// Sets up the arguments to call fn. This converts from the agg-expr signature,
+  /// taking TupleRow to the UDA signature taking AnvVals. Writes the serialize/finalize
+  /// result to the given destination slot/tuple. The fn can be NULL to indicate the src
+  /// value should simply be written into the destination.
   void SerializeOrFinalize(FunctionContext* agg_fn_ctx, Tuple* src,
       const SlotDescriptor* dst_slot_desc, Tuple* dst, void* fn);
 
-  // Writes the result in src into dst pointed to by dst_slot_desc
+  /// Writes the result in src into dst pointed to by dst_slot_desc
   void SetDstSlot(FunctionContext* ctx, const impala_udf::AnyVal* src,
       const SlotDescriptor* dst_slot_desc, Tuple* dst);
 };

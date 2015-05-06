@@ -32,8 +32,8 @@
 
 namespace impala {
 
-// Note: this function has a codegen'd version.  Changing this function requires
-// corresponding changes to CodegenWriteSlot.
+/// Note: this function has a codegen'd version.  Changing this function requires
+/// corresponding changes to CodegenWriteSlot.
 inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tuple,
     const char* data, int len, bool copy_string, bool need_escape, MemPool* pool) {
   if ((len == 0 && !slot_desc->type().IsStringType()) || data == NULL) {

@@ -27,60 +27,60 @@ class Frontend;
 class Status;
 class RuntimeProfile;
 
-// The CatalogOpExecutor is responsible for executing catalog operations.
-// This includes DDL statements such as CREATE and ALTER as well as statements such
-// as INVALIDATE METADATA. One CatalogOpExecutor is typically created per catalog
-// operation.
+/// The CatalogOpExecutor is responsible for executing catalog operations.
+/// This includes DDL statements such as CREATE and ALTER as well as statements such
+/// as INVALIDATE METADATA. One CatalogOpExecutor is typically created per catalog
+/// operation.
 class CatalogOpExecutor {
  public:
   CatalogOpExecutor(ExecEnv* env, Frontend* fe, RuntimeProfile* profile)
       : env_(env), fe_(fe), profile_(profile) {}
 
-  // Executes the given catalog operation against the catalog server.
+  /// Executes the given catalog operation against the catalog server.
   Status Exec(const TCatalogOpRequest& catalog_op);
 
-  // Fetches the metadata for the specific TCatalogObject descriptor from the catalog
-  // server. If the catalog server does not have the object cached, its metadata will
-  // be loaded.
+  /// Fetches the metadata for the specific TCatalogObject descriptor from the catalog
+  /// server. If the catalog server does not have the object cached, its metadata will
+  /// be loaded.
   Status GetCatalogObject(const TCatalogObject& object_desc, TCatalogObject* result);
 
-  // Translates the given compute stats params and its child-query results into
-  // a new table alteration request for updating the stats metadata, and executes
-  // the alteration via Exec();
+  /// Translates the given compute stats params and its child-query results into
+  /// a new table alteration request for updating the stats metadata, and executes
+  /// the alteration via Exec();
   Status ExecComputeStats(const TComputeStatsParams& compute_stats_params,
       const apache::hive::service::cli::thrift::TTableSchema& tbl_stats_schema,
       const apache::hive::service::cli::thrift::TRowSet& tbl_stats_data,
       const apache::hive::service::cli::thrift::TTableSchema& col_stats_schema,
       const apache::hive::service::cli::thrift::TRowSet& col_stats_data);
 
-  // Makes an RPC to the CatalogServer to prioritize the loading of the catalog objects
-  // specified in the TPrioritizeLoadRequest. Returns OK if the RPC was successful,
-  // otherwise a bad status will be returned.
+  /// Makes an RPC to the CatalogServer to prioritize the loading of the catalog objects
+  /// specified in the TPrioritizeLoadRequest. Returns OK if the RPC was successful,
+  /// otherwise a bad status will be returned.
   Status PrioritizeLoad(const TPrioritizeLoadRequest& req,
       TPrioritizeLoadResponse* result);
 
-  // Makes an RPC to the CatalogServer to verify whether the specified user has privileges
-  // to access the Sentry Policy Service. Returns OK if the user has privileges or
-  // a bad status if the user does not have privileges (or if there was an error).
+  /// Makes an RPC to the CatalogServer to verify whether the specified user has privileges
+  /// to access the Sentry Policy Service. Returns OK if the user has privileges or
+  /// a bad status if the user does not have privileges (or if there was an error).
   Status SentryAdminCheck(const TSentryAdminCheckRequest& re);
 
-  // Set in Exec(), returns a pointer to the TDdlExecResponse of the DDL execution.
-  // If called before Exec(), this will return NULL. Only set if the
-  // TCatalogOpType is DDL.
+  /// Set in Exec(), returns a pointer to the TDdlExecResponse of the DDL execution.
+  /// If called before Exec(), this will return NULL. Only set if the
+  /// TCatalogOpType is DDL.
   const TDdlExecResponse* ddl_exec_response() const { return exec_response_.get(); }
 
-  // Set in Exec(), for operations that execute using the CatalogServer. Returns
-  // a pointer to the TCatalogUpdateResult of the operation. This includes details on
-  // the Status of the operation, the CatalogService ID that processed the request,
-  // and the minimum catalog version that will reflect this change.
-  // If called before Exec(), this will return NULL.
+  /// Set in Exec(), for operations that execute using the CatalogServer. Returns
+  /// a pointer to the TCatalogUpdateResult of the operation. This includes details on
+  /// the Status of the operation, the CatalogService ID that processed the request,
+  /// and the minimum catalog version that will reflect this change.
+  /// If called before Exec(), this will return NULL.
   const TCatalogUpdateResult* update_catalog_result() const {
     return catalog_update_result_.get();
   }
 
  private:
-  // Helper functions used in ExecComputeStats() for setting the thrift structs in params
-  // for the table/column stats based on the results of the corresponding child query.
+  /// Helper functions used in ExecComputeStats() for setting the thrift structs in params
+  /// for the table/column stats based on the results of the corresponding child query.
   static void SetTableStats(
       const apache::hive::service::cli::thrift::TTableSchema& tbl_stats_schema,
       const apache::hive::service::cli::thrift::TRowSet& tbl_stats_data,
@@ -91,18 +91,18 @@ class CatalogOpExecutor {
       const apache::hive::service::cli::thrift::TRowSet& col_stats_data,
       TAlterTableUpdateStatsParams* params);
 
-  // Response from executing the DDL request, see ddl_exec_response().
+  /// Response from executing the DDL request, see ddl_exec_response().
   boost::scoped_ptr<TDdlExecResponse> exec_response_;
 
-  // Result of executing a DDL request using the CatalogService
+  /// Result of executing a DDL request using the CatalogService
   boost::scoped_ptr<TCatalogUpdateResult> catalog_update_result_;
 
   ExecEnv* env_;
   Frontend* fe_;
   RuntimeProfile* profile_;
 
-  // Handles additional BE work that needs to be done for drop function and data source,
-  // in particular, clearing the local library cache for this function.
+  /// Handles additional BE work that needs to be done for drop function and data source,
+  /// in particular, clearing the local library cache for this function.
   void HandleDropFunction(const TDropFunctionParams&);
   void HandleDropDataSource(const TDropDataSourceParams&);
 };

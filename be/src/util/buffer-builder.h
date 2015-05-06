@@ -21,7 +21,7 @@
 
 namespace impala {
 
-// Utility class to build an in-memory buffer.
+/// Utility class to build an in-memory buffer.
 class BufferBuilder {
  public:
   BufferBuilder(uint8_t* dst_buffer, int dst_len) 

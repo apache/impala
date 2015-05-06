@@ -25,7 +25,7 @@
 
 namespace impala {
 
-// Execution state of a single plan fragment.
+/// Execution state of a single plan fragment.
 class FragmentMgr::FragmentExecState {
  public:
   FragmentExecState(const TPlanFragmentInstanceCtx& fragment_instance_ctx,
@@ -37,18 +37,18 @@ class FragmentMgr::FragmentExecState {
       client_cache_(exec_env->impalad_client_cache()) {
   }
 
-  // Calling the d'tor releases all memory and closes all data streams
-  // held by executor_.
+  /// Calling the d'tor releases all memory and closes all data streams
+  /// held by executor_.
   ~FragmentExecState() { }
 
-  // Returns current execution status, if there was an error. Otherwise cancels
-  // the fragment and returns OK.
+  /// Returns current execution status, if there was an error. Otherwise cancels
+  /// the fragment and returns OK.
   Status Cancel();
 
-  // Call Prepare() and create and initialize data sink.
+  /// Call Prepare() and create and initialize data sink.
   Status Prepare(const TExecPlanFragmentParams& exec_params);
 
-  // Main loop of plan fragment execution. Blocks until execution finishes.
+  /// Main loop of plan fragment execution. Blocks until execution finishes.
   void Exec();
 
   const TUniqueId& query_id() const {
@@ -63,7 +63,7 @@ class FragmentMgr::FragmentExecState {
     return fragment_instance_ctx_.query_ctx.coord_address;
   }
 
-  // Set the execution thread, taking ownership of the object.
+  /// Set the execution thread, taking ownership of the object.
   void set_exec_thread(Thread* exec_thread) { exec_thread_.reset(exec_thread); }
 
  private:
@@ -72,22 +72,22 @@ class FragmentMgr::FragmentExecState {
   ImpalaInternalServiceClientCache* client_cache_;
   TExecPlanFragmentParams exec_params_;
 
-  // the thread executing this plan fragment
+  /// the thread executing this plan fragment
   boost::scoped_ptr<Thread> exec_thread_;
 
-  // protects exec_status_
+  /// protects exec_status_
   boost::mutex status_lock_;
 
-  // set in ReportStatusCb();
-  // if set to anything other than OK, execution has terminated w/ an error
+  /// set in ReportStatusCb();
+  /// if set to anything other than OK, execution has terminated w/ an error
   Status exec_status_;
 
-  // Callback for executor; updates exec_status_ if 'status' indicates an error
-  // or if there was a thrift error.
+  /// Callback for executor; updates exec_status_ if 'status' indicates an error
+  /// or if there was a thrift error.
   void ReportStatusCb(const Status& status, RuntimeProfile* profile, bool done);
 
-  // Update exec_status_ w/ status, if the former isn't already an error.
-  // Returns current exec_status_.
+  /// Update exec_status_ w/ status, if the former isn't already an error.
+  /// Returns current exec_status_.
   Status UpdateStatus(const Status& status);
 };
 

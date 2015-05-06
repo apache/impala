@@ -22,12 +22,12 @@
 
 using namespace impala;
 
-// Macro to return false if condition is false. Only defined for this file.
+/// Macro to return false if condition is false. Only defined for this file.
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return false
 
-// Handle the fast common path where all the bytes are in the first buffer.  This
-// is the path used by sequence/rc/parquet file formats to read a very small number
-// (i.e. single int) of bytes.
+/// Handle the fast common path where all the bytes are in the first buffer.  This
+/// is the path used by sequence/rc/parquet file formats to read a very small number
+/// (i.e. single int) of bytes.
 inline bool ScannerContext::Stream::GetBytes(int64_t requested_len, uint8_t** buffer,
     int64_t* out_len, Status* status, bool peek) {
   if (UNLIKELY(requested_len < 0)) {
@@ -65,8 +65,8 @@ inline bool ScannerContext::Stream::ReadBytes(int64_t length, uint8_t** buf,
   return true;
 }
 
-// TODO: consider implementing a Skip in the context/stream object that's more
-// efficient than GetBytes.
+/// TODO: consider implementing a Skip in the context/stream object that's more
+/// efficient than GetBytes.
 inline bool ScannerContext::Stream::SkipBytes(int64_t length, Status* status) {
   uint8_t* dummy_buf;
   int64_t bytes_read;

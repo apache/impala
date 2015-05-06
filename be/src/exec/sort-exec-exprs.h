@@ -20,58 +20,58 @@
 
 namespace impala {
 
-// Helper class to Prepare() , Open() and Close() the ordering expressions used to perform
-// comparisons in a sort. Used by TopNNode, SortNode, and MergingExchangeNode.  When two
-// rows are compared, the ordering expressions are evaluated once for each side.
-// TopN and Sort materialize input rows into a single tuple before sorting.
-// If materialize_tuple_ is true, SortExecExprs also stores the slot expressions used to
-// materialize the sort tuples.
+/// Helper class to Prepare() , Open() and Close() the ordering expressions used to perform
+/// comparisons in a sort. Used by TopNNode, SortNode, and MergingExchangeNode.  When two
+/// rows are compared, the ordering expressions are evaluated once for each side.
+/// TopN and Sort materialize input rows into a single tuple before sorting.
+/// If materialize_tuple_ is true, SortExecExprs also stores the slot expressions used to
+/// materialize the sort tuples.
 class SortExecExprs {
  public:
-  // Initialize the expressions from a TSortInfo using the specified pool.
+  /// Initialize the expressions from a TSortInfo using the specified pool.
   Status Init(const TSortInfo& sort_info, ObjectPool* pool);
 
-  // Initialize the ordering and (optionally) materialization expressions from the thrift
-  // TExprs into the specified pool. sort_tuple_slot_exprs is NULL if the tuple is not
-  // materialized.
+  /// Initialize the ordering and (optionally) materialization expressions from the thrift
+  /// TExprs into the specified pool. sort_tuple_slot_exprs is NULL if the tuple is not
+  /// materialized.
   Status Init(const std::vector<TExpr>& ordering_exprs,
     const std::vector<TExpr>* sort_tuple_slot_exprs, ObjectPool* pool);
 
-  // Prepare all expressions used for sorting and tuple materialization.
+  /// Prepare all expressions used for sorting and tuple materialization.
   Status Prepare(RuntimeState* state, const RowDescriptor& child_row_desc,
     const RowDescriptor& output_row_desc, MemTracker* expr_mem_tracker);
 
-  // Open all expressions used for sorting and tuple materialization.
+  /// Open all expressions used for sorting and tuple materialization.
   Status Open(RuntimeState* state);
 
-  // Close all expressions used for sorting and tuple materialization.
+  /// Close all expressions used for sorting and tuple materialization.
   void Close(RuntimeState* state);
 
   const std::vector<ExprContext*>& sort_tuple_slot_expr_ctxs() const {
     return sort_tuple_slot_expr_ctxs_;
   }
 
-  // Can only be used after calling Prepare()
+  /// Can only be used after calling Prepare()
   const std::vector<ExprContext*>& lhs_ordering_expr_ctxs() const {
     return lhs_ordering_expr_ctxs_;
   }
-  // Can only be used after calling Open()
+  /// Can only be used after calling Open()
   const std::vector<ExprContext*>& rhs_ordering_expr_ctxs() const {
     return rhs_ordering_expr_ctxs_;
   }
 
  private:
-  // Create two ExprContexts for evaluating over the TupleRows.
+  /// Create two ExprContexts for evaluating over the TupleRows.
   std::vector<ExprContext*> lhs_ordering_expr_ctxs_;
   std::vector<ExprContext*> rhs_ordering_expr_ctxs_;
 
-  // If true, the tuples to be sorted are materialized by
-  // sort_tuple_slot_exprs_ before the actual sort is performed.
+  /// If true, the tuples to be sorted are materialized by
+  /// sort_tuple_slot_exprs_ before the actual sort is performed.
   bool materialize_tuple_;
 
-  // Expressions used to materialize slots in the tuples to be sorted.
-  // One expr per slot in the materialized tuple. Valid only if
-  // materialize_tuple_ is true.
+  /// Expressions used to materialize slots in the tuples to be sorted.
+  /// One expr per slot in the materialized tuple. Valid only if
+  /// materialize_tuple_ is true.
   std::vector<ExprContext*> sort_tuple_slot_expr_ctxs_;
 };
 

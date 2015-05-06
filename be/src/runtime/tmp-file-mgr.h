@@ -20,25 +20,25 @@
 
 namespace impala {
 
-// TmpFileMgr is a utility class that creates temporary directories on the local
-// filesystem.
+/// TmpFileMgr is a utility class that creates temporary directories on the local
+/// filesystem.
 //
-// TmpFileMgr::GetFile() is used to return a TmpFileMgr::File handle with a unique
-// filename on a specified temp file device - the client owns the handle.
+/// TmpFileMgr::GetFile() is used to return a TmpFileMgr::File handle with a unique
+/// filename on a specified temp file device - the client owns the handle.
 class TmpFileMgr {
  public:
-  // TmpFileMgr::File is a handle to a physical file in a temporary directory. Clients
-  // can allocate file space and remove files using AllocateSpace() and Remove().
-  // Creation of the file is deferred until the first call to AllocateSpace().
+  /// TmpFileMgr::File is a handle to a physical file in a temporary directory. Clients
+  /// can allocate file space and remove files using AllocateSpace() and Remove().
+  /// Creation of the file is deferred until the first call to AllocateSpace().
   class File {
    public:
-    // Allocates 'write_size' bytes in this file for a new block of data.
-    // The file size is increased by a call to truncate() if necessary.
-    // The physical file is created on the first call to AllocateSpace().
+    /// Allocates 'write_size' bytes in this file for a new block of data.
+    /// The file size is increased by a call to truncate() if necessary.
+    /// The physical file is created on the first call to AllocateSpace().
     Status AllocateSpace(int64_t write_size, int64_t* offset);
 
-    // Delete the physical file on disk, if one was created.
-    // It is not valid to read or write to a file after calling Remove().
+    /// Delete the physical file on disk, if one was created.
+    /// It is not valid to read or write to a file after calling Remove().
     Status Remove();
 
     const std::string& path() const { return path_; }
@@ -47,49 +47,49 @@ class TmpFileMgr {
    private:
     friend class TmpFileMgr;
 
-    // The name of the sub-directory that Impala created within each configured scratch
-    // directory.
+    /// The name of the sub-directory that Impala created within each configured scratch
+    /// directory.
     const static std::string TMP_SUB_DIR_NAME;
 
-    // Space (in MB) that must ideally be available for writing on a scratch
-    // directory. A warning is issued if available space is less than this threshold.
+    /// Space (in MB) that must ideally be available for writing on a scratch
+    /// directory. A warning is issued if available space is less than this threshold.
     const static uint64_t AVAILABLE_SPACE_THRESHOLD_MB;
 
     File(const std::string& path);
 
-    // Path of the physical file in the filesystem.
+    /// Path of the physical file in the filesystem.
     std::string path_;
 
-    // The id of the disk on which the physical file lies.
+    /// The id of the disk on which the physical file lies.
     int disk_id_;
 
-    // Offset to which the next block will be written.
+    /// Offset to which the next block will be written.
     int64_t current_offset_;
 
-    // Current file size. Modified by AllocateSpace(). Is always >= current offset.
-    // Size is 0 before the file is created.
+    /// Current file size. Modified by AllocateSpace(). Is always >= current offset.
+    /// Size is 0 before the file is created.
     int64_t current_size_;
   };
 
-  // Creates the tmp directories configured by CM. If multiple directories are specified
-  // per disk, only one is created and used. Must be called after DiskInfo::Init().
+  /// Creates the tmp directories configured by CM. If multiple directories are specified
+  /// per disk, only one is created and used. Must be called after DiskInfo::Init().
   static Status Init();
 
-  // Return a new File handle with a unique path for a query instance. The file path
-  // is within the (single) tmp directory on the specified device id. The caller owns
-  // the returned handle and is responsible for deleting it. The file is not created -
-  // creation is deferred until the first call to File::AllocateSpace().
+  /// Return a new File handle with a unique path for a query instance. The file path
+  /// is within the (single) tmp directory on the specified device id. The caller owns
+  /// the returned handle and is responsible for deleting it. The file is not created -
+  /// creation is deferred until the first call to File::AllocateSpace().
   static Status GetFile(int tmp_device_id, const TUniqueId& query_id,
       File** new_file);
 
-  // Total number of devices with tmp directories. This is the same as the number
-  // of tmp directories created.
+  /// Total number of devices with tmp directories. This is the same as the number
+  /// of tmp directories created.
   static int num_tmp_devices() { return tmp_dirs_.size(); }
 
  private:
   static bool initialized_;
 
-  // The created tmp directories, atmost one per device.
+  /// The created tmp directories, atmost one per device.
   static std::vector<std::string> tmp_dirs_;
 };
 

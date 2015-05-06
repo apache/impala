@@ -27,24 +27,24 @@ namespace impala {
 
 class TExprNode;
 
-// Expr for evaluating a pre-compiled native or LLVM IR function that uses the UDF
-// interface (i.e. a scalar function). This class overrides GetCodegendComputeFn() to
-// return a function that calls any child exprs and passes the results as arguments to the
-// specified scalar function. If codegen is enabled, ScalarFnCall's Get*Val() compute
-// functions are wrappers around this codegen'd function.
+/// Expr for evaluating a pre-compiled native or LLVM IR function that uses the UDF
+/// interface (i.e. a scalar function). This class overrides GetCodegendComputeFn() to
+/// return a function that calls any child exprs and passes the results as arguments to the
+/// specified scalar function. If codegen is enabled, ScalarFnCall's Get*Val() compute
+/// functions are wrappers around this codegen'd function.
 //
-// If codegen is disabled, some native functions can be called without codegen, depending
-// on the native function's signature. However, since we can't write static code to call
-// every possible function signature, codegen may be required to generate the call to the
-// function even if codegen is disabled. Codegen will also be used for IR UDFs (note that
-// there is no way to specify both a native and IR library for a single UDF).
+/// If codegen is disabled, some native functions can be called without codegen, depending
+/// on the native function's signature. However, since we can't write static code to call
+/// every possible function signature, codegen may be required to generate the call to the
+/// function even if codegen is disabled. Codegen will also be used for IR UDFs (note that
+/// there is no way to specify both a native and IR library for a single UDF).
 //
-// TODO:
-// - Fix error reporting, e.g. reporting leaks
-// - Testing
-//    - Test cancellation
-//    - Type descs in UDA test harness
-//    - Allow more functions to be NULL in UDA test harness
+/// TODO:
+/// - Fix error reporting, e.g. reporting leaks
+/// - Testing
+///    - Test cancellation
+///    - Type descs in UDA test harness
+///    - Allow more functions to be NULL in UDA test harness
 class ScalarFnCall: public Expr {
  public:
   virtual std::string DebugString() const;
@@ -75,48 +75,48 @@ class ScalarFnCall: public Expr {
   virtual DecimalVal GetDecimalVal(ExprContext* context, TupleRow*);
 
  private:
-  // If this function has var args, children()[vararg_start_idx_] is the first vararg
-  // argument.
-  // If this function does not have varargs, it is set to -1.
+  /// If this function has var args, children()[vararg_start_idx_] is the first vararg
+  /// argument.
+  /// If this function does not have varargs, it is set to -1.
   int vararg_start_idx_;
 
-  // Function pointer to the JIT'd function produced by GetCodegendComputeFn().
-  // Has signature *Val (ExprContext*, TupleRow*), and calls the scalar
-  // function with signature like *Val (FunctionContext*, const *Val& arg1, ...)
+  /// Function pointer to the JIT'd function produced by GetCodegendComputeFn().
+  /// Has signature *Val (ExprContext*, TupleRow*), and calls the scalar
+  /// function with signature like *Val (FunctionContext*, const *Val& arg1, ...)
   void* scalar_fn_wrapper_;
 
-  // The UDF's prepare function, if specified. This is initialized in Prepare() and
-  // called in Open() (since we may have needed to codegen the function if it's from an
-  // IR module).
+  /// The UDF's prepare function, if specified. This is initialized in Prepare() and
+  /// called in Open() (since we may have needed to codegen the function if it's from an
+  /// IR module).
   UdfPrepare prepare_fn_;
 
-  // THe UDF's close function, if specified. This is initialized in Prepare() and called
-  // in Close().
+  /// THe UDF's close function, if specified. This is initialized in Prepare() and called
+  /// in Close().
   UdfClose close_fn_;
 
-  // If running with codegen disabled, scalar_fn_ will be a pointer to the non-JIT'd
-  // scalar function.
+  /// If running with codegen disabled, scalar_fn_ will be a pointer to the non-JIT'd
+  /// scalar function.
   void* scalar_fn_;
 
-  // Returns the number of non-vararg arguments
+  /// Returns the number of non-vararg arguments
   int NumFixedArgs() const {
     return vararg_start_idx_ >= 0 ? vararg_start_idx_ : children_.size();
   }
 
-  // Loads the native or IR function from HDFS and puts the result in *udf.
+  /// Loads the native or IR function from HDFS and puts the result in *udf.
   Status GetUdf(RuntimeState* state, llvm::Function** udf);
 
-  // Loads the native or IR function 'symbol' from HDFS and puts the result in *fn.
-  // If the function is loaded from an IR module, it cannot be called until the module
-  // has been JIT'd (i.e. after Prepare() has completed).
+  /// Loads the native or IR function 'symbol' from HDFS and puts the result in *fn.
+  /// If the function is loaded from an IR module, it cannot be called until the module
+  /// has been JIT'd (i.e. after Prepare() has completed).
   Status GetFunction(RuntimeState* state, const std::string& symbol, void** fn);
 
-  // Evaluates the children exprs and stores the results in input_vals. Used in the
-  // interpreted path.
+  /// Evaluates the children exprs and stores the results in input_vals. Used in the
+  /// interpreted path.
   void EvaluateChildren(ExprContext* context, TupleRow* row,
                         std::vector<impala_udf::AnyVal*>* input_vals);
 
-  // Function to call scalar_fn_. Used in the interpreted path.
+  /// Function to call scalar_fn_. Used in the interpreted path.
   template<typename RETURN_TYPE>
   RETURN_TYPE InterpretEval(ExprContext* context, TupleRow* row);
 };

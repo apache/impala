@@ -18,8 +18,8 @@
 #include "rpc/thrift-util.h"
 #include "util/jni-util.h"
 
-// Utility functions that depend on both JNI and Thrift, kept separate to reduce
-// unnecessary dependencies where we just want to use one or the other.
+/// Utility functions that depend on both JNI and Thrift, kept separate to reduce
+/// unnecessary dependencies where we just want to use one or the other.
 
 namespace impala {
 
@@ -32,7 +32,7 @@ Status SerializeThriftMsg(JNIEnv* env, T* msg, jbyteArray* serialized_msg) {
   uint32_t size = 0;
   RETURN_IF_ERROR(serializer.Serialize<T>(msg, &size, &buffer));
 
-  // create jbyteArray given buffer
+  /// create jbyteArray given buffer
   *serialized_msg = env->NewByteArray(size);
   RETURN_ERROR_IF_EXC(env);
   if (*serialized_msg == NULL) return Status("couldn't construct jbyteArray");
@@ -50,8 +50,8 @@ Status DeserializeThriftMsg(JNIEnv* env, jbyteArray serialized_msg, T* deseriali
   RETURN_IF_ERROR(DeserializeThriftMsg(
           reinterpret_cast<uint8_t*>(buf), &buf_size, false, deserialized_msg));
 
-  // Return buffer back. JNI_ABORT indicates to not copy contents back to java
-  // side.
+  /// Return buffer back. JNI_ABORT indicates to not copy contents back to java
+  /// side.
   env->ReleaseByteArrayElements(serialized_msg, buf, JNI_ABORT);
   return Status::OK;
 }

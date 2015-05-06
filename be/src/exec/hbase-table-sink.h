@@ -28,8 +28,8 @@
 
 namespace impala {
 
-// Class to take row batches and send them to the HBaseTableWriter to
-// eventually be written into an HBase table.
+/// Class to take row batches and send them to the HBaseTableWriter to
+/// eventually be written into an HBase table.
 class HBaseTableSink : public DataSink {
  public:
   HBaseTableSink(const RowDescriptor& row_desc,
@@ -42,28 +42,28 @@ class HBaseTableSink : public DataSink {
   virtual RuntimeProfile* profile() { return runtime_profile_; }
 
  private:
-  // Turn thrift TExpr into Expr and prepare them to run
+  /// Turn thrift TExpr into Expr and prepare them to run
   Status PrepareExprs(RuntimeState* state);
 
-  // Used to get the HBaseTableDescriptor from the RuntimeState
+  /// Used to get the HBaseTableDescriptor from the RuntimeState
   TableId table_id_;
 
-  // The description of the table.  Used for table name and column mapping.
+  /// The description of the table.  Used for table name and column mapping.
   HBaseTableDescriptor* table_desc_;
 
-  // The object that this sink uses to write to hbase.
-  // hbase_table_writer is owned by this sink and should be closed
-  // when this is Close'd.
+  /// The object that this sink uses to write to hbase.
+  /// hbase_table_writer is owned by this sink and should be closed
+  /// when this is Close'd.
   boost::scoped_ptr<HBaseTableWriter> hbase_table_writer_;
 
-  // Owned by the RuntimeState.
+  /// Owned by the RuntimeState.
   const RowDescriptor& row_desc_;
 
-  // Owned by the RuntimeState.
+  /// Owned by the RuntimeState.
   const std::vector<TExpr>& select_list_texprs_;
   std::vector<ExprContext*> output_expr_ctxs_;
 
-  // Allocated from runtime state's pool.
+  /// Allocated from runtime state's pool.
   RuntimeProfile* runtime_profile_;
 };
 

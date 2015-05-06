@@ -31,17 +31,17 @@
 
 namespace impala {
 
-// Utility class for all Thrift servers. Runs a threaded server by default, or a
-// TThreadPoolServer with, by default, 2 worker threads, that exposes the interface
-// described by a user-supplied TProcessor object.
-// If TThreadPoolServer is used, client must use TSocket as transport.
-// TODO: Need a builder to help with the unwieldy constructor
+/// Utility class for all Thrift servers. Runs a threaded server by default, or a
+/// TThreadPoolServer with, by default, 2 worker threads, that exposes the interface
+/// described by a user-supplied TProcessor object.
+/// If TThreadPoolServer is used, client must use TSocket as transport.
+/// TODO: Need a builder to help with the unwieldy constructor
 class ThriftServer {
  public:
-  // Username.
+  /// Username.
   typedef std::string Username;
 
-  // Per-connection information.
+  /// Per-connection information.
   struct ConnectionContext {
     TUniqueId connection_id;
     Username username;
@@ -49,154 +49,154 @@ class ThriftServer {
     std::string server_name;
   };
 
-  // Interface class for receiving connection creation / termination events.
+  /// Interface class for receiving connection creation / termination events.
   class ConnectionHandlerIf {
    public:
-    // Called when a connection is established (when a client connects).
+    /// Called when a connection is established (when a client connects).
     virtual void ConnectionStart(const ConnectionContext& connection_context) = 0;
 
-    // Called when a connection is terminated (when a client closes the connection).
-    // After this callback returns, the memory connection_context references is no longer
-    // valid and clients must not refer to it again.
+    /// Called when a connection is terminated (when a client closes the connection).
+    /// After this callback returns, the memory connection_context references is no longer
+    /// valid and clients must not refer to it again.
     virtual void ConnectionEnd(const ConnectionContext& connection_context) = 0;
   };
 
   static const int DEFAULT_WORKER_THREADS = 2;
 
-  // There are 2 servers supported by Thrift with different threading models.
-  // ThreadPool  -- Allocates a fixed number of threads. A thread is used by a
-  //                connection until it closes.
-  // Threaded    -- Allocates 1 thread per connection, as needed.
+  /// There are 2 servers supported by Thrift with different threading models.
+  /// ThreadPool  -- Allocates a fixed number of threads. A thread is used by a
+  ///                connection until it closes.
+  /// Threaded    -- Allocates 1 thread per connection, as needed.
   enum ServerType { ThreadPool = 0, Threaded };
 
-  // Creates, but does not start, a new server on the specified port
-  // that exports the supplied interface.
-  //  - name: human-readable name of this server. Should not contain spaces
-  //  - processor: Thrift processor to handle RPCs
-  //  - port: The port the server will listen for connections on
-  //  - auth_provider: Authentication scheme to use. If NULL, use the global default
-  //    demon<->demon provider.
-  //  - metrics: if not NULL, the server will register metrics on this object
-  //  - num_worker_threads: the number of worker threads to use in any thread pool
-  //  - server_type: the type of IO strategy this server should employ
+  /// Creates, but does not start, a new server on the specified port
+  /// that exports the supplied interface.
+  ///  - name: human-readable name of this server. Should not contain spaces
+  ///  - processor: Thrift processor to handle RPCs
+  ///  - port: The port the server will listen for connections on
+  ///  - auth_provider: Authentication scheme to use. If NULL, use the global default
+  ///    demon<->demon provider.
+  ///  - metrics: if not NULL, the server will register metrics on this object
+  ///  - num_worker_threads: the number of worker threads to use in any thread pool
+  ///  - server_type: the type of IO strategy this server should employ
   ThriftServer(const std::string& name,
       const boost::shared_ptr<apache::thrift::TProcessor>& processor, int port,
       AuthProvider* auth_provider = NULL, MetricGroup* metrics = NULL,
       int num_worker_threads = DEFAULT_WORKER_THREADS, ServerType server_type = Threaded);
 
-  // Enables secure access over SSL. Must be called before Start(). The arguments are
-  // paths to certificate and private key files in .PEM format, respectively. If either
-  // file does not exist, an error is returned.
+  /// Enables secure access over SSL. Must be called before Start(). The arguments are
+  /// paths to certificate and private key files in .PEM format, respectively. If either
+  /// file does not exist, an error is returned.
   Status EnableSsl(const std::string& certificate, const std::string& private_key);
 
   int port() const { return port_; }
 
   bool ssl_enabled() const { return ssl_enabled_; }
 
-  // Blocks until the server stops and exits its main thread.
+  /// Blocks until the server stops and exits its main thread.
   void Join();
 
-  // FOR TESTING ONLY; stop the server and block until the server is stopped; use it
-  // only if it is a Threaded server.
+  /// FOR TESTING ONLY; stop the server and block until the server is stopped; use it
+  /// only if it is a Threaded server.
   void StopForTesting();
 
-  // Starts the main server thread. Once this call returns, clients
-  // may connect to this server and issue RPCs. May not be called more
-  // than once.
+  /// Starts the main server thread. Once this call returns, clients
+  /// may connect to this server and issue RPCs. May not be called more
+  /// than once.
   Status Start();
 
-  // Sets the connection handler which receives events when connections are created or
-  // closed.
+  /// Sets the connection handler which receives events when connections are created or
+  /// closed.
   void SetConnectionHandler(ConnectionHandlerIf* connection) {
     connection_handler_ = connection;
   }
 
-  // Returns a unique identifier for the current connection. A connection is
-  // identified with the lifetime of a socket connection to this server.
-  // It is only safe to call this method during a Thrift processor RPC
-  // implementation. Otherwise, the result of calling this method is undefined.
-  // It is also only safe to reference the returned value during an RPC method.
+  /// Returns a unique identifier for the current connection. A connection is
+  /// identified with the lifetime of a socket connection to this server.
+  /// It is only safe to call this method during a Thrift processor RPC
+  /// implementation. Otherwise, the result of calling this method is undefined.
+  /// It is also only safe to reference the returned value during an RPC method.
   static const TUniqueId& GetThreadConnectionId();
 
-  // Returns a pointer to a struct that contains information about the current
-  // connection. This includes:
-  //   - A unique identifier for the connection.
-  //   - The username provided by the underlying transport for the current connection, or
-  //     an empty string if the transport did not provide a username. Currently, only the
-  //     TSasl transport provides this information.
-  //   - The client connection network address.
-  // It is only safe to call this method during a Thrift processor RPC
-  // implementation. Otherwise, the result of calling this method is undefined.
-  // It is also only safe to reference the returned value during an RPC method.
+  /// Returns a pointer to a struct that contains information about the current
+  /// connection. This includes:
+  ///   - A unique identifier for the connection.
+  ///   - The username provided by the underlying transport for the current connection, or
+  ///     an empty string if the transport did not provide a username. Currently, only the
+  ///     TSasl transport provides this information.
+  ///   - The client connection network address.
+  /// It is only safe to call this method during a Thrift processor RPC
+  /// implementation. Otherwise, the result of calling this method is undefined.
+  /// It is also only safe to reference the returned value during an RPC method.
   static const ConnectionContext* GetThreadConnectionContext();
 
  private:
-  // Creates the server socket on which this server listens. May be SSL enabled. Returns
-  // OK unless there was a Thrift error.
+  /// Creates the server socket on which this server listens. May be SSL enabled. Returns
+  /// OK unless there was a Thrift error.
   Status CreateSocket(
       boost::shared_ptr<apache::thrift::transport::TServerTransport>* socket);
 
-  // True if the server has been successfully started, for internal use only
+  /// True if the server has been successfully started, for internal use only
   bool started_;
 
-  // The port on which the server interface is exposed
+  /// The port on which the server interface is exposed
   int port_;
 
-  // True if the server socket only accepts SSL connections
+  /// True if the server socket only accepts SSL connections
   bool ssl_enabled_;
 
-  // Path to certificate file in .PEM format
+  /// Path to certificate file in .PEM format
   std::string certificate_path_;
 
-  // Path to private key file in .PEM format
+  /// Path to private key file in .PEM format
   std::string private_key_path_;
 
-  // How many worker threads to use to serve incoming requests
-  // (requests are queued if no thread is immediately available)
+  /// How many worker threads to use to serve incoming requests
+  /// (requests are queued if no thread is immediately available)
   int num_worker_threads_;
 
-  // ThreadPool or Threaded server
+  /// ThreadPool or Threaded server
   ServerType server_type_;
 
-  // User-specified identifier that shows up in logs
+  /// User-specified identifier that shows up in logs
   const std::string name_;
 
-  // Thread that runs ThriftServerEventProcessor::Supervise() in a separate loop
+  /// Thread that runs ThriftServerEventProcessor::Supervise() in a separate loop
   boost::scoped_ptr<Thread> server_thread_;
 
-  // Thrift housekeeping
+  /// Thrift housekeeping
   boost::scoped_ptr<apache::thrift::server::TServer> server_;
   boost::shared_ptr<apache::thrift::TProcessor> processor_;
 
-  // If not NULL, called when connection events happen. Not owned by us.
+  /// If not NULL, called when connection events happen. Not owned by us.
   ConnectionHandlerIf* connection_handler_;
 
-  // Protects connection_contexts_
+  /// Protects connection_contexts_
   boost::mutex connection_contexts_lock_;
 
-  // Map of active connection context to a shared_ptr containing that context; when an
-  // item is removed from the map, it is automatically freed.
+  /// Map of active connection context to a shared_ptr containing that context; when an
+  /// item is removed from the map, it is automatically freed.
   typedef boost::unordered_map<ConnectionContext*, boost::shared_ptr<ConnectionContext> >
       ConnectionContextSet;
   ConnectionContextSet connection_contexts_;
 
-  // True if metrics are enabled
+  /// True if metrics are enabled
   bool metrics_enabled_;
 
-  // Number of currently active connections
+  /// Number of currently active connections
   IntGauge* num_current_connections_metric_;
 
-  // Total connections made over the lifetime of this server
+  /// Total connections made over the lifetime of this server
   IntCounter* total_connections_metric_;
 
-  // Used to generate a unique connection id for every connection
+  /// Used to generate a unique connection id for every connection
   boost::uuids::random_generator uuid_generator_;
 
-  // Not owned by us, owned by the AuthManager
+  /// Not owned by us, owned by the AuthManager
   AuthProvider* auth_provider_;
 
-  // Helper class which monitors starting servers. Needs access to internal members, and
-  // is not used outside of this class.
+  /// Helper class which monitors starting servers. Needs access to internal members, and
+  /// is not used outside of this class.
   class ThriftServerEventProcessor;
   friend class ThriftServerEventProcessor;
 };

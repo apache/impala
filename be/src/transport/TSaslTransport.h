@@ -145,23 +145,23 @@ class TSaslTransport : public TVirtualTransport<TSaslTransport> {
   std::string getUsername();
 
  protected:
-  // Underlying transport
+  /// Underlying transport
   boost::shared_ptr<TTransport> transport_;
 
-  // Buffer for reading and writing.
+  /// Buffer for reading and writing.
   TMemoryBuffer* memBuf_;
 
-  // Sasl implementation class. This is passed in to the transport constructor
-  // initialized for either a client or a server.
+  /// Sasl implementation class. This is passed in to the transport constructor
+  /// initialized for either a client or a server.
   boost::shared_ptr<sasl::TSasl> sasl_;
 
-  // IF true we wrap data in encryption.
+  /// IF true we wrap data in encryption.
   bool shouldWrap_;
 
-  // True if this is a client.
+  /// True if this is a client.
   bool isClient_;
 
-  // Buffer to hold protocol info.
+  /// Buffer to hold protocol info.
   boost::scoped_array<uint8_t> protoBuf_;
 
   /* store the big endian format int to given buffer */
@@ -213,8 +213,8 @@ class TSaslTransport : public TVirtualTransport<TSaslTransport> {
   void writeLength(uint32_t length);
   virtual void handleSaslStartMessage() = 0;
 
-  // If memBuf_ is filled with bytes that are already read, and has crossed a size
-  // threshold (see implementation for exact value), resize the buffer to a default value.
+  /// If memBuf_ is filled with bytes that are already read, and has crossed a size
+  /// threshold (see implementation for exact value), resize the buffer to a default value.
   void shrinkBuffer();
 };
 

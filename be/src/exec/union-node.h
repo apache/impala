@@ -28,10 +28,10 @@ namespace impala {
 class Tuple;
 class TupleRow;
 
-// Node that merges the results of its children by materializing their
-// evaluated expressions into row batches. The UnionNode pulls row batches from its
-// children sequentially, i.e., it exhausts one child completely before moving
-// on to the next one.
+/// Node that merges the results of its children by materializing their
+/// evaluated expressions into row batches. The UnionNode pulls row batches from its
+/// children sequentially, i.e., it exhausts one child completely before moving
+/// on to the next one.
 class UnionNode : public ExecNode {
  public:
   UnionNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
@@ -44,49 +44,49 @@ class UnionNode : public ExecNode {
   virtual void Close(RuntimeState* state);
 
  private:
-  // Tuple id resolved in Prepare() to set tuple_desc_;
+  /// Tuple id resolved in Prepare() to set tuple_desc_;
   int tuple_id_;
 
-  // Descriptor for tuples this union node constructs.
+  /// Descriptor for tuples this union node constructs.
   const TupleDescriptor* tuple_desc_;
 
-  // those tuple_desc_->slots() which are materialized, in the same order
+  /// those tuple_desc_->slots() which are materialized, in the same order
   std::vector<SlotDescriptor*> materialized_slots_;
 
-  // Const exprs materialized by this node. These exprs don't refer to any children.
+  /// Const exprs materialized by this node. These exprs don't refer to any children.
   std::vector<std::vector<ExprContext*> > const_result_expr_ctx_lists_;
 
-  // Index of current const result expr list.
+  /// Index of current const result expr list.
   int const_result_expr_idx_;
 
-  // Exprs materialized by this node. The i-th result expr list refers to the i-th child.
+  /// Exprs materialized by this node. The i-th result expr list refers to the i-th child.
   std::vector<std::vector<ExprContext*> > result_expr_ctx_lists_;
 
-  // Index of current child.
+  /// Index of current child.
   int child_idx_;
 
-  // Current row batch of current child. We reset the pointer to a new RowBatch
-  // when switching to a different child.
+  /// Current row batch of current child. We reset the pointer to a new RowBatch
+  /// when switching to a different child.
   boost::scoped_ptr<RowBatch> child_row_batch_;
 
-  // Saved from the last to GetNext() on the current child.
+  /// Saved from the last to GetNext() on the current child.
   bool child_eos_;
 
-  // Index of current row in child_row_batch_.
+  /// Index of current row in child_row_batch_.
   int child_row_idx_;
 
-  // Opens the child at child_idx_, fetches the first batch into child_row_batch_,
-  // and sets child_row_idx_ to 0. May set child_eos_.
+  /// Opens the child at child_idx_, fetches the first batch into child_row_batch_,
+  /// and sets child_row_idx_ to 0. May set child_eos_.
   Status OpenCurrentChild(RuntimeState* state);
 
-  // Evaluates exprs on all rows in child_row_batch_ starting from child_row_idx_,
-  // and materializes their results into *tuple.
-  // Adds *tuple into row_batch, and increments *tuple.
-  // If const_exprs is true, then the exprs are evaluated exactly once without
-  // fetching rows from child_row_batch_.
-  // Only commits tuples to row_batch if they are not filtered by conjuncts.
-  // Returns true if row_batch should be returned to caller or limit has been
-  // reached, false otherwise.
+  /// Evaluates exprs on all rows in child_row_batch_ starting from child_row_idx_,
+  /// and materializes their results into *tuple.
+  /// Adds *tuple into row_batch, and increments *tuple.
+  /// If const_exprs is true, then the exprs are evaluated exactly once without
+  /// fetching rows from child_row_batch_.
+  /// Only commits tuples to row_batch if they are not filtered by conjuncts.
+  /// Returns true if row_batch should be returned to caller or limit has been
+  /// reached, false otherwise.
   bool EvalAndMaterializeExprs( const std::vector<ExprContext*>& ctxs,
                                 bool const_exprs, Tuple** tuple, RowBatch* row_batch);
 };

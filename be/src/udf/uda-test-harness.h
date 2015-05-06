@@ -49,21 +49,21 @@ class UdaTestHarnessBase {
 
   typedef RESULT (*FinalizeFn)(FunctionContext* context, const INTERMEDIATE& value);
 
-  // UDA test harness allows for custom comparator to validate results. UDAs
-  // can specify a custom comparator to, for example, tolerate numerical imprecision.
-  // Returns true if x and y should be treated as equal.
+  /// UDA test harness allows for custom comparator to validate results. UDAs
+  /// can specify a custom comparator to, for example, tolerate numerical imprecision.
+  /// Returns true if x and y should be treated as equal.
   typedef bool (*ResultComparator)(const RESULT& x, const RESULT& y);
 
   void SetResultComparator(ResultComparator fn) {
     result_comparator_fn_ = fn;
   }
 
-  // This must be called if the INTERMEDIATE is TYPE_FIXED_BUFFER
+  /// This must be called if the INTERMEDIATE is TYPE_FIXED_BUFFER
   void SetIntermediateSize(int byte_size) {
     fixed_buffer_byte_size_ = byte_size;
   }
 
-  // Returns the failure string if any.
+  /// Returns the failure string if any.
   const std::string& GetErrorMsg() const { return error_msg_; }
 
  protected:
@@ -94,46 +94,46 @@ class UdaTestHarnessBase {
     UdaTestHarnessBase* harness_;
   };
 
-  // Runs the UDA in all the modes, validating the result is 'expected' each time.
+  /// Runs the UDA in all the modes, validating the result is 'expected' each time.
   bool Execute(const RESULT& expected, UdaExecutionMode mode);
 
-  // Returns false if there is an error set in the context.
+  /// Returns false if there is an error set in the context.
   bool CheckContext(FunctionContext* context);
 
-  // Verifies x == y, using the custom comparator if set.
+  /// Verifies x == y, using the custom comparator if set.
   bool CheckResult(const RESULT& x, const RESULT& y);
 
-  // Runs the UDA on a single node. The entire execution happens in 1 context.
-  // The UDA does a update on all the input values and then a finalize.
+  /// Runs the UDA on a single node. The entire execution happens in 1 context.
+  /// The UDA does a update on all the input values and then a finalize.
   RESULT ExecuteSingleNode(ScopedFunctionContext* result_context);
 
-  // Runs the UDA, simulating a single level aggregation. The values are processed
-  // on num_nodes + 1 contexts. There are num_nodes that do update and serialize.
-  // There is a final context that does merge and finalize.
+  /// Runs the UDA, simulating a single level aggregation. The values are processed
+  /// on num_nodes + 1 contexts. There are num_nodes that do update and serialize.
+  /// There is a final context that does merge and finalize.
   RESULT ExecuteOneLevel(int num_nodes, ScopedFunctionContext* result_context);
 
-  // Runs the UDA, simulating a two level aggregation with num1 in the first level and
-  // num2 in the second. The values are processed in num1 + num2 contexts.
+  /// Runs the UDA, simulating a two level aggregation with num1 in the first level and
+  /// num2 in the second. The values are processed in num1 + num2 contexts.
   RESULT ExecuteTwoLevel(int num1, int num2, ScopedFunctionContext* result_context);
 
   virtual void Update(int idx, FunctionContext* context, INTERMEDIATE* dst) = 0;
 
-  // UDA functions
+  /// UDA functions
   InitFn init_fn_;
   MergeFn merge_fn_;
   SerializeFn serialize_fn_;
   FinalizeFn finalize_fn_;
 
-  // Customer comparator, NULL if default == should be used.
+  /// Customer comparator, NULL if default == should be used.
   ResultComparator result_comparator_fn_;
 
-  // Set during Execute() by subclass
+  /// Set during Execute() by subclass
   int num_input_values_;
 
-  // Buffer len for intermediate results if the type is TYPE_FIXED_BUFFER
+  /// Buffer len for intermediate results if the type is TYPE_FIXED_BUFFER
   int fixed_buffer_byte_size_;
 
-  // Error message if anything went wrong during the execution.
+  /// Error message if anything went wrong during the execution.
   std::string error_msg_;
 };
 
@@ -155,12 +155,12 @@ class UdaTestHarness : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
       update_fn_(update_fn) {
   }
 
-  // Runs the UDA in all the modes, validating the result is 'expected' each time.
+  /// Runs the UDA in all the modes, validating the result is 'expected' each time.
   bool Execute(const std::vector<INPUT>& values, const RESULT& expected,
       UdaExecutionMode mode = ALL);
 
-  // Runs the UDA in all the modes, validating the result is 'expected' each time.
-  // T needs to be compatible (i.e. castable to) with INPUT
+  /// Runs the UDA in all the modes, validating the result is 'expected' each time.
+  /// T needs to be compatible (i.e. castable to) with INPUT
   template<typename T>
   bool Execute(const std::vector<T>& values, const RESULT& expected,
       UdaExecutionMode mode = ALL) {
@@ -177,7 +177,7 @@ class UdaTestHarness : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
 
  private:
   UpdateFn update_fn_;
-  // Set during Execute()
+  /// Set during Execute()
   std::vector<const INPUT*> input_;
 };
 
@@ -199,7 +199,7 @@ class UdaTestHarness2 : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
       update_fn_(update_fn) {
   }
 
-  // Runs the UDA in all the modes, validating the result is 'expected' each time.
+  /// Runs the UDA in all the modes, validating the result is 'expected' each time.
   bool Execute(const std::vector<INPUT1>& values1, const std::vector<INPUT2>& values2,
       const RESULT& expected, UdaExecutionMode mode = ALL);
 
@@ -231,7 +231,7 @@ class UdaTestHarness3 : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
       update_fn_(update_fn) {
   }
 
-  // Runs the UDA in all the modes, validating the result is 'expected' each time.
+  /// Runs the UDA in all the modes, validating the result is 'expected' each time.
   bool Execute(const std::vector<INPUT1>& values1, const std::vector<INPUT2>& values2,
       const std::vector<INPUT3>& values3,
       const RESULT& expected, UdaExecutionMode mode = ALL);
@@ -266,7 +266,7 @@ class UdaTestHarness4 : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
       update_fn_(update_fn) {
   }
 
-  // Runs the UDA in all the modes, validating the result is 'expected' each time.
+  /// Runs the UDA in all the modes, validating the result is 'expected' each time.
   bool Execute(const std::vector<INPUT1>& values1, const std::vector<INPUT2>& values2,
       const std::vector<INPUT3>& values3, const std::vector<INPUT4>& values4,
       const RESULT& expected, UdaExecutionMode mode = ALL);
@@ -287,4 +287,3 @@ class UdaTestHarness4 : public UdaTestHarnessBase<RESULT, INTERMEDIATE> {
 #include "udf/uda-test-harness-impl.h"
 
 #endif
-

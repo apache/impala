@@ -28,32 +28,32 @@ namespace impala {
 class TExprNode;
 class RuntimeState;
 
-// Executor for hive udfs using JNI. This works with the UdfExecutor on the
-// java side which calls into the actual UDF.
+/// Executor for hive udfs using JNI. This works with the UdfExecutor on the
+/// java side which calls into the actual UDF.
 //
-// To minimize the JNI overhead, we eliminate as many copies as possible and
-// share memory between the native side and java side. Memory in the native heap
-// can be read with no issues from java but not vice versa (ptrs in the java heap
-// move). Also, JNI calls are cheaper for function calls with no arguments and
-// no return value (void).
+/// To minimize the JNI overhead, we eliminate as many copies as possible and
+/// share memory between the native side and java side. Memory in the native heap
+/// can be read with no issues from java but not vice versa (ptrs in the java heap
+/// move). Also, JNI calls are cheaper for function calls with no arguments and
+/// no return value (void).
 //
-// During Prepare(), we allocate an input buffer that is big enough to store
-// all of the inputs (i.e. the slot size). This buffer is passed to the UdfExecutor
-// in the constructor. During Evaluate(), the input buffer is populated and
-// the UdfExecutor.evaluate() method is called via JNI. For input arguments,
-// strings don't need to be treated any differently. The java side can parse
-// the ptr and length from the StringValue and then read the ptr directly.
+/// During Prepare(), we allocate an input buffer that is big enough to store
+/// all of the inputs (i.e. the slot size). This buffer is passed to the UdfExecutor
+/// in the constructor. During Evaluate(), the input buffer is populated and
+/// the UdfExecutor.evaluate() method is called via JNI. For input arguments,
+/// strings don't need to be treated any differently. The java side can parse
+/// the ptr and length from the StringValue and then read the ptr directly.
 //
-// For return values that are fixed size (i.e. not strings), we allocate an
-// output buffer in Prepare(). This is also passed to the UdfExecutor in the
-// constructor. The UdfExecutor writes to it directly during evaluate().
+/// For return values that are fixed size (i.e. not strings), we allocate an
+/// output buffer in Prepare(). This is also passed to the UdfExecutor in the
+/// constructor. The UdfExecutor writes to it directly during evaluate().
 //
-// For strings, we pass a StringValue sized output buffer to the FE. The address
-// of the StringValue does not change. When the FE writes the string result, it
-// populates the StringValue with the buffer it allocated from its native heap.
-// The BE reads the StringValue as normal.
+/// For strings, we pass a StringValue sized output buffer to the FE. The address
+/// of the StringValue does not change. When the FE writes the string result, it
+/// populates the StringValue with the buffer it allocated from its native heap.
+/// The BE reads the StringValue as normal.
 //
-// If the UDF ran into an error, the FE throws an exception.
+/// If the UDF ran into an error, the FE throws an exception.
 class HiveUdfCall : public Expr {
  public:
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc,
@@ -84,19 +84,19 @@ class HiveUdfCall : public Expr {
   virtual std::string DebugString() const;
 
  private:
-  // Evalutes the UDF over row. Returns the result as an AnyVal. This function
-  // never returns NULL but rather an AnyVal object with is_null set to true on
-  // error.
+  /// Evalutes the UDF over row. Returns the result as an AnyVal. This function
+  /// never returns NULL but rather an AnyVal object with is_null set to true on
+  /// error.
   AnyVal* Evaluate(ExprContext* ctx, TupleRow* row);
 
-  // The path on the local FS to the UDF's jar
+  /// The path on the local FS to the UDF's jar
   std::string local_location_;
 
-  // input_byte_offsets_[i] is the byte offset child ith's input argument should
-  // be written to.
+  /// input_byte_offsets_[i] is the byte offset child ith's input argument should
+  /// be written to.
   std::vector<int> input_byte_offsets_;
 
-  // The size of the buffer for passing in input arguments.
+  /// The size of the buffer for passing in input arguments.
   int input_buffer_size_;
 };
 

@@ -27,38 +27,38 @@ DECLARE_bool(disable_mem_pools);
 
 namespace impala {
 
-// Implementation of a free pool to recycle allocations. The pool is broken
-// up into 64 lists, one for each power of 2. Each allocation is rounded up
-// to the next power of 2. When the allocation is freed, it is added to the
-// corresponding free list.
-// Each allocation has an 8 byte header that immediately precedes the actual
-// allocation. If the allocation is owned by the user, the header contains
-// the ptr to the list that it should be added to on Free().
-// When the allocation is in the pool (i.e. available to be handed out), it
-// contains the link to the next allocation.
-// This has O(1) Allocate() and Free().
-// This is not thread safe.
-// TODO: consider integrating this with MemPool.
-// TODO: consider changing to something more granular than doubling.
+/// Implementation of a free pool to recycle allocations. The pool is broken
+/// up into 64 lists, one for each power of 2. Each allocation is rounded up
+/// to the next power of 2. When the allocation is freed, it is added to the
+/// corresponding free list.
+/// Each allocation has an 8 byte header that immediately precedes the actual
+/// allocation. If the allocation is owned by the user, the header contains
+/// the ptr to the list that it should be added to on Free().
+/// When the allocation is in the pool (i.e. available to be handed out), it
+/// contains the link to the next allocation.
+/// This has O(1) Allocate() and Free().
+/// This is not thread safe.
+/// TODO: consider integrating this with MemPool.
+/// TODO: consider changing to something more granular than doubling.
 class FreePool {
  public:
-  // C'tor, initializes the FreePool to be empty. All allocations come from the
-  // 'mem_pool'.
+  /// C'tor, initializes the FreePool to be empty. All allocations come from the
+  /// 'mem_pool'.
   FreePool(MemPool* mem_pool)
     : mem_pool_(mem_pool),
       net_allocations_(0) {
     memset(&lists_, 0, sizeof(lists_));
   }
 
-  // Allocates a buffer of size.
+  /// Allocates a buffer of size.
   uint8_t* Allocate(int size) {
     ++net_allocations_;
     if (FLAGS_disable_mem_pools) return reinterpret_cast<uint8_t*>(malloc(size));
 
-    // This is the typical malloc behavior. NULL is reserved for failures.
+    /// This is the typical malloc behavior. NULL is reserved for failures.
     if (size == 0) return reinterpret_cast<uint8_t*>(0x1);
 
-    // Do ceil(log_2(size))
+    /// Do ceil(log_2(size))
     int free_list_idx = BitUtil::Log2(size);
     DCHECK_LT(free_list_idx, NUM_LISTS);
 
@@ -96,9 +96,9 @@ class FreePool {
     list->next = node;
   }
 
-  // Returns an allocation that is at least 'size'. If the current allocation
-  // backing 'ptr' is big enough, 'ptr' is returned. Otherwise a new one is
-  // made and the contents of ptr are copied into it.
+  /// Returns an allocation that is at least 'size'. If the current allocation backing
+  /// 'ptr' is big enough, 'ptr' is returned. Otherwise a new one is made and the contents
+  /// of ptr are copied into it.
   uint8_t* Reallocate(uint8_t* ptr, int size) {
     if (FLAGS_disable_mem_pools) {
       return reinterpret_cast<uint8_t*>(realloc(reinterpret_cast<void*>(ptr), size));
@@ -116,8 +116,8 @@ class FreePool {
     // If it's already big enough, just return the ptr.
     if (allocation_size >= size) return ptr;
 
-    // Make a new one. Since Allocate() already rounds up to powers of 2, this
-    // effectively doubles for the caller.
+    // Make a new one. Since Allocate() already rounds up to powers of 2, this effectively
+    // doubles for the caller.
     uint8_t* new_ptr = Allocate(size);
     memcpy(new_ptr, ptr, allocation_size);
     Free(ptr);
@@ -131,7 +131,7 @@ class FreePool {
   static const int NUM_LISTS = 64;
 
   struct FreeListNode {
-    // Union for clarity when manipulating the node.
+    /// Union for clarity when manipulating the node.
     union {
       FreeListNode* next; // Used when it is in the free list
       FreeListNode* list; // Used when it is being used by the caller.
@@ -169,15 +169,15 @@ class FreePool {
     return ss.str();
   }
 
-  // MemPool to allocate from. Unowned.
+  /// MemPool to allocate from. Unowned.
   MemPool* mem_pool_;
 
-  // One list head for each allocation size indexed by the LOG_2 of the allocation size.
-  // While it doesn't make too much sense to use this for very small (e.g. 8 byte)
-  // allocations, it makes the indexing easy.
+  /// One list head for each allocation size indexed by the LOG_2 of the allocation size.
+  /// While it doesn't make too much sense to use this for very small (e.g. 8 byte)
+  /// allocations, it makes the indexing easy.
   FreeListNode lists_[NUM_LISTS];
 
-  // Diagnostic counter that tracks (# Allocates - # Frees)
+  /// Diagnostic counter that tracks (# Allocates - # Frees)
   int64_t net_allocations_;
 };
 

@@ -21,13 +21,13 @@
 
 namespace impala {
 
-// A fixed-size sampler to collect samples over time. AddSample should be
-// called periodically with the sampled value. Samples are added at the max
-// resolution possible.  When the sample buffer is full, the current samples
-// are collapsed and the collection period is doubled.
-// The input period and the streaming sampler period do not need to match, the
-// streaming sampler will average values.
-// T is the type of the sample and must be a native numerical type (e.g. int or float).
+/// A fixed-size sampler to collect samples over time. AddSample should be
+/// called periodically with the sampled value. Samples are added at the max
+/// resolution possible.  When the sample buffer is full, the current samples
+/// are collapsed and the collection period is doubled.
+/// The input period and the streaming sampler period do not need to match, the
+/// streaming sampler will average values.
+/// T is the type of the sample and must be a native numerical type (e.g. int or float).
 template<typename T, int MAX_SAMPLES>
 class StreamingSampler {
  public:
@@ -39,7 +39,7 @@ class StreamingSampler {
       current_sample_total_time_(0) {
   }
 
-  // Initialize the sampler with values.
+  /// Initialize the sampler with values.
   StreamingSampler(int period, const std::vector<T>& initial_samples)
     : samples_collected_(initial_samples.size()),
       period_(period),
@@ -50,14 +50,14 @@ class StreamingSampler {
     memcpy(samples_, &initial_samples[0], sizeof(T) * samples_collected_);
   }
 
-  // Add a sample to the sampler. 'ms' is the time elapsed since the last time this
-  // was called.
-  // The input value is accumulated into current_*. If the total time elapsed
-  // in current_sample_total_time_ is higher than the storage period, the value is
-  // stored. 'sample' should be interpreted as a representative sample from
-  // (now - ms, now].
-  // TODO: we can make this more complex by taking a weighted average of samples
-  // accumulated in a period.
+  /// Add a sample to the sampler. 'ms' is the time elapsed since the last time this
+  /// was called.
+  /// The input value is accumulated into current_*. If the total time elapsed
+  /// in current_sample_total_time_ is higher than the storage period, the value is
+  /// stored. 'sample' should be interpreted as a representative sample from
+  /// (now - ms, now].
+  /// TODO: we can make this more complex by taking a weighted average of samples
+  /// accumulated in a period.
   void AddSample(T sample, int ms) {
     boost::lock_guard<SpinLock> l(lock_);
     ++current_sample_count_;
@@ -71,7 +71,7 @@ class StreamingSampler {
       current_sample_total_time_ = 0;
 
       if (samples_collected_ == MAX_SAMPLES) {
-        // collapse the samples in half by averaging them and doubling the storage period
+        /// collapse the samples in half by averaging them and doubling the storage period
         period_ *= 2;
         for (int i = 0; i < MAX_SAMPLES / 2; ++i) {
           samples_[i] = (samples_[i * 2] + samples_[i * 2 + 1]) / 2;
@@ -81,10 +81,10 @@ class StreamingSampler {
     }
   }
 
-  // Get the samples collected.  Returns the number of samples and
-  // the period they were collected at.
-  // If lock is non-null, the lock will be taken before returning. The caller
-  // must unlock it.
+  /// Get the samples collected.  Returns the number of samples and
+  /// the period they were collected at.
+  /// If lock is non-null, the lock will be taken before returning. The caller
+  /// must unlock it.
   const T* GetSamples(int* num_samples, int* period, SpinLock** lock = NULL) const {
     if (lock != NULL) {
       lock_.lock();
@@ -95,7 +95,7 @@ class StreamingSampler {
     return samples_;
   }
 
-  // Set the underlying data to period/samples
+  /// Set the underlying data to period/samples
   void SetSamples(int period, const std::vector<T>& samples) {
     DCHECK_LE(samples.size(), MAX_SAMPLES);
 
@@ -124,23 +124,23 @@ class StreamingSampler {
  private:
   mutable SpinLock lock_;
 
-  // Aggregated samples collected. Note: this is not all the input samples from
-  // AddSample(), as logically, those samples get resampled and aggregated.
+  /// Aggregated samples collected. Note: this is not all the input samples from
+  /// AddSample(), as logically, those samples get resampled and aggregated.
   T samples_[MAX_SAMPLES];
 
-  // Number of samples collected <= MAX_SAMPLES.
+  /// Number of samples collected <= MAX_SAMPLES.
   int samples_collected_;
 
-  // Storage period in ms.
+  /// Storage period in ms.
   int period_;
 
-  // The sum of input samples that makes up the next stored sample.
+  /// The sum of input samples that makes up the next stored sample.
   T current_sample_sum_;
 
-  // The number of input samples that contribute to current_sample_sum_.
+  /// The number of input samples that contribute to current_sample_sum_.
   int current_sample_count_;
 
-  // The total time that current_sample_sum_ represents
+  /// The total time that current_sample_sum_ represents
   int current_sample_total_time_;
 };
 

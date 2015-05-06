@@ -21,10 +21,10 @@
 
 namespace impala {
 
-// Utility class to measure time.  This is measured using the cpu tick counter which
-// is very low overhead but can be inaccurate if the thread is switched away.  This
-// is useful for measuring cpu time at the row batch level (too much overhead at the
-// row granularity).
+/// Utility class to measure time.  This is measured using the cpu tick counter which
+/// is very low overhead but can be inaccurate if the thread is switched away.  This
+/// is useful for measuring cpu time at the row batch level (too much overhead at the
+/// row granularity).
 class StopWatch {
  public:
   StopWatch() {
@@ -46,7 +46,7 @@ class StopWatch {
     }
   }
 
-  // Returns time in cpu ticks.
+  /// Returns time in cpu ticks.
   uint64_t ElapsedTime() const {
     return running_ ? Rdtsc() - start_ : total_time_;
   }
@@ -65,12 +65,12 @@ class StopWatch {
   bool running_;
 };
 
-// Stop watch for reporting elapsed time in nanosec based on CLOCK_MONOTONIC.
-// It is as fast as Rdtsc.
-// It is also accurate because it not affected by cpu frequency changes and
-// it is not affected by user setting the system clock.
-// CLOCK_MONOTONIC represents monotonic time since some unspecified starting point.
-// It is good for computing elapsed time.
+/// Stop watch for reporting elapsed time in nanosec based on CLOCK_MONOTONIC.
+/// It is as fast as Rdtsc.
+/// It is also accurate because it not affected by cpu frequency changes and
+/// it is not affected by user setting the system clock.
+/// CLOCK_MONOTONIC represents monotonic time since some unspecified starting point.
+/// It is good for computing elapsed time.
 class MonotonicStopWatch {
  public:
   MonotonicStopWatch() {
@@ -92,7 +92,7 @@ class MonotonicStopWatch {
     }
   }
 
-  // Restarts the timer. Returns the elapsed time until this point.
+  /// Restarts the timer. Returns the elapsed time until this point.
   uint64_t Reset() {
     uint64_t ret = ElapsedTime();
     if (running_) {
@@ -101,7 +101,7 @@ class MonotonicStopWatch {
     return ret;
   }
 
-  // Returns time in nanosecond.
+  /// Returns time in nanosecond.
   uint64_t ElapsedTime() const {
     if (!running_) return total_time_;
     timespec end;

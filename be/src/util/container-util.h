@@ -24,8 +24,8 @@
 
 namespace impala {
 
-// Hash function for TNetworkAddress. This function must be called hash_value to be picked
-// up properly by boost.
+/// Hash function for TNetworkAddress. This function must be called hash_value to be picked
+/// up properly by boost.
 inline std::size_t hash_value(const TNetworkAddress& host_port) {
   uint32_t hash =
       HashUtil::Hash(host_port.hostname.c_str(), host_port.hostname.length(), 0);
@@ -44,8 +44,8 @@ struct TNetworkAddressPtrEquals : public std::unary_function<TNetworkAddress*, b
 };
 
 
-// FindOrInsert(): if the key is present, return the value; if the key is not present,
-// create a new entry (key, default_val) and return default_val.
+/// FindOrInsert(): if the key is present, return the value; if the key is not present,
+/// create a new entry (key, default_val) and return default_val.
 
 template <typename K, typename V>
 V* FindOrInsert(std::map<K,V>* m, const K& key, const V& default_val) {
@@ -66,8 +66,8 @@ V* FindOrInsert(boost::unordered_map<K,V>* m, const K& key, const V& default_val
 }
 
 
-// FindWithDefault: if the key is present, return the corresponding value; if the key
-// is not present, return the supplied default value
+/// FindWithDefault: if the key is present, return the corresponding value; if the key
+/// is not present, return the supplied default value
 
 template <typename K, typename V>
 const V& FindWithDefault(const std::map<K, V>& m, const K& key, const V& default_val) {
@@ -84,8 +84,8 @@ const V& FindWithDefault(const boost::unordered_map<K, V>& m, const K& key,
   return it->second;
 }
 
-// Merges (by summing) the values from two maps of values. The values must be
-// native types or support operator +=.
+/// Merges (by summing) the values from two maps of values. The values must be
+/// native types or support operator +=.
 template<typename K, typename V>
 void MergeMapValues(const std::map<K, V>& src, std::map<K, V>* dst) {
   for (typename std::map<K, V>::const_iterator src_it = src.begin();

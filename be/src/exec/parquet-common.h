@@ -22,7 +22,7 @@
 #include "runtime/string-value.h"
 #include "util/bit-util.h"
 
-// This file contains common elements between the parquet Writer and Scanner.
+/// This file contains common elements between the parquet Writer and Scanner.
 namespace impala {
 
 class TimestampValue;
@@ -30,8 +30,8 @@ class TimestampValue;
 const uint8_t PARQUET_VERSION_NUMBER[4] = {'P', 'A', 'R', '1'};
 const uint32_t PARQUET_CURRENT_VERSION = 1;
 
-// Mapping of impala types to parquet storage types.  This is indexed by
-// PrimitiveType enum
+/// Mapping of impala types to parquet storage types.  This is indexed by
+/// PrimitiveType enum
 const parquet::Type::type IMPALA_TO_PARQUET_TYPES[] = {
   parquet::Type::BOOLEAN,     // Invalid
   parquet::Type::BOOLEAN,     // NULL type
@@ -52,7 +52,7 @@ const parquet::Type::type IMPALA_TO_PARQUET_TYPES[] = {
   parquet::Type::BYTE_ARRAY,  // CHAR(N)
 };
 
-// Mapping of Parquet codec enums to Impala enums
+/// Mapping of Parquet codec enums to Impala enums
 const THdfsCompression::type PARQUET_TO_IMPALA_CODEC[] = {
   THdfsCompression::NONE,
   THdfsCompression::SNAPPY,
@@ -60,7 +60,7 @@ const THdfsCompression::type PARQUET_TO_IMPALA_CODEC[] = {
   THdfsCompression::LZO
 };
 
-// Mapping of Impala codec enums to Parquet enums
+/// Mapping of Impala codec enums to Parquet enums
 const parquet::CompressionCodec::type IMPALA_TO_PARQUET_CODEC[] = {
   parquet::CompressionCodec::UNCOMPRESSED,
   parquet::CompressionCodec::SNAPPY,  // DEFAULT
@@ -71,20 +71,20 @@ const parquet::CompressionCodec::type IMPALA_TO_PARQUET_CODEC[] = {
   parquet::CompressionCodec::LZO,
 };
 
-// The plain encoding does not maintain any state so all these functions
-// are static helpers.
-// TODO: we are using templates to provide a generic interface (over the
-// types) to avoid performance penalties. This makes the code more complex
-// and should be removed when we have codegen support to inline virtual
-// calls.
+/// The plain encoding does not maintain any state so all these functions
+/// are static helpers.
+/// TODO: we are using templates to provide a generic interface (over the
+/// types) to avoid performance penalties. This makes the code more complex
+/// and should be removed when we have codegen support to inline virtual
+/// calls.
 class ParquetPlainEncoder {
  public:
-  // Returns the byte size of 'v'.
+  /// Returns the byte size of 'v'.
   template<typename T>
   static int ByteSize(const T& v) { return sizeof(T); }
 
-  // Returns the encoded size of values of type t. Returns -1 if it is variable
-  // length. This can be different than the slot size of the types.
+  /// Returns the encoded size of values of type t. Returns -1 if it is variable
+  /// length. This can be different than the slot size of the types.
   static int ByteSize(const ColumnType& t) {
     switch (t.type) {
       case TYPE_STRING:
@@ -112,7 +112,7 @@ class ParquetPlainEncoder {
     }
   }
 
-  // The minimum byte size to store decimals of with precision t.precision.
+  /// The minimum byte size to store decimals of with precision t.precision.
   static int DecimalSize(const ColumnType& t) {
     DCHECK(t.type == TYPE_DECIMAL);
     // Numbers in the comment is the max positive value that can be represented
@@ -158,45 +158,45 @@ class ParquetPlainEncoder {
     return -1;
   }
 
-  // Encodes t into buffer. Returns the number of bytes added.  buffer must
-  // be preallocated and big enough.  Buffer need not be aligned.
-  // 'fixed_len_size' is only applicable for data encoded using FIXED_LEN_BYTE_ARRAY and
-  // is the number of bytes the plain encoder should use.
+  /// Encodes t into buffer. Returns the number of bytes added.  buffer must
+  /// be preallocated and big enough.  Buffer need not be aligned.
+  /// 'fixed_len_size' is only applicable for data encoded using FIXED_LEN_BYTE_ARRAY and
+  /// is the number of bytes the plain encoder should use.
   template<typename T>
   static int Encode(uint8_t* buffer, int fixed_len_size, const T& t) {
     memcpy(buffer, &t, ByteSize(t));
     return ByteSize(t);
   }
 
-  // Decodes t from buffer. Returns the number of bytes read.  Buffer need
-  // not be aligned.
-  // For types that are stored as FIXED_LEN_BYTE_ARRAY, fixed_len_size is the size
-  // of the object. Otherwise, it is unused.
+  /// Decodes t from buffer. Returns the number of bytes read.  Buffer need
+  /// not be aligned.
+  /// For types that are stored as FIXED_LEN_BYTE_ARRAY, fixed_len_size is the size
+  /// of the object. Otherwise, it is unused.
   template<typename T>
   static int Decode(uint8_t* buffer, int fixed_len_size, T* v) {
     memcpy(v, buffer, ByteSize(*v));
     return ByteSize(*v);
   }
 
-  // Encode 't', which must be in the machine endian, to FIXED_LEN_BYTE_ARRAY
-  // of 'fixed_len_size'. The result is encoded as big endian.
+  /// Encode 't', which must be in the machine endian, to FIXED_LEN_BYTE_ARRAY
+  /// of 'fixed_len_size'. The result is encoded as big endian.
   template <typename T>
   static int EncodeToFixedLenByteArray(uint8_t* buffer, int fixed_len_size, const T& t);
 
-  // Decodes into v assuming buffer is encoded using FIXED_LEN_BYTE_ARRAY of
-  // 'fixed_len_size'. The bytes in buffer must be big endian and the result stored in
-  // v is the machine endian format.
+  /// Decodes into v assuming buffer is encoded using FIXED_LEN_BYTE_ARRAY of
+  /// 'fixed_len_size'. The bytes in buffer must be big endian and the result stored in
+  /// v is the machine endian format.
   template<typename T>
   static int DecodeFromFixedLenByteArray(uint8_t* buffer, int fixed_len_size, T* v);
 };
 
-// Disable for bools. Plain encoding is not used for booleans.
+/// Disable for bools. Plain encoding is not used for booleans.
 template<> int ParquetPlainEncoder::ByteSize(const bool& b);
 template<> int ParquetPlainEncoder::Encode(uint8_t*, int fixed_len_size, const bool&);
 template<> int ParquetPlainEncoder::Decode(uint8_t*, int fixed_len_size, bool* v);
 
-// Not used for decimals since the plain encoding encodes them using
-// FIXED_LEN_BYTE_ARRAY.
+/// Not used for decimals since the plain encoding encodes them using
+/// FIXED_LEN_BYTE_ARRAY.
 template<> inline int ParquetPlainEncoder::ByteSize(const Decimal4Value&) {
   DCHECK(false);
   return -1;
@@ -210,7 +210,7 @@ template<> inline int ParquetPlainEncoder::ByteSize(const Decimal16Value&) {
   return -1;
 }
 
-// Parquet doesn't have 8-bit or 16-bit ints. They are converted to 32-bit.
+/// Parquet doesn't have 8-bit or 16-bit ints. They are converted to 32-bit.
 template<>
 inline int ParquetPlainEncoder::ByteSize(const int8_t& v) { return sizeof(int32_t); }
 template<>
@@ -272,11 +272,11 @@ inline int ParquetPlainEncoder::Decode(
   return bytesize;
 }
 
-// Write decimals as big endian (byte comparable) to benefit from common prefixes.
-// fixed_len_size can be less than sizeof(Decimal*Value) for space savings. This means
-// that the value in the in-memory format has leading zeros or negative 1's.
-// For example, precision 2 fits in 1 byte. All decimals stored as Decimal4Value
-// will have 3 bytes of leading zeros, we will only store the interesting byte.
+/// Write decimals as big endian (byte comparable) to benefit from common prefixes.
+/// fixed_len_size can be less than sizeof(Decimal*Value) for space savings. This means
+/// that the value in the in-memory format has leading zeros or negative 1's.
+/// For example, precision 2 fits in 1 byte. All decimals stored as Decimal4Value
+/// will have 3 bytes of leading zeros, we will only store the interesting byte.
 template<>
 inline int ParquetPlainEncoder::Encode(
     uint8_t* buffer, int fixed_len_size, const Decimal4Value& v) {

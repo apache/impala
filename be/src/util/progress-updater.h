@@ -23,39 +23,39 @@
 
 namespace impala {
 
-// Utility class to update progress.  This is split out so a different
-// logging level can be set for these updates (GLOG_module)
-// This class is thread safe.
-// Example usage:
-//   ProgressUpdater updater("Task", 100, 10);  // 100 items, print every 10%
-//   updater.Update(15);  // 15 done, prints 15%
-//   updater.Update(3);   // 18 done, doesn't print
-//   update.Update(5);    // 23 done, prints 23%
+/// Utility class to update progress.  This is split out so a different
+/// logging level can be set for these updates (GLOG_module)
+/// This class is thread safe.
+/// Example usage:
+///   ProgressUpdater updater("Task", 100, 10);  // 100 items, print every 10%
+///   updater.Update(15);  // 15 done, prints 15%
+///   updater.Update(3);   // 18 done, doesn't print
+///   update.Update(5);    // 23 done, prints 23%
 class ProgressUpdater {
  public:
-  // label - label that is printed with each update.
-  // max - maximum number of work items
-  // update_period - how often the progress is spewed expressed as a percentage
+  /// label - label that is printed with each update.
+  /// max - maximum number of work items
+  /// update_period - how often the progress is spewed expressed as a percentage
   ProgressUpdater(const std::string& label, int64_t max, int update_period = 1);
 
   ProgressUpdater();
 
-  // Sets the GLOG level for this progress updater.  By default, this will use
-  // 2 but objects can override it.
+  /// Sets the GLOG level for this progress updater.  By default, this will use
+  /// 2 but objects can override it.
   void set_logging_level(int level) { logging_level_ = level; }
 
-  // 'delta' more of the work has been complete.  Will potentially output to
-  // VLOG_PROGRESS
+  /// 'delta' more of the work has been complete.  Will potentially output to
+  /// VLOG_PROGRESS
   void Update(int64_t delta);
 
-  // Returns if all tasks are done.
+  /// Returns if all tasks are done.
   bool done() const { return num_complete_ >= total_; }
 
   int64_t total() const { return total_; }
   int64_t num_complete() const { return num_complete_; }
   int64_t remaining() const { return total() - num_complete(); }
 
-  // Returns a string representation of the current progress
+  /// Returns a string representation of the current progress
   std::string ToString() const;
 
  private:

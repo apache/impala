@@ -20,10 +20,10 @@
 
 namespace impala {
 
-// Provides information about the OS we're running on.
+/// Provides information about the OS we're running on.
 class OsInfo {
  public:
-  // Initialize OsInfo.
+  /// Initialize OsInfo.
   static void Init();
 
   static const std::string os_version() {

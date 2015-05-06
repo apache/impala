@@ -22,8 +22,8 @@ namespace impala {
 class MemTracker;
 class Webserver;
 
-// Adds a set of default path handlers to the webserver to display
-// logs and configuration flags
+/// Adds a set of default path handlers to the webserver to display
+/// logs and configuration flags
 void AddDefaultUrlCallbacks(Webserver* webserver, MemTracker* process_mem_tracker = NULL);
 }
 

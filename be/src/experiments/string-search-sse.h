@@ -10,25 +10,25 @@
 namespace impala {
 
 // This class implements strstr for non-null terminated strings.  It wraps the
-// standard strstr function (which is sse4 optimized). 
-// NOTE: Because this modifies the strings in place, you *cannot* pass it data
-// that was from the data section (e.g. StringSearchSSE(StringValue("abcd", 4));
-// TODO: this is still 25% slower than just calling strstr.  Look into why
-// TODO: this cannot be used with data containing nulls (I think)
+// standard strstr function (which is sse4 optimized).
+/// NOTE: Because this modifies the strings in place, you *cannot* pass it data
+/// that was from the data section (e.g. StringSearchSSE(StringValue("abcd", 4));
+/// TODO: this is still 25% slower than just calling strstr.  Look into why
+/// TODO: this cannot be used with data containing nulls (I think)
 class StringSearchSSE {
  public:
-  // Create a search needle for *null-terminated strings*.  This is more
-  // efficient for searching and should be used if either the needle already
-  // happens to be null terminated or the needle will be reused repeatedly, in
-  // which case the copy and null terminate is worth it.
-  // The caller owns the memory for the needle.
-  StringSearchSSE(const char* needle) : 
+  /// Create a search needle for *null-terminated strings*.  This is more
+  /// efficient for searching and should be used if either the needle already
+  /// happens to be null terminated or the needle will be reused repeatedly, in
+  /// which case the copy and null terminate is worth it.
+  /// The caller owns the memory for the needle.
+  StringSearchSSE(const char* needle) :
       needle_str_val_(NULL), needle_cstr_(needle) {
     needle_len_ = strlen(needle);
   }
 
-  // Create a search needle from a non-null terminated string.  The caller
-  // owns the memory for the needle.
+  /// Create a search needle from a non-null terminated string.  The caller
+  /// owns the memory for the needle.
   StringSearchSSE(const StringValue* needle) :
       needle_str_val_(needle), needle_cstr_(NULL) {
     needle_len_ = needle->len;
@@ -36,10 +36,10 @@ class StringSearchSSE {
 
   StringSearchSSE() : needle_str_val_(NULL), needle_cstr_(NULL), needle_len_(0) {}
 
-  // Search for needle in haystack.
-  //   Returns the offset into str if the needle exists
-  //   Returns -1 if the needle is not found
-  // str will be temporarily modified for the duration of the function
+  /// Search for needle in haystack.
+  ///   Returns the offset into str if the needle exists
+  ///   Returns -1 if the needle is not found
+  /// str will be temporarily modified for the duration of the function
   int Search(const StringValue& haystack) const {
     // Edge cases
     if (UNLIKELY(haystack.len == 0 && needle_len_ == 0)) return 0;
@@ -67,7 +67,7 @@ class StringSearchSSE {
       return  result;
     }
 
-    // needle is null terminated.  We just need to run strstr on the 
+    // needle is null terminated.  We just need to run strstr on the
     // null terminated haystack, and if there is no match, try a match
     // on the last needle_len chars.
     if (LIKELY(needle_cstr_ != NULL)) {
@@ -94,7 +94,7 @@ class StringSearchSSE {
       // Needle is not null terminated.  Terminate it on the fly.
       const char last_char_needle = needle_str_val_->ptr[needle_len_ - 1];
       needle_str_val_->ptr[needle_len_ - 1] = '\0';
-      
+
       int offset = 0;
       char* haystack_pos = haystack.ptr;
       while (offset <= haystack.len - needle_len_) {
@@ -109,7 +109,7 @@ class StringSearchSSE {
         // The match happened at the very end of string.  This is the case where:
         //   needle = "abc"  (null terminated to "ab")
         //   haystack is "aaabc" (null terminated to "aaab")
-        // In this case, we just need to compare the last chars from both. 
+        // In this case, we just need to compare the last chars from both.
         if (offset == haystack.len - needle_len_) {
           if (last_char_needle == last_char_haystack) result = offset;
           break;
@@ -138,7 +138,7 @@ class StringSearchSSE {
   }
 
  private:
-  // Only one of these two will be non-null.  Both are unowned.
+  /// Only one of these two will be non-null.  Both are unowned.
   const StringValue* needle_str_val_;
   const char* needle_cstr_;
 

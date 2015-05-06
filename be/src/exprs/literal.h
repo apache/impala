@@ -27,7 +27,7 @@ class TExprNode;
 
 class Literal: public Expr {
  public:
-  // Test ctors
+  /// Test ctors
   Literal(ColumnType type, bool v);
   Literal(ColumnType type, int8_t v);
   Literal(ColumnType type, int16_t v);
@@ -38,8 +38,8 @@ class Literal: public Expr {
   Literal(ColumnType type, const std::string& v);
   Literal(ColumnType type, const StringValue& v);
 
-  // Test function that parses 'str' according to 'type'. The caller owns the returned
-  // Literal.
+  /// Test function that parses 'str' according to 'type'. The caller owns the returned
+  /// Literal.
   static Literal* CreateLiteral(const ColumnType& type, const std::string& str);
 
   virtual Status GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn);

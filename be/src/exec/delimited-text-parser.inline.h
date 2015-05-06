@@ -22,9 +22,9 @@
 
 namespace impala {
 
-// Updates the values in the field and tuple masks, escaping them if necessary.
-// If the character at n is an escape character, then delimiters(tuple/field/escape
-// characters) at n+1 don't count.
+/// Updates the values in the field and tuple masks, escaping them if necessary.
+/// If the character at n is an escape character, then delimiters(tuple/field/escape
+/// characters) at n+1 don't count.
 inline void ProcessEscapeMask(uint16_t escape_mask, bool* last_char_is_escape,
                               uint16_t* delim_mask) {
   // Escape characters can escape escape characters.
@@ -81,19 +81,19 @@ void inline DelimitedTextParser:: FillColumns(int len, char** last_column,
   }
 }
 
-// SSE optimized raw text file parsing.  SSE4_2 added an instruction (with 3 modes) for
-// text processing.  The modes mimic strchr, strstr and strcmp.  For text parsing, we can
-// leverage the strchr functionality.
+/// SSE optimized raw text file parsing.  SSE4_2 added an instruction (with 3 modes) for
+/// text processing.  The modes mimic strchr, strstr and strcmp.  For text parsing, we can
+/// leverage the strchr functionality.
 //
-// The instruction operates on two sse registers:
-//  - the needle (what you are searching for)
-//  - the haystack (where you are searching in)
-// Both registers can contain up to 16 characters.  The result is a 16-bit mask with a bit
-// set for each character in the haystack that matched any character in the needle.
-// For example:
-//  Needle   = 'abcd000000000000' (we're searching for any a's, b's, c's or d's)
-//  Haystack = 'asdfghjklhjbdwwc' (the raw string)
-//  Result   = '1010000000011001'
+/// The instruction operates on two sse registers:
+///  - the needle (what you are searching for)
+///  - the haystack (where you are searching in)
+/// Both registers can contain up to 16 characters.  The result is a 16-bit mask with a bit
+/// set for each character in the haystack that matched any character in the needle.
+/// For example:
+///  Needle   = 'abcd000000000000' (we're searching for any a's, b's, c's or d's)
+///  Haystack = 'asdfghjklhjbdwwc' (the raw string)
+///  Result   = '1010000000011001'
 template <bool process_escapes>
 inline void DelimitedTextParser::ParseSse(int max_tuples,
     int64_t* remaining_len, char** byte_buffer_ptr,
@@ -216,7 +216,7 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
   }
 }
 
-// Simplified version of ParseSSE which does not handle tuple delimiters.
+/// Simplified version of ParseSSE which does not handle tuple delimiters.
 template <bool process_escapes>
 inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* buffer,
     FieldLocation* field_locations, int* num_fields) {
@@ -305,4 +305,3 @@ inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* b
 }
 
 #endif
-

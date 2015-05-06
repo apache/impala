@@ -23,12 +23,12 @@ namespace impala {
 
 class AtomicUtil {
  public:
-  // Issues instruction to have the CPU wait, this is less busy (bus traffic
-  // etc) than just spinning.
-  // For example:
-  //  while (1);
-  // should be:
-  //  while (1) CpuWait();
+  /// Issues instruction to have the CPU wait, this is less busy (bus traffic
+  /// etc) than just spinning.
+  /// For example:
+  ///  while (1);
+  /// should be:
+  ///  while (1) CpuWait();
   static inline void CpuWait() {
     asm volatile("pause\n": : :"memory");
   }
@@ -38,10 +38,10 @@ class AtomicUtil {
   }
 };
 
-// Wrapper for atomic integers.  This should be switched to c++ 11 when
-// we can switch.
-// This class overloads operators to behave like a regular integer type
-// but all operators and functions are thread safe.
+/// Wrapper for atomic integers.  This should be switched to c++ 11 when
+/// we can switch.
+/// This class overloads operators to behave like a regular integer type
+/// but all operators and functions are thread safe.
 template<typename T>
 class AtomicInt {
  public:
@@ -76,7 +76,7 @@ class AtomicInt {
     return *this;
   }
 
-  // These define the preincrement (i.e. --value) operators.
+  /// These define the preincrement (i.e. --value) operators.
   AtomicInt& operator++() {
     __sync_add_and_fetch(&value_, 1);
     return *this;
@@ -86,7 +86,7 @@ class AtomicInt {
     return *this;
   }
 
-  // This is post increment, which needs to return a new object.
+  /// This is post increment, which needs to return a new object.
   AtomicInt<T> operator++(int) {
     T prev = __sync_fetch_and_add(&value_, 1);
     return AtomicInt<T>(prev);
@@ -96,22 +96,22 @@ class AtomicInt {
     return AtomicInt<T>(prev);
   }
 
-  // Safe read of the value
+  /// Safe read of the value
   T Read() {
     return __sync_fetch_and_add(&value_, 0);
   }
 
-  // Increments by delta (i.e. += delta) and returns the new val
+  /// Increments by delta (i.e. += delta) and returns the new val
   T UpdateAndFetch(T delta) {
     return __sync_add_and_fetch(&value_, delta);
   }
 
-  // Increment by delta and returns the old val
+  /// Increment by delta and returns the old val
   T FetchAndUpdate(T delta) {
     return __sync_fetch_and_add(&value_, delta);
   }
 
-  // Updates the int to 'value' if value is larger
+  /// Updates the int to 'value' if value is larger
   void UpdateMax(T value) {
     while (true) {
       T old_value = value_;
@@ -127,18 +127,18 @@ class AtomicInt {
     }
   }
 
-  // Returns true if the atomic compare-and-swap was successful.
+  /// Returns true if the atomic compare-and-swap was successful.
   bool CompareAndSwap(T old_val, T new_val) {
     return __sync_bool_compare_and_swap(&value_, old_val, new_val);
   }
 
-  // Returns the content of value_ before the operation.
-  // If returnValue == old_val, then the atomic compare-and-swap was successful.
+  /// Returns the content of value_ before the operation.
+  /// If returnValue == old_val, then the atomic compare-and-swap was successful.
   T CompareAndSwapVal(T old_val, T new_val) {
     return __sync_val_compare_and_swap(&value_, old_val, new_val);
   }
 
-  // Atomically updates value_ with new_val. Returns the old value_.
+  /// Atomically updates value_ with new_val. Returns the old value_.
   T Swap(const T& new_val) {
     return __sync_lock_test_and_set(&value_, new_val);
   }

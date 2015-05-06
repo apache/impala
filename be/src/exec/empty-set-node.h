@@ -20,8 +20,8 @@
 
 namespace impala {
 
-// Node that returns an empty result set, i.e., just sets eos_ in GetNext().
-// Corresponds to EmptySetNode.java in the FE.
+/// Node that returns an empty result set, i.e., just sets eos_ in GetNext().
+/// Corresponds to EmptySetNode.java in the FE.
 class EmptySetNode : public ExecNode {
  public:
   EmptySetNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);

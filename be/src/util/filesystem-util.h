@@ -19,31 +19,31 @@
 
 namespace impala {
 
-// Utility class for common local file system operations such as file creation and
-// deletion. This class should NOT be used to read or write data (DiskIoMgr is used
-// for that). Errors are indicated by the status code RUNTIME_ERROR, and are not
-// handled via exceptions.
+/// Utility class for common local file system operations such as file creation and
+/// deletion. This class should NOT be used to read or write data (DiskIoMgr is used
+/// for that). Errors are indicated by the status code RUNTIME_ERROR, and are not
+/// handled via exceptions.
 class FileSystemUtil {
  public:
-  // Create the specified directories. The directories and their contents are destroyed
-  // if they already exist.
+  /// Create the specified directories. The directories and their contents are destroyed
+  /// if they already exist.
   static Status CreateDirectories(const std::vector<std::string>& directories);
 
-  // Create a file at the specified path.
+  /// Create a file at the specified path.
   static Status CreateFile(const std::string& file_path);
 
-  // Resize a file to a specified length - uses unistd truncate().
+  /// Resize a file to a specified length - uses unistd truncate().
   static Status ResizeFile(const std::string& file_path, int64_t trunc_len);
 
-  // Remove the specified paths and their enclosing files/directories.
+  /// Remove the specified paths and their enclosing files/directories.
   static Status RemovePaths(const std::vector<std::string>& directories);
 
-  // Verify that the specified path is an existing directory.
-  // Returns Status::OK if it is, or a runtime error with a message otherwise.
+  /// Verify that the specified path is an existing directory.
+  /// Returns Status::OK if it is, or a runtime error with a message otherwise.
   static Status VerifyIsDirectory(const std::string& directory_path);
 
-  // Returns the space available on the file system containing 'directory_path'
-  // in 'available_bytes'
+  /// Returns the space available on the file system containing 'directory_path'
+  /// in 'available_bytes'
   static Status GetSpaceAvailable(const std::string& directory_path,
       uint64_t* available_bytes);
 };

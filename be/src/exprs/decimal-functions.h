@@ -58,7 +58,7 @@ class DecimalFunctions {
       FunctionContext* context, const DecimalVal& val, const BigIntVal& scale);
 
  private:
-  // Implementation of RoundTo
+  /// Implementation of RoundTo
   static DecimalVal RoundTo(FunctionContext* context, const DecimalVal& val, int scale,
                             DecimalOperators::DecimalRoundOp op);
 };

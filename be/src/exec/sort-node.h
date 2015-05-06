@@ -22,15 +22,15 @@
 
 namespace impala {
 
-// Node that implements a full sort of its input with a fixed memory budget, spilling
-// to disk if the input is larger than available memory.
-// Uses Sorter and BufferedBlockMgr for the external sort implementation.
-// Input rows to SortNode are materialized by the Sorter into a single tuple
-// using the expressions specified in sort_exec_exprs_.
-// In GetNext(), SortNode passes in the output batch to the sorter instance created
-// in Open() to fill it with sorted rows.
-// If a merge phase was performed in the sort, sorted rows are deep copied into
-// the output batch. Otherwise, the sorter instance owns the sorted data.
+/// Node that implements a full sort of its input with a fixed memory budget, spilling
+/// to disk if the input is larger than available memory.
+/// Uses Sorter and BufferedBlockMgr for the external sort implementation.
+/// Input rows to SortNode are materialized by the Sorter into a single tuple
+/// using the expressions specified in sort_exec_exprs_.
+/// In GetNext(), SortNode passes in the output batch to the sorter instance created
+/// in Open() to fill it with sorted rows.
+/// If a merge phase was performed in the sort, sorted rows are deep copied into
+/// the output batch. Otherwise, the sorter instance owns the sorted data.
 class SortNode : public ExecNode {
  public:
   SortNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
@@ -47,22 +47,22 @@ class SortNode : public ExecNode {
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
-  // Fetch input rows and feed them to the sorter until the input is exhausted.
+  /// Fetch input rows and feed them to the sorter until the input is exhausted.
   Status SortInput(RuntimeState* state);
 
-  // Create a block manager object and set it in block_mgr_.
-  // Returns and sets the query status to Status::MEM_LIMIT_EXCEEDED if there is not
-  // enough memory for the sort.
+  /// Create a block manager object and set it in block_mgr_.
+  /// Returns and sets the query status to Status::MEM_LIMIT_EXCEEDED if there is not
+  /// enough memory for the sort.
   Status CreateBlockMgr(RuntimeState* state);
 
-  // Number of rows to skip.
+  /// Number of rows to skip.
   int64_t offset_;
   int64_t num_rows_skipped_;
 
-  // Object used for external sorting.
+  /// Object used for external sorting.
   boost::scoped_ptr<Sorter> sorter_;
 
-  // Expressions and parameters used for tuple materialization and tuple comparison.
+  /// Expressions and parameters used for tuple materialization and tuple comparison.
   SortExecExprs sort_exec_exprs_;
   std::vector<bool> is_asc_order_;
   std::vector<bool> nulls_first_;

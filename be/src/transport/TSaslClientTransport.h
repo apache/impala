@@ -48,7 +48,7 @@ class TSaslClientTransport : public TSaslTransport {
                        boost::shared_ptr<TTransport> transport);
 
  protected:
-  // Handle any startup messages.
+  /// Handle any startup messages.
   virtual void handleSaslStartMessage();
 };
 

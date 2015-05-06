@@ -33,18 +33,18 @@ class MemPool;
 class RowBatch;
 class TupleRow;
 
-// Node for in-memory hash joins:
-// - builds up a hash table with the rows produced by our right input
-//   (child(1)); build exprs are the rhs exprs of our equi-join predicates
-// - for each row from our left input, probes the hash table to retrieve
-//   matching entries; the probe exprs are the lhs exprs of our equi-join predicates
+/// Node for in-memory hash joins:
+/// - builds up a hash table with the rows produced by our right input
+///   (child(1)); build exprs are the rhs exprs of our equi-join predicates
+/// - for each row from our left input, probes the hash table to retrieve
+///   matching entries; the probe exprs are the lhs exprs of our equi-join predicates
 //
-// Row batches:
-// - In general, we are not able to pass our output row batch on to our left child (when
-//   we're fetching the probe rows): if we have a 1xn join, our output will contain
-//   multiple rows per left input row
-// - TODO: fix this, so in the case of 1x1/nx1 joins (for instance, fact to dimension tbl)
-//   we don't do these extra copies
+/// Row batches:
+/// - In general, we are not able to pass our output row batch on to our left child (when
+///   we're fetching the probe rows): if we have a 1xn join, our output will contain
+///   multiple rows per left input row
+/// - TODO: fix this, so in the case of 1x1/nx1 joins (for instance, fact to dimension tbl)
+///   we don't do these extra copies
 class HashJoinNode : public BlockingJoinNode {
  public:
   HashJoinNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
@@ -67,70 +67,70 @@ class HashJoinNode : public BlockingJoinNode {
   boost::scoped_ptr<OldHashTable> hash_tbl_;
   OldHashTable::Iterator hash_tbl_iterator_;
 
-  // our equi-join predicates "<lhs> = <rhs>" are separated into
-  // build_exprs_ (over child(1)) and probe_exprs_ (over child(0))
+  /// our equi-join predicates "<lhs> = <rhs>" are separated into
+  /// build_exprs_ (over child(1)) and probe_exprs_ (over child(0))
     std::vector<ExprContext*> probe_expr_ctxs_;
     std::vector<ExprContext*> build_expr_ctxs_;
 
-  // non-equi-join conjuncts from the JOIN clause
+  /// non-equi-join conjuncts from the JOIN clause
   std::vector<ExprContext*> other_join_conjunct_ctxs_;
 
-  // Derived from join_op_
-  // Output all rows coming from the probe input. Used in LEFT_OUTER_JOIN and
-  // FULL_OUTER_JOIN.
+  /// Derived from join_op_
+  /// Output all rows coming from the probe input. Used in LEFT_OUTER_JOIN and
+  /// FULL_OUTER_JOIN.
   bool match_all_probe_;
 
-  // Match at most one build row to each probe row. Used in LEFT_SEMI_JOIN.
+  /// Match at most one build row to each probe row. Used in LEFT_SEMI_JOIN.
   bool match_one_build_;
 
-  // Output all rows coming from the build input. Used in RIGHT_OUTER_JOIN and
-  // FULL_OUTER_JOIN.
+  /// Output all rows coming from the build input. Used in RIGHT_OUTER_JOIN and
+  /// FULL_OUTER_JOIN.
   bool match_all_build_;
 
-  // llvm function for build batch
+  /// llvm function for build batch
   llvm::Function* codegen_process_build_batch_fn_;
 
-  // Function declaration for codegen'd function.  Signature must match
-  // HashJoinNode::ProcessBuildBatch
+  /// Function declaration for codegen'd function.  Signature must match
+  /// HashJoinNode::ProcessBuildBatch
   typedef void (*ProcessBuildBatchFn)(HashJoinNode*, RowBatch*);
   ProcessBuildBatchFn process_build_batch_fn_;
 
-  // HashJoinNode::ProcessProbeBatch() exactly
+  /// HashJoinNode::ProcessProbeBatch() exactly
   typedef int (*ProcessProbeBatchFn)(HashJoinNode*, RowBatch*, RowBatch*, int);
-  // Jitted ProcessProbeBatch function pointer.  Null if codegen is disabled.
+  /// Jitted ProcessProbeBatch function pointer.  Null if codegen is disabled.
   ProcessProbeBatchFn process_probe_batch_fn_;
 
   RuntimeProfile::Counter* build_buckets_counter_;   // num buckets in hash table
   RuntimeProfile::Counter* hash_tbl_load_factor_counter_;
 
-  // GetNext helper function for the common join cases: Inner join, left semi and left
-  // outer
+  /// GetNext helper function for the common join cases: Inner join, left semi and left
+  /// outer
   Status LeftJoinGetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
 
-  // Processes a probe batch for the common (non right-outer join) cases.
-  //  out_batch: the batch for resulting tuple rows
-  //  probe_batch: the probe batch to process.  This function can be called to
-  //    continue processing a batch in the middle
-  //  max_added_rows: maximum rows that can be added to out_batch
-  // return the number of rows added to out_batch
+  /// Processes a probe batch for the common (non right-outer join) cases.
+  ///  out_batch: the batch for resulting tuple rows
+  ///  probe_batch: the probe batch to process.  This function can be called to
+  ///    continue processing a batch in the middle
+  ///  max_added_rows: maximum rows that can be added to out_batch
+  /// return the number of rows added to out_batch
   int ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch, int max_added_rows);
 
-  // Construct the build hash table, adding all the rows in 'build_batch'
+  /// Construct the build hash table, adding all the rows in 'build_batch'
   void ProcessBuildBatch(RowBatch* build_batch);
 
-  // Codegen function to create output row
+  /// Codegen function to create output row
   llvm::Function* CodegenCreateOutputRow(LlvmCodeGen* codegen);
 
-  // Codegen processing build batches.  Identical signature to ProcessBuildBatch.
-  // hash_fn is the codegen'd function for computing hashes over tuple rows in the
-  // hash table.
-  // Returns NULL if codegen was not possible.
+  /// Codegen processing build batches.  Identical signature to ProcessBuildBatch.
+  /// hash_fn is the codegen'd function for computing hashes over tuple rows in the
+  /// hash table.
+  /// Returns NULL if codegen was not possible.
   llvm::Function* CodegenProcessBuildBatch(RuntimeState* state, llvm::Function* hash_fn);
 
-  // Codegen processing probe batches.  Identical signature to ProcessProbeBatch.
-  // hash_fn is the codegen'd function for computing hashes over tuple rows in the
-  // hash table.
-  // Returns NULL if codegen was not possible.
+  /// Codegen processing probe batches.  Identical signature to ProcessProbeBatch.
+  /// hash_fn is the codegen'd function for computing hashes over tuple rows in the
+  /// hash table.
+  /// Returns NULL if codegen was not possible.
   llvm::Function* CodegenProcessProbeBatch(RuntimeState* state, llvm::Function* hash_fn);
 };
 

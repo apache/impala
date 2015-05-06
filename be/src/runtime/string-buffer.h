@@ -21,16 +21,16 @@
 
 namespace impala {
 
-// Dynamic-sizable string (similar to std::string) but without as many
-// copies and allocations.  
-// StringBuffer wraps a StringValue object with a pool and memory buffer length.
-// It supports a subset of the std::string functionality but will only allocate
-// bigger string buffers as necessary.  std::string tries to be immutable and will
-// reallocate very often.  std::string should be avoided in all hot paths.
+/// Dynamic-sizable string (similar to std::string) but without as many
+/// copies and allocations.
+/// StringBuffer wraps a StringValue object with a pool and memory buffer length.
+/// It supports a subset of the std::string functionality but will only allocate
+/// bigger string buffers as necessary.  std::string tries to be immutable and will
+/// reallocate very often.  std::string should be avoided in all hot paths.
 class StringBuffer {
  public:
-  // C'tor for StringBuffer.  Memory backing the string will be allocated from
-  // the pool as necessary.  Can optionally be initialized from a StringValue.
+  /// C'tor for StringBuffer.  Memory backing the string will be allocated from
+  /// the pool as necessary.  Can optionally be initialized from a StringValue.
   StringBuffer(MemPool* pool, StringValue* str = NULL)
       : pool_(pool), buffer_size_(0) {
     DCHECK(pool_ != NULL);
@@ -40,7 +40,7 @@ class StringBuffer {
     }
   }
 
-  // Append 'str' to the current string, allocating a new buffer as necessary.
+  /// Append 'str' to the current string, allocating a new buffer as necessary.
   void Append(const char* str, int len) {
     int new_len = len + string_value_.len;
     if (new_len > buffer_size_) {
@@ -50,51 +50,51 @@ class StringBuffer {
     string_value_.len = new_len;
   }
 
-  // TODO: switch everything to uint8_t?
+  /// TODO: switch everything to uint8_t?
   void Append(const uint8_t* str, int len) {
     Append(reinterpret_cast<const char*>(str), len);
   }
 
-  // Assigns contents to StringBuffer
+  /// Assigns contents to StringBuffer
   void Assign(const char* str, int len) {
     Clear();
     Append(str, len);
   }
 
-  // Clear the underlying StringValue.  The allocated buffer can be reused.
+  /// Clear the underlying StringValue.  The allocated buffer can be reused.
   void Clear() {
     string_value_.len = 0;
   }
 
-  // Clears the underlying buffer and StringValue
+  /// Clears the underlying buffer and StringValue
   void Reset() {
     string_value_.len = 0;
     buffer_size_ = 0;
   }
 
-  // Returns whether the current string is empty
+  /// Returns whether the current string is empty
   bool Empty() const {
     return string_value_.len == 0;
   }
 
-  // Returns the length of the current string
+  /// Returns the length of the current string
   int Size() const {
     return string_value_.len;
   }
 
-  // Returns the underlying StringValue
+  /// Returns the underlying StringValue
   const StringValue& str() const {
     return string_value_;
   }
 
-  // Returns the buffer size
+  /// Returns the buffer size
   int buffer_size() const {
     return buffer_size_;
   }
 
  private:
-  // Grows the buffer backing the string to be at least new_size, copying over the
-  // previous string data into the new buffer.
+  /// Grows the buffer backing the string to be at least new_size, copying over the
+  /// previous string data into the new buffer.
   void GrowBuffer(int new_len) {
     // TODO: Release/reuse old buffers somehow
     buffer_size_ = std::max(buffer_size_ * 2, new_len);

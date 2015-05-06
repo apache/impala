@@ -27,13 +27,13 @@
 
 namespace impala {
 
-// Singleton utility class that updates counter values. This is used to sample some
-// metric (e.g. memory used) at regular intervals. The samples can be summarized in
-// a few ways (e.g. averaged, stored as histogram, kept as a time series data, etc).
-// This class has one thread that will wake up at a regular period and update all
-// the registered counters.
-// Typically, the counter updates should be stopped as early as possible to prevent
-// future stale samples from polluting the useful values.
+/// Singleton utility class that updates counter values. This is used to sample some
+/// metric (e.g. memory used) at regular intervals. The samples can be summarized in
+/// a few ways (e.g. averaged, stored as histogram, kept as a time series data, etc).
+/// This class has one thread that will wake up at a regular period and update all
+/// the registered counters.
+/// Typically, the counter updates should be stopped as early as possible to prevent
+/// future stale samples from polluting the useful values.
 class PeriodicCounterUpdater {
  public:
   enum PeriodicCounterType {
@@ -41,39 +41,39 @@ class PeriodicCounterUpdater {
     SAMPLING_COUNTER,
   };
 
-  // Tears down the update thread.
+  /// Tears down the update thread.
   ~PeriodicCounterUpdater();
 
-  // Registers a periodic counter to be updated by the update thread.
-  // Either sample_fn or dst_counter must be non-NULL.  When the periodic counter
-  // is updated, it either gets the value from the dst_counter or calls the sample
-  // function to get the value.
-  // dst_counter/sample fn is assumed to be compatible types with src_counter.
+  /// Registers a periodic counter to be updated by the update thread.
+  /// Either sample_fn or dst_counter must be non-NULL.  When the periodic counter
+  /// is updated, it either gets the value from the dst_counter or calls the sample
+  /// function to get the value.
+  /// dst_counter/sample fn is assumed to be compatible types with src_counter.
   static void RegisterPeriodicCounter(RuntimeProfile::Counter* src_counter,
       RuntimeProfile::DerivedCounterFunction sample_fn,
       RuntimeProfile::Counter* dst_counter, PeriodicCounterType type);
 
-  // Adds a bucketing counter to be updated at regular intervals.
+  /// Adds a bucketing counter to be updated at regular intervals.
   static void RegisterBucketingCounters(RuntimeProfile::Counter* src_counter,
       std::vector<RuntimeProfile::Counter*>* buckets);
 
-  // Adds counter to be sampled and updated at regular intervals.
+  /// Adds counter to be sampled and updated at regular intervals.
   static void RegisterTimeSeriesCounter(RuntimeProfile::TimeSeriesCounter* counter);
 
-  // Stops updating the value of 'counter'.
+  /// Stops updating the value of 'counter'.
   static void StopRateCounter(RuntimeProfile::Counter* counter);
 
-  // Stops updating the value of 'counter'.
+  /// Stops updating the value of 'counter'.
   static void StopSamplingCounter(RuntimeProfile::Counter* counter);
 
-  // Stops updating the bucket counter.
-  // If convert is true, convert the buckets from count to percentage.
-  // Sampling counters are updated periodically so should be removed as soon as the
-  // underlying counter is no longer going to change.
+  /// Stops updating the bucket counter.
+  /// If convert is true, convert the buckets from count to percentage.
+  /// Sampling counters are updated periodically so should be removed as soon as the
+  /// underlying counter is no longer going to change.
   static void StopBucketingCounters(std::vector<RuntimeProfile::Counter*>* buckets,
       bool convert);
 
-  // Stops 'counter' from receiving any more samples.
+  /// Stops 'counter' from receiving any more samples.
   static void StopTimeSeriesCounter(RuntimeProfile::TimeSeriesCounter* counter);
 
  private:
@@ -93,54 +93,54 @@ class PeriodicCounterUpdater {
   struct BucketCountersInfo {
     RuntimeProfile::Counter* src_counter; // the counter to be sampled
     int64_t num_sampled; // number of samples taken
-    // TODO: customize bucketing
+    /// TODO: customize bucketing
   };
 
   PeriodicCounterUpdater();
 
-  // Loop for periodic counter update thread.  This thread wakes up once in a while
-  // and updates all the added rate counters and sampling counters.
+  /// Loop for periodic counter update thread.  This thread wakes up once in a while
+  /// and updates all the added rate counters and sampling counters.
   void UpdateLoop();
 
-  // Thread performing asynchronous updates.
+  /// Thread performing asynchronous updates.
   boost::scoped_ptr<boost::thread> update_thread_;
 
-  // Spinlock that protects the map of rate counters
+  /// Spinlock that protects the map of rate counters
   SpinLock rate_lock_;
 
-  // A map of the dst (rate) counter to the src counter and elapsed time.
+  /// A map of the dst (rate) counter to the src counter and elapsed time.
   typedef boost::unordered_map<RuntimeProfile::Counter*, RateCounterInfo> RateCounterMap;
   RateCounterMap rate_counters_;
 
-  // Spinlock that protects the map of averages over samples of counters
+  /// Spinlock that protects the map of averages over samples of counters
   SpinLock sampling_lock_;
 
-  // A map of the dst (averages over samples) counter to the src counter (to be sampled)
-  // and number of samples taken.
+  /// A map of the dst (averages over samples) counter to the src counter (to be sampled)
+  /// and number of samples taken.
   typedef boost::unordered_map<RuntimeProfile::Counter*, SamplingCounterInfo>
       SamplingCounterMap;
   SamplingCounterMap sampling_counters_;
 
-  // Spinlock that protects the map of buckets of counters
+  /// Spinlock that protects the map of buckets of counters
   SpinLock bucketing_lock_;
 
-  // Map from a bucket of counters to the src counter
+  /// Map from a bucket of counters to the src counter
   typedef boost::unordered_map<std::vector<RuntimeProfile::Counter*>*, BucketCountersInfo>
       BucketCountersMap;
   BucketCountersMap bucketing_counters_;
 
-  // Spinlock that protects the map of time series counters
+  /// Spinlock that protects the map of time series counters
   SpinLock time_series_lock_;
 
-  // Set of time series counters that need to be updated
+  /// Set of time series counters that need to be updated
   typedef boost::unordered_set<RuntimeProfile::TimeSeriesCounter*> TimeSeriesCounters;
   TimeSeriesCounters time_series_counters_;
 
-  // If 1, tear down the update thread.
+  /// If 1, tear down the update thread.
   AtomicInt<uint32_t> done_;
 
-  // Singleton object that keeps track of all rate counters and the thread
-  // for updating them.
+  /// Singleton object that keeps track of all rate counters and the thread
+  /// for updating them.
   static PeriodicCounterUpdater state_;
 };
 
