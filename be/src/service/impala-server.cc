@@ -62,6 +62,7 @@
 #include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/error-util.h"
+#include "util/histogram-metric.h"
 #include "util/impalad-metrics.h"
 #include "util/network-util.h"
 #include "util/parse-util.h"
@@ -857,6 +858,19 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
   }
 
   exec_state->Done();
+
+  double duration_ms = 1000 * (exec_state->end_time().ToSubsecondUnixTime() -
+      exec_state->start_time().ToSubsecondUnixTime());
+
+  // This should never happen unless we mess around with timezones during Impala's
+  // execution. Unfortunately a test does exactly that right now and triggers IMPALA-2031.
+  if (duration_ms >= 0) {
+    if (exec_state->stmt_type() == TStmtType::DDL) {
+      ImpaladMetrics::DDL_DURATIONS->Update(duration_ms);
+    } else {
+      ImpaladMetrics::QUERY_DURATIONS->Update(duration_ms);
+    }
+  }
   LogQueryEvents(*exec_state.get());
 
   {

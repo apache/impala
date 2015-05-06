@@ -15,6 +15,7 @@
 #include "util/impalad-metrics.h"
 
 #include "util/debug-util.h"
+#include "util/histogram-metric.h"
 
 #include "common/names.h"
 
@@ -80,6 +81,10 @@ const char* ImpaladMetricKeys::RESULTSET_CACHE_TOTAL_NUM_ROWS =
     "impala-server.resultset-cache.total-num-rows";
 const char* ImpaladMetricKeys::RESULTSET_CACHE_TOTAL_BYTES =
     "impala-server.resultset-cache.total-bytes";
+const char* ImpaladMetricKeys::QUERY_DURATIONS =
+    "impala-server.query-durations-ms";
+const char* ImpaladMetricKeys::DDL_DURATIONS =
+    "impala-server.ddl-durations-ms";
 
 // These are created by impala-server during startup.
 // =======
@@ -117,6 +122,10 @@ BooleanProperty* ImpaladMetrics::CATALOG_READY = NULL;
 BooleanProperty* ImpaladMetrics::IMPALA_SERVER_READY = NULL;
 StringProperty* ImpaladMetrics::IMPALA_SERVER_START_TIME = NULL;
 StringProperty* ImpaladMetrics::IMPALA_SERVER_VERSION = NULL;
+
+// Histograms
+HistogramMetric* ImpaladMetrics::QUERY_DURATIONS = NULL;
+HistogramMetric* ImpaladMetrics::DDL_DURATIONS = NULL;
 
 void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
   // Initialize impalad metrics
@@ -184,6 +193,16 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
   CATALOG_NUM_DBS = m->AddGauge<int64_t>(ImpaladMetricKeys::CATALOG_NUM_DBS, 0L);
   CATALOG_NUM_TABLES = m->AddGauge<int64_t>(ImpaladMetricKeys::CATALOG_NUM_TABLES, 0L);
   CATALOG_READY = m->AddProperty<bool>(ImpaladMetricKeys::CATALOG_READY, false);
+
+  // Maximum duration to be tracked by the query durations metric. No particular reasoning
+  // behind five hours, except to say that there's some threshold beyond which queries
+  // just become "long running", and at that point the distribution of their run times
+  // isn't so interesting.
+  const int FIVE_HOURS_IN_MS = 60 * 60 * 1000 * 5;
+  QUERY_DURATIONS = m->RegisterMetric(new HistogramMetric(
+      MetricDefs::Get(ImpaladMetricKeys::QUERY_DURATIONS), FIVE_HOURS_IN_MS, 3));
+  DDL_DURATIONS = m->RegisterMetric(new HistogramMetric(
+      MetricDefs::Get(ImpaladMetricKeys::DDL_DURATIONS), FIVE_HOURS_IN_MS, 3));
 }
 
 }

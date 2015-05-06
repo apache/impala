@@ -1332,5 +1332,25 @@
     "units": "BYTES",
     "kind": "GAUGE",
     "key": "jvm.$0.peak-max-usage-bytes"
+  },
+  {
+    "description": "Distribution of query latencies",
+    "contexts": [
+        "IMPALAD"
+    ],
+    "label": "Query latency distribution",
+    "units": "TIME_MS",
+    "kind": "HISTOGRAM",
+    "key": "impala-server.query-durations-ms"
+  },
+  {
+    "description": "Distribution of DDL operation latencies",
+    "contexts": [
+        "IMPALAD"
+    ],
+    "label": "DDL latency distribution",
+    "units": "TIME_MS",
+    "kind": "HISTOGRAM",
+    "key": "impala-server.ddl-durations-ms"
   }
 ]

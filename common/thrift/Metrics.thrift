@@ -41,5 +41,6 @@ enum TMetricKind {
   // Fixed; will never change
   PROPERTY,
   STATS,
-  SET
+  SET,
+  HISTOGRAM
 }

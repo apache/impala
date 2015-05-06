@@ -11,15 +11,16 @@
   <tr>
     <td><tt>{{name}}</tt></td>
     {{! Is this a stats metric? }}
-    {{?count}}
+    {{?mean}}
     <td>
       Last (of {{count}}): <strong>{{last}}</strong>.
-      Min: {{min}}, max: {{max}}, avg: {{mean}}</td>{{/count}}
-    {{^count}}
+      Min: {{min}}, max: {{max}}, avg: {{mean}}</td>
+    {{/mean}}
+    {{^mean}}
     <td>
       {{human_readable}}
     </td>
-    {{/count}}
+    {{/mean}}
     <td>
       {{description}}
     </td>

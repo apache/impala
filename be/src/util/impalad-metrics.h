@@ -20,6 +20,8 @@
 
 namespace impala {
 
+class HistogramMetric;
+
 /// Contains the keys (strings) for impala metrics.
 class ImpaladMetricKeys {
  public:
@@ -114,6 +116,10 @@ class ImpaladMetricKeys {
 
   /// Total bytes consumed for rows cached to support HS2 FETCH_FIRST.
   static const char* RESULTSET_CACHE_TOTAL_BYTES;
+
+  // Distribution of execution times for queries and DDL statements, in ms.
+  static const char* QUERY_DURATIONS;
+  static const char* DDL_DURATIONS;
 };
 
 /// Global impalad-wide metrics.  This is useful for objects that want to update metrics
@@ -154,6 +160,9 @@ class ImpaladMetrics {
   static BooleanProperty* IMPALA_SERVER_READY;
   static StringProperty* IMPALA_SERVER_START_TIME;
   static StringProperty* IMPALA_SERVER_VERSION;
+  // Histograms
+  static HistogramMetric* QUERY_DURATIONS;
+  static HistogramMetric* DDL_DURATIONS;
 
   // Creates and initializes all metrics above in 'm'.
   static void CreateMetrics(MetricGroup* m);

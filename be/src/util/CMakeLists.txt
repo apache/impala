@@ -40,6 +40,7 @@ add_library(Util
   filesystem-util.cc
   hdfs-util.cc
   hdfs-bulk-ops.cc
+  hdr-histogram.cc
   impalad-metrics.cc
   jni-util.cc
   llama-util.cc
