@@ -1,0 +1,5 @@
+<map id="sasl::SaslException" name="sasl::SaslException">
+<area shape="rect" id="node3" href="$classsasl_1_1SaslClientImplException.html" title="{sasl::SaslClientImplException\n||+ SaslClientImplException()\l}" alt="" coords="5,256,203,333"/>
+<area shape="rect" id="node4" href="$classsasl_1_1SaslServerImplException.html" title="{sasl::SaslServerImplException\n||+ SaslServerImplException()\l}" alt="" coords="227,256,428,333"/>
+<area shape="rect" id="node2" href="$classTTransportException.html" title="{TTransportException\n||}" alt="" coords="145,5,287,83"/>
+</map>

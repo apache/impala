@@ -1,0 +1,5 @@
+<map id="com.cloudera.impala.service.Frontend.AuthorizationPolicyReader" name="com.cloudera.impala.service.Frontend.AuthorizationPolicyReader">
+<area shape="rect" id="node2" href="$classRunnable.html" title="{Runnable\n||}" alt="" coords="27,420,103,497"/>
+<area shape="rect" id="node3" href="$classcom_1_1cloudera_1_1impala_1_1authorization_1_1AuthorizationConfig.html" title="{com.cloudera.impala.authorization.\lAuthorizationConfig\n||+ AuthorizationConfig()\l+ validateConfig()\l+ isEnabled()\l+ isFileBasedPolicy()\l+ getServerName()\l+ getPolicyFile()\l+ getSentryConfig()\l+ getPolicyProviderClassName()\l+ createAuthDisabledConfig()\l+ createHadoopGroupAuthConfig()\l}" alt="" coords="128,347,351,571"/>
+<area shape="rect" id="node5" href="$classcom_1_1cloudera_1_1impala_1_1authorization_1_1SentryConfig.html" title="{com.cloudera.impala.authorization.\lSentryConfig\n||+ SentryConfig()\l+ loadConfig()\l+ getConfig()\l+ getConfigFile()\l}" alt="" coords="336,147,559,283"/>
+</map>

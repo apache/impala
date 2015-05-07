@@ -1,0 +1,25 @@
+<map id="be/src/exec/sort&#45;node.h" name="be/src/exec/sort&#45;node.h">
+<area shape="rect" id="node2" href="$exec-node_8h.html" title="exec/exec&#45;node.h" alt="" coords="620,245,745,272"/>
+<area shape="rect" id="node40" href="$sort-exec-exprs_8h.html" title="exec/sort&#45;exec&#45;exprs.h" alt="" coords="2483,80,2636,107"/>
+<area shape="rect" id="node45" href="$sorter_8h.html" title="runtime/sorter.h" alt="" coords="2662,80,2775,107"/>
+<area shape="rect" id="node46" href="$buffered-block-mgr_8h.html" title="runtime/buffered&#45;block\l&#45;mgr.h" alt="" coords="3227,155,3377,197"/>
+<area shape="rect" id="node5" href="$status_8h.html" title="common/status.h" alt="" coords="2321,493,2444,520"/>
+<area shape="rect" id="node14" href="$descriptors_8h.html" title="runtime/descriptors.h" alt="" coords="2569,403,2713,429"/>
+<area shape="rect" id="node22" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="1363,320,1497,347"/>
+<area shape="rect" id="node35" href="$blocking-queue_8h.html" title="util/blocking&#45;queue.h" alt="" coords="304,320,444,347"/>
+<area shape="rect" id="node8" href="$logging_8h.html" title="common/logging.h" alt="" coords="2597,584,2725,611"/>
+<area shape="rect" id="node9" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="2080,584,2237,611"/>
+<area shape="rect" id="node13" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="2749,584,2851,611"/>
+<area shape="rect" id="node18" href="$global-types_8h.html" title="common/global&#45;types.h" alt="" coords="2929,493,3087,520"/>
+<area shape="rect" id="node19" href="$types_8h.html" title="runtime/types.h" alt="" coords="3111,493,3221,520"/>
+<area shape="rect" id="node29" href="$atomic_8h.html" title="common/atomic.h" alt="" coords="942,403,1068,429"/>
+<area shape="rect" id="node30" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="94,403,244,429"/>
+<area shape="rect" id="node31" href="$thread_8h.html" title="util/thread.h" alt="" coords="2100,403,2191,429"/>
+<area shape="rect" id="node32" href="$stopwatch_8h.html" title="util/stopwatch.h" alt="" coords="752,403,867,429"/>
+<area shape="rect" id="node33" href="$streaming-sampler_8h.html" title="util/streaming&#45;sampler.h" alt="" coords="1145,403,1305,429"/>
+<area shape="rect" id="node41" href="$expr_8h.html" title="exprs/expr.h" alt="" coords="2557,320,2651,347"/>
+<area shape="rect" id="node42" href="$runtime-state_8h.html" title="runtime/runtime&#45;state.h" alt="" coords="2154,163,2309,189"/>
+<area shape="rect" id="node44" href="$disk-io-mgr_8h.html" title="runtime/disk&#45;io&#45;mgr.h" alt="" coords="1359,245,1503,272"/>
+<area shape="rect" id="node50" href="$tuple-row-compare_8h.html" title="util/tuple&#45;row&#45;compare.h" alt="" coords="2609,245,2769,272"/>
+<area shape="rect" id="node47" href="$tmp-file-mgr_8h.html" title="runtime/tmp&#45;file&#45;mgr.h" alt="" coords="3225,403,3373,429"/>
+</map>

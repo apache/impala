@@ -1,0 +1,20 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classimpala_1_1ExecNode.html" title="impala::ExecNode" alt="" coords="6,259,135,285"/>
+<area shape="rect" id="node2" href="$classimpala_1_1AggregationNode.html" title="impala::AggregationNode" alt="" coords="216,5,384,32"/>
+<area shape="rect" id="node3" href="$classimpala_1_1AnalyticEvalNode.html" title="impala::AnalyticEvalNode" alt="" coords="214,56,386,83"/>
+<area shape="rect" id="node4" href="$classimpala_1_1BlockingJoinNode.html" title="impala::BlockingJoinNode" alt="" coords="213,107,387,133"/>
+<area shape="rect" id="node8" href="$classimpala_1_1EmptySetNode.html" title="impala::EmptySetNode" alt="" coords="221,157,379,184"/>
+<area shape="rect" id="node9" href="$classimpala_1_1ExchangeNode.html" title="impala::ExchangeNode" alt="" coords="221,208,379,235"/>
+<area shape="rect" id="node10" href="$classimpala_1_1PartitionedAggregationNode.html" title="impala::PartitionedAggregationNode" alt="" coords="185,259,415,285"/>
+<area shape="rect" id="node11" href="$classimpala_1_1ScanNode.html" title="Abstract base class of all scan nodes; introduces SetScanRange(). " alt="" coords="235,309,365,336"/>
+<area shape="rect" id="node15" href="$classimpala_1_1SelectNode.html" title="impala::SelectNode" alt="" coords="232,360,368,387"/>
+<area shape="rect" id="node16" href="$classimpala_1_1SortNode.html" title="impala::SortNode" alt="" coords="239,411,361,437"/>
+<area shape="rect" id="node17" href="$classimpala_1_1TopNNode.html" title="impala::TopNNode" alt="" coords="235,461,365,488"/>
+<area shape="rect" id="node18" href="$classimpala_1_1UnionNode.html" title="impala::UnionNode" alt="" coords="233,512,367,539"/>
+<area shape="rect" id="node5" href="$classimpala_1_1CrossJoinNode.html" title="impala::CrossJoinNode" alt="" coords="493,56,651,83"/>
+<area shape="rect" id="node6" href="$classimpala_1_1HashJoinNode.html" title="impala::HashJoinNode" alt="" coords="495,107,649,133"/>
+<area shape="rect" id="node7" href="$classimpala_1_1PartitionedHashJoinNode.html" title="impala::PartitionedHashJoinNode" alt="" coords="464,157,680,184"/>
+<area shape="rect" id="node12" href="$classimpala_1_1DataSourceScanNode.html" title="impala::DataSourceScanNode" alt="" coords="473,259,671,285"/>
+<area shape="rect" id="node13" href="$classimpala_1_1HBaseScanNode.html" title="impala::HBaseScanNode" alt="" coords="487,309,657,336"/>
+<area shape="rect" id="node14" href="$classimpala_1_1HdfsScanNode.html" title="impala::HdfsScanNode" alt="" coords="493,360,651,387"/>
+</map>

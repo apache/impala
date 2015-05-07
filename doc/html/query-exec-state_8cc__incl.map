@@ -1,0 +1,36 @@
+<map id="be/src/service/query&#45;exec&#45;state.cc" name="be/src/service/query&#45;exec&#45;state.cc">
+<area shape="rect" id="node2" href="$query-exec-state_8h.html" title="service/query&#45;exec\l&#45;state.h" alt="" coords="1757,97,1889,138"/>
+<area shape="rect" id="node16" href="$impala-server_8h.html" title="impala&#45;server.h" alt="" coords="1427,269,1537,296"/>
+<area shape="rect" id="node19" href="$frontend_8h.html" title="service/frontend.h" alt="" coords="1297,352,1423,379"/>
+<area shape="rect" id="node20" href="$time_8h.html" title="util/time.h" alt="" coords="2192,352,2270,379"/>
+<area shape="rect" id="node21" href="$runtime-state_8h.html" title="runtime/runtime&#45;state.h" alt="" coords="820,352,975,379"/>
+<area shape="rect" id="node28" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="432,517,542,544"/>
+<area shape="rect" id="node32" href="$expr_8h.html" title="exprs/expr.h" alt="" coords="3175,187,3269,213"/>
+<area shape="rect" id="node41" href="$row-batch_8h.html" title="runtime/row&#45;batch.h" alt="" coords="2943,352,3079,379"/>
+<area shape="rect" id="node43" href="$expr-context_8h.html" title="exprs/expr&#45;context.h" alt="" coords="3782,352,3922,379"/>
+<area shape="rect" id="node45" href="$query-options_8h.html" title="service/query&#45;options.h" alt="" coords="2554,435,2711,461"/>
+<area shape="rect" id="node46" href="$impalad-metrics_8h.html" title="util/impalad&#45;metrics.h" alt="" coords="2786,104,2933,131"/>
+<area shape="rect" id="node50" href="$names_8h.html" title="common/names.h" alt="" coords="3457,104,3583,131"/>
+<area shape="rect" id="node3" href="$status_8h.html" title="common/status.h" alt="" coords="2278,517,2401,544"/>
+<area shape="rect" id="node7" href="$catalog-op-executor_8h.html" title="exec/catalog&#45;op&#45;executor.h" alt="" coords="26,517,205,544"/>
+<area shape="rect" id="node10" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="1322,517,1457,544"/>
+<area shape="rect" id="node12" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="3642,517,3818,544"/>
+<area shape="rect" id="node14" href="$child-query_8h.html" title="service/child&#45;query.h" alt="" coords="2101,187,2243,213"/>
+<area shape="rect" id="node29" href="$query-schedule_8h.html" title="statestore/query&#45;schedule.h" alt="" coords="1091,352,1273,379"/>
+<area shape="rect" id="node6" href="$logging_8h.html" title="common/logging.h" alt="" coords="3187,592,3315,619"/>
+<area shape="rect" id="node11" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="1648,592,1798,619"/>
+<area shape="rect" id="node13" href="$udf_8h.html" title="udf/udf.h" alt="" coords="3927,592,3999,619"/>
+<area shape="rect" id="node23" href="$query-resource-mgr_8h.html" title="statestore/query&#45;resource\l&#45;mgr.h" alt="" coords="1071,427,1242,469"/>
+<area shape="rect" id="node24" href="$exec-env_8h.html" title="runtime/exec&#45;env.h" alt="" coords="813,435,946,461"/>
+<area shape="rect" id="node25" href="$descriptors_8h.html" title="runtime/descriptors.h" alt="" coords="2786,435,2930,461"/>
+<area shape="rect" id="node26" href="$disk-io-mgr_8h.html" title="runtime/disk&#45;io&#45;mgr.h" alt="" coords="1722,435,1866,461"/>
+<area shape="rect" id="node27" href="$mem-tracker_8h.html" title="runtime/mem&#45;tracker.h" alt="" coords="635,435,787,461"/>
+<area shape="rect" id="node34" href="$decimal-value_8h.html" title="runtime/decimal&#45;value.h" alt="" coords="3407,517,3566,544"/>
+<area shape="rect" id="node35" href="$lib-cache_8h.html" title="runtime/lib&#45;cache.h" alt="" coords="1891,435,2022,461"/>
+<area shape="rect" id="node36" href="$raw-value_8h.html" title="runtime/raw&#45;value.h" alt="" coords="3557,435,3691,461"/>
+<area shape="rect" id="node37" href="$tuple_8h.html" title="runtime/tuple.h" alt="" coords="3245,352,3353,379"/>
+<area shape="rect" id="node40" href="$tuple-row_8h.html" title="runtime/tuple&#45;row.h" alt="" coords="3233,269,3366,296"/>
+<area shape="rect" id="node42" href="$string-value_8h.html" title="runtime/string&#45;value.h" alt="" coords="3842,517,3989,544"/>
+<area shape="rect" id="node39" href="$mem-pool_8h.html" title="runtime/mem&#45;pool.h" alt="" coords="3005,435,3142,461"/>
+<area shape="rect" id="node44" href="$expr-value_8h.html" title="exprs/expr&#45;value.h" alt="" coords="3819,435,3947,461"/>
+</map>

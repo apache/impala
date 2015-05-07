@@ -1,0 +1,3 @@
+<map id="impala::HdfsParquetTableWriter::BoolColumnWriter" name="impala::HdfsParquetTableWriter::BoolColumnWriter">
+<area shape="rect" id="node2" href="$classimpala_1_1HdfsParquetTableWriter_1_1BaseColumnWriter.html" title="{impala::HdfsParquetTable\lWriter::BaseColumnWriter\n|# parent_\l# expr_ctx_\l# codec_\l# compressor_\l# pages_\l# num_data_pages_\l# page_size_\l# current_page_\l# num_values_\l# total_compressed_byte\l_size_\land 6 more...\l|+ BaseColumnWriter()\l+ ~BaseColumnWriter()\l+ AppendRow()\l+ Flush()\l+ Reset()\l+ Close()\l+ type()\l+ num_values()\l+ total_compressed_size()\l+ total_uncompressed_size()\l+ codec()\l# EncodeValue()\l# FinalizeCurrentPage()\l# NewPage()\l# WriteDictDataPage()\l}" alt="" coords="5,5,195,464"/>
+</map>

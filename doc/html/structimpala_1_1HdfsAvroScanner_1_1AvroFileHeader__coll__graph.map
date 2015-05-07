@@ -1,0 +1,5 @@
+<map id="impala::HdfsAvroScanner::AvroFileHeader" name="impala::HdfsAvroScanner::AvroFileHeader">
+<area shape="rect" id="node2" href="$structimpala_1_1BaseSequenceScanner_1_1FileHeader.html" title="{impala::BaseSequenceScanner\l::FileHeader\n||+ ~FileHeader()\l}" alt="" coords="194,235,397,327"/>
+<area shape="rect" id="node6" href="$classbool.html" title="{bool\n||}" alt="" coords="482,5,528,83"/>
+<area shape="rect" id="node8" href="$classimpala_1_1Tuple.html" title="A tuple with 0 materialised slots is represented as NULL. " alt="" coords="737,147,983,415"/>
+</map>

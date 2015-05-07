@@ -1,0 +1,17 @@
+<map id="be/src/statestore/query&#45;resource&#45;mgr.h" name="be/src/statestore/query&#45;resource&#45;mgr.h">
+<area shape="rect" id="node2" href="$atomic_8h.html" title="common/atomic.h" alt="" coords="1267,96,1393,123"/>
+<area shape="rect" id="node5" href="$status_8h.html" title="common/status.h" alt="" coords="1019,435,1141,461"/>
+<area shape="rect" id="node25" href="$promise_8h.html" title="util/promise.h" alt="" coords="2443,179,2543,205"/>
+<area shape="rect" id="node43" href="$thread_8h.html" title="util/thread.h" alt="" coords="2275,96,2365,123"/>
+<area shape="rect" id="node4" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="1508,525,1665,552"/>
+<area shape="rect" id="node9" href="$logging_8h.html" title="common/logging.h" alt="" coords="1769,616,1897,643"/>
+<area shape="rect" id="node15" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="536,525,637,552"/>
+<area shape="rect" id="node27" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="2359,261,2535,288"/>
+<area shape="rect" id="node41" href="$time_8h.html" title="util/time.h" alt="" coords="2669,261,2747,288"/>
+<area shape="rect" id="node30" href="$timestamp-parse-util_8h.html" title="runtime/timestamp&#45;parse\l&#45;util.h" alt="" coords="1775,337,1941,378"/>
+<area shape="rect" id="node37" href="$udf_8h.html" title="udf/udf.h" alt="" coords="2613,344,2685,371"/>
+<area shape="rect" id="node40" href="$hash-util_8h.html" title="util/hash&#45;util.h" alt="" coords="2434,435,2536,461"/>
+<area shape="rect" id="node34" href="$string-value_8inline_8h.html" title="runtime/string&#45;value.inline.h" alt="" coords="1857,435,2039,461"/>
+<area shape="rect" id="node36" href="$string-parser_8h.html" title="util/string&#45;parser.h" alt="" coords="1706,435,1832,461"/>
+<area shape="rect" id="node35" href="$cpu-info_8h.html" title="util/cpu&#45;info.h" alt="" coords="1898,525,1997,552"/>
+</map>

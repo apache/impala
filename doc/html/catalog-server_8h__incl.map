@@ -1,0 +1,21 @@
+<map id="be/src/catalog/catalog&#45;server.h" name="be/src/catalog/catalog&#45;server.h">
+<area shape="rect" id="node10" href="$catalog_8h.html" title="catalog/catalog.h" alt="" coords="323,427,444,453"/>
+<area shape="rect" id="node22" href="$statestore-subscriber_8h.html" title="statestore/statestore\l&#45;subscriber.h" alt="" coords="1827,97,1969,138"/>
+<area shape="rect" id="node33" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="2529,352,2625,379"/>
+<area shape="rect" id="node14" href="$status_8h.html" title="common/status.h" alt="" coords="1149,509,1272,536"/>
+<area shape="rect" id="node16" href="$logging_8h.html" title="common/logging.h" alt="" coords="1556,600,1684,627"/>
+<area shape="rect" id="node17" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="964,600,1121,627"/>
+<area shape="rect" id="node21" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="1329,600,1431,627"/>
+<area shape="rect" id="node25" href="$statestore_8h.html" title="statestore/statestore.h" alt="" coords="1733,187,1885,213"/>
+<area shape="rect" id="node46" href="$thrift-client_8h.html" title="rpc/thrift&#45;client.h" alt="" coords="871,269,987,296"/>
+<area shape="rect" id="node48" href="$thread_8h.html" title="util/thread.h" alt="" coords="1705,352,1796,379"/>
+<area shape="rect" id="node49" href="$stopwatch_8h.html" title="util/stopwatch.h" alt="" coords="2783,187,2897,213"/>
+<area shape="rect" id="node50" href="$thrift-util_8h.html" title="rpc/thrift&#45;util.h" alt="" coords="591,269,693,296"/>
+<area shape="rect" id="node44" href="$webserver_8h.html" title="util/webserver.h" alt="" coords="1499,427,1613,453"/>
+<area shape="rect" id="node45" href="$collection-metrics_8h.html" title="util/collection&#45;metrics.h" alt="" coords="2639,269,2795,296"/>
+<area shape="rect" id="node47" href="$thread-pool_8h.html" title="util/thread&#45;pool.h" alt="" coords="2445,269,2563,296"/>
+<area shape="rect" id="node39" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="2502,427,2652,453"/>
+<area shape="rect" id="node40" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="2265,427,2375,453"/>
+<area shape="rect" id="node41" href="$json-util_8h.html" title="util/json&#45;util.h" alt="" coords="3111,427,3209,453"/>
+<area shape="rect" id="node43" href="$pretty-printer_8h.html" title="util/pretty&#45;printer.h" alt="" coords="2917,509,3043,536"/>
+</map>

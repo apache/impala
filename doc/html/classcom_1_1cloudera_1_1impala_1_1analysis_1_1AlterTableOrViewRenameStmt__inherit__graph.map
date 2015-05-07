@@ -1,0 +1,5 @@
+<map id="com.cloudera.impala.analysis.AlterTableOrViewRenameStmt" name="com.cloudera.impala.analysis.AlterTableOrViewRenameStmt">
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1AlterTableStmt.html" title="{com.cloudera.impala.analysis.\lAlterTableStmt\n|# tableName_\l# table_\l|+ getTbl()\l+ getDb()\l+ toThrift()\l+ analyze()\l# AlterTableStmt()\l# getTargetTable()\l}" alt="" coords="17,345,215,525"/>
+<area shape="rect" id="node3" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1StatementBase.html" title="{com.cloudera.impala.analysis.\lStatementBase\n|# isExplain_\l|+ analyze()\l+ toSql()\l+ setIsExplain()\l+ isExplain()\l}" alt="" coords="17,160,215,296"/>
+<area shape="rect" id="node4" href="$interfacecom_1_1cloudera_1_1impala_1_1analysis_1_1ParseNode.html" title="{com.cloudera.impala.analysis.\lParseNode\n||+ analyze()\l+ toSql()\l}" alt="" coords="17,5,215,112"/>
+</map>

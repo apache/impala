@@ -1,0 +1,3 @@
+<map id="impala::TimeoutFailureDetector" name="impala::TimeoutFailureDetector">
+<area shape="rect" id="node2" href="$classimpala_1_1FailureDetector.html" title="{impala::FailureDetector\n||+ ~FailureDetector()\l+ UpdateHeartbeat()\l+ GetPeerState()\l+ EvictPeer()\l+ PeerStateToString()\l}" alt="" coords="5,5,163,141"/>
+</map>

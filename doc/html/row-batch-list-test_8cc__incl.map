@@ -1,0 +1,27 @@
+<map id="be/src/exec/row&#45;batch&#45;list&#45;test.cc" name="be/src/exec/row&#45;batch&#45;list&#45;test.cc">
+<area shape="rect" id="node7" href="$row-batch-list_8h.html" title="exec/row&#45;batch&#45;list.h" alt="" coords="2234,96,2376,123"/>
+<area shape="rect" id="node12" href="$descriptors_8h.html" title="runtime/descriptors.h" alt="" coords="2761,395,2905,421"/>
+<area shape="rect" id="node20" href="$mem-pool_8h.html" title="runtime/mem&#45;pool.h" alt="" coords="2373,245,2509,272"/>
+<area shape="rect" id="node23" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="1016,320,1151,347"/>
+<area shape="rect" id="node33" href="$mem-tracker_8h.html" title="runtime/mem&#45;tracker.h" alt="" coords="1407,245,1560,272"/>
+<area shape="rect" id="node41" href="$string-value_8h.html" title="runtime/string&#45;value.h" alt="" coords="3507,320,3653,347"/>
+<area shape="rect" id="node46" href="$cpu-info_8h.html" title="util/cpu&#45;info.h" alt="" coords="3602,477,3701,504"/>
+<area shape="rect" id="node47" href="$tuple-row_8h.html" title="runtime/tuple&#45;row.h" alt="" coords="2473,96,2607,123"/>
+<area shape="rect" id="node49" href="$desc-tbl-builder_8h.html" title="testutil/desc&#45;tbl&#45;builder.h" alt="" coords="3637,96,3800,123"/>
+<area shape="rect" id="node50" href="$names_8h.html" title="common/names.h" alt="" coords="3825,96,3951,123"/>
+<area shape="rect" id="node9" href="$row-batch_8h.html" title="runtime/row&#45;batch.h" alt="" coords="2226,171,2363,197"/>
+<area shape="rect" id="node11" href="$logging_8h.html" title="common/logging.h" alt="" coords="2215,560,2343,587"/>
+<area shape="rect" id="node38" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="2567,395,2677,421"/>
+<area shape="rect" id="node15" href="$status_8h.html" title="common/status.h" alt="" coords="2017,477,2140,504"/>
+<area shape="rect" id="node16" href="$global-types_8h.html" title="common/global&#45;types.h" alt="" coords="3031,477,3188,504"/>
+<area shape="rect" id="node17" href="$types_8h.html" title="runtime/types.h" alt="" coords="3313,477,3424,504"/>
+<area shape="rect" id="node29" href="$atomic_8h.html" title="common/atomic.h" alt="" coords="1106,560,1232,587"/>
+<area shape="rect" id="node30" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="1009,395,1159,421"/>
+<area shape="rect" id="node32" href="$thread_8h.html" title="util/thread.h" alt="" coords="1719,395,1809,421"/>
+<area shape="rect" id="node31" href="$spinlock_8h.html" title="util/spinlock.h" alt="" coords="1207,477,1309,504"/>
+<area shape="rect" id="node39" href="$internal-queue_8h.html" title="util/internal&#45;queue.h" alt="" coords="1183,395,1317,421"/>
+<area shape="rect" id="node40" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="1435,320,1532,347"/>
+<area shape="rect" id="node43" href="$udf_8h.html" title="udf/udf.h" alt="" coords="3771,395,3844,421"/>
+<area shape="rect" id="node45" href="$hash-util_8h.html" title="util/hash&#45;util.h" alt="" coords="3529,395,3631,421"/>
+<area shape="rect" id="node48" href="$tuple_8h.html" title="runtime/tuple.h" alt="" coords="2687,171,2795,197"/>
+</map>

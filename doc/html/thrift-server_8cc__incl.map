@@ -1,0 +1,17 @@
+<map id="be/src/rpc/thrift&#45;server.cc" name="be/src/rpc/thrift&#45;server.cc">
+<area shape="rect" id="node18" href="$authentication_8h.html" title="rpc/authentication.h" alt="" coords="223,88,357,115"/>
+<area shape="rect" id="node30" href="$thrift-server_8h.html" title="rpc/thrift&#45;server.h" alt="" coords="2374,88,2495,115"/>
+<area shape="rect" id="node37" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="3129,261,3239,288"/>
+<area shape="rect" id="node47" href="$thrift-thread_8h.html" title="rpc/thrift&#45;thread.h" alt="" coords="2717,88,2837,115"/>
+<area shape="rect" id="node48" href="$network-util_8h.html" title="util/network&#45;util.h" alt="" coords="2519,88,2640,115"/>
+<area shape="rect" id="node49" href="$uid-util_8h.html" title="util/uid&#45;util.h" alt="" coords="3015,88,3107,115"/>
+<area shape="rect" id="node50" href="$names_8h.html" title="common/names.h" alt="" coords="3199,179,3325,205"/>
+<area shape="rect" id="node21" href="$auth-provider_8h.html" title="rpc/auth&#45;provider.h" alt="" coords="1268,179,1397,205"/>
+<area shape="rect" id="node24" href="$status_8h.html" title="common/status.h" alt="" coords="1693,261,1816,288"/>
+<area shape="rect" id="node27" href="$TSaslServerTransport_8h.html" title="transport/TSaslServerTransport.h" alt="" coords="639,179,853,205"/>
+<area shape="rect" id="node29" href="$TSasl_8h.html" title="transport/TSasl.h" alt="" coords="480,261,603,288"/>
+<area shape="rect" id="node26" href="$promise_8h.html" title="util/promise.h" alt="" coords="2301,261,2400,288"/>
+<area shape="rect" id="node25" href="$logging_8h.html" title="common/logging.h" alt="" coords="2028,344,2156,371"/>
+<area shape="rect" id="node35" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="2101,179,2197,205"/>
+<area shape="rect" id="node46" href="$thread_8h.html" title="util/thread.h" alt="" coords="2273,179,2364,205"/>
+</map>

@@ -1,0 +1,16 @@
+<map id="be/src/util/impalad&#45;metrics.h" name="be/src/util/impalad&#45;metrics.h">
+<area shape="rect" id="node2" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="2715,96,2812,123"/>
+<area shape="rect" id="node12" href="$logging_8h.html" title="common/logging.h" alt="" coords="2701,435,2829,461"/>
+<area shape="rect" id="node15" href="$status_8h.html" title="common/status.h" alt="" coords="1955,344,2077,371"/>
+<area shape="rect" id="node26" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="2622,171,2772,197"/>
+<area shape="rect" id="node28" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="817,253,927,280"/>
+<area shape="rect" id="node38" href="$json-util_8h.html" title="util/json&#45;util.h" alt="" coords="2969,171,3068,197"/>
+<area shape="rect" id="node42" href="$pretty-printer_8h.html" title="util/pretty&#45;printer.h" alt="" coords="2955,253,3081,280"/>
+<area shape="rect" id="node47" href="$webserver_8h.html" title="util/webserver.h" alt="" coords="1745,171,1860,197"/>
+<area shape="rect" id="node18" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="1477,435,1635,461"/>
+<area shape="rect" id="node22" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="2165,435,2267,461"/>
+<area shape="rect" id="node27" href="$spinlock_8h.html" title="util/spinlock.h" alt="" coords="2646,253,2748,280"/>
+<area shape="rect" id="node41" href="$template-util_8h.html" title="util/template&#45;util.h" alt="" coords="3267,344,3392,371"/>
+<area shape="rect" id="node46" href="$cpu-info_8h.html" title="util/cpu&#45;info.h" alt="" coords="2627,344,2727,371"/>
+<area shape="rect" id="node50" href="$network-util_8h.html" title="util/network&#45;util.h" alt="" coords="1895,253,2016,280"/>
+</map>

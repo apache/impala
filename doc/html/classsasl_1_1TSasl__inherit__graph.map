@@ -1,0 +1,4 @@
+<map id="sasl::TSasl" name="sasl::TSasl">
+<area shape="rect" id="node2" href="$classsasl_1_1TSaslClient.html" title="{sasl::TSaslClient\n|&#45; clientStarted\l&#45; chosenMech\l&#45; mechList\l|+ TSaslClient()\l+ evaluateChallengeOrResponse()\l+ getMechanismName()\l+ getNegotiatedProperty()\l+ hasInitialResponse()\l+ SaslInit()\l}" alt="" coords="5,265,227,445"/>
+<area shape="rect" id="node3" href="$classsasl_1_1TSaslServer.html" title="{sasl::TSaslServer\n|&#45; serverStarted\l|+ TSaslServer()\l+ evaluateChallengeOrResponse()\l+ SaslInit()\l}" alt="" coords="251,301,473,408"/>
+</map>

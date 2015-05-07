@@ -1,0 +1,27 @@
+var searchData=
+[
+  ['udatestharness',['UdaTestHarness',['../classimpala__udf_1_1UdaTestHarness.html',1,'impala_udf']]],
+  ['udatestharness2',['UdaTestHarness2',['../classimpala__udf_1_1UdaTestHarness2.html',1,'impala_udf']]],
+  ['udatestharness3',['UdaTestHarness3',['../classimpala__udf_1_1UdaTestHarness3.html',1,'impala_udf']]],
+  ['udatestharness4',['UdaTestHarness4',['../classimpala__udf_1_1UdaTestHarness4.html',1,'impala_udf']]],
+  ['udatestharnessbase',['UdaTestHarnessBase',['../classimpala__udf_1_1UdaTestHarnessBase.html',1,'impala_udf']]],
+  ['udatestharnessutil',['UdaTestHarnessUtil',['../classimpala__udf_1_1UdaTestHarnessUtil.html',1,'impala_udf']]],
+  ['udfbuiltins',['UdfBuiltins',['../classimpala_1_1UdfBuiltins.html',1,'impala']]],
+  ['udfexecutor',['UdfExecutor',['../classcom_1_1cloudera_1_1impala_1_1hive_1_1executor_1_1UdfExecutor.html',1,'com::cloudera::impala::hive::executor']]],
+  ['udfexecutortest',['UdfExecutorTest',['../classcom_1_1cloudera_1_1impala_1_1hive_1_1executor_1_1UdfExecutorTest.html',1,'com::cloudera::impala::hive::executor']]],
+  ['udftestharness',['UdfTestHarness',['../classimpala__udf_1_1UdfTestHarness.html',1,'impala_udf']]],
+  ['uintgauge',['UIntGauge',['../classUIntGauge.html',1,'']]],
+  ['unionnode',['UnionNode',['../classimpala_1_1UnionNode.html',1,'impala']]],
+  ['unionnode',['UnionNode',['../classcom_1_1cloudera_1_1impala_1_1planner_1_1UnionNode.html',1,'com::cloudera::impala::planner']]],
+  ['unionoperand',['UnionOperand',['../classcom_1_1cloudera_1_1impala_1_1analysis_1_1UnionStmt_1_1UnionOperand.html',1,'com::cloudera::impala::analysis::UnionStmt']]],
+  ['unionstmt',['UnionStmt',['../classcom_1_1cloudera_1_1impala_1_1analysis_1_1UnionStmt.html',1,'com::cloudera::impala::analysis']]],
+  ['uniqueid',['UniqueId',['../structimpala__udf_1_1FunctionContext_1_1UniqueId.html',1,'impala_udf::FunctionContext']]],
+  ['unpaddedtuplestruct',['UnpaddedTupleStruct',['../structUnpaddedTupleStruct.html',1,'']]],
+  ['unsafeutil',['UnsafeUtil',['../classcom_1_1cloudera_1_1impala_1_1util_1_1UnsafeUtil.html',1,'com::cloudera::impala::util']]],
+  ['unusedclass',['UnusedClass',['../classimpala_1_1UnusedClass.html',1,'impala']]],
+  ['urlhandler',['UrlHandler',['../classimpala_1_1Webserver_1_1UrlHandler.html',1,'impala::Webserver']]],
+  ['urlparser',['UrlParser',['../classimpala_1_1UrlParser.html',1,'impala']]],
+  ['user',['User',['../classcom_1_1cloudera_1_1impala_1_1authorization_1_1User.html',1,'com::cloudera::impala::authorization']]],
+  ['usestmt',['UseStmt',['../classcom_1_1cloudera_1_1impala_1_1analysis_1_1UseStmt.html',1,'com::cloudera::impala::analysis']]],
+  ['utilityfunctions',['UtilityFunctions',['../classimpala_1_1UtilityFunctions.html',1,'impala']]]
+];

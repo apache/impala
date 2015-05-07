@@ -1,0 +1,8 @@
+<map id="impala::StatestoreSubscriber" name="impala::StatestoreSubscriber">
+<area shape="rect" id="node18" href="$classimpala_1_1StatsMetric.html" title="{impala::StatsMetric\l\&lt; double \&gt;\n||+ StatsMetric()\l+ Update()\l+ Reset()\l+ ToJson()\l+ ToLegacyJson()\l+ ToHumanReadable()\l}" alt="" coords="2344,449,2497,615"/>
+<area shape="rect" id="node24" href="$classimpala_1_1MetricGroup.html" title="MetricGroups may be organised hierarchically as a tree. " alt="" coords="1761,405,1937,659"/>
+<area shape="rect" id="node12" href="$classimpala_1_1MonotonicStopWatch.html" title="{impala::MonotonicStopWatch\n||+ MonotonicStopWatch()\l+ Start()\l+ Stop()\l+ Reset()\l+ ElapsedTime()\l}" alt="" coords="2711,464,2904,600"/>
+<area shape="rect" id="node13" href="$classuint64__t.html" title="{uint64_t\n||}" alt="" coords="2962,212,3029,289"/>
+<area shape="rect" id="node15" href="$classbool.html" title="{bool\n||}" alt="" coords="3054,212,3100,289"/>
+<area shape="rect" id="node19" href="$classimpala_1_1Metric.html" title="TODO: Add ToThrift() for conversion to an RPC&#45;friendly format. " alt="" coords="2279,161,2432,341"/>
+</map>

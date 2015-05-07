@@ -1,0 +1,11 @@
+<map id="be/src/benchmarks/name&#45;resolution&#45;benchmark.cc" name="be/src/benchmarks/name&#45;resolution&#45;benchmark.cc">
+<area shape="rect" id="node5" href="$cpu-info_8h.html" title="util/cpu&#45;info.h" alt="" coords="1677,179,1776,205"/>
+<area shape="rect" id="node11" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="1060,96,1170,123"/>
+<area shape="rect" id="node22" href="$network-util_8h.html" title="util/network&#45;util.h" alt="" coords="1788,96,1908,123"/>
+<area shape="rect" id="node36" href="$stopwatch_8h.html" title="util/stopwatch.h" alt="" coords="1934,96,2048,123"/>
+<area shape="rect" id="node8" href="$logging_8h.html" title="common/logging.h" alt="" coords="1427,269,1555,296"/>
+<area shape="rect" id="node23" href="$status_8h.html" title="common/status.h" alt="" coords="2298,179,2420,205"/>
+<area shape="rect" id="node26" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="2188,269,2346,296"/>
+<area shape="rect" id="node30" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="2063,269,2164,296"/>
+<area shape="rect" id="node37" href="$time_8h.html" title="time.h" alt="" coords="2928,179,2986,205"/>
+</map>

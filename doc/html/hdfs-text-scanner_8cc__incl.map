@@ -1,0 +1,31 @@
+<map id="be/src/exec/hdfs&#45;text&#45;scanner.cc" name="be/src/exec/hdfs&#45;text&#45;scanner.cc">
+<area shape="rect" id="node2" href="$hdfs-text-scanner_8h.html" title="exec/hdfs&#45;text&#45;scanner.h" alt="" coords="611,195,777,221"/>
+<area shape="rect" id="node8" href="$hdfs-scan-node_8h.html" title="exec/hdfs&#45;scan&#45;node.h" alt="" coords="1107,352,1260,379"/>
+<area shape="rect" id="node20" href="$row-batch_8h.html" title="runtime/row&#45;batch.h" alt="" coords="785,501,921,528"/>
+<area shape="rect" id="node26" href="$llvm-codegen_8h.html" title="codegen/llvm&#45;codegen.h" alt="" coords="2628,427,2791,453"/>
+<area shape="rect" id="node37" href="$delimited-text-parser_8h.html" title="exec/delimited&#45;text\l&#45;parser.h" alt="" coords="1679,187,1811,229"/>
+<area shape="rect" id="node39" href="$delimited-text-parser_8inline_8h.html" title="exec/delimited&#45;text\l&#45;parser.inline.h" alt="" coords="1730,97,1861,138"/>
+<area shape="rect" id="node40" href="$cpu-info_8h.html" title="util/cpu&#45;info.h" alt="" coords="2145,195,2244,221"/>
+<area shape="rect" id="node41" href="$hdfs-lzo-text-scanner_8h.html" title="exec/hdfs&#45;lzo&#45;text\l&#45;scanner.h" alt="" coords="1470,187,1596,229"/>
+<area shape="rect" id="node43" href="$scanner-context_8inline_8h.html" title="exec/scanner&#45;context.inline.h" alt="" coords="93,352,285,379"/>
+<area shape="rect" id="node44" href="$text-converter_8h.html" title="exec/text&#45;converter.h" alt="" coords="2049,427,2193,453"/>
+<area shape="rect" id="node45" href="$runtime-state_8h.html" title="runtime/runtime&#45;state.h" alt="" coords="1715,501,1871,528"/>
+<area shape="rect" id="node46" href="$text-converter_8inline_8h.html" title="exec/text&#45;converter.inline.h" alt="" coords="1840,352,2019,379"/>
+<area shape="rect" id="node47" href="$codec_8h.html" title="util/codec.h" alt="" coords="262,584,351,611"/>
+<area shape="rect" id="node48" href="$decompress_8h.html" title="util/decompress.h" alt="" coords="803,195,928,221"/>
+<area shape="rect" id="node49" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="2195,104,2305,131"/>
+<area shape="rect" id="node50" href="$names_8h.html" title="common/names.h" alt="" coords="2330,104,2456,131"/>
+<area shape="rect" id="node3" href="$hdfs-scanner_8h.html" title="exec/hdfs&#45;scanner.h" alt="" coords="710,277,849,304"/>
+<area shape="rect" id="node23" href="$string-buffer_8h.html" title="runtime/string&#45;buffer.h" alt="" coords="115,427,263,453"/>
+<area shape="rect" id="node14" href="$scan-node_8h.html" title="exec/scan&#45;node.h" alt="" coords="1565,427,1691,453"/>
+<area shape="rect" id="node17" href="$scanner-context_8h.html" title="exec/scanner&#45;context.h" alt="" coords="462,427,620,453"/>
+<area shape="rect" id="node19" href="$disk-io-mgr_8h.html" title="runtime/disk&#45;io&#45;mgr.h" alt="" coords="915,584,1059,611"/>
+<area shape="rect" id="node21" href="$descriptors_8h.html" title="runtime/descriptors.h" alt="" coords="2019,584,2163,611"/>
+<area shape="rect" id="node24" href="$progress-updater_8h.html" title="util/progress&#45;updater.h" alt="" coords="1489,584,1639,611"/>
+<area shape="rect" id="node25" href="$spinlock_8h.html" title="util/spinlock.h" alt="" coords="1185,427,1287,453"/>
+<area shape="rect" id="node16" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="1277,675,1412,701"/>
+<area shape="rect" id="node18" href="$status_8h.html" title="common/status.h" alt="" coords="1833,675,1956,701"/>
+<area shape="rect" id="node22" href="$types_8h.html" title="runtime/types.h" alt="" coords="2592,675,2703,701"/>
+<area shape="rect" id="node35" href="$expr_8h.html" title="exprs/expr.h" alt="" coords="2390,501,2484,528"/>
+<area shape="rect" id="node38" href="$sse-util_8h.html" title="util/sse&#45;util.h" alt="" coords="1767,277,1863,304"/>
+</map>

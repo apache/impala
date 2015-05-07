@@ -1,0 +1,11 @@
+<map id="be/src/util/parquet&#45;reader.cc" name="be/src/util/parquet&#45;reader.cc">
+<area shape="rect" id="node13" href="$rle-encoding_8h.html" title="util/rle&#45;encoding.h" alt="" coords="338,104,461,131"/>
+<area shape="rect" id="node28" href="$names_8h.html" title="common/names.h" alt="" coords="1814,104,1940,131"/>
+<area shape="rect" id="node15" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="411,411,568,437"/>
+<area shape="rect" id="node16" href="$bit-stream-utils_8inline_8h.html" title="util/bit&#45;stream&#45;utils.inline.h" alt="" coords="331,187,505,213"/>
+<area shape="rect" id="node22" href="$bit-util_8h.html" title="util/bit&#45;util.h" alt="" coords="603,336,692,363"/>
+<area shape="rect" id="node17" href="$bit-stream-utils_8h.html" title="util/bit&#45;stream&#45;utils.h" alt="" coords="351,261,491,288"/>
+<area shape="rect" id="node20" href="$logging_8h.html" title="common/logging.h" alt="" coords="312,485,440,512"/>
+<area shape="rect" id="node24" href="$cpu-info_8h.html" title="util/cpu&#45;info.h" alt="" coords="593,411,692,437"/>
+<area shape="rect" id="node26" href="$sse-util_8h.html" title="util/sse&#45;util.h" alt="" coords="717,411,813,437"/>
+</map>

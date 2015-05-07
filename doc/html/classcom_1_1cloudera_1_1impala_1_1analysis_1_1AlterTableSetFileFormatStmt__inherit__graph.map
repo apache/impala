@@ -1,0 +1,6 @@
+<map id="com.cloudera.impala.analysis.AlterTableSetFileFormatStmt" name="com.cloudera.impala.analysis.AlterTableSetFileFormatStmt">
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1AlterTableSetStmt.html" title="{com.cloudera.impala.analysis.\lAlterTableSetStmt\n|# partitionSpec_\l|+ AlterTableSetStmt()\l+ getPartitionSpec()\l+ analyze()\l}" alt="" coords="10,574,208,695"/>
+<area shape="rect" id="node3" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1AlterTableStmt.html" title="{com.cloudera.impala.analysis.\lAlterTableStmt\n|# tableName_\l# table_\l|+ getTbl()\l+ getDb()\l+ toThrift()\l+ analyze()\l# AlterTableStmt()\l# getTargetTable()\l}" alt="" coords="10,345,208,525"/>
+<area shape="rect" id="node4" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1StatementBase.html" title="{com.cloudera.impala.analysis.\lStatementBase\n|# isExplain_\l|+ analyze()\l+ toSql()\l+ setIsExplain()\l+ isExplain()\l}" alt="" coords="10,160,208,296"/>
+<area shape="rect" id="node5" href="$interfacecom_1_1cloudera_1_1impala_1_1analysis_1_1ParseNode.html" title="{com.cloudera.impala.analysis.\lParseNode\n||+ analyze()\l+ toSql()\l}" alt="" coords="10,5,208,112"/>
+</map>

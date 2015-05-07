@@ -1,0 +1,9 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classimpala_1_1Metric.html" title="TODO: Add ToThrift() for conversion to an RPC&#45;friendly format. " alt="" coords="5,148,109,175"/>
+<area shape="rect" id="node2" href="$classimpala_1_1SetMetric.html" title="Metric whose value is a set of items. " alt="" coords="163,5,319,32"/>
+<area shape="rect" id="node3" href="$classimpala_1_1SimpleMetric.html" title="impala::SimpleMetric\l\&lt; T, metric_kind \&gt;" alt="" coords="169,57,313,98"/>
+<area shape="rect" id="node4" href="$classimpala_1_1StatsMetric.html" title="impala::StatsMetric\&lt; T \&gt;" alt="" coords="158,123,325,149"/>
+<area shape="rect" id="node5" href="$classimpala_1_1TimerMetric.html" title="impala::TimerMetric" alt="" coords="173,173,310,200"/>
+<area shape="rect" id="node6" href="$classimpala_1_1SetMetric.html" title="impala::SetMetric\&lt;\l std::string \&gt;" alt="" coords="175,225,307,266"/>
+<area shape="rect" id="node7" href="$classimpala_1_1StatsMetric.html" title="impala::StatsMetric\l\&lt; double \&gt;" alt="" coords="174,290,309,331"/>
+</map>

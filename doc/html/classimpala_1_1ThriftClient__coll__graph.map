@@ -1,0 +1,7 @@
+<map id="impala::ThriftClient&lt; InterfaceType &gt;" name="impala::ThriftClient&lt; InterfaceType &gt;">
+<area shape="rect" id="node2" href="$classimpala_1_1ThriftClientImpl.html" title="Super class for templatized thrift clients. " alt="" coords="788,768,945,963"/>
+<area shape="rect" id="node3" href="$classimpala_1_1Status.html" title="{impala::Status\n||+ Status()\l+ Status()\l+ Status()\l+ Status()\l+ Status()\l+ Status()\l+ Status()\l+ Status()\l+ Status()\l+ Status()\land 23 more...\l+ Expected()\l&#45; Status()\l}" alt="" coords="139,451,245,704"/>
+<area shape="rect" id="node4" href="$classimpala_1_1ErrorMsg.html" title="{impala::ErrorMsg\n||+ ErrorMsg()\l+ ErrorMsg()\l+ ErrorMsg()\l+ ErrorMsg()\l+ ErrorMsg()\l+ ErrorMsg()\l+ ErrorMsg()\l+ ErrorMsg()\l+ ErrorMsg()\l+ ErrorMsg()\land 9 more...\l+ Init()\l}" alt="" coords="131,147,252,386"/>
+<area shape="rect" id="node12" href="$classbool.html" title="{bool\n||}" alt="" coords="1139,539,1185,616"/>
+<area shape="rect" id="node15" href="$classimpala_1_1AuthProvider.html" title="{impala::AuthProvider\n||+ Start()\l+ GetServerTransportFactory()\l+ WrapClientTransport()\l+ is_sasl()\l}" alt="" coords="1180,805,1379,926"/>
+</map>

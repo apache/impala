@@ -1,0 +1,5 @@
+<map id="impala::ImpalaServer" name="impala::ImpalaServer">
+<area shape="rect" id="node2" href="$classImpalaServiceIf.html" title="{ImpalaServiceIf\n||}" alt="" coords="5,20,117,97"/>
+<area shape="rect" id="node3" href="$classImpalaHiveServer2ServiceIf.html" title="{ImpalaHiveServer2ServiceIf\n||}" alt="" coords="142,20,327,97"/>
+<area shape="rect" id="node4" href="$classimpala_1_1ThriftServer_1_1ConnectionHandlerIf.html" title="Interface class for receiving connection creation / termination events. " alt="" coords="352,5,500,112"/>
+</map>

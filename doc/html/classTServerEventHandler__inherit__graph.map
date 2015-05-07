@@ -1,0 +1,3 @@
+<map id="TServerEventHandler" name="TServerEventHandler">
+<area shape="rect" id="node2" href="$classimpala_1_1ThriftServer_1_1ThriftServerEventProcessor.html" title="{impala::ThriftServer\l::ThriftServerEventProcessor\n|&#45; signal_lock_\l&#45; signal_cond_\l&#45; thrift_server_\l&#45; signal_fired_\l&#45; TIMEOUT_MS\l|+ ThriftServerEventProcessor()\l+ preServe()\l+ createContext()\l+ processContext()\l+ deleteContext()\l+ StartAndWaitForServer()\l&#45; Supervise()\l}" alt="" coords="5,131,208,370"/>
+</map>

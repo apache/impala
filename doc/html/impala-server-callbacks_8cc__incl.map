@@ -1,0 +1,26 @@
+<map id="be/src/service/impala&#45;server&#45;callbacks.cc" name="be/src/service/impala&#45;server&#45;callbacks.cc">
+<area shape="rect" id="node2" href="$impala-server_8h.html" title="service/impala&#45;server.h" alt="" coords="1736,277,1893,304"/>
+<area shape="rect" id="node23" href="$webserver_8h.html" title="util/webserver.h" alt="" coords="179,517,293,544"/>
+<area shape="rect" id="node32" href="$names_8h.html" title="common/names.h" alt="" coords="622,435,748,461"/>
+<area shape="rect" id="node39" href="$catalog-util_8h.html" title="catalog/catalog&#45;util.h" alt="" coords="909,104,1051,131"/>
+<area shape="rect" id="node41" href="$query-exec-state_8h.html" title="service/query&#45;exec\l&#45;state.h" alt="" coords="3337,97,3468,138"/>
+<area shape="rect" id="node48" href="$redactor_8h.html" title="util/redactor.h" alt="" coords="48,195,149,221"/>
+<area shape="rect" id="node49" href="$summary-util_8h.html" title="util/summary&#45;util.h" alt="" coords="3493,104,3621,131"/>
+<area shape="rect" id="node50" href="$url-coding_8h.html" title="util/url&#45;coding.h" alt="" coords="3918,600,4028,627"/>
+<area shape="rect" id="node15" href="$thrift-server_8h.html" title="rpc/thrift&#45;server.h" alt="" coords="999,352,1120,379"/>
+<area shape="rect" id="node16" href="$status_8h.html" title="common/status.h" alt="" coords="3011,600,3133,627"/>
+<area shape="rect" id="node19" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="773,435,869,461"/>
+<area shape="rect" id="node26" href="$frontend_8h.html" title="service/frontend.h" alt="" coords="1853,352,1979,379"/>
+<area shape="rect" id="node27" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="2544,517,2679,544"/>
+<area shape="rect" id="node28" href="$simple-logger_8h.html" title="util/simple&#45;logger.h" alt="" coords="3059,517,3188,544"/>
+<area shape="rect" id="node29" href="$thread-pool_8h.html" title="util/thread&#45;pool.h" alt="" coords="521,517,639,544"/>
+<area shape="rect" id="node30" href="$time_8h.html" title="util/time.h" alt="" coords="821,352,899,379"/>
+<area shape="rect" id="node31" href="$uid-util_8h.html" title="util/uid&#45;util.h" alt="" coords="1151,352,1243,379"/>
+<area shape="rect" id="node33" href="$coordinator_8h.html" title="runtime/coordinator.h" alt="" coords="2637,352,2781,379"/>
+<area shape="rect" id="node34" href="$runtime-state_8h.html" title="runtime/runtime&#45;state.h" alt="" coords="2371,435,2527,461"/>
+<area shape="rect" id="node35" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="3189,352,3365,379"/>
+<area shape="rect" id="node36" href="$types_8h.html" title="runtime/types.h" alt="" coords="43,517,153,544"/>
+<area shape="rect" id="node42" href="$catalog-op-executor_8h.html" title="exec/catalog&#45;op&#45;executor.h" alt="" coords="3541,352,3720,379"/>
+<area shape="rect" id="node43" href="$child-query_8h.html" title="service/child&#45;query.h" alt="" coords="2979,195,3121,221"/>
+<area shape="rect" id="node45" href="$query-schedule_8h.html" title="statestore/query&#45;schedule.h" alt="" coords="3745,352,3927,379"/>
+</map>

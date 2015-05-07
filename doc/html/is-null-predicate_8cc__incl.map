@@ -1,0 +1,27 @@
+<map id="be/src/exprs/is&#45;null&#45;predicate.cc" name="be/src/exprs/is&#45;null&#45;predicate.cc">
+<area shape="rect" id="node2" href="$is-null-predicate_8h.html" title="exprs/is&#45;null&#45;predicate.h" alt="" coords="3137,96,3296,123"/>
+<area shape="rect" id="node43" href="$udf_8h.html" title="udf/udf.h" alt="" coords="3242,568,3315,595"/>
+<area shape="rect" id="node4" href="$predicate_8h.html" title="exprs/predicate.h" alt="" coords="2849,171,2972,197"/>
+<area shape="rect" id="node5" href="$expr_8h.html" title="exprs/expr.h" alt="" coords="2354,245,2448,272"/>
+<area shape="rect" id="node7" href="$status_8h.html" title="common/status.h" alt="" coords="844,568,967,595"/>
+<area shape="rect" id="node17" href="$descriptors_8h.html" title="runtime/descriptors.h" alt="" coords="1420,485,1564,512"/>
+<area shape="rect" id="node25" href="$decimal-value_8h.html" title="runtime/decimal&#45;value.h" alt="" coords="2087,411,2245,437"/>
+<area shape="rect" id="node32" href="$lib-cache_8h.html" title="runtime/lib&#45;cache.h" alt="" coords="603,485,735,512"/>
+<area shape="rect" id="node38" href="$raw-value_8h.html" title="runtime/raw&#45;value.h" alt="" coords="2568,328,2703,355"/>
+<area shape="rect" id="node41" href="$string-value_8h.html" title="runtime/string&#45;value.h" alt="" coords="2732,485,2879,512"/>
+<area shape="rect" id="node46" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="3047,485,3223,512"/>
+<area shape="rect" id="node47" href="$tuple_8h.html" title="runtime/tuple.h" alt="" coords="1726,411,1833,437"/>
+<area shape="rect" id="node50" href="$tuple-row_8h.html" title="runtime/tuple&#45;row.h" alt="" coords="1624,328,1757,355"/>
+<area shape="rect" id="node9" href="$logging_8h.html" title="common/logging.h" alt="" coords="2552,659,2680,685"/>
+<area shape="rect" id="node10" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="992,659,1149,685"/>
+<area shape="rect" id="node14" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="1173,659,1275,685"/>
+<area shape="rect" id="node21" href="$global-types_8h.html" title="common/global&#45;types.h" alt="" coords="1580,568,1737,595"/>
+<area shape="rect" id="node22" href="$types_8h.html" title="runtime/types.h" alt="" coords="2359,568,2469,595"/>
+<area shape="rect" id="node29" href="$multi-precision_8h.html" title="runtime/multi&#45;precision.h" alt="" coords="2119,568,2283,595"/>
+<area shape="rect" id="node30" href="$decimal-util_8h.html" title="util/decimal&#45;util.h" alt="" coords="2204,485,2324,512"/>
+<area shape="rect" id="node31" href="$hash-util_8h.html" title="util/hash&#45;util.h" alt="" coords="2546,568,2648,595"/>
+<area shape="rect" id="node36" href="$atomic_8h.html" title="common/atomic.h" alt="" coords="253,568,379,595"/>
+<area shape="rect" id="node37" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="594,568,744,595"/>
+<area shape="rect" id="node40" href="$string-value_8inline_8h.html" title="runtime/string&#45;value.inline.h" alt="" coords="2367,411,2548,437"/>
+<area shape="rect" id="node49" href="$mem-pool_8h.html" title="runtime/mem&#45;pool.h" alt="" coords="1813,568,1949,595"/>
+</map>

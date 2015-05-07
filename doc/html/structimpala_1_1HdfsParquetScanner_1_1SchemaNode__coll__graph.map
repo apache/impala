@@ -1,0 +1,6 @@
+<map id="impala::HdfsParquetScanner::SchemaNode" name="impala::HdfsParquetScanner::SchemaNode">
+<area shape="rect" id="node4" href="$classimpala_1_1SlotDescriptor.html" title="{impala::SlotDescriptor\n||+ id()\l+ type()\l+ parent()\l+ col_pos()\l+ col_path()\l+ field_idx()\l+ tuple_offset()\l+ null_indicator_offset()\l+ is_materialized()\l+ is_nullable()\l+ slot_size()\l+ DebugString()\l+ CodegenIsNull()\l+ CodegenUpdateNull()\l+ ColPathLessThan()\l&#45; SlotDescriptor()\l}" alt="" coords="398,683,556,981"/>
+<area shape="rect" id="node5" href="$structimpala_1_1NullIndicatorOffset.html" title="{impala::NullIndicatorOffset\n||+ NullIndicatorOffset()\l+ DebugString()\l}" alt="" coords="5,402,181,494"/>
+<area shape="rect" id="node7" href="$structimpala_1_1ColumnType.html" title="{impala::ColumnType\n||+ ColumnType()\l+ ColumnType()\l+ operator==()\l+ operator!=()\l+ ToThrift()\l+ IsStringType()\l+ IsVarLen()\l+ GetByteSize()\l+ GetSlotSize()\l+ ToHs2Type()\l+ DebugString()\l+ CreateCharType()\l+ CreateVarcharType()\l+ CreateDecimalType()\l+ GetDecimalByteSize()\l}" alt="" coords="525,307,688,589"/>
+<area shape="rect" id="node11" href="$classbool.html" title="{bool\n||}" alt="" coords="454,409,500,487"/>
+</map>

@@ -1,0 +1,5 @@
+<map id="impala::ThriftServer" name="impala::ThriftServer">
+<area shape="rect" id="node2" href="$classimpala_1_1ThriftServer_1_1ConnectionHandlerIf.html" title="Interface class for receiving connection creation / termination events. " alt="" coords="5,13,153,120"/>
+<area shape="rect" id="node11" href="$classbool.html" title="{bool\n||}" alt="" coords="1579,28,1625,105"/>
+<area shape="rect" id="node13" href="$classimpala_1_1AuthProvider.html" title="{impala::AuthProvider\n||+ Start()\l+ GetServerTransportFactory()\l+ WrapClientTransport()\l+ is_sasl()\l}" alt="" coords="1840,6,2039,127"/>
+</map>

@@ -1,0 +1,4 @@
+<map id="impala::DiskIoMgr::ScanRange" name="impala::DiskIoMgr::ScanRange">
+<area shape="rect" id="node2" href="$classimpala_1_1DiskIoMgr_1_1RequestRange.html" title="{impala::DiskIoMgr::\lRequestRange\n|# fs_\l# file_\l# offset_\l# len_\l# disk_id_\l# request_type_\l|+ fs()\l+ file()\l+ offset()\l+ len()\l+ disk_id()\l+ request_type()\l}" alt="" coords="25,219,160,458"/>
+<area shape="rect" id="node3" href="$structimpala_1_1InternalQueue_1_1Node.html" title="{impala::InternalQueue\l\&lt; T \&gt;::Node\n|&#45; parent_queue\l&#45; next\l&#45; prev\l|+ Node()\l+ ~Node()\l+ Next()\l+ Prev()\l}" alt="" coords="19,5,167,171"/>
+</map>

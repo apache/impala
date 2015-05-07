@@ -1,0 +1,28 @@
+var classimpala_1_1ClientCacheHelper =
+[
+    [ "PerHostCache", "structimpala_1_1ClientCacheHelper_1_1PerHostCache.html", "structimpala_1_1ClientCacheHelper_1_1PerHostCache" ],
+    [ "ClientFactory", "classimpala_1_1ClientCacheHelper.html#a4da1ac222ceff2be3f798650fc4d48f9", null ],
+    [ "ClientMap", "classimpala_1_1ClientCacheHelper.html#aa5a49cf4968695cbf24f1b83ffbc61fc", null ],
+    [ "PerHostCacheMap", "classimpala_1_1ClientCacheHelper.html#a2a7dba2cc619dce959168fb5521d7cf3", null ],
+    [ "ClientCacheHelper", "classimpala_1_1ClientCacheHelper.html#a1b814cc326129a5e182341f88833a2ee", null ],
+    [ "CloseConnections", "classimpala_1_1ClientCacheHelper.html#a216d1682a3075523b67ecc506db12ba2", null ],
+    [ "CreateClient", "classimpala_1_1ClientCacheHelper.html#a450ceb70e00125f966fb929b327aa4c9", null ],
+    [ "DebugString", "classimpala_1_1ClientCacheHelper.html#a2ff1124846a1e27106bb2ad47dfc7c37", null ],
+    [ "GetClient", "classimpala_1_1ClientCacheHelper.html#a866e9a0ba17a9812cb2ceafbbef183d4", null ],
+    [ "InitMetrics", "classimpala_1_1ClientCacheHelper.html#a655a4878f988d44bb8f0e782d2b49b51", null ],
+    [ "ReleaseClient", "classimpala_1_1ClientCacheHelper.html#a952813bed7ba0ad4d5ac212d6b412855", null ],
+    [ "ReopenClient", "classimpala_1_1ClientCacheHelper.html#ad0d2e8780d700174f9fa8e8cac83b4b2", null ],
+    [ "TestShutdown", "classimpala_1_1ClientCacheHelper.html#a0633abad539e0ed6881e31ed209967a1", null ],
+    [ "ClientCache", "classimpala_1_1ClientCacheHelper.html#a430dce1ab5a6f30a141b20e1da13ad6a", null ],
+    [ "cache_lock_", "classimpala_1_1ClientCacheHelper.html#a7f28c5c2ecae44c0e5d6f2d73b05e6f6", null ],
+    [ "client_map_", "classimpala_1_1ClientCacheHelper.html#a368c998c61f2e401c891358fa2474904", null ],
+    [ "client_map_lock_", "classimpala_1_1ClientCacheHelper.html#af32d280bf9948b02f2ae6f390ccc5277", null ],
+    [ "clients_in_use_metric_", "classimpala_1_1ClientCacheHelper.html#a2cd7d0a889c3b3fa9dc6f9c6a4458e81", null ],
+    [ "metrics_enabled_", "classimpala_1_1ClientCacheHelper.html#a72626f83388532e065e9f37b9e73e1e2", null ],
+    [ "num_tries_", "classimpala_1_1ClientCacheHelper.html#aea87a817f89cc03e6fd1177c4363d81b", null ],
+    [ "per_host_caches_", "classimpala_1_1ClientCacheHelper.html#aa2443d6ecc23ae8866afd0643b55a6b3", null ],
+    [ "recv_timeout_ms_", "classimpala_1_1ClientCacheHelper.html#a8bed620b75773576dbb4ae5f76b23350", null ],
+    [ "send_timeout_ms_", "classimpala_1_1ClientCacheHelper.html#aaa00024d1bc2bd1b114f917f7b067e8f", null ],
+    [ "total_clients_metric_", "classimpala_1_1ClientCacheHelper.html#ab76ef9db08fbe52cde5aa8e6850c6616", null ],
+    [ "wait_ms_", "classimpala_1_1ClientCacheHelper.html#aa6f05f2194e6acc7a1723ed1541ba677", null ]
+];

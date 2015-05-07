@@ -1,0 +1,5 @@
+<map id="impala::SimpleTupleStreamTest" name="impala::SimpleTupleStreamTest">
+<area shape="rect" id="node3" href="$classimpala_1_1MultiNullableTupleStreamTest.html" title="{impala::MultiNullableTuple\lStreamTest\n||# CreateDescriptors()\l}" alt="" coords="5,595,179,687"/>
+<area shape="rect" id="node4" href="$classimpala_1_1MultiTupleStreamTest.html" title="{impala::MultiTupleStreamTest\n||# CreateDescriptors()\l}" alt="" coords="203,603,399,680"/>
+<area shape="rect" id="node5" href="$classimpala_1_1SimpleNullStreamTest.html" title="{impala::SimpleNullStreamTest\n||# CreateDescriptors()\l}" alt="" coords="423,603,621,680"/>
+</map>

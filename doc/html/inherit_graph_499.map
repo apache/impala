@@ -1,0 +1,6 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classimpala_1_1TableDescriptor.html" title="Base class for table descriptors. " alt="" coords="5,56,165,83"/>
+<area shape="rect" id="node2" href="$classimpala_1_1DataSourceTableDescriptor.html" title="Descriptor for a DataSourceTable. " alt="" coords="213,5,443,32"/>
+<area shape="rect" id="node3" href="$classimpala_1_1HBaseTableDescriptor.html" title="impala::HBaseTableDescriptor" alt="" coords="228,56,428,83"/>
+<area shape="rect" id="node4" href="$classimpala_1_1HdfsTableDescriptor.html" title="impala::HdfsTableDescriptor" alt="" coords="234,107,422,133"/>
+</map>

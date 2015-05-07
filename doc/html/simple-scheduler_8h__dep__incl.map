@@ -1,0 +1,29 @@
+<map id="be/src/statestore/simple&#45;scheduler.h" name="be/src/statestore/simple&#45;scheduler.h">
+<area shape="rect" id="node2" href="$coordinator_8h.html" title="be/src/runtime/coordinator.h" alt="" coords="1472,104,1656,131"/>
+<area shape="rect" id="node12" href="$impala-beeswax-server_8cc.html" title="be/src/service/impala\l&#45;beeswax&#45;server.cc" alt="" coords="2295,459,2441,501"/>
+<area shape="rect" id="node15" href="$impala-server_8cc.html" title="be/src/service/impala\l&#45;server.cc" alt="" coords="1023,459,1169,501"/>
+<area shape="rect" id="node23" href="$simple-scheduler_8cc.html" title="be/src/statestore/simple\l&#45;scheduler.cc" alt="" coords="2405,278,2568,319"/>
+<area shape="rect" id="node26" href="$exec-env_8cc.html" title="be/src/runtime/exec\l&#45;env.cc" alt="" coords="2694,97,2831,138"/>
+<area shape="rect" id="node27" href="$admission-controller_8cc.html" title="be/src/scheduling/admission\l&#45;controller.cc" alt="" coords="2856,97,3043,138"/>
+<area shape="rect" id="node28" href="$simple-scheduler-test_8cc.html" title="be/src/statestore/simple\l&#45;scheduler&#45;test.cc" alt="" coords="3067,97,3229,138"/>
+<area shape="rect" id="node3" href="$coordinator_8cc.html" title="be/src/runtime/coordinator.cc" alt="" coords="1469,195,1659,221"/>
+<area shape="rect" id="node4" href="$impala-server_8h.html" title="be/src/service/impala\l&#45;server.h" alt="" coords="1033,187,1180,229"/>
+<area shape="rect" id="node21" href="$impalad-main_8cc.html" title="be/src/service/impalad\l&#45;main.cc" alt="" coords="5,278,157,319"/>
+<area shape="rect" id="node5" href="$catalog-op-executor_8cc.html" title="be/src/exec/catalog\l&#45;op&#45;executor.cc" alt="" coords="607,278,741,319"/>
+<area shape="rect" id="node6" href="$expr-benchmark_8cc.html" title="be/src/exprs/expr&#45;benchmark.cc" alt="" coords="1755,285,1964,312"/>
+<area shape="rect" id="node7" href="$expr-test_8cc.html" title="be/src/exprs/expr&#45;test.cc" alt="" coords="1989,285,2155,312"/>
+<area shape="rect" id="node8" href="$thrift-server-test_8cc.html" title="be/src/rpc/thrift&#45;server\l&#45;test.cc" alt="" coords="2179,278,2329,319"/>
+<area shape="rect" id="node9" href="$child-query_8h.html" title="be/src/service/child\l&#45;query.h" alt="" coords="295,278,429,319"/>
+<area shape="rect" id="node11" href="$query-exec-state_8h.html" title="be/src/service/query\l&#45;exec&#45;state.h" alt="" coords="506,369,645,410"/>
+<area shape="rect" id="node13" href="$impala-hs2-server_8cc.html" title="be/src/service/impala\l&#45;hs2&#45;server.cc" alt="" coords="148,459,295,501"/>
+<area shape="rect" id="node14" href="$impala-server-callbacks_8cc.html" title="be/src/service/impala\l&#45;server&#45;callbacks.cc" alt="" coords="479,459,625,501"/>
+<area shape="rect" id="node16" href="$query-exec-state_8cc.html" title="be/src/service/query\l&#45;exec&#45;state.cc" alt="" coords="650,459,789,501"/>
+<area shape="rect" id="node17" href="$fe-support_8cc.html" title="be/src/service/fe&#45;support.cc" alt="" coords="817,285,1001,312"/>
+<area shape="rect" id="node18" href="$impala-internal-service-proxy_8h.html" title="be/src/service/impala\l&#45;internal&#45;service&#45;proxy.h" alt="" coords="1026,278,1187,319"/>
+<area shape="rect" id="node19" href="$impala-internal-service_8h.html" title="be/src/service/impala\l&#45;internal&#45;service.h" alt="" coords="1437,369,1584,410"/>
+<area shape="rect" id="node20" href="$impala-server_8inline_8h.html" title="be/src/service/impala\l&#45;server.inline.h" alt="" coords="233,369,380,410"/>
+<area shape="rect" id="node22" href="$session-expiry-test_8cc.html" title="be/src/service/session\l&#45;expiry&#45;test.cc" alt="" coords="1211,278,1364,319"/>
+<area shape="rect" id="node24" href="$in-process-servers_8cc.html" title="be/src/testutil/in\l&#45;process&#45;servers.cc" alt="" coords="1389,278,1525,319"/>
+<area shape="rect" id="node25" href="$mini-impala-cluster_8cc.html" title="be/src/testutil/mini\l&#45;impala&#45;cluster.cc" alt="" coords="1550,278,1679,319"/>
+<area shape="rect" id="node10" href="$child-query_8cc.html" title="be/src/service/child\l&#45;query.cc" alt="" coords="319,459,453,501"/>
+</map>

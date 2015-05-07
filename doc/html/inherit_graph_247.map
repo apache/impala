@@ -1,0 +1,6 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classimpala_1_1DataSink.html" title="Superclass of all data sinks. " alt="" coords="5,56,128,83"/>
+<area shape="rect" id="node2" href="$classimpala_1_1DataStreamSender.html" title="impala::DataStreamSender" alt="" coords="176,5,355,32"/>
+<area shape="rect" id="node3" href="$classimpala_1_1HBaseTableSink.html" title="impala::HBaseTableSink" alt="" coords="182,56,349,83"/>
+<area shape="rect" id="node4" href="$classimpala_1_1HdfsTableSink.html" title="impala::HdfsTableSink" alt="" coords="188,107,343,133"/>
+</map>

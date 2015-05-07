@@ -1,0 +1,6 @@
+<map id="impala::DiskIoMgr::RequestRange" name="impala::DiskIoMgr::RequestRange">
+<area shape="rect" id="node2" href="$structimpala_1_1InternalQueue_1_1Node.html" title="{impala::InternalQueue\l\&lt; T \&gt;::Node\n||+ Node()\l+ ~Node()\l+ Next()\l+ Prev()\l}" alt="" coords="468,155,616,291"/>
+<area shape="rect" id="node3" href="$classimpala_1_1InternalQueue.html" title="T must be a subclass of InternalQueue::Node. " alt="" coords="577,376,759,629"/>
+<area shape="rect" id="node4" href="$classimpala_1_1SpinLock.html" title="Lightweight spinlock. " alt="" coords="787,147,919,298"/>
+<area shape="rect" id="node6" href="$classbool.html" title="{bool\n||}" alt="" coords="914,5,960,83"/>
+</map>

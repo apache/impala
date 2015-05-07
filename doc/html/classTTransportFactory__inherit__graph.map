@@ -1,0 +1,3 @@
+<map id="TTransportFactory" name="TTransportFactory">
+<area shape="rect" id="node2" href="$classapache_1_1thrift_1_1transport_1_1TSaslServerTransport_1_1Factory.html" title="{apache::thrift::transport\l::TSaslServerTransport\l::Factory\n|&#45; serverDefinitionMap_\l&#45; transportMap_\l&#45; transportMap_mutex_\l|+ Factory()\l+ Factory()\l+ ~Factory()\l+ getTransport()\l+ addServerDefinition()\l}" alt="" coords="5,131,163,325"/>
+</map>

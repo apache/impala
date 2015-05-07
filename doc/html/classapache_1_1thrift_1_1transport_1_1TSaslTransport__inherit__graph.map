@@ -1,0 +1,5 @@
+<map id="apache::thrift::transport::TSaslTransport" name="apache::thrift::transport::TSaslTransport">
+<area shape="rect" id="node3" href="$classapache_1_1thrift_1_1transport_1_1TSaslClientTransport.html" title="{apache::thrift::transport\l::TSaslClientTransport\n||+ TSaslClientTransport()\l# handleSaslStartMessage()\l}" alt="" coords="5,669,192,776"/>
+<area shape="rect" id="node4" href="$classapache_1_1thrift_1_1transport_1_1TSaslServerTransport.html" title="{apache::thrift::transport\l::TSaslServerTransport\n|&#45; serverDefinitionMap_\l|+ TSaslServerTransport()\l+ TSaslServerTransport()\l+ addServerDefinition()\l+ setSaslServer()\l&#45; handleSaslStartMessage()\l&#45; TSaslServerTransport()\l}" alt="" coords="217,640,399,805"/>
+<area shape="rect" id="node2" href="$classTVirtualTransport.html" title="{TVirtualTransport\&lt;\l TSaslTransport \&gt;\n||}" alt="" coords="137,6,267,98"/>
+</map>

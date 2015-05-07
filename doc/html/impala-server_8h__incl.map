@@ -1,0 +1,23 @@
+<map id="be/src/service/impala&#45;server.h" name="be/src/service/impala&#45;server.h">
+<area shape="rect" id="node14" href="$thrift-server_8h.html" title="rpc/thrift&#45;server.h" alt="" coords="1458,179,1579,205"/>
+<area shape="rect" id="node17" href="$status_8h.html" title="common/status.h" alt="" coords="865,411,988,437"/>
+<area shape="rect" id="node28" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="1470,261,1567,288"/>
+<area shape="rect" id="node40" href="$frontend_8h.html" title="service/frontend.h" alt="" coords="521,96,647,123"/>
+<area shape="rect" id="node42" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="2492,261,2627,288"/>
+<area shape="rect" id="node43" href="$simple-logger_8h.html" title="util/simple&#45;logger.h" alt="" coords="949,96,1079,123"/>
+<area shape="rect" id="node44" href="$thread-pool_8h.html" title="util/thread&#45;pool.h" alt="" coords="2089,261,2207,288"/>
+<area shape="rect" id="node45" href="$time_8h.html" title="util/time.h" alt="" coords="2077,96,2155,123"/>
+<area shape="rect" id="node46" href="$uid-util_8h.html" title="util/uid&#45;util.h" alt="" coords="1807,179,1899,205"/>
+<area shape="rect" id="node47" href="$coordinator_8h.html" title="runtime/coordinator.h" alt="" coords="2579,96,2723,123"/>
+<area shape="rect" id="node48" href="$runtime-state_8h.html" title="runtime/runtime&#45;state.h" alt="" coords="2573,179,2728,205"/>
+<area shape="rect" id="node49" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="59,493,235,520"/>
+<area shape="rect" id="node50" href="$types_8h.html" title="runtime/types.h" alt="" coords="412,411,523,437"/>
+<area shape="rect" id="node27" href="$auth-provider_8h.html" title="rpc/auth&#45;provider.h" alt="" coords="1040,336,1169,363"/>
+<area shape="rect" id="node39" href="$thread_8h.html" title="util/thread.h" alt="" coords="1901,336,1992,363"/>
+<area shape="rect" id="node21" href="$logging_8h.html" title="common/logging.h" alt="" coords="1364,493,1492,520"/>
+<area shape="rect" id="node22" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="1031,493,1188,520"/>
+<area shape="rect" id="node26" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="721,493,823,520"/>
+<area shape="rect" id="node35" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="2371,336,2521,363"/>
+<area shape="rect" id="node36" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="2998,336,3108,363"/>
+<area shape="rect" id="node37" href="$json-util_8h.html" title="util/json&#45;util.h" alt="" coords="765,336,864,363"/>
+</map>

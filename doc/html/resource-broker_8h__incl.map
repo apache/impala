@@ -1,0 +1,17 @@
+<map id="be/src/resourcebroker/resource&#45;broker.h" name="be/src/resourcebroker/resource&#45;broker.h">
+<area shape="rect" id="node5" href="$client-cache_8h.html" title="runtime/client&#45;cache.h" alt="" coords="1054,104,1204,131"/>
+<area shape="rect" id="node35" href="$collection-metrics_8h.html" title="util/collection&#45;metrics.h" alt="" coords="3282,104,3437,131"/>
+<area shape="rect" id="node44" href="$promise_8h.html" title="util/promise.h" alt="" coords="3455,277,3555,304"/>
+<area shape="rect" id="node11" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="2266,195,2363,221"/>
+<area shape="rect" id="node20" href="$status_8h.html" title="common/status.h" alt="" coords="1361,360,1484,387"/>
+<area shape="rect" id="node27" href="$thrift-client_8h.html" title="rpc/thrift&#45;client.h" alt="" coords="990,277,1105,304"/>
+<area shape="rect" id="node34" href="$thrift-util_8h.html" title="rpc/thrift&#45;util.h" alt="" coords="411,277,513,304"/>
+<area shape="rect" id="node18" href="$logging_8h.html" title="common/logging.h" alt="" coords="2319,443,2447,469"/>
+<area shape="rect" id="node21" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="1791,277,1941,304"/>
+<area shape="rect" id="node22" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="2018,277,2128,304"/>
+<area shape="rect" id="node24" href="$json-util_8h.html" title="util/json&#45;util.h" alt="" coords="2153,277,2252,304"/>
+<area shape="rect" id="node25" href="$pretty-printer_8h.html" title="util/pretty&#45;printer.h" alt="" coords="2218,360,2344,387"/>
+<area shape="rect" id="node26" href="$webserver_8h.html" title="util/webserver.h" alt="" coords="2428,277,2543,304"/>
+<area shape="rect" id="node46" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="3417,360,3593,387"/>
+<area shape="rect" id="node47" href="$time_8h.html" title="util/time.h" alt="" coords="3618,360,3696,387"/>
+</map>

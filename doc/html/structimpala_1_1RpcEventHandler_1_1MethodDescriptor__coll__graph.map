@@ -1,0 +1,5 @@
+<map id="impala::RpcEventHandler::MethodDescriptor" name="impala::RpcEventHandler::MethodDescriptor">
+<area shape="rect" id="node2" href="$classimpala_1_1AtomicInt.html" title="{impala::AtomicInt\&lt;\l uint32_t \&gt;\n||+ AtomicInt()\l+ operator uint32_t()\l+ operator=()\l+ operator=()\l+ operator+=()\l+ operator&#45;=()\l+ operator\|=()\l+ operator&amp;=()\l+ operator++()\l+ operator++()\land 10 more...\l}" alt="" coords="5,406,144,645"/>
+<area shape="rect" id="node6" href="$classimpala_1_1Metric.html" title="TODO: Add ToThrift() for conversion to an RPC&#45;friendly format. " alt="" coords="221,161,375,341"/>
+<area shape="rect" id="node5" href="$classimpala_1_1StatsMetric.html" title="{impala::StatsMetric\l\&lt; double \&gt;\n||+ StatsMetric()\l+ Update()\l+ Reset()\l+ ToJson()\l+ ToLegacyJson()\l+ ToHumanReadable()\l}" alt="" coords="392,443,545,608"/>
+</map>

@@ -1,0 +1,35 @@
+<map id="be/src/util/jni&#45;util.h" name="be/src/util/jni&#45;util.h">
+<area shape="rect" id="node2" href="$catalogd-main_8cc.html" title="be/src/catalog/catalogd\l&#45;main.cc" alt="" coords="1873,171,2031,213"/>
+<area shape="rect" id="node3" href="$data-source-scan-node_8cc.html" title="be/src/exec/data&#45;source\l&#45;scan&#45;node.cc" alt="" coords="2505,81,2668,122"/>
+<area shape="rect" id="node4" href="$hbase-scan-node_8cc.html" title="be/src/exec/hbase&#45;scan\l&#45;node.cc" alt="" coords="2693,81,2853,122"/>
+<area shape="rect" id="node5" href="$hbase-table-scanner_8cc.html" title="be/src/exec/hbase&#45;table\l&#45;scanner.cc" alt="" coords="2878,81,3039,122"/>
+<area shape="rect" id="node6" href="$hbase-table-writer_8cc.html" title="be/src/exec/hbase&#45;table\l&#45;writer.cc" alt="" coords="3063,81,3224,122"/>
+<area shape="rect" id="node7" href="$jni-thrift-util_8h.html" title="be/src/rpc/jni&#45;thrift\l&#45;util.h" alt="" coords="1151,81,1277,122"/>
+<area shape="rect" id="node13" href="$fe-support_8cc.html" title="be/src/service/fe&#45;support.cc" alt="" coords="1665,179,1849,205"/>
+<area shape="rect" id="node14" href="$frontend_8cc.html" title="be/src/service/frontend.cc" alt="" coords="520,179,693,205"/>
+<area shape="rect" id="node15" href="$jni-util_8cc.html" title="be/src/util/jni&#45;util.cc" alt="" coords="1506,179,1640,205"/>
+<area shape="rect" id="node16" href="$hbase-table-factory_8cc.html" title="be/src/runtime/hbase\l&#45;table&#45;factory.cc" alt="" coords="3249,81,3393,122"/>
+<area shape="rect" id="node17" href="$hbase-table_8cc.html" title="be/src/runtime/hbase\l&#45;table.cc" alt="" coords="3417,81,3561,122"/>
+<area shape="rect" id="node18" href="$runtime-state_8cc.html" title="be/src/runtime/runtime\l&#45;state.cc" alt="" coords="3585,81,3737,122"/>
+<area shape="rect" id="node19" href="$fe-support_8h.html" title="be/src/service/fe&#45;support.h" alt="" coords="2202,88,2379,115"/>
+<area shape="rect" id="node25" href="$impalad-main_8cc.html" title="be/src/service/impalad\l&#45;main.cc" alt="" coords="3275,171,3428,213"/>
+<area shape="rect" id="node27" href="$mini-impala-cluster_8cc.html" title="be/src/testutil/mini\l&#45;impala&#45;cluster.cc" alt="" coords="3453,171,3581,213"/>
+<area shape="rect" id="node29" href="$impala-beeswax-server_8cc.html" title="be/src/service/impala\l&#45;beeswax&#45;server.cc" alt="" coords="3761,81,3908,122"/>
+<area shape="rect" id="node30" href="$logging-support_8h.html" title="be/src/util/logging\l&#45;support.h" alt="" coords="350,81,473,122"/>
+<area shape="rect" id="node33" href="$memory-metrics_8cc.html" title="be/src/util/memory\l&#45;metrics.cc" alt="" coords="3932,81,4061,122"/>
+<area shape="rect" id="node34" href="$metrics-test_8cc.html" title="be/src/util/metrics\l&#45;test.cc" alt="" coords="4087,81,4213,122"/>
+<area shape="rect" id="node8" href="$catalog_8cc.html" title="be/src/catalog/catalog.cc" alt="" coords="328,179,496,205"/>
+<area shape="rect" id="node9" href="$external-data-source-executor_8cc.html" title="be/src/exec/external\l&#45;data&#45;source&#45;executor.cc" alt="" coords="718,171,884,213"/>
+<area shape="rect" id="node10" href="$expr-benchmark_8cc.html" title="be/src/exprs/expr&#45;benchmark.cc" alt="" coords="909,179,1117,205"/>
+<area shape="rect" id="node11" href="$hive-udf-call_8cc.html" title="be/src/exprs/hive&#45;udf\l&#45;call.cc" alt="" coords="1143,171,1287,213"/>
+<area shape="rect" id="node12" href="$request-pool-service_8cc.html" title="be/src/scheduling/request\l&#45;pool&#45;service.cc" alt="" coords="1311,171,1481,213"/>
+<area shape="rect" id="node20" href="$expr-test_8cc.html" title="be/src/exprs/expr&#45;test.cc" alt="" coords="2550,179,2716,205"/>
+<area shape="rect" id="node21" href="$thrift-server-test_8cc.html" title="be/src/rpc/thrift&#45;server\l&#45;test.cc" alt="" coords="2741,171,2891,213"/>
+<area shape="rect" id="node22" href="$buffered-block-mgr-test_8cc.html" title="be/src/runtime/buffered\l&#45;block&#45;mgr&#45;test.cc" alt="" coords="2915,171,3071,213"/>
+<area shape="rect" id="node23" href="$buffered-tuple-stream-test_8cc.html" title="be/src/runtime/buffered\l&#45;tuple&#45;stream&#45;test.cc" alt="" coords="3095,171,3251,213"/>
+<area shape="rect" id="node24" href="$data-stream-test_8cc.html" title="be/src/runtime/data\l&#45;stream&#45;test.cc" alt="" coords="2055,171,2189,213"/>
+<area shape="rect" id="node26" href="$session-expiry-test_8cc.html" title="be/src/service/session\l&#45;expiry&#45;test.cc" alt="" coords="2214,171,2367,213"/>
+<area shape="rect" id="node28" href="$proc-info-test_8cc.html" title="be/src/util/proc&#45;info\l&#45;test.cc" alt="" coords="2392,171,2525,213"/>
+<area shape="rect" id="node31" href="$init_8cc.html" title="be/src/common/init.cc" alt="" coords="153,179,303,205"/>
+<area shape="rect" id="node32" href="$logging-support_8cc.html" title="be/src/util/logging\l&#45;support.cc" alt="" coords="5,171,128,213"/>
+</map>

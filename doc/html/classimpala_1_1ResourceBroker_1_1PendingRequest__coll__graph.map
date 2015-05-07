@@ -1,0 +1,4 @@
+<map id="impala::ResourceBroker::PendingRequest" name="impala::ResourceBroker::PendingRequest">
+<area shape="rect" id="node2" href="$classbool.html" title="{bool\n||}" alt="" coords="27,5,73,83"/>
+<area shape="rect" id="node5" href="$classimpala_1_1Promise.html" title="{impala::Promise\&lt; bool \&gt;\n||+ Promise()\l+ Set()\l+ Get()\l+ Get()\l+ IsSet()\l}" alt="" coords="131,160,294,296"/>
+</map>

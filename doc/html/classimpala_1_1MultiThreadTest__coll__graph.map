@@ -1,0 +1,5 @@
+<map id="impala::MultiThreadTest" name="impala::MultiThreadTest">
+<area shape="rect" id="node3" href="$classimpala_1_1BlockingQueue.html" title="{impala::BlockingQueue\l\&lt; int32_t \&gt;\n||+ BlockingQueue()\l+ BlockingGet()\l+ BlockingPut()\l+ Shutdown()\l+ GetSize()\l+ total_get_wait_time()\l+ total_put_wait_time()\l}" alt="" coords="383,190,539,370"/>
+<area shape="rect" id="node4" href="$classuint64__t.html" title="{uint64_t\n||}" alt="" coords="387,5,455,83"/>
+<area shape="rect" id="node9" href="$classbool.html" title="{bool\n||}" alt="" coords="514,5,560,83"/>
+</map>

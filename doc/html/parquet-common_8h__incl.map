@@ -1,0 +1,14 @@
+<map id="be/src/exec/parquet&#45;common.h" name="be/src/exec/parquet&#45;common.h">
+<area shape="rect" id="node4" href="$decimal-value_8h.html" title="runtime/decimal&#45;value.h" alt="" coords="884,104,1043,131"/>
+<area shape="rect" id="node23" href="$bit-util_8h.html" title="util/bit&#45;util.h" alt="" coords="1215,261,1304,288"/>
+<area shape="rect" id="node30" href="$string-value_8h.html" title="runtime/string&#45;value.h" alt="" coords="1785,187,1932,213"/>
+<area shape="rect" id="node9" href="$logging_8h.html" title="common/logging.h" alt="" coords="1640,427,1768,453"/>
+<area shape="rect" id="node12" href="$multi-precision_8h.html" title="runtime/multi&#45;precision.h" alt="" coords="374,261,537,288"/>
+<area shape="rect" id="node17" href="$decimal-util_8h.html" title="util/decimal&#45;util.h" alt="" coords="705,187,825,213"/>
+<area shape="rect" id="node29" href="$hash-util_8h.html" title="util/hash&#45;util.h" alt="" coords="1462,261,1564,288"/>
+<area shape="rect" id="node20" href="$types_8h.html" title="runtime/types.h" alt="" coords="877,261,988,288"/>
+<area shape="rect" id="node25" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="1509,344,1667,371"/>
+<area shape="rect" id="node26" href="$cpu-info_8h.html" title="util/cpu&#45;info.h" alt="" coords="1265,344,1364,371"/>
+<area shape="rect" id="node27" href="$sse-util_8h.html" title="util/sse&#45;util.h" alt="" coords="1389,344,1485,371"/>
+<area shape="rect" id="node32" href="$udf_8h.html" title="udf/udf.h" alt="" coords="1894,261,1967,288"/>
+</map>

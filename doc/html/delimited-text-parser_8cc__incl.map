@@ -1,0 +1,33 @@
+<map id="be/src/exec/delimited&#45;text&#45;parser.cc" name="be/src/exec/delimited&#45;text&#45;parser.cc">
+<area shape="rect" id="node2" href="$delimited-text-parser_8inline_8h.html" title="exec/delimited&#45;text\l&#45;parser.inline.h" alt="" coords="3573,97,3704,138"/>
+<area shape="rect" id="node4" href="$hdfs-scanner_8h.html" title="exec/hdfs&#45;scanner.h" alt="" coords="1911,261,2051,288"/>
+<area shape="rect" id="node39" href="$cpu-info_8h.html" title="util/cpu&#45;info.h" alt="" coords="3551,800,3651,827"/>
+<area shape="rect" id="node49" href="$names_8h.html" title="common/names.h" alt="" coords="3781,104,3907,131"/>
+<area shape="rect" id="node3" href="$delimited-text-parser_8h.html" title="delimited&#45;text&#45;parser.h" alt="" coords="3094,187,3244,213"/>
+<area shape="rect" id="node40" href="$sse-util_8h.html" title="util/sse&#45;util.h" alt="" coords="3559,725,3655,752"/>
+<area shape="rect" id="node11" href="$hdfs-scan-node_8h.html" title="exec/hdfs&#45;scan&#45;node.h" alt="" coords="2073,336,2227,363"/>
+<area shape="rect" id="node10" href="$impala-ir_8h.html" title="codegen/impala&#45;ir.h" alt="" coords="1914,336,2048,363"/>
+<area shape="rect" id="node17" href="$scan-node_8h.html" title="exec/scan&#45;node.h" alt="" coords="3111,485,3236,512"/>
+<area shape="rect" id="node33" href="$scanner-context_8h.html" title="exec/scanner&#45;context.h" alt="" coords="1449,411,1607,437"/>
+<area shape="rect" id="node34" href="$disk-io-mgr_8h.html" title="runtime/disk&#45;io&#45;mgr.h" alt="" coords="1339,560,1483,587"/>
+<area shape="rect" id="node43" href="$row-batch_8h.html" title="runtime/row&#45;batch.h" alt="" coords="602,485,739,512"/>
+<area shape="rect" id="node26" href="$descriptors_8h.html" title="runtime/descriptors.h" alt="" coords="2504,725,2648,752"/>
+<area shape="rect" id="node30" href="$spinlock_8h.html" title="util/spinlock.h" alt="" coords="493,800,595,827"/>
+<area shape="rect" id="node31" href="$thread_8h.html" title="util/thread.h" alt="" coords="2175,725,2265,752"/>
+<area shape="rect" id="node47" href="$string-buffer_8h.html" title="runtime/string&#45;buffer.h" alt="" coords="1787,485,1935,512"/>
+<area shape="rect" id="node48" href="$progress-updater_8h.html" title="util/progress&#45;updater.h" alt="" coords="3261,800,3411,827"/>
+<area shape="rect" id="node19" href="$exec-node_8h.html" title="exec/exec&#45;node.h" alt="" coords="2745,560,2871,587"/>
+<area shape="rect" id="node27" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="1561,643,1696,669"/>
+<area shape="rect" id="node20" href="$status_8h.html" title="common/status.h" alt="" coords="2237,800,2360,827"/>
+<area shape="rect" id="node21" href="$logging_8h.html" title="common/logging.h" alt="" coords="1787,875,1915,901"/>
+<area shape="rect" id="node22" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="1293,957,1451,984"/>
+<area shape="rect" id="node23" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="2983,875,3084,901"/>
+<area shape="rect" id="node28" href="$atomic_8h.html" title="common/atomic.h" alt="" coords="469,875,595,901"/>
+<area shape="rect" id="node29" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="1161,725,1311,752"/>
+<area shape="rect" id="node36" href="$hdfs_8h.html" title="common/hdfs.h" alt="" coords="1249,643,1360,669"/>
+<area shape="rect" id="node37" href="$thread-resource-mgr_8h.html" title="runtime/thread&#45;resource\l&#45;mgr.h" alt="" coords="965,635,1123,677"/>
+<area shape="rect" id="node38" href="$bit-util_8h.html" title="util/bit&#45;util.h" alt="" coords="3362,643,3451,669"/>
+<area shape="rect" id="node42" href="$internal-queue_8h.html" title="util/internal&#45;queue.h" alt="" coords="399,725,533,752"/>
+<area shape="rect" id="node45" href="$mem-pool_8h.html" title="runtime/mem&#45;pool.h" alt="" coords="1729,560,1865,587"/>
+<area shape="rect" id="node46" href="$mem-tracker_8h.html" title="runtime/mem&#45;tracker.h" alt="" coords="594,560,747,587"/>
+</map>

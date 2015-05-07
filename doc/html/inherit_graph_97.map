@@ -1,0 +1,5 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classcom_1_1cloudera_1_1impala_1_1common_1_1AliasGenerator.html" title="com.cloudera.impala.common.\lAliasGenerator" alt="" coords="5,38,205,79"/>
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1common_1_1ColumnAliasGenerator.html" title="com.cloudera.impala.common.\lColumnAliasGenerator" alt="" coords="253,5,453,46"/>
+<area shape="rect" id="node3" href="$classcom_1_1cloudera_1_1impala_1_1common_1_1TableAliasGenerator.html" title="com.cloudera.impala.common.\lTableAliasGenerator" alt="" coords="253,70,453,111"/>
+</map>

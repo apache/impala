@@ -1,0 +1,5 @@
+<map id="impala::BaseSequenceScanner::FileHeader" name="impala::BaseSequenceScanner::FileHeader">
+<area shape="rect" id="node2" href="$structimpala_1_1HdfsAvroScanner_1_1AvroFileHeader.html" title="{impala::HdfsAvroScanner\l::AvroFileHeader\n|+ schema\l+ template_tuple\l+ use_codegend_decode\l_avro_data\l|}" alt="" coords="5,205,176,341"/>
+<area shape="rect" id="node3" href="$structimpala_1_1HdfsRCFileScanner_1_1RcFileHeader.html" title="Data that is fixed across headers. This struct is shared between scan ranges. " alt="" coords="201,220,385,327"/>
+<area shape="rect" id="node4" href="$structimpala_1_1HdfsSequenceScanner_1_1SeqFileHeader.html" title="Data that is fixed across headers. This struct is shared between scan ranges. " alt="" coords="411,227,613,319"/>
+</map>

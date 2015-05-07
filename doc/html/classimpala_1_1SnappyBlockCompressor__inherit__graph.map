@@ -1,0 +1,3 @@
+<map id="impala::SnappyBlockCompressor" name="impala::SnappyBlockCompressor">
+<area shape="rect" id="node2" href="$classimpala_1_1Codec.html" title="{impala::Codec\n|+ DEFAULT_COMPRESSION\l+ GZIP_COMPRESSION\l+ BZIP2_COMPRESSION\l+ SNAPPY_COMPRESSION\l+ UNKNOWN_CODEC_ERROR\l+ CODEC_MAP\l+ MAX_BLOCK_SIZE\l# memory_pool_\l# temp_memory_pool_\l# reuse_buffer_\l# out_buffer_\l# buffer_length_\l|+ ~Codec()\l+ ProcessBlock()\l+ ProcessBlock32()\l+ ProcessBlockStreaming()\l+ MaxOutputLen()\l+ Close()\l+ file_extension()\l+ reuse_output_buffer()\l+ CreateDecompressor()\l+ CreateDecompressor()\l+ CreateCompressor()\l+ CreateCompressor()\l+ GetCodecName()\l+ GetHadoopCodecClassName()\l# Codec()\l# Init()\l}" alt="" coords="5,5,224,464"/>
+</map>

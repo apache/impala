@@ -1,0 +1,4 @@
+<map id="com.cloudera.impala.catalog.BuiltinsDb" name="com.cloudera.impala.catalog.BuiltinsDb">
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1catalog_1_1Db.html" title="{com.cloudera.impala.catalog.Db\n|&#45; parentCatalog_\l&#45; thriftDb_\l&#45; catalogVersion_\l&#45; tableCache_\l&#45; functions_\l&#45; isSystemDb_\l&#45; LOG\l|+ Db()\l+ setIsSystemDb()\l+ isSystemDb()\l+ toThrift()\l+ getName()\l+ getCatalogObjectType()\l+ addTable()\l+ getAllTableNames()\l+ containsTable()\l+ getTable()\land 16 more...\l+ fromTDatabase()\l# getAllFunctions()\l}" alt="" coords="11,205,220,547"/>
+<area shape="rect" id="node3" href="$interfacecom_1_1cloudera_1_1impala_1_1catalog_1_1CatalogObject.html" title="{com.cloudera.impala.catalog.\lCatalogObject\n||+ getCatalogObjectType()\l+ getName()\l+ getCatalogVersion()\l+ setCatalogVersion()\l+ isLoaded()\l}" alt="" coords="20,6,212,157"/>
+</map>

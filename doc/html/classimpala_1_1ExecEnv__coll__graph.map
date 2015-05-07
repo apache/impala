@@ -1,0 +1,9 @@
+<map id="impala::ExecEnv" name="impala::ExecEnv">
+<area shape="rect" id="node9" href="$classimpala_1_1ImpalaServer.html" title="{impala::ImpalaServer\n||+ ImpalaServer()\l+ ~ImpalaServer()\l+ query()\l+ executeAndWait()\l+ explain()\l+ fetch()\l+ get_results_metadata()\l+ close()\l+ get_state()\l+ echo()\land 41 more...\l+ PrepareQueryContext()\l&#45; CreateHS2ResultSet()\l&#45; GetQueryExecState()\l&#45; GetSessionIdForQuery()\l&#45; UpdateCatalogMetrics()\l&#45; Execute()\l&#45; ExecuteInternal()\l&#45; RegisterQuery()\l&#45; SetQueryInflight()\l&#45; UnregisterQuery()\l&#45; CancelInternal()\land 45 more...\l&#45; InitLoggingDir()\l&#45; THandleIdentifierToTUniqueId()\l&#45; TUniqueIdToTHandleIdentifier()\l}" alt="" coords="3661,926,3872,1370"/>
+<area shape="rect" id="node10" href="$classImpalaServiceIf.html" title="{ImpalaServiceIf\n||}" alt="" coords="1159,477,1272,555"/>
+<area shape="rect" id="node11" href="$classImpalaHiveServer2ServiceIf.html" title="{ImpalaHiveServer2ServiceIf\n||}" alt="" coords="1297,477,1481,555"/>
+<area shape="rect" id="node12" href="$classimpala_1_1ThriftServer_1_1ConnectionHandlerIf.html" title="Interface class for receiving connection creation / termination events. " alt="" coords="1507,463,1655,569"/>
+<area shape="rect" id="node14" href="$structimpala_1_1ImpalaServer_1_1CatalogUpdateVersionInfo.html" title="Contains details on the version information of a catalog update. " alt="" coords="4307,470,4501,562"/>
+<area shape="rect" id="node39" href="$classimpala_1_1TimezoneDatabase.html" title="Functions to load and access the timestamp database. " alt="" coords="2585,160,2767,267"/>
+<area shape="rect" id="node26" href="$classbool.html" title="{bool\n||}" alt="" coords="5,175,51,252"/>
+</map>

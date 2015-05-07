@@ -1,0 +1,3 @@
+<map id="impala::HdfsTextTableWriter" name="impala::HdfsTextTableWriter">
+<area shape="rect" id="node2" href="$classimpala_1_1HdfsTableWriter.html" title="{impala::HdfsTableWriter\n|# parent_\l# state_\l# output_\l# table_desc_\l# output_expr_ctxs_\l# stats_\l# HDFS_FLUSH_WRITE_SIZE\l|+ HdfsTableWriter()\l+ ~HdfsTableWriter()\l+ Init()\l+ InitNewFile()\l+ AppendRowBatch()\l+ Finalize()\l+ Close()\l+ stats()\l+ default_block_size()\l+ file_extension()\l# Write()\l# Write()\l# Write()\l}" alt="" coords="5,5,213,347"/>
+</map>

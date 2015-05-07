@@ -1,0 +1,7 @@
+<map id="impala::RpcEventHandler::InvocationContext" name="impala::RpcEventHandler::InvocationContext">
+<area shape="rect" id="node3" href="$structimpala_1_1RpcEventHandler_1_1MethodDescriptor.html" title="Per&#45;method descriptor. " alt="" coords="253,710,424,802"/>
+<area shape="rect" id="node4" href="$classimpala_1_1AtomicInt.html" title="{impala::AtomicInt\&lt;\l uint32_t \&gt;\n||+ AtomicInt()\l+ operator uint32_t()\l+ operator=()\l+ operator=()\l+ operator+=()\l+ operator&#45;=()\l+ operator\|=()\l+ operator&amp;=()\l+ operator++()\l+ operator++()\land 10 more...\l}" alt="" coords="154,406,293,645"/>
+<area shape="rect" id="node8" href="$classimpala_1_1Metric.html" title="TODO: Add ToThrift() for conversion to an RPC&#45;friendly format. " alt="" coords="589,161,742,341"/>
+<area shape="rect" id="node13" href="$structimpala_1_1ThriftServer_1_1ConnectionContext.html" title="Per&#45;connection information. " alt="" coords="852,205,994,297"/>
+<area shape="rect" id="node7" href="$classimpala_1_1StatsMetric.html" title="{impala::StatsMetric\l\&lt; double \&gt;\n||+ StatsMetric()\l+ Update()\l+ Reset()\l+ ToJson()\l+ ToLegacyJson()\l+ ToHumanReadable()\l}" alt="" coords="376,443,529,608"/>
+</map>

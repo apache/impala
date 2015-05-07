@@ -1,0 +1,10 @@
+<map id="impala::InProcessImpalaServer" name="impala::InProcessImpalaServer">
+<area shape="rect" id="node2" href="$classimpala_1_1ImpalaServer.html" title="{impala::ImpalaServer\n||+ ImpalaServer()\l+ ~ImpalaServer()\l+ query()\l+ executeAndWait()\l+ explain()\l+ fetch()\l+ get_results_metadata()\l+ close()\l+ get_state()\l+ echo()\land 41 more...\l+ PrepareQueryContext()\l&#45; CreateHS2ResultSet()\l&#45; GetQueryExecState()\l&#45; GetSessionIdForQuery()\l&#45; UpdateCatalogMetrics()\l&#45; Execute()\l&#45; ExecuteInternal()\l&#45; RegisterQuery()\l&#45; SetQueryInflight()\l&#45; UnregisterQuery()\l&#45; CancelInternal()\land 45 more...\l&#45; InitLoggingDir()\l&#45; THandleIdentifierToTUniqueId()\l&#45; TUniqueIdToTHandleIdentifier()\l}" alt="" coords="2937,550,3148,994"/>
+<area shape="rect" id="node15" href="$classimpala_1_1ExecEnv.html" title="{impala::ExecEnv\n||+ ExecEnv()\l+ ExecEnv()\l+ ~ExecEnv()\l+ SetImpalaServer()\l+ statestore_subscriber()\l+ stream_mgr()\l+ impalad_client_cache()\l+ catalogd_client_cache()\l+ htable_factory()\l+ disk_io_mgr()\land 17 more...\l+ GetInstance()\l&#45; InitRm()\l}" alt="" coords="1545,1101,1716,1355"/>
+<area shape="rect" id="node3" href="$classImpalaServiceIf.html" title="{ImpalaServiceIf\n||}" alt="" coords="1522,175,1635,252"/>
+<area shape="rect" id="node4" href="$classImpalaHiveServer2ServiceIf.html" title="{ImpalaHiveServer2ServiceIf\n||}" alt="" coords="1659,175,1844,252"/>
+<area shape="rect" id="node5" href="$classimpala_1_1ThriftServer_1_1ConnectionHandlerIf.html" title="Interface class for receiving connection creation / termination events. " alt="" coords="1869,160,2017,267"/>
+<area shape="rect" id="node7" href="$structimpala_1_1ImpalaServer_1_1CatalogUpdateVersionInfo.html" title="Contains details on the version information of a catalog update. " alt="" coords="2396,167,2591,259"/>
+<area shape="rect" id="node26" href="$classimpala_1_1TimezoneDatabase.html" title="Functions to load and access the timestamp database. " alt="" coords="1655,719,1836,825"/>
+<area shape="rect" id="node30" href="$classbool.html" title="{bool\n||}" alt="" coords="1451,175,1497,252"/>
+</map>

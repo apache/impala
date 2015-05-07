@@ -1,0 +1,9 @@
+<map id="impala::SlotRef" name="impala::SlotRef">
+<area shape="rect" id="node2" href="$classimpala_1_1Expr.html" title="This is the superclass of all expr evaluation nodes. " alt="" coords="781,1305,1019,2042"/>
+<area shape="rect" id="node3" href="$structLibCache_1_1LibCacheEntry.html" title="{impala::LibCache::LibCache\lEntry\n||+ LibCacheEntry()\l+ ~LibCacheEntry()\l}" alt="" coords="584,1016,771,1123"/>
+<area shape="rect" id="node4" href="$classimpala_1_1Status.html" title="{impala::Status\n||+ Status()\l+ Status()\l+ Status()\l+ Status()\l+ Status()\l+ Status()\l+ Status()\l+ Status()\l+ Status()\l+ Status()\land 23 more...\l+ Expected()\l&#45; Status()\l}" alt="" coords="241,451,348,704"/>
+<area shape="rect" id="node5" href="$classimpala_1_1ErrorMsg.html" title="{impala::ErrorMsg\n||+ ErrorMsg()\l+ ErrorMsg()\l+ ErrorMsg()\l+ ErrorMsg()\l+ ErrorMsg()\l+ ErrorMsg()\l+ ErrorMsg()\l+ ErrorMsg()\l+ ErrorMsg()\l+ ErrorMsg()\land 9 more...\l+ Init()\l}" alt="" coords="321,147,441,386"/>
+<area shape="rect" id="node17" href="$structimpala_1_1ColumnType.html" title="{impala::ColumnType\n||+ ColumnType()\l+ ColumnType()\l+ operator==()\l+ operator!=()\l+ ToThrift()\l+ IsStringType()\l+ IsVarLen()\l+ GetByteSize()\l+ GetSlotSize()\l+ ToHs2Type()\l+ DebugString()\l+ CreateCharType()\l+ CreateVarcharType()\l+ CreateDecimalType()\l+ GetDecimalByteSize()\l}" alt="" coords="1318,928,1481,1211"/>
+<area shape="rect" id="node24" href="$structimpala_1_1NullIndicatorOffset.html" title="{impala::NullIndicatorOffset\n||+ NullIndicatorOffset()\l+ DebugString()\l}" alt="" coords="1558,1023,1735,1115"/>
+<area shape="rect" id="node14" href="$classbool.html" title="{bool\n||}" alt="" coords="5,539,51,616"/>
+</map>

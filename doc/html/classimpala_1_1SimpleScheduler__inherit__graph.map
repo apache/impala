@@ -1,0 +1,3 @@
+<map id="impala::SimpleScheduler" name="impala::SimpleScheduler">
+<area shape="rect" id="node2" href="$classimpala_1_1Scheduler.html" title="{impala::Scheduler\n||+ ~Scheduler()\l+ GetBackends()\l+ GetBackend()\l+ HasLocalBackend()\l+ GetAllKnownBackends()\l+ Schedule()\l+ Release()\l+ HandlePreemptedReservation()\l+ HandlePreemptedResource()\l+ HandleLostResource()\l+ Init()\l}" alt="" coords="19,5,235,229"/>
+</map>

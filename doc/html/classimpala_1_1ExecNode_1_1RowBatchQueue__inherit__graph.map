@@ -1,0 +1,3 @@
+<map id="impala::ExecNode::RowBatchQueue" name="impala::ExecNode::RowBatchQueue">
+<area shape="rect" id="node2" href="$classimpala_1_1BlockingQueue.html" title="{impala::BlockingQueue\l\&lt; RowBatch * \&gt;\n|&#45; shutdown_\l&#45; max_elements_\l&#45; get_cv_\l&#45; put_cv_\l&#45; lock_\l&#45; list_\l&#45; total_get_wait_time_\l&#45; total_put_wait_time_\l|+ BlockingQueue()\l+ BlockingGet()\l+ BlockingPut()\l+ Shutdown()\l+ GetSize()\l+ total_get_wait_time()\l+ total_put_wait_time()\l}" alt="" coords="26,5,181,288"/>
+</map>

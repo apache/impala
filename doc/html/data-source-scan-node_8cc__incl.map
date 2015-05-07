@@ -1,0 +1,33 @@
+<map id="be/src/exec/data&#45;source&#45;scan&#45;node.cc" name="be/src/exec/data&#45;source&#45;scan&#45;node.cc">
+<area shape="rect" id="node2" href="$data-source-scan-node_8h.html" title="exec/data&#45;source&#45;scan\l&#45;node.h" alt="" coords="2120,262,2273,303"/>
+<area shape="rect" id="node6" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="3241,451,3376,477"/>
+<area shape="rect" id="node17" href="$mem-pool_8h.html" title="runtime/mem&#45;pool.h" alt="" coords="2291,360,2428,387"/>
+<area shape="rect" id="node22" href="$parquet-common_8h.html" title="exec/parquet&#45;common.h" alt="" coords="228,269,391,296"/>
+<area shape="rect" id="node26" href="$string-value_8h.html" title="runtime/string&#45;value.h" alt="" coords="5,360,152,387"/>
+<area shape="rect" id="node30" href="$read-write-util_8h.html" title="exec/read&#45;write&#45;util.h" alt="" coords="518,360,660,387"/>
+<area shape="rect" id="node31" href="$expr_8h.html" title="exprs/expr.h" alt="" coords="1047,96,1141,123"/>
+<area shape="rect" id="node38" href="$tuple-row_8h.html" title="runtime/tuple&#45;row.h" alt="" coords="2031,179,2164,205"/>
+<area shape="rect" id="node39" href="$row-batch_8h.html" title="runtime/row&#45;batch.h" alt="" coords="2430,269,2567,296"/>
+<area shape="rect" id="node44" href="$runtime-state_8h.html" title="runtime/runtime&#45;state.h" alt="" coords="3570,269,3725,296"/>
+<area shape="rect" id="node48" href="$jni-util_8h.html" title="util/jni&#45;util.h" alt="" coords="1329,451,1417,477"/>
+<area shape="rect" id="node49" href="$periodic-counter-updater_8h.html" title="util/periodic&#45;counter\l&#45;updater.h" alt="" coords="4409,353,4543,394"/>
+<area shape="rect" id="node50" href="$names_8h.html" title="common/names.h" alt="" coords="4670,96,4796,123"/>
+<area shape="rect" id="node5" href="$scan-node_8h.html" title="exec/scan&#45;node.h" alt="" coords="2735,360,2860,387"/>
+<area shape="rect" id="node11" href="$external-data-source-executor_8h.html" title="exec/external&#45;data\l&#45;source&#45;executor.h" alt="" coords="1476,353,1605,394"/>
+<area shape="rect" id="node14" href="$descriptors_8h.html" title="runtime/descriptors.h" alt="" coords="2119,360,2263,387"/>
+<area shape="rect" id="node7" href="$logging_8h.html" title="common/logging.h" alt="" coords="1040,608,1168,635"/>
+<area shape="rect" id="node8" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="3090,533,3240,560"/>
+<area shape="rect" id="node12" href="$status_8h.html" title="common/status.h" alt="" coords="1871,533,1993,560"/>
+<area shape="rect" id="node24" href="$decimal-value_8h.html" title="runtime/decimal&#45;value.h" alt="" coords="685,360,844,387"/>
+<area shape="rect" id="node29" href="$bit-util_8h.html" title="util/bit&#45;util.h" alt="" coords="565,451,653,477"/>
+<area shape="rect" id="node27" href="$udf_8h.html" title="udf/udf.h" alt="" coords="415,451,488,477"/>
+<area shape="rect" id="node33" href="$lib-cache_8h.html" title="runtime/lib&#45;cache.h" alt="" coords="2021,451,2152,477"/>
+<area shape="rect" id="node34" href="$raw-value_8h.html" title="runtime/raw&#45;value.h" alt="" coords="1005,269,1140,296"/>
+<area shape="rect" id="node35" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="869,360,1045,387"/>
+<area shape="rect" id="node36" href="$tuple_8h.html" title="runtime/tuple.h" alt="" coords="1847,269,1955,296"/>
+<area shape="rect" id="node40" href="$disk-io-mgr_8h.html" title="runtime/disk&#45;io&#45;mgr.h" alt="" coords="3023,360,3167,387"/>
+<area shape="rect" id="node43" href="$mem-tracker_8h.html" title="runtime/mem&#45;tracker.h" alt="" coords="3571,360,3724,387"/>
+<area shape="rect" id="node41" href="$thread-resource-mgr_8h.html" title="runtime/thread&#45;resource\l&#45;mgr.h" alt="" coords="3402,443,3560,485"/>
+<area shape="rect" id="node45" href="$query-resource-mgr_8h.html" title="statestore/query&#45;resource\l&#45;mgr.h" alt="" coords="3749,353,3920,394"/>
+<area shape="rect" id="node46" href="$exec-env_8h.html" title="runtime/exec&#45;env.h" alt="" coords="4023,451,4156,477"/>
+</map>

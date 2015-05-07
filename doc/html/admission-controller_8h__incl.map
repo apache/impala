@@ -1,0 +1,23 @@
+<map id="be/src/scheduling/admission&#45;controller.h" name="be/src/scheduling/admission&#45;controller.h">
+<area shape="rect" id="node8" href="$status_8h.html" title="common/status.h" alt="" coords="1655,451,1777,477"/>
+<area shape="rect" id="node19" href="$request-pool-service_8h.html" title="scheduling/request\l&#45;pool&#45;service.h" alt="" coords="387,187,516,229"/>
+<area shape="rect" id="node27" href="$statestore-subscriber_8h.html" title="statestore/statestore\l&#45;subscriber.h" alt="" coords="1161,97,1303,138"/>
+<area shape="rect" id="node37" href="$thread_8h.html" title="util/thread.h" alt="" coords="3135,368,3225,395"/>
+<area shape="rect" id="node42" href="$query-schedule_8h.html" title="statestore/query&#45;schedule.h" alt="" coords="2407,195,2589,221"/>
+<area shape="rect" id="node49" href="$internal-queue_8h.html" title="util/internal&#45;queue.h" alt="" coords="3298,195,3432,221"/>
+<area shape="rect" id="node10" href="$logging_8h.html" title="common/logging.h" alt="" coords="3140,541,3268,568"/>
+<area shape="rect" id="node13" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="2193,541,2351,568"/>
+<area shape="rect" id="node17" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="2007,541,2108,568"/>
+<area shape="rect" id="node22" href="$collection-metrics_8h.html" title="util/collection&#45;metrics.h" alt="" coords="374,285,529,312"/>
+<area shape="rect" id="node23" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="842,368,939,395"/>
+<area shape="rect" id="node30" href="$statestore_8h.html" title="statestore/statestore.h" alt="" coords="1098,195,1251,221"/>
+<area shape="rect" id="node34" href="$thrift-client_8h.html" title="rpc/thrift&#45;client.h" alt="" coords="1165,285,1280,312"/>
+<area shape="rect" id="node35" href="$stopwatch_8h.html" title="util/stopwatch.h" alt="" coords="2895,368,3009,395"/>
+<area shape="rect" id="node36" href="$thrift-util_8h.html" title="rpc/thrift&#45;util.h" alt="" coords="554,285,656,312"/>
+<area shape="rect" id="node41" href="$promise_8h.html" title="util/promise.h" alt="" coords="3125,451,3224,477"/>
+<area shape="rect" id="node43" href="$global-types_8h.html" title="common/global&#45;types.h" alt="" coords="2420,285,2577,312"/>
+<area shape="rect" id="node44" href="$query-resource-mgr_8h.html" title="statestore/query&#45;resource\l&#45;mgr.h" alt="" coords="2124,278,2295,319"/>
+<area shape="rect" id="node47" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="2988,285,3123,312"/>
+<area shape="rect" id="node45" href="$atomic_8h.html" title="common/atomic.h" alt="" coords="3402,368,3528,395"/>
+<area shape="rect" id="node50" href="$spinlock_8h.html" title="util/spinlock.h" alt="" coords="3453,285,3555,312"/>
+</map>

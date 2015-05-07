@@ -1,0 +1,6 @@
+<map id="com.cloudera.impala.planner.DataSink" name="com.cloudera.impala.planner.DataSink">
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1planner_1_1DataStreamSink.html" title="{com.cloudera.impala.planner.\lDataStreamSink\n|&#45; exchNode_\l&#45; outputPartition_\l|+ DataStreamSink()\l+ getExplainString()\l+ getOutputPartition()\l# toThrift()\l}" alt="" coords="5,249,197,399"/>
+<area shape="rect" id="node3" href="$classcom_1_1cloudera_1_1impala_1_1planner_1_1TableSink.html" title="{com.cloudera.impala.planner.\lTableSink\n|# targetTable_\l|+ TableSink()\l}" alt="" coords="221,278,413,370"/>
+<area shape="rect" id="node4" href="$classcom_1_1cloudera_1_1impala_1_1planner_1_1HBaseTableSink.html" title="{com.cloudera.impala.planner.\lHBaseTableSink\n||+ HBaseTableSink()\l+ getExplainString()\l# toThrift()\l}" alt="" coords="107,478,299,599"/>
+<area shape="rect" id="node5" href="$classcom_1_1cloudera_1_1impala_1_1planner_1_1HdfsTableSink.html" title="{com.cloudera.impala.planner.\lHdfsTableSink\n|# DEFAULT_NUM_PARTITIONS\l# partitionKeyExprs_\l# overwrite_\l|+ HdfsTableSink()\l+ computeCosts()\l+ getExplainString()\l# toThrift()\l&#45; getPerPartitionMemReq()\l}" alt="" coords="323,449,543,629"/>
+</map>

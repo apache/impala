@@ -1,0 +1,4 @@
+<map id="com.cloudera.impala.util.RequestPoolService" name="com.cloudera.impala.util.RequestPoolService">
+<area shape="rect" id="node8" href="$classcom_1_1cloudera_1_1impala_1_1util_1_1FileWatchService.html" title="{com.cloudera.impala.util.\lFileWatchService\n||+ FileWatchService()\l+ setCheckIntervalMs()\l+ start()\l+ stop()\l&#45; checkFile()\l}" alt="" coords="669,206,835,357"/>
+<area shape="rect" id="node9" href="$interfacecom_1_1cloudera_1_1impala_1_1util_1_1FileWatchService_1_1FileChangeListener.html" title="{com.cloudera.impala.util.\lFileWatchService.FileChangeListener\n||+ onFileChange()\l}" alt="" coords="331,6,572,98"/>
+</map>

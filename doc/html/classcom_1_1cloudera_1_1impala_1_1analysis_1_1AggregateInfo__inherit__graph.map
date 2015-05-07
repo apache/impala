@@ -1,0 +1,3 @@
+<map id="com.cloudera.impala.analysis.AggregateInfo" name="com.cloudera.impala.analysis.AggregateInfo">
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1AggregateInfoBase.html" title="{com.cloudera.impala.analysis.\lAggregateInfoBase\n|# groupingExprs_\l# aggregateExprs_\l# intermediateTupleDesc_\l# outputTupleDesc_\l# materializedSlots_\l&#45; LOG\l|+ materializeRequiredSlots()\l+ getGroupingExprs()\l+ getAggregateExprs()\l+ getOutputTupleDesc()\l+ getIntermediateTupleDesc()\l+ getIntermediateTupleId()\l+ getOutputTupleId()\l+ requiresIntermediateTuple()\l+ debugString()\l+ requiresIntermediateTuple()\l# AggregateInfoBase()\l# createTupleDescs()\l# tupleDebugName()\l&#45; createTupleDesc()\l}" alt="" coords="21,6,219,362"/>
+</map>

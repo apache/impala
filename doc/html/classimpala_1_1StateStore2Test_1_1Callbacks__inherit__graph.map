@@ -1,0 +1,4 @@
+<map id="impala::StateStore2Test::Callbacks" name="impala::StateStore2Test::Callbacks">
+<area shape="rect" id="node2" href="$classimpala_1_1TestRegistrationCb.html" title="{impala::TestRegistrationCb\n|# cv_mutex_\l# cv_\l|+ Topic1()\l+ lock1()\l+ cv1()\l}" alt="" coords="9,161,191,282"/>
+<area shape="rect" id="node3" href="$classimpala_1_1TestReceiveTopicCb.html" title="{impala::TestReceiveTopicCb\n||&#45; Topic1()\l}" alt="" coords="5,331,195,408"/>
+</map>

@@ -1,0 +1,8 @@
+<map id="be/src/exec/scanner&#45;context.inline.h" name="be/src/exec/scanner&#45;context.inline.h">
+<area shape="rect" id="node2" href="$base-sequence-scanner_8cc.html" title="be/src/exec/base&#45;sequence\l&#45;scanner.cc" alt="" coords="5,97,187,138"/>
+<area shape="rect" id="node3" href="$hdfs-avro-scanner_8cc.html" title="be/src/exec/hdfs&#45;avro\l&#45;scanner.cc" alt="" coords="211,97,359,138"/>
+<area shape="rect" id="node4" href="$hdfs-parquet-scanner_8cc.html" title="be/src/exec/hdfs&#45;parquet\l&#45;scanner.cc" alt="" coords="383,97,549,138"/>
+<area shape="rect" id="node5" href="$hdfs-rcfile-scanner_8cc.html" title="be/src/exec/hdfs&#45;rcfile\l&#45;scanner.cc" alt="" coords="574,97,724,138"/>
+<area shape="rect" id="node6" href="$hdfs-sequence-scanner_8cc.html" title="be/src/exec/hdfs&#45;sequence\l&#45;scanner.cc" alt="" coords="749,97,928,138"/>
+<area shape="rect" id="node7" href="$hdfs-text-scanner_8cc.html" title="be/src/exec/hdfs&#45;text\l&#45;scanner.cc" alt="" coords="953,97,1097,138"/>
+</map>

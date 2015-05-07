@@ -1,0 +1,5 @@
+<map id="impala::SlotDescriptor" name="impala::SlotDescriptor">
+<area shape="rect" id="node2" href="$structimpala_1_1NullIndicatorOffset.html" title="{impala::NullIndicatorOffset\n||+ NullIndicatorOffset()\l+ DebugString()\l}" alt="" coords="5,402,181,494"/>
+<area shape="rect" id="node5" href="$structimpala_1_1ColumnType.html" title="{impala::ColumnType\n||+ ColumnType()\l+ ColumnType()\l+ operator==()\l+ operator!=()\l+ ToThrift()\l+ IsStringType()\l+ IsVarLen()\l+ GetByteSize()\l+ GetSlotSize()\l+ ToHs2Type()\l+ DebugString()\l+ CreateCharType()\l+ CreateVarcharType()\l+ CreateDecimalType()\l+ GetDecimalByteSize()\l}" alt="" coords="343,307,507,589"/>
+<area shape="rect" id="node9" href="$classbool.html" title="{bool\n||}" alt="" coords="758,409,804,487"/>
+</map>

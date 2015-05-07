@@ -1,0 +1,8 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$interfacecom_1_1cloudera_1_1impala_1_1authorization_1_1Authorizeable.html" title="com.cloudera.impala.authorization.\lAuthorizeable" alt="" coords="5,135,229,177"/>
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1authorization_1_1AuthorizeableDb.html" title="com.cloudera.impala.authorization.\lAuthorizeableDb" alt="" coords="277,5,501,46"/>
+<area shape="rect" id="node3" href="$classcom_1_1cloudera_1_1impala_1_1authorization_1_1AuthorizeableFn.html" title="com.cloudera.impala.authorization.\lAuthorizeableFn" alt="" coords="277,70,501,111"/>
+<area shape="rect" id="node4" href="$classcom_1_1cloudera_1_1impala_1_1authorization_1_1AuthorizeableServer.html" title="com.cloudera.impala.authorization.\lAuthorizeableServer" alt="" coords="277,135,501,177"/>
+<area shape="rect" id="node5" href="$classcom_1_1cloudera_1_1impala_1_1authorization_1_1AuthorizeableTable.html" title="com.cloudera.impala.authorization.\lAuthorizeableTable" alt="" coords="277,201,501,242"/>
+<area shape="rect" id="node6" href="$classcom_1_1cloudera_1_1impala_1_1authorization_1_1AuthorizeableUri.html" title="com.cloudera.impala.authorization.\lAuthorizeableUri" alt="" coords="277,266,501,307"/>
+</map>

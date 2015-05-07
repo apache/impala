@@ -1,0 +1,4 @@
+<map id="impala::AuthProvider" name="impala::AuthProvider">
+<area shape="rect" id="node2" href="$classimpala_1_1NoAuthProvider.html" title="{impala::NoAuthProvider\n||+ NoAuthProvider()\l+ Start()\l+ GetServerTransportFactory()\l+ WrapClientTransport()\l+ is_sasl()\l}" alt="" coords="5,308,204,444"/>
+<area shape="rect" id="node3" href="$classimpala_1_1SaslAuthProvider.html" title="{impala::SaslAuthProvider\n|&#45; has_ldap_\l&#45; hostname_\l&#45; is_internal_\l&#45; principal_\l&#45; keytab_file_\l&#45; service_name_\l&#45; realm_\l&#45; needs_kinit_\l&#45; kinit_thread_\l&#45; env_setup_complete_\l|+ SaslAuthProvider()\l+ Start()\l+ WrapClientTransport()\l+ GetServerTransportFactory()\l+ is_sasl()\l+ InitKerberos()\l+ InitLdap()\l+ principal()\l+ service_name()\l+ hostname()\l+ realm()\l+ has_ldap()\l&#45; RunKinit()\l&#45; InitKerberosEnv()\l}" alt="" coords="229,176,428,576"/>
+</map>

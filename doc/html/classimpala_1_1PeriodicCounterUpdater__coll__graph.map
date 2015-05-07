@@ -1,0 +1,5 @@
+<map id="impala::PeriodicCounterUpdater" name="impala::PeriodicCounterUpdater">
+<area shape="rect" id="node2" href="$classimpala_1_1AtomicInt.html" title="{impala::AtomicInt\&lt;\l uint32_t \&gt;\n||+ AtomicInt()\l+ operator uint32_t()\l+ operator=()\l+ operator=()\l+ operator+=()\l+ operator&#45;=()\l+ operator\|=()\l+ operator&amp;=()\l+ operator++()\l+ operator++()\land 10 more...\l}" alt="" coords="5,147,144,386"/>
+<area shape="rect" id="node6" href="$classimpala_1_1SpinLock.html" title="Lightweight spinlock. " alt="" coords="634,191,765,342"/>
+<area shape="rect" id="node8" href="$classbool.html" title="{bool\n||}" alt="" coords="762,5,808,83"/>
+</map>

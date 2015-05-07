@@ -1,0 +1,4 @@
+<map id="com.cloudera.impala.catalog.HBaseColumn" name="com.cloudera.impala.catalog.HBaseColumn">
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1catalog_1_1Column.html" title="{com.cloudera.impala.catalog.\lColumn\n|# name_\l# type_\l# comment_\l# position_\l# stats_\l&#45; LOG\l|+ Column()\l+ Column()\l+ getComment()\l+ getName()\l+ getType()\l+ getPosition()\l+ setPosition()\l+ getStats()\l+ updateStats()\l+ updateStats()\l+ toString()\l+ toThrift()\l+ fromThrift()\l}" alt="" coords="5,5,197,347"/>
+<area shape="rect" id="node3" href="$classComparable.html" title="{Comparable\&lt; HBaseColumn \&gt;\n||}" alt="" coords="222,137,423,215"/>
+</map>

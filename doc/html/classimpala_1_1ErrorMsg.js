@@ -1,0 +1,27 @@
+var classimpala_1_1ErrorMsg =
+[
+    [ "ArgType", "classimpala_1_1ErrorMsg.html#a7f97fb51e6bdd2cb2b93b0e690169cb3", null ],
+    [ "ErrorMsg", "classimpala_1_1ErrorMsg.html#a3c17663f775c713014c0aeb5ce332c56", null ],
+    [ "ErrorMsg", "classimpala_1_1ErrorMsg.html#af48a3ecb5436e6f54b6ddc9d5be67706", null ],
+    [ "ErrorMsg", "classimpala_1_1ErrorMsg.html#ab264ef112b9b3e5cbf66fd048f5a3503", null ],
+    [ "ErrorMsg", "classimpala_1_1ErrorMsg.html#a0d7302e41c825104ddf3b802d34bb093", null ],
+    [ "ErrorMsg", "classimpala_1_1ErrorMsg.html#a80269294834de57aaf606447c412958e", null ],
+    [ "ErrorMsg", "classimpala_1_1ErrorMsg.html#a217d7d1efa88b0188b12c2c0f97edacf", null ],
+    [ "ErrorMsg", "classimpala_1_1ErrorMsg.html#ac560dfe9891283a9624ccc9f62a61246", null ],
+    [ "ErrorMsg", "classimpala_1_1ErrorMsg.html#a31a3cb4f14b423eb7ef84cde5fb6ac01", null ],
+    [ "ErrorMsg", "classimpala_1_1ErrorMsg.html#a0180da19f8791aae282f02493cfb84a2", null ],
+    [ "ErrorMsg", "classimpala_1_1ErrorMsg.html#ab73b97042147cd0cd99de4138dc4de70", null ],
+    [ "ErrorMsg", "classimpala_1_1ErrorMsg.html#a74baf78937dfc02f9141114e040566c9", null ],
+    [ "ErrorMsg", "classimpala_1_1ErrorMsg.html#aab1283b4367543fb8ebd74f5a71da501", null ],
+    [ "ErrorMsg", "classimpala_1_1ErrorMsg.html#acfeebcc4188fc7eaa506172523a6f117", null ],
+    [ "AddDetail", "classimpala_1_1ErrorMsg.html#a8cd59eba3c1485c94d37fc2032056df1", null ],
+    [ "details", "classimpala_1_1ErrorMsg.html#a4ad609b6a042448ad6ce1ff8cbd7cf01", null ],
+    [ "error", "classimpala_1_1ErrorMsg.html#a82657ad0b370959b139335ae7b062953", null ],
+    [ "GetFullMessageDetails", "classimpala_1_1ErrorMsg.html#a960ad6f0960b020da473b9e1b8eba9e0", null ],
+    [ "Init", "classimpala_1_1ErrorMsg.html#abf0f2381b45cb0b9f5d7a3a4dad5f824", null ],
+    [ "msg", "classimpala_1_1ErrorMsg.html#a99f5a1f06dfc4462643fd645ee38a75f", null ],
+    [ "SetError", "classimpala_1_1ErrorMsg.html#af4349e685f054c21c977088060d99c3e", null ],
+    [ "details_", "classimpala_1_1ErrorMsg.html#aa3bf801ad1ebfc56c723a49c9c78727a", null ],
+    [ "error_", "classimpala_1_1ErrorMsg.html#a32852e5e563ac133e658454240ed4117", null ],
+    [ "message_", "classimpala_1_1ErrorMsg.html#a27fff7a24dab64c23537b0a08801b345", null ]
+];

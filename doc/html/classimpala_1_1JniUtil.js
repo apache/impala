@@ -1,0 +1,26 @@
+var classimpala_1_1JniUtil =
+[
+    [ "CallJniMethod", "classimpala_1_1JniUtil.html#aeb425975e228b86c10c5c6367dcd11c5", null ],
+    [ "CallJniMethod", "classimpala_1_1JniUtil.html#a12f40fa1749a6be63ca9a064bc7b9c08", null ],
+    [ "CallJniMethod", "classimpala_1_1JniUtil.html#ac695abecc6199078b9ec5825c7017184", null ],
+    [ "CallJniMethod", "classimpala_1_1JniUtil.html#a79017014b9858795e49e258089b6deb9", null ],
+    [ "ClassExists", "classimpala_1_1JniUtil.html#a5c2923d58c1bd0a382d134e31cd748c0", null ],
+    [ "Cleanup", "classimpala_1_1JniUtil.html#a0cbc223e780420cab83967f9ae8d5794", null ],
+    [ "GetGlobalClassRef", "classimpala_1_1JniUtil.html#a2fdf8d5fc6c01982968faec681f792a9", null ],
+    [ "GetJniExceptionMsg", "classimpala_1_1JniUtil.html#a27781f7ed28a291ac2af91a6f37db97a", null ],
+    [ "GetJvmMetrics", "classimpala_1_1JniUtil.html#a5be8e724fa896dd6b7f181393c9d6416", null ],
+    [ "Init", "classimpala_1_1JniUtil.html#af206d4f6b71cec230f5eaaec53eec158", null ],
+    [ "InitLibhdfs", "classimpala_1_1JniUtil.html#a7aa7a7795d503a1d4c346a62a01441a8", null ],
+    [ "internal_exc_class", "classimpala_1_1JniUtil.html#a45378cba7fa84e3d004c3d37cd86efc0", null ],
+    [ "jni_util_class", "classimpala_1_1JniUtil.html#a494276ecd72fae6fe053454990abc6ee", null ],
+    [ "LoadJniMethod", "classimpala_1_1JniUtil.html#ac86c8bfaa04edbbcc334b5bcbe8ce970", null ],
+    [ "LocalToGlobalRef", "classimpala_1_1JniUtil.html#ac5f0573aba66e777c5b430e743bd2232", null ],
+    [ "throwable_to_stack_trace_id", "classimpala_1_1JniUtil.html#a44f602e8d4dc0ae16e704091563f2b24", null ],
+    [ "throwable_to_string_id", "classimpala_1_1JniUtil.html#aeb613bc219594eea72ed556efa7d71e3", null ],
+    [ "get_jvm_metrics_id_", "classimpala_1_1JniUtil.html#ad6c062b1de207d28341a2855b446cbdc", null ],
+    [ "global_refs_", "classimpala_1_1JniUtil.html#a65c5fc15a438d15b7d7e673b2d69bc86", null ],
+    [ "internal_exc_cl_", "classimpala_1_1JniUtil.html#a032678c6eb62df0745ef6af25778dc93", null ],
+    [ "jni_util_cl_", "classimpala_1_1JniUtil.html#acfb36b1c6752c25395837a2e62e39456", null ],
+    [ "throwable_to_stack_trace_id_", "classimpala_1_1JniUtil.html#a4b045e7993daf57b11ff45e1c8b04b6b", null ],
+    [ "throwable_to_string_id_", "classimpala_1_1JniUtil.html#aa9feafa1da8b48ae16f1ebf73f666579", null ]
+];

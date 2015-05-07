@@ -1,0 +1,10 @@
+<map id="be/src/rpc/jni&#45;thrift&#45;util.h" name="be/src/rpc/jni&#45;thrift&#45;util.h">
+<area shape="rect" id="node2" href="$catalog_8cc.html" title="be/src/catalog/catalog.cc" alt="" coords="5,104,173,131"/>
+<area shape="rect" id="node3" href="$external-data-source-executor_8cc.html" title="be/src/exec/external\l&#45;data&#45;source&#45;executor.cc" alt="" coords="198,97,364,138"/>
+<area shape="rect" id="node4" href="$expr-benchmark_8cc.html" title="be/src/exprs/expr&#45;benchmark.cc" alt="" coords="389,104,597,131"/>
+<area shape="rect" id="node5" href="$hive-udf-call_8cc.html" title="be/src/exprs/hive&#45;udf\l&#45;call.cc" alt="" coords="623,97,767,138"/>
+<area shape="rect" id="node6" href="$request-pool-service_8cc.html" title="be/src/scheduling/request\l&#45;pool&#45;service.cc" alt="" coords="791,97,961,138"/>
+<area shape="rect" id="node7" href="$fe-support_8cc.html" title="be/src/service/fe&#45;support.cc" alt="" coords="985,104,1169,131"/>
+<area shape="rect" id="node8" href="$frontend_8cc.html" title="be/src/service/frontend.cc" alt="" coords="1193,104,1367,131"/>
+<area shape="rect" id="node9" href="$jni-util_8cc.html" title="be/src/util/jni&#45;util.cc" alt="" coords="1391,104,1525,131"/>
+</map>

@@ -1,0 +1,7 @@
+<map id="impala::CatalogServer" name="impala::CatalogServer">
+<area shape="rect" id="node14" href="$classimpala_1_1Metric.html" title="TODO: Add ToThrift() for conversion to an RPC&#45;friendly format. " alt="" coords="1030,161,1184,341"/>
+<area shape="rect" id="node20" href="$classimpala_1_1MetricGroup.html" title="MetricGroups may be organised hierarchically as a tree. " alt="" coords="441,405,617,659"/>
+<area shape="rect" id="node5" href="$classimpala_1_1ThriftSerializer.html" title="{impala::ThriftSerializer\n||+ ThriftSerializer()\l+ Serialize()\l+ Serialize()\l+ Serialize()\l}" alt="" coords="1352,471,1504,593"/>
+<area shape="rect" id="node13" href="$classimpala_1_1StatsMetric.html" title="{impala::StatsMetric\l\&lt; double \&gt;\n||+ StatsMetric()\l+ Update()\l+ Reset()\l+ ToJson()\l+ ToLegacyJson()\l+ ToHumanReadable()\l}" alt="" coords="896,449,1049,615"/>
+<area shape="rect" id="node12" href="$classbool.html" title="{bool\n||}" alt="" coords="2066,493,2112,571"/>
+</map>

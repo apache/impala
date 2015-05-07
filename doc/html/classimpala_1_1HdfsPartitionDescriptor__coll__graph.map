@@ -1,0 +1,5 @@
+<map id="impala::HdfsPartitionDescriptor" name="impala::HdfsPartitionDescriptor">
+<area shape="rect" id="node4" href="$classimpala_1_1ObjectPool.html" title="{impala::ObjectPool\n||+ ObjectPool()\l+ ~ObjectPool()\l+ Add()\l}" alt="" coords="458,392,589,499"/>
+<area shape="rect" id="node5" href="$classimpala_1_1SpinLock.html" title="Lightweight spinlock. " alt="" coords="458,147,589,298"/>
+<area shape="rect" id="node7" href="$classbool.html" title="{bool\n||}" alt="" coords="559,5,605,83"/>
+</map>

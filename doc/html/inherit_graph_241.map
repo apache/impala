@@ -1,0 +1,13 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classimpala_1_1Codec.html" title="impala::Codec" alt="" coords="5,233,112,260"/>
+<area shape="rect" id="node2" href="$classimpala_1_1BzipCompressor.html" title="impala::BzipCompressor" alt="" coords="193,5,359,32"/>
+<area shape="rect" id="node3" href="$classimpala_1_1BzipDecompressor.html" title="impala::BzipDecompressor" alt="" coords="187,56,365,83"/>
+<area shape="rect" id="node4" href="$classimpala_1_1GzipCompressor.html" title="impala::GzipCompressor" alt="" coords="193,107,359,133"/>
+<area shape="rect" id="node5" href="$classimpala_1_1GzipDecompressor.html" title="impala::GzipDecompressor" alt="" coords="186,157,366,184"/>
+<area shape="rect" id="node6" href="$classimpala_1_1Lz4Compressor.html" title="impala::Lz4Compressor" alt="" coords="196,208,356,235"/>
+<area shape="rect" id="node7" href="$classimpala_1_1Lz4Decompressor.html" title="impala::Lz4Decompressor" alt="" coords="189,259,363,285"/>
+<area shape="rect" id="node8" href="$classimpala_1_1SnappyBlockCompressor.html" title="impala::SnappyBlockCompressor" alt="" coords="168,309,384,336"/>
+<area shape="rect" id="node9" href="$classimpala_1_1SnappyBlockDecompressor.html" title="impala::SnappyBlockDecompressor" alt="" coords="161,360,391,387"/>
+<area shape="rect" id="node10" href="$classimpala_1_1SnappyCompressor.html" title="impala::SnappyCompressor" alt="" coords="185,411,367,437"/>
+<area shape="rect" id="node11" href="$classimpala_1_1SnappyDecompressor.html" title="impala::SnappyDecompressor" alt="" coords="177,461,375,488"/>
+</map>

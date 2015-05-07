@@ -1,0 +1,25 @@
+var structimpala_1_1ImpalaServer_1_1QueryStateRecord =
+[
+    [ "QueryStateRecord", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#a630883bf91e60f6d60a37b50c7a9a833", null ],
+    [ "QueryStateRecord", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#a1e476b110fa777df222cba386917b6d1", null ],
+    [ "operator()", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#a38a08ad770bd427e9fa1fcb6593db4d4", null ],
+    [ "default_db", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#ab30101e9a55a8c6d423379384c2b03e5", null ],
+    [ "effective_user", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#a380184026401e461156eeac7918ce029", null ],
+    [ "encoded_profile_str", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#a100d2036c270c3459beff16886444440", null ],
+    [ "end_time", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#ae632bbc076199b0fb596fd1742cdbaa0", null ],
+    [ "event_sequence", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#a4848a59489b68d3223cd8295e82d3124", null ],
+    [ "exec_summary", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#ad7a0f591d37d0d44e964723b44cf1fc5", null ],
+    [ "fragments", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#a1a6e802eb87f730c71b425f7adde0556", null ],
+    [ "has_coord", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#a1460e42ed52b7128d568e98f10f8e547", null ],
+    [ "id", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#a96e93a9ef98115282c1849eb0c7731e5", null ],
+    [ "num_complete_fragments", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#aa18e53f91bc107e53fa163481c8b94fa", null ],
+    [ "num_rows_fetched", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#a546c69e15e4b508b85aae104b5a65cc4", null ],
+    [ "plan", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#afab95df41c6ed3cfc87c7eb3c8c6a6fc", null ],
+    [ "profile_str", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#a3fe8db9586cc14327a56ceac79b09102", null ],
+    [ "query_state", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#a09b2b25ceb73dae6cc1cc0999e62b90e", null ],
+    [ "query_status", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#a211c0b827cb625ecf50624b372ba478f", null ],
+    [ "start_time", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#ac4ea880b7914e67a3e08bf56b6f50ca1", null ],
+    [ "stmt", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#acbc5aadd9871899cfd21fdfda218e836", null ],
+    [ "stmt_type", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#a26b00e91c11cb65c55daaaa3c06117ac", null ],
+    [ "total_fragments", "structimpala_1_1ImpalaServer_1_1QueryStateRecord.html#ae54bf687d01a1e057563f6fde6d8b4ba", null ]
+];

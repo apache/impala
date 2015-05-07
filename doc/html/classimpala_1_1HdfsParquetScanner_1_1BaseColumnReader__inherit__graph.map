@@ -1,0 +1,4 @@
+<map id="impala::HdfsParquetScanner::BaseColumnReader" name="impala::HdfsParquetScanner::BaseColumnReader">
+<area shape="rect" id="node2" href="$classimpala_1_1HdfsParquetScanner_1_1BoolColumnReader.html" title="{impala::HdfsParquetScanner\l::BoolColumnReader\n|&#45; bool_values_\l|+ BoolColumnReader()\l# CreateDictionaryDecoder()\l# InitDataPage()\l# ReadSlot()\l}" alt="" coords="5,564,195,700"/>
+<area shape="rect" id="node3" href="$classimpala_1_1HdfsParquetScanner_1_1ColumnReader.html" title="{impala::HdfsParquetScanner\l::ColumnReader\&lt; T \&gt;\n|&#45; dict_decoder_\l&#45; needs_conversion_\l&#45; fixed_len_size_\l|+ ColumnReader()\l# CreateDictionaryDecoder()\l# InitDataPage()\l# ReadSlot()\l&#45; CopySlot()\l&#45; ConvertSlot()\l&#45; CopySlot()\l&#45; ConvertSlot()\l&#45; ConvertSlot()\l}" alt="" coords="219,513,408,751"/>
+</map>

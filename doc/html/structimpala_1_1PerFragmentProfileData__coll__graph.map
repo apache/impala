@@ -1,0 +1,8 @@
+<map id="impala::PerFragmentProfileData" name="impala::PerFragmentProfileData">
+<area shape="rect" id="node3" href="$classimpala_1_1RuntimeProfile.html" title="{impala::RuntimeProfile\n||+ RuntimeProfile()\l+ ~RuntimeProfile()\l+ AddChild()\l+ SortChildren()\l+ UpdateAverage()\l+ Update()\l+ AddCounter()\l+ AddHighWaterMarkCounter()\l+ AddDerivedCounter()\l+ AddThreadCounters()\land 32 more...\l+ CreateFromThrift()\l+ UnitsPerSecond()\l+ CounterSum()\l&#45; Update()\l&#45; ComputeTimeInProfile()\l&#45; CreateFromThrift()\l&#45; PrintChildCounters()\l}" alt="" coords="1149,843,1352,1170"/>
+<area shape="rect" id="node18" href="$classimpala_1_1AtomicInt.html" title="{impala::AtomicInt\&lt;\l int64_t \&gt;\n||+ AtomicInt()\l+ operator int64_t()\l+ operator=()\l+ operator=()\l+ operator+=()\l+ operator&#45;=()\l+ operator\|=()\l+ operator&amp;=()\l+ operator++()\l+ operator++()\land 10 more...\l}" alt="" coords="555,147,687,386"/>
+<area shape="rect" id="node9" href="$classimpala_1_1ObjectPool.html" title="{impala::ObjectPool\n||+ ObjectPool()\l+ ~ObjectPool()\l+ Add()\l}" alt="" coords="2355,532,2487,639"/>
+<area shape="rect" id="node10" href="$classimpala_1_1SpinLock.html" title="Lightweight spinlock. " alt="" coords="2338,191,2469,342"/>
+<area shape="rect" id="node12" href="$classbool.html" title="{bool\n||}" alt="" coords="1113,5,1159,83"/>
+<area shape="rect" id="node16" href="$classimpala_1_1RuntimeProfile_1_1Counter.html" title="{impala::RuntimeProfile\l::Counter\n||+ Counter()\l+ ~Counter()\l+ Add()\l+ BitOr()\l+ Set()\l+ Set()\l+ value()\l+ double_value()\l+ unit()\l}" alt="" coords="496,481,649,690"/>
+</map>

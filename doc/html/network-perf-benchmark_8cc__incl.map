@@ -1,0 +1,19 @@
+<map id="be/src/util/network&#45;perf&#45;benchmark.cc" name="be/src/util/network&#45;perf&#45;benchmark.cc">
+<area shape="rect" id="node11" href="$logging_8h.html" title="common/logging.h" alt="" coords="439,443,567,469"/>
+<area shape="rect" id="node14" href="$cpu-info_8h.html" title="util/cpu&#45;info.h" alt="" coords="145,368,244,395"/>
+<area shape="rect" id="node17" href="$stopwatch_8h.html" title="util/stopwatch.h" alt="" coords="5,368,120,395"/>
+<area shape="rect" id="node20" href="$thrift-client_8h.html" title="rpc/thrift&#45;client.h" alt="" coords="1458,104,1573,131"/>
+<area shape="rect" id="node39" href="$thrift-server_8h.html" title="rpc/thrift&#45;server.h" alt="" coords="1331,195,1452,221"/>
+<area shape="rect" id="node47" href="$thrift-thread_8h.html" title="rpc/thrift&#45;thread.h" alt="" coords="415,195,536,221"/>
+<area shape="rect" id="node49" href="$names_8h.html" title="common/names.h" alt="" coords="2855,104,2981,131"/>
+<area shape="rect" id="node18" href="$time_8h.html" title="time.h" alt="" coords="332,443,389,469"/>
+<area shape="rect" id="node24" href="$status_8h.html" title="common/status.h" alt="" coords="1641,368,1764,395"/>
+<area shape="rect" id="node32" href="$TSaslClientTransport_8h.html" title="transport/TSaslClientTransport.h" alt="" coords="1723,195,1932,221"/>
+<area shape="rect" id="node33" href="$TSasl_8h.html" title="transport/TSasl.h" alt="" coords="2233,285,2356,312"/>
+<area shape="rect" id="node34" href="$authentication_8h.html" title="rpc/authentication.h" alt="" coords="2649,195,2784,221"/>
+<area shape="rect" id="node27" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="1803,443,1960,469"/>
+<area shape="rect" id="node35" href="$auth-provider_8h.html" title="rpc/auth&#45;provider.h" alt="" coords="1481,285,1611,312"/>
+<area shape="rect" id="node38" href="$promise_8h.html" title="util/promise.h" alt="" coords="338,368,437,395"/>
+<area shape="rect" id="node44" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="1637,285,1733,312"/>
+<area shape="rect" id="node45" href="$thread_8h.html" title="util/thread.h" alt="" coords="513,285,604,312"/>
+</map>

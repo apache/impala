@@ -1,0 +1,10 @@
+<map id="impala::DecompressorTest" name="impala::DecompressorTest">
+<area shape="rect" id="node3" href="$classimpala_1_1MemPool.html" title="{impala::MemPool\n||+ MemPool()\l+ ~MemPool()\l+ Allocate()\l+ TryAllocate()\l+ ReturnPartialAllocation()\l+ Clear()\l+ FreeAll()\l+ AcquireData()\l+ Contains()\l+ DebugString()\land 10 more...\l&#45; FindChunk()\l&#45; CheckIntegrity()\l&#45; GetOffsetHelper()\l&#45; GetDataPtrHelper()\l&#45; GetFreeOffset()\l&#45; Allocate()\l}" alt="" coords="971,1653,1145,1965"/>
+<area shape="rect" id="node8" href="$classimpala_1_1MemTracker.html" title="This class is thread&#45;safe. " alt="" coords="1713,1203,1923,1589"/>
+<area shape="rect" id="node10" href="$classimpala_1_1AtomicInt.html" title="{impala::AtomicInt\&lt;\l int64_t \&gt;\n||+ AtomicInt()\l+ operator int64_t()\l+ operator=()\l+ operator=()\l+ operator+=()\l+ operator&#45;=()\l+ operator\|=()\l+ operator&amp;=()\l+ operator++()\l+ operator++()\land 10 more...\l}" alt="" coords="2953,147,3084,386"/>
+<area shape="rect" id="node27" href="$classimpala_1_1QueryResourceMgr.html" title="Only CPU&#45;heavy threads need be managed using this class. " alt="" coords="929,811,1167,1050"/>
+<area shape="rect" id="node16" href="$classimpala_1_1SpinLock.html" title="Lightweight spinlock. " alt="" coords="411,855,543,1006"/>
+<area shape="rect" id="node22" href="$classimpala_1_1RuntimeProfile_1_1HighWaterMarkCounter.html" title="{impala::RuntimeProfile\l::HighWaterMarkCounter\n||+ HighWaterMarkCounter()\l+ Add()\l+ TryAdd()\l+ Set()\l+ current_value()\l}" alt="" coords="2947,855,3125,1006"/>
+<area shape="rect" id="node23" href="$classimpala_1_1RuntimeProfile_1_1Counter.html" title="{impala::RuntimeProfile\l::Counter\n||+ Counter()\l+ ~Counter()\l+ Add()\l+ BitOr()\l+ Set()\l+ Set()\l+ value()\l+ double_value()\l+ unit()\l}" alt="" coords="2829,465,2983,674"/>
+<area shape="rect" id="node17" href="$classbool.html" title="{bool\n||}" alt="" coords="569,531,615,608"/>
+</map>

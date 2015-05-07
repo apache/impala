@@ -1,0 +1,10 @@
+<map id="impala::StatestoreSubscriberThriftIf" name="impala::StatestoreSubscriberThriftIf">
+<area shape="rect" id="node2" href="$classStatestoreSubscriberIf.html" title="{StatestoreSubscriberIf\n||}" alt="" coords="1320,853,1472,931"/>
+<area shape="rect" id="node3" href="$classimpala_1_1StatestoreSubscriber.html" title="{impala::StatestoreSubscriber\n||+ StatestoreSubscriber()\l+ AddTopic()\l+ Start()\l+ id()\l&#45; UpdateState()\l&#45; Heartbeat()\l&#45; RecoveryModeChecker()\l&#45; Register()\l&#45; CheckRegistrationId()\l}" alt="" coords="1497,795,1687,989"/>
+<area shape="rect" id="node20" href="$classimpala_1_1StatsMetric.html" title="{impala::StatsMetric\l\&lt; double \&gt;\n||+ StatsMetric()\l+ Update()\l+ Reset()\l+ ToJson()\l+ ToLegacyJson()\l+ ToHumanReadable()\l}" alt="" coords="2367,449,2520,615"/>
+<area shape="rect" id="node26" href="$classimpala_1_1MetricGroup.html" title="MetricGroups may be organised hierarchically as a tree. " alt="" coords="1767,405,1943,659"/>
+<area shape="rect" id="node14" href="$classimpala_1_1MonotonicStopWatch.html" title="{impala::MonotonicStopWatch\n||+ MonotonicStopWatch()\l+ Start()\l+ Stop()\l+ Reset()\l+ ElapsedTime()\l}" alt="" coords="2711,464,2904,600"/>
+<area shape="rect" id="node15" href="$classuint64__t.html" title="{uint64_t\n||}" alt="" coords="2962,212,3029,289"/>
+<area shape="rect" id="node17" href="$classbool.html" title="{bool\n||}" alt="" coords="3054,212,3100,289"/>
+<area shape="rect" id="node21" href="$classimpala_1_1Metric.html" title="TODO: Add ToThrift() for conversion to an RPC&#45;friendly format. " alt="" coords="2279,161,2432,341"/>
+</map>

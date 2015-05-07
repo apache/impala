@@ -1,0 +1,10 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$structimpala_1_1InternalQueue_1_1Node.html" title="impala::InternalQueue\l\&lt; T \&gt;::Node" alt="" coords="5,135,155,177"/>
+<area shape="rect" id="node2" href="$structimpala_1_1AdmissionController_1_1QueueNode.html" title="impala::AdmissionController\l::QueueNode" alt="" coords="203,5,389,46"/>
+<area shape="rect" id="node3" href="$classimpala_1_1BufferedBlockMgr_1_1Block.html" title="impala::BufferedBlockMgr\l::Block" alt="" coords="210,70,382,111"/>
+<area shape="rect" id="node4" href="$structimpala_1_1BufferedBlockMgr_1_1BufferDescriptor.html" title="Descriptor for a single memory buffer in the pool. " alt="" coords="210,135,382,177"/>
+<area shape="rect" id="node5" href="$classimpala_1_1DiskIoMgr_1_1RequestRange.html" title="impala::DiskIoMgr::\lRequestRange" alt="" coords="228,201,364,242"/>
+<area shape="rect" id="node8" href="$structimpala_1_1IntNode.html" title="impala::IntNode" alt="" coords="239,267,353,293"/>
+<area shape="rect" id="node6" href="$classimpala_1_1DiskIoMgr_1_1ScanRange.html" title="impala::DiskIoMgr::\lScanRange" alt="" coords="437,167,573,209"/>
+<area shape="rect" id="node7" href="$classimpala_1_1DiskIoMgr_1_1WriteRange.html" title="impala::DiskIoMgr::\lWriteRange" alt="" coords="437,233,573,274"/>
+</map>

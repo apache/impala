@@ -1,0 +1,5 @@
+<map id="apache::thrift::transport::TSaslClientTransport" name="apache::thrift::transport::TSaslClientTransport">
+<area shape="rect" id="node2" href="$classapache_1_1thrift_1_1transport_1_1TSaslTransport.html" title="{apache::thrift::transport\l::TSaslTransport\n||+ TSaslTransport()\l+ TSaslTransport()\l+ ~TSaslTransport()\l+ isOpen()\l+ peek()\l+ open()\l+ close()\l+ read()\l+ write()\l+ flush()\l+ getUnderlyingTransport()\l+ getUsername()\l# encodeInt()\l# decodeInt()\l# receiveSaslMessage()\l# sendSaslMessage()\l# readLength()\l# writeLength()\l# handleSaslStartMessage()\l# shrinkBuffer()\l}" alt="" coords="411,176,597,547"/>
+<area shape="rect" id="node3" href="$classTVirtualTransport.html" title="{TVirtualTransport\&lt;\l TSaslTransport \&gt;\n||}" alt="" coords="5,6,135,98"/>
+<area shape="rect" id="node6" href="$classbool.html" title="{bool\n||}" alt="" coords="553,13,599,91"/>
+</map>

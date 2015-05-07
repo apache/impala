@@ -1,0 +1,18 @@
+<map id="be/src/rpc/authentication.h" name="be/src/rpc/authentication.h">
+<area shape="rect" id="node4" href="$auth-provider_8h.html" title="rpc/auth&#45;provider.h" alt="" coords="1588,80,1717,107"/>
+<area shape="rect" id="node8" href="$status_8h.html" title="common/status.h" alt="" coords="1439,419,1561,445"/>
+<area shape="rect" id="node39" href="$TSaslServerTransport_8h.html" title="transport/TSaslServerTransport.h" alt="" coords="2086,80,2300,107"/>
+<area shape="rect" id="node42" href="$TSasl_8h.html" title="transport/TSasl.h" alt="" coords="2815,237,2937,264"/>
+<area shape="rect" id="node24" href="$promise_8h.html" title="util/promise.h" alt="" coords="1353,155,1452,181"/>
+<area shape="rect" id="node11" href="$logging_8h.html" title="common/logging.h" alt="" coords="261,509,389,536"/>
+<area shape="rect" id="node14" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="535,509,692,536"/>
+<area shape="rect" id="node18" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="964,509,1065,536"/>
+<area shape="rect" id="node26" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="337,237,513,264"/>
+<area shape="rect" id="node37" href="$time_8h.html" title="util/time.h" alt="" coords="1690,237,1768,264"/>
+<area shape="rect" id="node29" href="$timestamp-parse-util_8h.html" title="runtime/timestamp&#45;parse\l&#45;util.h" alt="" coords="782,321,948,362"/>
+<area shape="rect" id="node35" href="$udf_8h.html" title="udf/udf.h" alt="" coords="91,509,164,536"/>
+<area shape="rect" id="node36" href="$hash-util_8h.html" title="util/hash&#45;util.h" alt="" coords="249,419,351,445"/>
+<area shape="rect" id="node33" href="$string-value_8inline_8h.html" title="runtime/string&#45;value.inline.h" alt="" coords="1233,419,1415,445"/>
+<area shape="rect" id="node34" href="$string-parser_8h.html" title="util/string&#45;parser.h" alt="" coords="550,419,676,445"/>
+<area shape="rect" id="node48" href="$TSaslTransport_8h.html" title="transport/TSaslTransport.h" alt="" coords="2169,155,2345,181"/>
+</map>

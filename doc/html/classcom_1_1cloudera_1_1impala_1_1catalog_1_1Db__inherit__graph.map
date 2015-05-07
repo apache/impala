@@ -1,0 +1,4 @@
+<map id="com.cloudera.impala.catalog.Db" name="com.cloudera.impala.catalog.Db">
+<area shape="rect" id="node3" href="$classcom_1_1cloudera_1_1impala_1_1catalog_1_1BuiltinsDb.html" title="{com.cloudera.impala.catalog.\lBuiltinsDb\n|&#45; SAMPLE_INIT_SYMBOL\l&#45; SAMPLE_SERIALIZE_SYMBOL\l&#45; SAMPLE_MERGE_SYMBOL\l&#45; SAMPLE_UPDATE_SYMBOL\l&#45; SAMPLE_FINALIZE_SYMBOL\l&#45; APPX_MEDIAN_FINALIZE\l_SYMBOL\l&#45; HISTOGRAM_FINALIZE\l_SYMBOL\l&#45; HLL_UPDATE_SYMBOL\l&#45; PC_UPDATE_SYMBOL\l&#45; PCSA_UPDATE_SYMBOL\land 9 more...\l|+ BuiltinsDb()\l&#45; initBuiltins()\l&#45; initAggregateBuiltins()\l}" alt="" coords="5,595,227,893"/>
+<area shape="rect" id="node2" href="$interfacecom_1_1cloudera_1_1impala_1_1catalog_1_1CatalogObject.html" title="{com.cloudera.impala.catalog.\lCatalogObject\n||+ getCatalogObjectType()\l+ getName()\l+ getCatalogVersion()\l+ setCatalogVersion()\l+ isLoaded()\l}" alt="" coords="20,6,212,157"/>
+</map>

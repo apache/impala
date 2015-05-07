@@ -1,0 +1,20 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classimpala_1_1Expr.html" title="This is the superclass of all expr evaluation nodes. " alt="" coords="6,259,101,285"/>
+<area shape="rect" id="node2" href="$classimpala_1_1CaseExpr.html" title="impala::CaseExpr" alt="" coords="162,5,289,32"/>
+<area shape="rect" id="node3" href="$classimpala_1_1CoalesceExpr.html" title="impala::CoalesceExpr" alt="" coords="150,56,301,83"/>
+<area shape="rect" id="node4" href="$classimpala_1_1HiveUdfCall.html" title="If the UDF ran into an error, the FE throws an exception. " alt="" coords="156,107,295,133"/>
+<area shape="rect" id="node5" href="$classimpala_1_1IfExpr.html" title="impala::IfExpr" alt="" coords="174,157,277,184"/>
+<area shape="rect" id="node6" href="$classimpala_1_1IsNullExpr.html" title="impala::IsNullExpr" alt="" coords="161,208,290,235"/>
+<area shape="rect" id="node7" href="$classimpala_1_1Literal.html" title="impala::Literal" alt="" coords="174,259,277,285"/>
+<area shape="rect" id="node8" href="$classimpala_1_1NullIfExpr.html" title="impala::NullIfExpr" alt="" coords="162,309,289,336"/>
+<area shape="rect" id="node9" href="$classimpala_1_1NullLiteral.html" title="impala::NullLiteral" alt="" coords="162,360,289,387"/>
+<area shape="rect" id="node10" href="$classimpala_1_1Predicate.html" title="impala::Predicate" alt="" coords="164,411,287,437"/>
+<area shape="rect" id="node17" href="$classimpala_1_1ScalarFnCall.html" title="impala::ScalarFnCall" alt="" coords="154,461,297,488"/>
+<area shape="rect" id="node18" href="$classimpala_1_1SlotRef.html" title="Reference to a single slot of a tuple. " alt="" coords="169,512,281,539"/>
+<area shape="rect" id="node11" href="$classimpala_1_1CompoundPredicate.html" title="impala::CompoundPredicate" alt="" coords="351,335,537,361"/>
+<area shape="rect" id="node14" href="$classimpala_1_1InPredicate.html" title="Predicate for evaluating expressions of the form &quot;val [NOT] IN (x1, x2, x3...)&quot;. " alt="" coords="377,385,511,412"/>
+<area shape="rect" id="node15" href="$classimpala_1_1LikePredicate.html" title="This class handles the Like, Regexp, and Rlike predicates and uses the udf interface. " alt="" coords="371,436,517,463"/>
+<area shape="rect" id="node16" href="$classimpala_1_1TupleIsNullPredicate.html" title="impala::TupleIsNullPredicate" alt="" coords="349,487,539,513"/>
+<area shape="rect" id="node12" href="$classimpala_1_1AndPredicate.html" title="Expr for evaluating and (&amp;&amp;) operators. " alt="" coords="587,309,733,336"/>
+<area shape="rect" id="node13" href="$classimpala_1_1OrPredicate.html" title="Expr for evaluating or (||) operators. " alt="" coords="591,360,729,387"/>
+</map>

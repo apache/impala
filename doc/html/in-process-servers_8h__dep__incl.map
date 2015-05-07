@@ -1,0 +1,9 @@
+<map id="be/src/testutil/in&#45;process&#45;servers.h" name="be/src/testutil/in&#45;process&#45;servers.h">
+<area shape="rect" id="node2" href="$expr-test_8cc.html" title="be/src/exprs/expr&#45;test.cc" alt="" coords="5,104,171,131"/>
+<area shape="rect" id="node3" href="$thrift-server-test_8cc.html" title="be/src/rpc/thrift&#45;server\l&#45;test.cc" alt="" coords="195,97,345,138"/>
+<area shape="rect" id="node4" href="$session-expiry-test_8cc.html" title="be/src/service/session\l&#45;expiry&#45;test.cc" alt="" coords="370,97,523,138"/>
+<area shape="rect" id="node5" href="$state-store-2_80-test_8cc.html" title="be/src/statestore/state\l&#45;store&#45;2.0&#45;test.cc" alt="" coords="547,97,700,138"/>
+<area shape="rect" id="node6" href="$statestore-test_8cc.html" title="be/src/statestore/statestore\l&#45;test.cc" alt="" coords="725,97,907,138"/>
+<area shape="rect" id="node7" href="$in-process-servers_8cc.html" title="be/src/testutil/in\l&#45;process&#45;servers.cc" alt="" coords="931,97,1068,138"/>
+<area shape="rect" id="node8" href="$mini-impala-cluster_8cc.html" title="be/src/testutil/mini\l&#45;impala&#45;cluster.cc" alt="" coords="1093,97,1221,138"/>
+</map>

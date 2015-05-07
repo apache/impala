@@ -1,0 +1,4 @@
+<map id="com.cloudera.impala.common.AliasGenerator" name="com.cloudera.impala.common.AliasGenerator">
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1common_1_1ColumnAliasGenerator.html" title="{com.cloudera.impala.common.\lColumnAliasGenerator\n|&#45; DEFAULT_COL_ALIAS_PREFIX\l|+ ColumnAliasGenerator()\l}" alt="" coords="5,177,232,269"/>
+<area shape="rect" id="node3" href="$classcom_1_1cloudera_1_1impala_1_1common_1_1TableAliasGenerator.html" title="{com.cloudera.impala.common.\lTableAliasGenerator\n|&#45; DEFAULT_TBL_ALIAS_PREFIX\l|+ TableAliasGenerator()\l}" alt="" coords="257,177,479,269"/>
+</map>

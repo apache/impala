@@ -1,0 +1,3 @@
+<map id="com.cloudera.impala.planner.DataStreamSink" name="com.cloudera.impala.planner.DataStreamSink">
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1planner_1_1DataSink.html" title="{com.cloudera.impala.planner.\lDataSink\n|# perHostMemCost_\l# fragment_\l|+ getExplainString()\l+ setFragment()\l+ getFragment()\l+ getPerHostMemCost()\l+ computeCosts()\l+ createDataSink()\l# toThrift()\l}" alt="" coords="5,5,197,200"/>
+</map>

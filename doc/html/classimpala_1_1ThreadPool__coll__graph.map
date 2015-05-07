@@ -1,0 +1,5 @@
+<map id="impala::ThreadPool&lt; T &gt;" name="impala::ThreadPool&lt; T &gt;">
+<area shape="rect" id="node2" href="$classimpala_1_1ThreadGroup.html" title="{impala::ThreadGroup\n||+ ThreadGroup()\l+ ThreadGroup()\l+ AddThread()\l+ JoinAll()\l+ SetCgroup()\l+ SetCgroupsMgr()\l}" alt="" coords="311,497,453,647"/>
+<area shape="rect" id="node4" href="$classimpala_1_1CgroupsMgr.html" title="{impala::CgroupsMgr\n||+ CgroupsMgr()\l+ Init()\l+ UniqueIdToCgroup()\l+ VirtualCoresToCpuShares()\l+ RegisterFragment()\l+ UnregisterFragment()\l+ CreateCgroup()\l+ DropCgroup()\l+ SetCpuShares()\l+ AssignThreadToCgroup()\l+ RelocateThreads()\l&#45; GetCgroupPaths()\l}" alt="" coords="176,193,371,431"/>
+<area shape="rect" id="node11" href="$classbool.html" title="{bool\n||}" alt="" coords="1017,533,1063,611"/>
+</map>

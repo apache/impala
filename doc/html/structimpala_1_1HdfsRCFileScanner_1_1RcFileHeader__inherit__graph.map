@@ -1,0 +1,3 @@
+<map id="impala::HdfsRCFileScanner::RcFileHeader" name="impala::HdfsRCFileScanner::RcFileHeader">
+<area shape="rect" id="node2" href="$structimpala_1_1BaseSequenceScanner_1_1FileHeader.html" title="{impala::BaseSequenceScanner\l::FileHeader\n|+ sync\l+ is_compressed\l+ codec\l+ compression_type\l+ header_size\l|+ ~FileHeader()\l}" alt="" coords="5,6,208,157"/>
+</map>

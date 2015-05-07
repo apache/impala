@@ -1,0 +1,8 @@
+<map id="impala::AdmissionController" name="impala::AdmissionController">
+<area shape="rect" id="node5" href="$classimpala_1_1ThriftSerializer.html" title="{impala::ThriftSerializer\n||+ ThriftSerializer()\l+ Serialize()\l+ Serialize()\l+ Serialize()\l}" alt="" coords="591,782,743,903"/>
+<area shape="rect" id="node18" href="$classimpala_1_1StatsMetric.html" title="{impala::StatsMetric\l\&lt; double \&gt;\n||+ StatsMetric()\l+ Update()\l+ Reset()\l+ ToJson()\l+ ToLegacyJson()\l+ ToHumanReadable()\l}" alt="" coords="1476,449,1629,615"/>
+<area shape="rect" id="node23" href="$classimpala_1_1MetricGroup.html" title="MetricGroups may be organised hierarchically as a tree. " alt="" coords="2537,405,2713,659"/>
+<area shape="rect" id="node11" href="$classbool.html" title="{bool\n||}" alt="" coords="1353,493,1399,571"/>
+<area shape="rect" id="node15" href="$classimpala_1_1RequestPoolService.html" title="{impala::RequestPoolService\n||+ RequestPoolService()\l+ ResolveRequestPool()\l+ GetPoolConfig()\l}" alt="" coords="1707,789,1893,896"/>
+<area shape="rect" id="node19" href="$classimpala_1_1Metric.html" title="TODO: Add ToThrift() for conversion to an RPC&#45;friendly format. " alt="" coords="1428,161,1581,341"/>
+</map>

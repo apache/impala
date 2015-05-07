@@ -1,0 +1,25 @@
+var classimpala_1_1ThreadResourceMgr_1_1ResourcePool =
+[
+    [ "ResourcePool", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#a33f2584266fe2b4445204af978d834d6", null ],
+    [ "AcquireThreadToken", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#aa3cee04d64517865fa503fcb59af5f58", null ],
+    [ "num_available_threads", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#a468d2dddc7bb70af7265d190bc5d3376", null ],
+    [ "num_optional_threads", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#aa37a671f1ddea4bf5c78f5f2c8e31d0c", null ],
+    [ "num_required_threads", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#a7efd4db7dd5a6aa3b8d6465e4e4c8153", null ],
+    [ "num_reserved_optional_threads", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#a91d13a7322bc7b29fe573d195bb506a4", null ],
+    [ "num_threads", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#a706bcd238e4e99e0854d18d23f804d57", null ],
+    [ "optional_exceeded", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#a206a09379a1e4d99b6067e2008c73811", null ],
+    [ "quota", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#a8ccfa5003aa2ddbfdbf5f674718727ff", null ],
+    [ "ReleaseThreadToken", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#abd2059593964256011a6639b48e7e9f1", null ],
+    [ "ReserveOptionalTokens", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#a503ab1ef6e9ba35295f50d3d4ac034c9", null ],
+    [ "Reset", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#af8d73c99e4eefc5510896d18dd29472a", null ],
+    [ "set_max_quota", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#a231a2da34552814c89c8d9b5bc5ee379", null ],
+    [ "SetThreadAvailableCb", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#a0fb6fb62bd40deb0f79b94dbf8179d81", null ],
+    [ "TryAcquireThreadToken", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#a6d2e8fe97989a28eefd8ae614f8cb3a1", null ],
+    [ "ThreadResourceMgr", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#afd49f464d46d3b2758d136d9bc75820c", null ],
+    [ "lock_", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#ada8c97f161dee7ff2093145523f15a73", null ],
+    [ "max_quota_", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#a5a61cbf1eb7e6e2e6b1c5c55f5fd66d8", null ],
+    [ "num_reserved_optional_threads_", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#a0743d9a1a823b01cfce2f5e7a201c2a2", null ],
+    [ "num_threads_", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#a03e0db3860449580d0db44537741041f", null ],
+    [ "parent_", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#a916dd46970e141c5ecccb470c47a00c5", null ],
+    [ "thread_available_fn_", "classimpala_1_1ThreadResourceMgr_1_1ResourcePool.html#a406d0ff8de54e914f46eaf75dac6e911", null ]
+];

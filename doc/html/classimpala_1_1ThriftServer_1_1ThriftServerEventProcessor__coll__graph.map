@@ -1,0 +1,7 @@
+<map id="impala::ThriftServer::ThriftServerEventProcessor" name="impala::ThriftServer::ThriftServerEventProcessor">
+<area shape="rect" id="node2" href="$classTServerEventHandler.html" title="{TServerEventHandler\n||}" alt="" coords="5,308,152,385"/>
+<area shape="rect" id="node7" href="$classimpala_1_1ThriftServer.html" title="{impala::ThriftServer\n||+ ThriftServer()\l+ EnableSsl()\l+ port()\l+ ssl_enabled()\l+ Join()\l+ StopForTesting()\l+ Start()\l+ SetConnectionHandler()\l+ GetThreadConnectionId()\l+ GetThreadConnectionContext()\l&#45; CreateSocket()\l}" alt="" coords="1157,235,1371,459"/>
+<area shape="rect" id="node6" href="$classbool.html" title="{bool\n||}" alt="" coords="2262,28,2308,105"/>
+<area shape="rect" id="node8" href="$classimpala_1_1ThriftServer_1_1ConnectionHandlerIf.html" title="Interface class for receiving connection creation / termination events. " alt="" coords="1864,13,2012,120"/>
+<area shape="rect" id="node16" href="$classimpala_1_1AuthProvider.html" title="{impala::AuthProvider\n||+ Start()\l+ GetServerTransportFactory()\l+ WrapClientTransport()\l+ is_sasl()\l}" alt="" coords="1328,6,1527,127"/>
+</map>

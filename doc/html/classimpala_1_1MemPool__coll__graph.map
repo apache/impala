@@ -1,0 +1,9 @@
+<map id="impala::MemPool" name="impala::MemPool">
+<area shape="rect" id="node6" href="$classimpala_1_1MemTracker.html" title="This class is thread&#45;safe. " alt="" coords="1795,1203,2004,1589"/>
+<area shape="rect" id="node8" href="$classimpala_1_1AtomicInt.html" title="{impala::AtomicInt\&lt;\l int64_t \&gt;\n||+ AtomicInt()\l+ operator int64_t()\l+ operator=()\l+ operator=()\l+ operator+=()\l+ operator&#45;=()\l+ operator\|=()\l+ operator&amp;=()\l+ operator++()\l+ operator++()\land 10 more...\l}" alt="" coords="2682,147,2813,386"/>
+<area shape="rect" id="node25" href="$classimpala_1_1QueryResourceMgr.html" title="Only CPU&#45;heavy threads need be managed using this class. " alt="" coords="2142,811,2380,1050"/>
+<area shape="rect" id="node14" href="$classimpala_1_1SpinLock.html" title="Lightweight spinlock. " alt="" coords="454,855,585,1006"/>
+<area shape="rect" id="node20" href="$classimpala_1_1RuntimeProfile_1_1HighWaterMarkCounter.html" title="{impala::RuntimeProfile\l::HighWaterMarkCounter\n||+ HighWaterMarkCounter()\l+ Add()\l+ TryAdd()\l+ Set()\l+ current_value()\l}" alt="" coords="2676,855,2855,1006"/>
+<area shape="rect" id="node21" href="$classimpala_1_1RuntimeProfile_1_1Counter.html" title="{impala::RuntimeProfile\l::Counter\n||+ Counter()\l+ ~Counter()\l+ Add()\l+ BitOr()\l+ Set()\l+ Set()\l+ value()\l+ double_value()\l+ unit()\l}" alt="" coords="2559,465,2712,674"/>
+<area shape="rect" id="node15" href="$classbool.html" title="{bool\n||}" alt="" coords="611,531,657,608"/>
+</map>

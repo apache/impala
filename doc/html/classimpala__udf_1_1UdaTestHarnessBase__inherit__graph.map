@@ -1,0 +1,6 @@
+<map id="impala_udf::UdaTestHarnessBase&lt; RESULT, INTERMEDIATE &gt;" name="impala_udf::UdaTestHarnessBase&lt; RESULT, INTERMEDIATE &gt;">
+<area shape="rect" id="node2" href="$classimpala__udf_1_1UdaTestHarness.html" title="{impala_udf::UdaTestHarness\l\&lt; RESULT, INTERMEDIATE \&gt;\n|&#45; update_fn_\l&#45; input_\l|+ UdaTestHarness()\l+ Execute()\l+ Execute()\l# Update()\l}" alt="" coords="5,410,213,561"/>
+<area shape="rect" id="node3" href="$classimpala__udf_1_1UdaTestHarness2.html" title="{impala_udf::UdaTestHarness2\l\&lt; RESULT, INTERMEDIATE \&gt;\n|&#45; update_fn_\l&#45; input1_\l&#45; input2_\l|+ UdaTestHarness2()\l+ Execute()\l# Update()\l}" alt="" coords="237,410,445,561"/>
+<area shape="rect" id="node4" href="$classimpala__udf_1_1UdaTestHarness3.html" title="{impala_udf::UdaTestHarness3\l\&lt; RESULT, INTERMEDIATE \&gt;\n|&#45; update_fn_\l&#45; input1_\l&#45; input2_\l&#45; input3_\l|+ UdaTestHarness3()\l+ Execute()\l# Update()\l}" alt="" coords="469,403,677,568"/>
+<area shape="rect" id="node5" href="$classimpala__udf_1_1UdaTestHarness4.html" title="{impala_udf::UdaTestHarness4\l\&lt; RESULT, INTERMEDIATE \&gt;\n|&#45; update_fn_\l&#45; input1_\l&#45; input2_\l&#45; input3_\l&#45; input4_\l|+ UdaTestHarness4()\l+ Execute()\l# Update()\l}" alt="" coords="701,395,909,575"/>
+</map>

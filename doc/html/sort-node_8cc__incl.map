@@ -1,0 +1,34 @@
+<map id="be/src/exec/sort&#45;node.cc" name="be/src/exec/sort&#45;node.cc">
+<area shape="rect" id="node2" href="$sort-node_8h.html" title="exec/sort&#45;node.h" alt="" coords="2133,80,2251,107"/>
+<area shape="rect" id="node20" href="$sort-exec-exprs_8h.html" title="exec/sort&#45;exec&#45;exprs.h" alt="" coords="1880,245,2033,272"/>
+<area shape="rect" id="node32" href="$row-batch_8h.html" title="runtime/row&#45;batch.h" alt="" coords="3167,493,3304,520"/>
+<area shape="rect" id="node38" href="$runtime-state_8h.html" title="runtime/runtime&#45;state.h" alt="" coords="1827,493,1983,520"/>
+<area shape="rect" id="node48" href="$sorted-run-merger_8h.html" title="runtime/sorted&#45;run\l&#45;merger.h" alt="" coords="3306,155,3432,197"/>
+<area shape="rect" id="node49" href="$names_8h.html" title="common/names.h" alt="" coords="3350,80,3476,107"/>
+<area shape="rect" id="node3" href="$exec-node_8h.html" title="exec/exec&#45;node.h" alt="" coords="2416,493,2541,520"/>
+<area shape="rect" id="node42" href="$sorter_8h.html" title="runtime/sorter.h" alt="" coords="2135,163,2248,189"/>
+<area shape="rect" id="node43" href="$buffered-block-mgr_8h.html" title="runtime/buffered&#45;block\l&#45;mgr.h" alt="" coords="121,486,271,527"/>
+<area shape="rect" id="node6" href="$status_8h.html" title="common/status.h" alt="" coords="1483,757,1605,784"/>
+<area shape="rect" id="node11" href="$descriptors_8h.html" title="runtime/descriptors.h" alt="" coords="2875,584,3019,611"/>
+<area shape="rect" id="node15" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="2469,675,2604,701"/>
+<area shape="rect" id="node18" href="$blocking-queue_8h.html" title="util/blocking&#45;queue.h" alt="" coords="2816,757,2956,784"/>
+<area shape="rect" id="node8" href="$logging_8h.html" title="common/logging.h" alt="" coords="1829,832,1957,859"/>
+<area shape="rect" id="node17" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="2337,757,2487,784"/>
+<area shape="rect" id="node21" href="$expr_8h.html" title="exprs/expr.h" alt="" coords="1615,320,1709,347"/>
+<area shape="rect" id="node23" href="$decimal-value_8h.html" title="runtime/decimal&#45;value.h" alt="" coords="1109,493,1268,520"/>
+<area shape="rect" id="node24" href="$lib-cache_8h.html" title="runtime/lib&#45;cache.h" alt="" coords="1857,675,1988,701"/>
+<area shape="rect" id="node25" href="$raw-value_8h.html" title="runtime/raw&#45;value.h" alt="" coords="461,675,596,701"/>
+<area shape="rect" id="node26" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="251,757,427,784"/>
+<area shape="rect" id="node27" href="$udf_8h.html" title="udf/udf.h" alt="" coords="377,832,449,859"/>
+<area shape="rect" id="node28" href="$tuple_8h.html" title="runtime/tuple.h" alt="" coords="3035,493,3143,520"/>
+<area shape="rect" id="node31" href="$tuple-row_8h.html" title="runtime/tuple&#45;row.h" alt="" coords="2924,403,3057,429"/>
+<area shape="rect" id="node37" href="$string-value_8h.html" title="runtime/string&#45;value.h" alt="" coords="552,757,699,784"/>
+<area shape="rect" id="node30" href="$mem-pool_8h.html" title="runtime/mem&#45;pool.h" alt="" coords="3043,584,3180,611"/>
+<area shape="rect" id="node33" href="$disk-io-mgr_8h.html" title="runtime/disk&#45;io&#45;mgr.h" alt="" coords="1811,584,1955,611"/>
+<area shape="rect" id="node36" href="$mem-tracker_8h.html" title="runtime/mem&#45;tracker.h" alt="" coords="2545,584,2697,611"/>
+<area shape="rect" id="node34" href="$thread-resource-mgr_8h.html" title="runtime/thread&#45;resource\l&#45;mgr.h" alt="" coords="1571,667,1729,709"/>
+<area shape="rect" id="node39" href="$query-resource-mgr_8h.html" title="statestore/query&#45;resource\l&#45;mgr.h" alt="" coords="925,577,1096,618"/>
+<area shape="rect" id="node40" href="$exec-env_8h.html" title="runtime/exec&#45;env.h" alt="" coords="1363,675,1496,701"/>
+<area shape="rect" id="node47" href="$tuple-row-compare_8h.html" title="util/tuple&#45;row&#45;compare.h" alt="" coords="2807,245,2968,272"/>
+<area shape="rect" id="node44" href="$tmp-file-mgr_8h.html" title="runtime/tmp&#45;file&#45;mgr.h" alt="" coords="1120,584,1268,611"/>
+</map>

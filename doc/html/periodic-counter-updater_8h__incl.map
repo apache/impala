@@ -1,0 +1,19 @@
+<map id="be/src/util/periodic&#45;counter&#45;updater.h" name="be/src/util/periodic&#45;counter&#45;updater.h">
+<area shape="rect" id="node8" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="788,96,922,123"/>
+<area shape="rect" id="node12" href="$atomic_8h.html" title="common/atomic.h" alt="" coords="206,352,332,379"/>
+<area shape="rect" id="node15" href="$logging_8h.html" title="common/logging.h" alt="" coords="450,616,578,643"/>
+<area shape="rect" id="node18" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="88,179,238,205"/>
+<area shape="rect" id="node22" href="$thread_8h.html" title="util/thread.h" alt="" coords="965,179,1056,205"/>
+<area shape="rect" id="node48" href="$stopwatch_8h.html" title="util/stopwatch.h" alt="" coords="1624,269,1738,296"/>
+<area shape="rect" id="node49" href="$streaming-sampler_8h.html" title="util/streaming&#45;sampler.h" alt="" coords="315,179,476,205"/>
+<area shape="rect" id="node14" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="666,616,824,643"/>
+<area shape="rect" id="node21" href="$spinlock_8h.html" title="util/spinlock.h" alt="" coords="223,269,325,296"/>
+<area shape="rect" id="node26" href="$status_8h.html" title="common/status.h" alt="" coords="1242,525,1365,552"/>
+<area shape="rect" id="node38" href="$promise_8h.html" title="util/promise.h" alt="" coords="1120,269,1220,296"/>
+<area shape="rect" id="node32" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="997,616,1098,643"/>
+<area shape="rect" id="node39" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="998,352,1174,379"/>
+<area shape="rect" id="node46" href="$time_8h.html" title="util/time.h" alt="" coords="1642,352,1720,379"/>
+<area shape="rect" id="node42" href="$timestamp-parse-util_8h.html" title="runtime/timestamp&#45;parse\l&#45;util.h" alt="" coords="1003,427,1169,469"/>
+<area shape="rect" id="node43" href="$udf_8h.html" title="udf/udf.h" alt="" coords="854,435,926,461"/>
+<area shape="rect" id="node45" href="$hash-util_8h.html" title="util/hash&#45;util.h" alt="" coords="694,525,796,552"/>
+</map>

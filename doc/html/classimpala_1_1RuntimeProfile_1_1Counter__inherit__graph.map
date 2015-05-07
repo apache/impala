@@ -1,0 +1,5 @@
+<map id="impala::RuntimeProfile::Counter" name="impala::RuntimeProfile::Counter">
+<area shape="rect" id="node2" href="$classimpala_1_1RuntimeProfile_1_1AveragedCounter.html" title="{impala::RuntimeProfile\l::AveragedCounter\n|&#45; counter_value_map_\l&#45; current_double_sum_\l&#45; current_int_sum_\l|+ AveragedCounter()\l+ UpdateCounter()\l+ Set()\l+ Set()\l+ Add()\l}" alt="" coords="5,278,159,458"/>
+<area shape="rect" id="node3" href="$classimpala_1_1RuntimeProfile_1_1DerivedCounter.html" title="{impala::RuntimeProfile\l::DerivedCounter\n|&#45; counter_fn_\l|+ DerivedCounter()\l+ value()\l}" alt="" coords="184,315,337,421"/>
+<area shape="rect" id="node4" href="$classimpala_1_1RuntimeProfile_1_1HighWaterMarkCounter.html" title="{impala::RuntimeProfile\l::HighWaterMarkCounter\n|&#45; current_value_\l|+ HighWaterMarkCounter()\l+ Add()\l+ TryAdd()\l+ Set()\l+ current_value()\l}" alt="" coords="363,293,541,443"/>
+</map>

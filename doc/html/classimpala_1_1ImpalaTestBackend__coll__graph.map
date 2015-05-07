@@ -1,0 +1,4 @@
+<map id="impala::ImpalaTestBackend" name="impala::ImpalaTestBackend">
+<area shape="rect" id="node2" href="$classImpalaInternalServiceIf.html" title="{ImpalaInternalServiceIf\n||}" alt="" coords="5,228,160,305"/>
+<area shape="rect" id="node3" href="$classimpala_1_1DataStreamMgr.html" title="{impala::DataStreamMgr\n||+ DataStreamMgr()\l+ CreateRecvr()\l+ AddData()\l+ CloseSender()\l+ Cancel()\l&#45; FindRecvr()\l&#45; DeregisterRecvr()\l&#45; GetHashValue()\l}" alt="" coords="185,177,344,357"/>
+</map>

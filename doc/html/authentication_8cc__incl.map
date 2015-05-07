@@ -1,0 +1,17 @@
+<map id="be/src/rpc/authentication.cc" name="be/src/rpc/authentication.cc">
+<area shape="rect" id="node2" href="$authentication_8h.html" title="rpc/authentication.h" alt="" coords="544,88,679,115"/>
+<area shape="rect" id="node5" href="$auth-provider_8h.html" title="rpc/auth&#45;provider.h" alt="" coords="1412,179,1541,205"/>
+<area shape="rect" id="node11" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="1967,344,2068,371"/>
+<area shape="rect" id="node13" href="$promise_8h.html" title="util/promise.h" alt="" coords="1719,261,1819,288"/>
+<area shape="rect" id="node14" href="$time_8h.html" title="util/time.h" alt="" coords="1738,344,1816,371"/>
+<area shape="rect" id="node16" href="$TSaslServerTransport_8h.html" title="transport/TSaslServerTransport.h" alt="" coords="581,179,795,205"/>
+<area shape="rect" id="node19" href="$TSasl_8h.html" title="transport/TSasl.h" alt="" coords="273,344,396,371"/>
+<area shape="rect" id="node38" href="$TSaslClientTransport_8h.html" title="transport/TSaslClientTransport.h" alt="" coords="1171,179,1380,205"/>
+<area shape="rect" id="node39" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="3479,88,3589,115"/>
+<area shape="rect" id="node44" href="$network-util_8h.html" title="util/network&#45;util.h" alt="" coords="3618,179,3739,205"/>
+<area shape="rect" id="node45" href="$os-util_8h.html" title="util/os&#45;util.h" alt="" coords="1986,179,2075,205"/>
+<area shape="rect" id="node46" href="$thread_8h.html" title="util/thread.h" alt="" coords="1668,179,1759,205"/>
+<area shape="rect" id="node50" href="$names_8h.html" title="common/names.h" alt="" coords="4078,88,4204,115"/>
+<area shape="rect" id="node9" href="$status_8h.html" title="common/status.h" alt="" coords="1920,261,2043,288"/>
+<area shape="rect" id="node25" href="$TSaslTransport_8h.html" title="transport/TSaslTransport.h" alt="" coords="878,261,1055,288"/>
+</map>

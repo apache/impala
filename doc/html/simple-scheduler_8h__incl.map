@@ -1,0 +1,24 @@
+<map id="be/src/statestore/simple&#45;scheduler.h" name="be/src/statestore/simple&#45;scheduler.h">
+<area shape="rect" id="node7" href="$status_8h.html" title="common/status.h" alt="" coords="1885,624,2008,651"/>
+<area shape="rect" id="node16" href="$scheduler_8h.html" title="statestore/scheduler.h" alt="" coords="565,360,715,387"/>
+<area shape="rect" id="node27" href="$statestore-subscriber_8h.html" title="statestore/statestore\l&#45;subscriber.h" alt="" coords="1770,187,1912,229"/>
+<area shape="rect" id="node30" href="$statestore_8h.html" title="statestore/statestore.h" alt="" coords="3118,277,3271,304"/>
+<area shape="rect" id="node36" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="2891,451,2988,477"/>
+<area shape="rect" id="node49" href="$admission-controller_8h.html" title="scheduling/admission\l&#45;controller.h" alt="" coords="1328,97,1475,138"/>
+<area shape="rect" id="node9" href="$logging_8h.html" title="common/logging.h" alt="" coords="2671,707,2799,733"/>
+<area shape="rect" id="node10" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="2095,707,2252,733"/>
+<area shape="rect" id="node14" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="1748,707,1849,733"/>
+<area shape="rect" id="node17" href="$global-types_8h.html" title="common/global&#45;types.h" alt="" coords="637,541,795,568"/>
+<area shape="rect" id="node18" href="$query-schedule_8h.html" title="statestore/query&#45;schedule.h" alt="" coords="859,451,1041,477"/>
+<area shape="rect" id="node23" href="$container-util_8h.html" title="util/container&#45;util.h" alt="" coords="1283,451,1411,477"/>
+<area shape="rect" id="node41" href="$thrift-client_8h.html" title="rpc/thrift&#45;client.h" alt="" coords="2006,451,2121,477"/>
+<area shape="rect" id="node43" href="$thread_8h.html" title="util/thread.h" alt="" coords="1739,451,1829,477"/>
+<area shape="rect" id="node45" href="$thrift-util_8h.html" title="rpc/thrift&#45;util.h" alt="" coords="2278,451,2380,477"/>
+<area shape="rect" id="node48" href="$stopwatch_8h.html" title="util/stopwatch.h" alt="" coords="2796,277,2911,304"/>
+<area shape="rect" id="node39" href="$webserver_8h.html" title="util/webserver.h" alt="" coords="3109,541,3224,568"/>
+<area shape="rect" id="node40" href="$collection-metrics_8h.html" title="util/collection&#45;metrics.h" alt="" coords="2862,360,3017,387"/>
+<area shape="rect" id="node42" href="$thread-pool_8h.html" title="util/thread&#45;pool.h" alt="" coords="2391,360,2509,387"/>
+<area shape="rect" id="node44" href="$client-cache_8h.html" title="runtime/client&#45;cache.h" alt="" coords="2534,360,2684,387"/>
+<area shape="rect" id="node46" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="3231,624,3407,651"/>
+<area shape="rect" id="node47" href="$failure-detector_8h.html" title="statestore/failure\l&#45;detector.h" alt="" coords="3422,443,3540,485"/>
+</map>

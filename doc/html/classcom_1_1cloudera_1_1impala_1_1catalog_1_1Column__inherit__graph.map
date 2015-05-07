@@ -1,0 +1,3 @@
+<map id="com.cloudera.impala.catalog.Column" name="com.cloudera.impala.catalog.Column">
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1catalog_1_1HBaseColumn.html" title="{com.cloudera.impala.catalog.\lHBaseColumn\n|&#45; columnFamily_\l&#45; columnQualifier_\l&#45; binaryEncoded_\l|+ HBaseColumn()\l+ getColumnFamily()\l+ getColumnQualifier()\l+ isBinaryEncoded()\l+ compareTo()\l+ toThrift()\l}" alt="" coords="5,395,197,589"/>
+</map>

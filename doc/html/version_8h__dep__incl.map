@@ -1,0 +1,9 @@
+<map id="be/src/common/version.h" name="be/src/common/version.h">
+<area shape="rect" id="node2" href="$version_8cc.html" title="be/src/common/version.cc" alt="" coords="5,88,181,115"/>
+<area shape="rect" id="node3" href="$hdfs-lzo-text-scanner_8cc.html" title="be/src/exec/hdfs&#45;lzo\l&#45;text&#45;scanner.cc" alt="" coords="206,81,345,122"/>
+<area shape="rect" id="node4" href="$hdfs-parquet-table-writer_8cc.html" title="be/src/exec/hdfs&#45;parquet\l&#45;table&#45;writer.cc" alt="" coords="370,81,536,122"/>
+<area shape="rect" id="node5" href="$impala-beeswax-server_8cc.html" title="be/src/service/impala\l&#45;beeswax&#45;server.cc" alt="" coords="561,81,708,122"/>
+<area shape="rect" id="node6" href="$impala-hs2-server_8cc.html" title="be/src/service/impala\l&#45;hs2&#45;server.cc" alt="" coords="732,81,879,122"/>
+<area shape="rect" id="node7" href="$impala-server_8cc.html" title="be/src/service/impala\l&#45;server.cc" alt="" coords="903,81,1049,122"/>
+<area shape="rect" id="node8" href="$debug-util_8cc.html" title="be/src/util/debug&#45;util.cc" alt="" coords="1073,88,1231,115"/>
+</map>

@@ -1,0 +1,21 @@
+<map id="be/src/runtime/buffered&#45;block&#45;mgr.h" name="be/src/runtime/buffered&#45;block&#45;mgr.h">
+<area shape="rect" id="node3" href="$disk-io-mgr_8h.html" title="runtime/disk&#45;io&#45;mgr.h" alt="" coords="1251,96,1395,123"/>
+<area shape="rect" id="node47" href="$tmp-file-mgr_8h.html" title="runtime/tmp&#45;file&#45;mgr.h" alt="" coords="1846,96,1994,123"/>
+<area shape="rect" id="node11" href="$atomic_8h.html" title="common/atomic.h" alt="" coords="1221,419,1347,445"/>
+<area shape="rect" id="node14" href="$hdfs_8h.html" title="common/hdfs.h" alt="" coords="2114,179,2225,205"/>
+<area shape="rect" id="node15" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="1171,261,1321,288"/>
+<area shape="rect" id="node19" href="$status_8h.html" title="common/status.h" alt="" coords="2045,336,2167,363"/>
+<area shape="rect" id="node25" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="2311,419,2413,445"/>
+<area shape="rect" id="node31" href="$thread-resource-mgr_8h.html" title="runtime/thread&#45;resource\l&#45;mgr.h" alt="" coords="343,171,501,213"/>
+<area shape="rect" id="node34" href="$bit-util_8h.html" title="util/bit&#45;util.h" alt="" coords="2376,261,2465,288"/>
+<area shape="rect" id="node38" href="$internal-queue_8h.html" title="util/internal&#45;queue.h" alt="" coords="1012,261,1146,288"/>
+<area shape="rect" id="node39" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="1317,179,1451,205"/>
+<area shape="rect" id="node44" href="$thread_8h.html" title="util/thread.h" alt="" coords="846,261,937,288"/>
+<area shape="rect" id="node13" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="1503,509,1661,536"/>
+<area shape="rect" id="node17" href="$spinlock_8h.html" title="util/spinlock.h" alt="" coords="1323,336,1425,363"/>
+<area shape="rect" id="node18" href="$logging_8h.html" title="common/logging.h" alt="" coords="1501,419,1629,445"/>
+<area shape="rect" id="node36" href="$cpu-info_8h.html" title="util/cpu&#45;info.h" alt="" coords="2715,336,2814,363"/>
+<area shape="rect" id="node37" href="$sse-util_8h.html" title="util/sse&#45;util.h" alt="" coords="2475,336,2571,363"/>
+<area shape="rect" id="node45" href="$stopwatch_8h.html" title="util/stopwatch.h" alt="" coords="2935,419,3050,445"/>
+<area shape="rect" id="node46" href="$streaming-sampler_8h.html" title="util/streaming&#45;sampler.h" alt="" coords="1448,261,1609,288"/>
+</map>

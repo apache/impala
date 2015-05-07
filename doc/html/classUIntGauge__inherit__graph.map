@@ -1,0 +1,4 @@
+<map id="UIntGauge" name="UIntGauge">
+<area shape="rect" id="node2" href="$classimpala_1_1TcmallocMetric.html" title="Specialised metric which exposes numeric properties from tcmalloc. " alt="" coords="5,131,248,296"/>
+<area shape="rect" id="node3" href="$classimpala_1_1TcmallocMetric_1_1PhysicalBytesMetric.html" title="{impala::TcmallocMetric\l::PhysicalBytesMetric\n||+ PhysicalBytesMetric()\l&#45; CalculateValue()\l}" alt="" coords="272,160,435,267"/>
+</map>

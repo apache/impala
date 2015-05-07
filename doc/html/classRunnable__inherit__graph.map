@@ -1,0 +1,5 @@
+<map id="Runnable" name="Runnable">
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1catalog_1_1CatalogServiceCatalog_1_1CachePoolReader.html" title="{com.cloudera.impala.catalog.\lCatalogServiceCatalog.CachePool\lReader\n||+ run()\l}" alt="" coords="5,131,228,237"/>
+<area shape="rect" id="node3" href="$classcom_1_1cloudera_1_1impala_1_1service_1_1Frontend_1_1AuthorizationPolicyReader.html" title="{com.cloudera.impala.service.\lFrontend.AuthorizationPolicyReader\n|&#45; config_\l|+ AuthorizationPolicyReader()\l+ run()\l}" alt="" coords="254,131,484,237"/>
+<area shape="rect" id="node4" href="$classcom_1_1cloudera_1_1impala_1_1util_1_1SentryProxy_1_1PolicyReader.html" title="{com.cloudera.impala.util.\lSentryProxy.PolicyReader\n||+ run()\l}" alt="" coords="509,138,685,230"/>
+</map>

@@ -1,0 +1,6 @@
+<map id="impala::ResourceBroker" name="impala::ResourceBroker">
+<area shape="rect" id="node15" href="$classimpala_1_1StatsMetric.html" title="{impala::StatsMetric\l\&lt; double \&gt;\n||+ StatsMetric()\l+ Update()\l+ Reset()\l+ ToJson()\l+ ToLegacyJson()\l+ ToHumanReadable()\l}" alt="" coords="2124,449,2277,615"/>
+<area shape="rect" id="node23" href="$classimpala_1_1MetricGroup.html" title="MetricGroups may be organised hierarchically as a tree. " alt="" coords="2615,405,2791,659"/>
+<area shape="rect" id="node16" href="$classimpala_1_1Metric.html" title="TODO: Add ToThrift() for conversion to an RPC&#45;friendly format. " alt="" coords="1943,161,2096,341"/>
+<area shape="rect" id="node21" href="$classimpala_1_1Scheduler.html" title="{impala::Scheduler\n||+ ~Scheduler()\l+ GetBackends()\l+ GetBackend()\l+ HasLocalBackend()\l+ GetAllKnownBackends()\l+ Schedule()\l+ Release()\l+ HandlePreemptedReservation()\l+ HandlePreemptedResource()\l+ HandleLostResource()\l+ Init()\l}" alt="" coords="2303,420,2519,644"/>
+</map>

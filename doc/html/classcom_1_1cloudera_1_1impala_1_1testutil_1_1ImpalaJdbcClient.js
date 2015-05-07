@@ -1,0 +1,27 @@
+var classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient =
+[
+    [ "ClientExecOptions", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient_1_1ClientExecOptions.html", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient_1_1ClientExecOptions" ],
+    [ "ImpalaJdbcClient", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#a964f4db8dac4fdaf872e17cad6c1519b", null ],
+    [ "changeDatabase", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#ae0b7a1e051863371ffcbaabc8679c18f", null ],
+    [ "close", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#a89b013adad44d6d5cc74d6fad9c0cb57", null ],
+    [ "connect", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#a279a448652c8132e3663ad4090899bdf", null ],
+    [ "createClientUsingHiveJdbcDriver", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#a10d54303e486bfa0abd8e97738338f6b", null ],
+    [ "createClientUsingHiveJdbcDriver", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#a56417d20699f16eaafaab6e4414883b4", null ],
+    [ "execQuery", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#ae7ca5371eb4d7a25a671f7b7bf7848e4", null ],
+    [ "execQuery", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#a3b59fb774bf305bda7f3a49973a737a3", null ],
+    [ "formatColumnValue", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#a8c2d06a2a4f6bf4eca5a91acf5e1dc78", null ],
+    [ "getConnection", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#a44bf33be689dbb3568fb1c94ecb2506c", null ],
+    [ "getStatement", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#ae7fdd862c3ff7ab4b6d762311b03bf5a", null ],
+    [ "main", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#a177774d491b2e7875bdff2261becd33c", null ],
+    [ "parseOptions", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#a8fd8de3b34b901f1e38640ff5bd06bef", null ],
+    [ "validateConnection", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#ad215c7fc08054391a4d92723b1eee827", null ],
+    [ "conn_", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#ac2162c75fd77ab45b882e6cd32b28c1f", null ],
+    [ "connString_", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#a57a37c036a0d46cee0cc226bc50a1714", null ],
+    [ "DEFAULT_CONNECTION_STRING", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#a0f841366bc12dae55b40e05d0778e457", null ],
+    [ "driverName_", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#a6d8766a6c749a2c3008535ccc5a9de22", null ],
+    [ "HIVE_SERVER2_DRIVER_NAME", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#ae1b0b9745c4059400c311e2b49c5a516", null ],
+    [ "LOG", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#abed3e4875f3be0d67e258b529f3d6d8c", null ],
+    [ "NOSASL_AUTH_SPEC", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#a91801c066bc899016f88cd4dc7d5a72e", null ],
+    [ "SASL_AUTH_SPEC", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#aee82cea639ab4ee7d993a69cf6d471b4", null ],
+    [ "stmt_", "classcom_1_1cloudera_1_1impala_1_1testutil_1_1ImpalaJdbcClient.html#aa7af10b1e7c5e45c4f7768b6495d5a3f", null ]
+];

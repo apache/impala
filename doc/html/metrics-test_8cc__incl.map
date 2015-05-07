@@ -1,0 +1,18 @@
+<map id="be/src/util/metrics&#45;test.cc" name="be/src/util/metrics&#45;test.cc">
+<area shape="rect" id="node2" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="1549,179,1645,205"/>
+<area shape="rect" id="node29" href="$collection-metrics_8h.html" title="util/collection&#45;metrics.h" alt="" coords="2126,96,2281,123"/>
+<area shape="rect" id="node38" href="$memory-metrics_8h.html" title="util/memory&#45;metrics.h" alt="" coords="1158,96,1305,123"/>
+<area shape="rect" id="node43" href="$jni-util_8h.html" title="util/jni&#45;util.h" alt="" coords="39,269,127,296"/>
+<area shape="rect" id="node45" href="$thread_8h.html" title="util/thread.h" alt="" coords="459,179,549,205"/>
+<area shape="rect" id="node49" href="$names_8h.html" title="common/names.h" alt="" coords="2897,96,3023,123"/>
+<area shape="rect" id="node12" href="$logging_8h.html" title="common/logging.h" alt="" coords="1092,435,1220,461"/>
+<area shape="rect" id="node15" href="$status_8h.html" title="common/status.h" alt="" coords="576,352,699,379"/>
+<area shape="rect" id="node23" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="1466,269,1616,296"/>
+<area shape="rect" id="node24" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="989,269,1099,296"/>
+<area shape="rect" id="node26" href="$json-util_8h.html" title="util/json&#45;util.h" alt="" coords="1924,269,2023,296"/>
+<area shape="rect" id="node27" href="$pretty-printer_8h.html" title="util/pretty&#45;printer.h" alt="" coords="1863,352,1989,379"/>
+<area shape="rect" id="node28" href="$webserver_8h.html" title="util/webserver.h" alt="" coords="1175,269,1289,296"/>
+<area shape="rect" id="node18" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="404,435,561,461"/>
+<area shape="rect" id="node22" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="228,435,329,461"/>
+<area shape="rect" id="node48" href="$promise_8h.html" title="util/promise.h" alt="" coords="410,269,509,296"/>
+</map>

@@ -1,0 +1,5 @@
+<map id="DataProvider::ColDesc" name="DataProvider::ColDesc">
+<area shape="rect" id="node8" href="$structimpala_1_1StringValue.html" title="{impala::StringValue\n||+ StringValue()\l+ StringValue()\l+ StringValue()\l+ StringValue()\l+ Compare()\l+ Eq()\l+ operator==()\l+ Ne()\l+ operator!=()\l+ Le()\land 12 more...\l+ FromStringVal()\l+ PadWithSpaces()\l+ UnpaddedCharLength()\l+ CharSlotToPtr()\l+ CharSlotToPtr()\l}" alt="" coords="161,161,329,458"/>
+<area shape="rect" id="node5" href="$structDataProvider_1_1Value.html" title="{DataProvider::Value\n||}" alt="" coords="471,523,609,600"/>
+<area shape="rect" id="node14" href="$classbool.html" title="{bool\n||}" alt="" coords="822,271,868,348"/>
+</map>

@@ -1,0 +1,4 @@
+<map id="sasl::TSaslServer" name="sasl::TSaslServer">
+<area shape="rect" id="node2" href="$classsasl_1_1TSasl.html" title="{sasl::TSasl\n||+ ~TSasl()\l+ evaluateChallengeOrResponse()\l+ isComplete()\l+ unwrap()\l+ wrap()\l+ getMechanismName()\l+ hasInitialResponse()\l+ getUsername()\l+ SaslDone()\l}" alt="" coords="5,147,227,341"/>
+<area shape="rect" id="node4" href="$classbool.html" title="{bool\n||}" alt="" coords="209,5,255,83"/>
+</map>

@@ -1,0 +1,21 @@
+<map id="be/src/statestore/statestore&#45;subscriber.cc" name="be/src/statestore/statestore&#45;subscriber.cc">
+<area shape="rect" id="node2" href="$statestore-subscriber_8h.html" title="statestore/statestore\l&#45;subscriber.h" alt="" coords="1567,97,1709,138"/>
+<area shape="rect" id="node16" href="$logging_8h.html" title="common/logging.h" alt="" coords="96,616,224,643"/>
+<area shape="rect" id="node19" href="$status_8h.html" title="common/status.h" alt="" coords="1151,533,1273,560"/>
+<area shape="rect" id="node27" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="1439,533,1549,560"/>
+<area shape="rect" id="node35" href="$failure-detector_8h.html" title="statestore/failure\l&#45;detector.h" alt="" coords="2819,262,2937,303"/>
+<area shape="rect" id="node39" href="$time_8h.html" title="util/time.h" alt="" coords="901,269,979,296"/>
+<area shape="rect" id="node40" href="$thrift-util_8h.html" title="rpc/thrift&#45;util.h" alt="" coords="806,360,908,387"/>
+<area shape="rect" id="node47" href="$rpc-trace_8h.html" title="rpc/rpc&#45;trace.h" alt="" coords="2244,269,2351,296"/>
+<area shape="rect" id="node50" href="$names_8h.html" title="common/names.h" alt="" coords="4143,104,4269,131"/>
+<area shape="rect" id="node8" href="$statestore_8h.html" title="statestore/statestore.h" alt="" coords="1907,187,2060,213"/>
+<area shape="rect" id="node13" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="1669,451,1765,477"/>
+<area shape="rect" id="node30" href="$thrift-client_8h.html" title="rpc/thrift&#45;client.h" alt="" coords="1137,269,1252,296"/>
+<area shape="rect" id="node34" href="$thread_8h.html" title="util/thread.h" alt="" coords="1553,451,1644,477"/>
+<area shape="rect" id="node38" href="$stopwatch_8h.html" title="util/stopwatch.h" alt="" coords="945,187,1060,213"/>
+<area shape="rect" id="node28" href="$collection-metrics_8h.html" title="util/collection&#45;metrics.h" alt="" coords="3094,360,3249,387"/>
+<area shape="rect" id="node21" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="951,616,1108,643"/>
+<area shape="rect" id="node25" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="1487,616,1588,643"/>
+<area shape="rect" id="node32" href="$thrift-server_8h.html" title="rpc/thrift&#45;server.h" alt="" coords="1659,360,1780,387"/>
+<area shape="rect" id="node48" href="$internal-queue_8h.html" title="util/internal&#45;queue.h" alt="" coords="2414,360,2548,387"/>
+</map>

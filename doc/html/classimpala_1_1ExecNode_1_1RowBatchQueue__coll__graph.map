@@ -1,0 +1,8 @@
+<map id="impala::ExecNode::RowBatchQueue" name="impala::ExecNode::RowBatchQueue">
+<area shape="rect" id="node2" href="$classimpala_1_1BlockingQueue.html" title="{impala::BlockingQueue\l\&lt; RowBatch * \&gt;\n||+ BlockingQueue()\l+ BlockingGet()\l+ BlockingPut()\l+ Shutdown()\l+ GetSize()\l+ total_get_wait_time()\l+ total_put_wait_time()\l}" alt="" coords="325,190,480,370"/>
+<area shape="rect" id="node3" href="$classuint64__t.html" title="{uint64_t\n||}" alt="" coords="5,5,72,83"/>
+<area shape="rect" id="node5" href="$classconst_01int.html" title="{const int\n||}" alt="" coords="239,5,311,83"/>
+<area shape="rect" id="node7" href="$classbool.html" title="{bool\n||}" alt="" coords="514,5,560,83"/>
+<area shape="rect" id="node9" href="$classimpala_1_1SpinLock.html" title="Lightweight spinlock. " alt="" coords="525,205,656,355"/>
+<area shape="rect" id="node8" href="$classstd_1_1list_3_01RowBatch_01_5_01_4.html" title="{list\&lt; RowBatch * \&gt;\n||}" alt="" coords="608,5,741,83"/>
+</map>

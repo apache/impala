@@ -1,0 +1,4 @@
+<map id="impala::HdfsParquetTableWriter::BaseColumnWriter" name="impala::HdfsParquetTableWriter::BaseColumnWriter">
+<area shape="rect" id="node2" href="$classimpala_1_1HdfsParquetTableWriter_1_1BoolColumnWriter.html" title="{impala::HdfsParquetTable\lWriter::BoolColumnWriter\n|&#45; bool_values_\l|+ BoolColumnWriter()\l# EncodeValue()\l# FinalizeCurrentPage()\l}" alt="" coords="5,571,179,693"/>
+<area shape="rect" id="node3" href="$classimpala_1_1HdfsParquetTableWriter_1_1ColumnWriter.html" title="{impala::HdfsParquetTable\lWriter::ColumnWriter\&lt; T \&gt;\n|&#45; dict_encoder_\l&#45; num_values_since_dict\l_size_check_\l&#45; encoded_value_size_\l&#45; temp_\l&#45; DICTIONARY_DATA_PAGE\l_SIZE_CHECK_PERIOD\l|+ ColumnWriter()\l+ Reset()\l# EncodeValue()\l&#45; CastValue()\l&#45; CastValue()\l}" alt="" coords="203,513,404,751"/>
+</map>

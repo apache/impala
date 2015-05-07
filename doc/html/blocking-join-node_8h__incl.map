@@ -1,0 +1,22 @@
+<map id="be/src/exec/blocking&#45;join&#45;node.h" name="be/src/exec/blocking&#45;join&#45;node.h">
+<area shape="rect" id="node5" href="$exec-node_8h.html" title="exec/exec&#45;node.h" alt="" coords="1423,96,1549,123"/>
+<area shape="rect" id="node36" href="$promise_8h.html" title="util/promise.h" alt="" coords="567,344,666,371"/>
+<area shape="rect" id="node8" href="$status_8h.html" title="common/status.h" alt="" coords="985,600,1107,627"/>
+<area shape="rect" id="node19" href="$descriptors_8h.html" title="runtime/descriptors.h" alt="" coords="1922,253,2066,280"/>
+<area shape="rect" id="node26" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="1066,171,1201,197"/>
+<area shape="rect" id="node46" href="$blocking-queue_8h.html" title="util/blocking&#45;queue.h" alt="" coords="241,253,381,280"/>
+<area shape="rect" id="node10" href="$logging_8h.html" title="common/logging.h" alt="" coords="1305,691,1433,717"/>
+<area shape="rect" id="node13" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="1123,691,1281,717"/>
+<area shape="rect" id="node17" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="611,691,713,717"/>
+<area shape="rect" id="node22" href="$global-types_8h.html" title="common/global&#45;types.h" alt="" coords="2001,344,2158,371"/>
+<area shape="rect" id="node23" href="$types_8h.html" title="runtime/types.h" alt="" coords="1585,600,1695,627"/>
+<area shape="rect" id="node33" href="$atomic_8h.html" title="common/atomic.h" alt="" coords="1395,427,1521,453"/>
+<area shape="rect" id="node34" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="1645,253,1795,280"/>
+<area shape="rect" id="node35" href="$thread_8h.html" title="util/thread.h" alt="" coords="905,253,995,280"/>
+<area shape="rect" id="node43" href="$stopwatch_8h.html" title="util/stopwatch.h" alt="" coords="377,344,491,371"/>
+<area shape="rect" id="node44" href="$streaming-sampler_8h.html" title="util/streaming&#45;sampler.h" alt="" coords="617,253,778,280"/>
+<area shape="rect" id="node37" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="527,427,703,453"/>
+<area shape="rect" id="node42" href="$time_8h.html" title="util/time.h" alt="" coords="397,427,475,453"/>
+<area shape="rect" id="node40" href="$timestamp-parse-util_8h.html" title="runtime/timestamp&#45;parse\l&#45;util.h" alt="" coords="743,502,909,543"/>
+<area shape="rect" id="node41" href="$udf_8h.html" title="udf/udf.h" alt="" coords="361,509,434,536"/>
+</map>

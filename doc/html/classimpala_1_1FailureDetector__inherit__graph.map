@@ -1,0 +1,4 @@
+<map id="impala::FailureDetector" name="impala::FailureDetector">
+<area shape="rect" id="node2" href="$classimpala_1_1MissedHeartbeatFailureDetector.html" title="{impala::MissedHeartbeatFailure\lDetector\n|&#45; lock_\l&#45; max_missed_heartbeats_\l&#45; suspect_missed_heartbeats_\l&#45; missed_heartbeat_counts_\l|+ MissedHeartbeatFailureDetector()\l+ UpdateHeartbeat()\l+ GetPeerState()\l+ EvictPeer()\l}" alt="" coords="5,190,235,370"/>
+<area shape="rect" id="node3" href="$classimpala_1_1TimeoutFailureDetector.html" title="{impala::TimeoutFailureDetector\n|&#45; lock_\l&#45; peer_heartbeat_record_\l&#45; failure_timeout_\l&#45; suspect_timeout_\l|+ TimeoutFailureDetector()\l+ UpdateHeartbeat()\l+ GetPeerState()\l+ EvictPeer()\l}" alt="" coords="259,197,463,363"/>
+</map>

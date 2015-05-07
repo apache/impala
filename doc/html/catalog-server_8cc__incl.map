@@ -1,0 +1,17 @@
+<map id="be/src/catalog/catalog&#45;server.cc" name="be/src/catalog/catalog&#45;server.cc">
+<area shape="rect" id="node2" href="$catalog-server_8h.html" title="catalog/catalog&#45;server.h" alt="" coords="1605,96,1765,123"/>
+<area shape="rect" id="node17" href="$statestore-subscriber_8h.html" title="statestore/statestore\l&#45;subscriber.h" alt="" coords="2129,171,2271,213"/>
+<area shape="rect" id="node31" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="2339,427,2449,453"/>
+<area shape="rect" id="node47" href="$catalog-util_8h.html" title="catalog/catalog&#45;util.h" alt="" coords="2997,96,3139,123"/>
+<area shape="rect" id="node49" href="$names_8h.html" title="common/names.h" alt="" coords="3215,96,3341,123"/>
+<area shape="rect" id="node11" href="$catalog_8h.html" title="catalog/catalog.h" alt="" coords="253,179,373,205"/>
+<area shape="rect" id="node24" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="1431,352,1528,379"/>
+<area shape="rect" id="node15" href="$status_8h.html" title="common/status.h" alt="" coords="1856,427,1979,453"/>
+<area shape="rect" id="node16" href="$logging_8h.html" title="common/logging.h" alt="" coords="1539,509,1667,536"/>
+<area shape="rect" id="node20" href="$statestore_8h.html" title="statestore/statestore.h" alt="" coords="1786,269,1939,296"/>
+<area shape="rect" id="node40" href="$thrift-client_8h.html" title="rpc/thrift&#45;client.h" alt="" coords="2417,352,2532,379"/>
+<area shape="rect" id="node41" href="$stopwatch_8h.html" title="util/stopwatch.h" alt="" coords="2329,269,2444,296"/>
+<area shape="rect" id="node42" href="$thrift-util_8h.html" title="rpc/thrift&#45;util.h" alt="" coords="2659,352,2761,379"/>
+<area shape="rect" id="node44" href="$thread_8h.html" title="util/thread.h" alt="" coords="1099,352,1189,379"/>
+<area shape="rect" id="node30" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="1175,427,1325,453"/>
+</map>

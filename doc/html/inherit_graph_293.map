@@ -1,0 +1,5 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classimpala_1_1FailureDetector.html" title="impala::FailureDetector" alt="" coords="5,41,163,68"/>
+<area shape="rect" id="node2" href="$classimpala_1_1MissedHeartbeatFailureDetector.html" title="impala::MissedHeartbeatFailure\lDetector" alt="" coords="211,5,418,46"/>
+<area shape="rect" id="node3" href="$classimpala_1_1TimeoutFailureDetector.html" title="impala::TimeoutFailureDetector" alt="" coords="213,71,417,97"/>
+</map>

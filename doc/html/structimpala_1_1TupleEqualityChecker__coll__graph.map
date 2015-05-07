@@ -1,0 +1,4 @@
+<map id="impala::TupleEqualityChecker" name="impala::TupleEqualityChecker">
+<area shape="rect" id="node2" href="$classimpala_1_1TupleDescriptor.html" title="{impala::TupleDescriptor\n||+ byte_size()\l+ num_null_bytes()\l+ slots()\l+ string_slots()\l+ table_desc()\l+ id()\l+ DebugString()\l+ GenerateLlvmStruct()\l# TupleDescriptor()\l# AddSlot()\l}" alt="" coords="327,462,485,671"/>
+<area shape="rect" id="node4" href="$classimpala_1_1TableDescriptor.html" title="Base class for table descriptors. " alt="" coords="249,189,409,384"/>
+</map>

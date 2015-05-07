@@ -1,0 +1,8 @@
+<map id="be/src/exec/write&#45;stream.h" name="be/src/exec/write&#45;stream.h">
+<area shape="rect" id="node2" href="$write-stream_8inline_8h.html" title="be/src/exec/write&#45;stream.inline.h" alt="" coords="176,88,385,115"/>
+<area shape="rect" id="node5" href="$hdfs-avro-table-writer_8h.html" title="be/src/exec/hdfs&#45;avro\l&#45;table&#45;writer.h" alt="" coords="5,81,152,122"/>
+<area shape="rect" id="node7" href="$hdfs-sequence-table-writer_8h.html" title="be/src/exec/hdfs&#45;sequence\l&#45;table&#45;writer.h" alt="" coords="411,81,589,122"/>
+<area shape="rect" id="node3" href="$hdfs-avro-table-writer_8cc.html" title="be/src/exec/hdfs&#45;avro\l&#45;table&#45;writer.cc" alt="" coords="11,171,159,213"/>
+<area shape="rect" id="node4" href="$hdfs-sequence-table-writer_8cc.html" title="be/src/exec/hdfs&#45;sequence\l&#45;table&#45;writer.cc" alt="" coords="403,171,581,213"/>
+<area shape="rect" id="node6" href="$hdfs-table-sink_8cc.html" title="be/src/exec/hdfs&#45;table\l&#45;sink.cc" alt="" coords="198,171,348,213"/>
+</map>

@@ -1,0 +1,25 @@
+<map id="be/src/runtime/data&#45;stream&#45;recvr.cc" name="be/src/runtime/data&#45;stream&#45;recvr.cc">
+<area shape="rect" id="node4" href="$data-stream-recvr_8h.html" title="runtime/data&#45;stream\l&#45;recvr.h" alt="" coords="375,187,514,229"/>
+<area shape="rect" id="node24" href="$data-stream-mgr_8h.html" title="runtime/data&#45;stream\l&#45;mgr.h" alt="" coords="1069,97,1207,138"/>
+<area shape="rect" id="node31" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="2226,285,2361,312"/>
+<area shape="rect" id="node41" href="$row-batch_8h.html" title="runtime/row&#45;batch.h" alt="" coords="3188,104,3325,131"/>
+<area shape="rect" id="node47" href="$sorted-run-merger_8h.html" title="runtime/sorted&#45;run\l&#45;merger.h" alt="" coords="771,187,897,229"/>
+<area shape="rect" id="node48" href="$periodic-counter-updater_8h.html" title="util/periodic&#45;counter\l&#45;updater.h" alt="" coords="2420,187,2554,229"/>
+<area shape="rect" id="node49" href="$names_8h.html" title="common/names.h" alt="" coords="3496,104,3622,131"/>
+<area shape="rect" id="node6" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="1079,376,1229,403"/>
+<area shape="rect" id="node12" href="$status_8h.html" title="common/status.h" alt="" coords="1061,459,1183,485"/>
+<area shape="rect" id="node21" href="$descriptors_8h.html" title="runtime/descriptors.h" alt="" coords="594,376,738,403"/>
+<area shape="rect" id="node23" href="$tuple-row-compare_8h.html" title="util/tuple&#45;row&#45;compare.h" alt="" coords="533,285,694,312"/>
+<area shape="rect" id="node8" href="$spinlock_8h.html" title="util/spinlock.h" alt="" coords="1324,459,1426,485"/>
+<area shape="rect" id="node9" href="$atomic_8h.html" title="common/atomic.h" alt="" coords="1312,541,1438,568"/>
+<area shape="rect" id="node11" href="$logging_8h.html" title="common/logging.h" alt="" coords="2675,541,2803,568"/>
+<area shape="rect" id="node10" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="993,632,1150,659"/>
+<area shape="rect" id="node18" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="1463,541,1565,568"/>
+<area shape="rect" id="node30" href="$mem-tracker_8h.html" title="runtime/mem&#45;tracker.h" alt="" coords="1445,195,1598,221"/>
+<area shape="rect" id="node37" href="$promise_8h.html" title="util/promise.h" alt="" coords="2777,459,2877,485"/>
+<area shape="rect" id="node36" href="$thread_8h.html" title="util/thread.h" alt="" coords="2859,376,2950,403"/>
+<area shape="rect" id="node38" href="$stopwatch_8h.html" title="util/stopwatch.h" alt="" coords="2283,376,2398,403"/>
+<area shape="rect" id="node39" href="$streaming-sampler_8h.html" title="util/streaming&#45;sampler.h" alt="" coords="1807,376,1967,403"/>
+<area shape="rect" id="node43" href="$disk-io-mgr_8h.html" title="runtime/disk&#45;io&#45;mgr.h" alt="" coords="2991,195,3135,221"/>
+<area shape="rect" id="node46" href="$mem-pool_8h.html" title="runtime/mem&#45;pool.h" alt="" coords="3481,195,3618,221"/>
+</map>

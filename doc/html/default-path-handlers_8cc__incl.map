@@ -1,0 +1,17 @@
+<map id="be/src/util/default&#45;path&#45;handlers.cc" name="be/src/util/default&#45;path&#45;handlers.cc">
+<area shape="rect" id="node2" href="$default-path-handlers_8h.html" title="util/default&#45;path&#45;handlers.h" alt="" coords="5,96,179,123"/>
+<area shape="rect" id="node11" href="$logging_8h.html" title="common/logging.h" alt="" coords="356,485,484,512"/>
+<area shape="rect" id="node14" href="$mem-tracker_8h.html" title="runtime/mem&#45;tracker.h" alt="" coords="1935,96,2088,123"/>
+<area shape="rect" id="node25" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="1702,245,1812,272"/>
+<area shape="rect" id="node41" href="$webserver_8h.html" title="util/webserver.h" alt="" coords="2824,245,2939,272"/>
+<area shape="rect" id="node48" href="$pprof-path-handlers_8h.html" title="util/pprof&#45;path&#45;handlers.h" alt="" coords="3057,96,3221,123"/>
+<area shape="rect" id="node49" href="$names_8h.html" title="common/names.h" alt="" coords="3367,96,3493,123"/>
+<area shape="rect" id="node22" href="$atomic_8h.html" title="common/atomic.h" alt="" coords="357,328,483,355"/>
+<area shape="rect" id="node36" href="$internal-queue_8h.html" title="util/internal&#45;queue.h" alt="" coords="379,171,513,197"/>
+<area shape="rect" id="node37" href="$spinlock_8h.html" title="util/spinlock.h" alt="" coords="306,245,408,272"/>
+<area shape="rect" id="node38" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="2250,171,2347,197"/>
+<area shape="rect" id="node47" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="833,171,968,197"/>
+<area shape="rect" id="node24" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="2185,485,2343,512"/>
+<area shape="rect" id="node40" href="$status_8h.html" title="common/status.h" alt="" coords="2369,411,2492,437"/>
+<area shape="rect" id="node45" href="$network-util_8h.html" title="util/network&#45;util.h" alt="" coords="2741,328,2861,355"/>
+</map>

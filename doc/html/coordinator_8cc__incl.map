@@ -1,0 +1,26 @@
+<map id="be/src/runtime/coordinator.cc" name="be/src/runtime/coordinator.cc">
+<area shape="rect" id="node2" href="$coordinator_8h.html" title="runtime/coordinator.h" alt="" coords="708,88,852,115"/>
+<area shape="rect" id="node23" href="$logging_8h.html" title="common/logging.h" alt="" coords="3821,179,3949,205"/>
+<area shape="rect" id="node24" href="$expr_8h.html" title="exprs/expr.h" alt="" coords="3994,88,4088,115"/>
+<area shape="rect" id="node25" href="$data-sink_8h.html" title="exec/data&#45;sink.h" alt="" coords="4121,179,4239,205"/>
+<area shape="rect" id="node26" href="$client-cache_8h.html" title="runtime/client&#45;cache.h" alt="" coords="2831,179,2981,205"/>
+<area shape="rect" id="node27" href="$data-stream-sender_8h.html" title="runtime/data&#45;stream\l&#45;sender.h" alt="" coords="4164,81,4303,122"/>
+<area shape="rect" id="node28" href="$data-stream-mgr_8h.html" title="runtime/data&#45;stream\l&#45;mgr.h" alt="" coords="4327,81,4465,122"/>
+<area shape="rect" id="node29" href="$exec-env_8h.html" title="runtime/exec&#45;env.h" alt="" coords="2881,88,3015,115"/>
+<area shape="rect" id="node30" href="$hdfs-bulk-ops_8h.html" title="util/hdfs&#45;bulk&#45;ops.h" alt="" coords="3006,179,3137,205"/>
+<area shape="rect" id="node31" href="$hdfs-fs-cache_8h.html" title="runtime/hdfs&#45;fs&#45;cache.h" alt="" coords="4490,88,4648,115"/>
+<area shape="rect" id="node32" href="$plan-fragment-executor_8h.html" title="runtime/plan&#45;fragment\l&#45;executor.h" alt="" coords="4673,81,4820,122"/>
+<area shape="rect" id="node33" href="$row-batch_8h.html" title="runtime/row&#45;batch.h" alt="" coords="3833,88,3969,115"/>
+<area shape="rect" id="node34" href="$parallel-executor_8h.html" title="runtime/parallel&#45;executor.h" alt="" coords="4845,88,5019,115"/>
+<area shape="rect" id="node35" href="$scheduler_8h.html" title="statestore/scheduler.h" alt="" coords="1647,88,1797,115"/>
+<area shape="rect" id="node36" href="$container-util_8h.html" title="util/container&#45;util.h" alt="" coords="1817,179,1945,205"/>
+<area shape="rect" id="node39" href="$scan-node_8h.html" title="exec/scan&#45;node.h" alt="" coords="1924,88,2049,115"/>
+<area shape="rect" id="node40" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="1461,88,1571,115"/>
+<area shape="rect" id="node41" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="2073,88,2175,115"/>
+<area shape="rect" id="node42" href="$hdfs-util_8h.html" title="util/hdfs&#45;util.h" alt="" coords="5043,88,5143,115"/>
+<area shape="rect" id="node43" href="$llama-util_8h.html" title="util/llama&#45;util.h" alt="" coords="5168,88,5275,115"/>
+<area shape="rect" id="node44" href="$network-util_8h.html" title="util/network&#45;util.h" alt="" coords="5299,88,5420,115"/>
+<area shape="rect" id="node45" href="$pretty-printer_8h.html" title="util/pretty&#45;printer.h" alt="" coords="3630,88,3756,115"/>
+<area shape="rect" id="node46" href="$summary-util_8h.html" title="util/summary&#45;util.h" alt="" coords="5445,88,5573,115"/>
+<area shape="rect" id="node50" href="$names_8h.html" title="common/names.h" alt="" coords="6205,88,6331,115"/>
+</map>

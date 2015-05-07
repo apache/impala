@@ -1,0 +1,8 @@
+<map id="impala::Metric" name="impala::Metric">
+<area shape="rect" id="node2" href="$classimpala_1_1SetMetric.html" title="Metric whose value is a set of items. " alt="" coords="5,299,160,479"/>
+<area shape="rect" id="node3" href="$classimpala_1_1SimpleMetric.html" title="{impala::SimpleMetric\l\&lt; T, metric_kind \&gt;\n|# unit_\l# lock_\l# value_\l|+ SimpleMetric()\l+ SimpleMetric()\l+ ~SimpleMetric()\l+ value()\l+ set_value()\l+ Increment()\l+ ToJson()\l+ ToHumanReadable()\l+ ToLegacyJson()\l+ unit()\l+ kind()\l# CalculateValue()\l}" alt="" coords="185,248,339,531"/>
+<area shape="rect" id="node4" href="$classimpala_1_1StatsMetric.html" title="{impala::StatsMetric\&lt; T \&gt;\n|&#45; unit_\l&#45; lock_\l&#45; value_\l&#45; acc_\l|+ StatsMetric()\l+ Update()\l+ Reset()\l+ ToJson()\l+ ToLegacyJson()\l+ ToHumanReadable()\l}" alt="" coords="365,292,531,487"/>
+<area shape="rect" id="node5" href="$classimpala_1_1TimerMetric.html" title="{impala::TimerMetric\n||+ ToJson()\l+ ToLegacyJson()\l+ ToHumanReadable()\l}" alt="" coords="556,336,709,443"/>
+<area shape="rect" id="node6" href="$classimpala_1_1SetMetric.html" title="{impala::SetMetric\&lt;\l std::string \&gt;\n|&#45; lock_\l&#45; value_\l|+ SetMetric()\l+ Add()\l+ Remove()\l+ Reset()\l+ ToJson()\l+ ToLegacyJson()\l+ ToHumanReadable()\l}" alt="" coords="735,292,888,487"/>
+<area shape="rect" id="node7" href="$classimpala_1_1StatsMetric.html" title="{impala::StatsMetric\l\&lt; double \&gt;\n|&#45; unit_\l&#45; lock_\l&#45; value_\l&#45; acc_\l|+ StatsMetric()\l+ Update()\l+ Reset()\l+ ToJson()\l+ ToLegacyJson()\l+ ToHumanReadable()\l}" alt="" coords="913,285,1067,494"/>
+</map>

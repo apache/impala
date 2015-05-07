@@ -1,0 +1,5 @@
+<map id="impala::DescriptorTblBuilder" name="impala::DescriptorTblBuilder">
+<area shape="rect" id="node2" href="$classimpala_1_1ObjectPool.html" title="{impala::ObjectPool\n||+ ObjectPool()\l+ ~ObjectPool()\l+ Add()\l}" alt="" coords="179,363,311,469"/>
+<area shape="rect" id="node3" href="$classimpala_1_1SpinLock.html" title="Lightweight spinlock. " alt="" coords="43,147,175,298"/>
+<area shape="rect" id="node5" href="$classbool.html" title="{bool\n||}" alt="" coords="171,5,217,83"/>
+</map>

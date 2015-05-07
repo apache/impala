@@ -1,0 +1,4 @@
+<map id="com.cloudera.impala.planner.HdfsTableSink" name="com.cloudera.impala.planner.HdfsTableSink">
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1planner_1_1TableSink.html" title="{com.cloudera.impala.planner.\lTableSink\n|# targetTable_\l|+ TableSink()\l}" alt="" coords="19,249,211,341"/>
+<area shape="rect" id="node3" href="$classcom_1_1cloudera_1_1impala_1_1planner_1_1DataSink.html" title="{com.cloudera.impala.planner.\lDataSink\n|# perHostMemCost_\l# fragment_\l|+ getExplainString()\l+ setFragment()\l+ getFragment()\l+ getPerHostMemCost()\l+ computeCosts()\l+ createDataSink()\l# toThrift()\l}" alt="" coords="19,5,211,200"/>
+</map>

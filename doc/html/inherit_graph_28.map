@@ -1,0 +1,10 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1EquivalenceClassId.html" title="com.cloudera.impala.analysis.\lEquivalenceClassId" alt="" coords="94,5,293,46"/>
+<area shape="rect" id="node3" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1ExprId.html" title="com.cloudera.impala.analysis.\lExprId" alt="" coords="94,70,293,111"/>
+<area shape="rect" id="node4" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1SlotId.html" title="com.cloudera.impala.analysis.\lSlotId" alt="" coords="94,135,293,177"/>
+<area shape="rect" id="node5" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1TupleId.html" title="com.cloudera.impala.analysis.\lTupleId" alt="" coords="94,201,293,242"/>
+<area shape="rect" id="node6" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1VertexId.html" title="com.cloudera.impala.analysis.\lVertexId" alt="" coords="94,266,293,307"/>
+<area shape="rect" id="node7" href="$classcom_1_1cloudera_1_1impala_1_1catalog_1_1TableId.html" title="com.cloudera.impala.catalog.\lTableId" alt="" coords="97,331,289,373"/>
+<area shape="rect" id="node8" href="$classcom_1_1cloudera_1_1impala_1_1planner_1_1PlanFragmentId.html" title="com.cloudera.impala.planner.\lPlanFragmentId" alt="" coords="97,397,289,438"/>
+<area shape="rect" id="node9" href="$classcom_1_1cloudera_1_1impala_1_1planner_1_1PlanNodeId.html" title="com.cloudera.impala.planner.\lPlanNodeId" alt="" coords="97,462,289,503"/>
+</map>

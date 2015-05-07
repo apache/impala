@@ -1,0 +1,25 @@
+var classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role =
+[
+    [ "Role", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#a28f8205d8147ea9a2d394ccff000cc33", null ],
+    [ "Role", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#a1d11d4facf56524c9cbda92d4aa65abb", null ],
+    [ "addGrantGroup", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#a633c269643f0fccc0df87e3693dc9ec9", null ],
+    [ "addPrivilege", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#a8e81be3fff5ba43097819ccde78d7f40", null ],
+    [ "fromThrift", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#af3df8d13dde9b505f49c014f28c8f0de", null ],
+    [ "getCatalogObjectType", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#a9f6bd261ff752d9a3cfef36e5263f96c", null ],
+    [ "getCatalogVersion", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#a5642096f2701e9fafc324bdcf85b66d4", null ],
+    [ "getGrantGroups", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#ab21b41c9a467f3b3ae751ce84db98981", null ],
+    [ "getId", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#a29f61a0b3dab3dde8a29d8081ec0b5ec", null ],
+    [ "getName", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#ab2ae227789fd8e14df2f032759a19211", null ],
+    [ "getPrivilege", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#adad1d2227b4c97b09dc873113342017f", null ],
+    [ "getPrivilegeNames", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#acdc2f0a8362840f211d3441645f6b843", null ],
+    [ "getPrivileges", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#a15f753a259b835b28e28162f1413db31", null ],
+    [ "isLoaded", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#a1d53d56e9b88a57a2b4888ccaf9db9aa", null ],
+    [ "removeGrantGroup", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#ab3e72d2d383099ff3d6b0e38f50d0291", null ],
+    [ "removePrivilege", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#a9458b6f493821ee73e8779fc92eeef2d", null ],
+    [ "setCatalogVersion", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#a2d6d3fc0b7920342aaf1f3580ad0890a", null ],
+    [ "toThrift", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#a257b0d1390f4ad5b53b071e01abd51e6", null ],
+    [ "catalogVersion_", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#ae27771cfed761ac96040097af6a4bade", null ],
+    [ "role_", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#a7a6fe693fa1cbf0031eb0502cb7a2636", null ],
+    [ "roleId_", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#a94cef9fbfc47bd4622ab53c3f3ef7e8b", null ],
+    [ "rolePrivileges_", "classcom_1_1cloudera_1_1impala_1_1catalog_1_1Role.html#adde7841a6dacf6dd166c0ddb96b91aea", null ]
+];

@@ -1,0 +1,36 @@
+<map id="be/src/exec/hdfs&#45;avro&#45;table&#45;writer.cc" name="be/src/exec/hdfs&#45;avro&#45;table&#45;writer.cc">
+<area shape="rect" id="node2" href="$hdfs-avro-table-writer_8h.html" title="exec/hdfs&#45;avro&#45;table\l&#45;writer.h" alt="" coords="1331,171,1471,213"/>
+<area shape="rect" id="node3" href="$hdfs_8h.html" title="hdfs.h" alt="" coords="1085,419,1143,445"/>
+<area shape="rect" id="node14" href="$hdfs-util_8h.html" title="util/hdfs&#45;util.h" alt="" coords="2081,336,2180,363"/>
+<area shape="rect" id="node15" href="$codec_8h.html" title="util/codec.h" alt="" coords="1887,261,1976,288"/>
+<area shape="rect" id="node21" href="$exec-node_8h.html" title="exec/exec&#45;node.h" alt="" coords="912,261,1037,288"/>
+<area shape="rect" id="node24" href="$compress_8h.html" title="util/compress.h" alt="" coords="1099,96,1209,123"/>
+<area shape="rect" id="node27" href="$row-batch_8h.html" title="runtime/row&#45;batch.h" alt="" coords="1539,261,1676,288"/>
+<area shape="rect" id="node28" href="$uid-util_8h.html" title="util/uid&#45;util.h" alt="" coords="719,96,811,123"/>
+<area shape="rect" id="node32" href="$names_8h.html" title="common/names.h" alt="" coords="1495,179,1621,205"/>
+<area shape="rect" id="node33" href="$expr_8h.html" title="exprs/expr.h" alt="" coords="2669,96,2763,123"/>
+<area shape="rect" id="node38" href="$raw-value_8h.html" title="runtime/raw&#45;value.h" alt="" coords="3503,179,3637,205"/>
+<area shape="rect" id="node46" href="$expr-context_8h.html" title="exprs/expr&#45;context.h" alt="" coords="2873,96,3013,123"/>
+<area shape="rect" id="node48" href="$runtime-state_8h.html" title="runtime/runtime&#45;state.h" alt="" coords="514,261,669,288"/>
+<area shape="rect" id="node49" href="$hdfs-fs-cache_8h.html" title="runtime/hdfs&#45;fs&#45;cache.h" alt="" coords="1643,336,1801,363"/>
+<area shape="rect" id="node50" href="$write-stream_8inline_8h.html" title="write&#45;stream.inline.h" alt="" coords="1521,96,1660,123"/>
+<area shape="rect" id="node6" href="$hdfs-table-writer_8h.html" title="exec/hdfs&#45;table&#45;writer.h" alt="" coords="1322,261,1480,288"/>
+<area shape="rect" id="node18" href="$write-stream_8h.html" title="exec/write&#45;stream.h" alt="" coords="2001,261,2137,288"/>
+<area shape="rect" id="node8" href="$descriptors_8h.html" title="runtime/descriptors.h" alt="" coords="1424,336,1568,363"/>
+<area shape="rect" id="node10" href="$status_8h.html" title="common/status.h" alt="" coords="2188,419,2311,445"/>
+<area shape="rect" id="node11" href="$logging_8h.html" title="common/logging.h" alt="" coords="2880,501,3008,528"/>
+<area shape="rect" id="node16" href="$mem-pool_8h.html" title="runtime/mem&#45;pool.h" alt="" coords="2358,336,2495,363"/>
+<area shape="rect" id="node17" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="1900,419,2035,445"/>
+<area shape="rect" id="node22" href="$blocking-queue_8h.html" title="util/blocking&#45;queue.h" alt="" coords="904,336,1044,363"/>
+<area shape="rect" id="node26" href="$hdfs-scanner_8h.html" title="exec/hdfs&#45;scanner.h" alt="" coords="987,179,1127,205"/>
+<area shape="rect" id="node31" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="777,261,887,288"/>
+<area shape="rect" id="node35" href="$decimal-value_8h.html" title="runtime/decimal&#45;value.h" alt="" coords="3232,261,3391,288"/>
+<area shape="rect" id="node37" href="$lib-cache_8h.html" title="runtime/lib&#45;cache.h" alt="" coords="2571,336,2703,363"/>
+<area shape="rect" id="node41" href="$string-value_8h.html" title="runtime/string&#45;value.h" alt="" coords="3133,336,3280,363"/>
+<area shape="rect" id="node42" href="$udf_8h.html" title="udf/udf.h" alt="" coords="3051,419,3124,445"/>
+<area shape="rect" id="node43" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="2931,261,3107,288"/>
+<area shape="rect" id="node44" href="$tuple_8h.html" title="runtime/tuple.h" alt="" coords="2529,261,2636,288"/>
+<area shape="rect" id="node45" href="$tuple-row_8h.html" title="runtime/tuple&#45;row.h" alt="" coords="2320,179,2453,205"/>
+<area shape="rect" id="node40" href="$string-value_8inline_8h.html" title="runtime/string&#45;value.inline.h" alt="" coords="3416,261,3597,288"/>
+<area shape="rect" id="node47" href="$expr-value_8h.html" title="exprs/expr&#45;value.h" alt="" coords="3145,179,3273,205"/>
+</map>

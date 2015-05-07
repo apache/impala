@@ -1,0 +1,3 @@
+<map id="com.cloudera.impala.catalog.HdfsStorageDescriptor" name="com.cloudera.impala.catalog.HdfsStorageDescriptor">
+<area shape="rect" id="node6" href="$enumcom_1_1cloudera_1_1impala_1_1catalog_1_1HdfsFileFormat.html" title="{com.cloudera.impala.catalog.\lHdfsFileFormat\n|+ RC_FILE\l+ TEXT\l+ SEQUENCE_FILE\l+ AVRO\l|+ toJavaClassName()\l+ toThrift()\l+ toSql()\l+ isFileCompressionTypeSupported()\l+ isSplittable()\l+ isHdfsFormatClass()\l+ fromHdfsInputFormatClass()\l+ fromJavaClassName()\l+ fromThrift()\l}" alt="" coords="169,251,407,504"/>
+</map>

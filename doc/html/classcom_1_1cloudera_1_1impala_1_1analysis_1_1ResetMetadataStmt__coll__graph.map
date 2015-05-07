@@ -1,0 +1,5 @@
+<map id="com.cloudera.impala.analysis.ResetMetadataStmt" name="com.cloudera.impala.analysis.ResetMetadataStmt">
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1StatementBase.html" title="{com.cloudera.impala.analysis.\lStatementBase\n||+ analyze()\l+ toSql()\l+ setIsExplain()\l+ isExplain()\l}" alt="" coords="14,256,212,392"/>
+<area shape="rect" id="node3" href="$interfacecom_1_1cloudera_1_1impala_1_1analysis_1_1ParseNode.html" title="{com.cloudera.impala.analysis.\lParseNode\n||+ analyze()\l+ toSql()\l}" alt="" coords="5,5,203,112"/>
+<area shape="rect" id="node5" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1TableName.html" title="{com.cloudera.impala.analysis.\lTableName\n||+ TableName()\l+ getDb()\l+ getTbl()\l+ isEmpty()\l+ analyze()\l+ isFullyQualified()\l+ toSql()\l+ toString()\l+ toPath()\l+ toThrift()\l+ equals()\l+ hashCode()\l+ fromThrift()\l}" alt="" coords="357,190,555,458"/>
+</map>

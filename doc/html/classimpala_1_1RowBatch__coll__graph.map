@@ -1,0 +1,11 @@
+<map id="impala::RowBatch" name="impala::RowBatch">
+<area shape="rect" id="node4" href="$classimpala_1_1Tuple.html" title="A tuple with 0 materialised slots is represented as NULL. " alt="" coords="354,1305,600,1573"/>
+<area shape="rect" id="node6" href="$classimpala_1_1RowDescriptor.html" title="{impala::RowDescriptor\n||+ RowDescriptor()\l+ RowDescriptor()\l+ RowDescriptor()\l+ RowDescriptor()\l+ RowDescriptor()\l+ RowDescriptor()\l+ GetRowSize()\l+ GetTupleIdx()\l+ TupleIsNullable()\l+ IsAnyTupleNullable()\l+ tuple_descriptors()\l+ ToThrift()\l+ IsPrefixOf()\l+ Equals()\l+ DebugString()\l&#45; InitTupleIdxMap()\l}" alt="" coords="455,782,608,1079"/>
+<area shape="rect" id="node23" href="$classimpala_1_1SpinLock.html" title="Lightweight spinlock. " alt="" coords="2047,855,2179,1006"/>
+<area shape="rect" id="node15" href="$classimpala_1_1MemTracker.html" title="This class is thread&#45;safe. " alt="" coords="2488,1246,2697,1631"/>
+<area shape="rect" id="node17" href="$classimpala_1_1AtomicInt.html" title="{impala::AtomicInt\&lt;\l int64_t \&gt;\n||+ AtomicInt()\l+ operator int64_t()\l+ operator=()\l+ operator=()\l+ operator+=()\l+ operator&#45;=()\l+ operator\|=()\l+ operator&amp;=()\l+ operator++()\l+ operator++()\land 10 more...\l}" alt="" coords="2375,147,2507,386"/>
+<area shape="rect" id="node32" href="$classimpala_1_1QueryResourceMgr.html" title="Only CPU&#45;heavy threads need be managed using this class. " alt="" coords="3658,811,3896,1050"/>
+<area shape="rect" id="node14" href="$classbool.html" title="{bool\n||}" alt="" coords="3191,531,3237,608"/>
+<area shape="rect" id="node28" href="$classimpala_1_1RuntimeProfile_1_1HighWaterMarkCounter.html" title="{impala::RuntimeProfile\l::HighWaterMarkCounter\n||+ HighWaterMarkCounter()\l+ Add()\l+ TryAdd()\l+ Set()\l+ current_value()\l}" alt="" coords="2377,855,2556,1006"/>
+<area shape="rect" id="node29" href="$classimpala_1_1RuntimeProfile_1_1Counter.html" title="{impala::RuntimeProfile\l::Counter\n||+ Counter()\l+ ~Counter()\l+ Add()\l+ BitOr()\l+ Set()\l+ Set()\l+ value()\l+ double_value()\l+ unit()\l}" alt="" coords="2229,465,2383,674"/>
+</map>

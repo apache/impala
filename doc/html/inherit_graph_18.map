@@ -1,0 +1,11 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1AnalyzerTest.html" title="com.cloudera.impala.analysis.\lAnalyzerTest" alt="" coords="6,234,205,275"/>
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1AnalyzeAuthStmtsTest.html" title="com.cloudera.impala.analysis.\lAnalyzeAuthStmtsTest" alt="" coords="254,5,453,46"/>
+<area shape="rect" id="node3" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1AnalyzeDDLTest.html" title="com.cloudera.impala.analysis.\lAnalyzeDDLTest" alt="" coords="254,70,453,111"/>
+<area shape="rect" id="node4" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1AnalyzeExprsTest.html" title="com.cloudera.impala.analysis.\lAnalyzeExprsTest" alt="" coords="254,135,453,177"/>
+<area shape="rect" id="node5" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1AnalyzeStmtsTest.html" title="com.cloudera.impala.analysis.\lAnalyzeStmtsTest" alt="" coords="254,201,453,242"/>
+<area shape="rect" id="node6" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1AnalyzeSubqueriesTest.html" title="com.cloudera.impala.analysis.\lAnalyzeSubqueriesTest" alt="" coords="254,266,453,307"/>
+<area shape="rect" id="node7" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1AuditingTest.html" title="com.cloudera.impala.analysis.\lAuditingTest" alt="" coords="254,331,453,373"/>
+<area shape="rect" id="node8" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1ToSqlTest.html" title="com.cloudera.impala.analysis.\lToSqlTest" alt="" coords="254,397,453,438"/>
+<area shape="rect" id="node9" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1TypesUtilTest.html" title="com.cloudera.impala.analysis.\lTypesUtilTest" alt="" coords="254,462,453,503"/>
+</map>

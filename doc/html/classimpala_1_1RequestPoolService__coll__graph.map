@@ -1,0 +1,6 @@
+<map id="impala::RequestPoolService" name="impala::RequestPoolService">
+<area shape="rect" id="node4" href="$classbool.html" title="{bool\n||}" alt="" coords="398,493,444,571"/>
+<area shape="rect" id="node5" href="$classimpala_1_1StatsMetric.html" title="{impala::StatsMetric\l\&lt; double \&gt;\n||+ StatsMetric()\l+ Update()\l+ Reset()\l+ ToJson()\l+ ToLegacyJson()\l+ ToHumanReadable()\l}" alt="" coords="703,449,856,615"/>
+<area shape="rect" id="node6" href="$classimpala_1_1Metric.html" title="TODO: Add ToThrift() for conversion to an RPC&#45;friendly format. " alt="" coords="737,161,891,341"/>
+<area shape="rect" id="node12" href="$classimpala_1_1MetricGroup.html" title="MetricGroups may be organised hierarchically as a tree. " alt="" coords="469,405,645,659"/>
+</map>

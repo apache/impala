@@ -1,0 +1,28 @@
+var namespacecom_1_1cloudera_1_1impala_1_1util =
+[
+    [ "AvroSchemaParser", "classcom_1_1cloudera_1_1impala_1_1util_1_1AvroSchemaParser.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1AvroSchemaParser" ],
+    [ "DisjointSet< T >", "classcom_1_1cloudera_1_1impala_1_1util_1_1DisjointSet_3_01T_01_4.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1DisjointSet_3_01T_01_4" ],
+    [ "EventSequence", "classcom_1_1cloudera_1_1impala_1_1util_1_1EventSequence.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1EventSequence" ],
+    [ "FileWatchService", "classcom_1_1cloudera_1_1impala_1_1util_1_1FileWatchService.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1FileWatchService" ],
+    [ "FsPermissionChecker", "classcom_1_1cloudera_1_1impala_1_1util_1_1FsPermissionChecker.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1FsPermissionChecker" ],
+    [ "GlogAppender", "classcom_1_1cloudera_1_1impala_1_1util_1_1GlogAppender.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1GlogAppender" ],
+    [ "HdfsCachingUtil", "classcom_1_1cloudera_1_1impala_1_1util_1_1HdfsCachingUtil.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1HdfsCachingUtil" ],
+    [ "ListMap< T >", "classcom_1_1cloudera_1_1impala_1_1util_1_1ListMap_3_01T_01_4.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1ListMap_3_01T_01_4" ],
+    [ "MaxRowsProcessedVisitor", "classcom_1_1cloudera_1_1impala_1_1util_1_1MaxRowsProcessedVisitor.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1MaxRowsProcessedVisitor" ],
+    [ "MetaStoreUtil", "classcom_1_1cloudera_1_1impala_1_1util_1_1MetaStoreUtil.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1MetaStoreUtil" ],
+    [ "NativeLibUtil", "classcom_1_1cloudera_1_1impala_1_1util_1_1NativeLibUtil.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1NativeLibUtil" ],
+    [ "NativeLogger", "classcom_1_1cloudera_1_1impala_1_1util_1_1NativeLogger.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1NativeLogger" ],
+    [ "PatternMatcher", "classcom_1_1cloudera_1_1impala_1_1util_1_1PatternMatcher.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1PatternMatcher" ],
+    [ "RequestPoolService", "classcom_1_1cloudera_1_1impala_1_1util_1_1RequestPoolService.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1RequestPoolService" ],
+    [ "SentryPolicyService", "classcom_1_1cloudera_1_1impala_1_1util_1_1SentryPolicyService.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1SentryPolicyService" ],
+    [ "SentryProxy", "classcom_1_1cloudera_1_1impala_1_1util_1_1SentryProxy.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1SentryProxy" ],
+    [ "StatsHelper< T extends Number >", "classcom_1_1cloudera_1_1impala_1_1util_1_1StatsHelper_3_01T_01extends_01Number_01_4.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1StatsHelper_3_01T_01extends_01Number_01_4" ],
+    [ "TAccessLevelUtil", "classcom_1_1cloudera_1_1impala_1_1util_1_1TAccessLevelUtil.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1TAccessLevelUtil" ],
+    [ "TColumnValueUtil", "classcom_1_1cloudera_1_1impala_1_1util_1_1TColumnValueUtil.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1TColumnValueUtil" ],
+    [ "TResultRowBuilder", "classcom_1_1cloudera_1_1impala_1_1util_1_1TResultRowBuilder.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1TResultRowBuilder" ],
+    [ "TSessionStateUtil", "classcom_1_1cloudera_1_1impala_1_1util_1_1TSessionStateUtil.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1TSessionStateUtil" ],
+    [ "UnsafeUtil", "classcom_1_1cloudera_1_1impala_1_1util_1_1UnsafeUtil.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1UnsafeUtil" ],
+    [ "Visitor< T >", "interfacecom_1_1cloudera_1_1impala_1_1util_1_1Visitor_3_01T_01_4.html", "interfacecom_1_1cloudera_1_1impala_1_1util_1_1Visitor_3_01T_01_4" ],
+    [ "TestDisjointSet", "classcom_1_1cloudera_1_1impala_1_1util_1_1TestDisjointSet.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1TestDisjointSet" ],
+    [ "TestRequestPoolService", "classcom_1_1cloudera_1_1impala_1_1util_1_1TestRequestPoolService.html", "classcom_1_1cloudera_1_1impala_1_1util_1_1TestRequestPoolService" ]
+];

@@ -1,0 +1,18 @@
+<map id="be/src/util/periodic&#45;counter&#45;updater.cc" name="be/src/util/periodic&#45;counter&#45;updater.cc">
+<area shape="rect" id="node2" href="$periodic-counter-updater_8h.html" title="util/periodic&#45;counter\l&#45;updater.h" alt="" coords="781,97,915,138"/>
+<area shape="rect" id="node43" href="$time_8h.html" title="util/time.h" alt="" coords="2027,451,2105,477"/>
+<area shape="rect" id="node49" href="$names_8h.html" title="common/names.h" alt="" coords="2177,104,2303,131"/>
+<area shape="rect" id="node9" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="867,187,1001,213"/>
+<area shape="rect" id="node13" href="$atomic_8h.html" title="common/atomic.h" alt="" coords="167,451,293,477"/>
+<area shape="rect" id="node16" href="$logging_8h.html" title="common/logging.h" alt="" coords="725,451,853,477"/>
+<area shape="rect" id="node19" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="619,269,769,296"/>
+<area shape="rect" id="node23" href="$thread_8h.html" title="util/thread.h" alt="" coords="1360,269,1451,296"/>
+<area shape="rect" id="node45" href="$stopwatch_8h.html" title="util/stopwatch.h" alt="" coords="1661,360,1776,387"/>
+<area shape="rect" id="node46" href="$streaming-sampler_8h.html" title="util/streaming&#45;sampler.h" alt="" coords="794,269,955,296"/>
+<area shape="rect" id="node15" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="153,541,311,568"/>
+<area shape="rect" id="node22" href="$spinlock_8h.html" title="util/spinlock.h" alt="" coords="687,360,789,387"/>
+<area shape="rect" id="node27" href="$status_8h.html" title="common/status.h" alt="" coords="1051,360,1173,387"/>
+<area shape="rect" id="node39" href="$promise_8h.html" title="util/promise.h" alt="" coords="1355,360,1455,387"/>
+<area shape="rect" id="node33" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="1149,451,1251,477"/>
+<area shape="rect" id="node40" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="1560,451,1736,477"/>
+</map>

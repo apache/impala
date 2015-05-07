@@ -1,0 +1,5 @@
+<map id="com.cloudera.impala.util.TestRequestPoolService" name="com.cloudera.impala.util.TestRequestPoolService">
+<area shape="rect" id="node3" href="$classcom_1_1cloudera_1_1impala_1_1util_1_1RequestPoolService.html" title="{com.cloudera.impala.util.\lRequestPoolService\n||+ RequestPoolService()\l+ start()\l+ stop()\l+ resolveRequestPool()\l+ getPoolConfig()\l~ resolveRequestPool()\l~ getPoolConfig()\l~ assignToPool()\l~ hasAccess()\l~ getURL()\l&#45; stopInternal()\l&#45; getLlamaPoolConfigValue()\l}" alt="" coords="894,480,1082,733"/>
+<area shape="rect" id="node9" href="$classcom_1_1cloudera_1_1impala_1_1util_1_1FileWatchService.html" title="{com.cloudera.impala.util.\lFileWatchService\n||+ FileWatchService()\l+ setCheckIntervalMs()\l+ start()\l+ stop()\l&#45; checkFile()\l}" alt="" coords="989,206,1155,357"/>
+<area shape="rect" id="node10" href="$interfacecom_1_1cloudera_1_1impala_1_1util_1_1FileWatchService_1_1FileChangeListener.html" title="{com.cloudera.impala.util.\lFileWatchService.FileChangeListener\n||+ onFileChange()\l}" alt="" coords="893,6,1134,98"/>
+</map>

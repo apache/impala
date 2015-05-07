@@ -1,0 +1,8 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classcom_1_1cloudera_1_1impala_1_1catalog_1_1Type.html" title="com.cloudera.impala.catalog.Type" alt="" coords="5,111,227,137"/>
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1catalog_1_1ArrayType.html" title="com.cloudera.impala.catalog.\lArrayType" alt="" coords="275,5,467,46"/>
+<area shape="rect" id="node3" href="$classcom_1_1cloudera_1_1impala_1_1catalog_1_1MapType.html" title="com.cloudera.impala.catalog.\lMapType" alt="" coords="275,70,467,111"/>
+<area shape="rect" id="node4" href="$classcom_1_1cloudera_1_1impala_1_1catalog_1_1ScalarType.html" title="com.cloudera.impala.catalog.\lScalarType" alt="" coords="275,135,467,177"/>
+<area shape="rect" id="node5" href="$classcom_1_1cloudera_1_1impala_1_1catalog_1_1StructType.html" title="com.cloudera.impala.catalog.\lStructType" alt="" coords="275,201,467,242"/>
+<area shape="rect" id="node6" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1CollectionStructType.html" title="com.cloudera.impala.analysis.\lCollectionStructType" alt="" coords="515,201,714,242"/>
+</map>

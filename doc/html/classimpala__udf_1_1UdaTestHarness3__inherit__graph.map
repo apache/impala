@@ -1,0 +1,3 @@
+<map id="impala_udf::UdaTestHarness3&lt; RESULT, INTERMEDIATE, INPUT1, INPUT2, INPUT3 &gt;" name="impala_udf::UdaTestHarness3&lt; RESULT, INTERMEDIATE, INPUT1, INPUT2, INPUT3 &gt;">
+<area shape="rect" id="node2" href="$classimpala__udf_1_1UdaTestHarnessBase.html" title="{impala_udf::UdaTestHarness\lBase\&lt; RESULT, INTERMEDIATE \&gt;\n|# init_fn_\l# merge_fn_\l# serialize_fn_\l# finalize_fn_\l# result_comparator_fn_\l# num_input_values_\l# fixed_buffer_byte_size_\l# error_msg_\l|+ SetResultComparator()\l+ SetIntermediateSize()\l+ GetErrorMsg()\l# UdaTestHarnessBase()\l# Execute()\l# CheckContext()\l# CheckResult()\l# ExecuteSingleNode()\l# ExecuteOneLevel()\l# ExecuteTwoLevel()\l# Update()\l}" alt="" coords="5,5,243,347"/>
+</map>

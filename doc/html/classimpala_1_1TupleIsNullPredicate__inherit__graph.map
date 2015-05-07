@@ -1,0 +1,4 @@
+<map id="impala::TupleIsNullPredicate" name="impala::TupleIsNullPredicate">
+<area shape="rect" id="node2" href="$classimpala_1_1Predicate.html" title="{impala::Predicate\n||# Predicate()\l}" alt="" coords="63,923,185,1000"/>
+<area shape="rect" id="node3" href="$classimpala_1_1Expr.html" title="This is the superclass of all expr evaluation nodes. " alt="" coords="5,5,243,875"/>
+</map>

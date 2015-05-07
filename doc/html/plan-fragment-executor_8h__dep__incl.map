@@ -1,0 +1,9 @@
+<map id="be/src/runtime/plan&#45;fragment&#45;executor.h" name="be/src/runtime/plan&#45;fragment&#45;executor.h">
+<area shape="rect" id="node2" href="$coordinator_8cc.html" title="be/src/runtime/coordinator.cc" alt="" coords="5,104,195,131"/>
+<area shape="rect" id="node3" href="$plan-fragment-executor_8cc.html" title="be/src/runtime/plan\l&#45;fragment&#45;executor.cc" alt="" coords="220,97,368,138"/>
+<area shape="rect" id="node4" href="$fragment-exec-state_8h.html" title="be/src/service/fragment\l&#45;exec&#45;state.h" alt="" coords="394,97,552,138"/>
+<area shape="rect" id="node8" href="$impala-beeswax-server_8cc.html" title="be/src/service/impala\l&#45;beeswax&#45;server.cc" alt="" coords="577,97,724,138"/>
+<area shape="rect" id="node5" href="$fragment-exec-state_8cc.html" title="be/src/service/fragment\l&#45;exec&#45;state.cc" alt="" coords="211,187,369,229"/>
+<area shape="rect" id="node6" href="$fragment-mgr_8cc.html" title="be/src/service/fragment\l&#45;mgr.cc" alt="" coords="394,187,552,229"/>
+<area shape="rect" id="node7" href="$impala-server_8cc.html" title="be/src/service/impala\l&#45;server.cc" alt="" coords="577,187,724,229"/>
+</map>

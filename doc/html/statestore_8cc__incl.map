@@ -1,0 +1,20 @@
+<map id="be/src/statestore/statestore.cc" name="be/src/statestore/statestore.cc">
+<area shape="rect" id="node2" href="$statestore_8h.html" title="statestore/statestore.h" alt="" coords="2124,88,2277,115"/>
+<area shape="rect" id="node19" href="$status_8h.html" title="common/status.h" alt="" coords="1261,451,1384,477"/>
+<area shape="rect" id="node27" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="2115,360,2225,387"/>
+<area shape="rect" id="node30" href="$webserver_8h.html" title="util/webserver.h" alt="" coords="2301,360,2416,387"/>
+<area shape="rect" id="node39" href="$thrift-util_8h.html" title="rpc/thrift&#45;util.h" alt="" coords="558,269,660,296"/>
+<area shape="rect" id="node43" href="$failure-detector_8h.html" title="statestore/failure\l&#45;detector.h" alt="" coords="3270,171,3388,213"/>
+<area shape="rect" id="node48" href="$time_8h.html" title="util/time.h" alt="" coords="952,88,1030,115"/>
+<area shape="rect" id="node49" href="$uid-util_8h.html" title="util/uid&#45;util.h" alt="" coords="2700,88,2792,115"/>
+<area shape="rect" id="node50" href="$names_8h.html" title="common/names.h" alt="" coords="3016,179,3142,205"/>
+<area shape="rect" id="node14" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="2223,269,2320,296"/>
+<area shape="rect" id="node31" href="$collection-metrics_8h.html" title="util/collection&#45;metrics.h" alt="" coords="2784,179,2940,205"/>
+<area shape="rect" id="node32" href="$thrift-client_8h.html" title="rpc/thrift&#45;client.h" alt="" coords="1232,269,1348,296"/>
+<area shape="rect" id="node37" href="$thread-pool_8h.html" title="util/thread&#45;pool.h" alt="" coords="1880,269,1998,296"/>
+<area shape="rect" id="node38" href="$client-cache_8h.html" title="runtime/client&#45;cache.h" alt="" coords="1208,179,1358,205"/>
+<area shape="rect" id="node42" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="3337,451,3513,477"/>
+<area shape="rect" id="node18" href="$logging_8h.html" title="common/logging.h" alt="" coords="2208,541,2336,568"/>
+<area shape="rect" id="node21" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="884,541,1041,568"/>
+<area shape="rect" id="node25" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="1470,541,1572,568"/>
+</map>

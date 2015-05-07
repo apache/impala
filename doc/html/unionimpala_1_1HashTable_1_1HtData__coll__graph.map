@@ -1,0 +1,5 @@
+<map id="impala::HashTable::HtData" name="impala::HashTable::HtData">
+<area shape="rect" id="node2" href="$structimpala_1_1BufferedTupleStream_1_1RowIdx.html" title="{impala::BufferedTupleStream\l::RowIdx\n||+ block()\l+ offset()\l+ idx()\l+ set()\l+ DebugString()\l}" alt="" coords="5,294,195,445"/>
+<area shape="rect" id="node3" href="$classuint64__t.html" title="{uint64_t\n||}" alt="" coords="66,5,133,83"/>
+<area shape="rect" id="node4" href="$classimpala_1_1Tuple.html" title="A tuple with 0 materialised slots is represented as NULL. " alt="" coords="219,235,465,503"/>
+</map>

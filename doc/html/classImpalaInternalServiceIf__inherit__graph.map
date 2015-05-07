@@ -1,0 +1,4 @@
+<map id="ImpalaInternalServiceIf" name="ImpalaInternalServiceIf">
+<area shape="rect" id="node2" href="$classimpala_1_1ImpalaInternalService.html" title="{impala::ImpalaInternalService\n|&#45; impala_server_\l&#45; fragment_mgr_\l|+ ImpalaInternalService()\l+ ExecPlanFragment()\l+ CancelPlanFragment()\l+ ReportExecStatus()\l+ TransmitData()\l+ ImpalaInternalService()\l+ ExecPlanFragment()\l+ CancelPlanFragment()\l+ ReportExecStatus()\l+ TransmitData()\l}" alt="" coords="5,131,200,355"/>
+<area shape="rect" id="node3" href="$classimpala_1_1ImpalaTestBackend.html" title="{impala::ImpalaTestBackend\n|&#45; mgr_\l|+ ImpalaTestBackend()\l+ ~ImpalaTestBackend()\l+ ExecPlanFragment()\l+ ReportExecStatus()\l+ CancelPlanFragment()\l+ TransmitData()\l}" alt="" coords="224,167,408,318"/>
+</map>

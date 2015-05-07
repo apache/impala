@@ -1,0 +1,56 @@
+var classimpala__udf_1_1FunctionContext =
+[
+    [ "TypeDesc", "structimpala__udf_1_1FunctionContext_1_1TypeDesc.html", "structimpala__udf_1_1FunctionContext_1_1TypeDesc" ],
+    [ "UniqueId", "structimpala__udf_1_1FunctionContext_1_1UniqueId.html", "structimpala__udf_1_1FunctionContext_1_1UniqueId" ],
+    [ "FunctionStateScope", "classimpala__udf_1_1FunctionContext.html#a1e9662a1bbb78daa9923b47412347ffc", [
+      [ "FRAGMENT_LOCAL", "classimpala__udf_1_1FunctionContext.html#a1e9662a1bbb78daa9923b47412347ffca4e87124aaecd709eb2822f478f26f964", null ],
+      [ "THREAD_LOCAL", "classimpala__udf_1_1FunctionContext.html#a1e9662a1bbb78daa9923b47412347ffca9ad2da787a2eb3ea3af8eebe653c84a5", null ]
+    ] ],
+    [ "ImpalaVersion", "classimpala__udf_1_1FunctionContext.html#a3c69e8ce595c0d4ce2fd855f8341ca21", [
+      [ "v1_2", "classimpala__udf_1_1FunctionContext.html#a3c69e8ce595c0d4ce2fd855f8341ca21a5da9e299f601cbcf738084ab1b6e0104", null ],
+      [ "v1_3", "classimpala__udf_1_1FunctionContext.html#a3c69e8ce595c0d4ce2fd855f8341ca21ab8c09e4752b4544d3fc09daad0ee66c9", null ]
+    ] ],
+    [ "Type", "classimpala__udf_1_1FunctionContext.html#a0802c4491e244b8b13d4ff8461e960ff", [
+      [ "INVALID_TYPE", "classimpala__udf_1_1FunctionContext.html#a0802c4491e244b8b13d4ff8461e960ffa0ae5579bad9b0b270596a4c4d0c50c87", null ],
+      [ "TYPE_NULL", "classimpala__udf_1_1FunctionContext.html#a0802c4491e244b8b13d4ff8461e960ffa99465ed01e7e93ae2e9b184a482817ab", null ],
+      [ "TYPE_BOOLEAN", "classimpala__udf_1_1FunctionContext.html#a0802c4491e244b8b13d4ff8461e960ffa5d5a0dcee4b5cc71652d0abd9c895bb1", null ],
+      [ "TYPE_TINYINT", "classimpala__udf_1_1FunctionContext.html#a0802c4491e244b8b13d4ff8461e960ffab1528e8b9605961587c97b4073c8e381", null ],
+      [ "TYPE_SMALLINT", "classimpala__udf_1_1FunctionContext.html#a0802c4491e244b8b13d4ff8461e960ffa46b8f76a2941f7f0c8cdb577d1dc7e39", null ],
+      [ "TYPE_INT", "classimpala__udf_1_1FunctionContext.html#a0802c4491e244b8b13d4ff8461e960ffa41d0b2855fa8cb44f33d0a6376054c91", null ],
+      [ "TYPE_BIGINT", "classimpala__udf_1_1FunctionContext.html#a0802c4491e244b8b13d4ff8461e960ffa539b0dc809124932f3a0ec805d9efcd0", null ],
+      [ "TYPE_FLOAT", "classimpala__udf_1_1FunctionContext.html#a0802c4491e244b8b13d4ff8461e960ffa804ffef4c305ea36acdf4c6e732f28ea", null ],
+      [ "TYPE_DOUBLE", "classimpala__udf_1_1FunctionContext.html#a0802c4491e244b8b13d4ff8461e960ffa7b26a1a2475200332732c8189c782795", null ],
+      [ "TYPE_TIMESTAMP", "classimpala__udf_1_1FunctionContext.html#a0802c4491e244b8b13d4ff8461e960ffaf0055f98505d09e606b70a0c096f6ce9", null ],
+      [ "TYPE_STRING", "classimpala__udf_1_1FunctionContext.html#a0802c4491e244b8b13d4ff8461e960ffad04b24e07ab4c7fb86cbcd80249bcd55", null ],
+      [ "TYPE_FIXED_BUFFER", "classimpala__udf_1_1FunctionContext.html#a0802c4491e244b8b13d4ff8461e960ffac0f2e9fac69984d2a42b62bc0a4cd7a1", null ],
+      [ "TYPE_DECIMAL", "classimpala__udf_1_1FunctionContext.html#a0802c4491e244b8b13d4ff8461e960ffa1dd85d0dc61480f9f01982790a3819f4", null ],
+      [ "TYPE_VARCHAR", "classimpala__udf_1_1FunctionContext.html#a0802c4491e244b8b13d4ff8461e960fface77e94f08385fdec354f03618663e35", null ]
+    ] ],
+    [ "~FunctionContext", "classimpala__udf_1_1FunctionContext.html#af0781b66d50075284f26b159e43e1aab", null ],
+    [ "FunctionContext", "classimpala__udf_1_1FunctionContext.html#acac1d543ef6f4019b1aba63853db67db", null ],
+    [ "FunctionContext", "classimpala__udf_1_1FunctionContext.html#ab36068ef369cb32d523ffa84e92b53cb", null ],
+    [ "AddWarning", "classimpala__udf_1_1FunctionContext.html#a228cf1a119cfe039dbfb1646fa2566f7", null ],
+    [ "Allocate", "classimpala__udf_1_1FunctionContext.html#a24a7e63aa708e54ea3c8c9572a00ede2", null ],
+    [ "error_msg", "classimpala__udf_1_1FunctionContext.html#a9ad5dd07c98e9f74c52e8436421c1594", null ],
+    [ "Free", "classimpala__udf_1_1FunctionContext.html#a14904de2d63cac14b1a1ef09b0653a14", null ],
+    [ "Free", "classimpala__udf_1_1FunctionContext.html#a41a17bd6e2f3c420d747c2226a1a1de3", null ],
+    [ "GetArgType", "classimpala__udf_1_1FunctionContext.html#a982cd2abfd09cd038eb51fbc3d89366c", null ],
+    [ "GetConstantArg", "classimpala__udf_1_1FunctionContext.html#a80f0af285424f65b0d9f395049f7a75f", null ],
+    [ "GetFunctionState", "classimpala__udf_1_1FunctionContext.html#a9f06f92e1567f5de30969ec17bea757d", null ],
+    [ "GetIntermediateType", "classimpala__udf_1_1FunctionContext.html#a151ab1a6388213af923e63d4e1c9a048", null ],
+    [ "GetNumArgs", "classimpala__udf_1_1FunctionContext.html#a0eb0e2431b2954c02f1bfe97e5e0769a", null ],
+    [ "GetReturnType", "classimpala__udf_1_1FunctionContext.html#a06c1133689e37fcd9fa104c8654b63bb", null ],
+    [ "has_error", "classimpala__udf_1_1FunctionContext.html#ac675ff4a1fd6f4e360cca258ac6368e5", null ],
+    [ "impl", "classimpala__udf_1_1FunctionContext.html#ae700abb05fbec18210b5930aa2efc15a", null ],
+    [ "IsArgConstant", "classimpala__udf_1_1FunctionContext.html#aad06c7a14658a9a42d5de6e7d01ae136", null ],
+    [ "operator=", "classimpala__udf_1_1FunctionContext.html#a0eb5d045d3b354ece396e5104dbff0d0", null ],
+    [ "query_id", "classimpala__udf_1_1FunctionContext.html#a223486a4836bac2ad0bac4cdd283d347", null ],
+    [ "Reallocate", "classimpala__udf_1_1FunctionContext.html#a3e07497f8e6e2a9f97c55dc578afcd46", null ],
+    [ "SetError", "classimpala__udf_1_1FunctionContext.html#aa29186643c6b873f95e361b74e54a715", null ],
+    [ "SetFunctionState", "classimpala__udf_1_1FunctionContext.html#aba396e394b1f685d4453f6afb37959dc", null ],
+    [ "TrackAllocation", "classimpala__udf_1_1FunctionContext.html#aece9636fb109a4e034c311b80de6824c", null ],
+    [ "user", "classimpala__udf_1_1FunctionContext.html#a8eee8c461d5e9bb7d1c22569ff68b899", null ],
+    [ "version", "classimpala__udf_1_1FunctionContext.html#a4ed172014a12fc760fb444eeb9eebecf", null ],
+    [ "impala::FunctionContextImpl", "classimpala__udf_1_1FunctionContext.html#ac39956e54ea10ada0a665ba7e79a9c72", null ],
+    [ "impl_", "classimpala__udf_1_1FunctionContext.html#ab34d7495d3151d3ff82d5acb66952f91", null ]
+];

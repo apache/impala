@@ -1,0 +1,5 @@
+<map id="impala::InternalQueue&lt; T &gt;" name="impala::InternalQueue&lt; T &gt;">
+<area shape="rect" id="node5" href="$structimpala_1_1InternalQueue_1_1Node.html" title="{impala::InternalQueue\l\&lt; T \&gt;::Node\n||+ Node()\l+ ~Node()\l+ Next()\l+ Prev()\l}" alt="" coords="21,693,169,829"/>
+<area shape="rect" id="node2" href="$classimpala_1_1SpinLock.html" title="Lightweight spinlock. " alt="" coords="118,147,249,298"/>
+<area shape="rect" id="node4" href="$classbool.html" title="{bool\n||}" alt="" coords="245,5,291,83"/>
+</map>

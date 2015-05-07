@@ -1,0 +1,32 @@
+<map id="be/src/service/impala&#45;beeswax&#45;server.cc" name="be/src/service/impala&#45;beeswax&#45;server.cc">
+<area shape="rect" id="node2" href="$impala-server_8h.html" title="service/impala&#45;server.h" alt="" coords="719,195,876,221"/>
+<area shape="rect" id="node8" href="$thrift-server_8h.html" title="rpc/thrift&#45;server.h" alt="" coords="1170,277,1291,304"/>
+<area shape="rect" id="node9" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="570,352,746,379"/>
+<area shape="rect" id="node21" href="$llvm-codegen_8h.html" title="codegen/llvm&#45;codegen.h" alt="" coords="1115,104,1278,131"/>
+<area shape="rect" id="node22" href="$expr_8h.html" title="exprs/expr.h" alt="" coords="1713,195,1807,221"/>
+<area shape="rect" id="node23" href="$descriptors_8h.html" title="runtime/descriptors.h" alt="" coords="2390,277,2534,304"/>
+<area shape="rect" id="node25" href="$raw-value_8h.html" title="runtime/raw&#45;value.h" alt="" coords="2000,277,2135,304"/>
+<area shape="rect" id="node26" href="$logging_8h.html" title="common/logging.h" alt="" coords="2798,352,2926,379"/>
+<area shape="rect" id="node27" href="$version_8h.html" title="common/version.h" alt="" coords="3957,104,4086,131"/>
+<area shape="rect" id="node28" href="$exec-node_8h.html" title="exec/exec&#45;node.h" alt="" coords="2136,195,2262,221"/>
+<area shape="rect" id="node29" href="$hdfs-table-sink_8h.html" title="exec/hdfs&#45;table&#45;sink.h" alt="" coords="2337,195,2487,221"/>
+<area shape="rect" id="node30" href="$scan-node_8h.html" title="exec/scan&#45;node.h" alt="" coords="2086,104,2211,131"/>
+<area shape="rect" id="node31" href="$data-stream-mgr_8h.html" title="runtime/data&#45;stream\l&#45;mgr.h" alt="" coords="2512,187,2651,229"/>
+<area shape="rect" id="node32" href="$client-cache_8h.html" title="runtime/client&#45;cache.h" alt="" coords="1385,195,1535,221"/>
+<area shape="rect" id="node33" href="$thrift-util_8h.html" title="rpc/thrift&#45;util.h" alt="" coords="2262,277,2364,304"/>
+<area shape="rect" id="node34" href="$data-stream-sender_8h.html" title="runtime/data&#45;stream\l&#45;sender.h" alt="" coords="4111,97,4250,138"/>
+<area shape="rect" id="node35" href="$row-batch_8h.html" title="runtime/row&#45;batch.h" alt="" coords="2726,195,2863,221"/>
+<area shape="rect" id="node36" href="$plan-fragment-executor_8h.html" title="runtime/plan&#45;fragment\l&#45;executor.h" alt="" coords="4274,97,4422,138"/>
+<area shape="rect" id="node37" href="$hdfs-fs-cache_8h.html" title="runtime/hdfs&#45;fs&#45;cache.h" alt="" coords="1600,277,1758,304"/>
+<area shape="rect" id="node38" href="$exec-env_8h.html" title="runtime/exec&#45;env.h" alt="" coords="1352,104,1486,131"/>
+<area shape="rect" id="node39" href="$query-exec-state_8h.html" title="service/query&#45;exec\l&#45;state.h" alt="" coords="461,97,592,138"/>
+<area shape="rect" id="node40" href="$query-options_8h.html" title="service/query&#45;options.h" alt="" coords="4447,104,4604,131"/>
+<area shape="rect" id="node41" href="$simple-scheduler_8h.html" title="statestore/simple&#45;scheduler.h" alt="" coords="1782,277,1975,304"/>
+<area shape="rect" id="node42" href="$container-util_8h.html" title="util/container&#45;util.h" alt="" coords="1883,195,2011,221"/>
+<area shape="rect" id="node43" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="57,104,167,131"/>
+<area shape="rect" id="node45" href="$impalad-metrics_8h.html" title="util/impalad&#45;metrics.h" alt="" coords="4628,104,4775,131"/>
+<area shape="rect" id="node46" href="$string-parser_8h.html" title="util/string&#45;parser.h" alt="" coords="2940,195,3066,221"/>
+<area shape="rect" id="node47" href="$jni-util_8h.html" title="util/jni&#45;util.h" alt="" coords="243,104,331,131"/>
+<area shape="rect" id="node48" href="$webserver_8h.html" title="util/webserver.h" alt="" coords="4799,104,4914,131"/>
+<area shape="rect" id="node50" href="$names_8h.html" title="common/names.h" alt="" coords="5145,104,5271,131"/>
+</map>

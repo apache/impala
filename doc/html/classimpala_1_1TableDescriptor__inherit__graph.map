@@ -1,0 +1,5 @@
+<map id="impala::TableDescriptor" name="impala::TableDescriptor">
+<area shape="rect" id="node2" href="$classimpala_1_1DataSourceTableDescriptor.html" title="Descriptor for a DataSourceTable. " alt="" coords="5,418,235,510"/>
+<area shape="rect" id="node3" href="$classimpala_1_1HBaseTableDescriptor.html" title="{impala::HBaseTableDescriptor\n|# table_name_\l# cols_\l|+ HBaseTableDescriptor()\l+ DebugString()\l+ table_name()\l+ cols()\l}" alt="" coords="259,396,457,532"/>
+<area shape="rect" id="node4" href="$classimpala_1_1HdfsTableDescriptor.html" title="{impala::HdfsTableDescriptor\n|# hdfs_base_dir_\l# null_partition_key\l_value_\l# null_column_value_\l# partition_descriptors_\l# avro_schema_\l# object_pool_\l|+ HdfsTableDescriptor()\l+ hdfs_base_dir()\l+ null_partition_key\l_value()\l+ null_column_value()\l+ avro_schema()\l+ GetPartition()\l+ partition_descriptors()\l+ DebugString()\l}" alt="" coords="483,323,671,605"/>
+</map>

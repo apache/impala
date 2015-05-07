@@ -1,0 +1,16 @@
+<map id="be/src/runtime/parallel&#45;executor.cc" name="be/src/runtime/parallel&#45;executor.cc">
+<area shape="rect" id="node2" href="$parallel-executor_8h.html" title="runtime/parallel&#45;executor.h" alt="" coords="1477,96,1651,123"/>
+<area shape="rect" id="node40" href="$stopwatch_8h.html" title="util/stopwatch.h" alt="" coords="2487,344,2602,371"/>
+<area shape="rect" id="node43" href="$thread_8h.html" title="util/thread.h" alt="" coords="2029,253,2119,280"/>
+<area shape="rect" id="node49" href="$names_8h.html" title="common/names.h" alt="" coords="2195,96,2321,123"/>
+<area shape="rect" id="node5" href="$status_8h.html" title="common/status.h" alt="" coords="1501,344,1623,371"/>
+<area shape="rect" id="node22" href="$collection-metrics_8h.html" title="util/collection&#45;metrics.h" alt="" coords="571,171,726,197"/>
+<area shape="rect" id="node9" href="$logging_8h.html" title="common/logging.h" alt="" coords="2005,435,2133,461"/>
+<area shape="rect" id="node12" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="1418,435,1575,461"/>
+<area shape="rect" id="node16" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="1090,435,1191,461"/>
+<area shape="rect" id="node23" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="1328,253,1425,280"/>
+<area shape="rect" id="node30" href="$pretty-printer_8h.html" title="util/pretty&#45;printer.h" alt="" coords="535,344,661,371"/>
+<area shape="rect" id="node41" href="$time_8h.html" title="time.h" alt="" coords="2551,435,2609,461"/>
+<area shape="rect" id="node47" href="$promise_8h.html" title="util/promise.h" alt="" coords="2024,344,2123,371"/>
+<area shape="rect" id="node48" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="2157,435,2333,461"/>
+</map>

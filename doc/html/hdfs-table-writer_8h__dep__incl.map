@@ -1,0 +1,12 @@
+<map id="be/src/exec/hdfs&#45;table&#45;writer.h" name="be/src/exec/hdfs&#45;table&#45;writer.h">
+<area shape="rect" id="node2" href="$hdfs-avro-table-writer_8h.html" title="be/src/exec/hdfs&#45;avro\l&#45;table&#45;writer.h" alt="" coords="91,97,239,138"/>
+<area shape="rect" id="node5" href="$hdfs-parquet-table-writer_8h.html" title="be/src/exec/hdfs&#45;parquet\l&#45;table&#45;writer.h" alt="" coords="263,97,429,138"/>
+<area shape="rect" id="node7" href="$hdfs-sequence-table-writer_8h.html" title="be/src/exec/hdfs&#45;sequence\l&#45;table&#45;writer.h" alt="" coords="455,97,633,138"/>
+<area shape="rect" id="node9" href="$hdfs-table-writer_8cc.html" title="be/src/exec/hdfs&#45;table\l&#45;writer.cc" alt="" coords="827,97,977,138"/>
+<area shape="rect" id="node10" href="$hdfs-text-table-writer_8h.html" title="be/src/exec/hdfs&#45;text\l&#45;table&#45;writer.h" alt="" coords="658,97,803,138"/>
+<area shape="rect" id="node3" href="$hdfs-avro-table-writer_8cc.html" title="be/src/exec/hdfs&#45;avro\l&#45;table&#45;writer.cc" alt="" coords="5,187,152,229"/>
+<area shape="rect" id="node4" href="$hdfs-table-sink_8cc.html" title="be/src/exec/hdfs&#45;table\l&#45;sink.cc" alt="" coords="367,187,517,229"/>
+<area shape="rect" id="node6" href="$hdfs-parquet-table-writer_8cc.html" title="be/src/exec/hdfs&#45;parquet\l&#45;table&#45;writer.cc" alt="" coords="177,187,343,229"/>
+<area shape="rect" id="node8" href="$hdfs-sequence-table-writer_8cc.html" title="be/src/exec/hdfs&#45;sequence\l&#45;table&#45;writer.cc" alt="" coords="543,187,721,229"/>
+<area shape="rect" id="node11" href="$hdfs-text-table-writer_8cc.html" title="be/src/exec/hdfs&#45;text\l&#45;table&#45;writer.cc" alt="" coords="746,187,891,229"/>
+</map>

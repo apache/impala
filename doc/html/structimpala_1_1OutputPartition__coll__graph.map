@@ -1,0 +1,6 @@
+<map id="impala::OutputPartition" name="impala::OutputPartition">
+<area shape="rect" id="node6" href="$classimpala_1_1HdfsPartitionDescriptor.html" title="Metadata for a single partition inside an Hdfs table. " alt="" coords="525,622,728,890"/>
+<area shape="rect" id="node8" href="$classimpala_1_1ObjectPool.html" title="{impala::ObjectPool\n||+ ObjectPool()\l+ ~ObjectPool()\l+ Add()\l}" alt="" coords="642,392,773,499"/>
+<area shape="rect" id="node9" href="$classimpala_1_1SpinLock.html" title="Lightweight spinlock. " alt="" coords="825,147,956,298"/>
+<area shape="rect" id="node11" href="$classbool.html" title="{bool\n||}" alt="" coords="926,5,972,83"/>
+</map>

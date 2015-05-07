@@ -1,0 +1,21 @@
+<map id="be/src/exec/read&#45;write&#45;util.h" name="be/src/exec/read&#45;write&#45;util.h">
+<area shape="rect" id="node2" href="$data-source-scan-node_8cc.html" title="be/src/exec/data&#45;source\l&#45;scan&#45;node.cc" alt="" coords="23,97,185,138"/>
+<area shape="rect" id="node3" href="$hdfs-avro-scanner-ir_8cc.html" title="be/src/exec/hdfs&#45;avro\l&#45;scanner&#45;ir.cc" alt="" coords="210,97,357,138"/>
+<area shape="rect" id="node4" href="$hdfs-avro-scanner_8cc.html" title="be/src/exec/hdfs&#45;avro\l&#45;scanner.cc" alt="" coords="5,187,152,229"/>
+<area shape="rect" id="node5" href="$write-stream_8inline_8h.html" title="be/src/exec/write&#45;stream.inline.h" alt="" coords="649,104,859,131"/>
+<area shape="rect" id="node8" href="$hdfs-lzo-text-scanner_8cc.html" title="be/src/exec/hdfs&#45;lzo\l&#45;text&#45;scanner.cc" alt="" coords="885,97,1024,138"/>
+<area shape="rect" id="node9" href="$hdfs-parquet-scanner_8cc.html" title="be/src/exec/hdfs&#45;parquet\l&#45;scanner.cc" alt="" coords="177,187,343,229"/>
+<area shape="rect" id="node10" href="$hdfs-scanner_8cc.html" title="be/src/exec/hdfs&#45;scanner.cc" alt="" coords="1049,104,1236,131"/>
+<area shape="rect" id="node11" href="$read-write-util-test_8cc.html" title="be/src/exec/read&#45;write\l&#45;util&#45;test.cc" alt="" coords="1261,97,1411,138"/>
+<area shape="rect" id="node12" href="$read-write-util_8cc.html" title="be/src/exec/read&#45;write\l&#45;util.cc" alt="" coords="1435,97,1585,138"/>
+<area shape="rect" id="node13" href="$scanner-context_8inline_8h.html" title="be/src/exec/scanner\l&#45;context.inline.h" alt="" coords="485,97,624,138"/>
+<area shape="rect" id="node18" href="$zigzag-test_8cc.html" title="be/src/exec/zigzag\l&#45;test.cc" alt="" coords="1610,97,1741,138"/>
+<area shape="rect" id="node19" href="$compress_8cc.html" title="be/src/util/compress.cc" alt="" coords="1766,104,1924,131"/>
+<area shape="rect" id="node20" href="$decompress_8cc.html" title="be/src/util/decompress.cc" alt="" coords="1949,104,2120,131"/>
+<area shape="rect" id="node6" href="$hdfs-avro-table-writer_8cc.html" title="be/src/exec/hdfs&#45;avro\l&#45;table&#45;writer.cc" alt="" coords="1122,187,1269,229"/>
+<area shape="rect" id="node7" href="$hdfs-sequence-table-writer_8cc.html" title="be/src/exec/hdfs&#45;sequence\l&#45;table&#45;writer.cc" alt="" coords="1295,187,1473,229"/>
+<area shape="rect" id="node14" href="$base-sequence-scanner_8cc.html" title="be/src/exec/base&#45;sequence\l&#45;scanner.cc" alt="" coords="367,187,549,229"/>
+<area shape="rect" id="node15" href="$hdfs-rcfile-scanner_8cc.html" title="be/src/exec/hdfs&#45;rcfile\l&#45;scanner.cc" alt="" coords="574,187,724,229"/>
+<area shape="rect" id="node16" href="$hdfs-sequence-scanner_8cc.html" title="be/src/exec/hdfs&#45;sequence\l&#45;scanner.cc" alt="" coords="749,187,928,229"/>
+<area shape="rect" id="node17" href="$hdfs-text-scanner_8cc.html" title="be/src/exec/hdfs&#45;text\l&#45;scanner.cc" alt="" coords="953,187,1097,229"/>
+</map>

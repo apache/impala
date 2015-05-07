@@ -1,0 +1,7 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classimpala_1_1HdfsTableWriter.html" title="impala::HdfsTableWriter" alt="" coords="5,97,168,124"/>
+<area shape="rect" id="node2" href="$classimpala_1_1HdfsAvroTableWriter.html" title="impala::HdfsAvroTableWriter" alt="" coords="217,5,407,32"/>
+<area shape="rect" id="node3" href="$classimpala_1_1HdfsParquetTableWriter.html" title="impala::HdfsParquetTable\lWriter" alt="" coords="225,57,399,98"/>
+<area shape="rect" id="node4" href="$classimpala_1_1HdfsSequenceTableWriter.html" title="impala::HdfsSequenceTable\lWriter" alt="" coords="219,122,405,163"/>
+<area shape="rect" id="node5" href="$classimpala_1_1HdfsTextTableWriter.html" title="impala::HdfsTextTableWriter" alt="" coords="217,188,407,215"/>
+</map>

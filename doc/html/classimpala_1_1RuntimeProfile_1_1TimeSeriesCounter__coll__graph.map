@@ -1,0 +1,5 @@
+<map id="impala::RuntimeProfile::TimeSeriesCounter" name="impala::RuntimeProfile::TimeSeriesCounter">
+<area shape="rect" id="node2" href="$classimpala_1_1StreamingSampler.html" title="{impala::StreamingSampler\l\&lt; int64_t, 64 \&gt;\n||+ StreamingSampler()\l+ StreamingSampler()\l+ AddSample()\l+ GetSamples()\l+ SetSamples()\l+ DebugString()\l}" alt="" coords="98,392,272,557"/>
+<area shape="rect" id="node4" href="$classimpala_1_1SpinLock.html" title="Lightweight spinlock. " alt="" coords="347,147,479,298"/>
+<area shape="rect" id="node6" href="$classbool.html" title="{bool\n||}" alt="" coords="390,5,436,83"/>
+</map>

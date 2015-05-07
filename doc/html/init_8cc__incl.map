@@ -1,0 +1,34 @@
+<map id="be/src/common/init.cc" name="be/src/common/init.cc">
+<area shape="rect" id="node2" href="$init_8h.html" title="common/init.h" alt="" coords="48,80,152,107"/>
+<area shape="rect" id="node3" href="$test-info_8h.html" title="util/test&#45;info.h" alt="" coords="5,163,107,189"/>
+<area shape="rect" id="node6" href="$logging_8h.html" title="common/logging.h" alt="" coords="941,509,1069,536"/>
+<area shape="rect" id="node9" href="$status_8h.html" title="common/status.h" alt="" coords="2228,419,2351,445"/>
+<area shape="rect" id="node19" href="$expr_8h.html" title="exprs/expr.h" alt="" coords="1537,80,1631,107"/>
+<area shape="rect" id="node24" href="$decimal-value_8h.html" title="runtime/decimal&#45;value.h" alt="" coords="1304,328,1463,355"/>
+<area shape="rect" id="node26" href="$lib-cache_8h.html" title="runtime/lib&#45;cache.h" alt="" coords="1750,245,1881,272"/>
+<area shape="rect" id="node29" href="$timestamp-parse-util_8h.html" title="runtime/timestamp&#45;parse\l&#45;util.h" alt="" coords="2254,321,2420,362"/>
+<area shape="rect" id="node34" href="$cpu-info_8h.html" title="util/cpu&#45;info.h" alt="" coords="638,419,737,445"/>
+<area shape="rect" id="node35" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="2649,328,2759,355"/>
+<area shape="rect" id="node38" href="$disk-info_8h.html" title="util/disk&#45;info.h" alt="" coords="814,419,916,445"/>
+<area shape="rect" id="node39" href="$logging-support_8h.html" title="util/logging&#45;support.h" alt="" coords="1933,80,2075,107"/>
+<area shape="rect" id="node40" href="$mem-info_8h.html" title="util/mem&#45;info.h" alt="" coords="506,419,613,445"/>
+<area shape="rect" id="node41" href="$network-util_8h.html" title="util/network&#45;util.h" alt="" coords="3013,328,3133,355"/>
+<area shape="rect" id="node42" href="$os-info_8h.html" title="util/os&#45;info.h" alt="" coords="1245,419,1339,445"/>
+<area shape="rect" id="node43" href="$redactor_8h.html" title="util/redactor.h" alt="" coords="1957,245,2059,272"/>
+<area shape="rect" id="node44" href="$exec-env_8h.html" title="runtime/exec&#45;env.h" alt="" coords="2353,163,2487,189"/>
+<area shape="rect" id="node45" href="$hdfs-fs-cache_8h.html" title="runtime/hdfs&#45;fs&#45;cache.h" alt="" coords="1809,328,1967,355"/>
+<area shape="rect" id="node46" href="$mem-tracker_8h.html" title="runtime/mem&#45;tracker.h" alt="" coords="2719,245,2872,272"/>
+<area shape="rect" id="node47" href="$authentication_8h.html" title="rpc/authentication.h" alt="" coords="2043,328,2177,355"/>
+<area shape="rect" id="node48" href="$thrift-util_8h.html" title="rpc/thrift&#45;util.h" alt="" coords="2783,328,2885,355"/>
+<area shape="rect" id="node49" href="$thread_8h.html" title="util/thread.h" alt="" coords="2511,163,2601,189"/>
+<area shape="rect" id="node50" href="$names_8h.html" title="common/names.h" alt="" coords="3050,80,3176,107"/>
+<area shape="rect" id="node13" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="1845,509,2003,536"/>
+<area shape="rect" id="node17" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="2483,509,2584,536"/>
+<area shape="rect" id="node21" href="$descriptors_8h.html" title="runtime/descriptors.h" alt="" coords="1640,328,1784,355"/>
+<area shape="rect" id="node27" href="$raw-value_8h.html" title="runtime/raw&#45;value.h" alt="" coords="1133,163,1268,189"/>
+<area shape="rect" id="node28" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="1021,245,1197,272"/>
+<area shape="rect" id="node30" href="$udf_8h.html" title="udf/udf.h" alt="" coords="750,328,823,355"/>
+<area shape="rect" id="node31" href="$tuple_8h.html" title="runtime/tuple.h" alt="" coords="1434,245,1541,272"/>
+<area shape="rect" id="node32" href="$tuple-row_8h.html" title="runtime/tuple&#45;row.h" alt="" coords="1595,163,1728,189"/>
+<area shape="rect" id="node33" href="$string-value_8h.html" title="runtime/string&#45;value.h" alt="" coords="800,245,947,272"/>
+</map>

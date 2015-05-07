@@ -1,0 +1,12 @@
+<map id="be/src/catalog/catalog.cc" name="be/src/catalog/catalog.cc">
+<area shape="rect" id="node2" href="$catalog_8h.html" title="catalog/catalog.h" alt="" coords="709,155,829,181"/>
+<area shape="rect" id="node11" href="$logging_8h.html" title="common/logging.h" alt="" coords="56,328,184,355"/>
+<area shape="rect" id="node25" href="$jni-thrift-util_8h.html" title="rpc/jni&#45;thrift&#45;util.h" alt="" coords="894,80,1012,107"/>
+<area shape="rect" id="node34" href="$logging-support_8h.html" title="util/logging&#45;support.h" alt="" coords="1037,80,1179,107"/>
+<area shape="rect" id="node36" href="$names_8h.html" title="common/names.h" alt="" coords="1499,80,1625,107"/>
+<area shape="rect" id="node7" href="$status_8h.html" title="common/status.h" alt="" coords="993,237,1116,264"/>
+<area shape="rect" id="node14" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="884,328,1041,355"/>
+<area shape="rect" id="node18" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="1249,328,1351,355"/>
+<area shape="rect" id="node26" href="$thrift-util_8h.html" title="rpc/thrift&#45;util.h" alt="" coords="1510,155,1612,181"/>
+<area shape="rect" id="node33" href="$jni-util_8h.html" title="util/jni&#45;util.h" alt="" coords="912,155,1000,181"/>
+</map>

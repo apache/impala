@@ -1,0 +1,13 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$structimpala__udf_1_1AnyVal.html" title="impala_udf::AnyVal" alt="" coords="6,233,141,260"/>
+<area shape="rect" id="node2" href="$structimpala__udf_1_1BigIntVal.html" title="impala_udf::BigIntVal" alt="" coords="205,5,352,32"/>
+<area shape="rect" id="node3" href="$structimpala__udf_1_1BooleanVal.html" title="impala_udf::BooleanVal" alt="" coords="199,56,358,83"/>
+<area shape="rect" id="node4" href="$structimpala__udf_1_1DecimalVal.html" title="impala_udf::DecimalVal" alt="" coords="199,107,359,133"/>
+<area shape="rect" id="node5" href="$structimpala__udf_1_1DoubleVal.html" title="impala_udf::DoubleVal" alt="" coords="202,157,355,184"/>
+<area shape="rect" id="node6" href="$structimpala__udf_1_1FloatVal.html" title="impala_udf::FloatVal" alt="" coords="208,208,349,235"/>
+<area shape="rect" id="node7" href="$structimpala__udf_1_1IntVal.html" title="impala_udf::IntVal" alt="" coords="215,259,342,285"/>
+<area shape="rect" id="node8" href="$structimpala__udf_1_1SmallIntVal.html" title="impala_udf::SmallIntVal" alt="" coords="199,309,359,336"/>
+<area shape="rect" id="node9" href="$structimpala__udf_1_1StringVal.html" title="impala_udf::StringVal" alt="" coords="205,360,352,387"/>
+<area shape="rect" id="node10" href="$structimpala__udf_1_1TimestampVal.html" title="This object has a compatible storage format with boost::ptime. " alt="" coords="190,411,367,437"/>
+<area shape="rect" id="node11" href="$structimpala__udf_1_1TinyIntVal.html" title="impala_udf::TinyIntVal" alt="" coords="203,461,355,488"/>
+</map>

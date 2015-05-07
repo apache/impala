@@ -1,0 +1,20 @@
+<map id="be/src/util/hdfs&#45;bulk&#45;ops.h" name="be/src/util/hdfs&#45;bulk&#45;ops.h">
+<area shape="rect" id="node4" href="$hdfs_8h.html" title="common/hdfs.h" alt="" coords="1532,96,1643,123"/>
+<area shape="rect" id="node5" href="$atomic_8h.html" title="common/atomic.h" alt="" coords="1381,96,1507,123"/>
+<area shape="rect" id="node8" href="$status_8h.html" title="common/status.h" alt="" coords="1803,509,1925,536"/>
+<area shape="rect" id="node23" href="$thread-pool_8h.html" title="util/thread&#45;pool.h" alt="" coords="811,96,929,123"/>
+<area shape="rect" id="node7" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="1099,600,1256,627"/>
+<area shape="rect" id="node11" href="$logging_8h.html" title="common/logging.h" alt="" coords="439,600,567,627"/>
+<area shape="rect" id="node17" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="2148,600,2249,627"/>
+<area shape="rect" id="node24" href="$blocking-queue_8h.html" title="util/blocking&#45;queue.h" alt="" coords="307,171,447,197"/>
+<area shape="rect" id="node33" href="$thread_8h.html" title="util/thread.h" alt="" coords="1055,171,1145,197"/>
+<area shape="rect" id="node29" href="$stopwatch_8h.html" title="util/stopwatch.h" alt="" coords="5,253,120,280"/>
+<area shape="rect" id="node30" href="$time_8h.html" title="time.h" alt="" coords="68,336,125,363"/>
+<area shape="rect" id="node38" href="$promise_8h.html" title="util/promise.h" alt="" coords="657,253,756,280"/>
+<area shape="rect" id="node39" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="565,336,741,363"/>
+<area shape="rect" id="node42" href="$timestamp-parse-util_8h.html" title="runtime/timestamp&#45;parse\l&#45;util.h" alt="" coords="906,411,1072,453"/>
+<area shape="rect" id="node48" href="$udf_8h.html" title="udf/udf.h" alt="" coords="254,419,327,445"/>
+<area shape="rect" id="node50" href="$hash-util_8h.html" title="util/hash&#45;util.h" alt="" coords="451,509,553,536"/>
+<area shape="rect" id="node46" href="$string-value_8inline_8h.html" title="runtime/string&#45;value.inline.h" alt="" coords="1100,509,1281,536"/>
+<area shape="rect" id="node47" href="$string-parser_8h.html" title="util/string&#45;parser.h" alt="" coords="753,509,879,536"/>
+</map>

@@ -1,0 +1,21 @@
+<map id="be/src/util/promise&#45;test.cc" name="be/src/util/promise&#45;test.cc">
+<area shape="rect" id="node4" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="1867,171,2043,197"/>
+<area shape="rect" id="node46" href="$promise_8h.html" title="util/promise.h" alt="" coords="1993,96,2092,123"/>
+<area shape="rect" id="node47" href="$time_8h.html" title="util/time.h" alt="" coords="2258,171,2336,197"/>
+<area shape="rect" id="node49" href="$names_8h.html" title="common/names.h" alt="" coords="2419,96,2545,123"/>
+<area shape="rect" id="node10" href="$timestamp-parse-util_8h.html" title="runtime/timestamp&#45;parse\l&#45;util.h" alt="" coords="1530,246,1696,287"/>
+<area shape="rect" id="node31" href="$udf_8h.html" title="udf/udf.h" alt="" coords="1078,501,1151,528"/>
+<area shape="rect" id="node33" href="$hash-util_8h.html" title="util/hash&#45;util.h" alt="" coords="1766,501,1868,528"/>
+<area shape="rect" id="node14" href="$status_8h.html" title="common/status.h" alt="" coords="771,501,893,528"/>
+<area shape="rect" id="node28" href="$string-value_8inline_8h.html" title="runtime/string&#45;value.inline.h" alt="" coords="1092,344,1273,371"/>
+<area shape="rect" id="node39" href="$string-parser_8h.html" title="util/string&#45;parser.h" alt="" coords="1298,344,1424,371"/>
+<area shape="rect" id="node17" href="$logging_8h.html" title="common/logging.h" alt="" coords="1771,659,1899,685"/>
+<area shape="rect" id="node19" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="1501,576,1659,603"/>
+<area shape="rect" id="node23" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="467,576,568,603"/>
+<area shape="rect" id="node29" href="$string-value_8h.html" title="runtime/string&#45;value.h" alt="" coords="1229,427,1376,453"/>
+<area shape="rect" id="node34" href="$cpu-info_8h.html" title="util/cpu&#45;info.h" alt="" coords="1785,576,1884,603"/>
+<area shape="rect" id="node35" href="$sse-util_8h.html" title="util/sse&#45;util.h" alt="" coords="1960,576,2056,603"/>
+<area shape="rect" id="node37" href="$types_8h.html" title="runtime/types.h" alt="" coords="1315,576,1425,603"/>
+<area shape="rect" id="node42" href="$decimal-value_8h.html" title="runtime/decimal&#45;value.h" alt="" coords="1959,427,2117,453"/>
+<area shape="rect" id="node44" href="$decimal-util_8h.html" title="util/decimal&#45;util.h" alt="" coords="1563,501,1683,528"/>
+</map>

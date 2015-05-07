@@ -1,0 +1,5 @@
+<map id="impala::PartitioningThroughputTest" name="impala::PartitioningThroughputTest">
+<area shape="rect" id="node2" href="$classuint64__t.html" title="{uint64_t\n||}" alt="" coords="80,5,147,83"/>
+<area shape="rect" id="node3" href="$structimpala_1_1PartitioningThroughputTest_1_1Buffer.html" title="{impala::PartitioningThroughput\lTest::Buffer\n||+ Buffer()\l}" alt="" coords="154,147,352,239"/>
+<area shape="rect" id="node7" href="$structimpala_1_1PartitioningThroughputTest_1_1BufferBuffer.html" title="{impala::PartitioningThroughput\lTest::BufferBuffer\n||+ BufferBuffer()\l}" alt="" coords="377,147,575,239"/>
+</map>

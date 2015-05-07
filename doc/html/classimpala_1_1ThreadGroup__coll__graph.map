@@ -1,0 +1,3 @@
+<map id="impala::ThreadGroup" name="impala::ThreadGroup">
+<area shape="rect" id="node3" href="$classimpala_1_1CgroupsMgr.html" title="{impala::CgroupsMgr\n||+ CgroupsMgr()\l+ Init()\l+ UniqueIdToCgroup()\l+ VirtualCoresToCpuShares()\l+ RegisterFragment()\l+ UnregisterFragment()\l+ CreateCgroup()\l+ DropCgroup()\l+ SetCpuShares()\l+ AssignThreadToCgroup()\l+ RelocateThreads()\l&#45; GetCgroupPaths()\l}" alt="" coords="136,193,331,431"/>
+</map>

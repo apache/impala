@@ -1,0 +1,12 @@
+<map id="impala_udf::AnyVal" name="impala_udf::AnyVal">
+<area shape="rect" id="node2" href="$structimpala__udf_1_1BigIntVal.html" title="{impala_udf::BigIntVal\n|+ val\l|+ BigIntVal()\l+ operator==()\l+ operator!=()\l+ null()\l}" alt="" coords="5,175,152,297"/>
+<area shape="rect" id="node3" href="$structimpala__udf_1_1BooleanVal.html" title="{impala_udf::BooleanVal\n|+ val\l|+ BooleanVal()\l+ operator==()\l+ operator!=()\l+ null()\l}" alt="" coords="177,175,335,297"/>
+<area shape="rect" id="node4" href="$structimpala__udf_1_1DecimalVal.html" title="{impala_udf::DecimalVal\n|+ val4\l+ val8\l+ val16\l+ @18\l|+ DecimalVal()\l+ DecimalVal()\l+ DecimalVal()\l+ DecimalVal()\l+ operator=()\l+ DecimalVal()\l+ null()\l}" alt="" coords="360,131,519,341"/>
+<area shape="rect" id="node5" href="$structimpala__udf_1_1DoubleVal.html" title="{impala_udf::DoubleVal\n|+ val\l|+ DoubleVal()\l+ operator==()\l+ operator!=()\l+ null()\l}" alt="" coords="545,175,697,297"/>
+<area shape="rect" id="node6" href="$structimpala__udf_1_1FloatVal.html" title="{impala_udf::FloatVal\n|+ val\l|+ FloatVal()\l+ operator==()\l+ operator!=()\l+ null()\l}" alt="" coords="723,175,863,297"/>
+<area shape="rect" id="node7" href="$structimpala__udf_1_1IntVal.html" title="{impala_udf::IntVal\n|+ val\l|+ IntVal()\l+ operator==()\l+ operator!=()\l+ null()\l}" alt="" coords="889,175,1015,297"/>
+<area shape="rect" id="node8" href="$structimpala__udf_1_1SmallIntVal.html" title="{impala_udf::SmallIntVal\n|+ val\l|+ SmallIntVal()\l+ operator==()\l+ operator!=()\l+ null()\l}" alt="" coords="1040,175,1199,297"/>
+<area shape="rect" id="node9" href="$structimpala__udf_1_1StringVal.html" title="{impala_udf::StringVal\n|+ len\l+ ptr\l|+ StringVal()\l+ StringVal()\l+ StringVal()\l+ operator==()\l+ operator!=()\l+ null()\l}" alt="" coords="1224,153,1371,319"/>
+<area shape="rect" id="node10" href="$structimpala__udf_1_1TimestampVal.html" title="This object has a compatible storage format with boost::ptime. " alt="" coords="1395,168,1572,304"/>
+<area shape="rect" id="node11" href="$structimpala__udf_1_1TinyIntVal.html" title="{impala_udf::TinyIntVal\n|+ val\l|+ TinyIntVal()\l+ operator==()\l+ operator!=()\l+ null()\l}" alt="" coords="1597,175,1749,297"/>
+</map>

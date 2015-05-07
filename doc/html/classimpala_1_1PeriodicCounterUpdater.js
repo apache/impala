@@ -1,0 +1,35 @@
+var classimpala_1_1PeriodicCounterUpdater =
+[
+    [ "BucketCountersInfo", "structimpala_1_1PeriodicCounterUpdater_1_1BucketCountersInfo.html", "structimpala_1_1PeriodicCounterUpdater_1_1BucketCountersInfo" ],
+    [ "RateCounterInfo", "structimpala_1_1PeriodicCounterUpdater_1_1RateCounterInfo.html", "structimpala_1_1PeriodicCounterUpdater_1_1RateCounterInfo" ],
+    [ "SamplingCounterInfo", "structimpala_1_1PeriodicCounterUpdater_1_1SamplingCounterInfo.html", "structimpala_1_1PeriodicCounterUpdater_1_1SamplingCounterInfo" ],
+    [ "BucketCountersMap", "classimpala_1_1PeriodicCounterUpdater.html#ac46aeb9e66317a49269efd3e748e99fc", null ],
+    [ "RateCounterMap", "classimpala_1_1PeriodicCounterUpdater.html#ad93f3031352f4f65a9b0558c88e9c122", null ],
+    [ "SamplingCounterMap", "classimpala_1_1PeriodicCounterUpdater.html#a7d592c86d07e74ea1aa2a3634215e742", null ],
+    [ "TimeSeriesCounters", "classimpala_1_1PeriodicCounterUpdater.html#af7358fac8e6cacae8c075d3b773b7cb2", null ],
+    [ "PeriodicCounterType", "classimpala_1_1PeriodicCounterUpdater.html#a0afc46fc5ed7e335b06f2195e60766cd", [
+      [ "RATE_COUNTER", "classimpala_1_1PeriodicCounterUpdater.html#a0afc46fc5ed7e335b06f2195e60766cdab7ebd0da7557578f82a18b75691dbe78", null ],
+      [ "SAMPLING_COUNTER", "classimpala_1_1PeriodicCounterUpdater.html#a0afc46fc5ed7e335b06f2195e60766cdadb0987b5ba749f631afa594e6a3fce56", null ]
+    ] ],
+    [ "~PeriodicCounterUpdater", "classimpala_1_1PeriodicCounterUpdater.html#a80c3f8c9da4e6e0f7ef480104ded75fc", null ],
+    [ "PeriodicCounterUpdater", "classimpala_1_1PeriodicCounterUpdater.html#a94d421f4a758cf5f36f93bbd21a348e4", null ],
+    [ "RegisterBucketingCounters", "classimpala_1_1PeriodicCounterUpdater.html#a62893e40c66f94affb71ad3819e3c583", null ],
+    [ "RegisterPeriodicCounter", "classimpala_1_1PeriodicCounterUpdater.html#a1f83cf8b1ce2f06b9086e67c23d2923c", null ],
+    [ "RegisterTimeSeriesCounter", "classimpala_1_1PeriodicCounterUpdater.html#a20cdd07633ef2d0b5fdda437ddaeabbd", null ],
+    [ "StopBucketingCounters", "classimpala_1_1PeriodicCounterUpdater.html#a59298c90aa019fd18a8d48f441d6a4a7", null ],
+    [ "StopRateCounter", "classimpala_1_1PeriodicCounterUpdater.html#a05da0be47b84b2bc519f91869b03fcef", null ],
+    [ "StopSamplingCounter", "classimpala_1_1PeriodicCounterUpdater.html#a8755f55defce4fd6c5f9d7b46b6dd2b4", null ],
+    [ "StopTimeSeriesCounter", "classimpala_1_1PeriodicCounterUpdater.html#a88241faa992a1e97b670e9a67ab99032", null ],
+    [ "UpdateLoop", "classimpala_1_1PeriodicCounterUpdater.html#aa89f8a33a240d3b96a3fb9395310211c", null ],
+    [ "bucketing_counters_", "classimpala_1_1PeriodicCounterUpdater.html#ac276316e2f6f60db387165fa39a81ba6", null ],
+    [ "bucketing_lock_", "classimpala_1_1PeriodicCounterUpdater.html#a428ee59c7bf8ec21799bf35a8a38949c", null ],
+    [ "done_", "classimpala_1_1PeriodicCounterUpdater.html#ac8d3e2604cae9f06cbdf5c7af22472b2", null ],
+    [ "rate_counters_", "classimpala_1_1PeriodicCounterUpdater.html#ab6bd44cd63990507c3098bcf1606a8e8", null ],
+    [ "rate_lock_", "classimpala_1_1PeriodicCounterUpdater.html#acd3688eb40653ff390006bfe486d4039", null ],
+    [ "sampling_counters_", "classimpala_1_1PeriodicCounterUpdater.html#aca1c45a66f7c08f423df7add2683c0dd", null ],
+    [ "sampling_lock_", "classimpala_1_1PeriodicCounterUpdater.html#a0b58fd7ed6dcabab6129e5e7fae63e20", null ],
+    [ "state_", "classimpala_1_1PeriodicCounterUpdater.html#a7139fa94111a39832bfc2b7469e10df2", null ],
+    [ "time_series_counters_", "classimpala_1_1PeriodicCounterUpdater.html#a70c7cc02215bf118cb8c2c6f5a0cfc6c", null ],
+    [ "time_series_lock_", "classimpala_1_1PeriodicCounterUpdater.html#aa5f52abbc9d52b3969164595e3c4cdae", null ],
+    [ "update_thread_", "classimpala_1_1PeriodicCounterUpdater.html#a1c1d3335557d9911554b8cb8c6132081", null ]
+];

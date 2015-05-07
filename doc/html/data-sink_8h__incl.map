@@ -1,0 +1,22 @@
+<map id="be/src/exec/data&#45;sink.h" name="be/src/exec/data&#45;sink.h">
+<area shape="rect" id="node4" href="$status_8h.html" title="common/status.h" alt="" coords="2440,395,2563,421"/>
+<area shape="rect" id="node20" href="$runtime-state_8h.html" title="runtime/runtime&#45;state.h" alt="" coords="2546,80,2701,107"/>
+<area shape="rect" id="node7" href="$logging_8h.html" title="common/logging.h" alt="" coords="1949,477,2077,504"/>
+<area shape="rect" id="node10" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="2372,568,2529,595"/>
+<area shape="rect" id="node14" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="424,477,525,504"/>
+<area shape="rect" id="node21" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="753,320,903,347"/>
+<area shape="rect" id="node28" href="$query-resource-mgr_8h.html" title="statestore/query&#45;resource\l&#45;mgr.h" alt="" coords="3252,230,3423,271"/>
+<area shape="rect" id="node38" href="$exec-env_8h.html" title="runtime/exec&#45;env.h" alt="" coords="2172,155,2305,181"/>
+<area shape="rect" id="node43" href="$descriptors_8h.html" title="runtime/descriptors.h" alt="" coords="4256,237,4400,264"/>
+<area shape="rect" id="node44" href="$disk-io-mgr_8h.html" title="runtime/disk&#45;io&#45;mgr.h" alt="" coords="1325,155,1469,181"/>
+<area shape="rect" id="node45" href="$thread-resource-mgr_8h.html" title="runtime/thread&#45;resource\l&#45;mgr.h" alt="" coords="1586,230,1744,271"/>
+<area shape="rect" id="node46" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="1220,237,1355,264"/>
+<area shape="rect" id="node47" href="$mem-tracker_8h.html" title="runtime/mem&#45;tracker.h" alt="" coords="2662,155,2815,181"/>
+<area shape="rect" id="node24" href="$spinlock_8h.html" title="util/spinlock.h" alt="" coords="1367,395,1469,421"/>
+<area shape="rect" id="node25" href="$atomic_8h.html" title="common/atomic.h" alt="" coords="1551,477,1677,504"/>
+<area shape="rect" id="node33" href="$promise_8h.html" title="util/promise.h" alt="" coords="2027,395,2127,421"/>
+<area shape="rect" id="node34" href="$thread_8h.html" title="util/thread.h" alt="" coords="1485,320,1576,347"/>
+<area shape="rect" id="node40" href="$timestamp-functions_8h.html" title="exprs/timestamp&#45;functions.h" alt="" coords="1871,237,2057,264"/>
+<area shape="rect" id="node41" href="$client-cache_8h.html" title="runtime/client&#45;cache.h" alt="" coords="2082,237,2232,264"/>
+<area shape="rect" id="node42" href="$cgroups-mgr_8h.html" title="util/cgroups&#45;mgr.h" alt="" coords="2257,237,2383,264"/>
+</map>

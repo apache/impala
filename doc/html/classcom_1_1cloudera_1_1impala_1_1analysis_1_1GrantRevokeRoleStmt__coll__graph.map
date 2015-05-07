@@ -1,0 +1,6 @@
+<map id="com.cloudera.impala.analysis.GrantRevokeRoleStmt" name="com.cloudera.impala.analysis.GrantRevokeRoleStmt">
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1AuthorizationStmt.html" title="{com.cloudera.impala.analysis.\lAuthorizationStmt\n||+ analyze()\l}" alt="" coords="230,390,428,482"/>
+<area shape="rect" id="node3" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1StatementBase.html" title="{com.cloudera.impala.analysis.\lStatementBase\n||+ analyze()\l+ toSql()\l+ setIsExplain()\l+ isExplain()\l}" alt="" coords="75,176,273,312"/>
+<area shape="rect" id="node4" href="$interfacecom_1_1cloudera_1_1impala_1_1analysis_1_1ParseNode.html" title="{com.cloudera.impala.analysis.\lParseNode\n||+ analyze()\l+ toSql()\l}" alt="" coords="95,5,293,112"/>
+<area shape="rect" id="node6" href="$classcom_1_1cloudera_1_1impala_1_1authorization_1_1User.html" title="{com.cloudera.impala.authorization.User\n||+ User()\l+ getName()\l+ getShortName()\l}" alt="" coords="298,191,549,297"/>
+</map>

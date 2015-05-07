@@ -1,0 +1,22 @@
+<map id="be/src/service/impala&#45;internal&#45;service.h" name="be/src/service/impala&#45;internal&#45;service.h">
+<area shape="rect" id="node5" href="$impala-server_8h.html" title="service/impala&#45;server.h" alt="" coords="1307,96,1464,123"/>
+<area shape="rect" id="node50" href="$fragment-mgr_8h.html" title="service/fragment&#45;mgr.h" alt="" coords="2621,171,2776,197"/>
+<area shape="rect" id="node16" href="$thrift-server_8h.html" title="rpc/thrift&#45;server.h" alt="" coords="1175,253,1296,280"/>
+<area shape="rect" id="node19" href="$status_8h.html" title="common/status.h" alt="" coords="817,485,940,512"/>
+<area shape="rect" id="node30" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="559,336,656,363"/>
+<area shape="rect" id="node38" href="$frontend_8h.html" title="service/frontend.h" alt="" coords="501,171,627,197"/>
+<area shape="rect" id="node40" href="$runtime-profile_8h.html" title="util/runtime&#45;profile.h" alt="" coords="1815,336,1949,363"/>
+<area shape="rect" id="node41" href="$simple-logger_8h.html" title="util/simple&#45;logger.h" alt="" coords="1045,171,1175,197"/>
+<area shape="rect" id="node42" href="$thread-pool_8h.html" title="util/thread&#45;pool.h" alt="" coords="1317,336,1435,363"/>
+<area shape="rect" id="node43" href="$time_8h.html" title="util/time.h" alt="" coords="1890,171,1968,197"/>
+<area shape="rect" id="node44" href="$uid-util_8h.html" title="util/uid&#45;util.h" alt="" coords="651,171,743,197"/>
+<area shape="rect" id="node45" href="$coordinator_8h.html" title="runtime/coordinator.h" alt="" coords="1655,171,1799,197"/>
+<area shape="rect" id="node46" href="$runtime-state_8h.html" title="runtime/runtime&#45;state.h" alt="" coords="2069,253,2224,280"/>
+<area shape="rect" id="node47" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="2621,485,2797,512"/>
+<area shape="rect" id="node48" href="$types_8h.html" title="runtime/types.h" alt="" coords="1916,485,2027,512"/>
+<area shape="rect" id="node29" href="$auth-provider_8h.html" title="rpc/auth&#45;provider.h" alt="" coords="1060,336,1189,363"/>
+<area shape="rect" id="node37" href="$thread_8h.html" title="util/thread.h" alt="" coords="1263,411,1353,437"/>
+<area shape="rect" id="node23" href="$logging_8h.html" title="common/logging.h" alt="" coords="1509,568,1637,595"/>
+<area shape="rect" id="node24" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="815,568,972,595"/>
+<area shape="rect" id="node28" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="639,568,740,595"/>
+</map>

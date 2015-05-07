@@ -1,0 +1,6 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classTTransportException.html" title="TTransportException" alt="" coords="6,31,149,57"/>
+<area shape="rect" id="node2" href="$classsasl_1_1SaslException.html" title="sasl::SaslException" alt="" coords="197,31,336,57"/>
+<area shape="rect" id="node3" href="$classsasl_1_1SaslClientImplException.html" title="sasl::SaslClientImplException" alt="" coords="387,5,584,32"/>
+<area shape="rect" id="node4" href="$classsasl_1_1SaslServerImplException.html" title="sasl::SaslServerImplException" alt="" coords="385,56,586,83"/>
+</map>

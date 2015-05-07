@@ -1,0 +1,3 @@
+<map id="com.cloudera.impala.analysis.ColumnLineageGraph" name="com.cloudera.impala.analysis.ColumnLineageGraph">
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1DescriptorTable.html" title="{com.cloudera.impala.analysis.\lDescriptorTable\n||+ createTupleDescriptor()\l+ copyTupleDescriptor()\l+ addSlotDescriptor()\l+ copySlotDescriptor()\l+ getTupleDesc()\l+ getSlotDesc()\l+ getTupleDescs()\l+ getSlotDescs()\l+ getMaxTupleId()\l+ getMaxSlotId()\land 7 more...\l&#45; getReferencedPartitions()\l}" alt="" coords="771,189,969,443"/>
+</map>

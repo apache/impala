@@ -1,0 +1,5 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classimpala_1_1AuthProvider.html" title="impala::AuthProvider" alt="" coords="6,31,149,57"/>
+<area shape="rect" id="node2" href="$classimpala_1_1NoAuthProvider.html" title="impala::NoAuthProvider" alt="" coords="203,5,363,32"/>
+<area shape="rect" id="node3" href="$classimpala_1_1SaslAuthProvider.html" title="impala::SaslAuthProvider" alt="" coords="198,56,367,83"/>
+</map>

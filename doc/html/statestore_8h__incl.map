@@ -1,0 +1,18 @@
+<map id="be/src/statestore/statestore.h" name="be/src/statestore/statestore.h">
+<area shape="rect" id="node13" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="1729,179,1825,205"/>
+<area shape="rect" id="node28" href="$webserver_8h.html" title="util/webserver.h" alt="" coords="2419,269,2533,296"/>
+<area shape="rect" id="node29" href="$collection-metrics_8h.html" title="util/collection&#45;metrics.h" alt="" coords="1015,88,1171,115"/>
+<area shape="rect" id="node38" href="$thrift-client_8h.html" title="rpc/thrift&#45;client.h" alt="" coords="3375,179,3491,205"/>
+<area shape="rect" id="node47" href="$thread-pool_8h.html" title="util/thread&#45;pool.h" alt="" coords="1727,88,1845,115"/>
+<area shape="rect" id="node48" href="$client-cache_8h.html" title="runtime/client&#45;cache.h" alt="" coords="2763,88,2913,115"/>
+<area shape="rect" id="node49" href="$timestamp-value_8h.html" title="runtime/timestamp&#45;value.h" alt="" coords="4409,352,4585,379"/>
+<area shape="rect" id="node50" href="$failure-detector_8h.html" title="statestore/failure\l&#45;detector.h" alt="" coords="2795,262,2913,303"/>
+<area shape="rect" id="node20" href="$logging_8h.html" title="common/logging.h" alt="" coords="2208,427,2336,453"/>
+<area shape="rect" id="node22" href="$status_8h.html" title="common/status.h" alt="" coords="2211,352,2333,379"/>
+<area shape="rect" id="node23" href="$object-pool_8h.html" title="common/object&#45;pool.h" alt="" coords="1365,269,1515,296"/>
+<area shape="rect" id="node24" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="2558,269,2668,296"/>
+<area shape="rect" id="node26" href="$json-util_8h.html" title="util/json&#45;util.h" alt="" coords="1591,269,1689,296"/>
+<area shape="rect" id="node27" href="$pretty-printer_8h.html" title="util/pretty&#45;printer.h" alt="" coords="1603,352,1729,379"/>
+<area shape="rect" id="node45" href="$TSaslClientTransport_8h.html" title="transport/TSaslClientTransport.h" alt="" coords="3881,269,4091,296"/>
+<area shape="rect" id="node46" href="$TSasl_8h.html" title="transport/TSasl.h" alt="" coords="3925,352,4048,379"/>
+</map>

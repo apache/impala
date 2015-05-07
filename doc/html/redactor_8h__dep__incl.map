@@ -1,0 +1,12 @@
+<map id="be/src/util/redactor.h" name="be/src/util/redactor.h">
+<area shape="rect" id="node2" href="$init_8cc.html" title="be/src/common/init.cc" alt="" coords="5,88,155,115"/>
+<area shape="rect" id="node3" href="$logging_8cc.html" title="be/src/common/logging.cc" alt="" coords="179,88,353,115"/>
+<area shape="rect" id="node4" href="$impala-server-callbacks_8cc.html" title="be/src/service/impala\l&#45;server&#45;callbacks.cc" alt="" coords="379,81,525,122"/>
+<area shape="rect" id="node5" href="$impala-server_8cc.html" title="be/src/service/impala\l&#45;server.cc" alt="" coords="549,81,696,122"/>
+<area shape="rect" id="node6" href="$redactor_8cc.html" title="be/src/util/redactor.cc" alt="" coords="721,88,868,115"/>
+<area shape="rect" id="node10" href="$runtime-profile_8cc.html" title="be/src/util/runtime\l&#45;profile.cc" alt="" coords="893,81,1019,122"/>
+<area shape="rect" id="node11" href="$summary-util_8cc.html" title="be/src/util/summary\l&#45;util.cc" alt="" coords="1043,81,1180,122"/>
+<area shape="rect" id="node7" href="$redactor-config-parser-test_8cc.html" title="be/src/util/redactor\l&#45;config&#45;parser&#45;test.cc" alt="" coords="559,171,704,213"/>
+<area shape="rect" id="node8" href="$redactor-test_8cc.html" title="be/src/util/redactor\l&#45;test.cc" alt="" coords="729,171,859,213"/>
+<area shape="rect" id="node9" href="$redactor-unconfigured-test_8cc.html" title="be/src/util/redactor\l&#45;unconfigured&#45;test.cc" alt="" coords="884,171,1028,213"/>
+</map>

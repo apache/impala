@@ -1,0 +1,5 @@
+<map id="impala::DecimalAvgState" name="impala::DecimalAvgState">
+<area shape="rect" id="node2" href="$structimpala__udf_1_1DecimalVal.html" title="{impala_udf::DecimalVal\n||+ DecimalVal()\l+ DecimalVal()\l+ DecimalVal()\l+ DecimalVal()\l+ operator=()\l+ DecimalVal()\l+ null()\l}" alt="" coords="211,291,369,456"/>
+<area shape="rect" id="node3" href="$structimpala__udf_1_1AnyVal.html" title="{impala_udf::AnyVal\n||+ AnyVal()\l}" alt="" coords="67,148,201,225"/>
+<area shape="rect" id="node4" href="$classbool.html" title="{bool\n||}" alt="" coords="111,5,157,83"/>
+</map>

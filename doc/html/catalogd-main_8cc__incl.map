@@ -1,0 +1,30 @@
+<map id="be/src/catalog/catalogd&#45;main.cc" name="be/src/catalog/catalogd&#45;main.cc">
+<area shape="rect" id="node4" href="$catalog-server_8h.html" title="catalog/catalog&#45;server.h" alt="" coords="1571,96,1732,123"/>
+<area shape="rect" id="node14" href="$status_8h.html" title="common/status.h" alt="" coords="1916,485,2038,512"/>
+<area shape="rect" id="node24" href="$thrift-util_8h.html" title="rpc/thrift&#45;util.h" alt="" coords="1810,261,1912,288"/>
+<area shape="rect" id="node25" href="$metrics_8h.html" title="util/metrics.h" alt="" coords="1586,261,1682,288"/>
+<area shape="rect" id="node26" href="$debug-util_8h.html" title="util/debug&#45;util.h" alt="" coords="988,336,1098,363"/>
+<area shape="rect" id="node27" href="$webserver_8h.html" title="util/webserver.h" alt="" coords="2649,336,2764,363"/>
+<area shape="rect" id="node29" href="$network-util_8h.html" title="util/network&#45;util.h" alt="" coords="2818,411,2938,437"/>
+<area shape="rect" id="node31" href="$init_8h.html" title="common/init.h" alt="" coords="3442,96,3546,123"/>
+<area shape="rect" id="node33" href="$authentication_8h.html" title="rpc/authentication.h" alt="" coords="332,179,466,205"/>
+<area shape="rect" id="node39" href="$rpc-trace_8h.html" title="rpc/rpc&#45;trace.h" alt="" coords="2508,96,2614,123"/>
+<area shape="rect" id="node41" href="$thrift-server_8h.html" title="rpc/thrift&#45;server.h" alt="" coords="2274,179,2394,205"/>
+<area shape="rect" id="node45" href="$mem-tracker_8h.html" title="runtime/mem&#45;tracker.h" alt="" coords="3106,179,3258,205"/>
+<area shape="rect" id="node46" href="$fe-support_8h.html" title="service/fe&#45;support.h" alt="" coords="476,96,613,123"/>
+<area shape="rect" id="node47" href="$jni-util_8h.html" title="util/jni&#45;util.h" alt="" coords="577,336,665,363"/>
+<area shape="rect" id="node48" href="$memory-metrics_8h.html" title="util/memory&#45;metrics.h" alt="" coords="975,179,1122,205"/>
+<area shape="rect" id="node49" href="$default-path-handlers_8h.html" title="util/default&#45;path&#45;handlers.h" alt="" coords="3571,96,3745,123"/>
+<area shape="rect" id="node50" href="$names_8h.html" title="common/names.h" alt="" coords="3770,96,3896,123"/>
+<area shape="rect" id="node13" href="$catalog_8h.html" title="catalog/catalog.h" alt="" coords="740,336,861,363"/>
+<area shape="rect" id="node22" href="$statestore-subscriber_8h.html" title="statestore/statestore\l&#45;subscriber.h" alt="" coords="1402,171,1544,213"/>
+<area shape="rect" id="node16" href="$logging_8h.html" title="common/logging.h" alt="" coords="2241,568,2369,595"/>
+<area shape="rect" id="node17" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="1428,568,1585,595"/>
+<area shape="rect" id="node21" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="2014,568,2116,595"/>
+<area shape="rect" id="node32" href="$test-info_8h.html" title="util/test&#45;info.h" alt="" coords="3444,179,3545,205"/>
+<area shape="rect" id="node35" href="$auth-provider_8h.html" title="rpc/auth&#45;provider.h" alt="" coords="1177,261,1306,288"/>
+<area shape="rect" id="node37" href="$TSaslServerTransport_8h.html" title="transport/TSaslServerTransport.h" alt="" coords="135,261,349,288"/>
+<area shape="rect" id="node38" href="$TSasl_8h.html" title="transport/TSasl.h" alt="" coords="278,336,401,363"/>
+<area shape="rect" id="node40" href="$collection-metrics_8h.html" title="util/collection&#45;metrics.h" alt="" coords="2522,179,2677,205"/>
+<area shape="rect" id="node44" href="$internal-queue_8h.html" title="util/internal&#45;queue.h" alt="" coords="2979,261,3113,288"/>
+</map>

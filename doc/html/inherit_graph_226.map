@@ -1,0 +1,18 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node2" href="$classimpala_1_1BufferedBlockMgrTest.html" title="impala::BufferedBlockMgrTest" alt="" coords="106,5,305,32"/>
+<area shape="rect" id="node3" href="$classimpala_1_1DataStreamTest.html" title="impala::DataStreamTest" alt="" coords="123,56,287,83"/>
+<area shape="rect" id="node4" href="$classimpala_1_1DecompressorTest.html" title="impala::DecompressorTest" alt="" coords="116,107,295,133"/>
+<area shape="rect" id="node5" href="$classimpala_1_1DiskIoMgrTest.html" title="impala::DiskIoMgrTest" alt="" coords="128,157,283,184"/>
+<area shape="rect" id="node6" href="$classimpala_1_1ExprTest.html" title="impala::ExprTest" alt="" coords="145,208,266,235"/>
+<area shape="rect" id="node7" href="$classimpala_1_1GrowingTest.html" title="impala::GrowingTest" alt="" coords="134,259,277,285"/>
+<area shape="rect" id="node8" href="$classimpala_1_1HashTableTest.html" title="impala::HashTableTest" alt="" coords="127,309,284,336"/>
+<area shape="rect" id="node9" href="$classimpala_1_1OldHashTableTest.html" title="impala::OldHashTableTest" alt="" coords="117,360,294,387"/>
+<area shape="rect" id="node10" href="$classimpala_1_1RawValueTest.html" title="impala::RawValueTest" alt="" coords="128,411,283,437"/>
+<area shape="rect" id="node11" href="$classimpala_1_1RowBatchListTest.html" title="impala::RowBatchListTest" alt="" coords="117,461,293,488"/>
+<area shape="rect" id="node12" href="$classimpala_1_1SimpleSchedulerTest.html" title="impala::SimpleSchedulerTest" alt="" coords="109,512,301,539"/>
+<area shape="rect" id="node13" href="$classimpala_1_1SimpleTupleStreamTest.html" title="impala::SimpleTupleStreamTest" alt="" coords="101,563,309,589"/>
+<area shape="rect" id="node17" href="$classimpala_1_1StateStore2Test.html" title="impala::StateStore2Test" alt="" coords="124,613,287,640"/>
+<area shape="rect" id="node14" href="$classimpala_1_1MultiNullableTupleStreamTest.html" title="impala::MultiNullableTuple\lStreamTest" alt="" coords="370,497,545,538"/>
+<area shape="rect" id="node15" href="$classimpala_1_1MultiTupleStreamTest.html" title="impala::MultiTupleStreamTest" alt="" coords="359,563,555,589"/>
+<area shape="rect" id="node16" href="$classimpala_1_1SimpleNullStreamTest.html" title="impala::SimpleNullStreamTest" alt="" coords="358,613,557,640"/>
+</map>

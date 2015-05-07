@@ -1,0 +1,9 @@
+<map id="impala::ImpalaServer" name="impala::ImpalaServer">
+<area shape="rect" id="node14" href="$classimpala_1_1ExecEnv.html" title="{impala::ExecEnv\n||+ ExecEnv()\l+ ExecEnv()\l+ ~ExecEnv()\l+ SetImpalaServer()\l+ statestore_subscriber()\l+ stream_mgr()\l+ impalad_client_cache()\l+ catalogd_client_cache()\l+ htable_factory()\l+ disk_io_mgr()\land 17 more...\l+ GetInstance()\l&#45; InitRm()\l}" alt="" coords="1985,1101,2155,1355"/>
+<area shape="rect" id="node2" href="$classImpalaServiceIf.html" title="{ImpalaServiceIf\n||}" alt="" coords="387,175,499,252"/>
+<area shape="rect" id="node3" href="$classImpalaHiveServer2ServiceIf.html" title="{ImpalaHiveServer2ServiceIf\n||}" alt="" coords="3621,175,3806,252"/>
+<area shape="rect" id="node4" href="$classimpala_1_1ThriftServer_1_1ConnectionHandlerIf.html" title="Interface class for receiving connection creation / termination events. " alt="" coords="3831,160,3979,267"/>
+<area shape="rect" id="node6" href="$structimpala_1_1ImpalaServer_1_1CatalogUpdateVersionInfo.html" title="Contains details on the version information of a catalog update. " alt="" coords="4165,167,4359,259"/>
+<area shape="rect" id="node25" href="$classimpala_1_1TimezoneDatabase.html" title="Functions to load and access the timestamp database. " alt="" coords="3598,719,3779,825"/>
+<area shape="rect" id="node32" href="$classbool.html" title="{bool\n||}" alt="" coords="181,175,227,252"/>
+</map>

@@ -1,0 +1,12 @@
+<map id="be/src/service/frontend.cc" name="be/src/service/frontend.cc">
+<area shape="rect" id="node2" href="$frontend_8h.html" title="service/frontend.h" alt="" coords="2053,155,2179,181"/>
+<area shape="rect" id="node12" href="$logging_8h.html" title="common/logging.h" alt="" coords="1946,328,2074,355"/>
+<area shape="rect" id="node26" href="$jni-thrift-util_8h.html" title="rpc/jni&#45;thrift&#45;util.h" alt="" coords="1531,80,1649,107"/>
+<area shape="rect" id="node34" href="$jni-util_8h.html" title="util/jni&#45;util.h" alt="" coords="1594,155,1682,181"/>
+<area shape="rect" id="node35" href="$logging-support_8h.html" title="util/logging&#45;support.h" alt="" coords="1725,80,1867,107"/>
+<area shape="rect" id="node37" href="$names_8h.html" title="common/names.h" alt="" coords="2909,80,3035,107"/>
+<area shape="rect" id="node8" href="$status_8h.html" title="common/status.h" alt="" coords="1542,237,1665,264"/>
+<area shape="rect" id="node15" href="$compiler-util_8h.html" title="common/compiler&#45;util.h" alt="" coords="1106,328,1263,355"/>
+<area shape="rect" id="node19" href="$error-util_8h.html" title="util/error&#45;util.h" alt="" coords="981,328,1082,355"/>
+<area shape="rect" id="node27" href="$thrift-util_8h.html" title="rpc/thrift&#45;util.h" alt="" coords="608,155,710,181"/>
+</map>

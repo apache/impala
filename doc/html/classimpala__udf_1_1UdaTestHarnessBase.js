@@ -1,0 +1,28 @@
+var classimpala__udf_1_1UdaTestHarnessBase =
+[
+    [ "ScopedFunctionContext", "structimpala__udf_1_1UdaTestHarnessBase_1_1ScopedFunctionContext.html", "structimpala__udf_1_1UdaTestHarnessBase_1_1ScopedFunctionContext" ],
+    [ "FinalizeFn", "classimpala__udf_1_1UdaTestHarnessBase.html#ab1d5bd1f35c8a67dffc5bd5b533843ca", null ],
+    [ "InitFn", "classimpala__udf_1_1UdaTestHarnessBase.html#a65723abfa32ed4349b3a74d14a47c67c", null ],
+    [ "MergeFn", "classimpala__udf_1_1UdaTestHarnessBase.html#acc749d94ac316d4d0331a143892c7a9b", null ],
+    [ "ResultComparator", "classimpala__udf_1_1UdaTestHarnessBase.html#ac93b73e66fac22e219e2938338535ae4", null ],
+    [ "SerializeFn", "classimpala__udf_1_1UdaTestHarnessBase.html#aea57002224fa561be0efd9d2d0923d6c", null ],
+    [ "UdaTestHarnessBase", "classimpala__udf_1_1UdaTestHarnessBase.html#ab95f58c87649757c84c4b2d5a20ac39a", null ],
+    [ "CheckContext", "classimpala__udf_1_1UdaTestHarnessBase.html#a13e2dbb27ee60ca9283c592ba054107d", null ],
+    [ "CheckResult", "classimpala__udf_1_1UdaTestHarnessBase.html#a9fd55131363f9fa7b635bbc44792a88b", null ],
+    [ "Execute", "classimpala__udf_1_1UdaTestHarnessBase.html#a72c45200de4d364e2f2023448ddf839b", null ],
+    [ "ExecuteOneLevel", "classimpala__udf_1_1UdaTestHarnessBase.html#aacca961b9d694c86785e189d7309ebed", null ],
+    [ "ExecuteSingleNode", "classimpala__udf_1_1UdaTestHarnessBase.html#a3607746f3b8c2b82b293e656bc5e2171", null ],
+    [ "ExecuteTwoLevel", "classimpala__udf_1_1UdaTestHarnessBase.html#aa7727a842cfbbde947239432adfc98a9", null ],
+    [ "GetErrorMsg", "classimpala__udf_1_1UdaTestHarnessBase.html#a3a7419462c0f53dd357c4280fac4cbea", null ],
+    [ "SetIntermediateSize", "classimpala__udf_1_1UdaTestHarnessBase.html#a9b37227a3ff36c97bb077607e4e594ac", null ],
+    [ "SetResultComparator", "classimpala__udf_1_1UdaTestHarnessBase.html#aa6db12bf6e1790c486800bcfd10a7e7b", null ],
+    [ "Update", "classimpala__udf_1_1UdaTestHarnessBase.html#ae4ef4560b1f5c6a10597ec2d9a905e42", null ],
+    [ "error_msg_", "classimpala__udf_1_1UdaTestHarnessBase.html#af984fe38278b0f581e08e39471354a1d", null ],
+    [ "finalize_fn_", "classimpala__udf_1_1UdaTestHarnessBase.html#a0f08cf9cd55b637eeecc4aab102ce80c", null ],
+    [ "fixed_buffer_byte_size_", "classimpala__udf_1_1UdaTestHarnessBase.html#a3ea1b893506725e1db69d7321aef1ab1", null ],
+    [ "init_fn_", "classimpala__udf_1_1UdaTestHarnessBase.html#a285855c6e9e998bdb42d2220082dd618", null ],
+    [ "merge_fn_", "classimpala__udf_1_1UdaTestHarnessBase.html#ae3e090c6ed8cc4b60175c7c7c10e1157", null ],
+    [ "num_input_values_", "classimpala__udf_1_1UdaTestHarnessBase.html#abc79c2385a54f0c3c0c7c298669355e6", null ],
+    [ "result_comparator_fn_", "classimpala__udf_1_1UdaTestHarnessBase.html#aebc7d4e0c45007fec20da2688ecb598b", null ],
+    [ "serialize_fn_", "classimpala__udf_1_1UdaTestHarnessBase.html#a45c13cace473230bd9480a9b014f76df", null ]
+];

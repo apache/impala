@@ -1,0 +1,5 @@
+<map id="impala::AndPredicate" name="impala::AndPredicate">
+<area shape="rect" id="node2" href="$classimpala_1_1CompoundPredicate.html" title="{impala::CompoundPredicate\n||+ Not()\l# CompoundPredicate()\l# CodegenComputeFn()\l}" alt="" coords="31,1048,217,1155"/>
+<area shape="rect" id="node3" href="$classimpala_1_1Predicate.html" title="{impala::Predicate\n||# Predicate()\l}" alt="" coords="63,923,185,1000"/>
+<area shape="rect" id="node4" href="$classimpala_1_1Expr.html" title="This is the superclass of all expr evaluation nodes. " alt="" coords="5,5,243,875"/>
+</map>

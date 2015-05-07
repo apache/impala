@@ -1,0 +1,5 @@
+<map id="impala::HdfsOperationSet" name="impala::HdfsOperationSet">
+<area shape="rect" id="node2" href="$classimpala_1_1AtomicInt.html" title="{impala::AtomicInt\&lt;\l int64_t \&gt;\n||+ AtomicInt()\l+ operator int64_t()\l+ operator=()\l+ operator=()\l+ operator+=()\l+ operator&#45;=()\l+ operator\|=()\l+ operator&amp;=()\l+ operator++()\l+ operator++()\land 10 more...\l}" alt="" coords="5,161,136,399"/>
+<area shape="rect" id="node8" href="$classimpala_1_1Promise.html" title="{impala::Promise\&lt; bool \&gt;\n||+ Promise()\l+ Set()\l+ Get()\l+ Get()\l+ IsSet()\l}" alt="" coords="575,212,739,348"/>
+<area shape="rect" id="node7" href="$classbool.html" title="{bool\n||}" alt="" coords="755,5,801,83"/>
+</map>

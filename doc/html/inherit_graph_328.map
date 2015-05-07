@@ -1,0 +1,5 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classimpala_1_1HdfsParquetScanner_1_1BaseColumnReader.html" title="impala::HdfsParquetScanner\l::BaseColumnReader" alt="" coords="5,38,195,79"/>
+<area shape="rect" id="node2" href="$classimpala_1_1HdfsParquetScanner_1_1BoolColumnReader.html" title="impala::HdfsParquetScanner\l::BoolColumnReader" alt="" coords="243,5,432,46"/>
+<area shape="rect" id="node3" href="$classimpala_1_1HdfsParquetScanner_1_1ColumnReader.html" title="impala::HdfsParquetScanner\l::ColumnReader\&lt; T \&gt;" alt="" coords="243,70,432,111"/>
+</map>

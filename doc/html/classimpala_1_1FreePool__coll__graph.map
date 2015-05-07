@@ -1,0 +1,11 @@
+<map id="impala::FreePool" name="impala::FreePool">
+<area shape="rect" id="node2" href="$classimpala_1_1MemPool.html" title="{impala::MemPool\n||+ MemPool()\l+ ~MemPool()\l+ Allocate()\l+ TryAllocate()\l+ ReturnPartialAllocation()\l+ Clear()\l+ FreeAll()\l+ AcquireData()\l+ Contains()\l+ DebugString()\land 10 more...\l&#45; FindChunk()\l&#45; CheckIntegrity()\l&#45; GetOffsetHelper()\l&#45; GetDataPtrHelper()\l&#45; GetFreeOffset()\l&#45; Allocate()\l}" alt="" coords="734,1653,908,1965"/>
+<area shape="rect" id="node7" href="$classimpala_1_1MemTracker.html" title="This class is thread&#45;safe. " alt="" coords="1609,1203,1819,1589"/>
+<area shape="rect" id="node9" href="$classimpala_1_1AtomicInt.html" title="{impala::AtomicInt\&lt;\l int64_t \&gt;\n||+ AtomicInt()\l+ operator int64_t()\l+ operator=()\l+ operator=()\l+ operator+=()\l+ operator&#45;=()\l+ operator\|=()\l+ operator&amp;=()\l+ operator++()\l+ operator++()\land 10 more...\l}" alt="" coords="3117,147,3248,386"/>
+<area shape="rect" id="node26" href="$classimpala_1_1QueryResourceMgr.html" title="Only CPU&#45;heavy threads need be managed using this class. " alt="" coords="2707,811,2945,1050"/>
+<area shape="rect" id="node15" href="$classimpala_1_1SpinLock.html" title="Lightweight spinlock. " alt="" coords="289,855,420,1006"/>
+<area shape="rect" id="node21" href="$classimpala_1_1RuntimeProfile_1_1HighWaterMarkCounter.html" title="{impala::RuntimeProfile\l::HighWaterMarkCounter\n||+ HighWaterMarkCounter()\l+ Add()\l+ TryAdd()\l+ Set()\l+ current_value()\l}" alt="" coords="3031,855,3209,1006"/>
+<area shape="rect" id="node22" href="$classimpala_1_1RuntimeProfile_1_1Counter.html" title="{impala::RuntimeProfile\l::Counter\n||+ Counter()\l+ ~Counter()\l+ Add()\l+ BitOr()\l+ Set()\l+ Set()\l+ value()\l+ double_value()\l+ unit()\l}" alt="" coords="3295,465,3448,674"/>
+<area shape="rect" id="node16" href="$classbool.html" title="{bool\n||}" alt="" coords="1023,531,1069,608"/>
+<area shape="rect" id="node34" href="$structimpala_1_1FreePool_1_1FreeListNode.html" title="{impala::FreePool::FreeListNode\n||}" alt="" coords="2187,1771,2393,1848"/>
+</map>

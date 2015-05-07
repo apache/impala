@@ -1,0 +1,33 @@
+<map id="be/src/util/uid&#45;util.h" name="be/src/util/uid&#45;util.h">
+<area shape="rect" id="node2" href="$hdfs-avro-table-writer_8cc.html" title="be/src/exec/hdfs&#45;avro\l&#45;table&#45;writer.cc" alt="" coords="311,81,459,122"/>
+<area shape="rect" id="node3" href="$hdfs-sequence-table-writer_8cc.html" title="be/src/exec/hdfs&#45;sequence\l&#45;table&#45;writer.cc" alt="" coords="484,81,663,122"/>
+<area shape="rect" id="node4" href="$resource-broker_8cc.html" title="be/src/resourcebroker\l/resource&#45;broker.cc" alt="" coords="687,81,835,122"/>
+<area shape="rect" id="node5" href="$thrift-server_8cc.html" title="be/src/rpc/thrift&#45;server.cc" alt="" coords="860,88,1028,115"/>
+<area shape="rect" id="node6" href="$buffered-block-mgr_8cc.html" title="be/src/runtime/buffered\l&#45;block&#45;mgr.cc" alt="" coords="1053,81,1208,122"/>
+<area shape="rect" id="node7" href="$mem-tracker_8cc.html" title="be/src/runtime/mem\l&#45;tracker.cc" alt="" coords="1233,81,1372,122"/>
+<area shape="rect" id="node8" href="$impala-server_8h.html" title="be/src/service/impala\l&#45;server.h" alt="" coords="1396,81,1543,122"/>
+<area shape="rect" id="node19" href="$impala-server_8cc.html" title="be/src/service/impala\l&#45;server.cc" alt="" coords="1237,353,1384,394"/>
+<area shape="rect" id="node27" href="$simple-scheduler_8cc.html" title="be/src/statestore/simple\l&#45;scheduler.cc" alt="" coords="2535,171,2697,213"/>
+<area shape="rect" id="node30" href="$fragment-mgr_8cc.html" title="be/src/service/fragment\l&#45;mgr.cc" alt="" coords="2479,81,2637,122"/>
+<area shape="rect" id="node31" href="$query-schedule_8cc.html" title="be/src/statestore/query\l&#45;schedule.cc" alt="" coords="2662,81,2817,122"/>
+<area shape="rect" id="node32" href="$statestore_8cc.html" title="be/src/statestore/statestore.cc" alt="" coords="2843,88,3041,115"/>
+<area shape="rect" id="node9" href="$catalog-op-executor_8cc.html" title="be/src/exec/catalog\l&#45;op&#45;executor.cc" alt="" coords="560,171,695,213"/>
+<area shape="rect" id="node10" href="$expr-benchmark_8cc.html" title="be/src/exprs/expr&#45;benchmark.cc" alt="" coords="1885,179,2093,205"/>
+<area shape="rect" id="node11" href="$expr-test_8cc.html" title="be/src/exprs/expr&#45;test.cc" alt="" coords="2118,179,2284,205"/>
+<area shape="rect" id="node12" href="$thrift-server-test_8cc.html" title="be/src/rpc/thrift&#45;server\l&#45;test.cc" alt="" coords="2309,171,2459,213"/>
+<area shape="rect" id="node13" href="$child-query_8h.html" title="be/src/service/child\l&#45;query.h" alt="" coords="231,171,365,213"/>
+<area shape="rect" id="node15" href="$query-exec-state_8h.html" title="be/src/service/query\l&#45;exec&#45;state.h" alt="" coords="402,262,541,303"/>
+<area shape="rect" id="node16" href="$impala-beeswax-server_8cc.html" title="be/src/service/impala\l&#45;beeswax&#45;server.cc" alt="" coords="336,353,483,394"/>
+<area shape="rect" id="node17" href="$impala-hs2-server_8cc.html" title="be/src/service/impala\l&#45;hs2&#45;server.cc" alt="" coords="5,353,152,394"/>
+<area shape="rect" id="node18" href="$impala-server-callbacks_8cc.html" title="be/src/service/impala\l&#45;server&#45;callbacks.cc" alt="" coords="507,353,653,394"/>
+<area shape="rect" id="node20" href="$query-exec-state_8cc.html" title="be/src/service/query\l&#45;exec&#45;state.cc" alt="" coords="678,353,817,394"/>
+<area shape="rect" id="node21" href="$fe-support_8cc.html" title="be/src/service/fe&#45;support.cc" alt="" coords="821,179,1005,205"/>
+<area shape="rect" id="node22" href="$impala-internal-service-proxy_8h.html" title="be/src/service/impala\l&#45;internal&#45;service&#45;proxy.h" alt="" coords="1030,171,1191,213"/>
+<area shape="rect" id="node23" href="$impala-internal-service_8h.html" title="be/src/service/impala\l&#45;internal&#45;service.h" alt="" coords="2028,262,2175,303"/>
+<area shape="rect" id="node24" href="$impala-server_8inline_8h.html" title="be/src/service/impala\l&#45;server.inline.h" alt="" coords="116,262,263,303"/>
+<area shape="rect" id="node25" href="$impalad-main_8cc.html" title="be/src/service/impalad\l&#45;main.cc" alt="" coords="1215,171,1368,213"/>
+<area shape="rect" id="node26" href="$session-expiry-test_8cc.html" title="be/src/service/session\l&#45;expiry&#45;test.cc" alt="" coords="1393,171,1545,213"/>
+<area shape="rect" id="node28" href="$in-process-servers_8cc.html" title="be/src/testutil/in\l&#45;process&#45;servers.cc" alt="" coords="1570,171,1707,213"/>
+<area shape="rect" id="node29" href="$mini-impala-cluster_8cc.html" title="be/src/testutil/mini\l&#45;impala&#45;cluster.cc" alt="" coords="1731,171,1860,213"/>
+<area shape="rect" id="node14" href="$child-query_8cc.html" title="be/src/service/child\l&#45;query.cc" alt="" coords="177,353,311,394"/>
+</map>

@@ -1,0 +1,4 @@
+<map id="com.cloudera.impala.catalog.TableNotFoundException" name="com.cloudera.impala.catalog.TableNotFoundException">
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1catalog_1_1CatalogException.html" title="{com.cloudera.impala.catalog.\lCatalogException\n||+ CatalogException()\l+ CatalogException()\l}" alt="" coords="37,304,229,411"/>
+<area shape="rect" id="node3" href="$classcom_1_1cloudera_1_1impala_1_1common_1_1ImpalaException.html" title="{com.cloudera.impala.common.\lImpalaException\n||+ ImpalaException()\l# ImpalaException()\l}" alt="" coords="5,133,204,240"/>
+</map>

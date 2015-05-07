@@ -1,0 +1,10 @@
+<map id="impala::HBaseTableWriter" name="impala::HBaseTableWriter">
+<area shape="rect" id="node2" href="$classimpala_1_1HBaseTableDescriptor.html" title="{impala::HBaseTableDescriptor\n||+ HBaseTableDescriptor()\l+ DebugString()\l+ table_name()\l+ cols()\l}" alt="" coords="234,946,433,1067"/>
+<area shape="rect" id="node3" href="$classimpala_1_1TableDescriptor.html" title="Base class for table descriptors. " alt="" coords="140,488,301,683"/>
+<area shape="rect" id="node8" href="$classimpala_1_1RuntimeProfile.html" title="{impala::RuntimeProfile\n||+ RuntimeProfile()\l+ ~RuntimeProfile()\l+ AddChild()\l+ SortChildren()\l+ UpdateAverage()\l+ Update()\l+ AddCounter()\l+ AddHighWaterMarkCounter()\l+ AddDerivedCounter()\l+ AddThreadCounters()\land 32 more...\l+ CreateFromThrift()\l+ UnitsPerSecond()\l+ CounterSum()\l&#45; Update()\l&#45; ComputeTimeInProfile()\l&#45; CreateFromThrift()\l&#45; PrintChildCounters()\l}" alt="" coords="2025,843,2228,1170"/>
+<area shape="rect" id="node14" href="$classimpala_1_1SpinLock.html" title="Lightweight spinlock. " alt="" coords="2000,191,2132,342"/>
+<area shape="rect" id="node21" href="$classimpala_1_1AtomicInt.html" title="{impala::AtomicInt\&lt;\l int64_t \&gt;\n||+ AtomicInt()\l+ operator int64_t()\l+ operator=()\l+ operator=()\l+ operator+=()\l+ operator&#45;=()\l+ operator\|=()\l+ operator&amp;=()\l+ operator++()\l+ operator++()\land 10 more...\l}" alt="" coords="2787,147,2918,386"/>
+<area shape="rect" id="node13" href="$classimpala_1_1ObjectPool.html" title="{impala::ObjectPool\n||+ ObjectPool()\l+ ~ObjectPool()\l+ Add()\l}" alt="" coords="1931,532,2062,639"/>
+<area shape="rect" id="node15" href="$classbool.html" title="{bool\n||}" alt="" coords="2114,5,2160,83"/>
+<area shape="rect" id="node19" href="$classimpala_1_1RuntimeProfile_1_1Counter.html" title="{impala::RuntimeProfile\l::Counter\n||+ Counter()\l+ ~Counter()\l+ Add()\l+ BitOr()\l+ Set()\l+ Set()\l+ value()\l+ double_value()\l+ unit()\l}" alt="" coords="2786,481,2940,690"/>
+</map>

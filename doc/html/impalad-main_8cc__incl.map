@@ -1,0 +1,28 @@
+<map id="be/src/service/impalad&#45;main.cc" name="be/src/service/impalad&#45;main.cc">
+<area shape="rect" id="node4" href="$logging_8h.html" title="common/logging.h" alt="" coords="2231,485,2359,512"/>
+<area shape="rect" id="node7" href="$init_8h.html" title="common/init.h" alt="" coords="4167,96,4271,123"/>
+<area shape="rect" id="node9" href="$hbase-table-scanner_8h.html" title="exec/hbase&#45;table&#45;scanner.h" alt="" coords="582,171,764,197"/>
+<area shape="rect" id="node16" href="$hbase-table-factory_8h.html" title="runtime/hbase&#45;table\l&#45;factory.h" alt="" coords="671,246,805,287"/>
+<area shape="rect" id="node17" href="$status_8h.html" title="common/status.h" alt="" coords="2233,411,2356,437"/>
+<area shape="rect" id="node20" href="$hbase-table-writer_8h.html" title="exec/hbase&#45;table&#45;writer.h" alt="" coords="1301,171,1469,197"/>
+<area shape="rect" id="node23" href="$exec-env_8h.html" title="runtime/exec&#45;env.h" alt="" coords="2233,336,2367,363"/>
+<area shape="rect" id="node26" href="$llvm-codegen_8h.html" title="codegen/llvm&#45;codegen.h" alt="" coords="3321,171,3484,197"/>
+<area shape="rect" id="node38" href="$coordinator_8h.html" title="runtime/coordinator.h" alt="" coords="2460,171,2604,197"/>
+<area shape="rect" id="node39" href="$jni-util_8h.html" title="util/jni&#45;util.h" alt="" coords="300,336,388,363"/>
+<area shape="rect" id="node40" href="$network-util_8h.html" title="util/network&#45;util.h" alt="" coords="2949,336,3069,363"/>
+<area shape="rect" id="node41" href="$thrift-util_8h.html" title="rpc/thrift&#45;util.h" alt="" coords="1847,253,1949,280"/>
+<area shape="rect" id="node42" href="$thrift-server_8h.html" title="rpc/thrift&#45;server.h" alt="" coords="2111,171,2232,197"/>
+<area shape="rect" id="node43" href="$thread_8h.html" title="util/thread.h" alt="" coords="1241,336,1332,363"/>
+<area shape="rect" id="node44" href="$rpc-trace_8h.html" title="rpc/rpc&#45;trace.h" alt="" coords="2119,96,2225,123"/>
+<area shape="rect" id="node45" href="$impala-server_8h.html" title="service/impala&#45;server.h" alt="" coords="2309,96,2467,123"/>
+<area shape="rect" id="node48" href="$fe-support_8h.html" title="service/fe&#45;support.h" alt="" coords="166,96,303,123"/>
+<area shape="rect" id="node49" href="$impalad-metrics_8h.html" title="util/impalad&#45;metrics.h" alt="" coords="4295,96,4441,123"/>
+<area shape="rect" id="node50" href="$names_8h.html" title="common/names.h" alt="" coords="4466,96,4592,123"/>
+<area shape="rect" id="node8" href="$test-info_8h.html" title="util/test&#45;info.h" alt="" coords="4168,171,4269,197"/>
+<area shape="rect" id="node15" href="$scan-node_8h.html" title="exec/scan&#45;node.h" alt="" coords="249,411,375,437"/>
+<area shape="rect" id="node18" href="$hbase-table_8h.html" title="runtime/hbase&#45;table.h" alt="" coords="665,336,812,363"/>
+<area shape="rect" id="node22" href="$runtime-state_8h.html" title="runtime/runtime&#45;state.h" alt="" coords="2026,253,2181,280"/>
+<area shape="rect" id="node24" href="$descriptors_8h.html" title="runtime/descriptors.h" alt="" coords="1719,336,1863,363"/>
+<area shape="rect" id="node25" href="$row-batch_8h.html" title="runtime/row&#45;batch.h" alt="" coords="1263,253,1400,280"/>
+<area shape="rect" id="node37" href="$expr_8h.html" title="exprs/expr.h" alt="" coords="3138,253,3232,280"/>
+</map>

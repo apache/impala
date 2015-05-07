@@ -1,0 +1,6 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classimpala_1_1RuntimeProfile_1_1Counter.html" title="impala::RuntimeProfile\l::Counter" alt="" coords="5,70,160,111"/>
+<area shape="rect" id="node2" href="$classimpala_1_1RuntimeProfile_1_1AveragedCounter.html" title="impala::RuntimeProfile\l::AveragedCounter" alt="" coords="215,5,369,46"/>
+<area shape="rect" id="node3" href="$classimpala_1_1RuntimeProfile_1_1DerivedCounter.html" title="impala::RuntimeProfile\l::DerivedCounter" alt="" coords="215,70,369,111"/>
+<area shape="rect" id="node4" href="$classimpala_1_1RuntimeProfile_1_1HighWaterMarkCounter.html" title="impala::RuntimeProfile\l::HighWaterMarkCounter" alt="" coords="209,135,375,177"/>
+</map>

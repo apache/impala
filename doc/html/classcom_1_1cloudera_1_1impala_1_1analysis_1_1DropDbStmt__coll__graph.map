@@ -1,0 +1,4 @@
+<map id="com.cloudera.impala.analysis.DropDbStmt" name="com.cloudera.impala.analysis.DropDbStmt">
+<area shape="rect" id="node2" href="$classcom_1_1cloudera_1_1impala_1_1analysis_1_1StatementBase.html" title="{com.cloudera.impala.analysis.\lStatementBase\n||+ analyze()\l+ toSql()\l+ setIsExplain()\l+ isExplain()\l}" alt="" coords="14,176,212,312"/>
+<area shape="rect" id="node3" href="$interfacecom_1_1cloudera_1_1impala_1_1analysis_1_1ParseNode.html" title="{com.cloudera.impala.analysis.\lParseNode\n||+ analyze()\l+ toSql()\l}" alt="" coords="5,5,203,112"/>
+</map>

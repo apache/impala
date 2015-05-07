@@ -1,0 +1,7 @@
+<map id="be/src/runtime/data&#45;stream&#45;sender.h" name="be/src/runtime/data&#45;stream&#45;sender.h">
+<area shape="rect" id="node2" href="$data-sink_8cc.html" title="be/src/exec/data&#45;sink.cc" alt="" coords="5,104,169,131"/>
+<area shape="rect" id="node3" href="$coordinator_8cc.html" title="be/src/runtime/coordinator.cc" alt="" coords="195,104,385,131"/>
+<area shape="rect" id="node4" href="$data-stream-sender_8cc.html" title="be/src/runtime/data\l&#45;stream&#45;sender.cc" alt="" coords="410,97,544,138"/>
+<area shape="rect" id="node5" href="$data-stream-test_8cc.html" title="be/src/runtime/data\l&#45;stream&#45;test.cc" alt="" coords="569,97,703,138"/>
+<area shape="rect" id="node6" href="$impala-beeswax-server_8cc.html" title="be/src/service/impala\l&#45;beeswax&#45;server.cc" alt="" coords="728,97,875,138"/>
+</map>
