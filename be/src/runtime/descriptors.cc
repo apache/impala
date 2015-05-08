@@ -47,10 +47,11 @@ ostream& operator<<(ostream& os, const NullIndicatorOffset& null_indicator) {
   return os;
 }
 
-SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc)
+SlotDescriptor::SlotDescriptor(
+    const TSlotDescriptor& tdesc, const TupleDescriptor* parent)
   : id_(tdesc.id),
     type_(tdesc.slotType),
-    parent_(tdesc.parent),
+    parent_(parent),
     col_path_(tdesc.columnPath),
     tuple_offset_(tdesc.byteOffset),
     null_indicator_offset_(tdesc.nullIndicatorByte, tdesc.nullIndicatorBit),
@@ -61,6 +62,7 @@ SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc)
     is_null_fn_(NULL),
     set_not_null_fn_(NULL),
     set_null_fn_(NULL) {
+  DCHECK(parent_ != NULL) << tdesc.parent;
 }
 
 bool SlotDescriptor::ColPathLessThan(const SlotDescriptor* a, const SlotDescriptor* b) {
@@ -411,7 +413,9 @@ Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tb
 
   for (size_t i = 0; i < thrift_tbl.slotDescriptors.size(); ++i) {
     const TSlotDescriptor& tdesc = thrift_tbl.slotDescriptors[i];
-    SlotDescriptor* slot_d = pool->Add(new SlotDescriptor(tdesc));
+    // Tuple descriptors are already populated in tbl
+    TupleDescriptor* parent = (*tbl)->GetTupleDescriptor(tdesc.parent);
+    SlotDescriptor* slot_d = pool->Add(new SlotDescriptor(tdesc, parent));
     (*tbl)->slot_desc_map_[tdesc.id] = slot_d;
 
     // link to parent

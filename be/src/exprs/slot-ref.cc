@@ -78,10 +78,9 @@ Status SlotRef::Prepare(RuntimeState* state, const RowDescriptor& row_desc,
     error << "reference to non-materialized slot " << slot_id_;
     return Status(error.str());
   }
-  // TODO(marcel): get from runtime state
-  tuple_idx_ = row_desc.GetTupleIdx(slot_desc->parent());
+  tuple_idx_ = row_desc.GetTupleIdx(slot_desc->parent()->id());
   if (tuple_idx_ == RowDescriptor::INVALID_IDX) {
-    TupleDescriptor* d = state->desc_tbl().GetTupleDescriptor(slot_desc->parent());
+    TupleDescriptor* d = state->desc_tbl().GetTupleDescriptor(slot_desc->parent()->id());
     LOG(INFO) << "invalid idx: " << slot_desc->DebugString()
               << "\nparent=" << d->DebugString()
               << "\nrow=" << row_desc.DebugString();
