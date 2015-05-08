@@ -190,17 +190,18 @@ class HdfsScanNode : public ScanNode {
       int disk_id, bool try_cache, bool expected_local, int64_t mtime);
 
   /// Adds ranges to the io mgr queue and starts up new scanner threads if possible.
-  Status AddDiskIoRanges(const std::vector<DiskIoMgr::ScanRange*>& ranges);
+  /// 'num_files_queued' indicates how many file's scan ranges have been added
+  /// completely.  A file's scan ranges are added completely if no new scanner threads
+  /// will be needed to process that file besides the additional threads needed to
+  /// process those in 'ranges'.
+  Status AddDiskIoRanges(const std::vector<DiskIoMgr::ScanRange*>& ranges,
+      int num_files_queued);
 
-  /// Adds all splits for file_desc to the io mgr queue.
-  Status AddDiskIoRanges(const HdfsFileDesc* file_desc);
-
-  /// Indicates that this file_desc's scan ranges have all been issued to the IoMgr.
-  /// For each file, the scanner must call MarkFileDescIssued() or AddDiskIoRanges().
-  /// Issuing ranges happens asynchronously. For many of the file formats we synchronously
-  /// issue the file header/footer in Open() but the rest of the splits for the file are
-  /// issued asynchronously.
-  void MarkFileDescIssued(const HdfsFileDesc* file_desc);
+  /// Adds all splits for file_desc to the io mgr queue and indicates one file has
+  /// been added completely.
+  inline Status AddDiskIoRanges(const HdfsFileDesc* file_desc) {
+    return AddDiskIoRanges(file_desc->splits, 1);
+  }
 
   /// Allocates and initialises template_tuple_ with any values from
   /// the partition columns for the current scan range

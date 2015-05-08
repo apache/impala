@@ -56,7 +56,9 @@ Status BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node,
         -1, false, false, files[i]->mtime);
     header_ranges.push_back(header_range);
   }
-  RETURN_IF_ERROR(scan_node->AddDiskIoRanges(header_ranges));
+  // Issue the header ranges only.  ProcessSplit() will issue the files' scan ranges
+  // and those ranges will need scanner threads, so no files are marked completed yet.
+  RETURN_IF_ERROR(scan_node->AddDiskIoRanges(header_ranges, 0));
   return Status::OK;
 }
 

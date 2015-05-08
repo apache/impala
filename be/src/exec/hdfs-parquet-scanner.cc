@@ -116,7 +116,9 @@ Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
       footer_ranges.push_back(footer_range);
     }
   }
-  RETURN_IF_ERROR(scan_node->AddDiskIoRanges(footer_ranges));
+  // Issue the footer ranges for all files. The same thread that processes the footer
+  // will assemble the rows for this file, so mark these files added completely.
+  RETURN_IF_ERROR(scan_node->AddDiskIoRanges(footer_ranges, files.size()));
   return Status::OK;
 }
 
@@ -1006,11 +1008,6 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
   }
 
   RETURN_IF_ERROR(ValidateFileMetadata());
-
-  // Tell the scan node this file has been taken care of.
-  HdfsFileDesc* desc = scan_node_->GetFileDesc(stream_->filename());
-  scan_node_->MarkFileDescIssued(desc);
-
   // Parse file schema
   RETURN_IF_ERROR(CreateSchemaTree(file_metadata_.schema, &schema_));
 
