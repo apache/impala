@@ -79,7 +79,8 @@ public class Subquery extends Expr {
     analyzer_ = new Analyzer(analyzer);
     analyzer_.setIsSubquery();
     stmt_.analyze(analyzer_);
-    stmt_.checkCorrelatedTableRefs(analyzer_);
+    // Check whether the stmt_ contains an illegal mix of un/correlated table refs.
+    stmt_.getCorrelatedTupleIds(analyzer_);
 
     // Set the subquery type based on the types of the exprs in the
     // result list of the associated SelectStmt.

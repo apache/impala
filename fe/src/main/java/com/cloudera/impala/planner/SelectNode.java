@@ -21,7 +21,6 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
@@ -47,7 +46,7 @@ public class SelectNode extends PlanNode {
   }
 
   @Override
-  public void init(Analyzer analyzer) throws InternalException {
+  public void init(Analyzer analyzer) {
     analyzer.markConjunctsAssigned(conjuncts_);
     computeStats(analyzer);
     createDefaultSmap(analyzer);

@@ -1142,17 +1142,17 @@ WHERE `$a$2`.`$c$1` > t4.id
 08:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: sum(t1.int_col) > t4.id
 |
+|--00:SCAN HDFS [functional.alltypestiny t4]
+|     partitions=4/4 files=4 size=460B
+|
+07:NESTED LOOP JOIN [CROSS JOIN]
+|
 |--05:AGGREGATE [FINALIZE]
 |  |  output: sum(t1.int_col)
 |  |  limit: 1
 |  |
 |  04:SCAN HDFS [functional.alltypesagg t1]
 |     partitions=11/11 files=11 size=814.73KB
-|
-07:NESTED LOOP JOIN [CROSS JOIN]
-|
-|--00:SCAN HDFS [functional.alltypestiny t4]
-|     partitions=4/4 files=4 size=460B
 |
 03:HASH JOIN [INNER JOIN]
 |  hash predicates: t1.bigint_col = t2.smallint_col

@@ -21,7 +21,6 @@ import java.util.Set;
 
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TreeNode;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
@@ -100,6 +99,10 @@ public abstract class QueryStmt extends StatementBase {
   }
 
   /**
+   * Returns a list containing all the materialized tuple ids that this stmt is
+   * correlated with (i.e., those tuple ids from outer query blocks that TableRefs
+   * inside this stmt are rooted at).
+   *
    * Throws if this stmt contains an illegal mix of un/correlated table refs.
    * A statement is illegal if it contains a TableRef correlated with a parent query
    * block as well as a table ref with an absolute path (e.g. a BaseTabeRef). Such a
@@ -112,19 +115,22 @@ public abstract class QueryStmt extends StatementBase {
    * (3) a mix of correlated table refs and table refs rooted at those refs
    *     (the statement is 'self-contained' with respect to correlation)
    */
-  public void checkCorrelatedTableRefs(Analyzer analyzer) throws AnalysisException {
+  public List<TupleId> getCorrelatedTupleIds(Analyzer analyzer)
+      throws AnalysisException {
+    // Correlated tuple ids of this stmt.
+    List<TupleId> correlatedTupleIds = Lists.newArrayList();
+    // First correlated and absolute table refs. Used for error detection/reporting.
+    // We pick the first ones for simplicity. Choosing arbitrary ones is equally valid.
+    TableRef correlatedRef = null;
+    TableRef absoluteRef = null;
+    // Materialized tuple ids of the table refs checked so far.
+    Set<TupleId> tblRefIds = Sets.newHashSet();
+
     List<TableRef> tblRefs = Lists.newArrayList();
     collectTableRefs(tblRefs);
-
-    // First table ref that is correlated with a parent query block.
-    TableRef correlatedRef = null;
-    // First absolute table ref.
-    TableRef absoluteRef = null;
-    // Tuple ids of the tblRefs checked so far.
-    Set<TupleId> tblRefIds = Sets.newHashSet();
     for (TableRef tblRef: tblRefs) {
-      if (absoluteRef == null && !tblRef.isRelativeRef()) absoluteRef = tblRef;
-      if (correlatedRef == null && tblRef.isCorrelated()) {
+      if (absoluteRef == null && !tblRef.isRelative()) absoluteRef = tblRef;
+      if (tblRef.isCorrelated()) {
         // Check if the correlated table ref is rooted at a tuple descriptor from within
         // this query stmt. If so, the correlation is contained within this stmt
         // and the table ref does not conflict with absolute refs.
@@ -132,7 +138,8 @@ public abstract class QueryStmt extends StatementBase {
         Preconditions.checkNotNull(t.getResolvedPath().getRootDesc());
         // This check relies on tblRefs being in depth-first order.
         if (!tblRefIds.contains(t.getResolvedPath().getRootDesc().getId())) {
-          correlatedRef = tblRef;
+          if (correlatedRef == null) correlatedRef = tblRef;
+          correlatedTupleIds.add(t.getResolvedPath().getRootDesc().getId());
         }
       }
       if (correlatedRef != null && absoluteRef != null) {
@@ -143,6 +150,7 @@ public abstract class QueryStmt extends StatementBase {
       }
       tblRefIds.add(tblRef.getId());
     }
+    return correlatedTupleIds;
   }
 
   private void analyzeLimit(Analyzer analyzer) throws AnalysisException {
@@ -365,8 +373,7 @@ public abstract class QueryStmt extends StatementBase {
    * This is called prior to plan tree generation and allows tuple-materializing
    * PlanNodes to compute their tuple's mem layout.
    */
-  public abstract void materializeRequiredSlots(Analyzer analyzer)
-      throws InternalException;
+  public abstract void materializeRequiredSlots(Analyzer analyzer);
 
   /**
    * Mark slots referenced in exprs as materialized.

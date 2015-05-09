@@ -96,6 +96,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // to avoid having to pass assigned conjuncts back and forth
   // (the planner uses this to save and reset the global state in between join tree
   // alternatives)
+  // TODO for 2.3: Save this state in the PlannerContext instead.
   protected Set<ExprId> assignedConjuncts_;
 
   // estimate of the output cardinality of this node; set in computeStats();
@@ -386,8 +387,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * and computes the mem layout of all materialized tuples (with the assumption that
    * slots that are needed by ancestor PlanNodes have already been marked).
    * Also performs final expr substitution with childrens' smaps and computes internal
-   * state required for toThrift().
-   * This is called directly after construction.
+   * state required for toThrift(). This is called directly after construction.
+   * Throws if an expr substitution or evaluation fails.
    */
   public void init(Analyzer analyzer) throws InternalException {
     assignConjuncts(analyzer);

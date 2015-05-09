@@ -18,7 +18,6 @@ import java.util.ArrayList;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.TupleId;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
@@ -41,7 +40,7 @@ public class EmptySetNode extends PlanNode {
   }
 
   @Override
-  public void init(Analyzer analyzer) throws InternalException {
+  public void init(Analyzer analyzer) {
     // If the physical output tuple produced by an AnalyticEvalNode wasn't created
     // the logical output tuple is returned by getMaterializedTupleIds(). It needs
     // to be set as materialized (even though it isn't) to avoid failing precondition

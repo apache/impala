@@ -43,6 +43,7 @@ import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.PrintUtils;
@@ -600,6 +601,12 @@ public class HdfsScanNode extends ScanNode {
         // if none of the partitions knew its number of rows, we fall back on
         // the table stats
         cardinality_ = tbl_.getNumRows();
+      }
+    }
+    // Adjust cardinality for all collections referenced along the tuple's path.
+    if (cardinality_ != -1) {
+      for (Type t: desc_.getPath().getMatchedTypes()) {
+        if (t.isCollectionType()) cardinality_ *= PlannerContext.AVG_COLLECTION_SIZE;
       }
     }
     inputCardinality_ = cardinality_;

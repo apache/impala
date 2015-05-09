@@ -154,7 +154,7 @@ public class InlineViewRef extends TableRef {
     inlineViewAnalyzer_.setUseHiveColLabels(
         isCatalogView ? true : analyzer.useHiveColLabels());
     queryStmt_.analyze(inlineViewAnalyzer_);
-    queryStmt_.checkCorrelatedTableRefs(inlineViewAnalyzer_);
+    correlatedTupleIds_.addAll(queryStmt_.getCorrelatedTupleIds(inlineViewAnalyzer_));
     if (explicitColLabels_ != null) {
       Preconditions.checkState(
           explicitColLabels_.size() == queryStmt_.getColLabels().size());

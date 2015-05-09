@@ -22,7 +22,6 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.common.AnalysisException;
-import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -274,7 +273,7 @@ public class UnionStmt extends QueryStmt {
    * Calls materializeRequiredSlots() on the operands themselves.
    */
   @Override
-  public void materializeRequiredSlots(Analyzer analyzer) throws InternalException {
+  public void materializeRequiredSlots(Analyzer analyzer) {
     TupleDescriptor tupleDesc = analyzer.getDescTbl().getTupleDesc(tupleId_);
     if (!distinctOperands_.isEmpty()) {
       // to keep things simple we materialize all grouping exprs = output slots,

@@ -26,7 +26,6 @@ import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.OrderByElement;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TAnalyticNode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
@@ -108,7 +107,7 @@ public class AnalyticEvalNode extends PlanNode {
   public List<OrderByElement> getOrderByElements() { return orderByElements_; }
 
   @Override
-  public void init(Analyzer analyzer) throws InternalException {
+  public void init(Analyzer analyzer) {
     computeMemLayout(analyzer);
     intermediateTupleDesc_.computeMemLayout();
 

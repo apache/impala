@@ -45,39 +45,1105 @@ where a.f2 = 'test_a' and b.f2 = 'test_b'
 00:SCAN HDFS [functional.allcomplextypes.struct_array_col a]
    partitions=0/0 files=0 size=0B
    predicates: a.f2 = 'test_a'
-#====
+====
 # Test assignment of equi-join conjuncts and enforcement of
 # slot equivalences in a bushy join.
-# TODO: Enable this test once we the required planner changes
-# are checked in.
-#select 1 from
-#  tpch_nested_parquet.region r,
-#  r.r_nations n,
-#  tpch_nested_parquet.customer c,
-#  tpch_nested_parquet.supplier s
-#where c_nationkey = n_nationkey and s_nationkey = n_nationkey
-#  and c_comment = s_comment and n_comment = s_comment
-#---- PLAN
-#08:HASH JOIN [INNER JOIN]
-#|  hash predicates: n_nationkey = s_nationkey, c_comment = s_comment
-#|
-#|--06:SCAN HDFS [tpch_nested_parquet.supplier s]
-#|     partitions=1/1 files=1 size=111.08MB
-#|
-#07:HASH JOIN [INNER JOIN]
-#|  hash predicates: c_nationkey = n_nationkey, c.c_comment = n.n_comment
-#|
-#|--01:SUBPLAN
-#|  |
-#|  |--04:NESTED LOOPS JOIN [CROSS JOIN]
-#|  |  |
-#|  |  |--03:UNNEST [r.r_nations n]
-#|  |  |
-#|  |  02:NESTED ROW SRC
-#|  |
-#|  00:SCAN HDFS [tpch_nested_parquet.region r]
-#|     partitions=1/1 files=1 size=4.16KB
-#|
-#05:SCAN HDFS [tpch_nested_parquet.customer c]
-#   partitions=1/1 files=4 size=554.83MB
+select 1 from
+  tpch_nested_parquet.region r,
+  r.r_nations n,
+  tpch_nested_parquet.customer c,
+  tpch_nested_parquet.supplier s
+where c_nationkey = n_nationkey and s_nationkey = n_nationkey
+  and c_comment = s_comment and n_comment = s_comment
+---- PLAN
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: n_nationkey = s_nationkey, c_comment = s_comment
+|
+|--06:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: c_nationkey = n_nationkey, c.c_comment = n.n_comment
+|
+|--01:SUBPLAN
+|  |
+|  |--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--03:UNNEST [r.r_nations n]
+|  |  |
+|  |  02:SINGULAR ROW SRC
+|  |
+|  00:SCAN HDFS [tpch_nested_parquet.region r]
+|     partitions=1/1 files=1 size=4.16KB
+|
+05:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+====
+# Test subplans: Cross join of parent and relative ref.
+select a.id, b.item from functional.allcomplextypes a cross join a.int_array_col b
+where a.id < 10 and b.item % 2 = 0
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |     predicates: b.item % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10
+====
+# Test subplans: Left semi join of parent and relative ref without On-clause.
+select a.id from functional.allcomplextypes a left semi join a.int_array_col b
+where a.id < 10
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10
+====
+# Test subplans: Right semi join of parent and relative ref without On-clause.
+select b.item from functional.allcomplextypes a right semi join a.int_array_col b
+where b.item % 2 = 0
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |     predicates: b.item % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Left anti join of parent and relative ref without On-clause.
+select a.id from functional.allcomplextypes a left anti join a.int_array_col b
+where a.id < 10
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10
+====
+# Test subplans: Right anti join of parent and relative ref without On-clause.
+# TODO: Transform the join op into a CROSS JOIN.
+# in this context?
+select b.item from functional.allcomplextypes a right anti join a.int_array_col b
+where b.item % 2 = 0
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [RIGHT ANTI JOIN]
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |     predicates: b.item % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Left outer join of parent and relative ref without On-clause.
+select a.id, b.item from functional.allcomplextypes a left outer join a.int_array_col b
+where a.id < 10
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10
+====
+# Test subplans: Right outer join of parent and relative ref without On-clause.
+# TODO: Transform the join op into a CROSS JOIN.
+# in this context?
+select a.id, b.item from functional.allcomplextypes a right outer join a.int_array_col b
+where b.item % 2 = 0
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |     predicates: b.item % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Full outer join of parent and relative ref without On-clause.
+# TODO: Transform the join op into an INNER JOIN.
+select a.id, b.item from functional.allcomplextypes a full outer join a.int_array_col b
+where b.item % 2 = 0 and a.id < 10
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [FULL OUTER JOIN]
+|  |  predicates: b.item % 2 = 0, a.id < 10
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |     predicates: b.item % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10
+====
+# Test subplans: Non-equi inner join of parent and relative ref.
+select a.id, b.item from functional.allcomplextypes a, a.int_array_col b
+where a.id < 10 and b.item % 2 = 0 and a.id < b.item
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [INNER JOIN]
+|  |  predicates: a.id < b.item
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |     predicates: b.item % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10
+====
+# Test subplans: Non-equi left semi join of parent and relative ref.
+select a.id from functional.allcomplextypes a
+  left semi join a.int_array_col b on (a.id < b.item and b.item % 2 = 0)
+where a.id < 10
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  |  join predicates: a.id < b.item
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |     predicates: b.item % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10
+====
+# Test subplans: Non-equi right semi join of parent and relative ref.
+# TODO: Transform the join op into an INNER JOIN.
+select b.item from functional.allcomplextypes a
+  right semi join a.int_array_col b on (a.id < b.item and a.id < 10)
+where b.item % 2 = 0
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  |  join predicates: a.id < b.item
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |     predicates: b.item % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10
+====
+# Test subplans: Non-equi left anti join of parent and relative ref.
+select a.id from functional.allcomplextypes a
+  left anti join a.int_array_col b on (a.id < b.item and b.item % 2 = 0)
+where a.id < 10
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|  |  join predicates: a.id < b.item
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |     predicates: b.item % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10
+====
+# Test subplans: Non-equi right anti join of parent and relative ref.
+# TODO: Transform the join op into an INNER JOIN.
+select b.item from functional.allcomplextypes a
+  right anti join a.int_array_col b on (a.id < b.item and a.id < 10)
+where b.item % 2 = 0
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [RIGHT ANTI JOIN]
+|  |  join predicates: a.id < b.item
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |     predicates: b.item % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10
+====
+# Test subplans: Non-equi left outer join of parent and relative ref.
+select a.id, b.item from functional.allcomplextypes a
+  left outer join a.int_array_col b on (a.id < b.item and b.item % 2 = 0)
+where a.id < 10
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|  |  join predicates: a.id < b.item
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |     predicates: b.item % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10
+====
+# Test subplans: Non-equi right outer join of parent and relative ref.
+# TODO: Transform the join op into an INNER JOIN.
+select a.id, b.item from functional.allcomplextypes a
+  right outer join a.int_array_col b on (a.id < b.item and a.id < 10)
+where b.item % 2 = 0
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  join predicates: a.id < b.item
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |     predicates: b.item % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10
+====
+# Test subplans: Non-equi full outer join of parent and relative ref.
+# TODO: Transform the join op into LEFT OUTER JOIN.
+select a.id, b.item from functional.allcomplextypes a
+  full outer join a.int_array_col b on (a.id < b.item and a.id < 10)
+where b.item % 2 = 0
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [FULL OUTER JOIN]
+|  |  join predicates: a.id < b.item, a.id < 10
+|  |  predicates: b.item % 2 = 0
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |     predicates: b.item % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Inner equi-join of parent and relative ref.
+select a.id, b.f1, b.f2 from functional.allcomplextypes a
+  inner join a.struct_array_col b
+where a.id < 10 and b.f1 % 2 = 0 and b.f1 = a.id and b.f1 < a.year
+---- PLAN
+01:SUBPLAN
+|
+|--04:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.id = b.f1
+|  |  other predicates: b.f1 < a.year
+|  |
+|  |--03:UNNEST [a.struct_array_col b]
+|  |     predicates: b.f1 < 10, b.f1 % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10, a.id % 2 = 0
+====
+# Test subplans: Left-semi equi-join of parent and relative ref.
+select a.id from functional.allcomplextypes a
+  left semi join a.struct_array_col b
+    on (b.f1 % 2 = 0 and b.f1 = a.id and b.f1 < a.year)
+where a.id < 10
+---- PLAN
+01:SUBPLAN
+|
+|--04:HASH JOIN [LEFT SEMI JOIN]
+|  |  hash predicates: a.id = b.f1
+|  |  other join predicates: b.f1 < a.year
+|  |
+|  |--03:UNNEST [a.struct_array_col b]
+|  |     predicates: b.f1 % 2 = 0, b.f1 < 10
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id % 2 = 0, a.id < 10
+====
+# Test subplans: Right-semi equi-join of parent and relative ref.
+# TODO: Transform the join op into an INNER JOIN.
+select b.f1, b.f2 from functional.allcomplextypes a
+  right semi join a.struct_array_col b
+    on (a.id < 10 and b.f1 = a.id and b.f1 < a.year)
+where b.f1 % 2 = 0
+---- PLAN
+01:SUBPLAN
+|
+|--04:HASH JOIN [RIGHT SEMI JOIN]
+|  |  hash predicates: a.id = b.f1
+|  |  other join predicates: b.f1 < a.year
+|  |
+|  |--03:UNNEST [a.struct_array_col b]
+|  |     predicates: b.f1 < 10, b.f1 % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10, a.id % 2 = 0
+====
+# Test subplans: Left-anti equi-join of parent and relative ref.
+select a.id from functional.allcomplextypes a
+  left anti join a.struct_array_col b
+    on (b.f1 % 2 = 0 and b.f1 = a.id and b.f1 < a.year)
+where a.id < 10
+---- PLAN
+01:SUBPLAN
+|
+|--04:HASH JOIN [LEFT ANTI JOIN]
+|  |  hash predicates: a.id = b.f1
+|  |  other join predicates: b.f1 < a.year
+|  |
+|  |--03:UNNEST [a.struct_array_col b]
+|  |     predicates: b.f1 < 10, b.f1 % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10
+====
+# Test subplans: Right-anti equi-join of parent and relative ref.
+# TODO: Transform the join op into an INNER JOIN.
+select b.f1, b.f2 from functional.allcomplextypes a
+  right anti join a.struct_array_col b
+    on (a.id < 10 and b.f1 = a.id and b.f1 < a.year)
+where b.f1 % 2 = 0
+---- PLAN
+01:SUBPLAN
+|
+|--04:HASH JOIN [RIGHT ANTI JOIN]
+|  |  hash predicates: a.id = b.f1
+|  |  other join predicates: b.f1 < a.year
+|  |
+|  |--03:UNNEST [a.struct_array_col b]
+|  |     predicates: b.f1 % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id % 2 = 0, a.id < 10
+====
+# Test subplans: Left-outer equi-join of parent and relative ref.
+select a.id from functional.allcomplextypes a
+  left outer join a.struct_array_col b
+    on (b.f1 % 2 = 0 and b.f1 = a.id and b.f1 < a.year)
+where a.id < 10
+---- PLAN
+01:SUBPLAN
+|
+|--04:HASH JOIN [LEFT OUTER JOIN]
+|  |  hash predicates: a.id = b.f1
+|  |  other join predicates: b.f1 < a.year
+|  |
+|  |--03:UNNEST [a.struct_array_col b]
+|  |     predicates: b.f1 % 2 = 0, b.f1 < 10
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10
+====
+# Test subplans: Right-outer equi-join of parent and relative ref.
+# TODO: Transform the join op into an INNER JOIN.
+select b.f1, b.f2 from functional.allcomplextypes a
+  right outer join a.struct_array_col b
+    on (a.id < 10 and b.f1 = a.id and b.f1 < a.year)
+where b.f1 % 2 = 0
+---- PLAN
+01:SUBPLAN
+|
+|--04:HASH JOIN [RIGHT OUTER JOIN]
+|  |  hash predicates: a.id = b.f1
+|  |  other join predicates: b.f1 < a.year
+|  |
+|  |--03:UNNEST [a.struct_array_col b]
+|  |     predicates: b.f1 % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10, a.id % 2 = 0
+====
+# Test subplans: Full-outer equi-join of parent and relative ref.
+# TODO: Transform the join op into an LEFT OUTER JOIN.
+select b.f1, b.f2 from functional.allcomplextypes a
+  full outer join a.struct_array_col b
+    on (b.f1 = a.id and b.f1 < a.year)
+where a.id < 10 and b.f1 % 2 = 0
+---- PLAN
+01:SUBPLAN
+|
+|--04:HASH JOIN [FULL OUTER JOIN]
+|  |  hash predicates: a.id = b.f1
+|  |  other join predicates: b.f1 < a.year
+|  |  other predicates: a.id < 10, b.f1 % 2 = 0
+|  |
+|  |--03:UNNEST [a.struct_array_col b]
+|  |     predicates: b.f1 % 2 = 0
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+   predicates: a.id < 10
+====
+# Test subplans: Test multiple relative refs, disjunctive predicates,
+# and correct join ordering within a subplan.
+select 1 from functional.allcomplextypes a
+  inner join a.int_array_col b on (a.id < 1 or b.item > 2)
+  inner join a.int_map_col c on (a.year = c.value)
+  left outer join a.struct_array_col d on (a.month < 4 or d.f1 > 5)
+  inner join a.struct_map_col e on (e.f1 = a.id and e.f2 = 'test')
+---- PLAN
+01:SUBPLAN
+|
+|--10:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.id = e.f1
+|  |
+|  |--06:UNNEST [a.struct_map_col e]
+|  |     predicates: e.f2 = 'test'
+|  |
+|  09:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|  |  join predicates: (a.month < 4 OR d.f1 > 5)
+|  |
+|  |--05:UNNEST [a.struct_array_col d]
+|  |
+|  08:NESTED LOOP JOIN [INNER JOIN]
+|  |  predicates: (a.id < 1 OR b.item > 2)
+|  |
+|  |--03:UNNEST [a.int_array_col b]
+|  |
+|  07:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.year = c.value
+|  |
+|  |--04:UNNEST [a.int_map_col c]
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Test that subplans are not re-ordered across semi/outer joins.
+# The 'alltypes*' tables are purposely placed with increasing size to test
+# join inversion.
+select 1
+from functional.allcomplextypes a
+left outer join functional.alltypestiny b on (a.id = b.id)
+left anti join functional.alltypessmall c on (b.int_col = c.int_col)
+inner join functional.alltypes d on (b.id = d.id)
+inner join a.struct_array_col e
+where e.f1 < 10
+---- PLAN
+11:HASH JOIN [INNER JOIN]
+|  hash predicates: b.id = d.id
+|
+|--03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+10:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--07:UNNEST [a.struct_array_col e]
+|  |     predicates: e.f1 < 10
+|  |
+|  06:SINGULAR ROW SRC
+|
+09:HASH JOIN [RIGHT ANTI JOIN]
+|  hash predicates: c.int_col = b.int_col
+|
+|--05:HASH JOIN [RIGHT OUTER JOIN]
+|  |  hash predicates: b.id = a.id
+|  |
+|  |--00:SCAN HDFS [functional.allcomplextypes a]
+|  |     partitions=0/0 files=0 size=0B
+|  |
+|  01:SCAN HDFS [functional.alltypestiny b]
+|     partitions=4/4 files=4 size=460B
+|
+02:SCAN HDFS [functional.alltypessmall c]
+   partitions=4/4 files=4 size=6.32KB
+====
+# Test subplans: Same test as above but the relative table ref is wedged in between
+# semi/outer joins, and the join types are different.
+select 1
+from functional.allcomplextypes a
+full outer join functional.alltypestiny b on (a.id = b.id)
+inner join a.struct_array_col e
+right anti join functional.alltypessmall c on (b.int_col = c.int_col and e.f1 < 10)
+inner join functional.alltypes d on (b.id = d.id)
+---- PLAN
+11:HASH JOIN [INNER JOIN]
+|  hash predicates: b.id = d.id
+|
+|--03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+10:HASH JOIN [RIGHT ANTI JOIN]
+|  hash predicates: b.int_col = c.int_col
+|  other join predicates: b.int_col = c.int_col
+|
+|--02:SCAN HDFS [functional.alltypessmall c]
+|     partitions=4/4 files=4 size=6.32KB
+|
+09:SUBPLAN
+|
+|--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--06:UNNEST [a.struct_array_col e]
+|  |     predicates: e.f1 < 10
+|  |
+|  05:SINGULAR ROW SRC
+|
+08:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: b.id = a.id
+|
+|--00:SCAN HDFS [functional.allcomplextypes a]
+|     partitions=0/0 files=0 size=0B
+|
+01:SCAN HDFS [functional.alltypestiny b]
+   partitions=4/4 files=4 size=460B
+====
+# Test subplans: Test joining relative refs with independent table refs.
+# The 'alltypes*' tables are purposely placed with increasing size to test
+# join inversion.
+select *
+from functional.allcomplextypes a
+inner join a.int_array_col b
+left outer join functional.alltypessmall c on (b.item = c.id)
+inner join a.int_map_col d
+left semi join functional.alltypes e on (d.value = e.id)
+where b.item < 10 and c.int_col > 30
+---- PLAN
+12:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: e.id = d.value
+|
+|--11:SUBPLAN
+|  |
+|  |--09:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--08:UNNEST [a.int_map_col d]
+|  |  |
+|  |  07:SINGULAR ROW SRC
+|  |
+|  10:HASH JOIN [RIGHT OUTER JOIN]
+|  |  hash predicates: c.id = b.item
+|  |  other predicates: c.int_col > 30
+|  |
+|  |--01:SUBPLAN
+|  |  |
+|  |  |--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |  |
+|  |  |  |--03:UNNEST [a.int_array_col b]
+|  |  |  |     predicates: b.item < 10
+|  |  |  |
+|  |  |  02:SINGULAR ROW SRC
+|  |  |
+|  |  00:SCAN HDFS [functional.allcomplextypes a]
+|  |     partitions=0/0 files=0 size=0B
+|  |
+|  05:SCAN HDFS [functional.alltypessmall c]
+|     partitions=4/4 files=4 size=6.32KB
+|     predicates: c.id < 10, c.int_col > 30
+|
+06:SCAN HDFS [functional.alltypes e]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Test subplans: Same as above but with different join types
+select *
+from functional.allcomplextypes a
+inner join a.int_array_col b
+full outer join functional.alltypessmall c on (b.item = c.id)
+inner join a.int_map_col d
+right anti join functional.alltypestiny e on (d.value = e.id)
+where b.item < 10 and c.int_col > 30
+---- PLAN
+12:HASH JOIN [RIGHT ANTI JOIN]
+|  hash predicates: d.value = e.id
+|  other join predicates: (d.value = e.id)
+|
+|--06:SCAN HDFS [functional.alltypestiny e]
+|     partitions=4/4 files=4 size=460B
+|
+11:SUBPLAN
+|
+|--09:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--08:UNNEST [a.int_map_col d]
+|  |
+|  07:SINGULAR ROW SRC
+|
+10:HASH JOIN [FULL OUTER JOIN]
+|  hash predicates: c.id = b.item
+|  other predicates: b.item < 10, c.int_col > 30
+|
+|--01:SUBPLAN
+|  |
+|  |--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--03:UNNEST [a.int_array_col b]
+|  |  |     predicates: b.item < 10
+|  |  |
+|  |  02:SINGULAR ROW SRC
+|  |
+|  00:SCAN HDFS [functional.allcomplextypes a]
+|     partitions=0/0 files=0 size=0B
+|
+05:SCAN HDFS [functional.alltypessmall c]
+   partitions=4/4 files=4 size=6.32KB
+   predicates: c.int_col > 30
+====
+# Test subplans: Parent scan and aggregate subplan.
+select a.id, v.cnt
+from functional.allcomplextypes a,
+  (select count(*) cnt from a.int_array_col) v
+where v.cnt < 10
+---- PLAN
+01:SUBPLAN
+|
+|--05:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--04:AGGREGATE [FINALIZE]
+|  |  |  output: count(*)
+|  |  |  having: count(*) < 10
+|  |  |
+|  |  03:UNNEST [a.int_array_col]
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Parent scan and grouping aggregate subplan.
+select a.id, v.f1, v.cnt
+from functional.allcomplextypes a,
+  (select f1, count(*) cnt from a.struct_array_col group by f1) v
+where v.cnt < 10
+---- PLAN
+01:SUBPLAN
+|
+|--05:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |  group by: f1
+|  |  having: count(*) < 10
+|  |
+|  03:UNNEST [a.struct_array_col]
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Top-n inside subplan.
+select a.id, v.f1, v.f2
+from functional.allcomplextypes a,
+  (select * from a.struct_array_col order by f1 limit 10) v
+where v.f2 = 'test'
+---- PLAN
+01:SUBPLAN
+|
+|--06:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  05:SELECT
+|  |  predicates: item.f2 = 'test'
+|  |
+|  04:TOP-N [LIMIT=10]
+|  |  order by: f1 ASC
+|  |
+|  03:UNNEST [a.struct_array_col]
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Parent scan and analytic subplan.
+select a.id, v.key, v.rnum
+from functional.allcomplextypes a,
+  (select key, row_number() over (order by key) rnum from a.int_map_col) v
+where v.key != 'bad'
+---- PLAN
+01:SUBPLAN
+|
+|--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  06:SELECT
+|  |  predicates: key != 'bad'
+|  |
+|  05:ANALYTIC
+|  |  functions: row_number()
+|  |  order by: key ASC
+|  |  window: ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+|  |
+|  04:SORT
+|  |  order by: key ASC
+|  |
+|  03:UNNEST [a.int_map_col]
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Parent scan and uncorrelated scalar subquery.
+select a.id
+from functional.allcomplextypes a
+where id < (select avg(item) from a.int_array_col)
+---- PLAN
+01:SUBPLAN
+|
+|--05:NESTED LOOP JOIN [INNER JOIN]
+|  |  predicates: id < avg(item)
+|  |
+|  |--04:AGGREGATE [FINALIZE]
+|  |  |  output: avg(item)
+|  |  |
+|  |  03:UNNEST [a.int_array_col]
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Parent scan and uncorrelated exists subquery.
+select a.id
+from functional.allcomplextypes a
+where exists (select item from a.int_array_col where item > 100)
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [a.int_array_col]
+|     predicates: item > 100
+|     limit: 1
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Parent scan and a correlated subquery.
+# Note: The Nested Loop Join here is intentional because there is no
+# point in doing a hash join with a single build row.
+select a.id
+from functional.allcomplextypes a
+where id in (select b.item from a.int_array_col b where a.year < b.item)
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  |  predicates: id = b.item, a.year < b.item
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [a.int_array_col b]
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+ partitions=0/0 files=0 size=0B
+====
+# Test subplans: Bushy plan with multiple subplans.
+select a.id, c.item, d.key, d.value
+from functional.allcomplextypes a
+inner join functional.allcomplextypes b on a.id = b.id
+cross join a.int_array_col c
+cross join b.int_map_col d
+cross join
+  (select count(*)
+   from a.struct_array_col x inner join b.struct_map_col y
+   on x.f1 = y.f1) v
+---- PLAN
+17:SUBPLAN
+|
+|--15:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--14:AGGREGATE [FINALIZE]
+|  |  |  output: count(*)
+|  |  |
+|  |  13:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: x.f1 = y.f1
+|  |  |
+|  |  |--12:UNNEST [b.struct_map_col y]
+|  |  |
+|  |  11:UNNEST [a.struct_array_col x]
+|  |
+|  10:SINGULAR ROW SRC
+|
+16:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id
+|
+|--06:SUBPLAN
+|  |
+|  |--09:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--08:UNNEST [b.int_map_col d]
+|  |  |
+|  |  07:SINGULAR ROW SRC
+|  |
+|  05:SCAN HDFS [functional.allcomplextypes b]
+|     partitions=0/0 files=0 size=0B
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--03:UNNEST [a.int_array_col c]
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Same as above but with an INNER JOIN between c and d.
+select a.id, c.item, d.key, d.value
+from functional.allcomplextypes a
+inner join functional.allcomplextypes b on a.id = b.id
+cross join a.int_array_col c
+inner join b.int_map_col d on (c.item = d.value)
+cross join
+  (select count(*)
+   from a.struct_array_col x inner join b.struct_map_col y
+   on x.f1 = y.f1) v
+where b.id = d.value
+---- PLAN
+17:SUBPLAN
+|
+|--15:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--14:AGGREGATE [FINALIZE]
+|  |  |  output: count(*)
+|  |  |
+|  |  13:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: x.f1 = y.f1
+|  |  |
+|  |  |--12:UNNEST [b.struct_map_col y]
+|  |  |
+|  |  11:UNNEST [a.struct_array_col x]
+|  |
+|  10:SINGULAR ROW SRC
+|
+16:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id
+|
+|--06:SUBPLAN
+|  |
+|  |--09:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: b.id = d.value
+|  |  |
+|  |  |--08:UNNEST [b.int_map_col d]
+|  |  |
+|  |  07:SINGULAR ROW SRC
+|  |
+|  05:SCAN HDFS [functional.allcomplextypes b]
+|     partitions=0/0 files=0 size=0B
+|
+01:SUBPLAN
+|
+|--04:HASH JOIN [INNER JOIN]
+|  |  hash predicates: a.id = c.item
+|  |
+|  |--03:UNNEST [a.int_array_col c]
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Same as above but with a LEFT OUTER JOIN between c and d.
+# The outer join needs to be moved after the join between a and b to
+# correctly evaluate the On-clause.
+select a.id, c.item, d.key, d.value
+from functional.allcomplextypes a
+inner join functional.allcomplextypes b on a.id = b.id
+cross join a.int_array_col c
+left outer join b.int_map_col d on (c.item = d.value)
+cross join
+  (select count(*)
+   from a.struct_array_col x inner join b.struct_map_col y
+   on x.f1 = y.f1) v
+---- PLAN
+15:SUBPLAN
+|
+|--13:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--11:AGGREGATE [FINALIZE]
+|  |  |  output: count(*)
+|  |  |
+|  |  10:HASH JOIN [INNER JOIN]
+|  |  |  hash predicates: x.f1 = y.f1
+|  |  |
+|  |  |--09:UNNEST [b.struct_map_col y]
+|  |  |
+|  |  08:UNNEST [a.struct_array_col x]
+|  |
+|  12:HASH JOIN [LEFT OUTER JOIN]
+|  |  hash predicates: c.item = d.value
+|  |
+|  |--07:UNNEST [b.int_map_col d]
+|  |
+|  06:SINGULAR ROW SRC
+|
+14:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id
+|
+|--05:SCAN HDFS [functional.allcomplextypes b]
+|     partitions=0/0 files=0 size=0B
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--03:UNNEST [a.int_array_col c]
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Nested subplans.
+select 1
+from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems
+where c_custkey < 10 and o_orderkey < 5 and l_linenumber < 3
+limit 10
+---- PLAN
+01:SUBPLAN
+|  limit: 10
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--06:UNNEST [o.o_lineitems]
+|  |  |     predicates: l_linenumber < 3
+|  |  |
+|  |  05:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [c.c_orders o]
+|     predicates: o_orderkey < 5
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates: c_custkey < 10
+====
+# Nested subplans.
+select 1
+from functional.allcomplextypes a
+cross join
+  (select m1.key from a.map_map_col m1,
+   (select m2.key from m1.value m2) v1) v2
+---- PLAN
+01:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--06:UNNEST [m1.value m2]
+|  |  |
+|  |  05:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [a.map_map_col m1]
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: straight_join should place the Subplan in FROM-clause order
+# while coalescing adjacent ones.
+select /* +straight_join */ a.id
+from functional.allcomplextypes a
+inner join functional.allcomplextypes b on (a.id = b.id)
+cross join (select count(*) from a.int_map_col) v1
+cross join (select avg(item) from b.int_array_col) v2
+---- PLAN
+10:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--06:AGGREGATE [FINALIZE]
+|  |  |  output: avg(item)
+|  |  |
+|  |  05:UNNEST [b.int_array_col]
+|  |
+|  07:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--04:AGGREGATE [FINALIZE]
+|  |  |  output: count(*)
+|  |  |
+|  |  03:UNNEST [a.int_map_col]
+|  |
+|  02:SINGULAR ROW SRC
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: a.id = b.id
+|
+|--01:SCAN HDFS [functional.allcomplextypes b]
+|     partitions=0/0 files=0 size=0B
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
 ====

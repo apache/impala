@@ -26,7 +26,6 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.TupleId;
-import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExpr;
@@ -157,7 +156,7 @@ public class UnionNode extends PlanNode {
    * been evaluated during registration to set analyzer.hasEmptyResultSet_.
    */
   @Override
-  public void init(Analyzer analyzer) throws InternalException {
+  public void init(Analyzer analyzer) {
     computeMemLayout(analyzer);
     computeStats(analyzer);
 

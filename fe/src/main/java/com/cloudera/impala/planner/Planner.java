@@ -42,6 +42,15 @@ public class Planner {
   /**
    * Returns a list of plan fragments for executing an analyzed parse tree.
    * May return a single-node or distributed executable plan.
+   *
+   * Plan generation may fail and throw for the following reasons:
+   * 1. Expr evaluation failed, e.g., during partition pruning.
+   * 2. A certain feature is not yet implemented, e.g., physical join implementation for
+   *    outer/semi joins without equi conjuncts.
+   * 3. Expr substitution failed, e.g., because an expr was substituted with a type that
+   *    render the containing expr semantically invalid. Analysis should have ensured
+   *    that such an expr substitution during plan generation never fails. If it does,
+   *    that typically means there is a bug in analysis, or a broken/missing smap.
    */
   public ArrayList<PlanFragment> createPlan() throws ImpalaException {
     SingleNodePlanner singleNodePlanner = new SingleNodePlanner(ctx_);

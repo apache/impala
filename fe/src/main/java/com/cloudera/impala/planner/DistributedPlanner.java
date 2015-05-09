@@ -101,6 +101,8 @@ public class DistributedPlanner {
       // (the result set with the limit constraint needs to be computed centrally);
       // merge later if needed
       boolean childIsPartitioned = !child.hasLimit();
+      // Do not fragment the subplan of a SubplanNode since it is executed locally.
+      if (root instanceof SubplanNode && child == root.getChild(1)) continue;
       childFragments.add(
           createPlanFragments(
             child, childIsPartitioned, perNodeMemLimit, fragments));
@@ -120,6 +122,9 @@ public class DistributedPlanner {
       result = createNestedLoopJoinFragment(
           (NestedLoopJoinNode) root, childFragments.get(1), childFragments.get(0),
           perNodeMemLimit, fragments);
+    } else if (root instanceof SubplanNode) {
+      Preconditions.checkState(childFragments.size() == 1);
+      result = createSubplanNodeFragment((SubplanNode) root, childFragments.get(0));
     } else if (root instanceof SelectNode) {
       result = createSelectNodeFragment((SelectNode) root, childFragments);
     } else if (root instanceof UnionNode) {
@@ -264,6 +269,17 @@ public class DistributedPlanner {
    */
   private PlanFragment createScanFragment(PlanNode node) {
     return new PlanFragment(ctx_.getNextFragmentId(), node, DataPartition.RANDOM);
+  }
+
+  /**
+   * Adds the SubplanNode as the new plan root to the child fragment and returns
+   * the child fragment.
+   */
+  private PlanFragment createSubplanNodeFragment(SubplanNode node,
+      PlanFragment childFragment) {
+    node.setChild(0, childFragment.getPlanRoot());
+    childFragment.setPlanRoot(node);
+    return childFragment;
   }
 
   /**

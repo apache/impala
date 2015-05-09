@@ -35,9 +35,6 @@ public class CollectionTableRef extends TableRef {
   // parent scan's tuple. Result of analysis. Fully resolved against base tables.
   private Expr collectionExpr_;
 
-  // True if this TableRef directly references a TableRef from an outer query block.
-  private boolean isCorrelated_;
-
   // END: Members that need to be reset()
   /////////////////////////////////////////
 
@@ -61,20 +58,19 @@ public class CollectionTableRef extends TableRef {
     super(other);
     collectionExpr_ =
         (other.collectionExpr_ != null) ? other.collectionExpr_.clone() : null;
-    isCorrelated_ = other.isCorrelated_;
   }
 
   /**
-   * Registers this table ref with the given analyzer and add a slot descriptor for
-   * the materialized collection to be populated by parent scan. Also determines
-   * whether this table ref is correlated or not.
+   * Registers this collection table ref with the given analyzer and adds a slot
+   * descriptor for the materialized collection to be populated by parent scan.
+   * Also determines whether this collection table ref is correlated or not.
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     if (isAnalyzed_) return;
     Preconditions.checkNotNull(getPrivilegeRequirement());
     desc_ = analyzer.registerTableRef(this);
-    if (isRelativeRef()) {
+    if (isRelative()) {
       SlotDescriptor parentSlotDesc = analyzer.registerSlotRef(resolvedPath_);
       parentSlotDesc.setItemTupleDesc(desc_);
       collectionExpr_ = new SlotRef(parentSlotDesc);
@@ -83,20 +79,25 @@ public class CollectionTableRef extends TableRef {
       Analyzer parentAnalyzer =
           analyzer.findAnalyzer(resolvedPath_.getRootDesc().getId());
       Preconditions.checkNotNull(parentAnalyzer);
-      isCorrelated_ = parentAnalyzer != analyzer;
+      if (parentAnalyzer != analyzer) {
+        TableRef parentRef =
+            parentAnalyzer.getTableRef(resolvedPath_.getRootDesc().getId());
+        Preconditions.checkNotNull(parentRef);
+        // InlineViews are currently not supported as a parent ref.
+        Preconditions.checkState(!(parentRef instanceof InlineViewRef));
+        correlatedTupleIds_.add(parentRef.getId());
+      }
     }
     isAnalyzed_ = true;
     analyzeJoin(analyzer);
   }
 
   @Override
-  public boolean isRelativeRef() {
+  public boolean isRelative() {
     Preconditions.checkNotNull(resolvedPath_);
     return resolvedPath_.getRootDesc() != null;
   }
 
-  @Override
-  public boolean isCorrelated() { return isCorrelated_; }
   public Expr getCollectionExpr() { return collectionExpr_; }
 
   @Override
@@ -106,6 +107,5 @@ public class CollectionTableRef extends TableRef {
   public void reset() {
     super.reset();
     collectionExpr_ = null;
-    isCorrelated_ = false;
   }
 }

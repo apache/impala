@@ -104,6 +104,12 @@ public class TableRef implements ParseNode {
   // all (logical) TupleIds referenced in the On clause
   protected List<TupleId> onClauseTupleIds_ = Lists.newArrayList();
 
+  // All physical tuple ids that this table ref is correlated with:
+  // Tuple ids of root descriptors from outer query blocks that this table ref
+  // (if a CollectionTableRef) or contained CollectionTableRefs (if an InlineViewRef)
+  // are rooted at. Populated during analysis.
+  protected List<TupleId> correlatedTupleIds_ = Lists.newArrayList();
+
   // analysis output
   protected TupleDescriptor desc_;
 
@@ -142,6 +148,7 @@ public class TableRef implements ParseNode {
     leftTblRef_ = null;
     isAnalyzed_ = other.isAnalyzed_;
     onClauseTupleIds_ = Lists.newArrayList(other.onClauseTupleIds_);
+    correlatedTupleIds_ = Lists.newArrayList(other.correlatedTupleIds_);
     desc_ = other.desc_;
   }
 
@@ -230,7 +237,13 @@ public class TableRef implements ParseNode {
    * Returns true if this table ref has a resolved path that is rooted at a registered
    * tuple descriptor, false otherwise.
    */
-  public boolean isRelativeRef() { return false; }
+  public boolean isRelative() { return false; }
+
+  /**
+   * Indicates if this TableRef directly or indirectly references another TableRef from
+   * an outer query block.
+   */
+  public boolean isCorrelated() { return !correlatedTupleIds_.isEmpty(); }
 
   public List<String> getPath() { return rawPath_; }
   public Path getResolvedPath() { return resolvedPath_; }
@@ -281,12 +294,9 @@ public class TableRef implements ParseNode {
   }
   public DistributionMode getDistributionMode() { return distrMode_; }
   public List<TupleId> getOnClauseTupleIds() { return onClauseTupleIds_; }
+  public List<TupleId> getCorrelatedTupleIds() { return correlatedTupleIds_; }
+  public boolean isAnalyzed() { return isAnalyzed_; }
   public boolean isResolved() { return !getClass().equals(TableRef.class); }
-
-  /**
-   * Indicates if this TableRef references another TableRef from an outer query block.
-   */
-  public boolean isCorrelated() { return false; }
 
   /**
    * This method should only be called after the TableRef has been analyzed.
@@ -304,7 +314,7 @@ public class TableRef implements ParseNode {
   public TupleId getId() {
     Preconditions.checkState(isAnalyzed_);
     // after analyze(), desc should be set.
-    Preconditions.checkState(desc_ != null);
+    Preconditions.checkNotNull(desc_);
     return desc_.getId();
   }
 
@@ -476,7 +486,7 @@ public class TableRef implements ParseNode {
         onClauseTupleIds.addAll(tupleIds);
       }
       onClauseTupleIds_.addAll(onClauseTupleIds);
-    } else if (!isRelativeRef()
+    } else if (!isRelative()
         && (getJoinOp().isOuterJoin() || getJoinOp().isSemiJoin())) {
       throw new AnalysisException(
           joinOp_.toString() + " requires an ON or USING clause.");
@@ -587,5 +597,6 @@ public class TableRef implements ParseNode {
     leftTblRef_ = null;
     onClauseTupleIds_.clear();
     desc_ = null;
+    correlatedTupleIds_.clear();
   }
 }

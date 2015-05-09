@@ -14,12 +14,15 @@
 
 package com.cloudera.impala.planner;
 
+import java.util.LinkedList;
+
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.thrift.TQueryCtx;
 import com.cloudera.impala.thrift.TQueryOptions;
+import com.google.common.collect.Lists;
 
 /**
  * Contains the analysis result of a query as well as planning-specific
@@ -33,9 +36,24 @@ public class PlannerContext {
   // The maximum fraction of remaining memory that a sort node can use during execution.
   public final static double SORT_MEM_MAX_FRACTION = 0.80;
 
+  // Assumed average number of items in a nested collection, since we currently have no
+  // statistics on nested fields. The motivation for this constant is to avoid
+  // pathological plan choices that could result from a SubplanNode having an unknown
+  // cardinality (due to UnnestNodes not knowing their cardinality), or from a ScanNode
+  // significantly underestimating its output cardinality because intermediate collections
+  // are not accounted for at all. For example, we will place a table ref plan with a
+  // SubplanNode on the build side of a join due to an unknown cardinality if the other
+  // input is a base table scan with stats.
+  // The constant value was chosen arbitrarily to not be "too high" or "too low".
+  // TODO: Compute stats for nested types and pick them up here.
+  public static final long AVG_COLLECTION_SIZE = 10;
+
   private final IdGenerator<PlanNodeId> nodeIdGenerator_ = PlanNodeId.createGenerator();
   private final IdGenerator<PlanFragmentId> fragmentIdGenerator_ =
       PlanFragmentId.createGenerator();
+
+  // Keeps track of subplan nesting. Maintained with push/popSubplan().
+  private final LinkedList<SubplanNode> subplans_ = Lists.newLinkedList();
 
   private final TQueryCtx queryCtx_;
   private final AnalysisContext.AnalysisResult analysisResult_;
@@ -65,4 +83,9 @@ public class PlannerContext {
   public boolean isInsertOrCtas() {
     return analysisResult_.isInsertStmt() || analysisResult_.isCreateTableAsSelectStmt();
   }
+
+  public boolean hasSubplan() { return !subplans_.isEmpty(); }
+  public SubplanNode getSubplan() { return subplans_.getFirst(); }
+  public boolean pushSubplan(SubplanNode n) { return subplans_.offerFirst(n); }
+  public void popSubplan() { subplans_.removeFirst(); }
 }
