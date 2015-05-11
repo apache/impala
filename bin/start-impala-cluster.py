@@ -20,6 +20,7 @@ import os
 import sys
 from time import sleep, time
 from optparse import OptionParser
+from testdata.common import cgroups
 
 # Options
 parser = OptionParser()
@@ -29,6 +30,8 @@ parser.add_option("--build_type", dest="build_type", default= 'debug',
                   help="Build type to use - debug / release")
 parser.add_option("--impalad_args", dest="impalad_args", default="",
                   help="Additional arguments to pass to each Impalad during startup")
+parser.add_option("--enable_rm", dest="enable_rm", action="store_true", default=False,
+                  help="Enable resource management with Yarn and Llama.")
 parser.add_option("--state_store_args", dest="state_store_args", default="",
                   help="Additional arguments to pass to State Store during startup")
 parser.add_option("--catalogd_args", dest="catalogd_args", default="",
@@ -73,6 +76,8 @@ IMPALAD_PORTS = ("-beeswax_port=%d -hs2_port=%d  -be_port=%d "
                  "-llama_callback_port=%d")
 JVM_ARGS = "-jvm_debug_port=%s -jvm_args=%s"
 BE_LOGGING_ARGS = "-log_filename=%s -log_dir=%s -v=%s -logbufsecs=5"
+RM_ARGS = ("-enable_rm=true -llama_addresses=%s -cgroup_hierarchy_path=%s "
+           "-fair_scheduler_allocation_path=%s")
 CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 240
 
 def exec_impala_process(cmd, args, stderr_log_file_path):
@@ -140,6 +145,21 @@ def build_jvm_args(instance_num):
   BASE_JVM_DEBUG_PORT = 30000
   return JVM_ARGS % (BASE_JVM_DEBUG_PORT + instance_num, options.jvm_args)
 
+def build_rm_args(instance_num):
+  if not options.enable_rm:
+    return ""
+  try:
+    cgroup_path = cgroups.create_impala_cgroup_path(instance_num + 1)
+  except Exception as ex:
+    raise "Unable to initialize RM: %s" % str(ex)
+  llama_address = "localhost:15000"
+
+  # Don't bother checking if the path doesn't exist, the impalad won't start up
+  relative_fs_cfg_path = 'cdh%s/node-%d/etc/hadoop/conf/fair-scheduler.xml' %\
+      (os.environ.get('CDH_MAJOR_VERSION'), instance_num + 1)
+  fs_cfg_path = os.path.join(os.environ.get('CLUSTER_DIR'), relative_fs_cfg_path)
+  return RM_ARGS % (llama_address, cgroup_path, fs_cfg_path)
+
 def start_impalad_instances(cluster_size):
   # Start each impalad instance and optionally redirect the output to a log file.
   for i in range(options.cluster_size):
@@ -152,9 +172,10 @@ def start_impalad_instances(cluster_size):
       # Yes, this is a hack, but it's easier than modifying the minikdc...
       sleep(2)
 
-    args = "%s %s %s %s" %\
+    args = "%s %s %s %s %s" %\
           (build_impalad_logging_args(i, service_name), build_jvm_args(i),
-           build_impalad_port_args(i), options.impalad_args.replace("#ID", str(i)))
+           build_impalad_port_args(i), options.impalad_args.replace("#ID", str(i)),
+           build_rm_args(i))
     stderr_log_file_path = os.path.join(options.log_dir, '%s-error.log' % service_name)
     exec_impala_process(IMPALAD_PATH, args, stderr_log_file_path)
 
