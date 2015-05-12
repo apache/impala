@@ -186,11 +186,21 @@ set_target_properties(avro PROPERTIES IMPORTED_LOCATION "${AVRO_STATIC_LIB}")
 message(STATUS "Avro include dir: " ${AVRO_INCLUDE_DIR})
 message(STATUS "Avro static library: " ${AVRO_STATIC_LIB})
 
-# gutil can use GLOG
+# find Kudu client
+find_package(kuduClient REQUIRED PATHS ${KUDU_CLIENT_CMAKE_MODULE} $ENV{KUDU_CLIENT_CMAKE_MODULE})
+include_directories(${KUDU_CLIENT_INCLUDE_DIR})
+
+# gutil and KuduClient can use GLOG
 add_definitions(-DKUDU_HEADERS_USE_GLOG)
 
 # for PRI* print format macros
 add_definitions(-D__STDC_FORMAT_MACROS)
+
+# remove LLVM's dynamic annotations support
+# This is a workaround for a conflict between LLVM's Support/Valgrind.h file
+# and Kudu's dynamic_annotations.h. Defining this prevents the LLVM header
+# from getting included.
+add_definitions(-DLLVM_SYSTEM_VALGRIND_H)
 
 # Treat gutil just like an Impala native library (i.e., one built with CMake), so no need
 # for find_package()
