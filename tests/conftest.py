@@ -64,6 +64,9 @@ def pytest_addoption(parser):
                    help="Runs a single test vector from each test to provide a quick "\
                    "sanity check at the cost of lower test coverage.")
 
+  parser.addoption("--skip_hbase", action="store_true", default=False,
+                   help="Skip HBase tests")
+
 def pytest_assertrepr_compare(op, left, right):
   """
   Provides a hook for outputting type-specific assertion messages

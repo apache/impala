@@ -439,8 +439,9 @@ class ImpalaTestSuite(BaseTestSuite):
       tf_dimensions = TestDimension('table_format', *table_formats)
     else:
       tf_dimensions = load_table_info_dimension(cls.get_workload(), exploration_strategy)
-    # If the filesystem is either isilon or s3, we don't need the hbase dimension.
-    if TARGET_FILESYSTEM.lower() in ['s3', 'isilon']:
+    # If 'skip_hbase' is specified or the filesystem is either isilon or s3, we don't
+    # need the hbase dimension.
+    if pytest.config.option.skip_hbase or TARGET_FILESYSTEM.lower() in ['s3', 'isilon']:
       for tf_dimension in tf_dimensions:
         if tf_dimension.value.file_format == "hbase":
           tf_dimensions.remove(tf_dimension)

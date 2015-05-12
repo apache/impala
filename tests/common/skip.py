@@ -44,7 +44,8 @@ class SkipIfS3:
 class SkipIf:
   # Some tests require a non-default filesystem to be present.
   default_fs = pytest.mark.skipif(IS_DEFAULT_FS, reason="Non-default filesystem needed")
-
+  skip_hbase = pytest.mark.skipif(pytest.config.option.skip_hbase,
+      reason="--skip_hbase argument specified")
 
 class SkipIfIsilon:
   pass
