@@ -23,6 +23,7 @@
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
+#include "util/kudu-util.h"
 #include "util/logging-support.h"
 #include "util/mem-info.h"
 #include "util/network-util.h"
@@ -182,6 +183,9 @@ void impala::InitCommonRuntime(int argc, char** argv, bool init_jvm,
     DCHECK(false);
     Expr::InitBuiltinsDummy();
   }
+
+  // Initialize Kudu's logging.
+  impala::InitKuduLogging();
 
 #ifndef ADDRESS_SANITIZER
   // tcmalloc and address sanitizer can not be used together
