@@ -123,6 +123,10 @@ error_codes = (
    "Failed to verify function $0 from LLVM module $1, see log for more details."),
 
   ("PARQUET_CORRUPT_VALUE", 34, "Corrupt value: $0"),
+
+  ("KUDU_IMPALA_TYPE_MISSING", 35, "Kudu type $0 is not available in Impala."),
+
+  ("IMPALA_KUDU_TYPE_MISSING", 36, "Impala type $0 is not available in Kudu."),
 )
 
 import sys

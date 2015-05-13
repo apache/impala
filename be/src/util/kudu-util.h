@@ -16,10 +16,77 @@
 #define IMPALA_UTIL_KUDU_UTIL_H_
 
 #include "kudu/client/client.h"
+#include "kudu/client/schema.h"
 #include "kudu/gutil/bind.h"
 #include "kudu/util/logging_callback.h"
+#include "runtime/descriptors.h"
 
 namespace impala {
+
+static Status ImpalaToKuduType(const ColumnType& impala_type,
+                               kudu::client::KuduColumnSchema::DataType* kudu_type) {
+  using kudu::client::KuduColumnSchema;
+
+  switch (impala_type.type) {
+    case TYPE_STRING:
+      *kudu_type = KuduColumnSchema::STRING;
+      break;
+    case TYPE_TINYINT:
+      *kudu_type = KuduColumnSchema::INT8;
+      break;
+    case TYPE_SMALLINT:
+      *kudu_type = KuduColumnSchema::INT16;
+      break;
+    case TYPE_INT:
+      *kudu_type = KuduColumnSchema::INT32;
+      break;
+    case TYPE_BIGINT:
+      *kudu_type = KuduColumnSchema::INT64;
+      break;
+    case TYPE_FLOAT:
+      *kudu_type = KuduColumnSchema::FLOAT;
+      break;
+    case TYPE_DOUBLE:
+      *kudu_type = KuduColumnSchema::DOUBLE;
+      break;
+    default:
+      return Status(TErrorCode::IMPALA_KUDU_TYPE_MISSING, TypeToString(impala_type.type));
+  }
+  return Status::OK();
+}
+
+static Status KuduToImpalaType(const kudu::client::KuduColumnSchema::DataType& kudu_type,
+                               ColumnType* impala_type) {
+  using kudu::client::KuduColumnSchema;
+
+  switch (kudu_type) {
+    case KuduColumnSchema::STRING:
+      *impala_type = TYPE_STRING;
+      break;
+    case KuduColumnSchema::INT8:
+      *impala_type = TYPE_TINYINT;
+      break;
+    case KuduColumnSchema::INT16:
+      *impala_type = TYPE_SMALLINT;
+      break;
+    case KuduColumnSchema::INT32:
+      *impala_type = TYPE_INT;
+      break;
+    case KuduColumnSchema::INT64:
+      *impala_type = TYPE_BIGINT;
+      break;
+    case KuduColumnSchema::FLOAT:
+      *impala_type = TYPE_FLOAT;
+      break;
+    case KuduColumnSchema::DOUBLE:
+      *impala_type = TYPE_DOUBLE;
+      break;
+    default:
+      return Status(TErrorCode::KUDU_IMPALA_TYPE_MISSING,
+                    KuduColumnSchema::DataTypeToString(kudu_type));
+  }
+  return Status::OK();
+}
 
 static void LogKuduMessage(kudu::KuduLogSeverity severity,
                            const char* filename,
