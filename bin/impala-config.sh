@@ -141,9 +141,15 @@ export HIVE_HOME=$IMPALA_HOME/thirdparty/hive-${IMPALA_HIVE_VERSION}/
 export PATH=$HIVE_HOME/bin:$PATH
 export HIVE_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
 
-### Hive looks for jar files in a single directory from HIVE_AUX_JARS_PATH plus
-### any jars in AUX_CLASSPATH. (Or a list of jars in HIVE_AUX_JARS_PATH.)
-export HIVE_AUX_JARS_PATH=${IMPALA_FE_DIR}/target
+# Hive looks for jar files in a single directory from HIVE_AUX_JARS_PATH plus
+# any jars in AUX_CLASSPATH. (Or a list of jars in HIVE_AUX_JARS_PATH.) Find the
+# Postgresql jdbc driver required for starting the Hive Metastore.
+JDBC_DRIVER=$(find $IMPALA_HOME/thirdparty/postgresql-jdbc -name '*postgres*jdbc*jar' | head -n 1)
+if [[ -z "$JDBC_DRIVER" ]]; then
+  echo Could not find Postgres JDBC driver in >&2
+  exit 1
+fi
+export HIVE_AUX_JARS_PATH="$JDBC_DRIVER"
 export AUX_CLASSPATH=$HADOOP_LZO/build/hadoop-lzo-0.4.15.jar
 ### Tell hive not to use jline
 export HADOOP_USER_CLASSPATH_FIRST=true

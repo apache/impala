@@ -408,26 +408,6 @@
         </executions>
       </plugin>
 
-<!-- PDH - I don't think we need this right now, regardless there's a better way (ie not part of dev workflow) -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-assembly-plugin</artifactId>
-        <configuration>
-          <descriptorRefs>
-            <descriptorRef>jar-with-dependencies</descriptorRef>
-          </descriptorRefs>
-        </configuration>
-        <executions>
-          <execution>
-            <id>make-assembly</id>
-            <phase>package</phase>
-            <goals>
-              <goal>single</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-dependency-plugin</artifactId>
@@ -442,6 +422,7 @@
             <configuration>
               <excludeTypes>pom</excludeTypes>
               <includeScope>runtime</includeScope>
+              <silent>true</silent>
             </configuration>
           </execution>
         </executions>
