@@ -25,9 +25,9 @@ STRING
 ---- QUERY
 show table stats tinytable_like
 ---- RESULTS
-3,1,'38B','NOT CACHED','NOT CACHED','TEXT','false'
+3,1,'38B','NOT CACHED','NOT CACHED','TEXT','false',regex:.*
 ---- TYPES
-BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 # Verify INSERT into non-hdfs table is disallowed.
@@ -171,13 +171,13 @@ STRING
 ---- QUERY
 show table stats alltypes
 ---- RESULTS
-'2009','1',310,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false'
-'2009','2',280,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false'
-'2010','3',310,1,regex:'.+KB'','NOT CACHED','NOT CACHED','PARQUET','false'
-'2010','4',300,1,regex:'.+KB'','NOT CACHED','NOT CACHED','PARQUET','false'
+'2009','1',310,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2009','2',280,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','3',310,1,regex:'.+KB'','NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','4',300,1,regex:'.+KB'','NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
 'Total','',1200,4,regex:'.+KB','0B','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 drop table alltypes
@@ -257,13 +257,13 @@ STRING
 ---- QUERY
 show table stats alltypes
 ---- RESULTS
-'2009','5',310,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false'
-'2009','6',300,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false'
-'2010','2',280,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false'
-'2010','5',310,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false'
+'2009','5',310,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2009','6',300,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','2',280,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
+'2010','5',310,1,regex:'.+KB','NOT CACHED','NOT CACHED','PARQUET','false',regex:.*
 'Total','',1200,4,regex:'.+KB','0B','','',''
 ---- TYPES
-STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
 drop table alltypes
