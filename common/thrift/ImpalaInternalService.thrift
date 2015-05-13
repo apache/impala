@@ -213,6 +213,14 @@ struct TScanRangeParams {
   2: optional i32 volume_id = -1
   3: optional bool is_cached = false
   4: optional bool is_remote
+
+  // The timestamp on which to perform the scan for this range.
+  // When the backing storage engine supports timestmaps (such
+  // as Kudu) this allows to select a timestamp on which to
+  // perform the scan, making sure that results returned from
+  // multiple scan nodes are consistent.
+  // This defaults to -1 when no timestmap is desired.
+  5: optional i64 timestamp = -1;
 }
 
 // Specification of one output destination of a plan fragment
