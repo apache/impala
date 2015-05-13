@@ -1847,7 +1847,7 @@ select * from
   (select month, int_col, tinyint_col,
    sum(id) over(partition by month, tinyint_col order by bigint_col)
    from functional.alltypestiny where id = tinyint_col) v
-where month = int_col and int_col = 1 and tinyint_col = 1;
+where month = int_col and int_col = 1 and tinyint_col = 1
 ---- PLAN
 03:SELECT
 |  predicates: month = int_col
