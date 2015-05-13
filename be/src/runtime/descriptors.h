@@ -297,6 +297,22 @@ class DataSourceTableDescriptor : public TableDescriptor {
   virtual std::string DebugString() const;
 };
 
+// Descriptor for a KuduTable
+class KuduTableDescriptor : public TableDescriptor {
+ public:
+  explicit KuduTableDescriptor(const TTableDescriptor& tdesc);
+  virtual std::string DebugString() const;
+  const std::string table_name() const { return table_name_; }
+  const std::string kudu_master_address() const { return master_address_; }
+  const std::vector<std::string>& col_names() const { return col_names_; }
+
+ private:
+  // native name of Kudu table
+  std::string table_name_;
+  std::string master_address_;
+  std::vector<std::string> col_names_;
+};
+
 class TupleDescriptor {
  public:
   int byte_size() const { return byte_size_; }
