@@ -20,31 +20,124 @@
 
 #include "common/logging.h"
 #include "rpc/jni-thrift-util.h"
+#include "runtime/exec-env.h"
 #include "runtime/lib-cache.h"
 #include "util/parse-util.h"
+#include "util/metrics.h"
 
 #include "common/names.h"
 
 using namespace impala;
 using namespace impala::extdatasource;
 
+/// Static state shared across instances of the JNI ExternalDataSourceExecutor.
+class ExternalDataSourceExecutor::JniState {
+ public:
+  /// Gets the singleton instance. Creation of the instance is not thread-safe
+  /// (until C++11), but called once by ExternalDataSourceExecutor::Init() on startup,
+  /// at which time JniState::Init() (see below) is called once.
+  static ExternalDataSourceExecutor::JniState& GetInstance() {
+    static ExternalDataSourceExecutor::JniState state;
+    return state;
+  }
+
+  /// Initializes the JniState. Called exactly once by ExternalDataSourceExecutor::Init()
+  /// process startup.
+  Status Init(MetricGroup* metrics) {
+    DCHECK(executor_class_ == NULL) << "JniState was already initialized.";
+    JniMethodDescriptor methods[] = {
+      {"<init>",
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
+        &ctor_},
+      {"open", "([B)[B", &open_id_},
+      {"getNext", "([B)[B", &get_next_id_},
+      {"close", "([B)[B", &close_id_}};
+
+    JNIEnv* env = getJNIEnv();
+
+    JniLocalFrame jni_frame;
+    RETURN_IF_ERROR(jni_frame.push(env));
+
+    jclass cl = env->FindClass(
+        "com/cloudera/impala/extdatasource/ExternalDataSourceExecutor");
+    RETURN_ERROR_IF_EXC(env);
+    executor_class_ = reinterpret_cast<jclass>(env->NewGlobalRef(cl));
+    RETURN_ERROR_IF_EXC(env);
+    uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
+    for (int i = 0; i < num_methods; ++i) {
+      RETURN_IF_ERROR(JniUtil::LoadJniMethod(env, executor_class_, &(methods[i])));
+    }
+
+    get_num_cache_hits_id_ = env->GetStaticMethodID(executor_class_,
+        "getNumClassCacheHits", "()J");
+    RETURN_ERROR_IF_EXC(env);
+    get_num_cache_misses_id_ = env->GetStaticMethodID(executor_class_,
+        "getNumClassCacheMisses", "()J");
+    RETURN_ERROR_IF_EXC(env);
+
+    num_class_cache_hits_ = metrics->AddCounter<int64_t>(
+        "external-data-source.class-cache.hits", 0);
+    num_class_cache_misses_ = metrics->AddCounter<int64_t>(
+        "external-data-source.class-cache.misses", 0);
+    return Status::OK;
+  }
+
+
+  /// Updates the class cache metrics via the static JNI methods on
+  /// ExternalDataSourceExecutor.
+  Status UpdateClassCacheMetrics() const {
+    DCHECK(executor_class_ != NULL) << "JniState was not initialized.";
+    JNIEnv* env = getJNIEnv();
+    int64_t num_cache_hits = env->CallStaticLongMethod(executor_class_,
+        get_num_cache_hits_id_);
+    RETURN_ERROR_IF_EXC(env);
+    num_class_cache_hits_->set_value(num_cache_hits);
+    int64_t num_cache_misses = env->CallStaticLongMethod(executor_class_,
+        get_num_cache_misses_id_);
+    RETURN_ERROR_IF_EXC(env);
+    num_class_cache_misses_->set_value(num_cache_misses);
+    return Status::OK;
+  }
+
+  /// Class reference for com.cloudera.impala.extdatasource.ExternalDataSourceExecutor
+  jclass executor_class_;
+
+  jmethodID ctor_;
+  jmethodID open_id_;  // ExternalDataSourceExecutor.open()
+  jmethodID get_next_id_;  // ExternalDataSourceExecutor.getNext()
+  jmethodID close_id_;  // ExternalDataSourceExecutor.close()
+
+  // Static methods for getting the number of class cache hits/misses.
+  jmethodID get_num_cache_hits_id_;
+  jmethodID get_num_cache_misses_id_;
+
+  IntCounter* num_class_cache_hits_;
+  IntCounter* num_class_cache_misses_;
+
+ private:
+  JniState() : executor_class_(NULL) { }
+
+  DISALLOW_COPY_AND_ASSIGN(JniState);
+};
+
+Status ExternalDataSourceExecutor::InitJNI(MetricGroup* metrics) {
+  // Initializes the JniState singleton and initializes the metric values.
+  JniState& s = JniState::GetInstance();
+  RETURN_IF_ERROR(s.Init(metrics));
+  RETURN_IF_ERROR(s.UpdateClassCacheMetrics());
+  return Status::OK;
+}
+
 ExternalDataSourceExecutor::~ExternalDataSourceExecutor() {
   DCHECK(!is_initialized_);
 }
 
 Status ExternalDataSourceExecutor::Init(const string& jar_path,
-    const string& class_name, const string& api_version) {
+    const string& class_name, const string& api_version, const string& init_string) {
   DCHECK(!is_initialized_);
   string local_jar_path;
   RETURN_IF_ERROR(LibCache::instance()->GetLocalLibPath(
       jar_path, LibCache::TYPE_JAR, &local_jar_path));
-
-  // TODO: Make finding the class and methods static, i.e. only loaded once
-  JniMethodDescriptor methods[] = {
-    {"<init>", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V", &ctor_},
-    {"open", "([B)[B", &open_id_},
-    {"getNext", "([B)[B", &get_next_id_},
-    {"close", "([B)[B", &close_id_}};
 
   JNIEnv* jni_env = getJNIEnv();
 
@@ -52,28 +145,22 @@ Status ExternalDataSourceExecutor::Init(const string& jar_path,
   JniLocalFrame jni_frame;
   RETURN_IF_ERROR(jni_frame.push(jni_env));
 
-  jclass cl = jni_env->FindClass(
-      "com/cloudera/impala/extdatasource/ExternalDataSourceExecutor");
-  RETURN_ERROR_IF_EXC(jni_env);
-  executor_class_ = reinterpret_cast<jclass>(jni_env->NewGlobalRef(cl));
-  RETURN_ERROR_IF_EXC(jni_env);
-  uint32_t num_methods = sizeof(methods) / sizeof(methods[0]);
-  for (int i = 0; i < num_methods; ++i) {
-    RETURN_IF_ERROR(JniUtil::LoadJniMethod(jni_env, executor_class_, &(methods[i])));
-  }
-
   jstring jar_path_jstr = jni_env->NewStringUTF(local_jar_path.c_str());
   RETURN_ERROR_IF_EXC(jni_env);
   jstring class_name_jstr = jni_env->NewStringUTF(class_name.c_str());
   RETURN_ERROR_IF_EXC(jni_env);
   jstring api_version_jstr = jni_env->NewStringUTF(api_version.c_str());
   RETURN_ERROR_IF_EXC(jni_env);
+  jstring init_string_jstr = jni_env->NewStringUTF(init_string.c_str());
+  RETURN_ERROR_IF_EXC(jni_env);
 
-  jobject local_exec = jni_env->NewObject(executor_class_, ctor_, jar_path_jstr,
-      class_name_jstr, api_version_jstr);
+  const JniState& s = JniState::GetInstance();
+  jobject local_exec = jni_env->NewObject(s.executor_class_, s.ctor_, jar_path_jstr,
+      class_name_jstr, api_version_jstr, init_string_jstr);
   RETURN_ERROR_IF_EXC(jni_env);
   executor_ = jni_env->NewGlobalRef(local_exec);
   RETURN_ERROR_IF_EXC(jni_env);
+  RETURN_IF_ERROR(s.UpdateClassCacheMetrics());
   is_initialized_ = true;
   return Status::OK;
 }
@@ -99,28 +186,27 @@ Status CallJniMethod(const jobject& obj, const jmethodID& method, const T& arg,
 
 Status ExternalDataSourceExecutor::Open(const TOpenParams& params, TOpenResult* result) {
   DCHECK(is_initialized_);
-  return CallJniMethod(executor_, open_id_, params, result);
+  const JniState& s = JniState::GetInstance();
+  return CallJniMethod(executor_, s.open_id_, params, result);
 }
 
 Status ExternalDataSourceExecutor::GetNext(const TGetNextParams& params,
     TGetNextResult* result) {
   DCHECK(is_initialized_);
-  return CallJniMethod(executor_, get_next_id_, params, result);
+  const JniState& s = JniState::GetInstance();
+  return CallJniMethod(executor_, s.get_next_id_, params, result);
 }
 
 Status ExternalDataSourceExecutor::Close(const TCloseParams& params,
     TCloseResult* result) {
   DCHECK(is_initialized_);
-  Status status = CallJniMethod(executor_, close_id_, params,
+  const JniState& s = JniState::GetInstance();
+  Status status = CallJniMethod(executor_, s.close_id_, params,
       result);
   JNIEnv* env = getJNIEnv();
   if (executor_ != NULL) {
     env->DeleteGlobalRef(executor_);
     status.MergeStatus(JniUtil::GetJniExceptionMsg(env)); // no-op if Status == OK
-  }
-  if (executor_class_ != NULL) {
-    env->DeleteGlobalRef(executor_class_);
-    status.MergeStatus(JniUtil::GetJniExceptionMsg(env));
   }
   is_initialized_ = false;
   return status;

@@ -24,14 +24,17 @@
 
 namespace impala {
 
+class MetricGroup;
+
 /// Wraps the Java class ExternalDataSourceExecutor to call a data source.
 /// There is an explicit Init() method (rather than initializing in the c'tor) so
 /// that the initialization can return an error status if an error occurs.
 class ExternalDataSourceExecutor {
  public:
-  ExternalDataSourceExecutor()
-      : is_initialized_(false), executor_class_(NULL), executor_(NULL) {
-  };
+  ExternalDataSourceExecutor() : is_initialized_(false), executor_(NULL) { };
+
+  /// Initialize static JNI state. Called on process startup.
+  static Status InitJNI(MetricGroup* metrics);
 
   virtual ~ExternalDataSourceExecutor();
 
@@ -39,7 +42,7 @@ class ExternalDataSourceExecutor {
   /// containing the ExternalDataSource implementation specified by class_name. The
   /// class must implement the specified api_version.
   Status Init(const std::string& jar_path, const std::string& class_name,
-      const std::string& api_version);
+      const std::string& api_version, const std::string& init_string);
 
   /// Calls ExternalDataSource.open()
   Status Open(const impala::extdatasource::TOpenParams& params,
@@ -56,17 +59,12 @@ class ExternalDataSourceExecutor {
       impala::extdatasource::TCloseResult* result);
 
  private:
-  bool is_initialized_; // Set true in Init() to ensure the class is initialized.
+  class JniState;
 
-  /// Class reference for com.cloudera.impala.extdatasource.ExternalDataSourceExecutor
-  jclass executor_class_;
+  bool is_initialized_; // Set true in Init() to ensure the class is initialized.
 
   /// Instance of com.cloudera.impala.extdatasource.ExternalDataSourceExecutor
   jobject executor_;
-  jmethodID ctor_;
-  jmethodID open_id_;  // ExternalDataSourceExecutor.open()
-  jmethodID get_next_id_;  // ExternalDataSourceExecutor.getNext()
-  jmethodID close_id_;  // ExternalDataSourceExecutor.close()
 };
 
 }

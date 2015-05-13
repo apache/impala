@@ -41,6 +41,7 @@
 #include "catalog/catalog-util.h"
 #include "common/logging.h"
 #include "common/version.h"
+#include "exec/external-data-source-executor.h"
 #include "rpc/authentication.h"
 #include "rpc/thrift-util.h"
 #include "rpc/thrift-thread.h"
@@ -305,6 +306,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   ImpaladMetrics::CreateMetrics(exec_env->metrics()->GetChildGroup("impala-server"));
   ImpaladMetrics::IMPALA_SERVER_START_TIME->set_value(
       TimestampValue::LocalTime().DebugString());
+
+  EXIT_IF_ERROR(ExternalDataSourceExecutor::InitJNI(exec_env->metrics()));
 
   // Register the membership callback if required
   if (exec_env->subscriber() != NULL) {

@@ -1,5 +1,25 @@
 [
   {
+    "description": "Number of cache misses in the External Data Source Class Cache",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "External Data Source Class Cache Misses",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "external-data-source.class-cache.misses"
+  },
+  {
+    "description": "Number of cache hits in the External Data Source Class Cache",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "External Data Source Class Cache Hits",
+    "units": "UNIT",
+    "kind": "COUNTER",
+    "key": "external-data-source.class-cache.hits"
+  },
+  {
     "description": "Resource Pool $0 Cluster In Queue",
     "contexts": [
       "RESOURCE_POOL"

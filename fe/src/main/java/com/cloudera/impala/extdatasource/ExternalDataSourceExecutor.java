@@ -18,6 +18,7 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.Map;
 
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.thrift.TException;
@@ -43,6 +44,7 @@ import com.cloudera.impala.thrift.TErrorCode;
 import com.cloudera.impala.thrift.TStatus;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 /**
  * Wraps and executes an ExternalDataSource specified in an external jar. Used
@@ -61,19 +63,50 @@ public class ExternalDataSourceExecutor {
   private final static TBinaryProtocol.Factory protocolFactory_ =
       new TBinaryProtocol.Factory();
 
+  // Init string prefix used to indicate if the class should be cached. When this
+  // is specified, the Class is loaded and initialized at most once. Instances of
+  // the cached Class are still created for every query.
+  private final static String CACHE_CLASS_PREFIX = "CACHE_CLASS::";
+
+  // Map of class name to cached ExternalDataSource classes.
+  // Protected by cachedClassesLock_.
+  private final static Map<String, Class<?>> cachedClasses_ =
+      Maps.newHashMap();
+
+  // Number of cache hits/misses in cachedClasses_. Protected by cachedClassesLock_.
+  private static long numClassCacheHits_ = 0;
+  private static long numClassCacheMisses_ = 0;
+
+  // Protects cachedClasses_, numClassCacheHits_, and numClassCacheMisses_.
+  private final static Object cachedClassesLock_ = new Object();
+
   private final ApiVersion apiVersion_;
   private final ExternalDataSource dataSource_;
   private final String jarPath_;
   private final String className_;
+  private final String initString_;
+
+  public static long getNumClassCacheHits() {
+    synchronized (cachedClassesLock_) {
+      return numClassCacheHits_;
+    }
+  }
+
+  public static long getNumClassCacheMisses() {
+    synchronized (cachedClassesLock_) {
+      return numClassCacheMisses_;
+    }
+  }
 
   /**
    * @param jarPath The local path to the jar containing the ExternalDataSource.
    * @param className The name of the class implementing the ExternalDataSource.
    * @param apiVersionStr The API version the ExternalDataSource implements.
    *                         Must be a valid value of {@link ApiVersion}.
+   * @param initString The init string registered with this data source.
    */
   public ExternalDataSourceExecutor(String jarPath, String className,
-      String apiVersionStr) throws ImpalaException {
+      String apiVersionStr, String initString) throws ImpalaException {
     Preconditions.checkNotNull(jarPath);
 
     apiVersion_ = ApiVersion.valueOf(apiVersionStr);
@@ -82,17 +115,10 @@ public class ExternalDataSourceExecutor {
     }
     jarPath_ = jarPath;
     className_ = className;
+    initString_ = initString;
 
     try {
-      URL url = new File(jarPath).toURI().toURL();
-      URLClassLoader loader = URLClassLoader.newInstance(
-          new URL[] { url }, getClass().getClassLoader());
-      Class<?> c = Class.forName(className, true, loader);
-      if (!ArrayUtils.contains(c.getInterfaces(), apiVersion_.getApiInterface())) {
-        throw new ImpalaRuntimeException(String.format(
-            "Class '%s' does not implement interface '%s' required for API version %s",
-            className, apiVersion_.getApiInterface().getName(), apiVersionStr));
-      }
+      Class<?> c = getDataSourceClass();
       Constructor<?> ctor = c.getConstructor();
       dataSource_ = (ExternalDataSource) ctor.newInstance();
     } catch (Exception ex) {
@@ -100,6 +126,41 @@ public class ExternalDataSourceExecutor {
           "source library from path=%s className=%s apiVersion=%s", jarPath,
           className, apiVersionStr), ex);
     }
+  }
+
+  /**
+   * Returns the ExternalDataSource class, loading the jar if necessary. The
+   * class is cached if initString_ starts with CACHE_CLASS_PREFIX.
+   */
+  private Class<?> getDataSourceClass() throws Exception {
+    Class<?> c = null;
+    // Cache map key needs to contain both the class name and init string in case
+    // the same class is used for multiple tables where some are cached and others
+    // are not.
+    String cacheMapKey = String.format("%s.%s", className_, initString_);
+    synchronized (cachedClassesLock_) {
+      c = cachedClasses_.get(cacheMapKey);
+      if (c == null) {
+        URL url = new File(jarPath_).toURI().toURL();
+        URLClassLoader loader = URLClassLoader.newInstance(
+            new URL[] { url }, getClass().getClassLoader());
+        c = Class.forName(className_, true, loader);
+        if (!ArrayUtils.contains(c.getInterfaces(), apiVersion_.getApiInterface())) {
+          throw new ImpalaRuntimeException(String.format(
+              "Class '%s' does not implement interface '%s' required for API version %s",
+              className_, apiVersion_.getApiInterface().getName(), apiVersion_.name()));
+        }
+        // Only cache the class if the init string starts with CACHE_CLASS_PREFIX
+        if (initString_ != null && initString_.startsWith(CACHE_CLASS_PREFIX)) {
+          cachedClasses_.put(cacheMapKey, c);
+        }
+        LOG.info("Loaded jar for class {} at path {}", className_, jarPath_);
+        numClassCacheMisses_++;
+      } else {
+        numClassCacheHits_++;
+      }
+    }
+    return c;
   }
 
   public byte[] prepare(byte[] thriftParams) throws ImpalaException {

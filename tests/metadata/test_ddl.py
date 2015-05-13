@@ -22,6 +22,7 @@ from tests.common.test_result_verifier import *
 from subprocess import call
 from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
+from tests.common.impala_cluster import ImpalaCluster
 from tests.common.impala_test_suite import *
 from tests.common.skip import SkipIfS3
 from tests.util.filesystem_utils import WAREHOUSE, IS_DEFAULT_FS
@@ -220,6 +221,9 @@ class TestDdlStatements(ImpalaTestSuite):
                       "location '%s/libTestUdfs.so' symbol='NoArgs'" % WAREHOUSE)
     select_stmt = "select f() from functional.alltypes limit 10"
     drop_fn_stmt = "drop function %s f()"
+
+    self.__create_db_synced("udf_test", vector)
+    self.client.set_configuration(vector.get_value('exec_option'))
     self.create_drop_ddl(vector, "udf_test", [create_fn_stmt], [drop_fn_stmt],
         select_stmt)
 
@@ -232,17 +236,59 @@ class TestDdlStatements(ImpalaTestSuite):
         "CLASS 'com.cloudera.impala.extdatasource.AllTypesDataSource' "
         "API_VERSION 'V1'" % WAREHOUSE)
     create_tbl_stmt = """CREATE TABLE data_src_tbl (x int)
-        PRODUCED BY DATA SOURCE test_data_src"""
+        PRODUCED BY DATA SOURCE test_data_src('dummy_init_string')"""
     drop_ds_stmt = "drop data source %s test_data_src"
     drop_tbl_stmt = "drop table %s data_src_tbl"
     select_stmt = "select * from data_src_tbl limit 1"
+    class_cache_hits_metric = "external-data-source.class-cache.hits"
+    class_cache_misses_metric = "external-data-source.class-cache.misses"
 
     create_stmts = [create_ds_stmt, create_tbl_stmt]
     drop_stmts = [drop_tbl_stmt, drop_ds_stmt]
-    self.create_drop_ddl(vector, "data_src_test", create_stmts, drop_stmts,
-        select_stmt)
 
-  def create_drop_ddl(self, vector, db_name, create_stmts, drop_stmts, select_stmt):
+    # Get the impalad to capture metrics
+    impala_cluster = ImpalaCluster()
+    impalad = impala_cluster.get_first_impalad()
+
+    # Initial metric values
+    class_cache_hits = impalad.service.get_metric_value(class_cache_hits_metric)
+    class_cache_misses = impalad.service.get_metric_value(class_cache_misses_metric)
+    # Test with 1 node so we can check the metrics on only the coordinator
+    vector.get_value('exec_option')['num_nodes'] = 1
+    self.__create_db_synced("data_src_test", vector)
+    self.client.set_configuration(vector.get_value('exec_option'))
+
+    num_iterations = 2
+    self.create_drop_ddl(vector, "data_src_test", create_stmts, drop_stmts,
+        select_stmt, num_iterations)
+
+    # Check class cache metrics. Shouldn't have any new cache hits, there should be
+    # 2 cache misses for every iteration (jar is loaded by both the FE and BE).
+    expected_cache_misses = class_cache_misses + (num_iterations * 2)
+    impalad.service.wait_for_metric_value(class_cache_hits_metric, class_cache_hits)
+    impalad.service.wait_for_metric_value(class_cache_misses_metric,
+        expected_cache_misses)
+
+    # Test with a table that caches the class
+    create_tbl_stmt = """CREATE TABLE data_src_tbl (x int)
+        PRODUCED BY DATA SOURCE test_data_src('CACHE_CLASS::dummy_init_string')"""
+    create_stmts = [create_ds_stmt, create_tbl_stmt]
+    # Run once before capturing metrics because the class already may be cached from
+    # a previous test run.
+    # TODO: Provide a way to clear the cache
+    self.create_drop_ddl(vector, "data_src_test", create_stmts, drop_stmts,
+        select_stmt, 1)
+
+    # Capture metric values and run again, should hit the cache.
+    class_cache_hits = impalad.service.get_metric_value(class_cache_hits_metric)
+    class_cache_misses = impalad.service.get_metric_value(class_cache_misses_metric)
+    self.create_drop_ddl(vector, "data_src_test", create_stmts, drop_stmts,
+        select_stmt, 1)
+    impalad.service.wait_for_metric_value(class_cache_hits_metric, class_cache_hits + 2)
+    impalad.service.wait_for_metric_value(class_cache_misses_metric, class_cache_misses)
+
+  def create_drop_ddl(self, vector, db_name, create_stmts, drop_stmts, select_stmt,
+      num_iterations=3):
     # Helper method to run CREATE/DROP DDL commands repeatedly and exercise the lib cache
     # create_stmts is the list of CREATE statements to be executed in order drop_stmts is
     # the list of DROP statements to be executed in order. Each statement should have a
@@ -251,12 +297,9 @@ class TestDdlStatements(ImpalaTestSuite):
     # TODO: it's hard to tell that the cache is working (i.e. if it did nothing to drop
     # the cache, these tests would still pass). Testing that is a bit harder and requires
     # us to update the udf binary in the middle.
-    self.__create_db_synced(db_name, vector)
-    self.client.set_configuration(vector.get_value('exec_option'))
-
     self.client.execute("use %s" % (db_name,))
     for drop_stmt in drop_stmts: self.client.execute(drop_stmt % ("if exists"))
-    for i in xrange(1, 10):
+    for i in xrange(0, num_iterations):
       for create_stmt in create_stmts: self.client.execute(create_stmt)
       self.client.execute(select_stmt)
       for drop_stmt in drop_stmts: self.client.execute(drop_stmt % (""))

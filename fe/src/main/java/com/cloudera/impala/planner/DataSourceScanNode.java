@@ -171,7 +171,7 @@ public class DataSourceScanNode extends ScanNode {
     TStatus prepareStatus;
     try {
       ExternalDataSourceExecutor executor = new ExternalDataSourceExecutor(
-          localPath, className, apiVersion);
+          localPath, className, apiVersion, table_.getInitString());
       TPrepareParams prepareParams = new TPrepareParams();
       prepareParams.setInit_string(table_.getInitString());
       prepareParams.setPredicates(offeredPredicates);
