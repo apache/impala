@@ -1586,3 +1586,16 @@ LOCATION '/test-warehouse/{table_name}';
 hadoop fs -mkdir -p /test-warehouse/testescape_32_crlf && \
 hadoop fs -put -f /tmp/testescape_32_crlf/* /test-warehouse/testescape_32_crlf/
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+alltimezones
+---- CREATE
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+timezone STRING, utctime TIMESTAMP, localtime TIMESTAMP)
+row format delimited fields terminated by ','
+LOCATION '/test-warehouse/{table_name}';
+---- LOAD
+`hadoop fs -mkdir -p /test-warehouse/alltimezones && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/timezoneverification.csv /test-warehouse/alltimezones
+====

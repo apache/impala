@@ -436,9 +436,9 @@ TimezoneDatabase::~TimezoneDatabase() { }
 
 time_zone_ptr TimezoneDatabase::FindTimezone(const string& tz, const TimestampValue& tv) {
   // The backing database does not capture some subtleties, there are special cases
-  if ((tv.date().year() > 2011 || (tv.date().year() == 2011 && tv.date().month() >= 4)) &&
+  if ((tv.date().year() < 2011 || (tv.date().year() == 2011 && tv.date().month() < 4)) &&
       (iequals("Europe/Moscow", tz) || iequals("Moscow", tz) || iequals("MSK", tz))) {
-    // We transition in April 2011 from using the tz_database_ to a custom rule
+    // We transition in pre April 2011 from using the tz_database_ to a custom rule
     // Russia stopped using daylight savings in 2011, the tz_database_ is
     // set up assuming Russia uses daylight saving every year.
     // Sun, Mar 27, 2:00AM Moscow clocks moved forward +1 hour (a total of GMT +4)
@@ -448,13 +448,13 @@ time_zone_ptr TimezoneDatabase::FindTimezone(const string& tz, const TimestampVa
     // This means in 2011, The database rule will apply DST starting March 26 2011.
     // This will be a correct +4 offset, and the database rule can apply until
     // Oct 31 when tz_database_ will incorrectly attempt to turn clocks backwards 1 hour.
-    return TIMEZONE_MSK_2011_NODST;
+    return TIMEZONE_MSK_PRE_2011_DST;
   }
 
   // See if they specified a zone id
-  if (tz.find_first_of('/') != string::npos) {
-    return tz_database_.time_zone_from_region(tz);
-  }
+  time_zone_ptr tzp = tz_database_.time_zone_from_region(tz);
+  if (tzp != NULL) return tzp;
+
   for (vector<string>::const_iterator iter = tz_region_list_.begin();
        iter != tz_region_list_.end(); ++iter) {
     time_zone_ptr tzp = tz_database_.time_zone_from_region(*iter);
