@@ -46,6 +46,7 @@ export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID-"DummyAccessKeyId"}
 export S3_BUCKET=${S3_BUCKET-""}
 export HDFS_REPLICATION=${HDFS_REPLICATION-3}
 export ISILON_NAMENODE=${ISILON_NAMENODE-""}
+export DEFAULT_FS=${DEFAULT_FS-"hdfs://localhost:20500"}
 
 if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
   # Basic error checking
@@ -76,8 +77,8 @@ elif [ "${TARGET_FILESYSTEM}" = "isilon" ]; then
     echo "needs to be a non-empty and valid address."
     return 1
   fi
-  FILESYSTEM_PREFIX="hdfs://${ISILON_NAMENODE}:8020"
-  export FILESYSTEM_PREFIX
+  DEFAULT_FS="hdfs://${ISILON_NAMENODE}:8020"
+  export DEFAULT_FS
   # isilon manages its own replication.
   export HDFS_REPLICATION=1
 elif [ "${TARGET_FILESYSTEM}" != "hdfs" ]; then

@@ -57,7 +57,7 @@ if [[ "$REPLY" =~ ^[Yy]$ ]]; then
       if [ "${TARGET_FILESYSTEM}" = "isilon" ]; then
         hadoop fs -chmod -R 777 ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
       fi
-      hadoop fs -rm -r ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
+      hadoop fs -rm -r -skipTrash ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}
     fi
     echo "Creating test-warehouse directory"
     hadoop fs -mkdir ${FILESYSTEM_PREFIX}${TEST_WAREHOUSE_DIR}

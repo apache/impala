@@ -305,7 +305,12 @@ fi
 
 # Start Impala
 ${IMPALA_HOME}/bin/start-impala-cluster.py -s 3 --log_dir=${DATA_LOADING_LOG_DIR}
-${IMPALA_HOME}/testdata/bin/setup-hdfs-env.sh
+# The hdfs environment script sets up kms (encryption) and cache pools (hdfs caching).
+# On a non-hdfs filesystem, we don't test encryption or hdfs caching, so this setup is not
+# needed.
+if [[ "${TARGET_FILESYSTEM}" == "hdfs" ]]; then
+  ${IMPALA_HOME}/testdata/bin/setup-hdfs-env.sh
+fi
 
 if [ $SKIP_METADATA_LOAD -eq 0 ]; then
   # load custom schems

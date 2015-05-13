@@ -47,9 +47,20 @@ if [ ${USER} != "jenkins" ]; then
   sed -i "s/jenkins/${USER}/g" ${TMP_SNAPSHOT_FILE}
 fi
 
-if [[ "${TARGET_FILESYSTEM}" == "s3" || "${TARGET_FILESYSTEM}" = "isilon" ]]; then
+
+# When the tests are run on a filesystem other than hdfs, we need to change the location
+# of the tables in the metastore. The location change breaks down into two cases:
+#   - We use the other filesystem as a secondary filesystem. In this case, the
+#     core-site.xml still point to hdfs. We need to use the FILESYSTEM_PREFIX environment
+#     variable to determine the table location.
+#   - We use the other filesystem as the default filesystem. In this case, we use the
+#     DEFAULT_FS environment variable to determine the table locations.
+if [[ "${FILESYSTEM_PREFIX}" != "" ]]; then
   echo "Changing table metadata to point to ${FILESYSTEM_PREFIX}"
   sed -i "s|hdfs://localhost:20500|${FILESYSTEM_PREFIX}|g" ${TMP_SNAPSHOT_FILE}
+elif [[ "${DEFAULT_FS}" != "hdfs://localhost:20500" ]]; then
+  echo "Changing table metadata to point to ${DEFAULT_FS}"
+  sed -i "s|hdfs://localhost:20500|${DEFAULT_FS}|g" ${TMP_SNAPSHOT_FILE}
 fi
 
 # Drop and re-create the hive metastore database
