@@ -189,6 +189,9 @@ message(STATUS "Avro static library: " ${AVRO_STATIC_LIB})
 # gutil can use GLOG
 add_definitions(-DKUDU_HEADERS_USE_GLOG)
 
+# for PRI* print format macros
+add_definitions(-D__STDC_FORMAT_MACROS)
+
 # Treat gutil just like an Impala native library (i.e., one built with CMake), so no need
 # for find_package()
 add_subdirectory($ENV{IMPALA_HOME}/thirdparty/gutil/)
