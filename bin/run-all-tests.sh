@@ -45,6 +45,8 @@ fi
 : ${JDBC_TEST:=true}
 # Run Cluster Tests
 : ${CLUSTER_TEST:=true}
+# Extra arguments passed to start-impala-cluster for tests
+: ${TEST_START_CLUSTER_ARGS:=}
 
 # parse command line options
 while getopts "e:n:" OPTION
@@ -93,10 +95,8 @@ do
     fi
   fi
 
-  # Increase the admission controller max_requests to prevent builds failing due to
-  # queries not being closed.
-  ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} --cluster_size=3\
-      --impalad_args=--default_pool_max_requests=500
+  ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} --cluster_size=3 \
+      ${TEST_START_CLUSTER_ARGS}
 
   # Run some queries using run-workload to verify run-workload has not been broken.
   if ! ${IMPALA_HOME}/bin/run-workload.py -w tpch --num_clients=2 --query_names=TPCH-Q1 \
@@ -132,7 +132,8 @@ do
     # Run the JDBC tests with background loading disabled. This is interesting because
     # it requires loading missing table metadata.
     ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${LOG_DIR} --cluster_size=3 \
-      --catalogd_args=--load_catalog_in_background=false
+      --catalogd_args=--load_catalog_in_background=false \
+      ${TEST_START_CLUSTER_ARGS}
     pushd ${IMPALA_FE_DIR}
     if ! mvn test -Dtest=JdbcTest; then
       TEST_RET_CODE=1
