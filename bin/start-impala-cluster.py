@@ -146,12 +146,11 @@ def build_jvm_args(instance_num):
   return JVM_ARGS % (BASE_JVM_DEBUG_PORT + instance_num, options.jvm_args)
 
 def build_rm_args(instance_num):
-  if not options.enable_rm:
-    return ""
+  if not options.enable_rm: return ""
   try:
     cgroup_path = cgroups.create_impala_cgroup_path(instance_num + 1)
-  except Exception as ex:
-    raise "Unable to initialize RM: %s" % str(ex)
+  except Exception, ex:
+    raise RuntimeError("Unable to initialize RM: %s" % str(ex))
   llama_address = "localhost:15000"
 
   # Don't bother checking if the path doesn't exist, the impalad won't start up
@@ -201,7 +200,7 @@ def wait_for_impala_process_count(impala_cluster, retries=3):
   if not impala_cluster.catalogd:
     msg += "catalogd failed to start.\n"
   if msg:
-    raise RuntimeError, msg
+    raise RuntimeError(msg)
 
 def wait_for_cluster_web(timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
   """Checks if the cluster is "ready"
@@ -235,14 +234,14 @@ def wait_for_catalog(impalad, timeout_in_seconds):
       print e
     sleep(1)
   if not catalog_ready:
-    raise RuntimeError, 'Catalog was not initialized in expected time period.'
+    raise RuntimeError('Catalog was not initialized in expected time period.')
 
 def wait_for_cluster_cmdline(timeout_in_seconds=CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
   """Checks if the cluster is "ready" by executing a simple query in a loop"""
   start_time = time()
   while os.system('%s -i localhost:21000 -q "%s"' %  (IMPALA_SHELL, 'select 1')) != 0:
     if time() - timeout_in_seconds > start_time:
-      raise RuntimeError, 'Cluster did not start within %d seconds' % timeout_in_seconds
+      raise RuntimeError('Cluster did not start within %d seconds' % timeout_in_seconds)
     print 'Cluster not yet available. Sleeping...'
     sleep(2)
 
