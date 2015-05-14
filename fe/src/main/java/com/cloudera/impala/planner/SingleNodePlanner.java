@@ -1013,7 +1013,8 @@ public class SingleNodePlanner {
       // Since our only implementation of semi and outer joins is hash-based, and we do
       // not re-order semi and outer joins, we must have eqJoinConjuncts here to execute
       // this query.
-      // TODO Revisit when we add more semi/join implementations.
+      // TODO: Revisit when we add more semi/join implementations. Pick up and pass in
+      // the otherJoinConjuncts.
       if (tblRef.getJoinOp().isOuterJoin() ||
           tblRef.getJoinOp().isSemiJoin()) {
         throw new NotImplementedException(
@@ -1022,7 +1023,8 @@ public class SingleNodePlanner {
             tblRef.getJoinOp().isOuterJoin() ? "Outer" : "Semi",
             innerRef.getUniqueAlias()));
       }
-      CrossJoinNode result = new CrossJoinNode(outer, inner);
+      CrossJoinNode result =
+          new CrossJoinNode(outer, inner, tblRef, Collections.<Expr>emptyList());
       result.init(analyzer);
       return result;
     }

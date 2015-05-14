@@ -29,7 +29,7 @@ import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
-import com.cloudera.impala.planner.HashJoinNode.DistributionMode;
+import com.cloudera.impala.planner.JoinNode.DistributionMode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.cloudera.impala.thrift.TPlanFragment;

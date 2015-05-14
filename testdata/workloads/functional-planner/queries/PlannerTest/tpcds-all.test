@@ -3178,7 +3178,7 @@ order by promotions, total
 27:SORT
 |  order by: promotions ASC, total ASC
 |
-26:CROSS JOIN [BROADCAST]
+26:CROSS JOIN
 |
 |--25:AGGREGATE [FINALIZE]
 |  |  output: sum(ss_ext_sales_price)
@@ -3359,7 +3359,7 @@ from
           (household_demographics.hd_dep_count = 2 and household_demographics.hd_vehicle_count<=2+2))
      and store.s_store_name = 'ese') s8
 ---- PLAN
-70:CROSS JOIN [BROADCAST]
+70:CROSS JOIN
 |
 |--63:AGGREGATE [FINALIZE]
 |  |  output: count(*)
@@ -3388,7 +3388,7 @@ from
 |  56:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
 |
-69:CROSS JOIN [BROADCAST]
+69:CROSS JOIN
 |
 |--55:AGGREGATE [FINALIZE]
 |  |  output: count(*)
@@ -3417,7 +3417,7 @@ from
 |  48:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
 |
-68:CROSS JOIN [BROADCAST]
+68:CROSS JOIN
 |
 |--47:AGGREGATE [FINALIZE]
 |  |  output: count(*)
@@ -3446,7 +3446,7 @@ from
 |  40:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
 |
-67:CROSS JOIN [BROADCAST]
+67:CROSS JOIN
 |
 |--39:AGGREGATE [FINALIZE]
 |  |  output: count(*)
@@ -3475,7 +3475,7 @@ from
 |  32:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
 |
-66:CROSS JOIN [BROADCAST]
+66:CROSS JOIN
 |
 |--31:AGGREGATE [FINALIZE]
 |  |  output: count(*)
@@ -3504,7 +3504,7 @@ from
 |  24:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
 |
-65:CROSS JOIN [BROADCAST]
+65:CROSS JOIN
 |
 |--23:AGGREGATE [FINALIZE]
 |  |  output: count(*)
@@ -3533,7 +3533,7 @@ from
 |  16:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
 |
-64:CROSS JOIN [BROADCAST]
+64:CROSS JOIN
 |
 |--15:AGGREGATE [FINALIZE]
 |  |  output: count(*)

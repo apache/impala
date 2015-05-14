@@ -14,12 +14,15 @@
 
 package com.cloudera.impala.planner;
 
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
+import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.planner.HashJoinNode.DistributionMode;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
@@ -28,27 +31,16 @@ import com.google.common.base.Objects;
 
 /**
  * Cross join between left child and right child.
+ * TODO: Rename to NestedLoopsJoin or similar when adding support for more join modes.
+ * TODO: Adjust computeStats() and computeCosts() for outer and semi joins once
+ * those join modes are supported.
  */
-public class CrossJoinNode extends PlanNode {
+public class CrossJoinNode extends JoinNode {
   private final static Logger LOG = LoggerFactory.getLogger(CrossJoinNode.class);
 
-  // Default per-host memory requirement used if no valid stats are available.
-  // TODO: Come up with a more useful heuristic (e.g., based on scanned partitions).
-  private final static long DEFAULT_PER_HOST_MEM = 2L * 1024L * 1024L * 1024L;
-
-  public CrossJoinNode(PlanNode outer, PlanNode inner) {
-    super("CROSS JOIN");
-    tupleIds_.addAll(outer.getTupleIds());
-    tupleIds_.addAll(inner.getTupleIds());
-    tblRefIds_.addAll(outer.getTblRefIds());
-    tblRefIds_.addAll(inner.getTblRefIds());
-    children_.add(outer);
-    children_.add(inner);
-
-    // Inherits all the nullable tuple from the children
-    // Mark tuples that form the "nullable" side of the outer join as nullable.
-    nullableTupleIds_.addAll(outer.getNullableTupleIds());
-    nullableTupleIds_.addAll(inner.getNullableTupleIds());
+  public CrossJoinNode(PlanNode outer, PlanNode inner, TableRef tblRef,
+      List<Expr> otherJoinConjuncts) {
+    super(outer, inner, tblRef, otherJoinConjuncts, "CROSS JOIN");
   }
 
   @Override
@@ -73,25 +65,31 @@ public class CrossJoinNode extends PlanNode {
   }
 
   @Override
-  protected String debugString() {
-    return Objects.toStringHelper(this)
-        .addValue(super.debugString())
-        .toString();
-  }
-
-  @Override
-  protected void toThrift(TPlanNode msg) {
-    msg.node_type = TPlanNodeType.CROSS_JOIN_NODE;
+  public void computeCosts(TQueryOptions queryOptions) {
+    if (getChild(1).getCardinality() == -1 || getChild(1).getAvgRowSize() == -1
+        || numNodes_ == 0) {
+      perHostMemCost_ = DEFAULT_PER_HOST_MEM;
+      return;
+    }
+    perHostMemCost_ = (long) Math.ceil(getChild(1).cardinality_ * getChild(1).avgRowSize_);
   }
 
   @Override
   protected String getNodeExplainString(String prefix, String detailPrefix,
       TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    // Always a BROADCAST, but print it anyway so it's clear to users
-    output.append(String.format("%s%s:%s [%s]\n", prefix, id_.toString(),
-        displayName_, DistributionMode.BROADCAST.toString()));
+    String labelDetail = getDisplayLabelDetail();
+    if (labelDetail == null) {
+      output.append(prefix + getDisplayLabel() + "\n");
+    } else {
+      output.append(String.format("%s%s:%s [%s]\n", prefix, id_.toString(),
+          displayName_, getDisplayLabelDetail()));
+    }
     if (detailLevel.ordinal() >= TExplainLevel.STANDARD.ordinal()) {
+      if (!otherJoinConjuncts_.isEmpty()) {
+        output.append(detailPrefix + "join predicates: ")
+        .append(getExplainString(otherJoinConjuncts_) + "\n");
+      }
       if (!conjuncts_.isEmpty()) {
         output.append(detailPrefix + "predicates: ")
         .append(getExplainString(conjuncts_) + "\n");
@@ -101,12 +99,20 @@ public class CrossJoinNode extends PlanNode {
   }
 
   @Override
-  public void computeCosts(TQueryOptions queryOptions) {
-    if (getChild(1).getCardinality() == -1 || getChild(1).getAvgRowSize() == -1
-        || numNodes_ == 0) {
-      perHostMemCost_ = DEFAULT_PER_HOST_MEM;
-      return;
-    }
-    perHostMemCost_ = (long) Math.ceil(getChild(1).cardinality_ * getChild(1).avgRowSize_);
+  protected String getDisplayLabelDetail() {
+    if (distrMode_ == DistributionMode.NONE) return null;
+    return distrMode_.toString();
+  }
+
+  @Override
+  protected void toThrift(TPlanNode msg) {
+    msg.node_type = TPlanNodeType.CROSS_JOIN_NODE;
+  }
+
+  @Override
+  protected String debugString() {
+    return Objects.toStringHelper(this)
+        .addValue(super.debugString())
+        .toString();
   }
 }

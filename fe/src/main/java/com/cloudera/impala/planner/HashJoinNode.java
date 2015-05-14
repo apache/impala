@@ -47,40 +47,11 @@ import com.google.common.collect.Lists;
  * plan generated for a table ref. Typically, that is the right child, but due to join
  * inversion (for outer/semi/cross joins) it could also be the left child.
  */
-public class HashJoinNode extends PlanNode {
+public class HashJoinNode extends JoinNode {
   private final static Logger LOG = LoggerFactory.getLogger(HashJoinNode.class);
-
-  // Default per-host memory requirement used if no valid stats are available.
-  // TODO: Come up with a more useful heuristic (e.g., based on scanned partitions).
-  private final static long DEFAULT_PER_HOST_MEM = 2L * 1024L * 1024L * 1024L;
-
-  // tableRef corresponding to the left or right child of this join; only used for
-  // getting the plan hints of this join, so it's irrelevant which child exactly
-  private final TableRef tblRef_;
-  private final JoinOperator joinOp_;
-
-  enum DistributionMode {
-    NONE("NONE"),
-    BROADCAST("BROADCAST"),
-    PARTITIONED("PARTITIONED");
-
-    private final String description;
-
-    private DistributionMode(String descr) {
-      this.description = descr;
-    }
-
-    @Override
-    public String toString() { return description; }
-  }
-
-  private DistributionMode distrMode_;
 
   // conjuncts_ of the form "<lhs> = <rhs>"
   private List<BinaryPredicate> eqJoinConjuncts_;
-
-  // join conjuncts_ from the JOIN clause that aren't equi-join predicates
-  private List<Expr> otherJoinConjuncts_;
 
   // If true, this node can add filters for the probe side that can be generated
   // after reading the build side. This can be very helpful if the join is selective and
@@ -90,59 +61,12 @@ public class HashJoinNode extends PlanNode {
   public HashJoinNode(
       PlanNode outer, PlanNode inner, TableRef tblRef,
       List<BinaryPredicate> eqJoinConjuncts, List<Expr> otherJoinConjuncts) {
-    super("HASH JOIN");
-    Preconditions.checkArgument(eqJoinConjuncts != null);
-    Preconditions.checkArgument(otherJoinConjuncts != null);
-    tblRef_ = tblRef;
-    joinOp_ = tblRef.getJoinOp();
-
-    // Only retain the non-semi-joined tuples of the inputs.
-    switch (joinOp_) {
-      case LEFT_ANTI_JOIN:
-      case LEFT_SEMI_JOIN:
-      case NULL_AWARE_LEFT_ANTI_JOIN: {
-        tupleIds_.addAll(outer.getTupleIds());
-        break;
-      }
-      case RIGHT_ANTI_JOIN:
-      case RIGHT_SEMI_JOIN: {
-        tupleIds_.addAll(inner.getTupleIds());
-        break;
-      }
-      default: {
-        tupleIds_.addAll(outer.getTupleIds());
-        tupleIds_.addAll(inner.getTupleIds());
-        break;
-      }
-    }
-    tblRefIds_.addAll(outer.getTblRefIds());
-    tblRefIds_.addAll(inner.getTblRefIds());
-
-    distrMode_ = DistributionMode.NONE;
+    super(outer, inner, tblRef, otherJoinConjuncts, "HASH JOIN");
+    Preconditions.checkNotNull(eqJoinConjuncts);
     eqJoinConjuncts_ = eqJoinConjuncts;
-    otherJoinConjuncts_ = otherJoinConjuncts;
-    children_.add(outer);
-    children_.add(inner);
-
-    // Inherits all the nullable tuple from the children
-    // Mark tuples that form the "nullable" side of the outer join as nullable.
-    nullableTupleIds_.addAll(inner.getNullableTupleIds());
-    nullableTupleIds_.addAll(outer.getNullableTupleIds());
-    if (joinOp_.equals(JoinOperator.FULL_OUTER_JOIN)) {
-      nullableTupleIds_.addAll(outer.getTupleIds());
-      nullableTupleIds_.addAll(inner.getTupleIds());
-    } else if (joinOp_.equals(JoinOperator.LEFT_OUTER_JOIN)) {
-      nullableTupleIds_.addAll(inner.getTupleIds());
-    } else if (joinOp_.equals(JoinOperator.RIGHT_OUTER_JOIN)) {
-      nullableTupleIds_.addAll(outer.getTupleIds());
-    }
   }
 
   public List<BinaryPredicate> getEqJoinConjuncts() { return eqJoinConjuncts_; }
-  public JoinOperator getJoinOp() { return joinOp_; }
-  public TableRef getTableRef() { return tblRef_; }
-  public DistributionMode getDistributionMode() { return distrMode_; }
-  public void setDistributionMode(DistributionMode distrMode) { distrMode_ = distrMode; }
   public void setAddProbeFilters(boolean b) { addProbeFilters_ = true; }
 
   @Override

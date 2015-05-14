@@ -30,6 +30,7 @@ import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
+import com.cloudera.impala.planner.JoinNode.DistributionMode;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -274,6 +275,7 @@ public class DistributedPlanner {
       PlanFragment rightChildFragment, PlanFragment leftChildFragment,
       long perNodeMemLimit, ArrayList<PlanFragment> fragments)
       throws InternalException {
+    node.setDistributionMode(DistributionMode.BROADCAST);
     node.setChild(0, leftChildFragment.getPlanRoot());
     connectChildFragment(node, 1, rightChildFragment);
     leftChildFragment.setPlanRoot(node);
@@ -363,8 +365,8 @@ public class DistributedPlanner {
         && (perNodeMemLimit == 0
             || Math.round((double) rhsDataSize * PlannerContext.HASH_TBL_SPACE_OVERHEAD)
                 <= perNodeMemLimit)
-        && (node.getTableRef().isBroadcastJoin()
-            || (!node.getTableRef().isPartitionedJoin()
+        && (node.getDistributionModeHint() == DistributionMode.BROADCAST
+            || (node.getDistributionModeHint() != DistributionMode.PARTITIONED
                 && broadcastCost <= partitionCost)))
         || node.getJoinOp().isNullAwareLeftAntiJoin()) {
       doBroadcast = true;
