@@ -118,6 +118,9 @@ error_codes = (
 
   ("RPC_GENERAL_ERROR", 31, "RPC Error: $0"),
   ("RPC_TIMEOUT", 32, "RPC timed out"),
+
+  ("UDF_VERIFY_FAILED", 33,
+   "Failed to verify function $0 from LLVM module $1, see log for more details."),
 )
 
 import sys

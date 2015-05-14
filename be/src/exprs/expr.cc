@@ -64,11 +64,14 @@
 
 #include "common/names.h"
 
-using namespace impala;
 using namespace impala_udf;
 using namespace llvm;
 
+namespace impala {
+
 const char* Expr::LLVM_CLASS_NAME = "class.impala::Expr";
+
+const char* Expr::GET_CONSTANT_SYMBOL_PREFIX = "_ZN6impala4Expr11GetConstant";
 
 template<class T>
 bool ParseString(const string& str, T* val) {
@@ -543,7 +546,70 @@ AnyVal* Expr::GetConstVal(ExprContext* context) {
   return constant_val_.get();
 }
 
-Status Expr::GetCodegendComputeFnWrapper(RuntimeState* state, llvm::Function** fn) {
+
+template<> int Expr::GetConstant(const FunctionContext& ctx, ExprConstant c, int i) {
+  switch (c) {
+    case RETURN_TYPE_SIZE:
+      DCHECK_EQ(i, -1);
+      return AnyValUtil::TypeDescToColumnType(ctx.GetReturnType()).GetByteSize();
+    case ARG_TYPE_SIZE:
+      DCHECK_GE(i, 0);
+      DCHECK_LT(i, ctx.GetNumArgs());
+      return AnyValUtil::TypeDescToColumnType(*ctx.GetArgType(i)).GetByteSize();
+    default:
+      CHECK(false) << "NYI";
+      return -1;
+  }
+}
+
+Value* Expr::GetIrConstant(LlvmCodeGen* codegen, ExprConstant c, int i) {
+  switch (c) {
+    case RETURN_TYPE_SIZE:
+      DCHECK_EQ(i, -1);
+      return ConstantInt::get(codegen->GetType(TYPE_INT), type_.GetByteSize());
+    case ARG_TYPE_SIZE:
+      DCHECK_GE(i, 0);
+      DCHECK_LT(i, children_.size());
+      return ConstantInt::get(
+          codegen->GetType(TYPE_INT), children_[i]->type_.GetByteSize());
+    default:
+      CHECK(false) << "NYI";
+      return NULL;
+  }
+}
+
+int Expr::InlineConstants(LlvmCodeGen* codegen, Function* fn) {
+  int replaced = 0;
+  for (inst_iterator iter = inst_begin(fn), end = inst_end(fn); iter != end; ) {
+    // Increment iter now so we don't mess it up modifying the instrunction below
+    Instruction* instr = &*(iter++);
+
+    // Look for call instructions
+    if (!isa<CallInst>(instr)) continue;
+    CallInst* call_instr = cast<CallInst>(instr);
+    Function* called_fn = call_instr->getCalledFunction();
+
+    // Look for call to Expr::GetConstant()
+    if (called_fn == NULL ||
+        called_fn->getName().find(GET_CONSTANT_SYMBOL_PREFIX) == string::npos) continue;
+
+    // 'c' and 'i' arguments must be constant
+    ConstantInt* c_arg = dyn_cast<ConstantInt>(call_instr->getArgOperand(1));
+    ConstantInt* i_arg = dyn_cast<ConstantInt>(call_instr->getArgOperand(2));
+    DCHECK(c_arg != NULL) << "Non-constant 'c' argument to Expr::GetConstant()";
+    DCHECK(i_arg != NULL) << "Non-constant 'i' argument to Expr::GetConstant()";
+
+    // Replace the called function with the appropriate constant
+    ExprConstant c_val = static_cast<ExprConstant>(c_arg->getSExtValue());
+    int i_val = static_cast<int>(i_arg->getSExtValue());
+    call_instr->replaceAllUsesWith(GetIrConstant(codegen, c_val, i_val));
+    call_instr->eraseFromParent();
+    ++replaced;
+  }
+  return replaced;
+}
+
+Status Expr::GetCodegendComputeFnWrapper(RuntimeState* state, Function** fn) {
   if (ir_compute_fn_ != NULL) {
     *fn = ir_compute_fn_;
     return Status::OK;
@@ -609,4 +675,6 @@ TimestampVal Expr::GetTimestampVal(ExprContext* context, TupleRow* row) {
 DecimalVal Expr::GetDecimalVal(ExprContext* context, TupleRow* row) {
   DCHECK(false) << DebugString();
   return DecimalVal::null();
+}
+
 }

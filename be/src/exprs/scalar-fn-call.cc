@@ -254,12 +254,13 @@ Status ScalarFnCall::GetCodegendComputeFn(RuntimeState* state, llvm::Function** 
 
   LlvmCodeGen* codegen;
   RETURN_IF_ERROR(state->GetCodegen(&codegen));
+
   llvm::Function* udf;
   RETURN_IF_ERROR(GetUdf(state, &udf));
 
   // Create wrapper that computes args and calls UDF
   stringstream fn_name;
-  fn_name << SymbolsUtil::DemangleNameOnly(udf->getName().str()) << "Wrapper";
+  fn_name << udf->getName().str() << "Wrapper";
 
   llvm::Value* args[2];
   *fn = CreateIrFunctionPrototype(codegen, fn_name.str(), &args);
@@ -454,8 +455,16 @@ Status ScalarFnCall::GetUdf(RuntimeState* state, llvm::Function** udf) {
          << "Verify that all your impalads are the same version.";
       return Status(ss.str());
     }
+    // Builtin functions may use Expr::GetConstant(). Clone the function in case we need
+    // to use it again, and rename it to something more manageable than the mangled name.
+    string demangled_name = SymbolsUtil::DemangleNoArgs((*udf)->getName().str());
+    *udf = codegen->CloneFunction(*udf);
+    (*udf)->setName(demangled_name);
+    InlineConstants(codegen, *udf);
+    *udf = codegen->FinalizeFunction(*udf);
+    DCHECK_NOTNULL(*udf);
   } else {
-    // We're running a IR UDF.
+    // We're running an IR UDF.
     DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::IR);
     *udf = codegen->module()->getFunction(fn_.scalar_fn.symbol);
     if (*udf == NULL) {
@@ -464,8 +473,12 @@ Status ScalarFnCall::GetUdf(RuntimeState* state, llvm::Function** udf) {
          << " from LLVM module " << fn_.hdfs_location;
       return Status(ss.str());
     }
+    *udf = codegen->FinalizeFunction(*udf);
+    if (*udf == NULL) {
+      return Status(
+          TErrorCode::UDF_VERIFY_FAILED, fn_.scalar_fn.symbol, fn_.hdfs_location);
+    }
   }
-  (*udf)->addFnAttr(llvm::Attribute::AlwaysInline);
   return Status::OK;
 }
 

@@ -34,8 +34,8 @@ IntVal DecimalFunctions::Scale(FunctionContext* context, const DecimalVal& val) 
 
 DecimalVal DecimalFunctions::Abs(FunctionContext* context, const DecimalVal& val) {
   if (val.is_null) return DecimalVal::null();
-  ColumnType type = AnyValUtil::TypeDescToColumnType(*context->GetArgType(0));
-  switch (type.GetByteSize()) {
+  int type_byte_size = Expr::GetConstant<int>(*context, Expr::ARG_TYPE_SIZE, 0);
+  switch (type_byte_size) {
     case 4:
       return DecimalVal(abs(val.val4));
     case 8:

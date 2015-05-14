@@ -1820,3 +1820,16 @@ ORDER BY timestamp_col + INTERVAL bigint_col YEAR ASC limit 1
 ---- TYPES
 TIMESTAMP
 ====
+---- QUERY
+# Test Expr::GetConstant()
+select int_col, bigint_col from functional_avro_snap.alltypestiny
+where abs(cast(int_col as decimal(8,0))) >
+      negative(abs(cast(bigint_col as decimal(20, 0))))
+---- RESULTS
+1,10
+1,10
+1,10
+1,10
+---- TYPES
+INT,BIGINT
+====

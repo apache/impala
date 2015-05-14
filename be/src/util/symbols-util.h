@@ -26,14 +26,21 @@ class SymbolsUtil {
   /// Returns true if this symbol is mangled.
   static bool IsMangled(const std::string& symbol);
 
-  /// Returns the demangled string. The name is assumed to be a mangled string
-  /// using the gcc/llvm convention.
-  /// Returns the empty string if the name is not valid.
+  /// Returns the demangled string. The name is assumed to be a mangled string using the
+  /// gcc/llvm convention.
+  /// Returns the original input if it cannot be demangled.
   static std::string Demangle(const std::string& name);
 
-  /// Returns the function name of the demangled symbol (i.e., it strips the arguments and
-  /// any namespace/class qualifiers).
-  /// Returns the empty string if the name is not valid.
+  /// Returns the fully-qualified function name of 'symbol' (i.e. it strips the arguments
+  /// but retains any namespace and class names). 'symbol' may be mangled or unmangled.
+  /// Returns the original input if it cannot be demangled.
+  /// Example: "impala::foo(int arg1)" => "impala::foo"
+  static std::string DemangleNoArgs(const std::string& symbol);
+
+  /// Returns the function name of 'symbol' (i.e., it strips the arguments and any
+  /// namespace/class qualifiers). 'symbol' may be mangled or unmangled.
+  /// Returns the original input if it cannot be demangled.
+  /// Example: "impala::foo(int arg1)" => "foo"
   static std::string DemangleNameOnly(const std::string& symbol);
 
   /// Mangles fn_name with 'arg_types' to the function signature for user functions.

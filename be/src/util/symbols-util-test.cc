@@ -29,6 +29,11 @@ void TestDemangling(const string& mangled, const string& expected_demangled) {
   EXPECT_EQ(result, expected_demangled);
 }
 
+void TestDemanglingNoArgs(const string& mangled, const string& expected_demangled) {
+  string result = SymbolsUtil::DemangleNoArgs(mangled);
+  EXPECT_EQ(result, expected_demangled);
+}
+
 void TestDemanglingNameOnly(const string& mangled, const string& expected_demangled) {
   string result = SymbolsUtil::DemangleNameOnly(mangled);
   EXPECT_EQ(result, expected_demangled);
@@ -75,11 +80,31 @@ TEST(SymbolsUtil, Demangling) {
       "_Z14VarSumMultiplyPN10impala_udf15FunctionContextERKNS_9DoubleValEiPKNS_6IntValE",
       "VarSumMultiply(impala_udf::FunctionContext*, impala_udf::DoubleVal const&, int, "
           "impala_udf::IntVal const*)");
-  TestDemangling("FooBar", "");
+  TestDemangling("FooBar", "FooBar");
+  TestDemangling(
+      "Foo::TEST(impala_udf::FunctionContext*, impala_udf::IntVal const&, "
+      "impala_udf::IntVal const&)",
+      "Foo::TEST(impala_udf::FunctionContext*, impala_udf::IntVal const&, "
+      "impala_udf::IntVal const&)");
 }
 
-// Not very thoroughly tested since our implementation is just a wrapper around
-// the gcc library.
+TEST(SymbolsUtil, DemanglingNoArgs) {
+  TestDemanglingNoArgs("_Z6NoArgsPN10impala_udf15FunctionContextE", "NoArgs");
+  TestDemanglingNoArgs("_Z8IdentityPN10impala_udf15FunctionContextERKNS_10TinyIntValE",
+      "Identity");
+  TestDemanglingNoArgs("_Z8IdentityPN10impala_udf15FunctionContextERKNS_9StringValE",
+      "Identity");
+  TestDemanglingNoArgs("_ZN3Foo4TESTEPN10impala_udf15FunctionContextERKNS0_6IntValES5_",
+      "Foo::TEST");
+  TestDemanglingNoArgs(
+      "_Z14VarSumMultiplyPN10impala_udf15FunctionContextERKNS_9DoubleValEiPKNS_6IntValE",
+      "VarSumMultiply");
+  TestDemanglingNoArgs("FooBar", "FooBar");
+  TestDemanglingNoArgs(
+      "Foo::TEST(impala_udf::FunctionContext*, impala_udf::IntVal const&, "
+      "impala_udf::IntVal const&)", "Foo::TEST");
+}
+
 TEST(SymbolsUtil, DemanglingNameOnly) {
   TestDemanglingNameOnly("_Z6NoArgsPN10impala_udf15FunctionContextE", "NoArgs");
   TestDemanglingNameOnly("_Z8IdentityPN10impala_udf15FunctionContextERKNS_10TinyIntValE",
@@ -91,7 +116,10 @@ TEST(SymbolsUtil, DemanglingNameOnly) {
   TestDemanglingNameOnly(
       "_Z14VarSumMultiplyPN10impala_udf15FunctionContextERKNS_9DoubleValEiPKNS_6IntValE",
       "VarSumMultiply");
-  TestDemangling("FooBar", "");
+  TestDemanglingNameOnly("FooBar", "FooBar");
+  TestDemanglingNameOnly(
+      "Foo::TEST(impala_udf::FunctionContext*, impala_udf::IntVal const&, "
+      "impala_udf::IntVal const&)", "TEST");
 }
 
 // TODO: is there a less arduous way to test this?

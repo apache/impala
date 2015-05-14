@@ -56,6 +56,10 @@ add_executable(expr-benchmark expr-benchmark.cc)
 target_link_libraries(expr-benchmark ${IMPALA_TEST_LINK_LIBS})
 
 ADD_BE_TEST(expr-test)
+ADD_BE_TEST(expr-codegen-test)
+
+# expr-codegen-test includes test IR functions
+COMPILE_TO_IR(expr-codegen-test.cc)
 
 ADD_EXECUTABLE(aggregate-functions-test aggregate-functions-test.cc)
 TARGET_LINK_LIBRARIES(aggregate-functions-test ${UDF_TEST_LINK_LIBS})

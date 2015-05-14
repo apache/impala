@@ -271,9 +271,9 @@ class LlvmCodeGen {
   /// Returns the i-th argument of fn.
   llvm::Argument* GetArgument(llvm::Function* fn, int i);
 
-  /// Verify and optimize function.  This should be called at the end for each codegen'd
-  /// function.  If the function does not verify, it will delete the function and return
-  /// NULL, otherwise, it will optimize and return the function object.
+  /// Verify function.  This should be called at the end for each codegen'd function.  If
+  /// the function does not verify, it will delete the function and return NULL,
+  /// otherwise, it returns the function object.
   llvm::Function* FinalizeFunction(llvm::Function* function);
 
   /// Inlines all function calls for 'fn' that are marked as always inline.
@@ -314,8 +314,8 @@ class LlvmCodeGen {
   /// call non-compliant code from native code.
   void AddFunctionToJit(llvm::Function* fn, void** fn_ptr);
 
-  /// Verfies the function if the verfier is enabled.  Returns false if function
-  /// is invalid.
+  /// Verfies the function, e.g., checks that the IR is well-formed.  Returns false if
+  /// function is invalid.
   bool VerifyFunction(llvm::Function* function);
 
   /// This will generate a printf call instruction to output 'message' at the
@@ -418,6 +418,9 @@ class LlvmCodeGen {
   /// Loads a module at 'file' and links it to the module associated with
   /// this LlvmCodeGen object. The module must be on the local filesystem.
   Status LinkModule(const std::string& file);
+
+  // Used for testing.
+  void ResetVerification() { is_corrupt_ = false; }
 
  private:
   friend class LlvmCodeGenTest;

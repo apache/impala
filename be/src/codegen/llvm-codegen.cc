@@ -30,6 +30,7 @@
 #include <llvm/PassManager.h>
 #include <llvm/Support/DynamicLibrary.h>
 #include <llvm/Support/Host.h>
+#include "llvm/Support/InstIterator.h"
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/NoFolder.h>
 #include <llvm/Support/TargetRegistry.h>
@@ -423,15 +424,31 @@ Function* LlvmCodeGen::GetFunction(IRFunction::Type function) {
   return loaded_functions_[function];
 }
 
-// There is an llvm bug (#10957) that causes the first step of the verifier to always
-// abort the process if it runs into an issue and ignores ReturnStatusAction.  This
-// would cause impalad to go down if one query has a problem.
-// To work around this, we will copy that step here and not abort on error.
-// TODO: doesn't seem there is much traction in getting this fixed but we'll see
 bool LlvmCodeGen::VerifyFunction(Function* fn) {
   if (is_corrupt_) return false;
 
-  // Verify the function is valid. Adapted from the pre-verifier function pass.
+  // Check that there are no calls to Expr::GetConstant(). These should all have been
+  // inlined via Expr::InlineConstants().
+  for (inst_iterator iter = inst_begin(fn); iter != inst_end(fn); ++iter) {
+    Instruction* instr = &*iter;
+    if (!isa<CallInst>(instr)) continue;
+    CallInst* call_instr = reinterpret_cast<CallInst*>(instr);
+    Function* called_fn = call_instr->getCalledFunction();
+    // look for call to Expr::GetConstant()
+    if (called_fn != NULL &&
+        called_fn->getName().find(Expr::GET_CONSTANT_SYMBOL_PREFIX) != string::npos) {
+      LOG(ERROR) << "Found call to Expr::GetConstant(): " << Print(call_instr);
+      is_corrupt_ = true;
+      break;
+    }
+  }
+
+  // There is an llvm bug (#10957) that causes the first step of the verifier to always
+  // abort the process if it runs into an issue and ignores ReturnStatusAction.  This
+  // would cause impalad to go down if one query has a problem.  To work around this, we
+  // will copy that step here and not abort on error. Adapted from the pre-verifier
+  // function pass.
+  // TODO: doesn't seem there is much traction in getting this fixed but we'll see
   for (Function::iterator i = fn->begin(), e = fn->end(); i != e; ++i) {
     if (i->empty() || !i->back().isTerminator()) {
       LOG(ERROR) << "Basic block must end with terminator: \n" << Print(&(*i));
@@ -501,24 +518,17 @@ Function* LlvmCodeGen::ReplaceCallSites(Function* caller, bool update_in_place,
   }
 
   *replaced = 0;
-  // loop over all blocks
-  Function::iterator block_iter = caller->begin();
-  while (block_iter != caller->end()) {
-    BasicBlock* block = block_iter++;
-    // loop over instructions in the block
-    BasicBlock::iterator instr_iter = block->begin();
-    while (instr_iter != block->end()) {
-      Instruction* instr = instr_iter++;
-      // look for call instructions
-      if (CallInst::classof(instr)) {
-        CallInst* call_instr = reinterpret_cast<CallInst*>(instr);
-        Function* old_fn = call_instr->getCalledFunction();
-        // look for call instruction that matches the name
-        if (old_fn != NULL && old_fn->getName().find(replacee_name) != string::npos) {
-          // Replace the called function
-          call_instr->setCalledFunction(new_fn);
-          ++*replaced;
-        }
+  for (inst_iterator iter = inst_begin(caller); iter != inst_end(caller); ++iter) {
+    Instruction* instr = &*iter;
+    // look for call instructions
+    if (CallInst::classof(instr)) {
+      CallInst* call_instr = reinterpret_cast<CallInst*>(instr);
+      Function* old_fn = call_instr->getCalledFunction();
+      // look for call instruction that matches the name
+      if (old_fn != NULL && old_fn->getName().find(replacee_name) != string::npos) {
+        // Replace the called function
+        call_instr->setCalledFunction(new_fn);
+        ++*replaced;
       }
     }
   }

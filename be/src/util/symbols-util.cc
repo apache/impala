@@ -55,21 +55,25 @@ bool SymbolsUtil::IsMangled(const string& symbol) {
 }
 
 string SymbolsUtil::Demangle(const string& name) {
-  string result;
   int status = 0;
-  char* mangled_name = abi::__cxa_demangle(name.c_str(), NULL, NULL, &status);
-  if (status == 0) result = mangled_name;
-  if (mangled_name != NULL) free(mangled_name);
+  char* demangled_name = abi::__cxa_demangle(name.c_str(), NULL, NULL, &status);
+  if (status != 0) return name;
+  string result = demangled_name;
+  free(demangled_name);
   return result;
 }
 
-string SymbolsUtil::DemangleNameOnly(const string& symbol) {
+string SymbolsUtil::DemangleNoArgs(const string& symbol) {
   string fn_name = Demangle(symbol);
   // Chop off argument list (e.g. "foo(int)" => "foo")
-  fn_name = fn_name.substr(0, fn_name.find('('));
+  return fn_name.substr(0, fn_name.find('('));
+}
+
+string SymbolsUtil::DemangleNameOnly(const string& symbol) {
+  string fn_name = DemangleNoArgs(symbol);
   // Chop off namespace and/or class name if present (e.g. "impala::foo" => "foo")
-  fn_name = fn_name.substr(fn_name.find_last_of(':') + 1);
-  return fn_name;
+  // TODO: fix for templates
+  return fn_name.substr(fn_name.find_last_of(':') + 1);
 }
 
 // Appends <Length><String> to the stream.
