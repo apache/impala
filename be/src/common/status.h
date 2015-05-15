@@ -247,6 +247,15 @@ class Status {
     if (UNLIKELY(!__status__.ok())) return __status__; \
   } while (false)
 
+#define RETURN_IF_ERROR_PREPEND(expr, prepend) \
+  do { \
+    Status _s = (expr); \
+    if (PREDICT_FALSE(!_s.ok())) { \
+      return Status(strings::Substitute("$0: $1", prepend, _s.GetDetail())); \
+    } \
+  } while (0)
+
+
 #define EXIT_IF_ERROR(stmt) \
   do { \
     Status __status__ = (stmt); \
@@ -262,5 +271,11 @@ class Status {
   } while (false)
 
 }
+
+#define DCHECK_OK(to_call) \
+  do { \
+    Status _s = (to_call); \
+    DCHECK(_s.ok()) << "Bad status: " << _s.GetDetail(); \
+  } while (0);
 
 #endif
