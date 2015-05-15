@@ -42,11 +42,14 @@ def get_session_cpu_path():
      under the CPU controller root.
   """
   PROC_SELF_CGROUP = '/proc/self/cgroup'
-  with open(PROC_SELF_CGROUP) as cgroup_paths:
+  cgroup_paths = open(PROC_SELF_CGROUP)
+  try:
     for line in cgroup_paths:
       parts = line.strip().split(':')
       if len(parts) == 3 and parts[1] == 'cpu':
         return parts[2]
+  finally:
+    cgroup_paths.close()
   raise Exception("Process cgroup CPU hierarchy not found in %s" % (PROC_SELF_CGROUP))
 
 def create_impala_cgroup_path(instance_num):
