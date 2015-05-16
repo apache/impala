@@ -299,6 +299,11 @@ mvn install -DskipTests
 
 # build frontend and copy dependencies
 cd ${IMPALA_FE_DIR}
+# on jenkins runs, resolve dependencies quietly to avoid log spew
+if [ "${USER}" == "jenkins" ]; then
+  echo "Quietly resolving FE dependencies."
+  mvn -q dependency:resolve
+fi
 mvn package -DskipTests=true
 
 # Build the shell tarball

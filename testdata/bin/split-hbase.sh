@@ -8,8 +8,14 @@ fi
 
 # Split hbasealltypesagg and hbasealltypessmall and assign their splits
 cd $IMPALA_HOME/testdata
-mvn clean package
-mvn dependency:copy-dependencies
+mvn clean
+# quietly resolve dependencies to avoid log spew in jenkins runs
+if [ "${USER}" == "jenkins" ]; then
+  echo "Quietly resolving testdata dependencies."
+  mvn -q dependency:resolve
+fi
+mvn package
+mvn -q dependency:copy-dependencies
 
 . ${IMPALA_HOME}/bin/set-classpath.sh
 export CLASSPATH=$IMPALA_HOME/testdata/target/impala-testdata-0.1-SNAPSHOT.jar:$CLASSPATH
