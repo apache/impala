@@ -33,6 +33,7 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string.hpp>
 #include <gutil/strings/substitute.h>
+#include <errno.h>
 
 #include "common/logging.h"
 #include "exprs/expr.h"
@@ -607,9 +608,22 @@ Status Coordinator::FinalizeSuccessfulInsert() {
         // files by Hive and Impala, but directories are ignored (and may legitimately
         // be used to store permanent non-table data by other applications).
         int num_files = 0;
+        // hfdsListDirectory() only sets errno if there is an error, but it doesn't set
+        // it to 0 if the call succeed. When there is no error, errno could be any
+        // value. So need to clear errno before calling it.
+        // Once HDFS-8407 is fixed, the errno reset won't be needed.
+        errno = 0;
         hdfsFileInfo* existing_files =
             hdfsListDirectory(hdfs_connection, part_path.c_str(), &num_files);
-        if (existing_files == NULL) {
+        if (existing_files == NULL && errno == EAGAIN) {
+          errno = 0;
+          existing_files =
+              hdfsListDirectory(hdfs_connection, part_path.c_str(), &num_files);
+        }
+        // hdfsListDirectory() returns NULL not only when there is an error but also
+        // when the directory is empty(HDFS-8407). Need to check errno to make sure
+        // the call fails.
+        if (existing_files == NULL && errno != 0) {
           return GetHdfsErrorMsg("Could not list directory: ", part_path);
         }
         for (int i = 0; i < num_files; ++i) {

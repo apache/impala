@@ -395,6 +395,30 @@ functional.insert_overwrite_nopart SELECT int_col FROM functional.tinyinttable""
     assert len(new_ls['FileStatuses']['FileStatus']) == 1
     assert new_ls['FileStatuses'] == ls['FileStatuses']
 
+    # Run an insert overwrite/select that returns an empty resultset
+    insert_query = "INSERT OVERWRITE " + table_name + \
+        " PARTITION(year=2009, month=1) select 1, 1 from " + table_name + \
+        " LIMIT 0"
+    self.execute_query_expect_success(self.client, insert_query)
+    # Data file should be deleted
+    new_ls2 = self.hdfs_client.list_dir(partition_path)
+    assert len(new_ls2['FileStatuses']['FileStatus']) == 0
+    assert new_ls['FileStatuses'] != new_ls2['FileStatuses']
+
+    # Test for IMPALA-2008 insert overwrite to an empty table with empty dataset
+    empty_target_table = self.TEST_DB_NAME + ".test_overwrite_with_empty_target"
+    self.execute_query_expect_success(self.client, "CREATE TABLE " \
+        + empty_target_table + "(id INT, col INT)")
+    insert_query = "INSERT OVERWRITE " + empty_target_table + \
+        " SELECT 1, 1 from " + empty_target_table + " LIMIT 0"
+    self.execute_query_expect_success(self.client, insert_query)
+
+    # Delete target table directory, query should fail with
+    # "No such file or directory" error
+    target_table_path = db_path + "test_overwrite_with_empty_target"
+    self.hdfs_client.delete_file_dir(target_table_path, recursive=True)
+    self.execute_query_expect_failure(self.client, insert_query)
+
   def test_multiple_group_acls(self):
     """Test that INSERT correctly respects multiple group ACLs"""
     TBL = "functional.insert_group_acl_permissions"
