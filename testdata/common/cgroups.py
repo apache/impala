@@ -54,12 +54,18 @@ def get_session_cpu_path():
 
 def create_impala_cgroup_path(instance_num):
   """Returns the full filesystem path of a CPU controller cgroup hierarchy which is
-     writeable by an impalad. instance_num is used to provide different (sibiling)
-     cgroups for each impalad instance. The returned cgroup is created if necessary.
+     writeable by an impalad. The base cgroup path is read from the environment variable
+     IMPALA_CGROUP_BASE_PATH if it is set, otherwise it is set to a child of the path of
+     the cgroup for this process.
+
+     instance_num is used to provide different (sibiling) cgroups for each impalad
+     instance. The returned cgroup is created if necessary.
   """
-  # Join root path with the cpu hierarchy path by concatenting the strings. Can't use
-  # path.join() because the session cpu hierarchy path looks like an absolute FS path.
-  parent_cgroup = "%s%s" % (get_cpu_controller_root(), get_session_cpu_path())
+  parent_cgroup = os.getenv('IMPALA_CGROUP_BASE_PATH')
+  if parent_cgroup is None:
+    # Join root path with the cpu hierarchy path by concatenting the strings. Can't use
+    # path.join() because the session cpu hierarchy path looks like an absolute FS path.
+    parent_cgroup = "%s%s" % (get_cpu_controller_root(), get_session_cpu_path())
   cgroup_path = os.path.join(parent_cgroup, ("impala-%s" % instance_num))
   try:
     os.makedirs(cgroup_path)
