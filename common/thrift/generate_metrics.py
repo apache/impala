@@ -16,7 +16,10 @@
 import sys
 import os
 import re
-import json
+try:
+  import json
+except ImportError:
+  import simplejson as json # For Python 2.4
 
 def load_metrics(source_file):
   """Reads the json file of metric definitions and returns a map of metric names to

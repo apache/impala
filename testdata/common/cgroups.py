@@ -69,7 +69,7 @@ def create_impala_cgroup_path(instance_num):
   cgroup_path = os.path.join(parent_cgroup, ("impala-%s" % instance_num))
   try:
     os.makedirs(cgroup_path)
-  except OSError as ex:
+  except OSError, ex:
     if ex.errno == errno.EEXIST and os.path.isdir(cgroup_path):
         pass
     else: raise
