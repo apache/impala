@@ -558,6 +558,7 @@ StringVal AggregateFunctions::StringConcatFinalize(FunctionContext* ctx,
 const static int NUM_PC_BITMAPS = 64; // number of bitmaps
 const static int PC_BITMAP_LENGTH = 32; // the length of each bit map
 const static float PC_THETA = 0.77351f; // the magic number to compute the final result
+const static float PC_K = -1.75f; // the magic correction for low cardinalities
 
 void AggregateFunctions::PcInit(FunctionContext* c, StringVal* dst) {
   // Initialize the distinct estimate bit map - Probabilistic Counting Algorithms for Data
@@ -705,7 +706,11 @@ double DistinceEstimateFinalize(const StringVal& src) {
     sum += row_bit_count;
   }
   double avg = static_cast<double>(sum) / static_cast<double>(NUM_PC_BITMAPS);
-  double result = pow(static_cast<double>(2), avg) / PC_THETA;
+  // We apply a correction for small cardinalities based on equation (6) from
+  // Scheuermann et al DialM-POMC '07 so the above equation becomes
+  // (2^avg - 2^PC_K*avg) / PC_THETA
+  double result = (pow(static_cast<double>(2), avg) -
+                   pow(static_cast<double>(2), avg * PC_K)) / PC_THETA;
   return result;
 }
 
