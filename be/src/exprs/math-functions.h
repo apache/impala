@@ -45,6 +45,10 @@ class MathFunctions {
   static DoubleVal Acos(FunctionContext*, const DoubleVal&);
   static DoubleVal Tan(FunctionContext*, const DoubleVal&);
   static DoubleVal Atan(FunctionContext*, const DoubleVal&);
+  static DoubleVal Atan2(FunctionContext*, const DoubleVal&, const DoubleVal&);
+  static DoubleVal Cosh(FunctionContext*, const DoubleVal&);
+  static DoubleVal Tanh(FunctionContext*, const DoubleVal&);
+  static DoubleVal Sinh(FunctionContext*, const DoubleVal&);
   static DoubleVal Sqrt(FunctionContext*, const DoubleVal&);
   static DoubleVal Exp(FunctionContext*, const DoubleVal&);
   static BigIntVal Ceil(FunctionContext*, const DoubleVal&);

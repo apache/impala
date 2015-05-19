@@ -50,6 +50,14 @@ DoubleVal MathFunctions::E(FunctionContext* ctx) {
     return RET_TYPE(FN(v.val)); \
   }
 
+// Generates a UDF that always calls FN() on the input vals and returns it.
+#define TWO_ARG_MATH_FN(NAME, RET_TYPE, INPUT_TYPE1, INPUT_TYPE2, FN) \
+  RET_TYPE MathFunctions::NAME(FunctionContext* ctx, \
+    const INPUT_TYPE1& v1, const INPUT_TYPE2& v2) { \
+    if (v1.is_null || v2.is_null) return RET_TYPE::null(); \
+    return RET_TYPE(FN(v1.val, v2.val)); \
+  }
+
 ONE_ARG_MATH_FN(Abs, BigIntVal, BigIntVal, llabs);
 ONE_ARG_MATH_FN(Abs, DoubleVal, DoubleVal, fabs);
 ONE_ARG_MATH_FN(Abs, FloatVal, FloatVal, fabs);
@@ -62,12 +70,17 @@ ONE_ARG_MATH_FN(Cos, DoubleVal, DoubleVal, cos);
 ONE_ARG_MATH_FN(Acos, DoubleVal, DoubleVal, acos);
 ONE_ARG_MATH_FN(Tan, DoubleVal, DoubleVal, tan);
 ONE_ARG_MATH_FN(Atan, DoubleVal, DoubleVal, atan);
+ONE_ARG_MATH_FN(Cosh, DoubleVal, DoubleVal, cosh);
+ONE_ARG_MATH_FN(Tanh, DoubleVal, DoubleVal, tanh);
+ONE_ARG_MATH_FN(Sinh, DoubleVal, DoubleVal, sinh);
 ONE_ARG_MATH_FN(Sqrt, DoubleVal, DoubleVal, sqrt);
 ONE_ARG_MATH_FN(Ceil, BigIntVal, DoubleVal, ceil);
 ONE_ARG_MATH_FN(Floor, BigIntVal, DoubleVal, floor);
 ONE_ARG_MATH_FN(Ln, DoubleVal, DoubleVal, log);
 ONE_ARG_MATH_FN(Log10, DoubleVal, DoubleVal, log10);
 ONE_ARG_MATH_FN(Exp, DoubleVal, DoubleVal, exp);
+
+TWO_ARG_MATH_FN(Atan2, DoubleVal, DoubleVal, DoubleVal, atan2);
 
 FloatVal MathFunctions::Sign(FunctionContext* ctx, const DoubleVal& v) {
   if (v.is_null) return FloatVal::null();

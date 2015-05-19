@@ -2333,6 +2333,17 @@ TEST_F(ExprTest, MathTrigonometricFunctions) {
   TestValue("tan(pi())", TYPE_DOUBLE, tan(M_PI));
   TestValue("atan(pi())", TYPE_DOUBLE, atan(M_PI));
   TestValue("atan(pi() * - 1.0)", TYPE_DOUBLE, atan(M_PI * -1.0));
+  TestValue("cosh(0)", TYPE_DOUBLE, cosh(0));
+  TestValue("tanh(0)", TYPE_DOUBLE, tanh(0));
+  TestValue("sinh(0)", TYPE_DOUBLE, sinh(0));
+  TestValue("cosh(pi())", TYPE_DOUBLE, cosh(M_PI));
+  TestValue("tanh(pi())", TYPE_DOUBLE, tanh(M_PI));
+  TestValue("sinh(pi())", TYPE_DOUBLE, sinh(M_PI));
+  TestValue("cosh(-pi())", TYPE_DOUBLE, cosh(M_PI * -1.0));
+  TestValue("tanh(-pi())", TYPE_DOUBLE, tanh(M_PI * -1.0));
+  TestValue("sinh(-pi())", TYPE_DOUBLE, sinh(M_PI * -1.0));
+  TestValue("atan2(1,0)", TYPE_DOUBLE, atan2(1,0));
+  TestValue("atan2(-1,0)", TYPE_DOUBLE, atan2(-1,0));
   // this gets a very very small number rather than 0.
   // TestValue("radians(0)", TYPE_DOUBLE, 0);
   TestValue("radians(180.0)", TYPE_DOUBLE, M_PI);
