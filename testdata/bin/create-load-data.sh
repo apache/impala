@@ -313,6 +313,9 @@ if [ $SKIP_METADATA_LOAD -eq 0 ]; then
   # load functional/tpcds/tpch
   load-data "functional-query" "exhaustive"
   load-data "tpch" "core"
+  # Load tpch nested data.
+  # TODO: Hacky and introduces more complexity into the system, but it is expedient.
+  ${IMPALA_HOME}/testdata/bin/load_nested.sh
   load-data "tpcds" "core"
   load-aux-workloads
   copy-and-load-dependent-tables

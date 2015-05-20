@@ -505,10 +505,8 @@ def generate_statements(output_name, test_vectors, sections,
           print ("CREATE section not supported with %s, "
                  "skipping: '%s'" % (file_format, table_name))
           continue
-      else:
-        assert columns, "No CREATE or COLUMNS section defined for table " + table_name
+      elif columns:
         avro_schema_dir = "%s/%s" % (AVRO_SCHEMA_DIR, data_set)
-        temp_table_name = table_name
         table_template = build_table_template(
           create_file_format, columns, partition_columns,
           row_format, avro_schema_dir, table_name)
@@ -518,9 +516,12 @@ def generate_statements(output_name, test_vectors, sections,
             os.makedirs(avro_schema_dir)
           with open("%s/%s.json" % (avro_schema_dir, table_name),"w") as f:
             f.write(avro_schema(columns))
+      else:
+        table_template = None
 
-      output.create.append(build_create_statement(table_template, table_name, db_name,
-          db_suffix, create_file_format, create_codec, data_path))
+      if table_template:
+        output.create.append(build_create_statement(table_template, table_name, db_name,
+            db_suffix, create_file_format, create_codec, data_path))
       # HBASE create table
       if file_format == 'hbase':
         # If the HBASE_COLUMN_FAMILIES section does not exist, default to 'd'
