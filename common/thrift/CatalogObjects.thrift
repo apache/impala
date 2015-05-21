@@ -321,8 +321,8 @@ struct TKuduTable {
   // Network address of a master host in the form of 0.0.0.0:port
   2: required string master_address
 
-  // Name of the columns including key columns
-  3: required list<string> column_names
+  // Name of the key columns
+  3: required list<string> key_columns
 }
 
 // Represents a table or view.

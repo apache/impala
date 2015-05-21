@@ -304,13 +304,13 @@ class KuduTableDescriptor : public TableDescriptor {
   virtual std::string DebugString() const;
   const std::string table_name() const { return table_name_; }
   const std::string kudu_master_address() const { return master_address_; }
-  const std::vector<std::string>& col_names() const { return col_names_; }
+  const std::vector<std::string>& key_columns() const { return key_columns_; }
 
  private:
   // native name of Kudu table
   std::string table_name_;
   std::string master_address_;
-  std::vector<std::string> col_names_;
+  std::vector<std::string> key_columns_;
 };
 
 class TupleDescriptor {

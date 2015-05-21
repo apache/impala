@@ -235,15 +235,15 @@ KuduTableDescriptor::KuduTableDescriptor(const TTableDescriptor& tdesc)
   : TableDescriptor(tdesc),
     table_name_(tdesc.kuduTable.table_name),
     master_address_(tdesc.kuduTable.master_address),
-    col_names_(tdesc.kuduTable.column_names) {
+    key_columns_(tdesc.kuduTable.key_columns) {
 }
 
 string KuduTableDescriptor::DebugString() const {
   stringstream out;
   out << "KuduTable(" << TableDescriptor::DebugString() << " table=" << table_name_;
   out << " master_addr=" << master_address_;
-  out << " col_names=[";
-  out << join(col_names_, ":");
+  out << " key_columns=[";
+  out << join(key_columns_, ":");
   out << "]";
   return out.str();
 }
