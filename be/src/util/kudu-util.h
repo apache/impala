@@ -15,11 +15,15 @@
 #ifndef IMPALA_UTIL_KUDU_UTIL_H_
 #define IMPALA_UTIL_KUDU_UTIL_H_
 
+#include <boost/unordered_set.hpp>
+
 #include "kudu/client/client.h"
 #include "kudu/client/schema.h"
 #include "kudu/gutil/bind.h"
 #include "kudu/util/logging_callback.h"
 #include "runtime/descriptors.h"
+
+#include "common/names.h"
 
 namespace impala {
 
@@ -86,6 +90,46 @@ static Status KuduToImpalaType(const kudu::client::KuduColumnSchema::DataType& k
                     KuduColumnSchema::DataTypeToString(kudu_type));
   }
   return Status::OK();
+}
+
+// Builds a KuduSchema from a TupleDescriptor.
+Status KuduSchemaFromTupleDescriptor(const TupleDescriptor& tuple_desc,
+                                     kudu::client::KuduSchema* schema) {
+#ifndef NDEBUG
+  // In debug mode try a dynamic cast. If it fails it means that the
+  // TableDescriptor is not an instance of KuduTableDescriptor.
+  DCHECK(dynamic_cast<const KuduTableDescriptor*>(tuple_desc.table_desc()))
+      << "TableDescriptor must be an instance KuduTableDescriptor.";
+#endif
+
+  using kudu::client::KuduColumnSchema;
+
+  DCHECK_NOTNULL(schema);
+
+  const KuduTableDescriptor* table_desc =
+      static_cast<const KuduTableDescriptor*>(tuple_desc.table_desc());
+  LOG(INFO) << "Table desc for schema: " << table_desc->DebugString();
+
+  unordered_set<string> key_cols(table_desc->key_columns().begin(),
+                                 table_desc->key_columns().begin());
+
+  vector<KuduColumnSchema> kudu_cols;
+  const std::vector<SlotDescriptor*>& slots = tuple_desc.slots();
+  for (int i = 0; i < slots.size(); ++i) {
+    if (!slots[i]->is_materialized()) continue;
+    int col_idx = slots[i]->col_pos();
+    const string& col_name = table_desc->col_names()[col_idx];
+    // Initialize the DataType to avoid an uninitialized warning.
+    KuduColumnSchema::DataType kt = KuduColumnSchema::INT8;
+    RETURN_IF_ERROR(ImpalaToKuduType(slots[i]->type(), &kt));
+
+    // Key columns are not nullable, all others are for now.
+    bool nullable = key_cols.find(col_name) == key_cols.end();
+    kudu_cols.push_back(KuduColumnSchema(col_name, kt, nullable));
+  }
+
+  schema->Reset(kudu_cols, key_cols.size());
+  return Status::OK;
 }
 
 static void LogKuduMessage(kudu::KuduLogSeverity severity,
