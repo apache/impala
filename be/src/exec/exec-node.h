@@ -38,6 +38,7 @@ class TPlan;
 class TupleRow;
 class DataSink;
 class MemTracker;
+class SubplanNode;
 
 /// Superclass of all executor nodes.
 /// All subclasses need to make sure to check RuntimeState::is_cancelled()
@@ -159,6 +160,8 @@ class ExecNode {
   int id() const { return id_; }
   TPlanNodeType::type type() const { return type_; }
   const RowDescriptor& row_desc() const { return row_descriptor_; }
+  ExecNode* child(int i) { return children_[i]; }
+  int num_children() const { return children_.size(); }
   int64_t rows_returned() const { return num_rows_returned_; }
   int64_t limit() const { return limit_; }
   bool ReachedLimit() { return limit_ != -1 && num_rows_returned_ >= limit_; }
@@ -245,7 +248,6 @@ class ExecNode {
   boost::mutex exec_options_lock_;
   std::string runtime_exec_options_;
 
-  ExecNode* child(int i) { return children_[i]; }
   bool is_closed() { return is_closed_; }
 
   /// Create a single exec node derived from thrift node; place exec node in 'pool'.

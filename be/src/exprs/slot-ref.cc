@@ -19,6 +19,7 @@
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "gen-cpp/Exprs_types.h"
+#include "runtime/array-value.h"
 #include "runtime/runtime-state.h"
 
 #include "common/names.h"
@@ -457,6 +458,14 @@ DecimalVal SlotRef::GetDecimalVal(ExprContext* context, TupleRow* row) {
       DCHECK(false);
       return DecimalVal::null();
   }
+}
+
+ArrayVal SlotRef::GetArrayVal(ExprContext* context, TupleRow* row) {
+  DCHECK(type_.IsCollectionType());
+  Tuple* t = row->GetTuple(tuple_idx_);
+  if (t == NULL || t->IsNull(null_indicator_offset_)) return ArrayVal::null();
+  ArrayValue* array_value = reinterpret_cast<ArrayValue*>(t->GetSlot(slot_offset_));
+  return ArrayVal(array_value->ptr, array_value->num_tuples);
 }
 
 }

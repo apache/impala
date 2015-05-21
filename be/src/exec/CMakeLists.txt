@@ -69,11 +69,14 @@ add_library(Exec
   scan-node.cc
   scanner-context.cc
   select-node.cc
+  singular-row-src-node.cc
   sort-exec-exprs.cc
   sort-node.cc
+  subplan-node.cc
   text-converter.cc
   topn-node.cc
   union-node.cc
+  unnest-node.cc
 )
 add_dependencies(Exec thrift-deps)
 

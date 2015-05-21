@@ -22,29 +22,29 @@
 /// take arguments (ExprContext*, TupleRow*). The return type is a *Val (i.e. a subclass
 /// of AnyVal). Thus, a single expression will implement a compute function for every
 /// return type it supports.
-//
+///
 /// UDX: user-defined X. E.g., user-defined function, user-defined aggregate. Something
 /// that is written by an external user.
-//
+///
 /// Scalar function call: An expr that returns a single scalar value and can be
 /// implemented using the UDF interface. Note that this includes builtins, which although
 /// not being user-defined still use the same interface as UDFs (i.e., they are
 /// implemented as functions with signature "*Val (FunctionContext*, *Val, *Val...)").
-//
+///
 /// Aggregate function call: a UDA or builtin aggregate function.
-//
+///
 /// --- Expr overview:
-//
+///
 /// The Expr superclass defines a virtual Get*Val() compute function for each possible
 /// return type (GetBooleanVal(), GetStringVal(), etc). Expr subclasses implement the
 /// Get*Val() functions associated with their possible return types; for many Exprs this
 /// will be a single function. These functions are generally cross-compiled to both native
 /// and IR libraries. In the interpreted path, the native compute functions are run as-is.
-//
+///
 /// For the codegen path, Expr defines a virtual method GetCodegendComputeFn() that
 /// returns the Function* of the expr's compute function. Note that we do not need a
 /// separate GetCodegendComputeFn() for each type.
-//
+///
 /// Only short-circuited operators (e.g. &&, ||) and other special functions like literals
 /// must implement custom Get*Val() compute functions. Scalar function calls use the
 /// generic compute functions implemented by ScalarFnCall(). For cross-compiled compute
@@ -53,9 +53,18 @@
 /// functions (which we identify via the Get*Val() static wrappers), and replaces them
 /// with the codegen'd version of that function. This allows us to write a single function
 /// for both the interpreted and codegen paths.
-//
+///
+/// Only short-circuited operators (e.g. &&, ||) and other special functions like
+/// literals must implement custom Get*Val() compute functions. Scalar function calls
+/// use the generic compute functions implemented by ScalarFnCall(). For cross-compiled
+/// compute functions, GetCodegendComputeFn() can use ReplaceChildCallsComputeFn(), which
+/// takes a cross-compiled IR Get*Val() function, pulls out any calls to the children's
+/// Get*Val() functions (which we identify via the Get*Val() static wrappers), and
+/// replaces them with the codegen'd version of that function. This allows us to write a
+/// single function for both the interpreted and codegen paths.
+///
 /// --- Expr users (e.g. exec nodes):
-//
+///
 /// A typical usage pattern will look something like:
 /// 1. Expr::CreateExprTrees()
 /// 2. Expr::Prepare()
@@ -63,12 +72,12 @@
 /// 4. Expr::Clone() [for multi-threaded execution]
 /// 5. Evaluate exprs via Get*Val() calls
 /// 6. Expr::Close() [called once per ExprContext, including clones]
-//
+///
 /// Expr users should use the static Get*Val() wrapper functions to evaluate exprs,
 /// cross-compile the resulting function, and use ReplaceGetValCalls() to create the
 /// codegen'd function. See the comments on these functions for more details. This is a
 /// similar pattern to that used by the cross-compiled compute functions.
-//
+///
 /// TODO:
 /// - Fix codegen compile time
 /// - Fix perf regressions via extra optimization passes + patching LLVM
@@ -90,6 +99,7 @@
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
 #include "udf/udf.h"
+#include "udf/udf-internal.h" // for ArrayVal
 
 using namespace impala_udf;
 
@@ -117,10 +127,10 @@ class Expr {
  public:
   virtual ~Expr();
 
-  /// Virtual compute functions for each *Val type. Each Expr subclass should implement the
-  /// functions for the return type(s) it supports. For example, a boolean function will
-  /// only implement GetBooleanVal(). Some Exprs, like Literal, have many possible return
-  /// types and will implement multiple Get*Val() functions.
+  /// Virtual compute functions for each *Val type. Each Expr subclass should implement
+  /// the functions for the return type(s) it supports. For example, a boolean function
+  /// will only implement GetBooleanVal(). Some Exprs, like Literal, have many possible
+  /// return types and will implement multiple Get*Val() functions.
   virtual BooleanVal GetBooleanVal(ExprContext* context, TupleRow*);
   virtual TinyIntVal GetTinyIntVal(ExprContext* context, TupleRow*);
   virtual SmallIntVal GetSmallIntVal(ExprContext* context, TupleRow*);
@@ -129,11 +139,12 @@ class Expr {
   virtual FloatVal GetFloatVal(ExprContext* context, TupleRow*);
   virtual DoubleVal GetDoubleVal(ExprContext* context, TupleRow*);
   virtual StringVal GetStringVal(ExprContext* context, TupleRow*);
+  virtual ArrayVal GetArrayVal(ExprContext* context, TupleRow*);
   virtual TimestampVal GetTimestampVal(ExprContext* context, TupleRow*);
   virtual DecimalVal GetDecimalVal(ExprContext* context, TupleRow*);
 
-  /// Get the number of digits after the decimal that should be displayed for this
-  /// value. Returns -1 if no scale has been specified (currently the scale is only set for
+  /// Get the number of digits after the decimal that should be displayed for this value.
+  /// Returns -1 if no scale has been specified (currently the scale is only set for
   /// doubles set by RoundUpTo). GetValue() must have already been called.
   /// TODO: is this still necessary?
   int output_scale() const { return output_scale_; }
@@ -259,7 +270,7 @@ class Expr {
 
   static const char* LLVM_CLASS_NAME;
 
-  // Prefix of Expr::GetConstant() function symbols, regardless of template specialization
+  // Prefix of Expr::GetConstant() symbols, regardless of template specialization
   static const char* GET_CONSTANT_SYMBOL_PREFIX;
 
  protected:
@@ -283,9 +294,10 @@ class Expr {
   Expr(const TExprNode& node, bool is_slotref = false);
 
   /// Initializes this expr instance for execution. This does not include initializing
-  /// state in the ExprContext; 'context' should only be used to register a FunctionContext
-  /// via RegisterFunctionContext(). Any IR functions must be generated here.
-  //
+  /// state in the ExprContext; 'context' should only be used to register a
+  /// FunctionContext via RegisterFunctionContext(). Any IR functions must be generated
+  /// here.
+  ///
   /// Subclasses overriding this function should call Expr::Prepare() to recursively call
   /// Prepare() on the expr tree.
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc,
@@ -339,8 +351,8 @@ class Expr {
       ExprContext* ctx, RuntimeState* state, int varargs_buffer_size = 0);
 
   /// Helper function to create an empty Function* with the appropriate signature to be
-  /// returned by GetCodegendComputeFn(). 'name' is the name of the returned Function*. The
-  /// arguments to the function are returned in 'args'.
+  /// returned by GetCodegendComputeFn(). 'name' is the name of the returned Function*.
+  /// The arguments to the function are returned in 'args'.
   llvm::Function* CreateIrFunctionPrototype(LlvmCodeGen* codegen, const std::string& name,
                                             llvm::Value* (*args)[2]);
 
@@ -349,8 +361,8 @@ class Expr {
   //
   /// This is useful for builtins that can't be implemented with the UDF interface
   /// (e.g. functions that need short-circuiting) and that don't have custom codegen
-  /// functions that use the IRBuilder. It doesn't provide any performance benefit over the
-  /// interpreted path.
+  /// functions that use the IRBuilder. It doesn't provide any performance benefit over
+  /// the interpreted path.
   /// TODO: this should be replaced with fancier xcompiling infrastructure
   Status GetCodegendComputeFnWrapper(RuntimeState* state, llvm::Function** fn);
 
@@ -399,8 +411,8 @@ class Expr {
   /// Get*Val() function on expr, passing it the context and row arguments.
   //
   /// These are used to call Get*Val() functions from generated functions, since I don't
-  /// know how to call virtual functions directly. GetStaticGetValWrapper() returns the IR
-  /// function of the appropriate wrapper function.
+  /// know how to call virtual functions directly. GetStaticGetValWrapper() returns the
+  /// IR function of the appropriate wrapper function.
   static BooleanVal GetBooleanVal(Expr* expr, ExprContext* context, TupleRow* row);
   static TinyIntVal GetTinyIntVal(Expr* expr, ExprContext* context, TupleRow* row);
   static SmallIntVal GetSmallIntVal(Expr* expr, ExprContext* context, TupleRow* row);

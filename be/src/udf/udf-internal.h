@@ -172,5 +172,26 @@ class FunctionContextImpl {
 
 }
 
+namespace impala_udf {
+
+/// Temporary ArrayVal definition. This is not ready for public consumption because users
+/// must have access to our internal tuple layout.
+struct ArrayVal : public AnyVal {
+  uint8_t* ptr;
+  int num_tuples;
+
+  /// Construct an ArrayVal from ptr/num_tuples. Note: this does not make a copy of ptr so
+  /// the buffer must exist as long as this ArrayVal does.
+  ArrayVal(uint8_t* ptr = NULL, int num_tuples = 0) : ptr(ptr), num_tuples(num_tuples) {}
+
+  static ArrayVal null() {
+    ArrayVal av;
+    av.is_null = true;
+    return av;
+  }
+};
+
+}
+
 #endif
 

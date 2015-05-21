@@ -668,6 +668,10 @@ StringVal Expr::GetStringVal(ExprContext* context, TupleRow* row) {
   DCHECK(false) << DebugString();
   return StringVal::null();
 }
+ArrayVal Expr::GetArrayVal(ExprContext* context, TupleRow* row) {
+  DCHECK(false) << DebugString();
+  return ArrayVal::null();
+}
 TimestampVal Expr::GetTimestampVal(ExprContext* context, TupleRow* row) {
   DCHECK(false) << DebugString();
   return TimestampVal::null();

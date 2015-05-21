@@ -40,6 +40,9 @@ enum TPlanNodeType {
   CROSS_JOIN_NODE,
   DATA_SOURCE_NODE,
   ANALYTIC_EVAL_NODE,
+  SINGULAR_ROW_SRC_NODE,
+  UNNEST_NODE,
+  SUBPLAN_NODE,
 }
 
 // phases of an execution node
@@ -333,6 +336,12 @@ struct TExchangeNode {
   3: optional i64 offset
 }
 
+struct TUnnestNode {
+  // Expr that returns the in-memory collection to be scanned.
+  // Currently always a SlotRef into an array-typed slot.
+  1: required Exprs.TExpr collection_expr
+}
+
 // This is essentially a union of all messages corresponding to subclasses
 // of PlanNode.
 struct TPlanNode {
@@ -357,6 +366,7 @@ struct TPlanNode {
   14: optional TUnionNode union_node
   15: optional TExchangeNode exchange_node
   16: optional TAnalyticNode analytic_node
+  20: optional TUnnestNode unnest_node
 
   // Label that should be used to print this node to the user.
   17: optional string label

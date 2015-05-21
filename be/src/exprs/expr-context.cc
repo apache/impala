@@ -202,6 +202,7 @@ void* ExprContext::GetValue(TupleRow* row) {
 }
 
 void* ExprContext::GetValue(Expr* e, TupleRow* row) {
+  // TODO: Introduce and handle ARRAY_TYPE here.
   switch (e->type_.type) {
     case TYPE_BOOLEAN: {
       impala_udf::BooleanVal v = e->GetBooleanVal(this, row);
@@ -330,6 +331,9 @@ DoubleVal ExprContext::GetDoubleVal(TupleRow* row) {
 }
 StringVal ExprContext::GetStringVal(TupleRow* row) {
   return root_->GetStringVal(this, row);
+}
+ArrayVal ExprContext::GetArrayVal(TupleRow* row) {
+  return root_->GetArrayVal(this, row);
 }
 TimestampVal ExprContext::GetTimestampVal(TupleRow* row) {
   return root_->GetTimestampVal(this, row);

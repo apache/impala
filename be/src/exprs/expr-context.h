@@ -20,6 +20,7 @@
 #include "common/status.h"
 #include "exprs/expr-value.h"
 #include "udf/udf.h"
+#include "udf/udf-internal.h" // for ArrayVal
 
 using namespace impala_udf;
 
@@ -115,6 +116,7 @@ class ExprContext {
   FloatVal GetFloatVal(TupleRow* row);
   DoubleVal GetDoubleVal(TupleRow* row);
   StringVal GetStringVal(TupleRow* row);
+  ArrayVal GetArrayVal(TupleRow* row);
   TimestampVal GetTimestampVal(TupleRow* row);
   DecimalVal GetDecimalVal(TupleRow* row);
 
