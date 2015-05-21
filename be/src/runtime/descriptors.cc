@@ -238,6 +238,7 @@ TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
     num_null_bytes_(tdesc.numNullBytes),
     num_materialized_slots_(0),
     slots_(),
+    tuple_path_(tdesc.tuplePath),
     llvm_struct_(NULL) {
 }
 

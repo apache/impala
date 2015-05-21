@@ -303,6 +303,8 @@ class TupleDescriptor {
   int num_null_bytes() const { return num_null_bytes_; }
   const std::vector<SlotDescriptor*>& slots() const { return slots_; }
   const std::vector<SlotDescriptor*>& string_slots() const { return string_slots_; }
+  const std::vector<int>& tuple_path() const { return tuple_path_; }
+
   const TableDescriptor* table_desc() const { return table_desc_; }
 
   TupleId id() const { return id_; }
@@ -331,6 +333,12 @@ class TupleDescriptor {
   int num_materialized_slots_;
   std::vector<SlotDescriptor*> slots_;  // contains all slots
   std::vector<SlotDescriptor*> string_slots_;  // contains only materialized string slots
+
+  // Absolute path into the table schema pointing to the collection whose fields
+  // are materialized into this tuple. Non-empty if this tuple belongs to a
+  // nested collection, empty otherwise.
+  std::vector<int> tuple_path_;
+
   llvm::StructType* llvm_struct_; // cache for the llvm struct type for this tuple desc
 
   TupleDescriptor(const TTupleDescriptor& tdesc);
