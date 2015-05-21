@@ -48,17 +48,24 @@ static TSlotDescriptor MakeSlotDescriptor(int id, int parent_id, const ColumnTyp
   return slot_desc;
 }
 
-static TTupleDescriptor MakeTupleDescriptor(int id, int byte_size, int num_null_bytes) {
+static TTupleDescriptor MakeTupleDescriptor(int id, int byte_size, int num_null_bytes,
+    int table_id = -1) {
   TTupleDescriptor tuple_desc;
   tuple_desc.__set_id(id);
   tuple_desc.__set_byteSize(byte_size);
   tuple_desc.__set_numNullBytes(num_null_bytes);
+  if (table_id != -1) tuple_desc.__set_tableId(table_id);
   return tuple_desc;
+}
+
+void DescriptorTblBuilder::SetTableDescriptor(const TTableDescriptor& table_desc) {
+  DCHECK(thrift_desc_tbl_.tableDescriptors.empty())
+      << "Only one TableDescriptor can be set.";
+  thrift_desc_tbl_.tableDescriptors.push_back(table_desc);
 }
 
 DescriptorTbl* DescriptorTblBuilder::Build() {
   DescriptorTbl* desc_tbl;
-  TDescriptorTable thrift_desc_tbl;
   int slot_id = tuples_descs_.size(); // First ids reserved for TupleDescriptors
 
   for (int i = 0; i < tuples_descs_.size(); ++i) {
@@ -68,7 +75,7 @@ DescriptorTbl* DescriptorTblBuilder::Build() {
     int tuple_id = i;
 
     for(int j = 0; j < slot_types.size(); ++j) {
-      thrift_desc_tbl.slotDescriptors.push_back(
+      thrift_desc_tbl_.slotDescriptors.push_back(
           MakeSlotDescriptor(++slot_id, tuple_id, slot_types[j], j, byte_offset));
 
       int byte_size = slot_types[j].GetByteSize();
@@ -80,11 +87,18 @@ DescriptorTbl* DescriptorTblBuilder::Build() {
       byte_offset += byte_size;
     }
 
-    thrift_desc_tbl.tupleDescriptors.push_back(
-        MakeTupleDescriptor(tuple_id, byte_offset, num_null_bytes));
+    // If someone set a table descriptor pass that id along to the tuple descriptor.
+    if (thrift_desc_tbl_.tableDescriptors.empty()) {
+      thrift_desc_tbl_.tupleDescriptors.push_back(
+          MakeTupleDescriptor(tuple_id, byte_offset, num_null_bytes));
+    } else {
+      thrift_desc_tbl_.tupleDescriptors.push_back(
+          MakeTupleDescriptor(tuple_id, byte_offset, num_null_bytes,
+              thrift_desc_tbl_.tableDescriptors[0].id));
+    }
   }
 
-  Status status = DescriptorTbl::Create(obj_pool_, thrift_desc_tbl, &desc_tbl);
+  Status status = DescriptorTbl::Create(obj_pool_, thrift_desc_tbl_, &desc_tbl);
   DCHECK(status.ok());
   return desc_tbl;
 }

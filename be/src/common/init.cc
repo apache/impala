@@ -19,11 +19,11 @@
 
 #include "common/logging.h"
 #include "common/status.h"
+#include "exec/kudu-util.h"
 #include "exprs/expr.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/disk-info.h"
-#include "util/kudu-util.h"
 #include "util/logging-support.h"
 #include "util/mem-info.h"
 #include "util/network-util.h"

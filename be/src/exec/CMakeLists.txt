@@ -65,6 +65,9 @@ add_library(Exec
   partitioned-aggregation-node-ir.cc
   partitioned-hash-join-node.cc
   partitioned-hash-join-node-ir.cc
+  kudu-scanner.cc
+  kudu-scan-node.cc
+  kudu-util.cc
   read-write-util.cc
   scan-node.cc
   scanner-context.cc
@@ -85,3 +88,4 @@ ADD_BE_TEST(parquet-plain-test)
 ADD_BE_TEST(parquet-version-test)
 ADD_BE_TEST(row-batch-list-test)
 ADD_BE_TEST(incr-stats-util-test)
+ADD_BE_TEST(kudu-scan-node-test)

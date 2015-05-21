@@ -12,23 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IMPALA_UTIL_KUDU_UTIL_H_
-#define IMPALA_UTIL_KUDU_UTIL_H_
+#include "exec/kudu-util.h"
 
 #include <boost/unordered_set.hpp>
+#include <kudu/client/schema.h>
+#include <kudu/gutil/bind.h>
+#include <kudu/util/logging_callback.h>
 
-#include "kudu/client/client.h"
-#include "kudu/client/schema.h"
-#include "kudu/gutil/bind.h"
-#include "kudu/util/logging_callback.h"
 #include "runtime/descriptors.h"
 
 #include "common/names.h"
 
 namespace impala {
 
-static Status ImpalaToKuduType(const ColumnType& impala_type,
-                               kudu::client::KuduColumnSchema::DataType* kudu_type) {
+Status ImpalaToKuduType(const ColumnType& impala_type,
+    kudu::client::KuduColumnSchema::DataType* kudu_type) {
   using kudu::client::KuduColumnSchema;
 
   switch (impala_type.type) {
@@ -54,13 +52,15 @@ static Status ImpalaToKuduType(const ColumnType& impala_type,
       *kudu_type = KuduColumnSchema::DOUBLE;
       break;
     default:
+      DCHECK(false) << "Impala type unsupported in Kudu: "
+          << TypeToString(impala_type.type);
       return Status(TErrorCode::IMPALA_KUDU_TYPE_MISSING, TypeToString(impala_type.type));
   }
   return Status::OK();
 }
 
-static Status KuduToImpalaType(const kudu::client::KuduColumnSchema::DataType& kudu_type,
-                               ColumnType* impala_type) {
+Status KuduToImpalaType(const kudu::client::KuduColumnSchema::DataType& kudu_type,
+    ColumnType* impala_type) {
   using kudu::client::KuduColumnSchema;
 
   switch (kudu_type) {
@@ -86,15 +86,16 @@ static Status KuduToImpalaType(const kudu::client::KuduColumnSchema::DataType& k
       *impala_type = TYPE_DOUBLE;
       break;
     default:
+      DCHECK(false) << "Kudu type unsupported in impala: "
+          << KuduColumnSchema::DataTypeToString(kudu_type);
       return Status(TErrorCode::KUDU_IMPALA_TYPE_MISSING,
                     KuduColumnSchema::DataTypeToString(kudu_type));
   }
   return Status::OK();
 }
 
-// Builds a KuduSchema from a TupleDescriptor.
 Status KuduSchemaFromTupleDescriptor(const TupleDescriptor& tuple_desc,
-                                     kudu::client::KuduSchema* schema) {
+    kudu::client::KuduSchema* schema) {
 #ifndef NDEBUG
   // In debug mode try a dynamic cast. If it fails it means that the
   // TableDescriptor is not an instance of KuduTableDescriptor.
@@ -111,7 +112,7 @@ Status KuduSchemaFromTupleDescriptor(const TupleDescriptor& tuple_desc,
   LOG(INFO) << "Table desc for schema: " << table_desc->DebugString();
 
   unordered_set<string> key_cols(table_desc->key_columns().begin(),
-                                 table_desc->key_columns().begin());
+      table_desc->key_columns().end());
 
   vector<KuduColumnSchema> kudu_cols;
   const std::vector<SlotDescriptor*>& slots = tuple_desc.slots();
@@ -132,12 +133,8 @@ Status KuduSchemaFromTupleDescriptor(const TupleDescriptor& tuple_desc,
   return Status::OK;
 }
 
-static void LogKuduMessage(kudu::KuduLogSeverity severity,
-                           const char* filename,
-                           int line_number,
-                           const struct ::tm* time,
-                           const char* message,
-                           size_t message_len) {
+void LogKuduMessage(kudu::KuduLogSeverity severity, const char* filename,
+    int line_number, const struct ::tm* time, const char* message, size_t message_len) {
 
   // Note: we use raw ints instead of the nice LogSeverity typedef
   // that can be found in glog/log_severity.h as it has an import
@@ -157,14 +154,9 @@ static void LogKuduMessage(kudu::KuduLogSeverity severity,
   log_entry.stream() << msg;
 }
 
-// Initializes Kudu'd logging by binding a callback that logs back to
-// Impala's Glog. This also sets Kudu's verbose logging to whatever
-// level is set in Impala.
-static void InitKuduLogging() {
+void InitKuduLogging() {
   kudu::client::InstallLoggingCallback(kudu::Bind(&LogKuduMessage));
   kudu::client::SetVerboseLogLevel(FLAGS_v);
 }
 
-
-} // namespace impala
-#endif
+}  // namespace impala
