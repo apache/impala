@@ -99,6 +99,9 @@ class HdfsParquetScanner : public HdfsScanner {
     /// corresponds to a non-NULL value. Valid values are >= 0.
     int max_def_level;
 
+    // The maximum repetition level of this column. Valid values are >= 0.
+    int max_rep_level;
+
     /// Any nested schema nodes. Empty for non-nested types.
     std::vector<SchemaNode> children;
 
@@ -191,7 +194,8 @@ class HdfsParquetScanner : public HdfsScanner {
 
   /// Recursive implementation used internally by the above CreateSchemaTree() function.
   Status CreateSchemaTree(const std::vector<parquet::SchemaElement>& schema,
-      int max_def_level, int* idx, int* col_idx, SchemaNode* node) const;
+      int max_def_level, int max_rep_level, int* idx, int* col_idx, SchemaNode* node)
+      const;
 };
 
 } // namespace impala

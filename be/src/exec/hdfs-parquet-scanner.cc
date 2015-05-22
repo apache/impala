@@ -177,6 +177,7 @@ class HdfsParquetScanner::BaseColumnReader {
   const parquet::SchemaElement& schema_element() const { return *node_.element; }
   int col_idx() const { return node_.col_idx; }
   int max_def_level() const { return node_.max_def_level; }
+  int max_rep_level() const { return node_.max_rep_level; }
   THdfsCompression::type codec() const {
     if (metadata_ == NULL) return THdfsCompression::NONE;
     return PARQUET_TO_IMPALA_CODEC[metadata_->codec];
@@ -221,10 +222,15 @@ class HdfsParquetScanner::BaseColumnReader {
   // Pointer to start of next value in data page
   uint8_t* data_;
 
-  // Decoder for definition.  Only one of these is valid at a time, depending on
-  // the data page metadata.
+  // Decoder for definition levels. Only one of these is valid at a time, depending on the
+  // data page metadata.
   RleDecoder rle_def_levels_;
   BitReader bit_packed_def_levels_;
+
+  // Decoder for repetition levels. Only one of these is valid at a time, depending on the
+  // data page metadata.
+  RleDecoder rle_rep_levels_;
+  BitReader bit_packed_rep_levels_;
 
   // Decoder for dictionary-encoded columns. Set by the subclass.
   DictDecoderBase* dict_decoder_base_;
@@ -272,6 +278,10 @@ class HdfsParquetScanner::BaseColumnReader {
   // Returns -1 if there was a error parsing it.
   int ReadDefinitionLevel();
 
+  // Returns the repetition level for the next value
+  // Returns -1 if there was a error parsing it.
+  int ReadRepetitionLevel();
+
   // Creates a dictionary decoder from values/size. Subclass must implement this
   // and set dict_decoder_base_.
   virtual void CreateDictionaryDecoder(uint8_t* values, int size) = 0;
@@ -286,6 +296,15 @@ class HdfsParquetScanner::BaseColumnReader {
   // Subclass must implement this.
   // TODO: we need to remove this with codegen.
   virtual bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_failed) = 0;
+
+ private:
+  // Helper method for creating definition and repetition level decoders
+  Status InitLevelDecoders(parquet::Encoding::type encoding, int max_level,
+      uint8_t** data, int* data_size, RleDecoder* rle_decoder, BitReader* bit_reader);
+
+  // Helper method for ReadDefinitionLevel() and ReadRepetitionLevel().
+  int ReadLevel(parquet::Encoding::type encoding, RleDecoder* rle_decoder,
+      BitReader* bit_reader);
 };
 
 // Per column type reader.
@@ -688,32 +707,16 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
       DCHECK_EQ(current_page_header_.compressed_page_size, uncompressed_size);
     }
 
+    if (max_rep_level() > 0) {
+      // Initialize the repetition level data
+      InitLevelDecoders(current_page_header_.data_page_header.repetition_level_encoding,
+          max_rep_level(), &data_, &data_size, &rle_rep_levels_, &bit_packed_rep_levels_);
+    }
+
     if (max_def_level() > 0) {
       // Initialize the definition level data
-      int32_t num_definition_bytes = 0;
-      switch (current_page_header_.data_page_header.definition_level_encoding) {
-        case parquet::Encoding::RLE: {
-          if (!ReadWriteUtil::Read(&data_, &data_size, &num_definition_bytes, &status)) {
-            return status;
-          }
-          int bit_width = BitUtil::Log2(max_def_level() + 1);
-          rle_def_levels_ = RleDecoder(data_, num_definition_bytes, bit_width);
-          break;
-        }
-        case parquet::Encoding::BIT_PACKED:
-          num_definition_bytes = BitUtil::Ceil(num_buffered_values_, 8);
-          bit_packed_def_levels_ = BitReader(data_, num_definition_bytes);
-          break;
-        default: {
-          stringstream ss;
-          ss << "Unsupported definition level encoding: "
-            << current_page_header_.data_page_header.definition_level_encoding;
-          return Status(ss.str());
-        }
-      }
-      DCHECK_GT(num_definition_bytes, 0);
-      data_ += num_definition_bytes;
-      data_size -= num_definition_bytes;
+      InitLevelDecoders(current_page_header_.data_page_header.definition_level_encoding,
+          max_def_level(), &data_, &data_size, &rle_def_levels_, &bit_packed_def_levels_);
     }
 
     // Data can be empty if the column contains all NULLs
@@ -724,29 +727,78 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
   return Status::OK;
 }
 
-// TODO More codegen here as well.
-inline int HdfsParquetScanner::BaseColumnReader::ReadDefinitionLevel() {
-  if (max_def_level() == 0) {
-    // This column and any containing structs are required so there is nothing encoded for
-    // the definition levels.
-    return 0;
+Status HdfsParquetScanner::BaseColumnReader::InitLevelDecoders(
+    parquet::Encoding::type encoding, int max_level, uint8_t** data, int* data_size,
+    RleDecoder* rle_decoder, BitReader* bit_reader) {
+  int32_t num_bytes = 0;
+  switch (encoding) {
+    case parquet::Encoding::RLE: {
+      Status status;
+      if (!ReadWriteUtil::Read(data, data_size, &num_bytes, &status)) {
+        return status;
+      }
+      if (num_bytes < 0) {
+        return Status(TErrorCode::PARQUET_CORRUPT_VALUE,
+            Substitute("RLE level data bytes = $0", num_bytes));
+      }
+      int bit_width = BitUtil::Log2(max_level + 1);
+      *rle_decoder = RleDecoder(*data, num_bytes, bit_width);
+      break;
+    }
+    case parquet::Encoding::BIT_PACKED:
+      num_bytes = BitUtil::Ceil(num_buffered_values_, 8);
+      *bit_reader = BitReader(*data, num_bytes);
+      break;
+    default: {
+      stringstream ss;
+      ss << "Unsupported encoding: " << encoding;
+      return Status(ss.str());
+    }
   }
+  DCHECK_GT(num_bytes, 0);
+  *data += num_bytes;
+  *data_size -= num_bytes;
+  return Status::OK;
+}
 
-  uint8_t definition_level;
+// TODO More codegen here as well.
+inline int HdfsParquetScanner::BaseColumnReader::ReadLevel(
+    parquet::Encoding::type encoding, RleDecoder* rle_decoder, BitReader* bit_reader) {
+  uint8_t level;
   bool valid = false;
-  switch (current_page_header_.data_page_header.definition_level_encoding) {
+  switch (encoding) {
     case parquet::Encoding::RLE:
-      valid = rle_def_levels_.Get(&definition_level);
+      valid = rle_decoder->Get(&level);
       break;
     case parquet::Encoding::BIT_PACKED: {
-      valid = bit_packed_def_levels_.GetValue(1, &definition_level);
+      valid = bit_reader->GetValue(1, &level);
       break;
     }
     default:
       DCHECK(false);
   }
   if (!valid) return -1;
-  return definition_level;
+  return level;
+}
+
+inline int HdfsParquetScanner::BaseColumnReader::ReadDefinitionLevel() {
+  if (max_def_level() == 0) {
+    // This column and any containing structs are required so there is nothing encoded for
+    // the definition levels.
+    return 0;
+  }
+  return ReadLevel(current_page_header_.data_page_header.definition_level_encoding,
+      &rle_def_levels_, &bit_packed_def_levels_);
+}
+
+inline int HdfsParquetScanner::BaseColumnReader::ReadRepetitionLevel() {
+  if (max_rep_level() == 0) {
+    // This column is not nested in any collection types so there is nothing encoded for
+    // the repetition levels.
+    return 0;
+  }
+  return ReadLevel(current_page_header_.data_page_header.repetition_level_encoding,
+      &rle_rep_levels_, &bit_packed_rep_levels_);
 }
 
 inline bool HdfsParquetScanner::BaseColumnReader::ReadValue(
@@ -1180,14 +1232,15 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
 Status HdfsParquetScanner::CreateSchemaTree(const vector<parquet::SchemaElement>& schema,
     HdfsParquetScanner::SchemaNode* node) const {
   int max_def_level = 0;
+  int max_rep_level = 0;
   int idx = 0;
   int col_idx = 0;
-  return CreateSchemaTree(schema, max_def_level, &idx, &col_idx, node);
+  return CreateSchemaTree(schema, max_def_level, max_rep_level, &idx, &col_idx, node);
 }
 
 Status HdfsParquetScanner::CreateSchemaTree(
-    const vector<parquet::SchemaElement>& schema, int max_def_level, int* idx,
-    int* col_idx, HdfsParquetScanner::SchemaNode* node) const {
+    const vector<parquet::SchemaElement>& schema, int max_def_level, int max_rep_level,
+    int* idx, int* col_idx, HdfsParquetScanner::SchemaNode* node) const {
   if (*idx >= schema.size()) {
     return Status(Substitute("File $0 corrupt: could not reconstruct schema tree from "
             "flattened schema in file metadata", stream_->filename()));
@@ -1204,13 +1257,19 @@ Status HdfsParquetScanner::CreateSchemaTree(
 
   if (node->element->repetition_type == parquet::FieldRepetitionType::OPTIONAL) {
     ++max_def_level;
+  } else if (node->element->repetition_type == parquet::FieldRepetitionType::REPEATED) {
+    ++max_rep_level;
+    // Repeated fields add a definition level. This is used to distinguish between an
+    // empty list and a list with an item in it.
+    ++max_def_level;
   }
   node->max_def_level = max_def_level;
+  node->max_rep_level = max_rep_level;
 
   node->children.resize(node->element->num_children);
   for (int i = 0; i < node->element->num_children; ++i) {
-    RETURN_IF_ERROR(
-        CreateSchemaTree(schema, max_def_level, idx, col_idx, &node->children[i]));
+    RETURN_IF_ERROR(CreateSchemaTree(
+        schema, max_def_level, max_rep_level, idx, col_idx, &node->children[i]));
   }
   return Status::OK;
 }

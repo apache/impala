@@ -121,6 +121,8 @@ error_codes = (
 
   ("UDF_VERIFY_FAILED", 33,
    "Failed to verify function $0 from LLVM module $1, see log for more details."),
+
+  ("PARQUET_CORRUPT_VALUE", 34, "Corrupt value: $0"),
 )
 
 import sys
