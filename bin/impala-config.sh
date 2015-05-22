@@ -28,7 +28,11 @@ if [[ ! -e "$JAVA" ]]; then
 fi
 
 if [ -z $IMPALA_HOME ]; then
-  export IMPALA_HOME=$(dirname $(cd $(dirname "${BASH_SOURCE[0]}") && pwd))
+  if [[ ! -z $ZSH_NAME ]]; then
+    export IMPALA_HOME=$(dirname $(cd $(dirname ${(%):-%x}) && pwd))
+  else
+    export IMPALA_HOME=$(dirname $(cd $(dirname "${BASH_SOURCE[0]}") && pwd))
+  fi
 fi
 
 export CDH_MAJOR_VERSION=5
@@ -128,7 +132,8 @@ export PATH=$IMPALA_HOME/bin:$PATH
 
 export HADOOP_HOME=$IMPALA_HOME/thirdparty/hadoop-${IMPALA_HADOOP_VERSION}/
 export HADOOP_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
-export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:$HADOOP_HOME/share/hadoop/tools/lib/*
+
+export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:"${HADOOP_HOME}/share/hadoop/tools/lib/*"
 export MINI_DFS_BASE_DATA_DIR=$IMPALA_HOME/cdh-${CDH_MAJOR_VERSION}-hdfs-data
 export PATH=$HADOOP_HOME/bin:$PATH
 
@@ -147,7 +152,7 @@ export HIVE_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
 JDBC_DRIVER=$(find $IMPALA_HOME/thirdparty/postgresql-jdbc -name '*postgres*jdbc*jar' | head -n 1)
 if [[ -z "$JDBC_DRIVER" ]]; then
   echo Could not find Postgres JDBC driver in >&2
-  exit 1
+  return
 fi
 export HIVE_AUX_JARS_PATH="$JDBC_DRIVER"
 export AUX_CLASSPATH=$HADOOP_LZO/build/hadoop-lzo-0.4.15.jar
