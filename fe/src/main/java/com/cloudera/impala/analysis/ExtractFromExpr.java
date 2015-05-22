@@ -94,7 +94,7 @@ public class ExtractFromExpr extends FunctionCallExpr {
   @Override
   public String toSqlImpl() {
     StringBuilder strBuilder = new StringBuilder();
-    strBuilder.append(getFnName().getFunction().toUpperCase());
+    strBuilder.append(getFnName().toString().toUpperCase());
     strBuilder.append("(");
     strBuilder.append(((StringLiteral)getChild(1)).getValue());
     strBuilder.append(" FROM ");
