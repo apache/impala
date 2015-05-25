@@ -328,6 +328,8 @@ public class CaseExpr extends Expr {
 
   private boolean isCase() { return !isDecode(); }
   private boolean isDecode() { return decodeExpr_ != null; }
+  public boolean hasCaseExpr() { return hasCaseExpr_; }
+  public boolean hasElseExpr() { return hasElseExpr_; }
 
   @Override
   public Expr clone() { return new CaseExpr(this); }

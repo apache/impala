@@ -64,6 +64,7 @@ public class BetweenPredicate extends Predicate {
     Preconditions.checkState(isAnalyzed_);
     return rewrittenPredicate_;
   }
+  public ArrayList<Expr> getOriginalChildren() { return originalChildren_; }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {

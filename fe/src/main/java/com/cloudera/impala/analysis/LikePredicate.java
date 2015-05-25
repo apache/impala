@@ -132,4 +132,6 @@ public class LikePredicate extends Predicate {
 
   @Override
   public Expr clone() { return new LikePredicate(this); }
+
+  public Operator getOp() { return op_; }
 }
