@@ -137,7 +137,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   return Status::OK();
 }
 
-Status HashJoinNode::Reset(RuntimeState* state) {
+Status HashJoinNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   DCHECK(false) << "NYI";
   return Status("NYI");
 }

@@ -88,13 +88,16 @@ class ExecNode {
 
   /// Resets all data-specific state, returning this node to the state it was in after
   /// calling Prepare() and before calling Open().
+  /// If `row_batch` is not-NULL, this function transfers the ownership of row-batch
+  /// resources held by the exec node to the given `row_batch`. Otherwise, those
+  /// resources are just freed.
   /// Prepare() must have already been called before calling Reset(). Open() and GetNext()
   /// may have optionally been called. Close() must not have been called.
   /// If overridden in a subclass, must call superclass's Reset() at the end. The default
   /// implementation calls Reset() on children.
   /// Note that this function may be called many times, so should be fast. For example,
   /// accumulated memory does not need to be freed on every call if it's expensive.
-  virtual Status Reset(RuntimeState* state);
+  virtual Status Reset(RuntimeState* state, RowBatch* row_batch);
 
   /// Close() will get called for every exec node, regardless of what else is called and
   /// the status of these calls (i.e. Prepare() may never have been called, or

@@ -90,6 +90,14 @@ class RowBatchList {
     total_num_rows_ = 0;
   }
 
+  /// Transfers the resources of all contained row batches to `row_batch`.
+  void TransferState(RowBatch* row_batch) {
+    DCHECK_NOTNULL(row_batch);
+    for (int i = 0; i < row_batches_.size(); ++i) {
+      row_batch->AcquireState(row_batches_[i]);
+    }
+  }
+
   /// Outputs a debug string containing the contents of the list.
   std::string DebugString(const RowDescriptor& desc) {
     std::stringstream out;

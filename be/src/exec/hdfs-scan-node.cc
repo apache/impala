@@ -614,7 +614,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   return Status::OK();
 }
 
-Status HdfsScanNode::Reset(RuntimeState* state) {
+Status HdfsScanNode::Reset(RuntimeState* state, RowBatch* row_batchl) {
   DCHECK(false) << "NYI";
   return Status("NYI");
 }

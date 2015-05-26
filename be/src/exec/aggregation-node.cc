@@ -270,7 +270,7 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
   return Status::OK();
 }
 
-Status AggregationNode::Reset(RuntimeState* state) {
+Status AggregationNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   DCHECK(false) << "NYI";
   return Status("NYI");
 }

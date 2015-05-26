@@ -42,11 +42,12 @@ Status CrossJoinNode::Prepare(RuntimeState* state) {
   return Status::OK();
 }
 
-Status CrossJoinNode::Reset(RuntimeState* state) {
+Status CrossJoinNode::Reset(RuntimeState* state, RowBatch* row_batch) {
+  if (row_batch != NULL) build_batches_.TransferState(row_batch);
   build_batches_.Reset();
   // TODO: consider resetting object pool only when it reaches a certain size
   build_batch_pool_.reset(new ObjectPool());
-  return BlockingJoinNode::Reset(state);
+  return BlockingJoinNode::Reset(state, row_batch);
 }
 
 void CrossJoinNode::Close(RuntimeState* state) {

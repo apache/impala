@@ -156,9 +156,9 @@ Status ExecNode::Open(RuntimeState* state) {
   return Expr::Open(conjunct_ctxs_, state);
 }
 
-Status ExecNode::Reset(RuntimeState* state) {
+Status ExecNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   for (int i = 0; i < children_.size(); ++i) {
-    RETURN_IF_ERROR(children_[i]->Reset(state));
+    RETURN_IF_ERROR(children_[i]->Reset(state, row_batch));
   }
   return Status::OK();
 }

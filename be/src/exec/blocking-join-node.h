@@ -55,7 +55,7 @@ class BlockingJoinNode : public ExecNode {
 
   /// Subclasses should reset any state modified in Open() and GetNext() and then call
   /// BlockingJoinNode::Reset().
-  virtual Status Reset(RuntimeState* state);
+  virtual Status Reset(RuntimeState* state, RowBatch* row_batch);
 
   /// Subclasses should close any other structures and then call
   /// BlockingJoinNode::Close().

@@ -117,12 +117,16 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
   return Status::OK();
 }
 
-Status BlockingJoinNode::Reset(RuntimeState* state) {
+Status BlockingJoinNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   eos_ = false;
   probe_side_eos_ = false;
+  if (row_batch != NULL) {
+    row_batch->AcquireState(probe_batch_.get());
+    row_batch->tuple_data_pool()->AcquireData(build_pool_.get(), false);
+  }
   probe_batch_->Reset();
   build_pool_->FreeAll();
-  return ExecNode::Reset(state);
+  return ExecNode::Reset(state, row_batch);
 }
 
 void BlockingJoinNode::Close(RuntimeState* state) {
