@@ -91,10 +91,10 @@ class RowBatchList {
   }
 
   /// Transfers the resources of all contained row batches to `row_batch`.
-  void TransferState(RowBatch* row_batch) {
+  void TransferResourceOwnership(RowBatch* row_batch) {
     DCHECK_NOTNULL(row_batch);
     for (int i = 0; i < row_batches_.size(); ++i) {
-      row_batch->AcquireState(row_batches_[i]);
+      row_batches_[i]->TransferResourceOwnership(row_batch);
     }
   }
 

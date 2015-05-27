@@ -121,7 +121,7 @@ Status BlockingJoinNode::Reset(RuntimeState* state, RowBatch* row_batch) {
   eos_ = false;
   probe_side_eos_ = false;
   if (row_batch != NULL) {
-    row_batch->AcquireState(probe_batch_.get());
+    probe_batch_->TransferResourceOwnership(row_batch);
     row_batch->tuple_data_pool()->AcquireData(build_pool_.get(), false);
   }
   probe_batch_->Reset();

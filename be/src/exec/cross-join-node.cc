@@ -43,7 +43,7 @@ Status CrossJoinNode::Prepare(RuntimeState* state) {
 }
 
 Status CrossJoinNode::Reset(RuntimeState* state, RowBatch* row_batch) {
-  if (row_batch != NULL) build_batches_.TransferState(row_batch);
+  if (row_batch != NULL) build_batches_.TransferResourceOwnership(row_batch);
   build_batches_.Reset();
   // TODO: consider resetting object pool only when it reaches a certain size
   build_batch_pool_.reset(new ObjectPool());
