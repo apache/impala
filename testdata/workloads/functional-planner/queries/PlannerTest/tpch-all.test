@@ -446,23 +446,23 @@ order by
 |  group by: n_name
 |
 10:HASH JOIN [INNER JOIN]
+|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
+|
+|--03:SCAN HDFS [tpch.supplier]
+|     partitions=1/1 files=1 size=1.33MB
+|
+09:HASH JOIN [INNER JOIN]
 |  hash predicates: n_regionkey = r_regionkey
 |
 |--05:SCAN HDFS [tpch.region]
 |     partitions=1/1 files=1 size=384B
 |     predicates: r_name = 'ASIA'
 |
-09:HASH JOIN [INNER JOIN]
-|  hash predicates: s_nationkey = n_nationkey
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: tpch.customer.c_nationkey = tpch.nation.n_nationkey
 |
 |--04:SCAN HDFS [tpch.nation]
 |     partitions=1/1 files=1 size=2.15KB
-|
-08:HASH JOIN [INNER JOIN]
-|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
-|
-|--03:SCAN HDFS [tpch.supplier]
-|     partitions=1/1 files=1 size=1.33MB
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
@@ -497,29 +497,29 @@ order by
 |  group by: n_name
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: n_regionkey = r_regionkey
+|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
 |
 |--17:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpch.supplier]
+|     partitions=1/1 files=1 size=1.33MB
+|
+09:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: n_regionkey = r_regionkey
+|
+|--16:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpch.region]
 |     partitions=1/1 files=1 size=384B
 |     predicates: r_name = 'ASIA'
 |
-09:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: s_nationkey = n_nationkey
-|
-|--16:EXCHANGE [BROADCAST]
-|  |
-|  04:SCAN HDFS [tpch.nation]
-|     partitions=1/1 files=1 size=2.15KB
-|
 08:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
+|  hash predicates: tpch.customer.c_nationkey = tpch.nation.n_nationkey
 |
 |--15:EXCHANGE [BROADCAST]
 |  |
-|  03:SCAN HDFS [tpch.supplier]
-|     partitions=1/1 files=1 size=1.33MB
+|  04:SCAN HDFS [tpch.nation]
+|     partitions=1/1 files=1 size=2.15KB
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o_custkey = c_custkey
@@ -621,29 +621,29 @@ order by
 |  group by: n1.n_name, n2.n_name, year(l_shipdate)
 |
 10:HASH JOIN [INNER JOIN]
-|  hash predicates: c_nationkey = n2.n_nationkey
-|  other predicates: ((n1.n_name = 'FRANCE' AND n2.n_name = 'GERMANY') OR (n1.n_name = 'GERMANY' AND n2.n_name = 'FRANCE'))
-|
-|--05:SCAN HDFS [tpch.nation n2]
-|     partitions=1/1 files=1 size=2.15KB
-|
-09:HASH JOIN [INNER JOIN]
 |  hash predicates: s_nationkey = n1.n_nationkey
+|  other predicates: ((n1.n_name = 'FRANCE' AND n2.n_name = 'GERMANY') OR (n1.n_name = 'GERMANY' AND n2.n_name = 'FRANCE'))
 |
 |--04:SCAN HDFS [tpch.nation n1]
 |     partitions=1/1 files=1 size=2.15KB
 |
-08:HASH JOIN [INNER JOIN]
-|  hash predicates: o_custkey = c_custkey
-|
-|--03:SCAN HDFS [tpch.customer]
-|     partitions=1/1 files=1 size=23.08MB
-|
-07:HASH JOIN [INNER JOIN]
+09:HASH JOIN [INNER JOIN]
 |  hash predicates: l_suppkey = s_suppkey
 |
 |--00:SCAN HDFS [tpch.supplier]
 |     partitions=1/1 files=1 size=1.33MB
+|
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: c_nationkey = n2.n_nationkey
+|
+|--05:SCAN HDFS [tpch.nation n2]
+|     partitions=1/1 files=1 size=2.15KB
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: o_custkey = c_custkey
+|
+|--03:SCAN HDFS [tpch.customer]
+|     partitions=1/1 files=1 size=23.08MB
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: o_orderkey = l_orderkey
@@ -672,37 +672,37 @@ order by
 |  group by: n1.n_name, n2.n_name, year(l_shipdate)
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: c_nationkey = n2.n_nationkey
+|  hash predicates: s_nationkey = n1.n_nationkey
 |  other predicates: ((n1.n_name = 'FRANCE' AND n2.n_name = 'GERMANY') OR (n1.n_name = 'GERMANY' AND n2.n_name = 'FRANCE'))
 |
 |--17:EXCHANGE [BROADCAST]
 |  |
-|  05:SCAN HDFS [tpch.nation n2]
-|     partitions=1/1 files=1 size=2.15KB
-|
-09:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: s_nationkey = n1.n_nationkey
-|
-|--16:EXCHANGE [BROADCAST]
-|  |
 |  04:SCAN HDFS [tpch.nation n1]
 |     partitions=1/1 files=1 size=2.15KB
 |
-08:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: o_custkey = c_custkey
-|
-|--15:EXCHANGE [BROADCAST]
-|  |
-|  03:SCAN HDFS [tpch.customer]
-|     partitions=1/1 files=1 size=23.08MB
-|
-07:HASH JOIN [INNER JOIN, BROADCAST]
+09:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_suppkey = s_suppkey
 |
-|--14:EXCHANGE [BROADCAST]
+|--16:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpch.supplier]
 |     partitions=1/1 files=1 size=1.33MB
+|
+08:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: c_nationkey = n2.n_nationkey
+|
+|--15:EXCHANGE [BROADCAST]
+|  |
+|  05:SCAN HDFS [tpch.nation n2]
+|     partitions=1/1 files=1 size=2.15KB
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: o_custkey = c_custkey
+|
+|--14:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpch.customer]
+|     partitions=1/1 files=1 size=23.08MB
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o_orderkey = l_orderkey
@@ -764,42 +764,42 @@ order by
 |  group by: year(o_orderdate)
 |
 14:HASH JOIN [INNER JOIN]
+|  hash predicates: s_nationkey = n2.n_nationkey
+|
+|--06:SCAN HDFS [tpch.nation n2]
+|     partitions=1/1 files=1 size=2.15KB
+|
+13:HASH JOIN [INNER JOIN]
+|  hash predicates: l_suppkey = s_suppkey
+|
+|--01:SCAN HDFS [tpch.supplier]
+|     partitions=1/1 files=1 size=1.33MB
+|
+12:HASH JOIN [INNER JOIN]
 |  hash predicates: n1.n_regionkey = r_regionkey
 |
 |--07:SCAN HDFS [tpch.region]
 |     partitions=1/1 files=1 size=384B
 |     predicates: r_name = 'AMERICA'
 |
-13:HASH JOIN [INNER JOIN]
-|  hash predicates: s_nationkey = n2.n_nationkey
-|
-|--06:SCAN HDFS [tpch.nation n2]
-|     partitions=1/1 files=1 size=2.15KB
-|
-12:HASH JOIN [INNER JOIN]
+11:HASH JOIN [INNER JOIN]
 |  hash predicates: c_nationkey = n1.n_nationkey
 |
 |--05:SCAN HDFS [tpch.nation n1]
 |     partitions=1/1 files=1 size=2.15KB
 |
-11:HASH JOIN [INNER JOIN]
+10:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
 |
 |--04:SCAN HDFS [tpch.customer]
 |     partitions=1/1 files=1 size=23.08MB
 |
-10:HASH JOIN [INNER JOIN]
+09:HASH JOIN [INNER JOIN]
 |  hash predicates: l_orderkey = o_orderkey
 |
 |--03:SCAN HDFS [tpch.orders]
 |     partitions=1/1 files=1 size=162.56MB
 |     predicates: o_orderdate >= '1995-01-01', o_orderdate <= '1996-12-31'
-|
-09:HASH JOIN [INNER JOIN]
-|  hash predicates: l_suppkey = s_suppkey
-|
-|--01:SCAN HDFS [tpch.supplier]
-|     partitions=1/1 files=1 size=1.33MB
 |
 08:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
@@ -828,54 +828,54 @@ order by
 |  group by: year(o_orderdate)
 |
 14:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: n1.n_regionkey = r_regionkey
+|  hash predicates: s_nationkey = n2.n_nationkey
 |
 |--23:EXCHANGE [BROADCAST]
+|  |
+|  06:SCAN HDFS [tpch.nation n2]
+|     partitions=1/1 files=1 size=2.15KB
+|
+13:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_suppkey = s_suppkey
+|
+|--22:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpch.supplier]
+|     partitions=1/1 files=1 size=1.33MB
+|
+12:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: n1.n_regionkey = r_regionkey
+|
+|--21:EXCHANGE [BROADCAST]
 |  |
 |  07:SCAN HDFS [tpch.region]
 |     partitions=1/1 files=1 size=384B
 |     predicates: r_name = 'AMERICA'
 |
-13:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: s_nationkey = n2.n_nationkey
-|
-|--22:EXCHANGE [BROADCAST]
-|  |
-|  06:SCAN HDFS [tpch.nation n2]
-|     partitions=1/1 files=1 size=2.15KB
-|
-12:HASH JOIN [INNER JOIN, BROADCAST]
+11:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c_nationkey = n1.n_nationkey
 |
-|--21:EXCHANGE [BROADCAST]
+|--20:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpch.nation n1]
 |     partitions=1/1 files=1 size=2.15KB
 |
-11:HASH JOIN [INNER JOIN, BROADCAST]
+10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o_custkey = c_custkey
 |
-|--20:EXCHANGE [BROADCAST]
+|--19:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpch.customer]
 |     partitions=1/1 files=1 size=23.08MB
 |
-10:HASH JOIN [INNER JOIN, BROADCAST]
+09:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_orderkey = o_orderkey
 |
-|--19:EXCHANGE [BROADCAST]
+|--18:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpch.orders]
 |     partitions=1/1 files=1 size=162.56MB
 |     predicates: o_orderdate >= '1995-01-01', o_orderdate <= '1996-12-31'
-|
-09:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: l_suppkey = s_suppkey
-|
-|--18:EXCHANGE [BROADCAST]
-|  |
-|  01:SCAN HDFS [tpch.supplier]
-|     partitions=1/1 files=1 size=1.33MB
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_partkey = p_partkey
@@ -943,16 +943,16 @@ order by
 |     partitions=1/1 files=1 size=2.15KB
 |
 08:HASH JOIN [INNER JOIN]
-|  hash predicates: l_orderkey = o_orderkey
-|
-|--04:SCAN HDFS [tpch.orders]
-|     partitions=1/1 files=1 size=162.56MB
-|
-07:HASH JOIN [INNER JOIN]
 |  hash predicates: l_suppkey = s_suppkey
 |
 |--01:SCAN HDFS [tpch.supplier]
 |     partitions=1/1 files=1 size=1.33MB
+|
+07:HASH JOIN [INNER JOIN]
+|  hash predicates: l_orderkey = o_orderkey
+|
+|--04:SCAN HDFS [tpch.orders]
+|     partitions=1/1 files=1 size=162.56MB
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: l_partkey = p_partkey
@@ -997,20 +997,20 @@ order by
 |     partitions=1/1 files=1 size=2.15KB
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: l_orderkey = o_orderkey
+|  hash predicates: l_suppkey = s_suppkey
 |
 |--15:EXCHANGE [BROADCAST]
 |  |
-|  04:SCAN HDFS [tpch.orders]
-|     partitions=1/1 files=1 size=162.56MB
+|  01:SCAN HDFS [tpch.supplier]
+|     partitions=1/1 files=1 size=1.33MB
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: l_suppkey = s_suppkey
+|  hash predicates: l_orderkey = o_orderkey
 |
 |--14:EXCHANGE [BROADCAST]
 |  |
-|  01:SCAN HDFS [tpch.supplier]
-|     partitions=1/1 files=1 size=1.33MB
+|  04:SCAN HDFS [tpch.orders]
+|     partitions=1/1 files=1 size=162.56MB
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: l_partkey = p_partkey
@@ -2200,17 +2200,17 @@ limit 100
 |     predicates: n_name = 'SAUDI ARABIA'
 |
 07:HASH JOIN [INNER JOIN]
+|  hash predicates: l1.l_suppkey = s_suppkey
+|
+|--00:SCAN HDFS [tpch.supplier]
+|     partitions=1/1 files=1 size=1.33MB
+|
+06:HASH JOIN [INNER JOIN]
 |  hash predicates: l1.l_orderkey = o_orderkey
 |
 |--02:SCAN HDFS [tpch.orders]
 |     partitions=1/1 files=1 size=162.56MB
 |     predicates: o_orderstatus = 'F'
-|
-06:HASH JOIN [INNER JOIN]
-|  hash predicates: l1.l_suppkey = s_suppkey
-|
-|--00:SCAN HDFS [tpch.supplier]
-|     partitions=1/1 files=1 size=1.33MB
 |
 01:SCAN HDFS [tpch.lineitem l1]
    partitions=1/1 files=1 size=718.94MB
@@ -2264,21 +2264,21 @@ limit 100
 |     predicates: n_name = 'SAUDI ARABIA'
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: l1.l_orderkey = o_orderkey
+|  hash predicates: l1.l_suppkey = s_suppkey
 |
 |--14:EXCHANGE [BROADCAST]
+|  |
+|  00:SCAN HDFS [tpch.supplier]
+|     partitions=1/1 files=1 size=1.33MB
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l1.l_orderkey = o_orderkey
+|
+|--13:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpch.orders]
 |     partitions=1/1 files=1 size=162.56MB
 |     predicates: o_orderstatus = 'F'
-|
-06:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: l1.l_suppkey = s_suppkey
-|
-|--13:EXCHANGE [BROADCAST]
-|  |
-|  00:SCAN HDFS [tpch.supplier]
-|     partitions=1/1 files=1 size=1.33MB
 |
 01:SCAN HDFS [tpch.lineitem l1]
    partitions=1/1 files=1 size=718.94MB

@@ -121,7 +121,7 @@ from alltypesagg
 ---- TYPES
 bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint, bigint
 ---- RESULTS
-10549,2,9,104,1881,1342,944,991,1178,9880
+10280,2,9,97,957,1008,1016,1005,963,10210
 ====
 ---- QUERY
 # Test the distinctpc aggregate function on empty table

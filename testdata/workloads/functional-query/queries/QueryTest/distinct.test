@@ -355,7 +355,7 @@ set appx_count_distinct=true;
 select count(distinct int_col), count(distinct float_col), count(distinct string_col)
 from alltypesagg
 ---- RESULTS
-1881,944,1178
+957,1016,963
 ---- TYPES
 bigint, bigint, bigint
 ====

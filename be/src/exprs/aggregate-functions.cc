@@ -15,8 +15,10 @@
 #include "exprs/aggregate-functions.h"
 
 #include <math.h>
-#include <sstream>
 #include <algorithm>
+#include <map>
+#include <sstream>
+#include <utility>
 
 #include <boost/random/ranlux.hpp>
 #include <boost/random/uniform_int.hpp>
@@ -26,7 +28,7 @@
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
 #include "exprs/anyval-util.h"
-
+#include "exprs/hll-bias.h"
 
 #include "common/names.h"
 
@@ -34,6 +36,85 @@ using boost::uniform_int;
 using boost::ranlux64_3;
 using std::push_heap;
 using std::pop_heap;
+using std::map;
+using std::make_pair;
+
+namespace {
+// Threshold for each precision where it's better to use linear counting instead
+// of the bias corrected estimate.
+static float HllThreshold(int p) {
+  switch (p) {
+    case 4:
+      return 10.0;
+    case 5:
+      return 20.0;
+    case 6:
+      return 40.0;
+    case 7:
+      return 80.0;
+    case 8:
+      return 220.0;
+    case 9:
+      return 400.0;
+    case 10:
+      return 900.0;
+    case 11:
+      return 1800.0;
+    case 12:
+      return 3100.0;
+    case 13:
+      return 6500.0;
+    case 14:
+      return 11500.0;
+    case 15:
+      return 20000.0;
+    case 16:
+      return 50000.0;
+    case 17:
+      return 120000.0;
+    case 18:
+      return 350000.0;
+  }
+  return 0.0;
+}
+
+// Implements k nearest neighbor interpolation for k=6,
+// we choose 6 bassed on the HLL++ paper
+int64_t HllEstimateBias(int64_t estimate) {
+  const size_t K = 6;
+
+  // Precision index into data arrays
+  // We don't have data for precisions less than 4
+  DCHECK(impala::AggregateFunctions::HLL_PRECISION >= 4);
+  const size_t idx = impala::AggregateFunctions::HLL_PRECISION - 4;
+
+  // Calculate the square of the difference of this estimate to all
+  // precalculated estimates for a particular precision
+  map<double, size_t> distances;
+  for (size_t i = 0;
+      i < impala::HLL_DATA_SIZES[idx] / sizeof(double); ++i) {
+    double val = estimate - impala::HLL_RAW_ESTIMATE_DATA[idx][i];
+    distances.insert(make_pair(val * val, i));
+  }
+
+  size_t nearest[K];
+  size_t j = 0;
+  // Use a sorted map to find the K closest estimates to our initial estimate
+  for (map<double, size_t>::iterator it = distances.begin();
+       j < K && it != distances.end(); ++it, ++j) {
+    nearest[j] = it->second;
+  }
+
+  // Compute the average bias correction the K closest estimates
+  double bias = 0.0;
+  for (size_t i = 0; i < K; ++i) {
+    bias += impala::HLL_BIAS_DATA[idx][nearest[i]];
+  }
+
+  return bias / K;
+}
+
+}
 
 // TODO: this file should be cross compiled and then all of the builtin
 // aggregate functions will have a codegen enabled path. Then we can remove
@@ -1061,14 +1142,18 @@ uint64_t AggregateFunctions::HllFinalEstimate(const uint8_t* buckets,
   }
   harmonic_mean = 1.0f / harmonic_mean;
   int64_t estimate = alpha * HLL_LEN * HLL_LEN * harmonic_mean;
-
-  if (num_zero_registers != 0) {
-    // Estimated cardinality is too low. Hll is too inaccurate here, instead use
-    // linear counting.
-    estimate = HLL_LEN * log(static_cast<float>(HLL_LEN) / num_zero_registers);
+  // Adjust for Hll bias based on Hll++ algorithm
+  if (estimate <= 5 * HLL_LEN) {
+    estimate -= HllEstimateBias(estimate);
   }
 
-  return estimate;
+  if (num_zero_registers == 0) return estimate;
+
+  // Estimated cardinality is too low. Hll is too inaccurate here, instead use
+  // linear counting.
+  int64_t h = HLL_LEN * log(static_cast<float>(HLL_LEN) / num_zero_registers);
+
+  return (h <= HllThreshold(HLL_PRECISION)) ? h : estimate;
 }
 
 BigIntVal AggregateFunctions::HllFinalize(FunctionContext* ctx, const StringVal& src) {

@@ -87,7 +87,7 @@ decimal,decimal
 ---- QUERY
 select ndv(c1), distinctpc(c2), distinctpcsa(c1 + c2) from decimal_tiny
 ---- RESULTS
-95,94,103
+98,94,103
 ---- TYPES
 bigint,bigint,bigint
 ====

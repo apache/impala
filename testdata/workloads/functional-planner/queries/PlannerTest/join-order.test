@@ -211,23 +211,23 @@ limit 100
 |  group by: n_name
 |
 10:HASH JOIN [INNER JOIN]
+|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
+|
+|--03:SCAN HDFS [tpch.supplier s]
+|     partitions=1/1 files=1 size=1.33MB
+|
+09:HASH JOIN [INNER JOIN]
 |  hash predicates: n_regionkey = r_regionkey
 |
 |--05:SCAN HDFS [tpch.region]
 |     partitions=1/1 files=1 size=384B
 |     predicates: r_name = 'ASIA'
 |
-09:HASH JOIN [INNER JOIN]
-|  hash predicates: s_nationkey = n_nationkey
+08:HASH JOIN [INNER JOIN]
+|  hash predicates: tpch.customer.c_nationkey = tpch.nation.n_nationkey
 |
 |--04:SCAN HDFS [tpch.nation]
 |     partitions=1/1 files=1 size=2.15KB
-|
-08:HASH JOIN [INNER JOIN]
-|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
-|
-|--03:SCAN HDFS [tpch.supplier s]
-|     partitions=1/1 files=1 size=1.33MB
 |
 07:HASH JOIN [INNER JOIN]
 |  hash predicates: o_custkey = c_custkey
@@ -263,29 +263,29 @@ limit 100
 |  group by: n_name
 |
 10:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: n_regionkey = r_regionkey
+|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
 |
 |--17:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpch.supplier s]
+|     partitions=1/1 files=1 size=1.33MB
+|
+09:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: n_regionkey = r_regionkey
+|
+|--16:EXCHANGE [BROADCAST]
 |  |
 |  05:SCAN HDFS [tpch.region]
 |     partitions=1/1 files=1 size=384B
 |     predicates: r_name = 'ASIA'
 |
-09:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: s_nationkey = n_nationkey
-|
-|--16:EXCHANGE [BROADCAST]
-|  |
-|  04:SCAN HDFS [tpch.nation]
-|     partitions=1/1 files=1 size=2.15KB
-|
 08:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
+|  hash predicates: tpch.customer.c_nationkey = tpch.nation.n_nationkey
 |
 |--15:EXCHANGE [BROADCAST]
 |  |
-|  03:SCAN HDFS [tpch.supplier s]
-|     partitions=1/1 files=1 size=1.33MB
+|  04:SCAN HDFS [tpch.nation]
+|     partitions=1/1 files=1 size=2.15KB
 |
 07:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o_custkey = c_custkey

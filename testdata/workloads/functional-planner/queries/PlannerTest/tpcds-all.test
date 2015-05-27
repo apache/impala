@@ -128,17 +128,17 @@ limit 100
 |  group by: i_item_id
 |
 08:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_item_sk = i_item_sk
+|
+|--03:SCAN HDFS [tpcds.item]
+|     partitions=1/1 files=1 size=4.82MB
+|
+07:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_promo_sk = p_promo_sk
 |
 |--04:SCAN HDFS [tpcds.promotion]
 |     partitions=1/1 files=1 size=36.36KB
 |     predicates: (p_channel_email = 'N' OR p_channel_event = 'N')
-|
-07:HASH JOIN [INNER JOIN]
-|  hash predicates: ss_item_sk = i_item_sk
-|
-|--03:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
 |
 06:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_sold_date_sk = d_date_sk
@@ -175,21 +175,21 @@ limit 100
 |  group by: i_item_id
 |
 08:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: ss_promo_sk = p_promo_sk
+|  hash predicates: ss_item_sk = i_item_sk
 |
 |--14:EXCHANGE [BROADCAST]
+|  |
+|  03:SCAN HDFS [tpcds.item]
+|     partitions=1/1 files=1 size=4.82MB
+|
+07:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_promo_sk = p_promo_sk
+|
+|--13:EXCHANGE [BROADCAST]
 |  |
 |  04:SCAN HDFS [tpcds.promotion]
 |     partitions=1/1 files=1 size=36.36KB
 |     predicates: (p_channel_email = 'N' OR p_channel_event = 'N')
-|
-07:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: ss_item_sk = i_item_sk
-|
-|--13:EXCHANGE [BROADCAST]
-|  |
-|  03:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
 |
 06:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_sold_date_sk = d_date_sk
@@ -1891,6 +1891,12 @@ limit 100
 |  order by: s_store_name ASC, i_item_desc ASC
 |
 13:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_item_sk = i_item_sk
+|
+|--01:SCAN HDFS [tpcds.item]
+|     partitions=1/1 files=1 size=4.82MB
+|
+12:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_store_sk = ss_store_sk
 |  other predicates: sum(ss_sales_price) <= 0.1 * avg(revenue)
 |
@@ -1911,12 +1917,6 @@ limit 100
 |  |
 |  02:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
-|
-12:HASH JOIN [INNER JOIN]
-|  hash predicates: ss_item_sk = i_item_sk
-|
-|--01:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
 |
 11:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_store_sk = s_store_sk
@@ -1946,26 +1946,34 @@ limit 100
 |  order by: s_store_name ASC, i_item_desc ASC
 |
 13:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: ss_store_sk = ss_store_sk
-|  other predicates: sum(ss_sales_price) <= 0.1 * avg(revenue)
+|  hash predicates: ss_item_sk = i_item_sk
 |
 |--25:EXCHANGE [BROADCAST]
 |  |
-|  24:AGGREGATE [FINALIZE]
+|  01:SCAN HDFS [tpcds.item]
+|     partitions=1/1 files=1 size=4.82MB
+|
+12:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ss_store_sk = ss_store_sk
+|  other predicates: sum(ss_sales_price) <= 0.1 * avg(revenue)
+|
+|--24:EXCHANGE [BROADCAST]
+|  |
+|  23:AGGREGATE [FINALIZE]
 |  |  output: avg:merge(revenue)
 |  |  group by: ss_store_sk
 |  |
-|  23:EXCHANGE [HASH(ss_store_sk)]
+|  22:EXCHANGE [HASH(ss_store_sk)]
 |  |
 |  06:AGGREGATE
 |  |  output: avg(sum(ss_sales_price))
 |  |  group by: ss_store_sk
 |  |
-|  22:AGGREGATE [FINALIZE]
+|  21:AGGREGATE [FINALIZE]
 |  |  output: sum:merge(ss_sales_price)
 |  |  group by: ss_store_sk, ss_item_sk
 |  |
-|  21:EXCHANGE [HASH(ss_store_sk,ss_item_sk)]
+|  20:EXCHANGE [HASH(ss_store_sk,ss_item_sk)]
 |  |
 |  05:AGGREGATE
 |  |  output: sum(ss_sales_price)
@@ -1974,7 +1982,7 @@ limit 100
 |  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: ss_sold_date_sk = d_date_sk
 |  |
-|  |--20:EXCHANGE [BROADCAST]
+|  |--19:EXCHANGE [BROADCAST]
 |  |  |
 |  |  03:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
@@ -1982,14 +1990,6 @@ limit 100
 |  |
 |  02:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
-|
-12:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: ss_item_sk = i_item_sk
-|
-|--19:EXCHANGE [BROADCAST]
-|  |
-|  01:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
 |
 11:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: ss_store_sk = s_store_sk
@@ -2244,24 +2244,24 @@ limit 1000
 |  |  having: count(*) >= 1, count(*) <= 5
 |  |
 |  06:HASH JOIN [INNER JOIN]
+|  |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
+|  |
+|  |--01:SCAN HDFS [tpcds.date_dim]
+|  |     partitions=1/1 files=1 size=9.84MB
+|  |
+|  05:HASH JOIN [INNER JOIN]
 |  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
 |  |
 |  |--03:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
 |  |     predicates: (household_demographics.hd_buy_potential = '>10000' OR household_demographics.hd_buy_potential = 'unknown'), household_demographics.hd_vehicle_count > 0, CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1
 |  |
-|  05:HASH JOIN [INNER JOIN]
+|  04:HASH JOIN [INNER JOIN]
 |  |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
 |  |
 |  |--02:SCAN HDFS [tpcds.store]
 |  |     partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County')
-|  |
-|  04:HASH JOIN [INNER JOIN]
-|  |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
-|  |
-|  |--01:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
@@ -2293,30 +2293,30 @@ limit 1000
 |  |  group by: ss_ticket_number, ss_customer_sk
 |  |
 |  06:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
 |  |
 |  |--13:EXCHANGE [BROADCAST]
+|  |  |
+|  |  01:SCAN HDFS [tpcds.date_dim]
+|  |     partitions=1/1 files=1 size=9.84MB
+|  |
+|  05:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
+|  |
+|  |--12:EXCHANGE [BROADCAST]
 |  |  |
 |  |  03:SCAN HDFS [tpcds.household_demographics]
 |  |     partitions=1/1 files=1 size=148.10KB
 |  |     predicates: (household_demographics.hd_buy_potential = '>10000' OR household_demographics.hd_buy_potential = 'unknown'), household_demographics.hd_vehicle_count > 0, CASE WHEN household_demographics.hd_vehicle_count > 0 THEN household_demographics.hd_dep_count / household_demographics.hd_vehicle_count ELSE NULL END > 1
 |  |
-|  05:HASH JOIN [INNER JOIN, BROADCAST]
+|  04:HASH JOIN [INNER JOIN, BROADCAST]
 |  |  hash predicates: store_sales.ss_store_sk = store.s_store_sk
 |  |
-|  |--12:EXCHANGE [BROADCAST]
+|  |--11:EXCHANGE [BROADCAST]
 |  |  |
 |  |  02:SCAN HDFS [tpcds.store]
 |  |     partitions=1/1 files=1 size=3.08KB
 |  |     predicates: store.s_county IN ('Saginaw County', 'Sumner County', 'Appanoose County', 'Daviess County')
-|  |
-|  04:HASH JOIN [INNER JOIN, BROADCAST]
-|  |  hash predicates: store_sales.ss_sold_date_sk = date_dim.d_date_sk
-|  |
-|  |--11:EXCHANGE [BROADCAST]
-|  |  |
-|  |  01:SCAN HDFS [tpcds.date_dim]
-|  |     partitions=1/1 files=1 size=9.84MB
 |  |
 |  00:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
@@ -2833,28 +2833,28 @@ select * from (
 |     predicates: d_year = 1999, d_moy = 1
 |
 12:HASH JOIN [INNER JOIN]
-|  hash predicates: s.ss_item_sk = i.i_item_sk
-|
-|--04:SCAN HDFS [tpcds.item i]
-|     partitions=1/1 files=1 size=4.82MB
-|
-11:HASH JOIN [INNER JOIN]
 |  hash predicates: s.ss_sold_date_sk = d.d_date_sk
 |
 |--03:SCAN HDFS [tpcds.date_dim d]
 |     partitions=1/1 files=1 size=9.84MB
 |
-10:HASH JOIN [INNER JOIN]
+11:HASH JOIN [INNER JOIN]
 |  hash predicates: c.c_current_addr_sk = a.ca_address_sk
 |
 |--00:SCAN HDFS [tpcds.customer_address a]
 |     partitions=1/1 files=1 size=5.25MB
 |
-09:HASH JOIN [INNER JOIN]
+10:HASH JOIN [INNER JOIN]
 |  hash predicates: s.ss_customer_sk = c.c_customer_sk
 |
 |--01:SCAN HDFS [tpcds.customer c]
 |     partitions=1/1 files=1 size=12.60MB
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: s.ss_item_sk = i.i_item_sk
+|
+|--04:SCAN HDFS [tpcds.item i]
+|     partitions=1/1 files=1 size=4.82MB
 |
 02:SCAN HDFS [tpcds.store_sales s]
    partitions=120/120 files=120 size=21.31MB
@@ -2918,36 +2918,36 @@ select * from (
 |     predicates: d_year = 1999, d_moy = 1
 |
 12:HASH JOIN [INNER JOIN, BROADCAST]
-|  hash predicates: s.ss_item_sk = i.i_item_sk
-|
-|--20:EXCHANGE [BROADCAST]
-|  |
-|  04:SCAN HDFS [tpcds.item i]
-|     partitions=1/1 files=1 size=4.82MB
-|
-11:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s.ss_sold_date_sk = d.d_date_sk
 |
-|--19:EXCHANGE [BROADCAST]
+|--20:EXCHANGE [BROADCAST]
 |  |
 |  03:SCAN HDFS [tpcds.date_dim d]
 |     partitions=1/1 files=1 size=9.84MB
 |
-10:HASH JOIN [INNER JOIN, BROADCAST]
+11:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c.c_current_addr_sk = a.ca_address_sk
 |
-|--18:EXCHANGE [BROADCAST]
+|--19:EXCHANGE [BROADCAST]
 |  |
 |  00:SCAN HDFS [tpcds.customer_address a]
 |     partitions=1/1 files=1 size=5.25MB
 |
-09:HASH JOIN [INNER JOIN, BROADCAST]
+10:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: s.ss_customer_sk = c.c_customer_sk
 |
-|--17:EXCHANGE [BROADCAST]
+|--18:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpcds.customer c]
 |     partitions=1/1 files=1 size=12.60MB
+|
+09:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: s.ss_item_sk = i.i_item_sk
+|
+|--17:EXCHANGE [BROADCAST]
+|  |
+|  04:SCAN HDFS [tpcds.item i]
+|     partitions=1/1 files=1 size=4.82MB
 |
 02:SCAN HDFS [tpcds.store_sales s]
    partitions=120/120 files=120 size=21.31MB
@@ -3023,23 +3023,23 @@ with v1 as (
 |  |  group by: i_category, i_brand, s_store_name, s_company_name, d_year, d_moy
 |  |
 |  29:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_item_sk = i_item_sk
+|  |
+|  |--23:SCAN HDFS [tpcds.item]
+|  |     partitions=1/1 files=1 size=4.82MB
+|  |
+|  28:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_store_sk = s_store_sk
 |  |
 |  |--26:SCAN HDFS [tpcds.store]
 |  |     partitions=1/1 files=1 size=3.08KB
 |  |
-|  28:HASH JOIN [INNER JOIN]
+|  27:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_date_sk = d_date_sk
 |  |
 |  |--25:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
 |  |     predicates: (d_year = 2000 OR (d_year = 2000 - 1 AND d_moy = 12) OR (d_year = 2000 + 1 AND d_moy = 1))
-|  |
-|  27:HASH JOIN [INNER JOIN]
-|  |  hash predicates: ss_item_sk = i_item_sk
-|  |
-|  |--23:SCAN HDFS [tpcds.item]
-|  |     partitions=1/1 files=1 size=4.82MB
 |  |
 |  24:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
@@ -3071,23 +3071,23 @@ with v1 as (
 |  |  group by: i_category, i_brand, s_store_name, s_company_name, d_year, d_moy
 |  |
 |  06:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_item_sk = i_item_sk
+|  |
+|  |--00:SCAN HDFS [tpcds.item]
+|  |     partitions=1/1 files=1 size=4.82MB
+|  |
+|  05:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_store_sk = s_store_sk
 |  |
 |  |--03:SCAN HDFS [tpcds.store]
 |  |     partitions=1/1 files=1 size=3.08KB
 |  |
-|  05:HASH JOIN [INNER JOIN]
+|  04:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_date_sk = d_date_sk
 |  |
 |  |--02:SCAN HDFS [tpcds.date_dim]
 |  |     partitions=1/1 files=1 size=9.84MB
 |  |     predicates: (d_year = 2000 OR (d_year = 2000 - 1 AND d_moy = 12) OR (d_year = 2000 + 1 AND d_moy = 1))
-|  |
-|  04:HASH JOIN [INNER JOIN]
-|  |  hash predicates: ss_item_sk = i_item_sk
-|  |
-|  |--00:SCAN HDFS [tpcds.item]
-|  |     partitions=1/1 files=1 size=4.82MB
 |  |
 |  01:SCAN HDFS [tpcds.store_sales]
 |     partitions=120/120 files=120 size=21.31MB
@@ -3106,23 +3106,23 @@ with v1 as (
 |  group by: i_category, i_brand, s_store_name, s_company_name, d_year, d_moy
 |
 19:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_item_sk = i_item_sk
+|
+|--13:SCAN HDFS [tpcds.item]
+|     partitions=1/1 files=1 size=4.82MB
+|
+18:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_store_sk = s_store_sk
 |
 |--16:SCAN HDFS [tpcds.store]
 |     partitions=1/1 files=1 size=3.08KB
 |
-18:HASH JOIN [INNER JOIN]
+17:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_sold_date_sk = d_date_sk
 |
 |--15:SCAN HDFS [tpcds.date_dim]
 |     partitions=1/1 files=1 size=9.84MB
 |     predicates: (d_year = 2000 OR (d_year = 2000 - 1 AND d_moy = 12) OR (d_year = 2000 + 1 AND d_moy = 1))
-|
-17:HASH JOIN [INNER JOIN]
-|  hash predicates: ss_item_sk = i_item_sk
-|
-|--13:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
 |
 14:SCAN HDFS [tpcds.store_sales]
    partitions=120/120 files=120 size=21.31MB
@@ -3178,24 +3178,24 @@ order by promotions, total
 |  |  output: sum(ss_ext_sales_price)
 |  |
 |  24:HASH JOIN [INNER JOIN]
-|  |  hash predicates: ss_item_sk = i_item_sk
-|  |
-|  |--19:SCAN HDFS [tpcds.item]
-|  |     partitions=1/1 files=1 size=4.82MB
-|  |     predicates: i_category = 'Books'
-|  |
-|  23:HASH JOIN [INNER JOIN]
 |  |  hash predicates: c_current_addr_sk = ca_address_sk
 |  |
 |  |--18:SCAN HDFS [tpcds.customer_address]
 |  |     partitions=1/1 files=1 size=5.25MB
 |  |     predicates: ca_gmt_offset = -5
 |  |
-|  22:HASH JOIN [INNER JOIN]
+|  23:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_customer_sk = c_customer_sk
 |  |
 |  |--17:SCAN HDFS [tpcds.customer]
 |  |     partitions=1/1 files=1 size=12.60MB
+|  |
+|  22:HASH JOIN [INNER JOIN]
+|  |  hash predicates: ss_item_sk = i_item_sk
+|  |
+|  |--19:SCAN HDFS [tpcds.item]
+|  |     partitions=1/1 files=1 size=4.82MB
+|  |     predicates: i_category = 'Books'
 |  |
 |  21:HASH JOIN [INNER JOIN]
 |  |  hash predicates: ss_sold_date_sk = d_date_sk
@@ -3218,24 +3218,24 @@ order by promotions, total
 |  output: sum(ss_ext_sales_price)
 |
 12:HASH JOIN [INNER JOIN]
-|  hash predicates: ss_item_sk = i_item_sk
-|
-|--06:SCAN HDFS [tpcds.item]
-|     partitions=1/1 files=1 size=4.82MB
-|     predicates: i_category = 'Books'
-|
-11:HASH JOIN [INNER JOIN]
 |  hash predicates: c_current_addr_sk = ca_address_sk
 |
 |--05:SCAN HDFS [tpcds.customer_address]
 |     partitions=1/1 files=1 size=5.25MB
 |     predicates: ca_gmt_offset = -5
 |
-10:HASH JOIN [INNER JOIN]
+11:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_customer_sk = c_customer_sk
 |
 |--04:SCAN HDFS [tpcds.customer]
 |     partitions=1/1 files=1 size=12.60MB
+|
+10:HASH JOIN [INNER JOIN]
+|  hash predicates: ss_item_sk = i_item_sk
+|
+|--06:SCAN HDFS [tpcds.item]
+|     partitions=1/1 files=1 size=4.82MB
+|     predicates: i_category = 'Books'
 |
 09:HASH JOIN [INNER JOIN]
 |  hash predicates: ss_sold_date_sk = d_date_sk
