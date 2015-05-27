@@ -133,11 +133,10 @@ function load-data {
     WORKLOAD="functional"
   fi
   # Force load the dataset if we detect a schema change.
-  # FIXME We ignore schema changes for now
-  # if ! ${IMPALA_HOME}/testdata/bin/check-schema-diff.sh $WORKLOAD; then
-  #   ARGS+=("--force")
-  #   echo "Force loading $WORKLOAD because a schema change was detected"
-  # fi
+  if ! ${IMPALA_HOME}/testdata/bin/check-schema-diff.sh $WORKLOAD; then
+    ARGS+=("--force")
+    echo "Force loading $WORKLOAD because a schema change was detected"
+  fi
   LOG_FILE=${DATA_LOADING_LOG_DIR}/data-load-${WORKLOAD}-${EXPLORATION_STRATEGY}.log
   echo "$MSG. Logging to ${LOG_FILE}"
   # Use unbuffered logging by executing with 'python -u'
