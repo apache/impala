@@ -619,6 +619,14 @@ struct TUpdateCatalogCacheResponse {
   1: required Types.TUniqueId catalog_service_id
 }
 
+// Sent from the impalad BE to FE with the latest cluster membership snapshot resulting
+// from the Membership heartbeat.
+struct TUpdateMembershipRequest {
+  1: required set<string> hostnames
+  2: required set<string> ip_addresses
+  3: i32 num_nodes
+}
+
 // Contains all interesting statistics from a single 'memory pool' in the JVM.
 // All numeric values are measured in bytes.
 struct TJvmMemoryPool {

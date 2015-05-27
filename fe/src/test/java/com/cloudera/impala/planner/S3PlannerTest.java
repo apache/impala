@@ -30,8 +30,6 @@ import com.cloudera.impala.planner.PlannerTestBase;
 // S3 specific planner tests go here, and will run against tables in S3.  These tests
 // are run only when test.fs.s3a.name is set in the configuration.
 public class S3PlannerTest extends PlannerTestBase {
-  // Set to the s3a bucket URI when running on S3. e.g. s3a://bucket/
-  private static final String TEST_FS_S3A_NAME = "test.fs.s3a.name";
 
   // The path that will replace the value of TEST_FS_S3A_NAME in file paths.
   private static final Path S3A_CANONICAL_BUCKET = new Path("s3a://bucket");
@@ -39,19 +37,19 @@ public class S3PlannerTest extends PlannerTestBase {
   // The Hadoop configuration.
   private final Configuration CONF = new Configuration();
 
-  // The value of the TEST_FS_S3A_NAME property.
+  // The value of the FILESYSTEM_PREFIX environment variable.
   private Path fsName;
 
   /**
-   * Config property test.fs.s3a.name must be set to the S3 scheme and bucket when
-   * running on S3, and otherwise unset.  If it is not set, then skip this test.
-   * Also remember the scheme://bucket for later.
+   * Environment variable TARGET_FILESYSTEM will be set to s3 when running against S3.
+   * If not, then skip this test.  Also remember the scheme://bucket for later.
    */
   @Before
   public void setUpTest() {
-    String fsNameStr = CONF.getTrimmed(TEST_FS_S3A_NAME);
+    String targetFs = System.getenv("TARGET_FILESYSTEM");
     // Skip if the config property was not set. i.e. not running against S3.
-    assumeTrue(!StringUtils.isEmpty(fsNameStr));
+    assumeTrue(targetFs != null && targetFs.equals("s3"));
+    String fsNameStr = System.getenv("FILESYSTEM_PREFIX");
     fsName = new Path(fsNameStr);
   }
 
@@ -79,4 +77,8 @@ public class S3PlannerTest extends PlannerTestBase {
     runPlannerTestFile("s3");
   }
 
+  @Test
+  public void testTpch() {
+    runPlannerTestFile("tpch-all");
+  }
 }

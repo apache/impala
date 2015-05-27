@@ -595,7 +595,6 @@ public class HBaseTable extends Table {
     return hbaseConf_;
   }
 
-  @Override
   public int getNumNodes() {
     // TODO: implement
     return 100;

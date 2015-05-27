@@ -214,7 +214,7 @@ public class HBaseScanNode extends ScanNode {
     LOG.debug("computeStats HbaseScan: cardinality=" + Long.toString(cardinality_));
 
     // TODO: take actual regions into account
-    numNodes_ = desc_.getTable().getNumNodes();
+    numNodes_ = tbl.getNumNodes();
     LOG.debug("computeStats HbaseScan: #nodes=" + Integer.toString(numNodes_));
   }
 

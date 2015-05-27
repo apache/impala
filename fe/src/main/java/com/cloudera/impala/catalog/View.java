@@ -145,12 +145,6 @@ public class View extends Table {
   public QueryStmt getQueryStmt() { return queryStmt_; }
   public String getOriginalViewDef() { return originalViewDef_; }
   public String getInlineViewDef() { return inlineViewDef_; }
-
-  @Override
-  public int getNumNodes() {
-    throw new IllegalStateException("Cannot call getNumNodes() on a view.");
-  }
-
   public boolean isLocalView() { return isLocalView_; }
 
   @Override

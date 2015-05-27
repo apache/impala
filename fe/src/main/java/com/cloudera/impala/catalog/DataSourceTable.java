@@ -90,7 +90,6 @@ public class DataSourceTable extends Table {
    */
   public String getInitString() { return initString_; }
 
-  @Override
   public int getNumNodes() { return 1; }
 
   @Override

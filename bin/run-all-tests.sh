@@ -109,7 +109,12 @@ do
     # Requires a running impalad cluster because some tests (such as DataErrorTest and
     # JdbcTest) queries against an impala cluster.
     pushd ${IMPALA_FE_DIR}
-    if ! mvn -fae test; then
+    MVN_ARGS=""
+    if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
+      # When running against S3, only run the S3 frontend tests.
+      MVN_ARGS="-Dtest=S3*"
+    fi
+    if ! mvn -fae test ${MVN_ARGS}; then
       TEST_RET_CODE=1
     fi
     popd

@@ -61,6 +61,7 @@ Frontend::Frontend() {
     {"getAllHadoopConfigs", "()[B", &get_hadoop_configs_id_},
     {"checkConfiguration", "()Ljava/lang/String;", &check_config_id_},
     {"updateCatalogCache", "([B)[B", &update_catalog_cache_id_},
+    {"updateMembership", "([B)V", &update_membership_id_},
     {"getTableNames", "([B)[B", &get_table_names_id_},
     {"describeTable", "([B)[B", &describe_table_id_},
     {"showCreateTable", "([B)Ljava/lang/String;", &show_create_table_id_},
@@ -105,6 +106,10 @@ Frontend::Frontend() {
 Status Frontend::UpdateCatalogCache(const TUpdateCatalogCacheRequest& req,
     TUpdateCatalogCacheResponse* resp) {
   return JniUtil::CallJniMethod(fe_, update_catalog_cache_id_, req, resp);
+}
+
+Status Frontend::UpdateMembership(const TUpdateMembershipRequest& req) {
+  return JniUtil::CallJniMethod(fe_, update_membership_id_, req);
 }
 
 Status Frontend::DescribeTable(const TDescribeTableParams& params,

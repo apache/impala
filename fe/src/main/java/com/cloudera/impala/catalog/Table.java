@@ -98,8 +98,6 @@ public abstract class Table implements CatalogObject {
         CatalogServiceCatalog.getLastDdlTime(msTable_) : -1;
   }
 
-  //number of nodes that contain data for this table; -1: unknown
-  public abstract int getNumNodes();
   public abstract TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions);
   public abstract TCatalogObjectType getCatalogObjectType();
 

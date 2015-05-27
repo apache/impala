@@ -62,9 +62,6 @@ public class IncompleteTable extends Table {
   public TCatalogObjectType getCatalogObjectType() { return TCatalogObjectType.TABLE; }
 
   @Override
-  public int getNumNodes() { throw new IllegalStateException(cause_); }
-
-  @Override
   public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {
     throw new IllegalStateException(cause_);
   }

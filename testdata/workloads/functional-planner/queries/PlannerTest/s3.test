@@ -86,9 +86,9 @@ select * from tpch_parquet.lineitem
    partitions=1/1 files=3 size=195.85MB
 ---- SCANRANGELOCATIONS
 NODE 0:
-  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_parquet/<UID>_data.0.parq 0:59082180
-  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_parquet/<UID>_data.0.parq 0:72995555
-  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_parquet/<UID>_data.0.parq 0:73288878
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_parquet/<UID>_data.0.parq 0:59081117
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_parquet/<UID>_data.0.parq 0:72993740
+  HDFS SPLIT s3a://bucket/test-warehouse/tpch.lineitem_parquet/<UID>_data.0.parq 0:73291439
 ====
 select * from tpch_rc.lineitem
 ---- PLAN

@@ -123,7 +123,9 @@ import com.cloudera.impala.thrift.TStmtType;
 import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheResponse;
+import com.cloudera.impala.thrift.TUpdateMembershipRequest;
 import com.cloudera.impala.util.EventSequence;
+import com.cloudera.impala.util.MembershipSnapshot;
 import com.cloudera.impala.util.PatternMatcher;
 import com.cloudera.impala.util.TResultRowBuilder;
 import com.cloudera.impala.util.TSessionStateUtil;
@@ -224,6 +226,13 @@ public class Frontend {
           impaladCatalog_.getAuthPolicy()));
     }
     return response;
+  }
+
+  /**
+   * Update the cluster membership snapshot with the latest snapshot from the backend.
+   */
+  public void updateMembership(TUpdateMembershipRequest req) {
+    MembershipSnapshot.update(req);
   }
 
   /**

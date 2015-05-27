@@ -66,6 +66,8 @@ import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTupleDescriptor;
+import com.cloudera.impala.thrift.TUpdateMembershipRequest;
+import com.cloudera.impala.util.MembershipSnapshot;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -93,6 +95,12 @@ public class PlannerTestBase {
     RuntimeEnv.INSTANCE.setNumCores(8);
     // Set test env to control the explain level.
     RuntimeEnv.INSTANCE.setTestEnv(true);
+    // Mimic the 3 node test mini-cluster.
+    TUpdateMembershipRequest updateReq = new TUpdateMembershipRequest();
+    updateReq.setIp_addresses(Sets.newHashSet("127.0.0.1"));
+    updateReq.setHostnames(Sets.newHashSet("localhost"));
+    updateReq.setNum_nodes(3);
+    MembershipSnapshot.update(updateReq);
   }
 
   @AfterClass

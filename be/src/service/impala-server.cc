@@ -1356,7 +1356,7 @@ void ImpalaServer::MembershipCallback(
         continue;
       }
       // This is a new item - add it to the map of known backends.
-      known_backends_.insert(make_pair(item.key, backend_descriptor.address));
+      known_backends_.insert(make_pair(item.key, backend_descriptor));
     }
     // Process membership deletions.
     BOOST_FOREACH(const string& backend_id, delta.topic_deletions) {
@@ -1366,8 +1366,24 @@ void ImpalaServer::MembershipCallback(
     // Create a set of known backend network addresses. Used to test for cluster
     // membership by network address.
     set<TNetworkAddress> current_membership;
-    BOOST_FOREACH(const BackendAddressMap::value_type& backend, known_backends_) {
-      current_membership.insert(backend.second);
+    // Also reflect changes to the frontend. Initialized only if any_changes is true.
+    TUpdateMembershipRequest update_req;
+    bool any_changes = !delta.topic_entries.empty() || !delta.topic_deletions.empty() ||
+        !delta.is_delta;
+    BOOST_FOREACH(const BackendDescriptorMap::value_type& backend, known_backends_) {
+      current_membership.insert(backend.second.address);
+      if (any_changes) {
+        update_req.hostnames.insert(backend.second.address.hostname);
+        update_req.ip_addresses.insert(backend.second.ip_address);
+      }
+    }
+    if (any_changes) {
+      update_req.num_nodes = known_backends_.size();
+      Status status = exec_env_->frontend()->UpdateMembership(update_req);
+      if (!status.ok()) {
+        LOG(WARNING) << "Error updating frontend membership snapshot: "
+                     << status.GetDetail();
+      }
     }
 
     // Maps from query id (to be cancelled) to a list of failed Impalads that are

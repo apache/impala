@@ -58,6 +58,7 @@ import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TScanRange;
 import com.cloudera.impala.thrift.TScanRangeLocation;
 import com.cloudera.impala.thrift.TScanRangeLocations;
+import com.cloudera.impala.util.MembershipSnapshot;
 import com.google.common.base.Objects;
 import com.google.common.base.Objects.ToStringHelper;
 import com.google.common.base.Preconditions;
@@ -138,11 +139,11 @@ public class HdfsScanNode extends ScanNode {
     markSlotsMaterialized(analyzer, conjuncts_);
     computeMemLayout(analyzer);
 
-    // do this at the end so it can take all conjuncts into account
-    computeStats(analyzer);
-
     // compute scan range locations
     computeScanRangeLocations(analyzer);
+
+    // do this at the end so it can take all conjuncts and scan ranges into account
+    computeStats(analyzer);
 
     // TODO: do we need this?
     assignedConjuncts_ = analyzer.getAssignedConjuncts();
@@ -612,11 +613,60 @@ public class HdfsScanNode extends ScanNode {
     cardinality_ = capAtLimit(cardinality_);
     LOG.debug("computeStats HdfsScan: cardinality_=" + Long.toString(cardinality_));
 
-    // TODO: take actual partitions into account
+    computeNumNodes(analyzer, cardinality_);
+    LOG.debug("computeStats HdfsScan: #nodes=" + Integer.toString(numNodes_));
+  }
+
+  /**
+   * Estimate the number of impalad nodes that this scan node will execute on (which is
+   * ultimately determined by the scheduling done by the backend's SimpleScheduler).
+   * Assume that scan ranges that can be scheduled locally will be, and that scan
+   * ranges that cannot will be round-robined across the cluster.
+   */
+  protected void computeNumNodes(Analyzer analyzer, long cardinality) {
+    Preconditions.checkNotNull(scanRanges_);
+    MembershipSnapshot cluster = MembershipSnapshot.getCluster();
+    HashSet<TNetworkAddress> localHostSet = Sets.newHashSet();
+    int numLocalRanges = 0;
+    for (TScanRangeLocations range: scanRanges_) {
+      boolean anyLocal = false;
+      for (TScanRangeLocation loc: range.locations) {
+        TNetworkAddress dataNode = analyzer.getHostIndex().getEntry(loc.getHost_idx());
+        if (cluster.contains(dataNode)) {
+          anyLocal = true;
+          // Use the full datanode address (including port) to account for the test
+          // minicluster where there are multiple datanodes and impalads on a single
+          // host.  This assumes that when an impalad is colocated with a datanode,
+          // there are the same number of impalads as datanodes on this host in this
+          // cluster.
+          localHostSet.add(dataNode);
+        }
+      }
+      // This range has at least one replica with a colocated impalad, so assume it
+      // will be scheduled on one of those nodes.
+      if (anyLocal) ++numLocalRanges;
+    }
+    // Approximate the number of nodes that will execute locally assigned ranges to be
+    // the smaller of the number of locally assigned ranges and the number of hosts
+    // that hold block replica for those ranges.
+    int numLocalNodes = Math.min(numLocalRanges, localHostSet.size());
+    // The remote ranges are round-robined across all the impalads.
+    int numRemoteRanges = scanRanges_.size() - numLocalRanges;
+    int numRemoteNodes = Math.min(numRemoteRanges, cluster.numNodes());
+    // The local and remote assignments may overlap, but we don't know by how much so
+    // conservatively assume no overlap.
+    int totalNodes = Math.min(numLocalNodes + numRemoteNodes, cluster.numNodes());
     // Tables can reside on 0 nodes (empty table), but a plan node must always be
     // executed on at least one node.
-    numNodes_ = (cardinality_ == 0 || tbl_.getNumNodes() == 0) ? 1 : tbl_.getNumNodes();
-    LOG.debug("computeStats HdfsScan: #nodes=" + Integer.toString(numNodes_));
+    numNodes_ = (cardinality == 0 || totalNodes == 0) ? 1 : totalNodes;
+    // For the 5.4.x release, if all scan ranges are local, revert back to the old
+    // logic of using the number of datanodes that hold blocks of the table.
+    // Otherwise, some query plans may change drastically between maintence releases.
+    // TODO: delete this line to use the new logic for local tables.
+    if (numLocalRanges == scanRanges_.size()) numNodes_ = tbl_.getNumNodes();
+    LOG.debug("computeNumNodes localRanges=" + numLocalRanges +
+        " remoteRanges=" + numRemoteRanges + " localHostSet.size=" + localHostSet.size() +
+        " clusterNodes=" + cluster.numNodes());
   }
 
   @Override

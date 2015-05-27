@@ -85,6 +85,7 @@ import com.cloudera.impala.thrift.TShowRolesResult;
 import com.cloudera.impala.thrift.TShowStatsParams;
 import com.cloudera.impala.thrift.TTableName;
 import com.cloudera.impala.thrift.TUpdateCatalogCacheRequest;
+import com.cloudera.impala.thrift.TUpdateMembershipRequest;
 import com.cloudera.impala.util.GlogAppender;
 import com.cloudera.impala.util.TSessionStateUtil;
 import com.google.common.base.Preconditions;
@@ -164,6 +165,16 @@ public class JniFrontend {
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
+  }
+
+  /**
+   * Jni wrapper for Frontend.updateMembership(). Accepts a serialized
+   * TUpdateMembershipRequest.
+   */
+  public void updateMembership(byte[] thriftMembershipUpdate) throws ImpalaException {
+    TUpdateMembershipRequest req = new TUpdateMembershipRequest();
+    JniUtil.deserializeThrift(protocolFactory_, req, thriftMembershipUpdate);
+    frontend_.updateMembership(req);
   }
 
   /**
