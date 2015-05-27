@@ -153,6 +153,12 @@ class ImpaladMetrics {
   static IntCounter* NUM_RANGES_MISSING_VOLUME_ID;
   static IntCounter* NUM_RANGES_PROCESSED;
   static IntCounter* NUM_SESSIONS_EXPIRED;
+  static IntCounter* IO_MGR_BYTES_READ;
+  static IntCounter* IO_MGR_LOCAL_BYTES_READ;
+  static IntCounter* IO_MGR_CACHED_BYTES_READ;
+  static IntCounter* IO_MGR_SHORT_CIRCUIT_BYTES_READ;
+  static IntCounter* IO_MGR_BYTES_WRITTEN;
+
   // Gauges
   static IntGauge* CATALOG_NUM_DBS;
   static IntGauge* CATALOG_NUM_TABLES;
@@ -166,11 +172,6 @@ class ImpaladMetrics {
   static IntGauge* IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT;
   static IntGauge* IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT;
   static IntGauge* IO_MGR_TOTAL_BYTES;
-  static IntGauge* IO_MGR_BYTES_READ;
-  static IntGauge* IO_MGR_LOCAL_BYTES_READ;
-  static IntGauge* IO_MGR_CACHED_BYTES_READ;
-  static IntGauge* IO_MGR_SHORT_CIRCUIT_BYTES_READ;
-  static IntGauge* IO_MGR_BYTES_WRITTEN;
   static IntGauge* MEM_POOL_TOTAL_BYTES;
   static IntGauge* NUM_FILES_OPEN_FOR_INSERT;
   static IntGauge* RESULTSET_CACHE_TOTAL_NUM_ROWS;

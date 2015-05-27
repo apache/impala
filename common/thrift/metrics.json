@@ -172,7 +172,7 @@
   {
     "description": "Catalog Server Topic Processing Time",
     "contexts": [
-      "CATALOGD"
+      "CATALOGSERVER"
     ],
     "label": "Catalog Server Topic Processing Time",
     "units": "TIME_S",
@@ -200,7 +200,7 @@
     "key": "catalog.num-tables"
   },
   {
-    "description": "",
+    "description": "Indicates if the catalog is ready.",
     "contexts": [
       "IMPALAD"
     ],
@@ -210,7 +210,7 @@
     "key": "catalog.ready"
   },
   {
-    "description": "",
+    "description": "The number of clients currently in use by the Catalog Server client cache.",
     "contexts": [
       "IMPALAD"
     ],
@@ -220,7 +220,7 @@
     "key": "catalog.server.client-cache.clients-in-use"
   },
   {
-    "description": "",
+    "description": "The total number of clients in the Catalog Server client cache.",
     "contexts": [
       "IMPALAD"
     ],
@@ -230,9 +230,9 @@
     "key": "catalog.server.client-cache.total-clients"
   },
   {
-    "description": "catalogd build version",
+    "description": "The full version string of the Catalog Server.",
     "contexts": [
-      "CATALOGD"
+      "CATALOGSERVER"
     ],
     "label": "Catalog Version",
     "units": "NONE",
@@ -280,43 +280,43 @@
     "key": "impala-server.hash-table.total-bytes"
   },
   {
-    "description": "",
+    "description": "The total number of bytes read by the IO manager.",
     "contexts": [
       "IMPALAD"
     ],
     "label": "Impala Server Io Mgr Bytes Read",
     "units": "BYTES",
-    "kind": "GAUGE",
+    "kind": "COUNTER",
     "key": "impala-server.io-mgr.bytes-read"
   },
   {
-    "description": "",
+    "description": "Total number of bytes written to disk by the IO manager.",
     "contexts": [
       "IMPALAD"
     ],
     "label": "Impala Server Io Mgr Bytes Written",
     "units": "BYTES",
-    "kind": "GAUGE",
+    "kind": "COUNTER",
     "key": "impala-server.io-mgr.bytes-written"
   },
   {
-    "description": "",
+    "description": "Total number of cached bytes read by the IO manager.",
     "contexts": [
       "IMPALAD"
     ],
     "label": "Impala Server Io Mgr Cached Bytes Read",
     "units": "BYTES",
-    "kind": "GAUGE",
+    "kind": "COUNTER",
     "key": "impala-server.io-mgr.cached-bytes-read"
   },
   {
-    "description": "",
+    "description": "Total number of local bytes read by the IO manager.",
     "contexts": [
       "IMPALAD"
     ],
     "label": "Impala Server Io Mgr Local Bytes Read",
     "units": "BYTES",
-    "kind": "GAUGE",
+    "kind": "COUNTER",
     "key": "impala-server.io-mgr.local-bytes-read"
   },
   {
@@ -350,13 +350,13 @@
     "key": "impala-server.io-mgr.num-unused-buffers"
   },
   {
-    "description": "",
+    "description": "Total number of short-circuit bytes read by the IO manager.",
     "contexts": [
       "IMPALAD"
     ],
     "label": "Impala Server Io Mgr Short Circuit Bytes Read",
     "units": "BYTES",
-    "kind": "GAUGE",
+    "kind": "COUNTER",
     "key": "impala-server.io-mgr.short-circuit-bytes-read"
   },
   {
@@ -440,7 +440,7 @@
     "key": "impala-server.num-queries-expired"
   },
   {
-    "description": "",
+    "description": "Number of queries for which any operator spilled.",
     "contexts": [
       "IMPALAD"
     ],
@@ -460,7 +460,7 @@
     "key": "impala-server.num-sessions-expired"
   },
   {
-    "description": "",
+    "description": "Indicates if the Impala Server is ready.",
     "contexts": [
       "IMPALAD"
     ],
@@ -470,7 +470,7 @@
     "key": "impala-server.ready"
   },
   {
-    "description": "",
+    "description": "Total number of bytes consumed for rows cached to support HS2 FETCH_FIRST.",
     "contexts": [
       "IMPALAD"
     ],
@@ -480,7 +480,7 @@
     "key": "impala-server.resultset-cache.total-bytes"
   },
   {
-    "description": "",
+    "description": "Total number of rows cached to support HS2 FETCH_FIRST.",
     "contexts": [
       "IMPALAD"
     ],
@@ -510,7 +510,7 @@
     "key": "impala-server.scan-ranges.total"
   },
   {
-    "description": "",
+    "description": "The local start time of the Impala Server.",
     "contexts": [
       "IMPALAD"
     ],
@@ -520,7 +520,7 @@
     "key": "impala-server.start-time"
   },
   {
-    "description": "",
+    "description": "The full version string of the Impala Server.",
     "contexts": [
       "IMPALAD"
     ],
@@ -552,7 +552,7 @@
   {
     "description": "The number of active catalog service connections to this Catalog Server.",
     "contexts": [
-      "CATALOGD"
+      "CATALOGSERVER"
     ],
     "label": "Catalog Service Active Connections",
     "units": "NONE",
@@ -562,7 +562,7 @@
   {
     "description": "The total number of connections made to this Catalog Server's catalog service  over its lifetime.",
     "contexts": [
-      "CATALOGD"
+      "CATALOGSERVER"
     ],
     "label": "Catalog Service Total Connections",
     "units": "UNIT",
@@ -572,7 +572,7 @@
   {
     "description": "The number of active connections to this StateStore's StateStore service.",
     "contexts": [
-      "STATESTORED"
+      "STATESTORE"
     ],
     "label": "StateStore Service Active Connections",
     "units": "NONE",
@@ -582,7 +582,7 @@
   {
     "description": "The total number of connections made to this StateStore's StateStore service over its lifetime.",
     "contexts": [
-      "STATESTORED"
+      "STATESTORE"
     ],
     "label": "StateStore Service Connections",
     "units": "UNIT",
@@ -680,7 +680,7 @@
     "key": "mem-tracker.process.num-gcs"
   },
   {
-    "description": "",
+    "description": "Time (ms) spent resolving request request pools.",
     "contexts": [
       "IMPALAD"
     ],
@@ -697,7 +697,7 @@
     "label": "Resource Broker Active Llama",
     "units": "NONE",
     "kind": "PROPERTY",
-    "description": ""
+    "description": "The address of the active Llama server."
   },
   {
     "key": "resource-broker.active-llama-handle",
@@ -707,7 +707,7 @@
     "label": "Resource Broker Active Llama Handle",
     "units": "NONE",
     "kind": "PROPERTY",
-    "description": ""
+    "description": "The Llama client handle provided by the active Llama server."
   },
   {
     "key": "resource-broker.expansion-request-response-time",
@@ -882,8 +882,8 @@
   {
     "description": "Duration (ms) of RPC calls to $0",
     "contexts": [
-      "CATALOGD",
-      "STATESTORED",
+      "CATALOGSERVER",
+      "STATESTORE",
       "IMPALAD"
     ],
     "label": "$0 RPC Call Duration",
@@ -902,7 +902,7 @@
     "key": "simple-scheduler.assignments.total"
   },
   {
-    "description": "",
+    "description": "Indicates whether the scheduler has been initialized.",
     "contexts": [
       "IMPALAD"
     ],
@@ -934,7 +934,7 @@
   {
     "description": "Whether the Impala Daemon considers itself connected to the StateStore.",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "StateStore Connectivity",
@@ -943,9 +943,9 @@
     "key": "statestore-subscriber.connected"
   },
   {
-    "description": "",
+    "description": "The time (sec) between Statestore heartbeats.",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Statestore Subscriber Heartbeat Interval Time",
@@ -956,7 +956,7 @@
   {
     "description": "The amount of time the StateStore subscriber took to recover the connection the last time it was lost.",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "StateStore Subscriber Last Recovery Duration",
@@ -965,9 +965,9 @@
     "key": "statestore-subscriber.last-recovery-duration"
   },
   {
-    "description": "",
+    "description": "The local time that the last statestore recovery happened.",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Statestore Subscriber Last Recovery Time",
@@ -978,7 +978,7 @@
   {
     "description": "The most recent registration ID for this subscriber with the statestore. Set to 'N/A' if no registration has been completed",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Statestore Subscriber Registration Id",
@@ -989,7 +989,7 @@
   {
     "description": "The number of active StateStore subscriber clients in this Impala Daemon's client cache. These clients are for communication from this role to the StateStore.",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "StateStore Subscriber Active Clients",
@@ -1000,7 +1000,7 @@
   {
     "description": "The total number of StateStore subscriber clients in this Impala Daemon's client cache. These clients are for communication from this role to the StateStore.",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "StateStore Subscriber Total Clients",
@@ -1011,7 +1011,7 @@
   {
     "description": "Statestore Subscriber Topic $0 Processing Time",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Statestore Subscriber Topic $0 Processing Time",
@@ -1020,9 +1020,9 @@
     "key": "statestore-subscriber.topic-$0.processing-time-s"
   },
   {
-    "description": "",
+    "description": "The time (sec) taken to process Statestore subcriber topic updates.",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Statestore Subscriber Topic Update Duration",
@@ -1031,9 +1031,9 @@
     "key": "statestore-subscriber.topic-update-duration"
   },
   {
-    "description": "",
+    "description": "The time (sec) between Statestore subscriber topic updates.",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Statestore Subscriber Topic Update Interval Time",
@@ -1042,9 +1042,9 @@
     "key": "statestore-subscriber.topic-update-interval-time"
   },
   {
-    "description": "",
+    "description": "The time (sec) spent sending heartbeat RPCs. Includes subscriber-side processing time and network transmission time.",
     "contexts": [
-      "STATESTORED"
+      "STATESTORE"
     ],
     "label": "Statestore Heartbeat Durations",
     "units": "TIME_S",
@@ -1052,9 +1052,9 @@
     "key": "statestore.heartbeat-durations"
   },
   {
-    "description": "",
+    "description": "The number of registered Statestore subscribers.",
     "contexts": [
-      "STATESTORED"
+      "STATESTORE"
     ],
     "label": "Statestore Live Backends",
     "units": "NONE",
@@ -1062,9 +1062,9 @@
     "key": "statestore.live-backends"
   },
   {
-    "description": "",
+    "description": "The set of all live Statestore subscribers.",
     "contexts": [
-      "STATESTORED"
+      "STATESTORE"
     ],
     "label": "Statestore Live Backends List",
     "units": "NONE",
@@ -1072,9 +1072,9 @@
     "key": "statestore.live-backends.list"
   },
   {
-    "description": "",
+    "description": "The time (sec) spent sending topic update RPCs. Includes subscriber-side processing time and network transmission time.",
     "contexts": [
-      "STATESTORED"
+      "STATESTORE"
     ],
     "label": "Statestore Topic Update Durations",
     "units": "TIME_S",
@@ -1084,7 +1084,7 @@
   {
     "description": "The sum of the size of all keys for all topics tracked by the StateStore.",
     "contexts": [
-      "STATESTORED"
+      "STATESTORE"
     ],
     "label": "Topic Key Size",
     "units": "NONE",
@@ -1094,7 +1094,7 @@
   {
     "description": "The sum of the size of all keys and all values for all topics tracked by the StateStore.",
     "contexts": [
-      "STATESTORED"
+      "STATESTORE"
     ],
     "label": "Topic Size",
     "units": "NONE",
@@ -1104,7 +1104,7 @@
   {
     "description": "The sum of the size of all values for all topics tracked by the StateStore.",
     "contexts": [
-      "STATESTORED"
+      "STATESTORE"
     ],
     "label": "Topic Value Size",
     "units": "NONE",
@@ -1112,9 +1112,9 @@
     "key": "statestore.total-value-size-bytes"
   },
   {
-    "description": "",
+    "description": "The full version string of the Statestore Server.",
     "contexts": [
-      "STATESTORED"
+      "STATESTORE"
     ],
     "label": "Statestore Version",
     "units": "NONE",
@@ -1122,9 +1122,9 @@
     "key": "statestore.version"
   },
   {
-    "description": "",
+    "description": "The number of clients in use by the Statestore heartbeat client cache.",
     "contexts": [
-      "STATESTORED"
+      "STATESTORE"
     ],
     "label": "Subscriber Heartbeat Client Cache Clients In Use",
     "units": "NONE",
@@ -1132,9 +1132,9 @@
     "key": "subscriber-heartbeat.client-cache.clients-in-use"
   },
   {
-    "description": "",
+    "description": "The total number of clients in the Statestore heartbeat client cache.",
     "contexts": [
-      "STATESTORED"
+      "STATESTORE"
     ],
     "label": "Subscriber Heartbeat Client Cache Total Clients",
     "units": "NONE",
@@ -1142,9 +1142,9 @@
     "key": "subscriber-heartbeat.client-cache.total-clients"
   },
   {
-    "description": "",
+    "description": "The number of clients in use by the Statestore update state client cache.",
     "contexts": [
-      "STATESTORED"
+      "STATESTORE"
     ],
     "label": "Subscriber Update State Client Cache Clients In Use",
     "units": "NONE",
@@ -1152,9 +1152,9 @@
     "key": "subscriber-update-state.client-cache.clients-in-use"
   },
   {
-    "description": "",
+    "description": "The total number of clients in the Statestore update state client cache.",
     "contexts": [
-      "STATESTORED"
+      "STATESTORE"
     ],
     "label": "Subscriber Update State Client Cache Total Clients",
     "units": "NONE",
@@ -1164,8 +1164,8 @@
   {
     "description": "Number of bytes used by the application. This will not typically match the memory use reported by the OS, because it does not include TCMalloc overhead or memory fragmentation.",
     "contexts": [
-      "STATESTORED",
-      "CATALOGD",
+      "STATESTORE",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "TCMalloc Bytes in Use",
@@ -1176,8 +1176,8 @@
   {
     "description": "Number of bytes in free, mapped pages in page heap. These bytes can be used to fulfill allocation requests. They always count towards virtual memory usage, and unless the underlying memory is swapped out by the OS, they also count towards physical memory usage.",
     "contexts": [
-      "STATESTORED",
-      "CATALOGD",
+      "STATESTORE",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "TCMalloc Pageheap Free",
@@ -1188,8 +1188,8 @@
   {
     "description": "Number of bytes in free, unmapped pages in page heap. These are bytes that have been released back to the OS, possibly by one of the MallocExtension \"Release\" calls. They can be used to fulfill allocation requests, but typically incur a page fault. They always count towards virtual memory usage, and depending on the OS, typically do not count towards physical memory usage.",
     "contexts": [
-      "STATESTORED",
-      "CATALOGD",
+      "STATESTORE",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "TCMalloc Pageheap Unmapped",
@@ -1200,8 +1200,8 @@
   {
     "description": "Derived metric computing the amount of physical memory (in bytes) used by the process, including that actually in use and free bytes reserved by tcmalloc. Does not include the tcmalloc metadata.",
     "contexts": [
-      "STATESTORED",
-      "CATALOGD",
+      "STATESTORE",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "TCMalloc Physical Bytes Reserved",
@@ -1212,8 +1212,8 @@
   {
     "description": "Bytes of system memory reserved by TCMalloc.",
     "contexts": [
-      "STATESTORED",
-      "CATALOGD",
+      "STATESTORE",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "TCMalloc Total Bytes Reserved",
@@ -1224,8 +1224,8 @@
   {
     "description": "The number of running threads in this process.",
     "contexts": [
-      "STATESTORED",
-      "CATALOGD",
+      "STATESTORE",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Running Threads",
@@ -1236,8 +1236,8 @@
   {
     "description": "Threads created over the lifetime of the process.",
     "contexts": [
-      "STATESTORED",
-      "CATALOGD",
+      "STATESTORE",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Threads Created",
@@ -1248,7 +1248,7 @@
   {
     "description": "Jvm $0 Committed Usage Bytes",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Jvm $0 Committed Usage Bytes",
@@ -1259,7 +1259,7 @@
   {
     "description": "Jvm $0 Current Usage Bytes",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Jvm $0 Current Usage Bytes",
@@ -1270,7 +1270,7 @@
   {
     "description": "Jvm $0 Init Usage Bytes",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Jvm $0 Init Usage Bytes",
@@ -1281,7 +1281,7 @@
   {
     "description": "Jvm $0 Max Usage Bytes",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Jvm $0 Max Usage Bytes",
@@ -1292,7 +1292,7 @@
   {
     "description": "Jvm $0 Peak Committed Usage Bytes",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Jvm $0 Peak Committed Usage Bytes",
@@ -1303,7 +1303,7 @@
   {
     "description": "Jvm $0 Peak Current Usage Bytes",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Jvm $0 Peak Current Usage Bytes",
@@ -1314,7 +1314,7 @@
   {
     "description": "Jvm $0 Peak Init Usage Bytes",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Jvm $0 Peak Init Usage Bytes",
@@ -1325,7 +1325,7 @@
   {
     "description": "Jvm $0 Peak Max Usage Bytes",
     "contexts": [
-      "CATALOGD",
+      "CATALOGSERVER",
       "IMPALAD"
     ],
     "label": "Jvm $0 Peak Max Usage Bytes",

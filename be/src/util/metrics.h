@@ -132,7 +132,8 @@ class SimpleMetric : public Metric {
  public:
   SimpleMetric(const TMetricDef& metric_def, const T& initial_value)
       : Metric(metric_def), unit_(metric_def.units), value_(initial_value) {
-    DCHECK_EQ(metric_kind, metric_def.kind);
+    DCHECK_EQ(metric_kind, metric_def.kind) << "Metric kind does not match definition: "
+        << metric_def.key;
   }
 
   virtual ~SimpleMetric() { }

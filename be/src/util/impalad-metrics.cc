@@ -107,6 +107,11 @@ IntCounter* ImpaladMetrics::NUM_QUERIES_SPILLED = NULL;
 IntCounter* ImpaladMetrics::NUM_RANGES_MISSING_VOLUME_ID = NULL;
 IntCounter* ImpaladMetrics::NUM_RANGES_PROCESSED = NULL;
 IntCounter* ImpaladMetrics::NUM_SESSIONS_EXPIRED = NULL;
+IntCounter* ImpaladMetrics::IO_MGR_BYTES_READ = NULL;
+IntCounter* ImpaladMetrics::IO_MGR_LOCAL_BYTES_READ = NULL;
+IntCounter* ImpaladMetrics::IO_MGR_SHORT_CIRCUIT_BYTES_READ = NULL;
+IntCounter* ImpaladMetrics::IO_MGR_CACHED_BYTES_READ = NULL;
+IntCounter* ImpaladMetrics::IO_MGR_BYTES_WRITTEN = NULL;
 
 // Gauges
 IntGauge* ImpaladMetrics::CATALOG_NUM_DBS = NULL;
@@ -121,11 +126,6 @@ IntGauge* ImpaladMetrics::IO_MGR_NUM_FILE_HANDLES_OUTSTANDING = NULL;
 IntGauge* ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_HIT_COUNT = NULL;
 IntGauge* ImpaladMetrics::IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT = NULL;
 IntGauge* ImpaladMetrics::IO_MGR_TOTAL_BYTES = NULL;
-IntGauge* ImpaladMetrics::IO_MGR_BYTES_READ = NULL;
-IntGauge* ImpaladMetrics::IO_MGR_LOCAL_BYTES_READ = NULL;
-IntGauge* ImpaladMetrics::IO_MGR_SHORT_CIRCUIT_BYTES_READ = NULL;
-IntGauge* ImpaladMetrics::IO_MGR_CACHED_BYTES_READ = NULL;
-IntGauge* ImpaladMetrics::IO_MGR_BYTES_WRITTEN = NULL;
 IntGauge* ImpaladMetrics::MEM_POOL_TOTAL_BYTES = NULL;
 IntGauge* ImpaladMetrics::NUM_FILES_OPEN_FOR_INSERT = NULL;
 IntGauge* ImpaladMetrics::RESULTSET_CACHE_TOTAL_NUM_ROWS = NULL;
@@ -207,14 +207,14 @@ void ImpaladMetrics::CreateMetrics(MetricGroup* m) {
   IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT = m->AddGauge<int64_t>(
       ImpaladMetricKeys::IO_MGR_CACHED_FILE_HANDLES_MISS_COUNT, 0L);
 
-  IO_MGR_BYTES_READ = m->AddGauge(ImpaladMetricKeys::IO_MGR_BYTES_READ, 0L);
-  IO_MGR_LOCAL_BYTES_READ = m->AddGauge(
+  IO_MGR_BYTES_READ = m->AddCounter(ImpaladMetricKeys::IO_MGR_BYTES_READ, 0L);
+  IO_MGR_LOCAL_BYTES_READ = m->AddCounter(
       ImpaladMetricKeys::IO_MGR_LOCAL_BYTES_READ, 0L);
-  IO_MGR_CACHED_BYTES_READ = m->AddGauge<int64_t>(
+  IO_MGR_CACHED_BYTES_READ = m->AddCounter<int64_t>(
       ImpaladMetricKeys::IO_MGR_CACHED_BYTES_READ, 0L);
-  IO_MGR_SHORT_CIRCUIT_BYTES_READ = m->AddGauge<int64_t>(
+  IO_MGR_SHORT_CIRCUIT_BYTES_READ = m->AddCounter<int64_t>(
       ImpaladMetricKeys::IO_MGR_SHORT_CIRCUIT_BYTES_READ, 0L);
-  IO_MGR_BYTES_WRITTEN = m->AddGauge<int64_t>(
+  IO_MGR_BYTES_WRITTEN = m->AddCounter<int64_t>(
       ImpaladMetricKeys::IO_MGR_BYTES_WRITTEN, 0L);
 
   IO_MGR_CACHED_FILE_HANDLES_HIT_RATIO =
