@@ -161,12 +161,24 @@ class SlotDescriptor {
   SlotDescriptor(const TSlotDescriptor& tdesc, const TupleDescriptor* parent);
 };
 
+class ColumnDescriptor {
+ public:
+  ColumnDescriptor(const TColumnDescriptor& tdesc);
+  const std::string& name() const { return name_; }
+  const ColumnType& type() const { return type_; }
+  std::string DebugString() const;
+
+ private:
+  std::string name_;
+  ColumnType type_;
+};
+
 /// Base class for table descriptors.
 class TableDescriptor {
  public:
   TableDescriptor(const TTableDescriptor& tdesc);
   virtual ~TableDescriptor() {}
-  int num_cols() const { return num_cols_; }
+  int num_cols() const { return col_descs_.size(); }
   int num_clustering_cols() const { return num_clustering_cols_; }
   virtual std::string DebugString() const;
 
@@ -180,15 +192,14 @@ class TableDescriptor {
   const std::string& name() const { return name_; }
   const std::string& database() const { return database_; }
   int id() const { return id_; }
-  const std::vector<std::string>& col_names() const { return col_names_; }
+  const std::vector<ColumnDescriptor>& col_descs() const { return col_descs_; }
 
  protected:
   std::string name_;
   std::string database_;
   TableId id_;
-  int num_cols_;
   int num_clustering_cols_;
-  std::vector<std::string> col_names_;
+  std::vector<ColumnDescriptor> col_descs_;
 };
 
 /// Metadata for a single partition inside an Hdfs table.

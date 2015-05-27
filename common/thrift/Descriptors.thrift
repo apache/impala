@@ -40,23 +40,28 @@ struct TSlotDescriptor {
   9: required bool isMaterialized
 }
 
+struct TColumnDescriptor {
+  1: required string name
+  2: required Types.TColumnType type
+}
+
 // "Union" of all table types.
 struct TTableDescriptor {
   1: required Types.TTableId id
   2: required CatalogObjects.TTableType tableType
-  3: required i32 numCols
+  // Clustering/partition columns come first.
+  3: required list<TColumnDescriptor> columnDescriptors
   4: required i32 numClusteringCols
-  // Names of the columns. Clustering columns come first.
-  10: optional list<string> colNames;
+
   5: optional CatalogObjects.THdfsTable hdfsTable
   6: optional CatalogObjects.THBaseTable hbaseTable
   9: optional CatalogObjects.TDataSourceTable dataSourceTable
 
   // Unqualified name of table
-  7: required string tableName;
+  7: required string tableName
 
   // Name of the database that the table belongs to
-  8: required string dbName;
+  8: required string dbName
 }
 
 struct TTupleDescriptor {
@@ -72,9 +77,9 @@ struct TTupleDescriptor {
 }
 
 struct TDescriptorTable {
-  1: optional list<TSlotDescriptor> slotDescriptors;
-  2: required list<TTupleDescriptor> tupleDescriptors;
+  1: optional list<TSlotDescriptor> slotDescriptors
+  2: required list<TTupleDescriptor> tupleDescriptors
 
   // all table descriptors referenced by tupleDescriptors
-  3: optional list<TTableDescriptor> tableDescriptors;
+  3: optional list<TTableDescriptor> tableDescriptors
 }

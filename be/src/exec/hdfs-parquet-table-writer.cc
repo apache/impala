@@ -740,7 +740,7 @@ Status HdfsParquetTableWriter::CreateSchema() {
 
   for (int i = 0; i < columns_.size(); ++i) {
     parquet::SchemaElement& node = file_metadata_.schema[i + 1];
-    node.name = table_desc_->col_names()[i + num_clustering_cols];
+    node.name = table_desc_->col_descs()[i + num_clustering_cols].name();
     node.__set_type(IMPALA_TO_PARQUET_TYPES[output_expr_ctxs_[i]->root()->type().type]);
     node.__set_repetition_type(FieldRepetitionType::OPTIONAL);
     const ColumnType& type = output_expr_ctxs_[i]->root()->type();
@@ -781,7 +781,8 @@ Status HdfsParquetTableWriter::AddRowGroup() {
     // TODO: we might not have PLAIN encoding in this case
     metadata.encodings.push_back(Encoding::PLAIN_DICTIONARY);
     metadata.encodings.push_back(Encoding::PLAIN);
-    metadata.path_in_schema.push_back(table_desc_->col_names()[i + num_clustering_cols]);
+    metadata.path_in_schema.push_back(
+        table_desc_->col_descs()[i + num_clustering_cols].name());
     metadata.codec = columns_[i]->codec();
     current_row_group_->columns[i].__set_meta_data(metadata);
   }
@@ -949,7 +950,7 @@ Status HdfsParquetTableWriter::FlushCurrentRowGroup() {
     current_row_group_->total_byte_size += columns_[i]->total_compressed_size();
     current_row_group_->num_rows = columns_[i]->num_values();
     current_row_group_->columns[i].file_offset = file_pos_;
-    const string& col_name = table_desc_->col_names()[i + num_clustering_cols];
+    const string& col_name = table_desc_->col_descs()[i + num_clustering_cols].name();
     parquet_stats_.per_column_size[col_name] += columns_[i]->total_compressed_size();
 
     // Since we don't supported complex schemas, all columns should have the same

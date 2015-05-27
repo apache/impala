@@ -15,6 +15,7 @@
 #include "runtime/descriptors.h"
 
 #include <boost/algorithm/string/join.hpp>
+#include <gutil/strings/substitute.h>
 #include <ios>
 #include <sstream>
 
@@ -32,6 +33,7 @@
 
 using boost::algorithm::join;
 using namespace llvm;
+using namespace strings;
 
 namespace impala {
 
@@ -90,20 +92,34 @@ string SlotDescriptor::DebugString() const {
   return out.str();
 }
 
+ColumnDescriptor::ColumnDescriptor(const TColumnDescriptor& tdesc)
+  : name_(tdesc.name),
+    type_(ColumnType::FromThrift(tdesc.type)) {
+}
+
+string ColumnDescriptor::DebugString() const {
+  return Substitute("$0: $1", name_, type_.DebugString());
+}
+
 TableDescriptor::TableDescriptor(const TTableDescriptor& tdesc)
   : name_(tdesc.tableName),
     database_(tdesc.dbName),
     id_(tdesc.id),
-    num_cols_(tdesc.numCols),
-    num_clustering_cols_(tdesc.numClusteringCols),
-    col_names_(tdesc.colNames) {
+    num_clustering_cols_(tdesc.numClusteringCols) {
+  for (int i = 0; i < tdesc.columnDescriptors.size(); ++i) {
+    col_descs_.push_back(ColumnDescriptor(tdesc.columnDescriptors[i]));
+  }
 }
 
 string TableDescriptor::DebugString() const {
+  vector<string> cols;
+  BOOST_FOREACH(const ColumnDescriptor& col_desc, col_descs_) {
+    cols.push_back(col_desc.DebugString());
+  }
   stringstream out;
-  out << "#cols=" << num_cols_ << " #clustering_cols=" << num_clustering_cols_;
-  out << " col_names=[";
-  out << join(col_names_, ":");
+  out << "#cols=" << num_cols() << " #clustering_cols=" << num_clustering_cols_;
+  out << " cols=[";
+  out << join(cols, ", ");
   out << "]";
   return out.str();
 }

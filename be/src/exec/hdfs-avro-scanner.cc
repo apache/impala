@@ -430,7 +430,7 @@ HdfsAvroScanner::SchemaElement HdfsAvroScanner::ConvertSchema(
       if (slot_desc->type().type != TYPE_DECIMAL) break;
       if (slot_desc->type().scale != avro_schema_decimal_scale(schema)) {
         const string& col_name =
-            scan_node_->hdfs_table()->col_names()[slot_desc->col_pos()];
+            scan_node_->hdfs_table()->col_descs()[slot_desc->col_pos()].name();
         stringstream ss;
         ss << "File '" << stream_->filename() << "' column '" << col_name
            << "' has a scale that does not match the table metadata scale."
@@ -440,7 +440,7 @@ HdfsAvroScanner::SchemaElement HdfsAvroScanner::ConvertSchema(
       }
       if (slot_desc->type().precision != avro_schema_decimal_precision(schema)) {
         const string& col_name =
-            scan_node_->hdfs_table()->col_names()[slot_desc->col_pos()];
+            scan_node_->hdfs_table()->col_descs()[slot_desc->col_pos()].name();
         stringstream ss;
         ss << "File '" << stream_->filename() << "' column '" << col_name
            << "' has a precision that does not match the table metadata precision."

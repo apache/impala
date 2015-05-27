@@ -100,7 +100,7 @@ Status DataSourceScanNode::Open(RuntimeState* state) {
   BOOST_FOREACH(const SlotDescriptor* slot, materialized_slots_) {
     extdatasource::TColumnDesc col;
     int col_idx = slot->col_pos();
-    col.__set_name(tuple_desc_->table_desc()->col_names()[col_idx]);
+    col.__set_name(tuple_desc_->table_desc()->col_descs()[col_idx].name());
     col.__set_type(slot->type().ToThrift());
     cols.push_back(col);
   }

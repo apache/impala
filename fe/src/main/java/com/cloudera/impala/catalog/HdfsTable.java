@@ -1263,12 +1263,9 @@ public class HdfsTable extends Table {
 
   @Override
   public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {
-    // Create thrift descriptors to send to the BE.  The BE does not
-    // need any information below the THdfsPartition level.
     TTableDescriptor tableDesc = new TTableDescriptor(id_.asInt(), TTableType.HDFS_TABLE,
-        getColumns().size(), numClusteringCols_, name_, db_.getName());
+        getTColumnDescriptors(), numClusteringCols_, name_, db_.getName());
     tableDesc.setHdfsTable(getTHdfsTable(false, referencedPartitions));
-    tableDesc.setColNames(getColumnNames());
     return tableDesc;
   }
 

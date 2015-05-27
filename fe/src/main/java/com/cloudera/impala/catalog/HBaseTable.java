@@ -576,10 +576,9 @@ public class HBaseTable extends Table {
   @Override
   public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {
     TTableDescriptor tableDescriptor =
-        new TTableDescriptor(id_.asInt(), TTableType.HBASE_TABLE, getColumns().size(),
-            numClusteringCols_, hbaseTableName_, db_.getName());
+        new TTableDescriptor(id_.asInt(), TTableType.HBASE_TABLE,
+            getTColumnDescriptors(), numClusteringCols_, hbaseTableName_, db_.getName());
     tableDescriptor.setHbaseTable(getTHBaseTable());
-    tableDescriptor.setColNames(getColumnNames());
     return tableDescriptor;
   }
 

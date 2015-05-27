@@ -218,10 +218,9 @@ public class DataSourceTable extends Table {
   @Override
   public TTableDescriptor toThriftDescriptor(Set<Long> referencedPartitions) {
     TTableDescriptor tableDesc = new TTableDescriptor(id_.asInt(),
-        TTableType.DATA_SOURCE_TABLE, getColumns().size(), numClusteringCols_, name_,
-        db_.getName());
+        TTableType.DATA_SOURCE_TABLE, getTColumnDescriptors(), numClusteringCols_,
+        name_, db_.getName());
     tableDesc.setDataSourceTable(getDataSourceTable());
-    tableDesc.setColNames(getColumnNames());
     return tableDesc;
   }
 

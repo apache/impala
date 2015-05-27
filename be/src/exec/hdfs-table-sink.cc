@@ -86,7 +86,7 @@ Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
     }
   }
   // Sanity check.
-  DCHECK_LE(partition_key_expr_ctxs_.size(), table_desc_->col_names().size())
+  DCHECK_LE(partition_key_expr_ctxs_.size(), table_desc_->num_cols())
     << DebugString();
   DCHECK_EQ(partition_key_expr_ctxs_.size(), table_desc_->num_clustering_cols())
     << DebugString();
@@ -329,7 +329,7 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
   // etc.
   stringstream partition_name_ss;
   for (int j = 0; j < partition_key_expr_ctxs_.size(); ++j) {
-    partition_name_ss << table_desc_->col_names()[j] << "=";
+    partition_name_ss << table_desc_->col_descs()[j].name() << "=";
     void* value = partition_key_expr_ctxs_[j]->GetValue(current_row_);
     // NULL partition keys get a special value to be compatible with Hive.
     if (value == NULL) {

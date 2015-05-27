@@ -32,6 +32,7 @@ import com.cloudera.impala.thrift.TAccessLevel;
 import com.cloudera.impala.thrift.TCatalogObject;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TColumn;
+import com.cloudera.impala.thrift.TColumnDescriptor;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableStats;
@@ -351,6 +352,17 @@ public abstract class Table implements CatalogObject {
       colNames.add(col.getName());
     }
     return colNames;
+  }
+
+  /**
+   * Returns a list of thrift column descriptors ordered by position.
+   */
+  public List<TColumnDescriptor> getTColumnDescriptors() {
+    List<TColumnDescriptor> colDescs = Lists.<TColumnDescriptor>newArrayList();
+    for (Column col: colsByPos_) {
+      colDescs.add(new TColumnDescriptor(col.getName(), col.getType().toThrift()));
+    }
+    return colDescs;
   }
 
   /**
