@@ -47,6 +47,21 @@ class Expr;
 class ExprContext;
 class RuntimeState;
 
+// A path into a table schema (e.g. a vector of ColumnTypes) pointing to a particular
+// column/field. The i-th element of the path is the ordinal position of the column/field
+// of the schema at level i. For example, the path [0] would be the first column of the
+// table, and path [1,0] would be the first field in the second column of the table.
+//
+// Arrays are represented as having two fields. The first is the item element in the
+// schema. The second is an artifical position element, which does not actually exist in
+// the table schema. For example, if path [0] is an array, path [0,0] would refer to the
+// array's item, and path [0,1] would refer to the position element, which is the item
+// count of the array.
+//
+// Likewise, maps are represented as having three fields: the key element, the value
+// element, and the artifical position element.
+typedef std::vector<int> SchemaPath;
+
 struct LlvmTupleStruct {
   llvm::StructType* tuple_struct;
   llvm::PointerType* tuple_ptr;
@@ -84,7 +99,7 @@ class SlotDescriptor {
   /// TODO: This function should eventually be replaced by col_path(). It is currently
   /// convenient for table formats for which we only support flat data.
   int col_pos() const { return col_path_[0]; }
-  const std::vector<int>& col_path() const { return col_path_; }
+  const SchemaPath& col_path() const { return col_path_; }
   /// Returns the field index in the generated llvm struct for this slot's tuple
   int field_idx() const { return field_idx_; }
   int tuple_offset() const { return tuple_offset_; }
@@ -120,7 +135,7 @@ class SlotDescriptor {
   const SlotId id_;
   const ColumnType type_;
   const TupleDescriptor* parent_;
-  const std::vector<int> col_path_;
+  const SchemaPath col_path_;
   const int tuple_offset_;
   const NullIndicatorOffset null_indicator_offset_;
 
@@ -304,7 +319,7 @@ class TupleDescriptor {
   int num_null_bytes() const { return num_null_bytes_; }
   const std::vector<SlotDescriptor*>& slots() const { return slots_; }
   const std::vector<SlotDescriptor*>& string_slots() const { return string_slots_; }
-  const std::vector<int>& tuple_path() const { return tuple_path_; }
+  const SchemaPath& tuple_path() const { return tuple_path_; }
 
   const TableDescriptor* table_desc() const { return table_desc_; }
 
@@ -338,7 +353,7 @@ class TupleDescriptor {
   // Absolute path into the table schema pointing to the collection whose fields
   // are materialized into this tuple. Non-empty if this tuple belongs to a
   // nested collection, empty otherwise.
-  std::vector<int> tuple_path_;
+  SchemaPath tuple_path_;
 
   llvm::StructType* llvm_struct_; // cache for the llvm struct type for this tuple desc
 

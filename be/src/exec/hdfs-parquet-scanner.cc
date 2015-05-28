@@ -1106,7 +1106,7 @@ Status HdfsParquetScanner::CreateColumnReaders() {
   DCHECK(column_readers_.empty());
   for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
     SlotDescriptor* slot_desc = scan_node_->materialized_slots()[i];
-    const vector<int>& path = slot_desc->col_path();
+    const SchemaPath& path = slot_desc->col_path();
     SchemaNode* node = &schema_;
     // Traverse path and resolve node to this slot's SchemaNode, or NULL if this slot
     // doesn't exist in this file's schema
