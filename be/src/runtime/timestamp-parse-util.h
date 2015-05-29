@@ -216,6 +216,23 @@ class TimestampParser {
     }
     // Strip the trailing blanks.
     while (len > 0 && isspace(str[len - 1])) --len;
+    // Strip if there is a 'Z' suffix
+    if (len > 0 && str[len - 1] == 'Z') {
+      --len;
+    } else if (len > DEFAULT_TIME_FMT_LEN && (str[4] == '-' || str[2] == ':')) {
+      // Strip timezone offset if it seems like a valid timestamp string.
+      int curr_pos = DEFAULT_TIME_FMT_LEN;
+      // Timezone offset will be at least two bytes long, no need to check last
+      // two bytes.
+      while (curr_pos < len - 2) {
+        if (str[curr_pos] == '+' || str[curr_pos] == '-') {
+          len = curr_pos;
+          break;
+        }
+        ++curr_pos;
+      }
+    }
+
     // Only process what we have to.
     if (len > DEFAULT_DATE_TIME_FMT_LEN) len = DEFAULT_DATE_TIME_FMT_LEN;
     // Determine the default formatting context that's required for parsing.

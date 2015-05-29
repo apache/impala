@@ -3599,6 +3599,41 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestNonOkStatus("date_part(NULL, cast('2006-05-13 01:27:28.12345' as timestamp))");
   TestIsNull("date_part('EPOCH', NULL)", TYPE_INT);
   TestNonOkStatus("date_part(NULL, NULL)");
+
+  // Test with timezone offset
+  TestStringValue("cast(cast('2012-01-01T09:10:11Z' as timestamp) as string)",
+                  "2012-01-01 09:10:11");
+  TestStringValue("cast(cast('2012-01-01T09:10:11+01:30' as timestamp) as string)",
+                  "2012-01-01 09:10:11");
+  TestStringValue("cast(cast('2012-01-01T09:10:11-01:30' as timestamp) as string)",
+                  "2012-01-01 09:10:11");
+  TestStringValue("cast(cast('2012-01-01T09:10:11+0130' as timestamp) as string)",
+                  "2012-01-01 09:10:11");
+  TestStringValue("cast(cast('2012-01-01T09:10:11-0130' as timestamp) as string)",
+                  "2012-01-01 09:10:11");
+  TestStringValue("cast(cast('2012-01-01T09:10:11+01' as timestamp) as string)",
+                  "2012-01-01 09:10:11");
+  TestStringValue("cast(cast('2012-01-01T09:10:11-01' as timestamp) as string)",
+                  "2012-01-01 09:10:11");
+  TestStringValue("cast(cast('2012-01-01T09:10:11.12345+01:30' as timestamp) as string)",
+                  "2012-01-01 09:10:11.123450000");
+  TestStringValue("cast(cast('2012-01-01T09:10:11.12345-01:30' as timestamp) as string)",
+                  "2012-01-01 09:10:11.123450000");
+  TestStringValue("cast(cast('09:10:11+01:30' as timestamp) as string)", "09:10:11");
+  TestStringValue("cast(cast('09:10:11-01:30' as timestamp) as string)", "09:10:11");
+
+  TestValue("unix_timestamp('2038-01-19T03:14:08-0100')", TYPE_BIGINT, 2147483648);
+  TestValue("unix_timestamp('2038/01/19T03:14:08+01:00', 'yyyy/MM/ddTHH:mm:ss')",
+            TYPE_BIGINT, 2147483648);
+
+  TestError("unix_timestamp('2038/01/19T03:14:08+01:00', 'yyyy/MM/ddTHH:mm:ss+hh:mm')");
+  TestError("unix_timestamp('1990-01-01+01:00', 'yyyy-MM-dd+hh:mm')");
+  TestError("unix_timestamp('1970-01-01 00:00:00+01:10', 'yyyy-MM-dd HH:mm:ss+hh:dd')");
+
+  TestStringValue("cast(trunc('2014-07-22T01:34:55+0100', 'year') as STRING)",
+                  "2014-01-01 00:00:00");
+  TestStringValue("cast(trunc(cast('07:02:03+01:30' as timestamp), 'MI') as string)",
+                  "07:02:00");
 }
 
 TEST_F(ExprTest, ConditionalFunctions) {
