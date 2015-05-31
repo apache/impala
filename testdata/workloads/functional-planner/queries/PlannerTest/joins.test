@@ -173,13 +173,13 @@ and (b.double_col * c.tinyint_col > 1000 or c.tinyint_col < 1000)
 02:SCAN HDFS [functional.alltypesaggnonulls c]
    partitions=2/10 files=2 size=148.10KB
 ---- DISTRIBUTEDPLAN
-09:EXCHANGE [UNPARTITIONED]
+08:EXCHANGE [UNPARTITIONED]
 |
-04:HASH JOIN [LEFT OUTER JOIN, PARTITIONED]
+04:HASH JOIN [LEFT OUTER JOIN, BROADCAST]
 |  hash predicates: c.id = a.id, c.string_col = b.string_col
 |  other predicates: a.day >= 6, b.month > 2, a.tinyint_col = 15, b.string_col = '15', a.tinyint_col + b.tinyint_col < 15, a.float_col - c.double_col < 0, (b.double_col * c.tinyint_col > 1000 OR c.tinyint_col < 1000)
 |
-|--08:EXCHANGE [HASH(a.id,b.string_col)]
+|--07:EXCHANGE [BROADCAST]
 |  |
 |  03:HASH JOIN [FULL OUTER JOIN, PARTITIONED]
 |  |  hash predicates: a.id = b.id, a.int_col = b.int_col
@@ -195,8 +195,6 @@ and (b.double_col * c.tinyint_col > 1000 or c.tinyint_col < 1000)
 |  00:SCAN HDFS [functional.alltypesagg a]
 |     partitions=5/11 files=5 size=372.38KB
 |     predicates: a.tinyint_col = 15
-|
-07:EXCHANGE [HASH(c.id,c.string_col)]
 |
 02:SCAN HDFS [functional.alltypesaggnonulls c]
    partitions=2/10 files=2 size=148.10KB

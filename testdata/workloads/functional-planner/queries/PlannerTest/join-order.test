@@ -137,44 +137,40 @@ limit 10
    partitions=1/1 files=1 size=23.08MB
    predicates: c.c_mktsegment = 'BUILDING'
 ---- DISTRIBUTEDPLAN
-13:MERGING-EXCHANGE [UNPARTITIONED]
+11:MERGING-EXCHANGE [UNPARTITIONED]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC, o_orderdate ASC
 |  limit: 10
 |
 06:TOP-N [LIMIT=10]
 |  order by: round(sum(l_extendedprice * (1 - l_discount)), 5) DESC, o_orderdate ASC
 |
-12:AGGREGATE [FINALIZE]
+10:AGGREGATE [FINALIZE]
 |  output: sum:merge(l_extendedprice * (1 - l_discount))
 |  group by: l_orderkey, o_orderdate, o_shippriority
 |
-11:EXCHANGE [HASH(l_orderkey,o_orderdate,o_shippriority)]
+09:EXCHANGE [HASH(l_orderkey,o_orderdate,o_shippriority)]
 |
 05:AGGREGATE
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: l_orderkey, o_orderdate, o_shippriority
 |
-04:HASH JOIN [INNER JOIN, PARTITIONED]
+04:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: o.o_orderkey = l.l_orderkey
 |
-|--10:EXCHANGE [HASH(l.l_orderkey)]
+|--08:EXCHANGE [BROADCAST]
 |  |
 |  02:SCAN HDFS [tpch.lineitem l]
 |     partitions=1/1 files=1 size=718.94MB
 |     predicates: l_shipdate > '1995-03-15'
 |
-09:EXCHANGE [HASH(o.o_orderkey)]
-|
-03:HASH JOIN [INNER JOIN, PARTITIONED]
+03:HASH JOIN [INNER JOIN, BROADCAST]
 |  hash predicates: c.c_custkey = o.o_custkey
 |
-|--08:EXCHANGE [HASH(o.o_custkey)]
+|--07:EXCHANGE [BROADCAST]
 |  |
 |  01:SCAN HDFS [tpch.orders o]
 |     partitions=1/1 files=1 size=162.56MB
 |     predicates: o_orderdate < '1995-03-15'
-|
-07:EXCHANGE [HASH(c.c_custkey)]
 |
 00:SCAN HDFS [tpch.customer c]
    partitions=1/1 files=1 size=23.08MB

@@ -659,11 +659,6 @@ public class HdfsScanNode extends ScanNode {
     // Tables can reside on 0 nodes (empty table), but a plan node must always be
     // executed on at least one node.
     numNodes_ = (cardinality == 0 || totalNodes == 0) ? 1 : totalNodes;
-    // For the 5.4.x release, if all scan ranges are local, revert back to the old
-    // logic of using the number of datanodes that hold blocks of the table.
-    // Otherwise, some query plans may change drastically between maintence releases.
-    // TODO: delete this line to use the new logic for local tables.
-    if (numLocalRanges == scanRanges_.size()) numNodes_ = tbl_.getNumNodes();
     LOG.debug("computeNumNodes localRanges=" + numLocalRanges +
         " remoteRanges=" + numRemoteRanges + " localHostSet.size=" + localHostSet.size() +
         " clusterNodes=" + cluster.numNodes());
@@ -728,18 +723,7 @@ public class HdfsScanNode extends ScanNode {
       perHostMemCost_ = 0;
       return;
     }
-
-    // Number of nodes for the purpose of resource estimation adjusted
-    // for the special cases listed below.
-    long adjNumNodes = numNodes_;
-    if (numNodes_ <= 0) {
-      adjNumNodes = 1;
-    } else if (scanRanges_.size() < numNodes_) {
-      // TODO: Empirically evaluate whether there is more Hdfs block skew for relatively
-      // small files, i.e., whether this estimate is too optimistic.
-      adjNumNodes = scanRanges_.size();
-    }
-
+    Preconditions.checkState(0 < numNodes_ && numNodes_ <= scanRanges_.size());
     Preconditions.checkNotNull(desc_);
     Preconditions.checkNotNull(desc_.getTable() instanceof HdfsTable);
     HdfsTable table = (HdfsTable) desc_.getTable();
@@ -756,7 +740,7 @@ public class HdfsScanNode extends ScanNode {
       }
     } else {
       perHostScanRanges = (int) Math.ceil((
-          (double) scanRanges_.size() / (double) adjNumNodes) * SCAN_RANGE_SKEW_FACTOR);
+          (double) scanRanges_.size() / (double) numNodes_) * SCAN_RANGE_SKEW_FACTOR);
     }
 
     // TODO: The total memory consumption for a particular query depends on the number

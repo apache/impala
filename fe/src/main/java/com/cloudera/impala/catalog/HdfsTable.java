@@ -377,8 +377,8 @@ public class HdfsTable extends Table {
       // part of the FileSystem interface, so we'll need to downcast.
       if (!(fs instanceof DistributedFileSystem)) continue;
 
-      LOG.trace("Loading disk ids for: " + getFullName() + ". nodes: " + getNumNodes() +
-          ". filesystem: " + fsKey);
+      LOG.trace("Loading disk ids for: " + getFullName() + ". nodes: " +
+          hostIndex_.size() + ". filesystem: " + fsKey);
       DistributedFileSystem dfs = (DistributedFileSystem)fs;
       FileBlocksInfo blockLists = perFsFileBlocks.get(fsKey);
       Preconditions.checkNotNull(blockLists);
@@ -1317,7 +1317,6 @@ public class HdfsTable extends Table {
   public long getTotalHdfsBytes() { return totalHdfsBytes_; }
   public String getHdfsBaseDir() { return hdfsBaseDir_; }
   public boolean isAvroTable() { return avroSchema_ != null; }
-  public int getNumNodes() { return hostIndex_.size(); }
 
   /**
    * Get the index of hosts that store replicas of blocks of this table.

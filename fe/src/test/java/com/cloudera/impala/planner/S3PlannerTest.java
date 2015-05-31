@@ -78,7 +78,96 @@ public class S3PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testPredicatePropagation() {
+    runPlannerTestFile("predicate-propagation");
+  }
+
+  @Test
+  public void testConstant() {
+    runPlannerTestFile("constant");
+  }
+
+  @Test
+  public void testDistinct() {
+    runPlannerTestFile("distinct");
+  }
+
+  @Test
+  public void testAggregation() {
+    runPlannerTestFile("aggregation");
+  }
+
+  @Test
+  public void testAnalyticFns() {
+    runPlannerTestFile("analytic-fns");
+  }
+
+  @Test
+  public void testNestedCollections() {
+    runPlannerTestFile("nested-collections");
+  }
+
+  @Test
+  public void testJoinOrder() {
+    runPlannerTestFile("join-order");
+  }
+
+  @Test
+  public void testOuterJoins() {
+    runPlannerTestFile("outer-joins");
+  }
+
+  @Test
+  public void testImplicitJoins() {
+    runPlannerTestFile("implicit-joins");
+  }
+
+  @Test
+  public void testInlineViewLimit() {
+    runPlannerTestFile("inline-view-limit");
+  }
+
+  @Test
+  public void testSubqueryRewrite() {
+    runPlannerTestFile("subquery-rewrite");
+  }
+
+  @Test
+  public void testUnion() {
+    runPlannerTestFile("union");
+  }
+
+  @Test
+  public void testValues() {
+    runPlannerTestFile("values");
+  }
+
+  @Test
+  public void testViews() {
+    runPlannerTestFile("views");
+  }
+
+  @Test
+  public void testDistinctEstimate() {
+    runPlannerTestFile("distinct-estimate");
+  }
+
+  @Test
+  public void testDataSourceTables() {
+    runPlannerTestFile("data-source-tables");
+  }
+
+  @Test
   public void testTpch() {
     runPlannerTestFile("tpch-all");
   }
+
+  @Test
+  public void testTpcds() {
+    // Uses ss_sold_date_sk as the partition key of store_sales to allow static partition
+    // pruning. The original predicates were rephrased in terms of the ss_sold_date_sk
+    // partition key, with the query semantics identical to the original queries.
+    runPlannerTestFile("tpcds-all", "tpcds");
+  }
+
 }
