@@ -41,6 +41,15 @@ SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
 SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
 
+if (IMPALA_TOOLCHAIN)
+  SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -static-libstdc++")
+  SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -static-libgcc")
+  add_library(gcc_eh STATIC IMPORTED)
+  set(GCC_EH_LOCATION
+    "$ENV{IMPALA_TOOLCHAIN}/gcc-$ENV{IMPALA_GCC_VERSION}/lib/gcc/x86_64-unknown-linux-gnu/4.9.2/libgcc_eh.a")
+  set_target_properties(gcc_eh PROPERTIES IMPORTED_LOCATION ${GCC_EH_LOCATION})
+endif()
+
 # For any clang builds (currently only ASAN):
 #   -Qunused-arguments: quiet warnings about unused arguments to clang because ccache
 #        makes extra calls to clang which may have extra includes (-I) that are unused.
@@ -58,8 +67,10 @@ SET(CXX_GCC_FLAGS "-g -Wno-unused-local-typedefs")
 # For CMAKE_BUILD_TYPE=Release
 #   -O3: Enable all compiler optimizations
 #   -DNDEBUG: Turn off dchecks/asserts/debug only code.
-SET(CXX_FLAGS_DEBUG "${CXX_GCC_FLAGS} -ggdb")
-SET(CXX_FLAGS_RELEASE "${CXX_GCC_FLAGS} -O3 -DNDEBUG")
+#
+# Debug information is stored as dwarf2 to be as compatible as possible
+SET(CXX_FLAGS_DEBUG "${CXX_GCC_FLAGS} -ggdb -gdwarf-2")
+SET(CXX_FLAGS_RELEASE "${CXX_GCC_FLAGS} -O3 -DNDEBUG -gdwarf-2")
 SET(CXX_FLAGS_ADDRESS_SANITIZER
   "${CXX_CLANG_FLAGS} -O1 -g -fsanitize=address -fno-omit-frame-pointer -DADDRESS_SANITIZER")
 
@@ -176,6 +187,10 @@ set(CLANG_INCLUDE_FLAGS
   "-I${JAVA_INCLUDE_PATH2}"
   "-I${RE2_INCLUDE_DIR}"
   "-I${SASL_INCLUDE_DIR}"
+  "-I${BZIP2_INCLUDE_DIR}"
+  "-I${ZLIB_INCLUDE_DIR}"
+  "-I${OPENSSL_INCLUDE_DIR}"
+  "-I${LDAP_INCLUDE_DIR}"
 )
 
 # allow linking of static libs into dynamic lib
@@ -223,7 +238,7 @@ set (IMPALA_LINK_LIBS
 # If using dynamic linking, -Wl does not have any effect (it's only for .a files). So we
 # need to add these redundant dependencies to resolve the circular references in our
 # libraries when dynamic linking is enabled.
-if ("${BUILD_SHARED_LIBS}" STREQUAL "ON")
+if (BUILD_SHARED_LIBS)
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
     Runtime
     Exec
@@ -255,16 +270,16 @@ set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS}
   ${LDAP_LIBRARY}
   ${LBER_LIBRARY}
   ThriftSaslTransport
-  ${JAVA_JVM_LIBRARY}
-  ${HDFS_LIBS}
   gutil
   glogstatic
   gflagsstatic
   pprofstatic
+  ${HDFS_LIB}
   ${LIBZ}
   ${LIBBZ2}
   ${AVRO_STATIC_LIB}
-  -lrt -lboost_date_time
+  ${JAVA_JVM_LIBRARY}
+  -lrt
 )
 
 
@@ -283,6 +298,13 @@ if (NOT "${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} tcmallocstatic)
 endif()
 
+# When we link statically, we need to replace the static libhdfs.a with the dynamic
+# version otherwise the dynamic support libraries will pickup the static libhdfs.a
+# library. The result will not compile as libhdfs.a is not compiled with -fpic.
+set(IMPALA_LINK_LIBS_DYNAMIC_HDFS ${IMPALA_LINK_LIBS_NO_TCMALLOC})
+list(REMOVE_ITEM IMPALA_LINK_LIBS_DYNAMIC_HDFS HDFS_STATIC)
+set(IMPALA_LINK_LIBS_DYNAMIC_HDFS ${IMPALA_LINK_LIBS_DYNAMIC_HDFS} ${HDFS_LIBRARIES})
+
 # Replace Udf with ImpalaUdf for $UDF_TEST_LINK_LIBS
 set (UDF_TEST_LINK_LIBS ${IMPALA_LINK_LIBS} ImpalaUdf)
 list(REMOVE_ITEM UDF_TEST_LINK_LIBS Udf)
@@ -292,8 +314,11 @@ list(REMOVE_ITEM UDF_TEST_LINK_LIBS Udf)
 set (IMPALA_TEST_LINK_LIBS ${IMPALA_LINK_LIBS} gtest)
 set (UDF_TEST_LINK_LIBS ${UDF_TEST_LINK_LIBS} gtest)
 
-MESSAGE(STATUS, "Compiler Flags: ${CMAKE_CXX_FLAGS}")
-MESSAGE(STATUS, "Linker Libs: ${IMPALA_LINK_LIBS}")
+MESSAGE(STATUS "Compiler Flags: ${CMAKE_CXX_FLAGS}")
+
+if (CMAKE_DEBUG)
+  MESSAGE(STATUS "Linker Libs: ${IMPALA_LINK_LIBS}")
+endif()
 
 set(LLVM_IR_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/llvm-ir")
 file(MAKE_DIRECTORY ${LLVM_IR_OUTPUT_DIRECTORY})
@@ -327,6 +352,9 @@ function(COMPILE_TO_IR SRC_FILE)
     DEPENDS ${SRC_FILE})
   add_custom_target(${BASE_NAME}-ir ALL DEPENDS ${OUTPUT_FILE})
 endfunction(COMPILE_TO_IR)
+
+# Gutil is a little bit special
+add_subdirectory(src/gutil)
 
 # compile these subdirs using their own CMakeLists.txt
 add_subdirectory(src/catalog)

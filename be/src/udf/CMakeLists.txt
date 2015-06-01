@@ -23,7 +23,10 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/udf")
 # can have dependencies on our other libs. The second version is shipped as part
 # of the UDF sdk, which can't use other libs.
 add_library(Udf udf.cc udf-ir.cc udf-test-harness.cc)
+add_dependencies(Udf thrift-cpp)
+
 add_library(ImpalaUdf udf.cc udf-ir.cc udf-test-harness.cc)
+add_dependencies(ImpalaUdf thrift-cpp)
 set_target_properties(ImpalaUdf PROPERTIES COMPILE_FLAGS "-DIMPALA_UDF_SDK_BUILD")
 
 ADD_EXECUTABLE(udf-test udf-test.cc)
@@ -33,4 +36,3 @@ ADD_TEST(udf-test "${EXECUTABLE_OUTPUT_PATH}/udf-test")
 ADD_EXECUTABLE(uda-test uda-test.cc)
 TARGET_LINK_LIBRARIES(uda-test ${UDF_TEST_LINK_LIBS})
 ADD_TEST(uda-test "${EXECUTABLE_OUTPUT_PATH}/uda-test")
-

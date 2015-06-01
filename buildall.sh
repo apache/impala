@@ -206,11 +206,14 @@ if [[ -z $METASTORE_SNAPSHOT_FILE && "${TARGET_FILESYSTEM}" != "hdfs" &&
   exit 1
 fi
 
-# Sanity check that thirdparty is built.
-if [ ! -e $IMPALA_HOME/thirdparty/gflags-${IMPALA_GFLAGS_VERSION}/libgflags.la ]
-then
-  echo "Couldn't find thirdparty build files.  Building thirdparty."
-  $IMPALA_HOME/bin/build_thirdparty.sh $([ ${CLEAN_ACTION} -eq 0 ] && echo '-noclean')
+# Only build thirdparty if no toolchain is set
+if [[ -z $IMPALA_TOOLCHAIN ]]; then
+  # Sanity check that thirdparty is built.
+  if [ ! -e $IMPALA_HOME/thirdparty/gflags-${IMPALA_GFLAGS_VERSION}/libgflags.la ]
+  then
+    echo "Couldn't find thirdparty build files.  Building thirdparty."
+    $IMPALA_HOME/bin/build_thirdparty.sh $([ ${CLEAN_ACTION} -eq 0 ] && echo '-noclean')
+  fi
 fi
 
 if [ -e $HADOOP_LZO/build/native/Linux-*-*/lib/libgplcompression.so ]
@@ -290,7 +293,13 @@ $IMPALA_HOME/bin/make_impala.sh ${MAKE_IMPALA_ARGS}
 
 if [ -e $IMPALA_LZO ]
 then
-  (cd $IMPALA_LZO; cmake .; make)
+  cd $IMPALA_LZO
+  if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
+    cmake -DCMAKE_TOOLCHAIN_FILE=./cmake_modules/toolchain.cmake
+  else
+    cmake .
+  fi
+  make
 fi
 
 # build the external data source API

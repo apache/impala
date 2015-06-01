@@ -21,7 +21,6 @@
 #include <algorithm>
 
 #include "common/logging.h"
-#include "base/logging.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Function.h"

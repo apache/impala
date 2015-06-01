@@ -12,14 +12,63 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 cmake_minimum_required(VERSION 2.6)
+
+if (NOT DEFINED BUILD_SHARED_LIBS)
+  set(BUILD_SHARED_LIBS OFF)
+endif()
+
+# Build compile commands database
+set(CMAKE_EXPORT_COMPILE_COMMNDS ON)
+
+# Enable toolchain variable if the environment is setup
+if (NOT IMPALA_TOOLCHAIN)
+   message(STATUS "Regular build.")
+else()
+   message(STATUS "Toolchain build.")
+endif()
 
 # generate CTest input files
 enable_testing()
 
 # where to find cmake modules
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake_modules")
+
+# Helper function that given a package name constructs the package_ROOT variable based on
+# the version number extracted from the environment
+function(set_dep_root NAME)
+  string(TOLOWER ${NAME} NAME_LOWER)
+  string(REPLACE "_" "-" NAME_LOWER ${NAME_LOWER})
+  set(VAL_NAME "IMPALA_${NAME}_VERSION")
+  set(${NAME}_ROOT $ENV{IMPALA_TOOLCHAIN}/${NAME_LOWER}-$ENV{${VAL_NAME}} PARENT_SCOPE)
+endfunction()
+
+if (IMPALA_TOOLCHAIN)
+  message(STATUS "Found Impala Toolchain, enabling toolchain boost")
+  set(ENV{BOOST_ROOT} "$ENV{IMPALA_TOOLCHAIN}/boost-$ENV{IMPALA_BOOST_VERSION}")
+  set(Boost_USE_STATIC_LIBS NOT ${BUILD_SHARED_LIBS})
+  set(Boost_USE_STATIC_RUNTIME ON)
+
+  # Define root path for all dependencies, this is in the form of
+  # set_dep_root(PACKAGE) ->
+  #   PACKAGE_ROOT set to $ENV{IMPALA_TOOLCHAIN}/PACKAGE-$ENV{IMPALA_PACKAGE_VERSION}
+  set_dep_root(AVRO)
+  set_dep_root(BZIP2)
+  set_dep_root(CYRUS_SASL)
+  set_dep_root(GFLAGS)
+  set_dep_root(GLOG)
+  set_dep_root(GPERFTOOLS)
+  set_dep_root(GTEST)
+  set_dep_root(LLVM)
+  set_dep_root(LZ4)
+  set_dep_root(OPENLDAP)
+  set_dep_root(OPENSSL)
+  set_dep_root(RE2)
+  set_dep_root(RAPIDJSON)
+  set_dep_root(SNAPPY)
+  set_dep_root(THRIFT)
+  set_dep_root(ZLIB)
+endif ()
 
 # find libraries that will be statically linked if they were compiled with -fPIC
 find_package(PICLibs REQUIRED)
@@ -36,25 +85,65 @@ IF (DEFINED ENV{BOOST_ROOT})
     set(Boost_INCLUDE_DIR ${BOOST_INCLUDEDIR})
 ENDIF (DEFINED ENV{BOOST_ROOT})
 
-set(Boost_DEBUG TRUE)
+if (CMAKE_DEBUG)
+  set(Boost_DEBUG TRUE)
+endif()
 set(Boost_USE_MULTITHREADED ON)
-find_package(Boost REQUIRED COMPONENTS thread regex-mt system-mt filesystem-mt)
+
+find_package(Boost $ENV{IMPALA_MIN_BOOST_VERSION} REQUIRED
+  COMPONENTS thread regex system filesystem date_time)
 include_directories(${Boost_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${Boost_LIBRARIES})
 message(STATUS "Boost include dir: " ${Boost_INCLUDE_DIRS})
 message(STATUS "Boost libraries: " ${Boost_LIBRARIES})
 
-# find jni headers and libs
-find_package(JNI REQUIRED)
-include_directories(${JNI_INCLUDE_DIRS})
-set(LIBS ${LIBS} ${JNI_LIBRARIES})
-message(STATUS "JNI_INCLUDE_DIRS: ${JNI_INCLUDE_DIRS}")
-message(STATUS "JNI_LIBRARIES: ${JNI_LIBRARIES}")
+# Hint the OpenSSL path
+if (IMPALA_TOOLCHAIN)
+  set(OPENSSL_ROOT_DIR ${OPENSSL_ROOT})
+endif()
+
+find_package(OpenSSL REQUIRED)
+include_directories(${OPENSSL_INCLUDE_DIR})
+set(OPENSSL_LIBS ${OPENSSL_SSL} ${OPENSSL_CRYPTO})
+message(STATUS "OpenSSL: ${OPENSSL_LIBS}")
+
+find_package(Bzip2 REQUIRED)
+include_directories(${BZIP2_INCLUDE_DIR})
+
+find_package(Zlib REQUIRED)
+include_directories(${ZLIB_INCLUDE_DIR})
+
+if(NOT BUILD_SHARED_LIBS)
+  # It might be the case that bzip2 and zlib are not available as static libs in the non
+  # toolchain case
+  # TODO remove this when moving to toolchain only
+  if (NOT BZIP2_STATIC_FOUND)
+    set(LIBBZ2 ${BZIP2_LIBRARIES})
+  else()
+    set(LIBBZ2 BZIP2_STATIC)
+  endif()
+
+  if (NOT ZLIB_STATIC_FOUND)
+    set(LIBZ ${ZLIB_LIBRARIES})
+  else()
+    set(LIBZ ZLIB_STATIC)
+  endif()
+else()
+  set(LIBBZ2 ${BZIP2_LIBRARIES})
+  set(LIBZ ${ZLIB_LIBRARIES})
+endif ()
 
 # find HDFS headers and libs
 find_package(HDFS REQUIRED)
 include_directories(${HDFS_INCLUDE_DIR})
-set(LIBS ${LIBS} ${HDFS_LIBS})
+
+if(BUILD_SHARED_LIBS)
+  set(LIBS ${LIBS} ${HDFS_LIBRARIES})
+  set(HDFS_LIB ${HDFS_LIBRARIES})
+else()
+  set(LIBS ${LIBS} HDFS_STATIC)
+  set(HDFS_LIB HDFS_STATIC)
+endif()
 
 # find the Squeasel webserver library
 find_package(Squeasel REQUIRED)
@@ -70,37 +159,27 @@ include_directories(${MUSTACHE_INCLUDE_DIR})
 find_package(GLog REQUIRED)
 include_directories(${GLOG_INCLUDE_DIR})
 set(LIBS ${LIBS} ${GLOG_LIBS})
-# for static linking with GLOG, GLOG_STATIC_LIB is set in GLOG's find module
-add_library(glogstatic STATIC IMPORTED)
-# TODO: Is this directive required for all libraries? Seems to make no difference.
-set_target_properties(glogstatic PROPERTIES IMPORTED_LOCATION ${GLOG_STATIC_LIB})
 message(STATUS "GLog include dir: " ${GLOG_INCLUDE_DIR})
 
 # find GFlags headers and libs (needed for GLog)
 find_package(GFlags REQUIRED)
 include_directories(${GFLAGS_INCLUDE_DIR})
 set(LIBS ${LIBS} ${GFLAGS_LIBS})
-# for static linking with GFLAGS, GFLAGS_STATIC_LIB is set in GFLAGS' find module
-add_library(gflagsstatic STATIC IMPORTED)
-set_target_properties(gflagsstatic PROPERTIES IMPORTED_LOCATION ${GFLAGS_STATIC_LIB})
 message(STATUS "GFlags include dir: " ${GFLAGS_INCLUDE_DIR})
+message(STATUS "GFlags lib dir: " ${GFLAGS_LIBS})
 
 # find PProf libs
 find_package(PProf REQUIRED)
 include_directories(${PPROF_INCLUDE_DIR})
 set (LIBS ${LIBS} ${PPROF_LIBRARIES})
-add_library(pprofstatic STATIC IMPORTED)
-set_target_properties(pprofstatic PROPERTIES IMPORTED_LOCATION "${PPROF_STATIC_LIB}")
-add_library(tcmallocstatic STATIC IMPORTED)
-set_target_properties(tcmallocstatic PROPERTIES IMPORTED_LOCATION "${HEAPPROF_STATIC_LIB}")
 message(STATUS "PProf include dir: " ${PPROF_INCLUDE_DIR})
+message(STATUS "PProf static lib: " ${PPROF_STATIC_LIB})
 
 # find GTest headers and libs
 find_package(GTest REQUIRED)
 include_directories(${GTEST_INCLUDE_DIR})
 set(LIBS ${LIBS} ${GTEST_LIBRARIES})
-add_library(gtest STATIC IMPORTED)
-set_target_properties(gtest PROPERTIES IMPORTED_LOCATION "${GTEST_LIBRARY}")
+
 message(STATUS "GTest include dir: " ${GTEST_INCLUDE_DIR})
 message(STATUS "GTest library: " ${GTEST_LIBRARY})
 
@@ -112,8 +191,6 @@ set(LIBS ${LIBS} ${LLVM_MODULE_LIBS})
 # find Sasl
 find_package(Sasl REQUIRED)
 include_directories(${SASL_INCLUDE_DIR})
-add_library(saslstatic STATIC IMPORTED)
-set_target_properties(saslstatic PROPERTIES IMPORTED_LOCATION ${SASL_STATIC_LIBRARY})
 set(SASL_LIBRARY saslstatic)
 message(STATUS "Sasl include dir: " ${SASL_INCLUDE_DIR})
 message(STATUS "Sasl library: " ${SASL_LIBRARY})
@@ -121,12 +198,9 @@ message(STATUS "Sasl library: " ${SASL_LIBRARY})
 # find openldap
 find_package(Ldap REQUIRED)
 include_directories(${LDAP_INCLUDE_DIR})
-add_library(ldapstatic STATIC IMPORTED)
-set_target_properties(ldapstatic PROPERTIES IMPORTED_LOCATION ${LDAP_STATIC_LIBRARY})
-add_library(lberstatic STATIC IMPORTED)
-set_target_properties(lberstatic PROPERTIES IMPORTED_LOCATION ${LBER_STATIC_LIBRARY})
 set(LDAP_LIBRARY ldapstatic)
 set(LBER_LIBRARY lberstatic)
+message(STATUS "LDAP: ${LDAP_INCLUDE_DIR}")
 
 # find thrift headers and libs
 find_package(Thrift REQUIRED)
@@ -137,24 +211,18 @@ message(STATUS "Thrift contrib dir: ${THRIFT_CONTRIB_DIR}")
 message(STATUS "Thrift library path: ${THRIFT_LIBS}")
 message(STATUS "Thrift static library: ${THRIFT_STATIC_LIB}")
 message(STATUS "Thrift compiler: ${THRIFT_COMPILER}")
-# for static linking with Thrift, THRIFT_STATIC_LIB is set in FindThrift.cmake
-add_library(thriftstatic STATIC IMPORTED)
-set_target_properties(thriftstatic PROPERTIES IMPORTED_LOCATION ${THRIFT_STATIC_LIB})
 
 # find Snappy headers and libs
 find_package(Snappy REQUIRED)
 include_directories(${SNAPPY_INCLUDE_DIR})
 set(LIBS ${LIBS} ${SNAPPY_LIBRARIES})
-add_library(snappy STATIC IMPORTED)
-set_target_properties(snappy PROPERTIES IMPORTED_LOCATION "${SNAPPY_STATIC_LIB}")
 message(STATUS "Snappy include dir: " ${SNAPPY_INCLUDE_DIR})
 message(STATUS "Snappy library: " "${SNAPPY_STATIC_LIB}")
 
+# find lz4 lib
 find_package(Lz4 REQUIRED)
 include_directories(${LZ4_INCLUDE_DIR})
 set(LIBS ${LIBS} ${LZ4_LIBRARIES})
-add_library(lz4 STATIC IMPORTED)
-set_target_properties(lz4 PROPERTIES IMPORTED_LOCATION "${LZ4_STATIC_LIB}")
 message(STATUS "Lz4 include dir: " ${LZ4_INCLUDE_DIR})
 message(STATUS "Lz4 library: " "${LZ4_STATIC_LIB}")
 
@@ -162,8 +230,6 @@ message(STATUS "Lz4 library: " "${LZ4_STATIC_LIB}")
 find_package(Re2 REQUIRED)
 include_directories(${RE2_INCLUDE_DIR})
 set(LIBS ${LIBS} ${RE2_LIBRARIES})
-add_library(re2 STATIC IMPORTED)
-set_target_properties(re2 PROPERTIES IMPORTED_LOCATION "${RE2_STATIC_LIB}")
 message(STATUS "Re2 include dir: " ${RE2_INCLUDE_DIR})
 message(STATUS "Re2 library: " ${RE2_STATIC_LIB})
 
@@ -173,22 +239,25 @@ include_directories(${RAPIDJSON_INCLUDE_DIR})
 message(STATUS "RapidJson include dir: " ${RAPIDJSON_INCLUDE_DIR})
 
 # find boost multi precision headers
-find_package(BoostMultiPrecision REQUIRED)
-include_directories(${BOOST_MULTI_PRECISION_INCLUDE_DIR})
-message(STATUS "BoostMultiPrecision include dir: " ${BOOST_MULTI_PRECISION_INCLUDE_DIR})
+if (Boost_VERSION LESS 105300)
+  find_package(BoostMultiPrecision REQUIRED)
+  include_directories(${BOOST_MULTI_PRECISION_INCLUDE_DIR})
+  message(STATUS "BoostMultiPrecision include dir: " ${BOOST_MULTI_PRECISION_INCLUDE_DIR})
+endif ()
 
 # find Avro headers and libs
 find_package(Avro REQUIRED)
 include_directories(${AVRO_INCLUDE_DIR})
 set(LIBS ${LIBS} ${AVRO_STATIC_LIB})
-add_library(avro STATIC IMPORTED)
-set_target_properties(avro PROPERTIES IMPORTED_LOCATION "${AVRO_STATIC_LIB}")
 message(STATUS "Avro include dir: " ${AVRO_INCLUDE_DIR})
 message(STATUS "Avro static library: " ${AVRO_STATIC_LIB})
 
-# Treat gutil just like an Impala native library (i.e., one built with CMake), so no need
-# for find_package()
-add_subdirectory($ENV{IMPALA_HOME}/thirdparty/gutil/)
+# find jni headers and libs
+find_package(JNI REQUIRED)
+include_directories(${JNI_INCLUDE_DIRS})
+set(LIBS ${LIBS} ${JNI_LIBRARIES})
+message(STATUS "JNI_INCLUDE_DIRS: ${JNI_INCLUDE_DIRS}")
+message(STATUS "JNI_LIBRARIES: ${JNI_LIBRARIES}")
 
 # compile these subdirs using their own CMakeLists.txt
 add_subdirectory(common/function-registry)

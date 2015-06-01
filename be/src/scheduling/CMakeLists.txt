@@ -24,6 +24,7 @@ add_library(Scheduling STATIC
   admission-controller.cc
   request-pool-service.cc
 )
+add_dependencies(Scheduling thrift-cpp)
 
 # TODO: Add BE test
 # ADD_BE_TEST(admission-controller-test)

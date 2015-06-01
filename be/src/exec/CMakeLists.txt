@@ -75,6 +75,7 @@ add_library(Exec
   topn-node.cc
   union-node.cc
 )
+add_dependencies(Exec thrift-cpp)
 
 ADD_BE_TEST(zigzag-test)
 ADD_BE_TEST(old-hash-table-test)

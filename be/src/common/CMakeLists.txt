@@ -25,9 +25,11 @@ add_library(Common
   logging.cc
   status.cc
 )
+add_dependencies(Common thrift-cpp)
 
 add_library(GlobalFlags
   global-flags.cc
 )
+add_dependencies(GlobalFlags thrift-cpp)
 
 ADD_BE_TEST(atomic-test)

@@ -4,6 +4,7 @@
 #  HDFS_INCLUDE_DIR, directory containing hdfs.h
 #  HDFS_LIBS, location of libhdfs.so
 #  HDFS_FOUND, If false, do not try to use ant
+#  hdfsstatic
 
 exec_program(hadoop ARGS version OUTPUT_VARIABLE Hadoop_VERSION
              RETURN_VALUE Hadoop_RETURN)
@@ -33,7 +34,7 @@ endif ()
 
 message(STATUS "HDFS_LIB_PATHS: ${HDFS_LIB_PATHS}")
 
-find_library(HDFS_LIB NAMES hdfs PATHS 
+find_library(HDFS_LIB NAMES hdfs PATHS
   ${HDFS_LIB_PATHS}
   # make sure we don't accidentally pick up a different version
   NO_DEFAULT_PATH
@@ -41,7 +42,12 @@ find_library(HDFS_LIB NAMES hdfs PATHS
 
 if (HDFS_LIB)
   set(HDFS_FOUND TRUE)
-  set(HDFS_LIBS ${HDFS_LIB})
+  set(HDFS_LIBRARIES ${HDFS_LIB})
+  set(HDFS_STATIC_LIB ${HDFS_LIB_PATHS}/libhdfs.a)
+
+  add_library(HDFS_STATIC STATIC IMPORTED)
+  set_target_properties(HDFS_STATIC PROPERTIES IMPORTED_LOCATION ${HDFS_STATIC_LIB})
+
 else ()
   set(HDFS_FOUND FALSE)
 endif ()
@@ -50,15 +56,17 @@ if (HDFS_FOUND)
   if (NOT HDFS_FIND_QUIETLY)
     message(STATUS "${Hadoop_VERSION}")
     message(STATUS "HDFS_INCLUDE_DIR: ${HDFS_INCLUDE_DIR}")
-    message(STATUS "HDFS_LIBS: ${HDFS_LIBS}")
+    message(STATUS "HDFS_LIBRARIES: ${HDFS_LIBRARIES}")
+    message(STATUS "HDFS_STATIC: ${HDFS_STATIC_LIB}")
   endif ()
 else ()
-  message(STATUS "HDFS includes and libraries NOT found."
+  message(FATAL_ERROR "HDFS includes and libraries NOT found."
     "Thrift support will be disabled (${Thrift_RETURN}, "
     "${HDFS_INCLUDE_DIR}, ${HDFS_LIB})")
 endif ()
 
 mark_as_advanced(
-  HDFS_LIBS
+  HDFS_LIBRARIES
   HDFS_INCLUDE_DIR
+  HDFS_STATIC
 )

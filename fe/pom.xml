@@ -191,7 +191,7 @@
     <dependency>
       <groupId>org.apache.thrift</groupId>
       <artifactId>libthrift</artifactId>
-      <version>${env.IMPALA_THRIFT_VERSION}</version>
+      <version>${env.IMPALA_THRIFT_JAVA_VERSION}</version>
       <!-- libthrift depends httpcore 4.1.3 which does not work with KMS. To workaround
            this problem the dependency is excluded here and we explicitly add a newer
            httpcore dependency version. See CDH-22024. TODO: Find a better fix. -->
@@ -212,7 +212,7 @@
     <dependency>
       <groupId>org.apache.thrift</groupId>
       <artifactId>libfb303</artifactId>
-      <version>${env.IMPALA_THRIFT_VERSION}</version>
+      <version>${env.IMPALA_THRIFT_JAVA_VERSION}</version>
     </dependency>
 
     <dependency>

@@ -16,6 +16,16 @@
 # setup your environment. If $IMPALA_HOME is undefined
 # this script will set it to the current working directory.
 
+# Setting up Impala binary toolchain. The default path is /opt/bin-toolchain but can be
+# set to any path that contains the necessary dependencies in the format of
+#   /opt/bin-toolchain/package-X.Y.Z
+: ${IMPALA_TOOLCHAIN=}
+: ${USE_SYSTEM_GCC=0}
+
+# Export both variables
+export USE_SYSTEM_GCC
+export IMPALA_TOOLCHAIN
+
 export JAVA_HOME="${JAVA_HOME:-/usr/java/default}"
 if [ ! -d "$JAVA_HOME" ] ; then
   echo "JAVA_HOME must be set to the location of your JDK!"
@@ -98,14 +108,39 @@ else
 fi
 export NUM_CONCURRENT_TESTS=${NUM_CONCURRENT_TESTS-${CORES}}
 
-export IMPALA_GFLAGS_VERSION=2.0
-export IMPALA_GPERFTOOLS_VERSION=2.0
-export IMPALA_GLOG_VERSION=0.3.2
-export IMPALA_GTEST_VERSION=1.6.0
-export IMPALA_SNAPPY_VERSION=1.0.5
+# Versions of toolchain dependencies (or if toolchain is not used of dependencies in
+# thirdparty)
+export IMPALA_AVRO_VERSION=1.7.4
+export IMPALA_BOOST_VERSION=1.57.0
+export IMPALA_BZIP2_VERSION=1.0.6
 export IMPALA_CYRUS_SASL_VERSION=2.1.23
+export IMPALA_GCC_VERSION=4.9.2
+export IMPALA_GFLAGS_VERSION=2.0
+export IMPALA_GLOG_VERSION=0.3.2
+export IMPALA_GPERFTOOLS_VERSION=2.0
+export IMPALA_GTEST_VERSION=1.6.0
+export IMPALA_LLVM_VERSION=3.3
+export IMPALA_LZ4_VERSION=svn
+export IMPALA_MIN_BOOST_VERSION=1.46.0
 export IMPALA_OPENLDAP_VERSION=2.4.25
+export IMPALA_OPENSSL_VERSION=0.9.8zf
+export IMPALA_RAPIDJSON_VERSION=0.11
+export IMPALA_RE2_VERSION=20130115
+export IMPALA_SNAPPY_VERSION=1.0.5
 export IMPALA_SQUEASEL_VERSION=3.3
+export IMPALA_THRIFT_VERSION=0.9.0
+export IMPALA_THRIFT_JAVA_VERSION=0.9.0
+export IMPALA_ZLIB_VERSION=1.2.8
+
+
+# Some of the variables need to be overwritten to explicitely mark the patch level
+if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
+  IMPALA_AVRO_VERSION+=-p2
+  IMPALA_BZIP2_VERSION+=-p1
+  IMPALA_GLOG_VERSION+=-p1
+  IMPALA_GPERFTOOLS_VERSION+=-p1
+  IMPALA_THRIFT_VERSION+=-p2
+fi
 
 # Sasl has problems with 'make install' if the path contains a ~. In our
 # packaging jobs, the path contains ~ so we'll just install somewhere else.
@@ -116,10 +151,7 @@ export IMPALA_HBASE_VERSION=1.0.0-cdh5.5.0-SNAPSHOT
 export IMPALA_HIVE_VERSION=1.1.0-cdh5.5.0-SNAPSHOT
 export IMPALA_SENTRY_VERSION=1.4.0-cdh5.5.0-SNAPSHOT
 export IMPALA_LLAMA_VERSION=1.0.0-cdh5.5.0-SNAPSHOT
-export IMPALA_AVRO_VERSION=1.7.4
 export IMPALA_PARQUET_VERSION=1.5.0-cdh5.5.0-SNAPSHOT
-export IMPALA_THRIFT_VERSION=0.9.0
-export IMPALA_LLVM_VERSION=3.3
 export IMPALA_MINIKDC_VERSION=1.0.0
 
 export IMPALA_FE_DIR=$IMPALA_HOME/fe
@@ -131,6 +163,7 @@ export IMPALA_AUX_DATASET_DIR=$IMPALA_AUX_TEST_HOME/testdata/datasets
 export IMPALA_COMMON_DIR=$IMPALA_HOME/common
 export PATH=$IMPALA_HOME/bin:$PATH
 
+# Hadoop dependencies are snapshots in the Impala tree
 export HADOOP_HOME=$IMPALA_HOME/thirdparty/hadoop-${IMPALA_HADOOP_VERSION}/
 export HADOOP_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
 
@@ -170,12 +203,15 @@ export AUX_CLASSPATH=$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-server-${IMPALA_HBASE_
 export AUX_CLASSPATH=$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-protocol-${IMPALA_HBASE_VERSION}.jar
 export AUX_CLASSPATH=$AUX_CLASSPATH:$HBASE_HOME/lib/hbase-hadoop-compat-${IMPALA_HBASE_VERSION}.jar
 
-GPERFTOOLS_HOME=${IMPALA_HOME}/thirdparty/gperftools-${IMPALA_GPERFTOOLS_VERSION}/
-export PPROF_PATH="${PPROF_PATH:-${GPERFTOOLS_HOME}/src/pprof}"
 export HBASE_CONF_DIR=$HIVE_CONF_DIR
 
-export THRIFT_SRC_DIR=${IMPALA_HOME}/thirdparty/thrift-${IMPALA_THRIFT_VERSION}/
-export THRIFT_HOME=${THRIFT_SRC_DIR}build/
+# Optionally set the Thrift home to the toolchain
+if [[ -z $IMPALA_TOOLCHAIN ]]; then
+  THRIFT_SRC_DIR=${IMPALA_HOME}/thirdparty/thrift-${IMPALA_THRIFT_VERSION}/
+  export THRIFT_HOME=${THRIFT_SRC_DIR}build/
+else
+  export THRIFT_HOME=${IMPALA_TOOLCHAIN}/thrift-${IMPALA_THRIFT_VERSION}/
+fi
 
 export CLUSTER_DIR=${IMPALA_HOME}/testdata/cluster
 
@@ -245,7 +281,6 @@ echo "HIVE_CONF_DIR          = $HIVE_CONF_DIR"
 echo "HBASE_HOME             = $HBASE_HOME"
 echo "HBASE_CONF_DIR         = $HBASE_CONF_DIR"
 echo "MINIKDC_HOME           = $MINIKDC_HOME"
-echo "PPROF_PATH             = $PPROF_PATH"
 echo "THRIFT_HOME            = $THRIFT_HOME"
 echo "HADOOP_LZO             = $HADOOP_LZO"
 echo "IMPALA_LZO             = $IMPALA_LZO"
@@ -255,6 +290,7 @@ echo "PYTHONPATH             = $PYTHONPATH"
 echo "JAVA_HOME              = $JAVA_HOME"
 echo "LD_LIBRARY_PATH        = $LD_LIBRARY_PATH"
 echo "LD_PRELOAD             = $LD_PRELOAD"
+echo "IMPALA_TOOLCHAIN       = $IMPALA_TOOLCHAIN"
 
 # Kerberos things.  If the cluster exists and is kerberized, source
 # the required environment.  This is required for any hadoop tool to

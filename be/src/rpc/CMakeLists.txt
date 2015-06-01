@@ -26,6 +26,7 @@ add_library(Rpc
   thrift-server.cc
   thrift-thread.cc
 )
+add_dependencies(Rpc thrift-cpp)
 
 ADD_BE_TEST(thrift-util-test)
 ADD_BE_TEST(thrift-server-test)

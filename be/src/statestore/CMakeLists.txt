@@ -27,6 +27,7 @@ add_library(Statestore
   statestore-subscriber.cc
   query-schedule.cc
 )
+add_dependencies(Statestore thrift-cpp)
 
 add_executable(statestored statestored-main.cc)
 target_link_libraries(statestored ${IMPALA_LINK_LIBS})
