@@ -296,6 +296,7 @@ class TestDdlStatements(ImpalaTestSuite):
       self.client.execute(select_stmt)
       for drop_stmt in drop_stmts: self.client.execute(drop_stmt % (""))
 
+  @SkipIfS3.insert # S3: missing coverage: alter table partitions.
   @pytest.mark.execute_serially
   def test_create_alter_bulk_partition(self, vector):
     TBL_NAME = 'foo_part'
