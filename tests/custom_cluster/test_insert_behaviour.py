@@ -17,13 +17,12 @@ import os
 import pytest
 from tests.common.skip import SkipIfS3, SkipIfIsilon
 from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
-from tests.util.filesystem_utils import WAREHOUSE
+from tests.util.filesystem_utils import IS_ISILON, WAREHOUSE
 from tests.util.hdfs_util import HdfsConfig, get_hdfs_client, get_hdfs_client_from_conf
 
 TEST_TBL = "insert_inherit_permission"
 
 @SkipIfS3.insert
-@SkipIfIsilon.jira(reason="CDH-27688")
 class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
 
   @classmethod
@@ -93,10 +92,10 @@ class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
       self._check_partition_perms("p1=1/p2=2/p3=3/", "777")
 
       # 3. INSERT that creates no new directories keeps standard permissions
-      self.hdfs_client.chmod("test-warehouse/%s/p1=1/p2=2" % TEST_TBL, "644")
+      self.hdfs_client.chmod("test-warehouse/%s/p1=1/p2=2" % TEST_TBL, "744")
       self.execute_query_expect_success(client, "INSERT INTO %s"
                                         " PARTITION(p1=1, p2=2, p3=3) VALUES(1)" % TEST_TBL)
-      self._check_partition_perms("p1=1/p2=2/", "644")
+      self._check_partition_perms("p1=1/p2=2/", "744")
       self._check_partition_perms("p1=1/p2=2/p3=3/", "777")
     finally:
       client.close()
@@ -115,6 +114,8 @@ class TestInsertBehaviourCustomCluster(CustomClusterTestSuite):
       self.execute_query_expect_success(client, "INSERT INTO %s"
                                         " PARTITION(p1=1, p2=3, p3=4) VALUES(1)" % TEST_TBL)
       # Would be 777 if inheritance was enabled
-      self._check_partition_perms("p1=1/p2=3/", default_perms)
+      if not IS_ISILON: # CDH-27688
+        self._check_partition_perms("p1=1/p2=3/", default_perms)
+      self._check_partition_perms("p1=1/p2=3/p3=4/", default_perms)
     finally:
        client.close()
