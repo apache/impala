@@ -248,6 +248,9 @@ Status Webserver::Start() {
   options.push_back("listening_ports");
   options.push_back(listening_str.c_str());
 
+  options.push_back("enable_directory_listing");
+  options.push_back("no");
+
   // Options must be a NULL-terminated list
   options.push_back(NULL);
 

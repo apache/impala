@@ -211,6 +211,16 @@ TEST(Webserver, StartWithMissingPasswordFileTest) {
 
   Webserver webserver(FLAGS_webserver_port);
   ASSERT_FALSE(webserver.Start().ok());
+  FLAGS_webserver_password_file = "";
+}
+
+TEST(Webserver, DirectoryListingDisabledTest) {
+  Webserver webserver(FLAGS_webserver_port);
+  ASSERT_TRUE(webserver.Start().ok());
+  stringstream contents;
+  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port,
+          "/www/bootstrap/", &contents, 403).ok());
+  ASSERT_TRUE(contents.str().find("Directory listing denied") != string::npos);
 }
 
 int main(int argc, char **argv) {
