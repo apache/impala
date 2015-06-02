@@ -55,8 +55,6 @@ class TestDdlStatements(ImpalaTestSuite):
 
   def setup_method(self, method):
     self.expected_exceptions = 0
-    self.cleanup()
-
     # Get the current number of queries that are in the 'EXCEPTION' state. Used for
     # verification after running each test case.
     self.start_exception_count = self.query_exception_count()
@@ -172,9 +170,9 @@ class TestDdlStatements(ImpalaTestSuite):
   def test_create_kudu(self, vector):
     self.expected_exceptions = 2
     vector.get_value('exec_option')['abort_on_error'] = False
-    self.__create_db_synced('ddl_test_db', vector)
+    self._create_db('ddl_test_db', sync=True)
     self.run_test_case('QueryTest/create_kudu', vector, use_db='ddl_test_db',
-        multiple_impalad=self.__use_multiple_impalad(vector))
+        multiple_impalad=self._use_multiple_impalad(vector))
 
   @pytest.mark.execute_serially
   def test_sync_ddl_drop(self, vector):
