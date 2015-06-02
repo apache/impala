@@ -78,6 +78,23 @@ class PyWebHdfsClientWithChmod(PyWebHdfsClient):
     path = path.lstrip('/')
     return super(PyWebHdfsClientWithChmod, self).get_file_dir_status(path)
 
+  def copy(self, src, dest):
+    """Copies a file in hdfs from src to destination
+
+    Simulates hdfs dfs (or hadoop fs) -cp <src> <dst>. Does not resolve all the files if
+    the source or destination is a directory. Files need to be explicitly copied.
+    TODO: Infer whether the source or destination is a directory and do this implicitly.
+    TODO: Take care of larger files by always reading/writing them in small chunks.
+    """
+    assert self.get_file_dir_status(src)
+    # Get the data
+    data = self.read_file(src)
+    # Copy the data
+    self.create_file(dest, data)
+    assert self.get_file_dir_status(dest)
+    assert self.read_file(dest) == data
+    return True
+
 
 class HdfsConfig(object):
   """Reads an XML configuration file (produced by a mini-cluster) into a dictionary
