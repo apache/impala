@@ -90,7 +90,9 @@ public class KuduDdlDelegate implements DdlDelegate {
         Type t = KuduUtil.fromImpalaType(catalogType);
         // Create the actual column and check if the column is a key column
         ColumnSchemaBuilder csb = new ColumnSchemaBuilder(fieldSchema.getName(), t);
-        csb.key(keyCols.contains(fieldSchema.getName()));
+        boolean isKeyColumn = keyCols.contains(fieldSchema.getName());
+        csb.key(isKeyColumn);
+        csb.nullable(!isKeyColumn);
         columns.add(csb.build());
       }
 
