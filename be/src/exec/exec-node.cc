@@ -33,6 +33,7 @@
 #include "exec/hash-join-node.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/hbase-scan-node.h"
+#include "exec/kudu-scan-node.h"
 #include "exec/select-node.h"
 #include "exec/partitioned-aggregation-node.h"
 #include "exec/partitioned-hash-join-node.h"
@@ -270,6 +271,9 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
     case TPlanNodeType::DATA_SOURCE_NODE:
       *node = pool->Add(new DataSourceScanNode(pool, tnode, descs));
       break;
+    case TPlanNodeType::KUDU_SCAN_NODE:
+      *node = pool->Add(new KuduScanNode(pool, tnode, descs));
+      break;
     case TPlanNodeType::AGGREGATION_NODE:
       if (FLAGS_enable_partitioned_aggregation) {
         *node = pool->Add(new PartitionedAggregationNode(pool, tnode, descs));
@@ -366,6 +370,7 @@ void ExecNode::CollectNodes(TPlanNodeType::type node_type, vector<ExecNode*>* no
 void ExecNode::CollectScanNodes(vector<ExecNode*>* nodes) {
   CollectNodes(TPlanNodeType::HDFS_SCAN_NODE, nodes);
   CollectNodes(TPlanNodeType::HBASE_SCAN_NODE, nodes);
+  CollectNodes(TPlanNodeType::KUDU_SCAN_NODE, nodes);
 }
 
 void ExecNode::InitRuntimeProfile(const string& name) {
