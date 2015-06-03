@@ -117,12 +117,10 @@ class PerfResultDataStore(object):
     return self._cache[(file_format, compression_codec, compression_type)]
 
   def _get_run_info_id(self, run_info, user):
-    ''' Gets the run_info id for the given run_info and user. If not found in the
-    database, this information gets inserted into the database. Results are cached. '''
+    '''Gets the run_info id for the given run_info and user. Creates a new entry for each
+    (run_info, user) pair. Results are cached.'''
     if (run_info, user) not in self._cache:
-      self._cache[(run_info, user)] = \
-          self._get_run_info_id_remote(run_info, user) or \
-          self._insert_run_info(run_info, user)
+      self._cache[(run_info, user)] = self._insert_run_info(run_info, user)
     return self._cache[(run_info, user)]
 
   def _cursor_wrapper(function):
