@@ -61,7 +61,7 @@ public enum HdfsCompression {
   public static HdfsCompression fromHdfsInputFormatClass(String inputFormatClass) {
     // TODO: Remove when we have the native LZO writer.
     Preconditions.checkNotNull(inputFormatClass);
-    if (inputFormatClass.equals(HdfsFileFormat.LZO_TEXT_INPUT_FORMAT)) {
+    if (inputFormatClass.equals(HdfsFileFormat.LZO_TEXT.inputFormat())) {
       return LZO;
     }
     return NONE;

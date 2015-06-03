@@ -17,6 +17,7 @@ import logging
 import pytest
 import shlex
 import time
+from subprocess import call
 from tests.common.test_result_verifier import *
 from tests.util.shell_util import exec_process
 from tests.common.test_vector import *
@@ -91,3 +92,42 @@ class TestPartitionMetadata(ImpalaTestSuite):
     self.client.execute("insert into %s partition(j) select 1, 2" % self.TEST_TBL)
     data = self.execute_scalar("select sum(i), sum(j) from %s" % self.TEST_TBL)
     assert data.split('\t') == ['6', '9']
+
+  @SkipIfS3.hive
+  def test_partition_metadata_compatibility(self, vector):
+    """Regression test for IMPALA-2048. For partitioned tables, test that when Impala
+    updates the partition metadata (e.g. by doing a compute stats), the tables are
+    accessible in Hive."""
+    TEST_TBL_HIVE = "part_parquet_tbl_hive"
+    TEST_TBL_IMP = "part_parquet_tbl_impala"
+    # First case, the table is created in HIVE.
+    self.run_stmt_in_hive("create table %s.%s(a int) partitioned by (x int) "\
+        "stored as parquet" % (self.TEST_DB, TEST_TBL_HIVE))
+    self.run_stmt_in_hive("set hive.exec.dynamic.partition.mode=nostrict;"\
+        "insert into %s.%s partition (x) values(1,1)" % (self.TEST_DB, TEST_TBL_HIVE))
+    self.run_stmt_in_hive("select * from %s.%s" % (self.TEST_DB, TEST_TBL_HIVE))
+    # Load the table in Impala and modify its partition metadata by computing table
+    # statistics.
+    self.client.execute("invalidate metadata %s.%s" % (self.TEST_DB, TEST_TBL_HIVE))
+    self.client.execute("compute stats %s.%s" % (self.TEST_DB, TEST_TBL_HIVE))
+    self.client.execute("select * from %s.%s" % (self.TEST_DB, TEST_TBL_HIVE))
+    # Make sure the table is accessible in Hive
+    self.run_stmt_in_hive("select * from %s.%s" % (self.TEST_DB, TEST_TBL_HIVE))
+
+    # Second case, the table is created in Impala
+    self.client.execute("create table %s.%s(a int) partitioned by (x int) "\
+        "stored as parquet" % (self.TEST_DB, TEST_TBL_IMP))
+    self.client.execute("insert into %s.%s partition(x) values(1,1)" % (self.TEST_DB,
+        TEST_TBL_IMP))
+    # Make sure the table is accessible in HIVE
+    self.run_stmt_in_hive("select * from %s.%s" % (self.TEST_DB, TEST_TBL_IMP))
+    # Compute table statistics
+    self.client.execute("compute stats %s.%s" % (self.TEST_DB, TEST_TBL_IMP))
+    self.client.execute("select * from %s.%s" % (self.TEST_DB, TEST_TBL_IMP))
+    # Make sure the table remains accessible in HIVE
+    self.run_stmt_in_hive("select * from %s.%s" % (self.TEST_DB, TEST_TBL_IMP))
+
+  def run_stmt_in_hive(self, stmt):
+    hive_ret = call(['hive', '-e', stmt])
+    assert hive_ret == 0, 'Error executing statement %s in Hive' % stmt
+

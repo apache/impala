@@ -215,7 +215,7 @@ public abstract class Table implements CatalogObject {
       // have a special table property to indicate that Impala should use an external
       // data source.
       table = new DataSourceTable(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
-    } else if (HdfsFileFormat.isHdfsFormatClass(msTbl.getSd().getInputFormat())) {
+    } else if (HdfsFileFormat.isHdfsInputFormatClass(msTbl.getSd().getInputFormat())) {
       table = new HdfsTable(id, msTbl, db, msTbl.getTableName(), msTbl.getOwner());
     }
     return table;
