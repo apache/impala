@@ -81,7 +81,7 @@ Status KuduScanner::Open(const std::tr1::shared_ptr<KuduClient>& client,
 Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
   int tuple_buffer_size = row_batch->capacity() * scan_node_->tuple_desc()->byte_size();
   void* tuple_buffer_ = row_batch->tuple_data_pool()->TryAllocate(tuple_buffer_size);
-  if (tuple_buffer_ == NULL) return Status::MEM_LIMIT_EXCEEDED;
+  if (tuple_buffer_size > 0 && tuple_buffer_ == NULL) return Status::MEM_LIMIT_EXCEEDED;
   Tuple* tuple = reinterpret_cast<Tuple*>(tuple_buffer_);
 
   // Main scan loop:
@@ -158,13 +158,19 @@ void KuduScanner::CloseCurrentScanner() {
 
 Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
     Tuple** tuple_mem, bool* batch_done) {
-  (*tuple_mem)->Init(scan_node_->tuple_desc()->num_null_bytes());
 
   // Add the first row, this should never fail since we're getting a new batch.
   int idx = row_batch->AddRow();
   DCHECK(idx != RowBatch::INVALID_ROW_INDEX);
-  TupleRow* row = row_batch->GetRow(idx);
-  row->SetTuple(0, *tuple_mem);
+
+  TupleRow* row;
+  // Skip advancing/initializing the tuple buffer if we're not actually
+  // materializing any rows, e.g. for count(*).
+  if (!scan_node_->materialized_slots().empty()) {
+    row = row_batch->GetRow(idx);
+    (*tuple_mem)->Init(scan_node_->tuple_desc()->num_null_bytes());
+    row->SetTuple(0, *tuple_mem);
+  }
 
   int num_rows_returned = 0;
 
@@ -193,6 +199,10 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
         *batch_done = true;
         break;
       }
+
+      // Skip advancing/initializing the tuple buffer if we're not actually
+      // materializing any rows, e.g. for count(*).
+      if (scan_node_->materialized_slots().empty()) continue;
 
       // Move to the next tuple in the tuple buffer.
       *tuple_mem = next_tuple(*tuple_mem);

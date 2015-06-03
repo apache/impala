@@ -14,6 +14,8 @@
 
 #include "exec/kudu-util.h"
 
+#include <algorithm>
+
 #include <boost/unordered_set.hpp>
 #include <kudu/client/schema.h>
 #include <kudu/gutil/bind.h>
@@ -111,7 +113,7 @@ Status KuduSchemaFromTupleDescriptor(const TupleDescriptor& tuple_desc,
       static_cast<const KuduTableDescriptor*>(tuple_desc.table_desc());
   LOG(INFO) << "Table desc for schema: " << table_desc->DebugString();
 
-  unordered_set<string> key_cols(table_desc->key_columns().begin(),
+  unordered_set<string> key_col_names(table_desc->key_columns().begin(),
       table_desc->key_columns().end());
 
   vector<KuduColumnSchema> kudu_cols;
@@ -125,11 +127,11 @@ Status KuduSchemaFromTupleDescriptor(const TupleDescriptor& tuple_desc,
     RETURN_IF_ERROR(ImpalaToKuduType(slots[i]->type(), &kt));
 
     // Key columns are not nullable, all others are for now.
-    bool nullable = key_cols.find(col_name) == key_cols.end();
-    kudu_cols.push_back(KuduColumnSchema(col_name, kt, nullable));
+    bool is_key = key_col_names.find(col_name) == key_col_names.end();
+    kudu_cols.push_back(KuduColumnSchema(col_name, kt, is_key));
   }
 
-  schema->Reset(kudu_cols, key_cols.size());
+  schema->Reset(kudu_cols, std::min(kudu_cols.size(), key_col_names.size()));
   return Status::OK();
 }
 

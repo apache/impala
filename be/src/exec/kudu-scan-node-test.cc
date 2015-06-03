@@ -198,14 +198,27 @@ class KuduScanNodeTest : public testing::Test {
     // isolation.
     DCHECK_OK(exec_env_.InitForFeTests());
     runtime_state_.InitMemTrackers(TUniqueId(), NULL, -1);
+    exec_env_.disk_io_mgr()->Init(&mem_tracker_);
+  }
 
+  virtual void TearDown() {
+    kudu_test_helper_.DeleteTable();
+  }
+
+  void BuildRuntimeStateForScans(int num_cols_materialize) {
     TKuduScanNode kudu_scan_node_;
     kudu_node_.__set_kudu_scan_node(kudu_scan_node_);
     kudu_node_.__set_node_type(TPlanNodeType::KUDU_SCAN_NODE);
     kudu_node_.__set_limit(-1);
 
     DescriptorTblBuilder desc_builder(&obj_pool_);
-    desc_builder.DeclareTuple() << TYPE_INT << TYPE_INT << TYPE_STRING;
+    DCHECK_GE(num_cols_materialize, 0);
+    DCHECK_LE(num_cols_materialize, schema_.num_columns());
+
+    desc_builder.DeclareTuple()
+        .AddSlot(TYPE_INT, num_cols_materialize > 0)
+        .AddSlot(TYPE_INT, num_cols_materialize > 1)
+        .AddSlot(TYPE_STRING, num_cols_materialize > 2);
 
     TKuduTable t_kudu_table;
     t_kudu_table.__set_table_name(kudu_test_helper_.table_name());
@@ -228,21 +241,82 @@ class KuduScanNodeTest : public testing::Test {
                           boost::assign::list_of(false)));
 
     runtime_state_.set_desc_tbl(desc_tbl_);
-    exec_env_.disk_io_mgr()->Init(&mem_tracker_);
   }
 
-  virtual void TearDown() {
-    kudu_test_helper_.DeleteTable();
+  void SetUpScanner(KuduScanNode* scanner, vector<TScanRangeParams>* params) {
+    scanner->SetScanRanges(*params);
+    ASSERT_OK(scanner->Prepare(&runtime_state_));
+    ASSERT_OK(scanner->Open(&runtime_state_));
   }
 
-  void VerifyBatch(RowBatch* batch, int first_row, int last_row) {
+  void VerifyBatch(RowBatch* batch, int first_row,
+      int last_row, int num_materialized_cols) {
+
+    if (num_materialized_cols == 0) return;
     string batch_as_string = PrintBatch(batch);
+
+    DCHECK_GE(num_materialized_cols, 0);
+    DCHECK_LE(num_materialized_cols, schema_.num_columns());
+
+    string base_row = "[(";
+    if (num_materialized_cols >= 1) base_row.append("$0");
+    if (num_materialized_cols >= 2) base_row.append(" $1");
+    if (num_materialized_cols >= 3) base_row.append(" hello_$2");
+    base_row.append(")]");
+
     vector<string> rows = strings::Split(batch_as_string, "\n", strings::SkipEmpty());
     ASSERT_EQ(rows.size(), last_row - first_row);
     for (int i = 0; i < rows.size(); ++i) {
       int idx = first_row + i;
-      ASSERT_EQ(rows[i], strings::Substitute("[($0 $1 hello_$2)]", idx, idx * 2, idx));
+      string row;
+      switch(num_materialized_cols) {
+        case 1: row = strings::Substitute(base_row, idx); break;
+        case 2: row = strings::Substitute(base_row, idx, idx * 2); break;
+        case 3: row = strings::Substitute(base_row, idx, idx * 2, idx); break;
+      }
+      ASSERT_EQ(rows[i], row);
     }
+  }
+
+  void ScanAndVerify(int expected_num_rows, int expected_num_batches,
+      int num_cols_to_materialize) {
+    BuildRuntimeStateForScans(num_cols_to_materialize);
+
+    KuduScanNode scanner(&obj_pool_, kudu_node_, *desc_tbl_);
+
+    // TODO test more than one range. This was tested but left out of the current
+    // version as Kudu is currently changing the way it addresses start/stop keys (stop
+    // key is now inclusive and will become exclusive).
+    vector<TScanRangeParams> params;
+    AddScanRange("", "", &params);
+
+    SetUpScanner(&scanner, &params);
+
+    int num_rows = 0;
+    int num_batches = 0;
+    int batch_size = expected_num_rows / expected_num_batches;
+
+    bool eos = false;
+
+    do {
+      RowBatch* batch = obj_pool_.Add(new RowBatch(*row_desc_, batch_size,
+                                                   &mem_tracker_));
+      ASSERT_OK(scanner.GetNext(&runtime_state_, batch, &eos));
+
+      if (batch->num_rows() == 0) {
+        ASSERT_TRUE(eos);
+        break;
+      }
+
+      ASSERT_EQ(batch->num_rows(), batch_size);
+      VerifyBatch(batch, batch_size * num_batches, batch_size * (num_batches + 1),
+          num_cols_to_materialize);
+      num_rows += batch->num_rows();
+      ++num_batches;
+    } while(!eos);
+
+    ASSERT_EQ(expected_num_rows, num_rows);
+    ASSERT_EQ(expected_num_batches, num_batches);
   }
 
   void AddScanRange(const string& start_key, const string& stop_key,
@@ -282,47 +356,15 @@ TEST_F(KuduScanNodeTest, TestScanNode) {
   const int kNumRows = 1000;
   const int kNumBatches = 10;
 
-  // Insert 1000 rows for this test.
+  // Insert kNumRows rows for this test.
   kudu_test_helper_.InsertTestRows(kudu_test_helper_.client().get(),
                                    kudu_test_helper_.table().get(),
                                    kNumRows);
 
-  KuduScanNode scanner(&obj_pool_, kudu_node_, *desc_tbl_);
-
-  // TODO test more than one range. This was tested but left out of the current
-  // version as Kudu is currently changing the way it addresses start/stop keys (stop
-  // key is now inclusive and will become exclusive).
-  vector<TScanRangeParams> params;
-  AddScanRange("", "", &params);
-
-  scanner.SetScanRanges(params);
-
-  ASSERT_OK(scanner.Prepare(&runtime_state_));
-  ASSERT_OK(scanner.Open(&runtime_state_));
-
-  int num_rows = 0;
-  int num_batches = 0;
-  int batch_size = kNumRows / kNumBatches;
-
-  bool eos = false;
-
-  do {
-    RowBatch* batch = obj_pool_.Add(new RowBatch(*row_desc_, batch_size, &mem_tracker_));
-    ASSERT_OK(scanner.GetNext(&runtime_state_, batch, &eos));
-
-    if (batch->num_rows() == 0) {
-      ASSERT_TRUE(eos);
-      break;
-    }
-
-    ASSERT_EQ(batch->num_rows(), batch_size);
-    VerifyBatch(batch, batch_size * num_batches, batch_size * (num_batches + 1));
-    num_rows += batch->num_rows();
-    ++num_batches;
-  } while(!eos);
-
-  ASSERT_EQ(kNumRows, num_rows);
-  ASSERT_EQ(kNumBatches, num_batches);
+  // Test materializing all, some, or none of the slots
+  ScanAndVerify(kNumRows, kNumBatches, 3);
+  ScanAndVerify(kNumRows, kNumBatches, 2);
+  ScanAndVerify(kNumRows, kNumBatches, 0);
 }
 
 } // namespace impala
