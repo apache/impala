@@ -52,7 +52,8 @@ class TestRecoverPartitions(ImpalaTestSuite):
 
   def setup_method(self, method):
     self.cleanup_db(self.TEST_DB)
-    self.client.execute("create database %s" % self.TEST_DB)
+    self.client.execute("create database {0} location '{1}/{0}.db'".format(self.TEST_DB,
+      WAREHOUSE))
     self.client.execute("use %s" % self.TEST_DB)
 
   def teardown_method(self, method):
