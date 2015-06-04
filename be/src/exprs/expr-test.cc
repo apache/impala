@@ -3619,10 +3619,12 @@ TEST_F(ExprTest, TimestampFunctions) {
                   "2012-01-01 09:10:11");
   TestStringValue("cast(cast('2012-01-01T09:10:11-01' as timestamp) as string)",
                   "2012-01-01 09:10:11");
-  TestStringValue("cast(cast('2012-01-01T09:10:11.12345+01:30' as timestamp) as string)",
-                  "2012-01-01 09:10:11.123450000");
-  TestStringValue("cast(cast('2012-01-01T09:10:11.12345-01:30' as timestamp) as string)",
-                  "2012-01-01 09:10:11.123450000");
+  TestStringValue(
+      "cast(cast('2012-01-01T09:10:11.12345+01:30' as timestamp) as string)",
+      "2012-01-01 09:10:11.123450000");
+  TestStringValue(
+      "cast(cast('2012-01-01T09:10:11.12345-01:30' as timestamp) as string)",
+      "2012-01-01 09:10:11.123450000");
   TestStringValue("cast(cast('09:10:11+01:30' as timestamp) as string)", "09:10:11");
   TestStringValue("cast(cast('09:10:11-01:30' as timestamp) as string)", "09:10:11");
 
@@ -3630,7 +3632,8 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestValue("unix_timestamp('2038/01/19T03:14:08+01:00', 'yyyy/MM/ddTHH:mm:ss')",
             TYPE_BIGINT, 2147483648);
 
-  TestError("unix_timestamp('2038/01/19T03:14:08+01:00', 'yyyy/MM/ddTHH:mm:ss+hh:mm')");
+  TestValue("unix_timestamp('2038/01/19T03:14:08+01:00', 'yyyy/MM/ddTHH:mm:ss+hh:mm')",
+            TYPE_BIGINT, 2147480048);
   TestError("unix_timestamp('1990-01-01+01:00', 'yyyy-MM-dd+hh:mm')");
   TestError("unix_timestamp('1970-01-01 00:00:00+01:10', 'yyyy-MM-dd HH:mm:ss+hh:dd')");
 
@@ -3638,6 +3641,64 @@ TEST_F(ExprTest, TimestampFunctions) {
                   "2014-01-01 00:00:00");
   TestStringValue("cast(trunc(cast('07:02:03+01:30' as timestamp), 'MI') as string)",
                   "07:02:00");
+
+  // Test timezone offset format
+  TestStringValue("from_unixtime(unix_timestamp('2012-01-01 19:10:11+02:30', \
+      'yyyy-MM-dd HH:mm:ss+hh:mm'))", "2012-01-01 16:40:11");
+  TestStringValue("from_unixtime(unix_timestamp('2012-01-01 19:10:11-0630', \
+      'yyyy-MM-dd HH:mm:ss-hhmm'))", "2012-01-02 01:40:11");
+  TestStringValue("from_unixtime(unix_timestamp('2012-01-01 01:10:11+02', \
+      'yyyy-MM-dd HH:mm:ss+hh'))", "2011-12-31 23:10:11");
+  TestStringValue("from_unixtime(unix_timestamp('2012-12-31 11:10:11-1430', \
+      'yyyy-MM-dd HH:mm:ss+hhmm'))", "2013-01-01 01:40:11");
+  TestStringValue("from_unixtime(unix_timestamp('2012-01-01 11:10:11+1430', \
+      'yyyy-MM-dd HH:mm:ss+hhmm'))", "2011-12-31 20:40:11");
+  TestStringValue("from_unixtime(unix_timestamp('2012-02-28 11:10:11-1430', \
+      'yyyy-MM-dd HH:mm:ss+hhmm'))", "2012-02-29 01:40:11");
+  TestStringValue("from_unixtime(unix_timestamp('1970-01-01 00:00:00+05:00', \
+      'yyyy-MM-dd HH:mm:ss+hh:mm'))", "1969-12-31 19:00:00");
+  TestStringValue("from_unixtime(unix_timestamp('1400-01-01 19:00:00+1500', \
+      'yyyy-MM-dd HH:mm:ss+hhmm'))", "1400-01-01 04:00:00");
+  TestStringValue("from_unixtime(unix_timestamp('1400-01-01 02:00:00+0200', \
+      'yyyy-MM-dd HH:mm:ss+hhmm'))", "1400-01-01 00:00:00");
+  TestIsNull("from_unixtime(unix_timestamp('1400-01-01 00:00:00+0100', \
+      'yyyy-MM-dd HH:mm:ss+hhmm'))", TYPE_STRING);
+  TestIsNull("from_unixtime(unix_timestamp('1399-12-31 23:00:00+0500', \
+      'yyyy-MM-dd HH:mm:ss+hhmm'))", TYPE_STRING);
+  TestStringValue("from_unixtime(unix_timestamp('9999-12-31 01:00:00-05:00', \
+      'yyyy-MM-dd HH:mm:ss+hh:mm'))", "9999-12-31 06:00:00");
+  TestStringValue("from_unixtime(unix_timestamp('9999-12-31 22:59:59-01:00', \
+      'yyyy-MM-dd HH:mm:ss+hh:mm'))", "9999-12-31 23:59:59");
+  TestIsNull("from_unixtime(unix_timestamp('9999-12-31 22:59:00-01:01', \
+      'yyyy-MM-dd HH:mm:ss+hh:mm'))", TYPE_STRING);
+  TestIsNull("from_unixtime(unix_timestamp('9999-12-31 23:00:00-05:00', \
+      'yyyy-MM-dd HH:mm:ss+hh:mm'))", TYPE_STRING);
+  TestIsNull("from_unixtime(unix_timestamp('10000-01-01 02:00:00+02:00', \
+      'yyyy-MM-dd HH:mm:ss+hh:mm'))", TYPE_STRING);
+  TestIsNull("from_unixtime(unix_timestamp('2012-02-28 11:10:11', \
+      'yyyy-MM-dd HH:mm:ss+hhmm'))", TYPE_STRING);
+  TestIsNull("from_unixtime(unix_timestamp('2012-02-28 11:10:11-14', \
+      'yyyy-MM-dd HH:mm:ss+hhmm'))", TYPE_STRING);
+  TestIsNull("from_unixtime(unix_timestamp('2012-02-28 11:10:11*1430', \
+      'yyyy-MM-dd HH:mm:ss+hhmm'))", TYPE_STRING);
+  TestIsNull("from_unixtime(unix_timestamp('2012-02-28 11:10:11+1587', \
+      'yyyy-MM-dd HH:mm:ss+hhmm'))", TYPE_STRING);
+  TestIsNull("from_unixtime(unix_timestamp('2012-02-28 11:10:11+2530', \
+      'yyyy-MM-dd HH:mm:ss+hhmm'))", TYPE_STRING);
+  TestIsNull("from_unixtime(unix_timestamp('2012-02-28 11:10:11+1530', \
+      'yyyy-MM-dd HH:mm:ss+hh:mm'))", TYPE_STRING);
+  TestIsNull("from_unixtime(unix_timestamp('2012-02-28 11:10:11+2430', \
+      'yyyy-MM-dd HH:mm:ss+hhmm'))", TYPE_STRING);
+  TestIsNull("from_unixtime(unix_timestamp('2012-02-28 11:10:11+1560', \
+      'yyyy-MM-dd HH:mm:ss+hhmm'))", TYPE_STRING);
+  TestIsNull("from_unixtime(unix_timestamp('1400-01-01 00:00:00+1500', \
+      'yyyy-MM-dd HH:mm:ss+hhmm'))", TYPE_STRING);
+
+  TestError("from_unixtime(unix_timestamp('2012-02-28 11:10:11+0530', \
+      'yyyy-MM-dd HH:mm:ss+hhdd'))");
+  TestError("from_unixtime(unix_timestamp('2012-02-28+0530', 'yyyy-MM-dd+hhmm'))");
+  TestError("from_unixtime(unix_timestamp('10:00:00+0530 2010-01-01', \
+      'HH:mm:ss+hhmm yyyy-MM-dd'))");
 }
 
 TEST_F(ExprTest, ConditionalFunctions) {

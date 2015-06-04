@@ -25,6 +25,40 @@
 
 namespace impala {
 
+/// Add support for dealing with custom date/time formats in Impala. The following
+/// date/time tokens are supported:
+///   y – Year
+///   M – Month
+///   d – Day
+///   H – Hour
+///   m – Minute
+///   s – second
+///   S – Fractional second
+///
+///   TimeZone offset formats (Must be at the end of format string):
+///   +/-hh:mm
+///   +/-hhmm
+///   +/-hh
+/// The token names and usage have been modeled on the SimpleDateFormat class used
+/// in Java. This allows the use of repeating tokens to indicate zero padding for an
+/// output scenario (TS -> String) and a guide for reading data to a given length in
+/// a parsing scenario. Representing literal month is achieved by specifying three
+/// repeating tokens e.g. yyyy-MMM-dd -> 2013-Nov-21.
+///
+/// Formatting character groups can appear in any order along with any separators
+/// except TimeZone offset.
+/// e.g.
+///   yyyy/MM/dd
+///   dd-MMM-yy
+///   (dd)(MM)(yyyy) HH:mm:ss
+///   yyyy-MM-dd HH:mm:ss+hh:mm
+/// ..etc..
+///
+/// The following features are not supported:
+///   Long literal months e.g. MMMM
+///   Nested strings e.g. “Year: “ yyyy “Month: “ mm “Day: “ dd
+///   Lazy formatting
+
 /// Used to indicate the type of a date/time format token group.
 enum DateTimeFormatTokenType {
   UNKNOWN = 0,
@@ -41,6 +75,7 @@ enum DateTimeFormatTokenType {
   /// Indicates fractional seconds e.g.14:52:36.2334. By default this provides nanosecond
   /// resolution.
   FRACTION,
+  TZ_OFFSET,
 };
 
 /// Used to store metadata about a token group within a date/time format.
@@ -109,6 +144,7 @@ struct DateTimeParseResult {
   int minute;
   int second;
   int32_t fraction;
+  boost::posix_time::time_duration tz_offset;
 
   DateTimeParseResult()
     : year(0),
@@ -117,7 +153,8 @@ struct DateTimeParseResult {
       hour(0),
       minute(0),
       second(0),
-      fraction(0) {
+      fraction(0),
+      tz_offset(0,0,0,0) {
   }
 };
 
@@ -145,6 +182,12 @@ class TimestampParser {
       if (isdigit(*str)) return false;
       // Ignore T|Z|non aA-zZ chars but track them as separators (required for printing).
       if ((*str == 'T') || (*str == 'Z') || (!isalpha(*str))) {
+        if (dt_ctx->has_time_toks && IsValidTZOffset(str, str_end)) {
+          // TZ offset must come at the end of the format.
+          dt_ctx->toks.push_back(DateTimeFormatToken(TZ_OFFSET, str - str_begin,
+              str_end - str, str));
+          break;
+        }
         dt_ctx->toks.push_back(DateTimeFormatToken(SEPARATOR, str - str_begin, 1, str));
         ++str;
         continue;
@@ -188,11 +231,11 @@ class TimestampParser {
   }
 
   /// Parse a default date/time string. The default timestamp format is:
-  /// yyyy-MM-dd HH:mm:ss.SSSSSSSSS or yyyy-MM-ddTHH:mm:ss.SSSSSSSSS. Either just the date
-  /// or just the time may be specified. All components are required in either the date or
-  /// time except for the fractional seconds following the period. In the case of just a
-  /// date, the time will be set to 00:00:00. In the case of just a time, the date will be
-  /// set to invalid.
+  /// yyyy-MM-dd HH:mm:ss.SSSSSSSSS or yyyy-MM-ddTHH:mm:ss.SSSSSSSSS. Either just the
+  /// date or just the time may be specified. All components are required in either the
+  /// date or time except for the fractional seconds following the period. In the case
+  /// of just a date, the time will be set to 00:00:00. In the case of just a time, the
+  /// date will be set to invalid.
   /// str -- valid pointer to the string to parse
   /// len -- length of the string to parse (must be > 0)
   /// dt_ctx -- date/time format context (must contain valid tokens)
@@ -313,16 +356,47 @@ class TimestampParser {
     DCHECK(d != NULL);
     DCHECK(t != NULL);
     DateTimeParseResult dt_result;
+    int day_offset = 0;
     if (UNLIKELY(str == NULL || len <= 0 ||
         !ParseDateTime(str, len, dt_ctx, &dt_result))) {
       *d = boost::gregorian::date();
       *t = boost::posix_time::time_duration(boost::posix_time::not_a_date_time);
       return false;
     }
+    if (dt_ctx.has_time_toks) {
+      *t = boost::posix_time::time_duration(dt_result.hour, dt_result.minute,
+          dt_result.second, dt_result.fraction);
+      *t -= dt_result.tz_offset;
+      if (t->is_negative()) {
+        *t += boost::posix_time::hours(24);
+        day_offset = -1;
+      } else if (t->hours() >= 24) {
+        *t -= boost::posix_time::hours(24);
+        day_offset = 1;
+      }
+    } else {
+      *t = boost::posix_time::time_duration(0, 0, 0, 0);
+    }
     if (dt_ctx.has_date_toks) {
+      bool is_valid_date = true;
       try {
-        *d = boost::gregorian::date(dt_result.year, dt_result.month, dt_result.day);
+        DCHECK(-1 <= day_offset && day_offset <= 1);
+        if ((dt_result.year == 1400 && dt_result.month == 1 && dt_result.day == 1 &&
+            day_offset == -1) || (dt_result.year == 9999 && dt_result.month == 12 &&
+            dt_result.day == 31 && day_offset == 1)) {
+          // Have to check lower/upper bound explicitly.
+          // Tried boost::gregorian::date::is_not_a_date_time() but it doesn't
+          // complain value is out of range for "'1400-01-01' - 1 day" and
+          // "'9999-12-31' + 1 day".
+          is_valid_date = false;
+        } else {
+          *d = boost::gregorian::date(dt_result.year, dt_result.month, dt_result.day);
+          *d += boost::gregorian::date_duration(day_offset);
+        }
       } catch (boost::exception& e) {
+        is_valid_date = false;
+      }
+      if (!is_valid_date) {
         VLOG_ROW << "Invalid date: " << dt_result.year << "-" << dt_result.month << "-"
                  << dt_result.day;
         *d = boost::gregorian::date();
@@ -331,12 +405,6 @@ class TimestampParser {
       }
     } else {
       *d = boost::gregorian::date();
-    }
-    if (dt_ctx.has_time_toks) {
-      *t = boost::posix_time::time_duration(dt_result.hour, dt_result.minute,
-          dt_result.second, dt_result.fraction);
-    } else {
-      *t = boost::posix_time::time_duration(0, 0, 0, 0);
     }
     return true;
   }
@@ -387,6 +455,9 @@ class TimestampParser {
         case SEPARATOR: {
           str_val = tok.val;
           str_val_len = tok.len;
+          break;
+        }
+        case TZ_OFFSET: {
           break;
         }
         default: DCHECK(false) << "Unknown date/time format token";
@@ -476,10 +547,66 @@ class TimestampParser {
           for (int i = tok.len; i < 9; ++i) dt_result->fraction *= 10;
           break;
         }
+        case TZ_OFFSET: {
+          if (tok_val[0] != '+' && tok_val[0] != '-') return false;
+          int sign = tok_val[0] == '-' ? -1 : 1;
+          int minute = 0;
+          int hour = StringParser::StringToInt<int>(tok_val + 1, 2, &status);
+          if (UNLIKELY(StringParser::PARSE_SUCCESS != status ||
+              hour < 0 || hour > 23)) {
+            return false;
+          }
+          switch (tok.len) {
+            case 6: {
+              // +hh:mm
+              minute = StringParser::StringToInt<int>(tok_val + 4, 2, &status);
+              break;
+            }
+            case 5: {
+              // +hh:mm
+              minute = StringParser::StringToInt<int>(tok_val + 3, 2, &status);
+              break;
+            }
+            case 3: {
+              // +hh
+              break;
+            }
+            default: {
+              // Invalid timezone offset length.
+              return false;
+            }
+          }
+          if (UNLIKELY(StringParser::PARSE_SUCCESS != status ||
+              minute < 0 || minute > 59)) {
+            return false;
+          }
+          dt_result->tz_offset = boost::posix_time::time_duration(sign * hour,
+              sign * minute, 0, 0);
+          break;
+        }
         default: DCHECK(false) << "Unknown date/time format token";
       }
     }
     return true;
+  }
+
+  /// Check if the string is a TimeZone offset token.
+  /// Valid offset token format are 'hh:mm', 'hhmm', 'hh'.
+  static bool IsValidTZOffset(const char* str_begin, const char* str_end) {
+    if (*str_begin == '+' || *str_begin == '-') {
+      ++str_begin;
+      switch(str_end - str_begin) {
+        case 5:   // hh:mm
+          return strncmp(str_begin, "hh:mm", 5) == 0;
+        case 4:   // hhmm
+          return strncmp(str_begin, "hhmm", 4) == 0;
+        case 2:   // hh
+          return strncmp(str_begin, "hh", 2) == 0;
+        default:
+          break;
+      }
+    }
+    return false;
   }
 
   /// Constants to hold default format lengths.

@@ -18,6 +18,7 @@
 #include <vector>
 #include <sstream>
 #include "runtime/string-value.h"
+#include "runtime/timestamp-parse-util.h"
 #include "runtime/timestamp-value.h"
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
@@ -27,23 +28,30 @@ namespace gregorian = boost::gregorian;
 using boost::posix_time::duration_from_string;
 using boost::posix_time::hours;
 using boost::posix_time::nanoseconds;
+using boost::posix_time::ptime;
 using boost::posix_time::time_duration;
 using boost::posix_time::to_iso_extended_string;
 using boost::posix_time::to_simple_string;
 using namespace impala;
 
 // Benchmark for parsing timestamps.
-// Machine Info: Intel(R) Core(TM) i7-2600 CPU @ 3.40GHz
-// ParseDate:            Function                Rate          Comparison
+// Machine Info: Intel(R) Core(TM) i7-4790 CPU @ 3.60GHz
+// ParseDate:            Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//                BoostStringDate              0.6793                  1X
-//                      BoostDate              0.6583             0.9691X
-//                         Impala               28.75              42.32X
+//                BoostStringDate               0.204                  1X
+//                      BoostDate              0.1983             0.9716X
+//                         Impala                 3.9              19.11X
 //
-// ParseTimestamp:       Function                Rate          Comparison
+// ParseTimestamp:       Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//                      BoostTime               0.455                  1X
-//                         Impala               28.39              62.39X
+//                      BoostTime              0.1529                  1X
+//                         Impala               3.802              24.87X
+//
+// ParseTimestampWithFormat:Function  Rate (iters/ms)          Comparison
+// ----------------------------------------------------------------------
+//                  BoostDateTime             0.08337                  1X
+//                ImpalaTimeStamp               7.579              90.91X
+//              ImpalaTZTimeStamp               7.571              90.82X
 
 #define VALIDATE 0
 
@@ -65,6 +73,9 @@ struct TestData {
   vector<string> memory;
   vector<TimestampValue> result;
 };
+
+DateTimeFormatContext dt_ctx;
+DateTimeFormatContext dt_ctx_tz;
 
 void AddTestData(TestData* data, const string& input) {
   data->memory.push_back(input);
@@ -93,6 +104,31 @@ void AddTestDataTimes(TestData* data, int n, const string& startstr) {
     if (start.hours() >= 24) start -= hours(24);
     stringstream ss;
     ss << to_simple_string(start);
+    AddTestData(data, ss.str());
+  }
+}
+
+void AddTestDataDateTimes(TestData* data, int n, const string& startstr) {
+  ptime start(boost::posix_time::time_from_string(startstr));
+  for (int i = 0; i < n; ++i) {
+    int val = rand();
+    start += gregorian::date_duration(rand() % 100);
+    start += nanoseconds(val);
+    stringstream ss;
+    ss << to_simple_string(start);
+    AddTestData(data, ss.str());
+  }
+}
+
+void AddTestDataTZDateTimes(TestData* data, int n, const string& startstr) {
+  ptime start(boost::posix_time::time_from_string(startstr));
+  for (int i = 0; i < n; ++i) {
+    int val = rand();
+    start += gregorian::date_duration(rand() % 100);
+    start += nanoseconds(val);
+    stringstream ss;
+    ss << to_simple_string(start);
+    ss << "+03:30";
     AddTestData(data, ss.str());
   }
 }
@@ -139,18 +175,54 @@ void TestBoostTime(int batch_size, void* d) {
   }
 }
 
+void TestImpalaTimestamp(int batch_size, void* d) {
+  TestData* data = reinterpret_cast<TestData*>(d);
+  for (int i = 0; i < batch_size; ++i) {
+    int n = data->data.size();
+    for (int j = 0; j < n; ++j) {
+      data->result[j] = TimestampValue(data->data[j].ptr, data->data[j].len, dt_ctx);
+    }
+  }
+}
+
+void TestImpalaTZTimestamp(int batch_size, void* d) {
+  TestData* data = reinterpret_cast<TestData*>(d);
+  for (int i = 0; i < batch_size; ++i) {
+    int n = data->data.size();
+    for (int j = 0; j < n; ++j) {
+      data->result[j] = TimestampValue(data->data[j].ptr, data->data[j].len, dt_ctx_tz);
+    }
+  }
+}
+
+void TestBoostDateTime(int batch_size, void* d) {
+  TestData* data = reinterpret_cast<TestData*>(d);
+  for (int i = 0; i < batch_size; ++i) {
+    int n = data->data.size();
+    for (int j = 0; j < n; ++j) {
+      string s(data->data[j].ptr, data->data[j].len);
+      data->result[j] = TimestampValue(boost::posix_time::time_from_string(s));
+    }
+  }
+}
 
 int main(int argc, char **argv) {
   CpuInfo::Init();
   cout << Benchmark::GetMachineInfo() << endl;
 
-  TestData dates, times;
+  TimestampParser::Init();
+
+  TestData dates, times, datetimes, tzdatetimes;
 
   AddTestDataDates(&dates, 1000, "1953-04-22");
   AddTestDataTimes(&times, 1000, "01:02:03.45678");
+  AddTestDataDateTimes(&datetimes, 1000, "1953-04-22 01:02:03");
+  AddTestDataTZDateTimes(&tzdatetimes, 1000, "1990-04-22 01:10:03");
 
   dates.result.resize(dates.data.size());
   times.result.resize(times.data.size());
+  datetimes.result.resize(datetimes.data.size());
+  tzdatetimes.result.resize(tzdatetimes.data.size());
 
   Benchmark date_suite("ParseDate");
   date_suite.AddBenchmark("BoostStringDate", TestBoostStringDate, &dates);
@@ -161,9 +233,24 @@ int main(int argc, char **argv) {
   timestamp_suite.AddBenchmark("BoostTime", TestBoostTime, &times);
   timestamp_suite.AddBenchmark("Impala", TestImpalaDate, &times);
 
+  dt_ctx.Reset("yyyy-MM-dd HH:mm:ss", 19);
+  TimestampParser::ParseFormatTokens(&dt_ctx);
+  dt_ctx_tz.Reset("yyyy-MM-dd HH:mm:ss+hh:mm", 25);
+  TimestampParser::ParseFormatTokens(&dt_ctx_tz);
+
+  Benchmark timestamp_with_format_suite("ParseTimestampWithFormat");
+  timestamp_with_format_suite.AddBenchmark("BoostDateTime",
+      TestBoostDateTime, &datetimes);
+  timestamp_with_format_suite.AddBenchmark("ImpalaTimeStamp",
+      TestImpalaTimestamp, &datetimes);
+  timestamp_with_format_suite.AddBenchmark("ImpalaTZTimeStamp",
+      TestImpalaTZTimestamp, &tzdatetimes);
+
   cout << date_suite.Measure();
   cout << endl;
   cout << timestamp_suite.Measure();
+  cout << endl;
+  cout << timestamp_with_format_suite.Measure();
 
   return 0;
 }
