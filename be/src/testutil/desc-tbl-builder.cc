@@ -31,20 +31,20 @@ TupleDescBuilder& DescriptorTblBuilder::DeclareTuple() {
   return *tuple_builder;
 }
 
-static TSlotDescriptor MakeSlotDescriptor(int id, int parent_id, const ColumnType& type,
-    int slot_idx, int byte_offset) {
+static TSlotDescriptor MakeSlotDescriptor(int id, int parent_id,
+    const TupleDescBuilder::Slot& slot, int slot_idx, int byte_offset) {
   int null_byte = slot_idx / 8;
   int null_bit = slot_idx % 8;
   TSlotDescriptor slot_desc;
   slot_desc.__set_id(id);
   slot_desc.__set_parent(parent_id);
-  slot_desc.__set_slotType(type.ToThrift());
+  slot_desc.__set_slotType(slot.slot_type.ToThrift());
   slot_desc.__set_columnPath(vector<int>(1, slot_idx));
   slot_desc.__set_byteOffset(byte_offset);
   slot_desc.__set_nullIndicatorByte(null_byte);
   slot_desc.__set_nullIndicatorBit(null_bit);
   slot_desc.__set_slotIdx(slot_idx);
-  slot_desc.__set_isMaterialized(true);
+  slot_desc.__set_isMaterialized(slot.materialized);
   return slot_desc;
 }
 
@@ -69,19 +69,20 @@ DescriptorTbl* DescriptorTblBuilder::Build() {
   int slot_id = tuples_descs_.size(); // First ids reserved for TupleDescriptors
 
   for (int i = 0; i < tuples_descs_.size(); ++i) {
-    vector<ColumnType> slot_types = tuples_descs_[i]->slot_types();
-    int num_null_bytes = BitUtil::Ceil(slot_types.size(), 8);
+    vector<TupleDescBuilder::Slot> slots = tuples_descs_[i]->slots();
+    int num_null_bytes = BitUtil::Ceil(slots.size(), 8);
     int byte_offset = num_null_bytes;
     int tuple_id = i;
 
-    for(int j = 0; j < slot_types.size(); ++j) {
+    for(int j = 0; j < slots.size(); ++j) {
       thrift_desc_tbl_.slotDescriptors.push_back(
-          MakeSlotDescriptor(++slot_id, tuple_id, slot_types[j], j, byte_offset));
+          MakeSlotDescriptor(++slot_id, tuple_id, slots[j], j, byte_offset));
 
-      int byte_size = slot_types[j].GetByteSize();
+      int byte_size = slots[j].slot_type.GetByteSize();
       if (byte_size == 0) {
         // can only handle strings right now
-        DCHECK(slot_types[j].type == TYPE_STRING || slot_types[j].type == TYPE_VARCHAR);
+        DCHECK(slots[j].slot_type.type == TYPE_STRING
+               || slots[j].slot_type.type == TYPE_VARCHAR);
         byte_size = 16;
       }
       byte_offset += byte_size;

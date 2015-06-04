@@ -55,15 +55,27 @@ class DescriptorTblBuilder {
 
 class TupleDescBuilder {
  public:
+  struct Slot {
+    Slot(ColumnType type, bool mat = true)
+      : slot_type(type), materialized(mat) {}
+    ColumnType slot_type;
+    bool materialized;
+  };
+
   TupleDescBuilder& operator<< (ColumnType slot_type) {
-    slot_types_.push_back(slot_type);
+    slots_.push_back(Slot(slot_type));
     return *this;
   }
 
-  std::vector<ColumnType> slot_types() const { return slot_types_; }
+  TupleDescBuilder& AddSlot(ColumnType slot_type, bool materialized) {
+    slots_.push_back(Slot(slot_type, materialized));
+    return *this;
+  }
+
+  std::vector<Slot> slots() const { return slots_; }
 
  private:
-  std::vector<ColumnType> slot_types_;
+  std::vector<Slot> slots_;
 };
 
 }
