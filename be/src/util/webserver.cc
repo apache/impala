@@ -127,6 +127,7 @@ string BuildHeaderString(ResponseCode response, ContentType content_type) {
   static const string RESPONSE_TEMPLATE = "HTTP/1.1 $0 $1\r\n"
       "Content-Type: text/$2\r\n"
       "Content-Length: %d\r\n"
+      "X-Frame-Options: DENY\r\n"
       "\r\n";
 
   return Substitute(RESPONSE_TEMPLATE, response, response == OK ? "OK" : "Not found",

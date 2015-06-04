@@ -219,9 +219,29 @@ TEST(Webserver, DirectoryListingDisabledTest) {
   ASSERT_TRUE(webserver.Start().ok());
   stringstream contents;
   ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port,
-          "/www/bootstrap/", &contents, 403).ok());
+      "/www/bootstrap/", &contents, 403).ok());
   ASSERT_TRUE(contents.str().find("Directory listing denied") != string::npos);
 }
+
+void FrameCallback(const Webserver::ArgumentMap& args, Document* document) {
+  const string& contents = "<frameset cols='50%,50%'><frame src='/metrics'></frameset>";
+  document->AddMember("contents", contents.c_str(), document->GetAllocator());
+}
+
+TEST(Webserver, NoFrameEmbeddingTest) {
+  const string FRAME_TEST_PATH = "/frames_test";
+  Webserver webserver(FLAGS_webserver_port);
+  Webserver::UrlCallback callback = bind<void>(FrameCallback, _1, _2);
+  webserver.RegisterUrlCallback(FRAME_TEST_PATH, "raw-text.tmpl", callback);
+  ASSERT_TRUE(webserver.Start().ok());
+  stringstream contents;
+  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port,
+      FRAME_TEST_PATH, &contents, 200).ok());
+
+  // Confirm that the embedded frame isn't rendered
+  ASSERT_TRUE(contents.str().find("Metrics") == string::npos);
+}
+
 
 int main(int argc, char **argv) {
   InitCommonRuntime(argc, argv, false, TestInfo::BE_TEST);
