@@ -56,6 +56,7 @@ class RowBatchList {
     /// Increments the iterator. No-op if the iterator is at the end.
     void Next() {
       if (batch_it_ == list_->row_batches_.end()) return;
+      DCHECK_GE((*batch_it_)->num_rows(), 0);
       if (++row_idx_ == (*batch_it_)->num_rows()) {
         ++batch_it_;
         row_idx_ = 0;

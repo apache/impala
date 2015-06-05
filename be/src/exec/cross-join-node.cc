@@ -38,22 +38,18 @@ CrossJoinNode::CrossJoinNode(
 Status CrossJoinNode::Prepare(RuntimeState* state) {
   DCHECK(join_op_ == TJoinOp::CROSS_JOIN);
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
-  build_batch_pool_.reset(new ObjectPool());
   return Status::OK();
 }
 
-Status CrossJoinNode::Reset(RuntimeState* state, RowBatch* row_batch) {
-  if (row_batch != NULL) build_batches_.TransferResourceOwnership(row_batch);
+Status CrossJoinNode::Reset(RuntimeState* state, bool can_free_tuple_data) {
+  if (can_free_tuple_data) build_batch_pool_.Clear();
   build_batches_.Reset();
-  // TODO: consider resetting object pool only when it reaches a certain size
-  build_batch_pool_.reset(new ObjectPool());
-  return BlockingJoinNode::Reset(state, row_batch);
+  return BlockingJoinNode::Reset(state, can_free_tuple_data);
 }
 
 void CrossJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
-  build_batches_.Reset();
-  build_batch_pool_.reset();
+  build_batch_pool_.Clear();
   BlockingJoinNode::Close(state);
 }
 
@@ -61,7 +57,7 @@ Status CrossJoinNode::ConstructBuildSide(RuntimeState* state) {
   // Do a full scan of child(1) and store all build row batches.
   RETURN_IF_ERROR(child(1)->Open(state));
   while (true) {
-    RowBatch* batch = build_batch_pool_->Add(
+    RowBatch* batch = build_batch_pool_.Add(
         new RowBatch(child(1)->row_desc(), state->batch_size(), mem_tracker()));
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(QueryMaintenance(state));

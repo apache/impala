@@ -115,7 +115,7 @@ Status SortNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   return Status::OK();
 }
 
-Status SortNode::Reset(RuntimeState* state, RowBatch* row_batch) {
+Status SortNode::Reset(RuntimeState* state, bool can_free_tuple_data) {
   DCHECK(false) << "NYI";
   return Status("NYI");
 }

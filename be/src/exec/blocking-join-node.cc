@@ -117,16 +117,14 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
   return Status::OK();
 }
 
-Status BlockingJoinNode::Reset(RuntimeState* state, RowBatch* row_batch) {
+Status BlockingJoinNode::Reset(RuntimeState* state, bool can_free_tuple_data) {
   eos_ = false;
   probe_side_eos_ = false;
-  if (row_batch != NULL) {
-    probe_batch_->TransferResourceOwnership(row_batch);
-    row_batch->tuple_data_pool()->AcquireData(build_pool_.get(), false);
+  if (can_free_tuple_data) {
+    probe_batch_->Reset();
+    build_pool_->Clear();
   }
-  probe_batch_->Reset();
-  build_pool_->FreeAll();
-  return ExecNode::Reset(state, row_batch);
+  return ExecNode::Reset(state, can_free_tuple_data);
 }
 
 void BlockingJoinNode::Close(RuntimeState* state) {

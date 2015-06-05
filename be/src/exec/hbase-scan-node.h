@@ -44,7 +44,7 @@ class HBaseScanNode : public ScanNode {
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
 
   /// NYI
-  virtual Status Reset(RuntimeState* state, RowBatch* row_batch);
+  virtual Status Reset(RuntimeState* state, bool can_free_tuple_data);
 
   /// Close the hbase_scanner_, and report errors.
   virtual void Close(RuntimeState* state);

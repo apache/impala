@@ -47,7 +47,7 @@ class CrossJoinNode : public BlockingJoinNode {
 
   virtual Status Prepare(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
-  virtual Status Reset(RuntimeState* state, RowBatch* row_batch);
+  virtual Status Reset(RuntimeState* state, bool can_free_tuple_data);
   virtual void Close(RuntimeState* state);
 
  protected:
@@ -55,10 +55,19 @@ class CrossJoinNode : public BlockingJoinNode {
   virtual Status ConstructBuildSide(RuntimeState* state);
 
  private:
-  /// Object pool for build RowBatches, stores all BuildBatches in build_rows_
-  boost::scoped_ptr<ObjectPool> build_batch_pool_;
-  /// List of build batches, constructed in Prepare()
+  /////////////////////////////////////////
+  /// BEGIN: Members that must be Reset()
+
+  /// Object pool for build RowBatches. Stores and owns all batches in build_batches_,
+  /// as well as batches preserved across non-freeing Reset() calls.
+  ObjectPool build_batch_pool_;
+
+  /// List of build batches. The batches are owned by build_batch_pool_.
   RowBatchList build_batches_;
+
+  /// END: Members that must be Reset()
+  /////////////////////////////////////////
+
   RowBatchList::TupleRowIterator current_build_row_;
 
   /// Processes a batch from the left child.

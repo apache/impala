@@ -732,7 +732,7 @@ Status AnalyticEvalNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
   return Status::OK();
 }
 
-Status AnalyticEvalNode::Reset(RuntimeState* state, RowBatch* row_batch) {
+Status AnalyticEvalNode::Reset(RuntimeState* state, bool can_free_tuple_data) {
   DCHECK(false) << "NYI";
   return Status("NYI");
 }

@@ -372,7 +372,7 @@ void PartitionedAggregationNode::CleanupHashTbl(const vector<FunctionContext*>& 
   }
 }
 
-Status PartitionedAggregationNode::Reset(RuntimeState* state, RowBatch* row_batch) {
+Status PartitionedAggregationNode::Reset(RuntimeState* state, bool can_free_tuple_data) {
   DCHECK(false) << "NYI";
   return Status("NYI");
 }

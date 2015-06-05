@@ -178,7 +178,7 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   return Status::OK();
 }
 
-Status UnionNode::Reset(RuntimeState* state, RowBatch* row_batch) {
+Status UnionNode::Reset(RuntimeState* state, bool can_free_tuple_data) {
   DCHECK(false) << "NYI";
   return Status("NYI");
 }

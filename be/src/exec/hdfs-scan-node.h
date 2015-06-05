@@ -111,7 +111,7 @@ class HdfsScanNode : public ScanNode {
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
-  virtual Status Reset(RuntimeState* state, RowBatch* row_batchl);
+  virtual Status Reset(RuntimeState* state, bool can_free_tuple_data);
   virtual void Close(RuntimeState* state);
 
   int limit() const { return limit_; }

@@ -184,7 +184,7 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   return Status::OK();
 }
 
-Status PartitionedHashJoinNode::Reset(RuntimeState* state, RowBatch* row_batch) {
+Status PartitionedHashJoinNode::Reset(RuntimeState* state, bool can_free_tuple_data) {
   DCHECK(false) << "NYI";
   return Status("NYI");
 }

@@ -107,7 +107,7 @@ bool SelectNode::CopyRows(RowBatch* output_batch) {
   return output_batch->AtCapacity();
 }
 
-Status SelectNode::Reset(RuntimeState* state, RowBatch* row_batch) {
+Status SelectNode::Reset(RuntimeState* state, bool can_free_tuple_data) {
   DCHECK(false) << "NYI";
   return Status("NYI");
 }

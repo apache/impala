@@ -55,7 +55,7 @@ class BlockingJoinNode : public ExecNode {
 
   /// Subclasses should reset any state modified in Open() and GetNext() and then call
   /// BlockingJoinNode::Reset().
-  virtual Status Reset(RuntimeState* state, RowBatch* row_batch);
+  virtual Status Reset(RuntimeState* state, bool can_free_tuple_data);
 
   /// Subclasses should close any other structures and then call
   /// BlockingJoinNode::Close().
@@ -66,6 +66,10 @@ class BlockingJoinNode : public ExecNode {
  protected:
   const std::string node_name_;
   TJoinOp::type join_op_;
+
+  /////////////////////////////////////////
+  /// BEGIN: Members that must be Reset()
+
   bool eos_;  // if true, nothing left to return in GetNext()
   boost::scoped_ptr<MemPool> build_pool_;  // holds everything referenced from build side
 
@@ -75,6 +79,9 @@ class BlockingJoinNode : public ExecNode {
   boost::scoped_ptr<RowBatch> probe_batch_;
 
   bool probe_side_eos_;  // if true, left child has no more rows to process
+
+  /// END: Members that must be Reset()
+  /////////////////////////////////////////
 
   /// TODO: These variables should move to a join control block struct, which is local to
   /// each probing thread.

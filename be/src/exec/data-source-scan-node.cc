@@ -342,7 +342,7 @@ Status DataSourceScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, boo
   }
 }
 
-Status DataSourceScanNode::Reset(RuntimeState* state, RowBatch* row_batch) {
+Status DataSourceScanNode::Reset(RuntimeState* state, bool can_free_tuple_data) {
   DCHECK(false) << "NYI";
   return Status("NYI");
 }
