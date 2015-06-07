@@ -476,7 +476,7 @@ INT
 # Test that tuple ids from semi-joined table refs are not added in
 # an IsNullPredicate expr; inline view with right semi join between
 # two inline views (IMPALA-1526)
-select t1.int_col
+select distinct t1.int_col
 from alltypestiny t1 left join
   (select coalesce(t3.int_col, 384) as int_col
    from (select int_col from alltypes) t1
@@ -484,12 +484,6 @@ from alltypestiny t1 left join
 on t2.int_col = t1.month
 where t1.month is not null
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-0
-1
-0
-1
-0
-1
 0
 1
 ---- TYPES
@@ -504,4 +498,24 @@ ON (t2.int_col) = (t1.year) limit 1
 true
 ---- TYPES
 boolean
+====
+---- QUERY
+# Regression test for IMPALA-1987. Equi-join predicates of outer joins contain
+# TupleIsNullPredicate exprs.
+select t1.int_col, t2.int_col, t3.id
+from alltypestiny t1 left outer join
+  (select coalesce(int_col, 384) as int_col from alltypestiny) t2
+  on t1.int_col = t2.int_col
+left outer join
+  (select 0 as id from alltypestiny) t3
+  on t1.int_col = t3.id
+order by 1 limit 5
+---- RESULTS
+0,0,0
+0,0,0
+0,0,0
+0,0,0
+0,0,0
+---- TYPES
+INT,INT,TINYINT
 ====

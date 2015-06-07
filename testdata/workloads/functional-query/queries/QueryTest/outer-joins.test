@@ -634,7 +634,7 @@ tinyint
 select count(*) from functional.alltypestiny t1 left outer join [shuffle]
 (select zeroifnull(int_col) as id from functional.alltypessmall) t2 on (t1.id = t2.id)
 ---- RESULTS
-8
+84
 ---- TYPES
 bigint
 ====

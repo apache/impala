@@ -23,14 +23,11 @@
 namespace impala {
 
 BooleanVal TupleIsNullPredicate::GetBooleanVal(ExprContext* ctx, TupleRow* row) {
-  bool result = true;
+  int count = 0;
   for (int i = 0; i < tuple_idxs_.size(); ++i) {
-    if (row->GetTuple(tuple_idxs_[i]) != NULL) {
-      result = false;
-      break;
-    }
+    count += row->GetTuple(tuple_idxs_[i]) == NULL;
   }
-  return BooleanVal(result);
+  return BooleanVal(!tuple_idxs_.empty() && count == tuple_idxs_.size());
 }
 
 TupleIsNullPredicate::TupleIsNullPredicate(const TExprNode& node)
