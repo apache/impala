@@ -22,7 +22,7 @@ from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfS3
+from tests.common.skip import SkipIfS3, SkipIfIsilon
 
 # Tests to validate HDFS partitioning.
 class TestPartitioning(ImpalaTestSuite):
@@ -60,7 +60,10 @@ class TestPartitioning(ImpalaTestSuite):
     self.run_test_case('QueryTest/partition-col-types', vector,
         use_db='hdfs_partitioning')
 
+  # Missing Coverage: Impala deals with boolean partitions created by Hive on a non-hdfs
+  # filesystem.
   @SkipIfS3.hive
+  @SkipIfIsilon.hive
   @pytest.mark.execute_serially
   def test_boolean_partitions(self, vector):
     # This test takes about a minute to complete due to the Hive commands that are

@@ -7,7 +7,7 @@ from os.path import join
 from subprocess import call
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfS3
+from tests.common.skip import SkipIfS3, SkipIfIsilon
 
 # (file extension, table suffix) pairs
 compression_formats = [
@@ -17,6 +17,11 @@ compression_formats = [
   ('.snappy',  'snap'),
  ]
 
+
+# Missing Coverage: Compressed data written by Hive is queriable by Impala on a non-hdfs
+# filesystem.
+@SkipIfS3.hive
+@SkipIfIsilon.hive
 class TestCompressedFormats(ImpalaTestSuite):
   """
   Tests that we support compressed RC, sequence and text files and that unsupported
@@ -47,14 +52,14 @@ class TestCompressedFormats(ImpalaTestSuite):
     if file_format in ['rc', 'seq']:
       # Test that compressed RC/sequence files are supported.
       db_suffix = '_%s_%s' % (file_format, suffix)
-      self.__copy_and_query_compressed_file(
+      self._copy_and_query_compressed_file(
        'tinytable', db_suffix, suffix, '000000_0', extension)
     elif file_format is 'text':
       # TODO: How about LZO?
       if suffix in ['gzip', 'snap', 'bzip']:
         # Test that {gzip,snappy,bzip}-compressed text files are supported.
         db_suffix = '_%s_%s' % (file_format, suffix)
-        self.__copy_and_query_compressed_file(
+        self._copy_and_query_compressed_file(
           'tinytable', db_suffix, suffix, '000000_0', extension)
       else:
         # Deflate-compressed (['def']) text files (or at least text files with a
@@ -64,7 +69,7 @@ class TestCompressedFormats(ImpalaTestSuite):
       assert False, "Unknown file_format: %s" % file_format
 
   # TODO: switch to using hive metastore API rather than hive shell.
-  def __copy_and_query_compressed_file(self, table_name, db_suffix, compression_codec,
+  def _copy_and_query_compressed_file(self, table_name, db_suffix, compression_codec,
                                      file_name, extension, expected_error=None):
     # We want to create a test table with a compressed file that has a file
     # extension. We'll do this by making a copy of an existing table with hive.

@@ -80,7 +80,7 @@ class TestUnmatchedSchema(ImpalaTestSuite):
     cls.TestMatrix.add_constraint(\
         lambda v: v.get_value('table_format').file_format != 'avro')
 
-  def __get_table_location(self, table_name, vector):
+  def _get_table_location(self, table_name, vector):
     result = self.execute_query_using_client(self.client,
         "describe formatted %s" % table_name, vector)
     for row in result.data:
@@ -89,22 +89,22 @@ class TestUnmatchedSchema(ImpalaTestSuite):
     # This should never happen.
     assert 0, 'Unable to get location for table: ' + table_name
 
-  def __create_test_table(self, vector):
+  def _create_test_table(self, vector):
     """
     Creates the test table
 
     Cannot be done in a setup method because we need access to the current test vector
     """
-    self.__drop_test_table(vector)
+    self._drop_test_table(vector)
     self.execute_query_using_client(self.client,
         "create external table jointbl_test like jointbl", vector)
 
     # Update the location of the new table to point the same location as the old table
-    location = self.__get_table_location('jointbl', vector)
+    location = self._get_table_location('jointbl', vector)
     self.execute_query_using_client(self.client,
         "alter table jointbl_test set location '%s'" % location, vector)
 
-  def __drop_test_table(self, vector):
+  def _drop_test_table(self, vector):
     self.execute_query_using_client(self.client,
         "drop table if exists jointbl_test", vector)
 
@@ -114,9 +114,9 @@ class TestUnmatchedSchema(ImpalaTestSuite):
     # different, as hbase collapses duplicates.
     if table_format.file_format == 'hbase':
       pytest.skip()
-    self.__create_test_table(vector)
+    self._create_test_table(vector)
     self.run_test_case('QueryTest/test-unmatched-schema', vector)
-    self.__drop_test_table(vector)
+    self._drop_test_table(vector)
 
 
 # Tests that scanners can read a single-column, single-row, 10MB table
@@ -186,6 +186,7 @@ class TestWideTable(ImpalaTestSuite):
         order_matters=False)
     assert expected == actual
 
+
 class TestParquet(ImpalaTestSuite):
   @classmethod
   def get_workload(cls):
@@ -200,6 +201,10 @@ class TestParquet(ImpalaTestSuite):
   def test_parquet(self, vector):
     self.run_test_case('QueryTest/parquet', vector)
 
+# Missing coverage: Impala can query a table with complex types created by Hive on a
+# non-hdfs filesystem.
+@SkipIfS3.hive
+@SkipIfIsilon.hive
 class TestParquetComplexTypes(ImpalaTestSuite):
   COMPLEX_COLUMN_TABLE = "functional_parquet.nested_column_types"
 
@@ -218,10 +223,8 @@ class TestParquetComplexTypes(ImpalaTestSuite):
   # complex-typed columns.
   # TODO: remove this when we can read complex-typed columns (complex types testing should
   # supercede this)
-  @SkipIfS3.hive
-  @SkipIfIsilon.hive
   def test_complex_column_types(self, vector):
-    self.__drop_complex_column_table()
+    self._drop_complex_column_table()
 
     # Partitioned case
     create_table_stmt = """
@@ -272,7 +275,7 @@ class TestParquetComplexTypes(ImpalaTestSuite):
     assert(result.data[1] == "partition1\tbar")
 
     # Unpartitioned case
-    self.__drop_complex_column_table()
+    self._drop_complex_column_table()
 
     create_table_stmt = """
       CREATE TABLE IF NOT EXISTS {0} (
@@ -311,10 +314,10 @@ class TestParquetComplexTypes(ImpalaTestSuite):
 
   @classmethod
   def teardown_class(cls):
-    cls.__drop_complex_column_table()
+    cls._drop_complex_column_table()
 
   @classmethod
-  def __drop_complex_column_table(cls):
+  def _drop_complex_column_table(cls):
     cls.client.execute("drop table if exists %s" % cls.COMPLEX_COLUMN_TABLE)
 
 # We use various scan range lengths to exercise corner cases in the HDFS scanner more
@@ -380,6 +383,9 @@ class TestTextScanRangeLengths(ImpalaTestSuite):
       result = self.client.execute("select count(*) from " + t)
       assert result.data == expected_result.data
 
+# Missing Coverage: No coverage for truncated files errors or scans.
+@SkipIfS3.hive
+@SkipIfIsilon.hive
 @pytest.mark.execute_serially
 class TestScanTruncatedFiles(ImpalaTestSuite):
   TEST_DB = 'test_truncated_file'

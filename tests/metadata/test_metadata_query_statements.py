@@ -7,6 +7,7 @@ import pytest
 from subprocess import call
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxException
 from tests.common.impala_test_suite import *
+from tests.common.skip import SkipIfIsilon, SkipIfS3
 from tests.common.test_vector import *
 from tests.util.filesystem_utils import get_fs_path
 
@@ -73,6 +74,10 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
     self.run_test_case('QueryTest/describe', vector)
 
   @pytest.mark.execute_serially
+  # Missing Coverage: Describe formatted compatibility between Impala and Hive when the
+  # data doesn't reside in hdfs.
+  @SkipIfIsilon.hive
+  @SkipIfS3.hive
   def test_describe_formatted(self, vector):
     # Describe a partitioned table.
     self.exec_and_compare_hive_and_impala_hs2("describe formatted functional.alltypes")
@@ -110,6 +115,9 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
     self.run_test_case('QueryTest/use', vector)
 
   @pytest.mark.execute_serially
+  # Missing Coverage: ddl by hive being visible to Impala for data not residing in hdfs.
+  @SkipIfIsilon.hive
+  @SkipIfS3.hive
   def test_impala_sees_hive_created_tables_and_databases(self, vector):
     self.client.set_configuration(vector.get_value('exec_option'))
     db_name = 'hive_test_db'
