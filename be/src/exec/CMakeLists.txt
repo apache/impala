@@ -67,6 +67,7 @@ add_library(Exec
   partitioned-hash-join-node-ir.cc
   kudu-scanner.cc
   kudu-scan-node.cc
+  kudu-table-sink.cc
   kudu-util.cc
   read-write-util.cc
   scan-node.cc
@@ -89,3 +90,4 @@ ADD_BE_TEST(parquet-version-test)
 ADD_BE_TEST(row-batch-list-test)
 ADD_BE_TEST(incr-stats-util-test)
 ADD_BE_TEST(kudu-scan-node-test)
+ADD_BE_TEST(kudu-table-sink-test)
