@@ -96,6 +96,31 @@ Status KuduToImpalaType(const kudu::client::KuduColumnSchema::DataType& kudu_typ
   return Status::OK();
 }
 
+Status KuduSchemaFromExpressionList(const std::vector<TExpr>& expressions,
+                                    const KuduTableDescriptor& table_desc,
+                                    kudu::client::KuduSchema* schema) {
+  using kudu::client::KuduColumnSchema;
+
+  unordered_set<string> key_col_names(table_desc.key_columns().begin(),
+      table_desc.key_columns().end());
+
+  vector<KuduColumnSchema> kudu_cols;
+  for (int i = 0; i < expressions.size(); i++) {
+    string col_name = table_desc.col_names()[i];
+    // Get the last expression node.
+    const TExprNode& node = expressions[i].nodes.back();
+    KuduColumnSchema::DataType kt = KuduColumnSchema::INT8;
+    RETURN_IF_ERROR(ImpalaToKuduType(node.type, &kt));
+
+    // Key columns are not nullable, all others are for now.
+    bool is_key = key_col_names.find(col_name) == key_col_names.end();
+    kudu_cols.push_back(KuduColumnSchema(col_name, kt, is_key));
+  }
+
+  schema->Reset(kudu_cols, std::min(kudu_cols.size(), key_col_names.size()));
+  return Status::OK();
+}
+
 Status KuduSchemaFromTupleDescriptor(const TupleDescriptor& tuple_desc,
     kudu::client::KuduSchema* schema) {
 #ifndef NDEBUG

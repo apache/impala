@@ -19,6 +19,8 @@
 
 namespace impala {
 
+class TExpr;
+class KuduTableDescriptor;
 class Status;
 class ColumnType;
 class TupleDescriptor;
@@ -28,6 +30,10 @@ Status ImpalaToKuduType(const ColumnType& impala_type,
 
 Status KuduToImpalaType(const kudu::client::KuduColumnSchema::DataType& kudu_type,
     ColumnType* impala_type);
+
+/// Builds a KuduSchema from an expression list.
+Status KuduSchemaFromExpressionList(const std::vector<TExpr>& expressions,
+    const KuduTableDescriptor& table_desc, kudu::client::KuduSchema* schema);
 
 /// Builds a KuduSchema from a TupleDescriptor.
 Status KuduSchemaFromTupleDescriptor(const TupleDescriptor& tuple_desc,
