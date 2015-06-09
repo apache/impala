@@ -218,11 +218,22 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
   return Status::OK();
 }
 
+void KuduScanner::SetSlotToNull(Tuple* tuple, int mat_slot_idx) {
+  DCHECK(scan_node_->materialized_slots()[mat_slot_idx]->is_nullable());
+  tuple->SetNull(scan_node_->materialized_slots()[mat_slot_idx]->null_indicator_offset());
+}
+
+
 Status KuduScanner::KuduRowToImpalaTuple(const KuduRowResult& row,
     RowBatch* row_batch, Tuple* tuple) {
   for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
     const SlotDescriptor* info = scan_node_->materialized_slots()[i];
     void* slot = tuple->GetSlot(info->tuple_offset());
+
+    if (row.IsNull(i)) {
+      SetSlotToNull(tuple, i);
+      continue;
+    }
 
     switch (info->type().type) {
       case TYPE_STRING: {
@@ -231,7 +242,8 @@ Status KuduScanner::KuduRowToImpalaTuple(const KuduRowResult& row,
         // the slice to perform the allocation, but is inneficcient, Kudu's client should
         // allow to get the size of the string without a copy.
         kudu::Slice slice;
-        KUDU_DCHECK_OK(row.GetString(i, &slice));
+        KUDU_RETURN_IF_ERROR(row.GetString(i, &slice),
+            "Error getting column value from Kudu.");
         char* buffer = reinterpret_cast<char*>(
             row_batch->tuple_data_pool()->TryAllocate(slice.size()));
         if (buffer == NULL) return Status::MEM_LIMIT_EXCEEDED;
@@ -241,22 +253,28 @@ Status KuduScanner::KuduRowToImpalaTuple(const KuduRowResult& row,
         break;
       }
       case TYPE_TINYINT:
-        KUDU_DCHECK_OK(row.GetInt8(i, reinterpret_cast<int8_t*>(slot)));
+        KUDU_RETURN_IF_ERROR(row.GetInt8(i, reinterpret_cast<int8_t*>(slot)),
+            "Error getting column value from Kudu.");
         break;
       case TYPE_SMALLINT:
-        KUDU_DCHECK_OK(row.GetInt16(i, reinterpret_cast<int16_t*>(slot)));
+        KUDU_RETURN_IF_ERROR(row.GetInt16(i, reinterpret_cast<int16_t*>(slot)),
+            "Error getting column value from Kudu.");
         break;
       case TYPE_INT:
-        KUDU_DCHECK_OK(row.GetInt32(i, reinterpret_cast<int32_t*>(slot)));
+        KUDU_RETURN_IF_ERROR(row.GetInt32(i, reinterpret_cast<int32_t*>(slot)),
+            "Error getting column value from Kudu.");
         break;
       case TYPE_BIGINT:
-        KUDU_DCHECK_OK(row.GetInt64(i, reinterpret_cast<int64_t*>(slot)));
+        KUDU_RETURN_IF_ERROR(row.GetInt64(i, reinterpret_cast<int64_t*>(slot)),
+            "Error getting column value from Kudu.");
         break;
       case TYPE_FLOAT:
-        KUDU_DCHECK_OK(row.GetFloat(i, reinterpret_cast<float*>(slot)));
+        KUDU_RETURN_IF_ERROR(row.GetFloat(i, reinterpret_cast<float*>(slot)),
+            "Error getting column value from Kudu.");
         break;
       case TYPE_DOUBLE:
-        KUDU_DCHECK_OK(row.GetDouble(i, reinterpret_cast<double*>(slot)));
+        KUDU_RETURN_IF_ERROR(row.GetDouble(i, reinterpret_cast<double*>(slot)),
+            "Error getting column value from Kudu.");
         break;
       default:
         DCHECK(false) << "Impala type unsupported in Kudu: "

@@ -43,6 +43,9 @@ class KuduScanner {
   Status Close();
 
  private:
+  // Set 'tuple' slot 'mat_slot_idx' to null.
+  void SetSlotToNull(Tuple* tuple, int mat_slot_idx);
+
   /// Returns true if the current block hasn't been fully scanned.
   bool CurrentBlockHasMoreRows() {
     return rows_scanned_current_block_ < cur_rows_.size();

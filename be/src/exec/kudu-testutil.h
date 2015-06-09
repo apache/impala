@@ -107,22 +107,26 @@ class KuduTestHelper {
     }
   }
 
-  gscoped_ptr<KuduInsert> BuildTestRow(KuduTable* table, int index) {
+  gscoped_ptr<KuduInsert> BuildTestRow(KuduTable* table, int index, int num_cols) {
+    DCHECK_GT(num_cols, 0);
+    DCHECK_LE(num_cols, 3);
     gscoped_ptr<KuduInsert> insert = table->NewInsert();
     KuduPartialRow* row = insert->mutable_row();
     KUDU_CHECK_OK(row->SetInt32(0, index));
-    KUDU_CHECK_OK(row->SetInt32(1, index * 2));
-    KUDU_CHECK_OK(row->SetStringCopy(2, Slice(StringPrintf("hello_%d", index))));
+    if (num_cols > 1) KUDU_CHECK_OK(row->SetInt32(1, index * 2));
+    if (num_cols > 2) {
+      KUDU_CHECK_OK(row->SetStringCopy(2, Slice(StringPrintf("hello_%d", index))));
+    }
     return insert.Pass();
   }
 
   void InsertTestRows(KuduClient* client, KuduTable* table, int num_rows,
-      int first_row = 0) {
+      int first_row = 0, int num_cols = 3) {
     std::tr1::shared_ptr<KuduSession> session = client->NewSession();
     KUDU_ASSERT_OK(session->SetFlushMode(KuduSession::MANUAL_FLUSH));
     session->SetTimeoutMillis(10000);
     for (int i = first_row; i < num_rows + first_row; i++) {
-      KUDU_ASSERT_OK(session->Apply(BuildTestRow(table, i).Pass()));
+      KUDU_ASSERT_OK(session->Apply(BuildTestRow(table, i, num_cols).Pass()));
     }
     KUDU_ASSERT_OK(session->Flush());
     ASSERT_FALSE(session->HasPendingOperations());

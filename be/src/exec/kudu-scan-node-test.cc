@@ -33,6 +33,7 @@
 #include "util/test-info.h"
 
 using apache::thrift::ThriftDebugString;
+using strings::Substitute;
 
 namespace impala {
 
@@ -82,8 +83,8 @@ class KuduScanNodeTest : public testing::Test {
     ASSERT_OK(scanner->Open(&runtime_state_));
   }
 
-  void VerifyBatch(RowBatch* batch, int first_row,
-      int last_row, int num_materialized_cols) {
+  void VerifyBatch(RowBatch* batch, int first_row, int last_row,
+      int num_materialized_cols, int num_notnull_cols) {
 
     if (num_materialized_cols == 0) return;
     string batch_as_string = PrintBatch(batch);
@@ -94,7 +95,7 @@ class KuduScanNodeTest : public testing::Test {
     string base_row = "[(";
     if (num_materialized_cols >= 1) base_row.append("$0");
     if (num_materialized_cols >= 2) base_row.append(" $1");
-    if (num_materialized_cols >= 3) base_row.append(" hello_$2");
+    if (num_materialized_cols >= 3) base_row.append(" $2");
     base_row.append(")]");
 
     vector<string> rows = strings::Split(batch_as_string, "\n", strings::SkipEmpty());
@@ -103,16 +104,32 @@ class KuduScanNodeTest : public testing::Test {
       int idx = first_row + i;
       string row;
       switch(num_materialized_cols) {
-        case 1: row = strings::Substitute(base_row, idx); break;
-        case 2: row = strings::Substitute(base_row, idx, idx * 2); break;
-        case 3: row = strings::Substitute(base_row, idx, idx * 2, idx); break;
+        case 1: row = Substitute(base_row, idx); break;
+        case 2: {
+          if (num_notnull_cols > 1) {
+            row = Substitute(base_row, idx, idx * 2);
+            break;
+          } else {
+            row = Substitute(base_row, idx, "null");
+            break;
+          }
+        }
+        case 3: {
+          if (num_notnull_cols > 2) {
+            row = Substitute(base_row, idx, idx * 2, Substitute("hello_$0", idx));
+            break;
+          } else {
+            row = Substitute(base_row, idx, "null", "null");
+            break;
+          }
+        }
       }
       ASSERT_EQ(rows[i], row);
     }
   }
 
   void ScanAndVerify(int expected_num_rows, int expected_num_batches,
-      int num_cols_to_materialize) {
+      int num_cols_to_materialize, int num_notnull_cols = 3) {
     BuildRuntimeStateForScans(num_cols_to_materialize);
 
     KuduScanNode scanner(&obj_pool_, kudu_node_, *desc_tbl_);
@@ -143,7 +160,7 @@ class KuduScanNodeTest : public testing::Test {
 
       ASSERT_EQ(batch->num_rows(), batch_size);
       VerifyBatch(batch, batch_size * num_batches, batch_size * (num_batches + 1),
-          num_cols_to_materialize);
+          num_cols_to_materialize, num_notnull_cols);
       num_rows += batch->num_rows();
       ++num_batches;
     } while(!eos);
@@ -197,6 +214,23 @@ TEST_F(KuduScanNodeTest, TestScanNode) {
   ScanAndVerify(kNumRows, kNumBatches, 3);
   ScanAndVerify(kNumRows, kNumBatches, 2);
   ScanAndVerify(kNumRows, kNumBatches, 0);
+}
+
+TEST_F(KuduScanNodeTest, TestScanNullColValues) {
+
+  const int kNumRows = 1000;
+  const int kNumBatches = 10;
+
+  // Insert kNumRows rows for this test but only the keys, i.e. the 2nd
+  // and 3rd columns are null.
+  kudu_test_helper_.InsertTestRows(kudu_test_helper_.client().get(),
+                                   kudu_test_helper_.table().get(),
+                                   kNumRows, 0, 1);
+
+  // Now try scanning including and not including the null columns.
+  ScanAndVerify(kNumRows, kNumBatches, 3, 1);
+  ScanAndVerify(kNumRows, kNumBatches, 2, 1);
+  ScanAndVerify(kNumRows, kNumBatches, 1, 1);
 }
 
 } // namespace impala
