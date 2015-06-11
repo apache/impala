@@ -34,8 +34,6 @@ SelectNode::SelectNode(
 Status SelectNode::Prepare(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Prepare(state));
-  child_row_batch_.reset(
-      new RowBatch(child(0)->row_desc(), state->batch_size(), mem_tracker()));
   return Status::OK();
 }
 
@@ -43,6 +41,8 @@ Status SelectNode::Open(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_ERROR(child(0)->Open(state));
+  child_row_batch_.reset(
+      new RowBatch(child(0)->row_desc(), state->batch_size(), mem_tracker()));
   return Status::OK();
 }
 
@@ -54,6 +54,7 @@ Status SelectNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) 
     // we're already done or we exhausted the last child batch and there won't be any
     // new ones
     *eos = true;
+    child_row_batch_->TransferResourceOwnership(row_batch);
     return Status::OK();
   }
   *eos = false;
@@ -74,10 +75,12 @@ Status SelectNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) 
     if (CopyRows(row_batch)) {
       *eos = ReachedLimit()
           || (child_row_idx_ == child_row_batch_->num_rows() && child_eos_);
+      if (*eos) child_row_batch_->TransferResourceOwnership(row_batch);
       return Status::OK();
     }
     if (child_eos_) {
       // finished w/ last child row batch, and child eos is true
+      child_row_batch_->TransferResourceOwnership(row_batch);
       *eos = true;
       return Status::OK();
     }
@@ -107,9 +110,11 @@ bool SelectNode::CopyRows(RowBatch* output_batch) {
   return output_batch->AtCapacity();
 }
 
-Status SelectNode::Reset(RuntimeState* state, bool can_free_tuple_data) {
-  DCHECK(false) << "NYI";
-  return Status("NYI");
+Status SelectNode::Reset(RuntimeState* state) {
+  child_row_batch_->Reset();
+  child_row_idx_ = 0;
+  child_eos_ = false;
+  return ExecNode::Reset(state);
 }
 
 void SelectNode::Close(RuntimeState* state) {

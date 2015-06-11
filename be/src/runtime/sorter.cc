@@ -50,6 +50,8 @@ class Sorter::Run {
   // materialized so materialize_slots is false.
   Run(Sorter* parent, TupleDescriptor* sort_tuple_desc, bool materialize_slots);
 
+  ~Run() { DeleteAllBlocks(); }
+
   // Initialize the run for input rows by allocating the minimum number of required
   // blocks - one block for fixed-len data added to fixed_len_blocks_, one for the
   // initially unsorted var-len data added to var_len_blocks_, and one to copy sorted
@@ -63,6 +65,9 @@ class Sorter::Run {
   // in sorter_->sort_tuple_slot_expr_ctxs_, else just copies the input rows.
   template <bool has_var_len_data>
   Status AddBatch(RowBatch* batch, int start_index, int* num_processed);
+
+  /// Attaches all fixed-len and var-len blocks to the given row batch.
+  void TransferResources(RowBatch* row_batch);
 
   // Unpins all the blocks in a sorted run. Var-length column data is copied into new
   // blocks in sorted order. Pointers in the original tuples are converted to offsets
@@ -465,14 +470,35 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
   return Status::OK();
 }
 
+void Sorter::Run::TransferResources(RowBatch* row_batch) {
+  DCHECK_NOTNULL(row_batch);
+  BOOST_FOREACH(BufferedBlockMgr::Block* block, fixed_len_blocks_) {
+    if (block != NULL) row_batch->AddBlock(block);
+  }
+  fixed_len_blocks_.clear();
+  BOOST_FOREACH(BufferedBlockMgr::Block* block, var_len_blocks_) {
+    if (block != NULL) row_batch->AddBlock(block);
+  }
+  var_len_blocks_.clear();
+  if (var_len_copy_block_ != NULL) {
+    row_batch->AddBlock(var_len_copy_block_);
+    var_len_copy_block_ = NULL;
+  }
+}
+
 void Sorter::Run::DeleteAllBlocks() {
   BOOST_FOREACH(BufferedBlockMgr::Block* block, fixed_len_blocks_) {
     if (block != NULL) block->Delete();
   }
+  fixed_len_blocks_.clear();
   BOOST_FOREACH(BufferedBlockMgr::Block* block, var_len_blocks_) {
     if (block != NULL) block->Delete();
   }
-  if (var_len_copy_block_ != NULL) var_len_copy_block_->Delete();
+  var_len_blocks_.clear();
+  if (var_len_copy_block_ != NULL) {
+    var_len_copy_block_->Delete();
+    var_len_copy_block_ = NULL;
+  }
 }
 
 Status Sorter::Run::UnpinAllBlocks() {
@@ -873,12 +899,19 @@ Sorter::Sorter(const TupleRowComparator& compare_less_than,
     RuntimeProfile* profile, RuntimeState* state)
   : state_(state),
     compare_less_than_(compare_less_than),
+    in_mem_tuple_sorter_(NULL),
     block_mgr_(state->block_mgr()),
-    unsorted_run_(NULL),
-    output_row_desc_(output_row_desc),
+    block_mgr_client_(NULL),
+    has_var_len_slots_(false),
     sort_tuple_slot_expr_ctxs_(slot_materialize_expr_ctxs),
     mem_tracker_(mem_tracker),
-    profile_(profile) {
+    output_row_desc_(output_row_desc),
+    unsorted_run_(NULL),
+    profile_(profile),
+    initial_runs_counter_(NULL),
+    num_merges_counter_(NULL),
+    in_mem_sort_timer_(NULL),
+    sorted_data_size_(NULL) {
 }
 
 Sorter::~Sorter() {
@@ -996,10 +1029,23 @@ Status Sorter::GetNext(RowBatch* output_batch, bool* eos) {
     // In this case, only TupleRows are copied into output_batch. Sorted tuples are left
     // in the pinned blocks in the single sorted run.
     RETURN_IF_ERROR(sorted_runs_.back()->GetNext<false>(output_batch, eos));
+    if (*eos) sorted_runs_.back()->TransferResources(output_batch);
   } else {
     // In this case, rows are deep copied into output_batch.
     RETURN_IF_ERROR(merger_->GetNext(output_batch, eos));
   }
+  return Status::OK();
+}
+
+Status Sorter::Reset() {
+  merger_.reset();
+  merging_runs_.clear();
+  sorted_runs_.clear();
+  obj_pool_.Clear();
+  DCHECK(unsorted_run_ == NULL);
+  unsorted_run_ = obj_pool_.Add(
+      new Run(this, output_row_desc_->tuple_descriptors()[0], true));
+  unsorted_run_->Init();
   return Status::OK();
 }
 

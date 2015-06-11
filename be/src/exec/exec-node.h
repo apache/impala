@@ -69,6 +69,8 @@ class ExecNode {
   /// If overridden in subclass, must first call superclass's Open().
   /// If a parent exec node adds slot filters (see RuntimeState::AddBitmapFilter()),
   /// they need to be added before calling Open() on the child that will consume them.
+  /// Open() is called after Prepare() or Reset(), i.e., possibly multiple times
+  /// throughout the lifetime of this node.
   virtual Status Open(RuntimeState* state);
 
   /// Retrieves rows and returns them via row_batch. Sets eos to true
@@ -86,18 +88,18 @@ class ExecNode {
   /// TODO: AggregationNode and HashJoinNode cannot be "re-opened" yet.
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) = 0;
 
-  /// Resets all data-specific state, returning this node to the state it was in after
-  /// calling Prepare() and before calling Open().
-  /// If 'can_free_tuple_data' is true, then it is safe to also free any memory
-  /// associated with row batches returned by this node. Otherwise, that memory must be
-  /// kept until Close() or a Reset() with 'can_free_tuple_data' set to true.
-  /// Prepare() must have already been called before calling Reset(). Open() and GetNext()
-  /// may have optionally been called. Close() must not have been called.
+  /// Resets the stream of row batches to be retrieved by subsequent GetNext() calls.
+  /// Clears all internal state, returning this node to the state it was in after calling
+  /// Prepare() and before calling Open(). This function must not clear memory
+  /// still owned by this node that is backing rows returned in GetNext().
+  /// Prepare() must have already been called before calling Reset(). Open()/GetNext()
+  /// may have optionally been called (not necessarily until eos). Close() must not have
+  /// been called.
   /// If overridden in a subclass, must call superclass's Reset() at the end. The default
   /// implementation calls Reset() on children.
-  /// Note that this function may be called many times, so should be fast. For example,
-  /// accumulated memory does not need to be freed on every call if it's expensive.
-  virtual Status Reset(RuntimeState* state, bool can_free_tuple_data);
+  /// Note that this function may be called many times (proportional to the input data),
+  /// so should be fast.
+  virtual Status Reset(RuntimeState* state);
 
   /// Close() will get called for every exec node, regardless of what else is called and
   /// the status of these calls (i.e. Prepare() may never have been called, or

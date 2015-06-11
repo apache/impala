@@ -90,7 +90,7 @@ Status ExchangeNode::Open(RuntimeState* state) {
   return Status::OK();
 }
 
-Status ExchangeNode::Reset(RuntimeState* state, bool can_free_tuple_data) {
+Status ExchangeNode::Reset(RuntimeState* state) {
   DCHECK(false) << "NYI";
   return Status("NYI");
 }

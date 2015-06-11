@@ -40,7 +40,7 @@ class SortNode : public ExecNode {
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
-  virtual Status Reset(RuntimeState* state, bool can_free_tuple_data);
+  virtual Status Reset(RuntimeState* state);
   virtual void Close(RuntimeState* state);
 
  protected:
@@ -57,15 +57,23 @@ class SortNode : public ExecNode {
 
   /// Number of rows to skip.
   int64_t offset_;
-  int64_t num_rows_skipped_;
-
-  /// Object used for external sorting.
-  boost::scoped_ptr<Sorter> sorter_;
 
   /// Expressions and parameters used for tuple materialization and tuple comparison.
   SortExecExprs sort_exec_exprs_;
   std::vector<bool> is_asc_order_;
   std::vector<bool> nulls_first_;
+
+  /////////////////////////////////////////
+  /// BEGIN: Members that must be Reset()
+
+  /// Object used for external sorting.
+  boost::scoped_ptr<Sorter> sorter_;
+
+  /// Keeps track of the number of rows skipped for handling offset_.
+  int64_t num_rows_skipped_;
+
+  /// END: Members that must be Reset()
+  /////////////////////////////////////////
 };
 
 }

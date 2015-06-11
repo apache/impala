@@ -1,0 +1,104 @@
+====
+---- QUERY
+# Test a union inside a subplan with some constant operands.
+select c_custkey, o_orderkey from tpch_nested_parquet.customer c,
+  (select o_orderkey from c.c_orders
+   union all
+   values(100), (200), (300)) v
+where c_custkey in (1, 2, 3)
+---- TYPES
+BIGINT, BIGINT
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,100
+1,200
+1,300
+1,454791
+1,579908
+1,3868359
+1,4273923
+1,4808192
+1,5133509
+2,100
+2,200
+2,300
+2,430243
+2,1071617
+2,1374019
+2,1763205
+2,1842406
+2,2992930
+2,3986496
+3,100
+3,200
+3,300
+====
+# Test an order by + limit (topn node) inside a subplan.
+select c_custkey, o_orderkey from tpch_nested_parquet.customer c,
+  (select o_orderkey from c.c_orders
+   order by o_orderkey desc limit 2) v
+where c_custkey in (1, 2, 3)
+---- TYPES
+BIGINT, BIGINT
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,5133509
+1,4808192
+2,3986496
+2,2992930
+====
+# Test a select node inside a subplan.
+select c_custkey, o_orderkey from tpch_nested_parquet.customer c,
+  (select o_orderkey from c.c_orders
+   order by o_orderkey desc limit 2) v
+where c_custkey in (1, 2, 3) and o_orderkey % 2 = 0
+---- TYPES
+BIGINT, BIGINT
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,4808192
+2,3986496
+2,2992930
+====
+# Test an analytic function that requires a sort inside a subplan.
+select c_custkey, o_orderstatus, o_orderdate, o_orderkey, r from tpch_nested_parquet.customer c,
+  (select o_orderstatus, o_orderdate, o_orderkey,
+   row_number() over (partition by o_orderstatus order by o_orderdate) r
+   from c.c_orders) v
+where c_custkey in (1, 2, 3)
+---- TYPES
+BIGINT, STRING, BIGINT, BIGINT
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,F,1992-04-19,454791,1
+1,F,1992-08-22,3868359,2
+1,O,1996-06-29,4808192,1
+1,O,1996-07-01,5133509,2
+1,O,1996-12-09,579908,3
+1,O,1997-03-23,4273923,4
+2,F,1992-04-05,1374019,1
+2,F,1994-05-21,2992930,2
+2,F,1994-08-28,1763205,3
+2,F,1994-12-24,430243,4
+2,O,1996-08-05,1842406,1
+2,O,1997-02-22,3986496,2
+2,P,1995-03-10,1071617,1
+====
+# Test an analytic function that does not require a sort inside a subplan.
+select c_custkey, mp from tpch_nested_parquet.customer c,
+  (select max(o_totalprice) over () mp
+   from c.c_orders) v
+where c_custkey in (1, 2, 3)
+---- TYPES
+BIGINT, DECIMAL
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,174645.94
+1,174645.94
+1,174645.94
+1,174645.94
+1,174645.94
+1,174645.94
+2,312692.22
+2,312692.22
+2,312692.22
+2,312692.22
+2,312692.22
+2,312692.22
+2,312692.22
+====

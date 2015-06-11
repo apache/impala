@@ -25,6 +25,7 @@ namespace impala {
 SortNode::SortNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
     offset_(tnode.sort_node.__isset.offset ? tnode.sort_node.offset : 0),
+    sorter_(NULL),
     num_rows_skipped_(0) {
 }
 
@@ -56,15 +57,19 @@ Status SortNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(QueryMaintenance(state));
   RETURN_IF_ERROR(child(0)->Open(state));
 
-  TupleRowComparator less_than(
-      sort_exec_exprs_.lhs_ordering_expr_ctxs(), sort_exec_exprs_.rhs_ordering_expr_ctxs(),
-      is_asc_order_, nulls_first_);
-
-  // Create and initialize the external sort impl object
-  sorter_.reset(new Sorter(
-      less_than, sort_exec_exprs_.sort_tuple_slot_expr_ctxs(),
-      &row_descriptor_, mem_tracker(), runtime_profile(), state));
-  RETURN_IF_ERROR(sorter_->Init());
+  // These objects must be created after opening the sort_exec_exprs_. Avoid creating
+  // them after every Reset()/Open().
+  if (sorter_.get() == NULL) {
+    TupleRowComparator less_than(
+        sort_exec_exprs_.lhs_ordering_expr_ctxs(),
+        sort_exec_exprs_.rhs_ordering_expr_ctxs(),
+        is_asc_order_, nulls_first_);
+    // Create and initialize the external sort impl object
+    sorter_.reset(new Sorter(
+        less_than, sort_exec_exprs_.sort_tuple_slot_expr_ctxs(),
+        &row_descriptor_, mem_tracker(), runtime_profile(), state));
+    RETURN_IF_ERROR(sorter_->Init());
+  }
 
   // The child has been opened and the sorter created. Sort the input.
   // The final merge is done on-demand as rows are requested in GetNext().
@@ -115,9 +120,10 @@ Status SortNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   return Status::OK();
 }
 
-Status SortNode::Reset(RuntimeState* state, bool can_free_tuple_data) {
-  DCHECK(false) << "NYI";
-  return Status("NYI");
+Status SortNode::Reset(RuntimeState* state) {
+  num_rows_skipped_ = 0;
+  if (sorter_.get() != NULL) sorter_->Reset();
+  return ExecNode::Reset(state);
 }
 
 void SortNode::Close(RuntimeState* state) {
@@ -150,7 +156,6 @@ Status SortNode::SortInput(RuntimeState* state) {
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(QueryMaintenance(state));
   } while(!eos);
-
   RETURN_IF_ERROR(sorter_->InputDone());
   return Status::OK();
 }

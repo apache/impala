@@ -42,7 +42,7 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, int capacity,
     auxiliary_mem_usage_(0),
     need_to_return_(false),
     tuple_data_pool_(new MemPool(mem_tracker_)) {
-  DCHECK(mem_tracker_ != NULL);
+  DCHECK_NOTNULL(mem_tracker_);
   DCHECK_GT(capacity, 0);
   tuple_ptrs_size_ = capacity_ * num_tuples_per_row_ * sizeof(Tuple*);
   tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_->Allocate(tuple_ptrs_size_));
@@ -64,7 +64,7 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
     row_desc_(row_desc),
     auxiliary_mem_usage_(0),
     tuple_data_pool_(new MemPool(mem_tracker)) {
-  DCHECK(mem_tracker_ != NULL);
+  DCHECK_NOTNULL(mem_tracker_);
   tuple_ptrs_size_ = num_rows_ * input_batch.row_tuples.size() * sizeof(Tuple*);
   tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_->Allocate(tuple_ptrs_size_));
   if (input_batch.compression_type != THdfsCompression::NONE) {
@@ -142,6 +142,9 @@ RowBatch::~RowBatch() {
   for (int i = 0; i < tuple_streams_.size(); ++i) {
     tuple_streams_[i]->Close();
   }
+  for (int i = 0; i < blocks_.size(); ++i) {
+    blocks_[i]->Delete();
+  }
 }
 
 int RowBatch::Serialize(TRowBatch* output_batch) {
@@ -209,20 +212,31 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
 }
 
 void RowBatch::AddIoBuffer(DiskIoMgr::BufferDescriptor* buffer) {
-  DCHECK(buffer != NULL);
+  DCHECK_NOTNULL(buffer);
   io_buffers_.push_back(buffer);
   auxiliary_mem_usage_ += buffer->buffer_len();
   buffer->SetMemTracker(mem_tracker_);
 }
 
 void RowBatch::AddTupleStream(BufferedTupleStream* stream) {
-  DCHECK(stream != NULL);
+  DCHECK_NOTNULL(stream);
   tuple_streams_.push_back(stream);
   auxiliary_mem_usage_ += stream->byte_size();
 }
 
+bool RowBatch::ContainsTupleStream(BufferedTupleStream* stream) const {
+  return std::find(tuple_streams_.begin(), tuple_streams_.end(), stream)
+      != tuple_streams_.end();
+}
+
+void RowBatch::AddBlock(BufferedBlockMgr::Block* block) {
+  DCHECK_NOTNULL(block);
+  blocks_.push_back(block);
+  auxiliary_mem_usage_ += block->buffer_len();
+}
+
 void RowBatch::Reset() {
-  DCHECK(tuple_data_pool_.get() != NULL);
+  DCHECK_NOTNULL(tuple_data_pool_.get());
   num_rows_ = 0;
   has_in_flight_row_ = false;
   tuple_data_pool_->FreeAll();
@@ -234,6 +248,10 @@ void RowBatch::Reset() {
   for (int i = 0; i < tuple_streams_.size(); ++i) {
     tuple_streams_[i]->Close();
   }
+  for (int i = 0; i < blocks_.size(); ++i) {
+    blocks_[i]->Delete();
+  }
+  blocks_.clear();
   tuple_streams_.clear();
   auxiliary_mem_usage_ = 0;
   tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_->Allocate(tuple_ptrs_size_));
@@ -255,6 +273,11 @@ void RowBatch::TransferResourceOwnership(RowBatch* dest) {
     dest->auxiliary_mem_usage_ += tuple_streams_[i]->byte_size();
   }
   tuple_streams_.clear();
+  for (int i = 0; i < blocks_.size(); ++i) {
+    dest->blocks_.push_back(blocks_[i]);
+    dest->auxiliary_mem_usage_ += blocks_[i]->buffer_len();
+  }
+  blocks_.clear();
   dest->need_to_return_ |= need_to_return_;
   auxiliary_mem_usage_ = 0;
   tuple_ptrs_ = NULL;
@@ -289,6 +312,7 @@ void RowBatch::AcquireState(RowBatch* src) {
   src->auxiliary_mem_usage_ = 0;
 
   DCHECK(src->tuple_streams_.empty());
+  DCHECK(src->blocks_.empty());
 
   has_in_flight_row_ = src->has_in_flight_row_;
   num_rows_ = src->num_rows_;

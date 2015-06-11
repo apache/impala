@@ -117,16 +117,6 @@ Status BlockingJoinNode::Prepare(RuntimeState* state) {
   return Status::OK();
 }
 
-Status BlockingJoinNode::Reset(RuntimeState* state, bool can_free_tuple_data) {
-  eos_ = false;
-  probe_side_eos_ = false;
-  if (can_free_tuple_data) {
-    probe_batch_->Reset();
-    build_pool_->Clear();
-  }
-  return ExecNode::Reset(state, can_free_tuple_data);
-}
-
 void BlockingJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   if (build_pool_.get() != NULL) build_pool_->FreeAll();
@@ -160,6 +150,8 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Open(state));
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
+  eos_ = false;
+  probe_side_eos_ = false;
 
   // If we can get a thread token, initiate the construction of the build-side table in
   // a separate thread, so that the left child can do any initialisation in parallel.

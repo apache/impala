@@ -620,9 +620,9 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   return Status::OK();
 }
 
-Status HdfsScanNode::Reset(RuntimeState* state, bool can_free_tuple_data) {
-  DCHECK(false) << "NYI";
-  return Status("NYI");
+Status HdfsScanNode::Reset(RuntimeState* state) {
+  DCHECK(false) << "Internal error: Scan nodes should not appear in subplans.";
+  return Status("Internal error: Scan nodes should not appear in subplans.");
 }
 
 void HdfsScanNode::Close(RuntimeState* state) {

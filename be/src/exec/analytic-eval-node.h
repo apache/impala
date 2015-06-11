@@ -32,11 +32,11 @@ class AggFnEvaluator;
 /// unsorted. Uses a BufferedTupleStream to buffer input rows which are returned in a
 /// streaming fashion as entire row batches of output are ready to be returned, though in
 /// some cases the entire input must actually be consumed to produce any output rows.
-//
+///
 /// The output row is composed of the tuples from the child node followed by a single
 /// result tuple that holds the values of the evaluated analytic functions (one slot per
 /// analytic function).
-//
+///
 /// When enough input rows have been consumed to produce the results of all analytic
 /// functions for one or more rows (e.g. because the order by values are different for a
 /// RANGE window), the results of all the analytic functions for those rows are produced
@@ -46,7 +46,7 @@ class AggFnEvaluator;
 /// corresponding row. Result tuples may apply to many rows (e.g. an arbitrary number or
 /// an entire partition) so result_tuples_ stores a pair of the stream index (the last
 /// row in the stream it applies to) and the tuple.
-//
+///
 /// Input rows are consumed in a streaming fashion until enough input has been consumed
 /// in order to produce enough output rows. In some cases, this may mean that only a
 /// single input batch is needed to produce the results for an output batch, e.g.
@@ -63,7 +63,7 @@ class AnalyticEvalNode : public ExecNode {
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
-  virtual Status Reset(RuntimeState* state, bool can_free_tuple_data);
+  virtual Status Reset(RuntimeState* state);
   virtual void Close(RuntimeState* state);
 
  protected:
@@ -195,11 +195,6 @@ class AnalyticEvalNode : public ExecNode {
   /// order_by_exprs are empty.
   TupleDescriptor* buffered_tuple_desc_;
 
-  /// TupleRow* composed of the first child tuple and the buffered tuple, used by
-  /// partition_by_eq_expr_ctx_ and order_by_eq_expr_ctx_. Set in Prepare() if
-  /// buffered_tuple_desc_ is not NULL, allocated from mem_pool_.
-  TupleRow* child_tuple_cmp_row_;
-
   /// Expr context for a predicate that checks if child tuple '<' buffered tuple for
   /// partitioning exprs.
   ExprContext* partition_by_eq_expr_ctx_;
@@ -235,6 +230,26 @@ class AnalyticEvalNode : public ExecNode {
   /// functions is allocated via these contexts.
   std::vector<impala_udf::FunctionContext*> fn_ctxs_;
 
+  /// Pools used to allocate result tuples (added to result_tuples_ and later returned)
+  /// and window tuples (added to window_tuples_ to buffer the current window). Resources
+  /// are transferred from curr_tuple_pool_ to prev_tuple_pool_ once it is at least
+  /// MAX_TUPLE_POOL_SIZE bytes. Resources from prev_tuple_pool_ are transferred to an
+  /// output row batch when all result tuples it contains have been returned and all
+  /// window tuples it contains are no longer needed, or upon eos.
+  boost::scoped_ptr<MemPool> curr_tuple_pool_;
+  boost::scoped_ptr<MemPool> prev_tuple_pool_;
+
+  /// Block manager client used by input_stream_. Not owned.
+  BufferedBlockMgr::Client* client_;
+
+  /////////////////////////////////////////
+  /// BEGIN: Members that must be Reset()
+
+  /// TupleRow* composed of the first child tuple and the buffered tuple, used by
+  /// partition_by_eq_expr_ctx_ and order_by_eq_expr_ctx_. Set in Open() if
+  /// buffered_tuple_desc_ is not NULL, allocated from mem_pool_.
+  TupleRow* child_tuple_cmp_row_;
+
   /// Queue of tuples which are ready to be set in output rows, with the index into
   /// the input_stream_ stream of the last TupleRow that gets the Tuple, i.e. this is a
   /// sparse structure. For example, if result_tuples_ contains tuples with indexes x1 and
@@ -252,22 +267,12 @@ class AnalyticEvalNode : public ExecNode {
   /// Index in input_stream_ of the most recently added result tuple.
   int64_t last_result_idx_;
 
-  /// Child tuples (described by child_tuple_desc_) that are currently within the window
-  /// and the index into input_stream_ of the row they're associated with. Only used when
-  /// window start bound is PRECEDING or FOLLOWING. Tuples in this list are deep copied
-  /// and owned by curr_window_tuple_pool_.
+  /// Child tuples that are currently within the window and the index into input_stream_
+  /// of the row they're associated with. Only used when window start bound is PRECEDING
+  /// or FOLLOWING. Tuples in this list are deep copied and owned by
+  /// curr_window_tuple_pool_.
   /// TODO: Remove and use BufferedTupleStream (needs support for multiple readers).
   std::list<std::pair<int64_t, Tuple*> > window_tuples_;
-  TupleDescriptor* child_tuple_desc_;
-
-  /// Pools used to allocate result tuples (added to result_tuples_ and later returned)
-  /// and window tuples (added to window_tuples_ to buffer the current window). Resources
-  /// are transferred from curr_tuple_pool_ to prev_tuple_pool_ once it is at least
-  /// MAX_TUPLE_POOL_SIZE bytes. Resources from prev_tuple_pool_ are transferred to an
-  /// output row batch when all result tuples it contains have been returned and all
-  /// window tuples it contains are no longer needed.
-  boost::scoped_ptr<MemPool> curr_tuple_pool_;
-  boost::scoped_ptr<MemPool> prev_tuple_pool_;
 
   /// The index of the last row from input_stream_ associated with output row containing
   /// resources in prev_tuple_pool_. -1 when the pool is empty. Resources from
@@ -308,9 +313,6 @@ class AnalyticEvalNode : public ExecNode {
   boost::scoped_ptr<RowBatch> prev_child_batch_;
   boost::scoped_ptr<RowBatch> curr_child_batch_;
 
-  /// Block manager client used by input_stream_. Not owned.
-  BufferedBlockMgr::Client* client_;
-
   /// Buffers input rows added in ProcessChildBatch() until enough rows are able to
   /// be returned by GetNextOutputBatch(), in which case row batches are returned from
   /// the front of the stream and the underlying buffered blocks are deleted once read.
@@ -318,14 +320,21 @@ class AnalyticEvalNode : public ExecNode {
   /// no order by clause) to a single row (e.g. ROWS windows). When the amount of
   /// buffered data exceeds the available memory in the underlying BufferedBlockMgr,
   /// input_stream_ is unpinned (i.e., possibly spilled to disk if necessary).
+  /// The input stream owns tuple data backing rows returned in GetNext(), and is
+  /// attached to an output row batch on eos or ReachedLimit().
   /// TODO: Consider re-pinning unpinned streams when possible.
   boost::scoped_ptr<BufferedTupleStream> input_stream_;
 
-  /// Pool used for O(1) allocations that live until close.
+  /// Pool used for O(1) allocations that live until Close() or Reset().
+  /// Does not own data backing tuples returned in GetNext(), so it does not
+  /// need to be transferred to an output batch.
   boost::scoped_ptr<MemPool> mem_pool_;
 
   /// True when there are no more input rows to consume from our child.
   bool input_eos_;
+
+  /// END: Members that must be Reset()
+  /////////////////////////////////////////
 
   /// Time spent processing the child rows.
   RuntimeProfile::Counter* evaluation_timer_;

@@ -43,7 +43,7 @@ class TopNNode : public ExecNode {
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
-  virtual Status Reset(RuntimeState* state, bool can_free_tuple_data);
+  virtual Status Reset(RuntimeState* state);
   virtual void Close(RuntimeState* state);
 
  protected:
@@ -62,17 +62,38 @@ class TopNNode : public ExecNode {
 
   /// Number of rows to skip.
   int64_t offset_;
-  int64_t num_rows_skipped_;
 
   /// sort_exec_exprs_ contains the ordering expressions used for tuple comparison and
   /// the materialization exprs for the output tuple.
   SortExecExprs sort_exec_exprs_;
   std::vector<bool> is_asc_order_;
   std::vector<bool> nulls_first_;
+
   /// Cached descriptor for the materialized tuple. Assigned in Prepare().
   TupleDescriptor* materialized_tuple_desc_;
 
+  /// Comparator for priority_queue_.
   boost::scoped_ptr<TupleRowComparator> tuple_row_less_than_;
+
+  /// After computing the TopN in the priority_queue, pop them and put them in this vector
+  std::vector<Tuple*> sorted_top_n_;
+
+  /// Tuple allocated once from tuple_pool_ and reused in InsertTupleRow to
+  /// materialize input tuples if necessary. After materialization, tmp_tuple_ may be
+  /// copied into the tuple pool and inserted into the priority queue.
+  Tuple* tmp_tuple_;
+
+  /// Stores everything referenced in priority_queue_.
+  boost::scoped_ptr<MemPool> tuple_pool_;
+
+  // Iterator over elements in sorted_top_n_.
+  std::vector<Tuple*>::iterator get_next_iter_;
+
+  /////////////////////////////////////////
+  /// BEGIN: Members that must be Reset()
+
+  /// Number of rows skipped. Used for adhering to offset_.
+  int64_t num_rows_skipped_;
 
   /// The priority queue will never have more elements in it than the LIMIT + OFFSET.
   /// The stl priority queue doesn't support a max size, so to get that functionality,
@@ -82,16 +103,8 @@ class TopNNode : public ExecNode {
       std::priority_queue<Tuple*, std::vector<Tuple*>, TupleRowComparator> >
           priority_queue_;
 
-  /// After computing the TopN in the priority_queue, pop them and put them in this vector
-  std::vector<Tuple*> sorted_top_n_;
-  std::vector<Tuple*>::iterator get_next_iter_;
-
-  /// Stores everything referenced in priority_queue_
-  boost::scoped_ptr<MemPool> tuple_pool_;
-  /// Tuple allocated once from tuple_pool_ and reused in InsertTupleRow to
-  /// materialize input tuples if necessary. After materialization, tmp_tuple_ may be
-  /// copied into the the tuple pool and inserted into the priority queue.
-  Tuple* tmp_tuple_;
+  /// END: Members that must be Reset()
+  /////////////////////////////////////////
 };
 
 };

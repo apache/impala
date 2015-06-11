@@ -36,10 +36,13 @@ class SelectNode : public ExecNode {
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
-  virtual Status Reset(RuntimeState* state, bool can_free_tuple_data);
+  virtual Status Reset(RuntimeState* state);
   virtual void Close(RuntimeState* state);
 
  private:
+  /////////////////////////////////////////
+  /// BEGIN: Members that must be Reset()
+
   /// current row batch of child
   boost::scoped_ptr<RowBatch> child_row_batch_;
 
@@ -48,6 +51,9 @@ class SelectNode : public ExecNode {
 
   /// true if last GetNext() call on child signalled eos
   bool child_eos_;
+
+  /// END: Members that must be Reset()
+  /////////////////////////////////////////
 
   /// Copy rows from child_row_batch_ for which conjuncts_ evaluate to true to
   /// output_batch, up to limit_.

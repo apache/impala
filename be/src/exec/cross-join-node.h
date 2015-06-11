@@ -47,7 +47,7 @@ class CrossJoinNode : public BlockingJoinNode {
 
   virtual Status Prepare(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
-  virtual Status Reset(RuntimeState* state, bool can_free_tuple_data);
+  virtual Status Reset(RuntimeState* state);
   virtual void Close(RuntimeState* state);
 
  protected:
@@ -58,8 +58,7 @@ class CrossJoinNode : public BlockingJoinNode {
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
 
-  /// Object pool for build RowBatches. Stores and owns all batches in build_batches_,
-  /// as well as batches preserved across non-freeing Reset() calls.
+  /// Object pool for build RowBatches. Stores and owns all batches in build_batches_.
   ObjectPool build_batch_pool_;
 
   /// List of build batches. The batches are owned by build_batch_pool_.

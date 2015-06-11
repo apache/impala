@@ -269,7 +269,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
   return Status::OK();
 }
 
-Status HBaseScanNode::Reset(RuntimeState* state, bool can_free_tuple_data) {
+Status HBaseScanNode::Reset(RuntimeState* state) {
   DCHECK(false) << "NYI";
   return Status("NYI");
 }

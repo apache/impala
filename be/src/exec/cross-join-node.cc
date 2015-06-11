@@ -41,10 +41,10 @@ Status CrossJoinNode::Prepare(RuntimeState* state) {
   return Status::OK();
 }
 
-Status CrossJoinNode::Reset(RuntimeState* state, bool can_free_tuple_data) {
-  if (can_free_tuple_data) build_batch_pool_.Clear();
+Status CrossJoinNode::Reset(RuntimeState* state) {
+  build_batch_pool_.Clear();
   build_batches_.Reset();
-  return BlockingJoinNode::Reset(state, can_free_tuple_data);
+  return BlockingJoinNode::Reset(state);
 }
 
 void CrossJoinNode::Close(RuntimeState* state) {
@@ -84,6 +84,8 @@ Status CrossJoinNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool*
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   if (ReachedLimit() || eos_) {
     *eos = true;
+    probe_batch_->TransferResourceOwnership(output_batch);
+    build_batches_.TransferResourceOwnership(output_batch);
     return Status::OK();
   }
   *eos = false;
@@ -124,6 +126,10 @@ Status CrossJoinNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool*
     }
   }
 
+  if (*eos) {
+    probe_batch_->TransferResourceOwnership(output_batch);
+    build_batches_.TransferResourceOwnership(output_batch);
+  }
   return Status::OK();
 }
 

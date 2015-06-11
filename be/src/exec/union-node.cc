@@ -28,11 +28,12 @@ UnionNode::UnionNode(ObjectPool* pool, const TPlanNode& tnode,
                      const DescriptorTbl& descs)
     : ExecNode(pool, tnode, descs),
       tuple_id_(tnode.union_node.tuple_id),
+      tuple_desc_(NULL),
       const_result_expr_idx_(0),
       child_idx_(0),
       child_row_batch_(NULL),
-      child_eos_(false),
-      child_row_idx_(0) {
+      child_row_idx_(0),
+      child_eos_(false) {
 }
 
 Status UnionNode::Init(const TPlanNode& tnode) {
@@ -178,9 +179,13 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   return Status::OK();
 }
 
-Status UnionNode::Reset(RuntimeState* state, bool can_free_tuple_data) {
-  DCHECK(false) << "NYI";
-  return Status("NYI");
+Status UnionNode::Reset(RuntimeState* state) {
+  child_row_idx_ = 0;
+  const_result_expr_idx_ = 0;
+  child_idx_ = 0;
+  child_row_batch_.reset();
+  child_eos_ = false;
+  return ExecNode::Reset(state);
 }
 
 void UnionNode::Close(RuntimeState* state) {

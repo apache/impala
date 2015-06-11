@@ -21,6 +21,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "common/logging.h"
+#include "runtime/buffered-block-mgr.h" // for BufferedBlockMgr::Block
 #include "runtime/descriptors.h"
 #include "runtime/disk-io-mgr.h"
 #include "runtime/mem-pool.h"
@@ -159,6 +160,13 @@ class RowBatch {
   /// when freeing resources.
   void AddTupleStream(BufferedTupleStream* stream);
 
+  /// Returns true if 'stream' has been added to with batch, false otherwise.
+  bool ContainsTupleStream(BufferedTupleStream* stream) const;
+
+  /// Adds a block to this row batch. The block must be pinned. The blocks must be
+  /// deleted when freeing resources.
+  void AddBlock(BufferedBlockMgr::Block* block);
+
   /// Called to indicate this row batch must be returned up the operator tree.
   /// This is used to control memory management for streaming rows.
   /// TODO: consider using this mechanism instead of AddIoBuffer/AddTupleStream. This is
@@ -259,6 +267,10 @@ class RowBatch {
 
   /// Tuple streams currently owned by this row batch.
   std::vector<BufferedTupleStream*> tuple_streams_;
+
+  /// Blocks attached to this row batch. The underlying memory and block manager client
+  /// are owned by the BufferedBlockMgr.
+  std::vector<BufferedBlockMgr::Block*> blocks_;
 
   /// String to write compressed tuple data to in Serialize().
   /// This is a string so we can swap() with the string in the TRowBatch we're serializing

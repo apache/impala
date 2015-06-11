@@ -32,7 +32,8 @@ class RowBatch;
 class TupleRow;
 
 /// Abstract base class for join nodes that block while consuming all rows from their
-/// right child in Open().
+/// right child in Open(). There is no implementation of Reset() because the Open()
+/// sufficiently covers setting members into a 'reset' state.
 class BlockingJoinNode : public ExecNode {
  public:
   BlockingJoinNode(const std::string& node_name, const TJoinOp::type join_op,
@@ -53,10 +54,6 @@ class BlockingJoinNode : public ExecNode {
   /// (subclasses should implement InitGetNext()).
   virtual Status Open(RuntimeState* state);
 
-  /// Subclasses should reset any state modified in Open() and GetNext() and then call
-  /// BlockingJoinNode::Reset().
-  virtual Status Reset(RuntimeState* state, bool can_free_tuple_data);
-
   /// Subclasses should close any other structures and then call
   /// BlockingJoinNode::Close().
   virtual void Close(RuntimeState* state);
@@ -67,10 +64,6 @@ class BlockingJoinNode : public ExecNode {
   const std::string node_name_;
   TJoinOp::type join_op_;
 
-  /////////////////////////////////////////
-  /// BEGIN: Members that must be Reset()
-
-  bool eos_;  // if true, nothing left to return in GetNext()
   boost::scoped_ptr<MemPool> build_pool_;  // holds everything referenced from build side
 
   /// probe_batch_ must be cleared before calling GetNext().  The child node
@@ -78,10 +71,8 @@ class BlockingJoinNode : public ExecNode {
   /// is responsible for.
   boost::scoped_ptr<RowBatch> probe_batch_;
 
+  bool eos_;  // if true, nothing left to return in GetNext()
   bool probe_side_eos_;  // if true, left child has no more rows to process
-
-  /// END: Members that must be Reset()
-  /////////////////////////////////////////
 
   /// TODO: These variables should move to a join control block struct, which is local to
   /// each probing thread.
