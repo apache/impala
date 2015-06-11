@@ -79,7 +79,9 @@ Status KuduScanNode::Prepare(RuntimeState* state) {
       SCANNER_THREAD_TOTAL_WALLCLOCK_TIME);
   kudu_round_trips_ = ADD_COUNTER(runtime_profile(), KUDU_ROUND_TRIPS, TUnit::UNIT);
 
-  tuple_desc_ = DCHECK_NOTNULL(state->desc_tbl().GetTupleDescriptor(tuple_id_));
+  DCHECK(state->desc_tbl().GetTupleDescriptor(tuple_id_) != NULL);
+
+  tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   GetMaterializedSlots(*tuple_desc_, &materialized_slots_);
   RETURN_IF_ERROR(KuduSchemaFromTupleDescriptor(*tuple_desc_, &schema_));
 
