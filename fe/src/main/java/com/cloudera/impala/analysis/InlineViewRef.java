@@ -111,6 +111,7 @@ public class InlineViewRef extends TableRef {
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (isAnalyzed_) return;
     // Analyze the inline view query statement with its own analyzer
     inlineViewAnalyzer_ = new Analyzer(analyzer);
 

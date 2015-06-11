@@ -27,12 +27,12 @@ NODE 0:
 ---- QUERY
 insert into functional_kudu.testtbl(id) values (10)
 ---- PLAN
-WRITE TO KUDU [functional_kudu.testtbl]
+INSERT INTO KUDU [functional_kudu.testtbl]
 |
 00:UNION
    constant-operands=1
 ---- DISTRIBUTEDPLAN
-WRITE TO KUDU [functional_kudu.testtbl]
+INSERT INTO KUDU [functional_kudu.testtbl]
 |
 00:UNION
    constant-operands=1
@@ -40,11 +40,11 @@ WRITE TO KUDU [functional_kudu.testtbl]
 ---- QUERY
 insert into functional_kudu.testtbl(id) select int_col from functional_kudu.tinyinttable
 ---- PLAN
-WRITE TO KUDU [functional_kudu.testtbl]
+INSERT INTO KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.tinyinttable]
 ---- DISTRIBUTEDPLAN
-WRITE TO KUDU [functional_kudu.testtbl]
+INSERT INTO KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.tinyinttable]
 ====
@@ -53,7 +53,7 @@ insert into functional_kudu.testtbl(id, name)
 select count(distinct id), name from functional_kudu.dimtbl
 group by name
 ---- PLAN
-WRITE TO KUDU [functional_kudu.testtbl]
+INSERT INTO KUDU [functional_kudu.testtbl]
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(id)
@@ -64,7 +64,7 @@ WRITE TO KUDU [functional_kudu.testtbl]
 |
 00:SCAN KUDU [functional_kudu.dimtbl]
 ---- DISTRIBUTEDPLAN
-WRITE TO KUDU [functional_kudu.testtbl]
+INSERT INTO KUDU [functional_kudu.testtbl]
 |
 02:AGGREGATE [FINALIZE]
 |  output: count(id)

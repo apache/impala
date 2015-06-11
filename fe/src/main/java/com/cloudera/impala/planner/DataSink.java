@@ -73,7 +73,7 @@ public abstract class DataSink {
       Preconditions.checkState(overwrite == false);
       // Partition clauses don't make sense for Kudu inserts.
       Preconditions.checkState(partitionKeyExprs.isEmpty());
-      return new KuduTableSink(table);
+      return new KuduTableSink(table, KuduTableSink.Type.INSERT);
     } else {
       throw new UnsupportedOperationException(
           "Cannot create data sink into table of type: " + table.getClass().getName());

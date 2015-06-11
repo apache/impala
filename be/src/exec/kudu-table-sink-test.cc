@@ -63,7 +63,7 @@ class KuduTableSinkTest : public testing::Test {
   void BuildRuntimeStateForInsert(int num_cols_to_insert) {
     TTableSink table_sink;
     table_sink.__set_target_table_id(0);
-    table_sink.__set_type(TTableSinkType::KUDU);
+    table_sink.__set_type(TTableSinkType::KUDU_INSERT);
 
     data_sink_.__set_type(TDataSinkType::TABLE_SINK);
     data_sink_.__set_table_sink(table_sink);

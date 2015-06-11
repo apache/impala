@@ -20,12 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
-import org.apache.hadoop.hive.metastore.TableType;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
-import org.apache.log4j.Logger;
-
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.cloudera.impala.thrift.TKuduTable;
 import com.cloudera.impala.thrift.TTable;
@@ -39,6 +33,11 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.net.HostAndPort;
+import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
+import org.apache.log4j.Logger;
 
 /**
  * Impala representation of a Kudu table.
@@ -85,10 +84,9 @@ public class KuduTable extends Table {
     super(id, msTable, db, name, owner);
   }
 
-  TKuduTable getKuduTable() {
-    Preconditions.checkNotNull(kuduKeyColumnNames_);
+  public TKuduTable getKuduTable() {
     TKuduTable tbl = new TKuduTable();
-    tbl.setKey_columns(kuduKeyColumnNames_);
+    tbl.setKey_columns(Preconditions.checkNotNull(kuduKeyColumnNames_));
     tbl.setMaster_addresses(KuduUtil.hostAndPortToString(kuduMasters_));
     tbl.setTable_name(kuduTableName_);
     return tbl;
@@ -200,9 +198,7 @@ public class KuduTable extends Table {
   }
 
   public String getKuduTableName() { return kuduTableName_; }
-
   public List<HostAndPort> getKuduMasterAddresses() { return kuduMasters_; }
-
   public int getNumKeyColumns() { return kuduKeyColumnNames_.size(); }
 
   /**
@@ -224,4 +220,5 @@ public class KuduTable extends Table {
   @Override
   public int getNumNodes() { return -1; }
 
+  public List<String> getKuduKeyColumnNames() { return kuduKeyColumnNames_; }
 }

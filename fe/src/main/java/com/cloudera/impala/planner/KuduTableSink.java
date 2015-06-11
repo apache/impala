@@ -28,15 +28,25 @@ import com.cloudera.impala.thrift.TTableSinkType;
  * data from a plan fragment into an Kudu table using the Kudu client.
  */
 public class KuduTableSink extends TableSink {
-  public KuduTableSink(Table targetTable) {
+
+   // Sink type e.g. INSERT, UPDATE
+  private Type sinkType_;
+
+  /**
+   * Creates a Kudu table sink with a given operation type (e.g. INSERT, UPDATE)
+   */
+  public KuduTableSink(Table targetTable, Type sinkType) {
     super(targetTable);
+    sinkType_ = sinkType;
   }
 
   @Override
   public String getExplainString(String prefix, String detailPrefix,
       TExplainLevel explainLevel) {
     StringBuilder output = new StringBuilder();
-    output.append(prefix + "WRITE TO KUDU [" + targetTable_.getFullName() + "]\n");
+    output.append(
+        prefix + sinkType_.toExplainString() + " KUDU ["
+            + targetTable_.getFullName() + "]\n");
     if (explainLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
       output.append(PrintUtils.printHosts(detailPrefix, fragment_.getNumNodes()));
       output.append(PrintUtils.printMemCost(" ", perHostMemCost_));
@@ -49,8 +59,32 @@ public class KuduTableSink extends TableSink {
   protected TDataSink toThrift() {
     TDataSink result = new TDataSink(TDataSinkType.TABLE_SINK);
     TTableSink tTableSink =
-        new TTableSink(targetTable_.getId().asInt(), TTableSinkType.KUDU);
+        new TTableSink(targetTable_.getId().asInt(), sinkType_.toThrift());
     result.table_sink = tTableSink;
     return result;
+  }
+
+  /**
+   * Enum to specify the sink type
+   */
+  public enum Type {
+    INSERT {
+      @Override
+      public String toExplainString() { return "INSERT INTO"; }
+
+      @Override
+      public TTableSinkType toThrift() { return TTableSinkType.KUDU_INSERT; }
+    },
+    UPDATE {
+      @Override
+      public String toExplainString() { return "UPDATE"; }
+
+      @Override
+      public TTableSinkType toThrift() { return TTableSinkType.KUDU_UPDATE; }
+    };
+
+    public abstract String toExplainString();
+
+    public abstract TTableSinkType toThrift();
   }
 }

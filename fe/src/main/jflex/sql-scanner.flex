@@ -208,6 +208,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("unbounded", new Integer(SqlParserSymbols.KW_UNBOUNDED));
     keywordMap.put("uncached", new Integer(SqlParserSymbols.KW_UNCACHED));
     keywordMap.put("union", new Integer(SqlParserSymbols.KW_UNION));
+    keywordMap.put("update", new Integer(SqlParserSymbols.KW_UPDATE));
     keywordMap.put("update_fn", new Integer(SqlParserSymbols.KW_UPDATE_FN));
     keywordMap.put("use", new Integer(SqlParserSymbols.KW_USE));
     keywordMap.put("using", new Integer(SqlParserSymbols.KW_USING));

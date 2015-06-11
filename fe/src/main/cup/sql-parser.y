@@ -23,6 +23,7 @@ import com.cloudera.impala.catalog.StructField;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.analysis.ColumnDef;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
@@ -252,7 +253,7 @@ terminal
   KW_STRAIGHT_JOIN, KW_STRING, KW_STRUCT, KW_SYMBOL, KW_TABLE, KW_TABLES,
   KW_TBLPROPERTIES, KW_TERMINATED, KW_TEXTFILE, KW_THEN, KW_TIMESTAMP,
   KW_TINYINT, KW_TRUNCATE, KW_STATS, KW_TO, KW_TRUE, KW_UNBOUNDED, KW_UNCACHED,
-  KW_UNION, KW_UPDATE_FN, KW_USE, KW_USING,
+  KW_UNION, KW_UPDATE, KW_UPDATE_FN, KW_USE, KW_USING,
   KW_VALUES, KW_VARCHAR, KW_VIEW, KW_WHEN, KW_WHERE, KW_WITH;
 
 terminal COLON, SEMICOLON, COMMA, DOT, DOTDOTDOT, STAR, LPAREN, RPAREN, LBRACKET,
@@ -334,7 +335,8 @@ nonterminal ArrayList<CaseWhenClause> case_when_clause_list;
 nonterminal FunctionParams function_params;
 nonterminal ArrayList<String> dotted_path;
 nonterminal SlotRef slot_ref;
-nonterminal ArrayList<TableRef> from_clause, table_ref_list;
+nonterminal FromClause from_clause;
+nonterminal ArrayList<TableRef> table_ref_list;
 nonterminal WithClause opt_with_clause;
 nonterminal ArrayList<View> with_view_def_list;
 nonterminal View with_view_def;
@@ -347,6 +349,8 @@ nonterminal TypeDef type_def;
 nonterminal Type type;
 nonterminal Expr sign_chain_expr;
 nonterminal InsertStmt insert_stmt;
+nonterminal UpdateStmt update_stmt;
+nonterminal ArrayList<Pair<SlotRef, Expr>> update_set_expr_list;
 nonterminal StatementBase explain_stmt;
 // Optional partition spec
 nonterminal PartitionSpec opt_partition_spec;
@@ -482,6 +486,8 @@ stmt ::=
   {: RESULT = query; :}
   | insert_stmt:insert
   {: RESULT = insert; :}
+  | update_stmt:update
+  {: RESULT = update; :}
   | use_stmt:use
   {: RESULT = use; :}
   | show_tables_stmt:show_tables
@@ -611,6 +617,11 @@ explain_stmt ::=
      ctas_stmt.setIsExplain();
      RESULT = ctas_stmt;
   :}
+  | KW_EXPLAIN update_stmt:update
+  {:
+     update.setIsExplain();
+     RESULT = update;
+  :}
   ;
 
 // Insert statements have two optional clauses: the column permutation (INSERT into
@@ -631,6 +642,34 @@ insert_stmt ::=
   | opt_with_clause:w KW_INSERT KW_INTO opt_kw_table table_name:table
   partition_clause:list opt_plan_hints:hints query_stmt:query
   {: RESULT = new InsertStmt(w, table, false, list, hints, query, null); :}
+  ;
+
+// Update statements have an optional WHERE and optional FROM clause.
+update_stmt ::=
+  KW_UPDATE dotted_path:target_table KW_SET update_set_expr_list:values
+  where_clause:where_predicate
+  {:
+    FromClause from_clause = new FromClause(
+        Lists.newArrayList(new TableRef(target_table, null)));
+    RESULT = new UpdateStmt(target_table, from_clause, values, where_predicate);
+  :}
+  | KW_UPDATE dotted_path:target_table KW_SET update_set_expr_list:values
+    from_clause:tables where_clause:where_predicate
+  {: RESULT = new UpdateStmt(target_table, tables, values, where_predicate); :}
+  ;
+
+update_set_expr_list ::=
+  slot_ref:slot EQUAL expr:e
+  {:
+    ArrayList<Pair<SlotRef, Expr>> tmp =
+        Lists.newArrayList(new Pair<SlotRef, Expr>(slot, e));
+    RESULT = tmp;
+  :}
+  | update_set_expr_list:list COMMA slot_ref:slot EQUAL expr:e
+  {:
+    list.add(new Pair(slot, e));
+    RESULT = list;
+  :}
   ;
 
 opt_query_stmt ::=
@@ -1698,14 +1737,14 @@ select_stmt ::=
   :}
   |
     select_clause:selectList
-    from_clause:tableRefList
+    from_clause:fromClause
     where_clause:wherePredicate
     group_by_clause:groupingExprs
     having_clause:havingPredicate
     opt_order_by_clause:orderByClause
     opt_limit_offset_clause:limitOffsetClause
   {:
-    RESULT = new SelectStmt(selectList, tableRefList, wherePredicate, groupingExprs,
+    RESULT = new SelectStmt(selectList, fromClause, wherePredicate, groupingExprs,
                             havingPredicate, orderByClause, limitOffsetClause);
   :}
   ;
@@ -1794,7 +1833,7 @@ function_name ::=
 
 from_clause ::=
   KW_FROM table_ref_list:l
-  {: RESULT = l; :}
+  {: RESULT = new FromClause(l); :}
   ;
 
 table_ref_list ::=
