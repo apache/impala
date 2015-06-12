@@ -591,8 +591,9 @@ Status Coordinator::FinalizeSuccessfulInsert() {
       part_path_ss << finalize_params_.hdfs_base_dir << "/" << partition.first;
     } else {
       HdfsPartitionDescriptor* part = hdfs_table->GetPartition(partition.second.id);
-      DCHECK(part != NULL) << "Partition " << partition.second.id
-                           << " not known in descriptor table";
+      DCHECK(part != NULL) << "table_id=" << hdfs_table->id()
+                           << " partition_id=" << partition.second.id
+                           << "\n" <<  PrintThrift(runtime_state()->fragment_params());
       part_path_ss << part->location();
     }
     const string& part_path = part_path_ss.str();

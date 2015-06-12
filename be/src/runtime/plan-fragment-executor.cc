@@ -97,7 +97,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   }
 
   runtime_state_.reset(
-      new RuntimeState(request.fragment_instance_ctx, cgroup, exec_env_));
+      new RuntimeState(request, cgroup, exec_env_));
 
   // total_time_counter() is in the runtime_state_ so start it up now.
   SCOPED_TIMER(profile()->total_time_counter());

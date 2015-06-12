@@ -164,6 +164,7 @@ class TableDescriptor {
 
   const std::string& name() const { return name_; }
   const std::string& database() const { return database_; }
+  int id() const { return id_; }
   const std::vector<std::string>& col_names() const { return col_names_; }
 
  protected:

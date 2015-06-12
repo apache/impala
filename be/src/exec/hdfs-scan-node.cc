@@ -359,6 +359,14 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
     partition_ids_.insert(split.partition_id);
     HdfsPartitionDescriptor* partition_desc =
         hdfs_table_->GetPartition(split.partition_id);
+    if (partition_desc == NULL) {
+      // TODO: this should be a DCHECK but we sometimes hit it. It's likely IMPALA-1702.
+      LOG(ERROR) << "Bad table descriptor! table_id=" << hdfs_table_->id()
+                 << " partition_id=" << split.partition_id
+                 << "\n" << PrintThrift(state->fragment_params());
+      return Status("Query encountered invalid metadata, likely due to IMPALA-1702."
+                    " Try rerunning the query.");
+    }
     filesystem::path file_path(partition_desc->location());
     file_path.append(split.file_name, filesystem::path::codecvt());
     const string& native_file_path = file_path.native();
@@ -374,12 +382,6 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
       file_desc->file_compression = split.file_compression;
       RETURN_IF_ERROR(HdfsFsCache::instance()->GetConnection(
           native_file_path, &file_desc->fs, &fs_cache));
-
-      if (partition_desc == NULL) {
-        stringstream ss;
-        ss << "Could not find partition with id: " << split.partition_id;
-        return Status(ss.str());
-      }
       ++num_unqueued_files_;
       per_type_files_[partition_desc->file_format()].push_back(file_desc);
     } else {
@@ -441,7 +443,9 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   // Prepare all the partitions scanned by the scan node
   BOOST_FOREACH(const int64_t& partition_id, partition_ids_) {
     HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
-    DCHECK(partition_desc != NULL);
+    DCHECK(partition_desc != NULL) << "table_id=" << hdfs_table_->id()
+                                   << " partition_id=" << partition_id
+                                   << "\n" << PrintThrift(state->fragment_params());
     RETURN_IF_ERROR(partition_desc->PrepareExprs(state));
   }
 
@@ -536,7 +540,9 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   // Open all the partition exprs used by the scan node
   BOOST_FOREACH(const int64_t& partition_id, partition_ids_) {
     HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
-    DCHECK(partition_desc != NULL);
+    DCHECK(partition_desc != NULL) << "table_id=" << hdfs_table_->id()
+                                   << " partition_id=" << partition_id
+                                   << "\n" << PrintThrift(state->fragment_params());
     RETURN_IF_ERROR(partition_desc->OpenExprs(state));
   }
 
@@ -657,7 +663,9 @@ void HdfsScanNode::Close(RuntimeState* state) {
   // Close all the partitions scanned by the scan node
   BOOST_FOREACH(const int64_t& partition_id, partition_ids_) {
     HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
-    DCHECK(partition_desc != NULL);
+    DCHECK(partition_desc != NULL) << "table_id=" << hdfs_table_->id()
+                                   << " partition_id=" << partition_id
+                                   << "\n" << PrintThrift(state->fragment_params());
     partition_desc->CloseExprs(state);
   }
 
@@ -828,8 +836,9 @@ void HdfsScanNode::ScannerThread() {
           reinterpret_cast<ScanRangeMetadata*>(scan_range->meta_data());
       int64_t partition_id = metadata->partition_id;
       HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
-      DCHECK_NOTNULL(partition);
-
+      DCHECK(partition != NULL) << "table_id=" << hdfs_table_->id()
+                                << " partition_id=" << partition_id
+                                << "\n" << PrintThrift(runtime_state_->fragment_params());
       ScannerContext* context = runtime_state_->obj_pool()->Add(
           new ScannerContext(runtime_state_, this, partition, scan_range));
       Status scanner_status;

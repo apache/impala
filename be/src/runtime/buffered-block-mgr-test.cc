@@ -61,7 +61,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
     block_mgr_parent_tracker_.reset(new MemTracker(-1));
     exec_env_->disk_io_mgr()->Init(io_mgr_tracker_.get());
     runtime_state_.reset(
-        new RuntimeState(TPlanFragmentInstanceCtx(), "", exec_env_.get()));
+        new RuntimeState(TExecPlanFragmentParams(), "", exec_env_.get()));
   }
 
   virtual void TearDown() {

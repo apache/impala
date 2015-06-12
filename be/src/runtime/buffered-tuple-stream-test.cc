@@ -60,7 +60,7 @@ class SimpleTupleStreamTest : public testing::Test {
     exec_env_.reset(new ExecEnv);
     exec_env_->disk_io_mgr()->Init(&tracker_);
     runtime_state_.reset(
-        new RuntimeState(TPlanFragmentInstanceCtx(), "", exec_env_.get()));
+        new RuntimeState(TExecPlanFragmentParams(), "", exec_env_.get()));
 
     CreateDescriptors();
 
