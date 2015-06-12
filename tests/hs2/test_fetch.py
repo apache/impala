@@ -123,40 +123,13 @@ class TestFetch(HS2TestSuite):
 
     return fetch_results_resp
 
-  def __column_results_to_string(self, columns):
-    """Quick-and-dirty way to get a readable string to compare the output of a
-    columnar-oriented query to its expected output"""
-    formatted = ""
-    num_rows = 0
-    # Determine the number of rows by finding the type of the first column
-    for col_type in HS2TestSuite.HS2_V6_COLUMN_TYPES:
-      typed_col = getattr(columns[0], col_type)
-      if typed_col != None:
-        num_rows = len(typed_col.values)
-        break
-
-    for i in xrange(num_rows):
-      row = []
-      for c in columns:
-        for col_type in HS2TestSuite.HS2_V6_COLUMN_TYPES:
-          typed_col = getattr(c, col_type)
-          if typed_col != None:
-            indicator = ord(typed_col.nulls[i / 8])
-            if indicator & (1 << (i % 8)):
-              row.append("NULL")
-            else:
-              row.append(str(typed_col.values[i]))
-            break
-      formatted += (", ".join(row) + "\n")
-    return (num_rows, formatted)
-
   @needs_session()
   def test_alltypes_v6(self):
     """Test that a simple select statement works for all types"""
     fetch_results_resp = self.__query_and_fetch(
       "SELECT *, NULL from functional.alltypes ORDER BY id LIMIT 1")
 
-    num_rows, result = self.__column_results_to_string(fetch_results_resp.results.columns)
+    num_rows, result = self.column_results_to_string(fetch_results_resp.results.columns)
     assert num_rows == 1
     assert result == \
         "0, True, 0, 0, 0, 0, 0.0, 0.0, 01/01/09, 0, 2009-01-01 00:00:00, 2009, 1, NULL\n"
@@ -164,23 +137,23 @@ class TestFetch(HS2TestSuite):
     # Decimals
     fetch_results_resp = self.__query_and_fetch(
       "SELECT * from functional.decimal_tbl LIMIT 1")
-    num_rows, result = self.__column_results_to_string(fetch_results_resp.results.columns)
+    num_rows, result = self.column_results_to_string(fetch_results_resp.results.columns)
     assert result == ("1234, 2222, 1.2345678900, "
                       "0.12345678900000000000000000000000000000, 12345.78900, 1\n")
 
     # VARCHAR
     fetch_results_resp = self.__query_and_fetch("SELECT CAST('str' AS VARCHAR(3))")
-    num_rows, result = self.__column_results_to_string(fetch_results_resp.results.columns)
+    num_rows, result = self.column_results_to_string(fetch_results_resp.results.columns)
     assert result == "str\n"
 
     # CHAR not inlined
     fetch_results_resp = self.__query_and_fetch("SELECT CAST('car' AS CHAR(140))")
-    num_rows, result = self.__column_results_to_string(fetch_results_resp.results.columns)
+    num_rows, result = self.column_results_to_string(fetch_results_resp.results.columns)
     assert result == "car" + (" " * 137) + "\n"
 
     # CHAR inlined
     fetch_results_resp = self.__query_and_fetch("SELECT CAST('car' AS CHAR(5))")
-    num_rows, result = self.__column_results_to_string(fetch_results_resp.results.columns)
+    num_rows, result = self.column_results_to_string(fetch_results_resp.results.columns)
     assert result == "car  \n"
 
   @needs_session()
@@ -190,7 +163,7 @@ class TestFetch(HS2TestSuite):
                   "SHOW TABLE STATS functional.alltypes"]:
       fetch_results_resp = self.__query_and_fetch(query)
       num_rows, result = \
-          self.__column_results_to_string(fetch_results_resp.results.columns)
+          self.column_results_to_string(fetch_results_resp.results.columns)
       assert num_rows == 25
       # Match whether stats are computed or not
       assert re.match(
@@ -199,7 +172,7 @@ class TestFetch(HS2TestSuite):
   @needs_session()
   def test_show_column_stats(self):
     fetch_results_resp = self.__query_and_fetch("SHOW COLUMN STATS functional.alltypes")
-    num_rows, result = self.__column_results_to_string(fetch_results_resp.results.columns)
+    num_rows, result = self.column_results_to_string(fetch_results_resp.results.columns)
     assert num_rows == 13
     assert re.match(r"id, INT, -?\d+, -?\d+, (NULL|\d+), 4.0", result) is not None
 
@@ -253,7 +226,7 @@ class TestFetch(HS2TestSuite):
     HS2TestSuite.check_response(fetch_results_resp)
     assert fetch_results_resp.results.columns[0].boolVal is not None
 
-    assert self.__column_results_to_string(
+    assert self.column_results_to_string(
       fetch_results_resp.results.columns) == (1, "NULL\n")
 
   @needs_session()

@@ -2210,6 +2210,7 @@ TEST_F(ExprTest, StringParseUrlFunction) {
 TEST_F(ExprTest, UtilityFunctions) {
   TestStringValue("current_database()", "default");
   TestStringValue("user()", "impala_test_user");
+  TestStringValue("effective_user()",  "impala_test_user");
   TestStringValue("version()", GetVersionString());
   TestValue("sleep(100)", TYPE_BOOLEAN, true);
   TestIsNull("sleep(NULL)", TYPE_BOOLEAN);

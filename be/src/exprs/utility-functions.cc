@@ -79,6 +79,12 @@ StringVal UtilityFunctions::User(FunctionContext* ctx) {
   return (user.len > 0) ? user : StringVal::null();
 }
 
+StringVal UtilityFunctions::EffectiveUser(FunctionContext* ctx) {
+  StringVal effective_user(ctx->effective_user());
+  // An empty string indicates the user wasn't set in the session or in the query request.
+  return (effective_user.len > 0) ? effective_user : StringVal::null();
+}
+
 StringVal UtilityFunctions::Version(FunctionContext* ctx) {
   return AnyValUtil::FromString(ctx, GetVersionString());
 }

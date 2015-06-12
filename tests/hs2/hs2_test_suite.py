@@ -24,7 +24,8 @@ from thrift.protocol import TBinaryProtocol
 from tests.common.impala_test_suite import ImpalaTestSuite, IMPALAD_HS2_HOST_PORT
 
 def needs_session(protocol_version=
-                  TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6):
+                  TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6,
+                  conf_overlay=None):
   def session_decorator(fn):
     """Decorator that establishes a session and sets self.session_handle. When the test is
     finished, the session is closed.
@@ -33,6 +34,8 @@ def needs_session(protocol_version=
       open_session_req = TCLIService.TOpenSessionReq()
       open_session_req.username = getuser()
       open_session_req.configuration = dict()
+      if conf_overlay is not None:
+        open_session_req.configuration = conf_overlay
       open_session_req.client_protocol = protocol_version
       resp = self.hs2_client.OpenSession(open_session_req)
       HS2TestSuite.check_response(resp)
@@ -171,3 +174,30 @@ class HS2TestSuite(ImpalaTestSuite):
     resp = self.hs2_client.GetResultSetMetadata(req)
     HS2TestSuite.check_response(resp)
     return resp
+
+  def column_results_to_string(self, columns):
+    """Quick-and-dirty way to get a readable string to compare the output of a
+    columnar-oriented query to its expected output"""
+    formatted = ""
+    num_rows = 0
+    # Determine the number of rows by finding the type of the first column
+    for col_type in HS2TestSuite.HS2_V6_COLUMN_TYPES:
+      typed_col = getattr(columns[0], col_type)
+      if typed_col != None:
+        num_rows = len(typed_col.values)
+        break
+
+    for i in xrange(num_rows):
+      row = []
+      for c in columns:
+        for col_type in HS2TestSuite.HS2_V6_COLUMN_TYPES:
+          typed_col = getattr(c, col_type)
+          if typed_col != None:
+            indicator = ord(typed_col.nulls[i / 8])
+            if indicator & (1 << (i % 8)):
+              row.append("NULL")
+            else:
+              row.append(str(typed_col.values[i]))
+            break
+      formatted += (", ".join(row) + "\n")
+    return (num_rows, formatted)

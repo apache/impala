@@ -90,6 +90,7 @@ class RuntimeState {
   }
 
   const std::string connected_user() const { return ""; }
+  const std::string effective_user() const { return ""; }
 };
 
 }
@@ -237,6 +238,11 @@ FunctionContext::ImpalaVersion FunctionContext::version() const {
 const char* FunctionContext::user() const {
   if (impl_->state_ == NULL) return NULL;
   return impl_->state_->connected_user().c_str();
+}
+
+const char* FunctionContext::effective_user() const {
+  if (impl_->state_ == NULL) return NULL;
+  return impl_->state_->effective_user().c_str();
 }
 
 FunctionContext::UniqueId FunctionContext::query_id() const {

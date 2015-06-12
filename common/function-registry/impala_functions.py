@@ -491,6 +491,7 @@ functions = [
   # Utility functions
   [['current_database'], 'STRING', [], 'impala::UtilityFunctions::CurrentDatabase'],
   [['user'], 'STRING', [], 'impala::UtilityFunctions::User'],
+  [['effective_user'], 'STRING', [], 'impala::UtilityFunctions::EffectiveUser'],
   [['sleep'], 'BOOLEAN', ['INT'], 'impala::UtilityFunctions::Sleep'],
   [['pid'], 'INT', [], 'impala::UtilityFunctions::Pid'],
   [['version'], 'STRING', [], 'impala::UtilityFunctions::Version'],
