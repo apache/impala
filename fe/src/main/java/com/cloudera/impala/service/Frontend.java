@@ -17,8 +17,10 @@ package com.cloudera.impala.service;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -40,6 +42,7 @@ import org.apache.hive.service.cli.thrift.TGetTablesReq;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.CreateDataSrcStmt;
 import com.cloudera.impala.analysis.CreateDropRoleStmt;
@@ -59,6 +62,7 @@ import com.cloudera.impala.analysis.ShowGrantRoleStmt;
 import com.cloudera.impala.analysis.ShowRolesStmt;
 import com.cloudera.impala.analysis.TableName;
 import com.cloudera.impala.analysis.TruncateStmt;
+import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.authorization.AuthorizationChecker;
 import com.cloudera.impala.authorization.AuthorizationConfig;
 import com.cloudera.impala.authorization.ImpalaInternalAdminUser;
@@ -79,6 +83,7 @@ import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.ImpaladCatalog;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.TableId;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.FileSystemUtil;
@@ -993,9 +998,37 @@ public class Frontend {
       }
     }
 
+    validateTableIds(analysisResult.getAnalyzer(), result);
+
     timeline.markEvent("Planning finished");
     result.setTimeline(analysisResult.getAnalyzer().getTimeline().toThrift());
     return result;
+  }
+
+  /**
+   * Check that we don't have any duplicate table IDs (see IMPALA-1702).
+   * To be removed when IMPALA-1702 is resolved.
+   */
+  private void validateTableIds(Analyzer analyzer, TExecRequest result)
+      throws InternalException {
+    Map<TableId, Table> tableIds = Maps.newHashMap();
+    Collection<TupleDescriptor> tupleDescs = analyzer.getDescTbl().getTupleDescs();
+    for (TupleDescriptor desc: tupleDescs) {
+      Table table = desc.getTable();
+      // Tuple not materialized by scan, so no associated table descriptor.
+      if (table == null) continue;
+      Table otherTable = tableIds.get(table.getId());
+      if (otherTable == table) continue; // Same table referenced twice
+      if (otherTable == null) {
+        tableIds.put(table.getId(), table);
+        continue;
+      }
+      LOG.error("Found duplicate table ID! id=" + table.getId() + "\ntable1=\n"
+          + table.toTCatalogObject() + "\ntable2=\n" + otherTable.toTCatalogObject()
+          + "\nexec_request=\n" + result);
+      throw new InternalException("Query encountered invalid metadata, likely due to " +
+          "IMPALA-1702. Please try rerunning the query.");
+    }
   }
 
   /**
