@@ -106,4 +106,4 @@ add_library(ImpalaThrift ${SRC_FILES})
 # correctly
 set_source_files_properties(${SRC_FILES} PROPERTIES GENERATED TRUE)
 
-add_dependencies(ImpalaThrift thrift-cpp)
+add_dependencies(ImpalaThrift thrift-deps)

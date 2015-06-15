@@ -199,3 +199,6 @@ add_dependencies(thrift-cpp thrift-generated-files-metrics thrift-generated-file
 
 add_custom_target(thrift-ext-data-src ALL DEPENDS ${THRIFT_DATA_SRC_FILES})
 add_dependencies(thrift-ext-data-src thrift-cpp)
+
+# Combined target for all thrift dependencies
+add_custom_target(thrift-deps ALL DEPENDS thrift-cpp thrift-ext-data-src)

@@ -43,11 +43,6 @@ SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
 
 if (IMPALA_TOOLCHAIN)
   SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -static-libstdc++")
-  SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -static-libgcc")
-  add_library(gcc_eh STATIC IMPORTED)
-  set(GCC_EH_LOCATION
-    "$ENV{IMPALA_TOOLCHAIN}/gcc-$ENV{IMPALA_GCC_VERSION}/lib/gcc/x86_64-unknown-linux-gnu/4.9.2/libgcc_eh.a")
-  set_target_properties(gcc_eh PROPERTIES IMPORTED_LOCATION ${GCC_EH_LOCATION})
 endif()
 
 # For any clang builds (currently only ASAN):
@@ -300,10 +295,18 @@ endif()
 
 # When we link statically, we need to replace the static libhdfs.a with the dynamic
 # version otherwise the dynamic support libraries will pickup the static libhdfs.a
-# library. The result will not compile as libhdfs.a is not compiled with -fpic.
-set(IMPALA_LINK_LIBS_DYNAMIC_HDFS ${IMPALA_LINK_LIBS_NO_TCMALLOC})
-list(REMOVE_ITEM IMPALA_LINK_LIBS_DYNAMIC_HDFS HDFS_STATIC)
-set(IMPALA_LINK_LIBS_DYNAMIC_HDFS ${IMPALA_LINK_LIBS_DYNAMIC_HDFS} ${HDFS_LIBRARIES})
+# library. The result will not compile as libhdfs.a is not compiled with -fpic. The same
+# is true for other system dependencies that we don't have control over.
+set(IMPALA_LINK_LIBS_DYNAMIC_TARGETS ${IMPALA_LINK_LIBS_NO_TCMALLOC})
+list(REMOVE_ITEM IMPALA_LINK_LIBS_DYNAMIC_TARGETS HDFS_STATIC)
+set(IMPALA_LINK_LIBS_DYNAMIC_TARGETS ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS} ${HDFS_LIBRARIES})
+# Replace static libz bzib with dynamic
+if (NOT IMPALA_TOOLCHAIN AND NOT BUILD_SHARED_LIBS)
+  list(REMOVE_ITEM IMPALA_LINK_LIBS_DYNAMIC_TARGETS BZIP2_STATIC)
+  list(REMOVE_ITEM IMPALA_LINK_LIBS_DYNAMIC_TARGETS ZLIB_STATIC)
+  set(IMPALA_LINK_LIBS_DYNAMIC_TARGETS
+    ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS} ${ZLIB_LIBRARIES} ${BZIP2_LIBRARIES})
+endif()
 
 # Replace Udf with ImpalaUdf for $UDF_TEST_LINK_LIBS
 set (UDF_TEST_LINK_LIBS ${IMPALA_LINK_LIBS} ImpalaUdf)

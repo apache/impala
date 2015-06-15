@@ -20,7 +20,7 @@ add_library(Catalog
   catalog-server.cc
   catalog-util.cc
 )
-add_dependencies(Catalog thrift-cpp)
+add_dependencies(Catalog thrift-deps)
 
 add_executable(catalogd catalogd-main.cc)
 target_link_libraries(catalogd

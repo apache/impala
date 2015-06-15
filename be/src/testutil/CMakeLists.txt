@@ -28,16 +28,16 @@ add_library(TestUtil
   test-udas.cc
   test-udfs.cc
 )
-add_dependencies(TestUtil thrift-cpp)
+add_dependencies(TestUtil thrift-deps)
 
 add_library(TestUdfs SHARED test-udfs.cc)
-add_dependencies(TestUdfs thrift-cpp)
+add_dependencies(TestUdfs thrift-deps)
 
 COMPILE_TO_IR(test-udfs.cc)
-add_dependencies(test-udfs-ir thrift-cpp)
+add_dependencies(test-udfs-ir thrift-deps)
 
 add_library(TestUdas SHARED test-udas.cc)
-add_dependencies(TestUdas thrift-cpp)
+add_dependencies(TestUdas thrift-deps)
 
 add_executable(mini-impala-cluster
   mini-impala-cluster.cc

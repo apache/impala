@@ -25,7 +25,7 @@ add_library(CodeGen
   subexpr-elimination.cc
   instruction-counter.cc
 )
-add_dependencies(CodeGen thrift-cpp)
+add_dependencies(CodeGen thrift-deps)
 
 # output cross compile to ir metadata
 # TODO: this doesn't track dependences right.  We need to specify that

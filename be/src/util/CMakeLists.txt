@@ -73,7 +73,7 @@ add_library(Util
   url-parser.cc
   url-coding.cc
 )
-add_dependencies(Util thrift-cpp)
+add_dependencies(Util thrift-deps)
 
 add_library(Webserver STATIC
   ${SQUEASEL_SRC_DIR}/squeasel.c
@@ -98,7 +98,7 @@ add_executable(parquet-reader parquet-reader.cc)
 target_link_libraries(network-perf-benchmark ${IMPALA_LINK_LIBS})
 target_link_libraries(parquet-reader ${IMPALA_LINK_LIBS})
 
-target_link_libraries(loggingsupport ${IMPALA_LINK_LIBS_DYNAMIC_HDFS})
+target_link_libraries(loggingsupport ${IMPALA_LINK_LIBS_DYNAMIC_TARGETS})
 
 ADD_BE_TEST(runtime-profile-test)
 ADD_BE_TEST(benchmark-test)
