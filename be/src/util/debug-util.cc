@@ -25,6 +25,7 @@
 #include "runtime/row-batch.h"
 #include "util/cpu-info.h"
 #include "util/string-parser.h"
+#include "util/uid-util.h"
 
 // / WARNING this uses a private API of GLog: DumpStackTraceToString().
 namespace google {

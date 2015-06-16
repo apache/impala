@@ -514,7 +514,10 @@ Status ResourceBroker::Expand(const TResourceBrokerExpansionRequest& request,
 
   if (timed_out) {
     expansion_requests_timedout_metric_->Increment(1);
-    return Status(Substitute("Resource expansion request exceeded timeout of $0",
+    return Status(Substitute("Resource expansion request (expansion id=$0, "
+        "reservation id=$1) exceeded timeout of $2.",
+        PrintId(ll_request.expansion_id),
+        PrintId(request.reservation_id),
         PrettyPrinter::Print(request.request_timeout * 1000L * 1000L,
         TUnit::TIME_NS)));
   }
@@ -523,7 +526,10 @@ Status ResourceBroker::Expand(const TResourceBrokerExpansionRequest& request,
 
   if (!request_granted) {
     expansion_requests_rejected_metric_->Increment(1);
-    return Status("Resource expansion request was rejected.");
+    return Status(Substitute(
+        "Resource expansion request (expansion id=$0, reservation id=$1) was rejected.",
+        PrintId(ll_request.expansion_id),
+        PrintId(request.reservation_id)));
   }
 
   VLOG_QUERY << "Fulfilled expansion for id: " << ll_response.expansion_id;
@@ -578,7 +584,9 @@ Status ResourceBroker::Reserve(const TResourceBrokerReservationRequest& request,
 
   if (timed_out) {
     reservation_requests_timedout_metric_->Increment(1);
-    return Status(Substitute("Resource expansion request exceeded timeout of $0",
+    return Status(Substitute(
+        "Resource reservation request (id=$0) exceeded timeout of $1.",
+        PrintId(pending_request->request_id()),
         PrettyPrinter::Print(request.request_timeout * 1000L * 1000L,
         TUnit::TIME_NS)));
   }
@@ -587,7 +595,8 @@ Status ResourceBroker::Reserve(const TResourceBrokerReservationRequest& request,
 
   if (!request_granted) {
     reservation_requests_rejected_metric_->Increment(1);
-    return Status("Resource reservation request was rejected.");
+    return Status(Substitute("Resource reservation request (id=$0) was rejected.",
+        PrintId(pending_request->request_id())));
   }
 
   TUniqueId reservation_id;

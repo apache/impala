@@ -19,6 +19,8 @@
 #include <boost/algorithm/string.hpp>
 
 #include "common/names.h"
+#include "util/debug-util.h"
+#include "util/uid-util.h"
 
 using boost::algorithm::is_any_of;
 using boost::algorithm::join;
@@ -26,6 +28,10 @@ using boost::algorithm::split;
 using namespace llama;
 
 namespace llama {
+
+string PrintId(const TUniqueId& id, const string& separator) {
+  return PrintId(impala::CastTUniqueId<TUniqueId, impala::TUniqueId>(id), separator);
+}
 
 ostream& operator<<(ostream& os, const TUniqueId& id) {
   os << hex << id.hi << ":" << id.lo;
