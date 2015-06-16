@@ -1170,6 +1170,10 @@ DELIMITED FIELDS TERMINATED BY ','
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/ImpalaDemoDataset/DEC_00_SF3_P077_with_ann_noheader.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- TABLE_PROPERTIES
+--- For kudu we map the first two colums as keys so that we can have tests with more than
+--- one key.
+kudu:kudu.key_columns=id,zip
 ====
 ---- DATASET
 functional

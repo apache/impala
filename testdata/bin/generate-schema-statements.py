@@ -172,7 +172,7 @@ def build_create_statement(table_template, table_name, db_name, db_suffix,
   return create_stmt
 
 def build_table_template(file_format, columns, partition_columns, row_format,
-                         avro_schema_dir, table_name):
+                         avro_schema_dir, table_name, table_properties):
   if file_format == 'hbase':
     return build_hbase_create_stmt_in_hive(columns, partition_columns, table_name)
 
@@ -188,11 +188,12 @@ def build_table_template(file_format, columns, partition_columns, row_format,
   if file_format != 'kudu':
     file_format_string = "STORED AS {file_format}"
 
-  tblproperties = str()
+  tblproperties_clause = "TBLPROPERTIES (\n{0}\n)"
+  tblproperties = {}
+
   if file_format == 'avro':
-    tblproperties = "TBLPROPERTIES ('avro.schema.url'=" \
-        "'hdfs://%s/%s/%s/{table_name}.json')" \
-        % (options.hdfs_namenode, options.hive_warehouse_dir, avro_schema_dir)
+    tblproperties["avro.schema.url"] = "hdfs://%s/%s/%s/{table_name}.json" \
+      % (options.hdfs_namenode, options.hive_warehouse_dir, avro_schema_dir)
   elif file_format == 'parquet':
     row_format_stmt = str()
   elif file_format == 'kudu':
@@ -200,12 +201,31 @@ def build_table_template(file_format, columns, partition_columns, row_format,
     kudu_master = os.getenv("KUDU_MASTER_ADDRESS", "127.0.0.1")
     kudu_master_port = os.getenv("KUDU_MASTER_PORT", "7051")
     row_format_stmt = str()
-    tblproperties = ("TBLPROPERTIES ('storage_handler'="
-       "'com.cloudera.kudu.hive.KuduStorageHandler', "
-       "'kudu.master_addresses'='{0}:{1}', "
-       "'kudu.key_columns'='{3}',"
-       "'kudu.table_name'='{2}')").format(kudu_master, kudu_master_port, table_name,
-                                          columns.split("\n")[0].split(" ")[0])
+    tblproperties["storage_handler"] = "com.cloudera.kudu.hive.KuduStorageHandler"
+    tblproperties["kudu.master_addresses"] = \
+      "{0}:{1}".format(kudu_master, kudu_master_port)
+    tblproperties["kudu.table_name"] = table_name
+    tblproperties["kudu.key_columns"] = columns.split("\n")[0].split(" ")[0]
+
+  # Read the properties specified in the TABLE_PROPERTIES section. When the specified
+  # properties have the same key as a default property, the value for the specified
+  # property is used.
+  if table_properties:
+    for table_property in table_properties.split("\n"):
+      format_prop = table_property.split(":")
+      if format_prop[0] == file_format:
+        key_val = format_prop[1].split("=");
+        tblproperties[key_val[0]] = key_val[1]
+
+  all_tblproperties = []
+  for key, value in tblproperties.iteritems():
+    all_tblproperties.append("'{0}' = '{1}'".format(key, value))
+
+  # If there are no properties to set avoid the TBLPROPERTIES clause altogether.
+  if not all_tblproperties:
+    tblproperties_clause = ""
+  else:
+    tblproperties_clause = tblproperties_clause.format(",\n".join(all_tblproperties))
 
   # Note: columns are ignored but allowed if a custom serde is specified
   # (e.g. Avro)
@@ -221,7 +241,7 @@ LOCATION '{{hdfs_location}}'
     row_format=row_format_stmt,
     columns=',\n'.join(columns.split('\n')),
     partitioned_by=partitioned_by,
-    tblproperties=tblproperties,
+    tblproperties=tblproperties_clause,
     file_format_string=file_format_string
     ).strip()
 
@@ -477,6 +497,7 @@ def generate_statements(output_name, test_vectors, sections,
       alter = section.get('ALTER')
       create = section['CREATE']
       create_hive = section['CREATE_HIVE']
+      table_properties = section['TABLE_PROPERTIES']
       insert = eval_section(section['DEPENDENT_LOAD'])
       load = eval_section(section['LOAD'])
       # For some datasets we may want to use a different load strategy when running local
@@ -552,7 +573,7 @@ def generate_statements(output_name, test_vectors, sections,
         temp_table_name = table_name
         table_template = build_table_template(
           create_file_format, columns, partition_columns,
-          row_format, avro_schema_dir, table_name)
+          row_format, avro_schema_dir, table_name, table_properties)
         # Write Avro schema to local file
         if file_format == 'avro':
           if not os.path.exists(avro_schema_dir):
@@ -629,7 +650,7 @@ def generate_statements(output_name, test_vectors, sections,
 def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'COLUMNS', 'PARTITION_COLUMNS',
                          'ROW_FORMAT', 'CREATE', 'CREATE_HIVE', 'DEPENDENT_LOAD', 'LOAD',
-                         'LOAD_LOCAL', 'ALTER', 'HBASE_COLUMN_FAMILIES']
+                         'LOAD_LOCAL', 'ALTER', 'HBASE_COLUMN_FAMILIES', 'TABLE_PROPERTIES']
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 
 if __name__ == "__main__":
