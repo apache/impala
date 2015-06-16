@@ -71,6 +71,9 @@ const TProtocolVersion::type MAX_SUPPORTED_HS2_VERSION =
     } \
   } while (false)
 
+DECLARE_string(hostname);
+DECLARE_int32(webserver_port);
+
 namespace impala {
 
 const string IMPALA_RESULT_CACHING_OPT = "impala.resultset.cache.size";
@@ -619,6 +622,11 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
     }
   }
   TQueryOptionsToMap(state->default_query_options, &return_val.configuration);
+
+  // OpenSession() should return the coordinator's HTTP server address.
+  const string& http_addr = lexical_cast<string>(
+      MakeNetworkAddress(FLAGS_hostname, FLAGS_webserver_port));
+  return_val.configuration.insert(make_pair("http_addr", http_addr));
 
   // Put the session state in session_state_map_
   {

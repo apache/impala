@@ -16,6 +16,9 @@
 # Client tests for Impala's HiveServer2 interface
 
 import pytest
+import json
+from socket import getfqdn
+from urllib2 import urlopen
 from tests.hs2.hs2_test_suite import HS2TestSuite, needs_session, operation_id_to_query_id
 from TCLIService import TCLIService
 from ImpalaService import ImpalaHiveServer2Service
@@ -26,6 +29,18 @@ class TestHS2(HS2TestSuite):
     """Check that a session can be opened"""
     open_session_req = TCLIService.TOpenSessionReq()
     TestHS2.check_response(self.hs2_client.OpenSession(open_session_req))
+
+  def test_open_session_http_addr(self):
+    """Check that OpenSession returns the coordinator's http address."""
+    open_session_req = TCLIService.TOpenSessionReq()
+    open_session_resp = self.hs2_client.OpenSession(open_session_req)
+    TestHS2.check_response(open_session_resp)
+    http_addr = open_session_resp.configuration['http_addr']
+    resp = urlopen("http://%s/queries?json" % http_addr)
+    assert resp.msg == 'OK'
+    queries_json = json.loads(resp.read())
+    assert 'completed_queries' in queries_json
+    assert 'in_flight_queries' in queries_json
 
   def test_open_session_unsupported_protocol(self):
     """Test that we get the right protocol version back if we ask for one larger than the
