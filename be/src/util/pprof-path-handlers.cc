@@ -34,19 +34,6 @@ DECLARE_string(heap_profile_dir);
 
 const int PPROF_DEFAULT_SAMPLE_SECS = 30; // pprof default sample time in seconds.
 
-typedef boost::function<void
-    (const Webserver::ArgumentMap& args, std::stringstream* output)> PprofCallback;
-
-// Wrapper for all Pprof*Handler methods that want to write to a stringstream, this method
-// adds the output of the string to a Json document in the 'contents' member.
-void PprofJsonHandler(const PprofCallback& callback, const Webserver::ArgumentMap& args,
-    Document* document) {
-  stringstream ss;
-  callback(args, &ss);
-  Value output(ss.str().c_str(), document->GetAllocator());
-  document->AddMember("contents", output, document->GetAllocator());
-}
-
 // pprof asks for the url /pprof/cmdline to figure out what application it's profiling.
 // The server should respond by reading the contents of /proc/self/cmdline.
 void PprofCmdLineHandler(const Webserver::ArgumentMap& args, stringstream* output) {
@@ -150,14 +137,11 @@ void PprofSymbolHandler(const Webserver::ArgumentMap& args, stringstream* output
 void impala::AddPprofUrlCallbacks(Webserver* webserver) {
   // Path handlers for remote pprof profiling. For information see:
   // https://gperftools.googlecode.com/svn/trunk/doc/pprof_remote_servers.html
-  webserver->RegisterUrlCallback("/pprof/cmdline", "raw_text.tmpl",
-      bind<void>(PprofJsonHandler, PprofCmdLineHandler, _1, _2), false);
-  webserver->RegisterUrlCallback("/pprof/heap", "raw_text.tmpl",
-      bind<void>(PprofJsonHandler, PprofHeapHandler, _1, _2), false);
-  webserver->RegisterUrlCallback("/pprof/growth", "raw_text.tmpl",
-      bind<void>(PprofJsonHandler, PprofGrowthHandler, _1, _2), false);
-  webserver->RegisterUrlCallback("/pprof/profile", "raw_text.tmpl",
-      bind<void>(PprofJsonHandler, PprofCpuProfileHandler, _1, _2), false);
-  webserver->RegisterUrlCallback("/pprof/symbol", "raw_text.tmpl",
-      bind<void>(PprofJsonHandler, PprofSymbolHandler, _1, _2), false);
+  webserver->RegisterUrlCallback("/pprof/cmdline",
+      bind<void>(PprofCmdLineHandler, _1, _2));
+  webserver->RegisterUrlCallback("/pprof/heap", bind<void>(PprofHeapHandler, _1, _2));
+  webserver->RegisterUrlCallback("/pprof/growth", bind<void>(PprofGrowthHandler, _1, _2));
+  webserver->RegisterUrlCallback("/pprof/profile",
+      bind<void>(PprofCpuProfileHandler, _1, _2));
+  webserver->RegisterUrlCallback("/pprof/symbol", bind<void>(PprofSymbolHandler, _1, _2));
 }

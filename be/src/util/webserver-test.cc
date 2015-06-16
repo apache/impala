@@ -242,6 +242,22 @@ TEST(Webserver, NoFrameEmbeddingTest) {
   ASSERT_TRUE(contents.str().find("Metrics") == string::npos);
 }
 
+const string STRING_WITH_NULL = "123456789\0ABCDE";
+
+void NullCharCallback(const Webserver::ArgumentMap& args, stringstream* out) {
+  (*out) << STRING_WITH_NULL;
+}
+
+TEST(Webserver, NullCharTest) {
+  const string NULL_CHAR_TEST_PATH = "/null-char-test";
+  Webserver webserver(FLAGS_webserver_port);
+  webserver.RegisterUrlCallback(NULL_CHAR_TEST_PATH, NullCharCallback);
+  ASSERT_TRUE(webserver.Start().ok());
+  stringstream contents;
+  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port, NULL_CHAR_TEST_PATH, &contents).ok());
+  ASSERT_TRUE(contents.str().find(STRING_WITH_NULL) != string::npos);
+}
+
 
 int main(int argc, char **argv) {
   InitCommonRuntime(argc, argv, false, TestInfo::BE_TEST);

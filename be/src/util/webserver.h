@@ -28,6 +28,12 @@
 
 namespace impala {
 
+/// Supported HTTP content types
+enum ContentType {
+  HTML,
+  PLAIN
+};
+
 /// Wrapper class for the Squeasel web server library. Clients may register callback
 /// methods which produce Json documents which are rendered via a template file to either
 /// HTML or text.
@@ -36,10 +42,12 @@ class Webserver {
   typedef std::map<std::string, std::string> ArgumentMap;
   typedef boost::function<void (const ArgumentMap& args, rapidjson::Document* json)>
       UrlCallback;
+  typedef boost::function<void (const ArgumentMap& args, std::stringstream* output)>
+      RawUrlCallback;
 
-  /// Any callback may add a member to their Json output with key ENABLE_RAW_JSON_KEY; this
-  /// causes the result of the template rendering process to be sent to the browser as
-  /// text, not HTML.
+  /// Any callback may add a member to their Json output with key ENABLE_RAW_JSON_KEY;
+  /// this causes the result of the template rendering process to be sent to the browser
+  /// as text, not HTML.
   static const char* ENABLE_RAW_JSON_KEY;
 
   /// Using this constructor, the webserver will bind to all available interfaces.
@@ -69,6 +77,11 @@ class Webserver {
   void RegisterUrlCallback(const std::string& path, const std::string& template_filename,
       const UrlCallback& callback, bool is_on_nav_bar = true);
 
+  /// Register a 'raw' url callback that produces a bytestream as output. This should only
+  /// be used for URLs that want to return binary data; non-HTML callbacks that want to
+  /// produce text should use UrlCallback.
+  void RegisterUrlCallback(const std::string& path, const RawUrlCallback& callback);
+
   const TNetworkAddress& http_address() { return http_address_; }
 
   /// True if serving all traffic over SSL, false otherwise
@@ -83,19 +96,32 @@ class Webserver {
    public:
     UrlHandler(const UrlCallback& cb, const std::string& template_filename,
         bool is_on_nav_bar)
-        : is_on_nav_bar_(is_on_nav_bar), template_callback_(cb),
+        : is_on_nav_bar_(is_on_nav_bar), use_templates_(true), template_callback_(cb),
           template_filename_(template_filename) { }
 
+    UrlHandler(const RawUrlCallback& cb)
+        : is_on_nav_bar_(false), use_templates_(false),
+          raw_callback_(cb) { }
+
     bool is_on_nav_bar() const { return is_on_nav_bar_; }
+    bool use_templates() const { return use_templates_; }
     const UrlCallback& callback() const { return template_callback_; }
+    const RawUrlCallback& raw_callback() const { return raw_callback_; }
     const std::string& template_filename() const { return template_filename_; }
 
    private:
     /// If true, the page appears in the navigation bar.
     bool is_on_nav_bar_;
 
+    /// If true, use the template rendering callback, otherwise the 'raw' callback is
+    /// used.
+    bool use_templates_;
+
     /// Callback to produce a Json document to render via a template.
     UrlCallback template_callback_;
+
+    /// Callback to produce a raw bytestream.
+    RawUrlCallback raw_callback_;
 
     /// Path to the file that contains the template to render, relative to the webserver's
     /// document root.
@@ -113,6 +139,10 @@ class Webserver {
   /// Dispatch point for all incoming requests. Returns squeasel success code.
   int BeginRequestCallback(struct sq_connection* connection,
       struct sq_request_info* request_info);
+
+  /// Renders URLs through the Mustache templating library.
+  void RenderUrlWithTemplate(const ArgumentMap& arguments, const UrlHandler& url_handler,
+      std::stringstream* output, ContentType* content_type);
 
   /// Registered to handle "/", populates document with various system-wide information.
   void RootHandler(const ArgumentMap& args, rapidjson::Document* document);
