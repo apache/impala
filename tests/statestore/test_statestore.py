@@ -156,33 +156,41 @@ class StatestoreSubscriber(object):
   more readable."""
   def __init__(self, port=None, heartbeat_cb=None, update_cb=None):
     self.port = port if port else get_unused_port()
-    self.heartbeat_event, self.heartbeat_count = threading.Event(), 0
-    self.update_event, self.update_count = threading.Event(), 0
+    self.heartbeat_event, self.heartbeat_count = threading.Condition(), 0
+    self.update_event, self.update_count = threading.Condition(), 0
     self.heartbeat_cb, self.update_cb = heartbeat_cb, update_cb
     self.exception = None
 
   def Heartbeat(self, args):
     """Heartbeat RPC handler. Calls heartbeat callback if one exists."""
-    self.heartbeat_count += 1
-    response = Subscriber.THeartbeatResponse()
-    if self.heartbeat_cb is not None and self.exception is None:
-      try:
-        response = self.heartbeat_cb(self, args)
-      except Exception, e:
-        self.exception = e
-    self.heartbeat_event.set(); self.heartbeat_event.clear()
+    self.heartbeat_event.acquire()
+    try:
+      self.heartbeat_count += 1
+      response = Subscriber.THeartbeatResponse()
+      if self.heartbeat_cb is not None and self.exception is None:
+        try:
+          response = self.heartbeat_cb(self, args)
+        except Exception, e:
+          self.exception = e
+      self.heartbeat_event.notify()
+    finally:
+      self.heartbeat_event.release()
     return response
 
   def UpdateState(self, args):
     """UpdateState RPC handler. Calls update callback if one exists."""
-    self.update_count += 1
-    response = DEFAULT_UPDATE_STATE_RESPONSE
-    if self.update_cb is not None and self.exception is None:
-      try:
-        response = self.update_cb(self, args)
-      except Exception, e:
-        self.exception = e
-    self.update_event.set(); self.update_event.clear()
+    self.update_event.acquire()
+    try:
+      self.update_count += 1
+      response = DEFAULT_UPDATE_STATE_RESPONSE
+      if self.update_cb is not None and self.exception is None:
+        try:
+          response = self.update_cb(self, args)
+        except Exception, e:
+          self.exception = e
+      self.update_event.notify()
+    finally:
+      self.update_event.release()
     return response
 
   def __init_server(self):
@@ -243,33 +251,41 @@ class StatestoreSubscriber(object):
     """Waits for some number of heartbeats. If 'count' is provided, waits until the number
     of heartbeats seen by this subscriber exceeds count, otherwise waits for one further
     heartbeat."""
-    if count is not None and self.heartbeat_count >= count: return
-    if count is None: count = self.heartbeat_count
-    while count > self.heartbeat_count:
+    self.heartbeat_event.acquire()
+    try:
+      if count is not None and self.heartbeat_count >= count: return self
+      if count is None: count = self.heartbeat_count + 1
+      while count > self.heartbeat_count:
+        self.check_thread_exceptions()
+        last_count = self.heartbeat_count
+        self.heartbeat_event.wait(10)
+        if last_count == self.heartbeat_count:
+          raise Exception("Heartbeat not received within 10s (heartbeat count: %s)" %
+                          self.heartbeat_count)
       self.check_thread_exceptions()
-      last_count = self.heartbeat_count
-      self.heartbeat_event.wait(10)
-      if last_count == self.heartbeat_count:
-        raise Exception("Heartbeat not received within 10s (heartbeat count: %s)" %
-                        self.heartbeat_count)
-    self.check_thread_exceptions()
-    return self
+      return self
+    finally:
+      self.heartbeat_event.release()
 
   def wait_for_update(self, count=None):
     """Waits for some number of updates. If 'count' is provided, waits until the number
     of updates seen by this subscriber exceeds count, otherwise waits for one further
     update."""
-    if count is not None and self.update_count >= count: return
-    if count is None: count = self.update_count
-    while count > self.update_count:
+    self.update_event.acquire()
+    try:
+      if count is not None and self.update_count >= count: return self
+      if count is None: count = self.update_count + 1
+      while count > self.update_count:
+        self.check_thread_exceptions()
+        last_count = self.update_count
+        self.update_event.wait(10)
+        if last_count == self.update_count:
+          raise Exception("Update not received within 10s (update count: %s)" %
+                          self.update_count)
       self.check_thread_exceptions()
-      last_count = self.update_count
-      self.update_event.wait(10)
-      if last_count == self.update_count:
-        raise Exception("Update not received within 10s (update count: %s)" %
-                        self.update_count)
-    self.check_thread_exceptions()
-    return self
+      return self
+    finally:
+      self.update_event.release()
 
   def wait_for_failure(self, timeout=20):
     """Waits until this subscriber no longer appears in the statestore's subscriber
