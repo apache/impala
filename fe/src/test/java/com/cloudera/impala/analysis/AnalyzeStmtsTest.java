@@ -634,9 +634,10 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalysisError("select t.a.a.a.* from a.a t",
         "Cannot expand star in 't.a.a.a.*' because path 't.a.a.a' " +
         "resolved to type 'INT'.");
+    // Not ambiguous, but expands to an empty select list.
     AnalysisError("select t.* from a.a t",
-        "Expr 't.a' in select list returns a complex type 'STRUCT<a:STRUCT<a:INT>>'.\n" +
-        "Only scalar types are allowed in the select list.");
+        "The star exprs expanded to an empty select list because the referenced " +
+        "tables only have complex-typed columns.");
 
     // Star paths are ambiguous.
     AnalysisError("select a.* from a.a",
@@ -790,6 +791,22 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
    */
   @Test
   public void TestComplexTypesInSelectList() {
+    // Star only expands to the scalar-typed fields.
+    AnalyzesOk("select * from functional.allcomplextypes " +
+        "cross join functional_parquet.alltypes");
+    AnalyzesOk("select complex_struct_col.* from functional.allcomplextypes");
+    // The result exprs could be empty after star expansion.
+    addTestTable("create table only_complex_types " +
+        "(a array<int>, b struct<x:int, y:int>, c map<string, int>)");
+    AnalysisError("select * from only_complex_types",
+        "The star exprs expanded to an empty select list because the referenced " +
+        "tables only have complex-typed columns.");
+    AnalysisError("select a.* from only_complex_types a, " +
+        "functional.allcomplextypes b",
+        "The star exprs expanded to an empty select list because the referenced " +
+        "tables only have complex-typed columns.");
+    // Empty star expansion, but non empty result exprs.
+    AnalyzesOk("select 1, * from only_complex_types");
     // Illegal complex-typed expr in select list.
     AnalysisError("select int_struct_col from functional.allcomplextypes",
         "Expr 'int_struct_col' in select list returns a " +
@@ -818,16 +835,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "select int_struct_col from functional.allcomplextypes",
         "Expr 'int_struct_col' in select list returns a " +
         "complex type 'STRUCT<f1:INT,f2:INT>'.\n" +
-        "Only scalar types are allowed in the select list.");
-    // Legal star expansion adds illegal complex-typed expr.
-    AnalysisError("select * from functional.allcomplextypes " +
-        "cross join functional_parquet.alltypes",
-        "Expr 'functional.allcomplextypes.int_array_col' in select list returns a " +
-        "complex type 'ARRAY<INT>'.\n" +
-        "Only scalar types are allowed in the select list.");
-    AnalysisError("select complex_struct_col.* from functional.allcomplextypes",
-        "Expr 'functional.allcomplextypes.complex_struct_col.f2' in select list " +
-        "returns a complex type 'ARRAY<INT>'.\n" +
         "Only scalar types are allowed in the select list.");
   }
 

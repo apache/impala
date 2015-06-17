@@ -205,6 +205,17 @@ public class SelectStmt extends QueryStmt {
         colLabels_.add(label);
       }
     }
+
+    // Star exprs only expand to the scalar-typed columns/fields, so
+    // the resultExprs_ could be empty.
+    if (resultExprs_.isEmpty()) {
+      throw new AnalysisException("The star exprs expanded to an empty select list " +
+          "because the referenced tables only have complex-typed columns.\n" +
+          "Star exprs only expand to scalar-typed columns because complex-typed exprs " +
+          "are currently not supported in the select list.\n" +
+          "Affected select statement:\n" + toSql());
+    }
+
     // Complex types are currently not supported in the select list because we'd need
     // to serialize them in a meaningful way.
     for (Expr expr: resultExprs_) {
@@ -382,7 +393,9 @@ public class SelectStmt extends QueryStmt {
   }
 
   /**
-   * Expand "*" select list item, ignoring semi-joined tables.
+   * Expand "*" select list item, ignoring semi-joined tables as well as
+   * complex-typed fields because those are currently illegal in any select
+   * list (even for inline views, etc.)
    */
   private void expandStar(Analyzer analyzer) throws AnalysisException {
     if (tableRefs_.isEmpty()) {
@@ -398,7 +411,8 @@ public class SelectStmt extends QueryStmt {
   }
 
   /**
-   * Expand "path.*" from a resolved path.
+   * Expand "path.*" from a resolved path, ignoring complex-typed fields because those
+   * are currently illegal in any select list (even for inline views, etc.)
    */
   private void expandStar(Path resolvedPath, Analyzer analyzer)
       throws AnalysisException {
@@ -454,11 +468,14 @@ public class SelectStmt extends QueryStmt {
   /**
    * Helper function used during star expansion to add a single result expr
    * based on a given raw path to be resolved relative to an existing path.
+   * Ignores paths with a complex-typed destination because they are currently
+   * illegal in any select list (even for inline views, etc.)
    */
   private void addStarResultExpr(Path resolvedPath, Analyzer analyzer,
       String... relRawPath) throws AnalysisException {
     Path p = Path.createRelPath(resolvedPath, relRawPath);
     Preconditions.checkState(p.resolve());
+    if (p.destType().isComplexType()) return;
     SlotDescriptor slotDesc = analyzer.registerSlotRef(p);
     SlotRef slotRef = new SlotRef(slotDesc);
     slotRef.analyze(analyzer);
