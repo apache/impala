@@ -16,22 +16,30 @@ package com.cloudera.impala.catalog.delegates;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
 import org.kududb.ColumnSchema;
 import org.kududb.ColumnSchema.ColumnSchemaBuilder;
 import org.kududb.Schema;
 import org.kududb.Type;
 import org.kududb.client.CreateTableBuilder;
+import org.kududb.client.KeyBuilder;
 import org.kududb.client.KuduClient;
 
 import com.cloudera.impala.catalog.KuduTable;
 import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.cloudera.impala.thrift.TAlterTableParams;
-import com.cloudera.impala.util.KuduUtil;
 import com.google.common.collect.Lists;
+import org.slf4j.LoggerFactory;
+
+import static com.cloudera.impala.util.KuduUtil.compareSchema;
+import static com.cloudera.impala.util.KuduUtil.fromImpalaType;
+import static com.cloudera.impala.util.KuduUtil.parseKeyColumns;
+import static com.cloudera.impala.util.KuduUtil.parseSplits;
+import static com.cloudera.impala.util.KuduUtil.stringToHostAndPort;
 
 /**
  * Implementation of the Kudu DDL Delegate. Propagates create and drop table statements to
@@ -39,7 +47,7 @@ import com.google.common.collect.Lists;
  */
 public class KuduDdlDelegate implements DdlDelegate {
 
-  private static final Logger LOG = Logger.getLogger(KuduDdlDelegate.class);
+  private static final Logger LOG = LoggerFactory.getLogger(KuduDdlDelegate.class);
 
   /**
    * Creates the Kudu table if it does not exist and returns true. If the table exists and
@@ -56,8 +64,10 @@ public class KuduDdlDelegate implements DdlDelegate {
     // Can be optional for un-managed tables
     String kuduKeyCols = msTbl.getParameters().get(KuduTable.KEY_KEY_COLUMNS);
 
+    String splitsJson = msTbl.getParameters().get(KuduTable.KEY_SPLIT_KEYS);
+
     try {
-      KuduClient client = new KuduClient(KuduUtil.stringToHostAndPort(kuduMasters));
+      KuduClient client = new KuduClient(stringToHostAndPort(kuduMasters));
 
       // TODO should we throw if the table does not exist when its an external table?
       if (client.tableExists(kuduTableName)) {
@@ -68,7 +78,7 @@ public class KuduDdlDelegate implements DdlDelegate {
 
         // Check if the external table matches the schema
         org.kududb.client.KuduTable kuduTable = client.openTable(kuduTableName);
-        if (!KuduUtil.compareSchema(msTbl, kuduTable)) {
+        if (!compareSchema(msTbl, kuduTable)) {
           throw new ImpalaRuntimeException(String.format(
               "Table %s (%s) has a different schema in Kudu than in Hive.",
               msTbl.getTableName(), kuduTableName));
@@ -76,7 +86,8 @@ public class KuduDdlDelegate implements DdlDelegate {
         return;
       }
 
-      HashSet<String> keyCols = KuduUtil.parseKeyColumns(kuduKeyCols);
+      HashSet<String> keyColNames = parseKeyColumns(kuduKeyCols);
+      List<ColumnSchema> keyColSchemas = new ArrayList<>();
 
       // Create a new Schema and map the types accordingly
       ArrayList<ColumnSchema> columns = Lists.newArrayList();
@@ -87,17 +98,23 @@ public class KuduDdlDelegate implements DdlDelegate {
           throw new ImpalaRuntimeException(String.format(
               "Could not parse column type %s.", fieldSchema.getType()));
         }
-        Type t = KuduUtil.fromImpalaType(catalogType);
+        Type t = fromImpalaType(catalogType);
         // Create the actual column and check if the column is a key column
         ColumnSchemaBuilder csb = new ColumnSchemaBuilder(fieldSchema.getName(), t);
-        boolean isKeyColumn = keyCols.contains(fieldSchema.getName());
+        boolean isKeyColumn = keyColNames.contains(fieldSchema.getName());
         csb.key(isKeyColumn);
         csb.nullable(!isKeyColumn);
-        columns.add(csb.build());
+        ColumnSchema cs = csb.build();
+        columns.add(cs);
+        if (isKeyColumn) keyColSchemas.add(cs);
       }
 
       Schema schema = new Schema(columns);
       CreateTableBuilder ctb = new CreateTableBuilder();
+      for (KeyBuilder kb : parseSplits(schema.getRowKeyProjection(), splitsJson)) {
+        ctb.addSplitKey(kb);
+      }
+
       client.createTable(kuduTableName, schema, ctb);
     } catch (ImpalaRuntimeException e) {
       throw e;
@@ -116,7 +133,7 @@ public class KuduDdlDelegate implements DdlDelegate {
     String kuduMasters = msTbl.getParameters().get(KuduTable.KEY_MASTER_ADDRESSES);
 
     try {
-      KuduClient client = new KuduClient(KuduUtil.stringToHostAndPort(kuduMasters));
+      KuduClient client = new KuduClient(stringToHostAndPort(kuduMasters));
       if (!client.tableExists(kuduTableName)) {
         throw new ImpalaRuntimeException(String.format(
             "Table %s does not exist in Kudu master %s", kuduTableName, kuduMasters));
@@ -141,5 +158,4 @@ public class KuduDdlDelegate implements DdlDelegate {
     throw new ImpalaRuntimeException(
         "Alter table operations are not supported for Kudu tables.");
   }
-
 }

@@ -67,6 +67,8 @@ public class KuduTable extends Table {
   public static final String KUDU_STORAGE_HANDLER =
       "com.cloudera.kudu.hive.KuduStorageHandler";
 
+  public static final String KEY_SPLIT_KEYS = "kudu.split_keys";
+
   public static final long KUDU_RPC_TIMEOUT_MS = 50000;
 
   // The name of the table in Kudu.

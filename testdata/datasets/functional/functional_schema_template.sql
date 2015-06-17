@@ -577,6 +577,8 @@ delimited fields terminated by ','  escaped by '\\'
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/DimTbl/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- TABLE_PROPERTIES
+kudu:kudu.split_keys=[[1003], [1007]]
 ====
 ---- DATASET
 functional
@@ -1017,6 +1019,8 @@ delimited fields terminated by ','
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/TinyTable/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- TABLE_PROPERTIES
+kudu:kudu.split_keys=[["b"], ["d"]]
 ====
 ---- DATASET
 functional
@@ -1030,6 +1034,8 @@ delimited fields terminated by ','
 INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
 LOAD DATA LOCAL INPATH '{impala_home}/testdata/TinyIntTable/data.csv' OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
+---- TABLE_PROPERTIES
+kudu:kudu.split_keys=[[2], [4], [6], [8]]
 ====
 ---- DATASET
 functional
@@ -1174,6 +1180,7 @@ LOAD DATA LOCAL INPATH '{impala_home}/testdata/ImpalaDemoDataset/DEC_00_SF3_P077
 --- For kudu we map the first two colums as keys so that we can have tests with more than
 --- one key.
 kudu:kudu.key_columns=id,zip
+kudu:kudu.split_keys=[["8600000US01475", "01475"], ["8600000US63121", "63121"], ["8600000US84712", "84712"]]
 ====
 ---- DATASET
 functional

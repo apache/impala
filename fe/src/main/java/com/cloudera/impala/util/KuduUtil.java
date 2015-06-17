@@ -1,3 +1,4 @@
+
 // Copyright 2015 Cloudera Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,14 +15,19 @@
 
 package com.cloudera.impala.util;
 
+import java.io.StringReader;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.kududb.ColumnSchema;
+import org.kududb.Schema;
 import org.kududb.Type;
+import org.kududb.client.KeyBuilder;
 import org.kududb.client.KuduTable;
 
 import com.cloudera.impala.catalog.ScalarType;
@@ -32,7 +38,13 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.net.HostAndPort;
 
+import javax.json.Json;
+import javax.json.JsonArray;
+import javax.json.JsonReader;
+
 public class KuduUtil {
+
+  private static final String SPLIT_KEYS_ERROR_MESSAGE = "Error parsing splits keys.";
 
   /**
    * Compare the schema of a HMS table and a Kudu table. Returns true if both tables have
@@ -59,6 +71,65 @@ public class KuduUtil {
     }
 
     return true;
+  }
+
+  /**
+   * Parses split keys from statements.
+   *
+   * Split keys are expected to be in json, as an array of arrays, in the form:
+   * '[[value1_col1, value1_col2, ...], [value2_col1, value2_col2, ...], ...]'
+   *
+   * Each inner array corresponds to a split key and is expected to have the same
+   * number and type of values as specified in 'keyProjection'.
+   */
+  public static List<KeyBuilder> parseSplits(Schema keyProjection, String kuduSplits)
+      throws ImpalaRuntimeException {
+
+    // If there are no splits return early.
+    if (kuduSplits == null || kuduSplits.isEmpty()) return ImmutableList.of();
+
+    ImmutableList.Builder<KeyBuilder> keyBuilders = ImmutableList.builder();
+
+    // ...Otherwise parse the splits. We're expecting splits in the format of a list of
+    // lists of keys. We only support specifying splits for int and string keys
+    // (currently those are the only type of keys allowed in Kudu too).
+    try {
+      JsonReader jr = Json.createReader(new StringReader(kuduSplits));
+      JsonArray keysList = jr.readArray();
+      for (int i = 0; i < keysList.size(); i++) {
+        KeyBuilder keyBuilder = new KeyBuilder(keyProjection);
+        JsonArray compoundKey = keysList.getJsonArray(i);
+        if (compoundKey.size() != keyProjection.getKeysCount()) {
+          throw new ImpalaRuntimeException(SPLIT_KEYS_ERROR_MESSAGE +
+              " Wrong number of keys.");
+        }
+        for (int j = 0; j < compoundKey.size(); j++) {
+          setKey(keyBuilder, keyProjection.getColumn(j).getType(), compoundKey, j);
+        }
+        keyBuilders.add(keyBuilder);
+      }
+    } catch (ImpalaRuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new ImpalaRuntimeException(SPLIT_KEYS_ERROR_MESSAGE + " Problem parsing json"
+          + ": " + e.getMessage(), e);
+    }
+
+    return keyBuilders.build();
+  }
+
+  private static void setKey(KeyBuilder keyBuilder, Type type, JsonArray array, int pos)
+      throws ImpalaRuntimeException {
+    switch (type) {
+      case INT8: keyBuilder.addByte((byte) array.getInt(pos)); break;
+      case INT16: keyBuilder.addShort((short) array.getInt(pos)); break;
+      case INT32: keyBuilder.addInt(array.getInt(pos)); break;
+      case INT64: keyBuilder.addLong(array.getJsonNumber(pos).longValue()); break;
+      case STRING: keyBuilder.addString(array.getString(pos)); break;
+      default:
+        throw new ImpalaRuntimeException("Key columns not supported for type: "
+            + type.toString());
+    }
   }
 
   /**

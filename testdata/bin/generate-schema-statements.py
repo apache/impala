@@ -480,7 +480,7 @@ def generate_statements(output_name, test_vectors, sections,
 
       if table_format in schema_only_constraints and \
          table_name.lower() not in schema_only_constraints[table_format]:
-        print ('Skipping table: %s.%s, \'only\' constraint for foramt did not '
+        print ('Skipping table: %s.%s, \'only\' constraint for format did not '
                'include this table.') % (db, table_name)
         continue
 
