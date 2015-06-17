@@ -86,7 +86,7 @@ def parse_table_constraints(constraints_file):
   """Reads a table contraints file, if one exists"""
   schema_include = defaultdict(list)
   schema_exclude = defaultdict(list)
-  schema_only=defaultdict(set)
+  schema_only = defaultdict(list)
   if not isfile(constraints_file):
     LOG.info('No schema constraints file file found')
   else:
@@ -103,7 +103,7 @@ def parse_table_constraints(constraints_file):
         # collected for the same table_format will be created.
         if constraint_type == 'only':
           for f in map(parse_table_format_constraint, table_formats.split(',')):
-            schema_only[f] = table_name.lower()
+            schema_only[f].append(table_name.lower())
         elif constraint_type == 'restrict_to':
           schema_include[table_name.lower()] +=\
               map(parse_table_format_constraint, table_formats.split(','))
