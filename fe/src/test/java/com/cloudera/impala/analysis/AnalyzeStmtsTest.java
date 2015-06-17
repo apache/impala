@@ -532,6 +532,25 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         path(4, 1, 1, 1, 1));
     testSlotRefPath("select m1.key from d.t7, t7.c5, c5.m1, c5.m2, m2.m3",
         path(4, 1, 0, 0));
+
+    // Tests that an attempted implicit match must be succeeded by an explicit match.
+    addTestTable("create table d.t8 (" +
+        "s1 struct<" +
+        "  s2:struct<" +
+        "    a:array<" +
+        "      array<struct<" +
+        "        e:int,f:string>>>>>)");
+    // Explanation of test:
+    // - d.t8.s1.s2.a resolves to a CollectionStructType with fields 'item' and 'pos'
+    // - we are allowed to implicitly skip the 'item' field
+    // - d.t8.s1.s2.a.item again resolves to a CollectionStructType with 'item' and 'pos'
+    // - however, we are not allowed to implicitly skip 'item' again, since we have
+    //   already skipped 'item' previously
+    // - the rule is: an implicit match must be followed by an explicit one
+    AnalysisError("select f from d.t8.s1.s2.a",
+        "Could not resolve column/field reference: 'f'");
+    AnalysisError("select 1 from d.t8.s1.s2.a, a.f",
+        "Could not resolve table reference: 'a.f'");
   }
 
   @Test

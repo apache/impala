@@ -71,6 +71,20 @@ import com.google.common.collect.Lists;
  *
  * Please refer to TestImplicitAndExplicitPaths() for analogous examples for maps.
  *
+ * Illegal Implicit Paths
+ * The intention of implicit paths is to allow users to skip a *single* trivial level of
+ * indirection in common cases. In particular, it is illegal to implicitly skip multiple
+ * levels in a path, illustrated as follows.
+ *
+ * Example
+ * create table d.t (
+ *   c array<array<struct<e:int,f:string>>>
+ * );
+ *
+ * select c.f from d.t.c
+ * select 1 from d.t.c, c.f
+ *   c.f <-- illegal path because it would have to implicitly skip two 'item' fields
+ *
  *
  * Uses of Paths and Terminology
  *
@@ -197,6 +211,8 @@ public class Path {
       currentType = rootTable_.getType().getItemType();
     }
 
+    // True if the next raw-path element must match explicitly.
+    boolean expectExplicitMatch = false;
     // Map all remaining raw-path elements to field types and positions.
     while (rawPathIdx < rawPath_.size()) {
       if (!currentType.isComplexType()) return false;
@@ -205,7 +221,7 @@ public class Path {
       StructField field = structType.getField(rawPath_.get(rawPathIdx));
       if (field == null) {
         // Resolve implicit path.
-        if (structType instanceof CollectionStructType) {
+        if (!expectExplicitMatch && structType instanceof CollectionStructType) {
           field = ((CollectionStructType) structType).getOptionalField();
         } else {
           // Failed to resolve implicit or explicit path.
@@ -215,9 +231,13 @@ public class Path {
         matchedTypes_.add(field.getType());
         matchedPositions_.add(field.getPosition());
         currentType = field.getType();
+        // After an implicit match there must be an explicit match.
+        expectExplicitMatch = true;
         // Do not consume a raw-path element.
         continue;
       }
+      // After an explicit match we could have an implicit matche again.
+      expectExplicitMatch = false;
       matchedTypes_.add(field.getType());
       matchedPositions_.add(field.getPosition());
       if (field.getType().isCollectionType() && firstCollectionPathIdx_ == -1) {
