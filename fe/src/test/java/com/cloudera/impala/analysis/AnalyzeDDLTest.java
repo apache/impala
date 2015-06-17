@@ -1204,7 +1204,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         ")",
         "Kudu table is missing parameters in table properties. Please verify " +
         "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
-        "present.");
+        "present and have valid values.");
 
     AnalysisError("create table tab (x int) tblproperties (" +
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
@@ -1213,7 +1213,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         +")",
         "Kudu table is missing parameters in table properties. Please verify " +
         "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
-        "present.");
+        "present and have valid values.");
 
     AnalysisError("create table tab (x int) tblproperties (" +
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
@@ -1222,7 +1222,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         ")",
         "Kudu table is missing parameters in table properties. Please verify " +
         "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
-        "present.");
+        "present and have valid values.");
 
     // Check that properties are not empty
     AnalysisError("create table tab (x int) tblproperties (" +
@@ -1231,7 +1231,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "'kudu.master_addresses' = '127.0.0.1:8080', " +
         "'kudu.key_columns' = 'a,b,c'" +
         ")",
-        "Table property kudu.table_name cannot be empty for Kudu table.");
+        "Kudu table is missing parameters in table properties. Please verify " +
+        "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
+        "present and have valid values.");
 
     AnalysisError("create table tab (x int) tblproperties (" +
         "'storage_handler'='com.cloudera.kudu.hive.KuduStorageHandler', " +
@@ -1239,7 +1241,9 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "'kudu.master_addresses' = '', " +
         "'kudu.key_columns' = 'a,b,c'" +
         ")",
-        "Table property kudu.master_addresses cannot be empty for Kudu table.");
+        "Kudu table is missing parameters in table properties. Please verify " +
+        "if kudu.table_name, kudu.master_addresses, and kudu.key_columns are " +
+        "present and have valid values.");
 
     // Don't allow caching
     AnalysisError("create table tab (x int) cached in 'testPool' tblproperties (" +

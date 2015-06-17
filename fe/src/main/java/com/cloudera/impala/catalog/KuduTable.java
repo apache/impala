@@ -207,9 +207,12 @@ public class KuduTable extends Table {
    * map.
    */
   public static boolean validTable(Map<String, String> params) {
-    return params.get(KEY_TABLE_NAME) != null && params.get(KEY_MASTER_ADDRESSES) != null
-        && params.get(KEY_KEY_COLUMNS) != null;
-  }
+    return params.get(KEY_TABLE_NAME) != null && params.get(KEY_TABLE_NAME).length() > 0
+        && params.get(KEY_MASTER_ADDRESSES) != null
+        && params.get(KEY_MASTER_ADDRESSES).length() > 0
+        && params.get(KEY_KEY_COLUMNS) != null
+        && params.get(KEY_KEY_COLUMNS).length() > 0;
+   }
 
   /**
    * The number of nodes is not know ahead of time and will be updated during computeStats

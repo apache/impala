@@ -233,20 +233,10 @@ public class CreateTableStmt extends StatementBase {
         getTblProperties().get(KuduTable.KEY_STORAGE_HANDLER))) {
       if (!KuduTable.validTable(getTblProperties())) {
         throw new AnalysisException("Kudu table is missing parameters " +
-            String.format(
-            "in table properties. Please verify if %s, %s, and %s are present.",
+            String.format("in table properties. Please verify if %s, %s, and %s are "
+                + "present and have valid values.",
             KuduTable.KEY_TABLE_NAME, KuduTable.KEY_MASTER_ADDRESSES,
             KuduTable.KEY_KEY_COLUMNS));
-      }
-
-      List<String> prop_keys = Lists.newArrayList(KuduTable.KEY_KEY_COLUMNS,
-          KuduTable.KEY_MASTER_ADDRESSES, KuduTable.KEY_TABLE_NAME);
-      for (String k : prop_keys) {
-        if (!getTblProperties().containsKey(k) ||
-            getTblProperties().get(k).length() == 0) {
-          throw new AnalysisException(String.format("Table property %s cannot be " +
-              "empty for Kudu table.", k));
-        }
       }
 
       // Kudu table cannot be a cached table
