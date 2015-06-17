@@ -276,6 +276,12 @@ void BufferedBlockMgr::ClearTmpReservation(Client* client) {
 }
 
 bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
+  // Workaround IMPALA-1619. Return immediately if trying to allocate more than 1GB.
+  if (UNLIKELY(size > (1LL << 30))) {
+    LOG(WARNING) << "Trying to allocate memory >1GB (" << size << ")B."
+                 << GetStackTrace();
+    return false;
+  }
   int buffers_needed = BitUtil::Ceil(size, max_block_size());
   DCHECK_GT(buffers_needed, 0) << "Trying to consume 0 memory";
   unique_lock<mutex> lock(lock_);

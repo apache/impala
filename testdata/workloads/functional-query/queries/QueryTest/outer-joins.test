@@ -627,6 +627,36 @@ NULL
 tinyint
 ====
 ---- QUERY
+## Test for IMPALA-2065. This query needs a join with >1GB build partitions. We currently
+## cannot allocate such big partitions and we fail with OOM. Once IMPALA-1619 is delivered
+## we should be able to run this query.
+#SELECT
+#COUNT(DISTINCT t1.double_col) AS int_col,
+#(COALESCE((t1.month) - (t1.tinyint_col),
+#          (t1.month) - (t1.tinyint_col),
+#          (t1.month) - (t1.tinyint_col))) = (MIN((t1.month) - (t1.tinyint_col)))
+#AS boolean_col,
+#(t1.month) - (t1.tinyint_col) AS int_col_2
+#FROM alltypes t1
+#WHERE(t1.id) NOT IN (WITH with_1 AS (SELECT
+#LEAD(COALESCE(COALESCE(300, 124, -158), 369, 365), 63)
+#OVER (ORDER BY bigint_col DESC, string_col ASC) AS int_col
+#FROM alltypes)
+#SELECT
+#(tt1.int_col) - (-822.1) AS decimal_col
+#FROM with_1 tt1
+#INNER JOIN with_1 tt2 ON ((tt2.int_col) = (tt1.int_col)) AND ((tt2.int_col) = (tt1.int_col))
+#WHERE
+#((tt1.int_col) <= (tt1.int_col)) AND
+#(((t1.tinyint_col) = (tt2.int_col)) AND
+#((t1.id) = (tt2.int_col))))
+#GROUP BY (t1.month) - (t1.tinyint_col)
+#---- RESULTS
+#'WARNINGS:'
+#'Memory limit exceeded'
+#'Cannot perform hash join at node with id 9. Repartitioning did not reduce the size of a spilled partition. Repartitioning level 1. Number of rows 52374169.'
+#====
+#---- QUERY
 # Regression test for IMPALA-904. Tests correct execution of exprs from an outer-joined
 # inline view that can evaluate to a non-NULL value with NULL-valued slots. Use an
 # explicit [shuffle] hint for extra coverage because the expr will also be evaluated in

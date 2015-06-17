@@ -401,6 +401,10 @@ TEST_F(HashTableTest, QuadraticSetupTest) {
   SetupTest(true, 65536);
 }
 
+// TODO: In order to test IMPALA-2065, after IMPALA-1656 is delivered add a test that
+// tries to Init a hash table with very large (>2^31) number of buckets.
+//TEST_F(HashTableTest, InitTest)
+
 TEST_F(HashTableTest, LinearBasicTest) {
   BasicTest(false, 1);
   BasicTest(false, 1024);
