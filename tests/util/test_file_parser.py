@@ -9,7 +9,6 @@ from collections import defaultdict
 from os.path import isfile, isdir
 from tests.common.test_dimensions import TableFormatInfo
 
-logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('impala_test_suite')
 
 # constants
