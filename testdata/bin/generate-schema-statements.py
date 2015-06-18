@@ -191,6 +191,8 @@ def build_table_template(file_format, columns, partition_columns, row_format,
   tblproperties_clause = "TBLPROPERTIES (\n{0}\n)"
   tblproperties = {}
 
+  external = "EXTERNAL"
+
   if file_format == 'avro':
     tblproperties["avro.schema.url"] = "hdfs://%s/%s/%s/{table_name}.json" \
       % (options.hdfs_namenode, options.hive_warehouse_dir, avro_schema_dir)
@@ -206,6 +208,8 @@ def build_table_template(file_format, columns, partition_columns, row_format,
       "{0}:{1}".format(kudu_master, kudu_master_port)
     tblproperties["kudu.table_name"] = table_name
     tblproperties["kudu.key_columns"] = columns.split("\n")[0].split(" ")[0]
+    # Kudu's test tables are managed.
+    external = ""
 
   # Read the properties specified in the TABLE_PROPERTIES section. When the specified
   # properties have the same key as a default property, the value for the specified
@@ -230,7 +234,7 @@ def build_table_template(file_format, columns, partition_columns, row_format,
   # Note: columns are ignored but allowed if a custom serde is specified
   # (e.g. Avro)
   stmt = """
-CREATE EXTERNAL TABLE IF NOT EXISTS {{db_name}}{{db_suffix}}.{{table_name}} (
+CREATE {external} TABLE IF NOT EXISTS {{db_name}}{{db_suffix}}.{{table_name}} (
 {columns})
 {partitioned_by}
 {row_format}
@@ -238,6 +242,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS {{db_name}}{{db_suffix}}.{{table_name}} (
 LOCATION '{{hdfs_location}}'
 {tblproperties}
 """.format(
+    external=external,
     row_format=row_format_stmt,
     columns=',\n'.join(columns.split('\n')),
     partitioned_by=partitioned_by,
@@ -329,6 +334,12 @@ def build_insert_into_statement(insert, db_name, db_suffix, table_name, file_for
                                    db_suffix=db_suffix,
                                    table_name=table_name,
                                    hdfs_location=hdfs_path)
+
+  # Kudu tables are managed and don't support OVERWRITE, so we replace OVERWRITE
+  # with INTO to make this a regular INSERT.
+  if file_format == 'kudu':
+    insert_statement = insert_statement.replace("OVERWRITE", "INTO")
+
   if for_impala:
     return insert_statement
 
@@ -354,12 +365,6 @@ def build_hbase_insert(db_name, db_suffix, table_name):
 
 def build_insert(insert, db_name, db_suffix, file_format,
                  codec, compression_type, table_name, hdfs_path, create_hive=False):
-  # Data loading is currently disabled for Kudu, only schema is loaded
-  if file_format == 'kudu' and not create_hive:
-    #TODO enable insert stmts once Impala/Kudu supoprts this
-    print("Generating insert statements for {0}{1}.{2} disabled for Kudu table".format(
-      db_name, table_name, db_suffix))
-    return ""
   # HBASE inserts don't need the hive options to be set, and don't require and HDFS
   # file location, so they're handled separately.
   if file_format == 'hbase' and not create_hive:
@@ -620,13 +625,13 @@ def generate_statements(output_name, test_vectors, sections,
                                                               db_suffix, table_name))
           else:
             print 'Empty base table load for %s. Skipping load generation' % table_name
-        elif file_format == 'parquet':
+        elif file_format in ['kudu', 'parquet']:
           if insert:
             impala_load.load.append(build_insert_into_statement(insert, db_name,
-                db_suffix, table_name, 'parquet', data_path, for_impala=True))
+                db_suffix, table_name, file_format, data_path, for_impala=True))
           else:
-            print \
-                'Empty parquet load for table %s. Skipping insert generation' % table_name
+            print 'Empty parquet/kudu load for table %s. Skipping insert generation' \
+              % table_name
         else:
           if insert:
             hive_output.load.append(build_insert(insert, db_name, db_suffix, file_format,
