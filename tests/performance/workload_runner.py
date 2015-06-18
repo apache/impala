@@ -14,13 +14,17 @@
 # limitations under the License.
 
 import logging
-from tests.common.query import Query, QueryResult
-from tests.common.query_executor import (BeeswaxQueryExecConfig, HiveQueryExecConfig,
-    JdbcQueryExecConfig, execute_using_impala_beeswax, execute_using_jdbc,
-    execute_using_hive, QueryExecutor)
-from tests.common.test_dimensions import (TableFormatInfo, load_table_info_dimension,
+from tests.common.test_dimensions import (TableFormatInfo,
+    load_table_info_dimension,
     get_dataset_from_workload)
-from tests.common.scheduler import Scheduler
+from tests.performance.query import Query, QueryResult
+from tests.performance.query_executor import (BeeswaxQueryExecConfig,
+    HiveQueryExecConfig,
+    JdbcQueryExecConfig,
+    execute_using_impala_beeswax,
+    execute_using_jdbc,
+    execute_using_hive, QueryExecutor)
+from tests.performance.scheduler import Scheduler
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO, format='[%(name)s]: %(message)s')
@@ -49,7 +53,7 @@ class WorkloadRunner(object):
     config (WorkloadConfig)
     exit_on_error (boolean)
     results (list of QueryResult)
-    __test_vectors (list of ?)
+    _test_vectors (list of ?)
   """
   def __init__(self, workload, scale_factor, config):
     self.workload = workload
@@ -57,36 +61,36 @@ class WorkloadRunner(object):
     self.config = config
     self.exit_on_error = not self.config.continue_on_query_error
     if self.config.verbose: LOG.setLevel(level=logging.DEBUG)
-    self.__generate_test_vectors()
-    self.__results = list()
+    self._generate_test_vectors()
+    self._results = list()
 
   @property
   def results(self):
-    return self.__results
+    return self._results
 
-  def __generate_test_vectors(self):
+  def _generate_test_vectors(self):
     """Generate test vector objects
 
     If the user has specified a set for table_formats, generate them, otherwise generate
     vectors for all table formats within the specified exploration strategy.
     """
-    self.__test_vectors = []
+    self._test_vectors = []
     if self.config.table_formats:
       dataset = get_dataset_from_workload(self.workload.name)
       for tf in self.config.table_formats:
-        self.__test_vectors.append(TableFormatInfo.create_from_string(dataset, tf))
+        self._test_vectors.append(TableFormatInfo.create_from_string(dataset, tf))
     else:
       vectors = load_table_info_dimension(self.workload.name,
           self.config.exploration_strategy)
-      self.__test_vectors = [vector.value for vector in vectors]
+      self._test_vectors = [vector.value for vector in vectors]
 
-  def __get_executor_name(self):
+  def _get_executor_name(self):
     executor_name = self.config.client_type
     # We want to indicate this is IMPALA beeswax.
     # We currently don't support hive beeswax.
     return 'impala_beeswax' if executor_name == 'beeswax' else executor_name
 
-  def __create_executor(self, executor_name):
+  def _create_executor(self, executor_name):
     query_options = {
         'hive': lambda: (execute_using_hive,
           HiveQueryExecConfig(self.config.query_iterations,
@@ -104,14 +108,14 @@ class WorkloadRunner(object):
     } [executor_name]()
     return query_options
 
-  def __execute_queries(self, queries):
+  def _execute_queries(self, queries):
     """Execute a set of queries.
 
     Create query executors for each query, and pass them along with config information to
     the scheduler, which then runs the queries.
     """
-    executor_name = self.__get_executor_name()
-    exec_func, exec_config = self.__create_executor(executor_name)
+    executor_name = self._get_executor_name()
+    exec_func, exec_config = self._create_executor(executor_name)
     query_executors = []
     # Build an executor for each query
     for query in queries:
@@ -127,14 +131,14 @@ class WorkloadRunner(object):
         num_clients=self.config.num_clients)
 
     scheduler.run()
-    self.__results.extend(scheduler.results)
+    self._results.extend(scheduler.results)
 
   def run(self):
     """
     Runs the workload against all test vectors serially and stores the results.
     """
-    for test_vector in self.__test_vectors:
+    for test_vector in self._test_vectors:
       # Transform the query strings to Query objects for a combination of scale factor and
       # the test vector.
       queries = self.workload.construct_queries(test_vector, self.scale_factor)
-      self.__execute_queries(queries)
+      self._execute_queries(queries)

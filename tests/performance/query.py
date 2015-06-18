@@ -41,7 +41,7 @@ class Query(object):
     self.db = None
     # Only attempt to build the query if a query_str has been passed to the c'tor.
     # If it's None, assume the user wants to set a qualified query_str
-    if self.query_str: self.__build_query()
+    if self.query_str: self._build_query()
 
   def __eq__(self, other):
     return (self.query_str == other.query_str and
@@ -51,7 +51,7 @@ class Query(object):
             self.workload_name == other.workload_name and
             self.db == other.db)
 
-  def __build_query(self):
+  def _build_query(self):
     """Populates db, query_str, table_format_str"""
     self.db = QueryTestSectionReader.get_db_name(self.test_vector, self.scale_factor)
     self.query_str = QueryTestSectionReader.build_query(self.query_str.strip())
@@ -92,7 +92,7 @@ class QueryResult(object):
   def __init__(self, query, **kwargs):
     self.query = query
     self.time_taken = kwargs.get('time_taken', 0.0)
-    self.__summary = kwargs.get('summary', str())
+    self._summary = kwargs.get('summary', str())
     self.data = kwargs.get('data', str())
     self.start_time = kwargs.get('start_time')
     self.query_config = kwargs.get('query_config')
@@ -105,11 +105,11 @@ class QueryResult(object):
 
   @property
   def summary(self):
-    return self.__summary
+    return self._summary
 
   @summary.setter
   def summary(self, value):
-    self.__summary = value
+    self._summary = value
 
   def __str__(self):
     """Print human readable query execution details"""

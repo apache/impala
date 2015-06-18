@@ -57,35 +57,35 @@ class Scheduler(object):
     self.query_iterations = kwargs.get('query_iterations', 1)
     self.impalads = kwargs.get('impalads')
     self.num_clients = kwargs.get('num_clients', 1)
-    self.__exit = Event()
-    self.__results = list()
-    self.__result_dict_lock = Lock()
-    self.__thread_name = "[%s " % self.query_executors[0].query.db + "Thread %d]"
-    self.__threads = []
-    self.__create_workload_threads()
+    self._exit = Event()
+    self._results = list()
+    self._result_dict_lock = Lock()
+    self._thread_name = "[%s " % self.query_executors[0].query.db + "Thread %d]"
+    self._threads = []
+    self._create_workload_threads()
 
   @property
   def results(self):
     """Return execution results."""
-    return self.__results
+    return self._results
 
-  def __create_workload_threads(self):
+  def _create_workload_threads(self):
     """Create workload threads.
 
     Each workload thread is analogus to a client name, and is identified by a unique ID,
     the workload that's being run and the table formats it's being run on."""
     for thread_num in xrange(self.num_clients):
-      thread = Thread(target=self.__run_queries, args=[thread_num],
-          name=self.__thread_name % thread_num)
+      thread = Thread(target=self._run_queries, args=[thread_num],
+          name=self._thread_name % thread_num)
       thread.daemon = True
-      self.__threads.append(thread)
+      self._threads.append(thread)
 
-  def __get_next_impalad(self):
+  def _get_next_impalad(self):
     """Maintains a rotating list of impalads"""
     self.impalads.rotate(-1)
     return self.impalads[-1]
 
-  def __run_queries(self, thread_num):
+  def _run_queries(self, thread_num):
     """This method is run by every thread concurrently.
 
     Args:
@@ -103,33 +103,33 @@ class Scheduler(object):
         query_name = query_executor.query.name
         LOG.info("Running Query: %s" % query_name)
         for i in xrange(self.query_iterations):
-          if self.__exit.isSet():
+          if self._exit.isSet():
             LOG.error("Another thread failed, exiting.")
             exit(1)
           try:
-            query_executor.prepare(self.__get_next_impalad())
+            query_executor.prepare(self._get_next_impalad())
             query_executor.execute()
           # QueryExecutor only throws an exception if the query fails and abort_on_error
           # is set to True. If abort_on_error is False, then the exception is logged on
           # the console and execution moves on to the next query.
           except Exception as e:
             LOG.error("Query %s Failed: %s" % (query_name, str(e)))
-            self.__exit.set()
+            self._exit.set()
           finally:
             LOG.info("%s query iteration %d finished in %.2f seconds" % (query_name, i+1,
               query_executor.result.time_taken))
             result = query_executor.result
             result.client_name = thread_num + 1
-            self.__results.append(result)
+            self._results.append(result)
           workload_time_sec += query_executor.result.time_taken
       if self.query_iterations == 1:
         LOG.info("Workload iteration %d finished in %s seconds" % (j+1, workload_time_sec))
 
   def run(self):
     """Run the query pipelines concurrently"""
-    for thread_num, t in enumerate(self.__threads):
-      LOG.info("Starting %s" % self.__thread_name % thread_num)
+    for thread_num, t in enumerate(self._threads):
+      LOG.info("Starting %s" % self._thread_name % thread_num)
       t.start()
-    for thread_num,t in enumerate(self.__threads):
+    for thread_num,t in enumerate(self._threads):
       t.join()
-      LOG.info("Finished %s" % self.__thread_name % thread_num)
+      LOG.info("Finished %s" % self._thread_name % thread_num)

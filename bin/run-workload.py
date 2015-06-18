@@ -37,10 +37,10 @@ from random import shuffle
 from sys import exit
 
 from tests.common.test_dimensions import TableFormatInfo
-from tests.common.query import Query, QueryResult
-from tests.common.query_executor import QueryExecConfig
-from tests.common.workload_runner import WorkloadRunner
-from tests.common.workload import Workload
+from tests.performance.query import Query, QueryResult
+from tests.performance.query_executor import QueryExecConfig
+from tests.performance.workload_runner import WorkloadRunner
+from tests.performance.workload import Workload
 from tests.util.plugin_runner import PluginRunner
 
 parser = OptionParser()

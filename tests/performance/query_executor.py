@@ -36,7 +36,7 @@ from collections import defaultdict, deque
 from datetime import datetime
 from random import randint
 from subprocess import Popen, PIPE
-from tests.common.query import Query, QueryResult
+from tests.performance.query import Query, QueryResult
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient, ImpalaBeeswaxResult
 from threading import Thread, Lock
 
@@ -122,9 +122,9 @@ class BeeswaxQueryExecConfig(ImpalaQueryExecConfig):
         impalad=impalad)
     self.use_kerberos = use_kerberos
     self.exec_options = dict()
-    self.__build_options(exec_options)
+    self._build_options(exec_options)
 
-  def __build_options(self, exec_options):
+  def _build_options(self, exec_options):
     """Read the exec_options into self.exec_options
 
     Args:
@@ -178,7 +178,7 @@ class QueryExecutor(object):
     self.query = query
     self.exit_on_error = exit_on_error
     self.executor_name = name
-    self.__result = QueryResult(query, query_config=self.exec_config)
+    self._result = QueryResult(query, query_config=self.exec_config)
 
   def prepare(self, impalad):
     """Prepare the query to be run.
@@ -191,10 +191,10 @@ class QueryExecutor(object):
 
   def execute(self):
     """Execute the query using the given execution function"""
-    self.__result = self.exec_func(self.query, self.exec_config)
-    if not self.__result.success:
+    self._result = self.exec_func(self.query, self.exec_config)
+    if not self._result.success:
       if self.exit_on_error:
-        raise RuntimeError(self.__result.query_error)
+        raise RuntimeError(self._result.query_error)
       else:
         LOG.info("Continuing execution")
 
@@ -205,7 +205,7 @@ class QueryExecutor(object):
     A result is a QueryResult object that contains the details of a single run of the
     query.
     """
-    return self.__result
+    return self._result
 
 def establish_beeswax_connection(query, query_config):
   """Establish a connection to the user specified impalad.
