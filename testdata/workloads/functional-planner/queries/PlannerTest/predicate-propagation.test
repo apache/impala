@@ -1120,3 +1120,48 @@ where b.id < 10
    partitions=24/24 files=24 size=478.45KB
    predicates: id > 20, functional.alltypes.id < 10
 ====
+# Test proper predicate assignment with predicate propagation when the
+# generated predicate is bound by an outer joined tuple (IMPALA-2018)
+select * from
+  (select j.int_col, sum(j.tinyint_col) as total from
+   (select a.id, a.tinyint_col, b.int_col from
+    functional.alltypestiny a left outer join functional.alltypesagg b
+    on a.id = b.id) j
+   group by j.int_col) v
+where v.int_col = 10
+---- PLAN
+03:AGGREGATE [FINALIZE]
+|  output: sum(a.tinyint_col)
+|  group by: b.int_col
+|  having: j.int_col = 10
+|
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: b.id = a.id
+|
+|--00:SCAN HDFS [functional.alltypestiny a]
+|     partitions=4/4 files=4 size=460B
+|
+01:SCAN HDFS [functional.alltypesagg b]
+   partitions=11/11 files=11 size=814.73KB
+   predicates: b.int_col = 10
+====
+# Test proper predicate assignment with predicate propagation when the
+# generated predicate is bound by an outer joined tuple (IMPALA-2018)
+select * from
+  (select j.int_col, j.tinyint_col from
+   (select a.id, a.tinyint_col, b.int_col from
+    functional.alltypestiny a left outer join functional.alltypesagg b
+    on a.id = b.id) j) v
+where v.int_col = 10
+---- PLAN
+02:HASH JOIN [RIGHT OUTER JOIN]
+|  hash predicates: b.id = a.id
+|  other predicates: b.int_col = 10
+|
+|--00:SCAN HDFS [functional.alltypestiny a]
+|     partitions=4/4 files=4 size=460B
+|
+01:SCAN HDFS [functional.alltypesagg b]
+   partitions=11/11 files=11 size=814.73KB
+   predicates: b.int_col = 10
+====

@@ -1386,9 +1386,15 @@ public class Analyzer {
             }
           }
 
-          boolean evalByJoin = evalByJoin(srcConjunct) &&
-              (globalState_.ojClauseByConjunct.get(srcConjunct.getId())
-                  != globalState_.outerJoinedTupleIds.get(srcTid));
+          // Check if either srcConjunct or the generated predicate needs to be evaluated
+          // at a join node (IMPALA-2018).
+          boolean evalByJoin =
+              (evalByJoin(srcConjunct)
+               && (globalState_.ojClauseByConjunct.get(srcConjunct.getId())
+                != globalState_.outerJoinedTupleIds.get(srcTid)))
+              || (evalByJoin(p)
+                  && (globalState_.ojClauseByConjunct.get(p.getId())
+                   != globalState_.outerJoinedTupleIds.get(destTid)));
 
           // mark all bound predicates including duplicate ones
           if (reverseValueTransfer && !evalByJoin) markConjunctAssigned(srcConjunct);
