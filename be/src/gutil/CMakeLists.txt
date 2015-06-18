@@ -14,6 +14,9 @@
 
 cmake_minimum_required(VERSION 2.6)
 
+set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/gutil")
+set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/gutil")
+
 # Ignore the code in proto/ for now until needed; otherwise this adds an extra dependency
 # on protoc to the build for no gain.
 
