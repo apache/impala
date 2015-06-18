@@ -1,0 +1,4 @@
+#!/bin/bash -e
+
+DIR=$(dirname "$0")
+pip install --download "$DIR" -r "$DIR"/requirements.txt

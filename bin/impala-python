@@ -1,0 +1,5 @@
+#!/bin/bash
+set -eu -o pipefail
+PY_DIR=$(dirname "$0")/../infra/python
+python "$PY_DIR/bootstrap_virtualenv.py"
+exec "$PY_DIR/env/bin/python" "$@"

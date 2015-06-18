@@ -1,0 +1,13 @@
+To install new packages:
+
+1) Add your package to deps/requirements.txt. You should specify the version number
+   using the "foo == x.y.z" notation so future upgrades can be done automatically.
+2) Run deps/download_requirements, it will download the package to the deps dir.
+3) Run the "impala-python" command, this should detect that requirements.txt changed and
+   automatically rebuild the virtualenv.
+4) Now in the python prompt, you should be able to import the new module.
+
+To upgrade a package:
+
+1) Edit deps/requirement.txt to use the version you need.
+2) Go to step 2 above.

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -eu -o pipefail
+
+PY_DIR=$(dirname "$0")/../infra/python
+
+# impala-python will build or upgrade the python virtualenv automatically.
+impala-python -c ""
+
+exec "$PY_DIR/env/bin/ipython" "$@"

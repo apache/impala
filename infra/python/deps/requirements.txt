@@ -1,0 +1,30 @@
+# To download requirements use the downlod_requirements script in this dir.
+
+# Remember, all modules below need to support python 2.6.
+
+allpairs == 2.0.1
+cm-api == 10.0.0
+Fabric == 1.10.2
+
+# This is a custom build of impyla that includes commit c5dfcf which is not in the latest
+# release 0.10.0.
+impyla == 0.11.0.dev0
+
+pexpect == 3.3
+pg8000 == 1.10.2
+prettytable == 0.7.2
+psutil == 0.7.1
+pyhive == 0.1.5
+pytest == 2.7.2
+pytest-xdist == 1.12
+pywebhdfs == 0.3.2
+sh == 1.11
+sqlparse == 0.1.15
+texttable == 0.8.3
+
+# Thrift usually comes from the thirdparty dir but in case the virtualenv is needed
+# before thirdparty is built thrift will be installed anyways.
+thrift == 0.9.0
+
+# For dev purposes, not used in scripting. Version 1.2.1 is the latest that supports 2.6.
+ipython == 1.2.1
