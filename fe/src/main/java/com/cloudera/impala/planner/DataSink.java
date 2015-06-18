@@ -19,6 +19,7 @@ import java.util.List;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.KuduTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.thrift.TDataSink;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -67,6 +68,12 @@ public abstract class DataSink {
       Preconditions.checkState(overwrite == false);
       // Create the HBaseTableSink and return it.
       return new HBaseTableSink(table);
+    } else if (table instanceof KuduTable) {
+      // Kudu doesn't have a way to perform INSERT OVERWRITE.
+      Preconditions.checkState(overwrite == false);
+      // Partition clauses don't make sense for Kudu inserts.
+      Preconditions.checkState(partitionKeyExprs.isEmpty());
+      return new KuduTableSink(table);
     } else {
       throw new UnsupportedOperationException(
           "Cannot create data sink into table of type: " + table.getClass().getName());

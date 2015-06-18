@@ -28,6 +28,7 @@ import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.KuduTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.catalog.View;
@@ -368,6 +369,16 @@ public class InsertStmt extends StatementBase {
               "partition column (%s) is not supported: %s", col.getName(),
               targetTableName_));
         }
+      }
+    }
+
+    if (table_ instanceof KuduTable) {
+      if (overwrite_) {
+        throw new AnalysisException("INSERT OVERWRITE not supported for Kudu tables.");
+      }
+      if (partitionKeyValues_ != null && !partitionKeyValues_.isEmpty()) {
+        throw new AnalysisException(
+            "Partition specifications are not supported for Kudu tables.");
       }
     }
 

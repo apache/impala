@@ -24,3 +24,59 @@ NODE 0:
 00:SCAN KUDU [functional_kudu.liketbl]
   predicates: str_col = '10'
 ====
+---- QUERY
+insert into functional_kudu.liketbl(str_col) values ('hello_world')
+---- PLAN
+WRITE TO KUDU [functional_kudu.liketbl]
+|
+00:UNION
+   constant-operands=1
+---- DISTRIBUTEDPLAN
+WRITE TO KUDU [functional_kudu.liketbl]
+|
+00:UNION
+   constant-operands=1
+====
+---- QUERY
+insert into functional_kudu.testtbl(id) select int_col from functional_kudu.tinyinttable
+---- PLAN
+WRITE TO KUDU [functional_kudu.testtbl]
+|
+00:SCAN KUDU [functional_kudu.tinyinttable]
+---- DISTRIBUTEDPLAN
+WRITE TO KUDU [functional_kudu.testtbl]
+|
+00:SCAN KUDU [functional_kudu.tinyinttable]
+====
+---- QUERY
+insert into functional_kudu.testtbl(id, name)
+select count(distinct id), name from functional_kudu.dimtbl
+group by name
+---- PLAN
+WRITE TO KUDU [functional_kudu.testtbl]
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(id)
+|  group by: name
+|
+01:AGGREGATE
+|  group by: name, id
+|
+00:SCAN KUDU [functional_kudu.dimtbl]
+---- DISTRIBUTEDPLAN
+WRITE TO KUDU [functional_kudu.testtbl]
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(id)
+|  group by: name
+|
+04:AGGREGATE
+|  group by: name, id
+|
+03:EXCHANGE [HASH(name)]
+|
+01:AGGREGATE
+|  group by: name, id
+|
+00:SCAN KUDU [functional_kudu.dimtbl]
+====
