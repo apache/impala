@@ -135,8 +135,10 @@ public class KuduDdlDelegate implements DdlDelegate {
     try {
       KuduClient client = new KuduClient(stringToHostAndPort(kuduMasters));
       if (!client.tableExists(kuduTableName)) {
-        throw new ImpalaRuntimeException(String.format(
-            "Table %s does not exist in Kudu master %s", kuduTableName, kuduMasters));
+        LOG.warn("Table: %s is in inconsistent state. It does not exist in Kudu master(s)"
+            + " %s, but it exists in Hive metastore. Deleting from metastore only.",
+            kuduTableName, kuduMasters);
+        return;
       }
       client.deleteTable(kuduTableName);
       return;
