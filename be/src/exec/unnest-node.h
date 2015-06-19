@@ -38,13 +38,8 @@ class UnnestNode : public ExecNode {
   virtual Status Reset(RuntimeState* state);
   virtual void Close(RuntimeState* state);
 
-  void set_containing_subplan(SubplanNode* sp) { containing_subplan_ = sp; }
-
  private:
-  /// Pointer to containing subplan node. Not owned.
-  SubplanNode* containing_subplan_;
-
-  /// Size of an array item in bytes. Set in Prepare().
+  /// Size of an array item tuple in bytes. Set in Prepare().
   int item_byte_size_;
 
   /// Expr that produces the ArrayVal to be unnested. The expr is evaluated against the

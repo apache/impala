@@ -117,6 +117,7 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
     num_rows_returned_(0),
     rows_returned_counter_(NULL),
     rows_returned_rate_(NULL),
+    containing_subplan_(NULL),
     is_closed_(false) {
   InitRuntimeProfile(PrintPlanNodeType(tnode.node_type));
 }

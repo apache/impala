@@ -110,7 +110,10 @@ Status TopNNode::Open(RuntimeState* state) {
   }
   DCHECK_LE(priority_queue_->size(), limit_ + offset_);
   PrepareForOutput();
-  child(0)->Close(state);
+
+  // Unless we are inside a subplan expecting to call Open()/GetNext() on the child
+  // again, the child can be closed at this point.
+  if (!IsInSubplan()) child(0)->Close(state);
   return Status::OK();
 }
 

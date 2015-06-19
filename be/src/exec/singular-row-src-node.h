@@ -25,14 +25,7 @@ class SingularRowSrcNode : public ExecNode {
  public:
   SingularRowSrcNode(ObjectPool* pool, const TPlanNode& tnode,
       const DescriptorTbl& descs);
-
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
-
-  void set_containing_subplan(SubplanNode* sp) { containing_subplan_ = sp; }
-
- private:
-  /// Pointer to containing subplan node. Not owned.
-  SubplanNode* containing_subplan_;
 };
 
 }

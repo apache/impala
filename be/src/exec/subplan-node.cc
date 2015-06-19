@@ -40,11 +40,8 @@ Status SubplanNode::Init(const TPlanNode& tnode) {
 }
 
 void SubplanNode::SetContainingSubplan(SubplanNode* ancestor, ExecNode* node) {
-  if (node->type() == TPlanNodeType::UNNEST_NODE) {
-    static_cast<UnnestNode*>(node)->set_containing_subplan(ancestor);
-  } else if (node->type() == TPlanNodeType::SINGULAR_ROW_SRC_NODE) {
-    static_cast<SingularRowSrcNode*>(node)->set_containing_subplan(ancestor);
-  } else if (node->type() == TPlanNodeType::SUBPLAN_NODE) {
+  node->set_containing_subplan(ancestor);
+  if (node->type() == TPlanNodeType::SUBPLAN_NODE) {
     // Only traverse the first child and not the second one, because the Subplan
     // parent of nodes inside it should be 'node' and not 'ancestor'.
     SetContainingSubplan(ancestor, node->child(0));

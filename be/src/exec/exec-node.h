@@ -162,6 +162,11 @@ class ExecNode {
   const RowDescriptor& row_desc() const { return row_descriptor_; }
   ExecNode* child(int i) { return children_[i]; }
   int num_children() const { return children_.size(); }
+  SubplanNode* get_containing_subplan() const { return containing_subplan_; }
+  void set_containing_subplan(SubplanNode* sp) {
+    DCHECK(containing_subplan_ == NULL);
+    containing_subplan_ = sp;
+  }
   int64_t rows_returned() const { return num_rows_returned_; }
   int64_t limit() const { return limit_; }
   bool ReachedLimit() { return limit_ != -1 && num_rows_returned_ >= limit_; }
@@ -248,7 +253,15 @@ class ExecNode {
   boost::mutex exec_options_lock_;
   std::string runtime_exec_options_;
 
-  bool is_closed() { return is_closed_; }
+  bool is_closed() const { return is_closed_; }
+
+  /// Pointer to the containing SubplanNode or NULL if not inside a subplan.
+  /// Set by SubplanNode::Init(). Not owned.
+  SubplanNode* containing_subplan_;
+
+  /// Returns true if this node is inside the right-hand side plan tree of a SubplanNode.
+  /// Valid to call in or after Prepare().
+  bool IsInSubplan() const { return containing_subplan_ != NULL; }
 
   /// Create a single exec node derived from thrift node; place exec node in 'pool'.
   static Status CreateNode(ObjectPool* pool, const TPlanNode& tnode,

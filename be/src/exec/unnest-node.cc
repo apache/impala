@@ -24,7 +24,6 @@ namespace impala {
 UnnestNode::UnnestNode(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
-    containing_subplan_(NULL),
     item_byte_size_(0),
     array_expr_ctx_(NULL),
     array_val_(ArrayVal::null()),

@@ -158,7 +158,10 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     // ReachedLimit() is true as we may end up releasing resources that are referenced
     // by the output row_batch.
     child_row_batch_.reset();
-    child(child_idx_)->Close(state);
+
+    // Unless we are inside a subplan expecting to call Open()/GetNext() on the child
+    // again, the child can be closed at this point.
+    if (!IsInSubplan()) child(child_idx_)->Close(state);
     ++child_idx_;
   }
 

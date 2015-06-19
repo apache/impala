@@ -153,10 +153,13 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
   eos_ = false;
   probe_side_eos_ = false;
 
-  // If we can get a thread token, initiate the construction of the build-side table in
-  // a separate thread, so that the left child can do any initialisation in parallel.
-  // Otherwise, do this in the main thread.
-  if (state->resource_pool()->TryAcquireThreadToken()) {
+  // If this node is not inside a subplan and can get a thread token, initiate the
+  // construction of the build-side table in a separate thread, so that the left child
+  // can do any initialisation in parallel. Otherwise, do this in the main thread.
+  // Inside a subplan we expect Open() to be called a number of times proportional to the
+  // input data of the SubplanNode, so we prefer doing the join build in the main thread,
+  // assuming that thread creation is expensive relative to a single subplan iteration.
+  if (!IsInSubplan() && state->resource_pool()->TryAcquireThreadToken()) {
     Promise<Status> build_side_status;
     AddRuntimeExecOption("Join Build-Side Prepared Asynchronously");
     Thread build_thread(node_name_, "build thread",

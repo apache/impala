@@ -62,7 +62,6 @@ PartitionedHashJoinNode::PartitionedHashJoinNode(
   memset(hash_tbls_, 0, sizeof(HashTable*) * PARTITION_FANOUT);
   can_add_probe_filters_ = tnode.hash_join_node.add_probe_filters;
   can_add_probe_filters_ &= FLAGS_enable_phj_probe_side_filtering;
-  // TODO: can_add_probe_filters_ &= !is_in_subplan();
 }
 
 Status PartitionedHashJoinNode::Init(const TPlanNode& tnode) {
@@ -103,6 +102,10 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
     LlvmCodeGen* codegen;
     RETURN_IF_ERROR(state->GetCodegen(&codegen));
   }
+
+  // Disable probe-side filters if we are inside a subplan because no node
+  // inside the subplan can use them.
+  if (IsInSubplan()) can_add_probe_filters_ = false;
 
   RETURN_IF_ERROR(BlockingJoinNode::Prepare(state));
   runtime_state_ = state;

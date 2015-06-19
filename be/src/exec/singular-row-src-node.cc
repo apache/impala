@@ -20,9 +20,7 @@
 namespace impala {
 
 SingularRowSrcNode::SingularRowSrcNode(ObjectPool* pool, const TPlanNode& tnode,
-    const DescriptorTbl& descs)
-    : ExecNode(pool, tnode, descs),
-      containing_subplan_(NULL) {
+    const DescriptorTbl& descs) : ExecNode(pool, tnode, descs) {
 }
 
 Status SingularRowSrcNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {

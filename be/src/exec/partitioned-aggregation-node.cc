@@ -259,10 +259,10 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
     batch.Reset();
   } while (!eos);
 
-  // We have consumed all of the input from the child and transfered ownership of the
-  // resources we need, so the child can be closed safely to release its resources.
-  // TODO: Check whether we are in a subplan or not.
-  child(0)->Close(state);
+  // Unless we are inside a subplan expecting to call Open()/GetNext() on the child
+  // again, the child can be closed at this point. We have consumed all of the input
+  // from the child and transfered ownership of the resources we need.
+  if (!IsInSubplan()) child(0)->Close(state);
 
   // Done consuming child(0)'s input. Move all the partitions in hash_partitions_
   // to spilled_partitions_/aggregated_partitions_. We'll finish the processing in
