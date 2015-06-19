@@ -75,10 +75,11 @@ public class FunctionCallExpr extends Expr {
    */
   public static Expr createExpr(FunctionName fnName, FunctionParams params) {
     FunctionCallExpr functionCallExpr = new FunctionCallExpr(fnName, params);
-    if (fnName.getFnNamePath().get(0).equals("decode")
-        && (fnName.getDb() == null) || Catalog.BUILTINS_DB.equals(fnName.getDb())) {
-      // If someone created the DECODE function before it became a builtin, they can
-      // continue to use it by the fully qualified name.
+    if (fnName.getFnNamePath().size() == 1
+            && fnName.getFnNamePath().get(0).equalsIgnoreCase("decode")
+        || fnName.getFnNamePath().size() == 2
+            && fnName.getFnNamePath().get(0).equalsIgnoreCase(Catalog.BUILTINS_DB)
+            && fnName.getFnNamePath().get(1).equalsIgnoreCase("decode")) {
       return new CaseExpr(functionCallExpr);
     }
     return functionCallExpr;

@@ -1582,6 +1582,9 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("upper('HELLO')", "HELLO");
   TestStringValue("upper('Hello')", "HELLO");
   TestStringValue("upper('hello!')", "HELLO!");
+  // Regression test for fully builtin qualified function name (IMPALA-1951)
+  TestStringValue("_impala_builtins.upper('hello!')", "HELLO!");
+  TestStringValue("_impala_builtins.DECODE('hello!', 'hello!', 'HELLO!')", "HELLO!");
   TestStringValue("ucase('hello')", "HELLO");
   TestIsNull("upper(NULL)", TYPE_STRING);
   TestIsNull("ucase(NULL)", TYPE_STRING);

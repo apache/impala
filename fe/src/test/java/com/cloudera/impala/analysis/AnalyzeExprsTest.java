@@ -1402,6 +1402,9 @@ public class AnalyzeExprsTest extends AnalyzerTest {
   @Test
   public void TestFunctionCallExpr() throws AnalysisException {
     AnalyzesOk("select pi()");
+    AnalyzesOk("select _impala_builtins.pi()");
+    AnalyzesOk("select _impala_builtins.decode(1, 2, 3)");
+    AnalyzesOk("select _impala_builtins.DECODE(1, 2, 3)");
     AnalyzesOk("select sin(pi())");
     AnalyzesOk("select sin(cos(pi()))");
     AnalyzesOk("select sin(cos(tan(e())))");
