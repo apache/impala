@@ -95,6 +95,7 @@ DECLARE_int32(be_port);
 DECLARE_string(nn);
 DECLARE_int32(nn_port);
 DECLARE_string(authorized_proxy_user_config);
+DECLARE_string(authorized_proxy_user_config_delimiter);
 DECLARE_bool(abort_on_config_error);
 DECLARE_bool(disk_spill_encryption);
 
@@ -285,7 +286,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
         string proxy_user = config.substr(0, pos);
         string config_str = config.substr(pos + 1);
         vector<string> parsed_allowed_users;
-        split(parsed_allowed_users, config_str, is_any_of(","), token_compress_on);
+        split(parsed_allowed_users, config_str,
+            is_any_of(FLAGS_authorized_proxy_user_config_delimiter), token_compress_on);
         unordered_set<string> allowed_users(parsed_allowed_users.begin(),
             parsed_allowed_users.end());
         authorized_proxy_user_config_.insert(make_pair(proxy_user, allowed_users));

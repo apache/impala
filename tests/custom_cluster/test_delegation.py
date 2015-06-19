@@ -21,17 +21,13 @@ from tests.common.custom_cluster_test_suite import CustomClusterTestSuite
 
 USER_NAME = getpass.getuser()
 PROXY_USER = "proxy_user_name"
+PROXY_USER_WITH_COMMA = "proxy_user,name_2"
+PROXY_USERS_ALL = "proxy_user_name/proxy_user,name_2"
+PROXY_USER_DELIMITER = "/"
 
 class TestDelegation(CustomClusterTestSuite, HS2TestSuite):
 
-  @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args(
-    "--authorized_proxy_user_config=\"%s=%s\"" % (USER_NAME, PROXY_USER))
-  @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6,
-                 conf_overlay = {"impala.doas.user": PROXY_USER})
-  def test_effective_user(self):
-    '''Test that the effective user is correctly set when impala.doas.user is correct, and
-    that the effective_user() builtin returns the right thing'''
+  def check_user_and_effective_user(self, proxy_user):
     execute_statement_req = TCLIService.TExecuteStatementReq()
     execute_statement_req.sessionHandle = self.session_handle
     execute_statement_req.confOverlay = dict()
@@ -44,6 +40,41 @@ class TestDelegation(CustomClusterTestSuite, HS2TestSuite):
     fetch_results_req.maxRows = 1
     fetch_results_resp = self.hs2_client.FetchResults(fetch_results_req)
     HS2TestSuite.check_response(fetch_results_resp)
-
     assert self.column_results_to_string(
-      fetch_results_resp.results.columns) == (1, "%s, %s\n" % (PROXY_USER, USER_NAME))
+      fetch_results_resp.results.columns) == (1, "%s, %s\n" % (proxy_user, USER_NAME))
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    "--authorized_proxy_user_config=\"%s=%s\"" % (USER_NAME, PROXY_USER))
+  @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6,
+                 conf_overlay = {"impala.doas.user": PROXY_USER})
+  def test_effective_user_single_proxy(self):
+    '''Test that the effective user is correctly set when impala.doas.user is correct, and
+    that the effective_user() builtin returns the right thing'''
+    self.check_user_and_effective_user(PROXY_USER)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    "--authorized_proxy_user_config=\"%s=%s\"\
+      --authorized_proxy_user_config_delimiter=%c" % (USER_NAME, PROXY_USERS_ALL,
+      PROXY_USER_DELIMITER))
+  @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6,
+                 conf_overlay = {"impala.doas.user": PROXY_USER_WITH_COMMA})
+  def test_effective_user_multiple_proxies(self):
+    '''Test that the effective user is correctly set when there are multiple proxy users
+    seperated with the authorized_user_proxy_config_delimiter and when impala.doas.user
+    is correct, and that the effective_user() builtin returns the right thing'''
+    self.check_user_and_effective_user(PROXY_USER_WITH_COMMA)
+
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args(
+    "--authorized_proxy_user_config=\"%s=%s\"\
+      --authorized_proxy_user_config_delimiter=" % (USER_NAME, PROXY_USER_WITH_COMMA))
+  @needs_session(TCLIService.TProtocolVersion.HIVE_CLI_SERVICE_PROTOCOL_V6,
+                 conf_overlay = {"impala.doas.user": PROXY_USER_WITH_COMMA})
+  def test_effective_user_empty_delimiter(self):
+    '''Test that the effective user is correctly set when the
+    authorized_user_proxy_config_delimiter is set to the empty string and
+    impala.doas.user is correct, and that the effective_user() builtin returns the
+    right thing'''
+    self.check_user_and_effective_user(PROXY_USER_WITH_COMMA)
