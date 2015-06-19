@@ -138,7 +138,6 @@ table_name:alltimezones, constraint:restrict_to, table_format:text/none/none
 # we actually use for Kudu related tests.
 table_name:testtbl, constraint:only, table_format:kudu/none/none
 table_name:dimtbl, constraint:only, table_format:kudu/none/none
-table_name:liketbl, constraint:only, table_format:kudu/none/none
 table_name:text_comma_backslash_newline, constraint:only, table_format:kudu/none/none
 table_name:tinytable, constraint:only, table_format:kudu/none/none
 table_name:tinyinttable, constraint:only, table_format:kudu/none/none
