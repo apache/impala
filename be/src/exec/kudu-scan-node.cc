@@ -64,8 +64,7 @@ void GetMaterializedSlots(const TupleDescriptor& tuple_desc,
 KuduScanNode::KuduScanNode(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
-      tuple_id_(tnode.kudu_scan_node.tuple_id),
-      table_(NULL) {
+      tuple_id_(tnode.kudu_scan_node.tuple_id) {
 }
 
 KuduScanNode::~KuduScanNode() {

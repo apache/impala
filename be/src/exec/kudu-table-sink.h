@@ -77,7 +77,7 @@ class KuduTableSink : public DataSink {
 
   /// The Kudu client, table and session.
   std::tr1::shared_ptr<kudu::client::KuduClient> client_;
-  scoped_refptr<kudu::client::KuduTable> table_;
+  std::tr1::shared_ptr<kudu::client::KuduTable> table_;
   std::tr1::shared_ptr<kudu::client::KuduSession> session_;
 
   // Allocated from runtime state's pool.

@@ -16,16 +16,14 @@
 #define IMPALA_EXEC_KUDU_TESTUTIL_H
 
 #include <gtest/gtest.h>
+#include <kudu/client/client.h>
+#include <kudu/util/slice.h>
+#include <kudu/util/status.h>
 #include <string>
 #include <tr1/memory>
 #include <vector>
 
-#include "kudu/client/client.h"
-#include "kudu/client/encoded_key.h"
-#include "kudu/gutil/gscoped_ptr.h"
-#include "kudu/gutil/ref_counted.h"
-#include "kudu/util/slice.h"
-#include "kudu/util/status.h"
+#include "gutil/gscoped_ptr.h"
 #include "runtime/exec-env.h"
 #include "testutil/desc-tbl-builder.h"
 
@@ -39,8 +37,6 @@ namespace impala {
 using kudu::client::KuduClient;
 using kudu::client::KuduClientBuilder;
 using kudu::client::KuduColumnSchema;
-using kudu::client::KuduEncodedKey;
-using kudu::client::KuduEncodedKeyBuilder;
 using kudu::client::KuduInsert;
 using kudu::client::KuduSchema;
 using kudu::client::KuduSession;
@@ -110,7 +106,7 @@ class KuduTestHelper {
   gscoped_ptr<KuduInsert> BuildTestRow(KuduTable* table, int index, int num_cols) {
     DCHECK_GT(num_cols, 0);
     DCHECK_LE(num_cols, 3);
-    gscoped_ptr<KuduInsert> insert = table->NewInsert();
+    gscoped_ptr<KuduInsert> insert(table->NewInsert());
     KuduPartialRow* row = insert->mutable_row();
     KUDU_CHECK_OK(row->SetInt32(0, index));
     if (num_cols > 1) KUDU_CHECK_OK(row->SetInt32(1, index * 2));
@@ -126,7 +122,7 @@ class KuduTestHelper {
     KUDU_ASSERT_OK(session->SetFlushMode(KuduSession::MANUAL_FLUSH));
     session->SetTimeoutMillis(10000);
     for (int i = first_row; i < num_rows + first_row; i++) {
-      KUDU_ASSERT_OK(session->Apply(BuildTestRow(table, i, num_cols).Pass()));
+      KUDU_ASSERT_OK(session->Apply(BuildTestRow(table, i, num_cols).release()));
     }
     KUDU_ASSERT_OK(session->Flush());
     ASSERT_FALSE(session->HasPendingOperations());
@@ -140,11 +136,9 @@ class KuduTestHelper {
 
   vector<string> GenerateSplitKeys() {
     vector<string> keys;
-    KuduEncodedKeyBuilder builder(test_schema_);
-    int val = 5;
-    builder.AddColumnKey(&val);
-    gscoped_ptr<KuduEncodedKey> key(builder.BuildEncodedKey());
-    keys.push_back(key->ToString());
+    KuduPartialRow* key = test_schema_.NewRow();
+    key->SetInt32(0, 5);
+    keys.push_back(key->ToEncodedRowKeyOrDie());
     return keys;
   }
 
@@ -156,7 +150,7 @@ class KuduTestHelper {
     return client_;
   }
 
-  const scoped_refptr<KuduTable>& table() const {
+  const std::tr1::shared_ptr<KuduTable>& table() const {
     return client_table_;
   }
 
@@ -197,7 +191,7 @@ class KuduTestHelper {
   KuduSchema test_schema_;;
   ObjectPool obj_pool_;
   std::tr1::shared_ptr<KuduClient> client_;
-  scoped_refptr<KuduTable> client_table_;
+  std::tr1::shared_ptr<KuduTable> client_table_;
 };
 
 } // namespace impala

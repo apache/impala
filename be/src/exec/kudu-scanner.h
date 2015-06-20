@@ -32,7 +32,7 @@ class KuduScanner {
   /// Opens the first scanner into the provided table, with the provided
   /// client.
   Status Open(const std::tr1::shared_ptr<kudu::client::KuduClient>& client,
-      const scoped_refptr<kudu::client::KuduTable>& table);
+      const std::tr1::shared_ptr<kudu::client::KuduTable>& table);
 
   /// Fetches the next batch from Kudu.
   /// TODO make the scanner manages its own batches (like the HDFS scanner
@@ -95,7 +95,7 @@ class KuduScanner {
 
   /// References to the client and table being used.
   std::tr1::shared_ptr<kudu::client::KuduClient> client_;
-  scoped_refptr<kudu::client::KuduTable> table_;
+  std::tr1::shared_ptr<kudu::client::KuduTable> table_;
 
   /// The current Kudu scanner.
   boost::scoped_ptr<kudu::client::KuduScanner> scanner_;

@@ -17,9 +17,8 @@
 #include <algorithm>
 
 #include <boost/unordered_set.hpp>
+#include <kudu/client/callbacks.h>
 #include <kudu/client/schema.h>
-#include <kudu/gutil/bind.h>
-#include <kudu/util/logging_callback.h>
 
 #include "runtime/descriptors.h"
 
@@ -160,8 +159,9 @@ Status KuduSchemaFromTupleDescriptor(const TupleDescriptor& tuple_desc,
   return Status::OK();
 }
 
-void LogKuduMessage(kudu::KuduLogSeverity severity, const char* filename,
-    int line_number, const struct ::tm* time, const char* message, size_t message_len) {
+void LogKuduMessage(void* unused, kudu::client::KuduLogSeverity severity,
+    const char* filename, int line_number, const struct ::tm* time, const char* message,
+    size_t message_len) {
 
   // Note: we use raw ints instead of the nice LogSeverity typedef
   // that can be found in glog/log_severity.h as it has an import
@@ -169,10 +169,10 @@ void LogKuduMessage(kudu::KuduLogSeverity severity, const char* filename,
   int glog_severity;
 
   switch(severity) {
-    case kudu::SEVERITY_INFO: glog_severity = 0; break;
-    case kudu::SEVERITY_WARNING: glog_severity = 1; break;
-    case kudu::SEVERITY_ERROR: glog_severity = 2; break;
-    case kudu::SEVERITY_FATAL: glog_severity = 3; break;
+    case kudu::client::SEVERITY_INFO: glog_severity = 0; break;
+    case kudu::client::SEVERITY_WARNING: glog_severity = 1; break;
+    case kudu::client::SEVERITY_ERROR: glog_severity = 2; break;
+    case kudu::client::SEVERITY_FATAL: glog_severity = 3; break;
     default : CHECK(false) << "Unexpected severity type: " << severity;
   }
 
@@ -182,7 +182,8 @@ void LogKuduMessage(kudu::KuduLogSeverity severity, const char* filename,
 }
 
 void InitKuduLogging() {
-  kudu::client::InstallLoggingCallback(kudu::Bind(&LogKuduMessage));
+  static kudu::client::KuduLoggingFunctionCallback<void*> log_cb(&LogKuduMessage, NULL);
+  kudu::client::InstallLoggingCallback(&log_cb);
   kudu::client::SetVerboseLogLevel(FLAGS_v);
 }
 

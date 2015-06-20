@@ -15,6 +15,7 @@
 #ifndef IMPALA_UTIL_KUDU_UTIL_H_
 #define IMPALA_UTIL_KUDU_UTIL_H_
 
+#include <kudu/client/callbacks.h>
 #include <kudu/client/client.h>
 
 namespace impala {
@@ -46,7 +47,7 @@ void InitKuduLogging();
 // This is the callback mentioned above. When the Kudu client logs a message it gets
 // redirected here and forwarded to impala's glog.
 // This method is not supposed to be used directly.
-void LogKuduMessage(kudu::KuduLogSeverity severity, const char* filename,
+void LogKuduMessage(kudu::client::KuduLogSeverity severity, const char* filename,
     int line_number, const struct ::tm* time, const char* message, size_t message_len);
 
 /// Takes a Kudu status and returns an impala one, if it's not OK.

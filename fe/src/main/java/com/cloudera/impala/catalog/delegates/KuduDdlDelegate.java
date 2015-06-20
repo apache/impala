@@ -21,6 +21,7 @@ import java.util.List;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.kududb.ColumnSchema;
 import org.kududb.ColumnSchema.ColumnSchemaBuilder;
 import org.kududb.Schema;
@@ -33,13 +34,14 @@ import com.cloudera.impala.catalog.KuduTable;
 import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.cloudera.impala.thrift.TAlterTableParams;
 import com.google.common.collect.Lists;
-import org.slf4j.LoggerFactory;
 
 import static com.cloudera.impala.util.KuduUtil.compareSchema;
 import static com.cloudera.impala.util.KuduUtil.fromImpalaType;
 import static com.cloudera.impala.util.KuduUtil.parseKeyColumns;
 import static com.cloudera.impala.util.KuduUtil.parseSplits;
 import static com.cloudera.impala.util.KuduUtil.stringToHostAndPort;
+import static org.kududb.client.KuduClient.KuduClientBuilder;
+
 
 /**
  * Implementation of the Kudu DDL Delegate. Propagates create and drop table statements to
@@ -67,7 +69,8 @@ public class KuduDdlDelegate implements DdlDelegate {
     String splitsJson = msTbl.getParameters().get(KuduTable.KEY_SPLIT_KEYS);
 
     try {
-      KuduClient client = new KuduClient(stringToHostAndPort(kuduMasters));
+      KuduClientBuilder builder = new KuduClientBuilder(stringToHostAndPort(kuduMasters));
+      KuduClient client = builder.build();
 
       // TODO should we throw if the table does not exist when its an external table?
       if (client.tableExists(kuduTableName)) {
@@ -133,7 +136,8 @@ public class KuduDdlDelegate implements DdlDelegate {
     String kuduMasters = msTbl.getParameters().get(KuduTable.KEY_MASTER_ADDRESSES);
 
     try {
-      KuduClient client = new KuduClient(stringToHostAndPort(kuduMasters));
+      KuduClientBuilder builder = new KuduClientBuilder(stringToHostAndPort(kuduMasters));
+      KuduClient client = builder.build();
       if (!client.tableExists(kuduTableName)) {
         LOG.warn("Table: %s is in inconsistent state. It does not exist in Kudu master(s)"
             + " %s, but it exists in Hive metastore. Deleting from metastore only.",

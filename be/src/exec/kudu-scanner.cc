@@ -55,7 +55,7 @@ Status SetupScanRangePredicate(const TKuduKeyRange& key_range,
         "adding scan range lower bound");
   }
   if (!key_range.stopKey.empty()) {
-    KUDU_RETURN_IF_ERROR(scanner->AddUpperBoundRaw(key_range.stopKey),
+    KUDU_RETURN_IF_ERROR(scanner->AddExclusiveUpperBoundRaw(key_range.stopKey),
         "adding scan range upper bound");
   }
 
@@ -72,7 +72,7 @@ KuduScanner::KuduScanner(KuduScanNode* scan_node, RuntimeState* state,
     cur_scan_range_idx_(0) {}
 
 Status KuduScanner::Open(const std::tr1::shared_ptr<KuduClient>& client,
-    const scoped_refptr<KuduTable>& table) {
+    const std::tr1::shared_ptr<KuduTable>& table) {
   client_ = client;
   table_ = table;
   return GetNextScanner();

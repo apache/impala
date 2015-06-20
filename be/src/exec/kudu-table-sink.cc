@@ -20,6 +20,7 @@
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
+#include "gutil/gscoped_ptr.h"
 
 #include "common/names.h"
 
@@ -123,7 +124,7 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   // Since everything is set up just forward everything to the writer.
   for (int i = 0; i < batch->num_rows(); ++i) {
     TupleRow* current_row = batch->GetRow(i);
-    gscoped_ptr<kudu::client::KuduInsert> insert = table_->NewInsert();
+    gscoped_ptr<kudu::client::KuduInsert> insert(table_->NewInsert());
     for (int j = 0; j < output_expr_ctxs_.size(); ++j) {
       void* value = output_expr_ctxs_[j]->GetValue(current_row);
 
@@ -178,7 +179,7 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
       }
     }
 
-    KUDU_RETURN_IF_ERROR(session_->Apply(insert.Pass()),
+    KUDU_RETURN_IF_ERROR(session_->Apply(insert.release()),
         "Error while applying Kudu session.");
     ++rows_added;
   }

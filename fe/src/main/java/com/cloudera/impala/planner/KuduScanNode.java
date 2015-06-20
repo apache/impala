@@ -25,6 +25,8 @@ import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
+import static org.kududb.client.KuduClient.KuduClientBuilder;
+
 /**
  * Implements the frontend representation of a Kudu scan node.
  */
@@ -87,7 +89,9 @@ public class KuduScanNode extends ScanNode {
    * we get the key-range and for each tablet we get the replicated hosts as well.
    */
   private void computeScanRangeLocations(Analyzer analyzer) {
-    KuduClient client = new KuduClient(kuduTable_.getKuduMasterAddresses());
+    KuduClientBuilder builder =
+        new KuduClientBuilder(kuduTable_.getKuduMasterAddresses());
+    KuduClient client = builder.build();
     scanRanges_ = Lists.newArrayList();
     // TODO: The metadata that is queried from Kudu should be cached in the Catalog
     try {

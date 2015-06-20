@@ -89,7 +89,7 @@ class KuduScanNode : public ScanNode {
 
   /// The Kudu client and table. Scanners share these instances.
   std::tr1::shared_ptr<kudu::client::KuduClient> client_;
-  scoped_refptr<kudu::client::KuduTable> table_;
+  std::tr1::shared_ptr<kudu::client::KuduTable> table_;
 
   /// Set of ranges to be scanned.
   std::vector<TKuduKeyRange> scan_ranges_;
