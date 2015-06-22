@@ -38,6 +38,8 @@ public class CreateTableAsSelectStmt extends StatementBase {
   // BEGIN: Members that need to be reset()
 
   private final InsertStmt insertStmt_;
+  // Drop table statement for cleanup after CTAS query failure.
+  private final DropTableOrViewStmt cleanupStmt_;
 
   // END: Members that need to be reset()
   /////////////////////////////////////////
@@ -54,10 +56,12 @@ public class CreateTableAsSelectStmt extends StatementBase {
     createStmt_ = createStmt;
     insertStmt_ = new InsertStmt(null, createStmt.getTblName(), false,
         null, null, queryStmt, null);
+    cleanupStmt_ = new DropTableOrViewStmt(createStmt.getTblName(), true, true);
   }
 
   public QueryStmt getQueryStmt() { return insertStmt_.getQueryStmt(); }
   public InsertStmt getInsertStmt() { return insertStmt_; }
+  public DropTableOrViewStmt getCleanupStmt() { return cleanupStmt_; }
   public CreateTableStmt getCreateStmt() { return createStmt_; }
   @Override
   public String toSql() { return createStmt_.toSql() + " AS " + getQueryStmt().toSql(); }
@@ -153,13 +157,15 @@ public class CreateTableAsSelectStmt extends StatementBase {
       client.release();
     }
 
-    // Finally, run analysis on the insert statement.
+    // Finally, run analysis on the insert and cleanup statement.
     insertStmt_.analyze(analyzer);
+    cleanupStmt_.analyze(analyzer);
   }
 
   @Override
   public void reset() {
     super.reset();
     insertStmt_.reset();
+    cleanupStmt_.reset();
   }
 }

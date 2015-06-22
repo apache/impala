@@ -388,12 +388,7 @@ public class Frontend {
       ddl.setDdl_params(req);
       metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isDropTableOrViewStmt()) {
-      ddl.op_type = TCatalogOpType.DDL;
-      TDdlExecRequest req = new TDdlExecRequest();
-      DropTableOrViewStmt stmt = analysis.getDropTableOrViewStmt();
-      req.setDdl_type(stmt.isDropTable() ? TDdlType.DROP_TABLE : TDdlType.DROP_VIEW);
-      req.setDrop_table_or_view_params(stmt.toThrift());
-      ddl.setDdl_params(req);
+      createDropRequestHelper(ddl, analysis.getDropTableOrViewStmt());
       metadata.setColumns(Collections.<TColumn>emptyList());
     } else if (analysis.isTruncateStmt()) {
       ddl.op_type = TCatalogOpType.DDL;
@@ -500,6 +495,29 @@ public class Frontend {
       header.setRequesting_user(analysis.getAnalyzer().getUser().getName());
       ddl.getDdl_params().setHeader(header);
     }
+  }
+
+  private void createDropRequestHelper(TCatalogOpRequest ddl, DropTableOrViewStmt stmt) {
+    ddl.op_type = TCatalogOpType.DDL;
+    TDdlExecRequest req = new TDdlExecRequest();
+    req.setDdl_type(stmt.isDropTable() ? TDdlType.DROP_TABLE : TDdlType.DROP_VIEW);
+    req.setDrop_table_or_view_params(stmt.toThrift());
+    ddl.setDdl_params(req);
+  }
+
+  /**
+   * Constructs a TCatalogOpRequest object for cleanup request and attaches it to 'result'.
+   */
+  private void createCatalogCleanupRequest(AnalysisContext.AnalysisResult analysis,
+      TExecRequest result) {
+    Preconditions.checkState(analysis.isCreateTableAsSelectStmt());
+    Preconditions.checkNotNull(analysis.getCleanupStmt());
+    TCatalogOpRequest ddl = new TCatalogOpRequest();
+    createDropRequestHelper(ddl, analysis.getCleanupStmt());
+    TCatalogServiceRequestHeader header = new TCatalogServiceRequestHeader();
+    header.setRequesting_user(analysis.getAnalyzer().getUser().getName());
+    ddl.getDdl_params().setHeader(header);
+    result.setCatalog_cleanup_request(ddl);
   }
 
   /**
@@ -871,6 +889,8 @@ public class Frontend {
       }
       // All DDL operations except for CTAS are done with analysis at this point.
       if (!analysisResult.isCreateTableAsSelectStmt()) return result;
+      // Create cleanup request for CTAS.
+      createCatalogCleanupRequest(analysisResult, result);
     } else if (analysisResult.isLoadDataStmt()) {
       result.stmt_type = TStmtType.LOAD;
       result.setResult_set_metadata(new TResultSetMetadata(Arrays.asList(

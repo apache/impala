@@ -396,6 +396,9 @@ class ImpalaServer::QueryExecState {
   /// Sets result_cache_ to NULL and updates its associated metrics and mem consumption.
   /// This function is a no-op if the cache has already been cleared.
   void ClearResultCache();
+
+  /// Drops the newly created table of a CTAS to handle failure of the insert portion.
+  void CtasCleanup();
 };
 
 }

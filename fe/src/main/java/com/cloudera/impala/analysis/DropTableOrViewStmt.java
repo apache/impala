@@ -46,7 +46,7 @@ public class DropTableOrViewStmt extends StatementBase {
 
   @Override
   public String toSql() {
-    StringBuilder sb = new StringBuilder("DROP " + ((dropTable_) ? "TABLE" : "VIEW"));
+    StringBuilder sb = new StringBuilder("DROP " + ((dropTable_) ? "TABLE " : "VIEW "));
     if (ifExists_) sb.append("IF EXISTS ");
     if (tableName_.getDb() != null) sb.append(tableName_.getDb() + ".");
     sb.append(tableName_.getTbl());
