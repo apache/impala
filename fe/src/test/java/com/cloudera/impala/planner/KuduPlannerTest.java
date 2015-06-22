@@ -26,4 +26,9 @@ public class KuduPlannerTest extends PlannerTestBase {
     runPlannerTestFile("kudu");
   }
 
+  @Test
+  public void testUpdate() {
+    runPlannerTestFile("kudu-update");
+  }
+
 }

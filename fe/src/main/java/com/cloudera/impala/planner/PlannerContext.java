@@ -47,6 +47,8 @@ public class PlannerContext {
     queryCtx_ = queryCtx;
     if (isInsertOrCtas()) {
       queryStmt_ = analysisResult.getInsertStmt().getQueryStmt();
+    } else if (analysisResult.isUpdateStmt()) {
+      queryStmt_ = analysisResult.getUpdateStmt().getQueryStmt();
     } else {
       queryStmt_ = analysisResult.getQueryStmt();
     }
@@ -65,4 +67,5 @@ public class PlannerContext {
   public boolean isInsertOrCtas() {
     return analysisResult_.isInsertStmt() || analysisResult_.isCreateTableAsSelectStmt();
   }
+  public boolean isUpdate() { return analysisResult_.isUpdateStmt(); }
 }

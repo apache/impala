@@ -56,7 +56,7 @@ struct THdfsTableSink {
 struct TKuduTableSink {
   // The position in this vector is equal to the position in the output
   // expressions of the sink and holds the index into the Kudu schema
-  1: optional list<i64> referenced_columns;
+  1: optional list<i32> referenced_columns;
 }
 
 // Union type of all table sinks.

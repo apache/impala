@@ -25,6 +25,7 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
+
 /**
  * Creates an executable plan from an analyzed parse tree and query options.
  */
@@ -84,6 +85,9 @@ public class Planner {
       }
       // set up table sink for root fragment
       rootFragment.setSink(insertStmt.createDataSink());
+    } else if (ctx_.isUpdate()) {
+      // Set up update sink for root fragment
+      rootFragment.setSink(ctx_.getAnalysisResult().getUpdateStmt().createDataSink());
     }
 
     ColumnLineageGraph graph = ctx_.getRootAnalyzer().getColumnLineageGraph();

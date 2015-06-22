@@ -28,6 +28,8 @@ import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
+import com.cloudera.impala.planner.DataSink;
+import com.cloudera.impala.planner.KuduTableSink;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -298,6 +300,17 @@ public class UpdateStmt extends StatementBase {
    * String representation of the UPDATE stmt, Does not generate the SQL matching the
    * underlying select statement but only the SQL for the UPDATE stmt.
    */
+  public QueryStmt getQueryStmt() { return sourceStmt_; }
+
+  /**
+   * Return an instance of a KuduTableSink specialized as an Update operation.
+   */
+  public DataSink createDataSink() {
+    // analyze() must have been called before.
+    Preconditions.checkState(table_ != null);
+    return KuduTableSink.createUpdateSink(table_, referencedColumns_);
+  }
+
   @Override
   public String toSql() {
     StringBuilder b = new StringBuilder();

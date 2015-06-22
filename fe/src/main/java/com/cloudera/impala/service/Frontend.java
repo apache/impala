@@ -845,7 +845,7 @@ public class Frontend {
 
     // create TQueryExecRequest
     Preconditions.checkState(analysisResult.isQueryStmt() || analysisResult.isDmlStmt()
-        || analysisResult.isCreateTableAsSelectStmt());
+        || analysisResult.isCreateTableAsSelectStmt() || analysisResult.isUpdateStmt());
 
     TQueryExecRequest queryExecRequest = new TQueryExecRequest();
     // create plan
@@ -957,10 +957,8 @@ public class Frontend {
         metadata.addToColumns(colDesc);
       }
       result.setResult_set_metadata(metadata);
-    } else {
-      Preconditions.checkState(analysisResult.isInsertStmt() ||
-          analysisResult.isCreateTableAsSelectStmt());
-
+    } else if (analysisResult.isInsertStmt() ||
+        analysisResult.isCreateTableAsSelectStmt()) {
       // For CTAS the overall TExecRequest statement type is DDL, but the
       // query_exec_request should be DML
       result.stmt_type =
@@ -982,6 +980,10 @@ public class Frontend {
             hdfsTable.getHdfsBaseDir() + "/_impala_insert_staging");
         queryExecRequest.setFinalize_params(finalizeParams);
       }
+    } else {
+      Preconditions.checkState(analysisResult.isUpdateStmt());
+      result.stmt_type = TStmtType.DML;
+      result.query_exec_request.stmt_type = TStmtType.DML;
     }
 
     timeline.markEvent("Planning finished");
