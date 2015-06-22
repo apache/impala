@@ -25,9 +25,12 @@ class ImpalaShellResult(object):
     self.stdout = str()
     self.stderr = str()
 
-def get_shell_cmd_result(process):
+def get_shell_cmd_result(process, stdin_input=None):
   result = ImpalaShellResult()
-  result.stdout, result.stderr = process.communicate()
+  result.stdout, result.stderr = process.communicate(input=stdin_input)
+  # We need to close STDIN if we gave it an input, in order to send an EOF that will
+  # allow the subprocess to exit.
+  if stdin_input is not None: process.stdin.close()
   result.rc = process.returncode
   return result
 

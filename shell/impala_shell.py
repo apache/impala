@@ -898,10 +898,15 @@ def execute_queries_non_interactive_mode(options):
   queries = []
   if options.query_file:
     try:
-      query_file_handle = open(options.query_file, 'r')
+      # "-" here signifies input from STDIN
+      if options.query_file == "-":
+        query_file_handle = sys.stdin
+      else:
+        query_file_handle = open(options.query_file, 'r')
 
       queries = parse_query_text(query_file_handle.read())
-      query_file_handle.close()
+      if query_file_handle != sys.stdin:
+        query_file_handle.close()
     except Exception, e:
       print_to_stderr('Error: %s' % e)
       sys.exit(1)
