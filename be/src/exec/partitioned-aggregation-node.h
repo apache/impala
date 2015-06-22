@@ -78,16 +78,17 @@ class SlotDescriptor;
 /// and hash table will use io-sized buffers only.
 //
 /// TODO: Buffer rows before probing into the hash table?
-/// TODO: after spilling, we can still maintain a very small hash table just to remove
+/// TODO: After spilling, we can still maintain a very small hash table just to remove
 /// some number of rows (from likely going to disk).
-/// TODO: consider allowing to spill the hash table structure in addition to the rows.
-/// TODO: do we want to insert a buffer before probing into the partition's hash table.
-/// TODO: use a prefetch/batched probe interface.
-/// TODO: return rows from the aggregated_row_stream rather than the HT.
-/// TODO: spill the HT as well
-/// TODO: think about spilling heuristic.
-/// TODO: when processing a spilled partition, we have a lot more information and can
+/// TODO: Consider allowing to spill the hash table structure in addition to the rows.
+/// TODO: Do we want to insert a buffer before probing into the partition's hash table?
+/// TODO: Use a prefetch/batched probe interface.
+/// TODO: Return rows from the aggregated_row_stream rather than the HT.
+/// TODO: Think about spilling heuristic.
+/// TODO: When processing a spilled partition, we have a lot more information and can
 /// size the partitions/hash tables better.
+/// TODO: Start with unpartitioned (single partition) and switch to partitioning and
+/// spilling only if the size gets large, say larger than the LLC.
 class PartitionedAggregationNode : public ExecNode {
  public:
   PartitionedAggregationNode(ObjectPool* pool,
@@ -134,7 +135,7 @@ class PartitionedAggregationNode : public ExecNode {
   /// doesn't know how to deal with the LLVM IR 'invoke' instruction. Workaround that by
   /// placing the Status here so exceptions won't need to destruct it.
   /// TODO: fix IMPALA-1948 and remove this.
-  Status processBatchStatus_;
+  Status process_batch_status_;
 
   /// Tuple into which Update()/Merge()/Serialize() results are stored.
   TupleId intermediate_tuple_id_;
@@ -150,8 +151,8 @@ class PartitionedAggregationNode : public ExecNode {
 
   /// Certain aggregates require a finalize step, which is the final step of the
   /// aggregate after consuming all input rows. The finalize step converts the aggregate
-  /// value into its final form. This is true if this node contains aggregate that requires
-  /// a finalize step.
+  /// value into its final form. This is true if this node contains aggregate that
+  /// requires a finalize step.
   const bool needs_finalize_;
 
   /// Contains any evaluators that require the serialize step.
@@ -159,8 +160,8 @@ class PartitionedAggregationNode : public ExecNode {
 
   std::vector<AggFnEvaluator*> aggregate_evaluators_;
 
-  /// FunctionContext for each aggregate function and backing MemPool. String data returned
-  /// by the aggregate functions is allocated via these contexts.
+  /// FunctionContext for each aggregate function and backing MemPool. String data
+  /// returned by the aggregate functions is allocated via these contexts.
   /// These contexts are only passed to the evaluators in the non-partitioned
   /// (non-grouping) case. Otherwise they are only used to clone FunctionContexts for the
   /// partitions.
@@ -175,30 +176,19 @@ class PartitionedAggregationNode : public ExecNode {
   /// All the exprs are simply SlotRefs for the intermediate tuple.
   std::vector<ExprContext*> build_expr_ctxs_;
 
-  /// True if the resulting tuple contains var-len agg/grouping expressions. This
+  /// True if the resulting tuple contains var-len agg/grouping values. This
   /// means we need to do more work when allocating and spilling these rows.
   bool contains_var_len_grouping_exprs_;
 
   RuntimeState* state_;
   BufferedBlockMgr::Client* block_mgr_client_;
 
-  /// If true, the partitions in hash_partitions_ are using small buffers.
-  bool using_small_buffers_;
-
-  /// Result of aggregation w/o GROUP BY.
-  /// Note: can be NULL even if there is no grouping if the result tuple is 0 width
-  /// e.g. select 1 from table group by col.
-  Tuple* singleton_output_tuple_;
-  bool singleton_output_tuple_returned_;
-
   /// MemPool used to allocate memory for when we don't have grouping and don't initialize
   /// the partitioning structures, or during Close() when creating new output tuples.
+  /// For non-grouping aggregations, the ownership of the pool's memory is transferred
+  /// to the output batch on eos. The pool should not be Reset() to allow amortizing
+  /// memory allocation over a series of Reset()/Open()/GetNext()* calls.
   boost::scoped_ptr<MemPool> mem_pool_;
-
-  /// Used for hash-related functionality, such as evaluating rows and calculating hashes.
-  /// TODO: If we want to multi-thread then this context should be thread-local and not
-  /// associated with the node.
-  boost::scoped_ptr<HashTableCtx> ht_ctx_;
 
   /// The current partition and iterator to the next row in its hash table that we need
   /// to return in GetNext()
@@ -240,6 +230,40 @@ class PartitionedAggregationNode : public ExecNode {
   /// The largest fraction after repartitioning. This is expected to be
   /// 1 / PARTITION_FANOUT. A value much larger indicates skew.
   RuntimeProfile::HighWaterMarkCounter* largest_partition_percent_;
+
+  /////////////////////////////////////////
+  /// BEGIN: Members that must be Reset()
+
+  /// Result of aggregation w/o GROUP BY.
+  /// Note: can be NULL even if there is no grouping if the result tuple is 0 width
+  /// e.g. select 1 from table group by col.
+  Tuple* singleton_output_tuple_;
+  bool singleton_output_tuple_returned_;
+
+  /// If true, the partitions in hash_partitions_ are using small buffers.
+  bool using_small_buffers_;
+
+  /// Used for hash-related functionality, such as evaluating rows and calculating hashes.
+  /// TODO: If we want to multi-thread then this context should be thread-local and not
+  /// associated with the node.
+  boost::scoped_ptr<HashTableCtx> ht_ctx_;
+
+  /// Object pool that holds the Partition objects in hash_partitions_.
+  boost::scoped_ptr<ObjectPool> partition_pool_;
+
+  /// Current partitions we are partitioning into.
+  std::vector<Partition*> hash_partitions_;
+
+  /// All partitions that have been spilled and need further processing.
+  std::list<Partition*> spilled_partitions_;
+
+  /// All partitions that are aggregated and can just return the results in GetNext().
+  /// After consuming all the input, hash_partitions_ is split into spilled_partitions_
+  /// and aggregated_partitions_, depending on if it was spilled or not.
+  std::list<Partition*> aggregated_partitions_;
+
+  /// END: Members that must be Reset()
+  /////////////////////////////////////////
 
   struct Partition {
     Partition(PartitionedAggregationNode* parent, int level)
@@ -296,29 +320,18 @@ class PartitionedAggregationNode : public ExecNode {
     boost::scoped_ptr<BufferedTupleStream> unaggregated_row_stream;
   };
 
-  /// Current partitions we are partitioning into.
-  std::vector<Partition*> hash_partitions_;
-
-  /// All partitions that have been spilled and need further processing.
-  std::list<Partition*> spilled_partitions_;
-
-  /// All partitions that are aggregated and can just return the results in GetNext().
-  /// After consuming all the input, hash_partitions_ is split into spilled_partitions_
-  /// or aggregated_partitions_, depending on if it was spilled or not.
-  std::list<Partition*> aggregated_partitions_;
-
   /// Stream used to store serialized spilled rows. Only used if needs_serialize_
   /// is set. This stream is never pinned and only used in Partition::Spill as a
   /// a temporary buffer.
   boost::scoped_ptr<BufferedTupleStream> serialize_stream_;
 
-  /// Allocates a new allocated aggregation intermediate tuple.
+  /// Allocates a new aggregation intermediate tuple.
   /// Initialized to grouping values computed over 'current_row_' using 'agg_fn_ctxs'.
   /// Aggregation expr slots are set to their initial values.
   /// Pool/Stream specify where the memory (tuple and var len slots) should be allocated
   /// from. Only one can be set.
   /// Returns NULL if there was not enough memory to allocate the tuple or an error
-  /// occurred.  When returning NULL, sets *status.
+  /// occurred. When returning NULL, sets *status.
   Tuple* ConstructIntermediateTuple(
       const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs,
       MemPool* pool, BufferedTupleStream* stream, Status* status);
@@ -329,8 +342,8 @@ class PartitionedAggregationNode : public ExecNode {
   /// in is_merge == true.  The override is needed to merge spilled and non-spilled rows
   /// belonging to the same partition independent of whether the agg fn evaluators have
   /// is_merge() == true.
-  /// This function is replaced by codegen (which is why we don't use a vector argument for
-  /// agg_fn_ctxs).
+  /// This function is replaced by codegen (which is why we don't use a vector argument
+  /// for agg_fn_ctxs).
   void UpdateTuple(impala_udf::FunctionContext** agg_fn_ctxs, Tuple* tuple, TupleRow* row,
                    bool is_merge = false);
 
@@ -390,9 +403,14 @@ class PartitionedAggregationNode : public ExecNode {
 
   /// Moves the partitions in hash_partitions_ to aggregated_partitions_ or
   /// spilled_partitions_. Partitions moved to spilled_partitions_ are unpinned.
-  /// input_rows is the number of rows the number of input rows that have been
-  /// repartitioned. Used for diagnostics.
+  /// input_rows is the number of input rows that have been repartitioned.
+  /// Used for diagnostics.
   Status MoveHashPartitions(int64_t input_rows);
+
+  /// Calls Close() on every Partition in 'aggregated_partitions_',
+  /// 'spilled_partitions_', and 'hash_partitions_' and then resets the lists,
+  /// the vector and the partition pool.
+  void ClosePartitions();
 
   /// Calls finalizes on all tuples starting at 'it'.
   void CleanupHashTbl(const std::vector<impala_udf::FunctionContext*>& fn_ctxs,

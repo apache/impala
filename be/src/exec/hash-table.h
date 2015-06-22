@@ -62,36 +62,37 @@ class HashTable;
 /// std::hashset API.
 //
 /// The data (rows) are stored in a BufferedTupleStream. The basic data structure of this
-/// hash table is a vector of buckets. The buckets (indexed by the mod of the hash) contain
-/// a pointer to either the slot in the tuple-stream or in case of duplicate values, to the
-/// head of a linked list of nodes that in turn contain a pointer to tuple-stream slots.
-/// When inserting an entry we start at the bucket at position (hash % size) and search
-/// for either a bucket with the same hash or for an empty bucket. If a bucket with the
-/// same hash is found, we then compare for row equality and either insert a duplicate node
-/// if the equality is true, or continue the search if the row equality is false.
-/// Similarly, when probing we start from the bucket at position (hash % size) and search
-/// for an entry with the same hash or for an empty bucket. In the former case, we then
-/// check for row equality and continue the search if the row equality is false. In the
-/// latter case, the probe is not successful. When growing the hash table, the number of
-/// buckets is doubled. We trigger a resize when the fill factor is approx 75%. Due to the
-/// doubling nature of the buckets, we require that the number of buckets is a power of 2.
-/// This allows us to perform a modulo of the hash using a bitmask.
-//
+/// hash table is a vector of buckets. The buckets (indexed by the mod of the hash)
+/// contain a pointer to either the slot in the tuple-stream or in case of duplicate
+/// values, to the head of a linked list of nodes that in turn contain a pointer to
+/// tuple-stream slots. When inserting an entry we start at the bucket at position
+/// (hash % size) and search for either a bucket with the same hash or for an empty
+/// bucket. If a bucket with the same hash is found, we then compare for row equality and
+/// either insert a duplicate node if the equality is true, or continue the search if the
+/// row equality is false. Similarly, when probing we start from the bucket at position
+/// (hash % size) and search for an entry with the same hash or for an empty bucket.
+/// In the former case, we then check for row equality and continue the search if the row
+/// equality is false. In the latter case, the probe is not successful. When growing the
+/// hash table, the number of buckets is doubled. We trigger a resize when the fill
+/// factor is approx 75%. Due to the doubling nature of the buckets, we require that the
+/// number of buckets is a power of 2. This allows us to perform a modulo of the hash
+/// using a bitmask.
+///
 /// We choose to use linear or quadratic probing because they exhibit good (predictable)
 /// cache behavior.
-/// We require that the number of buckets is a power of 2. This allows us to determine the
-/// bucket index using a bitmask.
+///
 /// The first NUM_SMALL_BLOCKS of nodes_ are made of blocks less than the IO size (of 8MB)
 /// to reduce the memory footprint of small queries.
-//
+///
 /// TODO: Compare linear and quadratic probing and remove the loser.
 /// TODO: We currently use 32-bit hashes. There is room in the bucket structure for at
 /// least 48-bits. We should exploit this space.
 /// TODO: Consider capping the probes with a threshold value. If an insert reaches
 /// that threshold it is inserted to another linked list of overflow entries.
 /// TODO: Smarter resizes, and perhaps avoid using powers of 2 as the hash table size.
-/// TODO: this is not a fancy hash table in terms of memory access patterns (cuckoo-hashing
-/// or something that spills to disk). We will likely want to invest more time into this.
+/// TODO: this is not a fancy hash table in terms of memory access patterns
+/// (cuckoo-hashing or something that spills to disk). We will likely want to invest
+/// more time into this.
 /// TODO: hash-join and aggregation have very different access patterns.  Joins insert
 /// all the rows and then calls scan to find them.  Aggregation interleaves Find() and
 /// Inserts().  We may want to optimize joins more heavily for Inserts() (in particular
@@ -99,7 +100,7 @@ class HashTable;
 /// TODO: Batched interface for inserts and finds.
 /// TODO: Do we need to check mem limit exceeded so often. Check once per batch?
 
-/// Control block for a hash table.  This class contains the logic as well as the variables
+/// Control block for a hash table. This class contains the logic as well as the variables
 /// needed by a thread to operate on a hash table.
 class HashTableCtx {
  public:
@@ -199,7 +200,8 @@ class HashTableCtx {
   /// Evaluate 'row' over build exprs caching the results in 'expr_values_buffer_' This
   /// will be replaced by codegen.  We do not want this function inlined when cross
   /// compiled because we need to be able to differentiate between EvalBuildRow and
-  /// EvalProbeRow by name and the build/probe exprs are baked into the codegen'd function.
+  /// EvalProbeRow by name and the build/probe exprs are baked into the codegen'd
+  /// function.
   bool IR_NO_INLINE EvalBuildRow(TupleRow* row) {
     return EvalRow(row, build_expr_ctxs_);
   }
@@ -255,7 +257,7 @@ class HashTableCtx {
   int results_buffer_size_;
 
   /// Buffer to store evaluated expr results.  This address must not change once
-  /// allocated since the address is baked into the codegen
+  /// allocated since the address is baked into the codegen.
   uint8_t* expr_values_buffer_;
 
   /// Use bytes instead of bools to be compatible with llvm.  This address must
@@ -270,14 +272,14 @@ class HashTableCtx {
 };
 
 /// The hash table consists of a contiguous array of buckets that contain a pointer to the
-/// data, the hash value and three flags: whether this bucket is filled, whether this entry
-/// has been matched (used in right and full joins) and whether this entry has duplicates.
-/// If there are duplicates, then the data is pointing to the head of a linked list of
-/// duplicate nodes that point to the actual data. Note that the duplicate nodes do not
-/// contain the hash value, because all the linked nodes have the same hash value, the one
-/// in the bucket. The data is either a tuple stream index or a Tuple*. This array of
-/// buckets is sparse, we are shooting for up to 3/4 fill factor (75%). The data allocated
-/// by the hash table comes from the BufferedBlockMgr.
+/// data, the hash value and three flags: whether this bucket is filled, whether this
+/// entry has been matched (used in right and full joins) and whether this entry has
+/// duplicates. If there are duplicates, then the data is pointing to the head of a
+/// linked list of duplicate nodes that point to the actual data. Note that the duplicate
+/// nodes do not contain the hash value, because all the linked nodes have the same hash
+/// value, the one in the bucket. The data is either a tuple stream index or a Tuple*.
+/// This array of buckets is sparse, we are shooting for up to 3/4 fill factor (75%). The
+/// data allocated by the hash table comes from the BufferedBlockMgr.
 class HashTable {
  private:
 
@@ -354,10 +356,10 @@ class HashTable {
   void Close();
 
   /// Inserts the row to the hash table. Returns true if the insertion was successful.
-  /// 'idx' is the index into tuple_stream_ for this row. If the row contains more than one
-  /// tuple, the 'idx' is stored instead of the 'row'. The 'row' is not copied by the hash
-  /// table and the caller must guarantee it stays in memory. This will not grow the hash
-  /// table. In the case that there is a need to insert a duplicate node, instead of
+  /// 'idx' is the index into tuple_stream_ for this row. If the row contains more than
+  /// one tuple, the 'idx' is stored instead of the 'row'. The 'row' is not copied by the
+  /// hash table and the caller must guarantee it stays in memory. This will not grow the
+  /// hash table. In the case that there is a need to insert a duplicate node, instead of
   /// filling a new bucket, and there is not enough memory to insert a duplicate node,
   /// the insert fails and this function returns false.
   /// Used during the build phase of hash joins.
@@ -459,11 +461,11 @@ class HashTable {
     /// Iterates to the next element. It should be called only if !AtEnd().
     void IR_ALWAYS_INLINE Next();
 
-    /// Iterates to the next duplicate node. If the bucket does not have duplicates or when
-    /// it reaches the last duplicate node, then it moves the Iterator to AtEnd(). Used
-    /// when we want to iterate over all the duplicate nodes bypassing the Next() interface
-    /// (e.g. in semi/outer joins without other_join_conjuncts, in order to iterate over
-    /// all nodes of an unmatched bucket).
+    /// Iterates to the next duplicate node. If the bucket does not have duplicates or
+    /// when it reaches the last duplicate node, then it moves the Iterator to AtEnd().
+    /// Used when we want to iterate over all the duplicate nodes bypassing the Next()
+    /// interface (e.g. in semi/outer joins without other_join_conjuncts, in order to
+    /// iterate over all nodes of an unmatched bucket).
     void IR_ALWAYS_INLINE NextDuplicate();
 
     /// Iterates to the next element that does not have its matched flag set. Used in
@@ -522,8 +524,8 @@ class HashTable {
   /// (a) the index of the bucket that contains the entry that matches with the last row
   ///     evaluated in 'ht_ctx'. If 'ht_ctx' is NULL then it does not check for row
   ///     equality and returns the index of the first empty bucket.
-  /// (b) the index of the first empty bucket according to the probing algorithm (linear or
-  ///     quadratic), if the entry is not in the hash table or 'ht_ctx' is NULL.
+  /// (b) the index of the first empty bucket according to the probing algorithm (linear
+  ///     or quadratic), if the entry is not in the hash table or 'ht_ctx' is NULL.
   /// (c) Iterator::BUCKET_NOT_FOUND if the probe was not successful, i.e. the maximum
   ///     distance was traveled without finding either an empty or a matching bucket.
   /// Using the returned index value, the caller can create an iterator that can be
@@ -555,9 +557,9 @@ class HashTable {
 
   /// Creates a new DuplicateNode for a entry and chains it to the bucket with index
   /// 'bucket_idx'. The duplicate nodes of a bucket are chained as a linked list.
-  /// This places the new duplicate node at the beginning of the list. If this is the first
-  /// duplicate entry inserted in this bucket, then the entry already contained by the
-  /// bucket is converted to a DuplicateNode. That is, the contents of 'data' of the
+  /// This places the new duplicate node at the beginning of the list. If this is the
+  /// first duplicate entry inserted in this bucket, then the entry already contained by
+  /// the bucket is converted to a DuplicateNode. That is, the contents of 'data' of the
   /// bucket are copied to a DuplicateNode and 'data' is updated to pointing to a
   /// DuplicateNode.
   /// Returns NULL if the node array could not grow, i.e. there was not enough memory to
@@ -653,11 +655,12 @@ class HashTable {
   int64_t num_failed_probes_;
 
   /// Total distance traveled for each probe. That is the sum of the diff between the end
-  /// position of a probe (find/insert) and its start position (hash & (num_buckets_ - 1)).
+  /// position of a probe (find/insert) and its start position
+  /// (hash & (num_buckets_ - 1)).
   int64_t travel_length_;
 
-  /// The number of cases where we had to compare buckets with the same hash value, but the
-  /// row equality failed.
+  /// The number of cases where we had to compare buckets with the same hash value, but
+  /// the row equality failed.
   int64_t num_hash_collisions_;
 
   /// How many times this table has resized so far.

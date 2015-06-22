@@ -32,6 +32,7 @@ BIGINT, BIGINT
 3,200
 3,300
 ====
+---- QUERY
 # Test an order by + limit (topn node) inside a subplan.
 select c_custkey, o_orderkey from tpch_nested_parquet.customer c,
   (select o_orderkey from c.c_orders
@@ -45,6 +46,7 @@ BIGINT, BIGINT
 2,3986496
 2,2992930
 ====
+---- QUERY
 # Test a select node inside a subplan.
 select c_custkey, o_orderkey from tpch_nested_parquet.customer c,
   (select o_orderkey from c.c_orders
@@ -57,6 +59,7 @@ BIGINT, BIGINT
 2,3986496
 2,2992930
 ====
+---- QUERY
 # Test an analytic function that requires a sort inside a subplan.
 select c_custkey, o_orderstatus, o_orderdate, o_orderkey, r from tpch_nested_parquet.customer c,
   (select o_orderstatus, o_orderdate, o_orderkey,
@@ -80,6 +83,7 @@ BIGINT, STRING, BIGINT, BIGINT
 2,O,1997-02-22,3986496,2
 2,P,1995-03-10,1071617,1
 ====
+---- QUERY
 # Test an analytic function that does not require a sort inside a subplan.
 select c_custkey, mp from tpch_nested_parquet.customer c,
   (select max(o_totalprice) over () mp
@@ -101,4 +105,52 @@ BIGINT, DECIMAL
 2,312692.22
 2,312692.22
 2,312692.22
+====
+---- QUERY
+# Test a non-grouping aggregation inside a subplan.
+select c_custkey, cnt, avp
+from tpch_nested_parquet.customer c,
+  (select count(o_orderkey) cnt,
+          avg(o_totalprice) avp
+   from c.c_orders) v
+where c_custkey < 3
+---- TYPES
+BIGINT, BIGINT, DECIMAL
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,6,97960.48
+2,7,146896.20
+====
+---- QUERY
+SELECT c_custkey, avg(maxp)
+FROM tpch_nested_parquet.customer c,
+  (SELECT MAX(o_totalprice) maxp
+   FROM c.c_orders GROUP BY o_orderpriority) v
+WHERE c_custkey < 3
+GROUP BY c_custkey
+---- TYPES
+BIGINT, DECIMAL
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,114777.96
+2,212462.41
+====
+---- QUERY
+# Test a grouping aggregation inside a subplan.
+select c_custkey, o_orderpriority, cnt, avp
+from tpch_nested_parquet.customer c,
+  (select count(o_orderkey) cnt,
+          avg(o_totalprice) avp,
+          o_orderpriority
+   from c.c_orders
+   group by o_orderpriority) v
+where c_custkey < 3
+---- TYPES
+BIGINT, STRING, BIGINT, DECIMAL
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,1-URGENT,2,124624.37
+1,2-HIGH,1,65478.05
+1,3-MEDIUM,1,95911.01
+1,5-LOW,2,88562.55
+2,1-URGENT,4,167623.89
+2,2-HIGH,1,221397.35
+2,4-NOT SPECIFIED,2,68190.25
 ====
