@@ -107,7 +107,7 @@ Status KuduSchemaFromExpressionList(const std::vector<TExpr>& expressions,
   for (int i = 0; i < expressions.size(); i++) {
     string col_name = table_desc.col_names()[i];
     // Get the last expression node.
-    const TExprNode& node = expressions[i].nodes.back();
+    const TExprNode& node = expressions[i].nodes.front();
     KuduColumnSchema::DataType kt = KuduColumnSchema::INT8;
     RETURN_IF_ERROR(ImpalaToKuduType(node.type, &kt));
 

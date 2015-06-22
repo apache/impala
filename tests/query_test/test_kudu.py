@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from tests.common.impala_test_suite import ImpalaTestSuite
+import pytest
 
 class TestKuduOperations(ImpalaTestSuite):
   """
@@ -41,3 +42,7 @@ class TestKuduOperations(ImpalaTestSuite):
 
   def test_kudu_scan_node(self, vector):
     self.run_test_case('QueryTest/kudu-scan-node', vector, use_db="functional_kudu")
+
+  @pytest.mark.execute_serially
+  def test_insert_update_delete(self, vector):
+    self.run_test_case('QueryTest/kudu_crud', vector, use_db="kududb_test")

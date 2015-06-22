@@ -29,6 +29,8 @@ using kudu::client::KuduSchema;
 using kudu::client::KuduClient;
 using kudu::client::KuduRowResult;
 using kudu::client::KuduTable;
+using kudu::client::KuduInsert;
+using kudu::client::KuduUpdate;
 
 static const char* KUDU_SINK_NAME = "KuduTableSink";
 
@@ -38,11 +40,13 @@ const static string& ROOT_PARTITION_KEY =
     g_ImpalaInternalService_constants.ROOT_PARTITION_KEY;
 
 KuduTableSink::KuduTableSink(const RowDescriptor& row_desc,
-                             const vector<TExpr>& select_list_texprs,
-                             const TDataSink& tsink)
+    const vector<TExpr>& select_list_texprs,
+    const TDataSink& tsink)
     : table_id_(tsink.table_sink.target_table_id),
       row_desc_(row_desc),
-      select_list_texprs_(select_list_texprs) {
+      select_list_texprs_(select_list_texprs),
+      sink_type_(tsink.table_sink.type),
+      kudu_table_sink_(tsink.table_sink.kudu_table_sink) {
 }
 
 Status KuduTableSink::PrepareExprs(RuntimeState* state) {
@@ -63,17 +67,15 @@ Status KuduTableSink::Prepare(RuntimeState* state) {
 
   RETURN_IF_ERROR(PrepareExprs(state));
 
-  DCHECK(state->desc_tbl().GetTableDescriptor(table_id_) != NULL);
 
   // Get the kudu table descriptor.
   TableDescriptor* table_desc = state->desc_tbl().GetTableDescriptor(table_id_);
+  DCHECK(table_desc != NULL);
 
-#ifndef NDEBUG
   // In debug mode try a dynamic cast. If it fails it means that the
   // TableDescriptor is not an instance of KuduTableDescriptor.
   DCHECK(dynamic_cast<const KuduTableDescriptor*>(table_desc))
       << "TableDescriptor must be an instance KuduTableDescriptor.";
-#endif
 
   table_desc_ = static_cast<const KuduTableDescriptor*>(table_desc);
 
@@ -82,7 +84,7 @@ Status KuduTableSink::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(KuduSchemaFromExpressionList(select_list_texprs_, *table_desc_,
       &schema_));
 
-  // Add a 'root partition' status in which to collect insert statistics
+  // Add a 'root partition' status in which to collect write statistics
   TInsertPartitionStatus root_status;
   root_status.__set_num_appended_rows(0L);
   root_status.__set_stats(TInsertStats());
@@ -115,6 +117,16 @@ Status KuduTableSink::Open(RuntimeState* state) {
   return Status::OK();
 }
 
+kudu::client::KuduWriteOperation* KuduTableSink::NewWriteOp() {
+  if (sink_type_ == TTableSinkType::KUDU_INSERT) {
+    return table_->NewInsert();
+  } else {
+    DCHECK(sink_type_ == TTableSinkType::KUDU_UPDATE) << "Sink type not supported. "
+                                                      << sink_type_;
+    return table_->NewUpdate();
+  }
+}
+
 Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   ExprContext::FreeLocalAllocations(output_expr_ctxs_);
@@ -124,68 +136,79 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   // Since everything is set up just forward everything to the writer.
   for (int i = 0; i < batch->num_rows(); ++i) {
     TupleRow* current_row = batch->GetRow(i);
-    gscoped_ptr<kudu::client::KuduInsert> insert(table_->NewInsert());
+    gscoped_ptr<kudu::client::KuduWriteOperation> write(NewWriteOp());
+
     for (int j = 0; j < output_expr_ctxs_.size(); ++j) {
+      int col = kudu_table_sink_.referenced_columns.empty() ?
+          j : kudu_table_sink_.referenced_columns[j];
+
       void* value = output_expr_ctxs_[j]->GetValue(current_row);
 
-      // If the value is NULL we have a null expression literal for this slot.
-      if (value == NULL) continue;
+      // If the value is NULL and no explicit column references are provided, the column
+      // should be ignored, else it's explicitly set to NULL.
+      if (value == NULL) {
+        if (!kudu_table_sink_.referenced_columns.empty()) {
+          KUDU_RETURN_IF_ERROR(write->mutable_row()->SetNull(col),
+              "Could not add Kudu WriteOp.");
+        }
+        continue;
+      }
 
       switch (output_expr_ctxs_[j]->root()->type().type) {
         case TYPE_STRING: {
           StringValue* sv = reinterpret_cast<StringValue*>(value);
           kudu::Slice slice(reinterpret_cast<uint8_t*>(sv->ptr), sv->len);
-          KUDU_RETURN_IF_ERROR(insert->mutable_row()->SetString(j, slice),
-              "Could not add insert.");
+          KUDU_RETURN_IF_ERROR(write->mutable_row()->SetString(col, slice),
+              "Could not add Kudu WriteOp.");
           break;
         }
         case TYPE_FLOAT:
           KUDU_RETURN_IF_ERROR(
-              insert->mutable_row()->SetFloat(j, *reinterpret_cast<float*>(value)),
-              "Could not add insert.");
+              write->mutable_row()->SetFloat(col, *reinterpret_cast<float*>(value)),
+              "Could not add Kudu WriteOp.");
           break;
         case TYPE_DOUBLE:
           KUDU_RETURN_IF_ERROR(
-              insert->mutable_row()->SetDouble(j, *reinterpret_cast<double*>(value)),
-              "Could not add insert.");
+              write->mutable_row()->SetDouble(col, *reinterpret_cast<double*>(value)),
+              "Could not add Kudu WriteOp.");
           break;
         case TYPE_BOOLEAN:
           KUDU_RETURN_IF_ERROR(
-              insert->mutable_row()->SetBool(j, *reinterpret_cast<bool*>(value)),
-              "Could not add insert.");
+              write->mutable_row()->SetBool(col, *reinterpret_cast<bool*>(value)),
+              "Could not add Kudu WriteOp.");
           break;
         case TYPE_TINYINT:
           KUDU_RETURN_IF_ERROR(
-              insert->mutable_row()->SetInt8(j, *reinterpret_cast<int8_t*>(value)),
-              "Could not add insert.");
+              write->mutable_row()->SetInt8(col, *reinterpret_cast<int8_t*>(value)),
+              "Could not add Kudu WriteOp.");
           break;
         case TYPE_SMALLINT:
           KUDU_RETURN_IF_ERROR(
-              insert->mutable_row()->SetInt16(j, *reinterpret_cast<int16_t*>(value)),
-              "Could not add insert.");
+              write->mutable_row()->SetInt16(col, *reinterpret_cast<int16_t*>(value)),
+              "Could not add Kudu WriteOp.");
           break;
         case TYPE_INT:
           KUDU_RETURN_IF_ERROR(
-              insert->mutable_row()->SetInt32(j, *reinterpret_cast<int32_t*>(value)),
-              "Could not add insert.");
+              write->mutable_row()->SetInt32(col, *reinterpret_cast<int32_t*>(value)),
+              "Could not add Kudu WriteOp.");
           break;
         case TYPE_BIGINT:
           KUDU_RETURN_IF_ERROR(
-              insert->mutable_row()->SetInt64(j, *reinterpret_cast<int64_t*>(value)),
-              "Could not add insert.");
+              write->mutable_row()->SetInt64(col, *reinterpret_cast<int64_t*>(value)),
+              "Could not add Kudu WriteOp.");
           break;
         default:
           DCHECK(false);
       }
     }
 
-    KUDU_RETURN_IF_ERROR(session_->Apply(insert.release()),
+    KUDU_RETURN_IF_ERROR(session_->Apply(write.release()),
         "Error while applying Kudu session.");
     ++rows_added;
   }
 
   // TODO right now we always flush an entire row batch, if these are small we'll
-  // be inneficcient. Consider decoupling impala's batch size from kudu's
+  // be inefficient. Consider decoupling impala's batch size from kudu's
   KUDU_RETURN_IF_ERROR(session_->Flush(), "Error while flushing Kudu session.");
 
   (*state->per_partition_status())[ROOT_PARTITION_KEY].num_appended_rows += rows_added;

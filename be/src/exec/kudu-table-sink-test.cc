@@ -60,10 +60,11 @@ class KuduTableSinkTest : public testing::Test {
     exec_env_.disk_io_mgr()->Init(&mem_tracker_);
   }
 
-  void BuildRuntimeStateForInsert(int num_cols_to_insert) {
+  void BuildRuntimeState(int num_cols_to_insert,
+      TTableSinkType::type sink_type) {
     TTableSink table_sink;
     table_sink.__set_target_table_id(0);
-    table_sink.__set_type(TTableSinkType::KUDU_INSERT);
+    table_sink.__set_type(sink_type);
 
     data_sink_.__set_type(TDataSinkType::TABLE_SINK);
     data_sink_.__set_table_sink(table_sink);
@@ -106,8 +107,8 @@ class KuduTableSinkTest : public testing::Test {
     exprs->push_back(expr_3);
   }
 
-  // Create a batch and fill it with 'num_cols_to_insert' columns.
-  RowBatch* CreateRowBatch(int first_row, int batch_size, int num_cols_to_insert) {
+  // Create a batch and fill it according to the tuple descriptor.
+  RowBatch* CreateRowBatch(int first_row, int batch_size, int factor, string val) {
     DCHECK(desc_tbl_->GetTupleDescriptor(0) != NULL);
     TupleDescriptor* tuple_desc = desc_tbl_->GetTupleDescriptor(0);
     RowBatch* batch = new RowBatch(*row_desc_, batch_size, &mem_tracker_);
@@ -116,15 +117,15 @@ class KuduTableSinkTest : public testing::Test {
     DCHECK(tuple_buffer_ != NULL);
     Tuple* tuple = reinterpret_cast<Tuple*>(tuple_buffer_);
 
-    bzero(tuple_buffer_, tuple_buffer_size);
+    memset(tuple_buffer_, 0, tuple_buffer_size);
     for (int i = 0; i < batch_size; ++i) {
       int idx = batch->AddRow();
       TupleRow* row = batch->GetRow(idx);
       row->SetTuple(0, tuple);
 
       for (int j = 0; j < tuple_desc->slots().size(); j++) {
-        DCHECK(tuple->GetSlot(tuple_desc->slots()[j]->tuple_offset()) != NULL);
         void* slot = tuple->GetSlot(tuple_desc->slots()[j]->tuple_offset());
+        DCHECK(slot != NULL);
         switch(j) {
           case 0: {
             int32_t* int_slot = reinterpret_cast<int32_t*>(slot);
@@ -133,19 +134,17 @@ class KuduTableSinkTest : public testing::Test {
           }
           case 1: {
             int32_t* int_slot = reinterpret_cast<int32_t*>(slot);
-            *int_slot = (first_row + i) * 2;
+            *int_slot = (first_row + i) * factor;
             break;
           }
           case 2: {
-            string value = strings::Substitute("hello_$0", first_row + i);
-            Slice slice(value);
-
+            string value = strings::Substitute("$0_$1", val, first_row + i);
             char* buffer = reinterpret_cast<char*>(
-                batch->tuple_data_pool()->TryAllocate(slice.size()));
+                batch->tuple_data_pool()->TryAllocate(value.size()));
             DCHECK(buffer != NULL);
-            memcpy(buffer, slice.data(), slice.size());
+            memcpy(buffer, value.data(), value.size());
             reinterpret_cast<StringValue*>(slot)->ptr = buffer;
-            reinterpret_cast<StringValue*>(slot)->len = slice.size();
+            reinterpret_cast<StringValue*>(slot)->len = value.size();
             break;
           }
           default:
@@ -153,12 +152,13 @@ class KuduTableSinkTest : public testing::Test {
         }
       }
       batch->CommitLastRow();
-      tuple = reinterpret_cast<Tuple*>(tuple + tuple_desc->byte_size());
+      uint8_t* mem = reinterpret_cast<uint8_t*>(tuple);
+      tuple = reinterpret_cast<Tuple*>(mem + tuple_desc->byte_size());
     }
     return batch;
   }
 
-  void Verify(int num_columns, int expected_num_rows) {
+  void Verify(int num_columns, int expected_num_rows, int factor, string val) {
     kudu::client::KuduScanner scanner(kudu_test_helper_.table().get());
     scanner.SetReadMode(kudu::client::KuduScanner::READ_AT_SNAPSHOT);
     scanner.SetOrderMode(kudu::client::KuduScanner::ORDERED);
@@ -176,12 +176,12 @@ class KuduTableSinkTest : public testing::Test {
           case 2:
             ASSERT_EQ(row.ToString(), strings::Substitute(
                 "(int32 key=$0, int32 int_val=$1, string string_val=NULL)",
-                row_idx, row_idx * 2));
+                row_idx, row_idx * factor));
             break;
           case 3:
             ASSERT_EQ(row.ToString(), strings::Substitute(
-                "(int32 key=$0, int32 int_val=$1, string string_val=hello_$2)",
-                row_idx, row_idx * 2, row_idx));
+                "(int32 key=$0, int32 int_val=$1, string string_val=$2_$3)",
+                row_idx, row_idx * factor, val, row_idx));
             break;
         }
         ++row_idx;
@@ -190,21 +190,29 @@ class KuduTableSinkTest : public testing::Test {
     ASSERT_EQ(row_idx, expected_num_rows);
   }
 
-  void InsertAndVerify(int num_columns) {
+  void WriteAndVerify(int num_columns, TTableSinkType::type type, int factor, string val) {
     const int kNumRowsPerBatch = 10;
 
-    BuildRuntimeStateForInsert(num_columns);
+    BuildRuntimeState(num_columns, type);
     vector<TExpr> exprs;
     CreateTExpr(num_columns, &exprs);
     KuduTableSink sink(*row_desc_, exprs, data_sink_);
     ASSERT_OK(sink.Prepare(&runtime_state_));
     ASSERT_OK(sink.Open(&runtime_state_));
     ASSERT_OK(sink.Send(&runtime_state_,
-        CreateRowBatch(0, kNumRowsPerBatch, num_columns), false));
+        CreateRowBatch(0, kNumRowsPerBatch, factor, val), false));
     ASSERT_OK(sink.Send(&runtime_state_,
-        CreateRowBatch(kNumRowsPerBatch, kNumRowsPerBatch, num_columns), true));
+        CreateRowBatch(kNumRowsPerBatch, kNumRowsPerBatch, factor, val), true));
     sink.Close(&runtime_state_);
-    Verify(num_columns, 2 * kNumRowsPerBatch);
+    Verify(num_columns, 2 * kNumRowsPerBatch, factor, val);
+  }
+
+  void InsertAndVerify(int num_columns) {
+    WriteAndVerify(num_columns, TTableSinkType::KUDU_INSERT, 2, "hello");
+  }
+
+  void UpdateAndVerify(int num_columns) {
+    WriteAndVerify(num_columns, TTableSinkType::KUDU_UPDATE, 3, "world");
   }
 
   virtual void TearDown() {
@@ -233,6 +241,16 @@ TEST_F(KuduTableSinkTest, TestInsertTwoCols) {
 
 TEST_F(KuduTableSinkTest, TestInsertAllCols) {
   InsertAndVerify(3);
+}
+
+TEST_F(KuduTableSinkTest, UpdateTwoCols) {
+  InsertAndVerify(2);
+  UpdateAndVerify(2);
+}
+
+TEST_F(KuduTableSinkTest, UpdateAllCols) {
+  InsertAndVerify(3);
+  UpdateAndVerify(3);
 }
 
 } // namespace impala

@@ -1,0 +1,119 @@
+====
+---- QUERY
+create table tdata ( id int, name string, valf float, vali bigint)
+TBLPROPERTIES(
+'storage_handler' = 'com.cloudera.kudu.hive.KuduStorageHandler',
+'kudu.table_name' = 'tdata',
+'kudu.split_keys' = '[[10], [30]]',
+'kudu.master_addresses' = '0.0.0.0:7051',
+'kudu.key_columns' = 'id'
+ )
+---- RESULTS
+====
+---- QUERY
+insert into tdata values
+(1, "martin", 1.0, 232232323),
+(2, "david", cast(1.0 as float), 99398493939),
+(3, "todd", cast(1.0 as float), 993393939)
+---- RESULTS
+: 3
+====
+---- QUERY
+update tdata set vali=43 where id = 1
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+1,'martin',1.0,43
+2,'david',1.0,99398493939
+3,'todd',1.0,993393939
+---- TYPES
+INT,STRING,FLOAT,BIGINT
+====
+---- QUERY
+update tdata set vali=43 where id > 1
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+1,'martin',1.0,43
+2,'david',1.0,43
+3,'todd',1.0,43
+---- TYPES
+INT,STRING,FLOAT,BIGINT
+====
+---- QUERY
+update tdata set name='unknown' where name = 'martin'
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+1,'unknown',1.0,43
+2,'david',1.0,43
+3,'todd',1.0,43
+---- TYPES
+INT,STRING,FLOAT,BIGINT
+====
+---- QUERY
+insert into tdata values (40, "he", cast(0.0 as float), 43), (120, "she", cast(0.0 as float), 99)
+---- RESULTS
+: 2
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+1,'unknown',1.0,43
+2,'david',1.0,43
+3,'todd',1.0,43
+40,'he',0.0,43
+120,'she',0.0,99
+---- TYPES
+INT,STRING,FLOAT,BIGINT
+====
+---- QUERY
+update tdata set name=null where id = 40
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+1,'unknown',1.0,43
+2,'david',1.0,43
+3,'todd',1.0,43
+40,'NULL',0.0,43
+120,'she',0.0,99
+---- TYPES
+INT,STRING,FLOAT,BIGINT
+====
+---- QUERY
+update tdata set name='he' where id = 40
+---- RESULTS
+====
+---- QUERY
+select * from tdata
+---- RESULTS
+1,'unknown',1.0,43
+2,'david',1.0,43
+3,'todd',1.0,43
+40,'he',0.0,43
+120,'she',0.0,99
+---- TYPES
+INT,STRING,FLOAT,BIGINT
+====
+---- QUERY
+# Make sure we can insert empty strings into string columns and that we can scan them
+# back.
+insert into tdata values (320, '', 2.0, 932)
+---- RESULTS
+: 1
+====
+---- QUERY
+select id, name from tdata where id = 320;
+---- RESULTS
+320,''
+---- TYPES
+INT,STRING
+====
