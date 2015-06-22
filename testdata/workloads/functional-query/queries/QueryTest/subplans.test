@@ -155,16 +155,63 @@ BIGINT, STRING, BIGINT, DECIMAL
 2,4-NOT SPECIFIED,2,68190.25
 ====
 ---- QUERY
-# Test a self-join inside a subplan.
-select count(okey), opriority
-from tpch_nested_parquet.customer c,
-  (select ca.o_orderkey okey, ca.o_orderpriority opriority
-   from c.c_orders ca, c.c_orders cb
-   where ca.o_orderkey = cb.o_orderkey
-   and ca.o_totalprice + cb.o_totalprice < 2) v
-group by opriority
+# Test a join inside a subplan.
+SELECT count(okey), opriority
+FROM tpch_nested_parquet.customer c,
+  (SELECT ca.o_orderkey okey, ca.o_orderpriority opriority
+   FROM c.c_orders ca, c.c_orders cb
+   WHERE ca.o_orderkey = cb.o_orderkey
+   AND ca.o_totalprice + cb.o_totalprice < 2) v
+GROUP BY opriority
 ---- TYPES
 BIGINT, STRING
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
-1,1-URGENT
+====
+---- QUERY
+# Test a self-join inside a subplan.
+SELECT count(okey), opriority
+FROM tpch_nested_parquet.customer c,
+  (SELECT ca.o_orderkey okey, ca.o_orderpriority opriority
+   FROM c.c_orders ca, c.c_orders cb
+   WHERE ca.o_orderkey = cb.o_orderkey) v
+GROUP BY opriority
+---- TYPES
+BIGINT, STRING
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+300091,2-HIGH
+300254,4-NOT SPECIFIED
+300589,5-LOW
+300343,1-URGENT
+298723,3-MEDIUM
+====
+---- QUERY
+# Test a left outer join inside a subplan.
+SELECT count(okey), opriority
+FROM tpch_nested_parquet.customer c,
+  (SELECT ca.o_orderkey okey, ca.o_orderpriority opriority
+   FROM c.c_orders ca LEFT OUTER JOIN c.c_orders cb
+   ON ca.o_orderkey = cb.o_orderkey) v
+GROUP BY opriority
+---- TYPES
+BIGINT, STRING
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+300091,2-HIGH
+300254,4-NOT SPECIFIED
+300589,5-LOW
+300343,1-URGENT
+298723,3-MEDIUM
+====
+---- QUERY
+# Test a right outer join inside a subplan.
+SELECT count(okey), opriority
+FROM tpch_nested_parquet.customer c,
+  (SELECT ca.o_orderkey okey, ca.o_orderpriority opriority
+   FROM c.c_orders ca RIGHT OUTER JOIN c.c_orders cb
+   ON ca.o_orderkey = cb.o_orderkey
+   WHERE ca.o_totalprice + cb.o_totalprice < 2
+   AND cb.o_orderpriority = '5-LOW') v
+GROUP BY opriority
+---- TYPES
+BIGINT, STRING
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
 ====

@@ -76,17 +76,20 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   /// Implementation details:
   /// Logically, the algorithm runs in three modes.
-  ///   1. Read the build side rows and partition them into hash_partitions_. This is a
-  ///      fixed fan out of the input. The input can either come from child(1) OR from the
-  ///      build tuple stream of partition that needs to be repartitioned.
-  ///   2. Read the probe side rows, partition them and either perform the join or spill
-  ///      them into hash_partitions_. If the partition has the hash table in memory, we
-  ///      perform the join, otherwise we spill the probe row. Similar to step one, the
-  ///      rows can come from child(0) or a spilled partition.
-  ///   3. Read and construct a single spilled partition. In this case we're walking a
-  ///      spilled partition and the hash table fits in memory. Neither the build nor probe
-  ///      side need to be partitioned and we just perform the join.
-  //
+  ///   1. [PARTITIONING_BUILD or REPARTITIONING] Read the build side rows and partition
+  ///      them into hash_partitions_. This is a fixed fan out of the input. The input
+  ///      can either come from child(1) OR from the build tuple stream of partition
+  ///      that needs to be repartitioned.
+  ///   2. [PROCESSING_PROBE or REPARTITIONING] Read the probe side rows, partition them
+  ///      and either perform the join or spill them into hash_partitions_. If the
+  ///      partition has the hash table in memory, we perform the join, otherwise we
+  ///      spill the probe row. Similar to step one, the rows can come from child(0) or
+  ///      a spilled partition.
+  ///   3. [PROBING_SPILLED_PARTITION] Read and construct a single spilled partition.
+  ///      In this case we are walking a spilled partition and the hash table fits in
+  ///      memory. Neither the build nor probe side need to be partitioned and we just
+  ///      perform the join.
+  ///
   /// States:
   /// The transition goes from PARTITIONING_BUILD -> PROCESSING_PROBE ->
   ///    PROBING_SPILLED_PARTITION/REPARTITIONING.
@@ -128,13 +131,6 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// Note that we need to have at least as many SEED_PRIMES in HashTableCtx.
   /// TODO: we can revisit and try harder to explicitly detect skew.
   static const int MAX_PARTITION_DEPTH = 16;
-
-  /// Maximum number of build tables that can be in memory at any time. This is in
-  /// addition to the memory constraints and is used for testing to trigger code paths
-  /// for small tables.
-  /// Note: In order to test the spilling paths more easily, set it to PARTITION_FANOUT / 2.
-  /// TODO: Eventually remove.
-  static const int MAX_IN_MEM_BUILD_TABLES = PARTITION_FANOUT;
 
   /// Append the row to stream. In the common case, the row is just in memory. If we
   /// run out of memory, this will spill a partition and try to add the row again.
@@ -180,14 +176,14 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   int ProcessProbeBatch(RowBatch* out_batch, HashTableCtx* ht_ctx, Status* status);
 
   /// Wrapper that calls the templated version of ProcessProbeBatch() based on 'join_op'.
-  int ProcessProbeBatch(
-  const TJoinOp::type join_op, RowBatch* out_batch, HashTableCtx* ht_ctx, Status* status);
+  int ProcessProbeBatch(const TJoinOp::type join_op, RowBatch* out_batch,
+                        HashTableCtx* ht_ctx, Status* status);
 
-  /// Sweep the hash_tbl_ of the partition that it is in the front of
-  /// flush_build_partitions_, using hash_tbl_iterator_ and output any unmatched build
+  /// Sweep the hash_tbl_ of the partition that is at the front of
+  /// output_build_partitions_, using hash_tbl_iterator_ and output any unmatched build
   /// rows. If reaches the end of the hash table it closes that partition, removes it from
-  /// flush_build_partitions_ and moves hash_tbl_iterator_ to the beginning of the
-  /// partition in the front of flush_build_partitions_.
+  /// output_build_partitions_ and moves hash_tbl_iterator_ to the beginning of the
+  /// new partition at the front of output_build_partitions_.
   void OutputUnmatchedBuild(RowBatch* out_batch);
 
   /// Initializes null_aware_partition_ and nulls_build_batch_ to output rows.
@@ -214,8 +210,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// Call at the end of consuming the probe rows. Walks hash_partitions_ and
   ///  - If this partition had a hash table, close it. This partition is fully processed
   ///    on both the build and probe sides. The streams are transferred to batch.
-  ///    In the case of right-outer and full-outer joins, instead of closing this partition
-  ///    we put it on a list of partitions that we need to flush their unmatched rows.
+  ///    In the case of right-outer and full-outer joins, instead of closing this
+  ///    partition we put it on a list of partitions for which we need to flush their
+  ///    unmatched rows.
   ///  - If this partition did not have a hash table, meaning both sides were spilled,
   ///    move the partition to spilled_partitions_.
   Status CleanUpHashPartitions(RowBatch* batch);
@@ -243,6 +240,11 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   /// Iterates over all the partitions in hash_partitions_ and returns the number of rows
   /// of the largest partition (in terms of number of aggregated and unaggregated rows).
   int64_t LargestSpilledPartition() const;
+
+  /// Calls Close() on every Partition in 'hash_partitions_',
+  /// 'spilled_partitions_', and 'output_build_partitions_' and then resets the lists,
+  /// the vector and the partition pool.
+  void ClosePartitions();
 
   /// Prepares for probing the next batch.
   void ResetForProbe();
@@ -292,14 +294,8 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   std::vector<ExprContext*> probe_expr_ctxs_;
   std::vector<ExprContext*> build_expr_ctxs_;
 
-  /// Non-equi-join conjuncts from the JOIN clause.
+  /// Non-equi-join conjuncts from the ON clause.
   std::vector<ExprContext*> other_join_conjunct_ctxs_;
-
-  /// If true, the partitions in hash_partitions_ are using small buffers.
-  bool using_small_buffers_;
-
-  /// State of the algorithm. Used just for debugging.
-  State state_;
 
   /// Codegen doesn't allow for automatic Status variables because then exception
   /// handling code is needed to destruct the Status, and our function call substitution
@@ -348,6 +344,82 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
 
   /// Time spent evaluating other_join_conjuncts for NAAJ.
   RuntimeProfile::Counter* null_aware_eval_timer_;
+
+  /////////////////////////////////////////
+  /// BEGIN: Members that must be Reset()
+
+  /// If true, the partitions in hash_partitions_ are using small buffers.
+  bool using_small_buffers_;
+
+  /// State of the algorithm. Used just for debugging.
+  State state_;
+
+  /// Object pool that holds the Partition objects in hash_partitions_.
+  boost::scoped_ptr<ObjectPool> partition_pool_;
+
+  /// The current set of partitions that are being built. This is only used in
+  /// mode 1 and 2 when we need to partition the build and probe inputs.
+  /// This is not used when processing a single partition.
+  /// After CleanUpHashPartitions() is called this vector should be empty.
+  std::vector<Partition*> hash_partitions_;
+
+  /// The list of partitions that have been spilled on both sides and still need more
+  /// processing. These partitions could need repartitioning, in which case more
+  /// partitions will be added to this list after repartitioning.
+  /// This list is populated at CleanUpHashPartitions().
+  std::list<Partition*> spilled_partitions_;
+
+  /// Cache of the per partition hash table to speed up ProcessProbeBatch.
+  /// In the case where we need to partition the probe:
+  ///  hash_tbls_[i] = hash_partitions_[i]->hash_tbl();
+  /// In the case where we don't need to partition the probe:
+  ///  hash_tbls_[i] = input_partition_->hash_tbl();
+  HashTable* hash_tbls_[PARTITION_FANOUT];
+
+  /// The current input partition to be processed (not in spilled_partitions_).
+  /// This partition can either serve as the source for a repartitioning step, or
+  /// if the hash table fits in memory, the source of the probe rows.
+  Partition* input_partition_;
+
+  /// In the case of right-outer and full-outer joins, this is the list of the partitions
+  /// for which we need to output their unmatched build rows.
+  /// This list is populated at CleanUpHashPartitions().
+  std::list<Partition*> output_build_partitions_;
+
+  /// Partition used if null_aware_ is set. This partition is always processed at the end
+  /// after all build and probe rows are processed. Rows are added to this partition along
+  /// the way.
+  /// In this partition's build_rows_, we store all the rows for which build_expr_ctxs_
+  /// evaluated over the row returns NULL (i.e. it has a NULL on the eq join slot).
+  /// In this partition's probe_rows, we store all probe rows that did not have a match
+  /// in the hash table.
+  /// At the very end, we then iterate over all the probe rows. For each probe row, we
+  /// return the rows that did not match any of the build rows.
+  /// NULL if we this join is not null aware or we are done processing this partition.
+  Partition* null_aware_partition_;
+
+  /// Used while processing null_aware_partition_. It contains all the build tuple rows
+  /// with a NULL when evaluating the hash table expr.
+  boost::scoped_ptr<RowBatch> nulls_build_batch_;
+
+  /// If true, the build side has at least one row.
+  bool non_empty_build_;
+
+  /// For NAAJ, this stream contains all probe rows that had NULL on the hash table
+  /// conjuncts.
+  BufferedTupleStream* null_probe_rows_;
+
+  /// For each row in null_probe_rows_, true if this row has matched any build row
+  /// (i.e. the resulting joined row passes other_join_conjuncts).
+  /// TODO: remove this. We need to be able to put these bits inside the tuple itself.
+  std::vector<bool> matched_null_probe_;
+
+  /// The current index into null_probe_rows_/matched_null_probe_ that we are
+  /// outputting.
+  int64_t null_probe_output_idx_;
+
+  /// END: Members that must be Reset()
+  /////////////////////////////////////////
 
   class Partition {
    public:
@@ -440,68 +512,9 @@ class PartitionedHashJoinNode : public BlockingJoinNode {
   ProcessProbeBatchFn process_probe_batch_fn_;
   ProcessProbeBatchFn process_probe_batch_fn_level0_;
 
-  /// The list of partitions that have been spilled on both sides and still need more
-  /// processing. These partitions could need repartitioning, in which cases more
-  /// partitions will be added to this list after repartitioning.
-  std::list<Partition*> spilled_partitions_;
-
-  /// The current set of partitions that are being built. This is only used in
-  /// mode 1 and 2 when we need to partition the build and probe inputs.
-  /// This is not used when processing a single partition.
-  std::vector<Partition*> hash_partitions_;
-
-  /// Cache of the per partition hash table to speed up ProcessProbeBatch.
-  /// In the case where we need to partition the probe:
-  ///  hash_tbls_[i] = hash_partitions_[i]->hash_tbl();
-  /// In the case where we don't need to partition the probe:
-  ///  hash_tbls_[i] = input_partition_->hash_tbl();
-  HashTable* hash_tbls_[PARTITION_FANOUT];
-
-  /// The current input partition to be processed (not in spilled_partitions_).
-  /// This partition can either serve as the source for a repartitioning step, or
-  /// if the hash table fits in memory, the source of the probe rows.
-  Partition* input_partition_;
-
-  /// In the case of right-outer and full-outer joins, this is the list of the partitions
-  /// that we need to output their unmatched build rows. We always flush the unmatched
-  /// rows of the partition that it is in the front.
-  std::list<Partition*> output_build_partitions_;
-
   /// Used for concentrating the existence bits from all the partitions, used by the
   /// probe-side filter optimization.
   std::vector<std::pair<SlotId, Bitmap*> > probe_filters_;
-
-  /// Partition used if null_aware_ is set. This partition is always processed at the end
-  /// after all build and probe rows are processed. Rows are added to this partition along
-  /// the way.
-  /// In this partition's build_rows_, we store all the rows for which build_expr_ctxs_
-  /// evaluated over the row returns NULL (i.e. it has a NULL on the eq join slot).
-  /// In this partition's probe_rows, we store all probe rows that did not have a match
-  /// in the hash table.
-  /// At the very end, we then iterate over all the probe rows. For each probe row, we
-  /// return the rows that did not match any of the build rows.
-  /// NULL if we this join is not null aware or we are done processing this partition.
-  Partition* null_aware_partition_;
-
-  /// Used while processing null_aware_partition_. It contains all the build tuple rows
-  /// with a NULL when evaluating the hash table expr.
-  boost::scoped_ptr<RowBatch> nulls_build_batch_;
-
-  /// If true, the build side has at least one row.
-  bool non_empty_build_;
-
-  /// For NAAJ, this stream contains all probe rows that had NULL on the hash table
-  /// conjuncts.
-  BufferedTupleStream* null_probe_rows_;
-
-  /// For each row in null_probe_rows_, true if this row has matched any build row
-  /// (i.e. the resulting joined row passes other_join_conjuncts).
-  /// TODO: remove this. We need to be able to put these bits inside the tuple itself.
-  std::vector<bool> matched_null_probe_;
-
-  /// The current index into null_probe_rows_/matched_null_probe_ that we are
-  /// outputting.
-  int64_t null_probe_output_idx_;
 };
 
 }

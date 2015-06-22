@@ -93,6 +93,7 @@ class BlockingJoinNode : public ExecNode {
 
   /// If true, this node can add filters to the probe (left child) node after processing
   /// the entire build side.
+  /// Note that we disable probe filters if we are inside a subplan.
   bool can_add_probe_filters_;
 
   RuntimeProfile::Counter* build_timer_;   // time to prepare build side
