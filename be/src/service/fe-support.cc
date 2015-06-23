@@ -186,7 +186,7 @@ static void ResolveSymbolLookup(const TSymbolLookupParams params,
 
   string symbol = params.symbol;
   ColumnType ret_type(INVALID_TYPE);
-  if (params.__isset.ret_arg_type) ret_type = ColumnType(params.ret_arg_type);
+  if (params.__isset.ret_arg_type) ret_type = ColumnType::FromThrift(params.ret_arg_type);
 
   // Mangle the user input
   DCHECK_NE(params.fn_binary_type, TFunctionBinaryType::HIVE);
@@ -262,7 +262,7 @@ Java_com_cloudera_impala_service_FeSupport_NativeLookupSymbol(
 
   vector<ColumnType> arg_types;
   for (int i = 0; i < lookup.arg_types.size(); ++i) {
-    arg_types.push_back(ColumnType(lookup.arg_types[i]));
+    arg_types.push_back(ColumnType::FromThrift(lookup.arg_types[i]));
   }
 
   TSymbolLookupResult result;

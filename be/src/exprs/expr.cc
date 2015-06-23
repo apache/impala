@@ -103,7 +103,7 @@ Expr::Expr(const ColumnType& type, bool is_slotref)
 Expr::Expr(const TExprNode& node, bool is_slotref)
     : cache_entry_(NULL),
       is_slotref_(is_slotref),
-      type_(ColumnType(node.type)),
+      type_(ColumnType::FromThrift(node.type)),
       output_scale_(-1),
       context_index_(-1),
       ir_compute_fn_(NULL) {

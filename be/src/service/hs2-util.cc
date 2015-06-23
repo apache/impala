@@ -185,23 +185,23 @@ void impala::ExprValueToHS2TColumn(const void* value, const TColumnType& type,
     case TPrimitiveType::DECIMAL: {
       // HiveServer2 requires decimal to be presented as string.
       column->stringVal.values.push_back("");
-      ColumnType decimalType(type);
+      const ColumnType& decimalType = ColumnType::FromThrift(type);
       if (value != NULL) {
         switch (decimalType.GetByteSize()) {
           case 4:
             column->stringVal.values.back() =
-                reinterpret_cast<const Decimal4Value*>(value)->ToString(type);
+                reinterpret_cast<const Decimal4Value*>(value)->ToString(decimalType);
             break;
           case 8:
             column->stringVal.values.back() =
-                reinterpret_cast<const Decimal8Value*>(value)->ToString(type);
+                reinterpret_cast<const Decimal8Value*>(value)->ToString(decimalType);
             break;
           case 16:
             column->stringVal.values.back() =
-                reinterpret_cast<const Decimal16Value*>(value)->ToString(type);
+                reinterpret_cast<const Decimal16Value*>(value)->ToString(decimalType);
             break;
           default:
-            DCHECK(false) << "bad type: " << type;
+            DCHECK(false) << "bad type: " << decimalType;
         }
       }
       nulls = &column->stringVal.nulls;
@@ -357,23 +357,23 @@ void impala::ExprValueToHS2TColumnValue(const void* value, const TColumnType& ty
       // HiveServer2 requires decimal to be presented as string.
       hs2_col_val->__isset.stringVal = true;
       hs2_col_val->stringVal.__isset.value = not_null;
-      ColumnType decimalType(type);
+      const ColumnType& decimalType = ColumnType::FromThrift(type);
       if (not_null) {
         switch (decimalType.GetByteSize()) {
           case 4:
             hs2_col_val->stringVal.value =
-              reinterpret_cast<const Decimal4Value*>(value)->ToString(type);
+              reinterpret_cast<const Decimal4Value*>(value)->ToString(decimalType);
             break;
           case 8:
             hs2_col_val->stringVal.value =
-              reinterpret_cast<const Decimal8Value*>(value)->ToString(type);
+              reinterpret_cast<const Decimal8Value*>(value)->ToString(decimalType);
             break;
           case 16:
             hs2_col_val->stringVal.value =
-              reinterpret_cast<const Decimal16Value*>(value)->ToString(type);
+              reinterpret_cast<const Decimal16Value*>(value)->ToString(decimalType);
             break;
           default:
-            DCHECK(false) << "bad type: " << type;
+            DCHECK(false) << "bad type: " << decimalType;
         }
       }
       break;

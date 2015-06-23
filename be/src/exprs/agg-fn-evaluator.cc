@@ -127,12 +127,12 @@ Status AggFnEvaluator::Prepare(RuntimeState* state, const RowDescriptor& desc,
       MemPool* agg_fn_pool, FunctionContext** agg_fn_ctx) {
   DCHECK(intermediate_slot_desc != NULL);
   DCHECK_EQ(intermediate_slot_desc->type().type,
-      ColumnType(fn_.aggregate_fn.intermediate_type).type);
+      ColumnType::FromThrift(fn_.aggregate_fn.intermediate_type).type);
   DCHECK(intermediate_slot_desc_ == NULL);
   intermediate_slot_desc_ = intermediate_slot_desc;
 
   DCHECK(output_slot_desc != NULL);
-  DCHECK_EQ(output_slot_desc->type().type, ColumnType(fn_.ret_type).type);
+  DCHECK_EQ(output_slot_desc->type().type, ColumnType::FromThrift(fn_.ret_type).type);
   DCHECK(output_slot_desc_ == NULL);
   output_slot_desc_ = output_slot_desc;
 

@@ -24,6 +24,55 @@ using namespace apache::hive::service::cli::thrift;
 
 namespace impala {
 
+ColumnType::ColumnType(const std::vector<TTypeNode>& types, int* idx)
+  : len(-1), precision(-1), scale(-1) {
+  DCHECK_GE(*idx, 0);
+  DCHECK_LT(*idx, types.size());
+  const TTypeNode& node = types[*idx];
+  switch (node.type) {
+    case TTypeNodeType::SCALAR: {
+      DCHECK(node.__isset.scalar_type);
+      const TScalarType scalar_type = node.scalar_type;
+      type = ThriftToType(scalar_type.type);
+      if (type == TYPE_CHAR || type == TYPE_VARCHAR) {
+        DCHECK(scalar_type.__isset.len);
+        len = scalar_type.len;
+      } else if (type == TYPE_DECIMAL) {
+        DCHECK(scalar_type.__isset.precision);
+        DCHECK(scalar_type.__isset.scale);
+        precision = scalar_type.precision;
+        scale = scalar_type.scale;
+      }
+      break;
+    }
+    case TTypeNodeType::STRUCT:
+      type = TYPE_STRUCT;
+      for (int i = 0; i < node.struct_fields.size(); ++i) {
+        ++(*idx);
+        children.push_back(ColumnType(types, idx));
+      }
+      break;
+    case TTypeNodeType::ARRAY:
+      DCHECK(!node.__isset.scalar_type);
+      DCHECK_LT(*idx, types.size() - 1);
+      type = TYPE_ARRAY;
+      ++(*idx);
+      children.push_back(ColumnType(types, idx));
+      break;
+    case TTypeNodeType::MAP:
+      DCHECK(!node.__isset.scalar_type);
+      DCHECK_LT(*idx, types.size() - 2);
+      type = TYPE_MAP;
+      ++(*idx);
+      children.push_back(ColumnType(types, idx));
+      ++(*idx);
+      children.push_back(ColumnType(types, idx));
+      break;
+    default:
+      DCHECK(false) << node.type;
+  }
+}
+
 PrimitiveType ThriftToType(TPrimitiveType::type ttype) {
   switch (ttype) {
     case TPrimitiveType::INVALID_TYPE: return INVALID_TYPE;
@@ -66,6 +115,10 @@ TPrimitiveType::type ToThrift(PrimitiveType ptype) {
     case TYPE_BINARY: return TPrimitiveType::BINARY;
     case TYPE_DECIMAL: return TPrimitiveType::DECIMAL;
     case TYPE_CHAR: return TPrimitiveType::CHAR;
+    case TYPE_STRUCT:
+    case TYPE_ARRAY:
+    case TYPE_MAP:
+      DCHECK(false) << "NYI: " << ptype;
     default: return TPrimitiveType::INVALID_TYPE;
   }
 }
@@ -89,6 +142,9 @@ string TypeToString(PrimitiveType t) {
     case TYPE_BINARY: return "BINARY";
     case TYPE_DECIMAL: return "DECIMAL";
     case TYPE_CHAR: return "CHAR";
+    case TYPE_STRUCT: return "STRUCT";
+    case TYPE_ARRAY: return "ARRAY";
+    case TYPE_MAP: return "MAP";
   };
   return "";
 }
@@ -113,6 +169,9 @@ string TypeToOdbcString(PrimitiveType t) {
     case TYPE_BINARY: return "binary";
     case TYPE_DECIMAL: return "decimal";
     case TYPE_CHAR: return "char";
+    case TYPE_STRUCT: return "struct";
+    case TYPE_ARRAY: return "array";
+    case TYPE_MAP: return "map";
   };
   return "unknown";
 }

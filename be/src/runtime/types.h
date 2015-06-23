@@ -24,6 +24,7 @@
 
 namespace impala {
 
+// TODO for 2.3: move into ColumnType, rename to Type, and remove TYPE_ prefix
 enum PrimitiveType {
   INVALID_TYPE = 0,
   TYPE_NULL,
@@ -45,7 +46,11 @@ enum PrimitiveType {
   /// parsed from scan nodes. It can be returned from exprs and must be consumable
   /// by exprs.
   TYPE_CHAR,
-  TYPE_VARCHAR
+  TYPE_VARCHAR,
+
+  TYPE_STRUCT,
+  TYPE_ARRAY,
+  TYPE_MAP
 };
 
 PrimitiveType ThriftToType(TPrimitiveType::type ttype);
@@ -53,9 +58,9 @@ TPrimitiveType::type ToThrift(PrimitiveType ptype);
 std::string TypeToString(PrimitiveType t);
 std::string TypeToOdbcString(PrimitiveType t);
 
-/// Wrapper struct to describe a type. Includes the enum and, optionally,
-/// size information.
-/// TODO: Rename to ScalarType and mirror FE type hierarchy after the expr refactoring.
+// Describes a type. Includes the enum, children types, and any type-specific metadata
+// (e.g. precision and scale for decimals).
+// TODO for 2.3: rename to TypeDescriptor
 struct ColumnType {
   PrimitiveType type;
   /// Only set if type == TYPE_CHAR or type == TYPE_VARCHAR
@@ -76,10 +81,17 @@ struct ColumnType {
   /// The maximum precision representable by a 8-byte decimal (Decimal8Value)
   static const int MAX_DECIMAL8_PRECISION = 18;
 
+  /// Empty for scalar types
+  std::vector<ColumnType> children;
+
+  // TODO: add name field for better error messages
+
   ColumnType(PrimitiveType type = INVALID_TYPE)
     : type(type), len(-1), precision(-1), scale(-1) {
     DCHECK_NE(type, TYPE_CHAR);
     DCHECK_NE(type, TYPE_DECIMAL);
+    DCHECK_NE(type, TYPE_STRUCT);
+    DCHECK_NE(type, TYPE_ARRAY);
   }
 
   static ColumnType CreateCharType(int len) {
@@ -112,29 +124,16 @@ struct ColumnType {
     return ret;
   }
 
-  ColumnType(const TColumnType& t) {
-    len = precision = scale = -1;
-    DCHECK_EQ(1, t.types.size());
-    const TTypeNode& node = t.types[0];
-    DCHECK(node.__isset.scalar_type);
-    const TScalarType scalar_type = node.scalar_type;
-    type = ThriftToType(scalar_type.type);
-    if (type == TYPE_CHAR || type == TYPE_VARCHAR) {
-      DCHECK(scalar_type.__isset.len);
-      len = scalar_type.len;
-    } else if (type == TYPE_DECIMAL) {
-      DCHECK(scalar_type.__isset.precision);
-      DCHECK(scalar_type.__isset.scale);
-      precision = scalar_type.precision;
-      scale = scalar_type.scale;
-    } else {
-      DCHECK_NE(type, TYPE_DECIMAL);
-      DCHECK_NE(type, TYPE_CHAR);
-    }
+  static ColumnType FromThrift(const TColumnType& t) {
+    int idx = 0;
+    ColumnType result(t.types, &idx);
+    DCHECK_EQ(idx, t.types.size() - 1);
+    return result;
   }
 
   bool operator==(const ColumnType& o) const {
     if (type != o.type) return false;
+    if (children != o.children) return false;
     if (type == TYPE_CHAR) return len == o.len;
     if (type == TYPE_DECIMAL) return precision == o.precision && scale == o.scale;
     return true;
@@ -145,7 +144,7 @@ struct ColumnType {
   }
 
   TColumnType ToThrift() const {
-    // TODO: Decimal and complex types.
+    if (IsComplexType()) DCHECK(false) << "NYI " << type;
     TColumnType thrift_type;
     thrift_type.types.push_back(TTypeNode());
     TTypeNode& node = thrift_type.types.back();
@@ -174,9 +173,15 @@ struct ColumnType {
         (type == TYPE_CHAR && len > MAX_CHAR_INLINE_LENGTH);
   }
 
+  inline bool IsComplexType() const {
+    return type == TYPE_STRUCT || type == TYPE_ARRAY || type == TYPE_MAP;
+  }
+
   /// Returns the byte size of this type.  Returns 0 for variable length types.
   inline int GetByteSize() const {
     switch (type) {
+      case TYPE_ARRAY:
+      case TYPE_MAP:
       case TYPE_STRING:
       case TYPE_VARCHAR:
         return 0;
@@ -203,7 +208,7 @@ struct ColumnType {
       case TYPE_DATE:
       case INVALID_TYPE:
       default:
-        DCHECK(false);
+        DCHECK(false) << "NYI: " << type;
     }
     return 0;
   }
@@ -231,6 +236,14 @@ struct ColumnType {
 
   apache::hive::service::cli::thrift::TTypeEntry ToHs2Type() const;
   std::string DebugString() const;
+
+ private:
+  // Used to create a possibly nested type from the flattened Thrift representation.
+  //
+  // 'idx' is an in/out parameter that is initially set to the index of the type in
+  // 'types' being constructed, and is set to the index of the next type in 'types' that
+  // needs to be processed (or the size 'types' if all nodes have been processed).
+  ColumnType(const std::vector<TTypeNode>& types, int* idx);
 };
 
 std::ostream& operator<<(std::ostream& os, const ColumnType& type);

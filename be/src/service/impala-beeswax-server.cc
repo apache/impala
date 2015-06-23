@@ -112,7 +112,7 @@ class ImpalaServer::AsciiQueryResultSet : public ImpalaServer::QueryResultSet {
       out_stream << (i > 0 ? "\t" : "");
       DCHECK_EQ(1, metadata_.columns[i].columnType.types.size());
       RawValue::PrintValue(col_values[i],
-          ColumnType(metadata_.columns[i].columnType),
+          ColumnType::FromThrift(metadata_.columns[i].columnType),
           scales[i], &out_stream);
     }
     result_set_->push_back(out_stream.str());

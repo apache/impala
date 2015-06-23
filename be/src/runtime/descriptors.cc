@@ -50,7 +50,7 @@ ostream& operator<<(ostream& os, const NullIndicatorOffset& null_indicator) {
 SlotDescriptor::SlotDescriptor(
     const TSlotDescriptor& tdesc, const TupleDescriptor* parent)
   : id_(tdesc.id),
-    type_(tdesc.slotType),
+    type_(ColumnType::FromThrift(tdesc.slotType)),
     parent_(parent),
     col_path_(tdesc.columnPath),
     tuple_offset_(tdesc.byteOffset),
