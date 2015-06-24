@@ -29,10 +29,10 @@ from tests.common.impala_connection import ImpalaConnection, create_connection
 from tests.common.test_dimensions import *
 from tests.common.test_result_verifier import *
 from tests.common.test_vector import *
-from tests.common.query import Query
 from tests.util.test_file_parser import *
 from tests.util.thrift_util import create_transport
 from tests.common.base_test_suite import BaseTestSuite
+from tests.performance.query import Query
 from tests.performance.query_executor import JdbcQueryExecConfig, execute_using_jdbc
 from tests.util.hdfs_util import HdfsConfig, get_hdfs_client, get_hdfs_client_from_conf
 
