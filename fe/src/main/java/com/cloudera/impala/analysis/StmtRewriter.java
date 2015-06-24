@@ -30,6 +30,8 @@ import com.google.common.collect.Lists;
 /**
  * Class representing a statement rewriter. A statement rewriter performs subquery
  * unnesting on an analyzed parse tree.
+ * TODO: Now that we have a nested-loop join supporting all join modes we could
+ * allow more rewrites, although it is not clear we would always want to.
  */
 public class StmtRewriter {
   private final static Logger LOG = LoggerFactory.getLogger(StmtRewriter.class);
@@ -353,12 +355,6 @@ public class StmtRewriter {
       subqueryStmt.limitElement_ = new LimitElement(null, null);
     }
 
-    if (expr instanceof ExistsPredicate) {
-      // For uncorrelated subqueries, we limit the number of rows returned by the
-      // subquery.
-      if (onClauseConjuncts.isEmpty()) subqueryStmt.setLimit(1);
-    }
-
     // Update the subquery's select list and/or its GROUP BY clause by adding
     // exprs from the extracted correlated predicates.
     boolean updateGroupBy = expr.getSubquery().isScalarSubquery() ||
@@ -416,19 +412,35 @@ public class StmtRewriter {
 
     if (onClausePredicate == null) {
       Preconditions.checkState(expr instanceof ExistsPredicate);
-      // TODO: Remove this when we support independent subquery evaluation.
-      if (((ExistsPredicate)expr).isNotExists()) {
-        throw new AnalysisException("Unsupported uncorrelated NOT EXISTS subquery: " +
-            subqueryStmt.toSql());
+      ExistsPredicate existsPred = (ExistsPredicate) expr;
+      // Note that the concept of a 'correlated inline view' is similar but not the same
+      // as a 'correlated subquery', i.e., a subquery with a correlated predicate.
+      if (inlineView.isCorrelated()) {
+        if (existsPred.isNotExists()) {
+          inlineView.setJoinOp(JoinOperator.LEFT_ANTI_JOIN);
+        } else {
+          inlineView.setJoinOp(JoinOperator.LEFT_SEMI_JOIN);
+        }
+        // No visible tuples added.
+        return false;
+      } else {
+        // TODO: Remove this when we support independent subquery evaluation.
+        if (existsPred.isNotExists()) {
+          throw new AnalysisException("Unsupported uncorrelated NOT EXISTS subquery: " +
+              subqueryStmt.toSql());
+        }
+        // For uncorrelated subqueries, we limit the number of rows returned by the
+        // subquery.
+        subqueryStmt.setLimit(1);
+        // We don't have an ON clause predicate to create an equi-join. Rewrite the
+        // subquery using a CROSS JOIN.
+        // TODO This is very expensive. Remove it when we implement independent
+        // subquery evaluation.
+        inlineView.setJoinOp(JoinOperator.CROSS_JOIN);
+        LOG.warn("uncorrelated subquery rewritten using a cross join");
+        // Indicate that new visible tuples may be added in stmt's select list.
+        return true;
       }
-      // We don't have an ON clause predicate to create an equi-join. Rewrite the
-      // subquery using a CROSS JOIN.
-      // TODO This is very expensive. Remove it when we implement independent
-      // subquery evaluation.
-      inlineView.setJoinOp(JoinOperator.CROSS_JOIN);
-      LOG.warn("uncorrelated subquery rewritten using a cross join");
-      // Indicate that new visible tuples may be added in stmt's select list.
-      return true;
     }
 
     // Create an smap from the original select-list exprs of the select list to
@@ -474,7 +486,7 @@ public class StmtRewriter {
       break;
     }
 
-    if (!hasEqJoinPred) {
+    if (!hasEqJoinPred && !inlineView.isCorrelated()) {
       // TODO: Remove this when independent subquery evaluation is implemented.
       // TODO: Requires support for non-equi joins.
       boolean hasGroupBy = ((SelectStmt) inlineView.getViewStmt()).hasGroupByClause();
@@ -494,7 +506,7 @@ public class StmtRewriter {
       return true;
     }
 
-    // We have a valid equi-join conjunct.
+    // We have a valid equi-join conjunct or the inline view is correlated.
     if (expr instanceof InPredicate && ((InPredicate)expr).isNotIn() ||
         expr instanceof ExistsPredicate && ((ExistsPredicate)expr).isNotExists()) {
       // For the case of a NOT IN with an eq join conjunct, replace the join

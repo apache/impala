@@ -843,14 +843,13 @@ where v.key != 'bad'
    partitions=0/0 files=0 size=0B
 ====
 # Test subplans: Parent scan and uncorrelated scalar subquery.
-select a.id
-from functional.allcomplextypes a
+select a.id from functional.allcomplextypes a
 where id < (select avg(item) from a.int_array_col)
 ---- PLAN
 01:SUBPLAN
 |
-|--05:NESTED LOOP JOIN [INNER JOIN]
-|  |  predicates: id < avg(item)
+|--05:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  |  join predicates: id < avg(item)
 |  |
 |  |--04:AGGREGATE [FINALIZE]
 |  |  |  output: avg(item)
@@ -863,19 +862,66 @@ where id < (select avg(item) from a.int_array_col)
    partitions=0/0 files=0 size=0B
 ====
 # Test subplans: Parent scan and uncorrelated exists subquery.
-select a.id
-from functional.allcomplextypes a
+select a.id from functional.allcomplextypes a
 where exists (select item from a.int_array_col where item > 100)
 ---- PLAN
 01:SUBPLAN
 |
-|--04:NESTED LOOP JOIN [CROSS JOIN]
+|--04:NESTED LOOP JOIN [RIGHT SEMI JOIN]
 |  |
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.int_array_col]
 |     predicates: item > 100
-|     limit: 1
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Parent scan and uncorrelated not exists subquery.
+select a.id from functional.allcomplextypes a
+where not exists (select item from a.int_array_col)
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|  |
+|  |--03:UNNEST [a.int_array_col]
+|  |
+|  02:SINGULAR ROW SRC
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Parent scan and correlated exists subquery
+# without an equi-join condition.
+select a.id from functional.allcomplextypes a
+where exists (select m.key from a.struct_map_col m where a.id < m.f1)
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  |  predicates: a.id < m.f1
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [a.struct_map_col m]
+|
+00:SCAN HDFS [functional.allcomplextypes a]
+   partitions=0/0 files=0 size=0B
+====
+# Test subplans: Parent scan and correlated not exists subquery
+# without an equi-join condition.
+select a.id from functional.allcomplextypes a
+where not exists (select c.f2 from a.struct_array_col c where a.id < c.f1)
+---- PLAN
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [RIGHT ANTI JOIN]
+|  |  predicates: a.id < c.f1
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [a.struct_array_col c]
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B

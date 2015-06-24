@@ -20,8 +20,7 @@ import static org.junit.Assert.fail;
 import java.lang.reflect.Field;
 import java.util.List;
 
-import junit.framework.Assert;
-
+import org.junit.Assert;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.PrimitiveType;
@@ -1183,6 +1182,19 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "'t.int_array_col' correlated with an outer block as well as an " +
         "uncorrelated one 'functional.alltypes':\n" +
         "SELECT count(1) cnt FROM t.int_array_col, functional.alltypes");
+
+    // Test that joins without an ON clause analyze ok if the rhs table is correlated.
+    for (JoinOperator joinOp: JoinOperator.values()) {
+      if (joinOp.isNullAwareLeftAntiJoin()) continue;
+      AnalyzesOk(String.format("select 1 from functional.allcomplextypes a %s " +
+          "(select item from a.int_array_col) v", joinOp));
+      AnalyzesOk(String.format("select 1 from functional.allcomplextypes a %s " +
+          "(select * from a.struct_array_col) v", joinOp));
+      AnalyzesOk(String.format("select 1 from functional.allcomplextypes a %s " +
+          "(select key, value from a.int_map_col) v", joinOp));
+      AnalyzesOk(String.format("select 1 from functional.allcomplextypes a %s " +
+          "(select * from a.struct_map_col) v", joinOp));
+    }
   }
 
   @Test
