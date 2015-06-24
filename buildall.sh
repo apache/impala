@@ -246,27 +246,37 @@ then
   fi
 
   # clean the external data source project
-  cd ${IMPALA_HOME}/ext-data-source
+  pushd ${IMPALA_HOME}/ext-data-source
   rm -rf api/generated-sources/*
   mvn clean
+  popd
 
   # clean fe
   # don't use git clean because we need to retain Eclipse conf files
-  cd $IMPALA_FE_DIR
+  pushd $IMPALA_FE_DIR
   rm -rf target
   rm -f src/test/resources/{core,hbase,hive}-site.xml
   rm -rf generated-sources/*
   rm -rf ${IMPALA_TEST_CLUSTER_LOG_DIR}/*
+  popd
 
   # clean be
-  cd $IMPALA_HOME/be
+  pushd $IMPALA_HOME/be
   # remove everything listed in .gitignore
   git clean -Xdf
+  popd
 
   # clean shell build artifacts
-  cd $IMPALA_HOME/shell
+  pushd $IMPALA_HOME/shell
   # remove everything listed in .gitignore
   git clean -Xdf
+  popd
+
+  # Clean stale .pyc, .pyo files and __pycache__ directories.
+  pushd ${IMPALA_HOME}
+  find . -type f -name "*.py[co]" -delete
+  find . -type d -name "__pycache__" -delete
+  popd
 
   # clean llvm
   rm -f $IMPALA_HOME/llvm-ir/impala*.ll
@@ -293,27 +303,31 @@ $IMPALA_HOME/bin/make_impala.sh ${MAKE_IMPALA_ARGS}
 
 if [ -e $IMPALA_LZO ]
 then
-  cd $IMPALA_LZO
+  pushd $IMPALA_LZO
   if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
     cmake -DCMAKE_TOOLCHAIN_FILE=./cmake_modules/toolchain.cmake
   else
     cmake .
   fi
   make
+  popd
 fi
 
 # build the external data source API
-cd ${IMPALA_HOME}/ext-data-source
+pushd ${IMPALA_HOME}/ext-data-source
 mvn install -DskipTests
+popd
 
 # build frontend and copy dependencies
-cd ${IMPALA_FE_DIR}
+pushd ${IMPALA_FE_DIR}
 # on jenkins runs, resolve dependencies quietly to avoid log spew
 if [ "${USER}" == "jenkins" ]; then
   echo "Quietly resolving FE dependencies."
   mvn -q dependency:resolve
 fi
 mvn package -DskipTests=true
+popd
+
 
 # Build the shell tarball
 echo "Creating shell tarball"
