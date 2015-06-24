@@ -577,7 +577,7 @@ select *
 from functional.alltypestiny t
 where exists (select * from functional.alltypessmall s where s.id < 5)
 ---- PLAN
-02:CROSS JOIN
+02:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--01:SCAN HDFS [functional.alltypessmall s]
 |     partitions=4/4 files=4 size=6.32KB
@@ -595,7 +595,7 @@ where exists
    from functional.alltypesagg where tinyint_col = 10
    group by id, int_col, bigint_col)
 ---- PLAN
-03:CROSS JOIN
+03:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--00:SCAN HDFS [functional.alltypestiny t]
 |     partitions=4/4 files=4 size=460B
@@ -732,7 +732,7 @@ where a.int_col <
   (select max(int_col) from functional.alltypesagg g where g.bool_col = true)
 and a.bigint_col > 10
 ---- PLAN
-03:CROSS JOIN
+03:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: a.int_col < max(int_col)
 |
 |--02:AGGREGATE [FINALIZE]
@@ -752,7 +752,7 @@ from functional.alltypesagg a
 where (select max(id) from functional.alltypes t where t.bool_col = false) > 10
 and a.int_col < 10
 ---- PLAN
-03:CROSS JOIN
+03:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: max(id)
@@ -850,7 +850,7 @@ and a.tinyint_col >
   (select max(tinyint_col) from functional.alltypessmall s where s.id < 10)
 and t.bool_col = false
 ---- PLAN
-08:CROSS JOIN
+08:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: a.tinyint_col > max(tinyint_col)
 |
 |--05:AGGREGATE [FINALIZE]
@@ -938,7 +938,7 @@ where a.int_col <
 |  |  output: count(*)
 |  |  group by: s.id
 |  |
-|  05:CROSS JOIN
+|  05:NESTED LOOP JOIN [INNER JOIN]
 |  |  predicates: s.tinyint_col > count(*)
 |  |
 |  |--04:AGGREGATE [FINALIZE]
@@ -969,7 +969,7 @@ and bool_col = false
 04:AGGREGATE [FINALIZE]
 |  group by: id, bool_col
 |
-03:CROSS JOIN
+03:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: count(*)
@@ -992,7 +992,7 @@ and g.bigint_col < 1000 and g.bigint_col = true
 05:AGGREGATE [FINALIZE]
 |  group by: g.id, g.bool_col, g.tinyint_col, g.smallint_col, g.int_col, g.bigint_col, g.float_col, g.double_col, g.date_string_col, g.string_col, g.timestamp_col, g.year, g.month, g.day
 |
-04:CROSS JOIN
+04:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--03:AGGREGATE [FINALIZE]
 |  |  output: count(id)
@@ -1014,7 +1014,7 @@ select *
 from functional.alltypestiny t
 where (select max(int_col) from functional.alltypesagg where int_col is null) is null
 ---- PLAN
-03:CROSS JOIN
+03:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: max(int_col)
@@ -1107,7 +1107,7 @@ where nullifzero((select min(id) from functional.alltypessmall s where s.bool_co
   is null
 and t.id < 10
 ---- PLAN
-03:CROSS JOIN
+03:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--02:AGGREGATE [FINALIZE]
 |  |  output: min(id)
@@ -1156,7 +1156,7 @@ where int_col between
   (select min(int_col) from functional.alltypessmall where bool_col = false) and
   (select max(int_col) from functional.alltypessmall where bool_col = true)
 ---- PLAN
-06:CROSS JOIN
+06:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: int_col <= max(int_col)
 |
 |--04:AGGREGATE [FINALIZE]
@@ -1166,7 +1166,7 @@ where int_col between
 |     partitions=4/4 files=4 size=6.32KB
 |     predicates: bool_col = TRUE
 |
-05:CROSS JOIN
+05:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: int_col >= min(int_col)
 |
 |--02:AGGREGATE [FINALIZE]
@@ -1262,7 +1262,7 @@ select 1
 from functional.alltypestiny t1
 where (select count(*) from functional.alltypessmall) + t1.int_col = t1.bigint_col - 1
 ---- PLAN
-03:CROSS JOIN
+03:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: count(*) + t1.int_col = t1.bigint_col - 1
 |
 |--02:AGGREGATE [FINALIZE]
@@ -1305,7 +1305,7 @@ from functional.alltypestiny t1 join functional.alltypessmall t2 on t1.id = t2.i
 where
   (select count(*) from functional.alltypes) + t2.bigint_col = t1.int_col + t2.int_col
 ---- PLAN
-05:CROSS JOIN
+05:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: count(*) + t2.bigint_col = t1.int_col + t2.int_col
 |
 |--03:AGGREGATE [FINALIZE]

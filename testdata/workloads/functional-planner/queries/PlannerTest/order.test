@@ -433,7 +433,7 @@ order by t1.id, t2.id
 03:SORT
 |  order by: id ASC, id ASC
 |
-02:CROSS JOIN
+02:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--01:SCAN HDFS [functional.alltypestiny t2]
 |     partitions=4/4 files=4 size=460B
@@ -449,7 +449,7 @@ order by t1.id, t2.id
 03:SORT
 |  order by: id ASC, id ASC
 |
-02:CROSS JOIN [BROADCAST]
+02:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
 |
 |--04:EXCHANGE [BROADCAST]
 |  |
