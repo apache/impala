@@ -26,13 +26,13 @@
 #include "exprs/expr.h"
 #include "exec/aggregation-node.h"
 #include "exec/analytic-eval-node.h"
-#include "exec/cross-join-node.h"
 #include "exec/data-source-scan-node.h"
 #include "exec/empty-set-node.h"
 #include "exec/exchange-node.h"
 #include "exec/hash-join-node.h"
 #include "exec/hbase-scan-node.h"
 #include "exec/hdfs-scan-node.h"
+#include "exec/nested-loop-join-node.h"
 #include "exec/partitioned-aggregation-node.h"
 #include "exec/partitioned-hash-join-node.h"
 #include "exec/select-node.h"
@@ -299,8 +299,8 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
         *node = pool->Add(new HashJoinNode(pool, tnode, descs));
       }
       break;
-    case TPlanNodeType::CROSS_JOIN_NODE:
-      *node = pool->Add(new CrossJoinNode(pool, tnode, descs));
+    case TPlanNodeType::NESTED_LOOP_JOIN_NODE:
+      *node = pool->Add(new NestedLoopJoinNode(pool, tnode, descs));
       break;
     case TPlanNodeType::EMPTY_SET_NODE:
       *node = pool->Add(new EmptySetNode(pool, tnode, descs));

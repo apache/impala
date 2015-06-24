@@ -47,6 +47,13 @@ class TestJoinQueries(ImpalaTestSuite):
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('QueryTest/outer-joins', new_vector)
 
+  def test_single_node_nested_loop_joins(self, vector):
+    # Test the execution of nested-loops joins for join types that can only be
+    # executed in a single node (right [outer|semi|anti] and full outer joins).
+    new_vector = copy(vector)
+    new_vector.get_value('exec_option')['num_nodes'] = 1
+    self.run_test_case('QueryTest/single-node-nlj', new_vector)
+
 class TestTPCHJoinQueries(ImpalaTestSuite):
   # Uses the tpch dataset in order to have larger joins. Needed for example to test
   # the repartitioning codepaths.

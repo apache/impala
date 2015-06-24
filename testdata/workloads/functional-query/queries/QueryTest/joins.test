@@ -51,6 +51,7 @@ select j.*, d.* from JoinTbl j inner join DimTbl d on
 1002,'Name2',94611,5000,1002,'Name2',94611
 ---- TYPES
 bigint, string, int, int, bigint, string, int
+====
 ---- QUERY
 # join between three tables, extra join predicates, extra scan predicates, nulls in joins cols
 # (alltypesagg.tinyint_col contains nulls instead of 0s)
@@ -484,4 +485,70 @@ where a.int_col is NULL limit 1
 NULL
 ---- TYPES
 INT
+====
+---- QUERY
+# Left outer join with non-equi join predicates
+select straight_join count(*) from
+alltypestiny a left outer join alltypes b on a.id < b.id
+where a.id < 5
+---- RESULTS
+36485
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Left semi join with non-equi join predicates
+select straight_join count(*) from
+alltypesagg a left semi join alltypestiny b on a.id >= b.id or a.int_col != b.int_col
+where a.tinyint_col < 10
+---- RESULTS
+9000
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Left anti join with non-equi join predicates
+select straight_join count(*) from
+alltypesagg a left anti join alltypestiny b on a.id < b.id and a.int_col > b.int_col
+---- RESULTS
+10994
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Inner and left outer joins with non-equi join predicates
+select straight_join count(*) from
+alltypesagg a inner join alltypes b on a.id < b.id
+left outer join alltypestiny c
+on a.int_col != c.int_col or a.tinyint_col > c.tinyint_col
+where a.smallint_col < 2
+---- RESULTS
+2038096
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Inner, left-semi and left-anti joins with non-equi join predicates
+select straight_join count(*) from
+alltypestiny a left semi join alltypesagg b on a.id != b.id
+left anti join alltypes c on a.int_col < c.int_col
+inner join alltypestiny d on a.int_col = d.int_col
+where a.tinyint_col < 10
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Joins with non-equi join predicates between inline views
+select straight_join count(*) from
+  (select * from alltypestiny where id < 10) v1
+inner join
+  (select * from alltypesagg a left semi join
+   alltypes b on a.id < b.id) v2
+on v1.int_col != v2.tinyint_col
+---- RESULTS
+49632
+---- TYPES
+BIGINT
 ====

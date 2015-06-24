@@ -121,6 +121,32 @@ public class SingleNodePlanner {
     return singleNodePlan;
   }
 
+  /*
+   * Validates a single-node plan by checking that it does not contain right or
+   * full outer joins with no equi-join conjuncts. Throws an InternalException
+   * if plan validation fails.
+   *
+   * TODO for 2.3: Temporary solution; the planner should avoid generating invalid plans.
+   * We will revisit this check and address this TODO in the context of subplan
+   * generation.
+   */
+  public void validatePlan(PlanNode planNode) throws NotImplementedException {
+    if (planNode instanceof NestedLoopJoinNode) {
+      JoinNode joinNode = (JoinNode) planNode;
+      JoinOperator joinOp = joinNode.getJoinOp();
+      if ((joinOp.isRightSemiJoin() || joinOp.isFullOuterJoin()
+           || joinOp == JoinOperator.RIGHT_OUTER_JOIN)
+          && joinNode.getEqJoinConjuncts().isEmpty()) {
+        throw new NotImplementedException(String.format("Error generating a valid " +
+            "execution plan for this query. A %s type with no equi-join " +
+            "predicates can only be executed with a single node plan.",
+            joinOp.toString()));
+      }
+    }
+
+    for (PlanNode child: planNode.getChildren()) validatePlan(child);
+  }
+
   /**
    * Creates an EmptyNode that 'materializes' the tuples of the given stmt.
    */
@@ -416,11 +442,13 @@ public class SingleNodePlanner {
           break;
         }
 
-        // Always prefer Hash Join over Cross Join due to limited costing infrastructure
+        // Always prefer Hash Join over Nested-Loop Join due to limited costing
+        // infrastructure.
         if (newRoot == null
             || (candidate.getClass().equals(newRoot.getClass())
                 && candidate.getCardinality() < newRoot.getCardinality())
-            || (candidate instanceof HashJoinNode && newRoot instanceof CrossJoinNode)) {
+            || (candidate instanceof HashJoinNode
+                && newRoot instanceof NestedLoopJoinNode)) {
           newRoot = candidate;
           minEntry = entry;
         }
@@ -1010,29 +1038,7 @@ public class SingleNodePlanner {
       }
     }
 
-    // Handle implicit cross joins
-    if (eqJoinConjuncts.isEmpty()) {
-      // Since our only implementation of semi and outer joins is hash-based, and we do
-      // not re-order semi and outer joins, we must have eqJoinConjuncts here to execute
-      // this query.
-      // TODO: Revisit when we add more semi/join implementations. Pick up and pass in
-      // the otherJoinConjuncts.
-      if (tblRef.getJoinOp().isOuterJoin() ||
-          tblRef.getJoinOp().isSemiJoin()) {
-        throw new NotImplementedException(
-            String.format("%s join with '%s' without equi-join " +
-            "conjuncts is not supported.",
-            tblRef.getJoinOp().isOuterJoin() ? "Outer" : "Semi",
-            innerRef.getUniqueAlias()));
-      }
-      CrossJoinNode result =
-          new CrossJoinNode(outer, inner, tblRef, Collections.<Expr>emptyList());
-      result.init(analyzer);
-      return result;
-    }
-
-    // Handle explicit cross joins with equi join conditions
-    if (tblRef.getJoinOp() == JoinOperator.CROSS_JOIN) {
+    if (!eqJoinConjuncts.isEmpty() && tblRef.getJoinOp() == JoinOperator.CROSS_JOIN) {
       tblRef.setJoinOp(JoinOperator.INNER_JOIN);
     }
 
@@ -1045,6 +1051,8 @@ public class SingleNodePlanner {
       // Unassigned conjuncts bound by the invisible tuple id of a semi join must have
       // come from the join's On-clause, and therefore, must be added to the other join
       // conjuncts to produce correct results.
+      // TODO This doesn't handle predicates specified in the On clause which are not
+      // bound by any tuple id (e.g. ON (true))
       otherJoinConjuncts =
           analyzer.getUnassignedConjuncts(tblRef.getAllTupleIds(), false);
       if (tblRef.getJoinOp().isNullAwareLeftAntiJoin()) {
@@ -1069,8 +1077,14 @@ public class SingleNodePlanner {
     }
     analyzer.markConjunctsAssigned(otherJoinConjuncts);
 
-    HashJoinNode result =
-        new HashJoinNode(outer, inner, tblRef, eqJoinConjuncts, otherJoinConjuncts);
+    JoinNode result = null;
+    if (eqJoinConjuncts.isEmpty()) {
+      result = new NestedLoopJoinNode(outer, inner, tblRef.getDistributionMode(),
+          tblRef.getJoinOp(), otherJoinConjuncts);
+    } else {
+      result = new HashJoinNode(outer, inner, tblRef.getDistributionMode(),
+          tblRef.getJoinOp(), eqJoinConjuncts, otherJoinConjuncts);
+    }
     result.init(analyzer);
     return result;
   }

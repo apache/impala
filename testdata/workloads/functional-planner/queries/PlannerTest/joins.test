@@ -514,7 +514,7 @@ functional.alltypes b on a.f2 = b.int_col
 select *
 from functional.testtbl t1 cross join functional.testtbl
 ---- PLAN
-02:CROSS JOIN
+02:NESTED LOOP JOIN [CROSS JOIN]
 |
 |--01:SCAN HDFS [functional.testtbl]
 |     partitions=1/1 files=0 size=0B
@@ -524,7 +524,7 @@ from functional.testtbl t1 cross join functional.testtbl
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
-02:CROSS JOIN [BROADCAST]
+02:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
 |
 |--03:EXCHANGE [BROADCAST]
 |  |
@@ -538,7 +538,7 @@ from functional.testtbl t1 cross join functional.testtbl
 select *
 from functional.testtbl t1 cross join functional.testtbl t2 where t1.id < t2.id
 ---- PLAN
-02:CROSS JOIN
+02:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: t1.id < t2.id
 |
 |--01:SCAN HDFS [functional.testtbl t2]
@@ -549,7 +549,7 @@ from functional.testtbl t1 cross join functional.testtbl t2 where t1.id < t2.id
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
-02:CROSS JOIN [BROADCAST]
+02:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
 |  predicates: t1.id < t2.id
 |
 |--03:EXCHANGE [BROADCAST]
@@ -1398,7 +1398,7 @@ cross join functional.alltypes c
 # assigned to inverted cross join
 where c.id != b.id
 ---- PLAN
-04:CROSS JOIN
+04:NESTED LOOP JOIN [INNER JOIN]
 |  predicates: c.id != b.id
 |
 |--03:HASH JOIN [INNER JOIN]
@@ -1744,5 +1744,146 @@ where a.float_col < b.float_col
 |     predicates: a.int_col < 10
 |
 01:SCAN HDFS [functional.alltypes b]
+   partitions=24/24 files=24 size=478.45KB
+====
+# Inner joins with non-equi join predicates
+select *
+from functional.alltypestiny a inner join functional.alltypessmall b
+  on a.id < b.id
+inner join functional.alltypes c
+  on a.int_col != c.int_col
+inner join functional.alltypesagg d
+  on b.tinyint_col > d.int_col or b.id != d.id
+where a.int_col = 10 and c.bigint_col = d.bigint_col
+---- PLAN
+06:NESTED LOOP JOIN [INNER JOIN]
+|  predicates: a.id < b.id, b.tinyint_col > d.int_col OR b.id != d.id
+|
+|--01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 files=4 size=6.32KB
+|
+05:NESTED LOOP JOIN [INNER JOIN]
+|  predicates: a.int_col != c.int_col
+|
+|--00:SCAN HDFS [functional.alltypestiny a]
+|     partitions=4/4 files=4 size=460B
+|     predicates: a.int_col = 10
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: d.bigint_col = c.bigint_col
+|
+|--02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+03:SCAN HDFS [functional.alltypesagg d]
+   partitions=11/11 files=11 size=814.73KB
+---- DISTRIBUTEDPLAN
+11:EXCHANGE [UNPARTITIONED]
+|
+06:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
+|  predicates: a.id < b.id, b.tinyint_col > d.int_col OR b.id != d.id
+|
+|--10:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 files=4 size=6.32KB
+|
+05:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
+|  predicates: a.int_col != c.int_col
+|
+|--09:EXCHANGE [BROADCAST]
+|  |
+|  00:SCAN HDFS [functional.alltypestiny a]
+|     partitions=4/4 files=4 size=460B
+|     predicates: a.int_col = 10
+|
+04:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: d.bigint_col = c.bigint_col
+|
+|--08:EXCHANGE [HASH(c.bigint_col)]
+|  |
+|  02:SCAN HDFS [functional.alltypes c]
+|     partitions=24/24 files=24 size=478.45KB
+|
+07:EXCHANGE [HASH(d.bigint_col)]
+|
+03:SCAN HDFS [functional.alltypesagg d]
+   partitions=11/11 files=11 size=814.73KB
+====
+# Inner joins between inline views with non-equi join predicates
+select *
+from
+  (select a.*
+   from functional.alltypestiny a inner join functional.alltypessmall b
+     on a.id <= b.id) vv1
+inner join
+  (select c.*
+   from functional.alltypesagg c inner join functional.alltypes d
+     on c.int_col != d.int_col where c.tinyint_col = 10) vv2
+on vv1.bigint_col > vv2.bigint_col
+where vv1.tinyint_col < 10
+---- PLAN
+06:NESTED LOOP JOIN [INNER JOIN]
+|  predicates: a.bigint_col > c.bigint_col
+|
+|--02:NESTED LOOP JOIN [INNER JOIN]
+|  |  predicates: a.id <= b.id
+|  |
+|  |--00:SCAN HDFS [functional.alltypestiny a]
+|  |     partitions=4/4 files=4 size=460B
+|  |     predicates: a.tinyint_col < 10
+|  |
+|  01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 files=4 size=6.32KB
+|
+05:NESTED LOOP JOIN [INNER JOIN]
+|  predicates: c.int_col != d.int_col
+|
+|--04:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+03:SCAN HDFS [functional.alltypesagg c]
+   partitions=11/11 files=11 size=814.73KB
+   predicates: c.tinyint_col = 10
+====
+# Inner, left-outer, left-semi and left-anti joins with non-equi join
+# predicates
+select *
+from functional.alltypestiny a inner join functional.alltypessmall b
+  on a.id < b.id
+left outer join functional.alltypes c
+  on a.int_col != c.int_col or a.tinyint_col > c.tinyint_col
+left semi join functional.alltypesagg d
+  on b.bigint_col > d.bigint_col
+left anti join functional.alltypesagg e
+  on c.string_col != e.string_col
+where a.id < 10
+---- PLAN
+08:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|  join predicates: c.string_col != e.string_col
+|
+|--04:SCAN HDFS [functional.alltypesagg e]
+|     partitions=11/11 files=11 size=814.73KB
+|
+07:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  join predicates: b.bigint_col > d.bigint_col
+|
+|--03:SCAN HDFS [functional.alltypesagg d]
+|     partitions=11/11 files=11 size=814.73KB
+|
+06:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  join predicates: a.int_col != c.int_col OR a.tinyint_col > c.tinyint_col
+|
+|--05:NESTED LOOP JOIN [INNER JOIN]
+|  |  predicates: a.id < b.id
+|  |
+|  |--00:SCAN HDFS [functional.alltypestiny a]
+|  |     partitions=4/4 files=4 size=460B
+|  |     predicates: a.id < 10
+|  |
+|  01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 files=4 size=6.32KB
+|
+02:SCAN HDFS [functional.alltypes c]
    partitions=24/24 files=24 size=478.45KB
 ====

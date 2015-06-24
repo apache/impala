@@ -1,0 +1,151 @@
+# Right outer joins with non-equi join predicates
+select straight_join *
+from functional.alltypestiny a right outer join functional.alltypes b
+  on a.id != b.id or a.int_col < b.int_col
+right outer join functional.alltypesagg c
+  on a.smallint_col >= c.smallint_col
+where a.id < 10 and c.bigint_col = 10
+---- PLAN
+04:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  join predicates: a.smallint_col >= c.smallint_col
+|  predicates: a.id < 10
+|
+|--02:SCAN HDFS [functional.alltypesagg c]
+|     partitions=11/11 files=11 size=814.73KB
+|     predicates: c.bigint_col = 10
+|
+03:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  join predicates: a.id != b.id OR a.int_col < b.int_col
+|
+|--01:SCAN HDFS [functional.alltypes b]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypestiny a]
+   partitions=4/4 files=4 size=460B
+   predicates: a.id < 10
+---- DISTRIBUTEDPLAN
+not implemented: Error generating a valid execution plan for this query. A RIGHT OUTER JOIN type with no equi-join predicates can only be executed with a single node plan.
+====
+# Right semi joins with non-equi join predicates
+select straight_join *
+from functional.alltypestiny a right semi join functional.alltypessmall c
+  on a.tinyint_col > c.tinyint_col
+right semi join functional.alltypesagg d
+  on c.tinyint_col < d.bigint_col
+where d.bigint_col < 10
+---- PLAN
+04:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  join predicates: c.tinyint_col < d.bigint_col
+|
+|--02:SCAN HDFS [functional.alltypesagg d]
+|     partitions=11/11 files=11 size=814.73KB
+|     predicates: d.bigint_col < 10
+|
+03:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  join predicates: a.tinyint_col > c.tinyint_col
+|
+|--01:SCAN HDFS [functional.alltypessmall c]
+|     partitions=4/4 files=4 size=6.32KB
+|
+00:SCAN HDFS [functional.alltypestiny a]
+   partitions=4/4 files=4 size=460B
+---- DISTRIBUTEDPLAN
+not implemented: Error generating a valid execution plan for this query. A RIGHT SEMI JOIN type with no equi-join predicates can only be executed with a single node plan.
+====
+# Full outer joins with non-equi join predicates
+select straight_join *
+from functional.alltypestiny a full outer join functional.alltypessmall b
+  on a.id != b.id or a.int_col != b.int_col
+full outer join functional.alltypesagg c
+  on a.tinyint_col > c.tinyint_col
+full outer join functional.alltypes d
+  on c.int_col > d.int_col
+where a.bigint_col != c.bigint_col and a.id < 10
+---- PLAN
+06:NESTED LOOP JOIN [FULL OUTER JOIN]
+|  join predicates: c.int_col > d.int_col
+|  predicates: a.bigint_col != c.bigint_col, a.id < 10
+|
+|--03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+05:NESTED LOOP JOIN [FULL OUTER JOIN]
+|  join predicates: a.tinyint_col > c.tinyint_col
+|
+|--02:SCAN HDFS [functional.alltypesagg c]
+|     partitions=11/11 files=11 size=814.73KB
+|
+04:NESTED LOOP JOIN [FULL OUTER JOIN]
+|  join predicates: a.id != b.id OR a.int_col != b.int_col
+|
+|--01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 files=4 size=6.32KB
+|
+00:SCAN HDFS [functional.alltypestiny a]
+   partitions=4/4 files=4 size=460B
+   predicates: a.id < 10
+---- DISTRIBUTEDPLAN
+not implemented: Error generating a valid execution plan for this query. A FULL OUTER JOIN type with no equi-join predicates can only be executed with a single node plan.
+====
+# Right anti join with non-equi join predicates
+select straight_join count(*)
+from functional.alltypestiny a right anti join functional.alltypessmall b
+  on a.id < b.id
+where b.int_col = 5
+---- PLAN
+03:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+02:NESTED LOOP JOIN [RIGHT ANTI JOIN]
+|  join predicates: a.id < b.id
+|
+|--01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 files=4 size=6.32KB
+|     predicates: b.int_col = 5
+|
+00:SCAN HDFS [functional.alltypestiny a]
+   partitions=4/4 files=4 size=460B
+---- DISTRIBUTEDPLAN
+not implemented: Error generating a valid execution plan for this query. A RIGHT ANTI JOIN type with no equi-join predicates can only be executed with a single node plan.
+====
+# Inner and right joins with non-equi join predicates
+select straight_join count(*)
+from functional.alltypestiny a inner join functional.alltypessmall b on a.id < b.id
+right outer join functional.alltypesagg c on a.int_col != c.int_col
+right semi join functional.alltypes d on c.tinyint_col < d.tinyint_col
+right anti join functional.alltypesnopart e on d.tinyint_col > e.tinyint_col
+where e.id < 10
+---- PLAN
+09:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+08:NESTED LOOP JOIN [RIGHT ANTI JOIN]
+|  join predicates: d.tinyint_col > e.tinyint_col
+|
+|--04:SCAN HDFS [functional.alltypesnopart e]
+|     partitions=1/1 files=0 size=0B
+|     predicates: e.id < 10
+|
+07:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  join predicates: c.tinyint_col < d.tinyint_col
+|
+|--03:SCAN HDFS [functional.alltypes d]
+|     partitions=24/24 files=24 size=478.45KB
+|
+06:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  join predicates: a.int_col != c.int_col
+|
+|--02:SCAN HDFS [functional.alltypesagg c]
+|     partitions=11/11 files=11 size=814.73KB
+|
+05:NESTED LOOP JOIN [INNER JOIN]
+|  predicates: a.id < b.id
+|
+|--01:SCAN HDFS [functional.alltypessmall b]
+|     partitions=4/4 files=4 size=6.32KB
+|
+00:SCAN HDFS [functional.alltypestiny a]
+   partitions=4/4 files=4 size=460B
+---- DISTRIBUTEDPLAN
+not implemented: Error generating a valid execution plan for this query. A RIGHT ANTI JOIN type with no equi-join predicates can only be executed with a single node plan.
+====
