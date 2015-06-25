@@ -135,6 +135,19 @@
       <groupId>org.apache.sentry</groupId>
       <artifactId>sentry-binding-hive</artifactId>
       <version>${sentry.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.sentry</groupId>
+          <artifactId>sentry-provider-db</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.sentry</groupId>
+      <artifactId>sentry-provider-db</artifactId>
+      <version>${sentry.version}</version>
+      <classifier>sh</classifier>
     </dependency>
 
     <dependency>
