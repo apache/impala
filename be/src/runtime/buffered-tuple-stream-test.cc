@@ -174,7 +174,7 @@ class SimpleTupleStreamTest : public testing::Test {
   }
 
   void AppendRowTuples(TupleRow* row, vector<int>* results) {
-    DCHECK_NOTNULL(row);
+    DCHECK(row != NULL);
     const int int_tuples = int_desc_->tuple_descriptors().size();
     for (int i = 0; i < int_tuples; ++i) {
       AppendValue(row->GetTuple(i), results);
@@ -182,7 +182,7 @@ class SimpleTupleStreamTest : public testing::Test {
   }
 
   void AppendRowTuples(TupleRow* row, vector<StringValue>* results) {
-    DCHECK_NOTNULL(row);
+    DCHECK(row != NULL);
     const int string_tuples = string_desc_->tuple_descriptors().size();
     for (int i = 0; i < string_tuples; ++i) {
       AppendValue(row->GetTuple(i), results);

@@ -82,7 +82,7 @@ bool BufferedTupleStream::DeepCopyInternal(TupleRow* row, uint8_t** dst) {
       const int tuple_size = desc_.tuple_descriptors()[i]->byte_size();
       Tuple* t = row->GetTuple(i);
       // TODO: Once IMPALA-1306 (Avoid passing empty tuples of non-materialized slots)
-      // is delivered, the check below should become DCHECK_NOTNULL(t).
+      // is delivered, the check below should become DCHECK(t != NULL).
       DCHECK(t != NULL || tuple_size == 0);
       memcpy(tuple_buf, t, tuple_size);
       tuple_buf += tuple_size;

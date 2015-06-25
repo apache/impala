@@ -42,7 +42,7 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, int capacity,
     auxiliary_mem_usage_(0),
     need_to_return_(false),
     tuple_data_pool_(new MemPool(mem_tracker_)) {
-  DCHECK_NOTNULL(mem_tracker_);
+  DCHECK(mem_tracker_ != NULL);
   DCHECK_GT(capacity, 0);
   tuple_ptrs_size_ = capacity_ * num_tuples_per_row_ * sizeof(Tuple*);
   tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_->Allocate(tuple_ptrs_size_));
@@ -64,7 +64,7 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
     row_desc_(row_desc),
     auxiliary_mem_usage_(0),
     tuple_data_pool_(new MemPool(mem_tracker)) {
-  DCHECK_NOTNULL(mem_tracker_);
+  DCHECK(mem_tracker_ != NULL);
   tuple_ptrs_size_ = num_rows_ * input_batch.row_tuples.size() * sizeof(Tuple*);
   tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_->Allocate(tuple_ptrs_size_));
   if (input_batch.compression_type != THdfsCompression::NONE) {
@@ -212,14 +212,14 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
 }
 
 void RowBatch::AddIoBuffer(DiskIoMgr::BufferDescriptor* buffer) {
-  DCHECK_NOTNULL(buffer);
+  DCHECK(buffer != NULL);
   io_buffers_.push_back(buffer);
   auxiliary_mem_usage_ += buffer->buffer_len();
   buffer->SetMemTracker(mem_tracker_);
 }
 
 void RowBatch::AddTupleStream(BufferedTupleStream* stream) {
-  DCHECK_NOTNULL(stream);
+  DCHECK(stream != NULL);
   tuple_streams_.push_back(stream);
   auxiliary_mem_usage_ += stream->byte_size();
 }
@@ -230,13 +230,13 @@ bool RowBatch::ContainsTupleStream(BufferedTupleStream* stream) const {
 }
 
 void RowBatch::AddBlock(BufferedBlockMgr::Block* block) {
-  DCHECK_NOTNULL(block);
+  DCHECK(block != NULL);
   blocks_.push_back(block);
   auxiliary_mem_usage_ += block->buffer_len();
 }
 
 void RowBatch::Reset() {
-  DCHECK_NOTNULL(tuple_data_pool_.get());
+  DCHECK(tuple_data_pool_.get() != NULL);
   num_rows_ = 0;
   has_in_flight_row_ = false;
   tuple_data_pool_->FreeAll();

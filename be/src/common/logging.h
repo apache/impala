@@ -28,7 +28,9 @@
   #define DCHECK_LT(a, b) while(false) std::cout
   #define DCHECK_GE(a, b) while(false) std::cout
   #define DCHECK_LE(a, b) while(false) std::cout
-  #define DCHECK_NOTNULL(a) while(false) std::cout
+  /// DCHECK_NOTNULL evaluates its arguments in all build types. We should usually use
+  /// DCHECK(x != NULL) instead.
+  #define DCHECK_NOTNULL(a) a
   /// Similar to how glog defines DCHECK for release.
   #define LOG(level) while(false) std::cout
   #define VLOG(level) while(false) std::cout
@@ -41,13 +43,6 @@
   #undef _XOPEN_SOURCE
   #include <glog/logging.h>
   #include <gflags/gflags.h>
-
-  #ifdef NDEBUG
-  #undef DCHECK_NOTNULL
-  /// Fix warnings of unused variables when NDEBUG is defined (glog emits (a) for the
-  /// following macro which triggers the warning).
-  #define DCHECK_NOTNULL(a) while(false)
-  #endif
 #endif
 
 /// Define verbose logging levels.  Per-row logging is more verbase than per-file /

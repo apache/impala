@@ -1017,7 +1017,7 @@ void ImpalaServer::QueryExecState::ClearResultCache() {
   int64_t total_bytes = result_cache_->ByteSize();
   ImpaladMetrics::RESULTSET_CACHE_TOTAL_BYTES->Increment(-total_bytes);
   if (coord_ != NULL) {
-    DCHECK_NOTNULL(coord_->query_mem_tracker());
+    DCHECK(coord_->query_mem_tracker() != NULL);
     coord_->query_mem_tracker()->Release(total_bytes);
   }
   result_cache_.reset(NULL);

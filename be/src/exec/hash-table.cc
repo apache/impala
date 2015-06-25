@@ -111,10 +111,10 @@ HashTableCtx::HashTableCtx(const vector<ExprContext*>& build_expr_ctxs,
 
 void HashTableCtx::Close() {
   // TODO: use tr1::array?
-  DCHECK_NOTNULL(expr_values_buffer_);
+  DCHECK(expr_values_buffer_ != NULL);
   delete[] expr_values_buffer_;
   expr_values_buffer_ = NULL;
-  DCHECK_NOTNULL(expr_value_null_bits_);
+  DCHECK(expr_value_null_bits_ != NULL);
   delete[] expr_value_null_bits_;
   expr_value_null_bits_ = NULL;
   free(row_);
@@ -312,7 +312,7 @@ bool HashTable::ResizeBuckets(int64_t num_buckets, HashTableCtx* ht_ctx) {
     return false;
   }
   Bucket* new_buckets = reinterpret_cast<Bucket*>(malloc(new_size));
-  DCHECK_NOTNULL(new_buckets);
+  DCHECK(new_buckets != NULL);
   memset(new_buckets, 0, new_size);
 
   // Walk the old table and copy all the filled buckets to the new (resized) table.
@@ -359,7 +359,7 @@ bool HashTable::GrowNodeArray() {
     ImpaladMetrics::HASH_TABLE_TOTAL_BYTES->Increment(page_size);
   } else {
     // Only used for testing.
-    DCHECK_NOTNULL(data_page_pool_);
+    DCHECK(data_page_pool_ != NULL);
     page_size = TEST_PAGE_SIZE;
     next_node_ = reinterpret_cast<DuplicateNode*>(data_page_pool_->Allocate(page_size));
     if (data_page_pool_->mem_tracker()->LimitExceeded()) return false;

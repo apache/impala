@@ -106,7 +106,7 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExprs(
     // Finalize the module so any UDF functions are jit'd
     LlvmCodeGen* codegen = NULL;
     state.GetCodegen(&codegen, /* initialize */ false);
-    DCHECK_NOTNULL(codegen);
+    DCHECK(codegen != NULL);
     codegen->EnableOptimizations(false);
     codegen->FinalizeModule();
   }

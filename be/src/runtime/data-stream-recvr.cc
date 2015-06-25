@@ -311,7 +311,7 @@ DataStreamRecvr::DataStreamRecvr(DataStreamMgr* stream_mgr, MemTracker* parent_t
 }
 
 Status DataStreamRecvr::GetNext(RowBatch* output_batch, bool* eos) {
-  DCHECK_NOTNULL(merger_.get());
+  DCHECK(merger_.get() != NULL);
   return merger_->GetNext(output_batch, eos);
 }
 

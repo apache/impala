@@ -348,7 +348,7 @@ PointerType* LlvmCodeGen::GetPtrType(const ColumnType& type) {
 
 Type* LlvmCodeGen::GetType(const string& name) {
   Type* type = module_->getTypeByName(name);
-  DCHECK_NOTNULL(type);
+  DCHECK(type != NULL);
   return type;
 }
 

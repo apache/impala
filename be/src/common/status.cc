@@ -162,7 +162,7 @@ Status Status::Expected(const std::string& error_msg) {
 }
 
 void Status::AddDetail(const std::string& msg) {
-  DCHECK_NOTNULL(msg_);
+  DCHECK(msg_ != NULL);
   msg_->AddDetail(msg);
   VLOG(2) << msg;
 }

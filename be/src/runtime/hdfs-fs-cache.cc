@@ -67,7 +67,7 @@ Status HdfsFsCache::GetConnection(const string& path, hdfsFS* fs,
       *fs = i->second;
     }
   }
-  DCHECK_NOTNULL(*fs);
+  DCHECK(*fs != NULL);
   // Populate the local cache for the next lookup.
   if (local_cache != NULL) {
     local_cache->insert(make_pair(namenode, *fs));

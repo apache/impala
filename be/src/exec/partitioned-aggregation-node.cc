@@ -477,7 +477,7 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
     // TODO: if it happens to not be a string, we could serialize in place. This is
     // a future optimization since it is very unlikely to have a serialize phase
     // for those UDAs.
-    DCHECK_NOTNULL(parent->serialize_stream_.get());
+    DCHECK(parent->serialize_stream_.get() != NULL);
     DCHECK(!parent->serialize_stream_->is_pinned());
     DCHECK(parent->serialize_stream_->has_write_block());
 
@@ -1164,7 +1164,7 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
       const string& symbol = evaluator->is_merge() ?
                              evaluator->merge_symbol() : evaluator->update_symbol();
       Function* ir_fn = codegen->module()->getFunction(symbol);
-      DCHECK_NOTNULL(ir_fn);
+      DCHECK(ir_fn != NULL);
 
       // Create pointer to src to pass to ir_fn. We must use the unlowered type.
       Value* src_lowered_ptr = codegen->CreateEntryBlockAlloca(

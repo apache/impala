@@ -1037,7 +1037,7 @@ void AggregateFunctions::HllMerge(FunctionContext* ctx, const StringVal& src,
 
 uint64_t AggregateFunctions::HllFinalEstimate(const uint8_t* buckets,
     int32_t num_buckets) {
-  DCHECK_NOTNULL(buckets);
+  DCHECK(buckets != NULL);
   DCHECK_EQ(num_buckets, HLL_LEN);
 
   // Empirical constants for the algorithm.

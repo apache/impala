@@ -189,7 +189,7 @@ class Status {
 
   /// Returns the error message associated with a non-successful status.
   const ErrorMsg& msg() const {
-    DCHECK_NOTNULL(msg_);
+    DCHECK(msg_ != NULL);
     return *msg_;
   }
 
@@ -197,7 +197,7 @@ class Status {
   /// if an error was reported.
   /// TODO: deprecate, error should be immutable
   void SetErrorMsg(const ErrorMsg& m) {
-    DCHECK_NOTNULL(msg_);
+    DCHECK(msg_ != NULL);
     delete msg_;
     msg_ = new ErrorMsg(m);
   }

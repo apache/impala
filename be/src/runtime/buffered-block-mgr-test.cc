@@ -142,7 +142,7 @@ class BufferedBlockMgrTest : public ::testing::Test {
   // When executed in single-threaded mode 'tid' should be SINGLE_THREADED_TID.
   static const int SINGLE_THREADED_TID = -1;
   void TestRandomInternalImpl(BufferedBlockMgr* block_mgr, int num_buffers, int tid) {
-    DCHECK_NOTNULL(block_mgr);
+    DCHECK(block_mgr != NULL);
     const int num_iterations = 100000;
     const int iters_before_close = num_iterations - 5000;
     bool close_called = false;

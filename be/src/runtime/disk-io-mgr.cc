@@ -541,8 +541,8 @@ Status DiskIoMgr::AddScanRanges(RequestContext* reader,
 // for eos and error cases. If there isn't already a cached scan range or a scan
 // range prepared by the disk threads, the caller waits on the disk threads.
 Status DiskIoMgr::GetNextRange(RequestContext* reader, ScanRange** range) {
-  DCHECK_NOTNULL(reader);
-  DCHECK_NOTNULL(range);
+  DCHECK(reader != NULL);
+  DCHECK(range != NULL);
   *range = NULL;
   Status status = Status::OK();
 
@@ -581,7 +581,7 @@ Status DiskIoMgr::GetNextRange(RequestContext* reader, ScanRange** range) {
       reader->ready_to_start_ranges_cv_.wait(reader_lock);
     } else {
       *range = reader->ready_to_start_ranges_.Dequeue();
-      DCHECK_NOTNULL(*range);
+      DCHECK(*range != NULL);
       int disk_id = (*range)->disk_id();
       DCHECK_EQ(*range, reader->disk_states_[disk_id].next_scan_range_to_start());
       // Set this to NULL, the next time this disk runs for this reader, it will
@@ -596,8 +596,8 @@ Status DiskIoMgr::GetNextRange(RequestContext* reader, ScanRange** range) {
 
 Status DiskIoMgr::Read(RequestContext* reader,
     ScanRange* range, BufferDescriptor** buffer) {
-  DCHECK_NOTNULL(range);
-  DCHECK_NOTNULL(buffer);
+  DCHECK(range != NULL);
+  DCHECK(buffer != NULL);
   *buffer = NULL;
 
   if (range->len() > max_buffer_size_) {
@@ -615,7 +615,7 @@ Status DiskIoMgr::Read(RequestContext* reader,
 }
 
 void DiskIoMgr::ReturnBuffer(BufferDescriptor* buffer_desc) {
-  DCHECK_NOTNULL(buffer_desc);
+  DCHECK(buffer_desc != NULL);
   if (!buffer_desc->status_.ok()) DCHECK(buffer_desc->buffer_ == NULL);
 
   RequestContext* reader = buffer_desc->reader_;

@@ -41,7 +41,7 @@ DECLARE_string(catalog_service_host);
 
 Status CatalogOpExecutor::Exec(const TCatalogOpRequest& request) {
   Status status;
-  DCHECK_NOTNULL(profile_);
+  DCHECK(profile_ != NULL);
   RuntimeProfile::Counter* exec_timer = ADD_TIMER(profile_, "CatalogOpExecTimer");
   SCOPED_TIMER(exec_timer);
   const TNetworkAddress& address =

@@ -54,7 +54,7 @@ class SortedRunMerger::BatchedRowSupplier {
   // Increment the current row index. If the current input batch is exhausted fetch the
   // next one from the sorted run. Transfer ownership to transfer_batch if not NULL.
   Status Next(RowBatch* transfer_batch, bool* done) {
-    DCHECK_NOTNULL(input_row_batch_);
+    DCHECK(input_row_batch_ != NULL);
     ++input_row_batch_index_;
     if (input_row_batch_index_ < input_row_batch_->num_rows()) {
       *done = false;

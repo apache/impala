@@ -66,7 +66,7 @@ Status PartitionedAggregationNode::ProcessBatch(RowBatch* batch, HashTableCtx* h
     // so we can try again to insert the row.
     Partition* dst_partition = hash_partitions_[hash >> (32 - NUM_PARTITIONING_BITS)];
     if (!dst_partition->is_spilled()) {
-      DCHECK_NOTNULL(dst_partition->hash_tbl.get());
+      DCHECK(dst_partition->hash_tbl.get() != NULL);
       DCHECK(dst_partition->aggregated_row_stream->is_pinned());
 
       HashTable* ht = dst_partition->hash_tbl.get();

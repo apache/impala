@@ -365,7 +365,7 @@ Status DiskIoMgr::ScanRange::Read(char* buffer, int64_t* bytes_read, bool* eosr)
       min(static_cast<int64_t>(io_mgr_->max_buffer_size_), len_ - bytes_read_);
 
   if (fs_ != NULL) {
-    DCHECK_NOTNULL(hdfs_file_);
+    DCHECK(hdfs_file_ != NULL);
     int64_t max_chunk_size = MaxReadChunkSize();
     while (*bytes_read < bytes_to_read) {
       int chunk_size = min(bytes_to_read - *bytes_read, max_chunk_size);

@@ -356,7 +356,7 @@ Status BufferedTupleStream::PrepareForRead(bool* got_buffer) {
 
 Status BufferedTupleStream::PinStream(bool already_reserved, bool* pinned) {
   DCHECK(!closed_);
-  DCHECK_NOTNULL(pinned);
+  DCHECK(pinned != NULL);
   if (!already_reserved) {
     // If we can't get all the blocks, don't try at all.
     if (!block_mgr_->TryAcquireTmpReservation(block_mgr_client_, blocks_unpinned())) {
@@ -559,7 +559,7 @@ Status BufferedTupleStream::GetNextInternal(RowBatch* batch, bool* eos,
     for (int j = 0; j < string_slots_.size(); ++j) {
       Tuple* tuple = row->GetTuple(string_slots_[j].first);
       if (HasNullableTuple && tuple == NULL) continue;
-      DCHECK_NOTNULL(tuple);
+      DCHECK(tuple != NULL);
       for (int k = 0; k < string_slots_[j].second.size(); ++k) {
         const SlotDescriptor* slot_desc = string_slots_[j].second[k];
         if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
@@ -597,7 +597,7 @@ int BufferedTupleStream::ComputeRowSize(TupleRow* row) const {
   for (int i = 0; i < string_slots_.size(); ++i) {
     Tuple* tuple = row->GetTuple(string_slots_[i].first);
     if (nullable_tuple_ && tuple == NULL) continue;
-    DCHECK_NOTNULL(tuple);
+    DCHECK(tuple != NULL);
     for (int j = 0; j < string_slots_[i].second.size(); ++j) {
       const SlotDescriptor* slot_desc = string_slots_[i].second[j];
       if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;

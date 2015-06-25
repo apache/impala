@@ -260,7 +260,7 @@ Status RuntimeState::SetMemLimitExceeded(MemTracker* tracker,
   stringstream ss;
   ss << "Memory Limit Exceeded\n";
   if (failed_allocation_size != 0) {
-    DCHECK_NOTNULL(tracker);
+    DCHECK(tracker != NULL);
     ss << "  " << tracker->label() << " could not allocate "
        << PrettyPrinter::Print(failed_allocation_size, TUnit::BYTES)
        << " without exceeding limit." << endl;
@@ -298,7 +298,7 @@ void RuntimeState::AddBitmapFilter(SlotId slot, Bitmap* bitmap,
     lock_guard<SpinLock> l(bitmap_lock_);
     if (slot_bitmap_filters_.find(slot) != slot_bitmap_filters_.end()) {
       Bitmap* existing_bitmap = slot_bitmap_filters_[slot];
-      DCHECK_NOTNULL(existing_bitmap);
+      DCHECK(existing_bitmap != NULL);
       existing_bitmap->And(bitmap);
     } else {
       // This is the first time we set the slot_bitmap_filters_[slot]. We avoid

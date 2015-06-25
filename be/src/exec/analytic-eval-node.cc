@@ -170,7 +170,7 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
   RETURN_IF_CANCELLED(state);
   RETURN_IF_ERROR(QueryMaintenance(state));
   RETURN_IF_ERROR(child(0)->Open(state));
-  DCHECK_NOTNULL(client_);
+  DCHECK(client_ != NULL);
   // TODO: Set delete_on_read to false if this node is inside a subplan.
   input_stream_.reset(new BufferedTupleStream(state, child(0)->row_desc(),
       state->block_mgr(), client_,

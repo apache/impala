@@ -356,17 +356,17 @@ Status Sorter::Run::Init() {
   BufferedBlockMgr::Block* block = NULL;
   RETURN_IF_ERROR(
       sorter_->block_mgr_->GetNewBlock(sorter_->block_mgr_client_, NULL, &block));
-  DCHECK_NOTNULL(block);
+  DCHECK(block != NULL);
   fixed_len_blocks_.push_back(block);
   if (has_var_len_slots_) {
     RETURN_IF_ERROR(
         sorter_->block_mgr_->GetNewBlock(sorter_->block_mgr_client_, NULL, &block));
-    DCHECK_NOTNULL(block);
+    DCHECK(block != NULL);
     var_len_blocks_.push_back(block);
     if (!is_sorted_) {
       RETURN_IF_ERROR(sorter_->block_mgr_->GetNewBlock(
           sorter_->block_mgr_client_, NULL, &var_len_copy_block_));
-      DCHECK_NOTNULL(var_len_copy_block_);
+      DCHECK(var_len_copy_block_ != NULL);
     }
   }
   if (!is_sorted_) sorter_->initial_runs_counter_->Add(1);
@@ -471,7 +471,7 @@ Status Sorter::Run::AddBatch(RowBatch* batch, int start_index, int* num_processe
 }
 
 void Sorter::Run::TransferResources(RowBatch* row_batch) {
-  DCHECK_NOTNULL(row_batch);
+  DCHECK(row_batch != NULL);
   BOOST_FOREACH(BufferedBlockMgr::Block* block, fixed_len_blocks_) {
     if (block != NULL) row_batch->AddBlock(block);
   }
@@ -510,7 +510,7 @@ Status Sorter::Run::UnpinAllBlocks() {
   var_values.reserve(sort_tuple_desc_->string_slots().size());
   BufferedBlockMgr::Block* cur_sorted_var_len_block = NULL;
   if (has_var_len_slots_ && var_len_blocks_.size() > 0) {
-    DCHECK_NOTNULL(var_len_copy_block_);
+    DCHECK(var_len_copy_block_ != NULL);
     sorted_var_len_blocks.push_back(var_len_copy_block_);
     cur_sorted_var_len_block = sorted_var_len_blocks.back();
   } else {
@@ -872,8 +872,8 @@ void Sorter::TupleSorter::SortHelper(TupleIterator first, TupleIterator last) {
   if (UNLIKELY(state_->is_cancelled())) return;
   // Use insertion sort for smaller sequences.
   while (last.index_ - first.index_ > INSERTION_THRESHOLD) {
-    TupleIterator iter(this, first.index_ + (last.index_ - first.index_)/2);
-    DCHECK_NOTNULL(iter.current_tuple_);
+    TupleIterator iter(this, first.index_ + (last.index_ - first.index_) / 2);
+    DCHECK(iter.current_tuple_ != NULL);
     // Partition() splits the tuples in [first, last) into two groups (<= pivot
     // and >= pivot) in-place. 'cut' is the index of the first tuple in the second group.
     TupleIterator cut = Partition(first, last,
@@ -915,7 +915,7 @@ Sorter::Sorter(const TupleRowComparator& compare_less_than,
 }
 
 Sorter::~Sorter() {
-  // Delete all blocks from the block mgr.
+  // Delete blocks from the block mgr.
   for (list<Run*>::iterator it = sorted_runs_.begin(); it != sorted_runs_.end(); ++it) {
     (*it)->DeleteAllBlocks();
   }
@@ -948,14 +948,14 @@ Status Sorter::Init() {
   RETURN_IF_ERROR(block_mgr_->RegisterClient(min_blocks_required, mem_tracker_, state_,
       &block_mgr_client_));
 
-  DCHECK_NOTNULL(unsorted_run_);
+  DCHECK(unsorted_run_ != NULL);
   RETURN_IF_ERROR(unsorted_run_->Init());
   return Status::OK();
 }
 
 Status Sorter::AddBatch(RowBatch* batch) {
-  DCHECK_NOTNULL(unsorted_run_);
-  DCHECK_NOTNULL(batch);
+  DCHECK(unsorted_run_ != NULL);
+  DCHECK(batch != NULL);
   int num_processed = 0;
   int cur_batch_index = 0;
   while (cur_batch_index < batch->num_rows()) {
@@ -1058,7 +1058,7 @@ Status Sorter::SortRun() {
     unsorted_run_->fixed_len_blocks_.pop_back();
   }
   if (has_var_len_slots_) {
-    DCHECK_NOTNULL(unsorted_run_->var_len_copy_block_);
+    DCHECK(unsorted_run_->var_len_copy_block_ != NULL);
     last_block = unsorted_run_->var_len_blocks_.back();
     if (last_block->valid_data_len() > 0) {
       sorted_data_size_->Add(last_block->valid_data_len());

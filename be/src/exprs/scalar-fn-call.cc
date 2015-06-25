@@ -462,7 +462,7 @@ Status ScalarFnCall::GetUdf(RuntimeState* state, llvm::Function** udf) {
     (*udf)->setName(demangled_name);
     InlineConstants(codegen, *udf);
     *udf = codegen->FinalizeFunction(*udf);
-    DCHECK_NOTNULL(*udf);
+    DCHECK(*udf != NULL);
   } else {
     // We're running an IR UDF.
     DCHECK_EQ(fn_.binary_type, TFunctionBinaryType::IR);

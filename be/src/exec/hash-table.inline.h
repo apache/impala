@@ -36,7 +36,7 @@ inline bool HashTableCtx::EvalAndHashProbe(TupleRow* row, uint32_t* hash) {
 
 inline int64_t HashTable::Probe(Bucket* buckets, int64_t num_buckets,
     HashTableCtx* ht_ctx, uint32_t hash, bool* found) {
-  DCHECK_NOTNULL(buckets);
+  DCHECK(buckets != NULL);
   DCHECK_GT(num_buckets, 0);
   *found = false;
   int64_t bucket_idx = hash & (num_buckets - 1);
@@ -217,10 +217,10 @@ inline TupleRow* HashTable::GetRow(HtData& htdata, TupleRow* row) const {
 }
 
 inline TupleRow* HashTable::GetRow(Bucket* bucket, TupleRow* row) const {
-  DCHECK_NOTNULL(bucket);
+  DCHECK(bucket != NULL);
   if (UNLIKELY(bucket->hasDuplicates)) {
     DuplicateNode* duplicate = bucket->bucketData.duplicates;
-    DCHECK_NOTNULL(duplicate);
+    DCHECK(duplicate != NULL);
     return GetRow(duplicate->htdata, row);
   } else {
     return GetRow(bucket->bucketData.htdata, row);
@@ -229,11 +229,11 @@ inline TupleRow* HashTable::GetRow(Bucket* bucket, TupleRow* row) const {
 
 inline TupleRow* HashTable::Iterator::GetRow() const {
   DCHECK(!AtEnd());
-  DCHECK_NOTNULL(table_);
-  DCHECK_NOTNULL(row_);
+  DCHECK(table_ != NULL);
+  DCHECK(row_ != NULL);
   Bucket* bucket = &table_->buckets_[bucket_idx_];
   if (UNLIKELY(bucket->hasDuplicates)) {
-    DCHECK_NOTNULL(node_);
+    DCHECK(node_ != NULL);
     return table_->GetRow(node_->htdata, row_);
   } else {
     return table_->GetRow(bucket->bucketData.htdata, row_);
@@ -246,7 +246,7 @@ inline Tuple* HashTable::Iterator::GetTuple() const {
   Bucket* bucket = &table_->buckets_[bucket_idx_];
   // TODO: To avoid the hasDuplicates check, store the HtData* in the Iterator.
   if (UNLIKELY(bucket->hasDuplicates)) {
-    DCHECK_NOTNULL(node_);
+    DCHECK(node_ != NULL);
     return node_->htdata.tuple;
   } else {
     return bucket->bucketData.htdata.tuple;

@@ -83,7 +83,7 @@ MemTracker* tracker_;
   int num_pinned_buffers_;
 
   void PinBuffer(BufferDescriptor* buffer) {
-    DCHECK_NOTNULL(buffer);
+    DCHECK(buffer != NULL);
     if (buffer->len == mgr_->max_block_size()) {
       ++num_pinned_buffers_;
       if (tracker_ != NULL) tracker_->ConsumeLocal(buffer->len, query_tracker_);
@@ -91,7 +91,7 @@ MemTracker* tracker_;
   }
 
   void UnpinBuffer(BufferDescriptor* buffer) {
-    DCHECK_NOTNULL(buffer);
+    DCHECK(buffer != NULL);
     if (buffer->len == mgr_->max_block_size()) {
       DCHECK_GT(num_pinned_buffers_, 0);
       --num_pinned_buffers_;
@@ -199,7 +199,7 @@ BufferedBlockMgr::BufferedBlockMgr(RuntimeState* state, int64_t block_size)
 Status BufferedBlockMgr::Create(RuntimeState* state, MemTracker* parent,
     RuntimeProfile* profile, int64_t mem_limit, int64_t block_size,
     shared_ptr<BufferedBlockMgr>* block_mgr) {
-  DCHECK_NOTNULL(parent);
+  DCHECK(parent != NULL);
   block_mgr->reset();
   {
     lock_guard<SpinLock> lock(static_block_mgrs_lock_);
@@ -535,7 +535,7 @@ Status BufferedBlockMgr::DeleteOrUnpinBlock(Block* block, bool unpin) {
 
 Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_block,
     bool unpin) {
-  DCHECK_NOTNULL(block);
+  DCHECK(block != NULL);
   DCHECK(!block->is_deleted_);
   *pinned = false;
   if (block->is_pinned_) {
@@ -834,9 +834,9 @@ void BufferedBlockMgr::ReturnUnusedBlock(Block* block) {
 }
 
 Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
-  DCHECK_NOTNULL(block);
+  DCHECK(block != NULL);
   Client* client = block->client_;
-  DCHECK_NOTNULL(client);
+  DCHECK(client != NULL);
   DCHECK(!block->is_pinned_ && !block->is_deleted_)
       << "Pinned or deleted block " << endl << block->DebugString();
   *in_mem = false;
@@ -905,7 +905,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
       return status;
     }
 
-    DCHECK_NOTNULL(buffer_desc);
+    DCHECK(buffer_desc != NULL);
     if (buffer_desc->block != NULL) {
       // This buffer was assigned to a block but now we are reusing it. Reset the
       // previous block->buffer link.
@@ -915,7 +915,7 @@ Status BufferedBlockMgr::FindBufferForBlock(Block* block, bool* in_mem) {
     buffer_desc->block = block;
     block->buffer_desc_ = buffer_desc;
   }
-  DCHECK_NOTNULL(block->buffer_desc_);
+  DCHECK(block->buffer_desc_ != NULL);
   block->is_pinned_ = true;
   client->PinBuffer(block->buffer_desc_);
   ++total_pinned_buffers_;
@@ -977,7 +977,7 @@ Status BufferedBlockMgr::FindBuffer(unique_lock<mutex>& lock,
 }
 
 BufferedBlockMgr::Block* BufferedBlockMgr::GetUnusedBlock(Client* client) {
-  DCHECK_NOTNULL(client);
+  DCHECK(client != NULL);
   Block* new_block = NULL;
   if (unused_blocks_.empty()) {
     new_block = obj_pool_.Add(new Block(this));
@@ -987,7 +987,7 @@ BufferedBlockMgr::Block* BufferedBlockMgr::GetUnusedBlock(Client* client) {
     new_block = unused_blocks_.Dequeue();
     recycled_blocks_counter_->Add(1);
   }
-  DCHECK_NOTNULL(new_block);
+  DCHECK(new_block != NULL);
   new_block->client_ = client;
   return new_block;
 }

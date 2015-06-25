@@ -272,7 +272,7 @@ void PlanFragmentExecutor::OptimizeLlvmModule() {
   LlvmCodeGen* codegen;
   Status status = runtime_state_->GetCodegen(&codegen, /* initalize */ false);
   DCHECK(status.ok());
-  DCHECK_NOTNULL(codegen);
+  DCHECK(codegen != NULL);
   status = codegen->FinalizeModule();
   if (!status.ok()) {
     stringstream ss;

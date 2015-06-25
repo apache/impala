@@ -166,7 +166,7 @@ class BufferedBlockMgr {
 
     /// Return the number of remaining bytes that can be allocated in this block.
     int BytesRemaining() const {
-      DCHECK_NOTNULL(buffer_desc_);
+      DCHECK(buffer_desc_ != NULL);
       return buffer_desc_->len - valid_data_len_;
     }
 
@@ -179,7 +179,7 @@ class BufferedBlockMgr {
     /// Pointer to start of the block data in memory. Only guaranteed to be valid if the
     /// block is pinned.
     uint8_t* buffer() const {
-      DCHECK_NOTNULL(buffer_desc_);
+      DCHECK(buffer_desc_ != NULL);
       return buffer_desc_->buffer;
     }
 

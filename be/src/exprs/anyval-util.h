@@ -143,7 +143,7 @@ class AnyValUtil {
   /// Templated equality functions. These assume the input values are not NULL.
   template<typename T>
   static inline bool Equals(const FunctionContext::TypeDesc* type, const T& x, const T& y) {
-    DCHECK_NOTNULL(type);
+    DCHECK(type != NULL);
     return Equals(TypeDescToColumnType(*type), x, y);
   }
 

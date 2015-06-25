@@ -151,8 +151,8 @@ class HdfsParquetScanner::BaseColumnReader {
 
   // This is called once for each row group in the file.
   Status Reset(const parquet::ColumnMetaData* metadata, ScannerContext::Stream* stream) {
-    DCHECK_NOTNULL(stream);
-    DCHECK_NOTNULL(metadata);
+    DCHECK(stream != NULL);
+    DCHECK(metadata != NULL);
 
     num_buffered_values_ = 0;
     data_ = NULL;
@@ -259,7 +259,7 @@ class HdfsParquetScanner::BaseColumnReader {
       decompressed_data_pool_(new MemPool(parent->scan_node_->mem_tracker())),
       num_buffered_values_(0),
       num_values_read_(0) {
-    DCHECK_NOTNULL(node.slot_desc);
+    DCHECK(node.slot_desc != NULL);
     DCHECK_GE(node.col_idx, 0);
     DCHECK_GE(node.max_def_level, 0);
 
@@ -902,7 +902,7 @@ Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
             rows_read += i;
             if (rows_read != expected_rows_in_group) {
               HdfsParquetScanner::BaseColumnReader* reader = column_readers_[c];
-              DCHECK_NOTNULL(reader->stream_);
+              DCHECK(reader->stream_ != NULL);
 
               ErrorMsg msg(TErrorCode::PARQUET_GROUP_ROW_COUNT_ERROR,
                  reader->stream_->filename(), row_group_idx,
@@ -961,7 +961,7 @@ Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
       // If another tuple is successfully read, it means that there are still values
       // in the file.
       HdfsParquetScanner::BaseColumnReader* reader = column_readers_[0];
-      DCHECK_NOTNULL(reader->stream_);
+      DCHECK(reader->stream_ != NULL);
       ErrorMsg msg(TErrorCode::PARQUET_GROUP_ROW_COUNT_OVERFLOW,
           reader->stream_->filename(), row_group_idx,
           expected_rows_in_group);
@@ -1014,7 +1014,7 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
     // not enough bytes in the footer range from IssueInitialRanges().
     // We'll just issue more ranges to the IoMgr that is the actual footer.
     const HdfsFileDesc* file_desc = scan_node_->GetFileDesc(metadata_range_->file());
-    DCHECK_NOTNULL(file_desc);
+    DCHECK(file_desc != NULL);
     // The start of the metadata is:
     // file_length - 4-byte metadata size - footer-size - metadata size
     int64_t metadata_start = file_desc->file_length -
@@ -1147,7 +1147,7 @@ Status HdfsParquetScanner::CreateColumnReaders() {
 
 Status HdfsParquetScanner::InitColumns(int row_group_idx) {
   const HdfsFileDesc* file_desc = scan_node_->GetFileDesc(metadata_range_->file());
-  DCHECK_NOTNULL(file_desc);
+  DCHECK(file_desc != NULL);
   parquet::RowGroup& row_group = file_metadata_.row_groups[row_group_idx];
 
   // All the scan ranges (one for each column).
