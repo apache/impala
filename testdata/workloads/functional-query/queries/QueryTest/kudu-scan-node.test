@@ -15,3 +15,11 @@ select * from testtbl where id = 10001;
 ---- TYPES
 BIGINT, STRING, INT
 ====
+---- QUERY
+# Make sure LIMIT is enforced.
+select * from dimtbl order by id limit 1;
+---- RESULTS
+1001,'Name1',94611
+---- TYPES
+BIGINT, STRING, INT
+====

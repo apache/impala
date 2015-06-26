@@ -128,9 +128,12 @@ class KuduScanNodeTest : public testing::Test {
     }
   }
 
+  static const int kNoLimit = -1;
+
   void ScanAndVerify(int expected_num_rows, int expected_num_batches,
-      int num_cols_to_materialize, int num_notnull_cols = 3) {
+      int num_cols_to_materialize, int num_notnull_cols = 3, int limit = kNoLimit) {
     BuildRuntimeStateForScans(num_cols_to_materialize);
+    if (limit != kNoLimit) kudu_node_.__set_limit(limit);
 
     KuduScanNode scanner(&obj_pool_, kudu_node_, *desc_tbl_);
 
@@ -144,7 +147,13 @@ class KuduScanNodeTest : public testing::Test {
 
     int num_rows = 0;
     int num_batches = 0;
-    int batch_size = expected_num_rows / expected_num_batches;
+    int batch_size;
+    // Even if 'limit' is equal to 0 we still need a batch size > 0.
+    if (limit == 0) {
+      batch_size = 1;
+    } else {
+      batch_size = expected_num_rows / expected_num_batches;
+    }
 
     bool eos = false;
 
@@ -258,6 +267,24 @@ TEST_F(KuduScanNodeTest, TestScanEmptyString) {
   ASSERT_EQ(1, batch->num_rows());
   ASSERT_TRUE(eos);
   ASSERT_EQ(PrintBatch(batch), "[(10 null )]\n");
+}
+
+// Test that scan limits are enforced.
+TEST_F(KuduScanNodeTest, TestLimitsAreEnforced) {
+  const int kNumRows = 1000;
+
+  // Insert kNumRows rows for this test.
+  kudu_test_helper_.InsertTestRows(kudu_test_helper_.client().get(),
+                                   kudu_test_helper_.table().get(),
+                                   kNumRows);
+
+  // Try scanning but limit the number of returned rows to several different values.
+  int limit_rows_to = 0;
+  ScanAndVerify(limit_rows_to, 0, 3, 3, limit_rows_to);
+  limit_rows_to = 1;
+  ScanAndVerify(limit_rows_to, 1, 3, 3, limit_rows_to);
+  limit_rows_to = 2000;
+  ScanAndVerify(1000, 1, 3, 3, limit_rows_to);
 }
 
 } // namespace impala

@@ -80,9 +80,9 @@ Status KuduScanner::Open(const std::tr1::shared_ptr<KuduClient>& client,
 
 Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
   int tuple_buffer_size = row_batch->capacity() * scan_node_->tuple_desc()->byte_size();
-  void* tuple_buffer_ = row_batch->tuple_data_pool()->TryAllocate(tuple_buffer_size);
-  if (tuple_buffer_size > 0 && tuple_buffer_ == NULL) return Status::MEM_LIMIT_EXCEEDED;
-  Tuple* tuple = reinterpret_cast<Tuple*>(tuple_buffer_);
+  void* tuple_buffer = row_batch->tuple_data_pool()->TryAllocate(tuple_buffer_size);
+  if (tuple_buffer_size > 0 && tuple_buffer == NULL) return Status::MEM_LIMIT_EXCEEDED;
+  Tuple* tuple = reinterpret_cast<Tuple*>(tuple_buffer);
 
   // Main scan loop:
   // Tries to fill 'row_batch' with rows from the last fetched block.
@@ -172,8 +172,6 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
     row->SetTuple(0, *tuple_mem);
   }
 
-  int num_rows_returned = 0;
-
   // Now iterate through the Kudu rows.
   for (int krow_idx = rows_scanned_current_block_; krow_idx < cur_rows_.size();
        ++krow_idx) {
@@ -184,18 +182,18 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
     ++rows_scanned_current_block_;
 
     // Evaluate the conjuncts that haven't been pushed down.
-    if (scan_node_->conjunct_ctxs().empty()
-        || ExecNode::EvalConjuncts(&scan_node_->conjunct_ctxs()[0],
+    if (scan_node_->conjunct_ctxs().empty() ||
+        ExecNode::EvalConjuncts(&scan_node_->conjunct_ctxs()[0],
             scan_node_->conjunct_ctxs().size(), row)) {
       // If the conjuncts pass on the row commit it.
       row_batch->CommitLastRow();
-      ++num_rows_returned;
 
       // Add another row.
       idx = row_batch->AddRow();
 
-      // If we've reached the capacity return.
-      if (idx == RowBatch::INVALID_ROW_INDEX || row_batch->AtCapacity()) {
+      // If we've reached the capacity, or the LIMIT for the scan, return.
+      if (idx == RowBatch::INVALID_ROW_INDEX || row_batch->AtCapacity() ||
+          scan_node_->ReachedLimit()) {
         *batch_done = true;
         break;
       }
@@ -214,7 +212,6 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
     }
   }
 
-  COUNTER_ADD(scan_node_->rows_returned_counter_, num_rows_returned);
   return Status::OK();
 }
 
@@ -299,6 +296,7 @@ Status KuduScanner::GetNextBlock() {
   KUDU_RETURN_IF_ERROR(scanner_->NextBatch(&cur_rows_), "Unable to advance iterator");
   scan_node_->kudu_round_trips_->Add(1);
   rows_scanned_current_block_ = 0;
+  COUNTER_ADD(scan_node_->rows_read_counter(), cur_rows_.size());
   return Status::OK();
 }
 

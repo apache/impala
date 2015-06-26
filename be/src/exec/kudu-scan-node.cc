@@ -135,6 +135,8 @@ Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   // TODO a multi-threaded implementation will have more than one scanner, likely each
   // one managing their own row_batch and appending the batches to a blocking queue.
   RETURN_IF_ERROR(scanner_->GetNext(row_batch, eos));
+  num_rows_returned_ += row_batch->num_rows();
+  COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   return Status::OK();
 }
 
