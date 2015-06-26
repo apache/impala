@@ -24,8 +24,10 @@ select * from dimtbl order by id limit 1;
 BIGINT, STRING, INT
 ====
 ---- QUERY
-# Make sure that we can list the columns to be scanned in any order.
-select zip, id from dimtbl order by id limit 1;
+# Make sure that we can list the columns to be scanned in any order, that predicates
+# work and that we can have predicates on columns not referenced elsewhere.
+select zip, id from dimtbl where id >= 1000 and 1002 >= id and 94611 = zip and
+'Name1' = name order by id;
 ---- RESULTS
 94611,1001
 ---- TYPES

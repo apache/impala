@@ -176,7 +176,6 @@ public class KuduTable extends Table {
     // Load the rest of the data from the table parameters directly
     loadColumns(msTbl.getSd().getCols(), client, keyColumns);
 
-    // TODO Revisit, when we allow predicate pushdown
     numClusteringCols_ = 0;
 
     // Get row count from stats
@@ -203,6 +202,8 @@ public class KuduTable extends Table {
   public String getKuduTableName() { return kuduTableName_; }
 
   public List<HostAndPort> getKuduMasterAddresses() { return kuduMasters_; }
+
+  public int getNumKeyColumns() { return kuduKeyColumnNames_.size(); }
 
   /**
    * Returns true if all required parameters are present in the given table properties

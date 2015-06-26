@@ -14,7 +14,7 @@ NODE 0:
 select * from functional_kudu.testtbl where name = '10'
 ---- PLAN
 00:SCAN KUDU [functional_kudu.testtbl]
-  predicates: name = '10'
+  kudu predicates: name = '10'
 ---- SCANRANGELOCATIONS
 NODE 0:
   KUDU KEYRANGE []:[]
@@ -22,7 +22,7 @@ NODE 0:
 01:EXCHANGE [UNPARTITIONED]
 |
 00:SCAN KUDU [functional_kudu.testtbl]
-  predicates: name = '10'
+  kudu predicates: name = '10'
 ====
 ---- QUERY
 insert into functional_kudu.testtbl(id) values (10)
@@ -79,4 +79,52 @@ WRITE TO KUDU [functional_kudu.testtbl]
 |  group by: name, id
 |
 00:SCAN KUDU [functional_kudu.dimtbl]
+====
+# All predicates can be pushed down.
+select * from functional_kudu.testtbl
+where id >= 10 and zip <= 5 and 20 >= id and 'foo' = name and zip >= 0 and 30 >= zip
+---- PLAN
+00:SCAN KUDU [functional_kudu.testtbl]
+   kudu predicates: id >= 10, zip <= 5, id <= 20, name = 'foo', zip >= 0, zip <= 30
+---- SCANRANGELOCATIONS
+NODE 0:
+  KUDU KEYRANGE []:[]
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN KUDU [functional_kudu.testtbl]
+   kudu predicates: id >= 10, zip <= 5, id <= 20, name = 'foo', zip >= 0, zip <= 30
+====
+# Some predicates can be pushed down but others can't (predicate on an non-const value).
+select * from functional_kudu.testtbl
+where cast(sin(id) as boolean) = true and name = 'a'
+---- PLAN
+00:SCAN KUDU [functional_kudu.testtbl]
+   predicates: CAST(sin(id) AS BOOLEAN) = TRUE
+   kudu predicates: name = 'a'
+---- SCANRANGELOCATIONS
+NODE 0:
+  KUDU KEYRANGE []:[]
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN KUDU [functional_kudu.testtbl]
+   predicates: CAST(sin(id) AS BOOLEAN) = TRUE
+   kudu predicates: name = 'a'
+====
+# No predicates can be pushed down (predicate on a non-const value and
+# non-binary predicate). There is a single tablet so no partition pruning.
+select * from functional_kudu.testtbl
+where cast(sin(id) as boolean) = true and name is null
+---- PLAN
+00:SCAN KUDU [functional_kudu.testtbl]
+   predicates: CAST(sin(id) AS BOOLEAN) = TRUE, name IS NULL
+---- SCANRANGELOCATIONS
+NODE 0:
+  KUDU KEYRANGE []:[]
+---- DISTRIBUTEDPLAN
+01:EXCHANGE [UNPARTITIONED]
+|
+00:SCAN KUDU [functional_kudu.testtbl]
+   predicates: CAST(sin(id) AS BOOLEAN) = TRUE, name IS NULL
 ====
