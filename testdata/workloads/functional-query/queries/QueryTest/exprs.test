@@ -1632,7 +1632,7 @@ select cast("2012-02-29 00:00:00" as timestamp) + interval 1 year,
        cast("2012-01-01 00:00:00" as timestamp) + interval 365 days,
        cast("2013-01-01 00:00:00" as timestamp) - interval 366 days
 ---- RESULTS
-2013-02-28 00:00:00,2012-02-29 00:00:00,2012-12-31 00:00:00,2012-01-01 00:00:00
+2013-02-28 00:00:00,2012-02-28 00:00:00,2012-12-31 00:00:00,2012-01-01 00:00:00
 ---- TYPES
 timestamp,timestamp,timestamp,timestamp
 ====
@@ -1816,7 +1816,7 @@ int, smallint, tinyint, bigint, double, float, decimal
 select timestamp_col FROM alltypesagg
 ORDER BY timestamp_col + INTERVAL bigint_col YEAR ASC limit 1
 ---- RESULTS
-2010-01-01 08:25:38.550000000
+2010-01-01 00:01:00
 ---- TYPES
 TIMESTAMP
 ====

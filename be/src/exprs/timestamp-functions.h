@@ -90,15 +90,30 @@ class TimestampFunctions {
   static IntVal DateDiff(FunctionContext* context, const TimestampVal& ts_val1,
       const TimestampVal& ts_val2);
 
-  /// Add/sub functions on the date portion.
-  template <bool ISADD, class VALTYPE, class UNIT>
-  static TimestampVal DateAddSub(FunctionContext* context, const TimestampVal& ts_value,
-      const VALTYPE& count);
-
-  /// Add/sub functions on the time portion.
-  template <bool ISADD, class VALTYPE, class UNIT>
-  static TimestampVal TimeAddSub(FunctionContext* context, const TimestampVal& ts_value,
-      const VALTYPE& count);
+  /// Add/sub functions on the timestamp. This handles three forms of adding/subtracting
+  /// intervals to/from timestamps:
+  ///   1) ADD/SUB_<INTERVAL>(<TIMESTAMP>, <NUMBER>),
+  ///        ex: ADD_DAYS(CAST('2015-01-01' AS TIMESTAMP), 1)
+  ///            SUB_YEARS(CAST('2015-01-01' AS TIMESTAMP), 1)
+  ///   2) <TIMESTAMP> +/- INTERVAL '<NUMBER>' <INTERVAL>,
+  ///        ex: CAST('2015-01-01' AS TIMESTAMP) + INTERVAL '1' DAY
+  ///            CAST('2015-01-01' AS TIMESTAMP) - INTERVAL '1' YEAR
+  ///   3) DATE_ADD/SUB(<TIMESTAMP>, INTERVAL <NUMBER> <INTERVAL>)
+  ///        ex: DATE_ADD(CAST('2015-01-01' AS TIMESTAMP), INTERVAL 1 DAY)
+  ///            DATE_SUB(CAST('2015-01-01' AS TIMESTAMP), INTERVAL 1 YEAR)
+  /// These three forms are provided for compatibility with other databases so we inherit
+  /// their behavior. For all intervals except MONTH the three forms above produce the
+  /// same results. MONTH is a special case where the result may differ if the input
+  /// TIMESTAMP is the last day of the month (ADD_MONTH() always sets the result to the
+  /// last day of the month if the input is the last day of the month).
+  /// AddSubMonthsKeepMaxDay() below handles the ADD_MONTH() case, the INTERVAL cases
+  /// (#2 & #3) are handled by AddSub().
+  template <bool is_add, typename AnyIntVal, typename Interval>
+  static TimestampVal AddSub(FunctionContext* context, const TimestampVal& timestamp,
+      const AnyIntVal& num_interval_units);
+  template <bool is_add, typename AnyIntVal>
+  static TimestampVal AddSubMonthsKeepMaxDay(FunctionContext* context,
+      const TimestampVal& timestamp, const AnyIntVal& months);
 
   /// Helper function to check date/time format strings.
   /// TODO: eventually return format converted from Java to Boost.

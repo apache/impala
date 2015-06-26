@@ -2905,7 +2905,7 @@ TEST_F(ExprTest, TimestampFunctions) {
       "2012-02-29 09:10:11.123456789");
   TestStringValue("cast(date_sub(cast('2012-02-29 09:10:11.123456789' "
       "as timestamp), interval cast(1 as bigint) month) as string)",
-      "2012-01-31 09:10:11.123456789");
+      "2012-01-29 09:10:11.123456789");
   // Add/sub weeks.
   TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
       "as timestamp), interval 2 weeks) as string)",
@@ -3034,7 +3034,29 @@ TEST_F(ExprTest, TimestampFunctions) {
       "interval NULL years)", TYPE_TIMESTAMP);
   TestIsNull("date_sub(NULL, interval NULL years)", TYPE_TIMESTAMP);
 
-  // Test add/sub behavior with very large time values.
+  // ADD_MONTHS() differs from '... + INTERVAL 1 MONTH'. The function version treats
+  // an input value that falls on the last day of the month specially -- the result will
+  // also always be the last day of the month.
+  TestStringValue("cast(add_months(cast('2000-02-29' as timestamp), 1) as string)",
+      "2000-03-31 00:00:00");
+  TestStringValue("cast(cast('2000-02-29' as timestamp) + interval 1 month as string)",
+      "2000-03-29 00:00:00");
+  TestStringValue("cast(add_months(cast('1999-02-28' as timestamp), 12) as string)",
+      "2000-02-29 00:00:00");
+  TestStringValue("cast(cast('1999-02-28' as timestamp) + interval 12 month as string)",
+      "2000-02-28 00:00:00");
+
+  // Try a few cases in which ADD_MONTHS() and INTERVAL produce the same result.
+  TestStringValue("cast(months_sub(cast('2000-03-31' as timestamp), 1) as string)",
+      "2000-02-29 00:00:00");
+  TestStringValue("cast(cast('2000-03-31' as timestamp) - interval 1 month as string)",
+      "2000-02-29 00:00:00");
+  TestStringValue("cast(months_add(cast('2000-03-31' as timestamp), -2) as string)",
+      "2000-01-31 00:00:00");
+  TestStringValue("cast(cast('2000-03-31' as timestamp) + interval -2 month as string)",
+      "2000-01-31 00:00:00");
+
+  // Test add/sub behavior with edge case time interval values.
   string max_int = lexical_cast<string>(numeric_limits<int32_t>::max());
   string max_long = lexical_cast<string>(numeric_limits<int32_t>::max());
   TestStringValue(
