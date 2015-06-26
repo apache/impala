@@ -597,13 +597,15 @@ Status BufferedBlockMgr::PinBlock(Block* block, bool* pinned, Block* release_blo
 
   // Read from the io mgr buffer into the block's assigned buffer.
   int64_t offset = 0;
-  DiskIoMgr::BufferDescriptor* io_mgr_buffer;
+  bool buffer_eosr;
   do {
+    DiskIoMgr::BufferDescriptor* io_mgr_buffer;
     RETURN_IF_ERROR(scan_range->GetNext(&io_mgr_buffer));
     memcpy(block->buffer() + offset, io_mgr_buffer->buffer(), io_mgr_buffer->len());
     offset += io_mgr_buffer->len();
+    buffer_eosr = io_mgr_buffer->eosr();
     io_mgr_buffer->Return();
-  } while (!io_mgr_buffer->eosr());
+  } while (!buffer_eosr);
   DCHECK_EQ(offset, block->write_range_->len());
 
   // Verify integrity first, because the hash was generated from encrypted data.
