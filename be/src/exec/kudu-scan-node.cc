@@ -16,6 +16,8 @@
 
 #include <boost/foreach.hpp>
 #include <kudu/client/row_result.h>
+#include <kudu/client/schema.h>
+#include <kudu/client/value.h>
 #include <thrift/protocol/TDebugProtocol.h>
 #include <vector>
 
@@ -29,22 +31,31 @@
 #include "runtime/tuple-row.h"
 #include "gutil/gscoped_ptr.h"
 #include "gutil/strings/substitute.h"
+#include "gutil/stl_util.h"
 #include "util/jni-util.h"
 #include "util/periodic-counter-updater.h"
 #include "util/runtime-profile.h"
 
 #include "common/names.h"
 
-using kudu::client::KuduColumnSchema;
-using kudu::client::KuduSchema;
 using kudu::client::KuduClient;
+using kudu::client::KuduColumnSchema;
+using kudu::client::KuduPredicate;
 using kudu::client::KuduRowResult;
+using kudu::client::KuduSchema;
 using kudu::client::KuduTable;
+using kudu::client::KuduValue;
+using kudu::Slice;
+using strings::Substitute;
 
 namespace impala {
 
 const string KuduScanNode::KUDU_READ_TIMER = "TotalKuduReadTime";
 const string KuduScanNode::KUDU_ROUND_TRIPS = "TotalKuduScanRoundTrips";
+
+const std::string KuduScanNode::GE_FN = "ge";
+const std::string KuduScanNode::LE_FN = "le";
+const std::string KuduScanNode::EQ_FN = "eq";
 
 namespace {
 
@@ -64,12 +75,12 @@ void GetMaterializedSlots(const TupleDescriptor& tuple_desc,
 KuduScanNode::KuduScanNode(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
-      tuple_id_(tnode.kudu_scan_node.tuple_id) {
+      tuple_id_(tnode.kudu_scan_node.tuple_id),
+      pushable_conjuncts_(tnode.kudu_scan_node.pushable_conjuncts) {
 }
 
 KuduScanNode::~KuduScanNode() {
 }
-
 
 Status KuduScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ScanNode::Prepare(state));
@@ -114,10 +125,14 @@ Status KuduScanNode::Open(RuntimeState* state) {
 
   KUDU_RETURN_IF_ERROR(client_->OpenTable(table_desc->table_name(), &table_),
       "Unable to open Kudu table");
+
+  // Must happen after table_ is opened.
+  RETURN_IF_ERROR(TransformPushableConjunctsToRangePredicates());
+
   RETURN_IF_ERROR(scanner_->Open(client_, table_));
+
   return Status::OK();
 }
-
 
 Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
@@ -150,6 +165,72 @@ Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   }
 
   return Status::OK();
+}
+
+Status KuduScanNode::TransformPushableConjunctsToRangePredicates() {
+  // The only supported pushable predicates are binary operators with a SlotRef and a
+  // literal as the left and right operands respectively.
+  BOOST_FOREACH(const TExpr& predicate, pushable_conjuncts_) {
+    DCHECK_EQ(predicate.nodes.size(), 3);
+    const TExprNode& function_call = predicate.nodes[0];
+
+    DCHECK_EQ(function_call.node_type, TExprNodeType::FUNCTION_CALL);
+
+    Slice col_name;
+    KuduValue* bound;
+    GetSlotRefColumnName(predicate.nodes[1], &col_name);
+    GetExprLiteralBound(predicate.nodes[2], &bound);
+    DCHECK(bound != NULL);
+
+    const string& function_name = function_call.fn.name.function_name;
+    if (function_name == GE_FN) {
+      kudu_predicates_.push_back(table_->NewComparisonPredicate(col_name,
+          KuduPredicate::GREATER_EQUAL, bound));
+    } else if (function_name == LE_FN) {
+      kudu_predicates_.push_back(table_->NewComparisonPredicate(col_name,
+          KuduPredicate::LESS_EQUAL, bound));
+    } else if (function_name == EQ_FN) {
+      kudu_predicates_.push_back(table_->NewComparisonPredicate(col_name,
+          KuduPredicate::EQUAL, bound));
+    } else {
+      DCHECK(false) << "Received unpushable operator to push down: " << function_name;
+    }
+  }
+  return Status::OK();
+}
+
+void KuduScanNode::GetSlotRefColumnName(const TExprNode& node, Slice* col_name) {
+  const KuduTableDescriptor* table_desc =
+      static_cast<const KuduTableDescriptor*>(tuple_desc_->table_desc());
+  TSlotId slot_id = node.slot_ref.slot_id;
+  BOOST_FOREACH(SlotDescriptor* slot, tuple_desc_->slots()) {
+    if (slot->id() == slot_id) {
+      int col_idx = slot->col_pos();
+      *col_name = table_desc->col_names()[col_idx];
+      return;
+    }
+  }
+  DCHECK(false) << "Could not find a slot with slot id: " << slot_id;
+}
+
+void KuduScanNode::GetExprLiteralBound(const TExprNode& node, KuduValue** value) {
+  switch (node.node_type) {
+    case TExprNodeType::BOOL_LITERAL:
+      *value = KuduValue::FromBool(node.bool_literal.value);
+      return;
+    case TExprNodeType::FLOAT_LITERAL:
+      *value = KuduValue::FromFloat(node.float_literal.value);
+      return;
+    case TExprNodeType::INT_LITERAL:
+      *value = KuduValue::FromInt(node.int_literal.value);
+      return;
+    case TExprNodeType::STRING_LITERAL:
+      *value = KuduValue::CopyString(node.string_literal.value);
+      return;
+    default:
+      // Should be unreachable.
+      LOG(DFATAL) << "Unsupported node type: " << node.node_type;
+  }
 }
 
 void KuduScanNode::Close(RuntimeState* state) {

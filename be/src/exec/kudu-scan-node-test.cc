@@ -63,6 +63,7 @@ class KuduScanNodeTest : public testing::Test {
 
   void BuildRuntimeStateForScans(int num_cols_materialize) {
     TKuduScanNode kudu_scan_node_;
+    kudu_scan_node_.__set_pushable_conjuncts(pushable_conjuncts_);
     kudu_node_.__set_kudu_scan_node(kudu_scan_node_);
     kudu_node_.__set_node_type(TPlanNodeType::KUDU_SCAN_NODE);
     kudu_node_.__set_limit(-1);
@@ -77,10 +78,10 @@ class KuduScanNodeTest : public testing::Test {
     runtime_state_.set_desc_tbl(desc_tbl_);
   }
 
-  void SetUpScanner(KuduScanNode* scanner, vector<TScanRangeParams>* params) {
-    scanner->SetScanRanges(*params);
-    ASSERT_OK(scanner->Prepare(&runtime_state_));
-    ASSERT_OK(scanner->Open(&runtime_state_));
+  void SetUpScanner(KuduScanNode* scan_node, vector<TScanRangeParams>* params) {
+    scan_node->SetScanRanges(*params);
+    ASSERT_OK(scan_node->Prepare(&runtime_state_));
+    ASSERT_OK(scan_node->Open(&runtime_state_));
   }
 
   void VerifyBatch(RowBatch* batch, int first_row, int last_row,
@@ -131,8 +132,9 @@ class KuduScanNodeTest : public testing::Test {
   static const int NO_LIMIT = -1;
   static const int DEFAULT_ROWS_PER_BATCH = 1024;
 
-  void ScanAndVerify(int expected_num_rows, int expected_num_batches,
-      int num_cols_to_materialize, int num_notnull_cols = 3, int limit = NO_LIMIT) {
+  void ScanAndVerify(int first_row, int expected_num_rows, int expected_num_batches,
+      int num_cols_to_materialize, int num_notnull_cols = 3, int limit = NO_LIMIT,
+      bool verify = true) {
     BuildRuntimeStateForScans(num_cols_to_materialize);
     if (limit != NO_LIMIT) kudu_node_.__set_limit(limit);
 
@@ -149,7 +151,6 @@ class KuduScanNodeTest : public testing::Test {
     int num_rows = 0;
     int num_batches = 0;
     bool eos = false;
-    int first_row = num_rows;
 
     do {
       RowBatch* batch = obj_pool_.Add(new RowBatch(*row_desc_, DEFAULT_ROWS_PER_BATCH,
@@ -161,10 +162,12 @@ class KuduScanNodeTest : public testing::Test {
         break;
       }
 
-      VerifyBatch(batch, first_row, first_row + batch->num_rows(),
-          num_cols_to_materialize, num_notnull_cols);
+      if (verify) {
+        VerifyBatch(batch, first_row, first_row + batch->num_rows(),
+            num_cols_to_materialize, num_notnull_cols);
+      }
       num_rows += batch->num_rows();
-      first_row = num_rows;
+      first_row += batch->num_rows();
       ++num_batches;
     } while(!eos);
 
@@ -201,28 +204,31 @@ class KuduScanNodeTest : public testing::Test {
   TTableDescriptor t_tbl_desc_;
   DescriptorTbl* desc_tbl_;
   RowDescriptor* row_desc_;
+  vector<TExpr> pushable_conjuncts_;
 };
 
 TEST_F(KuduScanNodeTest, TestScanNode) {
 
   const int NUM_BATCHES = 5;
   const int NUM_ROWS = DEFAULT_ROWS_PER_BATCH * NUM_BATCHES;
+  const int FIRST_ROW = 0;
 
   // Insert NUM_ROWS rows for this test.
   kudu_test_helper_.InsertTestRows(kudu_test_helper_.client().get(),
                                    kudu_test_helper_.table().get(),
                                    NUM_ROWS);
 
-  // Test materializing all, some, or none of the slots
-  ScanAndVerify(NUM_ROWS, NUM_BATCHES, 3);
-  ScanAndVerify(NUM_ROWS, NUM_BATCHES, 2);
-  ScanAndVerify(NUM_ROWS, NUM_BATCHES, 0);
+  // Test materializing all, some, or none of the slots.
+  ScanAndVerify(FIRST_ROW, NUM_ROWS, NUM_BATCHES, 3);
+  ScanAndVerify(FIRST_ROW, NUM_ROWS, NUM_BATCHES, 2);
+  ScanAndVerify(FIRST_ROW, NUM_ROWS, NUM_BATCHES, 0);
 }
 
 TEST_F(KuduScanNodeTest, TestScanNullColValues) {
 
   const int NUM_ROWS = 1000;
   const int NUM_BATCHES = 1;
+  const int FIRST_ROW = 0;
 
   // Insert NUM_ROWS rows for this test but only the keys, i.e. the 2nd
   // and 3rd columns are null.
@@ -230,10 +236,187 @@ TEST_F(KuduScanNodeTest, TestScanNullColValues) {
                                    kudu_test_helper_.table().get(),
                                    NUM_ROWS, 0, 1);
 
-  // try scanning including and not including the null columns.
-  ScanAndVerify(NUM_ROWS, NUM_BATCHES, 3, 1);
-  ScanAndVerify(NUM_ROWS, NUM_BATCHES, 2, 1);
-  ScanAndVerify(NUM_ROWS, NUM_BATCHES, 1, 1);
+  // Try scanning including and not including the null columns.
+  ScanAndVerify(FIRST_ROW, NUM_ROWS, NUM_BATCHES, 3, 1);
+  ScanAndVerify(FIRST_ROW, NUM_ROWS, NUM_BATCHES, 2, 1);
+  ScanAndVerify(FIRST_ROW, NUM_ROWS, NUM_BATCHES, 1, 1);
+}
+
+namespace {
+
+// Sets a binary predicate, based on 'type', to the plan node. This will be transformed
+// into a range predicate by KuduScanNode.
+void AddExpressionNodesToExpression(TExpr* expression, int slot_id, const string& op_name,
+    TExprNodeType::type constant_type, const void* value) {
+
+  vector<TExprNode> nodes;
+
+  // Build the op node.
+  TExprNode function_node;
+  function_node.__set_node_type(TExprNodeType::FUNCTION_CALL);
+  TFunctionName function_name;
+  function_name.__set_function_name(op_name);
+  TFunction function;
+  function.__set_name(function_name);
+  function_node.__set_fn(function);
+
+  nodes.push_back(function_node);
+
+  // Add the slof ref.
+  TExprNode slot_ref_node;
+  slot_ref_node.__set_node_type(TExprNodeType::SLOT_REF);
+  TSlotRef slot_ref;
+  slot_ref.__set_slot_id(slot_id);
+  slot_ref_node.__set_slot_ref(slot_ref);
+
+  nodes.push_back(slot_ref_node);
+
+  TExprNode constant_node;
+  constant_node.__set_node_type(constant_type);
+  // Add the constant part.
+  switch(constant_type) {
+    // We only add the boilerplate for the types used in the test schema.
+    case TExprNodeType::INT_LITERAL: {
+      TIntLiteral int_literal;
+      int_literal.__set_value(*reinterpret_cast<const int64_t*>(value));
+      constant_node.__set_int_literal(int_literal);
+      break;
+    }
+    case TExprNodeType::STRING_LITERAL: {
+      TStringLiteral string_literal;
+      string_literal.__set_value(*reinterpret_cast<const string*>(value));
+      constant_node.__set_string_literal(string_literal);
+      break;
+    }
+    default:
+      LOG(FATAL) << "Unsupported function type";
+  }
+
+  nodes.push_back(constant_node);
+  expression->__set_nodes(nodes);
+}
+
+} // anonymous namespace
+
+
+// Test a >= predicate on the Key.
+TEST_F(KuduScanNodeTest, TestPushIntGEPredicateOnKey) {
+  const int NUM_ROWS_TO_INSERT = 1000;
+  const int NUM_BATCHES = 1;
+  const int SLOT_ID = 2;
+  const int MAT_COLS = 3;
+  const int FIRST_ROW = 500;
+  const int EXPECTED_NUM_ROWS = 500;
+
+  // Insert kNumRows rows for this test.
+  kudu_test_helper_.InsertTestRows(kudu_test_helper_.client().get(),
+                                   kudu_test_helper_.table().get(),
+                                   NUM_ROWS_TO_INSERT);
+
+  const int64_t PREDICATE_VALUE = 500;
+
+  // Now test having a pushable predicate on the key.
+  TExpr conjunct;
+  AddExpressionNodesToExpression(&conjunct, SLOT_ID, KuduScanNode::GE_FN,
+      TExprNodeType::INT_LITERAL, &PREDICATE_VALUE);
+  pushable_conjuncts_.push_back(conjunct);
+
+  ScanAndVerify(FIRST_ROW, EXPECTED_NUM_ROWS, NUM_BATCHES, NUM_BATCHES, MAT_COLS);
+}
+
+// Test a == predicate on the 2nd column.
+TEST_F(KuduScanNodeTest, TestPushIntEQPredicateOn2ndColumn) {
+  const int NUM_ROWS_TO_INSERT = 1000;
+  const int NUM_BATCHES = 1;
+  const int SLOT_ID = 3;
+  const int MAT_COLS = 3;
+
+  const int FIRST_ROW = 500;
+  const int EXPECTED_NUM_ROWS = 1;
+
+  // Insert kNumRows rows for this test.
+  kudu_test_helper_.InsertTestRows(kudu_test_helper_.client().get(),
+                                   kudu_test_helper_.table().get(),
+                                   NUM_ROWS_TO_INSERT);
+
+  // When rows are added col2 is 2 * col1 so we multiply by two to get back
+  // first row = 500.
+  const int64_t PREDICATE_VAL = FIRST_ROW * 2;
+
+  // Now test having a pushable predicate on the 2nd column.
+  TExpr conjunct;
+  AddExpressionNodesToExpression(&conjunct, SLOT_ID, KuduScanNode::EQ_FN,
+      TExprNodeType::INT_LITERAL, &PREDICATE_VAL);
+  pushable_conjuncts_.push_back(conjunct);
+
+  ScanAndVerify(FIRST_ROW, EXPECTED_NUM_ROWS, NUM_BATCHES, NUM_BATCHES, MAT_COLS);
+}
+
+TEST_F(KuduScanNodeTest, TestPushStringLEPredicateOn3rdColumn) {
+  const int NUM_ROWS_TO_INSERT = 1000;
+  const int NUM_BATCHES = 1;
+  const int SLOT_ID = 4;
+  const int MAT_COLS = 3;
+  // This predicate won't return consecutive rows so we just assert on the count.
+  const bool VERIFY_ROWS = false;
+
+  const int FIRST_ROW = 0;
+  const string PREDICATE_VAL = "hello_500";
+
+  // We expect 448 rows as Kudu will lexicographically compare the predicate value to
+  // column values. We can expect to obtain rows 1-500, inclusive, except numbers
+  // 6-9 (hello_6 > hello_500) and numbers 51-99 for a total of 52 excluded numbers.
+  const int EXPECTED_NUM_ROWS = 448;
+
+
+  // Insert kNumRows rows for this test.
+  kudu_test_helper_.InsertTestRows(kudu_test_helper_.client().get(),
+                                   kudu_test_helper_.table().get(),
+                                   NUM_ROWS_TO_INSERT);
+
+  // Now test having a pushable predicate on the third column.
+  TExpr conjunct;
+  AddExpressionNodesToExpression(&conjunct, SLOT_ID, KuduScanNode::LE_FN,
+      TExprNodeType::STRING_LITERAL, &PREDICATE_VAL);
+  pushable_conjuncts_.push_back(conjunct);
+
+  ScanAndVerify(FIRST_ROW, EXPECTED_NUM_ROWS, NUM_BATCHES, MAT_COLS, MAT_COLS, NO_LIMIT,
+                VERIFY_ROWS);
+}
+
+TEST_F(KuduScanNodeTest, TestPushTwoPredicatesOnNonMaterializedColumn) {
+  const int NUM_ROWS_TO_INSERT = 1000;
+  const int NUM_BATCHES = 1;
+  const int SLOT_ID = 3;
+  const int MAT_COLS = 1;
+
+  const int FIRST_ROW = 251;
+
+  const int EXPECTED_NUM_ROWS = 500;
+
+  // Insert kNumRows rows for this test.
+  kudu_test_helper_.InsertTestRows(kudu_test_helper_.client().get(),
+                                   kudu_test_helper_.table().get(),
+                                   NUM_ROWS_TO_INSERT);
+
+
+  const int64_t PREDICATE_VAL_LOW = 501;
+  const int64_t PREDICATE_VAL_HIGH = 1500;
+
+  // Now test having a pushable predicate on the 2nd column, but materialize only the key
+  // (e.g. select key from test_table where int_val >= 250 and int_val <= 750).
+  TExpr conjunct_low;
+  AddExpressionNodesToExpression(&conjunct_low, SLOT_ID, KuduScanNode::GE_FN,
+      TExprNodeType::INT_LITERAL, &PREDICATE_VAL_LOW);
+
+  TExpr conjunct_high;
+  AddExpressionNodesToExpression(&conjunct_high, SLOT_ID, KuduScanNode::LE_FN,
+      TExprNodeType::INT_LITERAL, &PREDICATE_VAL_HIGH);
+
+  pushable_conjuncts_.push_back(conjunct_low);
+  pushable_conjuncts_.push_back(conjunct_high);
+
+  ScanAndVerify(FIRST_ROW, EXPECTED_NUM_ROWS, NUM_BATCHES, MAT_COLS);
 }
 
 // Test for a bug where we would mishandle getting an empty string from
@@ -266,6 +449,7 @@ TEST_F(KuduScanNodeTest, TestScanEmptyString) {
 // Test that scan limits are enforced.
 TEST_F(KuduScanNodeTest, TestLimitsAreEnforced) {
   const int NUM_ROWS = 1000;
+  const int FIRST_ROW = 0;
 
   // Insert NUM_ROWS rows for this test.
   kudu_test_helper_.InsertTestRows(kudu_test_helper_.client().get(),
@@ -274,11 +458,11 @@ TEST_F(KuduScanNodeTest, TestLimitsAreEnforced) {
 
   // Try scanning but limit the number of returned rows to several different values.
   int limit_rows_to = 0;
-  ScanAndVerify(limit_rows_to, 0, 3, 3, limit_rows_to);
+  ScanAndVerify(FIRST_ROW, limit_rows_to, 0, 3, 3, limit_rows_to);
   limit_rows_to = 1;
-  ScanAndVerify(limit_rows_to, 1, 3, 3, limit_rows_to);
+  ScanAndVerify(FIRST_ROW, limit_rows_to, 1, 3, 3, limit_rows_to);
   limit_rows_to = 2000;
-  ScanAndVerify(1000, 1, 3, 3, limit_rows_to);
+  ScanAndVerify(FIRST_ROW, 1000, 1, 3, 3, limit_rows_to);
 }
 
 } // namespace impala

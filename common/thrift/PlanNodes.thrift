@@ -157,6 +157,8 @@ struct THBaseScanNode {
 
 struct TKuduScanNode {
   1: required Types.TTupleId tuple_id
+  // List of conjuncts that can be pushed down to Kudu.
+  2: optional list<Exprs.TExpr> pushable_conjuncts
 }
 
 struct TEqJoinCondition {

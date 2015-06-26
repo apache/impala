@@ -16,10 +16,19 @@
 #define IMPALA_EXEC_KUDU_SCAN_NODE_H_
 
 #include <boost/scoped_ptr.hpp>
+#include <gtest/gtest.h>
 #include <kudu/client/client.h>
 
 #include "exec/scan-node.h"
 #include "runtime/descriptors.h"
+#include "gutil/gscoped_ptr.h"
+
+namespace kudu {
+class Slice;
+namespace client {
+class KuduValue;
+} // namespace client
+} // namespace kudu
 
 namespace impala {
 
@@ -74,9 +83,16 @@ class KuduScanNode : public ScanNode {
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
+  FRIEND_TEST(KuduScanNodeTest, TestPushIntGEPredicateOnKey);
+  FRIEND_TEST(KuduScanNodeTest, TestPushIntEQPredicateOn2ndColumn);
+  FRIEND_TEST(KuduScanNodeTest, TestPushStringLEPredicateOn3rdColumn);
+  FRIEND_TEST(KuduScanNodeTest, TestPushTwoPredicatesOnNonMaterializedColumn);
+
   /// Friend so that scanners can call QueryMaintenance() on the scan node and access
   /// counters.
   friend class KuduScanner;
+
+  ObjectPool pool_;
 
   /// Tuple id resolved in Prepare() to set tuple_desc_.
   TupleId tuple_id_;
@@ -105,6 +121,29 @@ class KuduScanNode : public ScanNode {
   RuntimeProfile::Counter* kudu_round_trips_;
   static const std::string KUDU_READ_TIMER;
   static const std::string KUDU_ROUND_TRIPS;
+
+  // The function names of the supported predicates.
+  static const std::string GE_FN;
+  static const std::string LE_FN;
+  static const std::string EQ_FN;
+
+  // The set of conjuncts that are pushable to Kudu, as they arrive from the frontend.
+  std::vector<TExpr> pushable_conjuncts_;
+
+  // The set of predicates we're able to push down to Kudu. This is derived from the
+  // conjuncts received in the TKuduScanNode and passed to all the KuduScanners.
+  std::vector<kudu::client::KuduPredicate*> kudu_predicates_;
+
+  // Returns a KuduValue with the value of the literal in 'node'.
+  // Expects that 'node' is a literal value.
+  void GetExprLiteralBound(const TExprNode& node, kudu::client::KuduValue** value);
+
+  // Returns a Slice with the name of the column that 'node' refers to.
+  void GetSlotRefColumnName(const TExprNode& node, kudu::Slice* col_name);
+
+  // Transforms the set of pushable conjuncts received from the frontend into a set of
+  // KuduPredicates that will be set in all scanners.
+  Status TransformPushableConjunctsToRangePredicates();
 };
 
 }

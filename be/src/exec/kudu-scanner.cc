@@ -34,10 +34,11 @@
 
 #include "common/names.h"
 
-using kudu::client::KuduColumnSchema;
-using kudu::client::KuduSchema;
 using kudu::client::KuduClient;
+using kudu::client::KuduColumnSchema;
+using kudu::client::KuduPredicate;
 using kudu::client::KuduRowResult;
+using kudu::client::KuduSchema;
 using kudu::client::KuduTable;
 
 namespace impala {
@@ -144,6 +145,10 @@ Status KuduScanner::GetNextScanner()  {
   RETURN_IF_ERROR(SetupScanRangePredicate(key_range, scanner_.get()));
   KUDU_RETURN_IF_ERROR(scanner_->SetReadMode(
       kudu::client::KuduScanner::READ_AT_SNAPSHOT), "Unable to set snapshot read mode.");
+
+  BOOST_FOREACH(KuduPredicate* predicate, scan_node_->kudu_predicates_) {
+    scanner_->AddConjunctPredicate(predicate);
+  }
 
   KUDU_RETURN_IF_ERROR(scanner_->Open(), "Unable to open scanner");
   return Status::OK();
