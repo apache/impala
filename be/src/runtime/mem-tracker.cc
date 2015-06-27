@@ -321,7 +321,7 @@ bool MemTracker::ExpandRmReservation(int64_t bytes) {
   // Finally, check whether the allocation that we got took us over the limits for any of
   // our ancestors.
   int64_t bytes_allocated = resource.memory_mb * 1024L * 1024L;
-  BOOST_FOREACH(const MemTracker* tracker, all_trackers_) {
+  BOOST_FOREACH(const MemTracker* tracker, limit_trackers_) {
     if (tracker == this) continue;
     if (tracker->consumption_->current_value() + bytes_allocated > tracker->limit_) {
       // Don't adjust our limit; rely on query tear-down to release the resource.
