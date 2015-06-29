@@ -154,3 +154,17 @@ BIGINT, STRING, BIGINT, DECIMAL
 2,2-HIGH,1,221397.35
 2,4-NOT SPECIFIED,2,68190.25
 ====
+---- QUERY
+# Test a self-join inside a subplan.
+select count(okey), opriority
+from tpch_nested_parquet.customer c,
+  (select ca.o_orderkey okey, ca.o_orderpriority opriority
+   from c.c_orders ca, c.c_orders cb
+   where ca.o_orderkey = cb.o_orderkey
+   and ca.o_totalprice + cb.o_totalprice < 2) v
+group by opriority
+---- TYPES
+BIGINT, STRING
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,1-URGENT
+====

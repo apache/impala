@@ -20,6 +20,12 @@ import com.google.common.base.Preconditions;
 /**
  * Reference to a MAP or ARRAY collection type that implies its
  * flattening during execution.
+ * TODO: We currently create a new slot in the root tuple descriptor for every
+ * relative collection ref, even if they have the same path. We should instead
+ * share the slot and the corresponding item tuple descriptor among all collection
+ * table refs with the same path. This change will require decoupling tuple
+ * descriptors from table aliases, i.e., a tuple descriptor should be able to back
+ * multiple aliases.
  */
 public class CollectionTableRef extends TableRef {
   /////////////////////////////////////////

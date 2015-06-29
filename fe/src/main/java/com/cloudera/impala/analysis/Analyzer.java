@@ -313,8 +313,9 @@ public class Analyzer {
   // Set of lowercase ambiguous implicit table aliases.
   private final Set<String> ambiguousAliases_ = Sets.newHashSet();
 
-  // map from lowercase explicit or fully-qualified implicit alias to descriptor
-  private final Map<String, SlotDescriptor> slotRefMap_ = Maps.newHashMap();
+  // Map from lowercase fully-qualified path to its slot descriptor. Only contains paths
+  // that have a scalar type as destination (see registerSlotRef()).
+  private final Map<String, SlotDescriptor> slotPathMap_ = Maps.newHashMap();
 
   // Tracks the all tables/views found during analysis that were missing metadata.
   private Set<TableName> missingTbls_ = new HashSet<TableName>();
@@ -584,7 +585,7 @@ public class Analyzer {
    * Given a "table alias"."column alias", return the SlotDescriptor
    */
   public SlotDescriptor getSlotDescriptor(String qualifiedColumnName) {
-    return slotRefMap_.get(qualifiedColumnName);
+    return slotPathMap_.get(qualifiedColumnName);
   }
 
   /**
@@ -807,19 +808,25 @@ public class Analyzer {
   }
 
   /**
-   * Creates and returns an empty SlotDescriptor for the given Path if it hasn't
-   * previously been registered, otherwise returns the existing descriptor.
+   * Returns an existing or new SlotDescriptor for the given path. Always returns
+   * a new empty SlotDescriptor for paths with a collection-typed destination.
    */
   public SlotDescriptor registerSlotRef(Path slotPath) throws AnalysisException {
-    // SlotRefs are registered against the tuple's explicit or fully-qualified
-    // implicit alias.
-    TupleDescriptor tupleDesc = slotPath.getRootDesc();
+    Preconditions.checkNotNull(slotPath.getRootDesc());
+    // Always register a new slot descriptor for collection types.
+    if (slotPath.destType().isCollectionType()) {
+      SlotDescriptor result = addSlotDescriptor(slotPath.getRootDesc());
+      result.setPath(slotPath);
+      return result;
+    }
+    // SlotRefs with a scalar type are registered against the slot's
+    // fully-qualified lowercase path.
     String key = slotPath.toString();
-    SlotDescriptor result = slotRefMap_.get(key);
-    if (result != null) return result;
-    result = addSlotDescriptor(tupleDesc);
+    SlotDescriptor existingSlotDesc = slotPathMap_.get(key);
+    if (existingSlotDesc != null) return existingSlotDesc;
+    SlotDescriptor result = addSlotDescriptor(slotPath.getRootDesc());
     result.setPath(slotPath);
-    slotRefMap_.put(slotPath.toString(), result);
+    slotPathMap_.put(key, result);
     return result;
   }
 

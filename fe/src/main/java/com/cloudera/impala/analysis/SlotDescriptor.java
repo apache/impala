@@ -98,7 +98,11 @@ public class SlotDescriptor {
   public Type getType() { return type_; }
   public void setType(Type type) { type_ = type; }
   public TupleDescriptor getItemTupleDesc() { return itemTupleDesc_; }
-  public void setItemTupleDesc(TupleDescriptor t) { itemTupleDesc_ = t; }
+  public void setItemTupleDesc(TupleDescriptor t) {
+    Preconditions.checkState(
+        itemTupleDesc_ == null, "Item tuple descriptor already set.");
+    itemTupleDesc_ = t;
+  }
   public boolean isMaterialized() { return isMaterialized_; }
   public void setIsMaterialized(boolean value) { isMaterialized_ = value; }
   public boolean getIsNullable() { return isNullable_; }
