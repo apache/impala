@@ -135,7 +135,7 @@ def metric_to_mdl(m):
     context=(m['key']),
     name=('impala_' + m['key'].lower().replace('-', '_').replace('.', '_')),
     counter=(m['kind'] == 'COUNTER'),
-    numeratorUnit=m['units'],
+    numeratorUnit=m['units'].lower(),
     description=m['description'],
     label=m['label'])
 
