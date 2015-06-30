@@ -246,8 +246,14 @@ Status KuduScanner::KuduRowToImpalaTuple(const KuduRowResult& row,
             "Error getting column value from Kudu.");
         char* buffer = reinterpret_cast<char*>(
             row_batch->tuple_data_pool()->TryAllocate(slice.size()));
-        if (buffer == NULL) return Status::MEM_LIMIT_EXCEEDED;
-        memcpy(buffer, slice.data(), slice.size());
+        if (UNLIKELY(buffer == NULL)) {
+          if (UNLIKELY(slice.size() > 0)) return Status::MEM_LIMIT_EXCEEDED;
+        } else {
+          // If we ever change TryAllocate() to return something other than NULL
+          // when size is 0 (e.g. return a valid pointer) we need to change this logic.
+          DCHECK(slice.size() > 0);
+          memcpy(buffer, slice.data(), slice.size());
+        }
         reinterpret_cast<StringValue*>(slot)->ptr = buffer;
         reinterpret_cast<StringValue*>(slot)->len = slice.size();
         break;

@@ -1,0 +1,17 @@
+# TODO we should likely clean the database after we run tests, but need to wait
+# until DELETE is in.
+====
+---- QUERY
+# Make sure we can insert empty strings into string columns and that we can scan them
+# back.
+insert into testtbl (id, name) VALUES (10001, "");
+---- RESULTS
+: 1
+====
+---- QUERY
+select * from testtbl where id = 10001;
+---- RESULTS
+10001,'',NULL
+---- TYPES
+BIGINT, STRING, INT
+====

@@ -39,5 +39,5 @@ class TestKuduOperations(ImpalaTestSuite):
   def teardown_method(self, methd):
     self.cleanup_db("kududb_test")
 
-  def test_sample(self, vector):
-    pass
+  def test_kudu_scan_node(self, vector):
+    self.run_test_case('QueryTest/kudu-scan-node', vector, use_db="functional_kudu")

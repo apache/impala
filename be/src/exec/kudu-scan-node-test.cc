@@ -233,6 +233,33 @@ TEST_F(KuduScanNodeTest, TestScanNullColValues) {
   ScanAndVerify(kNumRows, kNumBatches, 1, 1);
 }
 
+// Test for a bug where we would mishandle getting an empty string from
+// Kudu and wrongfully return a MEM_LIMIT_EXCEEDED.
+TEST_F(KuduScanNodeTest, TestScanEmptyString) {
+
+  std::tr1::shared_ptr<KuduSession> session = kudu_test_helper_.client()->NewSession();
+  KUDU_ASSERT_OK(session->SetFlushMode(KuduSession::MANUAL_FLUSH));
+  session->SetTimeoutMillis(10000);
+  gscoped_ptr<KuduInsert> insert(kudu_test_helper_.table()->NewInsert());
+  KUDU_ASSERT_OK(insert->mutable_row()->SetInt32(0, 10));
+  KUDU_ASSERT_OK(insert->mutable_row()->SetString(2, ""));
+  session->Apply(insert.release());
+  KUDU_ASSERT_OK(session->Flush());
+  ASSERT_FALSE(session->HasPendingOperations());
+
+  BuildRuntimeStateForScans(3);
+  KuduScanNode scanner(&obj_pool_, kudu_node_, *desc_tbl_);
+  vector<TScanRangeParams> params;
+  AddScanRange("", "", &params);
+  SetUpScanner(&scanner, &params);
+  bool eos = false;
+  RowBatch* batch = obj_pool_.Add(new RowBatch(*row_desc_, 10, &mem_tracker_));
+  ASSERT_OK(scanner.GetNext(&runtime_state_, batch, &eos));
+  ASSERT_EQ(1, batch->num_rows());
+  ASSERT_TRUE(eos);
+  ASSERT_EQ(PrintBatch(batch), "[(10 null )]\n");
+}
+
 } // namespace impala
 
 int main(int argc, char** argv) {
