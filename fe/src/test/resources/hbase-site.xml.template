@@ -44,7 +44,7 @@
   </property>
   <property>
     <name>hbase.client.retries.number</name>
-    <value>3</value>
+    <value>35</value>
   </property>
   <property>
     <name>hbase.rpc.timeout</name>
