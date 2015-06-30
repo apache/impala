@@ -14,4 +14,4 @@
 # limitations under the License.
 
 # Start Kudu
-python $KUDU_BIN_HOME/bin/run_server.py
+python $KUDU_BIN_HOME/bin/run_server.py $1 --data_root=${IMPALA_HOME}/testdata/cluster/kudu

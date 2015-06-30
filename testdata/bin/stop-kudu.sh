@@ -14,4 +14,4 @@
 # limitations under the License.
 
 # Stop Kudu
-python $KUDU_BIN_HOME/bin/stop_server.py
+python $KUDU_BIN_HOME/bin/stop_server.py --data_root=${IMPALA_HOME}/testdata/cluster/kudu
