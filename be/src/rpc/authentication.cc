@@ -28,7 +28,6 @@
 #include <thrift/Thrift.h>
 #include <transport/TSasl.h>
 #include <transport/TSaslServerTransport.h>
-#include <glog/logging.h>
 #include <gflags/gflags.h>
 
 #include <ldap.h>

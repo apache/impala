@@ -19,7 +19,6 @@
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/unordered_map.hpp>
-#include <glog/logging.h>
 #include <list>
 #include <map>
 #include <stack>
