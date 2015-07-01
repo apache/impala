@@ -9,7 +9,7 @@ from (
     c_custkey,
     count(o_orderkey) as c_count
   from
-    tpch_nested_parquet.customer c left outer join c.c_orders on (
+    customer c left outer join c.c_orders on (
       o_comment not like '%special%requests%'
     )
   group by

@@ -4,8 +4,8 @@
 select
   sum(l_extendedprice) / 7.0 as avg_yearly
 from
-  tpch_nested_parquet.customer.c_orders.o_lineitems l,
-  tpch_nested_parquet.part p
+  customer.c_orders.o_lineitems l,
+  part p
 where
   p_partkey = l_partkey
   and p_brand = 'Brand#23'
@@ -14,7 +14,7 @@ where
     select
       0.2 * avg(l_quantity)
     from
-      tpch_nested_parquet.customer.c_orders.o_lineitems l
+      customer.c_orders.o_lineitems l
     where
       l_partkey = p_partkey
   )

@@ -16,7 +16,7 @@ select
     else 0
   end) as low_line_count
 from
-  tpch_nested_parquet.customer.c_orders o,
+  customer.c_orders o,
   o.o_lineitems l
 where
   l_shipmode in ('MAIL', 'SHIP')

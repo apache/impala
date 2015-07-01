@@ -5,11 +5,11 @@ select
   n_name,
   sum(l_extendedprice * (1 - l_discount)) as revenue
 from
-  tpch_nested_parquet.customer c,
+  customer c,
   c.c_orders o,
   o.o_lineitems l,
-  tpch_nested_parquet.supplier s,
-  tpch_nested_parquet.region r,
+  supplier s,
+  region r,
   r.r_nations n
 where
   l_suppkey = s_suppkey

@@ -5,11 +5,11 @@ select
   s_name,
   count(*) as numwait
 from
-  tpch_nested_parquet.supplier s,
-  tpch_nested_parquet.customer c,
+  supplier s,
+  customer c,
   c.c_orders o,
   o.o_lineitems l1,
-  tpch_nested_parquet.region.r_nations n
+  region.r_nations n
 where
   s_suppkey = l1.l_suppkey
   and o_orderstatus = 'F'

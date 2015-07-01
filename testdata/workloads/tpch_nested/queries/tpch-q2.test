@@ -11,10 +11,10 @@ select
   s_phone,
   s_comment
 from
-  tpch_nested_parquet.supplier s,
+  supplier s,
   s.s_partsupps ps,
-  tpch_nested_parquet.part p,
-  tpch_nested_parquet.region r,
+  part p,
+  region r,
   r.r_nations n
 where
   p_partkey = ps_partkey
@@ -26,9 +26,9 @@ where
     select
       min(ps_supplycost)
     from
-      tpch_nested_parquet.supplier s,
+      supplier s,
       s.s_partsupps ps,
-      tpch_nested_parquet.region r,
+      region r,
       r.r_nations n
     where
       p_partkey = ps_partkey

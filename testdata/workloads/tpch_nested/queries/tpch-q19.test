@@ -4,8 +4,8 @@
 select
   sum(l_extendedprice * (1 - l_discount)) as revenue
 from
-  tpch_nested_parquet.customer.c_orders.o_lineitems l,
-  tpch_nested_parquet.part p
+  customer.c_orders.o_lineitems l,
+  part p
 where
   p_partkey = l_partkey
   and (

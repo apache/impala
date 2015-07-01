@@ -14,14 +14,14 @@ from (
     l_extendedprice * (1 - l_discount) as volume,
     n2.n_name as nation
   from
-    tpch_nested_parquet.customer c,
+    customer c,
     c.c_orders o,
     o.o_lineitems l,
-    tpch_nested_parquet.supplier s,
-    tpch_nested_parquet.part p,
-    tpch_nested_parquet.region r,
+    supplier s,
+    part p,
+    region r,
     r.r_nations n1,
-    tpch_nested_parquet.region.r_nations n2
+    region.r_nations n2
   where
     p_partkey = l_partkey
     and s_suppkey = l_suppkey

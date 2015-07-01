@@ -9,9 +9,9 @@ from (
     ps_partkey,
     sum(ps_supplycost * ps_availqty) as value
   from
-    tpch_nested_parquet.supplier s,
+    supplier s,
     s.s_partsupps ps,
-    tpch_nested_parquet.region.r_nations n
+    region.r_nations n
   where
     s_nationkey = n_nationkey
     and n_name = 'GERMANY'
@@ -23,9 +23,9 @@ where
     select
       sum(ps_supplycost * ps_availqty) * 0.0001
     from
-      tpch_nested_parquet.supplier s,
+      supplier s,
       s.s_partsupps ps,
-      tpch_nested_parquet.region.r_nations n
+      region.r_nations n
     where
       s_nationkey = n_nationkey
       and n_name = 'GERMANY'

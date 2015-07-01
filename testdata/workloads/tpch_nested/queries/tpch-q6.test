@@ -4,7 +4,7 @@
 select
   sum(l_extendedprice * l_discount) as revenue
 from
-  tpch_nested_parquet.customer.c_orders.o_lineitems
+  customer.c_orders.o_lineitems
 where
   l_shipdate >= '1994-01-01'
   and l_shipdate < '1995-01-01'

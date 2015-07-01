@@ -9,7 +9,7 @@ select
   o_totalprice,
   sum(l_quantity)
 from
-  tpch_nested_parquet.customer c,
+  customer c,
   c.c_orders o,
   o.o_lineitems l
 where

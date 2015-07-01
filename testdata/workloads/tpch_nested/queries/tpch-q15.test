@@ -6,7 +6,7 @@ with revenue_view as (
     l_suppkey as supplier_no,
     sum(l_extendedprice * (1 - l_discount)) as total_revenue
   from
-    tpch_nested_parquet.customer.c_orders.o_lineitems l
+    customer.c_orders.o_lineitems l
   where
     l_shipdate >= '1996-01-01'
     and l_shipdate < '1996-04-01'
@@ -19,7 +19,7 @@ select
   s_phone,
   total_revenue
 from
-  tpch_nested_parquet.supplier,
+  supplier,
   revenue_view
 where
   s_suppkey = supplier_no

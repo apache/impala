@@ -7,9 +7,9 @@ select
   p_size,
   count(distinct s_suppkey) as supplier_cnt
 from
-  tpch_nested_parquet.supplier s,
+  supplier s,
   s.s_partsupps ps,
-  tpch_nested_parquet.part p
+  part p
 where
   p_partkey = ps_partkey
   and p_brand <> 'Brand#45'

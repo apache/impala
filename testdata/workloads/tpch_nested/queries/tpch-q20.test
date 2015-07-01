@@ -7,15 +7,15 @@ select distinct
   s_name,
   s_address
 from
-  tpch_nested_parquet.supplier s,
+  supplier s,
   s.s_partsupps ps,
-  tpch_nested_parquet.region.r_nations n
+  region.r_nations n
 where
   ps_partkey in (
       select
         p_partkey
       from
-        tpch_nested_parquet.part p
+        part p
       where
         p_name like 'forest%'
   )
@@ -23,7 +23,7 @@ where
       select
         0.5 * sum(l_quantity)
       from
-        tpch_nested_parquet.customer.c_orders.o_lineitems l
+        customer.c_orders.o_lineitems l
       where
         l_partkey = ps_partkey
         and l_suppkey = s_suppkey

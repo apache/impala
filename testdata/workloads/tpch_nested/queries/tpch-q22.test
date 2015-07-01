@@ -10,14 +10,14 @@ from (
     substr(c_phone, 1, 2) as cntrycode,
     c_acctbal
   from
-    tpch_nested_parquet.customer c
+    customer c
   where
     substr(c_phone, 1, 2) in ('13', '31', '23', '29', '30', '18', '17')
     and c_acctbal > (
       select
         avg(c_acctbal)
       from
-        tpch_nested_parquet.customer c
+        customer c
       where
         c_acctbal > 0.00
         and substr(c_phone, 1, 2) in ('13', '31', '23', '29', '30', '18', '17')

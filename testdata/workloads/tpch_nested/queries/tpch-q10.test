@@ -12,10 +12,10 @@ select
   c_phone,
   c_comment
 from
-  tpch_nested_parquet.customer c,
+  customer c,
   c.c_orders o,
   o.o_lineitems l,
-  tpch_nested_parquet.region.r_nations n
+  region.r_nations n
 where
   o_orderdate >= '1993-10-01'
   and o_orderdate < '1994-01-01'

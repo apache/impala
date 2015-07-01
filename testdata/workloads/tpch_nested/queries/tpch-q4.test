@@ -5,7 +5,7 @@ select
   o_orderpriority,
   count(*) as order_count
 from
-  tpch_nested_parquet.customer c,
+  customer c,
   c.c_orders o
 where
   o_orderdate >= '1993-07-01'

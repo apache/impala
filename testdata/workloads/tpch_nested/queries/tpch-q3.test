@@ -7,7 +7,7 @@ select
   o_orderdate,
   o_shippriority
 from
-  tpch_nested_parquet.customer c,
+  customer c,
   c.c_orders o,
   o.o_lineitems l
 where

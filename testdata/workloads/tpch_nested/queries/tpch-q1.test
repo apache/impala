@@ -13,7 +13,7 @@ select
   avg(l_discount) as avg_disc,
   count(*) as count_order
 from
-  tpch_nested_parquet.customer.c_orders.o_lineitems
+  customer.c_orders.o_lineitems
 where
   l_shipdate <= '1998-09-02'
 group by
