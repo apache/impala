@@ -1616,6 +1616,20 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("chr(-1)", "");
   TestIsNull("chr(NULL)", TYPE_STRING);
 
+  TestStringValue("split_part('abc~!def~!ghi', '~!', 1)", "abc");
+  TestStringValue("split_part('abc~!~def~!~ghi', '~!', 2)", "~def");
+  TestStringValue("split_part('abc@@def@@ghi', '@@', 3)", "ghi");
+  TestStringValue("split_part('abc@@def@@@@ghi', '@@', 4)", "ghi");
+  TestStringValue("split_part('abc@@def@@ghi', '@@', 4)", "");
+  TestStringValue("split_part('', '@@', 1)", "");
+  TestStringValue("split_part('abcdef', '', 1)", "abcdef");
+  TestStringValue("split_part('', '', 1)", "");
+  TestIsNull("split_part(NULL, NULL, 1)", TYPE_STRING);
+  TestIsNull("split_part('abcdefabc', NULL, 1)", TYPE_STRING);
+  TestIsNull("split_part(NULL, 'xyz', 1)", TYPE_STRING);
+  TestError("split_part('abc@@def@@ghi', '@@', 0)");
+  TestError("split_part('abc@@def@@ghi', '@@', -1)");
+
   TestStringValue("lower('')", "");
   TestStringValue("lower('HELLO')", "hello");
   TestStringValue("lower('Hello')", "hello");
@@ -1997,6 +2011,20 @@ TEST_F(ExprTest, StringRegexpFunctions) {
   TestIsNull("regexp_replace('axcaycazc', NULL, 'abcde')", TYPE_STRING);
   TestIsNull("regexp_replace('axcaycazc', 'a.*', NULL)", TYPE_STRING);
   TestIsNull("regexp_replace(NULL, NULL, NULL)", TYPE_STRING);
+
+  TestValue("regexp_like('abcabcd', '(a|ab|abc|abcd)')", TYPE_BOOLEAN, true);
+  TestValue("regexp_like('axcayczc', 'a.*')", TYPE_BOOLEAN, true);
+  TestValue("regexp_like('axcayczc', 'a.*y.*z')", TYPE_BOOLEAN, true);
+  TestValue("regexp_like('lee', '[aEiou]{2}', 'i')", TYPE_BOOLEAN, true);
+  TestValue("regexp_like('this\nis\nnewline', '^new.*$', 'm')", TYPE_BOOLEAN, true);
+  TestValue("regexp_like('this\nis\nnewline', '^new.*$', 'n')", TYPE_BOOLEAN, false);
+  TestValue("regexp_like('this\nis\nnewline', '^.*$')", TYPE_BOOLEAN, false);
+  TestValue("regexp_like('this\nis\nnewline', '^.*$', 'n')", TYPE_BOOLEAN, true);
+  TestError("regexp_like('abcabcdef', '*')");
+  TestError("regexp_like('abcabcdef', '.*', 'qpl')");
+  TestIsNull("regexp_like(NULL, NULL, NULL)", TYPE_BOOLEAN);
+  TestIsNull("regexp_like(NULL, NULL)", TYPE_BOOLEAN);
+
 }
 
 TEST_F(ExprTest, StringParseUrlFunction) {

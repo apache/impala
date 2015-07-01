@@ -100,6 +100,19 @@ class LikePredicate: public Predicate {
   static impala_udf::BooleanVal Regex(impala_udf::FunctionContext* context,
       const impala_udf::StringVal& val, const impala_udf::StringVal& pattern);
 
+  /// Set options in the RE2 library before pattern matching
+  static bool SetRE2Options(impala_udf::FunctionContext* context,
+      const impala_udf::StringVal* match_parameter, RE2::Options* opts);
+
+  /// Prepare function for regexp_like() when a third optional parameter is used
+  static void RegexpLikePrepare(impala_udf::FunctionContext* context,
+      impala_udf::FunctionContext::FunctionStateScope scope);
+
+  /// Handles regexp_like() when 3 parameters are passed to it
+  static impala_udf::BooleanVal RegexpLike(impala_udf::FunctionContext* context,
+      const impala_udf::StringVal& val, const impala_udf::StringVal& pattern,
+      const impala_udf::StringVal& match_parameter);
+
   static void RegexClose(impala_udf::FunctionContext*,
       impala_udf::FunctionContext::FunctionStateScope scope);
 

@@ -32,6 +32,8 @@ class StringFunctions {
   static StringVal Substring(FunctionContext*, const StringVal& str, const BigIntVal& pos,
                              const BigIntVal& len);
   static StringVal Substring(FunctionContext*, const StringVal& str, const BigIntVal& pos);
+  static StringVal SplitPart(FunctionContext* context, const StringVal& str,
+                             const StringVal& delim, const BigIntVal& field);
   static StringVal Left(FunctionContext*, const StringVal& str, const BigIntVal& len);
   static StringVal Right(FunctionContext*, const StringVal& str, const BigIntVal& len);
   static StringVal Space(FunctionContext*, const BigIntVal& len);

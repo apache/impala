@@ -1960,3 +1960,221 @@ order by id
 3,1,12,-1073741824,-1073741824
 ---- TYPES
 INT,INT,INT,INT,INT
+====
+---- QUERY
+select str_col, match_regex_col from LikeTbl
+where REGEXP_LIKE(str_col, match_regex_col)
+---- RESULTS
+'beginning of line','^begin.*'
+'eight','.*eight.*'
+'end of line','.*line$'
+'five','.*five.*'
+'four','.*four.*'
+'middle of line','^.*of.*$'
+'nine','.*nine.*'
+'one','.*one.*'
+'seven','.*seven.*'
+'six','.*six.*'
+'ten','.*ten.*'
+'three','.*three.*'
+'two','.*two.*'
+'','.*'
+---- TYPES
+string, string
+====
+---- QUERY
+select str_col, no_match_regex_col from LikeTbl
+where REGEXP_LIKE(str_col, no_match_regex_col)
+---- RESULTS
+---- TYPES
+string, string
+====
+---- QUERY
+select str_col, match_regex_col from LikeTbl
+where NOT REGEXP_LIKE(str_col, match_regex_col)
+---- RESULTS
+---- TYPES
+string, string
+====
+---- QUERY
+select str_col, no_match_regex_col from LikeTbl
+where NOT REGEXP_LIKE(str_col, no_match_regex_col)
+---- RESULTS
+'beginning of line','^not begin.*'
+'eight','n.*eight.*'
+'end of line','.*line end$'
+'five','n.*five.*'
+'four','n.*four.*'
+'middle of line','.*of$'
+'nine','n.*nine.*'
+'one','n.*one.*'
+'seven','n.*seven.*'
+'six','n.*six.*'
+'ten','n.*ten.*'
+'three','n.*three.*'
+'two','n.*two.*'
+'','X'
+---- TYPES
+string, string
+====
+---- QUERY
+select str_col, match_regex_col from LikeTbl
+where REGEXP_LIKE(upper(str_col), lower(match_regex_col), 'i')
+---- RESULTS
+'beginning of line','^begin.*'
+'eight','.*eight.*'
+'end of line','.*line$'
+'five','.*five.*'
+'four','.*four.*'
+'middle of line','^.*of.*$'
+'nine','.*nine.*'
+'one','.*one.*'
+'seven','.*seven.*'
+'six','.*six.*'
+'ten','.*ten.*'
+'three','.*three.*'
+'two','.*two.*'
+'','.*'
+---- TYPES
+string, string
+====
+---- QUERY
+select str_col, match_regex_col from LikeTbl
+where REGEXP_LIKE(str_col, match_regex_col, 'c')
+---- RESULTS
+'beginning of line','^begin.*'
+'eight','.*eight.*'
+'end of line','.*line$'
+'five','.*five.*'
+'four','.*four.*'
+'middle of line','^.*of.*$'
+'nine','.*nine.*'
+'one','.*one.*'
+'seven','.*seven.*'
+'six','.*six.*'
+'ten','.*ten.*'
+'three','.*three.*'
+'two','.*two.*'
+'','.*'
+---- TYPES
+string, string
+====
+---- QUERY
+select str_col, match_regex_col from LikeTbl
+where REGEXP_LIKE(upper(str_col), lower(match_regex_col), 'c')
+---- RESULTS
+'','.*'
+---- TYPES
+string, string
+====
+---- QUERY
+drop table if exists multiline_test_table
+---- RESULTS
+====
+---- QUERY
+create table multiline_test_table(id_col INT, str_col STRING)
+row format delimited lines terminated by ','
+---- RESULTS
+====
+---- QUERY
+insert into multiline_test_table values(1, 'testfield')
+====
+---- QUERY
+insert into multiline_test_table values(1, 'multi\nfield')
+====
+---- QUERY
+insert into multiline_test_table values(1, 'multi\nfield\ntwo')
+====
+---- QUERY
+select str_col from multiline_test_table
+where REGEXP_LIKE(str_col, "^multi.*$")
+---- RESULTS
+---- TYPES
+string
+====
+---- QUERY
+select translate(str_col, '\n', '@') from multiline_test_table
+where REGEXP_LIKE(str_col, "^multi.*$", 'n')
+---- RESULTS
+'multi@field@two'
+'multi@field'
+---- TYPES
+string
+====
+---- QUERY
+select str_col from multiline_test_table
+where REGEXP_LIKE(str_col, "^fiel.*$", 'n')
+---- RESULTS
+---- TYPES
+string
+====
+---- QUERY
+select translate(str_col, '\n', '@') from multiline_test_table
+where REGEXP_LIKE(str_col, "^fiel.*$", 'm')
+---- RESULTS
+'multi@field'
+'multi@field@two'
+---- TYPES
+string
+====
+---- QUERY
+select translate(str_col, '\n', '@') from multiline_test_table
+where REGEXP_LIKE(str_col, "^fiel.*$", 'mn')
+---- RESULTS
+'multi@field'
+'multi@field@two'
+---- TYPES
+string
+====
+---- QUERY
+select translate(str_col, '\n', '@') from multiline_test_table
+where REGEXP_LIKE('', '', '')
+---- RESULTS
+'testfield'
+'multi@field'
+'multi@field@two'
+---- TYPES
+string
+====
+---- QUERY
+select translate(str_col, '\n', '@') from multiline_test_table
+where REGEXP_LIKE('', '')
+---- RESULTS
+'testfield'
+'multi@field'
+'multi@field@two'
+---- TYPES
+string
+====
+---- QUERY
+select split_part(tmp.str, tmp.delim, pos) from (values
+('abc@@def@@ghi' as str, '@@' as delim, 1 as pos),
+('@@123@@456', '@@', 1),
+('@@123@@456', '@@', 2),
+('@@', '@@', 1),
+('abc~!~def~!~!~ghi', '~!~', 3),
+('abc', '@@', 1),
+('xyz!!qwe', '!!', 500),
+(NULL, NULL, 1),
+('abc', NULL, 2),
+(NULL, '@@', 1),
+(NULL, '!!', 1)
+) as tmp
+---- RESULTS
+'abc'
+''
+'123'
+''
+'!~ghi'
+'abc'
+''
+'NULL'
+'NULL'
+'NULL'
+'NULL'
+---- TYPES
+string
+====
+---- QUERY
+drop table if exists multiline_test_table
+====

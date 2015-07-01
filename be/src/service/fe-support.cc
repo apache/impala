@@ -134,6 +134,7 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalConstExprs(
     expr_ctxs[i]->Close(&state);
     results.push_back(val);
   }
+
   expr_results.__set_colVals(results);
   THROW_IF_ERROR_RET(SerializeThriftMsg(env, &expr_results, &result_bytes), env,
                      JniUtil::internal_exc_class(), result_bytes);
