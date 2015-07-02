@@ -214,9 +214,9 @@ public class Analyzer {
     // a kind of semi-join, so anti-joined tuples are also registered here.
     public final Map<TupleId, TableRef> semiJoinedTupleIds = Maps.newHashMap();
 
-    // map from right-hand side table ref of an outer join to the list of
-    // conjuncts in its On clause
-    public final Map<TableRef, List<ExprId>> conjunctsByOjClause = Maps.newHashMap();
+    // Map from right-hand side table-ref id of an outer join to the list of
+    // conjuncts in its On clause.
+    public final Map<TupleId, List<ExprId>> conjunctsByOjClause = Maps.newHashMap();
 
     // map from registered conjunct to its containing outer join On clause (represented
     // by its right-hand side table ref); this is limited to conjuncts that can only be
@@ -876,10 +876,10 @@ public class Analyzer {
     Preconditions.checkNotNull(e);
     List<ExprId> ojConjuncts = null;
     if (rhsRef.getJoinOp().isOuterJoin()) {
-      ojConjuncts = globalState_.conjunctsByOjClause.get(rhsRef);
+      ojConjuncts = globalState_.conjunctsByOjClause.get(rhsRef.getId());
       if (ojConjuncts == null) {
         ojConjuncts = Lists.newArrayList();
-        globalState_.conjunctsByOjClause.put(rhsRef, ojConjuncts);
+        globalState_.conjunctsByOjClause.put(rhsRef.getId(), ojConjuncts);
       }
     }
     for (Expr conjunct: e.getConjuncts()) {
@@ -1088,7 +1088,7 @@ public class Analyzer {
   public List<Expr> getUnassignedOjConjuncts(TableRef ref) {
     Preconditions.checkState(ref.getJoinOp().isOuterJoin());
     List<Expr> result = Lists.newArrayList();
-    List<ExprId> candidates = globalState_.conjunctsByOjClause.get(ref);
+    List<ExprId> candidates = globalState_.conjunctsByOjClause.get(ref.getId());
     if (candidates == null) return result;
     for (ExprId conjunctId: candidates) {
       if (!globalState_.assignedConjuncts.contains(conjunctId)) {
@@ -1137,38 +1137,45 @@ public class Analyzer {
 
   /**
    * Returns list of candidate equi-join conjuncts to be evaluated by the join node
-   * that is specified by: a) the tids materialized by one side (lhs or rhs) and,
-   * b) joinedTblRef which is the new joined table. If joinedTblRef is an outer join,
-   * only equi-join conjuncts from that outer join's On clause are returned. If an
-   * equi-join conjunct is full outer joined, it is not added to the candidate list
-   * if this is not the plan node to full outer join it.
+   * that is specified by the table ref ids of its left and right children.
+   * If the join to be performed is an outer join, then only equi-join conjuncts
+   * from its On-clause are returned. If an equi-join conjunct is full outer joined,
+   * then it is only added to the result if this join is the one to full-outer join it.
    */
-  public List<Expr> getEqJoinConjuncts(List<TupleId> tids, TableRef joinedTblRef) {
-    Preconditions.checkNotNull(joinedTblRef);
-    TupleId id = joinedTblRef.getId();
-    List<TupleId> nodeTupleIds = Lists.newArrayList(tids);
-    nodeTupleIds.add(id);
-    List<ExprId> conjunctIds = globalState_.eqJoinConjuncts.get(id);
-    if (conjunctIds == null) return null;
-    List<Expr> result = Lists.newArrayList();
-    List<ExprId> ojClauseConjuncts = null;
-    if (joinedTblRef.getJoinOp().isOuterJoin()) {
-      Preconditions.checkState(joinedTblRef.getOnClause() != null);
-      ojClauseConjuncts = globalState_.conjunctsByOjClause.get(joinedTblRef);
+  public List<Expr> getEqJoinConjuncts(List<TupleId> lhsTblRefIds,
+      List<TupleId> rhsTblRefIds) {
+    // Contains all equi-join conjuncts that have one child fully bound by one of the
+    // rhs table ref ids (the other child is not bound by that rhs table ref id).
+    List<ExprId> conjunctIds = Lists.newArrayList();
+    for (TupleId rhsId: rhsTblRefIds) {
+      List<ExprId> cids = globalState_.eqJoinConjuncts.get(rhsId);
+      if (cids == null) continue;
+      for (ExprId eid: cids) {
+        if (!conjunctIds.contains(eid)) conjunctIds.add(eid);
+      }
     }
+
+    // Since we currently prevent join re-reordering across outer joins, we can never
+    // have a bushy outer join with multiple rhs table ref ids. A busy outer join can
+    // only be constructed with an inline view (which has a single table ref id).
+    List<ExprId> ojClauseConjuncts = null;
+    if (rhsTblRefIds.size() == 1) {
+      ojClauseConjuncts = globalState_.conjunctsByOjClause.get(rhsTblRefIds.get(0));
+    }
+
+    // List of table ref ids that the join node will 'materialize'.
+    List<TupleId> nodeTblRefIds = Lists.newArrayList(lhsTblRefIds);
+    nodeTblRefIds.addAll(rhsTblRefIds);
+    List<Expr> result = Lists.newArrayList();
     for (ExprId conjunctId: conjunctIds) {
       Expr e = globalState_.conjuncts.get(conjunctId);
       Preconditions.checkState(e != null);
-      if (ojClauseConjuncts != null) {
-        if (ojClauseConjuncts.contains(conjunctId)
-            && canEvalFullOuterJoinedConjunct(e, nodeTupleIds)
-            && canEvalAntiJoinedConjunct(e, nodeTupleIds)) {
-          result.add(e);
-        }
-      } else if (canEvalFullOuterJoinedConjunct(e, nodeTupleIds)
-          && canEvalAntiJoinedConjunct(e, nodeTupleIds)) {
-        result.add(e);
+      if (!canEvalFullOuterJoinedConjunct(e, nodeTblRefIds) ||
+          !canEvalAntiJoinedConjunct(e, nodeTblRefIds)) {
+        continue;
       }
+      if (ojClauseConjuncts != null && !ojClauseConjuncts.contains(conjunctId)) continue;
+      result.add(e);
     }
     return result;
   }
@@ -1433,9 +1440,10 @@ public class Analyzer {
   public void invertOuterJoinState(TableRef oldRhsTbl, TableRef newRhsTbl) {
     Preconditions.checkState(oldRhsTbl.getJoinOp().isOuterJoin());
     // Invert analysis state for an outer join.
-    List<ExprId> conjunctIds = globalState_.conjunctsByOjClause.remove(oldRhsTbl);
+    List<ExprId> conjunctIds =
+        globalState_.conjunctsByOjClause.remove(oldRhsTbl.getId());
     Preconditions.checkNotNull(conjunctIds);
-    globalState_.conjunctsByOjClause.put(newRhsTbl, conjunctIds);
+    globalState_.conjunctsByOjClause.put(newRhsTbl.getId(), conjunctIds);
     for (ExprId eid: conjunctIds) {
       globalState_.ojClauseByConjunct.put(eid, newRhsTbl);
     }
@@ -1447,11 +1455,11 @@ public class Analyzer {
   /**
    * For each equivalence class, adds/removes predicates from conjuncts such that it
    * contains a minimum set of <lhsSlot> = <rhsSlot> predicates that establish the known
-   * equivalences between slots in lhsTids and rhsTid (lhsTids must not contain rhsTid).
+   * equivalences between slots in lhsTids and rhsTids which must be disjoint.
    * Preserves original conjuncts when possible. Assumes that predicates for establishing
-   * equivalences among slots in only lhsTids and only rhsTid have already been
-   * established. This function adds the remaining predicates to "connect" the disjoin
-   * equivalent slot sets of lhsTids and rhsTid.
+   * equivalences among slots in only lhsTids and only rhsTids have already been
+   * established. This function adds the remaining predicates to "connect" the disjoint
+   * equivalent slot sets of lhsTids and rhsTids.
    * The intent of this function is to enable construction of a minimum spanning tree
    * to cover the known slot equivalences. This function should be called for join
    * nodes during plan generation to (1) remove redundant join predicates, and (2)
@@ -1460,30 +1468,30 @@ public class Analyzer {
    * TODO: Consider caching the DisjointSet during plan generation instead of
    * re-creating it here on every invocation.
    */
-  public <T extends Expr> void createEquivConjuncts(List<TupleId> lhsTids, TupleId rhsTid,
-      List<T> conjuncts) {
-    Preconditions.checkState(!lhsTids.contains(rhsTid));
+  public <T extends Expr> void createEquivConjuncts(List<TupleId> lhsTids,
+      List<TupleId> rhsTids, List<T> conjuncts) {
+    Preconditions.checkState(Collections.disjoint(lhsTids, rhsTids));
 
     // Equivalence classes only containing slots belonging to lhsTids.
-    Map<EquivalenceClassId, List<SlotId>> planEquivClasses =
+    Map<EquivalenceClassId, List<SlotId>> lhsEquivClasses =
         getEquivClasses(lhsTids);
 
-    // Equivalence classes only containing slots belonging to rhsTid.
-    Map<EquivalenceClassId, List<SlotId>> tidEquivClasses =
-        getEquivClasses(Lists.newArrayList(rhsTid));
+    // Equivalence classes only containing slots belonging to rhsTids.
+    Map<EquivalenceClassId, List<SlotId>> rhsEquivClasses =
+        getEquivClasses(rhsTids);
 
     // Maps from a slot id to its set of equivalent slots. Used to track equivalences
     // that have been established by predicates assigned/generated to plan nodes
     // materializing lhsTids as well as the given conjuncts.
     DisjointSet<SlotId> partialEquivSlots = new DisjointSet<SlotId>();
     // Add the partial equivalences to the partialEquivSlots map. The equivalent-slot
-    // sets of slots from lhsTids are disjoint from those of slots from rhsTid.
+    // sets of slots from lhsTids are disjoint from those of slots from rhsTids.
     // We need to 'connect' the disjoint slot sets by constructing a new predicate
     // for each equivalence class (unless there is already one in 'conjuncts').
-    for (List<SlotId> partialEquivClass: planEquivClasses.values()) {
+    for (List<SlotId> partialEquivClass: lhsEquivClasses.values()) {
       partialEquivSlots.bulkUnion(partialEquivClass);
     }
-    for (List<SlotId> partialEquivClass: tidEquivClasses.values()) {
+    for (List<SlotId> partialEquivClass: rhsEquivClasses.values()) {
       partialEquivSlots.bulkUnion(partialEquivClass);
     }
 
@@ -1532,11 +1540,11 @@ public class Analyzer {
 
     // For each equivalence class, construct a new predicate to 'connect' the disjoint
     // slot sets.
-    for (Map.Entry<EquivalenceClassId, List<SlotId>> tidEquivClass:
-      tidEquivClasses.entrySet()) {
-      List<SlotId> lhsSlots = planEquivClasses.get(tidEquivClass.getKey());
+    for (Map.Entry<EquivalenceClassId, List<SlotId>> rhsEquivClass:
+      rhsEquivClasses.entrySet()) {
+      List<SlotId> lhsSlots = lhsEquivClasses.get(rhsEquivClass.getKey());
       if (lhsSlots == null) continue;
-      List<SlotId> rhsSlots = tidEquivClass.getValue();
+      List<SlotId> rhsSlots = rhsEquivClass.getValue();
       Preconditions.checkState(!lhsSlots.isEmpty() && !rhsSlots.isEmpty());
 
       if (!partialEquivSlots.union(lhsSlots.get(0), rhsSlots.get(0))) continue;
@@ -1877,20 +1885,20 @@ public class Analyzer {
   }
 
   /**
-   * Return in equivSlotIds the ids of slots that are in the same equivalence class
-   * as slotId and are part of a tuple in tupleIds.
+   * Returns the ids of slots that are in the same equivalence class as slotId
+   * and are part of a tuple in tupleIds.
    */
-  public void getEquivSlots(SlotId slotId, List<TupleId> tupleIds,
-      List<SlotId> equivSlotIds) {
-    equivSlotIds.clear();
+  public List<SlotId> getEquivSlots(SlotId slotId, List<TupleId> tupleIds) {
+    List<SlotId> result = Lists.newArrayList();
     LOG.trace("getequivslots: slotid=" + Integer.toString(slotId.asInt()));
     EquivalenceClassId classId = globalState_.equivClassBySlotId.get(slotId);
     for (SlotId memberId: globalState_.equivClassMembers.get(classId)) {
       if (tupleIds.contains(
           globalState_.descTbl.getSlotDesc(memberId).getParent().getId())) {
-        equivSlotIds.add(memberId);
+        result.add(memberId);
       }
     }
+    return result;
   }
 
   public EquivalenceClassId getEquivClassId(SlotId slotId) {

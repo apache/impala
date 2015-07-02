@@ -45,4 +45,39 @@ where a.f2 = 'test_a' and b.f2 = 'test_b'
 00:SCAN HDFS [functional.allcomplextypes.struct_array_col a]
    partitions=0/0 files=0 size=0B
    predicates: a.f2 = 'test_a'
+#====
+# Test assignment of equi-join conjuncts and enforcement of
+# slot equivalences in a bushy join.
+# TODO: Enable this test once we the required planner changes
+# are checked in.
+#select 1 from
+#  tpch_nested_parquet.region r,
+#  r.r_nations n,
+#  tpch_nested_parquet.customer c,
+#  tpch_nested_parquet.supplier s
+#where c_nationkey = n_nationkey and s_nationkey = n_nationkey
+#  and c_comment = s_comment and n_comment = s_comment
+#---- PLAN
+#08:HASH JOIN [INNER JOIN]
+#|  hash predicates: n_nationkey = s_nationkey, c_comment = s_comment
+#|
+#|--06:SCAN HDFS [tpch_nested_parquet.supplier s]
+#|     partitions=1/1 files=1 size=111.08MB
+#|
+#07:HASH JOIN [INNER JOIN]
+#|  hash predicates: c_nationkey = n_nationkey, c.c_comment = n.n_comment
+#|
+#|--01:SUBPLAN
+#|  |
+#|  |--04:NESTED LOOPS JOIN [CROSS JOIN]
+#|  |  |
+#|  |  |--03:UNNEST [r.r_nations n]
+#|  |  |
+#|  |  02:NESTED ROW SRC
+#|  |
+#|  00:SCAN HDFS [tpch_nested_parquet.region r]
+#|     partitions=1/1 files=1 size=4.16KB
+#|
+#05:SCAN HDFS [tpch_nested_parquet.customer c]
+#   partitions=1/1 files=4 size=554.83MB
 ====

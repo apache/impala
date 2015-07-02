@@ -184,7 +184,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   public ExprId getId() { return id_; }
-  protected void setId(ExprId id) { this.id_ = id; }
+  protected void setId(ExprId id) { id_ = id; }
   public Type getType() { return type_; }
   public double getSelectivity() { return selectivity_; }
   public long getNumDistinctValues() { return numDistinctValues_; }

@@ -895,78 +895,73 @@ public class SingleNodePlanner {
   }
 
   /**
-   * Return all applicable conjuncts for join between a plan tree and a single TableRef;
-   * the conjuncts can be used for hash table lookups.
+   * Returns all applicable conjuncts for join between two plan trees 'materializing' the
+   * given left-hand and right-hand side table ref ids. The conjuncts either come from
+   * the analyzer or are generated based on equivalence classes, if necessary. The
+   * returned conjuncts are marked as assigned.
+   * The conjuncts can be used for hash table lookups.
    * - for inner joins, those are equi-join predicates in which one side is fully bound
-   *   by planIds and the other by joinedTblRef.id_;
-   * - for outer joins: same type of conjuncts_ as inner joins, but only from the JOIN
-   *   clause
-   * Returns the conjuncts_ in 'joinConjuncts' (in which "<lhs> = <rhs>" is returned
-   * as BinaryPredicate and also in their original form in 'joinPredicates'.
-   * Each lhs is bound by planIds, and each rhs by the tuple id of joinedTblRef.
-   * Predicates that are redundant based on equivalences classes are intentionally
-   * returneded by this function because the removal of redundant predicates
-   * and the creation of new predicates for enforcing slot equivalences go hand-in-hand
+   *   by lhsTblRefIds and the other by rhsTblRefIds
+   * - for outer joins: same type of conjuncts as inner joins, but only from the
+   *   ON or USING clause
+   * Predicates that are redundant based on equivalence classes are intentionally
+   * returneded by this function because the removal of redundant predicates and the
+   * creation of new predicates for enforcing slot equivalences go hand-in-hand
    * (see analyzer.createEquivConjuncts()).
    */
-  private void getHashLookupJoinConjuncts(
-      Analyzer analyzer, List<TupleId> planIds, TableRef joinedTblRef,
-      List<BinaryPredicate> joinConjuncts, List<Expr> joinPredicates) {
-    joinConjuncts.clear();
-    joinPredicates.clear();
-    TupleId tblRefId = joinedTblRef.getId();
-    List<TupleId> tblRefIds = tblRefId.asList();
-    List<Expr> candidates = analyzer.getEqJoinConjuncts(planIds, joinedTblRef);
-    if (candidates == null) return;
-
-    List<TupleId> joinTupleIds = Lists.newArrayList();
-    joinTupleIds.addAll(planIds);
-    joinTupleIds.add(tblRefId);
+  private List<BinaryPredicate> getHashLookupJoinConjuncts(
+      List<TupleId> lhsTblRefIds, List<TupleId> rhsTblRefIds, Analyzer analyzer) {
+    List<BinaryPredicate> result = Lists.newArrayList();
+    List<Expr> candidates = analyzer.getEqJoinConjuncts(lhsTblRefIds, rhsTblRefIds);
+    Preconditions.checkNotNull(candidates);
     for (Expr e: candidates) {
       // Ignore predicate if one of its children is a constant.
       if (e.getChild(0).isConstant() || e.getChild(1).isConstant()) continue;
 
       Expr rhsExpr = null;
-      if (e.getChild(0).isBoundByTupleIds(tblRefIds)) {
+      if (e.getChild(0).isBoundByTupleIds(rhsTblRefIds)) {
         rhsExpr = e.getChild(0);
       } else {
-        Preconditions.checkState(e.getChild(1).isBoundByTupleIds(tblRefIds));
+        Preconditions.checkState(e.getChild(1).isBoundByTupleIds(rhsTblRefIds));
         rhsExpr = e.getChild(1);
       }
 
       Expr lhsExpr = null;
-      if (e.getChild(1).isBoundByTupleIds(planIds)) {
+      if (e.getChild(1).isBoundByTupleIds(lhsTblRefIds)) {
         lhsExpr = e.getChild(1);
-      } else if (e.getChild(0).isBoundByTupleIds(planIds)) {
+      } else if (e.getChild(0).isBoundByTupleIds(lhsTblRefIds)) {
         lhsExpr = e.getChild(0);
       } else {
-        // not an equi-join condition between lhsIds and rhsId
+        // not an equi-join condition between the lhs and rhs ids
         continue;
       }
 
       Preconditions.checkState(lhsExpr != rhsExpr);
-      joinPredicates.add(e);
       BinaryPredicate joinConjunct =
           new BinaryPredicate(((BinaryPredicate)e).getOp(), lhsExpr, rhsExpr);
+      analyzer.markConjunctAssigned(e);
       joinConjunct.analyzeNoThrow(analyzer);
-      joinConjuncts.add(joinConjunct);
+      result.add(joinConjunct);
     }
-    if (!joinPredicates.isEmpty()) return;
-    Preconditions.checkState(joinConjuncts.isEmpty());
+    if (!result.isEmpty()) return result;
 
-    // construct joinConjunct entries derived from equivalence class membership
-    List<SlotId> lhsSlotIds = Lists.newArrayList();
-    for (SlotDescriptor slotDesc: joinedTblRef.getDesc().getSlots()) {
-      analyzer.getEquivSlots(slotDesc.getId(), planIds, lhsSlotIds);
-      if (!lhsSlotIds.isEmpty()) {
-        // construct a BinaryPredicates in order to get correct casting;
-        // we only do this for one of the equivalent slots, all the other implied
-        // equalities are redundant
-        BinaryPredicate pred =
-            analyzer.createEqPredicate(lhsSlotIds.get(0), slotDesc.getId());
-        joinConjuncts.add(pred);
+    // Construct join conjuncts derived from equivalence class membership.
+    for (TupleId rhsId: rhsTblRefIds) {
+      TableRef rhsTblRef = analyzer.getTableRef(rhsId);
+      Preconditions.checkNotNull(rhsTblRef);
+      for (SlotDescriptor slotDesc: rhsTblRef.getDesc().getSlots()) {
+        List<SlotId> lhsSlotIds = analyzer.getEquivSlots(slotDesc.getId(), lhsTblRefIds);
+        if (!lhsSlotIds.isEmpty()) {
+          // construct a BinaryPredicates in order to get correct casting;
+          // we only do this for one of the equivalent slots, all the other implied
+          // equalities are redundant
+          BinaryPredicate pred =
+              analyzer.createEqPredicate(lhsSlotIds.get(0), slotDesc.getId());
+          result.add(pred);
+        }
       }
     }
+    return result;
   }
 
   /**
@@ -980,24 +975,23 @@ public class SingleNodePlanner {
     Preconditions.checkState(innerRef != null ^ outerRef != null);
     TableRef tblRef = (innerRef != null) ? innerRef : outerRef;
 
-    List<BinaryPredicate> eqJoinConjuncts = Lists.newArrayList();
-    List<Expr> eqJoinPredicates = Lists.newArrayList();
     // get eq join predicates for the TableRefs' ids (not the PlanNodes' ids, which
     // are materialized)
+    List<BinaryPredicate> eqJoinConjuncts = Collections.emptyList();
     if (innerRef != null) {
-      getHashLookupJoinConjuncts(
-          analyzer, outer.getTblRefIds(), innerRef, eqJoinConjuncts, eqJoinPredicates);
+      eqJoinConjuncts = getHashLookupJoinConjuncts(
+          outer.getTblRefIds(), inner.getTblRefIds(), analyzer);
       // Outer joins should only use On-clause predicates as eqJoinConjuncts.
       if (!innerRef.getJoinOp().isOuterJoin()) {
-        analyzer.createEquivConjuncts(outer.getTblRefIds(), innerRef.getId(),
+        analyzer.createEquivConjuncts(outer.getTblRefIds(), inner.getTblRefIds(),
             eqJoinConjuncts);
       }
     } else {
-      getHashLookupJoinConjuncts(
-          analyzer, inner.getTblRefIds(), outerRef, eqJoinConjuncts, eqJoinPredicates);
+      eqJoinConjuncts = getHashLookupJoinConjuncts(
+          inner.getTblRefIds(), outer.getTblRefIds(), analyzer);
       // Outer joins should only use On-clause predicates as eqJoinConjuncts.
       if (!outerRef.getJoinOp().isOuterJoin()) {
-        analyzer.createEquivConjuncts(inner.getTblRefIds(), outerRef.getId(),
+        analyzer.createEquivConjuncts(inner.getTblRefIds(), outer.getTblRefIds(),
             eqJoinConjuncts);
       }
       // Reverse the lhs/rhs of the join conjuncts.
@@ -1033,8 +1027,6 @@ public class SingleNodePlanner {
     if (tblRef.getJoinOp() == JoinOperator.CROSS_JOIN) {
       tblRef.setJoinOp(JoinOperator.INNER_JOIN);
     }
-
-    analyzer.markConjunctsAssigned(eqJoinPredicates);
 
     List<Expr> otherJoinConjuncts = Lists.newArrayList();
     if (tblRef.getJoinOp().isOuterJoin()) {
@@ -1112,7 +1104,7 @@ public class SingleNodePlanner {
           continue;
         }
       }
-      PlanNode opPlan = createQueryPlan(queryStmt, analyzer, false);
+      PlanNode opPlan = createQueryPlan(queryStmt, op.getAnalyzer(), false);
       if (opPlan instanceof EmptySetNode) continue;
       unionNode.addChild(opPlan, op.getQueryStmt().getBaseTblResultExprs());
     }
