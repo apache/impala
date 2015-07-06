@@ -1182,8 +1182,8 @@ public class AnalyzeDDLTest extends AnalyzerTest {
   @Test
   public void TestAlterKuduTable() {
     // Alter table is not supported and should fail
-    AnalysisError("ALTER TABLE functional_kudu.liketbl ADD COLUMNS (other int)",
-        "ALTER TABLE not allowed on Kudu table: functional_kudu.liketbl");
+    AnalysisError("ALTER TABLE functional_kudu.testtbl ADD COLUMNS (other int)",
+        "ALTER TABLE not allowed on Kudu table: functional_kudu.testtbl");
   }
 
   @Test
