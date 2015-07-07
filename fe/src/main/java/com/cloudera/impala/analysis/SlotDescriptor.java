@@ -167,6 +167,7 @@ public class SlotDescriptor {
         id_.asInt(), parent_.getId().asInt(), type_.toThrift(),
         slotPath, byteOffset_, nullIndicatorByte_, nullIndicatorBit_,
         slotIdx_, isMaterialized_);
+    if (itemTupleDesc_ != null) result.setItemTupleId(itemTupleDesc_.getId().asInt());
     return result;
   }
 

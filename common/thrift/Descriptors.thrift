@@ -22,7 +22,9 @@ include "Exprs.thrift"
 struct TSlotDescriptor {
   1: required Types.TSlotId id
   2: required Types.TTupleId parent
-  3: required Types.TColumnType slotType
+  // Only set for collection slots. The tuple ID of the item tuple for the collection.
+  3: optional Types.TTupleId itemTupleId
+  4: required Types.TColumnType slotType
 
   // Absolute path into the table schema pointing to the column/field materialized into
   // this slot. Contains only a single element for slots that do not materialize a
@@ -31,13 +33,13 @@ struct TSlotDescriptor {
   // at level i. For example, columnPos[0] is an ordinal into the list of table columns,
   // columnPos[1] is an ordinal into the list of fields of the complex-typed column at
   // position columnPos[0], etc.
-  4: required list<i32> columnPath
+  5: required list<i32> columnPath
 
-  5: required i32 byteOffset  // into tuple
-  6: required i32 nullIndicatorByte
-  7: required i32 nullIndicatorBit
-  8: required i32 slotIdx
-  9: required bool isMaterialized
+  6: required i32 byteOffset  // into tuple
+  7: required i32 nullIndicatorByte
+  8: required i32 nullIndicatorBit
+  9: required i32 slotIdx
+  10: required bool isMaterialized
 }
 
 struct TColumnDescriptor {

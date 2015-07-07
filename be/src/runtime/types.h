@@ -177,6 +177,10 @@ struct ColumnType {
     return type == TYPE_STRUCT || type == TYPE_ARRAY || type == TYPE_MAP;
   }
 
+  inline bool IsCollectionType() const {
+    return type == TYPE_ARRAY || type == TYPE_MAP;
+  }
+
   /// Returns the byte size of this type.  Returns 0 for variable length types.
   inline int GetByteSize() const {
     switch (type) {

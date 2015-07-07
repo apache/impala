@@ -50,10 +50,12 @@ ostream& operator<<(ostream& os, const NullIndicatorOffset& null_indicator) {
 }
 
 SlotDescriptor::SlotDescriptor(
-    const TSlotDescriptor& tdesc, const TupleDescriptor* parent)
+    const TSlotDescriptor& tdesc, const TupleDescriptor* parent,
+    const TupleDescriptor* collection_item_descriptor)
   : id_(tdesc.id),
     type_(ColumnType::FromThrift(tdesc.slotType)),
     parent_(parent),
+    collection_item_descriptor_(collection_item_descriptor),
     col_path_(tdesc.columnPath),
     tuple_offset_(tdesc.byteOffset),
     null_indicator_offset_(tdesc.nullIndicatorByte, tdesc.nullIndicatorBit),
@@ -65,6 +67,13 @@ SlotDescriptor::SlotDescriptor(
     set_not_null_fn_(NULL),
     set_null_fn_(NULL) {
   DCHECK(parent_ != NULL) << tdesc.parent;
+  if (type_.IsCollectionType()) {
+    DCHECK(tdesc.__isset.itemTupleId);
+    DCHECK(collection_item_descriptor_ != NULL) << tdesc.itemTupleId;
+  } else {
+    DCHECK(!tdesc.__isset.itemTupleId);
+    DCHECK(collection_item_descriptor == NULL);
+  }
 }
 
 bool SlotDescriptor::ColPathLessThan(const SlotDescriptor* a, const SlotDescriptor* b) {
@@ -85,8 +94,11 @@ string SlotDescriptor::DebugString() const {
     out << ",";
     out << col_path_[i];
   }
-  out << "]"
-      << " offset=" << tuple_offset_ << " null=" << null_indicator_offset_.DebugString()
+  out << "]";
+  if (collection_item_descriptor_ != NULL) {
+    out << " collection_item_tuple_id=" << collection_item_descriptor_->id();
+  }
+  out << " offset=" << tuple_offset_ << " null=" << null_indicator_offset_.DebugString()
       << " slot_idx=" << slot_idx_ << " field_idx=" << field_idx_
       << ")";
   return out.str();
@@ -278,6 +290,12 @@ string TupleDescriptor::DebugString() const {
     out << slots_[i]->DebugString();
   }
   out << "]";
+  out << " tuple_path=[";
+  for (size_t i = 0; i < tuple_path_.size(); ++i) {
+    if (i > 0) out << ", ";
+    out << tuple_path_[i];
+  }
+  out << "]";
   out << ")";
   return out.str();
 }
@@ -432,7 +450,10 @@ Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tb
     const TSlotDescriptor& tdesc = thrift_tbl.slotDescriptors[i];
     // Tuple descriptors are already populated in tbl
     TupleDescriptor* parent = (*tbl)->GetTupleDescriptor(tdesc.parent);
-    SlotDescriptor* slot_d = pool->Add(new SlotDescriptor(tdesc, parent));
+    TupleDescriptor* collection_item_descriptor = tdesc.__isset.itemTupleId ?
+        (*tbl)->GetTupleDescriptor(tdesc.itemTupleId) : NULL;
+    SlotDescriptor* slot_d = pool->Add(
+        new SlotDescriptor(tdesc, parent, collection_item_descriptor));
     (*tbl)->slot_desc_map_[tdesc.id] = slot_d;
 
     // link to parent

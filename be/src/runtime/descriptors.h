@@ -94,6 +94,9 @@ class SlotDescriptor {
   SlotId id() const { return id_; }
   const ColumnType& type() const { return type_; }
   const TupleDescriptor* parent() const { return parent_; }
+  const TupleDescriptor* collection_item_descriptor() const {
+    return collection_item_descriptor_;
+  }
   /// Returns the column index of this slot, including partition keys.
   /// (e.g., col_pos - num_partition_keys = the table column this slot corresponds to)
   /// TODO: This function should eventually be replaced by col_path(). It is currently
@@ -135,6 +138,8 @@ class SlotDescriptor {
   const SlotId id_;
   const ColumnType type_;
   const TupleDescriptor* parent_;
+  // Non-NULL only for collection slots
+  const TupleDescriptor* collection_item_descriptor_;
   const SchemaPath col_path_;
   const int tuple_offset_;
   const NullIndicatorOffset null_indicator_offset_;
@@ -158,7 +163,9 @@ class SlotDescriptor {
   llvm::Function* set_not_null_fn_;
   llvm::Function* set_null_fn_;
 
-  SlotDescriptor(const TSlotDescriptor& tdesc, const TupleDescriptor* parent);
+  // collection_item_descriptor should be non-NULL iff this is a collection slot
+  SlotDescriptor(const TSlotDescriptor& tdesc, const TupleDescriptor* parent,
+                 const TupleDescriptor* collection_item_descriptor);
 };
 
 class ColumnDescriptor {
