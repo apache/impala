@@ -72,6 +72,12 @@ struct TPlanNodeExecSummary {
   9: optional bool is_broadcast
 }
 
+// Progress counters for an in-flight query.
+struct TExecProgress {
+  1: optional i64 total_scan_ranges
+  2: optional i64 num_completed_scan_ranges
+}
+
 // Execution summary of an entire query.
 struct TExecSummary {
   // State of the query.
@@ -91,5 +97,7 @@ struct TExecSummary {
   // even if status is okay, in which case it contains errors that impala skipped
   // over.
   5: optional list<string> error_logs
-}
 
+  // Optional record indicating the query progress
+  6: optional TExecProgress progress
+}

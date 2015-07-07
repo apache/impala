@@ -580,14 +580,23 @@ Status ImpalaServer::GetRuntimeProfileStr(const TUniqueId& query_id,
 }
 
 Status ImpalaServer::GetExecSummary(const TUniqueId& query_id, TExecSummary* result) {
-  // Search for the query id in the active query map
+  // Search for the query id in the active query map.
   {
     shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
     if (exec_state != NULL) {
       lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
       if (exec_state->coord() != NULL) {
-        lock_guard<SpinLock> lock(exec_state->coord()->GetExecSummaryLock());
-        *result = exec_state->coord()->exec_summary();
+        TExecProgress progress;
+        {
+          lock_guard<SpinLock> lock(exec_state->coord()->GetExecSummaryLock());
+          *result = exec_state->coord()->exec_summary();
+
+          // Update the current scan range progress for the summary.
+          progress.__set_num_completed_scan_ranges(
+              exec_state->coord()->progress().num_complete());
+          progress.__set_total_scan_ranges(exec_state->coord()->progress().total());
+        }
+        result->__set_progress(progress);
         return Status::OK();
       }
     }

@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import csv
+import re
 import sys
 from cStringIO import StringIO
 
@@ -86,3 +87,40 @@ class OutputStream(object):
     # Don't close the file handle if it points to sys.stdout.
     if self.filename and self.handle != sys.stdout:
       self.handle.close()
+
+
+class OverwritingStdErrOutputStream(object):
+  """This class is used to write output to stderr and overwrite the previous text as
+  soon as new content needs to be written."""
+
+  # ANSI Escape code for up.
+  UP = "\x1b[A"
+
+  def __init__(self):
+    self.last_line_count = 0
+    self.last_clean_text = ""
+
+  def _clean_before(self):
+    sys.stderr.write(self.UP * self.last_line_count)
+    sys.stderr.write(self.last_clean_text)
+
+  def write(self, data):
+    """This method will erase the previously printed text on screen by going
+    up as many new lines as the old text had and overwriting it with whitespace.
+    Afterwards, the new text will be printed."""
+    self._clean_before()
+    new_line_count = data.count("\n")
+    sys.stderr.write(self.UP * min(new_line_count, self.last_line_count))
+    sys.stderr.write(data)
+
+    # Cache the line count and the old text where all text was replaced by
+    # whitespace.
+    self.last_line_count = new_line_count
+    self.last_clean_text = re.sub(r"[^\s]", " ", data)
+
+  def clear(self):
+    sys.stderr.write(self.UP * self.last_line_count)
+    sys.stderr.write(self.last_clean_text)
+    sys.stderr.write(self.UP * self.last_line_count)
+    self.last_line_count = 0
+    self.last_clean_text = ""

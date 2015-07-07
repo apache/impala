@@ -33,6 +33,7 @@ from impala_client import (ImpalaClient, DisconnectedException, QueryStateExcept
 from impala_shell_config_defaults import impala_shell_defaults
 from option_parser import get_option_parser, get_config_from_file
 from shell_output import DelimitedOutputFormatter, OutputStream, PrettyOutputFormatter
+from shell_output import OverwritingStdErrOutputStream
 from subprocess import call
 
 VERSION_FORMAT = "Impala Shell v%(version)s (%(git_hash)s) built on %(build_date)s"
@@ -94,6 +95,14 @@ class ImpalaShell(cmd.Cmd):
   # Seperator for queries in the history file.
   HISTORY_FILE_QUERY_DELIM = '_IMP_DELIM_'
 
+  VALID_SHELL_OPTIONS = {
+    'LIVE_PROGRESS' : (lambda x: x in ("true", "TRUE", "True", "1"), "print_progress"),
+    'LIVE_SUMMARY' : (lambda x: x in ("true", "TRUE", "True", "1"), "print_summary")
+  }
+
+  # Minimum time in seconds between two calls to get the exec summary.
+  PROGRESS_UPDATE_INTERVAL = 1.0
+
   def __init__(self, options):
     cmd.Cmd.__init__(self)
     self.is_alive = True
@@ -127,6 +136,8 @@ class ImpalaShell(cmd.Cmd):
     self.write_delimited = options.write_delimited
     self.print_header = options.print_header
 
+    self.progress_stream = OverwritingStdErrOutputStream()
+
     self.set_query_options = {}
 
     self._populate_command_list()
@@ -136,6 +147,9 @@ class ImpalaShell(cmd.Cmd):
     # Tracks query handle of the last query executed. Used by the 'profile' command.
     self.last_query_handle = None;
     self.query_handle_closed = None
+
+    self.print_summary = options.print_summary
+    self.print_progress = options.print_progress
 
     try:
       self.readline = __import__('readline')
@@ -171,7 +185,8 @@ class ImpalaShell(cmd.Cmd):
 
   def _print_options(self, default_options, set_options):
     # Prints the current query options
-    # with default values distinguished from set values by brackets []
+    # with default values distinguished from set values by brackets [], followed by
+    # shell-local options.
     if not default_options and not set_options:
       print '\tNo options available.'
     else:
@@ -180,6 +195,13 @@ class ImpalaShell(cmd.Cmd):
           print '\n'.join(["\t%s: %s" % (k, set_options[k])])
         else:
           print '\n'.join(["\t%s: [%s]" % (k, default_options[k])])
+    self._print_shell_options()
+
+  def _print_shell_options(self):
+    """Prints shell options, which are local and independent of query options."""
+    print "\nShell Options"
+    for x in self.VALID_SHELL_OPTIONS:
+      print "\t%s: %s" % (x, self.__dict__[self.VALID_SHELL_OPTIONS[x][1]])
 
   def do_shell(self, args):
     """Run a command on the shell
@@ -390,13 +412,19 @@ class ImpalaShell(cmd.Cmd):
       print_to_stderr("Summary not available")
       return CmdStatus.SUCCESS
     output = []
-    table = self.construct_table_header(["Operator", "#Hosts", "Avg Time", "Max Time",
-                                           "#Rows", "Est. #Rows", "Peak Mem",
-                                           "Est. Peak Mem", "Detail"])
+    table = self._default_summary_table()
     self.imp_client.build_summary_table(summary, 0, False, 0, False, output)
     formatter = PrettyOutputFormatter(table)
     self.output_stream = OutputStream(formatter, filename=self.output_file)
     self.output_stream.write(output)
+
+  def _handle_shell_options(self, token, value):
+    try:
+      handle = self.VALID_SHELL_OPTIONS[token]
+      self.__dict__[handle[1]] = handle[0](value)
+      return True
+    except KeyError:
+      return False
 
   def do_set(self, args):
     """Set or display query options.
@@ -420,12 +448,13 @@ class ImpalaShell(cmd.Cmd):
       print_to_stderr("Error: SET <option>=<value>")
       return CmdStatus.ERROR
     option_upper = tokens[0].upper()
-    if option_upper not in self.imp_client.default_query_options.keys():
-      print "Unknown query option: %s" % (tokens[0])
-      print "Available query options, with their values (defaults shown in []):"
-      self._print_options(self.imp_client.default_query_options, self.set_query_options)
-      return CmdStatus.ERROR
-    self.set_query_options[option_upper] = tokens[1]
+    if not self._handle_shell_options(option_upper, tokens[1]):
+      if option_upper not in self.imp_client.default_query_options.keys():
+        print "Unknown query option: %s" % (tokens[0])
+        print "Available query options, with their values (defaults shown in []):"
+        self._print_options(self.imp_client.default_query_options, self.set_query_options)
+        return CmdStatus.ERROR
+      self.set_query_options[option_upper] = tokens[1]
     self._print_if_verbose('%s set to %s' % (option_upper, tokens[1]))
 
   def do_unset(self, args):
@@ -629,9 +658,49 @@ class ImpalaShell(cmd.Cmd):
       if self.print_header:
         self.output_stream.write([column_names])
     else:
-      prettytable = self.construct_table_header(column_names)
+      prettytable = self.construct_table_with_header(column_names)
       formatter = PrettyOutputFormatter(prettytable)
       self.output_stream = OutputStream(formatter, filename=self.output_file)
+
+  def _periodic_wait_callback(self):
+    """If enough time elapsed since the last call to the periodic callback,
+    execute the RPC to get the query exec summary and depending on the set options
+    print either the progress or the summary or both to stderr.
+    """
+    if not self.print_progress and not self.print_summary: return
+
+    checkpoint = time.time()
+    if checkpoint - self.last_summary > self.PROGRESS_UPDATE_INTERVAL:
+      summary = self.imp_client.get_summary(self.last_query_handle)
+      if summary and summary.progress:
+        progress = summary.progress
+
+        # If the data is not complete return and wait for a good result.
+        if not progress.total_scan_ranges and not progress.num_completed_scan_ranges:
+          self.last_summary = time.time()
+          return
+
+        data = ""
+        if self.print_progress and progress.total_scan_ranges > 0:
+          val = ((summary.progress.num_completed_scan_ranges * 100) /
+                 summary.progress.total_scan_ranges)
+          fragment_text = "[%s%s] %s%%\n" % ("#" * val, " " * (100 - val), val)
+          data += fragment_text
+
+        if self.print_summary:
+          table = self._default_summary_table()
+          output = []
+          self.imp_client.build_summary_table(summary, 0, False, 0, False, output)
+          formatter = PrettyOutputFormatter(table)
+          data += formatter.format(output) + "\n"
+
+        self.progress_stream.write(data)
+      self.last_summary = time.time()
+
+  def _default_summary_table(self):
+    return self.construct_table_with_header(["Operator", "#Hosts", "Avg Time", "Max Time",
+                                             "#Rows", "Est. #Rows", "Peak Mem",
+                                             "Est. Peak Mem", "Detail"])
 
   def _execute_stmt(self, query, is_insert=False):
     """ The logic of executing any query statement
@@ -650,7 +719,11 @@ class ImpalaShell(cmd.Cmd):
 
       self.last_query_handle = self.imp_client.execute_query(query)
       self.query_handle_closed = False
-      wait_to_finish = self.imp_client.wait_to_finish(self.last_query_handle)
+      self.last_summary = time.time()
+      wait_to_finish = self.imp_client.wait_to_finish(self.last_query_handle,
+         self._periodic_wait_callback)
+      # Reset the progress stream.
+      self.progress_stream.clear()
 
       if is_insert:
         # retrieve the error log
@@ -729,7 +802,7 @@ class ImpalaShell(cmd.Cmd):
     if ImpalaShell.CANCELLATION_ERROR not in str(error):
       return True
 
-  def construct_table_header(self, column_names):
+  def construct_table_with_header(self, column_names):
     """ Constructs the table header for a given query handle.
 
     Should be called after the query has finished and before data is fetched.
@@ -1008,6 +1081,10 @@ if __name__ == "__main__":
       sys.exit(1)
 
   if options.query or options.query_file:
+    if options.print_progress or options.print_summary:
+      print_to_stderr("Error: Live reporting is available for interactive mode only.")
+      sys.exit(1)
+
     execute_queries_non_interactive_mode(options)
     sys.exit(0)
 

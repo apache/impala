@@ -39,5 +39,7 @@ impala_shell_defaults = {
             'user': getpass.getuser(),
             'ssl': False,
             'ca_cert': None,
-            'config_file': os.path.expanduser("~/.impalarc")
+            'config_file': os.path.expanduser("~/.impalarc"),
+            'print_progress' : False,
+            'print_summary' : False
             }

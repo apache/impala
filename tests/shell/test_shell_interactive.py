@@ -60,6 +60,26 @@ class TestImpalaShellInteractive(object):
   def teardown_class(cls):
     if os.path.exists(TMP_HISTORY_FILE): shutil.move(TMP_HISTORY_FILE, SHELL_HISTORY_FILE)
 
+  def _expect_with_cmd(self, proc, cmd, expectations=()):
+    """Executes a command on the expect process instance and verifies a set of
+    assertions defined by the expections."""
+    proc.sendline(cmd + ";")
+    proc.expect(":21000] >")
+    if not expectations: return
+    for e in expectations:
+      assert e in proc.before
+
+  @pytest.mark.execute_serially
+  def test_local_shell_options(self):
+    """Test that setting the local shell options works"""
+    proc = pexpect.spawn(SHELL_CMD)
+    proc.expect(":21000] >")
+    self._expect_with_cmd(proc, "set", ("LIVE_PROGRESS: False", "LIVE_SUMMARY: False"))
+    self._expect_with_cmd(proc, "set live_progress=true")
+    self._expect_with_cmd(proc, "set", ("LIVE_PROGRESS: True", "LIVE_SUMMARY: False"))
+    self._expect_with_cmd(proc, "set live_summary=1")
+    self._expect_with_cmd(proc, "set", ("LIVE_PROGRESS: True", "LIVE_SUMMARY: True"))
+
   @pytest.mark.execute_serially
   def test_escaped_quotes(self):
     """Test escaping quotes"""

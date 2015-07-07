@@ -134,6 +134,10 @@ def get_option_parser(defaults):
                           "Specifying this option within a config file will have "
                           "no effect. Only specify this as a option in the commandline."
                           ))
+  parser.add_option("--live_summary", dest="print_summary", action="store_true",
+                    help="Print a query summary every 1s while the query is running.")
+  parser.add_option("--live_progress", dest="print_progress", action="store_true",
+                    help="Print a query progress every 1s while the query is running.")
 
   # add default values to the help text
   for option in parser.option_list:
