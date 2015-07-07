@@ -49,14 +49,12 @@ class SaslException : public TTransportException {
 
 /**
  * These classes implement the Simple Authentication and Security Layer (SASL)
- * authentication mechanisms.  see: http://www.ietf.org/rfc/rfc2222.txt. 
+ * authentication mechanisms.  see: http://www.ietf.org/rfc/rfc2222.txt.
  * They are mostly wrappers for the cyrus-sasl library routines.
  */
 class TSasl {
   public:
-   ~TSasl() {
-    sasl_dispose(&conn);
-   }
+   virtual ~TSasl() { sasl_dispose(&conn); }
 
   /*
    * Called once per application to free resources.`

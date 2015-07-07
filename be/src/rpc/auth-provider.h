@@ -52,6 +52,8 @@ class AuthProvider {
 
   /// Returns true if this provider uses Sasl at the transport layer.
   virtual bool is_sasl() = 0;
+
+  virtual ~AuthProvider() { }
 };
 
 /// If either (or both) Kerberos and LDAP auth are desired, we use Sasl for the
