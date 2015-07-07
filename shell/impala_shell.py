@@ -154,11 +154,19 @@ class ImpalaShell(cmd.Cmd):
     self.print_summary = options.print_summary
     self.print_progress = options.print_progress
 
-    try:
-      self.readline = __import__('readline')
-      self.readline.set_history_length(HISTORY_LENGTH)
-    except ImportError:
+    # Due to a readline bug in centos/rhel7, importing it causes control characters to be
+    # printed. This breaks any scripting against the shell in non-interactive mode. Since
+    # the non-interactive mode does not need readline - do not import it.
+    if options.query or options.query_file:
+      self.interactive = False
       self._disable_readline()
+    else:
+      self.interactive = True
+      try:
+        self.readline = __import__('readline')
+        self.readline.set_history_length(HISTORY_LENGTH)
+      except ImportError:
+        self._disable_readline()
 
     if options.impalad is not None:
       self.do_connect(options.impalad)
@@ -217,13 +225,13 @@ class ImpalaShell(cmd.Cmd):
       print_to_stderr('Error running command : %s' % e)
       return CmdStatus.ERROR
 
-  def sanitise_input(self, args, interactive=True):
+  def sanitise_input(self, args):
     """Convert the command to lower case, so it's recognized"""
     # A command terminated by a semi-colon is legal. Check for the trailing
     # semi-colons and strip them from the end of the command.
     args = args.strip()
     tokens = args.split(' ')
-    if not interactive:
+    if not self.interactive:
       tokens[0] = tokens[0].lower()
       # Strip all the non-interactive commands of the delimiter.
       return ' '.join(tokens).rstrip(ImpalaShell.CMD_DELIM)
@@ -1044,7 +1052,7 @@ def execute_queries_non_interactive_mode(options):
   # Deal with case.
   sanitized_queries = []
   for query in queries:
-    sanitized_queries.append(shell.sanitise_input(query, interactive=False))
+    sanitized_queries.append(shell.sanitise_input(query))
   for query in sanitized_queries:
     # check if an error was encountered
     if shell.onecmd(query) is CmdStatus.ERROR:
