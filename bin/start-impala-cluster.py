@@ -28,13 +28,16 @@ parser.add_option("-s", "--cluster_size", type="int", dest="cluster_size", defau
                   help="Size of the cluster (number of impalad instances to start).")
 parser.add_option("--build_type", dest="build_type", default= 'debug',
                   help="Build type to use - debug / release")
-parser.add_option("--impalad_args", dest="impalad_args", default="",
+parser.add_option("--impalad_args", dest="impalad_args", action="append", type="string",
+                  default=[],
                   help="Additional arguments to pass to each Impalad during startup")
 parser.add_option("--enable_rm", dest="enable_rm", action="store_true", default=False,
                   help="Enable resource management with Yarn and Llama.")
-parser.add_option("--state_store_args", dest="state_store_args", default="",
+parser.add_option("--state_store_args", dest="state_store_args", action="append",
+                  type="string", default=[],
                   help="Additional arguments to pass to State Store during startup")
-parser.add_option("--catalogd_args", dest="catalogd_args", default="",
+parser.add_option("--catalogd_args", dest="catalogd_args", action="append",
+                  type="string", default=[],
                   help="Additional arguments to pass to the Catalog Service at startup")
 parser.add_option("--kill", "--kill_only", dest="kill_only", action="store_true",
                   default=False, help="Instead of starting the cluster, just kill all"\
@@ -106,14 +109,15 @@ def start_statestore():
   print "Starting State Store logging to %s/statestored.INFO" % options.log_dir
   stderr_log_file_path = os.path.join(options.log_dir, "statestore-error.log")
   args = "%s %s" % (build_impalad_logging_args(0, "statestored"),
-                    options.state_store_args)
+                    " ".join(options.state_store_args))
   exec_impala_process(STATE_STORE_PATH, args, stderr_log_file_path)
 
 def start_catalogd():
   print "Starting Catalog Service logging to %s/catalogd.INFO" % options.log_dir
   stderr_log_file_path = os.path.join(options.log_dir, "catalogd-error.log")
   args = "%s %s %s" % (build_impalad_logging_args(0, "catalogd"),
-                       options.catalogd_args, build_jvm_args(options.cluster_size))
+                       " ".join(options.catalogd_args),
+                       build_jvm_args(options.cluster_size))
   exec_impala_process(CATALOGD_PATH, args, stderr_log_file_path)
 
 def start_mini_impala_cluster(cluster_size):
@@ -171,9 +175,12 @@ def start_impalad_instances(cluster_size):
       # Yes, this is a hack, but it's easier than modifying the minikdc...
       sleep(2)
 
+    # impalad args from the --impalad_args flag. Also replacing '#ID' with the instance.
+    param_args = (" ".join(options.impalad_args)).replace("#ID", str(i))
+    print "Impalad args: %s" % (param_args)
     args = "%s %s %s %s %s" %\
           (build_impalad_logging_args(i, service_name), build_jvm_args(i),
-           build_impalad_port_args(i), options.impalad_args.replace("#ID", str(i)),
+           build_impalad_port_args(i), param_args,
            build_rm_args(i))
     stderr_log_file_path = os.path.join(options.log_dir, '%s-error.log' % service_name)
     exec_impala_process(IMPALAD_PATH, args, stderr_log_file_path)
