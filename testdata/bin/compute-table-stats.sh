@@ -19,4 +19,5 @@ if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
 fi
 python ${COMPUTE_STATS_SCRIPT} --db_names=tpch,tpch_parquet \
     --table_names=customer,lineitem,nation,orders,part,partsupp,region,supplier
+python ${COMPUTE_STATS_SCRIPT} --db_names=tpch_nested_parquet
 python ${COMPUTE_STATS_SCRIPT} --db_names=tpcds
