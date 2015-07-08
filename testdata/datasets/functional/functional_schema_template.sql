@@ -1255,6 +1255,18 @@ bad_parquet
 field STRING
 ====
 ---- DATASET
+-- IMPALA-2130: Wrong verification of parquet file version
+functional
+---- BASE_TABLE_NAME
+bad_magic_number
+---- COLUMNS
+field STRING
+---- LOAD
+`hadoop fs -mkdir -p /test-warehouse/bad_magic_number_parquet && \
+hadoop fs -put -f ${IMPALA_HOME}/testdata/data/bad_magic_number.parquet \
+/test-warehouse/bad_magic_number_parquet/
+====
+---- DATASET
 -- IMPALA-1658: Timestamps written by Hive are local-to-UTC adjusted.
 functional
 ---- BASE_TABLE_NAME

@@ -990,10 +990,10 @@ Status HdfsParquetScanner::ProcessFooter(bool* eosr) {
         stream_->filename()));
   }
 
-  // Validate magic file bytes are correct
+  // Validate magic file bytes are correct.
   uint8_t* magic_number_ptr = buffer + len - sizeof(PARQUET_VERSION_NUMBER);
-  if (memcmp(magic_number_ptr,
-      PARQUET_VERSION_NUMBER, sizeof(PARQUET_VERSION_NUMBER) != 0)) {
+  if (memcmp(magic_number_ptr, PARQUET_VERSION_NUMBER,
+             sizeof(PARQUET_VERSION_NUMBER)) != 0) {
     return Status(Substitute("File $0 is invalid.  Invalid file footer: $1",
         stream_->filename(),
         string((char*)magic_number_ptr, sizeof(PARQUET_VERSION_NUMBER))));
