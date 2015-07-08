@@ -30,4 +30,4 @@ class ClearBufferCache(Plugin):
     # since that is not what we are testing and it causes excessive performance
     # variability.
     cmd = "sysctl -w vm.drop_caches=1 vm.drop_caches=0"
-    self.cluster_controller.run_cmd(cmd)
+    self.cluster_controller.deprecated_run_cmd(cmd)

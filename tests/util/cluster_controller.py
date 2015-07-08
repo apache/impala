@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,118 +12,90 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import fabric.decorators
 import logging
 import os
-from fabric.api import sudo, local, run, execute, parallel
-from fabric.api import hide, env as fabric_env
+from contextlib import contextmanager
+from fabric.context_managers import hide, settings
+from fabric.operations import local, run, sudo
+from fabric.tasks import execute
+from textwrap import dedent
 
-# Setup logging for this module.
 LOG = logging.getLogger('cluster_controller')
-LOG.setLevel(logging.INFO)
-
-# Set paramiko's logging level to ERROR, to suppress its log spew.
-logging.getLogger("paramiko").setLevel(logging.ERROR)
 
 class ClusterController(object):
-  """Responsible for running remote commands on a cluster.
+  """A convenience wrapper around fabric."""
 
-  Reads three environment variables in order to connect to a remote cluster:
-    * FABRIC_SSH_KEY: The full path of the user's private key.
-    * FABRIC_SSH_USER: The username corresponding to the key
-    * FABRIC_HOST_FILE: A text file with a list of fully qualified hostnames
-                        terminated by an EOL
+  def __init__(self, ssh_user=os.environ.get('FABRIC_SSH_USER'),
+      ssh_key_path=os.environ.get('FABRIC_SSH_KEY'), host_names=(),
+      host_names_path=os.environ.get('FABRIC_HOST_FILE'), ssh_timeout_secs=60,
+      ssh_port=22):
+    """If no hosts are given, command execution will be done locally.
 
-  If the host file does not exist, the command will be run locally.
-  """
-  hosts = []
-  def __init__(self, *args, **kwargs):
-    self.ssh_key = os.environ.get('FABRIC_SSH_KEY')
-    self.user = os.environ.get('FABRIC_SSH_USER')
-    self.local = True
-    self.cmd = str()
-    self.__get_cluster_hosts()
-    if not self.local:
-      self.__set_fabric_env(kwargs)
-      self.__validate()
-
-  def __validate(self):
-    """Validate that commands can be issued
-
-    TODO: Validate that the connections are successful.
+       If the FABRIC_HOST_FILE environment variable is used, it should be a path to a
+       text file with a list of fully qualified host names each terminated by an EOL.
     """
+    self.ssh_user = ssh_user
+    self.ssh_key_path = ssh_key_path
+    if host_names:
+      self.hosts = host_names
+    elif host_names_path:
+      with open(host_names_path, 'r') as host_file:
+        self.hosts = [h.strip('\n') for h in host_file.readlines()]
+    self.ssh_port = ssh_port
+    self.ssh_timeout_secs = ssh_timeout_secs
 
-    # We do not need to validate the connection for a local run
-    pass
+  @contextmanager
+  def _cmd_settings(self, _use_deprecated_mode):
+    settings_args = [hide("running", "stdout")]
+    settings_kwargs = {
+        "abort_on_prompts": True,
+        "connection_attempts": 10,
+        "disable_known_hosts": True,
+        "keepalive": True,
+        "key_filename": self.ssh_key_path,
+        "parallel": True,
+        "timeout": self.ssh_timeout_secs,
+        "use_ssh_config": True,
+        "user": self.ssh_user}
+    if _use_deprecated_mode:
+      settings_kwargs["warn_only"] = True
+    else:
+      settings_args += [hide("warnings", "stderr")]
+      settings_kwargs["abort_exception"] = Exception
+    with settings(*settings_args, **settings_kwargs):
+      yield
 
-  def __set_fabric_env(self, kwargs):
-    """Set fabric global environment variables"""
-    fabric_env.hosts = ClusterController.hosts
-    fabric_env.warn_only = kwargs.get('continue_on_error', True)
-    # This sets the fabric timeout
-    # TODO: Find optimal timeout value
-    fabric_env.timeout = kwargs.get('timeout', 60)
-    if self.user:
-      fabric_env.user = self.user
-    if self.ssh_key:
-      fabric_env.key_filename = self.ssh_key
+  def run_cmd(self, cmd, cmd_prefix="set -euo pipefail", hosts=(),
+      _use_deprecated_mode=False):
+    """Runs the given command and blocks until it completes then returns a dictionary
+       containing the command output keyed by host name. 'cmd_prefix' will be prepended
+       to the cmd if it is set.
 
-  def change_fabric_hosts(self, hosts):
-    """Change fabric hosts
-
-    This method can be called if an operation needs to only be run on specific machines.
+       If '_use_deprecated_mode' is enabled:
+         1) Sudo will be used. (Deprecated because it breaks the remote/local
+            transparency.)
+         2) Command failures will generate warning but not raise exceptions. (Deprecated
+            since runtime behavior is not reliable.)
+         3) The 'cmd_prefix' argument will be ignored.
+         4) Additional runtime information about command execution will be sent to stdout.
     """
-    fabric_env.hosts = hosts
-
-  def reset_fabric_hosts(self):
-    """Reset the fabric hosts to the ClusterController default
-
-    This method can be called after an operation on specific hosts. It's generally called
-    after an operation requiring change_fabric_hosts"""
-    fabric_env.hosts = ClusterController.hosts
-
-  def __get_cluster_hosts(self):
-    """Get the host list from the environment variable
-
-    Hosts are specified in a text file pointed to by $HOST_FILE
-    """
-    try:
-      host_file = open(os.environ['FABRIC_HOST_FILE'], 'r+')
-      ClusterController.hosts = [h.strip('\n') for h in host_file.readlines()]
-      host_file.close()
-      msg = "Hosts read from FABRIC_HOST_FILE: %s" % '\n'.join(ClusterController.hosts)
-      LOG.debug(msg)
-      self.local = False
-    except Exception as e:
-      LOG.error("No host file specified, running command on localhost")
-      LOG.error("Error: %s" % e)
-
-  def run_cmd(self, cmd, serial=False):
-    """Run commands locally or remotely.
-
-    If in local mode, the command is run locally. When not local,
-    the command is run with superuser privileges on remote hosts
-    in parallel. The user can override running the command in parallel
-    by explicitly invoking run_cmd to run serially.
-    The method returns a dictionary. key = hostname, value = the results of the
-    command.
-    TODO: Make this cleaner. Remove superuser restriction and make it an option.
-    """
-    self.cmd = cmd
-    # The 'hide' context manager allows for selective muting of fabric's logging when
-    # running remote commands. Specifically, mute the execution status of the command and
-    # the information about which command is being run. Error messages are still logged.
-    with hide('stdout', 'running'):
-      if self.local:
-        local(self.cmd)
-        return
-      if serial:
-        return execute(self.__run_cmd_serial)
+    with self._cmd_settings(_use_deprecated_mode):
+      if not _use_deprecated_mode and cmd_prefix:
+        cmd = cmd_prefix + "\n" + cmd
+      cmd = dedent(cmd)
+      cmd_hosts = hosts or self.hosts
+      if cmd_hosts:
+        @fabric.decorators.hosts(cmd_hosts)
+        def task():
+          if _use_deprecated_mode:
+            return sudo(cmd)
+          else:
+            return run(cmd)
+        return execute(task)
       else:
-        return execute(self.__run_cmd_parallel)
+        return {"localhost": local(cmd)}
 
-  @parallel
-  def __run_cmd_parallel(self):
-    return sudo(self.cmd, combine_stderr=True)
-
-  def __run_cmd_serial(self):
-    return sudo(self.cmd, combine_stderr=True)
+  def deprecated_run_cmd(self, cmd, hosts=()):
+    """No new code should use this."""
+    return self.run_cmd(cmd, cmd_prefix=None, hosts=hosts, _use_deprecated_mode=True)

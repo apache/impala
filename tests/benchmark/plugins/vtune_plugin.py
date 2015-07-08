@@ -58,8 +58,8 @@ class VTunePlugin(Plugin):
     pre_cmd = pre_cmd % (self.run_tag, context.get('db_name', 'UNKNOWN'),
         context.get('short_query_name', 'UNKNOWN'),
         table_format_str,context.get('iteration', 1))
-    self.thread  = threading.Thread(target=self.cluster_controller.run_cmd,
-        args=[pre_cmd], kwargs={'serial':False})
+    self.thread = threading.Thread(target=self.cluster_controller.deprecated_run_cmd,
+        args=[pre_cmd])
     self.thread.start()
     # TODO: Test whether this is a good time to wait
     # Because we start this colection asychronously, we need to ensure that all the
@@ -80,13 +80,13 @@ class VTunePlugin(Plugin):
     post_cmd = post_cmd % (self.run_tag, context.get('db_name', 'UNKNOWN'),
         context.get('short_query_name', 'UNKNOWN'), table_format_str,
         context.get('iteration', 1))
-    self.cluster_controller.run_cmd(post_cmd)
+    self.cluster_controller.deprecated_run_cmd(post_cmd)
     # Wait for reports to generate and kill hosts that are hanging around
     self._wait_for_completion(2)
 
   def _check_path_on_hosts(self):
     path_check_cmd = 'if [ -d "%s" ]; then echo "exists"\nfi' % (self.VTUNE_PATH)
-    host_check_dict = self.cluster_controller.run_cmd(path_check_cmd)
+    host_check_dict = self.cluster_controller.deprecated_run_cmd(path_check_cmd)
     bad_hosts = [k for k in host_check_dict.keys() if host_check_dict[k] != "exists"]
     if bad_hosts:
       raise RuntimeError('VTune is not installed in the expected path for hosts %s' %
@@ -105,7 +105,8 @@ class VTunePlugin(Plugin):
     reports_done = True
     finish_time = datetime.datetime.now() + datetime.timedelta(minutes=timeout)
     while ((reports_done) and (datetime.datetime.now() < finish_time)):
-      grep_dict = self.cluster_controller.run_cmd('ps aux|grep vtune|grep -v grep')
+      grep_dict = self.cluster_controller.deprecated_run_cmd(
+          'ps aux|grep vtune|grep -v grep')
       reports_done = any(map(self.__is_not_none_or_empty_str, grep_dict.values()))
       # TODO: Investigate a better length of time for the sleep period between checks
       time.sleep(5)
@@ -115,9 +116,7 @@ class VTunePlugin(Plugin):
     # This method kills threads that are still hanging around after timeout
     kill_list = filter(self.__is_not_none_or_empty_str, host_dict.keys())
     if kill_list:
-      self.cluster_controller.change_fabric_hosts(kill_list)
-      self.cluster_controller.run_cmd(self.KILL_CMD)
-      self.cluster_controller.reset_fabric_hosts()
+      self.cluster_controller.deprecated_run_cmd(self.KILL_CMD, hosts=kill_list)
 
   def __is_not_none_or_empty_str(self, s):
     return s != None and s != ''
