@@ -193,8 +193,7 @@ public abstract class Type {
    */
   public int getSlotSize() {
     // 8-byte pointer and 4-byte length indicator (12 bytes total).
-    // Aligning to 8 bytes so 16 total.
-    if (isCollectionType()) return 16;
+    if (isCollectionType()) return 12;
     throw new IllegalStateException("getSlotSize() not implemented for type " + toSql());
   }
 
