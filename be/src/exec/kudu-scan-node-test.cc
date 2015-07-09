@@ -128,12 +128,12 @@ class KuduScanNodeTest : public testing::Test {
     }
   }
 
-  static const int kNoLimit = -1;
+  static const int NO_LIMIT = -1;
 
   void ScanAndVerify(int expected_num_rows, int expected_num_batches,
-      int num_cols_to_materialize, int num_notnull_cols = 3, int limit = kNoLimit) {
+      int num_cols_to_materialize, int num_notnull_cols = 3, int limit = NO_LIMIT) {
     BuildRuntimeStateForScans(num_cols_to_materialize);
-    if (limit != kNoLimit) kudu_node_.__set_limit(limit);
+    if (limit != NO_LIMIT) kudu_node_.__set_limit(limit);
 
     KuduScanNode scanner(&obj_pool_, kudu_node_, *desc_tbl_);
 
@@ -211,35 +211,35 @@ class KuduScanNodeTest : public testing::Test {
 
 TEST_F(KuduScanNodeTest, TestScanNode) {
 
-  const int kNumRows = 1000;
-  const int kNumBatches = 10;
+  const int NUM_ROWS = 1000;
+  const int NUM_BATCHES = 10;
 
-  // Insert kNumRows rows for this test.
+  // Insert NUM_ROWS rows for this test.
   kudu_test_helper_.InsertTestRows(kudu_test_helper_.client().get(),
                                    kudu_test_helper_.table().get(),
-                                   kNumRows);
+                                   NUM_ROWS);
 
   // Test materializing all, some, or none of the slots
-  ScanAndVerify(kNumRows, kNumBatches, 3);
-  ScanAndVerify(kNumRows, kNumBatches, 2);
-  ScanAndVerify(kNumRows, kNumBatches, 0);
+  ScanAndVerify(NUM_ROWS, NUM_BATCHES, 3);
+  ScanAndVerify(NUM_ROWS, NUM_BATCHES, 2);
+  ScanAndVerify(NUM_ROWS, NUM_BATCHES, 0);
 }
 
 TEST_F(KuduScanNodeTest, TestScanNullColValues) {
 
-  const int kNumRows = 1000;
-  const int kNumBatches = 10;
+  const int NUM_ROWS = 1000;
+  const int NUM_BATCHES = 10;
 
-  // Insert kNumRows rows for this test but only the keys, i.e. the 2nd
+  // Insert NUM_ROWS rows for this test but only the keys, i.e. the 2nd
   // and 3rd columns are null.
   kudu_test_helper_.InsertTestRows(kudu_test_helper_.client().get(),
                                    kudu_test_helper_.table().get(),
-                                   kNumRows, 0, 1);
+                                   NUM_ROWS, 0, 1);
 
-  // Now try scanning including and not including the null columns.
-  ScanAndVerify(kNumRows, kNumBatches, 3, 1);
-  ScanAndVerify(kNumRows, kNumBatches, 2, 1);
-  ScanAndVerify(kNumRows, kNumBatches, 1, 1);
+  // try scanning including and not including the null columns.
+  ScanAndVerify(NUM_ROWS, NUM_BATCHES, 3, 1);
+  ScanAndVerify(NUM_ROWS, NUM_BATCHES, 2, 1);
+  ScanAndVerify(NUM_ROWS, NUM_BATCHES, 1, 1);
 }
 
 // Test for a bug where we would mishandle getting an empty string from
@@ -271,12 +271,12 @@ TEST_F(KuduScanNodeTest, TestScanEmptyString) {
 
 // Test that scan limits are enforced.
 TEST_F(KuduScanNodeTest, TestLimitsAreEnforced) {
-  const int kNumRows = 1000;
+  const int NUM_ROWS = 1000;
 
-  // Insert kNumRows rows for this test.
+  // Insert NUM_ROWS rows for this test.
   kudu_test_helper_.InsertTestRows(kudu_test_helper_.client().get(),
                                    kudu_test_helper_.table().get(),
-                                   kNumRows);
+                                   NUM_ROWS);
 
   // Try scanning but limit the number of returned rows to several different values.
   int limit_rows_to = 0;
