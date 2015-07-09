@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <limits>
 #include <map>
 #include <math.h>
 #include <string>
@@ -63,6 +64,7 @@ using boost::bad_lexical_cast;
 using boost::date_time::c_local_adjustor;
 using boost::posix_time::from_time_t;
 using boost::posix_time::ptime;
+using std::numeric_limits;
 using namespace Apache::Hadoop::Hive;
 using namespace impala;
 using namespace llvm;
@@ -5001,6 +5003,177 @@ TEST_F(ExprTest, MADlib) {
     "madlib_vector_get(2, madlib_decode_vector(madlib_encode_vector("
       "madlib_vector(1.0, 2.0, 3.0))))",
     TYPE_DOUBLE, 3.0);
+}
+
+TEST_F(ExprTest, BitByteBuiltins) {
+  TestIsNull("bitand(1,NULL)", TYPE_TINYINT);
+  TestIsNull("bitand(NULL,3)", TYPE_TINYINT);
+  // And of numbers differing in 2nd bit position gives min of two numbers
+  TestValue("bitand(1,3)", TYPE_TINYINT, 1);
+  TestValue("bitand(129,131)", TYPE_SMALLINT, 129);
+  TestValue("bitand(32769,32771)", TYPE_INT, 32769);
+  TestValue("bitand(2147483649,2147483651)", TYPE_BIGINT, 2147483649);
+
+  TestIsNull("bitor(1,NULL)", TYPE_TINYINT);
+  TestIsNull("bitor(NULL,3)", TYPE_TINYINT);
+  // Or of numbers differing in 2nd bit position gives max of two numbers
+  TestValue("bitor(1,3)", TYPE_TINYINT, 3);
+  TestValue("bitor(129,131)", TYPE_SMALLINT, 131);
+  TestValue("bitor(32769,32771)", TYPE_INT, 32771);
+  TestValue("bitor(2147483649,2147483651)", TYPE_BIGINT, 2147483651);
+
+  TestIsNull("bitxor(1,NULL)", TYPE_TINYINT);
+  TestIsNull("bitxor(NULL,3)", TYPE_TINYINT);
+  // Xor of numbers differing in 2nd bit position gives 2
+  TestValue("bitxor(1,3)", TYPE_TINYINT, 2);
+  TestValue("bitxor(129,131)", TYPE_SMALLINT, 2);
+  TestValue("bitxor(32769,32771)", TYPE_INT, 2);
+  TestValue("bitxor(2147483649,2147483651)", TYPE_BIGINT, 2);
+
+  TestIsNull("bitnot(NULL)", TYPE_TINYINT);
+  TestValue("bitnot(1)", TYPE_TINYINT, -2);
+  TestValue("bitnot(129)", TYPE_SMALLINT, -130);
+  TestValue("bitnot(32769)", TYPE_INT, -32770);
+  TestValue("bitnot(2147483649)", TYPE_BIGINT, -2147483650);
+
+  // basic bit patterns
+  TestValue("countset(0)", TYPE_INT, 0);
+  TestValue("countset(1)", TYPE_INT, 1);
+  TestValue("countset(2)", TYPE_INT, 1);
+  TestValue("countset(3)", TYPE_INT, 2);
+  // 0101... bit pattern
+  TestValue("countset(" + lexical_cast<string>(0x55) + ")", TYPE_INT, 4);
+  TestValue("countset(" + lexical_cast<string>(0x5555) + ")", TYPE_INT, 8);
+  TestValue("countset(" + lexical_cast<string>(0x55555555) + ")", TYPE_INT, 16);
+  TestValue("countset(" + lexical_cast<string>(0x5555555555555555) + ")", TYPE_INT, 32);
+  // 1111... bit pattern to test signed/unsigned conversion
+  TestValue("countset(cast(-1 as TINYINT))", TYPE_INT, 8);
+  TestValue("countset(cast(-1 as SMALLINT))", TYPE_INT, 16);
+  TestValue("countset(cast(-1 as INT))", TYPE_INT, 32);
+  TestValue("countset(cast(-1 as BIGINT))", TYPE_INT, 64);
+  // NULL arguments
+  TestIsNull("countset(cast(NULL as TINYINT))", TYPE_INT);
+  TestIsNull("countset(cast(NULL as SMALLINT))", TYPE_INT);
+  TestIsNull("countset(cast(NULL as INT))", TYPE_INT);
+  TestIsNull("countset(cast(NULL as BIGINT))", TYPE_INT);
+
+  // Check with optional argument
+  TestIsNull("countset(0, NULL)", TYPE_INT);
+  TestValue("countset(0, 0)", TYPE_INT, 8);
+  TestValue("countset(0, 1)", TYPE_INT, 0);
+  // TestError("countset(0, 2)"); TODO - disabled because of IMPALA-1746
+
+  // getbit for all integer types
+  TestIsNull("getbit(NULL, 1)", TYPE_TINYINT);
+  TestIsNull("getbit(1, NULL)", TYPE_TINYINT);
+  TestValue("getbit(1, 0)", TYPE_TINYINT, 1);
+  TestValue("getbit(1, 1)", TYPE_TINYINT, 0);
+  string int8_min = lexical_cast<string>((int16_t)numeric_limits<int8_t>::min());
+  TestValue("getbit(" + int8_min + ", 7)", TYPE_TINYINT, 1);
+  TestValue("getbit(" + int8_min + ", 6)", TYPE_TINYINT, 0);
+  string int16_min = lexical_cast<string>(numeric_limits<int16_t>::min());
+  TestValue("getbit(" + int16_min + ", 15)", TYPE_TINYINT, 1);
+  TestValue("getbit(" + int16_min + ", 14)", TYPE_TINYINT, 0);
+  string int32_min = lexical_cast<string>(numeric_limits<int32_t>::min());
+  TestValue("getbit(" + int32_min + ", 31)", TYPE_TINYINT, 1);
+  TestValue("getbit(" + int32_min + ", 30)", TYPE_TINYINT, 0);
+  string int64_min = lexical_cast<string>(numeric_limits<int64_t>::min());
+  TestValue("getbit(" + int64_min + ", 63)", TYPE_TINYINT, 1);
+  TestValue("getbit(" + int64_min + ", 62)", TYPE_TINYINT, 0);
+  // Out of range bitpos causes errors
+  // TODO - disabled because of IMPALA-1746
+  // TestError("getbit(0, -1)", TYPE_TINYINT);
+  // TestError("getbit(0, 8)", TYPE_TINYINT);
+  // TestError("getbit(" + int16_min + ", 16)", TYPE_TINYINT);
+  // TestError("getbit(" + int32_min + ", 32)", TYPE_TINYINT);
+  // TestError("getbit(" + int64_min + ", 64)", TYPE_TINYINT);
+
+  // Set bits for all integer types
+  TestIsNull("setbit(cast(NULL as INT), 1)", TYPE_INT);
+  TestIsNull("setbit(1, NULL)", TYPE_TINYINT);
+  TestIsNull("setbit(cast(NULL as INT), 1, 1)", TYPE_INT);
+  TestIsNull("setbit(1, NULL, 1)", TYPE_TINYINT);
+  TestIsNull("setbit(1, 1, NULL)", TYPE_TINYINT);
+  // TestError("setbit(1, 1, -1)"); TODO - disabled because of IMPALA-1746
+  // TestError("setbit(1, 1, 2)");  TODO - disabled because of IMPALA-1746
+  TestValue("setbit(0, 0)", TYPE_TINYINT, 1);
+  TestValue("setbit(0, 0, 1)", TYPE_TINYINT, 1);
+  TestValue("setbit(1, 0, 0)", TYPE_TINYINT, 0);
+  TestValue("setbit(cast(1 as INT), 8)", TYPE_INT, 257);
+  TestValue("setbit(cast(1 as INT), 8, 1)", TYPE_INT, 257);
+  TestValue("setbit(cast(257 as INT), 8, 0)", TYPE_INT, 1);
+  TestValue("setbit(cast(-1 as BIGINT), 63, 0)", TYPE_BIGINT,
+      numeric_limits<int64_t>::max());
+        // Out of range bitpos causes errors
+  // TODO - disabled because of IMPALA-1746
+  // TestError("setbit(0, -1)", TYPE_TINYINT);
+  // TestError("setbit(0, 8)", TYPE_TINYINT);
+  // TestError("setbit(0, -1, 1)", TYPE_TINYINT);
+  // TestError("setbit(0, 8, 1)", TYPE_TINYINT);
+
+  // Shift and rotate null checks
+  TestIsNull("shiftleft(1, NULL)", TYPE_TINYINT);
+  TestIsNull("shiftleft(cast(NULL as INT), 2)", TYPE_INT);
+  TestIsNull("rotateleft(cast(NULL as INT), 2)", TYPE_INT);
+  TestIsNull("shiftright(1, NULL)", TYPE_TINYINT);
+  TestIsNull("shiftright(cast(NULL as INT), 2)", TYPE_INT);
+  TestIsNull("rotateright(cast(NULL as INT), 2)", TYPE_INT);
+
+  // Basic left shift/rotate tests for all integer types
+  TestValue("shiftleft(1, 2)", TYPE_TINYINT, 4);
+  TestValue("rotateleft(1, 2)", TYPE_TINYINT, 4);
+  string pow2_6 = lexical_cast<string>(1 << 6);
+  TestValue("shiftleft(" + pow2_6 + ", 2)", TYPE_TINYINT, 0);
+  TestValue("rotateleft(" + pow2_6 + ", 2)", TYPE_TINYINT, 1);
+  TestValue("shiftleft(" + pow2_6 + ", 1)", TYPE_TINYINT, -(1 << 7));
+  TestValue("rotateleft(" + pow2_6 + ", 1)", TYPE_TINYINT, -(1 << 7));
+  TestValue("shiftleft(cast(1 as SMALLINT), 2)", TYPE_SMALLINT, 4);
+  string pow2_14 = lexical_cast<string>(1 << 14);
+  TestValue("shiftleft(" + pow2_14 + ", 2)", TYPE_SMALLINT, 0);
+  TestValue("rotateleft(" + pow2_14 + ", 2)", TYPE_SMALLINT, 1);
+  TestValue("rotateleft(" + pow2_14 + ", 34)", TYPE_SMALLINT, 1); // Wraparound
+  TestValue("shiftleft(" + pow2_14 + ", 1)", TYPE_SMALLINT, -(1 << 15));
+  TestValue("shiftleft(cast(1 as INT), 2)", TYPE_INT, 4);
+  string pow2_30 = lexical_cast<string>(1 << 30);
+  TestValue("shiftleft(" + pow2_30 + ", 2)", TYPE_INT, 0);
+  TestValue("shiftleft(" + pow2_30 + ", 1)", TYPE_INT, 1 << 31);
+  TestValue("shiftleft(cast(1 as BIGINT), 2)", TYPE_BIGINT, 4);
+  string pow2_62 = lexical_cast<string>(((int64_t)1) << 62);
+  TestValue("shiftleft(" + pow2_62 + ", 2)", TYPE_BIGINT, 0);
+  TestValue("rotateleft(" + pow2_62 + ", 2)", TYPE_BIGINT, 1);
+  TestValue("shiftleft(" + pow2_62 + ", 1)", TYPE_BIGINT,
+            ((int64_t)1) << 63);
+
+  // Basic right shift/rotate tests for all integer types
+  TestValue("shiftright(4, 2)", TYPE_TINYINT, 1);
+  TestValue("shiftright(4, 3)", TYPE_TINYINT, 0);
+  TestValue("rotateright(4, 3)", TYPE_TINYINT, -128);
+  TestValue("shiftright(4, 4)", TYPE_TINYINT, 0);
+  TestValue("rotateright(4, 132)", TYPE_TINYINT, 64);
+  string pow2_8 = lexical_cast<string>(1 << 8);
+  TestValue("shiftright(" + pow2_8 + ", 1)", TYPE_SMALLINT, 1 << 7);
+  TestValue("shiftright(" + pow2_8 + ", 9)", TYPE_SMALLINT, 0);
+  string pow2_16 = lexical_cast<string>(1 << 16);
+  TestValue("shiftright(" + pow2_16 + ", 1)", TYPE_INT, 1 << 15);
+  TestValue("rotateright(" + pow2_16 + ", 1)", TYPE_INT, 1 << 15);
+  TestValue("shiftright(" + pow2_16 + ", 17)", TYPE_INT, 0);
+  string pow2_32 = lexical_cast<string>(((int64_t)1) << 32);
+  TestValue("shiftright(" + pow2_32 + ", 1)", TYPE_BIGINT, ((int64_t)1) << 31);
+  TestValue("rotateright(" + pow2_32 + ", 1)", TYPE_BIGINT, ((int64_t)1) << 31);
+  TestValue("shiftright(" + pow2_32 + ", 33)", TYPE_BIGINT, 0);
+  TestValue("rotateright(" + pow2_32 + ", 33)", TYPE_BIGINT,
+      numeric_limits<int64_t>::min());
+
+  // Check that no sign extension happens for negative numbers
+  TestValue("shiftright(cast(-1 as INT), 1)", TYPE_INT, 0x7FFFFFFF);
+  TestValue("rotateright(-128, 1)", TYPE_TINYINT, 1 << 6);
+
+  // Test shifting/rotating negative amount - should reverse direction
+  TestValue("shiftleft(4, -2)", TYPE_TINYINT, 1);
+  TestValue("shiftright(cast(1 as BIGINT), -2)", TYPE_BIGINT, 4);
+  TestValue("rotateleft(4, -3)", TYPE_TINYINT, -128);
+  TestValue("rotateright(256, -2)", TYPE_SMALLINT, 1024);
+
 }
 
 } // namespace impala

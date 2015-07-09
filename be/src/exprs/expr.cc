@@ -30,6 +30,7 @@
 #include "exprs/expr.h"
 #include "exprs/expr-context.h"
 #include "exprs/aggregate-functions.h"
+#include "exprs/bit-byte-functions.h"
 #include "exprs/case-expr.h"
 #include "exprs/cast-functions.h"
 #include "exprs/compound-predicates.h"
@@ -475,6 +476,7 @@ void Expr::InitBuiltinsDummy() {
   // from that class in.
   // TODO: is there a better way to do this?
   AggregateFunctions::InitNull(NULL, NULL);
+  BitByteFunctions::CountSet(NULL, TinyIntVal::null());
   CastFunctions::CastToBooleanVal(NULL, TinyIntVal::null());
   CompoundPredicate::Not(NULL, BooleanVal::null());
   ConditionalFunctions::NullIfZero(NULL, TinyIntVal::null());

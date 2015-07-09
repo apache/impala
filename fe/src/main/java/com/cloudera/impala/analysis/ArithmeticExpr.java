@@ -111,18 +111,13 @@ public class ArithmeticExpr extends Expr {
         Lists.<Type>newArrayList(Type.DECIMAL, Type.DECIMAL),
         Type.DECIMAL));
 
-    // MOD() and FACTORIAL() are registered as builtins, see impala_functions.py
+    /*
+     * MOD(), FACTORIAL(), BITAND(), BITOR(), BITXOR(), and BITNOT() are registered as
+     * builtins, see impala_functions.py
+     */
     for (Type t: Type.getIntegerTypes()) {
       db.addBuiltin(ScalarFunction.createBuiltinOperator(
           Operator.INT_DIVIDE.getName(), Lists.newArrayList(t, t), t));
-      db.addBuiltin(ScalarFunction.createBuiltinOperator(
-          Operator.BITAND.getName(), Lists.newArrayList(t, t), t));
-      db.addBuiltin(ScalarFunction.createBuiltinOperator(
-          Operator.BITOR.getName(), Lists.newArrayList(t, t), t));
-      db.addBuiltin(ScalarFunction.createBuiltinOperator(
-          Operator.BITXOR.getName(), Lists.newArrayList(t, t), t));
-      db.addBuiltin(ScalarFunction.createBuiltinOperator(
-          Operator.BITNOT.getName(), Lists.newArrayList(t), t));
     }
   }
 

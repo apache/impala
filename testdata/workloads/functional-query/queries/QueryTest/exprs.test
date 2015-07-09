@@ -1889,3 +1889,74 @@ select madlib_vector(1.0, 2.0, NULL);
 ---- RESULTS
 ---- CATCH
 madlib vector entry 2 is NULL
+====
+---- QUERY
+# Test countset
+select tinyint_col, countset(tinyint_col), countset(tinyint_col, 0),
+       smallint_col, countset(smallint_col), countset(smallint_col, 0),
+       int_col, countset(int_col), countset(int_col, 0),
+       bigint_col, countset(bigint_col), countset(bigint_col, 0)
+from alltypestiny
+where id <= 1
+order by id
+---- RESULTS
+0,0,8,0,0,16,0,0,32,0,0,64
+1,1,7,1,1,15,1,1,31,10,2,62
+---- TYPES
+TINYINT,INT,INT,SMALLINT,INT,INT,INT,INT,INT,BIGINT,INT,INT
+====
+---- QUERY
+# Test basic bitwise ops
+select bitand(tinyint_col, int_col),
+       bitor(smallint_col, bigint_col),
+       bitxor(tinyint_col, smallint_col),
+       bitxor(int_col, bigint_col),
+       bitxor(int_col, bitnot(int_col)),
+       bitnot(tinyint_col)
+from alltypes
+where id <= 3
+order by id
+---- RESULTS
+0,0,0,0,-1,-1
+1,11,0,11,-1,-2
+2,22,0,22,-1,-3
+3,31,0,29,-1,-4
+---- TYPES
+INT,BIGINT,SMALLINT,BIGINT,INT,TINYINT
+====
+---- QUERY
+# Test getbit and setbit
+select bigint_col,
+       getbit(bigint_col,0),
+       getbit(bigint_col,1),
+       getbit(bigint_col,int_col),
+       setbit(bigint_col,0),
+       setbit(bigint_col,1,0)
+from alltypes
+where id <= 3
+order by id
+---- RESULTS
+0,0,0,0,1,0
+10,0,1,1,11,8
+20,0,0,1,21,20
+30,0,1,1,31,28
+---- TYPES
+BIGINT,TINYINT,TINYINT,TINYINT,BIGINT,BIGINT
+====
+---- QUERY
+# Test shifts and rotates
+select int_col,
+    shiftright(int_col,1),
+    shiftleft(int_col,2),
+    rotateleft(int_col,30),
+    rotateright(int_col,2)
+from alltypes
+where id <= 3
+order by id
+---- RESULTS
+0,0,0,0,0
+1,0,4,1073741824,1073741824
+2,1,8,-2147483648,-2147483648
+3,1,12,-1073741824,-1073741824
+---- TYPES
+INT,INT,INT,INT,INT

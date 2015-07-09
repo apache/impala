@@ -23,6 +23,7 @@ add_library(Exprs
   agg-fn-evaluator.cc
   aggregate-functions.cc
   anyval-util.cc
+  bit-byte-functions.cc
   case-expr.cc
   cast-functions.cc
   compound-predicates.cc

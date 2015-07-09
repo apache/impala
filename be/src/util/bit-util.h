@@ -18,11 +18,15 @@
 
 #include <endian.h>
 
+#include <boost/type_traits/make_unsigned.hpp>
+
 #include "common/compiler-util.h"
 #include "util/cpu-info.h"
 #include "util/sse-util.h"
 
 namespace impala {
+
+using boost::make_unsigned;
 
 /// Utility class to do standard bit tricks
 /// TODO: is this in boost or something else like that?
@@ -121,6 +125,13 @@ class BitUtil {
     }
   }
 
+  // Compute correct population count for various-width signed integers
+  template<typename T>
+  static inline int PopcountSigned(T v) {
+    // Converting to same-width unsigned then extending preserves the bit pattern.
+    return BitUtil::Popcount(static_cast<typename make_unsigned<T>::type>(v));
+  }
+
   /// Returns the 'num_bits' least-significant bits of 'v'.
   static inline uint64_t TrailingBits(uint64_t v, int num_bits) {
     if (UNLIKELY(num_bits == 0)) return 0;
@@ -191,6 +202,7 @@ class BitUtil {
     for (int i = 0; i < len; ++i) {
       d[i] = s[len - i - 1];
     }
+
   }
 
   /// Converts to big endian format (if not already in big endian) from the
@@ -228,6 +240,35 @@ class BitUtil {
   static inline uint16_t FromBigEndian(uint16_t val) { return val; }
 #endif
 
+  // Logical right shift for signed integer types
+  // This is needed because the C >> operator does arithmetic right shift
+  // Negative shift amounts lead to undefined behavior
+  template<typename T>
+  static T ShiftRightLogical(T v, int shift) {
+    // Conversion to unsigned ensures most significant bits always filled with 0's
+    return static_cast<typename make_unsigned<T>::type>(v) >> shift;
+  }
+
+  // Get an specific bit of a numeric type
+  template<typename T>
+  static inline int8_t GetBit(T v, int bitpos) {
+    T masked = v & (static_cast<T>(0x1) << bitpos);
+    return static_cast<int8_t>(ShiftRightLogical(masked, bitpos));
+  }
+
+  // Set a specific bit to 1
+  // Behavior when bitpos is negative is undefined
+  template<typename T>
+  static T SetBit(T v, int bitpos) {
+    return v | (static_cast<T>(0x1) << bitpos);
+  }
+
+  // Set a specific bit to 0
+  // Behavior when bitpos is negative is undefined
+  template<typename T>
+  static T UnsetBit(T v, int bitpos) {
+    return v & ~(static_cast<T>(0x1) << bitpos);
+  }
 };
 
 }
