@@ -23,3 +23,11 @@ select * from dimtbl order by id limit 1;
 ---- TYPES
 BIGINT, STRING, INT
 ====
+---- QUERY
+# Make sure that we can list the columns to be scanned in any order.
+select zip, id from dimtbl order by id limit 1;
+---- RESULTS
+94611,1001
+---- TYPES
+INT, BIGINT
+====

@@ -112,8 +112,8 @@ Status KuduSchemaFromExpressionList(const std::vector<TExpr>& expressions,
     RETURN_IF_ERROR(ImpalaToKuduType(node.type, &kt));
 
     // Key columns are not nullable, all others are for now.
-    bool is_key = key_col_names.find(col_name) == key_col_names.end();
-    kudu_cols.push_back(KuduColumnSchema(col_name, kt, is_key));
+    bool is_key = key_col_names.find(col_name) != key_col_names.end();
+    kudu_cols.push_back(KuduColumnSchema(col_name, kt, !is_key));
   }
 
   schema->Reset(kudu_cols, std::min(kudu_cols.size(), key_col_names.size()));
@@ -151,11 +151,12 @@ Status KuduSchemaFromTupleDescriptor(const TupleDescriptor& tuple_desc,
     RETURN_IF_ERROR(ImpalaToKuduType(slots[i]->type(), &kt));
 
     // Key columns are not nullable, all others are for now.
-    bool is_key = key_col_names.find(col_name) == key_col_names.end();
-    kudu_cols.push_back(KuduColumnSchema(col_name, kt, is_key));
+    bool is_key = key_col_names.find(col_name) != key_col_names.end();
+    kudu_cols.push_back(KuduColumnSchema(col_name, kt, !is_key));
   }
 
-  schema->Reset(kudu_cols, std::min(kudu_cols.size(), key_col_names.size()));
+  // Scans don't care about key columns so we always pass 0.
+  schema->Reset(kudu_cols, 0);
   return Status::OK();
 }
 
