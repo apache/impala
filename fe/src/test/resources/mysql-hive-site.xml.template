@@ -30,7 +30,7 @@
 </property>
 <property>
  <name>javax.jdo.option.ConnectionURL</name>
- <value>jdbc:mysql://localhost:3306/hive_${METASTORE_DB}?createDatabaseIfNotExist=true</value>
+ <value>jdbc:mysql://localhost:3306/${METASTORE_DB}?createDatabaseIfNotExist=true</value>
 </property>
 <property>
  <name>javax.jdo.option.ConnectionDriverName</name>
@@ -66,7 +66,7 @@
 </property>
 <property>
   <name>hive.stats.dbconnectionstring</name>
-  <value>jdbc:mysql://localhost:3306/hive_${METASTORE_DB}_Stats?createDatabaseIfNotExist=true&amp;user=hiveuser&amp;password=password</value>
+  <value>jdbc:mysql://localhost:3306/${METASTORE_DB}_Stats?createDatabaseIfNotExist=true&amp;user=hiveuser&amp;password=password</value>
 </property>
 <property>
   <name>hive.stats.jdbcdriver</name>

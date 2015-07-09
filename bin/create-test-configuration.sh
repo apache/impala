@@ -53,10 +53,6 @@ if [ "${IMPALA_CONFIG_SOURCED}" != "1" ]; then
   exit 1
 fi
 
-# If a specific metastore db is defined, use that. Otherwise create unique metastore
-# DB name based on the current directory.
-: ${METASTORE_DB=`basename ${IMPALA_HOME} | sed -e "s/\\./_/g" | sed -e "s/[.-]/_/g"`}
-
 ${CLUSTER_DIR}/admin create_cluster
 
 if [ ! -z "${IMPALA_KERBERIZE}" ]; then
@@ -75,14 +71,12 @@ else
   export HIVE_S2_AUTH=NONE
 fi
 
-# Convert Metastore DB name to be lowercase
-export METASTORE_DB=`echo $METASTORE_DB | tr '[A-Z]' '[a-z]'`
 export CURRENT_USER=`whoami`
 
 CONFIG_DIR=${IMPALA_HOME}/fe/src/test/resources
 echo "Config dir: ${CONFIG_DIR}"
 echo "Current user: ${CURRENT_USER}"
-echo "Metastore DB: hive_${METASTORE_DB}"
+echo "Metastore DB: ${METASTORE_DB}"
 
 pushd ${CONFIG_DIR}
 # Cleanup any existing files
@@ -91,15 +85,15 @@ rm -f authz-provider.ini
 
 if [ $CREATE_METASTORE -eq 1 ]; then
   echo "Creating postgresql database for Hive metastore"
-  dropdb -U hiveuser hive_$METASTORE_DB 2> /dev/null || true
-  createdb -U hiveuser hive_$METASTORE_DB
+  dropdb -U hiveuser ${METASTORE_DB} 2> /dev/null || true
+  createdb -U hiveuser ${METASTORE_DB}
 
-  psql -q -U hiveuser -d hive_$METASTORE_DB \
+  psql -q -U hiveuser -d ${METASTORE_DB} \
        -f ${HIVE_HOME}/scripts/metastore/upgrade/postgres/hive-schema-0.13.0.postgres.sql
   # Increase the size limit of PARAM_VALUE from SERDE_PARAMS table to be able to create
   # HBase tables with large number of columns.
   echo "alter table \"SERDE_PARAMS\" alter column \"PARAM_VALUE\" type character varying" \
-      | psql -q -U hiveuser -d hive_$METASTORE_DB
+      | psql -q -U hiveuser -d ${METASTORE_DB}
 fi
 
 if [ $CREATE_SENTRY_POLICY_DB -eq 1 ]; then

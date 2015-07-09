@@ -30,7 +30,7 @@
 </property>
 <property>
  <name>javax.jdo.option.ConnectionURL</name>
- <value>jdbc:postgresql://localhost:5432/hive_${METASTORE_DB}</value>
+ <value>jdbc:postgresql://localhost:5432/${METASTORE_DB}</value>
 </property>
 <property>
  <name>javax.jdo.option.ConnectionDriverName</name>

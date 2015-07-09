@@ -63,6 +63,7 @@ export ISILON_NAMENODE=${ISILON_NAMENODE-""}
 export DEFAULT_FS=${DEFAULT_FS-"hdfs://localhost:20500"}
 export WAREHOUSE_LOCATION_PREFIX=${WAREHOUSE_LOCATION_PREFIX-""}
 export LOCAL_FS="file:${WAREHOUSE_LOCATION_PREFIX}"
+export METASTORE_DB="hive_impala"
 
 if [ "${TARGET_FILESYSTEM}" = "s3" ]; then
   # Basic error checking
