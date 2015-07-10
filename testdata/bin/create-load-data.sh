@@ -116,6 +116,7 @@ function load-data {
   WORKLOAD=${1}
   EXPLORATION_STRATEGY=${2:-"core"}
   TABLE_FORMATS=${3:-}
+  FORCE_LOAD=${4:-}
 
   MSG="Loading workload '$WORKLOAD'"
   ARGS=("--workloads $WORKLOAD")
@@ -136,7 +137,11 @@ function load-data {
   if ! ${IMPALA_HOME}/testdata/bin/check-schema-diff.sh $WORKLOAD; then
     ARGS+=("--force")
     echo "Force loading $WORKLOAD because a schema change was detected"
+  elif [ "${FORCE_LOAD}" = "force" ]; then
+    ARGS+=("--force")
+    echo "Force loading."
   fi
+
   LOG_FILE=${DATA_LOADING_LOG_DIR}/data-load-${WORKLOAD}-${EXPLORATION_STRATEGY}.log
   echo "$MSG. Logging to ${LOG_FILE}"
   # Use unbuffered logging by executing with 'python -u'
@@ -313,9 +318,6 @@ if [ $SKIP_METADATA_LOAD -eq 0 ]; then
   # load functional/tpcds/tpch
   load-data "functional-query" "exhaustive"
 
-  # TODO KUDU remove this once inserts are working
-  python -u ${IMPALA_HOME}/bin/load-data.py -w functional-query -e exhaustive --table_formats=kudu/none/none
-
   load-data "tpch" "core"
   load-data "tpcds" "core"
   load-aux-workloads
@@ -326,6 +328,9 @@ elif [ "${TARGET_FILESYSTEM}" = "hdfs" ];  then
   echo "Skipped loading the metadata. Loading HBase."
   load-data "functional-query" "core" "hbase/none"
 fi
+
+# Always load the Kudu data from scratch.
+load-data "functional-query" "core" "kudu/none/none" force
 
 build-and-copy-hive-udfs
 # Configure alltypes_seq as a read-only table. This is required for fe tests.
