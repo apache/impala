@@ -30,6 +30,7 @@ namespace impala {
 class Bitmap;
 class RowBatch;
 class TupleRow;
+class RowBatchCache;
 
 /// Operator to perform nested-loop join.
 /// This operator does not support spill to disk. Supports all join modes except
@@ -56,10 +57,11 @@ class NestedLoopJoinNode : public BlockingJoinNode {
   /////////////////////////////////////////
   /// BEGIN: Members that must be Reset()
 
-  /// Object pool for build RowBatches. Stores and owns all batches in build_batches_.
-  /// The resources of these batches are transfered to the output batch in
-  /// GetNext() when eos_ is set to true.
-  ObjectPool build_batch_pool_;
+  /// Creates and caches RowBatches for the build side. The RowBatch objects are owned by
+  /// this cache, but the tuple data is always transferred to the output batch in
+  /// GetNext() when eos_ is set to true. The cache helps to avoid creating new
+  /// RowBatches after a Reset().
+  RowBatchCache* build_batch_cache_;
 
   /// List of build batches. The batches are owned by build_batch_pool_.
   RowBatchList build_batches_;

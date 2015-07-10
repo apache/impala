@@ -17,6 +17,7 @@
 #include <sstream>
 #include <gutil/strings/substitute.h>
 
+#include "exec/row-batch-cache.h"
 #include "exprs/expr.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
@@ -33,6 +34,7 @@ NestedLoopJoinNode::NestedLoopJoinNode(ObjectPool* pool, const TPlanNode& tnode,
     const DescriptorTbl& descs)
   : BlockingJoinNode("NestedLoopJoinNode", tnode.nested_loop_join_node.join_op, pool,
         tnode, descs),
+    build_batch_cache_(NULL),
     current_build_row_idx_(0),
     matching_build_rows_(NULL),
     process_unmatched_build_rows_(false),
@@ -72,12 +74,13 @@ Status NestedLoopJoinNode::Prepare(RuntimeState* state) {
   RowDescriptor full_row_desc(child(0)->row_desc(), child(1)->row_desc());
   RETURN_IF_ERROR(Expr::Prepare(
       join_conjunct_ctxs_, state, full_row_desc, expr_mem_tracker()));
+  build_batch_cache_ = new RowBatchCache(
+      child(1)->row_desc(), state->batch_size(), mem_tracker());
   return Status::OK();
 }
 
 Status NestedLoopJoinNode::Reset(RuntimeState* state) {
   build_batches_.Reset();
-  build_batch_pool_.Clear();
   if (matching_build_rows_ != NULL) {
     delete matching_build_rows_;
     matching_build_rows_ = NULL;
@@ -86,17 +89,21 @@ Status NestedLoopJoinNode::Reset(RuntimeState* state) {
   current_probe_row_ = NULL;
   probe_batch_pos_ = 0;
   process_unmatched_build_rows_ = false;
+  build_batch_cache_->Reset();
   return BlockingJoinNode::Reset(state);
 }
 
 void NestedLoopJoinNode::Close(RuntimeState* state) {
   if (is_closed()) return;
   build_batches_.Reset();
-  build_batch_pool_.Clear();
   Expr::Close(join_conjunct_ctxs_, state);
   if (matching_build_rows_ != NULL) {
     delete matching_build_rows_;
     matching_build_rows_ = NULL;
+  }
+  if (build_batch_cache_ != NULL) {
+    delete build_batch_cache_;
+    build_batch_cache_ = NULL;
   }
   BlockingJoinNode::Close(state);
 }
@@ -105,8 +112,7 @@ Status NestedLoopJoinNode::ConstructBuildSide(RuntimeState* state) {
   RETURN_IF_ERROR(child(1)->Open(state));
   bool eos = false;
   do {
-    RowBatch* batch = build_batch_pool_.Add(
-        new RowBatch(child(1)->row_desc(), state->batch_size(), mem_tracker()));
+    RowBatch* batch = build_batch_cache_->GetNextBatch();
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(QueryMaintenance(state));
     RETURN_IF_ERROR(child(1)->GetNext(state, batch, &eos));
