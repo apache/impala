@@ -276,9 +276,10 @@ void BufferedBlockMgr::ClearTmpReservation(Client* client) {
 }
 
 bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
-  // Workaround IMPALA-1619. Return immediately if trying to allocate more than 1GB.
-  if (UNLIKELY(size > (1LL << 30))) {
-    LOG(WARNING) << "Trying to allocate memory >1GB (" << size << ")B."
+  // Workaround IMPALA-1619. Return immediately if the allocation size will cause
+  // an arithmetic overflow.
+  if (UNLIKELY(size >= (1LL << 31))) {
+    LOG(WARNING) << "Trying to allocate memory >=2GB (" << size << ")B."
                  << GetStackTrace();
     return false;
   }
@@ -293,7 +294,7 @@ bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
   }
 
   if (max(0L, remaining_unreserved_buffers()) + client->num_tmp_reserved_buffers_ <
-        buffers_needed) {
+      buffers_needed) {
     return false;
   }
 
