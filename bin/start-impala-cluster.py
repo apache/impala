@@ -177,7 +177,6 @@ def start_impalad_instances(cluster_size):
 
     # impalad args from the --impalad_args flag. Also replacing '#ID' with the instance.
     param_args = (" ".join(options.impalad_args)).replace("#ID", str(i))
-    print "Impalad args: %s" % (param_args)
     args = "%s %s %s %s %s" %\
           (build_impalad_logging_args(i, service_name), build_jvm_args(i),
            build_impalad_port_args(i), param_args,
