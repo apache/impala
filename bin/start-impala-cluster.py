@@ -17,6 +17,7 @@
 # ImpalaD instances. Each ImpalaD runs on a different port allowing this to be run
 # on a single machine.
 import os
+import psutil
 import sys
 from time import sleep, time
 from optparse import OptionParser
@@ -83,6 +84,23 @@ RM_ARGS = ("-enable_rm=true -llama_addresses=%s -cgroup_hierarchy_path=%s "
            "-fair_scheduler_allocation_path=%s")
 CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 240
 
+def check_process_exists(binary, attempts=1):
+  """Checks if a process exists given the binary name. The `attempts` count allows us to
+  control the time a process needs to settle until it becomes available. After each try
+  the script will sleep for one second and retry. Returns True if it exists and False
+  otherwise.
+  """
+  for _ in range(attempts):
+    for pid in psutil.get_pid_list():
+      try:
+        process = psutil.Process(pid)
+        if process.name == binary: return True
+      except psutil.NoSuchProcess, e:
+        # Ignore the case when a process is no longer exists
+        pass
+    sleep(1)
+  return False
+
 def exec_impala_process(cmd, args, stderr_log_file_path):
   redirect_output = str()
   if options.verbose:
@@ -105,12 +123,18 @@ def kill_matching_processes(binary_name, force=False):
   if force: kill_cmd += " -9"
   os.system("%s %s" % (kill_cmd, binary_name))
 
+  if check_process_exists(binary_name):
+    raise RuntimeError("Unable to kill %s. Check process permissions." % (binary_name, ))
+
 def start_statestore():
   print "Starting State Store logging to %s/statestored.INFO" % options.log_dir
   stderr_log_file_path = os.path.join(options.log_dir, "statestore-error.log")
   args = "%s %s" % (build_impalad_logging_args(0, "statestored"),
                     " ".join(options.state_store_args))
   exec_impala_process(STATE_STORE_PATH, args, stderr_log_file_path)
+  if not check_process_exists("statestored", 10):
+    raise RuntimeError("Unable to start statestored. Check log or file permissions"
+                       " for more details.")
 
 def start_catalogd():
   print "Starting Catalog Service logging to %s/catalogd.INFO" % options.log_dir
@@ -119,6 +143,9 @@ def start_catalogd():
                        " ".join(options.catalogd_args),
                        build_jvm_args(options.cluster_size))
   exec_impala_process(CATALOGD_PATH, args, stderr_log_file_path)
+  if not check_process_exists("catalogd", 10):
+    raise RuntimeError("Unable to start catalogd. Check log or file permissions"
+                       " for more details.")
 
 def start_mini_impala_cluster(cluster_size):
   print ("Starting in-process Impala Cluster logging "
