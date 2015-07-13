@@ -1,15 +1,15 @@
 ====
 ---- QUERY
-insert into table insertalltypesagg 
-select id, bigint_col, bool_col, date_string_col, day, double_col, float_col, 
+insert into table insertalltypesagg
+select id, bigint_col, bool_col, date_string_col, day, double_col, float_col,
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
 ---- RESULTS
 : 11000
 ====
 ---- QUERY
-select id, bool_col from insertalltypesagg 
-WHERE id > 300 
-ORDER BY id 
+select id, bool_col from insertalltypesagg
+WHERE id > 300
+ORDER BY id
 LIMIT 2
 ---- RESULTS
 301,false
@@ -19,15 +19,15 @@ INT, BOOLEAN
 ====
 ---- QUERY
 insert into table insertalltypesagg
-select 9999999, bigint_col, false, date_string_col, day, double_col, float_col, 
+select 9999999, bigint_col, false, date_string_col, day, double_col, float_col,
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
 ---- RESULTS
 : 11000
 ====
 ---- QUERY
-select id, bool_col from insertalltypesagg 
-WHERE id = 9999999 
-ORDER BY id 
+select id, bool_col from insertalltypesagg
+WHERE id = 9999999
+ORDER BY id
 LIMIT 2
 ---- RESULTS
 9999999,false
@@ -43,16 +43,16 @@ select * from insertalltypesagg limit 1
 : 1
 ====
 ---- QUERY
-# test inserting Hive's default text representation of NULL '\N' 
+# test inserting Hive's default text representation of NULL '\N'
 # and make sure a scan returns the string and not NULL
 insert into table insertalltypesagg
-select 9999999, bigint_col, false, "\\N", day, double_col, float_col, 
+select 9999999, bigint_col, false, "\\N", day, double_col, float_col,
 int_col, month, smallint_col, "\\N", timestamp_col, tinyint_col, year from functional.alltypesagg limit 1
 ---- RESULTS
 : 1
 ====
 ---- QUERY
-select id, date_string_col, string_col from insertalltypesagg 
+select id, date_string_col, string_col from insertalltypesagg
 where id = 9999999
 ---- RESULTS
 9999999,'\N','\N'
@@ -61,7 +61,7 @@ INT, STRING, STRING
 ====
 ---- QUERY
 insert into table insertalltypesaggbinary
-select id, bigint_col, bool_col, date_string_col, day, double_col, float_col, 
+select id, bigint_col, bool_col, date_string_col, day, double_col, float_col,
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
 ---- RESULTS
 : 11000
@@ -97,9 +97,9 @@ select count(*) from (
 BIGINT
 ====
 ---- QUERY
-select id, bool_col from insertalltypesaggbinary 
-WHERE id > 300 
-ORDER BY id 
+select id, bool_col from insertalltypesaggbinary
+WHERE id > 300
+ORDER BY id
 LIMIT 2
 ---- RESULTS
 301,false
@@ -109,15 +109,15 @@ INT, BOOLEAN
 ====
 ---- QUERY
 insert into table insertalltypesaggbinary
-select 9999999, bigint_col, false, date_string_col, day, double_col, float_col, 
+select 9999999, bigint_col, false, date_string_col, day, double_col, float_col,
 int_col, month, smallint_col, string_col, timestamp_col, tinyint_col, year from functional.alltypesagg
 ---- RESULTS
 : 11000
 ====
 ---- QUERY
-select id, bool_col from insertalltypesaggbinary 
-WHERE id = 9999999 
-ORDER BY id 
+select id, bool_col from insertalltypesaggbinary
+WHERE id = 9999999
+ORDER BY id
 LIMIT 2
 ---- RESULTS
 9999999,false
@@ -133,16 +133,16 @@ select * from insertalltypesaggbinary limit 1
 : 1
 ====
 ---- QUERY
-# test inserting Hive's default text representation of NULL '\N' 
+# test inserting Hive's default text representation of NULL '\N'
 # and make sure a scan returns the string and not NULL
 insert into table insertalltypesaggbinary
-select 9999999, bigint_col, false, "\\N", day, double_col, float_col, 
+select 9999999, bigint_col, false, "\\N", day, double_col, float_col,
 int_col, month, smallint_col, "\\N", timestamp_col, tinyint_col, year from functional.alltypesagg limit 1
 ---- RESULTS
 : 1
 ====
 ---- QUERY
-select id, date_string_col, string_col from insertalltypesaggbinary 
+select id, date_string_col, string_col from insertalltypesaggbinary
 where id = 9999999
 ---- RESULTS
 9999999,'\N','\N'
@@ -150,7 +150,7 @@ where id = 9999999
 INT, STRING, STRING
 ====
 ---- QUERY
-#IMPALA-715 handle large string value 
+#IMPALA-715 handle large string value
 insert into table insertalltypesagg(id, string_col) values(9999999, rpad('a', 50000, 'b'))
 ---- RESULTS
 : 1
@@ -162,4 +162,31 @@ WHERE id = 9999999
 9999999,50000
 ---- TYPES
 INT, INT
+====
+---- QUERY
+# IMPALA-2133
+insert into table insertalltypesagg (id, string_col) values (99999999, 'William\'s'), (999999999, "Other\"s")
+---- RESULTS
+: 2
+====
+---- QUERY
+select id, string_col from insertalltypesagg where id = 99999999
+---- RESULTS
+99999999,'William's'
+---- TYPES
+INT, STRING
+=====
+---- QUERY
+select id, string_col from insertalltypesagg where string_col = 'William\'s'
+---- RESULTS
+99999999,'William's'
+---- TYPES
+INT, STRING
+====
+---- QUERY
+select id, string_col from insertalltypesagg where string_col = "Other\"s"
+---- RESULTS
+999999999,'Other"s'
+---- TYPES
+INT, STRING
 ====

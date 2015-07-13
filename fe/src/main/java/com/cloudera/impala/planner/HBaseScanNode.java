@@ -260,7 +260,7 @@ public class HBaseScanNode extends ScanNode {
         HBaseColumn col = (HBaseColumn) slot.getColumn();
         filters_.add(new THBaseFilter(
             col.getColumnFamily(), col.getColumnQualifier(),
-            (byte) hbaseOp.ordinal(), literal.getValue()));
+            (byte) hbaseOp.ordinal(), literal.getUnescapedValue()));
         analyzer.materializeSlots(Lists.newArrayList(e));
       }
     }
