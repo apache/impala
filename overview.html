@@ -133,18 +133,31 @@
   </li>
   </ul>
 We encourage you to read the <a href="http://www.cloudera.com/content/cloudera-content/cloudera-docs/CDH5/latest/Impala/impala.html">documentation</a> for further exploration. Also, see the <a href="http://www.slideshare.net/cloudera/the-impala-cookbook-42530186">Impala Cookbook</a>, which is continually updated to reflect current best practices.
-<h3>Roadmap</h3>
-<h5>Impala 2.1 and Beyond (Ships in 2015)</h5>
+<h3>Roadmap (Subject to Change)</h3>
+<h5>Planned for 2015</h5>
 <ul>
-  <li>Nested data – enables queries on complex nested structures including maps, structs, and arrays (early 2015)</li>
-  <li>MERGE statement – enables merging in updates into existing tables</li>
-  <li>Additional analytic SQL functionality – ROLLUP, CUBE, and GROUPING SET</li>
-  <li>SQL SET operators – MINUS, INTERSECT</li>
-  <li>Apache HBase CRUD – allows use of Impala for inserts and updates into HBase</li>
-  <li>UDTFs (user-defined table functions) – for more advanced user functions and extensibility</li>
-  <li>Intra-node parallelized aggregations and joins – to provide even faster joins and aggregations on on top of the performance gains of Impala</li>
-  <li>Parquet enhancements – continued performance gains including index pages</li>
-  <li>Amazon S3 integration</li>
+  <li>EMC Isilon support - to execute distributed queries against data in Isilon </li>
+  <li>Nested types - enabling queries on complex data structures like maps, structs, and arrays</li>
+  <li>Even greater scalability and reliability - to run at greater node and user scalability with less manual tuning</li>
+  <li>Even better predictability under concurrency - to handle greater concurrency in resource-limited situations</li>
+  <li>New Python data analysis framework - to maximize user productivity and executing natively on Impala&rsquo;s high-performance scale-out architecture (more news soon!)</li>
+</ul>
+<h5>Planned for late 2015 or early 2016</h5>
+<ul>
+  <li>Fine-grained authorization across CDH - expansion and full integration of Apache Sentry authorization across all CDH frameworks</li>
+  <li>Dynamic partition pruning - to perform data elimination of queries where the partition filters are in dimension tables instead of the fact tables</li>
+  <li>Greater node scalability for metadata propagation - finer-grain updates of metadata to enable more frequent metadata updates and greater node scalability</li>
+  <li>Improved YARN integration via Llama - for improved predictability of resource requests with dynamic resource scheduling via YARN</li>
+</ul>
+<h5>Planned for 2016</h5>
+<ul>
+  <li>Support for updates - to directly update and insert data into Hadoop</li>
+  <li>&gt;20x performance gains – via multi-core joins/aggregations, even more runtime code generation, collaboration with Intel for greater hardware efficiency gains, and more</li>
+  <li> In-memory columnar format - for more efficient, more scalable, vectorized operations on nested data types as well as to enable high-performance custom logic (UDFs/UDAs) without serialization/deserialization bottlenecks</li>
+  <li>Automated and incremental metadata refresh</li>
+  <li>Automated and incremental stats collection</li>
+  <li>Temporary tables - enabling temporary scratch locations to store interim results</li>
+  <li>Additional language extensions and data types - addition of new SQL and vendor-specific language extensions and data types based on customer feedback</li>
 </ul>
 <p>&nbsp;</p>
     </div>
