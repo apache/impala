@@ -669,10 +669,15 @@ Status PartitionedHashJoinNode::NextSpilledProbeRowBatch(
       // In case of right-outer, right-anti and full-outer joins, we move this partition
       // to the list of partitions that we need to output their unmatched build rows.
       DCHECK(output_build_partitions_.empty());
-      DCHECK(input_partition_->hash_tbl_.get() != NULL);
-      hash_tbl_iterator_ =
-          input_partition_->hash_tbl_->FirstUnmatched(ht_ctx_.get());
-      output_build_partitions_.push_back(input_partition_);
+      if (input_partition_->build_rows()->num_rows() > 0) {
+        DCHECK(input_partition_->hash_tbl_.get() != NULL) << " id: " << id_
+            << " Build: " << input_partition_->build_rows()->num_rows()
+            << " Probe: " << probe_rows->num_rows() << endl
+            << GetStackTrace();
+        hash_tbl_iterator_ =
+            input_partition_->hash_tbl_->FirstUnmatched(ht_ctx_.get());
+        output_build_partitions_.push_back(input_partition_);
+      }
     } else {
       // In any other case, just close the input partition.
       input_partition_->Close(out_batch);
