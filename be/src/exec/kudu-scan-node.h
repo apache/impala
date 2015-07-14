@@ -65,7 +65,7 @@ class KuduScanNode : public ScanNode {
     return materialized_slots_;
   }
 
-  const kudu::client::KuduSchema& kudu_schema() const { return schema_; }
+  const std::vector<std::string>& projected_columns() const { return projected_columns_; }
 
   const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
 
@@ -84,8 +84,8 @@ class KuduScanNode : public ScanNode {
   /// Descriptor of tuples read from Kudu table.
   const TupleDescriptor* tuple_desc_;
 
-  /// The schema of the materialized slots (i.e projection)
-  kudu::client::KuduSchema schema_;
+  /// The list of columns to project for the scan.
+  std::vector<std::string> projected_columns_;
 
   /// The Kudu client and table. Scanners share these instances.
   std::tr1::shared_ptr<kudu::client::KuduClient> client_;

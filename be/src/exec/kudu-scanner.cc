@@ -138,8 +138,8 @@ Status KuduScanner::GetNextScanner()  {
       << "/" << scan_ranges_.size();
 
   scanner_.reset(new kudu::client::KuduScanner(table_.get()));
-  KUDU_RETURN_IF_ERROR(scanner_->SetProjection(&scan_node_->kudu_schema()),
-      "Unable to set projection");
+  KUDU_RETURN_IF_ERROR(scanner_->SetProjectedColumns(scan_node_->projected_columns()),
+      "Unable to set projected columns");
 
   RETURN_IF_ERROR(SetupScanRangePredicate(key_range, scanner_.get()));
   KUDU_RETURN_IF_ERROR(scanner_->SetReadMode(

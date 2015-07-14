@@ -120,43 +120,28 @@ Status KuduSchemaFromExpressionList(const std::vector<TExpr>& expressions,
   return Status::OK();
 }
 
-Status KuduSchemaFromTupleDescriptor(const TupleDescriptor& tuple_desc,
-    kudu::client::KuduSchema* schema) {
-#ifndef NDEBUG
+Status ProjectedColumnsFromTupleDescriptor(const TupleDescriptor& tuple_desc,
+    vector<string>* projected_columns) {
+  DCHECK(projected_columns != NULL);
+  projected_columns->clear();
+
   // In debug mode try a dynamic cast. If it fails it means that the
   // TableDescriptor is not an instance of KuduTableDescriptor.
   DCHECK(dynamic_cast<const KuduTableDescriptor*>(tuple_desc.table_desc()))
       << "TableDescriptor must be an instance KuduTableDescriptor.";
-#endif
-
-  using kudu::client::KuduColumnSchema;
-
-  DCHECK_NOTNULL(schema);
 
   const KuduTableDescriptor* table_desc =
       static_cast<const KuduTableDescriptor*>(tuple_desc.table_desc());
   LOG(INFO) << "Table desc for schema: " << table_desc->DebugString();
 
-  unordered_set<string> key_col_names(table_desc->key_columns().begin(),
-      table_desc->key_columns().end());
-
-  vector<KuduColumnSchema> kudu_cols;
   const std::vector<SlotDescriptor*>& slots = tuple_desc.slots();
   for (int i = 0; i < slots.size(); ++i) {
     if (!slots[i]->is_materialized()) continue;
     int col_idx = slots[i]->col_pos();
     const string& col_name = table_desc->col_names()[col_idx];
-    // Initialize the DataType to avoid an uninitialized warning.
-    KuduColumnSchema::DataType kt = KuduColumnSchema::INT8;
-    RETURN_IF_ERROR(ImpalaToKuduType(slots[i]->type(), &kt));
-
-    // Key columns are not nullable, all others are for now.
-    bool is_key = key_col_names.find(col_name) != key_col_names.end();
-    kudu_cols.push_back(KuduColumnSchema(col_name, kt, !is_key));
+    projected_columns->push_back(col_name);
   }
 
-  // Scans don't care about key columns so we always pass 0.
-  schema->Reset(kudu_cols, 0);
   return Status::OK();
 }
 

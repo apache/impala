@@ -82,7 +82,7 @@ Status KuduScanNode::Prepare(RuntimeState* state) {
 
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   GetMaterializedSlots(*tuple_desc_, &materialized_slots_);
-  RETURN_IF_ERROR(KuduSchemaFromTupleDescriptor(*tuple_desc_, &schema_));
+  RETURN_IF_ERROR(ProjectedColumnsFromTupleDescriptor(*tuple_desc_, &projected_columns_));
 
   // Convert TScanRangeParams to ScanRanges.
   CHECK(scan_range_params_ != NULL)
