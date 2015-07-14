@@ -36,7 +36,7 @@ table_name:bad_text_lzo, constraint:restrict_to, table_format:text/lzo/block
 table_name:bad_text_gzip, constraint:restrict_to, table_format:text/gzip/block
 table_name:bad_seq_snap, constraint:restrict_to, table_format:seq/snap/block
 table_name:bad_parquet, constraint:restrict_to, table_format:parquet/none/none
-table_name:bad_magic_number_parquet, constraint:restrict_to, table_format:parquet/none/none
+table_name:bad_magic_number, constraint:restrict_to, table_format:parquet/none/none
 table_name:bad_metadata_len, constraint:restrict_to, table_format:parquet/none/none
 table_name:bad_dict_page_offset, constraint:restrict_to, table_format:parquet/none/none
 table_name:bad_compressed_size, constraint:restrict_to, table_format:parquet/none/none
