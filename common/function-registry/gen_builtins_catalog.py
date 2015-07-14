@@ -63,7 +63,9 @@ FE_PATH = os.path.expandvars(
 meta_data_entries = []
 
 # Read in the function and add it to the meta_data_entries map
-def add_function(fn_meta_data):
+def add_function(fn_meta_data, user_visible):
+  assert 4 <= len(fn_meta_data) <= 6, \
+         "Invalid function entry in impala_functions.py:\n\t" + repr(fn_meta_data)
   entry = {}
   entry["sql_names"] = fn_meta_data[0]
   entry["ret_type"] = fn_meta_data[1]
@@ -73,12 +75,17 @@ def add_function(fn_meta_data):
     entry["prepare"] = fn_meta_data[4]
   if len(fn_meta_data) >= 6:
     entry["close"] = fn_meta_data[5]
+  entry["user_visible"] = user_visible
   meta_data_entries.append(entry)
 
 def generate_fe_entry(entry, name):
   java_output = ""
   java_output += "\"" + name + "\""
   java_output += ", \"" + entry["symbol"] + "\""
+  if entry["user_visible"]:
+    java_output += ", true"
+  else:
+    java_output += ", false"
 
   if 'prepare' in entry:
     java_output += ', "%s"' % entry["prepare"]
@@ -114,10 +121,10 @@ def generate_fe_registry_init(filename):
   java_registry_file.close()
 
 # Read the function metadata inputs
-for function in impala_functions.functions:
-  assert 4 <= len(function) <= 6, \
-         "Invalid function entry in impala_functions.py:\n\t" + repr(function)
-  add_function(function)
+for function in impala_functions.visible_functions:
+  add_function(function, True)
+for function in impala_functions.invisible_functions:
+  add_function(function, False)
 
 if not os.path.exists(FE_PATH):
   os.makedirs(FE_PATH)
