@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "common/init.h"
+#include "service/hs2-util.h"
 
 #include <string>
+#include <utility>
 #include <gtest/gtest.h>
 
-#include "service/hs2-util.h"
+#include "common/init.h"
 
 #include "common/names.h"
 
 using namespace impala;
+using namespace std;
 
 // Test that a single byte can be stitched to an empty string at all offsets.
 TEST(StitchNullsTest, OneByteStitch) {
@@ -105,6 +107,55 @@ TEST(StitchNullsTest, StitchWithOffset) {
     ASSERT_EQ(to[0], 0x3);
   }
 }
+
+TEST(PrintTColumnValueTest, TestAllTypes) {
+  using namespace apache::hive::service::cli::thrift;
+
+  vector<pair<apache::hive::service::cli::thrift::TColumnValue, string> > values;
+  values.resize(9);
+
+  values[0].first.__set_boolVal(TBoolValue());
+  values[0].first.boolVal.__set_value(false);
+  values[0].second = "false";
+
+  values[1].first.__set_boolVal(TBoolValue());
+  values[1].first.boolVal.__set_value(true);
+  values[1].second = "true";
+
+  values[2].first.__set_doubleVal(TDoubleValue());
+  values[2].first.doubleVal.__set_value(1.23);
+  values[2].second = "1.23";
+
+  values[3].first.__set_byteVal(TByteValue());
+  values[3].first.byteVal.__set_value(12);
+  values[3].second = "12";
+
+  values[4].first.__set_i16Val(TI16Value());
+  values[4].first.i16Val.__set_value(123);
+  values[4].second = "123";
+
+  values[5].first.__set_i32Val(TI32Value());
+  values[5].first.i32Val.__set_value(1234);
+  values[5].second = "1234";
+
+  values[6].first.__set_i64Val(TI64Value());
+  values[6].first.i64Val.__set_value(12345);
+  values[6].second = "12345";
+
+  values[7].first.__set_stringVal(TStringValue());
+  values[7].first.stringVal.__set_value("hello world");
+  values[7].second = "hello world";
+
+  values[8].first.__set_i64Val(TI64Value());
+  values[8].second = "NULL";
+
+  for (int i = 0; i < values.size(); ++i) {
+    stringstream ss;
+    PrintTColumnValue(values[i].first, &ss);
+    ASSERT_EQ(ss.str(), values[i].second);
+  }
+}
+
 
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
