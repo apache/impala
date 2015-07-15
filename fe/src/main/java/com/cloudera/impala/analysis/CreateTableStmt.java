@@ -269,8 +269,14 @@ public class CreateTableStmt extends StatementBase {
     schemaSearchLocations.add(tblProperties_);
     String avroSchema = null;
     try {
-      avroSchema = HdfsTable.getAvroSchema(schemaSearchLocations,
-          dbName_ + "." + tableName_.getTbl());
+      avroSchema = HdfsTable.getAvroSchema(schemaSearchLocations);
+      // TODO: Allow creating Avro tables without an Avro schema, inferring the schema
+      // from the column definitions.
+      if (avroSchema == null) {
+        throw new AnalysisException(String.format("No Avro schema provided in " +
+            "SERDEPROPERTIES or TBLPROPERTIES for table: %s ",
+            dbName_ + "." + tableName_.getTbl()));
+      }
     } catch (TableLoadingException e) {
       throw new AnalysisException(e.getMessage(), e);
     }

@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.apache.avro.Schema;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
@@ -75,6 +76,7 @@ import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
+import com.cloudera.impala.util.AvroSchemaConverter;
 import com.cloudera.impala.util.AvroSchemaParser;
 import com.cloudera.impala.util.FsPermissionChecker;
 import com.cloudera.impala.util.HdfsCachingUtil;
@@ -1015,6 +1017,8 @@ public class HdfsTable extends Table {
           msTbl.getParameters().get(serdeConstants.SERIALIZATION_NULL_FORMAT);
       if (nullColumnValue_ == null) nullColumnValue_ = DEFAULT_NULL_COLUMN_VALUE;
 
+      // Excludes partition columns.
+      List<FieldSchema> msColDefs = msTbl.getSd().getCols();
       String inputFormat = msTbl.getSd().getInputFormat();
       if (HdfsFileFormat.fromJavaClassName(inputFormat) == HdfsFileFormat.AVRO) {
         // Look for the schema in TBLPROPERTIES and in SERDEPROPERTIES, with the latter
@@ -1024,8 +1028,14 @@ public class HdfsTable extends Table {
             getMetaStoreTable().getSd().getSerdeInfo().getParameters());
         schemaSearchLocations.add(getMetaStoreTable().getParameters());
 
-        avroSchema_ =
-            HdfsTable.getAvroSchema(schemaSearchLocations, getFullName());
+        avroSchema_ = HdfsTable.getAvroSchema(schemaSearchLocations);
+        if (avroSchema_ == null) {
+          // No Avro schema was explicitly set in the table metadata, so infer the Avro
+          // schema from the column definitions.
+          Schema avroSchema = AvroSchemaConverter.convertFieldSchemas(
+              msColDefs, getFullName());
+          avroSchema_ = avroSchema.toString();
+        }
         String serdeLib = msTbl.getSd().getSerdeInfo().getSerializationLib();
         if (serdeLib == null ||
             serdeLib.equals("org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe")) {
@@ -1033,32 +1043,49 @@ public class HdfsTable extends Table {
           // indicates there is an issue with the table metadata since Avro table need a
           // non-native serde. Instead of failing to load the table, fall back to
           // using the fields from the storage descriptor (same as Hive).
-          nonPartFieldSchemas_.addAll(msTbl.getSd().getCols());
+          nonPartFieldSchemas_.addAll(msColDefs);
         } else {
-          // Load the fields from the Avro schema.
-          // Since Avro does not include meta-data for CHAR or VARCHAR, an Avro type of
-          // "string" is used for CHAR, VARCHAR and STRING. Default back to the storage
-          // descriptor to determine the the type for "string"
-          List<FieldSchema> sdTypes = msTbl.getSd().getCols();
-          int i = 0;
-          List<Column> avroTypeList = AvroSchemaParser.parse(avroSchema_);
-          boolean canFallBack = sdTypes.size() == avroTypeList.size();
-          for (Column parsedCol: avroTypeList) {
-            FieldSchema fs = new FieldSchema();
-            fs.setName(parsedCol.getName());
-            String avroType = parsedCol.getType().toSql();
-            if (avroType.toLowerCase().equals("string") && canFallBack) {
-              fs.setType(sdTypes.get(i).getType());
-            } else {
-              fs.setType(avroType);
+          // Generate new FieldSchemas from the Avro schema. This step reconciles
+          // differences in the column definitions and the Avro schema. For
+          // Impala-created tables this step is not necessary because the same
+          // resolution is done during table creation. But Hive-created tables
+          // store the original column definitions, and not the reconciled ones.
+          // The schemas are reconciled according to following policy:
+          //
+          // Mismatched number of columns -> Prefer Avro column.
+          // Mismatched name/type -> Prefer Avro column, except:
+          //   A CHAR/VARCHAR column definition maps to an Avro STRING, and is preserved
+          //   as a CHAR/VARCHAR in the reconciled schema.
+          // Behavior for TIMESTAMP:
+          // A TIMESTAMP column definition maps to an Avro STRING and is presented as a
+          // STRING in the reconciled schema, because Avro has no binary TIMESTAMP
+          // representation. As a result, no Avro table may have a TIMESTAMP column.
+          //
+          // TODO: Factor out common schema reconciliation logic from here and
+          // CreateTableStmt.
+          List<Column> avroCols = AvroSchemaParser.parse(avroSchema_);
+          for (int i = 0; i < avroCols.size(); ++i) {
+            boolean useAvroType = true;
+            if (msColDefs.size() == avroCols.size()) {
+              Type colDefType = parseColumnType(msColDefs.get(i));
+              if (avroCols.get(i).getType().isStringType() && colDefType.isStringType()) {
+                // Preserve CHAR/VARCHAR from column definition. Avro only has STRING.
+                useAvroType = false;
+              }
             }
-            fs.setComment("from deserializer");
-            nonPartFieldSchemas_.add(fs);
-            i++;
+            FieldSchema newFs = new FieldSchema();
+            newFs.setName(avroCols.get(i).getName());
+            newFs.setComment("from deserializer");
+            if (useAvroType) {
+              newFs.setType(avroCols.get(i).getType().toSql());
+            } else {
+              newFs.setType(msColDefs.get(i).getType());
+            }
+            nonPartFieldSchemas_.add(newFs);
           }
         }
       } else {
-        nonPartFieldSchemas_.addAll(msTbl.getSd().getCols());
+        nonPartFieldSchemas_.addAll(msColDefs);
       }
       // The number of clustering columns is the number of partition keys.
       numClusteringCols_ = msTbl.getPartitionKeys().size();
@@ -1163,15 +1190,15 @@ public class HdfsTable extends Table {
   /**
    * Gets an Avro table's JSON schema from the list of given table property search
    * locations. The schema may be specified as a string literal or provided as a
-   * Hadoop FileSystem or http URL that points to the schema. This function does not
-   * perform any validation on the returned string (e.g., it may not be a valid
-   * schema).  If the schema was found to be specified as a SCHEMA_URL, this function
-   * will attempt to download the schema from the given URL.  Throws a
-   * TableLoadingException if no schema is found or if there was any error extracting
-   * the schema.
+   * Hadoop FileSystem or http URL that points to the schema. Apart from ensuring
+   * that the JSON schema is not SCHEMA_NONE, this function does not perform any
+   * additional validation on the returned string (e.g., it may not be a valid
+   * schema). Returns the Avro schema or null if none was specified in the search
+   * locations. Throws a TableLoadingException if a schema was specified, but could not
+   * be retrieved, e.g., because of an invalid URL.
    */
-  public static String getAvroSchema(List<Map<String, String>> schemaSearchLocations,
-      String tableName) throws TableLoadingException {
+  public static String getAvroSchema(List<Map<String, String>> schemaSearchLocations)
+      throws TableLoadingException {
     String url = null;
     // Search all locations and break out on the first valid schema found.
     for (Map<String, String> schemaLocation: schemaSearchLocations) {
@@ -1181,15 +1208,13 @@ public class HdfsTable extends Table {
       if (literal != null && !literal.equals(AvroSerdeUtils.SCHEMA_NONE)) return literal;
 
       url = schemaLocation.get(AvroSerdeUtils.SCHEMA_URL);
-      if (url != null) {
+      if (url != null && !url.equals(AvroSerdeUtils.SCHEMA_NONE)) {
         url = url.trim();
         break;
       }
     }
-    if (url == null || url.equals(AvroSerdeUtils.SCHEMA_NONE)) {
-      throw new TableLoadingException(String.format("No Avro schema provided in " +
-          "SERDEPROPERTIES or TBLPROPERTIES for table: %s ", tableName));
-    }
+    if (url == null) return null;
+
     String schema = null;
     if (url.toLowerCase().startsWith("http://")) {
       InputStream urlStream = null;

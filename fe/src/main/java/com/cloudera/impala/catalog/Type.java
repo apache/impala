@@ -18,8 +18,6 @@ import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
-
 import com.cloudera.impala.analysis.CreateTableStmt;
 import com.cloudera.impala.analysis.SqlParser;
 import com.cloudera.impala.analysis.SqlScanner;
@@ -225,11 +223,11 @@ public abstract class Type {
    *     returned but type.IsSupported() returns false.
    *   - A type Impala can't understand at all in which case null is returned.
    */
-  public static Type parseColumnType(FieldSchema fs) {
+  public static Type parseColumnType(String typeStr) {
     // Wrap the type string in a CREATE TABLE stmt and use Impala's Parser
     // to get the ColumnType.
     // Pick a table name that can't be used.
-    String stmt = String.format("CREATE TABLE $DUMMY ($DUMMY %s)", fs.getType());
+    String stmt = String.format("CREATE TABLE $DUMMY ($DUMMY %s)", typeStr);
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
     CreateTableStmt createTableStmt;

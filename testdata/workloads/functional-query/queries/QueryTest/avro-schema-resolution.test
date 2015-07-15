@@ -8,3 +8,17 @@ boolean, int, long, float, double, string, string, string
 true,1,1,1,1,'default string','','NULL'
 false,2,2,2,2,'serialized string','','NULL'
 ====
+---- QUERY
+# IMPALA-1136: Tests that Impala can read Hive-created Avro tables that have
+# no specified Avro schema, i.e., the Avro schema is inferred from the column
+# definitions
+# See testdata/avro_schema_resolution
+select * from no_avro_schema where year = 2009 order by id limit 1
+union all
+select * from no_avro_schema where year = 2010 order by id limit 1
+---- TYPES
+int, boolean, int, int, int, bigint, float, double, string, string, string, int, int
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+2430,true,0,0,0,0,0,0,'09/01/09','0','2009-09-01 00:00:00',2009,9
+6380,true,0,0,0,0,0,0,'10/01/10','0','2010-10-01 00:00:00',2010,10
+====

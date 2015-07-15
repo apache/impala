@@ -1485,6 +1485,31 @@ OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+no_avro_schema
+---- CREATE_HIVE
+-- Avro schema is inferred from the column definitions (IMPALA-1136)
+CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (
+id int,
+bool_col boolean,
+tinyint_col tinyint,
+smallint_col smallint,
+int_col int,
+bigint_col bigint,
+float_col float,
+double_col double,
+date_string_col string,
+string_col string,
+timestamp_col timestamp)
+PARTITIONED BY (year int, month int)
+STORED AS AVRO
+LOCATION '/test-warehouse/alltypes_avro_snap';
+---- ALTER
+ALTER TABLE {table_name} ADD PARTITION (year=2009,month=9);
+ALTER TABLE {table_name} ADD PARTITION (year=2010,month=10);
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 table_no_newline
 ---- CREATE
 CREATE EXTERNAL TABLE IF NOT EXISTS {db_name}{db_suffix}.{table_name} (

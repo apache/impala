@@ -395,6 +395,8 @@ create table compute_stats_db.avro_hive_alltypes_missing_coldef
 like functional_avro_snap.alltypes_missing_coldef;
 create table compute_stats_db.avro_hive_alltypes_type_mismatch
 like functional_avro_snap.alltypes_type_mismatch;
+create table compute_stats_db.avro_hive_no_avro_schema
+like functional_avro_snap.no_avro_schema;
 ====
 ---- QUERY
 # Avro table with matching column definitions and Avro schema
@@ -543,6 +545,45 @@ COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
 'date_string_col','STRING',0,-1,0,0
 'string_col','STRING',0,-1,0,0
 'timestamp_col','TIMESTAMP',0,-1,16,16
+'year','INT',0,0,4,4
+'month','INT',0,0,4,4
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, INT, DOUBLE
+====
+---- QUERY
+# Avro table without an Avro schema created by Hive.
+# The Avro schema is inferred from the column definitions,
+compute stats compute_stats_db.avro_hive_no_avro_schema
+---- RESULTS
+'Updated 0 partition(s) and 11 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.avro_hive_no_avro_schema
+---- LABELS
+YEAR, MONTH, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+'Total','',0,0,'0B','0B','','','',''
+---- TYPES
+STRING, STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+show column stats compute_stats_db.avro_hive_no_avro_schema
+---- LABELS
+COLUMN, TYPE, #DISTINCT VALUES, #NULLS, MAX SIZE, AVG SIZE
+---- RESULTS
+'id','INT',0,-1,4,4
+'bool_col','BOOLEAN',2,-1,1,1
+'tinyint_col','INT',0,-1,4,4
+'smallint_col','INT',0,-1,4,4
+'int_col','INT',0,-1,4,4
+'bigint_col','BIGINT',0,-1,8,8
+'float_col','FLOAT',0,-1,4,4
+'double_col','DOUBLE',0,-1,8,8
+'date_string_col','STRING',0,-1,0,0
+'string_col','STRING',0,-1,0,0
+'timestamp_col','STRING',0,-1,0,0
 'year','INT',0,0,4,4
 'month','INT',0,0,4,4
 ---- TYPES

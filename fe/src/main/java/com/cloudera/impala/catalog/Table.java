@@ -324,7 +324,7 @@ public abstract class Table implements CatalogObject {
    *   - A type Impala can't understand at all, and a TableLoadingException is thrown.
    */
    protected Type parseColumnType(FieldSchema fs) throws TableLoadingException {
-     Type type = Type.parseColumnType(fs);
+     Type type = Type.parseColumnType(fs.getType());
      if (type == null) {
        throw new TableLoadingException(String.format(
            "Unsupported type '%s' in column '%s' of table '%s'",
