@@ -150,14 +150,6 @@ select count(*) from alltypesaggmultifiles where day is not null
 BIGINT
 ====
 ---- QUERY
-# Test multi files partitioned table (text)
-select count(*) from alltypesaggmultifiles where day is not null
----- RESULTS
-10000
----- TYPES
-BIGINT
-====
----- QUERY
 # Test partition pruning when a binary predicate contains a NullLiteral
 select count(*) from alltypestiny where year != null or year = null
 ---- RESULTS
