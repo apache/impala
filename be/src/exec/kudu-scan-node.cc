@@ -128,6 +128,8 @@ Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   *eos = false;
 
   if (ReachedLimit()) {
+    // LIMIT 0 case.  Other limit values handled below.
+    DCHECK_EQ(limit_, 0);
     *eos = true;
     return Status::OK();
   }
@@ -137,6 +139,16 @@ Status KuduScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   RETURN_IF_ERROR(scanner_->GetNext(row_batch, eos));
   num_rows_returned_ += row_batch->num_rows();
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+
+  if (ReachedLimit()) {
+    int num_rows_over = num_rows_returned_ - limit_;
+    row_batch->set_num_rows(row_batch->num_rows() - num_rows_over);
+    num_rows_returned_ -= num_rows_over;
+    COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+
+    *eos = true;
+  }
+
   return Status::OK();
 }
 

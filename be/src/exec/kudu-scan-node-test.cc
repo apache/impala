@@ -129,6 +129,7 @@ class KuduScanNodeTest : public testing::Test {
   }
 
   static const int NO_LIMIT = -1;
+  static const int DEFAULT_ROWS_PER_BATCH = 1024;
 
   void ScanAndVerify(int expected_num_rows, int expected_num_batches,
       int num_cols_to_materialize, int num_notnull_cols = 3, int limit = NO_LIMIT) {
@@ -147,19 +148,12 @@ class KuduScanNodeTest : public testing::Test {
 
     int num_rows = 0;
     int num_batches = 0;
-    int batch_size;
-    // Even if 'limit' is equal to 0 we still need a batch size > 0.
-    if (limit == 0) {
-      batch_size = 1;
-    } else {
-      batch_size = expected_num_rows / expected_num_batches;
-    }
-
     bool eos = false;
+    int first_row = num_rows;
 
     do {
-      RowBatch* batch = obj_pool_.Add(new RowBatch(*row_desc_, batch_size,
-                                                   &mem_tracker_));
+      RowBatch* batch = obj_pool_.Add(new RowBatch(*row_desc_, DEFAULT_ROWS_PER_BATCH,
+          &mem_tracker_));
       ASSERT_OK(scanner.GetNext(&runtime_state_, batch, &eos));
 
       if (batch->num_rows() == 0) {
@@ -167,10 +161,10 @@ class KuduScanNodeTest : public testing::Test {
         break;
       }
 
-      ASSERT_EQ(batch->num_rows(), batch_size);
-      VerifyBatch(batch, batch_size * num_batches, batch_size * (num_batches + 1),
+      VerifyBatch(batch, first_row, first_row + batch->num_rows(),
           num_cols_to_materialize, num_notnull_cols);
       num_rows += batch->num_rows();
+      first_row = num_rows;
       ++num_batches;
     } while(!eos);
 
@@ -211,8 +205,8 @@ class KuduScanNodeTest : public testing::Test {
 
 TEST_F(KuduScanNodeTest, TestScanNode) {
 
-  const int NUM_ROWS = 1000;
-  const int NUM_BATCHES = 10;
+  const int NUM_BATCHES = 5;
+  const int NUM_ROWS = DEFAULT_ROWS_PER_BATCH * NUM_BATCHES;
 
   // Insert NUM_ROWS rows for this test.
   kudu_test_helper_.InsertTestRows(kudu_test_helper_.client().get(),
@@ -228,7 +222,7 @@ TEST_F(KuduScanNodeTest, TestScanNode) {
 TEST_F(KuduScanNodeTest, TestScanNullColValues) {
 
   const int NUM_ROWS = 1000;
-  const int NUM_BATCHES = 10;
+  const int NUM_BATCHES = 1;
 
   // Insert NUM_ROWS rows for this test but only the keys, i.e. the 2nd
   // and 3rd columns are null.
