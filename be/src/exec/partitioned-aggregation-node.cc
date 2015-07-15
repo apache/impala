@@ -357,8 +357,8 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
   return Status::OK();
 }
 
-void PartitionedAggregationNode::CleanupHashTbl(const vector<FunctionContext*>& ctxs,
-    HashTable::Iterator it) {
+void PartitionedAggregationNode::CleanupHashTbl(
+    const vector<FunctionContext*>& agg_fn_ctxs, HashTable::Iterator it) {
   if (!needs_finalize_ && !needs_serialize_) return;
 
   // Iterate through the remaining rows in the hash table and call Serialize/Finalize on
@@ -370,13 +370,13 @@ void PartitionedAggregationNode::CleanupHashTbl(const vector<FunctionContext*>& 
     dummy_dst = Tuple::Create(output_tuple_desc_->byte_size(), mem_pool_.get());
     while (!it.AtEnd()) {
       Tuple* tuple = it.GetTuple();
-      AggFnEvaluator::Finalize(aggregate_evaluators_, agg_fn_ctxs_, tuple, dummy_dst);
+      AggFnEvaluator::Finalize(aggregate_evaluators_, agg_fn_ctxs, tuple, dummy_dst);
       it.Next();
     }
   } else {
     while (!it.AtEnd()) {
       Tuple* tuple = it.GetTuple();
-      AggFnEvaluator::Serialize(aggregate_evaluators_, agg_fn_ctxs_, tuple);
+      AggFnEvaluator::Serialize(aggregate_evaluators_, agg_fn_ctxs, tuple);
       it.Next();
     }
   }

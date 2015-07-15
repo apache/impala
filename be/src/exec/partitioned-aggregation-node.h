@@ -89,6 +89,9 @@ class SlotDescriptor;
 /// size the partitions/hash tables better.
 /// TODO: Start with unpartitioned (single partition) and switch to partitioning and
 /// spilling only if the size gets large, say larger than the LLC.
+/// TODO: Simplify or cleanup the various uses of agg_fn_ctx, agg_fn_ctx_, and ctx.
+/// There are so many contexts in use that a plain "ctx" variable should never be used.
+/// Likewise, it's easy to mixup the agg fn ctxs, there should be a way to simplify this.
 class PartitionedAggregationNode : public ExecNode {
  public:
   PartitionedAggregationNode(ObjectPool* pool,
@@ -413,7 +416,7 @@ class PartitionedAggregationNode : public ExecNode {
   void ClosePartitions();
 
   /// Calls finalizes on all tuples starting at 'it'.
-  void CleanupHashTbl(const std::vector<impala_udf::FunctionContext*>& fn_ctxs,
+  void CleanupHashTbl(const std::vector<impala_udf::FunctionContext*>& agg_fn_ctxs,
       HashTable::Iterator it);
 
   /// Codegen UpdateSlot(). Returns NULL if codegen is unsuccessful.
