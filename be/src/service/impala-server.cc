@@ -873,8 +873,7 @@ Status ImpalaServer::UnregisterQuery(const TUniqueId& query_id, bool check_infli
   double duration_ms = 1000 * (exec_state->end_time().ToSubsecondUnixTime() -
       exec_state->start_time().ToSubsecondUnixTime());
 
-  // This should never happen unless we mess around with timezones during Impala's
-  // execution. Unfortunately a test does exactly that right now and triggers IMPALA-2031.
+  // duration_ms can be negative when the local timezone changes during query execution.
   if (duration_ms >= 0) {
     if (exec_state->stmt_type() == TStmtType::DDL) {
       ImpaladMetrics::DDL_DURATIONS->Update(duration_ms);
