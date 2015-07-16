@@ -114,8 +114,7 @@ class TestTpchMemLimitError(ImpalaTestSuite):
     try:
       self.run_test_case(tpch_query, new_vector)
     except ImpalaBeeswaxException as e:
-      if (expects_error == 0):
-        raise
+      if not expects_error: raise
       assert TestTpchMemLimitError.EXPECTED_ERROR_MSG in str(e)
 
   def test_low_mem_limit_q1(self, vector):
