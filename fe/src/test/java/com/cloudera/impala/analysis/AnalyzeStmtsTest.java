@@ -1987,6 +1987,18 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select int_col + 0.5, count(*) from functional.alltypes group by 1");
     AnalyzesOk("select cast(int_col as double), count(*)" +
         "from functional.alltypes group by 1");
+
+    // select expression refers to column with same name as its own explicit alias and
+    // it's referred to by ordinal in group by (IMPALA-1898)
+    // Trivial example
+    AnalyzesOk("select bigint_col + 0 AS bigint_col, sum(smallint_col) " +
+               "FROM functional.alltypes " +
+               "GROUP BY 1");
+    // More complex example
+    AnalyzesOk("select extract(timestamp_col, 'hour') AS timestamp_col, string_col, " +
+               "sum(double_col) AS double_total " +
+               "FROM functional.alltypes " +
+               "GROUP BY 1, 2");
   }
 
   @Test
@@ -2062,6 +2074,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "select * from functional.alltypes order by int_col",
         "Ignoring ORDER BY clause without LIMIT or OFFSET: " +
         "ORDER BY int_col ASC");
+
+    // select expression refers to column with same name as its own explicit alias and
+    // it's referred to by ordinal in group by (IMPALA-1898)
+    AnalyzesOk("select extract(timestamp_col, 'hour') AS timestamp_col " +
+               "FROM functional.alltypes " +
+               "ORDER BY timestamp_col");
   }
 
   @Test

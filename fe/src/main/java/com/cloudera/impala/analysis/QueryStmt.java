@@ -184,13 +184,7 @@ public abstract class QueryStmt extends StatementBase {
       isAscOrder.add(Boolean.valueOf(orderByElement.isAsc()));
       nullsFirstParams.add(orderByElement.getNullsFirstParam());
     }
-    substituteOrdinals(orderingExprs, "ORDER BY", analyzer);
-    Expr ambiguousAlias = getFirstAmbiguousAlias(orderingExprs);
-    if (ambiguousAlias != null) {
-      throw new AnalysisException("Column '" + ambiguousAlias.toSql() +
-          "' in ORDER BY clause is ambiguous");
-    }
-    orderingExprs = Expr.trySubstituteList(orderingExprs, aliasSmap_, analyzer, false);
+    substituteOrdinalsAliases(orderingExprs, "ORDER BY", analyzer);
 
     if (!analyzer.isRootAnalyzer() && hasOffset() && !hasLimit()) {
       throw new AnalysisException("Order-by with offset without limit not supported" +
@@ -274,30 +268,52 @@ public abstract class QueryStmt extends StatementBase {
 
   /**
    * Substitute exprs of the form "<number>"  with the corresponding
-   * expressions.
+   * expressions and any alias references in aliasSmap_.
+   * Modifies exprs list in-place.
    */
-  protected void substituteOrdinals(List<Expr> exprs, String errorPrefix,
+  protected void substituteOrdinalsAliases(List<Expr> exprs, String errorPrefix,
       Analyzer analyzer) throws AnalysisException {
-    // Substitute ordinals.
+    Expr ambiguousAlias = getFirstAmbiguousAlias(exprs);
+    if (ambiguousAlias != null) {
+      throw new AnalysisException("Column '" + ambiguousAlias.toSql() +
+          "' in " + errorPrefix + " clause is ambiguous");
+    }
+
     ListIterator<Expr> i = exprs.listIterator();
     while (i.hasNext()) {
       Expr expr = i.next();
-      if (!(expr instanceof NumericLiteral)) continue;
-      expr.analyze(analyzer);
-      if (!expr.getType().isIntegerType()) continue;
-      long pos = ((NumericLiteral) expr).getLongValue();
-      if (pos < 1) {
-        throw new AnalysisException(
-            errorPrefix + ": ordinal must be >= 1: " + expr.toSql());
+      // We can substitute either by ordinal or by alias.
+      // If we substitute by ordinal, we should not replace any aliases, since
+      // the new expression was copied from the select clause context, where
+      // alias substitution is not performed in the same way.
+      Expr substituteExpr = trySubstituteOrdinal(expr, errorPrefix, analyzer);
+      if (substituteExpr == null) {
+        substituteExpr = expr.trySubstitute(aliasSmap_, analyzer, false);
       }
-      if (pos > resultExprs_.size()) {
-        throw new AnalysisException(
-            errorPrefix + ": ordinal exceeds number of items in select list: "
-            + expr.toSql());
-      }
-      // Create copy to protect against accidentally shared state.
-      i.set(resultExprs_.get((int) pos - 1).clone());
+      i.set(substituteExpr);
     }
+  }
+
+  // Attempt to replace an expression of form "<number>" with the corresponding
+  // select list items.  Return null if not an ordinal expression.
+  private Expr trySubstituteOrdinal(Expr expr, String errorPrefix,
+      Analyzer analyzer) throws AnalysisException {
+    if (!(expr instanceof NumericLiteral)) return null;
+    expr.analyze(analyzer);
+    if (!expr.getType().isIntegerType()) return null;
+    long pos = ((NumericLiteral) expr).getLongValue();
+    if (pos < 1) {
+      throw new AnalysisException(
+          errorPrefix + ": ordinal must be >= 1: " + expr.toSql());
+    }
+    if (pos > resultExprs_.size()) {
+      throw new AnalysisException(
+          errorPrefix + ": ordinal exceeds number of items in select list: "
+          + expr.toSql());
+    }
+
+    // Create copy to protect against accidentally shared state.
+    return resultExprs_.get((int) pos - 1).clone();
   }
 
   /**

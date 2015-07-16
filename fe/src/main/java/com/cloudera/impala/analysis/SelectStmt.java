@@ -541,14 +541,9 @@ public class SelectStmt extends QueryStmt {
       // make a deep copy here, we don't want to modify the original
       // exprs during analysis (in case we need to print them later)
       groupingExprsCopy = Expr.cloneList(groupingExprs_);
-      substituteOrdinals(groupingExprsCopy, "GROUP BY", analyzer);
-      Expr ambiguousAlias = getFirstAmbiguousAlias(groupingExprsCopy);
-      if (ambiguousAlias != null) {
-        throw new AnalysisException("Column '" + ambiguousAlias.toSql() +
-            "' in GROUP BY clause is ambiguous");
-      }
-      groupingExprsCopy =
-          Expr.trySubstituteList(groupingExprsCopy, aliasSmap_, analyzer, false);
+
+      substituteOrdinalsAliases(groupingExprsCopy, "GROUP BY", analyzer);
+
       for (int i = 0; i < groupingExprsCopy.size(); ++i) {
         groupingExprsCopy.get(i).analyze(analyzer);
         if (groupingExprsCopy.get(i).contains(Expr.isAggregatePredicate())) {
@@ -699,7 +694,6 @@ public class SelectStmt extends QueryStmt {
       }
     }
   }
-
 
   /**
    * Create a map from COUNT([ALL]) -> zeroifnull(COUNT([ALL])) if

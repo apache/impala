@@ -1119,3 +1119,39 @@ select count(null * 1) from functional.alltypes
 ---- TYPES
 BIGINT
 ====
+---- QUERY
+# IMPALA-1898: ordinal in group/order by combined with explicit select-list alias
+# that match columns in underlying table
+select extract(timestamp_col, 'year') as timestamp_col,
+       extract(timestamp_col, 'month') as month,
+       sum(tinyint_col)
+from functional.alltypes
+group by 1, 2
+order by 1, 2;
+---- RESULTS
+2009,1,1395
+2009,2,1260
+2009,3,1395
+2009,4,1350
+2009,5,1395
+2009,6,1350
+2009,7,1395
+2009,8,1395
+2009,9,1350
+2009,10,1395
+2009,11,1350
+2009,12,1395
+2010,1,1395
+2010,2,1260
+2010,3,1395
+2010,4,1350
+2010,5,1395
+2010,6,1350
+2010,7,1395
+2010,8,1395
+2010,9,1350
+2010,10,1395
+2010,11,1350
+2010,12,1395
+---- TYPES
+INT,INT,BIGINT
