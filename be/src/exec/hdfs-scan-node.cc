@@ -463,6 +463,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   // Prepare all the partitions scanned by the scan node
   BOOST_FOREACH(const int64_t& partition_id, partition_ids_) {
     HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
+    // This is IMPALA-1702, but will have been caught earlier in this method.
     DCHECK(partition_desc != NULL) << "table_id=" << hdfs_table_->id()
                                    << " partition_id=" << partition_id
                                    << "\n" << PrintThrift(state->fragment_params());
@@ -671,9 +672,13 @@ void HdfsScanNode::Close(RuntimeState* state) {
   // Close all the partitions scanned by the scan node
   BOOST_FOREACH(const int64_t& partition_id, partition_ids_) {
     HdfsPartitionDescriptor* partition_desc = hdfs_table_->GetPartition(partition_id);
-    DCHECK(partition_desc != NULL) << "table_id=" << hdfs_table_->id()
-                                   << " partition_id=" << partition_id
-                                   << "\n" << PrintThrift(state->fragment_params());
+    if (partition_desc == NULL) {
+      // TODO: Revert when IMPALA-1702 is fixed.
+      LOG(ERROR) << "Bad table descriptor! table_id=" << hdfs_table_->id()
+                 << " partition_id=" << partition_id
+                 << "\n" << PrintThrift(state->fragment_params());
+      continue;
+    }
     partition_desc->CloseExprs(state);
   }
   ScanNode::Close(state);

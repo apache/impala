@@ -179,7 +179,7 @@ Status HdfsPartitionDescriptor::OpenExprs(RuntimeState* state) {
 }
 
 void HdfsPartitionDescriptor::CloseExprs(RuntimeState* state) {
-  if (exprs_closed_) return;
+  if (exprs_closed_ || !exprs_prepared_) return;
   exprs_closed_ = true;
   Expr::Close(partition_key_value_ctxs_, state);
 }
