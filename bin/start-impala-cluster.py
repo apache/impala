@@ -17,7 +17,6 @@
 # ImpalaD instances. Each ImpalaD runs on a different port allowing this to be run
 # on a single machine.
 import os
-import psutil
 import sys
 from time import sleep, time
 from optparse import OptionParser
@@ -89,7 +88,13 @@ def check_process_exists(binary, attempts=1):
   control the time a process needs to settle until it becomes available. After each try
   the script will sleep for one second and retry. Returns True if it exists and False
   otherwise.
+  TODO: The conditional import will go away once we start using virtualenv.
   """
+  try:
+    import psutil
+  except ImportError:
+    print "psutil not available, process invocations and kills may be unstable."
+    return True
   for _ in range(attempts):
     for pid in psutil.get_pid_list():
       try:
