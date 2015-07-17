@@ -99,6 +99,7 @@ class ExprContext {
   /// Register(). This should only be called by Exprs.
   FunctionContext* fn_context(int i) {
     DCHECK_GE(i, 0);
+    DCHECK_LT(i, fn_contexts_.size());
     return fn_contexts_[i];
   }
 

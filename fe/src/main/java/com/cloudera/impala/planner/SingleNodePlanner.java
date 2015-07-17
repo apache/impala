@@ -52,6 +52,7 @@ import com.cloudera.impala.catalog.DataSourceTable;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Type;
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
@@ -823,7 +824,11 @@ public class SingleNodePlanner {
     // Mark pre-substitution conjuncts as assigned, since the ids of the new exprs may
     // have changed.
     analyzer.markConjunctsAssigned(preds);
-    inlineViewRef.getAnalyzer().registerConjuncts(viewPredicates);
+    try {
+      inlineViewRef.getAnalyzer().registerConjuncts(viewPredicates);
+    } catch (AnalysisException ex) {
+      throw new IllegalStateException("Caught an AnalysisException in the planner", ex);
+    }
 
     // mark (fully resolve) slots referenced by remaining unassigned conjuncts as
     // materialized
@@ -1152,7 +1157,12 @@ public class SingleNodePlanner {
       for (UnionOperand op: unionStmt.getOperands()) {
         List<Expr> opConjuncts =
             Expr.substituteList(conjuncts, op.getSmap(), analyzer, false);
-        op.getAnalyzer().registerConjuncts(opConjuncts);
+        try {
+          op.getAnalyzer().registerConjuncts(opConjuncts);
+        } catch (AnalysisException ex) {
+          throw new IllegalStateException(
+              "Caught an AnalysisException in the planner", ex);
+        }
         // Some of the opConjuncts have become constant and eval'd to false, or an
         // ancestor block is already guaranteed to return empty results.
         if (op.getAnalyzer().hasEmptyResultSet()) op.drop();

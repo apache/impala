@@ -72,7 +72,7 @@ HiveUdfCall::HiveUdfCall(const TExprNode& node)
 }
 
 AnyVal* HiveUdfCall::Evaluate(ExprContext* ctx, TupleRow* row) {
-  FunctionContext* fn_ctx = ctx->fn_context(context_index_);
+  FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
   JniContext* jni_ctx = reinterpret_cast<JniContext*>(
       fn_ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
   DCHECK(jni_ctx != NULL);
@@ -178,7 +178,7 @@ Status HiveUdfCall::Open(RuntimeState* state, ExprContext* ctx,
   RETURN_IF_ERROR(Expr::Open(state, ctx, scope));
 
   // Create a JniContext in this thread's FunctionContext
-  FunctionContext* fn_ctx = ctx->fn_context(context_index_);
+  FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
   JniContext* jni_ctx = new JniContext;
   fn_ctx->SetFunctionState(FunctionContext::THREAD_LOCAL, jni_ctx);
 
@@ -231,7 +231,7 @@ Status HiveUdfCall::Open(RuntimeState* state, ExprContext* ctx,
 
 void HiveUdfCall::Close(RuntimeState* state, ExprContext* ctx,
                         FunctionContext::FunctionStateScope scope) {
-  FunctionContext* fn_ctx = ctx->fn_context(context_index_);
+  FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
   JniContext* jni_ctx = reinterpret_cast<JniContext*>(
       fn_ctx->GetFunctionState(FunctionContext::THREAD_LOCAL));
 

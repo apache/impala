@@ -1833,3 +1833,26 @@ where abs(cast(int_col as decimal(8,0))) >
 ---- TYPES
 INT,BIGINT
 ====
+---- QUERY
+# Test for IMPALA-1756 (Builtin)
+select int_col from functional.alltypes where regexp_replace('abc', '*', 'cde') = 'cde'
+limit 10
+---- TYPES
+INT
+---- RESULTS
+---- CATCH
+AnalysisException: Error evaluating "regexp_replace('abc', '*', 'cde') = 'cde'"
+CAUSED BY: InternalException: Could not compile regexp pattern: *
+Error: no argument for repetition operator: *
+====
+---- QUERY
+# Test for IMPALA-1756 (UDF)
+select int_col from functional.alltypes where
+madlib_vector_get(0, madlib_vector(1.0, 2.0, NULL)) = 1.0 limit 10
+---- TYPES
+INT
+---- RESULTS
+---- CATCH
+AnalysisException: Error evaluating "madlib_vector_get(0, madlib_vector(1.0, 2.0, NULL)) = 1.0"
+CAUSED BY: InternalException: madlib vector entry 2 is NULL
+====

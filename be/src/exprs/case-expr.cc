@@ -53,7 +53,7 @@ Status CaseExpr::Prepare(RuntimeState* state, const RowDescriptor& desc,
 Status CaseExpr::Open(RuntimeState* state, ExprContext* ctx,
                       FunctionContext::FunctionStateScope scope) {
   RETURN_IF_ERROR(Expr::Open(state, ctx, scope));
-  FunctionContext* fn_ctx = ctx->fn_context(context_index_);
+  FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
   CaseExprState* case_state =
       reinterpret_cast<CaseExprState*>(fn_ctx->Allocate(sizeof(CaseExprState)));
   fn_ctx->SetFunctionState(FunctionContext::THREAD_LOCAL, case_state);
@@ -69,8 +69,8 @@ Status CaseExpr::Open(RuntimeState* state, ExprContext* ctx,
 
 void CaseExpr::Close(RuntimeState* state, ExprContext* ctx,
                      FunctionContext::FunctionStateScope scope) {
-  if (context_index_ != -1) {
-    FunctionContext* fn_ctx = ctx->fn_context(context_index_);
+  if (fn_context_index_ != -1) {
+    FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
     void* case_state = fn_ctx->GetFunctionState(FunctionContext::THREAD_LOCAL);
     fn_ctx->Free(reinterpret_cast<uint8_t*>(case_state));
   }
@@ -366,7 +366,7 @@ bool CaseExpr::AnyValEq(const ColumnType& type, const AnyVal* v1, const AnyVal* 
 
 #define CASE_COMPUTE_FN(THEN_TYPE) \
   THEN_TYPE CaseExpr::Get##THEN_TYPE(ExprContext* ctx, TupleRow* row) { \
-    FunctionContext* fn_ctx = ctx->fn_context(context_index_); \
+    FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_); \
     CaseExprState* state = reinterpret_cast<CaseExprState*>( \
         fn_ctx->GetFunctionState(FunctionContext::THREAD_LOCAL)); \
     DCHECK(state->case_val != NULL); \
