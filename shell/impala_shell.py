@@ -37,6 +37,7 @@ from option_parser import get_option_parser, get_config_from_file
 from shell_output import DelimitedOutputFormatter, OutputStream, PrettyOutputFormatter
 from shell_output import OverwritingStdErrOutputStream
 from subprocess import call
+from thrift.Thrift import TException
 
 VERSION_FORMAT = "Impala Shell v%(version)s (%(git_hash)s) built on %(build_date)s"
 VERSION_STRING = "build version not available"
@@ -159,7 +160,7 @@ class ImpalaShell(cmd.Cmd):
     except ImportError:
       self._disable_readline()
 
-    if options.impalad != None:
+    if options.impalad is not None:
       self.do_connect(options.impalad)
 
     # We handle Ctrl-C ourselves, using an Event object to signal cancellation
@@ -391,6 +392,11 @@ class ImpalaShell(cmd.Cmd):
       # If cmdqueue is populated, then commands are executed from the cmdqueue, and user
       # input is ignored. Send an empty string as the user input just to be safe.
       return str()
+    try:
+      self.imp_client.test_connection()
+    except TException:
+      print_to_stderr("Connection lost, reconnecting...")
+      self._connect()
     return args.encode('utf-8')
 
   def postcmd(self, status, args):
@@ -486,7 +492,7 @@ class ImpalaShell(cmd.Cmd):
 
     """
     # Assume the user wants to connect to the local impalad if no connection string is
-    # specified. Conneting to a kerberized impalad requires an fqdn as the host name.
+    # specified. Connecting to a kerberized impalad requires an fqdn as the host name.
     if self.use_ldap and self.ldap_password is None:
       self.ldap_password = getpass.getpass("LDAP password for %s: " % self.user)
 
@@ -558,13 +564,13 @@ class ImpalaShell(cmd.Cmd):
       self.imp_client.close_connection()
       raise
     except ImportError:
-        print_to_stderr(("Unable to import the python 'ssl' module. It is"
-                         " required for an SSL-secured connection."))
-        sys.exit(1)
+      print_to_stderr("Unable to import the python 'ssl' module. It is"
+      " required for an SSL-secured connection.")
+      sys.exit(1)
     except socket.error, (code, e):
       # if the socket was interrupted, reconnect the connection with the client
       if code == errno.EINTR:
-        self._reconnect_cancellation
+        self._reconnect_cancellation()
       else:
         print_to_stderr("Socket error %s: %s" % (code, e))
         self.prompt = self.DISCONNECTED_PROMPT

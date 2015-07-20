@@ -208,6 +208,12 @@ class ImpalaClient(object):
       output += first_child_output
     return idx
 
+  def test_connection(self):
+    """Checks to see if the current Impala connection is still alive. If not, an exception
+    will be raised."""
+    if self.connected:
+      self.imp_service.PingImpalaService()
+
   def connect(self):
     """Creates a connection to an Impalad instance
 
