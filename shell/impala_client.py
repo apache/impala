@@ -243,9 +243,9 @@ class ImpalaClient(object):
        is used.
     """
     if self.use_ssl:
-        # TSSLSocket needs the ssl module, which may not be standard on all Operating
-        # Systems. Only attempt to import TSSLSocket if the user wants an SSL connection.
-        from thrift.transport import TSSLSocket
+      # TSSLSocket needs the ssl module, which may not be standard on all Operating
+      # Systems. Only attempt to import TSSLSocket if the user wants an SSL connection.
+      from thrift.transport import TSSLSocket
 
     # sasl does not accept unicode strings, explicitly encode the string into ascii.
     host, port = self.impalad[0].encode('ascii', 'ignore'), int(self.impalad[1])

@@ -383,6 +383,16 @@ class TestImpalaShell(object):
     result = run_impala_shell_cmd(args)
     assert output == result.stdout, "Queries from STDIN not parsed correctly."
 
+  @pytest.mark.execute_serially
+  def test_allow_creds_in_clear(self):
+    args = '-l'
+    result = run_impala_shell_cmd(args, expect_success=False)
+    assert "LDAP credentials may not be sent over insecure connections. " +\
+    "Enable SSL or set --auth_creds_ok_in_clear" in result.stderr
+
+    # TODO: Without an Impala daemon running LDAP authentication, we can't test if
+    # --auth_creds_ok_in_clear works when correctly set.
+
 def run_impala_shell_cmd(shell_args, expect_success=True, stdin_input=None):
   """Runs the Impala shell on the commandline.
 

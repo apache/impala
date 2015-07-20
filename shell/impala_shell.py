@@ -159,9 +159,6 @@ class ImpalaShell(cmd.Cmd):
     except ImportError:
       self._disable_readline()
 
-    if options.use_ldap:
-      self.ldap_password = getpass.getpass("LDAP password for %s:" % self.user)
-
     if options.impalad != None:
       self.do_connect(options.impalad)
 
@@ -490,6 +487,9 @@ class ImpalaShell(cmd.Cmd):
     """
     # Assume the user wants to connect to the local impalad if no connection string is
     # specified. Conneting to a kerberized impalad requires an fqdn as the host name.
+    if self.use_ldap and self.ldap_password is None:
+      self.ldap_password = getpass.getpass("LDAP password for %s: " % self.user)
+
     if not args: args = socket.getfqdn()
     tokens = args.split(" ")
     # validate the connection string.
@@ -503,9 +503,9 @@ class ImpalaShell(cmd.Cmd):
     self.impalad = tuple(host_port)
     if self.imp_client: self.imp_client.close_connection()
     self.imp_client = ImpalaClient(self.impalad, self.use_kerberos,
-                                 self.kerberos_service_name, self.use_ssl,
-                                 self.ca_cert, self.user, self.ldap_password,
-                                 self.use_ldap)
+                                   self.kerberos_service_name, self.use_ssl,
+                                   self.ca_cert, self.user, self.ldap_password,
+                                   self.use_ldap)
     self._connect()
     # If the connection fails and the Kerberos has not been enabled,
     # check for a valid kerberos ticket and retry the connection
@@ -1047,7 +1047,6 @@ def execute_queries_non_interactive_mode(options):
         sys.exit(1)
 
 if __name__ == "__main__":
-
   # pass defaults into option parser
   parser = get_option_parser(impala_shell_defaults)
   options, args = parser.parse_args()
@@ -1089,6 +1088,11 @@ if __name__ == "__main__":
 
   if options.use_kerberos and options.use_ldap:
     print_to_stderr("Please specify at most one authentication mechanism (-k or -l)")
+    sys.exit(1)
+
+  if not options.ssl and not options.creds_ok_in_clear and options.use_ldap:
+    print_to_stderr("LDAP credentials may not be sent over insecure " +
+                    "connections. Enable SSL or set --auth_creds_ok_in_clear")
     sys.exit(1)
 
   if options.use_kerberos:
@@ -1133,6 +1137,10 @@ if __name__ == "__main__":
     sys.exit(0)
 
   intro = WELCOME_STRING
+  if not options.ssl and options.creds_ok_in_clear and options.use_ldap:
+    intro += ("\n\\nLDAP authentication is enabled, but the connection to Impala is " +
+              "not secured by TLS.\nALL PASSWORDS WILL BE SENT IN THE CLEAR TO IMPALA.\n")
+
   shell = ImpalaShell(options)
   while shell.is_alive:
     try:

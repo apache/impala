@@ -138,6 +138,11 @@ def get_option_parser(defaults):
                     help="Print a query summary every 1s while the query is running.")
   parser.add_option("--live_progress", dest="print_progress", action="store_true",
                     help="Print a query progress every 1s while the query is running.")
+  parser.add_option("--auth_creds_ok_in_clear", dest="creds_ok_in_clear",
+                    action="store_true", help="If set, LDAP authentication " +
+                    "may be used with an insecure connection to Impala. " +
+                    "WARNING: Authentication credentials will therefore be sent " +
+                    "unencrypted, and may be vulnerable to attack.")
 
   # add default values to the help text
   for option in parser.option_list:
