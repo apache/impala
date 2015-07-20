@@ -17,6 +17,15 @@
 # ImpalaD instances. Each ImpalaD runs on a different port allowing this to be run
 # on a single machine.
 import os
+# psutil does not exist on hosts which build Impala packages. Furthermore, it is not
+# needed as the packaging code does not start any processes.
+# TODO: Remove this logic and all usage of psutil_exists once we switch to using a python
+# virtualenv.
+try:
+  import psutil
+  psutil_exists = True
+except ImportError:
+  psutil_exists = False
 import sys
 from time import sleep, time
 from optparse import OptionParser
@@ -90,9 +99,7 @@ def check_process_exists(binary, attempts=1):
   otherwise.
   TODO: The conditional import will go away once we start using virtualenv.
   """
-  try:
-    import psutil
-  except ImportError:
+  if not psutil_exists:
     print "psutil not available, process invocations and kills may be unstable."
     return True
   for _ in range(attempts):
@@ -128,7 +135,7 @@ def kill_matching_processes(binary_name, force=False):
   if force: kill_cmd += " -9"
   os.system("%s %s" % (kill_cmd, binary_name))
 
-  if check_process_exists(binary_name):
+  if psutil_exists and check_process_exists(binary_name):
     raise RuntimeError("Unable to kill %s. Check process permissions." % (binary_name, ))
 
 def start_statestore():
