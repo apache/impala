@@ -171,20 +171,29 @@ class MemTracker {
       MemTracker* tracker = all_trackers_[i];
       int64_t limit = tracker->effective_limit();
       if (limit < 0) {
-        tracker->consumption_->Add(bytes);
+        tracker->consumption_->Add(bytes); // No limit at this tracker.
       } else {
-        if (!tracker->consumption_->TryAdd(bytes, limit)) {
-          // One of the trackers failed, attempt to GC memory or expand our limit. If that
-          // succeeds, TryUpdate() again. Bail if either fails.
-          //
+        // If TryConsume fails, we can try to GC or expand the RM reservation, but we may
+        // need to try several times if there are concurrent consumers because we don't
+        // take a lock before trying to update consumption_.
+        bool fail_consume = false;
+        while (!tracker->consumption_->TryAdd(bytes, limit)) {
+          VLOG_RPC << "TryConsume failed, bytes=" << bytes
+                   << " consumption=" << tracker->consumption_->current_value()
+                   << " limit=" << limit << " attempting to GC and expand reservation";
           // TODO: This may not be right if more than one tracker can actually change its
-          // rm reservation limit.
-          if (!tracker->GcMemory(limit - bytes) || tracker->ExpandRmReservation(bytes)) {
-            if (!tracker->consumption_->TryAdd(bytes, tracker->limit_)) break;
-          } else {
+          // RM reservation limit.
+          if (tracker->GcMemory(limit - bytes) && !tracker->ExpandRmReservation(bytes)) {
+            fail_consume = true;
             break;
           }
+          VLOG_RPC << "GC or expansion succeeded, TryConsume bytes=" << bytes
+                   << " consumption=" << tracker->consumption_->current_value()
+                   << " new limit=" << tracker->effective_limit() << " prev=" << limit;
+          // Need to update the limit if the RM reservation was expanded.
+          limit = tracker->effective_limit();
         }
+        if (fail_consume) break;
       }
     }
     // Everyone succeeded, return.
