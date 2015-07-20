@@ -674,6 +674,85 @@ describe avro_alltypes_part
 STRING, STRING, STRING
 ====
 ---- QUERY
+# Test creating a partitioned Avro table without an Avro schema.
+# The Avro schema is inferred from the column definitions.
+create table no_avro_schema (
+  c1 tinyint,
+  c2 smallint comment 'becomes int',
+  c3 int,
+  c4 bigint,
+  c5 float,
+  c6 double,
+  c7 timestamp comment 'becomes string',
+  c8 string,
+  c9 char(10) comment 'preserved',
+  c10 varchar(20),
+  c11 decimal(10, 5),
+  c12 struct<f1:int,f2:string>,
+  c13 array<int>,
+  c14 map<string,string>)
+partitioned by (year int, month int)
+stored as avro
+---- RESULTS
+====
+---- QUERY
+describe no_avro_schema
+---- RESULTS
+'c1','int','from deserializer'
+'c2','int','becomes int'
+'c3','int','from deserializer'
+'c4','bigint','from deserializer'
+'c5','float','from deserializer'
+'c6','double','from deserializer'
+'c7','string','becomes string'
+'c8','string','from deserializer'
+'c9','char(10)','preserved'
+'c10','varchar(20)','from deserializer'
+'c11','decimal(10,5)','from deserializer'
+'c12','struct<\n  f1:int,\n  f2:string\n>','from deserializer'
+'c13','array<int>','from deserializer'
+'c14','map<string,string>','from deserializer'
+'year','int',''
+'month','int',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+# Test creating an Avro table without an Avro schema via CREATE TABLE LIKE (IMPALA-1813)
+create table like_no_avro_schema like no_avro_schema stored as avro
+---- RESULTS
+====
+---- QUERY
+describe like_no_avro_schema
+---- RESULTS
+'c1','int','from deserializer'
+'c2','int','becomes int'
+'c3','int','from deserializer'
+'c4','bigint','from deserializer'
+'c5','float','from deserializer'
+'c6','double','from deserializer'
+'c7','string','becomes string'
+'c8','string','from deserializer'
+'c9','char(10)','preserved'
+'c10','varchar(20)','from deserializer'
+'c11','decimal(10,5)','from deserializer'
+'c12','struct<\n  f1:int,\n  f2:string\n>','from deserializer'
+'c13','array<int>','from deserializer'
+'c14','map<string,string>','from deserializer'
+'year','int',''
+'month','int',''
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+drop table like_no_avro_schema
+---- RESULTS
+====
+---- QUERY
+drop table no_avro_schema
+---- RESULTS
+====
+---- QUERY
 drop table avro_alltypes_part
 ---- RESULTS
 ====

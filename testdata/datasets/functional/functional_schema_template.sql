@@ -1504,8 +1504,11 @@ PARTITIONED BY (year int, month int)
 STORED AS AVRO
 LOCATION '/test-warehouse/alltypes_avro_snap';
 ---- ALTER
-ALTER TABLE {table_name} ADD PARTITION (year=2009,month=9);
-ALTER TABLE {table_name} ADD PARTITION (year=2010,month=10);
+-- The second partition is added twice because there seems to be a Hive/beeline
+-- bug where the last alter is not executed properly.
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION (year=2009,month=9);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION (year=2010,month=10);
+ALTER TABLE {table_name} ADD IF NOT EXISTS PARTITION (year=2010,month=10);
 ====
 ---- DATASET
 functional

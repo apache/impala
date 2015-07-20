@@ -293,7 +293,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     AnalysisError(
         "alter table functional.alltypes change column int_col Tinyint_col int",
-        "Column already exists: Tinyint_col");
+        "Column already exists: tinyint_col");
 
     // Invalid column name.
     AnalysisError("alter table functional.alltypes change column int_col `???` int",
@@ -1120,7 +1120,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create table db_does_not_exist.new_table (i int)",
         "Database does not exist: db_does_not_exist");
     AnalysisError("create table new_table (i int, I string)",
-        "Duplicate column name: I");
+        "Duplicate column name: i");
     AnalysisError("create table new_table (c1 double, col2 int, c1 double, c4 string)",
         "Duplicate column name: c1");
     AnalysisError("create table new_table (i int, s string) PARTITIONED BY (i int)",
@@ -1269,10 +1269,14 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "double_col double, date_string_col string, string_col string, " +
         "timestamp_col timestamp) with serdeproperties ('avro.schema.url'='%s')" +
         "stored as avro", alltypesSchemaLoc),
-        "Ignoring column definitions in favor of Avro schema due to a mismatched " +
-        "column name at position 5.\n" +
-        "Column definition: bad_int_col INT\n" +
-        "Avro schema column: int_col INT");
+        "Resolved the following name and/or type inconsistencies between the column " +
+        "definitions and the Avro schema.\n" +
+        "Column definition at position 4:  bad_int_col INT\n" +
+        "Avro schema column at position 4: int_col INT\n" +
+        "Resolution at position 4: int_col INT\n" +
+        "Column definition at position 10:  timestamp_col TIMESTAMP\n" +
+        "Avro schema column at position 10: timestamp_col STRING\n" +
+        "Resolution at position 10: timestamp_col STRING");
     // Mismatched type.
     AnalyzesOk(String.format(
         "create table foo_avro (id int, bool_col boolean, tinyint_col int, " +
@@ -1280,33 +1284,43 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "double_col bigint, date_string_col string, string_col string, " +
         "timestamp_col timestamp) stored as avro tblproperties ('avro.schema.url'='%s')",
         alltypesSchemaLoc),
-        "Ignoring column definitions in favor of Avro schema due to a mismatched " +
-        "column type at position 8.\n" +
-        "Column definition: double_col BIGINT\n" +
-        "Avro schema column: double_col DOUBLE");
+        "Resolved the following name and/or type inconsistencies between the column " +
+        "definitions and the Avro schema.\n" +
+        "Column definition at position 7:  double_col BIGINT\n" +
+        "Avro schema column at position 7: double_col DOUBLE\n" +
+        "Resolution at position 7: double_col DOUBLE\n" +
+        "Column definition at position 10:  timestamp_col TIMESTAMP\n" +
+        "Avro schema column at position 10: timestamp_col STRING\n" +
+        "Resolution at position 10: timestamp_col STRING");
 
-    // No Avro schema specified for Avro format table.
-    AnalysisError("create table foo_avro (i int) stored as avro",
-        "No Avro schema provided in SERDEPROPERTIES or TBLPROPERTIES for table: " +
-        "default.foo_avro");
-    AnalysisError("create table foo_avro (i int) stored as avro tblproperties ('a'='b')",
-        "No Avro schema provided in SERDEPROPERTIES or TBLPROPERTIES for table: " +
-        "default.foo_avro");
+    // Avro schema is inferred from column definitions.
+    AnalyzesOk("create table foo_avro (c1 tinyint, c2 smallint, c3 int, c4 bigint, " +
+        "c5 float, c6 double, c7 timestamp, c8 string, c9 char(10), c10 varchar(20)," +
+        "c11 decimal(10, 5), c12 struct<f1:int,f2:string>, c13 array<int>," +
+        "c14 map<string,string>) stored as avro");
+    AnalyzesOk("create table foo_avro (c1 tinyint, c2 smallint, c3 int, c4 bigint, " +
+        "c5 float, c6 double, c7 timestamp, c8 string, c9 char(10), c10 varchar(20)," +
+        "c11 decimal(10, 5), c12 struct<f1:int,f2:string>, c13 array<int>," +
+        "c14 map<string,string>) partitioned by (year int, month int) stored as avro");
+    // Neither Avro schema nor column definitions.
     AnalysisError("create table foo_avro stored as avro tblproperties ('a'='b')",
-        "No Avro schema provided in SERDEPROPERTIES or TBLPROPERTIES for table: "+
-        "default.foo_avro");
+        "An Avro table requires column definitions or an Avro schema.");
 
     // Invalid schema URL
+    AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
+        "('avro.schema.url'='')",
+        "Invalid avro.schema.url: . Can not create a Path from an empty string");
     AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
         "('avro.schema.url'='schema.avsc')",
         "Invalid avro.schema.url: schema.avsc. Path does not exist.");
     AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
         "('avro.schema.url'='hdfs://invalid*host/schema.avsc')",
-        "Invalid avro.schema.url: hdfs://invalid*host/schema.avsc. " +
+        "Failed to read Avro schema at: hdfs://invalid*host/schema.avsc. " +
         "Incomplete HDFS URI, no host: hdfs://invalid*host/schema.avsc");
     AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
         "('avro.schema.url'='foo://bar/schema.avsc')",
-        "Invalid avro.schema.url: foo://bar/schema.avsc. No FileSystem for scheme: foo");
+        "Failed to read Avro schema at: foo://bar/schema.avsc. " +
+        "No FileSystem for scheme: foo");
 
     // Decimal parsing
     AnalyzesOk("create table foo_avro (i int) stored as avro tblproperties " +
@@ -1347,28 +1361,21 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "org.codehaus.jackson.JsonParseException: Unexpected close marker ']': "+
         "expected '}'");
 
-    // Unsupported types
-    // Array
-    AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
+    // Map/Array types in Avro schema.
+    AnalyzesOk("create table foo_avro (i int) stored as avro tblproperties " +
         "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
         "\"fields\": [{\"name\": \"string1\", \"type\": \"string\"}," +
-        "{\"name\": \"list1\", \"type\": {\"type\":\"array\", \"items\": \"int\"}}]}')",
-        "Error parsing Avro schema for table 'default.foo_avro': " +
-        "Unsupported type 'array' of column 'list1'");
-    // Map
-    AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
+        "{\"name\": \"list1\", \"type\": {\"type\":\"array\", \"items\": \"int\"}}]}')");
+    AnalyzesOk("create table foo_avro (i int) stored as avro tblproperties " +
         "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
         "\"fields\": [{\"name\": \"string1\", \"type\": \"string\"}," +
-        "{\"name\": \"map1\", \"type\": {\"type\":\"map\", \"values\": \"int\"}}]}')",
-        "Error parsing Avro schema for table 'default.foo_avro': " +
-        "Unsupported type 'map' of column 'map1'");
+        "{\"name\": \"map1\", \"type\": {\"type\":\"map\", \"values\": \"int\"}}]}')");
 
-    // Union
+    // Union is not supported
     AnalysisError("create table foo_avro (i int) stored as avro tblproperties " +
         "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
         "\"fields\": [{\"name\": \"string1\", \"type\": \"string\"}," +
         "{\"name\": \"union1\", \"type\": [\"float\", \"boolean\"]}]}')",
-        "Error parsing Avro schema for table 'default.foo_avro': " +
         "Unsupported type 'union' of column 'union1'");
 
     // TODO: Add COLLECTION ITEMS TERMINATED BY and MAP KEYS TERMINATED BY clauses.

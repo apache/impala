@@ -1,4 +1,4 @@
-// Copyright 2014 Cloudera Inc.
+// Copyright 2015 Cloudera Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,9 @@ import java.util.List;
 
 import org.apache.avro.Schema;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.codehaus.jackson.node.IntNode;
 
+import com.cloudera.impala.analysis.ColumnDef;
 import com.cloudera.impala.catalog.ArrayType;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.MapType;
@@ -58,6 +60,12 @@ public class AvroSchemaConverter {
     return converter.convertColumnsImpl(columns, schemaName);
   }
 
+  public static Schema convertColumnDefs(
+      List<ColumnDef> colDefs, String schemaName) {
+    AvroSchemaConverter converter = new AvroSchemaConverter();
+    return converter.convertColumnDefsImpl(colDefs, schemaName);
+  }
+
   public static Schema convertFieldSchemas(
       List<FieldSchema> fieldSchemas, String schemaName) {
     AvroSchemaConverter converter = new AvroSchemaConverter();
@@ -73,6 +81,16 @@ public class AvroSchemaConverter {
     for (Column column: columns) {
       final Schema.Field avroField = new Schema.Field(column.getName(),
           createAvroSchema(column.getType()), column.getComment(), null);
+      avroFields.add(avroField);
+    }
+    return createAvroRecord(avroFields, schemaName);
+  }
+
+  private Schema convertColumnDefsImpl(List<ColumnDef> colDefs, String schemaName) {
+    List<Schema.Field> avroFields = Lists.newArrayList();
+    for (ColumnDef colDef: colDefs) {
+      final Schema.Field avroField = new Schema.Field(colDef.getColName(),
+          createAvroSchema(colDef.getType()), colDef.getComment(), null);
       avroFields.add(avroField);
     }
     return createAvroRecord(avroFields, schemaName);
@@ -144,11 +162,11 @@ public class AvroSchemaConverter {
   private Schema createDecimalSchema(ScalarType impalaDecimalType) {
     Schema decimalSchema = Schema.create(Schema.Type.BYTES);
     decimalSchema.addProp(AVRO_LOGICAL_TYPE, AVRO_DECIMAL_TYPE);
-    // addProp expects a string as the value.
+    // precision and scale must be integer values
     decimalSchema.addProp(PRECISION_PROP_NAME,
-        String.valueOf(impalaDecimalType.decimalPrecision()));
+        new IntNode(impalaDecimalType.decimalPrecision()));
     decimalSchema.addProp(SCALE_PROP_NAME,
-        String.valueOf(impalaDecimalType.decimalScale()));
+        new IntNode(impalaDecimalType.decimalScale()));
     return decimalSchema;
   }
 

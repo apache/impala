@@ -25,6 +25,14 @@ public class MapType extends Type {
   public Type getValueType() { return valueType_; }
 
   @Override
+  public boolean equals(Object other) {
+    if (!(other instanceof MapType)) return false;
+    MapType otherMapType = (MapType) other;
+    return otherMapType.keyType_.equals(keyType_) &&
+        otherMapType.valueType_.equals(valueType_);
+  }
+
+  @Override
   public String toSql() {
     return String.format("MAP<%s,%s>", keyType_.toSql(), valueType_.toSql());
   }

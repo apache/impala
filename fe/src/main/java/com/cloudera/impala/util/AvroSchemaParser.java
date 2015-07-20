@@ -30,9 +30,15 @@ import org.apache.avro.Schema;
 import org.apache.avro.SchemaParseException;
 import org.codehaus.jackson.JsonNode;
 
-import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.analysis.ColumnDef;
+import com.cloudera.impala.analysis.TypeDef;
+import com.cloudera.impala.catalog.ArrayType;
+import com.cloudera.impala.catalog.MapType;
 import com.cloudera.impala.catalog.ScalarType;
+import com.cloudera.impala.catalog.StructField;
+import com.cloudera.impala.catalog.StructType;
 import com.cloudera.impala.catalog.Type;
+import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -57,31 +63,35 @@ public class AvroSchemaParser {
 
   /**
    * Parses the Avro schema string literal, mapping the Avro types to Impala types.
-   * Returns a list of Column objects with their name and type info set.
-   * Throws an UnsupportedOperationException if the Avro type maps to a type Impala
+   * Returns a list of ColumnDef objects with their name and type info set.
+   * Throws an AnalysisException if the Avro type maps to a type that Impala
    * does not yet support.
    * Throws a SchemaParseException if the Avro schema was invalid.
    */
-  public static List<Column> parse(String schemaStr) throws SchemaParseException {
+  public static List<ColumnDef> parse(String schemaStr)
+      throws SchemaParseException, AnalysisException {
     Schema.Parser avroSchemaParser = new Schema.Parser();
     Schema schema = avroSchemaParser.parse(schemaStr);
     if (!schema.getType().equals(Schema.Type.RECORD)) {
       throw new UnsupportedOperationException("Schema for table must be of type " +
           "RECORD. Received type: " + schema.getType());
     }
-    List<Column> cols = Lists.newArrayList();
-    for (int i = 0; i < schema.getFields().size(); ++i) {
-      Schema.Field field = schema.getFields().get(i);
-      cols.add(new Column(field.name(), getTypeInfo(field.schema(), field.name()), i));
+    List<ColumnDef> colDefs = Lists.newArrayListWithCapacity(schema.getFields().size());
+    for (Schema.Field field: schema.getFields()) {
+      ColumnDef colDef = new ColumnDef(field.name(),
+          new TypeDef(getTypeInfo(field.schema(), field.name())), field.doc());
+      colDef.analyze();
+      colDefs.add(colDef);
     }
-    return cols;
+    return colDefs;
   }
 
   /**
    * Parses the given Avro schema and returns the matching Impala type
    * for this field. Handles primitive and complex types.
    */
-  private static Type getTypeInfo(Schema schema, String colName) {
+  private static Type getTypeInfo(Schema schema, String colName)
+      throws AnalysisException {
     // Avro requires NULLable types to be defined as unions of some type T
     // and NULL.  This is annoying and we're going to hide it from the user.
     if (isNullableType(schema)) {
@@ -94,19 +104,30 @@ public class AvroSchemaParser {
     }
 
     switch(type) {
+      case ARRAY:
+        Type itemType = getTypeInfo(schema.getElementType(), colName);
+        return new ArrayType(itemType);
+      case MAP:
+        Type valueType = getTypeInfo(schema.getValueType(), colName);
+        return new MapType(Type.STRING, valueType);
+      case RECORD:
+        StructType structType = new StructType();
+        for (Schema.Field field: schema.getFields()) {
+          Type fieldType = getTypeInfo(field.schema(), colName);
+          structType.addField(new StructField(field.name(), fieldType, field.doc()));
+        }
+        return structType;
       case BYTES:
         // Decimal is stored in Avro as a BYTE.
         Type decimalType = getDecimalType(schema);
         if (decimalType != null) return decimalType;
-      case RECORD:
-      case MAP:
-      case ARRAY:
+      // TODO: Add support for stored Avro UNIONs by exposing them as STRUCTs in Impala.
       case UNION:
       case ENUM:
       case FIXED:
       case NULL:
       default: {
-        throw new UnsupportedOperationException(String.format(
+        throw new AnalysisException(String.format(
             "Unsupported type '%s' of column '%s'", type.getName(), colName));
       }
     }

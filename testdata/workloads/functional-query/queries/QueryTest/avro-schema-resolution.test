@@ -11,7 +11,9 @@ false,2,2,2,2,'serialized string','','NULL'
 ---- QUERY
 # IMPALA-1136: Tests that Impala can read Hive-created Avro tables that have
 # no specified Avro schema, i.e., the Avro schema is inferred from the column
-# definitions
+# definitions.
+# IMPALA-1947: A TIMESTAMP from the column definitions results in a STRING column
+# backed by a stored Avro STRING during table loading.
 # See testdata/avro_schema_resolution
 select * from no_avro_schema where year = 2009 order by id limit 1
 union all
