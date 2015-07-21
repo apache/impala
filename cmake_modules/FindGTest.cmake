@@ -37,21 +37,21 @@ set(GTEST_H gtest/gtest.h)
 
 find_path(GTEST_INCLUDE_DIR ${GTEST_H}
   PATHS ${GTEST_ROOT}/include
-        ${CMAKE_SOURCE_DIR}/thirdparty/gtest-1.6.0/include
+        $ENV{IMPALA_HOME}/thirdparty/gtest-1.6.0/include
         NO_DEFAULT_PATH
   DOC   "Path to the ${GTEST_H} file"
 )
 
 find_library(GTEST_LIBRARY NAMES gtest
   PATHS ${GTEST_ROOT}/lib
-        ${CMAKE_SOURCE_DIR}/thirdparty/gtest-1.6.0
+        $ENV{IMPALA_HOME}/thirdparty/gtest-1.6.0
         NO_DEFAULT_PATH
   DOC   "Google's framework for writing C++ tests (gtest)"
 )
 
 find_library(GTEST_MAIN_LIBRARY NAMES gtest_main
   PATHS ${GTEST_ROOT}/lib
-        ${CMAKE_SOURCE_DIR}/thirdparty/gtest-1.6.0
+        $ENV{IMPALA_HOME}/thirdparty/gtest-1.6.0
         NO_DEFAULT_PATH
   DOC   "Google's framework for writing C++ tests (gtest_main)"
 )

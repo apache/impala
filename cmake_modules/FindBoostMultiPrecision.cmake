@@ -2,7 +2,7 @@
 # This is a header only library so we just need to set the include dir
 
 set(BOOST_MULTI_PRECISION_SEARCH_HEADER_PATH
-  ${CMAKE_SOURCE_DIR}/thirdparty/boost_multiprecision
+  $ENV{IMPALA_HOME}/thirdparty/boost_multiprecision
 )
 
 find_file(BOOST_MULTI_PRECISION_HEADER NAMES cpp_int.hpp
@@ -28,4 +28,3 @@ endif ()
 mark_as_advanced(
   BOOST_MULTI_PRECISION_INCLUDE_DIR
 )
-

@@ -3,8 +3,8 @@
 #  SQUEASEL_INCLUDE_DIR, directory containing headers
 #  SQUEASEL_SRC_DIR, directory containing source
 
-find_path(SQUEASEL_INCLUDE_DIR squeasel/squeasel.h HINTS ${CMAKE_SOURCE_DIR}/thirdparty)
-find_path(SQUEASEL_SRC_DIR squeasel.c HINTS ${CMAKE_SOURCE_DIR}/thirdparty/squeasel)
+find_path(SQUEASEL_INCLUDE_DIR squeasel/squeasel.h HINTS $ENV{IMPALA_HOME}/thirdparty)
+find_path(SQUEASEL_SRC_DIR squeasel.c HINTS $ENV{IMPALA_HOME}/thirdparty/squeasel)
 
 if (SQUEASEL_INCLUDE_DIR)
   set(SQUEASEL_FOUND TRUE)

@@ -7,7 +7,7 @@
 #  GLOG_STATIC_LIB, path to libglog.a
 #  glogstatic
 
-set(THIRDPARTY ${CMAKE_SOURCE_DIR}/thirdparty)
+set(THIRDPARTY $ENV{IMPALA_HOME}/thirdparty)
 
 set(GLOG_SEARCH_HEADER_PATHS
   ${GLOG_ROOT}/include

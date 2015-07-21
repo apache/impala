@@ -7,9 +7,9 @@
 #  LBER_STATIC_LIBRARY, a support library for LDAP.
 #  ldapstatic, lberstatic, imported libraries
 
-set(THIRDPARTY_LDAP thirdparty/openldap-$ENV{IMPALA_OPENLDAP_VERSION})
+set(THIRDPARTY_LDAP $ENV{IMPALA_HOME}/thirdparty/openldap-$ENV{IMPALA_OPENLDAP_VERSION})
 
-set (THIRDPARTY ${CMAKE_SOURCE_DIR}/thirdparty)
+set(THIRDPARTY $ENV{IMPALA_HOME}/thirdparty)
 set(LDAP_SEARCH_LIB_PATH
   ${OPENLDAP_ROOT}/lib
   ${THIRDPARTY}/openldap-$ENV{IMPALA_OPENLDAP_VERSION}/impala_install/lib

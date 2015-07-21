@@ -7,12 +7,12 @@
 
 set(RE2_SEARCH_HEADER_PATHS
   ${RE2_ROOT}/include
-  ${CMAKE_SOURCE_DIR}/thirdparty/re2
+  $ENV{IMPALA_HOME}/thirdparty/re2
 )
 
 set(RE2_SEARCH_LIB_PATHS
   ${RE2_ROOT}/lib
-  ${CMAKE_SOURCE_DIR}/thirdparty/re2/obj
+  $ENV{IMPALA_HOME}/thirdparty/re2/obj
 )
 
 find_path(RE2_INCLUDE_DIR re2/re2.h

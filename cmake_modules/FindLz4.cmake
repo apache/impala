@@ -9,12 +9,12 @@
 
 set(LZ4_SEARCH_LIB_PATH
   ${LZ4_ROOT}/lib
-  ${CMAKE_SOURCE_DIR}/thirdparty/lz4
+  $ENV{IMPALA_HOME}/thirdparty/lz4
 )
 
 set(LZ4_SEARCH_INCLUDE_DIR
   ${LZ4_ROOT}/include
-  ${CMAKE_SOURCE_DIR}/thirdparty/lz4
+  $ENV{IMPALA_HOME}/thirdparty/lz4
 )
 
 find_path(LZ4_INCLUDE_DIR lz4.h

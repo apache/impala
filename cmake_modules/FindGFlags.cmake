@@ -9,12 +9,12 @@
 
 set(GFLAGS_SEARCH_HEADER_PATHS
   ${GFLAGS_ROOT}/include
-  ${CMAKE_SOURCE_DIR}/thirdparty/gflags-$ENV{IMPALA_GFLAGS_VERSION}/src
+  $ENV{IMPALA_HOME}/thirdparty/gflags-$ENV{IMPALA_GFLAGS_VERSION}/src
 )
 
 set(GFLAGS_SEARCH_LIB_PATH
   ${GFLAGS_ROOT}/lib
-  ${CMAKE_SOURCE_DIR}/thirdparty/gflags-$ENV{IMPALA_GFLAGS_VERSION}/.libs
+  $ENV{IMPALA_HOME}/thirdparty/gflags-$ENV{IMPALA_GFLAGS_VERSION}/.libs
 )
 
 find_path(GFLAGS_INCLUDE_DIR gflags/gflags.h PATHS

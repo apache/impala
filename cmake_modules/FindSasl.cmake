@@ -5,9 +5,9 @@
 #  SASL_STATIC_LIBRARY, the library to use
 #  saslstatic - imported static library
 
-set(THIRDPARTY_SASL thirdparty/cyrus-sasl-$ENV{IMPALA_CYRUS_SASL_VERSION})
+set(THIRDPARTY_SASL $ENV{IMPALA_HOME}/thirdparty/cyrus-sasl-$ENV{IMPALA_CYRUS_SASL_VERSION})
 
-set (THIRDPARTY ${CMAKE_SOURCE_DIR}/thirdparty)
+set(THIRDPARTY $ENV{IMPALA_HOME}/thirdparty)
 
 set(SASL_SEARCH_LIB_PATH
   ${CYRUS_SASL_ROOT}/lib

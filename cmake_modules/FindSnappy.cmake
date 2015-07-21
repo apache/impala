@@ -10,12 +10,12 @@
 
 set(SNAPPY_SEARCH_HEADER_PATHS
   ${SNAPPY_ROOT}/include
-  ${CMAKE_SOURCE_DIR}/thirdparty/snappy-1.0.5/build/include
+  $ENV{IMPALA_HOME}/thirdparty/snappy-1.0.5/build/include
 )
 
 set(SNAPPY_SEARCH_LIB_PATH
   ${SNAPPY_ROOT}/lib
-  ${CMAKE_SOURCE_DIR}/thirdparty/snappy-1.0.5/build/lib
+  $ENV{IMPALA_HOME}/thirdparty/snappy-1.0.5/build/lib
 )
 
 find_path(SNAPPY_INCLUDE_DIR

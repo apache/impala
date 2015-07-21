@@ -6,11 +6,11 @@
 #  avro - static library
 set(AVRO_SEARCH_HEADER_PATHS
   ${AVRO_ROOT}/include
-  ${CMAKE_SOURCE_DIR}/thirdparty/avro-c-$ENV{IMPALA_AVRO_VERSION}/src)
+  $ENV{IMPALA_HOME}/thirdparty/avro-c-$ENV{IMPALA_AVRO_VERSION}/src)
 
 set(AVRO_SEARCH_LIB_PATH
   ${AVRO_ROOT}/lib
-  ${CMAKE_SOURCE_DIR}/thirdparty/avro-c-$ENV{IMPALA_AVRO_VERSION}/src)
+  $ENV{IMPALA_HOME}/thirdparty/avro-c-$ENV{IMPALA_AVRO_VERSION}/src)
 
 find_path(AVRO_INCLUDE_DIR NAMES avro/schema.h schema.h PATHS
   ${AVRO_SEARCH_HEADER_PATHS}

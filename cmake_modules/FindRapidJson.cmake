@@ -4,7 +4,7 @@
 
 set(RAPIDJSON_SEARCH_HEADER_PATHS
   ${RAPIDJSON_ROOT}/include
-  ${CMAKE_SOURCE_DIR}/thirdparty/rapidjson/include/
+  $ENV{IMPALA_HOME}/thirdparty/rapidjson/include/
 )
 
 find_path(RAPIDJSON_INCLUDE_DIR rapidjson/rapidjson.h HINTS

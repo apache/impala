@@ -9,12 +9,12 @@
 
 set(PPROF_SEARCH_HEADER_PATHS
   ${GPERFTOOLS_ROOT}/include
-  ${CMAKE_SOURCE_DIR}/thirdparty/gperftools-2.0/src
+  $ENV{IMPALA_HOME}/thirdparty/gperftools-2.0/src
 )
 
 set(PPROF_SEARCH_LIB_PATH
   ${GPERFTOOLS_ROOT}/lib
-  ${CMAKE_SOURCE_DIR}/thirdparty/gperftools-2.0/.libs
+  $ENV{IMPALA_HOME}/thirdparty/gperftools-2.0/.libs
 )
 
 find_path(PPROF_INCLUDE_DIR google/profiler.h PATHS
