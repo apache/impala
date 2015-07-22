@@ -57,7 +57,10 @@ from tests.comparison.types import (
     Timestamp,
     TinyInt,
     VarChar)
-from tests.util.hdfs_util import create_default_hdfs_client, get_default_hdfs_config
+from tests.util.hdfs_util import (
+    create_default_hdfs_client,
+    get_default_hdfs_config,
+    get_hdfs_client)
 
 LOG = getLogger(__name__)
 
@@ -66,8 +69,9 @@ IMPALA = 'IMPALA'
 MYSQL = 'MYSQL'
 ORACLE = 'ORACLE'
 POSTGRESQL = 'POSTGRESQL'
+HIVE_FOR_IMPALA = 'HIVE_FOR_IMPALA'
 
-DATABASES = [HIVE, IMPALA, MYSQL, ORACLE, POSTGRESQL]
+DATABASES = [HIVE, IMPALA, MYSQL, ORACLE, POSTGRESQL, HIVE_FOR_IMPALA]
 
 class DbConnector(object):
   '''Wraps a DB API 2 implementation to provide a standard way of obtaining a
@@ -83,7 +87,9 @@ class DbConnector(object):
       password=None,
       host_name=None,
       port=None,
-      service=None):
+      service=None,
+      hdfs_host=None,
+      hdfs_port=None):
     self.db_type = db_type.upper()
     if self.db_type not in DATABASES:
       raise Exception('Unsupported database: %s' % db_type)
@@ -92,15 +98,26 @@ class DbConnector(object):
     self.host_name = host_name or getfqdn()
     self.port = port
     self.service = service
+    self.hdfs_host = hdfs_host
+    self.hdfs_port = hdfs_port
 
   def create_connection(self, db_name=None):
     if self.db_type == HIVE:
-      connection_class = ImpalaDbConnection   # Reuse the Impala class for Hive
+      connection_class = HiveDbConnection
+      connection = impala_connect(
+          host=self.host_name,
+          port=self.port,
+          ldap_user=self.user_name,
+          ldap_password=self.password)
+      return HiveDbConnection(self, connection, user_name=self.user_name,
+          user_pass=self.password, db_name=db_name, hdfs_host=self.hdfs_host,
+          hdfs_port=self.hdfs_port)
+    elif self.db_type == HIVE_FOR_IMPALA:
       try:
         from pyhs2 import connect as hive_connect
       except:
         print('Error importing pyhs2. Please make sure it is installed. '
-            'See the README for details.')
+          'See the README for details.')
         raise
       connection = hive_connect(
           host=self.host_name,
@@ -403,7 +420,7 @@ class DbConnection(object):
         table.name,
         ', '.join('%s %s' %
             (col.name, self.get_sql_for_data_type(col.exact_type)) +
-            ('' if self.db_type == IMPALA else ' NULL')
+            ('' if (self.db_type == IMPALA or self.db_type == HIVE) else ' NULL')
             for col in table.cols))
     return sql
 
@@ -736,6 +753,62 @@ class ImpalaDbCursor(DatabaseCursor):
   def get_log(self):
     '''Return any messages relating to the most recently executed query or statement.'''
     return self.cursor.get_log()
+
+#########################################
+## Hive                                ##
+#########################################
+class HiveDbConnection(ImpalaDbConnection):
+
+  def __init__(self, connector, connection, user_name, user_pass, db_name, hdfs_host, hdfs_port):
+    ImpalaDbConnection.__init__(self, connector, connection, db_name)
+    self.hdfs_host = hdfs_host
+    self.hdfs_port = hdfs_port
+    self.warehouse_dir = '/user/hive/warehouse'
+    self.user_name = user_name
+    self.user_pass = user_pass
+
+  def create_cursor(self):
+    cursor = ImpalaDbCursor(self.connection.cursor(user=self.user_name), self)
+    if self.db_name:
+      cursor.execute('USE %s' % self.db_name)
+    return cursor
+
+  #########################################
+  # Tables                                #
+  #########################################
+
+  def make_create_table_sql(self, table):
+    sql = DbConnection.make_create_table_sql(self, table)
+    if not self._bulk_load_table:
+      return sql
+
+    if self._bulk_load_table.storage_format.upper() != 'TEXTFILE':
+      raise Exception('Only Textfile currently supported')
+
+    return sql
+
+  def end_bulk_load_table(self):
+    DbConnection.end_bulk_load_table(self)
+    if self.hdfs_host is None:
+      hdfs = create_default_hdfs_client()
+    else:
+      hdfs = get_hdfs_client(self.hdfs_host, self.hdfs_port, user_name='hdfs')
+    pywebhdfs_dirname = dirname(self.hdfs_file_path).lstrip('/')
+    hdfs.make_dir(pywebhdfs_dirname)
+    pywebhdfs_file_path = pywebhdfs_dirname + '/' + basename(self.hdfs_file_path)
+    try:
+      # TODO: Only delete the file if it exists
+      hdfs.delete_file_dir(pywebhdfs_file_path)
+    except Exception as e:
+      LOG.debug(e)
+    with open(self._bulk_load_data_file.name) as readable_file:
+      hdfs.create_file(pywebhdfs_file_path, readable_file)
+    self._bulk_load_data_file.close()
+    if self._bulk_load_non_text_table:
+      self.execute('CREATE TABLE %s AS SELECT * FROM %s'
+          % (self._bulk_load_non_text_table.name, self._bulk_load_table.name))
+      self.drop_table(self._bulk_load_table.name)
+    self._bulk_load_data_file = None
 
 #########################################
 ## Postgresql                          ##

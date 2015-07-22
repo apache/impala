@@ -51,6 +51,8 @@ class SqlWriter(object):
       return OracleSqlWriter()
     if dialect == 'POSTGRESQL':
       return PostgresqlSqlWriter()
+    if dialect == 'HIVE':
+      return HiveSqlWriter()
     raise Exception('Unknown dialect: %s' % dialect)
 
   def __init__(self):
@@ -372,6 +374,11 @@ class ImpalaSqlWriter(SqlWriter):
 class OracleSqlWriter(SqlWriter):
 
   DIALECT = 'ORACLE'
+
+
+class HiveSqlWriter(SqlWriter):
+
+  DIALECT = 'HIVE'
 
 
 class PostgresqlSqlWriter(SqlWriter):

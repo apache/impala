@@ -36,6 +36,7 @@ from tests.comparison.db_connector import (
     DbConnection,
     DbConnector,
     IMPALA,
+    HIVE,
     MYSQL,
     ORACLE,
     POSTGRESQL)
@@ -622,7 +623,7 @@ if __name__ == '__main__':
   cli_options.add_connection_option_groups(parser)
 
   parser.add_option('--test-db-type', default=IMPALA,
-      choices=(IMPALA, MYSQL, ORACLE, POSTGRESQL),
+      choices=(HIVE, IMPALA, MYSQL, ORACLE, POSTGRESQL),
       help='The type of the test database to use. Ex: IMPALA.')
   parser.add_option('--ref-db-type', default=POSTGRESQL,
       choices=(MYSQL, ORACLE, POSTGRESQL),

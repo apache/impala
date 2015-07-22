@@ -33,7 +33,8 @@ from tests.comparison.db_connector import (
     IMPALA,
     MYSQL,
     ORACLE,
-    POSTGRESQL)
+    POSTGRESQL,
+    HIVE_FOR_IMPALA)
 from tests.comparison.common import Column, Table
 from tests.comparison.types import (
     Boolean,
@@ -152,7 +153,7 @@ class DatabasePopulator(object):
         # The Impala table creator needs help from Hive for some storage formats.
         # Eventually Impala should be able to write in all formats and this can be
         # removed.
-        hive_connection = DbConnector(HIVE).create_connection(db_name=db_name)
+        hive_connection = DbConnector(HIVE_FOR_IMPALA).create_connection(db_name=db_name)
         connection.hive_connection = hive_connection
     for table_idx in xrange(randint(min_number_of_tables, max_number_of_tables)):
       table = self.create_random_table(
@@ -370,10 +371,19 @@ if __name__ == '__main__':
       password=options.mysql_password,
       host_name=options.mysql_host,
       port=options.mysql_port))
+  if options.use_hive:
+    db_connectors.append(DbConnector(HIVE,
+      user_name=options.hive_user,
+      password=options.hive_password,
+      host_name=options.hive_host,
+      port=options.hive_port,
+      hdfs_host=options.hdfs_host,
+      hdfs_port=options.hdfs_port))
 
   populator = DatabasePopulator()
   if command == 'populate':
-    db_connectors.append(impala_connector)
+    if not options.use_hive:
+      db_connectors.append(impala_connector)
     populator.drop_and_create_database(options.db_name, db_connectors)
     populator.populate_db_with_random_data(
         options.db_name,

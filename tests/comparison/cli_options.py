@@ -55,6 +55,23 @@ def add_connection_option_groups(parser):
       help="The hs2 port of the host running the Impala daemon")
   parser.add_option_group(group)
 
+  group = OptionGroup(parser, "Hive Options")
+  group.add_option('--use-hive', action='store_true', default=False,
+      help='Use Hive (Impala will be skipped)')
+  group.add_option('--hive-host', default='localhost',
+      help="The name of the host running the HS2")
+  group.add_option("--hive-port", default=10000, type=int,
+      help="The port of HiveServer2")
+  group.add_option('--hive-user', default='hive',
+      help="The user name to use when connecting to HiveServer2")
+  group.add_option('--hive-password', default='hive',
+      help="The password to use when connecting to HiveServer2")
+  group.add_option('--hdfs-host',
+      help='The host for HDFS backing Hive tables, necessary for external HiveServer2')
+  group.add_option('--hdfs-port',
+      help='The port for HDFS backing Hive tables, necessary for external HiveServer2')
+  parser.add_option_group(group)
+
   group = OptionGroup(parser, 'MySQL Options')
   group.add_option('--use-mysql', action='store_true', default=False,
       help='Use MySQL')
