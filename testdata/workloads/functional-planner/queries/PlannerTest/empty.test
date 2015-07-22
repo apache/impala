@@ -319,3 +319,48 @@ where T2.bigint_col < 10 and false
 |
 00:EMPTYSET
 ====
+# IMPALA-2088: Test empty union operands with analytic functions.
+# TODO: Simplify the plan of unions with empty operands using an empty set node.
+# TODO: Simplify the plan of unions with only a single non-empty operand to not
+# use a union node (this is tricky because a union materializes a new tuple).
+select lead(-496, 81) over (order by t1.double_col desc, t1.id asc)
+from functional.alltypestiny t1 where 5 = 6
+union
+select 794.67
+from functional.alltypes t1 where 5 = 6
+union all
+select coalesce(10.4, int_col)
+from functional.alltypes where false
+---- PLAN
+02:UNION
+|
+01:AGGREGATE [FINALIZE]
+|  group by: lead(-496, 81, NULL) OVER(...)
+|
+00:UNION
+====
+# IMPALA-2088: Test empty union operands with analytic functions.
+select lead(-496, 81) over (order by t1.double_col desc, t1.id asc)
+from functional.alltypestiny t1 where 5 = 6
+union
+select 794.67
+from functional.alltypes t1 where 5 = 6
+union all
+select coalesce(10.4, int_col)
+from functional.alltypes where false
+union all
+select 1
+union all select bigint_col
+from functional.alltypestiny
+---- PLAN
+02:UNION
+|  constant-operands=1
+|
+|--01:AGGREGATE [FINALIZE]
+|  |  group by: lead(-496, 81, NULL) OVER(...)
+|  |
+|  00:UNION
+|
+03:SCAN HDFS [functional.alltypestiny]
+   partitions=4/4 files=4 size=460B
+====

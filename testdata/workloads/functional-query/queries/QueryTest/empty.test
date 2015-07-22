@@ -129,3 +129,17 @@ NULL,0
 ---- TYPES
 BIGINT, BIGINT
 ====
+---- QUERY
+# IMPALA-2088: Test empty union operands with analytic functions.
+select lead(-496, 81) over (order by t1.double_col desc, t1.id asc)
+from functional.alltypestiny t1 where 5 = 6
+union
+select 794.67
+from functional.alltypes t1 where 5 = 6
+union all
+select coalesce(10.4, int_col)
+from functional.alltypes where false
+---- RESULTS
+---- TYPES
+FLOAT
+====

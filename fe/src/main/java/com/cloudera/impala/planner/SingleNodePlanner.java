@@ -52,7 +52,6 @@ import com.cloudera.impala.catalog.DataSourceTable;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Type;
-import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
@@ -1102,11 +1101,10 @@ public class SingleNodePlanner {
       Analyzer analyzer, UnionStmt unionStmt, List<UnionOperand> unionOperands,
       PlanNode unionDistinctPlan)
       throws ImpalaException {
-    UnionNode unionNode =
-        new UnionNode(ctx_.getNextNodeId(), unionStmt.getTupleId());
+    UnionNode unionNode = new UnionNode(ctx_.getNextNodeId(), unionStmt.getTupleId());
     for (UnionOperand op: unionOperands) {
+      if (op.getAnalyzer().hasEmptyResultSet()) continue;
       QueryStmt queryStmt = op.getQueryStmt();
-      if (op.isDropped()) continue;
       if (queryStmt instanceof SelectStmt) {
         SelectStmt selectStmt = (SelectStmt) queryStmt;
         if (selectStmt.getTableRefs().isEmpty()) {
@@ -1118,6 +1116,7 @@ public class SingleNodePlanner {
       if (opPlan instanceof EmptySetNode) continue;
       unionNode.addChild(opPlan, op.getQueryStmt().getBaseTblResultExprs());
     }
+
     if (unionDistinctPlan != null) {
       Preconditions.checkState(unionStmt.hasDistinctOps());
       Preconditions.checkState(unionDistinctPlan instanceof AggregationNode);
@@ -1140,6 +1139,9 @@ public class SingleNodePlanner {
    *   TODO: optimize this by still pushing predicates into the union operands
    *   that don't contain analytic exprs and evaluating the conjuncts in Select
    *   directly above the AnalyticEvalNodes
+   * TODO: Simplify the plan of unions with empty operands using an empty set node.
+   * TODO: Simplify the plan of unions with only a single non-empty operand to not
+   *       use a union node (this is tricky because a union materializes a new tuple).
    */
   private PlanNode createUnionPlan(UnionStmt unionStmt, Analyzer analyzer)
       throws ImpalaException {
@@ -1154,9 +1156,6 @@ public class SingleNodePlanner {
         List<Expr> opConjuncts =
             Expr.substituteList(conjuncts, op.getSmap(), analyzer, false);
         op.getAnalyzer().registerConjuncts(opConjuncts);
-        // Some of the opConjuncts have become constant and eval'd to false, or an
-        // ancestor block is already guaranteed to return empty results.
-        if (op.getAnalyzer().hasEmptyResultSet()) op.drop();
       }
       analyzer.markConjunctsAssigned(conjuncts);
     } else {
