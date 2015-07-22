@@ -142,9 +142,18 @@ if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
   IMPALA_THRIFT_VERSION+=-p2
 fi
 
-# Sasl has problems with 'make install' if the path contains a ~. In our
-# packaging jobs, the path contains ~ so we'll just install somewhere else.
-export IMPALA_CYRUS_SASL_INSTALL_DIR=/tmp/impala-build/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION}/build
+if [[ ! -z "${IMPALA_CYRUS_SASL_INSTALL_DIR:-}" ]]
+then
+  export IMPALA_CYRUS_SASL_INSTALL_DIR # Ensure it's exported
+elif [[ "${IMPALA_HOME}" =~ "~" ]]
+then
+  # Sasl has problems with 'make install' if the path contains a ~, e.g.
+  # /some~directory/impala. In our packaging jobs, the path contains ~ so we'll
+  # just install somewhere else as a workaround.
+  export IMPALA_CYRUS_SASL_INSTALL_DIR=/tmp/impala-build/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION}/build
+else
+  export IMPALA_CYRUS_SASL_INSTALL_DIR=${IMPALA_HOME}/thirdparty/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION}/build
+fi
 
 export IMPALA_HADOOP_VERSION=2.6.0-cdh5.5.0-SNAPSHOT
 export IMPALA_HBASE_VERSION=1.0.0-cdh5.5.0-SNAPSHOT
