@@ -25,9 +25,10 @@ namespace impala {
 /// handled via exceptions.
 class FileSystemUtil {
  public:
-  /// Create the specified directories. The directories and their contents are destroyed
-  /// if they already exist.
-  static Status CreateDirectories(const std::vector<std::string>& directories);
+  /// Create the specified directory and any ancestor directories that do not exist yet.
+  /// The directory and its contents are destroyed if it already exists.
+  /// Returns Status::OK if successful, or a runtime error with a message otherwise.
+  static Status CreateDirectory(const std::string& directory);
 
   /// Create a file at the specified path.
   static Status CreateFile(const std::string& file_path);

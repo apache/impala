@@ -47,6 +47,11 @@ vector<string> TmpFileMgr::tmp_dirs_;
 Status TmpFileMgr::Init() {
   DCHECK(!initialized_);
   string tmp_dirs_spec = FLAGS_scratch_dirs;
+  // Empty string should be interpreted as no scratch
+  if (tmp_dirs_spec.empty()) {
+    LOG(WARNING) << "Running without spill to disk: no scratch directories provided.";
+    return Status::OK();
+  }
   vector<string> all_tmp_dirs;
   split(all_tmp_dirs, tmp_dirs_spec, is_any_of(","), token_compress_on);
   vector<bool> is_tmp_dir_on_disk(DiskInfo::num_disks(), false);
@@ -56,7 +61,12 @@ Status TmpFileMgr::Init() {
   for (int i = 0; i < all_tmp_dirs.size(); ++i) {
     path tmp_path(trim_right_copy_if(all_tmp_dirs[i], is_any_of("/")));
     // tmp_path must be a writable directory.
-    RETURN_IF_ERROR(FileSystemUtil::VerifyIsDirectory(tmp_path.string()));
+    Status status = FileSystemUtil::VerifyIsDirectory(tmp_path.string());
+    if (!status.ok()) {
+      LOG(WARNING) << "Cannot use directory " << tmp_path.string() << " for scratch: "
+                   << status.msg().msg();
+      continue;
+    }
     // Find the disk id of tmp_path. Add the scratch directory if there isn't another
     // directory on the same disk (or if we don't know which disk it is on).
     int disk_id = DiskInfo::disk_id(tmp_path.c_str());
@@ -66,23 +76,33 @@ Status TmpFileMgr::Init() {
           &available_space));
       if (available_space < AVAILABLE_SPACE_THRESHOLD_MB * 1024 * 1024) {
         LOG(WARNING) << "Filesystem containing scratch directory " << tmp_path
-                      << " has less than " << AVAILABLE_SPACE_THRESHOLD_MB
-                      << "MB available.";
+                     << " has less than " << AVAILABLE_SPACE_THRESHOLD_MB
+                     << "MB available.";
       }
-      if (disk_id >= 0) is_tmp_dir_on_disk[disk_id] = true;
       path create_dir_path(tmp_path / TMP_SUB_DIR_NAME);
-      tmp_dirs_.push_back(create_dir_path.string());
+      // Create the directory, destroying if already present. If this succeeds, we will
+      // have an empty writable scratch directory.
+      status = FileSystemUtil::CreateDirectory(create_dir_path.string());
+      if (status.ok()) {
+        if (disk_id >= 0) is_tmp_dir_on_disk[disk_id] = true;
+        LOG(INFO) << "Using scratch directory " << create_dir_path.string() << " on disk "
+                  << disk_id;
+        tmp_dirs_.push_back(create_dir_path.string());
+      } else {
+        LOG(WARNING) << "Could not remove and recreate directory "
+                     << create_dir_path.string() << ": cannot use it for scratch. "
+                     << "Error was: " << status.msg().msg();
+      }
     }
   }
   initialized_ = true;
-  Status status = FileSystemUtil::CreateDirectories(tmp_dirs_);
-  if (status.ok()) {
-    LOG (INFO) << "Created the following scratch dirs:" << JoinStrings(tmp_dirs_, " ");
-  } else {
-    // Attempt to remove the directories created. Ignore any errors.
-    FileSystemUtil::RemovePaths(tmp_dirs_);
+
+  if (tmp_dirs_.empty()) {
+    LOG(ERROR) << "Running without spill to disk: could not use any scratch "
+               << "directories in list: " << tmp_dirs_spec << ". See previous warnings "
+               << "for information on causes.";
   }
-  return status;
+  return Status::OK();
 }
 
 Status TmpFileMgr::GetFile(int tmp_device_id, const TUniqueId& query_id,

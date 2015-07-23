@@ -52,58 +52,98 @@ def normal_dirs(num):
 
 class TestScratchDir(CustomClusterTestSuite):
 
-  CustomClusterTestSuite.dirs = []
-  query =  "select o_orderdate, o_custkey, o_comment from tpch.orders order by o_orderdate"
+  # Query with order by requires spill to disk if intermediate results don't fit in mem
+  spill_query = """
+      select o_orderdate, o_custkey, o_comment
+      from tpch.orders
+      order by o_orderdate
+      """
+  # Query without order by can be executed without spilling to disk.
+  in_mem_query = """
+      select o_orderdate, o_custkey, o_comment from tpch.orders
+      """
+  # Memory limit that is low enough to get Impala to spill to disk when executing
+  # spill_query and high enough that we can execute in_mem_query without spilling.
+  mem_limit = "200m"
 
-  def count_nonempty_dirs(self):
+  def count_nonempty_dirs(self, dirs):
     count = 0
-    for dir_name in CustomClusterTestSuite.dirs:
+    for dir_name in dirs:
       if os.path.exists(dir_name) and len(os.listdir(dir_name)) > 0:
         count += 1
     return count
 
   def get_dirs(dirs):
-    CustomClusterTestSuite.dirs = dirs
-    return ','.join(CustomClusterTestSuite.dirs)
+    return ','.join(dirs)
 
+  MULTIPLE_DIRS = normal_dirs(5)
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args('-scratch_dirs=%s' % get_dirs(normal_dirs(5)))
+  @CustomClusterTestSuite.with_args('-scratch_dirs=%s' % get_dirs(MULTIPLE_DIRS))
   def test_multiple_dirs(self, vector):
     """ 5 empty directories are created in the /tmp directory and we verify that only
-        one of those directories is used as scratch disk """
+        one of those directories is used as scratch disk. Only one should be used as
+        scratch because all directories are on same disk."""
+    self.assert_impalad_log_contains("INFO", "Using scratch directory ",
+                                    expected_count=1)
     exec_option = vector.get_value('exec_option')
-    exec_option['mem_limit'] = "200m"
+    exec_option['mem_limit'] = self.mem_limit
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
-    self.execute_query_expect_success(client, self.query, exec_option)
-    assert self.count_nonempty_dirs() == 1
-
-""" In these tests we pass in non-existing or non-writable directories. However, this
-    causes the test to hang (which is expected behavior) because impala fails to start.
-    One way out of this is to start a timer and check that Impala did not start after x
-    seconds. Ishaan thinks this is a bad idea.
+    self.execute_query_expect_success(client, self.spill_query, exec_option)
+    assert self.count_nonempty_dirs(self.MULTIPLE_DIRS) == 1
 
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args('-scratch_dirs=%s' %
-      get_dirs(normal_dirs(5) + non_existing_dirs(1)))
-  def test_non_existing(self, vector):
-    pytest.xfail("non existing scratch directory")
+  @CustomClusterTestSuite.with_args("-scratch_dirs=")
+  def test_no_dirs(self, vector):
+    """ Test we can execute a query with no scratch dirs """
+    self.assert_impalad_log_contains("WARNING",
+        "Running without spill to disk: no scratch directories provided\.")
     exec_option = vector.get_value('exec_option')
-    exec_option['mem_limit'] = "300m"
+    exec_option['mem_limit'] = self.mem_limit
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
-    self.execute_query_expect_success(client, self.query, exec_option)
-    assert self.count_nonempty_dirs() == 1
+    # Expect spill to disk to fail
+    self.execute_query_expect_failure(client, self.spill_query, exec_option)
+    # Should be able to execute in-memory query
+    self.execute_query_expect_success(client, self.in_mem_query, exec_option)
 
+  NON_WRITABLE_DIRS = non_writable_dirs(5)
   @pytest.mark.execute_serially
-  @CustomClusterTestSuite.with_args('-scratch_dirs=%s' %
-      get_dirs(normal_dirs(5) + non_writable_dirs(1)))
+  @CustomClusterTestSuite.with_args('-scratch_dirs=%s' % get_dirs(NON_WRITABLE_DIRS))
   def test_non_writable_dirs(self, vector):
-    pytest.xfail("scratch directory is non writable")
+    """ Test we can execute a query with only bad non-writable scratch """
+    self.assert_impalad_log_contains("ERROR", "Running without spill to disk: could "
+        + "not use any scratch directories in list:.*. See previous "
+        + "warnings for information on causes.")
+    self.assert_impalad_log_contains("WARNING", "Could not remove and recreate directory "
+            + ".*: cannot use it for scratch\. Error was: .*", expected_count=5)
     exec_option = vector.get_value('exec_option')
-    exec_option['mem_limit'] = "300m"
+    exec_option['mem_limit'] = self.mem_limit
     impalad = self.cluster.get_any_impalad()
     client = impalad.service.create_beeswax_client()
-    self.execute_query_expect_success(client, self.query, exec_option)
-    assert self.count_nonempty_dirs() == 1
-"""
+    # Expect spill to disk to fail
+    self.execute_query_expect_failure(client, self.spill_query, exec_option)
+    # Should be able to execute in-memory query
+    self.execute_query_expect_success(client, self.in_mem_query, exec_option)
+    assert self.count_nonempty_dirs(self.NON_WRITABLE_DIRS) == 0
+
+  NON_EXISTING_DIRS = non_existing_dirs(5)
+  @pytest.mark.execute_serially
+  @CustomClusterTestSuite.with_args('-scratch_dirs=%s' % get_dirs(NON_EXISTING_DIRS))
+  def test_non_existing_dirs(self, vector):
+    """ Test that non-existing directories are not created or used """
+    self.assert_impalad_log_contains("ERROR", "Running without spill to disk: could "
+        + "not use any scratch directories in list:.*. See previous "
+        + "warnings for information on causes.")
+    self.assert_impalad_log_contains("WARNING", "Cannot use directory .* for scratch: "
+        + "Encountered exception while verifying existence of directory path",
+        expected_count=5)
+    exec_option = vector.get_value('exec_option')
+    exec_option['mem_limit'] = self.mem_limit
+    impalad = self.cluster.get_any_impalad()
+    client = impalad.service.create_beeswax_client()
+    # Expect spill to disk to fail
+    self.execute_query_expect_failure(client, self.spill_query, exec_option)
+    # Should be able to execute in-memory query
+    self.execute_query_expect_success(client, self.in_mem_query, exec_option)
+    assert self.count_nonempty_dirs(self.NON_EXISTING_DIRS) == 0
