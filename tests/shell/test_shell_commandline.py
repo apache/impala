@@ -20,7 +20,7 @@ import re
 import shlex
 import signal
 
-from impala_shell_results import get_shell_cmd_result, cancellation_helper
+from impala_shell_results import get_shell_cmd_result
 from subprocess import Popen, PIPE, call
 from tests.common.impala_cluster import ImpalaCluster
 from time import sleep
@@ -304,12 +304,9 @@ class TestImpalaShell(object):
     args = '-q "select sleep(10000)"'
     cmd = "%s %s" % (SHELL_CMD, args)
 
-    p = Popen(shlex.split(cmd), shell=False, stderr=PIPE, stdout=PIPE)
-    sleep(1)
-    # iterate through all processes with psutil
-    shell_pid = cancellation_helper(args)
-    sleep(2)
-    os.kill(shell_pid, signal.SIGINT)
+    p = Popen(shlex.split(cmd), stderr=PIPE, stdout=PIPE)
+    sleep(3)
+    os.kill(p.pid, signal.SIGINT)
     result = get_shell_cmd_result(p)
 
     assert "Cancelling Query" in result.stderr, result.stderr

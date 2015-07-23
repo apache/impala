@@ -23,10 +23,9 @@ import shutil
 import socket
 import signal
 
-from impala_shell_results import get_shell_cmd_result, cancellation_helper
+from impala_shell_results import get_shell_cmd_result
 from subprocess import Popen, PIPE
 from tests.common.impala_service import ImpaladService
-from tests.verifiers.metric_verifier import MetricVerifier
 from time import sleep
 
 SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
@@ -45,11 +44,9 @@ class TestImpalaShellInteractive(object):
     p.stdin.write("%s;\n" % cmd)
     p.stdin.flush()
 
-  def _start_new_shell_process(self, args=None):
+  def _start_new_shell_process(self):
     """Starts a shell process and returns the process handle"""
-    cmd = "%s %s" % (SHELL_CMD, args) if args else SHELL_CMD
-    return Popen(shlex.split(SHELL_CMD), shell=True, stdout=PIPE,
-                 stdin=PIPE, stderr=PIPE)
+    return Popen([SHELL_CMD], stdout=PIPE, stdin=PIPE, stderr=PIPE)
 
   @classmethod
   def setup_class(cls):
@@ -101,12 +98,9 @@ class TestImpalaShellInteractive(object):
     command = "select sleep(10000);"
     p = self._start_new_shell_process()
     self._send_cmd_to_shell(p, command)
-    sleep(1)
-    # iterate through all processes with psutil
-    shell_pid = cancellation_helper()
-    sleep(2)
-    os.kill(shell_pid, signal.SIGINT)
-    result = get_shell_cmd_result(p)
+    sleep(3)
+    os.kill(p.pid, signal.SIGINT)
+    get_shell_cmd_result(p)
     assert impalad.wait_for_num_in_flight_queries(0)
 
   @pytest.mark.execute_serially

@@ -17,4 +17,4 @@
 # This script runs the impala shell from a dev environment.
 . ${IMPALA_HOME}/bin/set-pythonpath.sh
 SHELL_HOME=${IMPALA_SHELL_HOME:-${IMPALA_HOME}/shell}
-python ${SHELL_HOME}/impala_shell.py "$@"
+exec python ${SHELL_HOME}/impala_shell.py "$@"
