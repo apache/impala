@@ -43,11 +43,17 @@ function(set_dep_root NAME)
   set(${NAME}_ROOT $ENV{IMPALA_TOOLCHAIN}/${NAME_LOWER}-$ENV{${VAL_NAME}} PARENT_SCOPE)
 endfunction()
 
+set(Boost_USE_MULTITHREADED ON)
+
 if (IMPALA_TOOLCHAIN)
   message(STATUS "Found Impala Toolchain, enabling toolchain boost")
   set(ENV{BOOST_ROOT} "$ENV{IMPALA_TOOLCHAIN}/boost-$ENV{IMPALA_BOOST_VERSION}")
   set(Boost_USE_STATIC_LIBS NOT ${BUILD_SHARED_LIBS})
   set(Boost_USE_STATIC_RUNTIME ON)
+
+  # Newer versions of boost (including the version in toolchain) don't build separate
+  # multithreaded versions (they always are). Make sure to pick those up.
+  set(Boost_USE_MULTITHREADED OFF)
 
   # Define root path for all dependencies, this is in the form of
   # set_dep_root(PACKAGE) ->
@@ -62,7 +68,6 @@ if (IMPALA_TOOLCHAIN)
   set_dep_root(LLVM)
   set_dep_root(LZ4)
   set_dep_root(OPENLDAP)
-  set_dep_root(OPENSSL)
   set_dep_root(RE2)
   set_dep_root(RAPIDJSON)
   set_dep_root(SNAPPY)
@@ -88,7 +93,7 @@ ENDIF (DEFINED ENV{BOOST_ROOT})
 if (CMAKE_DEBUG)
   set(Boost_DEBUG TRUE)
 endif()
-set(Boost_USE_MULTITHREADED ON)
+
 
 find_package(Boost $ENV{IMPALA_MIN_BOOST_VERSION} REQUIRED
   COMPONENTS thread regex system filesystem date_time)
@@ -96,11 +101,6 @@ include_directories(${Boost_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${Boost_LIBRARIES})
 message(STATUS "Boost include dir: " ${Boost_INCLUDE_DIRS})
 message(STATUS "Boost libraries: " ${Boost_LIBRARIES})
-
-# Hint the OpenSSL path
-if (IMPALA_TOOLCHAIN)
-  set(OPENSSL_ROOT_DIR ${OPENSSL_ROOT})
-endif()
 
 find_package(OpenSSL REQUIRED)
 include_directories(${OPENSSL_INCLUDE_DIR})

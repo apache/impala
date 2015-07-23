@@ -304,7 +304,7 @@ $IMPALA_HOME/bin/make_impala.sh ${MAKE_IMPALA_ARGS}
 if [ -e $IMPALA_LZO ]
 then
   pushd $IMPALA_LZO
-  if [[ -n "$IMPALA_TOOLCHAIN" ]]; then
+  if [[ ! -z $IMPALA_TOOLCHAIN ]]; then
     cmake -DCMAKE_TOOLCHAIN_FILE=./cmake_modules/toolchain.cmake
   else
     cmake .

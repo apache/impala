@@ -35,7 +35,7 @@ PROJECT(ASSEMBLER)
 #  -Wno-deprecated: gutil contains deprecated headers
 #  -pthread: enable multithreaded malloc
 #  -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG: enable nanosecond precision for boost
-SET(CXX_COMMON_FLAGS "-Wall -Wno-sign-compare -Wno-unknown-pragmas -pthread")
+SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wall -Wno-sign-compare -Wno-unknown-pragmas -pthread")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -fno-strict-aliasing")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-deprecated")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
@@ -86,8 +86,10 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE_DEBUG")
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE_RELEASE")
   SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_RELEASE} ${CXX_COVERAGE_FLAGS}")
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "ADDRESS_SANITIZER")
-  SET(CMAKE_CXX_COMPILER ${LLVM_CLANG_EXECUTABLE})
-  SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_ADDRESS_SANITIZER})
+  if (NOT IMPALA_TOOLCHAIN)
+    SET(CMAKE_CXX_COMPILER ${LLVM_CLANG_EXECUTABLE})
+  endif()
+  SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_ADDRESS_SANITIZER}")
 else()
   message(FATAL_ERROR "Unknown build type: ${CMAKE_BUILD_TYPE}")
 endif ()
@@ -167,7 +169,24 @@ include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # resolve includes of generated code
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/generated-sources)
 
+set(CLANG_INCLUDE_FLAGS)
+
+if (IMPALA_TOOLCHAIN)
+  # When the Toolchain is used we use LLVM 3.3 that was built in a different path that it
+  # is invoked from, and a GCC that resides in a different location. LVVM 3.3 relies on
+  # hard-coded path information about where to find the system headers and does not support
+  # specifying the -gcc-toolchain flag to dynamically provide this information. Because of
+  # these reasons we need to manually add the system c++ headers to the path when we
+  # compile the IR code with clang.
+  set(CLANG_BASE_FLAGS
+    "-I${GCC_ROOT}/include/c++/$ENV{IMPALA_GCC_VERSION}"
+    "-I${GCC_ROOT}/include/c++/$ENV{IMPALA_GCC_VERSION}/backward"
+    "-I${GCC_ROOT}/include/c++/$ENV{IMPALA_GCC_VERSION}/x86_64-unknown-linux-gnu")
+  set(CLANG_INCLUDE_FLAGS ${CLANG_BASE_FLAGS})
+endif()
+
 set(CLANG_INCLUDE_FLAGS
+  ${CLANG_INCLUDE_FLAGS}
   "-I${CMAKE_CURRENT_SOURCE_DIR}/src"
   "-I${CMAKE_CURRENT_SOURCE_DIR}/generated-sources"
   "-I${THRIFT_INCLUDE_DIR}"

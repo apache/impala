@@ -19,8 +19,16 @@ set(TOOLCHAIN_ROOT $ENV{IMPALA_TOOLCHAIN})
 
 # If Impala is built with the toolchain, change compiler and link paths
 set(GCC_ROOT $ENV{IMPALA_TOOLCHAIN}/gcc-$ENV{IMPALA_GCC_VERSION})
-set(CMAKE_C_COMPILER ${GCC_ROOT}/bin/gcc)
-set(CMAKE_CXX_COMPILER ${GCC_ROOT}/bin/g++)
+
+# Use LLVM Trunk to build asan
+set(LLVM_TRUNK_ROOT $ENV{IMPALA_TOOLCHAIN}/llvm-trunk)
+
+set(CMAKE_C_COMPILER ${LLVM_TRUNK_ROOT}/bin/clang)
+set(CMAKE_CXX_COMPILER ${LLVM_TRUNK_ROOT}/bin/clang++)
+
+# Add the GCC root location to the compiler flags
+# TODO: remove no-c++11-extensions when we enable c++11
+set(CXX_COMMON_FLAGS "-Wno-unused-local-typedef -Wno-c++11-extensions --gcc-toolchain=${GCC_ROOT}")
 
 # The rpath is needed to be able to run the binaries produced by the toolchain without
 # specifying an LD_LIBRARY_PATH

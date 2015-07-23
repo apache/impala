@@ -92,7 +92,7 @@ static SSE_ALWAYS_INLINE __m128i SSE4_cmpestrm(
   /// clang doesn't support Y-prefixed asm constraints.
   register __m128i result asm("xmm0");
   __asm__("pcmpestrm %5, %2, %1"
-      : "=x"(result) : "x"(str1), "xm"(str2), "a"(len1), "d"(len2), "K"(mode) : "cc");
+      : "=x"(result) : "x"(str1), "xm"(str2), "a"(len1), "d"(len2), "i"(mode) : "cc");
   return result;
 }
 
@@ -100,7 +100,7 @@ static SSE_ALWAYS_INLINE int SSE4_cmpestri(
     __m128i str1, int len1, __m128i str2, int len2, const int mode) {
   int result;
   __asm__("pcmpestri %5, %2, %1"
-      : "=c"(result) : "x"(str1), "xm"(str2), "a"(len1), "d"(len2), "K"(mode) : "cc");
+      : "=c"(result) : "x"(str1), "xm"(str2), "a"(len1), "d"(len2), "i"(mode) : "cc");
   return result;
 }
 

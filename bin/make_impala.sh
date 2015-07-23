@@ -96,7 +96,12 @@ then
     fi
 
     if [[ ! -z $IMPALA_TOOLCHAIN ]]; then
-      CMAKE_ARGS+=(-DCMAKE_TOOLCHAIN_FILE=$IMPALA_HOME/cmake_modules/toolchain.cmake)
+
+      if [[ "$TARGET_BUILD_TYPE" == "Address_Sanitizer" ]]; then
+        CMAKE_ARGS+=(-DCMAKE_TOOLCHAIN_FILE=$IMPALA_HOME/cmake_modules/asan_toolchain.cmake)
+      else
+        CMAKE_ARGS+=(-DCMAKE_TOOLCHAIN_FILE=$IMPALA_HOME/cmake_modules/toolchain.cmake)
+      fi
     fi
 
     cmake . ${CMAKE_ARGS[@]}
