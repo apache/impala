@@ -677,15 +677,12 @@ DecimalVal Expr::GetDecimalVal(ExprContext* context, TupleRow* row) {
   return DecimalVal::null();
 }
 
-bool Expr::FnContextHasError(ExprContext* ctx, const char** error_msg) {
+Status Expr::GetFnContextError(ExprContext* ctx) {
   if (fn_context_index_ != -1) {
     FunctionContext* fn_ctx = ctx->fn_context(fn_context_index_);
-    if (fn_ctx->has_error()) {
-      if (error_msg) *error_msg = fn_ctx->error_msg();
-      return true;
-    }
+    if (fn_ctx->has_error()) return Status(fn_ctx->error_msg());
   }
-  return false;
+  return Status::OK();
 }
 
 }

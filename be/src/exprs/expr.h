@@ -147,11 +147,9 @@ class Expr {
 
   const std::vector<Expr*>& children() const { return children_; }
 
-  inline const int fn_context_index() { return fn_context_index_; }
-
-  /// Returns true and populates 'error_msg' if the function context associated with the
+  /// Returns an error status if the function context associated with the
   /// expr has an error set.
-  bool FnContextHasError(ExprContext* ctx, const char** error_msg);
+  Status GetFnContextError(ExprContext* ctx);
 
   /// Returns true if GetValue(NULL) can be called on this expr and always returns the same
   /// result (e.g., exprs that don't contain slotrefs). The default implementation returns

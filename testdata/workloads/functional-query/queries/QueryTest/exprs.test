@@ -1856,3 +1856,11 @@ INT
 AnalysisException: Error evaluating "madlib_vector_get(0, madlib_vector(1.0, 2.0, NULL)) = 1.0"
 CAUSED BY: InternalException: madlib vector entry 2 is NULL
 ====
+---- QUERY
+select * from (select 'abc' as x, '*' as y, 'def' as z from functional.alltypestiny) v
+where regexp_replace(x, y, z) = 'cde'
+---- RESULTS
+---- CATCH
+AnalysisException: Error evaluating "regexp_replace('abc', '*', 'def') = 'cde'"
+CAUSED BY: InternalException: Could not compile regexp pattern: *
+Error: no argument for repetition operator: *

@@ -768,7 +768,7 @@ public class SingleNodePlanner {
    * filters from the enclosing scope can be safely applied (to the grouping cols, say).
    */
   public void migrateConjunctsToInlineView(Analyzer analyzer,
-      InlineViewRef inlineViewRef) {
+      InlineViewRef inlineViewRef) throws ImpalaException {
     List<Expr> unassignedConjuncts =
         analyzer.getUnassignedConjuncts(inlineViewRef.getId().asList(), true);
     if (!canMigrateConjuncts(inlineViewRef)) {
@@ -824,11 +824,7 @@ public class SingleNodePlanner {
     // Mark pre-substitution conjuncts as assigned, since the ids of the new exprs may
     // have changed.
     analyzer.markConjunctsAssigned(preds);
-    try {
-      inlineViewRef.getAnalyzer().registerConjuncts(viewPredicates);
-    } catch (AnalysisException ex) {
-      throw new IllegalStateException("Caught an AnalysisException in the planner", ex);
-    }
+    inlineViewRef.getAnalyzer().registerConjuncts(viewPredicates);
 
     // mark (fully resolve) slots referenced by remaining unassigned conjuncts as
     // materialized
@@ -1157,12 +1153,7 @@ public class SingleNodePlanner {
       for (UnionOperand op: unionStmt.getOperands()) {
         List<Expr> opConjuncts =
             Expr.substituteList(conjuncts, op.getSmap(), analyzer, false);
-        try {
-          op.getAnalyzer().registerConjuncts(opConjuncts);
-        } catch (AnalysisException ex) {
-          throw new IllegalStateException(
-              "Caught an AnalysisException in the planner", ex);
-        }
+        op.getAnalyzer().registerConjuncts(opConjuncts);
         // Some of the opConjuncts have become constant and eval'd to false, or an
         // ancestor block is already guaranteed to return empty results.
         if (op.getAnalyzer().hasEmptyResultSet()) op.drop();

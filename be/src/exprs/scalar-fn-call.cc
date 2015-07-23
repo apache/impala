@@ -168,10 +168,8 @@ Status ScalarFnCall::Open(RuntimeState* state, ExprContext* ctx,
     for (int i = 0; i < children_.size(); ++i) {
       constant_args.push_back(children_[i]->GetConstVal(ctx));
       // Check if any errors were set during the GetConstVal() call
-      const char* child_error_msg;
-      if (children_[i]->FnContextHasError(ctx, &child_error_msg)) {
-        return Status(child_error_msg);
-      }
+      Status child_status = children_[i]->GetFnContextError(ctx);
+      if (!child_status.ok()) return child_status;
     }
     fn_ctx->impl()->SetConstantArgs(constant_args);
   }
@@ -204,7 +202,6 @@ void ScalarFnCall::Close(RuntimeState* state, ExprContext* context,
                          FunctionContext::FunctionStateScope scope) {
   if (fn_context_index_ != -1 && close_fn_ != NULL) {
     FunctionContext* fn_ctx = context->fn_context(fn_context_index_);
-
     close_fn_(fn_ctx, FunctionContext::THREAD_LOCAL);
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
       close_fn_(fn_ctx, FunctionContext::FRAGMENT_LOCAL);
