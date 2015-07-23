@@ -291,7 +291,7 @@ class ExprTest : public testing::Test {
     StringValue* result;
     GetValue(expr, TYPE_STRING, reinterpret_cast<void**>(&result));
     string tmp(result->ptr, result->len);
-    EXPECT_EQ(tmp, expected_result) << expr;
+    EXPECT_EQ(expected_result, tmp) << expr;
   }
 
   void TestCharValue(const string& expr, const string& expected_result,
@@ -299,7 +299,7 @@ class ExprTest : public testing::Test {
     StringValue* result;
     GetValue(expr, type, reinterpret_cast<void**>(&result));
     string tmp(result->ptr, result->len);
-    EXPECT_EQ(tmp, expected_result) << expr;
+    EXPECT_EQ(expected_result, tmp) << expr;
   }
 
   // We can't put this into TestValue() because GTest can't resolve
@@ -309,7 +309,7 @@ class ExprTest : public testing::Test {
     TimestampValue* result;
     GetValue(expr, TYPE_TIMESTAMP, reinterpret_cast<void**>(&result));
     if (tolerance_in_seconds == 0) {
-      EXPECT_EQ(*result, expected_result);
+      EXPECT_EQ(expected_result, *result);
     } else {
       int64_t delta = abs(result->ToUnixTime() - expected_result.ToUnixTime());
       EXPECT_LE(delta, tolerance_in_seconds);
@@ -364,10 +364,7 @@ class ExprTest : public testing::Test {
       const ColumnType& expected_type) {
     T* result = NULL;
     GetValue(expr, expected_type, reinterpret_cast<void**>(&result));
-    EXPECT_EQ(result->value(), expected_result.value()) << expr
-        << ": values did not match. Expected: "
-        << expected_result.ToString(expected_type)
-        << " Actual: " << result->ToString(expected_type);
+    EXPECT_EQ(expected_result.value(), result->value());
   }
 
   template <class T> void TestValue(const string& expr, const ColumnType& expr_type,
@@ -380,19 +377,19 @@ class ExprTest : public testing::Test {
     double expected_double;
     switch (expr_type.type) {
       case TYPE_BOOLEAN:
-        EXPECT_EQ(*reinterpret_cast<bool*>(result), expected_result) << expr;
+        EXPECT_EQ(expected_result, *reinterpret_cast<bool*>(result)) << expr;
         break;
       case TYPE_TINYINT:
-        EXPECT_EQ(*reinterpret_cast<int8_t*>(result), expected_result) << expr;
+        EXPECT_EQ(expected_result, *reinterpret_cast<int8_t*>(result)) << expr;
         break;
       case TYPE_SMALLINT:
-        EXPECT_EQ(*reinterpret_cast<int16_t*>(result), expected_result) << expr;
+        EXPECT_EQ(expected_result, *reinterpret_cast<int16_t*>(result)) << expr;
         break;
       case TYPE_INT:
-        EXPECT_EQ(*reinterpret_cast<int32_t*>(result), expected_result) << expr;
+        EXPECT_EQ(expected_result, *reinterpret_cast<int32_t*>(result)) << expr;
         break;
       case TYPE_BIGINT:
-        EXPECT_EQ(*reinterpret_cast<int64_t*>(result), expected_result) << expr;
+        EXPECT_EQ(expected_result, *reinterpret_cast<int64_t*>(result)) << expr;
         break;
       case TYPE_FLOAT:
         // Converting the float back from a string is inaccurate so convert
@@ -401,13 +398,13 @@ class ExprTest : public testing::Test {
         expected_float = static_cast<float>(expected_result);
         RawValue::PrintValue(reinterpret_cast<const void*>(&expected_float),
                              TYPE_FLOAT, -1, &expected_str);
-        EXPECT_EQ(*reinterpret_cast<string*>(result), expected_str) << expr;
+        EXPECT_EQ(expected_str, *reinterpret_cast<string*>(result)) << expr;
         break;
       case TYPE_DOUBLE:
         expected_double = static_cast<double>(expected_result);
         RawValue::PrintValue(reinterpret_cast<const void*>(&expected_double),
                              TYPE_DOUBLE, -1, &expected_str);
-        EXPECT_EQ(*reinterpret_cast<string*>(result), expected_str) << expr;
+        EXPECT_EQ(expected_str, *reinterpret_cast<string*>(result)) << expr;
         break;
       default:
         ASSERT_TRUE(false) << "invalid TestValue() type: " << expr_type;
@@ -830,7 +827,7 @@ template <typename T> void TestSingleLiteralConstruction(
   ctx.Prepare(&state, desc, &tracker);
   Status status = ctx.Open(&state);
   EXPECT_TRUE(status.ok());
-  EXPECT_EQ(RawValue::Compare(ctx.GetValue(NULL), &value, type), 0)
+  EXPECT_EQ(0, RawValue::Compare(ctx.GetValue(NULL), &value, type))
       << "type: " << type << ", value: " << value;
   ctx.Close(&state);
 }
@@ -4115,8 +4112,8 @@ void ValidateLayout(const vector<Expr*>& exprs, int expected_byte_size,
   int var_begin;
   int byte_size = Expr::ComputeResultsLayout(exprs, &offsets, &var_begin);
 
-  EXPECT_EQ(byte_size, expected_byte_size);
-  EXPECT_EQ(var_begin, expected_var_begin);
+  EXPECT_EQ(expected_byte_size, byte_size);
+  EXPECT_EQ(expected_var_begin, var_begin);
 
   // Walk the computed offsets and make sure the resulting sets match expected_offsets
   for (int i = 0; i < exprs.size(); ++i) {
