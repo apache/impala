@@ -78,7 +78,7 @@ class TestTpchMemLimitError(ImpalaTestSuite):
   EXPECTED_ERROR_MSG = "Memory limit exceeded"
 
   # The mem limits that will be used.
-  MEM_IN_MB = [100, 150, 180, 420, 700, 780, 960, 980, 1050, 1100]
+  MEM_IN_MB = [20, 100, 150, 180, 420, 700, 780, 960, 980, 1050, 1100]
 
   # Different values of mem limits and minimum mem limit (in MBs) each query is expected
   # to run without problem. Those values were determined by manual testing.

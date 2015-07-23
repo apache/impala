@@ -357,9 +357,9 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
   virtual bool ReadSlot(void* slot, MemPool* pool, bool* conjuncts_failed)  {
     parquet::Encoding::type page_encoding =
         current_page_header_.data_page_header.encoding;
-    bool result = true;
     T val;
     T* val_ptr = needs_conversion_ ? &val : reinterpret_cast<T*>(slot);
+    bool result = true;
     if (page_encoding == parquet::Encoding::PLAIN_DICTIONARY) {
       result = dict_decoder_->GetValue(val_ptr);
     } else {
@@ -856,7 +856,6 @@ Status HdfsParquetScanner::ProcessSplit() {
     RETURN_IF_ERROR(InitColumns(i));
     RETURN_IF_ERROR(AssembleRows(i));
   }
-
   return Status::OK();
 }
 
@@ -887,26 +886,27 @@ Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
         for (int c = 0; c < num_column_readers; ++c) {
           if (!column_readers_[c]->ReadValue(pool, tuple, &conjuncts_failed)) {
             assemble_rows_timer_.Stop();
-            // This column is complete and has no more data.  This indicates
-            // we are done with this row group.
-            // For correctly formed files, this should be the first column we
-            // are reading.
+            // If we reach this point, it means that we have read the entire column chunk,
+            // or we hit either a parse or a mem limit error.
+            // For correctly formed files, this indicates we are done with this row
+            // group and this should be the first column we are reading.
             DCHECK(c == 0 || !parse_status_.ok())
               << "c=" << c << " " << parse_status_.GetDetail();;
             COUNTER_ADD(scan_node_->rows_read_counter(), i);
             RETURN_IF_ERROR(CommitRows(num_to_commit));
 
-            // If we reach this point, it means that we reached the end of file for
-            // this column. Test if the expected number of rows from metadata matches
-            // the actual number of rows in the file.
+            // Unless we terminated early due to mem limit exceeded error, test if the
+            // actual number of rows in the file matches the expected number of rows
+            // from metadata.
             rows_read += i;
-            if (rows_read != expected_rows_in_group) {
+            if (rows_read != expected_rows_in_group &&
+                !parse_status_.IsMemLimitExceeded()) {
               HdfsParquetScanner::BaseColumnReader* reader = column_readers_[c];
               DCHECK(reader->stream_ != NULL);
-
               ErrorMsg msg(TErrorCode::PARQUET_GROUP_ROW_COUNT_ERROR,
                  reader->stream_->filename(), row_group_idx,
                  expected_rows_in_group, rows_read);
+              msg.AddDetail(parse_status_.GetDetail());
               LOG_OR_RETURN_ON_ERROR(msg, scan_node_->runtime_state());
             }
             return parse_status_;

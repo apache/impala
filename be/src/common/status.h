@@ -39,8 +39,8 @@ namespace impala {
 //
 /// A Status may either be OK (represented by passing a default constructed Status
 /// instance, created via Status::OK()), or it may represent an error condition. In the
-/// latter case, a Status has both an error code, which belongs to the TErrorCode enum, and
-/// an error string, which may be presented to clients or logged to disk.
+/// latter case, a Status has both an error code, which belongs to the TErrorCode enum,
+/// and an error string, which may be presented to clients or logged to disk.
 ///
 /// An error Status may also have one or more optional 'detail' strings which provide
 /// further context. These strings are intended for internal consumption only - and
@@ -91,7 +91,7 @@ class Status {
   static const Status MEM_LIMIT_EXCEEDED;
   static const Status DEPRECATED_RPC;
 
-  /// copy c'tor makes copy of error detail so Status can be returned by value
+  /// Copy c'tor makes copy of error detail so Status can be returned by value.
   Status(const Status& status)
     : msg_(status.msg_ != NULL ? new ErrorMsg(*status.msg_) : NULL) { }
 
@@ -221,8 +221,8 @@ class Status {
   void ToThrift(TStatus* status) const;
 
   /// Returns the formatted message of the error message and the individual details of the
-  /// additional messages as a single string. This should only be called internally and not
-  /// to report an error back to the client.
+  /// additional messages as a single string. This should only be called internally and
+  /// not to report an error back to the client.
   const std::string GetDetail() const;
 
   TErrorCode::type code() const {

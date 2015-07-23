@@ -48,7 +48,7 @@ class ErrorMsg {
  public:
   typedef strings::internal::SubstituteArg ArgType;
 
-  /// Trivial constructor
+  /// Trivial constructor.
   ErrorMsg() : error_(TErrorCode::OK) {}
 
   /// Below are a set of overloaded constructors taking all possible number of arguments
@@ -104,17 +104,17 @@ class ErrorMsg {
 
   TErrorCode::type error() const { return error_; }
 
-  /// Add detail string message
+  /// Add detail string message.
   void AddDetail(const std::string& d) {
     details_.push_back(d);
   }
 
-  /// Set a specific error code
+  /// Set a specific error code.
   void SetError(TErrorCode::type e) {
     error_ = e;
   }
 
-  /// Returns the formatted error string
+  /// Return the formatted error string.
   const std::string& msg() const {
     return message_;
   }
@@ -140,29 +140,29 @@ private:
   std::vector<std::string> details_;
 };
 
-/// Tracks log messages per error code
+/// Track log messages per error code.
 typedef std::map<TErrorCode::type, TErrorLogEntry> ErrorLogMap;
 
 /// Merge error maps. Merging of error maps occurs, when the errors from multiple backends
-/// are merged into a single error map.  General log messages are simply appended, specific
-/// errors are deduplicated by either appending a new instance or incrementing the count of
-/// an existing one.
+/// are merged into a single error map.  General log messages are simply appended,
+/// specific errors are deduplicated by either appending a new instance or incrementing
+/// the count of an existing one.
 void MergeErrorMaps(ErrorLogMap* left, const ErrorLogMap& right);
 
 /// Append an error to the error map. Performs the aggregation as follows: GENERAL errors
-/// are appended to the list of GENERAL errors, to keep one item each in the map, while for
-/// all other error codes only the count is incremented and only the first message is kept
-/// as a sample.
+/// are appended to the list of GENERAL errors, to keep one item each in the map, while
+/// for all other error codes only the count is incremented and only the first message
+/// is kept as a sample.
 void AppendError(ErrorLogMap* map, const ErrorMsg& e);
 
-/// Helper method to print the contents of an ErrorMap to a stream
+/// Helper method to print the contents of an ErrorMap to a stream.
 void PrintErrorMap(std::ostream* stream, const ErrorLogMap& errors);
 
-/// Returns the number of errors within this error maps. General errors are counted
+/// Return the number of errors within this error maps. General errors are counted
 /// individually, while specific errors are counted once per distinct occurrence.
 size_t ErrorCount(const ErrorLogMap& errors);
 
-/// Generates a string representation of the error map. Produces the same output as
+/// Generate a string representation of the error map. Produces the same output as
 /// PrintErrorMap, but returns a string instead of using a stream.
 std::string PrintErrorMapToString(const ErrorLogMap& errors);
 
