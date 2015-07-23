@@ -2488,8 +2488,10 @@ TEST_F(ExprTest, MathFunctions) {
   TestValue("exp(e())", TYPE_DOUBLE, exp(M_E));
   TestValue("ln(e())", TYPE_DOUBLE, 1.0);
   TestValue("ln(255.0)", TYPE_DOUBLE, log(255.0));
+  TestValue("dlog1(10)", TYPE_DOUBLE, log(10.0));
   TestValue("log10(1000.0)", TYPE_DOUBLE, 3.0);
   TestValue("log10(50.0)", TYPE_DOUBLE, log10(50.0));
+  TestValue("dlog10(100.0)", TYPE_DOUBLE, 2.0);
   TestValue("log2(64.0)", TYPE_DOUBLE, 6.0);
   TestValue("log2(678.0)", TYPE_DOUBLE, log(678.0) / log(2.0));
   TestValue("log(10.0, 1000.0)", TYPE_DOUBLE, log(1000.0) / log(10.0));
@@ -2498,14 +2500,18 @@ TEST_F(ExprTest, MathFunctions) {
   TestValue("pow(e(), 2.0)", TYPE_DOUBLE, M_E * M_E);
   TestValue("power(2.0, 10.0)", TYPE_DOUBLE, pow(2.0, 10.0));
   TestValue("power(e(), 2.0)", TYPE_DOUBLE, M_E * M_E);
+  TestValue("dpow(3, 3)", TYPE_DOUBLE, 27.0);
+  TestValue("fpow(3, 3)", TYPE_DOUBLE, 27.0);
   TestValue("sqrt(121.0)", TYPE_DOUBLE, 11.0);
   TestValue("sqrt(2.0)", TYPE_DOUBLE, sqrt(2.0));
+  TestValue("dsqrt(81.0)", TYPE_DOUBLE, 9);
 
   // Run twice to test deterministic behavior.
   uint32_t seed = 0;
   double expected = static_cast<double>(rand_r(&seed)) / static_cast<double>(RAND_MAX);
   TestValue("rand()", TYPE_DOUBLE, expected);
   TestValue("rand()", TYPE_DOUBLE, expected);
+  TestValue("random()", TYPE_DOUBLE, expected); // Test alias
   seed = 1234;
   expected = static_cast<double>(rand_r(&seed)) / static_cast<double>(RAND_MAX);
   TestValue("rand(1234)", TYPE_DOUBLE, expected);
@@ -2790,12 +2796,14 @@ TEST_F(ExprTest, MathFunctions) {
 TEST_F(ExprTest, MathRoundingFunctions) {
   TestValue("ceil(cast(0.1 as double))", TYPE_BIGINT, 1);
   TestValue("ceil(cast(-10.05 as double))", TYPE_BIGINT, -10);
+  TestValue("ceil(cast(23.6 as double))", TYPE_BIGINT, 24);
   TestValue("ceiling(cast(0.1 as double))", TYPE_BIGINT, 1);
   TestValue("ceiling(cast(-10.05 as double))", TYPE_BIGINT, -10);
   TestValue("floor(cast(0.1 as double))", TYPE_BIGINT, 0);
   TestValue("floor(cast(-10.007 as double))", TYPE_BIGINT, -11);
   TestValue("truncate(cast(0.1 as double))", TYPE_BIGINT, 0);
   TestValue("truncate(cast(-10.007 as double))", TYPE_BIGINT, -10);
+  TestValue("dtrunc(cast(10.99 as double))", TYPE_BIGINT, 10);
 
   TestValue("round(cast(1.499999 as double))", TYPE_BIGINT, 1);
   TestValue("round(cast(1.5 as double))", TYPE_BIGINT, 2);
@@ -2803,6 +2811,7 @@ TEST_F(ExprTest, MathRoundingFunctions) {
   TestValue("round(cast(-1.499999 as double))", TYPE_BIGINT, -1);
   TestValue("round(cast(-1.5 as double))", TYPE_BIGINT, -2);
   TestValue("round(cast(-1.500001 as double))", TYPE_BIGINT, -2);
+  TestValue("dround(cast(2.500001 as double))", TYPE_BIGINT, 3);
 
   TestValue("round(cast(3.14159265 as double), 0)", TYPE_DOUBLE, 3.0);
   TestValue("round(cast(3.14159265 as double), 1)", TYPE_DOUBLE, 3.1);
@@ -2816,6 +2825,7 @@ TEST_F(ExprTest, MathRoundingFunctions) {
   TestValue("round(cast(-3.14159265 as double), 3)", TYPE_DOUBLE, -3.142);
   TestValue("round(cast(-3.14159265 as double), 4)", TYPE_DOUBLE, -3.1416);
   TestValue("round(cast(-3.14159265 as double), 5)", TYPE_DOUBLE, -3.14159);
+  TestValue("dround(cast(3.14159265 as double), 5)", TYPE_DOUBLE, 3.14159);
 
   // NULL arguments.
   TestIsNull("ceil(cast(NULL as double))", TYPE_BIGINT);
