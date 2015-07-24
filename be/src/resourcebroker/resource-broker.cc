@@ -101,6 +101,7 @@ ResourceBroker::ResourceBroker(const vector<TNetworkAddress>& llama_addresses,
         FLAGS_resource_broker_recv_timeout,
         LLAMA_KERBEROS_SERVICE_NAME)) {
   DCHECK(metrics != NULL);
+  llama_client_cache_->InitMetrics(metrics, "resource-broker");
   active_llama_metric_ = metrics->AddProperty<string>(
       "resource-broker.active-llama", "none");
   active_llama_handle_metric_ = metrics->AddProperty<string>(

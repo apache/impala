@@ -690,6 +690,26 @@
     "key": "request-pool-service.resolve-pool-duration-ms"
   },
   {
+    "description": "The number of clients in use by the resource broker client cache.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Client Cache Clients In Use",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "resource-broker.client-cache.clients-in-use"
+  },
+  {
+    "description": "The total number of clients in the resource broker client cache.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Resource Broker Client Cache Total Clients",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "resource-broker.client-cache.total-clients"
+  },
+  {
     "key": "resource-broker.active-llama",
     "contexts": [
       "IMPALAD"
