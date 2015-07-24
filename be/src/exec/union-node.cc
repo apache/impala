@@ -137,8 +137,9 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
       RETURN_IF_ERROR(QueryMaintenance(state));
 
       // Continue materializing exprs on child_row_batch_ into row batch.
-      if (EvalAndMaterializeExprs(
-              result_expr_ctx_lists_[child_idx_], false, &tuple, row_batch)) {
+      RETURN_IF_ERROR(EvalAndMaterializeExprs(result_expr_ctx_lists_[child_idx_], false,
+          &tuple, row_batch));
+      if (row_batch->AtCapacity() || ReachedLimit()) {
         *eos = ReachedLimit();
         return Status::OK();
       }
@@ -166,9 +167,10 @@ Status UnionNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     // Only evaluate the const expr lists by the first fragment instance.
     if (state->fragment_ctx().fragment_instance_idx == 0) {
       // Materialize expr results into row_batch.
-      EvalAndMaterializeExprs(
-          const_result_expr_ctx_lists_[const_result_expr_idx_], true,
-          &tuple, row_batch);
+      RETURN_IF_ERROR(EvalAndMaterializeExprs(
+          const_result_expr_ctx_lists_[const_result_expr_idx_], true, &tuple,
+          row_batch));
+
     }
     ++const_result_expr_idx_;
     *eos = ReachedLimit();
@@ -200,11 +202,11 @@ void UnionNode::Close(RuntimeState* state) {
   ExecNode::Close(state);
 }
 
-bool UnionNode::EvalAndMaterializeExprs(const vector<ExprContext*>& ctxs, bool const_exprs,
-                                        Tuple** tuple, RowBatch* row_batch) {
+Status UnionNode::EvalAndMaterializeExprs(const vector<ExprContext*>& ctxs,
+    bool const_exprs, Tuple** tuple, RowBatch* row_batch) {
   // Make sure there are rows left in the batch.
   if (!const_exprs && child_row_idx_ >= child_row_batch_->num_rows()) {
-    return false;
+    return Status::OK();
   }
   // Execute the body at least once.
   bool done = true;
@@ -232,8 +234,9 @@ bool UnionNode::EvalAndMaterializeExprs(const vector<ExprContext*>& ctxs, bool c
     for (int i = 0; i < ctxs.size(); ++i) {
       // our exprs correspond to materialized slots
       SlotDescriptor* slot_desc = materialized_slots_[i];
-      RawValue::Write(ctxs[i]->GetValue(child_row), *tuple, slot_desc,
-          row_batch->tuple_data_pool());
+      const void* value = ctxs[i]->GetValue(child_row);
+      RETURN_IF_ERROR(ctxs[i]->root()->GetFnContextError(ctxs[i]));
+      RawValue::Write(value, *tuple, slot_desc, row_batch->tuple_data_pool());
     }
 
     if (EvalConjuncts(conjunct_ctxs, num_conjunct_ctxs, row)) {
@@ -248,13 +251,10 @@ bool UnionNode::EvalAndMaterializeExprs(const vector<ExprContext*>& ctxs, bool c
       // the tuple assembled for the previous row.
       (*tuple)->Init(tuple_desc_->byte_size());
     }
-
-    if (row_batch->AtCapacity() || ReachedLimit()) {
-      return true;
-    }
+    if (row_batch->AtCapacity() || ReachedLimit()) return Status::OK();
   } while (!done);
 
-  return false;
+  return Status::OK();
 }
 
 }
