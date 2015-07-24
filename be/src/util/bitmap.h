@@ -38,8 +38,8 @@ class Bitmap {
   template<bool mod>
   void Set(int64_t bit_index, bool v) {
     if (mod) bit_index %= size();
-    int64_t word_index = bit_index >> 8;
-    bit_index &= 63;
+    int64_t word_index = bit_index >> NUM_OFFSET_BITS;
+    bit_index &= BIT_INDEX_MASK;
     DCHECK_LT(word_index, buffer_.size());
     if (v) {
       buffer_[word_index] |= (1 << bit_index);
@@ -53,8 +53,8 @@ class Bitmap {
   template<bool mod>
   bool Get(int64_t bit_index) const {
     if (mod) bit_index %= size();
-    int64_t word_index = bit_index >> 8;
-    bit_index &= 63;
+    int64_t word_index = bit_index >> NUM_OFFSET_BITS;
+    bit_index &= BIT_INDEX_MASK;
     DCHECK_LT(word_index, buffer_.size());
     return (buffer_[word_index] & (1 << bit_index)) != 0;
   }
@@ -87,6 +87,10 @@ class Bitmap {
  private:
   std::vector<uint64_t> buffer_;
   int64_t size_;
+
+  /// Used for bit shifting and masking for the word and offset calculation.
+  static const int64_t NUM_OFFSET_BITS = 6;
+  static const int64_t BIT_INDEX_MASK = 63;
 };
 
 }
