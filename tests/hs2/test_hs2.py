@@ -260,3 +260,29 @@ class TestHS2(HS2TestSuite):
     TestHS2.check_response(get_profile_resp)
 
     assert execute_statement_req.statement in get_profile_resp.profile
+
+  @needs_session(conf_overlay={"use:database": "functional"})
+  def test_change_default_database(self):
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = "SELECT 1 FROM alltypes LIMIT 1"
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    # Will fail if there's no table called 'alltypes' in the database
+    TestHS2.check_response(execute_statement_resp)
+
+  @needs_session(conf_overlay={"use:database": "FUNCTIONAL"})
+  def test_change_default_database_case_insensitive(self):
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = "SELECT 1 FROM alltypes LIMIT 1"
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    # Will fail if there's no table called 'alltypes' in the database
+    TestHS2.check_response(execute_statement_resp)
+
+  @needs_session(conf_overlay={"use:database": "doesnt-exist"})
+  def test_bad_default_database(self):
+    execute_statement_req = TCLIService.TExecuteStatementReq()
+    execute_statement_req.sessionHandle = self.session_handle
+    execute_statement_req.statement = "SELECT 1 FROM alltypes LIMIT 1"
+    execute_statement_resp = self.hs2_client.ExecuteStatement(execute_statement_req)
+    TestHS2.check_response(execute_statement_resp, TCLIService.TStatusCode.ERROR_STATUS)
