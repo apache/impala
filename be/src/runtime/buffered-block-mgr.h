@@ -202,6 +202,10 @@ class BufferedBlockMgr {
 
     bool is_pinned() const { return is_pinned_; }
 
+    /// Path of temporary file backing the block. Intended for use in testing.
+    /// Returns empty string if no backing file allocated.
+    std::string TmpFilePath() const;
+
     /// Debug helper method to print the state of a block.
     std::string DebugString() const;
 
@@ -234,6 +238,10 @@ class BufferedBlockMgr {
     /// write_range_ are only valid while the block is being written.
     /// write_range_ instance is owned by the block manager.
     DiskIoMgr::WriteRange* write_range_;
+
+    /// The file this block belongs to. The lifetime is the same as the file location
+    /// and offset in write_range_. The File is owned by BufferedBlockMgr, not TmpFileMgr.
+    TmpFileMgr::File* tmp_file_;
 
     /// Length of valid (i.e. allocated) data within the block.
     int64_t valid_data_len_;
@@ -293,8 +301,8 @@ class BufferedBlockMgr {
   /// - mem_limit: maximum memory that will be used by the block mgr.
   /// - buffer_size: maximum size of each buffer.
   static Status Create(RuntimeState* state, MemTracker* parent,
-      RuntimeProfile* profile, int64_t mem_limit, int64_t buffer_size,
-      boost::shared_ptr<BufferedBlockMgr>* block_mgr);
+      RuntimeProfile* profile, TmpFileMgr* tmp_file_mgr, int64_t mem_limit,
+      int64_t buffer_size, boost::shared_ptr<BufferedBlockMgr>* block_mgr);
 
   ~BufferedBlockMgr();
 
@@ -327,11 +335,6 @@ class BufferedBlockMgr {
   /// Sets tmp reservation to 0 on this client.
   void ClearTmpReservation(Client* client);
 
-  /// Return the number of blocks a block manager will reserve for its I/O buffers.
-  static int GetNumReservedBlocks() {
-    return TmpFileMgr::num_tmp_devices();
-  }
-
   /// Return a new pinned block. If there is no memory for this block, *block will be set
   /// to NULL.
   /// If len > 0, GetNewBlock() will return a block with a buffer of size len. len
@@ -350,6 +353,9 @@ class BufferedBlockMgr {
   /// Cancels the block mgr. All subsequent calls fail with Status::CANCELLED.
   /// Idempotent.
   void Cancel();
+
+  /// Returns true if the block manager was cancelled.
+  bool IsCancelled();
 
   /// Dumps block mgr state. Grabs lock. If client is not NULL, also dumps its state.
   std::string DebugString(Client* client = NULL);
@@ -411,7 +417,7 @@ class BufferedBlockMgr {
     }
   };
 
-  BufferedBlockMgr(RuntimeState* state, int64_t block_size);
+  BufferedBlockMgr(RuntimeState* state, TmpFileMgr* tmp_file_mgr, int64_t block_size);
 
   /// Initializes the block mgr. Idempotent and thread-safe.
   void Init(DiskIoMgr* io_mgr, RuntimeProfile* profile,
@@ -473,6 +479,11 @@ class BufferedBlockMgr {
   /// Issues the write for this block to the DiskIoMgr.
   Status WriteUnpinnedBlock(Block* block);
 
+  /// Allocate block_size bytes in a temporary file. Try multiple disks if error occurs.
+  /// Returns an error only if no temporary files are usable.
+  Status AllocateScratchSpace(int64_t block_size, TmpFileMgr::File** tmp_file,
+      int64_t* file_offset);
+
   /// Callback used by DiskIoMgr to indicate a block write has completed.  write_status
   /// is the status of the write. is_cancelled_ is set to true if write_status is not
   /// Status::OK or a re-issue of the write fails. Returns the block's buffer to the
@@ -510,6 +521,9 @@ class BufferedBlockMgr {
 
   /// Track buffers allocated by the block manager.
   boost::scoped_ptr<MemTracker> mem_tracker_;
+
+  /// The temporary file manager used to allocate temporary file space.
+  TmpFileMgr* tmp_file_mgr_;
 
   /// This lock protects the block and buffer lists below, except for unused_blocks_.
   /// It also protects the various counters and changes to block state. Additionally, it is

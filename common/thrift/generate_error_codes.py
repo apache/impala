@@ -174,6 +174,13 @@ error_codes = (
   ("PARQUET_UNRECOGNIZED_SCHEMA", 55, "Unrecognized $0 schema:\\n$1"),
 
   ("COLLECTION_ALLOC_FAILED", 56, "Failed to allocate buffer for collection '$0'."),
+
+  ("TMP_DEVICE_BLACKLISTED", 57,
+    "Temporary device for directory $0 is blacklisted from a previous error and cannot "
+    "be used."),
+
+  ("TMP_FILE_BLACKLISTED", 58,
+    "Temporary file $0 is blacklisted from a previous error and cannot be expanded."),
 )
 
 import sys

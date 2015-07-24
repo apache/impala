@@ -180,8 +180,8 @@ Status RuntimeState::CreateBlockMgr() {
   }
 
   RETURN_IF_ERROR(BufferedBlockMgr::Create(this, query_mem_tracker(),
-      runtime_profile(), block_mgr_limit, io_mgr()->max_read_buffer_size(),
-      &block_mgr_));
+      runtime_profile(), exec_env()->tmp_file_mgr(), block_mgr_limit,
+      io_mgr()->max_read_buffer_size(), &block_mgr_));
   return Status::OK();
 }
 

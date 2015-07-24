@@ -1422,5 +1422,25 @@
     "units": "NONE",
     "kind": "GAUGE",
     "key": "impala-server.io.mgr.cached-file-handles-miss-count"
+  },
+  {
+    "description": "The number of active scratch directories for spilling to disk.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Active scratch directories",
+    "units": "NONE",
+    "kind": "GAUGE",
+    "key": "tmp-file-mgr.active-scratch-dirs"
+  },
+  {
+    "description": "The set of all active scratch directories for spilling to disk.",
+    "contexts": [
+      "IMPALAD"
+    ],
+    "label": "Active scratch directories list",
+    "units": "NONE",
+    "kind": "SET",
+    "key": "tmp-file-mgr.active-scratch-dirs.list"
   }
 ]

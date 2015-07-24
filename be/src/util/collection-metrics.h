@@ -64,6 +64,12 @@ class SetMetric : public Metric {
     value_.erase(item);
   }
 
+  /// Copy out value.
+  std::set<T> value() {
+    boost::lock_guard<boost::mutex> l(lock_);
+    return value_;
+  }
+
   void Reset() { value_.clear(); }
 
   virtual void ToJson(rapidjson::Document* document, rapidjson::Value* value) {

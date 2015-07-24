@@ -17,6 +17,8 @@
 #include <boost/thread/thread.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <gutil/strings/substitute.h>
+#include <sys/stat.h>
 
 #include <gtest/gtest.h>
 
@@ -31,6 +33,7 @@
 #include "service/fe-support.h"
 #include "util/disk-info.h"
 #include "util/cpu-info.h"
+#include "util/filesystem-util.h"
 #include "util/promise.h"
 #include "util/test-info.h"
 #include "util/time.h"
@@ -41,10 +44,21 @@
 #include "common/names.h"
 
 using boost::filesystem::directory_iterator;
+using boost::filesystem::remove;
+using strings::Substitute;
 
 // Note: This is the default scratch dir created by impala.
 // FLAGS_scratch_dirs + TmpFileMgr::TMP_SUB_DIR_NAME.
 const string SCRATCH_DIR = "/tmp/impala-scratch";
+
+// This suffix is appended to a tmp dir
+const string SCRATCH_SUFFIX = "/impala-scratch";
+
+// Number of millieconds to wait to ensure write completes
+const static int WRITE_WAIT_MILLIS = 500;
+
+// How often to check for write completion
+const static int WRITE_CHECK_INTERVAL_MILLIS = 10;
 
 DECLARE_bool(disk_spill_encryption);
 
@@ -62,13 +76,40 @@ class BufferedBlockMgrTest : public ::testing::Test {
     exec_env_->disk_io_mgr()->Init(io_mgr_tracker_.get());
     runtime_state_.reset(
         new RuntimeState(TExecPlanFragmentParams(), "", exec_env_.get()));
+    metrics_.reset(new MetricGroup("buffered-block-mgr-test"));
+    tmp_file_mgr_.reset(new TmpFileMgr);
+    tmp_file_mgr_->Init(metrics_.get());
   }
 
   virtual void TearDown() {
     block_mgr_parent_tracker_.reset();
+    tmp_file_mgr_.reset();
     runtime_state_.reset();
     exec_env_.reset();
     io_mgr_tracker_.reset();
+    // Tests modify permissions, so make sure we can delete if they didn't clean up.
+    for (int i = 0; i < created_tmp_dirs_.size(); ++i) {
+      chmod((created_tmp_dirs_[i] + SCRATCH_SUFFIX).c_str(), S_IRWXU);
+    }
+    FileSystemUtil::RemovePaths(created_tmp_dirs_);
+    created_tmp_dirs_.clear();
+  }
+
+  vector<string> InitMultipleTmpDirs(int num_dirs, shared_ptr<TmpFileMgr>* tmp_file_mgr) {
+    vector<string> tmp_dirs;
+    for (int i = 0; i < num_dirs; ++i) {
+      const string& dir = Substitute("/tmp/buffered-block-mgr-test.$0", i);
+      // Fix permissions in case old directories were left from previous runs of test.
+      chmod((dir + SCRATCH_SUFFIX).c_str(), S_IRWXU);
+      EXPECT_TRUE(FileSystemUtil::CreateDirectory(dir).ok());
+      tmp_dirs.push_back(dir);
+      created_tmp_dirs_.push_back(dir);
+    }
+    metrics_.reset(new MetricGroup("buffered-block-mgr-test"));
+    tmp_file_mgr->reset(new TmpFileMgr);
+    (*tmp_file_mgr)->InitCustom(tmp_dirs, false, metrics_.get());
+    EXPECT_EQ(num_dirs, (*tmp_file_mgr)->num_active_tmp_devices());
+    return tmp_dirs;
   }
 
   static void GetFreeBlock(BufferedBlockMgr* block_mgr, BufferedBlockMgr::Client* client,
@@ -111,14 +152,53 @@ class BufferedBlockMgrTest : public ::testing::Test {
     }
   }
 
-  shared_ptr<BufferedBlockMgr> CreateMgr(int max_buffers) {
+  shared_ptr<BufferedBlockMgr> CreateMgr(int max_buffers, TmpFileMgr* tmp_file_mgr=NULL) {
+    if (tmp_file_mgr == NULL) tmp_file_mgr = tmp_file_mgr_.get();
     shared_ptr<BufferedBlockMgr> mgr;
     BufferedBlockMgr::Create(runtime_state_.get(),
         block_mgr_parent_tracker_.get(), runtime_state_->runtime_profile(),
-        max_buffers * block_size_, block_size_, &mgr);
+        tmp_file_mgr, max_buffers * block_size_, block_size_, &mgr);
     EXPECT_TRUE(mgr != NULL);
     EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
     return mgr;
+  }
+
+  static RuntimeState* CreateRuntimeState(int64_t query_id, ExecEnv* exec_env) {
+    TExecPlanFragmentParams plan_params = TExecPlanFragmentParams();
+    plan_params.fragment_instance_ctx.query_ctx.query_id.hi = 0;
+    plan_params.fragment_instance_ctx.query_ctx.query_id.lo = query_id;
+    return new RuntimeState(plan_params, "", exec_env);
+  }
+
+  shared_ptr<BufferedBlockMgr> CreateQueryMgr(TmpFileMgr* tmp_file_mgr,
+      int64_t query_id, int blocks_per_mgr, shared_ptr<RuntimeState>* runtime_state) {
+    runtime_state->reset(CreateRuntimeState(query_id, exec_env_.get()));
+    EXPECT_TRUE(runtime_state != NULL);
+    shared_ptr<BufferedBlockMgr> mgr;
+    BufferedBlockMgr::Create(runtime_state->get(),
+        block_mgr_parent_tracker_.get(), (*runtime_state)->runtime_profile(),
+        tmp_file_mgr, blocks_per_mgr * block_size_, block_size_, &mgr);
+    EXPECT_TRUE(mgr != NULL);
+    return mgr;
+  }
+
+  // Create multiple separate managers, e.g. as if multiple queries were executing.
+  // Return created objects for use or later deletion by caller. Returned objects that
+  // must be deleted are wrapped in shared_ptrs so that occurs automatically.
+  void CreateQueryMgrs(TmpFileMgr* tmp_file_mgr, int num_mgrs, int max_buffers,
+      vector<shared_ptr<RuntimeState> >* runtime_states,
+      vector<shared_ptr<BufferedBlockMgr> >* mgrs,
+      vector<BufferedBlockMgr::Client*>* clients) {
+    for (int i = 0; i < num_mgrs; ++i) {
+      shared_ptr<RuntimeState> runtime_state;
+      shared_ptr<BufferedBlockMgr> mgr = CreateQueryMgr(tmp_file_mgr, i, max_buffers,
+          &runtime_state);
+      BufferedBlockMgr::Client* client;
+      mgr->RegisterClient(0, NULL, runtime_state.get(), &client);
+      runtime_states->push_back(runtime_state);
+      mgrs->push_back(mgr);
+      clients->push_back(client);
+    }
   }
 
   void AllocateBlocks(BufferedBlockMgr* block_mgr, BufferedBlockMgr::Client* client,
@@ -134,6 +214,71 @@ class BufferedBlockMgrTest : public ::testing::Test {
       *data = blocks->size();
       blocks->push_back(new_block);
     }
+  }
+
+  // Pin all blocks, expecting they are pinned successfully.
+  void PinBlocks(const vector<BufferedBlockMgr::Block*>& blocks) {
+    for (int i = 0; i < blocks.size(); ++i) {
+      bool pinned;
+      EXPECT_TRUE(blocks[i]->Pin(&pinned).ok());
+      EXPECT_TRUE(pinned);
+    }
+  }
+
+  // Pin all blocks, expecting no errors from Unpin() calls.
+  void UnpinBlocks(const vector<BufferedBlockMgr::Block*>& blocks) {
+    for (int i = 0; i < blocks.size(); ++i) {
+      EXPECT_TRUE(blocks[i]->Unpin().ok());
+    }
+  }
+
+  static void WaitForWrites(const shared_ptr<BufferedBlockMgr>& block_mgr) {
+    vector<shared_ptr<BufferedBlockMgr> > block_mgrs;
+    block_mgrs.push_back(block_mgr);
+    WaitForWrites(block_mgrs);
+  }
+
+  // Wait for writes issued through block managers to complete.
+  static void WaitForWrites(const vector<shared_ptr<BufferedBlockMgr> >& block_mgrs) {
+    int max_attempts = WRITE_WAIT_MILLIS / WRITE_CHECK_INTERVAL_MILLIS;
+    for (int i = 0; i < max_attempts; ++i) {
+      SleepForMs(WRITE_CHECK_INTERVAL_MILLIS);
+      if (AllWritesComplete(block_mgrs)) return;
+    }
+    EXPECT_TRUE(false) << "Writes did not complete after " << WRITE_WAIT_MILLIS << "ms";
+  }
+
+  static bool AllWritesComplete(const vector<shared_ptr<BufferedBlockMgr> >& block_mgrs) {
+    for (int i = 0; i < block_mgrs.size(); ++i) {
+      RuntimeProfile::Counter* writes_outstanding =
+          block_mgrs[i]->profile()->GetCounter("BlockWritesOutstanding");
+      if (writes_outstanding->value() != 0) return false;
+    }
+    return true;
+  }
+
+  // Delete the temporary file backing a block - all subsequent writes to the file
+  // should fail. Expects backing file has already been allocated.
+  static void DeleteBackingFile(BufferedBlockMgr::Block* block) {
+    const string& path = block->TmpFilePath();
+    EXPECT_GT(path.size(), 0);
+    EXPECT_TRUE(remove(path));
+    LOG(INFO) << "Injected fault by deleting file " << path;
+  }
+
+  // Check that the file backing the block has dir as a prefix of its path.
+  static bool BlockInDir(BufferedBlockMgr::Block* block, const string& dir) {
+    return block->TmpFilePath().find(dir) == 0;
+  }
+
+  // Find a block in the list that is backed by a file with the given directory as prefix
+  // of its path.
+  static BufferedBlockMgr::Block* FindBlockForDir(
+      const vector<BufferedBlockMgr::Block*>& blocks, const string& dir) {
+    for (int i = 0; i < blocks.size(); ++i) {
+      if (BlockInDir(blocks[i], dir)) return blocks[i];
+    }
+    return NULL;
   }
 
   // Test that randomly issues GetFreeBlock(), Pin(), Unpin(), Delete() and Close()
@@ -292,14 +437,16 @@ class BufferedBlockMgrTest : public ::testing::Test {
   scoped_ptr<RuntimeState> runtime_state_;
   scoped_ptr<MemTracker> block_mgr_parent_tracker_;
   scoped_ptr<MemTracker> io_mgr_tracker_;
+  scoped_ptr<MetricGroup> metrics_;
+  scoped_ptr<TmpFileMgr> tmp_file_mgr_;
+  vector<string> created_tmp_dirs_;
 };
 
 TEST_F(BufferedBlockMgrTest, GetNewBlock) {
   int max_num_blocks = 5;
   shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_blocks);
   BufferedBlockMgr::Client* client;
-  Status status = block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client);
-  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client).ok());
   EXPECT_EQ(block_mgr_parent_tracker_->consumption(), 0);
 
   // Allocate blocks until max_num_blocks, they should all succeed and memory
@@ -307,27 +454,27 @@ TEST_F(BufferedBlockMgrTest, GetNewBlock) {
   BufferedBlockMgr::Block* new_block;
   BufferedBlockMgr::Block* first_block = NULL;
   for (int i = 0; i < max_num_blocks; ++i) {
-    status = block_mgr->GetNewBlock(client, NULL, &new_block);
+    EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block).ok());
     EXPECT_TRUE(new_block != NULL);
     EXPECT_EQ(block_mgr->bytes_allocated(), (i + 1) * block_size_);
     if (first_block == NULL) first_block = new_block;
   }
 
   // Trying to allocate a new one should fail.
-  status = block_mgr->GetNewBlock(client, NULL, &new_block);
+  EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block).ok());
   EXPECT_TRUE(new_block == NULL);
   EXPECT_EQ(block_mgr->bytes_allocated(), max_num_blocks * block_size_);
 
   // We can allocate a new block by transferring an already allocated one.
   uint8_t* old_buffer = first_block->buffer();
-  status = block_mgr->GetNewBlock(client, first_block, &new_block);
+  EXPECT_TRUE(block_mgr->GetNewBlock(client, first_block, &new_block).ok());
   EXPECT_TRUE(new_block != NULL);
   EXPECT_TRUE(old_buffer == new_block->buffer());
   EXPECT_EQ(block_mgr->bytes_allocated(), max_num_blocks * block_size_);
   EXPECT_TRUE(!first_block->is_pinned());
 
   // Trying to allocate a new one should still fail.
-  status = block_mgr->GetNewBlock(client, NULL, &new_block);
+  EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block).ok());
   EXPECT_TRUE(new_block == NULL);
   EXPECT_EQ(block_mgr->bytes_allocated(), max_num_blocks * block_size_);
 
@@ -341,17 +488,15 @@ TEST_F(BufferedBlockMgrTest, GetNewBlockSmallBlocks) {
   shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_blocks);
   BufferedBlockMgr::Client* client;
   MemTracker tracker;
-  Status status = block_mgr->RegisterClient(0, &tracker, runtime_state_.get(), &client);
-  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(block_mgr->RegisterClient(0, &tracker, runtime_state_.get(), &client).ok());
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 
   vector<BufferedBlockMgr::Block*> blocks;
 
   // Allocate a small block.
   BufferedBlockMgr::Block* new_block = NULL;
-  status = block_mgr->GetNewBlock(client, NULL, &new_block, 128);
+  EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block, 128).ok());
   EXPECT_TRUE(new_block != NULL);
-  EXPECT_TRUE(status.ok());
   EXPECT_EQ(block_mgr->bytes_allocated(), 0);
   EXPECT_EQ(block_mgr_parent_tracker_->consumption(), 0);
   EXPECT_EQ(tracker.consumption(), 128);
@@ -361,9 +506,8 @@ TEST_F(BufferedBlockMgrTest, GetNewBlockSmallBlocks) {
   blocks.push_back(new_block);
 
   // Allocate a normal block
-  status = block_mgr->GetNewBlock(client, NULL, &new_block);
+  EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block).ok());
   EXPECT_TRUE(new_block != NULL);
-  EXPECT_TRUE(status.ok());
   EXPECT_EQ(block_mgr->bytes_allocated(), block_mgr->max_block_size());
   EXPECT_EQ(block_mgr_parent_tracker_->consumption(), block_mgr->max_block_size());
   EXPECT_EQ(tracker.consumption(), 128 + block_mgr->max_block_size());
@@ -373,9 +517,8 @@ TEST_F(BufferedBlockMgrTest, GetNewBlockSmallBlocks) {
   blocks.push_back(new_block);
 
   // Allocate another small block.
-  status = block_mgr->GetNewBlock(client, NULL, &new_block, 512);
+  EXPECT_TRUE(block_mgr->GetNewBlock(client, NULL, &new_block, 512).ok());
   EXPECT_TRUE(new_block != NULL);
-  EXPECT_TRUE(status.ok());
   EXPECT_EQ(block_mgr->bytes_allocated(), block_mgr->max_block_size());
   EXPECT_EQ(block_mgr_parent_tracker_->consumption(), block_mgr->max_block_size());
   EXPECT_EQ(tracker.consumption(), 128 + 512 + block_mgr->max_block_size());
@@ -385,12 +528,10 @@ TEST_F(BufferedBlockMgrTest, GetNewBlockSmallBlocks) {
   blocks.push_back(new_block);
 
   // Should be able to unpin and pin the middle block
-  status = blocks[1]->Unpin();
-  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(blocks[1]->Unpin().ok());
 
   bool pinned;
-  status = blocks[1]->Pin(&pinned);
-  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(blocks[1]->Pin(&pinned).ok());
   EXPECT_TRUE(pinned);
 
   for (int i = 0; i < blocks.size(); ++i) {
@@ -578,28 +719,22 @@ static int clear_scratch_dir() {
 // calls return 'CANCELLED' correctly.
 TEST_F(BufferedBlockMgrTest, WriteError) {
   int max_num_buffers = 2;
-  const int write_wait_millis = 500;
   shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_buffers);
   BufferedBlockMgr::Client* client;
   Status status = block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client != NULL);
 
-  RuntimeProfile* profile = block_mgr->profile();
-  RuntimeProfile::Counter* writes_outstanding =
-      profile->GetCounter("BlockWritesOutstanding");
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr.get(), client, max_num_buffers, &blocks);
   // Unpin two blocks here, to ensure that backing storage is allocated in tmp file.
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < 2; ++i) {
     status = blocks[i]->Unpin();
     EXPECT_TRUE(status.ok());
   }
-  // Wait for the writes to go through.
-  SleepForMs(write_wait_millis);
-  EXPECT_TRUE(writes_outstanding->value() == 0);
+  WaitForWrites(block_mgr);
   // Repin the blocks
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < 2; ++i) {
     bool pinned;
     status = blocks[i]->Pin(&pinned);
     EXPECT_TRUE(status.ok());
@@ -608,15 +743,13 @@ TEST_F(BufferedBlockMgrTest, WriteError) {
   // Remove the backing storage so that future writes will fail
   int num_files = clear_scratch_dir();
   EXPECT_TRUE(num_files > 0);
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < 2; ++i) {
     status = blocks[i]->Unpin();
     EXPECT_TRUE(status.ok());
   }
-  // Wait for the writes to go through.
-  SleepForMs(write_wait_millis);
-  EXPECT_TRUE(writes_outstanding->value() == 0);
+  WaitForWrites(block_mgr);
   // Subsequent calls should fail.
-  for (int i = 0; i < 2; i++) {
+  for (int i = 0; i < 2; ++i) {
     status = blocks[i]->Delete();
     EXPECT_TRUE(status.IsCancelled());
   }
@@ -632,24 +765,18 @@ TEST_F(BufferedBlockMgrTest, WriteError) {
 // back an unpinned buffer.
 TEST_F(BufferedBlockMgrTest, TmpFileAllocateError) {
   int max_num_buffers = 2;
-  const int write_wait_millis = 500;
   shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_buffers);
   BufferedBlockMgr::Client* client;
   Status status = block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client);
   EXPECT_TRUE(status.ok());
   EXPECT_TRUE(client != NULL);
 
-  RuntimeProfile* profile = block_mgr->profile();
-  RuntimeProfile::Counter* writes_outstanding =
-      profile->GetCounter("BlockWritesOutstanding");
   vector<BufferedBlockMgr::Block*> blocks;
   AllocateBlocks(block_mgr.get(), client, max_num_buffers, &blocks);
   // Unpin a block, forcing a write.
   status = blocks[0]->Unpin();
   EXPECT_TRUE(status.ok());
-  // Wait for the write to go through.
-  SleepForMs(write_wait_millis);
-  EXPECT_TRUE(writes_outstanding->value() == 0);
+  WaitForWrites(block_mgr);
   // Remove temporary files - subsequent operations will fail.
   int num_files = clear_scratch_dir();
   EXPECT_TRUE(num_files > 0);
@@ -660,6 +787,162 @@ TEST_F(BufferedBlockMgrTest, TmpFileAllocateError) {
   EXPECT_FALSE(status.ok());
   block_mgr.reset();
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
+}
+
+// Test that the block manager is able to blacklist a temporary device correctly after a
+// write error. We should not allocate more blocks on that device, but existing blocks
+// on the device will remain in use.
+TEST_F(BufferedBlockMgrTest, WriteErrorBlacklist) {
+  // Set up two buffered block managers with two temporary dirs.
+  shared_ptr<TmpFileMgr> tmp_file_mgr;
+  vector<string> tmp_dirs = InitMultipleTmpDirs(2, &tmp_file_mgr);
+  // Simulate two concurrent queries.
+  const int NUM_BLOCK_MGRS = 2;
+  const int MAX_NUM_BLOCKS = 4;
+  int blocks_per_mgr = MAX_NUM_BLOCKS / NUM_BLOCK_MGRS;
+  vector<shared_ptr<RuntimeState> > runtime_states;
+  vector<shared_ptr<BufferedBlockMgr> > block_mgrs;
+  vector<BufferedBlockMgr::Client*> clients;
+  CreateQueryMgrs(tmp_file_mgr.get(), NUM_BLOCK_MGRS, blocks_per_mgr, &runtime_states,
+      &block_mgrs, &clients);
+  // Allocate files for all 2x2 combinations by unpinning blocks.
+  vector<vector<BufferedBlockMgr::Block*> > blocks;
+  vector<BufferedBlockMgr::Block*> all_blocks;
+  for (int i = 0; i < NUM_BLOCK_MGRS; ++i) {
+    vector<BufferedBlockMgr::Block*> mgr_blocks;
+    AllocateBlocks(block_mgrs[i].get(), clients[i], blocks_per_mgr, &mgr_blocks);
+    UnpinBlocks(mgr_blocks);
+    for (int j = 0; j < blocks_per_mgr; ++j) {
+      LOG(INFO) << "Manager " << i << " Block " << j << " backed by file "
+                << mgr_blocks[j]->TmpFilePath();
+    }
+    blocks.push_back(mgr_blocks);
+    all_blocks.insert(all_blocks.end(), mgr_blocks.begin(), mgr_blocks.end());
+  }
+  WaitForWrites(block_mgrs);
+  int error_mgr = 0;
+  int no_error_mgr = 1;
+  const string& error_dir = tmp_dirs[0];
+  const string& good_dir = tmp_dirs[1];
+  // Delete one file from first scratch dir for first block manager.
+  BufferedBlockMgr::Block* error_block = FindBlockForDir(blocks[error_mgr], error_dir);
+  ASSERT_TRUE(error_block != NULL) << "Expected a tmp file in dir " << error_dir;
+  PinBlocks(all_blocks);
+  DeleteBackingFile(error_block);
+  UnpinBlocks(all_blocks); // Should succeed since tmp file space was already allocated.
+  WaitForWrites(block_mgrs);
+  EXPECT_TRUE(block_mgrs[error_mgr]->IsCancelled());
+  EXPECT_FALSE(block_mgrs[no_error_mgr]->IsCancelled());
+  // Temporary device with error should no longer be active.
+  vector<TmpFileMgr::DeviceId> active_tmp_devices = tmp_file_mgr->active_tmp_devices();
+  EXPECT_EQ(tmp_dirs.size() - 1, active_tmp_devices.size());
+  for (int i = 0; i < active_tmp_devices.size(); ++i) {
+    const string& device_path = tmp_file_mgr->GetTmpDirPath(active_tmp_devices[i]);
+    EXPECT_EQ(string::npos, error_dir.find(device_path));
+  }
+  // The second block manager should continue using allocated scratch space, since it
+  // didn't encounter a write error itself. In future this could change but for now it is
+  // the intended behaviour.
+  PinBlocks(blocks[no_error_mgr]);
+  UnpinBlocks(blocks[no_error_mgr]);
+  EXPECT_TRUE(FindBlockForDir(blocks[no_error_mgr], good_dir) != NULL);
+  EXPECT_TRUE(FindBlockForDir(blocks[no_error_mgr], error_dir) != NULL);
+  // The second block manager should avoid using bad directory for new blocks.
+  vector<BufferedBlockMgr::Block*> no_error_new_blocks;
+  AllocateBlocks(block_mgrs[no_error_mgr].get(), clients[no_error_mgr], blocks_per_mgr,
+      &no_error_new_blocks);
+  UnpinBlocks(no_error_new_blocks);
+  for (int i = 0; i < no_error_new_blocks.size(); ++i) {
+    LOG(INFO) << "Newly created block backed by file "
+              << no_error_new_blocks[i]->TmpFilePath();
+    EXPECT_TRUE(BlockInDir(no_error_new_blocks[i], good_dir));
+  }
+  // A new block manager should only use the good dir for backing storage.
+  shared_ptr<RuntimeState> new_runtime_state;
+  shared_ptr<BufferedBlockMgr> new_block_mgr = CreateQueryMgr(tmp_file_mgr.get(), 9999,
+      blocks_per_mgr, &new_runtime_state);
+  BufferedBlockMgr::Client* new_client;
+  new_block_mgr->RegisterClient(0, NULL, new_runtime_state.get(), &new_client);
+  vector<BufferedBlockMgr::Block*> new_mgr_blocks;
+  AllocateBlocks(new_block_mgr.get(), new_client, blocks_per_mgr, &new_mgr_blocks);
+  UnpinBlocks(new_mgr_blocks);
+  for (int i = 0; i < blocks_per_mgr; ++i) {
+    LOG(INFO) << "New manager Block " << i << " backed by file "
+              << new_mgr_blocks[i]->TmpFilePath();
+    EXPECT_TRUE(BlockInDir(new_mgr_blocks[i], good_dir));
+  }
+}
+
+// Check that allocation error resulting from removal of directory results in blacklisting
+// of directory.
+TEST_F(BufferedBlockMgrTest, AllocationErrorBlacklist) {
+  // Set up two buffered block managers with two temporary dirs.
+  shared_ptr<TmpFileMgr> tmp_file_mgr;
+  vector<string> tmp_dirs = InitMultipleTmpDirs(2, &tmp_file_mgr);
+  // Simulate two concurrent queries.
+  int num_block_mgrs = 2;
+  int max_num_blocks = 4;
+  int blocks_per_mgr = max_num_blocks / num_block_mgrs;
+  vector<shared_ptr<RuntimeState> > runtime_states;
+  vector<shared_ptr<BufferedBlockMgr> > block_mgrs;
+  vector<BufferedBlockMgr::Client*> clients;
+  CreateQueryMgrs(tmp_file_mgr.get(), num_block_mgrs, blocks_per_mgr, &runtime_states,
+      &block_mgrs, &clients);
+  // Allocate files for all 2x2 combinations by unpinning blocks.
+  vector<vector<BufferedBlockMgr::Block*> > blocks;
+  for (int i = 0; i < num_block_mgrs; ++i) {
+    vector<BufferedBlockMgr::Block*> mgr_blocks;
+    AllocateBlocks(block_mgrs[i].get(), clients[i], blocks_per_mgr, &mgr_blocks);
+    blocks.push_back(mgr_blocks);
+  }
+  const string& bad_dir = tmp_dirs[0];
+  const string& bad_scratch_subdir = bad_dir + SCRATCH_SUFFIX;
+  const string& good_dir = tmp_dirs[1];
+  const string& good_scratch_subdir = good_dir + SCRATCH_SUFFIX;
+  chmod(bad_scratch_subdir.c_str(), 0);
+  // The block mgr should attempt to allocate space in bad dir for one block, which will
+  // cause an error when it tries to create/expand the file. It should recover and just
+  // use the good dir.
+  UnpinBlocks(blocks[0]);
+  EXPECT_EQ(1, tmp_file_mgr->num_active_tmp_devices());
+  const string& active_tmp_dir = tmp_file_mgr->GetTmpDirPath(
+      tmp_file_mgr->active_tmp_devices()[0]);
+  EXPECT_EQ(good_scratch_subdir, active_tmp_dir);
+  chmod(bad_scratch_subdir.c_str(), S_IRWXU);
+  // Blocks should not be written to bad dir even if writable again.
+  UnpinBlocks(blocks[1]);
+  for (int i = 0; i < num_block_mgrs; ++i) {
+    for (int j = 0; j < blocks_per_mgr; ++j) {
+      EXPECT_TRUE(BlockInDir(blocks[i][j], good_dir));
+    }
+  }
+  // All writes should succeed.
+  WaitForWrites(block_mgrs);
+  for (int i = 0; i < blocks.size(); ++i) {
+    for (int j = 0; j < blocks[i].size(); ++j) {
+      EXPECT_TRUE(blocks[i][j]->Delete().ok());
+    }
+  }
+}
+
+// Test that block manager fails cleanly when all directories are inaccessible at runtime.
+TEST_F(BufferedBlockMgrTest, NoDirsAllocationError) {
+  shared_ptr<TmpFileMgr> tmp_file_mgr;
+  vector<string> tmp_dirs = InitMultipleTmpDirs(2, &tmp_file_mgr);
+  int max_num_buffers = 2;
+  shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_buffers, tmp_file_mgr.get());
+  BufferedBlockMgr::Client* client;
+  EXPECT_TRUE(block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client).ok());
+  EXPECT_TRUE(client != NULL);
+  vector<BufferedBlockMgr::Block*> blocks;
+  AllocateBlocks(block_mgr.get(), client, max_num_buffers, &blocks);
+  for (int i = 0; i < tmp_dirs.size(); ++i) {
+    const string& tmp_scratch_subdir = tmp_dirs[i] + SCRATCH_SUFFIX;
+    chmod(tmp_scratch_subdir.c_str(), 0);
+  }
+  for (int i = 0; i < blocks.size(); ++i) {
+    EXPECT_FALSE(blocks[i]->Unpin().ok());
+  }
 }
 
 // Create two clients with different number of reserved buffers.
@@ -918,7 +1201,6 @@ int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();
-  impala::TmpFileMgr::Init();
   impala::LlvmCodeGen::InitializeLlvm();
   return RUN_ALL_TESTS();
 }

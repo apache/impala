@@ -65,6 +65,9 @@ class SimpleTupleStreamTest : public testing::Test {
     CreateDescriptors();
 
     mem_pool_.reset(new MemPool(&tracker_));
+    metrics_.reset(new MetricGroup("buffered-tuple-stream-test"));
+    tmp_file_mgr_.reset(new TmpFileMgr);
+    tmp_file_mgr_->Init(metrics_.get());
   }
 
   virtual void CreateDescriptors() {
@@ -91,8 +94,9 @@ class SimpleTupleStreamTest : public testing::Test {
   }
 
   void CreateMgr(int64_t limit, int block_size) {
-    Status status = BufferedBlockMgr::Create(runtime_state_.get(),
-        &tracker_, runtime_state_->runtime_profile(), limit, block_size, &block_mgr_);
+    Status status = BufferedBlockMgr::Create(runtime_state_.get(), &tracker_,
+        runtime_state_->runtime_profile(), tmp_file_mgr_.get(), limit, block_size,
+        &block_mgr_);
     EXPECT_TRUE(status.ok());
     status = block_mgr_->RegisterClient(0, &tracker_, runtime_state_.get(), &client_);
     EXPECT_TRUE(status.ok());
@@ -399,6 +403,8 @@ class SimpleTupleStreamTest : public testing::Test {
   RowDescriptor* int_desc_;
   RowDescriptor* string_desc_;
   scoped_ptr<MemPool> mem_pool_;
+  scoped_ptr<MetricGroup> metrics_;
+  scoped_ptr<TmpFileMgr> tmp_file_mgr_;
 }; // SimpleTupleStreamTest
 
 
@@ -711,7 +717,6 @@ int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   impala::InitCommonRuntime(argc, argv, true, impala::TestInfo::BE_TEST);
   impala::InitFeSupport();
-  impala::TmpFileMgr::Init();
   impala::LlvmCodeGen::InitializeLlvm();
   return RUN_ALL_TESTS();
 }

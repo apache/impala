@@ -247,7 +247,7 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     }
   }
 
-  status = TmpFileMgr::Init();
+  status = exec_env->tmp_file_mgr()->Init(exec_env->metrics());
   if (!status.ok()) {
     LOG(ERROR) << status.GetDetail();
     if (FLAGS_abort_on_config_error) {

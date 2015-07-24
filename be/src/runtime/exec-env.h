@@ -45,6 +45,7 @@ class CgroupsManager;
 class ImpalaServer;
 class RequestPoolService;
 class Frontend;
+class TmpFileMgr;
 
 /// Execution environment for queries/plan fragments.
 /// Contains all required global structures, and handles to
@@ -87,6 +88,7 @@ class ExecEnv {
   ThreadResourceMgr* thread_mgr() { return thread_mgr_.get(); }
   CgroupsMgr* cgroups_mgr() { return cgroups_mgr_.get(); }
   HdfsOpThreadPool* hdfs_op_thread_pool() { return hdfs_op_thread_pool_.get(); }
+  TmpFileMgr* tmp_file_mgr() { return tmp_file_mgr_.get(); }
   ImpalaServer* impala_server() { return impala_server_; }
   Frontend* frontend() { return frontend_.get(); };
 
@@ -130,6 +132,7 @@ class ExecEnv {
   boost::scoped_ptr<ThreadResourceMgr> thread_mgr_;
   boost::scoped_ptr<CgroupsMgr> cgroups_mgr_;
   boost::scoped_ptr<HdfsOpThreadPool> hdfs_op_thread_pool_;
+  boost::scoped_ptr<TmpFileMgr> tmp_file_mgr_;
   boost::scoped_ptr<RequestPoolService> request_pool_service_;
   boost::scoped_ptr<Frontend> frontend_;
 
