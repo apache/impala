@@ -419,6 +419,12 @@ class ExprTest : public testing::Test {
     EXPECT_TRUE(result == NULL) << expr;
   }
 
+  void TestIsNotNull(const string& expr, const ColumnType& expr_type) {
+    void* result;
+    GetValue(expr, expr_type, &result);
+    EXPECT_TRUE(result != NULL) << expr;
+  }
+
   void TestError(const string& expr) {
     void* dummy_result;
     GetValue(expr, INVALID_TYPE, &dummy_result, /* expect_error */ true);
@@ -2952,9 +2958,7 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestStringValue("cast(date_sub(cast('2012-01-01 09:10:11.123456789' "
       "as timestamp), interval cast(10 as bigint) years) as string)",
       "2002-01-01 09:10:11.123456789");
-  // These return NULL because year is out of range (IMPALA-1493). If very large
-  // intervals are used the results will be incorrect due to using boost (IMPALA-1675
-  // still unresolved).
+  // These return NULL because the resulting year is out of range.
   TestIsNull(
       "CAST('2005-10-11 00:00:00' AS TIMESTAMP) - INTERVAL 718 YEAR", TYPE_TIMESTAMP);
   TestIsNull(
@@ -2963,6 +2967,14 @@ TEST_F(ExprTest, TimestampFunctions) {
       "CAST('2005-10-11 00:00:00' AS TIMESTAMP) + INTERVAL 9718 YEAR", TYPE_TIMESTAMP);
   TestIsNull(
       "CAST('2005-10-11 00:00:00' AS TIMESTAMP) - INTERVAL -9718 YEAR", TYPE_TIMESTAMP);
+  TestIsNull(
+      "CAST('1405-01-11 00:00:00' AS TIMESTAMP) + INTERVAL -61 MONTH", TYPE_TIMESTAMP);
+  TestIsNull(
+      "CAST('1405-01-11 00:00:00' AS TIMESTAMP) - INTERVAL 61 MONTH", TYPE_TIMESTAMP);
+  TestIsNull(
+      "CAST('9995-12-11 00:00:00' AS TIMESTAMP) + INTERVAL 61 MONTH", TYPE_TIMESTAMP);
+  TestIsNull(
+      "CAST('9995-12-11 00:00:00' AS TIMESTAMP) - INTERVAL -61 MONTH", TYPE_TIMESTAMP);
   // Add/sub months.
   TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
       "as timestamp), interval 13 months) as string)",
@@ -2976,6 +2988,12 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestStringValue("cast(date_sub(cast('2012-02-29 09:10:11.123456789' "
       "as timestamp), interval cast(1 as bigint) month) as string)",
       "2012-01-29 09:10:11.123456789");
+  TestStringValue("cast(add_months(cast('1405-01-29 09:10:11.123456789' "
+      "as timestamp), -60) as string)",
+      "1400-01-29 09:10:11.123456789");
+  TestStringValue("cast(add_months(cast('9995-01-29 09:10:11.123456789' "
+      "as timestamp), 59) as string)",
+      "9999-12-29 09:10:11.123456789");
   // Add/sub weeks.
   TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
       "as timestamp), interval 2 weeks) as string)",
@@ -3128,23 +3146,60 @@ TEST_F(ExprTest, TimestampFunctions) {
 
   // Test add/sub behavior with edge case time interval values.
   string max_int = lexical_cast<string>(numeric_limits<int32_t>::max());
-  string max_long = lexical_cast<string>(numeric_limits<int32_t>::max());
-  TestStringValue(
-        "cast(years_add(cast('2000-01-01 00:00:00' "
-        "as timestamp), " + max_int + ") as string)",
-        "1999-01-01 00:00:00");
-  TestStringValue(
-      "cast(years_sub(cast('2000-01-01 00:00:00' "
-      "as timestamp), " + max_long + ") as string)",
-      "2001-01-01 00:00:00");
-  TestStringValue(
-      "cast(years_add(cast('2000-01-01 00:00:00' "
-      "as timestamp), " + max_int + ") as string)",
-      "1999-01-01 00:00:00");
-  TestStringValue(
-      "cast(years_sub(cast('2000-01-01 00:00:00' "
-      "as timestamp), " + max_long + ") as string)",
-      "2001-01-01 00:00:00");
+  string max_long = lexical_cast<string>(numeric_limits<int64_t>::max());
+  typedef map<string, int64_t> MaxIntervals;
+  MaxIntervals max_intervals;
+  max_intervals["years"] = TimestampFunctions::MAX_YEAR_INTERVAL;
+  max_intervals["months"] = TimestampFunctions::MAX_MONTH_INTERVAL;
+  max_intervals["weeks"] = TimestampFunctions::MAX_WEEK_INTERVAL;
+  max_intervals["days"] = TimestampFunctions::MAX_DAY_INTERVAL;
+  max_intervals["hours"] = TimestampFunctions::MAX_HOUR_INTERVAL;
+  max_intervals["minutes"] = TimestampFunctions::MAX_MINUTE_INTERVAL;
+  max_intervals["seconds"] = TimestampFunctions::MAX_SEC_INTERVAL;
+  max_intervals["microseconds"] = TimestampFunctions::MAX_MILLI_INTERVAL;
+  max_intervals["nanoseconds"] = numeric_limits<int64_t>::max();
+  string year_5000 = "cast('5000-01-01' as timestamp)";
+  string gt_year_5000 = "cast('5000-01-01 00:00:00.1' as timestamp)";
+  string lt_year_5000 = "cast('4999-12-31 23:59:59.9' as timestamp)";
+  for (MaxIntervals::iterator it = max_intervals.begin(); it != max_intervals.end();
+      ++it) {
+    const string& unit = it->first;
+    const string& lt_max_interval =
+        lexical_cast<string>(static_cast<int64_t>(0.9 * it->second));
+    // Test that pushing a value beyond the max/min values results in a NULL.
+    TestIsNull(unit + "_add(cast('9999-12-31 23:59:59' as timestamp) + interval 1 year, "
+        + lt_max_interval + ")", TYPE_TIMESTAMP);
+    TestIsNull(unit + "_sub(cast('1400-01-01 00:00:00' as timestamp), "
+        + lt_max_interval + ")", TYPE_TIMESTAMP);
+
+    // Same as above but with edge case values of max int/long.
+    TestIsNull(unit + "_add(years_add(cast('9999-12-31 23:59:59' as timestamp), 1), "
+        + max_int + ")", TYPE_TIMESTAMP);
+    TestIsNull(unit + "_sub(cast('1400-01-01 00:00:00' as timestamp), " + max_int + ")",
+        TYPE_TIMESTAMP);
+    TestIsNull(unit + "_add(years_add(cast('9999-12-31 23:59:59' as timestamp), 1), "
+        + max_long + ")", TYPE_TIMESTAMP);
+    TestIsNull(unit + "_sub(cast('1400-01-01 00:00:00' as timestamp), " + max_long
+        + ")", TYPE_TIMESTAMP);
+
+    // Test that adding/subtracting a value slightly less than the MAX_*_INTERVAL
+    // can result in a non-NULL.
+    TestIsNotNull(unit + "_add(cast('1400-01-01 00:00:00' as timestamp), "
+        + lt_max_interval + ")", TYPE_TIMESTAMP);
+    TestIsNotNull(unit + "_sub(cast('9999-12-31 23:59:59' as timestamp), "
+        + lt_max_interval + ")", TYPE_TIMESTAMP);
+
+    // Test that adding/subtracting either results in NULL or a value more/less than
+    // the original value.
+    TestValue("isnull(" + unit + "_add(" + year_5000 + ", " + max_int
+        + "), " + gt_year_5000 + ") > " + year_5000, TYPE_BOOLEAN, true);
+    TestValue("isnull(" + unit + "_sub(" + year_5000 + ", " + max_int
+        + "), " + lt_year_5000 + ") < " + year_5000, TYPE_BOOLEAN, true);
+    TestValue("isnull(" + unit + "_add(" + year_5000 + ", " + max_long
+        + "), " + gt_year_5000 + ") > " + year_5000, TYPE_BOOLEAN, true);
+    TestValue("isnull(" + unit + "_sub(" + year_5000 + ", " + max_long
+        + "), " + lt_year_5000 + ") < " + year_5000, TYPE_BOOLEAN, true);
+  }
 
   // Test Unix epoch conversions.
   TestTimestampUnixEpochConversions(0, "1970-01-01 00:00:00");

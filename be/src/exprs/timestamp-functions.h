@@ -39,6 +39,20 @@ class TupleRow;
 /// TODO: Reconsider whether this class needs to exist.
 class TimestampFunctions {
  public:
+  // To workaround IMPALA-1675 (boost doesn't throw an error for very large intervals),
+  // define the max intervals.
+  static const int64_t MAX_YEAR;
+  static const int64_t MIN_YEAR;
+  static const int64_t MAX_YEAR_INTERVAL;
+  static const int64_t MAX_MONTH_INTERVAL;
+  static const int64_t MAX_WEEK_INTERVAL;
+  static const int64_t MAX_DAY_INTERVAL;
+  static const int64_t MAX_HOUR_INTERVAL;
+  static const int64_t MAX_MINUTE_INTERVAL;
+  static const int64_t MAX_SEC_INTERVAL;
+  static const int64_t MAX_MILLI_INTERVAL;
+  static const int64_t MAX_MICRO_INTERVAL;
+
   /// Parse and initialize format string if it is a constant. Raise error if invalid.
   static void UnixAndFromUnixPrepare(FunctionContext* context,
       FunctionContext::FunctionStateScope scope);
@@ -105,15 +119,13 @@ class TimestampFunctions {
   /// their behavior. For all intervals except MONTH the three forms above produce the
   /// same results. MONTH is a special case where the result may differ if the input
   /// TIMESTAMP is the last day of the month (ADD_MONTH() always sets the result to the
-  /// last day of the month if the input is the last day of the month).
-  /// AddSubMonthsKeepMaxDay() below handles the ADD_MONTH() case, the INTERVAL cases
-  /// (#2 & #3) are handled by AddSub().
-  template <bool is_add, typename AnyIntVal, typename Interval>
+  /// last day of the month if the input is the last day of the month). A value of true
+  /// for the template parameter 'is_add_months_keep_last_day' corresponds to the
+  /// ADD_MONTH() case.
+  template <bool is_add, typename AnyIntVal, typename Interval,
+      bool is_add_months_keep_last_day>
   static TimestampVal AddSub(FunctionContext* context, const TimestampVal& timestamp,
       const AnyIntVal& num_interval_units);
-  template <bool is_add, typename AnyIntVal>
-  static TimestampVal AddSubMonthsKeepMaxDay(FunctionContext* context,
-      const TimestampVal& timestamp, const AnyIntVal& months);
 
   /// Helper function to check date/time format strings.
   /// TODO: eventually return format converted from Java to Boost.

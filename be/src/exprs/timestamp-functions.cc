@@ -37,8 +37,10 @@
 
 using boost::algorithm::iequals;
 using boost::gregorian::greg_month;
+using boost::gregorian::min_date_time;
 using boost::local_time::local_date_time;
 using boost::local_time::time_zone_ptr;
+using boost::posix_time::not_a_date_time;
 using boost::posix_time::ptime;
 using namespace impala_udf;
 using namespace strings;
@@ -65,6 +67,35 @@ const char* TimestampFunctions::WEDNESDAY = "Wednesday";
 const char* TimestampFunctions::THURSDAY = "Thursday";
 const char* TimestampFunctions::FRIDAY = "Friday";
 const char* TimestampFunctions::SATURDAY = "Saturday";
+
+// To workaround a boost bug (where adding very large intervals to ptimes causes the
+// value to wrap around instead or throwing an exception -- the root cause of
+// IMPALA-1675), max interval value are defined below. Some values below are less than
+// the minimum interval needed to trigger IMPALA-1675 but the values are greater or
+// equal to the interval that would definitely result in an out of bounds value. The
+// min and max year are also defined for manual error checking. Boost is inconsistent
+// with its defined max year. date(max_date_time).year() will give 9999 but testing shows
+// the actual max date is 1 year later.
+const int64_t TimestampFunctions::MAX_YEAR = 10000;
+const int64_t TimestampFunctions::MIN_YEAR = Date(min_date_time).year();
+const int64_t TimestampFunctions::MAX_YEAR_INTERVAL =
+    TimestampFunctions::MAX_YEAR - TimestampFunctions::MIN_YEAR;
+const int64_t TimestampFunctions::MAX_MONTH_INTERVAL =
+    TimestampFunctions::MAX_YEAR_INTERVAL * 12;
+const int64_t TimestampFunctions::MAX_WEEK_INTERVAL =
+    TimestampFunctions::MAX_YEAR_INTERVAL * 53;
+const int64_t TimestampFunctions::MAX_DAY_INTERVAL =
+    TimestampFunctions::MAX_YEAR_INTERVAL * 366;
+const int64_t TimestampFunctions::MAX_HOUR_INTERVAL =
+    TimestampFunctions::MAX_DAY_INTERVAL * 24;
+const int64_t TimestampFunctions::MAX_MINUTE_INTERVAL =
+    TimestampFunctions::MAX_DAY_INTERVAL * 60;
+const int64_t TimestampFunctions::MAX_SEC_INTERVAL =
+    TimestampFunctions::MAX_MINUTE_INTERVAL * 60;
+const int64_t TimestampFunctions::MAX_MILLI_INTERVAL =
+    TimestampFunctions::MAX_SEC_INTERVAL * 1000;
+const int64_t TimestampFunctions::MAX_MICRO_INTERVAL =
+    TimestampFunctions::MAX_MILLI_INTERVAL * 1000;
 
 void TimestampFunctions::UnixAndFromUnixPrepare(FunctionContext* context,
     FunctionContext::FunctionStateScope scope) {
@@ -321,17 +352,102 @@ inline unsigned short GetLastDayOfMonth(int month, int year) {
   }
 }
 
-/// For compatibility with other databases (Postgresql, MySql, Oracle), the boost logic
-/// about adding/subtracting years/months to dates will not be used. For intervals other
-/// than year/month, the boost logic produces the desired results.
-/// 'WeeksOrDays' should be either 'weeks' or 'days' from boost::gregorian.
-template <typename WeeksOrDays>
-inline TimestampVal AddWeeksOrDays(const TimestampValue& timestamp, int64_t interval) {
-  const TimestampValue value(timestamp.date() + WeeksOrDays(interval), timestamp.time());
-  value.date().year();  // Forces validation on the year (which will throw).
-  TimestampVal val;
-  value.ToTimestampVal(&val);
-  return val;
+/// The functions below help workaround IMPALA-1675: if a very large interval is added
+/// to a date, boost fails to throw an exception.
+template <class Interval>
+bool IsOverMaxInterval(const int64_t count) {
+  DCHECK(false) << "NYI";
+  return false;
+}
+
+template <>
+inline bool IsOverMaxInterval<Years>(const int64_t val) {
+  return val < -TimestampFunctions::MAX_YEAR_INTERVAL ||
+      TimestampFunctions::MAX_YEAR_INTERVAL < val;
+}
+
+template <>
+inline bool IsOverMaxInterval<Months>(const int64_t val) {
+  return val < -TimestampFunctions::MAX_MONTH_INTERVAL ||
+      TimestampFunctions::MAX_MONTH_INTERVAL < val;
+}
+
+template <>
+inline bool IsOverMaxInterval<Weeks>(const int64_t val) {
+  return val < -TimestampFunctions::MAX_WEEK_INTERVAL ||
+      TimestampFunctions::MAX_WEEK_INTERVAL < val;
+}
+
+template <>
+inline bool IsOverMaxInterval<Days>(const int64_t val) {
+  return val < -TimestampFunctions::MAX_DAY_INTERVAL ||
+      TimestampFunctions::MAX_DAY_INTERVAL < val;
+}
+
+template <>
+inline bool IsOverMaxInterval<Hours>(const int64_t val) {
+  return val < -TimestampFunctions::MAX_HOUR_INTERVAL ||
+      TimestampFunctions::MAX_HOUR_INTERVAL < val;
+}
+
+template <>
+inline bool IsOverMaxInterval<Minutes>(const int64_t val) {
+  return val < -TimestampFunctions::MAX_MINUTE_INTERVAL ||
+      TimestampFunctions::MAX_MINUTE_INTERVAL < val;
+}
+
+template <>
+inline bool IsOverMaxInterval<Seconds>(const int64_t val) {
+  return val < -TimestampFunctions::MAX_SEC_INTERVAL ||
+      TimestampFunctions::MAX_SEC_INTERVAL < val;
+}
+
+template <>
+inline bool IsOverMaxInterval<Milliseconds>(const int64_t val) {
+  return val < -TimestampFunctions::MAX_MILLI_INTERVAL ||
+      TimestampFunctions::MAX_MILLI_INTERVAL < val;
+}
+
+template <>
+inline bool IsOverMaxInterval<Microseconds>(const int64_t val) {
+  return val < -TimestampFunctions::MAX_MICRO_INTERVAL ||
+      TimestampFunctions::MAX_MICRO_INTERVAL < val;
+}
+
+template <>
+inline bool IsOverMaxInterval<Nanoseconds>(const int64_t val) {
+  return false;
+}
+
+inline bool IsUnsupportedYear(int64_t year) {
+  return year < TimestampFunctions::MIN_YEAR || TimestampFunctions::MAX_YEAR < year;
+}
+
+/// The AddInterval() functions provide a unified interface for adding intervals of all
+/// types. To subtract, the 'interval' can be negative. 'context' and 'interval' are
+/// input params, 'datetime' is an output param.
+template <typename Interval>
+inline void AddInterval(FunctionContext* context, int64_t interval, ptime* datetime) {
+  *datetime += Interval(interval);
+}
+
+/// IMPALA-2086: Avoid boost changing Feb 28th into Feb 29th when the resulting year is
+/// a leap year. Doing the work rather than using boost then adjusting the boost result
+/// is a little faster (and about the same speed as the default boost logic).
+template <>
+inline void AddInterval<Years>(FunctionContext* context, int64_t interval,
+    ptime* datetime) {
+  const Date& date = datetime->date();
+  int year = date.year() + interval;
+  if (UNLIKELY(IsUnsupportedYear(year))) {
+    context->AddWarning(Substitute("Add/sub year resulted in an out of range year: $0",
+          year).c_str());
+    *datetime = ptime(not_a_date_time);
+  }
+  greg_month month = date.month();
+  int day = date.day().as_number();
+  if (day == 29 && month == boost::gregorian::Feb && !IsLeapYear(year)) day = 28;
+  *datetime = ptime(boost::gregorian::date(year, month, day), datetime->time_of_day());
 }
 
 /// The MONTH interval is a special case. The different ways of adding a month interval
@@ -345,11 +461,11 @@ inline TimestampVal AddWeeksOrDays(const TimestampValue& timestamp, int64_t inte
 /// as case #1. In all cases, if the result would be on a day that is beyond the last day
 /// of the month, the day is reduced to be the last day of the month. A value of true
 /// for the 'keep_max_day' argument corresponds to case #1.
-inline TimestampVal AddMonths(const TimestampValue& timestamp, int64_t months,
-    bool keep_max_day) {
+inline void AddMonths(FunctionContext* context, int64_t months, bool keep_max_day,
+    ptime* datetime) {
   int64_t years = months / 12;
   months %= 12;
-  const Date& date = timestamp.date();
+  const Date& date = datetime->date();
   int year = date.year() + years;
   int month = date.month().as_number() + months;
   if (month <= 0) {
@@ -359,6 +475,11 @@ inline TimestampVal AddMonths(const TimestampValue& timestamp, int64_t months,
     ++year;
     month -= 12;
   }
+  if (UNLIKELY(IsUnsupportedYear(year))) {
+    context->AddWarning(Substitute("Add/sub month resulted in an out of range year: $0",
+          year).c_str());
+    *datetime = ptime(not_a_date_time);
+  }
   DCHECK_GE(month, 1);
   DCHECK_LE(month, 12);
   int day = date.day().as_number();
@@ -367,63 +488,81 @@ inline TimestampVal AddMonths(const TimestampValue& timestamp, int64_t months,
   } else {
     day = min(day, static_cast<int>(GetLastDayOfMonth(month, year)));
   }
-  const TimestampValue value(boost::gregorian::date(year, month, day), timestamp.time());
-  TimestampVal val;
-  value.ToTimestampVal(&val);
-  return val;
-}
-
-/// The AddInterval() functions provide a unified interface for adding intervals of all
-/// types. To subtract, the 'interval' can be negative. The default template below only
-/// handles time intervals (hours, seconds, etc). Date intervals (days, weeks, etc) need
-/// to be specified individually.
-template <typename Interval>
-inline TimestampVal AddInterval(const TimestampValue& timestamp, int64_t interval) {
-  ptime temp;
-  timestamp.ToPtime(&temp);
-  temp += Interval(interval);
-  temp.date().year();  // Forces validation on the year (which will throw).
-  const TimestampValue value(temp);
-  TimestampVal val;
-  value.ToTimestampVal(&val);
-  return val;
-}
-
-/// IMPALA-2086: Avoid boost changing Feb 28th into Feb 29th when the resulting year is
-/// a leap year. Doing the work rather than using boost then adjusting the boost result
-/// is a little faster (and about the same speed as the default boost logic).
-template <>
-inline TimestampVal AddInterval<Years>(const TimestampValue& timestamp,
-    int64_t interval) {
-  const Date& date = timestamp.date();
-  int year = date.year() + interval;
-  greg_month month = date.month();
-  int day = date.day().as_number();
-  if (day == 29 && month == boost::gregorian::Feb && !IsLeapYear(year)) day = 28;
-  const TimestampValue value(boost::gregorian::date(year, month, day), timestamp.time());
-  TimestampVal val;
-  value.ToTimestampVal(&val);
-  return val;
+  *datetime = ptime(boost::gregorian::date(year, month, day), datetime->time_of_day());
 }
 
 template <>
-inline TimestampVal AddInterval<Months>(const TimestampValue& timestamp,
-    int64_t interval) {
-  return AddMonths(timestamp, interval, false);
+inline void AddInterval<Months>(FunctionContext* context, int64_t interval,
+    ptime* datetime) {
+  AddMonths(context, interval, false, datetime);
 }
 
+/// Workaround a boost bug in adding large minute intervals -- if the interval is too
+/// large, some sort of overflow/wrap around happens resulting in an incorrect value.
 template <>
-inline TimestampVal AddInterval<Weeks>(const TimestampValue& timestamp,
-    int64_t interval) {
-  return AddWeeksOrDays<Weeks>(timestamp, interval);
+inline void AddInterval<Minutes>(FunctionContext* context, int64_t interval,
+    ptime* datetime) {
+  int64_t days = interval / (60 * 24);
+  int64_t minutes = interval % (60 * 24);
+  AddInterval<Days>(context, days, datetime);
+  *datetime += Minutes(minutes);
 }
 
+/// Workaround a boost bug in adding large second intervals.
 template <>
-inline TimestampVal AddInterval<Days>(const TimestampValue& timestamp, int64_t interval) {
-  return AddWeeksOrDays<Days>(timestamp, interval);
+inline void AddInterval<Seconds>(FunctionContext* context, int64_t interval,
+    ptime* datetime) {
+  int64_t days = interval / (60 * 60 * 24);
+  int64_t seconds = interval % (60 * 60 * 24);
+  AddInterval<Days>(context, days, datetime);
+  *datetime += Seconds(seconds);
 }
 
-template <bool is_add, typename AnyIntVal, typename Interval>
+/// Workaround a boost bug in adding large microsecond intervals.
+template <>
+inline void AddInterval<Microseconds>(FunctionContext* context, int64_t interval,
+    ptime* datetime) {
+  int64_t seconds = interval / 1000000;
+  int64_t microseconds = interval % 1000000;
+  AddInterval<Seconds>(context, seconds, datetime);
+  *datetime += Microseconds(microseconds);
+}
+
+/// Workaround a boost bug in adding large nanosecond intervals.
+template <>
+inline void AddInterval<Nanoseconds>(FunctionContext* context, int64_t interval,
+    ptime* datetime) {
+  int64_t seconds = interval / 1000000000;
+  int64_t nanoseconds = interval % 1000000000;
+  AddInterval<Seconds>(context, seconds, datetime);
+  *datetime += Nanoseconds(nanoseconds);
+}
+
+inline void DcheckAddSubResult(const TimestampVal& input, const TimestampVal& result,
+    bool is_add, int64_t interval) {
+#ifndef NDEBUG
+  if (!result.is_null) {
+    const TimestampValue& input_value = TimestampValue::FromTimestampVal(input);
+    const TimestampValue& result_value = TimestampValue::FromTimestampVal(result);
+    if (interval == 0) {
+      DCHECK_EQ(result_value, input_value);
+    } else if (is_add == (interval > 0)) {
+      DCHECK_GT(result_value, input_value);
+    } else {
+      DCHECK_LT(result_value, input_value);
+    }
+  }
+#endif
+}
+
+/// Template parameters:
+///   'is_add': Set to false for subtraction.
+///   'AnyIntVal': TinyIntVal, SmallIntVal, ...
+///   'Interval': A boost interval type -- Years, Months, ...
+///   'is_add_months_keep_last_day': Should only be set to true if 'Interval' is Months.
+///       When true, AddMonths() will be called with 'keep_max_day' set to true.
+template <bool is_add, typename AnyIntVal, typename Interval,
+    bool is_add_months_keep_last_day>
 TimestampVal TimestampFunctions::AddSub(FunctionContext* context,
     const TimestampVal& timestamp, const AnyIntVal& num_interval_units) {
   if (timestamp.is_null || num_interval_units.is_null) return TimestampVal::null();
@@ -432,30 +571,32 @@ TimestampVal TimestampFunctions::AddSub(FunctionContext* context,
   // Adding/subtracting boost::gregorian::dates can throw if the result exceeds the
   // min/max supported dates. (Sometimes the exception is thrown lazily and calling an
   // accessor functions is needed to trigger validation.)
+  if (UNLIKELY(IsOverMaxInterval<Interval>(num_interval_units.val))) {
+    context->AddWarning(Substitute("Cannot $0 interval $1: Interval value too large",
+        is_add ? "add" : "subtract", num_interval_units.val).c_str());
+    return TimestampVal::null();
+  }
   try {
-    return AddInterval<Interval>(
-        value, is_add ? num_interval_units.val : -num_interval_units.val);
+    ptime datetime;
+    value.ToPtime(&datetime);
+    if (is_add_months_keep_last_day) {
+      AddMonths(context, is_add ? num_interval_units.val : -num_interval_units.val, true,
+          &datetime);
+    } else {
+      AddInterval<Interval>(context,
+          is_add ? num_interval_units.val : -num_interval_units.val, &datetime);
+    }
+    // Validate that the ptime is not "special" (ie not_a_date_time) and has a valid year.
+    // If validation fails, an exception is thrown.
+    datetime.date().year();
+    const TimestampValue result_value(datetime);
+    TimestampVal result_val;
+    result_value.ToTimestampVal(&result_val);
+    DcheckAddSubResult(timestamp, result_val, is_add, num_interval_units.val);
+    return result_val;
   } catch (const std::exception& e) {
     context->AddWarning(Substitute("Cannot $0 interval $1: $2",
         is_add ? "add" : "subtract", num_interval_units.val, e.what()).c_str());
-    return TimestampVal::null();
-  }
-}
-
-template <bool is_add, typename AnyIntVal>
-TimestampVal TimestampFunctions::AddSubMonthsKeepMaxDay(FunctionContext* context,
-    const TimestampVal& timestamp, const AnyIntVal& interval) {
-  if (timestamp.is_null || interval.is_null) return TimestampVal::null();
-  const TimestampValue& value = TimestampValue::FromTimestampVal(timestamp);
-  if (!value.HasDate()) return TimestampVal::null();
-  // Adding/subtracting boost::gregorian::dates can throw if the result exceeds the
-  // min/max supported dates. (Sometimes the exception is thrown lazily and calling an
-  // accessor functions is needed to trigger validation.)
-  try {
-    return AddMonths(value, is_add ? interval.val : -interval.val, true);
-  } catch (const std::exception& e) {
-    context->AddWarning(Substitute("Cannot $0 interval $1: $2",
-        is_add ? "add" : "subtract", interval.val, e.what()).c_str());
     return TimestampVal::null();
   }
 }
@@ -616,137 +757,136 @@ template StringVal
 TimestampFunctions::FromUnix<BigIntVal>(FunctionContext* context, const BigIntVal& intp);
 
 template TimestampVal
-TimestampFunctions::AddSubMonthsKeepMaxDay<true, IntVal>(
-    FunctionContext* context, const TimestampVal& ts_val, const IntVal& count);
+TimestampFunctions::AddSub<true, IntVal, Years, false>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSubMonthsKeepMaxDay<false, IntVal>(
-    FunctionContext* context, const TimestampVal& ts_val, const IntVal& count);
+TimestampFunctions::AddSub<true, BigIntVal, Years, false>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSubMonthsKeepMaxDay<true, BigIntVal>(
-    FunctionContext* context, const TimestampVal& ts_val, const BigIntVal& count);
+TimestampFunctions::AddSub<false, IntVal, Years, false>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSubMonthsKeepMaxDay<false, BigIntVal>(
-    FunctionContext* context, const TimestampVal& ts_val, const BigIntVal& count);
+TimestampFunctions::AddSub<false, BigIntVal, Years, false>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<true, IntVal, Months, false>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<true, IntVal, Months, true>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<true, BigIntVal, Months, false>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<true, BigIntVal, Months, true>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<false, IntVal, Months, false>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<false, IntVal, Months, true>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<false, BigIntVal, Months, false>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<false, BigIntVal, Months, true>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<true, IntVal, Weeks, false>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<true, BigIntVal, Weeks, false>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<false, IntVal, Weeks, false>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<false, BigIntVal, Weeks, false>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<true, IntVal, Days, false>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<true, BigIntVal, Days, false>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<false, IntVal, Days, false>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<false, BigIntVal, Days, false>(FunctionContext* context,
+    const TimestampVal& ts_val, const BigIntVal& count);
 
 template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, Years>(FunctionContext* context,
+TimestampFunctions::AddSub<true, IntVal, Hours, false>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, Years>(FunctionContext* context,
+TimestampFunctions::AddSub<true, BigIntVal, Hours, false>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, Years>(FunctionContext* context,
+TimestampFunctions::AddSub<false, IntVal, Hours, false>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, Years>(FunctionContext* context,
+TimestampFunctions::AddSub<false, BigIntVal, Hours, false>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, Months>(FunctionContext* context,
+TimestampFunctions::AddSub<true, IntVal, Minutes, false>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, Months>(FunctionContext* context,
+TimestampFunctions::AddSub<true, BigIntVal, Minutes, false>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, Months>(FunctionContext* context,
+TimestampFunctions::AddSub<false, IntVal, Minutes, false>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, Months>(FunctionContext* context,
+TimestampFunctions::AddSub<false, BigIntVal, Minutes, false>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, Weeks>(FunctionContext* context,
+TimestampFunctions::AddSub<true, IntVal, Seconds, false>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, Weeks>(FunctionContext* context,
+TimestampFunctions::AddSub<true, BigIntVal, Seconds, false>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, Weeks>(FunctionContext* context,
+TimestampFunctions::AddSub<false, IntVal, Seconds, false>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, Weeks>(FunctionContext* context,
+TimestampFunctions::AddSub<false, BigIntVal, Seconds, false>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, Days>(FunctionContext* context,
+TimestampFunctions::AddSub<true, IntVal, Milliseconds, false>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, Days>(FunctionContext* context,
+TimestampFunctions::AddSub<true, BigIntVal, Milliseconds, false>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, Days>(FunctionContext* context,
+TimestampFunctions::AddSub<false, IntVal, Milliseconds, false>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, Days>(FunctionContext* context,
-    const TimestampVal& ts_val, const BigIntVal& count);
-
+TimestampFunctions::AddSub<false, BigIntVal, Milliseconds, false>(
+    FunctionContext* context, const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, Hours>(FunctionContext* context,
+TimestampFunctions::AddSub<true, IntVal, Microseconds, false>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, Hours>(FunctionContext* context,
-    const TimestampVal& ts_val, const BigIntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, Hours>(FunctionContext* context,
-    const TimestampVal& ts_val, const IntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, Hours>(FunctionContext* context,
+TimestampFunctions::AddSub<true, BigIntVal, Microseconds, false>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, Minutes>(FunctionContext* context,
+TimestampFunctions::AddSub<false, IntVal, Microseconds, false>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, Minutes>(FunctionContext* context,
+TimestampFunctions::AddSub<false, BigIntVal, Microseconds, false>(
+    FunctionContext* context, const TimestampVal& ts_val, const BigIntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<true, IntVal, Nanoseconds, false>(FunctionContext* context,
+    const TimestampVal& ts_val, const IntVal& count);
+template TimestampVal
+TimestampFunctions::AddSub<true, BigIntVal, Nanoseconds, false>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, Minutes>(FunctionContext* context,
+TimestampFunctions::AddSub<false, IntVal, Nanoseconds, false>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, Minutes>(FunctionContext* context,
-    const TimestampVal& ts_val, const BigIntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, Seconds>(FunctionContext* context,
-    const TimestampVal& ts_val, const IntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, Seconds>(FunctionContext* context,
-    const TimestampVal& ts_val, const BigIntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, Seconds>(FunctionContext* context,
-    const TimestampVal& ts_val, const IntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, Seconds>(FunctionContext* context,
-    const TimestampVal& ts_val, const BigIntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, Milliseconds>(FunctionContext* context,
-    const TimestampVal& ts_val, const IntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, Milliseconds>(FunctionContext* context,
-    const TimestampVal& ts_val, const BigIntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, Milliseconds>(FunctionContext* context,
-    const TimestampVal& ts_val, const IntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, Milliseconds>(FunctionContext* context,
-    const TimestampVal& ts_val, const BigIntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, Microseconds>(FunctionContext* context,
-    const TimestampVal& ts_val, const IntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, Microseconds>(FunctionContext* context,
-    const TimestampVal& ts_val, const BigIntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, Microseconds>(FunctionContext* context,
-    const TimestampVal& ts_val, const IntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, Microseconds>(FunctionContext* context,
-    const TimestampVal& ts_val, const BigIntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, Nanoseconds>(FunctionContext* context,
-    const TimestampVal& ts_val, const IntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, Nanoseconds>(FunctionContext* context,
-    const TimestampVal& ts_val, const BigIntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, Nanoseconds>(FunctionContext* context,
-    const TimestampVal& ts_val, const IntVal& count);
-template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, Nanoseconds>(FunctionContext* context,
+TimestampFunctions::AddSub<false, BigIntVal, Nanoseconds, false>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 }

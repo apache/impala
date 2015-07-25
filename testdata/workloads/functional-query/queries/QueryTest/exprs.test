@@ -1641,7 +1641,7 @@ timestamp,timestamp,timestamp,timestamp
 select cast("2012-01-01 00:00:00" as timestamp) + interval 2147483647 years,
        cast("2012-01-01 00:00:00" as timestamp) - interval 2147483647 years
 ---- RESULTS
-2011-01-01 00:00:00,2013-01-01 00:00:00
+NULL,NULL
 ---- TYPES
 timestamp,timestamp
 ====
