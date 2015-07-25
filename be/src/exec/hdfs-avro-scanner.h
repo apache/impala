@@ -71,9 +71,10 @@
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
 
-/// From avro/schema.h
-struct avro_obj_t;
-typedef struct avro_obj_t* avro_schema_t;
+namespace llvm {
+  class BasicBlock;
+  class Value;
+}
 
 namespace impala {
 
@@ -102,49 +103,9 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   }
 
  private:
-  /// Wrapper for avro_schema_t's that handles decrementing the ref count
-  struct ScopedAvroSchemaT {
-    ScopedAvroSchemaT(avro_schema_t s = NULL) : schema(s) { }
-    ScopedAvroSchemaT(const ScopedAvroSchemaT&);
-
-    ~ScopedAvroSchemaT();
-
-    ScopedAvroSchemaT& operator=(const ScopedAvroSchemaT&);
-    ScopedAvroSchemaT& operator=(const avro_schema_t& s);
-
-    avro_schema_t operator->() const { return schema; }
-    avro_schema_t get() const { return schema; }
-
-   private:
-    /// If not NULL, this owns a reference to schema
-    avro_schema_t schema;
-  };
-
-  /// Internal representation of a field/column schema. The schema for a data file is a
-  /// record with a field for each column. For a given file, we create a SchemaElement for
-  /// each field of the record.
-  struct SchemaElement {
-    /// The record field schema from the file.
-    ScopedAvroSchemaT schema;
-
-    /// Complex types, e.g. records, may have nested child types
-    std::vector<SchemaElement> children;
-
-    /// Avro supports nullable types via unions of the form [<type>, "null"]. We special
-    /// case nullable primitives by storing which position "null" occupies in the union and
-    /// setting 'schema' to the non-null type's schema, rather than the union schema.
-    /// null_union_position is set to 0 or 1 accordingly if this type is a union between a
-    /// primitive type and "null", and -1 otherwise.
-    int null_union_position;
-
-    /// The slot descriptor corresponding to this element. NULL if this element does not
-    /// correspond to a materialized column.
-    const SlotDescriptor* slot_desc;
-  };
-
   struct AvroFileHeader : public BaseSequenceScanner::FileHeader {
-    /// List of SchemaElements corresponding to the fields of the file schema.
-    std::vector<SchemaElement> schema;
+    /// The root of the file schema tree (i.e. the top-level record schema of the file)
+    ScopedAvroSchemaElement schema;
 
     /// Template tuple for this file containing partition key values and default values.
     /// NULL if there are no materialized partition keys and no default values are
@@ -177,18 +138,33 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// Utility function for decoding and parsing file header metadata
   Status ParseMetadata();
 
-  /// Populates avro_header_->schema with the result of resolving the the table's schema
-  /// with the file's schema. Default values are written to avro_header_->template_tuple
-  /// (which is initialized to template_tuple_ if necessary).
-  Status ResolveSchemas(const avro_schema_t& table_root,
-                        const avro_schema_t& file_root);
+  /// Resolves the table schema (i.e. the reader schema) against the file schema (i.e. the
+  /// writer schema), and sets the 'slot_desc' fields of the nodes of the file schema
+  /// corresponding to materialized slots. Calls WriteDefaultValue() as
+  /// appropriate. Returns a non-OK status if the schemas could not be resolved.
+  Status ResolveSchemas(const AvroSchemaElement& table_root,
+                        AvroSchemaElement* file_root);
 
-  /// Utility function that maps the Avro library's type representation to our own.
-  static SchemaElement ConvertSchema(const avro_schema_t& schema);
+  // Returns Status::OK iff table_schema (the reader schema) can be resolved against
+  // file_schema (the writer schema). field_name is used for error messages.
+  Status VerifyTypesMatch(const AvroSchemaElement& table_schema,
+      const AvroSchemaElement& file_schema, const string& field_name);
 
   /// Returns Status::OK iff a value with the given schema can be used to populate
-  /// slot_desc. 'schema' can be either a avro_schema_t or avro_datum_t.
+  /// 'slot_desc', as if 'schema' were the writer schema and 'slot_desc' the reader
+  /// schema. 'schema' can be either a avro_schema_t or avro_datum_t.
   Status VerifyTypesMatch(SlotDescriptor* slot_desc, avro_obj_t* schema);
+
+  /// Return true if reader_type can be used to read writer_type according to the Avro
+  /// type promotion rules. Note that this does not handle nullability or TYPE_NULL.
+  bool VerifyTypesMatch(const ColumnType& reader_type, const ColumnType& writer_type);
+
+  /// Writes 'default_value' to 'slot_desc' in the template tuple, initializing the
+  /// template tuple if it doesn't already exist. Returns a non-OK status if slot_desc's
+  /// and default_value's types are incompatible or unsupported. field_name is used for
+  /// error messages.
+  Status WriteDefaultValue(SlotDescriptor* slot_desc, avro_datum_t default_value,
+      const char* field_name);
 
   /// Decodes records and copies the data into tuples.
   /// Returns the number of tuples to be committed.
@@ -198,10 +174,11 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// - tuple: tuple pointer to copy objects to
   /// - tuple_row: tuple row of written tuples
   int DecodeAvroData(int max_tuples, MemPool* pool, uint8_t** data,
-                        Tuple* tuple, TupleRow* tuple_row);
+      Tuple* tuple, TupleRow* tuple_row);
 
   /// Materializes a single tuple from serialized record data.
-  void MaterializeTuple(MemPool* pool, uint8_t** data, Tuple* tuple);
+  void MaterializeTuple(const AvroSchemaElement& record_schema, MemPool* pool,
+      uint8_t** data, Tuple* tuple);
 
   /// Produces a version of DecodeAvroData that uses codegen'd instead of interpreted
   /// functions.
@@ -214,6 +191,30 @@ class HdfsAvroScanner : public BaseSequenceScanner {
   /// TODO: Codegen a function for each unique file schema.
   static llvm::Function* CodegenMaterializeTuple(HdfsScanNode* node,
                                                  LlvmCodeGen* codegen);
+
+  /// Used by CodegenMaterializeTuple to recursively create the IR for reading an Avro
+  /// record.
+  /// - path: the column path constructed so far. This is used to find the slot desc, if
+  ///     any, associated with each field of the record. Note that this assumes the
+  ///     table's Avro schema matches up with the table's column definitions by ordinal.
+  /// - builder: used to insert the IR, starting at the current insert point. The insert
+  ///     point will be left at the end of the record but before the 'insert_before'
+  ///     block.
+  /// - insert_before: the block to insert any new blocks directly before. NULL if blocks
+  ///     should be inserted at the end of fn. (This could theoretically be inferred from
+  ///     builder's insert point, but I can't figure out how to get the successor to a
+  ///     basic block.)
+  /// - this_val, pool_val, tuple_val, data_val: arguments to MaterializeTuple()
+  static Status CodegenReadRecord(
+      const SchemaPath& path, const AvroSchemaElement& record, HdfsScanNode* node,
+      LlvmCodeGen* codegen, void* builder, llvm::Function* fn,
+      llvm::BasicBlock* insert_before, llvm::Value* this_val, llvm::Value* pool_val,
+      llvm::Value* tuple_val, llvm::Value* data_val);
+
+  /// Creates the IR for reading an Avro scalar at builder's current insert point.
+  static Status CodegenReadScalar(const AvroSchemaElement& element,
+    SlotDescriptor* slot_desc, LlvmCodeGen* codegen, void* builder, llvm::Value* this_val,
+    llvm::Value* pool_val, llvm::Value* tuple_val, llvm::Value* data_val);
 
   /// The following are cross-compiled functions for parsing a serialized Avro primitive
   /// type and writing it to a slot. They can also be used for skipping a field without

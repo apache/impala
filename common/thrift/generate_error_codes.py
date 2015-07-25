@@ -123,6 +123,33 @@ error_codes = (
    "Failed to verify function $0 from LLVM module $1, see log for more details."),
 
   ("PARQUET_CORRUPT_VALUE", 34, "Corrupt value: $0"),
+
+  ("AVRO_DECIMAL_RESOLUTION_ERROR", 35, "Column '$0' has conflicting Avro decimal types. "
+   "Table schema $1: $2, file schema $1: $3"),
+
+  ("AVRO_DECIMAL_METADATA_MISMATCH", 36, "Column '$0' has conflicting Avro decimal types. "
+   "Declared $1: $2, $1 in table's Avro schema: $3"),
+
+  ("AVRO_SCHEMA_RESOLUTION_ERROR", 37, "Unresolvable types for column '$0': "
+   "table type: $1, file type: $2"),
+
+  ("AVRO_SCHEMA_METADATA_MISMATCH", 38, "Unresolvable types for column '$0': "
+   "declared column type: $1, table's Avro schema type: $2"),
+
+  ("AVRO_UNSUPPORTED_DEFAULT_VALUE", 39, "Field $0 is missing from file and default "
+   "values of type $1 are not yet supported."),
+
+  ("AVRO_MISSING_FIELD", 40, "Inconsistent table metadata. Mismatch between column "
+   "definition and Avro schema: cannot read field $0 because there are only $1 fields."),
+
+  ("AVRO_MISSING_DEFAULT", 41,
+   "Field $0 is missing from file and does not have a default value."),
+
+  ("AVRO_NULLABILITY_MISMATCH", 42,
+   "Field $0 is nullable in the file schema but not the table schema."),
+
+  ("AVRO_NOT_A_RECORD", 43,
+   "Inconsistent table metadata. Field $0 is not a record in the Avro schema."),
 )
 
 import sys

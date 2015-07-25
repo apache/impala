@@ -32,6 +32,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/disk-io-mgr.h"
 #include "runtime/string-buffer.h"
+#include "util/avro-util.h"
 #include "util/progress-updater.h"
 #include "util/spinlock.h"
 #include "util/thread.h"
@@ -133,6 +134,8 @@ class HdfsScanNode : public ScanNode {
   const TupleDescriptor* tuple_desc() { return tuple_desc_; }
 
   const HdfsTableDescriptor* hdfs_table() { return hdfs_table_; }
+
+  const AvroSchemaElement& avro_schema() { return *avro_schema_.get(); }
 
   RuntimeState* runtime_state() { return runtime_state_; }
 
@@ -280,8 +283,11 @@ class HdfsScanNode : public ScanNode {
   /// Set in Prepare, owned by RuntimeState
   const HdfsTableDescriptor* hdfs_table_;
 
-  /// If true, the warning that some disk ids are unknown was logged.  Only log
-  /// this once per scan node since it can be noisy.
+  /// The root of the table's Avro schema, if we're scanning an Avro table.
+  ScopedAvroSchemaElement avro_schema_;
+
+  /// If true, the warning that some disk ids are unknown was logged.  Only log this once
+  /// per scan node since it can be noisy.
   bool unknown_disk_id_warned_;
 
   /// Partitions scanned by this scan node.

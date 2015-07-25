@@ -1108,6 +1108,7 @@ llvm::Function* PartitionedAggregationNode::CodegenUpdateSlot(
   PointerType* fn_ctx_type =
       codegen->GetPtrType(FunctionContextImpl::LLVM_FUNCTIONCONTEXT_NAME);
   StructType* tuple_struct = intermediate_tuple_desc_->GenerateLlvmStruct(codegen);
+  if (tuple_struct == NULL) return NULL; // Could not generate tuple struct
   PointerType* tuple_ptr_type = PointerType::get(tuple_struct, 0);
   PointerType* tuple_row_ptr_type = codegen->GetPtrType(TupleRow::LLVM_CLASS_NAME);
 

@@ -22,6 +22,8 @@
 #include "exec/hdfs-parquet-scanner.h"
 
 #include <sstream>
+#include <avro/errors.h>
+#include <avro/schema.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/foreach.hpp>
 #include <boost/filesystem.hpp>
@@ -325,6 +327,18 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   hdfs_table_ = static_cast<const HdfsTableDescriptor*>(tuple_desc_->table_desc());
   scan_node_pool_.reset(new MemPool(mem_tracker()));
 
+  // Parse Avro table schema if applicable
+  const string& avro_schema_str = hdfs_table_->avro_schema();
+  if (!avro_schema_str.empty()) {
+    avro_schema_t avro_schema;
+    int error = avro_schema_from_json_length(
+        avro_schema_str.c_str(), avro_schema_str.size(), &avro_schema);
+    if (error != 0) {
+      return Status(Substitute("Failed to parse table schema: $0", avro_strerror()));
+    }
+    RETURN_IF_ERROR(AvroSchemaElement::ConvertSchema(avro_schema, avro_schema_.get()));
+  }
+
   // Gather materialized partition-key slots and non-partition slots.
   const vector<SlotDescriptor*>& slots = tuple_desc_->slots();
   for (size_t i = 0; i < slots.size(); ++i) {
@@ -467,6 +481,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   PrintHdfsSplitStats(per_volume_stats, &str);
   runtime_profile()->AddInfoString(HDFS_SPLIT_STATS_DESC, str.str());
 
+  // Create codegen'd functions
   for (int format = THdfsFileFormat::TEXT;
        format <= THdfsFileFormat::PARQUET; ++format) {
     vector<HdfsFileDesc*>& file_descs =
