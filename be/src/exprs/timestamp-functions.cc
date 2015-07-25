@@ -36,23 +36,24 @@
 #include "common/names.h"
 
 using boost::algorithm::iequals;
-using boost::gregorian::date;
-using boost::gregorian::days;
 using boost::gregorian::greg_month;
-using boost::gregorian::months;
-using boost::gregorian::weeks;
-using boost::gregorian::years;
 using boost::local_time::local_date_time;
 using boost::local_time::time_zone_ptr;
-using boost::posix_time::hours;
-using boost::posix_time::microseconds;
-using boost::posix_time::milliseconds;
-using boost::posix_time::minutes;
-using boost::posix_time::nanoseconds;
 using boost::posix_time::ptime;
-using boost::posix_time::seconds;
 using namespace impala_udf;
 using namespace strings;
+
+typedef boost::gregorian::date Date;
+typedef boost::gregorian::days Days;
+typedef boost::gregorian::months Months;
+typedef boost::gregorian::weeks Weeks;
+typedef boost::gregorian::years Years;
+typedef boost::posix_time::hours Hours;
+typedef boost::posix_time::microseconds Microseconds;
+typedef boost::posix_time::milliseconds Milliseconds;
+typedef boost::posix_time::minutes Minutes;
+typedef boost::posix_time::nanoseconds Nanoseconds;
+typedef boost::posix_time::seconds Seconds;
 
 namespace impala {
 
@@ -348,7 +349,7 @@ inline TimestampVal AddMonths(const TimestampValue& timestamp, int64_t months,
     bool keep_max_day) {
   int64_t years = months / 12;
   months %= 12;
-  const date& date = timestamp.date();
+  const Date& date = timestamp.date();
   int year = date.year() + years;
   int month = date.month().as_number() + months;
   if (month <= 0) {
@@ -392,9 +393,9 @@ inline TimestampVal AddInterval(const TimestampValue& timestamp, int64_t interva
 /// a leap year. Doing the work rather than using boost then adjusting the boost result
 /// is a little faster (and about the same speed as the default boost logic).
 template <>
-inline TimestampVal AddInterval<years>(const TimestampValue& timestamp,
+inline TimestampVal AddInterval<Years>(const TimestampValue& timestamp,
     int64_t interval) {
-  const date& date = timestamp.date();
+  const Date& date = timestamp.date();
   int year = date.year() + interval;
   greg_month month = date.month();
   int day = date.day().as_number();
@@ -406,20 +407,20 @@ inline TimestampVal AddInterval<years>(const TimestampValue& timestamp,
 }
 
 template <>
-inline TimestampVal AddInterval<months>(const TimestampValue& timestamp,
+inline TimestampVal AddInterval<Months>(const TimestampValue& timestamp,
     int64_t interval) {
   return AddMonths(timestamp, interval, false);
 }
 
 template <>
-inline TimestampVal AddInterval<weeks>(const TimestampValue& timestamp,
+inline TimestampVal AddInterval<Weeks>(const TimestampValue& timestamp,
     int64_t interval) {
-  return AddWeeksOrDays<weeks>(timestamp, interval);
+  return AddWeeksOrDays<Weeks>(timestamp, interval);
 }
 
 template <>
-inline TimestampVal AddInterval<days>(const TimestampValue& timestamp, int64_t interval) {
-  return AddWeeksOrDays<days>(timestamp, interval);
+inline TimestampVal AddInterval<Days>(const TimestampValue& timestamp, int64_t interval) {
+  return AddWeeksOrDays<Days>(timestamp, interval);
 }
 
 template <bool is_add, typename AnyIntVal, typename Interval>
@@ -628,124 +629,124 @@ TimestampFunctions::AddSubMonthsKeepMaxDay<false, BigIntVal>(
     FunctionContext* context, const TimestampVal& ts_val, const BigIntVal& count);
 
 template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, years>(FunctionContext* context,
+TimestampFunctions::AddSub<true, IntVal, Years>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, years>(FunctionContext* context,
+TimestampFunctions::AddSub<true, BigIntVal, Years>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, years>(FunctionContext* context,
+TimestampFunctions::AddSub<false, IntVal, Years>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, years>(FunctionContext* context,
+TimestampFunctions::AddSub<false, BigIntVal, Years>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, months>(FunctionContext* context,
+TimestampFunctions::AddSub<true, IntVal, Months>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, months>(FunctionContext* context,
+TimestampFunctions::AddSub<true, BigIntVal, Months>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, months>(FunctionContext* context,
+TimestampFunctions::AddSub<false, IntVal, Months>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, months>(FunctionContext* context,
+TimestampFunctions::AddSub<false, BigIntVal, Months>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, weeks>(FunctionContext* context,
+TimestampFunctions::AddSub<true, IntVal, Weeks>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, weeks>(FunctionContext* context,
+TimestampFunctions::AddSub<true, BigIntVal, Weeks>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, weeks>(FunctionContext* context,
+TimestampFunctions::AddSub<false, IntVal, Weeks>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, weeks>(FunctionContext* context,
+TimestampFunctions::AddSub<false, BigIntVal, Weeks>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, days>(FunctionContext* context,
+TimestampFunctions::AddSub<true, IntVal, Days>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, days>(FunctionContext* context,
+TimestampFunctions::AddSub<true, BigIntVal, Days>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, days>(FunctionContext* context,
+TimestampFunctions::AddSub<false, IntVal, Days>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, days>(FunctionContext* context,
+TimestampFunctions::AddSub<false, BigIntVal, Days>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 
 template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, hours>(FunctionContext* context,
+TimestampFunctions::AddSub<true, IntVal, Hours>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, hours>(FunctionContext* context,
+TimestampFunctions::AddSub<true, BigIntVal, Hours>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, hours>(FunctionContext* context,
+TimestampFunctions::AddSub<false, IntVal, Hours>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, hours>(FunctionContext* context,
+TimestampFunctions::AddSub<false, BigIntVal, Hours>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, minutes>(FunctionContext* context,
+TimestampFunctions::AddSub<true, IntVal, Minutes>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, minutes>(FunctionContext* context,
+TimestampFunctions::AddSub<true, BigIntVal, Minutes>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, minutes>(FunctionContext* context,
+TimestampFunctions::AddSub<false, IntVal, Minutes>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, minutes>(FunctionContext* context,
+TimestampFunctions::AddSub<false, BigIntVal, Minutes>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, seconds>(FunctionContext* context,
+TimestampFunctions::AddSub<true, IntVal, Seconds>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, seconds>(FunctionContext* context,
+TimestampFunctions::AddSub<true, BigIntVal, Seconds>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, seconds>(FunctionContext* context,
+TimestampFunctions::AddSub<false, IntVal, Seconds>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, seconds>(FunctionContext* context,
+TimestampFunctions::AddSub<false, BigIntVal, Seconds>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, milliseconds>(FunctionContext* context,
+TimestampFunctions::AddSub<true, IntVal, Milliseconds>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, milliseconds>(FunctionContext* context,
+TimestampFunctions::AddSub<true, BigIntVal, Milliseconds>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, milliseconds>(FunctionContext* context,
+TimestampFunctions::AddSub<false, IntVal, Milliseconds>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, milliseconds>(FunctionContext* context,
+TimestampFunctions::AddSub<false, BigIntVal, Milliseconds>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, microseconds>(FunctionContext* context,
+TimestampFunctions::AddSub<true, IntVal, Microseconds>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, microseconds>(FunctionContext* context,
+TimestampFunctions::AddSub<true, BigIntVal, Microseconds>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, microseconds>(FunctionContext* context,
+TimestampFunctions::AddSub<false, IntVal, Microseconds>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, microseconds>(FunctionContext* context,
+TimestampFunctions::AddSub<false, BigIntVal, Microseconds>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, IntVal, nanoseconds>(FunctionContext* context,
+TimestampFunctions::AddSub<true, IntVal, Nanoseconds>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<true, BigIntVal, nanoseconds>(FunctionContext* context,
+TimestampFunctions::AddSub<true, BigIntVal, Nanoseconds>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, IntVal, nanoseconds>(FunctionContext* context,
+TimestampFunctions::AddSub<false, IntVal, Nanoseconds>(FunctionContext* context,
     const TimestampVal& ts_val, const IntVal& count);
 template TimestampVal
-TimestampFunctions::AddSub<false, BigIntVal, nanoseconds>(FunctionContext* context,
+TimestampFunctions::AddSub<false, BigIntVal, Nanoseconds>(FunctionContext* context,
     const TimestampVal& ts_val, const BigIntVal& count);
 }
