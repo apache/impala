@@ -10,7 +10,9 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.ColumnLineageGraph;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.InsertStmt;
+import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.ImpalaException;
@@ -75,8 +77,16 @@ public class Planner {
     }
 
     PlanFragment rootFragment = fragments.get(fragments.size() - 1);
+    ExprSubstitutionMap rootNodeSmap = rootFragment.getPlanRoot().getOutputSmap();
+    ColumnLineageGraph graph = ctx_.getRootAnalyzer().getColumnLineageGraph();
+    List<Expr> resultExprs = null;
+    Table targetTable = null;
     if (ctx_.isInsertOrCtas()) {
       InsertStmt insertStmt = ctx_.getAnalysisResult().getInsertStmt();
+      insertStmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());
+      resultExprs = insertStmt.getResultExprs();
+      targetTable = insertStmt.getTargetTable();
+      graph.addTargetColumnLabels(targetTable);
       if (!ctx_.isSingleNodeExec()) {
         // repartition on partition keys
         rootFragment = distributedPlanner.createInsertFragment(
@@ -84,23 +94,14 @@ public class Planner {
       }
       // set up table sink for root fragment
       rootFragment.setSink(insertStmt.createDataSink());
-    }
-
-    ColumnLineageGraph graph = ctx_.getRootAnalyzer().getColumnLineageGraph();
-    List<Expr> resultExprs = null;
-    Table targetTable = null;
-    if (ctx_.isInsertOrCtas()) {
-      InsertStmt insertStmt = ctx_.getAnalysisResult().getInsertStmt();
-      resultExprs = insertStmt.getResultExprs();
-      targetTable = insertStmt.getTargetTable();
-      graph.addTargetColumnLabels(targetTable);
     } else {
-      resultExprs = ctx_.getQueryStmt().getResultExprs();
+      QueryStmt queryStmt = ctx_.getQueryStmt();
+      queryStmt.substituteResultExprs(rootNodeSmap, ctx_.getRootAnalyzer());
+      resultExprs = queryStmt.getResultExprs();
       graph.addTargetColumnLabels(ctx_.getQueryStmt().getColLabels());
     }
-    resultExprs = Expr.substituteList(resultExprs,
-        rootFragment.getPlanRoot().getOutputSmap(), ctx_.getRootAnalyzer(), true);
     rootFragment.setOutputExprs(resultExprs);
+
     LOG.debug("desctbl: " + ctx_.getRootAnalyzer().getDescTbl().debugString());
     LOG.debug("resultexprs: " + Expr.debugString(rootFragment.getOutputExprs()));
     LOG.debug("finalize plan fragments");

@@ -100,7 +100,7 @@ public class InsertStmt extends StatementBase {
   private Table table_;
 
   // Set in analyze(). Exprs corresponding to the partitionKeyValues,
-  private final List<Expr> partitionKeyExprs_ = new ArrayList<Expr>();
+  private List<Expr> partitionKeyExprs_ = Lists.newArrayList();
 
   // True to force re-partitioning before the table sink, false to prevent it. Set in
   // analyze() based on planHints_. Null if no explicit hint was given (the planner
@@ -111,7 +111,7 @@ public class InsertStmt extends StatementBase {
   // include casts, and NullLiterals where an output column isn't explicitly mentioned.
   // Set in prepareExpressions(). The i'th expr produces the i'th column of the target
   // table.
-  private final ArrayList<Expr> resultExprs_ = new ArrayList<Expr>();
+  private ArrayList<Expr> resultExprs_ = Lists.newArrayList();
 
   // END: Members that need to be reset()
   /////////////////////////////////////////
@@ -648,6 +648,15 @@ public class InsertStmt extends StatementBase {
     // analyze() must have been called before.
     Preconditions.checkState(table_ != null);
     return DataSink.createDataSink(table_, partitionKeyExprs_, overwrite_);
+  }
+
+  /**
+   * Substitutes the result expressions and the partition key expressions with smap.
+   * Preserves the original types of those expressions during the substitution.
+   */
+  public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
+    resultExprs_ = Expr.substituteList(resultExprs_, smap, analyzer, true);
+    partitionKeyExprs_ = Expr.substituteList(partitionKeyExprs_, smap, analyzer, true);
   }
 
   @Override

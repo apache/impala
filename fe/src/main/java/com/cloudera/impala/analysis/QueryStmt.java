@@ -379,6 +379,14 @@ public abstract class QueryStmt extends StatementBase {
     analyzer.getDescTbl().markSlotsMaterialized(slotIds);
   }
 
+  /**
+   * Substitutes the result expressions with smap. Preserves the original types of
+   * those expressions during the substitution.
+   */
+  public void substituteResultExprs(ExprSubstitutionMap smap, Analyzer analyzer) {
+    resultExprs_ = Expr.substituteList(resultExprs_, smap, analyzer, true);
+  }
+
   public ArrayList<OrderByElement> cloneOrderByElements() {
     if (orderByElements_ == null) return null;
     ArrayList<OrderByElement> result =

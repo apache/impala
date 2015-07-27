@@ -701,3 +701,23 @@ BIGINT
 ---- RESULTS
 0
 ====
+---- QUERY
+# IMPALA-1737: Test dynamic partition insert from a select stmt that
+# has an analytic function with an order by clause.
+insert overwrite table alltypesinsert
+partition (year, month)
+select id, bool_col, tinyint_col, smallint_col, int_col,
+sum(bigint_col) over(order by string_col),
+float_col, double_col, date_string_col, string_col, timestamp_col,
+int_col, month
+from functional.alltypestiny
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+year=0/month=1/: 1
+year=0/month=2/: 1
+year=0/month=3/: 1
+year=0/month=4/: 1
+year=1/month=1/: 1
+year=1/month=2/: 1
+year=1/month=3/: 1
+year=1/month=4/: 1
+====
