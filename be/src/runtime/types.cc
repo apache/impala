@@ -50,6 +50,7 @@ ColumnType::ColumnType(const std::vector<TTypeNode>& types, int* idx)
       for (int i = 0; i < node.struct_fields.size(); ++i) {
         ++(*idx);
         children.push_back(ColumnType(types, idx));
+        field_names.push_back(node.struct_fields[i].name);
       }
       break;
     case TTypeNodeType::ARRAY:

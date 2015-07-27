@@ -1114,8 +1114,8 @@ Status HdfsParquetScanner::CreateColumnReaders() {
       int idx = j > 0 ? path[j] : path[j] - scan_node_->num_partition_keys();
       if (node->children.size() <= idx) {
         // The selected column is not in the file
-        VLOG_FILE << Substitute("File $0 does not contain path $1",
-            stream_->filename(), PrintPath(path));
+        VLOG_FILE << Substitute("File '$0' does not contain path '$1'",
+            stream_->filename(), PrintPath(*scan_node_->hdfs_table(), path));
         node = NULL;
         break;
       }
@@ -1123,8 +1123,8 @@ Status HdfsParquetScanner::CreateColumnReaders() {
     }
 
     if (node != NULL && node->children.size() > 0) {
-      string error = Substitute("Path $0 is not a supported type in file $1",
-          PrintPath(path), stream_->filename());
+      string error = Substitute("Path '$0' is not a supported type in file '$1'",
+          PrintPath(*scan_node_->hdfs_table(), path), stream_->filename());
       VLOG_QUERY << error << endl << schema_.DebugString();
       return Status(error);
     }

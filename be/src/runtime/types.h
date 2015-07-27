@@ -84,7 +84,8 @@ struct ColumnType {
   /// Empty for scalar types
   std::vector<ColumnType> children;
 
-  // TODO: add name field for better error messages
+  /// Only set if type == TYPE_STRUCT. The field name of each child.
+  std::vector<std::string> field_names;
 
   ColumnType(PrimitiveType type = INVALID_TYPE)
     : type(type), len(-1), precision(-1), scale(-1) {
