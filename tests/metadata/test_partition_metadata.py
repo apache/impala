@@ -23,7 +23,7 @@ from tests.util.shell_util import exec_process
 from tests.common.test_vector import *
 from tests.common.test_dimensions import ALL_NODES_ONLY
 from tests.common.impala_test_suite import *
-from tests.common.skip import SkipIfS3
+from tests.common.skip import SkipIfS3, SkipIfIsilon
 from tests.util.filesystem_utils import WAREHOUSE
 
 
@@ -94,6 +94,7 @@ class TestPartitionMetadata(ImpalaTestSuite):
     assert data.split('\t') == ['6', '9']
 
   @SkipIfS3.hive
+  @SkipIfIsilon.hive
   def test_partition_metadata_compatibility(self, vector):
     """Regression test for IMPALA-2048. For partitioned tables, test that when Impala
     updates the partition metadata (e.g. by doing a compute stats), the tables are
