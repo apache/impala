@@ -815,6 +815,14 @@ public class BuiltinsDb extends Db {
         prefix + "10CountMergeEPN10impala_udf15FunctionContextERKNS1_9BigIntValEPS4_",
         null, null));
 
+    // The following 3 functions are never directly executed because they get rewritten
+    db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
+        db, "percent_rank", Lists.<Type>newArrayList(), Type.DOUBLE, Type.STRING));
+    db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
+        db, "cume_dist", Lists.<Type>newArrayList(), Type.DOUBLE, Type.STRING));
+    db.addBuiltin(AggregateFunction.createAnalyticBuiltin(
+        db, "ntile", Lists.<Type>newArrayList(Type.BIGINT), Type.BIGINT, Type.STRING));
+
     for (Type t: Type.getSupportedTypes()) {
       if (t.isNull()) continue; // NULL is handled through type promotion.
       if (t.isScalarType(PrimitiveType.CHAR)) continue; // promoted to STRING

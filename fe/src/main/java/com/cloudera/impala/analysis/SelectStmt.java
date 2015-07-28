@@ -257,7 +257,7 @@ public class SelectStmt extends QueryStmt {
 
     createSortInfo(analyzer);
     analyzeAggregation(analyzer);
-    analyzeAnalytics(analyzer);
+    createAnalyticInfo(analyzer);
     if (evaluateOrderBy_) createSortTupleInfo(analyzer);
 
     // Remember the SQL string before inline-view expression substitution.
@@ -768,7 +768,7 @@ public class SelectStmt extends QueryStmt {
    * If the select list contains AnalyticExprs, create AnalyticInfo and substitute
    * AnalyticExprs using the AnalyticInfo's smap.
    */
-  private void analyzeAnalytics(Analyzer analyzer)
+  private void createAnalyticInfo(Analyzer analyzer)
       throws AnalysisException {
     // collect AnalyticExprs from the SELECT and ORDER BY clauses
     ArrayList<Expr> analyticExprs = Lists.newArrayList();
@@ -778,15 +778,42 @@ public class SelectStmt extends QueryStmt {
           analyticExprs);
     }
     if (analyticExprs.isEmpty()) return;
+    ExprSubstitutionMap rewriteSmap = new ExprSubstitutionMap();
+    for (Expr expr: analyticExprs) {
+      AnalyticExpr toRewrite = (AnalyticExpr)expr;
+      Expr newExpr = AnalyticExpr.rewrite(toRewrite);
+      if (newExpr != null) {
+        newExpr.analyze(analyzer);
+        if (!rewriteSmap.containsMappingFor(toRewrite)) {
+          rewriteSmap.put(toRewrite, newExpr);
+        }
+      }
+    }
+    if (rewriteSmap.size() > 0) {
+      // Substitute the exprs with their rewritten versions.
+      ArrayList<Expr> updatedAnalyticExprs =
+          Expr.substituteList(analyticExprs, rewriteSmap, analyzer, false);
+      // This is to get rid the original exprs which have been rewritten.
+      analyticExprs.clear();
+      // Collect the new exprs introduced through the rewrite and the non-rewrite exprs.
+      TreeNode.collect(updatedAnalyticExprs, AnalyticExpr.class, analyticExprs);
+    }
+
     analyticInfo_ = AnalyticInfo.create(analyticExprs, analyzer);
 
+    ExprSubstitutionMap smap = analyticInfo_.getSmap();
+    // If 'exprRewritten' is true, we have to compose the new smap with the existing one.
+    if (rewriteSmap.size() > 0) {
+      smap = ExprSubstitutionMap.compose(
+          rewriteSmap, analyticInfo_.getSmap(), analyzer);
+    }
     // change select list and ordering exprs to point to analytic output. We need
     // to reanalyze the exprs at this point.
-    resultExprs_ = Expr.substituteList(resultExprs_, analyticInfo_.getSmap(), analyzer,
+    resultExprs_ = Expr.substituteList(resultExprs_, smap, analyzer,
         false);
     LOG.trace("post-analytic selectListExprs: " + Expr.debugString(resultExprs_));
     if (sortInfo_ != null) {
-      sortInfo_.substituteOrderingExprs(analyticInfo_.getSmap(), analyzer);
+      sortInfo_.substituteOrderingExprs(smap, analyzer);
       LOG.trace("post-analytic orderingExprs: " +
           Expr.debugString(sortInfo_.getOrderingExprs()));
     }

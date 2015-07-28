@@ -962,6 +962,34 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     //      + "from functional.alltypes",
     //    "Only one ORDER BY expression allowed if used with a RANGE window with "
     //      + "PRECEDING/FOLLOWING");
+
+    // percent_rank(), cume_dist() and ntile() tests
+    AnalyzesOk("select percent_rank() over(order by id) from functional.alltypes");
+    AnalyzesOk("select cume_dist() over(order by id) from functional.alltypes");
+    AnalyzesOk("select ntile(3) over(order by id) from functional.alltypes");
+    AnalyzesOk("select ntile(3000) over(order by id) from functional.alltypes");
+    AnalyzesOk("select ntile(3000000000) over(order by id) from functional.alltypes");
+    AnalyzesOk("select percent_rank() over(partition by tinyint_col, bool_col "
+        + "order by id), ntile(3) over(partition by int_col, bool_col "
+        + "order by smallint_col, id), cume_dist() over(partition by int_col, bool_col "
+        + "order by month) from functional.alltypes");
+
+    AnalysisError("select ntile(-1) over(order by int_col) from functional.alltypestiny",
+        "NTILE() requires a positive argument: -1");
+    AnalysisError("select percent_rank() over(partition by int_col) "
+        + "from functional.alltypestiny",
+        "'percent_rank()' requires an ORDER BY clause");
+    AnalysisError("select cume_dist() over(partition by int_col) "
+        + "from functional.alltypestiny",
+      "'cume_dist()' requires an ORDER BY clause");
+    AnalysisError("select ntile(2) over(partition by int_col) "
+        + "from functional.alltypestiny",
+      "'ntile(2)' requires an ORDER BY clause");
+    // TODO: Remove this test once we allow for non-constant arguments in ntile()
+    AnalysisError(
+      "select ntile(int_col) over(order by tinyint_col) "
+        + "from functional.alltypestiny",
+      "NTILE() requires a constant argument");
   }
 
   /**

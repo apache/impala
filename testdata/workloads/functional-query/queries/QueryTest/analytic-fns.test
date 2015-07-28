@@ -1314,3 +1314,217 @@ on (a.id = b.id and b.int_col < 10)
 ---- TYPES
 INT, INT
 ====
+---- QUERY
+# Test percent_rank() with multiple partition exprs and multiple order by exprs and
+# compare with the rewrite target query
+select t.year, t.month, t.id, t.pr, (t.r-1)/(t.c-1)
+from (select year, month, id, rank() over (partition by year, month order by id) as r,
+count() over(partition by year, month) as c,
+percent_rank() over(partition by year, month order by id) as pr
+from functional.alltypes where tinyint_col < 2 and month < 3 and (id % 100 < 10)) as t
+order by t.year, t.month, t.id;
+---- RESULTS
+2009,1,0,0,0
+2009,1,1,0.1428571428571428,0.1428571428571428
+2009,1,100,0.2857142857142857,0.2857142857142857
+2009,1,101,0.4285714285714285,0.4285714285714285
+2009,1,200,0.5714285714285714,0.5714285714285714
+2009,1,201,0.7142857142857143,0.7142857142857143
+2009,1,300,0.8571428571428571,0.8571428571428571
+2009,1,301,1,1
+2009,2,400,0,0
+2009,2,401,0.3333333333333333,0.3333333333333333
+2009,2,500,0.6666666666666666,0.6666666666666666
+2009,2,501,1,1
+2010,1,3700,0,0
+2010,1,3701,0.2,0.2
+2010,1,3800,0.4,0.4
+2010,1,3801,0.6,0.6
+2010,1,3900,0.8,0.8
+2010,1,3901,1,1
+2010,2,4000,0,0
+2010,2,4001,0.2,0.2
+2010,2,4100,0.4,0.4
+2010,2,4101,0.6,0.6
+2010,2,4200,0.8,0.8
+2010,2,4201,1,1
+---- TYPES
+INT, INT, INT, DOUBLE, DOUBLE
+====
+---- QUERY
+# Test cume_dist() with multiple partition exprs and multiple order by exprs
+# and compare with the rewrite query
+select t.year, t.month, t.id, t.cd, ((t.c-t.r)+1)/t.c
+from (select year, month, id,
+rank() over (partition by year, month order by id desc) as r,
+count() over(partition by year, month) as c,
+cume_dist() over(partition by year, month order by id) as cd
+from functional.alltypes where tinyint_col < 2 and month < 3 and (id % 100 < 10)) as t
+order by t.year, t.month, t.id;
+---- RESULTS
+2009,1,0,0.125,0.125
+2009,1,1,0.25,0.25
+2009,1,100,0.375,0.375
+2009,1,101,0.5,0.5
+2009,1,200,0.625,0.625
+2009,1,201,0.75,0.75
+2009,1,300,0.875,0.875
+2009,1,301,1,1
+2009,2,400,0.25,0.25
+2009,2,401,0.5,0.5
+2009,2,500,0.75,0.75
+2009,2,501,1,1
+2010,1,3700,0.1666666666666667,0.1666666666666667
+2010,1,3701,0.3333333333333333,0.3333333333333333
+2010,1,3800,0.5,0.5
+2010,1,3801,0.6666666666666666,0.6666666666666666
+2010,1,3900,0.8333333333333334,0.8333333333333334
+2010,1,3901,1,1
+2010,2,4000,0.1666666666666667,0.1666666666666667
+2010,2,4001,0.3333333333333333,0.3333333333333333
+2010,2,4100,0.5,0.5
+2010,2,4101,0.6666666666666666,0.6666666666666666
+2010,2,4200,0.8333333333333334,0.8333333333333334
+2010,2,4201,1,1
+---- TYPES
+INT, INT, INT, DOUBLE, DOUBLE
+====
+---- QUERY
+# Test ntile() with multiple partition exprs and multiple order by exprs and compare
+# with the rewrite query
+select t.year, t.month, t.id, t.nt, floor((if(t.c>3, 3, t.c)*(t.rownum-1))/t.c) + 1
+from (select year, month, id,
+row_number() over (partition by year, month order by id) as rownum,
+count() over(partition by year, month) as c,
+ntile(3) over(partition by year, month order by id) as nt
+from functional.alltypes where tinyint_col < 2 and month < 3 and (id % 100 < 10)) as t
+order by t.year, t.month, t.id;
+---- RESULTS
+2009,1,0,1,1
+2009,1,1,1,1
+2009,1,100,1,1
+2009,1,101,2,2
+2009,1,200,2,2
+2009,1,201,2,2
+2009,1,300,3,3
+2009,1,301,3,3
+2009,2,400,1,1
+2009,2,401,1,1
+2009,2,500,2,2
+2009,2,501,3,3
+2010,1,3700,1,1
+2010,1,3701,1,1
+2010,1,3800,2,2
+2010,1,3801,2,2
+2010,1,3900,3,3
+2010,1,3901,3,3
+2010,2,4000,1,1
+2010,2,4001,1,1
+2010,2,4100,2,2
+2010,2,4101,2,2
+2010,2,4200,3,3
+2010,2,4201,3,3
+---- TYPES
+INT, INT, INT, BIGINT, BIGINT
+====
+---- QUERY
+# Test for ntile when the argument is larger than number of rows
+select year, month, id, ntile(1000) over(order by year, month, id) from alltypes where
+tinyint_col < 2 and month < 3 and (id % 100 < 10) order by year, month, id
+---- RESULTS
+2009,1,0,1
+2009,1,1,2
+2009,1,100,3
+2009,1,101,4
+2009,1,200,5
+2009,1,201,6
+2009,1,300,7
+2009,1,301,8
+2009,2,400,9
+2009,2,401,10
+2009,2,500,11
+2009,2,501,12
+2010,1,3700,13
+2010,1,3701,14
+2010,1,3800,15
+2010,1,3801,16
+2010,1,3900,17
+2010,1,3901,18
+2010,2,4000,19
+2010,2,4001,20
+2010,2,4100,21
+2010,2,4101,22
+2010,2,4200,23
+2010,2,4201,24
+---- TYPES
+INT, INT, INT, BIGINT
+====
+---- QUERY
+# percent_rank() and cume_dist() with inline views
+select bool_col, a, b, a + b from
+  (select
+   bool_col,
+   percent_rank() over(order by id) a,
+   cume_dist() over(partition by bool_col order by id) b
+   from
+     (select * from functional.alltypes where id < 20) v1) v2
+order by 1, 2, 3
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+false,0.05263157894736842,0.1,0.1526315789473684
+false,0.1578947368421053,0.2,0.3578947368421053
+false,0.2631578947368421,0.3,0.5631578947368421
+false,0.3684210526315789,0.4,0.7684210526315789
+false,0.4736842105263158,0.5,0.9736842105263157
+false,0.5789473684210527,0.6,1.178947368421053
+false,0.6842105263157895,0.7,1.38421052631579
+false,0.7894736842105263,0.8,1.589473684210526
+false,0.8947368421052632,0.9,1.794736842105263
+false,1,1,2
+true,0,0.1,0.1
+true,0.1052631578947368,0.2,0.3052631578947368
+true,0.2105263157894737,0.3,0.5105263157894737
+true,0.3157894736842105,0.4,0.7157894736842105
+true,0.4210526315789473,0.5,0.9210526315789473
+true,0.5263157894736842,0.6,1.126315789473684
+true,0.631578947368421,0.7,1.331578947368421
+true,0.7368421052631579,0.8,1.536842105263158
+true,0.8421052631578947,0.9,1.742105263157895
+true,0.9473684210526315,1,1.947368421052631
+---- TYPES
+BOOLEAN, DOUBLE, DOUBLE, DOUBLE
+====
+---- QUERY
+select 1 a, cume_dist() over (order by int_col) as cd from alltypes where id < 5
+union
+distinct (select 2, percent_rank() over (partition by bool_col order by int_col)
+from alltypesagg where id >= 5 and id <= 10) order by a, cd;
+---- RESULTS
+1,0.2
+1,0.4
+1,0.6
+1,0.8
+1,1
+2,0
+2,0.333333333333333
+2,0.5
+2,0.666666666666666
+2,1
+---- TYPES
+TINYINT, DOUBLE
+====
+---- QUERY
+# Test analytic function rewrite when the same expr appears twice
+select id, percent_rank() over(order by id) from functional.alltypestiny
+order by percent_rank() over (order by id)
+---- RESULTS
+0,0
+1,0.1428571428571428
+2,0.2857142857142857
+3,0.4285714285714285
+4,0.5714285714285714
+5,0.7142857142857143
+6,0.8571428571428571
+7,1
+---- TYPES
+INT, DOUBLE
+====

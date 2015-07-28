@@ -27,6 +27,7 @@ import com.cloudera.impala.analysis.AnalyticWindow.BoundaryType;
 import com.cloudera.impala.catalog.AggregateFunction;
 import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.Type;
+import com.cloudera.impala.catalog.ScalarType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TreeNode;
@@ -84,6 +85,9 @@ public class AnalyticExpr extends Expr {
   private static String ROWNUMBER = "row_number";
   private static String MIN = "min";
   private static String MAX = "max";
+  private static String PERCENT_RANK = "percent_rank";
+  private static String CUME_DIST = "cume_dist";
+  private static String NTILE = "ntile";
 
   // Internal function used to implement FIRST_VALUE with a window rewrite and
   // additional null handling in the backend.
@@ -181,9 +185,13 @@ public class AnalyticExpr extends Expr {
   protected void toThrift(TExprNode msg) {
   }
 
-  public static boolean isAnalyticFn(Function fn) {
+  private static boolean isAnalyticFn(Function fn) {
     return fn instanceof AggregateFunction
         && ((AggregateFunction) fn).isAnalyticFn();
+  }
+
+  private static boolean isAnalyticFn(Function fn, String fnName) {
+    return isAnalyticFn(fn) && fn.functionName().equals(fnName);
   }
 
   public static boolean isAggregateFn(Function fn) {
@@ -191,21 +199,162 @@ public class AnalyticExpr extends Expr {
         && ((AggregateFunction) fn).isAggregateFn();
   }
 
+  public static boolean isPercentRankFn(Function fn) {
+    return isAnalyticFn(fn, PERCENT_RANK);
+  }
+
+  public static boolean isCumeDistFn(Function fn) {
+    return isAnalyticFn(fn, CUME_DIST);
+  }
+
+  public static boolean isNtileFn(Function fn) {
+    return isAnalyticFn(fn, NTILE);
+  }
+
   static private boolean isOffsetFn(Function fn) {
-    if (!isAnalyticFn(fn)) return false;
-    return fn.functionName().equals(LEAD) || fn.functionName().equals(LAG);
+    return isAnalyticFn(fn, LEAD) || isAnalyticFn(fn, LAG);
   }
 
   static private boolean isMinMax(Function fn) {
-    if (!isAnalyticFn(fn)) return false;
-    return fn.functionName().equals(MIN) || fn.functionName().equals(MAX);
+    return isAnalyticFn(fn, MIN) || isAnalyticFn(fn, MAX);
   }
 
   static private boolean isRankingFn(Function fn) {
-    if (!isAnalyticFn(fn)) return false;
-    return fn.functionName().equals(RANK)
-        || fn.functionName().equals(DENSERANK)
-        || fn.functionName().equals(ROWNUMBER);
+    return isAnalyticFn(fn, RANK) || isAnalyticFn(fn, DENSERANK) ||
+        isAnalyticFn(fn, ROWNUMBER);
+  }
+
+  /**
+   * Rewrite the following analytic functions:
+   * percent_rank(), cume_dist() and ntile()
+   *
+   * Returns a new Expr if the analytic expr is rewritten, returns null if it's not one
+   * that we want to rewrite.
+   */
+  public static Expr rewrite(AnalyticExpr analyticExpr) {
+    Function fn = analyticExpr.getFnCall().getFn();
+    if (AnalyticExpr.isPercentRankFn(fn)) {
+      return createPercentRank(analyticExpr);
+    } else if (AnalyticExpr.isCumeDistFn(fn)) {
+      return createCumeDist(analyticExpr);
+    } else if (AnalyticExpr.isNtileFn(fn)) {
+      return createNtile(analyticExpr);
+    }
+    return null;
+  }
+
+  /**
+   * Rewrite percent_rank() to the following:
+   *
+   * percent_rank() over([partition by clause] order by clause)
+   *    = (Rank - 1)/(Count - 1)
+   * where,
+   *  Rank = rank() over([partition by clause] order by clause)
+   *  Count = count() over([partition by clause])
+   */
+  private static Expr createPercentRank(AnalyticExpr analyticExpr) {
+    Preconditions.checkState(
+        AnalyticExpr.isPercentRankFn(analyticExpr.getFnCall().getFn()));
+    AnalyticExpr rankExpr =
+        create("rank", analyticExpr, true, false);
+    AnalyticExpr countExpr =
+        create("count", analyticExpr, false, false);
+    NumericLiteral one = new NumericLiteral(BigInteger.valueOf(1), ScalarType.BIGINT);
+    ArithmeticExpr arithmeticRewrite =
+        new ArithmeticExpr(ArithmeticExpr.Operator.DIVIDE,
+          new ArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, rankExpr, one),
+          new ArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, countExpr, one));
+    return arithmeticRewrite;
+  }
+
+  /**
+   * Rewrite cume_dist() to the following:
+   *
+   * cume_dist() over([partition by clause] order by clause)
+   *    = ((Count - Rank) + 1)/Count
+   * where,
+   *  Rank = rank() over([partition by clause] order by clause DESC)
+   *  Count = count() over([partition by clause])
+   */
+  private static Expr createCumeDist(AnalyticExpr analyticExpr) {
+    Preconditions.checkState(
+        AnalyticExpr.isCumeDistFn(analyticExpr.getFnCall().getFn()));
+    AnalyticExpr rankExpr =
+        create("rank", analyticExpr, true, true);
+    AnalyticExpr countExpr =
+        create("count", analyticExpr, false, false);
+    NumericLiteral one = new NumericLiteral(BigInteger.valueOf(1), ScalarType.BIGINT);
+    ArithmeticExpr arithmeticRewrite =
+        new ArithmeticExpr(ArithmeticExpr.Operator.DIVIDE,
+          new ArithmeticExpr(ArithmeticExpr.Operator.ADD,
+            new ArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, countExpr, rankExpr),
+          one),
+        countExpr);
+    return arithmeticRewrite;
+  }
+
+  /**
+   * Rewrite ntile() to the following:
+   *
+   * ntile(B) over([partition by clause] order by clause)
+   *    = floor(min(Count, B) * (RowNumber - 1)/Count) + 1
+   * where,
+   *  RowNumber = row_number() over([partition by clause] order by clause)
+   *  Count = count() over([partition by clause])
+   */
+  private static Expr createNtile(AnalyticExpr analyticExpr) {
+    Preconditions.checkState(
+        AnalyticExpr.isNtileFn(analyticExpr.getFnCall().getFn()));
+    Expr bucketExpr = analyticExpr.getChild(0);
+    AnalyticExpr rowNumExpr =
+        create("row_number", analyticExpr, true, false);
+    AnalyticExpr countExpr =
+        create("count", analyticExpr, false, false);
+
+    List<Expr> ifParams = Lists.newArrayList();
+    ifParams.add(
+        new BinaryPredicate(BinaryPredicate.Operator.LT, bucketExpr, countExpr));
+    ifParams.add(bucketExpr);
+    ifParams.add(countExpr);
+
+    NumericLiteral one = new NumericLiteral(BigInteger.valueOf(1), ScalarType.BIGINT);
+    ArithmeticExpr minMultiplyRowMinusOne =
+        new ArithmeticExpr(ArithmeticExpr.Operator.MULTIPLY,
+          new ArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, rowNumExpr, one),
+          new FunctionCallExpr("if", ifParams));
+    ArithmeticExpr divideAddOne =
+        new ArithmeticExpr(ArithmeticExpr.Operator.ADD,
+          new ArithmeticExpr(ArithmeticExpr.Operator.INT_DIVIDE,
+            minMultiplyRowMinusOne, countExpr),
+        one);
+    return divideAddOne;
+  }
+
+  /**
+   * Create a new Analytic Expr and associate it with a new function.
+   * Takes a reference analytic expression and clones the partition expressions and the
+   * order by expressions if 'copyOrderBy' is set and optionally reverses it if
+   * 'reverseOrderBy' is set. The new function that it will be associated with is
+   * specified by fnName.
+   */
+  private static AnalyticExpr create(String fnName,
+      AnalyticExpr referenceExpr, boolean copyOrderBy, boolean reverseOrderBy) {
+    FunctionCallExpr fnExpr = new FunctionCallExpr(fnName, new ArrayList<Expr>());
+    fnExpr.setIsAnalyticFnCall(true);
+    List<OrderByElement> orderByElements = null;
+    if (copyOrderBy) {
+      if (reverseOrderBy) {
+        orderByElements = OrderByElement.reverse(referenceExpr.getOrderByElements());
+      } else {
+        orderByElements = Lists.newArrayList();
+        for (OrderByElement elem: referenceExpr.getOrderByElements()) {
+          orderByElements.add(elem.clone());
+        }
+      }
+    }
+    AnalyticExpr analyticExpr = new AnalyticExpr(fnExpr,
+        Expr.cloneList(referenceExpr.getPartitionExprs()), orderByElements, null);
+    return analyticExpr;
   }
 
   /**
@@ -318,6 +467,23 @@ public class AnalyticExpr extends Expr {
                 "The default parameter (parameter 3) of LEAD/LAG must be a constant: "
                   + getFnCall().toSql());
           }
+        }
+      }
+      if (isNtileFn(fn)) {
+        // TODO: IMPALA-2171:Remove this when ntile() can handle a non-constant argument.
+        if (!getFnCall().getChild(0).isConstant()) {
+          throw new AnalysisException("NTILE() requires a constant argument");
+        }
+        // Check if argument value is zero or negative and throw an exception if found.
+        try {
+          TColumnValue bucketValue =
+              FeSupport.EvalConstExpr(getFnCall().getChild(0), analyzer.getQueryCtx());
+          Long arg = bucketValue.getLong_val();
+          if (arg <= 0) {
+            throw new AnalysisException("NTILE() requires a positive argument: " + arg);
+          }
+        } catch (InternalException e) {
+          throw new AnalysisException(e.toString());
         }
       }
     }
