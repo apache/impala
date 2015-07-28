@@ -63,11 +63,7 @@ class TmpFileMgr {
     /// The id of the disk on which the physical file lies.
     int disk_id_;
 
-    /// Offset to which the next block will be written.
-    int64_t current_offset_;
-
-    /// Current file size. Modified by AllocateSpace(). Is always >= current offset.
-    /// Size is 0 before the file is created.
+    /// Current file size. Modified by AllocateSpace(). Size is 0 before file creation.
     int64_t current_size_;
   };
 

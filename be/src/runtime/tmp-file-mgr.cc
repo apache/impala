@@ -103,29 +103,20 @@ Status TmpFileMgr::GetFile(int tmp_device_id, const TUniqueId& query_id,
 
 TmpFileMgr::File::File(const string& path)
   : path_(path),
-    current_offset_(0),
     current_size_(0) {
 }
 
 Status TmpFileMgr::File::AllocateSpace(int64_t write_size, int64_t* offset) {
   DCHECK_GT(write_size, 0);
-  DCHECK_GE(current_size_, current_offset_);
-  *offset = current_offset_;
-
   if (current_size_ == 0) {
     // First call to AllocateSpace. Create the file.
     RETURN_IF_ERROR(FileSystemUtil::CreateFile(path_));
     disk_id_ = DiskInfo::disk_id(path_.c_str());
   }
-
-  current_offset_ += write_size;
-  if (current_offset_ > current_size_) {
-    int64_t trunc_len = current_offset_ + write_size;
-    RETURN_IF_ERROR(FileSystemUtil::ResizeFile(path_, trunc_len));
-    current_size_ = trunc_len;
-  }
-
-  DCHECK_GE(current_size_, current_offset_);
+  int64_t new_size = current_size_ + write_size;
+  RETURN_IF_ERROR(FileSystemUtil::ResizeFile(path_, new_size));
+  *offset = current_size_;
+  current_size_ = new_size;
   return Status::OK();
 }
 

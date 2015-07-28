@@ -562,10 +562,75 @@ TEST_F(BufferedBlockMgrTest, Close) {
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
 
-// Test that the block manager behaves correctly after a write error
-// Delete the scratch directory before an operation that would cause a write
-// and test that subsequent API calls return 'CANCELLED' correctly.
+// Clear scratch directory. Return # of files deleted.
+static int clear_scratch_dir() {
+  int num_files = 0;
+  directory_iterator dir_it(SCRATCH_DIR);
+  for (; dir_it != directory_iterator(); ++dir_it) {
+    ++num_files;
+    remove_all(dir_it->path());
+  }
+  return num_files;
+}
+
+// Test that the block manager behaves correctly after a write error.  Delete the scratch
+// directory before an operation that would cause a write and test that subsequent API
+// calls return 'CANCELLED' correctly.
 TEST_F(BufferedBlockMgrTest, WriteError) {
+  int max_num_buffers = 2;
+  const int write_wait_millis = 500;
+  shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_buffers);
+  BufferedBlockMgr::Client* client;
+  Status status = block_mgr->RegisterClient(0, NULL, runtime_state_.get(), &client);
+  EXPECT_TRUE(status.ok());
+  EXPECT_TRUE(client != NULL);
+
+  RuntimeProfile* profile = block_mgr->profile();
+  RuntimeProfile::Counter* writes_outstanding =
+      profile->GetCounter("BlockWritesOutstanding");
+  vector<BufferedBlockMgr::Block*> blocks;
+  AllocateBlocks(block_mgr.get(), client, max_num_buffers, &blocks);
+  // Unpin two blocks here, to ensure that backing storage is allocated in tmp file.
+  for (int i = 0; i < 2; i++) {
+    status = blocks[i]->Unpin();
+    EXPECT_TRUE(status.ok());
+  }
+  // Wait for the writes to go through.
+  SleepForMs(write_wait_millis);
+  EXPECT_TRUE(writes_outstanding->value() == 0);
+  // Repin the blocks
+  for (int i = 0; i < 2; i++) {
+    bool pinned;
+    status = blocks[i]->Pin(&pinned);
+    EXPECT_TRUE(status.ok());
+    EXPECT_TRUE(pinned);
+  }
+  // Remove the backing storage so that future writes will fail
+  int num_files = clear_scratch_dir();
+  EXPECT_TRUE(num_files > 0);
+  for (int i = 0; i < 2; i++) {
+    status = blocks[i]->Unpin();
+    EXPECT_TRUE(status.ok());
+  }
+  // Wait for the writes to go through.
+  SleepForMs(write_wait_millis);
+  EXPECT_TRUE(writes_outstanding->value() == 0);
+  // Subsequent calls should fail.
+  for (int i = 0; i < 2; i++) {
+    status = blocks[i]->Delete();
+    EXPECT_TRUE(status.IsCancelled());
+  }
+  BufferedBlockMgr::Block* new_block;
+  status = block_mgr->GetNewBlock(client, NULL, &new_block);
+  EXPECT_TRUE(new_block == NULL);
+  EXPECT_TRUE(status.IsCancelled());
+  block_mgr.reset();
+  EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
+}
+
+// Test block manager error handling when temporary file space cannot be allocated to
+// back an unpinned buffer.
+TEST_F(BufferedBlockMgrTest, TmpFileAllocateError) {
   int max_num_buffers = 2;
   const int write_wait_millis = 500;
   shared_ptr<BufferedBlockMgr> block_mgr = CreateMgr(max_num_buffers);
@@ -585,30 +650,14 @@ TEST_F(BufferedBlockMgrTest, WriteError) {
   // Wait for the write to go through.
   SleepForMs(write_wait_millis);
   EXPECT_TRUE(writes_outstanding->value() == 0);
-
-  // Empty the scratch directory.
-  int num_files = 0;
-  directory_iterator dir_it(SCRATCH_DIR);
-  for (; dir_it != directory_iterator(); ++dir_it) {
-    ++num_files;
-    remove_all(dir_it->path());
-  }
+  // Remove temporary files - subsequent operations will fail.
+  int num_files = clear_scratch_dir();
   EXPECT_TRUE(num_files > 0);
+  // Current implementation will fail here because it tries to expand the tmp file
+  // immediately. This behavior is not contractual but we want to know if it changes
+  // accidentally.
   status = blocks[1]->Unpin();
-  EXPECT_TRUE(status.ok());
-  // Allocate one more block, forcing a write and causing an error.
-  AllocateBlocks(block_mgr.get(), client, 1, &blocks);
-  // Wait for the write to go through.
-  SleepForMs(write_wait_millis);
-  EXPECT_TRUE(writes_outstanding->value() == 0);
-
-  // Subsequent calls should fail.
-  status = blocks[2]->Delete();
-  EXPECT_TRUE(status.IsCancelled());
-  BufferedBlockMgr::Block* new_block;
-  status = block_mgr->GetNewBlock(client, NULL, &new_block);
-  EXPECT_TRUE(new_block == NULL);
-  EXPECT_TRUE(status.IsCancelled());
+  EXPECT_FALSE(status.ok());
   block_mgr.reset();
   EXPECT_TRUE(block_mgr_parent_tracker_->consumption() == 0);
 }
