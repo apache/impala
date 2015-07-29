@@ -22,6 +22,7 @@ import shlex
 import shutil
 import socket
 import signal
+import sys
 
 from impala_shell_results import get_shell_cmd_result
 from subprocess import Popen, PIPE
@@ -222,6 +223,20 @@ class TestImpalaShellInteractive(object):
     result = get_shell_cmd_result(p)
     for query in queries:
       assert query in result.stderr, "'%s' not in '%s'" % (query, result.stderr)
+
+  @pytest.mark.execute_serially
+  def test_tip(self):
+    """Smoke test for the TIP command"""
+    # Temporarily add impala_shell module to path to get at TIPS list for verification
+    sys.path.append("%s/shell/" % os.environ['IMPALA_HOME'])
+    try:
+      import impala_shell
+    finally:
+      sys.path = sys.path[:-1]
+    result = run_impala_shell_interactive("tip;")
+    for t in impala_shell.TIPS:
+      if t in result.stderr: return
+    assert False, "No tip found in output %s" % result.stderr
 
 def run_impala_shell_interactive(command, shell_args=''):
   """Runs a command in the Impala shell interactively."""
