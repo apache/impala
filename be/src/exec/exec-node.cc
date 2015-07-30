@@ -230,10 +230,11 @@ Status ExecNode::CreateTreeHelper(
   if (*node_idx >= tnodes.size()) {
     return Status("Failed to reconstruct plan tree from thrift.");
   }
-  int num_children = tnodes[*node_idx].num_children;
+  const TPlanNode& tnode = tnodes[*node_idx];
+
+  int num_children = tnode.num_children;
   ExecNode* node = NULL;
-  RETURN_IF_ERROR(CreateNode(pool, tnodes[*node_idx], descs, &node));
-  // assert(parent != NULL || (node_idx == 0 && root_expr != NULL));
+  RETURN_IF_ERROR(CreateNode(pool, tnode, descs, &node));
   if (parent != NULL) {
     parent->children_.push_back(node);
   } else {
@@ -248,6 +249,9 @@ Status ExecNode::CreateTreeHelper(
       return Status("Failed to reconstruct plan tree from thrift.");
     }
   }
+
+  // Call Init() after children have been set and Init()'d themselves
+  RETURN_IF_ERROR(node->Init(tnode));
 
   // build up tree of profiles; add children >0 first, so that when we print
   // the profile, child 0 is printed last (makes the output more readable)
@@ -338,7 +342,6 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       error_msg << str << " not implemented";
       return Status(error_msg.str());
   }
-  RETURN_IF_ERROR((*node)->Init(tnode));
   return Status::OK();
 }
 
