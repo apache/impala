@@ -56,7 +56,7 @@ public class DescribeResultFactory {
       TColumnValue colNameCol = new TColumnValue();
       colNameCol.setString_val(column.getName());
       TColumnValue dataTypeCol = new TColumnValue();
-      dataTypeCol.setString_val(column.getType().toSql().toLowerCase());
+      dataTypeCol.setString_val(column.getType().prettyPrint().toLowerCase());
       TColumnValue commentCol = new TColumnValue();
       commentCol.setString_val(column.getComment() != null ? column.getComment() : "");
       descResult.results.add(

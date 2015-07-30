@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.catalog;
 
+import org.apache.commons.lang3.StringUtils;
+
 import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TStructField;
 import com.cloudera.impala.thrift.TTypeNode;
@@ -47,6 +49,24 @@ public class StructField {
   public String toSql() {
     StringBuilder sb = new StringBuilder(name_);
     if (type_ != null) sb.append(":" + type_.toSql());
+    if (comment_ != null) sb.append(String.format(" COMMENT '%s'", comment_));
+    return sb.toString();
+  }
+
+  /**
+   * Pretty prints this field with lpad number of leading spaces.
+   * Calls prettyPrint(lpad) on this field's type.
+   */
+  public String prettyPrint(int lpad) {
+    String leftPadding = StringUtils.repeat(' ', lpad);
+    StringBuilder sb = new StringBuilder(leftPadding + name_);
+    if (type_ != null) {
+      // Pass in the padding to make sure nested fields are aligned properly,
+      // even if we then strip the top-level padding.
+      String typeStr = type_.prettyPrint(lpad);
+      typeStr = typeStr.substring(lpad);
+      sb.append(":" + typeStr);
+    }
     if (comment_ != null) sb.append(String.format(" COMMENT '%s'", comment_));
     return sb.toString();
   }

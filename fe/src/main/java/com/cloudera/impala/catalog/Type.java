@@ -111,10 +111,19 @@ public abstract class Type {
   /**
    * The output of this is stored directly in the hive metastore as the column type.
    * The string must match exactly.
-   * TODO: Consider adding another 'pretty print' method for complex types to use
-   * in describe/show statements.
    */
   public abstract String toSql();
+
+  /**
+   * Same as toSql() but adds newlines and spaces for better readability of nested types.
+   */
+  public String prettyPrint() { return prettyPrint(0); }
+
+  /**
+   * Pretty prints this type with lpad number of leading spaces. Used to implement
+   * prettyPrint() with space-indented nested types.
+   */
+  protected abstract String prettyPrint(int lpad);
 
   public boolean isInvalid() { return isScalarType(PrimitiveType.INVALID_TYPE); }
   public boolean isValid() { return !isInvalid(); }

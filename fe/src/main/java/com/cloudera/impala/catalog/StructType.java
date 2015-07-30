@@ -3,6 +3,8 @@ package com.cloudera.impala.catalog;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import org.apache.commons.lang3.StringUtils;
+
 import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TStructField;
 import com.cloudera.impala.thrift.TTypeNode;
@@ -35,10 +37,17 @@ public class StructType extends Type {
   @Override
   public String toSql() {
     ArrayList<String> fieldsSql = Lists.newArrayList();
-    for (StructField f: fields_) {
-      fieldsSql.add(f.toSql());
-    }
+    for (StructField f: fields_) fieldsSql.add(f.toSql());
     return String.format("STRUCT<%s>", Joiner.on(",").join(fieldsSql));
+  }
+
+  @Override
+  protected String prettyPrint(int lpad) {
+    String leftPadding = StringUtils.repeat(' ', lpad);
+    ArrayList<String> fieldsSql = Lists.newArrayList();
+    for (StructField f: fields_) fieldsSql.add(f.prettyPrint(lpad + 2));
+    return String.format("%sSTRUCT<\n%s\n%s>",
+        leftPadding, Joiner.on(",\n").join(fieldsSql), leftPadding);
   }
 
   public void addField(StructField field) {

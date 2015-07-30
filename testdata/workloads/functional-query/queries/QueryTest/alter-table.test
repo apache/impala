@@ -161,7 +161,7 @@ describe t2
 'c3','int','added a comment'
 'x','array<int>',''
 'y','map<string,float>','Map Col'
-'z','struct<f1:boolean,f2:bigint>',''
+'z','struct<\n  f1:boolean,\n  f2:bigint\n>',''
 ---- TYPES
 string,string,string
 ====
@@ -177,7 +177,7 @@ c double)
 describe t2
 ---- RESULTS
 'a','int','Int Col'
-'b','struct<f1:array<int>,f2:map<string,struct<f1:bigint>>>',''
+'b','struct<\n  f1:array<int>,\n  f2:map<string,struct<\n    f1:bigint\n  >>\n>',''
 'c','double',''
 ---- TYPES
 string,string,string

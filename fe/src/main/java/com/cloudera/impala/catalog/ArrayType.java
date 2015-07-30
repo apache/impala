@@ -1,5 +1,7 @@
 package com.cloudera.impala.catalog;
 
+import org.apache.commons.lang3.StringUtils;
+
 import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TTypeNode;
 import com.cloudera.impala.thrift.TTypeNodeType;
@@ -18,9 +20,7 @@ public class ArrayType extends Type {
   public Type getItemType() { return itemType_; }
 
   @Override
-  public String toSql() {
-    return String.format("ARRAY<%s>", itemType_.toSql());
-  }
+  public String toSql() { return String.format("ARRAY<%s>", itemType_.toSql()); }
 
   @Override
   public boolean equals(Object other) {
@@ -37,5 +37,15 @@ public class ArrayType extends Type {
     node.setType(TTypeNodeType.ARRAY);
     itemType_.toThrift(container);
   }
-}
 
+  @Override
+  protected String prettyPrint(int lpad) {
+    String leftPadding = StringUtils.repeat(' ', lpad);
+    if (!itemType_.isStructType()) return leftPadding + toSql();
+    // Pass in the padding to make sure nested fields are aligned properly,
+    // even if we then strip the top-level padding.
+    String structStr = itemType_.prettyPrint(lpad);
+    structStr = structStr.substring(lpad);
+    return String.format("%sARRAY<%s>", leftPadding, structStr);
+  }
+}

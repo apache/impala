@@ -14,6 +14,8 @@
 
 package com.cloudera.impala.catalog;
 
+import org.apache.commons.lang3.StringUtils;
+
 import com.cloudera.impala.analysis.TypesUtil;
 import com.cloudera.impala.thrift.TColumnType;
 import com.cloudera.impala.thrift.TScalarType;
@@ -158,6 +160,11 @@ public class ScalarType extends Type {
         return String.format("%s(%s,%s)", type_.toString(), precision_, scale_);
       default: return type_.toString();
     }
+  }
+
+  @Override
+  protected String prettyPrint(int lpad) {
+    return StringUtils.repeat(' ', lpad) + toSql();
   }
 
   @Override

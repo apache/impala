@@ -2,8 +2,6 @@
 ---- QUERY
 # Simple describe (note Hive does not support this)
 describe functional.alltypes
----- TYPES
-string, string, string
 ---- RESULTS
 'id','int','Add a comment'
 'bool_col','boolean',''
@@ -18,6 +16,8 @@ string, string, string
 'timestamp_col','timestamp',''
 'year','int',''
 'month','int',''
+---- TYPES
+string, string, string
 ====
 ---- QUERY
 USE functional
@@ -25,8 +25,6 @@ USE functional
 ---- QUERY
 # Default database
 describe alltypes
----- TYPES
-string, string, string
 ---- RESULTS
 'id','int','Add a comment'
 'bool_col','boolean',''
@@ -41,26 +39,28 @@ string, string, string
 'timestamp_col','timestamp',''
 'year','int',''
 'month','int',''
+---- TYPES
+string, string, string
 ====
 ---- QUERY
 # Test printing of complex types.
 describe functional.allcomplextypes
----- TYPES
-string, string, string
 ---- RESULTS
 'id','int',''
 'int_array_col','array<int>',''
 'array_array_col','array<array<int>>',''
 'map_array_col','array<map<string,int>>',''
-'struct_array_col','array<struct<f1:bigint,f2:string>>',''
+'struct_array_col','array<struct<\n  f1:bigint,\n  f2:string\n>>',''
 'int_map_col','map<string,int>',''
 'array_map_col','map<string,array<int>>',''
 'map_map_col','map<string,map<string,int>>',''
-'struct_map_col','map<string,struct<f1:bigint,f2:string>>',''
-'int_struct_col','struct<f1:int,f2:int>',''
-'complex_struct_col','struct<f1:int,f2:array<int>,f3:map<string,int>>',''
-'nested_struct_col','struct<f1:int,f2:struct<f11:bigint,f12:struct<f21:bigint>>>',''
-'complex_nested_struct_col','struct<f1:int,f2:array<struct<f11:bigint,f12:map<string,struct<f21:bigint>>>>>',''
+'struct_map_col','map<string,struct<\n  f1:bigint,\n  f2:string\n>>',''
+'int_struct_col','struct<\n  f1:int,\n  f2:int\n>',''
+'complex_struct_col','struct<\n  f1:int,\n  f2:array<int>,\n  f3:map<string,int>\n>',''
+'nested_struct_col','struct<\n  f1:int,\n  f2:struct<\n    f11:bigint,\n    f12:struct<\n      f21:bigint\n    >\n  >\n>',''
+'complex_nested_struct_col','struct<\n  f1:int,\n  f2:array<struct<\n    f11:bigint,\n    f12:map<string,struct<\n      f21:bigint\n    >>\n  >>\n>',''
 'year','int',''
 'month','int',''
+---- TYPES
+string, string, string
 ====
