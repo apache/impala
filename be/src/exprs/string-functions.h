@@ -75,7 +75,17 @@ class StringFunctions {
   static StringVal ParseUrlKey(FunctionContext*, const StringVal& url,
                                const StringVal& key, const StringVal& part);
   static void ParseUrlClose(FunctionContext*, FunctionContext::FunctionStateScope);
-};
 
+  /// Converts ASCII 'val' to corresponding character.
+  static StringVal Chr(FunctionContext* context, const IntVal& val);
+
+  static void BTrimPrepare(FunctionContext*, FunctionContext::FunctionStateScope);
+  static void BTrimClose(FunctionContext*, FunctionContext::FunctionStateScope);
+
+  /// Trims occurrences of the characters in 'chars_to_trim' string from
+  /// both ends of string 'str'.
+  static StringVal BTrimString(FunctionContext* ctx, const StringVal& str,
+    const StringVal& chars_to_trim);
+};
 }
 #endif

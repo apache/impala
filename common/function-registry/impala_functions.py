@@ -424,6 +424,10 @@ visible_functions = [
   [['parse_url'], 'STRING', ['STRING', 'STRING', 'STRING'], 'impala::StringFunctions::ParseUrlKey',
    '_ZN6impala15StringFunctions15ParseUrlPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE',
    '_ZN6impala15StringFunctions13ParseUrlCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE'],
+# Netezza compatibility char functions
+  [['chr'], 'STRING', ['INT'], 'impala::StringFunctions::Chr'],
+  [['btrim'], 'STRING', ['STRING'], 'impala::StringFunctions::Trim'],
+  [['btrim'], 'STRING', ['STRING', 'STRING'], 'impala::StringFunctions::BTrimString', '_ZN6impala15StringFunctions12BTrimPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE', '_ZN6impala15StringFunctions10BTrimCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE'],
 
   # Conditional Functions
   # Some of these have empty symbols because the BE special-cases them based on the

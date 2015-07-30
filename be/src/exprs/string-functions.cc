@@ -18,6 +18,7 @@
 #include <stdint.h>
 #include <re2/re2.h>
 #include <re2/stringpiece.h>
+#include <bitset>
 
 #include "exprs/anyval-util.h"
 #include "exprs/expr.h"
@@ -28,6 +29,7 @@
 #include "common/names.h"
 
 using namespace impala_udf;
+using std::bitset;
 
 // NOTE: be careful not to use string::append.  It is not performant.
 namespace impala {
@@ -560,4 +562,59 @@ StringVal StringFunctions::ParseUrlKey(FunctionContext* ctx, const StringVal& ur
   return result_sv;
 }
 
+StringVal StringFunctions::Chr(FunctionContext* ctx, const IntVal& val) {
+  if (val.is_null) return StringVal::null();
+  if (val.val < 0 || val.val > 255) return "";
+  char c = static_cast<char>(val.val);
+  return AnyValUtil::FromBuffer(ctx, &c, 1);
+}
+
+void StringFunctions::BTrimPrepare(
+    FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
+  // Create a bitset to hold the unique characters to trim.
+  bitset<256>* unique_chars = new bitset<256>;
+  context->SetFunctionState(scope, unique_chars);
+  if (!context->IsArgConstant(1)) return;
+  DCHECK_EQ(context->GetArgType(1)->type, FunctionContext::TYPE_STRING);
+  StringVal* chars_to_trim = reinterpret_cast<StringVal*>(context->GetConstantArg(1));
+  for (int32_t i = 0; i < chars_to_trim->len; ++i) {
+    unique_chars->set(static_cast<int>(chars_to_trim->ptr[i]), true);
+  }
+}
+
+void StringFunctions::BTrimClose(
+    FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+  if (scope != FunctionContext::FRAGMENT_LOCAL) return;
+  bitset<256>* unique_chars = reinterpret_cast<bitset<256>*>(context->GetFunctionState(scope));
+  if (unique_chars != NULL) delete unique_chars;
+}
+
+StringVal StringFunctions::BTrimString(FunctionContext* ctx,
+    const StringVal& str, const StringVal& chars_to_trim) {
+  if (str.is_null) return StringVal::null();
+  bitset<256>* unique_chars =
+      reinterpret_cast<bitset<256>*>(ctx->GetFunctionState(FunctionContext::FRAGMENT_LOCAL));
+  // When 'chars_to_trim' is unique for each element (e.g. when 'chars_to_trim'
+  // is each element of a table column), we need to prepare a bitset of unique
+  // characters here instead of using the bitset from function context.
+  if (!ctx->IsArgConstant(1)) {
+    unique_chars->reset();
+    for (int32_t i = 0; i < chars_to_trim.len; ++i) {
+      unique_chars->set(static_cast<int>(chars_to_trim.ptr[i]), true);
+    }
+  }
+  // Find new starting position.
+  int32_t begin = 0;
+  while (begin < str.len &&
+      unique_chars->test(static_cast<int>(str.ptr[begin]))) {
+    ++begin;
+  }
+  // Find new ending position.
+  int32_t end = str.len - 1;
+  while (end > begin && unique_chars->test(static_cast<int>(str.ptr[end]))) {
+    --end;
+  }
+  return StringVal(str.ptr + begin, end - begin + 1);
+}
 }

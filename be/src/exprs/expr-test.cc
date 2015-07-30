@@ -1597,6 +1597,15 @@ TEST_F(ExprTest, StringFunctions) {
   TestIsNull("substring('Hello', 1, NULL)", TYPE_STRING);
   TestIsNull("substring(NULL, NULL, NULL)", TYPE_STRING);
 
+  TestStringValue("chr(93)", "]");
+  TestStringValue("chr(96)", "`");
+  TestStringValue("chr(97)", "a");
+  TestStringValue("chr(48)", "0");
+  TestStringValue("chr(65)", "A");
+  TestStringValue("chr(300)", "");
+  TestStringValue("chr(-1)", "");
+  TestIsNull("chr(NULL)", TYPE_STRING);
+
   TestStringValue("lower('')", "");
   TestStringValue("lower('HELLO')", "hello");
   TestStringValue("lower('Hello')", "hello");
@@ -1694,6 +1703,30 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("rtrim('   abcdefg')", "   abcdefg");
   TestStringValue("rtrim('abc  defg')", "abc  defg");
   TestIsNull("rtrim(NULL)", TYPE_STRING);
+
+  TestStringValue("btrim('     abcdefg   ')", "abcdefg");
+  TestStringValue("btrim('     abcdefg')", "abcdefg");
+  TestStringValue("btrim('abcdefg      ')", "abcdefg");
+  TestStringValue("btrim('abcdefg')", "abcdefg");
+  TestStringValue("btrim('abc defg')", "abc defg");
+  TestStringValue("btrim('        ')", "");
+  TestStringValue("btrim(',')", ",");
+  TestIsNull("btrim(NULL)", TYPE_STRING);
+
+  TestStringValue("btrim('%%%%%abcdefg%%%%%', '%')", "abcdefg");
+  TestStringValue("btrim('%%%%%abcdefg', '%')", "abcdefg");
+  TestStringValue("btrim('abcdefg%%%%%', '%')", "abcdefg");
+  TestStringValue("btrim('abc%%defg%%%%%', '%')", "abc%%defg");
+  TestStringValue("btrim('abcdefg', 'abc')", "defg");
+  TestStringValue("btrim('abacdefg', 'abc')", "defg");
+  TestStringValue("btrim('abacdefgcab', 'abc')", "defg");
+  TestStringValue("btrim('abcacbbacbcacabcba', 'abc')", "");
+  TestStringValue("btrim('', 'abc')", "");
+  TestStringValue("btrim('abcdefg', NULL)", "abcdefg");
+  TestStringValue("btrim('abcdabcdabc', 'abc')", "dabcd");
+  TestStringValue("btrim('aaaaaaaaa', 'a')", "");
+  TestStringValue("btrim('abcdefg', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabg')", "cdef");
+  TestStringValue("btrim('æeioü','æü')", "eio");
 
   TestStringValue("space(0)", "");
   TestStringValue("space(-1)", "");
