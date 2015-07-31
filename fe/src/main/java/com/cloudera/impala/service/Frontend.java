@@ -1014,8 +1014,9 @@ public class Frontend {
     Map<TableId, Table> tableIds = Maps.newHashMap();
     Collection<TupleDescriptor> tupleDescs = analyzer.getDescTbl().getTupleDescs();
     for (TupleDescriptor desc: tupleDescs) {
+      // Skip if tuple descriptor did not come from materializing scan.
+      if (!desc.isMaterialized()) continue;
       Table table = desc.getTable();
-      // Tuple not materialized by scan, so no associated table descriptor.
       if (table == null) continue;
       Table otherTable = tableIds.get(table.getId());
       if (otherTable == table) continue; // Same table referenced twice
