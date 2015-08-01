@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Targeted Impala tests for different tuple delimiters, field delimiters,
 # and escape characters.

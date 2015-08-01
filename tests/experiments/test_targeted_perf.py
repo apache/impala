@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Targeted performance tests.
 # These queries are already run as part of our performance benchmarking.

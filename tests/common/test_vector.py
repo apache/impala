@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # A TextMatrix is used to generate a set of TestVectors. The vectors that are generated
 # are based on one or more TestDimensions inputs. These lists define the set of

@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (c) 2015 Cloudera, Inc. All rights reserved.
 #
 # This test suite validates the scanners by running queries against ALL file formats and

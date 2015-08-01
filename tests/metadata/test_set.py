@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (c) 2014 Cloudera, Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

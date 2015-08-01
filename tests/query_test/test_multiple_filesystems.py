@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (c) 2015 Cloudera, Inc. All rights reserved.
 # Validates table stored on the LocalFileSystem.
 #
