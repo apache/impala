@@ -350,6 +350,8 @@ public class MetadataOp {
         for (int k = 0; k < dbsMetadata.columns.get(i).get(j).size(); ++k) {
           Column column = dbsMetadata.columns.get(i).get(j).get(k);
           Type colType = column.getType();
+          String colTypeName = getHs2MetadataTypeName(colType);
+
           TResultRow row = new TResultRow();
           row.colVals = Lists.newArrayList();
           row.colVals.add(NULL_COL_VAL); // TABLE_CAT
@@ -357,8 +359,7 @@ public class MetadataOp {
           row.colVals.add(createTColumnValue(tabName)); // TABLE_NAME
           row.colVals.add(createTColumnValue(column.getName())); // COLUMN_NAME
           row.colVals.add(createTColumnValue(colType.getJavaSqlType())); // DATA_TYPE
-          row.colVals.add(
-              createTColumnValue(colType.getPrimitiveType().name())); // TYPE_NAME
+          row.colVals.add(createTColumnValue(colTypeName)); // TYPE_NAME
           row.colVals.add(createTColumnValue(colType.getColumnSize())); // COLUMN_SIZE
           row.colVals.add(NULL_COL_VAL); // BUFFER_LENGTH, unused
           // DECIMAL_DIGITS
@@ -386,6 +387,27 @@ public class MetadataOp {
     }
     LOG.debug("Returning " + result.rows.size() + " table columns");
     return result;
+  }
+
+  /**
+   * Returns the string representation of the given Impala column type to populate the
+   * TYPE_NAME column of the result set returned by a HiveServer2 GetColumns() request.
+   *
+   * To be consistent with Hive's behavior, the TYPE_NAME field is populated with the
+   * primitive type name for scalar types, and with the full toSql() for complex types.
+   * The resulting type names are somewhat inconsistent, because nested types are printed
+   * differently than top-level types, e.g.:
+   * toSql()                     TYPE_NAME
+   * DECIMAL(10,10)         -->  DECIMAL
+   * CHAR(10)               -->  CHAR
+   * VARCHAR(10)            -->  VARCHAR
+   * ARRAY<DECIMAL(10,10)>  -->  ARRAY<DECIMAL(10,10)>
+   * ARRAY<CHAR(10)>        -->  ARRAY<CHAR(10)>
+   * ARRAY<VARCHAR(10)>     -->  ARRAY<VARCHAR(10)>
+   */
+  private static String getHs2MetadataTypeName(Type colType) {
+    if (colType.isScalarType()) return colType.getPrimitiveType().toString();
+    return colType.toSql();
   }
 
   /**

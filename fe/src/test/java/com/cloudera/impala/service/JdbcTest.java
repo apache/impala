@@ -8,6 +8,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.StringReader;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -15,13 +16,19 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.cloudera.impala.analysis.CreateTableStmt;
+import com.cloudera.impala.analysis.SqlParser;
+import com.cloudera.impala.analysis.SqlScanner;
 import com.cloudera.impala.testutil.ImpalaJdbcClient;
+import com.google.common.collect.Lists;
 
 /**
  * JdbcTest
@@ -32,6 +39,9 @@ import com.cloudera.impala.testutil.ImpalaJdbcClient;
  */
 public class JdbcTest {
   private static Connection con_;
+
+  // Test-local list of test tables. These are cleaned up in @After.
+  private final List<String> testTableNames_ = Lists.newArrayList();
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -58,6 +68,46 @@ public class JdbcTest {
 
     assertNotNull("createStatement() on closed connection should throw exception",
         expectedException);
+  }
+
+  protected void addTestTable(String createTableSql) throws Exception {
+    // Parse the stmt to extract the table name. We do this first to ensure
+    // that we do not execute arbitrary SQL here and pollute the test setup.
+    SqlScanner input = new SqlScanner(new StringReader(createTableSql));
+    SqlParser parser = new SqlParser(input);
+    Object result = parser.parse().value;
+    if (!(result instanceof CreateTableStmt)) {
+      throw new Exception("Given stmt is not a CREATE TABLE stmt: " + createTableSql);
+    }
+
+    // Execute the stmt.
+    Statement stmt = con_.createStatement();
+    try {
+      stmt.execute(createTableSql);
+    } finally {
+      stmt.close();
+    }
+
+    // Once the stmt was executed successfully, add the fully-qualified table name
+    // for cleanup in @After.
+    CreateTableStmt parsedStmt = (CreateTableStmt) result;
+    testTableNames_.add(parsedStmt.getTblName().toString());
+  }
+
+  protected void dropTestTable(String tableName) throws SQLException {
+    Statement stmt = con_.createStatement();
+    try {
+      stmt.execute("DROP TABLE " + tableName);
+    } finally {
+      stmt.close();
+    }
+  }
+
+  @After
+  public void testCleanUp() throws SQLException {
+    for (String tableName: testTableNames_) {
+      dropTestTable(tableName);
+    }
   }
 
   @Test
@@ -134,7 +184,7 @@ public class JdbcTest {
   }
 
   @Test
-  public void testMetaDataGetColumns() throws SQLException {
+  public void testMetaDataGetColumns() throws Exception {
     // It should return alltypessmall.string_col.
     ResultSet rs = con_.getMetaData().getColumns(null,
         "functional", "alltypessmall", "s%rin%");
@@ -290,6 +340,91 @@ public class JdbcTest {
     assertEquals("Incorrect type", Types.VARCHAR, rs.getInt("DATA_TYPE"));
     assertEquals(32, rs.getInt("COLUMN_SIZE"));
     assertFalse(rs.next());
+    rs.close();
+
+    // Validate complex types STRUCT/MAP/ARRAY.
+    // To be consistent with Hive's behavior, the TYPE_NAME field is populated
+    // with the primitive type name for scalar types, and with the full toSql()
+    // for complex types. The resulting type names are somewhat inconsistent,
+    // because nested types are printed differently than top-level types, e.g.:
+    // toSql()                     TYPE_NAME
+    // DECIMAL(10,10)         -->  DECIMAL
+    // CHAR(10)               -->  CHAR
+    // VARCHAR(10)            -->  VARCHAR
+    // ARRAY<DECIMAL(10,10)>  -->  ARRAY<DECIMAL(10,10)>
+    // ARRAY<CHAR(10)>        -->  ARRAY<CHAR(10)>
+    // ARRAY<VARCHAR(10)>     -->  ARRAY<VARCHAR(10)>
+    addTestTable("create table default.jdbc_complex_type_test (" +
+        "s struct<f1:int,f2:char(4),f3:varchar(5),f4:decimal(10,10)>," +
+        "a1 array<int>," +
+        "a2 array<char(4)>," +
+        "a3 array<varchar(5)>," +
+        "a4 array<decimal(10,10)>," +
+        "m1 map<int,string>," +
+        "m2 map<string,char(4)>," +
+        "m3 map<bigint,varchar(5)>," +
+        "m4 map<boolean,decimal(10,10)>)");
+    rs = con_.getMetaData().getColumns(null, "default", "jdbc_complex_type_test", null);
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.STRUCT, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type name",
+        "STRUCT<f1:INT,f2:CHAR(4),f3:VARCHAR(5),f4:DECIMAL(10,10)>",
+        rs.getString("TYPE_NAME"));
+    assertEquals(0, rs.getInt("COLUMN_SIZE"));
+    assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(0, rs.getInt("NUM_PREC_RADIX"));
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.ARRAY, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type name", "ARRAY<INT>", rs.getString("TYPE_NAME"));
+    assertEquals(0, rs.getInt("COLUMN_SIZE"));
+    assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(0, rs.getInt("NUM_PREC_RADIX"));
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.ARRAY, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type name", "ARRAY<CHAR(4)>", rs.getString("TYPE_NAME"));
+    assertEquals(0, rs.getInt("COLUMN_SIZE"));
+    assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(0, rs.getInt("NUM_PREC_RADIX"));
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.ARRAY, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type name", "ARRAY<VARCHAR(5)>", rs.getString("TYPE_NAME"));
+    assertEquals(0, rs.getInt("COLUMN_SIZE"));
+    assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(0, rs.getInt("NUM_PREC_RADIX"));
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.ARRAY, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type name", "ARRAY<DECIMAL(10,10)>",
+        rs.getString("TYPE_NAME"));
+    assertEquals(0, rs.getInt("COLUMN_SIZE"));
+    assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(0, rs.getInt("NUM_PREC_RADIX"));
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.ARRAY, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type name", "MAP<INT,STRING>", rs.getString("TYPE_NAME"));
+    assertEquals(0, rs.getInt("COLUMN_SIZE"));
+    assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(0, rs.getInt("NUM_PREC_RADIX"));
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.ARRAY, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type name", "MAP<STRING,CHAR(4)>",
+        rs.getString("TYPE_NAME"));
+    assertEquals(0, rs.getInt("COLUMN_SIZE"));
+    assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(0, rs.getInt("NUM_PREC_RADIX"));
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.ARRAY, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type name", "MAP<BIGINT,VARCHAR(5)>",
+        rs.getString("TYPE_NAME"));
+    assertEquals(0, rs.getInt("COLUMN_SIZE"));
+    assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(0, rs.getInt("NUM_PREC_RADIX"));
+    assertTrue(rs.next());
+    assertEquals("Incorrect type", Types.ARRAY, rs.getInt("DATA_TYPE"));
+    assertEquals("Incorrect type name", "MAP<BOOLEAN,DECIMAL(10,10)>",
+        rs.getString("TYPE_NAME"));
+    assertEquals(0, rs.getInt("COLUMN_SIZE"));
+    assertEquals(0, rs.getInt("DECIMAL_DIGITS"));
+    assertEquals(0, rs.getInt("NUM_PREC_RADIX"));
     rs.close();
   }
 

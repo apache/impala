@@ -490,10 +490,12 @@ public abstract class Type {
    * Returns the java SQL type enum
    */
   public int getJavaSqlType() {
-    if (!isScalarType()) {
-      Preconditions.checkArgument(false, "Invalid non-scalar type " + toSql());
-      return 0;
-    }
+    if (isStructType()) return java.sql.Types.STRUCT;
+    // Both MAP and ARRAY are reported as ARRAY, since there is no better matching
+    // Java SQL type. This behavior is consistent with Hive.
+    if (isCollectionType()) return java.sql.Types.ARRAY;
+
+    Preconditions.checkState(isScalarType(), "Invalid non-scalar type: " + toSql());
     ScalarType t = (ScalarType) this;
     switch (t.getPrimitiveType()) {
       case NULL_TYPE: return java.sql.Types.NULL;
