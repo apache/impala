@@ -248,13 +248,17 @@ PartitionedHashJoinNode::Partition::Partition(RuntimeState* state,
   : parent_(parent),
     is_closed_(false),
     is_spilled_(false),
-    level_(level),
-    build_rows_(state->obj_pool()->Add(new BufferedTupleStream(
-        state, parent_->child(1)->row_desc(), state->block_mgr(),
-        parent_->block_mgr_client_, use_small_buffers))),
-    probe_rows_(state->obj_pool()->Add(new BufferedTupleStream(
-        state, parent_->child(0)->row_desc(),
-        state->block_mgr(), parent_->block_mgr_client_, use_small_buffers))) {
+    level_(level) {
+  BufferedTupleStream* build = new BufferedTupleStream(
+      state, parent_->child(1)->row_desc(), state->block_mgr(),
+      parent_->block_mgr_client_, use_small_buffers);
+  DCHECK(build != NULL);
+  build_rows_ = state->obj_pool()->Add(build);
+  BufferedTupleStream* probe = new BufferedTupleStream(
+      state, parent_->child(0)->row_desc(),
+      state->block_mgr(), parent_->block_mgr_client_, use_small_buffers);
+  DCHECK(probe != NULL);
+  probe_rows_ = state->obj_pool()->Add(probe);
 }
 
 PartitionedHashJoinNode::Partition::~Partition() {
@@ -672,9 +676,10 @@ Status PartitionedHashJoinNode::NextSpilledProbeRowBatch(
       // In case of right-outer, right-anti and full-outer joins, we move this partition
       // to the list of partitions that we need to output their unmatched build rows.
       DCHECK(output_build_partitions_.empty());
-      if (input_partition_->build_rows()->num_rows() > 0) {
+      BufferedTupleStream* build_rows = input_partition_->build_rows();
+      if (build_rows->num_rows() > 0) {
         DCHECK(input_partition_->hash_tbl_.get() != NULL) << " id: " << id_
-            << " Build: " << input_partition_->build_rows()->num_rows()
+            << " Build: " << build_rows->num_rows()
             << " Probe: " << probe_rows->num_rows() << endl
             << GetStackTrace();
         hash_tbl_iterator_ =
