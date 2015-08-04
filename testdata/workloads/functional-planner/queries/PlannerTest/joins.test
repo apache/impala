@@ -977,7 +977,7 @@ on a.id = b.x and a.id = b.tinyint_col and
 ====
 # Test correct removal of redundant join predicates (IMPALA-1353):
 # No predicates are removed from the On-clause. The resulting plan is correct
-# but inconsistent with Impala's behavior for other queries.
+# but inconsistent with behavior of Impala behavior for other queries.
 # TODO: Investigate why the equivalence class computation appears to not
 # work for the slots of tables a and b. We expect predicates such as
 # 'id+id = tinyint_col' to be assigned in the union operands.

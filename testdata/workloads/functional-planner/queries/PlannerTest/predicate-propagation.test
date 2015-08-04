@@ -1,4 +1,4 @@
-# non-executable predicates (due to casting, as in this case) aren't propagated
+# Non-executable predicates (due to casting, as in this case) are not propagated
 select straight_join count(*)
 from functional.alltypes a join functional.alltypes b on (a.double_col = b.bigint_col)
 where b.bigint_col div 2 = 0
@@ -215,25 +215,27 @@ NODE 2:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
 ---- DISTRIBUTEDPLAN
-07:EXCHANGE [UNPARTITIONED]
+08:EXCHANGE [UNPARTITIONED]
 |
-04:HASH JOIN [INNER JOIN, BROADCAST]
+04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: b.smallint_col = c.int_col, b.id = c.id, b.year = c.year, b.month = c.month
 |
-|--06:EXCHANGE [BROADCAST]
+|--07:EXCHANGE [HASH(c.int_col,c.id,c.year,c.month)]
 |  |
 |  02:SCAN HDFS [functional.alltypestiny c]
 |     partitions=2/4 files=2 size=230B
 |     predicates: c.id = 17, CAST(sin(c.int_col) AS BOOLEAN) = TRUE
 |
-03:HASH JOIN [INNER JOIN, BROADCAST]
+03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: a.tinyint_col = b.smallint_col, a.id = b.id, a.year = b.year, a.month = b.month
 |
-|--05:EXCHANGE [BROADCAST]
+|--06:EXCHANGE [HASH(b.smallint_col,b.id,b.year,b.month)]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall b]
 |     partitions=2/4 files=2 size=3.16KB
 |     predicates: b.id = 17, CAST(sin(b.smallint_col) AS BOOLEAN) = TRUE
+|
+05:EXCHANGE [HASH(a.tinyint_col,a.id,a.year,a.month)]
 |
 00:SCAN HDFS [functional.alltypes a]
    partitions=2/24 files=2 size=38.07KB
@@ -278,25 +280,27 @@ NODE 2:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
 ---- DISTRIBUTEDPLAN
-07:EXCHANGE [UNPARTITIONED]
+08:EXCHANGE [UNPARTITIONED]
 |
-04:HASH JOIN [INNER JOIN, BROADCAST]
+04:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: functional.alltypessmall.smallint_col = functional.alltypestiny.int_col, functional.alltypessmall.id = functional.alltypestiny.id, functional.alltypessmall.year = functional.alltypestiny.year, functional.alltypessmall.month = functional.alltypestiny.month
 |
-|--06:EXCHANGE [BROADCAST]
+|--07:EXCHANGE [HASH(functional.alltypestiny.int_col,functional.alltypestiny.id,functional.alltypestiny.year,functional.alltypestiny.month)]
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
 |     partitions=2/4 files=2 size=230B
 |     predicates: functional.alltypestiny.id = 17, CAST(sin(functional.alltypestiny.int_col) AS BOOLEAN) = TRUE
 |
-03:HASH JOIN [INNER JOIN, BROADCAST]
+03:HASH JOIN [INNER JOIN, PARTITIONED]
 |  hash predicates: functional.alltypes.tinyint_col = functional.alltypessmall.smallint_col, functional.alltypes.id = functional.alltypessmall.id, functional.alltypes.year = functional.alltypessmall.year, functional.alltypes.month = functional.alltypessmall.month
 |
-|--05:EXCHANGE [BROADCAST]
+|--06:EXCHANGE [HASH(functional.alltypessmall.smallint_col,functional.alltypessmall.id,functional.alltypessmall.year,functional.alltypessmall.month)]
 |  |
 |  01:SCAN HDFS [functional.alltypessmall]
 |     partitions=2/4 files=2 size=3.16KB
 |     predicates: functional.alltypessmall.id = 17, CAST(sin(functional.alltypessmall.smallint_col) AS BOOLEAN) = TRUE
+|
+05:EXCHANGE [HASH(functional.alltypes.tinyint_col,functional.alltypes.id,functional.alltypes.year,functional.alltypes.month)]
 |
 00:SCAN HDFS [functional.alltypes]
    partitions=2/24 files=2 size=38.07KB
@@ -852,8 +856,8 @@ ON a.id=b.id
    partitions=24/24 files=24 size=478.45KB
 ====
 # TODO: Remove the following limitation in our predicate propagation:
-# It is safe to propagate 'y.id is null' to y's scan, but we prevent it
-# because b is outer joined and b's slots are in the same equivalence
+# It is safe to propagate 'y.id is null' to the scan of y, but we prevent
+# it because b is outer joined and b's slots are in the same equivalence
 # class as y's slots. We do not recognize that b is in a parent block
 # and therefore does not affect the correctness of propagating
 # predicates in child blocks ('x.id is null').
@@ -1164,4 +1168,33 @@ where v.int_col = 10
 01:SCAN HDFS [functional.alltypesagg b]
    partitions=11/11 files=11 size=814.73KB
    predicates: b.int_col = 10
+====
+# Tests propagation of cardinality estimation of SCAN HDFS node with small
+# initial cardinality and low selectivity (IMPALA-2165). If any of the
+# inputs of the CROSS JOIN is 0, then the cardinality of that node will be 0
+# and the LOJ will be inverted to a ROJ.
+SELECT count(*) FROM
+ (SELECT * from tpch_parquet.customer c CROSS JOIN tpch_parquet.nation n
+  WHERE n_name = 'BRAZIL' AND n_regionkey = 1 AND c_custkey % 2 = 0) cn
+ LEFT OUTER JOIN tpch_parquet.region r ON n_regionkey = r_regionkey
+---- PLAN
+05:AGGREGATE [FINALIZE]
+|  output: count(*)
+|
+04:HASH JOIN [LEFT OUTER JOIN]
+|  hash predicates: n.n_regionkey = r_regionkey
+|
+|--03:SCAN HDFS [tpch_parquet.region r]
+|     partitions=1/1 files=1 size=900B
+|     predicates: r.r_regionkey = 1
+|
+02:NESTED LOOP JOIN [CROSS JOIN]
+|
+|--01:SCAN HDFS [tpch_parquet.nation n]
+|     partitions=1/1 files=1 size=2.17KB
+|     predicates: n_name = 'BRAZIL', n_regionkey = 1
+|
+00:SCAN HDFS [tpch_parquet.customer c]
+   partitions=1/1 files=1 size=12.47MB
+   predicates: c_custkey % 2 = 0
 ====

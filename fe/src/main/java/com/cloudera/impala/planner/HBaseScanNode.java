@@ -211,7 +211,7 @@ public class HBaseScanNode extends ScanNode {
     inputCardinality_ = cardinality_;
 
     cardinality_ *= computeSelectivity();
-    cardinality_ = Math.max(0, cardinality_);
+    cardinality_ = Math.max(1, cardinality_);
     cardinality_ = capAtLimit(cardinality_);
     LOG.debug("computeStats HbaseScan: cardinality=" + Long.toString(cardinality_));
 

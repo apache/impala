@@ -742,6 +742,8 @@ public class HdfsScanNode extends ScanNode {
       LOG.debug("cardinality_=" + Long.toString(cardinality_) +
                 " sel=" + Double.toString(computeSelectivity()));
       cardinality_ = Math.round(cardinality_ * computeSelectivity());
+      // IMPALA-2165: Avoid setting the cardinality to 0 after rounding.
+      cardinality_ = Math.max(cardinality_, 1);
     }
     cardinality_ = capAtLimit(cardinality_);
     LOG.debug("computeStats HdfsScan: cardinality_=" + Long.toString(cardinality_));

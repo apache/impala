@@ -195,14 +195,16 @@ select * from functional.alltypes where year=2009 and month in (1, 3, 5, 7)
 00:SCAN HDFS [functional.alltypes]
    partitions=4/24 files=4 size=80.74KB
 ====
-# adding a predicate that always evaluates to true shouldn't change anything
-select * from functional.alltypes where year=2009 and month in (1, 3, 5, 7) and month is not null
+# adding a predicate that always evaluates to true should not change anything
+select * from functional.alltypes
+where year=2009 and month in (1, 3, 5, 7) and month is not null
 ---- PLAN
 00:SCAN HDFS [functional.alltypes]
    partitions=4/24 files=4 size=80.74KB
 ====
 # adding a predicate that always evaluates to false should remove all partitions
-select * from functional.alltypes where year=2009 and month in (1, 3, 5, 7) and month is null
+select * from functional.alltypes
+where year=2009 and month in (1, 3, 5, 7) and month is null
 ---- PLAN
 00:SCAN HDFS [functional.alltypes]
    partitions=0/24 files=0 size=0B
@@ -231,7 +233,8 @@ select * from functional.alltypes where year < 2010 and year < 2009 and month > 
    partitions=0/24 files=0 size=0B
 ====
 # multiple predicates on second key
-select * from functional.alltypes where year < 2010 and (month > 6 or month = 1 or month in (3, 4))
+select * from functional.alltypes
+where year < 2010 and (month > 6 or month = 1 or month in (3, 4))
 ---- PLAN
 00:SCAN HDFS [functional.alltypes]
    partitions=9/24 files=9 size=180.49KB
@@ -243,7 +246,8 @@ select * from functional.alltypes where year = 2009 and month between 6 and 8
    partitions=3/24 files=3 size=60.43KB
 ====
 # between predicates on first and second keys
-select * from functional.alltypes where year between 2009 and 2009 and month between 6 and 8
+select * from functional.alltypes
+where year between 2009 and 2009 and month between 6 and 8
 ---- PLAN
 00:SCAN HDFS [functional.alltypes]
    partitions=3/24 files=3 size=60.43KB
@@ -304,7 +308,8 @@ select * from functional.alltypesagg where month = 1 and (day is null or year = 
    partitions=11/11 files=11 size=814.73KB
 ====
 # partition key predicates which are in conjunctive normal form (case 5)
-select * from functional.alltypesagg where (year = 2010 or month = 1) and (day is not null or day = 10)
+select * from functional.alltypesagg
+where (year = 2010 or month = 1) and (day is not null or day = 10)
 ---- PLAN
 00:SCAN HDFS [functional.alltypesagg]
    partitions=10/11 files=10 size=743.67KB
@@ -328,7 +333,8 @@ select * from functional.alltypesagg where day = 10 or (day is null and year = 2
    partitions=2/11 files=2 size=145.53KB
 ====
 # partition key predicates which are in disjunctive normal form (case 4)
-select * from functional.alltypesagg where (month = 1 and day = 1) or (day is null and year = 2010)
+select * from functional.alltypesagg
+where (month = 1 and day = 1) or (day is null and year = 2010)
 ---- PLAN
 00:SCAN HDFS [functional.alltypesagg]
    partitions=2/11 files=2 size=144.45KB
@@ -358,26 +364,31 @@ select * from functional.alltypesagg where not (day is not null or day < 9)
    partitions=0/11 files=0 size=0B
 ====
 # partition key predicates with negation (case 4)
-select * from functional.alltypesagg where not (day is not null and (not (day < 9 and month = 1)))
+select * from functional.alltypesagg
+where not (day is not null and (not (day < 9 and month = 1)))
 ---- PLAN
 00:SCAN HDFS [functional.alltypesagg]
    partitions=9/11 files=9 size=665.77KB
 ====
 # partition key predicates with negation (case 5)
-select * from functional.alltypesagg where not (day is not null or (day = 1 and (not (month = 1 or year = 2010))))
+select * from functional.alltypesagg
+where not (day is not null or (day = 1 and (not (month = 1 or year = 2010))))
 ---- PLAN
 00:SCAN HDFS [functional.alltypesagg]
    partitions=1/11 files=1 size=71.05KB
 ====
 # partition key predicates where some are evaluated by the index and others are evaluated in the BE
-select * from functional.alltypesagg where year + 1 = 2011 and month + 1 <= 3 and day is null
+select * from functional.alltypesagg
+where year + 1 = 2011 and month + 1 <= 3 and day is null
 ---- PLAN
 00:SCAN HDFS [functional.alltypesagg]
    partitions=1/11 files=1 size=71.05KB
 ====
 # all supported predicates that can be evaluated using partition key index
-select * from functional.alltypesagg where day = 5 or (day >= 1 and day <= 2) or (day > 6 and day < 8) or
-day is null or day in (4) or not(day is not null) or not (day not in (10)) or not (day != 8)
+select * from functional.alltypesagg
+where day = 5 or (day >= 1 and day <= 2) or (day > 6 and day < 8)
+or day is null or day in (4) or not(day is not null)
+or not (day not in (10)) or not (day != 8)
 ---- PLAN
 00:SCAN HDFS [functional.alltypesagg]
    partitions=8/11 files=8 size=591.30KB

@@ -262,7 +262,7 @@ public class DataSourceScanNode extends ScanNode {
     inputCardinality_ = numRowsEstimate_;
     cardinality_ = numRowsEstimate_;
     cardinality_ *= computeSelectivity();
-    cardinality_ = Math.max(0, cardinality_);
+    cardinality_ = Math.max(1, cardinality_);
     cardinality_ = capAtLimit(cardinality_);
 
     LOG.debug("computeStats DataSourceScan: cardinality=" + Long.toString(cardinality_));
