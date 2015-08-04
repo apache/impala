@@ -1,3 +1,4 @@
+#!/usr/bin/env impala-python
 # Copyright (c) Cloudera 2012.
 
 from subprocess import Popen, PIPE

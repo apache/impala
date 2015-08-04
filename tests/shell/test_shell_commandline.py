@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # encoding=utf-8
 # Copyright 2012 Cloudera Inc.
 #

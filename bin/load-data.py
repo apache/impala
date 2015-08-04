@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env impala-python
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #
 # This script is used to load the proper datasets for the specified workloads. It loads

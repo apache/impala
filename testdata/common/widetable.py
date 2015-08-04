@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env impala-python
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 # Functions for creating wide (i.e. many-column) tables. When run from the command line,

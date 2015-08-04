@@ -139,8 +139,8 @@ function load-data {
   fi
   LOG_FILE=${DATA_LOADING_LOG_DIR}/data-load-${WORKLOAD}-${EXPLORATION_STRATEGY}.log
   echo "$MSG. Logging to ${LOG_FILE}"
-  # Use unbuffered logging by executing with 'python -u'
-  python -u ${IMPALA_HOME}/bin/load-data.py ${ARGS[@]} &> ${LOG_FILE}
+  # Use unbuffered logging by executing with -u
+  impala-python -u ${IMPALA_HOME}/bin/load-data.py ${ARGS[@]} &> ${LOG_FILE}
 }
 
 function cache-test-tables {
@@ -159,7 +159,7 @@ function load-aux-workloads {
   rm -f $LOG_FILE
   # Load all the auxiliary workloads (if any exist)
   if [ -d ${IMPALA_AUX_WORKLOAD_DIR} ] && [ -d ${IMPALA_AUX_DATASET_DIR} ]; then
-    python -u ${IMPALA_HOME}/bin/load-data.py --workloads all\
+    impala-python -u ${IMPALA_HOME}/bin/load-data.py --workloads all\
         --workload_dir=${IMPALA_AUX_WORKLOAD_DIR}\
         --dataset_dir=${IMPALA_AUX_DATASET_DIR}\
         --exploration_strategy=core ${LOAD_DATA_ARGS} &>> $LOG_FILE

@@ -84,7 +84,7 @@ $HBASE_HOME/bin/start-hbase.sh 2>&1 | tee ${HBASE_LOGDIR}/hbase-startup.out
 # classpath. ZooKeeper has conflicts with JARs added as part of set-classpath.sh, so
 # generate a valid classpath using the 'hadoop classpath' command.
 export CLASSPATH=`hadoop classpath`
-python ${CLUSTER_BIN}/wait-for-hbase-master.py
+${CLUSTER_BIN}/wait-for-hbase-master.py
 
 $HBASE_HOME/bin/local-regionservers.sh start 1 2 3 2>&1 | \
     tee ${HBASE_LOGDIR}/hbase-rs-startup.out

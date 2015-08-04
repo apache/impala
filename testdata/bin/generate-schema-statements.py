@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env impala-python
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 # This script generates the "CREATE TABLE", "INSERT", and "LOAD" statements for loading

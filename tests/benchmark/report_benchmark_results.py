@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env impala-python
 # Copyright (c) 2014 Cloudera, Inc. All rights reserved.
 #
 # This script provides help with parsing and reporting of perf results. It currently

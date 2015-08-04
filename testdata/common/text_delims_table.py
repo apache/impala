@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env impala-python
 # Copyright (c) 2015 Cloudera, Inc. All rights reserved.
 
 # Functions for generating test files with specific length, and ended with all

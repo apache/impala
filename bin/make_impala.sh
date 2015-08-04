@@ -116,7 +116,7 @@ make
 
 cd $IMPALA_BE_DIR
 # TODO: we need to figure out how to use CMake dependencies properly
-python src/codegen/gen_ir_descriptions.py --noclean
+src/codegen/gen_ir_descriptions.py --noclean
 
 cd $IMPALA_HOME
 if [ $BUILD_TESTS -eq 1 ]

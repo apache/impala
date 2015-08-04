@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env impala-python
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #
 # This script is used to generate test "vectors" based on a dimension input file.

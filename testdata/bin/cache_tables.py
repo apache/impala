@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env impala-python
 #
 # This script will warm up the buffer cache with the tables required to run the input
 # query.  This only works on a mini-dfs cluster.  This is remarkably difficult to do 

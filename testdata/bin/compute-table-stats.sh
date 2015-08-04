@@ -8,16 +8,16 @@ set -u
 COMPUTE_STATS_SCRIPT="${IMPALA_HOME}/tests/util/compute_table_stats.py"
 
 # Run compute stats over as many of the tables used in the Planner tests as possible.
-python ${COMPUTE_STATS_SCRIPT} --db_names=functional\
+${COMPUTE_STATS_SCRIPT} --db_names=functional\
     --table_names="alltypes,alltypesagg,alltypesaggmultifilesnopart,alltypesaggnonulls,
     alltypessmall,alltypestiny,jointbl,dimtbl"
 
 # We cannot load HBase on s3 and isilon yet.
 if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
-  python ${COMPUTE_STATS_SCRIPT} --db_name=functional_hbase\
+  ${COMPUTE_STATS_SCRIPT} --db_name=functional_hbase\
     --table_names="alltypessmall,stringids"
 fi
-python ${COMPUTE_STATS_SCRIPT} --db_names=tpch,tpch_parquet \
+${COMPUTE_STATS_SCRIPT} --db_names=tpch,tpch_parquet \
     --table_names=customer,lineitem,nation,orders,part,partsupp,region,supplier
-python ${COMPUTE_STATS_SCRIPT} --db_names=tpch_nested_parquet
-python ${COMPUTE_STATS_SCRIPT} --db_names=tpcds
+${COMPUTE_STATS_SCRIPT} --db_names=tpch_nested_parquet
+${COMPUTE_STATS_SCRIPT} --db_names=tpcds

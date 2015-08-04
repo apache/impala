@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env impala-python
 # encoding=utf-8
 # Copyright 2014 Cloudera Inc.
 #
