@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.util;
 
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -35,6 +36,7 @@ import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.cloudera.impala.thrift.TPrivilege;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 /**
@@ -52,7 +54,7 @@ import com.google.common.collect.Sets;
 public class SentryProxy {
   private static final Logger LOG = Logger.getLogger(SentryProxy.class);
 
-  // Used to periodically poll the Sentry service and updates the catalog with any
+  // Used to periodically poll the Sentry Service and updates the catalog with any
   // changes.
   private final ScheduledExecutorService policyReader_ =
       Executors.newScheduledThreadPool(1);
@@ -248,48 +250,72 @@ public class SentryProxy {
   }
 
   /**
-   * Grants the privileges on a role using the Sentry Service and updates the Impala
-   * catalog. If the RPC to the Sentry Service fails the Impala catalog will not
-   * be modified. Returns the new privilege.
+   * Grants privileges to a role in the Sentry Service and updates the Impala
+   * catalog. If the RPC to the Sentry Service fails, the Impala catalog will not
+   * be modified. Returns the granted privileges.
    * Throws exception if there was any error updating the Sentry Service or if the Impala
    * catalog does not contain the given role name.
    */
-  public synchronized RolePrivilege grantRolePrivilege(User user, String roleName,
-      TPrivilege privilege) throws ImpalaException {
-    sentryPolicyService_.grantRolePrivilege(user, roleName, privilege);
-    return catalog_.addRolePrivilege(roleName, privilege);
+  public synchronized List<RolePrivilege> grantRolePrivileges(User user,
+      String roleName, List<TPrivilege> privileges) throws ImpalaException {
+    sentryPolicyService_.grantRolePrivileges(user, roleName, privileges);
+    // Update the catalog
+    List<RolePrivilege> rolePrivileges = Lists.newArrayList();
+    for (TPrivilege privilege: privileges) {
+      rolePrivileges.add(catalog_.addRolePrivilege(roleName, privilege));
+    }
+    return rolePrivileges;
   }
 
   /**
-   * Revokes a privileges on a role using the Sentry Service and updates the Impala
+   * Revokes privileges from a role in the Sentry Service and updates the Impala
    * catalog. If the RPC to the Sentry Service fails the Impala catalog will not be
-   * modified.
-   * Returns the removed privilege, or null if the privilege did not exist. Throws an
-   * exception if there was any error updating the Sentry Service or if the Impala
-   * catalog does not contain the given role name.
+   * modified. Returns the removed privileges. Throws an exception if there was any error
+   * updating the Sentry Service or if the Impala catalog does not contain the given role
+   * name.
    */
-  public synchronized RolePrivilege revokeRolePrivilege(User user, String roleName,
-      TPrivilege privilege) throws ImpalaException {
-    if (!privilege.isHas_grant_opt()) {
-      sentryPolicyService_.revokeRolePrivilege(user, roleName, privilege);
-      return catalog_.removeRolePrivilege(roleName, privilege);
-    } else {
-      // If the REVOKE GRANT OPTION has been specified the privilege should not be
-      // removed, it should just be updated to clear the GRANT OPTION flag.
-      RolePrivilege existingPriv = catalog_.getRolePrivilege(roleName, privilege);
-      if (existingPriv == null || !existingPriv.toThrift().isHas_grant_opt()) {
-        // Nothing to do. The privilege doesn't exist or the grant option flag is not set
-        return existingPriv;
+  public synchronized List<RolePrivilege> revokeRolePrivileges(User user,
+      String roleName, List<TPrivilege> privileges, boolean hasGrantOption)
+      throws ImpalaException {
+    List<RolePrivilege> rolePrivileges = Lists.newArrayList();
+    if (!hasGrantOption) {
+      sentryPolicyService_.revokeRolePrivileges(user, roleName, privileges);
+      // Update the catalog
+      for (TPrivilege privilege: privileges) {
+        RolePrivilege rolePriv = catalog_.removeRolePrivilege(roleName, privilege);
+        if (rolePriv == null) {
+          rolePriv = RolePrivilege.fromThrift(privilege);
+          rolePriv.setCatalogVersion(catalog_.getCatalogVersion());
+        }
+        rolePrivileges.add(rolePriv);
       }
-
-      // Sentry does not yet provide an "alter privilege" API so we need to remove the
-      // privilege and re-add it.
-      sentryPolicyService_.revokeRolePrivilege(user, roleName, privilege);
-      TPrivilege updatedPriv = existingPriv.toThrift();
-      updatedPriv.setHas_grant_opt(false);
-      sentryPolicyService_.grantRolePrivilege(user, roleName, updatedPriv);
-      return catalog_.addRolePrivilege(roleName, updatedPriv);
+    } else {
+      // If the REVOKE GRANT OPTION has been specified, the privileges should not be
+      // removed, they should just be updated to clear the GRANT OPTION flag. Sentry
+      // does not yet provide an "alter privilege" API so we need to revoke the
+      // privileges and re-grant them.
+      sentryPolicyService_.revokeRolePrivileges(user, roleName, privileges);
+      List<TPrivilege> updatedPrivileges = Lists.newArrayList();
+      for (TPrivilege privilege: privileges) {
+        RolePrivilege existingPriv = catalog_.getRolePrivilege(roleName, privilege);
+        if (existingPriv == null) {
+          RolePrivilege rolePriv = RolePrivilege.fromThrift(privilege);
+          rolePriv.setCatalogVersion(catalog_.getCatalogVersion());
+          rolePrivileges.add(rolePriv);
+          continue;
+        }
+        TPrivilege updatedPriv = existingPriv.toThrift();
+        updatedPriv.setHas_grant_opt(false);
+        updatedPrivileges.add(updatedPriv);
+      }
+      // Re-grant the updated privileges.
+      sentryPolicyService_.grantRolePrivileges(user, roleName, updatedPrivileges);
+      // Update the catalog
+      for (TPrivilege updatedPriv: updatedPrivileges) {
+        rolePrivileges.add(catalog_.addRolePrivilege(roleName, updatedPriv));
+      }
     }
+    return rolePrivileges;
   }
 
   /**

@@ -2087,21 +2087,18 @@ public class CatalogOpExecutor {
     Preconditions.checkNotNull(requestingUser);
     verifySentryServiceEnabled();
     String roleName = grantRevokePrivParams.getRole_name();
+    List<TPrivilege> privileges = grantRevokePrivParams.getPrivileges();
+    List<RolePrivilege> rolePrivileges = null;
+    if (grantRevokePrivParams.isIs_grant()) {
+      rolePrivileges = catalog_.getSentryProxy().grantRolePrivileges(requestingUser,
+          roleName, privileges);
+    } else {
+      rolePrivileges = catalog_.getSentryProxy().revokeRolePrivileges(requestingUser,
+          roleName, privileges, grantRevokePrivParams.isHas_grant_opt());
+    }
+    Preconditions.checkNotNull(rolePrivileges);
     List<TCatalogObject> updatedPrivs = Lists.newArrayList();
-    for (TPrivilege privilege: grantRevokePrivParams.getPrivileges()) {
-      RolePrivilege rolePriv;
-      if (grantRevokePrivParams.isIs_grant()) {
-          rolePriv = catalog_.getSentryProxy().grantRolePrivilege(requestingUser,
-              roleName, privilege);
-      } else {
-        rolePriv = catalog_.getSentryProxy().revokeRolePrivilege(requestingUser,
-            roleName, privilege);
-        if (rolePriv == null) {
-          rolePriv = RolePrivilege.fromThrift(privilege);
-          rolePriv.setCatalogVersion(catalog_.getCatalogVersion());
-        }
-      }
-      Preconditions.checkNotNull(rolePriv);
+    for (RolePrivilege rolePriv: rolePrivileges) {
       TCatalogObject catalogObject = new TCatalogObject();
       catalogObject.setType(rolePriv.getCatalogObjectType());
       catalogObject.setPrivilege(rolePriv.toThrift());
@@ -2117,7 +2114,7 @@ public class CatalogOpExecutor {
       // If this is a REVOKE statement with hasGrantOpt, only the GRANT OPTION is revoked
       // from the privilege.
       if (grantRevokePrivParams.isIs_grant() ||
-          grantRevokePrivParams.getPrivileges().get(0).isHas_grant_opt()) {
+          privileges.get(0).isHas_grant_opt()) {
         resp.result.setUpdated_catalog_object(updatedPrivs.get(0));
       } else {
         resp.result.setRemoved_catalog_object(updatedPrivs.get(0));

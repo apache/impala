@@ -2860,8 +2860,27 @@ public class ParserTest {
       ParsesOk(String.format("%s INSERT ON URI 'foo' %s  myRole", formatStr));
 
       ParsesOk(String.format("%s SELECT ON TABLE foo %s myRole", formatStr));
+      ParserError(String.format("%s SELECT ON TABLE %s myRole", formatStr));
       ParsesOk(String.format("%s SELECT ON DATABASE foo %s myRole", formatStr));
-      ParsesOk(String.format("%s SELECT ON URI 'foo' %s  myRole", formatStr));
+      ParserError(String.format("%s SELECT ON DATABASE %s myRole", formatStr));
+      ParsesOk(String.format("%s SELECT ON URI 'foo' %s myRole", formatStr));
+      ParserError(String.format("%s SELECT ON URI %s myRole", formatStr));
+
+      // Column-level authorization on TABLE scope
+      ParsesOk(String.format("%s SELECT (a, b) ON TABLE foo %s myRole", formatStr));
+      ParsesOk(String.format("%s SELECT () ON TABLE foo %s myRole", formatStr));
+      ParsesOk(String.format("%s INSERT (a, b) ON TABLE foo %s myRole", formatStr));
+      ParsesOk(String.format("%s ALL (a, b) ON TABLE foo %s myRole", formatStr));
+      ParserError(String.format("%s SELECT (*) ON TABLE foo %s myRole", formatStr));
+
+      ParserError(String.format("%s SELECT (a,) ON TABLE foo %s myRole", formatStr));
+      ParserError(String.format("%s SELECT a, b ON TABLE foo %s myRole", formatStr));
+      ParserError(String.format("%s SELECT (a), b ON TABLE foo %s myRole", formatStr));
+      ParserError(String.format("%s SELECT ON TABLE (a, b) foo %s myRole", formatStr));
+      ParserError(String.format("%s SELECT ((a)) ON TABLE foo %s myRole", formatStr));
+      ParserError(String.format("%s SELECT (a, b) ON DATABASE foo %s myRole",
+          formatStr));
+      ParserError(String.format("%s SELECT (a, b) ON URI 'foo' %s myRole", formatStr));
 
       // Server scope does not accept a name.
       ParsesOk(String.format("%s ALL ON SERVER %s myRole", formatStr));

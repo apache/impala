@@ -27,6 +27,7 @@ import org.apache.sentry.service.thrift.SentryServiceClientFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.PrivilegeSpec;
 import com.cloudera.impala.authorization.SentryConfig;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
@@ -36,6 +37,8 @@ import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TPrivilege;
 import com.cloudera.impala.thrift.TPrivilegeLevel;
 import com.cloudera.impala.thrift.TPrivilegeScope;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
@@ -177,7 +180,6 @@ public class SentryPolicyService {
     }
   }
 
-
   /**
    * Removes a role from a group.
    *
@@ -206,6 +208,14 @@ public class SentryPolicyService {
   }
 
   /**
+   * Grants a privilege to an existing role.
+   */
+  public void grantRolePrivilege(User requestingUser, String roleName,
+      TPrivilege privilege) throws ImpalaException {
+    grantRolePrivileges(requestingUser, roleName, Lists.newArrayList(privilege));
+  }
+
+  /**
    * Grants privileges to an existing role.
    *
    * @param requestingUser - The requesting user.
@@ -213,14 +223,25 @@ public class SentryPolicyService {
    * @param privilege - The privilege to grant.
    * @throws ImpalaException - On any error
    */
-  public void grantRolePrivilege(User requestingUser, String roleName,
-      TPrivilege privilege) throws ImpalaException {
-    LOG.trace(String.format("Granting role '%s' privilege '%s' on '%s' on behalf of: %s",
-        roleName, privilege.toString(), privilege.getScope().toString(),
+  public void grantRolePrivileges(User requestingUser, String roleName,
+      List<TPrivilege> privileges) throws ImpalaException {
+    Preconditions.checkState(!privileges.isEmpty());
+    TPrivilege privilege = privileges.get(0);
+    TPrivilegeScope scope = privilege.getScope();
+    LOG.trace(String.format("Granting role '%s' '%s' privilege on '%s' on behalf of: %s",
+        roleName, privilege.getPrivilege_level().toString(), scope.toString(),
         requestingUser.getName()));
+    // Verify that all privileges have the same scope.
+    for (int i = 1; i < privileges.size(); ++i) {
+      Preconditions.checkState(privileges.get(i).getScope() == scope, "All the " +
+          "privileges must have the same scope.");
+    }
+    Preconditions.checkState(scope == TPrivilegeScope.COLUMN || privileges.size() == 1,
+        "Cannot grant multiple " + scope + " privileges with a singe RPC to the " +
+        "Sentry Service.");
     SentryServiceClient client = new SentryServiceClient();
     try {
-      switch (privilege.getScope()) {
+      switch (scope) {
         case SERVER:
           client.get().grantServerPrivilege(requestingUser.getShortName(), roleName,
               privilege.getServer_name(), privilege.isHas_grant_opt());
@@ -232,12 +253,16 @@ public class SentryPolicyService {
               privilege.isHas_grant_opt());
           break;
         case TABLE:
-          String tblName = privilege.getTable_name();
-          String dbName = privilege.getDb_name();
           client.get().grantTablePrivilege(requestingUser.getShortName(), roleName,
-              privilege.getServer_name(), dbName, tblName,
-              privilege.getPrivilege_level().toString(),
+              privilege.getServer_name(), privilege.getDb_name(),
+              privilege.getTable_name(), privilege.getPrivilege_level().toString(),
               privilege.isHas_grant_opt());
+          break;
+        case COLUMN:
+          client.get().grantColumnsPrivileges(requestingUser.getShortName(), roleName,
+              privilege.getServer_name(), privilege.getDb_name(),
+              privilege.getTable_name(), getColumnNames(privileges),
+              privilege.getPrivilege_level().toString(), privilege.isHas_grant_opt());
           break;
         case URI:
           client.get().grantURIPrivilege(requestingUser.getShortName(),
@@ -257,21 +282,40 @@ public class SentryPolicyService {
   }
 
   /**
-   * Revokes privileges from an existing role.
-   *
-   * @param requestingUser - The requesting user.
-   * @param roleName - The role to grant privileges to (case insensitive).
-   * @param privilege - The privilege to grant to the object.
-   * @throws ImpalaException - On any error
+   * Revokes a privilege from an existing role.
    */
   public void revokeRolePrivilege(User requestingUser, String roleName,
       TPrivilege privilege) throws ImpalaException {
-    LOG.trace(String.format("Revoking role '%s' privilege '%s' on '%s' on behalf of: %s",
-        roleName, privilege.toString(), privilege.getScope().toString(),
-        requestingUser.getName()));
+    revokeRolePrivileges(requestingUser, roleName, Lists.newArrayList(privilege));
+  }
+
+  /**
+   * Revokes privileges from an existing role.
+   *
+   * @param requestingUser - The requesting user.
+   * @param roleName - The role to revoke privileges from (case insensitive).
+   * @param privilege - The privilege to revoke.
+   * @throws ImpalaException - On any error
+   */
+  public void revokeRolePrivileges(User requestingUser, String roleName,
+      List<TPrivilege> privileges) throws ImpalaException {
+    Preconditions.checkState(!privileges.isEmpty());
+    TPrivilege privilege = privileges.get(0);
+    TPrivilegeScope scope = privilege.getScope();
+    LOG.trace(String.format("Revoking from role '%s' '%s' privilege on '%s' on " +
+        "behalf of: %s", roleName, privilege.getPrivilege_level().toString(),
+        scope.toString(), requestingUser.getName()));
+    // Verify that all privileges have the same scope.
+    for (int i = 1; i < privileges.size(); ++i) {
+      Preconditions.checkState(privileges.get(i).getScope() == scope, "All the " +
+          "privileges must have the same scope.");
+    }
+    Preconditions.checkState(scope == TPrivilegeScope.COLUMN || privileges.size() == 1,
+        "Cannot revoke multiple " + scope + " privileges with a singe RPC to the " +
+        "Sentry Service.");
     SentryServiceClient client = new SentryServiceClient();
     try {
-      switch (privilege.getScope()) {
+      switch (scope) {
         case SERVER:
           client.get().revokeServerPrivilege(requestingUser.getShortName(), roleName,
               privilege.getServer_name(), privilege.getPrivilege_level().toString());
@@ -282,12 +326,16 @@ public class SentryPolicyService {
               privilege.getPrivilege_level().toString(), null);
           break;
         case TABLE:
-          String tblName = privilege.getTable_name();
-          String dbName = privilege.getDb_name();
           client.get().revokeTablePrivilege(requestingUser.getShortName(), roleName,
-              privilege.getServer_name(), dbName, tblName,
-              privilege.getPrivilege_level().toString(),
+              privilege.getServer_name(), privilege.getDb_name(),
+              privilege.getTable_name(), privilege.getPrivilege_level().toString(),
               null);
+          break;
+        case COLUMN:
+          client.get().revokeColumnsPrivilege(requestingUser.getShortName(), roleName,
+              privilege.getServer_name(), privilege.getDb_name(),
+              privilege.getTable_name(), getColumnNames(privileges),
+              privilege.getPrivilege_level().toString(), null);
           break;
         case URI:
           client.get().revokeURIPrivilege(requestingUser.getShortName(),
@@ -304,6 +352,24 @@ public class SentryPolicyService {
     } finally {
       client.close();
     }
+  }
+
+  /**
+   * Returns the column names referenced in a list of column-level privileges.
+   * Verifies that all column-level privileges refer to the same table.
+   */
+  private List<String> getColumnNames(List<TPrivilege> privileges) {
+    List<String> columnNames = Lists.newArrayList();
+    String tablePath = PrivilegeSpec.getTablePath(privileges.get(0));
+    columnNames.add(privileges.get(0).getColumn_name());
+    // Collect all column names and verify that they belong to the same table.
+    for (int i = 1; i < privileges.size(); ++i) {
+      TPrivilege privilege = privileges.get(i);
+      Preconditions.checkState(tablePath.equals(PrivilegeSpec.getTablePath(privilege))
+          && privilege.getScope() == TPrivilegeScope.COLUMN);
+      columnNames.add(privileges.get(i).getColumn_name());
+    }
+    return columnNames;
   }
 
   /**
@@ -371,6 +437,9 @@ public class SentryPolicyService {
     privilege.setServer_name(sentryPriv.getServerName());
     if (sentryPriv.isSetDbName()) privilege.setDb_name(sentryPriv.getDbName());
     if (sentryPriv.isSetTableName()) privilege.setTable_name(sentryPriv.getTableName());
+    if (sentryPriv.isSetColumnName()) {
+      privilege.setColumn_name(sentryPriv.getColumnName());
+    }
     if (sentryPriv.isSetURI()) privilege.setUri(sentryPriv.getURI());
     privilege.setScope(Enum.valueOf(TPrivilegeScope.class,
         sentryPriv.getPrivilegeScope().toUpperCase()));

@@ -14,30 +14,41 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.List;
+
 import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.catalog.DataSourceTable;
 import com.cloudera.impala.catalog.RolePrivilege;
+import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.TableLoadingException;
+import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TPrivilege;
 import com.cloudera.impala.thrift.TPrivilegeLevel;
 import com.cloudera.impala.thrift.TPrivilegeScope;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
 
 /**
- * Represents a privilegeSpec from a GRANT/REVOKE statement.
+ * Represents a privilege spec from a GRANT/REVOKE statement.
+ * A privilege spec may correspond to one or more privileges. Currently, a privilege spec
+ * can represent multiple privileges only at the COLUMN scope.
  */
 public class PrivilegeSpec implements ParseNode {
   private final TPrivilegeScope scope_;
   private final TPrivilegeLevel privilegeLevel_;
   private final TableName tableName_;
   private final HdfsUri uri_;
+  private final List<String> columnNames_;
 
   // Set/modified during analysis
   private String dbName_;
   private String serverName_;
 
   private PrivilegeSpec(TPrivilegeLevel privilegeLevel, TPrivilegeScope scope,
-      String dbName, TableName tableName, HdfsUri uri) {
+      String dbName, TableName tableName, HdfsUri uri, List<String> columnNames) {
     Preconditions.checkNotNull(scope);
     Preconditions.checkNotNull(privilegeLevel);
     privilegeLevel_ = privilegeLevel;
@@ -45,33 +56,62 @@ public class PrivilegeSpec implements ParseNode {
     tableName_ = tableName;
     dbName_ = (tableName_ != null ? tableName_.getDb() : dbName);
     uri_ = uri;
+    columnNames_ = columnNames;
   }
 
   public static PrivilegeSpec createServerScopedPriv(TPrivilegeLevel privilegeLevel) {
-    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.SERVER, null, null, null);
+    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.SERVER, null, null, null,
+        null);
   }
 
   public static PrivilegeSpec createDbScopedPriv(TPrivilegeLevel privilegeLevel,
       String dbName) {
     Preconditions.checkNotNull(dbName);
     return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.DATABASE, dbName, null,
-        null);
+        null, null);
   }
 
   public static PrivilegeSpec createTableScopedPriv(TPrivilegeLevel privilegeLevel,
       TableName tableName) {
     Preconditions.checkNotNull(tableName);
     return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.TABLE, null, tableName,
-        null);
+        null, null);
+  }
+
+  public static PrivilegeSpec createColumnScopedPriv(TPrivilegeLevel privilegeLevel,
+        TableName tableName, List<String> columnNames) {
+    Preconditions.checkNotNull(tableName);
+    Preconditions.checkNotNull(columnNames);
+    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.COLUMN, null, tableName,
+        null, columnNames);
   }
 
   public static PrivilegeSpec createUriScopedPriv(TPrivilegeLevel privilegeLevel,
       HdfsUri uri) {
     Preconditions.checkNotNull(uri);
-    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.URI, null, null, uri);
+    return new PrivilegeSpec(privilegeLevel, TPrivilegeScope.URI, null, null, uri, null);
   }
 
-  public TPrivilege toThrift() {
+  public List<TPrivilege> toThrift() {
+    List<TPrivilege> privileges = Lists.newArrayList();
+    if (scope_ == TPrivilegeScope.COLUMN) {
+      // Create a TPrivilege for every referenced column
+      for (String column: columnNames_) {
+        privileges.add(createTPrivilege(column));
+      }
+    } else {
+      privileges.add(createTPrivilege(null));
+    }
+    return privileges;
+  }
+
+  /**
+   * Helper function to construct a TPrivilege from this privilege spec. If the scope is
+   * COLUMN, 'columnName' must be a non-null column name. Otherwise, 'columnName' is
+   * null.
+   */
+  private TPrivilege createTPrivilege(String columnName) {
+    Preconditions.checkState(columnName == null ^ scope_ == TPrivilegeScope.COLUMN);
     TPrivilege privilege = new TPrivilege();
     privilege.setScope(scope_);
     privilege.setServer_name(serverName_);
@@ -80,10 +120,21 @@ public class PrivilegeSpec implements ParseNode {
     if (dbName_ != null) privilege.setDb_name(dbName_);
     if (tableName_ != null) privilege.setTable_name(tableName_.getTbl());
     if (uri_ != null) privilege.setUri(uri_.toString());
-    privilege.setPrivilege_name(
-        RolePrivilege.buildRolePrivilegeName(privilege));
+    if (columnName != null) privilege.setColumn_name(columnName);
     privilege.setCreate_time_ms(-1);
+    privilege.setPrivilege_name(RolePrivilege.buildRolePrivilegeName(privilege));
     return privilege;
+  }
+
+  /**
+   * Return the table path of a COLUMN level privilege. The table path consists
+   * of server name, database name and table name.
+   */
+  public static String getTablePath(TPrivilege privilege) {
+    Preconditions.checkState(privilege.getScope() == TPrivilegeScope.COLUMN);
+    Joiner joiner = Joiner.on(".");
+    return joiner.join(privilege.getServer_name(), privilege.getDb_name(),
+        privilege.getTable_name());
   }
 
   @Override
@@ -95,6 +146,11 @@ public class PrivilegeSpec implements ParseNode {
       sb.append(" " + dbName_);
     } else if (scope_ == TPrivilegeScope.TABLE) {
       sb.append(" " + tableName_.toString());
+    } else if (scope_ == TPrivilegeScope.COLUMN) {
+      sb.append("(");
+      sb.append(Joiner.on(",").join(columnNames_));
+      sb.append(")");
+      sb.append(" " + tableName_.toString());
     } else if (scope_ == TPrivilegeScope.URI) {
       sb.append(" '" + uri_.getLocation() + "'");
     }
@@ -105,40 +161,109 @@ public class PrivilegeSpec implements ParseNode {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     serverName_ = analyzer.getAuthzConfig().getServerName();
     Preconditions.checkState(!Strings.isNullOrEmpty(serverName_));
+    Preconditions.checkNotNull(scope_);
 
-    if (scope_ != null) {
-      switch (scope_) {
-        case SERVER:
-          if (privilegeLevel_ != TPrivilegeLevel.ALL) {
-            throw new AnalysisException("Only 'ALL' privilege may be applied at " +
-                "SERVER scope in privilege spec.");
-          }
-          break;
-        case DATABASE:
-          if (Strings.isNullOrEmpty(dbName_)) {
-            throw new AnalysisException("Database name in privilege spec cannot " +
-                "be empty");
-          }
-          break;
-        case URI:
-          if (privilegeLevel_ != TPrivilegeLevel.ALL) {
-            throw new AnalysisException("Only 'ALL' privilege may be applied at " +
-                "URI scope in privilege spec.");
-          }
-          uri_.analyze(analyzer, Privilege.ALL, false);
-          break;
-        case TABLE:
-          if (Strings.isNullOrEmpty(tableName_.getTbl())) {
-            throw new AnalysisException("Table name in privilege spec cannot be " +
-                "empty");
-          }
-          dbName_ = analyzer.getTargetDbName(tableName_);
-          Preconditions.checkNotNull(dbName_);
-          break;
-        default:
-          throw new IllegalStateException("Unknown TPrivilegeScope in privilege spec: " +
-              scope_.toString());
+    switch (scope_) {
+      case SERVER:
+        if (privilegeLevel_ != TPrivilegeLevel.ALL) {
+          throw new AnalysisException("Only 'ALL' privilege may be applied at " +
+              "SERVER scope in privilege spec.");
+        }
+        break;
+      case DATABASE:
+        Preconditions.checkState(!Strings.isNullOrEmpty(dbName_));
+        try {
+          analyzer.getDb(dbName_, true);
+        } catch (AnalysisException e) {
+          throw new AnalysisException(String.format("Error setting privileges for " +
+              "database '%s'. Verify that the database exists and that you have " +
+              "permissions to issue a GRANT/REVOKE statement."));
+        }
+        break;
+      case URI:
+        Preconditions.checkNotNull(uri_);
+        if (privilegeLevel_ != TPrivilegeLevel.ALL) {
+          throw new AnalysisException("Only 'ALL' privilege may be applied at " +
+              "URI scope in privilege spec.");
+        }
+        uri_.analyze(analyzer, Privilege.ALL, false);
+        break;
+      case TABLE:
+        analyzeTargetTable(analyzer);
+        break;
+      case COLUMN:
+        analyzeColumnPrivScope(analyzer);
+        break;
+      default:
+        throw new IllegalStateException("Unknown TPrivilegeScope in privilege spec: " +
+            scope_.toString());
+    }
+  }
+
+  /**
+   * Analyzes a privilege spec at the COLUMN scope.
+   * Throws an AnalysisException in the following cases:
+   * 1. No columns are specified.
+   * 2. Privilege is applied on a view or an external data source.
+   * 3. Referenced table and/or columns do not exist.
+   * 4. Privilege level is not SELECT.
+   */
+  private void analyzeColumnPrivScope(Analyzer analyzer) throws AnalysisException {
+    Preconditions.checkState(scope_ == TPrivilegeScope.COLUMN);
+    Preconditions.checkNotNull(columnNames_);
+    if (columnNames_.isEmpty()) {
+      throw new AnalysisException("Empty column list in column privilege spec.");
+    }
+    if (privilegeLevel_ != TPrivilegeLevel.SELECT) {
+      throw new AnalysisException("Only 'SELECT' privileges are allowed " +
+          "in a column privilege spec.");
+    }
+    Table table = analyzeTargetTable(analyzer);
+    if (table instanceof View) {
+      throw new AnalysisException("Column-level privileges on views are not " +
+          "supported.");
+    }
+    if (table instanceof DataSourceTable) {
+      throw new AnalysisException("Column-level privileges on external data " +
+          "source tables are not supported.");
+    }
+    for (String columnName: columnNames_) {
+      if (table.getColumn(columnName) == null) {
+        // The error message should not reveal the existence or absence of a column.
+        throw new AnalysisException(String.format("Error setting column-level " +
+            "privileges for table '%s'. Verify that both table and columns exist " +
+            "and that you have permissions to issue a GRANT/REVOKE statement.",
+            tableName_.toString()));
       }
     }
+  }
+
+  /**
+   * Verifies that the table referenced in the privilege spec exists in the catalog and
+   * returns the catalog object.
+   * Throws an AnalysisException in the following cases:
+   * 1. The table name is not valid.
+   * 2. Table is not loaded in the catalog.
+   * 3. Table does not exist.
+   */
+  private Table analyzeTargetTable(Analyzer analyzer) throws AnalysisException {
+    Preconditions.checkState(scope_ == TPrivilegeScope.TABLE ||
+        scope_ == TPrivilegeScope.COLUMN);
+    Preconditions.checkState(!Strings.isNullOrEmpty(tableName_.getTbl()));
+    Table table = null;
+    try {
+      dbName_ = analyzer.getTargetDbName(tableName_);
+      Preconditions.checkNotNull(dbName_);
+      table = analyzer.getTable(dbName_, tableName_.getTbl());
+    } catch (TableLoadingException e) {
+      throw new AnalysisException(e.getMessage(), e);
+    } catch (AnalysisException e) {
+      if (analyzer.hasMissingTbls()) throw e;
+      throw new AnalysisException(String.format("Error setting privileges for " +
+          "table '%s'. Verify that the table exists and that you have permissions " +
+          "to issue a GRANT/REVOKE statement.", tableName_.toString()));
+    }
+    Preconditions.checkNotNull(table);
+    return table;
   }
 }

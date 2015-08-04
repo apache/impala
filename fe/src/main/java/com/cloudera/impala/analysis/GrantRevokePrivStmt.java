@@ -14,13 +14,14 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.List;
+
 import com.cloudera.impala.catalog.Role;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TGrantRevokePrivParams;
 import com.cloudera.impala.thrift.TPrivilege;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import com.google.common.collect.Lists;
 
 /**
  * Represents a "GRANT/REVOKE PRIVILEGE" statement.
@@ -53,10 +54,13 @@ public class GrantRevokePrivStmt extends AuthorizationStmt {
     TGrantRevokePrivParams params = new TGrantRevokePrivParams();
     params.setRole_name(roleName_);
     params.setIs_grant(isGrantPrivStmt_);
-    TPrivilege privilege = privilegeSpec_.toThrift();
-    privilege.setRole_id(role_.getId());
-    privilege.setHas_grant_opt(hasGrantOpt_);
-    params.setPrivileges(Lists.newArrayList(privilege));
+    List<TPrivilege> privileges = privilegeSpec_.toThrift();
+    for (TPrivilege privilege: privileges) {
+      privilege.setRole_id(role_.getId());
+      privilege.setHas_grant_opt(hasGrantOpt_);
+    }
+    params.setHas_grant_opt(hasGrantOpt_);
+    params.setPrivileges(privileges);
     return params;
   }
 

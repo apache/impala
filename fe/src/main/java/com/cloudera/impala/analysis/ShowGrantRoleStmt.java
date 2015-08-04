@@ -41,7 +41,7 @@ public class ShowGrantRoleStmt extends AuthorizationStmt {
     params.setRole_name(roleName_);
     params.setRequesting_user(requestingUser_.getShortName());
     if (privilegeSpec_ != null) {
-      params.setPrivilege(privilegeSpec_.toThrift());
+      params.setPrivilege(privilegeSpec_.toThrift().get(0));
       params.getPrivilege().setRole_id(role_.getId());
     }
     return params;

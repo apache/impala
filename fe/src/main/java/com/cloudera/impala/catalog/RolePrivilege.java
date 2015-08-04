@@ -82,6 +82,13 @@ public class RolePrivilege implements CatalogObject {
           authorizable.add(KV_JOINER.join("table", privilege.getTable_name()));
           break;
         }
+        case COLUMN: {
+          authorizable.add(KV_JOINER.join("server", privilege.getServer_name()));
+          authorizable.add(KV_JOINER.join("db", privilege.getDb_name()));
+          authorizable.add(KV_JOINER.join("table", privilege.getTable_name()));
+          authorizable.add(KV_JOINER.join("column", privilege.getColumn_name()));
+          break;
+        }
         default: {
           throw new UnsupportedOperationException(
               "Unknown privilege scope: " + scope.toString());

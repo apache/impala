@@ -388,6 +388,7 @@ enum TPrivilegeScope {
   URI,
   DATABASE,
   TABLE,
+  COLUMN,
 }
 
 // The privilege level allowed.
@@ -405,13 +406,13 @@ enum TPrivilegeLevel {
 struct TPrivilege {
   // A human readable name for this privilege. The combination of role_id +
   // privilege_name is guaranteed to be unique. Stored in a form that can be passed
-  // to Sentry: [ServerName]->[DbName]->[TableName]->[Action Granted].
+  // to Sentry: [ServerName]->[DbName]->[TableName]->[ColumnName]->[Action Granted].
   1: required string privilege_name
 
   // The level of access this privilege provides.
   2: required TPrivilegeLevel privilege_level
 
-  // The scope of the privilege: SERVER, DATABASE, URI, or TABLE
+  // The scope of the privilege: SERVER, DATABASE, URI, TABLE or COLUMN
   3: required TPrivilegeScope scope
 
   // If true, GRANT OPTION was specified. For a GRANT privilege statement, everyone
@@ -438,6 +439,9 @@ struct TPrivilege {
 
   // Time this privilege was created (in milliseconds since epoch).
   10: optional i64 create_time_ms
+
+  // Set if scope is COLUMN
+  11: optional string column_name
 }
 
 // Thrift representation of an HdfsCachePool.

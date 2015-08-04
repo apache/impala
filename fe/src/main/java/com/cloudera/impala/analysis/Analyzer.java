@@ -2236,12 +2236,21 @@ public class Analyzer {
       registerPrivReq(pb.allOf(privilege).onDb(dbName).toRequest());
     }
 
+    Db db = getDb(dbName, throwIfDoesNotExist);
+    globalState_.accessEvents.add(new TAccessEvent(
+        dbName, TCatalogObjectType.DATABASE, privilege.toString()));
+    return db;
+  }
+
+  /**
+   * Returns a Catalog Db object without checking for privileges.
+   */
+  public Db getDb(String dbName, boolean throwIfDoesNotExist)
+      throws AnalysisException {
     Db db = getCatalog().getDb(dbName);
     if (db == null && throwIfDoesNotExist) {
       throw new AnalysisException(DB_DOES_NOT_EXIST_ERROR_MSG + dbName);
     }
-    globalState_.accessEvents.add(new TAccessEvent(
-        dbName, TCatalogObjectType.DATABASE, privilege.toString()));
     return db;
   }
 

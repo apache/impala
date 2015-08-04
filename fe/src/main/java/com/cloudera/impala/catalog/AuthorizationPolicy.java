@@ -298,6 +298,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
     result.getSchema().addToColumns(new TColumn("scope", Type.STRING.toThrift()));
     result.getSchema().addToColumns(new TColumn("database", Type.STRING.toThrift()));
     result.getSchema().addToColumns(new TColumn("table", Type.STRING.toThrift()));
+    result.getSchema().addToColumns(new TColumn("column", Type.STRING.toThrift()));
     result.getSchema().addToColumns(new TColumn("uri", Type.STRING.toThrift()));
     result.getSchema().addToColumns(new TColumn("privilege", Type.STRING.toThrift()));
     result.getSchema().addToColumns(
@@ -319,6 +320,7 @@ public class AuthorizationPolicy implements PrivilegeCache {
       rowBuilder.add(privilege.getScope().toString());
       rowBuilder.add(Strings.nullToEmpty(privilege.getDb_name()));
       rowBuilder.add(Strings.nullToEmpty(privilege.getTable_name()));
+      rowBuilder.add(Strings.nullToEmpty(privilege.getColumn_name()));
       rowBuilder.add(Strings.nullToEmpty(privilege.getUri()));
       rowBuilder.add(privilege.getPrivilege_level().toString());
       rowBuilder.add(Boolean.toString(privilege.isHas_grant_opt()));
