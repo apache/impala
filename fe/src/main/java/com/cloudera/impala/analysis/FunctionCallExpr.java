@@ -435,8 +435,13 @@ public class FunctionCallExpr extends Expr {
 
       // TODO: the distinct rewrite does not handle this but why?
       if (params_.isDistinct()) {
-        if (fnName_.getFunction().equalsIgnoreCase("group_concat")) {
-          throw new AnalysisException("GROUP_CONCAT() does not support DISTINCT.");
+        // The second argument in group_concat(distinct) must be a constant expr that
+        // returns a string.
+        if (fnName_.getFunction().equalsIgnoreCase("group_concat")
+            && getChildren().size() == 2
+            && !getChild(1).isConstant()) {
+            throw new AnalysisException("Second parameter in GROUP_CONCAT(DISTINCT)" +
+                " must be a constant expression that returns a string.");
         }
         if (fn_.getBinaryType() != TFunctionBinaryType.BUILTIN) {
           throw new AnalysisException("User defined aggregates do not support DISTINCT.");

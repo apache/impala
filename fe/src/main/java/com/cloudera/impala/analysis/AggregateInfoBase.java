@@ -110,11 +110,7 @@ public abstract class AggregateInfoBase {
     for (int i = 0; i < exprs.size(); ++i) {
       Expr expr = exprs.get(i);
       SlotDescriptor slotDesc = analyzer.addSlotDescriptor(result);
-      slotDesc.setLabel(expr.toSql());
-      slotDesc.setSourceExpr(expr);
-      slotDesc.setStats(ColumnStats.fromExpr(expr));
-      Preconditions.checkState(expr.getType().isValid());
-      slotDesc.setType(expr.getType());
+      slotDesc.initFromExpr(expr);
       if (i < aggregateExprStartIndex) {
         // register equivalence between grouping slot and grouping expr;
         // do this only when the grouping expr isn't a constant, otherwise

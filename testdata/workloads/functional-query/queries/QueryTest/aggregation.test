@@ -930,8 +930,36 @@ group by day
 int, string, string
 ====
 ---- QUERY
+# Test group_concat distinct with multiple agg columns
+select day, group_concat(string_col, '->'), group_concat(date_string_col),
+group_concat(distinct date_string_col)
+from (select * from alltypesagg where id % 250 = day order by id limit 99999) a
+group by day order by day
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+1,'1->251->501->751','01/01/10, 01/01/10, 01/01/10, 01/01/10','01/01/10'
+2,'2->252->502->752','01/02/10, 01/02/10, 01/02/10, 01/02/10','01/02/10'
+3,'3->253->503->753','01/03/10, 01/03/10, 01/03/10, 01/03/10','01/03/10'
+4,'4->254->504->754','01/04/10, 01/04/10, 01/04/10, 01/04/10','01/04/10'
+5,'5->255->505->755','01/05/10, 01/05/10, 01/05/10, 01/05/10','01/05/10'
+6,'6->256->506->756','01/06/10, 01/06/10, 01/06/10, 01/06/10','01/06/10'
+7,'7->257->507->757','01/07/10, 01/07/10, 01/07/10, 01/07/10','01/07/10'
+8,'8->258->508->758','01/08/10, 01/08/10, 01/08/10, 01/08/10','01/08/10'
+9,'9->259->509->759','01/09/10, 01/09/10, 01/09/10, 01/09/10','01/09/10'
+10,'10->260->510->760','01/10/10, 01/10/10, 01/10/10, 01/10/10','01/10/10'
+---- TYPES
+int, string, string, string
+====
+---- QUERY
 # Test group_concat with null result
 select group_concat(string_col) from alltypesagg where string_col = NULL;
+---- RESULTS
+'NULL'
+---- TYPES
+string
+====
+---- QUERY
+# Test group_concat distinct with null result
+select group_concat(distinct string_col) from alltypesagg where string_col = NULL;
 ---- RESULTS
 'NULL'
 ---- TYPES
@@ -952,6 +980,15 @@ STRING
 select group_concat('abc', 'xy') from functional.alltypesagg where id % 1000 = day
 ---- RESULTS
 'abcxyabcxyabcxyabcxyabcxyabcxyabcxyabcxyabcxyabc'
+---- TYPES
+string
+====
+---- QUERY
+# Same as last query test, now adding the "distinct" clause
+select group_concat(distinct 'abc', 'xy') from functional.alltypesagg
+where id % 1000 = day
+---- RESULTS
+'abc'
 ---- TYPES
 string
 ====

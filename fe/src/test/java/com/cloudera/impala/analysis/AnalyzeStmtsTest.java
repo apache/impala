@@ -1782,16 +1782,12 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
         "'*' can only be used in conjunction with COUNT");
     AnalysisError("select max(*) from functional.testtbl",
         "'*' can only be used in conjunction with COUNT");
-    AnalysisError("select group_concat(*) from functional.testtbl",
-        "'*' can only be used in conjunction with COUNT");
 
     // multiple args
     AnalysisError("select count(id, zip) from functional.testtbl",
         "COUNT must have DISTINCT for multiple arguments: count(id, zip)");
     AnalysisError("select min(id, zip) from functional.testtbl",
         "No matching function with signature: min(BIGINT, INT).");
-    AnalysisError("select group_concat(name, '-', ',') from functional.testtbl",
-        "No matching function with signature: group_concat(STRING, STRING, STRING)");
 
     // nested aggregates
     AnalysisError("select sum(count(*)) from functional.testtbl",
@@ -1813,30 +1809,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     // aggregate requires table in the FROM clause
     AnalysisError("select count(*)", "aggregation without a FROM clause is not allowed");
     AnalysisError("select min(1)", "aggregation without a FROM clause is not allowed");
-    AnalysisError("select group_concat('')",
-        "aggregation without a FROM clause is not allowed");
-
-    // test group_concat
-    AnalyzesOk("select group_concat(string_col) from functional.alltypes");
-    AnalyzesOk("select group_concat(string_col, '-') from functional.alltypes");
-    AnalyzesOk("select group_concat(string_col, string_col) from functional.alltypes");
-    // test all types as arguments
-    for (Type type: typeToLiteralValue_.keySet()) {
-      String literal = typeToLiteralValue_.get(type);
-      String query1 = String.format(
-          "select group_concat(%s) from functional.alltypes", literal);
-      String query2 = String.format(
-          "select group_concat(string_col, %s) from functional.alltypes", literal);
-      if (type.getPrimitiveType() == PrimitiveType.STRING || type.isNull()) {
-        AnalyzesOk(query1);
-        AnalyzesOk(query2);
-      } else {
-        AnalysisError(query1,
-            "No matching function with signature: group_concat(");
-        AnalysisError(query2,
-            "No matching function with signature: group_concat(");
-      }
-    }
 
     // Test distinct estimate
     for (Type type: typeToLiteralValue_.keySet()) {
@@ -1851,8 +1823,6 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select ndv(d1), distinctpc(d2), distinctpcsa(d3), count(distinct d4) "
         + "from functional.decimal_tbl");
     AnalyzesOk("select avg(d5) from functional.decimal_tbl");
-    AnalysisError("select group_concat(d5) from functional.decimal_tbl",
-        "No matching function with signature: group_concat(DECIMAL(10,5))");
 
     // Test select stmt avg smap.
     AnalyzesOk("select cast(avg(c1) as decimal(10,4)) as c from " +
@@ -1906,8 +1876,58 @@ public class AnalyzeStmtsTest extends AnalyzerTest {
     AnalyzesOk("select tinyint_col, count(distinct int_col),"
         + "min(distinct smallint_col), max(distinct string_col) "
         + "from functional.alltypesagg group by 1");
-    AnalysisError("select group_concat(distinct name) from functional.testtbl",
-            "GROUP_CONCAT() does not support DISTINCT");
+  }
+
+  @Test
+  public void TestGroupConcat() throws AnalysisException {
+    // Test valid and invalid parameters
+    AnalyzesOk("select group_concat(distinct name) from functional.testtbl");
+    AnalysisError("select group_concat(distinct name, name) from functional.testtbl",
+        "Second parameter in GROUP_CONCAT(DISTINCT) must be a constant expression" +
+        " that returns a string.");
+    AnalyzesOk("select group_concat(distinct name, cast(123 as string)) " +
+        "from functional.testtbl");
+    AnalysisError("select group_concat(distinct name, cast(id as string)) " +
+        "from functional.testtbl",
+         "Second parameter in GROUP_CONCAT(DISTINCT) must be a constant expression" +
+         " that returns a string.");
+    AnalyzesOk("select group_concat(distinct string_col, concat('-', '?')) " +
+        "from functional.alltypesagg");
+
+    AnalysisError("select group_concat(*) from functional.testtbl",
+        "'*' can only be used in conjunction with COUNT");
+
+    // test group_concat using a column as the custom separator
+    AnalyzesOk("select group_concat(string_col, string_col) from functional.alltypes");
+
+    // test group_concat without and with distinct
+    String[] keywords = new String[] {"distinct", ""};
+    for (String keyword: keywords) {
+      AnalysisError(String.format("select group_concat(%s '')", keyword), "aggregation" +
+          " without a FROM clause is not allowed");
+      AnalysisError(String.format("select group_concat(%s name, '-', ',') " +
+          "from functional.testtbl", keyword), "No matching function with signature: " +
+          "group_concat(STRING, STRING, STRING)");
+
+      // test all types as arguments
+      for (Type type: typeToLiteralValue_.keySet()) {
+        String literal = typeToLiteralValue_.get(type);
+        String query1 = String.format(
+            "select group_concat(%s %s) from functional.alltypes", keyword, literal);
+        String query2 = String.format(
+            "select group_concat(%s %s, '---') from functional.alltypes", keyword,
+            literal);
+        if (type.getPrimitiveType() == PrimitiveType.STRING || type.isNull()) {
+          AnalyzesOk(query1);
+          AnalyzesOk(query2);
+        } else {
+          AnalysisError(query1,
+              "No matching function with signature: group_concat(");
+          AnalysisError(query2,
+              "No matching function with signature: group_concat(");
+        }
+      }
+    }
   }
 
   @Test

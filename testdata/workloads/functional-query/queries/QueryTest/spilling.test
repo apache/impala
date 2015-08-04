@@ -310,3 +310,26 @@ limit 100
 ---- TYPES
 string, bigint
 ====
+---- QUERY
+# Test aggregation spill with group_concat distinct
+# TODO: get this to spill.
+set num_nodes=1;
+set max_block_mgr_memory=265m;
+select l_orderkey, count(*), group_concat(distinct l_linestatus, '|')
+from lineitem
+group by 1
+order by 1 limit 10
+---- RESULTS
+1,6,'O'
+2,1,'O'
+3,6,'F'
+4,1,'O'
+5,3,'F'
+6,1,'F'
+7,7,'O'
+32,6,'O'
+33,4,'F'
+34,3,'O'
+---- TYPES
+BIGINT, BIGINT, STRING
+====

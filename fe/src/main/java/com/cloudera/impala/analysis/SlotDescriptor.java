@@ -200,6 +200,18 @@ public class SlotDescriptor {
     return materializedPath;
   }
 
+  /**
+   * Initializes a slot by setting its source expression information
+   */
+  public void initFromExpr(Expr expr) {
+    setLabel(expr.toSql());
+    Preconditions.checkState(sourceExprs_.isEmpty());
+    setSourceExpr(expr);
+    setStats(ColumnStats.fromExpr(expr));
+    Preconditions.checkState(expr.getType().isValid());
+    setType(expr.getType());
+  }
+
   public TSlotDescriptor toThrift() {
     List<Integer> materializedPath = getMaterializedPath();
     TSlotDescriptor result = new TSlotDescriptor(
