@@ -55,10 +55,13 @@ public class AvroSchemaUtils {
     for (Map<String, String> schemaLocation: schemaSearchLocations) {
       if (schemaLocation == null) continue;
 
-      String literal = schemaLocation.get(AvroSerdeUtils.SCHEMA_LITERAL);
+      String literal =
+          schemaLocation.get(
+              AvroSerdeUtils.AvroTableProperties.SCHEMA_LITERAL.getPropName());
       if (literal != null && !literal.equals(AvroSerdeUtils.SCHEMA_NONE)) return literal;
 
-      url = schemaLocation.get(AvroSerdeUtils.SCHEMA_URL);
+      url = schemaLocation.get(
+          AvroSerdeUtils.AvroTableProperties.SCHEMA_URL.getPropName());
       if (url != null && !url.equals(AvroSerdeUtils.SCHEMA_NONE)) {
         url = url.trim();
         break;

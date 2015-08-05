@@ -130,24 +130,24 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     // IF NOT EXISTS properly checks for partition existence
     AnalyzesOk("alter table functional.alltypes add " +
-          "partition(year=2050, month=10)");
+        "partition(year=2050, month=10)");
     AnalysisError("alter table functional.alltypes add " +
-          "partition(year=2010, month=10)",
-          "Partition spec already exists: (year=2010, month=10).");
+        "partition(year=2010, month=10)",
+        "Partition spec already exists: (year=2010, month=10).");
     AnalyzesOk("alter table functional.alltypes add if not exists " +
-          " partition(year=2010, month=10)");
+        " partition(year=2010, month=10)");
     AnalyzesOk("alter table functional.alltypes add if not exists " +
         " partition(year=2010, month=10) location " +
         "'/test-warehouse/alltypes/year=2010/month=10'");
 
     // IF EXISTS properly checks for partition existence
     AnalyzesOk("alter table functional.alltypes drop " +
-          "partition(year=2010, month=10)");
+        "partition(year=2010, month=10)");
     AnalysisError("alter table functional.alltypes drop " +
-          "partition(year=2050, month=10)",
-          "Partition spec does not exist: (year=2050, month=10).");
+        "partition(year=2050, month=10)",
+        "Partition spec does not exist: (year=2050, month=10).");
     AnalyzesOk("alter table functional.alltypes drop if exists " +
-          "partition(year=2050, month=10)");
+        "partition(year=2050, month=10)");
 
     // Caching ops
     AnalyzesOk("alter table functional.alltypes add " +
@@ -501,6 +501,96 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Partition spec does not exist: (year=9999, month=1).");
   }
 
+
+  @Test
+  public void TestAlterTableSetAvroProperties() {
+    // Test set tblproperties with avro.schema.url and avro.schema.literal
+    // TODO: Include customized schema files
+
+    for (String propertyType : Lists.newArrayList("tblproperties", "serdeproperties")) {
+      // Valid url with valid schema
+      AnalyzesOk(String.format("alter table functional.alltypes set %s" +
+          "('avro.schema.url'=" +
+          "'hdfs:///test-warehouse/avro_schemas/functional/alltypes.json')",
+          propertyType));
+
+      // Invalid schema URL
+      AnalysisError(String.format("alter table functional.alltypes set %s " +
+          "('avro.schema.url'='')", propertyType),
+          "Invalid avro.schema.url: . Can not create a Path from an empty string");
+      AnalysisError(String.format("alter table functional.alltypes set %s " +
+          "('avro.schema.url'='hdfs://invalid*host/schema.avsc')", propertyType),
+          "Failed to read Avro schema at: hdfs://invalid*host/schema.avsc. " +
+          "Incomplete HDFS URI, no host: hdfs://invalid*host/schema.avsc");
+      AnalysisError(String.format("alter table functional.alltypes set %s" +
+          "('avro.schema.url'='schema.avsc')", propertyType),
+          "Invalid avro.schema.url: schema.avsc. Path does not exist.");
+      AnalysisError(String.format("alter table functional.alltypes set %s " +
+          "('avro.schema.url'='foo://bar/schema.avsc')", propertyType),
+          "Failed to read Avro schema at: foo://bar/schema.avsc. " +
+          "No FileSystem for scheme: foo");
+
+      // Valid schema literal
+      AnalyzesOk(String.format("alter table functional.alltypes set %s" +
+          "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
+          "\"fields\": [{\"name\": \"string1\", \"type\": \"string\"}] }')",
+          propertyType));
+
+      // Invalid schema
+      AnalysisError(String.format("alter table functional.alltypes set %s " +
+          "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
+          "\"fields\": {\"name\": \"string1\", \"type\": \"string\"}]}')", propertyType),
+          "Error parsing Avro schema for table 'functional.alltypes': " +
+          "org.codehaus.jackson.JsonParseException: Unexpected close marker ']': " +
+          "expected '}'");
+      AnalysisError(String.format("alter table functional.alltypes set %s " +
+          "('avro.schema.literal'='')", propertyType),
+          "Avro schema is null or empty: functional.alltypes");
+      AnalysisError(String.format("alter table functional.alltypes set %s " +
+          "('avro.schema.literal'='{\"name\": \"my_record\"}')", propertyType),
+          "Error parsing Avro schema for table 'functional.alltypes': " +
+          "No type: {\"name\":\"my_record\"}");
+      AnalysisError(String.format("alter table functional.alltypes set %s " +
+          "('avro.schema.literal'='{\"name\":\"my_record\", \"type\": \"record\"}')",
+          propertyType), "Error parsing Avro schema for table 'functional.alltypes': " +
+          "Record has no fields: {\"name\":\"my_record\",\"type\":\"record\"}");
+      AnalysisError(String.format("alter table functional.alltypes set %s " +
+          "('avro.schema.literal'='" +
+          "{\"type\":\"record\", \"fields\":[ {\"name\":\"fff\",\"type\":\"int\"} ] }')",
+          propertyType), "Error parsing Avro schema for table 'functional.alltypes': " +
+          "No name in schema: {\"type\":\"record\",\"fields\":[{\"name\":\"fff\"," +
+          "\"type\":\"int\"}]}");
+
+      // Unsupported types
+      // Union
+      AnalysisError(String.format("alter table functional.alltypes set %s " +
+          "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
+          "\"fields\": [{\"name\": \"string1\", \"type\": \"string\"}," +
+          "{\"name\": \"union1\", \"type\": [\"float\", \"boolean\"]}]}')",
+          propertyType), "Unsupported type 'union' of column 'union1'");
+
+      // Check avro.schema.url and avro.schema.literal evaluation order,
+      // skip checking url when literal is provided.
+      AnalysisError(String.format("alter table functional.alltypes set %s " +
+          "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
+          "\"fields\": {\"name\": \"string1\", \"type\": \"string\"}]}', " +
+          "'avro.schema.url'='')", propertyType),
+          "Error parsing Avro schema for table 'functional.alltypes': " +
+          "org.codehaus.jackson.JsonParseException: Unexpected close marker ']': " +
+          "expected '}'");
+      // Url is invalid but ignored because literal is provided.
+      AnalyzesOk(String.format("alter table functional.alltypes set %s " +
+          "('avro.schema.literal'='{\"name\": \"my_record\", \"type\": \"record\", " +
+          "\"fields\": [{\"name\": \"string1\", \"type\": \"string\"}] }', " +
+          "'avro.schema.url'='')", propertyType));
+      // Even though url is valid, literal has higher priority.
+      AnalysisError(String.format("alter table functional.alltypes set %s " +
+          "('avro.schema.literal'='', 'avro.schema.url'=" +
+          "'hdfs:///test-warehouse/avro_schemas/functional/alltypes.json')",
+          propertyType), "Avro schema is null or empty: functional.alltypes");
+    }
+  }
+
   @Test
   public void TestAlterTableRename() throws AnalysisException {
     AnalyzesOk("alter table functional.alltypes rename to new_alltypes");
@@ -673,10 +763,10 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     // Mismatched column name (table was created by Hive).
     AnalysisError("compute stats functional_avro_snap.schema_resolution_test",
         "Cannot COMPUTE STATS on Avro table 'schema_resolution_test' because its " +
-            "column definitions do not match those in the Avro schema.\nDefinition of " +
-            "column 'col1' of type 'string' does not match the Avro-schema column " +
-            "'boolean1' of type 'BOOLEAN' at position '0'.\nPlease re-create the table " +
-            "with column definitions, e.g., using the result of 'SHOW CREATE TABLE'");
+        "column definitions do not match those in the Avro schema.\nDefinition of " +
+        "column 'col1' of type 'string' does not match the Avro-schema column " +
+        "'boolean1' of type 'BOOLEAN' at position '0'.\nPlease re-create the table " +
+        "with column definitions, e.g., using the result of 'SHOW CREATE TABLE'");
   }
 
   @Test
@@ -1818,7 +1908,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create aggregate function "
         + "foo(int, int, int, int, int, int, int , int, int) "
         + "RETURNS int" + loc,
-      "UDAs with more than 8 arguments are not yet supported.");
+        "UDAs with more than 8 arguments are not yet supported.");
 
     // Check that CHAR and VARCHAR are not valid UDA argument or return types
     String symbols =
@@ -1890,7 +1980,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
 
     // Test missing .ll file. TODO: reenable when we can run IR UDAs
     AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
-            "'/foo.ll' UPDATE_FN='Fn'", "IR UDAs are not yet supported.");
+        "'/foo.ll' UPDATE_FN='Fn'", "IR UDAs are not yet supported.");
     //AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
     //    "'/foo.ll' UPDATE_FN='Fn'", "Could not load binary: /foo.ll");
     //AnalysisError("create aggregate function foo(int) RETURNS int LOCATION " +
@@ -1947,7 +2037,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "Could not find function BadFn(STRING) returns STRING in: " + hdfsLoc);
     AnalysisError("create aggregate function foo(string, double) RETURNS string" + loc +
         "UPDATE_FN='Agg2Update' INIT_FN='AggInit' MERGE_FN='AggMerge' "+
-            "FINALIZE_FN='not there'",
+        "FINALIZE_FN='not there'",
         "Could not find function not there(STRING) in: " + hdfsLoc);
   }
 

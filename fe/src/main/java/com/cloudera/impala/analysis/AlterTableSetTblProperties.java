@@ -15,12 +15,20 @@
 package com.cloudera.impala.analysis;
 
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-import com.cloudera.impala.thrift.TAlterTableParams;
-import com.cloudera.impala.thrift.TAlterTableSetTblPropertiesParams;
-import com.cloudera.impala.thrift.TAlterTableType;
-import com.cloudera.impala.thrift.TTablePropertyType;
+import org.apache.avro.SchemaParseException;
+import org.apache.hadoop.hive.serde2.avro.AvroSerdeUtils;
+
+import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.*;
+import com.cloudera.impala.util.AvroSchemaParser;
+import com.cloudera.impala.util.AvroSchemaUtils;
+
 import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
 
 /**
 * Represents an ALTER TABLE SET [PARTITION ('k1'='a', 'k2'='b'...)]
@@ -32,12 +40,12 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
 
   public AlterTableSetTblProperties(TableName tableName, PartitionSpec partitionSpec,
       TTablePropertyType targetProperty, HashMap<String, String> tblProperties) {
-   super(tableName, partitionSpec);
-   Preconditions.checkNotNull(tblProperties);
-   Preconditions.checkNotNull(targetProperty);
-   targetProperty_ = targetProperty;
-   tblProperties_ = tblProperties;
-   CreateTableStmt.unescapeProperties(tblProperties_);
+    super(tableName, partitionSpec);
+    Preconditions.checkNotNull(tblProperties);
+    Preconditions.checkNotNull(targetProperty);
+    targetProperty_ = targetProperty;
+    tblProperties_ = tblProperties;
+    CreateTableStmt.unescapeProperties(tblProperties_);
   }
 
   public HashMap<String, String> getTblProperties() { return tblProperties_; }
@@ -55,5 +63,48 @@ public class AlterTableSetTblProperties extends AlterTableSetStmt {
    }
    params.setSet_tbl_properties_params(tblPropertyParams);
    return params;
+  }
+
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException {
+    super.analyze(analyzer);
+
+    // Check avro schema when it is set in avro.schema.url or avro.schema.literal to
+    // avoid potential metadata corruption (see IMPALA-2042).
+    // If both properties are set then only check avro.schema.literal and ignore
+    // avro.schema.url.
+    if (tblProperties_.containsKey(
+            AvroSerdeUtils.AvroTableProperties.SCHEMA_LITERAL.getPropName()) ||
+        tblProperties_.containsKey(
+            AvroSerdeUtils.AvroTableProperties.SCHEMA_URL.getPropName())) {
+      analyzeAvroSchema(analyzer);
+    }
+  }
+
+  /**
+   * Check that Avro schema provided in avro.schema.url or avro.schema.literal is valid
+   * Json and contains only supported Impala types. If both properties are set, then
+   * avro.schema.url is ignored.
+   */
+  private void analyzeAvroSchema(Analyzer analyzer)
+      throws AnalysisException {
+    List<Map<String, String>> schemaSearchLocations = Lists.newArrayList();
+    schemaSearchLocations.add(tblProperties_);
+
+    String avroSchema = AvroSchemaUtils.getAvroSchema(schemaSearchLocations);
+    avroSchema = Strings.nullToEmpty(avroSchema);
+    if (avroSchema.isEmpty()) {
+      throw new AnalysisException("Avro schema is null or empty: " +
+          table_.getFullName());
+    }
+
+    // Check if the schema is valid and is supported by Impala
+    try {
+      AvroSchemaParser.parse(avroSchema);
+    } catch (SchemaParseException e) {
+      throw new AnalysisException(String.format(
+          "Error parsing Avro schema for table '%s': %s", table_.getFullName(),
+          e.getMessage()));
+    }
   }
 }

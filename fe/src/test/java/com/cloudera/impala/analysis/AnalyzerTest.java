@@ -337,6 +337,7 @@ public class AnalyzerTest {
       Preconditions.checkNotNull(analysisResult.getStmt());
     } catch (Exception e) {
       String errorString = e.getMessage();
+      Preconditions.checkNotNull(errorString, "Stack trace lost during exception.");
       Assert.assertTrue(
           "got error:\n" + errorString + "\nexpected:\n" + expectedErrorString,
           errorString.startsWith(expectedErrorString));
