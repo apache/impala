@@ -253,7 +253,7 @@ Status DataStreamSender::Channel::SendCurrentBatch() {
   // make sure there's no in-flight TransmitData() call that might still want to
   // access thrift_batch_
   WaitForRpc();
-  parent_->SerializeBatch(batch_.get(), &thrift_batch_);
+  RETURN_IF_ERROR(parent_->SerializeBatch(batch_.get(), &thrift_batch_));
   batch_->Reset();
   RETURN_IF_ERROR(SendBatch(&thrift_batch_));
   return Status::OK();
@@ -408,7 +408,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
   if (broadcast_ || channels_.size() == 1) {
     // current_thrift_batch_ is *not* the one that was written by the last call
     // to Serialize()
-    SerializeBatch(batch, current_thrift_batch_, channels_.size());
+    RETURN_IF_ERROR(SerializeBatch(batch, current_thrift_batch_, channels_.size()));
     // SendBatch() will block if there are still in-flight rpcs (and those will
     // reference the previously written thrift batch)
     for (int i = 0; i < channels_.size(); ++i) {
@@ -421,7 +421,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch, bool eos) {
     // rpc before overwriting its batch.
     Channel* current_channel = channels_[current_channel_idx_];
     current_channel->WaitForRpc();
-    SerializeBatch(batch, current_channel->thrift_batch());
+    RETURN_IF_ERROR(SerializeBatch(batch, current_channel->thrift_batch()));
     current_channel->SendBatch(current_channel->thrift_batch());
     current_channel_idx_ = (current_channel_idx_ + 1) % channels_.size();
   } else {
@@ -456,14 +456,20 @@ void DataStreamSender::Close(RuntimeState* state) {
   closed_ = true;
 }
 
-void DataStreamSender::SerializeBatch(RowBatch* src, TRowBatch* dest, int num_receivers) {
+Status DataStreamSender::SerializeBatch(RowBatch* src, TRowBatch* dest, int num_receivers) {
   VLOG_ROW << "serializing " << src->num_rows() << " rows";
   {
     SCOPED_TIMER(serialize_batch_timer_);
-    int uncompressed_bytes = src->Serialize(dest);
-    COUNTER_ADD(bytes_sent_counter_, RowBatch::GetBatchSize(*dest) * num_receivers);
+    RETURN_IF_ERROR(src->Serialize(dest));
+    int bytes = RowBatch::GetBatchSize(*dest);
+    int uncompressed_bytes = bytes - dest->tuple_data.size() + dest->uncompressed_size;
+    // The size output_batch would be if we didn't compress tuple_data (will be equal to
+    // actual batch size if tuple_data isn't compressed)
+
+    COUNTER_ADD(bytes_sent_counter_, bytes * num_receivers);
     COUNTER_ADD(uncompressed_bytes_counter_, uncompressed_bytes * num_receivers);
   }
+  return Status::OK();
 }
 
 int64_t DataStreamSender::GetNumDataBytesSent() const {

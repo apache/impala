@@ -164,7 +164,9 @@ error_codes = (
   ("SSL_CERTIFICATE_NOT_FOUND", 50, "The SSL certificate file does not exist at path $0"),
   ("SSL_PRIVATE_KEY_NOT_FOUND", 51, "The SSL private key file does not exist at path $0"),
 
-  ("SSL_SOCKET_CREATION_FAILED", 52, "SSL socket creation failed: $0")
+  ("SSL_SOCKET_CREATION_FAILED", 52, "SSL socket creation failed: $0"),
+
+  ("MEM_ALLOC_FAILED", 53, "Memory allocation of $0 bytes failed"),
 )
 
 import sys

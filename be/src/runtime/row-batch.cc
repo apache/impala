@@ -23,6 +23,7 @@
 #include "runtime/tuple-row.h"
 #include "util/compress.h"
 #include "util/decompress.h"
+#include "util/fixed-size-hash-table.h"
 #include "gen-cpp/Results_types.h"
 
 #include "common/names.h"
@@ -136,7 +137,11 @@ RowBatch::~RowBatch() {
   }
 }
 
-int RowBatch::Serialize(TRowBatch* output_batch) {
+Status RowBatch::Serialize(TRowBatch* output_batch) {
+  return Serialize(output_batch, UseFullDedup());
+}
+
+Status RowBatch::Serialize(TRowBatch* output_batch, bool full_dedup) {
   // why does Thrift not generate a Clear() function?
   output_batch->row_tuples.clear();
   output_batch->tuple_offsets.clear();
@@ -146,18 +151,29 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
   row_desc_.ToThrift(&output_batch->row_tuples);
 
   // As part of the serialization process we deduplicate tuples to avoid serializing a
-  // Tuple multiple times for the RowBatch. We currently only detect duplicate tuples in
-  // adjacent rows only.
-  int64_t size = TotalByteSize();
-  SerializeInternal(size, output_batch);
+  // Tuple multiple times for the RowBatch. By default we only detect duplicate tuples
+  // in adjacent rows only. If full deduplication is enabled, we will build a
+  // map to detect non-adjacent duplicates. Building this map comes with significant
+  // overhead, so is only worthwhile in the uncommon case of many non-adjacent duplicates.
+  int64_t size;
+  if (full_dedup) {
+    // Maps from tuple to offset of its serialized data in output_batch->tuple_data.
+    DedupMap distinct_tuples;
+    RETURN_IF_ERROR(distinct_tuples.Init(num_rows_ * num_tuples_per_row_ * 2, 0));
+    size = TotalByteSize(&distinct_tuples);
+    distinct_tuples.Clear(); // Reuse allocated hash table.
+    SerializeInternal(size, &distinct_tuples, output_batch);
+  } else {
+    size = TotalByteSize(NULL);
+    SerializeInternal(size, NULL, output_batch);
+  }
 
   if (size > 0) {
     // Try compressing tuple_data to compression_scratch_, swap if compressed data is
     // smaller
     scoped_ptr<Codec> compressor;
-    Status status = Codec::CreateCompressor(NULL, false, THdfsCompression::LZ4,
-                                            &compressor);
-    DCHECK(status.ok()) << status.GetDetail();
+    RETURN_IF_ERROR(Codec::CreateCompressor(NULL, false, THdfsCompression::LZ4,
+                                            &compressor));
 
     int64_t compressed_size = compressor->MaxOutputLen(size);
     if (compression_scratch_.size() < compressed_size) {
@@ -165,7 +181,8 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
     }
     uint8_t* input = (uint8_t*)output_batch->tuple_data.c_str();
     uint8_t* compressed_output = (uint8_t*)compression_scratch_.c_str();
-    compressor->ProcessBlock(true, size, input, &compressed_size, &compressed_output);
+    RETURN_IF_ERROR(compressor->ProcessBlock(true, size, input, &compressed_size,
+        &compressed_output));
     if (LIKELY(compressed_size < size)) {
       compression_scratch_.resize(compressed_size);
       output_batch->tuple_data.swap(compression_scratch_);
@@ -173,13 +190,26 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
     }
     VLOG_ROW << "uncompressed size: " << size << ", compressed size: " << compressed_size;
   }
-
-  // The size output_batch would be if we didn't compress tuple_data (will be equal to
-  // actual batch size if tuple_data isn't compressed)
-  return GetBatchSize(*output_batch) - output_batch->tuple_data.size() + size;
+  return Status::OK();
 }
 
-void RowBatch::SerializeInternal(int64_t size, TRowBatch* output_batch) {
+bool RowBatch::UseFullDedup() {
+  // Switch to using full deduplication in cases where severe size blow-ups are known to
+  // be common: when a row contains tuples with collections and where there are three or
+  // more tuples per row so non-adjacent duplicate tuples may have been created when
+  // joining tuples from multiple sources into a single row.
+  if (row_desc_.tuple_descriptors().size() < 3) return false;
+  vector<TupleDescriptor*>::const_iterator tuple_desc =
+      row_desc_.tuple_descriptors().begin();
+  for (; tuple_desc != row_desc_.tuple_descriptors().end(); ++tuple_desc) {
+    if (!(*tuple_desc)->collection_slots().empty()) return true;
+  }
+  return false;
+}
+
+void RowBatch::SerializeInternal(int64_t size, DedupMap* distinct_tuples,
+    TRowBatch* output_batch) {
+  DCHECK(distinct_tuples == NULL || distinct_tuples->size() == 0);
   // TODO: max_size() is much larger than the amount of memory we could feasibly
   // allocate. Need better way to detect problem.
   DCHECK_LE(size, output_batch->tuple_data.max_size());
@@ -209,6 +239,14 @@ void RowBatch::SerializeInternal(int64_t size, TRowBatch* output_batch) {
         output_batch->tuple_offsets.push_back(
             output_batch->tuple_offsets[prev_row_idx]);
         continue;
+      } else if (UNLIKELY(distinct_tuples != NULL)) {
+        int* dedupd_offset = distinct_tuples->FindOrInsert(tuple, offset);
+        if (*dedupd_offset != offset) {
+          // Repeat of tuple
+          DCHECK_GE(*dedupd_offset, 0);
+          output_batch->tuple_offsets.push_back(*dedupd_offset);
+          continue;
+        }
       }
       // Record offset before creating copy (which increments offset and tuple_data)
       output_batch->tuple_offsets.push_back(offset);
@@ -332,10 +370,8 @@ void RowBatch::AcquireState(RowBatch* src) {
 }
 
 // TODO: consider computing size of batches as they are built up
-// In case of non-adjacent duplicates containing large collections, computing the row
-// batch size can take a long time, since each collection must be traversed multiple
-// times (once per reference to it).
-int64_t RowBatch::TotalByteSize() {
+int64_t RowBatch::TotalByteSize(DedupMap* distinct_tuples) {
+  DCHECK(distinct_tuples == NULL || distinct_tuples->size() == 0);
   int64_t result = 0;
   vector<int> tuple_count(row_desc_.tuple_descriptors().size(), 0);
 
@@ -348,6 +384,9 @@ int64_t RowBatch::TotalByteSize() {
       if (LIKELY(i > 0) && UNLIKELY(GetRow(i - 1)->GetTuple(j) == tuple)) {
         // Fast tuple deduplication for adjacent rows.
         continue;
+      } else if (UNLIKELY(distinct_tuples != NULL)) {
+        bool inserted = distinct_tuples->InsertIfNotPresent(tuple, -1);
+        if (!inserted) continue;
       }
       result += tuple->VarlenByteSize(*row_desc_.tuple_descriptors()[j]);
       ++tuple_count[j];

@@ -38,20 +38,45 @@
 //
 // serialize:            Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//    serialize_no_dups_baseline               15.43                  1X
-//             serialize_no_dups               15.43              1.001X
+//          ser_no_dups_baseline               17.43                  1X
+//                   ser_no_dups               17.33             0.9944X
+//              ser_no_dups_full                14.1             0.8092X
 //
-// serialize_adjacent_dups_baseline            23.82                  1X
-//       serialize_adjacent_dups               59.14              2.482X
+//    ser_adjacent_dups_baseline               26.65                  1X
+//             ser_adjacent_dups               63.98                2.4X
+//        ser_adjacent_dups_full               55.88              2.096X
+//
+//             ser_dups_baseline               19.26                  1X
+//                      ser_dups               19.55              1.015X
+//                 ser_dups_full                32.4              1.682X
 //
 // deserialize:          Function     Rate (iters/ms)          Comparison
 // ----------------------------------------------------------------------
-//  deserialize_no_dups_baseline               59.13                  1X
-//           deserialize_no_dups               62.14              1.051X
+//        deser_no_dups_baseline               64.94                  1X
+//                 deser_no_dups               69.24              1.066X
 //
-// deserialize_adjacent_dups_baseline          98.18                  1X
-//     deserialize_adjacent_dups               183.7              1.871X
-
+//  deser_adjacent_dups_baseline                 112                  1X
+//           deser_adjacent_dups               207.4              1.852X
+//
+//           deser_dups_baseline               114.8                  1X
+//                    deser_dups               208.5              1.817X
+//
+// Earlier results with LossyHashTable
+// serialize:            Function     Rate (iters/ms)          Comparison
+// ----------------------------------------------------------------------
+//             ser_no_dups_lossy               15.93             0.9139X
+//       ser_adjacent_dups_lossy               58.21              2.184X
+//                ser_dups_lossy               50.46               2.62X
+//
+// Earlier results with boost::unordered_map
+// serialize:            Function     Rate (iters/ms)          Comparison
+// ----------------------------------------------------------------------
+//              ser_no_dups_full                8.73             0.5582X
+//
+//        ser_adjacent_dups_full                38.7              1.634X
+//
+//                 ser_dups_full                27.5               1.54X
+//
 
 using namespace impala;
 
@@ -177,7 +202,7 @@ class RowBatchSerializeBaseline {
     // Convert input_batch.tuple_offsets into pointers
     int tuple_idx = 0;
     for (vector<int32_t>::const_iterator offset = input_batch.tuple_offsets.begin();
-         offset != input_batch.tuple_offsets.end(); ++offset) {
+         offset != input_batch.tuple_offsets.end(); ++offset) {///
       if (*offset == -1) {
         batch->tuple_ptrs_[tuple_idx++] = NULL;
       } else {
@@ -200,130 +225,175 @@ class RowBatchSerializeBaseline {
   }
 };
 
-}
-
-// Fill batch with (int, string) tuples with random data.
-static void FillBatch(RowBatch* batch, int rand_seed, int repeats) {
-  srand(rand_seed);
-  MemPool* mem_pool = batch->tuple_data_pool();
-  const TupleDescriptor* tuple_desc = batch->row_desc().tuple_descriptors()[0];
-  int unique_tuples = (NUM_ROWS - 1) / repeats + 1;
-  uint8_t* tuple_mem = mem_pool->Allocate(tuple_desc->byte_size() * unique_tuples);
-  for (int i = 0; i < NUM_ROWS; ++i) {
-    int row_idx = batch->AddRow();
-    TupleRow* row = batch->GetRow(row_idx);
-    Tuple* tuple;
-    if (i % repeats == 0) {
-      // Generate new unique tuple.
-      tuple = reinterpret_cast<Tuple*>(tuple_mem);
-      tuple->Init(tuple_desc->byte_size());
-      tuple_mem += tuple_desc->byte_size();
-      int int_val = rand();
-      RawValue::Write(&int_val, tuple, tuple_desc->slots()[0], mem_pool);
-      char string_buf[MAX_STRING_LEN + 1];
-      int string_len = rand() % MAX_STRING_LEN;
-      for (int j = 0; j < string_len; ++j) {
-        string_buf[j] = (char)rand() % 256;
+class RowBatchSerializeBenchmark {
+ public:
+  // Fill batch with (int, string) tuples with random data.
+  static void FillBatch(RowBatch* batch, int rand_seed, int repeats, int cycle) {
+    srand(rand_seed);
+    if (cycle <= 0) cycle = NUM_ROWS; // Negative means no repeats in cycle.
+    MemPool* mem_pool = batch->tuple_data_pool();
+    const TupleDescriptor* tuple_desc = batch->row_desc().tuple_descriptors()[0];
+    int unique_tuples = (NUM_ROWS - 1) / repeats + 1;
+    uint8_t* tuple_mem = mem_pool->Allocate(tuple_desc->byte_size() * unique_tuples);
+    for (int i = 0; i < NUM_ROWS; ++i) {
+      int row_idx = batch->AddRow();
+      TupleRow* row = batch->GetRow(row_idx);
+      Tuple* tuple;
+      if (i >= cycle) {
+        // Duplicate of tuple from previous cycle.
+        tuple = batch->GetRow(i - cycle)->GetTuple(0);
+      } else if (i % repeats == 0) {
+        // Generate new unique tuple.
+        tuple = reinterpret_cast<Tuple*>(tuple_mem);
+        tuple->Init(tuple_desc->byte_size());
+        tuple_mem += tuple_desc->byte_size();
+        int int_val = rand();
+        RawValue::Write(&int_val, tuple, tuple_desc->slots()[0], mem_pool);
+        char string_buf[MAX_STRING_LEN + 1];
+        int string_len = rand() % MAX_STRING_LEN;
+        for (int j = 0; j < string_len; ++j) {
+          string_buf[j] = (char)rand() % 256;
+        }
+        StringValue string_val(string_buf, string_len);
+        RawValue::Write(&string_val, tuple, tuple_desc->slots()[1], mem_pool);
+      } else {
+        // Duplicate of previous.
+        tuple = batch->GetRow(i - 1)->GetTuple(0);
       }
-      StringValue string_val(string_buf, string_len);
-      RawValue::Write(&string_val, tuple, tuple_desc->slots()[1], mem_pool);
-    } else {
-      // Duplicate of previous.
-      tuple = batch->GetRow(i - 1)->GetTuple(0);
+      row->SetTuple(0, tuple);
+      batch->CommitLastRow();
     }
-    row->SetTuple(0, tuple);
-    batch->CommitLastRow();
   }
-}
 
-static void TestSerialize(int batch_size, void* data) {
-  RowBatch* batch = reinterpret_cast<RowBatch*>(data);
-  for (int iter = 0; iter < batch_size; ++iter) {
-    TRowBatch trow_batch;
-    batch->Serialize(&trow_batch);
+  struct SerializeArgs {
+    RowBatch* batch;
+    bool full_dedup;
+  };
+
+  static void TestSerialize(int batch_size, void* data) {
+    SerializeArgs* args = reinterpret_cast<SerializeArgs*>(data);
+    for (int iter = 0; iter < batch_size; ++iter) {
+      TRowBatch trow_batch;
+      args->batch->Serialize(&trow_batch, args->full_dedup);
+    }
   }
-}
 
-static void TestSerializeBaseline(int batch_size, void* data) {
-  RowBatch* batch = reinterpret_cast<RowBatch*>(data);
-  for (int iter = 0; iter < batch_size; ++iter) {
-    TRowBatch trow_batch;
-    RowBatchSerializeBaseline::Serialize(batch, &trow_batch);
+  static void TestSerializeBaseline(int batch_size, void* data) {
+    RowBatch* batch = reinterpret_cast<RowBatch*>(data);
+    for (int iter = 0; iter < batch_size; ++iter) {
+      TRowBatch trow_batch;
+      RowBatchSerializeBaseline::Serialize(batch, &trow_batch);
+    }
   }
-}
 
-struct DeserializeArgs {
-  TRowBatch* trow_batch;
-  RowDescriptor* row_desc;
-  MemTracker* tracker;
+  struct DeserializeArgs {
+    TRowBatch* trow_batch;
+    RowDescriptor* row_desc;
+    MemTracker* tracker;
+  };
+
+  static void TestDeserialize(int batch_size, void* data) {
+    struct DeserializeArgs* args = reinterpret_cast<struct DeserializeArgs*>(data);
+    for (int iter = 0; iter < batch_size; ++iter) {
+      RowBatch deserialized_batch(*args->row_desc, *args->trow_batch, args->tracker);
+    }
+  }
+
+  static void TestDeserializeBaseline(int batch_size, void* data) {
+    struct DeserializeArgs* args = reinterpret_cast<struct DeserializeArgs*>(data);
+    for (int iter = 0; iter < batch_size; ++iter) {
+      RowBatch deserialized_batch(*args->row_desc, args->trow_batch->num_rows,
+          args->tracker);
+      RowBatchSerializeBaseline::Deserialize(&deserialized_batch, *args->trow_batch);
+    }
+  }
+
+  static void Run() {
+    CpuInfo::Init();
+
+    MemTracker tracker;
+    MemPool mem_pool(&tracker);
+    ObjectPool obj_pool;
+    DescriptorTblBuilder builder(&obj_pool);
+    builder.DeclareTuple() << TYPE_INT << TYPE_STRING;
+    DescriptorTbl* desc_tbl = builder.Build();
+
+    vector<bool> nullable_tuples(1, false);
+    vector<TTupleId> tuple_id(1, (TTupleId) 0);
+    RowDescriptor row_desc(*desc_tbl, tuple_id, nullable_tuples);
+
+    RowBatch* no_dup_batch = obj_pool.Add(new RowBatch(row_desc, NUM_ROWS, &tracker));
+    FillBatch(no_dup_batch, 12345, 1, -1);
+    TRowBatch no_dup_tbatch;
+    no_dup_batch->Serialize(&no_dup_tbatch);
+
+    RowBatch* adjacent_dup_batch =
+        obj_pool.Add(new RowBatch(row_desc, NUM_ROWS, &tracker));
+    FillBatch(adjacent_dup_batch, 12345, 5, -1);
+    TRowBatch adjacent_dup_tbatch;
+    adjacent_dup_batch->Serialize(&adjacent_dup_tbatch, false);
+
+    RowBatch* dup_batch =
+        obj_pool.Add(new RowBatch(row_desc, NUM_ROWS, &tracker));
+    // Non-adjacent duplicates.
+    FillBatch(dup_batch, 12345, 1, NUM_ROWS / 5);
+    TRowBatch dup_tbatch;
+    dup_batch->Serialize(&dup_tbatch, true);
+
+    int baseline;
+    Benchmark ser_suite("serialize");
+    baseline = ser_suite.AddBenchmark("ser_no_dups_baseline", TestSerializeBaseline,
+        no_dup_batch, -1);
+    struct SerializeArgs no_dup_ser_args = { no_dup_batch, false };
+    struct SerializeArgs no_dup_ser_full_args = { no_dup_batch, true };
+    ser_suite.AddBenchmark("ser_no_dups", TestSerialize, &no_dup_ser_args, baseline);
+    ser_suite.AddBenchmark("ser_no_dups_full",
+        TestSerialize, &no_dup_ser_full_args, baseline);
+
+    baseline = ser_suite.AddBenchmark("ser_adjacent_dups_baseline",
+        TestSerializeBaseline, adjacent_dup_batch, -1);
+    struct SerializeArgs adjacent_dup_ser_args = { adjacent_dup_batch, false };
+    struct SerializeArgs adjacent_dup_ser_full_args = { adjacent_dup_batch, true };
+    ser_suite.AddBenchmark("ser_adjacent_dups",
+        TestSerialize, &adjacent_dup_ser_args, baseline);
+    ser_suite.AddBenchmark("ser_adjacent_dups_full",
+        TestSerialize, &adjacent_dup_ser_full_args, baseline);
+
+    baseline = ser_suite.AddBenchmark("ser_dups_baseline",
+        TestSerializeBaseline, dup_batch, -1);
+    struct SerializeArgs dup_ser_args = { dup_batch, false };
+    struct SerializeArgs dup_ser_full_args = { dup_batch, true };
+    ser_suite.AddBenchmark("ser_dups", TestSerialize, &dup_ser_args, baseline);
+    ser_suite.AddBenchmark("ser_dups_full", TestSerialize, &dup_ser_full_args, baseline);
+
+    cout << ser_suite.Measure() << endl;
+
+    Benchmark deser_suite("deserialize");
+    struct DeserializeArgs no_dup_deser_args = { &no_dup_tbatch, &row_desc, &tracker };
+    baseline = deser_suite.AddBenchmark("deser_no_dups_baseline",
+        TestDeserializeBaseline, &no_dup_deser_args, -1);
+    deser_suite.AddBenchmark("deser_no_dups",
+        TestDeserialize, &no_dup_deser_args, baseline);
+
+    struct DeserializeArgs adjacent_dup_deser_args = { &adjacent_dup_tbatch, &row_desc,
+        &tracker };
+    baseline = deser_suite.AddBenchmark("deser_adjacent_dups_baseline",
+        TestDeserializeBaseline, &adjacent_dup_deser_args, -1);
+    deser_suite.AddBenchmark("deser_adjacent_dups",
+        TestDeserialize, &adjacent_dup_deser_args, baseline);
+
+    struct DeserializeArgs dup_deser_args = { &dup_tbatch, &row_desc, &tracker };
+    baseline = deser_suite.AddBenchmark("deser_dups_baseline",
+        TestDeserializeBaseline, &dup_deser_args, -1);
+    deser_suite.AddBenchmark("deser_dups", TestDeserialize, &dup_deser_args, baseline);
+
+    cout << deser_suite.Measure() << endl;
+  }
 };
 
-static void TestDeserialize(int batch_size, void* data) {
-  struct DeserializeArgs* args = reinterpret_cast<struct DeserializeArgs*>(data);
-  for (int iter = 0; iter < batch_size; ++iter) {
-    RowBatch deserialized_batch(*args->row_desc, *args->trow_batch, args->tracker);
-  }
-}
-
-static void TestDeserializeBaseline(int batch_size, void* data) {
-  struct DeserializeArgs* args = reinterpret_cast<struct DeserializeArgs*>(data);
-  for (int iter = 0; iter < batch_size; ++iter) {
-    RowBatch deserialized_batch(*args->row_desc, args->trow_batch->num_rows,
-        args->tracker);
-    RowBatchSerializeBaseline::Deserialize(&deserialized_batch, *args->trow_batch);
-  }
 }
 
 int main(int argc, char** argv) {
-  CpuInfo::Init();
-
-  MemTracker tracker;
-  MemPool mem_pool(&tracker);
-  ObjectPool obj_pool;
-  DescriptorTblBuilder builder(&obj_pool);
-  builder.DeclareTuple() << TYPE_INT << TYPE_STRING;
-  DescriptorTbl* desc_tbl = builder.Build();
-
-  vector<bool> nullable_tuples(1, false);
-  vector<TTupleId> tuple_id(1, (TTupleId) 0);
-  RowDescriptor row_desc(*desc_tbl, tuple_id, nullable_tuples);
-
-  RowBatch* no_dup_batch = obj_pool.Add(new RowBatch(row_desc, NUM_ROWS, &tracker));
-  FillBatch(no_dup_batch, 12345, 1);
-  TRowBatch no_dup_tbatch;
-  no_dup_batch->Serialize(&no_dup_tbatch);
-
-  RowBatch* adjacent_dup_batch =
-      obj_pool.Add(new RowBatch(row_desc, NUM_ROWS, &tracker));
-  FillBatch(adjacent_dup_batch, 12345, 5);
-  TRowBatch adjacent_dup_tbatch;
-  adjacent_dup_batch->Serialize(&adjacent_dup_tbatch);
-
-  int baseline;
-  Benchmark serialize_suite("serialize");
-  baseline = serialize_suite.AddBenchmark("serialize_no_dups_baseline",
-      TestSerializeBaseline, no_dup_batch, -1);
-  serialize_suite.AddBenchmark("serialize_no_dups",
-      TestSerialize, no_dup_batch, baseline);
-  baseline = serialize_suite.AddBenchmark("serialize_adjacent_dups_baseline",
-      TestSerializeBaseline, adjacent_dup_batch, -1);
-  serialize_suite.AddBenchmark("serialize_adjacent_dups",
-      TestSerialize, adjacent_dup_batch, baseline);
-  cout << serialize_suite.Measure() << endl;
-
-  Benchmark deserialize_suite("deserialize");
-  struct DeserializeArgs no_dup_deser_args = { &no_dup_tbatch, &row_desc, &tracker };
-  baseline = deserialize_suite.AddBenchmark("deserialize_no_dups_baseline",
-      TestDeserializeBaseline, &no_dup_deser_args, -1);
-  deserialize_suite.AddBenchmark("deserialize_no_dups",
-      TestDeserialize, &no_dup_deser_args, baseline);
-  struct DeserializeArgs adjacent_dup_deser_args = { &adjacent_dup_tbatch, &row_desc,
-      &tracker };
-  baseline = deserialize_suite.AddBenchmark("deserialize_adjacent_dups_baseline",
-      TestDeserializeBaseline, &adjacent_dup_deser_args, -1);
-  deserialize_suite.AddBenchmark("deserialize_adjacent_dups",
-      TestDeserialize, &adjacent_dup_deser_args, baseline);
-  cout << deserialize_suite.Measure() << endl;
-
+  RowBatchSerializeBenchmark::Run();
   return 0;
 }

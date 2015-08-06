@@ -30,11 +30,14 @@
 namespace impala {
 
 class BufferedTupleStream;
+template <typename K, typename V> class FixedSizeHashTable;
 class MemTracker;
+class RowBatchSerializeTest;
 class TRowBatch;
 class Tuple;
 class TupleRow;
 class TupleDescriptor;
+
 
 /// A RowBatch encapsulates a batch of rows, each composed of a number of tuples.
 /// The maximum number of rows is fixed at the time of construction.
@@ -208,10 +211,8 @@ class RowBatch {
   /// output_batch.tuple_data will be snappy-compressed unless the compressed data is
   /// larger than the uncompressed data. Use output_batch.is_compressed to determine
   /// whether tuple_data is compressed. If an in-flight row is present in this row batch,
-  /// it is ignored. This function does not Reset(). Returns the uncompressed serialized
-  /// size (this will be the true size of output_batch if tuple_data is actually
-  /// uncompressed).
-  int Serialize(TRowBatch* output_batch);
+  /// it is ignored. This function does not Reset().
+  Status Serialize(TRowBatch* output_batch);
 
   /// Utility function: returns total size of batch.
   static int GetBatchSize(const TRowBatch& batch);
@@ -230,14 +231,28 @@ class RowBatch {
 
  private:
   friend class RowBatchSerializeBaseline;
+  friend class RowBatchSerializeBenchmark;
+  friend class RowBatchSerializeTest;
+
+  /// Decide whether to do full tuple deduplication based on row composition. Full
+  /// deduplication is enabled only when there is risk of the serialized size being
+  /// much larger than in-memory size due to non-adjacent duplicate tuples.
+  bool UseFullDedup();
+
+  /// Overload for testing that allows the test to force the deduplication level.
+  Status Serialize(TRowBatch* output_batch, bool full_dedup);
+
+  typedef FixedSizeHashTable<Tuple*, int> DedupMap;
 
   /// The total size of all data represented in this row batch (tuples and referenced
   /// string and collection data). This is the size of the row batch after removing all
-  /// gaps in the auxiliary and adjacent duplicate tuples (i.e. the smallest footprint
-  /// for the row batch).
-  int64_t TotalByteSize();
+  /// gaps in the auxiliary and deduplicated tuples (i.e. the smallest footprint for the
+  /// row batch). If the distinct_tuples argument is non-null, full deduplication is
+  /// enabled. The distinct_tuples map must be empty.
+  int64_t TotalByteSize(DedupMap* distinct_tuples);
 
-  void SerializeInternal(int64_t size, TRowBatch* output_batch);
+  void SerializeInternal(int64_t size, DedupMap* distinct_tuples,
+      TRowBatch* output_batch);
 
   MemTracker* mem_tracker_;  // not owned
 

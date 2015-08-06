@@ -81,7 +81,7 @@ class DataStreamSender : public DataSink {
   /// Serializes the src batch into the dest thrift batch. Maintains metrics.
   /// num_receivers is the number of receivers this batch will be sent to. Only
   /// used to maintain metrics.
-  void SerializeBatch(RowBatch* src, TRowBatch* dest, int num_receivers = 1);
+  Status SerializeBatch(RowBatch* src, TRowBatch* dest, int num_receivers = 1);
 
   /// Return total number of bytes sent in TRowBatch.data. If batches are
   /// broadcast to multiple receivers, they are counted once per receiver.

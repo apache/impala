@@ -47,11 +47,12 @@ class RowBatchSerializeTest : public testing::Test {
 
   // Serializes and deserializes 'batch', then checks that the deserialized batch is valid
   // and has the same contents as 'batch'.
-  void TestRowBatch(const RowDescriptor& row_desc, RowBatch* batch, bool print_batches) {
+  void TestRowBatch(const RowDescriptor& row_desc, RowBatch* batch, bool print_batches,
+      bool full_dedup = false) {
     if (print_batches) cout << PrintBatch(batch) << endl;
 
     TRowBatch trow_batch;
-    batch->Serialize(&trow_batch);
+    EXPECT_TRUE(batch->Serialize(&trow_batch, full_dedup).ok());
 
     RowBatch deserialized_batch(row_desc, trow_batch, tracker_.get());
     if (print_batches) cout << PrintBatch(&deserialized_batch) << endl;
@@ -271,6 +272,15 @@ class RowBatchSerializeTest : public testing::Test {
     vector<int> tmp_repeats(1, repeats);
     AddTuplesToRowBatch(num_rows, tmp_tuples, tmp_repeats, batch);
   }
+
+  // Helper to access internal state of batch (this class is friend of RowBatch).
+  bool UseFullDedup(RowBatch* batch) { return batch->UseFullDedup(); }
+
+  void TestDupCorrectness(bool full_dedup);
+
+  void TestDupRemoval(bool full_dedup);
+
+  void TestConsecutiveNulls(bool full_dedup);
 };
 
 TEST_F(RowBatchSerializeTest, Basic) {
@@ -391,8 +401,16 @@ TEST_F(RowBatchSerializeTest, NestedArrays) {
   TestRowBatch(row_desc, batch, true);
 }
 
-// Test that we get correct results when serializing/deserializing with duplicates.
-TEST_F(RowBatchSerializeTest, DupCorrectness) {
+// Test that we get correct result when serializing/deserializing with duplicates
+TEST_F(RowBatchSerializeTest, DupCorrectnessAdjacent) {
+  TestDupCorrectness(false);
+}
+
+TEST_F(RowBatchSerializeTest, DupCorrectnessFull) {
+  TestDupCorrectness(true);
+}
+
+void RowBatchSerializeTest::TestDupCorrectness(bool full_dedup) {
   // tuples: (int), (string)
   DescriptorTblBuilder builder(&pool_);
   builder.DeclareTuple() << TYPE_INT;
@@ -421,11 +439,19 @@ TEST_F(RowBatchSerializeTest, DupCorrectness) {
   CreateTuples(*row_desc.tuple_descriptors()[1], batch->tuple_data_pool(),
       distinct_string_tuples, 0, 10, &distinct_tuples[1]);
   AddTuplesToRowBatch(num_rows, distinct_tuples, repeats, batch);
-  TestRowBatch(row_desc, batch, false);
+  TestRowBatch(row_desc, batch, false, full_dedup);
+}
+
+TEST_F(RowBatchSerializeTest, DupRemovalAdjacent) {
+  TestDupRemoval(false);
+}
+
+TEST_F(RowBatchSerializeTest, DupRemovalFull) {
+  TestDupRemoval(true);
 }
 
 // Test that tuple deduplication results in the expected reduction in serialized size.
-TEST_F(RowBatchSerializeTest, DupRemoval) {
+void RowBatchSerializeTest::TestDupRemoval(bool full_dedup) {
   // tuples: (int, string)
   DescriptorTblBuilder builder(&pool_);
   builder.DeclareTuple() << TYPE_INT << TYPE_STRING;
@@ -445,18 +471,26 @@ TEST_F(RowBatchSerializeTest, DupRemoval) {
   CreateTuples(tuple_desc, batch->tuple_data_pool(), num_distinct_tuples, 0, 10, &tuples);
   AddTuplesToRowBatch(num_rows, tuples, repeats, batch);
   TRowBatch trow_batch;
-  batch->Serialize(&trow_batch);
+  EXPECT_TRUE(batch->Serialize(&trow_batch, full_dedup).ok());
   // Serialized data should only have one copy of each tuple.
   int64_t total_byte_size = 0; // Total size without duplication
   for (int i = 0; i < tuples.size(); ++i) {
     total_byte_size += tuples[i]->TotalByteSize(tuple_desc);
   }
   EXPECT_EQ(total_byte_size, trow_batch.uncompressed_size);
-  TestRowBatch(row_desc, batch, false);
+  TestRowBatch(row_desc, batch, false, full_dedup);
+}
+
+TEST_F(RowBatchSerializeTest, ConsecutiveNullsAdjacent) {
+  TestConsecutiveNulls(false);
+}
+
+TEST_F(RowBatchSerializeTest, ConsecutiveNullsFull) {
+  TestConsecutiveNulls(true);
 }
 
 // Test that deduplication handles NULL tuples correctly.
-TEST_F(RowBatchSerializeTest, ConsecutiveNullTuples) {
+void RowBatchSerializeTest::TestConsecutiveNulls(bool full_dedup) {
   // tuples: (int)
   DescriptorTblBuilder builder(&pool_);
   builder.DeclareTuple() << TYPE_INT;
@@ -473,7 +507,106 @@ TEST_F(RowBatchSerializeTest, ConsecutiveNullTuples) {
   CreateTuples(*row_desc.tuple_descriptors()[0], batch->tuple_data_pool(),
       num_distinct_tuples, 50, 10, &tuples);
   AddTuplesToRowBatch(num_rows, tuples, repeats, batch);
-  TestRowBatch(row_desc, batch, false);
+  TestRowBatch(row_desc, batch, false, full_dedup);
+}
+
+// Test a pathological case for consecutive deduplication - two large alternating tuples.
+// This tests that we are capable of duplicating non-adjacent tuples to produce a compact
+// serialized batch with no duplication. It also stresses the serialization logic to
+// ensure that it can handle batches with large degrees of duplication without hitting
+// any runtime errors.
+TEST_F(RowBatchSerializeTest, DedupPathologicalFull) {
+  // tuples: (int, int array<(string)>)
+  // Need 3 tuples + array to enable non-adjacent dedup automatically
+  ColumnType array_type;
+  array_type.type = TYPE_ARRAY;
+  array_type.children.push_back(TYPE_STRING);
+  DescriptorTblBuilder builder(&pool_);
+  builder.DeclareTuple() << TYPE_INT;
+  builder.DeclareTuple() << TYPE_INT;
+  builder.DeclareTuple() << array_type;
+  DescriptorTbl* desc_tbl = builder.Build();
+  vector<bool> nullable_tuples(3, true);
+  vector<TTupleId> tuple_id;
+  tuple_id.push_back((TTupleId) 0);
+  tuple_id.push_back((TTupleId) 1);
+  tuple_id.push_back((TTupleId) 2);
+  RowDescriptor row_desc(*desc_tbl, tuple_id, nullable_tuples);
+  const int num_tuples = 3;
+  const int num_int_tuples = 2;
+  const int array_tuple_idx = 2;
+  int huge_string_size = INT_MAX / 256;
+  int num_rows = 100000; // Without deduplication this will be gigantic
+  int num_distinct_array_tuples = 2;
+
+  // Build two tuples with huge strings in them
+  string huge_string;
+  LOG(INFO) << "Try to resize to " << huge_string_size;
+  huge_string.resize(huge_string_size, 'z');
+  vector<vector<Tuple*> > tuples(num_tuples);
+  vector<int> repeats(num_tuples, 1); // Don't repeat tuples adjacently
+  int64_t total_byte_size = 0;
+  RowBatch* batch = pool_.Add(new RowBatch(row_desc, num_rows, tracker_.get()));
+  // First two tuples are integers because it doesn't matter for this test.
+  for (int tuple_idx = 0; tuple_idx < num_int_tuples; ++tuple_idx) {
+    TupleDescriptor* tuple_desc = row_desc.tuple_descriptors()[tuple_idx];
+    CreateTuples(*tuple_desc, batch->tuple_data_pool(), num_rows, 0, false,
+        &tuples[tuple_idx]);
+    total_byte_size += tuple_desc->byte_size() * num_rows;
+  }
+  // The last tuple is a duplicated array with a large string inside.
+  const TupleDescriptor* array_tuple_desc = row_desc.tuple_descriptors()[array_tuple_idx];
+  const SlotDescriptor* array_slot_desc = array_tuple_desc->slots()[0];
+  const TupleDescriptor* array_item_desc = array_slot_desc->collection_item_descriptor();
+  const SlotDescriptor* string_slot_desc = array_item_desc->slots()[0];
+  MemPool* pool = batch->tuple_data_pool();
+  for (int i = 0; i < num_distinct_array_tuples; ++i) {
+    uint8_t* tuple_mem = pool->Allocate(array_tuple_desc->byte_size());
+    Tuple* tuple = reinterpret_cast<Tuple*>(tuple_mem);
+    ArrayValue av;
+    av.ptr = pool->Allocate(array_item_desc->byte_size());
+    av.num_tuples = 1;
+    StringValue huge_string_value((char*)huge_string.data(), huge_string_size);
+    RawValue::Write(&huge_string_value, reinterpret_cast<Tuple*>(av.ptr),
+        string_slot_desc, NULL);
+    RawValue::Write(&av, tuple, array_slot_desc, NULL);
+    tuples[array_tuple_idx].push_back(tuple);
+    total_byte_size += array_tuple_desc->byte_size() + av.ByteSize(*array_item_desc) +
+        huge_string_size;
+  }
+  LOG(INFO) << "Building row batch";
+  AddTuplesToRowBatch(num_rows, tuples, repeats, batch);
+  // Full dedup should be automatically enabled because of row batch structure.
+  EXPECT_TRUE(UseFullDedup(batch));
+  LOG(INFO) << "Serializing row batch";
+  TRowBatch trow_batch;
+  EXPECT_TRUE(batch->Serialize(&trow_batch).ok());
+  LOG(INFO) << "Serialized batch size: " << trow_batch.tuple_data.size();
+  LOG(INFO) << "Serialized batch uncompressed size: " << trow_batch.uncompressed_size;
+  LOG(INFO) << "Serialized batch expected size: " << total_byte_size;
+  // Serialized data should only have one copy of each tuple.
+  EXPECT_EQ(total_byte_size, trow_batch.uncompressed_size);
+  LOG(INFO) << "Deserializing row batch";
+  RowBatch deserialized_batch(row_desc, trow_batch, tracker_.get());
+  LOG(INFO) << "Verifying row batch";
+  // Need to do special verification: comparing all duplicate strings is too slow.
+  EXPECT_EQ(batch->num_rows(), deserialized_batch.num_rows());
+  for (int row_idx = 0; row_idx < batch->num_rows(); ++row_idx) {
+    for (int tuple_idx = 0; tuple_idx < num_tuples; ++tuple_idx) {
+      TupleDescriptor* tuple_desc = row_desc.tuple_descriptors()[tuple_idx];
+      Tuple* tuple = batch->GetRow(row_idx)->GetTuple(tuple_idx);
+      Tuple* deserialized_tuple = deserialized_batch.GetRow(row_idx)->GetTuple(tuple_idx);
+      if (tuple_idx != array_tuple_idx || row_idx < tuples.size()) {
+        // Compare tuples directly
+        TestTuplesEqual(*tuple_desc, tuple, deserialized_tuple);
+      } else {
+        // This should just be a repeat of a previous tuple - avoid comparison.
+        int prev_dup_idx = row_idx - num_distinct_array_tuples;
+        EXPECT_EQ(deserialized_batch.GetRow(prev_dup_idx)->GetTuple(tuple_idx),
+            deserialized_tuple);
+      }
+    }
+  }
 }
 
 }
