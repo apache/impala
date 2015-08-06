@@ -93,6 +93,10 @@ class ImpalaShell(cmd.Cmd):
   CANCELLATION_TRIES = 3
   # Commands are terminated with the following delimiter.
   CMD_DELIM = ';'
+  # Valid variable name pattern
+  VALID_VAR_NAME_PATTERN = r'[A-Za-z][A-Za-z0-9_]*'
+  # Variable names are prefixed with the following string
+  VAR_PREFIXES = [ 'VAR', 'HIVEVAR' ]
   DEFAULT_DB = 'default'
   # Regex applied to all tokens of a query to detect the query type.
   INSERT_REGEX = re.compile("^insert$", re.I)
@@ -143,6 +147,7 @@ class ImpalaShell(cmd.Cmd):
     self.progress_stream = OverwritingStdErrOutputStream()
 
     self.set_query_options = {}
+    self.set_variables = options.variables
 
     self._populate_command_list()
 
@@ -199,12 +204,20 @@ class ImpalaShell(cmd.Cmd):
     if not default_options and not set_options:
       print '\tNo options available.'
     else:
-      for k in sorted(default_options.keys()):
-        if k in set_options.keys() and set_options[k] != default_options[k]:
+      for k in sorted(default_options):
+        if k in set_options and set_options[k] != default_options[k]:
           print '\n'.join(["\t%s: %s" % (k, set_options[k])])
         else:
           print '\n'.join(["\t%s: [%s]" % (k, default_options[k])])
     self._print_shell_options()
+
+  def _print_variables(self):
+    # Prints the currently defined variables.
+    if not self.set_variables:
+      print '\tNo variables defined.'
+    else:
+      for k in sorted(self.set_variables):
+        print '\n'.join(["\t%s: %s" % (k, self.set_variables[k])])
 
   def _print_shell_options(self):
     """Prints shell options, which are local and independent of query options."""
@@ -394,6 +407,40 @@ class ImpalaShell(cmd.Cmd):
         print_to_stderr("Failed to reconnect and close (try %i/%i): %s" % (
             cancel_try + 1, ImpalaShell.CANCELLATION_TRIES, err_msg))
 
+  def _replace_variables(self, query):
+    """Replaces variable within the query text with their corresponding values"""
+    errors = False
+    matches = set(map(lambda v: v.upper(), re.findall(r'(?<!\\)\${([^}]+)}', query)))
+    for name in matches:
+      value = None
+      # A namespace must be specified
+      ns_match = re.match(r'^([^:]*):(.*)', name)
+      if ns_match is None:
+        print_to_stderr('Error: Variable namespace not specified (%s). ' % (name) + \
+                        'Use ${VAR:var_name}.')
+        errors = True
+      else:
+        ns = ns_match.group(1)
+        var_name = ns_match.group(2)
+        if ns in ImpalaShell.VAR_PREFIXES:
+          # Replaces variable value
+          if self.set_variables and var_name in self.set_variables:
+            value = self.set_variables[var_name]
+          else:
+            print_to_stderr('Error: Unknown variable %s' % (var_name))
+            errors = True
+        else:
+          print_to_stderr('Error: Unknown substitution syntax (%s). ' % (name) + \
+                          'Use ${VAR:var_name}.')
+          errors = True
+        if value is not None:
+          regexp = re.compile(r'(?<!\\)\${%s}' % (name,), re.IGNORECASE)
+          query = regexp.sub(value, query)
+    if errors:
+      return None
+    else:
+      return query
+
   def precmd(self, args):
     args = self.sanitise_input(args)
     if not args: return args
@@ -413,6 +460,21 @@ class ImpalaShell(cmd.Cmd):
       print_to_stderr("Connection lost, reconnecting...")
       self._connect()
     return args.encode('utf-8')
+
+  def onecmd(self, line):
+    """Overridden to ensure the variable replacement is processed in interactive
+       as well as non-interactive mode, since the precmd method would only work for
+       the interactive case, when cmdloop is called.
+    """
+    # Replace variables in the statement before it's executed
+    line = self._replace_variables(line)
+    # Cmd is an old-style class, hence we need to call the method directly
+    # instead of using super()
+    # TODO: This may have to be changed to a super() call once we move to Python 3
+    if line == None:
+      return CmdStatus.ERROR
+    else:
+      return cmd.Cmd.onecmd(self, line)
 
   def postcmd(self, status, args):
     # status conveys to shell how the shell should continue execution
@@ -458,7 +520,9 @@ class ImpalaShell(cmd.Cmd):
     # TODO: Expand set to allow for setting more than just query options.
     if len(args) == 0:
       print "Query options (defaults shown in []):"
-      self._print_options(self.imp_client.default_query_options, self.set_query_options);
+      self._print_options(self.imp_client.default_query_options, self.set_query_options)
+      print "\nVariables:"
+      self._print_variables()
       return CmdStatus.SUCCESS
 
     # Remove any extra spaces surrounding the tokens.
@@ -469,7 +533,7 @@ class ImpalaShell(cmd.Cmd):
       return CmdStatus.ERROR
     option_upper = tokens[0].upper()
     if not self._handle_shell_options(option_upper, tokens[1]):
-      if option_upper not in self.imp_client.default_query_options.keys():
+      if option_upper not in self.imp_client.default_query_options:
         print "Unknown query option: %s" % (tokens[0])
         print "Available query options, with their values (defaults shown in []):"
         self._print_options(self.imp_client.default_query_options, self.set_query_options)
@@ -484,10 +548,10 @@ class ImpalaShell(cmd.Cmd):
       return CmdStatus.ERROR
     option = args.upper()
     if self.set_query_options.get(option):
-      print 'Unsetting %s' % option
+      print 'Unsetting option %s' % option
       del self.set_query_options[option]
     else:
-      print "No option called %s is set" % args
+      print "No option called %s is set" % option
 
   def do_quit(self, args):
     """Quit the Impala shell"""
@@ -560,8 +624,8 @@ class ImpalaShell(cmd.Cmd):
     self.partial_cmd = str()
     # Check if any of query options set by the user are inconsistent
     # with the impalad being connected to
-    for set_option in self.set_query_options.keys():
-      if set_option not in set(self.imp_client.default_query_options.keys()):
+    for set_option in self.set_query_options:
+      if set_option not in set(self.imp_client.default_query_options):
         print ('%s is not supported for the impalad being '
                'connected to, ignoring.' % set_option)
         del self.set_query_options[set_option]
@@ -1039,6 +1103,22 @@ def parse_query_text(query_text, utf8_encode_policy='strict'):
   """Parse query file text to extract queries and encode into utf-8"""
   return [q.encode('utf-8', utf8_encode_policy) for q in sqlparse.split(query_text)]
 
+def parse_variables(keyvals):
+  """Parse variable assignments passed as arguments in the command line"""
+  kv_pattern = r'(%s)=(.*)$' % (ImpalaShell.VALID_VAR_NAME_PATTERN,)
+  vars = {}
+  if keyvals:
+    for keyval in keyvals:
+      match = re.match(kv_pattern, keyval)
+      if not match:
+        print_to_stderr('Error: Could not parse key-value "%s". ' + \
+                        'It must follow the pattern "KEY=VALUE".' % (keyval,))
+        parser.print_help()
+        sys.exit(1)
+      else:
+        vars[match.groups()[0].upper()] = match.groups()[1]
+  return vars
+
 def execute_queries_non_interactive_mode(options):
   """Run queries in non-interactive mode."""
   queries = []
@@ -1172,6 +1252,7 @@ if __name__ == "__main__":
       print_to_stderr('Error opening output file for writing: %s' % e)
       sys.exit(1)
 
+  options.variables = parse_variables(options.keyval)
   if options.query or options.query_file:
     if options.print_progress or options.print_summary:
       print_to_stderr("Error: Live reporting is available for interactive mode only.")

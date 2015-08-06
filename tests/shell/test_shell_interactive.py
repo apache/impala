@@ -18,7 +18,7 @@
 import os
 import pexpect
 import pytest
-import shlex
+import re
 import shutil
 import socket
 import signal
@@ -33,6 +33,7 @@ from time import sleep
 SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
 SHELL_HISTORY_FILE = os.path.expanduser("~/.impalahistory")
 TMP_HISTORY_FILE = os.path.expanduser("~/.impalahistorytmp")
+QUERY_FILE_PATH = os.path.join(os.environ['IMPALA_HOME'], 'tests', 'shell')
 
 class TestImpalaShellInteractive(object):
   """Test the impala shell interactively"""
@@ -256,15 +257,42 @@ class TestImpalaShellInteractive(object):
       if t in result.stderr: return
     assert False, "No tip found in output %s" % result.stderr
 
-def run_impala_shell_interactive(command, shell_args=''):
+  @pytest.mark.execute_serially
+  def test_var_replacement(self):
+    cmds = open(os.path.join(QUERY_FILE_PATH, 'test_var_substitution.sql')).read().\
+      split('\n')
+    args = '--var=foo=123 --var=BAR=456 --delimited --output_delimiter=" "'
+    result = run_impala_shell_interactive(cmds, shell_args=args)
+    assert re.search(r'\bfoo_number=\s*123123', result.stdout), \
+      "Numeric values not replaced correctly"
+    assert re.search(r'\bfoo_string=123', result.stdout), \
+      "String values not replaced correctly"
+    assert re.search(r'\bVariables:[\s\n]*BAR:\s*456\n\s*FOO:\s*123', result.stdout), \
+      "Set variable not listed correctly by the SET command"
+    assert re.search(r'\bError:\s*Unknown\s*variable\s*FOO1', result.stderr), \
+      "Missing variable FOO1 not reported correctly"
+    assert re.search(r'\bmulti_test=456_123_456_123', result.stdout), \
+      "Multiple replaces not working correctly"
+    assert re.search(r'\bError:\s*Variable\s*namespace\s*not\s*specified\s*' +
+                     r'\(RANDOM_NAME\). Use \${VAR:var_name}', \
+      result.stderr), "Invalid variable reference"
+    assert re.search(r'"This should be not replaced: \${VAR:foo} \${HIVEVAR:bar}"',
+      result.stdout), "Variable escaping not working"
+
+
+def run_impala_shell_interactive(input_lines, shell_args=''):
   """Runs a command in the Impala shell interactively."""
   cmd = "%s %s" % (SHELL_CMD, shell_args)
+  # if argument "input_lines" is a string, makes it into a list
+  if type(input_lines) is str:
+    input_lines = [input_lines]
   # workaround to make Popen environment 'utf-8' compatible
   # since piping defaults to ascii
   my_env = os.environ
   my_env['PYTHONIOENCODING'] = 'utf-8'
-  p = Popen(shlex.split(cmd), shell=True, stdout=PIPE,
+  p = Popen(cmd, shell=True, stdout=PIPE,
             stdin=PIPE, stderr=PIPE, env=my_env)
-  p.stdin.write(command + "\n")
-  p.stdin.flush()
+  for line in input_lines:
+    p.stdin.write(line + "\n")
+    p.stdin.flush()
   return get_shell_cmd_result(p)
