@@ -34,7 +34,13 @@ namespace impala {
 
 int64_t Tuple::TotalByteSize(const TupleDescriptor& desc) const {
   int64_t result = desc.byte_size();
+  if (!desc.HasVarlenSlots()) return result;
+  result += VarlenByteSize(desc);
+  return result;
+}
 
+int64_t Tuple::VarlenByteSize(const TupleDescriptor& desc) const {
+  int64_t result = 0;
   vector<SlotDescriptor*>::const_iterator slot = desc.string_slots().begin();
   for (; slot != desc.string_slots().end(); ++slot) {
     DCHECK((*slot)->type().IsVarLenStringType());
@@ -86,7 +92,7 @@ void Tuple::DeepCopy(const TupleDescriptor& desc, char** data, int* offset,
   memcpy(dst, this, desc.byte_size());
   *data += desc.byte_size();
   *offset += desc.byte_size();
-  dst->CopyVarlenData(desc, data, offset, convert_ptrs);
+  if (desc.HasVarlenSlots()) dst->CopyVarlenData(desc, data, offset, convert_ptrs);
 }
 
 void Tuple::CopyVarlenData(const TupleDescriptor& desc, char** data, int* offset,

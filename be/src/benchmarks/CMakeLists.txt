@@ -32,6 +32,7 @@ ADD_BE_BENCHMARK(rle-benchmark)
 ADD_BE_BENCHMARK(string-compare-benchmark)
 ADD_BE_BENCHMARK(multiint-benchmark)
 ADD_BE_BENCHMARK(status-benchmark)
+ADD_BE_BENCHMARK(row-batch-serialize-benchmark)
 
 add_executable(hash-benchmark hash-benchmark.cc)
 target_link_libraries(hash-benchmark Experiments ${IMPALA_LINK_LIBS})

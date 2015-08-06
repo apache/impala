@@ -133,11 +133,6 @@ class RowBatch {
         (tuple_pool->total_allocated_bytes() > AT_CAPACITY_MEM_USAGE && num_rows_ > 0);
   }
 
-  /// The total size of all data represented in this row batch (tuples and referenced
-  /// string and collection data). This is the size of the row batch after removing all
-  /// gaps in the auxiliary (i.e. the smallest footprint for the row batch).
-  int64_t TotalByteSize();
-
   TupleRow* GetRow(int row_idx) {
     DCHECK(tuple_ptrs_ != NULL);
     DCHECK_GE(row_idx, 0);
@@ -208,13 +203,14 @@ class RowBatch {
   void AcquireState(RowBatch* src);
 
   /// Create a serialized version of this row batch in output_batch, attaching all of the
-  /// data it references to output_batch.tuple_data. output_batch.tuple_data will be
-  /// snappy-compressed unless the compressed data is larger than the uncompressed
-  /// data. Use output_batch.is_compressed to determine whether tuple_data is compressed.
-  /// If an in-flight row is present in this row batch, it is ignored.
-  /// This function does not Reset().
-  /// Returns the uncompressed serialized size (this will be the true size of output_batch
-  /// if tuple_data is actually uncompressed).
+  /// data it references to output_batch.tuple_data. This function attempts to
+  /// detect duplicate tuples in the row batch to reduce the serialized size.
+  /// output_batch.tuple_data will be snappy-compressed unless the compressed data is
+  /// larger than the uncompressed data. Use output_batch.is_compressed to determine
+  /// whether tuple_data is compressed. If an in-flight row is present in this row batch,
+  /// it is ignored. This function does not Reset(). Returns the uncompressed serialized
+  /// size (this will be the true size of output_batch if tuple_data is actually
+  /// uncompressed).
   int Serialize(TRowBatch* output_batch);
 
   /// Utility function: returns total size of batch.
@@ -233,6 +229,16 @@ class RowBatch {
   int MaxTupleBufferSize();
 
  private:
+  friend class RowBatchSerializeBaseline;
+
+  /// The total size of all data represented in this row batch (tuples and referenced
+  /// string and collection data). This is the size of the row batch after removing all
+  /// gaps in the auxiliary and adjacent duplicate tuples (i.e. the smallest footprint
+  /// for the row batch).
+  int64_t TotalByteSize();
+
+  void SerializeInternal(int64_t size, TRowBatch* output_batch);
+
   MemTracker* mem_tracker_;  // not owned
 
   /// All members below need to be handled in RowBatch::AcquireState()

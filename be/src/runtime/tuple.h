@@ -64,6 +64,9 @@ class Tuple {
   /// string and collection data).
   int64_t TotalByteSize(const TupleDescriptor& desc) const;
 
+  /// The size of all referenced string and collection data.
+  int64_t VarlenByteSize(const TupleDescriptor& desc) const;
+
   /// Create a copy of 'this', including all of its referenced variable-length data
   /// (i.e. strings and collections), using pool to allocate memory. Returns the copy.
   Tuple* DeepCopy(const TupleDescriptor& desc, MemPool* pool);

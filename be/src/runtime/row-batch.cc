@@ -102,30 +102,23 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
     }
   }
 
-  // Check whether we have slots that require offset-to-pointer conversion
-  // TODO: do that during setup (part of RowDescriptor c'tor?)
-  bool has_varlen_slots = false;
-  const vector<TupleDescriptor*>& tuple_descs = row_desc_.tuple_descriptors();
-  for (int i = 0; i < tuple_descs.size(); ++i) {
-    if (!tuple_descs[i]->string_slots().empty() ||
-        !tuple_descs[i]->collection_slots().empty()) {
-      has_varlen_slots = true;
-      break;
-    }
-  }
-  if (!has_varlen_slots) return;
+  // Check whether we have slots that require offset-to-pointer conversion.
+  if (!row_desc_.HasVarlenSlots()) return;
 
-  // Convert string and collection data offsets contained in 'tuple_data' into pointers
+  // For every unique tuple, convert string offsets contained in tuple data into
+  // pointers. Tuples were serialized in the order we are deserializing them in,
+  // so the first occurrence of a tuple will always have a higher offset than any tuple
+  // we already converted.
+  Tuple* last_converted = NULL;
   for (int i = 0; i < num_rows_; ++i) {
-    TupleRow* row = GetRow(i);
-    vector<TupleDescriptor*>::const_iterator desc = row_desc_.tuple_descriptors().begin();
-    for (int j = 0; desc != row_desc_.tuple_descriptors().end(); ++desc, ++j) {
-      if ((*desc)->string_slots().empty() && (*desc)->collection_slots().empty()) {
-        continue;
-      }
-      Tuple* t = row->GetTuple(j);
-      if (t == NULL) continue;
-      t->ConvertOffsetsToPointers(**desc, tuple_data);
+    for (int j = 0; j < num_tuples_per_row_; ++j) {
+      const TupleDescriptor* desc = row_desc_.tuple_descriptors()[j];
+      if (!desc->HasVarlenSlots()) continue;
+      Tuple* tuple = GetRow(i)->GetTuple(j);
+      // Handle NULL or already converted tuples with one check.
+      if (tuple <= last_converted) continue;
+      last_converted = tuple;
+      tuple->ConvertOffsetsToPointers(*desc, tuple_data);
     }
   }
 }
@@ -151,35 +144,12 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
 
   output_batch->num_rows = num_rows_;
   row_desc_.ToThrift(&output_batch->row_tuples);
-  output_batch->tuple_offsets.reserve(num_rows_ * num_tuples_per_row_);
 
+  // As part of the serialization process we deduplicate tuples to avoid serializing a
+  // Tuple multiple times for the RowBatch. We currently only detect duplicate tuples in
+  // adjacent rows only.
   int64_t size = TotalByteSize();
-  // TODO: return bad status if size is greater than std::string::max_size()
-  // TODO: track memory usage
-  output_batch->tuple_data.resize(size);
-  output_batch->uncompressed_size = size;
-
-  // Copy tuple data, including strings, into output_batch (converting string
-  // pointers into offsets in the process)
-  int offset = 0; // current offset into output_batch->tuple_data
-  char* tuple_data = const_cast<char*>(output_batch->tuple_data.c_str());
-  for (int i = 0; i < num_rows_; ++i) {
-    TupleRow* row = GetRow(i);
-    const vector<TupleDescriptor*>& tuple_descs = row_desc_.tuple_descriptors();
-    vector<TupleDescriptor*>::const_iterator desc = tuple_descs.begin();
-    for (int j = 0; desc != tuple_descs.end(); ++desc, ++j) {
-      if (row->GetTuple(j) == NULL) {
-        // NULLs are encoded as -1
-        output_batch->tuple_offsets.push_back(-1);
-        continue;
-      }
-      // Record offset before creating copy (which increments offset and tuple_data)
-      output_batch->tuple_offsets.push_back(offset);
-      row->GetTuple(j)->DeepCopy(**desc, &tuple_data, &offset, /* convert_ptrs */ true);
-      DCHECK_LE(offset, size);
-    }
-  }
-  DCHECK_EQ(offset, size);
+  SerializeInternal(size, output_batch);
 
   if (size > 0) {
     // Try compressing tuple_data to compression_scratch_, swap if compressed data is
@@ -207,6 +177,46 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
   // The size output_batch would be if we didn't compress tuple_data (will be equal to
   // actual batch size if tuple_data isn't compressed)
   return GetBatchSize(*output_batch) - output_batch->tuple_data.size() + size;
+}
+
+void RowBatch::SerializeInternal(int64_t size, TRowBatch* output_batch) {
+  // TODO: max_size() is much larger than the amount of memory we could feasibly
+  // allocate. Need better way to detect problem.
+  DCHECK_LE(size, output_batch->tuple_data.max_size());
+
+  // TODO: track memory usage
+  // TODO: detect if serialized size is too large to allocate and return proper error.
+  output_batch->tuple_data.resize(size);
+  output_batch->uncompressed_size = size;
+  output_batch->tuple_offsets.reserve(num_rows_ * num_tuples_per_row_);
+
+  // Copy tuple data of unique tuples, including strings, into output_batch (converting
+  // string pointers into offsets in the process).
+  int offset = 0; // current offset into output_batch->tuple_data
+  char* tuple_data = const_cast<char*>(output_batch->tuple_data.c_str());
+
+  for (int i = 0; i < num_rows_; ++i) {
+    vector<TupleDescriptor*>::const_iterator desc = row_desc_.tuple_descriptors().begin();
+    for (int j = 0; desc != row_desc_.tuple_descriptors().end(); ++desc, ++j) {
+      Tuple* tuple = GetRow(i)->GetTuple(j);
+      if (UNLIKELY(tuple == NULL)) {
+        // NULLs are encoded as -1
+        output_batch->tuple_offsets.push_back(-1);
+        continue;
+      } else if (LIKELY(i > 0) && UNLIKELY(GetRow(i - 1)->GetTuple(j) == tuple)) {
+        // Fast tuple deduplication for adjacent rows.
+        int prev_row_idx = output_batch->tuple_offsets.size() - num_tuples_per_row_;
+        output_batch->tuple_offsets.push_back(
+            output_batch->tuple_offsets[prev_row_idx]);
+        continue;
+      }
+      // Record offset before creating copy (which increments offset and tuple_data)
+      output_batch->tuple_offsets.push_back(offset);
+      tuple->DeepCopy(**desc, &tuple_data, &offset, /* convert_ptrs */ true);
+      DCHECK_LE(offset, size);
+    }
+  }
+  DCHECK_EQ(offset, size);
 }
 
 void RowBatch::AddIoBuffer(DiskIoMgr::BufferDescriptor* buffer) {
@@ -322,15 +332,30 @@ void RowBatch::AcquireState(RowBatch* src) {
 }
 
 // TODO: consider computing size of batches as they are built up
+// In case of non-adjacent duplicates containing large collections, computing the row
+// batch size can take a long time, since each collection must be traversed multiple
+// times (once per reference to it).
 int64_t RowBatch::TotalByteSize() {
   int64_t result = 0;
+  vector<int> tuple_count(row_desc_.tuple_descriptors().size(), 0);
+
+  // Sum total variable length byte sizes.
   for (int i = 0; i < num_rows_; ++i) {
-    TupleRow* row = GetRow(i);
-    for (int j = 0; j < row_desc_.tuple_descriptors().size(); ++j) {
-      Tuple* tuple = row->GetTuple(j);
-      if (tuple == NULL) continue;
-      result += tuple->TotalByteSize(*row_desc_.tuple_descriptors()[j]);
+    for (int j = 0; j < num_tuples_per_row_; ++j) {
+      Tuple* tuple = GetRow(i)->GetTuple(j);
+      if (UNLIKELY(tuple == NULL)) continue;
+      // Only count the data of unique tuples.
+      if (LIKELY(i > 0) && UNLIKELY(GetRow(i - 1)->GetTuple(j) == tuple)) {
+        // Fast tuple deduplication for adjacent rows.
+        continue;
+      }
+      result += tuple->VarlenByteSize(*row_desc_.tuple_descriptors()[j]);
+      ++tuple_count[j];
     }
+  }
+  // Compute sum of fixed component of tuple sizes.
+  for (int j = 0; j < num_tuples_per_row_; ++j) {
+    result += row_desc_.tuple_descriptors()[j]->byte_size() * tuple_count[j];
   }
   return result;
 }
