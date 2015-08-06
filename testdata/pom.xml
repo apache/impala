@@ -27,7 +27,7 @@
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
-      <version>r09</version>
+      <version>11.0.2</version>
     </dependency>
 
     <dependency>
@@ -89,6 +89,18 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
       <version>1.7.5</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.parquet</groupId>
+      <artifactId>parquet-avro</artifactId>
+      <version>1.8.0</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.kitesdk</groupId>
+      <artifactId>kite-data-core</artifactId>
+      <version>1.0.0-cdh5.4.4</version>
     </dependency>
   </dependencies>
 

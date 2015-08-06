@@ -1,0 +1,48 @@
+{"type": "record",
+"namespace": "com.cloudera.impala",
+"name": "nested",
+"fields": [
+  {"name": "t_long", "type": "long"},
+  {"name": "t_struct", "type":
+    {"name": "r1", "type": "record", "fields": [
+      {"name": "f_int", "type": "int"},
+      {"name": "t_struct", "type":
+        {"name": "r2", "type": "record", "fields": [
+          {"name": "f_int", "type": "int"},
+          {"name": "f_int2", "type": ["int", "null"]}
+        ]}
+      },
+      {"name": "int_arr", "type": {"type": "array", "items": "int"}},
+      {"name": "int_map", "type": {"type": "map", "values": "int"}}
+    ]}
+  },
+  {"name": "t_array_basic", "type": {"type": "array", "items": "int"}},
+  {"name": "t_array_struct", "type": {
+    "type": "array", "items": {
+      "name": "f_struct", "type": "record", "fields": [
+        {"name": "f_int1", "type": "int"},
+        {"name": "f_int2", "type": "int"},
+        {"name": "f_int3", "type": ["int", "null"]}
+      ]
+    }
+  }},
+  {"name": "t_array_array", "type": {"type": "array", "items": {
+    "type": "array", "items": "int"
+  }}},
+  {"name": "t_array_map", "type": {"type": "array", "items": {
+    "type": "map", "values": "int"
+  }}},
+  {"name": "map_int", "type": {"type": "map", "values": "int"}},
+  {"name": "map_struct", "type": {"type": "map", "values": {
+    "name": "r3", "type": "record", "fields": [
+      {"name": "f_int", "type": "int"},
+      {"name": "f_int2", "type": "int"}
+    ]
+  }}},
+  {"name": "map_array", "type": {"type": "map", "values": {
+    "type": "array", "items": ["int", "null"]
+  }}},
+  {"name": "map_map", "type": {"type": "map", "values": {
+    "type": "map", "values": ["int", "null"]
+  }}}
+]}

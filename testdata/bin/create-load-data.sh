@@ -99,6 +99,8 @@ function load-custom-schemas {
   hadoop fs -put $SCHEMA_SRC_DIR/alltypestiny.parquet ${SCHEMA_DEST_DIR}/
   hadoop fs -put $SCHEMA_SRC_DIR/malformed_decimal_tiny.parquet ${SCHEMA_DEST_DIR}/
   hadoop fs -put $SCHEMA_SRC_DIR/decimal.parquet ${SCHEMA_DEST_DIR}/
+  hadoop fs -put $SCHEMA_SRC_DIR/nested/modern_nested.parquet ${SCHEMA_DEST_DIR}/
+  hadoop fs -put $SCHEMA_SRC_DIR/nested/legacy_nested.parquet ${SCHEMA_DEST_DIR}/
 
   # CHAR and VARCHAR tables written by Hive
   hadoop fs -mkdir -p /test-warehouse/chars_formats_avro_snap/

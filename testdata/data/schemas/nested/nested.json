@@ -1,0 +1,22 @@
+[
+{ "t_long": 1,
+  "t_struct": {
+    "f_int": 1,
+    "t_struct": {
+      "f_int": 1,
+      "f_int2": 2
+    },
+    "int_arr": [1, 2],
+    "int_map": {"k1": 1}
+  },
+  "t_array_basic": [1, 2],
+  "t_array_struct": [
+    {"f_int1": 1, "f_int2": 2, "f_int3": 3},
+    {"f_int1": 1, "f_int2": 2, "f_int3": 3}
+  ],
+  "t_array_array": [[1, 2], [3, 4]],
+  "t_array_map": [{"a": 2, "b": 3}, {"a": 2, "b": 3}],
+  "map_int": {"a": 1, "b": 2},
+  "map_struct": {"a": {"f_int": 1, "f_int2": 2}, "b": {"f_int": 3, "f_int2": 4}},
+  "map_array": {"a": [1, 2], "b": [3, 4]},
+  "map_map": {"a": {"b": 2, "c":4}}}]
