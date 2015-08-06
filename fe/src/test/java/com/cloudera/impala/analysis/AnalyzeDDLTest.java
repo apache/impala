@@ -919,21 +919,7 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create table if not exists functional.zipcode_incomes like parquet "
         + "'/test-warehouse/schemas/malformed_decimal_tiny.parquet'",
         "Unsupported parquet type FIXED_LEN_BYTE_ARRAY for field c1");
-
-    // this has structures, maps, and arrays
-    AnalysisError("create table table_DNE like parquet "
-        + "'/test-warehouse/schemas/unsupported.parquet'",
-        "Unsupported parquet type for field strct");
-    AnalysisError("create table table_DNE like parquet "
-        + "'/test-warehouse/schemas/map.parquet'",
-        "Unsupported parquet type for field mp");
-    AnalysisError("create table table_DNE like parquet "
-        + "'/test-warehouse/schemas/array.parquet'",
-        "Unsupported parquet type for field lst");
-    AnalysisError("create table table_DNE like parquet "
-        + "'/test-warehouse/schemas/struct.parquet'",
-        "Unsupported parquet type for field strct");
- }
+  }
 
   @Test
   public void TestCreateTableAsSelect() throws AnalysisException {

@@ -1,5 +1,63 @@
 ====
 ---- QUERY
+drop table if exists ddl_test_db.temp_legacy_table
+---- RESULTS
+====
+---- QUERY
+create table ddl_test_db.temp_legacy_table like parquet
+'$FILESYSTEM_PREFIX/test-warehouse/schemas/legacy_nested.parquet'
+---- RESULTS
+====
+---- QUERY
+describe ddl_test_db.temp_legacy_table
+---- RESULTS
+'t_long','bigint','inferred from: required int64 t_long'
+'t_struct','struct<f_int:int,t_struct:struct<f_int:int,f_int2:int>,int_arr:array<int>,int_map:map<string,int>>','inferred from: required group t_struct {\n  required int32 f_int;\n  required group t_struct {\n    required int32 f_int;\n    optional int32 f_int2;\n  }\n  required group int_arr (LIST) {\n    repeated int32 array;\n  }\n  required group int_map (MAP) {\n    repeated group map (MAP_KEY_VALUE) {\n      required binary key (UTF8);\n      required int32 value;\n    }\n  }\n}'
+'t_array_basic','array<int>','inferred from: required group t_array_basic (LIST) {\n  repeated int32 array;\n}'
+'t_array_struct','array<struct<f_int1:int,f_int2:int,f_int3:int>>','inferred from: required group t_array_struct (LIST) {\n  repeated group array {\n    required int32 f_int1;\n    required int32 f_int2;\n    optional int32 f_int3;\n  }\n}'
+'t_array_array','array<array<int>>','inferred from: required group t_array_array (LIST) {\n  repeated group array (LIST) {\n    repeated int32 array;\n  }\n}'
+'t_array_map','array<map<string,int>>','inferred from: required group t_array_map (LIST) {\n  repeated group array (MAP) {\n    repeated group map (MAP_KEY_VALUE) {\n      required binary key (UTF8);\n      required int32 value;\n    }\n  }\n}'
+'map_int','map<string,int>','inferred from: required group map_int (MAP) {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key (UTF8);\n    required int32 value;\n  }\n}'
+'map_struct','map<string,struct<f_int:int,f_int2:int>>','inferred from: required group map_struct (MAP) {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key (UTF8);\n    required group value {\n      required int32 f_int;\n      required int32 f_int2;\n    }\n  }\n}'
+'map_array','map<string,array<int>>','inferred from: required group map_array (MAP) {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key (UTF8);\n    required group value (LIST) {\n      repeated int32 array;\n    }\n  }\n}'
+'map_map','map<string,map<string,int>>','inferred from: required group map_map (MAP) {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key (UTF8);\n    required group value (MAP) {\n      repeated group map (MAP_KEY_VALUE) {\n        required binary key (UTF8);\n        optional int32 value;\n      }\n    }\n  }\n}'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+drop table if exists ddl_test_db.temp_legacy_table
+---- RESULTS
+====
+---- QUERY
+drop table if exists ddl_test_db.temp_modern_table
+---- RESULTS
+====
+---- QUERY
+create table ddl_test_db.temp_modern_table like parquet
+'$FILESYSTEM_PREFIX/test-warehouse/schemas/modern_nested.parquet'
+---- RESULTS
+====
+---- QUERY
+describe ddl_test_db.temp_modern_table
+---- RESULTS
+'t_long','bigint','inferred from: required int64 t_long'
+'t_struct','struct<f_int:int,t_struct:struct<f_int:int,f_int2:int>,int_arr:array<int>,int_map:map<string,int>>','inferred from: required group t_struct {\n  required int32 f_int;\n  required group t_struct {\n    required int32 f_int;\n    optional int32 f_int2;\n  }\n  required group int_arr (LIST) {\n    repeated group list {\n      required int32 element;\n    }\n  }\n  required group int_map (MAP) {\n    repeated group map (MAP_KEY_VALUE) {\n      required binary key (UTF8);\n      required int32 value;\n    }\n  }\n}'
+'t_array_basic','array<int>','inferred from: required group t_array_basic (LIST) {\n  repeated group list {\n    required int32 element;\n  }\n}'
+'t_array_struct','array<struct<f_int1:int,f_int2:int,f_int3:int>>','inferred from: required group t_array_struct (LIST) {\n  repeated group list {\n    required group element {\n      required int32 f_int1;\n      required int32 f_int2;\n      optional int32 f_int3;\n    }\n  }\n}'
+'t_array_array','array<array<int>>','inferred from: required group t_array_array (LIST) {\n  repeated group list {\n    required group element (LIST) {\n      repeated group list {\n        required int32 element;\n      }\n    }\n  }\n}'
+'t_array_map','array<map<string,int>>','inferred from: required group t_array_map (LIST) {\n  repeated group list {\n    required group element (MAP) {\n      repeated group map (MAP_KEY_VALUE) {\n        required binary key (UTF8);\n        required int32 value;\n      }\n    }\n  }\n}'
+'map_int','map<string,int>','inferred from: required group map_int (MAP) {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key (UTF8);\n    required int32 value;\n  }\n}'
+'map_struct','map<string,struct<f_int:int,f_int2:int>>','inferred from: required group map_struct (MAP) {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key (UTF8);\n    required group value {\n      required int32 f_int;\n      required int32 f_int2;\n    }\n  }\n}'
+'map_array','map<string,array<int>>','inferred from: required group map_array (MAP) {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key (UTF8);\n    required group value (LIST) {\n      repeated group list {\n        optional int32 element;\n      }\n    }\n  }\n}'
+'map_map','map<string,map<string,int>>','inferred from: required group map_map (MAP) {\n  repeated group map (MAP_KEY_VALUE) {\n    required binary key (UTF8);\n    required group value (MAP) {\n      repeated group map (MAP_KEY_VALUE) {\n        required binary key (UTF8);\n        optional int32 value;\n      }\n    }\n  }\n}'
+---- TYPES
+STRING, STRING, STRING
+====
+---- QUERY
+drop table if exists ddl_test_db.temp_modern_table
+---- RESULTS
+====
+---- QUERY
 drop table if exists ddl_test_db.temp_decimal_table
 ---- RESULTS
 ====
@@ -543,8 +601,6 @@ stored as parquet
 ====
 ---- QUERY
 describe allcomplextypes_clone
----- TYPES
-STRING, STRING, STRING
 ---- RESULTS
 'id','int',''
 'int_array_col','array<int>',''
@@ -561,6 +617,8 @@ STRING, STRING, STRING
 'complex_nested_struct_col','struct<f1:int,f2:array<struct<f11:bigint,f12:map<string,struct<f21:bigint>>>>>',''
 'year','int',''
 'month','int',''
+---- TYPES
+STRING, STRING, STRING
 ====
 ---- QUERY
 # Test creating an unpartitioned Avro table without column definitions.
@@ -572,8 +630,6 @@ stored as avro
 ====
 ---- QUERY
 describe avro_alltypes_nopart
----- TYPES
-STRING, STRING, STRING
 ---- RESULTS
 'bigint_col','bigint','from deserializer'
 'bool_col','boolean','from deserializer'
@@ -586,6 +642,8 @@ STRING, STRING, STRING
 'string_col','string','from deserializer'
 'timestamp_col','string','from deserializer'
 'tinyint_col','int','from deserializer'
+---- TYPES
+STRING, STRING, STRING
 ====
 ---- QUERY
 # Test creating a partitioned Avro table without column definitions.
@@ -598,8 +656,6 @@ stored as avro
 ====
 ---- QUERY
 describe avro_alltypes_part
----- TYPES
-STRING, STRING, STRING
 ---- RESULTS
 'bigint_col','bigint','from deserializer'
 'bool_col','boolean','from deserializer'
@@ -614,6 +670,8 @@ STRING, STRING, STRING
 'timestamp_col','string','from deserializer'
 'tinyint_col','int','from deserializer'
 'year','int',''
+---- TYPES
+STRING, STRING, STRING
 ====
 ---- QUERY
 drop table avro_alltypes_part

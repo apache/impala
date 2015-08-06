@@ -8,9 +8,9 @@ select * from text_comma_backslash_newline
 ---- RESULTS
 'one','two',3,4
 'one,one','two',3,4
-'one\','two',3,4
-'one\,one','two',3,4
 'one\\','two',3,4
+'one\\,one','two',3,4
+'one\\\\','two',3,4
 ---- TYPES
 STRING,STRING,INT,INT
 ====
@@ -47,9 +47,9 @@ insert into delim_text_test_db.cbn values
 ---- QUERY
 select * from delim_text_test_db.cbn
 ---- RESULTS
-'abc , abc','xyz \ xyz',1,2
-'abc ,,, abc','xyz \\\ xyz',3,4
-'abc \,\, abc','xyz ,\,\ xyz',5,6
+'abc , abc','xyz \\ xyz',1,2
+'abc ,,, abc','xyz \\\\\\ xyz',3,4
+'abc \\,\\, abc','xyz ,\\,\\ xyz',5,6
 ---- TYPES
 STRING,STRING,INT,INT
 ====

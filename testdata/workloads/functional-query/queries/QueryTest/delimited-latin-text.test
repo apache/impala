@@ -7,10 +7,10 @@
 select * from text_thorn_ecirc_newline
 ---- RESULTS
 'one','two',3,4
-'oneþone','two',3,4
-'oneê','two',3,4
-'oneêþone','two',3,4
-'oneêê','two',3,4
+'one\xfeone','two',3,4
+'one\xea','two',3,4
+'one\xea\xfeone','two',3,4
+'one\xea\xea','two',3,4
 ---- TYPES
 STRING,STRING,INT,INT
 ====

@@ -16,8 +16,6 @@ RESET alltypesnopart_insert
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
 from alltypesnopart_insert
----- TYPES
-int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ---- RESULTS
 75,false,0,0,0,0,0,0,'04/01/09','0'
 76,true,1,1,1,10,1.100000023841858,10.1,'04/01/09','1'
@@ -44,6 +42,8 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 97,false,2,2,2,20,2.200000047683716,20.2,'04/03/09','2'
 98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3'
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4'
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ====
 ---- QUERY
 # insert into unpartitioned table
@@ -60,10 +60,10 @@ RESET alltypesnopart_insert
 ---- QUERY
 # search the table to verify it contains 25 rows
 select count(*) from alltypesnopart_insert
----- TYPES
-bigint
 ---- RESULTS
 25
+---- TYPES
+bigint
 ====
 ---- QUERY
 # static partition overwrite
@@ -85,8 +85,6 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
 from alltypesinsert
 where year=2009 and month=4
----- TYPES
-int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ---- RESULTS
 75,false,0,0,0,0,0,0,'04/01/09','0'
 76,true,1,1,1,10,1.100000023841858,10.1,'04/01/09','1'
@@ -113,6 +111,8 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 97,false,2,2,2,20,2.200000047683716,20.2,'04/03/09','2'
 98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3'
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4'
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ====
 ---- QUERY
 # static partition insert$TABLE, test creation of partitions
@@ -131,10 +131,10 @@ year=2009/month=4/: 25
 # search the partition to verify it contains all 25 rows
 select count(*) from alltypesinsert
 where year=2009 and month=4
----- TYPES
-bigint
 ---- RESULTS
 25
+---- TYPES
+bigint
 ====
 ---- QUERY
 # partially dynamic partition overwrite
@@ -157,8 +157,6 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
 from alltypesinsert
 where year=2009 and month>1 and month<=4
----- TYPES
-int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ---- RESULTS
 25,false,0,0,0,0,0,0,'02/01/09','0'
 26,true,1,1,1,10,1.100000023841858,10.1,'02/01/09','1'
@@ -235,6 +233,8 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 97,false,2,2,2,20,2.200000047683716,20.2,'04/03/09','2'
 98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3'
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4'
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ====
 ---- QUERY
 # partially dynamic partition insert$TABLE, check partition creation
@@ -255,10 +255,10 @@ year=2009/month=3/: 25
 # search the partitions to verify they contain all 75 rows
 select count(id) from alltypesinsert
 where year=2009 and month>=1 and month<4
----- TYPES
-bigint
 ---- RESULTS
 75
+---- TYPES
+bigint
 ====
 ---- QUERY
 # fully dynamic partition overwrite
@@ -281,8 +281,6 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
 from alltypesinsert
 where year=2009 and month>=1 and month<=4
----- TYPES
-int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ---- RESULTS
 0,true,0,0,0,0,0,0,'01/01/09','0'
 1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1'
@@ -384,6 +382,8 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 97,false,2,2,2,20,2.200000047683716,20.2,'04/03/09','2'
 98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3'
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4'
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ====
 ---- QUERY
 # fully dynamic partition insert$TABLE, check partition creation
@@ -404,10 +404,10 @@ year=2009/month=4/: 25
 # search the partitions to verify they contain all 100 rows
 select count(timestamp_col) from alltypesinsert
 where year=2009 and month>=1 and month<=4
----- TYPES
-bigint
 ---- RESULTS
 100
+---- TYPES
+bigint
 ====
 ---- QUERY
 # test insert into ... select *
@@ -423,10 +423,10 @@ year=2009/month=4/: 25
 ---- QUERY
 # check size of alltypesinsert to ensure previous insert worked
 select count(*) from alltypesinsert
----- TYPES
-bigint
 ---- RESULTS
 100
+---- TYPES
+bigint
 ====
 ---- QUERY
 # static partition insert into string-partitioned table with special characters in partition key
@@ -440,18 +440,18 @@ s2=%2F%5C%25./: 1
 ---- QUERY
 # select with unencoded partition key
 SELECT * FROM insert_string_partitioned;
+---- RESULTS
+'value','/\\%.'
 ---- TYPES
 string, string
----- RESULTS
-'value','/\%.'
 ====
 ---- QUERY
 # select with unencoded partition key as column predicate
 SELECT * FROM insert_string_partitioned WHERE s2 = "/\%.";
+---- RESULTS
+'value','/\\%.'
 ---- TYPES
 string, string
----- RESULTS
-'value','/\%.'
 ====
 ---- QUERY
 # static partition insert into string-partitioned table with non-escaped special characters
@@ -466,10 +466,10 @@ s2=_.~ +/: 1
 ---- QUERY
 # select with unencoded partition key
 SELECT * FROM insert_string_partitioned;
----- TYPES
-string, string
 ---- RESULTS
 'value','_.~ +'
+---- TYPES
+string, string
 ====
 ---- QUERY
 # static partition insert into string-partitioned table with empty partition key
@@ -505,21 +505,21 @@ s2=__HIVE_DEFAULT_PARTITION__/: 1
 # select with empty partition key as predicate should return nothing, because "" is
 # mapped to NULL
 SELECT * FROM insert_string_partitioned WHERE s2 = "";
+---- RESULTS
 ---- TYPES
 string, string
----- RESULTS
 ====
 ---- QUERY
 # select with NULL partition key as predicate should return rows
 SELECT s1, s2 FROM insert_string_partitioned where s2 is NULL
 order by s1 limit 10
----- TYPES
-string, string
 ---- RESULTS
 'value1','NULL'
 'value2','NULL'
 'value3','NULL'
 'value4','NULL'
+---- TYPES
+string, string
 ====
 ---- QUERY
 # static partition insert with constant exprs as partition-key values
@@ -554,11 +554,11 @@ year=2010/month=4/: 1
 ---- QUERY
 # verify contents of alltypesinsert
 select * from alltypesinsert order by id limit 2
----- TYPES
-int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
 ---- RESULTS
 100,false,1,1,1,10,10,10,'02/01/09','1',2009-02-01 00:01:00,2010,4
 200,true,2,2,2,20,20,20,'02/01/09','1',2009-02-01 00:02:00,2010,4
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp, int, int
 ====
 ---- QUERY
 # static partition insert from values statement
@@ -634,8 +634,6 @@ from alltypessmall limit 10
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypesnopart_insert
----- TYPES
-int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ---- RESULTS
 NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
 NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
@@ -647,6 +645,8 @@ NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
 NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
 NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
 NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'NULL','NULL',NULL
+---- TYPES
+int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ====
 ---- QUERY
 insert overwrite alltypesnopart_insert(float_col, double_col)
@@ -662,13 +662,13 @@ RESET alltypesinsert
 # (even nan), so the results check would otherwise always fail.
 select CAST(float_col AS string), CAST(double_col AS string) from alltypesnopart_insert
 order by float_col, double_col limit 10;
----- TYPES
-STRING, STRING
 ---- RESULTS
 'nan','nan'
 'nan','nan'
 '-inf','-inf'
 'inf','inf'
+---- TYPES
+STRING, STRING
 ====
 ---- QUERY
 # Test that insert overwrite with a limit 0 clears the table.
@@ -681,10 +681,10 @@ from alltypessmall limit 0
 ====
 ---- QUERY
 select count(*) from alltypesinsert
----- TYPES
-BIGINT
 ---- RESULTS
 0
+---- TYPES
+BIGINT
 ====
 ---- QUERY
 # Test that insert overwrite with a limit 0 clears the table.
@@ -696,10 +696,10 @@ from alltypessmall limit 0
 ====
 ---- QUERY
 select count(*) from alltypesnopart_insert
----- TYPES
-BIGINT
 ---- RESULTS
 0
+---- TYPES
+BIGINT
 ====
 ---- QUERY
 # IMPALA-1737: Test dynamic partition insert from a select stmt that
@@ -743,10 +743,10 @@ year=2015/month=8/: 4
 ---- QUERY
 select * from alltypesinsert
 ---- RESULTS: VERIFY_IS_EQUAL_SORTED
+NULL,NULL,NULL,NULL,NULL,NULL,5,6,'s1','s2',2009-02-06 00:01:00,2015,8
 0,false,1,2,3,4,NULL,NULL,'NULL','NULL',NULL,2015,8
 1,false,1,2,3,4,5,6,'s1','s2',2009-02-06 00:01:00,2015,8
 2,false,1,2,3,4,5,6,'s1','s2',2009-02-06 00:01:00,2015,8
-NULL,NULL,NULL,NULL,NULL,NULL,5,6,'s1','s2',2009-02-06 00:01:00,2015,8
 ---- TYPES
 INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
 ====

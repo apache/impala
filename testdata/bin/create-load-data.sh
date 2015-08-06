@@ -92,10 +92,6 @@ function load-custom-schemas {
   hadoop fs -rm -r -f ${SCHEMA_DEST_DIR}
   hadoop fs -mkdir ${SCHEMA_DEST_DIR}
   hadoop fs -put $SCHEMA_SRC_DIR/zipcode_incomes.parquet ${SCHEMA_DEST_DIR}/
-  hadoop fs -put $SCHEMA_SRC_DIR/unsupported.parquet ${SCHEMA_DEST_DIR}/
-  hadoop fs -put $SCHEMA_SRC_DIR/map.parquet ${SCHEMA_DEST_DIR}/
-  hadoop fs -put $SCHEMA_SRC_DIR/array.parquet ${SCHEMA_DEST_DIR}/
-  hadoop fs -put $SCHEMA_SRC_DIR/struct.parquet ${SCHEMA_DEST_DIR}/
   hadoop fs -put $SCHEMA_SRC_DIR/alltypestiny.parquet ${SCHEMA_DEST_DIR}/
   hadoop fs -put $SCHEMA_SRC_DIR/malformed_decimal_tiny.parquet ${SCHEMA_DEST_DIR}/
   hadoop fs -put $SCHEMA_SRC_DIR/decimal.parquet ${SCHEMA_DEST_DIR}/

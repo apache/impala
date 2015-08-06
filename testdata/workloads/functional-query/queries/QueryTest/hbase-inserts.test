@@ -55,7 +55,7 @@ int_col, month, smallint_col, "\\N", timestamp_col, tinyint_col, year from funct
 select id, date_string_col, string_col from insertalltypesagg
 where id = 9999999
 ---- RESULTS
-9999999,'\N','\N'
+9999999,'\\N','\\N'
 ---- TYPES
 INT, STRING, STRING
 ====
@@ -145,7 +145,7 @@ int_col, month, smallint_col, "\\N", timestamp_col, tinyint_col, year from funct
 select id, date_string_col, string_col from insertalltypesaggbinary
 where id = 9999999
 ---- RESULTS
-9999999,'\N','\N'
+9999999,'\\N','\\N'
 ---- TYPES
 INT, STRING, STRING
 ====
@@ -175,7 +175,7 @@ select id, string_col from insertalltypesagg where id = 99999999
 99999999,'William's'
 ---- TYPES
 INT, STRING
-=====
+====
 ---- QUERY
 select id, string_col from insertalltypesagg where string_col = 'William\'s'
 ---- RESULTS

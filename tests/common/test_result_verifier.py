@@ -390,7 +390,8 @@ def parse_result_rows(exec_result):
     new_cols = list()
     for i in xrange(len(cols)):
       if col_types[i] == 'STRING' or col_types[i] == 'CHAR':
-        new_cols.append("'%s'" % cols[i])
+        col = cols[i].encode('unicode_escape')
+        new_cols.append("'%s'" % col)
       else:
         new_cols.append(cols[i])
     result.append(','.join(new_cols))
