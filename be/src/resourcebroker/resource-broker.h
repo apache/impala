@@ -120,20 +120,14 @@ class ResourceBroker {
   /// (see comment on llama_client_id_ for details).
   Status RegisterWithLlama();
 
-  /// Issues the Llama RPC corresponding to the LlamaReqType and LlamaRespType.
-  /// This function encapsulates the complex connect/rpc/retry logic for all Llama RPCs
-  /// except Register(). If rpc_time_metric is non-NULL, the metric is updated upon
-  /// success of the RPC. Returns a non-OK status if the RPC failed due to connectivity
-  /// issues with the Llama. Returns OK if the RPC succeeded.
-  template <typename LlamaReqType, typename LlamaRespType>
-  Status LlamaRpc(LlamaReqType* request, LlamaRespType* response,
+  /// Issues the Llama RPC f where F is a thrift call taking LlamaReqType and returning
+  /// LlamaRespType. If failures occur, this function handles re-registering with Llama
+  /// if necessary and re-trying multiple times. If rpc_time_metric is non-NULL, the
+  /// metric is updated upon success of the RPC. Returns a non-OK status if the RPC
+  /// failed due to connectivity issues with the Llama. Returns OK if the RPC succeeded.
+  template <class F, typename LlamaReqType, typename LlamaRespType>
+  Status LlamaRpc(const F& f, LlamaReqType* request, LlamaRespType* response,
       StatsMetric<double>* rpc_time_metric);
-
-  /// Sends the given Llama RPC request via the given client. This function must be
-  /// specialized on the Llama request/response types. Throws a TException.
-  template <typename LlamaReqType, typename LlamaRespType>
-  void SendLlamaRpc(ClientConnection<llama::LlamaAMServiceClient>* llama_client,
-      const LlamaReqType& request, LlamaRespType* response);
 
   /// Re-registers with Llama to recover from the Llama being unreachable. Handles both
   /// Llama restart and failover. This function is a template to allow specialization on

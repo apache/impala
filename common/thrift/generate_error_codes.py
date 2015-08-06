@@ -181,6 +181,9 @@ error_codes = (
 
   ("TMP_FILE_BLACKLISTED", 58,
     "Temporary file $0 is blacklisted from a previous error and cannot be expanded."),
+
+  ("RPC_CLIENT_CONNECT_FAILURE", 59,
+    "RPC client failed to connect: $0")
 )
 
 import sys

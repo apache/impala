@@ -209,18 +209,19 @@ class ClientConnection {
 
   T* operator->() const { return client_; }
 
-  /// Perform an RPC call f(request, response), with some failure handling in case the TCP
-  /// connection underpinning this client has been closed unexpectedly. Note that this can
-  /// lead to f() being called twice, as this method may retry f() once, depending on the
-  /// error received from the first attempt. TODO: Detect already-closed cnxns and only
-  /// retry in that case.
+  /// Perform an RPC call f(request, response), with some failure handling in case the
+  /// TCP connection underpinning this client has been closed unexpectedly. Note that
+  /// this can lead to f() being called twice, as this method may retry f() once,
+  /// depending on the error received from the first attempt.
+  /// TODO: Detect already-closed cnxns and only retry in that case.
+  ///
+  /// Returns RPC_TIMEOUT if a timeout occurred, RPC_CLIENT_CONNECT_FAILURE if the client
+  /// failed to connect, and RPC_GENERAL_ERROR if the RPC could not be completed for any
+  /// other reason (except for an unexpectedly closed cnxn, see TODO). Application-level
+  /// failures should be signalled through the response type.
   //
-  /// Returns RPC_TIMEOUT if a timeout occurred, and RPC_GENERAL_ERROR if the RPC could not
-  /// be completed for any other reason (except for an unexpectedly closed cnxn, see
-  /// TODO). Application-level failures should be signalled through the response type.
-  //
-  /// TODO: Use TTransportException::TTransportExceptionType to distinguish between failure
-  /// modes.
+  /// TODO: Use TTransportException::TTransportExceptionType to distinguish between
+  /// failure modes.
   template <class F, class Request, class Response>
   Status DoRpc(const F& f, const Request& request, Response* response) {
     DCHECK(response != NULL);
@@ -231,7 +232,10 @@ class ClientConnection {
 
       // Client may have unexpectedly been closed, so re-open and retry.
       // TODO: ThriftClient should return proper error codes.
-      RETURN_IF_ERROR(Reopen());
+      const Status& status = Reopen();
+      if (!status.ok()) {
+        return Status(TErrorCode::RPC_CLIENT_CONNECT_FAILURE, status.GetDetail());
+      }
       try {
         (client_->*f)(*response, request);
       } catch (apache::thrift::TException& e) {

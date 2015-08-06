@@ -298,9 +298,9 @@ void ResourceBroker::CreateLlamaReleaseRequest(const TResourceBrokerReleaseReque
   dest.reservation_id << src.reservation_id;
 }
 
-template <typename LlamaReqType, typename LlamaRespType>
-Status ResourceBroker::LlamaRpc(LlamaReqType* request, LlamaRespType* response,
-    StatsMetric<double>* rpc_time_metric) {
+template <class F, typename LlamaReqType, typename LlamaRespType>
+Status ResourceBroker::LlamaRpc(const F& f, LlamaReqType* request,
+    LlamaRespType* response, StatsMetric<double>* rpc_time_metric) {
   int attempts = 0;
   MonotonicStopWatch sw;
   // Indicates whether to re-register with Llama before the next RPC attempt,
@@ -324,17 +324,11 @@ Status ResourceBroker::LlamaRpc(LlamaReqType* request, LlamaRespType* response,
     }
 
     sw.Start();
-    try {
-      SendLlamaRpc(&llama_client, *request, response);
-    } catch (const TException& e) {
-      VLOG_RPC << "Reopening Llama client due to: " << e.what();
-      rpc_status = llama_client.Reopen();
-      if (!rpc_status.ok()) {
-        register_with_llama = true;
-        continue;
-      }
-      VLOG_RPC << "Retrying Llama RPC: " << *request;
-      SendLlamaRpc(&llama_client, *request, response);
+    Status status = llama_client.DoRpc(f, *request, response);
+    if (!status.ok()) {
+      VLOG_RPC << "Error making Llama RPC: " << status.GetDetail();
+      register_with_llama = status.code() == TErrorCode::RPC_CLIENT_CONNECT_FAILURE;
+      continue;
     }
     if (rpc_time_metric != NULL) {
       rpc_time_metric->Update(sw.ElapsedTime() / (1000.0 * 1000.0 * 1000.0));
@@ -351,53 +345,6 @@ Status ResourceBroker::LlamaRpc(LlamaReqType* request, LlamaRespType* response,
         FLAGS_llama_max_request_attempts));
   }
   return Status::OK();
-}
-
-template <typename LlamaReqType, typename LlamaRespType>
-void ResourceBroker::SendLlamaRpc(
-    ClientConnection<llama::LlamaAMServiceClient>* llama_client,
-    const LlamaReqType& request, LlamaRespType* response) {
-  DCHECK(false) << "SendLlamaRpc template function must be specialized.";
-}
-
-// Template specialization for the Llama GetNodes() RPC.
-template <>
-void ResourceBroker::SendLlamaRpc(
-    ClientConnection<llama::LlamaAMServiceClient>* llama_client,
-    const llama::TLlamaAMGetNodesRequest& request,
-    llama::TLlamaAMGetNodesResponse* response) {
-  DCHECK(response != NULL);
-  (*llama_client)->GetNodes(*response, request);
-}
-
-// Template specialization for the Llama Reserve() RPC.
-template <>
-void ResourceBroker::SendLlamaRpc(
-    ClientConnection<llama::LlamaAMServiceClient>* llama_client,
-    const llama::TLlamaAMReservationRequest& request,
-    llama::TLlamaAMReservationResponse* response) {
-  DCHECK(response != NULL);
-  (*llama_client)->Reserve(*response, request);
-}
-
-// Template specialization for the Llama Expand() RPC.
-template <>
-void ResourceBroker::SendLlamaRpc(
-    ClientConnection<llama::LlamaAMServiceClient>* llama_client,
-    const llama::TLlamaAMReservationExpansionRequest& request,
-    llama::TLlamaAMReservationExpansionResponse* response) {
-  DCHECK(response != NULL);
-  (*llama_client)->Expand(*response, request);
-}
-
-// Template specialization for the Llama Release() RPC.
-template <>
-void ResourceBroker::SendLlamaRpc(
-    ClientConnection<llama::LlamaAMServiceClient>* llama_client,
-    const llama::TLlamaAMReleaseRequest& request,
-    llama::TLlamaAMReleaseResponse* response) {
-  DCHECK(response != NULL);
-  (*llama_client)->Release(*response, request);
 }
 
 template <typename LlamaReqType, typename LlamaRespType>
@@ -491,7 +438,8 @@ Status ResourceBroker::Expand(const TResourceBrokerExpansionRequest& request,
 
   MonotonicStopWatch sw;
   sw.Start();
-  Status status = LlamaRpc(&ll_request, &ll_response, expansion_rpc_time_metric_);
+  Status status = LlamaRpc(&llama::LlamaAMServiceClient::Expand, &ll_request,
+      &ll_response, expansion_rpc_time_metric_);
   // Check the status of the response.
   if (!status.ok()) {
     expansion_requests_failed_metric_->Increment(1);
@@ -557,7 +505,8 @@ Status ResourceBroker::Reserve(const TResourceBrokerReservationRequest& request,
 
   MonotonicStopWatch sw;
   sw.Start();
-  Status status = LlamaRpc(&ll_request, &ll_response, reservation_rpc_time_metric_);
+  Status status = LlamaRpc(&llama::LlamaAMServiceClient::Reserve, &ll_request,
+      &ll_response, reservation_rpc_time_metric_);
   // Check the status of the response.
   if (!status.ok()) {
     reservation_requests_failed_metric_->Increment(1);
@@ -648,7 +597,7 @@ Status ResourceBroker::Release(const TResourceBrokerReleaseRequest& request,
   llama::TLlamaAMReleaseResponse llama_response;
   CreateLlamaReleaseRequest(request, llama_request);
 
-  RETURN_IF_ERROR(LlamaRpc(
+  RETURN_IF_ERROR(LlamaRpc(&llama::LlamaAMServiceClient::Release,
           &llama_request, &llama_response,reservation_rpc_time_metric_));
   RETURN_IF_ERROR(LlamaStatusToImpalaStatus(llama_response.status));
   requests_released_metric_->Increment(1);
@@ -744,7 +693,8 @@ Status ResourceBroker::RefreshLlamaNodes() {
   llama_request.__set_version(llama::TLlamaServiceVersion::V1);
   llama::TLlamaAMGetNodesResponse llama_response;
 
-  RETURN_IF_ERROR(LlamaRpc(&llama_request, &llama_response, NULL));
+  RETURN_IF_ERROR(LlamaRpc(&llama::LlamaAMServiceClient::GetNodes, &llama_request,
+      &llama_response, NULL));
   RETURN_IF_ERROR(LlamaStatusToImpalaStatus(llama_response.status));
   llama_nodes_ = llama_response.nodes;
   LOG(INFO) << "Llama Nodes [" << join(llama_nodes_, ", ") << "]";
