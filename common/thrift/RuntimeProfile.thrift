@@ -80,7 +80,7 @@ struct TRuntimeProfileNode {
 }
 
 // A flattened tree of runtime profiles, obtained by an
-// in-order traversal
+// pre-order traversal
 struct TRuntimeProfileTree {
   1: required list<TRuntimeProfileNode> nodes
 }
