@@ -110,7 +110,13 @@ Status ImpaladQueryExecutor::FetchResult(string* row) {
   // If we have not fetched any data, or we've returned all the data, fetch more rows
   // from ImpalaServer
   if (!query_results_.__isset.data || current_row_ >= query_results_.data.size()) {
-    client_->iface()->fetch(query_results_, query_handle_, false, 0);
+    try {
+      client_->iface()->fetch(query_results_, query_handle_, false, 0);
+    } catch (BeeswaxException& e) {
+      stringstream ss;
+      ss << e.SQLState << ": " << e.message;
+      return Status(ss.str());
+    }
     current_row_ = 0;
   }
 

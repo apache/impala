@@ -221,13 +221,17 @@ class ExprTest : public testing::Test {
     string stmt = "select " + expr;
     vector<FieldSchema> result_types;
     Status status = executor_->Exec(stmt, &result_types);
+    if (!status.ok()) {
+      ASSERT_TRUE(expect_error) << "stmt: " << stmt << "\nerror: " << status.GetDetail();
+      return;
+    }
+    string result_row;
+    status = executor_->FetchResult(&result_row);
     if (expect_error) {
       ASSERT_FALSE(status.ok()) << "Expected error\nstmt: " << stmt;
       return;
     }
     ASSERT_TRUE(status.ok()) << "stmt: " << stmt << "\nerror: " << status.GetDetail();
-    string result_row;
-    ASSERT_TRUE(executor_->FetchResult(&result_row).ok()) << expr;
     EXPECT_EQ(TypeToOdbcString(expr_type.type), result_types[0].type) << expr;
     *interpreted_value = ConvertValue(expr_type, result_row);
   }
@@ -787,7 +791,7 @@ class ExprTest : public testing::Test {
     TestValue("-20!", TYPE_BIGINT, 1);
     TestIsNull("NULL!", TYPE_BIGINT);
     TestValue("20!", TYPE_BIGINT, 2432902008176640000); // Largest valid value
-    // TestError("21!"); // TODO - Overflow - disabled due to IMPALA-1746
+    TestError("21!"); // Overflow
 
     // Compound exprs
     TestValue("4 + (3!)", TYPE_BIGINT, 10);
@@ -5149,7 +5153,7 @@ TEST_F(ExprTest, BitByteBuiltins) {
   TestIsNull("countset(0, NULL)", TYPE_INT);
   TestValue("countset(0, 0)", TYPE_INT, 8);
   TestValue("countset(0, 1)", TYPE_INT, 0);
-  // TestError("countset(0, 2)"); TODO - disabled because of IMPALA-1746
+  TestError("countset(0, 2)");
 
   // getbit for all integer types
   TestIsNull("getbit(NULL, 1)", TYPE_TINYINT);
@@ -5169,12 +5173,12 @@ TEST_F(ExprTest, BitByteBuiltins) {
   TestValue("getbit(" + int64_min + ", 63)", TYPE_TINYINT, 1);
   TestValue("getbit(" + int64_min + ", 62)", TYPE_TINYINT, 0);
   // Out of range bitpos causes errors
-  // TODO - disabled because of IMPALA-1746
-  // TestError("getbit(0, -1)", TYPE_TINYINT);
-  // TestError("getbit(0, 8)", TYPE_TINYINT);
-  // TestError("getbit(" + int16_min + ", 16)", TYPE_TINYINT);
-  // TestError("getbit(" + int32_min + ", 32)", TYPE_TINYINT);
-  // TestError("getbit(" + int64_min + ", 64)", TYPE_TINYINT);
+  // The following TestError() calls also test IMPALA-2141 and IMPALA-2188
+   TestError("getbit(0, -1)");
+   TestError("getbit(0, 8)");
+   TestError("getbit(" + int16_min + ", 16)");
+   TestError("getbit(" + int32_min + ", 32)");
+   TestError("getbit(" + int64_min + ", 64)");
 
   // Set bits for all integer types
   TestIsNull("setbit(cast(NULL as INT), 1)", TYPE_INT);
@@ -5182,8 +5186,10 @@ TEST_F(ExprTest, BitByteBuiltins) {
   TestIsNull("setbit(cast(NULL as INT), 1, 1)", TYPE_INT);
   TestIsNull("setbit(1, NULL, 1)", TYPE_TINYINT);
   TestIsNull("setbit(1, 1, NULL)", TYPE_TINYINT);
-  // TestError("setbit(1, 1, -1)"); TODO - disabled because of IMPALA-1746
-  // TestError("setbit(1, 1, 2)");  TODO - disabled because of IMPALA-1746
+  // The following TestError() calls also test IMPALA-2141 and IMPALA-2188
+  TestError("setbit(1, 1, -1)");
+  TestError("setbit(1, 1, 2)");
+
   TestValue("setbit(0, 0)", TYPE_TINYINT, 1);
   TestValue("setbit(0, 0, 1)", TYPE_TINYINT, 1);
   TestValue("setbit(1, 0, 0)", TYPE_TINYINT, 0);
@@ -5192,12 +5198,12 @@ TEST_F(ExprTest, BitByteBuiltins) {
   TestValue("setbit(cast(257 as INT), 8, 0)", TYPE_INT, 1);
   TestValue("setbit(cast(-1 as BIGINT), 63, 0)", TYPE_BIGINT,
       numeric_limits<int64_t>::max());
-        // Out of range bitpos causes errors
-  // TODO - disabled because of IMPALA-1746
-  // TestError("setbit(0, -1)", TYPE_TINYINT);
-  // TestError("setbit(0, 8)", TYPE_TINYINT);
-  // TestError("setbit(0, -1, 1)", TYPE_TINYINT);
-  // TestError("setbit(0, 8, 1)", TYPE_TINYINT);
+  // Out of range bitpos causes errors
+  // The following TestError() calls also test IMPALA-2141 and IMPALA-2188
+  TestError("setbit(0, -1)");
+  TestError("setbit(0, 8)");
+  TestError("setbit(0, -1, 1)");
+  TestError("setbit(0, 8, 1)");
 
   // Shift and rotate null checks
   TestIsNull("shiftleft(1, NULL)", TYPE_TINYINT);
