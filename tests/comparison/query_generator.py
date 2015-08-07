@@ -18,7 +18,8 @@ from itertools import ifilter
 from logging import getLogger
 from random import shuffle, choice, randint, randrange
 
-from tests.comparison.common import TableExprList, ValExpr, ValExprList
+from tests.comparison.common import TableExprList, ValExpr, ValExprList, Table, Column
+from tests.comparison.query_profile import DefaultProfile, HiveProfile
 from tests.comparison.funcs import (
     AGG_FUNCS,
     AggFunc,
@@ -185,7 +186,9 @@ class QueryGenerator(object):
         select_clause.distinct = True
 
     if self.profile.use_having_clause() \
-        and (query.group_by_clause or select_clause.agg_items):
+        and (query.group_by_clause
+             or (self.profile.use_having_without_groupby()
+             and select_clause.agg_items)):
       basic_select_item_exprs = \
           ValExprList(item.val_expr for item in select_clause.basic_items)
       query.having_clause = self._create_having_clause(
@@ -479,7 +482,8 @@ class QueryGenerator(object):
               # Don't use UNION + LIMIT; https://issues.cloudera.org/browse/IMPALA-1379
               allow_union_clause=(not signature_arg.is_subquery),
               table_alias_prefix=(table_alias_prefix +
-                  ('t' if use_correlated_subquery else '')))
+                  ('t' if use_correlated_subquery else '')),
+              allow_with_clause=self.profile.use_nested_with())
           if use_scalar_subquery and not use_agg_subquery:
             # Impala will assume the query will return more than one row unless a LIMIT 1
             # is added. An ORDER BY will also be added under the assumption that we want
@@ -1237,3 +1241,31 @@ class QueryGenerator(object):
     # else: The remaining case could happen if the original expr was something like
     #       "SUM(a) + b + 1" where b is a GROUP BY field.
     return exprs_to_funcs
+
+if __name__ == '__main__':
+  '''Generate some queries for manual inspection. The query won't run anywhere because the
+     tables used are fake. To make real queries, we'd need to connect to a database and
+     read the table metadata and such.
+  '''
+  tables = list()
+  data_types = list(TYPES)
+  data_types.remove(Float)
+  for table_idx in xrange(5):
+    table = Table('table_%s' % table_idx)
+    tables.append(table)
+    for col_idx in xrange(3):
+      col_type = choice(data_types)
+      col = Column(table, '%s_col_%s' % (col_type.__name__.lower(), col_idx), col_type)
+      table.cols.append(col)
+
+  query_profile = HiveProfile()
+  query_generator = QueryGenerator(query_profile)
+  from model_translator import SqlWriter
+  sql_writer = SqlWriter.create(dialect='HIVE')
+  ref_writer = SqlWriter.create(dialect='POSTGRESQL', nulls_order_asc=query_profile.nulls_order_asc())
+  for _ in range(3000):
+    query = query_generator.create_query(tables)
+    print("Test db")
+    print(sql_writer.write_query(query) + '\n')
+    print("Ref db")
+    print(ref_writer.write_query(query) + '\n')

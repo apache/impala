@@ -322,6 +322,19 @@ class DefaultProfile(object):
   def get_query_execution(self):
     return self._choose_from_weights('QUERY_EXECUTION')
 
+  def use_having_without_groupby(self):
+    return True
+
+  def use_nested_with(self):
+    return True
+
+  # Workaround for Hive null ordering differences, and lack of 'NULL FIRST', 'NULL LAST'
+  # specifications. The ref db will order nulls as specified for ASC sorting to make it
+  # identifical to Hive. Valid return values are: 'BEFORE', 'AFTER', or 'DEFAULT',
+  # the latter means no specification needed.
+  def nulls_order_asc(self):
+    return 'DEFAULT'
+
   def choose_val_expr(self, val_exprs, types=TYPES):
     if not val_exprs:
       raise Exception('At least on value is required')
@@ -445,6 +458,35 @@ class DefaultProfile(object):
       elif not weights[arg.type]:
         return False
     return True
+
+
+class HiveProfile(DefaultProfile):
+  def __init__(self):
+      super(HiveProfile, self).__init__()
+
+  def use_having_without_groupby(self):
+    return False
+
+  def use_nested_with(self):
+    return False
+
+  def nulls_order_asc(self):
+    return 'BEFORE'
+
+  def allow_func_signature(self, signature):
+    if signature.func._NAME.startswith('DateAdd'):
+      return False
+    if signature.func._NAME in ('Greatest', 'Least'):
+      type = signature.return_type
+      argtypes = [arg.type for arg in signature.args]
+      for argtype in argtypes:
+        if type is None:
+          type = argtype
+          continue
+        else:
+          if type != argtype:
+            return False
+    return DefaultProfile.allow_func_signature(self, signature)
 
 
 PROFILES = [var for var in locals().values()

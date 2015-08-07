@@ -109,7 +109,8 @@ class DbConnector(object):
           host=self.host_name,
           port=self.port,
           ldap_user=self.user_name,
-          ldap_password=self.password)
+          ldap_password=self.password,
+          timeout=maxint)
       return HiveDbConnection(self, connection, user_name=self.user_name,
           user_pass=self.password, db_name=db_name, hdfs_host=self.hdfs_host,
           hdfs_port=self.hdfs_port)

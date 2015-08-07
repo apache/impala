@@ -86,6 +86,10 @@ def add_data_types_options(section):
       help='A comma separated list of data types to use.')
 
 
+def add_timeout_option(section):
+  section.add_option('--timeout', default=(3 * 60), type=int, help='Query timeout in seconds')
+
+
 def add_connection_option_groups(parser):
   group = OptionGroup(parser, "Impala Options")
   group.add_option('--impalad-host', default='localhost',

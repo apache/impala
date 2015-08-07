@@ -20,6 +20,7 @@ from sqlparse import format
 
 from tests.comparison.types import (
     Char,
+    Decimal,
     Float,
     Int,
     String,
@@ -37,25 +38,29 @@ class SqlWriter(object):
   '''
 
   @staticmethod
-  def create(dialect='impala'):
+  def create(dialect='impala', nulls_order_asc='DEFAULT'):
     '''Create and return a new SqlWriter appropriate for the given sql dialect. "dialect"
        refers to database specific deviations of sql, and the val should be one of
        "IMPALA", "MYSQL", or "POSTGRESQL".
     '''
     dialect = dialect.upper()
     if dialect == 'IMPALA':
-      return ImpalaSqlWriter()
+      return ImpalaSqlWriter(nulls_order_asc)
     if dialect == 'MYSQL':
-      return MySQLSqlWriter()
+      return MySQLSqlWriter(nulls_order_asc)
     if dialect == 'ORACLE':
-      return OracleSqlWriter()
+      return OracleSqlWriter(nulls_order_asc)
     if dialect == 'POSTGRESQL':
-      return PostgresqlSqlWriter()
+      return PostgresqlSqlWriter(nulls_order_asc)
     if dialect == 'HIVE':
-      return HiveSqlWriter()
+      return HiveSqlWriter(nulls_order_asc)
     raise Exception('Unknown dialect: %s' % dialect)
 
-  def __init__(self):
+  def __init__(self, nulls_order_asc):
+    if nulls_order_asc not in ('BEFORE', 'AFTER', 'DEFAULT'):
+      raise Exception('Unknown nulls order: %s' % nulls_order_asc)
+    self.nulls_order_asc = nulls_order_asc
+
     # Functions that don't follow the usual call syntax of foo(bar, baz) can be listed
     # here. Parenthesis were added everywhere to avoid problems with operator precedence.
     # TODO: Account for operator precedence...
@@ -228,6 +233,9 @@ class SqlWriter(object):
   def _write_cast_as_char(self, func):
     return 'CAST(%s AS %s)' % (self._write(func.args[0]), self._write(String))
 
+  def _write_cast(self, arg, type):
+    return 'CAST(%s AS %s)' % (self._write(arg), type)
+
   def _write_date_add_year(self, func):
     return "%s + INTERVAL %s YEAR" \
         % (self._write(func.args[0]), self._write(func.args[1]))
@@ -330,6 +338,9 @@ class SqlWriter(object):
       sql += self._write(expr)
       if order:
         sql += ' ' + order
+        nulls_order = self.get_nulls_order(order)
+        if nulls_order is not None:
+          sql += ' ' + nulls_order
     return sql
 
   def _write_limit_clause(self, limit_clause):
@@ -359,6 +370,21 @@ class SqlWriter(object):
 
     raise Exception('Unsupported object: %s<%s>' % (type(object_).__name__, object_))
 
+  def get_nulls_order(self, order):
+    if self.nulls_order_asc is None:
+      return None
+    nulls_order_asc = self.nulls_order_asc
+    if order == 'ASC':
+      if nulls_order_asc == 'BEFORE':
+        return 'NULLS FIRST'
+      if nulls_order_asc == 'AFTER':
+        return 'NULLS LAST'
+    if order == 'DESC':
+      if nulls_order_asc == 'BEFORE':
+        return 'NULLS LAST'
+      if nulls_order_asc == 'AFTER':
+        return 'NULLS FIRST'
+
   def _to_py_name(self, name):
     return sub('([A-Z])', r'_\1', name).lower().lstrip('_')
 
@@ -379,6 +405,60 @@ class OracleSqlWriter(SqlWriter):
 class HiveSqlWriter(SqlWriter):
 
   DIALECT = 'HIVE'
+
+  # Hive greatest UDF is strict on type equality
+  # Hive Profile already restricts to signatures with the same types,
+  # but sometimes expression with UDF's like 'count'
+  # return an unpredictable type like 'bigint' unlike
+  # the query model, so cast is still necessary.
+  def _write_greatest(self, func):
+    args = func.args
+    if args[0].type in (Int, Decimal, Float):
+      argtype = args[0].type.__name__.lower()
+      sql = '%s(%s)' % \
+            (self._to_sql_name(func.name()),
+             (self._write_cast(args[0], argtype)
+              + ", "
+              + self._write_cast(args[1], argtype)))
+    else:
+      sql = self._write_func(func)
+    return sql
+
+  # Hive least UDF is strict on type equality
+  # Hive Profile already restricts to signatures with the same types,
+  # but sometimes expression with UDF's like 'count'
+  # return an unpredictable type like 'bigint' unlike
+  # the query model, so cast is still necessary.
+  def _write_least(self, func):
+    args = func.args
+    if args[0].type in (Int, Decimal, Float):
+      argtype = args[0].type.__name__.lower()
+      sql = '%s(%s)' % \
+            (self._to_sql_name(func.name()),
+             (self._write_cast(args[0], argtype)
+              + ", "
+              + self._write_cast(args[1], argtype)))
+    else:
+      sql = self._write_func(func)
+    return sql
+
+  # Hive partition by clause throws exception if sorted by more than one key, unless 'rows unbounded preceding' added.
+  def _write_analytic_func(self, func):
+    sql = self._to_sql_name(func.name()) \
+        + '(' + self._write_as_comma_list(func.args) \
+        + ') OVER ('
+    options = []
+    if func.partition_by_clause:
+      options.append(self._write(func.partition_by_clause))
+    if func.order_by_clause:
+      options.append(self._write(func.order_by_clause))
+    if func.window_clause:
+      options.append(self._write(func.window_clause))
+    if func.partition_by_clause and func.order_by_clause:
+      if len(func.order_by_clause.exprs_to_order) > 1:
+        if func.SUPPORTS_WINDOWING and func.window_clause is None:
+          options.append('rows unbounded preceding')
+    return sql + ' '.join(options) + ')'
 
 
 class PostgresqlSqlWriter(SqlWriter):
@@ -434,6 +514,9 @@ class PostgresqlSqlWriter(SqlWriter):
         sql += self._write(expr)
       if order:
         sql += ' ' + order
+        nulls_order = self.get_nulls_order(order)
+        if (nulls_order is not None):
+          sql += ' ' + nulls_order
     return sql
 
   def _write_data_type(self, data_type):
@@ -507,4 +590,7 @@ class MySQLSqlWriter(SqlWriter):
       sql += 'ISNULL({0}), {0}'.format(self._write(expr))
       if order:
         sql += ' ' + order
+        nulls_order = self.get_nulls_order(order)
+        if (nulls_order is not None):
+          sql += ' ' + nulls_order
     return sql
