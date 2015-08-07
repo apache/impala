@@ -30,6 +30,7 @@ enum TTableSinkType {
   HBASE
   KUDU_INSERT
   KUDU_UPDATE
+  KUDU_DELETE
 }
 
 // Sink which forwards data to a remote plan fragment,

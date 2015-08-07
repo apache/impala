@@ -16,13 +16,19 @@ package com.cloudera.impala.analysis;
 
 import org.junit.Test;
 
-public class AnalyzeUpdateStmtsTest extends AnalyzerTest {
+/**
+ * Tests analysis phase of the ModifyStmt and its sub-classes.
+ *
+ * Most of the tests are on UpdateStmt only as it exercises all important code paths while
+ * DeleteStmt uses only a subset of the functionality of the UpdateStmt for now.
+ */
+public class AnalyzeModifyStmtsTest extends AnalyzerTest {
 
   @Test
   public void TestFromListAliases() {
     AnalysisError("update a.name set a.name = 'Oskar' from functional_kudu.testtbl a",
         "'a.name' is not a table alias. Using the FROM clause requires the target table" +
-        " to be a table alias.");
+            " to be a table alias.");
     AnalysisError("update a.name set a.name = 'Oskar' from functional_kudu.testtbl",
         "'a.name' is not a valid table alias or reference.");
     AnalysisError("Update functional_kudu.testtbl.c set name='Oskar'",
@@ -42,14 +48,14 @@ public class AnalyzeUpdateStmtsTest extends AnalyzerTest {
     // If explicit alias is set, it has to be used
     AnalysisError(
         "update functional_kudu.dimtbl set name = 'Oskar' FROM functional_kudu" +
-        ".dimtbl foo",
+            ".dimtbl foo",
         "'functional_kudu.dimtbl' is not a valid table alias or reference.");
     // Implicit alias is ok
     AnalyzesOk("update dimtbl set name = 'Oskar' FROM functional_kudu.dimtbl");
     // Duplicate aliases are illegal
     AnalysisError(
         "update dimtbl set name = 'Oskar' FROM functional_kudu.dimtbl, functional" +
-        ".alltypes dimtbl", "Duplicate table alias: 'dimtbl'");
+            ".alltypes dimtbl", "Duplicate table alias: 'dimtbl'");
     // Location of the kudu table doesnt matter
     AnalyzesOk(
         "update a set a.name = 'Oskar' from functional.testtbl b, dimtbl a where b.id =" +
@@ -62,6 +68,12 @@ public class AnalyzeUpdateStmtsTest extends AnalyzerTest {
     AnalyzesOk(
         "update a set a.name = b.name FROM functional.testtbl b join functional_kudu" +
         ".testtbl a on a.id = b.id where a.id = 10");
+
+    AnalyzesOk("delete from functional_kudu.testtbl");
+    AnalyzesOk("delete functional_kudu.testtbl from functional_kudu.testtbl");
+    AnalyzesOk("delete a from functional_kudu.testtbl a");
+    AnalyzesOk("delete a from functional_kudu.testtbl a join functional.testtbl b " +
+        "on a.zip = b.zip");
   }
 
   @Test
@@ -100,7 +112,7 @@ public class AnalyzeUpdateStmtsTest extends AnalyzerTest {
     AnalyzesOk("update functional_kudu.dimtbl set name = substr('hallo', 3)");
     // Only Kudu tables can be updated
     AnalysisError("update functional.alltypes set intcol = 99",
-        "Impala does not support updating a non-Kudu table: functional.alltypes");
+        "Impala does not support modifying a non-Kudu table: functional.alltypes");
     // Non existing column in update
     AnalysisError("update functional_kudu.dimtbl set links='10'",
         "Could not resolve column/field reference: 'links'");
@@ -120,63 +132,78 @@ public class AnalyzeUpdateStmtsTest extends AnalyzerTest {
   }
 
   @Test
-  public void TestUpdateWhereClause() {
+  public void TestWhereClause() {
     // With where clause
     AnalyzesOk("update functional_kudu.dimtbl set name = '10' where name = '11'");
     // Complex where clause
     AnalyzesOk(
         "update functional_kudu.dimtbl set name = '10' where name < '11' and name " +
-        "between '1' and '10'");
+            "between '1' and '10'");
+    AnalyzesOk("delete from functional_kudu.testtbl where id < 9");
+    AnalyzesOk("delete from functional_kudu.testtbl where " +
+        "id in (select id from functional.testtbl)");
   }
 
   @Test
-  public void TestUpdateWithSourceStmtRewrite() {
+  public void TestWithSourceStmtRewrite() {
     // No subqueries in set statement as we cannot translate them into subqueries in
     // the select list
     AnalysisError(
         "update a set name = (select name from functional.testtbl b where b.zip = a.zip" +
-        " limit 1) from functional_kudu.testtbl a",
+            " limit 1) from functional_kudu.testtbl a",
         "Subqueries are not supported as update expressions for column 'name'");
 
     AnalysisError(
         "update functional_kudu.testtbl set zip = 1 + (select count(*) from functional" +
-        ".alltypes)",
+            ".alltypes)",
         "Subqueries are not supported as update expressions for column 'zip'");
 
     // Subqueries in where condition
     AnalyzesOk("update functional_kudu.dimtbl set name = '10' where " +
         "name in (select name from functional.dimtbl)");
+    AnalyzesOk("delete functional_kudu.dimtbl where " +
+        "name in (select name from functional.dimtbl)");
   }
 
   @Test
-  public void TestUpdateWithJoin() {
+  public void TestWithJoin() {
     // Simple Join
     AnalyzesOk(
         "update a set a.name = b.name FROM functional_kudu.testtbl a join functional" +
         ".testtbl b on a.id = b.id where a.id = 10");
+    AnalyzesOk(
+        "delete a from functional_kudu.testtbl a join functional.testtbl b on " +
+            "a.id = b.id where a.id = 10");
     // Wrong target table
     AnalysisError(
         "update a set b.name = 'Oskar' FROM functional_kudu.testtbl a join functional" +
-        ".testtbl b on a.id = b.id where a.id = 10",
+            ".testtbl b on a.id = b.id where a.id = 10",
         "Left-hand side column 'b.name' in assignment expression 'b.name='Oskar'' does " +
-        "not belong to target table 'functional_kudu.testtbl'");
+            "not belong to target table 'functional_kudu.testtbl'");
     AnalysisError(
         "update a set b.name = b.other  FROM functional_kudu.testtbl a join functional" +
-        ".testtbl b on a.id = b.id where a.id = 10",
+            ".testtbl b on a.id = b.id where a.id = 10",
         "Could not resolve column/field reference: 'b.other'");
     // Join with values clause as data
     AnalyzesOk(
         "update a set a.name = 'values' FROM functional_kudu.testtbl a join (values (1 " +
-        "as ids,2,3) ) b on a.id = b.ids");
+            "as ids,2,3) ) b on a.id = b.ids");
+    AnalyzesOk(
+        "delete a FROM functional_kudu.testtbl a join (values (1 " +
+            "as ids,2,3) ) b on a.id = b.ids");
     AnalysisError(
         "update a set b.name =" +
-        " 'Oskar' FROM functional.testtbl a join functional_kudu.testtbl b",
-        "Impala does not support updating a non-Kudu table: functional.testtbl");
+            " 'Oskar' FROM functional.testtbl a join functional_kudu.testtbl b",
+        "Impala does not support modifying a non-Kudu table: functional.testtbl");
+    AnalysisError(
+        "delete a FROM functional.testtbl a join functional_kudu.testtbl b",
+        "Impala does not support modifying a non-Kudu table: functional.testtbl");
   }
 
   @Test
-  public void TestNoViewUpdate() {
-    AnalysisError("update functional.alltypes_view set id = 10", "Cannot update view");
+  public void TestNoViewModification() {
+    AnalysisError("update functional.alltypes_view set id = 10", "Cannot modify view");
+    AnalysisError("delete functional.alltypes_view", "Cannot modify view");
   }
 
   @Test
@@ -185,11 +212,11 @@ public class AnalyzeUpdateStmtsTest extends AnalyzerTest {
         "update a set c.item = 10 FROM functional_kudu.testtbl a, functional" +
         ".allcomplextypes b, b.int_array_col c",
         "Left-hand side column 'c.item' in assignment expression 'c.item=10' does not " +
-        "belong to target table 'functional_kudu.testtbl'");
+            "belong to target table 'functional_kudu.testtbl'");
 
     AnalysisError(
         "update a set a.zip = b.int_array_col FROM functional_kudu.testtbl a, " +
-        "functional.allcomplextypes b, b.int_array_col c",
+            "functional.allcomplextypes b, b.int_array_col c",
         "Column 'zip' of type INT is not compatible with the expression b.int_array_col" +
         " of type ARRAY<INT>");
 

@@ -88,6 +88,9 @@ public class Planner {
     } else if (ctx_.isUpdate()) {
       // Set up update sink for root fragment
       rootFragment.setSink(ctx_.getAnalysisResult().getUpdateStmt().createDataSink());
+    } else if (ctx_.isDelete()) {
+      // Set up delete sink for root fragment
+      rootFragment.setSink(ctx_.getAnalysisResult().getDeleteStmt().createDataSink());
     }
 
     ColumnLineageGraph graph = ctx_.getRootAnalyzer().getColumnLineageGraph();

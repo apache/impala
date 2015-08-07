@@ -15,7 +15,6 @@
 package com.cloudera.impala.analysis;
 
 import java.io.StringReader;
-import java.util.List;
 import java.util.Set;
 
 import org.slf4j.Logger;
@@ -101,8 +100,10 @@ public class AnalysisContext {
       return stmt_ instanceof GrantRevokePrivStmt;
     }
     public boolean isTruncateStmt() { return stmt_ instanceof TruncateStmt; }
-    public boolean isUpdateStmt() { return stmt_ instanceof UpdateStmt; }
-    public UpdateStmt getUpdateStmt() { return (UpdateStmt) stmt_; }
+    public boolean isUpdateStmt() { return stmt_ instanceof UpdateStmt2; }
+    public UpdateStmt2 getUpdateStmt() { return (UpdateStmt2) stmt_; }
+    public boolean isDeleteStmt() { return stmt_ instanceof DeleteStmt; }
+    public DeleteStmt getDeleteStmt() { return (DeleteStmt) stmt_; }
 
     public boolean isCatalogOp() {
       return isUseStmt() || isViewMetadataStmt() || isDdlStmt();

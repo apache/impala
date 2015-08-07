@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.analysis;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,7 +28,6 @@ import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.planner.DataSink;
-import com.cloudera.impala.planner.KuduTableSink;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -40,72 +38,68 @@ import org.slf4j.LoggerFactory;
 import static java.lang.String.format;
 
 /**
- * Representation of an Update statement.
+ * Abstract super class for statements that modify existing data like
+ * UPDATE and DELETE.
  *
- * Example UPDATE statement:
- *
- *     UPDATE target_table
- *       SET slotRef=expr, [slotRef=expr, ...]
- *       FROM table_ref_list
- *       WHERE conjunct_list
- *
- * An update statement consists of four major parts. First, the target table path,
- * second, the list of assignments, the optional FROM clause, and the optional where
- * clause. The type of the right-hand side of each assignments must be
- * assignment compatible with the left-hand side column type.
+ * The ModifStmt has four major parts:
+ *   - targetTablePath (not null)
+ *   - fromClause (not null)
+ *   - assignmentExprs (not null, can be empty)
+ *   - wherePredicate (nullable)
  *
  * In the analysis phase, a SelectStmt is created with the result expressions set to
- * match the right-hand side of the assignments. During query execution, the plan that
- * is generated from this SelectStmt produces all rows that need to be updated.
+ * match the right-hand side of the assignments in addition to projecting the key columns
+ * of the underlying table. During query execution, the plan that
+ * is generated from this SelectStmt produces all rows that need to be modified.
  *
- * Currently, only Kudu tables can be updated.
+ * Currently, only Kudu tables can be modified.
  */
-public class UpdateStmt extends StatementBase {
+public abstract class UpdateStmt extends StatementBase {
   private final static org.slf4j.Logger LOG = LoggerFactory.getLogger(UpdateStmt.class);
 
   // List of explicitly mentioned assignment expressions in the UPDATE's SET clause
-  private final List<Pair<SlotRef, Expr>> assignments_;
+  protected final List<Pair<SlotRef, Expr>> assignments_;
 
   // Optional WHERE clause of the statement
-  private final Expr wherePredicate_;
+  protected final Expr wherePredicate_;
 
   // Path identifying the target table.
   private final List<String> targetTablePath_;
 
   // TableRef identifying the target table, set during analysis.
-  private TableRef targetTableRef_;
+  protected TableRef targetTableRef_;
 
-  private FromClause fromClause_;
+  protected FromClause fromClause_;
 
   // Result of the analysis of the internal SelectStmt that produces the rows that
-  // will be updated.
+  // will be modified.
   private SelectStmt sourceStmt_;
 
   // Target Kudu table. Since currently only Kudu tables are supported, we use a
   // concrete table class. Result of analysis.
-  private KuduTable table_;
+  protected KuduTable table_;
 
   // Position mapping of output expressions of the sourceStmt_ to column indices in the
   // target table. The i'th position in this list maps to the referencedColumns_[i]'th
   // position in the target table. Set in createSourceStmt() during analysis.
-  private ArrayList<Integer> referencedColumns_;
+  protected ArrayList<Integer> referencedColumns_;
 
-  public UpdateStmt(List<String> targetTablePath, FromClause tableRefs,
+  public UpdateStmt(List<String> targetTablePath, FromClause fromClause,
       List<Pair<SlotRef, Expr>> assignmentExprs,
       Expr wherePredicate) {
     targetTablePath_ = Preconditions.checkNotNull(targetTablePath);
-    fromClause_ = Preconditions.checkNotNull(tableRefs);
+    fromClause_ = Preconditions.checkNotNull(fromClause);
     assignments_ = Preconditions.checkNotNull(assignmentExprs);
     wherePredicate_ = wherePredicate;
   }
 
   /**
-   * The analysis of the UPDATE progresses as follows. First, the FROM clause is analyzed
-   * and the targetTablePath is verified to be a valid alias into the FROM clause. When
-   * the target table is identified, the assignment expressions are validated and as a
-   * last step the internal SelectStmt is produced and analyzed. Potential query rewrites
-   * for the select statement are implemented here and are not triggered externally
-   * by the statement rewriter.
+   * The analysis of the ModifyStmt progresses as follows. First, the FROM clause is
+   * analyzed and the targetTablePath is verified to be a valid alias into the FROM
+   * clause. When the target table is identified, the assignment expressions are
+   * validated and as a last step the internal SelectStmt is produced and analyzed.
+   * Potential query rewrites for the select statement are implemented here and are not
+   * triggered externally by the statement rewriter.
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
@@ -131,7 +125,7 @@ public class UpdateStmt extends StatementBase {
 
     targetTableRef_ = analyzer.getTableRef(path.getRootDesc().getId());
     if (targetTableRef_ instanceof InlineViewRef) {
-      throw new AnalysisException(format("Cannot update view: '%s'",
+      throw new AnalysisException(format("Cannot modify view: '%s'",
           targetTableRef_.toSql()));
     }
 
@@ -140,13 +134,13 @@ public class UpdateStmt extends StatementBase {
     // Only Kudu tables can be updated
     if (!(dstTbl instanceof KuduTable)) {
       throw new AnalysisException(
-          format("Impala does not support updating a non-Kudu table: %s",
+          format("Impala does not support modifying a non-Kudu table: %s",
               dstTbl.getFullName()));
     }
     table_ = (KuduTable) dstTbl;
 
-    // Make sure that the user is allowed to update the target table, since no UPDATE
-    // privilege exists, we reuse the INSERT one.
+    // Make sure that the user is allowed to modify the target table, since no
+    // UPDATE / DELETE privilege exists, we reuse the INSERT one.
     analyzer.registerPrivReq(new PrivilegeRequestBuilder()
         .onTable(table_.getDb().getName(), table_.getName())
         .allOf(Privilege.INSERT).toRequest());
@@ -199,9 +193,9 @@ public class UpdateStmt extends StatementBase {
   }
 
   /**
-   * Validates the list of value assignments that should be used to update the target
+   * Validates the list of value assignments that should be used to modify the target
    * table. It verifies that only those columns are referenced that belong to the target
-   * table, no key columns are updated, and that a single column is not updated multiple
+   * table, no key columns are modified, and that a single column is not modified multiple
    * times. Analyzes the Exprs and SlotRefs of assignments_ and writes a list of
    * SelectListItems to the out parameter selectList that is used to build the select list
    * for sourceStmt_. A list of integers indicating the column position of an entry in the
@@ -236,6 +230,7 @@ public class UpdateStmt extends StatementBase {
       referencedColumns.add(colIndexMap.get(k));
     }
 
+    // Assignments are only used in the context of updates.
     for (Pair<SlotRef, Expr> valueAssignment : assignments_) {
       Expr rhsExpr = valueAssignment.second;
       SlotRef lhsSlotRef = valueAssignment.first;
@@ -296,55 +291,11 @@ public class UpdateStmt extends StatementBase {
     }
   }
 
-  /**
-   * String representation of the UPDATE stmt, Does not generate the SQL matching the
-   * underlying select statement but only the SQL for the UPDATE stmt.
-   */
   public QueryStmt getQueryStmt() { return sourceStmt_; }
 
-  /**
-   * Return an instance of a KuduTableSink specialized as an Update operation.
-   */
-  public DataSink createDataSink() {
-    // analyze() must have been called before.
-    Preconditions.checkState(table_ != null);
-    return KuduTableSink.createUpdateSink(table_, referencedColumns_);
-  }
+  public abstract DataSink createDataSink();
 
-  @Override
-  public String toSql() {
-    StringBuilder b = new StringBuilder();
-    b.append("UPDATE ");
+  public abstract String toSql();
 
-    if (fromClause_ == null) {
-      b.append(targetTableRef_.toSql());
-    } else {
-      if (targetTableRef_.hasExplicitAlias()) {
-        b.append(targetTableRef_.getExplicitAlias());
-      } else {
-        b.append(targetTableRef_.toSql());
-      }
-    }
-    b.append(" SET");
 
-    boolean first = true;
-    for (Pair<SlotRef, Expr> i : assignments_) {
-      if (!first) {
-        b.append(",");
-      } else {
-        first = false;
-      }
-      b.append(format(" %s = %s",
-          i.first.toSql(),
-          i.second.toSql()));
-    }
-
-    b.append(fromClause_.toSql());
-
-    if (wherePredicate_ != null) {
-      b.append(" WHERE ");
-      b.append(wherePredicate_.toSql());
-    }
-    return b.toString();
-  }
 }

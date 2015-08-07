@@ -1508,6 +1508,21 @@ public class ParserTest {
   }
 
   @Test
+  public void TestDelete() {
+    ParsesOk("delete from t");
+    ParsesOk("delete a from t a");
+    ParsesOk("delete a from t a join b on a.id = b.id where true");
+    ParsesOk("delete a from t a join b where true");
+    ParsesOk("delete t from t");
+    ParsesOk("delete t from t where a < b");
+    ParsesOk("delete a from t a where a < b");
+    ParsesOk("delete FROM t where a < b");
+    ParsesOk("delete t where a < b");
+    ParsesOk("delete t");
+    ParserError("delete t join f on t.id = f.id");
+  }
+
+  @Test
   public void TestUse() {
     ParserError("USE");
     ParserError("USE db1 db2");
@@ -2503,7 +2518,7 @@ public class ParserTest {
         "c, b, c from t\n" +
         "^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: ALTER, COMPUTE, CREATE, DESCRIBE, DROP, EXPLAIN, GRANT, " +
+        "Expected: ALTER, COMPUTE, CREATE, DELETE, DESCRIBE, DROP, EXPLAIN, GRANT, " +
         "INSERT, INVALIDATE, LOAD, REFRESH, REVOKE, SELECT, SET, SHOW, TRUNCATE, " +
         "UPDATE, USE, VALUES, WITH\n");
 

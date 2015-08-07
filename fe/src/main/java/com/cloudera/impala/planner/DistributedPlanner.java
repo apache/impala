@@ -71,7 +71,8 @@ public class DistributedPlanner {
     // so we can pass it back to the client.
     boolean isPartitioned = false;
     if ((analysisResult.isInsertStmt() || analysisResult.isCreateTableAsSelectStmt() ||
-        analysisResult.isUpdateStmt()) && !singleNodePlan.hasLimit()) {
+        analysisResult.isUpdateStmt() || analysisResult.isDeleteStmt())
+        && !singleNodePlan.hasLimit()) {
       Preconditions.checkState(!queryStmt.hasOffset());
       isPartitioned = true;
     }

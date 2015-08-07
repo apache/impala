@@ -58,8 +58,10 @@ public class StmtRewriter {
       Preconditions.checkNotNull(analysisResult.getTmpCreateTableStmt());
       rewrittenStmt = new CreateTableAsSelectStmt(analysisResult.getTmpCreateTableStmt(),
           ctasStmt.getQueryStmt().clone());
-    } else if (analysisResult.getStmt() instanceof UpdateStmt) {
+    } else if (analysisResult.isUpdateStmt()) {
       throw new AnalysisException("Update performs internal rewrite only.");
+    } else if (analysisResult.isDeleteStmt()) {
+      throw new AnalysisException("Delete performs internal rewrite only.");
     } else {
       throw new AnalysisException("Unsupported statement containing subqueries: " +
           analysisResult.getStmt().toSql());

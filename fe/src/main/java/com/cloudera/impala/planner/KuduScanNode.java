@@ -162,7 +162,7 @@ public class KuduScanNode extends ScanNode {
       TExplainLevel detailLevel) {
     StringBuilder result = new StringBuilder();
 
-    String aliasStr = desc_.hasExplicitAlias() ? desc_.getAlias() : "";
+    String aliasStr = desc_.hasExplicitAlias() ? " " + desc_.getAlias() : "";
     result.append(String.format("%s%s:%s [%s%s]\n", prefix, id_.toString(), displayName_,
         kuduTable_.getFullName(), aliasStr));
 

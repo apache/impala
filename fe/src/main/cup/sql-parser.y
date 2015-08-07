@@ -235,9 +235,9 @@ terminal
   KW_ARRAY, KW_AS, KW_ASC, KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BOOLEAN, KW_BY,
   KW_CACHED, KW_CASE, KW_CAST, KW_CHANGE, KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN,
   KW_COLUMNS, KW_COMMENT, KW_COMPUTE, KW_CREATE, KW_CROSS, KW_CURRENT, KW_DATA,
-  KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DELIMITED, KW_DESC,
-  KW_DESCRIBE, KW_DISTINCT, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED,
-  KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL, KW_FALSE, KW_FIELDS,
+  KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DELETE, KW_DELIMITED,
+  KW_DESC, KW_DESCRIBE, KW_DISTINCT, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END,
+  KW_ESCAPED, KW_EXISTS, KW_EXPLAIN, KW_EXTERNAL, KW_FALSE, KW_FIELDS,
   KW_FILEFORMAT, KW_FILES, KW_FINALIZE_FN,
   KW_FIRST, KW_FLOAT, KW_FOLLOWING, KW_FOR, KW_FORMAT, KW_FORMATTED, KW_FROM, KW_FULL,
   KW_FUNCTION, KW_FUNCTIONS, KW_GRANT, KW_GROUP, KW_HAVING, KW_IF, KW_IN, KW_INCREMENTAL,
@@ -349,7 +349,9 @@ nonterminal TypeDef type_def;
 nonterminal Type type;
 nonterminal Expr sign_chain_expr;
 nonterminal InsertStmt insert_stmt;
-nonterminal UpdateStmt update_stmt;
+nonterminal UpdateStmt2 update_stmt;
+nonterminal DeleteStmt delete_stmt;
+nonterminal ArrayList<String> opt_delete_from;
 nonterminal ArrayList<Pair<SlotRef, Expr>> update_set_expr_list;
 nonterminal StatementBase explain_stmt;
 // Optional partition spec
@@ -488,6 +490,8 @@ stmt ::=
   {: RESULT = insert; :}
   | update_stmt:update
   {: RESULT = update; :}
+  | delete_stmt:delete
+  {: RESULT = delete; :}
   | use_stmt:use
   {: RESULT = use; :}
   | show_tables_stmt:show_tables
@@ -622,6 +626,11 @@ explain_stmt ::=
      update.setIsExplain();
      RESULT = update;
   :}
+  | KW_EXPLAIN delete_stmt:delete
+  {:
+     delete.setIsExplain();
+     RESULT = delete;
+  :}
   ;
 
 // Insert statements have two optional clauses: the column permutation (INSERT into
@@ -651,11 +660,11 @@ update_stmt ::=
   {:
     FromClause from_clause = new FromClause(
         Lists.newArrayList(new TableRef(target_table, null)));
-    RESULT = new UpdateStmt(target_table, from_clause, values, where_predicate);
+    RESULT = new UpdateStmt2(target_table, from_clause, values, where_predicate);
   :}
   | KW_UPDATE dotted_path:target_table KW_SET update_set_expr_list:values
     from_clause:tables where_clause:where_predicate
-  {: RESULT = new UpdateStmt(target_table, tables, values, where_predicate); :}
+  {: RESULT = new UpdateStmt2(target_table, tables, values, where_predicate); :}
   ;
 
 update_set_expr_list ::=
@@ -670,6 +679,28 @@ update_set_expr_list ::=
     list.add(new Pair(slot, e));
     RESULT = list;
   :}
+  ;
+
+// A DELETE statement comes in two main representations, the DELETE keyword with a path
+// specification as the target table with an optional FROM keyword or the DELETE
+// keyword followed by a table alias or reference and a full FROM clause. In all cases
+// a WHERE clause may be present.
+delete_stmt ::=
+  KW_DELETE opt_delete_from:target_table  where_clause:where
+  {:
+    FromClause from_clause = new FromClause(
+        Lists.newArrayList(new TableRef(target_table, null)));
+    RESULT = new DeleteStmt(target_table, from_clause, where);
+  :}
+  | KW_DELETE dotted_path:target_table from_clause:from where_clause:where
+  {: RESULT = new DeleteStmt(target_table, from, where); :}
+  ;
+
+opt_delete_from ::=
+  KW_FROM dotted_path:target_table
+  {: RESULT = target_table; :}
+  | dotted_path:target_table
+  {: RESULT = target_table; :}
   ;
 
 opt_query_stmt ::=

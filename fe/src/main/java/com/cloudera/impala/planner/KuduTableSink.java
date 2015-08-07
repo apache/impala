@@ -58,6 +58,11 @@ public class KuduTableSink extends TableSink {
     return new KuduTableSink(targetTable, Type.UPDATE, referencedColIdxs);
   }
 
+  public static KuduTableSink createDeleteSink(Table targetTable,
+      List<Integer> referencedColIdxs) {
+    return new KuduTableSink(targetTable, Type.DELETE, referencedColIdxs);
+  }
+
   @Override
   public String getExplainString(String prefix, String detailPrefix,
       TExplainLevel explainLevel) {
@@ -102,6 +107,13 @@ public class KuduTableSink extends TableSink {
 
       @Override
       public TTableSinkType toThrift() { return TTableSinkType.KUDU_UPDATE; }
+    },
+    DELETE {
+      @Override
+      public String toExplainString() { return "DELETE FROM"; }
+
+      @Override
+      public TTableSinkType toThrift() { return TTableSinkType.KUDU_DELETE; }
     };
 
     public abstract String toExplainString();

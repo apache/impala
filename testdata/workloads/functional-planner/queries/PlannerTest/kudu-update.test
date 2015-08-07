@@ -56,7 +56,7 @@ UPDATE KUDU [functional_kudu.testtbl]
 |     partitions=1/1 files=0 size=0B
 |     predicates: b.id = 10
 |
-00:SCAN KUDU [functional_kudu.testtbla]
+00:SCAN KUDU [functional_kudu.testtbl a]
    kudu predicates: a.id = 10
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
@@ -70,7 +70,7 @@ UPDATE KUDU [functional_kudu.testtbl]
 |     partitions=1/1 files=0 size=0B
 |     predicates: b.id = 10
 |
-00:SCAN KUDU [functional_kudu.testtbla]
+00:SCAN KUDU [functional_kudu.testtbl a]
    kudu predicates: a.id = 10
 ====
 ---- QUERY
@@ -83,7 +83,7 @@ UPDATE KUDU [functional_kudu.testtbl]
 02:HASH JOIN [INNER JOIN]
 |  hash predicates: ids = a.id
 |
-|--00:SCAN KUDU [functional_kudu.testtbla]
+|--00:SCAN KUDU [functional_kudu.testtbl a]
 |
 01:UNION
    constant-operands=1
@@ -95,7 +95,7 @@ UPDATE KUDU [functional_kudu.testtbl]
 |
 |--03:EXCHANGE [UNPARTITIONED]
 |  |
-|  00:SCAN KUDU [functional_kudu.testtbla]
+|  00:SCAN KUDU [functional_kudu.testtbl a]
 |
 01:UNION
    constant-operands=1
@@ -115,7 +115,7 @@ UPDATE KUDU [functional_kudu.testtbl]
 |     partitions=1/1 files=0 size=0B
 |     limit: 10
 |
-00:SCAN KUDU [functional_kudu.testtbla]
+00:SCAN KUDU [functional_kudu.testtbl a]
 ---- DISTRIBUTEDPLAN
 UPDATE KUDU [functional_kudu.testtbl]
 |
@@ -131,7 +131,7 @@ UPDATE KUDU [functional_kudu.testtbl]
 |     partitions=1/1 files=0 size=0B
 |     limit: 10
 |
-00:SCAN KUDU [functional_kudu.testtbla]
+00:SCAN KUDU [functional_kudu.testtbl a]
 ====
 ---- QUERY
 update functional_kudu.testtbl set zip = 94546 where false

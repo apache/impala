@@ -695,6 +695,16 @@ public class ToSqlTest extends AnalyzerTest {
             "functional.alltypes b ON a.id = b.id WHERE zip > 94549");
   }
 
+  @Test
+  public void TestDelete() {
+    testToSql("delete functional_kudu.testtbl where zip = 10",
+        "DELETE FROM functional_kudu.testtbl WHERE zip = 10");
+    testToSql("delete from functional_kudu.testtbl where zip = 10",
+        "DELETE FROM functional_kudu.testtbl WHERE zip = 10");
+    testToSql("delete a from functional_kudu.testtbl a where zip = 10",
+        "DELETE a FROM functional_kudu.testtbl a WHERE zip = 10");
+  }
+
   /**
    * Tests that toSql() properly handles subqueries in the where clause.
    */

@@ -845,7 +845,8 @@ public class Frontend {
 
     // create TQueryExecRequest
     Preconditions.checkState(analysisResult.isQueryStmt() || analysisResult.isDmlStmt()
-        || analysisResult.isCreateTableAsSelectStmt() || analysisResult.isUpdateStmt());
+        || analysisResult.isCreateTableAsSelectStmt() || analysisResult.isUpdateStmt()
+        || analysisResult.isDeleteStmt());
 
     TQueryExecRequest queryExecRequest = new TQueryExecRequest();
     // create plan
@@ -981,7 +982,8 @@ public class Frontend {
         queryExecRequest.setFinalize_params(finalizeParams);
       }
     } else {
-      Preconditions.checkState(analysisResult.isUpdateStmt());
+      Preconditions.checkState(analysisResult.isUpdateStmt()
+          || analysisResult.isDeleteStmt());
       result.stmt_type = TStmtType.DML;
       result.query_exec_request.stmt_type = TStmtType.DML;
     }

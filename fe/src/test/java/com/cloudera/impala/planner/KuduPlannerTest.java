@@ -22,13 +22,12 @@ import org.junit.Test;
 public class KuduPlannerTest extends PlannerTestBase {
 
   @Test
-  public void testKudu() {
-    runPlannerTestFile("kudu");
-  }
+  public void testKudu() { runPlannerTestFile("kudu"); }
 
   @Test
-  public void testUpdate() {
-    runPlannerTestFile("kudu-update");
-  }
+  public void testUpdate() { runPlannerTestFile("kudu-update"); }
+
+  @Test
+  public void testDelete() { runPlannerTestFile("kudu-delete"); }
 
 }
