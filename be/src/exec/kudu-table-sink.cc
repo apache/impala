@@ -31,6 +31,7 @@ using kudu::client::KuduRowResult;
 using kudu::client::KuduTable;
 using kudu::client::KuduInsert;
 using kudu::client::KuduUpdate;
+using kudu::client::KuduError;
 
 static const char* KUDU_SINK_NAME = "KuduTableSink";
 
@@ -120,10 +121,12 @@ Status KuduTableSink::Open(RuntimeState* state) {
 kudu::client::KuduWriteOperation* KuduTableSink::NewWriteOp() {
   if (sink_type_ == TTableSinkType::KUDU_INSERT) {
     return table_->NewInsert();
-  } else {
-    DCHECK(sink_type_ == TTableSinkType::KUDU_UPDATE) << "Sink type not supported. "
-                                                      << sink_type_;
+  } else if (sink_type_ == TTableSinkType::KUDU_UPDATE) {
     return table_->NewUpdate();
+  } else {
+    DCHECK(sink_type_ == TTableSinkType::KUDU_DELETE) << "Sink type not supported. "
+                                                      << sink_type_;
+    return table_->NewDelete();
   }
 }
 
@@ -209,7 +212,37 @@ Status KuduTableSink::Send(RuntimeState* state, RowBatch* batch, bool eos) {
 
   // TODO right now we always flush an entire row batch, if these are small we'll
   // be inefficient. Consider decoupling impala's batch size from kudu's
-  KUDU_RETURN_IF_ERROR(session_->Flush(), "Error while flushing Kudu session.");
+  if (sink_type_ != TTableSinkType::KUDU_DELETE) {
+    KUDU_RETURN_IF_ERROR(session_->Flush(), "Error while flushing Kudu session.");
+  } else {
+    // DELETE with a row value that doesn't exist is defined to be a no-op,
+    // so ignore kudu::Status::IsNotFound errors.
+    kudu::Status s = session_->Flush();
+    if (UNLIKELY(!s.ok())) {
+      vector<KuduError*> errors;
+      bool overflowed = false;
+      session_->GetPendingErrors(&errors, &overflowed);
+      // The memory for the errors is manually manged. Iterate over all errors and delete
+      // them accordingly.
+      Status result = Status::OK();
+      // Overflowed is set to true if the KuduSession could not hold on to all errors.
+      // In this case we cannot guarantee that all errors are of type "NotFound".
+      if (UNLIKELY(overflowed)) {
+        result = Status("Error overflow in Kudu session, previous delete might be inconsistent.");
+      }
+
+      for (int i = 0; i < errors.size(); ++i) {
+        kudu::Status e = errors[i]->status();
+        // Only set the final status once, but continue iterating to clean up the memory
+        if (result.ok() && !e.IsNotFound()) {
+          result = Status(strings::Substitute("$0: $1",
+              "Error while flushing Kudu session", e.ToString()));
+        }
+        delete errors[i];
+      }
+      RETURN_IF_ERROR(result);
+    }
+  }
 
   (*state->per_partition_status())[ROOT_PARTITION_KEY].num_appended_rows += rows_added;
   return Status::OK();

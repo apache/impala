@@ -108,8 +108,16 @@ class KuduTableSinkTest : public testing::Test {
   }
 
   // Create a batch and fill it according to the tuple descriptor.
-  RowBatch* CreateRowBatch(int first_row, int batch_size, int factor, string val) {
+  // Parameters:
+  //   - first_row - offset used to calculate the values to be written
+  //   - batch_size - maximum number of rows to generate
+  //   - factor - multiplier used to modify the value to be written, used in update tests
+  //   - val - free string value passed to the string column
+  //   - skip_val - skips rows where  (row_pos % skip_val) == 0
+  RowBatch* CreateRowBatch(int first_row, int batch_size, int factor, string val,
+      int skip_val) {
     DCHECK(desc_tbl_->GetTupleDescriptor(0) != NULL);
+    DCHECK_GE(skip_val, 1);
     TupleDescriptor* tuple_desc = desc_tbl_->GetTupleDescriptor(0);
     RowBatch* batch = new RowBatch(*row_desc_, batch_size, &mem_tracker_);
     int tuple_buffer_size = batch->capacity() * tuple_desc->byte_size();
@@ -119,6 +127,7 @@ class KuduTableSinkTest : public testing::Test {
 
     memset(tuple_buffer_, 0, tuple_buffer_size);
     for (int i = 0; i < batch_size; ++i) {
+      if (skip_val != 1 && ((i + first_row) % skip_val) == 0) continue;
       int idx = batch->AddRow();
       TupleRow* row = batch->GetRow(idx);
       row->SetTuple(0, tuple);
@@ -158,7 +167,8 @@ class KuduTableSinkTest : public testing::Test {
     return batch;
   }
 
-  void Verify(int num_columns, int expected_num_rows, int factor, string val) {
+  void Verify(int num_columns, int expected_num_rows, int factor, string val,
+      int skip_val) {
     kudu::client::KuduScanner scanner(kudu_test_helper_.table().get());
     scanner.SetReadMode(kudu::client::KuduScanner::READ_AT_SNAPSHOT);
     scanner.SetOrderMode(kudu::client::KuduScanner::ORDERED);
@@ -171,48 +181,57 @@ class KuduTableSinkTest : public testing::Test {
         switch(num_columns) {
           case 1:
             ASSERT_EQ(row.ToString(), strings::Substitute(
-                "(int32 key=$0, int32 int_val=NULL, string string_val=NULL)", row_idx));
+                "(int32 key=$0, int32 int_val=NULL, string string_val=NULL)",
+                row_idx * skip_val));
             break;
           case 2:
             ASSERT_EQ(row.ToString(), strings::Substitute(
                 "(int32 key=$0, int32 int_val=$1, string string_val=NULL)",
-                row_idx, row_idx * factor));
+                row_idx * skip_val, row_idx * skip_val * factor));
             break;
           case 3:
             ASSERT_EQ(row.ToString(), strings::Substitute(
                 "(int32 key=$0, int32 int_val=$1, string string_val=$2_$3)",
-                row_idx, row_idx * factor, val, row_idx));
+                row_idx * skip_val, row_idx * skip_val * factor, val, row_idx * skip_val));
             break;
         }
         ++row_idx;
       }
     }
-    ASSERT_EQ(row_idx, expected_num_rows);
+    ASSERT_EQ(row_idx,
+        skip_val == 1 ? expected_num_rows : (expected_num_rows + 1) / skip_val);
   }
 
-  void WriteAndVerify(int num_columns, TTableSinkType::type type, int factor, string val) {
+  void WriteAndVerify(int num_columns, TTableSinkType::type type, int factor, string val,
+      int skip_val) {
     const int kNumRowsPerBatch = 10;
-
-    BuildRuntimeState(num_columns, type);
+    // For deletes only populate the key column, in other cases populate all columns
+    int schema_cols = num_columns;
+    if (type == TTableSinkType::KUDU_DELETE) schema_cols = 1;
+    BuildRuntimeState(schema_cols, type);
     vector<TExpr> exprs;
-    CreateTExpr(num_columns, &exprs);
+    CreateTExpr(schema_cols, &exprs);
     KuduTableSink sink(*row_desc_, exprs, data_sink_);
     ASSERT_OK(sink.Prepare(&runtime_state_));
     ASSERT_OK(sink.Open(&runtime_state_));
     ASSERT_OK(sink.Send(&runtime_state_,
-        CreateRowBatch(0, kNumRowsPerBatch, factor, val), false));
+        CreateRowBatch(0, kNumRowsPerBatch, factor, val, skip_val), false));
     ASSERT_OK(sink.Send(&runtime_state_,
-        CreateRowBatch(kNumRowsPerBatch, kNumRowsPerBatch, factor, val), true));
+        CreateRowBatch(kNumRowsPerBatch, kNumRowsPerBatch, factor, val, skip_val), true));
     sink.Close(&runtime_state_);
-    Verify(num_columns, 2 * kNumRowsPerBatch, factor, val);
+    Verify(num_columns, 2 * kNumRowsPerBatch, factor, val, skip_val);
   }
 
   void InsertAndVerify(int num_columns) {
-    WriteAndVerify(num_columns, TTableSinkType::KUDU_INSERT, 2, "hello");
+    WriteAndVerify(num_columns, TTableSinkType::KUDU_INSERT, 2, "hello", 1);
   }
 
   void UpdateAndVerify(int num_columns) {
-    WriteAndVerify(num_columns, TTableSinkType::KUDU_UPDATE, 3, "world");
+    WriteAndVerify(num_columns, TTableSinkType::KUDU_UPDATE, 3, "world", 1);
+  }
+
+  void DeleteAndVerify(int num_columns, int skip_val) {
+    WriteAndVerify(num_columns, TTableSinkType::KUDU_DELETE, 2, "hello", skip_val);
   }
 
   virtual void TearDown() {
@@ -251,6 +270,20 @@ TEST_F(KuduTableSinkTest, UpdateTwoCols) {
 TEST_F(KuduTableSinkTest, UpdateAllCols) {
   InsertAndVerify(3);
   UpdateAndVerify(3);
+}
+
+TEST_F(KuduTableSinkTest, DeleteModThree) {
+  // 3 cols, delete all rows idx % 3 != 0
+  InsertAndVerify(3);
+  DeleteAndVerify(3, 3);
+}
+
+TEST_F(KuduTableSinkTest, DeleteModThreeTwice) {
+  // 3 cols, delete all rows idx % 3 != 0
+  InsertAndVerify(3);
+  DeleteAndVerify(3, 3);
+  // Deleting the same rows does not have an impact
+  DeleteAndVerify(3, 3);
 }
 
 } // namespace impala
