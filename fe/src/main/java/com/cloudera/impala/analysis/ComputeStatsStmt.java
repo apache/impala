@@ -230,7 +230,7 @@ public class ComputeStatsStmt extends StatementBase {
    * of rows per-partition are also recorded.
    *
    * For both the row count query, and the column stats query, the query's WHERE clause is
-   * used to restrict execution only to partitions that actually require new statstics to
+   * used to restrict execution only to partitions that actually require new statistics to
    * be computed.
    *
    * SELECT NDV_NO_FINALIZE(col), <nulls, max, avg>, COUNT(col) FROM tbl
@@ -343,6 +343,12 @@ public class ComputeStatsStmt extends StatementBase {
         filterPreds.add("(" + Joiner.on(" AND ").join(partitionConjuncts) + ")");
         HdfsPartition targetPartition =
             hdfsTable.getPartition(partitionSpec_.getPartitionSpecKeyValues());
+        List<String> partValues = Lists.newArrayList();
+        for (LiteralExpr partValue: targetPartition.getPartitionValues()) {
+          partValues.add(PartitionKeyValue.getPartitionKeyValueString(partValue,
+              "NULL"));
+        }
+        expectedPartitions_.add(partValues);
         for (HdfsPartition p: hdfsTable.getPartitions()) {
           if (p.isDefaultPartition()) continue;
           if (p == targetPartition) continue;

@@ -177,6 +177,25 @@ show table stats compute_stats_db.incremental_empty_partitioned;
 STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
 ====
 ---- QUERY
+drop stats compute_stats_db.incremental_empty_partitioned;
+====
+---- QUERY
+# IMPALA-2199: Test that compute incremental stats with a partition spec on an empty partition populates the row count.
+compute incremental stats compute_stats_db.incremental_empty_partitioned partition(j=1);
+---- RESULTS
+'Updated 1 partition(s) and 1 column(s).'
+---- TYPES
+STRING
+====
+---- QUERY
+show table stats compute_stats_db.incremental_empty_partitioned;
+---- RESULTS
+'1',0,0,'0B','NOT CACHED','NOT CACHED','TEXT','true',regex:.*
+'Total',0,0,'0B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
 drop incremental stats compute_stats_db.alltypes_incremental partition(year=2010, month=1);
 drop incremental stats compute_stats_db.alltypes_incremental partition(year=2010, month=2);
 ====
