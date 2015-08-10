@@ -370,9 +370,10 @@ class BufferedBlockMgr {
   /// stopped, the number of buffers this client could get.
   int64_t available_buffers(Client* client) const;
 
-  /// Returns a MEM_LIMIT_EXCEEDED error which includes the minimum memory required by this
-  /// client.
-  Status MemLimitTooLowError(Client* client);
+  /// Returns a MEM_LIMIT_EXCEEDED error which includes the minimum memory required by
+  /// this 'client' that acts on behalf of the node with id 'node_id'. 'node_id' is used
+  /// only for error reporting.
+  Status MemLimitTooLowError(Client* client, int node_id);
 
   /// TODO: Remove these two. Not clear what the sorter really needs.
   /// TODO: Those are dirty, dangerous reads to two lists whose all other accesses are

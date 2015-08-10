@@ -167,11 +167,12 @@ class BufferedTupleStream {
       bool use_initial_small_buffers = true,
       bool delete_on_read = false, bool read_write = false);
 
-  /// Initializes the tuple stream object. Must be called once before any of the
-  /// other APIs.
-  /// If pinned, the tuple stream starts of pinned, otherwise it is unpinned.
-  /// If profile is non-NULL, counters are created.
-  Status Init(RuntimeProfile* profile = NULL, bool pinned = true);
+  /// Initializes the tuple stream object on behalf of node 'node_id'. Must be called
+  /// once before any of the other APIs.
+  /// If 'pinned' is true, the tuple stream starts of pinned, otherwise it is unpinned.
+  /// If 'profile' is non-NULL, counters are created.
+  /// 'node_id' is only used for error reporting.
+  Status Init(int node_id, RuntimeProfile* profile, bool pinned);
 
   /// Must be called for streams using small buffers to switch to IO-sized buffers.
   /// TODO: this does not seem like the best mechanism.

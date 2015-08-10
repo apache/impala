@@ -373,14 +373,15 @@ void BufferedBlockMgr::Cancel() {
   io_mgr_->CancelContext(io_request_context_);
 }
 
-Status BufferedBlockMgr::MemLimitTooLowError(Client* client) {
+Status BufferedBlockMgr::MemLimitTooLowError(Client* client, int node_id) {
   // TODO: what to print here. We can't know the value of the entire query here.
   Status status = Status::MEM_LIMIT_EXCEEDED;
-  status.AddDetail(Substitute("The memory limit is set too low initialize the"
-      " spilling operator. The minimum required memory to spill this operator is $0.",
-      PrettyPrinter::Print(client->num_reserved_buffers_ * max_block_size(),
+  status.AddDetail(Substitute("The memory limit is set too low to initialize spilling"
+      " operator (id=$0). The minimum required memory to spill this operator is $1.",
+      node_id, PrettyPrinter::Print(client->num_reserved_buffers_ * max_block_size(),
       TUnit::BYTES)));
-  VLOG_QUERY << "Query: " << query_id_ << " ran out of memory: " << endl
+  VLOG_QUERY << "Query: " << query_id_ << ". Node=" << node_id
+             << " ran out of memory: " << endl
              << DebugInternal() << endl << client->DebugString() << endl
              << GetStackTrace();
   return status;

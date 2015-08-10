@@ -178,7 +178,7 @@ Status AnalyticEvalNode::Open(RuntimeState* state) {
       false /* initial_small_buffers */,
       true /* delete_on_read */,
       true /* read_write */));
-  RETURN_IF_ERROR(input_stream_->Init(runtime_profile()));
+  RETURN_IF_ERROR(input_stream_->Init(id(), runtime_profile(), true));
 
   DCHECK_EQ(evaluators_.size(), fn_ctxs_.size());
   for (int i = 0; i < evaluators_.size(); ++i) {

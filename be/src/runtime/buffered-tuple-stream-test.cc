@@ -298,7 +298,7 @@ class SimpleTupleStreamTest : public testing::Test {
   template <typename T>
   void TestValues(int num_batches, RowDescriptor* desc, bool gen_null) {
     BufferedTupleStream stream(runtime_state_.get(), *desc, block_mgr_.get(), client_);
-    Status status = stream.Init();
+    Status status = stream.Init(-1, NULL, true);
     ASSERT_TRUE(status.ok()) << status.GetDetail();
     status = stream.UnpinStream();
     ASSERT_TRUE(status.ok());
@@ -353,7 +353,7 @@ class SimpleTupleStreamTest : public testing::Test {
           small_buffers == 0,  // initial small buffers
           true,  // delete_on_read
           true); // read_write
-      Status status = stream.Init();
+      Status status = stream.Init(-1, NULL, true);
       ASSERT_TRUE(status.ok());
       status = stream.UnpinStream();
       ASSERT_TRUE(status.ok());
@@ -531,7 +531,7 @@ TEST_F(SimpleTupleStreamTest, UnpinPin) {
   CreateMgr(3 * buffer_size, buffer_size);
 
   BufferedTupleStream stream(runtime_state_.get(), *int_desc_, block_mgr_.get(), client_);
-  Status status = stream.Init();
+  Status status = stream.Init(-1, NULL, true);
   ASSERT_TRUE(status.ok());
 
   int offset = 0;
@@ -574,7 +574,7 @@ TEST_F(SimpleTupleStreamTest, SmallBuffers) {
   CreateMgr(2 * buffer_size, buffer_size);
 
   BufferedTupleStream stream(runtime_state_.get(), *int_desc_, block_mgr_.get(), client_);
-  Status status = stream.Init(NULL, false);
+  Status status = stream.Init(-1, NULL, false);
   ASSERT_TRUE(status.ok());
 
   // Initial buffer should be small.

@@ -136,13 +136,13 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
     // Since there is only one such NAAJ stream, we don't worry about the memory consumed
     // and always use IO-sized buffers.
     null_aware_partition_ = partition_pool_->Add(new Partition(state, this, 0, false));
-    RETURN_IF_ERROR(null_aware_partition_->build_rows()->Init(runtime_profile(), false));
-    RETURN_IF_ERROR(null_aware_partition_->probe_rows()->Init(runtime_profile(), false));
+    RETURN_IF_ERROR(null_aware_partition_->build_rows()->Init(id(), runtime_profile(), false));
+    RETURN_IF_ERROR(null_aware_partition_->probe_rows()->Init(id(), runtime_profile(), false));
 
     null_probe_rows_ = state->obj_pool()->Add(new BufferedTupleStream(
         state, child(0)->row_desc(), state->block_mgr(), block_mgr_client_,
         false /* use small buffers */, false /* delete on read */ ));
-    RETURN_IF_ERROR(null_probe_rows_->Init(runtime_profile(), false));
+    RETURN_IF_ERROR(null_probe_rows_->Init(id(), runtime_profile(), false));
     null_aware_eval_timer_ = ADD_TIMER(runtime_profile(), "NullAwareAntiJoinEvalTime");
   }
 
@@ -497,7 +497,7 @@ Status PartitionedHashJoinNode::SpillPartition(Partition** spilled_partition) {
 
   if (partition_idx == -1) {
     // Could not find a partition to spill. This means the mem limit was just too low.
-    return runtime_state_->block_mgr()->MemLimitTooLowError(block_mgr_client_);
+    return runtime_state_->block_mgr()->MemLimitTooLowError(block_mgr_client_, id());
   }
 
   VLOG(2) << "Spilling partition: " << partition_idx << endl << NodeDebugString();
@@ -543,7 +543,8 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
     hash_partitions_.push_back(partition_pool_->Add(
         new Partition(state, this, level, using_small_buffers_)));
-    RETURN_IF_ERROR(hash_partitions_[i]->build_rows()->Init(runtime_profile()));
+    RETURN_IF_ERROR(
+        hash_partitions_[i]->build_rows()->Init(id(), runtime_profile(), true));
 
     // Initialize a buffer for the probe here to make sure why have it if we need it.
     // While this is not strictly necessary (there are some cases where we won't need this
@@ -552,7 +553,8 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
     // buffer, there is only a small range of build input sizes where this is beneficial
     // (an IO buffer size). It makes the logic much more complex to enable this
     // optimization.
-    RETURN_IF_ERROR(hash_partitions_[i]->probe_rows()->Init(runtime_profile(), false));
+    RETURN_IF_ERROR(
+        hash_partitions_[i]->probe_rows()->Init(id(), runtime_profile(), false));
   }
   COUNTER_ADD(partitions_created_, PARTITION_FANOUT);
   COUNTER_SET(max_partition_level_, level);

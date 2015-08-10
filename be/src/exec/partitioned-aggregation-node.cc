@@ -202,7 +202,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
         state->block_mgr(), block_mgr_client_,
         false, /* use initial small buffers */
         true  /* delete on read */));
-    RETURN_IF_ERROR(serialize_stream_->Init(runtime_profile(), false));
+    RETURN_IF_ERROR(serialize_stream_->Init(id(), runtime_profile(), false));
     DCHECK(serialize_stream_->has_write_block());
   }
 
@@ -447,7 +447,8 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
       parent->block_mgr_client_,
       level == 0, /* use small buffers */
       false /* delete on read */));
-  RETURN_IF_ERROR(aggregated_row_stream->Init(parent->runtime_profile()));
+  RETURN_IF_ERROR(
+      aggregated_row_stream->Init(parent->id(), parent->runtime_profile(), true));
 
   unaggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
       parent->child(0)->row_desc(), parent->state_->block_mgr(),
@@ -455,7 +456,8 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
       level == 0, /* use small buffers */
       true /* delete on read */));
   // This stream is only used to spill, no need to ever have this pinned.
-  RETURN_IF_ERROR(unaggregated_row_stream->Init(parent->runtime_profile(), false));
+  RETURN_IF_ERROR(unaggregated_row_stream->Init(parent->id(), parent->runtime_profile(),
+      false));
   DCHECK(unaggregated_row_stream->has_write_block());
   return Status::OK();
 }
@@ -510,7 +512,8 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
     if (intermediate_tuple != NULL) {
       AggFnEvaluator::Serialize(evaluators, agg_fn_ctxs, intermediate_tuple);
       if (!failed_to_add &&
-          !new_stream->AddRow(reinterpret_cast<TupleRow*>(&intermediate_tuple), &status)) {
+          !new_stream->AddRow(reinterpret_cast<TupleRow*>(&intermediate_tuple),
+              &status)) {
         failed_to_add = true;
       }
     }
@@ -524,7 +527,8 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
       hash_tbl.reset();
       aggregated_row_stream->Close();
       RETURN_IF_ERROR(status);
-      return parent->state_->block_mgr()->MemLimitTooLowError(parent->block_mgr_client_);
+      return parent->state_->block_mgr()->MemLimitTooLowError(parent->block_mgr_client_,
+          parent->id());
     }
     DCHECK(status.ok());
 
@@ -539,7 +543,8 @@ Status PartitionedAggregationNode::Partition::Spill(Tuple* intermediate_tuple) {
         parent->block_mgr_client_,
         false, /* use small buffers */
         true   /* delete on read */));
-    Status s = parent->serialize_stream_->Init(parent->runtime_profile(), false);
+    Status s = parent->serialize_stream_->Init(parent->id(), parent->runtime_profile(),
+        false);
     if (!s.ok()) {
       hash_tbl->Close();
       hash_tbl.reset();
@@ -921,7 +926,7 @@ Status PartitionedAggregationNode::SpillPartition(Partition* curr_partition,
   }
   if (partition_idx == -1) {
     // Could not find a partition to spill. This means the mem limit was just too low.
-    return state_->block_mgr()->MemLimitTooLowError(block_mgr_client_);
+    return state_->block_mgr()->MemLimitTooLowError(block_mgr_client_, id());
   }
 
   Partition* spilled_partition = hash_partitions_[partition_idx];

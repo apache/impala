@@ -113,7 +113,7 @@ string BufferedTupleStream::DebugString() const {
   return ss.str();
 }
 
-Status BufferedTupleStream::Init(RuntimeProfile* profile, bool pinned) {
+Status BufferedTupleStream::Init(int node_id, RuntimeProfile* profile, bool pinned) {
   if (profile != NULL) {
     pin_timer_ = ADD_TIMER(profile, "PinTime");
     unpin_timer_ = ADD_TIMER(profile, "UnpinTime");
@@ -126,7 +126,7 @@ Status BufferedTupleStream::Init(RuntimeProfile* profile, bool pinned) {
 
   bool got_block = false;
   RETURN_IF_ERROR(NewBlockForWrite(fixed_tuple_row_size_, &got_block));
-  if (!got_block) return block_mgr_->MemLimitTooLowError(block_mgr_client_);
+  if (!got_block) return block_mgr_->MemLimitTooLowError(block_mgr_client_, node_id);
   DCHECK(write_block_ != NULL);
   if (read_write_) RETURN_IF_ERROR(PrepareForRead());
   if (!pinned) RETURN_IF_ERROR(UnpinStream());
