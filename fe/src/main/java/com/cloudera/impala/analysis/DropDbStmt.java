@@ -20,31 +20,34 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TDropDbParams;
 
 /**
- * Represents a DROP [IF EXISTS] DATABASE statement
+ * Represents a DROP [IF EXISTS] DATABASE [CASCADE] statement
  */
 public class DropDbStmt extends StatementBase {
   private final String dbName_;
   private final boolean ifExists_;
+  private final boolean cascade_;
 
   /**
    * Constructor for building the drop statement. If ifExists is true, an error will not
-   * be thrown if the database does not exist.
+   * be thrown if the database does not exist. If cascade is true, all the tables in the
+   * database will be dropped.
    */
-  public DropDbStmt(String dbName, boolean ifExists) {
+  public DropDbStmt(String dbName, boolean ifExists, boolean cascade) {
     this.dbName_ = dbName;
     this.ifExists_ = ifExists;
+    this.cascade_ = cascade;
   }
 
   public String getDb() { return dbName_; }
   public boolean getIfExists() { return ifExists_; }
+  public boolean getCascade() { return cascade_; }
 
   @Override
   public String toSql() {
     StringBuilder sb = new StringBuilder("DROP DATABASE");
-    if (ifExists_) {
-      sb.append(" IF EXISTS ");
-    }
+    if (ifExists_) sb.append(" IF EXISTS ");
     sb.append(getDb());
+    if (cascade_) sb.append(" CASCADE");
     return sb.toString();
   }
 
@@ -52,6 +55,7 @@ public class DropDbStmt extends StatementBase {
     TDropDbParams params = new TDropDbParams();
     params.setDb(getDb());
     params.setIf_exists(getIfExists());
+    params.setCascade(getCascade());
     return params;
   }
 
@@ -65,7 +69,7 @@ public class DropDbStmt extends StatementBase {
     if (analyzer.getDefaultDb().toLowerCase().equals(dbName_.toLowerCase())) {
       throw new AnalysisException("Cannot drop current default database: " + dbName_);
     }
-    if (db != null && db.numFunctions() > 0) {
+    if (db != null && db.numFunctions() > 0 && !cascade_) {
       throw new AnalysisException("Cannot drop non-empty database: " + dbName_);
     }
   }

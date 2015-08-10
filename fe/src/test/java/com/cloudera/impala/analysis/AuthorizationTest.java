@@ -738,11 +738,19 @@ public class AuthorizationTest {
   public void TestDropDatabase() throws AnalysisException, AuthorizationException {
     // User has permissions.
     AuthzOk("drop database tpch");
-    // User has permissions, database does not exists and IF EXISTS specified
+    AuthzOk("drop database tpch cascade");
+    // User has permissions, database does not exists and IF EXISTS specified.
     AuthzOk("drop database if exists newdb");
+    AuthzOk("drop database if exists newdb cascade");
     // User has permission, database does not exists, IF EXISTS not specified.
     try {
       AuthzOk("drop database newdb");
+      fail("Expected analysis error");
+    } catch (AnalysisException e) {
+      Assert.assertEquals(e.getMessage(), "Database does not exist: newdb");
+    }
+    try {
+      AuthzOk("drop database newdb cascade");
       fail("Expected analysis error");
     } catch (AnalysisException e) {
       Assert.assertEquals(e.getMessage(), "Database does not exist: newdb");
@@ -753,11 +761,15 @@ public class AuthorizationTest {
         "User '%s' does not have privileges to execute 'DROP' on: functional");
     AuthzError("drop database if exists functional",
         "User '%s' does not have privileges to execute 'DROP' on: functional");
+    AuthzError("drop database if exists functional cascade",
+        "User '%s' does not have privileges to execute 'DROP' on: functional");
 
     // Database does not exist, user doesn't have permission to drop.
     AuthzError("drop database nodb",
         "User '%s' does not have privileges to execute 'DROP' on: nodb");
     AuthzError("drop database if exists nodb",
+        "User '%s' does not have privileges to execute 'DROP' on: nodb");
+    AuthzError("drop database if exists nodb cascade",
         "User '%s' does not have privileges to execute 'DROP' on: nodb");
 
     AuthzError("drop database _impala_builtins",

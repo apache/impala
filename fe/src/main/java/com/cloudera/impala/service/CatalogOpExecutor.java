@@ -14,7 +14,6 @@
 
 package com.cloudera.impala.service;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -22,15 +21,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.TableType;
+import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.BooleanColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
@@ -47,8 +44,6 @@ import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
-import org.apache.hadoop.hive.metastore.MetaStoreUtils;
-import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 
@@ -146,7 +141,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.google.common.util.concurrent.SettableFuture;
 
 /**
  * Class used to execute Catalog Operations, including DDL and refresh/invalidate
@@ -902,8 +896,7 @@ public class CatalogOpExecutor {
 
   /**
    * Drops a database from the metastore and removes the database's metadata from the
-   * internal cache. The database must be empty (contain no tables) for the drop
-   * operation to succeed. Re-throws any Hive Meta Store exceptions encountered during
+   * internal cache. Re-throws any Hive Meta Store exceptions encountered during
    * the drop.
    */
   private void dropDatabase(TDropDbParams params, TDdlExecResponse resp)
@@ -914,7 +907,7 @@ public class CatalogOpExecutor {
 
     LOG.debug("Dropping database " + params.getDb());
     Db db = catalog_.getDb(params.db);
-    if (db != null && db.numFunctions() > 0) {
+    if (db != null && db.numFunctions() > 0 && !params.cascade) {
       throw new CatalogException("Database " + db.getName() + " is not empty");
     }
 
@@ -922,7 +915,8 @@ public class CatalogOpExecutor {
     MetaStoreClient msClient = catalog_.getMetaStoreClient();
     synchronized (metastoreDdlLock_) {
       try {
-        msClient.getHiveClient().dropDatabase(params.getDb(), true, params.if_exists);
+        msClient.getHiveClient().dropDatabase(
+            params.getDb(), true, params.if_exists, params.cascade);
       } catch (TException e) {
         throw new ImpalaRuntimeException(
             String.format(HMS_RPC_ERROR_FORMAT_STR, "dropDatabase"), e);

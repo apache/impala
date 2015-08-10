@@ -487,6 +487,9 @@ struct TDropDbParams {
 
   // If true, no error is raised if the target db does not exist
   2: required bool if_exists
+
+  // If true, drops all tables of the database
+  3: required bool cascade
 }
 
 // Parameters of DROP TABLE/VIEW commands

@@ -682,3 +682,62 @@ show databases like 'ddl_test_db'
 ---- TYPES
 STRING
 ====
+---- QUERY
+# Test DROP DATABASE ... CASCADE
+create database if not exists test_drop_cascade_db
+====
+---- QUERY
+show databases like 'test_drop_cascade_db'
+---- RESULTS
+'test_drop_cascade_db'
+---- TYPES
+STRING
+====
+---- QUERY
+create table if not exists test_drop_cascade_db.t1 (i int);
+create table if not exists test_drop_cascade_db.t2 (i int)
+  partitioned by (year smallint, month smallint);
+insert into test_drop_cascade_db.t2 partition (year=2015, month=8) values(1);
+create external table if not exists test_drop_cascade_db.t3 like functional.alltypes
+  location '$FILESYSTEM_PREFIX/test-warehouse/alltypes_external';
+create view if not exists test_drop_cascade_db.v1 as
+  select int_col from functional.alltypes;
+create function if not exists test_drop_cascade_db.f1() returns string
+  location '$FILESYSTEM_PREFIX/test-warehouse/libTestUdfs.so' symbol='NoArgs';
+create aggregate function if not exists test_drop_cascade_db.f2(int, string) RETURNS int
+  location '$FILESYSTEM_PREFIX/test-warehouse/libTestUdas.so' UPDATE_FN='TwoArgUpdate'
+---- RESULTS
+====
+---- QUERY
+show tables in test_drop_cascade_db
+---- RESULTS
+'t1'
+'t2'
+'t3'
+'v1'
+---- TYPES
+STRING
+====
+---- QUERY
+show functions in test_drop_cascade_db
+---- RESULTS
+'STRING','f1()'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+show aggregate functions in test_drop_cascade_db
+---- RESULTS
+'INT','f2(INT, STRING)'
+---- TYPES
+STRING, STRING
+====
+---- QUERY
+# Should drop all tables and the database
+drop database test_drop_cascade_db cascade
+---- RESULTS
+====
+---- QUERY
+show databases like 'test_drop_cascade_db'
+---- RESULTS
+====

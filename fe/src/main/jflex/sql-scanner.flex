@@ -69,6 +69,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("by", new Integer(SqlParserSymbols.KW_BY));
     keywordMap.put("cached", new Integer(SqlParserSymbols.KW_CACHED));
     keywordMap.put("case", new Integer(SqlParserSymbols.KW_CASE));
+    keywordMap.put("cascade", new Integer(SqlParserSymbols.KW_CASCADE));
     keywordMap.put("cast", new Integer(SqlParserSymbols.KW_CAST));
     keywordMap.put("change", new Integer(SqlParserSymbols.KW_CHANGE));
     keywordMap.put("char", new Integer(SqlParserSymbols.KW_CHAR));

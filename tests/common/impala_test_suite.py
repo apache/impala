@@ -136,28 +136,9 @@ class ImpalaTestSuite(BaseTestSuite):
 
   @classmethod
   def cleanup_db(self, db_name, sync_ddl=1):
-    # To drop a db, we need to first drop all the tables in that db
     self.client.execute("use default")
     self.client.set_configuration({'sync_ddl': sync_ddl})
-
-    if db_name in self.client.execute("show databases", ).data:
-      # We use quoted identifiers to avoid name clashes with keywords
-      for tbl_name in self.client.execute("show tables in `" + db_name + "`").data:
-        full_tbl_name = '`%s`.`%s`' % (db_name, tbl_name)
-        result = self.client.execute("describe formatted " + full_tbl_name)
-        if 'VIRTUAL_VIEW' in '\n'.join(result.data):
-          self.client.execute("drop view " + full_tbl_name)
-        else:
-          self.client.execute("drop table " + full_tbl_name)
-      for fn_result in self.client.execute("show functions in `" + db_name + "`").data:
-        # First column is the return type, second is the function signature
-        fn_name = fn_result.split('\t')[1]
-        self.client.execute("drop function `%s`.%s" % (db_name, fn_name))
-      for fn_result in self.client.execute(\
-        "show aggregate functions in `" + db_name + "`").data:
-        fn_name = fn_result.split('\t')[1]
-        self.client.execute("drop function `%s`.%s" % (db_name, fn_name))
-      self.client.execute("drop database `" + db_name + "`")
+    self.client.execute("drop database if exists `" + db_name + "` cascade")
 
   def run_test_case(self, test_file_name, vector, use_db=None, multiple_impalad=False,
       encoding=None):

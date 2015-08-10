@@ -2346,8 +2346,10 @@ public class ParserTest {
     ParsesOk("DROP VIEW Foo.Bar");
     ParsesOk("DROP VIEW IF EXISTS Foo.Bar");
     ParsesOk("DROP DATABASE Foo");
+    ParsesOk("DROP DATABASE Foo CASCADE");
     ParsesOk("DROP SCHEMA Foo");
     ParsesOk("DROP DATABASE IF EXISTS Foo");
+    ParsesOk("DROP DATABASE IF EXISTS Foo CASCADE");
     ParsesOk("DROP SCHEMA IF EXISTS Foo");
     ParsesOk("DROP FUNCTION Foo()");
     ParsesOk("DROP AGGREGATE FUNCTION Foo(INT)");
@@ -2361,6 +2363,8 @@ public class ParserTest {
     ParserError("DROP DATABASE Foo.Bar");
     ParserError("DROP SCHEMA Foo.Bar");
     ParserError("DROP DATABASE Foo Bar");
+    ParserError("DROP DATABASE CASCADE Foo");
+    ParserError("DROP CASCADE DATABASE IF EXISTS Foo");
     ParserError("DROP SCHEMA Foo Bar");
     ParserError("DROP TABLE IF Foo");
     ParserError("DROP TABLE EXISTS Foo");

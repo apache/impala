@@ -104,6 +104,22 @@ class TestDdlStatements(ImpalaTestSuite):
     self.client.execute("drop database {0}".format(DDL_TEST_DB))
     assert not self.hdfs_client.exists("test-warehouse/{0}.db/".format(DDL_TEST_DB))
 
+    # Dropping the db using "cascade" removes all tables' and db's directories
+    # but keeps the external tables' directory
+    self._create_db(DDL_TEST_DB)
+    self.client.execute("create table {0}.t1(i int)".format(DDL_TEST_DB))
+    self.client.execute("create table {0}.t2(i int)".format(DDL_TEST_DB))
+    self.client.execute("create external table {0}.t3(i int) "
+                        "location '/test-warehouse/{0}/t3/'".format(DDL_TEST_DB))
+    self.client.execute("drop database {0} cascade".format(DDL_TEST_DB))
+    assert not self.hdfs_client.exists("test-warehouse/{0}.db/".format(DDL_TEST_DB))
+    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t1/".format(DDL_TEST_DB))
+    assert not self.hdfs_client.exists("test-warehouse/{0}.db/t2/".format(DDL_TEST_DB))
+    assert self.hdfs_client.exists("test-warehouse/{0}/t3/".format(DDL_TEST_DB))
+    self.hdfs_client.delete_file_dir("test-warehouse/{0}/t3/".format(DDL_TEST_DB),
+        recursive=True)
+    assert not self.hdfs_client.exists("test-warehouse/{0}/t3/".format(DDL_TEST_DB))
+
   @SkipIfS3.insert # S3: missing coverage: truncate table
   @pytest.mark.execute_serially
   def test_truncate_cleans_hdfs_files(self):

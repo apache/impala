@@ -232,7 +232,7 @@ parser code {:
 terminal
   KW_ADD, KW_AGGREGATE, KW_ALL, KW_ALTER, KW_ANALYTIC, KW_AND, KW_ANTI, KW_API_VERSION,
   KW_ARRAY, KW_AS, KW_ASC, KW_AVRO, KW_BETWEEN, KW_BIGINT, KW_BINARY, KW_BOOLEAN, KW_BY,
-  KW_CACHED, KW_CASE, KW_CAST, KW_CHANGE, KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN,
+  KW_CACHED, KW_CASCADE, KW_CASE, KW_CAST, KW_CHANGE, KW_CHAR, KW_CLASS, KW_CLOSE_FN, KW_COLUMN,
   KW_COLUMNS, KW_COMMENT, KW_COMPUTE, KW_CREATE, KW_CROSS, KW_CURRENT, KW_DATA,
   KW_DATABASE, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DECIMAL, KW_DELIMITED, KW_DESC,
   KW_DESCRIBE, KW_DISTINCT, KW_DIV, KW_DOUBLE, KW_DROP, KW_ELSE, KW_END, KW_ESCAPED,
@@ -409,6 +409,7 @@ nonterminal String opt_kw_column;
 // Used to simplify commands where KW_TABLE is optional
 nonterminal String opt_kw_table;
 nonterminal Boolean overwrite_val;
+nonterminal Boolean cascade_val;
 
 // For GRANT/REVOKE/AUTH DDL statements
 nonterminal ShowRolesStmt show_roles_stmt;
@@ -1226,6 +1227,13 @@ alter_view_stmt ::=
   {: RESULT = new AlterTableOrViewRenameStmt(before_table, new_table, false); :}
   ;
 
+cascade_val ::=
+  KW_CASCADE
+  {: RESULT = true; :}
+  |
+  {: RESULT = false; :}
+  ;
+
 compute_stats_stmt ::=
   KW_COMPUTE KW_STATS table_name:table
   {: RESULT = new ComputeStatsStmt(table); :}
@@ -1243,8 +1251,8 @@ drop_stats_stmt ::=
   ;
 
 drop_db_stmt ::=
-  KW_DROP db_or_schema_kw if_exists_val:if_exists IDENT:db_name
-  {: RESULT = new DropDbStmt(db_name, if_exists); :}
+  KW_DROP db_or_schema_kw if_exists_val:if_exists IDENT:db_name cascade_val:cascade
+  {: RESULT = new DropDbStmt(db_name, if_exists, cascade); :}
   ;
 
 drop_tbl_or_view_stmt ::=
