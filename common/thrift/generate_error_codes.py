@@ -154,6 +154,17 @@ error_codes = (
 
   ("PARQUET_DICT_DECODE_FAILURE", 46, "Failed to decode dictionary-encoded value. "
    "file=$0"),
+
+  ("SSL_PASSWORD_CMD_FAILED", 47,
+   "SSL private-key password command ('$0') failed with error: $1"),
+
+  ("SSL_CERTIFICATE_PATH_BLANK", 48, "The SSL certificate path is blank"),
+  ("SSL_PRIVATE_KEY_PATH_BLANK", 49, "The SSL private key path is blank"),
+
+  ("SSL_CERTIFICATE_NOT_FOUND", 50, "The SSL certificate file does not exist at path $0"),
+  ("SSL_PRIVATE_KEY_NOT_FOUND", 51, "The SSL private key file does not exist at path $0"),
+
+  ("SSL_SOCKET_CREATION_FAILED", 52, "SSL socket creation failed: $0")
 )
 
 import sys

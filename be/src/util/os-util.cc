@@ -111,7 +111,10 @@ bool impala::RunShellProcess(const string& cmd, string* msg) {
     return true;
   }
 
-  *msg = Substitute("Shell cmd: '$0' exited with an error: '$1'. Output was: '$2'", cmd,
-      GetStrErrMsg(), output);
+  // pclose() doesn't set errno. We could redirect the cmd to get the stderr output as
+  // well, but that might interfere with correct executions that happen to produce output
+  // on stderr.
+  *msg = Substitute("Shell cmd: '$0' exited with error status: '$1'. Stdout was: '$2'",
+      cmd, WEXITSTATUS(status), output);
   return false;
 }

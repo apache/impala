@@ -84,10 +84,14 @@ class ThriftServer {
       AuthProvider* auth_provider = NULL, MetricGroup* metrics = NULL,
       int num_worker_threads = DEFAULT_WORKER_THREADS, ServerType server_type = Threaded);
 
-  /// Enables secure access over SSL. Must be called before Start(). The arguments are
-  /// paths to certificate and private key files in .PEM format, respectively. If either
-  /// file does not exist, an error is returned.
-  Status EnableSsl(const std::string& certificate, const std::string& private_key);
+  /// Enables secure access over SSL. Must be called before Start(). The first two
+  /// arguments are paths to certificate and private key files in .PEM format,
+  /// respectively. If either file does not exist, an error is returned. The final
+  /// optional argument provides the command to run if a password is required to decrypt
+  /// the private key. It is invoked once, and the resulting password is used only for
+  /// password-protected .PEM files.
+  Status EnableSsl(const std::string& certificate, const std::string& private_key,
+      const std::string& pem_password_cmd = "");
 
   int port() const { return port_; }
 
@@ -150,6 +154,9 @@ class ThriftServer {
 
   /// Path to private key file in .PEM format
   std::string private_key_path_;
+
+  /// Password string retrieved by running command in EnableSsl().
+  std::string key_password_;
 
   /// How many worker threads to use to serve incoming requests
   /// (requests are queued if no thread is immediately available)

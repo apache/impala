@@ -150,6 +150,13 @@ DEFINE_string(ssl_client_ca_certificate, "", "(Advanced) The full path to a cert
     "used by Thrift clients to check the validity of a server certificate. May either be "
     "a certificate for a third-party Certificate Authority, or a copy of the certificate "
     "the client expects to receive from the server.");
+DEFINE_string(ssl_private_key_password_cmd, "", "A Unix command whose output returns the "
+    "password used to decrypt the certificate private key file specified in "
+    "--ssl_private_key. If the .PEM key file is not password-protected, this command "
+    "will not be invoked. The output of the command will be truncated to 1024 bytes, and "
+    "then all trailing whitespace will be trimmed before it is used to decrypt the "
+    "private key");
+
 
 DEFINE_int32(idle_session_timeout, 0, "The time, in seconds, that a session may be idle"
     " for before it is closed (and all running queries cancelled) by Impala. If 0, idle"
@@ -1704,8 +1711,8 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
     (*beeswax_server)->SetConnectionHandler(handler.get());
     if (!FLAGS_ssl_server_certificate.empty()) {
       LOG(INFO) << "Enabling SSL for Beeswax";
-      RETURN_IF_ERROR((*beeswax_server)->EnableSsl(
-              FLAGS_ssl_server_certificate, FLAGS_ssl_private_key));
+      RETURN_IF_ERROR((*beeswax_server)->EnableSsl(FLAGS_ssl_server_certificate,
+          FLAGS_ssl_private_key, FLAGS_ssl_private_key_password_cmd));
     }
 
     LOG(INFO) << "Impala Beeswax Service listening on " << beeswax_port;
@@ -1726,8 +1733,8 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
     (*hs2_server)->SetConnectionHandler(handler.get());
     if (!FLAGS_ssl_server_certificate.empty()) {
       LOG(INFO) << "Enabling SSL for HiveServer2";
-      RETURN_IF_ERROR((*hs2_server)->EnableSsl(
-              FLAGS_ssl_server_certificate, FLAGS_ssl_private_key));
+      RETURN_IF_ERROR((*hs2_server)->EnableSsl(FLAGS_ssl_server_certificate,
+          FLAGS_ssl_private_key, FLAGS_ssl_private_key_password_cmd));
     }
 
     LOG(INFO) << "Impala HiveServer2 Service listening on " << hs2_port;
@@ -1746,8 +1753,8 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port, int
         exec_env->metrics(), FLAGS_be_service_threads);
     if (!FLAGS_ssl_server_certificate.empty()) {
       LOG(INFO) << "Enabling SSL for backend";
-      RETURN_IF_ERROR((*be_server)->EnableSsl(
-              FLAGS_ssl_server_certificate, FLAGS_ssl_private_key));
+      RETURN_IF_ERROR((*be_server)->EnableSsl(FLAGS_ssl_server_certificate,
+          FLAGS_ssl_private_key, FLAGS_ssl_private_key_password_cmd));
     }
 
     LOG(INFO) << "ImpalaInternalService listening on " << be_port;
