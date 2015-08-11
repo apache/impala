@@ -44,6 +44,11 @@
 
   <dependencies>
     <dependency>
+      <groupId>org.htrace</groupId>
+      <artifactId>htrace-core</artifactId>
+      <version>3.0.4</version>
+    </dependency>
+    <dependency>
       <groupId>com.cloudera.impala</groupId>
       <artifactId>impala-data-source-api</artifactId>
       <version>${impala.extdatasrc.api.version}</version>
