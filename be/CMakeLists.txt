@@ -326,6 +326,9 @@ endif()
 set(LLVM_IR_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/llvm-ir")
 file(MAKE_DIRECTORY ${LLVM_IR_OUTPUT_DIRECTORY})
 
+# Add custom target to only build the backend tests
+add_custom_target(be-test)
+
 # Utility CMake function to make specifying tests and benchmarks less verbose
 FUNCTION(ADD_BE_TEST TEST_NAME)
   # This gets the directory where the test is from (e.g. 'exprs' or 'runtime')
@@ -334,6 +337,7 @@ FUNCTION(ADD_BE_TEST TEST_NAME)
   TARGET_LINK_LIBRARIES(${TEST_NAME} ${IMPALA_TEST_LINK_LIBS})
   set(CMAKE_EXE_LINKER_FLAGS "--start-group")
   ADD_TEST(${TEST_NAME} "${BUILD_OUTPUT_ROOT_DIRECTORY}/${DIR_NAME}/${TEST_NAME}")
+  ADD_DEPENDENCIES(be-test ${TEST_NAME})
 ENDFUNCTION()
 
 FUNCTION(ADD_BE_BENCHMARK BENCHMARK_NAME)
