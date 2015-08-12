@@ -5,7 +5,7 @@ from (select * from functional.alltypestiny) t1
   join (select * from functional.alltypestiny) t2 on (t1.id = t2.id)
   join functional.alltypestiny t3 on (coalesce(t1.id, t3.id) = t3.id)
 ---- PLAN
-04:NESTED LOOP JOIN [INNER JOIN]
+04:CROSS JOIN
 |  predicates: (coalesce(functional.alltypestiny.id, t3.id) = t3.id)
 |
 |--02:SCAN HDFS [functional.alltypestiny t3]
@@ -28,7 +28,7 @@ from
 where
   v.x < v.y
 ---- PLAN
-02:NESTED LOOP JOIN [INNER JOIN]
+02:CROSS JOIN
 |  predicates: t1.id < t2.id
 |
 |--01:SCAN HDFS [functional.alltypes t2]
@@ -45,7 +45,7 @@ from
 where
   t1.id = t2.id
 ---- PLAN
-04:NESTED LOOP JOIN [CROSS JOIN]
+04:CROSS JOIN
 |
 |--02:SCAN HDFS [functional.alltypes t3]
 |     partitions=24/24 files=24 size=478.45KB
@@ -67,7 +67,7 @@ from
 where
   t1.id = t3.id
 ---- PLAN
-04:NESTED LOOP JOIN [CROSS JOIN]
+04:CROSS JOIN
 |
 |--01:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
@@ -98,7 +98,7 @@ where
 |--02:SCAN HDFS [functional.alltypessmall t3]
 |     partitions=4/4 files=4 size=6.32KB
 |
-03:NESTED LOOP JOIN [CROSS JOIN]
+03:CROSS JOIN
 |
 |--01:SCAN HDFS [functional.alltypestiny t2]
 |     partitions=4/4 files=4 size=460B
@@ -113,7 +113,7 @@ from
   functional.alltypes t3 on t3.id = t2.id,
   functional.alltypes t4
 ---- PLAN
-06:NESTED LOOP JOIN [CROSS JOIN]
+06:CROSS JOIN
 |
 |--03:SCAN HDFS [functional.alltypes t4]
 |     partitions=24/24 files=24 size=478.45KB
@@ -124,7 +124,7 @@ from
 |--02:SCAN HDFS [functional.alltypes t3]
 |     partitions=24/24 files=24 size=478.45KB
 |
-04:NESTED LOOP JOIN [CROSS JOIN]
+04:CROSS JOIN
 |
 |--01:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
@@ -146,7 +146,7 @@ select a.* from
 |--02:SCAN HDFS [functional.alltypes c]
 |     partitions=24/24 files=24 size=478.45KB
 |
-03:NESTED LOOP JOIN [CROSS JOIN]
+03:CROSS JOIN
 |
 |--01:SCAN HDFS [functional.alltypessmall b]
 |     partitions=4/4 files=4 size=6.32KB
@@ -167,7 +167,7 @@ where a.id = d.id and b.id = c.id
 |--03:SCAN HDFS [functional.alltypes d]
 |     partitions=24/24 files=24 size=478.45KB
 |
-05:NESTED LOOP JOIN [CROSS JOIN]
+05:CROSS JOIN
 |
 |--00:SCAN HDFS [functional.alltypestiny a]
 |     partitions=4/4 files=4 size=460B
@@ -189,27 +189,7 @@ from
     on t1.id < t2.id,
   functional.alltypes t3
 ---- PLAN
-07:AGGREGATE [FINALIZE]
-|  output: count(*)
-|
-06:NESTED LOOP JOIN [CROSS JOIN]
-|
-|--03:SCAN HDFS [functional.alltypes t3]
-|     partitions=24/24 files=24 size=478.45KB
-|
-05:NESTED LOOP JOIN [LEFT OUTER JOIN]
-|  join predicates: t1.id < t2.id
-|
-|--02:SCAN HDFS [functional.alltypes t2]
-|     partitions=24/24 files=24 size=478.45KB
-|
-04:NESTED LOOP JOIN [CROSS JOIN]
-|
-|--00:SCAN HDFS [functional.alltypes t0]
-|     partitions=24/24 files=24 size=478.45KB
-|
-01:SCAN HDFS [functional.alltypes t1]
-   partitions=24/24 files=24 size=478.45KB
+not implemented: Outer join with 't2' without equi-join conjuncts is not supported.
 ====
 select count(*)
 from
@@ -223,7 +203,7 @@ where
 07:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
-06:NESTED LOOP JOIN [CROSS JOIN]
+06:CROSS JOIN
 |
 |--03:SCAN HDFS [functional.alltypes t3]
 |     partitions=24/24 files=24 size=478.45KB
@@ -236,7 +216,7 @@ where
 |--02:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
 |
-04:NESTED LOOP JOIN [CROSS JOIN]
+04:CROSS JOIN
 |
 |--00:SCAN HDFS [functional.alltypes t0]
 |     partitions=24/24 files=24 size=478.45KB
@@ -256,7 +236,7 @@ where
 07:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
-06:NESTED LOOP JOIN [CROSS JOIN]
+06:CROSS JOIN
 |
 |--03:SCAN HDFS [functional.alltypes t3]
 |     partitions=24/24 files=24 size=478.45KB
@@ -269,7 +249,7 @@ where
 |--02:SCAN HDFS [functional.alltypes t2]
 |     partitions=24/24 files=24 size=478.45KB
 |
-04:NESTED LOOP JOIN [CROSS JOIN]
+04:CROSS JOIN
 |
 |--00:SCAN HDFS [functional.alltypes t0]
 |     partitions=24/24 files=24 size=478.45KB
@@ -282,17 +262,7 @@ from
   functional.alltypes t0 left semi join
   functional.alltypes t1 on ( t0.id < t1.id )
 ---- PLAN
-03:AGGREGATE [FINALIZE]
-|  output: count(*)
-|
-02:NESTED LOOP JOIN [LEFT SEMI JOIN]
-|  join predicates: (t0.id < t1.id)
-|
-|--01:SCAN HDFS [functional.alltypes t1]
-|     partitions=24/24 files=24 size=478.45KB
-|
-00:SCAN HDFS [functional.alltypes t0]
-   partitions=24/24 files=24 size=478.45KB
+not implemented: Semi join with 't1' without equi-join conjuncts is not supported.
 ====
 # Check for implicit cross joins conversion in presence of complex where
 # clauses that lead to query rewriting
@@ -310,7 +280,7 @@ where
 05:HASH JOIN [RIGHT SEMI JOIN]
 |  hash predicates: avg(id) = b.id
 |
-|--04:NESTED LOOP JOIN [INNER JOIN]
+|--04:CROSS JOIN
 |  |  predicates: a.id < b.id
 |  |
 |  |--01:SCAN HDFS [functional.alltypestiny b]
@@ -332,12 +302,12 @@ from functional.alltypes t1,
 functional.alltypes t2 join functional.alltypes t3 on (t1.id = t2.id),
 functional.alltypes t4
 ---- PLAN
-06:NESTED LOOP JOIN [CROSS JOIN]
+06:CROSS JOIN
 |
 |--03:SCAN HDFS [functional.alltypes t4]
 |     partitions=24/24 files=24 size=478.45KB
 |
-05:NESTED LOOP JOIN [CROSS JOIN]
+05:CROSS JOIN
 |
 |--02:SCAN HDFS [functional.alltypes t3]
 |     partitions=24/24 files=24 size=478.45KB

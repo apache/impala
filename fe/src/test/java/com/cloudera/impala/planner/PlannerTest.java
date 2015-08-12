@@ -175,11 +175,4 @@ public class PlannerTest extends PlannerTestBase {
     options.setExec_single_node_rows_threshold(8);
     runPlannerTestFile("small-query-opt", options);
   }
-
-  @Test
-  public void testSingleNodeNlJoin() {
-    TQueryOptions options = new TQueryOptions();
-    options.setNum_nodes(1);
-    runPlannerTestFile("nested-loop-join", options);
-  }
 }

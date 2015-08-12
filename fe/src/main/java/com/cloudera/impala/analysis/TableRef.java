@@ -27,7 +27,6 @@ import com.cloudera.impala.catalog.View;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.planner.PlanNode;
-import com.cloudera.impala.planner.JoinNode.DistributionMode;
 import com.cloudera.impala.thrift.TAccessEvent;
 import com.cloudera.impala.thrift.TCatalogObjectType;
 import com.google.common.base.Joiner;
@@ -82,10 +81,6 @@ public class TableRef implements ParseNode {
   protected ArrayList<String> joinHints_;
   protected List<String> usingColNames_;
 
-  // Hinted distribution mode for this table ref; set after analyzeJoinHints()
-  // TODO: Move join-specific members out of TableRef.
-  private DistributionMode distrMode_ = DistributionMode.NONE;
-
   /////////////////////////////////////////
   // BEGIN: Members that need to be reset()
 
@@ -93,6 +88,10 @@ public class TableRef implements ParseNode {
   protected Path resolvedPath_;
 
   protected Expr onClause_;
+
+  // set after analyzeJoinHints(); true if explicitly set via hints
+  private boolean isBroadcastJoin_;
+  private boolean isPartitionedJoin_;
 
   // the ref to the left of us, if we're part of a JOIN clause
   protected TableRef leftTblRef_;
@@ -136,7 +135,8 @@ public class TableRef implements ParseNode {
     onClause_ = (other.onClause_ != null) ? other.onClause_.clone() : null;
     usingColNames_ =
         (other.usingColNames_ != null) ? Lists.newArrayList(other.usingColNames_) : null;
-    distrMode_ = other.distrMode_;
+    isBroadcastJoin_ = other.isBroadcastJoin_;
+    isPartitionedJoin_ = other.isPartitionedJoin_;
     // The table ref links are created at the statement level, so cloning a set of linked
     // table refs is the responsibility of the statement.
     leftTblRef_ = null;
@@ -275,11 +275,8 @@ public class TableRef implements ParseNode {
   public TableRef getLeftTblRef() { return leftTblRef_; }
   public void setLeftTblRef(TableRef leftTblRef) { this.leftTblRef_ = leftTblRef; }
   public void setJoinHints(ArrayList<String> hints) { this.joinHints_ = hints; }
-  public boolean isBroadcastJoin() { return distrMode_ == DistributionMode.BROADCAST; }
-  public boolean isPartitionedJoin() {
-    return distrMode_ == DistributionMode.PARTITIONED;
-  }
-  public DistributionMode getDistributionMode() { return distrMode_; }
+  public boolean isBroadcastJoin() { return isBroadcastJoin_; }
+  public boolean isPartitionedJoin() { return isPartitionedJoin_; }
   public List<TupleId> getOnClauseTupleIds() { return onClauseTupleIds_; }
   public boolean isResolved() { return !getClass().equals(TableRef.class); }
 
@@ -355,19 +352,19 @@ public class TableRef implements ParseNode {
           throw new AnalysisException(
               joinOp_.toString() + " does not support BROADCAST.");
         }
-        if (isPartitionedJoin()) {
+        if (isPartitionedJoin_) {
           throw new AnalysisException("Conflicting JOIN hint: " + hint);
         }
-        distrMode_ = DistributionMode.BROADCAST;
+        isBroadcastJoin_ = true;
         analyzer.setHasPlanHints();
       } else if (hint.equalsIgnoreCase("SHUFFLE")) {
         if (joinOp_ == JoinOperator.CROSS_JOIN) {
           throw new AnalysisException("CROSS JOIN does not support SHUFFLE.");
         }
-        if (isBroadcastJoin()) {
+        if (isBroadcastJoin_) {
           throw new AnalysisException("Conflicting JOIN hint: " + hint);
         }
-        distrMode_ = DistributionMode.PARTITIONED;
+        isPartitionedJoin_ = true;
         analyzer.setHasPlanHints();
       } else {
         analyzer.addWarning("JOIN hint not recognized: " + hint);
@@ -385,7 +382,7 @@ public class TableRef implements ParseNode {
     analyzeJoinHints(analyzer);
     if (joinOp_ == JoinOperator.CROSS_JOIN) {
       // A CROSS JOIN is always a broadcast join, regardless of the join hints
-      distrMode_ = DistributionMode.BROADCAST;
+      isBroadcastJoin_ = true;
     }
 
     if (usingColNames_ != null) {
@@ -584,6 +581,8 @@ public class TableRef implements ParseNode {
     } else if (onClause_ != null) {
       onClause_.reset();
     }
+    isBroadcastJoin_ = false;
+    isPartitionedJoin_ = false;
     leftTblRef_ = null;
     onClauseTupleIds_.clear();
     desc_ = null;

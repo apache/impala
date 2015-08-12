@@ -115,10 +115,10 @@ public class DistributedPlanner {
       result = createHashJoinFragment(
           (HashJoinNode) root, childFragments.get(1), childFragments.get(0),
           perNodeMemLimit, fragments);
-    } else if (root instanceof NestedLoopJoinNode) {
+    } else if (root instanceof CrossJoinNode) {
       Preconditions.checkState(childFragments.size() == 2);
-      result = createNestedLoopJoinFragment(
-          (NestedLoopJoinNode) root, childFragments.get(1), childFragments.get(0),
+      result = createCrossJoinFragment(
+          (CrossJoinNode) root, childFragments.get(1), childFragments.get(0),
           perNodeMemLimit, fragments);
     } else if (root instanceof SelectNode) {
       result = createSelectNodeFragment((SelectNode) root, childFragments);
@@ -271,7 +271,7 @@ public class DistributedPlanner {
    * provided by an ExchangeNode, which is the destination of the rightChildFragment's
    * output.
    */
-  private PlanFragment createNestedLoopJoinFragment(NestedLoopJoinNode node,
+  private PlanFragment createCrossJoinFragment(CrossJoinNode node,
       PlanFragment rightChildFragment, PlanFragment leftChildFragment,
       long perNodeMemLimit, ArrayList<PlanFragment> fragments)
       throws InternalException {

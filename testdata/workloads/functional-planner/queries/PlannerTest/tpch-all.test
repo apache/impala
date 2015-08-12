@@ -1175,7 +1175,7 @@ order by
 13:SORT
 |  order by: value DESC
 |
-12:NESTED LOOP JOIN [INNER JOIN]
+12:CROSS JOIN
 |  predicates: sum(ps_supplycost * ps_availqty) > sum(ps_supplycost * ps_availqty) * 0.0001
 |
 |--11:AGGREGATE [FINALIZE]
@@ -1223,7 +1223,7 @@ order by
 13:SORT
 |  order by: value DESC
 |
-12:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
+12:CROSS JOIN [BROADCAST]
 |  predicates: sum(ps_supplycost * ps_availqty) > sum(ps_supplycost * ps_availqty) * 0.0001
 |
 |--22:EXCHANGE [BROADCAST]
@@ -2331,7 +2331,7 @@ order by
 05:HASH JOIN [RIGHT ANTI JOIN]
 |  hash predicates: o_custkey = c_custkey
 |
-|--04:NESTED LOOP JOIN [INNER JOIN]
+|--04:CROSS JOIN
 |  |  predicates: c_acctbal > avg(c_acctbal)
 |  |
 |  |--02:AGGREGATE [FINALIZE]
@@ -2369,7 +2369,7 @@ order by
 |
 |--12:EXCHANGE [HASH(c_custkey)]
 |  |
-|  04:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
+|  04:CROSS JOIN [BROADCAST]
 |  |  predicates: c_acctbal > avg(c_acctbal)
 |  |
 |  |--10:EXCHANGE [BROADCAST]

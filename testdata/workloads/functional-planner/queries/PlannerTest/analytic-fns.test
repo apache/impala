@@ -1645,7 +1645,7 @@ WHERE EXISTS (SELECT t1.year AS int_col_1 FROM functional.alltypesagg t1)
 03:SORT
 |  order by: day ASC
 |
-02:NESTED LOOP JOIN [CROSS JOIN]
+02:CROSS JOIN
 |
 |--01:SCAN HDFS [functional.alltypesagg t1]
 |     partitions=11/11 files=11 size=814.73KB

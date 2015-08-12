@@ -97,7 +97,7 @@ from
    cross join (select id, string_col from functional.alltypes) b
 where a.string_col = 'a' and b.string_col = 'b'
 ---- PLAN
-02:NESTED LOOP JOIN [CROSS JOIN]
+02:CROSS JOIN
 |
 |--01:SCAN HDFS [functional.alltypes]
 |     partitions=24/24 files=24 size=478.45KB
@@ -109,7 +109,7 @@ where a.string_col = 'a' and b.string_col = 'b'
 ---- DISTRIBUTEDPLAN
 04:EXCHANGE [UNPARTITIONED]
 |
-02:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+02:CROSS JOIN [BROADCAST]
 |
 |--03:EXCHANGE [BROADCAST]
 |  |

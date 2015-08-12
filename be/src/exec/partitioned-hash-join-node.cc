@@ -80,8 +80,15 @@ Status PartitionedHashJoinNode::Init(const TPlanNode& tnode) {
       Expr::CreateExprTrees(pool_, tnode.hash_join_node.other_join_conjuncts,
                             &other_join_conjunct_ctxs_));
 
-  DCHECK(join_op_ != TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN ||
-      eq_join_conjuncts.size() == 1);
+  if (join_op_ == TJoinOp::LEFT_SEMI_JOIN || join_op_ == TJoinOp::LEFT_ANTI_JOIN ||
+      join_op_ == TJoinOp::RIGHT_SEMI_JOIN || join_op_ == TJoinOp::RIGHT_ANTI_JOIN ||
+      join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
+    DCHECK_EQ(conjunct_ctxs_.size(), 0);
+
+    if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {
+      DCHECK_EQ(eq_join_conjuncts.size(), 1);
+    }
+  }
   return Status::OK();
 }
 

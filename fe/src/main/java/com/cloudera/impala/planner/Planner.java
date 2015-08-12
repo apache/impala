@@ -72,7 +72,6 @@ public class Planner {
       fragments = Lists.newArrayList(new PlanFragment(
           ctx_.getNextFragmentId(), singleNodePlan, DataPartition.UNPARTITIONED));
     } else {
-      singleNodePlanner.validatePlan(singleNodePlan);
       // create distributed plan
       fragments = distributedPlanner.createPlanFragments(singleNodePlan);
     }

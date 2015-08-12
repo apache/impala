@@ -645,7 +645,7 @@ where n_name = 'x'
 05:AGGREGATE [FINALIZE]
 |  output: count(*)
 |
-04:NESTED LOOP JOIN [CROSS JOIN]
+04:CROSS JOIN
 |
 |--01:SCAN HDFS [tpch.orders]
 |     partitions=1/1 files=1 size=162.56MB
@@ -668,7 +668,7 @@ where n_name = 'x'
 05:AGGREGATE
 |  output: count(*)
 |
-04:NESTED LOOP JOIN [CROSS JOIN, BROADCAST]
+04:CROSS JOIN [BROADCAST]
 |
 |--07:EXCHANGE [BROADCAST]
 |  |
@@ -695,9 +695,9 @@ select c.int_col from functional.alltypestiny a
 cross join functional.alltypestiny b
 cross join functional.alltypes c
 ---- PLAN
-04:NESTED LOOP JOIN [CROSS JOIN]
+04:CROSS JOIN
 |
-|--03:NESTED LOOP JOIN [CROSS JOIN]
+|--03:CROSS JOIN
 |  |
 |  |--01:SCAN HDFS [functional.alltypestiny b]
 |  |     partitions=4/4 files=4 size=460B
@@ -1139,7 +1139,7 @@ WHERE `$a$2`.`$c$1` > t4.id
 |--06:SCAN HDFS [functional.alltypestiny tt1]
 |     partitions=4/4 files=4 size=460B
 |
-08:NESTED LOOP JOIN [INNER JOIN]
+08:CROSS JOIN
 |  predicates: sum(t1.int_col) > t4.id
 |
 |--05:AGGREGATE [FINALIZE]
@@ -1149,7 +1149,7 @@ WHERE `$a$2`.`$c$1` > t4.id
 |  04:SCAN HDFS [functional.alltypesagg t1]
 |     partitions=11/11 files=11 size=814.73KB
 |
-07:NESTED LOOP JOIN [CROSS JOIN]
+07:CROSS JOIN
 |
 |--00:SCAN HDFS [functional.alltypestiny t4]
 |     partitions=4/4 files=4 size=460B
