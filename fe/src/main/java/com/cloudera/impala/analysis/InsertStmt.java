@@ -184,7 +184,9 @@ public class InsertStmt extends StatementBase {
         queryStmt_.analyze(queryStmtAnalyzer);
         // Subqueries need to be rewritten by the StmtRewriter first.
         if (analyzer.containsSubquery()) return;
-        selectListExprs = Expr.cloneList(queryStmt_.getBaseTblResultExprs());
+        // Use getResultExprs() and not getBaseTblResultExprs() here because the final
+        // substitution with TupleIsNullPredicate() wrapping happens in planning.
+        selectListExprs = Expr.cloneList(queryStmt_.getResultExprs());
       } catch (AnalysisException e) {
         if (analyzer.getMissingTbls().isEmpty()) throw e;
       }

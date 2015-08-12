@@ -721,3 +721,32 @@ year=1/month=2/: 1
 year=1/month=3/: 1
 year=1/month=4/: 1
 ====
+---- QUERY
+# IMPALA-2203: Test insert from a select statement that has outer-joined inline views with
+# constant exprs in the select list. The non-matches of the outer join should be NULL.
+truncate table alltypesinsert;
+insert overwrite table alltypesinsert
+partition (year=2015, month=8)
+select a.id, a.bool_col, a.tinyint_col, a.smallint_col, a.int_col, a.bigint_col,
+  b.float_col, b.double_col, b.date_string_col, b.string_col, b.timestamp_col
+from
+(select id, false bool_col, 1 tinyint_col, 2 smallint_col, 3 int_col, 4 bigint_col
+ from functional.alltypestiny where id between 0 and 2) a
+full outer join
+(select id, 5 float_col, 6 double_col, "s1" date_string_col, "s2" string_col,
+   cast("2009-02-06 00:01:00" as timestamp) timestamp_col
+ from functional.alltypestiny where id between 1 and 3) b
+on (a.id = b.id)
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+year=2015/month=8/: 4
+====
+---- QUERY
+select * from alltypesinsert
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,false,1,2,3,4,NULL,NULL,'NULL','NULL',NULL,2015,8
+1,false,1,2,3,4,5,6,'s1','s2',2009-02-06 00:01:00,2015,8
+2,false,1,2,3,4,5,6,'s1','s2',2009-02-06 00:01:00,2015,8
+NULL,NULL,NULL,NULL,NULL,NULL,5,6,'s1','s2',2009-02-06 00:01:00,2015,8
+---- TYPES
+INT, BOOLEAN, TINYINT, SMALLINT, INT, BIGINT, FLOAT, DOUBLE, STRING, STRING, TIMESTAMP, INT, INT
+====

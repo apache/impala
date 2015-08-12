@@ -508,6 +508,35 @@ select * from ctas_join_limit0
 BIGINT, STRING, INT, INT
 ====
 ---- QUERY
+# IMPALA-2203: Test CTAS from a select statement that has outer-joined inline views with
+# constant exprs in the select list. The non-matches of the outer join should be NULL.
+create table ctas_impala_2203 as
+select a.id, a.bool_col, a.tinyint_col, a.smallint_col, a.int_col, a.bigint_col,
+  b.float_col, b.double_col, b.date_string_col, b.string_col, b.timestamp_col
+from
+(select id, false bool_col, 1 tinyint_col, 2 smallint_col, 3 int_col, 4 bigint_col
+ from functional.alltypestiny where id between 0 and 2) a
+full outer join
+(select id, 5 float_col, 6 double_col, "s1" date_string_col, "s2" string_col,
+   cast("2009-02-06 00:01:00" as timestamp) timestamp_col
+ from functional.alltypestiny where id between 1 and 3) b
+on (a.id = b.id)
+---- RESULTS
+'Inserted 4 row(s)'
+---- TYPES
+STRING
+====
+---- QUERY
+select * from ctas_impala_2203
+---- RESULTS: VERIFY_IS_EQUAL_SORTED
+0,false,1,2,3,4,NULL,NULL,'NULL','NULL',NULL
+1,false,1,2,3,4,5,6,'s1','s2',2009-02-06 00:01:00
+2,false,1,2,3,4,5,6,'s1','s2',2009-02-06 00:01:00
+NULL,NULL,NULL,NULL,NULL,NULL,5,6,'s1','s2',2009-02-06 00:01:00
+---- TYPES
+INT, BOOLEAN, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, TINYINT, STRING, STRING, TIMESTAMP
+====
+---- QUERY
 create table allcomplextypes_clone like functional.allcomplextypes
 stored as parquet
 ---- RESULTS
@@ -604,6 +633,10 @@ drop table ctas_join
 ====
 ---- QUERY
 drop table ctas_join_limit0
+---- RESULTS
+====
+---- QUERY
+drop table ctas_impala_2203
 ---- RESULTS
 ====
 ---- QUERY
