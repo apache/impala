@@ -521,9 +521,6 @@ public class CatalogOpExecutor {
       // this partition's keys with Hive's replacement value.
       List<String> partitionValues = partition.getPartitionValuesAsStrings(false);
       TPartitionStats partitionStats = params.partition_stats.get(partitionValues);
-      TPartitionStats existingPartStats =
-          PartitionStatsUtil.partStatsFromParameters(partition.getParameters());
-
       if (partitionStats == null) {
         // No stats were collected for this partition. This means that it was not included
         // in the original computation statements. If the backend does not find any rows
@@ -540,33 +537,19 @@ public class CatalogOpExecutor {
         partitionStats.stats.setNum_rows(0L);
       }
 
+      // Unconditionally update the partition stats and row count, even if the partition
+      // already has identical ones. This behavior results in possibly redundant work,
+      // but it is predictable and easy to reason about because it does not depend on the
+      // existing state of the metadata. See IMPALA-2201.
       long numRows = partitionStats.stats.num_rows;
       LOG.debug(String.format("Updating stats for partition %s: numRows=%s",
-              partition.getValuesAsString(), numRows));
-
-      boolean updatedPartition = false;
-      // Update the partition stats if: either there are no existing stats for this
-      // partition, or they're different.
-      if (existingPartStats == null || !existingPartStats.equals(partitionStats)) {
-        PartitionStatsUtil.partStatsToParameters(partitionStats, partition);
-        updatedPartition = true;
-      }
-
-      String existingRowCount =
-          partition.getParameters().get(StatsSetupConst.ROW_COUNT);
-      String newRowCount = String.valueOf(numRows);
-      // Update table stats
-      if (existingRowCount == null || !existingRowCount.equals(newRowCount)) {
-        // The existing row count value wasn't set or has changed.
-        partition.putToParameters(StatsSetupConst.ROW_COUNT, newRowCount);
-        partition.putToParameters(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK,
-            StatsSetupConst.TRUE);
-        updatedPartition = true;
-      }
-      if (updatedPartition) {
-        ++numTargetedPartitions;
-        modifiedParts.add(partition);
-      }
+          partition.getValuesAsString(), numRows));
+      PartitionStatsUtil.partStatsToParameters(partitionStats, partition);
+      partition.putToParameters(StatsSetupConst.ROW_COUNT, String.valueOf(numRows));
+      partition.putToParameters(StatsSetupConst.STATS_GENERATED_VIA_STATS_TASK,
+          StatsSetupConst.TRUE);
+      ++numTargetedPartitions;
+      modifiedParts.add(partition);
     }
 
     // For unpartitioned tables and HBase tables report a single updated partition.
