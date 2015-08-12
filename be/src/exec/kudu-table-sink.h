@@ -79,9 +79,6 @@ class KuduTableSink : public DataSink {
   const std::vector<TExpr>& select_list_texprs_;
   std::vector<ExprContext*> output_expr_ctxs_;
 
-  /// The schema of the materialized slots (i.e projection)
-  kudu::client::KuduSchema schema_;
-
   /// The Kudu client, table and session.
   std::tr1::shared_ptr<kudu::client::KuduClient> client_;
   std::tr1::shared_ptr<kudu::client::KuduTable> table_;

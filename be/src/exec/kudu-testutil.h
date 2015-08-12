@@ -39,6 +39,7 @@ using kudu::client::KuduClientBuilder;
 using kudu::client::KuduColumnSchema;
 using kudu::client::KuduInsert;
 using kudu::client::KuduSchema;
+using kudu::client::KuduSchemaBuilder;
 using kudu::client::KuduSession;
 using kudu::client::KuduTable;
 using kudu::KuduPartialRow;
@@ -64,13 +65,11 @@ class KuduTestHelper {
     KUDU_ASSERT_OK(KuduClientBuilder()
                    .add_master_server_addr("127.0.0.1:7051")
                    .Build(&client_));
-
-    vector<KuduColumnSchema> column_schemas;
-    column_schemas.push_back(KuduColumnSchema("key", KuduColumnSchema::INT32));
-    column_schemas.push_back(KuduColumnSchema("int_val", KuduColumnSchema::INT32, true));
-    column_schemas.push_back(KuduColumnSchema("string_val", KuduColumnSchema::STRING,
-                                              true));
-    test_schema_ = KuduSchema(column_schemas, 1);
+    KuduSchemaBuilder builder;
+    builder.AddColumn("key")->Type(KuduColumnSchema::INT32)->NotNull()->PrimaryKey();
+    builder.AddColumn("int_val")->Type(KuduColumnSchema::INT32)->Nullable();
+    builder.AddColumn("string_val")->Type(KuduColumnSchema::STRING)->Nullable();
+    KUDU_ASSERT_OK(builder.Build(&test_schema_));
   }
 
   void CreateTable(const string& table_name_prefix) {
@@ -89,7 +88,7 @@ class KuduTestHelper {
       kudu::Status s = client_->NewTableCreator()->table_name(table_name_)
                              .schema(&test_schema_)
                              .num_replicas(3)
-                             .split_keys(GenerateSplitKeys())
+                             .split_rows(GenerateSplitRows())
                              .Create();
       if (s.IsAlreadyPresent()) {
         LOG(INFO) << "Table existed, deleting. " << table_name_;
@@ -134,11 +133,11 @@ class KuduTestHelper {
     KUDU_ASSERT_OK(client_->DeleteTable(table_name_));
   }
 
-  vector<string> GenerateSplitKeys() {
-    vector<string> keys;
+  vector<const KuduPartialRow*> GenerateSplitRows() {
+    vector<const KuduPartialRow*> keys;
     KuduPartialRow* key = test_schema_.NewRow();
     key->SetInt32(0, 5);
-    keys.push_back(key->ToEncodedRowKeyOrDie());
+    keys.push_back(key);
     return keys;
   }
 

@@ -20,15 +20,14 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.kududb.ColumnSchema;
 import org.kududb.Schema;
 import org.kududb.Type;
-import org.kududb.client.KeyBuilder;
 import org.kududb.client.KuduTable;
+import org.kududb.client.PartialRow;
 
 import com.cloudera.impala.catalog.ScalarType;
 import com.cloudera.impala.common.ImpalaRuntimeException;
@@ -82,13 +81,13 @@ public class KuduUtil {
    * Each inner array corresponds to a split key and is expected to have the same
    * number and type of values as specified in 'keyProjection'.
    */
-  public static List<KeyBuilder> parseSplits(Schema keyProjection, String kuduSplits)
+  public static List<PartialRow> parseSplits(Schema keyProjection, String kuduSplits)
       throws ImpalaRuntimeException {
 
     // If there are no splits return early.
     if (kuduSplits == null || kuduSplits.isEmpty()) return ImmutableList.of();
 
-    ImmutableList.Builder<KeyBuilder> keyBuilders = ImmutableList.builder();
+    ImmutableList.Builder<PartialRow> splitRows = ImmutableList.builder();
 
     // ...Otherwise parse the splits. We're expecting splits in the format of a list of
     // lists of keys. We only support specifying splits for int and string keys
@@ -97,16 +96,16 @@ public class KuduUtil {
       JsonReader jr = Json.createReader(new StringReader(kuduSplits));
       JsonArray keysList = jr.readArray();
       for (int i = 0; i < keysList.size(); i++) {
-        KeyBuilder keyBuilder = new KeyBuilder(keyProjection);
+        PartialRow splitRow = new PartialRow(keyProjection);
         JsonArray compoundKey = keysList.getJsonArray(i);
         if (compoundKey.size() != keyProjection.getKeysCount()) {
           throw new ImpalaRuntimeException(SPLIT_KEYS_ERROR_MESSAGE +
               " Wrong number of keys.");
         }
         for (int j = 0; j < compoundKey.size(); j++) {
-          setKey(keyBuilder, keyProjection.getColumn(j).getType(), compoundKey, j);
+          setKey(splitRow, keyProjection.getColumn(j).getType(), compoundKey, j);
         }
-        keyBuilders.add(keyBuilder);
+        splitRows.add(splitRow);
       }
     } catch (ImpalaRuntimeException e) {
       throw e;
@@ -115,17 +114,17 @@ public class KuduUtil {
           + ": " + e.getMessage(), e);
     }
 
-    return keyBuilders.build();
+    return splitRows.build();
   }
 
-  private static void setKey(KeyBuilder keyBuilder, Type type, JsonArray array, int pos)
+  private static void setKey(PartialRow key, Type type, JsonArray array, int pos)
       throws ImpalaRuntimeException {
     switch (type) {
-      case INT8: keyBuilder.addByte((byte) array.getInt(pos)); break;
-      case INT16: keyBuilder.addShort((short) array.getInt(pos)); break;
-      case INT32: keyBuilder.addInt(array.getInt(pos)); break;
-      case INT64: keyBuilder.addLong(array.getJsonNumber(pos).longValue()); break;
-      case STRING: keyBuilder.addString(array.getString(pos)); break;
+      case INT8: key.addByte(pos, (byte) array.getInt(pos)); break;
+      case INT16: key.addShort(pos, (short) array.getInt(pos)); break;
+      case INT32: key.addInt(pos, array.getInt(pos)); break;
+      case INT64: key.addLong(pos, array.getJsonNumber(pos).longValue()); break;
+      case STRING: key.addString(pos, array.getString(pos)); break;
       default:
         throw new ImpalaRuntimeException("Key columns not supported for type: "
             + type.toString());

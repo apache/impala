@@ -9,7 +9,7 @@ import org.kududb.ColumnSchema;
 import org.kududb.ColumnSchema.ColumnSchemaBuilder;
 import org.kududb.Schema;
 import org.kududb.Type;
-import org.kududb.client.KeyBuilder;
+import org.kududb.client.PartialRow;
 
 import java.util.List;
 
@@ -35,8 +35,8 @@ public class KuduUtilTest {
     String json = "[[\"a\"],[\"b\"]]";
     List<ColumnSchema> keyCols = ImmutableList.of(newKeyColumn("col1", Type.STRING));
     Schema schema = new Schema(keyCols);
-    List<KeyBuilder> kbs = KuduUtil.parseSplits(schema.getRowKeyProjection(), json);
-    assertEquals(kbs.size(), 2);
+    List<PartialRow> splitRows = KuduUtil.parseSplits(schema.getRowKeyProjection(), json);
+    assertEquals(splitRows.size(), 2);
   }
 
   // Tests that we're able to parse splits for a single key of 'bigint' type.
@@ -48,8 +48,8 @@ public class KuduUtilTest {
     String json = "[[10], [100]]";
     List<ColumnSchema> keyCols = ImmutableList.of(newKeyColumn("col1", Type.INT64));
     Schema schema = new Schema(keyCols);
-    List<KeyBuilder> kbs = KuduUtil.parseSplits(schema.getRowKeyProjection(), json);
-    assertEquals(kbs.size(), 2);
+    List<PartialRow> splitRows = KuduUtil.parseSplits(schema.getRowKeyProjection(), json);
+    assertEquals(splitRows.size(), 2);
   }
 
   // Tests that we're able to parse splits for a compound key of 'string', 'bigint' type.
@@ -63,8 +63,8 @@ public class KuduUtilTest {
     List<ColumnSchema> keyCols = ImmutableList.of(newKeyColumn("col1", Type.STRING),
         newKeyColumn("col2", Type.INT64));
     Schema schema = new Schema(keyCols);
-    List<KeyBuilder> kbs = KuduUtil.parseSplits(schema.getRowKeyProjection(), json);
-    assertEquals(kbs.size(), 2);
+    List<PartialRow> splitRows = KuduUtil.parseSplits(schema.getRowKeyProjection(), json);
+    assertEquals(splitRows.size(), 2);
   }
 
   // Tests that we get an exception of the splits keys are of the wrong type, for a single

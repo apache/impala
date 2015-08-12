@@ -80,11 +80,6 @@ Status KuduTableSink::Prepare(RuntimeState* state) {
 
   table_desc_ = static_cast<const KuduTableDescriptor*>(table_desc);
 
-  // The expressions we get from the front end cover all the columns in the table
-  // descriptor, so build a schema with that info.
-  RETURN_IF_ERROR(KuduSchemaFromExpressionList(select_list_texprs_, *table_desc_,
-      &schema_));
-
   // Add a 'root partition' status in which to collect write statistics
   TInsertPartitionStatus root_status;
   root_status.__set_num_appended_rows(0L);

@@ -27,8 +27,8 @@ import org.kududb.ColumnSchema.ColumnSchemaBuilder;
 import org.kududb.Schema;
 import org.kududb.Type;
 import org.kududb.client.CreateTableBuilder;
-import org.kududb.client.KeyBuilder;
 import org.kududb.client.KuduClient;
+import org.kududb.client.PartialRow;
 
 import com.cloudera.impala.catalog.KuduTable;
 import com.cloudera.impala.common.ImpalaRuntimeException;
@@ -114,8 +114,8 @@ public class KuduDdlDelegate implements DdlDelegate {
 
       Schema schema = new Schema(columns);
       CreateTableBuilder ctb = new CreateTableBuilder();
-      for (KeyBuilder kb : parseSplits(schema.getRowKeyProjection(), splitsJson)) {
-        ctb.addSplitKey(kb);
+      for (PartialRow splitRow : parseSplits(schema.getRowKeyProjection(), splitsJson)) {
+        ctb.addSplitRow(splitRow);
       }
 
       client.createTable(kuduTableName, schema, ctb);
