@@ -39,7 +39,6 @@ import static com.cloudera.impala.util.KuduUtil.compareSchema;
 import static com.cloudera.impala.util.KuduUtil.fromImpalaType;
 import static com.cloudera.impala.util.KuduUtil.parseKeyColumns;
 import static com.cloudera.impala.util.KuduUtil.parseSplits;
-import static com.cloudera.impala.util.KuduUtil.stringToHostAndPort;
 import static org.kududb.client.KuduClient.KuduClientBuilder;
 
 
@@ -69,7 +68,7 @@ public class KuduDdlDelegate implements DdlDelegate {
     String splitsJson = msTbl.getParameters().get(KuduTable.KEY_SPLIT_KEYS);
 
     try {
-      KuduClientBuilder builder = new KuduClientBuilder(stringToHostAndPort(kuduMasters));
+      KuduClientBuilder builder = new KuduClientBuilder(kuduMasters);
       KuduClient client = builder.build();
 
       // TODO should we throw if the table does not exist when its an external table?
@@ -136,7 +135,7 @@ public class KuduDdlDelegate implements DdlDelegate {
     String kuduMasters = msTbl.getParameters().get(KuduTable.KEY_MASTER_ADDRESSES);
 
     try {
-      KuduClientBuilder builder = new KuduClientBuilder(stringToHostAndPort(kuduMasters));
+      KuduClientBuilder builder = new KuduClientBuilder(kuduMasters);
       KuduClient client = builder.build();
       if (!client.tableExists(kuduTableName)) {
         LOG.warn("Table: %s is in inconsistent state. It does not exist in Kudu master(s)"

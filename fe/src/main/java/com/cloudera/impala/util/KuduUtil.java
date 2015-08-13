@@ -1,4 +1,3 @@
-
 // Copyright 2015 Cloudera Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +15,7 @@
 package com.cloudera.impala.util;
 
 import java.io.StringReader;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -145,39 +145,6 @@ public class KuduUtil {
     };
 
     return Sets.newHashSet(Lists.transform(Lists.newArrayList(cols.split(",")), strip));
-  }
-
-  /**
-   * Helper function that takes a string with a list of comma separated addresses and
-   * transforms it into a list of HostAndPorts
-   */
-  public static List<HostAndPort> stringToHostAndPort(String masters) {
-    return stringToHostAndPort(Lists.newArrayList(masters.split(",")));
-  }
-
-  /**
-   * Helper function that transforms a list of Strings to HostAndPorts
-   */
-  public static List<HostAndPort> stringToHostAndPort(List<String> masters) {
-    Function<String, HostAndPort> fun = new Function<String, HostAndPort>() {
-      @Override
-      public HostAndPort apply(String input) {
-        return HostAndPort.fromString(input.trim());
-      }
-    };
-    return Lists.transform(masters, fun);
-  }
-
-  /**
-   * Helper function that transforms a list of HostAndPort instances to a list of strings
-   */
-  public static List<String> hostAndPortToString(List<HostAndPort> masters) {
-    return Lists.transform(masters, new Function<HostAndPort, String>() {
-      @Override
-      public String apply(HostAndPort input) {
-        return input.toString();
-      }
-    });
   }
 
   /**

@@ -26,11 +26,13 @@ import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
 import com.cloudera.impala.util.KuduUtil;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.net.HostAndPort;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
@@ -58,7 +60,8 @@ public class KuduTable extends Table {
   // The order of the keys is important.
   public static final String KEY_KEY_COLUMNS = "kudu.key_columns";
 
-  // Key to access the master address from the table properties
+  // Key to access the master address from the table properties. Error handling for
+  // this string is done in the KuduClient library.
   // TODO we should have something like KuduConfig.getDefaultConfig()
   public static final String KEY_MASTER_ADDRESSES = "kudu.master_addresses";
 
@@ -73,8 +76,8 @@ public class KuduTable extends Table {
   // The name of the table in Kudu.
   private String kuduTableName_;
 
-  // The set of Kudu masters.
-  private List<HostAndPort> kuduMasters_;
+  // Comma separated list of Kudu master hosts with optional ports.
+  private String kuduMasters_;
 
   // The set of columns that are key columns in Kudu.
   private List<String> kuduKeyColumnNames_;
@@ -87,7 +90,7 @@ public class KuduTable extends Table {
   public TKuduTable getKuduTable() {
     TKuduTable tbl = new TKuduTable();
     tbl.setKey_columns(Preconditions.checkNotNull(kuduKeyColumnNames_));
-    tbl.setMaster_addresses(KuduUtil.hostAndPortToString(kuduMasters_));
+    tbl.setMaster_addresses(Lists.newArrayList(kuduMasters_.split(",")));
     tbl.setTable_name(kuduTableName_);
     return tbl;
   }
@@ -164,8 +167,7 @@ public class KuduTable extends Table {
     }
 
     kuduTableName_ = msTbl.getParameters().get(KEY_TABLE_NAME);
-    kuduMasters_ = KuduUtil.stringToHostAndPort(msTbl.getParameters().get(
-        KEY_MASTER_ADDRESSES));
+    kuduMasters_ = msTbl.getParameters().get(KEY_MASTER_ADDRESSES);
 
     Set<String> keyColumns = ImmutableSet.copyOf(Splitter.on(",").trimResults().split(
         Preconditions.checkNotNull(msTbl.getParameters().get(KEY_KEY_COLUMNS),
@@ -193,12 +195,12 @@ public class KuduTable extends Table {
     super.loadFromThrift(thriftTable);
     TKuduTable tkudu = thriftTable.getKudu_table();
     kuduTableName_ = tkudu.getTable_name();
-    kuduMasters_ = KuduUtil.stringToHostAndPort(tkudu.getMaster_addresses());
+    kuduMasters_ = Joiner.on(',').join(tkudu.getMaster_addresses());
     kuduKeyColumnNames_ = tkudu.getKey_columns();
   }
 
   public String getKuduTableName() { return kuduTableName_; }
-  public List<HostAndPort> getKuduMasterAddresses() { return kuduMasters_; }
+  public String getKuduMasterAddresses() { return kuduMasters_; }
   public int getNumKeyColumns() { return kuduKeyColumnNames_.size(); }
 
   /**

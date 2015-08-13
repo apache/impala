@@ -2,6 +2,8 @@
 
 package com.cloudera.impala.util;
 
+import java.util.List;
+
 import com.cloudera.impala.common.ImpalaRuntimeException;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
@@ -10,8 +12,6 @@ import org.kududb.ColumnSchema.ColumnSchemaBuilder;
 import org.kududb.Schema;
 import org.kududb.Type;
 import org.kududb.client.PartialRow;
-
-import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
