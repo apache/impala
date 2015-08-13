@@ -40,10 +40,36 @@ class TestDelimitedText(ImpalaTestSuite):
     self.client.execute('drop table if exists %s.cbn' % self.TEST_DB_NAME)
     self.client.execute('drop table if exists %s.dhp' % self.TEST_DB_NAME)
     self.client.execute('drop table if exists %s.tecn' % self.TEST_DB_NAME)
+    self.client.execute('drop table if exists %s.nl_queries' % self.TEST_DB_NAME)
     self.client.execute('drop database if exists %s' % self.TEST_DB_NAME)
 
   def test_delimited_text(self, vector):
     self.run_test_case('QueryTest/delimited-text', vector)
+
+  def test_delimited_text_newlines(self, vector):
+    """ Test text with newlines in strings - IMPALA-1943. Execute queries from Python to
+    avoid issues with newline handling in test file format. """
+    self.execute_query_expect_success(self.client, """
+      create table if not exists %s.nl_queries
+      (c1 string, c2 string, c3 string)
+      row format delimited
+      fields terminated by '\002'
+      lines terminated by '\001'
+      stored as textfile
+      """ % self.TEST_DB_NAME)
+    # Create test data with newlines in various places
+    self.execute_query_expect_success(self.client, """
+      insert into %s.nl_queries
+      values ("the\\n","\\nquick\\nbrown","fox\\n"),
+             ("\\njumped","over the lazy\\n","\\ndog")""" % self.TEST_DB_NAME)
+    result = self.execute_query("select * from %s.nl_queries" % self.TEST_DB_NAME)
+    assert len(result.data) == 2
+    assert result.data[0].split("\t") == ["the\n", "\nquick\nbrown", "fox\n"]
+    assert result.data[1].split("\t") == ["\njumped","over the lazy\n","\ndog"]
+    # The row count may be computed without parsing each row, so could be inconsistent.
+    result = self.execute_query("select count(*) from %s.nl_queries" % self.TEST_DB_NAME)
+    assert len(result.data) == 1
+    assert result.data[0] == "2"
 
   @pytest.mark.execute_serially
   def test_delimited_text_latin_chars(self, vector):
