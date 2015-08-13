@@ -24,6 +24,7 @@
 
 namespace impala {
 
+struct ArrayValue;
 struct StringValue;
 class TupleDescriptor;
 class TupleRow;
@@ -59,29 +60,39 @@ class Tuple {
     bzero(this, size);
   }
 
-  /// Create a copy of 'this', including all of its referenced string data,
-  /// using pool to allocate memory. Returns the copy.
-  /// If 'convert_ptrs' is true, converts pointers that are part of the tuple
-  /// into offsets in 'pool'.
-  Tuple* DeepCopy(const TupleDescriptor& desc, MemPool* pool, bool convert_ptrs = false);
+  /// The total size of all data represented in this tuple (tuple data and referenced
+  /// string and collection data).
+  int64_t TotalByteSize(const TupleDescriptor& desc) const;
 
-  /// Create a copy of 'this', including all its referenced string data.  This
-  /// version does not allocate a tuple, instead copying 'dst'.  dst must already
-  /// be allocated to the correct size (desc.byte_size())
-  /// If 'convert_ptrs' is true, converts pointers that are part of the tuple
-  /// into offsets in 'pool'.
-  void DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool,
-                bool convert_ptrs = false);
+  /// Create a copy of 'this', including all of its referenced variable-length data
+  /// (i.e. strings and collections), using pool to allocate memory. Returns the copy.
+  Tuple* DeepCopy(const TupleDescriptor& desc, MemPool* pool);
 
-  /// Create a copy of 'this', including all referenced string data, into
-  /// data. The tuple is written first, followed by any strings. data and offset
-  /// will be incremented by the total number of bytes written. data must already
-  /// be allocated to the correct size.
-  /// If 'convert_ptrs' is true, converts pointers that are part of the tuple
-  /// into offsets in data, based on the provided offset. Otherwise they will be
-  /// pointers directly into data.
+  /// Create a copy of 'this', including all its referenced variable-length data
+  /// (i.e. strings and collections), using pool to allocate memory. This version does
+  /// not allocate a tuple, instead copying to 'dst'. 'dst' must already be allocated to
+  /// the correct size (i.e. TotalByteSize()).
+  void DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool);
+
+  /// Create a copy of 'this', including all referenced variable-length data (i.e. strings
+  /// and collections), into 'data'. The tuple is written first, followed by any
+  /// variable-length data. 'data' and 'offset' will be incremented by the total number of
+  /// bytes written. 'data' must already be allocated to the correct size
+  /// (i.e. TotalByteSize()).
+  /// If 'convert_ptrs' is true, rewrites pointers that are part of the tuple as offsets
+  /// into 'data'. Otherwise they will remain pointers directly into data. The offsets are
+  /// determined by 'offset', where '*offset' corresponds to address '*data'.
   void DeepCopy(const TupleDescriptor& desc, char** data, int* offset,
                 bool convert_ptrs = false);
+
+  /// This function should only be called on tuples created by DeepCopy() with
+  /// 'convert_ptrs' = true. It takes all pointers contained in this tuple (i.e. in
+  /// StringValues and ArrayValues, including those contained within other ArrayValues),
+  /// and converts the offset values into pointers into 'tuple_data'. 'tuple_data' should
+  /// be the serialized tuple buffer created by DeepCopy(). Note that 'tuple_data' should
+  /// always be the beginning of this buffer, regardless of this tuple's offset in
+  /// 'tuple_data'.
+  void ConvertOffsetsToPointers(const TupleDescriptor& desc, uint8_t* tuple_data);
 
   /// Materialize this by evaluating the expressions in materialize_exprs
   /// over the specified 'row'. 'pool' is used to allocate var-length data.
@@ -130,11 +141,34 @@ class Tuple {
     return reinterpret_cast<StringValue*>(reinterpret_cast<char*>(this) + offset);
   }
 
+  const StringValue* GetStringSlot(int offset) const {
+    DCHECK(offset != -1);  // -1 offset indicates non-materialized slot
+    return reinterpret_cast<const StringValue*>(
+        reinterpret_cast<const char*>(this) + offset);
+  }
+
+  ArrayValue* GetCollectionSlot(int offset) {
+    DCHECK(offset != -1);  // -1 offset indicates non-materialized slot
+    return reinterpret_cast<ArrayValue*>(reinterpret_cast<char*>(this) + offset);
+  }
+
+  const ArrayValue* GetCollectionSlot(int offset) const {
+    DCHECK(offset != -1);  // -1 offset indicates non-materialized slot
+    return reinterpret_cast<const ArrayValue*>(
+        reinterpret_cast<const char*>(this) + offset);
+  }
+
   /// For C++/IR interop, we need to be able to look up types by name.
   static const char* LLVM_CLASS_NAME;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(Tuple);
+
+  /// Copies all referenced string and collection data into 'data'. Increments 'data' and
+  /// 'offset' by the number of bytes written. Recursively writes collection tuple data
+  /// and referenced collection and string data.
+  void CopyVarlenData(const TupleDescriptor& desc, char** data, int* offset,
+      bool convert_ptrs);
 };
 
 }

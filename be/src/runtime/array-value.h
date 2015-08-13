@@ -20,7 +20,11 @@
 
 namespace impala {
 
-/// The in-memory representation of an array-type slot.
+/// The in-memory representation of a collection-type slot. Note that both arrays and maps
+/// are represented in memory as arrays of tuples. After being read from the on-disk data,
+/// arrays and maps are effectively indistinguishable; a map can be thought of as an array
+/// of key/value structs (and neither of these fields are necessarily materialized in the
+/// item tuples).
 ///
 /// Possible future implementations:
 /// - ArrayValues are backed by a BufferedTupleStream, with one stream per tuple desc and
@@ -40,6 +44,7 @@ namespace impala {
 ///       bool* c2_item_nulls; // the number of null bits = sum(c2_sizes)
 ///       float* c2_item_values;
 ///     }
+/// TODO for 2.3: rename to CollectionValue
 struct ArrayValue {
   /// Pointer to buffer containing item tuples.
   uint8_t* ptr;

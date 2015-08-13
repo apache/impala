@@ -151,7 +151,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
     state->obj_pool()->Add(expr);
     build_expr_ctxs_.push_back(new ExprContext(expr));
     state->obj_pool()->Add(build_expr_ctxs_.back());
-    contains_var_len_grouping_exprs_ |= expr->type().IsVarLen();
+    contains_var_len_grouping_exprs_ |= expr->type().IsVarLenStringType();
   }
   // Construct a new row desc for preparing the build exprs because neither the child's
   // nor this node's output row desc may contain the intermediate tuple, e.g.,
@@ -617,7 +617,7 @@ Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
       // TODO: This is likely to be too slow. The hash table could maintain this as
       // it hashes.
       for (int i = 0; i < probe_expr_ctxs_.size(); ++i) {
-        if (!probe_expr_ctxs_[i]->root()->type().IsVarLen()) continue;
+        if (!probe_expr_ctxs_[i]->root()->type().IsVarLenStringType()) continue;
         if (ht_ctx_->last_expr_value_null(i)) continue;
         StringValue* sv = reinterpret_cast<StringValue*>(ht_ctx_->last_expr_value(i));
         size += sv->len;

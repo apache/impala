@@ -47,19 +47,19 @@ class Expr;
 class ExprContext;
 class RuntimeState;
 
-// A path into a table schema (e.g. a vector of ColumnTypes) pointing to a particular
-// column/field. The i-th element of the path is the ordinal position of the column/field
-// of the schema at level i. For example, the path [0] would be the first column of the
-// table, and path [1,0] would be the first field in the second column of the table.
-//
-// Arrays are represented as having two fields. The first is the item element in the
-// schema. The second is an artifical position element, which does not actually exist in
-// the table schema. For example, if path [0] is an array, path [0,0] would refer to the
-// array's item, and path [0,1] would refer to the position element, which is the item
-// count of the array.
-//
-// Likewise, maps are represented as having three fields: the key element, the value
-// element, and the artifical position element.
+/// A path into a table schema (e.g. a vector of ColumnTypes) pointing to a particular
+/// column/field. The i-th element of the path is the ordinal position of the column/field
+/// of the schema at level i. For example, the path [0] would be the first column of the
+/// table, and path [1,0] would be the first field in the second column of the table.
+///
+/// Arrays are represented as having two fields. The first is the item element in the
+/// schema. The second is an artifical position element, which does not actually exist in
+/// the table schema. For example, if path [0] is an array, path [0,0] would refer to the
+/// array's item, and path [0,1] would refer to the position element, which is the item
+/// count of the array.
+///
+/// Likewise, maps are represented as having three fields: the key element, the value
+/// element, and the artifical position element.
 typedef std::vector<int> SchemaPath;
 
 struct LlvmTupleStruct {
@@ -75,7 +75,7 @@ struct LlvmTupleStruct {
 /// This is more efficient than branching to check if the slot is non-nullable.
 struct NullIndicatorOffset {
   int byte_offset;
-  uint8_t bit_mask;  // to extract null indicator
+  uint8_t bit_mask;  /// to extract null indicator
 
   NullIndicatorOffset(int byte_offset, int bit_offset)
     : byte_offset(byte_offset),
@@ -138,7 +138,7 @@ class SlotDescriptor {
   const SlotId id_;
   const ColumnType type_;
   const TupleDescriptor* parent_;
-  // Non-NULL only for collection slots
+  /// Non-NULL only for collection slots
   const TupleDescriptor* collection_item_descriptor_;
   const SchemaPath col_path_;
   const int tuple_offset_;
@@ -163,7 +163,7 @@ class SlotDescriptor {
   llvm::Function* set_not_null_fn_;
   llvm::Function* set_null_fn_;
 
-  // collection_item_descriptor should be non-NULL iff this is a collection slot
+  /// collection_item_descriptor should be non-NULL iff this is a collection slot
   SlotDescriptor(const TSlotDescriptor& tdesc, const TupleDescriptor* parent,
                  const TupleDescriptor* collection_item_descriptor);
 };
@@ -337,6 +337,9 @@ class TupleDescriptor {
   int num_null_bytes() const { return num_null_bytes_; }
   const std::vector<SlotDescriptor*>& slots() const { return slots_; }
   const std::vector<SlotDescriptor*>& string_slots() const { return string_slots_; }
+  const std::vector<SlotDescriptor*>& collection_slots() const {
+    return collection_slots_;
+  }
   const SchemaPath& tuple_path() const { return tuple_path_; }
 
   const TableDescriptor* table_desc() const { return table_desc_; }
@@ -365,15 +368,22 @@ class TupleDescriptor {
   const int byte_size_;
   const int num_null_bytes_;
   int num_materialized_slots_;
-  std::vector<SlotDescriptor*> slots_;  // contains all slots
-  std::vector<SlotDescriptor*> string_slots_;  // contains only materialized string slots
 
-  // Absolute path into the table schema pointing to the collection whose fields
-  // are materialized into this tuple. Non-empty if this tuple belongs to a
-  // nested collection, empty otherwise.
+  /// Contains all slots.
+  std::vector<SlotDescriptor*> slots_;
+
+  /// Contains only materialized string slots.
+  std::vector<SlotDescriptor*> string_slots_;
+
+  /// Contains only materialized map and array slots.
+  std::vector<SlotDescriptor*> collection_slots_;
+
+  /// Absolute path into the table schema pointing to the collection whose fields are
+  /// materialized into this tuple. Non-empty if this tuple belongs to a nested
+  /// collection, empty otherwise.
   SchemaPath tuple_path_;
 
-  llvm::StructType* llvm_struct_; // cache for the llvm struct type for this tuple desc
+  llvm::StructType* llvm_struct_; /// cache for the llvm struct type for this tuple desc
 
   TupleDescriptor(const TTupleDescriptor& tdesc);
   void AddSlot(SlotDescriptor* slot);

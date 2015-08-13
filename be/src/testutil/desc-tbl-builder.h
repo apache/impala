@@ -45,11 +45,15 @@ class DescriptorTblBuilder {
   ObjectPool* obj_pool_;
 
   std::vector<TupleDescBuilder*> tuples_descs_;
+
+  TTupleDescriptor BuildTuple(
+      const std::vector<ColumnType>& slot_types, TDescriptorTable* thrift_desc_tbl,
+      int* tuple_id, int* slot_id);
 };
 
 class TupleDescBuilder {
  public:
-  TupleDescBuilder& operator<< (ColumnType slot_type) {
+  TupleDescBuilder& operator<< (const ColumnType& slot_type) {
     slot_types_.push_back(slot_type);
     return *this;
   }

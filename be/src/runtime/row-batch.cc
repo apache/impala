@@ -67,6 +67,7 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
   DCHECK(mem_tracker_ != NULL);
   tuple_ptrs_size_ = num_rows_ * input_batch.row_tuples.size() * sizeof(Tuple*);
   tuple_ptrs_ = reinterpret_cast<Tuple**>(tuple_data_pool_->Allocate(tuple_ptrs_size_));
+  uint8_t* tuple_data;
   if (input_batch.compression_type != THdfsCompression::NONE) {
     // Decompress tuple data into data pool
     uint8_t* compressed_data = (uint8_t*)input_batch.tuple_data.c_str();
@@ -79,57 +80,52 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch,
 
     int64_t uncompressed_size = input_batch.uncompressed_size;
     DCHECK_NE(uncompressed_size, -1) << "RowBatch decompression failed";
-    uint8_t* data = tuple_data_pool_->Allocate(uncompressed_size);
+    tuple_data = tuple_data_pool_->Allocate(uncompressed_size);
     status = decompressor->ProcessBlock(true, compressed_size, compressed_data,
-        &uncompressed_size, &data);
+        &uncompressed_size, &tuple_data);
     DCHECK(status.ok()) << "RowBatch decompression failed.";
     decompressor->Close();
   } else {
     // Tuple data uncompressed, copy directly into data pool
-    uint8_t* data = tuple_data_pool_->Allocate(input_batch.tuple_data.size());
-    memcpy(data, input_batch.tuple_data.c_str(), input_batch.tuple_data.size());
+    tuple_data = tuple_data_pool_->Allocate(input_batch.tuple_data.size());
+    memcpy(tuple_data, input_batch.tuple_data.c_str(), input_batch.tuple_data.size());
   }
 
-  // convert input_batch.tuple_offsets into pointers
+  // Convert input_batch.tuple_offsets into pointers
   int tuple_idx = 0;
   for (vector<int32_t>::const_iterator offset = input_batch.tuple_offsets.begin();
        offset != input_batch.tuple_offsets.end(); ++offset) {
     if (*offset == -1) {
       tuple_ptrs_[tuple_idx++] = NULL;
     } else {
-      tuple_ptrs_[tuple_idx++] = reinterpret_cast<Tuple*>(
-          tuple_data_pool_->GetDataPtr(*offset + tuple_ptrs_size_));
+      tuple_ptrs_[tuple_idx++] = reinterpret_cast<Tuple*>(tuple_data + *offset);
     }
   }
 
-  // check whether we have string slots
+  // Check whether we have slots that require offset-to-pointer conversion
   // TODO: do that during setup (part of RowDescriptor c'tor?)
-  bool has_string_slots = false;
+  bool has_varlen_slots = false;
   const vector<TupleDescriptor*>& tuple_descs = row_desc_.tuple_descriptors();
   for (int i = 0; i < tuple_descs.size(); ++i) {
-    if (!tuple_descs[i]->string_slots().empty()) {
-      has_string_slots = true;
+    if (!tuple_descs[i]->string_slots().empty() ||
+        !tuple_descs[i]->collection_slots().empty()) {
+      has_varlen_slots = true;
       break;
     }
   }
-  if (!has_string_slots) return;
+  if (!has_varlen_slots) return;
 
-  // convert string offsets contained in tuple data into pointers
+  // Convert string and collection data offsets contained in 'tuple_data' into pointers
   for (int i = 0; i < num_rows_; ++i) {
     TupleRow* row = GetRow(i);
-    vector<TupleDescriptor*>::const_iterator desc = tuple_descs.begin();
-    for (int j = 0; desc != tuple_descs.end(); ++desc, ++j) {
-      if ((*desc)->string_slots().empty()) continue;
+    vector<TupleDescriptor*>::const_iterator desc = row_desc_.tuple_descriptors().begin();
+    for (int j = 0; desc != row_desc_.tuple_descriptors().end(); ++desc, ++j) {
+      if ((*desc)->string_slots().empty() && (*desc)->collection_slots().empty()) {
+        continue;
+      }
       Tuple* t = row->GetTuple(j);
       if (t == NULL) continue;
-
-      vector<SlotDescriptor*>::const_iterator slot = (*desc)->string_slots().begin();
-      for (; slot != (*desc)->string_slots().end(); ++slot) {
-        DCHECK((*slot)->type().IsVarLen());
-        StringValue* string_val = t->GetStringSlot((*slot)->tuple_offset());
-        int offset = reinterpret_cast<intptr_t>(string_val->ptr) + tuple_ptrs_size_;
-        string_val->ptr = reinterpret_cast<char*>(tuple_data_pool_->GetDataPtr(offset));
-      }
+      t->ConvertOffsetsToPointers(**desc, tuple_data);
     }
   }
 }
@@ -157,7 +153,9 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
   row_desc_.ToThrift(&output_batch->row_tuples);
   output_batch->tuple_offsets.reserve(num_rows_ * num_tuples_per_row_);
 
-  int size = TotalByteSize();
+  int64_t size = TotalByteSize();
+  // TODO: return bad status if size is greater than std::string::max_size()
+  // TODO: track memory usage
   output_batch->tuple_data.resize(size);
   output_batch->uncompressed_size = size;
 
@@ -324,23 +322,14 @@ void RowBatch::AcquireState(RowBatch* src) {
 }
 
 // TODO: consider computing size of batches as they are built up
-int RowBatch::TotalByteSize() {
-  int result = 0;
+int64_t RowBatch::TotalByteSize() {
+  int64_t result = 0;
   for (int i = 0; i < num_rows_; ++i) {
     TupleRow* row = GetRow(i);
-    const vector<TupleDescriptor*>& tuple_descs = row_desc_.tuple_descriptors();
-    vector<TupleDescriptor*>::const_iterator desc = tuple_descs.begin();
-    for (int j = 0; desc != tuple_descs.end(); ++desc, ++j) {
+    for (int j = 0; j < row_desc_.tuple_descriptors().size(); ++j) {
       Tuple* tuple = row->GetTuple(j);
       if (tuple == NULL) continue;
-      result += (*desc)->byte_size();
-      vector<SlotDescriptor*>::const_iterator slot = (*desc)->string_slots().begin();
-      for (; slot != (*desc)->string_slots().end(); ++slot) {
-        DCHECK((*slot)->type().IsVarLen());
-        if (tuple->IsNull((*slot)->null_indicator_offset())) continue;
-        StringValue* string_val = tuple->GetStringSlot((*slot)->tuple_offset());
-        result += string_val->len;
-      }
+      result += tuple->TotalByteSize(*row_desc_.tuple_descriptors()[j]);
     }
   }
   return result;

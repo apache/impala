@@ -601,7 +601,7 @@ int BufferedTupleStream::ComputeRowSize(TupleRow* row) const {
     for (int j = 0; j < string_slots_[i].second.size(); ++j) {
       const SlotDescriptor* slot_desc = string_slots_[i].second[j];
       if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
-      StringValue* sv = tuple->GetStringSlot(slot_desc->tuple_offset());
+      const StringValue* sv = tuple->GetStringSlot(slot_desc->tuple_offset());
       size += sv->len;
     }
   }

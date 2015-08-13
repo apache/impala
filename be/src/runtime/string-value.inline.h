@@ -115,7 +115,7 @@ inline int64_t StringValue::UnpaddedCharLength(const char* cptr, int64_t len) {
 inline char* StringValue::CharSlotToPtr(void* slot, const ColumnType& type) {
   DCHECK(type.type == TYPE_CHAR);
   if (slot == NULL) return NULL;
-  if (type.IsVarLen()) {
+  if (type.IsVarLenStringType()) {
     StringValue* sv = reinterpret_cast<StringValue*>(slot);
     DCHECK_EQ(sv->len, type.len);
     return sv->ptr;
@@ -126,7 +126,7 @@ inline char* StringValue::CharSlotToPtr(void* slot, const ColumnType& type) {
 inline const char* StringValue::CharSlotToPtr(const void* slot, const ColumnType& type) {
   DCHECK(type.type == TYPE_CHAR);
   if (slot == NULL) return NULL;
-  if (type.IsVarLen()) {
+  if (type.IsVarLenStringType()) {
     const StringValue* sv = reinterpret_cast<const StringValue*>(slot);
     DCHECK_EQ(sv->len, type.len);
     return sv->ptr;

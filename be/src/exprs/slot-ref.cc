@@ -284,7 +284,7 @@ Status SlotRef::GetCodegendComputeFn(RuntimeState* state, llvm::Function** fn) {
   // *Val. The optimizer does a better job when there is a phi node for each value, rather
   // than having get_slot_block generate an AnyVal and having a single phi node over that.
   // TODO: revisit this code, can possibly be simplified
-  if (type().IsVarLen()) {
+  if (type().IsVarLenStringType()) {
     DCHECK(ptr != NULL);
     DCHECK(len != NULL);
     PHINode* ptr_phi = builder.CreatePHI(ptr->getType(), 2, "ptr_phi");

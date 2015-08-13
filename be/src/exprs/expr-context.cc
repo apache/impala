@@ -259,7 +259,7 @@ void* ExprContext::GetValue(Expr* e, TupleRow* row) {
       if (v.is_null) return NULL;
       result_.string_val.ptr = reinterpret_cast<char*>(v.ptr);
       result_.string_val.len = v.len;
-      if (e->type_.IsVarLen()) {
+      if (e->type_.IsVarLenStringType()) {
         return &result_.string_val;
       } else {
         return result_.string_val.ptr;

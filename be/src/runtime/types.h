@@ -145,23 +145,8 @@ struct ColumnType {
   }
 
   TColumnType ToThrift() const {
-    if (IsComplexType()) DCHECK(false) << "NYI " << type;
     TColumnType thrift_type;
-    thrift_type.types.push_back(TTypeNode());
-    TTypeNode& node = thrift_type.types.back();
-    node.type = TTypeNodeType::SCALAR;
-    node.__set_scalar_type(TScalarType());
-    TScalarType& scalar_type = node.scalar_type;
-    scalar_type.__set_type(impala::ToThrift(type));
-    if (type == TYPE_CHAR || type == TYPE_VARCHAR) {
-      DCHECK_NE(len, -1);
-      scalar_type.__set_len(len);
-    } else if (type == TYPE_DECIMAL) {
-      DCHECK_NE(precision, -1);
-      DCHECK_NE(scale, -1);
-      scalar_type.__set_precision(precision);
-      scalar_type.__set_scale(scale);
-    }
+    ToThrift(&thrift_type);
     return thrift_type;
   }
 
@@ -169,7 +154,7 @@ struct ColumnType {
     return type == TYPE_STRING || type == TYPE_VARCHAR || type == TYPE_CHAR;
   }
 
-  inline bool IsVarLen() const {
+  inline bool IsVarLenStringType() const {
     return type == TYPE_STRING || type == TYPE_VARCHAR ||
         (type == TYPE_CHAR && len > MAX_CHAR_INLINE_LENGTH);
   }
@@ -191,7 +176,7 @@ struct ColumnType {
       case TYPE_VARCHAR:
         return 0;
       case TYPE_CHAR:
-        if (IsVarLen()) return 0;
+        if (IsVarLenStringType()) return 0;
         return len;
       case TYPE_NULL:
       case TYPE_BOOLEAN:
@@ -225,8 +210,13 @@ struct ColumnType {
       case TYPE_VARCHAR:
         return 16;
       case TYPE_CHAR:
-        if (IsVarLen()) return 16;
+        if (IsVarLenStringType()) return 16;
         return len;
+      case TYPE_ARRAY:
+      case TYPE_MAP:
+        return 16;
+      case TYPE_STRUCT:
+        DCHECK(false) << "TYPE_STRUCT slot not possible";
       default:
         return GetByteSize();
     }
@@ -243,12 +233,16 @@ struct ColumnType {
   std::string DebugString() const;
 
  private:
-  // Used to create a possibly nested type from the flattened Thrift representation.
-  //
-  // 'idx' is an in/out parameter that is initially set to the index of the type in
-  // 'types' being constructed, and is set to the index of the next type in 'types' that
-  // needs to be processed (or the size 'types' if all nodes have been processed).
+  /// Used to create a possibly nested type from the flattened Thrift representation.
+  ///
+  /// 'idx' is an in/out parameter that is initially set to the index of the type in
+  /// 'types' being constructed, and is set to the index of the next type in 'types' that
+  /// needs to be processed (or the size 'types' if all nodes have been processed).
   ColumnType(const std::vector<TTypeNode>& types, int* idx);
+
+  /// Recursive implementation of ToThrift() that populates 'thrift_type' with the
+  /// TTypeNodes for this type and its children.
+  void ToThrift(TColumnType* thrift_type) const;
 };
 
 std::ostream& operator<<(std::ostream& os, const ColumnType& type);

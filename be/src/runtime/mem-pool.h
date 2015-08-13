@@ -132,8 +132,7 @@ class MemPool {
 
   /// Absorb all chunks that hold data from src. If keep_current is true, let src hold on
   /// to its last allocated chunk that contains data.
-  /// All offsets handed out by calls to GetOffset()/GetCurrentOffset() for 'src'
-  /// become invalid.
+  /// All offsets handed out by calls to GetCurrentOffset() for 'src' become invalid.
   void AcquireData(MemPool* src, bool keep_current);
 
   /// Diagnostic to check if memory is allocated from this mempool.
@@ -152,19 +151,6 @@ class MemPool {
 
   /// Return sum of chunk_sizes_.
   int64_t GetTotalChunkSizes() const;
-
-  /// Return logical offset of data ptr into allocated data (interval
-  /// [0, total_allocated_bytes()) ).
-  /// Returns -1 if 'data' doesn't belong to this mempool.
-  int GetOffset(uint8_t* data);
-
-  /// Return logical offset of memory returned by next call to Allocate()
-  /// into allocated data.
-  int GetCurrentOffset() const { return total_allocated_bytes_; }
-
-  /// Given a logical offset into the allocated data (allowed values:
-  /// 0 - total_allocated_bytes() - 1), return a pointer to that offset.
-  uint8_t* GetDataPtr(int offset);
 
   /// Return (data ptr, allocated bytes) pairs for all chunks owned by this mempool.
   void GetChunkInfo(std::vector<std::pair<uint8_t*, int> >* chunk_info);
@@ -278,29 +264,6 @@ class MemPool {
     return result;
   }
 };
-
-inline
-int MemPool::GetOffset(uint8_t* data) {
-  if (last_offset_conversion_chunk_idx_ != -1) {
-    const ChunkInfo& info = chunks_[last_offset_conversion_chunk_idx_];
-    if (info.data <= data && info.data + info.allocated_bytes > data) {
-      return info.cumulative_allocated_bytes + data - info.data;
-    }
-  }
-  return GetOffsetHelper(data);
-}
-
-inline
-uint8_t* MemPool::GetDataPtr(int offset) {
-  if (last_offset_conversion_chunk_idx_ != -1) {
-    const ChunkInfo& info = chunks_[last_offset_conversion_chunk_idx_];
-    if (info.cumulative_allocated_bytes <= offset
-        && info.cumulative_allocated_bytes + info.allocated_bytes > offset) {
-      return info.data + offset - info.cumulative_allocated_bytes;
-    }
-  }
-  return GetDataPtrHelper(offset);
-}
 
 }
 

@@ -134,9 +134,9 @@ class RowBatch {
   }
 
   /// The total size of all data represented in this row batch (tuples and referenced
-  /// string data). This is the size of the row batch after removing all gaps in the
-  /// auxiliary (i.e. the smallest footprint for the row batch).
-  int TotalByteSize();
+  /// string and collection data). This is the size of the row batch after removing all
+  /// gaps in the auxiliary (i.e. the smallest footprint for the row batch).
+  int64_t TotalByteSize();
 
   TupleRow* GetRow(int row_idx) {
     DCHECK(tuple_ptrs_ != NULL);

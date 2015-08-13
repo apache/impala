@@ -98,7 +98,7 @@ bool BufferedTupleStream::DeepCopyInternal(TupleRow* row, uint8_t** dst) {
     for (int j = 0; j < string_slots_[i].second.size(); ++j) {
       const SlotDescriptor* slot_desc = string_slots_[i].second[j];
       if (tuple->IsNull(slot_desc->null_indicator_offset())) continue;
-      StringValue* sv = tuple->GetStringSlot(slot_desc->tuple_offset());
+      const StringValue* sv = tuple->GetStringSlot(slot_desc->tuple_offset());
       if (LIKELY(sv->len > 0)) {
         if (UNLIKELY(write_block_->BytesRemaining() < sv->len)) {
           write_block_->ReturnAllocation(bytes_allocated);

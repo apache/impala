@@ -66,6 +66,7 @@ SlotDescriptor::SlotDescriptor(
     is_null_fn_(NULL),
     set_not_null_fn_(NULL),
     set_null_fn_(NULL) {
+  DCHECK_NE(type_.type, TYPE_STRUCT);
   DCHECK(parent_ != NULL) << tdesc.parent;
   if (type_.IsCollectionType()) {
     DCHECK(tdesc.__isset.itemTupleId);
@@ -272,10 +273,11 @@ TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
 
 void TupleDescriptor::AddSlot(SlotDescriptor* slot) {
   slots_.push_back(slot);
-  if (slot->type().IsVarLen() && slot->is_materialized()) {
-    string_slots_.push_back(slot);
+  if (slot->is_materialized()) {
+    ++num_materialized_slots_;
+    if (slot->type().IsVarLenStringType()) string_slots_.push_back(slot);
+    if (slot->type().IsCollectionType()) collection_slots_.push_back(slot);
   }
-  if (slot->is_materialized()) ++num_materialized_slots_;
 }
 
 string TupleDescriptor::DebugString() const {

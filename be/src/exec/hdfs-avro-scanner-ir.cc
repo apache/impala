@@ -135,7 +135,7 @@ void HdfsAvroScanner::ReadAvroChar(PrimitiveType type, int max_len, uint8_t** da
     DCHECK(type == TYPE_CHAR);
     ColumnType ctype = ColumnType::CreateCharType(max_len);
     int str_len = std::min(static_cast<int>(len), max_len);
-    if (ctype.IsVarLen()) {
+    if (ctype.IsVarLenStringType()) {
       StringValue* sv = reinterpret_cast<StringValue*>(slot);
       sv->ptr = reinterpret_cast<char*>(pool->Allocate(max_len));
       sv->len = max_len;

@@ -112,34 +112,6 @@ TEST(MemPoolTest, Basic) {
   }
 }
 
-TEST(MemPoolTest, Offsets) {
-  MemTracker tracker;
-  MemPool p(&tracker);
-  uint8_t* data[1024];
-  int offset = 0;
-  // test GetCurrentOffset()
-  for (int i = 0; i < 1024; ++i) {
-    EXPECT_EQ(offset, p.GetCurrentOffset());
-    data[i] = p.Allocate(8);
-    offset += 8;
-  }
-
-  // test GetOffset()
-  offset = 0;
-  for (int i = 0; i < 1024; ++i) {
-    EXPECT_EQ(offset, p.GetOffset(data[i]));
-    offset += 8;
-  }
-
-  // test GetDataPtr
-  offset = 0;
-  for (int i = 0; i < 1024; ++i) {
-    EXPECT_EQ(data[i], p.GetDataPtr(offset));
-    offset += 8;
-  }
-  p.FreeAll();
-}
-
 // Test that we can keep an allocated chunk and a free chunk.
 // This case verifies that when chunks are acquired by another memory pool the
 // remaining chunks are consistent if there were more than one used chunk and some

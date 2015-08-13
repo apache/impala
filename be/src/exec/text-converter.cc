@@ -139,7 +139,7 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
   codegen->CreateIfElseBlocks(fn, "set_null", "parse_slot",
       &set_null_block, &parse_slot_block);
 
-  if (!slot_desc->type().IsVarLen()) {
+  if (!slot_desc->type().IsVarLenStringType()) {
     check_zero_block = BasicBlock::Create(codegen->context(), "check_zero", fn);
   }
 
@@ -160,9 +160,9 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     is_null = codegen->false_value();
   }
   builder.CreateCondBr(is_null, set_null_block,
-      (slot_desc->type().IsVarLen()) ? parse_slot_block : check_zero_block);
+      (slot_desc->type().IsVarLenStringType()) ? parse_slot_block : check_zero_block);
 
-  if (!slot_desc->type().IsVarLen()) {
+  if (!slot_desc->type().IsVarLenStringType()) {
     builder.SetInsertPoint(check_zero_block);
     // If len <= 0 and it is not a string col, set slot to NULL
     // The len can be less than 0 if the field contained an escape character which
@@ -176,7 +176,7 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
   builder.SetInsertPoint(parse_slot_block);
   Value* slot = builder.CreateStructGEP(args[0], slot_desc->field_idx(), "slot");
 
-  if (slot_desc->type().IsVarLen()) {
+  if (slot_desc->type().IsVarLenStringType()) {
     Value* ptr = builder.CreateStructGEP(slot, 0, "string_ptr");
     Value* len = builder.CreateStructGEP(slot, 1, "string_len");
 

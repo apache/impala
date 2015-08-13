@@ -235,7 +235,7 @@ class AnyValUtil {
       case TYPE_STRING:
       case TYPE_VARCHAR:
       case TYPE_CHAR: {
-        if (type.IsVarLen()) {
+        if (type.IsVarLenStringType()) {
           reinterpret_cast<const StringValue*>(slot)->ToStringVal(
               reinterpret_cast<StringVal*>(dst));
           if (type.type == TYPE_VARCHAR) {

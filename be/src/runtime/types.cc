@@ -13,8 +13,10 @@
 // limitations under the License.
 
 #include "runtime/types.h"
+
 #include <ostream>
 #include <sstream>
+#include <boost/foreach.hpp>
 
 #include "gen-cpp/TCLIService_constants.h"
 
@@ -175,6 +177,43 @@ string TypeToOdbcString(PrimitiveType t) {
     case TYPE_MAP: return "map";
   };
   return "unknown";
+}
+
+void ColumnType::ToThrift(TColumnType* thrift_type) const {
+  thrift_type->types.push_back(TTypeNode());
+  TTypeNode& node = thrift_type->types.back();
+  if (IsComplexType()) {
+    if (type == TYPE_ARRAY) {
+      node.type = TTypeNodeType::ARRAY;
+    } else if (type == TYPE_MAP) {
+      node.type = TTypeNodeType::MAP;
+    } else {
+      DCHECK_EQ(type, TYPE_STRUCT);
+      node.type = TTypeNodeType::STRUCT;
+      node.__set_struct_fields(vector<TStructField>());
+      BOOST_FOREACH(const string& field_name, field_names) {
+        node.struct_fields.push_back(TStructField());
+        node.struct_fields.back().name = field_name;
+      }
+    }
+    BOOST_FOREACH(const ColumnType& child, children) {
+      child.ToThrift(thrift_type);
+    }
+  } else {
+    node.type = TTypeNodeType::SCALAR;
+    node.__set_scalar_type(TScalarType());
+    TScalarType& scalar_type = node.scalar_type;
+    scalar_type.__set_type(impala::ToThrift(type));
+    if (type == TYPE_CHAR || type == TYPE_VARCHAR) {
+      DCHECK_NE(len, -1);
+      scalar_type.__set_len(len);
+    } else if (type == TYPE_DECIMAL) {
+      DCHECK_NE(precision, -1);
+      DCHECK_NE(scale, -1);
+      scalar_type.__set_precision(precision);
+      scalar_type.__set_scale(scale);
+    }
+  }
 }
 
 TTypeEntry ColumnType::ToHs2Type() const {

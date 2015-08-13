@@ -15,6 +15,7 @@
 #include <sstream>
 #include <boost/functional/hash.hpp>
 
+#include "runtime/array-value.h"
 #include "runtime/raw-value.h"
 #include "runtime/string-value.inline.h"
 #include "runtime/tuple.h"
@@ -220,7 +221,7 @@ void RawValue::Write(const void* value, void* dst, const ColumnType& type,
     case TYPE_STRING:
     case TYPE_VARCHAR:
     case TYPE_CHAR: {
-      if (!type.IsVarLen()) {
+      if (!type.IsVarLenStringType()) {
         DCHECK_EQ(type.type, TYPE_CHAR);
         memcpy(StringValue::CharSlotToPtr(dst, type), value, type.len);
         break;
@@ -240,6 +241,15 @@ void RawValue::Write(const void* value, void* dst, const ColumnType& type,
     case TYPE_DECIMAL:
       memcpy(dst, value, type.GetByteSize());
       break;
+    case TYPE_ARRAY:
+    case TYPE_MAP: {
+      DCHECK(pool == NULL) << "RawValue::Write(): deep copy of ArrayValues NYI";
+      const ArrayValue* src = reinterpret_cast<const ArrayValue*>(value);
+      ArrayValue* dest = reinterpret_cast<ArrayValue*>(dst);
+      dest->num_tuples = src->num_tuples;
+      dest->ptr = src->ptr;
+      break;
+    }
     default:
       DCHECK(false) << "RawValue::Write(): bad type: " << type.DebugString();
   }
@@ -279,7 +289,7 @@ void RawValue::Write(const void* value, const ColumnType& type,
     case TYPE_VARCHAR:
     case TYPE_CHAR: {
       DCHECK(buf != NULL);
-      if (!type.IsVarLen()) {
+      if (!type.IsVarLenStringType()) {
         DCHECK_EQ(type.type, TYPE_CHAR);
         memcpy(dst, value, type.len);
         break;

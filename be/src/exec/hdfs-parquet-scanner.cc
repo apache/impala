@@ -412,7 +412,7 @@ void HdfsParquetScanner::ColumnReader<StringValue>::ConvertSlot(
   int len = slot_desc()->type().len;
   StringValue sv;
   sv.len = len;
-  if (slot_desc()->type().IsVarLen()) {
+  if (slot_desc()->type().IsVarLenStringType()) {
     sv.ptr = reinterpret_cast<char*>(pool->Allocate(len));
   } else {
     sv.ptr = reinterpret_cast<char*>(dst);
@@ -421,7 +421,7 @@ void HdfsParquetScanner::ColumnReader<StringValue>::ConvertSlot(
   memcpy(sv.ptr, src->ptr, unpadded_len);
   StringValue::PadWithSpaces(sv.ptr, len, unpadded_len);
 
-  if (slot_desc()->type().IsVarLen()) *dst = sv;
+  if (slot_desc()->type().IsVarLenStringType()) *dst = sv;
 }
 
 template<>

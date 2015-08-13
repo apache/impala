@@ -285,7 +285,7 @@ int Expr::ComputeResultsLayout(const vector<Expr*>& exprs, vector<int>* offsets,
   // Collect all the byte sizes and sort them
   for (int i = 0; i < exprs.size(); ++i) {
     data[i].expr_idx = i;
-    if (exprs[i]->type().IsVarLen()) {
+    if (exprs[i]->type().IsVarLenStringType()) {
       data[i].byte_size = 16;
       data[i].variable_length = true;
     } else {
@@ -311,7 +311,7 @@ int Expr::ComputeResultsLayout(const vector<Expr*>& exprs, vector<int>* offsets,
     // Don't align more than word (8-byte) size.  This is consistent with what compilers
     // do.
     if (exprs[data[i].expr_idx]->type().type == TYPE_CHAR &&
-        !exprs[data[i].expr_idx]->type().IsVarLen()) {
+        !exprs[data[i].expr_idx]->type().IsVarLenStringType()) {
       // CHARs are not padded, to be consistent with complier layouts
       // aligns the next value on an 8 byte boundary
       current_alignment = (data[i].byte_size + current_alignment) % max_alignment;

@@ -58,7 +58,8 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
       int buffer_len = len;
       if (type.type == TYPE_VARCHAR || type.type == TYPE_CHAR) buffer_len = type.len;
 
-      bool reuse_data = type.IsVarLen() && !(len != 0 && (copy_string || need_escape));
+      bool reuse_data = type.IsVarLenStringType() &&
+                        !(len != 0 && (copy_string || need_escape));
       if (type.type == TYPE_CHAR) reuse_data &= (buffer_len <= len);
 
       StringValue str;
@@ -66,7 +67,8 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
       if (reuse_data) {
         str.ptr = const_cast<char*>(data);
       } else {
-        str.ptr = type.IsVarLen() ? reinterpret_cast<char*>(pool->Allocate(buffer_len)) :
+        str.ptr = type.IsVarLenStringType() ?
+            reinterpret_cast<char*>(pool->Allocate(buffer_len)) :
             reinterpret_cast<char*>(slot);
         if (need_escape) {
           UnescapeString(data, str.ptr, &str.len, buffer_len);
@@ -79,8 +81,8 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
         StringValue::PadWithSpaces(str.ptr, buffer_len, str.len);
         str.len = type.len;
       }
-      // write back to the slot, if !IsVarLen() we already wrote to the slot
-      if (type.IsVarLen()) {
+      // write back to the slot, if !IsVarLenStringType() we already wrote to the slot
+      if (type.IsVarLenStringType()) {
         StringValue* str_slot = reinterpret_cast<StringValue*>(slot);
         *str_slot = str;
       }
