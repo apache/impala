@@ -103,6 +103,38 @@ class TimestampFunctions {
   static StringVal ToDate(FunctionContext* context, const TimestampVal& ts_val);
   static IntVal DateDiff(FunctionContext* context, const TimestampVal& ts_val1,
       const TimestampVal& ts_val2);
+  static string ShortDayName(FunctionContext* context, const TimestampVal& ts);
+  static string ShortMonthName(FunctionContext* context, const TimestampVal& ts);
+
+  /// Return verbose string version of current time of day
+  /// e.g. Mon Dec 01 16:25:05 2003 EST.
+  static StringVal TimeOfDay(FunctionContext* context);
+
+  /// Compare value of two timestamps.
+  /// Return 0 if 'ts1' is equal to 'ts2'.
+  /// Return 1 if 'ts1' is later than 'ts2'.
+  /// Return -1 if 'ts1' is earlier than 'ts2'.
+  static IntVal TimestampCmp(FunctionContext* context,
+      const TimestampVal& ts_val1, const TimestampVal& ts_val2);
+
+  /// Return total number of full months between two timestamps.
+  /// If 'ts_val1' is later than 'ts_val2' result is positive if there is a gap
+  /// of more than 1 month between the two dates.
+  /// If 'ts_val1' is earlier than 'ts_val2' result is negative if there is a
+  /// gap of more than 1 month between the two dates.
+  /// If the gap between the two dates is less than a full month, result is
+  /// zero.
+  static IntVal IntMonthsBetween(FunctionContext* context,
+      const TimestampVal& ts_val1, const TimestampVal& ts_val2);
+
+  /// Return number of months between two timestamps:
+  /// If 'ts_val1' is later than 'ts_val2' result is positive.
+  /// If 'ts_val1' is earlier than 'ts_val2' result is negative.
+  /// If 'ts_val1' and 'ts_val2' are both same days of the month or both last
+  /// days of their respective months, result is an integer.
+  /// Otherwise result includes a fractional portion based on 31 day month.
+  static DoubleVal MonthsBetween(FunctionContext* context,
+      const TimestampVal& ts_val1, const TimestampVal& ts_val2);
 
   /// Add/sub functions on the timestamp. This handles three forms of adding/subtracting
   /// intervals to/from timestamps:

@@ -17,6 +17,7 @@
 #include <boost/date_time/time_zone_base.hpp>
 #include <boost/date_time/local_time/local_time.hpp>
 #include <boost/algorithm/string.hpp>
+#include <ctime>
 #include <gutil/strings/substitute.h>
 
 #include "exprs/timestamp-functions.h"
@@ -448,6 +449,96 @@ inline void AddInterval<Years>(FunctionContext* context, int64_t interval,
   int day = date.day().as_number();
   if (day == 29 && month == boost::gregorian::Feb && !IsLeapYear(year)) day = 28;
   *datetime = ptime(boost::gregorian::date(year, month, day), datetime->time_of_day());
+}
+
+string TimestampFunctions::ShortDayName(FunctionContext* context,
+    const TimestampVal& ts) {
+  if (ts.is_null) return NULL;
+  static const string DAY_ARRAY[7] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri",
+      "Sat"};
+  IntVal dow = DayOfWeek(context, ts);
+  DCHECK_GT(dow.val, 0);
+  DCHECK_LT(dow.val, 8);
+  return DAY_ARRAY[dow.val - 1];
+}
+
+string TimestampFunctions::ShortMonthName(FunctionContext* context,
+    const TimestampVal& ts) {
+  if (ts.is_null) return NULL;
+  static const string MONTH_ARRAY[12] = {"Jan", "Feb", "Mar", "Apr", "May",
+      "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+  IntVal mth = Month(context, ts);
+  DCHECK_GT(mth.val, 0);
+  DCHECK_LT(mth.val, 13);
+  return MONTH_ARRAY[mth.val - 1];
+}
+
+StringVal TimestampFunctions::TimeOfDay(FunctionContext* context) {
+  const TimestampVal curr = Now(context);
+  if (curr.is_null) return StringVal::null();
+  const string& day = ShortDayName(context, curr);
+  const string& month = ShortMonthName(context, curr);
+  IntVal dayofmonth = DayOfMonth(context, curr);
+  IntVal hour = Hour(context, curr);
+  IntVal min = Minute(context, curr);
+  IntVal sec = Second(context, curr);
+  IntVal year = Year(context, curr);
+  time_t rawtime;
+  time(&rawtime);
+  struct tm tzone;
+  localtime_r(&rawtime, &tzone);
+  stringstream result;
+  result << day << " " << month << " " << setw(2) << setfill('0')
+         << dayofmonth.val << " " << setw(2) << setfill('0') << hour.val << ":"
+         << setw(2) << setfill('0') << min.val << ":"
+         << setw(2) << setfill('0') << sec.val << " " << year.val << " "
+         << tzone.tm_zone;
+  return AnyValUtil::FromString(context, result.str());
+}
+
+IntVal TimestampFunctions::TimestampCmp(FunctionContext* context,
+    const TimestampVal& ts1, const TimestampVal& ts2) {
+  if (ts1.is_null || ts2.is_null) return IntVal::null();
+  const TimestampValue& ts_value1 = TimestampValue::FromTimestampVal(ts1);
+  const TimestampValue& ts_value2 = TimestampValue::FromTimestampVal(ts2);
+  if (ts_value1 > ts_value2) return 1;
+  if (ts_value1 < ts_value2) return -1;
+  return 0;
+}
+
+DoubleVal TimestampFunctions::MonthsBetween(FunctionContext* context,
+    const TimestampVal& ts1, const TimestampVal& ts2) {
+  if (ts1.is_null || ts2.is_null) return DoubleVal::null();
+  const TimestampValue& ts_value1 = TimestampValue::FromTimestampVal(ts1);
+  const TimestampValue& ts_value2 = TimestampValue::FromTimestampVal(ts2);
+  if (!ts_value1.HasDate() || !ts_value2.HasDate()) return DoubleVal::null();
+  IntVal year1 = Year(context, ts1);
+  IntVal year2 = Year(context, ts2);
+  IntVal month1 = Month(context, ts1);
+  IntVal month2 = Month(context, ts2);
+  IntVal day1 = DayOfMonth(context, ts1);
+  IntVal day2 = DayOfMonth(context, ts2);
+  int days_diff = 0;
+  // If both timestamps are last days of different months they don't contribute
+  // a fractional value to the number of months, therefore there is no need to
+  // calculate difference in their days.
+  if (!(day1.val == GetLastDayOfMonth(month1.val, year1.val) &&
+      day2.val == GetLastDayOfMonth(month2.val, year2.val))) {
+    days_diff = day1.val - day2.val;
+  }
+  double months_between = (year1.val - year2.val) * 12 +
+      month1.val - month2.val + (static_cast<double>(days_diff) / 31.0);
+  return DoubleVal(months_between);
+}
+
+IntVal TimestampFunctions::IntMonthsBetween(FunctionContext* context,
+    const TimestampVal& ts1, const TimestampVal& ts2) {
+  if (ts1.is_null || ts2.is_null) return IntVal::null();
+  const TimestampValue& ts_value1 = TimestampValue::FromTimestampVal(ts1);
+  const TimestampValue& ts_value2 = TimestampValue::FromTimestampVal(ts2);
+  if (!ts_value1.HasDate() || !ts_value2.HasDate()) return IntVal::null();
+  DoubleVal months_between = MonthsBetween(context, ts1, ts2);
+  return IntVal(static_cast<int32_t>(months_between.val));
 }
 
 /// The MONTH interval is a special case. The different ways of adding a month interval

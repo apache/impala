@@ -3315,6 +3315,43 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestStringValue(
       "to_date(cast('2011-12-22 09:10:11.12345678' as timestamp))", "2011-12-22");
 
+  // Check that timeofday() does not crash or return incorrect results
+  StringValue* tod;
+  GetValue("timeofday()", TYPE_STRING, reinterpret_cast<void**>(&tod));
+
+  TestValue("timestamp_cmp('1964-05-04 15:33:45','1966-05-04 15:33:45')", TYPE_INT, -1);
+  TestValue("timestamp_cmp('1966-09-04 15:33:45','1966-05-04 15:33:45')", TYPE_INT, 1);
+  TestValue("timestamp_cmp('1966-05-04 15:33:45','1966-05-04 15:33:45')", TYPE_INT, 0);
+  TestValue("timestamp_cmp('1967-06-05','1966-05-04')", TYPE_INT, 1);
+  TestValue("timestamp_cmp('15:33:45','16:34:45')", TYPE_INT, -1);
+  TestValue("timestamp_cmp('1966-05-04','1966-05-04 15:33:45')", TYPE_INT, -1);
+
+  TestIsNull("timestamp_cmp('','1966-05-04 15:33:45')", TYPE_INT);
+  TestIsNull("timestamp_cmp('','1966-05-04 15:33:45')", TYPE_INT);
+  TestIsNull("timestamp_cmp(NULL,'1966-05-04 15:33:45')", TYPE_INT);
+  // Invalid timestamp test case
+  TestIsNull("timestamp_cmp('1966-5-4 5:33:45','1966-5-4 15:33:45')", TYPE_INT);
+
+  TestValue("int_months_between('1967-07-19','1966-06-04')", TYPE_INT, 13);
+  TestValue("int_months_between('1966-06-04 16:34:45','1967-07-19 15:33:46')",
+      TYPE_INT, -13);
+  TestValue("int_months_between('1967-07-19','1967-07-19')", TYPE_INT, 0);
+  TestValue("int_months_between('2015-07-19','2015-08-18')", TYPE_INT, 0);
+
+  TestIsNull("int_months_between('23:33:45','15:33:45')", TYPE_INT);
+  TestIsNull("int_months_between('','1966-06-04')", TYPE_INT);
+
+  TestValue("months_between('1967-07-19','1966-06-04')", TYPE_DOUBLE,
+      13.48387096774194);
+  TestValue("months_between('1966-06-04 16:34:45','1967-07-19 15:33:46')",
+      TYPE_DOUBLE, -13.48387096774194);
+  TestValue("months_between('1967-07-19','1967-07-19')", TYPE_DOUBLE, 0);
+  TestValue("months_between('2015-02-28','2015-05-31')", TYPE_DOUBLE, -3);
+  TestValue("months_between('2012-02-29','2012-01-31')", TYPE_DOUBLE, 1);
+
+  TestIsNull("months_between('23:33:45','15:33:45')", TYPE_DOUBLE);
+  TestIsNull("months_between('','1966-06-04')", TYPE_DOUBLE);
+
   TestValue("datediff(cast('2011-12-22 09:10:11.12345678' as timestamp), \
       cast('2012-12-22' as timestamp))", TYPE_INT, -366);
   TestValue("datediff(cast('2012-12-22' as timestamp), \

@@ -221,6 +221,13 @@ visible_functions = [
    "impala::TimestampFunctions::FromUtc"],
   [['to_utc_timestamp'], 'TIMESTAMP', ['TIMESTAMP', 'STRING'],
    "impala::TimestampFunctions::ToUtc"],
+  [['timeofday'], 'STRING', [],"impala::TimestampFunctions::TimeOfDay"],
+  [['timestamp_cmp'], 'INT', ['TIMESTAMP', 'TIMESTAMP'],
+   "impala::TimestampFunctions::TimestampCmp"],
+  [['int_months_between'], 'INT', ['TIMESTAMP', 'TIMESTAMP'],
+   "impala::TimestampFunctions::IntMonthsBetween"],
+  [['months_between'], 'DOUBLE', ['TIMESTAMP', 'TIMESTAMP'],
+   "impala::TimestampFunctions::MonthsBetween"],
 
   # Math builtin functions
   [['pi'], 'DOUBLE', [], 'impala::MathFunctions::Pi'],
