@@ -32,7 +32,8 @@ from tests.util.test_file_parser import *
 from tests.util.thrift_util import create_transport
 from tests.common.base_test_suite import BaseTestSuite
 from tests.performance.query import Query
-from tests.performance.query_executor import JdbcQueryExecConfig, execute_using_jdbc
+from tests.performance.query_executor import JdbcQueryExecConfig
+from tests.performance.query_exec_functions import execute_using_jdbc
 from tests.util.hdfs_util import HdfsConfig, get_hdfs_client, get_hdfs_client_from_conf
 
 # Imports required for Hive Metastore Client

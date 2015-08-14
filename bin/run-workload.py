@@ -59,13 +59,9 @@ parser.add_option("--impalads", dest="impalads", default="localhost:21000",
                   "workload against."))
 parser.add_option("--exec_options", dest="exec_options", default=str(),
                   help="Runquery exec option string.")
-parser.add_option("--compare_with_hive", dest="compare_with_hive", action="store_true",
-                  default= False, help="Run all queries using Hive as well as Impala")
 parser.add_option("--results_json_file", dest="results_json_file",
                   default=os.environ['IMPALA_HOME'] + "/benchmark_results.json",
                   help="The output file where benchmark results are saved")
-parser.add_option("--hive_cmd", dest="hive_cmd", default="hive -e",
-                  help="The command to use for executing hive queries")
 parser.add_option("-i", "--query_iterations", type="int", dest="query_iterations",
                   default=1, help="Number of times to run each query within a workload")
 parser.add_option("-x", "--workload_iterations", type="int", dest="workload_iterations",
@@ -78,8 +74,6 @@ parser.add_option("--table_formats", dest="table_formats", default=str(),
                   help=("Override the default test vectors and run using only the"
                         " specified table formats. Ex. --table_formats=seq/snap/block"
                         ",text/none"))
-parser.add_option("--skip_impala", dest="skip_impala", action="store_true",
-                  default= False, help="If set, queries will only run against Hive.")
 parser.add_option("--shuffle_query_exec_order", dest="shuffle_queries",
                   action="store_true", default=False, help=("Randomizes the order "
                     "of query execution. Useful when the execution scope is a workload"))
@@ -201,13 +195,19 @@ def _validate_options():
   if options.use_kerberos: import sasl
 
   # Only two client types are allowed (for now)
-  assert options.client_type in ['beeswax', 'jdbc'], \
-      'Invalid Client Type %s' % options.client_type
+  if not options.client_type in ['beeswax', 'jdbc']:
+    raise RuntimeError('Invalid Client Type %s' % options.client_type)
 
   # Check for duplicate workload/scale_factor combinations
   workloads = split_and_strip(options.workloads)
-  assert len(set(workloads)) == len(workloads),\
-    "Duplicate workload/scale factor combinations are not allowed"
+  if not len(set(workloads)) == len(workloads):
+    raise RuntimeError("Duplicate workload/scale factor combinations are not allowed")
+
+  # The list of Impalads must be provided as a comma separated list of either host:port
+  # combination or just host.
+  for impalad in split_and_strip(options.impalads):
+    if len(impalad.split(":")) not in [1,2]:
+      raise RuntimeError("Impalads must be of the form host:port or host.")
 
 if __name__ == "__main__":
   # Check for badly formed user options.

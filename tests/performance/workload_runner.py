@@ -18,11 +18,11 @@ from tests.common.test_dimensions import (TableFormatInfo,
     get_dataset_from_workload)
 from tests.performance.query import Query, QueryResult
 from tests.performance.query_executor import (BeeswaxQueryExecConfig,
-    HiveQueryExecConfig,
     JdbcQueryExecConfig,
+     QueryExecutor)
+from tests.performance.query_exec_functions import (
     execute_using_impala_beeswax,
-    execute_using_jdbc,
-    execute_using_hive, QueryExecutor)
+    execute_using_jdbc)
 from tests.performance.scheduler import Scheduler
 
 # Setup Logging
@@ -91,11 +91,6 @@ class WorkloadRunner(object):
 
   def _create_executor(self, executor_name):
     query_options = {
-        'hive': lambda: (execute_using_hive,
-          HiveQueryExecConfig(self.config.query_iterations,
-          hive_cmd=self.config.hive_cmd,
-          plugin_runner=self.config.plugin_runner
-          )),
         'impala_beeswax': lambda: (execute_using_impala_beeswax,
           BeeswaxQueryExecConfig(plugin_runner=self.config.plugin_runner,
           exec_options=self.config.exec_options,
