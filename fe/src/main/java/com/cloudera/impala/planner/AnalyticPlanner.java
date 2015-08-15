@@ -68,26 +68,12 @@ import com.google.common.collect.Lists;
 public class AnalyticPlanner {
   private final static Logger LOG = LoggerFactory.getLogger(AnalyticPlanner.class);
 
-  // List of tuple ids materialized by the originating SelectStmt (i.e., what is returned
-  // by SelectStmt.getMaterializedTupleIds()). During analysis, conjuncts have been
-  // registered against these tuples, so we need them to find unassigned conjuncts during
-  // plan generation.
-  // If the size of this list is 1 it means the stmt has a sort after the analytics.
-  // Otherwise, the last tuple id must be analyticInfo_.getOutputTupleDesc().
-  private final List<TupleId> stmtTupleIds_;
-
   private final AnalyticInfo analyticInfo_;
   private final Analyzer analyzer_;
   private final PlannerContext ctx_;
 
-  public AnalyticPlanner(List<TupleId> stmtTupleIds,
-      AnalyticInfo analyticInfo, Analyzer analyzer,
+  public AnalyticPlanner(AnalyticInfo analyticInfo, Analyzer analyzer,
       PlannerContext ctx) {
-    Preconditions.checkState(!stmtTupleIds.isEmpty());
-    TupleId lastStmtTupleId = stmtTupleIds.get(stmtTupleIds.size() - 1);
-    Preconditions.checkState(stmtTupleIds.size() == 1 ||
-        lastStmtTupleId.equals(analyticInfo.getOutputTupleId()));
-    stmtTupleIds_ = stmtTupleIds;
     analyticInfo_ = analyticInfo;
     analyzer_ = analyzer;
     ctx_ = ctx;
@@ -421,12 +407,11 @@ public class AnalyticPlanner {
         LOG.trace("orderByEq: " + orderByEq.debugString());
       }
 
-      root = new AnalyticEvalNode(ctx_.getNextNodeId(), root, stmtTupleIds_,
+      root = new AnalyticEvalNode(ctx_.getNextNodeId(), root,
           windowGroup.analyticFnCalls, windowGroup.partitionByExprs,
-          windowGroup.orderByElements,
-          windowGroup.window, analyticInfo_.getOutputTupleDesc(),
-          windowGroup.physicalIntermediateTuple,
-          windowGroup.physicalOutputTuple, windowGroup.logicalToPhysicalSmap,
+          windowGroup.orderByElements, windowGroup.window,
+          windowGroup.physicalIntermediateTuple, windowGroup.physicalOutputTuple,
+          windowGroup.logicalToPhysicalSmap,
           partitionByEq, orderByEq, bufferedTupleDesc);
       root.init(analyzer_);
     }

@@ -202,10 +202,8 @@ public class SingleNodePlanner {
       // insert possible AnalyticEvalNode before SortNode
       if (((SelectStmt) stmt).getAnalyticInfo() != null) {
         AnalyticInfo analyticInfo = selectStmt.getAnalyticInfo();
-        ArrayList<TupleId> stmtTupleIds = Lists.newArrayList();
-        stmt.getMaterializedTupleIds(stmtTupleIds);
         AnalyticPlanner analyticPlanner =
-            new AnalyticPlanner(stmtTupleIds, analyticInfo, analyzer, ctx_);
+            new AnalyticPlanner(analyticInfo, analyzer, ctx_);
         List<Expr> inputPartitionExprs = Lists.newArrayList();
         AggregateInfo aggInfo = selectStmt.getAggInfo();
         root = analyticPlanner.createSingleNodePlan(root,

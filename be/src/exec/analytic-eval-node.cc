@@ -95,6 +95,7 @@ AnalyticEvalNode::AnalyticEvalNode(ObjectPool* pool, const TPlanNode& tnode,
 
 Status AnalyticEvalNode::Init(const TPlanNode& tnode) {
   RETURN_IF_ERROR(ExecNode::Init(tnode));
+  DCHECK_EQ(conjunct_ctxs_.size(), 0);
   const TAnalyticNode& analytic_node = tnode.analytic_node;
   bool has_lead_fn = false;
   for (int i = 0; i < analytic_node.analytic_functions.size(); ++i) {
@@ -654,9 +655,6 @@ Status AnalyticEvalNode::GetNextOutputBatch(RuntimeState* state, RowBatch* outpu
   }
 
   const int num_child_tuples = child(0)->row_desc().tuple_descriptors().size();
-  ExprContext** ctxs = &conjunct_ctxs_[0];
-  int num_ctxs = conjunct_ctxs_.size();
-
   RowBatch input_batch(child(0)->row_desc(), output_batch->capacity(), mem_tracker());
   int64_t stream_idx = input_stream_->rows_returned();
   RETURN_IF_ERROR(input_stream_->GetNext(&input_batch, eos));
@@ -671,11 +669,8 @@ Status AnalyticEvalNode::GetNextOutputBatch(RuntimeState* state, RowBatch* outpu
     TupleRow* dest = output_batch->GetRow(output_batch->AddRow());
     input_batch.CopyRow(input_batch.GetRow(i), dest);
     dest->SetTuple(num_child_tuples, result_tuples_.front().second);
-
-    if (ExecNode::EvalConjuncts(ctxs, num_ctxs, dest)) {
-      output_batch->CommitLastRow();
-      ++num_rows_returned_;
-    }
+    output_batch->CommitLastRow();
+    ++num_rows_returned_;
 
     // Remove the head of result_tuples_ if all rows using that evaluated tuple
     // have been returned.
