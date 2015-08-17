@@ -150,7 +150,10 @@ Status KuduScanner::GetNextScanner()  {
     scanner_->AddConjunctPredicate(predicate->Clone());
   }
 
-  KUDU_RETURN_IF_ERROR(scanner_->Open(), "Unable to open scanner");
+  {
+    SCOPED_TIMER(scan_node_->kudu_read_timer_);
+    KUDU_RETURN_IF_ERROR(scanner_->Open(), "Unable to open scanner");
+  }
   return Status::OK();
 }
 
