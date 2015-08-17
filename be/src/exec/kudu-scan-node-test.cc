@@ -78,8 +78,8 @@ class KuduScanNodeTest : public testing::Test {
     runtime_state_.set_desc_tbl(desc_tbl_);
   }
 
-  void SetUpScanner(KuduScanNode* scan_node, vector<TScanRangeParams>* params) {
-    scan_node->SetScanRanges(*params);
+  void SetUpScanner(KuduScanNode* scan_node, const vector<TScanRangeParams>& params) {
+    scan_node->SetScanRanges(params);
     ASSERT_OK(scan_node->Prepare(&runtime_state_));
     ASSERT_OK(scan_node->Open(&runtime_state_));
   }
@@ -132,21 +132,14 @@ class KuduScanNodeTest : public testing::Test {
   static const int NO_LIMIT = -1;
   static const int DEFAULT_ROWS_PER_BATCH = 1024;
 
-  void ScanAndVerify(int first_row, int expected_num_rows, int expected_num_batches,
-      int num_cols_to_materialize, int num_notnull_cols = 3, int limit = NO_LIMIT,
-      bool verify = true) {
+  void ScanAndVerify(const vector<TScanRangeParams>& params, int first_row,
+      int expected_num_rows, int expected_num_batches, int num_cols_to_materialize,
+      int num_notnull_cols = 3, int limit = NO_LIMIT, bool verify = true) {
     BuildRuntimeStateForScans(num_cols_to_materialize);
     if (limit != NO_LIMIT) kudu_node_.__set_limit(limit);
 
     KuduScanNode scanner(&obj_pool_, kudu_node_, *desc_tbl_);
-
-    // TODO test more than one range. This was tested but left out of the current
-    // version as Kudu is currently changing the way it addresses start/stop keys (stop
-    // key is now inclusive and will become exclusive).
-    vector<TScanRangeParams> params;
-    AddScanRange("", "", &params);
-
-    SetUpScanner(&scanner, &params);
+    SetUpScanner(&scanner, params);
 
     int num_rows = 0;
     int num_batches = 0;
@@ -175,12 +168,33 @@ class KuduScanNodeTest : public testing::Test {
     ASSERT_EQ(expected_num_batches, num_batches);
   }
 
-  void AddScanRange(const string& start_key, const string& stop_key,
+  // Adds a new TScanRangeParams to 'params'.
+  // If start_key and/or stop_key are '-1' an empty key string is passed
+  // instead.
+  void AddScanRange(int start_key, int stop_key,
       vector<TScanRangeParams>* params) {
 
+    string encoded_start_key;
+    if (start_key != -1) {
+      gscoped_ptr<KuduPartialRow> start_key_row(kudu_test_helper_.test_schema().NewRow());
+      start_key_row->SetInt32(0, start_key);
+      start_key_row->EncodeRowKey(&encoded_start_key);
+    } else {
+      encoded_start_key = "";
+    }
+
+    string encoded_stop_key;
+    if (stop_key != -1) {
+      gscoped_ptr<KuduPartialRow> stop_key_row(kudu_test_helper_.test_schema().NewRow());
+      stop_key_row->SetInt32(0, stop_key);
+      stop_key_row->EncodeRowKey(&encoded_stop_key);
+    } else {
+      encoded_stop_key = "";
+    }
+
     TKuduKeyRange kudu_key_range;
-    kudu_key_range.__set_startKey(start_key);
-    kudu_key_range.__set_stopKey(stop_key);
+    kudu_key_range.__set_startKey(encoded_start_key);
+    kudu_key_range.__set_stopKey(encoded_stop_key);
 
     TScanRange scan_range;
     scan_range.__set_kudu_key_range(kudu_key_range);
@@ -218,10 +232,17 @@ TEST_F(KuduScanNodeTest, TestScanNode) {
                                    kudu_test_helper_.table().get(),
                                    NUM_ROWS);
 
+
+  // Test having multiple scan ranges.
+  int mid_key = FIRST_ROW + (NUM_ROWS / 2);
+  vector<TScanRangeParams> params;
+  AddScanRange(FIRST_ROW, mid_key, &params);
+  AddScanRange(mid_key, NUM_ROWS, &params);
+
   // Test materializing all, some, or none of the slots.
-  ScanAndVerify(FIRST_ROW, NUM_ROWS, NUM_BATCHES, 3);
-  ScanAndVerify(FIRST_ROW, NUM_ROWS, NUM_BATCHES, 2);
-  ScanAndVerify(FIRST_ROW, NUM_ROWS, NUM_BATCHES, 0);
+  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, NUM_BATCHES, 3);
+  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, NUM_BATCHES, 2);
+  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, NUM_BATCHES, 0);
 }
 
 TEST_F(KuduScanNodeTest, TestScanNullColValues) {
@@ -236,10 +257,13 @@ TEST_F(KuduScanNodeTest, TestScanNullColValues) {
                                    kudu_test_helper_.table().get(),
                                    NUM_ROWS, 0, 1);
 
+  vector<TScanRangeParams> params;
+  AddScanRange(-1, -1, &params);
+
   // Try scanning including and not including the null columns.
-  ScanAndVerify(FIRST_ROW, NUM_ROWS, NUM_BATCHES, 3, 1);
-  ScanAndVerify(FIRST_ROW, NUM_ROWS, NUM_BATCHES, 2, 1);
-  ScanAndVerify(FIRST_ROW, NUM_ROWS, NUM_BATCHES, 1, 1);
+  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, NUM_BATCHES, 3, 1);
+  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, NUM_BATCHES, 2, 1);
+  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, NUM_BATCHES, 1, 1);
 }
 
 namespace {
@@ -315,13 +339,16 @@ TEST_F(KuduScanNodeTest, TestPushIntGEPredicateOnKey) {
 
   const int64_t PREDICATE_VALUE = 500;
 
-  // Now test having a pushable predicate on the key.
+  // Test having a pushable predicate on the key (key >= PREDICATE_VALUE).
   TExpr conjunct;
   AddExpressionNodesToExpression(&conjunct, SLOT_ID, KuduScanNode::GE_FN,
       TExprNodeType::INT_LITERAL, &PREDICATE_VALUE);
   pushable_conjuncts_.push_back(conjunct);
 
-  ScanAndVerify(FIRST_ROW, EXPECTED_NUM_ROWS, NUM_BATCHES, NUM_BATCHES, MAT_COLS);
+  vector<TScanRangeParams> params;
+  AddScanRange(-1, -1, &params);
+
+  ScanAndVerify(params, FIRST_ROW, EXPECTED_NUM_ROWS, NUM_BATCHES, NUM_BATCHES, MAT_COLS);
 }
 
 // Test a == predicate on the 2nd column.
@@ -349,7 +376,10 @@ TEST_F(KuduScanNodeTest, TestPushIntEQPredicateOn2ndColumn) {
       TExprNodeType::INT_LITERAL, &PREDICATE_VAL);
   pushable_conjuncts_.push_back(conjunct);
 
-  ScanAndVerify(FIRST_ROW, EXPECTED_NUM_ROWS, NUM_BATCHES, NUM_BATCHES, MAT_COLS);
+  vector<TScanRangeParams> params;
+  AddScanRange(-1, -1, &params);
+
+  ScanAndVerify(params, FIRST_ROW, EXPECTED_NUM_ROWS, NUM_BATCHES, NUM_BATCHES, MAT_COLS);
 }
 
 TEST_F(KuduScanNodeTest, TestPushStringLEPredicateOn3rdColumn) {
@@ -380,8 +410,11 @@ TEST_F(KuduScanNodeTest, TestPushStringLEPredicateOn3rdColumn) {
       TExprNodeType::STRING_LITERAL, &PREDICATE_VAL);
   pushable_conjuncts_.push_back(conjunct);
 
-  ScanAndVerify(FIRST_ROW, EXPECTED_NUM_ROWS, NUM_BATCHES, MAT_COLS, MAT_COLS, NO_LIMIT,
-                VERIFY_ROWS);
+  vector<TScanRangeParams> params;
+  AddScanRange(-1, -1, &params);
+
+  ScanAndVerify(params, FIRST_ROW, EXPECTED_NUM_ROWS, NUM_BATCHES, MAT_COLS, MAT_COLS,
+                NO_LIMIT, VERIFY_ROWS);
 }
 
 TEST_F(KuduScanNodeTest, TestPushTwoPredicatesOnNonMaterializedColumn) {
@@ -416,7 +449,10 @@ TEST_F(KuduScanNodeTest, TestPushTwoPredicatesOnNonMaterializedColumn) {
   pushable_conjuncts_.push_back(conjunct_low);
   pushable_conjuncts_.push_back(conjunct_high);
 
-  ScanAndVerify(FIRST_ROW, EXPECTED_NUM_ROWS, NUM_BATCHES, MAT_COLS);
+  vector<TScanRangeParams> params;
+  AddScanRange(-1, -1, &params);
+
+  ScanAndVerify(params, FIRST_ROW, EXPECTED_NUM_ROWS, NUM_BATCHES, MAT_COLS);
 }
 
 // Test for a bug where we would mishandle getting an empty string from
@@ -436,8 +472,8 @@ TEST_F(KuduScanNodeTest, TestScanEmptyString) {
   BuildRuntimeStateForScans(3);
   KuduScanNode scanner(&obj_pool_, kudu_node_, *desc_tbl_);
   vector<TScanRangeParams> params;
-  AddScanRange("", "", &params);
-  SetUpScanner(&scanner, &params);
+  AddScanRange(-1, -1, &params);
+  SetUpScanner(&scanner, params);
   bool eos = false;
   RowBatch* batch = obj_pool_.Add(new RowBatch(*row_desc_, 10, &mem_tracker_));
   ASSERT_OK(scanner.GetNext(&runtime_state_, batch, &eos));
@@ -456,13 +492,16 @@ TEST_F(KuduScanNodeTest, TestLimitsAreEnforced) {
                                    kudu_test_helper_.table().get(),
                                    NUM_ROWS);
 
+  vector<TScanRangeParams> params;
+  AddScanRange(-1, -1, &params);
+
   // Try scanning but limit the number of returned rows to several different values.
   int limit_rows_to = 0;
-  ScanAndVerify(FIRST_ROW, limit_rows_to, 0, 3, 3, limit_rows_to);
+  ScanAndVerify(params, FIRST_ROW, limit_rows_to, 0, 3, 3, limit_rows_to);
   limit_rows_to = 1;
-  ScanAndVerify(FIRST_ROW, limit_rows_to, 1, 3, 3, limit_rows_to);
+  ScanAndVerify(params, FIRST_ROW, limit_rows_to, 1, 3, 3, limit_rows_to);
   limit_rows_to = 2000;
-  ScanAndVerify(FIRST_ROW, 1000, 1, 3, 3, limit_rows_to);
+  ScanAndVerify(params, FIRST_ROW, 1000, 1, 3, 3, limit_rows_to);
 }
 
 } // namespace impala

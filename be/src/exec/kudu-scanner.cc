@@ -147,7 +147,7 @@ Status KuduScanner::GetNextScanner()  {
       kudu::client::KuduScanner::READ_AT_SNAPSHOT), "Unable to set snapshot read mode.");
 
   BOOST_FOREACH(KuduPredicate* predicate, scan_node_->kudu_predicates_) {
-    scanner_->AddConjunctPredicate(predicate);
+    scanner_->AddConjunctPredicate(predicate->Clone());
   }
 
   KUDU_RETURN_IF_ERROR(scanner_->Open(), "Unable to open scanner");

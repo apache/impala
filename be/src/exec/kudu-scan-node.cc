@@ -80,6 +80,7 @@ KuduScanNode::KuduScanNode(ObjectPool* pool, const TPlanNode& tnode,
 }
 
 KuduScanNode::~KuduScanNode() {
+  STLDeleteElements(&kudu_predicates_);
 }
 
 Status KuduScanNode::Prepare(RuntimeState* state) {
