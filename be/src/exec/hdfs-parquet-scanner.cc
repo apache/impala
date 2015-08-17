@@ -1182,6 +1182,8 @@ Status HdfsParquetScanner::BaseScalarColumnReader::ReadDataPage() {
     }
 
     // Read Data Page
+    // TODO: when we start using page statistics, we will need to ignore certain corrupt
+    // statistics. See IMPALA-2208 and PARQUET-251.
     if (!stream_->ReadBytes(data_size, &data_, &status)) return status;
     num_buffered_values_ = current_page_header_.data_page_header.num_values;
     num_values_read_ += num_buffered_values_;
