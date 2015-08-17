@@ -56,12 +56,7 @@ class ResultRow(object):
     self.row_string = row_string
     # If applicable, pre-compile the regex that actual row values (row_string)
     # should be matched against instead of self.columns.
-    self.regex = None
-    if row_string and ROW_REGEX_PREFIX.match(row_string):
-      pattern = row_string[len(ROW_REGEX_PREFIX_PATTERN):].strip()
-      self.regex = re.compile(pattern)
-      if self.regex is None:
-        assert False, "Invalid row regex specification: %s" % self.row_string
+    self.regex = try_compile_regex(row_string)
 
   def __parse_row(self, row_string, column_types, column_labels):
     """Parses a row string and build a list of ResultColumn objects"""
@@ -122,6 +117,17 @@ class ResultRow(object):
 
   def __str__(self):
     return ','.join(['%s' % col for col in self.columns])
+
+# Check if the string is a row regex, and if so compile it.
+# Return None if the row does not have a regex prefix.
+def try_compile_regex(row_string):
+  if row_string and ROW_REGEX_PREFIX.match(row_string):
+    pattern = row_string[len(ROW_REGEX_PREFIX_PATTERN):].strip()
+    regex = re.compile(pattern)
+    if regex is None:
+      assert False, "Invalid row regex specification: %s" % self.row_string
+    return regex
+  return None
 
 # If comparing against a float or double, don't do a strict comparison
 # See: http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
@@ -402,3 +408,37 @@ def parse_result_rows(exec_result):
         new_cols.append(cols[i])
     result.append(','.join(new_cols))
   return result
+
+def verify_runtime_profile(expected, actual):
+  """
+  Check that lines matching all of the expected runtime profile entries are present
+  in the actual text runtime profile. The check passes if, for each of the expected
+  rows, at least one matching row is present in the actual runtime profile. Rows
+  with the "row_regex:" prefix are treated as regular expressions.
+  """
+  expected_lines = remove_comments(expected).splitlines()
+  matched = [False] * len(expected_lines)
+  expected_regexes = []
+  for expected_line in expected_lines:
+    expected_regexes.append(try_compile_regex(expected_line))
+
+  # Check the expected and actual rows pairwise.
+  for line in actual.splitlines():
+    for i in xrange(len(expected_lines)):
+      if matched[i]: continue
+      if expected_regexes[i] is not None:
+        match = expected_regexes[i].match(line)
+      else:
+        match = expected_lines[i].strip() == line.strip()
+      if match:
+        matched[i] = True
+        break
+
+  unmatched_lines = []
+  for i in xrange(len(expected_lines)):
+    if not matched[i]:
+      unmatched_lines.append(expected_lines[i])
+  assert len(unmatched_lines) == 0, ("Did not find matches for lines in runtime profile:"
+      "\nEXPECTED LINES:\n%s\n\nACTUAL PROFILE:\n%s" % ('\n'.join(unmatched_lines),
+        actual))
+

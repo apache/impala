@@ -14,6 +14,7 @@
 
 #include "exec/partitioned-aggregation-node.h"
 
+#include <algorithm>
 #include <math.h>
 #include <set>
 #include <sstream>
@@ -54,6 +55,47 @@ namespace impala {
 const char* PartitionedAggregationNode::LLVM_CLASS_NAME =
     "class.impala::PartitionedAggregationNode";
 
+/// The minimum reduction factor (input rows divided by output rows) to grow hash tables
+/// in a streaming preaggregation, given that the hash tables are currently the given
+/// size or above. The sizes roughly correspond to hash table sizes where the bucket
+/// arrays will fit in  a cache level. Intuitively, we don't want the working set of the
+/// aggregation to expand to the next level of cache unless we're reducing the input
+/// enough to outweigh the increased memory latency we'll incur for each hash table
+/// lookup.
+///
+/// Note that the current reduction achieved is not always a good estimate of the
+/// final reduction. It may be biased either way depending on the ordering of the
+/// input. If the input order is random, we will underestimate the final reduction
+/// factor because the probability of a row having the same key as a previous row
+/// increases as more input is processed.  If the input order is correlated with the
+/// key, skew may bias the estimate. If high cardinality keys appear first, we
+/// may overestimate and if low cardinality keys appear first, we underestimate.
+/// To estimate the eventual reduction achieved, we estimate the final reduction
+/// using the planner's estimated input cardinality and the assumption that input
+/// is in a random order. This means that we assume that the reduction factor will
+/// increase over time.
+struct StreamingHtMinReductionEntry {
+  // Use 'streaming_ht_min_reduction' if the total size of hash table bucket directories in
+  // bytes is greater than this threshold.
+  int min_ht_mem;
+  // The minimum reduction factor to expand the hash tables.
+  double streaming_ht_min_reduction;
+};
+
+// TODO: experimentally tune these values and also programmatically get the cache size
+// of the machine that we're running on.
+static const StreamingHtMinReductionEntry STREAMING_HT_MIN_REDUCTION[] = {
+  // Expand up to L2 cache always.
+  {0, 0.0},
+  // Expand into L3 cache if we look like we're getting some reduction.
+  {256 * 1024, 1.1},
+  // Expand into main memory if we're getting a significant reduction.
+  {2 * 1024 * 1024, 2.0},
+};
+
+static const int STREAMING_HT_MIN_REDUCTION_SIZE =
+    sizeof(STREAMING_HT_MIN_REDUCTION) / sizeof(STREAMING_HT_MIN_REDUCTION[0]);
+
 PartitionedAggregationNode::PartitionedAggregationNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
@@ -62,10 +104,12 @@ PartitionedAggregationNode::PartitionedAggregationNode(
     output_tuple_id_(tnode.agg_node.output_tuple_id),
     output_tuple_desc_(NULL),
     needs_finalize_(tnode.agg_node.need_finalize),
+    is_streaming_preagg_(tnode.agg_node.use_streaming_preaggregation),
     needs_serialize_(false),
     block_mgr_client_(NULL),
     output_partition_(NULL),
     process_row_batch_fn_(NULL),
+    process_batch_streaming_fn_(NULL),
     build_timer_(NULL),
     ht_resize_timer_(NULL),
     get_results_timer_(NULL),
@@ -74,10 +118,24 @@ PartitionedAggregationNode::PartitionedAggregationNode(
     max_partition_level_(NULL),
     num_row_repartitioned_(NULL),
     num_repartitions_(NULL),
+    num_spilled_partitions_(NULL),
+    largest_partition_percent_(NULL),
+    streaming_timer_(NULL),
+    num_passthrough_rows_(NULL),
+    preagg_estimated_reduction_(NULL),
+    preagg_streaming_ht_min_reduction_(NULL),
+    estimated_input_cardinality_(tnode.agg_node.estimated_input_cardinality),
     singleton_output_tuple_(NULL),
     singleton_output_tuple_returned_(true),
+    partition_eos_(false),
+    child_eos_(false),
     partition_pool_(new ObjectPool()) {
   DCHECK_EQ(PARTITION_FANOUT, 1 << NUM_PARTITIONING_BITS);
+  if (is_streaming_preagg_) {
+    DCHECK(conjunct_ctxs_.empty()) << "Preaggs have no conjuncts";
+    DCHECK(!tnode.agg_node.grouping_exprs.empty()) << "Streaming preaggs do grouping";
+    DCHECK(limit_ == -1) << "Preaggs have no limits";
+  }
 }
 
 Status PartitionedAggregationNode::Init(const TPlanNode& tnode) {
@@ -110,23 +168,34 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   mem_pool_.reset(new MemPool(mem_tracker()));
   agg_fn_pool_.reset(new MemPool(expr_mem_tracker()));
 
-  build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
   ht_resize_timer_ = ADD_TIMER(runtime_profile(), "HTResizeTime");
   get_results_timer_ = ADD_TIMER(runtime_profile(), "GetResultsTime");
   num_hash_buckets_ =
       ADD_COUNTER(runtime_profile(), "HashBuckets", TUnit::UNIT);
   partitions_created_ =
       ADD_COUNTER(runtime_profile(), "PartitionsCreated", TUnit::UNIT);
-  max_partition_level_ = runtime_profile()->AddHighWaterMarkCounter(
-      "MaxPartitionLevel", TUnit::UNIT);
-  num_row_repartitioned_ =
-      ADD_COUNTER(runtime_profile(), "RowsRepartitioned", TUnit::UNIT);
-  num_repartitions_ =
-      ADD_COUNTER(runtime_profile(), "NumRepartitions", TUnit::UNIT);
-  num_spilled_partitions_ =
-      ADD_COUNTER(runtime_profile(), "SpilledPartitions", TUnit::UNIT);
   largest_partition_percent_ = runtime_profile()->AddHighWaterMarkCounter(
       "LargestPartitionPercent", TUnit::UNIT);
+  if (is_streaming_preagg_) {
+    AddRuntimeExecOption("Streaming Preaggregation");
+    streaming_timer_ = ADD_TIMER(runtime_profile(), "StreamingTime");
+    num_passthrough_rows_ =
+        ADD_COUNTER(runtime_profile(), "RowsPassedThrough", TUnit::UNIT);
+    preagg_estimated_reduction_ = ADD_COUNTER(
+        runtime_profile(), "ReductionFactorEstimate", TUnit::DOUBLE_VALUE);
+    preagg_streaming_ht_min_reduction_ = ADD_COUNTER(
+        runtime_profile(), "ReductionFactorThresholdToExpand", TUnit::DOUBLE_VALUE);
+  } else {
+    build_timer_ = ADD_TIMER(runtime_profile(), "BuildTime");
+    num_row_repartitioned_ =
+        ADD_COUNTER(runtime_profile(), "RowsRepartitioned", TUnit::UNIT);
+    num_repartitions_ =
+        ADD_COUNTER(runtime_profile(), "NumRepartitions", TUnit::UNIT);
+    num_spilled_partitions_ =
+        ADD_COUNTER(runtime_profile(), "SpilledPartitions", TUnit::UNIT);
+    max_partition_level_ = runtime_profile()->AddHighWaterMarkCounter(
+        "MaxPartitionLevel", TUnit::UNIT);
+  }
 
   intermediate_tuple_desc_ =
       state->desc_tbl().GetTupleDescriptor(intermediate_tuple_id_);
@@ -175,8 +244,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   }
 
   if (grouping_expr_ctxs_.empty()) {
-    // Create single output tuple now; we need to output something
-    // even if our input is empty.
+    // Create single output tuple; we need to output something even if our input is empty.
     singleton_output_tuple_ =
         ConstructSingletonOutputTuple(agg_fn_ctxs_, mem_pool_.get());
     // Check for failures during AggFnEvaluator::Init().
@@ -193,7 +261,7 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
 
   // TODO: Is there a need to create the stream here? If memory reservations work we may
   // be able to create this stream lazily and only whenever we need to spill.
-  if (needs_serialize_ && block_mgr_client_ != NULL) {
+  if (!is_streaming_preagg_ && needs_serialize_ && block_mgr_client_ != NULL) {
     serialize_stream_.reset(new BufferedTupleStream(state, *intermediate_row_desc_,
         state->block_mgr(), block_mgr_client_, false /* use_initial_small_buffers */,
         false /* read_write */));
@@ -206,12 +274,22 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
   if (state->codegen_enabled()) {
     LlvmCodeGen* codegen;
     RETURN_IF_ERROR(state->GetCodegen(&codegen));
-    Function* codegen_process_row_batch_fn;
-    codegen_status = CodegenProcessBatch(&codegen_process_row_batch_fn);
-    if (codegen_status.ok()) {
-      codegen->AddFunctionToJit(codegen_process_row_batch_fn,
-          reinterpret_cast<void**>(&process_row_batch_fn_));
-      codegen_enabled = true;
+    if (is_streaming_preagg_) {
+      Function* codegen_process_batch_streaming_fn;
+      codegen_status = CodegenProcessBatchStreaming(&codegen_process_batch_streaming_fn);
+      if (codegen_status.ok()) {
+        codegen->AddFunctionToJit(codegen_process_batch_streaming_fn,
+            reinterpret_cast<void**>(&process_batch_streaming_fn_));
+        codegen_enabled = true;
+      }
+    } else {
+      Function* codegen_process_row_batch_fn;
+      codegen_status = CodegenProcessBatch(&codegen_process_row_batch_fn);
+      if (codegen_status.ok()) {
+        codegen->AddFunctionToJit(codegen_process_row_batch_fn,
+            reinterpret_cast<void**>(&process_row_batch_fn_));
+        codegen_enabled = true;
+      }
     }
   }
   AddCodegenExecOption(codegen_enabled, codegen_status);
@@ -230,9 +308,13 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
     RETURN_IF_ERROR(aggregate_evaluators_[i]->Open(state, agg_fn_ctxs_[i]));
   }
 
-  // Read all the rows from the child and process them.
   RETURN_IF_ERROR(children_[0]->Open(state));
-  RowBatch batch(children_[0]->row_desc(), state->batch_size(), mem_tracker());
+
+  // Streaming preaggregations do all processing in GetNext().
+  if (is_streaming_preagg_) return Status::OK();
+
+  RowBatch batch(child(0)->row_desc(), state->batch_size(), mem_tracker());
+  // Read all the rows from the child and process them.
   bool eos = false;
   do {
     RETURN_IF_CANCELLED(state);
@@ -258,13 +340,15 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
     batch.Reset();
   } while (!eos);
 
-  // Unless we are inside a subplan expecting to call Open()/GetNext() on the child
-  // again, the child can be closed at this point. We have consumed all of the input
-  // from the child and transfered ownership of the resources we need.
+  // The child can be closed at this point in most cases because we have consumed all of
+  // the input from the child and transfered ownership of the resources we need. The
+  // exception is if we are inside a subplan expecting to call Open()/GetNext() on the
+  // child again,
   if (!IsInSubplan()) child(0)->Close(state);
+  child_eos_ = true;
 
   // Done consuming child(0)'s input. Move all the partitions in hash_partitions_
-  // to spilled_partitions_/aggregated_partitions_. We'll finish the processing in
+  // to spilled_partitions_ or aggregated_partitions_. We'll finish the processing in
   // GetNext().
   if (!grouping_expr_ctxs_.empty()) {
     RETURN_IF_ERROR(MoveHashPartitions(child(0)->rows_returned()));
@@ -272,8 +356,8 @@ Status PartitionedAggregationNode::Open(RuntimeState* state) {
   return Status::OK();
 }
 
-Status PartitionedAggregationNode::GetNext(RuntimeState* state,
-    RowBatch* row_batch, bool* eos) {
+Status PartitionedAggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch,
+    bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT, state));
   RETURN_IF_CANCELLED(state);
@@ -284,31 +368,50 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
     return Status::OK();
   }
 
-  ExprContext** ctxs = &conjunct_ctxs_[0];
-  int num_ctxs = conjunct_ctxs_.size();
   if (grouping_expr_ctxs_.empty()) {
     // There was no grouping, so evaluate the conjuncts and return the single result row.
     // We allow calling GetNext() after eos, so don't return this row again.
-    if (!singleton_output_tuple_returned_) {
-      int row_idx = row_batch->AddRow();
-      TupleRow* row = row_batch->GetRow(row_idx);
-      Tuple* output_tuple = GetOutputTuple(
-          agg_fn_ctxs_, singleton_output_tuple_, row_batch->tuple_data_pool());
-      row->SetTuple(0, output_tuple);
-      if (ExecNode::EvalConjuncts(ctxs, num_ctxs, row)) {
-        row_batch->CommitLastRow();
-        ++num_rows_returned_;
-      }
-      singleton_output_tuple_returned_ = true;
-    }
-    // Keep the current chunk to amortize the memory allocation over a series
-    // of Reset()/Open()/GetNext()* calls.
-    row_batch->tuple_data_pool()->AcquireData(mem_pool_.get(), true);
+    if (!singleton_output_tuple_returned_) GetSingletonOutput(row_batch);
+    singleton_output_tuple_returned_ = true;
     *eos = true;
-    COUNTER_SET(rows_returned_counter_, num_rows_returned_);
     return Status::OK();
   }
 
+  if (!child_eos_) {
+    // For streaming preaggregations, we process rows from the child as we go.
+    DCHECK(is_streaming_preagg_);
+    RETURN_IF_ERROR(GetRowsStreaming(state, row_batch));
+  } else if (!partition_eos_) {
+    RETURN_IF_ERROR(GetRowsFromPartition(state, row_batch));
+  }
+
+  *eos = partition_eos_ && child_eos_;
+  COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+  return Status::OK();
+}
+
+void PartitionedAggregationNode::GetSingletonOutput(RowBatch* row_batch) {
+  DCHECK(grouping_expr_ctxs_.empty());
+  int row_idx = row_batch->AddRow();
+  TupleRow* row = row_batch->GetRow(row_idx);
+  Tuple* output_tuple = GetOutputTuple(
+      agg_fn_ctxs_, singleton_output_tuple_, row_batch->tuple_data_pool());
+  row->SetTuple(0, output_tuple);
+  if (ExecNode::EvalConjuncts(&conjunct_ctxs_[0], conjunct_ctxs_.size(), row)) {
+    row_batch->CommitLastRow();
+    ++num_rows_returned_;
+    COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+  }
+  // Keep the current chunk to amortize the memory allocation over a series
+  // of Reset()/Open()/GetNext()* calls.
+  row_batch->tuple_data_pool()->AcquireData(mem_pool_.get(), true);
+  // This node no longer owns the memory for singleton_output_tuple_.
+  singleton_output_tuple_ = NULL;
+}
+
+Status PartitionedAggregationNode::GetRowsFromPartition(RuntimeState* state,
+    RowBatch* row_batch) {
+  DCHECK(!row_batch->AtCapacity());
   if (output_iterator_.AtEnd()) {
     // Done with this partition, move onto the next one.
     if (output_partition_ != NULL) {
@@ -317,7 +420,7 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
     }
     if (aggregated_partitions_.empty() && spilled_partitions_.empty()) {
       // No more partitions, all done.
-      *eos = true;
+      partition_eos_ = true;
       return Status::OK();
     }
     // Process next partition.
@@ -329,7 +432,7 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
   int count = 0;
   const int N = BitUtil::NextPowerOfTwo(state->batch_size());
   // Keeping returning rows from the current partition.
-  while (!output_iterator_.AtEnd() && !row_batch->AtCapacity()) {
+  while (!output_iterator_.AtEnd()) {
     // This loop can go on for a long time if the conjuncts are very selective. Do query
     // maintenance every N iterations.
     if ((count++ & (N - 1)) == 0) {
@@ -344,16 +447,134 @@ Status PartitionedAggregationNode::GetNext(RuntimeState* state,
         output_partition_->agg_fn_ctxs, intermediate_tuple, row_batch->tuple_data_pool());
     output_iterator_.Next();
     row->SetTuple(0, output_tuple);
-    if (ExecNode::EvalConjuncts(ctxs, num_ctxs, row)) {
+    if (ExecNode::EvalConjuncts(&conjunct_ctxs_[0], conjunct_ctxs_.size(), row)) {
       row_batch->CommitLastRow();
       ++num_rows_returned_;
-      if (ReachedLimit()) break; // TODO: remove this check? is this expensive?
+      if (ReachedLimit() || row_batch->AtCapacity()) {
+        break;
+      }
     }
   }
+
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-  *eos = ReachedLimit();
+  partition_eos_ = ReachedLimit();
   if (output_iterator_.AtEnd()) row_batch->MarkNeedToReturn();
+
   return Status::OK();
+}
+
+Status PartitionedAggregationNode::GetRowsStreaming(RuntimeState* state,
+    RowBatch* out_batch) {
+  DCHECK(!child_eos_);
+  DCHECK(is_streaming_preagg_);
+
+  if (child_batch_ == NULL) {
+    child_batch_.reset(new RowBatch(child(0)->row_desc(), state->batch_size(),
+        mem_tracker()));
+  }
+
+  do {
+    DCHECK_EQ(out_batch->num_rows(), 0);
+    RETURN_IF_CANCELLED(state);
+    RETURN_IF_ERROR(QueryMaintenance(state));
+
+    RETURN_IF_ERROR(child(0)->GetNext(state, child_batch_.get(), &child_eos_));
+
+    SCOPED_TIMER(streaming_timer_);
+
+    int remaining_capacity[PARTITION_FANOUT];
+    bool ht_needs_expansion = false;
+    for (int i = 0; i < PARTITION_FANOUT; ++i) {
+      DCHECK(hash_partitions_[i]->hash_tbl != NULL);
+      remaining_capacity[i] = hash_partitions_[i]->hash_tbl->NumInsertsBeforeResize();
+      ht_needs_expansion |= remaining_capacity[i] < child_batch_->num_rows();
+    }
+
+    // Stop expanding hash tables if we're not reducing the input sufficiently. As our
+    // hash tables expand out of each level of cache hierarchy, every hash table lookup
+    // will take longer. We also may not be able to expand hash tables because of memory
+    // pressure. In this case HashTable::CheckAndResize() will fail. In either case we
+    // should always use the remaining space in the hash table to avoid wasting memory.
+    if (ht_needs_expansion && ShouldExpandPreaggHashTables()) {
+      for (int i = 0; i < PARTITION_FANOUT; ++i) {
+        HashTable* ht = hash_partitions_[i]->hash_tbl.get();
+        if (remaining_capacity[i] < child_batch_->num_rows()) {
+          SCOPED_TIMER(ht_resize_timer_);
+          if (ht->CheckAndResize(child_batch_->num_rows(), ht_ctx_.get())) {
+            remaining_capacity[i] = ht->NumInsertsBeforeResize();
+          }
+        }
+      }
+    }
+
+    if (process_batch_streaming_fn_ != NULL) {
+      RETURN_IF_ERROR(process_batch_streaming_fn_(this, needs_serialize_,
+          child_batch_.get(), out_batch, ht_ctx_.get(), remaining_capacity));
+    } else {
+      RETURN_IF_ERROR(ProcessBatchStreaming(needs_serialize_, child_batch_.get(),
+            out_batch, ht_ctx_.get(), remaining_capacity ));
+    }
+
+    child_batch_->Reset(); // All rows from child_batch_ were processed.
+  } while (out_batch->num_rows() == 0 && !child_eos_);
+
+  if (child_eos_) {
+    child(0)->Close(state);
+    child_batch_.reset();
+    MoveHashPartitions(child(0)->rows_returned());
+  }
+
+  num_rows_returned_ += out_batch->num_rows();
+  COUNTER_SET(num_passthrough_rows_, num_rows_returned_);
+  return Status::OK();
+}
+
+bool PartitionedAggregationNode::ShouldExpandPreaggHashTables() const {
+  int64_t ht_mem = 0;
+  int64_t ht_rows = 0;
+  for (int i = 0; i < PARTITION_FANOUT; ++i) {
+    HashTable* ht = hash_partitions_[i]->hash_tbl.get();
+    ht_mem += ht->CurrentMemSize();
+    ht_rows += ht->size();
+  }
+
+  // Need some rows in tables to have valid statistics.
+  if (ht_rows == 0) return true;
+
+  // Find the appropriate reduction factor in our table for the current hash table sizes.
+  int cache_level = 0;
+  while (cache_level + 1 < STREAMING_HT_MIN_REDUCTION_SIZE &&
+      ht_mem >= STREAMING_HT_MIN_REDUCTION[cache_level + 1].min_ht_mem) {
+    ++cache_level;
+  }
+
+  // Compare the number of rows in the hash table with the number of input rows that
+  // were aggregated into it. Exclude passed through rows from this calculation since
+  // they were not in hash tables.
+  const int64_t input_rows = children_[0]->rows_returned();
+  const int64_t aggregated_input_rows = input_rows - num_rows_returned_;
+  const int64_t expected_input_rows = estimated_input_cardinality_ - num_rows_returned_;
+  double current_reduction = static_cast<double>(aggregated_input_rows) / ht_rows;
+
+  // TODO: workaround for IMPALA-2490: subplan node rows_returned counter may be
+  // inaccurate, which could lead to a divide by zero below.
+  if (aggregated_input_rows <= 0) return true;
+
+  // Extrapolate the current reduction factor (r) using the formula
+  // R = 1 + (N / n) * (r - 1), where R is the reduction factor over the full input data
+  // set, N is the number of input rows, excluding passed-through rows, and n is the
+  // number of rows inserted or merged into the hash tables. This is a very rough
+  // approximation but is good enough to be useful.
+  // TODO: consider collecting more statistics to better estimate reduction.
+  double estimated_reduction = aggregated_input_rows >= expected_input_rows
+      ? current_reduction
+      : 1 + (expected_input_rows / aggregated_input_rows) * (current_reduction - 1);
+  double min_reduction =
+    STREAMING_HT_MIN_REDUCTION[cache_level].streaming_ht_min_reduction;
+
+  COUNTER_SET(preagg_estimated_reduction_, estimated_reduction);
+  COUNTER_SET(preagg_streaming_ht_min_reduction_, min_reduction);
+  return estimated_reduction > min_reduction;
 }
 
 void PartitionedAggregationNode::CleanupHashTbl(
@@ -382,6 +603,7 @@ void PartitionedAggregationNode::CleanupHashTbl(
 }
 
 Status PartitionedAggregationNode::Reset(RuntimeState* state) {
+  DCHECK(!is_streaming_preagg_) << "Cannot reset preaggregation";
   if (grouping_expr_ctxs_.empty()) {
     // Re-create the single output tuple for this non-grouping agg.
     singleton_output_tuple_ =
@@ -390,10 +612,12 @@ Status PartitionedAggregationNode::Reset(RuntimeState* state) {
     RETURN_IF_ERROR(state_->GetQueryStatus());
     singleton_output_tuple_returned_ = false;
   } else {
+    child_eos_ = false;
+    partition_eos_ = false;
     // Reset the HT and the partitions for this grouping agg.
     ht_ctx_->set_level(0);
     ClosePartitions();
-    CreateHashPartitions(0);
+    RETURN_IF_ERROR(CreateHashPartitions(0));
   }
   return ExecNode::Reset(state);
 }
@@ -415,6 +639,7 @@ void PartitionedAggregationNode::Close(RuntimeState* state) {
 
   ClosePartitions();
 
+  child_batch_.reset();
   for (int i = 0; i < aggregate_evaluators_.size(); ++i) {
     aggregate_evaluators_[i]->Close(state);
   }
@@ -465,14 +690,16 @@ Status PartitionedAggregationNode::Partition::InitStreams() {
   RETURN_IF_ERROR(
       aggregated_row_stream->Init(parent->id(), parent->runtime_profile(), true));
 
-  unaggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
-      parent->child(0)->row_desc(), parent->state_->block_mgr(),
+  if (!parent->is_streaming_preagg_) {
+    unaggregated_row_stream.reset(new BufferedTupleStream(parent->state_,
+        parent->child(0)->row_desc(), parent->state_->block_mgr(),
       parent->block_mgr_client_, true /* use_initial_small_buffers */,
-      false /* read_write */));
-  // This stream is only used to spill, no need to ever have this pinned.
-  RETURN_IF_ERROR(unaggregated_row_stream->Init(parent->id(), parent->runtime_profile(),
-      false));
-  DCHECK(unaggregated_row_stream->has_write_block());
+        false /* read_write */));
+    // This stream is only used to spill, no need to ever have this pinned.
+    RETURN_IF_ERROR(unaggregated_row_stream->Init(parent->id(), parent->runtime_profile(),
+        false));
+    DCHECK(unaggregated_row_stream->has_write_block());
+  }
   return Status::OK();
 }
 
@@ -485,12 +712,14 @@ bool PartitionedAggregationNode::Partition::InitHashTable() {
   // though. Always start with small buffers.
   // TODO: How many buckets? We currently use a default value, 1024.
   static const int64_t PAGG_DEFAULT_HASH_TABLE_SZ = 1024;
+
   hash_tbl.reset(HashTable::Create(parent->state_, parent->block_mgr_client_, 1,
-      NULL, 1 << (32 - NUM_PARTITIONING_BITS), PAGG_DEFAULT_HASH_TABLE_SZ));
+      NULL, 1L << (32 - NUM_PARTITIONING_BITS), PAGG_DEFAULT_HASH_TABLE_SZ));
   return hash_tbl->Init();
 }
 
-Status PartitionedAggregationNode::Partition::CleanUp() {
+Status PartitionedAggregationNode::Partition::SerializeStreamForSpilling() {
+  DCHECK(!parent->is_streaming_preagg_);
   if (parent->needs_serialize_ && aggregated_row_stream->num_rows() != 0) {
     // We need to do a lot more work in this case. This step effectively does a merge
     // aggregation in this node. We need to serialize the intermediates, spill the
@@ -563,7 +792,7 @@ Status PartitionedAggregationNode::Partition::Spill() {
   DCHECK(!is_closed);
   DCHECK(!is_spilled());
 
-  RETURN_IF_ERROR(CleanUp());
+  RETURN_IF_ERROR(SerializeStreamForSpilling());
 
   // Free the in-memory result data.
   for (int i = 0; i < agg_fn_ctxs.size(); ++i) {
@@ -640,12 +869,33 @@ Tuple* PartitionedAggregationNode::ConstructSingletonOutputTuple(
 }
 
 Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
+    const vector<FunctionContext*>& agg_fn_ctxs, MemPool* pool, Status* status) {
+  const int fixed_size = intermediate_tuple_desc_->byte_size();
+  const int varlen_size = GroupingExprsVarlenSize();
+  uint8_t* tuple_data = pool->TryAllocate(fixed_size + varlen_size);
+  if (tuple_data == NULL) {
+    *status = Status::MemLimitExceeded();
+    status->AddDetail(Substitute("Cannot perform aggregation at node with id $0."
+          " Failed to allocate $1 bytes for intermediate tuple. The memory limit"
+          " is too low to execute the query.", id_, fixed_size + varlen_size));
+    state_->SetMemLimitExceeded();
+    return NULL;
+  }
+  memset(tuple_data, 0, fixed_size);
+  Tuple* intermediate_tuple = reinterpret_cast<Tuple*>(tuple_data);
+  uint8_t* varlen_data = tuple_data + fixed_size;
+  CopyGroupingValues(intermediate_tuple, varlen_data, varlen_size);
+  InitAggSlots(agg_fn_ctxs, intermediate_tuple);
+  return intermediate_tuple;
+}
+
+Tuple* PartitionedAggregationNode::ConstructIntermediateTuple(
     const vector<FunctionContext*>& agg_fn_ctxs,
     BufferedTupleStream* stream, Status* status) {
   DCHECK(stream != NULL && status != NULL);
   // Allocate space for the entire tuple in the stream.
-  int fixed_size = intermediate_tuple_desc_->byte_size();
-  int varlen_size = GroupingExprsVarlenSize();
+  const int fixed_size = intermediate_tuple_desc_->byte_size();
+  const int varlen_size = GroupingExprsVarlenSize();
   uint8_t* varlen_buffer;
   uint8_t* fixed_buffer = stream->AllocateRow(fixed_size, varlen_size, &varlen_buffer,
       status);
@@ -814,13 +1064,14 @@ void PartitionedAggregationNode::DebugString(int indentation_level,
        << "intermediate_tuple_id=" << intermediate_tuple_id_
        << " output_tuple_id=" << output_tuple_id_
        << " needs_finalize=" << needs_finalize_
-       << " probe_exprs=" << Expr::DebugString(grouping_expr_ctxs_)
+       << " grouping_exprs=" << Expr::DebugString(grouping_expr_ctxs_)
        << " agg_exprs=" << AggFnEvaluator::DebugString(aggregate_evaluators_);
   ExecNode::DebugString(indentation_level, out);
   *out << ")";
 }
 
 Status PartitionedAggregationNode::CreateHashPartitions(int level) {
+  if (is_streaming_preagg_) DCHECK_EQ(level, 0);
   if (level >= MAX_PARTITION_DEPTH) {
     return state_->SetMemLimitExceeded(ErrorMsg(
         TErrorCode::PARTITIONED_AGG_MAX_PARTITION_DEPTH, id_, MAX_PARTITION_DEPTH));
@@ -834,22 +1085,38 @@ Status PartitionedAggregationNode::CreateHashPartitions(int level) {
     hash_partitions_.push_back(partition_pool_->Add(new_partition));
     RETURN_IF_ERROR(new_partition->InitStreams());
   }
-  DCHECK_GT(state_->block_mgr()->num_reserved_buffers_remaining(block_mgr_client_), 0);
+  if (!is_streaming_preagg_) {
+    DCHECK_GT(state_->block_mgr()->num_reserved_buffers_remaining(block_mgr_client_), 0);
+  }
 
   // Now that all the streams are reserved (meaning we have enough memory to execute
   // the algorithm), allocate the hash tables. These can fail and we can still continue.
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
     if (!hash_partitions_[i]->InitHashTable()) {
+      // We don't spill on preaggregations. If we have so little memory that we can't
+      // allocate small hash tables, the mem limit is just too low.
+      if (is_streaming_preagg_) {
+        Status status = Status::MemLimitExceeded();
+        status.AddDetail(Substitute("Cannot perform aggregation at node with id $0."
+              " Failed to initialize hash table in preaggregation. The memory limit"
+              " is too low to execute the query.", id_));
+        state_->SetMemLimitExceeded();
+        return status;
+      }
       RETURN_IF_ERROR(hash_partitions_[i]->Spill());
     }
   }
-  COUNTER_ADD(partitions_created_, PARTITION_FANOUT);
-  COUNTER_SET(max_partition_level_, level);
+
+  COUNTER_ADD(partitions_created_, hash_partitions_.size());
+  if (!is_streaming_preagg_) {
+    COUNTER_SET(max_partition_level_, level);
+  }
   return Status::OK();
 }
 
 Status PartitionedAggregationNode::CheckAndResizeHashPartitions(int num_rows,
     HashTableCtx* ht_ctx) {
+  DCHECK(!is_streaming_preagg_);
   for (int i = 0; i < PARTITION_FANOUT; ++i) {
     Partition* partition = hash_partitions_[i];
     while (!partition->is_spilled()) {
@@ -857,7 +1124,6 @@ Status PartitionedAggregationNode::CheckAndResizeHashPartitions(int num_rows,
         SCOPED_TIMER(ht_resize_timer_);
         if (partition->hash_tbl->CheckAndResize(num_rows, ht_ctx)) break;
       }
-      // There was not enough memory for the resize. Spill a partition and retry.
       RETURN_IF_ERROR(SpillPartition());
     }
   }
@@ -893,6 +1159,7 @@ Status PartitionedAggregationNode::NextPartition() {
 
     if (partition == NULL) {
       DCHECK(!spilled_partitions_.empty());
+      DCHECK(!is_streaming_preagg_);
       DCHECK_EQ(state_->block_mgr()->num_pinned_buffers(block_mgr_client_),
           needs_serialize_ ? 1 : 0);
 
@@ -955,6 +1222,7 @@ Status PartitionedAggregationNode::NextPartition() {
 
 template<bool AGGREGATED_ROWS>
 Status PartitionedAggregationNode::ProcessStream(BufferedTupleStream* input_stream) {
+  DCHECK(!is_streaming_preagg_);
   if (input_stream->num_rows() > 0) {
     while (true) {
       bool got_buffer = false;
@@ -1014,7 +1282,10 @@ Status PartitionedAggregationNode::MoveHashPartitions(int64_t num_input_rows) {
   for (int i = 0; i < hash_partitions_.size(); ++i) {
     Partition* partition = hash_partitions_[i];
     int64_t aggregated_rows = partition->aggregated_row_stream->num_rows();
-    int64_t unaggregated_rows = partition->unaggregated_row_stream->num_rows();
+    int64_t unaggregated_rows = 0;
+    if (partition->unaggregated_row_stream != NULL) {
+      unaggregated_rows = partition->unaggregated_row_stream->num_rows();
+    }
     double total_rows = aggregated_rows + unaggregated_rows;
     double percent = total_rows * 100 / num_input_rows;
     ss << "  " << i << " "  << (partition->is_spilled() ? "spilled" : "not spilled")
@@ -1468,9 +1739,7 @@ Status PartitionedAggregationNode::CodegenProcessBatch(Function** fn) {
 
   int replaced = 0;
   if (!grouping_expr_ctxs_.empty()) {
-    // Aggregation w/o grouping does not use a hash table.
-
-    // Codegen for hash
+    // Codegen for grouping using hash table
     // The codegen'd ProcessBatch function is only used in Open() with level_ = 0,
     // so don't use murmur hash
     Function* hash_fn;
@@ -1481,13 +1750,13 @@ Status PartitionedAggregationNode::CodegenProcessBatch(Function** fn) {
     Function* build_equals_fn;
     RETURN_IF_ERROR(ht_ctx_->CodegenEquals(state_, true, &build_equals_fn));
 
-    // Codegen for evaluating probe rows
-    Function* eval_probe_row_fn;
-    RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(state_, false, &eval_probe_row_fn));
+    // Codegen for evaluating input rows
+    Function* eval_grouping_expr_fn;
+    RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(state_, false, &eval_grouping_expr_fn));
 
     // Replace call sites
     process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
-        eval_probe_row_fn, "EvalProbeRow", &replaced);
+        eval_grouping_expr_fn, "EvalProbeRow", &replaced);
     DCHECK_EQ(replaced, 1);
 
     process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, true,
@@ -1507,6 +1776,63 @@ Status PartitionedAggregationNode::CodegenProcessBatch(Function** fn) {
   if (*fn == NULL) {
     return Status("PartitionedAggregationNode::CodegenProcessBatch(): codegen'd "
         "ProcessBatch() function failed verification, see log");
+  }
+  return Status::OK();
+}
+
+Status PartitionedAggregationNode::CodegenProcessBatchStreaming(Function** fn) {
+  DCHECK(is_streaming_preagg_);
+  LlvmCodeGen* codegen;
+  RETURN_IF_ERROR(state_->GetCodegen(&codegen));
+  SCOPED_TIMER(codegen->codegen_timer());
+
+  IRFunction::Type ir_fn = IRFunction::PART_AGG_NODE_PROCESS_BATCH_STREAMING;
+  Function* process_batch_streaming_fn = codegen->GetFunction(ir_fn);
+  DCHECK(process_batch_streaming_fn != NULL);
+
+  // Make needs_serialize arg constant so dead code can be optimised out.
+  Value* needs_serialize_arg = codegen->GetArgument(process_batch_streaming_fn, 2);
+  needs_serialize_arg->replaceAllUsesWith(
+      ConstantInt::get(Type::getInt1Ty(codegen->context()), needs_serialize_));
+
+  Function* update_tuple_fn;
+  RETURN_IF_ERROR(CodegenUpdateTuple(&update_tuple_fn));
+
+  // We only use the top-level hash function for streaming aggregations.
+  Function* hash_fn;
+  RETURN_IF_ERROR(ht_ctx_->CodegenHashCurrentRow(state_, false, &hash_fn));
+
+  // Codegen HashTable::Equals
+  Function* equals_fn;
+  RETURN_IF_ERROR(ht_ctx_->CodegenEquals(state_, true, &equals_fn));
+
+  // Codegen for evaluating input rows
+  Function* eval_grouping_expr_fn;
+  RETURN_IF_ERROR(ht_ctx_->CodegenEvalRow(state_, false, &eval_grouping_expr_fn));
+
+  // Replace call sites
+  int replaced = 0;
+  process_batch_streaming_fn = codegen->ReplaceCallSites(process_batch_streaming_fn,
+      false, update_tuple_fn, "UpdateTuple", &replaced);
+  DCHECK_EQ(replaced, 2);
+
+  process_batch_streaming_fn = codegen->ReplaceCallSites(process_batch_streaming_fn,
+      true, eval_grouping_expr_fn, "EvalProbeRow", &replaced);
+  DCHECK_EQ(replaced, 1);
+
+  process_batch_streaming_fn = codegen->ReplaceCallSites(process_batch_streaming_fn, true,
+      hash_fn, "HashCurrentRow", &replaced);
+  DCHECK_EQ(replaced, 1);
+
+  process_batch_streaming_fn = codegen->ReplaceCallSites(process_batch_streaming_fn, true,
+      equals_fn, "Equals", &replaced);
+  DCHECK_EQ(replaced, 1);
+
+  DCHECK(process_batch_streaming_fn != NULL);
+  *fn = codegen->OptimizeFunctionWithExprs(process_batch_streaming_fn);
+  if (*fn == NULL) {
+    return Status("PartitionedAggregationNode::CodegenProcessBatchStreaming(): codegen'd "
+        "ProcessBatchStreaming() function failed verification, see log");
   }
   return Status::OK();
 }

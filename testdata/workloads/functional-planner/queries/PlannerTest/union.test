@@ -169,7 +169,7 @@ NODE 3:
 |
 05:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-04:AGGREGATE
+04:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -250,7 +250,7 @@ NODE 2:
 |
 04:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-03:AGGREGATE
+03:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -314,7 +314,7 @@ NODE 4:
 |
 07:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-05:AGGREGATE
+05:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -392,7 +392,7 @@ NODE 6:
 |
 08:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-03:AGGREGATE
+03:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -461,7 +461,7 @@ NODE 6:
 |
 08:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-04:AGGREGATE
+04:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -586,7 +586,7 @@ NODE 3:
 |
 05:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-04:AGGREGATE
+04:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -635,7 +635,7 @@ NODE 3:
 |
 05:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-04:AGGREGATE
+04:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -692,7 +692,7 @@ NODE 5:
 |
 06:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-04:AGGREGATE
+04:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 01:UNION
@@ -746,7 +746,7 @@ NODE 4:
 |
 06:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-05:AGGREGATE
+05:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 02:UNION
@@ -810,7 +810,7 @@ NODE 6:
 |
 07:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-05:AGGREGATE
+05:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 02:UNION
@@ -874,7 +874,7 @@ NODE 5:
 |
 07:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-06:AGGREGATE
+06:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 03:UNION
@@ -950,7 +950,7 @@ NODE 7:
 |
 08:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-05:AGGREGATE
+05:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 02:UNION
@@ -1109,7 +1109,7 @@ NODE 3:
 |
 05:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-04:AGGREGATE
+04:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -1159,7 +1159,7 @@ NODE 3:
 |
 05:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-04:AGGREGATE
+04:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -1216,7 +1216,7 @@ NODE 4:
 |
 06:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-05:AGGREGATE
+05:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -1276,7 +1276,7 @@ NODE 4:
 |
 06:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-05:AGGREGATE
+05:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -1335,7 +1335,7 @@ NODE 5:
 |
 09:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-06:AGGREGATE
+06:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -1402,7 +1402,7 @@ NODE 4:
 |
 09:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-06:AGGREGATE
+06:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -1534,7 +1534,7 @@ NODE 5:
 |
 07:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-06:AGGREGATE
+06:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -1619,7 +1619,7 @@ NODE 7:
 |
 15:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-10:AGGREGATE
+10:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 02:UNION
@@ -1644,7 +1644,7 @@ NODE 7:
 |
 11:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-08:AGGREGATE
+08:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 05:UNION
@@ -1713,7 +1713,7 @@ NODE 6:
 |
 14:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-09:AGGREGATE
+09:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -1741,7 +1741,7 @@ NODE 6:
 |
 10:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-07:AGGREGATE
+07:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 04:UNION
@@ -1867,7 +1867,7 @@ NODE 14:
 |
 19:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-08:AGGREGATE
+08:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -2000,7 +2000,7 @@ NODE 5:
 |
 10:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-06:AGGREGATE
+06:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -2013,7 +2013,7 @@ NODE 5:
 |
 08:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-04:AGGREGATE
+04:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 01:UNION
@@ -2066,7 +2066,7 @@ NODE 3:
 |  |
 |  07:EXCHANGE [HASH(int_col,bool_col)]
 |  |
-|  04:AGGREGATE
+|  04:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: int_col, bool_col
 |  |
@@ -2080,7 +2080,7 @@ NODE 3:
 |
 05:EXCHANGE [HASH(int_col,bool_col)]
 |
-02:AGGREGATE
+02:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: int_col, bool_col
 |
@@ -2155,7 +2155,7 @@ select int_col, string_col, bool_col, float_col from functional.alltypestiny
 |
 05:EXCHANGE [HASH(1,'a',null,f)]
 |
-02:AGGREGATE
+02:AGGREGATE [STREAMING]
 |  group by: 1, 'a', null, f
 |
 00:UNION
@@ -2205,7 +2205,7 @@ select 503
 |
 08:EXCHANGE [HASH(500)]
 |
-04:AGGREGATE
+04:AGGREGATE [STREAMING]
 |  group by: 500
 |
 00:UNION
@@ -2293,7 +2293,7 @@ select int_col, string_col, bool_col, float_col from functional.alltypessmall
 |
 05:EXCHANGE [HASH(1,'a',null,f)]
 |
-02:AGGREGATE
+02:AGGREGATE [STREAMING]
 |  group by: 1, 'a', null, f
 |
 00:UNION
@@ -2351,7 +2351,7 @@ select count(*) from (
 |
 05:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-03:AGGREGATE
+03:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -2486,7 +2486,7 @@ select 1000, 2000
 |
 07:EXCHANGE [HASH(bigint_col)]
 |
-03:AGGREGATE
+03:AGGREGATE [STREAMING]
 |  output: sum(int_col)
 |  group by: bigint_col
 |
@@ -2640,7 +2640,7 @@ select 1000, 2000
 |
 14:EXCHANGE [HASH(bigint_col)]
 |
-07:AGGREGATE
+07:AGGREGATE [STREAMING]
 |  output: sum(int_col)
 |  group by: bigint_col
 |

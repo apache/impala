@@ -15,7 +15,7 @@ from functional.testtbl
 |
 02:EXCHANGE [HASH(functional.testtbl.id,functional.testtbl.name,functional.testtbl.zip)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
 |
 00:SCAN HDFS [functional.testtbl]
@@ -38,7 +38,7 @@ from functional.testtbl
 |
 02:EXCHANGE [HASH(id,zip)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: id, zip
 |
 00:SCAN HDFS [functional.testtbl]
@@ -70,7 +70,7 @@ from functional.testtbl
 |
 03:EXCHANGE [HASH(id,zip)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: id, zip
 |
 00:SCAN HDFS [functional.testtbl]
@@ -102,7 +102,7 @@ group by 1
 |
 03:EXCHANGE [HASH(tinyint_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: tinyint_col, int_col, bigint_col
 |
 00:SCAN HDFS [functional.alltypesagg]
@@ -134,7 +134,7 @@ group by 1
 |
 03:EXCHANGE [HASH(tinyint_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: tinyint_col, int_col
 |
 00:SCAN HDFS [functional.alltypesagg]
@@ -166,7 +166,7 @@ from functional.alltypesagg
 |
 03:EXCHANGE [HASH(int_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: int_col
 |
 00:SCAN HDFS [functional.alltypesagg]
@@ -201,7 +201,7 @@ from functional.alltypesagg group by 1
 |
 03:EXCHANGE [HASH(tinyint_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: min(smallint_col), max(string_col)
 |  group by: tinyint_col, int_col
 |
@@ -236,7 +236,7 @@ from functional.alltypesagg group by 1
 |
 03:EXCHANGE [HASH(tinyint_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: count(*), sum(int_col), min(smallint_col), max(bigint_col)
 |  group by: tinyint_col, int_col
 |
@@ -289,7 +289,7 @@ select t1.c, t2.c from
 |  |
 |  11:EXCHANGE [HASH(bigint_col)]
 |  |
-|  04:AGGREGATE
+|  04:AGGREGATE [STREAMING]
 |  |  group by: bigint_col
 |  |
 |  03:SCAN HDFS [functional.alltypestiny]
@@ -308,7 +308,7 @@ select t1.c, t2.c from
 |
 07:EXCHANGE [HASH(int_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: int_col
 |
 00:SCAN HDFS [functional.alltypestiny]
@@ -349,7 +349,7 @@ having count(bigint_col) > 0
 |
 03:EXCHANGE [HASH(tinyint_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: count(bigint_col)
 |  group by: tinyint_col
 |
@@ -386,7 +386,7 @@ where t.x is not null
 |
 03:EXCHANGE [HASH(1)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: 1
 |
 00:SCAN HDFS [functional.alltypes]
@@ -424,7 +424,7 @@ where t.x + t.y > 10 and t.x > 0 and t.y > 1
 |
 03:EXCHANGE [HASH(1)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: count(1)
 |  group by: 1
 |
@@ -447,7 +447,7 @@ select * from (select count(distinct int_col) cd from functional.alltypes) v
 |
 03:EXCHANGE [HASH(int_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: int_col
 |
 00:SCAN HDFS [functional.alltypes]
@@ -467,7 +467,7 @@ select * from (select count(distinct int_col) cd from functional.alltypes group 
 |
 03:EXCHANGE [HASH(bool_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: bool_col, int_col
 |
 00:SCAN HDFS [functional.alltypes]

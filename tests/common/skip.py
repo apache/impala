@@ -75,6 +75,8 @@ using_old_aggs_joins = re.search(old_agg_regex, test_start_cluster_args) is not 
 class SkipIfOldAggsJoins:
   nested_types = pytest.mark.skipif(using_old_aggs_joins,
       reason="Nested types not supported with old aggs and joins")
+  passthrough_preagg = pytest.mark.skipif(using_old_aggs_joins,
+      reason="Passthrough optimization not implemented by old agg")
   unsupported = pytest.mark.skipif(using_old_aggs_joins,
       reason="Query unsupported with old aggs and joins")
 

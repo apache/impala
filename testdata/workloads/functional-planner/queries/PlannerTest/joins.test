@@ -639,7 +639,7 @@ on (a.int_col = b.int_col and b.bool_col = a.bool_col)
 |  |
 |  04:EXCHANGE [HASH(int_col,bool_col)]
 |  |
-|  02:AGGREGATE
+|  02:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: int_col, bool_col
 |  |
@@ -691,7 +691,7 @@ on (b.int_col = c.int_col and c.bool_col = b.bool_col)
 |  |
 |  08:EXCHANGE [HASH(int_col,bool_col)]
 |  |
-|  03:AGGREGATE
+|  03:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: int_col, bool_col
 |  |
@@ -1073,7 +1073,7 @@ on (a.int_col = b.bigint_col)
 |  |
 |  07:EXCHANGE [HASH(bigint_col)]
 |  |
-|  03:AGGREGATE
+|  03:AGGREGATE [STREAMING]
 |  |  group by: bigint_col
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
@@ -1084,7 +1084,7 @@ on (a.int_col = b.bigint_col)
 |
 05:EXCHANGE [HASH(int_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: int_col
 |
 00:SCAN HDFS [functional.alltypessmall]
@@ -1466,7 +1466,7 @@ on (v1.tinyint_col = v2.tinyint_col and
 |  |
 |  07:EXCHANGE [HASH(tinyint_col,int_col)]
 |  |
-|  01:AGGREGATE
+|  01:AGGREGATE [STREAMING]
 |  |  group by: tinyint_col, int_col
 |  |
 |  00:SCAN HDFS [functional.alltypestiny]
@@ -1477,7 +1477,7 @@ on (v1.tinyint_col = v2.tinyint_col and
 |
 05:EXCHANGE [HASH(tinyint_col,int_col,bigint_col)]
 |
-03:AGGREGATE
+03:AGGREGATE [STREAMING]
 |  group by: tinyint_col, int_col, bigint_col
 |
 02:SCAN HDFS [functional.alltypessmall]
@@ -1515,7 +1515,7 @@ on (v1.tinyint_col = v2.tinyint_col and
 |  |
 |  07:EXCHANGE [HASH(tinyint_col,int_col)]
 |  |
-|  01:AGGREGATE
+|  01:AGGREGATE [STREAMING]
 |  |  group by: tinyint_col, int_col
 |  |
 |  00:SCAN HDFS [functional.alltypestiny]
@@ -1526,7 +1526,7 @@ on (v1.tinyint_col = v2.tinyint_col and
 |
 05:EXCHANGE [HASH(tinyint_col,int_col,bigint_col)]
 |
-03:AGGREGATE
+03:AGGREGATE [STREAMING]
 |  group by: tinyint_col, int_col, bigint_col
 |
 02:SCAN HDFS [functional.alltypessmall]
@@ -1562,7 +1562,7 @@ on (v1.string_col = v2.string_col and
 |  |
 |  07:EXCHANGE [HASH(string_col,bigint_col)]
 |  |
-|  03:AGGREGATE
+|  03:AGGREGATE [STREAMING]
 |  |  group by: string_col, bigint_col
 |  |
 |  02:SCAN HDFS [functional.alltypessmall]
@@ -1573,7 +1573,7 @@ on (v1.string_col = v2.string_col and
 |
 05:EXCHANGE [HASH(bigint_col,string_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: bigint_col, string_col
 |
 00:SCAN HDFS [functional.alltypestiny]
@@ -1604,7 +1604,7 @@ on (a.string_col = b.string_col and a.int_col = b.int_col)
 |
 04:EXCHANGE [HASH(int_col,string_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: int_col, string_col
 |
 00:SCAN HDFS [functional.alltypestiny]
@@ -1630,7 +1630,7 @@ on (a.string_col = b.string_col and a.int_col = b.int_col)
 |  |
 |  04:EXCHANGE [HASH(int_col,string_col)]
 |  |
-|  02:AGGREGATE
+|  02:AGGREGATE [STREAMING]
 |  |  group by: int_col, string_col
 |  |
 |  01:SCAN HDFS [functional.alltypestiny]
@@ -1670,7 +1670,7 @@ on (b.int_col = c.smallint_col and b.string_col = c.string_col)
 |  |
 |  13:EXCHANGE [HASH(string_col,tinyint_col,smallint_col,int_col,bigint_col)]
 |  |
-|  05:AGGREGATE
+|  05:AGGREGATE [STREAMING]
 |  |  group by: string_col, tinyint_col, smallint_col, int_col, bigint_col
 |  |
 |  04:SCAN HDFS [functional.alltypes]
@@ -1687,7 +1687,7 @@ on (b.int_col = c.smallint_col and b.string_col = c.string_col)
 |  |
 |  10:EXCHANGE [HASH(tinyint_col,smallint_col,int_col,string_col)]
 |  |
-|  03:AGGREGATE
+|  03:AGGREGATE [STREAMING]
 |  |  group by: tinyint_col, smallint_col, int_col, string_col
 |  |
 |  02:SCAN HDFS [functional.alltypestiny]
@@ -1699,7 +1699,7 @@ on (b.int_col = c.smallint_col and b.string_col = c.string_col)
 |
 08:EXCHANGE [HASH(string_col,int_col,smallint_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: string_col, int_col, smallint_col
 |
 00:SCAN HDFS [functional.alltypessmall]

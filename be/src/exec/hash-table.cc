@@ -265,10 +265,6 @@ void HashTable::Close() {
   state_->block_mgr()->ReleaseMemory(block_mgr_client_, num_buckets_ * sizeof(Bucket));
 }
 
-int64_t HashTable::CurrentMemSize() const {
-  return num_buckets_ * sizeof(Bucket) + num_duplicate_nodes_ * sizeof(DuplicateNode);
-}
-
 bool HashTable::CheckAndResize(uint64_t buckets_to_fill, HashTableCtx* ht_ctx) {
   uint64_t shift = 0;
   while (num_filled_buckets_ + buckets_to_fill >

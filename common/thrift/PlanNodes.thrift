@@ -241,6 +241,12 @@ struct TAggregationNode {
 
   // Set to true if this aggregation node needs to run the finalization step.
   5: required bool need_finalize
+
+  // Set to true to use the streaming preagg algorithm. Node must be a preaggregation.
+  6: required bool use_streaming_preaggregation
+
+  // Estimate of number of input rows from the planner.
+  7: required i64 estimated_input_cardinality
 }
 
 struct TSortInfo {

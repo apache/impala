@@ -43,6 +43,7 @@ ir_functions = [
   ["PART_AGG_NODE_PROCESS_BATCH_TRUE", "ProcessBatch_true"],
   ["PART_AGG_NODE_PROCESS_BATCH_FALSE", "ProcessBatch_false"],
   ["PART_AGG_NODE_PROCESS_BATCH_NO_GROUPING", "ProcessBatchNoGrouping"],
+  ["PART_AGG_NODE_PROCESS_BATCH_STREAMING", "ProcessBatchStreaming"],
   ["AVG_UPDATE_BIGINT", "9AvgUpdateIN10impala_udf9BigIntVal"],
   ["AVG_UPDATE_DOUBLE", "9AvgUpdateIN10impala_udf9DoubleVal"],
   ["AVG_UPDATE_TIMESTAMP", "TimestampAvgUpdate"],

@@ -143,6 +143,9 @@ struct TQueryOptions {
   // For scan nodes with any conjuncts, use codegen to evaluate the conjuncts if
   // the number of rows * number of operators in the conjuncts exceeds this threshold.
   35: optional i64 scan_node_codegen_threshold = 1800000
+
+  // If true, the planner will not generate plans with streaming preaggregations.
+  36: optional bool disable_streaming_preaggregations = 0
 }
 
 // Impala currently has two types of sessions: Beeswax and HiveServer2

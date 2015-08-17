@@ -1,0 +1,41 @@
+select tinyint_col, count(*)
+from functional.alltypesagg
+group by 1
+---- DISTRIBUTEDPLAN
+04:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: tinyint_col
+|
+02:EXCHANGE [HASH(tinyint_col)]
+|
+01:AGGREGATE
+|  output: count(*)
+|  group by: tinyint_col
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 files=11 size=814.73KB
+====
+select count(distinct id)
+from functional.alltypesagg
+---- DISTRIBUTEDPLAN
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(id)
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  output: count(id)
+|
+04:AGGREGATE
+|  group by: id
+|
+03:EXCHANGE [HASH(id)]
+|
+01:AGGREGATE
+|  group by: id
+|
+00:SCAN HDFS [functional.alltypesagg]
+   partitions=11/11 files=11 size=814.73KB
+====

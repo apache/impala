@@ -66,7 +66,7 @@ order by 2 desc
 |
 03:EXCHANGE [HASH(zip)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: zip
 |
@@ -102,7 +102,7 @@ order by 2
 |
 03:EXCHANGE [HASH(int_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: sum(float_col)
 |  group by: int_col
 |
@@ -135,7 +135,7 @@ order by 2,3 desc
 |
 03:EXCHANGE [HASH(int_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: sum(float_col), min(float_col)
 |  group by: int_col
 |
@@ -243,7 +243,7 @@ order by int_col desc offset 5
 |
 05:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-03:AGGREGATE
+03:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -382,7 +382,7 @@ order by avg(tinyint_col)
 |
 03:EXCHANGE [HASH(int_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: count(*), avg(tinyint_col)
 |  group by: int_col
 |
@@ -502,7 +502,7 @@ order by 1
 |
 07:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-05:AGGREGATE
+05:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -569,7 +569,7 @@ order by 1,2
 |
 08:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-03:AGGREGATE
+03:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -684,7 +684,7 @@ order by 12, 13, 1
 |
 20:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-08:AGGREGATE
+08:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION
@@ -938,7 +938,7 @@ order by int_col offset 5
 |
 12:EXCHANGE [HASH(int_col)]
 |
-06:AGGREGATE
+06:AGGREGATE [STREAMING]
 |  group by: int_col
 |
 00:UNION
@@ -1060,7 +1060,7 @@ order by x
 |  |
 |  13:EXCHANGE [HASH(float_col,bigint_col,int_col,tinyint_col,smallint_col,id)]
 |  |
-|  04:AGGREGATE
+|  04:AGGREGATE [STREAMING]
 |  |  group by: float_col, bigint_col, int_col, tinyint_col, smallint_col, id
 |  |
 |  03:SCAN HDFS [functional.alltypes]

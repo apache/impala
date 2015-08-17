@@ -40,7 +40,7 @@ WRITE TO HDFS [default.t, OVERWRITE=false]
 |
 05:EXCHANGE [HASH(a.int_col,a.string_col)]
 |
-03:AGGREGATE
+03:AGGREGATE [STREAMING]
 |  group by: a.int_col, a.string_col
 |
 02:HASH JOIN [INNER JOIN, BROADCAST]

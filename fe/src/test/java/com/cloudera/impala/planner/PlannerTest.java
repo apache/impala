@@ -207,4 +207,12 @@ public class PlannerTest extends PlannerTestBase {
     options.setMem_limit(500);
     runPlannerTestFile("mem-limit-broadcast-join", options);
   }
+
+  @Test
+  public void testDisablePreaggregations() {
+    TQueryOptions options = new TQueryOptions();
+    options.setDisable_streaming_preaggregations(true);
+    runPlannerTestFile("disable-preaggregations", options);
+  }
+
 }

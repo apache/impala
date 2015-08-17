@@ -463,7 +463,7 @@ NODE 1:
 |  |
 |  04:EXCHANGE [HASH(year,month,id,int_col)]
 |  |
-|  02:AGGREGATE
+|  02:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: year, month, id, int_col
 |  |
@@ -522,7 +522,7 @@ where a.id = b.id and
 |  |
 |  04:EXCHANGE [HASH(year,month,id,int_col)]
 |  |
-|  02:AGGREGATE
+|  02:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: year, month, id, int_col
 |  |
@@ -597,7 +597,7 @@ NODE 1:
 |  |
 |  05:EXCHANGE [HASH(year,month,id,int_col)]
 |  |
-|  02:AGGREGATE
+|  02:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: year, month, id, int_col
 |  |
@@ -666,7 +666,7 @@ where a.year = 2009 and
 |  |
 |  05:EXCHANGE [HASH(year,month,id,int_col)]
 |  |
-|  02:AGGREGATE
+|  02:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: year, month, id, int_col
 |  |

@@ -45,7 +45,7 @@ order by
 |
 03:EXCHANGE [HASH(l_returnflag,l_linestatus)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: sum(l_quantity), sum(l_extendedprice), sum(l_extendedprice * (1 - l_discount)), sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)), avg(l_quantity), avg(l_extendedprice), avg(l_discount), count(*)
 |  group by: l_returnflag, l_linestatus
 |
@@ -218,7 +218,7 @@ limit 100
 |
 22:EXCHANGE [HASH(ps_partkey)]
 |
-12:AGGREGATE
+12:AGGREGATE [STREAMING]
 |  output: min(ps_supplycost)
 |  group by: ps_partkey
 |
@@ -314,7 +314,7 @@ limit 10
 |
 09:EXCHANGE [HASH(l_orderkey,o_orderdate,o_shippriority)]
 |
-05:AGGREGATE
+05:AGGREGATE [STREAMING]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: l_orderkey, o_orderdate, o_shippriority
 |
@@ -394,7 +394,7 @@ order by
 |
 07:EXCHANGE [HASH(o_orderpriority)]
 |
-03:AGGREGATE
+03:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: o_orderpriority
 |
@@ -494,7 +494,7 @@ order by
 |
 18:EXCHANGE [HASH(n_name)]
 |
-11:AGGREGATE
+11:AGGREGATE [STREAMING]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: n_name
 |
@@ -669,7 +669,7 @@ order by
 |
 19:EXCHANGE [HASH(supp_nation,cust_nation,l_year)]
 |
-11:AGGREGATE
+11:AGGREGATE [STREAMING]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: n1.n_name, n2.n_name, year(l_shipdate)
 |
@@ -827,7 +827,7 @@ order by
 |
 26:EXCHANGE [HASH(o_year)]
 |
-15:AGGREGATE
+15:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * (1 - l_discount) ELSE 0 END), sum(l_extendedprice * (1 - l_discount))
 |  group by: year(o_orderdate)
 |
@@ -984,7 +984,7 @@ order by
 |
 19:EXCHANGE [HASH(nation,o_year)]
 |
-11:AGGREGATE
+11:AGGREGATE [STREAMING]
 |  output: sum(l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity)
 |  group by: n_name, year(o_orderdate)
 |
@@ -1113,7 +1113,7 @@ limit 20
 |
 13:EXCHANGE [HASH(c_custkey,c_name,c_acctbal,c_phone,n_name,c_address,c_comment)]
 |
-07:AGGREGATE
+07:AGGREGATE [STREAMING]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: c_custkey, c_name, c_acctbal, c_phone, n_name, c_address, c_comment
 |
@@ -1274,7 +1274,7 @@ order by
 |
 16:EXCHANGE [HASH(ps_partkey)]
 |
-05:AGGREGATE
+05:AGGREGATE [STREAMING]
 |  output: sum(ps_supplycost * ps_availqty)
 |  group by: ps_partkey
 |
@@ -1358,7 +1358,7 @@ order by
 |
 06:EXCHANGE [HASH(l_shipmode)]
 |
-03:AGGREGATE
+03:AGGREGATE [STREAMING]
 |  output: sum(CASE WHEN o_orderpriority = '1-URGENT' OR o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END), sum(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END)
 |  group by: l_shipmode
 |
@@ -1430,7 +1430,7 @@ order by
 |
 10:EXCHANGE [HASH(c_count)]
 |
-04:AGGREGATE
+04:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: count(o_orderkey)
 |
@@ -1440,7 +1440,7 @@ order by
 |
 08:EXCHANGE [HASH(c_custkey)]
 |
-03:AGGREGATE
+03:AGGREGATE [STREAMING]
 |  output: count(o_orderkey)
 |  group by: c_custkey
 |
@@ -1596,7 +1596,7 @@ order by
 |  |
 |  12:EXCHANGE [HASH(l_suppkey)]
 |  |
-|  04:AGGREGATE
+|  04:AGGREGATE [STREAMING]
 |  |  output: sum(l_extendedprice * (1 - l_discount))
 |  |  group by: l_suppkey
 |  |
@@ -1615,7 +1615,7 @@ order by
 |  |
 |  09:EXCHANGE [HASH(l_suppkey)]
 |  |
-|  02:AGGREGATE
+|  02:AGGREGATE [STREAMING]
 |  |  output: sum(l_extendedprice * (1 - l_discount))
 |  |  group by: l_suppkey
 |  |
@@ -1701,7 +1701,7 @@ order by
 |
 10:EXCHANGE [HASH(p_brand,p_type,p_size)]
 |
-05:AGGREGATE
+05:AGGREGATE [STREAMING]
 |  group by: p_brand, p_type, p_size, ps_suppkey
 |
 04:HASH JOIN [NULL AWARE LEFT ANTI JOIN, BROADCAST]
@@ -1801,7 +1801,7 @@ where
 |
 07:EXCHANGE [HASH(l_partkey)]
 |
-03:AGGREGATE
+03:AGGREGATE [STREAMING]
 |  output: avg(l_quantity)
 |  group by: l_partkey
 |
@@ -1891,7 +1891,7 @@ limit 100
 |
 15:EXCHANGE [HASH(c_name,c_custkey,o_orderkey,o_orderdate,o_totalprice)]
 |
-08:AGGREGATE
+08:AGGREGATE [STREAMING]
 |  output: sum(l_quantity)
 |  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
 |
@@ -1905,7 +1905,7 @@ limit 100
 |  |
 |  13:EXCHANGE [HASH(l_orderkey)]
 |  |
-|  04:AGGREGATE
+|  04:AGGREGATE [STREAMING]
 |  |  output: sum(l_quantity)
 |  |  group by: l_orderkey
 |  |
@@ -2131,7 +2131,7 @@ order by
 |
 11:EXCHANGE [HASH(l_partkey,l_suppkey)]
 |
-05:AGGREGATE
+05:AGGREGATE [STREAMING]
 |  output: sum(l_quantity)
 |  group by: l_partkey, l_suppkey
 |
@@ -2241,7 +2241,7 @@ limit 100
 |
 19:EXCHANGE [HASH(s_name)]
 |
-11:AGGREGATE
+11:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: s_name
 |
@@ -2372,7 +2372,7 @@ order by
 |
 13:EXCHANGE [HASH(cntrycode)]
 |
-06:AGGREGATE
+06:AGGREGATE [STREAMING]
 |  output: count(*), sum(c_acctbal)
 |  group by: substr(c_phone, 1, 2)
 |

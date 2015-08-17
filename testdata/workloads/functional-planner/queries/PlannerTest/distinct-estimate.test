@@ -45,7 +45,7 @@ select count(distinct l_orderkey), distinctpc(l_orderkey) from tpch.lineitem
 |
 03:EXCHANGE [HASH(l_orderkey)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: distinctpc(l_orderkey)
 |  group by: l_orderkey
 |

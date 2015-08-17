@@ -200,7 +200,7 @@ group by 1
 |
 02:EXCHANGE [HASH(int_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: int_col
 |

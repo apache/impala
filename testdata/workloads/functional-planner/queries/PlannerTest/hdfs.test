@@ -32,7 +32,7 @@ group by 1
 |
 02:EXCHANGE [HASH(zip)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: zip
 |

@@ -182,7 +182,10 @@ enum TImpalaQueryOptions {
 
   // For scan nodes with any conjuncts, use codegen to evaluate the conjuncts if
   // the number of rows * number of operators in the conjuncts exceeds this threshold.
-  SCAN_NODE_CODEGEN_THRESHOLD
+  SCAN_NODE_CODEGEN_THRESHOLD,
+
+  // If true, the planner will not generate plans with streaming preaggregations.
+  DISABLE_STREAMING_PREAGGREGATIONS,
 }
 
 // The summary of an insert.

@@ -290,6 +290,8 @@ class ImpalaTestSuite(BaseTestSuite):
         test_section['RESULTS'] = test_section['RESULTS'] \
             .replace(NAMENODE, '$NAMENODE') \
             .replace('$IMPALA_HOME', IMPALA_HOME)
+      if 'RUNTIME_PROFILE' in test_section:
+        verify_runtime_profile(test_section['RUNTIME_PROFILE'], result.runtime_profile)
     if pytest.config.option.update_results:
       output_file = os.path.join('/tmp', test_file_name.replace('/','_') + ".test")
       write_test_file(output_file, sections, encoding=encoding)

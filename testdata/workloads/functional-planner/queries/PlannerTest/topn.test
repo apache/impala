@@ -50,7 +50,7 @@ limit 10
 |
 03:EXCHANGE [HASH(zip)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: zip
 |
@@ -88,7 +88,7 @@ limit 4
 |
 03:EXCHANGE [HASH(int_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: sum(float_col)
 |  group by: int_col
 |
@@ -304,7 +304,7 @@ order by int_col desc limit 10 offset 5
 |
 05:EXCHANGE [HASH(id,bool_col,tinyint_col,smallint_col,int_col,bigint_col,float_col,double_col,date_string_col,string_col,timestamp_col,year,month)]
 |
-03:AGGREGATE
+03:AGGREGATE [STREAMING]
 |  group by: id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 |
 00:UNION

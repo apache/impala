@@ -1,0 +1,89 @@
+====
+---- QUERY
+# Test for preaggregation passthrough optimization - the group by keys are nearly unique.
+# Include string columns to ensure some varlen data in key is aggregated.
+select l_orderkey, l_partkey, l_shipmode, count(*), sum(l_quantity)
+from tpch.lineitem
+group by 1, 2, 3
+order by 1, 2, 3
+limit 10
+---- RESULTS
+1,2132,'AIR',1,28.00
+1,15635,'MAIL',1,32.00
+1,24027,'FOB',1,24.00
+1,63700,'REG AIR',1,8.00
+1,67310,'MAIL',1,36.00
+1,155190,'TRUCK',1,17.00
+2,106170,'RAIL',1,38.00
+3,4297,'AIR',1,45.00
+3,19036,'RAIL',1,49.00
+3,29380,'TRUCK',1,2.00
+---- TYPES
+bigint,bigint,string,bigint,decimal
+---- RUNTIME_PROFILE
+# Verify that passthrough was activated.
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Test for preaggregation passthrough optimization - the group by keys are nearly unique.
+# Aggregation result is a string to test that variable length data is handled correctly.
+select l_orderkey, l_partkey, count(*), group_concat(l_linestatus,"|")
+from tpch.lineitem
+group by 1, 2
+order by 3 desc, 1, 2
+limit 10;
+---- RESULTS
+52454,81890,2,'O|O'
+66177,188454,2,'O|O'
+90817,31501,2,'O|O'
+406371,84149,2,'O|O'
+947425,147543,2,'F|F'
+994534,69702,2,'O|O'
+1044672,106122,2,'F|F'
+1088965,26110,2,'O|O'
+1711296,70166,2,'F|F'
+1727424,130049,2,'F|F'
+---- TYPES
+bigint,bigint,bigint,string
+---- RUNTIME_PROFILE
+# Verify that passthrough was activated.
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Test for preaggregation passthrough optimization: two-phase count distinct aggregation.
+select count(distinct p_comment)
+from part
+---- RESULTS
+131753
+---- TYPES
+bigint
+---- RUNTIME_PROFILE
+# Verify that passthrough was activated.
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+====
+---- QUERY
+# Test for preaggregation passthrough optimization: count distinct aggregation with
+# grouping.
+select p_container, p_type, p_size, count(distinct p_mfgr)
+from part
+group by 1, 2, 3
+order by 4 desc, 1, 2, 3
+limit 10;
+---- RESULTS
+'JUMBO DRUM','ECONOMY POLISHED TIN',50,5
+'JUMBO PACK','ECONOMY PLATED BRASS',12,5
+'JUMBO PACK','STANDARD PLATED STEEL',23,5
+'LG JAR','MEDIUM BURNISHED COPPER',36,5
+'SM DRUM','ECONOMY BRUSHED BRASS',33,5
+'SM PACK','ECONOMY PLATED STEEL',32,5
+'WRAP CAN','ECONOMY BRUSHED STEEL',16,5
+'WRAP CAN','ECONOMY BURNISHED TIN',19,5
+'WRAP CASE','MEDIUM BURNISHED COPPER',47,5
+'WRAP PACK','PROMO POLISHED COPPER',14,5
+---- TYPES
+string,string,int,bigint
+---- RUNTIME_PROFILE
+# Verify that passthrough was activated.
+row_regex: .*RowsPassedThrough: .* \([1-9][0-9]*\)
+====
+

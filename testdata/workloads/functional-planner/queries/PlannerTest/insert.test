@@ -149,7 +149,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(year,m
 |
 02:EXCHANGE [HASH(year,month)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col)
 |  group by: year, month
 |
@@ -216,7 +216,7 @@ WRITE TO HDFS [functional.alltypessmall, OVERWRITE=false, PARTITION-KEYS=(2009,m
 |
 02:EXCHANGE [HASH(month)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: min(id), min(bool_col), min(tinyint_col), min(smallint_col), min(int_col), min(bigint_col), min(float_col), min(double_col), min(date_string_col), min(string_col), min(timestamp_col)
 |  group by: month
 |
@@ -372,7 +372,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
 |
 02:EXCHANGE [HASH(string_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: count(int_col)
 |  group by: string_col
 |
@@ -411,7 +411,7 @@ WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2010,10)]
 |
 03:EXCHANGE [HASH(string_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: string_col, int_col
 |
 00:SCAN HDFS [functional.alltypes]

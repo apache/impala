@@ -344,6 +344,9 @@ typedef void (*UdfClose)(FunctionContext* context,
 /// For clarity in documenting the UDA interface, the various types will be typedefed
 /// here. The actual execution resolves all the types at runtime and none of these types
 /// should actually be used.
+///
+/// TODO: add an Init() variant that takes the initial input value to avoid initializing
+/// then immediately overwriting the value.
 typedef AnyVal InputType;
 typedef AnyVal InputType2;
 typedef AnyVal ResultType;

@@ -61,7 +61,7 @@ limit 10
 |
 09:EXCHANGE [HASH(l_orderkey,o_orderdate,o_shippriority)]
 |
-05:AGGREGATE
+05:AGGREGATE [STREAMING]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: l_orderkey, o_orderdate, o_shippriority
 |
@@ -150,7 +150,7 @@ limit 10
 |
 09:EXCHANGE [HASH(l_orderkey,o_orderdate,o_shippriority)]
 |
-05:AGGREGATE
+05:AGGREGATE [STREAMING]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: l_orderkey, o_orderdate, o_shippriority
 |
@@ -258,7 +258,7 @@ limit 100
 |
 18:EXCHANGE [HASH(n_name)]
 |
-11:AGGREGATE
+11:AGGREGATE [STREAMING]
 |  output: sum(l_extendedprice * (1 - l_discount))
 |  group by: n_name
 |
@@ -450,7 +450,7 @@ limit 10
 |
 07:EXCHANGE [HASH(o_orderpriority)]
 |
-03:AGGREGATE
+03:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: o_orderpriority
 |
@@ -506,7 +506,7 @@ order by o_orderpriority limit 10
 |
 07:EXCHANGE [HASH(o_orderpriority)]
 |
-03:AGGREGATE
+03:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: o_orderpriority
 |
@@ -560,7 +560,7 @@ order by o_orderpriority limit 10
 |
 07:EXCHANGE [HASH(o_orderpriority)]
 |
-03:AGGREGATE
+03:AGGREGATE [STREAMING]
 |  output: count(*)
 |  group by: o_orderpriority
 |

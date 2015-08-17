@@ -431,6 +431,9 @@ class HashTable {
   /// duplicates.
   int64_t CurrentMemSize() const;
 
+  /// Returns the number of inserts that can be performed before resizing the table.
+  int64_t NumInsertsBeforeResize() const;
+
   /// Calculates the fill factor if 'buckets_to_fill' additional buckets were to be
   /// filled and resizes the hash table so that the projected fill factor is below the
   /// max fill factor.

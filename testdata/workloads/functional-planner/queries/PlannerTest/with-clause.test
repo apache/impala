@@ -171,7 +171,7 @@ limit 3
 |
 06:EXCHANGE [HASH(int_col,tinyint_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: max(id)
 |  group by: int_col, tinyint_col
 |

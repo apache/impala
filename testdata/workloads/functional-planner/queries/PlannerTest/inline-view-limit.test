@@ -112,7 +112,7 @@ where a.id < 5 limit 5
 |  |
 |  05:EXCHANGE [HASH(id)]
 |  |
-|  02:AGGREGATE
+|  02:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: id
 |  |

@@ -353,6 +353,15 @@ inline void HashTableCtx::set_level(int level) {
   level_ = level;
 }
 
+inline int64_t HashTable::CurrentMemSize() const {
+  return num_buckets_ * sizeof(Bucket) + num_duplicate_nodes_ * sizeof(DuplicateNode);
+}
+
+inline int64_t HashTable::NumInsertsBeforeResize() const {
+  return max<int64_t>(0,
+      static_cast<int64_t>(num_buckets_ * MAX_FILL_FACTOR) - num_filled_buckets_);
+}
+
 }
 
 #endif

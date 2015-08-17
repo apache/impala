@@ -58,6 +58,9 @@ public class AggregationNode extends PlanNode {
   // node is the root node of a distributed aggregation.
   private boolean needsFinalize_;
 
+  // If true, use streaming preaggregation algorithm. Not valid if this is a merge agg.
+  private boolean useStreamingPreagg_;
+
   /**
    * Create an agg node from aggInfo.
    */
@@ -80,11 +83,23 @@ public class AggregationNode extends PlanNode {
 
   public AggregateInfo getAggInfo() { return aggInfo_; }
 
-  // Unsets this node as requiring finalize. Only valid to call this if it is
-  // currently marked as needing finalize.
+  /**
+   * Unsets this node as requiring finalize. Only valid to call this if it is
+   * currently marked as needing finalize.
+   */
   public void unsetNeedsFinalize() {
     Preconditions.checkState(needsFinalize_);
     needsFinalize_ = false;
+  }
+
+  /**
+   * Sets this node as a preaggregation. Only valid to call this if it is not marked
+   * as a preaggregation
+   */
+  public void setIsPreagg(PlannerContext ctx_) {
+    TQueryOptions query_options = ctx_.getQueryOptions();
+    useStreamingPreagg_ =  !query_options.disable_streaming_preaggregations &&
+        aggInfo_.getGroupingExprs().size() > 0;
   }
 
   /**
@@ -99,7 +114,7 @@ public class AggregationNode extends PlanNode {
   }
 
   @Override
-  public boolean isBlockingNode() { return true; }
+  public boolean isBlockingNode() { return !useStreamingPreagg_; }
 
   @Override
   public void init(Analyzer analyzer) throws InternalException {
@@ -204,7 +219,9 @@ public class AggregationNode extends PlanNode {
     msg.agg_node = new TAggregationNode(
         aggregateFunctions,
         aggInfo_.getIntermediateTupleId().asInt(),
-        aggInfo_.getOutputTupleId().asInt(), needsFinalize_);
+        aggInfo_.getOutputTupleId().asInt(), needsFinalize_,
+        useStreamingPreagg_,
+        getChild(0).getCardinality());
     List<Expr> groupingExprs = aggInfo_.getGroupingExprs();
     if (groupingExprs != null) {
       msg.agg_node.setGrouping_exprs(Expr.treesToThrift(groupingExprs));
@@ -213,6 +230,7 @@ public class AggregationNode extends PlanNode {
 
   @Override
   protected String getDisplayLabelDetail() {
+    if (useStreamingPreagg_) return "STREAMING";
     if (needsFinalize_) return "FINALIZE";
     return null;
   }

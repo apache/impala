@@ -715,6 +715,7 @@ public class DistributedPlanner {
       // 'node' is phase 1 of a DISTINCT aggregation; the actual agg fragment
       // will get created in the next createAggregationFragment() call
       // for the parent AggregationNode
+      node.setIsPreagg(ctx_);
       childFragment.addPlanRoot(node);
       return childFragment;
     }
@@ -732,6 +733,7 @@ public class DistributedPlanner {
       // and goes into a parent fragment
       childFragment.addPlanRoot(node);
       node.setIntermediateTuple();
+      node.setIsPreagg(ctx_);
 
       // if there is a limit, we need to transfer it from the pre-aggregation
       // node in the child fragment to the merge aggregation node in the parent

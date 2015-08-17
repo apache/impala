@@ -50,7 +50,7 @@ where month = 1
 |  |
 |  05:EXCHANGE [HASH(int_col)]
 |  |
-|  01:AGGREGATE
+|  01:AGGREGATE [STREAMING]
 |  |  output: count(*)
 |  |  group by: int_col
 |  |
@@ -375,7 +375,7 @@ NODE 0:
 |
 02:EXCHANGE [HASH(tinyint_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: count(*), min(functional.alltypesagg.tinyint_col), max(functional.alltypesagg.tinyint_col), sum(functional.alltypesagg.tinyint_col), avg(functional.alltypesagg.tinyint_col)
 |  group by: functional.alltypesagg.tinyint_col
 |
@@ -405,7 +405,7 @@ group by 1
 |
 02:EXCHANGE [HASH(tinyint_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col), avg(tinyint_col)
 |  group by: tinyint_col
 |
@@ -445,7 +445,7 @@ from
 |
 03:EXCHANGE [HASH(int_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: sum(float_col), min(float_col)
 |  group by: int_col
 |
@@ -493,7 +493,7 @@ from (select distinct * from functional.testtbl) x
 |
 05:EXCHANGE [HASH(x.id,x.name,x.zip)]
 |
-02:AGGREGATE
+02:AGGREGATE [STREAMING]
 |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
 |
 04:AGGREGATE [FINALIZE]
@@ -501,7 +501,7 @@ from (select distinct * from functional.testtbl) x
 |
 03:EXCHANGE [HASH(functional.testtbl.id,functional.testtbl.name,functional.testtbl.zip)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
 |
 00:SCAN HDFS [functional.testtbl]
@@ -527,7 +527,7 @@ from (select distinct * from functional.testtbl) x
 |
 05:EXCHANGE [HASH(id,zip)]
 |
-02:AGGREGATE
+02:AGGREGATE [STREAMING]
 |  group by: functional.testtbl.id, functional.testtbl.zip
 |
 04:AGGREGATE [FINALIZE]
@@ -535,7 +535,7 @@ from (select distinct * from functional.testtbl) x
 |
 03:EXCHANGE [HASH(functional.testtbl.id,functional.testtbl.name,functional.testtbl.zip)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
 |
 00:SCAN HDFS [functional.testtbl]
@@ -571,7 +571,7 @@ and   c2 > 10
 |
 02:EXCHANGE [HASH(int_col % 7)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: count(*), avg(functional.alltypesagg.int_col)
 |  group by: functional.alltypesagg.int_col % 7
 |
@@ -664,7 +664,7 @@ group by x.smallint_col
 |
 09:EXCHANGE [HASH(x.smallint_col)]
 |
-05:AGGREGATE
+05:AGGREGATE [STREAMING]
 |  output: count(b.id)
 |  group by: a.smallint_col
 |
@@ -803,7 +803,7 @@ group by x.smallint_col
 |
 11:EXCHANGE [HASH(x.smallint_col)]
 |
-06:AGGREGATE
+06:AGGREGATE [STREAMING]
 |  output: sum(count(a.id))
 |  group by: b.smallint_col
 |
@@ -818,7 +818,7 @@ group by x.smallint_col
 |  |
 |  08:EXCHANGE [HASH(b.smallint_col)]
 |  |
-|  04:AGGREGATE
+|  04:AGGREGATE [STREAMING]
 |  |  output: count(a.id)
 |  |  group by: b.smallint_col
 |  |

@@ -310,6 +310,8 @@ Status impala::SetQueryOption(const string& key, const string& value,
         break;
       case TImpalaQueryOptions::SCAN_NODE_CODEGEN_THRESHOLD:
         query_options->__set_scan_node_codegen_threshold(atol(value.c_str()));
+      case TImpalaQueryOptions::DISABLE_STREAMING_PREAGGREGATIONS:
+        query_options->__set_disable_streaming_preaggregations(atoi(value.c_str()));
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

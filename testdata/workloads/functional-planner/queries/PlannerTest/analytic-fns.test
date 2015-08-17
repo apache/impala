@@ -19,7 +19,7 @@ group by int_col, tinyint_col
 |
 04:EXCHANGE [HASH(int_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  group by: int_col, tinyint_col
 |
 00:SCAN HDFS [functional.alltypes]
@@ -652,7 +652,7 @@ order by 1, 2, 3
 |
 07:EXCHANGE [HASH(bool_col)]
 |
-01:AGGREGATE
+01:AGGREGATE [STREAMING]
 |  output: min(int_col), min(tinyint_col), max(int_col), sum(bigint_col), sum(int_col)
 |  group by: bool_col
 |
@@ -1133,7 +1133,7 @@ order by 1 desc nulls first
 |
 16:EXCHANGE [HASH(min(id) OVER(...))]
 |
-07:AGGREGATE
+07:AGGREGATE [STREAMING]
 |  group by: min(id) OVER(...)
 |
 00:UNION
