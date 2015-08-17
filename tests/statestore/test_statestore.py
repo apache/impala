@@ -458,7 +458,7 @@ class TestStatestore():
     (
       sub.start()
          .register(topics=reg)
-         .wait_for_update(1)
+         .wait_for_update(2)
          .kill()
          .wait_for_failure()
     )
