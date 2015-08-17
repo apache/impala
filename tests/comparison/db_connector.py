@@ -35,6 +35,7 @@ from json import dumps
 from logging import getLogger
 from os import chmod
 from os.path import basename, dirname
+from pg8000 import connect as postgresql_connect
 from random import randint
 from re import compile
 import shelve
@@ -158,12 +159,6 @@ class DbConnector(object):
         connection_args['host'] = self.host_name
       if self.port:
         connection_args['port'] = self.port
-      try:
-        from psycopg2 import connect as postgresql_connect
-      except:
-        print('Error importing psycopg2. Please make sure it is installed. '
-            'See the README for details.')
-        raise
       connection = postgresql_connect(**connection_args)
       connection.autocommit = True
     elif self.db_type == MYSQL:
