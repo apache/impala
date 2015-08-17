@@ -68,7 +68,7 @@ ScannerContext::Stream* ScannerContext::AddStream(DiskIoMgr::ScanRange* range) {
   stream->output_buffer_pos_ = NULL;
   stream->output_buffer_bytes_left_ =
       const_cast<int64_t*>(&OUTPUT_BUFFER_BYTES_LEFT_INIT);
-  stream->contains_tuple_data_ = !scan_node_->tuple_desc()->string_slots().empty();
+  stream->contains_tuple_data_ = scan_node_->tuple_desc()->ContainsStringData();
   streams_.push_back(stream);
   return stream;
 }

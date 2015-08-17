@@ -347,6 +347,9 @@ class TupleDescriptor {
   TupleId id() const { return id_; }
   std::string DebugString() const;
 
+  /// Returns true if this tuple or any nested collection item tuples have string slots.
+  bool ContainsStringData() const;
+
   /// Creates a typed struct description for llvm.  The layout of the struct is computed
   /// by the FE which includes the order of the fields in the resulting struct.
   /// Returns the struct type or NULL if the type could not be created.

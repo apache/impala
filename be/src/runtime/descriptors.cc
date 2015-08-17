@@ -280,6 +280,16 @@ void TupleDescriptor::AddSlot(SlotDescriptor* slot) {
   }
 }
 
+bool TupleDescriptor::ContainsStringData() const {
+  if (!string_slots_.empty()) return true;
+  for (int i = 0; i < collection_slots_.size(); ++i) {
+    if (collection_slots_[i]->collection_item_descriptor_->ContainsStringData()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 string TupleDescriptor::DebugString() const {
   stringstream out;
   out << "Tuple(id=" << id_ << " size=" << byte_size_;
