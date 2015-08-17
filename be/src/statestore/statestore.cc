@@ -453,6 +453,10 @@ Status Statestore::SendTopicUpdate(Subscriber* subscriber, bool* update_skipped)
         continue;
       }
 
+      VLOG_RPC << "Received update for topic " << update.topic_name
+               << " from  " << subscriber->id() << ", number of entries: "
+               << update.topic_entries.size();
+
       // The subscriber sent back their from_version which indicates that they want to
       // reset their max version for this topic to this value. The next update sent will
       // be from this version.
