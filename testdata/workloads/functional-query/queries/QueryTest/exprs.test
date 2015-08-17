@@ -1756,6 +1756,42 @@ select from_unixtime(tmp.val, tmp.fmt) from (values
 string
 ====
 ---- QUERY
+select to_timestamp(tmp.val) from (values
+(0 as val),
+(34304461),
+(68439783)) as tmp
+---- RESULTS
+1970-01-01 00:00:00
+1971-02-02 01:01:01
+1972-03-03 03:03:03
+---- TYPES
+TIMESTAMP
+====
+---- QUERY
+select to_timestamp(tmp.val, tmp.fmt) from (values
+('1970-01-01 00:00:00' as val, 'yyyy-MM-dd HH:mm:ss' as fmt),
+('01:01:01 02/1971/02', 'HH:mm:ss dd/yyyy/MM'),
+('1972||Mar||03||030303', 'yyyy||MMM||dd||HHmmss')) as tmp
+---- RESULTS
+1970-01-01 00:00:00
+1971-02-02 01:01:01
+1972-03-03 03:03:03
+---- TYPES
+TIMESTAMP
+====
+---- QUERY
+select from_timestamp(tmp.val, tmp.fmt) from (values
+('1970-01-01 00:00:00' as val, 'yyyy-MM-dd HH:mm:ss' as fmt),
+('1971-02-02 01:01:01', 'yyyy-MM-dd HH:mm:ss'),
+('1972-03-03 03:03:03', 'yyyy-MM-dd HH:mm:ss')) as tmp
+---- RESULTS
+'1970-01-01 00:00:00'
+'1971-02-02 01:01:01'
+'1972-03-03 03:03:03'
+---- TYPES
+string
+====
+---- QUERY
 select 1.1 * 1.1 + cast(1.1 as float)
 ---- RESULTS
 2.310000023841858
@@ -1864,13 +1900,6 @@ where regexp_replace(x, y, z) = 'cde'
 AnalysisException: Error evaluating "regexp_replace('abc', '*', 'def') = 'cde'"
 CAUSED BY: InternalException: Could not compile regexp pattern: *
 Error: no argument for repetition operator: *
-====
----- QUERY
-select * from functional.insert_string_partitioned
-where s2 = from_unixtime(unix_timestamp(), 'yyyyMMMdd hh:mm:ss')
----- RESULTS
----- CATCH
-InternalException: Bad date/time conversion format: yyyyMMMdd hh:mm:ss
 ====
 ---- QUERY
 # Test for factorial operator

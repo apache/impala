@@ -361,6 +361,15 @@ class ExprTest : public testing::Test {
         + ", 'yyyy-MM-dd')", "1970-01-01");
     TestStringValue("from_unixtime(cast(" + lexical_cast<string>(unix_time_at_local_epoch)
         + " as bigint), 'yyyy-MM-dd')", "1970-01-01");
+    TestIsNull("to_timestamp(NULL)", TYPE_TIMESTAMP);
+    TestIsNull("to_timestamp(NULL, 'yyyy-MM-dd')", TYPE_TIMESTAMP);
+    TestIsNull("from_timestamp(NULL, 'yyyy-MM-dd')", TYPE_STRING);
+    TestStringValue("cast(to_timestamp(" + lexical_cast<string>(unix_time_at_local_epoch)
+        + ") as string)", "1970-01-01 00:00:00");
+    TestStringValue("cast(to_timestamp('1970-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss') \
+        as string)", "1970-01-01 00:00:00");
+    TestStringValue("from_timestamp('1970-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')",
+        "1970-01-01 00:00:00");
   }
 
   // Decimals don't work with TestValue.
@@ -3284,6 +3293,14 @@ TEST_F(ExprTest, TimestampFunctions) {
         'yyyy-MM-dd')", "1999-01-02");
   TestStringValue("from_unixtime(unix_timestamp('1999-01-01 10:10:10') + 10, \
         'yyyy-MM-dd HH:mm:ss')", "1999-01-01 10:10:20");
+  TestStringValue("from_timestamp(cast('1999-01-01 10:10:10' as timestamp), \
+      'yyyy-MM-dd')", "1999-01-01");
+  TestStringValue("from_timestamp(cast('1999-01-01 10:10:10' as timestamp), \
+      'yyyy-MM-dd HH:mm:ss')", "1999-01-01 10:10:10");
+  TestStringValue("from_timestamp(to_timestamp(unix_timestamp('1999-01-01 10:10:10') \
+      + 60*60*24), 'yyyy-MM-dd')", "1999-01-02");
+  TestStringValue("from_timestamp(to_timestamp(unix_timestamp('1999-01-01 10:10:10') \
+      + 10), 'yyyy-MM-dd HH:mm:ss')", "1999-01-01 10:10:20");
   TestValue("cast('2011-12-22 09:10:11.123456789' as timestamp) > \
       cast('2011-12-22 09:10:11.12345678' as timestamp)", TYPE_BOOLEAN, true);
   TestValue("cast('2011-12-22 08:10:11.123456789' as timestamp) > \
@@ -3529,6 +3546,10 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestError("from_unixtime(0, NULL)");
   TestError("from_unixtime(cast(0 as bigint), NULL)");
   TestError("from_unixtime(NULL, NULL)");
+  TestError("to_timestamp('1970-01-01 00:00:00', NULL)");
+  TestError("to_timestamp(NULL, NULL)");
+  TestError("from_timestamp(cast('1970-01-01 00:00:00' as timestamp), NULL)");
+  TestError("from_timestamp(NULL, NULL)");
   TestError("unix_timestamp('1970-01-01 00:00:00', ' ')");
   TestError("unix_timestamp('1970-01-01 00:00:00', ' -===-')");
   TestError("unix_timestamp('1970-01-01', '\"foo\"')");
@@ -3540,12 +3561,41 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestError("from_unixtime(0, NULL)");
   TestError("from_unixtime(0, ' ')");
   TestError("from_unixtime(0, ' -=++=- ')");
+  TestError("to_timestamp('1970-01-01 00:00:00', ' ')");
+  TestError("to_timestamp('1970-01-01 00:00:00', ' -===-')");
+  TestError("to_timestamp('1970-01-01', '\"foo\"')");
+  TestError("from_timestamp(cast('1970-01-01 00:00:00' as timestamp), ' ')");
+  TestError("from_timestamp(cast('1970-01-01 00:00:00' as timestamp), ' -===-')");
+  TestError("from_timestamp(cast('1970-01-01' as timestamp), '\"foo\"')");
+  TestError("to_timestamp('1970-01-01', 'YY-MM-dd HH:mm:dd')");
+  TestError("to_timestamp('1970-01-01', 'yyyy-MM-dd hh::dd')");
+  TestError("to_timestamp('1970-01-01', 'YY-MM-dd HH:mm:dd')");
+  TestError("to_timestamp('1970-01-01', 'yyyy-MM-dd hh::dd')");
+  TestError("to_timestamp('1970-01-01', '')");
+  TestError("to_timestamp('1970-01-01', NULL)");
+  TestError("to_timestamp('1970-01-01', ' ')");
+  TestError("to_timestamp('1970-01-01', ' -=++=- ')");
+  TestError("from_timestamp(cast('1970-01-01' as timestamp), 'YY-MM-dd HH:mm:dd')");
+  TestError("from_timestamp(cast('1970-01-01' as timestamp), 'yyyy-MM-dd hh::dd')");
+  TestError("from_timestamp(cast('1970-01-01' as timestamp), 'YY-MM-dd HH:mm:dd')");
+  TestError("from_timestamp(cast('1970-01-01' as timestamp), 'yyyy-MM-dd hh::dd')");
+  TestError("from_timestamp(cast('1970-01-01' as timestamp), '')");
+  TestError("from_timestamp(cast('1970-01-01' as timestamp), NULL)");
+  TestError("from_timestamp(cast('1970-01-01' as timestamp), ' ')");
+  TestError("from_timestamp(cast('1970-01-01' as timestamp), ' -=++=- ')");
 
   // Valid format string, but invalid Timestamp, should return null;
   TestIsNull("unix_timestamp('1970-01-01', 'yyyy-MM-dd HH:mm:ss')", TYPE_BIGINT);
   TestIsNull("unix_timestamp('1970', 'yyyy-MM-dd')", TYPE_BIGINT);
   TestIsNull("unix_timestamp('', 'yyyy-MM-dd')", TYPE_BIGINT);
   TestIsNull("unix_timestamp('|1|1 00|00|00', 'yyyy|M|d HH|MM|ss')", TYPE_BIGINT);
+  TestIsNull("to_timestamp('1970-01-01', 'yyyy-MM-dd HH:mm:ss')", TYPE_TIMESTAMP);
+  TestIsNull("to_timestamp('1970', 'yyyy-MM-dd')", TYPE_TIMESTAMP);
+  TestIsNull("to_timestamp('', 'yyyy-MM-dd')", TYPE_TIMESTAMP);
+  TestIsNull("to_timestamp('|1|1 00|00|00', 'yyyy|M|d HH|MM|ss')", TYPE_TIMESTAMP);
+  TestIsNull("from_timestamp(cast('1970' as timestamp), 'yyyy-MM-dd')", TYPE_STRING);
+  TestIsNull("from_timestamp(cast('' as timestamp), 'yyyy-MM-dd')", TYPE_STRING);
+  TestIsNull("from_timestamp(cast('|1|1 00|00|00' as timestamp), 'yyyy|M|d HH|MM|ss')", TYPE_STRING);
 
   TestIsNull("unix_timestamp('1970-01', 'yyyy-MM-dd')", TYPE_BIGINT);
   TestIsNull("unix_timestamp('1970-20-01', 'yyyy-MM-dd')", TYPE_BIGINT);
@@ -3917,12 +3967,37 @@ TEST_F(ExprTest, TimestampFunctions) {
       'yyyy-MM-dd HH:mm:ss+hhmm'))", TYPE_STRING);
   TestIsNull("from_unixtime(unix_timestamp('1400-01-01 00:00:00+1500', \
       'yyyy-MM-dd HH:mm:ss+hhmm'))", TYPE_STRING);
+  TestStringValue("cast(to_timestamp('2012-01-01 19:10:11+02:30', \
+      'yyyy-MM-dd HH:mm:ss+hh:mm') as string)", "2012-01-01 16:40:11");
+  TestStringValue("cast(to_timestamp('2012-01-01 19:10:11-0630', \
+      'yyyy-MM-dd HH:mm:ss-hhmm') as string)", "2012-01-02 01:40:11");
+  TestStringValue("cast(to_timestamp('2012-01-01 01:10:11+02', \
+      'yyyy-MM-dd HH:mm:ss+hh') as string)", "2011-12-31 23:10:11");
+  TestStringValue("cast(to_timestamp('2012-12-31 11:10:11-1430', \
+      'yyyy-MM-dd HH:mm:ss+hhmm') as string)", "2013-01-01 01:40:11");
+  TestStringValue("cast(to_timestamp('2012-01-01 11:10:11+1430', \
+      'yyyy-MM-dd HH:mm:ss+hhmm') as string)", "2011-12-31 20:40:11");
+  TestStringValue("cast(to_timestamp('2012-02-28 11:10:11-1430', \
+      'yyyy-MM-dd HH:mm:ss+hhmm') as string)", "2012-02-29 01:40:11");
+  TestStringValue("cast(to_timestamp('1970-01-01 00:00:00+05:00', \
+      'yyyy-MM-dd HH:mm:ss+hh:mm') as string)", "1969-12-31 19:00:00");
+  TestStringValue("cast(to_timestamp('1400-01-01 19:00:00+1500', \
+      'yyyy-MM-dd HH:mm:ss+hhmm') as string)", "1400-01-01 04:00:00");
+  TestStringValue("cast(to_timestamp('1400-01-01 02:00:00+0200', \
+      'yyyy-MM-dd HH:mm:ss+hhmm') as string)", "1400-01-01 00:00:00");
 
   TestError("from_unixtime(unix_timestamp('2012-02-28 11:10:11+0530', \
       'yyyy-MM-dd HH:mm:ss+hhdd'))");
   TestError("from_unixtime(unix_timestamp('2012-02-28+0530', 'yyyy-MM-dd+hhmm'))");
   TestError("from_unixtime(unix_timestamp('10:00:00+0530 2010-01-01', \
       'HH:mm:ss+hhmm yyyy-MM-dd'))");
+
+  TestError("to_timestamp('2012-02-28 11:10:11+0530', 'yyyy-MM-dd HH:mm:ss+hhdd')");
+  TestError("to_timestamp('2012-02-28+0530', 'yyyy-MM-dd+hhmm')");
+  TestError("to_timestamp('10:00:00+0530 2010-01-01', 'HH:mm:ss+hhmm yyyy-MM-dd')");
+  TestError("from_timestamp(cast('2012-02-28 11:10:11+0530' as timestamp), 'yyyy-MM-dd HH:mm:ss+hhdd')");
+  TestError("from_timestamp(cast('2012-02-28+0530' as timestamp), 'yyyy-MM-dd+hhmm')");
+  TestError("from_timestamp(cast('10:00:00+0530 2010-01-01' as timestamp), 'HH:mm:ss+hhmm yyyy-MM-dd')");
 }
 
 TEST_F(ExprTest, ConditionalFunctions) {

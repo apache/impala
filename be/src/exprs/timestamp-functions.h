@@ -67,6 +67,15 @@ class TimestampFunctions {
   /// Returns the current time.
   static BigIntVal Unix(FunctionContext* context);
 
+  // Functions to convert to and from TimestampVal type
+  static TimestampVal ToTimestamp(FunctionContext* context, const BigIntVal& bigint_val);
+  static TimestampVal ToTimestamp(FunctionContext* context, const StringVal& date,
+      const StringVal& fmt);
+  static StringVal FromTimestamp(FunctionContext* context, const TimestampVal& date,
+      const StringVal& fmt);
+
+  static StringVal StringValFromTimestamp(FunctionContext* context, TimestampValue tv,
+      const StringVal& fmt);
   static BigIntVal UnixFromString(FunctionContext* context, const StringVal& sv);
 
   /// Return a timestamp string from a unix time_t

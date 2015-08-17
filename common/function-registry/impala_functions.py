@@ -228,6 +228,16 @@ visible_functions = [
    "impala::TimestampFunctions::IntMonthsBetween"],
   [['months_between'], 'DOUBLE', ['TIMESTAMP', 'TIMESTAMP'],
    "impala::TimestampFunctions::MonthsBetween"],
+  [['to_timestamp'], 'TIMESTAMP', ['BIGINT'],
+   '_ZN6impala18TimestampFunctions11ToTimestampEPN10impala_udf15FunctionContextERKNS1_9BigIntValE'],
+  [['to_timestamp'], 'TIMESTAMP', ['STRING', 'STRING'],
+   '_ZN6impala18TimestampFunctions11ToTimestampEPN10impala_udf15FunctionContextERKNS1_9StringValES6_',
+   '_ZN6impala18TimestampFunctions22UnixAndFromUnixPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE',
+   '_ZN6impala18TimestampFunctions20UnixAndFromUnixCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE'],
+  [['from_timestamp'], 'STRING', ['TIMESTAMP', 'STRING'],
+   'impala::TimestampFunctions::FromTimestamp',
+   '_ZN6impala18TimestampFunctions22UnixAndFromUnixPrepareEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE',
+   '_ZN6impala18TimestampFunctions20UnixAndFromUnixCloseEPN10impala_udf15FunctionContextENS2_18FunctionStateScopeE'],
 
   # Math builtin functions
   [['pi'], 'DOUBLE', [], 'impala::MathFunctions::Pi'],

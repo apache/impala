@@ -134,6 +134,25 @@ void TimestampFunctions::UnixAndFromUnixClose(FunctionContext* context,
   }
 }
 
+StringVal TimestampFunctions::StringValFromTimestamp(FunctionContext* context,
+    TimestampValue tv, const StringVal& fmt) {
+  void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
+  DateTimeFormatContext* dt_ctx = reinterpret_cast<DateTimeFormatContext*>(state);
+  if (!context->IsArgConstant(1)) {
+    dt_ctx->Reset(reinterpret_cast<const char*>(fmt.ptr), fmt.len);
+    if (!TimestampParser::ParseFormatTokens(dt_ctx)){
+      TimestampFunctions::ReportBadFormat(context, fmt, false);
+      return StringVal::null();
+    }
+  }
+
+  int buff_len = dt_ctx->fmt_out_len + 1;
+  StringVal result(context, buff_len);
+  result.len = tv.Format(*dt_ctx, buff_len, reinterpret_cast<char*>(result.ptr));
+  if (result.len <= 0) return StringVal::null();
+  return result;
+}
+
 template <class TIME>
 StringVal TimestampFunctions::FromUnix(FunctionContext* context, const TIME& intp) {
   if (intp.is_null) return StringVal::null();
@@ -151,44 +170,14 @@ StringVal TimestampFunctions::FromUnix(FunctionContext* context, const TIME& int
   if (intp.is_null) return StringVal::null();
 
   TimestampValue t(intp.val);
-  void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
-  DateTimeFormatContext* dt_ctx = reinterpret_cast<DateTimeFormatContext*>(state);
-  if (!context->IsArgConstant(1)) {
-    dt_ctx->Reset(reinterpret_cast<const char*>(fmt.ptr), fmt.len);
-    if (!TimestampParser::ParseFormatTokens(dt_ctx)){
-      TimestampFunctions::ReportBadFormat(context, fmt, false);
-      return StringVal::null();
-    }
-  }
-
-  int buff_len = dt_ctx->fmt_out_len + 1;
-  StringVal result(context, buff_len);
-  result.len = t.Format(*dt_ctx, buff_len, reinterpret_cast<char*>(result.ptr));
-  if (result.len <= 0) return StringVal::null();
-  return result;
+  return StringValFromTimestamp(context, t, fmt);
 }
 
 BigIntVal TimestampFunctions::Unix(FunctionContext* context, const StringVal& string_val,
     const StringVal& fmt) {
-  if (fmt.is_null || fmt.len == 0) {
-    TimestampFunctions::ReportBadFormat(context, fmt, false);
-    return BigIntVal::null();
-  }
-  if (string_val.is_null || string_val.len == 0) return BigIntVal::null();
-
-  void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
-  DateTimeFormatContext* dt_ctx = reinterpret_cast<DateTimeFormatContext*>(state);
-  if (!context->IsArgConstant(1)) {
-     dt_ctx->Reset(reinterpret_cast<const char*>(fmt.ptr), fmt.len);
-     if (!TimestampParser::ParseFormatTokens(dt_ctx)) {
-       ReportBadFormat(context, fmt, false);
-       return BigIntVal::null();
-     }
-  }
-
-  TimestampValue tv = TimestampValue(
-      reinterpret_cast<const char*>(string_val.ptr), string_val.len, *dt_ctx);
-  if (!tv.HasDate()) return BigIntVal::null();
+  const TimestampVal& tv_val = ToTimestamp(context, string_val, fmt);
+  if (tv_val.is_null) return BigIntVal::null();
+  const TimestampValue& tv = TimestampValue::FromTimestampVal(tv_val);
   return BigIntVal(tv.ToUnixTime());
 }
 
@@ -202,6 +191,48 @@ BigIntVal TimestampFunctions::Unix(FunctionContext* context, const TimestampVal&
 BigIntVal TimestampFunctions::Unix(FunctionContext* context) {
   if (!context->impl()->state()->now()->HasDate()) return BigIntVal::null();
   return BigIntVal(context->impl()->state()->now()->ToUnixTime());
+}
+
+TimestampVal TimestampFunctions::ToTimestamp(FunctionContext* context,
+    const BigIntVal& bigint_val) {
+  if (bigint_val.is_null) return TimestampVal::null();
+  TimestampValue tv(bigint_val.val);
+  if (!tv.HasDate()) return TimestampVal::null();
+  TimestampVal tv_val;
+  tv.ToTimestampVal(&tv_val);
+  return tv_val;
+}
+
+TimestampVal TimestampFunctions::ToTimestamp(FunctionContext* context,
+    const StringVal& date, const StringVal& fmt) {
+  if (fmt.is_null || fmt.len == 0) {
+    TimestampFunctions::ReportBadFormat(context, fmt, false);
+    return TimestampVal::null();
+  }
+  if (date.is_null || date.len == 0) return TimestampVal::null();
+  void* state = context->GetFunctionState(FunctionContext::THREAD_LOCAL);
+  DateTimeFormatContext* dt_ctx = reinterpret_cast<DateTimeFormatContext*>(state);
+  if (!context->IsArgConstant(1)) {
+     dt_ctx->Reset(reinterpret_cast<const char*>(fmt.ptr), fmt.len);
+     if (!TimestampParser::ParseFormatTokens(dt_ctx)) {
+       ReportBadFormat(context, fmt, false);
+       return TimestampVal::null();
+     }
+  }
+  TimestampValue tv = TimestampValue(
+      reinterpret_cast<const char*>(date.ptr), date.len, *dt_ctx);
+  if (!tv.HasDate()) return TimestampVal::null();
+  TimestampVal tv_val;
+  tv.ToTimestampVal(&tv_val);
+  return tv_val;
+}
+
+StringVal TimestampFunctions::FromTimestamp(FunctionContext* context,
+    const TimestampVal& date, const StringVal& fmt) {
+  if (date.is_null) return StringVal::null();
+  TimestampValue tv = TimestampValue::FromTimestampVal(date);
+  if (!tv.HasDate()) return StringVal::null();
+  return StringValFromTimestamp(context, tv, fmt);
 }
 
 BigIntVal TimestampFunctions::UnixFromString(FunctionContext* context,
