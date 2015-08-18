@@ -27,3 +27,10 @@ select sum_small_decimal(c3) from functional.decimal_tiny;
 ---- TYPES
 decimal
 ====
+---- QUERY
+select trunc_sum(double_col),sum(double_col) from functional_parquet.alltypes where id < 5555;
+---- RESULTS
+252348,252348.5
+---- TYPES
+bigint,double
+====

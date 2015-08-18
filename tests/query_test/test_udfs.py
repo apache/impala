@@ -32,8 +32,11 @@ class TestUdfs(ImpalaTestSuite):
       self.create_udfs_template, vector, database,
       get_fs_path('/test-warehouse/libTestUdfs.so'))
     self.__load_functions(
-      self.create_udas_template, vector, database,
+      self.create_sample_udas_template, vector, database,
       get_fs_path('/test-warehouse/libudasample.so'))
+    self.__load_functions(
+      self.create_test_udas_template, vector, database,
+      get_fs_path('/test-warehouse/libTestUdas.so'))
 
     self.run_test_case('QueryTest/udf', vector, use_db=database)
     if not IS_S3: # S3 doesn't support INSERT
@@ -226,8 +229,8 @@ class TestUdfs(ImpalaTestSuite):
       result = self.execute_query_expect_success(self.client, query, exec_options)
       assert result is not None
 
-  # Create test UDA functions in {database} from library {location}
-  create_udas_template = """
+  # Create sample UDA functions in {database} from library {location}
+  create_sample_udas_template = """
 drop function if exists {database}.test_count(int);
 drop function if exists {database}.hll(int);
 drop function if exists {database}.sum_small_decimal(decimal(9,2));
@@ -242,6 +245,18 @@ location '{location}' update_fn='HllUpdate';
 
 create aggregate function {database}.sum_small_decimal(decimal(9,2))
 returns decimal(9,2) location '{location}' update_fn='SumSmallDecimalUpdate';
+"""
+
+  # Create test UDA functions in {database} from library {location}
+  create_test_udas_template = """
+drop function if exists {database}.trunc_sum(double);
+
+create database if not exists {database};
+
+create aggregate function {database}.trunc_sum(double)
+returns bigint intermediate double location '{location}'
+update_fn='TruncSumUpdate' merge_fn='TruncSumMerge'
+serialize_fn='TruncSumSerialize' finalize_fn='TruncSumFinalize';
 """
 
   # Create test UDF functions in {database} from library {location}

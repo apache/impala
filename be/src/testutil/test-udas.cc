@@ -48,12 +48,13 @@ StringVal AggSerialize(FunctionContext*, const StringVal& v) { return v;}
 StringVal AggFinalize(FunctionContext*, const StringVal& v) { return v;}
 
 
-// Defines Agg(int) returns BIGINT intermediate CHAR(10)
-void Agg(FunctionContext*, const IntVal&, BufferVal*) {}
-void AggUpdate(FunctionContext*, const IntVal&, BufferVal*) {}
-void AggInit(FunctionContext*, BufferVal*) {}
-void AggMerge(FunctionContext*, const BufferVal&, BufferVal*) {}
-BigIntVal AggFinalize(FunctionContext*, const BufferVal&) {
+// Defines AggIntermediate(int) returns BIGINT intermediate CHAR(10)
+// TODO: StringVal should be replaced with BufferVal in Impala 2.0
+void AggIntermediate(FunctionContext*, const IntVal&, StringVal*) {}
+void AggIntermediateUpdate(FunctionContext*, const IntVal&, StringVal*) {}
+void AggIntermediateInit(FunctionContext*, StringVal*) {}
+void AggIntermediateMerge(FunctionContext*, const StringVal&, StringVal*) {}
+BigIntVal AggIntermediateFinalize(FunctionContext*, const StringVal&) {
   return BigIntVal::null();
 }
 
@@ -90,4 +91,26 @@ BigIntVal MemTestFinalize(FunctionContext* context, const BigIntVal& total) {
   if (total.is_null) return BigIntVal(0);
   context->Free(total.val);
   return total;
+}
+
+// Defines aggregate function for testing different intermediate/output types that
+// computes the truncated bigint sum of many floats.
+void TruncSumInit(FunctionContext* context, DoubleVal* total) {
+  *total = DoubleVal(0);
+}
+
+void TruncSumUpdate(FunctionContext* context, const DoubleVal& val, DoubleVal* total) {
+  total->val += val.val;
+}
+
+void TruncSumMerge(FunctionContext* context, const DoubleVal& src, DoubleVal* dst) {
+  dst->val += src.val;
+}
+
+const DoubleVal TruncSumSerialize(FunctionContext* context, const DoubleVal& total) {
+  return total;
+}
+
+BigIntVal TruncSumFinalize(FunctionContext* context, const DoubleVal& total) {
+  return BigIntVal(static_cast<int64_t>(total.val));
 }

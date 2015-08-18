@@ -132,18 +132,6 @@ public class CreateUdaStmt extends CreateFunctionStmtBase {
     }
     uda.setIntermediateType(intermediateType);
 
-    // TODO: this is a temporary restriction. Remove when we can support
-    // different intermediate types.
-    if (!intermediateType.equals(fn_.getReturnType())) {
-      StringBuilder error = new StringBuilder();
-      error.append("UDAs with an intermediate type, ")
-           .append(intermediateType.toSql())
-           .append(", that is different from the return type, ")
-           .append(fn_.getReturnType().toSql())
-           .append(", are currently not supported.");
-      throw new AnalysisException(error.toString());
-    }
-
     // Check arguments that are only valid in UDFs are not set.
     checkOptArgNotSet(OptArg.SYMBOL);
     checkOptArgNotSet(OptArg.PREPARE_FN);
