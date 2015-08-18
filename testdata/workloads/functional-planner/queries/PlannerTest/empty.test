@@ -364,3 +364,21 @@ from functional.alltypestiny
 03:SCAN HDFS [functional.alltypestiny]
    partitions=4/4 files=4 size=460B
 ====
+# IMPALA-2216: Make sure the final output exprs are substituted, even
+# if the resulting plan is an EmptySetNode.
+select * from (select 10 as i, 2 as j, '2013' as s) as t
+where t.i < 10
+---- PLAN
+00:EMPTYSET
+====
+# IMPALA-2216: Make sure the final output exprs are substituted, even
+# if the table sink is fed by an EmptySetNode.
+insert into functional.alltypes (id) partition(year,month)
+select * from (select 10 as i, 2 as j, 2013 as s) as t
+where t.i < 10
+---- PLAN
+WRITE TO HDFS [functional.alltypes, OVERWRITE=false, PARTITION-KEYS=(2,2013)]
+|  partitions=1
+|
+00:EMPTYSET
+====

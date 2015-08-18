@@ -701,9 +701,17 @@ public class SingleNodePlanner {
       SelectStmt selectStmt = (SelectStmt) viewStmt;
       if (selectStmt.getTableRefs().isEmpty()) {
         if (inlineViewRef.getAnalyzer().hasEmptyResultSet()) {
-          return createEmptyNode(viewStmt, inlineViewRef.getAnalyzer());
+          PlanNode emptySetNode = createEmptyNode(viewStmt, inlineViewRef.getAnalyzer());
+          // Still substitute exprs in parent nodes with the inline-view's smap to make
+          // sure no exprs reference the non-materialized inline view slots. No wrapping
+          // with TupleIsNullPredicates is necessary here because we do not migrate
+          // conjuncts into outer-joined inline views, so hasEmptyResultSet() cannot be
+          // true for an outer-joined inline view that has no table refs.
+          Preconditions.checkState(!analyzer.isOuterJoined(inlineViewRef.getId()));
+          emptySetNode.setOutputSmap(inlineViewRef.getSmap());
+          return emptySetNode;
         }
-        // Analysis should have generated a tuple id_ into which to materialize the exprs.
+        // Analysis should have generated a tuple id into which to materialize the exprs.
         Preconditions.checkState(inlineViewRef.getMaterializedTupleIds().size() == 1);
         // we need to materialize all slots of our inline view tuple
         analyzer.getTupleDesc(inlineViewRef.getId()).materializeSlots();
@@ -720,7 +728,7 @@ public class SingleNodePlanner {
     PlanNode rootNode =
         createQueryPlan(inlineViewRef.getViewStmt(), inlineViewRef.getAnalyzer(), false);
     // TODO: we should compute the "physical layout" of the view's descriptor, so that
-    // the avg row size is availble during optimization; however, that means we need to
+    // the avg row size is available during optimization; however, that means we need to
     // select references to its resultExprs from the enclosing scope(s)
     rootNode.setTblRefIds(Lists.newArrayList(inlineViewRef.getId()));
 
