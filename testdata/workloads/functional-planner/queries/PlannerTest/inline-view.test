@@ -554,7 +554,7 @@ and   c2 > 10
 01:AGGREGATE [FINALIZE]
 |  output: count(*), avg(functional.alltypesagg.int_col)
 |  group by: functional.alltypesagg.int_col % 7
-|  having: avg(int_col) > 500 OR count(*) = 10, count(*) > 10, int_col % 7 IS NOT NULL
+|  having: avg(int_col) > 500 OR count(*) = 10, int_col % 7 IS NOT NULL, count(*) > 10
 |
 00:SCAN HDFS [functional.alltypesagg]
    partitions=11/11 files=11 size=814.73KB
@@ -564,7 +564,7 @@ and   c2 > 10
 03:AGGREGATE [FINALIZE]
 |  output: count:merge(*), avg:merge(int_col)
 |  group by: int_col % 7
-|  having: avg(int_col) > 500 OR count(*) = 10, count(*) > 10, int_col % 7 IS NOT NULL
+|  having: avg(int_col) > 500 OR count(*) = 10, int_col % 7 IS NOT NULL, count(*) > 10
 |
 02:EXCHANGE [HASH(int_col % 7)]
 |

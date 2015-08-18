@@ -1155,3 +1155,26 @@ order by 1, 2;
 2010,12,1395
 ---- TYPES
 INT,INT,BIGINT
+====
+---- QUERY
+# IMPALA-2089: Tests correct elimination of redundant predicates.
+# The equivalences between inline-view slots are enforced inside the inline-view plan.
+# Equivalences between simple grouping slots (with SlotRef grouping exprs) are enforced
+# at the scan, and equivalences between grouping slots with complex grouping exprs are
+# enforced at the aggregation.
+select t2.timestamp_col, t1.int_col_1
+from
+(select coalesce(t1.smallint_col, t1.month, t1.month) as int_col,
+        (count(t1.int_col)) <= (coalesce(t1.smallint_col, t1.month, t1.month)) as boolean_col,
+        (t1.bigint_col) + (t1.smallint_col) as int_col_1
+ from functional.alltypes t1
+ group by coalesce(t1.smallint_col, t1.month, t1.month), (t1.bigint_col) + (t1.smallint_col)
+ having (t1.bigint_col) + (t1.smallint_col) != (count(t1.bigint_col + t1.smallint_col))
+) t1
+inner join functional.alltypes t2
+  on (t2.month = t1.int_col and t2.month = t1.int_col_1 and t2.tinyint_col = t1.int_col)
+where t2.int_col IN (t1.int_col_1, t1.int_col)
+---- RESULTS
+---- TYPES
+TIMESTAMP,BIGINT
+====

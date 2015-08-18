@@ -108,10 +108,16 @@ public class AggregationNode extends PlanNode {
     // distinct aggs place them in the 2nd phase agg node. The conjuncts are
     // transferred to the proper place in the multi-node plan via transferConjuncts().
     if (tupleIds_.get(0).equals(aggInfo_.getResultTupleId()) && !aggInfo_.isMerge()) {
-      // Ignore predicates bound to a group-by slot because those
-      // are already evaluated below this agg node (e.g., in a scan).
+      // Ignore predicates bound by a grouping slot produced by a SlotRef grouping expr.
+      // Those predicates are already evaluated below this agg node (e.g., in a scan),
+      // because the grouping slot must be in the same equivalence class as another slot
+      // below this agg node. We must not ignore other grouping slots in order to retain
+      // conjuncts bound by those grouping slots in createEquivConjuncts() (IMPALA-2089).
+      // Those conjuncts cannot be redundant because our equivalence classes do not
+      // capture dependencies with non-SlotRef exprs.
       Set<SlotId> groupBySlots = Sets.newHashSet();
       for (int i = 0; i < aggInfo_.getGroupingExprs().size(); ++i) {
+        if (aggInfo_.getGroupingExprs().get(i).unwrapSlotRef(true) == null) continue;
         groupBySlots.add(aggInfo_.getOutputTupleDesc().getSlots().get(i).getId());
       }
       ArrayList<Expr> bindingPredicates =

@@ -611,3 +611,23 @@ limit 1
 00:SCAN HDFS [functional.alltypesagg t1]
    partitions=11/11 files=11 size=814.73KB
 ====
+# IMPALA-2089: Tests correct elimination of redundant predicates.
+# The equivalences between inline-view slots are enforced inside the inline-view plan.
+# Equivalences between simple grouping slots (with SlotRef grouping exprs) are enforced
+# at the scan, and equivalences between grouping slots with complex grouping exprs are
+# enforced at the aggregation.
+# a, b, c, d are in the same equivalence class and some predicates are redundant.
+select * from
+  (select tinyint_col a, smallint_col b, int_col + int_col c, coalesce(bigint_col, year) d
+   from functional.alltypes
+   group by 1, 2, 3, 4) v
+where v.a = v.b and v.b = v.c and v.c = v.d and v.a = v.c and v.a = v.d
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  group by: tinyint_col, smallint_col, int_col + int_col, coalesce(bigint_col, year)
+|  having: int_col + int_col = coalesce(bigint_col, year), smallint_col = int_col + int_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: functional.alltypes.tinyint_col = functional.alltypes.smallint_col
+====
