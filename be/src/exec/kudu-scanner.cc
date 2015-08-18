@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "exprs/expr.h"
+#include "exprs/expr-context.h"
 #include "exec/kudu-util.h"
 #include "runtime/mem-pool.h"
 #include "runtime/runtime-state.h"
@@ -65,22 +66,23 @@ Status SetupScanRangePredicate(const TKuduKeyRange& key_range,
 
 } // anonymous namespace
 
-KuduScanner::KuduScanner(KuduScanNode* scan_node, RuntimeState* state,
-    const vector<TKuduKeyRange>& scan_ranges)
+KuduScanner::KuduScanner(KuduScanNode* scan_node, RuntimeState* state)
   : scan_node_(scan_node),
-    state_(state),
-    scan_ranges_(scan_ranges),
-    cur_scan_range_idx_(0) {}
+    state_(state) {}
 
 Status KuduScanner::Open(const std::tr1::shared_ptr<KuduClient>& client,
     const std::tr1::shared_ptr<KuduTable>& table) {
   client_ = client;
   table_ = table;
-  return GetNextScanner();
+  materialized_slots_ = scan_node_->materialized_slots();
+  tuple_byte_size_ = scan_node_->tuple_desc()->byte_size();
+  tuple_num_null_bytes_ = scan_node_->tuple_desc()->num_null_bytes();
+  projected_columns_ = scan_node_->projected_columns();
+  return scan_node_->GetConjunctCtxs(&conjunct_ctxs_);
 }
 
 Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
-  int tuple_buffer_size = row_batch->capacity() * scan_node_->tuple_desc()->byte_size();
+  int tuple_buffer_size = row_batch->capacity() * tuple_byte_size_;
   void* tuple_buffer = row_batch->tuple_data_pool()->TryAllocate(tuple_buffer_size);
   if (tuple_buffer_size > 0 && tuple_buffer == NULL) return Status::MEM_LIMIT_EXCEEDED;
   Tuple* tuple = reinterpret_cast<Tuple*>(tuple_buffer);
@@ -92,7 +94,6 @@ Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
   // If there aren't any more rows, blocks or ranges we're done.
   while(true) {
     RETURN_IF_CANCELLED(state_);
-    RETURN_IF_ERROR(scan_node_->QueryMaintenance(state_));
 
     // If the last fetched block has more rows, decode and if we filled up the batch
     // return.
@@ -111,13 +112,7 @@ Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
     // No more blocks in the current scanner, close it.
     CloseCurrentScanner();
 
-    // Check if there are more scanners and continue if there are.
-    if (HasMoreScanners()) {
-      RETURN_IF_ERROR(GetNextScanner());
-      continue;
-    }
-
-    // No more rows, blocks or scanners, we're done.
+    // No more rows or blocks, we're done.
     *eos = true;
     return Status::OK();
   }
@@ -125,33 +120,29 @@ Status KuduScanner::GetNext(RowBatch* row_batch, bool* eos) {
   return Status::OK();
 }
 
-Status KuduScanner::Close() {
-  scanner_->Close();
-  return Status::OK();
+void KuduScanner::Close() {
+  if (scanner_) CloseCurrentScanner();
+  Expr::Close(conjunct_ctxs_, state_);
 }
 
-Status KuduScanner::GetNextScanner()  {
+Status KuduScanner::OpenNextScanner(const TKuduKeyRange& key_range)  {
   DCHECK(scanner_ == NULL);
-  DCHECK_LT(cur_scan_range_idx_, scan_ranges_.size());
-  const TKuduKeyRange& key_range = scan_ranges_[cur_scan_range_idx_];
-
-  VLOG_FILE << "Starting scanner " << (cur_scan_range_idx_ + 1)
-      << "/" << scan_ranges_.size();
-
   scanner_.reset(new kudu::client::KuduScanner(table_.get()));
-  KUDU_RETURN_IF_ERROR(scanner_->SetProjectedColumns(scan_node_->projected_columns()),
+  KUDU_RETURN_IF_ERROR(scanner_->SetProjectedColumns(projected_columns_),
       "Unable to set projected columns");
 
   RETURN_IF_ERROR(SetupScanRangePredicate(key_range, scanner_.get()));
   KUDU_RETURN_IF_ERROR(scanner_->SetReadMode(
       kudu::client::KuduScanner::READ_AT_SNAPSHOT), "Unable to set snapshot read mode.");
 
-  BOOST_FOREACH(KuduPredicate* predicate, scan_node_->kudu_predicates_) {
-    scanner_->AddConjunctPredicate(predicate->Clone());
+  vector<KuduPredicate*> predicates;
+  scan_node_->ClonePredicates(&predicates);
+  BOOST_FOREACH(KuduPredicate* predicate, predicates) {
+    scanner_->AddConjunctPredicate(predicate);
   }
 
   {
-    SCOPED_TIMER(scan_node_->kudu_read_timer_);
+    SCOPED_TIMER(scan_node_->kudu_read_timer());
     KUDU_RETURN_IF_ERROR(scanner_->Open(), "Unable to open scanner");
   }
   return Status::OK();
@@ -161,7 +152,7 @@ void KuduScanner::CloseCurrentScanner() {
   DCHECK_NOTNULL(scanner_.get());
   scanner_->Close();
   scanner_.reset();
-  ++cur_scan_range_idx_;
+  ExprContext::FreeLocalAllocations(conjunct_ctxs_);
 }
 
 Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
@@ -174,9 +165,9 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
   TupleRow* row;
   // Skip advancing/initializing the tuple buffer if we're not actually
   // materializing any rows, e.g. for count(*).
-  if (!scan_node_->materialized_slots().empty()) {
+  if (!materialized_slots_.empty()) {
     row = row_batch->GetRow(idx);
-    (*tuple_mem)->Init(scan_node_->tuple_desc()->num_null_bytes());
+    (*tuple_mem)->Init(tuple_num_null_bytes_);
     row->SetTuple(0, *tuple_mem);
   }
 
@@ -190,9 +181,8 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
     ++rows_scanned_current_block_;
 
     // Evaluate the conjuncts that haven't been pushed down.
-    if (scan_node_->conjunct_ctxs().empty() ||
-        ExecNode::EvalConjuncts(&scan_node_->conjunct_ctxs()[0],
-            scan_node_->conjunct_ctxs().size(), row)) {
+    if (conjunct_ctxs_.empty() || ExecNode::EvalConjuncts(&conjunct_ctxs_[0],
+        conjunct_ctxs_.size(), row)) {
       // If the conjuncts pass on the row commit it.
       row_batch->CommitLastRow();
 
@@ -208,11 +198,11 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
 
       // Skip advancing/initializing the tuple buffer if we're not actually
       // materializing any rows, e.g. for count(*).
-      if (scan_node_->materialized_slots().empty()) continue;
+      if (materialized_slots_.empty()) continue;
 
       // Move to the next tuple in the tuple buffer.
       *tuple_mem = next_tuple(*tuple_mem);
-      (*tuple_mem)->Init(scan_node_->tuple_desc()->num_null_bytes());
+      (*tuple_mem)->Init(tuple_num_null_bytes_);
 
       // Make 'row' point to the new row.
       row = row_batch->GetRow(idx);
@@ -224,15 +214,15 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
 }
 
 void KuduScanner::SetSlotToNull(Tuple* tuple, int mat_slot_idx) {
-  DCHECK(scan_node_->materialized_slots()[mat_slot_idx]->is_nullable());
-  tuple->SetNull(scan_node_->materialized_slots()[mat_slot_idx]->null_indicator_offset());
+  DCHECK(materialized_slots_[mat_slot_idx]->is_nullable());
+  tuple->SetNull(materialized_slots_[mat_slot_idx]->null_indicator_offset());
 }
 
 
 Status KuduScanner::KuduRowToImpalaTuple(const KuduRowResult& row,
     RowBatch* row_batch, Tuple* tuple) {
-  for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
-    const SlotDescriptor* info = scan_node_->materialized_slots()[i];
+  for (int i = 0; i < materialized_slots_.size(); ++i) {
+    const SlotDescriptor* info = materialized_slots_[i];
     void* slot = tuple->GetSlot(info->tuple_offset());
 
     if (row.IsNull(i)) {
@@ -299,10 +289,10 @@ Status KuduScanner::KuduRowToImpalaTuple(const KuduRowResult& row,
 
 
 Status KuduScanner::GetNextBlock() {
-  SCOPED_TIMER(scan_node_->kudu_read_timer_);
+  SCOPED_TIMER(scan_node_->kudu_read_timer());
   cur_rows_.clear();
   KUDU_RETURN_IF_ERROR(scanner_->NextBatch(&cur_rows_), "Unable to advance iterator");
-  scan_node_->kudu_round_trips_->Add(1);
+  COUNTER_ADD(scan_node_->kudu_round_trips(), 1);
   rows_scanned_current_block_ = 0;
   COUNTER_ADD(scan_node_->rows_read_counter(), cur_rows_.size());
   return Status::OK();

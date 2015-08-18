@@ -21,6 +21,7 @@
 
 #include "exec/scan-node.h"
 #include "runtime/descriptors.h"
+#include "runtime/thread-resource-mgr.h"
 #include "gutil/gscoped_ptr.h"
 
 namespace kudu {
@@ -78,6 +79,16 @@ class KuduScanNode : public ScanNode {
 
   const TupleDescriptor* tuple_desc() const { return tuple_desc_; }
 
+  // Returns a cloned copy of the scan node's conjuncts. Requires that the expressions
+  // have been open previously.
+  Status GetConjunctCtxs(vector<ExprContext*>* ctxs);
+
+  // Clones the set of predicates to be set on scanners.
+  void ClonePredicates(vector<kudu::client::KuduPredicate*>* predicates);
+
+  RuntimeProfile::Counter* kudu_read_timer() const { return kudu_read_timer_; }
+  RuntimeProfile::Counter* kudu_round_trips() const { return kudu_round_trips_; }
+
  protected:
   /// Write debug string of this into out.
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
@@ -88,14 +99,12 @@ class KuduScanNode : public ScanNode {
   FRIEND_TEST(KuduScanNodeTest, TestPushStringLEPredicateOn3rdColumn);
   FRIEND_TEST(KuduScanNodeTest, TestPushTwoPredicatesOnNonMaterializedColumn);
 
-  /// Friend so that scanners can call QueryMaintenance() on the scan node and access
-  /// counters.
-  friend class KuduScanner;
-
   ObjectPool pool_;
 
   /// Tuple id resolved in Prepare() to set tuple_desc_.
   TupleId tuple_id_;
+
+  RuntimeState* state_;
 
   /// Descriptor of tuples read from Kudu table.
   const TupleDescriptor* tuple_desc_;
@@ -110,12 +119,31 @@ class KuduScanNode : public ScanNode {
   /// Set of ranges to be scanned.
   std::vector<TKuduKeyRange> scan_ranges_;
 
+  /// The index into scan_range_params_ for the range currently being serviced.
+  int cur_scan_range_idx_;
+
   /// Cached set of materialized slots in the tuple descriptor.
   std::vector<SlotDescriptor*> materialized_slots_;
 
-  /// The (single) scanner used to perform scans on kudu.
-  /// TODO a multi-threaded implementation will have more than one of these.
-  boost::scoped_ptr<KuduScanner> scanner_;
+  // Outgoing row batches queue. Row batches are produced asynchronously by the scanner
+  // threads and consumed by the main thread.
+  boost::scoped_ptr<RowBatchQueue> materialized_row_batches_;
+
+  boost::mutex lock_;
+  Status status_;
+
+  // Number of active running scanner threads.
+  int num_active_scanners_;
+
+  // If set to true, the scanners are all done. This can be because of an error or all
+  // scan ranges are processed. There can still be batches queued in materialized_row_batches_.
+  bool done_;
+
+  /// Maximum size of materialized_row_batches_.
+  int max_materialized_row_batches_;
+
+  /// Thread group for all scanner worker threads
+  ThreadGroup scanner_threads_;
 
   RuntimeProfile::Counter* kudu_read_timer_;
   RuntimeProfile::Counter* kudu_round_trips_;
@@ -144,6 +172,16 @@ class KuduScanNode : public ScanNode {
   // Transforms the set of pushable conjuncts received from the frontend into a set of
   // KuduPredicates that will be set in all scanners.
   Status TransformPushableConjunctsToRangePredicates();
+
+  // Callback to determine if we should start up more scanner threads.
+  void ThreadTokenAvailableCb(ThreadResourceMgr::ResourcePool* pool);
+
+  // Thread that creates and runs a scanner.
+  void ScannerThread(const string& name, const TKuduKeyRange* initial_range);
+
+  // Returns the next key range to read. Thread safe. Returns NULL if there are no more
+  // ranges.
+  TKuduKeyRange* GetNextKeyRange();
 };
 
 }

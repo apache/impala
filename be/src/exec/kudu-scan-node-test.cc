@@ -75,6 +75,13 @@ class KuduScanNodeTest : public testing::Test {
 
   void BuildRuntimeStateForScans(int num_cols_materialize) {
     obj_pool_.reset(new ObjectPool());
+
+    // If we had a RuntimeState previously we need to unregister it from the thread
+    // pool, or the new RuntimeState will only have access to half the threads.
+    if (runtime_state_) {
+      exec_env_->thread_mgr()->UnregisterPool(runtime_state_->resource_pool());
+    }
+
     runtime_state_.reset(new RuntimeState(TPlanFragmentInstanceCtx(), "",
         exec_env_.get()));
     runtime_state_->InitMemTrackers(TUniqueId(), NULL, -1);
@@ -518,6 +525,8 @@ TEST_F(KuduScanNodeTest, TestScanEmptyString) {
       new RowBatch(scanner.row_desc(), DEFAULT_ROWS_PER_BATCH, mem_tracker_.get()));
   ASSERT_OK(scanner.GetNext(runtime_state_.get(), batch, &eos));
   ASSERT_EQ(1, batch->num_rows());
+
+  ASSERT_OK(scanner.GetNext(runtime_state_.get(), NULL, &eos));
   ASSERT_TRUE(eos);
   ASSERT_EQ(PrintBatch(batch), "[(10 null )]\n");
 }

@@ -26,13 +26,15 @@ namespace impala {
 /// Executes scans in Kudu based on the provided set of scan ranges.
 class KuduScanner {
  public:
-  KuduScanner(KuduScanNode* scan_node, RuntimeState* state,
-      const vector<TKuduKeyRange>& scan_ranges);
+  KuduScanner(KuduScanNode* scan_node, RuntimeState* state);
 
   /// Opens the first scanner into the provided table, with the provided
   /// client.
   Status Open(const std::tr1::shared_ptr<kudu::client::KuduClient>& client,
       const std::tr1::shared_ptr<kudu::client::KuduTable>& table);
+
+  /// Opens the next scanner to read range.
+  Status OpenNextScanner(const TKuduKeyRange& range);
 
   /// Fetches the next batch from Kudu.
   /// TODO make the scanner manages its own batches (like the HDFS scanner
@@ -40,7 +42,7 @@ class KuduScanner {
   Status GetNext(RowBatch* row_batch, bool* eos);
 
   /// Closes the Kudu scanner.
-  Status Close();
+  void Close();
 
  private:
   // Set 'tuple' slot 'mat_slot_idx' to null.
@@ -68,14 +70,6 @@ class KuduScanner {
   /// Closes the current scanner.
   void CloseCurrentScanner();
 
-  /// Returns whether there are more scan ranges to scan.
-  bool HasMoreScanners() {
-    return cur_scan_range_idx_ < scan_ranges_.size();
-  }
-
-  /// Opens the next scanner, requires there are more ranges to scan.
-  Status GetNextScanner();
-
   /// Transforms a kudu row in an impala row. For non string values data is copied
   /// directly to the right slot. For string values data is copied to the row batch's
   /// tuple data pool and a prt/len is set on the slot.
@@ -100,12 +94,17 @@ class KuduScanner {
   /// The current Kudu scanner.
   boost::scoped_ptr<kudu::client::KuduScanner> scanner_;
 
-  /// The index into scan_range_params_ for the range currently being serviced.
-  int cur_scan_range_idx_;
-
   /// The current set of retrieved rows.
   std::vector<kudu::client::KuduRowResult> cur_rows_;
   size_t rows_scanned_current_block_;
+
+  // The scanner's cloned copy of the conjuncts to apply.
+  vector<ExprContext*> conjunct_ctxs_;
+
+  std::vector<SlotDescriptor*> materialized_slots_;
+  std::vector<std::string> projected_columns_;
+  int tuple_byte_size_;
+  int tuple_num_null_bytes_;
 };
 
 } /// namespace impala
