@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 
@@ -39,6 +40,7 @@ import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
+import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
@@ -49,6 +51,7 @@ import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.RuntimeEnv;
 import com.cloudera.impala.thrift.TExplainLevel;
+import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.THdfsFileBlock;
 import com.cloudera.impala.thrift.THdfsFileSplit;
 import com.cloudera.impala.thrift.THdfsScanNode;
@@ -65,6 +68,7 @@ import com.google.common.base.Objects.ToStringHelper;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 /**
@@ -102,6 +106,12 @@ public class HdfsScanNode extends ScanNode {
   // Total number of bytes from partitions_
   private long totalBytes_ = 0;
 
+  // Conjuncts that can be evaluated while materializing the items (tuples) of
+  // collection-typed slots. Maps from tuple descriptor to the conjuncts bound by that
+  // tuple. Uses a linked hash map for consistent display in explain.
+  private final Map<TupleDescriptor, List<Expr>> collectionConjuncts_ =
+      Maps.newLinkedHashMap();
+
   /**
    * Constructs node to scan given data files of table 'tbl_'.
    */
@@ -120,7 +130,7 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Populate conjuncts_, partitions_, and scanRanges_.
+   * Populate conjuncts_, collectionConjuncts_, partitions_, and scanRanges_.
    */
   @Override
   public void init(Analyzer analyzer) throws InternalException {
@@ -138,6 +148,9 @@ public class HdfsScanNode extends ScanNode {
 
     // mark all slots referenced by the remaining conjuncts as materialized
     markSlotsMaterialized(analyzer, conjuncts_);
+
+    assignCollectionConjuncts(analyzer);
+
     computeMemLayout(analyzer);
 
     // compute scan range locations
@@ -148,6 +161,62 @@ public class HdfsScanNode extends ScanNode {
 
     // TODO: do we need this?
     assignedConjuncts_ = analyzer.getAssignedConjuncts();
+  }
+
+  /**
+   * Populates the collection conjuncts, materializes their required slots, and marks
+   * the conjuncts as assigned, if it is correct to do so. Some conjuncts may have to
+   * also be evaluated at a subsequent semi or outer join.
+   */
+  private void assignCollectionConjuncts(Analyzer analyzer) {
+    collectionConjuncts_.clear();
+    assignCollectionConjuncts(desc_, analyzer);
+  }
+
+  /**
+   * Recursively collects and assigns conjuncts bound by tuples materialized in a
+   * collection-typed slot.
+   *
+   * Limitation: Conjuncts that must first be migrated into inline views and that cannot
+   * be captured by slot binding will not be assigned here, but in an UnnestNode.
+   * This limitation applies to conjuncts bound by inline-view slots that are backed by
+   * non-SlotRef exprs in the inline-view's select list. We only capture value transfers
+   * between slots, and not between arbitrary exprs.
+   *
+   * TODO for 2.3: The logic for gathering conjuncts and deciding which ones should be
+   * marked as assigned needs to be clarified and consolidated in one place. The code
+   * below is rather different from the code for assigning the top-level conjuncts in
+   * init() although the performed tasks is conceptually identical. Refactoring the
+   * assignment code is tricky/risky for now.
+   */
+  private void assignCollectionConjuncts(TupleDescriptor tupleDesc, Analyzer analyzer) {
+    for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
+      if (!slotDesc.getType().isCollectionType()) continue;
+      Preconditions.checkNotNull(slotDesc.getItemTupleDesc());
+      TupleDescriptor itemTupleDesc = slotDesc.getItemTupleDesc();
+      TupleId itemTid = itemTupleDesc.getId();
+      // First collect unassigned and binding predicates. Then remove redundant
+      // predicates based on slot equivalences and enforce slot equivalences by
+      // generating new predicates.
+      List<Expr> collectionConjuncts =
+          analyzer.getUnassignedConjuncts(Lists.newArrayList(itemTid), false);
+      ArrayList<Expr> bindingPredicates = analyzer.getBoundPredicates(itemTid);
+      for (Expr boundPred: bindingPredicates) {
+        if (!collectionConjuncts.contains(boundPred)) collectionConjuncts.add(boundPred);
+      }
+      analyzer.createEquivConjuncts(itemTid, collectionConjuncts);
+      // Mark those conjuncts as assigned that do not also need to be evaluated by a
+      // subsequent semi or outer join.
+      for (Expr conjunct: collectionConjuncts) {
+        if (!analyzer.evalByJoin(conjunct)) analyzer.markConjunctAssigned(conjunct);
+      }
+      if (!collectionConjuncts.isEmpty()) {
+        markSlotsMaterialized(analyzer, collectionConjuncts);
+        collectionConjuncts_.put(itemTupleDesc, collectionConjuncts);
+      }
+      // Recursively look for collection-typed slots in nested tuple descriptors.
+      assignCollectionConjuncts(itemTupleDesc, analyzer);
+    }
   }
 
   /**
@@ -615,7 +684,7 @@ public class HdfsScanNode extends ScanNode {
     if (cardinality_ > 0) {
       LOG.debug("cardinality_=" + Long.toString(cardinality_) +
                 " sel=" + Double.toString(computeSelectivity()));
-      cardinality_ = Math.round((double) cardinality_ * computeSelectivity());
+      cardinality_ = Math.round(cardinality_ * computeSelectivity());
     }
     cardinality_ = capAtLimit(cardinality_);
     LOG.debug("computeStats HdfsScan: cardinality_=" + Long.toString(cardinality_));
@@ -669,13 +738,22 @@ public class HdfsScanNode extends ScanNode {
     LOG.debug("computeNumNodes localRanges=" + numLocalRanges +
         " remoteRanges=" + numRemoteRanges + " localHostSet.size=" + localHostSet.size() +
         " clusterNodes=" + cluster.numNodes());
+
   }
 
   @Override
   protected void toThrift(TPlanNode msg) {
-    // TODO: retire this once the migration to the new plan is complete
     msg.hdfs_scan_node = new THdfsScanNode(desc_.getId().asInt());
     msg.node_type = TPlanNodeType.HDFS_SCAN_NODE;
+    if (!collectionConjuncts_.isEmpty()) {
+      Map<Integer, List<TExpr>> tcollectionConjuncts = Maps.newLinkedHashMap();
+      for (Map.Entry<TupleDescriptor, List<Expr>> entry:
+        collectionConjuncts_.entrySet()) {
+        tcollectionConjuncts.put(entry.getKey().getId().asInt(),
+            Expr.treesToThrift(entry.getValue()));
+      }
+      msg.hdfs_scan_node.setCollection_conjuncts(tcollectionConjuncts);
+    }
   }
 
   @Override
@@ -714,6 +792,14 @@ public class HdfsScanNode extends ScanNode {
       if (!conjuncts_.isEmpty()) {
         output.append(
             detailPrefix + "predicates: " + getExplainString(conjuncts_) + "\n");
+      }
+      if (!collectionConjuncts_.isEmpty()) {
+        for (Map.Entry<TupleDescriptor, List<Expr>> entry:
+          collectionConjuncts_.entrySet()) {
+          String alias = entry.getKey().getAlias();
+          output.append(String.format("%spredicates on %s: %s\n",
+              detailPrefix, alias, getExplainString(entry.getValue())));
+        }
       }
     }
     if (detailLevel.ordinal() >= TExplainLevel.EXTENDED.ordinal()) {
@@ -791,6 +877,6 @@ public class HdfsScanNode extends ScanNode {
     // THREADS_PER_CORE each using a default of
     // MAX_IO_BUFFERS_PER_THREAD * IO_MGR_BUFFER_SIZE bytes.
     return (long) RuntimeEnv.INSTANCE.getNumCores() * (long) THREADS_PER_CORE *
-        (long) MAX_IO_BUFFERS_PER_THREAD * IO_MGR_BUFFER_SIZE;
+        MAX_IO_BUFFERS_PER_THREAD * IO_MGR_BUFFER_SIZE;
   }
 }

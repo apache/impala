@@ -1073,9 +1073,9 @@ public class Analyzer {
     List<TupleId> tids = Lists.newArrayList();
     e.getIds(tids, null);
     if (tids.isEmpty()) return false;
-    if (tids.size() > 1 || isOjConjunct(e)
+    if (tids.size() > 1 || isOjConjunct(e) || isFullOuterJoined(e)
         || (isOuterJoined(tids.get(0)) && e.isWhereClauseConjunct())
-        || isAntiJoinedConjunct(e) || isFullOuterJoined(e)) {
+        || (isAntiJoinedConjunct(e) && !isSemiJoined(tids.get(0)))) {
       return true;
     }
     return false;

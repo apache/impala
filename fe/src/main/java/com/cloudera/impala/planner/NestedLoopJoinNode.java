@@ -30,9 +30,8 @@ import com.cloudera.impala.thrift.TNestedLoopJoinNode;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TQueryOptions;
-import com.google.common.base.Preconditions;
-
 import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 
 /**
  * Nested-loop join between left child and right child.

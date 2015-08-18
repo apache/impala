@@ -90,11 +90,11 @@ where a.id < 10 and b.item % 2 = 0
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.int_array_col b]
-|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
+   predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Left semi join of parent and relative ref without On-clause.
 select a.id from functional.allcomplextypes a left semi join a.int_array_col b
@@ -123,10 +123,10 @@ where b.item % 2 = 0
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.int_array_col b]
-|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+   predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Left anti join of parent and relative ref without On-clause.
 select a.id from functional.allcomplextypes a left anti join a.int_array_col b
@@ -157,10 +157,10 @@ where b.item % 2 = 0
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.int_array_col b]
-|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+   predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Left outer join of parent and relative ref without On-clause.
 select a.id, b.item from functional.allcomplextypes a left outer join a.int_array_col b
@@ -191,10 +191,10 @@ where b.item % 2 = 0
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.int_array_col b]
-|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+   predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Full outer join of parent and relative ref without On-clause.
 # TODO: Transform the join op into an INNER JOIN.
@@ -209,11 +209,11 @@ where b.item % 2 = 0 and a.id < 10
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.int_array_col b]
-|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
+   predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Non-equi inner join of parent and relative ref.
 select a.id, b.item from functional.allcomplextypes a, a.int_array_col b
@@ -227,11 +227,11 @@ where a.id < 10 and b.item % 2 = 0 and a.id < b.item
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.int_array_col b]
-|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
+   predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Non-equi left semi join of parent and relative ref.
 select a.id from functional.allcomplextypes a
@@ -246,11 +246,11 @@ where a.id < 10
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.int_array_col b]
-|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
+   predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Non-equi right semi join of parent and relative ref.
 # TODO: Transform the join op into an INNER JOIN.
@@ -266,11 +266,11 @@ where b.item % 2 = 0
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.int_array_col b]
-|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
+   predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Non-equi left anti join of parent and relative ref.
 select a.id from functional.allcomplextypes a
@@ -285,11 +285,11 @@ where a.id < 10
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.int_array_col b]
-|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
+   predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Non-equi right anti join of parent and relative ref.
 # TODO: Transform the join op into an INNER JOIN.
@@ -305,11 +305,11 @@ where b.item % 2 = 0
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.int_array_col b]
-|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
+   predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Non-equi left outer join of parent and relative ref.
 select a.id, b.item from functional.allcomplextypes a
@@ -324,11 +324,11 @@ where a.id < 10
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.int_array_col b]
-|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
+   predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Non-equi right outer join of parent and relative ref.
 # TODO: Transform the join op into an INNER JOIN.
@@ -344,11 +344,11 @@ where b.item % 2 = 0
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.int_array_col b]
-|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
+   predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Non-equi full outer join of parent and relative ref.
 # TODO: Transform the join op into LEFT OUTER JOIN.
@@ -365,10 +365,10 @@ where b.item % 2 = 0
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.int_array_col b]
-|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+   predicates on b: b.item % 2 = 0
 ====
 # Test subplans: Inner equi-join of parent and relative ref.
 select a.id, b.f1, b.f2 from functional.allcomplextypes a
@@ -384,11 +384,11 @@ where a.id < 10 and b.f1 % 2 = 0 and b.f1 = a.id and b.f1 < a.year
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.struct_array_col b]
-|     predicates: b.f1 < 10, b.f1 % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10, a.id % 2 = 0
+   predicates on b: b.f1 < 10, b.f1 % 2 = 0
 ====
 # Test subplans: Left-semi equi-join of parent and relative ref.
 select a.id from functional.allcomplextypes a
@@ -404,11 +404,11 @@ where a.id < 10
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.struct_array_col b]
-|     predicates: b.f1 % 2 = 0, b.f1 < 10
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id % 2 = 0, a.id < 10
+   predicates on b: b.f1 % 2 = 0, b.f1 < 10
 ====
 # Test subplans: Right-semi equi-join of parent and relative ref.
 # TODO: Transform the join op into an INNER JOIN.
@@ -425,11 +425,11 @@ where b.f1 % 2 = 0
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.struct_array_col b]
-|     predicates: b.f1 < 10, b.f1 % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10, a.id % 2 = 0
+   predicates on b: b.f1 < 10, b.f1 % 2 = 0
 ====
 # Test subplans: Left-anti equi-join of parent and relative ref.
 select a.id from functional.allcomplextypes a
@@ -445,11 +445,11 @@ where a.id < 10
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.struct_array_col b]
-|     predicates: b.f1 < 10, b.f1 % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
+   predicates on b: b.f1 % 2 = 0, b.f1 < 10
 ====
 # Test subplans: Right-anti equi-join of parent and relative ref.
 # TODO: Transform the join op into an INNER JOIN.
@@ -466,11 +466,11 @@ where b.f1 % 2 = 0
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.struct_array_col b]
-|     predicates: b.f1 % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id % 2 = 0, a.id < 10
+   predicates on b: b.f1 % 2 = 0
 ====
 # Test subplans: Left-outer equi-join of parent and relative ref.
 select a.id from functional.allcomplextypes a
@@ -486,11 +486,11 @@ where a.id < 10
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.struct_array_col b]
-|     predicates: b.f1 % 2 = 0, b.f1 < 10
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
+   predicates on b: b.f1 % 2 = 0, b.f1 < 10
 ====
 # Test subplans: Right-outer equi-join of parent and relative ref.
 # TODO: Transform the join op into an INNER JOIN.
@@ -507,11 +507,11 @@ where b.f1 % 2 = 0
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.struct_array_col b]
-|     predicates: b.f1 % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10, a.id % 2 = 0
+   predicates on b: b.f1 % 2 = 0
 ====
 # Test subplans: Full-outer equi-join of parent and relative ref.
 # TODO: Transform the join op into an LEFT OUTER JOIN.
@@ -529,11 +529,11 @@ where a.id < 10 and b.f1 % 2 = 0
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.struct_array_col b]
-|     predicates: b.f1 % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
    predicates: a.id < 10
+   predicates on b: b.f1 % 2 = 0
 ====
 # Test subplans: Test multiple relative refs, disjunctive predicates,
 # and correct join ordering within a subplan.
@@ -549,7 +549,6 @@ select 1 from functional.allcomplextypes a
 |  |  hash predicates: a.id = e.f1
 |  |
 |  |--06:UNNEST [a.struct_map_col e]
-|  |     predicates: e.f2 = 'test'
 |  |
 |  09:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  |  join predicates: (a.month < 4 OR d.f1 > 5)
@@ -570,6 +569,7 @@ select 1 from functional.allcomplextypes a
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+   predicates on e: e.f2 = 'test'
 ====
 # Test subplans: Test that subplans are not re-ordered across semi/outer joins.
 # The 'alltypes*' tables are purposely placed with increasing size to test
@@ -595,7 +595,6 @@ where e.f1 < 10
 |  |--06:SINGULAR ROW SRC
 |  |
 |  07:UNNEST [a.struct_array_col e]
-|     predicates: e.f1 < 10
 |
 09:HASH JOIN [RIGHT ANTI JOIN]
 |  hash predicates: c.int_col = b.int_col
@@ -605,6 +604,7 @@ where e.f1 < 10
 |  |
 |  |--00:SCAN HDFS [functional.allcomplextypes a]
 |  |     partitions=0/0 files=0 size=0B
+|  |     predicates on e: e.f1 < 10
 |  |
 |  01:SCAN HDFS [functional.alltypestiny b]
 |     partitions=4/4 files=4 size=460B
@@ -641,13 +641,13 @@ inner join functional.alltypes d on (b.id = d.id)
 |  |--05:SINGULAR ROW SRC
 |  |
 |  06:UNNEST [a.struct_array_col e]
-|     predicates: e.f1 < 10
 |
 08:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: b.id = a.id
 |
 |--00:SCAN HDFS [functional.allcomplextypes a]
 |     partitions=0/0 files=0 size=0B
+|     predicates on e: e.f1 < 10
 |
 01:SCAN HDFS [functional.alltypestiny b]
    partitions=4/4 files=4 size=460B
@@ -685,10 +685,10 @@ where b.item < 10 and c.int_col > 30
 |  |  |  |--02:SINGULAR ROW SRC
 |  |  |  |
 |  |  |  03:UNNEST [a.int_array_col b]
-|  |  |     predicates: b.item < 10
 |  |  |
 |  |  00:SCAN HDFS [functional.allcomplextypes a]
 |  |     partitions=0/0 files=0 size=0B
+|  |     predicates on b: b.item < 10
 |  |
 |  05:SCAN HDFS [functional.alltypessmall c]
 |     partitions=4/4 files=4 size=6.32KB
@@ -732,10 +732,10 @@ where b.item < 10 and c.int_col > 30
 |  |  |--02:SINGULAR ROW SRC
 |  |  |
 |  |  03:UNNEST [a.int_array_col b]
-|  |     predicates: b.item < 10
 |  |
 |  00:SCAN HDFS [functional.allcomplextypes a]
 |     partitions=0/0 files=0 size=0B
+|     predicates on b: b.item < 10
 |
 05:SCAN HDFS [functional.alltypessmall c]
    partitions=4/4 files=4 size=6.32KB
@@ -865,10 +865,10 @@ where exists (select item from a.int_array_col where item > 100)
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.int_array_col]
-|     predicates: item > 100
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+   predicates on int_array_col: item > 100
 ====
 # Test subplans: Parent scan and uncorrelated not exists subquery.
 select a.id from functional.allcomplextypes a
@@ -1116,14 +1116,14 @@ limit 10
 |  |  |--05:SINGULAR ROW SRC
 |  |  |
 |  |  06:UNNEST [o.o_lineitems]
-|  |     predicates: l_linenumber < 3
 |  |
 |  03:UNNEST [c.c_orders o]
-|     predicates: o_orderkey < 5
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=554.83MB
    predicates: c_custkey < 10
+   predicates on o: o_orderkey < 5
+   predicates on o_lineitems: l_linenumber < 3
 ====
 # Nested subplans.
 select 1
@@ -1211,12 +1211,63 @@ where c.c_custkey = o.o_orderkey and c.c_custkey = o.o_shippriority
 |  |  |--05:SINGULAR ROW SRC
 |  |  |
 |  |  06:UNNEST [o.o_lineitems l]
-|  |     predicates: l.l_partkey = l.l_linenumber, l.l_partkey = l.l_suppkey
 |  |
 |  03:UNNEST [c.c_orders o]
-|     predicates: o.o_orderkey = o.o_shippriority
 |
 00:SCAN HDFS [tpch_nested_parquet.customer c]
    partitions=1/1 files=4 size=554.83MB
    predicates: c.c_custkey = c.c_nationkey
+   predicates on o: o.o_orderkey = o.o_shippriority
+   predicates on l: l.l_partkey = l.l_linenumber, l.l_partkey = l.l_suppkey
+====
+# Test assignment of nested conjuncts in the parent scan and its limitations.
+select *
+from functional.allcomplextypes t,
+t.int_array_col a,
+(select * from t.int_map_col m where m.key = 'test' and m.value != 30 limit 1) v1,
+t.complex_nested_struct_col.f2 c,
+(select key, f21 as value, coalesce(key, cast(f21 as string)) x from c.f12) v2
+where a.item between 10 and 20
+  and c.f11 % 2 = 0
+  and a.item < v1.value
+  and c.f11 = a.item
+  and t.id < 200
+  and v2.key = 'test2'
+  and v2.x = 'test3'
+---- PLAN
+01:SUBPLAN
+|
+|--12:NESTED LOOP JOIN [INNER JOIN]
+|  |  predicates: a.item < m.value
+|  |
+|  |--04:UNNEST [t.int_map_col m]
+|  |     limit: 1
+|  |
+|  11:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  10:HASH JOIN [INNER JOIN]
+|  |  hash predicates: c.f11 = a.item
+|  |
+|  |--03:UNNEST [t.int_array_col a]
+|  |
+|  06:SUBPLAN
+|  |
+|  |--09:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--07:SINGULAR ROW SRC
+|  |  |
+|  |  08:UNNEST [c.f12]
+|  |     predicates: coalesce(key, CAST(f21 AS STRING)) = 'test3'
+|  |
+|  05:UNNEST [t.complex_nested_struct_col.f2 c]
+|
+00:SCAN HDFS [functional.allcomplextypes t]
+   partitions=0/0 files=0 size=0B
+   predicates: t.id < 200
+   predicates on a: a.item >= 10, a.item <= 20, a.item % 2 = 0
+   predicates on m: m.key = 'test', m.value != 30
+   predicates on c: c.f11 >= 10, c.f11 <= 20, c.f11 % 2 = 0
+   predicates on f12: f12.key = 'test2'
 ====

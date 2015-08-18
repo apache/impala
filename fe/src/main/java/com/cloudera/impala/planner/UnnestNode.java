@@ -14,8 +14,6 @@
 
 package com.cloudera.impala.planner;
 
-import java.util.ArrayList;
-
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.CollectionTableRef;
 import com.cloudera.impala.analysis.Expr;
@@ -50,12 +48,10 @@ public class UnnestNode extends PlanNode {
 
   @Override
   public void init(Analyzer analyzer) throws InternalException {
-    // TODO: Remove the scan predicates and predicates for enforcing slot
-    // equivalences here when assigning them in the parent scan.
-    ArrayList<Expr> scanPredicates = analyzer.getBoundPredicates(tupleIds_.get(0));
-    conjuncts_.addAll(scanPredicates);
+    // Do not assign binding predicates or predicates for enforcing slot equivalences
+    // because they must have been assigned in the scan node materializing the
+    // collection-typed slot.
     super.init(analyzer);
-    analyzer.createEquivConjuncts(tupleIds_.get(0), conjuncts_);
 
     // Unnest is like a scan and must materialize the slots of its conjuncts.
     markSlotsMaterialized(analyzer, conjuncts_);

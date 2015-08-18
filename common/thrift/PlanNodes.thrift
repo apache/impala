@@ -113,6 +113,11 @@ struct TScanRange {
 
 struct THdfsScanNode {
   1: required Types.TTupleId tuple_id
+
+  // Conjuncts that can be evaluated while materializing the items (tuples) of
+  // collection-typed slots. Maps from item tuple id to the list of conjuncts
+  // to be evaluated.
+  2: optional map<Types.TTupleId, list<Exprs.TExpr>> collection_conjuncts
 }
 
 struct TDataSourceScanNode {
