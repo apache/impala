@@ -32,8 +32,14 @@
 #include "util/cpu-info.h"
 #include "util/test-info.h"
 
-DEFINE_bool(run_kudu_scan_benchmarks, false, "Whether to run the Kudu scan benchmark"
-    "tests.");
+DEFINE_bool(run_scan_bench, false, "Whether to run the Kudu scan benchmarks. Note:"
+    " These are likely slow.");
+DEFINE_bool(bench_strings, true, "Whether to scan string columns in benchmarks.");
+DEFINE_int32(bench_num_rows, 10 * 1000 * 1000, "Num rows to insert in benchmarks.");
+DEFINE_int32(bench_num_splits, 40, "Num tablets to create in benchmarks");
+DEFINE_int32(bench_num_runs, 10, "Num times to run each benchmark.");
+DEFINE_bool(skip_delete_table, false, "Skips deleting the tables at the end of the tests.");
+DEFINE_string(use_existing_table, "", "The name of the existing table to use.");
 
 using apache::thrift::ThriftDebugString;
 using strings::Substitute;
@@ -57,10 +63,12 @@ class KuduScanNodeTest : public testing::Test {
     // isolation.
     DCHECK_OK(exec_env_->InitForFeTests());
     exec_env_->disk_io_mgr()->Init(mem_tracker_.get());
+
+    if (FLAGS_use_existing_table != "") FLAGS_skip_delete_table = true;
   }
 
   virtual void TearDown() {
-    if (kudu_test_helper_.table()) {
+    if (kudu_test_helper_.table() && !FLAGS_skip_delete_table) {
       kudu_test_helper_.DeleteTable();
     }
   }
@@ -237,6 +245,9 @@ class KuduScanNodeTest : public testing::Test {
 
     params->push_back(scan_range_params);
   }
+
+  void DoBenchmarkScan(const string& name, const vector<TScanRangeParams>& params,
+                       int num_cols);
 
  protected:
   KuduTestHelper kudu_test_helper_;
@@ -532,6 +543,83 @@ TEST_F(KuduScanNodeTest, TestLimitsAreEnforced) {
   ScanAndVerify(params, FIRST_ROW, limit_rows_to, 3, 3, limit_rows_to);
   limit_rows_to = 2000;
   ScanAndVerify(params, FIRST_ROW, 1000, 3, 3, limit_rows_to);
+}
+
+void KuduScanNodeTest::DoBenchmarkScan(const string& name,
+    const vector<TScanRangeParams>& params, int num_cols) {
+
+  const int NUM_ROWS = FLAGS_bench_num_rows;
+  const int FIRST_ROW = 0;
+
+  double avg = 0;
+  int num_runs = 0;
+
+  LOG(INFO) << "===== Starting benchmark: " << name;
+  for (int i = 0; i < FLAGS_bench_num_runs; ++i) {
+    MonotonicStopWatch watch;
+    watch.Start();
+    ScanAndVerify(params, FIRST_ROW, NUM_ROWS, num_cols, 3, NO_LIMIT, false);
+    watch.Stop();
+    int64_t total = watch.ElapsedTime();
+    avg += total;
+    ++num_runs;
+    LOG(INFO) << "Run took: " << (total / (1000 * 1000)) << " msecs.";
+  }
+
+  avg = (avg / num_runs) / (1000 * 1000);
+  LOG(INFO) << "===== Benchmark: " << name << " took(avg): " << avg << " msecs.";
+}
+
+TEST_F(KuduScanNodeTest, BenchmarkScanNode) {
+  if (!FLAGS_run_scan_bench) return;
+
+  // Generate some more splits and insert a lot more rows.
+  const int NUM_ROWS = FLAGS_bench_num_rows;
+  const int NUM_SPLITS = FLAGS_bench_num_splits;
+  const int FIRST_ROW = 0;
+
+  if (FLAGS_use_existing_table == "") {
+    vector<const KuduPartialRow*> split_rows;
+    int previous_split_key = -1;
+    for (int i = 1; i < NUM_SPLITS; ++i) {
+       int split_key = (NUM_ROWS / NUM_SPLITS) * i;
+       KuduPartialRow* row = kudu_test_helper_.test_schema().NewRow();
+       row->SetInt32(0, split_key);
+       split_rows.push_back(row);
+    }
+
+    kudu_test_helper_.CreateTable(BASE_TABLE_NAME, &split_rows);
+    // Insert NUM_ROWS rows for this test.
+    kudu_test_helper_.InsertTestRows(kudu_test_helper_.client().get(),
+                                     kudu_test_helper_.table().get(),
+                                     NUM_ROWS);
+    LOG(INFO) << "Inserted: " << NUM_ROWS << " rows into " << NUM_SPLITS << " tablets.";
+  } else {
+    kudu_test_helper_.OpenTable(FLAGS_use_existing_table);
+  }
+
+  // TODO We calculate the scan ranges based on the test params and not by actually
+  // querying the tablet servers since Kudu doesn't have an API to get them.
+  vector<TScanRangeParams> params;
+  int previous_split_key = -1;
+  for (int i = 1; i < NUM_SPLITS; ++i) {
+     int split_key = (NUM_ROWS / NUM_SPLITS) * i;
+     AddScanRange(previous_split_key, split_key, &params);
+     previous_split_key = split_key;
+     if (i == NUM_SPLITS -1) {
+       AddScanRange(split_key, -1, &params);
+     }
+  }
+
+  LOG(INFO) << "Warming up scans.";
+
+  // Scan all columns once to warmup.
+  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, 3, 3, NO_LIMIT, false);
+
+  DoBenchmarkScan("No cols", params, 0);
+  DoBenchmarkScan("Key only", params, 1);
+  DoBenchmarkScan("Int cols", params, 2);
+  DoBenchmarkScan("All cols with strings", params, 3);
 }
 
 } // namespace impala

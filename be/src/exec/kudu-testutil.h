@@ -139,6 +139,11 @@ class KuduTestHelper {
     ASSERT_FALSE(session->HasPendingOperations());
   }
 
+  void OpenTable(const string& table_name) {
+    table_name_ = table_name;
+    LOG(INFO) << "Opening Kudu table: " << table_name_;
+    KUDU_ASSERT_OK(client_->OpenTable(table_name, &client_table_));
+  }
 
   void DeleteTable() {
     LOG(INFO) << "Deleting Kudu table: " << table_name_;
