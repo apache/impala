@@ -120,7 +120,7 @@ inline HashTable::Iterator HashTable::Find(HashTableCtx* ht_ctx, uint32_t hash) 
   int64_t bucket_idx = Probe(buckets_, num_buckets_, ht_ctx, hash, &found);
   if (found) {
     return Iterator(this, ht_ctx->row(), bucket_idx,
-        buckets_[bucket_idx].bucketData.duplicates, hash);
+        buckets_[bucket_idx].bucketData.duplicates);
   }
   return End();
 }
@@ -129,14 +129,14 @@ inline HashTable::Iterator HashTable::Begin(HashTableCtx* ctx) {
   int64_t bucket_idx = Iterator::BUCKET_NOT_FOUND;
   DuplicateNode* node = NULL;
   NextFilledBucket(&bucket_idx, &node);
-  return Iterator(this, ctx->row(), bucket_idx, node, 0);
+  return Iterator(this, ctx->row(), bucket_idx, node);
 }
 
 inline HashTable::Iterator HashTable::FirstUnmatched(HashTableCtx* ctx) {
   int64_t bucket_idx = Iterator::BUCKET_NOT_FOUND;
   DuplicateNode* node = NULL;
   NextFilledBucket(&bucket_idx, &node);
-  Iterator it(this, ctx->row(), bucket_idx, node, 0);
+  Iterator it(this, ctx->row(), bucket_idx, node);
   // Check whether the bucket, or its first duplicate node, is matched. If it is not
   // matched, then return. Otherwise, move to the first unmatched entry (node or bucket).
   Bucket* bucket = &buckets_[bucket_idx];

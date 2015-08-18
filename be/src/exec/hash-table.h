@@ -496,8 +496,7 @@ class HashTable {
    private:
     friend class HashTable;
 
-    Iterator(HashTable* table, TupleRow* row, int bucket_idx, DuplicateNode* node,
-             uint32_t hash)
+    Iterator(HashTable* table, TupleRow* row, int bucket_idx, DuplicateNode* node)
       : table_(table),
         row_(row),
         bucket_idx_(bucket_idx),
