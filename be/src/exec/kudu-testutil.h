@@ -72,7 +72,16 @@ class KuduTestHelper {
     KUDU_ASSERT_OK(builder.Build(&test_schema_));
   }
 
-  void CreateTable(const string& table_name_prefix) {
+  void CreateTable(const string& table_name_prefix,
+                   vector<const KuduPartialRow*>* split_rows = NULL) {
+
+    vector<const KuduPartialRow*> splits;
+    if (split_rows != NULL) {
+      splits = *split_rows;
+    } else {
+      splits = DefaultSplitRows();
+    }
+
     // Kudu's table delete functionality is in flux, meaning a table may reappear
     // after being deleted. To work around this we add the time in milliseconds to
     // the required table name, making it unique. When Kudu's delete table functionality
@@ -88,7 +97,7 @@ class KuduTestHelper {
       kudu::Status s = client_->NewTableCreator()->table_name(table_name_)
                              .schema(&test_schema_)
                              .num_replicas(3)
-                             .split_rows(GenerateSplitRows())
+                             .split_rows(splits)
                              .Create();
       if (s.IsAlreadyPresent()) {
         LOG(INFO) << "Table existed, deleting. " << table_name_;
@@ -122,6 +131,9 @@ class KuduTestHelper {
     session->SetTimeoutMillis(10000);
     for (int i = first_row; i < num_rows + first_row; i++) {
       KUDU_ASSERT_OK(session->Apply(BuildTestRow(table, i, num_cols).release()));
+      if (i % 1000 == 0) {
+        session->Flush();
+      }
     }
     KUDU_ASSERT_OK(session->Flush());
     ASSERT_FALSE(session->HasPendingOperations());
@@ -133,7 +145,7 @@ class KuduTestHelper {
     KUDU_ASSERT_OK(client_->DeleteTable(table_name_));
   }
 
-  vector<const KuduPartialRow*> GenerateSplitRows() {
+  vector<const KuduPartialRow*> DefaultSplitRows() {
     vector<const KuduPartialRow*> keys;
     KuduPartialRow* key = test_schema_.NewRow();
     key->SetInt32(0, 5);

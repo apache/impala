@@ -32,56 +32,65 @@
 #include "util/cpu-info.h"
 #include "util/test-info.h"
 
+DEFINE_bool(run_kudu_scan_benchmarks, false, "Whether to run the Kudu scan benchmark"
+    "tests.");
+
 using apache::thrift::ThriftDebugString;
 using strings::Substitute;
 
 namespace impala {
 
 static const char* BASE_TABLE_NAME = "TestScanNodeTable";
+// The id of the slot that contains the key, in the test schema.
+const int KEY_SLOT_ID = 2;
 
 class KuduScanNodeTest : public testing::Test {
  public:
-  KuduScanNodeTest()
-      : runtime_state_(TPlanFragmentInstanceCtx(), "", &exec_env_) {}
-
   virtual void SetUp() {
     // Create a Kudu client and the table (this will abort the test here
     // if a Kudu cluster is not available).
     kudu_test_helper_.CreateClient();
-    kudu_test_helper_.CreateTable(BASE_TABLE_NAME);
+    mem_tracker_.reset(new MemTracker());
+    exec_env_.reset(new ExecEnv());
 
     // Initialize the environment/runtime so that we can use a scan node in
     // isolation.
-    DCHECK_OK(exec_env_.InitForFeTests());
-    runtime_state_.InitMemTrackers(TUniqueId(), NULL, -1);
-    exec_env_.disk_io_mgr()->Init(&mem_tracker_);
+    DCHECK_OK(exec_env_->InitForFeTests());
+    exec_env_->disk_io_mgr()->Init(mem_tracker_.get());
   }
 
   virtual void TearDown() {
-    kudu_test_helper_.DeleteTable();
+    if (kudu_test_helper_.table()) {
+      kudu_test_helper_.DeleteTable();
+    }
   }
 
   void BuildRuntimeStateForScans(int num_cols_materialize) {
+    obj_pool_.reset(new ObjectPool());
+    runtime_state_.reset(new RuntimeState(TPlanFragmentInstanceCtx(), "",
+        exec_env_.get()));
+    runtime_state_->InitMemTrackers(TUniqueId(), NULL, -1);
+
     TKuduScanNode kudu_scan_node_;
     kudu_scan_node_.__set_pushable_conjuncts(pushable_conjuncts_);
-    kudu_node_.__set_kudu_scan_node(kudu_scan_node_);
-    kudu_node_.__set_node_type(TPlanNodeType::KUDU_SCAN_NODE);
-    kudu_node_.__set_limit(-1);
+
+    kudu_node_.reset(new TPlanNode);
+
+    kudu_node_->__set_kudu_scan_node(kudu_scan_node_);
+    kudu_node_->__set_node_type(TPlanNodeType::KUDU_SCAN_NODE);
+    kudu_node_->__set_limit(-1);
+    kudu_node_->row_tuples.push_back(0);
+    kudu_node_->nullable_tuples.push_back(false);
 
     kudu_test_helper_.CreateTableDescriptor(num_cols_materialize, &desc_tbl_);
 
-    row_desc_ = obj_pool_.Add(
-        new RowDescriptor(*desc_tbl_,
-                          boost::assign::list_of(0),
-                          boost::assign::list_of(false)));
-
-    runtime_state_.set_desc_tbl(desc_tbl_);
+    runtime_state_->set_desc_tbl(desc_tbl_);
   }
 
   void SetUpScanner(KuduScanNode* scan_node, const vector<TScanRangeParams>& params) {
     scan_node->SetScanRanges(params);
-    ASSERT_OK(scan_node->Prepare(&runtime_state_));
-    ASSERT_OK(scan_node->Open(&runtime_state_));
+    ASSERT_OK(scan_node->Prepare(runtime_state_.get()));
+    ASSERT_OK(scan_node->Open(runtime_state_.get()));
   }
 
   void VerifyBatch(RowBatch* batch, int first_row, int last_row,
@@ -132,40 +141,61 @@ class KuduScanNodeTest : public testing::Test {
   static const int NO_LIMIT = -1;
   static const int DEFAULT_ROWS_PER_BATCH = 1024;
 
+  struct batch_less_than {
+    int tuple_offset;
+
+    int GetKeyValue(RowBatch* batch) const {
+      return *reinterpret_cast<int32_t*>(
+          batch->GetRow(0)->GetTuple(0)->GetSlot(tuple_offset));
+    }
+
+    inline bool operator() (RowBatch* left, RowBatch* right) const {
+      return GetKeyValue(left) < GetKeyValue(right);
+    }
+  };
+
   void ScanAndVerify(const vector<TScanRangeParams>& params, int first_row,
-      int expected_num_rows, int expected_num_batches, int num_cols_to_materialize,
+      int expected_num_rows, int num_cols_to_materialize,
       int num_notnull_cols = 3, int limit = NO_LIMIT, bool verify = true) {
     BuildRuntimeStateForScans(num_cols_to_materialize);
-    if (limit != NO_LIMIT) kudu_node_.__set_limit(limit);
+    if (limit != NO_LIMIT) kudu_node_->__set_limit(limit);
 
-    KuduScanNode scanner(&obj_pool_, kudu_node_, *desc_tbl_);
+    KuduScanNode scanner(obj_pool_.get(), *kudu_node_, *desc_tbl_);
     SetUpScanner(&scanner, params);
 
     int num_rows = 0;
-    int num_batches = 0;
     bool eos = false;
+    vector<RowBatch*> row_batches;
 
     do {
-      RowBatch* batch = obj_pool_.Add(new RowBatch(*row_desc_, DEFAULT_ROWS_PER_BATCH,
-          &mem_tracker_));
-      ASSERT_OK(scanner.GetNext(&runtime_state_, batch, &eos));
+      RowBatch* batch = obj_pool_->Add(new RowBatch(scanner.row_desc(),
+          DEFAULT_ROWS_PER_BATCH, mem_tracker_.get()));
+      ASSERT_OK(scanner.GetNext(runtime_state_.get(), batch, &eos));
 
       if (batch->num_rows() == 0) {
         ASSERT_TRUE(eos);
         break;
       }
 
-      if (verify) {
-        VerifyBatch(batch, first_row, first_row + batch->num_rows(),
-            num_cols_to_materialize, num_notnull_cols);
-      }
+      row_batches.push_back(batch);
       num_rows += batch->num_rows();
-      first_row += batch->num_rows();
-      ++num_batches;
     } while(!eos);
 
+    if (verify) {
+      batch_less_than comp;
+      comp.tuple_offset = runtime_state_->desc_tbl().
+          GetSlotDescriptor(KEY_SLOT_ID)->tuple_offset();
+
+      std::sort(row_batches.begin(), row_batches.end(), comp);
+      BOOST_FOREACH(RowBatch* batch, row_batches) {
+        VerifyBatch(batch, first_row, first_row + batch->num_rows(),
+            num_cols_to_materialize, num_notnull_cols);
+        first_row += batch->num_rows();
+      }
+    }
+
     ASSERT_EQ(expected_num_rows, num_rows);
-    ASSERT_EQ(expected_num_batches, num_batches);
+    scanner.Close(runtime_state_.get());
   }
 
   // Adds a new TScanRangeParams to 'params'.
@@ -210,21 +240,19 @@ class KuduScanNodeTest : public testing::Test {
 
  protected:
   KuduTestHelper kudu_test_helper_;
-  MemTracker mem_tracker_;
-  ObjectPool obj_pool_;
-  ExecEnv exec_env_;
-  RuntimeState runtime_state_;
-  TPlanNode kudu_node_;
+  boost::scoped_ptr<MemTracker> mem_tracker_;
+  boost::scoped_ptr<ObjectPool> obj_pool_;
+  boost::scoped_ptr<ExecEnv> exec_env_;
+  boost::scoped_ptr<RuntimeState> runtime_state_;
+  boost::scoped_ptr<TPlanNode> kudu_node_;
   TTableDescriptor t_tbl_desc_;
   DescriptorTbl* desc_tbl_;
-  RowDescriptor* row_desc_;
   vector<TExpr> pushable_conjuncts_;
 };
 
 TEST_F(KuduScanNodeTest, TestScanNode) {
-
-  const int NUM_BATCHES = 5;
-  const int NUM_ROWS = DEFAULT_ROWS_PER_BATCH * NUM_BATCHES;
+  kudu_test_helper_.CreateTable(BASE_TABLE_NAME);
+  const int NUM_ROWS = DEFAULT_ROWS_PER_BATCH * 5;
   const int FIRST_ROW = 0;
 
   // Insert NUM_ROWS rows for this test.
@@ -240,15 +268,15 @@ TEST_F(KuduScanNodeTest, TestScanNode) {
   AddScanRange(mid_key, NUM_ROWS, &params);
 
   // Test materializing all, some, or none of the slots.
-  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, NUM_BATCHES, 3);
-  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, NUM_BATCHES, 2);
-  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, NUM_BATCHES, 0);
+  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, 3);
+  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, 2);
+  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, 0, /* 0 non-null cols */0, NO_LIMIT,
+      /* Don't verify */false);
 }
 
 TEST_F(KuduScanNodeTest, TestScanNullColValues) {
-
+  kudu_test_helper_.CreateTable(BASE_TABLE_NAME);
   const int NUM_ROWS = 1000;
-  const int NUM_BATCHES = 1;
   const int FIRST_ROW = 0;
 
   // Insert NUM_ROWS rows for this test but only the keys, i.e. the 2nd
@@ -261,9 +289,9 @@ TEST_F(KuduScanNodeTest, TestScanNullColValues) {
   AddScanRange(-1, -1, &params);
 
   // Try scanning including and not including the null columns.
-  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, NUM_BATCHES, 3, 1);
-  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, NUM_BATCHES, 2, 1);
-  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, NUM_BATCHES, 1, 1);
+  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, 3, 1);
+  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, 2, 1);
+  ScanAndVerify(params, FIRST_ROW, NUM_ROWS, 1, 1);
 }
 
 namespace {
@@ -325,8 +353,8 @@ void AddExpressionNodesToExpression(TExpr* expression, int slot_id, const string
 
 // Test a >= predicate on the Key.
 TEST_F(KuduScanNodeTest, TestPushIntGEPredicateOnKey) {
+  kudu_test_helper_.CreateTable(BASE_TABLE_NAME);
   const int NUM_ROWS_TO_INSERT = 1000;
-  const int NUM_BATCHES = 1;
   const int SLOT_ID = 2;
   const int MAT_COLS = 3;
   const int FIRST_ROW = 500;
@@ -348,13 +376,13 @@ TEST_F(KuduScanNodeTest, TestPushIntGEPredicateOnKey) {
   vector<TScanRangeParams> params;
   AddScanRange(-1, -1, &params);
 
-  ScanAndVerify(params, FIRST_ROW, EXPECTED_NUM_ROWS, NUM_BATCHES, NUM_BATCHES, MAT_COLS);
+  ScanAndVerify(params, FIRST_ROW, EXPECTED_NUM_ROWS, MAT_COLS);
 }
 
 // Test a == predicate on the 2nd column.
 TEST_F(KuduScanNodeTest, TestPushIntEQPredicateOn2ndColumn) {
+  kudu_test_helper_.CreateTable(BASE_TABLE_NAME);
   const int NUM_ROWS_TO_INSERT = 1000;
-  const int NUM_BATCHES = 1;
   const int SLOT_ID = 3;
   const int MAT_COLS = 3;
 
@@ -379,12 +407,12 @@ TEST_F(KuduScanNodeTest, TestPushIntEQPredicateOn2ndColumn) {
   vector<TScanRangeParams> params;
   AddScanRange(-1, -1, &params);
 
-  ScanAndVerify(params, FIRST_ROW, EXPECTED_NUM_ROWS, NUM_BATCHES, NUM_BATCHES, MAT_COLS);
+  ScanAndVerify(params, FIRST_ROW, EXPECTED_NUM_ROWS, MAT_COLS);
 }
 
 TEST_F(KuduScanNodeTest, TestPushStringLEPredicateOn3rdColumn) {
+  kudu_test_helper_.CreateTable(BASE_TABLE_NAME);
   const int NUM_ROWS_TO_INSERT = 1000;
-  const int NUM_BATCHES = 1;
   const int SLOT_ID = 4;
   const int MAT_COLS = 3;
   // This predicate won't return consecutive rows so we just assert on the count.
@@ -413,13 +441,13 @@ TEST_F(KuduScanNodeTest, TestPushStringLEPredicateOn3rdColumn) {
   vector<TScanRangeParams> params;
   AddScanRange(-1, -1, &params);
 
-  ScanAndVerify(params, FIRST_ROW, EXPECTED_NUM_ROWS, NUM_BATCHES, MAT_COLS, MAT_COLS,
+  ScanAndVerify(params, FIRST_ROW, EXPECTED_NUM_ROWS, MAT_COLS, MAT_COLS,
                 NO_LIMIT, VERIFY_ROWS);
 }
 
 TEST_F(KuduScanNodeTest, TestPushTwoPredicatesOnNonMaterializedColumn) {
+  kudu_test_helper_.CreateTable(BASE_TABLE_NAME);
   const int NUM_ROWS_TO_INSERT = 1000;
-  const int NUM_BATCHES = 1;
   const int SLOT_ID = 3;
   const int MAT_COLS = 1;
 
@@ -452,13 +480,13 @@ TEST_F(KuduScanNodeTest, TestPushTwoPredicatesOnNonMaterializedColumn) {
   vector<TScanRangeParams> params;
   AddScanRange(-1, -1, &params);
 
-  ScanAndVerify(params, FIRST_ROW, EXPECTED_NUM_ROWS, NUM_BATCHES, MAT_COLS);
+  ScanAndVerify(params, FIRST_ROW, EXPECTED_NUM_ROWS, MAT_COLS);
 }
 
 // Test for a bug where we would mishandle getting an empty string from
 // Kudu and wrongfully return a MEM_LIMIT_EXCEEDED.
 TEST_F(KuduScanNodeTest, TestScanEmptyString) {
-
+  kudu_test_helper_.CreateTable(BASE_TABLE_NAME);
   std::tr1::shared_ptr<KuduSession> session = kudu_test_helper_.client()->NewSession();
   KUDU_ASSERT_OK(session->SetFlushMode(KuduSession::MANUAL_FLUSH));
   session->SetTimeoutMillis(10000);
@@ -470,13 +498,14 @@ TEST_F(KuduScanNodeTest, TestScanEmptyString) {
   ASSERT_FALSE(session->HasPendingOperations());
 
   BuildRuntimeStateForScans(3);
-  KuduScanNode scanner(&obj_pool_, kudu_node_, *desc_tbl_);
+  KuduScanNode scanner(obj_pool_.get(), *kudu_node_, *desc_tbl_);
   vector<TScanRangeParams> params;
   AddScanRange(-1, -1, &params);
   SetUpScanner(&scanner, params);
   bool eos = false;
-  RowBatch* batch = obj_pool_.Add(new RowBatch(*row_desc_, 10, &mem_tracker_));
-  ASSERT_OK(scanner.GetNext(&runtime_state_, batch, &eos));
+  RowBatch* batch = obj_pool_->Add(
+      new RowBatch(scanner.row_desc(), DEFAULT_ROWS_PER_BATCH, mem_tracker_.get()));
+  ASSERT_OK(scanner.GetNext(runtime_state_.get(), batch, &eos));
   ASSERT_EQ(1, batch->num_rows());
   ASSERT_TRUE(eos);
   ASSERT_EQ(PrintBatch(batch), "[(10 null )]\n");
@@ -484,6 +513,7 @@ TEST_F(KuduScanNodeTest, TestScanEmptyString) {
 
 // Test that scan limits are enforced.
 TEST_F(KuduScanNodeTest, TestLimitsAreEnforced) {
+  kudu_test_helper_.CreateTable(BASE_TABLE_NAME);
   const int NUM_ROWS = 1000;
   const int FIRST_ROW = 0;
 
@@ -497,11 +527,11 @@ TEST_F(KuduScanNodeTest, TestLimitsAreEnforced) {
 
   // Try scanning but limit the number of returned rows to several different values.
   int limit_rows_to = 0;
-  ScanAndVerify(params, FIRST_ROW, limit_rows_to, 0, 3, 3, limit_rows_to);
+  ScanAndVerify(params, FIRST_ROW, limit_rows_to, 3, 3, limit_rows_to);
   limit_rows_to = 1;
-  ScanAndVerify(params, FIRST_ROW, limit_rows_to, 1, 3, 3, limit_rows_to);
+  ScanAndVerify(params, FIRST_ROW, limit_rows_to, 3, 3, limit_rows_to);
   limit_rows_to = 2000;
-  ScanAndVerify(params, FIRST_ROW, 1000, 1, 3, 3, limit_rows_to);
+  ScanAndVerify(params, FIRST_ROW, 1000, 3, 3, limit_rows_to);
 }
 
 } // namespace impala
