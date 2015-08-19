@@ -33,17 +33,17 @@ using boost::make_unsigned;
 class BitUtil {
  public:
   /// Returns the ceil of value/divisor
-  static inline int Ceil(int value, int divisor) {
+  static inline int64_t Ceil(int64_t value, int64_t divisor) {
     return value / divisor + (value % divisor != 0);
   }
 
   /// Returns 'value' rounded up to the nearest multiple of 'factor'
-  static inline int RoundUp(int value, int factor) {
+  static inline int64_t RoundUp(int64_t value, int64_t factor) {
     return (value + (factor - 1)) / factor * factor;
   }
 
   /// Returns 'value' rounded down to the nearest multiple of 'factor'
-  static inline int RoundDown(int value, int factor) {
+  static inline int64_t RoundDown(int64_t value, int64_t factor) {
     return (value / factor) * factor;
   }
 

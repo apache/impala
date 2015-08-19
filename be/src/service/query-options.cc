@@ -268,7 +268,15 @@ Status impala::SetQueryOption(const string& key, const string& value,
       case TImpalaQueryOptions::PARQUET_FILE_SIZE: {
         int64_t file_size;
         RETURN_IF_ERROR(ParseMemValue(value, "parquet file size", &file_size));
-        query_options->__set_parquet_file_size(file_size);
+        if (file_size > numeric_limits<int32_t>::max()) {
+          // Do not allow values greater than or equal to 2GB since hdfsOpenFile() from
+          // the HDFS API gets an int32 blocksize parameter (see HDFS-8949).
+          stringstream ss;
+          ss << "The PARQUET_FILE_SIZE query option must be less than 2GB.";
+          return Status(ss.str());
+        } else {
+          query_options->__set_parquet_file_size(file_size);
+        }
         break;
       }
       case TImpalaQueryOptions::EXPLAIN_LEVEL:
