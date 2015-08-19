@@ -61,7 +61,7 @@ Status UnnestNode::Prepare(RuntimeState* state) {
 
   DCHECK_EQ(1, row_desc().tuple_descriptors().size());
   const TupleDescriptor* item_tuple_desc = row_desc().tuple_descriptors()[0];
-  DCHECK_NOTNULL(item_tuple_desc);
+  DCHECK(item_tuple_desc != NULL);
   item_byte_size_ = item_tuple_desc->byte_size();
   RETURN_IF_ERROR(array_expr_ctx_->Prepare(
       state, containing_subplan_->child(0)->row_desc(), expr_mem_tracker()));
@@ -132,7 +132,7 @@ Status UnnestNode::Reset(RuntimeState* state) {
 
 void UnnestNode::Close(RuntimeState* state) {
   if (is_closed()) return;
-  DCHECK_NOTNULL(array_expr_ctx_);
+  DCHECK(array_expr_ctx_ != NULL);
   array_expr_ctx_->Close(state);
   ExecNode::Close(state);
 }
