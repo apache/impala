@@ -17,16 +17,17 @@ import traceback
 import getpass
 import re
 
-from beeswaxd import BeeswaxService
-from beeswaxd.BeeswaxService import QueryState
+from impala._thrift_gen.beeswax import BeeswaxService
+from impala._thrift_gen.beeswax.BeeswaxService import QueryState
 from datetime import datetime
 try:
   # If Exec Summary is not implemented in Impala, this cannot be imported
-  from ExecStats.ttypes import TExecStats
+  from impala._thrift_gen.ExecStats.ttypes import TExecStats
 except ImportError:
   pass
-from ImpalaService import ImpalaService
-from ImpalaService.ImpalaService import TImpalaQueryOptions, TResetTableReq
+from impala._thrift_gen.ImpalaService import ImpalaService
+from impala._thrift_gen.ImpalaService.ImpalaService import (TImpalaQueryOptions,
+    TResetTableReq)
 from tests.util.thrift_util import create_transport
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException

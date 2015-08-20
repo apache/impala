@@ -23,6 +23,7 @@
 #   - Stores the execution details in JSON format.
 #
 
+import getpass
 import json
 import logging
 import os
@@ -31,13 +32,14 @@ import prettytable
 from collections import deque
 from copy import deepcopy
 from datetime import datetime
+from decimal import Decimal
 from itertools import groupby
 from optparse import OptionParser
 from random import shuffle
 from sys import exit
 
 from tests.common.test_dimensions import TableFormatInfo
-from tests.performance.query import Query, QueryResult
+from tests.performance.query import Query, HiveQueryResult, ImpalaQueryResult
 from tests.performance.query_executor import QueryExecConfig
 from tests.performance.workload_runner import WorkloadRunner
 from tests.performance.workload import Workload
@@ -54,7 +56,7 @@ parser.add_option("-w", "--workloads", dest="workloads", default="tpcds",
                   " list format. Optional scale factors for each workload are specified"
                   " using colons. For example: -w tpcds,tpch:400gb,tpch:1gb. "
                   "Some valid workloads:'tpch', 'tpcds', ..."))
-parser.add_option("--impalads", dest="impalads", default="localhost:21000",
+parser.add_option("--impalads", dest="impalads", default="localhost",
                   help=("A comma-separated list of impalad instances to run the "
                   "workload against."))
 parser.add_option("--exec_options", dest="exec_options", default=str(),
@@ -84,11 +86,19 @@ parser.add_option("--continue_on_query_error", dest="continue_on_query_error",
                   action="store_true", default=False,
                   help="If set, continue execution on each query error.")
 parser.add_option("-c", "--client_type", dest="client_type", default='beeswax',
-                  help="Client type. Valid options are 'beeswax' or 'jdbc'")
+                  choices=['beeswax', 'jdbc', 'hs2'],
+                  help="Client type. Valid options are 'beeswax' or 'jdbc' or 'hs2'")
 parser.add_option("--plugin_names", dest="plugin_names", default=None,
                   help=("Set of comma-separated plugin names with scope; Plugins are"
                     " specified as <plugin_name>[:<scope>]. If no scope if specified,"
                     " it defaults to Query. Plugin names are case sensitive"))
+parser.add_option("--exec_engine", dest="exec_engine", default="impala",
+                  choices=['impala', 'hive'],
+                  help=("Which SQL engine to use - impala, hive are valid options"))
+parser.add_option("--hiveserver", dest="hiveserver", default="localhost",
+                  help=("Host that has HiveServers2 service running"))
+parser.add_option("--user", dest="user", default=getpass.getuser(),
+                  help=("User account under which workload/query will run"))
 
 options, args = parser.parse_args()
 
@@ -111,11 +121,13 @@ class CustomJSONEncoder(json.JSONEncoder):
     - JSON does not know how to serialize object. We intercept the objects and
       provide their __dict__ representations
   """
-  def default(self, obj):
+  def default(self, obj,):
+    if isinstance(obj, Decimal):
+      return str(obj)
     if isinstance(obj, datetime):
       # Convert datetime into an standard iso string
       return obj.isoformat()
-    elif isinstance(obj, (Query, QueryResult, QueryExecConfig, TableFormatInfo)):
+    elif isinstance(obj, (Query, HiveQueryResult, QueryExecConfig, TableFormatInfo)):
       # Serialize these objects manually by returning their __dict__ methods.
       return obj.__dict__
     else:
@@ -194,9 +206,9 @@ def _validate_options():
   # the sasl module must be importable on a secure setup.
   if options.use_kerberos: import sasl
 
-  # Only two client types are allowed (for now)
-  if not options.client_type in ['beeswax', 'jdbc']:
-    raise RuntimeError('Invalid Client Type %s' % options.client_type)
+  # If Hive is the exec engine, hs2 is the only suported interface.
+  if options.exec_engine.lower() == "hive" and options.client_type != "hs2":
+    raise RuntimeError("The only supported client type for Hive engine is hs2")
 
   # Check for duplicate workload/scale_factor combinations
   workloads = split_and_strip(options.workloads)

@@ -64,22 +64,20 @@ class Query(object):
     return msg
 
 
-class QueryResult(object):
+class HiveQueryResult(object):
   """Contains the results of a query execution.
 
   Parameters:
     Required:
       query (Query): The query object associated with this result.
       start_time (datetime): Timestamp at the start of execution.
-      query_config (BeeswaxQueryExecConfig)
+      query_config (HiveHS2QueryExecConfig)
       client_name (int): The thread id
 
     Optional:
       time_taken (float): Time taken to execute the query.
       summary (str): query exection summary (ex. returned 10 rows)
       data (list of str): Query results returned by Impala.
-      runtime_profile (str): Saved runtime profile of the query's execution.
-      exec_summary (TExecSummary)
       success (bool): True if the execution was successful.
 
   Attributes - these are modified by another class:
@@ -96,8 +94,6 @@ class QueryResult(object):
     self.start_time = kwargs.get('start_time')
     self.query_config = kwargs.get('query_config')
     self.client_name = kwargs.get('client_name')
-    self.runtime_profile = kwargs.get('runtime_profile', str())
-    self.exec_summary = kwargs.get('exec_summary', str())
     self.success = kwargs.get('success', False)
     self.query_error = str()
     self.executor_name = str()
@@ -116,3 +112,33 @@ class QueryResult(object):
         self.start_time, self.time_taken, self.client_name)
     if not self.success: msg += " Error: %s" % self.query_error
     return msg
+
+
+class ImpalaQueryResult(HiveQueryResult):
+  """Contains the results of an Impala query execution.
+
+  Parameters:
+    Required:
+      query (Query): The query object associated with this result.
+      start_time (datetime): Timestamp at the start of execution.
+      query_config (BeeswaxQueryExecConfig, HS2QueryExecConfig)
+      client_name (int): The thread id
+
+    Optional:
+      time_taken (float): Time taken to execute the query.
+      summary (str): query exection summary (ex. returned 10 rows)
+      data (list of str): Query results returned by Impala.
+      runtime_profile (str): Saved runtime profile of the query's execution.
+      exec_summary (TExecSummary)
+      success (bool): True if the execution was successful.
+
+  Attributes - these are modified by another class:
+    query_error (str): Empty string if the query succeeded. Error returned by the client
+        if it failed.
+    executor_name (str)
+  """
+
+  def __init__(self, query, **kwargs):
+    super(ImpalaQueryResult, self).__init__(query, **kwargs)
+    self.runtime_profile = kwargs.get('runtime_profile', str())
+    self.exec_summary = kwargs.get('exec_summary', str())

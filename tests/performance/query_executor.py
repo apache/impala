@@ -30,8 +30,8 @@ import logging
 import os
 
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient, ImpalaBeeswaxResult
-from tests.performance.query import Query, QueryResult
-
+from tests.performance.query import Query, HiveQueryResult, ImpalaQueryResult
+from impala.dbapi import connect as connect_to_impala
 # Setup logging for this module.
 logging.basicConfig(level=logging.INFO, format='[%(name)s] %(threadName)s: %(message)s')
 LOG = logging.getLogger('query_executor')
@@ -94,6 +94,43 @@ class JdbcQueryExecConfig(ImpalaQueryExecConfig):
     return JdbcQueryExecConfig.JDBC_CLIENT_PATH + ' -i "%s" -t %s' % (self._impalad,
                                                                       self.transport)
 
+class ImpalaHS2QueryConfig(ImpalaQueryExecConfig):
+  def __init__(self, use_kerberos=False, impalad="localhost:21050", plugin_runner=None):
+    super(ImpalaHS2QueryConfig, self).__init__(plugin_runner=plugin_runner,
+        impalad=impalad)
+    # TODO Use a config dict for query execution options similar to HS2
+    self.use_kerberos = use_kerberos
+
+
+class HiveHS2QueryConfig(QueryExecConfig):
+  def __init__(self,
+      plugin_runner=None,
+      exec_options = None,
+      use_kerberos=False,
+      user=None,
+      hiveserver='localhost'):
+    super(HiveHS2QueryConfig, self).__init__()
+    self.exec_options = dict()
+    self._build_options(exec_options)
+    self.use_kerberos = use_kerberos
+    self.user = user
+    self.hiveserver = hiveserver
+
+  def _build_options(self, exec_options):
+    """Read the exec_options into self.exec_options
+
+    Args:
+      exec_options (str): String formatted as "command1;command2"
+    """
+
+    if exec_options:
+      # exec_options are seperated by ; on the command line
+      options = exec_options.split(';')
+      for option in options:
+        key, value = option.split(':')
+        # The keys in HiveService QueryOptions are lower case.
+        self.exec_options[key.lower()] = value
+
 class BeeswaxQueryExecConfig(ImpalaQueryExecConfig):
   """Impala query execution config for beeswax
 
@@ -139,18 +176,18 @@ class QueryExecutor(object):
     name (str): eg. "hive"
     query (str): string containing SQL query to be executed
     func (function): Function that accepts a QueryExecOption parameter and returns a
-      QueryResult. Eg. execute_using_impala_beeswax
+      ImpalaQueryResult. Eg. execute_using_impala_beeswax
     config (QueryExecOption)
     exit_on_error (boolean): Exit right after an error encountered.
 
   Attributes:
     exec_func (function): Function that accepts a QueryExecOption parameter and returns a
-      QueryResult.
+      ImpalaQueryResult.
     exec_config (QueryExecOption)
     query (str): string containing SQL query to be executed
     exit_on_error (boolean): Exit right after an error encountered.
     executor_name (str): eg. "hive"
-    result (QueryResult): Contains the result after execute method is called.
+    result (ImpalaQueryResult): Contains the result after execute method is called.
   """
 
   def __init__(self, name, query, func, config, exit_on_error):
@@ -159,7 +196,7 @@ class QueryExecutor(object):
     self.query = query
     self.exit_on_error = exit_on_error
     self.executor_name = name
-    self._result = QueryResult(query, query_config=self.exec_config)
+    self._result = None
 
   def prepare(self, impalad):
     """Prepare the query to be run.
@@ -167,11 +204,12 @@ class QueryExecutor(object):
     For now, this sets the impalad that the query connects to. If the executor is hive,
     it's a no op.
     """
-    if self.executor_name != 'hive':
+    if 'hive' not in self.executor_name:
       self.exec_config.impalad = impalad
 
   def execute(self):
     """Execute the query using the given execution function"""
+    LOG.debug('Executing %s' % self.query)
     self._result = self.exec_func(self.query, self.exec_config)
     if not self._result.success:
       if self.exit_on_error:
@@ -183,7 +221,7 @@ class QueryExecutor(object):
   def result(self):
     """Getter for the result of the query execution.
 
-    A result is a QueryResult object that contains the details of a single run of the
-    query.
+    A result is a ImpalaQueryResult object that contains the details of a single run of
+    the query.
     """
     return self._result

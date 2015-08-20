@@ -16,13 +16,17 @@ import logging
 from tests.common.test_dimensions import (TableFormatInfo,
     load_table_info_dimension,
     get_dataset_from_workload)
-from tests.performance.query import Query, QueryResult
+from tests.performance.query import Query, ImpalaQueryResult, HiveQueryResult
 from tests.performance.query_executor import (BeeswaxQueryExecConfig,
+    ImpalaHS2QueryConfig,
     JdbcQueryExecConfig,
-     QueryExecutor)
+    HiveHS2QueryConfig,
+    QueryExecutor)
 from tests.performance.query_exec_functions import (
     execute_using_impala_beeswax,
-    execute_using_jdbc)
+    execute_using_impala_hs2,
+    execute_using_jdbc,
+    execute_using_hive_hs2)
 from tests.performance.scheduler import Scheduler
 
 # Setup Logging
@@ -51,9 +55,10 @@ class WorkloadRunner(object):
     scale_factor (str): eg. "300gb"
     config (WorkloadConfig)
     exit_on_error (boolean)
-    results (list of QueryResult)
+    results (list of ImpalaQueryResult)
     _test_vectors (list of ?)
   """
+
   def __init__(self, workload, scale_factor, config):
     self.workload = workload
     self.scale_factor = scale_factor
@@ -83,12 +88,6 @@ class WorkloadRunner(object):
           self.config.exploration_strategy)
       self._test_vectors = [vector.value for vector in vectors]
 
-  def _get_executor_name(self):
-    executor_name = self.config.client_type
-    # We want to indicate this is IMPALA beeswax.
-    # We currently don't support hive beeswax.
-    return 'impala_beeswax' if executor_name == 'beeswax' else executor_name
-
   def _create_executor(self, executor_name):
     query_options = {
         'impala_beeswax': lambda: (execute_using_impala_beeswax,
@@ -96,9 +95,20 @@ class WorkloadRunner(object):
           exec_options=self.config.exec_options,
           use_kerberos=self.config.use_kerberos,
           )),
-        'jdbc': lambda: (execute_using_jdbc,
+        'impala_jdbc': lambda: (execute_using_jdbc,
           JdbcQueryExecConfig(plugin_runner=self.config.plugin_runner)
-          )
+          ),
+        'impala_hs2': lambda: (execute_using_impala_hs2,
+          ImpalaHS2QueryConfig(plugin_runner=self.config.plugin_runner,
+            use_kerberos=self.config.use_kerberos
+          )),
+        'hive_hs2': lambda: (execute_using_hive_hs2,
+          HiveHS2QueryConfig(hiveserver=self.config.hiveserver,
+            plugin_runner=self.config.plugin_runner,
+            exec_options=self.config.exec_options,
+            user=self.config.user,
+            use_kerberos=self.config.use_kerberos
+          ))
     } [executor_name]()
     return query_options
 
@@ -106,14 +116,17 @@ class WorkloadRunner(object):
     """Execute a set of queries.
 
     Create query executors for each query, and pass them along with config information to
-    the scheduler, which then runs the queries.
+    the scheduler.
     """
-    executor_name = self._get_executor_name()
+    executor_name = "{0}_{1}".format(self.config.exec_engine, self.config.client_type)
     exec_func, exec_config = self._create_executor(executor_name)
     query_executors = []
     # Build an executor for each query
     for query in queries:
-      query_executor = QueryExecutor(executor_name, query, exec_func, exec_config,
+      query_executor = QueryExecutor(executor_name,
+          query,
+          exec_func,
+          exec_config,
           self.exit_on_error)
       query_executors.append(query_executor)
     # Initialize the scheduler.

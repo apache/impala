@@ -72,6 +72,8 @@ parser = OptionParser()
 parser.add_option("--input_result_file", dest="result_file",
                  default=os.environ['IMPALA_HOME'] + '/benchmark_results.json',
                  help="The input JSON file with benchmark results")
+parser.add_option("--hive_results", dest="hive_results", action="store_true",
+                 help="Process results generated from queries ran against Hive")
 parser.add_option("--reference_result_file", dest="reference_result_file",
                  default=os.environ['IMPALA_HOME'] + '/reference_benchmark_results.json',
                  help="The input JSON file with reference benchmark results")
@@ -134,7 +136,7 @@ def get_dict_from_json(filename):
   Everything in this file is based on the nested dictionary data structure. The dictionary
   is structured as follows: Top level maps to workload. Each workload maps to file_format.
   Each file_format maps to queries. Each query contains a key "result_list" that maps to a
-  list of QueryResult (look at query.py) dictionaries. The compute stats method
+  list of ImpalaQueryResult (look at query.py) dictionaries. The compute stats method
   add additional keys such as "avg" or "stddev" here.
 
   Here's how the keys are structred:
@@ -358,10 +360,11 @@ class Report(object):
         else:
           self.perf_change_str = ''
 
-        try:
-          save_runtime_diffs(results, ref_results, self.perf_change, self.is_regression)
-        except Exception as e:
-          LOG.error('Could not generate an html diff: {0}'.format(e))
+    if not options.hive_results:
+      try:
+        save_runtime_diffs(results, ref_results, self.perf_change, self.is_regression)
+      except Exception as e:
+        LOG.error('Could not generate an html diff: {0}'.format(e))
 
     def __check_perf_change_significance(self, stat, ref_stat):
       absolute_difference = abs(ref_stat[AVG] - stat[AVG])
@@ -1023,6 +1026,9 @@ def save_runtime_diffs(results, ref_results, change_significant, is_regression):
     f.write(runtime_profile_diff)
 
 def build_exec_summary_str(results, ref_results, for_variability = False):
+  # There is no summary available for Hive after query execution
+  if options.hive_results:
+    return ""
   exec_summaries = [result[EXEC_SUMMARY] for result in results[RESULT_LIST]]
   combined_summary = CombinedExecSummaries(exec_summaries)
 
@@ -1046,8 +1052,9 @@ def build_summary_header(current_impala_version, ref_impala_version):
     summary += '\nCluster Name: {0}\n'.format(options.cluster_name)
   if options.lab_run_info:
     summary += 'Lab Run Info: {0}\n'.format(options.lab_run_info)
-  summary += 'Impala Version:          {0}\n'.format(current_impala_version)
-  summary += 'Baseline Impala Version: {0}\n'.format(ref_impala_version)
+  if not options.hive_results:
+    summary += 'Impala Version:          {0}\n'.format(current_impala_version)
+    summary += 'Baseline Impala Version: {0}\n'.format(ref_impala_version)
   return summary
 
 def write_results_to_datastore(grouped):
@@ -1084,7 +1091,7 @@ def write_results_to_datastore(grouped):
              version=options.build_version,
              run_info=options.lab_run_info,
              user_name=options.run_user_name,
-             runtime_profile=query_result[RUNTIME_PROFILE])
+             runtime_profile = 'N/A' if options.hive_results else query_result[RUNTIME_PROFILE])
 
 if __name__ == "__main__":
   """Workflow:
@@ -1099,7 +1106,6 @@ if __name__ == "__main__":
 
   # Generate a dictionary based on the JSON file
   grouped = get_dict_from_json(options.result_file)
-  current_impala_version = get_impala_version(grouped)
 
   try:
     # Generate a dictionary based on the reference JSON file
@@ -1110,10 +1116,16 @@ if __name__ == "__main__":
     LOG.error('Could not read reference result file: {0}'.format(e))
     ref_grouped = None
 
-  ref_impala_version = get_impala_version(ref_grouped) if ref_grouped else 'N/A'
   if options.save_to_db: write_results_to_datastore(grouped)
-
   report = Report(grouped, ref_grouped)
+
+  ref_impala_version = 'N/A'
+  if options.hive_results:
+    current_impala_version = 'N/A'
+  else:
+    current_impala_version = get_impala_version(grouped)
+    if ref_grouped:
+      ref_impala_version = get_impala_version(ref_grouped)
 
   print build_summary_header(current_impala_version, ref_impala_version)
   print report
