@@ -6,7 +6,7 @@
 ${USER} = all_tpch, all_newdb, all_functional_seq_snap, select_tpcds,\
           select_functional_alltypesagg, insert_functional_alltypes,\
           select_functional_complex_view, select_functional_view_view,\
-          insert_parquet, new_table_uri, tpch_data_uri
+          insert_parquet, new_table_uri, tpch_data_uri, select_column_level_functional
 server_admin = all_server
 
 # The [roles] section defines privileges for objects in the authorizeable hierarchy.
@@ -27,7 +27,27 @@ select_functional_complex_view =\
 select_functional_view_view =\
     server=server1->db=functional->table=view_view->action=select
 insert_parquet = server=server1->db=functional_parquet->table=*->action=insert
-
+select_column_level_functional =\
+    server=server1->db=functional->table=alltypessmall->column=id->action=select,\
+    server=server1->db=functional->table=alltypessmall->column=int_col->action=select,\
+    server=server1->db=functional->table=alltypessmall->column=year->action=select,\
+    server=server1->db=functional->table=alltypestiny->column=id->action=select,\
+    server=server1->db=functional->table=alltypestiny->column=bool_col->action=select,\
+    server=server1->db=functional->table=alltypestiny->column=tinyint_col->action=select,\
+    server=server1->db=functional->table=alltypestiny->column=smallint_col->action=select,\
+    server=server1->db=functional->table=alltypestiny->column=int_col->action=select,\
+    server=server1->db=functional->table=alltypestiny->column=bigint_col->action=select,\
+    server=server1->db=functional->table=alltypestiny->column=float_col->action=select,\
+    server=server1->db=functional->table=alltypestiny->column=double_col->action=select,\
+    server=server1->db=functional->table=alltypestiny->column=date_string_col->action=select,\
+    server=server1->db=functional->table=alltypestiny->column=timestamp_col->action=select,\
+    server=server1->db=functional->table=alltypestiny->column=string_col->action=select,\
+    server=server1->db=functional->table=alltypestiny->column=year->action=select,\
+    server=server1->db=functional->table=alltypestiny->column=month->action=select,\
+    server=server1->db=functional->table=allcomplextypes->column=int_struct_col->action=select,\
+    server=server1->db=functional->table=allcomplextypes->column=id->action=select,\
+    server=server1->db=functional->table=allcomplextypes->column=struct_array_col->action=select,\
+    server=server1->db=functional->table=allcomplextypes->column=int_map_col->action=select
 new_table_uri = server=server1->uri=hdfs://localhost:20500/test-warehouse/new_table
 tpch_data_uri = server=server1->uri=hdfs://localhost:20500/test-warehouse/tpch.lineitem
 

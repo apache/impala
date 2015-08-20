@@ -16,8 +16,7 @@ package com.cloudera.impala.analysis;
 
 import java.util.Set;
 
-import junit.framework.Assert;
-
+import org.junit.Assert;
 import org.junit.Test;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
@@ -270,11 +269,15 @@ public class AuditingTest extends AnalyzerTest {
     Set<TAccessEvent> accessEvents =
         AnalyzeAccessEvents("describe functional.alltypesagg");
     Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
+        "functional.alltypesagg", TCatalogObjectType.TABLE, "ANY")));
+
+    accessEvents = AnalyzeAccessEvents("describe formatted functional.alltypesagg");
+    Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
         "functional.alltypesagg", TCatalogObjectType.TABLE, "VIEW_METADATA")));
 
     accessEvents = AnalyzeAccessEvents("describe functional.complex_view");
     Assert.assertEquals(accessEvents, Sets.newHashSet(new TAccessEvent(
-        "functional.complex_view", TCatalogObjectType.VIEW, "VIEW_METADATA")));
+        "functional.complex_view", TCatalogObjectType.VIEW, "ANY")));
   }
 
   @Test
@@ -314,16 +317,15 @@ public class AuditingTest extends AnalyzerTest {
         "server1", "/does/not/exist", "");
     ImpaladCatalog catalog = new ImpaladTestCatalog(config);
     Frontend fe = new Frontend(config, catalog);
-    Analyzer analyzer = new Analyzer(catalog, TestUtils.createQueryContext(), config);
-
+    AnalysisContext analysisContext =
+        new AnalysisContext(catalog, TestUtils.createQueryContext(), config);
     // We should get an audit event even when an authorization failure occurs.
     try {
-      ParseNode node = ParsesOk("create table foo_does_not_exist(i int)");
-      node.analyze(analyzer);
-      analyzer.authorize(fe.getAuthzChecker());
+      analysisContext.analyze("create table foo_does_not_exist(i int)");
+      analysisContext.authorize(fe.getAuthzChecker());
       Assert.fail("Expected AuthorizationException");
     } catch (AuthorizationException e) {
-      Assert.assertEquals(1, analyzer.getAccessEvents().size());
+      Assert.assertEquals(1, analysisContext.getAnalyzer().getAccessEvents().size());
     }
   }
 

@@ -55,4 +55,20 @@ public class PrivilegeRequest {
    * Returns Authorizeable object. Null if the request is for server-level permission.
    */
   public Authorizeable getAuthorizeable() { return authorizeable_; }
+
+  @Override
+  public int hashCode() {
+    return (authorizeable_ == null ? 0 : authorizeable_.hashCode()) * 37 +
+        privilege_.hashCode();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof PrivilegeRequest)) return false;
+    if (authorizeable_ == null) {
+      return ((PrivilegeRequest) o).getPrivilege().equals(privilege_);
+    }
+    return ((PrivilegeRequest) o).getAuthorizeable().equals(authorizeable_) &&
+        ((PrivilegeRequest) o).getPrivilege().equals(privilege_);
+  }
 }

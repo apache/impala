@@ -42,7 +42,7 @@ public class SlotDescriptor {
   private String label_;
 
   // Expr(s) materialized into this slot; multiple exprs for unions. Should be empty if
-  // column_ is set.
+  // path_ is set.
   private List<Expr> sourceExprs_ = Lists.newArrayList();
 
   // if false, this slot doesn't need to be materialized in parent tuple

@@ -1,4 +1,4 @@
-// Copyright 2013 Cloudera Inc.
+// Copyright 2015 Cloudera Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,38 +23,41 @@ import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 
 /**
- * Class used to authorize access to a table or view.
- * Even though Hive's spec includes an authorizable object 'view', we chose
- * to treat views the same way as tables for the sake of authorization.
+ * Class used to authorize access to a column.
  */
-public class AuthorizeableTable extends Authorizeable {
-  // Constant to represent privileges in the policy for "ANY" table in a
-  // a database.
-  public final static String ANY_TABLE_NAME =
-      org.apache.sentry.core.model.db.AccessConstants.ALL;
-
+public class AuthorizeableColumn extends Authorizeable {
+  private final org.apache.sentry.core.model.db.Column column_;
   private final org.apache.sentry.core.model.db.Table table_;
   private final org.apache.sentry.core.model.db.Database database_;
+  public final static String ANY_COLUMN_NAME =
+      org.apache.sentry.core.model.db.AccessConstants.ALL;
 
-  public AuthorizeableTable(String dbName, String tableName) {
-    Preconditions.checkState(!Strings.isNullOrEmpty(tableName));
+  public AuthorizeableColumn(String dbName, String tableName, String columnName) {
     Preconditions.checkState(!Strings.isNullOrEmpty(dbName));
+    Preconditions.checkState(!Strings.isNullOrEmpty(tableName));
+    Preconditions.checkState(!Strings.isNullOrEmpty(columnName));
+    column_ = new org.apache.sentry.core.model.db.Column(columnName);
     table_ = new org.apache.sentry.core.model.db.Table(tableName);
     database_ = new org.apache.sentry.core.model.db.Database(dbName);
   }
 
   @Override
   public List<DBModelAuthorizable> getHiveAuthorizeableHierarchy() {
-    return Lists.newArrayList(database_, table_);
+    return Lists.newArrayList(database_, table_, column_);
   }
 
   @Override
-  public String getName() { return database_.getName() + "." + table_.getName(); }
+  public String getName() { return database_.getName() + "." + table_.getName() + "."
+      + column_.getName(); }
+
+  @Override
+  public String getFullTableName() {
+    return database_.getName() + "." + table_.getName();
+  }
 
   @Override
   public String getDbName() { return database_.getName(); }
-  public String getTblName() { return table_.getName(); }
 
-  @Override
-  public String getFullTableName() { return getName(); }
+  public String getTblName() { return table_.getName(); }
+  public String getColumnName() { return column_.getName(); }
 }

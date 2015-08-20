@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 
 import org.junit.After;
 import org.junit.Test;
@@ -424,7 +424,7 @@ public class AnalyzerTest {
       slotD.setIsMaterialized(true);
     }
     descTbl.computeMemLayout();
-    Assert.assertEquals(97.0f, tupleD.getAvgSerializedSize());
+    Assert.assertEquals(97.0f, tupleD.getAvgSerializedSize(), 0.0);
     checkLayoutParams("functional.alltypes.bool_col", 1, 2, 0, 0);
     checkLayoutParams("functional.alltypes.tinyint_col", 1, 3, 0, 1);
     checkLayoutParams("functional.alltypes.smallint_col", 2, 4, 0, 2);
@@ -453,7 +453,7 @@ public class AnalyzerTest {
       slotD.setIsMaterialized(true);
     }
     descTbl.computeMemLayout();
-    Assert.assertEquals(16.0f, aggDesc.getAvgSerializedSize());
+    Assert.assertEquals(16.0f, aggDesc.getAvgSerializedSize(), 0.0);
     Assert.assertEquals(16, aggDesc.getByteSize());
     checkLayoutParams(aggDesc.getSlots().get(0), 8, 0, 0, -1);
     checkLayoutParams(aggDesc.getSlots().get(1), 8, 8, 0, -1);
@@ -473,7 +473,7 @@ public class AnalyzerTest {
       slotD.setIsMaterialized(true);
     }
     descTbl.computeMemLayout();
-    Assert.assertEquals(16.0f, aggDesc.getAvgSerializedSize());
+    Assert.assertEquals(16.0f, aggDesc.getAvgSerializedSize(), 0.0);
     Assert.assertEquals(24, aggDesc.getByteSize());
     checkLayoutParams(aggDesc.getSlots().get(0), 8, 8, 0, 0);
     checkLayoutParams(aggDesc.getSlots().get(1), 8, 16, 0, -1);
@@ -496,7 +496,7 @@ public class AnalyzerTest {
     slots.get(9).setIsMaterialized(false);
 
     descTbl.computeMemLayout();
-    Assert.assertEquals(68.0f, tupleD.getAvgSerializedSize());
+    Assert.assertEquals(68.0f, tupleD.getAvgSerializedSize(), 0.0);
     // Check non-materialized slots.
     checkLayoutParams("functional.alltypes.id", 0, -1, 0, 0);
     checkLayoutParams("functional.alltypes.double_col", 0, -1, 0, 0);

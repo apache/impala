@@ -14,6 +14,9 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
+import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
@@ -87,6 +90,12 @@ public class CollectionTableRef extends TableRef {
         Preconditions.checkState(!(parentRef instanceof InlineViewRef));
         correlatedTupleIds_.add(parentRef.getId());
       }
+    } else {
+      // Register a column-level privilege request for the collection-typed column.
+      analyzer.registerPrivReq(new PrivilegeRequestBuilder().
+          allOf(Privilege.SELECT).onColumn(desc_.getTableName().getDb(),
+          desc_.getTableName().getTbl(), desc_.getPath().getRawPath().get(0))
+          .toRequest());
     }
     isAnalyzed_ = true;
     analyzeJoin(analyzer);

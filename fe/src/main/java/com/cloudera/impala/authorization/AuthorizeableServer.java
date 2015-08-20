@@ -28,7 +28,7 @@ import com.google.common.collect.Lists;
  * What Sentry refers to as a Server maps to our concept of a Catalog, thus
  * the name AuthorizeableServer.
  */
-public class AuthorizeableServer implements Authorizeable {
+public class AuthorizeableServer extends Authorizeable {
   private final org.apache.sentry.core.model.db.Server server_;
 
   public AuthorizeableServer(String serverName) {

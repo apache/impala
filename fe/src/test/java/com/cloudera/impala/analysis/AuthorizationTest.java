@@ -23,7 +23,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
-import junit.framework.Assert;
+import org.junit.Assert;
 
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
 import org.apache.hive.service.cli.thrift.TGetSchemasReq;
@@ -39,7 +39,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.authorization.AuthorizeableDb;
 import com.cloudera.impala.authorization.AuthorizeableTable;
 import com.cloudera.impala.authorization.User;
 import com.cloudera.impala.catalog.AuthorizationException;
@@ -78,6 +77,13 @@ public class AuthorizationTest {
   //   SELECT permissions on 'functional.alltypesagg' (no INSERT permissions)
   //   SELECT permissions on 'functional.complex_view' (no INSERT permissions)
   //   SELECT permissions on 'functional.view_view' (no INSERT permissions)
+  //   SELECT permissions on columns ('id', 'int_col', and 'year') on
+  //   'functional.alltypessmall' (no SELECT permissions on 'functional.alltypessmall')
+  //   SELECT permissions on columns ('id', 'int_struct_col', 'struct_array_col',
+  //   'int_map_col') on 'functional.allcomplextypes' (no SELECT permissions on
+  //   'functional.allcomplextypes')
+  //   SELECT permissions on all the columns of 'functional.alltypestiny' (no SELECT
+  //   permissions on table 'functional.alltypestiny')
   //   INSERT permissions on 'functional.alltypes' (no SELECT permissions)
   //   INSERT permissions on all tables in 'functional_parquet' database
   //   No permissions on database 'functional_rc'
@@ -243,13 +249,54 @@ public class AuthorizationTest {
     privilege.setServer_name("server1");
     privilege.setDb_name("functional_seq_snap");
     sentryService.grantRolePrivilege(USER, roleName, privilege);
-  }
 
-  @Test
-  public void TestFix() throws AnalysisException {
-    AuthzError("select * from functional.complex_view_sub",
-        "User '%s' does not have privileges to execute 'SELECT' on: " +
-        "functional.complex_view_sub");
+    // select_column_level_functional
+    roleName = "select_column_level_functional";
+    sentryService.createRole(USER, roleName, true);
+    sentryService.grantRoleToGroup(USER, roleName, USER.getName());
+
+    // select (id, int_col, year) on functional.alltypessmall
+    List<TPrivilege> privileges = Lists.newArrayList();
+    for (String columnName: Arrays.asList("id", "int_col", "year")) {
+      TPrivilege priv = new TPrivilege("", TPrivilegeLevel.SELECT,
+          TPrivilegeScope.COLUMN, false);
+      priv.setServer_name("server1");
+      priv.setDb_name("functional");
+      priv.setTable_name("alltypessmall");
+      priv.setColumn_name(columnName);
+      privileges.add(priv);
+    }
+    sentryService.grantRolePrivileges(USER, roleName, privileges);
+    privileges.clear();
+
+    // select (id, int_struct_col) on functional.allcomplextypes
+    for (String columnName: Arrays.asList("id", "int_struct_col", "struct_array_col",
+        "int_map_col")) {
+      TPrivilege priv = new TPrivilege("", TPrivilegeLevel.SELECT,
+          TPrivilegeScope.COLUMN, false);
+      priv.setServer_name("server1");
+      priv.setDb_name("functional");
+      priv.setTable_name("allcomplextypes");
+      priv.setColumn_name(columnName);
+      privileges.add(priv);
+    }
+    sentryService.grantRolePrivileges(USER, roleName, privileges);
+    privileges.clear();
+
+    // select (*) on functional.alltypestiny
+    String[] columnNames = {"id", "bool_col", "tinyint_col", "smallint_col",
+        "int_col", "bigint_col", "float_col", "double_col", "date_string_col",
+        "timestamp_col", "string_col", "year", "month"};
+    for (String columnName: Arrays.asList(columnNames)) {
+      TPrivilege priv = new TPrivilege("", TPrivilegeLevel.SELECT,
+          TPrivilegeScope.COLUMN, false);
+      priv.setServer_name("server1");
+      priv.setDb_name("functional");
+      priv.setTable_name("alltypestiny");
+      priv.setColumn_name(columnName);
+      privileges.add(priv);
+    }
+    sentryService.grantRolePrivileges(USER, roleName, privileges);
   }
 
   @Test
@@ -261,7 +308,6 @@ public class AuthorizationTest {
 
     sentryService.createRole(USER, roleName, true);
     String dbName = UUID.randomUUID().toString();
-    AuthorizeableDb db = new AuthorizeableDb(dbName);
     TPrivilege privilege =
         new TPrivilege("", TPrivilegeLevel.ALL, TPrivilegeScope.DATABASE, false);
     privilege.setServer_name("server1");
@@ -277,6 +323,18 @@ public class AuthorizationTest {
       privilege.setTable_name("test_tbl_" + String.valueOf(i));
       sentryService.grantRolePrivilege(USER, roleName, privilege);
     }
+
+    List<TPrivilege> privileges = Lists.newArrayList();
+    for (int i = 0; i < 10; ++i) {
+      TPrivilege priv = new TPrivilege("", TPrivilegeLevel.SELECT, TPrivilegeScope.COLUMN,
+          false);
+      priv.setServer_name("server1");
+      priv.setDb_name(dbName);
+      priv.setTable_name("test_tbl_1");
+      priv.setColumn_name("col_" + String.valueOf(i));
+      privileges.add(priv);
+    }
+    sentryService.grantRolePrivileges(USER, roleName, privileges);
   }
 
   @After
@@ -356,6 +414,51 @@ public class AuthorizationTest {
         "functional.alltypes");
     // Table within inline view is authorized properly (user has permission).
     AuthzOk("select a.* from (select * from functional.alltypesagg) a");
+
+    // User has SELECT privileges on all the columns of 'alltypestiny'
+    AuthzOk("select * from functional.alltypestiny");
+
+    // No SELECT privileges on all the columns of 'alltypessmall'
+    AuthzError("select * from functional.alltypessmall", "User '%s' does " +
+        "not have privileges to execute 'SELECT' on: functional.alltypessmall");
+
+    // No SELECT privileges on table 'alltypessmall'
+    AuthzError("select count(*) from functional.alltypessmall", "User '%s' does " +
+        "not have privileges to execute 'SELECT' on: functional.alltypessmall");
+    AuthzError("select 1 from functional.alltypessmall", "User '%s' does not " +
+        "have privileges to execute 'SELECT' on: functional.alltypessmall");
+    AuthzOk("select 1, id from functional.alltypessmall");
+
+    // No SELECT privileges on column 'month'
+    AuthzError("select id, int_col, year, month from functional.alltypessmall",
+        "User '%s' does not have privileges to execute 'SELECT' on: " +
+        "functional.alltypessmall");
+
+    // User has column-level privileges on all referenced columns
+    AuthzOk("select id, count(int_col) from functional.alltypessmall where " +
+        "year = 2010 group by id");
+
+    // No SELECT privileges on 'int_array_col'
+    AuthzError("select a.id, b.item from functional.allcomplextypes a, " +
+        "a.int_array_col b", "User '%s' does not have privileges to execute " +
+        "'SELECT' on: functional.allcomplextypes");
+
+    // Sufficient column-level privileges on both scalar and nested columns
+    AuthzOk("select a.int_struct_col.f1 from functional.allcomplextypes a " +
+        "where a.id = 1");
+    AuthzOk("select pos, item.f1, f2 from functional.allcomplextypes t, " +
+        "t.struct_array_col");
+    AuthzOk("select * from functional.allcomplextypes.struct_array_col");
+    AuthzOk("select key from functional.allcomplextypes.int_map_col");
+    AuthzOk("select id, b.key from functional.allcomplextypes a, a.int_map_col b");
+
+    // No SELECT privileges on 'alltypessmall'
+    AuthzError("select a.* from functional.alltypesagg cross join " +
+        "functional.alltypessmall b", "User '%s' does not have privileges to execute " +
+        "'SELECT' on: functional.alltypessmall");
+
+    // User has SELECT privileges on all columns referenced in the inline view
+    AuthzOk("select * from (select id, int_col from functional.alltypessmall) v");
   }
 
   @Test
@@ -367,6 +470,13 @@ public class AuthorizationTest {
         "select * from functional.alltypes",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
          "functional.alltypes");
+
+    AuthzOk("select id, int_col, year from functional.alltypessmall union all " +
+        "select id, int_col, year from functional.alltypestiny");
+
+    AuthzError("select * from functional.alltypessmall union all " +
+        "select * from functional.alltypestiny", "User '%s' does not have privileges " +
+        "to execute 'SELECT' on: functional.alltypessmall");
   }
 
   @Test
@@ -402,6 +512,31 @@ public class AuthorizationTest {
         "functional_seq.alltypes) b on (a.int_col = b.int_col)",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
         "functional_seq.alltypes");
+
+    // User doesn't have INSERT permissions on the target table but has sufficient SELECT
+    // permissions on all the referenced columns of the source table
+    AuthzError("insert into functional.alltypestiny partition (month, year) " +
+        "select * from functional.alltypestiny", "User '%s' does not have " +
+        "privileges to execute 'INSERT' on: functional.alltypestiny");
+
+    // User has INSERT permissions on target table but insufficient column-level
+    // permissions on the source table
+    AuthzError("insert into functional.alltypes partition (month, year) " +
+        "select * from functional.alltypessmall", "User '%s' does not have " +
+        "privileges to execute 'SELECT' on: functional.alltypessmall");
+
+    // User has INSERT permissions on the target table and SELECT permissions on
+    // all the columns of the source table
+    AuthzOk("insert into functional.alltypes partition (month, year) " +
+        "select * from functional.alltypestiny where id < 100");
+
+    // Same as above with a column permutation
+    AuthzOk("insert into table functional.alltypes" +
+        "(id, bool_col, string_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, tinyint_col, timestamp_col) " +
+        "partition (month, year) select id, bool_col, string_col, smallint_col, " +
+        "int_col, bigint_col, float_col, double_col, date_string_col, tinyint_col, " +
+        "timestamp_col, month, year from functional.alltypestiny");
   }
 
   @Test
@@ -428,6 +563,15 @@ public class AuthorizationTest {
         "insert into functional_parquet.alltypes partition(month,year) select * from t",
         "User '%s' does not have privileges to execute 'SELECT' on: " +
          "functional.alltypes_view");
+
+    // User has SELECT privileges on columns referenced in the WITH-clause view.
+    AuthzOk("with t as (select id, int_col from functional.alltypessmall) " +
+        "select * from t");
+
+    // User does not have SELECT privileges on 'month'
+    AuthzError("with t as (select id, int_col from functional.alltypessmall " +
+        "where month = 10) select count(*) from t", "User '%s' does not have " +
+        "privileges to execute 'SELECT' on: functional.alltypessmall");
   }
 
   @Test
@@ -500,6 +644,13 @@ public class AuthorizationTest {
     AuthzError("explain select a.id from functional.view_view a "
         + "join functional.complex_view b ON (a.id = b.id)",
         "User '%s' does not have privileges to EXPLAIN this statement.");
+
+    // User has SELECT privileges on all referenced columns
+    AuthzOk("explain select * from functional.alltypestiny");
+
+    // User doesn't have SELECT privileges on all referenced columns
+    AuthzError("explain select * from functional.alltypessmall", "User '%s' " +
+        "does not have privileges to execute 'SELECT' on: functional.alltypessmall");
   }
 
   @Test
@@ -554,6 +705,12 @@ public class AuthorizationTest {
         "User '%s' does not have privileges to access: functional.alltypessmall");
     AuthzError("refresh functional.alltypes_view",
         "User '%s' does not have privileges to access: functional.alltypes_view");
+    // Only column-level privileges on the table
+    AuthzError("invalidate metadata functional.alltypestiny", "User '%s' does not " +
+        "have privileges to access: functional.alltypestiny");
+    // Only column-level privileges on the table
+    AuthzError("refresh functional.alltypestiny", "User '%s' does not have " +
+        "privileges to access: functional.alltypestiny");
 
     AuthzError("invalidate metadata",
         "User '%s' does not have privileges to access: server");
@@ -642,6 +799,20 @@ public class AuthorizationTest {
         + "'hdfs://localhost:20500/test-warehouse/alltypes'",
         "User '%s' does not have privileges to access: "
         + "hdfs://localhost:20500/test-warehouse/alltypes");
+
+    // Sufficient column-level privileges in the source table
+    AuthzOk("create table tpch.new_table as select id, int_col from " +
+        "functional.alltypessmall where year = 2010");
+
+    // Insufficient column-level privileges in the source table
+    AuthzError("create table tpch.new as select * from functional.alltypessmall",
+        "User '%s' does not have privileges to execute 'SELECT' on: " +
+        "functional.alltypessmall");
+
+    // No permissions on target table but sufficient column-level privileges in the
+    // source table
+    AuthzError("create table tpch_rc.new_tbl as select * from functional.alltypestiny",
+        "User '%s' does not have privileges to execute 'CREATE' on: tpch_rc.new_tbl");
   }
 
   @Test
@@ -693,6 +864,16 @@ public class AuthorizationTest {
     AuthzError("create view _impala_builtins.new_view as "
         + "select * from functional.alltypesagg",
         "Cannot modify system database.");
+
+    // User has SELECT privileges on the referenced columns of the source table
+    AuthzOk("create view tpch.new_view as select * from functional.alltypestiny");
+    AuthzOk("create view tpch.new_view as select count(id) from " +
+        "functional.alltypessmall");
+
+    // No SELECT permissions on all the referenced columns
+    AuthzError("create view tpch.new as select id, count(month) from " +
+        "functional.alltypessmall where int_col = 1 group by id", "User '%s' does " +
+        "not have privileges to execute 'SELECT' on: functional.alltypessmall");
   }
 
   @Test
@@ -787,6 +968,9 @@ public class AuthorizationTest {
         "User '%s' does not have privileges to execute 'DROP' on: functional.alltypes");
     AuthzError("drop table if exists functional.alltypes",
         "User '%s' does not have privileges to execute 'DROP' on: functional.alltypes");
+    // Drop table when user only has column-level privileges
+    AuthzError("drop table if exists functional.alltypestiny", "User '%s' does not " +
+        "have privileges to execute 'DROP' on: functional.alltypestiny");
 
     // Drop table with unqualified table name.
     AuthzError("drop table alltypes",
@@ -856,6 +1040,11 @@ public class AuthorizationTest {
     AuthzError("truncate table functional.alltypes_view",
         "User '%s' does not have privileges to execute 'INSERT' on: " +
         "functional.alltypes_view");
+
+    // User doesn't have INSERT permissions on the target table but has SELECT permissions
+    // on all the columns.
+    AuthzError("truncate table functional.alltypestiny", "User '%s' does not have " +
+        "privileges to execute 'INSERT' on: functional.alltypestiny");
   }
 
   @Test
@@ -974,6 +1163,15 @@ public class AuthorizationTest {
 
     AuthzError("ALTER TABLE alltypes SET TBLPROPERTIES ('a'='b', 'c'='d')",
         "User '%s' does not have privileges to execute 'ALTER' on: default.alltypes");
+
+    // Alter table, user only has column-level privileges.
+    AuthzError("ALTER TABLE functional.alltypestiny ADD COLUMNS (c1 int)", "User " +
+        "'%s' does not have privileges to execute 'ALTER' on: functional.alltypestiny");
+
+    // User has column-level privileges on the column being dropped but no table-level
+    // privileges
+    AuthzError("ALTER TABLE functional.alltypestinyt DROP id", "User '%s' does not " +
+        "have privileges to execute 'ALTER' on: functional.alltypestiny");
   }
 
   @Test
@@ -1041,6 +1239,9 @@ public class AuthorizationTest {
     AuthzError("compute stats functional.alltypesagg",
         "User '%s' does not have privileges to execute 'ALTER' on: " +
         "functional.alltypesagg");
+    // User has column-level privileges on the target table
+    AuthzError("compute stats functional.alltypestiny", "User '%s' does not have " +
+        "privileges to execute 'ALTER' on: functional.alltypestiny");
   }
 
   @Test
@@ -1052,6 +1253,9 @@ public class AuthorizationTest {
     AuthzError("drop stats functional.alltypesagg",
         "User '%s' does not have privileges to execute 'ALTER' on: " +
         "functional.alltypesagg");
+    // User has column-level privileges on the target table
+    AuthzError("drop stats functional.alltypestiny", "User '%s' does not have " +
+        "privileges to execute 'ALTER' on: functional.alltypestiny");
   }
 
   @Test
@@ -1066,8 +1270,12 @@ public class AuthorizationTest {
     // Database doesn't exist.
     AuthzError("describe nodb.alltypes",
         "User '%s' does not have privileges to access: nodb.alltypes");
+    // User has column level privileges
+    AuthzOk("describe functional.alltypestiny");
+    // User has column level privileges on a subset of table columns
+    AuthzOk("describe functional.alltypessmall");
     // Insufficient privileges on table.
-    AuthzError("describe functional.alltypestiny",
+    AuthzError("describe formatted functional.alltypestiny",
         "User '%s' does not have privileges to access: functional.alltypestiny");
     // Insufficient privileges on view.
     AuthzError("describe functional.alltypes_view",
@@ -1087,7 +1295,13 @@ public class AuthorizationTest {
     AuthzError("load data inpath 'hdfs://localhost:20500/test-warehouse/tpch.lineitem'" +
         " into table functional.alltypesagg",
         "User '%s' does not have privileges to execute 'INSERT' on: " +
-        "functional.alltypes");
+        "functional.alltypesagg");
+
+    // User only has column-level privileges on the table
+    AuthzError("load data inpath 'hdfs://localhost:20500/test-warehouse/tpch.lineitem'" +
+        " into table functional.alltypestiny",
+        "User '%s' does not have privileges to execute 'INSERT' on: " +
+        "functional.alltypestiny");
 
     // User does not have permission on URI.
     AuthzError("load data inpath 'hdfs://localhost:20500/test-warehouse/tpch.part'" +
@@ -1156,6 +1370,9 @@ public class AuthorizationTest {
           "User '%s' does not have privileges to access: functional.badtbl");
       AuthzError(String.format("show %s functional_rc.alltypes", qual),
           "User '%s' does not have privileges to access: functional_rc.alltypes");
+      // User only has column-level privileges
+      AuthzError(String.format("show %s functional.alltypestiny", qual),
+          "User '%s' does not have privileges to access: functional.alltypestiny");
     }
 
     // Show files
@@ -1169,6 +1386,9 @@ public class AuthorizationTest {
           "User '%s' does not have privileges to access: functional.badtbl");
       AuthzError(String.format("show files in functional_rc.alltypes %s", partition),
           "User '%s' does not have privileges to access: functional_rc.alltypes");
+      // User only has column-level privileges.
+      AuthzError(String.format("show files in functional.alltypestiny %s", partition),
+          "User '%s' does not have privileges to access: functional.alltypestiny");
     }
   }
 
@@ -1189,8 +1409,9 @@ public class AuthorizationTest {
   @Test
   public void TestShowTableResultsFiltered() throws ImpalaException {
     // The user only has permission on these tables/views in the functional databases.
-    List<String> expectedTbls =
-        Lists.newArrayList("alltypes", "alltypesagg", "complex_view", "view_view");
+    List<String> expectedTbls = Lists.newArrayList("allcomplextypes", "alltypes",
+        "alltypesagg", "alltypessmall", "alltypestiny", "complex_view",
+        "view_view");
 
     List<String> tables = fe_.getTableNames("functional", "*", USER);
     Assert.assertEquals(expectedTbls, tables);
@@ -1216,6 +1437,9 @@ public class AuthorizationTest {
     // Insufficient privileges on db.
     AuthzError("show create table functional_rc.alltypes",
         "User '%s' does not have privileges to access: functional_rc.alltypes");
+    // User has column-level privileges on table
+    AuthzError("show create table functional.alltypestiny",
+        "User '%s' does not have privileges to access: functional.alltypestiny");
   }
 
   @Test
@@ -1228,15 +1452,25 @@ public class AuthorizationTest {
     // Get all tables
     req.get_tables_req.setTableName("%");
     TResultSet resp = fe_.execHiveServer2MetadataOp(req);
-    assertEquals(4, resp.rows.size());
-    assertEquals("alltypes",
+    assertEquals(7, resp.rows.size());
+    assertEquals("allcomplextypes",
         resp.rows.get(0).colVals.get(2).string_val.toLowerCase());
-    assertEquals(
-        "alltypesagg", resp.rows.get(1).colVals.get(2).string_val.toLowerCase());
-    assertEquals(
-        "complex_view", resp.rows.get(2).colVals.get(2).string_val.toLowerCase());
-    assertEquals(
-        "view_view", resp.rows.get(3).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypes", resp.rows.get(1).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypesagg",
+        resp.rows.get(2).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypessmall",
+        resp.rows.get(3).colVals.get(2).string_val.toLowerCase());
+    assertEquals("alltypestiny",
+        resp.rows.get(4).colVals.get(2).string_val.toLowerCase());
+    assertEquals("complex_view",
+        resp.rows.get(5).colVals.get(2).string_val.toLowerCase());
+    assertEquals("view_view", resp.rows.get(6).colVals.get(2).string_val.toLowerCase());
+
+    // Get all tables of tpcds
+    req.get_tables_req.setSchemaName("tpcds");
+    req.get_tables_req.setTableName("%");
+    resp = fe_.execHiveServer2MetadataOp(req);
+    assertEquals(11, resp.rows.size());
   }
 
   @Test
@@ -1281,6 +1515,25 @@ public class AuthorizationTest {
     req.get_columns_req.setTableName("alltypes");
     resp = fe_.execHiveServer2MetadataOp(req);
     assertEquals(0, resp.rows.size());
+
+    // User has SELECT privileges on all table columns but no table-level privileges.
+    req.get_columns_req.setSchemaName("functional");
+    req.get_columns_req.setTableName("alltypestiny");
+    req.get_columns_req.setColumnName("%");
+    resp = fe_.execHiveServer2MetadataOp(req);
+    assertEquals(13, resp.rows.size());
+
+    // User has SELECT privileges on some columns but no table-level privileges.
+    req.get_columns_req.setSchemaName("functional");
+    req.get_columns_req.setTableName("alltypessmall");
+    req.get_columns_req.setColumnName("%");
+    resp = fe_.execHiveServer2MetadataOp(req);
+    String[] expectedColumnNames = {"id", "int_col", "year"};
+    assertEquals(expectedColumnNames.length, resp.rows.size());
+    for (int i = 0; i < resp.rows.size(); ++i) {
+      assertEquals(expectedColumnNames[i],
+          resp.rows.get(i).colVals.get(3).string_val.toLowerCase());
+    }
   }
 
   @Test
@@ -1583,7 +1836,7 @@ public class AuthorizationTest {
   private static void AuthzOk(Frontend fe, AnalysisContext context, String stmt)
       throws AuthorizationException, AnalysisException {
     context.analyze(stmt);
-    context.getAnalyzer().authorize(fe.getAuthzChecker());
+    context.authorize(fe.getAuthzChecker());
   }
 
   /**
@@ -1607,7 +1860,7 @@ public class AuthorizationTest {
       try {
         analysisContext.analyze(stmt);
       } finally {
-        analysisContext.getAnalyzer().authorize(fe.getAuthzChecker());
+        analysisContext.authorize(fe.getAuthzChecker());
       }
     } catch (AuthorizationException e) {
       // Insert the username into the error.

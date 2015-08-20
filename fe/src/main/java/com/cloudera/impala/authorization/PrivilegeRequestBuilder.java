@@ -34,6 +34,15 @@ public class PrivilegeRequestBuilder {
   Privilege privilege_;
 
   /**
+   * Sets the authorizeable object to be a column.
+   */
+  public PrivilegeRequestBuilder onColumn(String dbName, String tableName,
+      String columnName) {
+    authorizeable_ = new AuthorizeableColumn(dbName, tableName, columnName);
+    return this;
+  }
+
+  /**
    * Sets the authorizeable object to be a table.
    */
   public PrivilegeRequestBuilder onTable(String dbName, String tableName) {
@@ -62,6 +71,13 @@ public class PrivilegeRequestBuilder {
    */
   public PrivilegeRequestBuilder onAnyTable(String dbName) {
     return onTable(dbName, AuthorizeableTable.ANY_TABLE_NAME);
+  }
+
+  /**
+   * Specifies that permissions on any column in the given table.
+   */
+  public PrivilegeRequestBuilder onAnyColumn(String dbName, String tableName) {
+    return onColumn(dbName, tableName, AuthorizeableColumn.ANY_COLUMN_NAME);
   }
 
   /**

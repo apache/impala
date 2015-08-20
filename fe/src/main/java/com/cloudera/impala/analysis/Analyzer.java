@@ -30,15 +30,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Path.PathType;
-import com.cloudera.impala.authorization.AuthorizationChecker;
 import com.cloudera.impala.authorization.AuthorizationConfig;
-import com.cloudera.impala.authorization.AuthorizeableDb;
-import com.cloudera.impala.authorization.AuthorizeableTable;
 import com.cloudera.impala.authorization.Privilege;
 import com.cloudera.impala.authorization.PrivilegeRequest;
 import com.cloudera.impala.authorization.PrivilegeRequestBuilder;
 import com.cloudera.impala.authorization.User;
-import com.cloudera.impala.catalog.AuthorizationException;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.DataSourceTable;
@@ -231,7 +227,7 @@ public class Analyzer {
     public final Map<SlotId, Analyzer> blockBySlot = Maps.newHashMap();
 
     // Tracks all privilege requests on catalog objects.
-    private final List<PrivilegeRequest> privilegeReqs = Lists.newArrayList();
+    private final Set<PrivilegeRequest> privilegeReqs = Sets.newLinkedHashSet();
 
     // List of PrivilegeRequest to custom authorization failure error message.
     // Tracks all privilege requests on catalog objects that need a custom
@@ -828,6 +824,7 @@ public class Analyzer {
     if (slotPath.destType().isCollectionType()) {
       SlotDescriptor result = addSlotDescriptor(slotPath.getRootDesc());
       result.setPath(slotPath);
+      registerColumnPrivReq(result);
       return result;
     }
     // SlotRefs with a scalar type are registered against the slot's
@@ -838,7 +835,26 @@ public class Analyzer {
     SlotDescriptor result = addSlotDescriptor(slotPath.getRootDesc());
     result.setPath(slotPath);
     slotPathMap_.put(key, result);
+    registerColumnPrivReq(result);
     return result;
+  }
+
+  /**
+   * Registers a column-level privilege request if 'slotDesc' directly or indirectly
+   * refers to a table column. It handles both scalar and complex-typed columns.
+   */
+  private void registerColumnPrivReq(SlotDescriptor slotDesc) {
+    Preconditions.checkNotNull(slotDesc.getPath());
+    TupleDescriptor tupleDesc = slotDesc.getParent();
+    if (tupleDesc.isMaterialized() && tupleDesc.getTable() != null) {
+      Column column = tupleDesc.getTable().getColumn(
+          slotDesc.getPath().getRawPath().get(0));
+      if (column != null) {
+        registerPrivReq(new PrivilegeRequestBuilder().
+            allOf(Privilege.SELECT).onColumn(tupleDesc.getTableName().getDb(),
+            tupleDesc.getTableName().getTbl(), column.getName()).toRequest());
+      }
+    }
   }
 
   /**
@@ -2136,6 +2152,10 @@ public class Analyzer {
     return ImmutableList.copyOf(globalState_.privilegeReqs);
   }
 
+  public ImmutableList<Pair<PrivilegeRequest, String>> getMaskedPrivilegeReqs() {
+    return ImmutableList.copyOf(globalState_.maskedPrivilegeReqs);
+  }
+
   /**
    * Returns a list of the successful catalog object access events. Does not include
    * accesses that failed due to AuthorizationExceptions. In general, if analysis
@@ -2196,9 +2216,13 @@ public class Analyzer {
     Table table = null;
     tableName = new TableName(getTargetDbName(tableName), tableName.getTbl());
 
-    registerPrivReq(new PrivilegeRequestBuilder()
-        .onTable(tableName.getDb(), tableName.getTbl()).allOf(privilege).toRequest());
-
+    if (privilege == Privilege.ANY) {
+      registerPrivReq(new PrivilegeRequestBuilder()
+          .any().onAnyColumn(tableName.getDb(), tableName.getTbl()).toRequest());
+    } else {
+      registerPrivReq(new PrivilegeRequestBuilder()
+          .allOf(privilege).onTable(tableName.getDb(), tableName.getTbl()).toRequest());
+    }
     // This may trigger a metadata load, in which case we want to return the errors as
     // AnalysisExceptions.
     try {
@@ -2757,57 +2781,5 @@ public class Analyzer {
     } else {
       globalState_.maskedPrivilegeReqs.add(Pair.create(privReq, authErrorMsg_));
     }
-  }
-
-  /**
-   * Authorizes all privilege requests, throwing an AuthorizationException if
-   * the user does not have sufficient privileges for any of the requests. Generally
-   * called after analysis has completed.
-   */
-  public void authorize(AuthorizationChecker authzChecker) throws AuthorizationException {
-    for (PrivilegeRequest privReq: globalState_.privilegeReqs) {
-      // If this is a system database, some actions should always be allowed
-      // or disabled, regardless of what is in the auth policy.
-      String dbName = null;
-      if (privReq.getAuthorizeable() instanceof AuthorizeableDb) {
-        dbName = privReq.getName();
-      } else if (privReq.getAuthorizeable() instanceof AuthorizeableTable) {
-        AuthorizeableTable tbl = (AuthorizeableTable) privReq.getAuthorizeable();
-        dbName = tbl.getDbName();
-      }
-      if (dbName != null && checkSystemDbAccess(dbName, privReq.getPrivilege())) {
-        continue;
-      }
-
-      // Perform the authorization check.
-      authzChecker.checkAccess(getUser(), privReq);
-    }
-
-    for (Pair<PrivilegeRequest, String> maskedReq: globalState_.maskedPrivilegeReqs) {
-      // Perform the authorization check.
-      if (!authzChecker.hasAccess(getUser(), maskedReq.first)) {
-        throw new AuthorizationException(maskedReq.second);
-      }
-    }
-  }
-
-  /**
-   * Throws an authorization exception if the dbName is a system db
-   * and they are trying to modify it.
-   * Returns true if this is a system db and the action is allowed.
-   */
-  private boolean checkSystemDbAccess(String dbName, Privilege privilege)
-      throws AuthorizationException {
-    Db db = globalState_.catalog.getDb(dbName);
-    if (db != null && db.isSystemDb()) {
-      switch (privilege) {
-        case VIEW_METADATA:
-        case ANY:
-          return true;
-        default:
-          throw new AuthorizationException("Cannot modify system database.");
-      }
-    }
-    return false;
   }
 }

@@ -24,7 +24,7 @@ import com.google.common.collect.Lists;
 /**
  * Class used to authorize access to a Function.
  */
-public class AuthorizeableFn implements Authorizeable {
+public class AuthorizeableFn extends Authorizeable {
   private final String fnName_;
 
   public AuthorizeableFn(String fnName) {

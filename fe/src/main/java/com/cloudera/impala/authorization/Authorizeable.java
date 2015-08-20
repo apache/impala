@@ -19,9 +19,9 @@ import java.util.List;
 import org.apache.sentry.core.model.db.DBModelAuthorizable;
 
 /*
- * Interface all authorizeable objects (Table, Db, Column, etc) must implement.
+ * Abstract class representing an authorizeable object (Table, Db, Column, etc).
  */
-public interface Authorizeable {
+public abstract class Authorizeable {
   /*
   * Returns the list of the Hive "authorizeable" objects in their hierarchical order.
   * For example:
@@ -30,8 +30,24 @@ public interface Authorizeable {
   * [Db] would return [Db]
   * [URI] would return [URI]
   */
-  public List<DBModelAuthorizable> getHiveAuthorizeableHierarchy();
+  public abstract List<DBModelAuthorizable> getHiveAuthorizeableHierarchy();
 
   // Returns the name of the object.
-  public String getName();
+  public abstract String getName();
+
+  // Returns the full table name if applicable, null otherwise.
+  public String getFullTableName() { return null; }
+
+  // Returns the database name if applicable, null otherwise.
+  public String getDbName() { return null; }
+
+  @Override
+  public int hashCode() { return getName().hashCode(); }
+
+  @Override
+  public boolean equals(Object o) {
+    if (o == null) return false;
+    if (o.getClass() != this.getClass()) return false;
+    return ((Authorizeable) o).getName().equals(this.getName());
+  }
 }

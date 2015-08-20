@@ -35,8 +35,8 @@ public class DescribeStmt extends StatementBase {
   private TableName tableName_;
 
   public DescribeStmt(TableName tableName, TDescribeTableOutputStyle outputStyle) {
-    this.tableName_ = tableName;
-    this.outputStyle_ = outputStyle;
+    tableName_ = tableName;
+    outputStyle_ = outputStyle;
   }
 
   @Override
@@ -48,21 +48,23 @@ public class DescribeStmt extends StatementBase {
     return sb.toString() + tableName_;
   }
 
-  public TableName getTable() { return tableName_; }
+  public TableName getTableName() { return tableName_; }
   public TDescribeTableOutputStyle getOutputStyle() { return outputStyle_; }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (!tableName_.isFullyQualified()) {
-      tableName_ = new TableName(analyzer.getDefaultDb(), tableName_.getTbl());
+    tableName_ = analyzer.getFqTableName(tableName_);
+    if (outputStyle_ == TDescribeTableOutputStyle.MINIMAL) {
+      analyzer.getTable(tableName_, Privilege.ANY);
+    } else {
+      analyzer.getTable(tableName_, Privilege.VIEW_METADATA);
     }
-    analyzer.getTable(tableName_, Privilege.VIEW_METADATA);
   }
 
   public TDescribeTableParams toThrift() {
     TDescribeTableParams params = new TDescribeTableParams();
-    params.setTable_name(getTable().getTbl());
-    params.setDb(getTable().getDb());
+    params.setTable_name(getTableName().getTbl());
+    params.setDb(getTableName().getDb());
     params.setOutput_style(outputStyle_);
     return params;
   }

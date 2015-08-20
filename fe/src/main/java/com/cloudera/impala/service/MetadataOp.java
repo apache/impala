@@ -276,8 +276,6 @@ public class MetadataOp {
         for (String tabName: fe.getTableNames(db.getName(), "*", user)) {
           if (!tablePattern.matches(tabName)) continue;
           tableList.add(tabName);
-          List<Column> columns = Lists.newArrayList();
-
           Table table = null;
           try {
             table = catalog.getTable(dbName, tabName);
@@ -286,16 +284,13 @@ public class MetadataOp {
           }
           if (table == null) continue;
 
+          List<Column> columns = Lists.newArrayList();
           // If the table is not yet loaded, the columns will be unknown. Add it
           // to the set of missing tables.
           if (!table.isLoaded()) {
             result.missingTbls.add(new TableName(dbName, tabName));
           } else {
-            for (Column column: table.getColumnsInHiveOrder()) {
-              String colName = column.getName();
-              if (!columnPattern.matches(colName)) continue;
-              columns.add(column);
-            }
+            columns.addAll(fe.getColumns(table, columnPattern, user));
           }
           tablesColumnsList.add(columns);
         }

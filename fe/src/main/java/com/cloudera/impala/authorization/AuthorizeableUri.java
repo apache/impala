@@ -22,7 +22,7 @@ import com.google.common.collect.Lists;
 /*
  * Class used to authorize access to a URI.
  */
-public class AuthorizeableUri implements Authorizeable {
+public class AuthorizeableUri extends Authorizeable {
   private final String uriName_;
 
   public AuthorizeableUri(String uriName) {
@@ -31,10 +31,12 @@ public class AuthorizeableUri implements Authorizeable {
   }
 
   @Override
-  public List<org.apache.sentry.core.model.db.DBModelAuthorizable> getHiveAuthorizeableHierarchy() {
+  public List<org.apache.sentry.core.model.db.DBModelAuthorizable>
+      getHiveAuthorizeableHierarchy() {
     org.apache.sentry.core.model.db.AccessURI accessURI =
         new org.apache.sentry.core.model.db.AccessURI(uriName_);
-    return Lists.newArrayList((org.apache.sentry.core.model.db.DBModelAuthorizable) accessURI);
+    return Lists.newArrayList(
+        (org.apache.sentry.core.model.db.DBModelAuthorizable) accessURI);
   }
 
   @Override

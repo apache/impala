@@ -24,7 +24,7 @@ import com.google.common.collect.Lists;
 /*
  * Class used to authorize access to a database.
  */
-public class AuthorizeableDb implements Authorizeable {
+public class AuthorizeableDb extends Authorizeable {
   private final org.apache.sentry.core.model.db.Database database_;
 
   public AuthorizeableDb(String dbName) {
@@ -39,4 +39,7 @@ public class AuthorizeableDb implements Authorizeable {
 
   @Override
   public String getName() { return database_.getName(); }
+
+  @Override
+  public String getDbName() { return getName(); }
 }
