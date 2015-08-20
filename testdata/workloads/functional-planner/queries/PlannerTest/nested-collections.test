@@ -69,9 +69,9 @@ where c_nationkey = n_nationkey and s_nationkey = n_nationkey
 |  |
 |  |--04:NESTED LOOP JOIN [CROSS JOIN]
 |  |  |
-|  |  |--03:UNNEST [r.r_nations n]
+|  |  |--02:SINGULAR ROW SRC
 |  |  |
-|  |  02:SINGULAR ROW SRC
+|  |  03:UNNEST [r.r_nations n]
 |  |
 |  00:SCAN HDFS [tpch_nested_parquet.region r]
 |     partitions=1/1 files=1 size=4.16KB
@@ -87,10 +87,10 @@ where a.id < 10 and b.item % 2 = 0
 |
 |--04:NESTED LOOP JOIN [CROSS JOIN]
 |  |
-|  |--03:UNNEST [a.int_array_col b]
-|  |     predicates: b.item % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col b]
+|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -102,11 +102,11 @@ where a.id < 10
 ---- PLAN
 01:SUBPLAN
 |
-|--04:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|--04:NESTED LOOP JOIN [RIGHT SEMI JOIN]
 |  |
-|  |--03:UNNEST [a.int_array_col b]
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col b]
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -118,12 +118,12 @@ where b.item % 2 = 0
 ---- PLAN
 01:SUBPLAN
 |
-|--04:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|--04:NESTED LOOP JOIN [LEFT SEMI JOIN]
 |  |
-|  |--03:UNNEST [a.int_array_col b]
-|  |     predicates: b.item % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col b]
+|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -134,11 +134,11 @@ where a.id < 10
 ---- PLAN
 01:SUBPLAN
 |
-|--04:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|--04:NESTED LOOP JOIN [RIGHT ANTI JOIN]
 |  |
-|  |--03:UNNEST [a.int_array_col b]
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col b]
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -152,12 +152,12 @@ where b.item % 2 = 0
 ---- PLAN
 01:SUBPLAN
 |
-|--04:NESTED LOOP JOIN [RIGHT ANTI JOIN]
+|--04:NESTED LOOP JOIN [LEFT ANTI JOIN]
 |  |
-|  |--03:UNNEST [a.int_array_col b]
-|  |     predicates: b.item % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col b]
+|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -168,11 +168,11 @@ where a.id < 10
 ---- PLAN
 01:SUBPLAN
 |
-|--04:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|--04:NESTED LOOP JOIN [RIGHT OUTER JOIN]
 |  |
-|  |--03:UNNEST [a.int_array_col b]
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col b]
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -186,12 +186,12 @@ where b.item % 2 = 0
 ---- PLAN
 01:SUBPLAN
 |
-|--04:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|--04:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  |
-|  |--03:UNNEST [a.int_array_col b]
-|  |     predicates: b.item % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col b]
+|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -206,10 +206,10 @@ where b.item % 2 = 0 and a.id < 10
 |--04:NESTED LOOP JOIN [FULL OUTER JOIN]
 |  |  predicates: b.item % 2 = 0, a.id < 10
 |  |
-|  |--03:UNNEST [a.int_array_col b]
-|  |     predicates: b.item % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col b]
+|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -224,10 +224,10 @@ where a.id < 10 and b.item % 2 = 0 and a.id < b.item
 |--04:NESTED LOOP JOIN [INNER JOIN]
 |  |  predicates: a.id < b.item
 |  |
-|  |--03:UNNEST [a.int_array_col b]
-|  |     predicates: b.item % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col b]
+|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -240,13 +240,13 @@ where a.id < 10
 ---- PLAN
 01:SUBPLAN
 |
-|--04:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|--04:NESTED LOOP JOIN [RIGHT SEMI JOIN]
 |  |  join predicates: a.id < b.item
 |  |
-|  |--03:UNNEST [a.int_array_col b]
-|  |     predicates: b.item % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col b]
+|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -260,13 +260,13 @@ where b.item % 2 = 0
 ---- PLAN
 01:SUBPLAN
 |
-|--04:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|--04:NESTED LOOP JOIN [LEFT SEMI JOIN]
 |  |  join predicates: a.id < b.item
 |  |
-|  |--03:UNNEST [a.int_array_col b]
-|  |     predicates: b.item % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col b]
+|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -279,13 +279,13 @@ where a.id < 10
 ---- PLAN
 01:SUBPLAN
 |
-|--04:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|--04:NESTED LOOP JOIN [RIGHT ANTI JOIN]
 |  |  join predicates: a.id < b.item
 |  |
-|  |--03:UNNEST [a.int_array_col b]
-|  |     predicates: b.item % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col b]
+|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -299,13 +299,13 @@ where b.item % 2 = 0
 ---- PLAN
 01:SUBPLAN
 |
-|--04:NESTED LOOP JOIN [RIGHT ANTI JOIN]
+|--04:NESTED LOOP JOIN [LEFT ANTI JOIN]
 |  |  join predicates: a.id < b.item
 |  |
-|  |--03:UNNEST [a.int_array_col b]
-|  |     predicates: b.item % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col b]
+|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -318,13 +318,13 @@ where a.id < 10
 ---- PLAN
 01:SUBPLAN
 |
-|--04:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|--04:NESTED LOOP JOIN [RIGHT OUTER JOIN]
 |  |  join predicates: a.id < b.item
 |  |
-|  |--03:UNNEST [a.int_array_col b]
-|  |     predicates: b.item % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col b]
+|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -338,13 +338,13 @@ where b.item % 2 = 0
 ---- PLAN
 01:SUBPLAN
 |
-|--04:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|--04:NESTED LOOP JOIN [LEFT OUTER JOIN]
 |  |  join predicates: a.id < b.item
 |  |
-|  |--03:UNNEST [a.int_array_col b]
-|  |     predicates: b.item % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col b]
+|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -362,10 +362,10 @@ where b.item % 2 = 0
 |  |  join predicates: a.id < b.item, a.id < 10
 |  |  predicates: b.item % 2 = 0
 |  |
-|  |--03:UNNEST [a.int_array_col b]
-|  |     predicates: b.item % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col b]
+|     predicates: b.item % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -377,14 +377,14 @@ where a.id < 10 and b.f1 % 2 = 0 and b.f1 = a.id and b.f1 < a.year
 ---- PLAN
 01:SUBPLAN
 |
-|--04:HASH JOIN [INNER JOIN]
-|  |  hash predicates: a.id = b.f1
-|  |  other predicates: b.f1 < a.year
+|--04:NESTED LOOP JOIN [INNER JOIN]
+|  |  join predicates: b.f1 = a.id
+|  |  predicates: b.f1 < a.year
 |  |
-|  |--03:UNNEST [a.struct_array_col b]
-|  |     predicates: b.f1 < 10, b.f1 % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.struct_array_col b]
+|     predicates: b.f1 < 10, b.f1 % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -398,14 +398,13 @@ where a.id < 10
 ---- PLAN
 01:SUBPLAN
 |
-|--04:HASH JOIN [LEFT SEMI JOIN]
-|  |  hash predicates: a.id = b.f1
-|  |  other join predicates: b.f1 < a.year
+|--04:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  |  join predicates: b.f1 < a.year, b.f1 = a.id
 |  |
-|  |--03:UNNEST [a.struct_array_col b]
-|  |     predicates: b.f1 % 2 = 0, b.f1 < 10
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.struct_array_col b]
+|     predicates: b.f1 % 2 = 0, b.f1 < 10
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -420,14 +419,13 @@ where b.f1 % 2 = 0
 ---- PLAN
 01:SUBPLAN
 |
-|--04:HASH JOIN [RIGHT SEMI JOIN]
-|  |  hash predicates: a.id = b.f1
-|  |  other join predicates: b.f1 < a.year
+|--04:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  |  join predicates: b.f1 < a.year, b.f1 = a.id
 |  |
-|  |--03:UNNEST [a.struct_array_col b]
-|  |     predicates: b.f1 < 10, b.f1 % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.struct_array_col b]
+|     predicates: b.f1 < 10, b.f1 % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -441,14 +439,13 @@ where a.id < 10
 ---- PLAN
 01:SUBPLAN
 |
-|--04:HASH JOIN [LEFT ANTI JOIN]
-|  |  hash predicates: a.id = b.f1
-|  |  other join predicates: b.f1 < a.year
+|--04:NESTED LOOP JOIN [RIGHT ANTI JOIN]
+|  |  join predicates: b.f1 < a.year, b.f1 = a.id
 |  |
-|  |--03:UNNEST [a.struct_array_col b]
-|  |     predicates: b.f1 < 10, b.f1 % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.struct_array_col b]
+|     predicates: b.f1 < 10, b.f1 % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -463,14 +460,13 @@ where b.f1 % 2 = 0
 ---- PLAN
 01:SUBPLAN
 |
-|--04:HASH JOIN [RIGHT ANTI JOIN]
-|  |  hash predicates: a.id = b.f1
-|  |  other join predicates: b.f1 < a.year
+|--04:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|  |  join predicates: b.f1 < a.year, b.f1 = a.id
 |  |
-|  |--03:UNNEST [a.struct_array_col b]
-|  |     predicates: b.f1 % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.struct_array_col b]
+|     predicates: b.f1 % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -484,14 +480,13 @@ where a.id < 10
 ---- PLAN
 01:SUBPLAN
 |
-|--04:HASH JOIN [LEFT OUTER JOIN]
-|  |  hash predicates: a.id = b.f1
-|  |  other join predicates: b.f1 < a.year
+|--04:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  join predicates: b.f1 < a.year, b.f1 = a.id
 |  |
-|  |--03:UNNEST [a.struct_array_col b]
-|  |     predicates: b.f1 % 2 = 0, b.f1 < 10
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.struct_array_col b]
+|     predicates: b.f1 % 2 = 0, b.f1 < 10
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -506,14 +501,13 @@ where b.f1 % 2 = 0
 ---- PLAN
 01:SUBPLAN
 |
-|--04:HASH JOIN [RIGHT OUTER JOIN]
-|  |  hash predicates: a.id = b.f1
-|  |  other join predicates: b.f1 < a.year
+|--04:NESTED LOOP JOIN [LEFT OUTER JOIN]
+|  |  join predicates: b.f1 < a.year, b.f1 = a.id
 |  |
-|  |--03:UNNEST [a.struct_array_col b]
-|  |     predicates: b.f1 % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.struct_array_col b]
+|     predicates: b.f1 % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -528,15 +522,14 @@ where a.id < 10 and b.f1 % 2 = 0
 ---- PLAN
 01:SUBPLAN
 |
-|--04:HASH JOIN [FULL OUTER JOIN]
-|  |  hash predicates: a.id = b.f1
-|  |  other join predicates: b.f1 < a.year
-|  |  other predicates: a.id < 10, b.f1 % 2 = 0
+|--04:NESTED LOOP JOIN [FULL OUTER JOIN]
+|  |  join predicates: b.f1 < a.year, b.f1 = a.id
+|  |  predicates: a.id < 10, b.f1 % 2 = 0
 |  |
-|  |--03:UNNEST [a.struct_array_col b]
-|  |     predicates: b.f1 % 2 = 0
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.struct_array_col b]
+|     predicates: b.f1 % 2 = 0
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -563,17 +556,17 @@ select 1 from functional.allcomplextypes a
 |  |
 |  |--05:UNNEST [a.struct_array_col d]
 |  |
-|  08:NESTED LOOP JOIN [INNER JOIN]
-|  |  predicates: (a.id < 1 OR b.item > 2)
-|  |
-|  |--03:UNNEST [a.int_array_col b]
-|  |
-|  07:HASH JOIN [INNER JOIN]
+|  08:HASH JOIN [INNER JOIN]
 |  |  hash predicates: a.year = c.value
 |  |
 |  |--04:UNNEST [a.int_map_col c]
 |  |
-|  02:SINGULAR ROW SRC
+|  07:NESTED LOOP JOIN [INNER JOIN]
+|  |  predicates: (a.id < 1 OR b.item > 2)
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [a.int_array_col b]
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -599,10 +592,10 @@ where e.f1 < 10
 |
 |--08:NESTED LOOP JOIN [CROSS JOIN]
 |  |
-|  |--07:UNNEST [a.struct_array_col e]
-|  |     predicates: e.f1 < 10
+|  |--06:SINGULAR ROW SRC
 |  |
-|  06:SINGULAR ROW SRC
+|  07:UNNEST [a.struct_array_col e]
+|     predicates: e.f1 < 10
 |
 09:HASH JOIN [RIGHT ANTI JOIN]
 |  hash predicates: c.int_col = b.int_col
@@ -645,10 +638,10 @@ inner join functional.alltypes d on (b.id = d.id)
 |
 |--07:NESTED LOOP JOIN [CROSS JOIN]
 |  |
-|  |--06:UNNEST [a.struct_array_col e]
-|  |     predicates: e.f1 < 10
+|  |--05:SINGULAR ROW SRC
 |  |
-|  05:SINGULAR ROW SRC
+|  06:UNNEST [a.struct_array_col e]
+|     predicates: e.f1 < 10
 |
 08:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: b.id = a.id
@@ -677,9 +670,9 @@ where b.item < 10 and c.int_col > 30
 |  |
 |  |--09:NESTED LOOP JOIN [CROSS JOIN]
 |  |  |
-|  |  |--08:UNNEST [a.int_map_col d]
+|  |  |--07:SINGULAR ROW SRC
 |  |  |
-|  |  07:SINGULAR ROW SRC
+|  |  08:UNNEST [a.int_map_col d]
 |  |
 |  10:HASH JOIN [RIGHT OUTER JOIN]
 |  |  hash predicates: c.id = b.item
@@ -689,10 +682,10 @@ where b.item < 10 and c.int_col > 30
 |  |  |
 |  |  |--04:NESTED LOOP JOIN [CROSS JOIN]
 |  |  |  |
-|  |  |  |--03:UNNEST [a.int_array_col b]
-|  |  |  |     predicates: b.item < 10
+|  |  |  |--02:SINGULAR ROW SRC
 |  |  |  |
-|  |  |  02:SINGULAR ROW SRC
+|  |  |  03:UNNEST [a.int_array_col b]
+|  |  |     predicates: b.item < 10
 |  |  |
 |  |  00:SCAN HDFS [functional.allcomplextypes a]
 |  |     partitions=0/0 files=0 size=0B
@@ -724,9 +717,9 @@ where b.item < 10 and c.int_col > 30
 |
 |--09:NESTED LOOP JOIN [CROSS JOIN]
 |  |
-|  |--08:UNNEST [a.int_map_col d]
+|  |--07:SINGULAR ROW SRC
 |  |
-|  07:SINGULAR ROW SRC
+|  08:UNNEST [a.int_map_col d]
 |
 10:HASH JOIN [FULL OUTER JOIN]
 |  hash predicates: c.id = b.item
@@ -736,10 +729,10 @@ where b.item < 10 and c.int_col > 30
 |  |
 |  |--04:NESTED LOOP JOIN [CROSS JOIN]
 |  |  |
-|  |  |--03:UNNEST [a.int_array_col b]
-|  |  |     predicates: b.item < 10
+|  |  |--02:SINGULAR ROW SRC
 |  |  |
-|  |  02:SINGULAR ROW SRC
+|  |  03:UNNEST [a.int_array_col b]
+|  |     predicates: b.item < 10
 |  |
 |  00:SCAN HDFS [functional.allcomplextypes a]
 |     partitions=0/0 files=0 size=0B
@@ -758,13 +751,13 @@ where v.cnt < 10
 |
 |--05:NESTED LOOP JOIN [CROSS JOIN]
 |  |
-|  |--04:AGGREGATE [FINALIZE]
-|  |  |  output: count(*)
-|  |  |  having: count(*) < 10
-|  |  |
-|  |  03:UNNEST [a.int_array_col]
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  04:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |  having: count(*) < 10
+|  |
+|  03:UNNEST [a.int_array_col]
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -848,15 +841,15 @@ where id < (select avg(item) from a.int_array_col)
 ---- PLAN
 01:SUBPLAN
 |
-|--05:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|--05:NESTED LOOP JOIN [RIGHT SEMI JOIN]
 |  |  join predicates: id < avg(item)
 |  |
-|  |--04:AGGREGATE [FINALIZE]
-|  |  |  output: avg(item)
-|  |  |
-|  |  03:UNNEST [a.int_array_col]
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  04:AGGREGATE [FINALIZE]
+|  |  output: avg(item)
+|  |
+|  03:UNNEST [a.int_array_col]
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -883,11 +876,11 @@ where not exists (select item from a.int_array_col)
 ---- PLAN
 01:SUBPLAN
 |
-|--04:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|--04:NESTED LOOP JOIN [RIGHT ANTI JOIN]
 |  |
-|  |--03:UNNEST [a.int_array_col]
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col]
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -900,7 +893,7 @@ where exists (select m.key from a.struct_map_col m where a.id < m.f1)
 01:SUBPLAN
 |
 |--04:NESTED LOOP JOIN [RIGHT SEMI JOIN]
-|  |  predicates: a.id < m.f1
+|  |  join predicates: a.id < m.f1
 |  |
 |  |--02:SINGULAR ROW SRC
 |  |
@@ -917,7 +910,7 @@ where not exists (select c.f2 from a.struct_array_col c where a.id < c.f1)
 01:SUBPLAN
 |
 |--04:NESTED LOOP JOIN [RIGHT ANTI JOIN]
-|  |  predicates: a.id < c.f1
+|  |  join predicates: a.id < c.f1
 |  |
 |  |--02:SINGULAR ROW SRC
 |  |
@@ -936,14 +929,14 @@ where id in (select b.item from a.int_array_col b where a.year < b.item)
 01:SUBPLAN
 |
 |--04:NESTED LOOP JOIN [RIGHT SEMI JOIN]
-|  |  predicates: id = b.item, a.year < b.item
+|  |  join predicates: a.year < b.item, b.item = id
 |  |
 |  |--02:SINGULAR ROW SRC
 |  |
 |  03:UNNEST [a.int_array_col b]
 |
 00:SCAN HDFS [functional.allcomplextypes a]
- partitions=0/0 files=0 size=0B
+   partitions=0/0 files=0 size=0B
 ====
 # Test subplans: Bushy plan with multiple subplans.
 select a.id, c.item, d.key, d.value
@@ -960,17 +953,17 @@ cross join
 |
 |--15:NESTED LOOP JOIN [CROSS JOIN]
 |  |
-|  |--14:AGGREGATE [FINALIZE]
-|  |  |  output: count(*)
-|  |  |
-|  |  13:HASH JOIN [INNER JOIN]
-|  |  |  hash predicates: x.f1 = y.f1
-|  |  |
-|  |  |--12:UNNEST [b.struct_map_col y]
-|  |  |
-|  |  11:UNNEST [a.struct_array_col x]
+|  |--10:SINGULAR ROW SRC
 |  |
-|  10:SINGULAR ROW SRC
+|  14:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |
+|  13:HASH JOIN [INNER JOIN]
+|  |  hash predicates: x.f1 = y.f1
+|  |
+|  |--12:UNNEST [b.struct_map_col y]
+|  |
+|  11:UNNEST [a.struct_array_col x]
 |
 16:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id
@@ -979,9 +972,9 @@ cross join
 |  |
 |  |--09:NESTED LOOP JOIN [CROSS JOIN]
 |  |  |
-|  |  |--08:UNNEST [b.int_map_col d]
+|  |  |--07:SINGULAR ROW SRC
 |  |  |
-|  |  07:SINGULAR ROW SRC
+|  |  08:UNNEST [b.int_map_col d]
 |  |
 |  05:SCAN HDFS [functional.allcomplextypes b]
 |     partitions=0/0 files=0 size=0B
@@ -990,9 +983,9 @@ cross join
 |
 |--04:NESTED LOOP JOIN [CROSS JOIN]
 |  |
-|  |--03:UNNEST [a.int_array_col c]
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col c]
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -1013,41 +1006,41 @@ where b.id = d.value
 |
 |--15:NESTED LOOP JOIN [CROSS JOIN]
 |  |
-|  |--14:AGGREGATE [FINALIZE]
-|  |  |  output: count(*)
-|  |  |
-|  |  13:HASH JOIN [INNER JOIN]
-|  |  |  hash predicates: x.f1 = y.f1
-|  |  |
-|  |  |--12:UNNEST [b.struct_map_col y]
-|  |  |
-|  |  11:UNNEST [a.struct_array_col x]
+|  |--10:SINGULAR ROW SRC
 |  |
-|  10:SINGULAR ROW SRC
+|  14:AGGREGATE [FINALIZE]
+|  |  output: count(*)
+|  |
+|  13:HASH JOIN [INNER JOIN]
+|  |  hash predicates: x.f1 = y.f1
+|  |
+|  |--12:UNNEST [b.struct_map_col y]
+|  |
+|  11:UNNEST [a.struct_array_col x]
 |
 16:HASH JOIN [INNER JOIN]
-|  hash predicates: a.id = b.id
+|  hash predicates: c.item = d.value
 |
 |--06:SUBPLAN
 |  |
-|  |--09:HASH JOIN [INNER JOIN]
-|  |  |  hash predicates: b.id = d.value
+|  |--09:NESTED LOOP JOIN [INNER JOIN]
+|  |  |  join predicates: d.value = b.id
 |  |  |
-|  |  |--08:UNNEST [b.int_map_col d]
+|  |  |--07:SINGULAR ROW SRC
 |  |  |
-|  |  07:SINGULAR ROW SRC
+|  |  08:UNNEST [b.int_map_col d]
 |  |
 |  05:SCAN HDFS [functional.allcomplextypes b]
 |     partitions=0/0 files=0 size=0B
 |
 01:SUBPLAN
 |
-|--04:HASH JOIN [INNER JOIN]
-|  |  hash predicates: a.id = c.item
+|--04:NESTED LOOP JOIN [INNER JOIN]
+|  |  join predicates: c.item = a.id
 |  |
-|  |--03:UNNEST [a.int_array_col c]
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col c]
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -1079,12 +1072,12 @@ cross join
 |  |  |
 |  |  08:UNNEST [a.struct_array_col x]
 |  |
-|  12:HASH JOIN [LEFT OUTER JOIN]
-|  |  hash predicates: c.item = d.value
+|  12:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |  join predicates: d.value = c.item
 |  |
-|  |--07:UNNEST [b.int_map_col d]
+|  |--06:SINGULAR ROW SRC
 |  |
-|  06:SINGULAR ROW SRC
+|  07:UNNEST [b.int_map_col d]
 |
 14:HASH JOIN [INNER JOIN]
 |  hash predicates: a.id = b.id
@@ -1096,9 +1089,9 @@ cross join
 |
 |--04:NESTED LOOP JOIN [CROSS JOIN]
 |  |
-|  |--03:UNNEST [a.int_array_col c]
+|  |--02:SINGULAR ROW SRC
 |  |
-|  02:SINGULAR ROW SRC
+|  03:UNNEST [a.int_array_col c]
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
@@ -1120,10 +1113,10 @@ limit 10
 |  |
 |  |--07:NESTED LOOP JOIN [CROSS JOIN]
 |  |  |
-|  |  |--06:UNNEST [o.o_lineitems]
-|  |  |     predicates: l_linenumber < 3
+|  |  |--05:SINGULAR ROW SRC
 |  |  |
-|  |  05:SINGULAR ROW SRC
+|  |  06:UNNEST [o.o_lineitems]
+|  |     predicates: l_linenumber < 3
 |  |
 |  03:UNNEST [c.c_orders o]
 |     predicates: o_orderkey < 5
@@ -1149,9 +1142,9 @@ cross join
 |  |
 |  |--07:NESTED LOOP JOIN [CROSS JOIN]
 |  |  |
-|  |  |--06:UNNEST [m1.value m2]
+|  |  |--05:SINGULAR ROW SRC
 |  |  |
-|  |  05:SINGULAR ROW SRC
+|  |  06:UNNEST [m1.value m2]
 |  |
 |  03:UNNEST [a.map_map_col m1]
 |
@@ -1192,4 +1185,38 @@ cross join (select avg(item) from b.int_array_col) v2
 |
 00:SCAN HDFS [functional.allcomplextypes a]
    partitions=0/0 files=0 size=0B
+====
+# Test subplans: Enforcement of slot equivalences and removal
+# of redundant predicates.
+select 1 from tpch_nested_parquet.customer c, c.c_orders o, o.o_lineitems l
+# conjuncts form a single equivalence class
+where c.c_custkey = o.o_orderkey and c.c_custkey = o.o_shippriority
+  and c.c_custkey = l.l_partkey and o.o_shippriority = l.l_linenumber
+  and o.o_orderkey = l.l_suppkey and c.c_nationkey = l.l_linenumber
+# redundant predicates
+  and o.o_orderkey = l.l_partkey and o.o_shippriority = l.l_suppkey
+---- PLAN
+01:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [INNER JOIN]
+|  |  join predicates: o.o_orderkey = c.c_custkey
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--07:NESTED LOOP JOIN [INNER JOIN]
+|  |  |  join predicates: l.l_linenumber = o.o_shippriority
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  06:UNNEST [o.o_lineitems l]
+|  |     predicates: l.l_partkey = l.l_linenumber, l.l_partkey = l.l_suppkey
+|  |
+|  03:UNNEST [c.c_orders o]
+|     predicates: o.o_orderkey = o.o_shippriority
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates: c.c_custkey = c.c_nationkey
 ====

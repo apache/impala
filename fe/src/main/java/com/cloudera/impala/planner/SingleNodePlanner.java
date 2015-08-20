@@ -450,6 +450,8 @@ public class SingleNodePlanner {
             invertJoin = true;
           }
         }
+        // Always place singular row src nodes on the build side.
+        if (root instanceof SingularRowSrcNode) invertJoin = true;
 
         analyzer.setAssignedConjuncts(root.getAssignedConjuncts());
         PlanNode candidate = null;
@@ -1281,16 +1283,6 @@ public class SingleNodePlanner {
     Preconditions.checkState(innerRef != null ^ outerRef != null);
     TableRef tblRef = (innerRef != null) ? innerRef : outerRef;
 
-    // A singular row source always has a cardinality of 1. In that case, a cross join
-    // is certainly cheaper than a hash join.
-    if (innerRef instanceof SingularRowSrcTableRef ||
-        outerRef instanceof SingularRowSrcTableRef) {
-      NestedLoopJoinNode result = new NestedLoopJoinNode(outer, inner,
-          tblRef.getDistributionMode(), tblRef.getJoinOp(), Collections.<Expr>emptyList());
-      result.init(analyzer);
-      return result;
-    }
-
     // get eq join predicates for the TableRefs' ids (not the PlanNodes' ids, which
     // are materialized)
     List<BinaryPredicate> eqJoinConjuncts = Collections.emptyList();
@@ -1358,8 +1350,14 @@ public class SingleNodePlanner {
     }
     analyzer.markConjunctsAssigned(otherJoinConjuncts);
 
+    // Use a nested-loop join if there are no equi-join conjuncts, or if one of the join
+    // children is a singular row src. A singular row src has a cardinality of 1, so a
+    // nested-loop join is certainly cheaper than a hash join.
     JoinNode result = null;
-    if (eqJoinConjuncts.isEmpty()) {
+    if (eqJoinConjuncts.isEmpty() ||
+        inner instanceof SingularRowSrcNode ||
+        outer instanceof SingularRowSrcNode) {
+      otherJoinConjuncts.addAll(eqJoinConjuncts);
       result = new NestedLoopJoinNode(outer, inner, tblRef.getDistributionMode(),
           tblRef.getJoinOp(), otherJoinConjuncts);
     } else {

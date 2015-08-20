@@ -50,9 +50,12 @@ public class UnnestNode extends PlanNode {
 
   @Override
   public void init(Analyzer analyzer) throws InternalException {
-    ArrayList<Expr> bindingPredicates = analyzer.getBoundPredicates(tupleIds_.get(0));
-    conjuncts_.addAll(bindingPredicates);
+    // TODO: Remove the scan predicates and predicates for enforcing slot
+    // equivalences here when assigning them in the parent scan.
+    ArrayList<Expr> scanPredicates = analyzer.getBoundPredicates(tupleIds_.get(0));
+    conjuncts_.addAll(scanPredicates);
     super.init(analyzer);
+    analyzer.createEquivConjuncts(tupleIds_.get(0), conjuncts_);
 
     // Unnest is like a scan and must materialize the slots of its conjuncts.
     markSlotsMaterialized(analyzer, conjuncts_);
