@@ -208,7 +208,7 @@ class RuntimeState {
   /// ErrorMsg class. The runtime state aggregates log messages based on type with one
   /// exception: messages with the GENERAL type are not aggregated but are kept
   /// individually.
-  bool LogError(const ErrorMsg& msg);
+  bool LogError(const ErrorMsg& msg, int vlog_level = 1);
 
   /// Returns true if the error log has not reached max_errors_.
   bool LogHasSpace() {
