@@ -77,7 +77,7 @@ Status HdfsScanner::Prepare(ScannerContext* context) {
   context_ = context;
   stream_ = context->GetStream();
   // The cloned contexts must be closed by the caller.
-  RETURN_IF_ERROR(Expr::Clone(scan_node_->conjunct_ctxs(),
+  RETURN_IF_ERROR(Expr::CloneIfNotExists(scan_node_->conjunct_ctxs(),
       scan_node_->runtime_state(), &scanner_conjunct_ctxs_));
 
   template_tuple_ = scan_node_->InitTemplateTuple(

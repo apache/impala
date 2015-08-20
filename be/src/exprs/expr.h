@@ -69,7 +69,7 @@
 /// 1. Expr::CreateExprTrees()
 /// 2. Expr::Prepare()
 /// 3. Expr::Open()
-/// 4. Expr::Clone() [for multi-threaded execution]
+/// 4. Expr::CloneIfNotExists() [for multi-threaded execution]
 /// 5. Evaluate exprs via Get*Val() calls
 /// 6. Expr::Close() [called once per ExprContext, including clones]
 ///
@@ -190,11 +190,12 @@ class Expr {
   /// Convenience function for opening multiple expr trees.
   static Status Open(const std::vector<ExprContext*>& ctxs, RuntimeState* state);
 
-  /// Clones each ExprContext for multiple expr trees. 'new_ctxs' should be an
-  /// empty vector, and a clone of each context in 'ctxs' will be added to it.
-  /// The new ExprContexts are created in state->obj_pool().
-  static Status Clone(const std::vector<ExprContext*>& ctxs, RuntimeState* state,
-                      std::vector<ExprContext*>* new_ctxs);
+  /// Clones each ExprContext for multiple expr trees. 'new_ctxs' must be non-NULL.
+  /// Idempotent: if '*new_ctxs' is empty, a clone of each context in 'ctxs' will be added
+  /// to it, and if non-empty, it is assumed CloneIfNotExists() was already called and the
+  /// call is a no-op. The new ExprContexts are created in state->obj_pool().
+  static Status CloneIfNotExists(const std::vector<ExprContext*>& ctxs,
+      RuntimeState* state, std::vector<ExprContext*>* new_ctxs);
 
   /// Convenience function for closing multiple expr trees.
   static void Close(const std::vector<ExprContext*>& ctxs, RuntimeState* state);

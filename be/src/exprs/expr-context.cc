@@ -55,7 +55,7 @@ Status ExprContext::Prepare(RuntimeState* state, const RowDescriptor& row_desc,
 
 Status ExprContext::Open(RuntimeState* state) {
   DCHECK(prepared_);
-  DCHECK(!opened_);
+  if (opened_) return Status::OK();
   opened_ = true;
   // Fragment-local state is only initialized for original contexts. Clones inherit the
   // original's fragment state and only need to have thread-local state initialized.
@@ -91,6 +91,7 @@ int ExprContext::Register(RuntimeState* state,
 Status ExprContext::Clone(RuntimeState* state, ExprContext** new_ctx) {
   DCHECK(prepared_);
   DCHECK(opened_);
+  DCHECK(*new_ctx == NULL);
 
   *new_ctx = state->obj_pool()->Add(new ExprContext(root_));
   (*new_ctx)->pool_.reset(new MemPool(pool_->mem_tracker()));
@@ -100,8 +101,9 @@ Status ExprContext::Clone(RuntimeState* state, ExprContext** new_ctx) {
   }
   (*new_ctx)->fn_contexts_ptr_ = &((*new_ctx)->fn_contexts_[0]);
 
-  (*new_ctx)->prepared_ = true;
   (*new_ctx)->is_clone_ = true;
+  (*new_ctx)->prepared_ = true;
+  (*new_ctx)->opened_ = true;
 
   return root_->Open(state, *new_ctx, FunctionContext::THREAD_LOCAL);
 }

@@ -375,10 +375,15 @@ Status Expr::Open(RuntimeState* state, ExprContext* context,
   return Status::OK();
 }
 
-Status Expr::Clone(const vector<ExprContext*>& ctxs, RuntimeState* state,
-                   vector<ExprContext*>* new_ctxs) {
+Status Expr::CloneIfNotExists(const vector<ExprContext*>& ctxs, RuntimeState* state,
+    vector<ExprContext*>* new_ctxs) {
   DCHECK(new_ctxs != NULL);
-  DCHECK(new_ctxs->empty());
+  if (!new_ctxs->empty()) {
+    // 'ctxs' was already cloned into '*new_ctxs', nothing to do.
+    DCHECK_EQ(new_ctxs->size(), ctxs.size());
+    for (int i = 0; i < new_ctxs->size(); ++i) DCHECK((*new_ctxs)[i]->is_clone_);
+    return Status::OK();
+  }
   new_ctxs->resize(ctxs.size());
   for (int i = 0; i < ctxs.size(); ++i) {
     RETURN_IF_ERROR(ctxs[i]->Clone(state, &(*new_ctxs)[i]));

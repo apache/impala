@@ -55,7 +55,8 @@ Status SortExecExprs::Open(RuntimeState* state) {
     RETURN_IF_ERROR(Expr::Open(sort_tuple_slot_expr_ctxs_, state));
   }
   RETURN_IF_ERROR(Expr::Open(lhs_ordering_expr_ctxs_, state));
-  RETURN_IF_ERROR(Expr::Clone(lhs_ordering_expr_ctxs_, state, &rhs_ordering_expr_ctxs_));
+  RETURN_IF_ERROR(Expr::CloneIfNotExists(
+      lhs_ordering_expr_ctxs_, state, &rhs_ordering_expr_ctxs_));
   return Status::OK();
 }
 
