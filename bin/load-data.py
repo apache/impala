@@ -22,6 +22,7 @@
 # Most ddl commands are executed by Impala.
 import collections
 import getpass
+import logging
 import os
 import re
 import sqlparse
@@ -30,11 +31,16 @@ import sys
 import tempfile
 import time
 import traceback
+
 from itertools import product
 from optparse import OptionParser
 from Queue import Queue
 from tests.beeswax.impala_beeswax import *
 from threading import Thread
+
+logging.basicConfig()
+LOG = logging.getLogger('load-data.py')
+LOG.setLevel(logging.DEBUG)
 
 parser = OptionParser()
 parser.add_option("-e", "--exploration_strategy", dest="exploration_strategy",
@@ -191,6 +197,7 @@ def generate_schema_statements(workload):
     generate_cmd += " --hive_warehouse_dir=%s" % options.hive_warehouse_dir
   if options.hdfs_namenode is not None:
     generate_cmd += " --hdfs_namenode=%s" % options.hdfs_namenode
+  generate_cmd += " --backend=%s" % options.impalad
   print 'Executing Generate Schema Command: ' + generate_cmd
   schema_cmd = os.path.join(TESTDATA_BIN_DIR, generate_cmd)
   error_msg = 'Error generating schema statements for workload: ' + workload
@@ -265,6 +272,11 @@ def invalidate_impala_metadata():
     impala_client.close_connection()
 
 if __name__ == "__main__":
+  # Having the actual command line at the top of each data-load-* log can help
+  # when debugging dataload issues.
+  #
+  LOG.debug(' '.join(sys.argv))
+
   all_workloads = available_workloads(WORKLOAD_DIR)
   workloads = []
   if options.workloads is None:

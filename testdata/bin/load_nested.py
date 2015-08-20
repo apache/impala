@@ -20,9 +20,12 @@
 '''This script creates a nested version of TPC-H. Non-nested TPC-H must already be
    loaded.
 '''
-
 import logging
 import os
+
+from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
+import tests.comparison.cli_options as cli_options
+
 
 LOG = logging.getLogger(os.path.splitext(os.path.basename(__file__))[0])
 
@@ -281,23 +284,25 @@ def load():
         DROP TABLE tmp_supplier_string;""".split(";"):
       if not stmt.strip():
         continue
+      LOG.info("Executing: {0}".format(stmt))
       hive.execute(stmt)
 
   with cluster.impala.cursor(db_name=target_db) as impala:
     impala.invalidate_metadata()
     impala.compute_stats()
 
+  LOG.info("Done loading nested TPCH data")
 
 if __name__ == "__main__":
-  from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
-  import tests.comparison.cli_options as cli_options
 
   parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
   cli_options.add_logging_options(parser)
-  cli_options.add_cluster_options(parser)
+  cli_options.add_cluster_options(parser)  # --cm-host and similar args added here
+
   parser.add_argument("-s", "--source-db", default="tpch_parquet")
   parser.add_argument("-t", "--target-db", default="tpch_nested_parquet")
   parser.add_argument("-c", "-p", "--chunks", type=int, default=1)
+
   args = parser.parse_args()
 
   cli_options.configure_logging(args.log_level, debug_log_file=args.debug_log_file)

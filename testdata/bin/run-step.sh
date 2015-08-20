@@ -24,6 +24,7 @@
 # outputs if there is an error.
 # Usage: run-step <step description> <log file name> <cmd> <arg1> <arg2> ...
 # LOG_DIR must be set to a writable directory for logs.
+
 function run-step {
   local MSG=$1
   shift

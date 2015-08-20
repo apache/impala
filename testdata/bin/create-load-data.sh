@@ -34,17 +34,38 @@ trap 'echo Error in $0 at line $LINENO: $(cd "'$PWD'" && awk "NR == $LINENO" $0)
 . ${IMPALA_HOME}/bin/impala-config.sh > /dev/null 2>&1
 . ${IMPALA_HOME}/testdata/bin/run-step.sh
 
+# Environment variables used to direct the data loading process to an external cluster.
+# TODO: We need a better way of managing how these get set. See:
+# https://issues.cloudera.org/browse/IMPALA-4346
+: ${HS2_HOST_PORT=localhost:11050}
+: ${HDFS_NN=localhost:20500}
+: ${IMPALAD=localhost:21000}
+: ${REMOTE_LOAD=}
+: ${CM_HOST=}
+
 SKIP_METADATA_LOAD=0
 SKIP_SNAPSHOT_LOAD=0
 SNAPSHOT_FILE=""
 LOAD_DATA_ARGS=""
-JDBC_URL="jdbc:hive2://localhost:11050/default;"
+EXPLORATION_STRATEGY="exhaustive"
+export JDBC_URL="jdbc:hive2://${HS2_HOST_PORT}/default;"
+
 # For logging when using run-step.
 LOG_DIR=${IMPALA_DATA_LOADING_LOGS_DIR}
+
+echo "Executing: create-load-data.sh $@"
 
 while [ -n "$*" ]
 do
   case $1 in
+    -exploration_strategy)
+      EXPLORATION_STRATEGY=${2-}
+      if [[ -z "$EXPLORATION_STRATEGY" ]]; then
+        echo "Must provide an exploration strategy from e.g. core, exhaustive"
+        exit 1;
+      fi
+      shift;
+      ;;
     -skip_metadata_load)
       SKIP_METADATA_LOAD=1
       ;;
@@ -59,11 +80,16 @@ do
       fi
       shift;
       ;;
+    -cm_host)
+      CM_HOST=${2-}
+      shift;
+      ;;
     -help|-h|*)
       echo "create-load-data.sh : Creates data and loads from scratch"
       echo "[-skip_metadata_load] : Skips loading of metadata"
       echo "[-skip_snapshot_load] : Assumes that the snapshot is already loaded"
       echo "[-snapshot_file] : Loads the test warehouse snapshot into hdfs"
+      echo "[-cm_host] : Address of the Cloudera Manager host if loading to a remote cluster"
       exit 1;
       ;;
     esac
@@ -71,8 +97,10 @@ do
 done
 
 if [[ $SKIP_METADATA_LOAD -eq 0  && "$SNAPSHOT_FILE" = "" ]]; then
-  run-step "Loading Hive Builtins" load-hive-builtins.log \
+  if [[ -z "$REMOTE_LOAD" ]]; then
+    run-step "Loading Hive Builtins" load-hive-builtins.log \
       ${IMPALA_HOME}/testdata/bin/load-hive-builtins.sh
+  fi
   run-step "Generating HBase data" create-hbase.log \
       ${IMPALA_HOME}/testdata/bin/create-hbase.sh
   run-step "Creating /test-warehouse HDFS directory" create-test-warehouse-dir.log \
@@ -97,6 +125,14 @@ else
   # hdfs data already exists, don't load it.
   echo Skipping loading data to hdfs.
 fi
+
+echo "Derived params for create-load-data.sh:"
+echo "EXPLORATION_STRATEGY=${EXPLORATION_STRATEGY:-}"
+echo "SKIP_METADATA_LOAD=${SKIP_METADATA_LOAD:-}"
+echo "SKIP_SNAPSHOT_LOAD=${SKIP_SNAPSHOT_LOAD:-}"
+echo "SNAPSHOT_FILE=${SNAPSHOT_FILE:-}"
+echo "CM_HOST=${CM_HOST:-}"
+echo "REMOTE_LOAD=${REMOTE_LOAD:-}"
 
 function load-custom-schemas {
   SCHEMA_SRC_DIR=${IMPALA_HOME}/testdata/data/schemas
@@ -131,7 +167,7 @@ function load-data {
 
   MSG="Loading workload '$WORKLOAD'"
   ARGS=("--workloads $WORKLOAD")
-  MSG+=" Using exploration strategy '$EXPLORATION_STRATEGY'"
+  MSG+=" using exploration strategy '$EXPLORATION_STRATEGY'"
   ARGS+=("-e $EXPLORATION_STRATEGY")
   if [ $TABLE_FORMATS ]; then
     MSG+=" in table formats '$TABLE_FORMATS'"
@@ -144,15 +180,35 @@ function load-data {
   if [ "${WORKLOAD}" = "functional-query" ]; then
     WORKLOAD="functional"
   fi
+
+  # TODO: Why is there a REMOTE_LOAD condition?
+  # See https://issues.cloudera.org/browse/IMPALA-4347
+  #
   # Force load the dataset if we detect a schema change.
-  if ! ${IMPALA_HOME}/testdata/bin/check-schema-diff.sh $WORKLOAD; then
-    ARGS+=("--force")
-    echo "Force loading $WORKLOAD because a schema change was detected"
-  elif [ "${FORCE_LOAD}" = "force" ]; then
-    ARGS+=("--force")
-    echo "Force loading."
+  if [[ -z "$REMOTE_LOAD" ]]; then
+    if ! ${IMPALA_HOME}/testdata/bin/check-schema-diff.sh $WORKLOAD; then
+      ARGS+=("--force")
+      echo "Force loading $WORKLOAD because a schema change was detected"
+    elif [ "${FORCE_LOAD}" = "force" ]; then
+      ARGS+=("--force")
+      echo "Force loading."
+    fi
   fi
-  LOG_FILE=${IMPALA_DATA_LOADING_LOGS_DIR}/data-load-${WORKLOAD}-${EXPLORATION_STRATEGY}.log
+
+  ARGS+=("--impalad ${IMPALAD}")
+  ARGS+=("--hive_hs2_hostport ${HS2_HOST_PORT}")
+  ARGS+=("--hdfs_namenode ${HDFS_NN}")
+
+  if [[ -n ${TABLE_FORMATS} ]]; then
+    # TBL_FMT_STR replaces slashes with underscores,
+    # e.g., kudu/none/none -> kudu_none_none
+    TBL_FMT_STR=${TABLE_FORMATS//[\/]/_}
+    LOG_BASENAME=data-load-${WORKLOAD}-${EXPLORATION_STRATEGY}-${TBL_FMT_STR}.log
+  else
+    LOG_BASENAME=data-load-${WORKLOAD}-${EXPLORATION_STRATEGY}.log
+  fi
+
+  LOG_FILE=${IMPALA_DATA_LOADING_LOGS_DIR}/${LOG_BASENAME}
   echo "$MSG. Logging to ${LOG_FILE}"
   # Use unbuffered logging by executing with -u
   if ! impala-python -u ${IMPALA_HOME}/bin/load-data.py ${ARGS[@]} &> ${LOG_FILE}; then
@@ -165,10 +221,13 @@ function load-data {
 function cache-test-tables {
   echo CACHING  tpch.nation AND functional.alltypestiny
   # uncaching the tables first makes this operation idempotent.
-  ${IMPALA_HOME}/bin/impala-shell.sh -q "alter table functional.alltypestiny set uncached"
-  ${IMPALA_HOME}/bin/impala-shell.sh -q "alter table tpch.nation set uncached"
-  ${IMPALA_HOME}/bin/impala-shell.sh -q "alter table tpch.nation set cached in 'testPool'"
-  ${IMPALA_HOME}/bin/impala-shell.sh -q\
+  ${IMPALA_HOME}/bin/impala-shell.sh -i ${IMPALAD}\
+    -q "alter table functional.alltypestiny set uncached"
+  ${IMPALA_HOME}/bin/impala-shell.sh -i ${IMPALAD}\
+    -q "alter table tpch.nation set uncached"
+  ${IMPALA_HOME}/bin/impala-shell.sh -i ${IMPALAD}\
+    -q "alter table tpch.nation set cached in 'testPool'"
+  ${IMPALA_HOME}/bin/impala-shell.sh -i ${IMPALAD} -q\
     "alter table functional.alltypestiny set cached in 'testPool'"
 }
 
@@ -179,6 +238,9 @@ function load-aux-workloads {
   if [ -d ${IMPALA_AUX_WORKLOAD_DIR} ] && [ -d ${IMPALA_AUX_DATASET_DIR} ]; then
     echo Loading auxiliary workloads. Logging to $LOG_FILE.
     if ! impala-python -u ${IMPALA_HOME}/bin/load-data.py --workloads all\
+        --impalad=${IMPALAD}\
+        --hive_hs2_hostport=${HS2_HOST_PORT}\
+        --hdfs_namenode=${HDFS_NN}\
         --workload_dir=${IMPALA_AUX_WORKLOAD_DIR}\
         --dataset_dir=${IMPALA_AUX_DATASET_DIR}\
         --exploration_strategy=core ${LOAD_DATA_ARGS} >> $LOG_FILE 2>&1; then
@@ -192,6 +254,7 @@ function load-aux-workloads {
 }
 
 function copy-auth-policy {
+  echo COPYING AUTHORIZATION POLICY FILE
   hadoop fs -rm -f ${FILESYSTEM_PREFIX}/test-warehouse/authz-policy.ini
   hadoop fs -put ${IMPALA_HOME}/fe/src/test/resources/authz-policy.ini \
       ${FILESYSTEM_PREFIX}/test-warehouse/
@@ -207,18 +270,37 @@ function copy-and-load-dependent-tables {
   hadoop fs -rm -r -f /tmp/alltypes_seq
   hadoop fs -mkdir -p /tmp/alltypes_seq/year=2009
   hadoop fs -mkdir -p /tmp/alltypes_rc/year=2009
-  hadoop fs -cp  /test-warehouse/alltypes_seq/year=2009/month=2/ /tmp/alltypes_seq/year=2009
-  hadoop fs -cp  /test-warehouse/alltypes_rc/year=2009/month=3/ /tmp/alltypes_rc/year=2009
+  hadoop fs -cp /test-warehouse/alltypes_seq/year=2009/month=2/ /tmp/alltypes_seq/year=2009
+  hadoop fs -cp /test-warehouse/alltypes_rc/year=2009/month=3/ /tmp/alltypes_rc/year=2009
 
   # Create a hidden file in AllTypesSmall
   hadoop fs -rm -f /test-warehouse/alltypessmall/year=2009/month=1/_hidden
   hadoop fs -rm -f /test-warehouse/alltypessmall/year=2009/month=1/.hidden
-  hadoop fs -cp  /test-warehouse/zipcode_incomes/DEC_00_SF3_P077_with_ann_noheader.csv \
+  hadoop fs -cp /test-warehouse/zipcode_incomes/DEC_00_SF3_P077_with_ann_noheader.csv \
    /test-warehouse/alltypessmall/year=2009/month=1/_hidden
-  hadoop fs -cp  /test-warehouse/zipcode_incomes/DEC_00_SF3_P077_with_ann_noheader.csv \
+  hadoop fs -cp /test-warehouse/zipcode_incomes/DEC_00_SF3_P077_with_ann_noheader.csv \
    /test-warehouse/alltypessmall/year=2009/month=1/.hidden
 
-  # For tables that rely on loading data from local fs test-warehouse
+  # In case the data is updated by a non-super user, make sure the user can write
+  # by chmoding 777 /tmp/alltypes_rc and /tmp/alltypes_seq. This is needed in order
+  # to prevent this error during data load to a remote cluster:
+  #
+  #   ERROR : Failed with exception Unable to move source hdfs://cluster-1.foo.cloudera.com:
+  #   8020/tmp/alltypes_seq/year=2009/month=2/000023_0 to destination hdfs://cluster-1.foo.
+  #   cloudera.com:8020/test-warehouse/alltypesmixedformat/year=2009/month=2/000023_0
+  #   [...]
+  #   Caused by: org.apache.hadoop.security.AccessControlException:
+  #   Permission denied: user=impala, access=WRITE
+  #   inode="/tmp/alltypes_seq/year=2009/month=2":hdfs:supergroup:drwxr-xr-x
+  #
+  # The error occurs while loading dependent tables.
+  #
+  # See: logs/data_loading/copy-and-load-dependent-tables.log)
+  # See also: https://issues.cloudera.org/browse/IMPALA-4345
+  hadoop fs -chmod -R 777 /tmp/alltypes_rc
+  hadoop fs -chmod -R 777 /tmp/alltypes_seq
+
+  # For tables that rely on loading data from local fs test-wareload-house
   # TODO: Find a good way to integrate this with the normal data loading scripts
   beeline -n $USER -u "${JDBC_URL}" -f\
     ${IMPALA_HOME}/testdata/bin/load-dependent-tables.sql
@@ -249,6 +331,7 @@ EOF
 
 function load-custom-data {
   # Load the index files for corrupted lzo data.
+  hadoop fs -mkdir -p /test-warehouse/bad_text_lzo_text_lzo
   hadoop fs -rm -f /test-warehouse/bad_text_lzo_text_lzo/bad_text.lzo.index
   hadoop fs -put ${IMPALA_HOME}/testdata/bad_text_lzo/bad_text.lzo.index \
       /test-warehouse/bad_text_lzo_text_lzo/
@@ -258,8 +341,12 @@ function load-custom-data {
   # Cleanup the old bad_text_lzo files, if they exist.
   hadoop fs -rm -r -f /test-warehouse/bad_text_lzo/
 
-  # Index all lzo files in HDFS under /test-warehouse
-  ${IMPALA_HOME}/testdata/bin/lzo_indexer.sh /test-warehouse
+  # TODO: Why is there a REMOTE_LOAD condition?
+  # See https://issues.cloudera.org/browse/IMPALA-4347
+  if [[ -z $REMOTE_LOAD ]]; then
+    # Index all lzo files in HDFS under /test-warehouse
+    ${IMPALA_HOME}/testdata/bin/lzo_indexer.sh /test-warehouse
+  fi
 
   hadoop fs -mv /bad_text_lzo_text_lzo/ /test-warehouse/
 
@@ -292,7 +379,7 @@ function load-custom-data {
   done
 
   # Remove all index files in this partition.
-  hadoop fs -rm /test-warehouse/alltypes_text_lzo/year=2009/month=1/*.lzo.index
+  hadoop fs -rm -f /test-warehouse/alltypes_text_lzo/year=2009/month=1/*.lzo.index
 
   # Add a sequence file that only contains a header (see IMPALA-362)
   hadoop fs -put -f ${IMPALA_HOME}/testdata/tinytable_seq_snap/tinytable_seq_snap_header_only \
@@ -303,8 +390,16 @@ function load-custom-data {
   hadoop fs -put -f ${IMPALA_HOME}/testdata/compressed_formats/compressed_payload.snap \
                     /test-warehouse/compressed_payload.snap
 
+  # Create Avro tables
   beeline -n $USER -u "${JDBC_URL}" -f\
     ${IMPALA_HOME}/testdata/avro_schema_resolution/create_table.sql
+
+  # Delete potentially existing avro data
+  hadoop fs -rm -f /test-warehouse/avro_schema_resolution_test/*.avro
+
+  # Upload Avro data to the 'schema_resolution_test' table
+  hadoop fs -put ${IMPALA_HOME}/testdata/avro_schema_resolution/records*.avro \
+    /test-warehouse/avro_schema_resolution_test
 }
 
 function build-and-copy-hive-udfs {
@@ -319,12 +414,16 @@ function build-and-copy-hive-udfs {
 
 # Additional data loading actions that must be executed after the main data is loaded.
 function custom-post-load-steps {
-  # Configure alltypes_seq as a read-only table. This is required for fe tests.
-  # Set both read and execute permissions because accessing the contents of a directory on
-  # the local filesystem requires the x permission (while on HDFS it requires the r
-  # permission).
-  hadoop fs -chmod -R 555 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=1
-  hadoop fs -chmod -R 555 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=3
+  # TODO: Why is there a REMOTE_LOAD condition?
+  # See https://issues.cloudera.org/browse/IMPALA-4347
+  if [[ -z "$REMOTE_LOAD" ]]; then
+    # Configure alltypes_seq as a read-only table. This is required for fe tests.
+    # Set both read and execute permissions because accessing the contents of a directory on
+    # the local filesystem requires the x permission (while on HDFS it requires the r
+    # permission).
+    hadoop fs -chmod -R 555 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=1
+    hadoop fs -chmod -R 555 ${FILESYSTEM_PREFIX}/test-warehouse/alltypes_seq/year=2009/month=3
+  fi
 
   #IMPALA-1881: data file produced by hive with multiple blocks.
   hadoop fs -mkdir -p ${FILESYSTEM_PREFIX}/test-warehouse/lineitem_multiblock_parquet
@@ -349,7 +448,7 @@ function copy-and-load-ext-data-source {
   # Copy the test data source library into HDFS
   ${IMPALA_HOME}/testdata/bin/copy-data-sources.sh
   # Create data sources table.
-  ${IMPALA_HOME}/bin/impala-shell.sh -f\
+  ${IMPALA_HOME}/bin/impala-shell.sh -i ${IMPALAD} -f\
     ${IMPALA_HOME}/testdata/bin/create-data-source-table.sql
 }
 
@@ -365,9 +464,12 @@ if [[ "${TARGET_FILESYSTEM}" == "local" ]]; then
 else
   START_CLUSTER_ARGS="-s 3 ${START_CLUSTER_ARGS}"
 fi
-run-step "Starting Impala cluster" start-impala-cluster.log \
-    ${IMPALA_HOME}/bin/start-impala-cluster.py \
-      --log_dir=${IMPALA_DATA_LOADING_LOGS_DIR} ${START_CLUSTER_ARGS}
+if [[ -z "$REMOTE_LOAD" ]]; then
+  run-step "Starting Impala cluster" start-impala-cluster.log \
+    ${IMPALA_HOME}/bin/start-impala-cluster.py --log_dir=${IMPALA_DATA_LOADING_LOGS_DIR} \
+    ${START_CLUSTER_ARGS}
+fi
+
 # The hdfs environment script sets up kms (encryption) and cache pools (hdfs caching).
 # On a non-hdfs filesystem, we don't test encryption or hdfs caching, so this setup is not
 # needed.
@@ -383,8 +485,11 @@ if [ $SKIP_METADATA_LOAD -eq 0 ]; then
   run-step "Loading TPC-H data" load-tpch.log load-data "tpch" "core"
   # Load tpch nested data.
   # TODO: Hacky and introduces more complexity into the system, but it is expedient.
+  if [[ -n "$CM_HOST" ]]; then
+    LOAD_NESTED_ARGS="--cm-host $CM_HOST"
+  fi
   run-step "Loading nested data" load-nested.log \
-      ${IMPALA_HOME}/testdata/bin/load_nested.py
+    ${IMPALA_HOME}/testdata/bin/load_nested.py ${LOAD_NESTED_ARGS:-}
   run-step "Loading TPC-DS data" load-tpcds.log load-data "tpcds" "core"
   run-step "Loading auxiliary workloads" load-aux-workloads.log load-aux-workloads
   run-step "Loading dependent tables" copy-and-load-dependent-tables.log \
@@ -419,7 +524,10 @@ if [ "${TARGET_FILESYSTEM}" = "hdfs" ]; then
   run-step "Loading external data sources" load-ext-data-source.log \
       copy-and-load-ext-data-source
 
-  run-step "Splitting HBase" create-hbase.log ${IMPALA_HOME}/testdata/bin/split-hbase.sh
+  # HBase splitting is only relevant for FE tests
+  if [[ -z "$REMOTE_LOAD" ]]; then
+    run-step "Splitting HBase" create-hbase.log ${IMPALA_HOME}/testdata/bin/split-hbase.sh
+  fi
 
   run-step "Creating internal HBase table" create-internal-hbase-table.log \
       create-internal-hbase-table
