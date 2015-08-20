@@ -171,21 +171,29 @@ void KuduScanner::CloseCurrentScanner() {
   ExprContext::FreeLocalAllocations(conjunct_ctxs_);
 }
 
+Status KuduScanner::HandleEmptyProjection(RowBatch* row_batch, bool* batch_done) {
+  int rem_in_block = cur_rows_.size() - rows_scanned_current_block_;
+  int rows_to_add = std::min(row_batch->capacity() - row_batch->num_rows(),
+      rem_in_block);
+  rows_scanned_current_block_ += rows_to_add;
+  row_batch->CommitRows(rows_to_add);
+  // If we've reached the capacity, or the LIMIT for the scan, return.
+  if (row_batch->AtCapacity() || scan_node_->ReachedLimit()) {
+    *batch_done = true;
+  }
+  return Status::OK();
+}
+
 Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
     Tuple** tuple_mem, bool* batch_done) {
 
-  // Add the first row, this should never fail since we're getting a new batch.
-  int idx = row_batch->AddRow();
-  DCHECK(idx != RowBatch::INVALID_ROW_INDEX);
+  // Short-circuit the count(*) case.
+  if (materialized_slots_.empty()) return HandleEmptyProjection(row_batch, batch_done);
 
-  TupleRow* row;
-  // Skip advancing/initializing the tuple buffer if we're not actually
-  // materializing any rows, e.g. for count(*).
-  if (!materialized_slots_.empty()) {
-    row = row_batch->GetRow(idx);
-    (*tuple_mem)->Init(tuple_num_null_bytes_);
-    row->SetTuple(0, *tuple_mem);
-  }
+  int idx = row_batch->AddRow();
+  TupleRow* row = row_batch->GetRow(idx);
+  (*tuple_mem)->Init(scan_node_->tuple_desc()->num_null_bytes());
+  row->SetTuple(0, *tuple_mem);
 
   // Now iterate through the Kudu rows.
   for (int krow_idx = rows_scanned_current_block_; krow_idx < cur_rows_.size();
@@ -214,10 +222,6 @@ Status KuduScanner::DecodeRowsIntoRowBatch(RowBatch* row_batch,
         *batch_done = true;
         break;
       }
-
-      // Skip advancing/initializing the tuple buffer if we're not actually
-      // materializing any rows, e.g. for count(*).
-      if (materialized_slots_.empty()) continue;
 
       // Move to the next tuple in the tuple buffer.
       *tuple_mem = next_tuple(*tuple_mem);

@@ -50,6 +50,9 @@ class KuduScanner {
   void Close();
 
  private:
+  // Handles the case where the projection is empty.
+  Status HandleEmptyProjection(RowBatch* row_batch, bool* batch_done);
+
   /// Set 'tuple' slot 'mat_slot_idx' to null.
   void SetSlotToNull(Tuple* tuple, const SlotDescriptor& slot);
 
@@ -109,7 +112,7 @@ class KuduScanner {
 
   /// The current set of retrieved rows.
   std::vector<kudu::client::KuduRowResult> cur_rows_;
-  size_t rows_scanned_current_block_;
+  int rows_scanned_current_block_;
 
   /// The scanner's cloned copy of the conjuncts to apply.
   vector<ExprContext*> conjunct_ctxs_;
