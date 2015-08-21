@@ -44,23 +44,18 @@ error_codes = (
    "Parquet files should not be split into multiple hdfs-blocks. file=$0"),
 
   ("PARQUET_COLUMN_METADATA_INVALID", 11,
-    "Column metadata states there are $0 values, but only read $1 values "
-    "from column $2"),
+   "Column metadata states there are $0 values, but read $1 values from column $2. "
+   "file=$3"),
 
-  ("PARQUET_HEADER_PAGE_SIZE_EXCEEDED", 12,
-    "ParquetScanner: could not read data page because page header exceeded "
-    "maximum size of $0"),
+  ("PARQUET_HEADER_PAGE_SIZE_EXCEEDED", 12, "(unused)"),
 
   ("PARQUET_HEADER_EOF", 13,
-    "ParquetScanner: reached EOF while deserializing data page header."),
+    "ParquetScanner: reached EOF while deserializing data page header. file=$0"),
 
   ("PARQUET_GROUP_ROW_COUNT_ERROR", 14,
-    "Metadata states that in group $0($1) there are $2 rows, but only $3 "
-    "rows were read."),
+    "Metadata states that in group $0($1) there are $2 rows, but $3 rows were read."),
 
-  ("PARQUET_GROUP_ROW_COUNT_OVERFLOW", 15,
-    "Metadata states that in group $0($1) there are $2 rows, but there is at least one "
-    "more row in the file."),
+  ("PARQUET_GROUP_ROW_COUNT_OVERFLOW", 15, "(unused)"),
 
   ("PARQUET_MISSING_PRECISION", 16,
    "File '$0' column '$1' does not have the decimal precision set."),
@@ -122,7 +117,7 @@ error_codes = (
   ("UDF_VERIFY_FAILED", 33,
    "Failed to verify function $0 from LLVM module $1, see log for more details."),
 
-  ("PARQUET_CORRUPT_VALUE", 34, "Corrupt value: $0"),
+  ("PARQUET_CORRUPT_VALUE", 34, "File $0 corrupt. RLE level data bytes = $1"),
 
   ("AVRO_DECIMAL_RESOLUTION_ERROR", 35, "Column '$0' has conflicting Avro decimal types. "
    "Table schema $1: $2, file schema $1: $3"),
@@ -150,6 +145,15 @@ error_codes = (
 
   ("AVRO_NOT_A_RECORD", 43,
    "Inconsistent table metadata. Field $0 is not a record in the Avro schema."),
+
+  ("PARQUET_DEF_LEVEL_ERROR", 44, "Could not read definition level, even though metadata"
+   " states there are $0 values remaining in data page. file=$1"),
+
+  ("PARQUET_NUM_COL_VALS_ERROR", 45, "Mismatched number of values in column index $0 "
+   "($1 vs. $2). file=$3"),
+
+  ("PARQUET_DICT_DECODE_FAILURE", 46, "Failed to decode dictionary-encoded value. "
+   "file=$0"),
 )
 
 import sys

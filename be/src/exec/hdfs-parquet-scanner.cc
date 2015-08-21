@@ -66,19 +66,28 @@ const int MAX_PAGE_HEADER_SIZE = 8 * 1024 * 1024;
 // upper bound.
 const int MAX_DICT_HEADER_SIZE = 100;
 
+// TODO: refactor error reporting across all scanners to be more consistent (e.g. make
+// sure file name is always included, errors are reported exactly once)
+// TODO: rename these macros so its easier to tell them apart
+
 #define LOG_OR_ABORT(error_msg, runtime_state)                          \
-  if (runtime_state->abort_on_error()) {                                \
-    return Status(error_msg);                                           \
-  } else {                                                              \
-    runtime_state->LogError(error_msg);                                 \
-    return Status::OK();                                                  \
-  }
+  do {                                                                  \
+    if (runtime_state->abort_on_error()) {                              \
+      return Status(error_msg);                                         \
+    } else {                                                            \
+      runtime_state->LogError(error_msg);                               \
+      return Status::OK();                                              \
+    }                                                                   \
+  } while (false)                                                       \
+
 
 #define LOG_OR_RETURN_ON_ERROR(error_msg, runtime_state)                \
-  if (runtime_state->abort_on_error()) {                                \
-    return Status(error_msg.msg());                                     \
-  }                                                                     \
-  runtime_state->LogError(error_msg);
+  do {                                                                  \
+    if (runtime_state->abort_on_error()) {                              \
+      return Status(error_msg.msg());                                   \
+    }                                                                   \
+    runtime_state->LogError(error_msg);                                 \
+  } while (false)                                                       \
 
 Status HdfsParquetScanner::IssueInitialRanges(HdfsScanNode* scan_node,
     const std::vector<HdfsFileDesc*>& files) {
@@ -183,18 +192,24 @@ class HdfsParquetScanner::BaseColumnReader {
     return PARQUET_TO_IMPALA_CODEC[metadata_->codec];
   }
 
-  // Read the next value into tuple for this column.  Returns false if there are no
-  // more values in the file.
-  // *conjuncts_failed is an in/out parameter. If false, it means this row has already
-  // been filtered out (i.e. ReadValue is really a SkipValue()) and should be set to
-  // true if ReadValue() can filter out this row.
+  // Reads the next value into 'tuple' for this column, unless this column chunk has
+  // already been read completely. In that case, sets output parameter 'end_of_col_chunk'
+  // to true (otherwise does not set 'end_of_col_chunk' at all, so the caller should
+  // initialize it).  Returns true on success, or false on error and sets the scan node's
+  // parse_status_.
+  //
+  // *conjuncts_failed should be initialized to false by the caller at the beginning of a
+  // row, and is set to true when this row should be filtered out.
+  // TODO: skip values after *conjuncts_failed is true? Revisit this and bitmap logic.
+  //
   // TODO: this is the function that needs to be codegen'd (e.g. CodegenReadValue())
   // The codegened functions from all the materialized cols will then be combined
   // into one function.
   // TODO: another option is to materialize col by col for the entire row batch in
   // one call.  e.g. MaterializeCol would write out 1024 values.  Our row batches
   // are currently dense so we'll need to figure out something there.
-  bool ReadValue(MemPool* pool, Tuple* tuple, bool* conjuncts_failed);
+  bool ReadValue(MemPool* pool, Tuple* tuple, bool* conjuncts_failed,
+      bool* end_of_col_chunk);
 
   // TODO: Some encodings might benefit a lot from a SkipValues(int num_rows) if
   // we know this row can be skipped. This could be very useful with stats and big
@@ -359,9 +374,12 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
         current_page_header_.data_page_header.encoding;
     T val;
     T* val_ptr = needs_conversion_ ? &val : reinterpret_cast<T*>(slot);
-    bool result = true;
     if (page_encoding == parquet::Encoding::PLAIN_DICTIONARY) {
-      result = dict_decoder_->GetValue(val_ptr);
+      if (!dict_decoder_->GetValue(val_ptr)) {
+        parent_->parse_status_ =
+            Status(TErrorCode::PARQUET_DICT_DECODE_FAILURE, stream_->filename());
+        return false;
+      }
     } else {
       DCHECK(page_encoding == parquet::Encoding::PLAIN);
       data_ += ParquetPlainEncoder::Decode<T>(data_, fixed_len_size_, val_ptr);
@@ -373,7 +391,7 @@ class HdfsParquetScanner::ColumnReader : public HdfsParquetScanner::BaseColumnRe
       *conjuncts_failed = !bitmap_filter_->Get<true>(h);
       ++bitmap_filter_rows_rejected_;
     }
-    return result;
+    return true;
   }
 
  private:
@@ -569,20 +587,28 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
   // the pages).
   while (true) {
     DCHECK_EQ(num_buffered_values_, 0);
-    if (num_values_read_ >= metadata_->num_values) {
+    if (num_values_read_ == metadata_->num_values) {
       // No more pages to read
-      DCHECK_EQ(num_values_read_, metadata_->num_values);
+      // TODO: should we check for stream_->eosr()?
       break;
+    } else if (num_values_read_ > metadata_->num_values) {
+      // The data pages contain more values than stated in the column metadata.
+      return Status(TErrorCode::PARQUET_COLUMN_METADATA_INVALID,
+         metadata_->num_values, num_values_read_,
+         slot_desc()->col_pos() - parent_->scan_node_->num_partition_keys(),
+         stream_->filename());
     }
 
     int64_t buffer_size;
     RETURN_IF_ERROR(stream_->GetBuffer(true, &buffer, &buffer_size));
     if (buffer_size == 0) {
+      // The data pages contain fewer values than stated in the column metadata.
       DCHECK(stream_->eosr());
-      ErrorMsg msg(TErrorCode::PARQUET_COLUMN_METADATA_INVALID,
+      DCHECK_LT(num_values_read_, metadata_->num_values);
+      return Status(TErrorCode::PARQUET_COLUMN_METADATA_INVALID,
          metadata_->num_values, num_values_read_,
-         slot_desc()->col_pos() - parent_->scan_node_->num_partition_keys());
-      LOG_OR_ABORT(msg, parent_->scan_node_->runtime_state());
+         slot_desc()->col_pos() - parent_->scan_node_->num_partition_keys(),
+         stream_->filename());
     }
 
     // We don't know the actual header size until the thrift object is deserialized.  Loop
@@ -616,8 +642,7 @@ Status HdfsParquetScanner::BaseColumnReader::ReadDataPage() {
 
       if (buffer_size == new_buffer_size) {
         DCHECK_NE(new_buffer_size, 0);
-        ErrorMsg msg(TErrorCode::PARQUET_HEADER_EOF);
-        LOG_OR_ABORT(msg, parent_->scan_node_->runtime_state());
+        return Status(TErrorCode::PARQUET_HEADER_EOF, stream_->filename());
       }
       DCHECK_GT(new_buffer_size, buffer_size);
       buffer_size = new_buffer_size;
@@ -738,8 +763,7 @@ Status HdfsParquetScanner::BaseColumnReader::InitLevelDecoders(
         return status;
       }
       if (num_bytes < 0) {
-        return Status(TErrorCode::PARQUET_CORRUPT_VALUE,
-            Substitute("RLE level data bytes = $0", num_bytes));
+        return Status(TErrorCode::PARQUET_CORRUPT_VALUE, stream_->filename(), num_bytes);
       }
       int bit_width = BitUtil::Log2(max_level + 1);
       *rle_decoder = RleDecoder(*data, num_bytes, bit_width);
@@ -802,20 +826,25 @@ inline int HdfsParquetScanner::BaseColumnReader::ReadRepetitionLevel() {
 }
 
 inline bool HdfsParquetScanner::BaseColumnReader::ReadValue(
-    MemPool* pool, Tuple* tuple, bool* conjuncts_failed) {
+    MemPool* pool, Tuple* tuple, bool* conjuncts_failed, bool* end_of_col_chunk) {
   if (num_buffered_values_ == 0) {
     parent_->assemble_rows_timer_.Stop();
     parent_->parse_status_ = ReadDataPage();
-    // We don't return Status objects as parameters because they are too
-    // expensive for per row/per col calls.  If ReadDataPage failed,
-    // return false to indicate this column reader is done.
-    if (num_buffered_values_ == 0 || !parent_->parse_status_.ok()) return false;
+    if (!parent_->parse_status_.ok()) return false;
+    if (num_buffered_values_ == 0) {
+      *end_of_col_chunk = true;
+      return true;
+    }
     parent_->assemble_rows_timer_.Start();
   }
 
   --num_buffered_values_;
   int definition_level = ReadDefinitionLevel();
-  if (definition_level < 0) return false;
+  if (definition_level < 0) {
+    parent_->parse_status_ = Status(TErrorCode::PARQUET_DEF_LEVEL_ERROR,
+        num_buffered_values_, stream_->filename());
+    return false;
+  }
 
   if (definition_level != max_def_level()) {
     // Null value
@@ -854,7 +883,14 @@ Status HdfsParquetScanner::ProcessSplit() {
     CommitRows(0);
 
     RETURN_IF_ERROR(InitColumns(i));
-    RETURN_IF_ERROR(AssembleRows(i));
+    // TODO: this status is actually parse_status_. Consider getting rid of parse_status_,
+    // at least for the parquet scanner.
+    Status status = AssembleRows(i);
+    if (status.IsMemLimitExceeded()) return status;
+    if (!status.ok()) LOG_OR_RETURN_ON_ERROR(status.msg(), state_);
+
+    // Reset parse_status_ for the next row group.
+    parse_status_ = Status::OK();
   }
   return Status::OK();
 }
@@ -863,55 +899,37 @@ Status HdfsParquetScanner::ProcessSplit() {
 // specific to type and encoding and then inlined into AssembleRows().
 Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
   assemble_rows_timer_.Start();
-  // Read at most as many rows as stated in the metadata
-  int64_t expected_rows_in_group = file_metadata_.row_groups[row_group_idx].num_rows;
+
   int64_t rows_read = 0;
-  bool reached_limit = scan_node_->ReachedLimit();
-  bool cancelled = context_->cancelled();
+  bool continue_execution = !(scan_node_->ReachedLimit() || context_->cancelled());
+  bool end_of_row_group = false;
   int num_column_readers = column_readers_.size();
   MemPool* pool;
 
-  while (!reached_limit && !cancelled && rows_read < expected_rows_in_group) {
+  while (!end_of_row_group && continue_execution) {
     Tuple* tuple;
     TupleRow* row;
-    int64_t row_mem_limit = static_cast<int64_t>(GetMemory(&pool, &tuple, &row));
-    int64_t expected_rows_to_read = expected_rows_in_group - rows_read;
-    int64_t num_rows = std::min(expected_rows_to_read, row_mem_limit);
+    int64_t num_rows = static_cast<int64_t>(GetMemory(&pool, &tuple, &row));
 
     int num_to_commit = 0;
+    int row_idx = 0;
     if (num_column_readers > 0) {
-      for (int i = 0; i < num_rows; ++i) {
+      for (row_idx = 0; row_idx < num_rows; ++row_idx) {
+        DCHECK(!end_of_row_group);
         bool conjuncts_failed = false;
+        // Local end-of-row-group variable for this row (so we don't update
+        // end_of_row_group if we bail in the middle of the row or if parse_status is set)
+        bool eorg = false;
         InitTuple(template_tuple_, tuple);
         for (int c = 0; c < num_column_readers; ++c) {
-          if (!column_readers_[c]->ReadValue(pool, tuple, &conjuncts_failed)) {
-            assemble_rows_timer_.Stop();
-            // If we reach this point, it means that we have read the entire column chunk,
-            // or we hit either a parse or a mem limit error.
-            // For correctly formed files, this indicates we are done with this row
-            // group and this should be the first column we are reading.
-            DCHECK(c == 0 || !parse_status_.ok())
-              << "c=" << c << " " << parse_status_.GetDetail();;
-            COUNTER_ADD(scan_node_->rows_read_counter(), i);
-            RETURN_IF_ERROR(CommitRows(num_to_commit));
-
-            // Unless we terminated early due to mem limit exceeded error, test if the
-            // actual number of rows in the file matches the expected number of rows
-            // from metadata.
-            rows_read += i;
-            if (rows_read != expected_rows_in_group &&
-                !parse_status_.IsMemLimitExceeded()) {
-              HdfsParquetScanner::BaseColumnReader* reader = column_readers_[c];
-              DCHECK(reader->stream_ != NULL);
-              ErrorMsg msg(TErrorCode::PARQUET_GROUP_ROW_COUNT_ERROR,
-                 reader->stream_->filename(), row_group_idx,
-                 expected_rows_in_group, rows_read);
-              msg.AddDetail(parse_status_.GetDetail());
-              LOG_OR_RETURN_ON_ERROR(msg, scan_node_->runtime_state());
-            }
-            return parse_status_;
-          }
+          DCHECK(continue_execution);
+          continue_execution = column_readers_[c]->ReadValue(
+              pool, tuple, &conjuncts_failed, &eorg);
+          if (UNLIKELY(!continue_execution)) goto commit_rows;
+          DCHECK(parse_status_.ok());
         }
+        end_of_row_group = eorg;
+        if (UNLIKELY(end_of_row_group)) goto commit_rows;
         if (conjuncts_failed) continue;
         row->SetTuple(scan_node_->tuple_idx(), tuple);
         if (EvalConjuncts(row)) {
@@ -931,7 +949,7 @@ Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
         row = next_row(row);
         tuple = next_tuple(tuple);
 
-        for (int i = 1; i < num_rows; ++i) {
+        for (row_idx = 1; row_idx < num_rows; ++row_idx) {
           InitTuple(template_tuple_, tuple);
           row->SetTuple(scan_node_->tuple_idx(), tuple);
           row = next_row(row);
@@ -940,32 +958,29 @@ Status HdfsParquetScanner::AssembleRows(int row_group_idx) {
         num_to_commit += num_rows;
       }
     }
-    rows_read += num_rows;
-    COUNTER_ADD(scan_node_->rows_read_counter(), num_rows);
+ commit_rows:
+    rows_read += row_idx;
+    COUNTER_ADD(scan_node_->rows_read_counter(), row_idx);
     RETURN_IF_ERROR(CommitRows(num_to_commit));
 
-    reached_limit = scan_node_->ReachedLimit();
-    cancelled = context_->cancelled();
+    continue_execution &= !(scan_node_->ReachedLimit() || context_->cancelled());
   }
 
-  if (!reached_limit && !cancelled && (num_column_readers > 0)) {
-    // If we get to this point, it means that we have read as many rows as the metadata
-    // told us we should read. Attempt to read one more row and if that succeeds report
-    // the error.
-    DCHECK_EQ(rows_read, expected_rows_in_group);
-    uint8_t dummy_tuple_mem[tuple_byte_size_];
-    Tuple* dummy_tuple = reinterpret_cast<Tuple*>(&dummy_tuple_mem);
-    InitTuple(template_tuple_, dummy_tuple);
-    bool conjuncts_failed = false;
-    if (column_readers_[0]->ReadValue(pool, dummy_tuple, &conjuncts_failed)) {
-      // If another tuple is successfully read, it means that there are still values
-      // in the file.
+  if (end_of_row_group && num_column_readers > 0) {
+    // We have reached the end of the row group.
+    DCHECK(parse_status_.ok());
+
+    // TODO: check that each column reader's num_values_read_ corresponds to reported
+    // number of values in the metadata
+
+    // Test if the expected number of rows from the file metadata matches the actual
+    // number of rows read from the file.
+    int64_t expected_rows_in_group = file_metadata_.row_groups[row_group_idx].num_rows;
+    if (rows_read != expected_rows_in_group) {
       HdfsParquetScanner::BaseColumnReader* reader = column_readers_[0];
       DCHECK(reader->stream_ != NULL);
-      ErrorMsg msg(TErrorCode::PARQUET_GROUP_ROW_COUNT_OVERFLOW,
-          reader->stream_->filename(), row_group_idx,
-          expected_rows_in_group);
-      LOG_OR_RETURN_ON_ERROR(msg, scan_node_->runtime_state());
+      parse_status_ = Status(TErrorCode::PARQUET_GROUP_ROW_COUNT_ERROR,
+          reader->stream_->filename(), row_group_idx, expected_rows_in_group, rows_read);
     }
   }
 
@@ -1152,12 +1167,23 @@ Status HdfsParquetScanner::InitColumns(int row_group_idx) {
 
   // All the scan ranges (one for each column).
   vector<DiskIoMgr::ScanRange*> col_ranges;
+  // Used to validate that the number of values in each reader in column_readers_ is the
+  // same.
+  int num_values = -1;
 
   for (int i = 0; i < column_readers_.size(); ++i) {
     const parquet::ColumnChunk& col_chunk =
         row_group.columns[column_readers_[i]->col_idx()];
-    int64_t col_start = col_chunk.meta_data.data_page_offset;
+    if (num_values == -1) {
+      num_values = col_chunk.meta_data.num_values;
+    } else if (col_chunk.meta_data.num_values != num_values) {
+      // TODO for 2.3: improve this error message by saying which columns are different,
+      // and also specify column in other error messages as appropriate
+      return Status(TErrorCode::PARQUET_NUM_COL_VALS_ERROR, column_readers_[i]->col_idx(),
+          col_chunk.meta_data.num_values, num_values, stream_->filename());
+    }
     RETURN_IF_ERROR(ValidateColumn(*column_readers_[i], row_group_idx));
+    int64_t col_start = col_chunk.meta_data.data_page_offset;
 
     // If there is a dictionary page, the file format requires it to come before
     // any data pages.  We need to start reading the column from the data page.
