@@ -1,0 +1,2414 @@
+# TPCH-Q1
+# Q1 - Pricing Summary Report Query
+select
+  l_returnflag,
+  l_linestatus,
+  sum(l_quantity) as sum_qty,
+  sum(l_extendedprice) as sum_base_price,
+  sum(l_extendedprice * (1 - l_discount)) as sum_disc_price,
+  sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge,
+  avg(l_quantity) as avg_qty,
+  avg(l_extendedprice) as avg_price,
+  avg(l_discount) as avg_disc,
+  count(*) as count_order
+from
+  customer.c_orders.o_lineitems
+where
+  l_shipdate <= '1998-09-02'
+group by
+  l_returnflag,
+  l_linestatus
+order by
+  l_returnflag,
+  l_linestatus
+---- PLAN
+02:SORT
+|  order by: l_returnflag ASC, l_linestatus ASC
+|
+01:AGGREGATE [FINALIZE]
+|  output: sum(l_quantity), sum(l_extendedprice), sum(l_extendedprice * (1 - l_discount)), sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)), avg(l_quantity), avg(l_extendedprice), avg(l_discount), count(*)
+|  group by: l_returnflag, l_linestatus
+|
+00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
+   partitions=1/1 files=4 size=554.83MB
+   predicates: l_shipdate <= '1998-09-02'
+---- DISTRIBUTEDPLAN
+05:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: l_returnflag ASC, l_linestatus ASC
+|
+02:SORT
+|  order by: l_returnflag ASC, l_linestatus ASC
+|
+04:AGGREGATE [FINALIZE]
+|  output: sum:merge(l_quantity), sum:merge(l_extendedprice), sum:merge(l_extendedprice * (1 - l_discount)), sum:merge(l_extendedprice * (1 - l_discount) * (1 + l_tax)), avg:merge(l_quantity), avg:merge(l_extendedprice), avg:merge(l_discount), count:merge(*)
+|  group by: l_returnflag, l_linestatus
+|
+03:EXCHANGE [HASH(l_returnflag,l_linestatus)]
+|
+01:AGGREGATE
+|  output: sum(l_quantity), sum(l_extendedprice), sum(l_extendedprice * (1 - l_discount)), sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)), avg(l_quantity), avg(l_extendedprice), avg(l_discount), count(*)
+|  group by: l_returnflag, l_linestatus
+|
+00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
+   partitions=1/1 files=4 size=554.83MB
+   predicates: l_shipdate <= '1998-09-02'
+====
+# TPCH-Q2
+# Q2 - Minimum Cost Supplier Query
+select
+  s_acctbal,
+  s_name,
+  n_name,
+  p_partkey,
+  p_mfgr,
+  s_address,
+  s_phone,
+  s_comment
+from
+  supplier s,
+  s.s_partsupps ps,
+  part p,
+  region r,
+  r.r_nations n
+where
+  p_partkey = ps_partkey
+  and p_size = 15
+  and p_type like '%BRASS'
+  and s_nationkey = n_nationkey
+  and r_name = 'EUROPE'
+  and ps_supplycost = (
+    select
+      min(ps_supplycost)
+    from
+      supplier s,
+      s.s_partsupps ps,
+      region r,
+      r.r_nations n
+    where
+      p_partkey = ps_partkey
+      and s_nationkey = n_nationkey
+      and r_name = 'EUROPE'
+    )
+order by
+  s_acctbal desc,
+  n_name,
+  s_name,
+  p_partkey
+limit 100
+---- PLAN
+26:TOP-N [LIMIT=100]
+|  order by: s_acctbal DESC, n_name ASC, s_name ASC, p_partkey ASC
+|
+25:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: ps_supplycost = min(ps_supplycost), p_partkey = ps_partkey
+|
+|--22:AGGREGATE [FINALIZE]
+|  |  output: min(ps_supplycost)
+|  |  group by: ps_partkey
+|  |
+|  21:HASH JOIN [INNER JOIN]
+|  |  hash predicates: s_nationkey = n_nationkey
+|  |
+|  |--17:SUBPLAN
+|  |  |
+|  |  |--20:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |  |
+|  |  |  |--18:SINGULAR ROW SRC
+|  |  |  |
+|  |  |  19:UNNEST [r.r_nations n]
+|  |  |
+|  |  16:SCAN HDFS [tpch_nested_parquet.region r]
+|  |     partitions=1/1 files=1 size=4.16KB
+|  |     predicates: r_name = 'EUROPE'
+|  |
+|  12:SUBPLAN
+|  |
+|  |--15:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--13:SINGULAR ROW SRC
+|  |  |
+|  |  14:UNNEST [s.s_partsupps ps]
+|  |
+|  11:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
+|
+24:HASH JOIN [INNER JOIN]
+|  hash predicates: s_nationkey = n_nationkey
+|
+|--07:SUBPLAN
+|  |
+|  |--10:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--08:SINGULAR ROW SRC
+|  |  |
+|  |  09:UNNEST [r.r_nations n]
+|  |
+|  06:SCAN HDFS [tpch_nested_parquet.region r]
+|     partitions=1/1 files=1 size=4.16KB
+|     predicates: r_name = 'EUROPE'
+|
+23:HASH JOIN [INNER JOIN]
+|  hash predicates: ps_partkey = p_partkey
+|
+|--05:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
+|     predicates: p_size = 15, p_type LIKE '%BRASS'
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [s.s_partsupps ps]
+|
+00:SCAN HDFS [tpch_nested_parquet.supplier s]
+   partitions=1/1 files=1 size=111.08MB
+---- DISTRIBUTEDPLAN
+33:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: s_acctbal DESC, n_name ASC, s_name ASC, p_partkey ASC
+|  limit: 100
+|
+26:TOP-N [LIMIT=100]
+|  order by: s_acctbal DESC, n_name ASC, s_name ASC, p_partkey ASC
+|
+25:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: ps_supplycost = min(ps_supplycost), p_partkey = ps_partkey
+|
+|--32:EXCHANGE [BROADCAST]
+|  |
+|  31:AGGREGATE [FINALIZE]
+|  |  output: min:merge(ps_supplycost)
+|  |  group by: ps_partkey
+|  |
+|  30:EXCHANGE [HASH(ps_partkey)]
+|  |
+|  22:AGGREGATE
+|  |  output: min(ps_supplycost)
+|  |  group by: ps_partkey
+|  |
+|  21:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: s_nationkey = n_nationkey
+|  |
+|  |--29:EXCHANGE [BROADCAST]
+|  |  |
+|  |  17:SUBPLAN
+|  |  |
+|  |  |--20:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |  |
+|  |  |  |--18:SINGULAR ROW SRC
+|  |  |  |
+|  |  |  19:UNNEST [r.r_nations n]
+|  |  |
+|  |  16:SCAN HDFS [tpch_nested_parquet.region r]
+|  |     partitions=1/1 files=1 size=4.16KB
+|  |     predicates: r_name = 'EUROPE'
+|  |
+|  12:SUBPLAN
+|  |
+|  |--15:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--13:SINGULAR ROW SRC
+|  |  |
+|  |  14:UNNEST [s.s_partsupps ps]
+|  |
+|  11:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
+|
+24:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: s_nationkey = n_nationkey
+|
+|--28:EXCHANGE [BROADCAST]
+|  |
+|  07:SUBPLAN
+|  |
+|  |--10:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--08:SINGULAR ROW SRC
+|  |  |
+|  |  09:UNNEST [r.r_nations n]
+|  |
+|  06:SCAN HDFS [tpch_nested_parquet.region r]
+|     partitions=1/1 files=1 size=4.16KB
+|     predicates: r_name = 'EUROPE'
+|
+23:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ps_partkey = p_partkey
+|
+|--27:EXCHANGE [BROADCAST]
+|  |
+|  05:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
+|     predicates: p_size = 15, p_type LIKE '%BRASS'
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [s.s_partsupps ps]
+|
+00:SCAN HDFS [tpch_nested_parquet.supplier s]
+   partitions=1/1 files=1 size=111.08MB
+====
+# TPCH-Q3
+# Q3 - Shipping Priority Query
+select
+  o_orderkey,
+  sum(l_extendedprice * (1 - l_discount)) as revenue,
+  o_orderdate,
+  o_shippriority
+from
+  customer c,
+  c.c_orders o,
+  o.o_lineitems l
+where
+  c_mktsegment = 'BUILDING'
+  and o_orderdate < '1995-03-15'
+  and l_shipdate > '1995-03-15'
+group by
+  o_orderkey,
+  o_orderdate,
+  o_shippriority
+order by
+  revenue desc,
+  o_orderdate
+limit 10
+---- PLAN
+10:TOP-N [LIMIT=10]
+|  order by: sum(l_extendedprice * (1 - l_discount)) DESC, o_orderdate ASC
+|
+09:AGGREGATE [FINALIZE]
+|  output: sum(l_extendedprice * (1 - l_discount))
+|  group by: o_orderkey, o_orderdate, o_shippriority
+|
+01:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  06:UNNEST [o.o_lineitems l]
+|  |
+|  03:UNNEST [c.c_orders o]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates: c_mktsegment = 'BUILDING'
+   predicates on o: o_orderdate < '1995-03-15'
+   predicates on l: l_shipdate > '1995-03-15'
+---- DISTRIBUTEDPLAN
+13:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: sum(l_extendedprice * (1 - l_discount)) DESC, o_orderdate ASC
+|  limit: 10
+|
+10:TOP-N [LIMIT=10]
+|  order by: sum(l_extendedprice * (1 - l_discount)) DESC, o_orderdate ASC
+|
+12:AGGREGATE [FINALIZE]
+|  output: sum:merge(l_extendedprice * (1 - l_discount))
+|  group by: o_orderkey, o_orderdate, o_shippriority
+|
+11:EXCHANGE [HASH(o_orderkey,o_orderdate,o_shippriority)]
+|
+09:AGGREGATE
+|  output: sum(l_extendedprice * (1 - l_discount))
+|  group by: o_orderkey, o_orderdate, o_shippriority
+|
+01:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  06:UNNEST [o.o_lineitems l]
+|  |
+|  03:UNNEST [c.c_orders o]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates: c_mktsegment = 'BUILDING'
+   predicates on o: o_orderdate < '1995-03-15'
+   predicates on l: l_shipdate > '1995-03-15'
+====
+# TPCH-Q4
+# Q4 - Order Priority Checking Query
+select
+  o_orderpriority,
+  count(*) as order_count
+from
+  customer c,
+  c.c_orders o
+where
+  o_orderdate >= '1993-07-01'
+  and o_orderdate < '1993-10-01'
+  and exists (
+    select
+      *
+    from
+      o.o_lineitems
+    where
+      l_commitdate < l_receiptdate
+    )
+group by
+  o_orderpriority
+order by
+  o_orderpriority
+---- PLAN
+10:SORT
+|  order by: o_orderpriority ASC
+|
+09:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: o_orderpriority
+|
+01:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--07:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  06:UNNEST [o.o_lineitems]
+|  |
+|  03:UNNEST [c.c_orders o]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates on o: o_orderdate < '1993-10-01', o_orderdate >= '1993-07-01'
+   predicates on o_lineitems: l_commitdate < l_receiptdate
+---- DISTRIBUTEDPLAN
+13:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: o_orderpriority ASC
+|
+10:SORT
+|  order by: o_orderpriority ASC
+|
+12:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: o_orderpriority
+|
+11:EXCHANGE [HASH(o_orderpriority)]
+|
+09:AGGREGATE
+|  output: count(*)
+|  group by: o_orderpriority
+|
+01:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--07:NESTED LOOP JOIN [RIGHT SEMI JOIN]
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  06:UNNEST [o.o_lineitems]
+|  |
+|  03:UNNEST [c.c_orders o]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates on o: o_orderdate < '1993-10-01', o_orderdate >= '1993-07-01'
+   predicates on o_lineitems: l_commitdate < l_receiptdate
+====
+# TPCH-Q5
+# Q5 - Local Supplier Volume Query
+select
+  n_name,
+  sum(l_extendedprice * (1 - l_discount)) as revenue
+from
+  customer c,
+  c.c_orders o,
+  o.o_lineitems l,
+  supplier s,
+  region r,
+  r.r_nations n
+where
+  l_suppkey = s_suppkey
+  and c_nationkey = s_nationkey
+  and s_nationkey = n_nationkey
+  and r_name = 'ASIA'
+  and o_orderdate >= '1994-01-01'
+  and o_orderdate < '1995-01-01'
+group by
+  n_name
+order by
+  revenue desc
+---- PLAN
+18:SORT
+|  order by: sum(l_extendedprice * (1 - l_discount)) DESC
+|
+17:AGGREGATE [FINALIZE]
+|  output: sum(l_extendedprice * (1 - l_discount))
+|  group by: n_name
+|
+16:HASH JOIN [INNER JOIN]
+|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
+|
+|--09:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
+|
+15:HASH JOIN [INNER JOIN]
+|  hash predicates: c.c_nationkey = n.n_nationkey
+|
+|--11:SUBPLAN
+|  |
+|  |--14:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--12:SINGULAR ROW SRC
+|  |  |
+|  |  13:UNNEST [r.r_nations n]
+|  |
+|  10:SCAN HDFS [tpch_nested_parquet.region r]
+|     partitions=1/1 files=1 size=4.16KB
+|     predicates: r_name = 'ASIA'
+|
+01:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  06:UNNEST [o.o_lineitems l]
+|  |
+|  03:UNNEST [c.c_orders o]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates on o: o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
+---- DISTRIBUTEDPLAN
+23:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: sum(l_extendedprice * (1 - l_discount)) DESC
+|
+18:SORT
+|  order by: sum(l_extendedprice * (1 - l_discount)) DESC
+|
+22:AGGREGATE [FINALIZE]
+|  output: sum:merge(l_extendedprice * (1 - l_discount))
+|  group by: n_name
+|
+21:EXCHANGE [HASH(n_name)]
+|
+17:AGGREGATE
+|  output: sum(l_extendedprice * (1 - l_discount))
+|  group by: n_name
+|
+16:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_suppkey = s_suppkey, c_nationkey = s_nationkey
+|
+|--20:EXCHANGE [BROADCAST]
+|  |
+|  09:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
+|
+15:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: c.c_nationkey = n.n_nationkey
+|
+|--19:EXCHANGE [BROADCAST]
+|  |
+|  11:SUBPLAN
+|  |
+|  |--14:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--12:SINGULAR ROW SRC
+|  |  |
+|  |  13:UNNEST [r.r_nations n]
+|  |
+|  10:SCAN HDFS [tpch_nested_parquet.region r]
+|     partitions=1/1 files=1 size=4.16KB
+|     predicates: r_name = 'ASIA'
+|
+01:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  06:UNNEST [o.o_lineitems l]
+|  |
+|  03:UNNEST [c.c_orders o]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates on o: o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
+====
+# TPCH-Q6
+# Q6 - Forecasting Revenue Change Query
+select
+  sum(l_extendedprice * l_discount) as revenue
+from
+  customer.c_orders.o_lineitems
+where
+  l_shipdate >= '1994-01-01'
+  and l_shipdate < '1995-01-01'
+  and l_discount between 0.05 and 0.07
+  and l_quantity < 24
+---- PLAN
+01:AGGREGATE [FINALIZE]
+|  output: sum(l_extendedprice * l_discount)
+|
+00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
+   partitions=1/1 files=4 size=554.83MB
+   predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01', l_discount >= 0.05, l_discount <= 0.07, l_quantity < 24
+---- DISTRIBUTEDPLAN
+03:AGGREGATE [FINALIZE]
+|  output: sum:merge(l_extendedprice * l_discount)
+|
+02:EXCHANGE [UNPARTITIONED]
+|
+01:AGGREGATE
+|  output: sum(l_extendedprice * l_discount)
+|
+00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems]
+   partitions=1/1 files=4 size=554.83MB
+   predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01', l_discount >= 0.05, l_discount <= 0.07, l_quantity < 24
+====
+# TPCH-Q7
+# Q7 - Volume Shipping Query
+select
+  supp_nation,
+  cust_nation,
+  l_year,
+  sum(volume) as revenue
+from (
+  select
+    n1.n_name as supp_nation,
+    n2.n_name as cust_nation,
+    year(l_shipdate) as l_year,
+    l_extendedprice * (1 - l_discount) as volume
+  from
+    customer c,
+    c.c_orders o,
+    o.o_lineitems l,
+    supplier s,
+    region.r_nations n1,
+    region.r_nations n2
+  where
+    s_suppkey = l_suppkey
+    and s_nationkey = n1.n_nationkey
+    and c_nationkey = n2.n_nationkey
+    and (
+      (n1.n_name = 'FRANCE' and n2.n_name = 'GERMANY')
+      or (n1.n_name = 'GERMANY' and n2.n_name = 'FRANCE')
+    )
+    and l_shipdate between '1995-01-01' and '1996-12-31'
+  ) as shipping
+group by
+  supp_nation,
+  cust_nation,
+  l_year
+order by
+  supp_nation,
+  cust_nation,
+  l_year
+---- PLAN
+16:SORT
+|  order by: supp_nation ASC, cust_nation ASC, l_year ASC
+|
+15:AGGREGATE [FINALIZE]
+|  output: sum(l_extendedprice * (1 - l_discount))
+|  group by: n1.n_name, n2.n_name, year(l_shipdate)
+|
+14:HASH JOIN [INNER JOIN]
+|  hash predicates: s_nationkey = n1.n_nationkey
+|  other predicates: ((n1.n_name = 'FRANCE' AND n2.n_name = 'GERMANY') OR (n1.n_name = 'GERMANY' AND n2.n_name = 'FRANCE'))
+|
+|--10:SCAN HDFS [tpch_nested_parquet.region.r_nations n1]
+|     partitions=1/1 files=1 size=4.16KB
+|
+13:HASH JOIN [INNER JOIN]
+|  hash predicates: l_suppkey = s_suppkey
+|
+|--09:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
+|
+12:HASH JOIN [INNER JOIN]
+|  hash predicates: c_nationkey = n2.n_nationkey
+|
+|--11:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
+|     partitions=1/1 files=1 size=4.16KB
+|
+01:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  06:UNNEST [o.o_lineitems l]
+|  |
+|  03:UNNEST [c.c_orders o]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates on l: l_shipdate >= '1995-01-01', l_shipdate <= '1996-12-31'
+---- DISTRIBUTEDPLAN
+22:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: supp_nation ASC, cust_nation ASC, l_year ASC
+|
+16:SORT
+|  order by: supp_nation ASC, cust_nation ASC, l_year ASC
+|
+21:AGGREGATE [FINALIZE]
+|  output: sum:merge(volume)
+|  group by: supp_nation, cust_nation, l_year
+|
+20:EXCHANGE [HASH(supp_nation,cust_nation,l_year)]
+|
+15:AGGREGATE
+|  output: sum(l_extendedprice * (1 - l_discount))
+|  group by: n1.n_name, n2.n_name, year(l_shipdate)
+|
+14:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: s_nationkey = n1.n_nationkey
+|  other predicates: ((n1.n_name = 'FRANCE' AND n2.n_name = 'GERMANY') OR (n1.n_name = 'GERMANY' AND n2.n_name = 'FRANCE'))
+|
+|--19:EXCHANGE [BROADCAST]
+|  |
+|  10:SCAN HDFS [tpch_nested_parquet.region.r_nations n1]
+|     partitions=1/1 files=1 size=4.16KB
+|
+13:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_suppkey = s_suppkey
+|
+|--18:EXCHANGE [BROADCAST]
+|  |
+|  09:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
+|
+12:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: c_nationkey = n2.n_nationkey
+|
+|--17:EXCHANGE [BROADCAST]
+|  |
+|  11:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
+|     partitions=1/1 files=1 size=4.16KB
+|
+01:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  06:UNNEST [o.o_lineitems l]
+|  |
+|  03:UNNEST [c.c_orders o]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates on l: l_shipdate >= '1995-01-01', l_shipdate <= '1996-12-31'
+====
+# TPCH-Q8
+# Q8 - National Market Share Query
+select
+  o_year,
+  sum(case
+    when nation = 'BRAZIL'
+    then volume
+    else 0
+  end) / sum(volume) as mkt_share
+from (
+  select
+    year(o_orderdate) as o_year,
+    l_extendedprice * (1 - l_discount) as volume,
+    n2.n_name as nation
+  from
+    customer c,
+    c.c_orders o,
+    o.o_lineitems l,
+    supplier s,
+    part p,
+    region r,
+    r.r_nations n1,
+    region.r_nations n2
+  where
+    p_partkey = l_partkey
+    and s_suppkey = l_suppkey
+    and c_nationkey = n1.n_nationkey
+    and r_name = 'AMERICA'
+    and s_nationkey = n2.n_nationkey
+    and o_orderdate between '1995-01-01' and '1996-12-31'
+    and p_type = 'ECONOMY ANODIZED STEEL'
+  ) as all_nations
+group by
+  o_year
+order by
+  o_year
+---- PLAN
+22:SORT
+|  order by: o_year ASC
+|
+21:AGGREGATE [FINALIZE]
+|  output: sum(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * (1 - l_discount) ELSE 0 END), sum(l_extendedprice * (1 - l_discount))
+|  group by: year(o_orderdate)
+|
+20:HASH JOIN [INNER JOIN]
+|  hash predicates: s_nationkey = n2.n_nationkey
+|
+|--16:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
+|     partitions=1/1 files=1 size=4.16KB
+|
+19:HASH JOIN [INNER JOIN]
+|  hash predicates: l_suppkey = s_suppkey
+|
+|--09:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
+|
+18:HASH JOIN [INNER JOIN]
+|  hash predicates: c_nationkey = n1.n_nationkey
+|
+|--12:SUBPLAN
+|  |
+|  |--15:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--13:SINGULAR ROW SRC
+|  |  |
+|  |  14:UNNEST [r.r_nations n1]
+|  |
+|  11:SCAN HDFS [tpch_nested_parquet.region r]
+|     partitions=1/1 files=1 size=4.16KB
+|     predicates: r_name = 'AMERICA'
+|
+17:HASH JOIN [INNER JOIN]
+|  hash predicates: l_partkey = p_partkey
+|
+|--10:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
+|     predicates: p_type = 'ECONOMY ANODIZED STEEL'
+|
+01:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  06:UNNEST [o.o_lineitems l]
+|  |
+|  03:UNNEST [c.c_orders o]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates on o: o_orderdate >= '1995-01-01', o_orderdate <= '1996-12-31'
+---- DISTRIBUTEDPLAN
+29:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: o_year ASC
+|
+22:SORT
+|  order by: o_year ASC
+|
+28:AGGREGATE [FINALIZE]
+|  output: sum:merge(CASE WHEN nation = 'BRAZIL' THEN volume ELSE 0 END), sum:merge(volume)
+|  group by: o_year
+|
+27:EXCHANGE [HASH(o_year)]
+|
+21:AGGREGATE
+|  output: sum(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * (1 - l_discount) ELSE 0 END), sum(l_extendedprice * (1 - l_discount))
+|  group by: year(o_orderdate)
+|
+20:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: s_nationkey = n2.n_nationkey
+|
+|--26:EXCHANGE [BROADCAST]
+|  |
+|  16:SCAN HDFS [tpch_nested_parquet.region.r_nations n2]
+|     partitions=1/1 files=1 size=4.16KB
+|
+19:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_suppkey = s_suppkey
+|
+|--25:EXCHANGE [BROADCAST]
+|  |
+|  09:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
+|
+18:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: c_nationkey = n1.n_nationkey
+|
+|--24:EXCHANGE [BROADCAST]
+|  |
+|  12:SUBPLAN
+|  |
+|  |--15:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--13:SINGULAR ROW SRC
+|  |  |
+|  |  14:UNNEST [r.r_nations n1]
+|  |
+|  11:SCAN HDFS [tpch_nested_parquet.region r]
+|     partitions=1/1 files=1 size=4.16KB
+|     predicates: r_name = 'AMERICA'
+|
+17:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_partkey = p_partkey
+|
+|--23:EXCHANGE [BROADCAST]
+|  |
+|  10:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
+|     predicates: p_type = 'ECONOMY ANODIZED STEEL'
+|
+01:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  06:UNNEST [o.o_lineitems l]
+|  |
+|  03:UNNEST [c.c_orders o]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates on o: o_orderdate >= '1995-01-01', o_orderdate <= '1996-12-31'
+====
+# TPCH-Q9
+# Q9 - Product Type Measure Query
+select
+  nation,
+  o_year,
+  sum(amount) as sum_profit
+from(
+  select
+    n_name as nation,
+    year(o_orderdate) as o_year,
+    l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity as amount
+  from
+    customer.c_orders o,
+    o.o_lineitems l,
+    supplier s,
+    s.s_partsupps ps,
+    part p,
+    region.r_nations n
+  where
+    s_suppkey = l_suppkey
+    and ps_partkey = l_partkey
+    and p_partkey = l_partkey
+    and s_nationkey = n_nationkey
+    and p_name like '%green%'
+  ) as profit
+group by
+  nation,
+  o_year
+order by
+  nation,
+  o_year desc
+---- PLAN
+16:SORT
+|  order by: nation ASC, o_year DESC
+|
+15:AGGREGATE [FINALIZE]
+|  output: sum(l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity)
+|  group by: n_name, year(o_orderdate)
+|
+14:HASH JOIN [INNER JOIN]
+|  hash predicates: s_nationkey = n_nationkey
+|
+|--11:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|     partitions=1/1 files=1 size=4.16KB
+|
+13:HASH JOIN [INNER JOIN]
+|  hash predicates: l_partkey = ps_partkey, l_suppkey = s_suppkey
+|
+|--06:SUBPLAN
+|  |
+|  |--09:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--07:SINGULAR ROW SRC
+|  |  |
+|  |  08:UNNEST [s.s_partsupps ps]
+|  |
+|  05:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
+|
+12:HASH JOIN [INNER JOIN]
+|  hash predicates: l_partkey = p_partkey
+|
+|--10:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
+|     predicates: p_name LIKE '%green%'
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [o.o_lineitems l]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer.c_orders o]
+   partitions=1/1 files=4 size=554.83MB
+---- DISTRIBUTEDPLAN
+22:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: nation ASC, o_year DESC
+|
+16:SORT
+|  order by: nation ASC, o_year DESC
+|
+21:AGGREGATE [FINALIZE]
+|  output: sum:merge(amount)
+|  group by: nation, o_year
+|
+20:EXCHANGE [HASH(nation,o_year)]
+|
+15:AGGREGATE
+|  output: sum(l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity)
+|  group by: n_name, year(o_orderdate)
+|
+14:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: s_nationkey = n_nationkey
+|
+|--19:EXCHANGE [BROADCAST]
+|  |
+|  11:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|     partitions=1/1 files=1 size=4.16KB
+|
+13:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_partkey = ps_partkey, l_suppkey = s_suppkey
+|
+|--18:EXCHANGE [BROADCAST]
+|  |
+|  06:SUBPLAN
+|  |
+|  |--09:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--07:SINGULAR ROW SRC
+|  |  |
+|  |  08:UNNEST [s.s_partsupps ps]
+|  |
+|  05:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
+|
+12:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_partkey = p_partkey
+|
+|--17:EXCHANGE [BROADCAST]
+|  |
+|  10:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
+|     predicates: p_name LIKE '%green%'
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [o.o_lineitems l]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer.c_orders o]
+   partitions=1/1 files=4 size=554.83MB
+====
+# TPCH-Q10
+# Q10 - Returned Item Reporting Query
+# Converted select from multiple tables to joins
+select
+  c_custkey,
+  c_name,
+  sum(l_extendedprice * (1 - l_discount)) as revenue,
+  c_acctbal,
+  n_name,
+  c_address,
+  c_phone,
+  c_comment
+from
+  customer c,
+  c.c_orders o,
+  o.o_lineitems l,
+  region.r_nations n
+where
+  o_orderdate >= '1993-10-01'
+  and o_orderdate < '1994-01-01'
+  and l_returnflag = 'R'
+  and c_nationkey = n_nationkey
+group by
+  c_custkey,
+  c_name,
+  c_acctbal,
+  c_phone,
+  n_name,
+  c_address,
+  c_comment
+order by
+  revenue desc
+limit 20
+---- PLAN
+12:TOP-N [LIMIT=20]
+|  order by: sum(l_extendedprice * (1 - l_discount)) DESC
+|
+11:AGGREGATE [FINALIZE]
+|  output: sum(l_extendedprice * (1 - l_discount))
+|  group by: c_custkey, c_name, c_acctbal, c_phone, n_name, c_address, c_comment
+|
+10:HASH JOIN [INNER JOIN]
+|  hash predicates: c_nationkey = n_nationkey
+|
+|--09:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|     partitions=1/1 files=1 size=4.16KB
+|
+01:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  06:UNNEST [o.o_lineitems l]
+|  |
+|  03:UNNEST [c.c_orders o]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates on o: o_orderdate >= '1993-10-01', o_orderdate < '1994-01-01'
+   predicates on l: l_returnflag = 'R'
+---- DISTRIBUTEDPLAN
+16:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: sum(l_extendedprice * (1 - l_discount)) DESC
+|  limit: 20
+|
+12:TOP-N [LIMIT=20]
+|  order by: sum(l_extendedprice * (1 - l_discount)) DESC
+|
+15:AGGREGATE [FINALIZE]
+|  output: sum:merge(l_extendedprice * (1 - l_discount))
+|  group by: c_custkey, c_name, c_acctbal, c_phone, n_name, c_address, c_comment
+|
+14:EXCHANGE [HASH(c_custkey,c_name,c_acctbal,c_phone,n_name,c_address,c_comment)]
+|
+11:AGGREGATE
+|  output: sum(l_extendedprice * (1 - l_discount))
+|  group by: c_custkey, c_name, c_acctbal, c_phone, n_name, c_address, c_comment
+|
+10:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: c_nationkey = n_nationkey
+|
+|--13:EXCHANGE [BROADCAST]
+|  |
+|  09:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|     partitions=1/1 files=1 size=4.16KB
+|
+01:SUBPLAN
+|
+|--08:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--07:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  06:UNNEST [o.o_lineitems l]
+|  |
+|  03:UNNEST [c.c_orders o]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates on o: o_orderdate >= '1993-10-01', o_orderdate < '1994-01-01'
+   predicates on l: l_returnflag = 'R'
+====
+# TPCH-Q11
+# Q11 - Important Stock Identification
+# Modifications: query was rewritten to not have a subquery in the having clause
+select
+  *
+from (
+  select
+    ps_partkey,
+    sum(ps_supplycost * ps_availqty) as value
+  from
+    supplier s,
+    s.s_partsupps ps,
+    region.r_nations n
+  where
+    s_nationkey = n_nationkey
+    and n_name = 'GERMANY'
+  group by
+    ps_partkey
+) as inner_query
+where
+  value > (
+    select
+      sum(ps_supplycost * ps_availqty) * 0.0001
+    from
+      supplier s,
+      s.s_partsupps ps,
+      region.r_nations n
+    where
+      s_nationkey = n_nationkey
+      and n_name = 'GERMANY'
+  )
+order by
+  value desc
+---- PLAN
+17:SORT
+|  order by: value DESC
+|
+16:NESTED LOOP JOIN [INNER JOIN]
+|  predicates: sum(ps_supplycost * ps_availqty) > sum(ps_supplycost * ps_availqty) * 0.0001
+|
+|--15:AGGREGATE [FINALIZE]
+|  |  output: sum(ps_supplycost * ps_availqty)
+|  |
+|  14:HASH JOIN [INNER JOIN]
+|  |  hash predicates: s_nationkey = n_nationkey
+|  |
+|  |--13:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|  |     partitions=1/1 files=1 size=4.16KB
+|  |     predicates: n_name = 'GERMANY'
+|  |
+|  09:SUBPLAN
+|  |
+|  |--12:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--10:SINGULAR ROW SRC
+|  |  |
+|  |  11:UNNEST [s.s_partsupps ps]
+|  |
+|  08:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
+|
+07:AGGREGATE [FINALIZE]
+|  output: sum(ps_supplycost * ps_availqty)
+|  group by: ps_partkey
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: s_nationkey = n_nationkey
+|
+|--05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|     partitions=1/1 files=1 size=4.16KB
+|     predicates: n_name = 'GERMANY'
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [s.s_partsupps ps]
+|
+00:SCAN HDFS [tpch_nested_parquet.supplier s]
+   partitions=1/1 files=1 size=111.08MB
+---- DISTRIBUTEDPLAN
+25:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: value DESC
+|
+17:SORT
+|  order by: value DESC
+|
+16:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
+|  predicates: sum(ps_supplycost * ps_availqty) > sum(ps_supplycost * ps_availqty) * 0.0001
+|
+|--24:EXCHANGE [BROADCAST]
+|  |
+|  23:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(ps_supplycost * ps_availqty)
+|  |
+|  22:EXCHANGE [UNPARTITIONED]
+|  |
+|  15:AGGREGATE
+|  |  output: sum(ps_supplycost * ps_availqty)
+|  |
+|  14:HASH JOIN [INNER JOIN, BROADCAST]
+|  |  hash predicates: s_nationkey = n_nationkey
+|  |
+|  |--21:EXCHANGE [BROADCAST]
+|  |  |
+|  |  13:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|  |     partitions=1/1 files=1 size=4.16KB
+|  |     predicates: n_name = 'GERMANY'
+|  |
+|  09:SUBPLAN
+|  |
+|  |--12:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--10:SINGULAR ROW SRC
+|  |  |
+|  |  11:UNNEST [s.s_partsupps ps]
+|  |
+|  08:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
+|
+20:AGGREGATE [FINALIZE]
+|  output: sum:merge(ps_supplycost * ps_availqty)
+|  group by: ps_partkey
+|
+19:EXCHANGE [HASH(ps_partkey)]
+|
+07:AGGREGATE
+|  output: sum(ps_supplycost * ps_availqty)
+|  group by: ps_partkey
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: s_nationkey = n_nationkey
+|
+|--18:EXCHANGE [BROADCAST]
+|  |
+|  05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|     partitions=1/1 files=1 size=4.16KB
+|     predicates: n_name = 'GERMANY'
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [s.s_partsupps ps]
+|
+00:SCAN HDFS [tpch_nested_parquet.supplier s]
+   partitions=1/1 files=1 size=111.08MB
+====
+# TPCH-Q12
+# Q12 - Shipping Mode and Order Priority Query
+select
+  l_shipmode,
+  sum(case
+    when o_orderpriority = '1-URGENT'
+      or o_orderpriority = '2-HIGH'
+    then 1
+    else 0
+  end) as high_line_count,
+  sum(case
+    when o_orderpriority <> '1-URGENT'
+      and o_orderpriority <> '2-HIGH'
+    then 1
+    else 0
+  end) as low_line_count
+from
+  customer.c_orders o,
+  o.o_lineitems l
+where
+  l_shipmode in ('MAIL', 'SHIP')
+  and l_commitdate < l_receiptdate
+  and l_shipdate < l_commitdate
+  and l_receiptdate >= '1994-01-01'
+  and l_receiptdate < '1995-01-01'
+group by
+  l_shipmode
+order by
+  l_shipmode
+---- PLAN
+06:SORT
+|  order by: l_shipmode ASC
+|
+05:AGGREGATE [FINALIZE]
+|  output: sum(CASE WHEN o_orderpriority = '1-URGENT' OR o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END), sum(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END)
+|  group by: l_shipmode
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [o.o_lineitems l]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer.c_orders o]
+   partitions=1/1 files=4 size=554.83MB
+   predicates on l: l_shipmode IN ('MAIL', 'SHIP'), l_commitdate < l_receiptdate, l_shipdate < l_commitdate, l_receiptdate >= '1994-01-01', l_receiptdate < '1995-01-01'
+---- DISTRIBUTEDPLAN
+09:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: l_shipmode ASC
+|
+06:SORT
+|  order by: l_shipmode ASC
+|
+08:AGGREGATE [FINALIZE]
+|  output: sum:merge(CASE WHEN o_orderpriority = '1-URGENT' OR o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END), sum:merge(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END)
+|  group by: l_shipmode
+|
+07:EXCHANGE [HASH(l_shipmode)]
+|
+05:AGGREGATE
+|  output: sum(CASE WHEN o_orderpriority = '1-URGENT' OR o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END), sum(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END)
+|  group by: l_shipmode
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [o.o_lineitems l]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer.c_orders o]
+   partitions=1/1 files=4 size=554.83MB
+   predicates on l: l_shipmode IN ('MAIL', 'SHIP'), l_commitdate < l_receiptdate, l_shipdate < l_commitdate, l_receiptdate >= '1994-01-01', l_receiptdate < '1995-01-01'
+====
+# TPCH-Q13
+# Q13 - Customer Distribution Query
+select
+  c_count,
+  count(*) as custdist
+from (
+  select
+    c_custkey,
+    count(o_orderkey) as c_count
+  from
+    customer c left outer join c.c_orders on (
+      o_comment not like '%special%requests%'
+    )
+  group by
+    c_custkey
+  ) as c_orders
+group by
+  c_count
+order by
+  custdist desc,
+  c_count desc
+---- PLAN
+07:SORT
+|  order by: count(*) DESC, c_count DESC
+|
+06:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: count(o_orderkey)
+|
+05:AGGREGATE [FINALIZE]
+|  output: count(o_orderkey)
+|  group by: c_custkey
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [c.c_orders]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates on c_orders: (NOT o_comment LIKE '%special%requests%')
+---- DISTRIBUTEDPLAN
+12:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: count(*) DESC, c_count DESC
+|
+07:SORT
+|  order by: count(*) DESC, c_count DESC
+|
+11:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: c_count
+|
+10:EXCHANGE [HASH(c_count)]
+|
+06:AGGREGATE
+|  output: count(*)
+|  group by: count(o_orderkey)
+|
+09:AGGREGATE [FINALIZE]
+|  output: count:merge(o_orderkey)
+|  group by: c_custkey
+|
+08:EXCHANGE [HASH(c_custkey)]
+|
+05:AGGREGATE
+|  output: count(o_orderkey)
+|  group by: c_custkey
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [RIGHT OUTER JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [c.c_orders]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates on c_orders: (NOT o_comment LIKE '%special%requests%')
+====
+# TPCH-Q14
+# Q14 - Promotion Effect
+select
+  100.00 * sum(case
+    when p_type like 'PROMO%'
+    then l_extendedprice * (1 - l_discount)
+    else 0.0
+    end) / sum(l_extendedprice * (1 - l_discount)) as promo_revenue
+from
+  customer.c_orders.o_lineitems l,
+  part p
+where
+  l_partkey = p_partkey
+  and l_shipdate >= '1995-09-01'
+  and l_shipdate < '1995-10-01'
+---- PLAN
+03:AGGREGATE [FINALIZE]
+|  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0.0 END), sum(l_extendedprice * (1 - l_discount))
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: p_partkey = l_partkey
+|
+|--00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+|     partitions=1/1 files=4 size=554.83MB
+|     predicates: l_shipdate >= '1995-09-01', l_shipdate < '1995-10-01'
+|
+01:SCAN HDFS [tpch_nested_parquet.part p]
+   partitions=1/1 files=1 size=6.30MB
+---- DISTRIBUTEDPLAN
+06:AGGREGATE [FINALIZE]
+|  output: sum:merge(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0.0 END), sum:merge(l_extendedprice * (1 - l_discount))
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE
+|  output: sum(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * (1 - l_discount) ELSE 0.0 END), sum(l_extendedprice * (1 - l_discount))
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: p_partkey = l_partkey
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+|     partitions=1/1 files=4 size=554.83MB
+|     predicates: l_shipdate >= '1995-09-01', l_shipdate < '1995-10-01'
+|
+01:SCAN HDFS [tpch_nested_parquet.part p]
+   partitions=1/1 files=1 size=6.30MB
+====
+# TPCH-Q15
+# Q15 - Top Supplier Query
+with revenue_view as (
+  select
+    l_suppkey as supplier_no,
+    sum(l_extendedprice * (1 - l_discount)) as total_revenue
+  from
+    customer.c_orders.o_lineitems l
+  where
+    l_shipdate >= '1996-01-01'
+    and l_shipdate < '1996-04-01'
+  group by
+    l_suppkey)
+select
+  s_suppkey,
+  s_name,
+  s_address,
+  s_phone,
+  total_revenue
+from
+  supplier,
+  revenue_view
+where
+  s_suppkey = supplier_no
+  and total_revenue = (
+    select
+      max(total_revenue)
+    from
+      revenue_view
+    )
+order by
+  s_suppkey
+---- PLAN
+08:SORT
+|  order by: s_suppkey ASC
+|
+07:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: sum(l_extendedprice * (1 - l_discount)) = max(total_revenue)
+|
+|--05:AGGREGATE [FINALIZE]
+|  |  output: max(sum(l_extendedprice * (1 - l_discount)))
+|  |
+|  04:AGGREGATE [FINALIZE]
+|  |  output: sum(l_extendedprice * (1 - l_discount))
+|  |  group by: l_suppkey
+|  |
+|  03:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+|     partitions=1/1 files=4 size=554.83MB
+|     predicates: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: l_suppkey = s_suppkey
+|
+|--00:SCAN HDFS [tpch_nested_parquet.supplier]
+|     partitions=1/1 files=1 size=111.08MB
+|
+02:AGGREGATE [FINALIZE]
+|  output: sum(l_extendedprice * (1 - l_discount))
+|  group by: l_suppkey
+|
+01:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+   partitions=1/1 files=4 size=554.83MB
+   predicates: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
+---- DISTRIBUTEDPLAN
+17:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: s_suppkey ASC
+|
+08:SORT
+|  order by: s_suppkey ASC
+|
+07:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: sum(l_extendedprice * (1 - l_discount)) = max(total_revenue)
+|
+|--16:EXCHANGE [BROADCAST]
+|  |
+|  15:AGGREGATE [FINALIZE]
+|  |  output: max:merge(total_revenue)
+|  |
+|  14:EXCHANGE [UNPARTITIONED]
+|  |
+|  05:AGGREGATE
+|  |  output: max(sum(l_extendedprice * (1 - l_discount)))
+|  |
+|  13:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(l_extendedprice * (1 - l_discount))
+|  |  group by: l_suppkey
+|  |
+|  12:EXCHANGE [HASH(l_suppkey)]
+|  |
+|  04:AGGREGATE
+|  |  output: sum(l_extendedprice * (1 - l_discount))
+|  |  group by: l_suppkey
+|  |
+|  03:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+|     partitions=1/1 files=4 size=554.83MB
+|     predicates: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
+|
+06:HASH JOIN [INNER JOIN, PARTITIONED]
+|  hash predicates: l_suppkey = s_suppkey
+|
+|--11:EXCHANGE [HASH(s_suppkey)]
+|  |
+|  00:SCAN HDFS [tpch_nested_parquet.supplier]
+|     partitions=1/1 files=1 size=111.08MB
+|
+10:AGGREGATE [FINALIZE]
+|  output: sum:merge(l_extendedprice * (1 - l_discount))
+|  group by: l_suppkey
+|
+09:EXCHANGE [HASH(l_suppkey)]
+|
+02:AGGREGATE
+|  output: sum(l_extendedprice * (1 - l_discount))
+|  group by: l_suppkey
+|
+01:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+   partitions=1/1 files=4 size=554.83MB
+   predicates: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
+====
+# TPCH-Q16
+# Q16 - Parts/Supplier Relation Query
+select
+  p_brand,
+  p_type,
+  p_size,
+  count(distinct s_suppkey) as supplier_cnt
+from
+  supplier s,
+  s.s_partsupps ps,
+  part p
+where
+  p_partkey = ps_partkey
+  and p_brand <> 'Brand#45'
+  and p_type not like 'MEDIUM POLISHED%'
+  and p_size in (49, 14, 23, 45, 19, 3, 36, 9)
+  and s_comment not like '%Customer%Complaints%'
+group by
+  p_brand,
+  p_type,
+  p_size
+order by
+  supplier_cnt desc,
+  p_brand,
+  p_type,
+  p_size
+---- PLAN
+09:SORT
+|  order by: count(s_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
+|
+08:AGGREGATE [FINALIZE]
+|  output: count(s_suppkey)
+|  group by: p_brand, p_type, p_size
+|
+07:AGGREGATE
+|  group by: p_brand, p_type, p_size, s_suppkey
+|
+06:HASH JOIN [INNER JOIN]
+|  hash predicates: ps_partkey = p_partkey
+|
+|--05:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
+|     predicates: p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%', p_size IN (49, 14, 23, 45, 19, 3, 36, 9)
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [s.s_partsupps ps]
+|
+00:SCAN HDFS [tpch_nested_parquet.supplier s]
+   partitions=1/1 files=1 size=111.08MB
+   predicates: NOT s_comment LIKE '%Customer%Complaints%'
+---- DISTRIBUTEDPLAN
+13:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: count(s_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
+|
+09:SORT
+|  order by: count(s_suppkey) DESC, p_brand ASC, p_type ASC, p_size ASC
+|
+08:AGGREGATE [FINALIZE]
+|  output: count(s_suppkey)
+|  group by: p_brand, p_type, p_size
+|
+12:AGGREGATE
+|  group by: p_brand, p_type, p_size, s_suppkey
+|
+11:EXCHANGE [HASH(p_brand,p_type,p_size)]
+|
+07:AGGREGATE
+|  group by: p_brand, p_type, p_size, s_suppkey
+|
+06:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: ps_partkey = p_partkey
+|
+|--10:EXCHANGE [BROADCAST]
+|  |
+|  05:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
+|     predicates: p_brand != 'Brand#45', NOT p_type LIKE 'MEDIUM POLISHED%', p_size IN (49, 14, 23, 45, 19, 3, 36, 9)
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [s.s_partsupps ps]
+|
+00:SCAN HDFS [tpch_nested_parquet.supplier s]
+   partitions=1/1 files=1 size=111.08MB
+   predicates: NOT s_comment LIKE '%Customer%Complaints%'
+====
+# TPCH-Q17
+# Q17 - Small-Quantity-Order Revenue Query
+select
+  sum(l_extendedprice) / 7.0 as avg_yearly
+from
+  customer.c_orders.o_lineitems l,
+  part p
+where
+  p_partkey = l_partkey
+  and p_brand = 'Brand#23'
+  and p_container = 'MED BOX'
+  and l_quantity < (
+    select
+      0.2 * avg(l_quantity)
+    from
+      customer.c_orders.o_lineitems l
+    where
+      l_partkey = p_partkey
+  )
+---- PLAN
+06:AGGREGATE [FINALIZE]
+|  output: sum(l_extendedprice)
+|
+05:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: p_partkey = l_partkey
+|  other join predicates: l_quantity < 0.2 * avg(l_quantity)
+|
+|--03:AGGREGATE [FINALIZE]
+|  |  output: avg(l_quantity)
+|  |  group by: l_partkey
+|  |
+|  02:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+|     partitions=1/1 files=4 size=554.83MB
+|
+04:HASH JOIN [INNER JOIN]
+|  hash predicates: l_partkey = p_partkey
+|
+|--01:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
+|     predicates: p_brand = 'Brand#23', p_container = 'MED BOX'
+|
+00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+   partitions=1/1 files=4 size=554.83MB
+---- DISTRIBUTEDPLAN
+12:AGGREGATE [FINALIZE]
+|  output: sum:merge(l_extendedprice)
+|
+11:EXCHANGE [UNPARTITIONED]
+|
+06:AGGREGATE
+|  output: sum(l_extendedprice)
+|
+05:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: p_partkey = l_partkey
+|  other join predicates: l_quantity < 0.2 * avg(l_quantity)
+|
+|--10:EXCHANGE [BROADCAST]
+|  |
+|  09:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(l_quantity)
+|  |  group by: l_partkey
+|  |
+|  08:EXCHANGE [HASH(l_partkey)]
+|  |
+|  03:AGGREGATE
+|  |  output: avg(l_quantity)
+|  |  group by: l_partkey
+|  |
+|  02:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+|     partitions=1/1 files=4 size=554.83MB
+|
+04:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_partkey = p_partkey
+|
+|--07:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
+|     predicates: p_brand = 'Brand#23', p_container = 'MED BOX'
+|
+00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+   partitions=1/1 files=4 size=554.83MB
+====
+# TPCH-Q18
+# Q18 - Large Value Customer Query
+select
+  c_name,
+  c_custkey,
+  o_orderkey,
+  o_orderdate,
+  o_totalprice,
+  sum(l_quantity)
+from
+  customer c,
+  c.c_orders o,
+  o.o_lineitems l
+where
+  (select sum(l_quantity) from o.o_lineitems) > 300
+group by
+  c_name,
+  c_custkey,
+  o_orderkey,
+  o_orderdate,
+  o_totalprice
+order by
+  o_totalprice desc,
+  o_orderdate
+limit 100
+---- PLAN
+13:TOP-N [LIMIT=100]
+|  order by: o_totalprice DESC, o_orderdate ASC
+|
+12:AGGREGATE [FINALIZE]
+|  output: sum(l_quantity)
+|  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
+|
+01:SUBPLAN
+|
+|--11:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--10:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  |  |
+|  |  |--08:AGGREGATE [FINALIZE]
+|  |  |  |  output: sum(l_quantity)
+|  |  |  |  having: sum(l_quantity) > 300
+|  |  |  |
+|  |  |  07:UNNEST [o.o_lineitems]
+|  |  |
+|  |  09:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  06:UNNEST [o.o_lineitems l]
+|  |
+|  03:UNNEST [c.c_orders o]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+---- DISTRIBUTEDPLAN
+16:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: o_totalprice DESC, o_orderdate ASC
+|  limit: 100
+|
+13:TOP-N [LIMIT=100]
+|  order by: o_totalprice DESC, o_orderdate ASC
+|
+15:AGGREGATE [FINALIZE]
+|  output: sum:merge(l_quantity)
+|  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
+|
+14:EXCHANGE [HASH(c_name,c_custkey,o_orderkey,o_orderdate,o_totalprice)]
+|
+12:AGGREGATE
+|  output: sum(l_quantity)
+|  group by: c_name, c_custkey, o_orderkey, o_orderdate, o_totalprice
+|
+01:SUBPLAN
+|
+|--11:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  04:SUBPLAN
+|  |
+|  |--10:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  |  |
+|  |  |--08:AGGREGATE [FINALIZE]
+|  |  |  |  output: sum(l_quantity)
+|  |  |  |  having: sum(l_quantity) > 300
+|  |  |  |
+|  |  |  07:UNNEST [o.o_lineitems]
+|  |  |
+|  |  09:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--05:SINGULAR ROW SRC
+|  |  |
+|  |  06:UNNEST [o.o_lineitems l]
+|  |
+|  03:UNNEST [c.c_orders o]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+====
+# TPCH-Q19
+# Q19 - Discounted Revenue Query
+select
+  sum(l_extendedprice * (1 - l_discount)) as revenue
+from
+  customer.c_orders.o_lineitems l,
+  part p
+where
+  p_partkey = l_partkey
+  and (
+    (
+      p_brand = 'Brand#12'
+      and p_container in ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG')
+      and l_quantity >= 1 and l_quantity <= 11
+      and p_size between 1 and 5
+      and l_shipmode in ('AIR', 'AIR REG')
+      and l_shipinstruct = 'DELIVER IN PERSON'
+    )
+    or
+    (
+      p_brand = 'Brand#23'
+      and p_container in ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK')
+      and l_quantity >= 10 and l_quantity <= 20
+      and p_size between 1 and 10
+      and l_shipmode in ('AIR', 'AIR REG')
+      and l_shipinstruct = 'DELIVER IN PERSON'
+    )
+    or
+    (
+      p_brand = 'Brand#34'
+      and p_container in ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG')
+      and l_quantity >= 20 and l_quantity <= 30
+      and p_size between 1 and 15
+      and l_shipmode in ('AIR', 'AIR REG')
+      and l_shipinstruct = 'DELIVER IN PERSON'
+    )
+  )
+---- PLAN
+03:AGGREGATE [FINALIZE]
+|  output: sum(l_extendedprice * (1 - l_discount))
+|
+02:HASH JOIN [INNER JOIN]
+|  hash predicates: l_partkey = p_partkey
+|  other predicates: ((p_brand = 'Brand#12' AND p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') AND l_quantity >= 1 AND l_quantity <= 11 AND p_size BETWEEN 1 AND 5 AND l_shipmode IN ('AIR', 'AIR REG') AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') AND l_quantity >= 10 AND l_quantity <= 20 AND p_size BETWEEN 1 AND 10 AND l_shipmode IN ('AIR', 'AIR REG') AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#34' AND p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG') AND l_quantity >= 20 AND l_quantity <= 30 AND p_size BETWEEN 1 AND 15 AND l_shipmode IN ('AIR', 'AIR REG') AND l_shipinstruct = 'DELIVER IN PERSON'))
+|
+|--01:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
+|
+00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+   partitions=1/1 files=4 size=554.83MB
+---- DISTRIBUTEDPLAN
+06:AGGREGATE [FINALIZE]
+|  output: sum:merge(l_extendedprice * (1 - l_discount))
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+03:AGGREGATE
+|  output: sum(l_extendedprice * (1 - l_discount))
+|
+02:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l_partkey = p_partkey
+|  other predicates: ((p_brand = 'Brand#12' AND p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG') AND l_quantity >= 1 AND l_quantity <= 11 AND p_size BETWEEN 1 AND 5 AND l_shipmode IN ('AIR', 'AIR REG') AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#23' AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK') AND l_quantity >= 10 AND l_quantity <= 20 AND p_size BETWEEN 1 AND 10 AND l_shipmode IN ('AIR', 'AIR REG') AND l_shipinstruct = 'DELIVER IN PERSON') OR (p_brand = 'Brand#34' AND p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG') AND l_quantity >= 20 AND l_quantity <= 30 AND p_size BETWEEN 1 AND 15 AND l_shipmode IN ('AIR', 'AIR REG') AND l_shipinstruct = 'DELIVER IN PERSON'))
+|
+|--04:EXCHANGE [BROADCAST]
+|  |
+|  01:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
+|
+00:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+   partitions=1/1 files=4 size=554.83MB
+====
+# TPCH-Q20
+# Note: Tricky rewrite from the original to avoid mixing
+# correlated and uncorrelated table refs in a subquery.
+select distinct
+  s_name,
+  s_address
+from
+  supplier s,
+  s.s_partsupps ps,
+  region.r_nations n
+where
+  ps_partkey in (
+      select
+        p_partkey
+      from
+        part p
+      where
+        p_name like 'forest%'
+  )
+  and ps_availqty > (
+      select
+        0.5 * sum(l_quantity)
+      from
+        customer.c_orders.o_lineitems l
+      where
+        l_partkey = ps_partkey
+        and l_suppkey = s_suppkey
+        and l_shipdate >= '1994-01-01'
+        and l_shipdate < '1995-01-01'
+  )
+  and s_nationkey = n_nationkey
+  and n_name = 'CANADA'
+order by
+  s_name
+---- PLAN
+13:SORT
+|  order by: s_name ASC
+|
+12:AGGREGATE [FINALIZE]
+|  group by: s_name, s_address
+|
+11:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: s_suppkey = l_suppkey, ps_partkey = l_partkey
+|  other join predicates: ps_availqty > 0.5 * sum(l_quantity)
+|
+|--08:AGGREGATE [FINALIZE]
+|  |  output: sum(l_quantity)
+|  |  group by: l_partkey, l_suppkey
+|  |
+|  07:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+|     partitions=1/1 files=4 size=554.83MB
+|     predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
+|
+10:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: ps_partkey = p_partkey
+|
+|--06:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
+|     predicates: p_name LIKE 'forest%'
+|
+09:HASH JOIN [INNER JOIN]
+|  hash predicates: s_nationkey = n_nationkey
+|
+|--05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|     partitions=1/1 files=1 size=4.16KB
+|     predicates: n_name = 'CANADA'
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [s.s_partsupps ps]
+|
+00:SCAN HDFS [tpch_nested_parquet.supplier s]
+   partitions=1/1 files=1 size=111.08MB
+---- DISTRIBUTEDPLAN
+21:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: s_name ASC
+|
+13:SORT
+|  order by: s_name ASC
+|
+20:AGGREGATE [FINALIZE]
+|  group by: s_name, s_address
+|
+19:EXCHANGE [HASH(s_name,s_address)]
+|
+12:AGGREGATE
+|  group by: s_name, s_address
+|
+11:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: s_suppkey = l_suppkey, ps_partkey = l_partkey
+|  other join predicates: ps_availqty > 0.5 * sum(l_quantity)
+|
+|--18:EXCHANGE [BROADCAST]
+|  |
+|  17:AGGREGATE [FINALIZE]
+|  |  output: sum:merge(l_quantity)
+|  |  group by: l_partkey, l_suppkey
+|  |
+|  16:EXCHANGE [HASH(l_partkey,l_suppkey)]
+|  |
+|  08:AGGREGATE
+|  |  output: sum(l_quantity)
+|  |  group by: l_partkey, l_suppkey
+|  |
+|  07:SCAN HDFS [tpch_nested_parquet.customer.c_orders.o_lineitems l]
+|     partitions=1/1 files=4 size=554.83MB
+|     predicates: l_shipdate >= '1994-01-01', l_shipdate < '1995-01-01'
+|
+10:HASH JOIN [LEFT SEMI JOIN, BROADCAST]
+|  hash predicates: ps_partkey = p_partkey
+|
+|--15:EXCHANGE [BROADCAST]
+|  |
+|  06:SCAN HDFS [tpch_nested_parquet.part p]
+|     partitions=1/1 files=1 size=6.30MB
+|     predicates: p_name LIKE 'forest%'
+|
+09:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: s_nationkey = n_nationkey
+|
+|--14:EXCHANGE [BROADCAST]
+|  |
+|  05:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|     partitions=1/1 files=1 size=4.16KB
+|     predicates: n_name = 'CANADA'
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [s.s_partsupps ps]
+|
+00:SCAN HDFS [tpch_nested_parquet.supplier s]
+   partitions=1/1 files=1 size=111.08MB
+====
+# TPCH-Q21
+# Q21 - Suppliers Who Kept Orders Waiting Query
+select
+  s_name,
+  count(*) as numwait
+from
+  supplier s,
+  customer c,
+  c.c_orders o,
+  o.o_lineitems l1,
+  region.r_nations n
+where
+  s_suppkey = l1.l_suppkey
+  and o_orderstatus = 'F'
+  and l1.l_receiptdate > l1.l_commitdate
+  and exists (
+    select
+      *
+    from
+      o.o_lineitems l2
+    where
+      l2.l_suppkey <> l1.l_suppkey
+  )
+  and not exists (
+    select
+      *
+    from
+      o.o_lineitems l3
+    where
+      l3.l_suppkey <> l1.l_suppkey
+      and l3.l_receiptdate > l3.l_commitdate
+  )
+  and s_nationkey = n_nationkey
+  and n_name = 'SAUDI ARABIA'
+group by
+  s_name
+order by
+  numwait desc,
+  s_name
+limit 100
+---- PLAN
+18:TOP-N [LIMIT=100]
+|  order by: count(*) DESC, s_name ASC
+|
+17:AGGREGATE [FINALIZE]
+|  output: count(*)
+|  group by: s_name
+|
+16:HASH JOIN [INNER JOIN]
+|  hash predicates: s_nationkey = n_nationkey
+|
+|--14:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|     partitions=1/1 files=1 size=4.16KB
+|     predicates: n_name = 'SAUDI ARABIA'
+|
+15:HASH JOIN [INNER JOIN]
+|  hash predicates: l1.l_suppkey = s_suppkey
+|
+|--00:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
+|
+02:SUBPLAN
+|
+|--13:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--03:SINGULAR ROW SRC
+|  |
+|  05:SUBPLAN
+|  |
+|  |--12:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|  |  |  join predicates: l3.l_suppkey != l1.l_suppkey
+|  |  |
+|  |  |--09:UNNEST [o.o_lineitems l3]
+|  |  |
+|  |  11:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  |  |  join predicates: l2.l_suppkey != l1.l_suppkey
+|  |  |
+|  |  |--08:UNNEST [o.o_lineitems l2]
+|  |  |
+|  |  10:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--06:SINGULAR ROW SRC
+|  |  |
+|  |  07:UNNEST [o.o_lineitems l1]
+|  |
+|  04:UNNEST [c.c_orders o]
+|
+01:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates on o: o_orderstatus = 'F'
+   predicates on l1: l1.l_receiptdate > l1.l_commitdate
+   predicates on l3: l3.l_receiptdate > l3.l_commitdate
+---- DISTRIBUTEDPLAN
+23:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: count(*) DESC, s_name ASC
+|  limit: 100
+|
+18:TOP-N [LIMIT=100]
+|  order by: count(*) DESC, s_name ASC
+|
+22:AGGREGATE [FINALIZE]
+|  output: count:merge(*)
+|  group by: s_name
+|
+21:EXCHANGE [HASH(s_name)]
+|
+17:AGGREGATE
+|  output: count(*)
+|  group by: s_name
+|
+16:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: s_nationkey = n_nationkey
+|
+|--20:EXCHANGE [BROADCAST]
+|  |
+|  14:SCAN HDFS [tpch_nested_parquet.region.r_nations n]
+|     partitions=1/1 files=1 size=4.16KB
+|     predicates: n_name = 'SAUDI ARABIA'
+|
+15:HASH JOIN [INNER JOIN, BROADCAST]
+|  hash predicates: l1.l_suppkey = s_suppkey
+|
+|--19:EXCHANGE [BROADCAST]
+|  |
+|  00:SCAN HDFS [tpch_nested_parquet.supplier s]
+|     partitions=1/1 files=1 size=111.08MB
+|
+02:SUBPLAN
+|
+|--13:NESTED LOOP JOIN [CROSS JOIN]
+|  |
+|  |--03:SINGULAR ROW SRC
+|  |
+|  05:SUBPLAN
+|  |
+|  |--12:NESTED LOOP JOIN [LEFT ANTI JOIN]
+|  |  |  join predicates: l3.l_suppkey != l1.l_suppkey
+|  |  |
+|  |  |--09:UNNEST [o.o_lineitems l3]
+|  |  |
+|  |  11:NESTED LOOP JOIN [LEFT SEMI JOIN]
+|  |  |  join predicates: l2.l_suppkey != l1.l_suppkey
+|  |  |
+|  |  |--08:UNNEST [o.o_lineitems l2]
+|  |  |
+|  |  10:NESTED LOOP JOIN [CROSS JOIN]
+|  |  |
+|  |  |--06:SINGULAR ROW SRC
+|  |  |
+|  |  07:UNNEST [o.o_lineitems l1]
+|  |
+|  04:UNNEST [c.c_orders o]
+|
+01:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates on o: o_orderstatus = 'F'
+   predicates on l1: l1.l_receiptdate > l1.l_commitdate
+   predicates on l3: l3.l_receiptdate > l3.l_commitdate
+====
+# TPCH-Q22
+# Q22 - Global Sales Opportunity Query
+select
+  cntrycode,
+  count(*) as numcust,
+  sum(c_acctbal) as totacctbal
+from (
+  select
+    substr(c_phone, 1, 2) as cntrycode,
+    c_acctbal
+  from
+    customer c
+  where
+    substr(c_phone, 1, 2) in ('13', '31', '23', '29', '30', '18', '17')
+    and c_acctbal > (
+      select
+        avg(c_acctbal)
+      from
+        customer c
+      where
+        c_acctbal > 0.00
+        and substr(c_phone, 1, 2) in ('13', '31', '23', '29', '30', '18', '17')
+      )
+    and not exists (
+      select
+        o_orderkey
+      from
+        c.c_orders
+    )
+  ) as custsale
+group by
+  cntrycode
+order by
+  cntrycode
+---- PLAN
+09:SORT
+|  order by: cntrycode ASC
+|
+08:AGGREGATE [FINALIZE]
+|  output: count(*), sum(c_acctbal)
+|  group by: substr(c_phone, 1, 2)
+|
+07:NESTED LOOP JOIN [INNER JOIN]
+|  predicates: c_acctbal > avg(c_acctbal)
+|
+|--06:AGGREGATE [FINALIZE]
+|  |  output: avg(c_acctbal)
+|  |
+|  05:SCAN HDFS [tpch_nested_parquet.customer c]
+|     partitions=1/1 files=4 size=554.83MB
+|     predicates: c_acctbal > 0.00, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [RIGHT ANTI JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [c.c_orders]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
+---- DISTRIBUTEDPLAN
+15:MERGING-EXCHANGE [UNPARTITIONED]
+|  order by: cntrycode ASC
+|
+09:SORT
+|  order by: cntrycode ASC
+|
+14:AGGREGATE [FINALIZE]
+|  output: count:merge(*), sum:merge(c_acctbal)
+|  group by: cntrycode
+|
+13:EXCHANGE [HASH(cntrycode)]
+|
+08:AGGREGATE
+|  output: count(*), sum(c_acctbal)
+|  group by: substr(c_phone, 1, 2)
+|
+07:NESTED LOOP JOIN [INNER JOIN, BROADCAST]
+|  predicates: c_acctbal > avg(c_acctbal)
+|
+|--12:EXCHANGE [BROADCAST]
+|  |
+|  11:AGGREGATE [FINALIZE]
+|  |  output: avg:merge(c_acctbal)
+|  |
+|  10:EXCHANGE [UNPARTITIONED]
+|  |
+|  06:AGGREGATE
+|  |  output: avg(c_acctbal)
+|  |
+|  05:SCAN HDFS [tpch_nested_parquet.customer c]
+|     partitions=1/1 files=4 size=554.83MB
+|     predicates: c_acctbal > 0.00, substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
+|
+01:SUBPLAN
+|
+|--04:NESTED LOOP JOIN [RIGHT ANTI JOIN]
+|  |
+|  |--02:SINGULAR ROW SRC
+|  |
+|  03:UNNEST [c.c_orders]
+|
+00:SCAN HDFS [tpch_nested_parquet.customer c]
+   partitions=1/1 files=4 size=554.83MB
+   predicates: substr(c_phone, 1, 2) IN ('13', '31', '23', '29', '30', '18', '17')
+====

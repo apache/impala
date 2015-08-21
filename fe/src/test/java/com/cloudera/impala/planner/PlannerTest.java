@@ -162,6 +162,11 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testTpchNested() {
+    runPlannerTestFile("tpch-nested", "tpch_nested_parquet");
+  }
+
+  @Test
   public void testTpcds() {
     // Uses ss_sold_date_sk as the partition key of store_sales to allow static partition
     // pruning. The original predicates were rephrased in terms of the ss_sold_date_sk
