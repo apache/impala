@@ -72,7 +72,7 @@ IMPALA_CMD=${BINARY_BASE_DIR}/${BUILD_TYPE}/${BINARY}
 set +u
 # Optionally enable Java debugging.
 if [ -n "$JVM_DEBUG_PORT" ]; then
-  export JAVA_TOOL_OPTIONS="-agentlib:jdwp=transport=dt_socket,address=${JVM_DEBUG_PORT},server=y,suspend=${JVM_SUSPEND} ${JAVA_TOOL_OPTIONS}"
+  export JAVA_TOOL_OPTIONS="-agentlib:jdwp=transport=dt_socket,address=localhost:${JVM_DEBUG_PORT},server=y,suspend=${JVM_SUSPEND} ${JAVA_TOOL_OPTIONS}"
 fi
 # Optionally add additional JVM args.
 if [ -n "$JVM_ARGS" ]; then
