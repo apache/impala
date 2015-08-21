@@ -119,8 +119,8 @@ public class KuduScanNode extends ScanNode {
         // We're using the leader to avoid querying a lagging replica. This hinders
         // scheduling a scan with different replicas.
         LocatedTablet.Replica replica = tablet.getLeaderReplica();
-        HostPortPB host = replica.getRpcHostPort();
-        TNetworkAddress address = new TNetworkAddress(host.getHost(), host.getPort());
+        TNetworkAddress address = new TNetworkAddress(replica.getRpcHost(),
+            replica.getRpcPort());
 
         // Use the network address to look up the host in the global list
         Integer hostIndex = analyzer.getHostIndex().getIndex(address);
