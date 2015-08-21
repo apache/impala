@@ -29,6 +29,7 @@ from subprocess import Popen, PIPE
 from tests.common.impala_service import ImpaladService
 from tests.common.skip import SkipIfLocal
 from time import sleep
+from test_shell_common import assert_var_substitution
 
 SHELL_CMD = "%s/bin/impala-shell.sh" % os.environ['IMPALA_HOME']
 SHELL_HISTORY_FILE = os.path.expanduser("~/.impalahistory")
@@ -258,26 +259,12 @@ class TestImpalaShellInteractive(object):
     assert False, "No tip found in output %s" % result.stderr
 
   @pytest.mark.execute_serially
-  def test_var_replacement(self):
+  def test_var_substitution(self):
     cmds = open(os.path.join(QUERY_FILE_PATH, 'test_var_substitution.sql')).read().\
       split('\n')
     args = '--var=foo=123 --var=BAR=456 --delimited --output_delimiter=" "'
     result = run_impala_shell_interactive(cmds, shell_args=args)
-    assert re.search(r'\bfoo_number=\s*123123', result.stdout), \
-      "Numeric values not replaced correctly"
-    assert re.search(r'\bfoo_string=123', result.stdout), \
-      "String values not replaced correctly"
-    assert re.search(r'\bVariables:[\s\n]*BAR:\s*456\n\s*FOO:\s*123', result.stdout), \
-      "Set variable not listed correctly by the SET command"
-    assert re.search(r'\bError:\s*Unknown\s*variable\s*FOO1', result.stderr), \
-      "Missing variable FOO1 not reported correctly"
-    assert re.search(r'\bmulti_test=456_123_456_123', result.stdout), \
-      "Multiple replaces not working correctly"
-    assert re.search(r'\bError:\s*Variable\s*namespace\s*not\s*specified\s*' +
-                     r'\(RANDOM_NAME\). Use \${VAR:var_name}', \
-      result.stderr), "Invalid variable reference"
-    assert re.search(r'"This should be not replaced: \${VAR:foo} \${HIVEVAR:bar}"',
-      result.stdout), "Variable escaping not working"
+    assert_var_substitution(result)
 
 
 def run_impala_shell_interactive(input_lines, shell_args=''):

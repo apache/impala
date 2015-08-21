@@ -23,6 +23,7 @@ from impala_shell_results import get_shell_cmd_result
 from subprocess import Popen, PIPE, call
 from tests.common.impala_service import ImpaladService
 from time import sleep
+from test_shell_common import assert_var_substitution
 
 IMPALAD_HOST_PORT_LIST = pytest.config.option.impalad.split(',')
 assert len(IMPALAD_HOST_PORT_LIST) > 0, 'Must specify at least 1 impalad to target'
@@ -407,25 +408,11 @@ class TestImpalaShell(object):
     # positive case where the password is correct.
 
   @pytest.mark.execute_serially
-  def test_var_replacement(self):
+  def test_var_substitution(self):
     args = '--var=foo=123 --var=BAR=456 --delimited --output_delimiter=" " -c -f %s' \
       % (os.path.join(QUERY_FILE_PATH, 'test_var_substitution.sql'))
     result = run_impala_shell_cmd(args, expect_success=True)
-    assert re.search(r'^foo_number=\s*123123', result.stdout), \
-      "Numeric values not replaced correctly"
-    assert re.search(r'\nfoo_string=123', result.stdout), \
-      "String values not replaced correctly"
-    assert re.search(r'\nVariables:[\s\n]*BAR:\s*456\n\s*FOO:\s*123', result.stdout), \
-      "Set variable not listed correctly by the SET command"
-    assert re.search(r'\nError:\s*Unknown\s*variable\s*FOO1', result.stderr), \
-      "Missing variable FOO1 not reported correctly"
-    assert re.search(r'\nmulti_test=456_123_456_123', result.stdout), \
-      "Multiple replaces not working correctly"
-    assert re.search(r'\nError:\s*Variable\s*namespace\s*not\s*specified\s*' + \
-                     r'\(RANDOM_NAME\). Use \${VAR:var_name}', \
-      result.stderr), "Invalid variable reference"
-    assert re.search(r'\n"This should be not replaced: \${VAR:foo} \${HIVEVAR:bar}"',
-      result.stdout), "Variable escaping not working"
+    assert_var_substitution(result)
 
 
 def run_impala_shell_cmd(shell_args, expect_success=True, stdin_input=None):

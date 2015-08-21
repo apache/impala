@@ -95,6 +95,9 @@ class ImpalaShell(cmd.Cmd):
   CMD_DELIM = ';'
   # Valid variable name pattern
   VALID_VAR_NAME_PATTERN = r'[A-Za-z][A-Za-z0-9_]*'
+  # Pattern for removal of comments preceding SET commands
+  COMMENTS_BEFORE_SET_PATTERN = r'^(\s*/\*(.|\n)*?\*/|\s*--.*\n)*\s*((un)?set)'
+  COMMENTS_BEFORE_SET_REPLACEMENT = r'\3'
   # Variable names are prefixed with the following string
   VAR_PREFIXES = [ 'VAR', 'HIVEVAR' ]
   DEFAULT_DB = 'default'
@@ -239,38 +242,51 @@ class ImpalaShell(cmd.Cmd):
       print_to_stderr('Error running command : %s' % e)
       return CmdStatus.ERROR
 
+  def _remove_comments_before_set(self, line):
+    """SET commands preceded by a comment become a SET query, which are not processed
+       locally. SET VAR:* commands must be processed locally, since they are not known
+       to the frontend. Thus, we remove comments that precede SET commands to enforce the
+       local processing."""
+    regexp = re.compile(ImpalaShell.COMMENTS_BEFORE_SET_PATTERN, re.IGNORECASE)
+    return regexp.sub(ImpalaShell.COMMENTS_BEFORE_SET_REPLACEMENT, line, 1)
+
   def sanitise_input(self, args):
     """Convert the command to lower case, so it's recognized"""
     # A command terminated by a semi-colon is legal. Check for the trailing
     # semi-colons and strip them from the end of the command.
-    args = args.strip()
-    tokens = args.split(' ')
     if not self.interactive:
-      tokens[0] = tokens[0].lower()
       # Strip all the non-interactive commands of the delimiter.
+      args = self._remove_comments_before_set(args)
+      tokens = args.strip().split(' ')
+      tokens[0] = tokens[0].lower()
       return ' '.join(tokens).rstrip(ImpalaShell.CMD_DELIM)
+    # Handle EOF if input is interactive
+    tokens = args.strip().split(' ')
+    tokens[0] = tokens[0].lower()
+    if tokens[0] == 'eof':
+      if not self.partial_cmd:
+        # The first token is the command.
+        # If it's EOF, call do_quit()
+        return 'quit'
+      else:
+        # If a command is in progress and the user hits a Ctrl-D, clear its state
+        # and reset the prompt.
+        self.prompt = self.cached_prompt
+        self.partial_cmd = str()
+        # The print statement makes the new prompt appear in a new line.
+        # Also print an extra newline to indicate that the current command has
+        # been cancelled.
+        print '\n'
+        return str()
     # The first token is converted into lower case to route it to the
     # appropriate command handler. This only applies to the first line of user input.
     # Modifying tokens in subsequent lines may change the semantics of the command,
     # so do not modify the text.
-    if not self.partial_cmd:
-      # The first token is the command.
-      # If it's EOF, call do_quit()
-      if tokens[0] == 'EOF':
-        return 'quit'
-      else:
-        tokens[0] = tokens[0].lower()
-    elif tokens[0] == "EOF":
-      # If a command is in progress and the user hits a Ctrl-D, clear its state
-      # and reset the prompt.
-      self.prompt = self.cached_prompt
-      self.partial_cmd = str()
-      # The print statement makes the new prompt appear in a new line.
-      # Also print an extra newline to indicate that the current command has
-      # been cancelled.
-      print '\n'
-      return str()
-    args = self._check_for_command_completion(' '.join(tokens).strip())
+    args = self._check_for_command_completion(args)
+    args = self._remove_comments_before_set(args)
+    tokens = args.strip().split(' ')
+    tokens[0] = tokens[0].lower()
+    args = ' '.join(tokens).strip()
     return args.rstrip(ImpalaShell.CMD_DELIM)
 
   def _shlex_split(self, line):
@@ -413,29 +429,21 @@ class ImpalaShell(cmd.Cmd):
     matches = set(map(lambda v: v.upper(), re.findall(r'(?<!\\)\${([^}]+)}', query)))
     for name in matches:
       value = None
-      # A namespace must be specified
-      ns_match = re.match(r'^([^:]*):(.*)', name)
-      if ns_match is None:
-        print_to_stderr('Error: Variable namespace not specified (%s). ' % (name) + \
+      # Check if syntax is correct
+      var_name = self._get_var_name(name)
+      if var_name is None:
+        print_to_stderr('Error: Unknown substitution syntax (%s). ' % (name,) + \
                         'Use ${VAR:var_name}.')
         errors = True
       else:
-        ns = ns_match.group(1)
-        var_name = ns_match.group(2)
-        if ns in ImpalaShell.VAR_PREFIXES:
-          # Replaces variable value
-          if self.set_variables and var_name in self.set_variables:
-            value = self.set_variables[var_name]
-          else:
-            print_to_stderr('Error: Unknown variable %s' % (var_name))
-            errors = True
-        else:
-          print_to_stderr('Error: Unknown substitution syntax (%s). ' % (name) + \
-                          'Use ${VAR:var_name}.')
-          errors = True
-        if value is not None:
+        # Replaces variable value
+        if self.set_variables and var_name in self.set_variables:
+          value = self.set_variables[var_name]
           regexp = re.compile(r'(?<!\\)\${%s}' % (name,), re.IGNORECASE)
           query = regexp.sub(value, query)
+        else:
+          print_to_stderr('Error: Unknown variable %s' % (var_name))
+          errors = True
     if errors:
       return None
     else:
@@ -508,6 +516,18 @@ class ImpalaShell(cmd.Cmd):
     except KeyError:
       return False
 
+  def _get_var_name(self, name):
+    """Look for a namespace:var_name pattern in an option name.
+       Return the variable name if it's a match or None otherwise.
+    """
+    ns_match = re.match(r'^([^:]*):(.*)', name)
+    if ns_match is not None:
+      ns = ns_match.group(1)
+      var_name = ns_match.group(2)
+      if ns in ImpalaShell.VAR_PREFIXES:
+        return var_name
+    return None
+
   def do_set(self, args):
     """Set or display query options.
 
@@ -515,6 +535,8 @@ class ImpalaShell(cmd.Cmd):
     Usage: SET
     Set query options:
     Usage: SET <option>=<value>
+           OR
+           SET VAR:<variable>=<value>
 
     """
     # TODO: Expand set to allow for setting more than just query options.
@@ -530,16 +552,24 @@ class ImpalaShell(cmd.Cmd):
     tokens = [arg.strip() for arg in args.split("=")]
     if len(tokens) != 2:
       print_to_stderr("Error: SET <option>=<value>")
+      print_to_stderr("       OR")
+      print_to_stderr("       SET VAR:<variable>=<value>")
       return CmdStatus.ERROR
     option_upper = tokens[0].upper()
-    if not self._handle_shell_options(option_upper, tokens[1]):
-      if option_upper not in self.imp_client.default_query_options:
+    # Check if it's a variable
+    var_name = self._get_var_name(option_upper)
+    if var_name is not None:
+      # Set the variable
+      self.set_variables[var_name] = tokens[1]
+      self._print_if_verbose('Variable %s set to %s' % (var_name, tokens[1]))
+    elif not self._handle_shell_options(option_upper, tokens[1]):
+      if option_upper not in self.imp_client.default_query_options.keys():
         print "Unknown query option: %s" % (tokens[0])
         print "Available query options, with their values (defaults shown in []):"
         self._print_options(self.imp_client.default_query_options, self.set_query_options)
         return CmdStatus.ERROR
       self.set_query_options[option_upper] = tokens[1]
-    self._print_if_verbose('%s set to %s' % (option_upper, tokens[1]))
+      self._print_if_verbose('%s set to %s' % (option_upper, tokens[1]))
 
   def do_unset(self, args):
     """Unset a query option"""
@@ -547,7 +577,15 @@ class ImpalaShell(cmd.Cmd):
       print 'Usage: unset <option>'
       return CmdStatus.ERROR
     option = args.upper()
-    if self.set_query_options.get(option):
+    # Check if it's a variable
+    var_name = self._get_var_name(option)
+    if var_name is not None:
+      if self.set_variables.get(var_name):
+        print 'Unsetting variable %s' % var_name
+        del self.set_variables[var_name]
+      else:
+        print "No variable called %s is set" % var_name
+    elif self.set_query_options.get(option):
       print 'Unsetting option %s' % option
       del self.set_query_options[option]
     else:
