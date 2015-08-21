@@ -2068,49 +2068,21 @@ where REGEXP_LIKE(upper(str_col), lower(match_regex_col), 'c')
 string, string
 ====
 ---- QUERY
-drop table if exists multiline_test_table
+select tmp.str from (values
+('testfield' as str),
+('multi\nfield'),
+('multi\nfield\ntwo')) as tmp
+where regexp_like(tmp.str, '^multi.*$')
 ---- RESULTS
-====
----- QUERY
-create table multiline_test_table(id_col INT, str_col STRING)
-row format delimited lines terminated by ','
----- RESULTS
-====
----- QUERY
-insert into multiline_test_table values(1, 'testfield')
-====
----- QUERY
-insert into multiline_test_table values(1, 'multi\nfield')
-====
----- QUERY
-insert into multiline_test_table values(1, 'multi\nfield\ntwo')
-====
----- QUERY
-select str_col from multiline_test_table
-where REGEXP_LIKE(str_col, "^multi.*$")
----- RESULTS
----- TYPES
+----TYPES
 string
 ====
 ---- QUERY
-select translate(str_col, '\n', '@') from multiline_test_table
-where REGEXP_LIKE(str_col, "^multi.*$", 'n')
----- RESULTS
-'multi@field@two'
-'multi@field'
----- TYPES
-string
-====
----- QUERY
-select str_col from multiline_test_table
-where REGEXP_LIKE(str_col, "^fiel.*$", 'n')
----- RESULTS
----- TYPES
-string
-====
----- QUERY
-select translate(str_col, '\n', '@') from multiline_test_table
-where REGEXP_LIKE(str_col, "^fiel.*$", 'm')
+select translate(tmp.str, '\n', '@') from (values
+('testfield' as str),
+('multi\nfield'),
+('multi\nfield\ntwo')) as tmp
+where regexp_like(tmp.str, '^multi.*$', 'n')
 ---- RESULTS
 'multi@field'
 'multi@field@two'
@@ -2118,8 +2090,21 @@ where REGEXP_LIKE(str_col, "^fiel.*$", 'm')
 string
 ====
 ---- QUERY
-select translate(str_col, '\n', '@') from multiline_test_table
-where REGEXP_LIKE(str_col, "^fiel.*$", 'mn')
+select translate(tmp.str, '\n', '@') from (values
+('testfield' as str),
+('multi\nfield'),
+('multi\nfield\ntwo')) as tmp
+where regexp_like(tmp.str, '^fiel.*$', 'n')
+---- RESULTS
+---- TYPES
+string
+====
+---- QUERY
+select translate(tmp.str, '\n', '@') from (values
+('testfield' as str),
+('multi\nfield'),
+('multi\nfield\ntwo')) as tmp
+where regexp_like(tmp.str, '^fiel.*$', 'm')
 ---- RESULTS
 'multi@field'
 'multi@field@two'
@@ -2127,8 +2112,23 @@ where REGEXP_LIKE(str_col, "^fiel.*$", 'mn')
 string
 ====
 ---- QUERY
-select translate(str_col, '\n', '@') from multiline_test_table
-where REGEXP_LIKE('', '', '')
+select translate(tmp.str, '\n', '@') from (values
+('testfield' as str),
+('multi\nfield'),
+('multi\nfield\ntwo')) as tmp
+where regexp_like(tmp.str, '^fiel.*$', 'mn')
+---- RESULTS
+'multi@field'
+'multi@field@two'
+---- TYPES
+string
+====
+---- QUERY
+select translate(tmp.str, '\n', '@') from (values
+('testfield' as str),
+('multi\nfield'),
+('multi\nfield\ntwo')) as tmp
+where regexp_like('', '', '')
 ---- RESULTS
 'testfield'
 'multi@field'
@@ -2137,8 +2137,11 @@ where REGEXP_LIKE('', '', '')
 string
 ====
 ---- QUERY
-select translate(str_col, '\n', '@') from multiline_test_table
-where REGEXP_LIKE('', '')
+select translate(tmp.str, '\n', '@') from (values
+('testfield' as str),
+('multi\nfield'),
+('multi\nfield\ntwo')) as tmp
+where regexp_like('', '')
 ---- RESULTS
 'testfield'
 'multi@field'
@@ -2174,7 +2177,4 @@ select split_part(tmp.str, tmp.delim, pos) from (values
 'NULL'
 ---- TYPES
 string
-====
----- QUERY
-drop table if exists multiline_test_table
 ====
