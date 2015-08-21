@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from copy import deepcopy
 from inspect import getmro
 from logging import getLogger
 from re import sub
 from sqlparse import format
 
-from tests.comparison.types import (
+from common import StructColumn, CollectionColumn
+from db_types import (
     Char,
     Decimal,
     Float,
@@ -26,10 +26,8 @@ from tests.comparison.types import (
     String,
     Timestamp,
     VarChar)
-from tests.comparison.query import Query
-from tests.comparison.common import StructColumn, CollectionColumn
-from tests.comparison.query_flattener import QueryFlattener
-
+from query import Query
+from query_flattener import QueryFlattener
 
 LOG = getLogger(__name__)
 

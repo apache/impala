@@ -46,7 +46,7 @@ class ClusterController(object):
     self.ssh_timeout_secs = ssh_timeout_secs
 
   @contextmanager
-  def _cmd_settings(self, _use_deprecated_mode):
+  def _task_settings(self, _use_deprecated_mode=False):
     settings_args = [hide("running", "stdout")]
     settings_kwargs = {
         "abort_on_prompts": True,
@@ -80,7 +80,7 @@ class ClusterController(object):
          3) The 'cmd_prefix' argument will be ignored.
          4) Additional runtime information about command execution will be sent to stdout.
     """
-    with self._cmd_settings(_use_deprecated_mode):
+    with self._task_settings(_use_deprecated_mode=_use_deprecated_mode):
       if not _use_deprecated_mode and cmd_prefix:
         cmd = cmd_prefix + "\n" + cmd
       cmd = dedent(cmd)
@@ -95,6 +95,11 @@ class ClusterController(object):
         return execute(task)
       else:
         return {"localhost": local(cmd)}
+
+  def run_task(self, task, hosts=(), *task_args, **task_kwargs):
+    with self._task_settings():
+      cmd_hosts = hosts or self.hosts
+      return execute(fabric.decorators.hosts(cmd_hosts)(task), *task_args, **task_kwargs)
 
   def deprecated_run_cmd(self, cmd, hosts=()):
     """No new code should use this."""

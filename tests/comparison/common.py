@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+
 from collections import defaultdict
 from copy import deepcopy
 
@@ -25,18 +27,19 @@ __ALREADY_IMPORTED = False
 def get_import(name):
   global __ALREADY_IMPORTED
   if not __ALREADY_IMPORTED:
-    from tests.comparison.types import (
+    from db_types import (
         BigInt,
         Boolean,
         Char,
         DataType,
+        Decimal,
         Float,
         Int,
         JOINABLE_TYPES,
         Number,
         Timestamp)
-    from tests.comparison.funcs import AggFunc, AnalyticFunc, Func
-    from tests.comparison.query import InlineView, Subquery, WithClauseInlineView
+    from funcs import AggFunc, AnalyticFunc, Func
+    from query import InlineView, Subquery, WithClauseInlineView
     for key, value in locals().items():
       globals()[key] = value
     __ALREADY_IMPORTED = True
@@ -372,6 +375,9 @@ class TableExpr(object):
   def is_with_clause_inline_view(self):
     return isinstance(self, get_import('WithClauseInlineView'))
 
+  def __hash__(self):
+    return hash(self.identifier)
+
   def __eq__(self, other):
     if not isinstance(other, type(self)):
       return False
@@ -483,7 +489,20 @@ class Table(TableExpr):
     self._cols = [] # can include CollectionColumns and StructColumns
     self._unique_cols = []
     self.alias = None
-    self.is_visible = True # tables used in SEMI or ANTI JOINs are invisible
+    self.is_visible = True   # Tables used in SEMI or ANTI JOINs are invisible
+
+    # Only used for data loading. Always stored in upper-case. If set, values will be
+    # something like 'PARQUET' or 'TEXT'. See cli_options.py for a full list of
+    # possible values.
+    self._storage_format = None
+
+    # Only used for data loading. For Impala and Hive, this is the path to the directory
+    # in the storage system, such as an HDFS URL.
+    self.storage_location = None
+
+    # Only used for data loading. Avro tables may require a separate schema definition,
+    # this is the path to the schema file in the storage system, such as an HDFS URL.
+    self.schema_location = None
 
   @property
   def identifier(self):
@@ -508,6 +527,32 @@ class Table(TableExpr):
   @unique_cols.setter
   def unique_cols(self, unique_cols):
     self._unique_cols = unique_cols
+
+  @property
+  def storage_format(self):
+    return self._storage_format
+
+  @storage_format.setter
+  def storage_format(self, storage_format):
+    self._storage_format = storage_format and storage_format.upper()
+
+  def get_avro_schema(self):
+    avro_schema = {'name': 'my_record', 'type': 'record', 'fields': []}
+    for col in self.cols:
+      if issubclass(col.type, get_import('Int')):
+        avro_type = 'int'
+      elif issubclass(col.type, get_import('Char')):
+        avro_type = 'string'
+      elif issubclass(col.type, get_import('Decimal')):
+        avro_type = {
+            "type": "bytes",
+            "logicalType": "decimal",
+            "precision": col.exact_type.MAX_DIGITS,
+            "scale": col.exact_type.MAX_FRACTIONAL_DIGITS}
+      else:
+        avro_type = col.type.__name__.lower()
+      avro_schema['fields'].append({'name': col.name, 'type': ['null', avro_type]})
+    return json.dumps(avro_schema)
 
   def __repr__(self):
     return 'Table<name: %s, cols: %s>' \

@@ -17,18 +17,20 @@
 import logging
 import os
 import sys
-from optparse import NO_DEFAULT, OptionGroup
+from getpass import getuser
 from tempfile import gettempdir
 
-from tests.comparison.types import TYPES
+import db_connection
+from cluster import CmCluster, MiniCluster
+from db_types import TYPES
 
 def add_logging_options(section, default_debug_log_file=None):
   if not default_debug_log_file:
     default_debug_log_file = os.path.join(
         gettempdir(), os.path.basename(sys.modules["__main__"].__file__) + ".log")
-  section.add_option('--log-level', default='INFO',
+  section.add_argument('--log-level', default='INFO',
       help='The log level to use.', choices=('DEBUG', 'INFO', 'WARN', 'ERROR'))
-  section.add_option('--debug-log-file', default=default_debug_log_file,
+  section.add_argument('--debug-log-file', default=default_debug_log_file,
       help='Path to debug log file.')
 
 
@@ -56,107 +58,165 @@ def configure_logging(log_level, debug_log_file=None, log_thread_id=False,
     file_logger.setLevel(logging.DEBUG)
     root_logger.addHandler(file_logger)
 
+  def create_third_party_filter(level):
+    def filter_record(record):
+      name = record.name
+      if name.startswith("impala.") or name.startswith("paramiko.") \
+          or name.startswith("hdfs") or name.startswith("requests"):
+        return record.levelno >= level
+      return True
+    log_filter = logging.Filter()
+    log_filter.filter = filter_record
+    return log_filter
+  console_logger.addFilter(create_third_party_filter(logging.WARN))
+  if debug_log_file:
+    file_logger.addFilter(create_third_party_filter(logging.INFO))
 
-def add_cm_options(section):
-  section.add_option('--cm-host', metavar='host name',
-      help='The host name of the CM server.')
-  section.add_option('--cm-port', default=7180, type=int, metavar='port number',
-      help='The port of the CM server.')
-  section.add_option('--cm-user', default="admin", metavar='user name',
-      help='The name of the CM user.')
-  section.add_option('--cm-password', default="admin", metavar='password',
-      help='The password for the CM user.')
-  section.add_option('--cm-cluster-name', metavar='name',
-      help='If CM manages multiple clusters, use this to specify which cluster to use.')
+
+def add_ssh_options(section):
+  section.add_argument('--ssh-user', metavar='user name', default=getuser(),
+      help='The user name to use for SSH connections to cluster nodes.')
+  section.add_argument('--ssh-key-file', metavar='path to file',
+      help='Specify an additional SSH key other than the defaults in ~/.ssh.')
+  section.add_argument('--ssh-port', metavar='number', type=int, default=22,
+      help='The port number to use when connecting through SSH.')
 
 
 def add_db_name_option(section):
-  section.add_option('--db-name', default='randomness',
+  section.add_argument('--db-name', default='randomness',
       help='The name of the database to use. Ex: functional.')
+
+
+def add_cluster_options(section):
+  add_cm_options(section)
+  add_ssh_options(section)
+  section.add_argument("--hadoop-user-name", default=getuser(),
+      help="The user name to use when interacting with hadoop.")
+
+
+def add_cm_options(section):
+  section.add_argument('--cm-host', metavar='host name',
+      help='The host name of the CM server.')
+  section.add_argument('--cm-port', default=7180, type=int, metavar='port number',
+      help='The port of the CM server.')
+  section.add_argument('--cm-user', default="admin", metavar='user name',
+      help='The name of the CM user.')
+  section.add_argument('--cm-password', default="admin", metavar='password',
+      help='The password for the CM user.')
+  section.add_argument('--cm-cluster-name', metavar='name',
+      help='If CM manages multiple clusters, use this to specify which cluster to use.')
+
+
+def create_cluster(args):
+  if args.cm_host:
+    cluster = CmCluster(args.cm_host, user=args.cm_user, password=args.cm_password,
+        cluster_name=args.cm_cluster_name, ssh_user=args.ssh_user, ssh_port=args.ssh_port,
+        ssh_key_file=args.ssh_key_file)
+  else:
+    cluster = MiniCluster()
+  cluster.hadoop_user_name = args.hadoop_user_name
+  return cluster
 
 
 def add_storage_format_options(section):
   storage_formats = ['avro', 'parquet', 'rcfile', 'sequencefile', 'textfile']
-  section.add_option('--storage-file-formats', default=','.join(storage_formats),
+  section.add_argument('--storage-file-formats', default=','.join(storage_formats),
       help='A comma separated list of storage formats to use.')
 
 
 def add_data_types_options(section):
-  section.add_option('--data-types', default=','.join(type_.__name__ for type_ in TYPES),
+  section.add_argument('--data-types',
+      default=','.join(type_.__name__ for type_ in TYPES),
       help='A comma separated list of data types to use.')
 
 
 def add_timeout_option(section):
-  section.add_option('--timeout', default=(3 * 60), type=int, help='Query timeout in seconds')
+  section.add_argument('--timeout', default=(3 * 60), type=int,
+      help='Query timeout in seconds')
 
 
 def add_connection_option_groups(parser):
-  group = OptionGroup(parser, "Impala Options")
-  group.add_option('--impalad-host', default='localhost',
-      help="The name of the host running the Impala daemon")
-  group.add_option("--impalad-hs2-port", default=21050, type=int,
-      help="The hs2 port of the host running the Impala daemon")
-  parser.add_option_group(group)
-
-  group = OptionGroup(parser, "Hive Options")
-  group.add_option('--use-hive', action='store_true', default=False,
-      help='Use Hive (Impala will be skipped)')
-  group.add_option('--hive-host', default='localhost',
-      help="The name of the host running the HS2")
-  group.add_option("--hive-port", default=10000, type=int,
-      help="The port of HiveServer2")
-  group.add_option('--hive-user', default='hive',
-      help="The user name to use when connecting to HiveServer2")
-  group.add_option('--hive-password', default='hive',
-      help="The password to use when connecting to HiveServer2")
-  group.add_option('--hdfs-host',
-      help='The host for HDFS backing Hive tables, necessary for external HiveServer2')
-  group.add_option('--hdfs-port',
-      help='The port for HDFS backing Hive tables, necessary for external HiveServer2')
-  parser.add_option_group(group)
-
-  group = OptionGroup(parser, 'MySQL Options')
-  group.add_option('--use-mysql', action='store_true', default=False,
+  group = parser.add_argument_group('MySQL Options')
+  group.add_argument('--use-mysql', action='store_true',
       help='Use MySQL')
-  group.add_option('--mysql-host', default='localhost',
+  group.add_argument('--mysql-host', default='localhost',
       help='The name of the host running the MySQL database.')
-  group.add_option('--mysql-port', default=3306, type=int,
+  group.add_argument('--mysql-port', default=3306, type=int,
       help='The port of the host running the MySQL database.')
-  group.add_option('--mysql-user', default='root',
+  group.add_argument('--mysql-user', default='root',
       help='The user name to use when connecting to the MySQL database.')
-  group.add_option('--mysql-password',
+  group.add_argument('--mysql-password',
       help='The password to use when connecting to the MySQL database.')
-  parser.add_option_group(group)
+  parser.add_argument_group(group)
 
-  group = OptionGroup(parser, 'Oracle Options')
-  group.add_option('--use-oracle', action='store_true', default=False,
+  group = parser.add_argument_group('Oracle Options')
+  group.add_argument('--use-oracle', action='store_true',
       help='Use Oracle')
-  group.add_option('--oracle-host', default='localhost',
+  group.add_argument('--oracle-host', default='localhost',
       help='The name of the host running the Oracle database.')
-  group.add_option('--oracle-port', default=1521, type=int,
+  group.add_argument('--oracle-port', default=1521, type=int,
       help='The port of the host running the Oracle database.')
-  group.add_option('--oracle-user', default='system',
+  group.add_argument('--oracle-user', default='system',
       help='The user name to use when connecting to the Oracle database.')
-  group.add_option('--oracle-password',
+  group.add_argument('--oracle-password',
       help='The password to use when connecting to the Oracle database.')
-  parser.add_option_group(group)
+  parser.add_argument_group(group)
 
-  group = OptionGroup(parser, 'Postgresql Options')
-  group.add_option('--use-postgresql', action='store_true', default=False,
+  group = parser.add_argument_group('Postgresql Options')
+  group.add_argument('--use-postgresql', action='store_true',
       help='Use Postgresql')
-  group.add_option('--postgresql-host', default='localhost',
+  group.add_argument('--postgresql-host', default='localhost',
       help='The name of the host running the Postgresql database.')
-  group.add_option('--postgresql-port', default=5432, type=int,
+  group.add_argument('--postgresql-port', default=5432, type=int,
       help='The port of the host running the Postgresql database.')
-  group.add_option('--postgresql-user', default='postgres',
+  group.add_argument('--postgresql-user', default='postgres',
       help='The user name to use when connecting to the Postgresql database.')
-  group.add_option('--postgresql-password',
+  group.add_argument('--postgresql-password',
       help='The password to use when connecting to the Postgresql database.')
-  parser.add_option_group(group)
+  parser.add_argument_group(group)
 
 
-def add_default_values_to_help(parser):
-  for group in parser.option_groups + [parser]:
-    for option in group.option_list:
-      if option.default != NO_DEFAULT and option.help:
-        option.help += ' [default: %default]'
+def get_db_type(args):
+  db_types = list()
+  if args.use_mysql:
+    db_types.append(db_connection.MYSQL)
+  if args.use_oracle:
+    db_types.append(db_connection.ORACLE)
+  if args.use_postgresql:
+    db_types.append(db_connection.POSTGRESQL)
+  if not db_types:
+    raise Exception("At least one of --use-mysql, --use-oracle, or --use-postgresql"
+        "must be used")
+  elif len(db_types) > 1:
+    raise Exception("Too many databases requested: %s" % db_types)
+  return db_types[0]
+
+
+def create_connection(args, db_type=None, db_name=None):
+  if not db_type:
+    db_type = get_db_type(args)
+  if db_type == db_connection.POSTGRESQL:
+    conn_class = db_connection.PostgresqlConnection
+  elif db_type == db_connection.MYSQL:
+    conn_class = db_connection.MySQLConnection
+  elif db_type == db_connection.ORACLE:
+    conn_class = db_connection.OracleConnection
+  else:
+    raise Exception('Unexpected db_type: %s; expected one of %s.'
+        % (db_type, ', '.join([db_connection.POSTGRESQL, db_connection.MYSQL,
+              db_connection.ORACLE])))
+  prefix = db_type.lower()
+  return conn_class(
+      user_name=getattr(args, prefix + '_user'),
+      password=getattr(args, prefix + '_password'),
+      host_name=getattr(args, prefix + '_host'),
+      port=getattr(args, prefix + '_port'),
+      db_name=db_name)
+
+
+def add_kerberos_options(section):
+  section.add_argument("--use-kerberos", action="store_true",
+      help="Use kerberos when communicating with Impala. This requires that kinit has"
+      " already been done before running this script.")
+  section.add_argument("--kerberos-principal", default=getuser(),
+      help="The principal name to use.")

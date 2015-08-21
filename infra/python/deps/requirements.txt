@@ -2,33 +2,43 @@
 
 # Remember, all modules below need to support python 2.6.
 
+# Dependents are indented. Dependents that have multiple parents are not listed
+# multiple times (though maybe they could be).
+
 allpairs == 2.0.1
-bitarray == 0.8.1  # Needed by impyla
-
-# Needed by cm_api; already available as part of python on Linux.
-readline == 6.2.4.1; sys_platform == 'darwin'
-
+argparse == 1.4.0
 cm-api == 10.0.0
+  # Already available as part of python on Linux.
+  readline == 6.2.4.1; sys_platform == 'darwin'
 Fabric == 1.10.2
+  paramiko == 1.15.2
+  pycrypto == 2.6.1
+hdfs == 2.0.2
+  docopt == 0.6.2
+  execnet == 1.4.0
 impyla == 0.11.2
+  bitarray == 0.8.1
+  sasl == 0.1.3
+  six == 1.9.0
+  # Thrift usually comes from the thirdparty dir but in case the virtualenv is needed
+  # before thirdparty is built thrift will be installed anyways.
+  thrift == 0.9.0
+  thrift_sasl == 0.1.0
+ordereddict == 1.1
 pexpect == 3.3
 pg8000 == 1.10.2
 prettytable == 0.7.2
 psutil == 0.7.1
-pyhive == 0.1.5
 pyparsing == 2.0.3
 pytest == 2.7.2
+  py == 1.4.30
 pytest-xdist == 1.12
 pywebhdfs == 0.3.2
-sasl == 0.1.3
+  pbr == 1.8.1
+requests == 2.7.0
 sh == 1.11
 sqlparse == 0.1.15
 texttable == 0.8.3
-
-# Thrift usually comes from the thirdparty dir but in case the virtualenv is needed
-# before thirdparty is built thrift will be installed anyways.
-thrift == 0.9.0
-thrift_sasl == 0.1.0
 
 # For dev purposes, not used in scripting. Version 1.2.1 is the latest that supports 2.6.
 ipython == 1.2.1

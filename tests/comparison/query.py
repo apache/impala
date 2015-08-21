@@ -12,20 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from logging import getLogger
 from copy import deepcopy
+from logging import getLogger
 
-from tests.comparison.common import (
-    CollectionColumn,
-    Column,
-    StructColumn,
-    Table,
-    TableExpr,
-    TableExprList,
-    ValExpr,
-    ValExprList)
-from tests.comparison.funcs import And, Equals
-from tests.comparison.types import Boolean, BigInt
+from common import Column, TableExpr, TableExprList, ValExpr, ValExprList
 
 LOG = getLogger(__name__)
 

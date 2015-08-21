@@ -12,9 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
+import sys
+
 from collections import defaultdict
 
-from tests.comparison.common import ValExpr, ValExprList
+from common import ValExpr, ValExprList
+
+module_contents = dict()
 
 class DataTypeMetaclass(type):
   '''Provides sorting of classes used to determine upcasting.'''
@@ -137,6 +142,7 @@ class Decimal(Number):
   MAX_DIGITS = 38   # Arbitrary default values
   MAX_FRACTIONAL_DIGITS = 10   # Arbitrary default values
 
+
 class Float(Number):
 
   @classmethod
@@ -223,3 +229,27 @@ def get_varchar_class(length):
         (VarChar, ),
         {'MAX': length})
   return __VARCHAR_TYPE_CACHE[length]
+
+
+class ModuleWrapper(object):
+
+  def __init__(self, module):
+    self.module = module
+    self.decimal_class_pattern = re.compile(r"Decimal(\d{2})(\d{2})")
+    self.char_class_pattern = re.compile(r"Char(\d+)")
+    self.varchar_class_pattern = re.compile(r"VarChar(\d+)")
+
+  def __getattr__(self, name):
+    match = self.decimal_class_pattern.match(name)
+    if match:
+      return self.get_decimal_class(int(match.group(1)), int(match.group(2)))
+    match = self.char_class_pattern.match(name)
+    if match:
+      return self.get_char_class(int(match.group(1)))
+    match = self.varchar_class_pattern.match(name)
+    if match:
+      return self.get_varchar_class(int(match.group(1)))
+    return getattr(self.module, name)
+
+
+sys.modules[__name__] = ModuleWrapper(sys.modules[__name__])

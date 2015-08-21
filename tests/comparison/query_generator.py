@@ -16,18 +16,11 @@ from collections import defaultdict
 from copy import deepcopy
 from itertools import ifilter
 from logging import getLogger
-from random import shuffle, choice, randint, randrange, random
+from random import shuffle, choice, randint, randrange
 
-from tests.comparison.query_profile import DefaultProfile, HiveProfile
-from tests.comparison.common import (
-    ArrayColumn,
-    Column,
-    StructColumn,
-    Table,
-    TableExprList,
-    ValExpr,
-    ValExprList)
-from tests.comparison.funcs import (
+from common import TableExprList, ValExpr, ValExprList, Table, Column
+from query_profile import HiveProfile
+from funcs import (
     AGG_FUNCS,
     AggFunc,
     ANALYTIC_FUNCS,
@@ -41,16 +34,15 @@ from tests.comparison.funcs import (
     Trim,
     WindowBoundary,
     WindowClause)
-from tests.comparison.types import (
+from db_types import (
     Char,
     Boolean,
     Int,
     Float,
-    JOINABLE_TYPES,
     String,
     TYPES,
     VarChar)
-from tests.comparison.query import (
+from query import (
     FromClause,
     GroupByClause,
     HavingClause,
@@ -144,6 +136,9 @@ class QueryGenerator(object):
        of an aggregate query. This is used during Subquery creation where the context
        may require an aggregate or non-aggregate.
     '''
+    if not table_exprs:
+      raise Exception("At least one TableExpr is needed")
+
     query = Query()
     query.parent = self.current_query
     self.queries_under_construction.append(query)
@@ -1300,7 +1295,8 @@ if __name__ == '__main__':
   query_generator = QueryGenerator(query_profile)
   from model_translator import SqlWriter
   sql_writer = SqlWriter.create(dialect='HIVE')
-  ref_writer = SqlWriter.create(dialect='POSTGRESQL', nulls_order_asc=query_profile.nulls_order_asc())
+  ref_writer = SqlWriter.create(dialect='POSTGRESQL',
+      nulls_order_asc=query_profile.nulls_order_asc())
   for _ in range(3000):
     query = query_generator.create_query(tables)
     print("Test db")

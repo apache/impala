@@ -32,18 +32,17 @@ from tempfile import gettempdir
 from threading import current_thread, Thread
 from time import time
 
-from tests.comparison.db_connector import (
-    DbConnection,
-    DbConnector,
+from db_types import BigInt
+from db_connection import (
+    DbCursor,
     IMPALA,
     HIVE,
     MYSQL,
     ORACLE,
     POSTGRESQL)
-from tests.comparison.model_translator import SqlWriter
-from tests.comparison.query_flattener import QueryFlattener
-from tests.comparison.query_generator import QueryGenerator
-from tests.comparison.types import BigInt
+from model_translator import SqlWriter
+from query_flattener import QueryFlattener
+from query_generator import QueryGenerator
 
 LOG = getLogger(__name__)
 
@@ -56,17 +55,16 @@ class QueryResultComparator(object):
   # The DECIMAL values will be rounded before comparison
   DECIMAL_PLACES = 2
 
-  def __init__(self, query_profile, ref_connection,
-      test_connection, query_timeout_seconds):
-    '''test/ref_connection arguments should be an instance of DbConnection'''
-    ref_cursor = ref_connection.create_cursor()
-    test_cursor = test_connection.create_cursor()
+  def __init__(self, query_profile, ref_conn, test_conn, query_timeout_seconds):
+    '''test/ref_conn arguments should be an instance of DbConnection'''
+    ref_cursor = ref_conn.cursor()
+    test_cursor = test_conn.cursor()
 
-    self.ref_connection = ref_connection
-    self.ref_sql_writer = SqlWriter.create(dialect=ref_connection.db_type,
-                                           nulls_order_asc=query_profile.nulls_order_asc())
-    self.test_connection = test_connection
-    self.test_sql_writer = SqlWriter.create(dialect=test_connection.db_type)
+    self.ref_conn = ref_conn
+    self.ref_sql_writer = SqlWriter.create(
+        dialect=ref_conn.db_type, nulls_order_asc=query_profile.nulls_order_asc())
+    self.test_conn = test_conn
+    self.test_sql_writer = SqlWriter.create(dialect=test_conn.db_type)
 
     self.query_executor = QueryExecutor(
         [ref_cursor, test_cursor],
@@ -75,7 +73,7 @@ class QueryResultComparator(object):
 
   @property
   def ref_db_type(self):
-    return self.ref_connection.db_type
+    return self.ref_conn.db_type
 
   def compare_query_results(self, query):
     '''Execute the query, compare the data, and return a ComparisonResult, which
@@ -95,7 +93,7 @@ class QueryResultComparator(object):
         # This comes from Postgresql. Overflow errors will be ignored.
         comparison_result.exception = TypeOverflow(error_message)
       LOG.debug('%s encountered an error running query: %s',
-          self.ref_connection.db_type, ref_exception, exc_info=True)
+          self.ref_conn.db_type, ref_exception, exc_info=True)
       return comparison_result
 
     if test_exception:
@@ -124,7 +122,7 @@ class QueryResultComparator(object):
       else:
         comparison_result.exception = test_exception
         LOG.debug('%s encountered an error running query: %s',
-            self.test_connection.db_type, test_exception, exc_info=True)
+            self.test_conn.db_type, test_exception, exc_info=True)
       return comparison_result
 
     comparison_result.ref_row_count = len(ref_data_set)
@@ -241,9 +239,9 @@ class QueryExecutor(object):
     for cursor in cursors:
       # A list of all queries attempted
       query_log_path = gettempdir() + '/test_query_log_%s_%s.sql' \
-          % (cursor.connection.db_type.lower(), time())
+          % (cursor.db_type.lower(), time())
       self.query_logs.append(open(query_log_path, 'w'))
-      link = gettempdir() + '/test_query_log_%s.sql' % cursor.connection.db_type.lower()
+      link = gettempdir() + '/test_query_log_%s.sql' % cursor.db_type.lower()
       try:
         unlink(link)
       except OSError as e:
@@ -295,9 +293,9 @@ class QueryExecutor(object):
         query_thread.join(join_time)
       if query_thread.is_alive():
         # Kill connection and reconnect to return cursor to initial state.
-        if cursor.connection.supports_kill_connection:
+        if cursor.conn.supports_kill:
           LOG.debug('Attempting to kill connection')
-          cursor.connection.kill_connection()
+          cursor.conn.kill()
           LOG.debug('Kill connection')
         try:
           # XXX: Sometimes this takes a very long time causing the program to appear to
@@ -306,8 +304,7 @@ class QueryExecutor(object):
           cursor.close()
         except Exception as e:
           LOG.info('Error closing cursor: %s', e)
-        cursor.connection.reconnect()
-        cursor.cursor = cursor.connection.create_cursor().cursor
+        cursor.reconnect()
         query_thread.exception = QueryTimeout(
             'Query timed out after %s seconds' % self.query_timeout_seconds)
 
@@ -335,12 +332,12 @@ class QueryExecutor(object):
         setup_sql = None
         query_sql = sql_writer.write_query(query)
       if setup_sql:
-        LOG.debug("Executing on %s:\n%s", cursor.connection.db_type, setup_sql)
+        LOG.debug("Executing on %s:\n%s", cursor.db_type, setup_sql)
         current_thread().sql = setup_sql + ';\n'
         log_file.write(setup_sql + ';\n')
         log_file.flush()
         cursor.execute(setup_sql)
-      LOG.debug("Executing on %s:\n%s", cursor.connection.db_type, query_sql)
+      LOG.debug("Executing on %s:\n%s", cursor.db_type, query_sql)
       current_thread().sql += query_sql
       log_file.write(query_sql + ';\n')
       log_file.write('/***** End Query *****/\n')
@@ -351,12 +348,12 @@ class QueryExecutor(object):
       row_limit = self.TOO_MUCH_DATA / col_count
       data_set = list()
       current_thread().data_set = data_set
-      LOG.debug("Fetching results from %s", cursor.connection.db_type)
+      LOG.debug("Fetching results from %s", cursor.db_type)
       while True:
         batch = cursor.fetchmany(batch_size)
         data_set.extend(batch)
         if len(batch) < batch_size:
-          if cursor.connection.db_type == IMPALA:
+          if cursor.db_type == IMPALA:
             impala_log = cursor.get_log()
             if 'Expression overflowed, returning NULL' in impala_log:
               raise TypeOverflow('Numeric overflow; data may not match')
@@ -367,9 +364,9 @@ class QueryExecutor(object):
       current_thread().exception = e
     finally:
       if query.execution == 'CREATE_TABLE_AS':
-        cursor.connection.drop_table(self._table_or_view_name)
+        cursor.drop_table(self._table_or_view_name)
       elif query.execution == 'VIEW':
-        cursor.connection.drop_view(self._table_or_view_name)
+        cursor.drop_view(self._table_or_view_name)
 
   def _create_random_table_name(self):
     char_choices = ascii_lowercase
@@ -458,13 +455,16 @@ class QueryResultDiffSearcher(object):
   # Sometimes things get into a bad state and the same error loops forever
   ABORT_ON_REPEAT_ERROR_COUNT = 2
 
-  def __init__(self, query_profile, ref_connection, test_connection):
+  def __init__(self, query_profile, ref_conn, test_conn):
     '''query_profile should be an instance of one of the profiles in query_profile.py'''
     self.query_profile = query_profile
-    self.ref_connection = ref_connection
-    self.test_connection = test_connection
-    self.common_tables = DbConnection.describe_common_tables(
-        [ref_connection, test_connection])
+    self.ref_conn = ref_conn
+    self.test_conn = test_conn
+    with ref_conn.cursor() as ref_cursor:
+      with test_conn.cursor() as test_cursor:
+        self.common_tables = DbCursor.describe_common_tables([ref_cursor, test_cursor])
+        if not self.common_tables:
+          raise Exception("Unable to find a common set of tables in both databases")
 
   def search(self, number_of_test_queries, stop_on_result_mismatch, stop_on_crash,
              query_timeout_seconds):
@@ -476,7 +476,7 @@ class QueryResultDiffSearcher(object):
     '''
     start_time = time()
     query_result_comparator = QueryResultComparator(
-        self.query_profile, self.ref_connection, self.test_connection, query_timeout_seconds)
+        self.query_profile, self.ref_conn, self.test_conn, query_timeout_seconds)
     query_generator = QueryGenerator(self.query_profile)
     query_count = 0
     queries_resulted_in_data_count = 0
@@ -531,15 +531,15 @@ class QueryResultDiffSearcher(object):
           LOG.info('Restarting Impala')
           call([join_path(getenv('IMPALA_HOME'), 'bin/start-impala-cluster.py'),
                           '--log_dir=%s' % getenv('LOG_DIR', "/tmp/")])
-          self.test_connection.reconnect()
-          query_result_comparator.test_cursor = self.test_connection.create_cursor()
+          self.test_conn.reconnect()
+          query_result_comparator.test_cursor = self.test_conn.cursor()
           result = query_result_comparator.compare_query_results(query)
           if result.error:
             LOG.info('Restarting Impala')
             call([join_path(getenv('IMPALA_HOME'), 'bin/start-impala-cluster.py'),
                             '--log_dir=%s' % getenv('LOG_DIR', "/tmp/")])
-            self.test_connection.reconnect()
-            query_result_comparator.test_cursor = self.test_connection.create_cursor()
+            self.test_conn.reconnect()
+            query_result_comparator.test_cursor = self.test_conn.cursor()
           else:
             break
 
@@ -623,30 +623,31 @@ class SearchResults(object):
 
 if __name__ == '__main__':
   import sys
-  from optparse import OptionParser
+  from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 
-  import tests.comparison.cli_options as cli_options
-  from tests.comparison.query_profile import PROFILES
+  import cli_options
+  from query_profile import PROFILES
 
-  parser = OptionParser()
+  parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
   cli_options.add_logging_options(parser)
   cli_options.add_db_name_option(parser)
+  cli_options.add_cluster_options(parser)
   cli_options.add_connection_option_groups(parser)
   cli_options.add_timeout_option(parser)
 
-  parser.add_option('--test-db-type', default=IMPALA,
+  parser.add_argument('--test-db-type', default=IMPALA,
       choices=(HIVE, IMPALA, MYSQL, ORACLE, POSTGRESQL),
       help='The type of the test database to use. Ex: IMPALA.')
-  parser.add_option('--ref-db-type', default=POSTGRESQL,
+  parser.add_argument('--ref-db-type', default=POSTGRESQL,
       choices=(MYSQL, ORACLE, POSTGRESQL),
       help='The type of the ref database to use. Ex: POSTGRESQL.')
-  parser.add_option('--stop-on-mismatch', default=False, action='store_true',
+  parser.add_argument('--stop-on-mismatch', default=False, action='store_true',
       help='Exit immediately upon find a discrepancy in a query result.')
-  parser.add_option('--stop-on-crash', default=False, action='store_true',
+  parser.add_argument('--stop-on-crash', default=False, action='store_true',
       help='Exit immediately if Impala crashes.')
-  parser.add_option('--query-count', default=1000000, type=int,
+  parser.add_argument('--query-count', default=1000000, type=int,
       help='Exit after running the given number of queries.')
-  parser.add_option('--exclude-types', default='',
+  parser.add_argument('--exclude-types', default='',
       help='A comma separated list of data types to exclude while generating queries.')
   profiles = dict()
   for profile in PROFILES:
@@ -654,35 +655,28 @@ if __name__ == '__main__':
     if profile_name.endswith('Profile'):
       profile_name = profile_name[:-1 * len('Profile')]
     profiles[profile_name.lower()] = profile
-  parser.add_option('--profile', default='default',
+  parser.add_argument('--profile', default='default',
       choices=(sorted(profiles.keys())),
       help='Determines the mix of SQL features to use during query generation.')
   # TODO: Seed the random query generator for repeatable queries?
 
-  cli_options.add_default_values_to_help(parser)
+  args = parser.parse_args()
+  cli_options.configure_logging(args.log_level)
+  cluster = cli_options.create_cluster(args)
 
-  options, args = parser.parse_args()
-  cli_options.configure_logging(options.log_level)
-
-  db_connector_param_key = options.ref_db_type.lower()
-  ref_connection = DbConnector(options.ref_db_type,
-      user_name=getattr(options, db_connector_param_key + '_user'),
-      password=getattr(options, db_connector_param_key + '_password'),
-      host_name=getattr(options, db_connector_param_key + '_host'),
-      port=getattr(options, db_connector_param_key + '_port')) \
-      .create_connection(options.db_name)
-  db_connector_param_key = options.test_db_type.lower()
-  test_connection = DbConnector(options.test_db_type,
-      user_name=getattr(options, db_connector_param_key + '_user', None),
-      password=getattr(options, db_connector_param_key + '_password', None),
-      host_name=getattr(options, db_connector_param_key + '_host', None),
-      port=getattr(options, db_connector_param_key + '_port', None)) \
-      .create_connection(options.db_name)
+  ref_conn = cli_options.create_connection(args, args.ref_db_type, db_name=args.db_name)
+  if args.test_db_type == IMPALA:
+    test_conn = cluster.impala.connect(db_name=args.db_name)
+  elif args.test_db_type == HIVE:
+    test_conn = cluster.hive.connect(db_name=args.db_name)
+  else:
+    test_conn = cli_options.create_connection(
+        args, args.test_db_type, db_name=args.db_name)
   # Create an instance of profile class (e.g. DefaultProfile)
-  query_profile = profiles[options.profile]()
-  diff_searcher = QueryResultDiffSearcher(query_profile, ref_connection, test_connection)
-  query_timeout_seconds = options.timeout
+  query_profile = profiles[args.profile]()
+  diff_searcher = QueryResultDiffSearcher(query_profile, ref_conn, test_conn)
+  query_timeout_seconds = args.timeout
   search_results = diff_searcher.search(
-      options.query_count, options.stop_on_mismatch, options.stop_on_crash, query_timeout_seconds)
+      args.query_count, args.stop_on_mismatch, args.stop_on_crash, query_timeout_seconds)
   print(search_results)
   sys.exit(search_results.mismatch_count)

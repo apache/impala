@@ -15,7 +15,7 @@
 from logging import getLogger
 from random import choice, randint, random
 
-from tests.comparison.types import (
+from db_types import (
     Boolean,
     Char,
     Decimal,
@@ -23,8 +23,8 @@ from tests.comparison.types import (
     Int,
     TYPES,
     Timestamp)
-from tests.comparison.funcs import WindowBoundary
-from tests.comparison.data_generator import RandomValGenerator
+from funcs import WindowBoundary
+from random_val_generator import RandomValGenerator
 
 UNBOUNDED_PRECEDING = WindowBoundary.UNBOUNDED_PRECEDING
 PRECEDING = WindowBoundary.PRECEDING
@@ -327,6 +327,15 @@ class DefaultProfile(object):
 
   def use_nested_with(self):
     return True
+
+  def use_lateral_join(self):
+    return False
+
+  def use_boolean_expr_for_lateral_join(self):
+    return False
+
+  def get_num_boolean_exprs_for_lateral_join(self):
+    return False
 
   # Workaround for Hive null ordering differences, and lack of 'NULL FIRST', 'NULL LAST'
   # specifications. The ref db will order nulls as specified for ASC sorting to make it

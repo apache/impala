@@ -1,6 +1,18 @@
-#!/bin/bash -e
+#!/bin/bash
+
+set -euo pipefail
+
+# Prefer the virtualenv pip since this is what will actually be used during the
+# installation and it may be a different version than the system default.
+VIRTUAL_ENV_PIP="$IMPALA_HOME"/infra/python/env/bin/pip
+if [[ -e "$VIRTUAL_ENV_PIP" ]]; then
+  PIP="$VIRTUAL_ENV_PIP"
+else
+  PIP=pip
+fi
 
 DIR=$(dirname "$0")
 # Ignore the dev version of Impyla, it can't be downloaded (it needs to be built and
 # copied into the deps folder).
-pip install --download "$DIR" -r <(cat "$DIR"/requirements.txt | grep -v "impyla.*dev")
+"$PIP" install --download "$DIR" \
+    -r <(cat "$DIR"/requirements.txt | grep -v "impyla.*dev")

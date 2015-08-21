@@ -15,21 +15,20 @@
 from copy import deepcopy
 from logging import getLogger
 
-from tests.comparison.common import (
+from common import (
     CollectionColumn,
     Column,
     StructColumn,
     Table)
-from tests.comparison.funcs import Equals, And
-from tests.comparison.query import (
+from db_types import BigInt, Boolean
+from funcs import Equals, And
+from query import (
     FromClause,
     InlineView,
     JoinClause,
     Query,
     SelectClause,
-    Subquery,
     WhereClause)
-from tests.comparison.types import BigInt, Boolean
 
 LOG = getLogger(__name__)
 

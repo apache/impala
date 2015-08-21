@@ -23,7 +23,7 @@ from schedule_item import ScheduleItem
 from controller import PATH_TO_REPORTS, PATH_TO_SCHEDULE
 from threading import Thread
 from tests.comparison.query_profile import DefaultProfile
-from tests.comparison.types import (
+from tests.comparison.db_types import (
      Boolean,
      Char,
      Decimal,
