@@ -3,26 +3,24 @@
 # Test to select from table with additional columns at the end that are not in the 
 # schema and with missing columns
 select * from tblwithraggedcolumns
----- TYPES
-string, int
 ---- RESULTS
+'hello',1
+'\\r\\r\\n',NULL
 '',NULL
-'',NULL
-'ColumnWithCarriageReturn',123
-'NoDelimiter',0
-'\r\r\n',NULL
+'foo',2
 'a',3
-'at16bytes',NULL
+'',NULL
 'b',4
 'c',NULL
 'd',NULL
-'foo',2
-'hello',1
+'ColumnWithCarriageReturn',123
+'at16bytes',NULL
+'NoDelimiter',0
+---- TYPES
+string, int
 ====
 ---- QUERY
 select int_col from tblwithraggedcolumns
----- TYPES
-int
 ---- RESULTS
 0
 1
@@ -36,24 +34,26 @@ NULL
 NULL
 NULL
 NULL
+---- TYPES
+int
 ====
 ---- QUERY
 select str_col from tblwithraggedcolumns
----- TYPES
-string
 ---- RESULTS
+'hello'
+'\\r\\r\\n'
 ''
-''
-'ColumnWithCarriageReturn'
-'NoDelimiter'
-'\r\r\n'
+'foo'
 'a'
-'at16bytes'
+''
 'b'
 'c'
 'd'
-'foo'
-'hello'
+'ColumnWithCarriageReturn'
+'at16bytes'
+'NoDelimiter'
+---- TYPES
+string
 ====
 ---- QUERY
 # Quoting test
@@ -61,8 +61,6 @@ SELECT `table_alias`.`int_col` AS `default_int_col`
 FROM `functional`.`alltypes` `table_alias`
 GROUP BY `default_int_col`
 LIMIT 10
----- TYPES
-int
 ---- RESULTS
 0
 7
@@ -74,12 +72,12 @@ int
 5
 2
 8
+---- TYPES
+int
 ====
 ---- QUERY
 # Select from table with escape char that is same as delim char
 SELECT * FROM escapechartesttable
----- TYPES
-boolean, int
 ---- RESULTS
 true,0
 false,1
@@ -91,65 +89,67 @@ true,6
 false,7
 true,8
 false,9
+---- TYPES
+boolean, int
 ====
 ---- QUERY
 # Test string-literal escape sequences
 SELECT ASCII("\0"), ASCII("\\"), ASCII("\b"), ASCII("\n"), ASCII("\r"), ASCII("\t"), ASCII("\Z")
----- TYPES
-int, int, int, int, int, int, int
 ---- RESULTS
 0,92,8,10,13,9,26
+---- TYPES
+int, int, int, int, int, int, int
 ====
 ---- QUERY
 # Test escaping non-escape chars. We expect the escape to be simply removed.
 SELECT ASCII("\a"), ASCII("\X"), ASCII("\z"), ASCII("\?"), ASCII("\*")
----- TYPES
-int, int, int, int, int
 ---- RESULTS
 97,88,122,63,42
+---- TYPES
+int, int, int, int, int
 ====
 ---- QUERY
 # Test escaping '%' and '_' which handled specially.
 # We expect '\\%' and '\%' to result in '\%' (similarly for '_')
 SELECT "\%", "\\%", "\_", "\\_"
+---- RESULTS
+'\\%','\\%','\\_','\\_'
 ---- TYPES
 string, string, string, string
----- RESULTS
-'\%','\%','\_','\_'
 ====
 ---- QUERY
 # Test query filed in IMPALA-65
 SELECT "quote \"", 'quote \''
----- TYPES
-string, string
 ---- RESULTS
 'quote "','quote ''
+---- TYPES
+string, string
 ====
 ---- QUERY
 #  Select from table that contains unsupported primitive types
 SELECT int_col, str_col, bigint_col from functional.unsupported_types
----- TYPES
-int, string, bigint
 ---- RESULTS
 0,'aaaa',0
 1,'bbbb',10
 2,'cccc',20
 NULL,'NULL',NULL
 4,'eeee',40
+---- TYPES
+int, string, bigint
 ====
 ---- QUERY
 # where clause is a SlotRef
 SELECT count(*) from functional.alltypes where bool_col
----- TYPES
-bigint
 ---- RESULTS
 3650
+---- TYPES
+bigint
 ====
 ---- QUERY
 # having clause is a SlotRef
 SELECT count(*) from functional.alltypes group by bool_col having bool_col
----- TYPES
-bigint
 ---- RESULTS
 3650
+---- TYPES
+bigint
 ====
