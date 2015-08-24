@@ -33,7 +33,7 @@ except:
 from itertools import combinations, ifilter, izip
 from json import dumps
 from logging import getLogger
-from os import chmod
+from os import chmod, symlink, unlink
 from os.path import basename, dirname
 from pg8000 import connect as postgresql_connect
 from random import randint
@@ -41,7 +41,9 @@ from re import compile
 import shelve
 from socket import getfqdn
 from sys import maxint
-from tempfile import NamedTemporaryFile
+from tempfile import NamedTemporaryFile, gettempdir
+from threading import Lock
+from time import time
 
 from tests.comparison.common import Column, Table, TableExprList
 from tests.comparison.types import (
@@ -82,6 +84,8 @@ class DbConnector(object):
 
   '''
 
+  lock = Lock()
+
   def __init__(self,
       db_type,
       user_name=None,
@@ -101,6 +105,23 @@ class DbConnector(object):
     self.service = service
     self.hdfs_host = hdfs_host
     self.hdfs_port = hdfs_port
+    try:
+      DbConnector.lock.acquire()
+      sql_log_path = gettempdir() + '/sql_log_%s_%s.sql' \
+            % (self.db_type.lower(), time())
+      self.sql_log = open(sql_log_path, 'w')
+      link = gettempdir() + '/sql_log_%s.sql' % self.db_type.lower()
+      try:
+        unlink(link)
+      except OSError as e:
+        if not 'No such file' in str(e):
+          raise e
+      try:
+        symlink(sql_log_path, link)
+      except OSError as e:
+        raise e
+    finally:
+      DbConnector.lock.release()
 
   def create_connection(self, db_name=None):
     if self.db_type == HIVE:
@@ -574,6 +595,11 @@ class DatabaseCursor(object):
   def __getattr__(self, attr):
     return getattr(self.cursor, attr)
 
+  def execute(self, sql):
+    LOG.debug('%s: %s' % (self.connection.connector.db_type, sql))
+    self.connection.connector.sql_log.write('\nQuery: %s' % sql)
+    return self.cursor.execute(sql)
+
 
 #########################################
 ## Impala                              ##
@@ -775,13 +801,27 @@ class HiveDbConnection(ImpalaDbConnection):
 
   def make_create_table_sql(self, table):
     sql = DbConnection.make_create_table_sql(self, table)
-    if not self._bulk_load_table:
-      return sql
 
-    if self._bulk_load_table.storage_format.upper() != 'TEXTFILE':
-      raise Exception('Only Textfile currently supported')
+    if table.storage_format.upper() not in ('TEXTFILE', 'PARQUET'):
+      raise Exception('Only Textfile and Parquet currently supported')
 
+    if table.storage_format.upper() != 'TEXTFILE':
+      sql += "\nSTORED AS " + table.storage_format
     return sql
+
+  def begin_bulk_load_table(self, table):
+    if table.storage_format.upper() == 'TEXTFILE':
+      self._bulk_load_table = table
+      DbConnection.begin_bulk_load_table(self, table)
+    else:
+      # There is no python writer for all the various formats. Instead an additional text
+      # table will be created then use Insert statement to write the data in the desired
+      # format into the final table.
+      self._bulk_load_non_text_table = table
+      self._bulk_load_table = copy(table)
+      self._bulk_load_table.name += "_temp_%03d" % randint(1, 999)
+      self._bulk_load_table.storage_format = 'textfile'
+      DbConnection.begin_bulk_load_table(self, self._bulk_load_table)
 
   def end_bulk_load_table(self):
     DbConnection.end_bulk_load_table(self)
@@ -801,7 +841,8 @@ class HiveDbConnection(ImpalaDbConnection):
       hdfs.create_file(pywebhdfs_file_path, readable_file)
     self._bulk_load_data_file.close()
     if self._bulk_load_non_text_table:
-      self.execute('CREATE TABLE %s AS SELECT * FROM %s'
+      self.create_table(self._bulk_load_non_text_table)
+      self.execute('INSERT INTO TABLE %s SELECT * FROM %s'
           % (self._bulk_load_non_text_table.name, self._bulk_load_table.name))
       self.drop_table(self._bulk_load_table.name)
     self._bulk_load_data_file = None
