@@ -64,25 +64,23 @@ class TestHdfsFdCaching(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   def test_simple_scan(self, vector):
+    """Tests that in the default configuration, file handle caching is disabled and no
+    file handles are cached."""
 
-    # One table, one file, one handle
     num_handles_before = self.cached_handles()
+    assert 0 == num_handles_before
     self.execute_query("select * from cachefd.simple limit 1", vector=vector)
     num_handles_after = self.cached_handles()
-
-    # Should have at least one more handle cached and not more than three more
-    assert num_handles_after >= (num_handles_before + 1)
-    assert num_handles_after <= (num_handles_before + 3)
-
-    # No open handles if scanning is finished
-    assert self.outstanding_handles() == 0
+    assert 0 == num_handles_after
+    assert num_handles_after == num_handles_before
+    assert 0 == self.outstanding_handles()
 
     # No change when reading the table again
     for x in range(10):
       self.execute_query("select * from cachefd.simple limit 1", vector=vector)
 
-    assert num_handles_after == self.cached_handles()
-    assert self.outstanding_handles() == 0
+    assert num_handles_after == num_handles_before
+    assert 0 == self.outstanding_handles()
 
   def cached_handles(self):
     return self.get_agg_metric("impala-server.io.mgr.num-cached-file-handles")
