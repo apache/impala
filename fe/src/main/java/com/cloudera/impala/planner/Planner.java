@@ -160,6 +160,22 @@ public class Planner {
           request.per_host_vcores));
       hasHeader = true;
     }
+
+    // IMPALA-1983 In the case of corrupt stats, issue a warning for all queries except
+    // child queries of 'compute stats'.
+    if (!request.query_ctx.isSetParent_query_id() &&
+        request.query_ctx.isSetTables_with_corrupt_stats() &&
+        !request.query_ctx.getTables_with_corrupt_stats().isEmpty()) {
+      List<String> tableNames = Lists.newArrayList();
+      for (TTableName tableName: request.query_ctx.getTables_with_corrupt_stats()) {
+        tableNames.add(tableName.db_name + "." + tableName.table_name);
+      }
+      str.append("WARNING: The following tables have potentially corrupt table\n" +
+          "statistics. Drop and re-compute statistics to resolve this problem.\n" +
+          Joiner.on(", ").join(tableNames) + "\n");
+      hasHeader = true;
+    }
+
     // Append warning about tables missing stats except for child queries of
     // 'compute stats'. The parent_query_id is only set for compute stats child queries.
     if (!request.query_ctx.isSetParent_query_id() &&
@@ -173,6 +189,7 @@ public class Planner {
           "and/or column statistics.\n" + Joiner.on(", ").join(tableNames) + "\n");
       hasHeader = true;
     }
+
     if (request.query_ctx.isDisable_spilling()) {
       str.append("WARNING: Spilling is disabled for this query as a safety guard.\n" +
           "Reason: Query option disable_unsafe_spills is set, at least one table\n" +

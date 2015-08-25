@@ -116,3 +116,24 @@ class TestComputeStats(ImpalaTestSuite):
       self.execute_query("show table stats %s.%s" % (self.TEST_DB_NAME, table_name))
     assert(len(show_result.data) == 2)
     assert("1\tpval\t8" in show_result.data[0])
+
+
+@SkipIfS3.insert # S3: missing coverage: compute stats
+@SkipIf.not_default_fs # Isilon: Missing coverage: compute stats
+class TestCorruptTableStats(TestComputeStats):
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestComputeStats, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(create_exec_option_dimension(
+      disable_codegen_options=[False], exec_single_node_option=[100]))
+    # Do not run these tests using all dimensions because the expected results
+    # are different for different file formats.
+    cls.TestMatrix.add_dimension(create_uncompressed_text_dimension(cls.get_workload()))
+
+  @pytest.mark.execute_serially
+  def test_corrupted_stats(self, vector):
+    """IMPALA-1983: Test that in the presence of corrupt table statistics a warning is
+    issued and the small query optimization is disabled."""
+    if self.exploration_strategy() != 'exhaustive': pytest.skip("Only run in exhaustive")
+    self.run_test_case('QueryTest/corrupt_stats', vector)

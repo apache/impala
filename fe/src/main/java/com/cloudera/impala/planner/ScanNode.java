@@ -124,6 +124,11 @@ abstract public class ScanNode extends PlanNode {
     return false;
   }
 
+  /**
+   * Returns true, if the scanned table is suspected to have corrupt table stats,
+   * in particular, if the scan is non-empty and 'numRows' is 0 or negative (but not -1).
+   */
+  public boolean hasCorruptTableStats() { return false; }
 
   /**
    * Helper function to parse a "host:port" address string into TNetworkAddress

@@ -112,6 +112,10 @@ public class HdfsScanNode extends ScanNode {
   private final Map<TupleDescriptor, List<Expr>> collectionConjuncts_ =
       Maps.newLinkedHashMap();
 
+  // Indicates corrupt table stats based on the number of non-empty scan ranges and
+  // numRows set to 0. Set in computeStats().
+  private boolean hasCorruptTableStats_;
+
   /**
    * Constructs node to scan given data files of table 'tbl_'.
    */
@@ -648,12 +652,19 @@ public class HdfsScanNode extends ScanNode {
     numPartitionsMissingStats_ = 0;
     if (tbl_.getPartitions().isEmpty()) {
       cardinality_ = tbl_.getNumRows();
+      if ((cardinality_ < -1 || cardinality_ == 0) && tbl_.getTotalHdfsBytes() > 0) {
+        hasCorruptTableStats_ = true;
+      }
     } else {
       cardinality_ = 0;
       totalFiles_ = 0;
       totalBytes_ = 0;
       boolean hasValidPartitionCardinality = false;
       for (HdfsPartition p: partitions_) {
+        // Check for corrupt table stats
+        if ((p.getNumRows() == 0 || p.getNumRows() < -1) && p.getSize() > 0)  {
+          hasCorruptTableStats_ = true;
+        }
         // ignore partitions with missing stats in the hope they don't matter
         // enough to change the planning outcome
         if (p.getNumRows() > -1) {
@@ -879,4 +890,7 @@ public class HdfsScanNode extends ScanNode {
     return (long) RuntimeEnv.INSTANCE.getNumCores() * (long) THREADS_PER_CORE *
         MAX_IO_BUFFERS_PER_THREAD * IO_MGR_BUFFER_SIZE;
   }
+
+  @Override
+  public boolean hasCorruptTableStats() { return hasCorruptTableStats_; }
 }

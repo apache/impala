@@ -1,0 +1,184 @@
+====
+---- QUERY
+use compute_stats_db;
+====
+---- QUERY
+create table corrupted (id int, name string) partitioned by (org int);
+====
+---- QUERY
+insert into corrupted partition (org=1) values (1, "Martin"), (2, "Hans"), (3, "Peter");
+====
+---- QUERY
+insert into corrupted partition (org=2) values (4, "Martin"), (5, "Hans"), (6, "Peter");
+====
+---- QUERY
+show table stats corrupted;
+---- LABELS
+ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+'1',-1,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=1'
+'2',-1,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=2'
+'Total',-1,2,'48B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+compute stats corrupted;
+====
+---- QUERY
+show table stats corrupted;
+---- LABELS
+ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+'1',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=1'
+'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=2'
+'Total',6,2,'48B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+alter table corrupted partition(org=1) set tblproperties('numRows'='0');
+====
+---- QUERY
+invalidate metadata corrupted;
+====
+---- QUERY
+show table stats corrupted;
+---- LABELS
+ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+'1',0,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=1'
+'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=2'
+'Total',6,2,'48B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+explain select count(*) from corrupted where org = 1;
+---- RESULTS: VERIFY_IS_SUBSET
+'WARNING: The following tables have potentially corrupt table'
+'statistics. Drop and re-compute statistics to resolve this problem.'
+'compute_stats_db.corrupted'
+''
+'03:AGGREGATE [FINALIZE]'
+'|  output: count:merge(*)'
+'|'
+'02:EXCHANGE [UNPARTITIONED]'
+'|'
+'01:AGGREGATE'
+'|  output: count(*)'
+'|'
+'00:SCAN HDFS [compute_stats_db.corrupted]'
+'   partitions=1/2 files=1 size=24B'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table corrupted partition(org=1) set tblproperties('numRows'='3');
+alter table corrupted set tblproperties('numRows'='0');
+====
+---- QUERY
+show table stats corrupted;
+---- LABELS
+ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+'1',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=1'
+'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=2'
+'Total',0,2,'48B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+explain select count(*) from corrupted;
+---- RESULTS: VERIFY_IS_SUBSET
+'01:AGGREGATE [FINALIZE]'
+'|  output: count(*)'
+'|'
+'00:SCAN HDFS [compute_stats_db.corrupted]'
+'   partitions=2/2 files=2 size=48B'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table corrupted set tblproperties('numRows'='6');
+====
+---- QUERY
+show table stats corrupted;
+---- LABELS
+ORG, #ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+'1',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=1'
+'2',3,1,'24B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted/org=2'
+'Total',6,2,'48B','0B','','','',''
+---- TYPES
+STRING, BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+explain select count(*) from corrupted;
+---- RESULTS: VERIFY_IS_SUBSET
+'01:AGGREGATE [FINALIZE]'
+'|  output: count(*)'
+'|'
+'00:SCAN HDFS [compute_stats_db.corrupted]'
+'   partitions=2/2 files=2 size=48B'
+---- TYPES
+STRING
+====
+---- QUERY
+create table corrupted_no_part (id int);
+insert into corrupted_no_part values (1),(2),(3);
+compute stats corrupted_no_part;
+====
+---- QUERY
+show table stats corrupted_no_part;
+---- LABELS
+#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+3,1,'6B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted_no_part'
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+-- Check that small query optimization is executed.
+explain select count(*) from corrupted_no_part;
+---- RESULTS: VERIFY_IS_SUBSET
+'01:AGGREGATE [FINALIZE]'
+'|  output: count(*)'
+'|'
+'00:SCAN HDFS [compute_stats_db.corrupted_no_part]'
+'   partitions=1/1 files=1 size=6B'
+---- TYPES
+STRING
+====
+---- QUERY
+alter table corrupted_no_part set tblproperties('numRows'='0');
+====
+---- QUERY
+show table stats corrupted_no_part;
+---- LABELS
+#ROWS, #FILES, SIZE, BYTES CACHED, CACHE REPLICATION, FORMAT, INCREMENTAL STATS, LOCATION
+---- RESULTS
+-1,1,'6B','NOT CACHED','NOT CACHED','TEXT','false','hdfs://localhost:20500/test-warehouse/compute_stats_db.db/corrupted_no_part'
+---- TYPES
+BIGINT, BIGINT, STRING, STRING, STRING, STRING, STRING, STRING
+====
+---- QUERY
+-- After setting num rows to 0, the HMS will set it to -1 and avoids bad behavior.
+explain select count(*) from corrupted_no_part;
+---- RESULTS: VERIFY_IS_SUBSET
+'WARNING: The following tables are missing relevant table and/or column statistics.'
+'compute_stats_db.corrupted_no_part'
+''
+'03:AGGREGATE [FINALIZE]'
+'|  output: count:merge(*)'
+'|'
+'02:EXCHANGE [UNPARTITIONED]'
+'|'
+'01:AGGREGATE'
+'|  output: count(*)'
+'|'
+'00:SCAN HDFS [compute_stats_db.corrupted_no_part]'
+'   partitions=1/1 files=1 size=6B'
+---- TYPES
+STRING
+====

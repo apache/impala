@@ -186,6 +186,9 @@ struct TQueryCtx {
 
   // Set if this is a child query (e.g. a child of a COMPUTE STATS request)
   9: optional Types.TUniqueId parent_query_id
+
+  // List of tables suspected to have corrupt stats
+  10: optional list<CatalogObjects.TTableName> tables_with_corrupt_stats
 }
 
 // Context of a fragment instance, including its unique id, the total number

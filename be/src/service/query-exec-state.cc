@@ -53,6 +53,7 @@ namespace impala {
 static const string PER_HOST_MEM_KEY = "Estimated Per-Host Mem";
 static const string PER_HOST_VCORES_KEY = "Estimated Per-Host VCores";
 static const string TABLES_MISSING_STATS_KEY = "Tables Missing Stats";
+static const string TABLES_WITH_CORRUPT_STATS_KEY = "Tables With Corrupt Table Stats";
 
 ImpalaServer::QueryExecState::QueryExecState(
     const TQueryCtx& query_ctx, ExecEnv* exec_env, Frontend* frontend,
@@ -372,6 +373,19 @@ Status ImpalaServer::QueryExecState::ExecQueryOrDmlRequest(
       ss << tbls[i].db_name << "." << tbls[i].table_name;
     }
     summary_profile_.AddInfoString(TABLES_MISSING_STATS_KEY, ss.str());
+  }
+
+  if (!query_exec_request.query_ctx.__isset.parent_query_id &&
+      query_exec_request.query_ctx.__isset.tables_with_corrupt_stats &&
+      !query_exec_request.query_ctx.tables_with_corrupt_stats.empty()) {
+    stringstream ss;
+    const vector<TTableName>& tbls =
+        query_exec_request.query_ctx.tables_with_corrupt_stats;
+    for (int i = 0; i < tbls.size(); ++i) {
+      if (i != 0) ss << ",";
+      ss << tbls[i].db_name << "." << tbls[i].table_name;
+    }
+    summary_profile_.AddInfoString(TABLES_WITH_CORRUPT_STATS_KEY, ss.str());
   }
 
   // If desc_tbl is not set, query has SELECT with no FROM. In that

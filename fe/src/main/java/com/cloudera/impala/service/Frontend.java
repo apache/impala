@@ -890,6 +890,8 @@ public class Frontend {
     // Also assemble list of tables names missing stats for assembling a warning message.
     LOG.debug("get scan range locations");
     Set<TTableName> tablesMissingStats = Sets.newTreeSet();
+    // Assemble a similar list for corrupt stats
+    Set<TTableName> tablesWithCorruptStats = Sets.newTreeSet();
     for (ScanNode scanNode: scanNodes) {
       queryExecRequest.putToPer_node_scan_ranges(
           scanNode.getId().asInt(),
@@ -897,10 +899,17 @@ public class Frontend {
       if (scanNode.isTableMissingStats()) {
         tablesMissingStats.add(scanNode.getTupleDesc().getTableName().toThrift());
       }
+      if (scanNode.hasCorruptTableStats()) {
+        tablesWithCorruptStats.add(scanNode.getTupleDesc().getTableName().toThrift());
+      }
     }
+
     queryExecRequest.setHost_list(analysisResult.getAnalyzer().getHostIndex().getList());
     for (TTableName tableName: tablesMissingStats) {
       queryCtx.addToTables_missing_stats(tableName);
+    }
+    for (TTableName tableName: tablesWithCorruptStats) {
+      queryCtx.addToTables_with_corrupt_stats(tableName);
     }
 
     // Optionally disable spilling in the backend. Allow spilling if there are plan hints
