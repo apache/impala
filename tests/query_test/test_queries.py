@@ -84,6 +84,10 @@ class TestQueries(ImpalaTestSuite):
   def test_union(self, vector):
     self.run_test_case('QueryTest/union', vector)
 
+  def test_very_large_strings(self, vector):
+    """Regression test for IMPALA-1619"""
+    self.run_test_case('QueryTest/large_strings', vector)
+
   def test_sort(self, vector):
     if vector.get_value('table_format').file_format == 'hbase':
       pytest.xfail(reason="IMPALA-283 - select count(*) produces inconsistent results")

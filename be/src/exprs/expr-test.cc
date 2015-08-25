@@ -246,7 +246,9 @@ class ExprTest : public testing::Test {
         // We convert the expected result to string.
       case TYPE_FLOAT:
       case TYPE_DOUBLE:
-        expr_value_.string_val = value;
+        // Construct a StringValue from 'value'. 'value' must be valid for as long as
+        // this object is valid.
+        expr_value_.string_val = StringValue(value);
         return &expr_value_.string_val;
       case TYPE_TINYINT:
         expr_value_.tinyint_val =

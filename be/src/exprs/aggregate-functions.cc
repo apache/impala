@@ -127,9 +127,7 @@ StringVal ToStringVal(FunctionContext* context, T val) {
   stringstream ss;
   ss << val;
   const string &str = ss.str();
-  StringVal string_val(context, str.size());
-  memcpy(string_val.ptr, str.c_str(), str.size());
-  return string_val;
+  return StringVal::CopyFrom(context, reinterpret_cast<const uint8_t*>(str.c_str()), str.size());
 }
 
 // Delimiter to use if the separator is NULL.
@@ -159,9 +157,7 @@ void AggregateFunctions::InitZero(FunctionContext*, DecimalVal* dst) {
 StringVal AggregateFunctions::StringValGetValue(
     FunctionContext* ctx, const StringVal& src) {
   if (src.is_null) return src;
-  StringVal result(ctx, src.len);
-  memcpy(result.ptr, src.ptr, src.len);
-  return result;
+  return StringVal::CopyFrom(ctx, src.ptr, src.len);
 }
 
 StringVal AggregateFunctions::StringValSerializeOrFinalize(
@@ -584,13 +580,7 @@ void AggregateFunctions::StringConcatUpdate(FunctionContext* ctx,
     *result = StringVal(ctx->Allocate(header_len), header_len);
     *reinterpret_cast<StringConcatHeader*>(result->ptr) = sep->len;
   }
-  int new_len = result->len + sep->len + src.len;
-  result->ptr = ctx->Reallocate(result->ptr, new_len);
-  memcpy(result->ptr + result->len, sep->ptr, sep->len);
-  result->len += sep->len;
-  memcpy(result->ptr + result->len, src.ptr, src.len);
-  result->len += src.len;
-  DCHECK(result->len == new_len);
+  result->Append(ctx, sep->ptr, sep->len, src.ptr, src.len);
 }
 
 void AggregateFunctions::StringConcatMerge(FunctionContext* ctx,
@@ -600,15 +590,12 @@ void AggregateFunctions::StringConcatMerge(FunctionContext* ctx,
   if (result->is_null) {
     // Copy the header from the first intermediate value.
     *result = StringVal(ctx->Allocate(header_len), header_len);
+    if (result->is_null) return;
     *reinterpret_cast<StringConcatHeader*>(result->ptr) =
         *reinterpret_cast<StringConcatHeader*>(src.ptr);
   }
   // Append the string portion of the intermediate src to result (omit src's header).
-  int new_len = result->len + src.len - header_len;
-  result->ptr = ctx->Reallocate(result->ptr, new_len);
-  memcpy(result->ptr + result->len, src.ptr + header_len, src.len - header_len);
-  result->len += src.len - header_len;
-  DCHECK(result->len == new_len);
+  result->Append(ctx, src.ptr + header_len, src.len - header_len);
 }
 
 StringVal AggregateFunctions::StringConcatFinalize(FunctionContext* ctx,
@@ -619,8 +606,8 @@ StringVal AggregateFunctions::StringConcatFinalize(FunctionContext* ctx,
   int sep_len = *reinterpret_cast<StringConcatHeader*>(src.ptr);
   DCHECK(src.len >= header_len + sep_len);
   // Remove the header and the first separator.
-  StringVal result(ctx, src.len - header_len - sep_len);
-  memcpy(result.ptr, src.ptr + header_len + sep_len, result.len);
+  StringVal result = StringVal::CopyFrom(ctx, src.ptr + header_len + sep_len,
+      src.len - header_len - sep_len);
   ctx->Free(src.ptr);
   return result;
 }
@@ -848,9 +835,7 @@ struct ReservoirSample<StringVal> {
 
   // Gets a copy of the sample value that allocates memory from ctx, if necessary.
   StringVal GetValue(FunctionContext* ctx) {
-    StringVal result = StringVal(ctx, len);
-    memcpy(result.ptr, &val[0], len);
-    return result;
+    return StringVal::CopyFrom(ctx, &val[0], len);
   }
 };
 
@@ -905,8 +890,7 @@ template <typename T>
 const StringVal AggregateFunctions::ReservoirSampleSerialize(FunctionContext* ctx,
     const StringVal& src) {
   if (src.is_null) return src;
-  StringVal result(ctx, src.len);
-  memcpy(result.ptr, src.ptr, src.len);
+  StringVal result = StringVal::CopyFrom(ctx, src.ptr, src.len);
   ctx->Free(src.ptr);
 
   ReservoirSampleState<T>* state = reinterpret_cast<ReservoirSampleState<T>*>(result.ptr);
@@ -1057,8 +1041,8 @@ StringVal AggregateFunctions::HistogramFinalize(FunctionContext* ctx,
     if (bucket_idx < (num_buckets - 1)) out << ", ";
   }
   const string& out_str = out.str();
-  StringVal result_str(ctx, out_str.size());
-  memcpy(result_str.ptr, out_str.c_str(), result_str.len);
+  StringVal result_str = StringVal::CopyFrom(ctx,
+      reinterpret_cast<const uint8_t*>(out_str.c_str()), out_str.size());
   ctx->Free(src_val.ptr);
   return result_str;
 }
@@ -1378,7 +1362,7 @@ void AggregateFunctions::FirstValUpdate(FunctionContext* ctx, const StringVal& s
     return;
   }
   *dst = StringVal(ctx->Allocate(src.len), src.len);
-  memcpy(dst->ptr, src.ptr, src.len);
+  if (!dst->is_null) memcpy(dst->ptr, src.ptr, src.len);
 }
 
 template <typename T>

@@ -169,17 +169,17 @@ class MemPool {
   struct ChunkInfo {
     bool owns_data;  // true if we eventually need to dealloc data
     uint8_t* data;
-    int size;  // in bytes
+    int64_t size;  // in bytes
 
     /// number of bytes allocated via Allocate() up to but excluding this chunk;
     /// *not* valid for chunks > current_chunk_idx_ (because that would create too
     /// much maintenance work if we have trailing unoccupied chunks)
-    int cumulative_allocated_bytes;
+    int64_t cumulative_allocated_bytes;
 
     /// bytes allocated via Allocate() in this chunk
-    int allocated_bytes;
+    int64_t allocated_bytes;
 
-    explicit ChunkInfo(int size);
+    explicit ChunkInfo(int64_t size);
 
     ChunkInfo()
       : owns_data(true),
@@ -222,7 +222,7 @@ class MemPool {
   /// if a new chunk needs to be created.
   /// If check_limits is true, this call can fail (returns false) if adding a
   /// new chunk exceeds the mem limits.
-  bool FindChunk(int min_size, bool check_limits);
+  bool FindChunk(int64_t min_size, bool check_limits);
 
   /// Check integrity of the supporting data structures; always returns true but DCHECKs
   /// all invariants.

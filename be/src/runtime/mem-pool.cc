@@ -45,7 +45,7 @@ MemPool::MemPool(MemTracker* mem_tracker, int chunk_size)
   DCHECK(mem_tracker != NULL);
 }
 
-MemPool::ChunkInfo::ChunkInfo(int size)
+MemPool::ChunkInfo::ChunkInfo(int64_t size)
   : owns_data(true),
     data(reinterpret_cast<uint8_t*>(malloc(size))),
     size(size),
@@ -89,7 +89,7 @@ void MemPool::FreeAll() {
   }
 }
 
-bool MemPool::FindChunk(int min_size, bool check_limits) {
+bool MemPool::FindChunk(int64_t min_size, bool check_limits) {
   // Try to allocate from a free chunk. The first free chunk, if any, will be immediately
   // after the current chunk.
   int first_free_idx = current_chunk_idx_ + 1;
@@ -111,7 +111,7 @@ bool MemPool::FindChunk(int min_size, bool check_limits) {
 
   if (current_chunk_idx_ == static_cast<int>(chunks_.size())) {
     // need to allocate new chunk.
-    int chunk_size = chunk_size_;
+    int64_t chunk_size = chunk_size_;
     if (chunk_size == 0) {
       if (current_chunk_idx_ == 0) {
         chunk_size = DEFAULT_INITIAL_CHUNK_SIZE;

@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 # run buildall.sh -help to see options
 
 ROOT=`dirname "$0"`

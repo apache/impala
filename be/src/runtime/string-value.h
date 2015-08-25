@@ -31,6 +31,10 @@ namespace impala {
 /// shares its buffer the parent.
 /// TODO: rename this to be less confusing with impala_udf::StringVal.
 struct StringValue {
+  /// The current limitation for a string instance is 1GB character data.
+  /// See IMPALA-1619 for more details.
+  static const int MAX_LENGTH = (1 << 30);
+
   /// TODO: change ptr to an offset relative to a contiguous memory block,
   /// so that we can send row batches between nodes without having to swizzle
   /// pointers
@@ -39,21 +43,24 @@ struct StringValue {
 
   StringValue(char* ptr, int len): ptr(ptr), len(len) {
     DCHECK_GE(len, 0);
+    DCHECK_LE(len, MAX_LENGTH);
   }
   StringValue(): ptr(NULL), len(0) {}
 
   /// Construct a StringValue from 's'.  's' must be valid for as long as
   /// this object is valid.
-  StringValue(const std::string& s)
+  explicit StringValue(const std::string& s)
     : ptr(const_cast<char*>(s.c_str())), len(s.size()) {
+    DCHECK_LE(len, MAX_LENGTH);
   }
 
   /// Construct a StringValue from 's'.  's' must be valid for as long as
   /// this object is valid.
   /// s must be a null-terminated string.  This constructor is to prevent
   /// accidental use of the version taking an std::string.
-  StringValue(const char* s)
+  explicit StringValue(const char* s)
     : ptr(const_cast<char*>(s)), len(strlen(s)) {
+    DCHECK_LE(len, MAX_LENGTH);
   }
 
   /// Byte-by-byte comparison. Returns:

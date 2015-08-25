@@ -523,6 +523,9 @@ struct TimestampVal : public AnyVal {
 /// Note: there is a difference between a NULL string (is_null == true) and an
 /// empty string (len == 0).
 struct StringVal : public AnyVal {
+
+  static const int MAX_LENGTH = (1 << 30);
+
   int len;
   uint8_t* ptr;
 
@@ -532,21 +535,36 @@ struct StringVal : public AnyVal {
     assert(len >= 0);
   };
 
-
   /// Construct a StringVal from NULL-terminated c-string. Note: this does not make a
   /// copy of ptr so the underlying string must exist as long as this StringVal does.
   StringVal(const char* ptr) : len(strlen(ptr)), ptr((uint8_t*)ptr) {}
+
+  /// Creates a StringVal, allocating a new buffer with 'len'. This should
+  /// be used to return StringVal objects in UDF/UDAs that need to allocate new
+  /// string memory.
+  ///
+  /// If the memory allocation fails, e.g. because the intermediate value would be too
+  /// large, the constructor will construct a NULL string and set an error on the function
+  /// context.
+  StringVal(FunctionContext* context, int len);
+
+  /// Will create a new StringVal with the given dimension and copy the data from the
+  /// parameters. In case of an error will return a NULL string and set an error on the
+  /// function context.
+  static StringVal CopyFrom(FunctionContext* ctx, const uint8_t* buf, size_t len);
+
+  /// Append the passed buffer to this StringVal. Reallocate memory to fit the buffer. If
+  /// the memory allocation becomes too large, will set an error on FunctionContext and
+  /// return a NULL string.
+  void Append(FunctionContext* ctx, const uint8_t* buf, size_t len);
+  void Append(FunctionContext* ctx, const uint8_t* buf, size_t len, const uint8_t* buf2,
+      size_t buf2_len);
 
   static StringVal null() {
     StringVal sv;
     sv.is_null = true;
     return sv;
   }
-
-  /// Creates a StringVal, allocating a new buffer with 'len'. This should
-  /// be used to return StringVal objects in UDF/UDAs that need to allocate new
-  /// string memory.
-  StringVal(FunctionContext* context, int len);
 
   bool operator==(const StringVal& other) const {
     if (is_null != other.is_null) return false;

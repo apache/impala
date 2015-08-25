@@ -85,6 +85,7 @@ StringVal StringFunctions::Repeat(
   if (str.is_null || n.is_null) return StringVal::null();
   if (str.len == 0 || n.val <= 0) return StringVal();
   StringVal result(context, str.len * n.val);
+  if (UNLIKELY(result.is_null)) return result;
   uint8_t* ptr = result.ptr;
   for (int64_t i = 0; i < n.val; ++i) {
     memcpy(ptr, str.ptr, str.len);
@@ -102,6 +103,7 @@ StringVal StringFunctions::Lpad(FunctionContext* context, const StringVal& str,
   if (len.val <= str.len || pad.len == 0) return StringVal(str.ptr, len.val);
 
   StringVal result(context, len.val);
+  if (result.is_null) return result;
   int padded_prefix_len = len.val - str.len;
   int pad_index = 0;
   int result_index = 0;
@@ -129,6 +131,7 @@ StringVal StringFunctions::Rpad(FunctionContext* context, const StringVal& str,
   }
 
   StringVal result(context, len.val);
+  if (UNLIKELY(result.is_null)) return result;
   memcpy(result.ptr, str.ptr, str.len);
 
   // Append chars of pad until desired length
@@ -157,6 +160,7 @@ IntVal StringFunctions::CharLength(FunctionContext* context, const StringVal& st
 StringVal StringFunctions::Lower(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return StringVal::null();
   StringVal result(context, str.len);
+  if (UNLIKELY(result.is_null)) return result;
   for (int i = 0; i < str.len; ++i) {
     result.ptr[i] = ::tolower(str.ptr[i]);
   }
@@ -166,6 +170,7 @@ StringVal StringFunctions::Lower(FunctionContext* context, const StringVal& str)
 StringVal StringFunctions::Upper(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return StringVal::null();
   StringVal result(context, str.len);
+  if (UNLIKELY(result.is_null)) return result;
   for (int i = 0; i < str.len; ++i) {
     result.ptr[i] = ::toupper(str.ptr[i]);
   }
@@ -179,6 +184,7 @@ StringVal StringFunctions::Upper(FunctionContext* context, const StringVal& str)
 StringVal StringFunctions::InitCap(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return StringVal::null();
   StringVal result(context, str.len);
+  if (UNLIKELY(result.is_null)) return result;
   uint8_t* result_ptr = result.ptr;
   bool word_start = true;
   for (int i = 0; i < str.len; ++i) {
@@ -196,6 +202,7 @@ StringVal StringFunctions::InitCap(FunctionContext* context, const StringVal& st
 StringVal StringFunctions::Reverse(FunctionContext* context, const StringVal& str) {
   if (str.is_null) return StringVal::null();
   StringVal result(context, str.len);
+  if (UNLIKELY(result.is_null)) return result;
   std::reverse_copy(str.ptr, str.ptr + str.len, result.ptr);
   return result;
 }
@@ -204,6 +211,7 @@ StringVal StringFunctions::Translate(FunctionContext* context, const StringVal& 
     const StringVal& src, const StringVal& dst) {
   if (str.is_null || src.is_null || dst.is_null) return StringVal::null();
   StringVal result(context, str.len);
+  if (UNLIKELY(result.is_null)) return result;
 
   // TODO: if we know src and dst are constant, we can prebuild a conversion
   // table to remove the inner loop.

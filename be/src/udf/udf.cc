@@ -102,6 +102,7 @@ class RuntimeState {
 #endif
 
 #include "common/names.h"
+#include "common/compiler-util.h"
 
 using namespace impala;
 using namespace impala_udf;
@@ -424,8 +425,63 @@ void FunctionContextImpl::SetConstantArgs(const vector<AnyVal*>& constant_args) 
 // Note: this function crashes LLVM's JIT in expr-test if it's xcompiled. Do not move to
 // expr-ir.cc. This could probably use further investigation.
 StringVal::StringVal(FunctionContext* context, int len)
-  : len(len), ptr(context->impl()->AllocateLocal(len)) {
+  : len(len), ptr(NULL) {
+  if (UNLIKELY(len > StringVal::MAX_LENGTH)) {
+    std::cout << "MAX_LENGTH, Trying to allocate " << len;
+    context->SetError("String length larger than allowed limit of "
+        "1 GB character data.");
+    len = 0;
+    is_null = true;
+  } else {
+    ptr = context->impl()->AllocateLocal(len);
+    if (ptr == NULL && len > 0) {
+      len = 0;
+      is_null = true;
+      context->SetError("Large Memory allocation failed.");
+    }
+  }
 }
+
+StringVal StringVal::CopyFrom(FunctionContext* ctx, const uint8_t* buf, size_t len) {
+  StringVal result(ctx, len);
+  if (!result.is_null) {
+      memcpy(result.ptr, buf, len);
+  }
+  return result;
+}
+
+void StringVal::Append(FunctionContext* ctx, const uint8_t* buf, size_t buf_len) {
+  if (UNLIKELY(len + buf_len > StringVal::MAX_LENGTH)) {
+    ctx->SetError("Concatenated string length larger than allowed limit of "
+        "1 GB character data.");
+    ctx->Free(ptr);
+    ptr = NULL;
+    len = 0;
+    is_null = true;
+  } else {
+    ptr = ctx->Reallocate(ptr, len + buf_len);
+    memcpy(ptr + len, buf, buf_len);
+    len += buf_len;
+  }
+}
+void StringVal::Append(FunctionContext* ctx, const uint8_t* buf, size_t buf_len,
+    const uint8_t* buf2, size_t buf2_len) {
+  if (UNLIKELY(len + buf_len + buf2_len > StringVal::MAX_LENGTH)) {
+    ctx->SetError("Concatenated string length larger than allowed limit of "
+        "1 GB character data.");
+    ctx->Free(ptr);
+    ptr = NULL;
+    len = 0;
+    is_null = true;
+  } else {
+    ptr = ctx->Reallocate(ptr, len + buf_len + buf2_len);
+    memcpy(ptr + len, buf, buf_len);
+    memcpy(ptr + len + buf_len, buf2, buf2_len);
+    len += buf_len + buf2_len;
+  }
+}
+
+
 
 // TODO: why doesn't libudasample.so build if this in udf-ir.cc?
 const FunctionContext::TypeDesc* FunctionContext::GetArgType(int arg_idx) const {
