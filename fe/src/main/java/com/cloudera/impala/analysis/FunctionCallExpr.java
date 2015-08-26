@@ -293,13 +293,16 @@ public class FunctionCallExpr extends Expr {
     int digitsAfter = childType.decimalScale();
     if (fnName_.getFunction().equalsIgnoreCase("ceil") ||
                fnName_.getFunction().equalsIgnoreCase("ceiling") ||
-               fnName_.getFunction().equals("floor")) {
+               fnName_.getFunction().equals("floor") ||
+               fnName_.getFunction().equals("dfloor")) {
       // These functions just return with scale 0 but can trigger rounding. We need
       // to increase the precision by 1 to handle that.
       ++digitsBefore;
       digitsAfter = 0;
     } else if (fnName_.getFunction().equalsIgnoreCase("truncate") ||
-               fnName_.getFunction().equalsIgnoreCase("round")) {
+               fnName_.getFunction().equalsIgnoreCase("dtrunc") ||
+               fnName_.getFunction().equalsIgnoreCase("round") ||
+               fnName_.getFunction().equalsIgnoreCase("dround")) {
       if (children_.size() > 1) {
         // The second argument to these functions is the desired scale, otherwise
         // the default is 0.
@@ -334,7 +337,8 @@ public class FunctionCallExpr extends Expr {
         digitsAfter = 0;
       }
 
-      if (fnName_.getFunction().equalsIgnoreCase("round") &&
+      if ((fnName_.getFunction().equalsIgnoreCase("round") ||
+           fnName_.getFunction().equalsIgnoreCase("dround")) &&
           digitsAfter < childType.decimalScale()) {
         // If we are rounding to fewer decimal places, it's possible we need another
         // digit before the decimal.

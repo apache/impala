@@ -2614,6 +2614,7 @@ TEST_F(ExprTest, MathFunctions) {
   expected = static_cast<double>(rand_r(&seed)) / static_cast<double>(RAND_MAX);
   TestValue("rand(1234)", TYPE_DOUBLE, expected);
   TestValue("rand(1234)", TYPE_DOUBLE, expected);
+  TestValue("random(1234)", TYPE_DOUBLE, expected); // Test alias
 
   // Test bigint param.
   TestValue("pmod(10, 3)", TYPE_BIGINT, 1);
@@ -2899,6 +2900,7 @@ TEST_F(ExprTest, MathRoundingFunctions) {
   TestValue("ceiling(cast(-10.05 as double))", TYPE_BIGINT, -10);
   TestValue("floor(cast(0.1 as double))", TYPE_BIGINT, 0);
   TestValue("floor(cast(-10.007 as double))", TYPE_BIGINT, -11);
+  TestValue("dfloor(cast(123.456 as double))", TYPE_BIGINT, 123);
   TestValue("truncate(cast(0.1 as double))", TYPE_BIGINT, 0);
   TestValue("truncate(cast(-10.007 as double))", TYPE_BIGINT, -10);
   TestValue("dtrunc(cast(10.99 as double))", TYPE_BIGINT, 10);
@@ -4745,6 +4747,10 @@ TEST_F(ExprTest, DecimalFunctions) {
       ColumnType::CreateDecimalType(2, 0));
   TestIsNull("floor(cast(NULL as decimal(2,0)))", ColumnType::CreateDecimalType(2,0));
 
+  // Dfloor() alias
+  TestDecimalValue("dfloor(cast('3.14159' as decimal(6,5)))", Decimal4Value(3),
+      ColumnType::CreateDecimalType(6, 0));
+
   // Round()
   TestDecimalValue("round(cast('3.14159' as decimal(6,5)))", Decimal4Value(3),
       ColumnType::CreateDecimalType(6, 0));
@@ -4878,6 +4884,12 @@ TEST_F(ExprTest, DecimalFunctions) {
   TestDecimalValue("round(cast('99999.9951' as decimal(35,4)), 2)",
       Decimal16Value(10000000), ColumnType::CreateDecimalType(36, 2));
 
+  // Dround() alias
+  TestDecimalValue("dround(cast('3.14159' as decimal(6,5)))", Decimal4Value(3),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("dround(cast('99999.9951' as decimal(35,4)), 2)",
+      Decimal16Value(10000000), ColumnType::CreateDecimalType(36, 2));
+
   // TruncateTo()
   TestIsNull("truncate(cast(NULL as decimal(2,0)), 1)",
       ColumnType::CreateDecimalType(2,0));
@@ -4950,6 +4962,12 @@ TEST_F(ExprTest, DecimalFunctions) {
       Decimal16Value(0), ColumnType::CreateDecimalType(35, 0));
   TestDecimalValue("truncate(cast('-175.0' as decimal(35,1)), -4)",
       Decimal16Value(0), ColumnType::CreateDecimalType(35, 0));
+
+  // Dtrunc() alias
+  TestDecimalValue("dtrunc(cast('3.54159' as decimal(6,5)))", Decimal4Value(3),
+      ColumnType::CreateDecimalType(6, 0));
+  TestDecimalValue("dtrunc(cast('-3.1615' as decimal(6,4)), 0)", Decimal4Value(-3),
+      ColumnType::CreateDecimalType(6, 0));
 
   // Overflow on Round()/etc. This can only happen when the input is has enough
   // leading 9's.
