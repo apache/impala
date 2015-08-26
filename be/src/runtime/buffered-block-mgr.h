@@ -332,9 +332,6 @@ class BufferedBlockMgr {
   /// This is useful to Pin() a number of blocks and guarantee all or nothing behavior.
   bool TryAcquireTmpReservation(Client* client, int num_buffers);
 
-  /// Sets tmp reservation to 0 on this client.
-  void ClearTmpReservation(Client* client);
-
   /// Return a new pinned block. If there is no memory for this block, *block will be set
   /// to NULL.
   /// If len > 0, GetNewBlock() will return a block with a buffer of size len. len
@@ -362,7 +359,9 @@ class BufferedBlockMgr {
 
   /// Consumes 'size' bytes from the buffered block mgr. This is used by callers that want
   /// the memory to come from the block mgr pool (and therefore trigger spilling) but need
-  /// the allocation to be more flexible than blocks.
+  /// the allocation to be more flexible than blocks. Buffer space reserved with
+  /// TryAcquireTmpReservation may be used to fulfill the request if available. If the
+  /// request is unsuccessful, that temporary buffer space is not consumed.
   /// Returns false if there was not enough memory.
   /// TODO: this is added specifically to support the Buckets structure in the hash table
   /// which does not map well to Blocks. Revisit this.

@@ -280,12 +280,6 @@ bool BufferedBlockMgr::TryAcquireTmpReservation(Client* client, int num_buffers)
   return true;
 }
 
-void BufferedBlockMgr::ClearTmpReservation(Client* client) {
-  lock_guard<mutex> lock(lock_);
-  unfullfilled_reserved_buffers_ -= client->num_tmp_reserved_buffers_;
-  client->num_tmp_reserved_buffers_ = 0;
-}
-
 bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
   // Workaround IMPALA-1619. Return immediately if the allocation size will cause
   // an arithmetic overflow.
@@ -330,8 +324,9 @@ bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
   int buffers_acquired = 0;
   do {
     BufferDescriptor* buffer_desc = NULL;
-    FindBuffer(lock, &buffer_desc); // This waits on the lock.
+    Status s = FindBuffer(lock, &buffer_desc); // This waits on the lock.
     if (buffer_desc == NULL) break;
+    DCHECK(s.ok());
     all_io_buffers_.erase(buffer_desc->all_buffers_it);
     if (buffer_desc->block != NULL) buffer_desc->block->buffer_desc_ = NULL;
     delete[] buffer_desc->buffer;
@@ -347,13 +342,8 @@ bool BufferedBlockMgr::ConsumeMemory(Client* client, int64_t size) {
       VLOG_QUERY << "Query: " << query_id_ << " write unpinned buffers failed.";
       client->state_->LogError(status.msg());
     }
-    if (buffers_acquired < additional_tmp_reservations) {
-      // TODO: what is the reasoning behind this calculation?
-      client->num_tmp_reserved_buffers_ -=
-          (additional_tmp_reservations - buffers_acquired);
-      unfullfilled_reserved_buffers_ -=
-          (additional_tmp_reservations - buffers_acquired);
-    }
+    client->num_tmp_reserved_buffers_ -= additional_tmp_reservations;
+    unfullfilled_reserved_buffers_ -= additional_tmp_reservations;
     mem_tracker_->Release(buffers_acquired * max_block_size());
     return false;
   }
