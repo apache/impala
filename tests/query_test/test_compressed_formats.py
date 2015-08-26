@@ -2,6 +2,8 @@
 
 import os
 import pytest
+import random
+import subprocess
 from os.path import join
 from subprocess import call
 from tests.common.test_vector import *
@@ -139,3 +141,78 @@ class TestTableWriters(ImpalaTestSuite):
     # TODO debug this test, same as seq writer.
     pytest.skip()
     self.run_test_case('QueryTest/text-writer', vector)
+
+@SkipIfS3.insert
+@pytest.mark.execute_serially
+class TestLargeCompressedFile(ImpalaTestSuite):
+  """ Tests that we gracefully handle when a compressed file in HDFS is larger
+  than 1GB.
+  This test creates a testing data file that is over 1GB and loads it to a table.
+  Then verifies Impala will gracefully fail the query.
+  TODO: Once IMPALA-1619 is fixed, modify the test to test > 2GB file."""
+
+  TABLE_NAME = "large_compressed_file"
+  TABLE_LOCATION = "/test-warehouse/large_compressed_file"
+  """ Name the file with ".snappy" extension to let scanner treat it
+  as a snappy compressed file."""
+  FILE_NAME = "largefile.snappy"
+  LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  MAX_FILE_SIZE = 1024 * 1024 * 1024
+
+  @classmethod
+  def get_workload(self):
+    return 'functional-query'
+
+  @classmethod
+  def add_test_dimensions(cls):
+    super(TestLargeCompressedFile, cls).add_test_dimensions()
+
+    if cls.exploration_strategy() != 'exhaustive':
+      pytest.skip("skipping if it's not exhaustive test.")
+    cls.TestMatrix.add_constraint(lambda v:
+        (v.get_value('table_format').file_format =='text' and
+        v.get_value('table_format').compression_codec == 'none'))
+
+  def teardown_method(self, method):
+    self.__drop_test_table()
+
+  def __gen_char_or_num(self):
+    return random.choice(self.LETTERS)
+
+  def __generate_file(self, file_name, file_size):
+    """Generate file with random data and a specified size."""
+    s = ''
+    for j in range(1024):
+      s = s + self.__gen_char_or_num()
+    put = subprocess.Popen(["hadoop", "fs", "-put", "-f", "-", file_name],
+                           stdin=subprocess.PIPE, bufsize=-1)
+    remain = file_size % 1024
+    for i in range(int(file_size / 1024)):
+      put.stdin.write(s)
+    put.stdin.write(s[0:remain])
+    put.stdin.close()
+    put.wait()
+
+  def test_query_large_file(self, vector):
+    self.__create_test_table();
+    dst_path = "%s/%s" % (self.TABLE_LOCATION, self.FILE_NAME)
+    file_size = self.MAX_FILE_SIZE + 1
+    self.__generate_file(dst_path, file_size)
+    self.client.execute("refresh %s" % self.TABLE_NAME)
+
+    # Query the table and check for expected error.
+    expected_error = 'Requested buffer size %dB > 1GB' % file_size
+    try:
+      result = self.client.execute("select * from %s limit 1" % self.TABLE_NAME)
+      assert False, "Query was expected to fail"
+    except Exception as e:
+      error_msg = str(e)
+      assert expected_error in error_msg
+
+  def __create_test_table(self):
+    self.__drop_test_table()
+    self.client.execute("CREATE TABLE %s (col string) LOCATION '%s'"
+      % (self.TABLE_NAME, self.TABLE_LOCATION))
+
+  def __drop_test_table(self):
+    self.client.execute("DROP TABLE IF EXISTS %s" % self.TABLE_NAME)

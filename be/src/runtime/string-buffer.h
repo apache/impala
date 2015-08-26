@@ -98,6 +98,7 @@ class StringBuffer {
   void GrowBuffer(int new_len) {
     // TODO: Release/reuse old buffers somehow
     buffer_size_ = std::max(buffer_size_ * 2, new_len);
+    DCHECK_LE(buffer_size_, StringValue::MAX_LENGTH);
     char* new_buffer = reinterpret_cast<char*>(pool_->Allocate(buffer_size_));
     if (string_value_.len > 0) {
       memcpy(new_buffer, string_value_.ptr, string_value_.len);

@@ -71,6 +71,29 @@ TEST(StringBufferTest, Basic) {
   pool.FreeAll();
 }
 
+TEST(StringBufferTest, AppendBoundary) {
+  // Test StringBuffer::Append() up to 1GB is ok
+  // TODO: Once IMPALA-1619 is fixed, we should change the test to verify
+  // append over 2GB string is supported.
+  MemTracker tracker;
+  MemPool pool(&tracker);
+  StringBuffer str(&pool);
+  string std_str;
+
+  const int64_t chunk_size = 8 * 1024 * 1024;
+  std_str.resize(chunk_size, 'a');
+  int64_t data_size = 0;
+  while (data_size + chunk_size <= StringValue::MAX_LENGTH) {
+    str.Append(std_str.c_str(), chunk_size);
+    data_size += chunk_size;
+  }
+  EXPECT_EQ(str.buffer_size(), data_size);
+  std_str.resize(StringValue::MAX_LENGTH, 'a');
+  ValidateString(std_str, str);
+
+  pool.FreeAll();
+}
+
 }
 
 int main(int argc, char **argv) {
