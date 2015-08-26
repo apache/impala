@@ -49,6 +49,12 @@ Status BlockingJoinNode::Init(const TPlanNode& tnode) {
   DCHECK((join_op_ != TJoinOp::LEFT_SEMI_JOIN && join_op_ != TJoinOp::LEFT_ANTI_JOIN &&
       join_op_ != TJoinOp::RIGHT_SEMI_JOIN && join_op_ != TJoinOp::RIGHT_ANTI_JOIN &&
       join_op_ != TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) || conjunct_ctxs_.size() == 0);
+  runtime_profile_->AddLocalTimeCounter(
+      bind<int64_t>(&BlockingJoinNode::LocalTimeCounterFn,
+      runtime_profile_->total_time_counter(),
+      child(0)->runtime_profile()->total_time_counter(),
+      child(1)->runtime_profile()->total_time_counter(),
+      &built_probe_overlap_stop_watch_));
   return Status::OK();
 }
 
@@ -134,7 +140,6 @@ void BlockingJoinNode::BuildSideThread(RuntimeState* state, Promise<Status>* sta
   Status s;
   {
     SCOPED_TIMER(state->total_cpu_timer());
-    SCOPED_TIMER(runtime_profile()->total_async_timer());
     s = ConstructBuildSide(state);
   }
   // IMPALA-1863: If the build-side thread failed, then we need to close the right
@@ -180,6 +185,11 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
     // Don't exit even if we see an error, we still need to wait for the build thread
     // to finish.
     Status open_status = child(0)->Open(state);
+
+    // The left/right child overlap stops here.
+    clock_gettime(CLOCK_MONOTONIC, &overlap_stops_time_);
+    built_probe_overlap_stop_watch_.SetTimeCeiling(overlap_stops_time_);
+
     // Blocks until ConstructBuildSide has returned, after which the build side structures
     // are fully constructed.
     RETURN_IF_ERROR(build_side_status.Get());
@@ -194,6 +204,10 @@ Status BlockingJoinNode::Open(RuntimeState* state) {
     RETURN_IF_ERROR(child(0)->Open(state));
     RETURN_IF_ERROR(ConstructBuildSide(state));
   } else {
+    // The left/right child never overlaps. The overlap stops here.
+    clock_gettime(CLOCK_MONOTONIC, &overlap_stops_time_);
+    built_probe_overlap_stop_watch_.SetTimeCeiling(overlap_stops_time_);
+
     RETURN_IF_ERROR(ConstructBuildSide(state));
     RETURN_IF_ERROR(child(0)->Open(state));
   }
@@ -247,6 +261,20 @@ string BlockingJoinNode::GetLeftChildRowString(TupleRow* row) {
   }
   out << "]";
   return out.str();
+}
+
+int64_t BlockingJoinNode::LocalTimeCounterFn(const RuntimeProfile::Counter* total_time,
+    const RuntimeProfile::Counter* left_child_time,
+    const RuntimeProfile::Counter* right_child_time,
+    const MonotonicStopWatch* child_overlap_timer) {
+  int64_t local_time = total_time->value() - left_child_time->value() -
+      (right_child_time->value() - child_overlap_timer->TotalElapsedTime());
+  // While the calculation is correct at the end of the execution, counter value
+  // and the stop watch reading is not accurate during execution.
+  // If the child time counter is updated before the parent time counter, then the child
+  // time will be greater. Stop watch is not thread safe, which can return invalid value.
+  // Don't return a negative number in those cases.
+  return ::max(0L, local_time);
 }
 
 // This function is replaced by codegen

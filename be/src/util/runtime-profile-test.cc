@@ -159,7 +159,7 @@ TEST(CountersTest, MergeAndUpdate) {
   RuntimeProfile averaged_profile(&pool, "merged", true);
   averaged_profile.UpdateAverage(&profile1);
   averaged_profile.UpdateAverage(&profile2);
-  EXPECT_EQ(6, averaged_profile.num_counters());
+  EXPECT_EQ(5, averaged_profile.num_counters());
   ValidateCounter(&averaged_profile, "Parent Shared", 2);
   ValidateCounter(&averaged_profile, "Parent 1 Only", 2);
   ValidateCounter(&averaged_profile, "Parent 2 Only", 5);
@@ -171,15 +171,15 @@ TEST(CountersTest, MergeAndUpdate) {
   for (int i = 0; i < 3; ++i) {
     RuntimeProfile* profile = children[i];
     if (profile->name().compare("Child1") == 0) {
-      EXPECT_EQ(6, profile->num_counters());
+      EXPECT_EQ(5, profile->num_counters());
       ValidateCounter(profile, "Child1 Shared", 15);
       ValidateCounter(profile, "Child1 Parent 1 Only", 50);
       ValidateCounter(profile, "Child1 Parent 2 Only", 100);
     } else if (profile->name().compare("Child2") == 0) {
-      EXPECT_EQ(4, profile->num_counters());
+      EXPECT_EQ(3, profile->num_counters());
       ValidateCounter(profile, "Child2", 40);
     } else if (profile->name().compare("Child3") == 0) {
-      EXPECT_EQ(4, profile->num_counters());
+      EXPECT_EQ(3, profile->num_counters());
       ValidateCounter(profile, "Child3", 30);
     } else {
       EXPECT_TRUE(false);
@@ -192,7 +192,7 @@ TEST(CountersTest, MergeAndUpdate) {
 
   // Update profile2 w/ profile1 and validate
   profile2.Update(tprofile1);
-  EXPECT_EQ(6, profile2.num_counters());
+  EXPECT_EQ(5, profile2.num_counters());
   ValidateCounter(&profile2, "Parent Shared", 1);
   ValidateCounter(&profile2, "Parent 1 Only", 2);
   ValidateCounter(&profile2, "Parent 2 Only", 5);
@@ -203,15 +203,15 @@ TEST(CountersTest, MergeAndUpdate) {
   for (int i = 0; i < 3; ++i) {
     RuntimeProfile* profile = children[i];
     if (profile->name().compare("Child1") == 0) {
-      EXPECT_EQ(6, profile->num_counters());
+      EXPECT_EQ(5, profile->num_counters());
       ValidateCounter(profile, "Child1 Shared", 10);
       ValidateCounter(profile, "Child1 Parent 1 Only", 50);
       ValidateCounter(profile, "Child1 Parent 2 Only", 100);
     } else if (profile->name().compare("Child2") == 0) {
-      EXPECT_EQ(4, profile->num_counters());
+      EXPECT_EQ(3, profile->num_counters());
       ValidateCounter(profile, "Child2", 40);
     } else if (profile->name().compare("Child3") == 0) {
-      EXPECT_EQ(4, profile->num_counters());
+      EXPECT_EQ(3, profile->num_counters());
       ValidateCounter(profile, "Child3", 30);
     } else {
       EXPECT_TRUE(false);

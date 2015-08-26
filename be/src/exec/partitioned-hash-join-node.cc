@@ -564,7 +564,10 @@ Status PartitionedHashJoinNode::ConstructBuildSide(RuntimeState* state) {
   AllocateProbeFilters(state);
 
   // Do a full scan of child(1) and partition the rows.
-  RETURN_IF_ERROR(child(1)->Open(state));
+  {
+    SCOPED_STOP_WATCH(&built_probe_overlap_stop_watch_);
+    RETURN_IF_ERROR(child(1)->Open(state));
+  }
   RETURN_IF_ERROR(ProcessBuildInput(state, 0));
 
   AttachProbeFilters(state);
@@ -611,7 +614,10 @@ Status PartitionedHashJoinNode::ProcessBuildInput(RuntimeState* state, int level
     RETURN_IF_ERROR(QueryMaintenance(state));
     if (input_partition_ == NULL) {
       // If we are still consuming batches from the build side.
-      RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch, &eos));
+      {
+        SCOPED_STOP_WATCH(&built_probe_overlap_stop_watch_);
+        RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch, &eos));
+      }
       COUNTER_ADD(build_row_counter_, build_batch.num_rows());
     } else {
       // If we are consuming batches that have already been partitioned.

@@ -101,6 +101,17 @@ class BlockingJoinNode : public ExecNode {
   RuntimeProfile::Counter* build_row_counter_;   // num build rows
   RuntimeProfile::Counter* probe_row_counter_;   // num probe (left child) rows
 
+  /// The time (i.e. clock reads) when the right child stops overlapping with the left
+  /// child.
+  /// For the single threaded case, the left and right child never overlaps.
+  /// For the build side in a different thread, the overlap stops when the left child
+  /// Open() returns.
+  timespec overlap_stops_time_;
+
+  /// Stopwatch that measures the build child's Open/GetNext time that overlaps
+  /// with the probe child Open().
+  MonotonicStopWatch built_probe_overlap_stop_watch_;
+
   /// Init the build-side state for a new left child row (e.g. hash table iterator or list
   /// iterator) given the first row. Used in Open() to prepare for GetNext().
   /// A NULL ptr for first_left_child_row indicates the left child eos.
@@ -139,6 +150,43 @@ class BlockingJoinNode : public ExecNode {
         join_op_ == TJoinOp::RIGHT_OUTER_JOIN ||
         join_op_ == TJoinOp::FULL_OUTER_JOIN;
   }
+
+  /// This function calculates the "local time" spent in the join node.
+  ///
+  /// The definition of "local time" is the wall clock time where this exec node is
+  /// processing and it is not blocked by any of its children.
+  ///
+  /// The join node has two execution models:
+  ///   1. The entire join execution is in a single thread.
+  ///   2. The build(right) side is executed on a different thread while the main thread
+  ///      opens the probe(left) side.
+  ///
+  /// In case 1, the "local time" spent in this node is as simple as:
+  ///     total_time - left child time - right child time
+  /// Because the entire right child time blocks the execution, the right child time is
+  /// the same as right_child_blocking_stop_watch_.
+  ///
+  /// Case 2 is more complicated. The build thread is started first and then
+  /// the main thread will "open" the left child. When the left child is ready
+  /// (i.e. Open() returned), the main thread will wait for the build thread to finish.
+  /// Because the left child is always executed in the main thread, all the left child
+  /// time should not be counted towards the hash join "local time".
+  /// For the right child (the build side), the child time in the build thread up to the
+  /// point when the left child Open() returns should not be counted towards the hash
+  /// join local time. This time period completely overlaps with the left child time.
+  /// From the time when left child Open() returned, the right child time should be
+  /// removed from the total time because this is the only child that is blocking the
+  /// join execution.
+  ///
+  /// Here's the calculation:
+  ///   total_time - left child time - (right child time - overlapped period)
+  ///
+  /// The "overlapped period" is measured by built_probe_overlap_stop_watch_. Using this
+  /// overlap method, both children's "Prepare" time are also excluded.
+  static int64_t LocalTimeCounterFn(const RuntimeProfile::Counter* total_time,
+      const RuntimeProfile::Counter* left_child_time,
+      const RuntimeProfile::Counter* right_child_time,
+      const MonotonicStopWatch* child_overlap_timer);
 
  private:
   /// Supervises ConstructBuildSide in a separate thread, and returns its status in the

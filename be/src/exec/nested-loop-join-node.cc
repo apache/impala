@@ -117,11 +117,17 @@ void NestedLoopJoinNode::Close(RuntimeState* state) {
 }
 
 Status NestedLoopJoinNode::ConstructBuildSide(RuntimeState* state) {
-  RETURN_IF_ERROR(child(1)->Open(state));
+  {
+    SCOPED_STOP_WATCH(&built_probe_overlap_stop_watch_);
+    RETURN_IF_ERROR(child(1)->Open(state));
+  }
   bool eos = false;
   do {
     RowBatch* batch = build_batch_cache_->GetNextBatch();
-    RETURN_IF_ERROR(child(1)->GetNext(state, batch, &eos));
+    {
+      SCOPED_STOP_WATCH(&built_probe_overlap_stop_watch_);
+      RETURN_IF_ERROR(child(1)->GetNext(state, batch, &eos));
+    }
     SCOPED_TIMER(build_timer_);
     raw_build_batches_.AddRowBatch(batch);
     if (batch->need_to_return()) {

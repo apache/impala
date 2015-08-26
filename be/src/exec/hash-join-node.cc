@@ -161,12 +161,18 @@ Status HashJoinNode::ConstructBuildSide(RuntimeState* state) {
   // row ptrs.  The row ptrs are copied into the hash table's internal structure so they
   // don't need to be stored in the build_pool_.
   RowBatch build_batch(child(1)->row_desc(), state->batch_size(), mem_tracker());
-  RETURN_IF_ERROR(child(1)->Open(state));
+  {
+    SCOPED_STOP_WATCH(&built_probe_overlap_stop_watch_);
+    RETURN_IF_ERROR(child(1)->Open(state));
+  }
   while (true) {
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(QueryMaintenance(state));
     bool eos;
-    RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch, &eos));
+    {
+      SCOPED_STOP_WATCH(&built_probe_overlap_stop_watch_);
+      RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch, &eos));
+    }
     SCOPED_TIMER(build_timer_);
     // take ownership of tuple data of build_batch
     build_pool_->AcquireData(build_batch.tuple_data_pool(), false);

@@ -426,6 +426,10 @@ class RuntimeProfile {
   /// that the caller can update.  The counter is owned by the RuntimeProfile object.
   ThreadCounters* AddThreadCounters(const std::string& prefix);
 
+  // Add a derived counter to capture the local time. This function can be called at most
+  // once.
+  void AddLocalTimeCounter(const DerivedCounterFunction& counter_fn);
+
   /// Gets the counter object with 'name'.  Returns NULL if there is no counter with
   /// that name.
   Counter* GetCounter(const std::string& name);
@@ -455,8 +459,6 @@ class RuntimeProfile {
   /// Returns the counter for the total elapsed time.
   Counter* total_time_counter() { return counter_map_[TOTAL_TIME_COUNTER_NAME]; }
   Counter* inactive_timer() { return counter_map_[INACTIVE_TIME_COUNTER_NAME]; }
-  Counter* total_async_timer() { return counter_map_[ASYNC_TIME_COUNTER_NAME]; }
-
   int64_t local_time() { return local_time_ns_; }
 
   /// Prints the counters in a name: value format.
@@ -618,10 +620,6 @@ class RuntimeProfile {
 
   Counter counter_total_time_;
 
-  /// Total time that child profiles spent in an asychronous thread. This is used
-  /// in the local_time_percent_ calculation.
-  Counter total_async_timer_;
-
   /// Total time spent waiting (on non-children) that should not be counted when
   /// computing local_time_percent_. This is updated for example in the exchange
   /// node when waiting on the sender from another fragment.
@@ -646,8 +644,8 @@ class RuntimeProfile {
 
   /// Name of the counter maintaining the total time.
   static const std::string TOTAL_TIME_COUNTER_NAME;
+  static const std::string LOCAL_TIME_COUNTER_NAME;
   static const std::string INACTIVE_TIME_COUNTER_NAME;
-  static const std::string ASYNC_TIME_COUNTER_NAME;
 
   /// Create a subtree of runtime profiles from nodes, starting at *node_idx.
   /// On return, *node_idx is the index one past the end of this subtree

@@ -47,8 +47,8 @@ static const string THREAD_INVOLUNTARY_CONTEXT_SWITCHES = "InvoluntaryContextSwi
 static const string ROOT_COUNTER = "";
 
 const string RuntimeProfile::TOTAL_TIME_COUNTER_NAME = "TotalTime";
+const string RuntimeProfile::LOCAL_TIME_COUNTER_NAME = "LocalTime";
 const string RuntimeProfile::INACTIVE_TIME_COUNTER_NAME = "InactiveTotalTime";
-const string RuntimeProfile::ASYNC_TIME_COUNTER_NAME = "AsyncTotalTime";
 
 RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name,
     bool is_averaged_profile)
@@ -58,24 +58,19 @@ RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name,
     metadata_(-1),
     is_averaged_profile_(is_averaged_profile),
     counter_total_time_(TUnit::TIME_NS),
-    total_async_timer_(TUnit::TIME_NS),
     inactive_timer_(TUnit::TIME_NS),
     local_time_percent_(0),
     local_time_ns_(0) {
   Counter* total_time_counter;
-  Counter* total_async_timer;
   Counter* inactive_timer;
   if (!is_averaged_profile) {
     total_time_counter = &counter_total_time_;
-    total_async_timer = &total_async_timer_;
     inactive_timer = &inactive_timer_;
   } else {
     total_time_counter = pool->Add(new AveragedCounter(TUnit::TIME_NS));
-    total_async_timer = pool->Add(new AveragedCounter(TUnit::TIME_NS));
     inactive_timer = pool->Add(new AveragedCounter(TUnit::TIME_NS));
   }
   counter_map_[TOTAL_TIME_COUNTER_NAME] = total_time_counter;
-  counter_map_[ASYNC_TIME_COUNTER_NAME] = total_async_timer;
   counter_map_[INACTIVE_TIME_COUNTER_NAME] = inactive_timer;
 }
 
@@ -163,7 +158,6 @@ void RuntimeProfile::UpdateAverage(RuntimeProfile* other) {
 
       // Ignore this counter for averages.
       if (src_iter->first == INACTIVE_TIME_COUNTER_NAME) continue;
-      if (src_iter->first == ASYNC_TIME_COUNTER_NAME) continue;
 
       dst_iter = counter_map_.find(src_iter->first);
       AveragedCounter* avg_counter;
@@ -340,19 +334,29 @@ void RuntimeProfile::ComputeTimeInProfile() {
 void RuntimeProfile::ComputeTimeInProfile(int64_t total) {
   if (total == 0) return;
 
-  // Add all the total times in all the children
-  int64_t total_child_time = 0;
-  lock_guard<SpinLock> l(children_lock_);
-  for (int i = 0; i < children_.size(); ++i) {
-    total_child_time += children_[i].first->total_time_counter()->value();
+  // If a local time counter exists, use its value as local time. Otherwise, derive the
+  // local time from total time and the child time.
+  bool has_local_time_counter = false;
+  {
+    lock_guard<SpinLock> l(counter_map_lock_);
+    CounterMap::const_iterator itr = counter_map_.find(LOCAL_TIME_COUNTER_NAME);
+    if (itr != counter_map_.end()) {
+      local_time_ns_ = itr->second->value();
+      has_local_time_counter = true;
+    }
   }
-
-  local_time_ns_ = total_time_counter()->value() - total_child_time;
-  if (!is_averaged_profile_) {
-    local_time_ns_ += total_async_timer()->value();
-    local_time_ns_ -= inactive_timer()->value();
+  if (!has_local_time_counter) {
+    // Add all the total times of all the children.
+    int64_t total_child_time = 0;
+    lock_guard<SpinLock> l(children_lock_);
+    for (int i = 0; i < children_.size(); ++i) {
+      total_child_time += children_[i].first->total_time_counter()->value();
+    }
+    local_time_ns_ = total_time_counter()->value() - total_child_time;
+    if (!is_averaged_profile_) {
+      local_time_ns_ -= inactive_timer()->value();
+    }
   }
-
   // Counters have some margin, set to 0 if it was negative.
   local_time_ns_ = ::max(0L, local_time_ns_);
   local_time_percent_ =
@@ -471,6 +475,15 @@ RuntimeProfile::ThreadCounters* RuntimeProfile::AddThreadCounters(
   counter->involuntary_context_switches_ =
       AddCounter(prefix + THREAD_INVOLUNTARY_CONTEXT_SWITCHES, TUnit::UNIT);
   return counter;
+}
+
+void RuntimeProfile::AddLocalTimeCounter(const DerivedCounterFunction& counter_fn) {
+  DerivedCounter* local_time_counter = pool_->Add(
+      new DerivedCounter(TUnit::TIME_NS, counter_fn));
+  lock_guard<SpinLock> l(counter_map_lock_);
+  DCHECK(counter_map_.find(LOCAL_TIME_COUNTER_NAME) == counter_map_.end())
+      << "LocalTimeCounter already exists in the map.";
+  counter_map_[LOCAL_TIME_COUNTER_NAME] = local_time_counter;
 }
 
 RuntimeProfile::Counter* RuntimeProfile::GetCounter(const string& name) {
