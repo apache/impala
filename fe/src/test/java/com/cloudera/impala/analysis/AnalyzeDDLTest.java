@@ -1117,6 +1117,24 @@ public class AnalyzeDDLTest extends AnalyzerTest {
         "ESCAPED BY values and LINE/FIELD terminators must be specified as a single " +
         "character or as a decimal value in the range [-128:127]: ||");
 
+    // IMPALA-2251: it should not be possible to create text tables with the same
+    // delimiter character used for multiple purposes.
+    AnalysisError("create table functional.broken_text_table (c int) " +
+        "row format delimited fields terminated by '\001' lines terminated by '\001'",
+        "Field delimiter and line delimiter have same value: byte 1");
+    AnalysisError("create table functional.broken_text_table (c int) " +
+         "row format delimited lines terminated by '\001'",
+        "Field delimiter and line delimiter have same value: byte 1");
+    AnalysisError("create table functional.broken_text_table (c int) " +
+        "row format delimited fields terminated by '\012'",
+        "Field delimiter and line delimiter have same value: byte 10");
+    AnalysisError("create table functional.broken_text_table (c int) " +
+        "row format delimited escaped by '\001'",
+        "Field delimiter and escape character have same value: byte 1");
+    AnalysisError("create table functional.broken_text_table (c int) " +
+        "row format delimited escaped by 'x' lines terminated by 'x'",
+        "Line delimiter and escape character have same value: byte 120");
+
     AnalysisError("create table db_does_not_exist.new_table (i int)",
         "Database does not exist: db_does_not_exist");
     AnalysisError("create table new_table (i int, I string)",

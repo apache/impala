@@ -31,9 +31,9 @@ import com.google.common.collect.Maps;
  * Represents the file format metadata for files stored in a table or partition.
  */
 public class HdfsStorageDescriptor {
-  private static final char DEFAULT_LINE_DELIM = '\n';
+  public static final char DEFAULT_LINE_DELIM = '\n';
   // hive by default uses ctrl-a as field delim
-  private static final char DEFAULT_FIELD_DELIM = '\u0001';
+  public static final char DEFAULT_FIELD_DELIM = '\u0001';
   // hive by default has no escape char
   public static final char DEFAULT_ESCAPE_CHAR = '\u0000';
 

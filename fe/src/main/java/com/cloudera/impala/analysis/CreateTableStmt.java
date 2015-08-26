@@ -209,9 +209,7 @@ public class CreateTableStmt extends StatementBase {
       location_.analyze(analyzer, Privilege.ALL, FsAction.READ_WRITE);
     }
 
-    analyzeRowFormatValue(rowFormat_.getFieldDelimiter());
-    analyzeRowFormatValue(rowFormat_.getLineDelimiter());
-    analyzeRowFormatValue(rowFormat_.getEscapeChar());
+    analyzeRowFormat();
 
     // Check that all the column names are valid and unique.
     analyzeColumnDefs(analyzer);
@@ -227,6 +225,28 @@ public class CreateTableStmt extends StatementBase {
     }
 
     if (cachingOp_ != null) cachingOp_.analyze(analyzer);
+  }
+
+  private void analyzeRowFormat() throws AnalysisException {
+    Byte fieldDelim = analyzeRowFormatValue(rowFormat_.getFieldDelimiter());
+    Byte lineDelim = analyzeRowFormatValue(rowFormat_.getLineDelimiter());
+    Byte escapeChar = analyzeRowFormatValue(rowFormat_.getEscapeChar());
+    if (fileFormat_ == THdfsFileFormat.TEXT) {
+      if (fieldDelim == null) fieldDelim = HdfsStorageDescriptor.DEFAULT_FIELD_DELIM;
+      if (lineDelim == null) lineDelim = HdfsStorageDescriptor.DEFAULT_LINE_DELIM;
+      if (fieldDelim != null && lineDelim != null && fieldDelim.equals(lineDelim)) {
+        throw new AnalysisException("Field delimiter and line delimiter have same " +
+            "value: byte " + fieldDelim);
+      }
+      if (fieldDelim != null && escapeChar != null && fieldDelim.equals(escapeChar)) {
+        throw new AnalysisException("Field delimiter and escape character have same " +
+            "value: byte " + fieldDelim);
+      }
+      if (lineDelim != null && escapeChar != null && lineDelim.equals(escapeChar)) {
+        throw new AnalysisException("Line delimiter and escape character have same " +
+            "value: byte " + lineDelim);
+      }
+    }
   }
 
   /**
@@ -300,13 +320,15 @@ public class CreateTableStmt extends StatementBase {
     return reconciledColDefs;
   }
 
-  private void analyzeRowFormatValue(String value) throws AnalysisException {
-    if (value == null) return;
-    if (HdfsStorageDescriptor.parseDelim(value) == null) {
+  private Byte analyzeRowFormatValue(String value) throws AnalysisException {
+    if (value == null) return null;
+    Byte byteVal = HdfsStorageDescriptor.parseDelim(value);
+    if (byteVal == null) {
       throw new AnalysisException("ESCAPED BY values and LINE/FIELD " +
           "terminators must be specified as a single character or as a decimal " +
           "value in the range [-128:127]: " + value);
     }
+    return byteVal;
   }
 
   /**
