@@ -24,6 +24,9 @@
 
 DECLARE_int32(webserver_port);
 DECLARE_string(webserver_password_file);
+DECLARE_string(webserver_certificate_file);
+DECLARE_string(webserver_private_key_file);
+DECLARE_string(webserver_private_key_password_cmd);
 
 #include "common/names.h"
 
@@ -48,10 +51,11 @@ Status HttpGet(const string& host, const int32_t& port, const string& url_path,
     request_stream.connect(host, lexical_cast<string>(port));
     if (!request_stream) return Status("Could not connect request_stream");
 
-    request_stream << "GET " << url_path << " HTTP/1.0\r\n";
-    request_stream << "Host: " << host << "\r\n";
+    request_stream << "GET " << url_path << " HTTP/1.1\r\n";
+    request_stream << "Host: " << host << ":" << port <<  "\r\n";
     request_stream << "Accept: */*\r\n";
     request_stream << "Cache-Control: no-cache\r\n";
+
     request_stream << "Connection: close\r\n\r\n";
     request_stream.flush();
 
@@ -191,10 +195,70 @@ TEST(Webserver, EscapeErrorUriTest) {
       string::npos);
 }
 
+template<typename T>
+struct ScopedFlagSetter {
+  T* flag;
+  T old_val;
+  ScopedFlagSetter(T* f, T new_val) {
+    flag = f;
+    old_val = *f;
+    *f = new_val;
+  }
+
+  ~ScopedFlagSetter() {
+    *flag = old_val;
+  }
+};
+
+TEST(Webserver, SslTest) {
+  ScopedFlagSetter<string> certificate(&FLAGS_webserver_certificate_file,
+      Substitute("$0/be/src/testutil/server-cert.pem", getenv("IMPALA_HOME")));
+  ScopedFlagSetter<string> private_key(&FLAGS_webserver_private_key_file,
+      Substitute("$0/be/src/testutil/server-key.pem", getenv("IMPALA_HOME")));
+
+  Webserver webserver(FLAGS_webserver_port);
+  ASSERT_TRUE(webserver.Start().ok());
+}
+
+TEST(Webserver, SslBadCertTest) {
+  ScopedFlagSetter<string> certificate(&FLAGS_webserver_certificate_file,
+      Substitute("$0/be/src/testutil/invalid-server-cert.pem", getenv("IMPALA_HOME")));
+  ScopedFlagSetter<string> private_key(&FLAGS_webserver_private_key_file,
+      Substitute("$0/be/src/testutil/server-key.pem", getenv("IMPALA_HOME")));
+
+  Webserver webserver(FLAGS_webserver_port);
+  ASSERT_FALSE(webserver.Start().ok());
+}
+
+TEST(Webserver, SslWithPrivateKeyPasswordTest) {
+  ScopedFlagSetter<string> certificate(&FLAGS_webserver_certificate_file,
+      Substitute("$0/be/src/testutil/server-cert.pem", getenv("IMPALA_HOME")));
+  ScopedFlagSetter<string> private_key(&FLAGS_webserver_private_key_file,
+      Substitute("$0/be/src/testutil/server-key-password.pem", getenv("IMPALA_HOME")));
+  ScopedFlagSetter<string> password_cmd(
+      &FLAGS_webserver_private_key_password_cmd, "echo password");
+
+  Webserver webserver(FLAGS_webserver_port);
+  ASSERT_TRUE(webserver.Start().ok());
+}
+
+TEST(Webserver, SslBadPrivateKeyPasswordTest) {
+  ScopedFlagSetter<string> certificate(&FLAGS_webserver_certificate_file,
+      Substitute("$0/be/src/testutil/server-cert.pem", getenv("IMPALA_HOME")));
+  ScopedFlagSetter<string> private_key(&FLAGS_webserver_private_key_file,
+      Substitute("$0/be/src/testutil/server-key-password.pem", getenv("IMPALA_HOME")));
+  ScopedFlagSetter<string> password_cmd(
+      &FLAGS_webserver_private_key_password_cmd, "echo wrongpassword");
+
+  Webserver webserver(FLAGS_webserver_port);
+  ASSERT_FALSE(webserver.Start().ok());
+}
+
 TEST(Webserver, StartWithPasswordFileTest) {
   stringstream password_file;
   password_file << getenv("IMPALA_HOME") << "/be/src/testutil/htpasswd";
-  FLAGS_webserver_password_file = password_file.str();
+  ScopedFlagSetter<string> password_flag(&FLAGS_webserver_password_file,
+      password_file.str());
 
   Webserver webserver(FLAGS_webserver_port);
   ASSERT_TRUE(webserver.Start().ok());
@@ -207,11 +271,11 @@ TEST(Webserver, StartWithPasswordFileTest) {
 TEST(Webserver, StartWithMissingPasswordFileTest) {
   stringstream password_file;
   password_file << getenv("IMPALA_HOME") << "/be/src/testutil/doesntexist";
-  FLAGS_webserver_password_file = password_file.str();
+  ScopedFlagSetter<string> password_flag(&FLAGS_webserver_password_file,
+      password_file.str());
 
   Webserver webserver(FLAGS_webserver_port);
   ASSERT_FALSE(webserver.Start().ok());
-  FLAGS_webserver_password_file = "";
 }
 
 TEST(Webserver, DirectoryListingDisabledTest) {
@@ -254,7 +318,8 @@ TEST(Webserver, NullCharTest) {
   webserver.RegisterUrlCallback(NULL_CHAR_TEST_PATH, NullCharCallback);
   ASSERT_TRUE(webserver.Start().ok());
   stringstream contents;
-  ASSERT_TRUE(HttpGet("localhost", FLAGS_webserver_port, NULL_CHAR_TEST_PATH, &contents).ok());
+  ASSERT_TRUE(
+      HttpGet("localhost", FLAGS_webserver_port, NULL_CHAR_TEST_PATH, &contents).ok());
   ASSERT_TRUE(contents.str().find(STRING_WITH_NULL) != string::npos);
 }
 
@@ -262,5 +327,6 @@ TEST(Webserver, NullCharTest) {
 int main(int argc, char **argv) {
   InitCommonRuntime(argc, argv, false, TestInfo::BE_TEST);
   ::testing::InitGoogleTest(&argc, argv);
+  FLAGS_webserver_port = 27890;
   return RUN_ALL_TESTS();
 }

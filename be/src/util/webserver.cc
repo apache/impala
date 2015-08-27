@@ -36,6 +36,7 @@
 #include "util/disk-info.h"
 #include "util/mem-info.h"
 #include "util/os-info.h"
+#include "util/os-util.h"
 #include "util/process-state-info.h"
 #include "util/url-coding.h"
 #include "util/debug-util.h"
@@ -47,6 +48,7 @@
 
 using boost::algorithm::is_any_of;
 using boost::algorithm::split;
+using boost::algorithm::trim_right;
 using boost::algorithm::to_lower;
 using boost::filesystem::exists;
 using boost::upgrade_to_unique_lock;
@@ -70,6 +72,15 @@ DEFINE_bool(enable_webserver_doc_root, true,
 DEFINE_string(webserver_certificate_file, "",
     "The location of the debug webserver's SSL certificate file, in .pem format. If "
     "empty, webserver SSL support is not enabled");
+DEFINE_string(webserver_private_key_file, "", "The full path to the private key used as a"
+    " counterpart to the public key contained in --ssl_server_certificate. If "
+    "--ssl_server_certificate is set, this option must be set as well.");
+DEFINE_string(webserver_private_key_password_cmd, "", "A Unix command whose output "
+    "returns the password used to decrypt the Webserver's certificate private key file "
+    "specified in --webserver_private_key_file. If the .PEM key file is not "
+    "password-protected, this command will not be invoked. The output of the command "
+    "will be truncated to 1024 bytes, and then all trailing whitespace will be trimmed "
+    "before it is used to decrypt the private key");
 DEFINE_string(webserver_authentication_domain, "",
     "Domain used for debug webserver authentication");
 DEFINE_string(webserver_password_file, "",
@@ -220,6 +231,22 @@ Status Webserver::Start() {
   if (IsSecure()) {
     options.push_back("ssl_certificate");
     options.push_back(FLAGS_webserver_certificate_file.c_str());
+
+    if (!FLAGS_webserver_private_key_file.empty()) {
+      options.push_back("ssl_private_key");
+      options.push_back(FLAGS_webserver_private_key_file.c_str());
+
+      if (!FLAGS_webserver_private_key_password_cmd.empty()) {
+        string key_password;
+        if (!RunShellProcess(FLAGS_webserver_private_key_password_cmd, &key_password)) {
+          return Status(TErrorCode::SSL_PASSWORD_CMD_FAILED,
+              FLAGS_webserver_private_key_password_cmd, key_password);
+        }
+        trim_right(key_password);
+        options.push_back("ssl_private_key_password");
+        options.push_back(key_password.c_str());
+      }
+    }
   }
 
   if (!FLAGS_webserver_authentication_domain.empty()) {
