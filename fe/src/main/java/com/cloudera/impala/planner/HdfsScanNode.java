@@ -41,13 +41,16 @@ import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
+import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsPartition.FileBlock;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.RuntimeEnv;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -63,6 +66,7 @@ import com.cloudera.impala.thrift.TScanRange;
 import com.cloudera.impala.thrift.TScanRangeLocation;
 import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.cloudera.impala.util.MembershipSnapshot;
+import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Objects.ToStringHelper;
 import com.google.common.base.Preconditions;
@@ -137,7 +141,7 @@ public class HdfsScanNode extends ScanNode {
    * Populate conjuncts_, collectionConjuncts_, partitions_, and scanRanges_.
    */
   @Override
-  public void init(Analyzer analyzer) throws InternalException {
+  public void init(Analyzer analyzer) throws ImpalaException {
     ArrayList<Expr> bindingPredicates = analyzer.getBoundPredicates(tupleIds_.get(0));
     conjuncts_.addAll(bindingPredicates);
 
@@ -149,6 +153,7 @@ public class HdfsScanNode extends ScanNode {
     // do partition pruning before deciding which slots to materialize,
     // we might end up removing some predicates
     prunePartitions(analyzer);
+    checkForSupportedFileFormats();
 
     // mark all slots referenced by the remaining conjuncts as materialized
     markSlotsMaterialized(analyzer, conjuncts_);
@@ -165,6 +170,47 @@ public class HdfsScanNode extends ScanNode {
 
     // TODO: do we need this?
     assignedConjuncts_ = analyzer.getAssignedConjuncts();
+  }
+
+  /**
+   * Throws if the table schema contains a complex type and we need to scan
+   * a partition that has a format for which we do not support complex types,
+   * regardless of whether a complex-typed column is actually referenced
+   * in the query.
+   */
+  @Override
+  protected void checkForSupportedFileFormats() throws NotImplementedException {
+    Preconditions.checkNotNull(desc_);
+    Preconditions.checkNotNull(desc_.getTable());
+    Column firstComplexTypedCol = null;
+    for (Column col: desc_.getTable().getColumns()) {
+      if (col.getType().isComplexType()) {
+        firstComplexTypedCol = col;
+        break;
+      }
+    }
+    if (firstComplexTypedCol == null) return;
+
+    for (HdfsPartition part: partitions_) {
+      HdfsFileFormat format = part.getInputFormatDescriptor().getFileFormat();
+      if (format.isComplexTypesSupported()) continue;
+      String errSuffix = String.format(
+          "Complex types are supported for these file formats: %s",
+          Joiner.on(", ").join(HdfsFileFormat.complexTypesFormats()));
+      if (desc_.getTable().getNumClusteringCols() == 0) {
+        throw new NotImplementedException(String.format(
+            "Scan of table '%s' in format '%s' is not supported because the table " +
+            "has a column '%s' with a complex type '%s'.\n%s.",
+            desc_.getAlias(), format, firstComplexTypedCol.getName(),
+            firstComplexTypedCol.getType().toSql(), errSuffix));
+      }
+      throw new NotImplementedException(String.format(
+          "Scan of partition '%s' in format '%s' of table '%s' is not supported " +
+          "because the table has a column '%s' with a complex type '%s'.\n%s.",
+          part.getPartitionName(), format, desc_.getAlias(),
+          firstComplexTypedCol.getName(), firstComplexTypedCol.getType().toSql(),
+          errSuffix));
+    }
   }
 
   /**

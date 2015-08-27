@@ -306,7 +306,7 @@ public class PlannerTestBase {
     } else {
       // Compare actual and expected error messages.
       if (expectedErrorMsg != null && !expectedErrorMsg.isEmpty()) {
-        if (!e.getMessage().toLowerCase().equals(expectedErrorMsg.toLowerCase())) {
+        if (!e.getMessage().toLowerCase().startsWith(expectedErrorMsg.toLowerCase())) {
           errorLog.append("query:\n" + query + "\nExpected error message: '"
               + expectedErrorMsg + "'\nActual error message: '"
               + e.getMessage() + "'\n");

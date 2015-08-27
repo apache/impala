@@ -14,48 +14,61 @@
 
 package com.cloudera.impala.catalog;
 
+import java.util.List;
 import java.util.Map;
 
 import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 
 /**
  * Supported HDFS file formats. Every file format specifies:
  * 1) the input format class
  * 2) the output format class
  * 3) the serialization library class
+ * 4) whether scanning complex types from it is supported
  *
  * Important note: Always keep consistent with the classes used in Hive.
  */
 public enum HdfsFileFormat {
   RC_FILE("org.apache.hadoop.hive.ql.io.RCFileInputFormat",
       "org.apache.hadoop.hive.ql.io.RCFileOutputFormat",
-      "org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe"),
+      "org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe",
+      false),
   TEXT("org.apache.hadoop.mapred.TextInputFormat",
       "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
-      "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe"),
+      "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe",
+      false),
   LZO_TEXT("com.hadoop.mapred.DeprecatedLzoTextInputFormat",
       "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
-      ""),
+      "",
+      false),
   SEQUENCE_FILE("org.apache.hadoop.mapred.SequenceFileInputFormat",
       "org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat",
-      "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe"),
+      "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe", false),
   AVRO("org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat",
       "org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat",
-      "org.apache.hadoop.hive.serde2.avro.AvroSerDe"),
+      "org.apache.hadoop.hive.serde2.avro.AvroSerDe",
+      true),
   PARQUET("org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
       "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat",
-      "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe");
+      "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe",
+      true);
 
   private final String inputFormat_;
   private final String outputFormat_;
   private final String serializationLib_;
 
-  HdfsFileFormat(String inputFormat, String outputFormat, String serializationLib) {
+  // Indicates whether we support scanning complex types for this file format.
+  private final boolean isComplexTypesSupported_;
+
+  HdfsFileFormat(String inputFormat, String outputFormat, String serializationLib,
+      boolean isComplexTypesSupported) {
     inputFormat_ = inputFormat;
     outputFormat_ = outputFormat;
     serializationLib_ = serializationLib;
+    isComplexTypesSupported_ = isComplexTypesSupported;
   }
 
   public String inputFormat() { return inputFormat_; }
@@ -213,5 +226,22 @@ public enum HdfsFileFormat {
         throw new RuntimeException("Unknown HdfsFormat: "
             + this + " - should never happen!");
     }
+  }
+
+  /**
+   * Returns true if Impala supports scanning complex-typed columns
+   * from a table/partition with this file format.
+   */
+  public boolean isComplexTypesSupported() { return isComplexTypesSupported_; }
+
+  /**
+   * Returns a list with all formats for which isComplexTypesSupported() is true.
+   */
+  public static List<HdfsFileFormat> complexTypesFormats() {
+    List<HdfsFileFormat> result = Lists.newArrayList();
+    for (HdfsFileFormat f: values()) {
+      if (f.isComplexTypesSupported()) result.add(f);
+    }
+    return result;
   }
 }

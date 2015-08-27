@@ -27,7 +27,7 @@ import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.catalog.ColumnStats;
 import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.ImpalaException;
 import com.google.common.base.Preconditions;
 
 /**
@@ -130,7 +130,7 @@ public abstract class JoinNode extends PlanNode {
   public void setDistributionMode(DistributionMode distrMode) { distrMode_ = distrMode; }
 
   @Override
-  public void init(Analyzer analyzer) throws InternalException {
+  public void init(Analyzer analyzer) throws ImpalaException {
     super.init(analyzer);
     assignedConjuncts_ = analyzer.getAssignedConjuncts();
     otherJoinConjuncts_ = Expr.substituteList(otherJoinConjuncts_,

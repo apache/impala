@@ -41,6 +41,7 @@ import com.cloudera.impala.catalog.HBaseColumn;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Type;
+import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.service.FeSupport;
@@ -113,7 +114,8 @@ public class HBaseScanNode extends ScanNode {
   }
 
   @Override
-  public void init(Analyzer analyzer) throws InternalException {
+  public void init(Analyzer analyzer) throws ImpalaException {
+    checkForSupportedFileFormats();
     assignConjuncts(analyzer);
     setStartStopKey(analyzer);
     // Convert predicates to HBase filters_.

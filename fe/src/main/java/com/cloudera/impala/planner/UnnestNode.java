@@ -17,7 +17,7 @@ package com.cloudera.impala.planner;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.CollectionTableRef;
 import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
@@ -47,7 +47,7 @@ public class UnnestNode extends PlanNode {
   }
 
   @Override
-  public void init(Analyzer analyzer) throws InternalException {
+  public void init(Analyzer analyzer) throws ImpalaException {
     // Do not assign binding predicates or predicates for enforcing slot equivalences
     // because they must have been assigned in the scan node materializing the
     // collection-typed slot.

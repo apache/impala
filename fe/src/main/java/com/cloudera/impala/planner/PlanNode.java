@@ -28,7 +28,7 @@ import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
-import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.PrintUtils;
 import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.thrift.TExecStats;
@@ -390,7 +390,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * state required for toThrift(). This is called directly after construction.
    * Throws if an expr substitution or evaluation fails.
    */
-  public void init(Analyzer analyzer) throws InternalException {
+  public void init(Analyzer analyzer) throws ImpalaException {
     assignConjuncts(analyzer);
     computeStats(analyzer);
     createDefaultSmap(analyzer);

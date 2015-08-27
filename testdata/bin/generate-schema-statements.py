@@ -495,20 +495,6 @@ def generate_statements(output_name, test_vectors, sections,
       # sections), which is used to generate the create table statement.
       if create_hive:
         table_template = create_hive
-        # Loading dependent Avro tables involves generating an Avro schema literal from
-        # the COLUMNS section, but the COLUMNS section is not provided for CREATE_HIVE.
-        # The custom CREATE TABLE leaves the columns opaque to us, so we cannot generate
-        # an Avro schema literal.
-        # However, if the schema constraints are set up such that we are only going to
-        # to load this single Avro table, then we can safely proceed assuming that the
-        # provided CREATE TABLE has all necessary information to create an Avro table.
-        # TODO: Remove this restriction once Impala has the ability to infer the Avro
-        # schema from column definitions. Then we do not need to generate an Avro
-        # schema literal for creating dependent Avro tables anymore.
-        load_single_table = len(schema_include_constraints[table_name.lower()]) == 1
-        if file_format == 'avro' and not load_single_table:
-          print 'CREATE_HIVE section not supported'
-          continue
       elif create:
         table_template = create
         if file_format in ['avro', 'hbase']:

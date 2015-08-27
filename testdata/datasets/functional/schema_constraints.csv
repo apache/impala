@@ -50,6 +50,13 @@ table_name:allcomplextypes, constraint:restrict_to, table_format:parquet/none/no
 table_name:allcomplextypes, constraint:restrict_to, table_format:hbase/none/none
 table_name:functional, constraint:restrict_to, table_format:text/none/none
 
+table_name:complextypes_fileformat, constraint:restrict_to, table_format:text/none/none
+table_name:complextypes_fileformat, constraint:restrict_to, table_format:parquet/none/none
+table_name:complextypes_fileformat, constraint:restrict_to, table_format:avro/snap/block
+table_name:complextypes_fileformat, constraint:restrict_to, table_format:rc/snap/block
+table_name:complextypes_fileformat, constraint:restrict_to, table_format:seq/snap/block
+table_name:complextypes_multifileformat, constraint:restrict_to, table_format:text/none/none
+
 table_name:alltypeserror, constraint:exclude, table_format:parquet/none/none
 table_name:alltypeserrornonulls, constraint:exclude, table_format:parquet/none/none
 table_name:unsupported_types, constraint:exclude, table_format:parquet/none/none

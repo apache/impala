@@ -26,6 +26,7 @@ import com.cloudera.impala.analysis.ExprSubstitutionMap;
 import com.cloudera.impala.analysis.JoinOperator;
 import com.cloudera.impala.catalog.Type;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TEqJoinCondition;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -63,7 +64,7 @@ public class HashJoinNode extends JoinNode {
   public void setAddProbeFilters(boolean b) { addProbeFilters_ = true; }
 
   @Override
-  public void init(Analyzer analyzer) throws InternalException {
+  public void init(Analyzer analyzer) throws ImpalaException {
     super.init(analyzer);
     List<BinaryPredicate> newEqJoinConjuncts = Lists.newArrayList();
     ExprSubstitutionMap combinedChildSmap = getCombinedChildSmap();

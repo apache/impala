@@ -855,7 +855,7 @@ public class SingleNodePlanner {
    * Assigns conjuncts from the Having clause to the returned node.
    */
   private PlanNode createAggregationPlan(SelectStmt selectStmt, Analyzer analyzer,
-      PlanNode root) throws InternalException {
+      PlanNode root) throws ImpalaException {
     Preconditions.checkState(selectStmt.getAggInfo() != null);
     // add aggregation, if required
     AggregateInfo aggInfo = selectStmt.getAggInfo();

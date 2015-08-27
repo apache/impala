@@ -72,6 +72,11 @@ public class PlannerTest extends PlannerTestBase {
   }
 
   @Test
+  public void testComplexTypesFileFormats() {
+    runPlannerTestFile("complex-types-file-formats");
+  }
+
+  @Test
   public void testJoins() {
     runPlannerTestFile("joins");
   }

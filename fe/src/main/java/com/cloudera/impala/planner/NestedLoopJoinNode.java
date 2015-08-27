@@ -24,7 +24,7 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.JoinOperator;
-import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TNestedLoopJoinNode;
 import com.cloudera.impala.thrift.TPlanNode;
@@ -56,7 +56,7 @@ public class NestedLoopJoinNode extends JoinNode {
   }
 
   @Override
-  public void init(Analyzer analyzer) throws InternalException {
+  public void init(Analyzer analyzer) throws ImpalaException {
     super.init(analyzer);
     Preconditions.checkState(eqJoinConjuncts_.isEmpty());
     // Set the proper join operator based on whether predicates are assigned or not.

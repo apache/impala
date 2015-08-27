@@ -15,7 +15,7 @@
 package com.cloudera.impala.planner;
 
 import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
@@ -39,7 +39,7 @@ public class SingularRowSrcNode extends PlanNode {
   }
 
   @Override
-  public void init(Analyzer analyzer) throws InternalException {
+  public void init(Analyzer analyzer) throws ImpalaException {
     super.init(analyzer);
     outputSmap_ = containingSubplanNode_.getChild(0).getOutputSmap();
     Preconditions.checkState(conjuncts_.isEmpty());

@@ -18,6 +18,8 @@ import java.util.List;
 
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.TupleDescriptor;
+import com.cloudera.impala.catalog.HdfsFileFormat;
+import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TScanRangeLocations;
@@ -47,6 +49,31 @@ abstract public class ScanNode extends PlanNode {
   }
 
   public TupleDescriptor getTupleDesc() { return desc_; }
+
+  /**
+   * Checks if this scan is supported based on the types of scanned columns and the
+   * underlying file formats, in particular, whether complex types are supported.
+   *
+   * The default implementation throws if this scan would need to materialize a nested
+   * field or collection. The scan is ok if the table schema contains complex types, as
+   * long as the query does not reference them.
+   *
+   * Subclasses should override this function as appropriate.
+   */
+  protected void checkForSupportedFileFormats() throws NotImplementedException {
+    Preconditions.checkNotNull(desc_);
+    Preconditions.checkNotNull(desc_.getTable());
+    for (SlotDescriptor slotDesc: desc_.getSlots()) {
+      if (slotDesc.getType().isComplexType() || slotDesc.getColumn() == null) {
+        Preconditions.checkNotNull(slotDesc.getPath());
+        throw new NotImplementedException(String.format(
+            "Scan of table '%s' is not supported because '%s' references a nested " +
+            "field/collection.\nComplex types are supported for these file formats: %s.",
+            slotDesc.getPath().toString(), desc_.getAlias(),
+            Joiner.on(", ").join(HdfsFileFormat.complexTypesFormats())));
+      }
+    }
+  }
 
   /**
    * Returns all scan ranges plus their locations.
