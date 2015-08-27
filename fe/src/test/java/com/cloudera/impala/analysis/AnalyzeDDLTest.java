@@ -1128,12 +1128,14 @@ public class AnalyzeDDLTest extends AnalyzerTest {
     AnalysisError("create table functional.broken_text_table (c int) " +
         "row format delimited fields terminated by '\012'",
         "Field delimiter and line delimiter have same value: byte 10");
-    AnalysisError("create table functional.broken_text_table (c int) " +
+    AnalyzesOk("create table functional.broken_text_table (c int) " +
         "row format delimited escaped by '\001'",
-        "Field delimiter and escape character have same value: byte 1");
-    AnalysisError("create table functional.broken_text_table (c int) " +
+        "Field delimiter and escape character have same value: byte 1. " +
+        "Escape character will be ignored");
+    AnalyzesOk("create table functional.broken_text_table (c int) " +
         "row format delimited escaped by 'x' lines terminated by 'x'",
-        "Line delimiter and escape character have same value: byte 120");
+        "Line delimiter and escape character have same value: byte 120. " +
+        "Escape character will be ignored");
 
     AnalysisError("create table db_does_not_exist.new_table (i int)",
         "Database does not exist: db_does_not_exist");
