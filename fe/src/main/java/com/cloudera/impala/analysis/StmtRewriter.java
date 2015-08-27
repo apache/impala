@@ -465,10 +465,9 @@ public class StmtRewriter {
     // Check if we have a valid ON clause for an equi-join.
     boolean hasEqJoinPred = false;
     for (Expr conjunct: onClausePredicate.getConjuncts()) {
-      if (!(conjunct instanceof BinaryPredicate) ||
-          ((BinaryPredicate)conjunct).getOp() != BinaryPredicate.Operator.EQ) {
-        continue;
-      }
+      if (!(conjunct instanceof BinaryPredicate)) continue;
+      BinaryPredicate.Operator operator = ((BinaryPredicate) conjunct).getOp();
+      if (!operator.isEquivalence()) continue;
       List<TupleId> lhsTupleIds = Lists.newArrayList();
       conjunct.getChild(0).getIds(lhsTupleIds, null);
       if (lhsTupleIds.isEmpty()) continue;
@@ -524,9 +523,9 @@ public class StmtRewriter {
         for (Expr conjunct: onClausePredicate.getConjuncts()) {
           if (conjunct.equals(joinConjunct)) {
             Preconditions.checkState(conjunct instanceof BinaryPredicate);
-            Preconditions.checkState(((BinaryPredicate)conjunct).getOp() ==
-                BinaryPredicate.Operator.EQ);
-            ((BinaryPredicate)conjunct).setOp(BinaryPredicate.Operator.NULL_MATCHING_EQ);
+            BinaryPredicate binaryPredicate = (BinaryPredicate)conjunct;
+            Preconditions.checkState(binaryPredicate.getOp().isEquivalence());
+            binaryPredicate.setOp(BinaryPredicate.Operator.NULL_MATCHING_EQ);
             break;
           }
         }

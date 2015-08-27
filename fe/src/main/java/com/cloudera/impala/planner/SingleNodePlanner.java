@@ -994,7 +994,11 @@ public class SingleNodePlanner {
       Expr e = i.next();
       if (!(e instanceof BinaryPredicate)) continue;
       BinaryPredicate comp = (BinaryPredicate) e;
-      if (comp.getOp() == BinaryPredicate.Operator.NE) continue;
+      if ((comp.getOp() == BinaryPredicate.Operator.NE)
+          || (comp.getOp() == BinaryPredicate.Operator.DISTINCT_FROM)
+          || (comp.getOp() == BinaryPredicate.Operator.NOT_DISTINCT)) {
+        continue;
+      }
       Expr slotBinding = comp.getSlotBinding(d.getId());
       if (slotBinding == null || !slotBinding.isConstant() ||
           !slotBinding.getType().equals(Type.STRING)) {
@@ -1168,18 +1172,13 @@ public class SingleNodePlanner {
     Predicate<Expr> isIdentityPredicate = new Predicate<Expr>() {
       @Override
       public boolean apply(Expr expr) {
-        if (!(expr instanceof BinaryPredicate)
-            || ((BinaryPredicate) expr).getOp() != BinaryPredicate.Operator.EQ) {
-          return false;
-        }
-        if (!expr.isRegisteredPredicate()
+        return (expr instanceof BinaryPredicate)
+            && (((BinaryPredicate) expr).getOp().isEquivalence())
+            && !expr.isRegisteredPredicate()
             && expr.getChild(0) instanceof SlotRef
             && expr.getChild(1) instanceof SlotRef
-            && (((SlotRef) expr.getChild(0)).getSlotId() ==
-               ((SlotRef) expr.getChild(1)).getSlotId())) {
-          return true;
-        }
-        return false;
+            && (((SlotRef) expr.getChild(0)).getSlotId()
+                == ((SlotRef) expr.getChild(1)).getSlotId());
       }
     };
     Iterables.removeIf(viewPredicates, isIdentityPredicate);

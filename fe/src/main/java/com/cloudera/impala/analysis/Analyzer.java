@@ -1009,7 +1009,8 @@ public class Analyzer {
     // form <expr1> = <expr2> where at least one of the exprs is bound by
     // exactly one tuple id
     if (binaryPred.getOp() != BinaryPredicate.Operator.EQ &&
-       binaryPred.getOp() != BinaryPredicate.Operator.NULL_MATCHING_EQ) {
+       binaryPred.getOp() != BinaryPredicate.Operator.NULL_MATCHING_EQ &&
+       binaryPred.getOp() != BinaryPredicate.Operator.NOT_DISTINCT) {
       return;
     }
     // the binary predicate must refer to at least two tuples to be an eqJoinConjunct

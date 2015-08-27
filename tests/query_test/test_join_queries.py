@@ -30,7 +30,7 @@ class TestJoinQueries(ImpalaTestSuite):
       # Cut down on execution time when not running in exhaustive mode.
       cls.TestMatrix.add_constraint(lambda v: v.get_value('batch_size') != 1)
 
-  def test_joins(self, vector):
+  def test_basic_joins(self, vector):
     new_vector = copy(vector)
     new_vector.get_value('exec_option')['batch_size'] = vector.get_value('batch_size')
     self.run_test_case('QueryTest/joins', new_vector)

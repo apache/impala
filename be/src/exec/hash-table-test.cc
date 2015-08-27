@@ -237,7 +237,8 @@ class HashTableTest : public testing::Test {
     // Create the hash table and insert the build rows
     scoped_ptr<HashTable> hash_table;
     ASSERT_TRUE(CreateHashTable(quadratic, initial_num_buckets, &hash_table));
-    HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 0, 1);
+    HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false,
+        std::vector<bool>(build_expr_ctxs_.size(), false), 1, 0, 1);
 
     uint32_t hash = 0;
     bool success = hash_table->CheckAndResize(5, &ht_ctx);
@@ -287,7 +288,8 @@ class HashTableTest : public testing::Test {
     ASSERT_TRUE(CreateHashTable(quadratic, initial_size, &hash_table));
 
     int total_rows = rows_to_insert + additional_rows;
-    HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 0, 1);
+    HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false,
+        std::vector<bool>(build_expr_ctxs_.size(), false), 1, 0, 1);
 
     // Add 1 row with val 1, 2 with val 2, etc.
     vector<TupleRow*> build_rows;
@@ -340,7 +342,8 @@ class HashTableTest : public testing::Test {
     MemTracker tracker(100 * 1024 * 1024);
     scoped_ptr<HashTable> hash_table;
     ASSERT_TRUE(CreateHashTable(quadratic, num_to_add, &hash_table));
-    HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 0, 1);
+    HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false,
+        std::vector<bool>(build_expr_ctxs_.size(), false), 1, 0, 1);
 
     // Inserts num_to_add + (num_to_add^2) + (num_to_add^4) + ... + (num_to_add^20)
     // entries. When num_to_add == 4, then the total number of inserts is 4194300.
@@ -389,7 +392,8 @@ class HashTableTest : public testing::Test {
   void InsertFullTest(bool quadratic, int table_size) {
     scoped_ptr<HashTable> hash_table;
     ASSERT_TRUE(CreateHashTable(quadratic, table_size, &hash_table));
-    HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 0, 1);
+    HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false,
+        std::vector<bool>(build_expr_ctxs_.size(), false), 1, 0, 1);
     EXPECT_EQ(hash_table->EmptyBuckets(), table_size);
 
     // Insert and probe table_size different tuples. All of them are expected to be
@@ -454,7 +458,8 @@ class HashTableTest : public testing::Test {
     scoped_ptr<HashTable> hash_table;
     ASSERT_FALSE(CreateHashTable(quadratic, table_size, &hash_table, block_size,
           max_num_blocks, reserved_blocks));
-    HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 0, 1);
+    HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false,
+        std::vector<bool>(build_expr_ctxs_.size(), false), 1, 0, 1);
     HashTable::Iterator iter = hash_table->Begin(&ht_ctx);
     EXPECT_TRUE(iter.AtEnd());
 
@@ -533,7 +538,8 @@ TEST_F(HashTableTest, QuadraticInsertFullTest) {
 
 // Test that hashing empty string updates hash value.
 TEST_F(HashTableTest, HashEmpty) {
-  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false, false, 1, 2, 1);
+  HashTableCtx ht_ctx(build_expr_ctxs_, probe_expr_ctxs_, false,
+      std::vector<bool>(build_expr_ctxs_.size(), false), 1, 2, 1);
   uint32_t seed = 9999;
   ht_ctx.set_level(0);
   EXPECT_NE(seed, ht_ctx.Hash(NULL, 0, seed));

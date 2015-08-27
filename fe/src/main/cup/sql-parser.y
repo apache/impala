@@ -458,7 +458,7 @@ precedence left KW_AND;
 precedence right KW_NOT, NOT;
 precedence left KW_BETWEEN, KW_IN, KW_IS, KW_EXISTS;
 precedence left KW_LIKE, KW_RLIKE, KW_REGEXP;
-precedence left EQUAL, NOTEQUAL, LESSTHAN, GREATERTHAN;
+precedence left EQUAL, NOTEQUAL, LESSTHAN, GREATERTHAN, KW_FROM, KW_DISTINCT;
 precedence left ADD, SUBTRACT;
 precedence left STAR, DIVIDE, MOD, KW_DIV;
 precedence left BITAND, BITOR, BITXOR, BITNOT;
@@ -2406,6 +2406,12 @@ comparison_predicate ::=
   {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.LT, e1, e2); :}
   | expr:e1 GREATERTHAN expr:e2
   {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.GT, e1, e2); :}
+  | expr:e1 LESSTHAN EQUAL GREATERTHAN expr:e2
+  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NOT_DISTINCT, e1, e2); :}
+  | expr:e1 KW_IS KW_DISTINCT KW_FROM expr:e2
+  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.DISTINCT_FROM, e1, e2); :}
+  | expr:e1 KW_IS KW_NOT KW_DISTINCT KW_FROM expr:e2
+  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NOT_DISTINCT, e1, e2); :}
   ;
 
 like_predicate ::=

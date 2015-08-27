@@ -108,14 +108,18 @@ class HashTableCtx {
   ///  - build_exprs are the exprs that should be used to evaluate rows during Insert().
   ///  - probe_exprs are used during Find()
   ///  - stores_nulls: if false, TupleRows with nulls are ignored during Insert
-  ///  - finds_nulls: if false, Find() returns End() for TupleRows with nulls
-  ///      even if stores_nulls is true
+  ///  - finds_nulls: if finds_nulls[i] is false, Find() returns End() for TupleRows with
+  ///      nulls in position i even if stores_nulls is true.
   ///  - initial_seed: Initial seed value to use when computing hashes for rows with
   ///    level 0. Other levels have their seeds derived from this seed.
   ///  - The max levels we will hash with.
+  /// TODO: stores_nulls is too coarse: for a hash table in which some columns are joined
+  ///       with '<=>' and others with '=', stores_nulls could distinguish between columns
+  ///       in which nulls are stored and columns in which they are not, which could save
+  ///       space by not storing some rows we know will never match.
   HashTableCtx(const std::vector<ExprContext*>& build_expr_ctxs,
       const std::vector<ExprContext*>& probe_expr_ctxs, bool stores_nulls,
-      bool finds_nulls, int32_t initial_seed, int max_levels,
+      const std::vector<bool>& finds_nulls, int32_t initial_seed, int max_levels,
       int num_build_tuples);
 
   /// Call to cleanup any resources.
@@ -235,7 +239,10 @@ class HashTableCtx {
   /// TODO: these constants are an ideal candidate to be removed with codegen.
   /// TODO: ..or with template-ization
   const bool stores_nulls_;
-  const bool finds_nulls_;
+  const std::vector<bool> finds_nulls_;
+
+  /// finds_some_nulls_ is just the logical OR of finds_nulls_.
+  const bool finds_some_nulls_;
 
   /// The current level this context is working on. Each level needs to use a
   /// different seed.

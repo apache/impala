@@ -72,6 +72,10 @@ class HashJoinNode : public BlockingJoinNode {
     std::vector<ExprContext*> probe_expr_ctxs_;
     std::vector<ExprContext*> build_expr_ctxs_;
 
+  /// is_not_distinct_from_[i] is true if and only if the ith equi-join predicate is IS
+  /// NOT DISTINCT FROM, rather than equality.
+  std::vector<bool> is_not_distinct_from_;
+
   /// non-equi-join conjuncts from the JOIN clause
   std::vector<ExprContext*> other_join_conjunct_ctxs_;
 

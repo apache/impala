@@ -562,3 +562,151 @@ cross join functional.alltypes t2 where t1.id = 0 limit 1;
 ---- TYPES
 INT,BOOLEAN
 ====
+---- QUERY
+# IMPALA-2147: IS [NOT] DISTINCT FROM and "<=>"
+select count(*) > 0
+from alltypesagg as a, alltypesagg as b
+where (a.tinyint_col IS DISTINCT FROM b.tinyint_col)
+and a.tinyint_col is null
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+select count(*) > 0
+from alltypesagg as a, alltypesagg as b
+where (a.tinyint_col IS NOT DISTINCT FROM b.tinyint_col)
+and a.tinyint_col is null
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+select count(*) > 0
+from alltypesagg as a, alltypesagg as b
+where (a.tinyint_col <=> b.tinyint_col)
+and a.tinyint_col is null
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+# left joins with <=> are different from left joins with =
+select P.d, Q.d, Q.b, Q.b is null
+from nulltable P left join nulltable Q
+on P.d = Q.d
+---- RESULTS
+NULL,NULL,'NULL',true
+---- TYPES
+INT,INT,STRING,BOOLEAN
+====
+---- QUERY
+select P.d, Q.d, Q.b
+from nulltable P left join nulltable Q
+on P.d <=> Q.d
+---- RESULTS
+NULL,NULL,''
+---- TYPES
+INT,INT,STRING
+====
+---- QUERY
+select count(*)
+from nulltable P left anti join nulltable Q
+on P.d = Q.d
+---- RESULTS
+1
+---- TYPES
+BIGINT
+====
+---- QUERY
+select count(*)
+from nulltable P left anti join nulltable Q
+on P.d <=> Q.d
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+# Test that 'IS DISTINCT FROM' works in nested loop joins
+select count(*) from nulltable t1, nulltable t2 where not(t1.d != t2.d)
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+select t1.d, t2.d from nulltable t1, nulltable t2 where not(t1.d IS DISTINCT FROM t2.d)
+---- RESULTS
+NULL,NULL
+---- TYPES
+INT,INT
+====
+---- QUERY
+select count(*) from nulltable t1, nulltable t2
+where t1.d != length(t2.a)
+---- RESULTS
+0
+---- TYPES
+BIGINT
+====
+---- QUERY
+select t1.d, t2.a from nulltable t1, nulltable t2
+where t1.d IS DISTINCT FROM length(t2.a)
+---- RESULTS
+NULL,'a'
+---- TYPES
+INT,STRING
+====
+---- QUERY
+select t1.a, t1.b, t2.a, t2.b from
+(values
+(NULL a, NULL b), (NULL, 0), (NULL, 1),
+(0, NULL), (0, 0), (0, 1),
+(1, NULL), (1, 0), (1, 1)) as t1,
+(values
+(NULL a, NULL b), (NULL, 0), (NULL, 1),
+(0, NULL), (0, 0), (0, 1),
+(1, NULL), (1, 0), (1, 1)) as t2
+where t1.a <=> t2.a
+and t1.b <=> t2.b
+order by t1.a, t1.b, t2.a, t2.b
+---- RESULTS
+0,0,0,0
+0,1,0,1
+0,NULL,0,NULL
+1,0,1,0
+1,1,1,1
+1,NULL,1,NULL
+NULL,0,NULL,0
+NULL,1,NULL,1
+NULL,NULL,NULL,NULL
+---- TYPES
+TINYINT,TINYINT,TINYINT,TINYINT
+====
+---- QUERY
+select t1.a, t1.b, t2.a, t2.b from
+(values
+(NULL a, NULL b), (NULL, 0), (NULL, 1),
+(0, NULL), (0, 0), (0, 1),
+(1, NULL), (1, 0), (1, 1)) as t1,
+(values
+(NULL a, NULL b), (NULL, 0), (NULL, 1),
+(0, NULL), (0, 0), (0, 1),
+(1, NULL), (1, 0), (1, 1)) as t2
+where t1.a <=> t2.a
+and t1.b = t2.b
+order by t1.a, t1.b, t2.a, t2.b
+---- RESULTS
+0,0,0,0
+0,1,0,1
+1,0,1,0
+1,1,1,1
+NULL,0,NULL,0
+NULL,1,NULL,1
+---- TYPES
+TINYINT,TINYINT,TINYINT,TINYINT
+====

@@ -14,6 +14,9 @@
 
 #include "exec/hash-table.inline.h"
 
+#include <functional>
+#include <numeric>
+
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "exprs/expr.h"
@@ -77,17 +80,21 @@ static int64_t NULL_VALUE[] = { HashUtil::FNV_SEED, HashUtil::FNV_SEED,
 static const int64_t INITIAL_DATA_PAGE_SIZES[] = { 64 * 1024, 512 * 1024 };
 static const int NUM_SMALL_DATA_PAGES = sizeof(INITIAL_DATA_PAGE_SIZES) / sizeof(int64_t);
 
-HashTableCtx::HashTableCtx(const vector<ExprContext*>& build_expr_ctxs,
-    const vector<ExprContext*>& probe_expr_ctxs, bool stores_nulls, bool finds_nulls,
-    int32_t initial_seed, int max_levels, int num_build_tuples)
+HashTableCtx::HashTableCtx(const std::vector<ExprContext*>& build_expr_ctxs,
+    const std::vector<ExprContext*>& probe_expr_ctxs, bool stores_nulls,
+    const std::vector<bool>& finds_nulls, int32_t initial_seed,
+    int max_levels, int num_build_tuples)
     : build_expr_ctxs_(build_expr_ctxs),
       probe_expr_ctxs_(probe_expr_ctxs),
       stores_nulls_(stores_nulls),
       finds_nulls_(finds_nulls),
+      finds_some_nulls_(std::accumulate(
+          finds_nulls_.begin(), finds_nulls_.end(), false, std::logical_or<bool>())),
       level_(0),
       row_(reinterpret_cast<TupleRow*>(malloc(sizeof(Tuple*) * num_build_tuples))) {
   // Compute the layout and buffer size to store the evaluated expr results
   DCHECK_EQ(build_expr_ctxs_.size(), probe_expr_ctxs_.size());
+  DCHECK_EQ(build_expr_ctxs_.size(), finds_nulls_.size());
   DCHECK(!build_expr_ctxs_.empty());
   results_buffer_size_ = Expr::ComputeResultsLayout(build_expr_ctxs_,
       &expr_values_buffer_offsets_, &var_result_begin_);
@@ -170,7 +177,7 @@ bool HashTableCtx::Equals(TupleRow* build_row) {
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
     void* val = build_expr_ctxs_[i]->GetValue(build_row);
     if (val == NULL) {
-      if (!stores_nulls_) return false;
+      if (!(stores_nulls_ && finds_nulls_[i])) return false;
       if (!expr_value_null_bits_[i]) return false;
       continue;
     } else {
@@ -830,7 +837,7 @@ Function* HashTableCtx::CodegenEquals(RuntimeState* state) {
     // the case where the hash table does not store nulls, this is always false.
     Value* probe_is_null = codegen->false_value();
     uint8_t* null_byte_loc = &expr_value_null_bits_[i];
-    if (stores_nulls_) {
+    if (stores_nulls_ && finds_nulls_[i]) {
       Value* llvm_null_byte_loc =
           codegen->CastPtrToLlvmPtr(codegen->ptr_type(), null_byte_loc);
       Value* null_byte = builder.CreateLoad(llvm_null_byte_loc);

@@ -93,17 +93,21 @@ class OldHashTable {
   ///  - probe_exprs are used during Find()
   ///  - num_build_tuples: number of Tuples in the build tuple row
   ///  - stores_nulls: if false, TupleRows with nulls are ignored during Insert
-  ///  - finds_nulls: if false, Find() returns End() for TupleRows with nulls
-  ///      even if stores_nulls is true
+  ///  - finds_nulls: if finds_nulls[i] is false, Find() returns End() for TupleRows with
+  ///      nulls in position i even if stores_nulls is true.
   ///  - num_buckets: number of buckets that the hash table should be initialized to
   ///  - mem_tracker: if non-empty, all memory allocations for nodes and for buckets are
   ///    tracked; the tracker must be valid until the d'tor is called
   ///  - initial_seed: Initial seed value to use when computing hashes for rows
   ///  - stores_tuples: If true, the hash table stores tuples, otherwise it stores tuple
   ///    rows.
+  /// TODO: stores_nulls is too coarse: for a hash table in which some columns are joined
+  ///       with '<=>' and others with '=', stores_nulls could distinguish between columns
+  ///       in which nulls are stored and columns in which they are not, which could save
+  ///       space by not storing some rows we know will never match.
   OldHashTable(RuntimeState* state, const std::vector<ExprContext*>& build_expr_ctxs,
       const std::vector<ExprContext*>& probe_expr_ctxs, int num_build_tuples,
-      bool stores_nulls, bool finds_nulls, int32_t initial_seed,
+      bool stores_nulls, const std::vector<bool>& finds_nulls, int32_t initial_seed,
       MemTracker* mem_tracker, bool stores_tuples = false, int64_t num_buckets = 1024);
 
   /// Call to cleanup any resources. Must be called once.
@@ -435,7 +439,11 @@ class OldHashTable {
   /// different behavior.
   /// TODO: these constants are an ideal candidate to be removed with codegen.
   const bool stores_nulls_;
-  const bool finds_nulls_;
+  const std::vector<bool> finds_nulls_;
+
+  /// finds_some_nulls_ is just the logical OR of finds_nulls_.
+  const bool finds_some_nulls_;
+
   const bool stores_tuples_;
 
   const int32_t initial_seed_;

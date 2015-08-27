@@ -151,6 +151,48 @@ class Operators {
   static BooleanVal Ne_TimestampVal_TimestampVal(
       FunctionContext*, const TimestampVal&, const TimestampVal&);
 
+  static BooleanVal DistinctFrom_BooleanVal_BooleanVal(
+      FunctionContext*, const BooleanVal&, const BooleanVal&);
+  static BooleanVal DistinctFrom_TinyIntVal_TinyIntVal(
+      FunctionContext*, const TinyIntVal&, const TinyIntVal&);
+  static BooleanVal DistinctFrom_SmallIntVal_SmallIntVal(
+      FunctionContext*, const SmallIntVal&, const SmallIntVal&);
+  static BooleanVal DistinctFrom_IntVal_IntVal(
+      FunctionContext*, const IntVal&, const IntVal&);
+  static BooleanVal DistinctFrom_BigIntVal_BigIntVal(
+      FunctionContext*, const BigIntVal&, const BigIntVal&);
+  static BooleanVal DistinctFrom_FloatVal_FloatVal(
+      FunctionContext*, const FloatVal&, const FloatVal&);
+  static BooleanVal DistinctFrom_DoubleVal_DoubleVal(
+      FunctionContext*, const DoubleVal&, const DoubleVal&);
+  static BooleanVal DistinctFrom_StringVal_StringVal(
+      FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal DistinctFrom_Char_Char(
+      FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal DistinctFrom_TimestampVal_TimestampVal(
+      FunctionContext*, const TimestampVal&, const TimestampVal&);
+
+  static BooleanVal NotDistinct_BooleanVal_BooleanVal(
+      FunctionContext*, const BooleanVal&, const BooleanVal&);
+  static BooleanVal NotDistinct_TinyIntVal_TinyIntVal(
+      FunctionContext*, const TinyIntVal&, const TinyIntVal&);
+  static BooleanVal NotDistinct_SmallIntVal_SmallIntVal(
+      FunctionContext*, const SmallIntVal&, const SmallIntVal&);
+  static BooleanVal NotDistinct_IntVal_IntVal(
+      FunctionContext*, const IntVal&, const IntVal&);
+  static BooleanVal NotDistinct_BigIntVal_BigIntVal(
+      FunctionContext*, const BigIntVal&, const BigIntVal&);
+  static BooleanVal NotDistinct_FloatVal_FloatVal(
+      FunctionContext*, const FloatVal&, const FloatVal&);
+  static BooleanVal NotDistinct_DoubleVal_DoubleVal(
+      FunctionContext*, const DoubleVal&, const DoubleVal&);
+  static BooleanVal NotDistinct_StringVal_StringVal(
+      FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal NotDistinct_Char_Char(
+      FunctionContext*, const StringVal&, const StringVal&);
+  static BooleanVal NotDistinct_TimestampVal_TimestampVal(
+      FunctionContext*, const TimestampVal&, const TimestampVal&);
+
   static BooleanVal Gt_BooleanVal_BooleanVal(
       FunctionContext*, const BooleanVal&, const BooleanVal&);
   static BooleanVal Gt_TinyIntVal_TinyIntVal(

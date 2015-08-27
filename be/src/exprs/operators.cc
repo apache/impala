@@ -54,31 +54,64 @@ using strings::Substitute;
     return BigIntVal(fact); \
   }
 
+#define BINARY_PREDICATE_NUMERIC_NONNULL(OP, V1, V2) \
+  return BooleanVal(V1.val OP V2.val)
+
+#define BINARY_PREDICATE_NONNUMERIC_NONNULL(TYPE, IMPALA_TYPE, OP, V1, V2) \
+  IMPALA_TYPE iv1 = IMPALA_TYPE::From##TYPE(V1);\
+  IMPALA_TYPE iv2 = IMPALA_TYPE::From##TYPE(V2);\
+  return BooleanVal(iv1 OP iv2)
+
+#define BINARY_PREDICATE_CHAR_NONNULL(OP, V1, V2) \
+  StringValue iv1 = StringValue::FromStringVal(V1);\
+  StringValue iv2 = StringValue::FromStringVal(V2);\
+  iv1.len = StringValue::UnpaddedCharLength(iv1.ptr, c->GetArgType(0)->len); \
+  iv2.len = StringValue::UnpaddedCharLength(iv2.ptr, c->GetArgType(1)->len); \
+  return BooleanVal(iv1 OP iv2)
+
 #define BINARY_PREDICATE_NUMERIC_FN(NAME, TYPE, OP) \
   BooleanVal Operators::NAME##_##TYPE##_##TYPE(\
       FunctionContext* c, const TYPE& v1, const TYPE& v2) {\
     if (v1.is_null || v2.is_null) return BooleanVal::null();\
-    return BooleanVal(v1.val OP v2.val);\
+    BINARY_PREDICATE_NUMERIC_NONNULL(OP, v1, v2);\
   }
 
 #define BINARY_PREDICATE_NONNUMERIC_FN(NAME, TYPE, IMPALA_TYPE, OP) \
   BooleanVal Operators::NAME##_##TYPE##_##TYPE(\
       FunctionContext* c, const TYPE& v1, const TYPE& v2) {\
     if (v1.is_null || v2.is_null) return BooleanVal::null();\
-    IMPALA_TYPE iv1 = IMPALA_TYPE::From##TYPE(v1);\
-    IMPALA_TYPE iv2 = IMPALA_TYPE::From##TYPE(v2);\
-    return BooleanVal(iv1 OP iv2);\
+    BINARY_PREDICATE_NONNUMERIC_NONNULL(TYPE, IMPALA_TYPE, OP, v1, v2);\
   }
 
 #define BINARY_PREDICATE_CHAR(NAME, OP) \
   BooleanVal Operators::NAME##_Char_Char(\
       FunctionContext* c, const StringVal& v1, const StringVal& v2) {\
     if (v1.is_null || v2.is_null) return BooleanVal::null();\
-    StringValue iv1 = StringValue::FromStringVal(v1);\
-    StringValue iv2 = StringValue::FromStringVal(v2);\
-    iv1.len = StringValue::UnpaddedCharLength(iv1.ptr, c->GetArgType(0)->len); \
-    iv2.len = StringValue::UnpaddedCharLength(iv2.ptr, c->GetArgType(1)->len); \
-    return BooleanVal(iv1 OP iv2);\
+    BINARY_PREDICATE_CHAR_NONNULL(OP, v1, v2);\
+  }
+
+#define NULLSAFE_NUMERIC_DISTINCTION(NAME, TYPE, OP, IS_EQUAL) \
+  BooleanVal Operators::NAME##_##TYPE##_##TYPE(\
+      FunctionContext* c, const TYPE& v1, const TYPE& v2) {\
+    if (v1.is_null) return BooleanVal(IS_EQUAL ? v2.is_null : !v2.is_null); \
+    if (v2.is_null) return BooleanVal(!IS_EQUAL);\
+    BINARY_PREDICATE_NUMERIC_NONNULL(OP, v1, v2);\
+  }
+
+#define NULLSAFE_NONNUMERIC_DISTINCTION(NAME, TYPE, IMPALA_TYPE, OP, IS_EQUAL) \
+  BooleanVal Operators::NAME##_##TYPE##_##TYPE(\
+      FunctionContext* c, const TYPE& v1, const TYPE& v2) {\
+    if (v1.is_null) return BooleanVal(IS_EQUAL ? v2.is_null : !v2.is_null); \
+    if (v2.is_null) return BooleanVal(!IS_EQUAL);\
+    BINARY_PREDICATE_NONNUMERIC_NONNULL(TYPE, IMPALA_TYPE, OP, v1, v2);\
+  }
+
+#define NULLSAFE_CHAR_DISTINCTION(NAME, OP, IS_EQUAL) \
+  BooleanVal Operators::NAME##_Char_Char(\
+      FunctionContext* c, const StringVal& v1, const StringVal& v2) {\
+    if (v1.is_null) return BooleanVal(IS_EQUAL ? v2.is_null : !v2.is_null); \
+    if (v2.is_null) return BooleanVal(!IS_EQUAL);\
+    BINARY_PREDICATE_CHAR_NONNULL(OP, v1, v2);\
   }
 
 #define BINARY_OP_NUMERIC_TYPES(NAME, OP) \
@@ -112,6 +145,18 @@ using strings::Substitute;
   BINARY_PREDICATE_NONNUMERIC_FN(NAME, StringVal, StringValue, OP);\
   BINARY_PREDICATE_NONNUMERIC_FN(NAME, TimestampVal, TimestampValue, OP);\
   BINARY_PREDICATE_CHAR(NAME, OP);
+
+#define NULLSAFE_DISTINCTION(NAME, OP, IS_EQUAL) \
+  NULLSAFE_NUMERIC_DISTINCTION(NAME, BooleanVal, OP, IS_EQUAL); \
+  NULLSAFE_NUMERIC_DISTINCTION(NAME, TinyIntVal, OP, IS_EQUAL); \
+  NULLSAFE_NUMERIC_DISTINCTION(NAME, SmallIntVal, OP, IS_EQUAL); \
+  NULLSAFE_NUMERIC_DISTINCTION(NAME, IntVal, OP, IS_EQUAL); \
+  NULLSAFE_NUMERIC_DISTINCTION(NAME, BigIntVal, OP, IS_EQUAL); \
+  NULLSAFE_NUMERIC_DISTINCTION(NAME, FloatVal, OP, IS_EQUAL); \
+  NULLSAFE_NUMERIC_DISTINCTION(NAME, DoubleVal, OP, IS_EQUAL); \
+  NULLSAFE_NONNUMERIC_DISTINCTION(NAME, StringVal, StringValue, OP, IS_EQUAL);\
+  NULLSAFE_NONNUMERIC_DISTINCTION(NAME, TimestampVal, TimestampValue, OP, IS_EQUAL);\
+  NULLSAFE_CHAR_DISTINCTION(NAME, OP, IS_EQUAL);
 
 namespace impala {
 
@@ -181,5 +226,8 @@ BINARY_PREDICATE_ALL_TYPES(Gt, >);
 BINARY_PREDICATE_ALL_TYPES(Lt, <);
 BINARY_PREDICATE_ALL_TYPES(Ge, >=);
 BINARY_PREDICATE_ALL_TYPES(Le, <=);
+
+NULLSAFE_DISTINCTION(DistinctFrom, !=, false);
+NULLSAFE_DISTINCTION(NotDistinct, ==, true);
 
 } // namespace impala

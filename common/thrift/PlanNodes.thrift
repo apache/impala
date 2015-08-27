@@ -162,6 +162,8 @@ struct TEqJoinCondition {
   1: required Exprs.TExpr left;
   // right-hand side of "<a> = <b>"
   2: required Exprs.TExpr right;
+  // true if and only if operator is "<=>", also known as "IS NOT DISTINCT FROM"
+  3: required bool is_not_distinct_from;
 }
 
 enum TJoinOp {

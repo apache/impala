@@ -64,3 +64,67 @@ where string_col = 'VALIDATE_PREDICATES##id LT 1 && id GT 1 && id LE 1 && id GE 
 ---- TYPES
 STRING
 ====
+---- QUERY
+# Test that <=>, IS DISTINCT FROM, and IS NOT DISTINCT FROM all can be validated
+select string_col from alltypes_datasource
+where string_col = 'VALIDATE_PREDICATES##id NOT_DISTINCT 1 && id DISTINCT_FROM 1 && id NOT_DISTINCT 1'
+      and 1 <=> id and 1 IS DISTINCT FROM id and 1 IS NOT DISTINCT FROM id
+---- RESULTS
+'SUCCESS'
+---- TYPES
+STRING
+====
+---- QUERY
+# Test that <=>, IS DISTINCT FROM, and IS NOT DISTINCT FROM are evaluated just like their
+# equality counterparts
+select * from
+(select count(*) from alltypes_datasource
+where tinyint_col = 1 and smallint_col = 11) a
+union all
+(select count(*) from alltypes_datasource
+where tinyint_col <=> 1 and smallint_col <=> 11)
+---- RESULTS
+50
+50
+---- TYPES
+BIGINT
+====
+---- QUERY
+select * from
+(select count(*) from alltypes_datasource
+where smallint_col = 11 and tinyint_col = 1) a
+union all
+(select count(*) from alltypes_datasource
+where smallint_col <=> 11 and tinyint_col <=> 1)
+---- RESULTS
+500
+500
+---- TYPES
+BIGINT
+====
+---- QUERY
+select * from
+(select count(*) from alltypes_datasource
+where tinyint_col != 1 and smallint_col != 11) a
+union all
+(select count(*) from alltypes_datasource
+where tinyint_col IS DISTINCT FROM 1 and smallint_col IS DISTINCT FROM 11)
+---- RESULTS
+4950
+4950
+---- TYPES
+BIGINT
+====
+---- QUERY
+select * from
+(select count(*) from alltypes_datasource
+where smallint_col != 11 and tinyint_col != 1) a
+union all
+(select count(*) from alltypes_datasource
+where smallint_col IS DISTINCT FROM 11 and tinyint_col IS DISTINCT FROM 1)
+---- RESULTS
+4096
+4096
+---- TYPES
+BIGINT
+====

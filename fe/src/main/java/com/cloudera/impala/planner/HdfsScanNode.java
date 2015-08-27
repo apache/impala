@@ -399,7 +399,11 @@ public class HdfsScanNode extends ScanNode {
     Preconditions.checkNotNull(bindingExpr);
     Preconditions.checkState(bindingExpr.isLiteral());
     LiteralExpr literal = (LiteralExpr)bindingExpr;
-    if (literal instanceof NullLiteral) return Sets.newHashSet();
+    Operator op = bp.getOp();
+    if ((literal instanceof NullLiteral) && (op != Operator.NOT_DISTINCT)
+        && (op != Operator.DISTINCT_FROM)) {
+      return Sets.newHashSet();
+    }
 
     // Get the partition column position and retrieve the associated partition
     // value metadata.
@@ -410,12 +414,35 @@ public class HdfsScanNode extends ScanNode {
 
     HashSet<Long> matchingIds = Sets.newHashSet();
     // Compute the matching partition ids
-    Operator op = bp.getOp();
+    if (op == Operator.NOT_DISTINCT) {
+      // Case: SlotRef <=> Literal
+      if (literal instanceof NullLiteral) {
+        HashSet<Long> ids = tbl_.getNullPartitionIds(partitionPos);
+        if (ids != null) matchingIds.addAll(ids);
+        return matchingIds;
+      }
+      // Punt to equality case:
+      op = Operator.EQ;
+    }
     if (op == Operator.EQ) {
       // Case: SlotRef = Literal
       HashSet<Long> ids = partitionValueMap.get(literal);
       if (ids != null) matchingIds.addAll(ids);
       return matchingIds;
+    }
+    if (op == Operator.DISTINCT_FROM) {
+      // Case: SlotRef IS DISTINCT FROM Literal
+      if (literal instanceof NullLiteral) {
+        matchingIds.addAll(tbl_.getPartitionIds());
+        HashSet<Long> nullIds = tbl_.getNullPartitionIds(partitionPos);
+        matchingIds.removeAll(nullIds);
+        return matchingIds;
+      } else {
+        matchingIds.addAll(tbl_.getPartitionIds());
+        HashSet<Long> ids = partitionValueMap.get(literal);
+        if (ids != null) matchingIds.removeAll(ids);
+        return matchingIds;
+      }
     }
     if (op == Operator.NE) {
       // Case: SlotRef != Literal

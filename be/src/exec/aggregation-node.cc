@@ -144,8 +144,8 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   }
 
   // TODO: how many buckets?
-  hash_tbl_.reset(new OldHashTable(state, build_expr_ctxs_, probe_expr_ctxs_, 1,
-                                   true, true, id(), mem_tracker(), true));
+  hash_tbl_.reset(new OldHashTable(state, build_expr_ctxs_, probe_expr_ctxs_, 1, true,
+      std::vector<bool>(build_expr_ctxs_.size(), true), id(), mem_tracker(), true));
 
   if (probe_expr_ctxs_.empty()) {
     // create single intermediate tuple now; we need to output something

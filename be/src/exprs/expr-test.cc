@@ -537,7 +537,31 @@ class ExprTest : public testing::Test {
     TestValue("1.23 < 1.234", TYPE_BOOLEAN, true);
     TestValue("1.23 > 1.234", TYPE_BOOLEAN, false);
     TestValue("1.23 = 1.230000000000000000000", TYPE_BOOLEAN, true);
-    TestValue("1.2300 != 1.230000000000000000001", TYPE_BOOLEAN, true);
+
+    // Some values are too precise to be stored to full precision as doubles, but not too
+    // precise to be stored as decimals.
+    static const string not_too_precise = "1.25";
+    // The closest double to 'too_precise' is 1.25 - the string as written cannot be
+    // preresented exactly as a double.
+    static const string too_precise = "1.250000000000000000001";
+    TestValue(
+        "cast(" + not_too_precise + " as double) != cast(" + too_precise + " as double)",
+        TYPE_BOOLEAN, false);
+    TestValue(not_too_precise + " != " + too_precise, TYPE_BOOLEAN, true);
+    TestValue("cast(" + not_too_precise + " as double) IS DISTINCT FROM cast(" +
+            too_precise + " as double)",
+        TYPE_BOOLEAN, false);
+    TestValue(not_too_precise + " IS DISTINCT FROM " + too_precise, TYPE_BOOLEAN, true);
+    TestValue("cast(" + not_too_precise + " as double) IS NOT DISTINCT FROM cast(" +
+            too_precise + " as double)",
+        TYPE_BOOLEAN, true);
+    TestValue(
+        not_too_precise + " IS NOT DISTINCT FROM " + too_precise, TYPE_BOOLEAN, false);
+    TestValue(
+        "cast(" + not_too_precise + " as double) <=> cast(" + too_precise + " as double)",
+        TYPE_BOOLEAN, true);
+    TestValue(not_too_precise + " <=> " + too_precise, TYPE_BOOLEAN, false);
+
     TestValue("cast(1 as decimal(38,0)) = cast(1 as decimal(38,37))", TYPE_BOOLEAN, true);
     TestValue("cast(1 as decimal(38,0)) = cast(0.1 as decimal(38,38))",
               TYPE_BOOLEAN, false);
@@ -566,6 +590,47 @@ class ExprTest : public testing::Test {
     TestIsNull("NULL > " + op, TYPE_BOOLEAN);
     TestIsNull("NULL <= " + op, TYPE_BOOLEAN);
     TestIsNull("NULL >= " + op, TYPE_BOOLEAN);
+  }
+
+  // Test IS DISTINCT FROM operator and its variants
+  void TestDistinctFrom() {
+    static const string operators[] = {"<=>", "IS DISTINCT FROM", "IS NOT DISTINCT FROM"};
+    static const string types[] = {"Boolean", "TinyInt", "SmallInt", "Int", "BigInt",
+        "Float", "Double", "String", "Timestamp", "Decimal"};
+    static const string operands1[] = {
+        "true", "cast(1 as TinyInt)", "cast(1 as SmallInt)", "cast(1 as Int)",
+        "cast(1 as BigInt)", "cast(1 as Float)", "cast(1 as Double)",
+        "'this is a string'", "cast(1 as TimeStamp)", "cast(1 as Decimal)"
+    };
+    static const string operands2[] = {
+        "false", "cast(2 as TinyInt)", "cast(2 as SmallInt)", "cast(2 as Int)",
+        "cast(2 as BigInt)", "cast(2 as Float)", "cast(2 as Double)",
+        "'this is ALSO a string'", "cast(2 as TimeStamp)", "cast(2 as Decimal)"
+    };
+    for (int i = 0; i < sizeof(operators) / sizeof(string); ++i) {
+      // "IS DISTINCT FROM" and "<=>" are generalized equality, and
+      // this fact is recorded in is_equal.
+      const bool is_equal = operators[i] != "IS DISTINCT FROM";
+      // Everything IS NOT DISTINCT FROM itself.
+      for (int j = 0; j < sizeof(types) / sizeof(string); ++j) {
+        const string operand = "cast(NULL as " + types[j] + ")";
+        TestValue(operand + ' ' + operators[i] + ' ' + operand, TYPE_BOOLEAN, is_equal);
+      }
+      for (int j = 0; j < sizeof(operands1) / sizeof(string); ++j) {
+        TestValue(operands1[j] + ' ' + operators[i] + ' ' + operands1[j], TYPE_BOOLEAN,
+                  is_equal);
+      }
+      // NULL IS DISTINCT FROM all non-null things.
+      for (int j = 0; j < sizeof(operands1) / sizeof(string); ++j) {
+        TestValue("NULL " + operators[i] + ' ' + operands1[j], TYPE_BOOLEAN, !is_equal);
+        TestValue(operands1[j] + ' ' + operators[i] + " NULL", TYPE_BOOLEAN, !is_equal);
+      }
+      // Non-null values can be DISTINCT.
+      for (int j = 0; j < sizeof(operands1) / sizeof(string); ++j) {
+        TestValue(operands1[j] + ' ' + operators[i] + ' ' + operands2[j], TYPE_BOOLEAN,
+                  !is_equal);
+      }
+    }
   }
 
   // Test comparison operators with a left or right NULL operand on all types.
@@ -1181,6 +1246,7 @@ TEST_F(ExprTest, BinaryPredicates) {
   TestStringComparisons();
   TestDecimalComparisons();
   TestNullComparisons();
+  TestDistinctFrom();
 }
 
 // Test casting from all types to all other types

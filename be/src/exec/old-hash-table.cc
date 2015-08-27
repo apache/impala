@@ -14,6 +14,9 @@
 
 #include "exec/old-hash-table.inline.h"
 
+#include <functional>
+#include <numeric>
+
 #include "codegen/codegen-anyval.h"
 #include "codegen/llvm-codegen.h"
 #include "exprs/expr.h"
@@ -53,14 +56,16 @@ static int64_t NULL_VALUE[] = { HashUtil::FNV_SEED, HashUtil::FNV_SEED,
 
 OldHashTable::OldHashTable(RuntimeState* state, const vector<ExprContext*>& build_expr_ctxs,
     const vector<ExprContext*>& probe_expr_ctxs, int num_build_tuples, bool stores_nulls,
-    bool finds_nulls, int32_t initial_seed, MemTracker* mem_tracker, bool stores_tuples,
-    int64_t num_buckets)
+    const std::vector<bool>& finds_nulls, int32_t initial_seed, MemTracker* mem_tracker,
+    bool stores_tuples, int64_t num_buckets)
   : state_(state),
     build_expr_ctxs_(build_expr_ctxs),
     probe_expr_ctxs_(probe_expr_ctxs),
     num_build_tuples_(num_build_tuples),
     stores_nulls_(stores_nulls),
     finds_nulls_(finds_nulls),
+    finds_some_nulls_(std::accumulate(
+        finds_nulls_.begin(), finds_nulls_.end(), false, std::logical_or<bool>())),
     stores_tuples_(stores_tuples),
     initial_seed_(initial_seed),
     num_filled_buckets_(0),
@@ -73,7 +78,7 @@ OldHashTable::OldHashTable(RuntimeState* state, const vector<ExprContext*>& buil
     mem_limit_exceeded_(false) {
   DCHECK(mem_tracker != NULL);
   DCHECK_EQ(build_expr_ctxs_.size(), probe_expr_ctxs_.size());
-
+  DCHECK_EQ(build_expr_ctxs_.size(), finds_nulls_.size());
   DCHECK_EQ((num_buckets & (num_buckets-1)), 0) << "num_buckets must be a power of 2";
   buckets_.resize(num_buckets);
   num_buckets_ = num_buckets;
@@ -508,7 +513,7 @@ bool OldHashTable::Equals(TupleRow* build_row) {
   for (int i = 0; i < build_expr_ctxs_.size(); ++i) {
     void* val = build_expr_ctxs_[i]->GetValue(build_row);
     if (val == NULL) {
-      if (!stores_nulls_) return false;
+      if (!(stores_nulls_ && finds_nulls_[i])) return false;
       if (!expr_value_null_bits_[i]) return false;
       continue;
     } else {
@@ -630,7 +635,7 @@ Function* OldHashTable::CodegenEquals(RuntimeState* state) {
       // the case where the hash table does not store nulls, this is always false.
       Value* probe_is_null = codegen->false_value();
       uint8_t* null_byte_loc = &expr_value_null_bits_[i];
-      if (stores_nulls_) {
+      if (stores_nulls_ && finds_nulls_[i]) {
         Value* llvm_null_byte_loc =
             codegen->CastPtrToLlvmPtr(codegen->ptr_type(), null_byte_loc);
         Value* null_byte = builder.CreateLoad(llvm_null_byte_loc);

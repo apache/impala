@@ -127,9 +127,11 @@ public class HashJoinNode extends JoinNode {
     msg.hash_join_node = new THashJoinNode();
     msg.hash_join_node.join_op = joinOp_.toThrift();
     for (Expr entry: eqJoinConjuncts_) {
+      BinaryPredicate bp = (BinaryPredicate)entry;
       TEqJoinCondition eqJoinCondition =
-          new TEqJoinCondition(entry.getChild(0).treeToThrift(),
-              entry.getChild(1).treeToThrift());
+          new TEqJoinCondition(bp.getChild(0).treeToThrift(),
+              bp.getChild(1).treeToThrift(),
+              bp.getOp() == BinaryPredicate.Operator.NOT_DISTINCT);
       msg.hash_join_node.addToEq_join_conjuncts(eqJoinCondition);
     }
     for (Expr e: otherJoinConjuncts_) {

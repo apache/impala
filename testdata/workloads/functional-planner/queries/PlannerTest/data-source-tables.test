@@ -59,3 +59,17 @@ where a.tinyint_col = a.smallint_col and a.int_col = a.bigint_col
 00:SCAN DATA SOURCE [functional.alltypes_datasource a]
 predicates: a.tinyint_col = a.smallint_col, a.int_col = a.bigint_col, a.id = a.tinyint_col, a.id = a.int_col
 ====
+# Tests that <=>, IS DISTINCT FROM, and IS NOT DISTINCT FROM all can be offered to the
+# data source.
+select * from functional.alltypes_datasource
+where id <=> 1
+and bool_col <=> true
+and tinyint_col IS DISTINCT FROM 2
+and smallint_col IS DISTINCT FROM 3
+and int_col is not distinct from 4
+and bigint_col is not distinct from 5
+---- PLAN
+00:SCAN DATA SOURCE [functional.alltypes_datasource]
+data source predicates: id IS NOT DISTINCT FROM 1, tinyint_col IS DISTINCT FROM 2, int_col IS NOT DISTINCT FROM 4
+predicates: bool_col IS NOT DISTINCT FROM TRUE, smallint_col IS DISTINCT FROM 3, bigint_col IS NOT DISTINCT FROM 5
+====

@@ -647,40 +647,52 @@ BooleanVal DecimalOperators::CastToBooleanVal(
     return DecimalVal::null(); \
   }
 
+#define DECIMAL_BINARY_OP_NONNULL(OP_FN, X, Y) \
+  bool dummy = false; \
+  const FunctionContext::TypeDesc& x_type = *context->GetArgType(0); \
+  const FunctionContext::TypeDesc& y_type = *context->GetArgType(1); \
+  int byte_size = ::max(ColumnType::GetDecimalByteSize(x_type.precision), \
+                        ColumnType::GetDecimalByteSize(y_type.precision)); \
+  switch (byte_size) { \
+    case 4: { \
+      Decimal4Value x_val = GetDecimal4Value(X, x_type, &dummy); \
+      Decimal4Value y_val = GetDecimal4Value(Y, y_type, &dummy); \
+      bool result = x_val.OP_FN(x_type.scale, y_val, y_type.scale); \
+      return BooleanVal(result); \
+    } \
+    case 8: { \
+      Decimal8Value x_val = GetDecimal8Value(X, x_type, &dummy); \
+      Decimal8Value y_val = GetDecimal8Value(Y, y_type, &dummy); \
+      bool result = x_val.OP_FN(x_type.scale, y_val, y_type.scale); \
+      return BooleanVal(result); \
+    } \
+    case 16: { \
+      Decimal16Value x_val = GetDecimal16Value(X, x_type, &dummy); \
+      Decimal16Value y_val = GetDecimal16Value(Y, y_type, &dummy); \
+      bool result = x_val.OP_FN(x_type.scale, y_val, y_type.scale); \
+      return BooleanVal(result); \
+    } \
+    default: \
+      DCHECK(false); \
+      break; \
+  } \
+  return BooleanVal::null();
+
 #define DECIMAL_BINARY_OP(FN_NAME, OP_FN) \
   BooleanVal DecimalOperators::FN_NAME( \
       FunctionContext* context, const DecimalVal& x, const DecimalVal& y) { \
     if (x.is_null || y.is_null) return BooleanVal::null(); \
-    bool dummy = false; \
-    const FunctionContext::TypeDesc& x_type = *context->GetArgType(0); \
-    const FunctionContext::TypeDesc& y_type = *context->GetArgType(1); \
-    int byte_size = ::max(ColumnType::GetDecimalByteSize(x_type.precision), \
-                          ColumnType::GetDecimalByteSize(y_type.precision)); \
-    switch (byte_size) { \
-      case 4: { \
-        Decimal4Value x_val = GetDecimal4Value(x, x_type, &dummy); \
-        Decimal4Value y_val = GetDecimal4Value(y, y_type, &dummy); \
-        bool result = x_val.OP_FN(x_type.scale, y_val, y_type.scale); \
-        return BooleanVal(result); \
-      } \
-      case 8: { \
-        Decimal8Value x_val = GetDecimal8Value(x, x_type, &dummy); \
-        Decimal8Value y_val = GetDecimal8Value(y, y_type, &dummy); \
-        bool result = x_val.OP_FN(x_type.scale, y_val, y_type.scale); \
-        return BooleanVal(result); \
-      } \
-      case 16: { \
-        Decimal16Value x_val = GetDecimal16Value(x, x_type, &dummy); \
-        Decimal16Value y_val = GetDecimal16Value(y, y_type, &dummy); \
-        bool result = x_val.OP_FN(x_type.scale, y_val, y_type.scale); \
-        return BooleanVal(result); \
-      } \
-      default: \
-        DCHECK(false); \
-        break; \
-    } \
-    return BooleanVal::null(); \
+    DECIMAL_BINARY_OP_NONNULL(OP_FN, x, y) \
   }
+
+#define NULLSAFE_DECIMAL_BINARY_OP(FN_NAME, OP_FN, IS_EQUAL) \
+  BooleanVal DecimalOperators::FN_NAME( \
+      FunctionContext* context, const DecimalVal& x, const DecimalVal& y) { \
+    if (x.is_null) return BooleanVal(IS_EQUAL ? y.is_null : !y.is_null); \
+    if (y.is_null) return BooleanVal(!IS_EQUAL); \
+    DECIMAL_BINARY_OP_NONNULL(OP_FN, x, y) \
+  }
+
 
 DECIMAL_ARITHMETIC_OP(Add_DecimalVal_DecimalVal, Add)
 DECIMAL_ARITHMETIC_OP(Subtract_DecimalVal_DecimalVal, Subtract)
@@ -694,5 +706,6 @@ DECIMAL_BINARY_OP(Ge_DecimalVal_DecimalVal, Ge)
 DECIMAL_BINARY_OP(Gt_DecimalVal_DecimalVal, Gt)
 DECIMAL_BINARY_OP(Le_DecimalVal_DecimalVal, Le)
 DECIMAL_BINARY_OP(Lt_DecimalVal_DecimalVal, Lt)
-
+NULLSAFE_DECIMAL_BINARY_OP(DistinctFrom_DecimalVal_DecimalVal, Ne, false)
+NULLSAFE_DECIMAL_BINARY_OP(NotDistinct_DecimalVal_DecimalVal, Eq, true)
 }

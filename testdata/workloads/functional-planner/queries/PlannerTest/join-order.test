@@ -1264,3 +1264,82 @@ on (t3.string_col = t1.string_col_1 and t3.date_string_col = t1.string_col_2)
 01:SCAN HDFS [functional.alltypes t2]
    partitions=24/24 files=24 size=478.45KB
 ====
+# Test that filtering with "<=>" sets selectivity, just as "=" does. First, the
+# base case: functional.alltypes.timestamp_col has more distinct vals than
+# functional.alltypes.date_string_col. As a result, in a left semi join between
+# functional.alltypes and itself, if one side of the join is filtered on timestamp_col and
+# the other on date_string_col, the one filtered on timestamp_col is expected by the
+# planner to be smaller and becomes the build side of the hash join.
+select * from functional.alltypes a
+left semi join
+(select * from functional.alltypes
+where timestamp_col = now()) b
+on (a.id = b.id)
+and a.date_string_col = ''
+---- PLAN
+02:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: a.id = functional.alltypes.id
+|
+|--01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: timestamp_col = now()
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.date_string_col = ''
+====
+select * from functional.alltypes a
+left semi join
+(select * from functional.alltypes
+where date_string_col = '') b
+on (a.id = b.id)
+and a.timestamp_col = now()
+---- PLAN
+02:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: functional.alltypes.id = a.id
+|
+|--00:SCAN HDFS [functional.alltypes a]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: a.timestamp_col = now()
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: date_string_col = ''
+====
+# The same should hold true when the filtering is done with "<=>" rather than "=".
+select * from functional.alltypes a
+left semi join
+(select * from functional.alltypes
+where timestamp_col <=> now()) b
+on (a.id = b.id)
+and a.date_string_col <=> ''
+---- PLAN
+02:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: a.id = functional.alltypes.id
+|
+|--01:SCAN HDFS [functional.alltypes]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: timestamp_col IS NOT DISTINCT FROM now()
+|
+00:SCAN HDFS [functional.alltypes a]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: a.date_string_col IS NOT DISTINCT FROM ''
+====
+select * from functional.alltypes a
+left semi join
+(select * from functional.alltypes
+where date_string_col <=> '') b
+on (a.id = b.id)
+and a.timestamp_col <=> now()
+---- PLAN
+02:HASH JOIN [RIGHT SEMI JOIN]
+|  hash predicates: functional.alltypes.id = a.id
+|
+|--00:SCAN HDFS [functional.alltypes a]
+|     partitions=24/24 files=24 size=478.45KB
+|     predicates: a.timestamp_col IS NOT DISTINCT FROM now()
+|
+01:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+   predicates: date_string_col IS NOT DISTINCT FROM ''
+====

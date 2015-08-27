@@ -2759,7 +2759,8 @@ public class ParserTest {
   public void TestSubqueries() {
     // Binary nested predicates
     String subquery = "(SELECT count(*) FROM bar)";
-    String[] operators = {"=", "!=", "<>", ">", ">=", "<", "<="};
+    String[] operators = {"=", "!=", "<>", ">", ">=", "<", "<=", "<=>",
+      "IS DISTINCT FROM", "IS NOT DISTINCT FROM"};
     for (String op: operators) {
       ParsesOk(String.format("SELECT * FROM foo WHERE a %s %s", op, subquery));
       ParsesOk(String.format("SELECT * FROM foo WHERE %s %s a", subquery, op));

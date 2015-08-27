@@ -189,8 +189,9 @@ Status PartitionedAggregationNode::Prepare(RuntimeState* state) {
     RETURN_IF_ERROR(state_->GetQueryStatus());
     singleton_output_tuple_returned_ = false;
   } else {
-    ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_, true, true,
-        state->fragment_hash_seed(), MAX_PARTITION_DEPTH, 1));
+    ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_, true,
+        std::vector<bool>(build_expr_ctxs_.size(), true), state->fragment_hash_seed(),
+        MAX_PARTITION_DEPTH, 1));
     RETURN_IF_ERROR(state_->block_mgr()->RegisterClient(
         MinRequiredBuffers(), true, mem_tracker(), state, &block_mgr_client_));
     RETURN_IF_ERROR(CreateHashPartitions(0));

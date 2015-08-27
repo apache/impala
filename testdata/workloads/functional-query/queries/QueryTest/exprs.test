@@ -2338,3 +2338,61 @@ select regexp_match_count(tmp.str, tmp.pattern, tmp.start_pos, tmp.params) from 
 ('iPhone\niPad\niPod', '^I.*$', 1, 'imn')) as tmp
 ---- CATCH
 Illegal match parameter x
+====
+---- QUERY
+# IMPALA-2147: IS [NOT] DISTINCT FROM and "<=>"
+select NULL <=> NULL
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+select NULL <=> 1
+---- RESULTS
+false
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+select NULL <=> "foo"
+---- RESULTS
+false
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+select NULL IS DISTINCT FROM NULL
+---- RESULTS
+false
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+select NULL IS DISTINCT FROM 3.14
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+select cast(0 as bigint) IS DISTINCT FROM NULL
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+select 2.78 IS DISTINCT FROM 3.14
+---- RESULTS
+true
+---- TYPES
+BOOLEAN
+====
+---- QUERY
+select 2.78 IS NOT DISTINCT FROM 3.14
+---- RESULTS
+false
+---- TYPES
+BOOLEAN
+====

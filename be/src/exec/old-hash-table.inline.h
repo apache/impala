@@ -102,7 +102,7 @@ inline bool OldHashTable::EvalAndHashBuild(TupleRow* row, uint32_t* hash) {
 
 inline bool OldHashTable::EvalAndHashProbe(TupleRow* row, uint32_t* hash) {
   bool has_null = EvalProbeRow(row);
-  if ((!stores_nulls_ || !finds_nulls_) && has_null) return false;
+  if (has_null && !(stores_nulls_ && finds_some_nulls_)) return false;
   *hash = HashCurrentRow();
   return true;
 }

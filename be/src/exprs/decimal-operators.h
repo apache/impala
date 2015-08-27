@@ -75,6 +75,10 @@ class DecimalOperators {
       FunctionContext*, const DecimalVal&, const DecimalVal&);
   static BooleanVal Lt_DecimalVal_DecimalVal(
       FunctionContext*, const DecimalVal&, const DecimalVal&);
+  static BooleanVal DistinctFrom_DecimalVal_DecimalVal(
+      FunctionContext*, const DecimalVal&, const DecimalVal&);
+  static BooleanVal NotDistinct_DecimalVal_DecimalVal(
+      FunctionContext*, const DecimalVal&, const DecimalVal&);
 
   /// The rounding rule when converting decimals. These only apply going from a higher
   /// scale to a lower one.

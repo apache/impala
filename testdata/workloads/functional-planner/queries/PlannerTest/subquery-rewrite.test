@@ -1497,3 +1497,152 @@ and not exists
    partitions=11/11 files=11 size=814.73KB
    predicates: t3.id > 100
 ====
+# Tests for <=> (aka IS NOT DISTINCT FROM) and IS DISTINCT FROM
+select * from functional.alltypesagg t1
+where t1.id is not distinct from
+(select min(id) from functional.alltypes t2
+where t1.int_col is not distinct from t2.int_col);
+---- PLAN
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t1.id IS NOT DISTINCT FROM min(id), t1.int_col IS NOT DISTINCT FROM t2.int_col
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(id)
+|  |  group by: t2.int_col
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+====
+select * from functional.alltypesagg t1
+where t1.id is distinct from
+(select min(id) from functional.alltypes t2
+where t1.int_col is not distinct from t2.int_col);
+---- PLAN
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t1.int_col IS NOT DISTINCT FROM t2.int_col
+|  other join predicates: t1.id IS DISTINCT FROM min(id)
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(id)
+|  |  group by: t2.int_col
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+====
+select * from functional.alltypesagg t1
+where t1.id =
+(select min(id) from functional.alltypes t2
+where t1.int_col is not distinct from t2.int_col);
+---- PLAN
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t1.id = min(id), t1.int_col IS NOT DISTINCT FROM t2.int_col
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(id)
+|  |  group by: t2.int_col
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+====
+select * from functional.alltypesagg t1
+where t1.id !=
+(select min(id) from functional.alltypes t2
+where t1.int_col is not distinct from t2.int_col);
+---- PLAN
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t1.int_col IS NOT DISTINCT FROM t2.int_col
+|  other join predicates: t1.id != min(id)
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(id)
+|  |  group by: t2.int_col
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+====
+select * from functional.alltypesagg t1
+where t1.id is not distinct from
+(select min(id) from functional.alltypes t2
+where t1.int_col = t2.int_col);
+---- PLAN
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t1.id IS NOT DISTINCT FROM min(id), t1.int_col = t2.int_col
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(id)
+|  |  group by: t2.int_col
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+====
+select * from functional.alltypesagg t1
+where t1.id is distinct from
+(select min(id) from functional.alltypes t2
+where t1.int_col = t2.int_col);
+---- PLAN
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t1.int_col = t2.int_col
+|  other join predicates: t1.id IS DISTINCT FROM min(id)
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(id)
+|  |  group by: t2.int_col
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+====
+select * from functional.alltypesagg t1
+where t1.id =
+(select min(id) from functional.alltypes t2
+where t1.int_col = t2.int_col);
+---- PLAN
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t1.id = min(id), t1.int_col = t2.int_col
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(id)
+|  |  group by: t2.int_col
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+====
+select * from functional.alltypesagg t1
+where t1.id !=
+(select min(id) from functional.alltypes t2
+where t1.int_col = t2.int_col);
+---- PLAN
+03:HASH JOIN [LEFT SEMI JOIN]
+|  hash predicates: t1.int_col = t2.int_col
+|  other join predicates: t1.id != min(id)
+|
+|--02:AGGREGATE [FINALIZE]
+|  |  output: min(id)
+|  |  group by: t2.int_col
+|  |
+|  01:SCAN HDFS [functional.alltypes t2]
+|     partitions=24/24 files=24 size=478.45KB
+|
+00:SCAN HDFS [functional.alltypesagg t1]
+   partitions=11/11 files=11 size=814.73KB
+====

@@ -14,6 +14,8 @@
 
 #include "exec/partitioned-hash-join-node.inline.h"
 
+#include <functional>
+#include <numeric>
 #include <sstream>
 #include <gutil/strings/substitute.h>
 
@@ -44,6 +46,7 @@ PartitionedHashJoinNode::PartitionedHashJoinNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : BlockingJoinNode("PartitionedHashJoinNode", tnode.hash_join_node.join_op,
         pool, tnode, descs),
+    is_not_distinct_from_(),
     block_mgr_client_(NULL),
     partition_build_timer_(NULL),
     null_aware_eval_timer_(NULL),
@@ -79,6 +82,7 @@ Status PartitionedHashJoinNode::Init(const TPlanNode& tnode) {
     probe_expr_ctxs_.push_back(ctx);
     RETURN_IF_ERROR(Expr::CreateExprTree(pool_, eq_join_conjuncts[i].right, &ctx));
     build_expr_ctxs_.push_back(ctx);
+    is_not_distinct_from_.push_back(eq_join_conjuncts[i].is_not_distinct_from);
   }
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(pool_, tnode.hash_join_node.other_join_conjuncts,
@@ -130,10 +134,12 @@ Status PartitionedHashJoinNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(state->block_mgr()->RegisterClient(
       MinRequiredBuffers(), true, mem_tracker(), state, &block_mgr_client_));
 
-  bool should_store_nulls = join_op_ == TJoinOp::RIGHT_OUTER_JOIN ||
-      join_op_ == TJoinOp::RIGHT_ANTI_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN;
-  ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_,
-      should_store_nulls, false, state->fragment_hash_seed(), MAX_PARTITION_DEPTH,
+  const bool should_store_nulls = join_op_ == TJoinOp::RIGHT_OUTER_JOIN ||
+      join_op_ == TJoinOp::RIGHT_ANTI_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN ||
+      std::accumulate(is_not_distinct_from_.begin(), is_not_distinct_from_.end(), false,
+                      std::logical_or<bool>());
+  ht_ctx_.reset(new HashTableCtx(build_expr_ctxs_, probe_expr_ctxs_, should_store_nulls,
+      is_not_distinct_from_, state->fragment_hash_seed(), MAX_PARTITION_DEPTH,
       child(1)->row_desc().tuple_descriptors().size()));
 
   if (join_op_ == TJoinOp::NULL_AWARE_LEFT_ANTI_JOIN) {

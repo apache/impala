@@ -198,8 +198,8 @@ TEST_F(OldHashTableTest, BasicTest) {
 
   // Create the hash table and insert the build rows
   MemTracker tracker;
-  OldHashTable hash_table(NULL, build_expr_ctxs_, probe_expr_ctxs_,
-                       1, false, false, 0, &tracker);
+  OldHashTable hash_table(NULL, build_expr_ctxs_, probe_expr_ctxs_, 1, false,
+      std::vector<bool>(build_expr_ctxs_.size(), false), 0, &tracker);
   for (int i = 0; i < 5; ++i) {
     hash_table.Insert(build_rows[i]);
   }
@@ -240,8 +240,8 @@ TEST_F(OldHashTableTest, BasicTest) {
 // This tests makes sure we can scan ranges of buckets
 TEST_F(OldHashTableTest, ScanTest) {
   MemTracker tracker;
-  OldHashTable hash_table(NULL, build_expr_ctxs_, probe_expr_ctxs_,
-                       1, false, false, 0, &tracker);
+  OldHashTable hash_table(NULL, build_expr_ctxs_, probe_expr_ctxs_, 1, false,
+      std::vector<bool>(build_expr_ctxs_.size(), false), 0, &tracker);
   // Add 1 row with val 1, 2 with val 2, etc
   vector<TupleRow*> build_rows;
   ProbeTestData probe_rows[15];
@@ -286,8 +286,8 @@ TEST_F(OldHashTableTest, GrowTableTest) {
   int num_to_add = 4;
   int expected_size = 0;
   MemTracker tracker(100 * 1024 * 1024);
-  OldHashTable hash_table(NULL, build_expr_ctxs_, probe_expr_ctxs_,
-                       1, false, false, 0, &tracker, false, num_to_add);
+  OldHashTable hash_table(NULL, build_expr_ctxs_, probe_expr_ctxs_, 1, false,
+      std::vector<bool>(build_expr_ctxs_.size(), false), 0, &tracker, false, num_to_add);
   EXPECT_FALSE(hash_table.mem_limit_exceeded());
   EXPECT_TRUE(!tracker.LimitExceeded());
 
