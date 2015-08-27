@@ -26,20 +26,24 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
+import com.cloudera.impala.authorization.Privilege;
+import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.CatalogException;
 import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.Function;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.ScalarFunction;
 import com.cloudera.impala.catalog.ScalarType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TestSchemaUtils;
 import com.cloudera.impala.catalog.Type;
+import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
 
 public class AnalyzeExprsTest extends AnalyzerTest {
@@ -1018,7 +1022,7 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         Type.BIGINT, Type.FLOAT, Type.DOUBLE , Type.NULL };
     for (Type type1: numericTypes) {
       for (Type type2: numericTypes) {
-        Type t = Type.getAssignmentCompatibleType(type1, type2);
+        Type t = Type.getAssignmentCompatibleType(type1, type2, false);
         assertTrue(t.isScalarType());
         ScalarType compatibleType = (ScalarType) t;
         Type promotedType = compatibleType.getNextResolutionType();
@@ -1099,8 +1103,11 @@ public class AnalyzeExprsTest extends AnalyzerTest {
     for (BinaryPredicate.Operator cmpOp: BinaryPredicate.Operator.values()) {
       for (Type type1: types) {
         for (Type type2: types) {
-          Type compatibleType =
-              Type.getAssignmentCompatibleType(type1, type2);
+          // Prefer strict matching.
+          Type compatibleType = Type.getAssignmentCompatibleType(type1, type2, true);
+          if (compatibleType.isInvalid()) {
+            compatibleType = Type.getAssignmentCompatibleType(type1, type2, false);
+          }
           typeCastTest(type1, type2, false, null, cmpOp, compatibleType);
           typeCastTest(type1, type2, true, null, cmpOp, compatibleType);
         }
@@ -2231,5 +2238,61 @@ public class AnalyzeExprsTest extends AnalyzerTest {
         createAnalyzer(queryOptions),
         "all DISTINCT aggregate functions need to have the same set of parameters as " +
         "avg(DISTINCT int_col); deviating function: sum(DISTINCT");
+  }
+
+  @Test
+  // IMPALA-2233: Regression test for loss of precision through implicit casts.
+  public void TestImplicitArgumentCasts() throws AnalysisException {
+    FunctionName fnName = new FunctionName(Catalog.BUILTINS_DB, "greatest");
+    Function tinyIntFn = new Function(fnName, new Type[] {ScalarType.DOUBLE},
+        Type.DOUBLE, true);
+    Function decimalFn = new Function(fnName,
+        new Type[] {ScalarType.TINYINT, ScalarType.createDecimalType(30, 10)},
+        Type.INVALID, false);
+    Assert.assertFalse(tinyIntFn.compare(decimalFn, CompareMode.IS_SUPERTYPE_OF));
+    Assert.assertTrue(tinyIntFn.compare(decimalFn,
+        CompareMode.IS_NONSTRICT_SUPERTYPE_OF));
+    // Check that this resolves to the decimal version of the function.
+    Analyzer analyzer = createAnalyzer(Catalog.BUILTINS_DB);
+    Db db = analyzer.getDb(Catalog.BUILTINS_DB, Privilege.VIEW_METADATA, true);
+    Function foundFn = db.getFunction(decimalFn, CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+    assertNotNull(foundFn);
+    Assert.assertTrue(foundFn.getArgs()[0].isDecimal());
+
+    // The double version of the function is a non-strict supertype if the arguments are
+    // (double, decimal).
+    Function doubleDecimalFn = new Function(fnName,
+        new Type[] {ScalarType.DOUBLE, ScalarType.createDecimalType(30, 10)},
+        Type.INVALID, false);
+    foundFn = db.getFunction(doubleDecimalFn, CompareMode.IS_SUPERTYPE_OF);
+    Assert.assertNull(foundFn);
+    foundFn = db.getFunction(doubleDecimalFn, CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+    assertNotNull(foundFn);
+    Assert.assertEquals(Type.DOUBLE, foundFn.getArgs()[0]);
+
+    // Float and any precision decimal can be matched to FLOAT non-strictly.
+    Function floatDecimalFn = new Function(fnName,
+        new Type[] {ScalarType.FLOAT, ScalarType.createDecimalType(10, 7)},
+        Type.INVALID, false);
+    foundFn = db.getFunction(floatDecimalFn, CompareMode.IS_SUPERTYPE_OF);
+    Assert.assertNull(foundFn);
+    foundFn = db.getFunction(floatDecimalFn, CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+    assertNotNull(foundFn);
+    Assert.assertEquals(Type.FLOAT, foundFn.getArgs()[0]);
+
+    // Float and bigint should be matched to double.
+    Function floatBigIntFn = new Function(fnName,
+        new Type[] {ScalarType.FLOAT, ScalarType.BIGINT}, Type.INVALID, false);
+    foundFn = db.getFunction(floatBigIntFn, CompareMode.IS_SUPERTYPE_OF);
+    Assert.assertNotNull(foundFn);
+    Assert.assertEquals(Type.DOUBLE, foundFn.getArgs()[0]);
+
+    FunctionName lagFnName = new FunctionName(Catalog.BUILTINS_DB, "lag");
+    // Timestamp should not be converted to string if string overload available.
+    Function lagStringFn = new Function(lagFnName,
+        new Type[] {ScalarType.STRING, Type.TINYINT}, Type.INVALID, false);
+    foundFn = db.getFunction(lagStringFn, CompareMode.IS_SUPERTYPE_OF);
+    Assert.assertNotNull(foundFn);
+    Assert.assertEquals(Type.STRING, foundFn.getArgs()[0]);
   }
 }

@@ -2088,7 +2088,7 @@ public class Analyzer {
       newCompatibleType = expr.getType();
     } else {
       newCompatibleType = Type.getAssignmentCompatibleType(
-          lastCompatibleType, expr.getType());
+          lastCompatibleType, expr.getType(), false);
     }
     if (!newCompatibleType.isValid()) {
       throw new AnalysisException(String.format(

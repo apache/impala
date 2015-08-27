@@ -323,9 +323,9 @@ int
 ---- QUERY
 select var_sum(1.0, 2.0, 3.0)
 ---- TYPES
-double
+decimal
 ---- RESULTS
-6
+6.00
 ====
 ---- QUERY
 select var_sum("Hello", "World", "Foo", "Bar")

@@ -370,7 +370,7 @@ public class AnalyticExpr extends Expr {
     }
     Expr rangeExpr = boundary.getExpr();
     if (!Type.isImplicitlyCastable(
-        rangeExpr.getType(), orderByElements_.get(0).getExpr().getType())) {
+        rangeExpr.getType(), orderByElements_.get(0).getExpr().getType(), false)) {
       throw new AnalysisException(
           "The value expression of a PRECEDING/FOLLOWING clause of a RANGE window must "
             + "be implicitly convertable to the ORDER BY expression's type: "

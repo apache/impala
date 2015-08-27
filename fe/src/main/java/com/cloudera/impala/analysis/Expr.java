@@ -350,7 +350,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       if (result == null) {
         result = decimalType.getMinResolutionDecimal();
       } else {
-        result = Type.getAssignmentCompatibleType(result, childType);
+        result = Type.getAssignmentCompatibleType(result, childType, false);
       }
     }
     if (result != null) {
@@ -966,7 +966,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    *           failure to convert a string literal to a date literal
    */
   public final Expr castTo(Type targetType) throws AnalysisException {
-    Type type = Type.getAssignmentCompatibleType(this.type_, targetType);
+    Type type = Type.getAssignmentCompatibleType(this.type_, targetType, false);
     Preconditions.checkState(type.isValid(), "cast %s to %s", this.type_, targetType);
     // If the targetType is NULL_TYPE then ignore the cast because NULL_TYPE
     // is compatible with all types and no cast is necessary.

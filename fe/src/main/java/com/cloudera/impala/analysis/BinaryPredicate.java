@@ -159,7 +159,7 @@ public class BinaryPredicate extends Predicate {
     convertNumericLiteralsFromDecimal(analyzer);
     String opName = op_.getName().equals("null_matching_eq") ? "eq" : op_.getName();
     fn_ = getBuiltinFunction(analyzer, opName, collectChildReturnTypes(),
-        CompareMode.IS_SUPERTYPE_OF);
+        CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
     if (fn_ == null) {
       // Construct an appropriate error message and throw an AnalysisException.
       String errMsg = "operands of type " + getChild(0).getType().toSql() + " and " +

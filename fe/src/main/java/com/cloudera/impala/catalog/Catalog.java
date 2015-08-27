@@ -266,6 +266,10 @@ public abstract class Catalog {
    * Returns the function that best matches 'desc' that is registered with the
    * catalog using 'mode' to check for matching. If desc matches multiple functions
    * in the catalog, it will return the function with the strictest matching mode.
+   * If multiple functions match at the same matching mode, ties are broken by comparing
+   * argument types in lexical order. Argument types are ordered by argument precision
+   * (e.g. double is preferred over float) and then by alphabetical order of argument
+   * type name, to guarantee deterministic results.
    */
   public Function getFunction(Function desc, Function.CompareMode mode) {
     Db db = getDb(desc.dbName());

@@ -129,7 +129,7 @@ public class PartitionSpec implements ParseNode {
       Type colType = c.getType();
       Type literalType = pk.getValue().getType();
       Type compatibleType =
-          Type.getAssignmentCompatibleType(colType, literalType);
+          Type.getAssignmentCompatibleType(colType, literalType, false);
       if (!compatibleType.isValid()) {
         throw new AnalysisException(String.format("Value of partition spec (column=%s) "
             + "has incompatible type: '%s'. Expected type: '%s'.",

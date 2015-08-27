@@ -158,7 +158,7 @@ public class TimestampArithmeticExpr extends Expr {
     if (timeUnit_ == TimeUnit.MONTH) funcOpName += "_INTERVAL";
 
     fn_ = getBuiltinFunction(analyzer, funcOpName.toLowerCase(),
-         collectChildReturnTypes(), CompareMode.IS_SUPERTYPE_OF);
+         collectChildReturnTypes(), CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
     castForFunctionCall(false);
 
     Preconditions.checkNotNull(fn_);

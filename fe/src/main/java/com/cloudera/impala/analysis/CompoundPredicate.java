@@ -128,7 +128,7 @@ public class CompoundPredicate extends Predicate {
     }
 
     fn_ = getBuiltinFunction(analyzer, op_.toString(), collectChildReturnTypes(),
-        CompareMode.IS_SUPERTYPE_OF);
+        CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
     Preconditions.checkState(fn_ != null);
     Preconditions.checkState(fn_.getReturnType().isBoolean());
     castForFunctionCall(false);

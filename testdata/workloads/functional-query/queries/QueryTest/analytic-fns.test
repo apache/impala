@@ -1289,7 +1289,7 @@ right outer join
 on (t2.int_col = t1.int_col and t2.int_col = t1.int_col and t2.int_col = t1.int_col)
 ---- RESULTS
 ---- TYPES
-SMALLINT, INT, BIGINT, FLOAT, BIGINT
+SMALLINT, INT, BIGINT, DOUBLE, BIGINT
 ====
 ---- QUERY
 # IMPALA-1946: Check that On-clause predicates of an outer join assigned in a scan
@@ -1544,4 +1544,24 @@ select id, rank() over(order by id) from functional.alltypesagg limit 10
 8,10
 ---- TYPES
 INT, BIGINT
+====
+---- QUERY
+# IMPALA-2259 - wrong overload chosen for analytic function.
+select lag(c1, 1) over (order by c1), c1
+from decimal_tiny
+order by c1
+limit 10
+---- RESULTS
+NULL,0.0000
+0.0000,0.1111
+0.1111,0.2222
+0.2222,0.3333
+0.3333,0.4444
+0.4444,0.5555
+0.5555,0.6666
+0.6666,0.7777
+0.7777,0.8888
+0.8888,0.9999
+---- TYPES
+DECIMAL, DECIMAL
 ====

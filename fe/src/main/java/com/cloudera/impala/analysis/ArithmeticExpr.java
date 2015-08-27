@@ -212,7 +212,7 @@ public class ArithmeticExpr extends Expr {
           throw new AnalysisException("Invalid non-integer argument to operation '" +
               op_.toString() + "': " + this.toSql());
         }
-        type_ = Type.getAssignmentCompatibleType(t0, t1);
+        type_ = Type.getAssignmentCompatibleType(t0, t1, false);
         // If both of the children are null, we'll default to the INT version of the
         // operator. This prevents the BE from seeing NULL_TYPE.
         if (type_.isNull()) type_ = Type.INT;

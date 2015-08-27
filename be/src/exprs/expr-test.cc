@@ -1158,6 +1158,11 @@ TEST_F(ExprTest, DecimalArithmeticExprs) {
       ColumnType::CreateDecimalType(2,0));
   TestIsNull("mod(cast(NULL as decimal(2,0)), NULL)",
       ColumnType::CreateDecimalType(2,0));
+
+  // IMPALA-2233: Test that implicit casts do not lose precision.
+  // The overload greatest(decimal(*,*)) is available and should be used.
+  TestDecimalValue("greatest(0, cast('99999.1111' as decimal(30,10)))",
+      Decimal8Value(999991111000000), ColumnType::CreateDecimalType(30, 10));
 }
 
 // There are two tests of ranges, the second of which requires a cast
@@ -2849,8 +2854,9 @@ TEST_F(ExprTest, MathFunctions) {
   TestStringValue("greatest('apples', 'app\vles')", "apples");
   TestStringValue("greatest('apples', 'app\rles')", "apples");
 
-  // NULL arguments.
-  TestIsNull("abs(NULL)", TYPE_BIGINT);
+  // NULL arguments. In some cases the NULL can match multiple overloads so the result
+  // type depends on the order in which function overloads are considered.
+  TestIsNull("abs(NULL)", TYPE_TINYINT);
   TestIsNull("sign(NULL)", TYPE_FLOAT);
   TestIsNull("exp(NULL)", TYPE_DOUBLE);
   TestIsNull("ln(NULL)", TYPE_DOUBLE);

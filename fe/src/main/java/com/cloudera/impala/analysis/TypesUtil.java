@@ -119,12 +119,12 @@ public class TypesUtil {
         // Otherwise, promote the compatible type to the next higher resolution type,
         // to ensure that that a <op> b won't overflow/underflow.
         Type compatibleType =
-            ScalarType.getAssignmentCompatibleType(t1, t2);
+            ScalarType.getAssignmentCompatibleType(t1, t2, false);
         Preconditions.checkState(compatibleType.isScalarType());
         type = ((ScalarType) compatibleType).getNextResolutionType();
         break;
       case MOD:
-        type = ScalarType.getAssignmentCompatibleType(t1, t2);
+        type = ScalarType.getAssignmentCompatibleType(t1, t2, false);
         break;
       case DIVIDE:
         type = Type.DOUBLE;

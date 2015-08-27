@@ -582,7 +582,7 @@ public class InsertStmt extends StatementBase {
     if (colType.equals(exprType) && !colType.isComplexType()) return expr;
 
     Type compatibleType =
-        Type.getAssignmentCompatibleType(colType, exprType);
+        Type.getAssignmentCompatibleType(colType, exprType, false);
     // Incompatible types.
     if (!compatibleType.isValid()) {
       throw new AnalysisException(

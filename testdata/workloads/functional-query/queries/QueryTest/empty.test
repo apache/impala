@@ -141,7 +141,7 @@ select coalesce(10.4, int_col)
 from functional.alltypes where false
 ---- RESULTS
 ---- TYPES
-FLOAT
+DECIMAL
 ====
 ---- QUERY
 # IMPALA-2406: condition filters out all rows from subquery during planning.

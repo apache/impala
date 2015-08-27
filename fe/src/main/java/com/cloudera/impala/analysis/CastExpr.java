@@ -254,7 +254,7 @@ public class CastExpr extends Expr {
     Type[] args = { childType };
     Function searchDesc = new Function(fnName, args, Type.INVALID, false);
     if (isImplicit_) {
-      fn_ = Catalog.getBuiltin(searchDesc, CompareMode.IS_SUPERTYPE_OF);
+      fn_ = Catalog.getBuiltin(searchDesc, CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
       Preconditions.checkState(fn_ != null);
     } else {
       fn_ = Catalog.getBuiltin(searchDesc, CompareMode.IS_IDENTICAL);

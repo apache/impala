@@ -159,10 +159,10 @@ public class InPredicate extends Predicate {
       Type[] argTypes = {getChild(0).type_, getChild(1).type_};
       if (useSetLookup) {
         fn_ = getBuiltinFunction(analyzer, isNotIn_ ? NOT_IN_SET_LOOKUP : IN_SET_LOOKUP,
-            argTypes, CompareMode.IS_SUPERTYPE_OF);
+            argTypes, CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
       } else {
         fn_ = getBuiltinFunction(analyzer, isNotIn_ ? NOT_IN_ITERATE : IN_ITERATE,
-            argTypes, CompareMode.IS_SUPERTYPE_OF);
+            argTypes, CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
       }
       Preconditions.checkNotNull(fn_);
       Preconditions.checkState(fn_.getReturnType().isBoolean());

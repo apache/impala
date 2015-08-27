@@ -59,12 +59,16 @@ public class Function implements CatalogObject {
     // e.g. fn(NULL, int) is indistinguishable from fn(int, int)
     IS_INDISTINGUISHABLE,
 
-    // X is a supertype of Y if Y.arg[i] can be implicitly cast to X.arg[i]. If X has
-    // vargs, the remaining arguments of Y must be implicitly castable to the var arg
-    // type. The key property this provides is that X can be used in place of Y.
-    // e.g.
-    // fn(int, double, string...) is a supertype of fn(tinyint, float, string, string)
+    // X is a supertype of Y if Y.arg[i] can be strictly implicitly cast to X.arg[i]. If
+    /// X has vargs, the remaining arguments of Y must be strictly implicitly castable
+    // to the var arg type. The key property this provides is that X can be used in place
+    // of Y. e.g. fn(int, double, string...) is a supertype of fn(tinyint, float, string,
+    // string)
     IS_SUPERTYPE_OF,
+
+    // Nonstrict supertypes broaden the definition of supertype to accept implicit casts
+    // of arguments that may result in loss of precision - e.g. decimal to float.
+    IS_NONSTRICT_SUPERTYPE_OF,
   }
 
   // User specified function name e.g. "Add"
@@ -158,7 +162,8 @@ public class Function implements CatalogObject {
     switch (mode) {
       case IS_IDENTICAL: return isIdentical(other);
       case IS_INDISTINGUISHABLE: return isIndistinguishable(other);
-      case IS_SUPERTYPE_OF: return isSuperTypeOf(other);
+      case IS_SUPERTYPE_OF: return isSuperTypeOf(other, true);
+      case IS_NONSTRICT_SUPERTYPE_OF: return isSuperTypeOf(other, false);
       default:
         Preconditions.checkState(false);
         return false;
@@ -166,18 +171,17 @@ public class Function implements CatalogObject {
   }
   /**
    * Returns true if 'this' is a supertype of 'other'. Each argument in other must
-   * be implicitly castable to the matching argument in this.
-   * TODO: look into how we resolve implicitly castable functions. Is there a rule
-   * for "most" compatible or maybe return an error if it is ambiguous?
+   * be implicitly castable to the matching argument in this. If strict is true,
+   * only consider conversions where there is no loss of precision.
    */
-  private boolean isSuperTypeOf(Function other) {
+  private boolean isSuperTypeOf(Function other, boolean strict) {
     if (!other.name_.equals(name_)) return false;
     if (!this.hasVarArgs_ && other.argTypes_.length != this.argTypes_.length) {
       return false;
     }
     if (this.hasVarArgs_ && other.argTypes_.length < this.argTypes_.length) return false;
     for (int i = 0; i < this.argTypes_.length; ++i) {
-      if (!Type.isImplicitlyCastable(other.argTypes_[i], this.argTypes_[i])) {
+      if (!Type.isImplicitlyCastable(other.argTypes_[i], this.argTypes_[i], strict)) {
         return false;
       }
     }
@@ -185,8 +189,8 @@ public class Function implements CatalogObject {
     if (this.hasVarArgs_) {
       for (int i = this.argTypes_.length; i < other.argTypes_.length; ++i) {
         if (other.argTypes_[i].matchesType(this.getVarArgsType())) continue;
-        if (!Type.isImplicitlyCastable(other.argTypes_[i],
-            this.getVarArgsType())) {
+        if (!Type.isImplicitlyCastable(other.argTypes_[i], this.getVarArgsType(),
+              strict)) {
           return false;
         }
       }

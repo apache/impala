@@ -266,8 +266,7 @@ public class CaseExpr extends Expr {
       } else {
         // If no case expr was given, then the when exprs should always return
         // boolean or be castable to boolean.
-        if (!Type.isImplicitlyCastable(whenExpr.getType(),
-            Type.BOOLEAN)) {
+        if (!Type.isImplicitlyCastable(whenExpr.getType(), Type.BOOLEAN, false)) {
           Preconditions.checkState(isCase());
           throw new AnalysisException("When expr '" + whenExpr.toSql() + "'" +
               " is not of type boolean and not castable to type boolean.");
@@ -321,7 +320,8 @@ public class CaseExpr extends Expr {
     // Do the function lookup just based on the whenType.
     Type[] args = new Type[1];
     args[0] = whenType;
-    fn_ = getBuiltinFunction(analyzer, "case", args, CompareMode.IS_SUPERTYPE_OF);
+    fn_ = getBuiltinFunction(analyzer, "case", args,
+        CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
     Preconditions.checkNotNull(fn_);
     type_ = returnType;
   }

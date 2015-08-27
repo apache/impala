@@ -382,7 +382,7 @@ public class FunctionCallExpr extends Expr {
       // TODO: fix how we rewrite count distinct.
       argTypes = new Type[0];
       Function searchDesc = new Function(fnName_, argTypes, Type.INVALID, false);
-      fn_ = db.getFunction(searchDesc, Function.CompareMode.IS_SUPERTYPE_OF);
+      fn_ = db.getFunction(searchDesc, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
       type_ = fn_.getReturnType();
       // Make sure BE doesn't see any TYPE_NULL exprs
       for (int i = 0; i < children_.size(); ++i) {
@@ -405,8 +405,7 @@ public class FunctionCallExpr extends Expr {
     }
 
     Function searchDesc = new Function(fnName_, argTypes, Type.INVALID, false);
-    fn_ = db.getFunction(searchDesc, Function.CompareMode.IS_SUPERTYPE_OF);
-
+    fn_ = db.getFunction(searchDesc, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
     if (fn_ == null || (!isInternalFnCall_ && !fn_.userVisible())) {
       throw new AnalysisException(getFunctionNotFoundError(argTypes));
     }

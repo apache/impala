@@ -83,7 +83,7 @@ public class HashJoinNode extends JoinNode {
           throw new InternalException("Cannot compare " +
               t0.toSql() + " to " + t1.toSql() + " in join predicate.");
         }
-        Type compatibleType = Type.getAssignmentCompatibleType(t0, t1);
+        Type compatibleType = Type.getAssignmentCompatibleType(t0, t1, false);
         Preconditions.checkState(compatibleType.isDecimal() ||
             compatibleType.isStringType());
         try {

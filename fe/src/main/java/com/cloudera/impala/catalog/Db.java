@@ -14,11 +14,14 @@
 
 package com.cloudera.impala.catalog;
 
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.Function.CompareMode;
 import com.cloudera.impala.thrift.TCatalogObjectType;
@@ -42,7 +45,7 @@ import com.google.common.collect.Lists;
  *  * if the table loading failed on the previous attempt
  */
 public class Db implements CatalogObject {
-  private static final Logger LOG = Logger.getLogger(Db.class);
+  private static final Logger LOG = LoggerFactory.getLogger(Db.class);
   private final Catalog parentCatalog_;
   private final TDatabase thriftDb_;
   private long catalogVersion_ = Catalog.INITIAL_CATALOG_VERSION;
@@ -53,7 +56,8 @@ public class Db implements CatalogObject {
   // All of the registered user functions. The key is the user facing name (e.g. "myUdf"),
   // and the values are all the overloaded variants (e.g. myUdf(double), myUdf(string))
   // This includes both UDFs and UDAs. Updates are made thread safe by synchronizing
-  // on this map.
+  // on this map. Functions are sorted in a canonical order defined by
+  // FunctionResolutionOrder.
   private final HashMap<String, List<Function>> functions_;
 
   // If true, this database is an Impala system database.
@@ -117,6 +121,45 @@ public class Db implements CatalogObject {
   }
 
   /**
+   * Comparator that sorts function overloads. We want overloads to be always considered
+   * in a canonical order so that overload resolution in the case of multiple valid
+   * overloads does not depend on the order in which functions are added to the Db. The
+   * order is based on the PrimitiveType enum because this was the order used implicitly
+   * for builtin operators and functions in earlier versions of Impala.
+   */
+  private static class FunctionResolutionOrder implements Comparator<Function> {
+    @Override
+    public int compare(Function f1, Function f2) {
+      int numSharedArgs = Math.min(f1.getNumArgs(), f2.getNumArgs());
+      for (int i = 0; i < numSharedArgs; ++i) {
+        int cmp = typeCompare(f1.getArgs()[i], f2.getArgs()[i]);
+        if (cmp < 0) {
+          return -1;
+        } else if (cmp > 0) {
+          return 1;
+        }
+      }
+      // Put alternative with fewer args first.
+      if (f1.getNumArgs() < f2.getNumArgs()) {
+        return -1;
+      } else if (f1.getNumArgs() > f2.getNumArgs()) {
+        return 1;
+      }
+      return 0;
+    }
+
+    private int typeCompare(Type t1, Type t2) {
+      Preconditions.checkState(!t1.isComplexType());
+      Preconditions.checkState(!t2.isComplexType());
+      return Integer.compare(t1.getPrimitiveType().ordinal(),
+          t2.getPrimitiveType().ordinal());
+    }
+  }
+
+  private static final FunctionResolutionOrder FUNCTION_RESOLUTION_ORDER =
+      new FunctionResolutionOrder();
+
+  /**
    * Returns the number of functions in this database.
    */
   public int numFunctions() {
@@ -154,9 +197,15 @@ public class Db implements CatalogObject {
       }
       if (mode == Function.CompareMode.IS_INDISTINGUISHABLE) return null;
 
-      // Finally check for is_subtype
+      // Next check for strict supertypes
       for (Function f: fns) {
         if (f.compare(desc, Function.CompareMode.IS_SUPERTYPE_OF)) return f;
+      }
+      if (mode == Function.CompareMode.IS_SUPERTYPE_OF) return null;
+
+      // Finally check for non-strict supertypes
+      for (Function f: fns) {
+        if (f.compare(desc, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF)) return f;
       }
     }
     return null;
@@ -188,7 +237,11 @@ public class Db implements CatalogObject {
         fns = Lists.newArrayList();
         functions_.put(fn.functionName(), fns);
       }
-      return fns.add(fn);
+      if (fns.add(fn)) {
+        Collections.sort(fns, FUNCTION_RESOLUTION_ORDER);
+        return true;
+      }
+      return false;
     }
   }
 
