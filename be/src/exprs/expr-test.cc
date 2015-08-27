@@ -4329,15 +4329,40 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   ValidateLayout(exprs, 0, -1, expected_offsets);
 
   // Test single Expr case
+  vector<ColumnType> types;
+  types.push_back(TYPE_BOOLEAN);
+  types.push_back(TYPE_TINYINT);
+  types.push_back(TYPE_SMALLINT);
+  types.push_back(TYPE_INT);
+  types.push_back(TYPE_BIGINT);
+  types.push_back(TYPE_FLOAT);
+  types.push_back(TYPE_DOUBLE);
+  types.push_back(TYPE_TIMESTAMP);
+  types.push_back(TYPE_STRING);
+
+  types.push_back(ColumnType::CreateDecimalType(1,0));
+  types.push_back(ColumnType::CreateDecimalType(8,0));
+  types.push_back(ColumnType::CreateDecimalType(18,0));
+
+  types.push_back(ColumnType::CreateCharType(1));
+  types.push_back(ColumnType::CreateVarcharType(1));
+  types.push_back(ColumnType::CreateCharType(2));
+  types.push_back(ColumnType::CreateVarcharType(2));
+  types.push_back(ColumnType::CreateCharType(3));
+  types.push_back(ColumnType::CreateVarcharType(3));
+  types.push_back(ColumnType::CreateCharType(128));
+  types.push_back(ColumnType::CreateVarcharType(128));
+  types.push_back(ColumnType::CreateCharType(255));
+  types.push_back(ColumnType::CreateVarcharType(255));
+
   expected_offsets.clear();
-  for (int type = TYPE_BOOLEAN; type <= TYPE_STRING; ++type) {
-    ColumnType t = ColumnType(static_cast<PrimitiveType>(type));
+  BOOST_FOREACH(const ColumnType& t, types) {
     exprs.clear();
     expected_offsets.clear();
     // With one expr, all offsets should be 0.
     expected_offsets[t.GetByteSize()] = list_of(0);
     exprs.push_back(pool.Add(Literal::CreateLiteral(t, "0")));
-    if (t.type == TYPE_STRING) {
+    if (t.IsVarLenStringType()) {
       ValidateLayout(exprs, 16, 0, expected_offsets);
     } else {
       ValidateLayout(exprs, t.GetByteSize(), -1, expected_offsets);
@@ -4353,7 +4378,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   // The expected result is computed along the way
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_BOOLEAN, "0")));
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TINYINT, "0")));
-  exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TINYINT, "0")));
+  exprs.push_back(pool.Add(Literal::CreateLiteral(ColumnType::CreateCharType(1), "0")));
   expected_offsets[1].insert(expected_byte_size);
   expected_offsets[1].insert(expected_byte_size + 1);
   expected_offsets[1].insert(expected_byte_size + 2);
@@ -4361,38 +4386,59 @@ TEST_F(ExprTest, ResultsLayoutTest) {
 
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_SMALLINT, "0")));
   expected_offsets[2].insert(expected_byte_size);
-  expected_byte_size += 1 * 2 + 2;  // 2 bytes of padding
+  expected_byte_size += 2; // No padding before CHAR
+
+  exprs.push_back(pool.Add(Literal::CreateLiteral(ColumnType::CreateCharType(3), "0")));
+  expected_offsets[3].insert(expected_byte_size);
+  expected_byte_size += 3 + 3; // 3 byte of padding
+  DCHECK_EQ(expected_byte_size % 4, 0);
 
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_INT, "0")));
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_FLOAT, "0")));
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_FLOAT, "0")));
+  exprs.push_back(pool.Add(
+      Literal::CreateLiteral(ColumnType::CreateDecimalType(9, 0), "0")));
   expected_offsets[4].insert(expected_byte_size);
   expected_offsets[4].insert(expected_byte_size + 4);
   expected_offsets[4].insert(expected_byte_size + 8);
-  expected_byte_size += 3 * 4 + 4;  // 4 bytes of padding
+  expected_offsets[4].insert(expected_byte_size + 12);
+  expected_byte_size += 4 * 4 + 4;  // 4 bytes of padding
+  DCHECK_EQ(expected_byte_size % 8, 0);
 
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_BIGINT, "0")));
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_BIGINT, "0")));
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_BIGINT, "0")));
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_DOUBLE, "0")));
+  exprs.push_back(pool.Add(
+      Literal::CreateLiteral(ColumnType::CreateDecimalType(18, 0), "0")));
   expected_offsets[8].insert(expected_byte_size);
   expected_offsets[8].insert(expected_byte_size + 8);
   expected_offsets[8].insert(expected_byte_size + 16);
   expected_offsets[8].insert(expected_byte_size + 24);
-  expected_byte_size += 4 * 8;      // No more padding
+  expected_offsets[8].insert(expected_byte_size + 32);
+  expected_byte_size += 5 * 8;      // No more padding
+  DCHECK_EQ(expected_byte_size % 8, 0);
 
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TIMESTAMP, "0")));
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_TIMESTAMP, "0")));
+  exprs.push_back(pool.Add(
+      Literal::CreateLiteral(ColumnType::CreateDecimalType(20, 0), "0")));
   expected_offsets[16].insert(expected_byte_size);
   expected_offsets[16].insert(expected_byte_size + 16);
-  expected_byte_size += 2 * 16;
+  expected_offsets[16].insert(expected_byte_size + 32);
+  expected_byte_size += 3 * 16;
+  DCHECK_EQ(expected_byte_size % 8, 0);
 
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_STRING, "0")));
   exprs.push_back(pool.Add(Literal::CreateLiteral(TYPE_STRING, "0")));
+  exprs.push_back(pool.Add(
+      Literal::CreateLiteral(ColumnType::CreateVarcharType(1), "0")));
   expected_offsets[0].insert(expected_byte_size);
   expected_offsets[0].insert(expected_byte_size + 16);
+  expected_offsets[0].insert(expected_byte_size + 32);
   expected_var_begin = expected_byte_size;
-  expected_byte_size += 2 * 16;
+  expected_byte_size += 3 * 16;
+  DCHECK_EQ(expected_byte_size % 8, 0);
 
   // Validate computed layout
   ValidateLayout(exprs, expected_byte_size, expected_var_begin, expected_offsets);

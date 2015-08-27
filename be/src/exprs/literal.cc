@@ -163,6 +163,20 @@ Literal::Literal(ColumnType type, double v)
     value_.double_val = v;
   } else if (type.type == TYPE_TIMESTAMP) {
     value_.timestamp_val = TimestampValue(v);
+  } else if (type.type == TYPE_DECIMAL) {
+    bool overflow = false;
+    switch (type.GetByteSize()) {
+      case 4:
+        value_.decimal4_val = Decimal4Value::FromDouble(type, v, &overflow);
+        break;
+      case 8:
+        value_.decimal8_val = Decimal8Value::FromDouble(type, v, &overflow);
+        break;
+      case 16:
+        value_.decimal16_val = Decimal16Value::FromDouble(type, v, &overflow);
+        break;
+    }
+    DCHECK(!overflow);
   } else {
     DCHECK(false) << type.DebugString();
   }
@@ -171,7 +185,8 @@ Literal::Literal(ColumnType type, double v)
 Literal::Literal(ColumnType type, const string& v)
   : Expr(type),
     value_(v) {
-  DCHECK(type.type == TYPE_STRING || type.type == TYPE_CHAR) << type;
+  DCHECK(type.type == TYPE_STRING || type.type == TYPE_CHAR || type.type == TYPE_VARCHAR)
+      << type;
 }
 
 Literal::Literal(ColumnType type, const StringValue& v)
@@ -231,6 +246,11 @@ Literal* Literal::CreateLiteral(const ColumnType& type, const string& str) {
     case TYPE_TIMESTAMP: {
       double v = 0;
       DCHECK(ParseString<double>(str, &v));
+      return new Literal(type, v);
+    }
+    case TYPE_DECIMAL: {
+      double v = 0;
+      DCHECK(ParseString<double>(str, &v)) << str;
       return new Literal(type, v);
     }
     default:

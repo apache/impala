@@ -211,9 +211,14 @@ class Expr {
   static Expr* CreateLiteral(ObjectPool* pool, const ColumnType& type,
       const std::string&);
 
-  /// Computes a memory efficient layout for storing the results of evaluating 'exprs'
+  /// Computes a memory efficient layout for storing the results of evaluating
+  /// 'exprs'. The results are assumed to be void* slot types (vs AnyVal types). Varlen
+  /// data is not included (e.g. there will be space for a StringValue, but not the data
+  /// referenced by it).
+  ///
   /// Returns the number of bytes necessary to store all the results and offsets
   /// where the result for each expr should be stored.
+  ///
   /// Variable length types are guaranteed to be at the end and 'var_result_begin'
   /// will be set the beginning byte offset where variable length results begin.
   /// 'var_result_begin' will be set to -1 if there are no variable len types.

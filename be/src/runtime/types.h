@@ -90,6 +90,7 @@ struct ColumnType {
   ColumnType(PrimitiveType type = INVALID_TYPE)
     : type(type), len(-1), precision(-1), scale(-1) {
     DCHECK_NE(type, TYPE_CHAR);
+    DCHECK_NE(type, TYPE_VARCHAR);
     DCHECK_NE(type, TYPE_DECIMAL);
     DCHECK_NE(type, TYPE_STRUCT);
     DCHECK_NE(type, TYPE_ARRAY);
