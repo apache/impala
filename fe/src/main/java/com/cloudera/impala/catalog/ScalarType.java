@@ -447,12 +447,10 @@ public class ScalarType extends Type {
 
       if (t1Decimal.equals(t2Decimal)) {
         Preconditions.checkState(!(t1.isDecimal() && t2.isDecimal()));
-        // In this case, the resulting decimals are identical
-        // (e.g. decimal(9,0) and INT)), meaning either type is
-        // valid. In this case, we will always return the non-decimal
-        // type to make sure we always return the same type.
-        if (t1.isDecimal()) return t2;
-        return t1;
+        // The containing decimal type for a non-decimal type is always an exclusive
+        // upper bound, therefore the decimal has higher precision.
+        if (t1.isDecimal()) return t1;
+        return t2;
       }
       if (t1Decimal.isSupertypeOf(t2Decimal)) return t1;
       if (t2Decimal.isSupertypeOf(t1Decimal)) return t2;

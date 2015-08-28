@@ -16,6 +16,7 @@ package com.cloudera.impala.analysis;
 
 import static org.junit.Assert.assertTrue;
 
+import org.junit.Assert;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.PrimitiveType;
@@ -90,5 +91,62 @@ public class TypesUtilTest extends AnalyzerTest {
         TypesUtil.getDecimalAssignmentCompatibleType(
             Type.DECIMAL, ScalarType.createDecimalType(5, 0)),
         ScalarType.createDecimalType(5, 0));
+  }
+
+  @Test
+  // Test for implicit casts between numeric types, with many boundary cases.
+  public void TestNumericImplicitCast() {
+    // Decimals can be cast to integers if there is no loss of precision.
+    Assert.assertTrue(Type.isImplicitlyCastable(
+        ScalarType.createDecimalType(2, 0), Type.TINYINT));
+    Assert.assertTrue(Type.isImplicitlyCastable(
+        ScalarType.createDecimalType(4, 0), Type.SMALLINT));
+    Assert.assertTrue(Type.isImplicitlyCastable(
+        ScalarType.createDecimalType(9, 0), Type.INT));
+    Assert.assertTrue(Type.isImplicitlyCastable(
+        ScalarType.createDecimalType(18, 0), Type.BIGINT));
+    Assert.assertFalse(Type.isImplicitlyCastable(
+        ScalarType.createDecimalType(3, 0), Type.TINYINT));
+    Assert.assertFalse(Type.isImplicitlyCastable(
+        ScalarType.createDecimalType(5, 0), Type.SMALLINT));
+    Assert.assertFalse(Type.isImplicitlyCastable(
+        ScalarType.createDecimalType(10, 0), Type.INT));
+    Assert.assertFalse(Type.isImplicitlyCastable(
+        ScalarType.createDecimalType(19, 0), Type.BIGINT));
+    Assert.assertFalse(Type.isImplicitlyCastable(
+        ScalarType.createDecimalType(2, 1), Type.TINYINT));
+    Assert.assertFalse(Type.isImplicitlyCastable(
+        ScalarType.createDecimalType(4, 1), Type.SMALLINT));
+    Assert.assertFalse(Type.isImplicitlyCastable(
+        ScalarType.createDecimalType(2, 1), Type.INT));
+    Assert.assertFalse(Type.isImplicitlyCastable(
+        ScalarType.createDecimalType(18, 5), Type.BIGINT));
+
+    // Integers are only converted to decimal when all values of the source type can be
+    // represented in the destination type.
+    Assert.assertFalse(Type.isImplicitlyCastable(
+        Type.TINYINT, ScalarType.createDecimalType(2, 0)));
+    Assert.assertFalse(Type.isImplicitlyCastable(
+        Type.SMALLINT, ScalarType.createDecimalType(4, 0)));
+    Assert.assertFalse(Type.isImplicitlyCastable(
+        Type.INT, ScalarType.createDecimalType(9, 0)));
+    Assert.assertFalse(Type.isImplicitlyCastable(
+        Type.BIGINT, ScalarType.createDecimalType(18, 0)));
+    Assert.assertTrue(Type.isImplicitlyCastable(
+        Type.TINYINT, ScalarType.createDecimalType(3, 0)));
+    Assert.assertTrue(Type.isImplicitlyCastable(
+        Type.SMALLINT, ScalarType.createDecimalType(5, 0)));
+    Assert.assertTrue(Type.isImplicitlyCastable(
+        Type.INT, ScalarType.createDecimalType(10, 0)));
+    Assert.assertTrue(Type.isImplicitlyCastable(
+        Type.BIGINT, ScalarType.createDecimalType(19, 0)));
+    Assert.assertTrue(Type.isImplicitlyCastable(
+        Type.TINYINT, ScalarType.createDecimalType(4, 1)));
+    Assert.assertTrue(Type.isImplicitlyCastable(
+        Type.SMALLINT, ScalarType.createDecimalType(6, 1)));
+    Assert.assertTrue(Type.isImplicitlyCastable(
+        Type.INT, ScalarType.createDecimalType(11, 1)));
+    Assert.assertTrue(Type.isImplicitlyCastable(
+        Type.BIGINT, ScalarType.createDecimalType(20, 1)));
   }
 }
