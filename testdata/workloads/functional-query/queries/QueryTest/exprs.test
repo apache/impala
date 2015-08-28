@@ -1866,12 +1866,11 @@ CAUSED BY: InternalException: Could not compile regexp pattern: *
 Error: no argument for repetition operator: *
 ====
 ---- QUERY
-insert into functional.insert_string_partitioned
-partition(s2 = from_unixtime(unix_timestamp(), 'yyyyMMMdd hh:mm:ss')) select 'hello'
+select * from functional.insert_string_partitioned
+where s2 = from_unixtime(unix_timestamp(), 'yyyyMMMdd hh:mm:ss')
 ---- RESULTS
 ---- CATCH
-AnalysisException: Failed to evaluate expr 'from_unixtime(unix_timestamp(), 'yyyyMMMdd hh:mm:ss')'
-CAUSED BY: InternalException: Bad date/time conversion format: yyyyMMMdd hh:mm:ss
+InternalException: Bad date/time conversion format: yyyyMMMdd hh:mm:ss
 ====
 ---- QUERY
 # Test for factorial operator
