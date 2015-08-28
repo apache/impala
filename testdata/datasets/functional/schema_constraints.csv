@@ -144,3 +144,4 @@ table_name:alltimezones, constraint:restrict_to, table_format:text/none/none
 
 # Avro schema is inferred from the column definitions (IMPALA-1136)
 table_name:no_avro_schema, constraint:restrict_to, table_format:avro/snap/block
+table_name:avro_unicode_nulls, constraint:restrict_to, table_format:avro/snap/block

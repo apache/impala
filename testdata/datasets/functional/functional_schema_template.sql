@@ -1688,3 +1688,12 @@ LOCATION '/test-warehouse/{table_name}';
 `hadoop fs -mkdir -p /test-warehouse/alltimezones && \
 hadoop fs -put -f ${IMPALA_HOME}/testdata/data/timezoneverification.csv /test-warehouse/alltimezones
 ====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+avro_unicode_nulls
+---- CREATE_HIVE
+create external table {db_name}{db_suffix}.{table_name} like {db_name}.liketbl stored as avro LOCATION '/test-warehouse/avro_null_char';
+---- LOAD
+`hdfs dfs -mkdir -p /test-warehouse/avro_null_char && \
+hdfs dfs -put -f ${IMPALA_HOME}/testdata/avro_null_char/000000_0 /test-warehouse/avro_null_char/
