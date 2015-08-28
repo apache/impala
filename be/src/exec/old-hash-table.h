@@ -176,7 +176,7 @@ class OldHashTable {
   /// Returns an estimate of the number of bytes needed to build the hash table
   /// structure for 'num_rows'.
   static int64_t EstimateSize(int64_t num_rows) {
-    /// Assume 50% fill factor.
+    // Assume 50% fill factor.
     int64_t num_buckets = num_rows * 2;
     return num_buckets * sizeof(Bucket) + num_rows * sizeof(Node);
   }

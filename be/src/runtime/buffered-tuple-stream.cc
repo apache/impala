@@ -496,7 +496,6 @@ Status BufferedTupleStream::GetNextInternal(RowBatch* batch, bool* eos,
   batch->AddRows(rows_to_fill);
   uint8_t* tuple_row_mem = reinterpret_cast<uint8_t*>(batch->GetRow(batch->num_rows()));
 
-
   // Produce tuple rows from the current block and the corresponding position on the
   // null tuple indicator.
   vector<RowIdx> local_indices;
@@ -517,7 +516,9 @@ Status BufferedTupleStream::GetNextInternal(RowBatch* batch, bool* eos,
   uint32_t null_pos = 0;
   // Start reading from position read_tuple_idx_ in the block.
   uint64_t last_read_ptr = 0;
-  uint64_t last_read_row = read_tuple_idx_ / tuples_per_row;
+  // IMPALA-2256: Special case if there are no materialized slots.
+  bool increment_row = has_tuple_footprint();
+  uint64_t last_read_row = increment_row * (read_tuple_idx_ / tuples_per_row);
   while (i < rows_to_fill) {
     // Check if current block is done.
     if (UNLIKELY(rows_returned_curr_block + i == (*read_block_)->num_rows())) break;
@@ -536,7 +537,7 @@ Status BufferedTupleStream::GetNextInternal(RowBatch* batch, bool* eos,
         null_pos = read_tuple_idx_ & 7;
         ++read_tuple_idx_;
         const bool is_not_null = ((*null_word & (1 << (7 - null_pos))) == 0);
-        // Copy tuple and advance read_ptr_. If it it is a NULL tuple, it calls SetTuple
+        // Copy tuple and advance read_ptr_. If it is a NULL tuple, it calls SetTuple
         // with Tuple* being 0x0. To do that we multiply the current read_ptr_ with
         // false (0x0).
         row->SetTuple(j, reinterpret_cast<Tuple*>(
@@ -575,7 +576,7 @@ Status BufferedTupleStream::GetNextInternal(RowBatch* batch, bool* eos,
       if (HasNullableTuple && tuple == NULL) continue;
       ReadCollections(collection_slots_[j].second, data_len, tuple);
     }
-    ++last_read_row;
+    last_read_row += increment_row;
     ++i;
   }
 

@@ -244,7 +244,9 @@ class BufferedTupleStream {
   bool has_read_block() const { return read_block_ != blocks_.end(); }
   bool has_write_block() const { return write_block_ != NULL; }
   bool using_small_buffers() const { return use_small_buffers_; }
-
+  bool has_tuple_footprint() const {
+    return fixed_tuple_row_size_ > 0 || !string_slots_.empty() || nullable_tuple_;
+  }
   std::string DebugString() const;
 
  private:
