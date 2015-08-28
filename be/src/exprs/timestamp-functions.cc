@@ -619,8 +619,20 @@ inline void AddInterval<Months>(FunctionContext* context, int64_t interval,
   AddMonths(context, interval, false, datetime);
 }
 
-/// Workaround a boost bug in adding large minute intervals -- if the interval is too
-/// large, some sort of overflow/wrap around happens resulting in an incorrect value.
+/// The AddInterval() functions below workaround various boost bugs in adding large
+/// intervals -- if the interval is too large, some sort of overflow/wrap around
+/// happens resulting in an incorrect value. There is no way to predict what input value
+/// will cause a wrap around. The values below were chosen arbitrarily and shown to
+/// work through testing.
+template <>
+inline void AddInterval<Hours>(FunctionContext* context, int64_t interval,
+    ptime* datetime) {
+  int64_t weeks = interval / (7 * 24);
+  int64_t hours = interval % (7 * 24);
+  AddInterval<Weeks>(context, weeks, datetime);
+  *datetime += Hours(hours);
+}
+
 template <>
 inline void AddInterval<Minutes>(FunctionContext* context, int64_t interval,
     ptime* datetime) {

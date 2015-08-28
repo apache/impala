@@ -3252,6 +3252,21 @@ TEST_F(ExprTest, TimestampFunctions) {
         + "), " + lt_year_5000 + ") < " + year_5000, TYPE_BOOLEAN, true);
   }
 
+  // Regression test for IMPALA-2260, a seemingly non-edge case value results in an
+  // overflow causing the 9999999 interval to become negative.
+  for (MaxIntervals::iterator it = max_intervals.begin(); it != max_intervals.end();
+      ++it) {
+    const string& unit = it->first;
+    const int64_t max_interval = it->second;
+    for (int64_t interval = 1; interval <= max_interval && interval > 0; interval *= 10) {
+      const string& sql_interval = lexical_cast<string>(interval);
+      TestIsNotNull(unit + "_add(cast('1400-01-01 00:00:00' as timestamp), "
+          + sql_interval + ")", TYPE_TIMESTAMP);
+      TestIsNotNull(unit + "_sub(cast('9999-12-31 23:59:59' as timestamp), "
+          + sql_interval + ")", TYPE_TIMESTAMP);
+    }
+  }
+
   // Test Unix epoch conversions.
   TestTimestampUnixEpochConversions(0, "1970-01-01 00:00:00");
 
