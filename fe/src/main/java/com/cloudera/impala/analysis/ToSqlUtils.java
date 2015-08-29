@@ -33,7 +33,8 @@ import com.cloudera.impala.catalog.HdfsCompression;
 import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.RowFormat;
 import com.cloudera.impala.catalog.Table;
-
+import com.cloudera.impala.catalog.View;
+import com.cloudera.impala.common.PrintUtils;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -134,10 +135,12 @@ public class ToSqlUtils {
   }
 
   /**
-   * Returns a "CREATE TABLE" statement that creates the specified table.
+   * Returns a "CREATE TABLE" or "CREATE VIEW" statement that creates the specified
+   * table.
    */
   public static String getCreateTableSql(Table table) throws CatalogException {
     Preconditions.checkNotNull(table);
+    if (table instanceof View) return getCreateViewSql((View)table);
     org.apache.hadoop.hive.metastore.api.Table msTable = table.getMetaStoreTable();
     HashMap<String, String> properties = Maps.newHashMap(msTable.getParameters());
     boolean isExternal = msTable.getTableType() != null &&
@@ -256,6 +259,17 @@ public class ToSqlUtils {
     for (Function fn: functions) {
       sb.append(fn.toSql(false));
     }
+    return sb.toString();
+  }
+
+  public static String getCreateViewSql(View view) {
+    StringBuffer sb = new StringBuffer();
+    sb.append("CREATE VIEW ");
+    // Use toSql() to ensure that the table name and query statement are normalized
+    // and identifiers are quoted.
+    sb.append(view.getTableName().toSql());
+    sb.append(" AS\n");
+    sb.append(view.getQueryStmt().toSql());
     return sb.toString();
   }
 

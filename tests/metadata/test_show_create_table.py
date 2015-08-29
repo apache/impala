@@ -17,6 +17,7 @@ from subprocess import call
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 from tests.util.filesystem_utils import WAREHOUSE
+from tests.util.test_file_parser import remove_comments
 
 # The purpose of the show create table tests are to ensure that the "SHOW CREATE TABLE"
 # output can actually be used to recreate the table. A test consists of a table
@@ -24,7 +25,7 @@ from tests.util.filesystem_utils import WAREHOUSE
 # test if the table can be recreated. This test class does not support --update-results.
 class TestShowCreateTable(ImpalaTestSuite):
   TEST_DB_NAME = "show_create_table_test_db"
-  VALID_SECTION_NAMES = ["CREATE_TABLE", "QUERY", "RESULTS"]
+  VALID_SECTION_NAMES = ["CREATE_TABLE", "CREATE_VIEW", "QUERY", "RESULTS"]
   # Properties to filter before comparing results
   FILTER_TBL_PROPERTIES = ["transient_lastDdlTime", "numFiles", "numPartitions",\
                            "numRows", "rawDataSize", "totalSize", "COLUMN_STATS_ACCURATE",
@@ -65,6 +66,13 @@ class TestShowCreateTable(ImpalaTestSuite):
     contains a table creation statement to create table TABLE_NAME
     ---- RESULTS
     contains the expected result of SHOW CREATE TABLE table_name
+
+    OR
+
+    ---- CREATE_VIEW
+    contains a view creation statement to create table VIEW_NAME
+    ---- RESULTS
+    contains the expected result of SHOW CREATE VIEW table_name
 
     OR
 
@@ -182,33 +190,38 @@ class ShowCreateTableTestCase(object):
   def __init__(self, test_section, test_file_name, test_db_name):
     if 'QUERY' in test_section:
       self.existing_table = True
-      self.show_create_table_sql = test_section['QUERY'].strip()
+      self.show_create_table_sql = remove_comments(test_section['QUERY']).strip()
     elif 'CREATE_TABLE' in test_section:
-      self.existing_table = False
-      self.create_table_sql = QueryTestSectionReader.build_query(\
-          test_section['CREATE_TABLE'])
-      name = self.__get_table_name(self.create_table_sql)
-      assert name.find(".") == -1, 'Error in test file %s. Found unexpected table '\
-            'name %s that is qualified with a database' % (test_file_name, name)
-      self.table_name = test_db_name + '.' + name
-      self.create_table_sql =\
-          self.create_table_sql.replace(name, self.table_name, 1)
-      self.show_create_table_sql = 'show create table %s' % (self.table_name)
-      self.drop_table_sql = "drop table %s" % (self.table_name)
+      self.__process_create_section(test_section['CREATE_TABLE'], test_file_name,
+          test_db_name, 'table')
+    elif 'CREATE_VIEW' in test_section:
+      self.__process_create_section(test_section['CREATE_VIEW'], test_file_name,
+          test_db_name, 'view')
     else:
       assert 0, 'Error in test file %s. Test cases require a '\
           'CREATE_TABLE section.\n%s' %\
           (test_file_name, pprint.pformat(test_section))
-    self.expected_result = test_section['RESULTS']
+    self.expected_result = remove_comments(test_section['RESULTS'])
 
-  def __get_table_name(self, create_table_sql):
+  def __process_create_section(self, section, test_file_name, test_db_name, table_type):
+    self.existing_table = False
+    self.create_table_sql = QueryTestSectionReader.build_query(remove_comments(section))
+    name = self.__get_table_name(self.create_table_sql, table_type)
+    assert name.find(".") == -1, 'Error in test file %s. Found unexpected %s '\
+          'name %s that is qualified with a database' % (table_type, test_file_name, name)
+    self.table_name = test_db_name + '.' + name
+    self.create_table_sql = self.create_table_sql.replace(name, self.table_name, 1)
+    self.show_create_table_sql = 'show create table %s' % (self.table_name)
+    self.drop_table_sql = "drop %s %s" % (table_type, self.table_name)
+
+  def __get_table_name(self, create_table_sql, table_type):
     lexer = shlex.shlex(create_table_sql)
     tokens = list(lexer)
     # sanity check the create table statement
     if len(tokens) < 3 or tokens[0].lower() != "create":
       assert 0, 'Error in test. Invalid CREATE TABLE statement: %s' % (create_table_sql)
-    if tokens[1].lower() != "table" and \
-      (tokens[1].lower() != "external" or tokens[2].lower() != "table"):
+    if tokens[1].lower() != table_type.lower() and \
+      (tokens[1].lower() != "external" or tokens[2].lower() != table_type.lower()):
       assert 0, 'Error in test. Invalid CREATE TABLE statement: %s' % (create_table_sql)
 
     if tokens[1].lower() == "external":

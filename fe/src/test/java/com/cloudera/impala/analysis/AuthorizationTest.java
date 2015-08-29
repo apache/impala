@@ -67,6 +67,7 @@ import com.google.common.collect.Lists;
 
 @RunWith(Parameterized.class)
 public class AuthorizationTest {
+
   private final static Logger LOG =
       LoggerFactory.getLogger(AuthorizationTest.class);
 
@@ -90,6 +91,13 @@ public class AuthorizationTest {
   //   No permissions on database 'functional_rc'
   private final static String AUTHZ_POLICY_FILE = "/test-warehouse/authz-policy.ini";
   private final static User USER = new User(System.getProperty("user.name"));
+
+  // Tables in functional that the current user and 'test_user' have table- or
+  // column-level SELECT or INSERT permission. I.e. that should be returned by
+  // 'SHOW TABLES'.
+  private static final List<String> FUNCTIONAL_VISIBLE_TABLES = Lists.newArrayList(
+      "allcomplextypes", "alltypes", "alltypesagg", "alltypessmall", "alltypestiny",
+      "complex_view", "view_view");
 
   // The admin_user has ALL privileges on the server.
   private final static User ADMIN_USER = new User("admin_user");
@@ -1457,22 +1465,19 @@ public class AuthorizationTest {
 
   @Test
   public void TestShowTableResultsFiltered() throws ImpalaException {
-    // The user only has permission on these tables/views in the functional databases.
-    List<String> expectedTbls = Lists.newArrayList("allcomplextypes", "alltypes",
-        "alltypesagg", "alltypessmall", "alltypestiny", "complex_view",
-        "view_view");
-
     List<String> tables = fe_.getTableNames("functional", "*", USER);
-    Assert.assertEquals(expectedTbls, tables);
+    Assert.assertEquals(FUNCTIONAL_VISIBLE_TABLES, tables);
 
     tables = fe_.getTableNames("functional", null, USER);
-    Assert.assertEquals(expectedTbls, tables);
+    Assert.assertEquals(FUNCTIONAL_VISIBLE_TABLES, tables);
   }
 
   @Test
   public void TestShowCreateTable() throws ImpalaException {
     AuthzOk("show create table functional.alltypesagg");
     AuthzOk("show create table functional.alltypes");
+    // Have permissions on view and underlying table.
+    AuthzOk("show create table functional_seq_snap.alltypes_view");
 
     // Unqualified table name.
     AuthzError("show create table alltypes",
@@ -1489,6 +1494,11 @@ public class AuthorizationTest {
     // User has column-level privileges on table
     AuthzError("show create table functional.alltypestiny",
         "User '%s' does not have privileges to access: functional.alltypestiny");
+
+    // Cannot show SQL if user doesn't have permissions on underlying table.
+    AuthzError("show create table functional.complex_view",
+        "User '%s' does not have privileges to see the definition of view " +
+        "'functional.complex_view'.");
   }
 
   @Test
@@ -1501,19 +1511,11 @@ public class AuthorizationTest {
     // Get all tables
     req.get_tables_req.setTableName("%");
     TResultSet resp = fe_.execHiveServer2MetadataOp(req);
-    assertEquals(7, resp.rows.size());
-    assertEquals("allcomplextypes",
-        resp.rows.get(0).colVals.get(2).string_val.toLowerCase());
-    assertEquals("alltypes", resp.rows.get(1).colVals.get(2).string_val.toLowerCase());
-    assertEquals("alltypesagg",
-        resp.rows.get(2).colVals.get(2).string_val.toLowerCase());
-    assertEquals("alltypessmall",
-        resp.rows.get(3).colVals.get(2).string_val.toLowerCase());
-    assertEquals("alltypestiny",
-        resp.rows.get(4).colVals.get(2).string_val.toLowerCase());
-    assertEquals("complex_view",
-        resp.rows.get(5).colVals.get(2).string_val.toLowerCase());
-    assertEquals("view_view", resp.rows.get(6).colVals.get(2).string_val.toLowerCase());
+    assertEquals(FUNCTIONAL_VISIBLE_TABLES.size(), resp.rows.size());
+    for (int i = 0; i < resp.rows.size(); ++i) {
+      assertEquals(FUNCTIONAL_VISIBLE_TABLES.get(i),
+          resp.rows.get(i).colVals.get(2).string_val.toLowerCase());
+    }
 
     // Get all tables of tpcds
     req.get_tables_req.setSchemaName("tpcds");

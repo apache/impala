@@ -22,10 +22,11 @@ import com.cloudera.impala.thrift.TTableName;
 import com.google.common.base.Preconditions;
 
 /**
- * Representation of a SHOW CREATE TABLE statement which returns the "CREATE TABLE ..."
- * string that re-creates the table.
+ * Representation of a SHOW CREATE TABLE statement which returns either the
+ * "CREATE TABLE ..." string that re-creates the table or the "CREATE VIEW ..."
+ * string that re-creates the view as appropriate.
  *
- * Syntax: SHOW CREATE TABLE <table>
+ * Syntax: SHOW CREATE TABLE <table or view>
  */
 public class ShowCreateTableStmt extends StatementBase {
   private TableName tableName_;
@@ -40,13 +41,23 @@ public class ShowCreateTableStmt extends StatementBase {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    if (!tableName_.isFullyQualified()) {
-      tableName_ = new TableName(analyzer.getDefaultDb(), tableName_.getTbl());
-    }
+    tableName_ = analyzer.getFqTableName(tableName_);
     Table table = analyzer.getTable(tableName_, Privilege.VIEW_METADATA);
     if (table instanceof View) {
-      throw new AnalysisException("SHOW CREATE TABLE not supported on VIEW: " +
-          tableName_.toString());
+      View view = (View)table;
+      // Analyze the view query statement with its own analyzer for authorization.
+      Analyzer viewAnalyzer = new Analyzer(analyzer);
+      // Only show the view's query if the user has permissions to execute the query, to
+      // avoid revealing information, e.g. tables the user does not have access to.
+      // Report a masked authorization message if authorization fails.
+      viewAnalyzer.setAuthErrMsg(String.format("User '%s' does not have privileges to " +
+          "see the definition of view '%s'.",
+          analyzer.getUser().getName(), view.getFullName()));
+      QueryStmt viewQuery = view.getQueryStmt().clone();
+      // Views from the Hive metastore may rely on Hive's column naming if the SQL
+      // statement references a column by its implicitly defined column names.
+      viewAnalyzer.setUseHiveColLabels(true);
+      viewQuery.analyze(viewAnalyzer);
     }
   }
 

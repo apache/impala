@@ -22,6 +22,8 @@ import static com.cloudera.impala.common.ByteUnits.TERABYTE;
 
 import java.text.DecimalFormat;
 
+import org.apache.commons.lang3.StringUtils;
+
 /**
  * Utility functions for pretty printing.
  */
@@ -61,9 +63,7 @@ public class PrintUtils {
   public static void printMatrix(boolean[][] matrix, int cellSpacing,
       StringBuilder matrixStr) {
     // Print labels.
-    for (int i = 0; i < cellSpacing; ++i) {
-      matrixStr.append(" ");
-    }
+    matrixStr.append(StringUtils.repeat(' ', cellSpacing));
     String formatStr = "%Xd".replace("X", String.valueOf(cellSpacing));
     for (int i = 0; i < matrix.length; ++i) {
       matrixStr.append(String.format(formatStr, i));
