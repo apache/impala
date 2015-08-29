@@ -431,3 +431,45 @@ where t.x + t.y > 10 and t.x > 0 and t.y > 1
 00:SCAN HDFS [functional.alltypes]
    partitions=24/24 files=24 size=478.45KB
 ====
+# IMPALA-2266: Test non-grouping distinct aggregation inside an inline view.
+select * from (select count(distinct int_col) cd from functional.alltypes) v
+---- DISTRIBUTEDPLAN
+06:AGGREGATE [FINALIZE]
+|  output: count:merge(int_col)
+|
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE
+|  output: count(int_col)
+|
+04:AGGREGATE
+|  group by: int_col
+|
+03:EXCHANGE [HASH(int_col)]
+|
+01:AGGREGATE
+|  group by: int_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====
+# IMPALA-2266: Test grouping distinct aggregation inside an inline view.
+select * from (select count(distinct int_col) cd from functional.alltypes group by bool_col) v
+---- DISTRIBUTEDPLAN
+05:EXCHANGE [UNPARTITIONED]
+|
+02:AGGREGATE [FINALIZE]
+|  output: count(int_col)
+|  group by: bool_col
+|
+04:AGGREGATE
+|  group by: bool_col, int_col
+|
+03:EXCHANGE [HASH(bool_col)]
+|
+01:AGGREGATE
+|  group by: bool_col, int_col
+|
+00:SCAN HDFS [functional.alltypes]
+   partitions=24/24 files=24 size=478.45KB
+====

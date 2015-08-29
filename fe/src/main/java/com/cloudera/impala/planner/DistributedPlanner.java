@@ -136,7 +136,7 @@ public class DistributedPlanner {
       if (((SortNode) root).isAnalyticSort()) {
         // don't parallelize this like a regular SortNode
         result = createAnalyticFragment(
-            (SortNode) root, childFragments.get(0), fragments);
+            root, childFragments.get(0), fragments);
       } else {
         result = createOrderByFragment(
             (SortNode) root, childFragments.get(0), fragments);
@@ -379,7 +379,7 @@ public class DistributedPlanner {
         && node.getJoinOp() != JoinOperator.RIGHT_SEMI_JOIN
         && node.getJoinOp() != JoinOperator.RIGHT_ANTI_JOIN
         && (perNodeMemLimit == 0
-            || Math.round((double) rhsDataSize * PlannerContext.HASH_TBL_SPACE_OVERHEAD)
+            || Math.round(rhsDataSize * PlannerContext.HASH_TBL_SPACE_OVERHEAD)
                 <= perNodeMemLimit)
         && (node.getDistributionModeHint() == DistributionMode.BROADCAST
             || (node.getDistributionModeHint() != DistributionMode.PARTITIONED
@@ -828,8 +828,7 @@ public class DistributedPlanner {
       node.unsetLimit();
       mergeFragment = createParentFragment(mergeFragment, DataPartition.UNPARTITIONED);
       mergeAggInfo = node.getAggInfo().getMergeAggInfo();
-      mergeAggNode =
-          new AggregationNode(ctx_.getNextNodeId(), node.getChild(0), mergeAggInfo);
+      mergeAggNode = new AggregationNode(ctx_.getNextNodeId(), node, mergeAggInfo);
       mergeAggNode.init(ctx_.getRootAnalyzer());
       // Transfer having predicates. If hasGrouping == true, the predicates should
       // instead be evaluated by the 2nd phase agg (the predicates are already there).
